@@ -18,14 +18,17 @@ import { jumpKinematics } from '@/lib/jump/velocity';
 import { reachStorage, type ReachStorage } from '@/lib/jump/reachStore';
 import type { Decoder } from '@/lib/jump/slowmoDecode';
 
-export function JumpMore({ adult, bestHeightCm, plusMinusCm, decode, storage, t5 = null, pilot, onExport }: {
+export function JumpMore({ adult, bestHeightCm: bestIn, plusMinusCm: pmIn, decode, storage, t5: t5In = null, pilot, onExport, hideLive = false }: {
   adult: boolean; bestHeightCm: number | null; plusMinusCm?: number | null; decode?: Decoder; storage?: ReachStorage | null;
   /** JUMP-TESTS: the live check's read (its jumps' take-off speed; "keep today's jump check"; the pilot log). */
   t5?: T5Extra | null;
   /** The pilot panel's switch, for the probe; the app leaves it to the build flag. */
   pilot?: boolean;
   onExport?: (name: string, text: string) => void;
+  /** MIRROR-TRUST-RATING: a Low jump hides its number — no best height, no ± and no live read (t5) reach the cards below. */
+  hideLive?: boolean;
 }) {
+  const t5 = hideLive ? null : t5In, bestHeightCm = hideLive ? null : bestIn, plusMinusCm = hideLive ? null : pmIn;
   const kin = useMemo(() => new Map((t5?.jumps ?? []).filter((j) => j.valid).map((j) => [j.index, jumpKinematics(j, { countermovement: true })])), [t5]);
   if (!adult) return null;
   const store = storage === undefined ? reachStorage() : storage;

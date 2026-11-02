@@ -129,6 +129,29 @@ What that means for the plan: every "today" a gate cites from [R] is read by **t
 instrument and seed (each brief says how), so no phase starts without its baseline. The numbers that already exist
 ([H2], [C], [M]) are enough to rank the gaps.
 
+### 3c. Phase 3 (rivals that play basketball, lane/hoops-p03-rivals) — before → after
+
+Headless possession sim (`scripts/probes/hoops-gap/rival-sim.mts`, the real brains and modules against the rig's scripted defender,
+seed 7, 300 rival possessions a tier; before = `hoops.rivalKitOn` / `hoops.teamOffenseOn` 0, the release's script exactly):
+
+| bar | 1v1 PRO | 3v3 PRO |
+|---|---|---|
+| A3 distinct rival actions per 10 possessions (min) | 5.33 (3) → 9.9 (7) | 3.0 (3) → 9.7 (9) |
+| A3 entropy of the mix, bits (min) | 2.16 (1.53) → 3.07 (2.33) | 1.40 (1.23) → 3.07 (2.77) |
+| A3 ROOKIE vs ELITE action mix (total-variation distance) | 0.013 → 0.40 | 0.005 → 0.43 |
+| A4 rival possession median | 2.42 → 2.65 s | 0.78 → 7.38 s (ELITE 7.38, ROOKIE 5.68) |
+| A6 ≥ 1 screen or ≥ 2 passes | — | 0 % → 75 % (ELITE 83 %, ROOKIE 38 %) |
+| M5 driver root accel p99 | 33 → 33 m/s² | 154 → 33 m/s² |
+| make rate, jumper | 7.6 → 6.7 % | 24.3 → 25.9 % |
+| make rate, layup | 74.0 → 65.8 % (n 20 → 24) | n/a (the sim's bot blocked every scripted layup) → 39.3 % |
+
+The rig (`after/poss-*.json`, PRO): 1v1 possessions throw spin / crossover / hesitation / in-and-out / behind / step-back; 3v3 possessions
+run 12.6, 4.7, 7.0, 6.5 and 7.4 s with probes, a called and set screen, and a swing. The 1v1 layup rate moved because the kit makes a shot
+the script never took — a layup with the man he just beat on his hip; `rivalShotPct` / `rivalReleasePct` are untouched.
+On the rig the root accel p99 over one recorded 3v3 rival possession (`poss-threevthree-pro-s15-m2.json`) reads: the handler 59.8, the
+screener 99.6, the third man 33.0 and my mates 33.1 / 36.3 m/s² (release game, every foe: 122–137). Only bodies that touched someone are
+over 34. The movers are capped at 33; the rest is the contact separation pushing roots (`BodySeparation`, phase 7's single standoff).
+
 ## 4. Ranked gaps
 
 Ranked by what the owner feels first × how far from the bar. "Shared" = touches one of the shared hoops files.

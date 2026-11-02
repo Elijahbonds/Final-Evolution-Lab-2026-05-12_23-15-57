@@ -58,7 +58,7 @@ export const BASKETBALL: Family[] = [
       { name: 'Between-the-Legs Dribble', v: 'between', level: 'intermediate', cue: 'Bounce the ball hard between the feet on the floor, front to back.' },
       { name: 'Behind-the-Back Dribble', v: 'behind', level: 'intermediate', cue: 'Wrap the ball behind your belt line and bounce it to the other side.' },
       { name: 'In-and-Out Dribble', v: 'in-out', level: 'intermediate', cue: 'Fake the crossover with the ball, then push it back out on the same side.' },
-      { name: 'Hesitation Dribble', v: 'hesi', level: 'intermediate', cue: 'Slow the ball for a beat, eyes to the target, then explode past the cone.' },
+      { name: 'Hesitation Dribble', v: 'hesi', level: 'intermediate', cue: 'Slow the ball for a beat, eyes to the target, then burst past the cone.' },
       { name: 'Retreat Dribble', v: 'retreat', level: 'intermediate', cue: 'Two hard dribbles backward away from the cone, ball shielded, eyes up.' },
       { name: 'Two-Ball Pound Dribble', v: 'two-ball-pound', level: 'intermediate', ladder: 'two-ball', setup: 'A ball in each hand, athletic stance.', cue: 'Both balls hit the floor at the same time, hard and low.' },
       { name: 'Two-Ball Alternating Dribble', v: 'two-ball-alt', level: 'advanced', ladder: 'two-ball', setup: 'A ball in each hand, athletic stance.', cue: 'Alternate the balls like a drum beat on the floor, one up, one down.' },

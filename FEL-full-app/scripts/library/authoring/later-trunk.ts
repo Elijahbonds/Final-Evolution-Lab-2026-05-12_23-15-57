@@ -81,7 +81,7 @@ const ROLLOUTS: readonly [string, string, number, string, Variant['equipment']][
 // ── med-ball throws: throw × stance ───────────────────────────────────────────────────────────────────────────────
 
 const THROWS: readonly [string, string, number, string, Variant['pattern']][] = [
-  ['Chest Pass Throw', 'chest', 0, 'Step and snap the ball off the chest into the wall, as fast as you can.', 'push'],
+  ['Chest Pass Throw', 'chest', 0, 'Step and snap the ball off the chest into the wall, quick and crisp.', 'push'],
   ['Overhead Throw', 'overhead', 0, 'Ball overhead, step and throw it down hard into the wall.', 'push'],
   ['Rotational Scoop Toss', 'scoop', 1, 'Load the back hip, then turn and scoop the ball into the wall, fast.', 'rotation'],
   ['Rotational Shot Put', 'shot-put', 1, 'Ball at the shoulder, turn and push it into the wall like a shot put.', 'rotation'],
@@ -161,7 +161,7 @@ export const LATER_TRUNK: Family[] = [
     primary: ['obliques', 'glutes'], secondary: ['chest', 'delts', 'deep-core'], goals: ['power'], sport: ['general', 'basketball', 'football', 'tennis', 'volleyball'],
     lowLoad: ['knee'], equipment: ['medicine-ball', 'wall'], clip: 'throw',
     setup: 'Face or stand side-on to a solid wall, a medicine ball at the chest.',
-    cues: ['Throw it as fast as you can into the wall.', 'The floor push starts the throw; the arms finish it.', 'Catch it, reset, and throw again: every rep fast.'],
+    cues: ['Throw it quick and crisp into the wall.', 'The floor push starts the throw; the arms finish it.', 'Catch it, reset, and throw again: every rep fast.'],
     faults: [
       { fault: 'Arm-only throws', fix: 'Push the floor first, then let the turn and the arms follow.' },
       { fault: 'Slowing down over the set', fix: 'Stop the set when the ball stops hitting the wall hard.' },

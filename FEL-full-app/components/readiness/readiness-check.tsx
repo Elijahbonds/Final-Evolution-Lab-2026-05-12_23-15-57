@@ -18,13 +18,19 @@ import { poseService } from '@/lib/pose/PoseService';
 import { MirrorWakeLock, type WakeLockApiLike } from '@/lib/mirror/liveCamera';
 import { localDayKey } from '@/lib/health/readiness';
 import { ReadinessCapture, type CaptureView } from '@/lib/coach/readiness/capture';
-import { HOW_LINE, NOT_A_DIAGNOSIS, NOT_SAVED_LINE, ONE_A_DAY_LINE, BAND_LABEL } from '@/lib/coach/readiness/copy';
+import { NOT_A_DIAGNOSIS, NOT_SAVED_LINE, ONE_A_DAY_LINE, BAND_LABEL } from '@/lib/coach/readiness/copy';
 import { deviceStorage, keepDeviceCheck, readDeviceHistory } from '@/lib/coach/readiness/deviceHistory';
 import { JUMPS_ASKED } from '@/lib/coach/readiness/thresholds';
 import type { PriorCheck, ReadinessBand } from '@/lib/coach/readiness/types';
 import { readDay, viewOf, type CoachRuleCtx, type ReadinessView, type TrendPoint } from '@/lib/coach/readiness/view';
 import { SelfView } from '@/components/games/body-play';
 import { ReadinessTrend } from './readiness-trend';
+// TOOLS-EASY (2026-10-28): the shared setup card over the camera, the one voice, and each refused jump's reason and fix
+import { JumpTakeHud } from '@/components/tools-easy/jump-take-hud';
+import { useOneVoice } from '@/components/tools-easy/use-one-voice';
+import { SetupReader, type SetupWord } from '@/lib/tools-easy/setup';
+import { READINESS_HOW, START_CAMERA, STOP_AND_READ, TAKE_STAND_LINE } from '@/lib/tools-easy/copy';
+import { SetupPicture } from '@/components/vertical/setup-picture';
 import { BAND_STYLE } from './band';
 import { readinessView } from '@/lib/results/readiness';
 import { RESULT_COPY } from '@/lib/results/copy';
@@ -46,7 +52,9 @@ export function ReadinessCheck({ api = READINESS_API }: { api?: string }) {
   const [ctx, setCtx] = useState<Ctx | null>(null);
   const [phase, setPhase] = useState<Phase>('intro');
   const [feel, setFeel] = useState<number | null>(null);
-  const [live, setLive] = useState<CaptureView>({ step: 'stand', jumps: 0, why: null });
+  const [live, setLive] = useState<CaptureView>({ step: 'stand', jumps: 0, why: null, refusal: null, say: null });
+  const [setup, setSetup] = useState<SetupWord | null>(null);
+  const voice = useOneVoice('readiness');
   const [why, setWhy] = useState<string | null>(null);
   const [view, setView] = useState<ReadinessView | null>(null);
   const [kept, setKept] = useState<'server' | 'device' | 'none' | null>(null);
@@ -78,6 +86,7 @@ export function ReadinessCheck({ api = READINESS_API }: { api?: string }) {
   const finish = useCallback(async () => {
     const c = cap.current;
     release();
+    voice.hush();
     if (!c) return;
     setPhase('reading');
     const r = c.finish();
@@ -99,7 +108,7 @@ export function ReadinessCheck({ api = READINESS_API }: { api?: string }) {
     setView(v); setKept(ok ? 'device' : 'none');
     setTrend(readDeviceHistory(store).slice().reverse().map((x) => ({ day: x.day, bestCm: x.bestCm, band: x.band })));
     setPhase('result');
-  }, [api, ctx, release, today]);
+  }, [api, ctx, release, today, voice]);
 
   const start = useCallback(async () => {
     setWhy(null); setView(null);
@@ -114,25 +123,35 @@ export function ReadinessCheck({ api = READINESS_API }: { api?: string }) {
     const c = new ReadinessCapture({ aspect: cam && cam.height ? cam.width / cam.height : 4 / 3, cameraFps: cam?.frameRate ?? null });
     cap.current = c;
     let done = false;
+    const reader = new SetupReader('front');
+    let shownWord = '', saidId = 0;
+    voice.say(TAKE_STAND_LINE);
     off.current.push(svc.onFrame((fr) => {
       if (done) return;
-      const v = c.push({ t: fr.t, present: fr.present, image: fr.present ? fr.image.map((l) => ({ x: l.x, y: l.y, z: l.z, v: l.v })) : [], ...(fr.world ? { world: fr.world } : {}) });
+      const f = { t: fr.t, present: fr.present, image: fr.present ? fr.image.map((l) => ({ x: l.x, y: l.y, z: l.z, v: l.v })) : [], ...(fr.world ? { world: fr.world } : {}) };
+      const v = c.push(f);
       setLive(v);
+      if (v.step === 'stand') {
+        const w = reader.push(f);
+        if (w.word !== shownWord) { shownWord = w.word; setSetup(w); if (!w.ready) voice.say(w.word); }
+      }
+      if (v.say && v.say.id !== saidId) { saidId = v.say.id; voice.say(v.say.text); }
       if (v.step === 'done') { done = true; void finish(); }
     }));
-    setLive({ step: 'stand', jumps: 0, why: null });
+    setLive({ step: 'stand', jumps: 0, why: null, refusal: null, say: null });
+    setSetup(null);
     setPhase('live');
-  }, [finish]);
+  }, [finish, voice]);
 
   const doneToday = !!ctx?.today && phase === 'intro' && !view;
-  const caption = live.step === 'stand' ? (live.why ?? 'Hold still, hands on hips…') : live.step === 'jump' ? `Jump ${Math.min(live.jumps + 1, JUMPS_ASKED)} of ${JUMPS_ASKED}` : 'Reading your jumps…';
 
   if (ctx && !ctx.ok) return null;
   return (
     <div className="space-y-4" data-readiness-check>
       <div className={`fel-card space-y-2 rounded-xl p-4 ${phase === 'live' || phase === 'starting' || phase === 'result' ? 'hidden' : ''}`}>
         <div className="text-[12px] uppercase tracking-wider text-fel-dim">Daily readiness · 30 seconds</div>
-        <p className="text-sm text-white/75">{HOW_LINE}</p>
+        {/* TOOLS-EASY: where the phone goes, as a picture, and one short line (was HOW_LINE, 25 words) */}
+        <div className="flex items-center gap-3" data-readiness-how><SetupPicture className="h-14 w-auto shrink-0" /><p className="text-sm text-white/75">{READINESS_HOW}</p></div>
         <p className="text-xs text-fel-dim">{NOT_A_DIAGNOSIS}</p>
         {ctx && ctx.coaches.length > 0 && (
           <ul className="space-y-0.5 text-xs text-white/55" data-readiness-rules>
@@ -166,12 +185,7 @@ export function ReadinessCheck({ api = READINESS_API }: { api?: string }) {
         {/* Z-P4-4: the camera picture is shown in one place only, SelfView */}
         <SelfView className="absolute inset-0 h-full w-full rounded-none" style={{ aspectRatio: 'auto' }} />
         {phase === 'live' && (
-          <div className="absolute inset-x-3 top-3 rounded-lg bg-black/65 px-3 py-2 text-center text-white" aria-live="polite" data-readiness-caption>
-            <div className="text-lg font-black">{caption}</div>
-            <div className="mt-1 flex justify-center gap-1.5" aria-hidden>
-              {Array.from({ length: JUMPS_ASKED }, (_, i) => <span key={i} className={`h-2 w-6 rounded-full ${i < live.jumps ? 'bg-[#00FF9D]' : 'bg-white/25'}`} />)}
-            </div>
-          </div>
+          <div data-readiness-caption><JumpTakeHud v={{ ...live, asked: JUMPS_ASKED }} setup={setup} /></div>
         )}
       </div>
 
@@ -180,13 +194,13 @@ export function ReadinessCheck({ api = READINESS_API }: { api?: string }) {
       {phase !== 'result' && !doneToday && (
         phase === 'live' ? (
           <button type="button" onClick={() => void finish()} data-readiness-stop className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 font-bold text-black">
-            <Square className="h-4 w-4" /> Stop and read what I did
+            <Square className="h-4 w-4" /> {STOP_AND_READ}
           </button>
         ) : (
           <button type="button" onClick={() => void start()} disabled={!ctx || phase === 'starting' || phase === 'reading'} data-readiness-start
             className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#00E5FF] px-4 font-bold text-black disabled:opacity-50">
             {phase === 'starting' || phase === 'reading' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-            {phase === 'reading' ? 'Reading…' : 'Start the jump check'}
+            {phase === 'reading' ? 'Reading…' : START_CAMERA}
           </button>
         )
       )}
