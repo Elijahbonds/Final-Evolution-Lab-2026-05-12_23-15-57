@@ -27,6 +27,7 @@ import { hairCover, resolveHair } from '../../creator/look/hair';
 import { eyeParams } from '../creator/eyes/eyeTexture';
 import { RawTexture } from '@babylonjs/core';
 import { signedOutVisitor } from './visitor';
+import { takeHeroBodyRead } from './heroBodyRead';
 
 type TintMat = Material & { albedoColor?: Color3; diffuseColor?: Color3; bumpTexture?: { dispose(): void } | null };
 
@@ -120,7 +121,7 @@ export async function resolveIdentity(force = false): Promise<PlayerIdentity> {
     // FIRST-DUNK-BUDGET: a visitor the host knows is signed out is not asked (a guest's closet is a 401, and null is what a 401 gave).
     const [closet, heroBody] = await Promise.all([
       signedOut ? null : fetch('/api/v1/closet?for=spawn').then((r) => (r.ok ? r.json() : null)).catch(() => null),
-      fetch('/api/v1/hero-body').then((r) => (r.ok ? r.json() : null)).catch(() => null) as Promise<HeroBodyAnswer | null>,
+      takeHeroBodyRead(),   // DEMO-SPEED: the library stage's early read when one is fresh (heroBodyRead.ts), else this read's own
     ]);
     // TEENS (owner decision 2026-10-06, "Every mode, device only"): a lookLocal player's row holds only the catalog
     // defaults, so their look comes from the device copy — read here, never sent anywhere (lib/creator/look/slots.ts).

@@ -13,6 +13,7 @@
 // between (the perf guard and the agent bridge after the scene; nothing between the camera and the rig) runs in the hooks at
 // the same point. lookStack.test.ts holds the order.
 
+import { releaseParkedStage } from './parkedStage';
 import { Scene, TargetCamera, Vector3 } from '@babylonjs/core';
 import type { AbstractEngine, Camera } from '@babylonjs/core';
 import { createEngine } from './createEngine';
@@ -64,6 +65,8 @@ export interface LookStack {
 
 /** Mount the look stack. Each caller disposes the pieces in its own teardown order (the harness's is long and ordered). */
 export async function mountLookStack(o: LookStackOpts): Promise<LookStack> {
+  // DEMO-SPEED-2 (coordinator 2026-10-28): a parked exercise-demo stage gives its engine and body back before a mode builds
+  releaseParkedStage();
   const engine = o.engine ?? await createEngine(o.canvas!);
   // M95 (Pass 2): cap DPR + backing pixels; Ship pass: the tier is decided once, from the same fill-rate signal
   const fit = o.engine || !o.canvas ? null : applyCanvasFit(engine, o.canvas);
