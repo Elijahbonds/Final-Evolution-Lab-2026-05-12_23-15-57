@@ -347,7 +347,11 @@ function analyze(mode, rec, S) {
       for (let k = i - 5; k <= i + 5 && min; k++) { const yk = play[k].j?.[fi]?.[1]; if (yk != null && yk < y - 1e-6) min = false; }
       if (!min) continue; const a = play[i - 1], b2 = play[i + 1]; if (!a.r || !b2.r || !a.j?.[fi] || !b2.j?.[fi]) continue;
       const dtt = Math.max(1e-3, b2.t - a.t); const rv = Math.hypot(b2.r[0] - a.r[0], b2.r[2] - a.r[2]) / dtt; if (rv < 0.8 || rv > 15) continue;
-      const v = Math.hypot(b2.j[fi][0] - a.j[fi][0], b2.j[fi][2] - a.j[fi][2]) / dtt; cv.push(v); cr.push(v / rv);
+      // the SLOWEST the foot gets around that low point (±4 frames): a planted foot reaches ~0 somewhere in its stance, a
+      // skating one never drops under the body's speed (the low point alone can land on heel-strike or toe-off)
+      let v = Infinity;
+      for (let k = Math.max(1, i - 4); k <= Math.min(play.length - 1, i + 4); k++) { const p0 = play[k - 1].j?.[fi], p1 = play[k].j?.[fi]; const dk = play[k].t - play[k - 1].t; if (p0 && p1 && dk > 1e-4) v = Math.min(v, Math.hypot(p1[0] - p0[0], p1[2] - p0[2]) / dk); }
+      if (!isFinite(v)) continue; cv.push(v); cr.push(v / rv);
     }
     out.contacts = cv.length; out.contactSlideMed = r2(med(cv)); out.contactSlideRatio = r2(med(cr));
     // through the floor: the toes below the hero's own root height (a grounded hero stands at its root)
