@@ -92,6 +92,9 @@ describe('the wiring (source)', () => {
   it('the stage renders on demand and says its tier; the pad comes through the input layer, not the input bus', () => {
     expect(preview).toMatch(/if \(!stage\.gate\.due\(\)\) return;\s*scene\.render\(\);/);
     expect(preview).toContain('(scene.metadata ??= {}).felTier = tier;');
+    // DEMO-SPEED-3: the tier is the screen's (tierRule deviceTierDecision), never the preview canvas's box (detectQualityTier(box…))
+    expect(preview).toMatch(/const screenTier = deviceTierDecision\(\)\.tier;/);
+    expect(preview).not.toMatch(/detectQualityTier\(/);
     expect(preview).toContain("await import('@/lib/input/profiles')");
     expect(preview).not.toMatch(/InputBus/);
     expect(preview).not.toMatch(/attachControl/);   // the Studio owns its gestures (tap vs spin vs drag)

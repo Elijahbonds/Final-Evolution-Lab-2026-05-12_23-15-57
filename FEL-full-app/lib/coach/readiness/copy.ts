@@ -82,7 +82,7 @@ export function ruleLine(r: { kind: RuleKind; dropPct: number; action: RuleActio
   return `When ${when}: ${then}.${r.source === 'default' ? ' (default)' : ''}`;
 }
 
-export const ADULTS_ONLY_LINE = 'The jump check is for 18 and over for now. Your coach and your plan are unchanged.';
+export const ADULTS_ONLY_LINE = 'The readiness check is for 18 and over for now. Your coach and your plan are unchanged.';
 export const NOT_SAVED_LINE = 'Kept on this phone only: turn on saving your movement numbers (Profile) to keep your history across devices and share it with your coach.';
 export const ONE_A_DAY_LINE = 'Today\'s check is in. One a day keeps your normal honest; come back tomorrow.';
 export const NOT_A_DIAGNOSIS = 'A camera estimate of your jump against your own normal. It does not say why.';
