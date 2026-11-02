@@ -100,7 +100,9 @@ const SPORT_WORDS: readonly [string, RegExp][] = [
 ];
 
 const equipmentWords: readonly [string, RegExp][] = EQUIPMENT.filter((e) => !['other', 'wall', 'mat', 'towel', 'hoop', 'basketball', 'step', 'cone', 'strongman'].includes(e.id)).map((e) => {
-  const names = [e.label, ...e.aliases].map((n) => fold(n).replace(/\s+/g, ' ').replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  // PROGRAM-ASK (2026-11-02): a plural alias loses its "s" before the optional one is added, so the singular matches too
+  // ("all I have is a band": the alias "bands" used to become "bandss?" and the question read no equipment at all)
+  const names = [e.label, ...e.aliases].map((n) => fold(n).replace(/\s+/g, ' ').replace(/s$/, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
   return [e.id, new RegExp(`\\b(?:${names.map((n) => `${n}s?`).join('|')})\\b`)] as [string, RegExp];
 });
 
@@ -110,7 +112,7 @@ const equipmentWords: readonly [string, RegExp][] = EQUIPMENT.filter((e) => !['o
  * the traps muscle and returned snatch and clean deadlifts for "trap bar deadlift").
  */
 const equipmentNames: readonly [string, RegExp][] = EQUIPMENT.filter((e) => !['other', 'wall', 'mat', 'towel', 'hoop', 'basketball', 'step', 'cone', 'strongman'].includes(e.id))
-  .flatMap((e) => [e.label, ...e.aliases].map((n) => [e.id, fold(n).replace(/\s+/g, ' ')] as [string, string]))
+  .flatMap((e) => [e.label, ...e.aliases].map((n) => [e.id, fold(n).replace(/\s+/g, ' ').replace(/s$/, '')] as [string, string]))
   .sort((a, b) => b[1].length - a[1].length)
   .map(([id, n]) => [id, new RegExp(`\\b${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}s?\\b`)] as [string, RegExp]);
 

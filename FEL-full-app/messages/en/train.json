@@ -29,6 +29,10 @@
       "lineBlocks": "Your blocks and sessions.",
       "lineNone": "No coach yet. An invite link brings their plan."
     },
+    "build": {
+      "title": "Build my program",
+      "line": "Tell it what you have. Get a full plan."
+    },
     "signature": {
       "title": "Signature programs"
     },

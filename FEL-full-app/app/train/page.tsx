@@ -1,6 +1,6 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
-import { Activity, ArrowUpFromLine, BookOpen, ClipboardList, Dumbbell, Footprints, Gauge, Layers, Library, UtensilsCrossed, Users, ScanLine, Timer } from 'lucide-react';
+import { Activity, ArrowUpFromLine, BookOpen, ClipboardList, Dumbbell, Footprints, Gauge, Layers, Library, UtensilsCrossed, Users, ScanLine, Timer, Wand2 } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
 import { FULL_SCREEN_HREF } from '@/lib/screen-easy/door';
 import { loginPath } from '@/lib/auth/safeNext';
@@ -104,6 +104,12 @@ export default async function TrainPage() {
     {
       href: '/training', group: 'program' as Group, icon: ClipboardList, accent: PALETTE.cyan, title: t('train.cards.programming.title'),
       line: coachLink?.coach?.name ? t('train.cards.programming.lineCoach', { name: coachLink.coach.name }) : t(programCount > 0 ? 'train.cards.programming.lineBlocks' : 'train.cards.programming.lineNone'),
+    },
+    {
+      // PROGRAM-ASK (2026-11-02): "Build my program" — say what you have and want, get a full plan built from the library
+      // (lib/program-ask). The card reads nothing; the page reads the account's age rules on the server.
+      href: '/train/build', group: 'program' as Group, icon: Wand2, accent: PALETTE.cyan, title: t('train.cards.build.title'),
+      line: t('train.cards.build.line'),
     },
     {
       // SIGNATURE-PROGRAMS (2026-10-25): approved programs only (lib/signature/access.ts); the list shows the athlete's week

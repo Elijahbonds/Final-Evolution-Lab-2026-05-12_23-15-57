@@ -16,6 +16,7 @@ import { youthRules } from '@/lib/coach/taxonomy';
 import { createCatalogueItem, type CatalogueDb } from '@/lib/coach/catalogueServer';
 import { nameKey as catalogueNameKey } from '@/lib/coach/catalogue';
 import { answerAsk } from './ask/answer';
+import { wantsProgram } from '@/lib/program-ask/request';
 import { libraryToCatalogue, catalogueToSubmission, submissionToEntry } from './bridge';
 import { demoFor, muscleMap } from './demo';
 import { loadLibraryFiles } from './files';
@@ -162,6 +163,9 @@ export async function askLibrary(viewer: LibraryViewer, question: string, ai: ((
     question: a.parsed.question, chips: a.chips, filters: a.filters, text: a.parsed.text, relation: a.parsed.relation, intent: a.parsed.intent,
     results: a.results.map(toCard), total: a.total, plan: a.plan?.map((p) => ({ slot: p.slot, minutes: p.minutes, entry: toCard(p.entry) })) ?? null,
     anchor: a.anchor ? { id: a.anchor.id, name: a.anchor.name } : null, safety: a.safety, relaxed: a.relaxed, ai: a.ai, didYouMean: a.didYouMean,
+    // PROGRAM-ASK (2026-11-02): a question that asks for a whole program also gets the door to Build my program (never
+    // for a pain or injury question: that answer is the safety lines and general prehab only)
+    program: !a.safety && wantsProgram(question) ? { href: `/train/build?q=${encodeURIComponent(question.slice(0, 400))}` } : null,
   };
 }
 
