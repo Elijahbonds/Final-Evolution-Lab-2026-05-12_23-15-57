@@ -8,7 +8,7 @@
 //   · on idle, by a page that WILL show a demo (avatar-demo.tsx warmAvatarDemo, from use-auto-open.ts) — never on a
 //     data-saver connection (navigator.connection.saveData): a demo the person has not reached yet is a speculative
 //     download, and save-data says no to those. The demo itself still loads when it opens.
-// The file it asks for is the one CharacterLibrary will load: heroBody's urlForHeroBody + scanUrlForTier (one rule), with
+// The file it asks for is the one CharacterLibrary will load: heroBody's urlForHeroBody + bodyUrlForTier (one rule), with
 // the tier from tierRule's deviceTierDecision (the stage stamps the same decision on its scene). The hero-body read is
 // handed on to the spawn's identity read (heroBodyRead.ts), so the server is asked once.
 //
@@ -17,12 +17,12 @@
 //
 // No Babylon in this file or anything it imports (lib/assess/replay.test.ts walks the drill surfaces' imports).
 import { readHeroBodyEarly } from '@/lib/babylon/core/heroBodyRead';
-import { SCAN_BODY_MOBILE_URL, SCAN_BODY_URL, scanUrlForTier, urlForHeroBody, type HeroBodyKind } from '@/lib/babylon/core/heroBody';
+import { KIT_BODY_MOBILE_URL, KIT_BODY_URL, SCAN_BODY_MOBILE_URL, SCAN_BODY_URL, bodyUrlForTier, urlForHeroBody, type HeroBodyKind } from '@/lib/babylon/core/heroBody';
 import { deviceTierDecision } from '@/lib/babylon/scene/tierRule';
 
 /** The body file a stage on this device spawns, for a body kind and a tier (the rule CharacterLibrary loads by). */
 export function demoBodyUrl(kind: HeroBodyKind | null | undefined, tier: string): string {
-  return scanUrlForTier(urlForHeroBody(kind ?? 'kit-male'), tier);
+  return bodyUrlForTier(urlForHeroBody(kind ?? 'kit-male'), tier);
 }
 
 /** The visitor's data-saver setting (Chrome / Android: navigator.connection.saveData). */
@@ -90,9 +90,14 @@ export function warmDemoBody(): Promise<void> {
   return w.done;
 }
 
-/** The body file a tier-picked URL stands for (the scan's phone file → the scan): what CharacterLibrary.load is asked for,
- *  since it applies the scene's tier itself. */
-export function unscaledBodyUrl(url: string): string { return url === SCAN_BODY_MOBILE_URL ? SCAN_BODY_URL : url; }
+/** The body file a tier-picked URL stands for (a phone file → its full file): what CharacterLibrary.load is asked for,
+ *  since it applies the scene's tier itself (and falls back to the full file if the phone file will not load). */
+export function unscaledBodyUrl(url: string): string {
+  if (url === SCAN_BODY_MOBILE_URL) return SCAN_BODY_URL;
+  if (url === KIT_BODY_MOBILE_URL.male) return KIT_BODY_URL.male;
+  if (url === KIT_BODY_MOBILE_URL.female) return KIT_BODY_URL.female;
+  return url;
+}
 
 /** The file the warm-up fetched (null until the server's answer is in, or with no warm-up). For the rig and the tests. */
 export function warmedBodyUrl(): string | null { return warming?.url ?? null; }
