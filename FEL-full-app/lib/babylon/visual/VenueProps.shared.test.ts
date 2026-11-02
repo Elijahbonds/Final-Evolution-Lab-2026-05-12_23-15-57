@@ -4,13 +4,15 @@
 // bus — the same 4.7 MB file behind a symlink) and tent.glb twice (the venue's tents and the dunk's corner tent, two imports).
 // The venue's set and a mode's own copy now share one import per file; the copy is cloned from it as it lands.
 import { readFileSync, existsSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { FreeCamera, NullEngine, Scene, SceneLoader, Vector3 } from '@babylonjs/core';
+import { DracoDecoder, FreeCamera, NullEngine, Scene, SceneLoader, Vector3 } from '@babylonjs/core';
 import type { Mesh } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { copyKitModel, mountVenueProps } from './VenueProps';
 import { VENUE_PROP_SETS } from './venuePropSets';
+import { DRACO_DECODER_URLS } from './meshyProps';
 
 const glb = (url: string): string | null => {
   const f = path.resolve('public', url.replace(/^\//, ''));
@@ -20,6 +22,12 @@ const glb = (url: string): string | null => {
 afterEach(() => { vi.restoreAllMocks(); });
 
 function stage() {
+  // hoopbus.glb is Draco (HOOPBUS-SWAP): Node has no Worker, so decode in-thread from the repo's own decoder, as meshyProps.draco.test does
+  const require = createRequire(import.meta.url);
+  DracoDecoder.DefaultConfiguration = {
+    ...DRACO_DECODER_URLS, numWorkers: 0,
+    jsModule: require(path.resolve('public', DRACO_DECODER_URLS.wasmUrl.replace(/^\//, ''))), wasmBinary: readFileSync(path.resolve('public', DRACO_DECODER_URLS.wasmBinaryUrl.replace(/^\//, ''))),
+  };
   const scene = new Scene(new NullEngine());
   new FreeCamera('cam', new Vector3(0, 5, -12), scene);
   const asked: string[] = [];

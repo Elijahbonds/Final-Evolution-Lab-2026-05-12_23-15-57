@@ -86,7 +86,7 @@ function calfVariants(): Variant[] {
   const knees: [string, string, number][] = [['Straight-Knee', 'straight', 0], ['Bent-Knee', 'bent', 0]];
   const stances: [string, string, number][] = [['Double-Leg', 'double', 0], ['Single-Leg', 'single', 1]];
   const ranges: [string, string, number, string, Variant['equipment']][] = [
-    ['off a Step', 'step', 1, 'Sink below the edge of the step, slow, then rise as high as you can.', ['step']],
+    ['off a Step', 'step', 1, 'Sink below the edge of the step, slow, then rise up tall.', ['step']],
     ['Isometric Hold', 'iso', 0, 'Rise to halfway and hold still, the floor pressed away.', ['wall']],
     ['with a 3-Second Lower', 'slow', 1, 'Rise up, then lower to the floor on a slow three-count.', []],
   ];
@@ -275,7 +275,7 @@ export const LATER_PREHAB: Family[] = [
     primary: ['calves', 'soleus'], secondary: ['foot'], goals: ['ankle'], sport: ['general', 'basketball', 'volleyball', 'track'],
     lowLoad: ['back', 'shoulder', 'wrist'], equipment: [], clip: 'idle',
     setup: 'Stand tall holding a wall for balance.',
-    cues: ['Rise straight up over the big toe, as high as you can.', 'Smooth both ways, no bounce at the bottom.', 'Heel, big toe, little toe: press all three into the floor.'],
+    cues: ['Rise straight up over the big toe, all the way up.', 'Smooth both ways, no bounce at the bottom.', 'Heel, big toe, little toe: press all three into the floor.'],
     faults: [
       { fault: 'Rolling out onto the little toe', fix: 'Rise straight up over the big toe.' },
       { fault: 'Bouncing at the bottom', fix: 'Pause at the bottom, then rise smooth.' },

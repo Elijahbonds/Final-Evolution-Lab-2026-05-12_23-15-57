@@ -4,9 +4,11 @@
 // view, the lane page, the privacy page and the tests all render these.
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { AlertOctagon, AlertTriangle, ArrowLeft, CheckCircle2, CircleDashed, Users } from 'lucide-react';
+import { AlertOctagon, AlertTriangle, ArrowLeft, CheckCircle2, CircleDashed, Eye, EyeOff, Users } from 'lucide-react';
 import { BAND_WORDS, type BandWord } from '@/lib/screen/PROPOSED-thresholds';
-import { EARLY_VERSION, EARLY_VERSION_LINE, PARENT_BODY, PARENT_TITLE, STOP_LINE } from '@/lib/screen/copy';
+import { EARLY_VERSION, EARLY_VERSION_LINE, PARENT_BODY, PARENT_TITLE, STOP_LINE, TRUST_REASON_LINES, TRUST_WORDS } from '@/lib/screen/copy';
+import { tr } from '@/lib/screen/PROPOSED-trust';
+import type { TrustLevel, TrustReason } from '@/lib/screen/trust-rows';
 import { SCREEN_HOME } from '@/lib/screen/routes';
 import { SYSTEM_FONT_STACK } from '@/lib/screen/font';
 
@@ -28,6 +30,29 @@ export function BandChip({ band, size = 'md' }: { band: BandWord | null; size?: 
       <span data-band-word>{word}</span>
     </span>
   );
+}
+
+/**
+ * MIRROR-TRUST-RATING: how clearly the camera saw it, as a word and a colour beside the band (never in place of it).
+ * High takes the band-green token, Medium amber, Low grey, so Low can never be read as a Red band.
+ */
+export const TRUST_COLOUR: Record<TrustLevel, string> = { high: BAND_COLOUR.green, medium: BAND_COLOUR.yellow, low: BAND_COLOUR.unread };
+
+export function TrustChip({ level }: { level: TrustLevel; reasons?: readonly TrustReason[] }) {
+  const Icon = level === 'low' ? EyeOff : Eye;
+  return (
+    <span data-trust={level} data-colour={TRUST_COLOUR[level]} className="inline-flex items-center gap-1.5 text-[16px] font-bold" style={{ color: TRUST_COLOUR[level] }}>
+      <Icon aria-hidden className="h-4 w-4" />
+      <span data-trust-word>{TRUST_WORDS[level]}</span>
+    </span>
+  );
+}
+
+/** Medium and Low add one line: the level and its first reasons (all are kept; the register says how many show). High adds none. */
+export function TrustReasonLine({ level, reasons }: { level: TrustLevel; reasons: readonly TrustReason[] }) {
+  if (level === 'high' || !reasons.length) return null;
+  const shown = reasons.slice(0, tr('trust.reasonsShown')).map((r) => TRUST_REASON_LINES[r]).join('; ');
+  return <p data-trust-reason className="mt-0.5 text-[16px] leading-snug text-white/70">{`${TRUST_WORDS[level]}: ${shown}.`}</p>;
 }
 
 /**

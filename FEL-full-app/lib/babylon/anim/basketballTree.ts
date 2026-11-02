@@ -21,6 +21,7 @@ import { rateFor, StrideRateFilter, strideRef } from '../core/StrideMatch';
 import { boneNode, findBone } from './boneLookup';
 import { moveFadeSec } from '../core/HandleSystem';   // F4: one turbo crossover fade, the same number doMove uses
 import { MOVE_LEGS_BEAT, type MoveLegs } from './moveLegs';   // H2: the legs keep running under a handle move
+import { feel } from '../../feel-panel/feel';   // AF-11: the anim.holdLast knob (default off)
 import { protectClip, protectDribbles, restTempoFor } from './RestDribble';   // lane/h3-handler (#312 port): the dribble at rest
 
 // ── Blend tree ─────────────────────────────────────────────────────────────
@@ -231,11 +232,25 @@ function withoutTrigger(i: AnimTreeInput, state: BasketballAnimState): AnimTreeI
 /** States that may cut a beat in flight. */
 const PRIORITY = new Set<BasketballAnimState>(['floor', 'contact_stagger', 'dunk']);
 
+/** AF-11 (ANIM-FEEL-SPEC 2026-10-28): feel knob `anim.holdLast` default — 0 = off (both states loop, exactly as before), 1 = on. */
+export const ANIM_HOLD_LAST_ON = 0;
+/** AF-11: the states that, with the knob on, play their clip ONCE and hold its last frame while the state lasts (no wrap: the
+ *  jumpshot's wrap jumped 173° with a 4 cm hips pop — ANIM-CLIP-AUDIT:48). The clip table
+ *  (CLIP_FOR) is untouched: the knob changes how these rows PLAY, not what they are. */
+// DEFERRED TO AF-11b: 'gather' is NOT in this set — chooseBasketballClip has no path to the 'gather' state, so the tree never
+// plays it, and 1v1's gather telegraph runs through foeAnimTree.hold(SPORT_CLIP.dunkChargeGather) (OneVOneMode.ts:2317), which this
+// knob does not touch. Only the shot holds today.
+export const HOLD_LAST_STATES: ReadonlySet<BasketballAnimState> = new Set<BasketballAnimState>(['shot_release']);
+/** AF-11: is the hold-last-frame knob on? */
+export function holdLastOn(): boolean { return feel('anim.holdLast', ANIM_HOLD_LAST_ON) >= 0.5; }
+
 export interface TreeBeatOpts { fadeSec?: number; speedRatio?: number; onSettle?: () => void; /** Sit in this loop after the beat until the mode calls release() (a knockdown → the floor). */ settleTo?: { clip: string; fadeSec?: number; speedRatio?: number };
   /** BIOMECH-HOOPS-WAVE1: HOLD the beat's last frame when it runs out (an aerial clip in a flight — the dunk contest's
    *  playAir) until the mode's next beat / release(): the 0.35 s launch used to run out mid-air and settle into the run
    *  loop, the arms crossfading down through a T at the jam. */
-  holdEnd?: boolean }
+  holdEnd?: boolean;
+  /** AF-11 (internal): a HOLD_LAST state's clip — on its end it freezes on the last frame and the tree keeps the state (no settle). */
+  holdState?: boolean }
 export interface TreeHoldOpts { fadeSec?: number; speedRatio?: number }
 
 /**
@@ -252,7 +267,7 @@ export interface TreeHoldOpts { fadeSec?: number; speedRatio?: number }
 export class BasketballAnimTree {
   private current: BasketballAnimState | null = null;
   private last: AnimTreeInput | null = null;
-  private override: { kind: 'beat' | 'hold'; clip: string; state: BasketballAnimState | null } | null = null;
+  private override: { kind: 'beat' | 'hold'; clip: string; state: BasketballAnimState | null; holdState?: boolean } | null = null;
   private token = 0;
   private settledState: BasketballAnimState | null = null;
   /** The stride rate for the loop that is running, smoothed so a cadence never stutters. */
@@ -313,7 +328,9 @@ export class BasketballAnimTree {
     if (this.override) {
       // a mode-owned hold is never interrupted; a beat yields only to a priority state
       const yields = this.override.kind === 'beat' && PRIORITY.has(c.state) && c.state !== this.override.state;
-      if (!yields) return this.override.state ?? this.current ?? c.state;
+      // AF-11 EXCEPTION: a hold-last beat (knob on) leaves on the frame its state changes, as the loop it replaces did
+      const holdExit = this.override.kind === 'beat' && this.override.holdState === true && c.state !== this.override.state;
+      if (!yields && !holdExit) return this.override.state ?? this.current ?? c.state;
     }
     const now = typeof performance !== 'undefined' ? performance.now() / 1000 : 0;
     if (c.state !== this.current && c.loop && this.sameGroup(this.current, c.state) && now - this.stateSince < BasketballAnimTree.DWELL_SEC) return this.current!;   // the dwell
@@ -322,7 +339,11 @@ export class BasketballAnimTree {
     if (c.state !== this.current || handChanged) {
       const was = this.current;
       this.current = c.state; this.stateSince = now;
-      if (c.loop) {
+      if (HOLD_LAST_STATES.has(c.state) && holdLastOn()) {
+        // AF-11 (knob on): play the clip once and hold its last frame while the state lasts — see playBeat's holdState
+        this.strideClip = null;
+        this.playBeat(c.clip, { fadeSec: c.fadeSec, speedRatio: 1, holdState: true }, c.state);
+      } else if (c.loop) {
         this.token++; this.override = null;
         // adopt the new state's stride rate rather than sliding from the old one
         const r0 = rateFor(c.state, input.speedMps ?? 0, this.ref) ?? restTempoFor(c.state);   // lane/h3-handler (#312 port): the dribble's tempo at rest
@@ -382,7 +403,7 @@ export class BasketballAnimTree {
     // H2 (moveLegs): a handle move's beat on a moving body runs the legs layer, seeded from the loop it cuts (its stride phase)
     this.legsBeat = !!this.legs && MOVE_LEGS_BEAT.test(clip);
     if (this.legsBeat) this.legs!.begin(this.strideClip);
-    this.override = { kind: 'beat', clip, state };
+    this.override = { kind: 'beat', clip, state, ...(opts.holdState ? { holdState: true } : {}) };
     this.animator.play(clip, {
       loop: false, fadeSec: opts.fadeSec ?? 0.1, speedRatio: opts.speedRatio ?? 1, restart: true,   // POLISH: 0.08 → 0.10 — the reach and hand-up beats out of a stance popped a wrist 1 m in a frame
       onEnd: () => {
@@ -390,7 +411,10 @@ export class BasketballAnimTree {
         // ANIM CLEAN-UP (2026-09-18): the ended beat is parked on its last frame so whatever follows FADES from it — an
         // ended group is stopped, and a settle from a stopped group is a one-frame snap (0.6–0.9 m hand jumps, measured)
         this.animator.freezeAtEnd?.(clip);
-        if (opts.holdEnd) { opts.onSettle?.(); return; }   // the pose holds where the clip left it; the override stands until the next beat / release
+        if (opts.holdEnd) { opts.onSettle?.(); return; }
+        // AF-11: a hold-last state stays on its frozen last frame — the tree keeps the state, so the next update plays nothing until
+        // the state changes, and that state's clip fades out of the frozen pose
+        if (opts.holdState) { this.override = null; this.current = state; return; }   // the pose holds where the clip left it; the override stands until the next beat / release
         this.override = null; this.current = null;
         if (state) this.settledState = state;
         opts.onSettle?.();
