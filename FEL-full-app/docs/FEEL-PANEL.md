@@ -357,3 +357,45 @@ not owner numbers. A ranked, staked or head-to-head run reads every default abov
 lane/hoops-p02-defense, coordinator calls 1A / 2A (2026-10-28), **TUNED**: `hoops.aiReachGate` 0.5 → 0.7 (a steal intent in range becomes
 a reach more often; the strip is still his hand on the ball) and, new as a knob, `hoops.aiBlockJumpChance` 0.3 → 0.45 (`HoopsDefense.ts`
 `AI_BLOCK_JUMP_CHANCE`: in range at my gather the AI leaves the floor this often, else a hand up; the block is his hand on the ball).
+
+lane/hoops-p03-rivals (1v1 / 3v3 ten-phase pass, phase 3 "rivals that play basketball"; owner playtest 2026-10-27; the owner has felt none of
+these yet — every default is flagged in the lane report). Group "Hoops · rival offense", all **new**:
+
+- The 1v1 rival's MOVE KIT (`hoops/rivalOffense.ts`): `hoops.rivalKitOn` 1 (0 = the release's script exactly: check, weave, sidestep,
+  step-back, three shots); the reads — `hoops.rivalTightM` 1.25 m (tight invites the spin, the hesitation and the post-up; off him, the
+  crossover and the in-and-out), `hoops.rivalClosingMps` 1.6 m/s (closing this fast is a bite: the hesitation), `hoops.rivalSagM` 2.6 m and
+  `hoops.rivalPullUpRangeM` 6.2 m (in his lane but this far off, inside this range: PRO and ELITE pull up), `hoops.rivalAdaptK` 1 (× the
+  tier's adapt rate: how hard he leans on what worked against you); the moves — `hoops.rivalHesiSec` 0.3 s, `hoops.rivalHesiGoMps` 5.8 m/s,
+  `hoops.rivalSpinSec` 0.6 s; the post-up — `hoops.rivalPostMinM` / `hoops.rivalPostMaxM` 2.6 / 10 m (the rim distances he posts from: a back-down from the check is in it — the rig's scripted defender holds him at the top, 9.4–9.9 m),
+  `hoops.rivalPostMps` 1.4 m/s (the back-down), `hoops.rivalPostMaxSec` 1.6 s (then the turnaround), `hoops.rivalPostHookM` 2.3 m (inside it,
+  a hook); the floater's corridor `hoops.rivalFloaterMinM` / `hoops.rivalFloaterMaxM` 2.0 / 5.0 m. No make chance reads a knob here: a
+  floater and a fade are `rivalShotPct` 'jumper' from where they leave the hand, a hook a 'layup'.
+- The 3v3 rival TEAM OFFENCE (`hoops/teamOffense3v3.ts`): `hoops.teamOffenseOn` 1 (0 = the release's one lerped drive exactly);
+  `hoops.rivalTakeBackM` 6.9 m (a fresh possession is taken back beyond the arc first; 0 = from where he is), `hoops.rivalHandlerMps`
+  3.4 m/s (his pace off the drive), `hoops.rivalProbeSec` 1.6 s (the probe at the top, × the tier), `hoops.rivalScreenWaitSec` 2.4 s,
+  `hoops.rivalBudgetSec` 10 s (past it he attacks now, × the tier), `hoops.rivalAttackPullUpSec` 0.8 s (held in front on the attack, the
+  pull-up), `hoops.rivalPullUpMaxM` 6.0 m (the off-the-dribble pull-up only inside it: the release's jumper base has no range term). The
+  attack's pace is the release's `DRIVE_MPS` 5.4 m/s and the tell its `GATHER_TELL_SEC` 0.35 s; every finish (`rivalReleasePct`, the
+  block, the contest) is the release's.
+
+**assumption:** the bounds are safe, not tuned; the defaults are this lane's calibration on the headless possession sim
+(`scripts/probes/hoops-gap/rival-sim.mts`) and the rig, not owner numbers. A ranked, staked or head-to-head run reads every default above.
+
+lane/hoops-p04 (1v1 / 3v3 ten-phase pass, phase 4 "feet and transitions"; owner 2026-10-20: "blend + minimum-hold rules on every clip
+change"). The owner has felt none of these yet; every default is flagged in the lane report.
+
+- Group "Hoops · transitions" (`anim/hoopsTransitions.ts`), **TUNED (new behaviour)**: `hoops.transitionRuleOn` 1 (0 = every state's
+  own fade and the old dwell exactly); the fade floors — `hoops.gaitFadeSec` 0.22 s (dribble / run loop to loop; was 0.10–0.18),
+  `hoops.defenseFadeSec` 0.2 s (slide / backpedal / closeout / crossover step; was 0.12–0.20), `hoops.crossFadeSec` 0.2 s (offence ↔
+  defence, a loop after a beat), `hoops.beatFadeFloorSec` 0.1 s (a mode's beat: a move, a reach, a shot — the clip still starts on the
+  press's frame; was as low as 0.05), `hoops.priorityFadeSec` 0.08 s (a stagger, the floor, a dunk); `hoops.minHoldSec` 0.22 s (a loop
+  plays this long before a sibling loop replaces it — the release's dwell, now for every loop group).
+- Same group (`hoops/releaseTiming.ts`): `hoops.releaseToClipOn` 1 (the rival's jumper / finish clip is paced so the ball leaves on its
+  release key — the 3v3 tell, the 1v1 gather; 0 = the clip from its first frame, as before) and `hoops.jumperFromRiseOn` 1 (the hero's
+  jumper is entered at its rise, its load dip skipped, and paced from there to the green; 0 = from the first frame). Neither moves a
+  release in time or a make chance: only the clip moves.
+- Same group (`anim/basketballTree.ts`, **TUNED (new behaviour)**): `hoops.plantReleaseFadeSec` 0.12 s — the plant-and-cut lock (0.18 s)
+  lets its foot back to the clip over this instead of in one frame (the rig read the hero's thigh at 8–10 000 °/s on those frames); 0 =
+  the old one-frame release.
+
+**assumption:** the bounds are safe, not tuned. A ranked, staked or head-to-head run reads every default above.

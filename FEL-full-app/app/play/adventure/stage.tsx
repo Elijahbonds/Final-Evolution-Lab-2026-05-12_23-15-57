@@ -26,6 +26,8 @@ import { RebindPanel } from '@/components/adventure/RebindPanel';
 import { AdventureRadial } from '@/components/adventure/AdventureRadial';
 
 const MODE_KEY = 'adventure';
+/** The route's name, as app/play/adventure/page.tsx titles it. */
+export const ADVENTURE_TITLE = 'The Adventure';
 
 type Gate = 'checking' | 'pick' | 'ready';
 
@@ -89,13 +91,16 @@ export function AdventureStoryStage({ signedIn }: { signedIn: boolean }) {
         input: bus,
         onPhase: (p, d) => { if (!disposed) { setPhase(p); if (p === 'error') setErr(String(d)); } },
         onHud: (h) => { if (!disposed) setHud((prev) => ({ ...prev, ...h })); },
+        // PUBLIC-POLISH (2026-11-02, live sweep D4): the server said who this is, so a guest's spawn does not ask the closet
+        // (a 401 and a console error for every guest; FIRST-DUNK-BUDGET's flag, as /try passes it)
+        guest: !signedIn,
         // account XP waits for the session route to take a new mode (Phase B report); the Adventure level is in the save
         resultSink: async () => {},
       }).then((s) => { if (disposed) s(); else stop = s; })
         .catch((e) => { if (!disposed) setErr(String(e?.message ?? e)); });
     }, 0);
     return () => { disposed = true; mountedRef.current = false; stop?.(); clearTimeout(startTimer); };
-  }, [gate]);
+  }, [gate, signedIn]);
 
   const start = () => busRef.current?.emit({ t: 'button', btn: 'START', pressed: true });
   const playing = phase === 'playing' || phase === 'countdown';
@@ -106,7 +111,9 @@ export function AdventureStoryStage({ signedIn }: { signedIn: boolean }) {
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none outline-none" />
       {gate === 'pick' && (
         <div className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-4 bg-black/85 p-4">
-          <p className="text-[10px] tracking-[0.3em] text-white/50">THE ADVENTURE [PLACEHOLDER]</p>
+          {/* PUBLIC-POLISH (2026-11-02, live sweep J5): the route's own name (its page title), not "[PLACEHOLDER]". The chapter,
+              move and monster names stay [PLACEHOLDER] until the owner names them (their own guards hold that). */}
+          <p className="text-[10px] tracking-[0.3em] text-white/50">{ADVENTURE_TITLE.toUpperCase()}</p>
           <PartnerPicker slots={slots} onPick={pick} />
           {err && <p className="text-red-400">{err}</p>}
         </div>
