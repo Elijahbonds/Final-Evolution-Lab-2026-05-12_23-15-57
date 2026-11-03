@@ -258,6 +258,21 @@ const kneelArmDrill: Builder = (scene, sk) => {
   };
   return run(scene, sk, 'ex_kneel_arm_drill', 2.4, [at(p('Left'), 0), at(p('Right'), 0.6), at(p('Left'), 1.2), at(p('Right'), 1.6), at(p('Left'), 2.0)]);
 };
+/** ex_heel_kick_jump (the double-leg butt kick) — a short dip and a jump straight up, the heels kicked up to the seat at the
+ *  top, the legs coming back under before the feet touch, and a soft landing on partly bent knees. (exerciseBody.ts jump's
+ *  dip, take-off and landing; the unfolding key keeps the toes off the floor as the knees open.) */
+const heelKickJump: Builder = (scene, sk) => {
+  const stand: Pose = { bones: { ...STAND }, feet: both(0.13, ANKLE, 0.08), hands: HANG, poles: HANG_POLES, hipsY: 0 };
+  const dip: Pose = { bones: { Hips: [24, 0, 0], Spine: [12, 0, 0], Neck: [-14, 0, 0], LeftFoot: [-22, 0, 0], RightFoot: [-22, 0, 0] }, feet: both(0.13, ANKLE, 0.08), kneePoles: bothDir(0.15, 0, 1), hands: both(0.26, 0.62, -0.30), poles: bothDir(0.3, 0.3, -0.9), hipsY: -0.28 };
+  const off: Pose = { bones: { Hips: [0, 0, 0], Spine: [-2, 0, 0], LeftFoot: [34, 0, 0], RightFoot: [34, 0, 0] }, feet: both(0.13, ANKLE + 0.14, 0.06), kneePoles: bothDir(0.1, 0, 1), hands: both(0.20, 2.15, 0.12), poles: bothDir(0.9, 0.1, -0.3), hipsY: 0.10 };
+  const kick: Pose = { bones: { Hips: [2, 0, 0], Spine: [0, 0, 0], LeftUpLeg: [-8, 0, 4], RightUpLeg: [-8, 0, -4], LeftLeg: [124, 0, 0], RightLeg: [124, 0, 0], LeftFoot: [8, 0, 0], RightFoot: [8, 0, 0] }, hands: both(0.24, 1.70, 0.22), poles: bothDir(0.6, -0.2, -0.6), hipsY: 0.30 };
+  const unfold: Pose = { bones: { Hips: [4, 0, 0], Spine: [2, 0, 0], LeftUpLeg: [-14, 0, 2], RightUpLeg: [-14, 0, -2], LeftLeg: [44, 0, 0], RightLeg: [44, 0, 0], LeftFoot: [4, 0, 0], RightFoot: [4, 0, 0] }, hands: both(0.24, 1.40, 0.24), poles: bothDir(0.5, -0.4, -0.6), hipsY: 0.28 };
+  const touch: Pose = { bones: { Hips: [8, 0, 0], Spine: [4, 0, 0], LeftFoot: [-4, 0, 0], RightFoot: [-4, 0, 0] }, feet: both(0.13, ANKLE + 0.03, 0.08), kneePoles: bothDir(0.15, 0, 1), hands: both(0.26, 0.90, 0.30), poles: HANG_POLES, hipsY: 0.0 };
+  const land: Pose = { ...dip, bones: { ...dip.bones, Hips: [20, 0, 0], Spine: [10, 0, 0] }, hands: both(0.26, 0.70, 0.34), poles: HANG_POLES, hipsY: -0.22 };
+  // (half way down the dip the shins tilt before the ankles have flexed: a key there keeps the toes up off the floor)
+  const sink: Pose = { ...dip, bones: { Hips: [12, 0, 0], Spine: [6, 0, 0], Neck: [-7, 0, 0], LeftFoot: [-18, 0, 0], RightFoot: [-18, 0, 0] }, hands: both(0.26, 0.74, -0.10), hipsY: -0.13 };
+  return loop(scene, sk, 'ex_heel_kick_jump', 2.3, [at(stand, 0, true), at(sink, 0.22), at(dip, 0.45, true), at(off, 0.66), at(kick, 0.88, true), at(unfold, 1.06), at(touch, 1.2), at(land, 1.42, true), at(stand, 1.9)]);
+};
 /** ex_sled_push — leaning into the sled's handles at about 45°, the arms long: short, hard alternating drives of the knees,
  *  each foot striking down and back under the hips (in place). */
 const sledPush: Builder = (scene, sk) => {
@@ -327,6 +342,6 @@ export const FAMILY8_BUILDERS: readonly [string, Builder][] = [
   ['ex_zottman', zottman], ['ex_cross_hammer', crossHammer], ['ex_drag_curl', dragCurl], ['ex_concentration_stand', concentrationStand], ['ex_lying_cable_curl', lyingCableCurl], ['ex_lying_db_curl', lyingDbCurl],
   ['ex_pec_deck', pecDeck], ['ex_crossover', crossover], ['ex_crossover_low', crossoverLow], ['ex_crossover_one', crossoverOne], ['ex_iron_cross', ironCross], ['ex_band_crossover', bandCrossover], ['ex_svend_press', svendPress], ['ex_raise_pullover', raisePullover],
   ['ex_tate_press', tatePress], ['ex_jm_press', jmPress], ['ex_machine_triceps', machineTriceps],
-  ['ex_kneel_arm_drill', kneelArmDrill], ['ex_sled_push', sledPush], ['ex_sled_drag_back', sledDragBack('ex_sled_drag_back', false)], ['ex_sled_overhead_back', sledDragBack('ex_sled_overhead_back', true)],
+  ['ex_kneel_arm_drill', kneelArmDrill], ['ex_heel_kick_jump', heelKickJump], ['ex_sled_push', sledPush], ['ex_sled_drag_back', sledDragBack('ex_sled_drag_back', false)], ['ex_sled_overhead_back', sledDragBack('ex_sled_overhead_back', true)],
   ['ex_lat_wall_stretch', latWallStretch], ['ex_pole_over', poleOver], ['ex_pole_behind', poleBehind], ['ex_chair_chest_stretch', chairChestStretch], ['ex_dancer_stretch', dancerStretch],
 ];

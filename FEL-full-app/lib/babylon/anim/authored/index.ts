@@ -1071,7 +1071,7 @@ function authoredBuilders(scene: Scene, skeleton: Skeleton): [string, () => Anim
     ['ex_pole_behind', () => buildExerciseClip('ex_pole_behind', scene, skeleton)],
     ['ex_chair_chest_stretch', () => buildExerciseClip('ex_chair_chest_stretch', scene, skeleton)],
     ['ex_dancer_stretch', () => buildExerciseClip('ex_dancer_stretch', scene, skeleton)],
-    // DEMO-LOOPS-8: the fast skip and the double-leg butt kick (exerciseBody.ts)
+    // DEMO-LOOPS-8: the fast skip (exerciseBody.ts) and the double-leg butt kick (exerciseFamilies8.ts)
     ['ex_fast_skip', () => buildExerciseClip('ex_fast_skip', scene, skeleton)],
     ['ex_heel_kick_jump', () => buildExerciseClip('ex_heel_kick_jump', scene, skeleton)],
   ];

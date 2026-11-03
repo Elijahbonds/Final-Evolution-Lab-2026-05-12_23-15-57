@@ -62,7 +62,7 @@ export const REAL_CLIPS = new Set<string>([
   'ex_ankle_reset', 'ex_quad_t_rot', 'ex_ninety_turn', 'ex_bw_hinge', 'ex_knee_across', 'ex_ankle_unlock',
   // DEMO-LOOPS-8: the measured gaps — curls, flyes, triceps, sprint drills, sleds, upper-body stretches (exerciseFamilies8.ts)
   'ex_zottman', 'ex_cross_hammer', 'ex_drag_curl', 'ex_concentration_stand', 'ex_lying_cable_curl', 'ex_lying_db_curl', 'ex_pec_deck', 'ex_crossover', 'ex_crossover_low', 'ex_crossover_one', 'ex_iron_cross', 'ex_band_crossover', 'ex_svend_press', 'ex_raise_pullover', 'ex_tate_press', 'ex_jm_press', 'ex_machine_triceps', 'ex_kneel_arm_drill', 'ex_sled_push', 'ex_sled_drag_back', 'ex_sled_overhead_back', 'ex_lat_wall_stretch', 'ex_pole_over', 'ex_pole_behind', 'ex_chair_chest_stretch', 'ex_dancer_stretch',
-  // DEMO-LOOPS-8: the fast skip and the double-leg butt kick (exerciseBody.ts)
+  // DEMO-LOOPS-8: the fast skip (exerciseBody.ts) and the double-leg butt kick (exerciseFamilies8.ts)
   'ex_fast_skip', 'ex_heel_kick_jump',
   'idle_stand', 'strafe_left', 'strafe_right', 'jump_up', 'jump_land',
   'dunk_charge_gather', 'dunk_launch', 'dunk_mocap', 'dunk_360_eastbay', 'dunk_score_hang', 'dunk_land_crouch', 'dunk_land_absorb',

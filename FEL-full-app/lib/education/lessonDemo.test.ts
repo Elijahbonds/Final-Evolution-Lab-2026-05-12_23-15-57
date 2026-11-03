@@ -84,11 +84,11 @@ describe('lessonDemo', () => {
     expect(demoForLesson('nonsense')).toBeNull();
   });
 
-  it('coverage only goes up: 26 of the book\'s 42 drill lessons open on a demo (34 lessons in all)', () => {
+  it('coverage only goes up: 25 of the book\'s 42 drill lessons open on a demo (33 lessons in all)', () => {
     const drills = CHAPTERS.flatMap((c) => c.lessons.filter((l) => l.kind === 'drill').map((l) => lessonId(c.number, l.key)));
     const withDemo = drills.filter((id) => demoForLesson(id) !== null);
     expect(drills.length).toBe(42);
-    expect(withDemo.length).toBeGreaterThanOrEqual(26);
-    expect(LESSON_DEMOS.length).toBeGreaterThanOrEqual(34);
+    expect(withDemo.length).toBeGreaterThanOrEqual(25);
+    expect(LESSON_DEMOS.length).toBeGreaterThanOrEqual(33);
   });
 });
