@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server';
 import { listCourses, newCourse } from '@/lib/teach/api';
-import { sessionUserId, teachApiDeps } from '@/lib/teach/server';
+import { currentUserId } from '@/lib/camp/server';
+import { teachApiDeps } from '@/lib/teach/server';
 
 export const dynamic = 'force-dynamic';
 
 /** GET /api/teach/courses — PLAT-P10 (EDU-02): a teacher's own courses. 403 for anyone who may not author. */
 export async function GET() {
   try {
-    const userId = await sessionUserId();
+    const userId = await currentUserId();
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const r = await listCourses(userId, teachApiDeps());
     return NextResponse.json(r.body, { status: r.status });
@@ -20,7 +21,7 @@ export async function GET() {
 /** POST /api/teach/courses { title } — a new draft course. */
 export async function POST(req: Request) {
   try {
-    const userId = await sessionUserId();
+    const userId = await currentUserId();
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const r = await newCourse(userId, await req.json().catch(() => null), teachApiDeps());
     return NextResponse.json(r.body, { status: r.status });

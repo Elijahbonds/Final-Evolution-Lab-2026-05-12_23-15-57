@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin/requireAdmin';
 import { decide, queue } from '@/lib/teach/api';
-import { sessionUserId, teachApiDeps } from '@/lib/teach/server';
+import { currentUserId } from '@/lib/camp/server';
+import { teachApiDeps } from '@/lib/teach/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +22,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     if (!(await requireAdmin())) return NextResponse.json({ error: 'not_found' }, { status: 404 });
-    const ownerId = await sessionUserId();
+    const ownerId = await currentUserId();
     if (!ownerId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const r = await decide(ownerId, await req.json().catch(() => null), teachApiDeps());
     return NextResponse.json(r.body, { status: r.status });

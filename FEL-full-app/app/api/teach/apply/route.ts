@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server';
 import { apply } from '@/lib/teach/api';
-import { sessionUserId, teachApiDeps } from '@/lib/teach/server';
+import { currentUserId } from '@/lib/camp/server';
+import { teachApiDeps } from '@/lib/teach/server';
 
 export const dynamic = 'force-dynamic';
 
 /** POST /api/teach/apply { discipline, bio, sample, links } — PLAT-P10 (EDU-01): an adult's teacher application, screened. */
 export async function POST(req: Request) {
   try {
-    const userId = await sessionUserId();
+    const userId = await currentUserId();
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const body = await req.json().catch(() => null);
     const r = await apply(userId, body, teachApiDeps());
