@@ -417,3 +417,19 @@ change"). The owner has felt none of these yet; every default is flagged in the 
   a frame. 0 = the frame's speed, as before. The ball's push-ahead and the guard keep their own easing.
 
 **assumption:** the bounds are safe, not tuned. A ranked, staked or head-to-head run reads every default above.
+
+lane/gameplay-clean-3 (owner: "Gameplay needs to be really clean"; the runtime pops clip-smooth could not reach). The owner has not felt it
+yet.
+
+- Group "Anim · transitions" (`anim/FootPlanting.ts`), **TUNED (new behaviour)**: `anim.plantEngageSec` 0.1 s. The foot planter on every
+  body now eases its two-bone leg solve in when it starts holding a foot and out when it stops, instead of stepping in one frame. The
+  solve throws the knee toward the root's forward, so on a stance whose knees open elsewhere (Derby's batter) the first solved frame
+  was a 25° thigh jump with the foot still. 0 = the old one-frame engage and release exactly. The pin, its weight curve and its release
+  fade (`RELEASE_FADE_SEC` 0.1 s) are unchanged.
+
+- Same group (`anim/PostureLayer.ts`), **TUNED (new behaviour)**: `anim.hipYawFold` 1. A posture window that keeps only part of the
+  clip hip turn (Football Rush `spin`, keep 0.5) read the clip yaw WRAPPED, which jumps from +180 to -180 degrees: the hips flipped
+  180 degrees in one frame at the half-turn. The read is folded past 90 degrees (unchanged up to 90, back to 0 at 180), so the strip
+  is continuous. 0 = the old wrapped read exactly.
+
+**assumption:** the bounds (0 to 0.4 s) are safe, not tuned. A ranked, staked or head-to-head run reads the defaults.
