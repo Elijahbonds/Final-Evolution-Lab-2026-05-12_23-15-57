@@ -694,6 +694,9 @@ export const DEMO_RULES: readonly DemoRule[] = [
   { clip: 'ex_wrist_curl_bench_down', families: ['grip'], bases: /^palm-down-wrist-curl-over-bench$/ },
   { clip: 'ex_wrist_curl_behind', families: ['grip'], bases: /^stand-palm-up-behind-back-wrist-curl$/ },
   { clip: 'ex_wrist_roller', families: ['grip'], bases: /^wrist-roller$/ },
+  // the program-ask's Step-In Mountain Climber (lane/program-ask-2's entry: high plank, a foot steps in under the chest and
+  // back out, then the other): the loop authored for it in DEMO-LOOPS-4 (exerciseAsks.ts)
+  { clip: 'ex_stepin_climber', families: ['cardio'], bases: /^step-in-mountain-climber$/ },
 ];
 
 const RULES_BY_FAMILY: ReadonlyMap<string, readonly DemoRule[]> = (() => {
@@ -803,7 +806,7 @@ export const DEMO_CLIPS: readonly string[] = (() => {
 })();
 
 /** Floor loops: the stage frames these from the side, low (a push-up seen from the front is a head). */
-export const FLOOR_CLIPS: ReadonlySet<string> = new Set(['ex_leg_pull_in', 'ex_crunch_weight', 'ex_frog_situp', 'ex_cocoon', 'ex_bottoms_up', 'ex_butterfly_side_reach', 'ex_crunch_overhead', 'ex_crunch_tuck', 'ex_russian_twist', 'ex_leg_raise_back', 'ex_pushup', 'ex_plank', 'ex_plank_high', 'ex_mountain_climber', 'ex_bridge', 'ex_dead_bug', 'ex_bird_dog', 'ex_crunch', 'ex_floor_press', 'ex_spiderman_pushup', 'ex_archer_pushup', 'ex_prone_t', 'ex_adductor_squeeze', 'ex_copenhagen_knee', 'ex_copenhagen_raise_knee', 'ex_calf_smr', 'ex_piriformis_smr'].concat(
+export const FLOOR_CLIPS: ReadonlySet<string> = new Set(['ex_stepin_climber', 'ex_leg_pull_in', 'ex_crunch_weight', 'ex_frog_situp', 'ex_cocoon', 'ex_bottoms_up', 'ex_butterfly_side_reach', 'ex_crunch_overhead', 'ex_crunch_tuck', 'ex_russian_twist', 'ex_leg_raise_back', 'ex_pushup', 'ex_plank', 'ex_plank_high', 'ex_mountain_climber', 'ex_bridge', 'ex_dead_bug', 'ex_bird_dog', 'ex_crunch', 'ex_floor_press', 'ex_spiderman_pushup', 'ex_archer_pushup', 'ex_prone_t', 'ex_adductor_squeeze', 'ex_copenhagen_knee', 'ex_copenhagen_raise_knee', 'ex_calf_smr', 'ex_piriformis_smr'].concat(
   // LIBRARY-ANATOMY-2: the floor positions and every flow (a flow spends most of its time on the floor)
   ['dog', 'child', 'pigeon', 'halfsplit', 'lowlunge', 'kneel', 'ninety', 'shinbox', 'catcamel', 'thread', 'bear', 'cobra', 'lizard', 'butterfly', 'couch', 'frog', 'spider', 'inchworm',
     'supine', 'supine9090', 'legsup', 'kneehug', 'oneknee', 'happybaby', 'kneerock', 'figure4', 'lyinghams', 'prone', 'pike', 'straddle', 'switch', 'rockback', 'childside', 'dogpedal',
