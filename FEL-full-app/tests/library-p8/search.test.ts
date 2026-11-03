@@ -35,17 +35,22 @@ describe('moving demos first', () => {
     const still = QUERIES.reduce((n, q) => n + search(index, q, {}, { youth: false }).hits.slice(0, 6).filter((h) => !moves(h.entry)).length, 0);
     expect(still).toBeGreaterThan(0);
   });
-  it('relevance still decides WHICH entries make the page; inside a band only the moving ones step forward', () => {
+  it('relevance still decides WHICH entries make the page; the order is relevance band, then moving, then as before', () => {
     for (const q of QUERIES.slice(1)) {
-      const plain = search(index, q, {}, { youth: false, limit: DEMO_FIRST_WINDOW }).hits.map((h) => h.entry);
+      const plain = search(index, q, {}, { youth: false, limit: DEMO_FIRST_WINDOW }).hits;
       const first = search(index, q, {}, { youth: false, limit: DEMO_FIRST_WINDOW, demosFirst: true }).hits;
-      expect(new Set(first.map((h) => h.entry.id))).toEqual(new Set(plain.map((e) => e.id)));
-      expect(first.filter((h) => moves(h.entry)).map((h) => h.entry.id)).toEqual(plain.filter(moves).map((e) => e.id));
-      expect(first.filter((h) => !moves(h.entry)).map((h) => h.entry.id)).toEqual(plain.filter((e) => !moves(e)).map((e) => e.id));
-      // the score bands never invert: a hit is never more than one band ratio below a later hit's score
-      const top = first[0].score;
+      expect(new Set(first.map((h) => h.entry.id))).toEqual(new Set(plain.map((h) => h.entry.id)));
+      const top = Math.max(...plain.map((h) => h.score));
       const band = (sc: number) => (sc >= top ? 0 : Math.floor(Math.log(top / sc) / Math.log(1 / DEMO_FIRST_BAND)));
-      for (let i = 1; i < first.length; i++) expect(band(first[i].score)).toBeGreaterThanOrEqual(band(first[i - 1].score));
+      const key = (h: (typeof first)[number]) => [band(h.score), moves(h.entry) ? 0 : 1];
+      // the bands never go back up, and inside a band the moving entries lead
+      for (let i = 1; i < first.length; i++) {
+        const [b0, m0] = key(first[i - 1]), [b1, m1] = key(first[i]);
+        expect(b1 > b0 || (b1 === b0 && m1 >= m0)).toBe(true);
+      }
+      // inside each (band, moving) group the existing order is kept
+      const groupOf = (hs: typeof first) => { const g = new Map<string, string[]>(); for (const h of hs) { const k = key(h).join(); g.set(k, [...(g.get(k) ?? []), h.entry.id]); } return g; };
+      expect(groupOf(first)).toEqual(groupOf(plain));
     }
   });
   it('off by default: a search that does not ask is unchanged', () => {

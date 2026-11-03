@@ -105,6 +105,8 @@ function demosFirstOrder(index: LibraryIndex, ranked: RankedGroup[], score: Floa
     const s = Math.abs(score[g.rep]);
     return s >= top ? 0 : s <= 0 ? 99 : Math.floor(Math.log(top / s) / Math.log(1 / DEMO_FIRST_BAND));
   };
+  // raw score bands (the brief's order: relevance, then the loop). Inside the window this also settles a family-variety
+  // pick that scored a band lower (diversify) below the stronger matches; past the window diversify's order stands.
   const head = ranked.slice(0, n).map((g, i) => ({ g, i, b: band(g), m: moves[g.rep] ? 0 : 1 }));
   head.sort((x, y) => x.b - y.b || x.m - y.m || x.i - y.i);
   ranked.splice(0, n, ...head.map((x) => x.g));
