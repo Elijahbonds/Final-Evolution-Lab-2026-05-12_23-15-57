@@ -402,7 +402,34 @@ change"). The owner has felt none of these yet; every default is flagged in the 
   jumper is entered at its rise, its load dip skipped, and paced from there to the green; 0 = from the first frame). Neither moves a
   release in time or a make chance: only the clip moves.
 - Same group (`anim/basketballTree.ts`, **TUNED (new behaviour)**): `hoops.plantReleaseFadeSec` 0.12 s — the plant-and-cut lock (0.18 s)
-  lets its foot back to the clip over this instead of in one frame (the rig read the hero's thigh at 8–10 000 °/s on those frames); 0 =
-  the old one-frame release.
+  lets its foot back to the clip over this instead of in one frame; 0 = the old one-frame release. (Correction, hoops-p04b: p04 credited
+  the hero's 8–10 000 °/s thigh spike to this lock's release. The rig's stage tracer puts it on the stop accent below; this fade stays as
+  a general one-frame-release fix, not as that spike's cure.)
+- hoops-p04b, same group (`anim/locoAccent.ts`): `hoops.accentOffBeatsOn` 1 — the stop / start accent (the sink and lean, legSink's leg
+  re-solve) is off while the tree plays a beat or a hold, as the layer's header always said; 0 = it read the loop state under a beat and
+  kept sinking through the step-back gather (the thigh spike: 7 396 and 10 254 °/s, 1v1 seed 7 frames 343 / 349, traced to this layer).
+- hoops-p04b, same group (`hoops/contactPoses.ts`, **TUNED (new)**): `hoops.contactArmSwapSec` 0.15 s — which arm the contact poses drive
+  (the defender's hand-check arm, the handler's arm bar) eases per arm over this when it changes, and a handle move lets the bar go over it
+  (the hand-check keeps the last ball side through the move); 0 = the one-frame swap (3v3 seed 7: one arm 0 → 79°, the other 58 → 0° in
+  a frame, 3 500–6 000 °/s). A body's first contact still takes its arm at once (the hand-check's own k eases in).
+- hoops-p04b, same group (`anim/ballCarry.ts`, **TUNED (new)**): `hoops.carryArmSpeedSec` 0.12 s — the dribble's arm weights (the ball
+  arm's pace reach, the off arm's swing in at 0.35–0.65 of speed) follow the body's speed eased over this; a gear change stepped them in
+  a frame. 0 = the frame's speed, as before. The ball's push-ahead and the guard keep their own easing.
 
 **assumption:** the bounds are safe, not tuned. A ranked, staked or head-to-head run reads every default above.
+
+lane/gameplay-clean-3 (owner: "Gameplay needs to be really clean"; the runtime pops clip-smooth could not reach). The owner has not felt it
+yet.
+
+- Group "Anim · transitions" (`anim/FootPlanting.ts`), **TUNED (new behaviour)**: `anim.plantEngageSec` 0.1 s. The foot planter on every
+  body now eases its two-bone leg solve in when it starts holding a foot and out when it stops, instead of stepping in one frame. The
+  solve throws the knee toward the root's forward, so on a stance whose knees open elsewhere (Derby's batter) the first solved frame
+  was a 25° thigh jump with the foot still. 0 = the old one-frame engage and release exactly. The pin, its weight curve and its release
+  fade (`RELEASE_FADE_SEC` 0.1 s) are unchanged.
+
+- Same group (`anim/PostureLayer.ts`), **TUNED (new behaviour)**: `anim.hipYawFold` 1. A posture window that keeps only part of the
+  clip hip turn (Football Rush `spin`, keep 0.5) read the clip yaw WRAPPED, which jumps from +180 to -180 degrees: the hips flipped
+  180 degrees in one frame at the half-turn. The read is folded past 90 degrees (unchanged up to 90, back to 0 at 180), so the strip
+  is continuous. 0 = the old wrapped read exactly.
+
+**assumption:** the bounds (0 to 0.4 s) are safe, not tuned. A ranked, staked or head-to-head run reads the defaults.

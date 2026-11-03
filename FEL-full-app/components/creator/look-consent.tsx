@@ -13,13 +13,13 @@ export function LookConsent({
 }) {
   if (!adult) {
     return (
-      <p className="font-mono text-[10px] leading-relaxed text-white/50">
+      <p className="font-mono text-[12px] leading-relaxed text-white/50">
         Your look stays on this device. Nothing is uploaded.
       </p>
     );
   }
   return (
-    <div className="space-y-1 font-mono text-[10px] leading-relaxed text-white/60">
+    <div className="space-y-1 font-mono text-[12px] leading-relaxed text-white/60">
       <label className="flex items-start gap-2">
         <input type="checkbox" checked={consent.saveLookNumbers}
           onChange={(e) => onChange({ saveLookNumbers: e.target.checked, modelTraining: e.target.checked && consent.modelTraining })}

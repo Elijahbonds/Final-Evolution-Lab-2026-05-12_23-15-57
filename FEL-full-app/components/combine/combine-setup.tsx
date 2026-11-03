@@ -69,7 +69,7 @@ export function CombineSetup({ ctx, onStart, onCancel }: { ctx: CombineCtx; onSt
   return (
     <div className="space-y-5" data-combine-setup>
       <section className="fel-card space-y-2 rounded-xl p-4">
-        <label htmlFor="combine-name" className="text-[11px] uppercase tracking-wider text-fel-dim">Combine name</label>
+        <label htmlFor="combine-name" className="text-[12px] uppercase tracking-wider text-fel-dim">Combine name</label>
         <input id="combine-name" value={name} maxLength={60} onChange={(e) => setName(e.target.value)} data-combine-name
           className="min-h-12 w-full rounded-xl border border-white/15 bg-black/40 px-3 text-lg font-bold text-white" />
       </section>
@@ -113,7 +113,7 @@ export function CombineSetup({ ctx, onStart, onCancel }: { ctx: CombineCtx; onSt
         </ul>
         <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (typed.trim()) { setAdhoc([...adhoc, adhocAthlete(typed, [...ctx.athletes, ...adhoc])]); setTyped(''); } }}>
           <input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="Add someone not on your roster" maxLength={60} aria-label="Add a name"
-            className="min-h-11 min-w-0 flex-1 rounded-xl border border-white/15 bg-black/40 px-3 text-sm text-white placeholder:text-white/30" />
+            className="min-h-11 min-w-0 flex-1 rounded-xl border border-white/15 bg-black/40 px-3 text-sm text-white placeholder:text-white/50" />
           <button type="submit" className="flex min-h-11 items-center gap-1 rounded-xl border border-white/20 px-3 text-sm font-bold text-white/80"><UserPlus className="h-4 w-4" /> Add</button>
         </form>
       </section>

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
+import { readToast } from '@/components/ui/fel/toast';
 import { Loader2, Shirt, Palette, Check, Coins, Sparkles, Undo2, Redo2, Shuffle, Lock, Unlock, Camera, RotateCw, SplitSquareHorizontal, FlipHorizontal, ClipboardPaste, Sun, X } from 'lucide-react';
 import { newIdempotencyKey } from '@/lib/wallet/client';
 import { LookConsent } from '@/components/creator/look-consent';
@@ -128,7 +129,7 @@ function FacePreview({ face, accent }: { face: FaceConfig; accent: string }) {
       {face.hairStyle !== 'Bald' && (
         <div className="absolute left-1/2 top-3 -translate-x-1/2" style={{ width: 110, height: 34, backgroundColor: face.hairColor, borderRadius: '50% 50% 30% 30%' }} />
       )}
-      <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: accent, color: '#050505' }}>{face.hairStyle}</div>
+      <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full px-2 py-0.5 text-[12px] font-semibold" style={{ backgroundColor: accent, color: '#050505' }}>{face.hairStyle}</div>
     </div>
   );
 }
@@ -475,7 +476,7 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan: faceSca
   /** Mirror the selected part or layer (a mirrored part costs two of the 64). */
   const toggleMirror = () => {
     if (tab === 'parts' && selectedPart) {
-      if (!selectedPart.mirror && !fitsBudget(doc?.parts ?? [], 1)) { cue('deny'); toast.error('No room for a mirror copy — the parts budget is full.'); return; }
+      if (!selectedPart.mirror && !fitsBudget(doc?.parts ?? [], 1)) { cue('deny'); readToast.error('No room for a mirror copy — the parts budget is full.'); return; }
       editParts((ps) => updatePart(ps, selectedPart.id, { mirror: !selectedPart.mirror }));
     } else if (tab === 'paint' && selectedLayer) editPaint((ls) => updateLayer(ls, selectedLayer.id, { mirror: !selectedLayer.mirror }));
   };
@@ -561,7 +562,7 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan: faceSca
   const keepBefore = () => {
     if (!offer) return;
     const r = keepCopy(allSlots, offer.before);
-    if ('full' in r) { cue('deny'); toast.error(`All ${MAX_SLOTS} slots are full — Undo still has the old look.`); setOffer(null); return; }
+    if ('full' in r) { cue('deny'); readToast.error(`All ${MAX_SLOTS} slots are full — Undo still has the old look.`); setOffer(null); return; }
     setSlots(r.slots);   // the copy joins the list; the character being edited stays selected
     baseline.current.set(r.id, offer.before);
     toast.success(`Kept the old look as ${r.slots.find((s) => s.id === r.id)?.label ?? 'a new slot'} — Save to keep it.`);
@@ -665,7 +666,7 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan: faceSca
 
   const dirty = !!savedSig && sigNow !== savedSig;
   const stageH = fullBleed ? 'h-[100dvh]' : 'h-[calc(100dvh-3.5rem)] max-md:h-[calc(100dvh-3.5rem-4.5rem)]';
-  const hudBtn = 'pointer-events-auto flex items-center gap-1 rounded-lg border border-white/10 bg-black/55 px-2.5 py-1.5 max-md:px-2 max-md:py-1 font-display text-[10px] font-semibold uppercase tracking-wider text-white/80 backdrop-blur transition hover:border-cyan-400/50';
+  const hudBtn = 'pointer-events-auto flex items-center gap-1 rounded-lg border border-white/10 bg-black/55 px-2.5 py-1.5 max-md:px-2 max-md:py-1 font-display text-[12px] font-semibold uppercase tracking-wider text-white/80 backdrop-blur transition hover:border-cyan-400/50';
   const on = (v: boolean) => (v ? { borderColor: 'var(--fel-cyan)', color: 'var(--fel-cyan)', background: 'rgba(0,229,255,0.12)' } : undefined);
   const selLabel = tab === 'parts' && selectedPart ? `Part · ${selectedPart.shape}` : tab === 'paint' && selectedLayer ? `Layer · ${REGION_LABELS[selectedLayer.region]}`
     : selectedCloth ? `Wearing · ${clothLabel(selectedCloth)}` : null;
@@ -688,16 +689,16 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan: faceSca
         <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-3">
           <div className="min-w-[7rem]">
             <h1 className="flex items-center gap-2 font-display text-lg font-bold uppercase tracking-[0.22em] text-white max-md:text-base max-md:tracking-[0.15em]"><Shirt className="h-5 w-5 text-cyan-400" /> Studio</h1>
-            <p className="truncate font-display text-[11px] uppercase tracking-[0.18em] text-white/55">{slot.label || 'This character'}{dirty ? ' · unsaved' : ''}</p>
+            <p className="truncate font-display text-[12px] uppercase tracking-[0.18em] text-white/55">{slot.label || 'This character'}{dirty ? ' · unsaved' : ''}</p>
             {selLabel && (
               <div className="pointer-events-auto mt-2 flex items-center gap-1.5">
-                <span className="rounded-md bg-black/55 px-2 py-1 font-display text-[10px] uppercase tracking-wider text-cyan-200 backdrop-blur">{selLabel}</span>
+                <span className="rounded-md bg-black/55 px-2 py-1 font-display text-[12px] uppercase tracking-wider text-cyan-200 backdrop-blur">{selLabel}</span>
                 <button type="button" className={hudBtn} style={on(!!selMirror)} onClick={toggleMirror} aria-pressed={!!selMirror} title="Mirror left and right (M, pad R3)"><FlipHorizontal className="h-3.5 w-3.5" /> Mirror</button>
               </div>
             )}
             {tapped && !selLabel && (
               <div className="pointer-events-auto mt-2 flex flex-wrap items-center gap-1.5" aria-label="Tapped region">
-                <span className="rounded-md bg-black/55 px-2 py-1 font-display text-[10px] uppercase tracking-wider text-cyan-200 backdrop-blur">{REGION_LABELS[tapped.region]}</span>
+                <span className="rounded-md bg-black/55 px-2 py-1 font-display text-[12px] uppercase tracking-wider text-cyan-200 backdrop-blur">{REGION_LABELS[tapped.region]}</span>
                 <button type="button" className={hudBtn} onClick={() => addAt('fill')}>+ Fill</button>
                 <button type="button" className={hudBtn} onClick={() => addAt('pattern')}>+ Pattern</button>
                 <button type="button" className={hudBtn} onClick={() => addAt('stamp')}>+ Stamp here</button>
@@ -729,23 +730,23 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan: faceSca
           </div>
         </div>
 
-        {compare && <div className="pointer-events-none absolute left-1/2 top-16 -translate-x-1/2 rounded-full border border-[#FFD700]/60 bg-black/60 px-3 py-1 font-display text-[11px] font-bold uppercase tracking-[0.25em] text-[#FFD700]">Before</div>}
+        {compare && <div className="pointer-events-none absolute left-1/2 top-16 -translate-x-1/2 rounded-full border border-[#FFD700]/60 bg-black/60 px-3 py-1 font-display text-[12px] font-bold uppercase tracking-[0.25em] text-[#FFD700]">Before</div>}
 
         {showPose && (
           <div className="absolute inset-x-3 top-[7.5rem] z-10 rounded-xl border border-white/10 bg-[#0c0c11]/90 p-3 backdrop-blur md:left-auto md:w-[340px]" aria-label="Pose and light">
-            <div className="mb-1.5 font-display text-[10px] uppercase tracking-[0.2em] text-white/40">Pose — from the modes</div>
+            <div className="mb-1.5 font-display text-[12px] uppercase tracking-[0.2em] text-white/50">Pose — from the modes</div>
             <div className="mb-2 flex flex-wrap gap-1.5">{STUDIO_POSES.map((p) => <button key={p.id} type="button" className={hudBtn} style={on(pose === p.id)} onClick={() => playPose(p.id)}>{p.label}</button>)}</div>
-            <div className="mb-1.5 font-display text-[10px] uppercase tracking-[0.2em] text-white/40">Light — each venue&apos;s</div>
+            <div className="mb-1.5 font-display text-[12px] uppercase tracking-[0.2em] text-white/50">Light — each venue&apos;s</div>
             <div className="flex flex-wrap gap-1.5">{STUDIO_VENUES.map((v) => <button key={v.id} type="button" className={hudBtn} style={on(venue === v.id)} onClick={() => setVenue(v.id)}>{v.label}</button>)}</div>
-            <p className="mt-2 text-[10px] text-white/35">Poses and light are for looking only — they never change the look or the save.</p>
+            <p className="mt-2 text-[12px] text-white/50">Poses and light are for looking only — they never change the look or the save.</p>
           </div>
         )}
 
         {offer && !studioEdit && (   /* NEXUS STUDIO: one character only — no "keep a copy" slot */
           <div role="status" className="absolute left-1/2 top-[7.5rem] z-10 flex w-[min(420px,calc(100%-1.5rem))] -translate-x-1/2 flex-wrap items-center gap-2 rounded-xl border border-[#FFD700]/40 bg-[#0c0c11]/92 px-3 py-2 text-[12px] text-white/80 backdrop-blur">
             <span className="flex-1">Big change. Keep the look from before it as a new character?</span>
-            <button type="button" onClick={keepBefore} className="rounded-md bg-[#FFD700]/90 px-2.5 py-1 font-display text-[11px] font-bold uppercase text-black">Keep a copy</button>
-            <button type="button" onClick={() => setOffer(null)} className="text-[11px] text-white/50 hover:text-white">No thanks</button>
+            <button type="button" onClick={keepBefore} className="rounded-md bg-[#FFD700]/90 px-2.5 py-1 font-display text-[12px] font-bold uppercase text-black">Keep a copy</button>
+            <button type="button" onClick={() => setOffer(null)} className="text-[12px] text-white/50 hover:text-white">No thanks</button>
           </div>
         )}
 
@@ -770,7 +771,7 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan: faceSca
         {/* a phone's stage is small: the walkthrough sits at the top of the editor there */}
         <div className="mb-3 md:hidden"><WalkthroughCard state={walk} onNext={() => walkDo('next')} onSkip={() => walkDo('skip')} {...(studioEdit ? { studioEdit: true } : {})} /></div>
         <div className="mb-4 space-y-3">
-          <p className="text-[11px] text-white/45">Design your avatar&apos;s face, gear, and card skin. Everyone belongs here — the options are built to represent you. Tap the body to choose a region, drag the stage to spin, pinch or scroll to zoom.</p>
+          <p className="text-[12px] text-white/50">Design your avatar&apos;s face, gear, and card skin. Everyone belongs here — the options are built to represent you. Tap the body to choose a region, drag the stage to spin, pinch or scroll to zoom.</p>
           {studioEdit ? (
             <p className="rounded-lg border border-cyan-400/30 bg-cyan-400/5 px-3 py-2 text-[12px] text-white/75" role="status">Editing <b>{studioEdit.name}</b> for Nexus Studio. Nothing here is saved to your Closet; <b>Back to Nexus Studio</b> hands the look back.</p>
           ) : (<>
@@ -821,7 +822,7 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan: faceSca
                     className="flex w-full items-center justify-center gap-2 rounded-xl border border-cyan-400/40 bg-cyan-400/10 py-2.5 text-sm font-bold text-cyan-300 transition hover:bg-cyan-400/20">
                     <Sparkles className="h-4 w-4" /> Scan My Face
                   </button>
-                  <p className="-mt-3 text-[11px] leading-relaxed text-white/40">Auto-build your avatar from your camera or a photo. Runs entirely in your browser — nothing is uploaded. You can fine-tune every option below afterwards.</p>
+                  <p className="-mt-3 text-[12px] leading-relaxed text-white/50">Auto-build your avatar from your camera or a photo. Runs entirely in your browser — nothing is uploaded. You can fine-tune every option below afterwards.</p>
                 </>
               ) : null}
               <div className="flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-white/[0.02] p-3">
@@ -837,7 +838,7 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan: faceSca
                     return (
                       <button key={sec} type="button" title={`${on ? 'Locked' : 'Unlocked'}: ${RANDOM_SECTION_FIELDS[sec]}`} aria-pressed={on}
                         onClick={() => setLocks((l) => (on ? l.filter((x) => x !== sec) : [...l, sec]))}
-                        className="flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] capitalize transition"
+                        className="flex items-center gap-1 rounded-full border px-2 py-1 text-[12px] capitalize transition"
                         style={{ borderColor: on ? '#FFD700' : 'rgba(255,255,255,0.12)', color: on ? '#FFD700' : 'rgba(255,255,255,0.6)' }}>
                         {on ? <Lock className="h-3 w-3" /> : <Unlock className="h-3 w-3" />} {sec}
                       </button>
@@ -863,23 +864,23 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan: faceSca
               <Group title="Hide"><HideControls hide={doc?.flags.hide} onChange={setHide} /></Group>
               <Group title="Brows" soon={soonField('brows', BROWS)}>
                 <div className="flex flex-wrap gap-2">{BROWS.map((s) => <Chip key={s} label={faceOptionRenders('brows', s) ? s : `${s} · soon`} active={face.brows === s} onClick={() => setF('brows', s)} />)}</div>
-                {faceFieldRenders('brows', BROWS) && <p className="mt-1.5 text-[10px] text-white/35">Options marked “soon” show in the sketch only until their 3D shapes land.</p>}
+                {faceFieldRenders('brows', BROWS) && <p className="mt-1.5 text-[12px] text-white/50">Options marked “soon” show in the sketch only until their 3D shapes land.</p>}
               </Group>
               <Group title="Mouth" soon={soonField('mouth', MOUTHS)}><div className="flex flex-wrap gap-2">{MOUTHS.map((s) => <Chip key={s} label={s} active={face.mouth === s} onClick={() => setF('mouth', s)} />)}</div></Group>
               <Group title="Nose" soon={soonField('nose', NOSES)}><div className="flex flex-wrap gap-2">{NOSES.map((s) => <Chip key={s} label={s} active={face.nose === s} onClick={() => setF('nose', s)} />)}</div></Group>
               <Group title="Fine-tune">
-                <p className="mb-2 text-[11px] text-white/40">Sculpt on top of the shape preset. These are the same morphs the game renders.</p>
+                <p className="mb-2 text-[12px] text-white/50">Sculpt on top of the shape preset. These are the same morphs the game renders.</p>
                 <div className="space-y-2">
-                  {!faceSliders.length && <p className="text-[11px] text-white/40">This body has no face shapes to sculpt. Saved values are kept for a body that has them.</p>}
+                  {!faceSliders.length && <p className="text-[12px] text-white/50">This body has no face shapes to sculpt. Saved values are kept for a body that has them.</p>}
                   {faceSliders.map(({ key, label }) => (
                     <label key={key} className="flex items-center gap-3 text-xs text-white/70">
                       <span className="w-24 shrink-0">{label}</span>
                       <input type="range" min={0} max={100} value={Math.round(((face.sliders?.[key] ?? 0) as number) * 100)}
                         onChange={(e) => setSlider(key, Number(e.target.value) / 100)} className="w-full accent-cyan-400" aria-label={label} />
-                      <span className="w-8 text-right tabular-nums text-white/40">{Math.round(((face.sliders?.[key] ?? 0) as number) * 100)}</span>
+                      <span className="w-8 text-right tabular-nums text-white/50">{Math.round(((face.sliders?.[key] ?? 0) as number) * 100)}</span>
                     </label>
                   ))}
-                  <button type="button" onClick={() => setFace((p) => ({ ...p, sliders: {} }))} className="text-[11px] text-cyan-300/80 hover:text-cyan-200">Reset sculpt</button>
+                  <button type="button" onClick={() => setFace((p) => ({ ...p, sliders: {} }))} className="text-[12px] text-cyan-300/80 hover:text-cyan-200">Reset sculpt</button>
                 </div>
               </Group>
             </motion.div>
@@ -935,10 +936,10 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan: faceSca
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
               <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
                 <h3 className="mb-1 text-sm font-semibold text-white/80">Jersey ID</h3>
-                <p className="mb-3 text-[11px] text-white/40">Your number and name plate, rendered on your hero&apos;s back in every mode.</p>
+                <p className="mb-3 text-[12px] text-white/50">Your number and name plate, rendered on your hero&apos;s back in every mode.</p>
                 <div className="flex items-center gap-3">
                   <div>
-                    <label className="mb-1 block text-[10px] uppercase tracking-wider text-white/50">Number</label>
+                    <label className="mb-1 block text-[12px] uppercase tracking-wider text-white/50">Number</label>
                     <input
                       type="number" min={0} max={99} value={jersey.number}
                       onChange={(e) => setJersey((j) => sanitizeJersey({ ...j, number: e.target.value }))}
@@ -946,31 +947,31 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan: faceSca
                     />
                   </div>
                   <div className="flex-1">
-                    <label className="mb-1 block text-[10px] uppercase tracking-wider text-white/50">Name plate</label>
+                    <label className="mb-1 block text-[12px] uppercase tracking-wider text-white/50">Name plate</label>
                     <input
                       type="text" maxLength={12} value={jersey.name} placeholder="YOUR NAME"
                       onChange={(e) => setJersey((j) => sanitizeJersey({ ...j, name: e.target.value }))}
-                      className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 font-mono text-sm font-bold uppercase tracking-wider text-white placeholder:text-white/25"
+                      className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 font-mono text-sm font-bold uppercase tracking-wider text-white placeholder:text-white/50"
                     />
                   </div>
                 </div>
               </div>
               <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
                 <h3 className="mb-1 text-sm font-semibold text-white/80">Kit colours</h3>
-                <p className="mb-3 text-[11px] text-white/40">Any colour, on top of each item&apos;s own. Shows in every mode. Reset hands a slot back to the item&apos;s colour.</p>
+                <p className="mb-3 text-[12px] text-white/50">Any colour, on top of each item&apos;s own. Shows in every mode. Reset hands a slot back to the item&apos;s colour.</p>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   {KIT_COLOUR_SLOTS.map(([slot, label]) => {
                     const own = doc?.colours[slot];
                     const shown = (own ?? previewPalette[slot]).slice(0, 7).toLowerCase();
                     return (
-                      <label key={slot} className="flex flex-col gap-1 text-[11px] text-white/60">
+                      <label key={slot} className="flex flex-col gap-1 text-[12px] text-white/60">
                         <span>{label}</span>
                         <span className="flex items-center gap-2">
                           <input type="color" value={/^#[0-9a-f]{6}$/.test(shown) ? shown : '#000000'} aria-label={`${label} colour`}
                             onChange={(e) => setKitColour(slot, e.target.value)} className="h-8 w-10 cursor-pointer rounded border border-white/15 bg-transparent" />
-                          <span className="font-mono text-[10px] uppercase text-white/45">{shown}</span>
+                          <span className="font-mono text-[12px] uppercase text-white/50">{shown}</span>
                         </span>
-                        {own && <button type="button" onClick={() => setKitColour(slot, null)} className="self-start text-[10px] text-cyan-300/80 hover:text-cyan-200">Reset</button>}
+                        {own && <button type="button" onClick={() => setKitColour(slot, null)} className="self-start text-[12px] text-cyan-300/80 hover:text-cyan-200">Reset</button>}
                       </label>
                     );
                   })}
@@ -980,7 +981,7 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan: faceSca
                 <div key={slot}>
                   <h3 className="mb-2 text-sm font-semibold capitalize text-white/80">{slot}</h3>
                   {builtOver(slot) && (
-                    <p className="mb-2 text-[11px] text-[#FFD700]/80" role="note">Your built {builtOver(slot)} is worn over this slot (Clothing tab) — the item here shows again when you take it off.</p>
+                    <p className="mb-2 text-[12px] text-[#FFD700]/80" role="note">Your built {builtOver(slot)} is worn over this slot (Clothing tab) — the item here shows again when you take it off.</p>
                   )}
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                     <button onClick={() => setEquipped((p) => ({ ...p, [slot]: null }))} className="rounded-xl border border-white/10 bg-white/[0.02] p-3 text-left text-xs text-white/50 transition hover:border-white/25">None</button>
@@ -992,9 +993,9 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan: faceSca
                           <div className="mb-2 h-10 rounded-lg" style={{ background: `linear-gradient(135deg, ${w.accent}, transparent)` }} />
                           <div className="text-xs font-semibold text-white">{wearableLabel(w)}</div>
                           {isOwned ? (
-                            <button onClick={() => setEquipped((p) => ({ ...p, [slot]: w.itemId }))} className="mt-2 w-full rounded-lg py-1.5 text-[11px] font-bold" style={{ backgroundColor: isOn ? w.accent : 'rgba(255,255,255,0.08)', color: isOn ? '#050505' : '#fff' }}>{isOn ? 'Equipped' : 'Equip'}</button>
+                            <button onClick={() => setEquipped((p) => ({ ...p, [slot]: w.itemId }))} className="mt-2 w-full rounded-lg py-1.5 text-[12px] font-bold" style={{ backgroundColor: isOn ? w.accent : 'rgba(255,255,255,0.08)', color: isOn ? '#050505' : '#fff' }}>{isOn ? 'Equipped' : 'Equip'}</button>
                           ) : (
-                            <button onClick={() => buy(w.itemId)} disabled={buying === w.itemId} className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg bg-yellow-400/90 py-1.5 text-[11px] font-bold text-black disabled:opacity-60">
+                            <button onClick={() => buy(w.itemId)} disabled={buying === w.itemId} className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg bg-yellow-400/90 py-1.5 text-[12px] font-bold text-black disabled:opacity-60">
                               {buying === w.itemId ? <Loader2 className="h-3 w-3 animate-spin" /> : <Coins className="h-3 w-3" />} {w.coinPrice}
                             </button>
                           )}
@@ -1021,8 +1022,8 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan: faceSca
                       <button key={s.id} onClick={() => setSkinCardId(s.id)} className="rounded-xl border p-4 text-left transition" style={{ borderColor: on ? s.accent : 'rgba(255,255,255,0.1)', backgroundColor: on ? `${s.accent}18` : 'rgba(255,255,255,0.02)' }}>
                         <div className="mb-2 h-12 rounded-lg" style={{ background: `linear-gradient(135deg, ${s.accent}, transparent)` }} />
                         <div className="text-xs font-semibold text-white">{s.displayName}</div>
-                        <div className="text-[10px] uppercase text-white/40">{s.rarity}</div>
-                        {on && <div className="mt-1 text-[10px] font-bold" style={{ color: s.accent }}>Applied</div>}
+                        <div className="text-[12px] uppercase text-white/50">{s.rarity}</div>
+                        {on && <div className="mt-1 text-[12px] font-bold" style={{ color: s.accent }}>Applied</div>}
                       </button>
                     );
                   })}
@@ -1056,7 +1057,7 @@ function Group({ title, soon = false, children }: { title: string; soon?: boolea
       <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-white/80">
         <Palette className="h-3.5 w-3.5 text-cyan-400" /> {title}
       </h3>
-      {soon ? <p className="mb-2 text-[10px] text-white/35">Saved with your look; 3D shape not on body yet.</p> : null}
+      {soon ? <p className="mb-2 text-[12px] text-white/50">Saved with your look; 3D shape not on body yet.</p> : null}
       {children}
     </div>
   );

@@ -107,7 +107,7 @@ export function JumpCamera({ jumps, athlete, onAttempts }: { jumps: number; athl
           {jumps === 1 ? 'Start the camera: 1 jump' : `Start the camera: ${jumps} jumps`}
         </button>
       )}
-      <p className="text-[11px] text-fel-dim">{CAMERA_NOTE}</p>
+      <p className="text-[12px] text-fel-dim">{CAMERA_NOTE}</p>
     </div>
   );
 }

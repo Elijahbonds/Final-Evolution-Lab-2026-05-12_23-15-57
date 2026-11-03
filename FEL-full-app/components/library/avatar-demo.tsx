@@ -43,7 +43,7 @@ export function AvatarDemo({ clip }: { clip: string | null }) {
         </p>
       )}
       {state === 'ready' && (
-        <span className="pointer-events-none absolute left-2 top-2 rounded bg-black/60 px-2 py-0.5 text-[10px] font-bold tracking-wider text-[#00E5FF]" data-avatar-badge>
+        <span className="pointer-events-none absolute left-2 top-2 rounded bg-black/60 px-2 py-0.5 text-[12px] font-bold tracking-wider text-[#00E5FF]" data-avatar-badge>
           {still ? `YOUR ATHLETE · ${DEMO_COMING.toUpperCase()}` : 'YOUR ATHLETE'}
         </span>
       )}

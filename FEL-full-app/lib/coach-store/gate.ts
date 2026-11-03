@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/auth';
 import { isCoachStoreEnabled, isCoachStorePaymentsEnabled, isCoachReviewUploadsEnabled } from '@/lib/flags';
 import { STORE_CLOSED_MESSAGE } from './constants';
 import type { StoreClosedReason } from './stripeMode';
+import { isStoreCoachWith } from '@/lib/teach/role';
+import { teacherRoleDeps } from '@/lib/teach/server';
 
 /** Named so public coach-store routes match the route-contract guard. Flag off is a 404. */
 export function assertCoachStoreOn(): NextResponse | null {
@@ -52,4 +54,13 @@ export function logStoreUnavailable(): void {
 export function notSetUp(): NextResponse {
   logStoreUnavailable();
   return NextResponse.json({ error: 'coach_store_not_set_up', message: 'coach store not set up yet' }, { status: 503 });
+}
+
+/**
+ * PLAT-P10 (EDU-01, 2026-11-03): who may sell in the coach store. The teacher role replaces COACH_STORE_COACH_USER_IDS as
+ * the way in (lib/teach/role.ts: the owner-granted role, or a Camp-certified facilitator); the env list stays a fallback,
+ * checked first and with no database read, so the owner's own store keeps working before the teacher SQL is applied.
+ */
+export async function isStoreCoach(userId: string | null | undefined): Promise<boolean> {
+  return isStoreCoachWith(userId, teacherRoleDeps());
 }

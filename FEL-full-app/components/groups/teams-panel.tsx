@@ -39,7 +39,7 @@ export function TeamsPanel() {
           </li>
         ))}
       </ul>
-      <Link href={SQUADS_PATH} className="mt-3 inline-flex min-h-[44px] items-center text-xs font-bold text-fel-violet">{teams.length ? 'Start another team' : 'Start a team'} →</Link>
+      <Link href={SQUADS_PATH} className="mt-3 inline-flex min-h-[44px] items-center text-xs font-bold text-fel-violet-text">{teams.length ? 'Start another team' : 'Start a team'} →</Link>
     </section>
   );
 }

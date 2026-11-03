@@ -286,7 +286,7 @@ export function CalibrateClient({ returnTo = null }: { returnTo?: string | null 
               {offset > 0 ? '+' : ''}
               {offset} ms
             </p>
-            <p className="mt-1 text-xs text-white/40">{offsetLine(offset)}</p>
+            <p className="mt-1 text-xs text-white/50">{offsetLine(offset)}</p>
             {heard === 0 ? (
               <p className="mt-1 text-xs text-[#FFD700]">No taps heard — press Recalibrate and tap on every click.</p>
             ) : !steady ? (
@@ -342,7 +342,7 @@ export function CalibrateClient({ returnTo = null }: { returnTo?: string | null 
         )}
       </div>
 
-      <div className="mt-4 flex items-center justify-between gap-3 text-xs text-white/45">
+      <div className="mt-4 flex items-center justify-between gap-3 text-xs text-white/50">
         <span>
           {saved.saved ? (
             <>

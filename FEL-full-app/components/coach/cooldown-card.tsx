@@ -111,13 +111,13 @@ export function CooldownCard({ exercises, kind = null, programId, sessionId, end
     <section className="space-y-2" data-section="cooldown" data-cooldown aria-label={COOLDOWN.label}>
       <div className="px-1">
         {lead && <div className="text-sm font-medium text-white" data-cooldown-lead>{lead}</div>}
-        <div className="text-[11px] uppercase tracking-wider text-white/50">{COOLDOWN.label}</div>
-        <div className="text-[11px] text-fel-quiet">{COOLDOWN.meaning}</div>
+        <div className="text-[12px] uppercase tracking-wider text-white/50">{COOLDOWN.label}</div>
+        <div className="text-[12px] text-fel-quiet">{COOLDOWN.meaning}</div>
       </div>
       <div className="fel-card rounded-xl p-4 space-y-3" data-testid="cooldown">
         <div className="min-w-0">
           <div className="text-white font-medium" data-cooldown-title>{COOLDOWN_TITLE} · {plan.minutes} min</div>
-          <div className="text-[11px] text-fel-dim">{cooldownMeaning(plan.minutes)}</div>
+          <div className="text-[12px] text-fel-dim">{cooldownMeaning(plan.minutes)}</div>
         </div>
 
         <ul className="space-y-1" data-cooldown-notes>
@@ -138,17 +138,17 @@ export function CooldownCard({ exercises, kind = null, programId, sessionId, end
               className={`rounded-lg border px-3 py-2 ${at && !at.done && at.index === i ? 'border-fel-cyan/50 bg-fel-cyan/5' : 'border-white/8 bg-white/[0.02]'}`}>
               <div className="flex items-baseline justify-between gap-2">
                 <div className="min-w-0">
-                  <span className="mr-1.5 rounded bg-white/10 px-1 text-[10px] font-semibold uppercase tracking-wide text-white/60">{KIND_LABEL[s.kind]}</span>
+                  <span className="mr-1.5 rounded bg-white/10 px-1 text-[12px] font-semibold uppercase tracking-wide text-white/60">{KIND_LABEL[s.kind]}</span>
                   <span className="text-sm text-white">{s.name}</span>
                 </div>
                 <span className="shrink-0 font-mono text-xs tabular-nums text-white/50">{formatClock(s.seconds)}</span>
               </div>
-              <div className="text-[11px] text-fel-dim">{s.dose}</div>
+              <div className="text-[12px] text-fel-dim">{s.dose}</div>
               <div className="text-xs text-white/75">{s.cue}</div>
             </li>
           ))}
         </ol>
-        <div className="text-[11px] text-fel-quiet">{BREATH_SOURCE_LINE}</div>
+        <div className="text-[12px] text-fel-quiet">{BREATH_SOURCE_LINE}</div>
 
         {done ? (
           <div className="flex items-center gap-1.5 text-sm text-[#7BD389]" data-cooldown-done role="status">
@@ -184,7 +184,7 @@ function RunPanel({ plan, at, paused, onPause, onNext, onStop }: {
     <div className="rounded-lg border border-fel-cyan/30 bg-black/30 p-3 space-y-2" data-cooldown-run data-run-step={s.id}>
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <div className="text-[11px] uppercase tracking-wider text-fel-dim">{KIND_LABEL[s.kind]} · step {at.index + 1} of {plan.steps.length}{paused ? ' · paused' : ''}</div>
+          <div className="text-[12px] uppercase tracking-wider text-fel-dim">{KIND_LABEL[s.kind]} · step {at.index + 1} of {plan.steps.length}{paused ? ' · paused' : ''}</div>
           <div className="text-white font-medium truncate">{s.name}</div>
         </div>
         <div className="font-mono text-2xl tabular-nums text-white" aria-live="off">{formatClock(at.remainingSec)}</div>

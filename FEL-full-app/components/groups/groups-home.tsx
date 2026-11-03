@@ -58,7 +58,7 @@ export function GroupsHome({ initial, initialNames }: { initial: GroupsHomeData;
                 <span aria-hidden className="h-8 w-8 shrink-0 rounded-lg" style={{ background: `${GROUP_COLORS[g.color]}33`, boxShadow: `inset 0 0 0 1px ${GROUP_COLORS[g.color]}88` }} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[14.5px] font-bold text-white">{g.name}</span>
-                  <span className="block text-[11.5px] text-fel-dim">{KIND_LABEL[g.kind]} · {g.members} {g.members === 1 ? 'member' : 'members'} · you’re {g.role}</span>
+                  <span className="block text-[12px] text-fel-dim">{KIND_LABEL[g.kind]} · {g.members} {g.members === 1 ? 'member' : 'members'} · you’re {g.role}</span>
                 </span>
                 <span className="text-fel-quiet">›</span>
               </Link>
@@ -71,7 +71,7 @@ export function GroupsHome({ initial, initialNames }: { initial: GroupsHomeData;
         <h2 className="fel-heading text-[13px] font-bold uppercase tracking-wide text-white">Join with a code</h2>
         <form className="mt-2 flex gap-2" onSubmit={(e) => { e.preventDefault(); if (code.trim()) void post('/api/groups/join', { code }); }}>
           <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase().slice(0, 12))} placeholder="ABCD-2345" aria-label="Invite code" autoCapitalize="characters" autoComplete="off" spellCheck={false}
-            className="min-h-[48px] min-w-0 flex-1 rounded-lg border border-white/15 bg-black/40 px-3 font-mono text-[16px] tracking-[0.15em] text-white placeholder:text-white/25" />
+            className="min-h-[48px] min-w-0 flex-1 rounded-lg border border-white/15 bg-black/40 px-3 font-mono text-[16px] tracking-[0.15em] text-white placeholder:text-white/50" />
           <button disabled={busy || !code.trim()} className="min-h-[48px] rounded-lg bg-fel-cyan px-4 text-[13px] font-bold text-fel-bg disabled:opacity-50">Join</button>
         </form>
       </section>
@@ -104,12 +104,12 @@ export function GroupsHome({ initial, initialNames }: { initial: GroupsHomeData;
           <p className="mt-1 text-[12.5px] text-white/50">For coaches: athletes who join a team join your roster. The colour above is the team’s too.</p>
           <form className="mt-2 flex gap-2" onSubmit={(e) => { e.preventDefault(); void create('team'); }}>
             <input value={teamName} onChange={(e) => setTeamName(e.target.value.slice(0, 32))} placeholder="Team name" aria-label="Team name" maxLength={32}
-              className="min-h-[48px] min-w-0 flex-1 rounded-lg border border-white/15 bg-black/40 px-3 text-[15px] text-white placeholder:text-white/25" />
+              className="min-h-[48px] min-w-0 flex-1 rounded-lg border border-white/15 bg-black/40 px-3 text-[15px] text-white placeholder:text-white/50" />
             <button disabled={busy || teamName.trim().length < 2} className="min-h-[48px] rounded-lg bg-fel-violet px-4 text-[13px] font-bold text-white disabled:opacity-50">Create</button>
           </form>
         </section>
       )}
-      <p className="px-1 text-[11.5px] text-fel-quiet">{TEEN_SAFE_LINE}</p>
+      <p className="px-1 text-[12px] text-fel-quiet">{TEEN_SAFE_LINE}</p>
     </div>
   );
 }

@@ -41,6 +41,8 @@ import { PORTRAIT_HERO_MARGIN } from '@/lib/babylon/modes/netPortraitCam';
 import { OCCLUDER_FADE_ALPHA, OCCLUDER_FADE_SEC, OCCLUDER_HOLD_SEC } from '@/lib/babylon/core/OccluderFade';   // gameplay-clean
 import { FOOTBALL_CARRY_RATE_MAX } from '@/lib/babylon/anim/footballTree';   // gameplay-clean P2 #6
 import { CAM_LEAD_EASE_SEC, CAM_LEAD_FULL_MPS } from '@/lib/babylon/core/CameraDirector';   // gameplay-clean P2 #10
+import { PLANT_ENGAGE_SEC } from '@/lib/babylon/anim/FootPlanting';   // gameplay-clean P3
+import { HIP_YAW_FOLD_ON } from '@/lib/babylon/anim/PostureLayer';   // gameplay-clean P3
 import { AI_REACT_ROOKIE_MS, AI_REACT_PRO_MS, AI_REACT_ELITE_MS } from '@/lib/babylon/hoops/reaction';   // lane/hoops-round2
 import { DOUBLE_TEAM_ON, DOUBLE_PAINT_M, DOUBLE_AFTER_SEC, DOUBLE_MAX_SEC, DOUBLE_COOLDOWN_SEC, SWITCH_ON_SCREEN_ON, SWITCH_HELP_M, SWITCH_COOLDOWN_SEC } from '@/lib/babylon/hoops/teamDefense';
 import { HAND_CHECK_ON, HAND_CHECK_REACH_OVER_M, HAND_CHECK_GAP_SEC, HAND_CHECK_FOUL_COUNT, HAND_CHECK_WINDOW_SEC, CONTACT_POSE_ON, CONTACT_EASE_IN_SEC, CONTACT_EASE_OUT_SEC } from '@/lib/babylon/hoops/handCheck';
@@ -53,6 +55,9 @@ import * as P3T from '@/lib/babylon/hoops/teamOffense3v3';   // hoops-p03
 import * as P4T from '@/lib/babylon/anim/hoopsTransitions';   // hoops-p04
 import * as P4R from '@/lib/babylon/hoops/releaseTiming';   // hoops-p04
 import { PLANT_RELEASE_FADE_SEC } from '@/lib/babylon/anim/basketballTree';   // hoops-p04
+import * as P4B from '@/lib/babylon/anim/locoAccent';   // hoops-p04b
+import { CONTACT_ARM_SWAP_SEC } from '@/lib/babylon/hoops/contactPoses';   // hoops-p04b
+import { CARRY_ARM_SPEED_SEC } from '@/lib/babylon/anim/ballCarry';   // hoops-p04b
 import { STEAL_DICE_ON, STRIP_REACH_M, STRIP_SHIELD_M, STRIP_BALL_MAX_Y } from '@/lib/babylon/hoops/steals';   // hoops-p02
 import { ONBALL_CUSHION_M, ONBALL_CUSHION_PER_MPS } from '@/lib/babylon/hoops/pressure';   // hoops-p02
 
@@ -97,6 +102,8 @@ describe('the feel knob catalogue', () => {
     expect(def('football.carryStrideMax')).toBe(FOOTBALL_CARRY_RATE_MAX);
     expect(def('camera.leadEaseSec')).toBe(CAM_LEAD_EASE_SEC);
     expect(def('camera.leadFullMps')).toBe(CAM_LEAD_FULL_MPS);
+    expect(def('anim.plantEngageSec')).toBe(PLANT_ENGAGE_SEC);
+    expect(def('anim.hipYawFold')).toBe(HIP_YAW_FOLD_ON);
     // hoops-round2 (HOP-02 "Hoops · AI reaction", HOP-03 "Hoops · team defense", HOP-04 "Hoops · contact"): the owner's 420 / 220 / 120
     expect(def('hoops.aiReactRookieMs')).toBe(AI_REACT_ROOKIE_MS);
     expect(def('hoops.aiReactProMs')).toBe(AI_REACT_PRO_MS);
@@ -226,6 +233,10 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.releaseToClipOn')).toBe(P4R.RELEASE_TO_CLIP_ON ? 1 : 0);
     expect(def('hoops.jumperFromRiseOn')).toBe(P4R.JUMPER_FROM_RISE_ON ? 1 : 0);
     expect(def('hoops.plantReleaseFadeSec')).toBe(PLANT_RELEASE_FADE_SEC);
+    // hoops-p04b: the layer fixes the rig traced — defaults pinned
+    expect(def('hoops.accentOffBeatsOn')).toBe(P4B.ACCENT_OFF_BEATS_ON ? 1 : 0);
+    expect(def('hoops.contactArmSwapSec')).toBe(CONTACT_ARM_SWAP_SEC);
+    expect(def('hoops.carryArmSpeedSec')).toBe(CARRY_ARM_SPEED_SEC);
     expect(def('hoops.rivalKitOn')).toBe(P3R.RIVAL_KIT_ON ? 1 : 0);
     expect(def('hoops.rivalTightM')).toBe(P3R.RIVAL_TIGHT_M);
     expect(def('hoops.rivalHesiSec')).toBe(P3R.RIVAL_HESI_SEC);

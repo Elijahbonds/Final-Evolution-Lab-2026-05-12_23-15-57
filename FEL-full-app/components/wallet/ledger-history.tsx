@@ -91,7 +91,7 @@ export function LedgerHistory() {
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium text-white">{meta.label}</div>
                 {note && <div className="text-xs text-white/65">{note}</div>}
-                <div className="text-[11px] text-white/40">{fmtDate(e.created_at)}</div>
+                <div className="text-[12px] text-white/50">{fmtDate(e.created_at)}</div>
               </div>
               <div className={`flex items-center gap-1 font-mono text-sm font-semibold ${positive ? 'text-[#00FF9D]' : 'text-[#FF3366]'}`}>
                 {positive ? '+' : ''}{e.delta.toLocaleString('en-US')}
@@ -99,7 +99,7 @@ export function LedgerHistory() {
                   : e.currency === 'lc' ? <Landmark className="h-3.5 w-3.5 text-[#7FEFFF]" aria-label="Lab Credits" />
                   : <Coins className="h-3.5 w-3.5 text-[#FFD700]" aria-label="coins" />}
               </div>
-              <div className="w-16 shrink-0 text-right font-mono text-[11px] text-white/40">{e.balance_after.toLocaleString('en-US')}</div>
+              <div className="w-16 shrink-0 text-right font-mono text-[12px] text-white/50">{e.balance_after.toLocaleString('en-US')}</div>
             </li>
           );
         })}

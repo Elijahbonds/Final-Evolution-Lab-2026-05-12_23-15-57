@@ -51,7 +51,7 @@ export default function ControllerLinkHarness() {
   return (
     <div className="relative min-h-screen bg-[#07090d] p-6 font-mono text-xs text-white">
       <h1 className="text-lg font-bold text-[#00E5FF]">Controller Link — dev harness</h1>
-      <p className="mt-1 text-white/40">
+      <p className="mt-1 text-white/50">
         Scan the QR (or open the URL on another device on this network) to join as a controller.
       </p>
 
@@ -63,15 +63,15 @@ export default function ControllerLinkHarness() {
           <div className="mt-2 grid grid-cols-5 gap-2 text-center">
             {(['n', 'min', 'mean', 'p95', 'max'] as const).map((k) => (
               <div key={k}>
-                <div className="text-white/40">{k}</div>
+                <div className="text-white/50">{k}</div>
                 <div className="text-lg text-[#22d3ee]">{stats[k]}{k === 'n' ? '' : 'ms'}</div>
               </div>
             ))}
           </div>
         ) : (
-          <p className="mt-2 text-white/30">No inputs yet.</p>
+          <p className="mt-2 text-white/50">No inputs yet.</p>
         )}
-        <p className="mt-3 text-[10px] leading-relaxed text-white/30">
+        <p className="mt-3 text-[12px] leading-relaxed text-white/50">
           Cross-device clocks are not synchronised, so this figure is only exact when both
           ends are the same machine. For a real phone, read the RTT in the lobby panel —
           that is measured by ping/pong over the same data channel and needs no shared clock.
@@ -83,11 +83,11 @@ export default function ControllerLinkHarness() {
         <ul className="mt-2 space-y-1">
           {log.map((r, i) => (
             <li key={i} className="flex gap-4 text-white/70">
-              <span className="text-white/30">{new Date(r.t).toLocaleTimeString()}</span>
+              <span className="text-white/50">{new Date(r.t).toLocaleTimeString()}</span>
               <span className="text-[#ffd75e]">P{r.slot + 1}</span>
               <span className="text-[#00E5FF]">{r.action}</span>
-              <span className="text-white/40">{r.payload}</span>
-              <span className="ml-auto text-white/30">{r.latency}ms</span>
+              <span className="text-white/50">{r.payload}</span>
+              <span className="ml-auto text-white/50">{r.latency}ms</span>
             </li>
           ))}
         </ul>

@@ -110,7 +110,14 @@ const UA = 'AgeScreenTest/1.0';
 // BBS-04 (lane/plat-bbs04, 2026-11-03) prisma/pending/2026-11-03-hoops-cam.sql (pending SQL only; schema.prisma untouched;
 // HoopsCamSession, additive) at 72693f90, the lane commit carrying it on top of every file above (cut from finish-release
 // at 67169fd2). lane/plat-p10's teacher.sql is not on this base: whichever lands second re-pins at its merge.
-const PARENT = '72693f902e6b338f4086199e30e1de1666a09ee0';
+// TEACHER PLATFORM (lane/plat-p10, 2026-11-03) prisma/pending/2026-11-03-teacher.sql (pending SQL only; schema.prisma
+// untouched; TeacherApplication + TeacherRole + TeachCourse, additive) at 882bf0f9, the lane commit carrying it on top of
+// every file above.
+// Both lanes merged at 91ba351b (lane/plat-p10's merge of lane/finish-release), the first commit carrying every pending
+// file above.
+// MERGE (lane/plat-bbs04 + finish-release 05c73483, 2026-11-03): hoops-cam.sql + teacher.sql, both pending files; pinned at
+// the merge (interim value below is finish-release's pin; the follow-up commit re-pins to the merge sha).
+const PARENT = '91ba351b9b2b612a4da5d6c49af8c5eded53dd6d';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {

@@ -12,13 +12,13 @@ export function PressFrame({
   return (
     <div className="min-h-screen bg-[#070707] pb-24 text-white">
       {signedIn ? null : <PublicTopBar />}
-      <p className="bg-[#3a1214] px-4 py-2 text-center text-[11px] leading-relaxed text-[#ffb4b4]">
+      <p className="bg-[#3a1214] px-4 py-2 text-center text-[12px] leading-relaxed text-[#ffb4b4]">
         {EXAMPLE_PRICE_NOTE} Checkout is Stripe test mode. Buy buttons do not charge a live card.
       </p>
       <main className="mx-auto max-w-5xl px-4 py-8">
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/40">
+            <p className="text-[12px] font-semibold uppercase tracking-[0.22em] text-white/50">
               <Link href="/" className="hover:text-white/70">Final Evolution Lab</Link>
             </p>
             <h1 className="fel-heading text-4xl text-white sm:text-5xl">
@@ -36,7 +36,7 @@ export function PressFrame({
           </Link>
         </header>
         {children}
-        <footer className="mt-12 flex flex-wrap gap-4 border-t border-white/10 pt-4 text-[11px] text-white/35">
+        <footer className="mt-12 flex flex-wrap gap-4 border-t border-white/10 pt-4 text-[12px] text-white/50">
           <Link href="/terms" className="hover:text-white/70">Terms</Link>
           <Link href="/privacy" className="hover:text-white/70">Privacy</Link>
           <Link href="/support" className="hover:text-white/70">Support</Link>

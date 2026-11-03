@@ -37,6 +37,12 @@ import { SIGNATURE_BUILDERS } from './exerciseSignature';
 import { WARMUP_BUILDERS } from './exerciseWarmup';
 import { ASK_BUILDERS } from './exerciseAsks';
 import { FAMILY_BUILDERS } from './exerciseFamilies';
+import { FAMILY5_BUILDERS } from './exerciseFamilies5';
+import { OLY_BUILDERS } from './exerciseOly';
+import { HOOPS_DRILL_BUILDERS } from './exerciseHoops';
+import { GRIP_BUILDERS } from './exerciseGrip';
+import { FAMILY7_BUILDERS } from './exerciseFamilies7';
+import { FAMILY8_BUILDERS } from './exerciseFamilies8';
 
 
 // ── lower body ───────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -433,6 +439,12 @@ export const EXERCISE_BUILDERS: readonly [string, (scene: Scene, sk: Skeleton) =
   // DEMO-LOOPS-4: what the programs ask for and the single-leg search (exerciseAsks.ts)
   ...ASK_BUILDERS,
   ...FAMILY_BUILDERS,
+  ...FAMILY5_BUILDERS,
+  ...OLY_BUILDERS,
+  ...HOOPS_DRILL_BUILDERS,
+  ...GRIP_BUILDERS,
+  ...FAMILY7_BUILDERS,
+  ...FAMILY8_BUILDERS,
 ];
 /** Build one exercise loop by name (authored/index.ts registers each name through this). */
 export function buildExerciseClip(name: string, scene: Scene, sk: Skeleton): AnimationGroup | null {

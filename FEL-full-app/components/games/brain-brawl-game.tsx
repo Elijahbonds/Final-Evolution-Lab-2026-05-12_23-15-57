@@ -232,21 +232,21 @@ export default function BrainBrawlGame({ grade, prqDisplay: shownPrq, onEnd, gam
       <div className="relative z-10 mx-auto flex w-full max-w-xl items-center justify-between rounded-lg bg-[#0F0F13]/85 px-4 py-2.5 ring-1 ring-white/10">
         <div className="text-center">
           <div className="font-mono text-[28px] font-bold leading-none text-[#A855F7]">{score}</div>
-          <div className="text-[10px] uppercase tracking-wider text-white/40">Score</div>
+          <div className="text-[12px] uppercase tracking-wider text-white/50">Score</div>
         </div>
         <div className="text-center">
           <div className={`font-mono text-[28px] font-bold leading-none ${timeLeft <= 15 ? 'text-[#FF3366] fel-pulse' : 'text-white'}`}>
             {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
           </div>
-          <div className="text-[10px] uppercase tracking-wider text-white/40">Clock</div>
+          <div className="text-[12px] uppercase tracking-wider text-white/50">Clock</div>
         </div>
         <div className="text-center">
           <div className="font-mono text-[28px] font-bold leading-none text-[#00FF9D]">{acc}%</div>
-          <div className="text-[10px] uppercase tracking-wider text-white/40">Accuracy</div>
+          <div className="text-[12px] uppercase tracking-wider text-white/50">Accuracy</div>
         </div>
         <div className="hidden text-right sm:block">
           <div className="font-mono text-xs" style={{ color: (shownPrq ?? prqDisplay(null)).color }}>{(shownPrq ?? prqDisplay(null)).badge}</div>
-          <div className="font-mono text-[10px] text-white/40">DIFF: {difficulty().toUpperCase()}</div>
+          <div className="font-mono text-[12px] text-white/50">DIFF: {difficulty().toUpperCase()}</div>
         </div>
       </div>
 
@@ -269,7 +269,7 @@ export default function BrainBrawlGame({ grade, prqDisplay: shownPrq, onEnd, gam
         <div className={phase === 'spin' || phase === 'intro' ? 'mt-4' : 'hidden'}>
           <canvas ref={canvasRef} className="mx-auto" style={{ width: 300, height: 300 }} />
           {phase === 'spin' && !spinRef.current?.spinning && (
-            <p className="mt-2 text-center font-mono text-xs text-white/40">Landing…</p>
+            <p className="mt-2 text-center font-mono text-xs text-white/50">Landing…</p>
           )}
         </div>
 
@@ -311,11 +311,11 @@ export default function BrainBrawlGame({ grade, prqDisplay: shownPrq, onEnd, gam
                             ? 'border-[#00FF9D] bg-[#00FF9D]/15 text-[#00FF9D]'
                             : isPicked
                               ? 'border-[#FF3366] bg-[#FF3366]/15 text-[#FF3366]'
-                              : 'border-white/10 bg-[#16161A] text-white/40'
+                              : 'border-white/10 bg-[#16161A] text-white/50'
                           : 'border-white/10 bg-[#16161A] text-white/85 hover:border-[#A855F7]/60 hover:bg-[#A855F7]/10'
                       }`}
                     >
-                      <span className="mr-2 font-mono text-xs text-white/40">{String.fromCharCode(65 + i)}</span>
+                      <span className="mr-2 font-mono text-xs text-white/50">{String.fromCharCode(65 + i)}</span>
                       {opt}
                     </button>
                   );

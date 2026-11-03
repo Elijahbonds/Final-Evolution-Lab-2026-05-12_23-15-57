@@ -168,6 +168,36 @@ his own possession with no move logged (frames 342 / 348 of seed 7, unchanged by
 of the rest dribble ("gear stop → sprint") and on the guard hand's cross ("guard hand crosses") — the rest-dribble layers (anim/RestDribble,
 core/HoopsLook) snapping on and off; the rival's arm at the start of a kit move.
 
+### 3e. Phase 4b (the pops traced to a layer, lane/hoops-p04b) — before → after, the rig, same seed
+
+The rig now traces WHICH LAYER moved a bone (`POP_LIST=1`: the after-animations observers wrapped, a layer's frame-to-frame change over
+600 °/s logged against it) and records the pose as DRAWN (it recorded after hoops/contactPoses had put its arm bar and forearm back, and
+before nothing else: the contact poses were never measured). Both before and after are on this rig. **The rig is not deterministic:** one
+build and seed played two different 1v1 sequences (A: the pocket pick, then the step-back jumper; B: the reach-in, then the spin layup)
+on different runs, so each after is paired with a before of the same sequence.
+
+| what | before (p04 site) | after (p04b 27401346) |
+|---|---|---|
+| hero thigh spike in the step-back gather (1v1 A, frames 342–349) | 8 456 / 10 132 °/s — LocoAccent re-solving the legs under the gather beat | the legs' worst there 949 °/s (not severe); the ball arm's 3 967 °/s at frame 341 stays — the carry's let-go fades 108 → 44° and then cuts 44 → 0 in a frame |
+| 1v1 A, defence possession (frames 0–194): pops hero / rival, severe | 8 / 11, severe 3 / 2 | 5 / 8, severe 0 / 1 |
+| 1v1 A, offence possession to frame 437: pops hero / rival, severe | 26 / 16, severe 2 / 3 | 30 / 15, severe 1 / 1 |
+| 3v3, one rival possession (329 frames before, 395 after — the play differs): pops all six bodies, severe; hero pops, severe | 76, severe 10; hero 17, severe 8 | 66, severe 3; hero 15, severe 0 |
+| 1v1 input run (the scripted shots and stops), hero: pops, severe, slide p90, root snaps | 77, severe 9, 1.54 cm, 6 | 48, severe 5 (all five in the made-shot celebration), 2.07 cm, 0 |
+| contact poses in 3v3: layer events ≥ 3 000 °/s | 7 (max 7 696) | 1 (max 3 797), over a longer possession |
+| stop / start accent in 3v3: layer events ≥ 3 000 °/s | 10 (max 5 358) | 0 (max 1 758) |
+| M3 root snaps | 0 | 0 |
+
+The fixes, each traced to its layer first: the stop / start accent off under a beat (`hoops.accentOffBeatsOn`); a contact-pose arm
+swap eased per arm (`hoops.contactArmSwapSec`); the carry's arm weights on an eased speed (`hoops.carryArmSpeedSec`); the leg re-solves'
+knee pole is the clip's bend with a 1 cm memory of its own (legSink, footGlide), not the root's front under 1 cm of bend.
+
+What is left over the bars (ranked by the tracer): footGlide's lift and step re-solving the legs (the largest hero source on offence),
+the carry's reach on the ball arm through the moves and the release, the rival's foot planter and footGlide fighting the stumble and
+the contact reaction (FootPlanting is every mode's: not changed here), clip-stage foot spins under `ankle_stumble` and `def_cross_run`
+that the clip alone does not have (clip-flip.mts), and the celebration (`dunk_mc_celebrate_big`), whose arm pops come from after the
+traced pass. M1 slide: the hero's "planted" feet in a fast slide, a run and a block reach are footGlide's lift at 4.9–5.4 cm, just
+under the rig's 5 cm planted band, while the body moves 6–10 cm a frame: no foot is planted at all (clip pace, not a layer).
+
 ## 4. Ranked gaps
 
 Ranked by what the owner feels first × how far from the bar. "Shared" = touches one of the shared hoops files.

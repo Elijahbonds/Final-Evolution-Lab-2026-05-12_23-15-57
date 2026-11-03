@@ -73,7 +73,7 @@ export function BuyButton({
 
   return (
     <div>
-      <label className="mb-2 flex max-w-xs items-start gap-2 text-[11px] leading-snug text-white/60">
+      <label className="mb-2 flex max-w-xs items-start gap-2 text-[12px] leading-snug text-white/60">
         <input
           type="checkbox"
           checked={termsAgreed}

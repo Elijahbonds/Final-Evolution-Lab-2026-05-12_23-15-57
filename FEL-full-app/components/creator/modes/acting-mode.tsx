@@ -63,7 +63,7 @@ export default function ActingMode({ onPublish, submitLabel = 'Publish for Revie
           <button key={s.id} onClick={() => setScene(s)} disabled={phase === 'recording'}
             className={`rounded-xl p-3 text-left text-sm transition ${scene.id === s.id ? 'bg-amber-500 text-black' : 'bg-neutral-900 text-neutral-200 hover:bg-neutral-800'}`}>
             <span className="font-bold">{s.line}</span>
-            <span className="mt-1 block text-[11px] opacity-70">plays: {s.slot}</span>
+            <span className="mt-1 block text-[12px] opacity-70">plays: {s.slot}</span>
           </button>
         ))}
       </div>

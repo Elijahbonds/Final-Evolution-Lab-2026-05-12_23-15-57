@@ -67,7 +67,7 @@ export function ProgramWeekLine({ card }: { card: ProgramCard | null }) {
       className="mt-3 flex min-h-[44px] items-center gap-3 rounded-2xl border border-[#00E5FF]/20 bg-[#00E5FF]/[0.04] px-4 py-2.5 text-[13px] text-white/70 hover:bg-[#00E5FF]/[0.08]">
       <Layers aria-hidden className="h-4 w-4 shrink-0 text-[#00E5FF]" />
       <span className="min-w-0 flex-1">{card.title}: week {p.week} of {p.of}, {p.weekDone} of {p.weekTotal} sessions this week.</span>
-      <span className="shrink-0 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-[#00E5FF]">Program →</span>
+      <span className="shrink-0 font-mono text-[12px] font-bold uppercase tracking-[0.14em] text-[#00E5FF]">Program →</span>
     </Link>
   );
 }

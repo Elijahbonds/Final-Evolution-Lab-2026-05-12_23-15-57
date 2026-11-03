@@ -149,3 +149,24 @@ describe('the orbit cut plays as a travelling camera', () => {
     expect(swept).toBeGreaterThan(1.0);                                                // it travelled well over a radian by the end of the frames played
   });
 });
+
+// DUNK-FLAGSHIP Phase 8: an ordinary make (no freeze) ended its triple cut with ONE frame from the poster's camera — the low shot of
+// the rim, drawn after finish() had already put the live root back, so the dunker was out of the frame (measured on the rig).
+describe('the cut with no poster ends without the poster camera', () => {
+  it('one cut, one camera: no second jump of the camera before the cut ends', async () => {
+    const r = rig();
+    for (let i = 0; i < 60; i++) r.step((k) => { r.root.position.y = Math.min(1.2, k * 0.03); }, i);
+    const contact = r.nowSec() - 0.2;
+    // 0.51 s: not a whole number of 1/30 s frames, so the clock runs PAST the last cut on its final frame, as a real frame time does
+    // (the PROFILE cut: the baseline's camera stands within 0.5 m of the poster's — on the rig the last cut is the orbit, 3+ m away)
+    const cut: CutSpec = { id: 'profile', lead: 0.41, tail: 0.1, speed: 1, label: 'test' };
+    const seen: Vector3[] = [r.scene.activeCamera!.position.clone()];
+    let over = false;
+    const done = r.rec.playCuts(new Vector3(0, 3.05, 5), contact, [cut]).then(() => { over = true; });
+    for (let i = 0; i < 40 && !over; i++) { r.step(); seen.push(r.scene.activeCamera!.position.clone()); await Promise.resolve(); }
+    await done;
+    expect(over).toBe(true);
+    const jumps = seen.slice(1).map((p, k) => Vector3.Distance(p, seen[k])).filter((d) => d > 0.5);
+    expect(jumps.length, `camera jumps over 0.5 m in a frame: ${jumps.map((d) => d.toFixed(2)).join(', ')}`).toBe(1);   // the cut itself
+  });
+});
