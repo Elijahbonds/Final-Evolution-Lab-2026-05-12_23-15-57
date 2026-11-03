@@ -1,6 +1,7 @@
 // PROGRAM-ASK (2026-11-02): the parts around the builder — the ask parser and its chips, the AI guards (the model can never
 // set a dose, add an exercise or bypass a rule), the checkpoint, the phone's save, and the session-player adapter.
 import { describe, expect, it } from 'vitest';
+import { MAX_EFFORT_CUE } from '@/lib/coach/taxonomy';
 import { parseAsk } from '@/lib/library/ask/parse';
 import { loadLibraryFiles } from '@/lib/library/files';
 import { fromProgram } from '@/lib/session-player/fromProgram';
@@ -39,7 +40,7 @@ describe('the ask parser', () => {
     expect(a).toMatch(/medium long loop band — not a mini band/);
     expect(a).toMatch(/beginner/);
     expect(r.assumptions.every((x) => x.startsWith('assumption: '))).toBe(true);
-    expect(r.chips.filter((c) => c.assumed).map((c) => c.field)).toEqual(expect.arrayContaining(['days', 'minutes', 'level', 'tension', 'goal']));
+    expect(r.chips.filter((c) => c.assumed).map((c) => c.field)).toEqual(expect.arrayContaining(['days', 'minutes', 'level', 'bands', 'goal']));
   });
 
   it('a chip changes in one tap: days 3 → 4 by its + step, clamped, and its assumption line goes', () => {
@@ -188,5 +189,64 @@ describe('day 1 in the session player (lib/session-player/fromProgram.ts)', () =
     const row = s.steps.find((x) => /Band Row/.test(x.name))!;
     expect(row.setup).toMatch(/^Band setup: /);
     expect(row.note).toMatch(/Too easy\?/);
+  });
+});
+
+describe('PROGRAM-ASK-2: the authored band and home entries (data/library/authored/b5-program-ask.json)', () => {
+  const NEW = ['band-under-feet-squat', 'band-front-squat', 'band-split-squat', 'band-rear-foot-elevated-split-squat', 'pike-push-up', 'step-in-mountain-climber'];
+  const byId = new Map(LIB.map((e) => [e.id, e]));
+
+  it('are drafts, youth-safe, and every regression / progression link resolves to a real entry', () => {
+    for (const id of NEW) {
+      const e = byId.get(id)!;
+      expect(e, id).toBeTruthy();
+      expect(e.review.status).toBe('draft');
+      expect(e.youthOk).toBe(true);
+      for (const c of [...e.cues, ...e.faults.map((f) => f.fix), e.setup]) expect(MAX_EFFORT_CUE.test(c), c).toBe(false);
+      expect(e.regressionId && byId.has(e.regressionId), `${id} regression`).toBe(true);
+      expect(e.progressionId && byId.has(e.progressionId), `${id} progression`).toBe(true);
+    }
+  });
+
+  it('the builder prefers them: the sample\'s squats are both band-loaded, a no-equipment plan presses overhead, a beginner finisher stays on the floor', () => {
+    const knee = sample.weeks[0].days.flatMap((d) => d.blocks.flatMap((b) => b.items.filter((i) => i.slot === 'knee').map((i) => i.exId)));
+    expect(new Set(knee)).toEqual(new Set(['band-under-feet-squat', 'band-front-squat']));
+    const bw = buildProgram({ request: readProgramAsk('no equipment, full body, 3 days a week, 40 minutes').request, library: LIB });
+    expect(bw.weeks[0].days.some((d) => d.blocks.some((b) => b.items.some((i) => i.exId === 'pike-push-up')))).toBe(true);
+    const fin = sample.weeks[0].days[0].blocks.find((b) => b.kind === 'filler')!;
+    expect(fin.items.map((i) => i.exId)).toContain('step-in-mountain-climber');
+  });
+
+  it('a later block climbs onto the band split squat ladder', () => {
+    const long = buildProgram({ request: { ...sample.request, level: 'intermediate', weeks: 8 }, library: LIB });
+    const names = long.weeks.filter((w) => w.block === 2).flatMap((w) => w.days.flatMap((d) => d.blocks.flatMap((b) => b.items.map((i) => i.exId))));
+    expect(names.some((id) => ['band-split-squat', 'band-rear-foot-elevated-split-squat', 'band-front-squat'].includes(id))).toBe(true);
+  });
+});
+
+describe('PROGRAM-ASK-2: "What bands do you have?"', () => {
+  it('reads a band set, offers it as a chip, and the chip edits it', () => {
+    const r = readProgramAsk('I have light, medium and heavy bands, full body, 3 days');
+    expect(r.request.bands).toEqual(['light', 'medium', 'heavy']);
+    expect(r.assumptions.some((a) => /medium long loop band/.test(a))).toBe(false);
+    expect(readProgramAsk('a set of resistance bands').request.bands).toEqual(['light', 'medium', 'heavy']);
+    expect(readProgramAsk('a heavy band').request).toMatchObject({ tension: 'heavy', bands: [] });
+    const one = readProgramAsk('a band');
+    const chip = one.chips.find((c) => c.field === 'bands')!;
+    expect(chip.options!.map((o) => o.value)).toContain('light,heavy');
+    expect(applyEdits(one, { bands: 'light,heavy' }).request).toMatchObject({ bands: ['light', 'heavy'], tension: null });
+    expect(applyEdits(one, { bands: 'heavy' }).request).toMatchObject({ bands: [], tension: 'heavy' });
+    expect(applyEdits(one, { bands: 'purple' }).request.bands).toEqual([]);
+  });
+
+  it('with a set, each band exercise names its band: heavy for the legs and hips, lightest for the trunk', () => {
+    const p = buildProgram({ request: readProgramAsk('light, medium and heavy bands, full body, 3 days a week, 40 minutes').request, library: LIB });
+    expect(programProblems(p, LIB, { jumpsOpen: false })).toEqual([]);
+    const all = p.weeks[0].days.flatMap((d) => d.blocks.flatMap((b) => b.items)).filter((i) => i.bandSetup);
+    for (const i of all.filter((x) => ['knee', 'hinge'].includes(x.slot))) expect(i.bandSetup, i.name).toMatch(/Use the heavy band/);
+    for (const i of all.filter((x) => x.slot === 'antiRot')) expect(i.bandSetup, i.name).toMatch(/Use the light band/);
+    for (const i of all.filter((x) => x.slot === 'hpull')) expect(i.bandSetup, i.name).toMatch(/Use the medium band/);
+    // one band: no band named
+    for (const i of sample.weeks[0].days.flatMap((d) => d.blocks.flatMap((b) => b.items))) expect(i.bandSetup ?? '').not.toMatch(/Use the/);
   });
 });

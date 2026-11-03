@@ -14,7 +14,7 @@
 import type { BandTension, SlotId } from './types';
 
 /** Where the band goes, by movement. The words are FEL's; the movement is the library entry's tags and name. */
-export function bandSetupFor(name: string, slot: SlotId, tension: BandTension | null): string {
+export function bandSetupFor(name: string, slot: SlotId, tension: BandTension | null, use: BandTension | null = null): string {
   const n = name.toLowerCase();
   let where: string;
   if (/pallof|anti-rotation/.test(n)) where = 'Anchor at chest height. Stand side-on and step out until the band pulls you toward the anchor.';
@@ -31,7 +31,22 @@ export function bandSetupFor(name: string, slot: SlotId, tension: BandTension | 
   else if (/skull|triceps|overhead triceps/.test(n)) where = 'Anchor low behind you, or stand on one end and hold the other.';
   else where = 'Set it so the last 2 reps of each set are hard.';
   const t = tension === 'light' ? ' A light band: double it over or hold it shorter.' : tension === 'heavy' ? ' A heavy band: start closer to the anchor or hold it longer.' : '';
-  return `Band setup: ${where}${t}`;
+  return `Band setup: ${use ? `Use the ${use} band. ` : ''}${where}${use ? '' : t}`;
+}
+
+/**
+ * PROGRAM-ASK-2: with a band SET, which band each job starts on — the heaviest for the legs and hips (the strongest
+ * muscles), the middle one for the big upper-body pulls and presses, the lightest for small muscles and the trunk. FEL's
+ * rule of thumb; the "Too easy? / Too hard?" lines move it from there.
+ */
+export function bandForJob(slot: SlotId, bands: readonly BandTension[]): BandTension | null {
+  if (bands.length < 2) return null;
+  const order = (['light', 'medium', 'heavy'] as const).filter((b) => bands.includes(b));
+  const heavy = order[order.length - 1], light = order[0];
+  const mid = order.length === 3 ? order[1] : heavy;
+  if (['knee', 'single', 'hinge', 'calf'].includes(slot)) return heavy;
+  if (['hpull', 'vpull', 'hpush', 'vpush'].includes(slot)) return mid;
+  return light;
 }
 
 /** "Too easy?" — band tension first, then tempo, then the named next rung. */

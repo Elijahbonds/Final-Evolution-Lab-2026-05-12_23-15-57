@@ -6,8 +6,9 @@
 // health answer. Never sent anywhere by this file. An under-18's program lives only here (the signature programs' youth
 // rule, lib/signature/deviceProgress.ts). Every storage access is in try/catch; a corrupt value reads as nothing saved.
 //
-// Account save is NOT built: it would need a table (the pending-schema seam, lib/coach/pendingSchema.ts, and a data-rights
-// entry). Left for the owner's call — see docs/PROGRAM-ASK.md.
+// PROGRAM-ASK-2: an adult's plan is ALSO kept on the account once prisma/pending/2026-11-03-program-ask.sql is applied
+// (./accountStore.ts, ./accountServer.ts, /api/program-ask/saved); mergeAccount lays that copy over this one. Until then,
+// and always under youth rules, this key is the only copy.
 import type { StorageLike } from '@/lib/signature/deviceProgress';
 import type { Decision } from './checkpoint';
 import type { RequestEdits } from './request';
@@ -92,3 +93,20 @@ export function addDecision(s: StorageLike | null, d: Decision): SavedProgram | 
 export function forgetProgram(s: StorageLike | null): void {
   try { s?.removeItem(PROGRAM_DEVICE_KEY); } catch { /* nothing to do */ }
 }
+
+/**
+ * PROGRAM-ASK-2: the account's copy laid over the phone's (a new phone, or a second one). Same program: the done marks
+ * join and the longer list of checkpoint decisions wins. A different program on the account is not merged.
+ */
+export function mergeAccount(s: StorageLike | null, account: { programId: string; done: Record<string, string>; decisions: Decision[] } | null): SavedProgram | null {
+  const v = readSaved(s);
+  if (!v || !account || account.programId !== v.programId) return v;
+  const done = { ...account.done, ...v.done };
+  for (const k of Object.keys(done)) if (!SESSION.test(k)) delete done[k];
+  const decisions = account.decisions.length > v.decisions.length ? account.decisions.filter((d) => KINDS.has(d.kind)) : v.decisions;
+  const next = { ...v, done, decisions };
+  return write(s, next) ? next : v;
+}
+
+/** What the account keeps of a saved plan (never the program: the ask rebuilds it). */
+export const accountBody = (v: SavedProgram) => ({ question: v.question, edits: v.edits, programId: v.programId, done: v.done, decisions: v.decisions });

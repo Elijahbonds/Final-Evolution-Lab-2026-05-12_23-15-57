@@ -35,7 +35,7 @@ import {
 } from './rules';
 import { AMBIENT, LOADING_KIT, PREFERS_KIT, SLOT_MATCH, baseIdOf, eligible, isImpact, isTimedEntry, perSideEntry, type Eligibility } from './slots';
 import { daySeconds, timeWindow } from './time';
-import { EASIER_NAME, bandSetupFor, easierLine, harderLine } from './adjust';
+import { EASIER_NAME, bandForJob, bandSetupFor, easierLine, harderLine } from './adjust';
 import { MAX_WEEKLY_SET_GROWTH } from '@/lib/coach/templates/waves';
 import type {
   BuiltProgram, ProgramBlock, ProgramDay, ProgramItem, ProgramRequest, ProgramWeek, SlotId, TimedStep, VolumeGroup, WeeklyVolume,
@@ -126,7 +126,10 @@ function pools(lib: readonly LibraryExercise[], r: ProgramRequest, el: Eligibili
     for (const v of loadedVariants) if (!eligible(v, el)) aboveLevel.add(v.id);
     // ranked at their own level (a harder start is not "above level" here), counted reps before holds, strength before prehab
     const kr = (e: LibraryExercise) => rank(e, 'knee', { ...r, level: levelRank(e.level) > levelRank(r.level) ? e.level : r.level }, el.owned) - (isTimedEntry(e) ? 3 : 0) - (e.category === 'prehab' ? 2 : 0);
-    const loaded = [...knee.filter(loads), ...loadedVariants].sort((a, b) => kr(b) - kr(a) || a.name.localeCompare(b.name));
+    const loadedAll = [...knee.filter(loads), ...loadedVariants];
+    // on a ladder, the lower rung first (day A learns the easier one; the harder one is the next rung or day B)
+    const below = (e: LibraryExercise) => (loadedAll.some((x) => x.regressionId === e.id) ? 0.75 : 0);
+    const loaded = loadedAll.sort((a, b) => kr(b) + below(b) - kr(a) - below(a) || a.name.localeCompare(b.name));
     const oneLeg = lib.filter((e) => !e.variantOf && eligible(e, el) && e.category === 'strength' && !isImpact(e)
       && ((e.pattern === 'squat' && e.laterality !== 'bilateral') || e.family === 'split-squat') && e.primaryMuscles.includes('quads'))
       .sort((a, b) => kr(b) - kr(a) || a.name.localeCompare(b.name));
@@ -392,7 +395,7 @@ export function buildProgram(input: BuildInput): BuiltProgram {
       tempo, effort, effortWords: effortWords(effort, timed), isKey: t.key,
       contacts: impact ? reps * POWER_DOSE.contactsPerRep : null, impact,
       setup: e.setup, cue: cues[0] ?? null, note, baseId: baseIdOf(t.base),
-      bandSetup: banded ? bandSetupFor(e.name, t.slot, r.tension) : null,
+      bandSetup: banded ? bandSetupFor(e.name, t.slot, r.tension, bandForJob(t.slot, r.bands ?? [])) : null,
       harder: working ? harderLine({ band: banded, anchored: banded && /Anchor/.test(bandSetupFor(e.name, t.slot, null)), timed, next: nextRung && nextRung.id !== e.id ? nextRung.name : null }) : null,
       easier: working ? easierLine({ band: banded, anchored: banded && /Anchor/.test(bandSetupFor(e.name, t.slot, null)), timed, easier: easierOf(e, t.slot)?.name ?? null }) : null,
       harderStart: p.aboveLevel.has(e.id) || p.aboveLevel.has(t.base.id),
