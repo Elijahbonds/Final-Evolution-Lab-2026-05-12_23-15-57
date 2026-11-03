@@ -5,7 +5,11 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { DRILLS } from '@/lib/drills/drills';
 import { DEMO_CLIPS } from './demo';
-import { DRILL_DEMO_LOOPS, SCREEN_DEMO_LOOPS, drillDemoLoop } from './surfaceDemo';
+import { DRILL_DEMO_LOOPS, SCREEN_DEMO_LOOPS, WARMUP_DEMO_LOOPS, drillDemoLoop, warmupDemoLoop } from './surfaceDemo';
+import { WAKE_UP } from '@/lib/drills/drills';
+import { PRIMERS, ROCK_HOLDS } from '@/lib/coach/warmupContent';
+import { RECOVERY_BREATH_STEP } from '@/lib/coach/cooldown';
+import { fromCoachToday } from '@/lib/session-player/fromCoachToday';
 
 const SURFACES = ['app/play/mirror/assess/_components/drill-demo.tsx', 'app/play/drills/_components/drill-demo.tsx', 'app/coach/_components/exercise-catalogue.tsx', 'components/library/library-demo.tsx'];
 
@@ -26,5 +30,22 @@ describe('the 3D demo surfaces', () => {
     for (const d of DRILLS) expect(d.id in DRILL_DEMO_LOOPS, d.id).toBe(true);
     for (const c of [...Object.values(DRILL_DEMO_LOOPS), ...Object.values(SCREEN_DEMO_LOOPS)]) if (c) expect(DEMO_CLIPS, c).toContain(c);
     expect(drillDemoLoop('no-such-drill')).toBeNull();
+  });
+});
+
+// DEMO-LOOPS-4 (2026-11-03): every step FEL's warm-up and cool-down can generate plays a loop — the Wake-Up's phases, the
+// rock-and-holds, the primers, the recovery breath — and the coached session player passes it through.
+describe('the warm-up and cool-down steps', () => {
+  const IDS = [...WAKE_UP.phases.map((p) => p.id), ...ROCK_HOLDS.map((r) => r.id), ...PRIMERS.map((p) => p.id), RECOVERY_BREATH_STEP.id];
+  it('every step the generators make has a loop, and every loop is one the stage owns', () => {
+    expect(IDS.length).toBe(28);
+    expect(IDS.filter((id) => !warmupDemoLoop(id))).toEqual([]);
+    expect(Object.keys(WARMUP_DEMO_LOOPS).sort()).toEqual([...IDS].sort());
+    for (const c of Object.values(WARMUP_DEMO_LOOPS)) if (c) expect(DEMO_CLIPS, c).toContain(c);
+  });
+  it('the coached session player plays a warm-up or cool-down step\'s loop', () => {
+    const today = { block: { label: 'B' }, session: { id: 's', label: 'S', exercises: [] } } as unknown as Parameters<typeof fromCoachToday>[0];
+    const s = fromCoachToday(today, { warmup: { steps: [{ id: 'ankle-rock', name: 'Ankle Rock and Hold', seconds: 60, cue: 'c', dose: null }] } as never, cooldown: { steps: [{ id: 'recovery-breath', name: 'Breath', seconds: 90, cue: 'c', dose: null }] } as never });
+    expect(s.session.steps.map((x) => x.clip)).toEqual(['ex_ankle_rock', 'ex_breathe_supine']);
   });
 });

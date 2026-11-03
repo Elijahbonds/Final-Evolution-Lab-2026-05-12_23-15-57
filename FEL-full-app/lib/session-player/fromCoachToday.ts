@@ -19,6 +19,7 @@
 //
 // Every word is the route's (names, set-ups, cues, the coach's note) or the generator's; nothing is rewritten.
 // Pure. Client-safe (lib/coach/today.ts is already Today's client import).
+import { warmupDemoLoop } from '@/lib/library/surfaceDemo';
 import { KEY_SET_LINE, easierLine, todayLayout, type TodayExercise } from '@/lib/coach/today';
 import type { WarmupPlan } from '@/lib/coach/warmup';
 import type { CooldownPlan } from '@/lib/coach/cooldown';
@@ -96,7 +97,8 @@ const generatedStep = (kind: 'warmup' | 'cooldown', s: { id: string; name: strin
   restSeconds: 0,
   setup: s.dose ?? '',
   cue: s.cue || null,
-  clip: null,
+  // DEMO-LOOPS-4 (2026-11-03): the step's own loop (lib/library/surfaceDemo.ts WARMUP_DEMO_LOOPS), or the still
+  clip: warmupDemoLoop(s.id),
 });
 
 export function fromCoachToday(today: CoachTodayLike, o: FromCoachTodayOptions = {}): CoachSession {

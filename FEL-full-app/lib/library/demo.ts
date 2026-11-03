@@ -12,7 +12,7 @@
 //
 // Pure. Client-safe.
 
-import { DRILL_DEMO_LOOPS, SCREEN_DEMO_LOOPS } from './surfaceDemo';
+import { DRILL_DEMO_LOOPS, SCREEN_DEMO_LOOPS, WARMUP_DEMO_LOOPS } from './surfaceDemo';
 import { MUSCLES, type MovementPattern, type MuscleId } from './vocab';
 import { FLOW_CLIPS, FLOW_SEQS, flowClip } from '@/lib/babylon/anim/authored/exerciseFlows';   // (data only: no Babylon)
 import { PROPPED_LOOPS } from '@/lib/babylon/anim/authored/exerciseProps.data';   // (data only: which loop stands on what)
@@ -638,7 +638,7 @@ export const DEMO_CLIPS: readonly string[] = (() => {
   }
   for (const table of Object.values(MODIFIER_LOOPS)) for (const c of Object.values(table)) out.add(c);
   // DEMO-LOOPS: the loops the drill and check demos play (lib/library/surfaceDemo.ts) are the stage's too
-  for (const c of [...Object.values(DRILL_DEMO_LOOPS), ...Object.values(SCREEN_DEMO_LOOPS)]) if (c) out.add(c);
+  for (const c of [...Object.values(DRILL_DEMO_LOOPS), ...Object.values(SCREEN_DEMO_LOOPS), ...Object.values(WARMUP_DEMO_LOOPS)]) if (c) out.add(c);
   return [...out].sort();
 })();
 
@@ -651,6 +651,8 @@ export const FLOOR_CLIPS: ReadonlySet<string> = new Set(['ex_pushup', 'ex_plank'
   ['ex_reverse_crunch', 'ex_situp', 'ex_situp_34', 'ex_bicycle', 'ex_heel_touch', 'ex_flutter', 'ex_toe_touch', 'ex_vup', 'ex_hollow', 'ex_hollow_tuck', 'ex_hollow_rock', 'ex_dead_bug_heel',
     ...['forearm', 'high', 'bear'].flatMap((b) => ['leg', 'reach', 'knee'].map((a) => `ex_plank_${b}_${a}`)), 'ex_shoulder_tap', 'ex_bear_tap', 'ex_side_plank', 'ex_side_plank_leg',
     'ex_bear_crawl', 'ex_leopard_crawl', 'ex_crab_walk', 'ex_crab_reach', 'ex_plyo_pushup', 'ex_hand_release', 'ex_bridge_march', 'ex_bridge_sl', 'ex_slider_curl'],
+  // DEMO-LOOPS-4: the warm-up's and cool-down's floor steps (anim/authored/exerciseWarmup.ts)
+  ['ex_ankle_rock', 'ex_ninety_rock', 'ex_open_book_rock', 'ex_kneeling_reach_rock', 'ex_breathe_supine', 'ex_fast_pushup'],
   FLOW_CLIPS,
 ));
 /** Hinges and rows read from the side (the angle at the hips is the movement). */
@@ -665,12 +667,15 @@ export const SIDE_CLIPS: ReadonlySet<string> = new Set(['ex_hinge', 'ex_good_mor
   'ex_sl_rdl', 'ex_kickstand_rdl', 'ex_nordic', 'ex_squat_thrust', 'ex_burpee', 'ex_high_knees', 'ex_butt_kicks', 'ex_a_skip', 'ex_b_skip', 'ex_power_skip', 'ex_seated_kickback', 'ex_seated_kickback_one', 'ex_seated_row', 'ex_seated_row_one',
   // DEMO-LOOPS: read from the side
   'ex_sl_squat_partial', 'ex_supported_sl_rdl', 'ex_hip_airplane', 'ex_two_point_start', 'ex_arm_swing', 'ex_broad_jump_stick', 'ex_sl_hop_stick', 'ex_snap_down', 'ex_cmj_dip', 'ex_decel_stick', 'ex_jump_stop',
-  'ex_approach_one', 'ex_approach_two', 'ex_approach_jump_one_step', 'ex_approach_jump_two_step', 'ex_approach_jump_three_step', 'ex_approach_jump_one_foot']);
+  'ex_approach_one', 'ex_approach_two', 'ex_approach_jump_one_step', 'ex_approach_jump_two_step', 'ex_approach_jump_three_step', 'ex_approach_jump_one_foot',
+  // DEMO-LOOPS-4: the warm-up's hinges, the split-stance primers and the lean-back row read from the side
+  'ex_hinge_rock', 'ex_hip_snap', 'ex_split_drive', 'ex_split_hop', 'ex_door_row']);
 /** What the stage draws under a loop that needs it: a bench seat, a flat bench to lie on, or an incline bench. Bench loops
  *  lying down are framed from the side, like the floor loops. LIBRARY-ANATOMY-2: and the rest of a gym's furniture a loop
  *  stands, sits, lies or hangs on — a box, benches in front and behind, a pull-up bar, a low bar, dip bars, pads, a wall. */
 export type DemoProp = 'seat' | 'bench' | 'incline' | 'box' | 'boxside' | 'stepbox' | 'boxback' | 'rearbench' | 'handbench' | 'feetbench' | 'feetbenchfront' | 'thrust'
-  | 'pullbar' | 'lowbar' | 'dipbars' | 'dipbench' | 'legcurl' | 'proneincline' | 'decline' | 'preacher' | 'wall' | 'calfstep' | 'wallback' | 'rowseat' | 'dowel' | 'cphbench' | 'roller' | 'rollerseat';
+  | 'pullbar' | 'lowbar' | 'dipbars' | 'dipbench' | 'legcurl' | 'proneincline' | 'decline' | 'preacher' | 'wall' | 'calfstep' | 'wallback' | 'rowseat' | 'dowel' | 'cphbench' | 'roller' | 'rollerseat'
+  | 'doorpost' | 'doorway';
 /** A plain box (metres, the body's frame: +x its right, +y up, +z its front; rx tips it about x — negative raises its −z end).
  *  (The stage puts the body's +x at its own −x: the spawned root carries the importer's mirror.) */
 export interface PropBox { w: number; h: number; d: number; x?: number; y: number; z: number; rx?: number; /** DEMO-LOOPS: a roller — a cylinder across the body, `w` long, `h` across */ cyl?: true }
@@ -712,6 +717,10 @@ export const PROP_SHAPES: Readonly<Record<DemoProp, readonly PropBox[]>> = {
   // foam rollers (exerciseSignature.ts): under the calves, and under the seat
   roller: [{ w: 0.55, h: 0.14, d: 0.14, y: 0.07, z: 0.56, cyl: true }],
   rollerseat: [{ w: 0.55, h: 0.14, d: 0.14, y: 0.07, z: -0.04, cyl: true }],
+  // DEMO-LOOPS-4: a door post at the body's right (the doorway chest stretch's forearm on it: its inner face at x 0.64), and a
+  // doorway's two posts in front (the door-frame row holds them at chest height)
+  doorpost: [{ w: 0.08, h: 2.10, d: 0.12, x: 0.68, y: 1.05, z: 0.04 }],
+  doorway: [{ w: 0.08, h: 2.10, d: 0.10, x: -0.34, y: 1.05, z: 0.56 }, { w: 0.08, h: 2.10, d: 0.10, x: 0.34, y: 1.05, z: 0.56 }],
 };
 export const DEMO_PROPS: Readonly<Record<string, DemoProp>> = {
   ex_seated_press: 'seat', ex_seated_curl: 'seat', ex_seated_lateral_raise: 'seat', ex_seated_triceps: 'seat',

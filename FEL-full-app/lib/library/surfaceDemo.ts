@@ -36,6 +36,33 @@ export const SCREEN_DEMO_LOOPS: Readonly<Record<'T1' | 'T2' | 'T3' | 'T5', strin
   T1: 'ex_overhead_squat', T2: 'ex_knee_to_wall', T3: 'ex_sl_squat_partial', T5: 'ex_jump_hands_hips',
 };
 
+/**
+ * DEMO-LOOPS-4 (2026-11-03): FEL's generated warm-up and cool-down steps (lib/coach/warmup.ts WarmupStep ids, cooldown.ts
+ * steps) → the loop that is the step: the Pre-Game Wake-Up's six phases (lib/drills/drills.ts WAKE_UP), the eight
+ * rock-and-hold stretches and the thirteen primers (lib/coach/warmupContent.ts), and the cool-down's recovery breath (its
+ * stretches are the rock-and-holds, same ids). These play in every coached session (lib/session-player/fromCoachToday.ts).
+ * Every step has its own loop (anim/authored/exerciseWarmup.ts) or the library's loop that already IS it. surfaceDemo.test
+ * holds the table to the generators' ids, so a new step without a row fails the suite.
+ */
+export const WARMUP_DEMO_LOOPS: Readonly<Record<string, string | null>> = {
+  // the Wake-Up's phases
+  'release-the-locks': 'ex_wall_locks', pressurize: 'ex_breathe_ribs', 'wake-the-tripod': 'ex_tripod', 'open-the-joints': 'ex_joint_circles',
+  'build-the-rhythm': 'ex_pogo', 'prime-the-launch': 'ex_launch',
+  // the rock-and-hold stretches (the warm-up's, and the cool-down's)
+  'ankle-rock': 'ex_ankle_rock', 'wall-calf-rock': 'ex_wall_calf_rock', 'deep-squat-rock': 'ex_deep_squat_rock', 'hinge-rock': 'ex_hinge_rock',
+  'ninety-ninety-rock': 'ex_ninety_rock', 'open-book-rock': 'ex_open_book_rock', 'kneeling-reach-rock': 'ex_kneeling_reach_rock', 'doorway-chest-rock': 'ex_doorway_chest_rock',
+  // the primers
+  'squat-jump-primer': 'ex_squat_jump_stick', 'fast-squat-primer': 'ex_fast_squat', 'broad-jump-primer': 'ex_broad_jump_stick', 'hip-snap-primer': 'ex_hip_snap',
+  'split-hop-primer': 'ex_split_hop', 'split-drive-primer': 'ex_split_drive', 'fast-push-primer': 'ex_fast_pushup', 'fast-row-primer': 'ex_door_row',
+  'tall-march-primer': 'ex_march', 'turn-stop-primer': 'ex_turn_stop', 'pogo-stick-primer': 'ex_pogo_stick', 'wall-drive-primer': 'ex_wall_drive',
+  'squat-reach-primer': 'ex_squat_reach',
+  // the cool-down's breath
+  'recovery-breath': 'ex_breathe_supine',
+};
+
+/** A warm-up or cool-down step's loop, or null (the still). */
+export const warmupDemoLoop = (id: string): string | null => WARMUP_DEMO_LOOPS[id] ?? null;
+
 /** The still a surface with no loop shows: the body standing in the start position (held, not looping), "Demo coming". */
 export const STILL_DEMO_CLIP = 'idle_stand';
 export const DEMO_COMING = 'Demo coming';
