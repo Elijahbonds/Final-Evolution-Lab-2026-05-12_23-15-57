@@ -79,7 +79,7 @@ const BTN_I: Record<Btn, number> = { A: 0, B: 1, X: 2, Y: 3 }, DPAD_I: Record<Di
 const JN = ['Hips', 'LeftFoot', 'RightFoot', 'LeftToeBase', 'RightToeBase', 'LeftHand', 'RightHand', 'Head'];
 const QN = ['Hips', 'Spine', 'Spine1', 'Spine2', 'Neck', 'Head', 'LeftShoulder', 'RightShoulder', 'LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand', 'LeftUpLeg', 'RightUpLeg', 'LeftLeg', 'RightLeg', 'LeftFoot', 'RightFoot', 'LeftToeBase', 'RightToeBase'];
 
-interface Frame { occ?: string[] | null; lv?: number; inf?: number; t: number; f: number; rp: number[]; yaw: number; j: (number[] | null)[]; q: number[]; ball: number[] | null; bpar: string; cam: number[]; tgt: number[]; clips: [string, number][]; ts: number }
+interface Frame { sin?: number; occ?: string[] | null; lv?: number; inf?: number; t: number; f: number; rp: number[]; yaw: number; j: (number[] | null)[]; q: number[]; ball: number[] | null; bpar: string; cam: number[]; tgt: number[]; clips: [string, number][]; ts: number }
 interface Rec { scen: string; rep: number; frames: Frame[]; marks: { t: number; msg: string }[]; qa: { t: number; kind: string; name: string }[]; pressAt: number | null; t0: number; hud: string[]; err?: string }
 
 const PAD_INIT = `(() => {
@@ -130,6 +130,12 @@ const RECORDER = `(() => {
     const lv = (ringM && ringM.isVisible && ringM.isEnabled() ? 1 : 0) + (shadowM && shadowM.isVisible && shadowM.isEnabled() ? 2 : 0);
     let inf = 0; if (b) { const a = b.getAbsolutePosition(), M = scene.getTransformMatrix().m; const w = a.x * M[3] + a.y * M[7] + a.z * M[11] + M[15];
       if (w > 0) { const nx = (a.x * M[0] + a.y * M[4] + a.z * M[8] + M[12]) / w, ny = (a.x * M[1] + a.y * M[5] + a.z * M[9] + M[13]) / w; inf = Math.abs(nx) <= 1 && Math.abs(ny) <= 1 ? 1 : 0; } }
+    // Phase 8: the SHOW in frame — the hips, the head and the rim's centre (modeConfigs rimZ −10.28, the 3.048 m ring) projected
+    // through this frame's camera: 1 each when on screen (in front of the camera, |x|,|y| <= 1 in clip space)
+    let sin = 0; { const M = scene.getTransformMatrix().m; const on = (x, y, z) => { const w = x * M[3] + y * M[7] + z * M[11] + M[15]; if (w <= 0) return 0;
+        const nx = (x * M[0] + y * M[4] + z * M[8] + M[12]) / w, ny = (x * M[1] + y * M[5] + z * M[9] + M[13]) / w; return Math.abs(nx) <= 1 && Math.abs(ny) <= 1 ? 1 : 0; };
+      const hp = jn[0] && jn[0].getAbsolutePosition(), hd = jn[7] && jn[7].getAbsolutePosition();
+      sin = (hp ? on(hp.x, hp.y, hp.z) : 0) + (hd ? on(hd.x, hd.y, hd.z) * 2 : 0) + on(0, 3.048, -10.28) * 4; }
     // Phase 7: OCCL=1 — what stands between the camera and the hero: rays from the camera to the hips and the head (every 2nd
     // frame), every visible mesh on them that is not the hero's own, the ball or the floor (a prop parked in a corner, a tree)
     let occ = null;
@@ -144,7 +150,7 @@ const RECORDER = `(() => {
       }
       occ = hit.size ? [...hit].slice(0, 4) : [];
     }
-    R.frames.push({ occ, inf, t: performance.now(), f, rp: [r4(rp.x), r4(rp.y), r4(rp.z)], yaw: r5(yaw), j, q, ball, bpar, cam: [r4(cp.x), r4(cp.y), r4(cp.z)], tgt: tg, clips, ts: scene.animationTimeScale ?? 1, lv });
+    R.frames.push({ occ, inf, sin, t: performance.now(), f, rp: [r4(rp.x), r4(rp.y), r4(rp.z)], yaw: r5(yaw), j, q, ball, bpar, cam: [r4(cp.x), r4(cp.y), r4(cp.z)], tgt: tg, clips, ts: scene.animationTimeScale ?? 1, lv });
     if (R.frames.length > 4000) R.frames.shift();
     // the frame strip: pause the clock ON this frame so node photographs exactly it
     if (R.strip && R.strip.length && (f - R.f0) >= R.strip[0]) { R.strip.shift(); R.stripN++; R.stripWait = true; window.__vc.pause(); }
@@ -152,7 +158,7 @@ const RECORDER = `(() => {
   if (ytrap) { const h0 = dev.hero(); if (h0) { let r0 = h0; while (r0.parent) r0 = r0.parent; trapY(r0); } }   // from boot: the intro's writes too
   window.__hud = () => window.__hudObj || {};
   window.__HUDLOG = []; let last = '';
-  setInterval(() => { const h = window.__hud(); const s = [h.banner, h.hint, h.slamBeat].filter(Boolean).join(' | '); if (s && s !== last) { last = s; window.__HUDLOG.push({ t: performance.now(), s }); } }, 16);
+  setInterval(() => { const h = window.__hud(); const s = [h.banner, h.hint, h.slamBeat, h.cut].filter(Boolean).join(' | '); if (s && s !== last) { last = s; window.__HUDLOG.push({ t: performance.now(), s }); } }, 16);
   // the slam on the beat the mode publishes (slamBeat 'beat' = the window's centre), pressed in the page
   const LATE_MS = ${Number(process.env.SLAM_LATE_MS ?? 70)};
   // Phase 7: \`stick\` (+1 back / −1 up) is held on the left stick from the window's opening, at least 2 frames before the press,
@@ -367,10 +373,10 @@ function cfgFor(scen: string, rep: number): AttemptCfg {
     case 'oopstand': return { ...base, walkMs: 0, standMs: 300 + jit };                                  // RT from standing
     case 'ooppress': return { ...base, walkMs: 400, takeoff: 'press', pressAfterMs: 500 + jit };          // A early on the run
     case 'ooprelease': return { ...base, walkMs: 400, takeoff: 'release', pressAfterMs: 450 + jit };      // RT let go early
-    case 'show': return { ...base, recMs: 14000 };
+    case 'show': return { ...base, recMs: Number(process.env.SHOW_REC_MS ?? 14000) };   // Phase 8: SHOW_REC_MS to film through the reveal to the next runway
     default: if (scen.startsWith('trick:')) { const a = AIR[scen.slice(6)]; return { ...base, walkMs: 400, air: [DPAD_I[a[0]], BTN_I[a[1]]], airAfterMs: Number(process.env.AIR_AFTER_MS ?? 300), flightStick: Number(process.env.STICK_FLIGHT ?? 0) }; }
       // Phase 7: a plain flight slammed on the beat with the stick back (the REVERSE), up (the TWO-HAND POWER) or neutral
-      if (scen.startsWith('finish:')) { const k = scen.slice(7); return { ...base, walkMs: 400, slamStick: k === 'reverse' ? 1 : k === 'power' ? -1 : 0 }; }
+      if (scen.startsWith('finish:')) { const k = scen.slice(7); return { ...base, walkMs: 400, slamStick: k === 'reverse' ? 1 : k === 'power' ? -1 : 0, flightStick: k === 'reverse' ? 1 : 0 }; }   // 7b: the reverse holds the stick back from the take-off (the turn starts on the way up)
   }
   throw new Error('unknown scenario ' + scen);
 }
