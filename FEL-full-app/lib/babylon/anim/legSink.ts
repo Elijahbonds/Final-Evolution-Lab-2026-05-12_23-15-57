@@ -12,7 +12,7 @@ import { findBone } from './boneLookup';
 import { plantLeg } from './FootPlanting';
 import { armChain, reachArm, type ArmChain } from './HandIK';
 
-export interface SinkRig { hips: TransformNode; root: TransformNode; legs: { hip: TransformNode; knee: TransformNode; ankle: TransformNode }[]; arms: ArmChain[] }
+export interface SinkRig { hips: TransformNode; root: TransformNode; legs: { hip: TransformNode; knee: TransformNode; ankle: TransformNode; toe?: TransformNode | null }[]; arms: ArmChain[] }
 
 /** hoops-p04b: the knee's pole is never behind the body, and leans forward by this much (m) — so a leg passing through straight keeps its
  *  knee plane instead of swapping it. The pole was the clip's own bend (knee less the hip–ankle midpoint), or `fwd` under 1 cm of it: a
@@ -21,7 +21,16 @@ export interface SinkRig { hips: TransformNode; root: TransformNode; legs: { hip
  *  constant, not a feel number. **assumption:** 3 cm (the old threshold was 1 cm). */
 export const KNEE_POLE_BIAS_M = 0.03;
 /** The pole for a leg's re-solve (pure): the clip's bend with any backward part dropped, plus KNEE_POLE_BIAS_M of `fwd`. Continuous in
- *  the bend: no threshold to cross. `fwd` is the body's front (unit, horizontal). */
+ *  the bend: no threshold to cross. `fwd` is THIS LEG's front (unit, horizontal: legFront) — a knee bends over its own toes, so a body
+ *  turned off its root (a spin layup: the root's front made the legs' real bend read "behind" and the dip re-solved them 74–178° off
+ *  the clip, measured) keeps its knees. */
+/** A leg's front (hoops-p04b): its foot → toe, flat, as drawn now; `fallback` (the root's front) with no toe or a toe pointing down. */
+export function legFront(ankle: TransformNode, toe: TransformNode | null | undefined, fallback: Vector3): Vector3 {
+  if (!toe) return fallback;
+  ankle.computeWorldMatrix(true); toe.computeWorldMatrix(true);
+  const d = toe.getAbsolutePosition().subtract(ankle.getAbsolutePosition()); d.y = 0;
+  return d.lengthSquared() > 1e-4 * 1e-2 ? d.normalize() : fallback;
+}
 export function kneePole(bend: Vector3, fwd: Vector3): Vector3 {
   const b = bend.clone();
   const d = Vector3.Dot(b, fwd);
@@ -36,7 +45,7 @@ export function sinkRig(skeleton: Skeleton, root: TransformNode): SinkRig | null
   const legs: SinkRig['legs'] = [];
   for (const sd of ['Left', 'Right'] as const) {
     const hip = findBone(skeleton, `${sd}UpLeg`)?.getTransformNode(), knee = findBone(skeleton, `${sd}Leg`)?.getTransformNode(), ankle = findBone(skeleton, `${sd}Foot`)?.getTransformNode();
-    if (hip && knee && ankle) legs.push({ hip, knee, ankle });
+    if (hip && knee && ankle) legs.push({ hip, knee, ankle, toe: findBone(skeleton, `${sd}ToeBase`)?.getTransformNode() ?? null });   // (hoops-p04b: the leg's front, kneePole)
   }
   const arms = (['Left', 'Right'] as const).map((sd) => armChain(skeleton, sd)).filter((a): a is ArmChain => !!a);
   return hips && legs.length === 2 ? { hips, root, legs, arms } : null;
@@ -73,7 +82,7 @@ export function sinkHipsKeepFeet(r: SinkRig, hipsOverRoot: number, excess: numbe
     const tgt = new Vector3(p0.x, rootY + ankleTarget(p0.y - rootY, excess, ankleFloorY), p0.z);
     const hipP = l.hip.getAbsolutePosition(), kneeP = l.knee.getAbsolutePosition();
     const bend = kneeP.subtract(hipP.add(tgt).scale(0.5));
-    plantLeg(l.hip, l.knee, l.ankle, tgt, kneePole(bend, fwd));   // hoops-p04b: never behind, no threshold
+    plantLeg(l.hip, l.knee, l.ankle, tgt, kneePole(bend, legFront(l.ankle, l.toe, fwd)));   // hoops-p04b: never behind its own foot, no threshold
     // the foot keeps its turn (the hips only moved, so its turn under the hips is its turn in the world)
     l.ankle.rotationQuaternion = Quaternion.Inverse(lq(l.hip).multiply(lq(l.knee))).multiply(before[i].chain);
     l.ankle.computeWorldMatrix(true);
