@@ -126,8 +126,9 @@ function clipOf(el: Element, box: Rect): Run['clip'] {
       const over = clipOverrun(box, inner);
       if (over > 1.5) return { how: 'overflow', px: Math.round(over * 10) / 10, by: pathOf(p) };
     }
-    // a scroll container lets the reader reach the rest: nothing past it is lost
-    if (/(auto|scroll)/.test(ox) || /(auto|scroll)/.test(oy)) break;
+    // a scroll container (a side-scrolling shelf, a carousel) lets the reader reach the rest: nothing past it is lost,
+    // and nothing past its edge is "off the viewport" either
+    if (/(auto|scroll)/.test(ox) || /(auto|scroll)/.test(oy)) return null;
   }
   const vw = document.documentElement.clientWidth;
   const hScroll = document.documentElement.scrollWidth > vw + 1;

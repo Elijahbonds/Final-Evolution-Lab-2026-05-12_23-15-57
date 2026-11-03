@@ -42,14 +42,16 @@ function load(label: string) {
     for (const c of CONFIGS) {
       const fs = r[c]?.findings ?? [];
       for (const f of fs) {
-        const g = GROUP[f.rule] ?? f.rule;
+        // a run past the viewport's edge inside a side-scrolling shelf was counted as clipped by the rig before
+        // 2026-11-03 (inpage.ts now stops at the scroll container); both crawls carry it, so it is split out here
+        const g = f.rule === 'clipped' && /^viewport/.test(f.detail ?? '') ? 'off-screen in a shelf' : GROUP[f.rule] ?? f.rule;
         ((counts[c] ??= {})[g] = (counts[c][g] ?? 0) + 1);
-        if (f.rule === 'clipped' && f.key) keyClipped[c] = (keyClipped[c] ?? 0) + 1;
+        if (f.rule === 'clipped' && f.key && !/^viewport/.test(f.detail ?? '')) keyClipped[c] = (keyClipped[c] ?? 0) + 1;
         if (c === 'phone' || c === 'desktop') { by[g] = (by[g] ?? 0) + 1; texts[`${g} · ${f.text.slice(0, 40)}`] = (texts[`${g} · ${f.text.slice(0, 40)}`] ?? 0) + 1; }
       }
     }
     // the worst screens: a contrast or clip or overlap miss counts double a size miss
-    const score = Object.entries(by).reduce((a, [g, n]) => a + n * (/under/.test(g) ? 1 : 2), 0);
+    const score = Object.entries(by).reduce((a, [g, n]) => a + n * (g === 'off-screen in a shelf' || g === 'contrast-disabled' ? 0 : /under/.test(g) ? 1 : 2), 0);
     perRoute.push({ route: r.route, score, by });
   }
   perRoute.sort((a, b) => b.score - a.score);
@@ -62,7 +64,7 @@ const slug = (p: string) => (p === '/' ? 'root' : p.slice(1).replace(/[\/\[\]\.]
 writeFileSync(join(OUT_ROOT, LABEL, 'summary.json'), JSON.stringify({ label: LABEL, vs: VS ?? null, now, before }, null, 1));
 
 console.log(`${LABEL}: ${now.rendered}/${now.routes} routes rendered on the rig`);
-const groups = [...new Set(Object.values(GROUP))];
+const groups = [...new Set([...Object.values(GROUP), 'off-screen in a shelf'])];
 console.log(`${'rule'.padEnd(28)} ${CONFIGS.map((c) => c.padStart(16)).join('')}`);
 for (const g of groups) {
   console.log(`${g.padEnd(28)} ${CONFIGS.map((c) => (before ? `${before.counts[c]?.[g] ?? 0} → ${now.counts[c]?.[g] ?? 0}` : String(now.counts[c]?.[g] ?? 0)).padStart(16)).join('')}`);
