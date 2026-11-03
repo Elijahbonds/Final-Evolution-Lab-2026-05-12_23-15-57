@@ -153,7 +153,7 @@ export function AudioPlayer({
     <div id="sample" className="rounded-xl border border-white/10 bg-[#101010] p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#F5C518]">Audiobook · stream only</p>
+          <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-[#F5C518]">Audiobook · stream only</p>
           <p className="text-sm text-white">{active ? active.label : bookTitle}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -161,7 +161,7 @@ export function AudioPlayer({
             type="button"
             aria-label={`Back ${SKIP_SECONDS} seconds`}
             onClick={() => skip(-SKIP_SECONDS)}
-            className="rounded-md border border-white/15 px-2 py-1 font-mono text-[11px] text-white/70"
+            className="rounded-md border border-white/15 px-2 py-1 font-mono text-[12px] text-white/70"
           >
             −{SKIP_SECONDS}s
           </button>
@@ -169,7 +169,7 @@ export function AudioPlayer({
             type="button"
             aria-label={`Forward ${SKIP_SECONDS} seconds`}
             onClick={() => skip(SKIP_SECONDS)}
-            className="rounded-md border border-white/15 px-2 py-1 font-mono text-[11px] text-white/70"
+            className="rounded-md border border-white/15 px-2 py-1 font-mono text-[12px] text-white/70"
           >
             +{SKIP_SECONDS}s
           </button>
@@ -177,7 +177,7 @@ export function AudioPlayer({
             type="button"
             aria-label="Playback speed"
             onClick={() => setSpeed((s) => nextSpeed(s))}
-            className="rounded-md border border-white/15 px-2 py-1 font-mono text-[11px] text-white/70"
+            className="rounded-md border border-white/15 px-2 py-1 font-mono text-[12px] text-white/70"
           >
             {speed}×
           </button>
@@ -209,14 +209,14 @@ export function AudioPlayer({
               } disabled:cursor-not-allowed disabled:text-white/30`}
             >
               <span>{index + 1}. {ch.label}</span>
-              <span className="text-[10px] uppercase tracking-wider text-white/40">
+              <span className="text-[12px] uppercase tracking-wider text-white/50">
                 {ch.canPlay ? 'Play' : 'Locked'}
               </span>
             </button>
           </li>
         ))}
       </ol>
-      <p className="mt-2 text-[11px] text-white/35">Streamed from your library. Your place is saved on this device.</p>
+      <p className="mt-2 text-[12px] text-white/50">Streamed from your library. Your place is saved on this device.</p>
     </div>
   );
 }

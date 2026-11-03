@@ -699,7 +699,7 @@ export default function Karate3D(props: GameProps) {
               <div className="h-full rounded-full transition-all" style={{ width: `${Math.max(0, hud.php)}%`, background: hud.php > 50 ? '#00FF9D' : hud.php > 25 ? '#FFD700' : '#FF3366' }} />
             </div>
             {/* Phase6 — active power-up + boost timers */}
-            <div className="flex items-center gap-1.5 mt-1 font-mono text-[10px] font-bold">
+            <div className="flex items-center gap-1.5 mt-1 font-mono text-[12px] font-bold">
               {hud.instaKillT > 0 && <span className="px-2 py-0.5 rounded" style={{ background: 'rgba(255,51,102,0.2)', color: '#FF3366' }}>INSTA-KILL {Math.ceil(hud.instaKillT)}s</span>}
               {hud.doublePointsT > 0 && <span className="px-2 py-0.5 rounded" style={{ background: 'rgba(255,215,0,0.2)', color: '#FFD700' }}>2× PTS {Math.ceil(hud.doublePointsT)}s</span>}
               {hud.speedBoostT > 0 && <span className="px-2 py-0.5 rounded" style={{ background: 'rgba(0,229,255,0.2)', color: '#00E5FF' }}>SPEED {Math.ceil(hud.speedBoostT)}s</span>}
@@ -708,8 +708,8 @@ export default function Karate3D(props: GameProps) {
           </div>
 
           {/* Wave indicator (replaces the old AGGR/SPD debug readout) */}
-          <div className="absolute top-3 right-3 text-right font-mono text-[11px]">
-            <div className="fel-heading tracking-[0.2em] text-white/50 text-[10px]">WAVE</div>
+          <div className="absolute top-3 right-3 text-right font-mono text-[12px]">
+            <div className="fel-heading tracking-[0.2em] text-white/50 text-[12px]">WAVE</div>
             <div className="text-lg font-bold" style={{ color: props.grade?.color ?? '#00FF9D' }}>{hud.wave}</div>
           </div>
 
@@ -774,7 +774,7 @@ export default function Karate3D(props: GameProps) {
             </div>
           )}
           {hud.extractOpen && hud.extractP <= 0 && (
-            <div className="absolute bottom-24 right-4 text-right font-mono text-[10px] font-bold" style={{ color: '#00FF9D' }}>
+            <div className="absolute bottom-24 right-4 text-right font-mono text-[12px] font-bold" style={{ color: '#00FF9D' }}>
               EXTRACT UNLOCKED → hold the glowing edge
             </div>
           )}
@@ -796,7 +796,7 @@ export default function Karate3D(props: GameProps) {
               <div className="flex items-center gap-3">
                 <span className="fel-heading text-xl text-white tracking-widest">LAB SHOP</span>
                 <span className="font-mono text-sm font-bold" style={{ color: '#FFD700' }}>◉ {hud.credits}</span>
-                <span className="font-mono text-[10px] text-white/50">{Math.ceil(hud.buyMenuT)}s</span>
+                <span className="font-mono text-[12px] text-white/50">{Math.ceil(hud.buyMenuT)}s</span>
               </div>
               <div className="grid grid-cols-2 gap-2 w-[min(92%,440px)]">
                 {BUY_ITEMS.map((it) => {
@@ -818,7 +818,7 @@ export default function Karate3D(props: GameProps) {
                         <span className="text-sm font-bold text-white">{it.label}</span>
                         <span className="text-sm font-bold" style={{ color: '#FFD700' }}>◉{it.cost}</span>
                       </span>
-                      <span className="text-[10px] text-white/60">{it.desc}</span>
+                      <span className="text-[12px] text-white/60">{it.desc}</span>
                     </button>
                   );
                 })}
@@ -835,9 +835,9 @@ export default function Karate3D(props: GameProps) {
             </div>
             <div className="grid grid-cols-2 gap-2">
               <button onClick={() => act('kick', true)} className="h-12 w-12 rounded-full border border-[#00FF9D]/50 bg-black/50 text-sm font-bold text-[#00FF9D]">KICK</button>
-              <button onClick={() => act('special', true)} className="h-12 w-12 rounded-full border border-[#A855F7]/50 bg-black/50 text-[10px] font-bold text-[#A855F7]">SPCL</button>
+              <button onClick={() => act('special', true)} className="h-12 w-12 rounded-full border border-[#A855F7]/50 bg-black/50 text-[12px] font-bold text-[#A855F7]">SPCL</button>
               <button onClick={() => act('jab', true)} className="h-12 w-12 rounded-full border border-[#00E5FF]/50 bg-black/50 text-sm font-bold text-[#00E5FF]">JAB</button>
-              <button onPointerDown={() => act('block', true)} onPointerUp={() => act('block', false)} onPointerLeave={() => act('block', false)} className="h-12 w-12 rounded-full border border-[#FFD700]/50 bg-black/50 text-[10px] font-bold text-[#FFD700]">BLOCK</button>
+              <button onPointerDown={() => act('block', true)} onPointerUp={() => act('block', false)} onPointerLeave={() => act('block', false)} className="h-12 w-12 rounded-full border border-[#FFD700]/50 bg-black/50 text-[12px] font-bold text-[#FFD700]">BLOCK</button>
             </div>
           </div>
         </div>

@@ -229,15 +229,15 @@ export default function Surf3D(props: GameProps) {
         {/* HUD */}
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute left-1/2 top-3 -translate-x-1/2 rounded-lg border border-white/8 bg-black/70 px-5 py-2 text-center backdrop-blur-md">
-            <div className="fel-heading text-[10px] tracking-[0.2em] text-white/50">SURF BREAK</div>
+            <div className="fel-heading text-[12px] tracking-[0.2em] text-white/50">SURF BREAK</div>
             <div className="flex items-center justify-center gap-6 font-mono text-2xl font-bold">
               <span className="text-[#00E5FF]">{hud.score}</span>
-              <span className="text-[10px] font-normal tracking-widest text-white/30">TIME {hud.time}s</span>
+              <span className="text-[12px] font-normal tracking-widest text-white/50">TIME {hud.time}s</span>
             </div>
           </div>
           {/* Balance bar */}
           <div className="absolute left-3 top-14 w-28">
-            <div className="text-[9px] font-mono text-white/40 mb-0.5">BALANCE</div>
+            <div className="text-[12px] font-mono text-white/50 mb-0.5">BALANCE</div>
             <div className="h-2 w-full rounded-full bg-white/10 overflow-hidden">
               <div className="h-full rounded-full transition-all" style={{ width: `${hud.balance}%`, background: hud.balance > 30 ? '#00FF9D' : '#FF3366' }} />
             </div>

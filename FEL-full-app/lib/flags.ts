@@ -99,6 +99,12 @@ export function isPayoutsEnabled(): boolean {
   return envOn('PAYOUTS_ENABLED');
 }
 
+/** TRY-AGE-PLACEHOLDER-1 (Cyber's B1 ruling). Default OFF: /try reads the age answer by year alone, as shipped. On: the full
+ *  birth date picks the band (exact 13th / 18th birthday) and the band is locked for the session (lib/privacy/tryAgeGate). */
+export function isTryAgeBandsEnabled(): boolean {
+  return envOn('TRY_AGE_BANDS_ENABLED');
+}
+
 /** LIVE-PAGE-FLAGOFF. Default OFF. /live/schedule 404s while unset. */
 export function isLiveStreamScheduleEnabled(): boolean {
   return envOn('LIVE_STREAM_SCHEDULE_ENABLED');

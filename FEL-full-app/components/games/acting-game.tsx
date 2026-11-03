@@ -353,10 +353,10 @@ function PerformScreen({
               }}
             >
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: INTENSITY_COLOR[l.intensity] }}>
+                <span className="text-[12px] font-semibold uppercase tracking-widest" style={{ color: INTENSITY_COLOR[l.intensity] }}>
                   {l.intensity} · cue {l.cueAt.toFixed(1)}s
                 </span>
-                {state === 'done' && <span className="text-[10px]" style={{ color: GREEN }}>✓</span>}
+                {state === 'done' && <span className="text-[12px]" style={{ color: GREEN }}>✓</span>}
               </div>
               <div className="mt-1 text-lg font-semibold">{l.text}</div>
             </div>
@@ -419,7 +419,7 @@ function ResultsScreen({
                   {(ls.total * 100).toFixed(0)}%
                 </span>
               </div>
-              <div className="mt-1 flex items-center justify-between text-[11px] text-white/45">
+              <div className="mt-1 flex items-center justify-between text-[12px] text-white/50">
                 <span>timing {(ls.timing * 100).toFixed(0)} · energy {(ls.energy * 100).toFixed(0)} · range {(ls.range * 100).toFixed(0)}</span>
                 <span className="italic">{ls.note}</span>
               </div>

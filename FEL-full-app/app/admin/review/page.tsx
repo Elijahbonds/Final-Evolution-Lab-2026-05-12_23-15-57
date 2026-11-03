@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { loginPath } from '@/lib/auth/safeNext';
 import { canFlag } from '@/lib/creator/creative-card-review';
 import { ReviewBoard } from './_components/review-board';
+import { TeacherQueue } from '@/components/teach/teacher-queue';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,6 +30,8 @@ export default async function AdminReviewPage() {
           Everything public passes here first. Approve or reject with a note; music can go into the soundtrack rotation.
         </p>
         <ReviewBoard />
+        {/* PLAT-P10 (EDU-01): teacher applications; the decision routes re-check the admin role */}
+        <TeacherQueue />
       </main>
     </div>
   );

@@ -22,7 +22,7 @@ export function PathPicker({ value, onChange, adult }: {
   const options = pickerOptions({ adult });
   return (
     <div data-path-picker>
-      <p id="path-picker-label" className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-white/55">
+      <p id="path-picker-label" className="mb-2 font-mono text-[12px] font-bold uppercase tracking-[0.18em] text-white/55">
         What did you come for?
       </p>
       <div role="radiogroup" aria-labelledby="path-picker-label" className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
@@ -48,7 +48,7 @@ export function PathPicker({ value, onChange, adult }: {
             >
               <Icon aria-hidden className="h-[18px] w-[18px]" style={{ color: on ? o.accent : 'rgba(255,255,255,0.45)' }} strokeWidth={2.2} />
               <span className="fel-heading mt-2 block text-[14px] font-bold leading-none text-white">{o.label}</span>
-              <span className="mt-1.5 block text-[11.5px] leading-snug text-white/60">{o.held ? TEACH_HELD_LINE : o.line}</span>
+              <span className="mt-1.5 block text-[12px] leading-snug text-white/60">{o.held ? TEACH_HELD_LINE : o.line}</span>
             </button>
           );
         })}

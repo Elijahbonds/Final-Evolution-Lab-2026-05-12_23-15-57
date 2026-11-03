@@ -15,7 +15,7 @@ import { mirrorReviewView } from '@/lib/coach-tools/reviewResult';
 export function SideRepFraming({ lines }: { lines: readonly string[] }) {
   return (
     <section data-side-framing className="mt-5 rounded-2xl border border-[#FFC24B]/25 bg-[#FFC24B]/[0.04] p-4">
-      <p className="font-mono text-[9.5px] font-bold uppercase tracking-[0.18em] text-[#FFC24B]">Set up side-on</p>
+      <p className="font-mono text-[12px] font-bold uppercase tracking-[0.18em] text-[#FFC24B]">Set up side-on</p>
       <ul className="mt-2 space-y-1.5 text-[13px] leading-relaxed text-white/70">
         {lines.map((l) => <li key={l}>{l}</li>)}
       </ul>
@@ -66,7 +66,7 @@ export function SideRepChecks<F extends string>({ spec, state, label, live }: { 
               <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: !last ? 'rgba(255,255,255,0.25)' : faulting ? '#FF3366' : '#00FF9D' }} />
               <span className="min-w-0">
                 <span className="block text-[13px] font-semibold text-white/85">{label(f)}</span>
-                <span className="mt-0.5 block font-mono text-[9.5px] uppercase tracking-[0.14em] text-white/35">
+                <span className="mt-0.5 block font-mono text-[12px] uppercase tracking-[0.14em] text-white/50">
                   {!last ? (live ? 'No rep read yet' : 'Waiting for the camera') : faulting ? 'Last rep · estimated fault' : 'Last rep · estimated clean'}
                 </span>
               </span>
@@ -88,9 +88,9 @@ export function SideRepReviewCard<F extends string>({ spec, state, label, cueLog
   const r = sideRepReview(spec, state, label);
   const stage = (name: string, s: typeof r.check) => (
     <div>
-      <p className="font-mono text-[9.5px] uppercase tracking-[0.16em] text-white/35">{name}</p>
+      <p className="font-mono text-[12px] uppercase tracking-[0.16em] text-white/50">{name}</p>
       <p className="fel-heading mt-1 text-[24px] font-black leading-none text-white">
-        {s.reps}<span className="ml-1.5 font-mono text-[12px] uppercase tracking-[0.14em] text-white/35">reps</span>
+        {s.reps}<span className="ml-1.5 font-mono text-[12px] uppercase tracking-[0.14em] text-white/50">reps</span>
       </p>
       {s.faultReps.length === 0 ? (
         <p className="mt-2 text-[13px] text-white/60">{s.reps === 0 ? REVIEW_COPY.notDone : s.unread === s.reps ? REVIEW_COPY.notSideOn : REVIEW_COPY.nothingToFix}</p>
@@ -119,14 +119,14 @@ export function SideRepReviewCard<F extends string>({ spec, state, label, cueLog
         {stage(REVIEW_COPY.checkStage, r.check)}
         {stage(REVIEW_COPY.workStage, r.work)}
         <div>
-          <p className="font-mono text-[9.5px] uppercase tracking-[0.16em] text-white/35">{REVIEW_COPY.coachSaid}</p>
+          <p className="font-mono text-[12px] uppercase tracking-[0.16em] text-white/50">{REVIEW_COPY.coachSaid}</p>
           {cueLog.length === 0 ? (
             <p className="mt-2 text-[13px] text-white/60">{REVIEW_COPY.coachSaidNothing}</p>
           ) : (
             <ul className="mt-2 space-y-1.5">
               {cueLog.map((c, i) => (
                 <li key={i} className="text-[13px] text-white/70">
-                  <span className="font-mono text-[10px] uppercase tracking-wider text-white/30">{levelWord(c.level)}</span>{' '}{c.text}
+                  <span className="font-mono text-[12px] uppercase tracking-wider text-white/50">{levelWord(c.level)}</span>{' '}{c.text}
                 </li>
               ))}
             </ul>

@@ -62,11 +62,11 @@ export function SlotBar(p: SlotBarProps) {
   const sel = p.slots.find((s) => s.id === p.selected);
   useEffect(() => { if (p.openPaste) { setPasting(true); setPasteError(null); } }, [p.openPaste]);
 
-  const btn = 'flex items-center gap-1 rounded-lg bg-white/5 px-2 py-1 text-[11px] text-white/80 transition hover:bg-white/10 disabled:opacity-30';
+  const btn = 'flex items-center gap-1 rounded-lg bg-white/5 px-2 py-1 text-[12px] text-white/80 transition hover:bg-white/10 disabled:opacity-30';
   return (
     <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3" aria-label="Saved characters">
       <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-white/60">Characters <span className="text-white/35">{p.slots.length}/{MAX_SLOTS}</span></h2>
+        <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-white/60">Characters <span className="text-white/50">{p.slots.length}/{MAX_SLOTS}</span></h2>
         <div className="flex gap-1.5">
           <button type="button" className={btn} onClick={p.onNew} disabled={full} title={full ? `${MAX_SLOTS} characters is the most` : 'A new character'}><Plus className="h-3 w-3" /> New</button>
           <button type="button" className={btn} onClick={() => p.onDuplicate(p.selected)} disabled={full} title="Copy this character into a new slot"><Copy className="h-3 w-3" /> Duplicate</button>
@@ -85,8 +85,8 @@ export function SlotBar(p: SlotBarProps) {
               <button type="button" onClick={() => p.onSelect(s.id)} className="flex items-center gap-2 text-left" aria-label={`Edit ${s.label || 'character'}`}>
                 <SlotThumb slot={s} />
                 <span className="min-w-0">
-                  {renaming === s.id ? null : <span className="block truncate font-mono text-[11px] font-bold tracking-wider text-white">{s.label || '—'}</span>}
-                  <span className="block text-[9px] uppercase tracking-wider text-white/40">{s.body === 'scan' ? 'scan body' : s.body}</span>
+                  {renaming === s.id ? null : <span className="block truncate font-mono text-[12px] font-bold tracking-wider text-white">{s.label || '—'}</span>}
+                  <span className="block text-[12px] uppercase tracking-wider text-white/50">{s.body === 'scan' ? 'scan body' : s.body}</span>
                 </span>
               </button>
               {renaming === s.id && (
@@ -94,18 +94,18 @@ export function SlotBar(p: SlotBarProps) {
                   <input autoFocus value={draft} maxLength={12} aria-label="Character name"
                     onChange={(e) => setDraft(sanitizeStampText(e.target.value))}
                     onKeyDown={(e) => { if (e.key === 'Enter') { p.onRename(s.id, draft); setRenaming(null); } if (e.key === 'Escape') setRenaming(null); }}
-                    className="w-full rounded border border-white/15 bg-white/5 px-1.5 py-0.5 font-mono text-[11px] uppercase text-white" />
+                    className="w-full rounded border border-white/15 bg-white/5 px-1.5 py-0.5 font-mono text-[12px] uppercase text-white" />
                   <button type="button" aria-label="Save name" onClick={() => { p.onRename(s.id, draft); setRenaming(null); }}><Check className="h-3.5 w-3.5 text-cyan-300" /></button>
                 </span>
               )}
               <div className="flex items-center gap-1">
                 {playing
-                  ? <span className="flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-black tracking-wider text-black" style={{ background: accent }}><Play className="h-2.5 w-2.5" /> PLAYING</span>
-                  : <button type="button" onClick={() => p.onPlayAs(s.id)} className="rounded-full border border-white/15 px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-white/75 hover:bg-white/10" title="Play as this character in every mode">PLAY AS</button>}
+                  ? <span className="flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[12px] font-black tracking-wider text-black" style={{ background: accent }}><Play className="h-2.5 w-2.5" /> PLAYING</span>
+                  : <button type="button" onClick={() => p.onPlayAs(s.id)} className="rounded-full border border-white/15 px-1.5 py-0.5 text-[12px] font-bold tracking-wider text-white/75 hover:bg-white/10" title="Play as this character in every mode">PLAY AS</button>}
                 <span className="flex-1" />
-                <button type="button" aria-label={`Rename ${s.label}`} title="Rename" onClick={() => { setRenaming(s.id); setDraft(s.label); }} className="text-white/45 hover:text-white"><Pencil className="h-3 w-3" /></button>
+                <button type="button" aria-label={`Rename ${s.label}`} title="Rename" onClick={() => { setRenaming(s.id); setDraft(s.label); }} className="text-white/50 hover:text-white"><Pencil className="h-3 w-3" /></button>
                 <button type="button" aria-label={`Delete ${s.label}`} title={p.slots.length <= 1 ? 'Your only character' : 'Delete'} disabled={p.slots.length <= 1}
-                  onClick={() => setConfirmDelete(s.id)} className="text-white/45 hover:text-red-300 disabled:opacity-20"><Trash2 className="h-3 w-3" /></button>
+                  onClick={() => setConfirmDelete(s.id)} className="text-white/50 hover:text-red-300 disabled:opacity-20"><Trash2 className="h-3 w-3" /></button>
               </div>
             </div>
           );
@@ -113,7 +113,7 @@ export function SlotBar(p: SlotBarProps) {
       </div>
 
       {confirmDelete && (
-        <div role="alertdialog" aria-label="Delete character" className="mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-red-400/30 bg-red-500/10 p-2 text-[11px] text-red-100">
+        <div role="alertdialog" aria-label="Delete character" className="mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-red-400/30 bg-red-500/10 p-2 text-[12px] text-red-100">
           <span>Delete <b>{p.slots.find((s) => s.id === confirmDelete)?.label}</b>? This can&apos;t be undone once you save.</span>
           <button type="button" className="rounded bg-red-500/80 px-2 py-0.5 font-bold text-white" onClick={() => { p.onDelete(confirmDelete); setConfirmDelete(null); }}>Delete</button>
           <button type="button" className="rounded bg-white/10 px-2 py-0.5" onClick={() => setConfirmDelete(null)}>Cancel</button>
@@ -122,10 +122,10 @@ export function SlotBar(p: SlotBarProps) {
 
       {pasting && (
         <div className="mt-2 flex flex-col gap-1.5 rounded-xl border border-white/10 bg-white/[0.02] p-2">
-          <label className="text-[10px] uppercase tracking-wider text-white/45" htmlFor="slot-code">Share code</label>
+          <label className="text-[12px] uppercase tracking-wider text-white/50" htmlFor="slot-code">Share code</label>
           <textarea id="slot-code" rows={2} value={code} onChange={(e) => setCode(e.target.value)} placeholder="FEL2.…"
-            className="w-full rounded border border-white/10 bg-white/5 p-1.5 font-mono text-[10px] text-white/80" />
-          {pasteError && <p className="text-[11px] text-red-300">{pasteError}</p>}
+            className="w-full rounded border border-white/10 bg-white/5 p-1.5 font-mono text-[12px] text-white/80" />
+          {pasteError && <p className="text-[12px] text-red-300">{pasteError}</p>}
           <div className="flex gap-1.5">
             <button type="button" className={btn} disabled={!code.trim() || full} onClick={async () => {
               const err = await p.onPaste(code);
@@ -138,7 +138,7 @@ export function SlotBar(p: SlotBarProps) {
       )}
 
       {sel && (
-        <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-white/60">
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-[12px] text-white/60">
           <button type="button" className={btn} onClick={async () => setShare(await p.onShare(shareNumbers))}><Copy className="h-3 w-3" /> Share code for {sel.label || 'this character'}</button>
           <label className="flex items-center gap-1" title="The face sculpt numbers (a face scan writes these). Off unless you choose.">
             <input type="checkbox" checked={shareNumbers} onChange={(e) => { setShareNumbers(e.target.checked); setShare(null); }} /> include face sculpt
@@ -149,9 +149,9 @@ export function SlotBar(p: SlotBarProps) {
       {share && (
         <div className="mt-1.5 flex items-center gap-1.5">
           <input readOnly value={share} aria-label="Share code" onFocus={(e) => e.currentTarget.select()}
-            className="w-full rounded border border-white/10 bg-white/5 px-1.5 py-1 font-mono text-[10px] text-white/70" />
+            className="w-full rounded border border-white/10 bg-white/5 px-1.5 py-1 font-mono text-[12px] text-white/70" />
           <button type="button" className={btn} onClick={() => { void navigator.clipboard?.writeText(share).catch(() => {}); }}>Copy</button>
-          <span className="shrink-0 text-[10px] text-white/35">{share.length} chars</span>
+          <span className="shrink-0 text-[12px] text-white/50">{share.length} chars</span>
         </div>
       )}
     </div>

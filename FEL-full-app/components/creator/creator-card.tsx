@@ -47,12 +47,12 @@ export function CreatorCard({ card, stats, highlights }: { card: CreatorCardData
         {/* header */}
         <div className="flex items-center justify-between">
           <span
-            className="rounded-full px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-widest"
+            className="rounded-full px-3 py-1 font-mono text-[12px] font-bold uppercase tracking-widest"
             style={{ backgroundColor: meta.ring, color: '#050505' }}
           >
             {rarityLabel(rarity)}
           </span>
-          <span className="font-mono text-[10px] uppercase tracking-widest text-white/40">
+          <span className="font-mono text-[12px] uppercase tracking-widest text-white/50">
             FEL · CREATOR CARD
           </span>
         </div>
@@ -97,7 +97,7 @@ export function CreatorCard({ card, stats, highlights }: { card: CreatorCardData
           <span className="text-sm text-white/80">
             {card.signatureMove || 'Signature move undeclared'}
           </span>
-          <span className="ml-auto rounded-md bg-white/[0.06] px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-white/60">
+          <span className="ml-auto rounded-md bg-white/[0.06] px-2 py-1 font-mono text-[12px] uppercase tracking-wider text-white/60">
             {mpModeLabel(card.mode)}
           </span>
         </div>
@@ -112,7 +112,7 @@ export function CreatorCard({ card, stats, highlights }: { card: CreatorCardData
         {stats && <StatBlocks stats={stats} accent={accent} />}
         {highlights && highlights.length > 0 && (
           <div className="mt-4">
-            <div className="mb-2 font-mono text-[10px] uppercase tracking-widest text-white/40">Highlights</div>
+            <div className="mb-2 font-mono text-[12px] uppercase tracking-widest text-white/50">Highlights</div>
             <div className="space-y-1.5">
               {highlights.map((h) => (
                 <div key={`${h.kind}:${h.id}`} className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm">
@@ -138,15 +138,15 @@ function StatBlocks({ stats, accent }: { stats: PublicStats; accent: string }) {
           {/* the shield needs BOTH measured and current — a stale reading keeps its numbers but loses the
               badge and prints its age instead, because a shield beside an eight-month-old scan is the most
               misleading thing this card can say (lib/creator/claimClock.ts) */}
-          <div className="mb-2 flex items-center gap-1 font-mono text-[10px] uppercase tracking-widest text-white/40">PRQ profile {stats.verified ? <ShieldCheck className="h-3 w-3" style={{ color: accent }} /> : <span className="normal-case tracking-normal text-white/30">· {stats.prqSource === 'measured' ? 'not a current reading' : 'self-reported until measured'}</span>}</div>
+          <div className="mb-2 flex items-center gap-1 font-mono text-[12px] uppercase tracking-widest text-white/50">PRQ profile {stats.verified ? <ShieldCheck className="h-3 w-3" style={{ color: accent }} /> : <span className="normal-case tracking-normal text-white/50">· {stats.prqSource === 'measured' ? 'not a current reading' : 'self-reported until measured'}</span>}</div>
           {stats.prqNote && stats.prqFreshness !== 'fresh' && (
-            <div className="mb-2 text-[10px] text-white/35">{stats.prqNote}</div>
+            <div className="mb-2 text-[12px] text-white/50">{stats.prqNote}</div>
           )}
           <div className="space-y-1">
             {PRQ_ORDER.filter((k) => stats.prq && k in stats.prq).map((k) => {
               const v = Math.max(0, Math.min(100, stats.prq![k]));
               return (
-                <div key={k} className="flex items-center gap-2 text-[11px]">
+                <div key={k} className="flex items-center gap-2 text-[12px]">
                   <span className="w-16 capitalize text-white/50">{k}</span>
                   <div className="h-1.5 flex-1 rounded-full bg-white/10"><div className="h-1.5 rounded-full" style={{ width: `${v}%`, backgroundColor: accent }} /></div>
                   <span className="w-6 text-right font-mono text-white/70">{Math.round(stats.prq![k])}</span>
@@ -158,25 +158,25 @@ function StatBlocks({ stats, accent }: { stats: PublicStats; accent: string }) {
       )}
       {stats.mastery.length > 0 && (
         <div>
-          <div className="mb-2 font-mono text-[10px] uppercase tracking-widest text-white/40">Mastery</div>
-          <div className="flex flex-wrap gap-1.5">{stats.mastery.map((m) => <span key={m.mode} className="rounded-md border border-white/10 px-2 py-1 text-[11px] text-white/80">{mpModeLabel(m.mode)} · <span style={{ color: accent }}>{m.label}</span>{m.best != null ? ` · ${m.best}` : ''}</span>)}</div>
+          <div className="mb-2 font-mono text-[12px] uppercase tracking-widest text-white/50">Mastery</div>
+          <div className="flex flex-wrap gap-1.5">{stats.mastery.map((m) => <span key={m.mode} className="rounded-md border border-white/10 px-2 py-1 text-[12px] text-white/80">{mpModeLabel(m.mode)} · <span style={{ color: accent }}>{m.label}</span>{m.best != null ? ` · ${m.best}` : ''}</span>)}</div>
         </div>
       )}
       {stats.records.length > 0 && (
         <div>
-          <div className="mb-2 font-mono text-[10px] uppercase tracking-widest text-white/40">Records</div>
-          <div className="grid grid-cols-2 gap-1.5">{stats.records.slice(0, 6).map((r) => <div key={r.mode} className="rounded-lg border border-white/10 bg-white/[0.03] px-2 py-1.5 text-[11px]"><div className="text-white/80">{mpModeLabel(r.mode)}</div><div className="font-mono text-white/50">best <span className="text-white">{r.best}</span> · {r.wins}W / {r.sessions}</div></div>)}</div>
-          {stats.ladder && <div className="mt-1.5 text-[11px] text-white/50">Ladder best: <span className="text-white/80">{stats.ladder.bestScore}</span> in {mpModeLabel(stats.ladder.mode)}</div>}
+          <div className="mb-2 font-mono text-[12px] uppercase tracking-widest text-white/50">Records</div>
+          <div className="grid grid-cols-2 gap-1.5">{stats.records.slice(0, 6).map((r) => <div key={r.mode} className="rounded-lg border border-white/10 bg-white/[0.03] px-2 py-1.5 text-[12px]"><div className="text-white/80">{mpModeLabel(r.mode)}</div><div className="font-mono text-white/50">best <span className="text-white">{r.best}</span> · {r.wins}W / {r.sessions}</div></div>)}</div>
+          {stats.ladder && <div className="mt-1.5 text-[12px] text-white/50">Ladder best: <span className="text-white/80">{stats.ladder.bestScore}</span> in {mpModeLabel(stats.ladder.mode)}</div>}
         </div>
       )}
       {stats.resiliency && (
-        <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-[11px] text-white/70">
+        <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-[12px] text-white/70">
           <span>Resiliency · {stats.resiliency.attempts} attempts</span>
           <span>retry rate <span className="text-white">{Math.round(stats.resiliency.retryRate * 100)}%</span>{stats.resiliency.returnedAfterLoss === true ? ' · came back after the last loss' : ''}</span>
         </div>
       )}
       {stats.movement?.delta && (
-        <div className="text-[11px] text-white/60">Movement signature delta since last scan: {Object.entries(stats.movement.delta).slice(0, 4).map(([k, v]) => `${k} ${v > 0 ? '+' : ''}${Math.round(v * 10) / 10}`).join(' · ')}</div>
+        <div className="text-[12px] text-white/60">Movement signature delta since last scan: {Object.entries(stats.movement.delta).slice(0, 4).map(([k, v]) => `${k} ${v > 0 ? '+' : ''}${Math.round(v * 10) / 10}`).join(' · ')}</div>
       )}
     </div>
   );
@@ -187,7 +187,7 @@ function Stat({ icon, label, value, accent }: { icon: React.ReactNode; label: st
     <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-center">
       <div className="flex items-center justify-center" style={{ color: accent }}>{icon}</div>
       <div className="mt-1 fel-heading text-lg font-bold text-white">{value}</div>
-      <div className="font-mono text-[10px] uppercase tracking-wider text-white/40">{label}</div>
+      <div className="font-mono text-[12px] uppercase tracking-wider text-white/50">{label}</div>
     </div>
   );
 }

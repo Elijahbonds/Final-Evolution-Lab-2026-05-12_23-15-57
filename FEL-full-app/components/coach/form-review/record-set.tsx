@@ -186,7 +186,7 @@ export function RecordSet({ ctx, api = FORM_REVIEWS_API }: { ctx: RecordContext;
   return (
     <div className="space-y-4" data-record-set={ctx.movement}>
       <div className="fel-card space-y-2 rounded-xl p-4">
-        <div className="text-[11px] uppercase tracking-wider text-fel-dim">Film a set for your coach</div>
+        <div className="text-[12px] uppercase tracking-wider text-fel-dim">Film a set for your coach</div>
         <h1 className="text-lg font-bold text-white">{ctx.exerciseName}</h1>
         <p className="text-sm text-white/65">{spec.setup}</p>
         <p className="text-xs text-fel-dim">The camera counts your reps and reads each one. Every number is an estimate.</p>
@@ -285,7 +285,7 @@ export function RecordSet({ ctx, api = FORM_REVIEWS_API }: { ctx: RecordContext;
 
       {mine && mine.length > 0 && (
         <div className="fel-card space-y-2 rounded-xl p-4" data-my-sets>
-          <div className="text-[11px] uppercase tracking-wider text-fel-dim">Sets you sent</div>
+          <div className="text-[12px] uppercase tracking-wider text-fel-dim">Sets you sent</div>
           {mine.slice(0, 6).map((m) => (
             <div key={m.id} className="flex items-center justify-between gap-2 text-sm">
               <span className="min-w-0 truncate text-white/80">{m.exerciseName} · {m.reps} reps{m.setScore !== null ? ` · ${m.setScore}` : ''}</span>

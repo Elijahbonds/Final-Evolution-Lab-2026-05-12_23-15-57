@@ -408,7 +408,7 @@ export function EndScreen(props: EndScreenProps) {
                 animate={{ scale: 1, rotate: 0, opacity: 1 }}
                 transition={{ type: 'spring', damping: 11, stiffness: 220, delay: instant ? 0 : 0.08 }}
               >
-                <Trophy data-end-trophy={won ? 'gold' : 'dim'} className={`h-[min(2.6em,9vh)] w-[min(2.6em,9vh)] ${won ? 'text-[#FFD700] drop-shadow-[0_0_24px_rgba(255,215,0,0.7)]' : 'text-white/30'}`} />
+                <Trophy data-end-trophy={won ? 'gold' : 'dim'} className={`h-[min(2.6em,9vh)] w-[min(2.6em,9vh)] ${won ? 'text-[#FFD700] drop-shadow-[0_0_24px_rgba(255,215,0,0.7)]' : 'text-white/50'}`} />
               </motion.div>
               <motion.h2
                 data-end-headline
@@ -583,7 +583,7 @@ export function EndScreen(props: EndScreenProps) {
                 <Beat show={shown('goals')} instant={fast}>
                   <div data-end-goals className="rounded-2xl border border-[#FF7A2F]/25 bg-[#FF7A2F]/[0.05] px-[0.7em] py-[0.45em]">
                     <div className="mb-[0.3em] flex items-center gap-[0.4em] text-[0.72em] font-bold uppercase tracking-[0.2em] text-white/55">
-                      <Target className="h-[1.1em] w-[1.1em] text-[#FF7A2F]" /> Today&apos;s goals <span className="ml-auto font-display tabular-nums normal-case tracking-normal text-white/45">{goalsDoneCount(goals)}</span>
+                      <Target className="h-[1.1em] w-[1.1em] text-[#FF7A2F]" /> Today&apos;s goals <span className="ml-auto font-display tabular-nums normal-case tracking-normal text-white/50">{goalsDoneCount(goals)}</span>
                     </div>
                     <ul className="grid gap-[0.3em] md:grid-cols-3">
                       {goals.map((g) => (
@@ -663,13 +663,13 @@ export function EndScreen(props: EndScreenProps) {
               {(extraActions ?? []).map((a) => (
                 <ActionButton key={a.id} a={a} focused={focusId === `x-${a.id}`} onPress={(x) => { if (!armed()) return; if (x.href) onNavigate(x.href); else x.onSelect?.(); }} />
               ))}
-              <span aria-hidden className="ml-auto hidden items-center gap-[0.9em] text-[0.72em] uppercase tracking-[0.14em] text-white/45 [@media(hover:hover)]:flex">
+              <span aria-hidden className="ml-auto hidden items-center gap-[0.9em] text-[0.72em] uppercase tracking-[0.14em] text-white/50 [@media(hover:hover)]:flex">
                 <span><b className="text-[#00FF9D]">A</b> {revealDone(rv, steps.length) ? 'Select' : 'Skip'}</span>
                 <span><b className="text-[#FF3366]">B</b> Back</span>
                 <span>✚ Move</span>
               </span>
             </div>
-            {share.url && <p className="mt-[0.4em] break-all font-display tabular-nums text-[0.7em] text-white/45">{share.url}</p>}
+            {share.url && <p className="mt-[0.4em] break-all font-display tabular-nums text-[0.7em] text-white/50">{share.url}</p>}
           </footer>
         </motion.section>
       </div>

@@ -170,7 +170,7 @@ export function FaceScanCapture({
         <div className="relative mb-4 aspect-square w-full overflow-hidden rounded-xl bg-black">
           <video ref={videoRef} playsInline muted className="h-full w-full object-cover" style={{ display: status === 'camera' ? 'block' : 'none' }} />
           {status !== 'camera' && (
-            <div className="absolute inset-0 flex items-center justify-center text-center text-sm text-white/40">
+            <div className="absolute inset-0 flex items-center justify-center text-center text-sm text-white/50">
               {status === 'loading-model' ? 'Loading face model…'
                 : status === 'analyzing' ? 'Analyzing…'
                 : status === 'error' ? '—'

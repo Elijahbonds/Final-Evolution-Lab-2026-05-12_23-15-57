@@ -39,7 +39,7 @@ export function DrillDemo({ drill, initiallyOpen = false }: { drill: Drill; init
       <div className="overflow-hidden rounded-xl border border-white/10 bg-[#0c0c11]" aria-label={`${drill.name}: 3D demo`}>
         {threeDisabled ? (
           <div data-drill-demo-still className="flex aspect-video w-full items-center justify-center bg-[#16161a]">
-            <Dumbbell aria-hidden className="h-10 w-10 text-white/30" />
+            <Dumbbell aria-hidden className="h-10 w-10 text-white/50" />
           </div>
         ) : (
           <AvatarDemo clip={drillDemoLoop(drill.id)} />

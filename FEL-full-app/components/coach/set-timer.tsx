@@ -91,7 +91,7 @@ export function WorkBreath({ spec, sec }: { spec: PacerSpec; sec: number }) {
       <BreathPacer id="work-breath" spec={spec} elapsedSec={sec} size="sm" liveCaption />
       <div className="min-w-0 space-y-0.5">
         <div className="text-xs font-medium text-white">{POST_SESSION_BREATH.name}</div>
-        <div className="text-[11px] text-white/60">{POST_SESSION_BREATH.cue}</div>
+        <div className="text-[12px] text-white/60">{POST_SESSION_BREATH.cue}</div>
       </div>
     </div>
   );
@@ -227,7 +227,7 @@ export function SetTimer({ timers, onWorkLogged, testId, onRunChange, settleBloc
       {run && view && (
         <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-2">
-            <div className="text-[11px] uppercase tracking-wider text-fel-dim">{run.kind}{view.done ? ' · done' : view.paused ? ' · paused' : ''}</div>
+            <div className="text-[12px] uppercase tracking-wider text-fel-dim">{run.kind}{view.done ? ' · done' : view.paused ? ' · paused' : ''}</div>
             <div className="font-mono text-2xl tabular-nums text-white" data-testid={testId ? `${testId}-clock` : undefined} aria-live="off">{formatClock(view.remaining)}</div>
             <div className="flex items-center gap-1">
               {!view.done && <button type="button" onClick={togglePause} aria-label={view.paused ? 'Resume' : 'Pause'} className="rounded-md border border-white/10 p-1.5 text-white/70">{view.paused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}</button>}
@@ -237,14 +237,14 @@ export function SetTimer({ timers, onWorkLogged, testId, onRunChange, settleBloc
           <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
             <div className={`h-full ${run.kind === 'rest' ? 'bg-white/40' : 'bg-fel-cyan'}`} style={{ width: `${Math.round(view.fraction * 100)}%` }} />
           </div>
-          {run.kind === 'work' && <div className="text-[11px] text-fel-dim">{view.done ? 'Logged in the next set.' : 'Stop early and the seconds you worked go in the next set.'}</div>}
+          {run.kind === 'work' && <div className="text-[12px] text-fel-dim">{view.done ? 'Logged in the next set.' : 'Stop early and the seconds you worked go in the next set.'}</div>}
           {workBreath && <WorkBreath spec={workBreath.spec} sec={workBreath.sec} />}
           {settling && settle && (
             <div className="flex items-center gap-3 rounded-md border border-fel-cyan/20 bg-fel-cyan/5 p-2" data-settle>
               <BreathPacer id="settle" spec={settle} elapsedSec={view.elapsed} size="sm" liveCaption />
               <div className="min-w-0 space-y-0.5">
                 <div className="text-xs font-medium text-white">{BETWEEN_SET_SETTLE.name}</div>
-                <div className="text-[11px] text-white/60">{BETWEEN_SET_SETTLE.cue}</div>
+                <div className="text-[12px] text-white/60">{BETWEEN_SET_SETTLE.cue}</div>
               </div>
             </div>
           )}

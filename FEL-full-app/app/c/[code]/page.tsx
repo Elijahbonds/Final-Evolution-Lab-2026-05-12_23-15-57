@@ -16,6 +16,9 @@ import {
 } from '@/lib/social/challenge-terms';
 import { AGE_BLOCK_COOKIE } from '@/lib/privacy/ageScreen';
 import { verifiedAdult } from '@/lib/privacy/verifiedAdult';
+import { teacherSource } from '@/lib/teach/role';
+import { teacherRoleDeps } from '@/lib/teach/server';
+import { TeacherBadge } from '@/components/creator/teacher-badge';
 
 export const dynamic = 'force-dynamic';
 
@@ -56,6 +59,8 @@ export default async function ChallengePage({ params, searchParams }: { params: 
   const link = found && challengeVersionLive(found.payload) ? found : null;
 
   let v2: Parameters<typeof ChallengeLanding>[0] | null = null;
+  // PLAT-P10 (EDU-01): the Teacher badge when the challenger is an approved teacher (the role, never an application)
+  const teacher = link?.ownerUserId ? (await teacherSource(link.ownerUserId, teacherRoleDeps())) !== null : false;
   if (link) {
     const payload = link.payload as { t?: unknown; x?: never };
     const terms = termsOf(payload);
@@ -116,7 +121,10 @@ export default async function ChallengePage({ params, searchParams }: { params: 
             </a>
           </div>
         ) : (
-          <ChallengeLanding {...v2} />
+          <>
+            {teacher && <div className="mb-3 flex justify-center"><TeacherBadge /></div>}
+            <ChallengeLanding {...v2} />
+          </>
         )}
       </main>
       {session ? null : <PublicLegalFooter />}

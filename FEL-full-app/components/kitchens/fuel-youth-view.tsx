@@ -18,7 +18,7 @@ export function FuelYouthView() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 pt-4" data-testid="fuel-youth">
-      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/50">FEL Kitchens · Cook</p>
+      <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-white/50">FEL Kitchens · Cook</p>
       <h1 className="fel-heading mt-1 text-2xl font-bold text-white">Things to cook</h1>
       <p className="mt-1 text-sm text-white/60">Simple recipes, how long they take and what goes in them.</p>
 
@@ -35,7 +35,7 @@ export function FuelYouthView() {
           <li key={r.id} className="fel-panel rounded-xl p-3" data-recipe={r.id}>
             <div className="flex items-center justify-between gap-2">
               <p className="text-sm font-bold text-white">{r.title}</p>
-              <span className="font-mono text-[11px] text-white/50">{r.prepMinutes} min</span>
+              <span className="font-mono text-[12px] text-white/50">{r.prepMinutes} min</span>
             </div>
             <AllergenChips allergens={r.allergens} avoid={avoid} />
             <ul className="mt-2 space-y-0.5 text-[12px] text-white/70">

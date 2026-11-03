@@ -580,3 +580,31 @@ describe('review of 3a: the carry after physics, and its caps as speeds', () => 
   }
   it('HELD_STEP_M is the 60 fps step of HELD_MPS', () => { expect(HELD_STEP_M).toBeCloseTo(HELD_MPS / 60, 12); });
 });
+
+// hoops-p04b: a gear change steps speed01 in one frame (stop → sprint), and the off arm's pace swing (on from 0.35, full at 0.65) and the
+// ball arm's pace reach read it — so the arm took its whole reach in a frame (the rig's stage tracer: the carry, 1 000–2 300 deg/s on the
+// frames after `gear stop → sprint`). The arm weights read speed01 eased over CARRY_ARM_SPEED_SEC.
+describe('a gear change eases the carry arms in (hoops-p04b)', () => {
+  it('stop → sprint in one frame: the off arm takes its swing over several frames, never most of it in one', () => {
+    const scene = new Scene(new NullEngine());
+    const r = rig(scene);
+    attachBallToHand(r.ball, r.sk, 'LeftHand');
+    const carry = mountBallCarry({ scene, ball: r.ball, root: r.root, skeleton: r.sk, hoops: true });
+    const d = driver(scene, carry, r.ball);
+    const off = r.nodes.RightArm; const clipOff = off.rotationQuaternion!.clone();
+    const arms = ['LeftArm', 'LeftForeArm', 'RightArm', 'RightForeArm'].map((n) => [r.nodes[n], r.nodes[n].rotationQuaternion!.clone()] as const);
+    const clip = () => { for (const [n, q] of arms) n.rotationQuaternion!.copyFrom(q); };
+    for (let i = 0; i < 60; i++) { clip(); d.frame(1 / 60, 0, true); }   // standing dribble
+    const ang = (a: Quaternion, b: Quaternion) => 2 * Math.acos(Math.min(1, Math.abs(Quaternion.Dot(a, b)))) * 180 / Math.PI;
+    let prev = off.rotationQuaternion!.clone(); let maxStep = 0;
+    for (let i = 0; i < 40; i++) {   // the gear: speed01 0 → 1 at once
+      clip(); d.frame(1 / 60, 1, true);
+      maxStep = Math.max(maxStep, ang(off.rotationQuaternion!, prev)); prev = off.rotationQuaternion!.clone();
+    }
+    const total = ang(off.rotationQuaternion!, clipOff);
+    expect(total).toBeGreaterThan(5);              // the off arm does swing in at a sprint
+    expect(maxStep).toBeLessThan(0.4 * total);     // …over several frames, not in one
+    carry.dispose();
+  });
+});
+

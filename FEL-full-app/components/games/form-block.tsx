@@ -24,11 +24,11 @@ export function FormBlockView({ view, onDevice }: { view: FormView; onDevice: bo
         {view.lines.map((l) => (
           <li key={l.label} data-form-line={l.read ? 'read' : 'unread'} className="flex items-baseline justify-between gap-[0.6em] text-[0.88em]">
             <span className="min-w-0 text-white/80">{l.label}</span>
-            <span className={l.read ? 'font-semibold tabular-nums text-white' : 'italic text-white/45'}>{l.read ? l.value : UNREAD}</span>
+            <span className={l.read ? 'font-semibold tabular-nums text-white' : 'italic text-white/50'}>{l.read ? l.value : UNREAD}</span>
           </li>
         ))}
       </ul>
-      <p className="mt-[0.4em] text-[0.7em] text-white/45">
+      <p className="mt-[0.4em] text-[0.7em] text-white/50">
         Camera estimates, not measurements.{onDevice ? ' Kept on this device only — nothing is saved.' : ''}
       </p>
     </section>

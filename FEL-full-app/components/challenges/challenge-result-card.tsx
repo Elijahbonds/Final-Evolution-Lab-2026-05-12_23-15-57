@@ -51,16 +51,16 @@ export function ChallengeResultCard(p: ChallengeResultCardProps) {
   return (
     <section className="fel-panel rounded-2xl p-6 text-center" aria-labelledby="challenge-result-h" data-challenge-result={p.outcome}>
       <head.Icon className={`mx-auto h-10 w-10 ${head.tone}`} aria-hidden />
-      <div className="mt-2 font-mono text-[11px] uppercase tracking-[0.2em] text-white/40">{p.title}</div>
+      <div className="mt-2 font-mono text-[12px] uppercase tracking-[0.2em] text-white/50">{p.title}</div>
       <h2 id="challenge-result-h" className={`mt-1 fel-heading text-3xl font-bold ${head.tone}`}>{head.line}</h2>
 
       <div className="mt-5 grid grid-cols-2 gap-3" role="group" aria-label="Both scores">
         <div className={`rounded-xl border px-3 py-3 ${p.outcome === 'won' ? 'border-[#00FF9D]/50 bg-[#00FF9D]/10' : 'border-white/10 bg-white/[0.03]'}`}>
-          <div className="font-mono text-[10px] uppercase tracking-widest text-white/50">You</div>
+          <div className="font-mono text-[12px] uppercase tracking-widest text-white/50">You</div>
           <div className="mt-1 fel-heading text-2xl font-bold text-white" data-score="mine">{p.myScore}</div>
         </div>
         <div className={`rounded-xl border px-3 py-3 ${p.outcome === 'lost' ? 'border-[#FF3366]/50 bg-[#FF3366]/10' : 'border-white/10 bg-white/[0.03]'}`}>
-          <div className="truncate font-mono text-[10px] uppercase tracking-widest text-white/50">{p.theirName}</div>
+          <div className="truncate font-mono text-[12px] uppercase tracking-widest text-white/50">{p.theirName}</div>
           <div className="mt-1 fel-heading text-2xl font-bold text-white" data-score="theirs">{p.theirScore}</div>
         </div>
       </div>

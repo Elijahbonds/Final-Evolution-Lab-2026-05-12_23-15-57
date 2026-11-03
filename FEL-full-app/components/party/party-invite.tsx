@@ -26,7 +26,7 @@ export function PartyInvite({ modeId, variant = 'chip' }: { modeId: string; vari
   }
   return (
     <Link href={partyHref(m.id)} data-testid="party-invite-chip"
-      className="mt-1 inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-black/40 px-3 py-1 text-[10px] font-black tracking-[0.2em] text-white/85 hover:border-white/60">
+      className="mt-1 inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-black/40 px-3 py-1 text-[12px] font-black tracking-[0.2em] text-white/85 hover:border-white/60">
       <Users className="h-3.5 w-3.5" /> PLAY WITH FRIENDS · {playersBadge(m)} · {styleLine(m)}
     </Link>
   );

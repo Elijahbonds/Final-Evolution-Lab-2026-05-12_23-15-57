@@ -17,7 +17,7 @@ export default function JoinByCodePage({ searchParams }: { searchParams?: { code
       <Link href="/" className="fel-heading mb-10 text-lg font-bold text-white">
         FINAL <span className="text-fel-cyan">EVOLUTION</span> LAB
       </Link>
-      <p className="font-mono text-[11px] uppercase tracking-widest text-fel-dim">Coach invite</p>
+      <p className="font-mono text-[12px] uppercase tracking-widest text-fel-dim">Coach invite</p>
       <h1 className="fel-heading mt-3 text-2xl font-bold text-white sm:text-3xl">Got a code from your coach?</h1>
       <p className="mt-3 max-w-sm text-sm text-white/55">Type it in. You will see whose roster it is before you join.</p>
       <CodeForm initial={code ? formatCode(code) : ''} />

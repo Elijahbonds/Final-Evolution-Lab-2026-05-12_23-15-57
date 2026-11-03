@@ -32,7 +32,7 @@ export function AthleteStatusCard({ status }: { status: AthleteStatus }) {
     <section className="mt-8 rounded-2xl border border-fel-cyan/20 bg-fel-cyan/[0.04] p-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-fel-cyan/70">Athlete status</p>
+          <p className="font-mono text-[12px] font-bold uppercase tracking-[0.18em] text-fel-cyan/70">Athlete status</p>
           <h2 className="fel-heading mt-1 text-[22px] font-black text-white">What to do next</h2>
           <p className="mt-1 text-sm text-white/55">A live read of your scan history, Academy progress, and open protocols.</p>
         </div>
@@ -98,7 +98,7 @@ export function AthleteStatusCard({ status }: { status: AthleteStatus }) {
 function StatusMetric({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-2">
-      <p className="font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-fel-quiet">{label}</p>
+      <p className="font-mono text-[12px] font-bold uppercase tracking-[0.16em] text-fel-quiet">{label}</p>
       <p className="mt-1 text-sm font-black text-white">{value}</p>
     </div>
   );

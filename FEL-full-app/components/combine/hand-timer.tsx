@@ -54,11 +54,11 @@ export function HandTimer({ kind, onTime, now = () => performance.now() }: { kin
       <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); take(Number(typed.replace(',', '.'))); }}>
         <label className="sr-only" htmlFor={`combine-type-${kind}`}>Type a time in seconds</label>
         <input id={`combine-type-${kind}`} inputMode="decimal" placeholder="or type it: 4.82" value={typed} onChange={(e) => setTyped(e.target.value)} data-combine-typed
-          className="min-h-12 min-w-0 flex-1 rounded-xl border border-white/15 bg-black/40 px-3 text-lg text-white placeholder:text-white/30" />
+          className="min-h-12 min-w-0 flex-1 rounded-xl border border-white/15 bg-black/40 px-3 text-lg text-white placeholder:text-white/50" />
         <button type="submit" disabled={!typed.trim()} className="min-h-12 rounded-xl border border-white/25 px-4 font-bold text-white disabled:opacity-40">Record</button>
       </form>
       {why && <p role="alert" className="text-sm text-[#FFB020]">{why}</p>}
-      <p className="flex items-center gap-1.5 text-[11px] text-fel-dim"><Timer className="h-3.5 w-3.5" /> {HAND_TIMED_LINE}</p>
+      <p className="flex items-center gap-1.5 text-[12px] text-fel-dim"><Timer className="h-3.5 w-3.5" /> {HAND_TIMED_LINE}</p>
     </div>
   );
 }

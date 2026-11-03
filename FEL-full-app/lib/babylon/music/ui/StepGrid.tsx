@@ -218,17 +218,17 @@ export default function StepGrid(p: StepGridProps) {
     const label = (
       <div data-qa="grid-row" data-row={r.id} data-silent={r.silent ?? ''}
         style={{
-          fontSize: 11, alignSelf: 'center', display: 'flex', alignItems: 'center', gap: 6, minWidth: 0,
+          fontSize: 12, alignSelf: 'center', display: 'flex', alignItems: 'center', gap: 6, minWidth: 0,
           opacity: r.silent ? 0.55 : 0.9, ...(layout.compact ? { gridColumn: '1 / -1', marginTop: i === 0 ? 0 : 4 } : {}),
         }}>
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.label}</span>
         {r.silent && <span data-qa="row-silent" title={r.silent === 'mute' ? 'muted on the mixer' : 'silent: another row is soloed'}
-          style={{ fontSize: 9, fontWeight: 800, padding: '0 4px', borderRadius: 4, background: '#5a4470', color: '#fff' }}>{r.silent === 'mute' ? 'M' : 'S'}</span>}
+          style={{ fontSize: 12, fontWeight: 800, padding: '0 4px', borderRadius: 4, background: '#5a4470', color: '#fff' }}>{r.silent === 'mute' ? 'M' : 'S'}</span>}
         {r.pitched && (
           <button type="button" data-qa="note-open" data-row={r.id} aria-expanded={open} title="Notes: pick each step's note in the song's key"
             onClick={() => p.onOpenNote(open ? null : r.id)}
             style={{
-              marginLeft: layout.compact ? 'auto' : 0, minHeight: layout.compact ? 36 : 20, padding: '0 8px', borderRadius: 6, fontSize: 11, fontWeight: 800,
+              marginLeft: layout.compact ? 'auto' : 0, minHeight: layout.compact ? 36 : 20, padding: '0 8px', borderRadius: 6, fontSize: 12, fontWeight: 800,
               cursor: 'pointer', border: `1px solid ${open ? '#22d3ee' : '#7a5c9e'}`, background: open ? 'rgba(34,211,238,0.18)' : 'transparent', color: open ? '#22d3ee' : '#e8d9c2',
             }}>
             ♪{layout.compact ? (open ? ' NOTES ▾' : ' NOTES') : ''}
