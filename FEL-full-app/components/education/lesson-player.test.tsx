@@ -92,10 +92,17 @@ describe('a drill lesson shows before it tells', () => {
     expect((html.match(/data-fel-primary/g) ?? []).length).toBe(1);
   });
 
-  it('a lesson with no loop has no demo box (never a borrowed movement): the hip hinge leads with its cards', () => {
-    const html = renderToStaticMarkup(createElement(ChapterReader, { chapter: chapterByNumber(8)!, startAt: 'the-hip-hinge' }));
+  // DEMO-LOOPS-8 (2026-11-03): the hip hinge now has its own loop (ex_bw_hinge), so the no-loop case moves to the one drill
+  // lesson still without one, the partner-resisted march (lessonDemo.test pins it null), and the hinge now shows its demo
+  it('a lesson with no loop has no demo box (never a borrowed movement): the resisted march leads with its cards', () => {
+    const html = renderToStaticMarkup(createElement(ChapterReader, { chapter: chapterByNumber(7)!, startAt: 'the-resisted-march-to-sprint' }));
     expect(html).not.toContain('data-lesson-demo');
     expect(html).toContain('data-step-cards');
+  });
+
+  it('the hip hinge, given its loop in demo-loops-8, shows its demo', () => {
+    const html = renderToStaticMarkup(createElement(ChapterReader, { chapter: chapterByNumber(8)!, startAt: 'the-hip-hinge' }));
+    expect(html).toContain('data-lesson-demo');
   });
 
   it('a concept lesson is one line of the book, then Read more', () => {
