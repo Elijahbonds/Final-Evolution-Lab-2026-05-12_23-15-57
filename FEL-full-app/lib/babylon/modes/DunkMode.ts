@@ -41,7 +41,8 @@ import type { BodyView, ModeContext, ModeDefinition } from '../core/ModeHarness'
 import type { FelInput } from '../core/InputBus';
 import type { BodyEvent } from '@/lib/pose/BodyReader';
 import { DUNK_BODY, DunkBodyBinder, DUNK_FULL_RISE_M, DUNK_RUN_HOLD } from '@/lib/move/dunkBody';
-import { fetchVerifiedJumpCm } from '@/lib/dunk/verifiedJumpClient';   // dunk-flagship Phase 5: the verified real jump
+import { fetchVerifiedJumpCm } from '@/lib/dunk/verifiedJumpClient';
+import { loadJumps } from '@/lib/jump/historyStore';   // dunk-flagship Phase 9: READ ONLY, and only for a verified adult (DunkUnlocks.verifiedVertical)   // dunk-flagship Phase 5: the verified real jump
 import { BallSim } from '../core/BallPhysics';
 import { firstNight, nextNight, cardWon, cardVerdict, dunkOffDecide, dunkOffRuleLine, dunkOffByLine, type NightState, type DunkOffCard } from '../core/ContinuousNight';   // TRY-ONBOARD G1: the GO AGAIN ledger
 import { neverBindPose } from '../anim/importSanitizer';
@@ -125,8 +126,8 @@ import { MomentumBus } from '../core/MomentumBus';
 import type { RivalSituation } from '../core/RivalNerve';   // the rival feels the contest too (his nerve is read in core/DunkRivalSim.rollRivalAttempt)
 import { rivalSlamOffset, rivalPressAt } from '../core/RivalPlay';
 import { DUNK_CHALLENGES, nextChallenge, checkChallenge, challengeLine, challengeChip, challengeCard, type DunkChallenge } from '../core/DunkChallenges';   // dunk-next phase 6: set pieces on the practice runway
-import { emptyUnlocks, loadUnlocks, saveUnlocks, refOpen, needLine, nextUnlockLine, recordNightWon, recordChallenge, devUnlockOverride, allOpen, type UnlockState, type DunkUnlock } from '../core/DunkUnlocks';   // dunk-next phase 6: what winning opens, on the device
-import { newField, bookCard, cutField, cutTiebreak, placeOf, highlightSituation, simFinal, encodeField, fieldTotal, nightFormat, cardDunks, PLAYER_ID, FIELD_SIZE, FINALISTS, type FieldDunker, type NightFormat } from '../core/DunkField';   // dunk-next phase 5: the four-dunker night (casual nights only: owner 2026-10-06)
+import { emptyUnlocks, loadUnlocks, saveUnlocks, refOpen, needLine, nextUnlockLine, recordNightWon, recordChallenge, devUnlockOverride, allOpen, withVerifiedJump, jumpRoadLine, verifiedVertical, type UnlockState, type DunkUnlock } from '../core/DunkUnlocks';   // dunk-next phase 6: what winning opens, on the device
+import { newField, bookCard, cutField, cutTiebreak, placeOf, highlightSituation, simFinal, encodeField, fieldTotal, nightFormat, isStakedRun, cardDunks, PLAYER_ID, FIELD_SIZE, FINALISTS, type FieldDunker, type NightFormat } from '../core/DunkField';   // dunk-next phase 5: the four-dunker night (casual nights only: owner 2026-10-06)
 import { rollRivalAttempt, simRivalDunk, DEFAULT_RIVAL_RUNUP, type RivalAttempt, type RivalRunUp, type RivalDunkResult, type RivalJudgeContext } from '../core/DunkRivalSim';   // dunk-next phase 4: a rival's dunk, judged without flying it
 import { beatsCrossed, gradeTrickPress, flightFlow, encodeBeatStrip, BEAT_ORDER, BEAT_TOL_SEC, BEAT_TICK_PITCH, BEAT_TICK_VOLUME, type BeatGrade, type BeatMark, type SlamZone } from '../core/DunkBeats';   // dunk-next phase 1: the flight is a four-beat bar
 import { motionPolicy } from '@/lib/a11y/reducedMotion';   // WAVE 3: the orbit angle is camera travel
@@ -1002,7 +1003,7 @@ export const DunkMode: ModeDefinition = (() => {
   /** The attempt chip: the stakes on a judged dunk, PRACTICE on the practice runway. */
   function attemptChip(): string { return practice ? PRACTICE_CHIP : stakesLabel(stakes, calledLabel()); }
   const propAllowed = (p: Prop): boolean => !(p === 'oopalien' && skyTier?.kind !== 'saucer') && !(SPECIAL_PROPS.has(p) && !specialsOpen()) && refOpen('prop', p, unlocks);   // (dunk-next phase 6: + the won-nights ladder)
-  const propLockLine = (p: Prop): string => !refOpen('prop', p, unlocks) ? needLine('prop', p, unlocks) : p === 'oopalien' ? 'NO ALIENS OVER THIS COURT' : specialLockLine(p as 'kangaroo');
+  const propLockLine = (p: Prop): string => !refOpen('prop', p, unlocks) ? [needLine('prop', p, unlocks), stakedRun() ? '' : jumpRoadLine('prop', p, unlocks)].filter(Boolean).join(' ') : p === 'oopalien' ? 'NO ALIENS OVER THIS COURT' : specialLockLine(p as 'kangaroo');
   function togglePractice(ctx: ModeContext): void {
     practice = !practice;
     if (!practice) challenge = null;   // dunk-next phase 6: a challenge lives on the practice runway
@@ -1314,6 +1315,7 @@ export const DunkMode: ModeDefinition = (() => {
       if (ctx.scene.isDisposed) return;
       // the venue's set and the corner props in one breath: the tent and the bus are each one download, shared (copyKitModel)
       void dunkVenue?.mountDressing();
+      void readVerifiedVertical(ctx);   // dunk-flagship Phase 9: the verified jump's road on the ladder (after dunk 1, out of the air)
       parkCornerProps(ctx);
       mic?.loadAudio();
       if (!walkCue) void walkPlayer.prepare(null, (line) => ctx.setHud({ walkOutNow: line })).then(() => { if (!ended && !ctx.scene.isDisposed) startWalkOut(); });
@@ -5011,8 +5013,25 @@ export const DunkMode: ModeDefinition = (() => {
   function readUnlocks(): void {
     const o = process.env.NODE_ENV === 'development' && typeof location !== 'undefined' ? devUnlockOverride(location.search) : null;
     unlocksDev = o === 'all';
-    unlocks = unlocksDev ? allOpen() : loadUnlocks(deviceStore());
+    unlocks = unlocksDev ? allOpen() : withVerifiedJump(loadUnlocks(deviceStore()), verifiedCm, stakedRun()).state;   // Phase 9: this visit's verified jump, if one was read
     console.info(`[DUNK-UNLOCKS] ${unlocksDev ? 'dev: all open' : `${unlocks.nightsWon} nights won · ${unlocks.beaten.length} challenges beaten`}`);
+  }
+  /**
+   * dunk-flagship Phase 9: THE VERIFIED VERTICAL OPENS THE JUMPING FEATS. The server answers for the signed-in account: a number only
+   * for a verified 18+ athlete who opted in and has a verified jump saved (GET /api/dunk/verified-jump, Phase 5) — that answer is the
+   * adult gate, and without it this phone's jump history is NEVER read (a teen's or a kid's session, a guest, the rig). With it, the
+   * best of the saved jump and the phone's own verified hands-on-hips jumps. A staked or ladder run ignores it (withVerifiedJump).
+   */
+  let verifiedCm: number | null = null;
+  const stakedRun = (): boolean => typeof location !== 'undefined' && isStakedRun(location.search);
+  async function readVerifiedVertical(ctx: ModeContext): Promise<void> {
+    const serverCm = await fetchVerifiedJumpCm();
+    const device = verifiedVertical({ verifiedAdult: serverCm !== null }, () => loadJumps(deviceStore()));
+    verifiedCm = serverCm === null ? null : Math.max(serverCm, device ?? 0);
+    if (unlocksDev || ended || ctx.scene.isDisposed) return;
+    const r = withVerifiedJump(unlocks, verifiedCm, stakedRun()); unlocks = r.state;
+    console.info(`[DUNK-UNLOCKS] verified jump: ${verifiedCm === null ? 'none read' : `${verifiedCm} cm${stakedRun() ? ' (a staked run: not counted)' : ''}`}${r.opened.length ? ` · ${openedLine(r.opened)}` : ''}`);
+    if (r.opened.length) flash(ctx, `YOUR VERIFIED ${Math.round(verifiedCm ?? 0)} CM JUMP — ${openedLine(r.opened)}`, 1600);
   }
   /** Keep the ladder on the device (never the dev override's all-open state). */
   function keepUnlocks(): void { if (!unlocksDev) saveUnlocks(deviceStore(), unlocks); }
