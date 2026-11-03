@@ -82,14 +82,20 @@ export class DribbleReader {
     this.seenT = t;
     this.xs.push(obs.x); if (this.xs.length > 90) this.xs.shift();
     const hyst = Math.max(2.5, HYST_R * obs.r);
-    if (!this.ext || !this.dir) { this.ext = { t, x: obs.x, y: obs.y, r: obs.r }; this.dir = obs.vy >= 0 ? 'down' : 'up'; return null; }
+    if (!this.ext || !this.dir) {
+      // a fresh start: going down, the start is the top a dribble falls from; going up, a bottom (no dribble yet)
+      this.ext = { t, x: obs.x, y: obs.y, r: obs.r };
+      this.dir = obs.vy >= 0 ? 'down' : 'up';
+      if (this.dir === 'down' && !this.lastTop) this.lastTop = { t, x: obs.x, y: obs.y, side: 0 };
+      return null;
+    }
     if (this.dir === 'down') {
       if (obs.y >= this.ext.y) { this.ext = { t, x: obs.x, y: obs.y, r: obs.r }; return null; }
       if (this.ext.y - obs.y < hyst) return null;
       // a bottom: a dribble when it fell far enough from the last top
       const b = this.ext;
       this.dir = 'up'; this.ext = { t, x: obs.x, y: obs.y, r: obs.r };
-      const fell = this.lastTop ? b.y - this.lastTop.y : Infinity;
+      const fell = this.lastTop ? b.y - this.lastTop.y : 0;
       if (fell >= AMP_R * b.r) this.pendingBounce = { t: b.t, depth: b.y };
       return null;
     }

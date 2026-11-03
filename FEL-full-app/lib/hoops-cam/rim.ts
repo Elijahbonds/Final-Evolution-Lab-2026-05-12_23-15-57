@@ -38,10 +38,10 @@ export function rimFromTaps(a: { x: number; y: number }, b: { x: number; y: numb
 
 /** The ring's paint: a strong red-orange (redder and more saturated than a ball or a hardwood floor). */
 export function rimColoured(r: number, g: number, b: number): boolean {
-  if (r < 90 || r - g < 70 || g < b) return false;
+  if (r < 80 || r - g < 50 || g < b) return false;
   const c = r - b;
   const hue = (60 * (g - b)) / c;
-  return c / r > 0.6 && hue <= 24;
+  return c / r > 0.45 && hue <= 26;
 }
 
 export interface RimGuess extends Rim { score: number }
@@ -50,7 +50,18 @@ export interface RimGuess extends Rim { score: number }
 export function findRim(f: Rgb): RimGuess | null {
   const { w, h, data } = f;
   const m = new Uint8Array(w * h);
-  for (let i = 0, p = 0; i < w * h; i++, p += 4) if (rimColoured(data[p], data[p + 1], data[p + 2])) m[i] = 1;
+  const raw = new Uint8Array(w * h);
+  for (let i = 0, p = 0; i < w * h; i++, p += 4) if (rimColoured(data[p], data[p + 1], data[p + 2])) raw[i] = 1;
+  // the ring's tube is about a pixel thick at this size and breaks up against the board and the net: join its pieces
+  // (two pixels sideways, one up and down) before grouping
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    let on = 0;
+    for (let dy = -1; dy <= 1 && !on; dy++) for (let dx = -2; dx <= 2 && !on; dx++) {
+      const nx = x + dx, ny = y + dy;
+      if (nx >= 0 && ny >= 0 && nx < w && ny < h && raw[ny * w + nx]) on = 1;
+    }
+    m[y * w + x] = on;
+  }
   const seen = new Uint8Array(w * h);
   const stack = new Int32Array(w * h);
   let best: RimGuess | null = null;
@@ -75,7 +86,7 @@ export function findRim(f: Rgb): RimGuess | null {
     const aspect = bw / bh;
     if (aspect < 1.8) continue;                         // a ball or a blob, not a ring seen from the side
     const fill = area / (bw * bh);
-    if (fill > 0.85) continue;                          // a solid bar (a sign, a stripe), not an outline
+    if (fill > 0.9) continue;                           // a solid bar (a sign, a stripe), not an outline
     // a board above it: bright, low-saturation pixels in a band over the ring
     let bright = 0, n = 0;
     for (let y = Math.max(0, miny - Math.round(bw * 0.8)); y < miny; y++) {
@@ -88,8 +99,9 @@ export function findRim(f: Rgb): RimGuess | null {
     const board = n ? bright / n : 0;
     const score = Math.min(1, aspect / 5) * 0.5 + board * 0.5;
     if (!best || score > best.score) {
-      const hw = bw / 2 / w;
-      best = { x: (minx + maxx + 1) / 2 / w, y: (miny + maxy + 1) / 2 / h, hw, hh: Math.max(bh / 2 / h, hw * (w / h) * 0.12), score };
+      const hw = Math.max(1, bw / 2 - 2) / w;
+      // the joined box is 2 px wider and 1 px taller each side than the ring
+      best = { x: (minx + maxx + 1) / 2 / w, y: (miny + maxy + 1) / 2 / h, hw: Math.max(1, bw / 2 - 2) / w, hh: Math.max((bh / 2 - 1) / h, hw * (w / h) * 0.12), score };
     }
   }
   return best && best.score >= 0.3 ? best : null;
