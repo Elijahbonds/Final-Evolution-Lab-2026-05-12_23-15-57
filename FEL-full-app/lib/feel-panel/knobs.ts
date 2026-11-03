@@ -1300,6 +1300,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'How long the foot planter takes to take a leg over when it starts holding a foot, and to hand it back. 0 = the old one-frame step (the derby batter thigh jumped 25 degrees in a frame standing still).',
   },
   {
+    id: 'anim.hipYawFold', label: 'Posture hip strip folds past 90 degrees on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/PostureLayer.ts HIP_YAW_FOLD_ON',
+    hint: 'On: a window that keeps part of the hips turn (football spin) reads a turn past 90 degrees folded back, so the hips never flip 180 degrees in a frame at the half-turn. Off: the old wrapped read.',
+  },
+  {
     id: 'anim.clipSmooth', label: 'Smooth the snaps inside clips on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Anim · clips',
     source: 'lib/babylon/anim/clipDesnap.ts CLIP_SMOOTH_ON',
     hint: 'On: a clip step that snaps a bone 25° or more in one frame is spread over the frames either side (the poses before and after kept). Off: the clips exactly as captured. Takes effect on the next spawn.',

@@ -198,7 +198,7 @@ export function engagePole(leg: { hip: TransformNode; knee: TransformNode; ankle
   const t = len2 > 1e-8 ? (kx * ax + ky * ay + kz * az) / len2 : 0;
   let bx = kx - ax * t, by = ky - ay * t, bz = kz - az * t; const bl = Math.hypot(bx, by, bz);
   const f = forward.length() > 1e-8 ? forward : Vector3.Forward();
-  if (bl < 1e-3 || e >= 1) return out.copyFrom(f).normalize();
+  if (bl < 1e-3 || e >= 1) return out.copyFrom(f);   // the pole the layer always used, as given (no renormalise: bit for bit at engage 1)
   bx /= bl; by /= bl; bz /= bl;
   const fl = f.length();
   out.set(bx + (f.x / fl - bx) * e, by + (f.y / fl - by) * e, bz + (f.z / fl - bz) * e);
