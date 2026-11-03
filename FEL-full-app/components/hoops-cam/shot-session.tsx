@@ -14,7 +14,10 @@
 // (frame-grab.ts) is never shown or sent; nothing here sends anything at all.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Camera, Check, Loader2, Square, X } from 'lucide-react';
+import { Check, Crosshair, Loader2, Plus, RotateCcw, Square, Trash2, X } from 'lucide-react';
+import { Layer } from '@/components/session-player/layer';
+import { PrimaryCta } from '@/components/ui/fel/primary-cta';
+import { HOOPS_LOOK as K } from './look';
 import { poseService } from '@/lib/pose/PoseService';
 import { MirrorWakeLock, type WakeLockApiLike } from '@/lib/mirror/liveCamera';
 import { localDayKey } from '@/lib/health/readiness';
@@ -200,93 +203,84 @@ export function ShotSession({ tier, grab, startMode = 'shots' }: { tier: HoopsTi
             <input type="checkbox" checked={front} onChange={(e) => setFront(e.target.checked)} data-hoops-front className="h-5 w-5" />
             Use the front camera (the screen faces you)
           </label>
-          <ul className="list-disc space-y-0.5 pl-4 text-xs text-white/60" data-hoops-guide>
-            {(mode === 'shots' ? SHOT_GUIDE : DRIBBLE_GUIDE).map((l) => <li key={l}>{l}</li>)}
-          </ul>
+          {/* PLAT-P09: the set-up guide folds away (fewer words before the camera; one tap to read it) */}
+          <details className="text-xs text-white/60" data-hoops-guide-box>
+            <summary className="min-h-10 cursor-pointer py-2 text-[13px] font-semibold text-white/80">How to set the phone up</summary>
+            <ul className="list-disc space-y-0.5 pl-4" data-hoops-guide>
+              {(mode === 'shots' ? SHOT_GUIDE : DRIBBLE_GUIDE).map((l) => <li key={l}>{l}</li>)}
+            </ul>
+          </details>
           <p className="text-[11px] text-[#FFB020]/90" data-hoops-beta>{BETA_LINE}</p>
           <p className="text-[11px] text-white/40">{PRIVACY_LINE}</p>
         </div>
       )}
 
-      {/* collapsed (not unmounted) outside a session: the camera attaches to it on Start. Its box is the camera's own
-          aspect, so the picture (object-fit: cover) is never cropped and a tap lands where the rim is. */}
-      <div className={`relative overflow-hidden rounded-xl border border-white/10 bg-black ${liveish ? '' : 'hidden'}`} style={{ aspectRatio: String(aspect) }} data-camera-box>
-        {/* Z-P4-4: the camera picture is shown in one place only, SelfView */}
-        <SelfView mirrored={front} className="absolute inset-0 h-full w-full rounded-none" style={{ aspectRatio: 'auto' }}
-          overlay={<Overlay rim={live.current?.rim ?? null} suggest={phase === 'rim' ? suggest : null} tap={tap} ball={view?.ball ?? null} aspect={aspect} />} />
-        <div className="absolute inset-0" onClick={onPictureTap} data-hoops-tap-layer style={{ cursor: phase === 'rim' ? 'crosshair' : 'default' }} />
-        {phase === 'rim' && (
-          <div className="absolute inset-x-2 top-2 rounded-lg bg-black/75 px-3 py-2 text-center text-[13px] font-bold text-white" data-hoops-rim-help>
-            {tap ? 'Now the right end of the rim.' : suggest ? RIM_SUGGEST_LINE : RIM_LINE}
-          </div>
-        )}
-        {phase === 'live' && (
-          <div className="pointer-events-none absolute inset-x-2 top-2 rounded-lg bg-black/70 px-3 py-1.5 text-center" aria-live="polite" data-hoops-live>
-            {mode === 'shots' ? (
-              <div className="flex items-baseline justify-center gap-3">
-                <span className="text-[34px] font-black leading-none tabular-nums text-white" data-hoops-count>{view?.made ?? 0}/{view?.taken ?? 0}</span>
-                <span className="text-lg font-bold tabular-nums text-white/80" data-hoops-pct>{pctText(view?.made ?? 0, view?.taken ?? 0)}</span>
-                {view?.last && <span className={`rounded-full px-2 py-0.5 text-xs font-black ${view.last.made ? 'bg-[#00FF9D] text-black' : 'bg-[#FF6B8A] text-black'}`} data-hoops-last={view.last.made ? 'make' : 'miss'}>{view.last.made ? 'MAKE' : 'MISS'}{view.last.ask ? '?' : ''}</span>}
+      {/* PLAT-P09: while the camera runs, the session is the whole screen (the premium rule: only the count, the makes
+          and misses and one line while you play). The camera picture is shown in one place only, SelfView (Z-P4-4). */}
+      {liveish && (
+        <Layer>
+          <div className={K.layer} data-hoops-layer={phase}>
+            <div className={K.hud} aria-live="polite" data-hoops-live>
+              {mode === 'shots' ? (
+                <span className="flex items-baseline gap-3">
+                  <span className={K.count} data-hoops-count>{view?.made ?? 0}/{view?.taken ?? 0}</span>
+                  <span className={K.pct} data-hoops-pct>{pctText(view?.made ?? 0, view?.taken ?? 0)}</span>
+                  {view?.last && <span className={`${K.call} ${view.last.made ? 'bg-[#00FF9D]' : 'bg-[#FF6B8A]'}`} data-hoops-last={view.last.made ? 'make' : 'miss'}>{view.last.made ? 'MAKE' : 'MISS'}{view.last.ask ? '?' : ''}</span>}
+                </span>
+              ) : (
+                <span className="flex items-baseline gap-3">
+                  <span className={K.count} data-hoops-dribbles>{d?.count ?? 0}</span>
+                  <span className={K.pct}><b data-hoops-crossovers>{d?.crossovers ?? 0}</b> crossovers</span>
+                </span>
+              )}
+              <button type="button" onClick={finish} aria-label="End the session" data-hoops-end className={K.end}><Square className="h-5 w-5" /></button>
+            </div>
+            <p className={K.line} data-hoops-status>
+              {phase === 'rim' ? (tap ? 'Now the right end of the rim.' : suggest ? RIM_SUGGEST_LINE : RIM_LINE) : statusLine(view?.status ?? 'looking', mode)}
+            </p>
+            <div className={K.stage}>
+              <div className="relative mx-auto max-h-full w-full" style={{ aspectRatio: String(aspect) }} data-camera-box>
+                <SelfView mirrored={front} className="absolute inset-0 h-full w-full rounded-none" style={{ aspectRatio: 'auto' }}
+                  overlay={<Overlay rim={live.current?.rim ?? null} suggest={phase === 'rim' ? suggest : null} tap={tap} ball={view?.ball ?? null} aspect={aspect} />} />
+                <div className="absolute inset-0" onClick={onPictureTap} data-hoops-tap-layer style={{ cursor: phase === 'rim' ? 'crosshair' : 'default' }} />
               </div>
-            ) : (
-              <div className="flex items-baseline justify-center gap-3">
-                <span className="text-[34px] font-black leading-none tabular-nums text-white" data-hoops-dribbles>{d?.count ?? 0}</span>
-                <span className="text-xs text-white/75">dribbles · <b data-hoops-crossovers>{d?.crossovers ?? 0}</b> crossovers{d?.rateHz ? ` · ${d.rateHz.toFixed(1)}/s` : ''}</span>
+            </div>
+            {phase === 'rim' && (suggest || lastRim) && (
+              <div className={K.bar}>
+                {suggest && <button type="button" onClick={() => applyRim(suggest)} data-hoops-use-suggest className={K.pick}>Use this rim</button>}
+                {lastRim && <button type="button" onClick={() => applyRim(lastRim)} data-hoops-use-last className={K.pick}>Same rim as last time</button>}
               </div>
             )}
-            <div className="text-[11px] text-white/60" data-hoops-status>{statusLine(view?.status ?? 'looking', mode)}</div>
+            {phase === 'live' && mode === 'shots' && ask && (
+              <div className={K.ask} data-hoops-ask={ask.index}>
+                <span className="text-sm font-bold text-white">{ASK_LINE}</span>
+                <span className="flex gap-2">
+                  <button type="button" onClick={() => fix(ask.index, true)} data-hoops-ask-in className={K.yes}>In</button>
+                  <button type="button" onClick={() => fix(ask.index, false)} data-hoops-ask-out className={K.no}>Out</button>
+                </span>
+              </div>
+            )}
+            {phase === 'live' && mode === 'shots' && (
+              <div className={K.bar} data-hoops-fixers>
+                {view?.last && !ask && (
+                  <>
+                    <button type="button" onClick={() => fix(view.last!.index, !view.last!.made)} aria-label={`Shot ${view.last.index} was a ${view.last.made ? 'miss' : 'make'}`} data-hoops-flip className={K.icon}><RotateCcw className="h-5 w-5" /></button>
+                    <button type="button" onClick={() => drop(view.last!.index)} aria-label={`Shot ${view.last.index} was not a shot`} data-hoops-drop className={K.icon}><Trash2 className="h-5 w-5" /></button>
+                  </>
+                )}
+                <button type="button" onClick={() => byHand(true)} aria-label="Add a make it missed" data-hoops-add-make className={K.icon}><Plus className="h-5 w-5 text-[#00FF9D]" /></button>
+                <button type="button" onClick={() => byHand(false)} aria-label="Add a miss it missed" data-hoops-add-miss className={K.icon}><Plus className="h-5 w-5 text-[#FF6B8A]" /></button>
+                <button type="button" onClick={() => { setPhase('rim'); setTap(null); }} aria-label="Mark the rim again" data-hoops-remark className={K.icon}><Crosshair className="h-5 w-5" /></button>
+              </div>
+            )}
           </div>
-        )}
-      </div>
-
-      {phase === 'rim' && (
-        <div className="flex flex-wrap gap-2">
-          {suggest && <button type="button" onClick={() => applyRim(suggest)} data-hoops-use-suggest className="min-h-11 flex-1 rounded-xl bg-[#FF8A3D] px-3 text-sm font-bold text-black">Use this rim</button>}
-          {lastRim && <button type="button" onClick={() => applyRim(lastRim)} data-hoops-use-last className="min-h-11 flex-1 rounded-xl border border-white/20 px-3 text-sm font-bold text-white/85">Same spot as last time</button>}
-        </div>
-      )}
-
-      {phase === 'live' && mode === 'shots' && (
-        <div className="space-y-2" data-hoops-fixers>
-          {ask && (
-            <div className="flex items-center justify-between gap-2 rounded-xl border border-[#FFB020]/40 bg-[#FFB020]/[0.06] px-3 py-2" data-hoops-ask={ask.index}>
-              <span className="text-sm font-bold text-white">{ASK_LINE}</span>
-              <span className="flex gap-2">
-                <button type="button" onClick={() => fix(ask.index, true)} data-hoops-ask-in className="min-h-10 rounded-lg bg-[#00FF9D] px-3 text-sm font-black text-black">In</button>
-                <button type="button" onClick={() => fix(ask.index, false)} data-hoops-ask-out className="min-h-10 rounded-lg bg-[#FF6B8A] px-3 text-sm font-black text-black">Out</button>
-              </span>
-            </div>
-          )}
-          {view?.last && !ask && (
-            <div className="flex items-center justify-between gap-2 text-xs text-white/60">
-              <span>Shot {view.last.index}: {view.last.made ? 'make' : 'miss'}{view.last.fixed ? ' (fixed)' : ''}</span>
-              <span className="flex gap-2">
-                <button type="button" onClick={() => fix(view.last!.index, !view.last!.made)} data-hoops-flip className="min-h-9 rounded-lg border border-white/20 px-2.5 text-white/85">It was a {view.last.made ? 'miss' : 'make'}</button>
-                <button type="button" onClick={() => drop(view.last!.index)} data-hoops-drop className="min-h-9 rounded-lg border border-white/20 px-2.5 text-white/85">Not a shot</button>
-              </span>
-            </div>
-          )}
-          <div className="flex items-center gap-2 text-xs text-white/55">
-            A shot it missed:
-            <button type="button" onClick={() => byHand(true)} data-hoops-add-make className="min-h-9 rounded-lg border border-white/20 px-2.5 text-white/85">+ make</button>
-            <button type="button" onClick={() => byHand(false)} data-hoops-add-miss className="min-h-9 rounded-lg border border-white/20 px-2.5 text-white/85">+ miss</button>
-            <button type="button" onClick={() => { setPhase('rim'); setTap(null); }} data-hoops-remark className="ml-auto min-h-9 rounded-lg border border-white/20 px-2.5 text-white/85">Re-mark the rim</button>
-          </div>
-        </div>
+        </Layer>
       )}
 
       {why && <p role="alert" className="text-sm text-[#FFB020]" data-hoops-why>{why}</p>}
 
-      {phase === 'setup' || phase === 'starting' ? (
-        <button type="button" onClick={() => void start()} disabled={phase !== 'setup'} data-hoops-start
-          className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#FF8A3D] px-4 font-bold text-black disabled:opacity-50">
-          {phase === 'starting' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />} Start the camera
-        </button>
-      ) : liveish ? (
-        <button type="button" onClick={finish} data-hoops-end className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 font-bold text-black">
-          <Square className="h-4 w-4" /> End the session
-        </button>
-      ) : null}
+      {phase === 'setup' && <PrimaryCta onClick={() => void start()} testId="hoops-start">Start the camera</PrimaryCta>}
+      {phase === 'starting' && <p className="flex items-center justify-center gap-2 text-sm text-white/70" data-hoops-starting><Loader2 className="h-4 w-4 animate-spin" /> Starting the camera…</p>}
 
       {phase === 'summary' && view && (
         <div className="space-y-3" data-hoops-summary>

@@ -59,6 +59,9 @@ export function LandingUnlock({ access, live = LANDING_UNLOCK_LIVE }: { access: 
   );
 }
 
+/** PLAT-P09 (BBS-01/02): the ball shelf's door to the shot and dribble tracker (a plain link: its detector loads there only). */
+export const SHOTS_HREF = '/train/shots';
+
 /** PLAT-P09 (BBS-03): the two shelves, one tap apart. */
 export const SHELF_LABEL: Record<DrillShelf, string> = { playbook: 'Playbook drills', hoops: 'Ball skills' };
 
@@ -75,6 +78,12 @@ function Shelf({ access, unlockLive, shelf = 'playbook' }: { access: DrillsAcces
           </Link>
         ))}
       </nav>
+      {shelf === 'hoops' && (
+        <Link href={SHOTS_HREF} data-drill-shots-door
+          className="flex min-h-12 items-center justify-between gap-3 rounded-2xl border border-[#FF8A3D]/40 bg-[#FF8A3D]/[0.06] px-4 py-3 text-[14px] font-bold text-white">
+          <span>Count your shots and dribbles with a real ball</span><Camera aria-hidden className="h-4 w-4 text-[#FF8A3D]" />
+        </Link>
+      )}
       <Note access={access} />
       {shown.some((d) => d.gate !== 'open') && <LandingUnlock access={access} live={unlockLive} />}
       <ul className="grid gap-3 sm:grid-cols-2">

@@ -21,7 +21,8 @@ export const ASK_LINE = 'Did that one go in?';
 /** The set-up guide for shots. */
 export const SHOT_GUIDE: readonly string[] = [
   'Stand the phone still: a tripod, a fence post, a bag. Landscape works best.',
-  'Off to the side of your shots (a wing or the baseline), not straight behind you: from behind, one camera cannot see a ball drop in front of the rim from one that goes through.',
+  // PLAT-P09: ≤ 24 words a line (the premium rule); was 33
+  'Off to the side, on a wing or the baseline. From behind, a make and a ball short of the rim look the same.',
   'The rim, the net and you all in the picture, with some room above the rim for the arc.',
   'An orange or brown ball. Light from behind the camera helps.',
 ];
