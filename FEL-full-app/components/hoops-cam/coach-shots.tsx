@@ -52,7 +52,7 @@ function Picker({ items, value, onPick, label }: { items: { id: string; name: st
     <div className="flex flex-wrap gap-1.5" role="group" aria-label={label}>
       {items.map((m) => (
         <button key={m.id} type="button" aria-pressed={value === m.id} onClick={() => onPick(m.id)} data-coach-shots-pick={m.id}
-          className={`${K.chip} ${value === m.id ? K.chipOn : ''}`}>{m.name}{m.n != null ? <span className="ml-1 tabular-nums text-white/45">{m.n}</span> : null}</button>
+          className={`${K.chip} ${value === m.id ? K.chipOn : ''}`}>{m.name}{m.n != null ? <span className="ml-1 tabular-nums text-white/60">{m.n}</span> : null}</button>
       ))}
     </div>
   );

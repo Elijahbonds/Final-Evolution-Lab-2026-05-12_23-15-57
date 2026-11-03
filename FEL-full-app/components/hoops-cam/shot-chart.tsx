@@ -58,7 +58,7 @@ export function ShotChart({ shots, zones, title = 'Shot chart', total, noSpot }:
         {unplaced > 0 && <span>{unplaced} with no spot (counted in the totals)</span>}
       </figcaption>
       <table className="w-full text-left text-[12px] tabular-nums text-white/75" data-hoops-zones>
-        <thead><tr className="text-white/45"><th className="font-normal">Zone</th><th className="font-normal">Made</th><th className="font-normal">%</th></tr></thead>
+        <thead><tr className="text-white/60"><th className="font-normal">Zone</th><th className="font-normal">Made</th><th className="font-normal">%</th></tr></thead>
         <tbody>
           {ZONE_IDS.filter((z) => zones[z].taken > 0).map((z) => (
             <tr key={z} data-hoops-zone={z}><td>{ZONES[z]}</td><td>{zones[z].made}/{zones[z].taken}</td><td>{Math.round((zones[z].made / zones[z].taken) * 100)}%</td></tr>
