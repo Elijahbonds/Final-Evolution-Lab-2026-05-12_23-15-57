@@ -128,8 +128,9 @@ const kneeAcross: Builder = (scene, sk) => {
   const long: Pose = { ...LIE_BACK, ...arms, bones: { ...LIE_BACK.bones, LeftUpLeg: [0, 0, 0], RightUpLeg: [0, 0, 0], LeftFoot: [30, 0, 0], RightFoot: [30, 0, 0] } };
   const side = (s: 'Left' | 'Right', phase: 'chest' | 'across'): Pose => {
     const k = s === 'Left' ? 1 : -1;
-    const leg: Record<string, Deg3> = phase === 'chest' ? { [`${s}UpLeg`]: [-100, 0, 0], [`${s}Leg`]: [110, 0, 0], [`${s}Foot`]: [20, 0, 0] } : { [`${s}UpLeg`]: [-80, 0, 52 * k], [`${s}Leg`]: [96, 0, 0], [`${s}Foot`]: [20, 0, 0] };
-    return { ...long, bones: { ...long.bones, ...leg, ...(phase === 'across' ? { Spine: [0, -8 * k, 0], Neck: [10, 34 * k, 0] } : {}) } };
+    // (measured on the rig: a negative roll carries the left knee across to the right)
+    const leg: Record<string, Deg3> = phase === 'chest' ? { [`${s}UpLeg`]: [-100, 0, 0], [`${s}Leg`]: [110, 0, 0], [`${s}Foot`]: [20, 0, 0] } : { [`${s}UpLeg`]: [-76, 0, -62 * k], [`${s}Leg`]: [96, 0, 0], [`${s}Foot`]: [20, 0, 0] };
+    return { ...long, bones: { ...long.bones, ...leg, ...(phase === 'across' ? { Neck: [10, 34 * k, 0] } : {}) } };
   };
   return run(scene, sk, 'ex_knee_across', 14.0, [
     at(long, 0, true), at(side('Left', 'chest'), 1.2, true), at(side('Left', 'across'), 2.6, true), at(side('Left', 'across'), 5.4, true), at(side('Left', 'chest'), 6.4, true), at(long, 7.0, true),
@@ -272,8 +273,8 @@ const sledPush: Builder = (scene, sk) => {
 const sledDragBack = (name: string, overhead: boolean): Builder => (scene, sk) => {
   const arms: Pose = overhead ? { rel: { Left: [0.04, 0.60, 0.04], Right: [-0.04, 0.60, 0.04] }, poles: bothDir(1, 0.1, -0.1) } : { hands: both(0.16, 0.92, 0.52), poles: bothDir(0.3, -0.6, -0.6) };
   const lean = overhead ? -4 : -12;
-  const stand = (fwd: 'Left' | 'Right'): Pose => { const b = other(fwd); return { ...arms, bones: { Hips: [lean, 0, 0], Spine: [0, 0, 0], Neck: [6, 0, 0], [`${b}Foot`]: [16, 0, 0] } as Record<string, Deg3>, feet: { [fwd]: [sx(fwd, 0.12), ANKLE, 0.16], [b]: [sx(b, 0.12), ANKLE + 0.04, -0.20] } as Pair, kneePoles: bothDir(0.05, 0, 1), hipsY: -0.08, hipsZ: 0.02 }; };
-  const pass = (moving: 'Left' | 'Right'): Pose => { const o = other(moving); return { ...arms, bones: { Hips: [lean, 0, 0], Spine: [0, 0, 0], Neck: [6, 0, 0], [`${moving}UpLeg`]: [-24, 0, 0], [`${moving}Leg`]: [46, 0, 0], [`${moving}Foot`]: [10, 0, 0] } as Record<string, Deg3>, feet: { [o]: [sx(o, 0.12), ANKLE, -0.02] } as Pair, kneePoles: { [o]: [sx(o, 0.05), 0, 1] } as Pair, hipsY: -0.04, hipsZ: 0.0 }; };
+  const stand = (fwd: 'Left' | 'Right'): Pose => { const b = other(fwd); return { ...arms, bones: { Hips: [lean, 0, 0], Spine: [0, 0, 0], Neck: [6, 0, 0], [`${b}Foot`]: [12, 0, 0] } as Record<string, Deg3>, feet: { [fwd]: [sx(fwd, 0.12), ANKLE, 0.16], [b]: [sx(b, 0.12), ANKLE + 0.06, -0.20] } as Pair, kneePoles: bothDir(0.05, 0, 1), hipsY: -0.08, hipsZ: 0.02 }; };
+  const pass = (moving: 'Left' | 'Right'): Pose => { const o = other(moving); return { ...arms, bones: { Hips: [lean, 0, 0], Spine: [0, 0, 0], Neck: [6, 0, 0], [`${moving}UpLeg`]: [-22, 0, 0], [`${moving}Leg`]: [58, 0, 0], [`${moving}Foot`]: [-4, 0, 0] } as Record<string, Deg3>, feet: { [o]: [sx(o, 0.12), ANKLE, -0.02] } as Pair, kneePoles: { [o]: [sx(o, 0.05), 0, 1] } as Pair, hipsY: -0.04, hipsZ: 0.0 }; };
   return run(scene, sk, name, 1.4, [at(stand('Left'), 0), at(pass('Left'), 0.35), at(stand('Right'), 0.7), at(pass('Right'), 1.05)]);
 };
 

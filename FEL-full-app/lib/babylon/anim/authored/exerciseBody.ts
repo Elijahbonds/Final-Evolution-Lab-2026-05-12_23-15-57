@@ -268,7 +268,7 @@ function jump(scene: Scene, sk: Skeleton, name: string, flight: Pose): Animation
 }
 const TUCK: Pose = { bones: { Hips: [-4, 0, 0], Spine: [10, 0, 0], LeftUpLeg: [-108, 0, 6], RightUpLeg: [-108, 0, -6], LeftLeg: [118, 0, 0], RightLeg: [118, 0, 0], LeftFoot: [20, 0, 0], RightFoot: [20, 0, 0] }, hands: both(0.20, 1.26 + 0.28, 0.34), poles: bothDir(0.8, -0.4, 0), hipsY: 0.28 };
 /** DEMO-LOOPS-8: the double-leg butt kick's flight — the knees under the hips, the heels kicked up to the seat. */
-const HEEL_KICK: Pose = { bones: { Hips: [2, 0, 0], Spine: [0, 0, 0], LeftUpLeg: [-8, 0, 4], RightUpLeg: [-8, 0, -4], LeftLeg: [124, 0, 0], RightLeg: [124, 0, 0], LeftFoot: [30, 0, 0], RightFoot: [30, 0, 0] }, hands: both(0.24, 1.70, 0.22), poles: bothDir(0.6, -0.2, -0.6), hipsY: 0.26 };
+const HEEL_KICK: Pose = { bones: { Hips: [2, 0, 0], Spine: [0, 0, 0], LeftUpLeg: [-8, 0, 4], RightUpLeg: [-8, 0, -4], LeftLeg: [124, 0, 0], RightLeg: [124, 0, 0], LeftFoot: [8, 0, 0], RightFoot: [8, 0, 0] }, hands: both(0.24, 1.70, 0.22), poles: bothDir(0.6, -0.2, -0.6), hipsY: 0.30 };
 const STAR: Pose = { bones: { Hips: [0, 0, 0], Spine: [-2, 0, 0], LeftUpLeg: [0, 0, 30], RightUpLeg: [0, 0, -30], LeftLeg: [4, 0, 0], RightLeg: [4, 0, 0], LeftFoot: [30, 0, 0], RightFoot: [30, 0, 0] }, hands: both(0.72, 1.86 + 0.22, 0.06), poles: bothDir(0.3, 0.5, -0.8), hipsY: 0.22 };
 
 /** ex_split_jump — from a split-squat bottom, jump and switch the legs in the air, land in the other split, and back. */
