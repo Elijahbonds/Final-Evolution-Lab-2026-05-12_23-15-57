@@ -27,9 +27,12 @@ describe('moving demos first', () => {
     expect(hits.slice(0, 11).every((h) => h.score >= top * DEMO_FIRST_BAND)).toBe(true);
   });
   it('an exact name stays first even when it has no loop', () => {
-    const hits = search(index, 'one leg barbell squat', {}, { youth: false, demosFirst: true }).hits;
+    // DEMO-LOOPS-4 / -7: the example was One Leg Barbell Squat, then One Arm Dumbbell Bench Press, until each got its loop;
+    // Decline Reverse Crunch has none yet, and its search's next four all move (the decline crunch, the oblique, the reverse
+    // crunch, the cable's) — the same proof
+    const hits = search(index, 'decline reverse crunch', {}, { youth: false, demosFirst: true }).hits;
     expect(moves(hits[0].entry)).toBe(false);
-    expect(hits[0].entry.name).toBe('One Leg Barbell Squat');
+    expect(hits[0].entry.name).toBe('Decline Reverse Crunch');
   });
   it('control: without it (as Ask searches) the same queries put still entries in the first six', () => {
     const still = QUERIES.reduce((n, q) => n + search(index, q, {}, { youth: false }).hits.slice(0, 6).filter((h) => !moves(h.entry)).length, 0);

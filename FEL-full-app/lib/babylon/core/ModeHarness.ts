@@ -40,7 +40,7 @@ import { captions } from './captions';
 import { captionsFromHud, rememberHud } from './hudCaptions';   // MECHANICS PASS: press → perceivable answer, agent-only   // M43: unlock audio on first user gesture
 import type { BackdropFamily } from '../visual/Backdrops';
 import { FrameGuard, assertSpawned } from './FrameGuard';
-import { OccluderFade } from './OccluderFade';   // gameplay-clean (2026-10-28): what blocks the view of the hero goes see-through
+import { OccluderFade, OCCLUDER_FADE_OFF } from './OccluderFade';   // gameplay-clean (2026-10-28): what blocks the view of the hero goes see-through
 import { watchCanvasFit } from './canvasFit';       // M95 (Pass 2): cap DPR + backing-pixel budget
 import { prewarmScene, prewarmWanted } from './shaderPrewarm';
 import { installLoadProgress, LoadStallClock } from './loadProgress';   // FIRST-DUNK-BUDGET: the load watchdog watches the download
@@ -617,6 +617,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   // M37: hero-framing watchdog — recenters the camera if the hero leaves frame.
   frameGuard = new FrameGuard(scene, camera, () => heroRef.current, camDirector, () => objectiveRef.current);
   occluderFade = new OccluderFade(scene, () => heroRef.current, def.modeId);
+  camDirector.leadEase = !OCCLUDER_FADE_OFF.has(def.modeId);   // GAMEPLAY-CLEAN P2 #10: the eased look-ahead — not under the hoops lanes' modes (routed)
   // `instrument` (2026-09-12): SceneInstrumentation is a bare module specifier, so a probe running
   // IN the page cannot import it — which is why per-mode performance had never been measured and the
   // locomotion Phase 3 gate ("animation pass <= 4 ms") had to be reported unjudgeable. Handing the

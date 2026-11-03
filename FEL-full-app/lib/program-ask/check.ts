@@ -75,7 +75,7 @@ export function programProblems(p: BuiltProgram, library: readonly LibraryExerci
         const slots = new Set<SlotId>(d.blocks.flatMap((b) => b.items.map((i) => i.slot)));
         for (const req of FULL_DAY_REQUIRED) {
           const ok = typeof req === 'string' ? slots.has(req) : req.some((x) => slots.has(x));
-          if (!ok && !standIn(p, typeof req === 'string' ? req : req[0])) out.push(`${where}: full-body day without ${typeof req === 'string' ? req : req.join(' or ')}`);
+          if (!ok && !(typeof req === 'string' ? standIn(p, req) : req.some((x) => standIn(p, x)))) out.push(`${where}: full-body day without ${typeof req === 'string' ? req : req.join(' or ')}`);
         }
       }
     }
@@ -83,7 +83,7 @@ export function programProblems(p: BuiltProgram, library: readonly LibraryExerci
     const slots = new Set<SlotId>(w.days.flatMap((d) => d.blocks.flatMap((b) => b.items.map((i) => i.slot))));
     for (const req of [...WEEK_REQUIRED, ['vpush', 'vpull'] as SlotId[]]) {
       const ok = typeof req === 'string' ? slots.has(req) : req.some((x) => slots.has(x));
-      if (!ok && !standIn(p, typeof req === 'string' ? req : req[0])) out.push(`week ${w.n}: no ${typeof req === 'string' ? req : req.join(' or ')}`);
+      if (!ok && !(typeof req === 'string' ? standIn(p, req) : req.some((x) => standIn(p, x)))) out.push(`week ${w.n}: no ${typeof req === 'string' ? req : req.join(' or ')}`);
     }
   }
 

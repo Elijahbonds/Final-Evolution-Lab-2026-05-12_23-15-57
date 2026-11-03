@@ -21,7 +21,8 @@ from **real library entries**. Day 1 then plays in the existing session player.
 | AI polish (optional) | `lib/program-ask/ai.ts` | Picks among equivalent entries, then the rules rebuild and re-check. Writes the "why" paragraph through guards. Never sets a dose. |
 | Checkpoint | `lib/program-ask/checkpoint.ts` | One question after each lighter week. Answers: advance, repeat the block once, or (pain) repeat the lighter week. |
 | In-block progress | `lib/program-ask/adjust.ts` | Each exercise carries a "Too easy?" line and a "Too hard?" line, plus a band-setup line. |
-| Save | `lib/program-ask/device.ts` | Saved on the phone only, under the `fel.program-ask.v1` key. |
+| Save | `lib/program-ask/device.ts`, `accountStore.ts`, `accountServer.ts`, `app/api/program-ask/saved/route.ts` | Always saved on the phone, under the `fel.program-ask.v1` key. For an adult, also saved on the account once `prisma/pending/2026-11-03-program-ask.sql` is applied (below). |
+| Band set | `request.ts`, `adjust.ts bandForJob` | The "What bands do you have?" chip. With two or more bands, each band exercise names its band: the heaviest for legs and hips, the middle one for the big pulls and presses, the lightest for small muscles and the trunk. |
 | Player | `lib/session-player/fromProgram.ts` | Day → player steps. Pairs alternate set for set. Warm-up first, cool-down last. |
 | Free or Pro | `lib/program-ask/access.ts` | **Owner call.** The default matches the signature programs: week 1 free, then FEL Pro. |
 | Route and page | `app/api/program-ask/route.ts`, `app/train/build/page.tsx`, `components/program-ask/program-builder.tsx` | |
@@ -104,8 +105,24 @@ A building week sits inside the range. When the time cannot hold the low end, th
     level above the person's level);
   - then one-leg squats and split squats, which gives the single-leg bias.
 - Under-18s keep the bodyweight squat.
-- **Library gap:** the library has **no band-under-the-feet squat, no band front squat, no band split squat and no band
-  rear-foot-elevated split squat**. The program says so.
+- **Library gap, closed in PROGRAM-ASK-2:** the library had no band-under-the-feet squat, no band front squat, no band
+  split squat, no band rear-foot-elevated split squat, no pike push-up and no beginner conditioning move that stays on
+  the floor. These six are now authored as **drafts** in `data/library/authored/b5-program-ask.json`, written by
+  `scripts/library/authoring/program-ask.ts`, built as batch 5 by the one generator (`npx tsx scripts/library/author.ts --batch 5`), which runs the library validator over the whole library before it writes.
+  - All six are youth-safe, with no max-effort wording.
+  - Each has regression and progression links to real entries:
+
+    | Ladder | Rungs |
+    |---|---|
+    | Legs | Bodyweight Squat → Band Under-Feet Squat → Band Front Squat → Band Split Squat → Band Rear-Foot-Elevated Split Squat → Dumbbell Rear-Foot-Elevated Split Squat |
+    | Vertical push | Incline Push-Up → Pike Push-Up → Handstand Push-Ups |
+    | Conditioning | Bear Plank Hold → Step-In Mountain Climber → Mountain Climber Run |
+
+  - The builder now prefers them: the sample's two squat days are both band-loaded (day A the under-feet squat, day B the
+    front squat, the lower rung first). A no-equipment plan presses overhead with the pike push-up, and a beginner's
+    finisher is the step-in mountain climber.
+  - Demo loops: the squats and split squats play existing loops. `lib/library/demo.ts` gained `band` and `rfe-band` on
+    the split-squat rules. The pike push-up and the step-in climber have no loop yet.
 
 **Progression across weeks** (`rules.ts blockSteps`). A block is 5 weeks for a beginner (the lighter week is the 5th) and 4 weeks
 for intermediate and advanced (the lighter week is the 4th: the coach templates' wave, owner decision #10).
@@ -182,7 +199,7 @@ at-a-glance table.
 
 | | Exercise | W1 | W2 | W3 | W4 | W5 lighter |
 |---|---|---|---|---|---|---|
-| A1 | Band-Resisted Bodyweight Squat | 2 × 8 · Drive | 3 × 10 · Drive | 3 × 12 · Surge | 3 × 10, tempo 3-1-1-0 · Surge | 1 × 8 · Cruise |
+| A1 | Band Under-Feet Squat | 2 × 8 · Drive | 3 × 10 · Drive | 3 × 12 · Surge | 3 × 10, tempo 3-1-1-0 · Surge | 1 × 8 · Cruise |
 | A2 | Band Row | 3 × 8 · Cruise | 3 × 10 · Drive | 3 × 12 · Drive | 3 × 10, tempo 4-0-1-0 · Drive (Band Row with 4-Second Lower) | 2 × 8 · Cruise |
 | B1 | Band Good Morning | 3 × 8 · Cruise | 3 × 10 · Drive | 3 × 12 · Drive | 3 × 10, tempo 3-1-1-0 · Drive | 2 × 8 · Cruise |
 | B2 | Pushups | 3 × 8 · Cruise | 3 × 10 · Drive | 3 × 12 · Drive | 3 × 10, tempo 4-0-1-0 · Drive (Pushups with 4-Second Lower) | 2 × 8 · Cruise |
@@ -197,7 +214,7 @@ at-a-glance table.
 |---|---|---|---|---|---|---|
 | A1 | Band Pull-Through | 2 × 8 · Drive | 3 × 10 · Drive | 3 × 12 · Surge | 3 × 10, tempo 3-1-1-0 · Surge | 1 × 8 · Cruise |
 | A2 | Push-Up Wide | 3 × 8 · Cruise | 3 × 10 · Drive | 3 × 12 · Drive | 3 × 10, tempo 4-0-1-0 · Drive (Push-Up Wide with 4-Second Lower) | 2 × 8 · Cruise |
-| B1 | Split Squat | 2 × 8 each side · Cruise | 2 × 10 each side · Drive | 2 × 12 each side · Drive | 2 × 10 each side, tempo 4-0-1-0 · Drive (Split Squat with 4-Second Lower) | 1 × 8 each side · Cruise |
+| B1 | Band Front Squat | 3 × 8 · Cruise | 3 × 10 · Drive | 3 × 12 · Drive | 3 × 10, tempo 3-1-1-0 · Drive | 2 × 8 · Cruise |
 | B2 | Band Single-Arm Row | 2 × 8 each side · Cruise | 2 × 10 each side · Drive | 2 × 12 each side · Drive | 2 × 10 each side, tempo 3-1-1-0 · Drive | 1 × 8 each side · Cruise |
 | C1 | Lateral Lunge | 2 × 8 each side · Cruise | 2 × 10 each side · Drive | 2 × 12 each side · Drive | 2 × 10 each side, tempo 4-0-1-0 · Drive (Lateral Lunge with 4-Second Lower) | 1 × 8 each side · Cruise |
 | C2 | Shoulder Press - With Bands | 2 × 8 · Cruise | 2 × 10 · Drive | 2 × 12 · Drive | 2 × 10, tempo 3-1-1-0 · Drive | 1 × 8 · Cruise |
@@ -210,7 +227,7 @@ Effort words: Cruise = 5–6 reps left, Drive = 3–4 left, Surge = 1–2 left (
 
 | | Exercise | Band setup | Too easy? | Too hard? |
 |---|---|---|---|---|
-| A1 | Band-Resisted Bodyweight Squat | Stand on the band, ends looped over your shoulders or held at your shoulders: it pulls you down as you stand up. | Too easy? Next session hold the band shorter or double it over; then lower for 3 s. | Reps falling short? Switch to Bodyweight Squat, or hold the band longer. |
+| A1 | Band Under-Feet Squat | Stand on the band, ends looped over your shoulders or held at your shoulders: it pulls you down as you stand up. | Too easy? Next session hold the band shorter or double it over; then lower for 3 s; then move to Band Front Squat. | Reps falling short? Switch to Bodyweight Squat, or hold the band longer. |
 | A2 | Band Row | Anchor at chest height. Step back until the band is tight with your arms straight in front. | Too easy? Next session step further from the anchor; then lower for 3 s; then move to Paused Band Row. | Reps falling short? Stand closer to the anchor. |
 | B1 | Band Good Morning | Stand on the middle of the band, feet hip-width. Loop it behind your neck (good morning) or hold the ends (deadlift). | Too easy? Next session hold the band shorter or double it over; then lower for 3 s; then move to Band-Resisted Frog Pump. | Reps falling short? Hold the band longer. |
 | B2 | Pushups | — | Too easy? Next session lower for 3 s and pause at the bottom; then move to Paused Pushups. | Reps falling short? Switch to Wall Push-Up. |
@@ -223,7 +240,7 @@ Effort words: Cruise = 5–6 reps left, Drive = 3–4 left, Surge = 1–2 left (
 
 | Group | Range (sets/week) | W1 | W2 | W3 | W4 | W5* |
 |---|---|---|---|---|---|---|
-| knee | 5–12 | 9 | 11 | 11 | 11 | 4.5 |
+| knee | 5–12 | 10 | 12 | 12 | 12 | 5.5 |
 | hip | 5–12 | 11 | 12 | 12 | 12 | 6.5 |
 | push | 5–12 | 11 | 11 | 11 | 11 | 7 |
 | pull | 5–12 | 12 | 12 | 12 | 12 | 7 |
@@ -235,12 +252,12 @@ Effort words: Cruise = 5–6 reps left, Drive = 3–4 left, Surge = 1–2 left (
 
 ### Week 1 · Learn the moves
 
-**Mon · Full body (A) · about 42 min**
+**Mon · Full body (A) · about 39 min**
 
 | | Exercise | Job | Dose | Rest | Effort | Tempo / note |
 |---|---|---|---|---|---|---|
 | | Warm-up: Pressurize the System, Wake Up the Tripod, Open the Joints, Ankle Rock and Hold, Fast Squat Primer | | 6 min | | | |
-| A1 | Band-Resisted Bodyweight Squat | squat | 2 × 8 | → next | Drive: 3–4 reps left |  |
+| A1 | Band Under-Feet Squat | squat | 2 × 8 | → next | Drive: 3–4 reps left |  |
 | A2 | Band Row | row | 3 × 8 | 1:15 | Cruise: 5–6 reps left |  |
 | B1 | Band Good Morning | hip hinge | 3 × 8 | → next | Cruise: 5–6 reps left |  |
 | B2 | Pushups | push | 3 × 8 | 1:15 | Cruise: 5–6 reps left |  |
@@ -248,27 +265,23 @@ Effort words: Cruise = 5–6 reps left, Drive = 3–4 left, Surge = 1–2 left (
 | C2 | Band Pulldown | pulldown | 2 × 8 | 1:15 | Cruise: 5–6 reps left |  |
 | D1 | Plank | trunk (front) | 2 × 20 s | → next | Cruise: easy, could go longer |  |
 | D2 | Band Pallof Press | trunk (anti-rotation) | 2 × 10 each side | 50 s | Cruise: 5–6 reps left |  |
-| E1 | Inchworm | easy range | 2 × 30 s each side | → next | Cruise: easy, could go longer | Easy range, steady breathing. |
-| E2 | Cat-Camel | easy range | 2 × 30 s each side | → next | Cruise: easy, could go longer | Easy range, steady breathing. |
-| E3 | Open Book | easy range | 2 × 30 s each side | 10 s | Cruise: easy, could go longer | Easy range, steady breathing. |
+| E | Step-In Mountain Climber | finisher | 4 × 20 s each side | 20 s | Drive: steady, some left at the end | Steady and smooth: breathing hard, never sloppy. |
 | | Cool-down: 4-6 Recovery Breath, Ankle Rock and Hold, Open Book Rock and Hold, Hinge Rock and Hold | | 5 min | | | |
 
-**Wed · Full body (B) · about 40 min**
+**Wed · Full body (B) · about 39 min**
 
 | | Exercise | Job | Dose | Rest | Effort | Tempo / note |
 |---|---|---|---|---|---|---|
 | | Warm-up: Pressurize the System, Wake Up the Tripod, Open the Joints, Wall Calf Rock and Hold, Hip Snap Primer | | 6 min | | | |
 | A1 | Band Pull-Through | hip hinge | 2 × 8 | → next | Drive: 3–4 reps left |  |
-| A2 | Push-Up Wide | push | 3 × 8 | 1:15 | Cruise: 5–6 reps left |  |
-| B1 | Split Squat | squat | 2 × 8 each side | → next | Cruise: 5–6 reps left |  |
-| B2 | Band Single-Arm Row | row | 2 × 8 each side | 1:15 | Cruise: 5–6 reps left |  |
+| A2 | Push-Up Wide | push | 3 × 8 | 1:20 | Cruise: 5–6 reps left |  |
+| B1 | Band Front Squat | squat | 3 × 8 | → next | Cruise: 5–6 reps left |  |
+| B2 | Band Single-Arm Row | row | 2 × 8 each side | 1:20 | Cruise: 5–6 reps left |  |
 | C1 | Lateral Lunge | single leg | 2 × 8 each side | → next | Cruise: 5–6 reps left |  |
-| C2 | Shoulder Press - With Bands | overhead press | 2 × 8 | 1:15 | Cruise: 5–6 reps left |  |
+| C2 | Shoulder Press - With Bands | overhead press | 2 × 8 | 1:20 | Cruise: 5–6 reps left |  |
 | D1 | Dead Bug | trunk (front) | 2 × 20 s | → next | Cruise: easy, could go longer |  |
-| D2 | Half-Kneeling Pallof Press | trunk (anti-rotation) | 2 × 10 each side | 50 s | Cruise: 5–6 reps left |  |
-| E1 | 90/90 Lean | easy range | 2 × 30 s each side | → next | Cruise: easy, could go longer | Easy range, steady breathing. |
-| E2 | Sit Squats | easy range | 2 × 40 s | → next | Cruise: easy, could go longer | Easy range, steady breathing. |
-| E3 | Wall Slide | easy range | 2 × 30 s each side | 10 s | Cruise: easy, could go longer | Easy range, steady breathing. |
+| D2 | Half-Kneeling Pallof Press | trunk (anti-rotation) | 2 × 10 each side | 55 s | Cruise: 5–6 reps left |  |
+| E | Step-In Mountain Climber | finisher | 4 × 20 s each side | 20 s | Drive: steady, some left at the end | Steady and smooth: breathing hard, never sloppy. |
 | | Cool-down: 4-6 Recovery Breath, Wall Calf Rock and Hold, Open Book Rock and Hold, Hinge Rock and Hold | | 5 min | | | |
 
 ### Week 4 · Slow it down
@@ -278,7 +291,7 @@ Effort words: Cruise = 5–6 reps left, Drive = 3–4 left, Surge = 1–2 left (
 | | Exercise | Job | Dose | Rest | Effort | Tempo / note |
 |---|---|---|---|---|---|---|
 | | Warm-up: Pressurize the System, Wake Up the Tripod, Open the Joints, Ankle Rock and Hold, Fast Squat Primer | | 6 min | | | |
-| A1 | Band-Resisted Bodyweight Squat | squat | 3 × 10 | → next | Surge: 1–2 reps left | tempo 3-1-1-0 · Slow it down: 3 s on the way down, 1 s pause. |
+| A1 | Band Under-Feet Squat | squat | 3 × 10 | → next | Surge: 1–2 reps left | tempo 3-1-1-0 · Slow it down: 3 s on the way down, 1 s pause. |
 | A2 | Band Row with 4-Second Lower | row | 3 × 10 | 1:15 | Drive: 3–4 reps left | tempo 4-0-1-0 · Slow it down: 4 s on the way down. |
 | B1 | Band Good Morning | hip hinge | 3 × 10 | → next | Drive: 3–4 reps left | tempo 3-1-1-0 · Slow it down: 3 s on the way down, 1 s pause. |
 | B2 | Pushups with 4-Second Lower | push | 3 × 10 | 1:15 | Drive: 3–4 reps left | tempo 4-0-1-0 · Slow it down: 4 s on the way down. |
@@ -294,18 +307,52 @@ Effort words: Cruise = 5–6 reps left, Drive = 3–4 left, Surge = 1–2 left (
 |---|---|---|---|---|---|---|
 | | Warm-up: Pressurize the System, Wake Up the Tripod, Open the Joints, Wall Calf Rock and Hold, Hip Snap Primer | | 6 min | | | |
 | A1 | Band Pull-Through | hip hinge | 3 × 10 | → next | Surge: 1–2 reps left | tempo 3-1-1-0 · Slow it down: 3 s on the way down, 1 s pause. |
-| A2 | Push-Up Wide with 4-Second Lower | push | 3 × 10 | 1:15 | Drive: 3–4 reps left | tempo 4-0-1-0 · Slow it down: 4 s on the way down. |
-| B1 | Split Squat with 4-Second Lower | squat | 2 × 10 each side | → next | Drive: 3–4 reps left | tempo 4-0-1-0 · Slow it down: 4 s on the way down. |
-| B2 | Band Single-Arm Row | row | 2 × 10 each side | 1:15 | Drive: 3–4 reps left | tempo 3-1-1-0 · Slow it down: 3 s on the way down, 1 s pause. |
+| A2 | Push-Up Wide with 4-Second Lower | push | 3 × 10 | 1:20 | Drive: 3–4 reps left | tempo 4-0-1-0 · Slow it down: 4 s on the way down. |
+| B1 | Band Front Squat | squat | 3 × 10 | → next | Drive: 3–4 reps left | tempo 3-1-1-0 · Slow it down: 3 s on the way down, 1 s pause. |
+| B2 | Band Single-Arm Row | row | 2 × 10 each side | 1:20 | Drive: 3–4 reps left | tempo 3-1-1-0 · Slow it down: 3 s on the way down, 1 s pause. |
 | C1 | Lateral Lunge with 4-Second Lower | single leg | 2 × 10 each side | → next | Drive: 3–4 reps left | tempo 4-0-1-0 · Slow it down: 4 s on the way down. |
-| C2 | Shoulder Press - With Bands | overhead press | 2 × 10 | 1:15 | Drive: 3–4 reps left | tempo 3-1-1-0 · Slow it down: 3 s on the way down, 1 s pause. |
+| C2 | Shoulder Press - With Bands | overhead press | 2 × 10 | 1:20 | Drive: 3–4 reps left | tempo 3-1-1-0 · Slow it down: 3 s on the way down, 1 s pause. |
 | D1 | Dead Bug | trunk (front) | 2 × 30 s | → next | Drive: steady, some left at the end |  |
-| D2 | Half-Kneeling Pallof Press | trunk (anti-rotation) | 2 × 12 each side | 50 s | Drive: 3–4 reps left |  |
+| D2 | Half-Kneeling Pallof Press | trunk (anti-rotation) | 2 × 12 each side | 55 s | Drive: 3–4 reps left |  |
 | | Cool-down: 4-6 Recovery Breath, Wall Calf Rock and Hold, Open Book Rock and Hold, Hinge Rock and Hold | | 5 min | | | |
 
 <!-- SAMPLE:end -->
 
-## Owner calls (open)
+## Account save (PROGRAM-ASK-2, owner: "yes")
+
+**What is stored:** one `AskedProgram` row per adult account —
+- the ask;
+- the chips' edits;
+- the program id;
+- the sessions done;
+- the checkpoint answers.
+
+The program itself is not stored: the ask rebuilds it, because the builder is deterministic.
+
+**Who is saved where:**
+- Adults: the phone, plus the account once the table exists.
+- Youth (under 18, or no birth year): the phone only. The server refuses a youth write with 403 `youth_device_only`.
+
+**Data rights:** exported with "Download my data" and deleted by the account erase (`lib/data-rights/registry.ts AskedProgram`).
+
+**Fails closed:** until `prisma/pending/2026-11-03-program-ask.sql` is applied:
+- reading the account plan answers "keep it on the phone";
+- writes answer 503 `program_ask_not_ready`;
+- the page keeps saving on the phone.
+
+Within about 5 minutes of the SQL being applied, account save switches on, with no deploy (the shared pending-schema
+probe).
+
+`prisma/schema.prisma` is untouched. The SQL file holds the owner's steps.
+
+## Owner calls (decided 2026-11-03, via the coordinator)
+
+1. Free or Pro: keep `'like-signature'`. The owner may change it.
+2. AI polish: stays off.
+3. One medium band for v1. The band-set chip is there for anyone who has more.
+4. Account save: yes (above). The table still waits on the owner applying the SQL.
+
+## Owner calls (as first written)
 
 1. **Free or FEL Pro.** The default (`PROGRAM_ASK_ACCESS = 'like-signature'`) gives week 1 free and the rest with FEL Pro, the
    same as the signature programs. The other setting is `'all-free'`.

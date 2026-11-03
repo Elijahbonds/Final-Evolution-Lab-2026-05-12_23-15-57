@@ -1,4 +1,4 @@
-// gameplay-clean rig build (lane/gameplay-clean, 2026-10-28): node build.mjs <siteDir> [--dev]
+// gameplay-clean rig build (lane/gameplay-clean, 2026-10-28): node build.mjs <siteDir> [--dev | --nominify]
 //
 // Bundles ./entry.tsx — the REAL /play/<route> loader (GameShell + the mode's host + its HUD, READY card, pause, touch
 // deck and the feel panel's tab), with Next's server pieces stubbed — into <siteDir> as an ESM bundle with split chunks
@@ -20,6 +20,8 @@ const APP = path.resolve(HERE, '../../..');
 const SITE = process.argv[2];
 if (!SITE) { console.error('usage: node build.mjs <siteDir> [--dev]'); process.exit(2); }
 const dev = process.argv.includes('--dev');
+// --nominify: the production build with readable names (profiling: what the first frame of play spends its time on)
+const nominify = process.argv.includes('--nominify');
 const require = createRequire(path.join(APP, 'package.json'));
 const esbuild = require('esbuild');
 const ENV = dev ? '"development"' : '"production"';
@@ -74,7 +76,7 @@ const t0 = Date.now();
 // NOT --keep-names (docs/DUNK-FLAGSHIP.md §1: it breaks Babylon's Draco worker and freezes every clip)
 await esbuild.build({
   absWorkingDir: APP, entryPoints: { entry: path.join(HERE, 'entry.tsx') }, bundle: true, splitting: true, format: 'esm',
-  minify: !dev, platform: 'browser', target: 'es2020', jsx: 'automatic', tsconfig: path.join(APP, 'tsconfig.json'),
+  minify: !dev && !nominify, platform: 'browser', target: 'es2020', jsx: 'automatic', tsconfig: path.join(APP, 'tsconfig.json'),
   define: { 'process.env.NODE_ENV': ENV }, plugins: [stubs], logLevel: 'error', outdir: SITE, chunkNames: 'c/[hash]',
   banner: { js: `var process = globalThis.process || { env: { NODE_ENV: ${ENV} } }; globalThis.process = process;` },
   loader: { '.glb': 'dataurl', '.wasm': 'dataurl', '.png': 'empty', '.jpg': 'empty', '.svg': 'empty', '.woff2': 'empty' },

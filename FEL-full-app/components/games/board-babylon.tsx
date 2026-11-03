@@ -311,9 +311,12 @@ export function makeBoardHost(opts: BoardHostOpts) {
         </div>
 
         {/* The objectives, NAMED. The bezel showed "GOALS 0/4" and nothing else,
-            so the player was chasing four targets they had never been told. */}
+            so the player was chasing four targets they had never been told.
+            GAMEPLAY-CLEAN P2 (2026-11-03): TOP-LEFT, under the chip row — the left-hand mirror of the meters (right-4 top-24). It sat
+            at bottom-4 left-4, which is the touch deck's left column (the MOVE stick and the d-pad, TouchOverlay bottom-3 left-3): on
+            a sideways phone the list was printed over the stick a thumb is on (rig photograph skateboard-p2-2play5). */}
         {typeof hud.goalList === 'string' && hud.goalList && (
-          <div className="absolute bottom-4 left-4 flex flex-col items-start gap-0.5">
+          <div data-goal-list className="pointer-events-none absolute left-4 top-24 flex max-w-[30%] flex-col items-start gap-0.5">
             {hud.goalList.split(' · ').map((g) => (
               <HudText key={g} size="caption" tone={g.startsWith('✓') ? 'score' : 'text'} alpha={g.startsWith('✓') ? 1 : HUD_TEXT_ALPHA.faint}>
                 {g}

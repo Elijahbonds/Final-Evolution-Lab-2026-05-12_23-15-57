@@ -12,6 +12,7 @@ import {
   type Drill, type DrillPhase, type DrillTarget, alternate, repeat, round3, stepInterval, mirrorPhase,
   FIRST_LEAD_IN_SEC, LEAD_IN_SEC,
 } from './chart';
+import { HOOPS_DRILLS } from './hoopsDrills';
 
 // ── tempos and body timings ──────────────────────────────────────────────────────────────────────────────────────────
 
@@ -552,5 +553,6 @@ export const DRILLS: readonly Drill[] = [
 ];
 
 export function drillById(id: string): Drill | null {
-  return DRILLS.find((d) => d.id === id) ?? null;
+  // PLAT-P09: the ball-skill shelf's drills (hoopsDrills.ts) are found by id too; DRILLS stays the Playbook's eleven
+  return DRILLS.find((d) => d.id === id) ?? HOOPS_DRILLS.find((d) => d.id === id) ?? null;
 }

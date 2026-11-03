@@ -117,7 +117,7 @@ function stanceAction(scene: Scene, sk: Skeleton, name: string, st: StanceId, ac
 
 // ── carries, swings, rotator cuff, halo, side bend ─────────────────────────────────────────────────────────────────
 /** A loaded walk in place (exercise.ts ex_carry's step), the arms holding `arms`. */
-function carry(scene: Scene, sk: Skeleton, name: string, arms: Pose): AnimationGroup | null {
+export function carry(scene: Scene, sk: Skeleton, name: string, arms: Pose): AnimationGroup | null {
   const step = (s: 1 | -1, t: number): ExKey => ({
     t, bones: { Hips: [0, 0, 0], Spine: [0, 0, 0], Spine1: [0, 0, 0], Neck: [0, 0, 0], LeftUpLeg: [-22 * s, 0, 0], RightUpLeg: [22 * s, 0, 0], LeftLeg: [s > 0 ? 20 : 6, 0, 0], RightLeg: [s > 0 ? 6 : 20, 0, 0] },
     ...arms, hipsY: -0.01,
@@ -191,8 +191,8 @@ function sideBend(scene: Scene, sk: Skeleton): AnimationGroup | null {
 
 /** The single-arm standing cable press / row: the right hand pushes from the chest out in front (or pulls from out in front to
  *  the ribs), the left at the side, a staggered stance. */
-function cableOne(scene: Scene, sk: Skeleton, name: string, press: boolean): AnimationGroup | null {
-  const g = legs('split', 0);
+function cableOne(scene: Scene, sk: Skeleton, name: string, press: boolean, stance: StanceId = 'split'): AnimationGroup | null {
+  const g = legs(stance, 0);
   const chest: V3 = [0.0, -0.18, 0.12], out: V3 = [-0.04, -0.16, 0.52], ribs: V3 = [0.02, -0.30, -0.10];
   const [a, b] = press ? [chest, out] : [out, ribs];
   const key = (R: V3, t: number, pole: V3): ExKey => ({ t, hold: true, bones: { Hips: [4, 0, 0], Spine: [2, 0, 0], Neck: [0, 0, 0], ...g.bones }, feet: g.feet, kneePoles: g.kneePoles, hipsY: g.hipsY, rel: { Right: R }, hands: { Left: [HANG.Left![0], HANG.Left![1] + g.hipsY, HANG.Left![2]] }, poles: { Right: pole, Left: HANG_POLES.Left } });
@@ -231,4 +231,8 @@ export const ATHLETIC_BUILDERS: readonly [string, Builder][] = [
   ['ex_side_bend', sideBend],
   ['ex_cable_press_one', (scene, sk) => cableOne(scene, sk, 'ex_cable_press_one', true)],
   ['ex_cable_row_one', (scene, sk) => cableOne(scene, sk, 'ex_cable_row_one', false)],
+  // DEMO-LOOPS-4: the coach loop's half-kneeling one-arm cable row (the right knee down, the left foot in front, the right arm rows)
+  ['ex_cable_row_hk', (scene, sk) => cableOne(scene, sk, 'ex_cable_row_hk', false, 'halfkneel')],
+  // the suitcase carry: ONE load, in the right hand at the side; the left hand free and hanging, the trunk level
+  ['ex_carry_suitcase', (scene, sk) => carry(scene, sk, 'ex_carry_suitcase', { hands: { Right: [0.27, 0.80, 0.02], Left: [-0.24, 0.84, 0.06] }, poles: { Right: [0.3, -0.2, -0.9], Left: HANG_POLES.Left } })],
 ];

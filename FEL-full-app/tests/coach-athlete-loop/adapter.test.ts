@@ -18,6 +18,7 @@ import { GET as todayGET } from '@/app/api/coach/me/today/route';
 import { catalogueRow, newTodayStore, seedProgram } from '@/lib/coach/todayMemoryDb';
 import { fromCoachToday, slotSet } from '@/lib/session-player/fromCoachToday';
 import { doseParts } from '@/lib/session-player/dose';
+import { warmupDemoLoop } from '@/lib/library/surfaceDemo';
 import { generateCooldown, needsAutoCooldown } from '@/lib/coach/cooldown';
 import { FALLBACK_WARMUP_CONTEXT } from '@/lib/coach/warmup';
 import { planFor } from '@/components/coach/warmup-prep';
@@ -95,10 +96,14 @@ describe('fromCoachToday over the served session', () => {
     const { session, refs, cooldown } = fromCoachToday(p.today!, { warmup: warm, cooldown: cool });
     expect(session.steps.slice(0, warm.steps.length).map((s) => s.name)).toEqual(warm.steps.map((s) => s.name));
     expect(session.steps.slice(-cool.steps.length).map((s) => s.name)).toEqual(cool.steps.map((s) => s.name));
-    for (const s of [...session.steps.slice(0, warm.steps.length), ...session.steps.slice(-cool.steps.length)]) {
+    const n = session.steps.length;
+    for (const i of [...warm.steps.keys(), ...cool.steps.map((_, k) => n - cool.steps.length + k)]) {
+      const s = session.steps[i], r = refs[i] as { id: string };
       expect(s.sets).toBe(1);
       expect(s.workSeconds).toBeGreaterThan(0);
-      expect(s.clip).toBeNull();                           // no borrowed movement: the still pose until demo-loops adds one
+      // DEMO-LOOPS-4: every warm-up and cool-down step plays its own loop (surfaceDemo WARMUP_DEMO_LOOPS), never a borrowed one
+      expect(s.clip).toBe(warmupDemoLoop(r.id));
+      expect(s.clip).toBeTruthy();
     }
     expect(refs[0]).toEqual({ kind: 'warmup', id: warm.steps[0].id });
     expect(refs[refs.length - 1]).toEqual({ kind: 'cooldown', id: cool.steps[cool.steps.length - 1].id });

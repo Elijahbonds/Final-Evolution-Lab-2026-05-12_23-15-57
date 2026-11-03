@@ -223,6 +223,10 @@ async function buildStage(first: ExerciseStageProps, gone: () => boolean): Promi
     if (prop === 'pullbar') return { alpha: FRONT_ALPHA - 0.5, beta: 1.5, radius: 3.6, y: 1.5 };
     if (prop === 'dipbars') return { alpha: FRONT_ALPHA - 0.7, beta: 1.45, radius: 3.0, y: 1.15 };
     if (prop === 'wall') return { alpha: 0.05, beta: 1.36, radius: 3.0, y: 0.9 };
+    // DEMO-LOOPS-4: the door post at the body's right is seen from the front-left (the arm on it and the step through); the
+    // doorway's row from the side, as every row
+    if (prop === 'doorpost') return { alpha: FRONT_ALPHA - 0.45, beta: 1.36, radius: 3.2, y: 1.0 };
+    if (prop === 'doorway') return { alpha: 0.25, beta: 1.36, radius: 3.2, y: 0.95 };
     if (prop === 'box' || prop === 'boxside' || prop === 'stepbox' || prop === 'boxback' || prop === 'rearbench' || prop === 'wallback') return { alpha: 0.55, beta: 1.36, radius: 3.3, y: 1.0 };
     if (prop === 'calfstep') return { alpha: 0.6, beta: 1.4, radius: 2.7, y: 0.85 };
     if (prop) return { alpha: 0.45, beta: 1.22, radius: 2.6, y: 0.6 };

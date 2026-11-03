@@ -3,6 +3,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { FreeCamera, MeshBuilder, NullEngine, Scene, TransformNode, Vector3 } from '@babylonjs/core';
 import {
+  OCCLUDER_MAX_VERTS,
   OccluderFade, OCCLUDER_FADE_ALPHA, OCCLUDER_FADE_OFF, OCCLUDER_MIN_RADIUS_M, OCCLUDER_MAX_RADIUS_M, fadeCandidate, stepLevel,
 } from './OccluderFade';
 
@@ -35,6 +36,21 @@ describe('OccluderFade', () => {
     expect(r.tree.visibility).toBe(1);
     expect(r.floor.visibility).toBe(1);
     expect(r.body.visibility).toBe(1);
+  });
+
+  it('a DENSE prop (over OCCLUDER_MAX_VERTS) is tested by its box and still fades; one off the line does not (P2 #9)', () => {
+    const r = rig();
+    const hoop = MeshBuilder.CreateSphere('hoop', { diameter: 2, segments: 120 }, r.scene);   // ~29k vertices, radius 1 m
+    hoop.position.set(0, 1.2, -2); hoop.computeWorldMatrix(true);
+    const side = MeshBuilder.CreateSphere('side', { diameter: 2, segments: 120 }, r.scene);
+    side.position.set(-7, 1.2, -2); side.computeWorldMatrix(true);
+    expect(hoop.getTotalVertices()).toBeGreaterThan(OCCLUDER_MAX_VERTS);
+    r.fade.start();
+    r.frames(30);
+    expect(hoop.visibility).toBeCloseTo(OCCLUDER_FADE_ALPHA, 2);
+    expect(side.visibility).toBe(1);
+    r.frames(60);   // still on the line through the candidate rebuilds: it stays faded (no flicker)
+    expect(hoop.visibility).toBeCloseTo(OCCLUDER_FADE_ALPHA, 2);
   });
 
   it('brings it back once it is off the line (after the hold), and stop() restores everything', () => {
@@ -100,6 +116,11 @@ describe('OccluderFade', () => {
     expect(fadeCandidate({ ...base, materialAlpha: 0.3 })).toBe(false);
     expect(fadeCandidate({ ...base, thinInstances: 40 })).toBe(false);
     expect(fadeCandidate({ ...base, skinned: true })).toBe(false);   // a rival or a horde fighter is the game, not scenery
+    // P2 #9: a dense mesh (a stand, a crowd block) is never ray-tested — the rays' triangle walk was Penalty's top CPU cost
+    expect(fadeCandidate({ ...base, verts: 2400 })).toBe(true);
+    expect(fadeCandidate({ ...base, verts: OCCLUDER_MAX_VERTS + 1 })).toBe(true);              // a dense prop: box-tested, still faded
+    expect(fadeCandidate({ ...base, radius: 8, verts: OCCLUDER_MAX_VERTS + 1 })).toBe(false);  // a dense stand: skipped
+    expect(fadeCandidate({ ...base, verts: 0 })).toBe(false);
   });
 
   it('steps the fade at 1/fadeSec per second, both ways', () => {

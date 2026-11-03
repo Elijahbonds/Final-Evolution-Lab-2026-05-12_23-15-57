@@ -81,6 +81,7 @@ export function readProgramAsk(question: string, opts: ReadOptions = {}): Progra
   // equipment
   let equipment: EquipmentId[] = [];
   let tension: BandTension | null = null;
+  let bands: BandTension[] = [];
   if (NO_KIT.test(f) && !BAND.test(f.replace(NO_KIT, ' '))) { equipment = []; said.equipment = true; }
   else {
     let rest = f;
@@ -96,7 +97,12 @@ export function readProgramAsk(question: string, opts: ReadOptions = {}): Progra
     const t = /\b(light|thin|easy|yellow)\b/.test(f) ? 'light' : /\b(heavy|thick|strong(?:est)?|black|blue)\b(?= ?(?:resistance |loop )?band)/.test(f) || /\bheavy\b/.test(f) ? 'heavy' : /\b(medium|red|green)\b/.test(f) ? 'medium' : null;
     tension = t;
     if (t) said.tension = true;
-    else assumptions.push('assumption: one medium long loop band — not a mini band as well, and not a set of bands.');
+    // PROGRAM-ASK-2: a band SET — "a set of bands", or "bands" with two or more tensions named
+    const named = (['light', 'medium', 'heavy'] as const).filter((x) => new RegExp(`\\b${x}\\b`).test(f));
+    if (/\b(?:set of (?:resistance |loop )?bands|bands? set|three bands|all the bands)\b/.test(f)) bands = named.length >= 2 ? [...named] : ['light', 'medium', 'heavy'];
+    else if (named.length >= 2 && /\bbands\b/.test(f)) bands = [...named];
+    if (bands.length) { said.bands = true; said.tension = true; tension = null; }
+    if (!said.tension) assumptions.push('assumption: one medium long loop band — not a mini band as well, and not a set of bands.');
     assumptions.push('assumption: the band can be fixed at chest or head height (a door anchor or a post) for rows, pulldowns and the Pallof press.');
   }
   if (!said.equipment) assumptions.push('assumption: no equipment was named, so the plan uses bodyweight only. Add what you have.');
@@ -168,7 +174,7 @@ export function readProgramAsk(question: string, opts: ReadOptions = {}): Progra
   }
 
   const lowLoad: Joint[] = (lib.filters.lowLoad ?? []) as Joint[];
-  const request: ProgramRequest = { equipment, tension, goal, sport, days, minutes, level, weeks, age, lowLoad };
+  const request: ProgramRequest = { equipment, tension, bands, goal, sport, days, minutes, level, weeks, age, lowLoad };
   return {
     question: q, request, said, chips: chipsFor(request, said, !!opts.youth), assumptions,
     injury: { flagged: words.length > 0, words }, wantsProgram: wantsProgram(q) || said.days === true,
@@ -185,8 +191,13 @@ export function chipsFor(r: ProgramRequest, said: Partial<Record<RequestField, b
     },
   ];
   if (r.equipment.includes('band')) chips.push({
-    field: 'tension', value: r.tension ?? 'medium', label: TENSION_LABEL[r.tension ?? 'medium'], assumed: !said.tension,
-    options: (['light', 'medium', 'heavy'] as const).map((t) => ({ value: t, label: TENSION_LABEL[t] })),
+    // PROGRAM-ASK-2: "What bands do you have?" — one band (its tension), or a set (each exercise then names its band)
+    field: 'bands', value: r.bands.length ? r.bands.join(',') : r.tension ?? 'medium',
+    label: r.bands.length ? `Bands: ${r.bands.join(', ')}` : TENSION_LABEL[r.tension ?? 'medium'], assumed: !said.tension && !said.bands,
+    options: [
+      ...(['light', 'medium', 'heavy'] as const).map((t) => ({ value: t, label: `One ${TENSION_LABEL[t].toLowerCase()}` })),
+      { value: 'light,medium,heavy', label: 'Light, medium and heavy' }, { value: 'light,heavy', label: 'Light and heavy' }, { value: 'medium,heavy', label: 'Medium and heavy' },
+    ],
   });
   chips.push(
     {
@@ -226,19 +237,26 @@ export function applyEdits(read: ProgramAskRead, edits: RequestEdits | null | un
       case 'weeks': { const n = int(v, WEEKS.min, WEEKS.max); if (n !== null) { r.weeks = n; said.weeks = true; } break; }
       case 'level': if (v === 'beginner' || v === 'intermediate' || v === 'advanced') { r.level = v; said.level = true; } break;
       case 'goal': if (typeof v === 'string' && v in GOAL_LABEL) { r.goal = v as ProgramGoal; r.sport = v === 'sport' ? r.sport : null; said.goal = true; } break;
-      case 'tension': if (v === 'light' || v === 'medium' || v === 'heavy') { r.tension = v; said.tension = true; } break;
+      case 'tension': if (v === 'light' || v === 'medium' || v === 'heavy') { r.tension = v; r.bands = []; said.tension = true; } break;
+      case 'bands': {
+        if (typeof v !== 'string') break;
+        const set = [...new Set(v.split(',').map((x) => x.trim()))].filter((x): x is BandTension => x === 'light' || x === 'medium' || x === 'heavy');
+        if (set.length === 1) { r.tension = set[0]; r.bands = []; } else if (set.length > 1) { r.bands = (['light', 'medium', 'heavy'] as const).filter((x) => set.includes(x)); r.tension = null; } else break;
+        said.bands = true; said.tension = true;
+        break;
+      }
       case 'age': if (v === 'adult' || v === 'teen' || v === 'child') { r.age = opts.youth && v === 'adult' ? 'teen' : v; said.age = true; } break;
       case 'equipment': {
         if (typeof v !== 'string') break;
         const ids = v === 'none' ? [] : v.split(',').map((x) => x.trim()).filter((x): x is EquipmentId => EQUIPMENT.some((e) => e.id === x));
         r.equipment = [...new Set(ids)].slice(0, 8);
-        if (!r.equipment.includes('band')) r.tension = null;
+        if (!r.equipment.includes('band')) { r.tension = null; r.bands = []; }
         said.equipment = true;
         break;
       }
     }
   }
-  const assumptions = read.assumptions.filter((a) => !Object.entries(said).some(([k, s]) => s && !read.said[k as RequestField] && assumptionField(a) === k));
+  const assumptions = read.assumptions.filter((a) => !Object.entries(said).some(([k, s]) => s && !read.said[k as RequestField] && (assumptionField(a) === k || (k === 'bands' && assumptionField(a) === 'tension'))));
   return { ...read, request: r, said, chips: chipsFor(r, said, !!opts.youth), assumptions };
 }
 

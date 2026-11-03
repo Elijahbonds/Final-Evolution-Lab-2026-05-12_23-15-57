@@ -20,6 +20,8 @@
 //      using — the tree would have regressed it. Carry / route / truck all ride it now.
 
 import type { CharacterAnimator } from './CharacterAnimator';
+import { StrideRateFilter, strideRate } from '../core/StrideMatch';
+import { feel } from '../../feel-panel/feel';
 
 export type FootballAnimState =
   | 'presnap_idle' | 'snap' | 'dropback' | 'throw'
@@ -44,7 +46,22 @@ export interface FootballAnimInput {
   rushing: boolean;
   celebrating?: boolean;
   dejected?: boolean;
+  /** GAMEPLAY-CLEAN P2 #6: the carrier's planar speed (m/s) — the carry loop's stride is paced to it. Absent: the loop runs at 1×. */
+  speedMps?: number;
+  /** The frame's dt for the stride filter (default 1/60). */
+  dtSec?: number;
 }
+
+/** GAMEPLAY-CLEAN P2 #6 (2026-11-03): THE CARRY'S STRIDE. `football_carry_run` played at 1× for every speed: the rig measured its planted
+ *  feet covering 2.1 m/s of ground against a carrier at 7.7 m/s (stance pace, scratchpad stance.mjs — the base `run` reads 5.0 there,
+ *  where LocoBus's calibrated runRef is 4.8, so the probe agrees with the movement probe). MEASURED, not tuned: the speed the clip's
+ *  stride matches the ground at, as the carrier wears it (with RunPosture's layer on). */
+export const FOOTBALL_CARRY_PACE_MPS = 2.1;
+/** TUNE (new): the carry's top playback rate. Matching 7.7 m/s outright would want 3.6× — a cartoon cadence — so the rate stops at
+ *  1.4× (0.6 s cycle → 4.7 steps a second, a ball carrier's sprint cadence); the rest of the gap is the clip's short stride, which
+ *  is clip work (GATE 0) and is routed, not hidden here. Feel knob `football.carryStrideMax`. */
+export const FOOTBALL_CARRY_RATE_MAX = 1.4;
+const STRIDE_STATES: ReadonlySet<FootballAnimState> = new Set<FootballAnimState>(['route_run', 'carry', 'truck']);
 
 export interface FootballClipChoice { state: FootballAnimState; clip: string; loop: boolean; fadeSec: number }
 
@@ -115,6 +132,7 @@ export class FootballAnimTree {
   private spent: FootballAnimState | null = null;
   private token = 0;
   private lastInput: FootballAnimInput | null = null;
+  private strideFilter = new StrideRateFilter();
   /** Fires when a one-shot ENDS on its own (never when the tree cut it) — the mode clears its move / beat here. */
   onSettle: ((state: FootballAnimState) => void) | null = null;
   constructor(private animator: CharacterAnimator) {}
@@ -125,6 +143,11 @@ export class FootballAnimTree {
     if (this.spent && c.state !== this.spent) this.spent = null;
     if (this.spent && c.state === this.spent) c = settleAfter(this.spent, input);
     if (c.state !== this.current) this.enter(c);
+    // STRIDE MATCHING, every frame, on the RUNNING loop (never through play(): the state guard above keeps the tree stable)
+    if (input.speedMps !== undefined && STRIDE_STATES.has(c.state)) {
+      const want = strideRate(input.speedMps, FOOTBALL_CARRY_PACE_MPS, feel('football.carryStrideMax', FOOTBALL_CARRY_RATE_MAX));
+      this.animator.setPlaybackScale?.(c.clip, this.strideFilter.step(want, input.dtSec ?? 1 / 60));
+    }
     return c.state;
   }
   private enter(c: FootballClipChoice): void {

@@ -13,7 +13,7 @@ const RIG_ERR = /status of 501|Unsupported method|status of 404 \(File not found
 
 export function grade(r) {
   if (r.fail || r.bootFail) return { boot: 'R', note: r.fail || r.bootFail };
-  const play = r.play ?? [];
+  const play = (r.play ?? []).filter((x) => !x.endScreen && x.phase !== 'ended');   // a run that ended early photographs its end card, not its HUD
   const words = max(play.map((s) => s.words + (s.gui?.words ?? 0)));
   const small = max(play.map((s) => s.small + (s.gui?.small ?? 0)));
   const over = max(play.map((s) => s.overlaps));

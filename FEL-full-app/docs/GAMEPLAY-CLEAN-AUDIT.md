@@ -272,6 +272,84 @@ The unit tests for the other fixes are listed in §4 (pause through a real Input
 the dead stick, the duel's RUN fold, and the fade's 7 cases).
 <!-- AFTER:END -->
 
+## 4c. Phase 2 (lane/gameplay-clean-2), before → after
+
+Same rig and script. "Before" is the baseline (`f7b6de6b`) or the phase-1 after-run, as named; "after" is the p2 build
+(`1901222b`) or the p3 build (`50ed5e6d`, the occluder's box path). Two rig additions came with it: the hero's clips are named
+per frame (animation groups that target the hero's bones), and `FEEL=` runs the page with feel-panel overrides (the A/B below).
+
+| # | Item | Change | Before → after (how measured) |
+|---|---|---|---|
+| T | **Tiebreak on a sideways phone** | The game box is the `aspect-[16/10]` root itself (the canvas and both SWING buttons inside it). `game-surface.css` sets an `aspect-[16/10]` box to `height:100%` of its parent, and the old wrapper had no height. | Play photograph: black, SWING buttons only → **the court, both players and the SWING buttons** (`tiebreak-p2-2play5`). Words in play 10–16. |
+| 3 | **START stall** | **None. It was mostly a rig artifact.** | The 7.5–7.7 s first-play frames come only from FAST runs that photograph READY. The photograph switches drawing on for one frame, the shader compiles it starts land on the first play frame, and the link counter sees 0 ms (it times `linkProgram`, not the status wait). The same build with no photograph: 268 ms (skateboard), 337 ms (penalty). With real drawing under the CDP profiler: 254 / 210 ms, with 3–4 programs linked after START. The phone tier already prewarms at load (`shaderPrewarm.ts`). The stall is intermittent in photographed runs (penalty 395 ms in one run, 6.2 s in the next; football 7.6 s), so the rig's start metric needs a photograph-free run to be trusted. |
+| 9 | **Top CPU offender: this lane's own occluder fade** | The profile's top self time in penalty was `_intersectTriangles` under `OccluderFade` (1.05 s of a 4.4 s window). A mesh over 12k vertices is no longer triangle-tested. A dense **prop** (radius ≤ 4 m: a Meshy hoop) is tested by its world bounding box and still fades; a dense stand or shell is skipped. The candidate list is cached (rebuilt every 20 checks). | Penalty phone CPU p50/p95: 43.6/68.7 → **23.7/44.4 ms**. The first cut skipped dense props and let the duel's hoop back in the way (hidden 3.6 → 6.1 %); with the box path, **3.9 %** (baseline 16.1). Penalty hidden 0 % (7.7 % with the first cut). |
+| 10 | **Camera snaps** | `CameraDirector.aim`'s look-ahead now eases (0.2 s) and grows with ground speed up to 1 m/s. Both are new feel knobs. Steady running keeps the old lead. Off for dunk, 1v1 and 3v3. `snapTo` cuts (golf's ball flight, resets) are untouched. | Skateboard cuts after the intro: **8 → 0**. Freerun 7 → 5 (its 19.6° turn at 3.7 s, with the eye still, is not the lead; hidden 9.0 → 2.4 %). Football 9 → 7: the rest are its 14 m reset cuts between downs, which are intended. Penalty 14 → 14 and dunk duel 9 → 9: their snaps are not the lead. Penalty's are the breakaway's `snapTo` plus a 1.2–1.8 m-per-frame eye move over 4 frames (a camera fly). The duel's 31° at 2.4 s is a framing change. Both are in §6. |
+| 6 | **Foot skate** (rate only, GATE 0) | Penalty: the striker's `run` is paced by StrideMatch against LocoBus's calibrated 4.8, and he stands under 0.4 m/s (was: running on the spot). Football: the carry loop is paced against its measured 2.1 m/s up to 1.4× (knob). Dunk duel: **reverted**, see the next column. | Stance pace (the feet's speed under the body while down, ÷ the root's): **penalty run 0.65 → 0.99** at 7+ m/s (0.92 → 1.07 at 5–7), **football carry 0.27 → 0.90** (1.16 at 5–7). The audit's contact metric did not move (penalty 0.69 → 0.67, football 0.80 → 0.79). Its frame is the toe's lowest point, which on these authored loops falls on the swing, and its along-travel part stays at 0.67–0.79. That is clip shape. Dunk duel: the run was already near matched (0.85); pacing gave 1.11 and the contact metric worsened (0.84 → 1.04 / 1.21), so it is reverted (`8f4c13ab`). The duel's real skate is 42 frames of the idle → run crossfade at 5.9 m/s on the charge, plus the rim hang drifting at 1.7 m/s. |
+| 2 | **Hard pops** | AF-1's `anim.inertial` is wired (default **off**: no change) on the hero of karate, karate VS, showdown, mixed combat, football, skateboard and derby, so it can be A/B'd from the feel panel. No crossfade time was changed. | The clip-attributed split in the next table shows why: much of the count is inside the clips. **The A/B with the knob on was not measured.** The rig's `FEEL=` override never went active (the feel tab read inactive in every snapshot), so the owner's panel is the way to try it. |
+| 8 | **Busy screens** | Skate's play screen names the next 3 open goals and "+N MORE" (it listed all 9, done and open). | Skateboard words in play **60 → 34 / 23** (corrected counter). Penalty 20, football 35, derby 18, karate 8–23, tiebreak 10–16: already under 40. READY over 80: karate 126, showdown 108, football 103, skate 82, karate VS 81. Their READY is the owner-signed CONTROLS panel (`panelLines.ts`) plus venue and style pickers; §6. |
+
+**Where the hard pops are** (14 s anim-only runs; an event is any frame with a bone ≥ 1500°/s, clustered within 10 frames;
+"blend" means a crossfade is running or the clip set changes within ±2 frames, "in-clip" means one clip, steady):
+
+| Mode | Events/min | Blend | In-clip | The biggest |
+|---|---|---|---|---|
+| karate | 88.9 | 15 | 6 | strike onsets: run → `karate_mc_jab` ×4, jab+run → run ×3; in-clip `karate_mc_hit_react` legs 50–71°/frame, `karate_floor_hold`, the get-up |
+| karate VS | 51.1 | 11 | 1 | shuffle ↔ guard ↔ run switches, strike onsets |
+| football | 38.4 | 4 | 5 | carry ↔ `jump_up` (the hurdle); in-clip `football_carry_run`'s **off arm**, 26–31° a frame (an IK pole whip in the authored loop) |
+| skateboard | 34.1 | 5 | 3 | idle → `skate_ollie`; in-clip `board_push` |
+| showdown | 34.1 | 8 | 0 | guard ↔ `karate_guard_step` |
+| derby | 34.1 | 2 | 6 | in-clip `baseball_stance` ×3 and `baseball_swing` ×3 |
+| penalty | 17.0 | 2 | 2 | keeper dive / rise; in-clip `run` |
+
+The in-clip pops are clip content (GATE 0: not changed). A blend pop is usually a mocap clip's own fast first frames landing
+inside a 0.04–0.06 s fade. Lengthening those fades would soften the strikes the owner tuned fast. **The ≥ 70 % target is not
+reachable through transition timing alone**; the inertial blend (`anim.inertial`, now wired on these heroes) is the transition lever left, and it is the owner's to try.
+
+Trade-off, flagged: pacing the football carry up to 1.4× makes its authored off-arm whip cross the pop threshold more often
+(in-clip carry pops 3 → 14 in a 22 s run; football 60 → 67/min). The feet are right and the arm is the clip's. Knob
+`football.carryStrideMax` = 1 restores the old cadence.
+
+**Routed from phase 2** (not this lane's to change; GATE 0 or another lane's file):
+- Animation (clip content): `football_carry_run`'s off arm whips 26–31° a frame (an IK pole flip in the authored loop). The
+  karate family's mocap `karate_mc_hit_react` swings its legs at 50–71° a frame. `karate_floor_hold` → get-up.
+  `baseball_stance` and `baseball_swing` have in-clip pops (derby). On the authored run loops the toe's lowest point falls on
+  the swing (the audit's contact metric reads 0.67–0.79 along the travel even where the stance pace matches).
+- Dunk duel (this lane, not changed, it needs your eye): the charge starts the hold-run at the run-up's peak speed while the
+  run clip is still fading in from idle (42 frames of idle + run at 5.9 m/s), and the rim hang drifts at 1.7 m/s.
+- Penalty camera: the breakaway's `snapTo` plus a 1.2–1.8 m-per-frame eye move over 4 frames right after (a camera fly), and the
+  dunk duel's 31° framing change at 2.4 s. Both are deliberate framing changes, so they get no damping without your call.
+
+## 4d. Clip-smooth (lane/clip-smooth), the snaps inside clips
+
+Owner, 2026-11-03: "Yes, smooth them." Feel knob `anim.clipSmooth` (default **on**; 0 builds every clip exactly as before).
+
+**Where the in-clip snaps are, measured on the clips alone.** Every gameplay clip (authored, the opponents' captures and the
+23 style captures) played on the hero and sampled at 60 fps, counted with §1's pop rule (`clipDesnap.test`). Twelve carry a
+hard snap in their own keys, all captures retargeted to pose keys: `karate_mc_hit_react` (right thigh 52° in a frame),
+`karate_mc_knockdown` ×2, `karate_mc_get_up`, `karate_mc_high_kick`, `karate_mc_roundhouse`, `karate_mc_typhoon` ×2,
+`pk_backflip` (karate's wall flip), `pk_dive_roll`, `trick_backflip`, `cap_au_kick` ×2, `brk_windmill`, `brk_helicopter` ×2.
+`clipDesnap.ts` spreads a snapping key step over the keys either side when the clip is built (the poses before and after
+kept, a hold never moved, no key time moved). **In-clip hard snaps on the clips: 16 → 0**; no other gameplay clip has one.
+
+**In play** (anim-only runs, 14 s, the same script; in-clip as §4c; runs differ by the AI's choices):
+
+| Mode | In-clip hard pops before → after | Hard pops in the run |
+|---|---|---|
+| karate | 5 → **0** (floor hold ×2, get-up, wall flip, guard) | 17 → 11 |
+| karate VS | 1 → **0** | 11 → 12 |
+| showdown | 1 → **0** (`karate_mc_hit_react`) | 9 → 7 |
+| football | 2 → 2 | 9 → 10 |
+| derby | 10 → 10 | 11 → 11 |
+
+**What is not in the clips.** Derby's `baseball_stance` / `baseball_swing`, football's `football_carry_run` (knees at speed),
+`football_spin_move` (the hips 178° in a frame) and `football_td_spike`, and karate's `karate_floor_hold` and `guard` pops are
+**not in those clips' keys**: each clip measures no hard snap alone, on the hero, the male kit and the scan (max per-frame
+turn: stance 0°, swing 19°, carry 8°, floor hold 3°). In play the derby batter, standing still in a static stance, takes a
+fixed 25.4° right-thigh (10.6° left) jump in ONE frame and then holds the new pose: a runtime layer switching the legs, not
+a clip. FootPlanting alone, mounted on the same clip and body headless, does not reproduce it. These are runtime-layer work
+(the posture, foot-plant and carry layers), routed in the lane report: re-keying clips cannot reach them, so the mode-level
+≥ 70 % target holds for the karate family (7 → 0) and not for derby and football.
+
 ## 5. For the dunk and hoops lanes (routed, not changed here)
 
 Measured by the same rig on `/play/dunk`, `/play/onevone` and `/play/threevthree`. The occluder fade is off for these
@@ -304,7 +382,16 @@ three modes until their lanes take it (`OCCLUDER_FADE_OFF`).
    swing (derby and baseball: the 0.05 s and 0.04 s crossfades in `baseballTree.ts`), the karate family's strike entries,
    and football's run, each behind a GATE 0 and your eye on a strip.
 3. **The START stall (item 3).** *Recommend:* one profiled run of skateboard and penalty to name what the first play
-   frame builds, then move it behind READY. No change was made without the profile.
+   frame builds, then move it behind READY. No change was made without the profile. **Phase 2: profiled, and it was mostly a rig
+   artifact (§4c #3). Nothing to move.**
 4. **Motion on the pause (item 18).** *Recommend:* put the MOTION chip on the pause card too. The pause is one
    full-screen button today (pausedLayer.scan.test holds that), so the chip would sit beside it, not inside it.
 5. **A word budget for play screens (item 8).** *Recommend:* 25 words in play, with the CONTROLS sheet carrying the rest.
+6. **(Phase 2) Inertial transitions on the fighters, football, skate and derby.** *Recommend:* turn `anim.inertial` on in
+   the feel panel for one playtest of karate and football. It is wired on their heroes (default off) and is the only lever left
+   on the strike-onset pops short of slower strikes. If it reads better, flip its default; that knob belongs to the AF-1 lane.
+7. **(Phase 2) READY over 80 words** (karate 126, showdown 108, football 103). *Recommend:* cut showdown's second venue
+   picker (it shows both ARENA and PLACE, with the shrine in each) and karate's last two string lines (COUNTER and TAKEDOWN,
+   which the moves list teaches). Both are owner-signed panel text (`panelLines.ts`), so they were not cut here.
+8. **(Phase 2) The football carry's cadence** (`football.carryStrideMax` 1.4). *Recommend:* keep 1.4. The feet now keep up
+   (0.27 → 0.90), but the clip's off-arm whip shows more often at the higher rate. 1.0 restores the old cadence.

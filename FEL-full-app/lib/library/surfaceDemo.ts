@@ -9,6 +9,7 @@
 // position, labelled "Demo coming" — never a T-pose, never another movement.
 //
 // Pure. Client-safe.
+import { nameKey } from './search/text';
 
 /** A drill (lib/drills/drills.ts DRILLS id) → the authored loop that shows its movement. null: no loop is its movement. */
 export const DRILL_DEMO_LOOPS: Readonly<Record<string, string | null>> = {
@@ -27,6 +28,23 @@ export const DRILL_DEMO_LOOPS: Readonly<Record<string, string | null>> = {
   't-drill': 'ex_t_drill',
   'approach-one-foot': 'ex_approach_one',
   'approach-two-foot': 'ex_approach_two',
+  // DEMO-LOOPS-6 (2026-11-03): platform P9's ball-skill drills (lib/drills/hoopsDrills.ts), done in place. The loops that ARE
+  // the drill's movement: the one-hand form shot and the free throw's set shot (exerciseSignature.ts), the court's jab, pivot,
+  // drop step, euro step, closeout and defensive slide (the library stage's hoops borrow), the jump stop; and four authored
+  // for the drill (anim/authored/exerciseHoops.ts): the 1-2 step into the shot, the layup's steps, the rip-through, the rebound
+  'hoops-form-shooting': 'ex_form_shot_one',
+  'hoops-free-throw': 'ex_set_shot',
+  'hoops-catch-and-shoot': 'ex_catch_shoot_12',
+  'hoops-jab-series': 'bball_jab',
+  'hoops-jump-stop': 'ex_jump_stop',
+  'hoops-pivots': 'bball_pivot',
+  'hoops-drop-step': 'bball_drop_step',
+  'hoops-layup-footwork': 'ex_layup_steps',
+  'hoops-euro-step': 'bball_euro_step',
+  'hoops-rip-through': 'ex_rip_through',
+  'hoops-closeout': 'bball_closeout',
+  'hoops-defensive-slide': 'bball_defend_slide_left',
+  'hoops-rebound': 'ex_rebound_chin',
 };
 
 /** A Quick Screen test (lib/screen/copy.ts SCREEN_TEST_NAMES) → its loop: the overhead squat, the knee-to-wall ankle
@@ -35,6 +53,47 @@ export const SCREEN_DEMO_LOOPS: Readonly<Record<'T1' | 'T2' | 'T3' | 'T5', strin
   // DEMO-LOOPS (2026-10-27): each check authored as itself (anim/authored/exerciseDrills.ts)
   T1: 'ex_overhead_squat', T2: 'ex_knee_to_wall', T3: 'ex_sl_squat_partial', T5: 'ex_jump_hands_hips',
 };
+
+/**
+ * DEMO-LOOPS-4 (2026-11-03): FEL's generated warm-up and cool-down steps (lib/coach/warmup.ts WarmupStep ids, cooldown.ts
+ * steps) → the loop that is the step: the Pre-Game Wake-Up's six phases (lib/drills/drills.ts WAKE_UP), the eight
+ * rock-and-hold stretches and the thirteen primers (lib/coach/warmupContent.ts), and the cool-down's recovery breath (its
+ * stretches are the rock-and-holds, same ids). These play in every coached session (lib/session-player/fromCoachToday.ts).
+ * Every step has its own loop (anim/authored/exerciseWarmup.ts) or the library's loop that already IS it. surfaceDemo.test
+ * holds the table to the generators' ids, so a new step without a row fails the suite.
+ */
+export const WARMUP_DEMO_LOOPS: Readonly<Record<string, string | null>> = {
+  // the Wake-Up's phases
+  'release-the-locks': 'ex_wall_locks', pressurize: 'ex_breathe_ribs', 'wake-the-tripod': 'ex_tripod', 'open-the-joints': 'ex_joint_circles',
+  'build-the-rhythm': 'ex_pogo', 'prime-the-launch': 'ex_launch',
+  // the rock-and-hold stretches (the warm-up's, and the cool-down's)
+  'ankle-rock': 'ex_ankle_rock', 'wall-calf-rock': 'ex_wall_calf_rock', 'deep-squat-rock': 'ex_deep_squat_rock', 'hinge-rock': 'ex_hinge_rock',
+  'ninety-ninety-rock': 'ex_ninety_rock', 'open-book-rock': 'ex_open_book_rock', 'kneeling-reach-rock': 'ex_kneeling_reach_rock', 'doorway-chest-rock': 'ex_doorway_chest_rock',
+  // the primers
+  'squat-jump-primer': 'ex_squat_jump_stick', 'fast-squat-primer': 'ex_fast_squat', 'broad-jump-primer': 'ex_broad_jump_stick', 'hip-snap-primer': 'ex_hip_snap',
+  'split-hop-primer': 'ex_split_hop', 'split-drive-primer': 'ex_split_drive', 'fast-push-primer': 'ex_fast_pushup', 'fast-row-primer': 'ex_door_row',
+  'tall-march-primer': 'ex_march', 'turn-stop-primer': 'ex_turn_stop', 'pogo-stick-primer': 'ex_pogo_stick', 'wall-drive-primer': 'ex_wall_drive',
+  'squat-reach-primer': 'ex_squat_reach',
+  // the cool-down's breath
+  'recovery-breath': 'ex_breathe_supine',
+};
+
+/** A warm-up or cool-down step's loop, or null (the still). */
+export const warmupDemoLoop = (id: string): string | null => WARMUP_DEMO_LOOPS[id] ?? null;
+
+/**
+ * DEMO-LOOPS-4: coach catalogue rows the library cannot answer by name (lib/library/match.ts: no entry by that name or an
+ * alias), keyed by the catalogue's exact name (folded by nameKey) → the loop that IS that row's movement, by the row's own
+ * set-up (lib/coach/templateCatalogue.ts). Only names with no library entry: once the library has one, its own loop wins.
+ */
+export const CATALOGUE_DEMO_LOOPS: Readonly<Record<string, string>> = {
+  // (Pike Push-Up left this table in DEMO-LOOPS-6: the library has its entry now — program-ask-2's — and plays its loop)
+  // "Hold both sides of a sturdy door frame, … lean back … Pull your chest to the frame"
+  'Door Frame Row, Upright': 'ex_door_row', 'Door Frame Row': 'ex_door_row',
+};
+const CATALOGUE_BY_KEY: ReadonlyMap<string, string> = new Map(Object.entries(CATALOGUE_DEMO_LOOPS).map(([n, c]) => [nameKey(n), c]));
+/** A catalogue row's loop by its name, for a row the library has no entry for; null otherwise. */
+export const catalogueDemoLoop = (name: string | null | undefined): string | null => (name ? CATALOGUE_BY_KEY.get(nameKey(name)) ?? null : null);
 
 /** The still a surface with no loop shows: the body standing in the start position (held, not looping), "Demo coming". */
 export const STILL_DEMO_CLIP = 'idle_stand';

@@ -19,6 +19,7 @@ import { FT_SETUP_SEC, FT_ROUTINE_SEC, FT_SET_SEC, FT_RESULT_SEC, FT_DIST_NARROW
 import { BANK_SET_DEG, BANK_GLANCE_MS } from '@/lib/babylon/hoops/shotLooks';
 import { OVERTIME_3V3_SEC } from '@/lib/babylon/modes/threevthreeOvertime';
 import { OOP_LOB_FLIGHT_SEC, OOP_LATE_CATCH_CLIP_T, REAL_JUMP_PERSONAL, RUNWAY_STRIDE_SCALE, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG, LAND_LEAD_SEC } from '@/lib/babylon/core/DunkFlagship';   // dunk-flagship
+import { SLAM_VARIANTS_ON } from '@/lib/babylon/core/DunkSlamVariant';   // dunk-flagship Phase 7
 import { BALL_SIDE_SHADE_ON, SHADE_OFFSET_M, SHADE_REACT_SEC, SHADE_SHIFT_MPS, SHADE_FLIP_M, SHADE_RANGE_M, SHADE_RESEED_M } from '@/lib/babylon/core/BallSideShade';
 import { OFF_BALL_LOOK_ON, MAN_GLANCE_EVERY_SEC, MAN_GLANCE_SEC } from '@/lib/babylon/core/OffBallLook';   // lane/h3-aware
 import { POSSESSION_SWAP_ON, FOE_SPACE_ANGLE_K, HAS_BALL_M } from '@/lib/babylon/core/PossessionSwap';
@@ -38,6 +39,8 @@ import {
 } from '@/lib/babylon/core/HoopsStick';
 import { PORTRAIT_HERO_MARGIN } from '@/lib/babylon/modes/netPortraitCam';
 import { OCCLUDER_FADE_ALPHA, OCCLUDER_FADE_SEC, OCCLUDER_HOLD_SEC } from '@/lib/babylon/core/OccluderFade';   // gameplay-clean
+import { FOOTBALL_CARRY_RATE_MAX } from '@/lib/babylon/anim/footballTree';   // gameplay-clean P2 #6
+import { CAM_LEAD_EASE_SEC, CAM_LEAD_FULL_MPS } from '@/lib/babylon/core/CameraDirector';   // gameplay-clean P2 #10
 import { AI_REACT_ROOKIE_MS, AI_REACT_PRO_MS, AI_REACT_ELITE_MS } from '@/lib/babylon/hoops/reaction';   // lane/hoops-round2
 import { DOUBLE_TEAM_ON, DOUBLE_PAINT_M, DOUBLE_AFTER_SEC, DOUBLE_MAX_SEC, DOUBLE_COOLDOWN_SEC, SWITCH_ON_SCREEN_ON, SWITCH_HELP_M, SWITCH_COOLDOWN_SEC } from '@/lib/babylon/hoops/teamDefense';
 import { HAND_CHECK_ON, HAND_CHECK_REACH_OVER_M, HAND_CHECK_GAP_SEC, HAND_CHECK_FOUL_COUNT, HAND_CHECK_WINDOW_SEC, CONTACT_POSE_ON, CONTACT_EASE_IN_SEC, CONTACT_EASE_OUT_SEC } from '@/lib/babylon/hoops/handCheck';
@@ -91,6 +94,9 @@ describe('the feel knob catalogue', () => {
     expect(def('camera.occluderFadeAlpha')).toBe(OCCLUDER_FADE_ALPHA);
     expect(def('camera.occluderFadeSec')).toBe(OCCLUDER_FADE_SEC);
     expect(def('camera.occluderHoldSec')).toBe(OCCLUDER_HOLD_SEC);
+    expect(def('football.carryStrideMax')).toBe(FOOTBALL_CARRY_RATE_MAX);
+    expect(def('camera.leadEaseSec')).toBe(CAM_LEAD_EASE_SEC);
+    expect(def('camera.leadFullMps')).toBe(CAM_LEAD_FULL_MPS);
     // hoops-round2 (HOP-02 "Hoops · AI reaction", HOP-03 "Hoops · team defense", HOP-04 "Hoops · contact"): the owner's 420 / 220 / 120
     expect(def('hoops.aiReactRookieMs')).toBe(AI_REACT_ROOKIE_MS);
     expect(def('hoops.aiReactProMs')).toBe(AI_REACT_PRO_MS);
@@ -310,6 +316,8 @@ describe('the feel knob catalogue', () => {
     expect(def('dunk.oopLateCatchClipT')).toBe(OOP_LATE_CATCH_CLIP_T); // dunk-flagship Phase 3 (new)
     expect(def('dunk.realJumpPersonal')).toBe(REAL_JUMP_PERSONAL);     // dunk-flagship Phase 5 (new, off)
     expect(REAL_JUMP_PERSONAL).toBe(0);
+    expect(def('dunk.slamVariants')).toBe(SLAM_VARIANTS_ON);          // dunk-flagship Phase 7 (new, off)
+    expect(SLAM_VARIANTS_ON).toBe(0);
     expect(def('dunk.runwayStrideScale')).toBe(RUNWAY_STRIDE_SCALE); // dunk-flagship (new, default = the shipped pace)
     expect(def('dunk.slamHitStopBigMs')).toBe(SLAM_HITSTOP_BIG_MS);  // dunk-flagship TUNED (new; every make was 70)
     expect(def('dunk.slamShakeBig')).toBe(SLAM_SHAKE_BIG);

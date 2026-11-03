@@ -16,7 +16,9 @@ const count = (s: string, needle: string | RegExp): number => (typeof needle ===
 
 describe('K-SFX1 — the contact, its punch and onContact share the [HANDS] iron contact frame', () => {
   it('the jam asks jamIronStep (geometry only) and never ironContact (the timeout)', () => {
-    expect(DUNK).toMatch(/const ironStep = jamIronStep\(\{ ball: bp, rim, rimRadius: RIM_RADIUS, ballRadius: ballSim\.radius, sincePress: jamSec, centred: true \}\);/);
+    // test changed (dunk-flagship Phase 7): the line now holds the REVERSE's contact (null) until its back is to the iron; every argument of
+    // the geometric step is still pinned, and nothing else may answer it
+    expect(DUNK).toMatch(/const ironStep = finishVariant === 'reverse' && reverseLeft\(\) > Math\.PI - REVERSE_CONTACT_FROM \? null : jamIronStep\(\{ ball: bp, rim, rimRadius: RIM_RADIUS, ballRadius: ballSim\.radius, sincePress: jamSec, centred: true \}\);/);
     expect(DUNK).not.toMatch(/\bironContact\(/);
     expect(DUNK).not.toMatch(/timeout:/);
   });
