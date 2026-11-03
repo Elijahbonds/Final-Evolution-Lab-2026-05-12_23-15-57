@@ -85,7 +85,7 @@ describe('ALL SIXTEEN AIR TRICKS fire exactly as before, knob on or off', () => 
 
 describe('DunkMode reads the stick ONLY on the live A press inside the slam window', () => {
   it('readSlamVariant is called once: in the qteWindowOpen A branch, on a press the latch did not spend', () => {
-    expect(DUNK.split('readSlamVariant()').length - 1).toBe(1);
+    expect(DUNK.split('readSlamVariant();').length - 1).toBe(1);   // the one call (the definition reads 'readSlamVariant(): void')
     expect(DUNK).toMatch(/if \(e\.t === 'button' && e\.btn === 'A' && e\.pressed && qteWindowOpen && !lob\.live && !echoA\) \{ if \(phase === 'cinematic' && slamLatch\.press\(clipTime, true\) === 'spent'\) console\.info\([^\n]*\); else \{ readSlamVariant\(\); slamNow\(ctx, clipTime\); \} \}/);
   });
   it('slamVariantOf is read in readSlamVariant only, behind the knob, from the stick', () => {
