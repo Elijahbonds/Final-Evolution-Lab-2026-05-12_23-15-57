@@ -52,6 +52,10 @@ export const REAL_CLIPS = new Set<string>([
   'ex_box_pushoff', 'ex_stride_jump', 'ex_stride_jump_cross',
   // DEMO-LOOPS-5: trunk flexion, upper-body stretches (exerciseFamilies5.ts), the barbell clean and snatch (exerciseOly.ts)
   'ex_leg_pull_in', 'ex_bench_leg_raise', 'ex_bench_leg_pull_in', 'ex_seated_leg_tuck', 'ex_crunch_weight', 'ex_frog_situp', 'ex_cocoon', 'ex_bottoms_up', 'ex_rope_crunch_kneel', 'ex_rope_crunch_stand', 'ex_rope_crunch_seat', 'ex_arm_swing_up', 'ex_chest_swing', 'ex_stand_twist', 'ex_pelvic_tilt_stand', 'ex_wrist_pull', 'ex_seat_side_bend', 'ex_seat_twist', 'ex_butterfly_side_reach', 'ex_bb_clean', 'ex_bb_power_clean', 'ex_bb_hang_clean', 'ex_bb_hang_clean_low', 'ex_bb_split_clean', 'ex_bb_clean_pull', 'ex_bb_clean_shrug', 'ex_bb_clean_press', 'ex_bb_clean_jerk', 'ex_bb_snatch', 'ex_bb_power_snatch', 'ex_bb_hang_snatch', 'ex_bb_hang_snatch_low', 'ex_bb_split_snatch', 'ex_bb_snatch_pull', 'ex_bb_snatch_shrug', 'ex_bb_muscle_snatch', 'ex_bb_snatch_balance',
+  // DEMO-LOOPS-6: the ball-skill drills (exerciseHoops.ts)
+  'ex_catch_shoot_12', 'ex_layup_steps', 'ex_rip_through', 'ex_rebound_chin',
+  // DEMO-LOOPS-6: the grip family (exerciseGrip.ts)
+  'ex_wrist_curl', 'ex_wrist_curl_down', 'ex_wrist_curl_one', 'ex_wrist_curl_one_down', 'ex_wrist_curl_bench', 'ex_wrist_curl_bench_down', 'ex_wrist_curl_behind', 'ex_wrist_roller',
   'idle_stand', 'strafe_left', 'strafe_right', 'jump_up', 'jump_land',
   'dunk_charge_gather', 'dunk_launch', 'dunk_mocap', 'dunk_360_eastbay', 'dunk_score_hang', 'dunk_land_crouch', 'dunk_land_absorb',
   'dunk_finish_windmill', 'dunk_finish_tomahawk', 'dunk_finish_blown', 'dunk_celebrate_big',

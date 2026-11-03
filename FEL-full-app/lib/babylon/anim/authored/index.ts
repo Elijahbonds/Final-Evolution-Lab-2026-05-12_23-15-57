@@ -990,6 +990,20 @@ function authoredBuilders(scene: Scene, skeleton: Skeleton): [string, () => Anim
     ['ex_bb_snatch_shrug', () => buildExerciseClip('ex_bb_snatch_shrug', scene, skeleton)],
     ['ex_bb_muscle_snatch', () => buildExerciseClip('ex_bb_muscle_snatch', scene, skeleton)],
     ['ex_bb_snatch_balance', () => buildExerciseClip('ex_bb_snatch_balance', scene, skeleton)],
+    // DEMO-LOOPS-6: the ball-skill drills (exerciseHoops.ts)
+    ['ex_catch_shoot_12', () => buildExerciseClip('ex_catch_shoot_12', scene, skeleton)],
+    ['ex_layup_steps', () => buildExerciseClip('ex_layup_steps', scene, skeleton)],
+    ['ex_rip_through', () => buildExerciseClip('ex_rip_through', scene, skeleton)],
+    ['ex_rebound_chin', () => buildExerciseClip('ex_rebound_chin', scene, skeleton)],
+    // DEMO-LOOPS-6: the grip family (exerciseGrip.ts)
+    ['ex_wrist_curl', () => buildExerciseClip('ex_wrist_curl', scene, skeleton)],
+    ['ex_wrist_curl_down', () => buildExerciseClip('ex_wrist_curl_down', scene, skeleton)],
+    ['ex_wrist_curl_one', () => buildExerciseClip('ex_wrist_curl_one', scene, skeleton)],
+    ['ex_wrist_curl_one_down', () => buildExerciseClip('ex_wrist_curl_one_down', scene, skeleton)],
+    ['ex_wrist_curl_bench', () => buildExerciseClip('ex_wrist_curl_bench', scene, skeleton)],
+    ['ex_wrist_curl_bench_down', () => buildExerciseClip('ex_wrist_curl_bench_down', scene, skeleton)],
+    ['ex_wrist_curl_behind', () => buildExerciseClip('ex_wrist_curl_behind', scene, skeleton)],
+    ['ex_wrist_roller', () => buildExerciseClip('ex_wrist_roller', scene, skeleton)],
   ];
 }
 

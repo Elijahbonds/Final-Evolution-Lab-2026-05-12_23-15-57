@@ -28,6 +28,23 @@ export const DRILL_DEMO_LOOPS: Readonly<Record<string, string | null>> = {
   't-drill': 'ex_t_drill',
   'approach-one-foot': 'ex_approach_one',
   'approach-two-foot': 'ex_approach_two',
+  // DEMO-LOOPS-6 (2026-11-03): platform P9's ball-skill drills (lib/drills/hoopsDrills.ts), done in place. The loops that ARE
+  // the drill's movement: the one-hand form shot and the free throw's set shot (exerciseSignature.ts), the court's jab, pivot,
+  // drop step, euro step, closeout and defensive slide (the library stage's hoops borrow), the jump stop; and four authored
+  // for the drill (anim/authored/exerciseHoops.ts): the 1-2 step into the shot, the layup's steps, the rip-through, the rebound
+  'hoops-form-shooting': 'ex_form_shot_one',
+  'hoops-free-throw': 'ex_set_shot',
+  'hoops-catch-and-shoot': 'ex_catch_shoot_12',
+  'hoops-jab-series': 'bball_jab',
+  'hoops-jump-stop': 'ex_jump_stop',
+  'hoops-pivots': 'bball_pivot',
+  'hoops-drop-step': 'bball_drop_step',
+  'hoops-layup-footwork': 'ex_layup_steps',
+  'hoops-euro-step': 'bball_euro_step',
+  'hoops-rip-through': 'ex_rip_through',
+  'hoops-closeout': 'bball_closeout',
+  'hoops-defensive-slide': 'bball_defend_slide_left',
+  'hoops-rebound': 'ex_rebound_chin',
 };
 
 /** A Quick Screen test (lib/screen/copy.ts SCREEN_TEST_NAMES) → its loop: the overhead squat, the knee-to-wall ankle

@@ -682,6 +682,17 @@ export const DEMO_RULES: readonly DemoRule[] = [
   { clip: 'ex_row_one', families: ['row'], bases: /^(bent-over-singl-arm-long-bar-row|singl-arm-long-bar-row)$/ },
   { clip: 'ex_seated_row', families: ['row'], bases: /^leverag-iso-row$/ },
   { clip: 'ex_cable_row_one', families: ['row'], bases: /^shotgun-row$/ },
+  // DEMO-LOOPS-6: the grip family's wrist curls (anim/authored/exerciseGrip.ts), each against its source: sitting with the
+  // forearms on the thighs (two hands — dumbbells, a bar, or the low cable's bar — or one), kneeling with the forearms across
+  // a bench, standing with the bar behind the seat; palms up or down. The wrist roller rolls with the arms out in front.
+  { clip: 'ex_wrist_curl', families: ['grip'], bases: /^(seat-palm-up-wrist-curl|wrist-curl|seat-two-arm-palm-up-low-pulley-wrist-curl)$/ },
+  { clip: 'ex_wrist_curl_down', families: ['grip'], bases: /^seat-palm-down-wrist-curl$/ },
+  { clip: 'ex_wrist_curl_one', families: ['grip'], bases: /^seat-singl-arm-palm-up-wrist-curl$/ },
+  { clip: 'ex_wrist_curl_one_down', families: ['grip'], bases: /^seat-singl-arm-palm-down-wrist-curl$/ },
+  { clip: 'ex_wrist_curl_bench', families: ['grip'], bases: /^palm-up-wrist-curl-over-bench$/ },
+  { clip: 'ex_wrist_curl_bench_down', families: ['grip'], bases: /^palm-down-wrist-curl-over-bench$/ },
+  { clip: 'ex_wrist_curl_behind', families: ['grip'], bases: /^stand-palm-up-behind-back-wrist-curl$/ },
+  { clip: 'ex_wrist_roller', families: ['grip'], bases: /^wrist-roller$/ },
 ];
 
 const RULES_BY_FAMILY: ReadonlyMap<string, readonly DemoRule[]> = (() => {
@@ -887,7 +898,9 @@ export const DEMO_PROPS: Readonly<Record<string, DemoProp>> = {
 };
 /** Ball-handling and finishing loops: the stage draws no ball, and the card says so. */
 /** DEMO-LOOPS: the authored shooting and finishing loops carry a ball too (exerciseSignature.ts) */
-const BALL_LOOPS: ReadonlySet<string> = new Set(['ex_set_shot', 'ex_form_shot_one', 'ex_catch_shoot_hop', 'ex_pullup_jumper', 'ex_power_layup', 'ex_jab_crossover']);
+const BALL_LOOPS: ReadonlySet<string> = new Set(['ex_set_shot', 'ex_form_shot_one', 'ex_catch_shoot_hop', 'ex_pullup_jumper', 'ex_power_layup', 'ex_jab_crossover',
+  // DEMO-LOOPS-6: the ball-skill drills' own loops (exerciseHoops.ts)
+  'ex_catch_shoot_12', 'ex_layup_steps', 'ex_rip_through', 'ex_rebound_chin']);
 export const isBallClip = (clip: string | null | undefined): boolean => !!clip && (clip.startsWith('bball_') || clip === 'jumpshot' || BALL_LOOPS.has(clip));
 
 const ANATOMY: ReadonlyMap<string, string> = new Map(MUSCLES.map((m) => [m.id, m.anatomyKey]));
