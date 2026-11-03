@@ -66,6 +66,11 @@ export function ExerciseSheet({ e, tab, onClose, onUse, canAdd = false, onAdded,
       onAdded?.();
     } finally { setBusy(null); }
   };
+  // Try it: the player takes the whole screen; the sheet steps aside (it sits above the player's layer) and comes back
+  // when the player closes
+  if (trying) {
+    return <Layer><SessionPlayer session={fromLibrary(e)} mode="preview" doneLabel={SHEET_COPY.backToLibrary} onClose={() => setTrying(false)} /></Layer>;
+  }
   return (
     <Layer>
       <style>{SHEET_KEYFRAMES}</style>
@@ -79,7 +84,7 @@ export function ExerciseSheet({ e, tab, onClose, onUse, canAdd = false, onAdded,
           <button type="button" onClick={onClose} aria-label={SHEET_COPY.close} className={L.close}><X className="h-5 w-5" /></button>
         </div>
 
-        <LibraryDemo entry={e} initialTab={tab} />
+        <LibraryDemo entry={e} initialTab={tab} cuesShown />
 
         <div className={L.body}>
           {e.primaryMuscles.length > 0 && (
@@ -140,9 +145,6 @@ export function ExerciseSheet({ e, tab, onClose, onUse, canAdd = false, onAdded,
           </div>
         </div>
       </div>
-      {trying && (
-        <SessionPlayer session={fromLibrary(e)} mode="preview" doneLabel={SHEET_COPY.backToLibrary} onClose={() => setTrying(false)} />
-      )}
     </Layer>
   );
 }

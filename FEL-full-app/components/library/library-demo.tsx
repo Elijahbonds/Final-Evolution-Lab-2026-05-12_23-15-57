@@ -57,11 +57,16 @@ export function demoTabs(e: Pick<LibraryCard, 'demo'>): DemoTab[] {
 
 const ICON: Record<DemoTab, typeof User> = { demo: User, muscles: Eye, cues: MessageSquareText, video: Play };
 
-export function LibraryDemo({ entry, initialTab }: { entry: LibraryCard; initialTab?: DemoTab }) {
-  const tabs = demoTabs(entry);
+export function LibraryDemo({ entry, initialTab, cuesShown = false }: {
+  entry: LibraryCard; initialTab?: DemoTab;
+  /** PLAT-P08: the host shows the cues itself (the exercise sheet): no Cues tab, and the stage's first paint does not
+   *  repeat them — it says only that the athlete is loading (the sheet's ≤ 50 words before scrolling). */
+  cuesShown?: boolean;
+}) {
+  const tabs = demoTabs(entry).filter((t) => !(cuesShown && t === 'cues'));
   const has3d = !threeDisabled;
   const clip = has3d ? entry.avatarClip : null;
-  const [tab, setTab] = useState<DemoTab>(() => (initialTab && tabs.includes(initialTab) ? initialTab : clip ? 'demo' : 'cues'));
+  const [tab, setTab] = useState<DemoTab>(() => (initialTab && tabs.includes(initialTab) ? initialTab : clip || cuesShown ? 'demo' : 'cues'));
   const [stageOpened, setStageOpened] = useState(has3d && (tab === 'demo' ? !!clip : tab === 'muscles'));
   const legend = useMemo(() => anatomyLegend(entry), [entry]);
   const [side, setSide] = useState<StageSide>(() => initialSide(entry.muscleMap.primary));
@@ -75,7 +80,7 @@ export function LibraryDemo({ entry, initialTab }: { entry: LibraryCard; initial
     if (lastId.current === entry.id) return;
     lastId.current = entry.id;
     setSide(initialSide(entry.muscleMap.primary));
-    setTab((t) => (demoTabs(entry).includes(t) ? t : 'cues'));
+    setTab((t) => (demoTabs(entry).includes(t) && !(cuesShown && t === 'cues') ? t : cuesShown ? 'demo' : 'cues'));
   }, [entry]);
 
   const choose = (t: DemoTab) => {
@@ -92,7 +97,7 @@ export function LibraryDemo({ entry, initialTab }: { entry: LibraryCard; initial
           const Icon = ICON[t];
           return (
             <button key={t} role="tab" aria-selected={tab === t} onClick={() => choose(t)} data-testid={`demo-tab-${t}`}
-              className={`flex min-h-[40px] flex-1 items-center justify-center gap-1.5 text-[11px] font-bold tracking-wide transition-colors ${tab === t ? 'bg-white/[0.06] text-[#00E5FF]' : 'text-white/45 hover:text-white/75'}`}>
+              className={`flex min-h-[40px] flex-1 items-center justify-center gap-1.5 text-[11px] font-bold tracking-wide transition-colors ${tab === t ? 'bg-white/[0.06] text-[#00E5FF]' : 'text-white/60 hover:text-white/80'}`}>
               <Icon className="h-3.5 w-3.5" aria-hidden />{DEMO_TAB_LABEL[t]}
             </button>
           );
@@ -106,7 +111,7 @@ export function LibraryDemo({ entry, initialTab }: { entry: LibraryCard; initial
             <div className={`h-full w-full transition-opacity duration-300 ${stageState === 'ready' ? 'opacity-100' : 'opacity-0'}`}>
               <ExerciseStage view={stageView} clip={clip} hold={entry.avatarHold} muscles={entry.muscleMap} side={side} onState={setStageState} />
             </div>
-            <StagePreview entry={entry} view={stageView} legend={legend} secondary={secondary} state={stageState} />
+            <StagePreview entry={entry} view={stageView} legend={legend} secondary={secondary} state={stageState} cuesShown={cuesShown} />
           </div>
           {tab === 'demo' && stageState === 'ready' && (
             <span className="pointer-events-none absolute left-2 top-2 rounded bg-black/60 px-2 py-0.5 text-[10px] font-bold tracking-wider text-[#00E5FF]">
@@ -134,8 +139,8 @@ export function LibraryDemo({ entry, initialTab }: { entry: LibraryCard; initial
           <div className="flex items-center gap-3 rounded-xl bg-[#16161a] p-4">
             <Dumbbell className="h-8 w-8 shrink-0 text-white/30" aria-hidden />
             <div className="min-w-0 space-y-1">
-              <p className="text-[12px] text-white/55">{threeDisabled ? '3D is off on this device.' : 'No 3D demo for this one yet. Follow the cues:'}</p>
-              <ul className="space-y-0.5 text-[13px] text-white/85">{entry.cues.slice(0, 2).map((c) => <li key={c}>{c}</li>)}</ul>
+              <p className="text-[12px] text-white/55">{threeDisabled ? '3D is off on this device.' : cuesShown ? 'No 3D demo for this one yet.' : 'No 3D demo for this one yet. Follow the cues:'}</p>
+              {!cuesShown && <ul className="space-y-0.5 text-[13px] text-white/85">{entry.cues.slice(0, 2).map((c) => <li key={c}>{c}</li>)}</ul>}
             </div>
           </div>
         </div>
@@ -196,15 +201,15 @@ export function LibraryDemo({ entry, initialTab }: { entry: LibraryCard; initial
  * The stage's first paint (LIBRARY-ANATOMY-2): what the 3D will show, as text, in the same box — the cues for the Demo,
  * the muscles for Muscles — over the stage while it loads, faded out as the 3D fades in. Kept (not faded) if 3D fails.
  */
-function StagePreview({ entry, view, legend, secondary, state }: {
-  entry: LibraryCard; view: 'demo' | 'muscles'; legend: ReturnType<typeof anatomyLegend>; secondary: string; state: 'loading' | 'ready' | 'failed';
+function StagePreview({ entry, view, legend, secondary, state, cuesShown }: {
+  entry: LibraryCard; view: 'demo' | 'muscles'; legend: ReturnType<typeof anatomyLegend>; secondary: string; state: 'loading' | 'ready' | 'failed'; cuesShown: boolean;
 }) {
   const shown = state !== 'ready';
   const main = legend.filter((m) => m.tier === 'primary'), also = legend.filter((m) => m.tier !== 'primary');
   return (
     <div aria-hidden={!shown} data-testid="stage-preview" data-shown={shown ? 'true' : 'false'}
       className={`absolute inset-0 flex flex-col justify-center gap-3 overflow-hidden px-5 py-4 transition-opacity duration-300 ${shown ? 'opacity-100' : 'pointer-events-none opacity-0'}`}>
-      {view === 'demo' ? (
+      {view === 'demo' ? (cuesShown ? null :
         <div>
           <h5 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-white/45">Think about</h5>
           <ul className="space-y-1 text-[14px] leading-snug text-white/90">{entry.cues.slice(0, 3).map((c) => <li key={c}>{c}</li>)}</ul>
@@ -219,7 +224,7 @@ function StagePreview({ entry, view, legend, secondary, state }: {
           </>}
         </div>
       )}
-      <p className="text-[11px] text-white/40" role="status">{state === 'failed' ? 'Couldn’t load 3D on this device.' : 'Loading your athlete…'}</p>
+      <p className="text-[11px] text-white/55" role="status">{state === 'failed' ? 'Couldn’t load 3D on this device.' : 'Loading your athlete…'}</p>
     </div>
   );
 }

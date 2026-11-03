@@ -11,11 +11,12 @@
 // this file only draws them. Batches 2–4 (5,000+ entries): a search hit is a BASE exercise; its matching variants
 // ("Paused …", "… on the Move") fold under it as "+N variants", opened on demand, so one exercise never fills a page.
 //
-// PLAT-P08 (2026-11-02): search as you type (debounced 120 ms), one row of quick chips (goal, equipment, body area, sport —
-// the facets the entries already carry, no new field), the results as a two-column grid of tiles with MOVING DEMOS FIRST
-// (the server ranks them so: lib/library/search/engine.ts demosFirst — never a first screen of "Demo coming"), and the
-// one exercise sheet (components/library/exercise-sheet.tsx: the demo playing, the muscles, three cues, Try it).
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+// PLAT-P08 (2026-11-02): search ON THE DEVICE as you type (use-device-library.ts: the viewer's slice of the library, indexed
+// once; the server answers until it is in), one row of quick chips (goal, equipment, body area, sport — the facets the
+// entries already carry, no new field), the results as a two-column grid of tiles, relevance first and then MOVING DEMOS
+// first (lib/library/search/engine.ts demosFirst), and the one exercise sheet (components/library/exercise-sheet.tsx: the
+// demo playing, the muscles, three cues, Try it).
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { AlertTriangle, Loader2, MessageCircleQuestion, Play, Search, SlidersHorizontal, Sparkles, X } from 'lucide-react';
@@ -23,6 +24,7 @@ import type { DemoTab } from '@/components/library/library-demo';
 import { ExerciseSheet } from '@/components/library/exercise-sheet';
 import { LIB_LOOK as LL } from '@/components/library/look';
 import type { LibraryCard } from '@/lib/library/server';
+import { useDeviceLibrary } from './use-device-library';
 import type { AskChip } from '@/lib/library/ask/parse';
 
 type FacetKey = 'pattern' | 'equipment' | 'muscle' | 'level' | 'sport' | 'layer' | 'category' | 'goal';
@@ -50,7 +52,7 @@ const FACET_ORDER: FacetKey[] = ['category', 'pattern', 'equipment', 'level', 'g
 const QUICK: { key: FacetKey; n: number }[] = [{ key: 'goal', n: 3 }, { key: 'equipment', n: 3 }, { key: 'muscle', n: 3 }, { key: 'sport', n: 2 }];
 const ASK_EXAMPLES = ['knee-friendly vertical jump work with no equipment', 'something easier than a pistol squat', 'warm-up for basketball, 10 minutes'];
 
-/** Keystroke → request (PLAT-P08: was 180). (new) */
+/** Keystroke → request, while the library is not yet on the device (PLAT-P08: was 180); on the device there is none. */
 export const SEARCH_DEBOUNCE_MS = 120;
 
 function toParams(q: string, f: Filters, drafts: boolean, offset = 0): string {
@@ -88,7 +90,7 @@ export function LibraryBrowser({ onUse, onAdded, canAdd = false, title }: {
   const [question, setQuestion] = useState('');
   const [filters, setFilters] = useState<Filters>({});
   const [drafts, setDrafts] = useState(false);
-  const [data, setData] = useState<SearchPayload | null>(null);
+  const [served, setData] = useState<SearchPayload | null>(null);
   const [ask, setAsk] = useState<AskPayload | null>(null);
   const [loading, setLoading] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
@@ -108,12 +110,22 @@ export function LibraryBrowser({ onUse, onAdded, canAdd = false, title }: {
     finally { if (n === seq.current) setLoading(false); }
   }, []);
 
-  // search as you type (debounced); the Ask view keeps its own answer until a chip is removed
+  // PLAT-P08: search as you type ON THE DEVICE (use-device-library.ts): every keystroke, no round trip. The deferred
+  // values let the box take the letter first and the results follow in the same frame or the next.
+  const device = useDeviceLibrary(drafts);
+  const dq = useDeferredValue(q);
+  const df = useDeferredValue(filters);
+  const local = useMemo(() => (mode === 'search' && device ? device(new URLSearchParams(toParams(dq, df, drafts))) as unknown as SearchPayload : null), [device, dq, df, drafts, mode]);
+  const data = local ?? served;
+  useEffect(() => { if (device) { seq.current++; setMore([]); setLoading(false); } }, [device, dq, df, drafts]);
+
+  // …and until the library is on the device, the server answers (debounced); the Ask view keeps its own answer until a
+  // chip is removed
   useEffect(() => {
-    if (mode !== 'search') return;
+    if (mode !== 'search' || device) return;
     const t = setTimeout(() => { void runSearch(q, filters, drafts); }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(t);
-  }, [q, filters, drafts, mode, runSearch]);
+  }, [q, filters, drafts, mode, runSearch, device]);
 
   const runAsk = async (text: string) => {
     if (!text.trim()) return;
@@ -150,6 +162,7 @@ export function LibraryBrowser({ onUse, onAdded, canAdd = false, title }: {
 
   const loadMore = async () => {
     if (!data) return;
+    if (local && device) { const j = device(new URLSearchParams(toParams(dq, df, drafts, data.hits.length + more.length))) as unknown as SearchPayload; setMore((m) => [...m, ...j.hits]); return; }
     const r = await fetch(`/api/library/search?${toParams(q, filters, drafts, data.hits.length + more.length)}`);
     const j = r.ok ? await r.json() as SearchPayload : null;
     if (j) setMore((m) => [...m, ...j.hits]);
@@ -163,10 +176,11 @@ export function LibraryBrowser({ onUse, onAdded, canAdd = false, title }: {
     <div className="space-y-3" data-testid="library-browser">
       {title}
       {/* search ↔ ask */}
-      <div className="flex gap-1 rounded-xl border border-white/6 bg-[#0f0f13] p-1" role="tablist" aria-label="Search or ask">
+      {/* PLAT-P08: the toggle, Filters and Show more wear the chip look (one look for every small control on this screen) */}
+      <div className="flex gap-2" role="tablist" aria-label="Search or ask">
         {([['search', 'Search', Search], ['ask', 'Ask', MessageCircleQuestion]] as const).map(([k, label, Icon]) => (
           <button key={k} role="tab" aria-selected={mode === k} onClick={() => setMode(k)}
-            className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium ${mode === k ? 'bg-[#00E5FF]/15 text-[#00E5FF]' : 'text-white/45 hover:text-white/70'}`}>
+            className={`${LL.chip} flex-1 justify-center gap-1.5 ${mode === k ? LL.chipOn : ''}`}>
             <Icon className="h-3.5 w-3.5" />{label}
           </button>
         ))}
@@ -269,7 +283,7 @@ export function LibraryBrowser({ onUse, onAdded, canAdd = false, title }: {
           )}
           <div className="flex flex-wrap items-center gap-1.5">
             <button onClick={() => setShowFilters((s) => !s)} aria-expanded={showFilters}
-              className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] ${showFilters || active.length ? 'border-[#00E5FF]/30 text-[#00E5FF]' : 'border-white/10 text-white/50'}`}>
+              className={`${LL.chip} gap-1.5 ${showFilters || active.length ? LL.chipOn : ''}`}>
               <SlidersHorizontal className="h-3.5 w-3.5" /> Filters{active.length ? ` (${active.length})` : ''}
             </button>
             {filters.only && <Chip label="Only my equipment" onClear={() => setFilters((f) => { const o = { ...f }; delete o.only; return o; })} />}
@@ -312,7 +326,7 @@ export function LibraryBrowser({ onUse, onAdded, canAdd = false, title }: {
       )}
 
       {/* results */}
-      <div className={LL.grid} data-testid="library-results">
+      <div className={LL.grid} data-testid="library-results" data-results-for={(data as { query?: string } | null)?.query ?? ''} data-results-from={local ? 'device' : 'server'}>
         {results.map((e) => <ResultTile key={e.id} e={e} onOpen={() => { setSheetTab(undefined); setSelected(e); }} />)}
         {!loading && results.length === 0 && (mode === 'search' ? data : ask) && (
           <div className="col-span-2 py-8 text-center text-sm text-white/35">
@@ -322,7 +336,7 @@ export function LibraryBrowser({ onUse, onAdded, canAdd = false, title }: {
           </div>
         )}
         {mode === 'search' && data && (data.groups ?? data.total) > results.length && (
-          <button onClick={() => void loadMore()} className="col-span-2 w-full rounded-xl border border-white/10 py-2 text-xs text-white/60 hover:text-white">Show more ({((data.groups ?? data.total) - results.length).toLocaleString()} more)</button>
+          <button onClick={() => void loadMore()} className={`${LL.chip} col-span-2 w-full justify-center`}>Show more ({((data.groups ?? data.total) - results.length).toLocaleString()} more)</button>
         )}
       </div>
 

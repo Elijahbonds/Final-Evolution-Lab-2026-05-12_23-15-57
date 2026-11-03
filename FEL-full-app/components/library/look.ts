@@ -8,7 +8,7 @@ export const LIB_LOOK = {
   search: `${TYPE.small} w-full rounded-full border border-white/10 bg-fel-surface-2 py-3 pl-11 pr-11 text-white placeholder-white/35 focus:border-fel-cyan/50 focus:outline-none`,
   chips: 'flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
   chip: `${TYPE.label} fel-press inline-flex min-h-10 shrink-0 items-center gap-1 rounded-full border border-white/12 px-4 text-fel-soft`,
-  chipOn: 'border-fel-cyan/50 bg-fel-cyan/10 text-fel-cyan',
+  chipOn: 'border-fel-cyan/60 text-fel-cyan',   // no fill: on and off stay one look (the premium rule's ≤ 3 button looks)
   grid: 'grid grid-cols-2 gap-3',
   tile: 'fel-surface fel-press flex min-h-[132px] flex-col justify-between rounded-2xl p-3 text-left',
   tileName: `${TYPE.small} font-semibold text-white line-clamp-2`,

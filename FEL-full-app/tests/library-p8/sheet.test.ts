@@ -53,6 +53,12 @@ describe('the exercise sheet', () => {
     expect(player).toBeTruthy();
     expect((player!.props.session as { steps: unknown[] }).steps).toHaveLength(1);
     expect(player!.props.mode).toBe('preview');
+    // the sheet steps aside while the player runs (it sits above the player's layer: the rig caught it covering the player)
+    expect(all().some((e) => e.props['data-testid'] === 'library-sheet')).toBe(false);
+    // closing the player brings the sheet back
+    (player!.props.onClose as () => void)();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(all().some((e) => e.props['data-testid'] === 'library-sheet')).toBe(true);
     m.unmount();
   });
 });
