@@ -141,7 +141,7 @@
   { const SNAP = /release|block|swat|reject|rim protector|reach|goaltend|strip|contest|hand up|BLOCK-GEO|STOP/i;
     const r3 = (v) => (v ? [+v.x.toFixed(3), +v.y.toFixed(3), +v.z.toFixed(3)] : null);
     const o = console.info.bind(console);
-    console.info = (...a) => { o(...a); try { const m = String(a[0] ?? ''); if (HG.autoStrip && (HG.autoN || 0) < 8 && /blocked at the release|\] swat at k|rim protector swat|ai swat read at the bump: HIT|my block read .*HIT|ai reach resolve strip/.test(m)) { const n = HG.autoN = (HG.autoN || 0) + 1; HG.strip(`auto-${n}-${/my block|\] swat at/.test(m) ? 'myblock' : /reach/.test(m) ? 'aistrip' : 'aiblock'}`, 12, 3); }
+    console.info = (...a) => { o(...a); try { const m = String(a[0] ?? ''); if (HG.autoStrip && (HG.autoP3 || 0) < 6 && /rival action (hesitation|spin|post_up|in_and_out|stepback)|3V3-AI\] screen set by|the swing: |3V3-DEF\] rival gather (jumper|layup)/.test(m)) { const n = HG.autoP3 = (HG.autoP3 || 0) + 1; HG.strip(`auto-p3-${n}-${/screen/.test(m) ? 'screen' : /swing/.test(m) ? 'swing' : /rival gather/.test(m) ? 'gather' : (m.match(/rival action (\w+)/) || [])[1]}`, 16, 3); }   /* hoops-p03: the rival's moves, a screen, a swing */ if (HG.autoStrip && (HG.autoN || 0) < 8 && /blocked at the release|\] swat at k|rim protector swat|ai swat read at the bump: HIT|my block read .*HIT|ai reach resolve strip/.test(m)) { const n = HG.autoN = (HG.autoN || 0) + 1; HG.strip(`auto-${n}-${/my block|\] swat at/.test(m) ? 'myblock' : /reach/.test(m) ? 'aistrip' : 'aiblock'}`, 12, 3); }
       if (/^\[(1V1|3V3)-(DEF|REF|BLOCK|CONTEST)\]/.test(m) && SNAP.test(m) && HG.snaps.length < 3000) { const bl = ball(); HG.snaps.push({ f: HG.frame, m: m.slice(0, 200), ball: bl ? r3(bl.getAbsolutePosition()) : null, holder: holderOfBall()[0], bodies: B.map((b) => ({ id: b.id, root: r3(b.root.getAbsolutePosition()), rh: r3(b.rh && b.rh.getAbsolutePosition()), lh: r3(b.lh && b.lh.getAbsolutePosition()), hipsY: b.hips ? +b.hips.getAbsolutePosition().y.toFixed(3) : null })) }); } } catch (e) { /* the probe never breaks the game */ } };
   }
 
@@ -196,7 +196,7 @@
         const gx = dp.x + rx / rl * 1.0, gz = dp.z + rz / rl * 1.0; const ex = gx - me.x, ez = gz - me.z, el = Math.hypot(ex, ez);
         steer(ex, ez, el < 0.15 ? 0 : Math.min(1, 0.3 + el));
         const dd = Math.hypot(dp.x - me.x, dp.z - me.z);
-        if (dd < 1.6 && t >= P.nextPoke) { if (rnd() < 0.5) { tap('X'); bot.pokes++; } P.nextPoke = t + (0.6 + rnd() * 1.0) * 1000; }
+        if (!CFG.noPoke && dd < 1.6 && t >= P.nextPoke) { if (rnd() < 0.5) { tap('X'); bot.pokes++; } P.nextPoke = t + (0.6 + rnd() * 1.0) * 1000; }
         const ph = atkPhase();
         if (ph === 'gather' && !P.gatherSeen) P.gatherSeen = t;
         if (!P.blocked && P.gatherSeen && t - P.gatherSeen >= 220 && dd < 2.4) { P.blocked = true; tap('Y'); bot.blocks++; }
@@ -328,7 +328,7 @@
           const nb = []; for (let k = Math.max(1, i - 6); k <= Math.min(n - 1, i + 6); k++) if (k !== i) nb.push(w[k]); nb.sort((a, b) => a - b);
           const med = nb[Math.floor(nb.length / 2)] || 0; const side = Math.max(w[i - 3] || 0, w[i + 3] || 0);
           if (/Arm|Leg|Hand|Foot/.test(WATCH[j]) && w[i] > 1500) R.whips++;
-          if (w[i] >= 600 && w[i] >= 3.5 * Math.max(med, 60) && w[i] >= 3 * side) { R.pops++; if (opts.popFrames && (R.popAt || (R.popAt = [])).length < 3000) R.popAt.push(i); if (w[i] >= 3000) R.severe++; R.popBones[WATCH[j]] = (R.popBones[WATCH[j]] || 0) + 1; const sg = segOf(i); if (sg >= 0) { const P = out.possessions[sg]; (P.pops || (P.pops = {}))[B[bi].id] = (P.pops[B[bi].id] || 0) + 1; } }
+          if (w[i] >= 600 && w[i] >= 3.5 * Math.max(med, 60) && w[i] >= 3 * side) { R.pops++; if (opts.popFrames && (R.popAt || (R.popAt = [])).length < 3000) R.popAt.push(i); if (w[i] >= 3000) { R.severe++; if ((R.severeAt || (R.severeAt = [])).length < 60) R.severeAt.push([HG.f0 + i, WATCH[j], Math.round(w[i])]); }   /* hoops-p04: where the severe pops are */ R.popBones[WATCH[j]] = (R.popBones[WATCH[j]] || 0) + 1; const sg = segOf(i); if (sg >= 0) { const P = out.possessions[sg]; (P.pops || (P.pops = {}))[B[bi].id] = (P.pops[B[bi].id] || 0) + 1; } }
         }
       }
       // root snaps (> 20 deg of yaw in one frame) and root jumps (0.25-0.5 m in one frame) outside resets
@@ -337,7 +337,7 @@
         if (cuts.has(i)) continue;
         const o = (i * NB + bi) * K, p = ((i - 1) * NB + bi) * K;
         let dy = Math.abs(pos[o + 3] - pos[p + 3]) * 180 / Math.PI; if (dy > 180) dy = 360 - dy;
-        if (dy > 20) { R.rootSnaps++; const sg = segOf(i); if (sg >= 0) { const P = out.possessions[sg]; (P.rootSnaps || (P.rootSnaps = {}))[B[bi].id] = (P.rootSnaps[B[bi].id] || 0) + 1; } }
+        if (dy > 20) { R.rootSnaps++; if ((R.snapAt || (R.snapAt = [])).length < 60) R.snapAt.push([HG.f0 + i, +dy.toFixed(1)]); const sg = segOf(i); if (sg >= 0) { const P = out.possessions[sg]; (P.rootSnaps || (P.rootSnaps = {}))[B[bi].id] = (P.rootSnaps[B[bi].id] || 0) + 1; } }
         const d = Math.hypot(pos[o] - pos[p], pos[o + 2] - pos[p + 2]); if (d > 0.25) R.rootJumps++;
         vel[i] = d * 60;
         if (i > 1 && vel[i - 1] !== undefined && !cuts.has(i - 1)) { const q = ((i - 2) * NB + bi) * K; const ax = (pos[o] - 2 * pos[p] + pos[q]) * 3600, az = (pos[o + 2] - 2 * pos[p + 2] + pos[q + 2]) * 3600; acc.push(Math.hypot(ax, az)); }

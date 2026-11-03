@@ -66,6 +66,7 @@ for (let i = 0; i < 900 && !(await seamOk()); i++) {
 if (!(await seamOk())) { say('no seam ' + JSON.stringify(await ev(() => [window.__phase, window.__err]))); say(pageErrs.join('\n')); await browser.close(); process.exit(2); }
 for (let i = 0; i < 300; i++) { const ph = await ev(() => window.__phase); if (ph === 'playing') break; if (ph === 'ready' || ph === 'paused') await start(); await new Promise((r) => setTimeout(r, 400)); }
 const loadWallS = (Date.now() - T0) / 1000;
+await ev((c) => { window.__HG_CFG = Object.assign(window.__HG_CFG || {}, c); }, { noPoke: process.env.BOT_NOPOKE === '1' });   // hoops-p04: BOT_NOPOKE=1, the bot never reaches (a possession plays out to its shot)
 say('playing after ' + loadWallS.toFixed(0) + ' s wall; page.js: ' + await ev(fs.readFileSync(path.join(HERE, 'page.js'), 'utf8')));
 const shot = async (name) => { const f = path.join(SHOTS, `${MODE}-${name}.png`); await page.screenshot({ path: f }).catch(() => {}); return f; };
 const saveStrip = async (name) => { const urls = await ev((n) => window.__hg.strips[n] || [], name); const dir = path.join(SHOTS, `strip-${MODE}-${name}`); fs.mkdirSync(dir, { recursive: true }); urls.forEach((u, i) => { if (u) fs.writeFileSync(path.join(dir, `${String(i).padStart(2, '0')}.jpg`), Buffer.from(u.split(',')[1], 'base64')); }); return urls.length; };
@@ -83,8 +84,9 @@ async function possLoop() {
   const out = [];
   const tag = MODE === 'onevone' ? '1V1' : '3V3';
   const CAP = Number(process.env.POSS_CAP_MS ?? 7000), TAIL = Number(process.env.POSS_TAIL_MS ?? 1500);
-  for (let k = 0; k < POSS * 2; k++) {
-    const side = k % 2 === 0 ? 'def' : 'off';
+  const SIDES = (process.env.POSS_SIDES ?? 'def,off').split(',');   // hoops-p03: POSS_SIDES=def plays their possessions only
+  for (let k = 0; k < POSS * SIDES.length; k++) {
+    const side = SIDES[k % SIDES.length];
     await ev(() => { window.__hg.bot.on = false; });
     // a trip to the line (an and-one, a shooting foul) is a dead ball the seams do not cancel, and the bot does not shoot free throws:
     // shoot them out (press, let go at the line meter's green) before the next possession, or every later possession is a statue
@@ -114,7 +116,7 @@ async function possLoop() {
     const rec = await ev((a) => ({ log: (window.__LOG || []).filter((l) => l.f >= a[0] && l.f <= a[1]).map((l) => l.m), banners: (window.__hud || []).filter((h) => h.f >= a[0] && h.f <= a[1] && h.banner).map((h) => String(h.banner)) }), [f0, f1]);
     out.push({ side, f0, f1, sec: +((f1 - f0) / 60).toFixed(2), ...rec });
     say(`poss ${k} ${side} ${out[out.length - 1].sec} s ${rec.banners.slice(0, 4).join(' | ')}`);
-    if (k % 2 === 1) { result.poss = out; await checkpoint('poss ' + k); }
+    if (k % SIDES.length === SIDES.length - 1) { result.poss = out; await checkpoint('poss ' + k); }
   }
   return out;
 }
@@ -139,7 +141,9 @@ if (SCEN === 'game') {
   result.snaps = await ev(() => window.__hg.snaps || []);   // hoops-p02: the defence snapshots
   { const names = await ev(() => Object.keys(window.__hg.strips).filter((k) => k.startsWith('auto-'))); for (const nm of names) await saveStrip(nm); result.autoStrips = names; }
 } else if (SCEN === 'poss') {   // hoops-p02: the possession loop alone
-  result.poss = await possLoop(); result.log = await ev(() => window.__LOG); result.hud = await ev(() => window.__hud); result.snaps = await ev(() => window.__hg.snaps || []);
+  if (process.env.POSS_MOTION) await ev(() => window.__hg.start());   // hoops-p03: record the bodies over the loop (per-body root accel p99, pops)
+  result.poss = await possLoop();
+  if (process.env.POSS_MOTION) { await ev(() => window.__hg.stop()); result.analysis = await ev(() => window.__hg.analyse()); } result.log = await ev(() => window.__LOG); result.hud = await ev(() => window.__hud); result.snaps = await ev(() => window.__hg.snaps || []);
   { const names = await ev(() => Object.keys(window.__hg.strips).filter((k) => k.startsWith('auto-'))); for (const nm of names) await saveStrip(nm); result.autoStrips = names; }
 } else if (SCEN === 'input') {
   const S = (fn, arg) => ev(fn, arg);

@@ -30,19 +30,26 @@ describe('/pro', () => {
     expect(html).toContain('data-pro-buy="closed"');
     expect(html).toContain(PRO_CLOSED_LINE.replace("'", '&#x27;'));
     expect(html).not.toContain('data-action="buy-pro"');
+    expect(html).not.toContain('data-buy-entry');   // PLAT-P07: Opens soon, no button
+    expect(html).toContain('data-opens-soon');
   });
 
   it('on sale: weekly and monthly at the existing prices, the store-terms tick, the button disabled until ticked', async () => {
     process.env.VIRTUAL_PURCHASES_ENABLED = '1';
     const html = await render('weekly');
     expect(html).toContain('data-pro-buy="open"');
-    expect(html).toContain('$6.00 / week');
-    expect(html).toContain('$9.99 / month');
+    // test changed (PLAT-P07, 2026-11-02): every storefront prints prices with the one shop formatter
+    // (lib/coach-store/priceLabel.ts shopPriceLabel): "$6.00/week", was "$6.00 / week". Same amounts, the products' own.
+    expect(html).toContain('$6.00/week');
+    expect(html).toContain('$9.99/month');
     expect(html).toMatch(/<input[^>]*checked=""[^>]*value="weekly"|<input[^>]*value="weekly"[^>]*checked=""/);
     expect(html).not.toMatch(/<input[^>]*checked=""[^>]*value="monthly"|<input[^>]*value="monthly"[^>]*checked=""/);
-    // test changed (owner-approvals, 2026-10-27, card C28): FEL Pro buyers tick the Purchase Terms now, not the coach store's
-    expect(html).toContain('href="/purchase-terms"');
-    expect(html).toMatch(/disabled=""[^>]*data-action="buy-pro"/);
+    // test changed (PLAT-P07, 2026-11-02): the tick and the pay button moved into the one buy sheet (components/shop/
+    // buy-sheet.tsx: what you get → the terms tick → pay), which opens from the page's one primary. The tick-before-pay rule
+    // and the Purchase Terms link are pinned on the sheet itself (tests/shop/buy-sheet.test.tsx); here, the entry is there
+    // and nothing on the page links to the checkout route.
+    expect(html).toContain('data-buy-entry="pro"');
+    expect(html).not.toContain('/api/stripe/checkout');
     expect(STORE_TERMS_VERSION).toBeTruthy();
   });
 

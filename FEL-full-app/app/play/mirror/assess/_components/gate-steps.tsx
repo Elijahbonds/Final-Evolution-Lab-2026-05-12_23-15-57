@@ -32,8 +32,10 @@ export function StartStep({ onJump, onFull, jumpHref, fullHref }: {
   jumpHref?: string;
   fullHref?: string;
 }) {
-  const jumpClass = `${primaryBtn} mt-1`;
-  const fullClass = `${quietBtn} mt-2`;
+  // PUBLIC-POLISH (2026-11-02, live sweep J15): text-center. On /screen these are <Link>s, and an <a> does not centre a
+  // wrapped label the way a <button> does ("(about 1 / min)" sat left-aligned there, centred on /play/mirror/assess).
+  const jumpClass = `${primaryBtn} mt-1 text-center`;
+  const fullClass = `${quietBtn} mt-2 text-center`;
   return (
     <StepCard testId="start">
       {jumpHref
