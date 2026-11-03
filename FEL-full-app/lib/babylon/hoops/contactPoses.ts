@@ -33,6 +33,13 @@ export const ARM_BAR_FWD_M = 0.3;
 
 /** The hand-check arm reaches this share of its length toward a hip it cannot touch (a soft elbow; geometry). */
 export const REACH_FRAC = 0.92;
+/** hoops-p04b: WHICH ARM reaches eases over this long (s) — the defender's hand-check arm (the one whose shoulder is nearer the handler's
+ *  ball-side hip) and the handler's bar arm (his free arm; none during a handle move). Both were a one-frame choice under one eased k, so
+ *  a swap moved one arm 0 → 79° and the other 58 → 0° in a frame (3v3 seed 7 frames 180 / 234: 3 500–6 000 deg/s, the rig's stage
+ *  tracer), and a handle move dropped the bar in a frame. Each arm now has its own weight easing toward the choice. 0 = the one-frame
+ *  choice, as before. TUNED (new). Knob `hoops.contactArmSwapSec`. */
+export const CONTACT_ARM_SWAP_SEC = 0.15;
+
 /** The bones the layer drives (GATE 0 checks each on the hero rig). */
 export const CONTACT_BONES = ['Hips', 'Spine1', 'Spine2', 'LeftArm', 'LeftForeArm', 'LeftHand', 'RightArm', 'RightForeArm', 'RightHand'] as const;
 
@@ -57,8 +64,23 @@ function rigOf(sk: Skeleton): Rig | null {
 }
 const wpos = (n: TransformNode, out: Vector3): Vector3 => { n.computeWorldMatrix(true); return out.copyFrom(n.getAbsolutePosition()); };
 
-/** One pose pass on a pair (exported for the rig test). Returns the nodes it wrote (the caller restores them after the draw). */
-export function poseContact(p: ContactPair, wrote: TransformNode[] = [], leanDeg = feel('hoops.contactChestLeanDeg', CHEST_LEAN_DEG)): TransformNode[] {
+/** Each body's per-arm weights (rig arm order: Left, Right), as the defender's hand-check and as the handler's bar. */
+interface ArmWeights { check: [number, number]; bar: [number, number]; side: Vector3 | null; freshCheck: boolean; freshBar: boolean }
+const armWeights = new WeakMap<Skeleton, ArmWeights>();
+function weightsOf(sk: Skeleton): ArmWeights {
+  let w = armWeights.get(sk); if (!w) { w = { check: [0, 0], bar: [0, 0], side: null, freshCheck: true, freshBar: true }; armWeights.set(sk, w); }   // (a body's first contact takes its arm at once: k itself eases in)
+  return w;
+}
+/** One arm weight a step toward its target (pure): over `sec`; `dt` undefined or `sec` 0 = at once (the one-frame choice). */
+export function easeArmWeight(w: number, target: number, dt: number | undefined, sec: number): number {
+  if (dt === undefined || !(sec > 0)) return target;
+  const step = Math.max(0, dt) / sec;
+  return target > w ? Math.min(target, w + step) : Math.max(target, w - step);
+}
+
+/** One pose pass on a pair (exported for the rig test). Returns the nodes it wrote (the caller restores them after the draw).
+ *  `dt` (s): the frame's, for the arm weights' easing (hoops-p04b); omitted = each arm at its choice at once (the rig test's one pass). */
+export function poseContact(p: ContactPair, wrote: TransformNode[] = [], leanDeg = feel('hoops.contactChestLeanDeg', CHEST_LEAN_DEG), dt?: number): TransformNode[] {
   const k = Math.max(0, Math.min(1, p.k));
   if (k <= 1e-3) return wrote;
   const D = rigOf(p.defender.skeleton), H = rigOf(p.handler.skeleton);
@@ -87,27 +109,46 @@ export function poseContact(p: ContactPair, wrote: TransformNode[] = [], leanDeg
   const offArm = p.ballRig ? H.arms[p.ballRig === 'Left' ? 1 : 0] : null;
   let side = new Vector3(-toH.z, 0, toH.x);
   if (ballArm && offArm) { const s = wpos(ballArm.shoulder, new Vector3()).subtract(wpos(offArm.shoulder, new Vector3())); s.y = 0; if (s.lengthSquared() > 1e-6) side = s.normalize(); }
+  // hoops-p04b: a handle move (no ball hand) keeps the ball side it had — the perpendicular fallback moved the hand-check's target in a frame
+  const hwSide = weightsOf(p.handler.skeleton);
+  if (ballArm && offArm) hwSide.side = side.clone(); else if (dt !== undefined && hwSide.side) side = hwSide.side.clone();
   const hipT = hip.add(side.scale(HIP_OUT_M)).subtract(toH.scale(0.06));   // on the hip's surface, the defender's side of it
-  // 2. FOREARM ON HIP — the defender's arm whose shoulder is nearer that hip
+  const swapSec = feel('hoops.contactArmSwapSec', CONTACT_ARM_SWAP_SEC);
+  // 2. FOREARM ON HIP — the defender's arm whose shoulder is nearer that hip (hoops-p04b: each arm's weight eases toward that choice)
   const d0 = wpos(D.arms[0].shoulder, new Vector3()), d1 = wpos(D.arms[1].shoulder, new Vector3());
-  const dArm = Vector3.DistanceSquared(d0, hipT) <= Vector3.DistanceSquared(d1, hipT) ? D.arms[0] : D.arms[1];
-  const dOut = (dArm === D.arms[0] ? d0.subtract(d1) : d1.subtract(d0)); dOut.y = 0; if (dOut.lengthSquared() > 1e-6) dOut.normalize();
-  // At the rules' gap the hip is past an arm's length (measured on the hero: shoulder → hip 1.14 m at BODY_STANDOFF 1.10, the arm
-  // 0.48 m to the wrist): the forearm reaches TOWARD it, the elbow kept soft at REACH_FRAC of the arm, never a locked pole of an arm.
-  const sh = dArm === D.arms[0] ? d0 : d1;
-  const armLen = Vector3.Distance(sh, wpos(dArm.elbow, new Vector3())) + Vector3.Distance(wpos(dArm.elbow, new Vector3()), wpos(dArm.hand, new Vector3()));
-  const toHip = hipT.subtract(sh); const far = toHip.length();
-  const reachT = far > armLen * REACH_FRAC ? sh.add(toHip.scale(armLen * REACH_FRAC / far)) : hipT;
-  solveChainInFrame(dArm.shoulder, dArm.elbow, dArm.hand, reachT, dOut.scale(0.6).add(new Vector3(0, -1, 0)).normalize(), k);
-  wrote.push(dArm.shoulder, dArm.elbow);
-  // 3. ARM BAR — the handler's free arm across his chest toward the defender, elbow out
-  if (offArm && H.chest) {
-    const chest = wpos(H.chest, new Vector3());
-    const offOut = wpos(offArm.shoulder, new Vector3()).subtract(wpos(ballArm!.shoulder, new Vector3())); offOut.y = 0; if (offOut.lengthSquared() > 1e-6) offOut.normalize();
-    const barT = chest.subtract(toH.scale(ARM_BAR_FWD_M)).add(new Vector3(0, -0.12, 0)).add(offOut.scale(0.04));
-    solveChainInFrame(offArm.shoulder, offArm.elbow, offArm.hand, barT, offOut.scale(0.8).add(new Vector3(0, -0.4, 0)).normalize(), k * 0.85);
-    wrote.push(offArm.shoulder, offArm.elbow);
+  const pick = Vector3.DistanceSquared(d0, hipT) <= Vector3.DistanceSquared(d1, hipT) ? 0 : 1;
+  const dw = weightsOf(p.defender.skeleton);
+  for (let i = 0; i < 2; i++) {
+    dw.check[i] = easeArmWeight(dw.check[i], i === pick ? 1 : 0, dw.freshCheck ? undefined : dt, swapSec);
+    if (dw.check[i] <= 1e-3) continue;
+    const dArm = D.arms[i], sh = i === 0 ? d0 : d1;
+    const dOut = i === 0 ? d0.subtract(d1) : d1.subtract(d0); dOut.y = 0; if (dOut.lengthSquared() > 1e-6) dOut.normalize();
+    // At the rules' gap the hip is past an arm's length (measured on the hero: shoulder → hip 1.14 m at BODY_STANDOFF 1.10, the arm
+    // 0.48 m to the wrist): the forearm reaches TOWARD it, the elbow kept soft at REACH_FRAC of the arm, never a locked pole of an arm.
+    const armLen = Vector3.Distance(sh, wpos(dArm.elbow, new Vector3())) + Vector3.Distance(wpos(dArm.elbow, new Vector3()), wpos(dArm.hand, new Vector3()));
+    const toHip = hipT.subtract(sh); const far = toHip.length();
+    const reachT = far > armLen * REACH_FRAC ? sh.add(toHip.scale(armLen * REACH_FRAC / far)) : hipT;
+    solveChainInFrame(dArm.shoulder, dArm.elbow, dArm.hand, reachT, dOut.scale(0.6).add(new Vector3(0, -1, 0)).normalize(), k * dw.check[i]);
+    wrote.push(dArm.shoulder, dArm.elbow);
   }
+  dw.freshCheck = false;
+  // 3. ARM BAR — the handler's free arm across his chest toward the defender, elbow out (hoops-p04b: eased in and out per arm; a handle
+  // move, which leaves no free arm, lets the bar go over the swap time from the side it was on)
+  const hw = weightsOf(p.handler.skeleton);
+  const barIdx = p.ballRig ? (p.ballRig === 'Left' ? 1 : 0) : -1;
+  if (H.chest) {
+    for (let i = 0; i < 2; i++) {
+      hw.bar[i] = easeArmWeight(hw.bar[i], i === barIdx ? 1 : 0, hw.freshBar ? undefined : dt, swapSec);
+      if (hw.bar[i] <= 1e-3) continue;
+      const bar = H.arms[i], other = H.arms[1 - i];
+      const chest = wpos(H.chest, new Vector3());
+      const offOut = wpos(bar.shoulder, new Vector3()).subtract(wpos(other.shoulder, new Vector3())); offOut.y = 0; if (offOut.lengthSquared() > 1e-6) offOut.normalize();
+      const barT = chest.subtract(toH.scale(ARM_BAR_FWD_M)).add(new Vector3(0, -0.12, 0)).add(offOut.scale(0.04));
+      solveChainInFrame(bar.shoulder, bar.elbow, bar.hand, barT, offOut.scale(0.8).add(new Vector3(0, -0.4, 0)).normalize(), k * 0.85 * hw.bar[i]);
+      wrote.push(bar.shoulder, bar.elbow);
+    }
+  }
+  hw.freshBar = false;
   return wrote;
 }
 
@@ -121,6 +162,7 @@ export function mountContactPoses(scene: Scene, pairs: () => readonly ContactPai
   const pre = scene.onAfterAnimationsObservable.add(() => {
     saved.length = 0;
     const ps = pairs(); if (!ps.length) return;
+    const dt = Math.min(0.1, Math.max(0, scene.getEngine().getDeltaTime() / 1000));   // hoops-p04b: the arm weights' easing
     for (const p of ps) {
       if (p.k <= 1e-3) continue;
       // remember what is there before the pass writes (a node is saved once, the first time)
@@ -129,7 +171,7 @@ export function mountContactPoses(scene: Scene, pairs: () => readonly ContactPai
         if (!n || saved.some((s) => s.n === n)) continue;
         const ref = n.rotationQuaternion; saved.push({ n, ref, q: (ref ?? Quaternion.FromEulerVector(n.rotation)).clone() });
       }
-      wrote.length = 0; poseContact(p, wrote);
+      wrote.length = 0; poseContact(p, wrote, undefined, dt);
     }
   });
   const post: Nullable<Observer<Scene>> = scene.onAfterRenderObservable.add(() => {

@@ -13,7 +13,7 @@ import { gateContainerRig } from '../anim/rigNormalize';
 import { findBone } from '../anim/boneLookup';
 import { bodyFrontWorld } from '../anim/HandIK';
 import { BODY_STANDOFF } from '../core/BasketballCore';
-import { CONTACT_BONES, HIP_OUT_M, mountContactPoses, poseContact, type ContactBody } from './contactPoses';
+import { CONTACT_BONES, CONTACT_ARM_SWAP_SEC, HIP_OUT_M, easeArmWeight, mountContactPoses, poseContact, type ContactBody } from './contactPoses';
 
 const MODELS = join(__dirname, '..', '..', '..', 'public', 'models');
 const load = async (scene: Scene, rel: string): Promise<AssetContainer> =>
@@ -115,3 +115,35 @@ describe('the contact poses at the hard gap', () => {
     after.forEach((q, i) => expect(q.equalsWithEpsilon(before[i], 1e-6)).toBe(true));
   });
 });
+
+// hoops-p04b: WHICH ARM reaches eases. The hand-check arm (the defender's, nearer the ball-side hip) and the bar arm (the handler's free one)
+// were a one-frame choice under one eased k: a swap moved one arm 0 → 79° and the other 58 → 0° in a frame (3v3 seed 7, the rig's tracer).
+describe('an arm swap eases (hoops-p04b)', () => {
+  it('easeArmWeight: toward the target at 1/sec a second; no dt or sec 0 = at once', () => {
+    expect(easeArmWeight(0, 1, 1 / 60, 0.15)).toBeCloseTo(1 / 9, 6);
+    expect(easeArmWeight(1, 0, 1 / 60, 0.15)).toBeCloseTo(1 - 1 / 9, 6);
+    expect(easeArmWeight(0.95, 1, 1 / 60, 0.15)).toBe(1);
+    expect(easeArmWeight(0.2, 1, undefined, 0.15)).toBe(1);
+    expect(easeArmWeight(0.2, 0, 1 / 60, 0)).toBe(0);
+  });
+  it('the ball hand crossing (bar arm Left → Right): no handler arm bone turns more than 20° in a frame; it settles within the swap time', () => {
+    const arms = ['LeftArm', 'LeftForeArm', 'RightArm', 'RightForeArm'].map((n) => node(H.skeleton, n));
+    const pass = (ballRig: 'Left' | 'Right') => {
+      D.skeleton.returnToRest(); H.skeleton.returnToRest(); scene.render();
+      poseContact({ defender: D, handler: H, k: 1, ballRig }, [], 7, 1 / 60);
+      return arms.map((n) => (n.rotationQuaternion ?? Quaternion.Identity()).clone());
+    };
+    for (let i = 0; i < 20; i++) pass('Right');   // settled: the bar on the rig Left arm
+    let prev = pass('Right'); let worst = 0; let last: Quaternion[] = prev;
+    const frames = Math.ceil(CONTACT_ARM_SWAP_SEC * 60) + 2;
+    for (let f = 0; f < frames; f++) {
+      const now = pass('Left');
+      now.forEach((q, i) => { worst = Math.max(worst, 2 * Math.acos(Math.min(1, Math.abs(Quaternion.Dot(q, prev[i])))) * 180 / Math.PI); });
+      prev = now; last = now;
+    }
+    expect(worst).toBeLessThan(20);
+    const settled = pass('Left');
+    settled.forEach((q, i) => expect(2 * Math.acos(Math.min(1, Math.abs(Quaternion.Dot(q, last[i])))) * 180 / Math.PI).toBeLessThan(0.5));
+  });
+});
+
