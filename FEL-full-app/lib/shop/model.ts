@@ -14,7 +14,9 @@
 // Pure. Client-safe.
 import { shopPriceLabel, type ShopCadence } from '@/lib/coach-store/priceLabel';
 
-export type ShopKind = 'coach_package' | 'store_listing' | 'book' | 'pro';
+// GROUP-BOOKING (2026-11-02): 'group_class' (a seat in a group class) and 'session' (a 1:1), reserved and paid at the gym
+// until the owner switches online payment on (lib/group-booking/rules.ts payPlan).
+export type ShopKind = 'coach_package' | 'store_listing' | 'book' | 'pro' | 'group_class' | 'session';
 export type ShopState = 'buy' | 'opens_soon' | 'owned';
 export type { ShopCadence };
 
