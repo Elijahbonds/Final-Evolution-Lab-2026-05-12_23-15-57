@@ -51,6 +51,7 @@ import * as P4R from '@/lib/babylon/hoops/releaseTiming';   // hoops-p04
 import { PLANT_RELEASE_FADE_SEC } from '@/lib/babylon/anim/basketballTree';   // hoops-p04
 import * as P4B from '@/lib/babylon/anim/locoAccent';   // hoops-p04b
 import { CONTACT_ARM_SWAP_SEC } from '@/lib/babylon/hoops/contactPoses';   // hoops-p04b
+import { CARRY_ARM_SPEED_SEC } from '@/lib/babylon/anim/ballCarry';   // hoops-p04b
 import { STEAL_DICE_ON, STRIP_REACH_M, STRIP_SHIELD_M, STRIP_BALL_MAX_Y } from '@/lib/babylon/hoops/steals';   // hoops-p02
 import { ONBALL_CUSHION_M, ONBALL_CUSHION_PER_MPS } from '@/lib/babylon/hoops/pressure';   // hoops-p02
 
@@ -220,6 +221,7 @@ describe('the feel knob catalogue', () => {
     // hoops-p04b: the layer fixes the rig traced — defaults pinned
     expect(def('hoops.accentOffBeatsOn')).toBe(P4B.ACCENT_OFF_BEATS_ON ? 1 : 0);
     expect(def('hoops.contactArmSwapSec')).toBe(CONTACT_ARM_SWAP_SEC);
+    expect(def('hoops.carryArmSpeedSec')).toBe(CARRY_ARM_SPEED_SEC);
     expect(def('hoops.rivalKitOn')).toBe(P3R.RIVAL_KIT_ON ? 1 : 0);
     expect(def('hoops.rivalTightM')).toBe(P3R.RIVAL_TIGHT_M);
     expect(def('hoops.rivalHesiSec')).toBe(P3R.RIVAL_HESI_SEC);

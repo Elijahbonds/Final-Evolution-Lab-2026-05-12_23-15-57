@@ -12,7 +12,7 @@ await import('@babylonjs/loaders/glTF/index.js');
 const { boneNode } = await import(APP + '/lib/babylon/anim/boneLookup.ts');
 const BB = await import(APP + '/lib/babylon/anim/authored/basketball.ts');
 const { NullEngine, Scene, FreeCamera, Vector3, Quaternion, SceneLoader } = BJS;
-const WATCH = ['Hips', 'Spine', 'LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand', 'LeftUpLeg', 'RightUpLeg', 'LeftLeg', 'RightLeg', 'LeftFoot', 'RightFoot'];
+const WATCH = ['Hips', 'Spine', 'LeftFoot', 'RightFoot', 'LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand', 'LeftUpLeg', 'RightUpLeg', 'LeftLeg', 'RightLeg', 'LeftFoot', 'RightFoot'];
 const scene = new Scene(new NullEngine()); scene.metadata = { felModeId: 'onevone' };
 new FreeCamera('c', new Vector3(0, 1, -3), scene);
 const b64 = fs.readFileSync(path.join(APP, 'public/models/fel-hero.glb')).toString('base64');

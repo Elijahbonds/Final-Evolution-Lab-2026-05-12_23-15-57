@@ -405,5 +405,8 @@ change"). The owner has felt none of these yet; every default is flagged in the 
   (the defender's hand-check arm, the handler's arm bar) eases per arm over this when it changes, and a handle move lets the bar go over it
   (the hand-check keeps the last ball side through the move); 0 = the one-frame swap (3v3 seed 7: one arm 0 → 79°, the other 58 → 0° in
   a frame, 3 500–6 000 °/s). A body's first contact still takes its arm at once (the hand-check's own k eases in).
+- hoops-p04b, same group (`anim/ballCarry.ts`, **TUNED (new)**): `hoops.carryArmSpeedSec` 0.12 s — the dribble's arm weights (the ball
+  arm's pace reach, the off arm's swing in at 0.35–0.65 of speed) follow the body's speed eased over this; a gear change stepped them in
+  a frame. 0 = the frame's speed, as before. The ball's push-ahead and the guard keep their own easing.
 
 **assumption:** the bounds are safe, not tuned. A ranked, staked or head-to-head run reads every default above.

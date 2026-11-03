@@ -1254,6 +1254,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/hoops/contactPoses.ts CONTACT_ARM_SWAP_SEC',
     hint: 'When the hand-check arm or the handler arm bar changes sides, or a handle move drops the bar, each arm eases over this. 0 = the one-frame swap.',
   },
+  {
+    id: 'hoops.carryArmSpeedSec', label: 'Ball carry: arm weights ease on a gear change', def: 0.12, min: 0, max: 0.4, step: 0.01, unit: 's', group: 'Hoops · transitions',
+    source: 'lib/babylon/anim/ballCarry.ts CARRY_ARM_SPEED_SEC',
+    hint: 'The dribble arm reach and the off arm swing follow the body speed eased over this, so a gear change does not move an arm in one frame. 0 = the frame speed, as before.',
+  },
   // AF-1 (ANIM-FEEL-SPEC 2026-10-28): inertialized clip transitions, default OFF — off is the linear crossfade, unchanged.
   {
     id: 'anim.inertial', label: 'Inertial clip transitions on (1) / off (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',

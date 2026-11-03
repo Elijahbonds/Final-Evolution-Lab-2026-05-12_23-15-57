@@ -136,7 +136,7 @@
     const snap = () => B.map((b, bi) => TRACE.map((n, j) => tq(bi, j)));
     const prevOff = new Map(); let prevClip = null;
     const mag = (q) => (q ? Math.round(2 * Math.acos(Math.min(1, Math.abs(q[3]))) * 180 / Math.PI) : -1);
-    const note = (bi, j, stage, deg, a, b) => { if (HG.rec && HG.stageEv.length < 3000) HG.stageEv.push([HG.frame + 1, B[bi].id, TRACE[j], stage, Math.round(deg * 60), mag(b), mag(a)]); };   // … the layer's offset (deg) the frame before and now
+    const note = (bi, j, stage, deg, a, b) => { if (HG.rec && HG.stageEv.length < 20000) HG.stageEv.push([HG.frame + 1, B[bi].id, TRACE[j], stage, Math.round(deg * 60), mag(b), mag(a)]); };   // … the layer's offset (deg) the frame before and now
     const obsv = scene.onAfterAnimationsObservable;
     obsv.add(() => { try {
       const cur = snap();
