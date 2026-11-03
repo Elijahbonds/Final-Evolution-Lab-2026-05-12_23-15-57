@@ -166,6 +166,22 @@ Token and shared-component fixes first; per-screen edits only for the live sweep
 `coach/business/thanks`, `press/receipt`). The fix in each is the same codemod line; run
 `npx tsx scripts/readable/codemod.mts --write` once the lane lands, then `source-baseline.mts --write`.
 
+**What the after-crawl still finds** (phone; each is per-screen, and most are other lanes' or the owner's):
+
+- `/play`: the Play shelf's one-line mode lists ("Breakaway · Twelve Yards · Basebal…") end in an ellipsis by design
+  (premium-ui P4), and the hero clips its card strip. Recommendation: `line-clamp-2` on the list line.
+- The Quick Screen / Correctives header `h1` (`/screen`, `/screen/privacy`, `/play/mirror/assess`, `…/results`,
+  `/play/mirror/correctives`) clips its glyph tails by 2 px (`leading-none` inside an `overflow-hidden` row): the mirror
+  lanes hold those files.
+- `/profile`: "No duels yet…" and "Jump check, hands on hips →" measure 1.3:1 — they sit on the athlete stage's light
+  fallback panel when the 3D view cannot start (no WebGL here); worth a look on a device. The empty-tile dashes "—" are
+  2.7–2.9:1 (large, decorative).
+- `/cards` creator names, `/multiplayer` "Challenge online", `/party` "PARTY", `/live` tags: 3.1–4.46:1 from inline or
+  tinted backgrounds the class scanner cannot see (each a one-line colour change).
+- `/learn` and the legal pages (`/store-terms`, `/purchase-terms`, `/support`): a code block or a table scrolls the page
+  sideways at 150 % root font.
+- The `[OWNER: …]` placeholders render at 9–11 px on `/press`, `/media-kit`, `/team`, `/work-with-us`: owner copy.
+
 **Body copy at 14 px.** The rig counts runs of more than 12 words drawn at `TYPE.small` (14 px) on a phone. That is
 the type scale used past its own "≤ 12 words" line; the fix is per screen (use `TYPE.body`), and most of it is the
 owner's long-form copy (terms, credits, lesson text), so it is reported here, not rewritten.
