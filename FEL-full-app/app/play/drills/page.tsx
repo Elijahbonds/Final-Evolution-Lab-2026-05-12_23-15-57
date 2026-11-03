@@ -56,7 +56,7 @@ export default async function DrillsPage({ searchParams }: { searchParams?: Reco
         </Link>
         <header className="space-y-1">
           <p className="font-mono text-[10.5px] font-bold uppercase tracking-[0.18em] text-[#00FF9D]">Drills</p>
-          {shelf === 'hoops' && !drill ? (
+          {shelf === 'hoops' || drill?.source.book === 'fel' ? (
             <>
               <h1 className="text-3xl font-black text-white">Ball skills, on your camera</h1>
               <p className="text-[14px] text-white/55">Shooting form, footwork and defense, in place. Follow the targets.</p>
