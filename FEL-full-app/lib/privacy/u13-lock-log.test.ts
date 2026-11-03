@@ -103,7 +103,10 @@ const UA = 'AgeScreenTest/1.0';
 // GROUP-BOOKING (lane/group-booking, 2026-11-02) prisma/pending/2026-11-02-group-booking.sql (pending SQL only; schema.prisma
 // untouched; GroupGym + GroupTrainer + GroupClass + GroupPass + GroupSeat + GroupWaitlist + InPersonSession, additive raw
 // SQL) at 58ac9a29, the lane commit carrying it on top of every file above.
-const PARENT = '58ac9a293f66e96ce20e3bee5bebe5db558fb2f4';
+// TEACHER PLATFORM (lane/plat-p10, 2026-11-03) prisma/pending/2026-11-03-teacher.sql (pending SQL only; schema.prisma
+// untouched; TeacherApplication + TeacherRole + TeachCourse, additive) at 882bf0f9, the lane commit carrying it on top of
+// every file above.
+const PARENT = '882bf0f9c8fb3b2ca7a125e04323b81c9275dd42';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {
