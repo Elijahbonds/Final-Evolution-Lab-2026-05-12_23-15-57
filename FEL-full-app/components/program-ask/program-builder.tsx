@@ -10,7 +10,7 @@
 //   4. Start today plays the next session in the session player (lib/session-player/fromProgram.ts), and its finish marks
 //      the session done ON THIS PHONE (lib/program-ask/device.ts). Nothing about it is sent to an account.
 // The server builds (POST /api/program-ask): the library is server-only. The page draws what it answers.
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { ChevronDown, Lock, Minus, Play, Plus, Sparkles } from 'lucide-react';
 import { PrimaryCta } from '@/components/ui/fel/primary-cta';
@@ -19,9 +19,9 @@ import type { FinishResult } from '@/components/session-player/session-player';
 import { TYPE } from '@/lib/design/type';
 import { checkpointDecision, plannedWeeks, positionIn, type Decision } from '@/lib/program-ask/checkpoint';
 import {
-  ASK_BUTTON, ASK_PLACEHOLDER, CHECKPOINT_LINES, CHECKPOINT_TITLE, EDIT_HINT, LIGHTER_TAG, READ_BACK, SAVED_LINE, START_TODAY, WEEK_LINE, WEEK_VIEW,
+  ASK_BUTTON, ASK_PLACEHOLDER, CHECKPOINT_LINES, CHECKPOINT_TITLE, EDIT_HINT, LIGHTER_TAG, READ_BACK, SAVED_ACCOUNT_LINE, SAVED_LINE, START_TODAY, WEEK_LINE, WEEK_VIEW,
 } from '@/lib/program-ask/copy';
-import { addDecision, markDone, readSaved, saveProgram, type SavedProgram } from '@/lib/program-ask/device';
+import { accountBody, addDecision, markDone, mergeAccount, readSaved, saveProgram, type SavedProgram } from '@/lib/program-ask/device';
 import type { RequestEdits } from '@/lib/program-ask/request';
 import { doseText } from '@/lib/program-ask/table';
 import type { BuiltProgram, ProgramAskRead, ProgramChip, ProgramDay, RequestField } from '@/lib/program-ask/types';
@@ -115,6 +115,15 @@ export function ProgramBuilder({ initialQuestion = '' }: { initialQuestion?: str
   const [saved, setSaved] = useState<SavedProgram | null>(null);
   const [week, setWeek] = useState(1);
   const [playing, setPlaying] = useState<{ session: Session; id: string } | null>(null);
+  // PROGRAM-ASK-2: the account copy (adults, once the pending table exists); 'device' = the phone only (youth, or not ready)
+  const keep = useRef<'account' | 'device' | null>(null);
+  const [onAccount, setOnAccount] = useState(false);
+  const account = useRef<{ programId: string; done: Record<string, string>; decisions: Decision[] } | null>(null);
+  const push = useCallback((v: SavedProgram | null) => {
+    if (!v || keep.current !== 'account') return;
+    void fetch('/api/program-ask/saved', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(accountBody(v)) })
+      .then((r) => { if (r.ok) setOnAccount(true); if (r.status === 503 || r.status === 403) keep.current = 'device'; }).catch(() => undefined);
+  }, []);
 
   const ask = useCallback(async (question: string, e: RequestEdits) => {
     if (!question.trim()) return;
@@ -124,15 +133,32 @@ export function ProgramBuilder({ initialQuestion = '' }: { initialQuestion?: str
       if (!r.ok) { setError(r.status === 429 ? 'Too many asks in a minute. Try again shortly.' : 'That did not build. Try again.'); return; }
       const a = (await r.json()) as Answer;
       setAnswer(a);
-      if (a.program) { setSaved(saveProgram(deviceStorage(), question, e, a.program)); setWeek(1); }
+      if (a.program) {
+        saveProgram(deviceStorage(), question, e, a.program);
+        const merged = mergeAccount(deviceStorage(), account.current);
+        setSaved(merged);
+        push(merged);
+        setWeek(1);
+      }
     } catch { setError('That did not build. Try again.'); } finally { setBusy(false); }
-  }, []);
+  }, [push]);
 
   // a saved program opens as it was (or, with an ask from the library's door, that ask is built)
   useEffect(() => {
-    const s = readSaved(deviceStorage());
-    if (initialQuestion) { void ask(initialQuestion, {}); return; }
-    if (s) { setSaved(s); setQ(s.question); setEdits(s.edits); void ask(s.question, s.edits); }
+    let live = true;
+    (async () => {
+      // the account's copy first (a new phone picks the plan up); any failure leaves the phone's copy in charge
+      const r = await fetch('/api/program-ask/saved', { cache: 'no-store' }).then((x) => (x.ok ? x.json() : null)).catch(() => null) as
+        { keep?: 'account' | 'device'; saved?: { question: string; edits: RequestEdits; programId: string; done: Record<string, string>; decisions: Decision[] } | null } | null;
+      if (!live) return;
+      keep.current = r?.keep === 'account' ? 'account' : 'device';
+      account.current = r?.saved ?? null;
+      const s = readSaved(deviceStorage());
+      if (initialQuestion) { void ask(initialQuestion, {}); return; }
+      const from = s ?? (r?.saved ? { question: r.saved.question, edits: r.saved.edits } : null);
+      if (from) { if (s) setSaved(s); setQ(from.question); setEdits(from.edits); void ask(from.question, from.edits); }
+    })();
+    return () => { live = false; };
   }, [initialQuestion, ask]);
 
   const edit = (f: RequestField, v: string | number) => { const e = { ...edits, [f]: v }; setEdits(e); void ask(q, e); };
@@ -158,16 +184,16 @@ export function ProgramBuilder({ initialQuestion = '' }: { initialQuestion?: str
   const finish = useCallback(async (): Promise<FinishResult> => {
     if (!playing) return { ok: true, line: null };
     const s = markDone(deviceStorage(), playing.id);
-    if (s) setSaved(s);
+    if (s) { setSaved(s); push(s); }
     return { ok: !!s, line: s ? SAVED_LINE : null };
-  }, [playing]);
+  }, [playing, push]);
 
   const answerCheckpoint = (hit: boolean | null, pain: boolean) => {
     if (!pos.pendingCheckpoint) return;
     const repeats = decisions.filter((d) => d.kind === 'repeat').length;
     const d = checkpointDecision({ hitTargets: hit, pain, repeats });
     const s = addDecision(deviceStorage(), { afterWeek: pos.pendingCheckpoint.n, kind: d.kind });
-    if (s) setSaved(s);
+    if (s) { setSaved(s); push(s); }
   };
 
   const shown = weeks.find((w) => w.n === week) ?? weeks[0];
@@ -206,7 +232,7 @@ export function ProgramBuilder({ initialQuestion = '' }: { initialQuestion?: str
           <div className="space-y-2">
             <h2 className={`${TYPE.title} text-white`}>{p.title}</h2>
             <p data-testid="program-summary" className={`${TYPE.body} text-white/85`}>{p.summary}</p>
-            <p className={`${TYPE.small} text-fel-soft`}>{saved?.programId === p.id ? SAVED_LINE : ''}{pos.total ? ` ${pos.done} of ${pos.total} sessions done.` : ''}</p>
+            <p className={`${TYPE.small} text-fel-soft`}>{saved?.programId === p.id ? (onAccount ? SAVED_ACCOUNT_LINE : SAVED_LINE) : ''}{pos.total ? ` ${pos.done} of ${pos.total} sessions done.` : ''}</p>
           </div>
           {canStart && <PrimaryCta docked onClick={start} icon={<Play className="h-5 w-5" />} testId="program-start">{START_TODAY}</PrimaryCta>}
           {nextLocked && <p className={`${TYPE.small} text-fel-gold`}>{FREE_WEEK_LINE}</p>}
