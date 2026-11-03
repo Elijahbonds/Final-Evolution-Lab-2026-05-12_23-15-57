@@ -24,4 +24,7 @@ export const PROPPED_LOOPS = {
   ex_hang_leg_raise: 'pullbar', ex_hang_pike: 'pullbar', ex_bar_leg_raise: 'dipbars',
   // exerciseAsks.ts: the seat the one-leg calf raise sits on; the box the push-off (in front) and the stride jumps (beside) drive up from
   ex_seated_calf_one: 'seat', ex_box_pushoff: 'box', ex_stride_jump: 'boxside', ex_stride_jump_cross: 'boxside',
+  // exerciseFamilies5.ts (DEMO-LOOPS-5): the flat bench the leg raise and pull-in lie on (the legs off its end), the bench the
+  // seated tuck, the seated rope crunch and the chair stretches sit on
+  ex_bench_leg_raise: 'bench', ex_bench_leg_pull_in: 'bench', ex_seated_leg_tuck: 'seat', ex_rope_crunch_seat: 'seat', ex_seat_side_bend: 'seat', ex_seat_twist: 'seat',
 } as const satisfies Record<string, string>;

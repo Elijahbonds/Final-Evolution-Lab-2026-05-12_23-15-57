@@ -611,6 +611,77 @@ export const DEMO_RULES: readonly DemoRule[] = [
   // the rickshaw's handles are held low at the sides, walking: the farmer's carry; the machine shoulder press is the seated press
   { clip: 'ex_carry', families: ['carry'], bases: /^rickshaw-carry$/ },
   { clip: 'ex_seated_press', families: ['overhead-press'], bases: /^leverag-shoulder-press$/ },
+  // DEMO-LOOPS-5 (anim/authored/exerciseFamilies5.ts, exerciseOly.ts), each read against the movement the entry was imported
+  // as (free-exercise-db). Trunk flexion: the leg pull-in on the floor and on a bench, the bench leg raise, the seated leg
+  // tuck (the seated flat-bench leg pull-in is the same movement), the crunch holding a weight, the frog sit-up, the cocoon,
+  // bottoms up, the rope crunch kneeling, standing and seated
+  { clip: 'ex_leg_pull_in', families: ['flexion'], bases: /^leg-pull$/ },
+  { clip: 'ex_bench_leg_raise', families: ['flexion'], bases: /^flat-bench-lying-leg-rais$/ },
+  { clip: 'ex_bench_leg_pull_in', families: ['flexion'], bases: /^flat-bench-leg-pull$/ },
+  { clip: 'ex_seated_leg_tuck', families: ['flexion'], bases: /^(seat-leg-tuck|seat-flat-bench-leg-pull)$/ },
+  { clip: 'ex_crunch_weight', families: ['flexion'], bases: /^weight-crunch$/ },
+  { clip: 'ex_frog_situp', families: ['flexion'], bases: /^frog-sit-ups$/ },
+  { clip: 'ex_cocoon', families: ['flexion'], bases: /^cocoon$/ },
+  { clip: 'ex_bottoms_up', families: ['flexion'], bases: /^bottom-up$/ },
+  { clip: 'ex_rope_crunch_kneel', families: ['flexion'], bases: /^rop-crunch$/ },
+  { clip: 'ex_rope_crunch_stand', families: ['flexion'], bases: /^stand-rop-crunch$/ },
+  { clip: 'ex_rope_crunch_seat', families: ['flexion'], bases: /^seat-crunch$/ },
+  // existing loops that ARE these: the bent-knee hip raise is the reverse crunch (the knees in, the hips off the floor); the
+  // Janda sit-up is the sit-up's shape done slow; the scissor kick lifts one leg as the other lowers (the flutter kick);
+  // the step-up with knee raise; the "leg lift" lifts one heel behind, standing (the standing leg curl)
+  { clip: 'ex_reverse_crunch', families: ['flexion'], bases: /^bent-kne-hip-rais$/ },
+  { clip: 'ex_situp', families: ['flexion'], bases: /^janda-sit-up$/ },
+  { clip: 'ex_flutter', families: ['flexion'], bases: /^scissor-kick$/ },
+  { clip: 'ex_step_up_knee', families: ['flexion'], bases: /^step-up-kne-rais$/ },
+  { clip: 'ex_standing_leg_curl', families: ['flexion'], bases: /^leg-lift$/ },
+  // the upper-body stretches: the dynamic arm swing up and chest swing, the standing twist, the standing pelvic tilt, the side
+  // wrist pull, the chair's side bend and spinal twist, the seated overhead (butterfly) side reach; and existing loops that
+  // are these: the shoulder raise is the shrug, the pelvic tilt into bridge rolls up to the bridge, the kneeling forearm
+  // stretch leans back from the hands and knees (the rock back — the fingers' turn toward the knees is not shown)
+  { clip: 'ex_arm_swing_up', families: ['stretch-upper'], bases: /^dynamic-back-stretch$/ },
+  { clip: 'ex_chest_swing', families: ['stretch-upper'], bases: /^dynamic-chest-stretch$/ },
+  { clip: 'ex_stand_twist', families: ['stretch-upper'], bases: /^middl-back-stretch$/ },
+  { clip: 'ex_pelvic_tilt_stand', families: ['stretch-upper'], bases: /^stand-pelvic-tilt$/ },
+  { clip: 'ex_wrist_pull', families: ['stretch-upper'], bases: /^sid-wrist-pull$/ },
+  { clip: 'ex_seat_side_bend', families: ['stretch-upper'], bases: /^chair-lower-back-stretch$/ },
+  { clip: 'ex_seat_twist', families: ['stretch-upper'], bases: /^spinal-stretch$/ },
+  { clip: 'ex_butterfly_side_reach', families: ['stretch-upper'], bases: /^seat-overhead-stretch$/ },
+  { clip: 'ex_shrug', families: ['stretch-upper'], bases: /^shoulder-rais$/ },
+  { clip: 'ex_bridge', families: ['stretch-upper'], bases: /^pelvic-tilt-bridg$/ },
+  { clip: 'ex_pos_rockback', families: ['stretch-upper'], bases: /^kneel-forearm-stretch$/ },
+  // the barbell clean and snatch: where it starts (the floor, below the knees, the hang), how the bar is received (full,
+  // power, split; or not: the pull, the shrug), and the press and the jerk after the clean. The clean and snatch deadlifts
+  // are deadlifts (the hinge loop the deadlift family plays). The dumbbell clean shares the base and stays a cue card.
+  { clip: (_b, eq) => (eq.includes('barbell') ? 'ex_bb_clean' : null), families: ['clean'], bases: /^clean$/, emits: ['ex_bb_clean'] },
+  { clip: 'ex_bb_power_clean', families: ['clean'], bases: /^power-clean$/ },
+  { clip: (_b, eq) => (eq.includes('barbell') ? 'ex_bb_hang_clean' : null), families: ['clean'], bases: /^hang-clean$/, emits: ['ex_bb_hang_clean'] },
+  { clip: 'ex_bb_hang_clean_low', families: ['clean'], bases: /^hang-clean-below-kne$/ },
+  { clip: 'ex_bb_split_clean', families: ['clean'], bases: /^split-clean$/ },
+  { clip: 'ex_bb_clean_pull', families: ['clean'], bases: /^clean-pull$/ },
+  { clip: 'ex_bb_clean_shrug', families: ['clean'], bases: /^clean-shrug$/ },
+  { clip: 'ex_bb_clean_press', families: ['clean'], bases: /^clean-press$/ },
+  { clip: 'ex_bb_clean_jerk', families: ['clean'], bases: /^clean-jerk$/ },
+  { clip: 'ex_hinge', families: ['clean'], bases: /^clean-deadlift$/ },
+  { clip: 'ex_bb_snatch', families: ['snatch'], bases: /^snatch$/ },
+  { clip: 'ex_bb_power_snatch', families: ['snatch'], bases: /^power-snatch$/ },
+  { clip: 'ex_bb_hang_snatch', families: ['snatch'], bases: /^hang-snatch$/ },
+  { clip: 'ex_bb_hang_snatch_low', families: ['snatch'], bases: /^hang-snatch-below-kne$/ },
+  { clip: 'ex_bb_split_snatch', families: ['snatch'], bases: /^split-snatch$/ },
+  { clip: 'ex_bb_snatch_pull', families: ['snatch'], bases: /^snatch-pull$/ },
+  { clip: 'ex_bb_snatch_shrug', families: ['snatch'], bases: /^snatch-shrug$/ },
+  { clip: 'ex_bb_muscle_snatch', families: ['snatch'], bases: /^muscl-snatch$/ },
+  { clip: 'ex_bb_snatch_balance', families: ['snatch'], bases: /^(snatch-balanc|heav-snatch-balanc)$/ },
+  { clip: 'ex_hinge', families: ['snatch'], bases: /^snatch-deadlift$/ },
+  // existing loops that ARE these (each against its source): the rear lateral raise lying face down on a low incline is the
+  // prone incline T; the Smith machine shoulder press is seated; the kettlebell seesaw press presses one bell, lowers it and
+  // presses the other (the press arm after arm); the one-arm long-bar rows are the bent-over one-arm row; the leverage iso
+  // row is the seated row; the shotgun row is the split-stance one-arm cable row
+  { clip: 'ex_incline_t', families: ['raise'], bases: /^lying-rear-lateral-rais$/ },
+  { clip: 'ex_seated_press', families: ['overhead-press'], bases: /^smith-overhead-shoulder-press$/ },
+  { clip: 'ex_press_alt', families: ['overhead-press'], bases: /^seesaw-press$/ },
+  { clip: 'ex_row_one', families: ['row'], bases: /^(bent-over-singl-arm-long-bar-row|singl-arm-long-bar-row)$/ },
+  { clip: 'ex_seated_row', families: ['row'], bases: /^leverag-iso-row$/ },
+  { clip: 'ex_cable_row_one', families: ['row'], bases: /^shotgun-row$/ },
 ];
 
 const RULES_BY_FAMILY: ReadonlyMap<string, readonly DemoRule[]> = (() => {
@@ -720,7 +791,7 @@ export const DEMO_CLIPS: readonly string[] = (() => {
 })();
 
 /** Floor loops: the stage frames these from the side, low (a push-up seen from the front is a head). */
-export const FLOOR_CLIPS: ReadonlySet<string> = new Set(['ex_crunch_overhead', 'ex_crunch_tuck', 'ex_russian_twist', 'ex_leg_raise_back', 'ex_pushup', 'ex_plank', 'ex_plank_high', 'ex_mountain_climber', 'ex_bridge', 'ex_dead_bug', 'ex_bird_dog', 'ex_crunch', 'ex_floor_press', 'ex_spiderman_pushup', 'ex_archer_pushup', 'ex_prone_t', 'ex_adductor_squeeze', 'ex_copenhagen_knee', 'ex_copenhagen_raise_knee', 'ex_calf_smr', 'ex_piriformis_smr'].concat(
+export const FLOOR_CLIPS: ReadonlySet<string> = new Set(['ex_leg_pull_in', 'ex_crunch_weight', 'ex_frog_situp', 'ex_cocoon', 'ex_bottoms_up', 'ex_butterfly_side_reach', 'ex_crunch_overhead', 'ex_crunch_tuck', 'ex_russian_twist', 'ex_leg_raise_back', 'ex_pushup', 'ex_plank', 'ex_plank_high', 'ex_mountain_climber', 'ex_bridge', 'ex_dead_bug', 'ex_bird_dog', 'ex_crunch', 'ex_floor_press', 'ex_spiderman_pushup', 'ex_archer_pushup', 'ex_prone_t', 'ex_adductor_squeeze', 'ex_copenhagen_knee', 'ex_copenhagen_raise_knee', 'ex_calf_smr', 'ex_piriformis_smr'].concat(
   // LIBRARY-ANATOMY-2: the floor positions and every flow (a flow spends most of its time on the floor)
   ['dog', 'child', 'pigeon', 'halfsplit', 'lowlunge', 'kneel', 'ninety', 'shinbox', 'catcamel', 'thread', 'bear', 'cobra', 'lizard', 'butterfly', 'couch', 'frog', 'spider', 'inchworm',
     'supine', 'supine9090', 'legsup', 'kneehug', 'oneknee', 'happybaby', 'kneerock', 'figure4', 'lyinghams', 'prone', 'pike', 'straddle', 'switch', 'rockback', 'childside', 'dogpedal',
@@ -750,7 +821,11 @@ export const SIDE_CLIPS: ReadonlySet<string> = new Set(['ex_hinge', 'ex_good_mor
   'ex_hinge_rock', 'ex_hip_snap', 'ex_split_drive', 'ex_split_hop', 'ex_door_row',
   // the hike-and-snap kettlebell lifts, the fold to the toes, the front leg swing, the one-leg butt kick, the rounded upper back
   // (the hanging and bar raises and the box push-off keep their prop's framing: the bar and the box in view)
-  'ex_kb_clean_one', 'ex_kb_snatch_one', 'ex_kb_snatch_two', 'ex_kb_high_pull', 'ex_toe_touch_stand', 'ex_leg_raise_front', 'ex_butt_kick_one', 'ex_stretch_upper_back']);
+  'ex_kb_clean_one', 'ex_kb_snatch_one', 'ex_kb_snatch_two', 'ex_kb_high_pull', 'ex_toe_touch_stand', 'ex_leg_raise_front', 'ex_butt_kick_one', 'ex_stretch_upper_back',
+  // DEMO-LOOPS-5: the barbell's pulls and catches, the rope crunches, the arm swing up and the pelvic tilt read from the side
+  'ex_bb_clean', 'ex_bb_power_clean', 'ex_bb_hang_clean', 'ex_bb_hang_clean_low', 'ex_bb_clean_pull', 'ex_bb_clean_shrug', 'ex_bb_clean_press',
+  'ex_bb_snatch', 'ex_bb_power_snatch', 'ex_bb_hang_snatch', 'ex_bb_hang_snatch_low', 'ex_bb_snatch_pull', 'ex_bb_snatch_shrug', 'ex_bb_muscle_snatch', 'ex_bb_snatch_balance',
+  'ex_rope_crunch_kneel', 'ex_rope_crunch_stand', 'ex_arm_swing_up', 'ex_pelvic_tilt_stand']);
 /** What the stage draws under a loop that needs it: a bench seat, a flat bench to lie on, or an incline bench. Bench loops
  *  lying down are framed from the side, like the floor loops. LIBRARY-ANATOMY-2: and the rest of a gym's furniture a loop
  *  stands, sits, lies or hangs on — a box, benches in front and behind, a pull-up bar, a low bar, dip bars, pads, a wall. */
