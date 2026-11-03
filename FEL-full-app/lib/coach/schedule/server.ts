@@ -22,6 +22,7 @@ import { deliveryReady, NOT_READY, res, type Res } from '../delivery/probe';
 import { cleanSession, clashWith, endOf, LIMITS, reaches, type CleanSession } from './rules';
 import { cancelSession, dropFeed, feedNonce, insertSession, sessionsForCoach, sessionsForCoaches, setFeedNonce, updateSession, type SessionRow } from './store';
 import { feedPath, feedToken, newFeedNonce, readFeedToken } from './feedToken';
+import { groupFeedEvents } from '@/lib/group-booking/feed';
 
 export type ScheduleDb = PeopleDb & Partial<Pick<PrismaClient, 'instructor' | 'booking'>>;
 
@@ -141,6 +142,9 @@ export async function feedIcs(db: ScheduleDb, token: string, now: Date = new Dat
   const events: FeedEvent[] = [
     ...(own ?? []).map((s) => ({ uid: s.id, startsAt: s.startsAt, endsAt: endOf(s), title: s.title, place: s.place, cancelled: !!s.cancelledAt, updatedAt: s.updatedAt })),
     ...(asAthlete && 'rows' in asAthlete ? asAthlete.rows : []).map((s) => ({ uid: `${s.id}-a`, startsAt: s.startsAt, endsAt: endOf(s), title: `${s.title} (${s.coachName})`, place: s.place, cancelled: !!s.cancelledAt, updatedAt: s.updatedAt })),
+
+    // GROUP-BOOKING (2026-11-02): the group sessions this person runs or booked, and their in-person 1:1s (none before its SQL)
+    ...(await groupFeedEvents(db, userId, from, to, nowMs)),
   ];
   return calendarFeedIcs({ name: 'FEL coaching', events, now });
 }

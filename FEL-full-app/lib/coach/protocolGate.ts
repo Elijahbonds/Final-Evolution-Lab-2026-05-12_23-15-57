@@ -509,7 +509,7 @@ export const COACH_WHY: Record<ProtocolReason, string> = {
 
 /**
  * The line in place of a private reason without the client's coach_view grant — the pain flag's precedent (lib/health/
- * pain.ts coachPainFlag: "Client paused an exercise"): the coach has to know the item will not show as written, never
+ * pain.ts coachPainFlag: "Athlete paused an exercise"): the coach has to know the item will not show as written, never
  * which answer or check-in, how bad, or when.
  */
 export const COACH_WHY_PRIVATE = "something in the client's health answers or check-ins (the details are shared only with the client's consent)";
