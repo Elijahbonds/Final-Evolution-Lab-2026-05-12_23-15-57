@@ -107,7 +107,10 @@ const UA = 'AgeScreenTest/1.0';
 // untouched; AskedProgram, additive) at 115a8eaf; pinned at cc22c276, this lane's merge of lane/program-ask (finish-release at
 // 6a3933ba), the first commit carrying every pending file above.
 // MERGE (coordinator, 2026-11-03): lane/program-ask-2 + finish-release (group-booking): both pending files; pinned at the merge.
-const PARENT = 'f093256cb2b4266f4a687d4f5440d60d81614e3f';
+// BBS-04 (lane/plat-bbs04, 2026-11-03) prisma/pending/2026-11-03-hoops-cam.sql (pending SQL only; schema.prisma untouched;
+// HoopsCamSession, additive) at 72693f90, the lane commit carrying it on top of every file above (cut from finish-release
+// at 67169fd2). lane/plat-p10's teacher.sql is not on this base: whichever lands second re-pins at its merge.
+const PARENT = '72693f902e6b338f4086199e30e1de1666a09ee0';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {

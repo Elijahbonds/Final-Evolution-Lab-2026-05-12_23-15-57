@@ -17,6 +17,7 @@ import { DAILY_DRILL_PATH } from '@/lib/daily-drill/copy';
 import { GroupInvite } from './group-invite';
 import { GroupManage } from './group-manage';
 import { TeamRollup } from './team-rollup';
+import { TeamShots } from '@/components/hoops-cam/coach-shots';
 
 const card = 'rounded-2xl border border-white/10 bg-white/[0.03] p-4 sm:p-5';
 const h2 = 'fel-heading text-[13px] font-bold uppercase tracking-wide text-white';
@@ -227,6 +228,8 @@ export function GroupScreen({ initial }: { initial: GroupView }) {
       )}
 
       {g.rollup && <TeamRollup groupId={g.id} rollup={g.rollup} onChanged={reload} />}
+      {/* BBS-04: the team's shot charts, for whoever sees the roll-up; dark (nothing) until its table is applied */}
+      {g.rollup && <TeamShots teamId={g.id} />}
       {g.invite && <GroupInvite groupId={g.id} invite={g.invite} canEdit={g.can.edit} onChanged={reload} />}
       <GroupManage view={g} onChanged={reload} />
       {busy && <Loader2 className="fixed bottom-24 right-5 h-5 w-5 animate-spin text-white/50" aria-label="Saving" />}
