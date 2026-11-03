@@ -108,7 +108,7 @@ A building week sits inside the range. When the time cannot hold the low end, th
 - **Library gap, closed in PROGRAM-ASK-2:** the library had no band-under-the-feet squat, no band front squat, no band
   split squat, no band rear-foot-elevated split squat, no pike push-up and no beginner conditioning move that stays on
   the floor. These six are now authored as **drafts** in `data/library/authored/b5-program-ask.json`, written by
-  `scripts/library/author-program-ask.ts`, which runs the library validator over the whole library before it writes.
+  `scripts/library/authoring/program-ask.ts`, built as batch 5 by the one generator (`npx tsx scripts/library/author.ts --batch 5`), which runs the library validator over the whole library before it writes.
   - All six are youth-safe, with no max-effort wording.
   - Each has regression and progression links to real entries:
 

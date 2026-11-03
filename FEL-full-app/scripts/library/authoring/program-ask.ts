@@ -1,32 +1,28 @@
-#!/usr/bin/env -S npx tsx
-// scripts/library/author-program-ask.ts — PROGRAM-ASK-2 (2026-11-02): the band and home entries "Build my program" found
-// missing, written as FEL DRAFTS for the owner's review → data/library/authored/b5-program-ask.json.
+// scripts/library/authoring/program-ask.ts — PROGRAM-ASK-2 (2026-11-02): batch 5, the band and home entries "Build my
+// program" found missing, as FEL DRAFTS for the owner's review → data/library/authored/b5-program-ask.json.
 //
 // Coordinator, 2026-11-02 (review of the band-only sample): "Author the missing library entries as DRAFTS that pass the
 // library validator, each with regression/progression links". The library had no band-loaded squat (band under the
-// feet; its "Squat with Bands" is a barbell lift with bands), no band front squat, no band split squat, no band rear-foot-elevated split squat, no pike push-up and no beginner
-// conditioning move that does not leave the floor, so a band-only adult's legs had nothing that could honestly reach the
-// effort words.
+// feet; its "Squat with Bands" is a barbell lift with bands), no band front squat, no band split squat, no band
+// rear-foot-elevated split squat, no pike push-up and no beginner conditioning move that does not leave the floor.
 //
-// Same rules as scripts/library/author.ts: FEL's own words (cue style of lib/coach/taxonomy.ts SETUP_CUES; the cue
-// policy, lib/coach/cueLint.ts), every entry a draft, the whole library re-checked by the same validator the CI suite
-// runs (common.ts gate) before anything is written, and lib/library/files.ts regenerated (writeFilesIndex). Batch 5 is
-// its own file: author.ts only ever rewrites b1–b4, so re-running it leaves this file alone.
+// ONE GENERATOR (coordinator, 2026-11-03, PR #515): these entries are built by scripts/library/author.ts buildAll as
+// batch 5, like every other authored batch, so a re-run of the generator reproduces everything on disk
+// (tests/library-p8/generator.test.ts) and they pass through the same CUE-STYLE step (./cue-style.ts) as batches 1–4.
+// Write them with: npx tsx scripts/library/author.ts --batch 5 (the validator gate runs over the whole library first).
+// Unlike batches 1–4 they are written out whole here, not from a family × variant matrix: six entries, each its own
+// movement.
 //
 // THE LADDER (each entry's regressionId / progressionId, to real entries):
 //   Bodyweight Squat → Band Under-Feet Squat → Band Front Squat → Band Split Squat → Band Rear-Foot-Elevated Split Squat →
 //   Dumbbell Rear-Foot-Elevated Split Squat;  Incline Push-Up → Pike Push-Up → Handstand Push-Ups;
 //   Bear Plank Hold → Step-In Mountain Climber → Mountain Climber Run.
 // Youth: all six are youthOk, and none carries max-effort wording (the validator's youth check).
-// Demo loops: the squats and split squats are written in families and variations the avatar's existing loops already
-// cover (lib/library/demo.ts); the pike push-up and the step-in climber have none yet (gaps for the demo-loops lane).
-//
-// Run: npx tsx scripts/library/author-program-ask.ts
-import path from 'node:path';
-import { readDir, gate, writeEntries, writeFilesIndex, DATA } from './common';
-import type { LibraryExercise } from '../../lib/library/types';
+// Demo loops: the squats and split squats are written in families and variations the avatar's existing loops cover
+// (lib/library/demo.ts); the pike push-up and the step-in climber have none yet (gaps for the demo-loops lane).
+import type { LibraryExercise } from '../../../lib/library/types';
 
-export const B5_FILE = 'authored/b5-program-ask.json';
+export const PROGRAM_ASK_BATCH = 5;
 const BATCH = 'authored-b5-program-ask';
 const LICENCE = 'FEL original (Final Evolution Lab)';
 
@@ -124,11 +120,3 @@ function entryOf(s: Spec): LibraryExercise {
 
 export const PROGRAM_ASK_ENTRIES: readonly LibraryExercise[] = SPECS.map(entryOf);
 
-if (process.argv[1] && /author-program-ask\.ts$/.test(process.argv[1])) {
-  const others = [...readDir(path.join(DATA, 'seed')), ...readDir(path.join(DATA, 'authored'))].filter((e) => e.review.batch !== BATCH);
-  const issues = gate('program-ask batch 5', [...others, ...PROGRAM_ASK_ENTRIES]);
-  if (issues.length) process.exit(1);
-  writeEntries(path.join(DATA, B5_FILE), PROGRAM_ASK_ENTRIES);
-  writeFilesIndex();
-  console.log(`authored batch 5 (program-ask): ${PROGRAM_ASK_ENTRIES.length} drafts → data/library/${B5_FILE}`);
-}
