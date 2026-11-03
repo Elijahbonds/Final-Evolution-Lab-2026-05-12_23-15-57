@@ -27,13 +27,15 @@
 import type { Lm } from '@/lib/pose/landmarks';
 import { rng } from '@/lib/vbt/rng';
 import type { Rgb } from './frame';
+import { RIM_HEIGHT_M, RIM_RADIUS } from '@/lib/babylon/core/courtDims';
 
 export type V3 = [number, number, number];
 
 // ── the court (metres; FIBA/NBA hoop sizes) ─────────────────────────────────────────────────────────────────────────
-export const RIM_Y = 3.05;
+// HU-1 / DR-H12: the hoop's sizes come from the one place they live (lib/babylon/core/courtDims.ts)
+export const RIM_Y = RIM_HEIGHT_M;
 /** The ring's radius to the centre of its tube (an 18-inch ring). */
-export const RIM_R = 0.2286;
+export const RIM_R = RIM_RADIUS;
 const RIM_TUBE = 0.009;
 export const BALL_R = 0.12;
 /** The backboard's face (the ring's centre is 0.375 m out from it). */

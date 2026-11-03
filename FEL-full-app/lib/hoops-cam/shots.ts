@@ -29,6 +29,7 @@ import type { BallObs } from './track';
 import type { RimPx } from './rim';
 import type { Lm } from '@/lib/pose/landmarks';
 import { segmentUnits } from '@/lib/vbt/track';
+import { RIM_RADIUS } from '@/lib/babylon/core/courtDims';
 
 /** (new) Shot-reading thresholds, in ring half-widths (U) and ms. */
 export const LAUNCH_UPS = 7;
@@ -180,7 +181,7 @@ export class ShotReader {
   private netSlowed(t: number, y: number, U: number): boolean | null {
     const c = this.f!.cross;
     if (!c) return null;
-    const g = (9.81 / 0.2286) * U, d = y - this.rim.y;
+    const g = (9.81 / RIM_RADIUS) * U, d = y - this.rim.y;
     if (d <= 0) return null;
     const free = (-c.vy + Math.sqrt(c.vy * c.vy + 2 * g * d)) / g;
     return (t - c.t) / 1000 >= NET_SLOW * free;
