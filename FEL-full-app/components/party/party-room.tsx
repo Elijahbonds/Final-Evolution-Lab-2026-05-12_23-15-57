@@ -75,7 +75,7 @@ export default function PartyRoomScreen({ initialMode }: { initialMode: string |
   const openSeats = room.table.seats.length < PARTY_CAPACITY;
 
   return (
-    <main data-testid="party-room" data-phase={phase} className="fixed inset-0 overflow-hidden bg-[#05070c] text-white">
+    <main data-testid="party-room" data-phase={phase} className="fixed inset-0 overflow-y-auto overflow-x-hidden bg-[#05070c] text-white">
       {showGame && Game && (
         <div className="absolute inset-0">
           <Game key={room.gameKey} grade={GRADE} prq={0} onEnd={room.onGameEnd} />

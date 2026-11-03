@@ -36,6 +36,7 @@ const SKIP = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TITLE', 'TEMPLATE', 'OPTIO
 let nextId = 1;
 const ids = new WeakMap<Element, number>();
 const idOf = (el: Element) => { let i = ids.get(el); if (!i) { i = nextId++; ids.set(el, i); } return i; };
+const elOf = new Map<number, Element>();
 
 function parse(c: string): { r: number; g: number; b: number; a: number } | null {
   const m = c.match(/rgba?\(([^)]+)\)/);
@@ -112,6 +113,8 @@ function clipOf(el: Element, box: Rect): Run['clip'] {
     if (clamp && clamp !== 'none' && !p.closest('a[href]') && (p as HTMLElement).scrollHeight > (p as HTMLElement).clientHeight + 2) {
       return { how: 'line-clamp', px: (p as HTMLElement).scrollHeight - (p as HTMLElement).clientHeight, by: pathOf(p) };
     }
+    // a line-clamped teaser in a link: its overflow:hidden is the clamp itself, already judged above
+    if (clamp && clamp !== 'none' && p.closest('a[href]')) continue;
     const ox = s.overflowX, oy = s.overflowY;
     const clips = (v: string) => v === 'hidden' || v === 'clip';
     if (clips(ox) || clips(oy)) {
@@ -180,7 +183,7 @@ export function collect(): Run[] {
     const box = unionOf(rects);
     const control = el.closest('button, a, input, select, textarea, [role="button"], [role="tab"], label');
     out.push({
-      id: idOf(el), text: text.slice(0, 160), words: wordCount(text), tag: el.tagName.toLowerCase(),
+      id: (elOf.set(idOf(el), el), idOf(el)), text: text.slice(0, 160), words: wordCount(text), tag: el.tagName.toLowerCase(),
       px: Math.round(parseFloat(s.fontSize) * zoomOf(el) * 100) / 100, weight: Number(s.fontWeight) || 400, fg,
       rects, box, fixed: inFixed(el), ariaHidden: !!el.closest('[aria-hidden="true"]'),
       disabled: !!(control && ((control as HTMLButtonElement).disabled || control.getAttribute('aria-disabled') === 'true')) || !!el.closest('fieldset[disabled]'),
@@ -257,6 +260,22 @@ export function covered(where: 'top' | 'bottom'): Cover[] {
 
 export interface Collision { a: string; b: string }
 
+const fixedRoot = (el: Element | null): Element | null => {
+  let root: Element | null = null;
+  for (let p = el; p; p = p.parentElement) { const pos = getComputedStyle(p).position; if (pos === 'fixed' || pos === 'sticky') root = p; }
+  return root;
+};
+/** The run is drawn under a different fixed layer (a full-screen overlay over the rail and the tab bar): not visible. */
+function underOtherLayer(r: Run): boolean {
+  const el = elOf.get(r.id);
+  if (!el) return false;
+  const x = (r.box.left + r.box.right) / 2, y = (r.box.top + r.box.bottom) / 2;
+  if (x < 0 || y < 0 || x > innerWidth || y > innerHeight) return false;
+  const hit = document.elementFromPoint(x, y);
+  if (!hit || hit === el || el.contains(hit)) return false;
+  return fixedRoot(hit) !== fixedRoot(el);
+}
+
 /** Two different runs drawn on top of each other (in the viewport now). */
 export function collisions(): Collision[] {
   // a clipped run's hidden lines are not drawn (it is reported as clipped), and a fixed bar over scrolling text is the
@@ -267,6 +286,7 @@ export function collisions(): Collision[] {
     for (let j = i + 1; j < runs.length; j++) {
       const A = runs[i], B = runs[j];
       if (A.fixed !== B.fixed) continue;
+      if (underOtherLayer(A) || underOtherLayer(B)) continue;
       let hit = false;
       for (const ra of A.rects) { for (const rb of B.rects) if (textCollides({ rect: ra, text: A.text }, { rect: rb, text: B.text })) { hit = true; break; } if (hit) break; }
       if (hit) out.push({ a: A.text.slice(0, 50), b: B.text.slice(0, 50) });

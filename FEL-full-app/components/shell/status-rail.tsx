@@ -78,7 +78,7 @@ export function StatusRail() {
         </div>
         <div className="flex-1 md:hidden" />
 
-        <div className="ml-auto flex shrink-0 items-center gap-2">
+        <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
           {/* P10 (2026-10-27): the PRQ ring and the wallet are always there — a dash and an empty track until the profile
               answers — so nothing swaps in and the cluster never shifts (the rig measured 0.006 CLS from the old skeleton swap) */}
           <>
