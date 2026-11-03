@@ -78,7 +78,7 @@ export function CoachQueue({ items, dark, onOpen }: {
         {shown.map((c, i) => (
           <li key={c.key} data-queue-card={c.kind} data-queue-key={c.key}
             className={`${LOOK.card} max-h-60 ${leaving.has(c.key) ? LOOK.cardLeaving : ''}`} style={{ ['--fel-enter-delay' as string]: `${Math.min(i, 6) * 40}ms` }}>
-            <button type="button" className="flex min-w-0 items-center justify-between gap-2 text-left" onClick={() => onOpen(c)} aria-label={`Open ${c.name}`}>
+            <button type="button" className="flex min-w-0 items-center justify-between gap-2 text-left md:flex-1" onClick={() => onOpen(c)} aria-label={`Open ${c.name}`}>
               <span className="min-w-0">
                 <span className={`${LOOK.name} block truncate`}>{c.name}</span>
                 <span className={`${LOOK.line} block truncate`}>{c.line}</span>
@@ -86,7 +86,8 @@ export function CoachQueue({ items, dark, onOpen }: {
               <ChevronRight className="h-5 w-5 shrink-0 text-fel-dim" aria-hidden />
             </button>
             <div className={LOOK.actions}>
-              {c.actions.slice(1).map((a) => (
+              {/* COACH-TOOLS-EASY (2026-11-02): no "Open" beside the card — the card itself opens (it was a third control per card) */}
+              {c.actions.slice(1).filter((a) => a !== 'open').map((a) => (
                 <button key={a} type="button" className={LOOK.outline} disabled={busy === c.key} onClick={() => void run(c, a)} data-queue-action={a}>{LABEL[a]}</button>
               ))}
               <button type="button" className={LOOK.solid} disabled={busy === c.key} onClick={() => void run(c, c.actions[0])} data-queue-action={c.actions[0]}>

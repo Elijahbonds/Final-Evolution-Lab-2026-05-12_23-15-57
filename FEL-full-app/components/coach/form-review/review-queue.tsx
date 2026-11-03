@@ -54,7 +54,6 @@ function Opened({ item, api, onReviewed }: { item: QueueItemView; api: string; o
   const [d, setD] = useState<Detail | null>(null);
   const [failed, setFailed] = useState(false);
   const [focus, setFocus] = useState<number | null>(item.flags[0]?.rep ?? null);
-  const [cueId, setCueId] = useState('');
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -68,11 +67,12 @@ function Opened({ item, api, onReviewed }: { item: QueueItemView; api: string; o
   if (failed) return <p className="text-xs text-fel-crimson">This set could not be opened.</p>;
   if (!d) return <div className="flex justify-center py-4 text-fel-dim"><Loader2 className="h-4 w-4 animate-spin" /></div>;
   const pick = replayPick(d.review.reps, d.review.flags, focus);
-  const reply = async (markOnly: boolean) => {
+  // COACH-TOOLS-EASY (2026-11-02): a cue is one tap (it was a dropdown, then Send); the note sends with it, or alone
+  const reply = async (markOnly: boolean, cueId: string | null = null) => {
     setBusy(true);
     const r = await fetch(`${api}/${item.id}/reply`, {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(markOnly ? { markOnly: true } : { cueId: cueId || null, note, rep: focus }),
+      body: JSON.stringify(markOnly ? { markOnly: true } : { cueId, note, rep: focus }),
     }).catch(() => null);
     setBusy(false);
     const j = r ? await r.json().catch(() => ({})) : {};
@@ -100,21 +100,25 @@ function Opened({ item, api, onReviewed }: { item: QueueItemView; api: string; o
       )}
       {item.status === 'unreviewed' ? (
         <div className="space-y-2" data-reply>
-          <label className="block text-[11px] uppercase tracking-wider text-fel-dim" htmlFor={`cue-${item.id}`}>Cue from the catalogue</label>
-          <select id={`cue-${item.id}`} value={cueId} onChange={(e) => setCueId(e.target.value)} data-reply-cue
-            className="w-full min-w-0 rounded-lg border border-white/10 bg-[#0f0f13] px-2 py-2 text-sm text-white">
-            <option value="">No cue</option>
-            {groups.map(([g, ps]) => (
-              <optgroup key={g} label={g}>{ps.map((p) => <option key={p.id} value={p.id}>{p.text}</option>)}</optgroup>
-            ))}
-          </select>
+          <p className="block text-[12px] uppercase tracking-wider text-fel-dim">{REVIEW_COPY.tapCue}</p>
+          {groups.map(([g, ps]) => (
+            <div key={g} className="flex flex-col" data-reply-group={g}>
+              <p className="pt-1 text-[12px] text-fel-dim">{g}</p>
+              {ps.map((p) => (
+                <button key={p.id} type="button" disabled={busy} onClick={() => void reply(false, p.id)} data-reply-preset={p.id}
+                  className="flex min-h-12 w-full items-center justify-between gap-3 border-b border-white/[0.06] py-2 text-left text-sm text-white disabled:opacity-40">
+                  <span className="min-w-0">{p.text}</span><Send className="h-4 w-4 shrink-0 text-fel-cyan" aria-hidden />
+                </button>
+              ))}
+            </div>
+          ))}
           <textarea value={note} onChange={(e) => setNote(e.target.value.slice(0, REPLY_NOTE_MAX))} rows={2} maxLength={REPLY_NOTE_MAX}
-            placeholder="A short note (optional)" aria-label="Note to your athlete" data-reply-note
+            placeholder={REVIEW_COPY.notePlaceholder} aria-label="Note to your athlete" data-reply-note
             className="w-full resize-y rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white" />
           <div className="flex flex-wrap gap-2">
-            <button type="button" disabled={busy || (!cueId && !note.trim())} onClick={() => void reply(false)} data-reply-send
+            <button type="button" disabled={busy || !note.trim()} onClick={() => void reply(false)} data-reply-send
               className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-fel-cyan px-3 text-sm font-bold text-black disabled:opacity-40">
-              <Send className="h-4 w-4" /> Send to the thread
+              <Send className="h-4 w-4" /> {REVIEW_COPY.sendNote}
             </button>
             <button type="button" disabled={busy} onClick={() => void reply(true)} data-reply-mark
               className="min-h-11 rounded-lg border border-white/15 px-3 text-sm text-white/75 disabled:opacity-40">Mark reviewed</button>
@@ -126,6 +130,9 @@ function Opened({ item, api, onReviewed }: { item: QueueItemView; api: string; o
     </div>
   );
 }
+
+/** COACH-TOOLS-EASY: the reply's words. */
+export const REVIEW_COPY = { tapCue: 'Tap a cue to send it', sendNote: 'Send the note', notePlaceholder: 'Or write a short note' } as const;
 
 export function FormReviewQueue({ api = FORM_REVIEW_QUEUE_API }: { api?: string }) {
   const [data, setData] = useState<{ available: boolean; items: QueueItemView[] } | null>(null);
@@ -160,7 +167,7 @@ export function FormReviewQueue({ api = FORM_REVIEW_QUEUE_API }: { api?: string 
               </button>
             ))}
           </div>
-          {shown.length === 0 && <p className="text-sm text-white/50">{tab === 'unreviewed' ? 'Nothing waiting. Sets your clients film from Today land here, the flagged rep first.' : 'No reviewed sets in the last two weeks.'}</p>}
+          {shown.length === 0 && <p className="text-sm text-white/50">{tab === 'unreviewed' ? 'Nothing waiting. Sets your athletes film from Today land here, the flagged rep first.' : 'No reviewed sets in the last two weeks.'}</p>}
           {shown.map((it) => {
             const top = it.flags[0];
             return (

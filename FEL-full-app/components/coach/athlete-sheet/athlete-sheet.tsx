@@ -18,8 +18,10 @@ export function OnBody({ children }: { children: ReactNode }) {
 
 const TABS: { key: SheetTab; label: string }[] = [{ key: 'week', label: 'Week' }, { key: 'numbers', label: 'Numbers' }, { key: 'thread', label: 'Thread' }, { key: 'program', label: 'Program' }];
 
-export function AthleteSheet({ name, line, initial = 'week', onClose, children, className = '' }: {
+export function AthleteSheet({ name, line, initial = 'week', onClose, children, className = '', dots = {} }: {
   name: string;
+  /** COACH-TOOLS-EASY (2026-11-02): a dot on a tab with something new in it (the thread's unread messages). */
+  dots?: Partial<Record<SheetTab, boolean>>;
   /** e.g. the coach screens' 44 px tap floor (app/coach/_components/look.ts TAP), which a portal leaves behind */
   className?: string;
   line?: string | null;
@@ -50,7 +52,9 @@ export function AthleteSheet({ name, line, initial = 'week', onClose, children, 
         <div className={LOOK.tabs} role="tablist">
           {TABS.map((t) => (
             <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} onClick={() => setTab(t.key)}
-              className={`${LOOK.tab} ${tab === t.key ? LOOK.tabOn : LOOK.tabOff}`} data-sheet-tab={t.key}>{t.label}</button>
+              className={`${LOOK.tab} ${tab === t.key ? LOOK.tabOn : LOOK.tabOff}`} data-sheet-tab={t.key}>
+              {t.label}{dots[t.key] ? <><span aria-hidden className="ml-1.5 inline-block h-2 w-2 rounded-full bg-fel-cyan align-middle" data-tab-dot /><span className="sr-only"> (new)</span></> : null}
+            </button>
           ))}
         </div>
         <div className="space-y-4" data-sheet-body={tab}>{children(tab)}</div>

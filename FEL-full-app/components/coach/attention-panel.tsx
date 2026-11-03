@@ -103,7 +103,8 @@ export function AttentionPanel() {
 
   return (
     <section className="mb-4 rounded-xl border border-white/6 bg-[#0f0f13] p-4" aria-labelledby="attention-heading">
-      <h2 id="attention-heading" className="text-sm font-semibold text-white/80">Needs you today</h2>
+      {/* COACH-TOOLS-EASY (2026-11-02): it said "Needs you today", the home queue's own name, over different contents */}
+      <h2 id="attention-heading" className="text-sm font-semibold text-white/80">Readiness, pain and missed sessions</h2>
       <p className="mt-0.5 text-xs text-fel-dim">{board.headline ?? board.triage.summary}</p>
       <div className="mt-3 empty:hidden"><FormReviewCount /></div>
       <div className="empty:hidden"><ReadinessPanel /></div>
