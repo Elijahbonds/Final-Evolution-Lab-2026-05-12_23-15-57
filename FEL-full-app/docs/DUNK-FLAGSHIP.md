@@ -319,3 +319,57 @@ out reads `{ verified: false, heightCm: null }`. The device-only vertical of lan
 it only with the knob `dunk.realJumpPersonal` on (OFF by default; lib/feel-panel refuses knobs in ranked, staked and paid play);
 `lib/move/dunkBody` is untouched (movement-play's). Tests: the real assessment POST, then this GET (adult, unverified jumps, a teen,
 opted out, no session, a failing database).
+
+## 10. Phase 6 — 16 air tricks you can tell apart: results (lane/dunk-flagship-p6)
+
+Rig: the esbuild rig on build `82e88b7c` (the release merged in), the dunker filmed from the side (`SIDECAM=1`: the camera
+beside the hips each frame, after the mode's own camera). Contact sheet: `round9/dunk-flagship/shots/phase6-tricks.jpg`
+(6 side frames of every trick from the frame it fires, then the distance chart).
+
+### Gate 0, first
+The hero's rig as loaded (`GATE0=1`): `Human.rig_c57`, the 22 FEL-spec bones, none prefixed (rigNormalize's gate), the hips
+0.986 m over the floor at rest, the root at y 0.028. The pose targets below play on any body that passes it.
+
+### Gate 1 — all 16 air tricks fire on the rig
+16 of 16 log `[DUNK-TRICK] air <id>`, each on a fresh page (one attempt per page, so nothing left over from the last attempt):
+14 fire at 0.34 of the flight (in the window) and the two armed ones (scorpion, double clutch) at 0.71. The windmill and the
+cradle never fired at first: the probe threw them 0.1 s after an automatic launch, inside TakeoffEcho's late-jump window
+(`LATE_JUMP_MS` 250), which reads an A there as the jump the player was about to make. A probe artefact, not a game bug: the
+probe now presses the trick `AIR_AFTER_MS` (300) after the launch.
+
+### Gate 2 — distinct body paths
+The measure: for each trick, its own window (from the fire, 0.75 s, 18 samples), the hands, the feet and the head relative to
+the hips and turned into the body's facing, and the RMS distance in metres to every other trick's. The plan's wording — every
+trick's nearest neighbour at least the median — cannot hold for any set (half of any list sits below its median), so this
+phase used its other clause: **the closest pairs fixed and re-measured** (`assumption:` the owner meant that one).
+
+| | Nearest-neighbour median | All-pairs median | Closest pair |
+|---|---|---|---|
+| Before | 0.332 m | 0.507 m | fake eastbay / double eastbay 0.225 m |
+| After the cradle change | 0.332 m | 0.509 m | the same (by design, below) |
+
+- **Fixed: the cradle and the behind-the-back** (0.246 m, the closest real pair). They flew the same leg program, drive →
+  kick back → spread → long, so from the side two different hand paths rode on one pair of legs. The cradle's legs now swing
+  FORWARD while the ball rocks back past the hip (the counterweight; `AIR.kickOut` on the rock's two keys instead of
+  `AIR.kickBack`). Re-measured on the rig: the cradle 0.246 → **0.324 m** (nearest now the fake behind-the-back), the
+  behind-the-back 0.246 → **0.319 m** (nearest now the between-the-legs). The hands, the key times, the take-off and the flush
+  are unchanged; `coreClips.test.ts` (the named dunks move, finish long, legs asymmetric) passes unchanged. **RIG-ADJACENT,
+  an authored shape: the owner's eye signs it off** (the sheet shows the cradle before and after).
+- **Not changed, by design: the fakes.** Fake eastbay / double eastbay 0.225 m and fake behind-the-back / fake eastbay 0.259 m
+  sit lowest because the fakes are authored to copy the real move for their first third ("the lie", in `dunkTricks.ts`).
+  Pulling them apart would break what they are.
+- **Not changed: the 360 and the lost & found** (0.311 m). Both are turned by the mode's spin layer and the clip owns only the
+  arms, so their bodies share the turn by construction.
+- A whole-flight version of the measure (launch to +1.3 s, the shared carry-up and slam included) reads lower everywhere
+  (nearest-neighbour median 0.263 m) — the same rank order, which is why the gate is measured on the trick's own window.
+
+### Gate 3 — the side strips
+All 16 from the side, 6 frames each from the fire, on the sheet. The probe draws only the strip's frames (and the 3 before
+each) under FAST: filming every frame took ~14 min a trick under the shared CPU load. Checked against a fully drawn control
+of the same seed (the windmill): the same frames, per-frame RMSE 0.4–1.0 %.
+
+Probe changes (`scripts/probes/_dunk-flagship-probe.mts`): `AIR_AFTER_MS`, `TRICKS=` (a subset), `STRIP_ALL=1` (a strip of
+every attempt), `SIDECAM=1`, `GATE0=1`, FAST + STRIP draws only the strip frames, and the status line is restored after
+each photo (hidden, it made the page's next attempt read "no approach"). Found on the way: from the second attempt on a page
+an obstacle prop (an orange car, by the look of it) stands between the side camera and the dunker, so the strips and the numbers above are one trick per page
+(`PER_PAGE=1`).

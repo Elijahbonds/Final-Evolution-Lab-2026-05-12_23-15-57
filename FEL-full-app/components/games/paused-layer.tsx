@@ -134,7 +134,9 @@ export function PausedLayer({ onResume, modeId, hint }: { onResume: () => void; 
         <span className="fel-heading text-3xl font-bold text-white">{PAUSED_HEADLINE}</span>
         {how && <span data-pause-device-line className="font-mono text-xs font-bold tracking-wider text-white/70">{how}</span>}
         {line && <HandsUpLine line={line} progress={view.handsUp01} />}
-        {modeId && <ControlsPanel modeId={modeId} hint={hint} chooser={false} className="max-h-[60vh]" />}
+        {/* gameplay-clean (2026-10-28): the panel is near-opaque on the pause — at /60 the HUD's bright banners and meters
+            showed through its lines (the audit counted 4 overlapping texts on golf's pause) */}
+        {modeId && <ControlsPanel modeId={modeId} hint={hint} chooser={false} className="max-h-[60vh] !bg-black/85" />}
       </span>
     </button>
   );
