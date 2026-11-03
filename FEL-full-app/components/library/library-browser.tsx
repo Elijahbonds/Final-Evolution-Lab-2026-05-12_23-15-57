@@ -13,7 +13,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { readToast } from '@/components/ui/fel/toast';
 import { AlertTriangle, ArrowDown, ArrowUp, Check, ChevronDown, ChevronUp, Loader2, MessageCircleQuestion, Plus, Search, SlidersHorizontal, Sparkles, X } from 'lucide-react';
 import { LibraryDemo, DEMO_TAB_LABEL, demoTabs, type DemoTab } from '@/components/library/library-demo';
 import type { LibraryCard } from '@/lib/library/server';
@@ -110,7 +109,7 @@ export function LibraryBrowser({ onUse, onAdded, canAdd = false, title }: {
     setLoading(true);
     try {
       const r = await fetch('/api/library/ask', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ q: text, drafts }) });
-      if (r.status === 429) { readToast.error('That is a lot of questions in a minute. Try again shortly.'); return; }
+      if (r.status === 429) { toast.error('That is a lot of questions in a minute. Try again shortly.'); return; }
       const j = r.ok ? await r.json() as AskPayload : null;
       setAsk(j);
     } catch { setAsk(null); }
@@ -156,7 +155,7 @@ export function LibraryBrowser({ onUse, onAdded, canAdd = false, title }: {
       <div className="flex gap-1 rounded-xl border border-white/6 bg-[#0f0f13] p-1" role="tablist" aria-label="Search or ask">
         {([['search', 'Search', Search], ['ask', 'Ask', MessageCircleQuestion]] as const).map(([k, label, Icon]) => (
           <button key={k} role="tab" aria-selected={mode === k} onClick={() => setMode(k)}
-            className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium ${mode === k ? 'bg-[#00E5FF]/15 text-[#00E5FF]' : 'text-white/50 hover:text-white/70'}`}>
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium ${mode === k ? 'bg-[#00E5FF]/15 text-[#00E5FF]' : 'text-white/45 hover:text-white/70'}`}>
             <Icon className="h-3.5 w-3.5" />{label}
           </button>
         ))}
@@ -164,10 +163,10 @@ export function LibraryBrowser({ onUse, onAdded, canAdd = false, title }: {
 
       {mode === 'search' ? (
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/50" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search: goblet squat, RDL, pogo, ankle…" aria-label="Search the exercise library"
             className="w-full rounded-xl border border-white/10 bg-[#16161a] py-2.5 pl-10 pr-10 text-sm text-white placeholder-white/30 focus:border-[#00E5FF]/40 focus:outline-none" />
-          {loading && <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-white/50" />}
+          {loading && <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-white/40" />}
         </div>
       ) : (
         <form onSubmit={(e) => { e.preventDefault(); void runAsk(question); }} className="space-y-2">
@@ -181,7 +180,7 @@ export function LibraryBrowser({ onUse, onAdded, canAdd = false, title }: {
           {!ask && (
             <div className="flex flex-wrap gap-1.5">
               {ASK_EXAMPLES.map((x) => (
-                <button key={x} type="button" onClick={() => { setQuestion(x); void runAsk(x); }} className="rounded-lg border border-white/10 px-2 py-1 text-[12px] text-white/55 hover:border-[#00E5FF]/30 hover:text-white/80">{x}</button>
+                <button key={x} type="button" onClick={() => { setQuestion(x); void runAsk(x); }} className="rounded-lg border border-white/10 px-2 py-1 text-[11px] text-white/55 hover:border-[#00E5FF]/30 hover:text-white/80">{x}</button>
               ))}
             </div>
           )}
@@ -190,7 +189,7 @@ export function LibraryBrowser({ onUse, onAdded, canAdd = false, title }: {
 
       {/* what the library holds for this viewer, and the drafts opt-in */}
       {data && (
-        <div className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-white/50">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-white/40">
           <span data-testid="library-counts">{data.library.approved.toLocaleString()} approved{data.viewer.coach ? ` · ${data.library.drafts.toLocaleString()} drafts waiting for review` : ''}</span>
           <span className="flex items-center gap-3">
             {data.viewer.coach && (
@@ -213,25 +212,25 @@ export function LibraryBrowser({ onUse, onAdded, canAdd = false, title }: {
             </div>
           )}
           <div className="flex flex-wrap items-center gap-1.5" data-testid="ask-chips">
-            <span className="text-[12px] text-white/50">Read as:</span>
+            <span className="text-[11px] text-white/40">Read as:</span>
             {ask.chips.map((c) => (
               <button key={`${c.key}:${c.value}`} onClick={() => dropChip(c)} aria-label={`Remove ${c.label}`}
-                className="inline-flex items-center gap-1 rounded-full border border-[#00E5FF]/30 bg-[#00E5FF]/[0.07] px-2 py-0.5 text-[12px] text-[#00E5FF]/90 hover:border-[#FF3366]/50">
+                className="inline-flex items-center gap-1 rounded-full border border-[#00E5FF]/30 bg-[#00E5FF]/[0.07] px-2 py-0.5 text-[11px] text-[#00E5FF]/90 hover:border-[#FF3366]/50">
                 {c.label}<X className="h-3 w-3" />
               </button>
             ))}
-            {!ask.chips.length && <span className="text-[12px] text-white/50">nothing specific — showing the closest matches</span>}
+            {!ask.chips.length && <span className="text-[11px] text-white/40">nothing specific — showing the closest matches</span>}
           </div>
-          {ask.anchor && <p className="text-[12px] text-white/50">Compared with <button className="text-white/80 underline-offset-2 hover:underline" onClick={() => void openById(ask.anchor!.id, setSelected)}>{ask.anchor.name}</button>.</p>}
-          {ask.relaxed.length > 0 && <p className="text-[12px] text-[#FFD700]/80">Nothing matched everything, so this leaves out: {ask.relaxed.join(', ')}.</p>}
-          {ask.ai.used && ask.ai.why && <p className="text-[12px] text-white/55"><Sparkles className="mr-1 inline h-3 w-3 text-[#A855F7]" />{ask.ai.why}</p>}
+          {ask.anchor && <p className="text-[11px] text-white/50">Compared with <button className="text-white/80 underline-offset-2 hover:underline" onClick={() => void openById(ask.anchor!.id, setSelected)}>{ask.anchor.name}</button>.</p>}
+          {ask.relaxed.length > 0 && <p className="text-[11px] text-[#FFD700]/80">Nothing matched everything, so this leaves out: {ask.relaxed.join(', ')}.</p>}
+          {ask.ai.used && ask.ai.why && <p className="text-[11px] text-white/55"><Sparkles className="mr-1 inline h-3 w-3 text-[#A855F7]" />{ask.ai.why}</p>}
           {ask.plan && (
             <ol className="space-y-1.5" data-testid="ask-plan">
               {ask.plan.map((p, i) => (
                 <li key={p.entry.id}>
                   <button onClick={() => setSelected(p.entry)} className="fel-card flex w-full items-center justify-between gap-2 rounded-xl p-2.5 text-left">
                     <span className="min-w-0">
-                      <span className="block text-[12px] uppercase tracking-wider text-white/50">{i + 1}. {p.slot}</span>
+                      <span className="block text-[10px] uppercase tracking-wider text-white/35">{i + 1}. {p.slot}</span>
                       <span className="block truncate text-sm text-white">{p.entry.name}</span>
                     </span>
                     <span className="shrink-0 text-xs text-[#00E5FF]/80">{p.minutes} min</span>
@@ -248,25 +247,25 @@ export function LibraryBrowser({ onUse, onAdded, canAdd = false, title }: {
         <>
           <div className="flex flex-wrap items-center gap-1.5">
             <button onClick={() => setShowFilters((s) => !s)} aria-expanded={showFilters}
-              className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[12px] ${showFilters || active.length ? 'border-[#00E5FF]/30 text-[#00E5FF]' : 'border-white/10 text-white/50'}`}>
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] ${showFilters || active.length ? 'border-[#00E5FF]/30 text-[#00E5FF]' : 'border-white/10 text-white/50'}`}>
               <SlidersHorizontal className="h-3.5 w-3.5" /> Filters{active.length ? ` (${active.length})` : ''}
             </button>
             {filters.only && <Chip label="Only my equipment" onClear={() => setFilters((f) => { const o = { ...f }; delete o.only; return o; })} />}
             {active.map(({ k, v }) => <Chip key={`${k}:${v}`} label={k === 'lowLoad' ? `Easy on the ${v}` : k === 'notCategory' ? `No ${v}` : k === 'notEquipment' ? `No ${v}` : labelFor(k, v)} onClear={() => setFilters((f) => { const list = (f[k as FacetKey] ?? []).filter((x) => x !== v); const o = { ...f, [k]: list }; if (!list.length) delete (o as Record<string, unknown>)[k]; return o; })} />)}
-            {active.length > 0 && <button onClick={() => setFilters({})} className="text-[12px] text-white/50 hover:text-white/70">Clear all</button>}
+            {active.length > 0 && <button onClick={() => setFilters({})} className="text-[11px] text-white/40 hover:text-white/70">Clear all</button>}
           </div>
           {showFilters && data && (
             <div className="fel-card grid max-h-[50vh] grid-cols-1 gap-3 overflow-y-auto rounded-xl p-3 sm:grid-cols-2" data-testid="library-facets">
               {FACET_ORDER.map((k) => data.facets[k]?.length ? (
                 <div key={k} className="space-y-1">
-                  <div className="text-[12px] uppercase tracking-wider text-white/50">{FACET_TITLES[k]}</div>
+                  <div className="text-[10px] uppercase tracking-wider text-white/40">{FACET_TITLES[k]}</div>
                   <div className="flex flex-wrap gap-1">
                     {data.facets[k].slice(0, 14).map((v) => {
                       const on = (filters[k] ?? []).includes(v.value);
                       return (
                         <button key={v.value} onClick={() => toggle(k, v.value)} aria-pressed={on}
-                          className={`rounded-md border px-1.5 py-0.5 text-[12px] ${on ? 'border-[#00E5FF]/40 bg-[#00E5FF]/15 text-[#00E5FF]' : 'border-white/8 text-white/60 hover:text-white/85'}`}>
-                          {v.label} <span className="text-white/50">{v.count}</span>
+                          className={`rounded-md border px-1.5 py-0.5 text-[11px] ${on ? 'border-[#00E5FF]/40 bg-[#00E5FF]/15 text-[#00E5FF]' : 'border-white/8 text-white/60 hover:text-white/85'}`}>
+                          {v.label} <span className="text-white/35">{v.count}</span>
                         </button>
                       );
                     })}
@@ -276,7 +275,7 @@ export function LibraryBrowser({ onUse, onAdded, canAdd = false, title }: {
             </div>
           )}
           {data && (data.didYouMean || data.fallback === 'any-term' || (data.total === 0 && data.relaxations.length > 0)) && (
-            <div className="space-y-1 text-[12px] text-white/55" data-testid="library-recovery">
+            <div className="space-y-1 text-[11px] text-white/55" data-testid="library-recovery">
               {data.didYouMean && <p>Showing results for <button className="text-[#00E5FF] underline-offset-2 hover:underline" onClick={() => setQ(data.didYouMean!)}>{data.didYouMean}</button>.</p>}
               {data.fallback === 'any-term' && <p>Nothing matched every word, so these match some of them.</p>}
               {data.total === 0 && data.relaxations.map((r) => (
@@ -294,7 +293,7 @@ export function LibraryBrowser({ onUse, onAdded, canAdd = false, title }: {
       <div className="space-y-2" data-testid="library-results">
         {results.map((e) => <ResultCard key={e.id} e={e} onOpen={(t) => { setSheetTab(t); setSelected(e); }} onOpenVariant={(id) => { setSheetTab(undefined); void openById(id, setSelected); }} />)}
         {!loading && results.length === 0 && (mode === 'search' ? data : ask) && (
-          <div className="py-8 text-center text-sm text-white/50">
+          <div className="py-8 text-center text-sm text-white/35">
             {mode === 'search' && data && data.library.approved === 0 && !drafts
               ? (data.viewer.coach ? 'Nothing is approved yet. Turn on "Show drafts" to browse the drafts.' : 'The library opens as the owner approves it. Check back soon.')
               : 'Nothing matches. Try fewer words or another filter.'}
@@ -319,7 +318,7 @@ async function openById(id: string, set: (e: LibraryCard) => void) {
 
 function Chip({ label, onClear }: { label: string; onClear: () => void }) {
   return (
-    <button onClick={onClear} aria-label={`Remove ${label}`} className="inline-flex items-center gap-1 rounded-full border border-[#00E5FF]/30 bg-[#00E5FF]/[0.07] px-2 py-0.5 text-[12px] text-[#00E5FF]/90">
+    <button onClick={onClear} aria-label={`Remove ${label}`} className="inline-flex items-center gap-1 rounded-full border border-[#00E5FF]/30 bg-[#00E5FF]/[0.07] px-2 py-0.5 text-[11px] text-[#00E5FF]/90">
       {label}<X className="h-3 w-3" />
     </button>
   );
@@ -327,10 +326,10 @@ function Chip({ label, onClear }: { label: string; onClear: () => void }) {
 
 function Badges({ e }: { e: LibraryCard }) {
   return (
-    <span className="flex flex-wrap items-center gap-1.5 text-[12px]">
+    <span className="flex flex-wrap items-center gap-1.5 text-[10px]">
       <span className="rounded-full border px-1.5 py-0.5" style={{ color: LEVEL_TONE[e.level], borderColor: `${LEVEL_TONE[e.level]}55` }}>{e.level}</span>
       {e.review.status === 'draft' && <span className="rounded-full border border-[#FFD700]/40 px-1.5 py-0.5 text-[#FFD700]/90" data-testid="draft-badge">draft</span>}
-      <span className="text-white/50">{e.equipment.length ? e.equipment.join(', ').replace(/-/g, ' ') : 'no equipment'}</span>
+      <span className="text-white/40">{e.equipment.length ? e.equipment.join(', ').replace(/-/g, ' ') : 'no equipment'}</span>
     </span>
   );
 }
@@ -346,30 +345,30 @@ function ResultCard({ e, onOpen, onOpenVariant }: { e: LibraryCard; onOpen: (tab
             <div className="truncate text-sm font-medium text-white">{e.name}</div>
             <Badges e={e} />
             <p className="line-clamp-1 text-[12px] text-white/60">{e.cues[0]}</p>
-            {e.faults[0] && <p className="line-clamp-1 text-[12px] text-white/50"><span className="text-[#FF3366]/70">Watch for:</span> {e.faults[0].fault.toLowerCase()}</p>}
+            {e.faults[0] && <p className="line-clamp-1 text-[11px] text-white/40"><span className="text-[#FF3366]/70">Watch for:</span> {e.faults[0].fault.toLowerCase()}</p>}
           </div>
-          {e.avatarClip && <span className="shrink-0 rounded bg-[#00E5FF]/10 px-1.5 py-0.5 text-[12px] font-bold tracking-wider text-[#00E5FF]/80">3D</span>}
+          {e.avatarClip && <span className="shrink-0 rounded bg-[#00E5FF]/10 px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-[#00E5FF]/80">3D</span>}
         </div>
       </button>
       {/* LIBRARY-ANATOMY (2026-10-25): the four ways to see it, one tap from the card (each opens the sheet on that tab) */}
       <div className="flex flex-wrap gap-1.5 px-3 pb-2.5" data-testid="card-demo-links">
         {demoTabs(e).map((t) => (
           <button key={t} onClick={() => onOpen(t)} data-testid={`card-link-${t}`}
-            className="min-h-[28px] rounded-full border border-white/10 px-2.5 text-[12px] text-white/60 hover:border-[#00E5FF]/30 hover:text-white">
+            className="min-h-[28px] rounded-full border border-white/10 px-2.5 text-[11px] text-white/60 hover:border-[#00E5FF]/30 hover:text-white">
             {t === 'demo' && !e.avatarClip ? 'How to' : DEMO_TAB_LABEL[t]}
           </button>
         ))}
       </div>
       {variants.length > 0 && (
         <div className="border-t border-white/5 px-3 pb-2.5 pt-1.5">
-          <button onClick={() => setOpen((o) => !o)} aria-expanded={open} className="inline-flex items-center gap-1 text-[12px] text-[#00E5FF]/80 hover:text-[#00E5FF]" data-testid="variants-toggle">
+          <button onClick={() => setOpen((o) => !o)} aria-expanded={open} className="inline-flex items-center gap-1 text-[11px] text-[#00E5FF]/80 hover:text-[#00E5FF]" data-testid="variants-toggle">
             {open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />} +{variants.length} variant{variants.length === 1 ? '' : 's'}
           </button>
           {open && (
             <ul className="mt-1.5 flex flex-wrap gap-1.5" data-testid="variants-list">
               {variants.map((v) => (
                 <li key={v.id}>
-                  <button onClick={() => onOpenVariant(v.id)} className="rounded-lg border border-white/10 px-2 py-0.5 text-[12px] text-white/70 hover:border-[#00E5FF]/30 hover:text-white">
+                  <button onClick={() => onOpenVariant(v.id)} className="rounded-lg border border-white/10 px-2 py-0.5 text-[11px] text-white/70 hover:border-[#00E5FF]/30 hover:text-white">
                     {v.name}{v.status === 'draft' ? <span className="ml-1 text-[#FFD700]/70">draft</span> : null}
                   </button>
                 </li>
@@ -407,10 +406,10 @@ function EntrySheet({ e, tab, onClose, onUse, canAdd, onAdded, onOpen }: {
     <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center" role="dialog" aria-modal="true" aria-label={e.name}>
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div className="relative max-h-[88vh] w-full overflow-y-auto rounded-t-2xl border border-white/10 bg-[#0f0f13] p-5 sm:max-w-lg sm:rounded-2xl" data-testid="library-sheet">
-        <button onClick={onClose} aria-label="Close" className="absolute right-4 top-4 text-white/50 hover:text-white"><X className="h-5 w-5" /></button>
+        <button onClick={onClose} aria-label="Close" className="absolute right-4 top-4 text-white/40 hover:text-white"><X className="h-5 w-5" /></button>
         <h3 className="fel-heading pr-8 text-lg text-white">{e.name}</h3>
         <div className="mt-1"><Badges e={e} /></div>
-        {e.review.status === 'draft' && <p className="mt-2 text-[12px] text-[#FFD700]/80">Draft: written for the owner&apos;s review and not approved yet.</p>}
+        {e.review.status === 'draft' && <p className="mt-2 text-[11px] text-[#FFD700]/80">Draft: written for the owner&apos;s review and not approved yet.</p>}
 
         {(canAdd || onUse) && (
           <div className="mt-3 flex flex-wrap gap-2">
@@ -441,10 +440,10 @@ function EntrySheet({ e, tab, onClose, onUse, canAdd, onAdded, onOpen }: {
             <ul className="space-y-1.5">{e.faults.map((f) => <li key={f.fault} className="text-white/70"><span className="text-white/90">{f.fault}.</span> <span className="text-[#00E5FF]/80">Fix: {f.fix}</span></li>)}</ul>
           </Section>
           <Section label="Dose"><p className="text-white/75">{dose(e.dosage)}</p></Section>
-          {e.prehabNote && <p className="text-[12px] text-white/50">{e.prehabNote}</p>}
+          {e.prehabNote && <p className="text-[11px] text-white/45">{e.prehabNote}</p>}
           {e.cautions.length > 0 && <Section label="Before you load it"><ul className="list-disc space-y-1 pl-4 text-white/60">{e.cautions.map((c) => <li key={c}>{c}</li>)}</ul></Section>}
           <Section label="Muscles">
-            <p className="text-white/70" data-testid="muscle-map"><span className="text-white/90">{e.primaryMuscles.join(', ').replace(/-/g, ' ')}</span>{e.secondaryMuscles.length ? <span className="text-white/50"> · also {e.secondaryMuscles.join(', ').replace(/-/g, ' ')}</span> : null}</p>
+            <p className="text-white/70" data-testid="muscle-map"><span className="text-white/90">{e.primaryMuscles.join(', ').replace(/-/g, ' ')}</span>{e.secondaryMuscles.length ? <span className="text-white/45"> · also {e.secondaryMuscles.join(', ').replace(/-/g, ' ')}</span> : null}</p>
           </Section>
           {(e.regressionId || e.progressionId) && (
             <div className="flex flex-wrap gap-2">
@@ -452,7 +451,7 @@ function EntrySheet({ e, tab, onClose, onUse, canAdd, onAdded, onOpen }: {
               {e.progressionId && <button onClick={() => onOpen(e.progressionId!)} className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1 text-xs text-white/70"><ArrowUp className="h-3.5 w-3.5" /> Harder version</button>}
             </div>
           )}
-          <p className="text-[12px] text-white/50">{e.source.kind === 'seed' ? `From an open public-domain list (${e.source.licence}); words by FEL.` : e.source.kind === 'coach-submitted' ? 'Submitted by a FEL coach.' : 'Written by FEL.'}</p>
+          <p className="text-[10px] text-white/30">{e.source.kind === 'seed' ? `From an open public-domain list (${e.source.licence}); words by FEL.` : e.source.kind === 'coach-submitted' ? 'Submitted by a FEL coach.' : 'Written by FEL.'}</p>
         </div>
       </div>
     </div>
@@ -460,5 +459,5 @@ function EntrySheet({ e, tab, onClose, onUse, canAdd, onAdded, onOpen }: {
 }
 
 function Section({ label, children }: { label: string; children: ReactNode }) {
-  return <div><h5 className="mb-1 text-[12px] font-semibold uppercase tracking-wide text-white/50">{label}</h5>{children}</div>;
+  return <div><h5 className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-white/45">{label}</h5>{children}</div>;
 }

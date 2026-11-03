@@ -28,9 +28,8 @@ describe('the shared message primitives keep a message up for its read time', ()
   });
 });
 
-/** Routed, not edited: components/coach/** is lane/coach-tools-easy's while it runs (coordinator, 2026-11-02). Each line
- *  is one toast to move to readToast there; the list only shrinks. */
-const ROUTED = new Set(['components/coach/bulk-invite.tsx', 'components/coach/guardian-report-button.tsx', 'components/coach/invite-panel.tsx']);
+/** Routed, not edited: a file another lane holds. Each line is one toast to move to readToast there; the list only shrinks. */
+const ROUTED = new Set<string>([]);
 
 describe('every literal sonner toast reads inside sonner’s 4 s (a longer one uses readToast)', () => {
   it('no long literal through toast() directly', () => {

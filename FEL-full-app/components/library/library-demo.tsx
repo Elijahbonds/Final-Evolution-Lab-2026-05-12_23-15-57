@@ -92,7 +92,7 @@ export function LibraryDemo({ entry, initialTab }: { entry: LibraryCard; initial
           const Icon = ICON[t];
           return (
             <button key={t} role="tab" aria-selected={tab === t} onClick={() => choose(t)} data-testid={`demo-tab-${t}`}
-              className={`flex min-h-[40px] flex-1 items-center justify-center gap-1.5 text-[12px] font-bold tracking-wide transition-colors ${tab === t ? 'bg-white/[0.06] text-[#00E5FF]' : 'text-white/50 hover:text-white/75'}`}>
+              className={`flex min-h-[40px] flex-1 items-center justify-center gap-1.5 text-[11px] font-bold tracking-wide transition-colors ${tab === t ? 'bg-white/[0.06] text-[#00E5FF]' : 'text-white/45 hover:text-white/75'}`}>
               <Icon className="h-3.5 w-3.5" aria-hidden />{DEMO_TAB_LABEL[t]}
             </button>
           );
@@ -109,15 +109,15 @@ export function LibraryDemo({ entry, initialTab }: { entry: LibraryCard; initial
             <StagePreview entry={entry} view={stageView} legend={legend} secondary={secondary} state={stageState} />
           </div>
           {tab === 'demo' && stageState === 'ready' && (
-            <span className="pointer-events-none absolute left-2 top-2 rounded bg-black/60 px-2 py-0.5 text-[12px] font-bold tracking-wider text-[#00E5FF]">
+            <span className="pointer-events-none absolute left-2 top-2 rounded bg-black/60 px-2 py-0.5 text-[10px] font-bold tracking-wider text-[#00E5FF]">
               YOUR ATHLETE{entry.avatarHold != null ? ' · HOLD' : ''}
             </span>
           )}
           {tab === 'demo' && stageState === 'ready' && isBallClip(clip) && (
-            <span className="pointer-events-none absolute bottom-2 left-2 rounded bg-black/60 px-2 py-0.5 text-[12px] text-white/70" data-testid="ball-note">The ball isn&apos;t drawn here.</span>
+            <span className="pointer-events-none absolute bottom-2 left-2 rounded bg-black/60 px-2 py-0.5 text-[10px] text-white/70" data-testid="ball-note">The ball isn&apos;t drawn here.</span>
           )}
           {tab === 'muscles' && (
-            <div className="absolute right-2 top-2 flex overflow-hidden rounded-lg border border-white/15 bg-black/60 text-[12px] font-bold" role="group" aria-label="Which side of the body">
+            <div className="absolute right-2 top-2 flex overflow-hidden rounded-lg border border-white/15 bg-black/60 text-[11px] font-bold" role="group" aria-label="Which side of the body">
               {(['front', 'back'] as const).map((s) => (
                 <button key={s} onClick={() => setSide(s)} aria-pressed={side === s} data-testid={`side-${s}`}
                   className={`min-h-[34px] px-3 ${side === s ? 'bg-white/15 text-white' : 'text-white/55'}`}>
@@ -132,7 +132,7 @@ export function LibraryDemo({ entry, initialTab }: { entry: LibraryCard; initial
       {tab === 'demo' && !clip && (
         <div className="p-4" data-testid="demo-cue-card">
           <div className="flex items-center gap-3 rounded-xl bg-[#16161a] p-4">
-            <Dumbbell className="h-8 w-8 shrink-0 text-white/50" aria-hidden />
+            <Dumbbell className="h-8 w-8 shrink-0 text-white/30" aria-hidden />
             <div className="min-w-0 space-y-1">
               <p className="text-[12px] text-white/55">{threeDisabled ? '3D is off on this device.' : 'No 3D demo for this one yet. Follow the cues:'}</p>
               <ul className="space-y-0.5 text-[13px] text-white/85">{entry.cues.slice(0, 2).map((c) => <li key={c}>{c}</li>)}</ul>
@@ -149,12 +149,12 @@ export function LibraryDemo({ entry, initialTab }: { entry: LibraryCard; initial
               <li key={m.id} className="flex items-center gap-2 text-[12px]">
                 <span aria-hidden className="h-3 w-3 shrink-0 rounded-sm border border-black/40" style={{ background: m.tier === 'primary' ? ANATOMY_PALETTE.primary : secondary }} />
                 <span className={m.tier === 'primary' ? 'text-white' : 'text-white/70'}>{m.label}</span>
-                <span className="text-[12px] uppercase tracking-wide text-white/50">{m.tier === 'primary' ? 'Main' : 'Also'}{m.view !== 'both' && m.view !== side ? ` · ${m.view}` : ''}</span>
+                <span className="text-[10px] uppercase tracking-wide text-white/35">{m.tier === 'primary' ? 'Main' : 'Also'}{m.view !== 'both' && m.view !== side ? ` · ${m.view}` : ''}</span>
               </li>
             ))}
           </ul>
           {legend.some((m) => m.view !== 'both' && m.view !== side) && (
-            <button onClick={() => setSide(side === 'front' ? 'back' : 'front')} className="inline-flex items-center gap-1 text-[12px] text-[#00E5FF]/80">
+            <button onClick={() => setSide(side === 'front' ? 'back' : 'front')} className="inline-flex items-center gap-1 text-[11px] text-[#00E5FF]/80">
               <RotateCcw className="h-3 w-3" aria-hidden /> Turn to the {side === 'front' ? 'back' : 'front'}
             </button>
           )}
@@ -164,12 +164,12 @@ export function LibraryDemo({ entry, initialTab }: { entry: LibraryCard; initial
       {tab === 'cues' && (
         <div className="space-y-3 p-4" data-testid="demo-cues">
           <div>
-            <h5 className="mb-1 text-[12px] font-semibold uppercase tracking-wide text-white/50">Think about</h5>
+            <h5 className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-white/45">Think about</h5>
             <ul className="space-y-1.5 text-[15px] leading-snug text-white">{entry.cues.map((c) => <li key={c}>{c}</li>)}</ul>
           </div>
           {entry.faults.length > 0 && (
             <div>
-              <h5 className="mb-1 text-[12px] font-semibold uppercase tracking-wide text-white/50">Watch for</h5>
+              <h5 className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-white/45">Watch for</h5>
               <ul className="space-y-1 text-[13px] text-white/75">{entry.faults.slice(0, 2).map((f) => <li key={f.fault}>{f.fault}. <span className="text-[#00E5FF]/85">{f.fix}</span></li>)}</ul>
             </div>
           )}
@@ -206,20 +206,20 @@ function StagePreview({ entry, view, legend, secondary, state }: {
       className={`absolute inset-0 flex flex-col justify-center gap-3 overflow-hidden px-5 py-4 transition-opacity duration-300 ${shown ? 'opacity-100' : 'pointer-events-none opacity-0'}`}>
       {view === 'demo' ? (
         <div>
-          <h5 className="mb-1.5 text-[12px] font-semibold uppercase tracking-wide text-white/50">Think about</h5>
+          <h5 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-white/45">Think about</h5>
           <ul className="space-y-1 text-[14px] leading-snug text-white/90">{entry.cues.slice(0, 3).map((c) => <li key={c}>{c}</li>)}</ul>
         </div>
       ) : (
         <div className="space-y-2">
-          <p className="text-[12px] font-semibold uppercase tracking-wide text-white/50">Main</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-white/45">Main</p>
           <ul className="flex flex-wrap gap-1.5">{main.map((m) => <li key={m.id} className="flex items-center gap-1.5 rounded-full bg-white/[0.06] px-2.5 py-1 text-[12px] text-white"><span aria-hidden className="h-2.5 w-2.5 rounded-sm" style={{ background: ANATOMY_PALETTE.primary }} />{m.label}</li>)}</ul>
           {also.length > 0 && <>
-            <p className="text-[12px] font-semibold uppercase tracking-wide text-white/50">Also</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-white/45">Also</p>
             <ul className="flex flex-wrap gap-1.5">{also.map((m) => <li key={m.id} className="flex items-center gap-1.5 rounded-full bg-white/[0.04] px-2.5 py-1 text-[12px] text-white/75"><span aria-hidden className="h-2.5 w-2.5 rounded-sm" style={{ background: secondary }} />{m.label}</li>)}</ul>
           </>}
         </div>
       )}
-      <p className="text-[12px] text-white/50" role="status">{state === 'failed' ? 'Couldn’t load 3D on this device.' : 'Loading your athlete…'}</p>
+      <p className="text-[11px] text-white/40" role="status">{state === 'failed' ? 'Couldn’t load 3D on this device.' : 'Loading your athlete…'}</p>
     </div>
   );
 }

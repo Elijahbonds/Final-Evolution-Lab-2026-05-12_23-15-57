@@ -1,13 +1,13 @@
 {
  "note": "tests/readable/source-floor.test.ts: a file may not rise above its line; numbers only go down. docs/READABLE.md.",
  "totals": {
-  "size": 244,
-  "colour": 85
+  "size": 80,
+  "colour": 49
  },
  "files": {
   "app/coach/_components/clients-view.tsx": {
    "size": 2,
-   "why": "routed: lane/coach-tools-easy is editing it (coordinator, 2026-11-02)"
+   "why": "routed: lane/group-booking is editing it (trial merge, 2026-11-03)"
   },
   "app/coach/admin/_components/kb-admin.tsx": {
    "colour": 1,
@@ -23,213 +23,9 @@
    "colour": 2,
    "why": "routed: lane/public-polish holds it (coordinator, 2026-11-02)"
   },
-  "app/play/mirror/_components/mirror-harness.tsx": {
-   "size": 32,
-   "colour": 29,
-   "why": "routed: lane/coach-tools-easy is editing it (coordinator, 2026-11-02)"
-  },
-  "app/press/library/page.tsx": {
-   "size": 4,
-   "colour": 1,
-   "why": "routed: lane/public-polish is editing it (coordinator, 2026-11-02)"
-  },
-  "app/press/page.tsx": {
-   "size": 11,
-   "colour": 5,
-   "why": "routed: lane/plat-p07 is editing it (coordinator, 2026-11-02)"
-  },
   "app/press/receipt/page.tsx": {
    "size": 1,
    "why": "routed: lane/public-polish holds it (coordinator, 2026-11-02)"
-  },
-  "components/coach-business/business-dashboard.tsx": {
-   "colour": 1,
-   "why": "routed: lane/coach-tools-easy is editing it (coordinator, 2026-11-02)"
-  },
-  "components/coach-business/coach-profile-view.tsx": {
-   "colour": 2,
-   "why": "routed: lane/plat-p07 is editing it (coordinator, 2026-11-02)"
-  },
-  "components/coach-business/marketplace-view.tsx": {
-   "colour": 2,
-   "why": "routed: lane/plat-p07 is editing it (coordinator, 2026-11-02)"
-  },
-  "components/coach/alerts-strip.tsx": {
-   "size": 1,
-   "why": "routed: components/coach/** is lane/coach-tools-easy's while it runs (coordinator, 2026-11-02)"
-  },
-  "components/coach/assign-program.tsx": {
-   "size": 3,
-   "why": "routed: components/coach/** is lane/coach-tools-easy's while it runs (coordinator, 2026-11-02)"
-  },
-  "components/coach/attention-panel.tsx": {
-   "size": 1,
-   "why": "routed: lane/coach-tools-easy is editing it (coordinator, 2026-11-02)"
-  },
-  "components/coach/automations-panel.tsx": {
-   "size": 1,
-   "colour": 2,
-   "why": "routed: components/coach/** is lane/coach-tools-easy's while it runs (coordinator, 2026-11-02)"
-  },
-  "components/coach/availability-picker.tsx": {
-   "size": 3,
-   "why": "routed: components/coach/** is lane/coach-tools-easy's while it runs (coordinator, 2026-11-02)"
-  },
-  "components/coach/branding-panel.tsx": {
-   "size": 2,
-   "colour": 3,
-   "why": "routed: components/coach/** is lane/coach-tools-easy's while it runs (coordinator, 2026-11-02)"
-  },
-  "components/coach/bulk-invite.tsx": {
-   "size": 5,
-   "why": "routed: components/coach/** is lane/coach-tools-easy's while it runs (coordinator, 2026-11-02)"
-  },
-  "components/coach/calendar.tsx": {
-   "size": 2,
-   "colour": 3,
-   "why": "routed: components/coach/** is lane/coach-tools-easy's while it runs (coordinator, 2026-11-02)"
-  },
-  "components/coach/cooldown-card.tsx": {
-   "size": 7,
-   "why": "routed: components/coach/** is lane/coach-tools-easy's while it runs (coordinator, 2026-11-02)"
-  },
-  "components/coach/coverage-strip.tsx": {
-   "size": 3,
-   "why": "routed: components/coach/** is lane/coach-tools-easy's while it runs (coordinator, 2026-11-02)"
-  },
-  "components/coach/drafts-inbox.tsx": {
-   "size": 12,
-   "colour": 1,
-   "why": "routed: components/coach/** is lane/coach-tools-easy's while it runs (coordinator, 2026-11-02)"
-  },
-  "components/coach/exercise-demo.tsx": {
-   "size": 3,
-   "why": "routed: components/coach/** is lane/coach-tools-easy's while it runs (coordinator, 2026-11-02)"
-  },
-  "components/coach/first-block.tsx": {
-   "size": 1,
-   "colour": 2,
-   "why": "routed: components/coach/** is lane/coach-tools-easy's while it runs (coordinator, 2026-11-02)"
-  },
-  "components/coach/first-client.tsx": {
-   "size": 1,
-   "why": "routed: lane/coach-tools-easy is editing it (coordinator, 2026-11-02)"
-  },
-  "components/coach/form-review/pose-replay.tsx": {
-   "size": 1,
-   "why": "routed: components/coach/** is lane/coach-tools-easy's while it runs (coordinator, 2026-11-02)"
-  },
-  "components/coach/form-review/record-set.tsx": {
-   "size": 2,
-   "why": "routed: lane/coach-tools-easy is editing it (coordinator, 2026-11-02)"
-  },
-  "components/coach/form-review/review-queue.tsx": {
-   "size": 2,
-   "why": "routed: lane/coach-tools-easy is editing it (coordinator, 2026-11-02)"
-  },
-  "components/coach/guardian-report-button.tsx": {
-   "size": 1,
-   "why": "routed: components/coach/** is lane/coach-tools-easy's while it runs (coordinator, 2026-11-02)"
-  },
-  "components/coach/invite-panel.tsx": {
-   "size": 2,
-   "why": "routed: components/coach/** is lane/coach-tools-easy's while it runs (coordinator, 2026-11-02)"
-  },
-  "components/coach/live/client-live.tsx": {
-   "size": 2,
-   "why": "routed: components/coach/** is lane/coach-tools-easy's while it runs (coordinator, 2026-11-02)"
-  },
-  "components/coach/live/coach-live.tsx": {
-   "size": 5,
-   "why": "routed: components/coach/** is lane/coach-tools-easy's while it runs (coordinator, 2026-11-02)"
-  },
-  "components/coach/live/live-session-link.tsx": {
-   "size": 1,
-   "why": "routed: components/coach/** is lane/coach-tools-easy's while it runs (coordinator, 2026-11-02)"
-  },
-  "components/coach/live/pose-stage.tsx": {
-   "size": 1,
-   "why": "routed: components/coach/** is lane/coach-tools-easy's while it runs (coordinator, 2026-11-02)"
-  },
-  "components/coach/my-schedule.tsx": {
-   "size": 2,
-   "colour": 3,
-   "why": "routed: components/coach/** is lane/coach-tools-easy's while it runs (coordinator, 2026-11-02)"
-  },
-  "components/coach/pain-checkin.tsx": {
-   "size": 10,
-   "why": "routed: components/coach/** is lane/coach-tools-easy's while it runs (coordinator, 2026-11-02)"
-  },
-  "components/coach/parity/checkin-card.tsx": {
-   "size": 5,
-   "why": "routed: components/coach/** is lane/coach-tools-easy's while it runs (coordinator, 2026-11-02)"
-  },
-  "components/coach/parity/checkins-panel.tsx": {
-   "size": 4,
-   "why": "routed: components/coach/** is lane/coach-tools-easy's while it runs (coordinator, 2026-11-02)"
-  },
-  "components/coach/parity/habits-panel.tsx": {
-   "size": 2,
-   "why": "routed: components/coach/** is lane/coach-tools-easy's while it runs (coordinator, 2026-11-02)"
-  },
-  "components/coach/parity/habits-today.tsx": {
-   "size": 4,
-   "why": "routed: components/coach/** is lane/coach-tools-easy's while it runs (coordinator, 2026-11-02)"
-  },
-  "components/coach/parity/import-panel.tsx": {
-   "size": 5,
-   "why": "routed: components/coach/** is lane/coach-tools-easy's while it runs (coordinator, 2026-11-02)"
-  },
-  "components/coach/plan-update-card.tsx": {
-   "size": 2,
-   "why": "routed: components/coach/** is lane/coach-tools-easy's while it runs (coordinator, 2026-11-02)"
-  },
-  "components/coach/program-builder.tsx": {
-   "size": 22,
-   "why": "routed: components/coach/** is lane/coach-tools-easy's while it runs (coordinator, 2026-11-02)"
-  },
-  "components/coach/protocol-gate-line.tsx": {
-   "size": 1,
-   "why": "routed: components/coach/** is lane/coach-tools-easy's while it runs (coordinator, 2026-11-02)"
-  },
-  "components/coach/ramp-breath.tsx": {
-   "size": 1,
-   "why": "routed: components/coach/** is lane/coach-tools-easy's while it runs (coordinator, 2026-11-02)"
-  },
-  "components/coach/readiness-checkin.tsx": {
-   "size": 6,
-   "why": "routed: components/coach/** is lane/coach-tools-easy's while it runs (coordinator, 2026-11-02)"
-  },
-  "components/coach/readiness-survey.tsx": {
-   "size": 2,
-   "colour": 2,
-   "why": "routed: components/coach/** is lane/coach-tools-easy's while it runs (coordinator, 2026-11-02)"
-  },
-  "components/coach/readiness/readiness-panel.tsx": {
-   "size": 2,
-   "why": "routed: components/coach/** is lane/coach-tools-easy's while it runs (coordinator, 2026-11-02)"
-  },
-  "components/coach/reviews.tsx": {
-   "size": 1,
-   "colour": 3,
-   "why": "routed: components/coach/** is lane/coach-tools-easy's while it runs (coordinator, 2026-11-02)"
-  },
-  "components/coach/screen-prescriptions.tsx": {
-   "size": 5,
-   "colour": 1,
-   "why": "routed: components/coach/** is lane/coach-tools-easy's while it runs (coordinator, 2026-11-02)"
-  },
-  "components/coach/set-timer.tsx": {
-   "size": 4,
-   "why": "routed: components/coach/** is lane/coach-tools-easy's while it runs (coordinator, 2026-11-02)"
-  },
-  "components/coach/thread-messages.tsx": {
-   "size": 2,
-   "why": "routed: components/coach/** is lane/coach-tools-easy's while it runs (coordinator, 2026-11-02)"
-  },
-  "components/coach/warmup-prep.tsx": {
-   "size": 8,
-   "why": "routed: components/coach/** is lane/coach-tools-easy's while it runs (coordinator, 2026-11-02)"
   },
   "components/education/chapter-list.tsx": {
    "colour": 1,
@@ -238,7 +34,7 @@
   "components/games/dunk-game-3d.tsx": {
    "size": 7,
    "colour": 3,
-   "why": "routed: the dunk modes are lane/dunk-flagship-p6's (coordinator, 2026-11-02)"
+   "why": "routed: the dunk modes are lane/dunk-flagship-p6/p7's (coordinator, 2026-11-02)"
   },
   "components/games/onevone-win-by-2.tsx": {
    "size": 3,
@@ -263,6 +59,16 @@
    "colour": 1,
    "why": "reviewed: text-fel-violet / text-fel-indigo on an ICON (lucide draws currentColor): non-text, 3:1 is its bar (1.4.11)"
   },
+  "components/library/library-browser.tsx": {
+   "size": 25,
+   "colour": 18,
+   "why": "routed: lane/plat-p08-library is editing it (trial merge, 2026-11-03)"
+  },
+  "components/library/library-demo.tsx": {
+   "size": 12,
+   "colour": 9,
+   "why": "routed: lane/plat-p08-library is editing it (trial merge, 2026-11-03)"
+  },
   "components/party/social/party-hub.tsx": {
    "size": 2,
    "colour": 4,
@@ -271,11 +77,6 @@
   "components/profile-v2/badges-section.tsx": {
    "colour": 2,
    "why": "reviewed: text-fel-violet / text-fel-indigo on an ICON (lucide draws currentColor): non-text, 3:1 is its bar (1.4.11)"
-  },
-  "components/signature/program-page.tsx": {
-   "size": 4,
-   "colour": 3,
-   "why": "routed: lane/plat-p07 is editing it (coordinator, 2026-11-02)"
   }
  }
 }

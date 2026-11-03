@@ -91,14 +91,14 @@ function Weeks({ weeks, current, premiumLine }: { weeks: WeekView[]; current: nu
             className={`rounded-xl border p-3 ${w.n === current ? 'border-[#00E5FF]/40 bg-[#00E5FF]/[0.05]' : 'border-white/8 bg-white/[0.02]'}`}>
             <div className="flex items-center justify-between gap-2">
               <p className="min-w-0 text-[13.5px] font-bold text-white">Week {w.n} · {w.label}{w.repeat ? ' (again)' : ''}</p>
-              {w.access === 'locked' ? <Lock aria-label="FEL Pro" className="h-3.5 w-3.5 shrink-0 text-white/40" />
-                : w.access === 'free' ? <span className="shrink-0 font-mono text-[9.5px] uppercase tracking-[0.12em] text-[#00FF9D]">Free</span> : null}
+              {w.access === 'locked' ? <Lock aria-label="FEL Pro" className="h-3.5 w-3.5 shrink-0 text-white/50" />
+                : w.access === 'free' ? <span className="shrink-0 font-mono text-[12px] uppercase tracking-[0.12em] text-[#00FF9D]">Free</span> : null}
             </div>
-            <p className="text-[11.5px] text-white/45">{w.phaseLabel}{w.easier ? ' · easier week' : ''}</p>
+            <p className="text-[12px] text-white/50">{w.phaseLabel}{w.easier ? ' · easier week' : ''}</p>
             <ul className="mt-1.5 flex flex-wrap gap-1.5">
               {w.sessions.map((s) => (
                 <li key={s.id} data-session-stub={s.id} data-state={s.state}
-                  className={`rounded-lg px-2 py-1 text-[11.5px] ${s.state === 'done' ? 'bg-[#00FF9D]/15 text-[#00FF9D]' : s.state === 'next' ? 'bg-[#00E5FF]/15 text-[#00E5FF]' : 'bg-white/[0.04] text-white/55'}`}>
+                  className={`rounded-lg px-2 py-1 text-[12px] ${s.state === 'done' ? 'bg-[#00FF9D]/15 text-[#00FF9D]' : s.state === 'next' ? 'bg-[#00E5FF]/15 text-[#00E5FF]' : 'bg-white/[0.04] text-white/55'}`}>
                   {s.state === 'done' ? '✓ ' : ''}{s.day} · {s.label}{s.retest.length ? ' · re-test' : ''}
                 </li>
               ))}
@@ -251,9 +251,9 @@ export function ProgramPage({ initial, clips = {} }: { initial: ProgramView; cli
         <ol data-phases className="mt-3 grid gap-1.5">
           {view.phases.map((ph, i) => (
             <li key={ph.id} className="rounded-xl border border-white/8 bg-white/[0.02] px-3 py-2">
-              <p className="text-[13px] font-bold text-white">{i + 1}. {ph.label} <span className="font-normal text-white/45">· {ph.weeks} {ph.weeks === 1 ? 'week' : 'weeks'}</span></p>
+              <p className="text-[13px] font-bold text-white">{i + 1}. {ph.label} <span className="font-normal text-white/50">· {ph.weeks} {ph.weeks === 1 ? 'week' : 'weeks'}</span></p>
               <p className="text-[12px] text-white/55">{ph.goal}</p>
-              {ph.retests.length > 0 && <p className="mt-0.5 text-[11.5px] text-[#00E5FF]/85">Re-tests: {ph.retests.map((r) => RETEST[r].label).join(', ')}</p>}
+              {ph.retests.length > 0 && <p className="mt-0.5 text-[12px] text-[#00E5FF]/85">Re-tests: {ph.retests.map((r) => RETEST[r].label).join(', ')}</p>}
             </li>
           ))}
         </ol>

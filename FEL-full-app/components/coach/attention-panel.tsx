@@ -188,7 +188,7 @@ export function AttentionPanel() {
          today's — and no longer shows a "warm-up N min" formula as if it were the warm-up the athlete got. */}
       {readiness.length > 0 && (
         <div className="mt-3" data-testid="readiness-checkins">
-          <div className="text-[11px] uppercase tracking-wider text-fel-quiet">Check-ins shared with you</div>
+          <div className="text-[12px] uppercase tracking-wider text-fel-quiet">Check-ins shared with you</div>
           <ul className="mt-1 space-y-1.5">
             {readiness.map((r) => {
               const Icon = r.view.level === 'low' ? BatteryLow : SunMedium;

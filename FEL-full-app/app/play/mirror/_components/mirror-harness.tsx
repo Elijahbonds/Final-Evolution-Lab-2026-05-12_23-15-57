@@ -1065,14 +1065,14 @@ export function MirrorHarness({
             <ArrowLeft className="h-[18px] w-[18px]" />
           </Link>
           <div className="min-w-0">
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-[#00E5FF]">The Mirror</p>
+            <p className="font-mono text-[12px] font-bold uppercase tracking-[0.22em] text-[#00E5FF]">The Mirror</p>
             <h1 className="fel-heading truncate text-[22px] font-black leading-none tracking-tight text-white md:text-[26px]">
               {PATTERN_TITLE[pattern]}
             </h1>
           </div>
           <span
             className="ml-auto inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-1.5 font-mono
-                       text-[10px] font-bold uppercase tracking-[0.14em]"
+                       text-[12px] font-bold uppercase tracking-[0.14em]"
             style={{
               borderColor: live ? 'rgba(0,255,157,0.35)' : 'rgba(255,255,255,0.12)',
               color: live ? '#00FF9D' : 'rgba(255,255,255,0.4)',
@@ -1113,7 +1113,7 @@ export function MirrorHarness({
                 className={`shrink-0 whitespace-nowrap rounded-xl px-3.5 py-2 text-[12.5px] font-bold transition-all duration-200
                             disabled:cursor-not-allowed disabled:opacity-40
                             ${on ? 'bg-white/[0.07] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.10)]'
-                                 : 'text-white/45 hover:text-white/75'}`}
+                                 : 'text-white/50 hover:text-white/75'}`}
               >
                 {PATTERN_SHORT[key]}
               </button>
@@ -1125,7 +1125,7 @@ export function MirrorHarness({
             and grown-up step come first, for everyone (lib/screen/routes.ts). Not offered mid-session: leaving the page
             ends the set. */}
         {!live && !paused && (
-          <p className="-mt-2 mb-4 text-[12px] text-white/45">
+          <p className="-mt-2 mb-4 text-[12px] text-white/50">
             <Link href="/screen" data-quick-screen className="font-semibold text-white/70 underline-offset-2 hover:text-white hover:underline">
               Quick Screen
             </Link>
@@ -1169,7 +1169,7 @@ export function MirrorHarness({
               {status === 'requesting' || status === 'loading-model' ? (
                 <>
                   <Loader2 className="h-7 w-7 animate-spin text-[#00E5FF]" />
-                  <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-white/55">
+                  <p className="font-mono text-[12px] uppercase tracking-[0.18em] text-white/55">
                     {status === 'requesting' ? 'Asking for the camera' : 'Loading the pose model'}
                   </p>
                 </>
@@ -1193,7 +1193,7 @@ export function MirrorHarness({
                       Prop the phone up, step back until your whole body is in frame, and start when you are ready.
                     </p>
                   </div>
-                  <p className="mx-auto max-w-md text-[11.5px] leading-relaxed text-white/35">
+                  <p className="mx-auto max-w-md text-[12px] leading-relaxed text-white/50">
                     This shows <span className="text-white/60">estimated engagement</span> inferred from joint
                     movement. It does not measure muscle activation, and it is not a medical assessment. Everything
                     runs in your browser — the camera feed is never uploaded.
@@ -1211,13 +1211,13 @@ export function MirrorHarness({
               <div className="pointer-events-none absolute left-4 top-4 flex items-center gap-2">
                 {/* MIRROR-COACH P2 (2026-09-26): a map over every pattern (lib/mirror/hudChip.ts). The ternary here sent
                     the Movement Screen to its last arm, `squatStage`, so the chip read BREATHE through the whole screen. */}
-                <span className="max-w-[58vw] truncate rounded-lg bg-black/55 px-2.5 py-1.5 font-mono text-[10px] font-bold
+                <span className="max-w-[58vw] truncate rounded-lg bg-black/55 px-2.5 py-1.5 font-mono text-[12px] font-bold
                                  uppercase tracking-[0.16em] text-white/75 backdrop-blur-sm sm:max-w-none">
                   {chipLabel({ pattern, phase, jumpState, squatStage, lungeStage: lungeSession.stage, runner, hingeStage: hingeSession.stage, pushupStage: pushupSession.stage })}
                 </span>
                 {showFrameBudget && (
                   <span
-                    className="rounded-lg bg-black/55 px-2 py-1.5 font-mono text-[10px] backdrop-blur-sm"
+                    className="rounded-lg bg-black/55 px-2 py-1.5 font-mono text-[12px] backdrop-blur-sm"
                     style={{ color: frameMs > 50 ? '#FFC24B' : 'rgba(255,255,255,0.4)' }}
                   >
                     {frameMs.toFixed(1)}ms
@@ -1259,7 +1259,7 @@ export function MirrorHarness({
                       >
                         {Math.ceil(runner.remainingSec)}
                       </span>
-                      <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/50">
+                      <span className="font-mono text-[12px] uppercase tracking-[0.18em] text-white/50">
                         {runner.phase === 'holding' ? 'Hold' : runner.phase === 'retest' ? 'Once more' : 'Get set'} · station {runner.stationIndex + 1}
                       </span>
                     </div>
@@ -1277,7 +1277,7 @@ export function MirrorHarness({
                       <p className="fel-heading text-[40px] font-black leading-none text-white">
                         {cameraChecksRead(runner.screen, runner.results).readCount}
                       </p>
-                      <p className="mt-1 font-mono text-[9.5px] uppercase tracking-[0.18em] text-white/45">Checks read</p>
+                      <p className="mt-1 font-mono text-[12px] uppercase tracking-[0.18em] text-white/50">Checks read</p>
                     </>
                   )
                 ) : pattern === 'jump' ? (
@@ -1287,7 +1287,7 @@ export function MirrorHarness({
                         {Math.max(...jumps.map((j) => j.verticalCm))}
                         <span className="ml-1 text-[16px]">cm</span>
                       </p>
-                      <p className="mt-1 font-mono text-[9.5px] uppercase tracking-[0.18em] text-white/45">Best jump · estimated</p>
+                      <p className="mt-1 font-mono text-[12px] uppercase tracking-[0.18em] text-white/50">Best jump · estimated</p>
                     </>
                   )
                 ) : isSideRep(pattern) ? (
@@ -1298,7 +1298,7 @@ export function MirrorHarness({
                         <p className="fel-heading text-[40px] font-black leading-none text-white">
                           {ss.stage === 'review' ? ss.checkReps.length + ss.workReps.length : ss.reps}
                         </p>
-                        <p className="mt-1 font-mono text-[9.5px] uppercase tracking-[0.18em] text-white/45">
+                        <p className="mt-1 font-mono text-[12px] uppercase tracking-[0.18em] text-white/50">
                           {ss.stage === 'check' || ss.stage === 'work' ? `Reps · ${ss.stage}` : 'Reps'}
                         </p>
                       </>
@@ -1309,7 +1309,7 @@ export function MirrorHarness({
                     <p className="fel-heading text-[40px] font-black leading-none text-white">
                       {lungeSession.stage === 'review' ? lungeSession.workReps.left.length + lungeSession.workReps.right.length : lungeSession.reps}
                     </p>
-                    <p className="mt-1 font-mono text-[9.5px] uppercase tracking-[0.18em] text-white/45">
+                    <p className="mt-1 font-mono text-[12px] uppercase tracking-[0.18em] text-white/50">
                       {lungeSession.stage === 'review' ? 'Reps' : `Reps · ${lungeSession.stage} leg`}
                     </p>
                   </>
@@ -1318,7 +1318,7 @@ export function MirrorHarness({
                     <p className="fel-heading text-[40px] font-black leading-none text-white">
                       {pattern === 'squat' ? squatReps : reps?.reps ?? 0}
                     </p>
-                    <p className="mt-1 font-mono text-[9.5px] uppercase tracking-[0.18em] text-white/45">Reps</p>
+                    <p className="mt-1 font-mono text-[12px] uppercase tracking-[0.18em] text-white/50">Reps</p>
                   </>
                 )}
               </div>
@@ -1515,7 +1515,7 @@ export function MirrorHarness({
                     }}
                   >
                     <span className="block text-[13.5px] font-bold text-white">{label} screen</span>
-                    <span className="mt-0.5 block text-[11.5px] text-white/45">{blurb}</span>
+                    <span className="mt-0.5 block text-[12px] text-white/50">{blurb}</span>
                   </button>
                 );
               })}
@@ -1634,7 +1634,7 @@ export function MirrorHarness({
                       />
                       <span className="min-w-0">
                         <span className="block truncate text-[13px] font-semibold text-white/85">{label}</span>
-                        <span className="mt-0.5 block font-mono text-[9.5px] uppercase tracking-[0.14em] text-white/35">
+                        <span className="mt-0.5 block font-mono text-[12px] uppercase tracking-[0.14em] text-white/50">
                           {!seen ? (live ? 'Not in view' : 'Waiting for the camera')
                             : !judged ? 'Measured · not judged yet'
                               : notRead ? 'Not square · not read'
@@ -1677,7 +1677,7 @@ export function MirrorHarness({
                       />
                       <span className="min-w-0">
                         <span className="block truncate text-[13px] font-semibold text-white/85">{LUNGE_FAULT_LABEL[id]}</span>
-                        <span className="mt-0.5 block font-mono text-[9.5px] uppercase tracking-[0.14em] text-white/35">
+                        <span className="mt-0.5 block font-mono text-[12px] uppercase tracking-[0.14em] text-white/50">
                           {!seen ? (live ? 'Not in view' : 'Waiting for the camera')
                             : notRead ? 'Not square · not read'
                               : faulting ? 'Estimated fault' : 'Estimated stable'}
@@ -1701,7 +1701,7 @@ export function MirrorHarness({
                 <section className="mb-5 rounded-2xl border border-white/8 bg-white/[0.02] p-5">
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
-                      <p className="font-mono text-[9.5px] font-bold uppercase tracking-[0.18em] text-white/35">
+                      <p className="font-mono text-[12px] font-bold uppercase tracking-[0.18em] text-white/50">
                         Your best · estimated
                       </p>
                       <p className="fel-heading text-[40px] font-black leading-none text-[#FFD700]">
@@ -1710,7 +1710,7 @@ export function MirrorHarness({
                       </p>
                       {dunkProgress.trendCmPerWeek !== null && (
                         <p
-                          className="mt-1.5 font-mono text-[10px] uppercase tracking-[0.14em]"
+                          className="mt-1.5 font-mono text-[12px] uppercase tracking-[0.14em]"
                           style={{ color: dunkProgress.trendCmPerWeek >= 0 ? '#00FF9D' : '#FF7A2F' }}
                         >
                           {dunkProgress.trendCmPerWeek >= 0 ? '+' : ''}{dunkProgress.trendCmPerWeek} cm / week · estimated
@@ -1723,7 +1723,7 @@ export function MirrorHarness({
                         <p className="fel-heading text-[22px] font-black leading-none text-white">
                           {dunkProgress.streakDays}
                         </p>
-                        <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.14em] text-white/35">
+                        <p className="mt-1 font-mono text-[12px] uppercase tracking-[0.14em] text-white/50">
                           Day streak
                         </p>
                       </div>
@@ -1731,7 +1731,7 @@ export function MirrorHarness({
                         <p className="fel-heading text-[22px] font-black leading-none text-white">
                           {dunkProgress.thisWeek}
                         </p>
-                        <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.14em] text-white/35">
+                        <p className="mt-1 font-mono text-[12px] uppercase tracking-[0.14em] text-white/50">
                           This week
                         </p>
                       </div>
@@ -1739,7 +1739,7 @@ export function MirrorHarness({
                         <p className="fel-heading text-[22px] font-black leading-none text-white">
                           {dunkProgress.attempts}
                         </p>
-                        <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.14em] text-white/35">
+                        <p className="mt-1 font-mono text-[12px] uppercase tracking-[0.14em] text-white/50">
                           Jumps
                         </p>
                       </div>
@@ -1773,7 +1773,7 @@ export function MirrorHarness({
 
                   {dunkProgress.next && (
                     <div className="mt-5 border-t border-white/[0.06] pt-4">
-                      <p className="font-mono text-[9.5px] font-bold uppercase tracking-[0.16em] text-[#00E5FF]">
+                      <p className="font-mono text-[12px] font-bold uppercase tracking-[0.16em] text-[#00E5FF]">
                         Next dunk · {dunkProgress.next.family}
                       </p>
                       <p className="mt-1.5 text-[13.5px] leading-relaxed text-white/70">{dunkProgress.next.ask}</p>
@@ -1783,7 +1783,7 @@ export function MirrorHarness({
                   {dunkProgress.landed.length > 0 && (
                     <div className="mt-3 flex flex-wrap gap-1.5">
                       {dunkProgress.landed.map((f) => (
-                        <span key={f} className="rounded-md bg-[#00FF9D]/12 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.12em] text-[#00FF9D]">
+                        <span key={f} className="rounded-md bg-[#00FF9D]/12 px-2 py-0.5 font-mono text-[12px] uppercase tracking-[0.12em] text-[#00FF9D]">
                           {f}
                         </span>
                       ))}
@@ -1800,17 +1800,17 @@ export function MirrorHarness({
                   flight time is several centimetres. Every camera number says so. */}
               <h2 className="fel-heading mb-3 text-[15px] font-bold text-white/80">Jumps · estimated from flight time</h2>
               {jumps.length === 0 ? (
-                <p className="text-[13px] text-white/45">
+                <p className="text-[13px] text-white/50">
                   Stand tall, let the floor calibrate, then jump. The landing settles the rep.
                 </p>
               ) : (
                 <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                   {jumps.map((j, i) => (
                     <li key={i} className="flex items-baseline justify-between gap-3 rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-3">
-                      <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-white/35">Jump {i + 1}</span>
+                      <span className="font-mono text-[12px] uppercase tracking-[0.16em] text-white/50">Jump {i + 1}</span>
                       <span className="text-right">
                         <span className="fel-heading text-[20px] font-black text-[#FFD700]">{j.verticalCm}<span className="text-[12px]">cm</span></span>
-                        <span className="mt-0.5 block font-mono text-[9.5px] text-white/30">{j.flightTimeMs}ms · {j.takeoff}</span>
+                        <span className="mt-0.5 block font-mono text-[12px] text-white/50">{j.flightTimeMs}ms · {j.takeoff}</span>
                       </span>
                     </li>
                   ))}
@@ -1834,7 +1834,7 @@ export function MirrorHarness({
                           to "Lumbo-pelvi…" and the row said nothing. The name is the thing being read. */}
                       <span className="min-w-0">
                         <span className="block text-[13px] font-semibold leading-tight text-white/85">{ZONE_LABEL[id]}</span>
-                        <span className="mt-0.5 block font-mono text-[9.5px] uppercase tracking-[0.14em] text-white/35">
+                        <span className="mt-0.5 block font-mono text-[12px] uppercase tracking-[0.14em] text-white/50">
                           {ZONE_STATE_LABEL[st]}
                         </span>
                       </span>
@@ -1860,7 +1860,7 @@ export function MirrorHarness({
             <h2 className="fel-heading text-[15px] font-bold text-white/80">{REVIEW_COPY.heading}</h2>
             <div className="mt-3 grid gap-5 sm:grid-cols-2">
               <div>
-                <p className="font-mono text-[9.5px] uppercase tracking-[0.16em] text-white/35">{REVIEW_COPY.firstReps}</p>
+                <p className="font-mono text-[12px] uppercase tracking-[0.16em] text-white/50">{REVIEW_COPY.firstReps}</p>
                 {/* Only faults the coach may judge are findings; the knee is reported separately below while unverified. */}
                 {/* MIRROR-COACH P2 (2026-09-26): "Clean structure — load it" was the verified line; with the knee on, a
                     check with nothing flagged says only that — the knee line below says whether the knees were read. */}
@@ -1892,10 +1892,10 @@ export function MirrorHarness({
                   const numbers = showFrameBudget && kneeRecord.left !== null && kneeRecord.right !== null;
                   if (!kneeLine && !numbers) return null;
                   return (
-                    <p className="mt-3 text-[12px] leading-relaxed text-white/40">
+                    <p className="mt-3 text-[12px] leading-relaxed text-white/50">
                       {kneeLine}
                       {numbers && (
-                        <span className="mt-1 block font-mono text-[10.5px] text-white/35">
+                        <span className="mt-1 block font-mono text-[12px] text-white/50">
                           estimated worst inward (hip half-widths): L {kneeRecord.left!.toFixed(2)} · R {kneeRecord.right!.toFixed(2)}
                           {' '}· flagged frames {kneeRecord.flaggedFrames} · square frames {kneeRecord.squareFrames}
                           {' '}· not square {kneeRecord.notSquareFrames}
@@ -1906,14 +1906,14 @@ export function MirrorHarness({
                 })()}
               </div>
               <div>
-                <p className="font-mono text-[9.5px] uppercase tracking-[0.16em] text-white/35">{REVIEW_COPY.coachSaid}</p>
+                <p className="font-mono text-[12px] uppercase tracking-[0.16em] text-white/50">{REVIEW_COPY.coachSaid}</p>
                 {cueLog.length === 0 ? (
                   <p className="mt-2 text-[13px] text-white/60">{REVIEW_COPY.coachSaidNothing}</p>
                 ) : (
                   <ul className="mt-2 space-y-1.5">
                     {cueLog.map((c, i) => (
                       <li key={i} className="text-[13px] text-white/70">
-                        <span className="font-mono text-[10px] uppercase tracking-wider text-white/30">{levelWord(c.level)}</span>{' '}{c.text}
+                        <span className="font-mono text-[12px] uppercase tracking-wider text-white/50">{levelWord(c.level)}</span>{' '}{c.text}
                       </li>
                     ))}
                   </ul>
@@ -1939,11 +1939,11 @@ export function MirrorHarness({
                 const r = lungeSideResult(lungeSession, side);
                 return (
                   <div key={side}>
-                    <p className="font-mono text-[9.5px] uppercase tracking-[0.16em] text-white/35">
+                    <p className="font-mono text-[12px] uppercase tracking-[0.16em] text-white/50">
                       {side === 'left' ? 'Left leg forward' : 'Right leg forward'}
                     </p>
                     <p className="fel-heading mt-1 text-[24px] font-black leading-none text-white">
-                      {r.reps}<span className="ml-1.5 text-[12px] font-mono uppercase tracking-[0.14em] text-white/35">reps</span>
+                      {r.reps}<span className="ml-1.5 text-[12px] font-mono uppercase tracking-[0.14em] text-white/50">reps</span>
                     </p>
                     {r.unreadable ? (
                       <p className="mt-2 text-[13px] text-[#FFC24B]">{REVIEW_COPY.turnedAway}</p>
@@ -1968,7 +1968,7 @@ export function MirrorHarness({
               <ul className="mt-4 space-y-1.5 border-t border-white/[0.06] pt-4" data-lunge-cues>
                 {cueLog.map((c, i) => (
                   <li key={i} className="text-[13px] text-white/70">
-                    <span className="font-mono text-[10px] uppercase tracking-wider text-white/30">{levelWord(c.level)}</span>{' '}{c.text}
+                    <span className="font-mono text-[12px] uppercase tracking-wider text-white/50">{levelWord(c.level)}</span>{' '}{c.text}
                   </li>
                 ))}
               </ul>
@@ -2013,7 +2013,7 @@ export function MirrorHarness({
               {PATTERN_ZONES.map((id) => (
                 <li key={id} className="flex items-baseline gap-3 text-[13px]">
                   <span className="min-w-0 flex-1 truncate text-white/70">{ZONE_LABEL[id]}</span>
-                  <span className="shrink-0 font-mono text-[12px] text-white/45">
+                  <span className="shrink-0 font-mono text-[12px] text-white/50">
                     {secs(summary.timeInStableMs[id])}s stable
                   </span>
                   <span
@@ -2063,7 +2063,7 @@ function Figure({ label, value, accent }: { label: string; value: string; accent
   return (
     <div>
       <p className="fel-heading text-[24px] font-black leading-none" style={{ color: accent ?? '#FFFFFF' }}>{value}</p>
-      <p className="mt-1.5 font-mono text-[9.5px] uppercase tracking-[0.16em] text-white/35">{label}</p>
+      <p className="mt-1.5 font-mono text-[12px] uppercase tracking-[0.16em] text-white/50">{label}</p>
     </div>
   );
 }
