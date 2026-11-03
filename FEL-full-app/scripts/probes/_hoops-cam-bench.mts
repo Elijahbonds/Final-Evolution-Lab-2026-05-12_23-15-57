@@ -3,8 +3,14 @@
 // fixture's own truth (lib/hoops-cam/bench.ts). RATES ON DRAWN FRAMES: not recorded video and not a claim about a real gym.
 //   npx tsx scripts/probes/_hoops-cam-bench.mts [outFile.json]
 import { writeFileSync } from 'node:fs';
-import { FIXTURES, DRIBBLE_FIXTURES } from '../../lib/hoops-cam/scene';
-import { benchShots, benchDribbles, shotRow, dribbleRow } from '../../lib/hoops-cam/bench';
+import * as SceneNs from '../../lib/hoops-cam/scene';
+import * as BenchNs from '../../lib/hoops-cam/bench';
+
+// tsx loads the TS modules as CommonJS from this ES module: their exports sit on the default
+const scene = ((SceneNs as unknown as { default?: typeof SceneNs }).default ?? SceneNs) as typeof SceneNs;
+const bench = ((BenchNs as unknown as { default?: typeof BenchNs }).default ?? BenchNs) as typeof BenchNs;
+const { FIXTURES, DRIBBLE_FIXTURES } = scene;
+const { benchShots, benchDribbles, shotRow, dribbleRow } = bench;
 
 const shots = FIXTURES.map((fx) => { const b = benchShots(fx); return { ...shotRow(b), name: fx.name, msPerFrame: Math.round((b.ms / b.frames) * 100) / 100 }; });
 const dribbles = DRIBBLE_FIXTURES.map((fx) => {
