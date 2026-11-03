@@ -116,8 +116,8 @@ const UA = 'AgeScreenTest/1.0';
 // Both lanes merged at 91ba351b (lane/plat-p10's merge of lane/finish-release), the first commit carrying every pending
 // file above.
 // MERGE (lane/plat-bbs04 + finish-release 05c73483, 2026-11-03): hoops-cam.sql + teacher.sql, both pending files; pinned at
-// the merge (interim value below is finish-release's pin; the follow-up commit re-pins to the merge sha).
-const PARENT = '91ba351b9b2b612a4da5d6c49af8c5eded53dd6d';
+// the merge (pinned at the merge commit).
+const PARENT = 'ae7a22e2d0ad151786a4187b41be34335b7dfac0';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {
