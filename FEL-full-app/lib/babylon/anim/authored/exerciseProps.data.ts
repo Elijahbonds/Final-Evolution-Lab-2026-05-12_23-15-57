@@ -24,4 +24,12 @@ export const PROPPED_LOOPS = {
   ex_hang_leg_raise: 'pullbar', ex_hang_pike: 'pullbar', ex_bar_leg_raise: 'dipbars',
   // exerciseAsks.ts: the seat the one-leg calf raise sits on; the box the push-off (in front) and the stride jumps (beside) drive up from
   ex_seated_calf_one: 'seat', ex_box_pushoff: 'box', ex_stride_jump: 'boxside', ex_stride_jump_cross: 'boxside',
+  // exerciseFamilies5.ts (DEMO-LOOPS-5): the flat bench the leg raise and pull-in lie on (the legs off its end), the bench the
+  // seated tuck, the seated rope crunch and the chair stretches sit on
+  ex_bench_leg_raise: 'bench', ex_bench_leg_pull_in: 'bench', ex_seated_leg_tuck: 'seat', ex_rope_crunch_seat: 'seat', ex_seat_side_bend: 'seat', ex_seat_twist: 'seat',
+  // exerciseGrip.ts (DEMO-LOOPS-6): the bench the seated wrist curls sit on; the bench the kneeling ones lean across
+  ex_wrist_curl: 'seat', ex_wrist_curl_down: 'seat', ex_wrist_curl_one: 'seat', ex_wrist_curl_one_down: 'seat', ex_wrist_curl_bench: 'handbench', ex_wrist_curl_bench_down: 'handbench',
+  // exerciseFamilies7.ts (DEMO-LOOPS-7): the benches the presses, raises and twists sit or lie on; the decline bench; the bar
+  ex_bench_press_one: 'bench', ex_chest_press_seat: 'seat', ex_chest_press_incline: 'seat', ex_chest_press_decline: 'seat', ex_incline_shoulder_raise: 'incline', ex_front_raise_incline: 'incline',
+  ex_arnold_seated: 'seat', ex_bradford_seated: 'seat', ex_seat_twist_bar: 'seat', ex_decline_crunch: 'decline', ex_decline_oblique: 'decline', ex_decline_situp: 'decline', ex_gorilla_chin: 'pullbar',
 } as const satisfies Record<string, string>;

@@ -6,6 +6,7 @@ import { COACH_MOMENTS } from '../babylon/audio/mic/moments';
 import { LIMBS, MOVE_LIMBS, MOVE_WINDOW_SCALE, lateGraceFor, limbSatisfies, type Limb } from '../babylon/core/bodyTargets';
 import { bodyWindows, isBodyStep } from '../babylon/core/DanceCore';
 import { lintStyle } from '../cue-style/style';
+import { DEMO_CLIPS } from '../library/demo';
 import { drillDemoLoop } from '../library/surfaceDemo';
 import { COACH_WORDS_PER_SEC, FIRST_LEAD_IN_SEC, LEAD_IN_SEC, phaseSteps, type Drill, type DrillTarget } from './chart';
 import { DrillRunner, type DrillBodyEvent, type DrillState, type LimbPositions } from './DrillRunner';
@@ -47,8 +48,14 @@ describe('the ball-skill shelf', () => {
     }
   });
 
-  it('no demo loop is borrowed: none is mapped yet (queued for demo-loops), so the page shows the still start pose', () => {
-    for (const d of HOOPS_DRILLS) expect(drillDemoLoop(d.id)).toBeNull();
+  // DEMO-LOOPS-6 (2026-11-03): the loops this test queued are now mapped (surfaceDemo.ts DRILL_DEMO_LOOPS). The old "none is
+  // mapped yet" assertion is replaced, not dropped: every ball-skill drill now plays a loop, and that loop is a real demo clip.
+  it('every drill plays its own demo loop (demo-loops-6), each one a real demo clip', () => {
+    for (const d of HOOPS_DRILLS) {
+      const loop = drillDemoLoop(d.id);
+      expect(loop, d.id).not.toBeNull();
+      expect(DEMO_CLIPS, `${d.id} -> ${loop}`).toContain(loop);
+    }
   });
 });
 

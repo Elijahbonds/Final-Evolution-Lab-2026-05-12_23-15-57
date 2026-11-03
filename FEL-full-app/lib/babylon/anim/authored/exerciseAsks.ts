@@ -52,8 +52,11 @@ const stepinClimber: Builder = (scene, sk) => {
     return { ...P, bones: { ...P.bones, Hips: [66, 0, 0], [`${s}Foot`]: [26, 0, 0], [`${o}Foot`]: [12, 0, 0] }, feet: { [o]: P.feet![o], [s]: [s === 'Left' ? -0.30 : 0.30, TOE_ANKLE + 0.09, 0.18] } as Pair, kneePoles: { [o]: [0, -1, 0.1], [s]: [s === 'Left' ? -0.4 : 0.4, 0.2, 1] } as Pair, hipsY: -0.48 };
   };
   const L = step('Left'), R = step('Right');
+  // half way in (and out), the swinging foot clears the floor
+  const mid = (st: Pose, s: 'Left' | 'Right'): Pose => ({ ...st, bones: { ...st.bones, Hips: [66, 0, 0] }, feet: { ...st.feet, [s]: [s === 'Left' ? -0.22 : 0.22, TOE_ANKLE + 0.16, -0.36] } as Pair });
   return run(scene, sk, 'ex_stepin_climber', 3.2, [
-    at(P, 0, true), at(L, 0.6, true), at(L, 0.9, true), at(P, 1.5, true), at(R, 2.1, true), at(R, 2.4, true), at(P, 3.0, true),
+    at(P, 0, true), at(mid(L, 'Left'), 0.3), at(L, 0.6, true), at(L, 0.9, true), at(mid(L, 'Left'), 1.2), at(P, 1.5, true),
+    at(mid(R, 'Right'), 1.8), at(R, 2.1, true), at(R, 2.4, true), at(mid(R, 'Right'), 2.7), at(P, 3.0, true),
   ]);
 };
 

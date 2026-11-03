@@ -319,6 +319,37 @@ Trade-off, flagged: pacing the football carry up to 1.4× makes its authored off
 - Penalty camera: the breakaway's `snapTo` plus a 1.2–1.8 m-per-frame eye move over 4 frames right after (a camera fly), and the
   dunk duel's 31° framing change at 2.4 s. Both are deliberate framing changes, so they get no damping without your call.
 
+## 4d. Clip-smooth (lane/clip-smooth), the snaps inside clips
+
+Owner, 2026-11-03: "Yes, smooth them." Feel knob `anim.clipSmooth` (default **on**; 0 builds every clip exactly as before).
+
+**Where the in-clip snaps are, measured on the clips alone.** Every gameplay clip (authored, the opponents' captures and the
+23 style captures) played on the hero and sampled at 60 fps, counted with §1's pop rule (`clipDesnap.test`). Twelve carry a
+hard snap in their own keys, all captures retargeted to pose keys: `karate_mc_hit_react` (right thigh 52° in a frame),
+`karate_mc_knockdown` ×2, `karate_mc_get_up`, `karate_mc_high_kick`, `karate_mc_roundhouse`, `karate_mc_typhoon` ×2,
+`pk_backflip` (karate's wall flip), `pk_dive_roll`, `trick_backflip`, `cap_au_kick` ×2, `brk_windmill`, `brk_helicopter` ×2.
+`clipDesnap.ts` spreads a snapping key step over the keys either side when the clip is built (the poses before and after
+kept, a hold never moved, no key time moved). **In-clip hard snaps on the clips: 16 → 0**; no other gameplay clip has one.
+
+**In play** (anim-only runs, 14 s, the same script; in-clip as §4c; runs differ by the AI's choices):
+
+| Mode | In-clip hard pops before → after | Hard pops in the run |
+|---|---|---|
+| karate | 5 → **0** (floor hold ×2, get-up, wall flip, guard) | 17 → 11 |
+| karate VS | 1 → **0** | 11 → 12 |
+| showdown | 1 → **0** (`karate_mc_hit_react`) | 9 → 7 |
+| football | 2 → 2 | 9 → 10 |
+| derby | 10 → 10 | 11 → 11 |
+
+**What is not in the clips.** Derby's `baseball_stance` / `baseball_swing`, football's `football_carry_run` (knees at speed),
+`football_spin_move` (the hips 178° in a frame) and `football_td_spike`, and karate's `karate_floor_hold` and `guard` pops are
+**not in those clips' keys**: each clip measures no hard snap alone, on the hero, the male kit and the scan (max per-frame
+turn: stance 0°, swing 19°, carry 8°, floor hold 3°). In play the derby batter, standing still in a static stance, takes a
+fixed 25.4° right-thigh (10.6° left) jump in ONE frame and then holds the new pose: a runtime layer switching the legs, not
+a clip. FootPlanting alone, mounted on the same clip and body headless, does not reproduce it. These are runtime-layer work
+(the posture, foot-plant and carry layers), routed in the lane report: re-keying clips cannot reach them, so the mode-level
+≥ 70 % target holds for the karate family (7 → 0) and not for derby and football.
+
 ## 5. For the dunk and hoops lanes (routed, not changed here)
 
 Measured by the same rig on `/play/dunk`, `/play/onevone` and `/play/threevthree`. The occluder fade is off for these
