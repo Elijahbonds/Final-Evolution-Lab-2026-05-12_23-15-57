@@ -245,9 +245,9 @@ const highKnees = (scene: Scene, sk: Skeleton) => inPlace(scene, sk, 'ex_high_kn
 const buttKicks = (scene: Scene, sk: Skeleton) => inPlace(scene, sk, 'ex_butt_kicks', 0.6, [stride('Left', heelUp('Left'), 0.02), stride('Right', heelUp('Right'), 0.02)]);
 /** ex_a_skip / ex_power_skip — the skip: a knee drives up as the other foot hops (higher, and the arms bigger, for the power
  *  skip), the foot steps down, and the other side. */
-function skip(scene: Scene, sk: Skeleton, name: string, hop: number): AnimationGroup | null {
+function skip(scene: Scene, sk: Skeleton, name: string, hop: number, period = 1.2): AnimationGroup | null {
   const down = (s: Side): Pose => ({ ...stride(s, { [`${s}UpLeg`]: [-20, 0, 0], [`${s}Leg`]: [30, 0, 0] }, 0), feet: both(0.11, ANKLE, 0.04), hipsY: -0.02 });
-  return inPlace(scene, sk, name, 1.2, [down('Right'), stride('Left', kneeUp('Left'), hop), down('Left'), stride('Right', kneeUp('Right'), hop)]);
+  return inPlace(scene, sk, name, period, [down('Right'), stride('Left', kneeUp('Left'), hop), down('Left'), stride('Right', kneeUp('Right'), hop)]);
 }
 /** ex_b_skip — the A-skip whose raised leg then reaches out long and paws back down under the hip. */
 function bSkip(scene: Scene, sk: Skeleton): AnimationGroup | null {
@@ -267,6 +267,8 @@ function jump(scene: Scene, sk: Skeleton, name: string, flight: Pose): Animation
   return loop(scene, sk, name, 2.2, [at(stand, 0, true), at(dip, 0.45, true), at(off, 0.66), at(flight, 0.9, true), at({ ...off, hipsY: 0.08 }, 1.14), at(land, 1.36, true), at(stand, 1.8)]);
 }
 const TUCK: Pose = { bones: { Hips: [-4, 0, 0], Spine: [10, 0, 0], LeftUpLeg: [-108, 0, 6], RightUpLeg: [-108, 0, -6], LeftLeg: [118, 0, 0], RightLeg: [118, 0, 0], LeftFoot: [20, 0, 0], RightFoot: [20, 0, 0] }, hands: both(0.20, 1.26 + 0.28, 0.34), poles: bothDir(0.8, -0.4, 0), hipsY: 0.28 };
+/** DEMO-LOOPS-8: the double-leg butt kick's flight — the knees under the hips, the heels kicked up to the seat. */
+const HEEL_KICK: Pose = { bones: { Hips: [2, 0, 0], Spine: [0, 0, 0], LeftUpLeg: [-8, 0, 4], RightUpLeg: [-8, 0, -4], LeftLeg: [124, 0, 0], RightLeg: [124, 0, 0], LeftFoot: [30, 0, 0], RightFoot: [30, 0, 0] }, hands: both(0.24, 1.70, 0.22), poles: bothDir(0.6, -0.2, -0.6), hipsY: 0.26 };
 const STAR: Pose = { bones: { Hips: [0, 0, 0], Spine: [-2, 0, 0], LeftUpLeg: [0, 0, 30], RightUpLeg: [0, 0, -30], LeftLeg: [4, 0, 0], RightLeg: [4, 0, 0], LeftFoot: [30, 0, 0], RightFoot: [30, 0, 0] }, hands: both(0.72, 1.86 + 0.22, 0.06), poles: bothDir(0.3, 0.5, -0.8), hipsY: 0.22 };
 
 /** ex_split_jump — from a split-squat bottom, jump and switch the legs in the air, land in the other split, and back. */
@@ -370,6 +372,9 @@ export const BODY_BUILDERS: readonly [string, Builder][] = [
   ['ex_side_plank', (scene, sk) => sidePlank(scene, sk, 'ex_side_plank', false)], ['ex_side_plank_leg', (scene, sk) => sidePlank(scene, sk, 'ex_side_plank_leg', true)],
   ['ex_squat_thrust', (scene, sk) => burpee(scene, sk, 'ex_squat_thrust', false)], ['ex_burpee', (scene, sk) => burpee(scene, sk, 'ex_burpee', true)], ['ex_seal_jack', sealJack],
   ['ex_high_knees', highKnees], ['ex_butt_kicks', buttKicks], ['ex_a_skip', (scene, sk) => skip(scene, sk, 'ex_a_skip', 0.06)], ['ex_power_skip', (scene, sk) => skip(scene, sk, 'ex_power_skip', 0.22)], ['ex_b_skip', bSkip],
+  // DEMO-LOOPS-8: the fast skip (low and quick: the step-hop barely leaves the floor); the double-leg butt kick (a jump, the
+  // heels kicked up to the seat in the air)
+  ['ex_fast_skip', (scene, sk) => skip(scene, sk, 'ex_fast_skip', 0.025, 0.8)], ['ex_heel_kick_jump', (scene, sk) => jump(scene, sk, 'ex_heel_kick_jump', HEEL_KICK)],
   ['ex_tuck_jump', (scene, sk) => jump(scene, sk, 'ex_tuck_jump', TUCK)], ['ex_star_jump', (scene, sk) => jump(scene, sk, 'ex_star_jump', STAR)], ['ex_split_jump', splitJump], ['ex_sl_jump', slJump],
   ['ex_pogo_fb', (scene, sk) => hops(scene, sk, 'ex_pogo_fb', [[0, 0.12], [0, -0.12]], false, 0.10, 0.9)],
   ['ex_pogo_lat', (scene, sk) => hops(scene, sk, 'ex_pogo_lat', [[0.14, 0], [-0.14, 0]], false, 0.10, 0.9)],
