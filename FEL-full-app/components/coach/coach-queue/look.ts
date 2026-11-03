@@ -7,12 +7,16 @@
 import { TYPE } from '@/lib/design/type';
 
 export const LOOK = {
-  page: 'fel-fade mx-auto max-w-[680px] px-4 pb-28 pt-6 md:pb-10',
+  // COACH-TOOLS-EASY (2026-11-02): at 1280 the home used a 560 px column; a desktop gets the width (see `columns`)
+  page: 'fel-fade mx-auto max-w-[680px] px-4 pb-28 pt-6 md:pb-10 lg:max-w-[1160px]',
+  /** Desktop: the queue on the left, the roster and the tools on the right. A phone keeps one column. */
+  columns: 'lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,440px)] lg:items-start lg:gap-10',
   header: 'mb-5 flex items-center justify-between gap-3',
   title: `${TYPE.heading} text-white`,
   section: 'mb-6',
   sectionHead: `${TYPE.label} mb-3 flex items-center justify-between text-fel-dim`,
-  card: 'fel-surface fel-enter flex flex-col gap-3 p-4 transition-[opacity,transform,max-height,margin,padding] duration-200 ease-out',
+  // COACH-TOOLS-EASY: from md the buttons sit on the card's own row (the card was ~126 px tall with them under it)
+  card: 'fel-surface fel-enter flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between transition-[opacity,transform,max-height,margin,padding] duration-200 ease-out',
   cardLeaving: 'pointer-events-none !max-h-0 !py-0 opacity-0 translate-x-6 overflow-hidden',
   name: `${TYPE.body} font-semibold text-white`,
   line: `${TYPE.small} text-fel-soft`,
@@ -23,7 +27,8 @@ export const LOOK = {
   outline: `fel-press inline-flex min-h-12 min-w-12 items-center justify-center gap-2 rounded-full px-4 ${TYPE.small} font-semibold text-fel-soft hover:text-white disabled:opacity-50`,
   row: `fel-press flex min-h-12 w-full items-center justify-between gap-3 border-b border-white/[0.06] py-3 text-left ${TYPE.body} text-white`,
   // the roster strip: avatars in their own scroller (the page never scrolls sideways)
-  strip: '-mx-4 flex gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none]',
+  // COACH-TOOLS-EASY: on a desktop the strip wraps (it scrolled sideways and cut athlete 9 with the room to spare)
+  strip: '-mx-4 flex gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] lg:mx-0 lg:flex-wrap lg:overflow-visible lg:px-0',
   avatarBtn: 'fel-press flex w-[76px] shrink-0 flex-col items-center gap-1.5',
   avatar: `flex h-12 w-12 items-center justify-center rounded-full bg-white/[0.08] ${TYPE.small} font-semibold text-white`,
   dots: 'flex gap-[3px]',

@@ -21,8 +21,9 @@ import { rateFor, StrideRateFilter, strideRef } from '../core/StrideMatch';
 import { boneNode, findBone } from './boneLookup';
 import { moveFadeSec } from '../core/HandleSystem';   // F4: one turbo crossover fade, the same number doMove uses
 import { MOVE_LEGS_BEAT, type MoveLegs } from './moveLegs';   // H2: the legs keep running under a handle move
-import { feel } from '../../feel-panel/feel';   // AF-11: the anim.holdLast knob (default off)
+import { feel } from '../../feel-panel/feel';   // AF-11: the anim.holdLast knob (default off); hoops-p04: the plant lock's release fade
 import { protectClip, protectDribbles, restTempoFor } from './RestDribble';   // lane/h3-handler (#312 port): the dribble at rest
+import { transitionFor, transitionRuleOn } from './hoopsTransitions';   // hoops-p04: one blend + minimum-hold rule for every clip change
 
 // ── Blend tree ─────────────────────────────────────────────────────────────
 export type BasketballAnimState =
@@ -244,14 +245,14 @@ export const HOLD_LAST_STATES: ReadonlySet<BasketballAnimState> = new Set<Basket
 /** AF-11: is the hold-last-frame knob on? */
 export function holdLastOn(): boolean { return feel('anim.holdLast', ANIM_HOLD_LAST_ON) >= 0.5; }
 
-export interface TreeBeatOpts { fadeSec?: number; speedRatio?: number; onSettle?: () => void; /** Sit in this loop after the beat until the mode calls release() (a knockdown → the floor). */ settleTo?: { clip: string; fadeSec?: number; speedRatio?: number };
+export interface TreeBeatOpts { fadeSec?: number; speedRatio?: number; /** hoops-p04: start this far into the clip (a shot paced from its rise). */ from01?: number; onSettle?: () => void; /** Sit in this loop after the beat until the mode calls release() (a knockdown → the floor). */ settleTo?: { clip: string; fadeSec?: number; speedRatio?: number };
   /** BIOMECH-HOOPS-WAVE1: HOLD the beat's last frame when it runs out (an aerial clip in a flight — the dunk contest's
    *  playAir) until the mode's next beat / release(): the 0.35 s launch used to run out mid-air and settle into the run
    *  loop, the arms crossfading down through a T at the jam. */
   holdEnd?: boolean;
   /** AF-11 (internal): a HOLD_LAST state's clip — on its end it freezes on the last frame and the tree keeps the state (no settle). */
   holdState?: boolean }
-export interface TreeHoldOpts { fadeSec?: number; speedRatio?: number }
+export interface TreeHoldOpts { fadeSec?: number; speedRatio?: number; /** hoops-p04: start this far into the clip (a jumper held from its rise, its load skipped). */ from01?: number }
 
 /**
  * The ONE owner of a basketball body (ONEVONE-DEFENSE-LOGIC, 2026-09-07 — the boards' / combat's discipline). The mode
@@ -333,7 +334,10 @@ export class BasketballAnimTree {
       if (!yields && !holdExit) return this.override.state ?? this.current ?? c.state;
     }
     const now = typeof performance !== 'undefined' ? performance.now() / 1000 : 0;
-    if (c.state !== this.current && c.loop && this.sameGroup(this.current, c.state) && now - this.stateSince < BasketballAnimTree.DWELL_SEC) return this.current!;   // the dwell
+    // hoops-p04: THE RULE (anim/hoopsTransitions) — the fade floor and the minimum hold for this pair; off, the release's dwell exactly
+    const tr = transitionFor(this.current, c.state, c.loop, c.fadeSec);
+    const holdSec = transitionRuleOn() ? tr.holdSec : c.loop && this.sameGroup(this.current, c.state) ? BasketballAnimTree.DWELL_SEC : 0;
+    if (c.state !== this.current && c.loop && holdSec > 0 && now - this.stateSince < holdSec) return this.current!;   // the dwell
     // (phase 4b) the same loop state in the other hand is its twin: replayed with the state's own fade
     const handChanged = c.state === this.current && c.loop && !!this.strideClip && c.clip !== this.strideClip;
     if (c.state !== this.current || handChanged) {
@@ -354,9 +358,9 @@ export class BasketballAnimTree {
         if (r0 !== null && !carryOn) this.strideFilter.set(r0);
         // H2 (moveLegs): out of a handle move, the loop picks up at the stride phase the legs layer carried through it
         const phase01 = this.legs?.live ? this.legs.phaseFor(c.clip) : undefined;   // (the other hand's twin: half a stride on)
-        if (!carryOn) this.animator.play(c.clip, { loop: true, fadeSec: c.fadeSec, speedRatio: r0 ?? 1, ...(phase01 !== undefined ? { phase01 } : {}) });
+        if (!carryOn) this.animator.play(c.clip, { loop: true, fadeSec: tr.fadeSec, speedRatio: r0 ?? 1, ...(phase01 !== undefined ? { phase01 } : {}) });   // hoops-p04: the rule's fade
         this.loopPlaying = c.clip;
-      } else { this.strideClip = null; const isMove = c.state === 'crossover' || c.state === 'crossover_right'; this.playBeat(c.clip, { fadeSec: isMove && (input.moveRate ?? 1) > 1 ? moveFadeSec(true) : c.fadeSec, speedRatio: isMove ? input.moveRate ?? 1 : 1 }, c.state); }   // MOVE PACE
+      } else { this.strideClip = null; const isMove = c.state === 'crossover' || c.state === 'crossover_right'; this.playBeat(c.clip, { fadeSec: isMove && (input.moveRate ?? 1) > 1 ? moveFadeSec(true) : c.fadeSec, speedRatio: isMove ? input.moveRate ?? 1 : 1 }, c.state); }   // MOVE PACE   // (playBeat floors the fade: the rule)
     }
     // STRIDE MATCHING, every frame. The loop is only (re)played on a STATE CHANGE — which is what keeps it stable —
     // so the rate has to be set on the RUNNING animation instead, or a per-frame play() would restart the clip every
@@ -376,7 +380,7 @@ export class BasketballAnimTree {
     this.token++; this.loopPlaying = null;
     this.override = { kind: 'hold', clip, state: null };
     this.current = null;
-    this.animator.play(clip, { loop: true, fadeSec: opts.fadeSec ?? 0.12, speedRatio: opts.speedRatio ?? 1 });
+    this.animator.play(clip, { loop: true, fadeSec: transitionFor(null, null, false, opts.fadeSec ?? 0.12).fadeSec, speedRatio: opts.speedRatio ?? 1, ...(opts.from01 ? { from01: opts.from01 } : {}) });   // hoops-p04: the rule's floor; a hold may start at its rise
   }
 
   /** End a beat / hold now and settle into the tree's choice. */
@@ -405,7 +409,8 @@ export class BasketballAnimTree {
     if (this.legsBeat) this.legs!.begin(this.strideClip);
     this.override = { kind: 'beat', clip, state, ...(opts.holdState ? { holdState: true } : {}) };
     this.animator.play(clip, {
-      loop: false, fadeSec: opts.fadeSec ?? 0.1, speedRatio: opts.speedRatio ?? 1, restart: true,   // POLISH: 0.08 → 0.10 — the reach and hand-up beats out of a stance popped a wrist 1 m in a frame
+      loop: false, fadeSec: transitionFor(this.current, state, false, opts.fadeSec ?? 0.1).fadeSec, speedRatio: opts.speedRatio ?? 1, restart: true,   // POLISH: 0.08 → 0.10 — the reach and hand-up beats out of a stance popped a wrist 1 m in a frame   // hoops-p04: the rule's floor (a press is not delayed: the clip starts now)
+      ...(opts.from01 ? { from01: opts.from01 } : {}),   // hoops-p04: a shot paced from its rise
       onEnd: () => {
         if (this.token !== tok) return;   // cut by a newer beat / hold / release / reset
         // ANIM CLEAN-UP (2026-09-18): the ended beat is parked on its last frame so whatever follows FADES from it — an
@@ -427,6 +432,10 @@ export class BasketballAnimTree {
 
 // ── Foot plant (two-bone IK contact lock) ──────────────────────────────────
 export const PLANT_LOCK_SEC = 0.18;
+/** hoops-p04: the plant lock's release fade (s): the pin slides back to the clip's ankle over this instead of in one frame. 0 = the old
+ *  one-frame release. Knob `hoops.plantReleaseFadeSec`. */
+export const PLANT_RELEASE_FADE_SEC = 0.12;
+const plantReleaseFadeSec = (): number => feel('hoops.plantReleaseFadeSec', PLANT_RELEASE_FADE_SEC);
 
 export class FootPlant {
   // 2026-09-03: BoneIKController wrote bone matrices that this linked-node rig
@@ -434,7 +443,7 @@ export class FootPlant {
   // "explosion"). The pin is now the node-space two-bone solver, applied in
   // onAfterAnimationsObservable so the clip's own leg pose is what gets pinned
   // (the harness updates modes BEFORE the clips evaluate).
-  private lock: { foot: 'Left' | 'Right'; pin: Vector3; left: number; hip: TransformNode; knee: TransformNode; ankle: TransformNode } | null = null;
+  private lock: { foot: 'Left' | 'Right'; pin: Vector3; left: number; hip: TransformNode; knee: TransformNode; ankle: TransformNode; fadeLeft: number | null } | null = null;
   /**
    * IMPROVE (2026-10-06, 1v1 #17): ONE after-animations observer for the body's life, gated on the lock. Every plant-and-cut added
    * an observer and every release removed it (a list splice a cut, both bodies). It is added on the FIRST plant — where every
@@ -450,7 +459,11 @@ export class FootPlant {
     const l = this.lock;
     if (!l) return;
     l.ankle.computeWorldMatrix(true);
-    this.target.set(l.pin.x, l.ankle.getAbsolutePosition().y, l.pin.z);   // the clip keeps its height
+    const a = l.ankle.getAbsolutePosition();
+    // hoops-p04: THE PIN LETS GO OVER A FADE. The lock used to end in one frame — the leg jumped from the pin back to the clip's own
+    // ankle (the rig read the hero's thigh at 8–10 000 °/s on such frames): the target now slides from the pin to the clip's ankle
+    const w = l.fadeLeft === null ? 1 : Math.max(0, l.fadeLeft) / Math.max(1e-3, plantReleaseFadeSec());
+    this.target.set(a.x + (l.pin.x - a.x) * w, a.y, a.z + (l.pin.z - a.z) * w);   // the clip keeps its height
     plantLeg(l.hip, l.knee, l.ankle, this.target, this.mesh.forward);
   };
 
@@ -458,7 +471,8 @@ export class FootPlant {
    *  plant start so the cut rotates around a fixed contact point. The factory
    *  argument is kept for callers; no scene node is needed any more. */
   plant(_sceneFootTarget?: (name: string) => TransformNode): void {
-    if (this.lock) return;
+    if (this.lock && this.lock.fadeLeft === null) return;
+    if (this.lock) this.release();   // hoops-p04: a new plant during a release fade takes the foot afresh
     const lf = findBone(this.skeleton, 'LeftFoot');
     const rf = findBone(this.skeleton, 'RightFoot');
     if (!lf || !rf) return;
@@ -472,7 +486,7 @@ export class FootPlant {
     ankle.computeWorldMatrix(true);
     const pin = ankle.getAbsolutePosition().clone();
     this.obs ??= this.mesh.getScene().onAfterAnimationsObservable.add(this.pinLeg);   // IMPROVE (2026-10-06) #17: once, then gated on the lock
-    this.lock = { foot: side, pin, left: PLANT_LOCK_SEC, hip, knee, ankle };
+    this.lock = { foot: side, pin, left: PLANT_LOCK_SEC, hip, knee, ankle, fadeLeft: null };
     claimLeg(this.skeleton, side, pin);   // HOOPS MOTION phase 3d (S30): the one writer of this leg until release() — FootPlanting stands off
   }
 
@@ -480,7 +494,9 @@ export class FootPlant {
   update(dt: number): void {
     if (!this.lock) return;
     this.lock.left -= dt;
-    if (this.lock.left <= 0) this.release();
+    // hoops-p04: the window over, the pin FADES (plantReleaseFadeSec) and then lets go; a fade of 0 lets go at once, as before
+    if (this.lock.left <= 0 && this.lock.fadeLeft === null) { const f = plantReleaseFadeSec(); if (f <= 0) { this.release(); return; } this.lock.fadeLeft = f; return; }
+    if (this.lock.fadeLeft !== null) { this.lock.fadeLeft -= dt; if (this.lock.fadeLeft <= 0) this.release(); }
   }
 
   release(): void {

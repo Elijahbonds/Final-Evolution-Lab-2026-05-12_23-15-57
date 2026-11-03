@@ -9,7 +9,7 @@ import { Check } from 'lucide-react';
 export interface FirstClientState { invited: boolean }
 
 const STEPS = [
-  { id: 'invite', title: 'Invite your first client', line: 'Make one invite link or code below and send it to one athlete.', href: '#coach-invite' },
+  { id: 'invite', title: 'Invite your first athlete', line: 'Make one invite link or code below and send it to them.', href: '#coach-invite' },
   { id: 'template', title: 'Start their program from a template', line: 'When they join, open their program here and pick a starting template instead of an empty week.', href: null },
   { id: 'session', title: 'Run your first session', line: 'Live together, or a guided session on their phone. Their reps come back to you.', href: '/coach/session' },
 ] as const;
@@ -22,7 +22,7 @@ export function FirstClientChecklist({ state }: { state: FirstClientState }) {
   const done = firstClientDone(state);
   return (
     <section className="fel-card min-w-0 space-y-2 rounded-xl p-4" data-first-client>
-      <h2 className="fel-heading text-sm font-bold uppercase tracking-wide text-white">Your first client</h2>
+      <h2 className="fel-heading text-sm font-bold uppercase tracking-wide text-white">Your first athlete</h2>
       <ol className="space-y-2">
         {STEPS.map((s, i) => (
           <li key={s.id} className="flex min-w-0 gap-2 text-sm" data-first-client-step={s.id} data-done={done.has(s.id) ? 'true' : undefined}>
