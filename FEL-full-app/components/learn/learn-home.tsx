@@ -111,6 +111,8 @@ export function LearnHome() {
           <h2 id="learn-feed" className={`${TYPE.heading} text-white`}>The feed</h2>
           <div className="mt-2">
             <ListRow href="/learn/feed" icon={Layers} title="Quick cards" line="A minute at a time. Reviews come back." testId="learn-feed-door" />
+            {/* PLAT-P10 (EDU-01): the teacher platform's door (opens soon until the teacher SQL is applied) */}
+            <ListRow href="/teach" icon={GraduationCap} title="Teach on FEL" line="Apply, then build a free course." testId="learn-teach-door" />
           </div>
         </section>
 

@@ -5,10 +5,9 @@ import { getStripe } from '@/lib/stripe';
 import { paymentMethodsFor } from '@/lib/stripe-payment-methods';
 import { isVerifiedAdult } from './adult';
 import { attachListingMatches, type PartListingMatch } from './bundleParts';
-import { isAllowlistedCoach } from './coaches';
 import * as bundlePolicy from './bundlePolicy';
 import { missingBundleParts, ownedBundleParts, productsGrantedBy } from './entitlement';
-import { isMissingTable, logStoreUnavailable, reviewsCanBeSold, storeClosed } from './gate';
+import { isMissingTable, isStoreCoach, logStoreUnavailable, reviewsCanBeSold, storeClosed } from './gate';
 import { itemKeyFor, parseManifest, priceOk, programComingSoon, type CoachManifest } from './manifest';
 import { checkoutExpiresAtUnix, holdExpiresAt } from './policy';
 import { shareWithCoachAllowed } from './rescreen';
@@ -92,7 +91,7 @@ export async function startCheckout(userId: string, body: CheckoutBody, origin: 
       return NextResponse.json({ error: 'coming_soon' }, { status: 409 });
     }
     const instructor = await prisma.instructor.findFirst({ where: { userId: listing.creatorId, published: true } });
-    if (!instructor || !isAllowlistedCoach(instructor.userId)) {
+    if (!instructor || !(await isStoreCoach(instructor.userId))) {
       return NextResponse.json({ error: 'not_for_sale' }, { status: 409 });
     }
     if (listing.creatorId === userId) return NextResponse.json({ error: 'own_listing' }, { status: 409 });
