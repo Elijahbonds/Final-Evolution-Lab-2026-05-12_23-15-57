@@ -24,7 +24,8 @@ export type CoachPrompt =
  * about 2 m of floor and a camera in front (owner's decision: jumping in place, approaches become steps).
  */
 export interface DrillSource {
-  book: 'playbook' | 'art-of-dunking';
+  /** PLAT-P09: 'fel' = FEL's own drill (the ball-skill shelf, hoopsDrills.ts): no book has it; chapter 0. */
+  book: 'playbook' | 'art-of-dunking' | 'fel';
   chapter: number;
   section: string;
   adapted?: string;

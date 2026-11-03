@@ -18,7 +18,7 @@
 //
 // Pure: the server page computes it (it reads the context) and hands the client ids and lines, never the context.
 import { WAKE_UP } from './drills';
-import { ROUTE_DRILLS } from './route';
+import { OFFERED_DRILLS } from './route';
 import type { DrillAccess, DrillGate, DrillsAccess } from './gate';
 import {
   NOTE_COPY, WAKE_UP_IMPACT_GATED, WARMUP_FOLLOWS_JUMP_GATE, jumpGateNote, phaseImpact, type WarmupContext,
@@ -33,7 +33,7 @@ export function drillsAccess(ctx: Pick<WarmupContext, 'isYouth' | 'painDecision'
   if (ctx.hardStopped) {
     return {
       stopped: true, impactHeld: null, note: null, noteHref: null, landingCheck: false,
-      drills: ROUTE_DRILLS.map((d) => ({ id: d.id, gate: 'held', phases: [], heldPhases: d.phases.map((p) => p.name) })),
+      drills: OFFERED_DRILLS.map((d) => ({ id: d.id, gate: 'held', phases: [], heldPhases: d.phases.map((p) => p.name) })),
     };
   }
   const pain = ctx.painDecision ?? null;
@@ -48,7 +48,9 @@ export function drillsAccess(ctx: Pick<WarmupContext, 'isYouth' | 'painDecision'
   const wakeHeld = WAKE_UP_IMPACT_GATED ? why(WARMUP_FOLLOWS_JUMP_GATE && gateClosed) : null;
   const drillHeld = why(gateClosed);
 
-  const drills = ROUTE_DRILLS.map((d): DrillAccess => {
+  // PLAT-P09: both shelves (the Playbook's and the ball skills'): a ball-skill jump (the jump stop, the rebound) is held
+  // by the same rules as a chapter-6 jump
+  const drills = OFFERED_DRILLS.map((d): DrillAccess => {
     const held = d.id === WAKE_UP.id ? wakeHeld : drillHeld;
     // YOUTH-CONTACT-CAP (PM 2026-10-26): an adults-only drill or phase (Pogo Both Feet, the Wake-Up's 60 pogos) is held
     // for a youth athlete on its own, whatever the warm-up's switches say

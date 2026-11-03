@@ -18,4 +18,15 @@ export const PROPPED_LOOPS = {
   ex_back_wall_arm_raise: 'wallback', ex_wall_chin_tuck: 'wallback', ex_wall_slide_liftoff: 'wall', ex_box_jump: 'box', ex_drop_landing: 'stepbox',
   ex_seated_breathe: 'seat', ex_incline_scap_push_up: 'handbench', ex_supported_sl_rdl: 'dowel', ex_hip_airplane: 'dowel', ex_copenhagen_knee: 'cphbench', ex_copenhagen_raise_knee: 'cphbench', ex_calf_smr: 'roller', ex_piriformis_smr: 'rollerseat',
   ex_decline_press: 'decline', ex_decline_fly: 'decline', ex_decline_fly_one: 'decline', ex_decline_skull: 'decline', ex_decline_skull_one: 'decline',
+  // exerciseWarmup.ts (DEMO-LOOPS-4): the wall the calf rock and the Wake-Up's locks lean on; the door post and the doorway
+  ex_wall_calf_rock: 'wall', ex_wall_locks: 'wall', ex_doorway_chest_rock: 'doorpost', ex_door_row: 'doorway',
+  // exerciseFamilies.ts (DEMO-LOOPS-4): the bar the hanging raises hang from, the parallel bars the knee raise holds itself up on
+  ex_hang_leg_raise: 'pullbar', ex_hang_pike: 'pullbar', ex_bar_leg_raise: 'dipbars',
+  // exerciseAsks.ts: the seat the one-leg calf raise sits on; the box the push-off (in front) and the stride jumps (beside) drive up from
+  ex_seated_calf_one: 'seat', ex_box_pushoff: 'box', ex_stride_jump: 'boxside', ex_stride_jump_cross: 'boxside',
+  // exerciseFamilies5.ts (DEMO-LOOPS-5): the flat bench the leg raise and pull-in lie on (the legs off its end), the bench the
+  // seated tuck, the seated rope crunch and the chair stretches sit on
+  ex_bench_leg_raise: 'bench', ex_bench_leg_pull_in: 'bench', ex_seated_leg_tuck: 'seat', ex_rope_crunch_seat: 'seat', ex_seat_side_bend: 'seat', ex_seat_twist: 'seat',
+  // exerciseGrip.ts (DEMO-LOOPS-6): the bench the seated wrist curls sit on; the bench the kneeling ones lean across
+  ex_wrist_curl: 'seat', ex_wrist_curl_down: 'seat', ex_wrist_curl_one: 'seat', ex_wrist_curl_one_down: 'seat', ex_wrist_curl_bench: 'handbench', ex_wrist_curl_bench_down: 'handbench',
 } as const satisfies Record<string, string>;
