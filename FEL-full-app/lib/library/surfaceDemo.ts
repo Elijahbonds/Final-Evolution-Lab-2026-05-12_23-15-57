@@ -70,8 +70,6 @@ export const warmupDemoLoop = (id: string): string | null => WARMUP_DEMO_LOOPS[i
  * set-up (lib/coach/templateCatalogue.ts). Only names with no library entry: once the library has one, its own loop wins.
  */
 export const CATALOGUE_DEMO_LOOPS: Readonly<Record<string, string>> = {
-  // "Hands on the floor, hips high, heels lifted. Lower your head toward a spot just in front of your hands, then press away."
-  'Pike Push-Up': 'ex_pike_pushup',
   // "Hold both sides of a sturdy door frame, … lean back … Pull your chest to the frame"
   'Door Frame Row, Upright': 'ex_door_row', 'Door Frame Row': 'ex_door_row',
 };
