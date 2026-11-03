@@ -42,10 +42,10 @@ export const SLAM_VARIANTS: Record<SlamVariant, SlamVariantSpec> = {
 /** The rate (rad/s) the reverse turns the body away from the iron after the press: half a turn in ~0.2 s, about the 360's own
  *  peak step (17°/frame at 60 fps). NEW. */
 export const REVERSE_TURN_RATE = 15.7;
-/** The reverse's clip (dunk_finish_reverse, 0.7 s) plays this fast: its arch — the ball over and behind the head, t 0.4 — comes
- *  0.29 s after the press and the flush behind the head by 0.5 s, inside the jam's 0.6 s short timeout. The reach IK is off on the
- *  reverse (the iron is behind the body), so the clip carries the ball. NEW. */
-export const REVERSE_FINISH_RATE = 1.4;
+/** The REVERSE's jam rides this much higher (m) than a flush (JAM_Y 1.15): with the back to the iron the ball arm reaches up and
+ *  BACK over the head, and it topped out 0.10–0.25 m under the ring (measured: 2 of 3 reverses short of the iron, the ball at
+ *  2.80–2.95 m against a 3.05 m ring; the one that met it started the jam with the ball already over the ring). NEW. */
+export const REVERSE_JAM_LIFT = 0.2;
 /** The reverse's flush meets the iron only once the back is to it: the contact waits until the body is this far round (rad). */
 export const REVERSE_CONTACT_FROM = Math.PI * 0.8;
 

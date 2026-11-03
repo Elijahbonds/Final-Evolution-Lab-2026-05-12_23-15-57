@@ -296,7 +296,9 @@ async function boot(b: Browser, prop: string | null): Promise<{ p: Page; errors:
     sc.onBeforeRenderObservable.add(() => {
       const h = dev.hero(); if (!h || !sc.activeCamera) return; let root = h; while (root.parent) root = root.parent;
       const hips = sc.skeletons.flatMap((k: any) => k.bones).map((b: any) => b.getTransformNode()).find((n: any) => n && /Hips$/.test(n.name) && n.isDescendantOf(root));
-      const c = hips ? hips.getAbsolutePosition() : root.getAbsolutePosition(); const cam = sc.activeCamera;
+      // (no Hips node under the hero's root — the bones hang off the skeleton, not the root — aims at the feet and films the body at the
+      // top edge of the frame: the chest, a metre over the root, is the aim then)
+      const c = hips ? hips.getAbsolutePosition() : root.getAbsolutePosition().add(new (root.getAbsolutePosition().constructor)(0, 1.1, 0)); const cam = sc.activeCamera;
       // Phase 7: the side with a clear line to the hips (from dunk 2 the hoopbus parks on the right corner, where this camera
       // stood): checked every 15 frames, sticky while it stays clear
       const w = window as unknown as { __sideX?: number; __sideN?: number }; w.__sideN = (w.__sideN ?? 0) + 1;
@@ -390,7 +392,7 @@ async function runScen(b: Browser, scen: string, reps: number): Promise<Rec[]> {
     const stripOn = STRIP && (i === 0 || process.env.STRIP_ALL === '1');   // Phase 6: STRIP_ALL = a strip of every attempt (the 16 tricks)
     if (stripOn) cfg.strip = Array.from({ length: Number(process.env.STRIP_N ?? 20) }, (_, k) => Number(process.env.STRIP_FROM ?? 60) + k * Number(process.env.STRIP_STEP ?? 6));
     const p = pg.p;
-    const shotsDir = path.join(OUT, 'strip', s.replace(':', '-'));
+    const shotsDir = path.join(OUT, 'strip', s.replace(':', '-') + (list.filter((x) => x === s).length > 1 ? `-${i}` : ''));   // P7: a scenario thrown twice keeps both strips
     if (stripOn) fs.mkdirSync(shotsDir, { recursive: true });
     if (process.env.NEWMESH === '1') console.log('  [NEWMESH] before ' + s + ': ' + JSON.stringify(await p.evaluate(() => { const w = window as unknown as { __FEL_DEV__: { scene: any }; __mesh0: Record<number, string> };
       const out: string[] = []; for (const m of w.__FEL_DEV__.scene.meshes) { if (!m.isEnabled() || !m.isVisible) continue; m.computeWorldMatrix(true); const c = m.getBoundingInfo().boundingSphere.centerWorld; const at = `${c.x.toFixed(2)},${c.y.toFixed(2)},${c.z.toFixed(2)}`;

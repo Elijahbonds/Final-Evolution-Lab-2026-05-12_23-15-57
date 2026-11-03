@@ -89,7 +89,7 @@ import { applyVeniceDunkLookPass } from '../visual/veniceSurroundVisibility';
 import { DUNK_CONFIG as CFG } from './modeConfigs';
 import { readDisplaySetting } from '@/lib/controller-link/tvMode';   // TV MODE: the slam window widens on a mirrored display
 import { LAND_LEAD_SEC, timeToFloor, OOP_LOB_FLIGHT_SEC, OOP_WINDUP_SEC, OOP_LATE_CATCH_CLIP_T, whiffWhy, GLASS_RUN_CATCH_CLIP_T, GLASS_RELEASE_MIN_M, SELF_LOB_RELEASE_Y, glassThrowDue, OOP_GLASS_PASSER_X, OOP_GLASS_PASSER_FROM_RIM_M, OOP_GLASS_HIT_OVER_RIM_M, OOP_BOUNCE_FLIGHT_SEC, LOB_FRAME_LIFT, REAL_JUMP_PERSONAL, SLAM_BIG_FROM, personalFullRiseM, riseToPower, LOB_FRAME_TAU, oopThrowDue, RUNWAY_STRIDE_MPS, RUNWAY_STRIDE_SCALE, RUNWAY_RATE_MIN, RUNWAY_RATE_MAX, slamImpact, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG } from '../core/DunkFlagship';   // DUNK-FLAGSHIP: the pass's numbers (feel-panel knobs)
-import { slamVariantOf, SLAM_VARIANTS, SLAM_VARIANTS_ON, REVERSE_TURN_RATE, REVERSE_CONTACT_FROM, REVERSE_FINISH_RATE, type SlamVariant } from '../core/DunkSlamVariant';   // DUNK-FLAGSHIP Phase 7: the finish called with the slam (knob, off)
+import { slamVariantOf, SLAM_VARIANTS, SLAM_VARIANTS_ON, REVERSE_TURN_RATE, REVERSE_CONTACT_FROM, REVERSE_JAM_LIFT, type SlamVariant } from '../core/DunkSlamVariant';   // DUNK-FLAGSHIP Phase 7: the finish called with the slam (knob, off)
 import { feel } from '../../feel-panel/feel';
 import { rimCutSpot, clearOfHoop, runUpTune, tuneKey, dunkFramingOn } from '../core/dunkCamFraming';   // CAMERA TIP: cam.dunkFraming (default off)
 import { DUNK_BACKBOARD_Z } from '../visual/venuePropSets';
@@ -2428,11 +2428,11 @@ export const DunkMode: ModeDefinition = (() => {
             if (!replaying) {
               // DUNK-CAR-CLIP R2: a ball still further out than an on-time carry (a late press's finish) carries the body that much further in
               ball.computeWorldMatrix(true);
-              const jamExtra = jamFollowExtra(Math.hypot(ball.getAbsolutePosition().x - rim.x, ball.getAbsolutePosition().z - rim.z));
+              const jamExtra = finishVariant === 'reverse' ? 0 : jamFollowExtra(Math.hypot(ball.getAbsolutePosition().x - rim.x, ball.getAbsolutePosition().z - rim.z));   // DUNK-FLAGSHIP Phase 7: never on the REVERSE — its ball is BEHIND the head, so a ball far from the iron is not a body short of it (measured: the carry-in parked the hips under the ring, the ball 0.8 m off the iron)
               player.root.position.z += (rim.z + FLUSH_Z_AHEAD - JAM_FOLLOW_M - jamExtra - player.root.position.z) * Math.min(1, dt / JAM_FOLLOW_TAU);
               // the pull-up on the iron (never down); the LEFT-hand carry (the eastbay after its pass) pulls up further — the pass leaves
               // that palm facing down with the ball riding UNDER the wrist, 0.15 m lower than the right hand's palm-out carry
-              const jamY = JAM_Y + (inOffHand() ? JAM_Y_LEFT_EXTRA : 0);
+              const jamY = JAM_Y + (inOffHand() ? JAM_Y_LEFT_EXTRA : 0) + (finishVariant === 'reverse' ? REVERSE_JAM_LIFT : 0);   // DUNK-FLAGSHIP Phase 7: the turned body's reach over the head tops out lower
               // DUNK-CAR-CLIP R2: …and a body still ABOVE the jam height comes DOWN onto the iron. An early press the buffer fired at
               // the window's open edge (clip 1.11) resolves at the top of the arc — root 1.44 against 1.15 on time — and "never down"
               // held the ball 0.33 m over the ring until the 0.28 s timeout let it go 0.35 m off the iron and the flush floated it in
@@ -2571,7 +2571,7 @@ export const DunkMode: ModeDefinition = (() => {
       // arm to the rim through the tomahawk's cock-back and the windmill's top, the moments that make those dunks what they are
       const reachFrom = airTrick ? Math.max(HAND_IK_FROM, airTrick.t0 + (TRICK_READY_AT[airTrick.trick.id] ?? player.animator.durationOf(airTrick.trick.clip) ?? 0.8) / airTrick.rate - 0.08) : HAND_IK_FROM;
       const reachWant = (phase === 'cinematic' && clipTime >= reachFrom && !obstacleClipped)
-        || (phase === 'resolve' && qteHit && (!contactLatch || hangOn) && !obstacleClipped && finishRelease < 0 && finishVariant !== 'reverse')   // DUNK-HANDS-RIM: on through the jam to the iron, held through a hang (DUNK-FLAGSHIP Phase 7: not on the REVERSE — the iron is BEHIND the turned body, where the reach's anti-flip shaping caps the arm short of it; the clip's arch carries the ball back over the head to it)
+        || (phase === 'resolve' && qteHit && (!contactLatch || hangOn) && !obstacleClipped && finishRelease < 0)   // DUNK-HANDS-RIM: on through the jam to the iron, held through a hang
         || (replaying && replayAir && (replayAerial || replayClipNow >= HAND_IK_FROM));   // DUNK-BALL-ARMS-RIM: the replay reaches on the live flight's clip beat — on from the replay's first airborne frame, the reach whipped the arms 0.31–0.36 m a frame toward a rim 2 m away
       const ikScale = ctx.scene.animationTimeScale ?? 1;
       const ikStep = dt * (phase === 'cinematic' && Number.isFinite(ikScale) && ikScale > 0 ? ikScale : 1) / HAND_IK_LAG_SEC;
@@ -3344,7 +3344,6 @@ export const DunkMode: ModeDefinition = (() => {
     finishRelease = qteHit && !lob.live && aerialClip === SPORT_CLIP.dunkFinishWindmill ? WINDMILL_RELEASE_T : -1; finishT = 0;
     // the finish is paced so it ends with the flush (release + the 0.47 s flush), never a held clip-less pose before CONTACT
     finishRate = finishRelease >= 0 ? Math.min(1, (player.animator.durationOf(aerialClip) ?? 0.85) / (finishRelease + 0.5)) : 1;
-    if (finishVariant === 'reverse') finishRate = REVERSE_FINISH_RATE;   // DUNK-FLAGSHIP Phase 7: the arch over the head lands inside the jam's 0.6 s
     if (lob.live) { setTrail('off'); armSettle(); }   // the lost lob is already bouncing — no clank, the miss is the ball on the floor
     // DUNK-NO-PRESS-MISS (a): NO PRESS, NO IRON. The flight never threw the ball at the rim, so it does not clank off it: it drops
     // away in the air (core/DunkNoPress airDropVelocity, TUNE), with no graze, no ring or net, no thud — onMiss('noSlam')
