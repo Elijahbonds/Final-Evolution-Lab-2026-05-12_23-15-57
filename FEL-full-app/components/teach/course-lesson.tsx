@@ -22,20 +22,24 @@ import { TEACH_LOOK as L } from './look';
  * every other block follows in one row of cards you swipe, or step through with "Next step" (the row scrolls inside
  * itself, so the page never scrolls sideways). One block's words at a time on the first screen.
  */
-export function CourseLesson({ lesson, preview = false }: { lesson: Lesson; preview?: boolean }) {
+export function CourseLesson({ lesson, preview = false, onEnd }: { lesson: Lesson; preview?: boolean; onEnd?: (end: boolean) => void }) {
   const demos = lesson.blocks.filter((b) => b.kind === 'demo');
   const rest = lesson.blocks.filter((b) => b.kind !== 'demo');
+  // PLAT-P10 header cut: a lesson with one step or none is at its end from the start (the player offers the next lesson)
+  useEffect(() => { if (rest.length <= 1) onEnd?.(true); }, [rest.length, onEnd]);
   return (
     <div className="space-y-4" data-course-lesson={lesson.id}>
       {demos.map((b) => <BlockView key={b.id} b={b} preview={preview} />)}
-      {rest.length > 0 && <BlockRow blocks={rest} preview={preview} />}
+      {rest.length > 0 && <BlockRow key={lesson.id} blocks={rest} preview={preview} onEnd={onEnd} />}
     </div>
   );
 }
 
-function BlockRow({ blocks, preview }: { blocks: Block[]; preview: boolean }) {
+function BlockRow({ blocks, preview, onEnd }: { blocks: Block[]; preview: boolean; onEnd?: (end: boolean) => void }) {
   const row = useRef<HTMLOListElement>(null);
   const [at, setAt] = useState(0);
+  // PLAT-P10 header cut: one primary at a time — "Next step" through the steps, then the player's "Next lesson"
+  useEffect(() => { onEnd?.(at >= blocks.length - 1); }, [at, blocks.length, onEnd]);
   const onScroll = useCallback(() => {
     const el = row.current;
     if (!el) return;
@@ -61,7 +65,7 @@ function BlockRow({ blocks, preview }: { blocks: Block[]; preview: boolean }) {
           <span aria-hidden className="flex gap-1.5">
             {blocks.map((_, n) => <span key={n} className={`h-1.5 rounded-full transition-all duration-300 ${n === at ? 'w-5 bg-fel-cyan' : 'w-1.5 bg-white/20'}`} />)}
           </span>
-          {at < blocks.length - 1 && <button type="button" onClick={next} data-block-next className={CHIP_BUTTON}>Next step <ArrowRight aria-hidden className="h-4 w-4" /></button>}
+          {at < blocks.length - 1 && <button type="button" onClick={next} data-block-next aria-label="Next step" className={CHIP_BUTTON}>Next <ArrowRight aria-hidden className="h-4 w-4" /></button>}
         </div>
       )}
     </div>
