@@ -20,14 +20,15 @@ export type ClipReader = (rows: readonly { id: string; name: string; youth: bool
 /** The real clip reader: the server's library index (never shipped to a browser). */
 export const libraryClips: ClipReader = async (rows) => {
   if (!rows.length) return {};
-  const [{ libraryState }, { matchLibraryByName }, { demoClipFor }] = await Promise.all([
-    import('@/lib/library/server'), import('@/lib/library/match'), import('@/lib/library/demo'),
+  const [{ libraryState }, { matchLibraryByName }, { demoClipFor }, { catalogueDemoLoop }] = await Promise.all([
+    import('@/lib/library/server'), import('@/lib/library/match'), import('@/lib/library/demo'), import('@/lib/library/surfaceDemo'),
   ]);
   const { index } = await libraryState();
   const out: Record<string, string | null> = {};
   for (const r of rows) {
     const e = matchLibraryByName(index.docs, [r.name]);
-    out[r.id] = e && e.review.status === 'approved' && (!r.youth || e.youthOk) ? demoClipFor(e) : null;
+    // DEMO-LOOPS-4: a row the library has no entry for plays its catalogue loop (surfaceDemo CATALOGUE_DEMO_LOOPS), if any
+    out[r.id] = e ? (e.review.status === 'approved' && (!r.youth || e.youthOk) ? demoClipFor(e) : null) : catalogueDemoLoop(r.name);
   }
   return out;
 };
