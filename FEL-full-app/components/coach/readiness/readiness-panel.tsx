@@ -42,7 +42,7 @@ function RuleEditor({ scope, scopeId, name, rule, fallback, api, onSaved, note }
     <li className="space-y-2 rounded-lg bg-white/4 p-3" data-readiness-rule={`${scope}:${scopeId}`}>
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-sm font-semibold text-white">{name}</span>
-        <span className="text-[11px] text-fel-dim">{rule ? (scope === 'team' ? 'team rule' : 'own rule') : 'default'}</span>
+        <span className="text-[12px] text-fel-dim">{rule ? (scope === 'team' ? 'team rule' : 'own rule') : 'default'}</span>
       </div>
       {note && <p className="text-xs text-fel-dim">{note}</p>}
       <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -87,7 +87,7 @@ export function ReadinessPanel({ api = COACH_READINESS_API }: { api?: string }) 
   };
   return (
     <div className="mt-3 space-y-2" data-readiness-panel>
-      <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-fel-dim"><BatteryLow className="h-3.5 w-3.5" /> Daily jump check</div>
+      <div className="flex items-center gap-2 text-[12px] uppercase tracking-wider text-fel-dim"><BatteryLow className="h-3.5 w-3.5" /> Daily jump check</div>
       {alerts.length > 0 && (
         <ul className="space-y-1.5" data-readiness-alerts>
           {alerts.map((a) => (

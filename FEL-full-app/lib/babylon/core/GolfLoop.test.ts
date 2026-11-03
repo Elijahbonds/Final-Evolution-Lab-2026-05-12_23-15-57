@@ -112,7 +112,9 @@ describe('#10 / #11 timers and the banner channel', () => {
     vi.advanceTimersByTime(200); ch.flash('RING! +10', 700);
     vi.advanceTimersByTime(300);   // t 500: the FLICK clear would have fired here
     expect(shown.at(-1)).toBe('RING! +10');
-    vi.advanceTimersByTime(500);   // t 1000: the RING's own clear (at 900) has
+    vi.advanceTimersByTime(500);   // t 1000: READABLE (2026-11-02) — the RING is up for its read time (2 words → 1600 ms; its life was 700)
+    expect(shown.at(-1)).toBe('RING! +10');
+    vi.advanceTimersByTime(800);   // t 1800: the RING's own clear (200 + 1600) has run
     expect(shown.at(-1)).toBe('');
     expect(bag.pending).toBe(0);
   });

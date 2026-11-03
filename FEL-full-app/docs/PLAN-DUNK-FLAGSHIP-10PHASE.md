@@ -98,7 +98,7 @@ written up here as a diff. Before/after numbers are taken on the rig for every c
 - **Goal:** the variety the owner named (360, windmill, between the legs) plus the finishes that exist and are unused in the contest (the reverse dunk, the two-hand power), each with its own name and card.
 - **Exit gates:**
   - each new finish passes GATE 0;
-  - it fires from its input on the rig and lands on the iron (ball ≤ 0.2 m from the ring centre at contact);
+  - it fires from its input on the rig and lands on the iron: the ball's HORIZONTAL distance from the ring centre at contact ≤ the ring's inner radius (DunkMode `RIM_RADIUS` 0.225 m; the `[HANDS] iron contact` line's `flat`). Restated 2026-11-03 (coordinator): the old "≤ 0.2 m from the ring centre" was a 3-D distance that the shipped flush itself missed (0.20–0.34 m), because the contact is geometric at the iron;
   - it scores through the card with its own name;
   - it is distinct from its nearest neighbour by the phase 6 metric.
 - **Files:** `modes/DunkMode.ts`, `core/DunkSystem.ts`, `anim/authored/dunkFinishes.ts` (+ tests).

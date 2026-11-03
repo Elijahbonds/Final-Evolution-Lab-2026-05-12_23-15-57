@@ -127,8 +127,8 @@ export function WarmupPrep({ exercises, contextUrl, readiness = null, initialCon
   return (
     <section className="space-y-2" data-section="prep" data-warmup aria-label={PREP.label}>
       <div className="px-1">
-        <div className="text-[11px] uppercase tracking-wider text-white/50">{PREP.label}</div>
-        <div className="text-[11px] text-fel-quiet">{PREP.meaning}</div>
+        <div className="text-[12px] uppercase tracking-wider text-white/50">{PREP.label}</div>
+        <div className="text-[12px] text-fel-quiet">{PREP.meaning}</div>
       </div>
       <div className="fel-card rounded-xl p-4 space-y-3" data-testid="warmup">
         <div className="flex flex-wrap items-start justify-between gap-2">
@@ -136,7 +136,7 @@ export function WarmupPrep({ exercises, contextUrl, readiness = null, initialCon
             <div className="text-white font-medium" data-warmup-title>
               {WARMUP_TITLE}{plan ? ` · ${Math.round(plan.totalSec / 60)} min` : ''}{pattern ? ` · for today's ${pattern}` : ''}
             </div>
-            <div className="text-[11px] text-fel-dim">{WARMUP_MEANING}</div>
+            <div className="text-[12px] text-fel-dim">{WARMUP_MEANING}</div>
           </div>
           <div className="flex gap-1" role="group" aria-label="Warm-up length">
             {WARMUP_MINUTES.map((m) => (
@@ -171,19 +171,19 @@ export function WarmupPrep({ exercises, contextUrl, readiness = null, initialCon
                   className={`rounded-lg border px-3 py-2 ${at && !at.done && at.index === i ? 'border-fel-cyan/50 bg-fel-cyan/5' : 'border-white/8 bg-white/[0.02]'}`}>
                   <div className="flex items-baseline justify-between gap-2">
                     <div className="min-w-0">
-                      <span className="mr-1.5 rounded bg-white/10 px-1 text-[10px] font-semibold uppercase tracking-wide text-white/60">{KIND_LABEL[s.kind]}</span>
+                      <span className="mr-1.5 rounded bg-white/10 px-1 text-[12px] font-semibold uppercase tracking-wide text-white/60">{KIND_LABEL[s.kind]}</span>
                       <span className="text-sm text-white">{s.name}</span>
                     </div>
                     <span className="shrink-0 font-mono text-xs tabular-nums text-white/50">{formatClock(s.seconds)}</span>
                   </div>
-                  {s.dose && <div className="text-[11px] text-fel-dim">{s.dose}</div>}
+                  {s.dose && <div className="text-[12px] text-fel-dim">{s.dose}</div>}
                   <div className="text-xs text-white/75">{s.cue}</div>
                 </li>
               ))}
             </ol>
 
-            {heldBackLines(plan).map((l) => <div key={l} className="text-[11px] text-fel-dim" data-held>{l}</div>)}
-            <div className="text-[11px] text-fel-quiet">{WAKE_UP_SOURCE_LINE}</div>
+            {heldBackLines(plan).map((l) => <div key={l} className="text-[12px] text-fel-dim" data-held>{l}</div>)}
+            <div className="text-[12px] text-fel-quiet">{WAKE_UP_SOURCE_LINE}</div>
 
             {!run && plan.steps.length > 0 && (
               <div className="flex flex-wrap gap-2">
@@ -215,7 +215,7 @@ function RunPanel({ plan, at, paused, onPause, onNext, onStop }: {
     <div className="rounded-lg border border-fel-cyan/30 bg-black/30 p-3 space-y-2" data-warmup-run data-run-step={s.id}>
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <div className="text-[11px] uppercase tracking-wider text-fel-dim">{KIND_LABEL[s.kind]} · step {at.index + 1} of {plan.steps.length}{paused ? ' · paused' : ''}</div>
+          <div className="text-[12px] uppercase tracking-wider text-fel-dim">{KIND_LABEL[s.kind]} · step {at.index + 1} of {plan.steps.length}{paused ? ' · paused' : ''}</div>
           <div className="text-white font-medium truncate">{s.name}</div>
         </div>
         <div className="font-mono text-2xl tabular-nums text-white" aria-live="off">{formatClock(at.remainingSec)}</div>

@@ -14,6 +14,7 @@ import { findBone } from './boneLookup';
 import { animDt } from './motionLayers';
 import { sinkRig, sinkRead, sinkHipsKeepFeet, holdHands, restoreHands, type SinkRig } from './legSink';
 import { DIP_MIN_HIPS_OVER_ANKLE } from './moveDip';
+import { feel } from '../../feel-panel/feel';   // feel-panel knob hoops.accentOffBeatsOn (lib/feel-panel/knobs.ts)
 
 export type AccentKind = 'stop' | 'start';
 /** A stop counts from this ground speed (m/s; a jog is ~3.7). (new) */
@@ -34,6 +35,17 @@ export const ACCENT_GAP_SEC = 0.4;
 export const SPEED_TAU_SEC = 0.05;
 /** The loop states an accent may be drawn on (basketballTree's names). */
 export const ACCENT_STATES: ReadonlySet<string> = new Set(['idle_dribble', 'walk_dribble', 'speed_dribble', 'sprint_dribble', 'drive', 'protect', 'run', 'watch', 'carry_slide', 'carry_slide_right', 'carry_back']);
+
+/** hoops-p04b: 1 = a beat or a hold in flight is OFF the loop (the header's "never on a gather, a move beat"); 0 = the tree's state as
+ *  read before. Knob `hoops.accentOffBeatsOn`. The tree's `state` is `override.state ?? current`, and a beat started without a state (the
+ *  step-back gather, every handle move) left `current` — the loop under it — so the stop accent fired by the same frame's brake kept
+ *  sinking the hips and re-solving both legs through the gather: the trail leg, reaching back nearly straight, swapped its knee plane
+ *  (the rig's stage tracer: this layer turned the hero's RightUpLeg 7 396 and 10 254 deg/s on 1v1 seed 7 frames 343 and 349). */
+export const ACCENT_OFF_BEATS_ON = 1;
+/** The state an accent reads (pure but for the knob): null while the tree plays a beat or a hold, else the tree's loop state. */
+export function accentState(tree: { readonly busy: boolean; readonly state: string | null }): string | null {
+  return tree.busy && feel('hoops.accentOffBeatsOn', ACCENT_OFF_BEATS_ON) >= 0.5 ? null : tree.state;
+}
 
 /** The accent's shape at progress u (0..1): 0 at both ends, 1 at the middle — a sine bump (pure). */
 export const accentShape = (u: number): number => (u <= 0 || u >= 1 ? 0 : Math.sin(Math.PI * u));

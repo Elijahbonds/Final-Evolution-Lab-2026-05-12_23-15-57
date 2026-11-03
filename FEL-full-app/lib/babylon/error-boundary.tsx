@@ -47,7 +47,7 @@ export class ThreeDErrorBoundary extends React.Component<Props, State> {
                 <li>Network timeout loading assets</li>
               </ul>
               {this.state.error && (
-                <code className="block text-[10px] bg-black/50 p-2 rounded text-red-300 mb-4 overflow-auto max-h-24">
+                <code className="block text-[12px] bg-black/50 p-2 rounded text-red-300 mb-4 overflow-auto max-h-24">
                   {this.state.error.message}
                 </code>
               )}

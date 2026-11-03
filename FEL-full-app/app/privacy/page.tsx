@@ -18,7 +18,7 @@ export default async function PrivacyPage() {
           <div className={`${LEGAL_PROSE} ${LEGAL_QUOTE_VIOLET}`}>
             <div dangerouslySetInnerHTML={{ __html: simpleMarkdown(PRIVACY_CONTENT) }} />
           </div>
-          <div className="mt-4 text-center text-[10px] text-white/30">
+          <div className="mt-4 text-center text-[12px] text-white/50">
             Policy version: {CURRENT_POLICY_VERSION}
           </div>
         </div>

@@ -203,7 +203,7 @@ export function ProgramBuilder({ initialQuestion = '' }: { initialQuestion?: str
       <form onSubmit={(e) => { e.preventDefault(); setEdits({}); void ask(q, {}); }} className="space-y-3">
         <label htmlFor="program-ask" className={`${TYPE.label} text-fel-soft`}>What do you have, and what do you want?</label>
         <textarea id="program-ask" data-testid="program-ask-input" value={q} onChange={(e) => setQ(e.target.value)} rows={3} maxLength={400} placeholder={ASK_PLACEHOLDER}
-          className={`w-full rounded-2xl border border-white/10 bg-[#0c0c11] p-4 ${TYPE.body} text-white placeholder:text-white/40 focus:border-fel-cyan/60 focus:outline-none`} />
+          className={`w-full rounded-2xl border border-white/10 bg-[#0c0c11] p-4 ${TYPE.body} text-white placeholder:text-white/50 focus:border-fel-cyan/60 focus:outline-none`} />
         <button type="submit" disabled={busy || !q.trim()} data-testid="program-ask-build" className={`min-h-12 rounded-full border border-fel-cyan/50 px-6 ${TYPE.label} text-fel-cyan disabled:opacity-40`}>{busy ? 'Building…' : ASK_BUTTON}</button>
         {error && <p role="alert" className={`${TYPE.small} text-[#ff6b8b]`}>{error}</p>}
       </form>

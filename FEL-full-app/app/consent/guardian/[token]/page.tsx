@@ -56,7 +56,7 @@ export default async function GuardianAcceptPage({ params }: { params: { token: 
 
   return (
     <Shell>
-      <p className="font-mono text-[11px] uppercase tracking-widest text-white/40">Guardian consent</p>
+      <p className="font-mono text-[12px] uppercase tracking-widest text-white/50">Guardian consent</p>
       {consent.revokedAt ? (
         <>
           <h1 className="fel-heading mt-3 text-2xl font-bold text-white">This request was withdrawn</h1>

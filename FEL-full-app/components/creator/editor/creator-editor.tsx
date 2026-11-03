@@ -81,10 +81,10 @@ export default function CreatorEditor({ table, values, onChange, axes, issues = 
     <div className="flex h-full min-h-0 flex-col gap-3 p-3 text-white">
       {/* breadcrumb + title (§1) */}
       <div>
-        <p className="font-mono text-[10px] uppercase tracking-widest text-white/40">/{table.section}</p>
+        <p className="font-mono text-[12px] uppercase tracking-widest text-white/50">/{table.section}</p>
         <h2 className="fel-heading text-2xl font-bold">{table.title}</h2>
         {meters.length > 0 && (
-          <p className="mt-1 font-mono text-[10px] uppercase tracking-wide text-white/45">{meters.join(' · ')}</p>
+          <p className="mt-1 font-mono text-[12px] uppercase tracking-wide text-white/50">{meters.join(' · ')}</p>
         )}
       </div>
 
@@ -96,7 +96,7 @@ export default function CreatorEditor({ table, values, onChange, axes, issues = 
           <div className="flex gap-1">
             {tabs.map((t, i) => (
               <button key={t} onClick={() => { setTabIdx(i); setFocusId(null); }}
-                className={`whitespace-nowrap rounded-lg px-3 py-1 font-mono text-[11px] uppercase tracking-wide transition-colors ${
+                className={`whitespace-nowrap rounded-lg px-3 py-1 font-mono text-[12px] uppercase tracking-wide transition-colors ${
                   i === tabIdx ? 'bg-[var(--fel-cyan)] text-black' : 'fel-panel text-white/70'}`}>
                 {t}
               </button>
@@ -105,19 +105,19 @@ export default function CreatorEditor({ table, values, onChange, axes, issues = 
         </div>
         <button onClick={() => page(1)} disabled={tabIdx >= tabs.length - 1}
           className="fel-panel px-2 py-1 font-mono text-xs disabled:opacity-30" aria-label="Next tab">R</button>
-        <span className="font-mono text-[10px] text-white/40">{tabIdx + 1}/{tabs.length}</span>
+        <span className="font-mono text-[12px] text-white/50">{tabIdx + 1}/{tabs.length}</span>
       </div>
 
       <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter…"
-        className="fel-panel w-full rounded-lg px-3 py-1.5 font-mono text-xs text-white placeholder:text-white/30" />
+        className="fel-panel w-full rounded-lg px-3 py-1.5 font-mono text-xs text-white placeholder:text-white/50" />
 
       <div className="flex min-h-0 flex-1 gap-3">
         {/* the row list — one renderer, three row kinds */}
         <div className="min-h-0 flex-1 overflow-y-auto pr-1">
           {loose.map((i, n) => (
-            <p key={`loose-${n}`} className={`mb-2 font-mono text-[10px] ${i.kind === 'violation' ? 'text-[var(--fel-red)]' : 'text-[var(--fel-gold)]'}`}>{i.message}</p>
+            <p key={`loose-${n}`} className={`mb-2 font-mono text-[12px] ${i.kind === 'violation' ? 'text-[var(--fel-red)]' : 'text-[var(--fel-gold)]'}`}>{i.message}</p>
           ))}
-          {rows.length === 0 && <p className="px-2 py-6 font-mono text-xs text-white/40">Nothing matches that filter.</p>}
+          {rows.length === 0 && <p className="px-2 py-6 font-mono text-xs text-white/50">Nothing matches that filter.</p>}
           {rows.map((row) => {
             const focused = focusId === row.id;
             const val = values[row.id] ?? null;
@@ -130,9 +130,9 @@ export default function CreatorEditor({ table, values, onChange, axes, issues = 
                   focused ? 'bg-white/10 ring-1 [--tw-ring-color:color-mix(in_srgb,var(--fel-cyan)_60%,transparent)]' : 'bg-white/[0.03]'} ${bad ? 'ring-1 ![--tw-ring-color:color-mix(in_srgb,var(--fel-red)_70%,transparent)]' : ''}`}>
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate font-mono text-[11px] uppercase tracking-wide text-white/70">{row.label}</p>
+                    <p className="truncate font-mono text-[12px] uppercase tracking-wide text-white/70">{row.label}</p>
                     {row.kind === 'rated' && ceilingNote(row, axes) && (
-                      <p className="font-mono text-[9px] text-[var(--fel-gold)]">
+                      <p className="font-mono text-[12px] text-[var(--fel-gold)]">
                         {canStep(row, val, 1, axes) ? ceilingNote(row, axes) : `Locked. ${ceilingNote(row, axes)}`}
                       </p>
                     )}
@@ -163,7 +163,7 @@ export default function CreatorEditor({ table, values, onChange, axes, issues = 
                 </div>
                 {/* the complaint sits with the control that caused it */}
                 {rowIssues.map((i, n) => (
-                  <p key={n} className={`mt-1 font-mono text-[10px] ${i.kind === 'violation' ? 'text-[var(--fel-red)]' : 'text-[var(--fel-gold)]'}`}>
+                  <p key={n} className={`mt-1 font-mono text-[12px] ${i.kind === 'violation' ? 'text-[var(--fel-red)]' : 'text-[var(--fel-gold)]'}`}>
                     {i.message}
                   </p>
                 ))}
@@ -177,7 +177,7 @@ export default function CreatorEditor({ table, values, onChange, axes, issues = 
                 )}
                 {focused && (
                   <button onClick={(e) => { e.stopPropagation(); setGlossaryFor(row); }}
-                    className="mt-1 font-mono text-[10px] [color:color-mix(in_srgb,var(--fel-cyan)_70%,transparent)] underline">What does this do?</button>
+                    className="mt-1 font-mono text-[12px] [color:color-mix(in_srgb,var(--fel-cyan)_70%,transparent)] underline">What does this do?</button>
                 )}
               </div>
             );
@@ -189,7 +189,7 @@ export default function CreatorEditor({ table, values, onChange, axes, issues = 
       </div>
 
       {/* footer hint bar (§1) */}
-      <div className="flex items-center gap-3 font-mono text-[10px] uppercase tracking-wide text-white/45">
+      <div className="flex items-center gap-3 font-mono text-[12px] uppercase tracking-wide text-white/50">
         <span>Rotate</span><span>·</span><span>Select</span>
         {focusId && <><span>·</span><span>Glossary</span></>}
         <span>·</span>
@@ -205,7 +205,7 @@ export default function CreatorEditor({ table, values, onChange, axes, issues = 
             {glossaryFor.kind === 'trait' && (
               <ul className="mt-3 space-y-1">
                 {glossaryFor.tiers.map((t, i) => (
-                  <li key={t} className="font-mono text-[11px] text-white/60">
+                  <li key={t} className="font-mono text-[12px] text-white/60">
                     <span className="text-[var(--fel-gold)]">{t}</span> · {glossaryFor.tierText[i]} · {glossaryFor.cost[i]} pts
                   </li>
                 ))}

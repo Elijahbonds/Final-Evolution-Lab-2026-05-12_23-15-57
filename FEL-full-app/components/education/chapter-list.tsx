@@ -29,8 +29,8 @@ export function ChapterList() {
       <div className="mb-6 flex flex-wrap items-center gap-4 rounded-2xl border border-white/8 bg-white/[0.02] p-4">
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-3">
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-fel-quiet">Your progress</p>
-            <p className="font-mono text-[11px] text-fel-dim">{overall.done} / {overall.total} lessons</p>
+            <p className="font-mono text-[12px] font-bold uppercase tracking-[0.18em] text-fel-quiet">Your progress</p>
+            <p className="font-mono text-[12px] text-fel-dim">{overall.done} / {overall.total} lessons</p>
           </div>
           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/[0.07]">
             <div
@@ -41,8 +41,8 @@ export function ChapterList() {
         </div>
         <span className="inline-flex items-center gap-1.5 rounded-lg border border-fel-violet/30 bg-fel-violet/[0.07] px-2.5 py-1.5">
           <Gem className="h-3.5 w-3.5 text-fel-violet" />
-          <span className="font-mono text-[11px] font-bold text-white">{CHAPTER_SHARDS}</span>
-          <span className="font-mono text-[9.5px] uppercase tracking-[0.12em] text-fel-dim">a chapter</span>
+          <span className="font-mono text-[12px] font-bold text-white">{CHAPTER_SHARDS}</span>
+          <span className="font-mono text-[12px] uppercase tracking-[0.12em] text-fel-dim">a chapter</span>
         </span>
       </div>
 
@@ -84,12 +84,12 @@ export function ChapterList() {
                   {c.audience.map((a) => (
                     <span
                       key={a}
-                      className="rounded-md bg-white/[0.05] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.12em] text-fel-dim"
+                      className="rounded-md bg-white/[0.05] px-1.5 py-0.5 font-mono text-[12px] uppercase tracking-[0.12em] text-fel-dim"
                     >
                       {AUDIENCE_LABEL[a] ?? a}
                     </span>
                   ))}
-                  <span className="ml-auto font-mono text-[10px] text-fel-quiet">{p.done}/{p.total}</span>
+                  <span className="ml-auto font-mono text-[12px] text-fel-quiet">{p.done}/{p.total}</span>
                 </div>
               </Link>
             </li>

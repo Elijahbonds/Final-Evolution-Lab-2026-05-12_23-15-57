@@ -108,8 +108,8 @@ export function LearnWhileYouWait({ compact = false, className = '' }: { compact
       onPointerDown={(e) => e.stopPropagation()}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/45">Learn while you wait</span>
-        <span className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: accent }}>{topic.label}</span>
+        <span className="text-[12px] font-bold uppercase tracking-[0.18em] text-white/50">Learn while you wait</span>
+        <span className="text-[12px] font-bold uppercase tracking-[0.14em]" style={{ color: accent }}>{topic.label}</span>
       </div>
       <p className="mt-1.5 text-[14px] font-bold leading-snug text-white">{card.type === 'fact' ? `Did you know? ${headline}` : headline}</p>
       {text && <p className="mt-1 text-[12.5px] leading-snug text-white/70">{text}</p>}
@@ -134,7 +134,7 @@ export function LearnWhileYouWait({ compact = false, className = '' }: { compact
         </div>
       )}
 
-      {topic.notAdvice && <p className="mt-1.5 text-[10.5px] text-amber-200/60">{mods.topics.NOT_ADVICE_LINE[topic.notAdvice]}</p>}
+      {topic.notAdvice && <p className="mt-1.5 text-[12px] text-amber-200/60">{mods.topics.NOT_ADVICE_LINE[topic.notAdvice]}</p>}
 
       <div className="mt-2.5 flex items-center justify-between gap-2">
         <button type="button" onClick={next} className="rounded-full bg-white/10 px-3 py-1 text-[12px] font-bold text-white hover:bg-white/20">

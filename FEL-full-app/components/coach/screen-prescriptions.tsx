@@ -236,14 +236,14 @@ export function DraftView({ clientId, draft, sessions, into, onInto, added, onAd
       )}
 
       {/* 1 — the camera */}
-      <h5 className="mt-3 font-mono text-[10px] uppercase tracking-[0.14em] text-fel-dim" data-group="camera">{REVIEW_GROUPS.camera}</h5>
+      <h5 className="mt-3 font-mono text-[12px] uppercase tracking-[0.14em] text-fel-dim" data-group="camera">{REVIEW_GROUPS.camera}</h5>
       <ul className="mt-1.5 space-y-2">
         {review.camera.map((r) => (
           <li key={`${r.checkId}|${r.side ?? ''}`} className="border-l-2 border-white/10 pl-2" data-check={r.checkId} data-status={r.status}>
             <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
               <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: DOT[r.status] }} aria-hidden="true" />
               <span className="text-white/85">{r.title}</span>
-              <span className={`font-mono text-[10px] uppercase tracking-[0.1em] ${TONE[r.status]}`}>{r.statusLabel}</span>
+              <span className={`font-mono text-[12px] uppercase tracking-[0.1em] ${TONE[r.status]}`}>{r.statusLabel}</span>
             </p>
             {r.value && <p className="break-words text-white/50">{r.value}</p>}
             {r.fix && <p className="mt-0.5 text-white/70"><span className="font-semibold text-white/80">Fix: </span>{r.fix}</p>}
@@ -261,7 +261,7 @@ export function DraftView({ clientId, draft, sessions, into, onInto, added, onAd
       {/* the draft for the Prep section */}
       {draft.prescriptions.length > 0 && (
         <>
-          <h5 className="mt-3 font-mono text-[10px] uppercase tracking-[0.14em] text-fel-dim" data-group="draft">Draft for their Prep section</h5>
+          <h5 className="mt-3 font-mono text-[12px] uppercase tracking-[0.14em] text-fel-dim" data-group="draft">Draft for their Prep section</h5>
           {sessions.length > 1 && (
             <label className="mt-1.5 flex items-center gap-2 text-fel-dim">
               Add into
@@ -292,7 +292,7 @@ export function DraftView({ clientId, draft, sessions, into, onInto, added, onAd
                         <Search className="h-3 w-3 shrink-0" aria-hidden="true" /> look for: {p.wanted.join('; ')}
                       </span>
                     )}
-                    {state === 'failed' && <span className="block text-fel-crimson/80">That did not save. Try again.</span>}
+                    {state === 'failed' && <span className="block text-fel-crimson/100">That did not save. Try again.</span>}
                   </span>
                   {p.exercise && canAdd && (
                     state === 'added'
@@ -325,7 +325,7 @@ export function DraftView({ clientId, draft, sessions, into, onInto, added, onAd
       )}
 
       {/* 2 — their answers, as they gave them */}
-      <h5 className="mt-3 font-mono text-[10px] uppercase tracking-[0.14em] text-fel-dim" data-group="answers">{REVIEW_GROUPS.answers}</h5>
+      <h5 className="mt-3 font-mono text-[12px] uppercase tracking-[0.14em] text-fel-dim" data-group="answers">{REVIEW_GROUPS.answers}</h5>
       {review.answersWithheld ? (
         <p className="mt-1.5 text-fel-dim" data-answers-withheld>{ANSWERS_WITHHELD}</p>
       ) : (
@@ -342,7 +342,7 @@ export function DraftView({ clientId, draft, sessions, into, onInto, added, onAd
       )}
 
       {/* 3 — the hands-on checks */}
-      <h5 className="mt-3 font-mono text-[10px] uppercase tracking-[0.14em] text-fel-dim" data-group="coach">{REVIEW_GROUPS.coach}</h5>
+      <h5 className="mt-3 font-mono text-[12px] uppercase tracking-[0.14em] text-fel-dim" data-group="coach">{REVIEW_GROUPS.coach}</h5>
       {review.coachChecks.length > 0 ? (
         <ul className="mt-1.5 space-y-1">
           {review.coachChecks.map((c) => (

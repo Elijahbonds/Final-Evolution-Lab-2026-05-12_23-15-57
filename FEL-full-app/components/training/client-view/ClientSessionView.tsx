@@ -259,8 +259,8 @@ export function ClientSessionView({ api = SESSION_API, initialData = null }: { a
           <CardHeader>
             <div className="flex justify-between items-start">
               <div>
-                {currentExercise.isKeySet && <div className="mb-1 inline-flex items-center gap-1 rounded bg-[#FFD700]/15 px-1.5 text-[11px] font-semibold text-[#FFD700]"><KeyRound className="h-3 w-3" aria-hidden="true" />KEY SET</div>}
-                {currentExercise.isKeySet && <p className="mb-1 text-[11px] text-[#FFD700]/80">{KEY_SET_LINE}</p>}
+                {currentExercise.isKeySet && <div className="mb-1 inline-flex items-center gap-1 rounded bg-[#FFD700]/15 px-1.5 text-[12px] font-semibold text-[#FFD700]"><KeyRound className="h-3 w-3" aria-hidden="true" />KEY SET</div>}
+                {currentExercise.isKeySet && <p className="mb-1 text-[12px] text-[#FFD700]/80">{KEY_SET_LINE}</p>}
                 <CardTitle className="text-2xl">{currentExercise.name}</CardTitle>
                 <CardDescription>{currentExercise.dose}</CardDescription>
                 {currentExercise.protocolGate && <div className="mt-2"><GateSwapLine note={currentExercise.protocolGate} /></div>}

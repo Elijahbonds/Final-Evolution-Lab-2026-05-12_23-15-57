@@ -49,10 +49,10 @@ function Section({ title, note, onReset, children }: { title: string; note: stri
   return (
     <section className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
       <div className="mb-1 flex items-center justify-between">
-        <h3 className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/70">{title}</h3>
-        {onReset && <button type="button" onClick={onReset} className="text-[11px] text-cyan-300/80 hover:text-cyan-200">Reset</button>}
+        <h3 className="text-[12px] font-bold uppercase tracking-[0.18em] text-white/70">{title}</h3>
+        {onReset && <button type="button" onClick={onReset} className="text-[12px] text-cyan-300/80 hover:text-cyan-200">Reset</button>}
       </div>
-      <p className="mb-2 text-[10px] leading-snug text-white/40">{note}</p>
+      <p className="mb-2 text-[12px] leading-snug text-white/50">{note}</p>
       <div className="space-y-1.5">{children}</div>
     </section>
   );
@@ -84,7 +84,7 @@ export function ShapeTab(p: ShapeTabProps) {
             return (
               <button key={sec} type="button" title={`${on ? 'Locked' : 'Unlocked'}: ${SHAPE_RANDOM_FIELDS[sec]}`} aria-pressed={on}
                 onClick={() => p.onLocks(on ? p.locks.filter((x) => x !== sec) : [...p.locks, sec])}
-                className="flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] capitalize transition"
+                className="flex items-center gap-1 rounded-full border px-2 py-1 text-[12px] capitalize transition"
                 style={{ borderColor: on ? '#FFD700' : 'rgba(255,255,255,0.12)', color: on ? '#FFD700' : 'rgba(255,255,255,0.6)' }}>
                 {on ? <Lock className="h-3 w-3" /> : <Unlock className="h-3 w-3" />} {sec}
               </button>
@@ -115,8 +115,8 @@ export function ShapeTab(p: ShapeTabProps) {
         <NumSlider label="Size" value={p.presentation ?? 1} min={PRESENTATION_RANGE[0]} max={PRESENTATION_RANGE[1]} step={0.01}
           onChange={(v) => p.onPresentation(v, 'presentation')} />
       </Section>
-      {p.studioEdit ? <p className="text-[10px] leading-snug text-white/40">{STUDIO_EDIT_SHAPE_NOTE}</p>
-        : !p.numbersSaved && <p className="text-[10px] leading-snug text-white/40">Shape numbers stay on this device unless you allow saving look numbers.</p>}
+      {p.studioEdit ? <p className="text-[12px] leading-snug text-white/50">{STUDIO_EDIT_SHAPE_NOTE}</p>
+        : !p.numbersSaved && <p className="text-[12px] leading-snug text-white/50">Shape numbers stay on this device unless you allow saving look numbers.</p>}
     </div>
   );
 }

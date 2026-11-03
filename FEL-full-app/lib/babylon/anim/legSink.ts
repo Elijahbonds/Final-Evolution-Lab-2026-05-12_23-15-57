@@ -12,7 +12,34 @@ import { findBone } from './boneLookup';
 import { plantLeg } from './FootPlanting';
 import { armChain, reachArm, type ArmChain } from './HandIK';
 
-export interface SinkRig { hips: TransformNode; root: TransformNode; legs: { hip: TransformNode; knee: TransformNode; ankle: TransformNode }[]; arms: ArmChain[] }
+export interface SinkRig { hips: TransformNode; root: TransformNode; legs: { hip: TransformNode; knee: TransformNode; ankle: TransformNode; pole?: Vector3 | null }[]; arms: ArmChain[] }
+
+/** hoops-p04b: the knee pole's memory (m). The pole was the clip's own bend (knee less the hip–ankle midpoint), or the ROOT's front once
+ *  the bend fell under 1 cm: a leg passing through straight swapped from its own knee plane to the root's in one frame, and the thigh
+ *  turned 108–123° (1v1 seed 7, the step-back's trail leg: legSink under the stop accent, then footGlide; the rig's stage tracer). Now the
+ *  pole is the clip's bend plus this much of the pole this leg had last frame: the clip's own plane whenever the knee is bent (the solve
+ *  stays on the clip), the last plane kept while it passes through straight, and continuous in between. A solver constant, not a feel
+ *  number. **assumption:** 1 cm (the old threshold's size). Two earlier tries are measured in the lane report: dropping a "backward" bend
+ *  against the root's front (a spin's legs re-solved 74–178° off), and against the leg's own foot (turned-out feet: footGlide 5 → 15 severe). */
+export const KNEE_POLE_MEMORY_M = 0.01;
+/** The pole for a leg's re-solve (pure): `bend` plus KNEE_POLE_MEMORY_M of `prev` (this leg's pole last frame; the body's front `fwd`
+ *  the first time). Unit length; `prev` itself when there is nothing else. */
+export function kneePole(bend: Vector3, prev: Vector3 | null | undefined, fwd: Vector3): Vector3 {
+  const m = prev ?? fwd;
+  const b = bend.add(m.scale(KNEE_POLE_MEMORY_M));
+  return b.lengthSquared() > 1e-12 ? b.normalize() : m.clone();
+}
+
+/** kneePole for one leg, its memory kept in the ROOT's frame (`leg.pole`), so a body that turned since the layer last solved this leg
+ *  does not hand it a stale world direction. */
+export function legPole(leg: { pole?: Vector3 | null }, bend: Vector3, root: TransformNode, fwd: Vector3): Vector3 {
+  root.computeWorldMatrix(true);
+  const q = root.absoluteRotationQuaternion ?? Quaternion.Identity();
+  const prev = leg.pole ? leg.pole.applyRotationQuaternion(q) : null;
+  const p = kneePole(bend, prev, fwd);
+  leg.pole = p.applyRotationQuaternion(Quaternion.Inverse(q));
+  return p;
+}
 
 /** The bones the sink moves on this body, or null when it has no hips or not two legs. */
 export function sinkRig(skeleton: Skeleton, root: TransformNode): SinkRig | null {
@@ -20,7 +47,7 @@ export function sinkRig(skeleton: Skeleton, root: TransformNode): SinkRig | null
   const legs: SinkRig['legs'] = [];
   for (const sd of ['Left', 'Right'] as const) {
     const hip = findBone(skeleton, `${sd}UpLeg`)?.getTransformNode(), knee = findBone(skeleton, `${sd}Leg`)?.getTransformNode(), ankle = findBone(skeleton, `${sd}Foot`)?.getTransformNode();
-    if (hip && knee && ankle) legs.push({ hip, knee, ankle });
+    if (hip && knee && ankle) legs.push({ hip, knee, ankle, pole: null });   // (hoops-p04b: pole = kneePole's memory)
   }
   const arms = (['Left', 'Right'] as const).map((sd) => armChain(skeleton, sd)).filter((a): a is ArmChain => !!a);
   return hips && legs.length === 2 ? { hips, root, legs, arms } : null;
@@ -57,7 +84,7 @@ export function sinkHipsKeepFeet(r: SinkRig, hipsOverRoot: number, excess: numbe
     const tgt = new Vector3(p0.x, rootY + ankleTarget(p0.y - rootY, excess, ankleFloorY), p0.z);
     const hipP = l.hip.getAbsolutePosition(), kneeP = l.knee.getAbsolutePosition();
     const bend = kneeP.subtract(hipP.add(tgt).scale(0.5));
-    plantLeg(l.hip, l.knee, l.ankle, tgt, bend.lengthSquared() > 1e-4 ? bend.normalize() : fwd);
+    plantLeg(l.hip, l.knee, l.ankle, tgt, legPole(l, bend, r.root, fwd));   // hoops-p04b: the clip's plane, held through straight
     // the foot keeps its turn (the hips only moved, so its turn under the hips is its turn in the world)
     l.ankle.rotationQuaternion = Quaternion.Inverse(lq(l.hip).multiply(lq(l.knee))).multiply(before[i].chain);
     l.ankle.computeWorldMatrix(true);

@@ -361,18 +361,18 @@ export default function Golf3D(props: GameProps) {
           {/* scoreboard */}
           <div className="absolute top-3 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1">
             <div className="flex items-center gap-5 px-5 py-1.5 rounded-xl" style={{ background: 'rgba(5,5,8,0.75)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,255,157,0.2)' }}>
-              <span className="text-2xl font-bold text-[#00FF9D]">{hud.score}<span className="text-[11px] text-white/50"> PTS</span></span>
-              <span className="text-[11px] text-white/60 font-mono">SHOT {Math.min(hud.shot + 1, TOTAL_SHOTS)}/{TOTAL_SHOTS}</span>
-              <span className="text-[11px] font-mono" style={{ color: hud.wind < 0 ? '#00E5FF' : '#FFD700' }}>WIND {hud.wind > 0 ? '→' : hud.wind < 0 ? '←' : '•'} {Math.abs(hud.wind).toFixed(2)}</span>
+              <span className="text-2xl font-bold text-[#00FF9D]">{hud.score}<span className="text-[12px] text-white/50"> PTS</span></span>
+              <span className="text-[12px] text-white/60 font-mono">SHOT {Math.min(hud.shot + 1, TOTAL_SHOTS)}/{TOTAL_SHOTS}</span>
+              <span className="text-[12px] font-mono" style={{ color: hud.wind < 0 ? '#00E5FF' : '#FFD700' }}>WIND {hud.wind > 0 ? '→' : hud.wind < 0 ? '←' : '•'} {Math.abs(hud.wind).toFixed(2)}</span>
             </div>
-            <div className="flex gap-3 items-center px-3 py-0.5 rounded-lg font-mono text-[10px] text-white/70" style={{ background: 'rgba(5,5,8,0.8)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div className="flex gap-3 items-center px-3 py-0.5 rounded-lg font-mono text-[12px] text-white/70" style={{ background: 'rgba(5,5,8,0.8)', border: '1px solid rgba(255,255,255,0.08)' }}>
               <span>CLUB {hud.kind.toUpperCase()}</span>
               <span>{WIN_SCORE} TO WIN</span>
               <span style={{ color: '#C99BF7' }}>CAM {hud.camRig.toUpperCase()}</span>
             </div>
           </div>
 
-          <div className="absolute top-3 right-3 text-right font-mono text-[11px]" style={{ color: hud.prqColor }}>LINKS · {hud.prqLabel}</div>
+          <div className="absolute top-3 right-3 text-right font-mono text-[12px]" style={{ color: hud.prqColor }}>LINKS · {hud.prqLabel}</div>
 
           {/* aim bar */}
           {hud.phase === 'aim' && (
@@ -381,7 +381,7 @@ export default function Golf3D(props: GameProps) {
                 <div className="absolute inset-y-0 left-1/2 w-0.5 bg-white/40" />
                 <div className="absolute inset-y-0 w-2 rounded bg-[#FFD700]" style={{ left: `${((hud.aim + 1) / 2) * 100}%`, transition: 'none' }} />
               </div>
-              <p className="mt-1 text-center text-[10px] font-mono text-white/60">AIM — the wind pushes the ball {hud.wind > 0 ? 'right' : 'left'}</p>
+              <p className="mt-1 text-center text-[12px] font-mono text-white/60">AIM — the wind pushes the ball {hud.wind > 0 ? 'right' : 'left'}</p>
             </div>
           )}
           {/* power bar (Wii-Sports readability) */}
@@ -392,7 +392,7 @@ export default function Golf3D(props: GameProps) {
                 <div className="absolute inset-y-0 bg-[#00FF9D]/60" style={{ left: `${perfLeft}%`, width: `${perfW}%` }} />
                 <div className="h-full rounded" style={{ width: `${hud.power * 100}%`, background: 'rgba(255,215,0,0.55)', transition: 'none' }} />
               </div>
-              <p className="mt-1 text-center text-[10px] font-mono text-white/60">STOP IN THE GREEN FOR FULL CARRY</p>
+              <p className="mt-1 text-center text-[12px] font-mono text-white/60">STOP IN THE GREEN FOR FULL CARRY</p>
             </div>
           )}
 
@@ -406,10 +406,10 @@ export default function Golf3D(props: GameProps) {
 
           {/* touch controls */}
           <div className="absolute bottom-3 right-3 flex gap-2 pointer-events-auto">
-            <button onClick={() => pick('drive')} className="h-9 w-12 rounded-lg border border-[#00E5FF]/50 bg-black/50 text-[10px] font-bold text-[#00E5FF]">DRV</button>
-            <button onClick={() => pick('chip')} className="h-9 w-12 rounded-lg border border-[#FFD700]/50 bg-black/50 text-[10px] font-bold text-[#FFD700]">CHIP</button>
-            <button onClick={() => pick('putt')} className="h-9 w-12 rounded-lg border border-white/40 bg-black/50 text-[10px] font-bold text-white/80">PUTT</button>
-            <button onClick={act} className="h-9 w-16 rounded-lg border border-[#00FF9D]/60 bg-black/50 text-[10px] font-bold text-[#00FF9D]">SWING</button>
+            <button onClick={() => pick('drive')} className="h-9 w-12 rounded-lg border border-[#00E5FF]/50 bg-black/50 text-[12px] font-bold text-[#00E5FF]">DRV</button>
+            <button onClick={() => pick('chip')} className="h-9 w-12 rounded-lg border border-[#FFD700]/50 bg-black/50 text-[12px] font-bold text-[#FFD700]">CHIP</button>
+            <button onClick={() => pick('putt')} className="h-9 w-12 rounded-lg border border-white/40 bg-black/50 text-[12px] font-bold text-white/80">PUTT</button>
+            <button onClick={act} className="h-9 w-16 rounded-lg border border-[#00FF9D]/60 bg-black/50 text-[12px] font-bold text-[#00FF9D]">SWING</button>
           </div>
         </div>
       )}

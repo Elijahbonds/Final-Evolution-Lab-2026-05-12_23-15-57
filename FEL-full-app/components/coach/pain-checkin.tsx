@@ -44,7 +44,7 @@ const HEALTH_DATA_LOCKED = 'health_data_consent_required';
  *  because a pain check-in has no session-level front door of its own to mount that gate inline in front of. */
 export function GuardianLockedNotice() {
   return (
-    <div className="flex items-start gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-[11px] text-white/60">
+    <div className="flex items-start gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-[12px] text-white/60">
       <Lock className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
       <span>
         A parent or guardian needs to say it&apos;s OK before this saves.{' '}
@@ -84,7 +84,7 @@ export function HealthConsentLockedNotice({ onGranted }: { onGranted: () => void
     }
   };
   return (
-    <div className="space-y-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-[11px] text-white/70">
+    <div className="space-y-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-[12px] text-white/70">
       <div className="flex items-start gap-2">
         <Lock className="mt-0.5 h-3 w-3 shrink-0 text-white/50" aria-hidden="true" />
         <span className="font-medium text-white/85">{HEALTH_DATA_CONSENT_COPY.title}</span>
@@ -102,7 +102,7 @@ export function HealthConsentLockedNotice({ onGranted }: { onGranted: () => void
       >
         {busy && <Loader2 className="h-3 w-3 animate-spin" />} I agree — turn this on
       </button>
-      {error && <p className="text-[11px] text-fel-crimson">That didn&apos;t save — try again.</p>}
+      {error && <p className="text-[12px] text-fel-crimson">That didn&apos;t save — try again.</p>}
     </div>
   );
 }
@@ -126,7 +126,7 @@ async function submitPainCheckIn(body: Record<string, unknown>): Promise<{ ok: t
   }
 }
 
-const chipBase = 'rounded-full px-2.5 py-1 text-[11px] border';
+const chipBase = 'rounded-full px-2.5 py-1 text-[12px] border';
 const scoreBtn = (active: boolean) =>
   `h-7 w-7 shrink-0 rounded-md text-xs font-medium border ${active ? 'bg-fel-cyan/20 border-fel-cyan/50 text-fel-cyan' : 'border-white/10 text-white/60'}`;
 
@@ -158,7 +158,7 @@ function PainForm({ busy, fixedBodyArea, onSubmit }: { busy: boolean; fixedBodyA
   return (
     <div className="space-y-2">
       <div>
-        <div className="text-[11px] text-fel-dim mb-1">Pain, 0–10</div>
+        <div className="text-[12px] text-fel-dim mb-1">Pain, 0–10</div>
         <div className="flex flex-wrap gap-1">
           {Array.from({ length: 11 }, (_, n) => n).map((n) => (
             <button key={n} type="button" aria-pressed={score === n} onClick={() => setScore(n)} className={scoreBtn(score === n)}>{n}</button>
@@ -167,7 +167,7 @@ function PainForm({ busy, fixedBodyArea, onSubmit }: { busy: boolean; fixedBodyA
       </div>
       {!fixedBodyArea && (
         <div>
-          <div className="text-[11px] text-fel-dim mb-1">Where</div>
+          <div className="text-[12px] text-fel-dim mb-1">Where</div>
           <div className="flex flex-wrap gap-1">
             {BODY_AREAS.map((a) => (
               <button key={a.id} type="button" aria-pressed={bodyArea === a.id} onClick={() => setBodyArea(a.id)} className={`${chipBase} ${bodyArea === a.id ? 'bg-fel-cyan/15 border-fel-cyan/40 text-fel-cyan' : 'border-white/10 text-white/55'}`}>{a.label}</button>
@@ -176,7 +176,7 @@ function PainForm({ busy, fixedBodyArea, onSubmit }: { busy: boolean; fixedBodyA
         </div>
       )}
       <div>
-        <div className="text-[11px] text-fel-dim mb-1">Did any of these happen?</div>
+        <div className="text-[12px] text-fel-dim mb-1">Did any of these happen?</div>
         <div className="flex flex-wrap gap-1">
           {ACUTE_EVENTS.map((e) => (
             <button key={e.id} type="button" aria-pressed={acute.includes(e.id)} onClick={() => toggle(e.id)} className={`${chipBase} ${acute.includes(e.id) ? 'bg-fel-crimson/15 border-fel-crimson/40 text-fel-crimson' : 'border-white/10 text-white/55'}`}>{e.label}</button>
@@ -226,7 +226,7 @@ export function PainCheckInChip({ exerciseName, programExerciseId, kind = 'after
 
   return (
     <div data-pain-checkin={exerciseName}>
-      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex items-center gap-1 text-[11px] text-fel-dim hover:text-white/60">
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex items-center gap-1 text-[12px] text-fel-dim hover:text-white/60">
         Pain? (optional) {open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
       </button>
       {open && needsHealthConsent && (
@@ -236,7 +236,7 @@ export function PainCheckInChip({ exerciseName, programExerciseId, kind = 'after
       )}
       {open && locked && !needsHealthConsent && <div className="mt-1.5"><GuardianLockedNotice /></div>}
       {open && !result && !locked && !needsHealthConsent && <div className="mt-1.5"><PainForm busy={busy} onSubmit={submit} /></div>}
-      {error && <div className="mt-1 text-[11px] text-fel-crimson">{error}</div>}
+      {error && <div className="mt-1 text-[12px] text-fel-crimson">{error}</div>}
       {result && <div className="mt-1.5"><ResultBanner r={result} /></div>}
     </div>
   );
@@ -318,7 +318,7 @@ export function NextMorningFollowUps() {
                 fixedBodyArea={p.bodyArea as BodyAreaId}
                 onSubmit={(v) => submit(i, v)}
               />
-              <button type="button" onClick={() => setSkipped((s) => new Set(s).add(i))} className="text-[11px] text-fel-quiet underline">Not now</button>
+              <button type="button" onClick={() => setSkipped((s) => new Set(s).add(i))} className="text-[12px] text-fel-quiet underline">Not now</button>
             </>
           )}
         </div>
