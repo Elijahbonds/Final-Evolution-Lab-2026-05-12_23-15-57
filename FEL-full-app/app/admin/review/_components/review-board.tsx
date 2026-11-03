@@ -60,20 +60,20 @@ export function ReviewBoard() {
       {!approver && items && <p className="mt-3 text-xs text-amber-300/80">You can flag cards for the founder or an admin. Approving is theirs.</p>}
 
       <ul className="mt-4 flex flex-col gap-2">
-        {items === null && <li className="text-sm text-white/40">Loading…</li>}
-        {items?.length === 0 && <li className="text-sm text-white/40">Nothing here.</li>}
+        {items === null && <li className="text-sm text-white/50">Loading…</li>}
+        {items?.length === 0 && <li className="text-sm text-white/50">Nothing here.</li>}
         {items?.map((it) => (
           <li key={it.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
             <button type="button" className="flex w-full flex-wrap items-center gap-2 text-left" onClick={() => setOpen(open === it.id ? null : it.id)}>
-              <span className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[10px] uppercase text-white/70">{it.primary}</span>
+              <span className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[12px] uppercase text-white/70">{it.primary}</span>
               <span className="font-semibold text-white">{it.title}</span>
               <span className="text-xs text-white/50">by {it.owner.name}</span>
-              {it.staysPrivate && <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] text-amber-200">stays private: under 18 or age unknown</span>}
-              {!it.staysPrivate && !it.wantsPublic && <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/60">creator chose private</span>}
-              {it.flags > 0 && <span className="rounded bg-red-500/20 px-1.5 py-0.5 text-[10px] text-red-200">{it.flags} flag{it.flags > 1 ? 's' : ''}</span>}
-              {it.rotation && it.rotation !== 'pulled' && <span className="rounded bg-[#00E5FF]/20 px-1.5 py-0.5 text-[10px] text-[#9ff3ff]">{it.rotation === 'featured' ? 'featured' : 'in rotation'}</span>}
-              {it.plays > 0 && <span className="text-[10px] text-white/40">{it.plays} plays</span>}
-              <span className="ml-auto font-mono text-[10px] text-white/30">{new Date(it.createdAt).toLocaleString()}</span>
+              {it.staysPrivate && <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[12px] text-amber-200">stays private: under 18 or age unknown</span>}
+              {!it.staysPrivate && !it.wantsPublic && <span className="rounded bg-white/10 px-1.5 py-0.5 text-[12px] text-white/60">creator chose private</span>}
+              {it.flags > 0 && <span className="rounded bg-red-500/20 px-1.5 py-0.5 text-[12px] text-red-200">{it.flags} flag{it.flags > 1 ? 's' : ''}</span>}
+              {it.rotation && it.rotation !== 'pulled' && <span className="rounded bg-[#00E5FF]/20 px-1.5 py-0.5 text-[12px] text-[#9ff3ff]">{it.rotation === 'featured' ? 'featured' : 'in rotation'}</span>}
+              {it.plays > 0 && <span className="text-[12px] text-white/50">{it.plays} plays</span>}
+              <span className="ml-auto font-mono text-[12px] text-white/50">{new Date(it.createdAt).toLocaleString()}</span>
             </button>
             {open === it.id && <ReviewDetail item={it} approver={approver} onDone={() => { setOpen(null); void load(); }} />}
           </li>
@@ -116,11 +116,11 @@ function ReviewDetail({ item, approver, onDone }: { item: QueueItem; approver: b
     <div className="mt-3 border-t border-white/10 pt-3">
       {item.review && <p className="mb-2 text-xs text-white/50">Last decision: {item.review.decision}{item.review.note ? ` — “${item.review.note}”` : ''}</p>}
       {item.lastFlag && <p className="mb-2 text-xs text-red-200/80">Flag: {item.lastFlag.note ?? '(no note)'}</p>}
-      {preview ? <CardPreview art={preview.card.art} media={preview.media} /> : <p className="text-xs text-white/40">Loading preview…</p>}
+      {preview ? <CardPreview art={preview.card.art} media={preview.media} /> : <p className="text-xs text-white/50">Loading preview…</p>}
 
       <textarea value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} rows={2}
         placeholder="Note to the creator (shown to them, never public)"
-        className="mt-3 w-full rounded-lg bg-white/5 p-2 text-sm text-white placeholder:text-white/30" />
+        className="mt-3 w-full rounded-lg bg-white/5 p-2 text-sm text-white placeholder:text-white/50" />
 
       <div className="mt-2 flex flex-wrap items-center gap-2">
         {approver && item.reviewState !== 'approved' && (
@@ -169,7 +169,7 @@ function CardPreview({ art, media }: { art: Record<string, unknown>; media: Reco
           {Array.isArray(art.stemUrls) && (art.stemUrls as string[]).map((u, i) => audio(u, `Stem ${i + 1}`))}
         </div>
       );
-    case 'acting': return audio(art.performanceUrl, 'Line') ?? <p className="text-xs text-white/40">No audio.</p>;
+    case 'acting': return audio(art.performanceUrl, 'Line') ?? <p className="text-xs text-white/50">No audio.</p>;
     case 'art': {
       const s = src(art.canvasDataUrl);
       return s ? <img src={s} alt="Artwork" className="max-h-64 rounded-lg" /> : null;
@@ -186,6 +186,6 @@ function CardPreview({ art, media }: { art: Record<string, unknown>; media: Reco
     case 'cooking':
       return <p className="text-xs text-white/70">{((art.ingredients as string[]) ?? []).join(', ')} — {((art.steps as string[]) ?? []).length} steps</p>;
     default:
-      return <pre className="max-h-48 overflow-auto rounded bg-black/40 p-2 text-[10px] text-white/60">{JSON.stringify(art, null, 1)}</pre>;
+      return <pre className="max-h-48 overflow-auto rounded bg-black/40 p-2 text-[12px] text-white/60">{JSON.stringify(art, null, 1)}</pre>;
   }
 }

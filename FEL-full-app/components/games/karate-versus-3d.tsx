@@ -649,11 +649,11 @@ export default function KarateVersus3D(props: GameProps) {
             <div className="h-2 rounded-full bg-black/60 overflow-hidden">
               <div className="h-full rounded-full transition-all" style={{ width: `${hud.chi}%`, background: hud.chi >= 100 ? '#FFD700' : '#A855F7' }} />
             </div>
-            {hud.chi >= 100 && <div className="text-center text-[11px] font-mono text-[#FFD700] mt-1 animate-pulse">DRAGON PALM READY — HEAVY (K / B)</div>}
+            {hud.chi >= 100 && <div className="text-center text-[12px] font-mono text-[#FFD700] mt-1 animate-pulse">DRAGON PALM READY — HEAVY (K / B)</div>}
             {/* M14-P8 — guard meter: fills as blocked hits chip it; a full bar breaks the guard. */}
             {hud.guardMeter > 0.5 && (
               <div className="mt-1">
-                <div className="flex justify-between text-[9px] font-mono text-white/50 mb-0.5"><span>GUARD</span><span>{Math.round((hud.guardMeter / GUARD_BREAK_THRESHOLD) * 100)}%</span></div>
+                <div className="flex justify-between text-[12px] font-mono text-white/50 mb-0.5"><span>GUARD</span><span>{Math.round((hud.guardMeter / GUARD_BREAK_THRESHOLD) * 100)}%</span></div>
                 <div className="h-1.5 rounded-full bg-black/60 overflow-hidden"><div className="h-full rounded-full transition-all" style={{ width: `${Math.min(100, (hud.guardMeter / GUARD_BREAK_THRESHOLD) * 100)}%`, background: hud.guardMeter >= GUARD_BREAK_THRESHOLD * 0.75 ? '#FF3366' : '#00E5FF' }} /></div>
               </div>
             )}
@@ -662,7 +662,7 @@ export default function KarateVersus3D(props: GameProps) {
           {/* M14-P8 — signature weapon badge (cosmetic; carries no stats). */}
           <div className="absolute top-14 left-4 flex items-center gap-1.5">
             <span className="inline-block h-2 w-2 rounded-full" style={{ background: PLAYER_WEAPON.glowColor, boxShadow: `0 0 8px ${PLAYER_WEAPON.glowColor}` }} />
-            <span className="text-[10px] font-mono uppercase tracking-wide" style={{ color: PLAYER_WEAPON.bladeColor }}>{PLAYER_WEAPON.label}</span>
+            <span className="text-[12px] font-mono uppercase tracking-wide" style={{ color: PLAYER_WEAPON.bladeColor }}>{PLAYER_WEAPON.label}</span>
           </div>
 
           {/* range / telegraph cues — only during FIGHT */}
@@ -721,7 +721,7 @@ export default function KarateVersus3D(props: GameProps) {
               <span className="text-white/70">{b.label}</span>
             </div>
           ))}
-          <div className="text-[10px] text-white/40 mt-2">Press any key to dismiss</div>
+          <div className="text-[12px] text-white/50 mt-2">Press any key to dismiss</div>
         </div>
       )}
 

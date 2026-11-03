@@ -6,7 +6,7 @@ export function PartyBadge({ modeKey, className = '' }: { modeKey: string; class
   const m = partyModeFor(modeKey);
   if (!m) return null;
   return (
-    <span data-party-badge={m.id} className={`inline-block rounded px-1.5 py-0.5 align-middle font-mono text-[9px] font-bold tracking-wider ${className}`}
+    <span data-party-badge={m.id} className={`inline-block rounded px-1.5 py-0.5 align-middle font-mono text-[12px] font-bold tracking-wider ${className}`}
       style={{ background: '#00E5FF1f', color: '#00E5FF', border: '1px solid #00E5FF44' }}>
       {playersBadge(m)}
     </span>

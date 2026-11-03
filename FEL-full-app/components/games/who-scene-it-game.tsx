@@ -213,7 +213,7 @@ export default function WhoSceneItGame({ grade, prqDisplay: shownPrq, onEnd, gam
             <p className="max-w-md text-sm text-gray-300">
               Rapid-fire recall across every category — {TOTAL_Q} questions, {qTotalTime} seconds each. Answer fast for speed points, chain streaks for a multiplier up to x3. Score {WIN_SCORE}+ to win.
             </p>
-            <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 font-mono text-[11px] text-white/40">
+            <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 font-mono text-[12px] text-white/50">
               <span>1 / 2 / 3 / 4 — Pick answer</span>
               <span>Speed bonus: faster = more pts</span>
               <span>Streak builds a x3 multiplier</span>
@@ -243,7 +243,7 @@ export default function WhoSceneItGame({ grade, prqDisplay: shownPrq, onEnd, gam
                 if (feedback !== null) {
                   if (i === q.answer) cls = 'border-[#00FF9D] bg-[#00FF9D]/15 text-[#00FF9D]';
                   else if (picked === i) cls = 'border-[#FF3366] bg-[#FF3366]/15 text-[#FF3366]';
-                  else cls = 'border-white/10 bg-white/5 text-white/40';
+                  else cls = 'border-white/10 bg-white/5 text-white/50';
                 }
                 return (
                   <button key={i} onClick={() => pick(i)} disabled={feedback !== null} className={`rounded-lg border px-4 py-3 text-sm font-medium transition ${cls}`}>
@@ -257,7 +257,7 @@ export default function WhoSceneItGame({ grade, prqDisplay: shownPrq, onEnd, gam
               {feedback === 'wrong' && <span className="text-[#FF3366]">WRONG SCENE!</span>}
               {feedback === 'timeout' && <span className="text-[#FFD700]">TIME! MOVING ON...</span>}
             </div>
-            <p className="text-center font-mono text-[10px] text-white/30">{(shownPrq ?? prqDisplay(null)).badge}</p>
+            <p className="text-center font-mono text-[12px] text-white/50">{(shownPrq ?? prqDisplay(null)).badge}</p>
           </div>
         )}
       </div>

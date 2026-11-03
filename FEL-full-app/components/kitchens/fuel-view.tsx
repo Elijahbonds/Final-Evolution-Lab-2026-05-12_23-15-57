@@ -102,7 +102,7 @@ export function FuelView() {
     <div className="mx-auto max-w-3xl px-4 pt-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/50">FEL Kitchens · Fuel</p>
+          <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-white/50">FEL Kitchens · Fuel</p>
           <h1 className="fel-heading mt-1 text-2xl font-bold text-white">Today&apos;s fuel</h1>
           <p className="mt-1 text-sm text-white/60">Your Build&apos;s current leak and load, as a plate. Food tags only.</p>
         </div>
@@ -124,31 +124,31 @@ export function FuelView() {
               <span className="rounded-full border border-[#A855F7]/40 bg-[#A855F7]/10 px-2.5 py-1 text-xs font-bold text-[#A855F7]" data-testid="rx-leak">LEAK · {rx.leakLabel.toUpperCase()}</span>
               <span className="rounded-full border border-[#00E5FF]/40 bg-[#00E5FF]/10 px-2.5 py-1 text-xs font-bold text-[#00E5FF]" data-testid="rx-band">{BAND_LABEL[rx.loadBand]}</span>
               {shownPrq && <span className="rounded-full border border-white/15 px-2.5 py-1 font-mono text-xs text-white/70">{shownPrq.label}</span>}
-              <span className="font-mono text-[11px] text-white/40">scan {rx.sourceScanDate}</span>
+              <span className="font-mono text-[12px] text-white/50">scan {rx.sourceScanDate}</span>
             </div>
             <p className="mt-3 text-sm text-white/85">{LEAK_ONE_LINER[rx.leak]}</p>
             <div className="mt-3 flex flex-wrap gap-1.5">
-              {rx.themes.map((t) => <span key={t} className="rounded-md bg-white/[0.06] px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-white/70">{THEME_LABEL[t] ?? t}</span>)}
+              {rx.themes.map((t) => <span key={t} className="rounded-md bg-white/[0.06] px-2 py-1 text-[12px] font-bold uppercase tracking-wider text-white/70">{THEME_LABEL[t] ?? t}</span>)}
             </div>
           </section>
 
           <section className="mt-4">
-            <p className="px-1 text-[11px] font-bold uppercase tracking-[0.18em] text-white/50">Day plan</p>
+            <p className="px-1 text-[12px] font-bold uppercase tracking-[0.18em] text-white/50">Day plan</p>
             <ul className="mt-2 grid gap-2 sm:grid-cols-2" data-testid="day-plan">
               {rx.dayPlan.map((s) => (
                 <li key={`${s.slot}-${s.recipeId}`} className="fel-panel rounded-xl p-3" data-slot={s.slot} data-recipe={s.recipeId}>
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#00FF9D]">{s.slot}</span>
-                    <span className="font-mono text-[11px] text-white/50">{s.minutes} min</span>
+                    <span className="text-[12px] font-bold uppercase tracking-[0.18em] text-[#00FF9D]">{s.slot}</span>
+                    <span className="font-mono text-[12px] text-white/50">{s.minutes} min</span>
                   </div>
                   <p className="mt-1 text-sm font-bold text-white">{s.title}</p>
-                  <p className="mt-1 font-mono text-[11px] tabular-nums text-white/60">{s.macros.kcal} kcal · P {s.macros.proteinG} · C {s.macros.carbG} · F {s.macros.fatG}</p>
+                  <p className="mt-1 font-mono text-[12px] tabular-nums text-white/60">{s.macros.kcal} kcal · P {s.macros.proteinG} · C {s.macros.carbG} · F {s.macros.fatG}</p>
                   {/* allergens: the slot's own, or (a plan stored before they existed) the catalogue's; a hit is badged */}
                   <AllergenChips allergens={s.allergens ?? KITCHEN_RECIPES.find((r) => r.id === s.recipeId)?.allergens ?? []} avoid={avoid} />
                 </li>
               ))}
             </ul>
-            <p className="mt-2 px-1 text-[11px] leading-snug text-white/45">{ALLERGEN_NOTE}</p>
+            <p className="mt-2 px-1 text-[12px] leading-snug text-white/50">{ALLERGEN_NOTE}</p>
           </section>
 
           <div className="mt-4">
@@ -156,23 +156,23 @@ export function FuelView() {
           </div>
 
           <section className="mt-4">
-            <p className="px-1 text-[11px] font-bold uppercase tracking-[0.18em] text-white/50">Get it</p>
+            <p className="px-1 text-[12px] font-bold uppercase tracking-[0.18em] text-white/50">Get it</p>
             <div className="mt-2 grid gap-2 sm:grid-cols-3">
               {availablePaths({ instacart: instacart.available }).map((o) => (
                 <button key={o.path} type="button" onClick={() => choose(o.path, o.available)} disabled={!o.available}
                   className={`fel-panel rounded-xl p-3 text-left ${path === o.path && o.available ? 'border border-[#00E5FF]/50' : 'border border-transparent'} ${o.available ? 'hover:bg-white/[0.06]' : 'opacity-60'}`}>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-bold text-white">{o.label}</span>
-                    {!o.available && <Lock className="h-3.5 w-3.5 text-white/40" />}
+                    {!o.available && <Lock className="h-3.5 w-3.5 text-white/50" />}
                   </div>
-                  <p className="mt-1 text-[11px] text-white/55">{o.path === 'instacart' && instacart.note ? instacart.note : o.available ? (o.note ?? 'Live now — copy or share the list') : o.note}</p>
-                  {o.path === 'instacart' && instacart.url && <a href={instacart.url} target="_blank" rel="noopener noreferrer" className="mt-1 block truncate text-[11px] text-[#00E5FF] underline">{instacart.url}</a>}
+                  <p className="mt-1 text-[12px] text-white/55">{o.path === 'instacart' && instacart.note ? instacart.note : o.available ? (o.note ?? 'Live now — copy or share the list') : o.note}</p>
+                  {o.path === 'instacart' && instacart.url && <a href={instacart.url} target="_blank" rel="noopener noreferrer" className="mt-1 block truncate text-[12px] text-[#00E5FF] underline">{instacart.url}</a>}
                 </button>
               ))}
             </div>
           </section>
 
-          <p className="mt-6 pb-4 text-center text-[11px] leading-relaxed text-white/40">{rx.disclaimer}</p>
+          <p className="mt-6 pb-4 text-center text-[12px] leading-relaxed text-white/50">{rx.disclaimer}</p>
         </>
       )}
     </div>

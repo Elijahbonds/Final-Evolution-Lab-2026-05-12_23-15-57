@@ -23,7 +23,7 @@ export function StationResults({ screen, stations }: { screen: ScreenId; station
       <ul className="mt-3 space-y-3">
         {cards.map((c) => (
           <li key={c.stationIndex} className="rounded-xl border border-white/[0.06] bg-black/20 px-4 py-3" data-station={c.stationId}>
-            <p className="font-mono text-[9.5px] uppercase tracking-[0.16em] text-white/40">
+            <p className="font-mono text-[12px] uppercase tracking-[0.16em] text-white/50">
               {c.title}{c.retesting ? ' · retesting' : c.attempts > 1 ? ' · after one retest' : ''}
             </p>
             <ul className="mt-2 space-y-2.5">
@@ -32,11 +32,11 @@ export function StationResults({ screen, stations }: { screen: ScreenId; station
                   <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px]">
                     <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: TONE[r.status].dot }} />
                     <span className="font-semibold text-white/85">{r.label}</span>
-                    <span className={`font-mono text-[10px] font-bold uppercase tracking-[0.12em] ${TONE[r.status].text}`}>{r.statusLabel}</span>
+                    <span className={`font-mono text-[12px] font-bold uppercase tracking-[0.12em] ${TONE[r.status].text}`}>{r.statusLabel}</span>
                   </p>
                   <p className="mt-0.5 break-words text-[12.5px] leading-relaxed text-white/55">{r.value}</p>
                   {r.fix && <p className="mt-1 text-[12.5px] leading-relaxed text-white/70"><span className="font-bold text-white/80">Fix: </span>{r.fix}</p>}
-                  {r.retest && <p className="mt-1 text-[12px] leading-relaxed text-white/45">{r.retest}</p>}
+                  {r.retest && <p className="mt-1 text-[12px] leading-relaxed text-white/50">{r.retest}</p>}
                 </li>
               ))}
             </ul>

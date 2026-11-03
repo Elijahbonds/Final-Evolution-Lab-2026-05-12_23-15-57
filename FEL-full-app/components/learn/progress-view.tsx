@@ -89,13 +89,13 @@ export function ProgressView({
 
       <h2 className="mt-8 flex items-center gap-2 text-sm font-bold uppercase tracking-[0.18em] text-white/50"><Bookmark className="h-4 w-4" /> Saved</h2>
       {saved.length === 0 ? (
-        <p className="mt-2 text-sm text-white/45">Nothing saved yet — tap the bookmark on any card.</p>
+        <p className="mt-2 text-sm text-white/50">Nothing saved yet — tap the bookmark on any card.</p>
       ) : (
         <ul className="mt-3 space-y-2">
           {saved.map((c) => (
             <li key={c.id} className="flex items-start justify-between gap-3 rounded-xl border border-white/8 px-3.5 py-2.5">
               <span>
-                <span className="block text-[11px] font-bold uppercase tracking-[0.14em]" style={{ color: topicById(c.topic).accent }}>{topicById(c.topic).label}</span>
+                <span className="block text-[12px] font-bold uppercase tracking-[0.14em]" style={{ color: topicById(c.topic).accent }}>{topicById(c.topic).label}</span>
                 <span className="text-[15px] text-white/90">{headlineOf(c)}</span>
               </span>
               <button type="button" data-pad-focus onClick={() => onUnsave(c.id)} aria-label="Remove from saved"

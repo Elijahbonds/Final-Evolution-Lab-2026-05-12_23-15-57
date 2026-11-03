@@ -75,7 +75,7 @@ export default function PartyRoomScreen({ initialMode }: { initialMode: string |
   const openSeats = room.table.seats.length < PARTY_CAPACITY;
 
   return (
-    <main data-testid="party-room" data-phase={phase} className="fixed inset-0 overflow-hidden bg-[#05070c] text-white">
+    <main data-testid="party-room" data-phase={phase} className="fixed inset-0 overflow-y-auto overflow-x-hidden bg-[#05070c] text-white">
       {showGame && Game && (
         <div className="absolute inset-0">
           <Game key={room.gameKey} grade={GRADE} prq={0} onEnd={room.onGameEnd} />
@@ -89,7 +89,7 @@ export default function PartyRoomScreen({ initialMode }: { initialMode: string |
       {phase === 'playing' && room.between && (
         <div data-testid="party-up-next" className="absolute inset-0 z-50 grid place-items-center bg-[#05070c]">
           <div className="text-center">
-            <p className="font-mono text-xs tracking-[0.4em] text-white/40">{mode.title.toUpperCase()} · UP NEXT</p>
+            <p className="font-mono text-xs tracking-[0.4em] text-white/50">{mode.title.toUpperCase()} · UP NEXT</p>
             <p className="fel-heading mt-3 text-[min(12vh,72px)] font-black leading-none" style={{ color: room.turns ? (room.turns.players[room.turns.at]?.color ?? '#fff') : '#fff' }}>
               {room.banner.replace(/^UP NEXT · /, '')}
             </p>
@@ -104,7 +104,7 @@ export default function PartyRoomScreen({ initialMode }: { initialMode: string |
             type="button"
             data-testid="party-end-game"
             onClick={room.backToLobby}
-            className="absolute left-3 top-3 z-[60] rounded-full border border-white/15 bg-black/60 px-3 py-1 font-mono text-[10px] font-bold tracking-widest text-white/70 hover:text-white"
+            className="absolute left-3 top-3 z-[60] rounded-full border border-white/15 bg-black/60 px-3 py-1 font-mono text-[12px] font-bold tracking-widest text-white/70 hover:text-white"
           >
             ◀ LOBBY
           </button>
@@ -119,7 +119,7 @@ export default function PartyRoomScreen({ initialMode }: { initialMode: string |
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={qr} alt="" className="h-12 w-12 rounded bg-white p-0.5" />
               )}
-              <span className="font-mono text-[10px] leading-tight text-white/70">
+              <span className="font-mono text-[12px] leading-tight text-white/70">
                 JOIN · <span className="text-sm font-bold tracking-[0.2em] text-[#00E5FF]">{code}</span><br />
                 scan, or press A on a pad
               </span>
@@ -145,19 +145,19 @@ function Lobby({ room, qr, origin, share, shared }: { room: Room; qr: string | n
   const { mode, code, table } = room;
   const host = origin.replace(/^https?:\/\//, '');
   return (
-    <div className="absolute inset-0 flex flex-col gap-[2vh] p-[2.5vh] sm:p-5">
+    <div className="flex min-h-full flex-col gap-[2vh] p-[2.5vh] sm:p-5 md:absolute md:inset-0">
       <header className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link href="/play" aria-label="Back to Play" className="rounded-full border border-white/10 p-1.5 text-white/60 hover:text-white"><ArrowLeft className="h-4 w-4" /></Link>
           <div>
-            <p className="font-mono text-[10px] tracking-[0.35em] text-white/40">PARTY ROOM</p>
+            <p className="font-mono text-[12px] tracking-[0.35em] text-white/50">PARTY ROOM</p>
             <h1 className="fel-heading text-[min(5vh,28px)] font-black leading-none">PLAY WITH FRIENDS</h1>
           </div>
         </div>
-        <p className="hidden font-mono text-[11px] text-white/40 sm:block">Phones are controllers · pads work too · no app, no account</p>
+        <p className="hidden font-mono text-[12px] text-white/50 sm:block">Phones are controllers · pads work too · no app, no account</p>
       </header>
 
-      <div className="grid min-h-0 flex-1 grid-cols-[auto_1fr] gap-[2.5vh]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-[2.5vh] md:grid-cols-[auto_1fr]">
         {/* JOIN — the one thing a friend needs */}
         <section data-testid="party-join" className="flex min-h-0 flex-col items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] p-[2vh]">
           {room.error ? (
@@ -172,17 +172,17 @@ function Lobby({ room, qr, origin, share, shared }: { room: Room; qr: string | n
                 // eslint-disable-next-line @next/next/no-img-element
                 <img data-testid="party-qr" src={qr} alt={`Scan to join — code ${code}`} className="aspect-square h-[min(34vh,210px)] rounded-lg bg-white p-1.5" />
               ) : (
-                <div className="grid aspect-square h-[min(34vh,210px)] place-items-center rounded-lg border border-white/10 text-[11px] text-white/40">Opening the room…</div>
+                <div className="grid aspect-square h-[min(34vh,210px)] place-items-center rounded-lg border border-white/10 text-[12px] text-white/50">Opening the room…</div>
               )}
-              <p className="mt-[1.2vh] font-mono text-[10px] tracking-[0.3em] text-white/40">SCAN WITH A PHONE CAMERA</p>
+              <p className="mt-[1.2vh] font-mono text-[12px] tracking-[0.3em] text-white/50">SCAN WITH A PHONE CAMERA</p>
               <p data-testid="party-code" className="font-mono text-[min(7vh,40px)] font-black leading-tight tracking-[0.18em] text-[#00E5FF]">{code || '······'}</p>
-              <p className="text-center font-mono text-[10px] text-white/50">or open <span className="text-white/80">{host}{JOIN_PATH}</span></p>
+              <p className="text-center font-mono text-[12px] text-white/50">or open <span className="text-white/80">{host}{JOIN_PATH}</span></p>
               <button type="button" data-testid="party-share" onClick={share} disabled={!code}
-                className="mt-[1.2vh] flex items-center gap-1.5 rounded-full border border-[#A855F7]/50 bg-[#A855F7]/10 px-3 py-1 text-[11px] font-bold text-[#c4a1ff] disabled:opacity-40">
+                className="mt-[1.2vh] flex items-center gap-1.5 rounded-full border border-[#A855F7]/50 bg-[#A855F7]/10 px-3 py-1 text-[12px] font-bold text-[#c4a1ff] disabled:opacity-40">
                 {shared === 'copied' ? <><Check className="h-3.5 w-3.5" /> INVITE COPIED</> : <><Share2 className="h-3.5 w-3.5" /> SEND INVITE</>}
               </button>
               {loopbackHost() && (
-                <p className="mt-1.5 max-w-[220px] text-center text-[9px] leading-snug text-[#ffd75e]">Phones can’t open localhost — open this page by the computer’s network address to scan.</p>
+                <p className="mt-1.5 max-w-[220px] text-center text-[12px] leading-snug text-[#ffd75e]">Phones can’t open localhost — open this page by the computer’s network address to scan.</p>
               )}
             </>
           )}
@@ -190,23 +190,23 @@ function Lobby({ room, qr, origin, share, shared }: { room: Room; qr: string | n
 
         <div className="flex min-h-0 flex-col gap-[2vh]">
           {/* PLAYERS */}
-          <section data-testid="party-seats" className="grid grid-cols-4 gap-[1.2vh]">
+          <section data-testid="party-seats" className="grid grid-cols-2 gap-[1.2vh] md:grid-cols-4">
             {Array.from({ length: PARTY_CAPACITY }, (_, i) => {
               const s = table.seats[i];
               return s ? <SeatCard key={s.key} seat={s} inGame={i < mode.maxPlayers} onRemove={() => room.removeSeat(s)} /> : <EmptySeat key={`empty-${i}`} index={i} hasPads={room.pads.length > 0} />;
             })}
           </section>
           {table.waiting.length > 0 && (
-            <p className="-mt-[1vh] font-mono text-[10px] text-white/45">+{table.waiting.length} waiting for a seat: {table.waiting.map((w) => w.name).join(', ')}</p>
+            <p className="-mt-[1vh] font-mono text-[12px] text-white/50">+{table.waiting.length} waiting for a seat: {table.waiting.map((w) => w.name).join(', ')}</p>
           )}
 
           {/* GAMES */}
           <section data-testid="party-games" className="min-h-0 flex-1">
-            <div className="mb-1 flex items-center justify-between font-mono text-[10px] tracking-[0.25em] text-white/40">
+            <div className="mb-1 flex items-center justify-between font-mono text-[12px] tracking-[0.25em] text-white/50">
               <span>PICK A GAME · ◀ ▶</span>
               <span className="hidden sm:inline">the first phone in can pick too</span>
             </div>
-            <div className="grid h-[calc(100%-1.25rem)] grid-cols-4 gap-[1.2vh]">
+            <div className="grid grid-cols-2 gap-[1.2vh] md:h-[calc(100%-1.25rem)] md:grid-cols-4">
               {PARTY_MODES.map((m, i) => {
                 const on = i === room.modeIndex;
                 return (
@@ -215,9 +215,9 @@ function Lobby({ room, qr, origin, share, shared }: { room: Room; qr: string | n
                     style={{ borderColor: on ? m.color : 'rgba(255,255,255,0.08)', background: on ? `${m.color}1f` : 'rgba(255,255,255,0.02)', boxShadow: on ? `0 0 30px -12px ${m.color}` : 'none' }}>
                     <span className="block">
                       <span className="fel-heading block text-[min(3.6vh,18px)] font-bold leading-tight" style={{ color: on ? '#fff' : 'rgba(255,255,255,0.75)' }}>{m.title}</span>
-                      <span className="mt-1 hidden text-[11px] leading-snug text-white/50 md:block">{m.blurb}</span>
+                      <span className="mt-1 hidden text-[12px] leading-snug text-white/50 md:block">{m.blurb}</span>
                     </span>
-                    <span className="mt-1 flex flex-wrap gap-1 font-mono text-[9px] font-bold">
+                    <span className="mt-1 flex flex-wrap gap-1 font-mono text-[12px] font-bold">
                       <span className="rounded px-1.5 py-0.5" style={{ background: `${m.color}33`, color: m.color }}>{playersBadge(m)}</span>
                       <span className="rounded bg-white/10 px-1.5 py-0.5 text-white/60">{styleLine(m)}</span>
                     </span>
@@ -250,10 +250,10 @@ function SeatCard({ seat, inGame, onRemove }: { seat: Seat; inGame: boolean; onR
       <span aria-hidden className="absolute inset-x-0 top-0 h-1" style={{ background: seat.color }} />
       <div className="flex items-center justify-between">
         <span className="font-mono text-[min(3.2vh,16px)] font-black" style={{ color: seat.color }}>{seat.label}</span>
-        <Icon className="h-4 w-4 text-white/45" />
+        <Icon className="h-4 w-4 text-white/50" />
       </div>
       <p className="fel-heading mt-0.5 truncate text-[min(3.4vh,17px)] font-bold">{seat.name}</p>
-      <p className={`font-mono text-[10px] font-bold ${!seat.connected ? 'text-[#ff6b3d]' : seat.ready ? 'text-[#4ade80]' : 'text-white/40'}`}>
+      <p className={`font-mono text-[12px] font-bold ${!seat.connected ? 'text-[#ff6b3d]' : seat.ready ? 'text-[#4ade80]' : 'text-white/50'}`}>
         {!seat.connected ? 'RECONNECTING…' : seat.ready ? '✓ READY' : 'NOT READY'}{!inGame ? ' · NEXT GAME' : ''}
       </p>
       {seat.kind === 'phone' && !seat.connected && (
@@ -267,7 +267,7 @@ function EmptySeat({ index, hasPads }: { index: number; hasPads: boolean }) {
   return (
     <div data-testid={`party-seat-empty-${index + 1}`} className="rounded-xl border border-dashed border-white/15 p-[1.3vh]">
       <span className="font-mono text-[min(3.2vh,16px)] font-black" style={{ color: `${SEAT_COLORS[index]}66` }}>P{index + 1}</span>
-      <p className="mt-0.5 text-[min(2.4vh,11px)] leading-snug text-white/40">{openSeatHint(hasPads)}</p>
+      <p className="mt-0.5 text-[12px] leading-snug text-white/60">{openSeatHint(hasPads)}</p>
     </div>
   );
 }
@@ -282,7 +282,7 @@ function Results({ room, share, shared }: { room: Room; share: () => void; share
     <div data-testid="party-results" className="absolute inset-0 z-[65] grid place-items-center bg-black/70 p-4 backdrop-blur-sm">
       <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0a0d14]/95 p-[3vh] text-center">
         <Trophy className="mx-auto h-[min(6vh,36px)] w-[min(6vh,36px)] text-[#FFD700]" />
-        <p className="mt-1 font-mono text-[10px] tracking-[0.35em] text-white/40">{mode.title.toUpperCase()}</p>
+        <p className="mt-1 font-mono text-[12px] tracking-[0.35em] text-white/50">{mode.title.toUpperCase()}</p>
         <h2 data-testid="party-winner" className="fel-heading text-[min(6vh,32px)] font-black leading-tight">{room.banner}</h2>
         <ul className="mt-[1.5vh] space-y-1">
           {rows.map((r) => (
@@ -296,10 +296,10 @@ function Results({ room, share, shared }: { room: Room; share: () => void; share
           <button type="button" data-testid="party-rematch" onClick={room.rematch} className="rounded-xl bg-[#00E5FF] py-[1.4vh] font-mono text-sm font-black tracking-widest text-[#04202a]">REMATCH ▶</button>
           <button type="button" data-testid="party-change" onClick={room.backToLobby} className="rounded-xl border border-white/20 py-[1.4vh] font-mono text-sm font-bold tracking-widest text-white/80">CHANGE GAME</button>
         </div>
-        <button type="button" onClick={share} className="mt-2 w-full rounded-xl border border-[#A855F7]/40 py-[1vh] font-mono text-[11px] font-bold text-[#c4a1ff]">
+        <button type="button" onClick={share} className="mt-2 w-full rounded-xl border border-[#A855F7]/40 py-[1vh] font-mono text-[12px] font-bold text-[#c4a1ff]">
           {shared === 'copied' ? 'INVITE COPIED' : 'INVITE ONE MORE FRIEND'}
         </button>
-        <p className="mt-1.5 font-mono text-[10px] text-white/35">A / Enter rematch · B / Backspace change game · party games are free play</p>
+        <p className="mt-1.5 font-mono text-[12px] text-white/50">A / Enter rematch · B / Backspace change game · party games are free play</p>
       </div>
     </div>
   );

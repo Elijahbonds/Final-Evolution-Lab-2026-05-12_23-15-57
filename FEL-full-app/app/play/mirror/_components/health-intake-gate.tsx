@@ -377,7 +377,7 @@ export function HealthIntakeGate({ children, canWriteHealth = false, localStatus
     return (
       <GateShell>
         {browserOnly && qIndex === 0 && <p className="mb-3 text-[12.5px] leading-snug text-white/60">{BROWSER_ONLY_LINE}</p>}
-        <p className="text-[12px] font-semibold uppercase tracking-wide text-white/40">
+        <p className="text-[12px] font-semibold uppercase tracking-wide text-white/50">
           Question {qIndex + 1} of {questions.length}
         </p>
         <h2 className="mt-2 text-[19px] font-black leading-tight text-white">{q.prompt}</h2>

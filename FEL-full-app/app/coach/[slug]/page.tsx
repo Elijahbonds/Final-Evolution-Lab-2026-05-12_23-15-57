@@ -125,7 +125,7 @@ export default async function CoachStorePage({ params }: { params: { slug: strin
         {reviews.summary && (
           <section className="mx-auto mt-6 max-w-3xl px-4 text-white" data-coach-reviews-public>
             <h2 className="flex flex-wrap items-center gap-2 text-sm font-bold">Client reviews <Stars n={reviews.summary.avg} /> <span className="font-normal text-white/60">{reviews.summary.avg} · {reviews.summary.count} review{reviews.summary.count === 1 ? '' : 's'}</span></h2>
-            <ul className="mt-2 space-y-1 text-sm">{reviews.items.map((r, k) => <li key={k} className="text-white/70"><Stars n={r.stars} size={12} /> <span className="text-white/40">{r.at}</span>{r.text ? ` · ${r.text}` : ''}</li>)}</ul>
+            <ul className="mt-2 space-y-1 text-sm">{reviews.items.map((r, k) => <li key={k} className="text-white/70"><Stars n={r.stars} size={12} /> <span className="text-white/50">{r.at}</span>{r.text ? ` · ${r.text}` : ''}</li>)}</ul>
           </section>
         )}
         <ReviewForm slug={instructor.slug} />

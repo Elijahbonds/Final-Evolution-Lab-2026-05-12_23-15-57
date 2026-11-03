@@ -62,7 +62,7 @@ export function MyCombines({ available, events }: { available: boolean; events: 
           </ul>
         </section>
       ))}
-      <p className="text-[11px] text-fel-dim">{NO_ACCURACY_LINE}</p>
+      <p className="text-[12px] text-fel-dim">{NO_ACCURACY_LINE}</p>
     </div>
   );
 }

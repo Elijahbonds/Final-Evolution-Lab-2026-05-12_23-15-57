@@ -115,7 +115,7 @@ export function SeasonPassTrack() {
         <h3 className="fel-heading text-2xl font-bold text-white">SEASON PASS</h3>
         <span className="font-mono text-xs text-[#FFD700]">{state.season.name}</span>
         {dleft != null && (
-          <span className="ml-auto font-mono text-[11px] text-white/40">{dleft} days left</span>
+          <span className="ml-auto font-mono text-[12px] text-white/50">{dleft} days left</span>
         )}
       </div>
 
@@ -137,7 +137,7 @@ export function SeasonPassTrack() {
         <div className="relative h-2.5 flex-1 overflow-hidden rounded-full bg-white/10">
           <div className="h-full rounded-full bg-gradient-to-r from-[#FFD700] to-[#FF3366]" style={{ width: `${pct}%` }} />
         </div>
-        <span className="font-mono text-[11px] text-white/50">{state.into ?? 0}/{state.need ?? 0} XP</span>
+        <span className="font-mono text-[12px] text-white/50">{state.into ?? 0}/{state.need ?? 0} XP</span>
       </div>
 
       {/* IMPROVE (2026-10-06, owner decision): today's three goals — each one done adds season XP to the bar above */}
@@ -146,8 +146,8 @@ export function SeasonPassTrack() {
           <div className="flex items-center gap-2">
             <Target className="h-4 w-4 text-[#FF7A2F]" />
             <span className="fel-heading text-sm font-bold text-[#FF7A2F]">TODAY&apos;S GOALS</span>
-            <span className="font-mono text-[11px] text-white/50">+{QUEST_SEASON_XP} season XP each</span>
-            {goalsHours != null && <span className="ml-auto font-mono text-[11px] text-white/40">new goals in {goalsHours}h</span>}
+            <span className="font-mono text-[12px] text-white/50">+{QUEST_SEASON_XP} season XP each</span>
+            {goalsHours != null && <span className="ml-auto font-mono text-[12px] text-white/50">new goals in {goalsHours}h</span>}
           </div>
           <ul className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
             {goals.map((g) => (
@@ -159,7 +159,7 @@ export function SeasonPassTrack() {
                 <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/10">
                   <div className="h-full rounded-full" style={{ width: `${Math.round((g.progress / g.target) * 100)}%`, background: g.done ? '#00FF9D' : '#FF7A2F' }} />
                 </div>
-                <div className="mt-1 font-mono text-[11px] text-white/50">{g.done ? 'Done' : `${g.progress}/${g.target} · ${goalRemaining(g)} to go`}</div>
+                <div className="mt-1 font-mono text-[12px] text-white/50">{g.done ? 'Done' : `${g.progress}/${g.target} · ${goalRemaining(g)} to go`}</div>
               </li>
             ))}
           </ul>
@@ -172,7 +172,7 @@ export function SeasonPassTrack() {
           <div className="flex items-center gap-2">
             <Gift className="h-4 w-4 text-[#00FF9D]" />
             <span className="fel-heading text-sm font-bold text-[#00FF9D]">FREE LANE</span>
-            <span className="ml-auto font-mono text-[11px] text-white/50">{freeCount} unlocked</span>
+            <span className="ml-auto font-mono text-[12px] text-white/50">{freeCount} unlocked</span>
           </div>
           <p className="mt-2 text-xs text-white/50">
             LC drops + common cosmetics as you climb tiers. Earn season XP from every mode.
@@ -184,7 +184,7 @@ export function SeasonPassTrack() {
           <div className="flex items-center gap-2">
             <Star className="h-4 w-4 text-[#A855F7]" />
             <span className="fel-heading text-sm font-bold text-[#A855F7]">PRO LANE</span>
-            <span className="ml-auto font-mono text-[11px] text-white/50">
+            <span className="ml-auto font-mono text-[12px] text-white/50">
               {state.hasPro ? `${proCount} unlocked` : 'locked'}
             </span>
           </div>

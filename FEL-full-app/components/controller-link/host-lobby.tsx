@@ -152,7 +152,7 @@ export function HostLobby({ config, onInput, collapsed, onPeers, onPadInput, laz
     const usbLine = bus && (!collapsed || (justJoined && pads.length > 0)) ? (
       <span
         data-testid="usb-connect-hint"
-        className={`rounded-full px-3 py-0.5 text-[10px] ${pads.length ? 'text-[#22d3ee]' : 'text-white/70'}`}
+        className={`rounded-full px-3 py-0.5 text-[12px] ${pads.length ? 'text-[#22d3ee]' : 'text-white/70'}`}
         style={{ background: '#000000aa' }}
       >
         {usbStatusLine(pads)}
@@ -198,8 +198,8 @@ export function HostLobby({ config, onInput, collapsed, onPeers, onPadInput, laz
   return (
     <div data-testid="host-lobby-panel" className={`pointer-events-auto absolute ${anchor} z-[45] max-h-[calc(100vh-5rem)] w-[320px] overflow-y-auto rounded-xl border border-white/10 bg-black/80 p-4 font-mono text-xs text-white backdrop-blur`}>
       <div className="flex items-center justify-between">
-        <span className="tracking-[0.25em] text-white/40">CONNECT A CONTROLLER</span>
-        <span className="flex items-center gap-2 text-white/30">
+        <span className="tracking-[0.25em] text-white/50">CONNECT A CONTROLLER</span>
+        <span className="flex items-center gap-2 text-white/50">
           {state}
           <button type="button" aria-label="Close controller link" onClick={() => setOpen(false)} className="rounded px-1.5 text-white/60 hover:bg-white/10 hover:text-white">×</button>
         </span>
@@ -209,7 +209,7 @@ export function HostLobby({ config, onInput, collapsed, onPeers, onPadInput, laz
       <section data-testid="usb-connect-help" className="mt-3">
         <p className="font-bold text-white">① {USB_TITLE}</p>
         <Steps steps={USB_STEPS} />
-        <p className={`mt-1.5 text-[10px] ${pads.length ? 'text-[#22d3ee]' : 'text-white/45'}`}>
+        <p className={`mt-1.5 text-[12px] ${pads.length ? 'text-[#22d3ee]' : 'text-white/50'}`}>
           {bus ? (pads.length ? usbStatusLine(pads) : 'Waiting for a button press…') : ''}
         </p>
       </section>
@@ -218,7 +218,7 @@ export function HostLobby({ config, onInput, collapsed, onPeers, onPadInput, laz
       <section data-testid="qr-connect-help" className="mt-3 border-t border-white/10 pt-3">
         <p className="font-bold text-white">② {PHONE_TITLE}</p>
         {error ? (
-          <div className="mt-2 rounded bg-[#ffd75e]/10 px-2 py-2 text-[10px] leading-snug text-[#ffd75e]">
+          <div className="mt-2 rounded bg-[#ffd75e]/10 px-2 py-2 text-[12px] leading-snug text-[#ffd75e]">
             Phone link offline — {error}.
             <button type="button" data-testid="host-lobby-retry" onClick={retry} className="ml-2 rounded border border-[#ffd75e]/60 px-2 py-0.5 font-bold hover:bg-[#ffd75e]/10">RETRY</button>
           </div>
@@ -228,47 +228,47 @@ export function HostLobby({ config, onInput, collapsed, onPeers, onPadInput, laz
               // eslint-disable-next-line @next/next/no-img-element
               <img src={qr} data-testid="host-lobby-qr" alt={`QR code to join — scan with your phone camera (code ${code})`} className="mx-auto mt-2 h-40 w-40 rounded bg-white p-1" />
             ) : (
-              <div className="mx-auto mt-2 grid h-40 w-40 place-items-center rounded border border-white/10 text-[10px] text-white/40">Opening a room…</div>
+              <div className="mx-auto mt-2 grid h-40 w-40 place-items-center rounded border border-white/10 text-[12px] text-white/50">Opening a room…</div>
             )}
             <p className="mt-2 text-center text-3xl font-bold tracking-[0.25em] text-[#00E5FF]">
               {code || '····'}
             </p>
             <Steps steps={PHONE_STEPS} />
-            <p className="mt-1.5 break-all text-[10px] text-white/35">{typeInstead(url)}</p>
+            <p className="mt-1.5 break-all text-[12px] text-white/50">{typeInstead(url)}</p>
           </>
         )}
       </section>
       {loopbackHost() && (
-        <p className="mt-2 rounded bg-[#ffd75e]/10 px-2 py-1 text-[10px] leading-snug text-[#ffd75e]">
+        <p className="mt-2 rounded bg-[#ffd75e]/10 px-2 py-1 text-[12px] leading-snug text-[#ffd75e]">
           Phones cannot open localhost. Open this page on the host at its network address (http://&lt;this computer&apos;s IP&gt;:port) or the live site, then scan.
         </p>
       )}
 
       {/* TV MODE — the host is the screen being mirrored, so the switch lives with it */}
       <div className="mt-3 flex items-center justify-between gap-2 border-t border-white/10 pt-3">
-        <span className="text-[10px] leading-snug text-white/55">{displayBanner(display)}</span>
+        <span className="text-[12px] leading-snug text-white/55">{displayBanner(display)}</span>
         <button
           type="button"
           data-testid="tv-mode-toggle"
           onClick={toggleTv}
-          className={`shrink-0 rounded-md border px-2 py-1 text-[10px] font-bold ${display.mode === 'mirrored' ? 'border-[#00E5FF] text-[#00E5FF]' : 'border-white/25 text-white/70'}`}
+          className={`shrink-0 rounded-md border px-2 py-1 text-[12px] font-bold ${display.mode === 'mirrored' ? 'border-[#00E5FF] text-[#00E5FF]' : 'border-white/25 text-white/70'}`}
         >
           {display.mode === 'mirrored' ? 'TV MODE ON' : 'TV MODE OFF'}
         </button>
       </div>
-      <p className="mt-1 text-[10px] text-white/30">AirPlay / screen mirroring? Turn it on — applies from the next attempt.</p>
+      <p className="mt-1 text-[12px] text-white/50">AirPlay / screen mirroring? Turn it on — applies from the next attempt.</p>
 
       <div className="mt-3 border-t border-white/10 pt-3">
-        <p className="text-white/40">
+        <p className="text-white/50">
           PLAYERS {connected.length}/{config.maxPlayers}
         </p>
         {peers.length === 0 && (
-          <p className="mt-2 text-white/30">Scan the code with a phone to join.</p>
+          <p className="mt-2 text-white/50">Scan the code with a phone to join.</p>
         )}
         <ul className="mt-2 space-y-1">
           {peers.map((p) => (
             <li key={p.peerId} className="flex items-center justify-between">
-              <span className={p.connected ? 'text-white' : 'text-white/35'}>
+              <span className={p.connected ? 'text-white' : 'text-white/50'}>
                 {p.slot !== null ? `P${p.slot + 1} ` : ''}{p.name}
               </span>
               <span className={p.connected ? 'text-[#22d3ee]' : 'text-[#ff6b3d]'}>
@@ -288,7 +288,7 @@ function Stack({ children, anchor }: { children: React.ReactNode; anchor: string
 
 function Steps({ steps }: { steps: readonly string[] }) {
   return (
-    <ol className="mt-1.5 space-y-1 text-[10px] leading-snug text-white/75">
+    <ol className="mt-1.5 space-y-1 text-[12px] leading-snug text-white/75">
       {steps.map((s, i) => (
         <li key={i} className="flex gap-1.5"><span className="text-[#00E5FF]">{i + 1}.</span><span>{s}</span></li>
       ))}
@@ -302,7 +302,7 @@ function Badge({ children, tone, onClick }: { children: React.ReactNode; tone: s
       role={onClick ? 'button' : undefined}
       data-testid="host-lobby-badge"
       onClick={onClick}
-      className={`${onClick ? 'pointer-events-auto cursor-pointer hover:bg-white/10' : 'pointer-events-none'} rounded-full border px-3 py-1 font-mono text-[10px]`}
+      className={`${onClick ? 'pointer-events-auto inline-flex min-h-[44px] cursor-pointer items-center hover:bg-white/10' : 'pointer-events-none py-1'} rounded-full border px-3 font-mono text-[12px]`}
       style={{ borderColor: `${tone}55`, color: tone, background: '#000000aa' }}
     >
       {children}

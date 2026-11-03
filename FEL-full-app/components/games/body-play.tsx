@@ -217,7 +217,7 @@ export function SpaceCheckPanel({ onStart, variant = 'ready' }: { onStart: () =>
             <ul className="flex flex-wrap justify-center gap-x-4 gap-y-1">
               {session.lines.map((l) => (
                 <li key={`${l.move}-${l.verb}`} className="text-[12px] text-white/70">
-                  {l.move} <span className="font-mono text-[10px] font-bold uppercase text-[#00E5FF]">{l.verb}</span>
+                  {l.move} <span className="font-mono text-[12px] font-bold uppercase text-[#00E5FF]">{l.verb}</span>
                 </li>
               ))}
             </ul>
@@ -227,7 +227,7 @@ export function SpaceCheckPanel({ onStart, variant = 'ready' }: { onStart: () =>
         </div>
       )}
 
-      <p className="max-w-xl text-[11px] leading-snug text-white/45">{PRIVACY_LINE}</p>
+      <p className="max-w-xl text-[12px] leading-snug text-white/50">{PRIVACY_LINE}</p>
       <div className="flex flex-wrap items-center justify-center gap-2">
         <button type="button" onClick={(e) => { e.currentTarget.blur(); onStart(); }}
           className="rounded-2xl bg-white px-6 py-2.5 text-sm font-black text-black">{variant === 'paused' ? 'RESUME' : 'TAP TO START'}</button>
@@ -265,13 +265,13 @@ export function BodyPlayReady({ tint, onStart }: { tint: string; onStart: () => 
   const [remembered, setRemembered] = useState(false);
   useEffect(() => { setRemembered(key ? bodyPlay.remembered(key) : false); }, [key, view.stage]);
   if (offer === null) return null;
-  if (offer === 'coming') return <p className="text-[11px] tracking-wide text-white/45">{COMING_COPY}</p>;
+  if (offer === 'coming') return <p className="text-[12px] tracking-wide text-white/50">{COMING_COPY}</p>;
   if (view.grownUp === 'ask') return <BodyGrownUp />;
   const on = view.stage === 'starting' || view.stage === 'checking' || view.stage === 'set';
   if (on && view.collapsed) {
     return (
       <button type="button" onClick={() => bodyPlay.collapse(false)}
-        className="rounded-full border border-[#00FF9D]/50 px-3 py-1 text-[11px] font-bold text-[#00FF9D]">Body play on · Show</button>
+        className="rounded-full border border-[#00FF9D]/50 px-3 py-1 text-[12px] font-bold text-[#00FF9D]">Body play on · Show</button>
     );
   }
   if (on) return <SpaceCheckPanel onStart={onStart} variant="ready" />;
@@ -283,8 +283,8 @@ export function BodyPlayReady({ tint, onStart }: { tint: string; onStart: () => 
         style={remembered ? { background: tint } : { borderColor: tint }}>
         {PLAY_WITH_BODY}
       </button>
-      <p className="text-[11px] text-white/55">{CAMERA_NOTE}</p>
-      {view.stage === 'error' && view.camera.why && <p className="max-w-xs text-[11px] text-rose-300">{view.camera.why}</p>}
+      <p className="text-[12px] text-white/55">{CAMERA_NOTE}</p>
+      {view.stage === 'error' && view.camera.why && <p className="max-w-xs text-[12px] text-rose-300">{view.camera.why}</p>}
     </div>
   );
 }
@@ -344,7 +344,7 @@ export function BodyPlayLayer({ phase, onStart }: { phase: ModePhase; onStart: (
       <button type="button" aria-label="Move your self-view" onClick={(e) => { e.currentTarget.blur(); next(); }} className="block w-full">
         <SelfView className="w-full" />
       </button>
-      {line && <p className="rounded bg-black/70 px-1.5 py-0.5 text-center text-[10px] font-bold text-white">{line}</p>}
+      {line && <p className="rounded bg-black/70 px-1.5 py-0.5 text-center text-[12px] font-bold text-white">{line}</p>}
     </div>
   );
 }

@@ -62,7 +62,7 @@ export default function DanceMode({ onPublish, submitLabel = 'Publish Routine' }
           <button key={c.id} onClick={() => addClip(c.id)}
             className="rounded-xl bg-fuchsia-600/20 p-3 text-left text-sm font-semibold text-fuchsia-200 transition hover:bg-fuchsia-600/40">
             {c.name}
-            <span className="mt-1 block text-[11px] font-normal text-neutral-400">{c.beats} beats · lvl {c.difficulty}</span>
+            <span className="mt-1 block text-[12px] font-normal text-neutral-400">{c.beats} beats · lvl {c.difficulty}</span>
           </button>
         ))}
       </div>
@@ -70,16 +70,16 @@ export default function DanceMode({ onPublish, submitLabel = 'Publish Routine' }
       <div className="mb-5 rounded-2xl bg-neutral-900 p-4">
         <div className="mb-2 text-sm font-bold text-neutral-300">Routine ({seq.length})</div>
         {seq.length === 0 ? (
-          <p className="text-sm text-neutral-500">No steps yet — tap clips above to build your routine.</p>
+          <p className="text-sm text-neutral-400">No steps yet — tap clips above to build your routine.</p>
         ) : (
           <ol className="space-y-2">
             {seq.map((s, i) => {
               const clip = DANCE_LIBRARY.find((c) => c.id === s.clipId);
               return (
                 <li key={i} className="flex items-center gap-3 rounded-lg bg-neutral-800 px-3 py-2 text-sm">
-                  <span className="w-8 text-neutral-500">#{i + 1}</span>
+                  <span className="w-8 text-neutral-400">#{i + 1}</span>
                   <span className="flex-1 font-semibold">{clip?.name ?? s.clipId}</span>
-                  <span className="text-neutral-500">beat {s.beat}</span>
+                  <span className="text-neutral-400">beat {s.beat}</span>
                   <button onClick={() => toggleMirror(i)}
                     className={`rounded px-2 py-1 text-xs font-bold ${s.mirrored ? 'bg-cyan-500 text-black' : 'bg-neutral-700 text-neutral-300'}`}>
                     {s.mirrored ? 'MIRRORED' : 'mirror'}

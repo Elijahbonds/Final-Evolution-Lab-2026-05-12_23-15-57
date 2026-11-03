@@ -60,7 +60,7 @@ export function LadderView() {
               <ol className="divide-y divide-white/5">
                 {current.entries.slice(0, 20).map((e) => (
                   <li key={`${e.userId ?? e.name}-${e.rank}`} className={`flex items-center justify-between py-2 font-mono text-sm ${e.isMe ? 'text-[#00E5FF]' : 'text-white/80'}`}>
-                    <span className="flex items-center gap-3"><span className="w-6 text-right text-white/40">{e.rank}</span>{e.name ?? 'Anon'}{e.isMe ? ' · you' : ''}</span>
+                    <span className="flex items-center gap-3"><span className="w-6 text-right text-white/50">{e.rank}</span>{e.name ?? 'Anon'}{e.isMe ? ' · you' : ''}</span>
                     <span className="tabular-nums">{e.bestScore.toLocaleString('en-US')}</span>
                   </li>
                 ))}

@@ -241,7 +241,7 @@ export function CoachChat() {
             placeholder="Ask Coach Bonds anything..."
             rows={1}
             maxLength={AI_CHAT_MAX_CHARS}
-            className="flex-1 resize-none rounded-xl bg-[#16161a] border border-white/10 px-4 py-3 text-sm text-white placeholder-white/30 focus:outline-none focus:border-fel-cyan/40 transition-colors"
+            className="flex-1 resize-none rounded-xl bg-[#16161a] border border-white/10 px-4 py-3 text-sm text-white placeholder-white/50 focus:outline-none focus:border-fel-cyan/40 transition-colors"
             style={{ maxHeight: '120px' }}
             disabled={streaming || ai !== 'available'}
           />
