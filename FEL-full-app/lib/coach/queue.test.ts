@@ -17,7 +17,7 @@ const ALL: QueueSources = {
   reviews: [{ id: 'fr1', clientId: 'r', clientName: 'Ri', programId: 'p-r', exerciseName: 'Goblet squat', status: 'unreviewed', createdAt: iso(3), flags: [{}, {}], presets: [{ id: 'fault:a:cue', text: 'Knees out.' }] }],
   drafts: [{ draftId: 'd1', clientId: 'd', name: 'Di', status: 'ok', changes: [{ id: 'x1', safety: 'safe' }, { id: 'x2', safety: 'safe' }], decisions: {} }],
   redFlags: [{ clientId: 'l', name: 'Lu', view: { date: '2026-10-27', level: 'low', label: 'Running low: sleep' } }],
-  pain: [{ clientId: 'a', name: 'Ab', view: { present: true, detailed: false, label: 'Client paused an exercise' } }],
+  pain: [{ clientId: 'a', name: 'Ab', view: { present: true, detailed: false, label: 'Athlete paused an exercise' } }],
 };
 
 describe('the order: safety first, then decisions, drift, messages and joins', () => {

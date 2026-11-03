@@ -26,6 +26,7 @@ import { LIB_LOOK as LL } from '@/components/library/look';
 import type { LibraryCard } from '@/lib/library/server';
 import { useDeviceLibrary } from './use-device-library';
 import type { AskChip } from '@/lib/library/ask/parse';
+import { ASK_DOOR_CTA, ASK_DOOR_LINE } from '@/lib/program-ask/copy';
 
 type FacetKey = 'pattern' | 'equipment' | 'muscle' | 'level' | 'sport' | 'layer' | 'category' | 'goal';
 interface FacetValue { value: string; label: string; count: number }
@@ -42,6 +43,8 @@ interface AskPayload {
   question: string; chips: AskChip[]; filters: Filters & { equipmentOnly?: boolean }; text: string; intent: string;
   results: LibraryCard[]; total: number; plan: { slot: string; minutes: number; entry: LibraryCard }[] | null;
   anchor: { id: string; name: string } | null; safety: string[] | null; relaxed: string[]; ai: { used: boolean; why: string | null }; didYouMean: string | null;
+  /** PROGRAM-ASK (2026-11-02): the question asks for a whole program — the door to Build my program. */
+  program?: { href: string } | null;
 }
 
 const FACET_TITLES: Record<FacetKey, string> = {
@@ -235,6 +238,11 @@ export function LibraryBrowser({ onUse, onAdded, canAdd = false, title }: {
               <AlertTriangle className="h-4 w-4 text-[#FFD700]" aria-hidden="true" />
               {ask.safety.map((s) => <p key={s}>{s}</p>)}
             </div>
+          )}
+          {ask.program && (
+            <a href={ask.program.href} data-testid="ask-program-door" className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-[#00E5FF]/40 bg-[#00E5FF]/[0.08] px-3 py-2 text-sm text-white">
+              <span>{ASK_DOOR_LINE}</span><span className="font-semibold text-[#00E5FF]">{ASK_DOOR_CTA} →</span>
+            </a>
           )}
           <div className="flex flex-wrap items-center gap-1.5" data-testid="ask-chips">
             <span className="text-[11px] text-white/40">Read as:</span>

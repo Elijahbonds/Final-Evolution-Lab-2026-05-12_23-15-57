@@ -2,6 +2,7 @@
 // COACH-BUSINESS: /coach/business — the coach runs their business here: Free or Pro, payments (Stripe Connect), the
 // public profile and marketplace opt-in, packages, sales and refunds, applications, and client-approved results.
 // Every number and switch shown comes from GET /api/coach/business; nothing is decided in the browser.
+import { BusinessTodo } from '@/components/coach-tools/business-todo';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import type { Dashboard } from '@/lib/coach-business/dashboard';
@@ -63,6 +64,8 @@ export function BusinessDashboard({ api = DASHBOARD_API }: { api?: string }) {
       </header>
       {note ? <p role="status" className="rounded-xl border border-white/10 bg-white/[0.05] px-3 py-2 text-sm">{note}</p> : null}
       {!d.ready ? <p className={card}>Packages, payments and the marketplace are not set up yet. Your profile still saves.</p> : null}
+      {/* COACH-TOOLS-EASY (2026-11-02): what is left, first; each a jump to its card below (no card changed) */}
+      <BusinessTodo d={d} />
       <PlanCard d={d} api={api} onNote={setNote} />
       <PaymentsCard d={d} api={api} onNote={setNote} />
       {d.ready && d.disputes?.length ? <DisputesCard d={d} api={api} onNote={setNote} /> : null}

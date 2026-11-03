@@ -1069,6 +1069,22 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/hoops/contactPoses.ts CHEST_LEAN_DEG',
     hint: 'How far the defender\'s chest leans into the handler at full contact.',
   },
+  // ── gameplay-clean (2026-10-28): what blocks the camera's view of the hero goes see-through (every mode but the hoops lanes') ──
+  {
+    id: 'camera.occluderFadeAlpha', label: 'Blocking prop: fades to', def: 0.25, min: 0, max: 1, step: 0.05, unit: '', group: 'Camera · occluders',
+    source: 'lib/babylon/core/OccluderFade.ts OCCLUDER_FADE_ALPHA',
+    hint: 'How see-through a pole, tree or wall gets while it stands between the camera and you. 1 = never fades.',
+  },
+  {
+    id: 'camera.occluderFadeSec', label: 'Blocking prop: fade time', def: 0.18, min: 0, max: 1, step: 0.02, unit: 's', group: 'Camera · occluders',
+    source: 'lib/babylon/core/OccluderFade.ts OCCLUDER_FADE_SEC',
+    hint: 'How quickly it fades out, and back in.',
+  },
+  {
+    id: 'camera.occluderHoldSec', label: 'Blocking prop: stays faded', def: 0.4, min: 0, max: 2, step: 0.05, unit: 's', group: 'Camera · occluders',
+    source: 'lib/babylon/core/OccluderFade.ts OCCLUDER_HOLD_SEC',
+    hint: 'How long after it stops blocking before it comes back (stops a pole flickering as the camera sweeps past).',
+  },
   // hoops-p03 (1v1/3v3 phase 3 "rivals that play basketball"): the 1v1 rival's kit and reads (hoops/rivalOffense), the 3v3 team offence
   // (hoops/teamOffense3v3). Every default is this lane's; the owner has felt none of them.
   {
