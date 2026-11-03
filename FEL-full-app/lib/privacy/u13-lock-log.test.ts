@@ -103,10 +103,16 @@ const UA = 'AgeScreenTest/1.0';
 // GROUP-BOOKING (lane/group-booking, 2026-11-02) prisma/pending/2026-11-02-group-booking.sql (pending SQL only; schema.prisma
 // untouched; GroupGym + GroupTrainer + GroupClass + GroupPass + GroupSeat + GroupWaitlist + InPersonSession, additive raw
 // SQL) at 58ac9a29, the lane commit carrying it on top of every file above.
+// PROGRAM-ASK-2 (lane/program-ask-2, 2026-11-03) prisma/pending/2026-11-03-program-ask.sql (pending SQL only; schema.prisma
+// untouched; AskedProgram, additive) at 115a8eaf; pinned at cc22c276, this lane's merge of lane/program-ask (finish-release at
+// 6a3933ba), the first commit carrying every pending file above.
+// MERGE (coordinator, 2026-11-03): lane/program-ask-2 + finish-release (group-booking): both pending files; pinned at the merge.
 // TEACHER PLATFORM (lane/plat-p10, 2026-11-03) prisma/pending/2026-11-03-teacher.sql (pending SQL only; schema.prisma
 // untouched; TeacherApplication + TeacherRole + TeachCourse, additive) at 882bf0f9, the lane commit carrying it on top of
 // every file above.
-const PARENT = '882bf0f9c8fb3b2ca7a125e04323b81c9275dd42';
+// Both lanes merged at MERGE_SHA (lane/plat-p10's merge of lane/finish-release), the first commit carrying every pending
+// file above.
+const PARENT = 'f093256cb2b4266f4a687d4f5440d60d81614e3f';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {

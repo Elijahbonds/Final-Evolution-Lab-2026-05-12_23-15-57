@@ -18,4 +18,10 @@ export const PROPPED_LOOPS = {
   ex_back_wall_arm_raise: 'wallback', ex_wall_chin_tuck: 'wallback', ex_wall_slide_liftoff: 'wall', ex_box_jump: 'box', ex_drop_landing: 'stepbox',
   ex_seated_breathe: 'seat', ex_incline_scap_push_up: 'handbench', ex_supported_sl_rdl: 'dowel', ex_hip_airplane: 'dowel', ex_copenhagen_knee: 'cphbench', ex_copenhagen_raise_knee: 'cphbench', ex_calf_smr: 'roller', ex_piriformis_smr: 'rollerseat',
   ex_decline_press: 'decline', ex_decline_fly: 'decline', ex_decline_fly_one: 'decline', ex_decline_skull: 'decline', ex_decline_skull_one: 'decline',
+  // exerciseWarmup.ts (DEMO-LOOPS-4): the wall the calf rock and the Wake-Up's locks lean on; the door post and the doorway
+  ex_wall_calf_rock: 'wall', ex_wall_locks: 'wall', ex_doorway_chest_rock: 'doorpost', ex_door_row: 'doorway',
+  // exerciseFamilies.ts (DEMO-LOOPS-4): the bar the hanging raises hang from, the parallel bars the knee raise holds itself up on
+  ex_hang_leg_raise: 'pullbar', ex_hang_pike: 'pullbar', ex_bar_leg_raise: 'dipbars',
+  // exerciseAsks.ts: the seat the one-leg calf raise sits on; the box the push-off (in front) and the stride jumps (beside) drive up from
+  ex_seated_calf_one: 'seat', ex_box_pushoff: 'box', ex_stride_jump: 'boxside', ex_stride_jump_cross: 'boxside',
 } as const satisfies Record<string, string>;

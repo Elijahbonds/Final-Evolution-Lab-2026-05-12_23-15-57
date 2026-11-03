@@ -23,6 +23,8 @@ export interface ProgramRequest {
   equipment: EquipmentId[];
   /** The band's tension when they said it; null = not said (read as one medium band: an assumption, said so). */
   tension: BandTension | null;
+  /** PROGRAM-ASK-2: the band SET when they have more than one ("light, medium and heavy bands"); [] = one band. */
+  bands: BandTension[];
   goal: ProgramGoal;
   sport: SportTag | null;
   /** 2–6. */
@@ -38,7 +40,7 @@ export interface ProgramRequest {
 }
 
 /** What the person typed, field by field, versus what was filled in (an assumption, said so). */
-export type RequestField = 'equipment' | 'tension' | 'goal' | 'days' | 'minutes' | 'level' | 'weeks' | 'age';
+export type RequestField = 'equipment' | 'tension' | 'bands' | 'goal' | 'days' | 'minutes' | 'level' | 'weeks' | 'age';
 
 export interface ProgramChip {
   field: RequestField;

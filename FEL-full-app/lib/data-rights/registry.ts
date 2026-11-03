@@ -337,6 +337,8 @@ export const REGISTRY: Record<string, TableRights> = {
   // SIGNATURE-PROGRAMS (#451)
   SignatureEnrollment: { subjects: [{ col: 'userId', export: true, erase: 'delete', why: "The athlete's place in a signature program: the sessions done and the plan's adaptations. Their own training data." }] },
   SignatureProgramReview: { subjects: [{ col: 'reviewerId', export: OTHERS, erase: 'nullify', why: "The owner's review of FEL's own program (one row per program); the program stays, the reviewer is no longer named." }] },
+  // PROGRAM-ASK-2 (lane/program-ask-2; prisma/pending/2026-11-03-program-ask.sql). Adults only; no health answer or body number.
+  AskedProgram: { subjects: [{ col: 'userId', export: true, erase: 'delete', why: "The person's own asked-for training plan: the ask, the chips they changed, the sessions done and the checkpoint answers. Their own training data." }] },
   // TEAMS-SQUADS (#441)
   TrainingGroup: { omit: ['inviteToken'], subjects: [{ col: 'ownerId', export: true, erase: 'delete', why: 'An owner cannot leave a group, only delete it (lib/groups/rules.ts); erasing the owner deletes it, and its members and feed cascade.' }] },
   TrainingGroupMember: { subjects: [{ col: 'userId', export: true, erase: 'delete', why: 'Leaves every group.' }] },
