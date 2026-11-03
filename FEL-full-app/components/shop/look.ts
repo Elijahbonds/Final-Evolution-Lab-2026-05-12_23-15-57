@@ -40,6 +40,8 @@ export const SHOP_LOOK = {
   close: 'grid h-11 w-11 shrink-0 place-items-center rounded-full text-fel-soft',
   cta: 'mt-5 [&>[data-fel-primary]]:w-full',
   alert: `${TYPE.small} mt-3 text-amber-200`,
+  // GROUP-BOOKING: the sheet's done line ("Reserved. Pay at the gym …")
+  done: `${TYPE.small} mt-5 font-semibold text-[#7BD389]`,
   // the card's own buy button: the kit's outlined shape (the page's primary stays the one PrimaryCta)
   buy: `${TYPE.label} fel-press mt-3 inline-flex min-h-12 items-center justify-center rounded-full border border-white/25 px-6 text-white`,
 } as const;
