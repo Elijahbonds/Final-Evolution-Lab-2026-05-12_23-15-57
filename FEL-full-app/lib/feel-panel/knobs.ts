@@ -1286,6 +1286,12 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'anim.inertialHalfLifeK', label: 'Inertial offset half-life × fade time', def: 0.5, min: 0.1, max: 1.5, step: 0.05, unit: '×', group: 'Anim · transitions',
     source: 'lib/babylon/anim/inertialize.ts ANIM_INERTIAL_HALF_LIFE_K',
     hint: 'How long the old pose takes to wash out, as a fraction of each clip switch\'s fade time. Only read when inertial transitions are on.',
+  },
+  // CLIP-SMOOTH (2026-11-03, owner: "Yes, smooth them"): the karate captures' own single-frame snaps re-keyed, default ON.
+  {
+    id: 'anim.clipSmooth', label: 'Smooth the snaps inside clips on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Anim · clips',
+    source: 'lib/babylon/anim/clipDesnap.ts CLIP_SMOOTH_ON',
+    hint: 'On: a clip step that snaps a bone 25° or more in one frame is spread over the frames either side (the poses before and after kept). Off: the clips exactly as captured. Takes effect on the next spawn.',
   },  // CAMERA TIP (2026-10-29): the dunk contest's camera fixes (QA items 1-3, 8), default OFF — off is today's framing (2K High feel).
   {
     id: 'cam.dunkFraming', label: 'Dunk camera fixes on (1) / off (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Camera · dunk',
