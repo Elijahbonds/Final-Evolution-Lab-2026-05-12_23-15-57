@@ -33,16 +33,58 @@ const exe = process.env.CHROMIUM_EXE ?? '/opt/pw-browsers/chromium-1194/chrome-l
 
 const INIT = `(() => {
   window.__name = window.__name || ((f) => f);
+  // hoops-p05: A DETERMINISTIC CLOCK. Two runs of one build and seed played different 1v1 sequences (p04b: the first difference was the
+  // spawn's groundSnap, 0.031 vs 0.025 m — the idle clip had run a different time by then, because frames rendered during the async load
+  // advanced the clock). So: (1) until __go(), a frame advances the clock by LOAD_DT_MS (≈ 0: load time cannot move a clip, an AI tick or
+  // a tween), and timers are the browser's (the loaders need them); (2) __go(seed) reseeds Math.random, moves every timer onto the virtual
+  // clock (fired inside the frame, in due order), and holds the page: from then on frames run only when __vtStep says (a count, or
+  // Infinity while an awaited page promise settles: __awaitFrames), so nothing Node does lands on a frame chosen by wall time.
   const realNow = performance.now.bind(performance); window.__realNow = realNow;
-  let vt = realNow(); const raf = window.requestAnimationFrame.bind(window);
+  let vt = 1000; let dtMs = 0.001;   // (a fixed start: absolute times are the same every run) const raf = window.requestAnimationFrame.bind(window);
   performance.now = () => vt;
+  window.__vtStep = null;
+  const seedRandom = (s) => { let t = s >>> 0; Math.random = () => { t += 0x6D2B79F5; let r = Math.imul(t ^ (t >>> 15), 1 | t); r ^= r + Math.imul(r ^ (r >>> 7), 61 | r); return ((r ^ (r >>> 14)) >>> 0) / 4294967296; }; };
+  seedRandom(${SEED});
+  const st = window.setTimeout.bind(window), ct = window.clearTimeout.bind(window), si = window.setInterval.bind(window), ci = window.clearInterval.bind(window);
+  let virt = false; let tid = 1; const timers = []; const pre = new Map();
+  const runTimers = () => {
+    for (let guard = 0; guard < 5000; guard++) {
+      let best = -1;
+      for (let i = 0; i < timers.length; i++) { const x = timers[i]; if (x.due <= vt && (best < 0 || x.due < timers[best].due || (x.due === timers[best].due && x.id < timers[best].id))) best = i; }
+      if (best < 0) return;
+      const x = timers[best];
+      if (x.every) x.due += x.every; else timers.splice(best, 1);
+      try { if (typeof x.fn === 'function') x.fn(...x.a); } catch (e) { console.warn('[HG-TIMER] ' + String(e && e.message || e).slice(0, 160)); }
+    }
+  };
+  window.setTimeout = (fn, ms, ...a) => {
+    const id = tid++;
+    if (virt) { timers.push({ id, due: vt + Math.max(0, Number(ms) || 0), fn, a, every: 0 }); return id; }
+    const e = { fn, a, every: 0 }; pre.set(id, e); e.real = st(() => { pre.delete(id); if (typeof fn === 'function') fn(...a); }, ms === 20000 ? 300000 : ms); return id;
+  };
+  window.setInterval = (fn, ms, ...a) => {
+    const id = tid++; const every = Math.max(1, Number(ms) || 0);
+    if (virt) { timers.push({ id, due: vt + every, fn, a, every }); return id; }
+    const e = { fn, a, every }; pre.set(id, e); e.real = si(() => { if (typeof fn === 'function') fn(...a); }, ms); return id;
+  };
+  window.clearTimeout = window.clearInterval = (id) => { const i = timers.findIndex((x) => x.id === id); if (i >= 0) timers.splice(i, 1); const e = pre.get(id); if (e) { if (e.every) ci(e.real); else ct(e.real); pre.delete(id); } };
   let lastTs = -1;
-  window.requestAnimationFrame = (cb) => raf((ts) => { if (ts !== lastTs) { lastTs = ts; vt += 1000 / 60; } cb(vt); });
-  { let t = ${SEED} >>> 0; Math.random = () => { t += 0x6D2B79F5; let r = Math.imul(t ^ (t >>> 15), 1 | t); r ^= r + Math.imul(r ^ (r >>> 7), 61 | r); return ((r ^ (r >>> 14)) >>> 0) / 4294967296; }; }
-  const st = window.setTimeout.bind(window);
-  window.setTimeout = (fn, ms, ...a) => st(fn, ms === 20000 ? 300000 : ms, ...a);
-  { const si = window.setInterval.bind(window);
-    window.setInterval = (fn, ms, ...a) => { let last = performance.now(); const want = Math.max(1, Number(ms) || 0); return si(() => { const n = performance.now(); if (n - last >= want) { last = n; fn(...a); } }, Math.min(want, 50)); }; }
+  const tick = (ts) => {
+    if (ts === lastTs) return true;
+    if (window.__vtStep !== null && !(window.__vtStep > 0)) return false;
+    lastTs = ts; vt += dtMs;
+    if (window.__vtStep !== null && window.__vtStep !== Infinity) window.__vtStep--;
+    if (virt) runTimers();
+    return true;
+  };
+  window.requestAnimationFrame = (cb) => { const w = (ts) => { if (!tick(ts)) { raf(w); return; } cb(vt); }; return raf(w); };
+  window.__go = (seed) => {
+    if (vt > 1010) console.warn('[HG-CLOCK] the load ran ' + (vt - 1000).toFixed(3) + ' ms of clock: the go time is not fixed');
+    vt = Math.max(vt, 1010); dtMs = 1000 / 60; virt = true;
+    for (const [id, e] of pre) { if (e.every) { ci(e.real); timers.push({ id, due: vt + e.every, fn: e.fn, a: e.a, every: e.every }); } else { ct(e.real); timers.push({ id, due: vt, fn: e.fn, a: e.a, every: 0 }); } }
+    pre.clear(); seedRandom(seed); window.__vtStep = 0; return vt;
+  };
+  window.__awaitFrames = async (p) => { window.__vtStep = Infinity; try { return await p; } finally { window.__vtStep = 0; } };
   window.__LOG = [];
   for (const k of ['info', 'log', 'warn']) { const o = console[k].bind(console); console[k] = (...a) => { try { const m = a.map((x) => (typeof x === 'string' ? x : String(x))).join(' '); if (/^\\[[0-9A-Z][0-9A-Z-]*\\]/.test(m) && window.__LOG.length < 40000) window.__LOG.push({ f: window.__frameNo || 0, t: performance.now(), m: m.slice(0, 240) }); } catch (e) {} o(...a); }; }
 })()`;
@@ -54,7 +96,9 @@ const pageErrs = []; page.on('pageerror', (e) => pageErrs.push(String(e).slice(0
 await page.addInitScript(INIT);
 const ev = (fn, arg) => page.evaluate(fn, arg);
 const gameNow = () => ev(() => performance.now());
-const waitGame = async (ms) => { const t0 = await gameNow(); for (;;) { if ((await gameNow()) - t0 >= ms) return; await new Promise((r) => setTimeout(r, 200)); } };
+let GO = false;   // hoops-p05: after __go the page runs only the frames asked for
+const runFrames = async (n) => { await ev((k) => { window.__vtStep = k; }, Math.max(1, Math.round(n))); for (;;) { const v = await ev(() => window.__vtStep); if (!(v > 0)) return; await new Promise((r) => setTimeout(r, 15)); } };
+const waitGame = async (ms) => { if (GO) return runFrames(ms * 60 / 1000); const t0 = await gameNow(); for (;;) { if ((await gameNow()) - t0 >= ms) return; await new Promise((r) => setTimeout(r, 200)); } };
 const start = () => ev(() => { window.__bus?.emit({ t: 'button', btn: 'START', pressed: true }); window.__bus?.emit({ t: 'button', btn: 'START', pressed: false }); });
 const seamOk = () => ev((m) => !!window.__FEL_DEV__?.scene?.metadata?.[m], MODE).catch(() => false);
 const FEELQ = process.env.FEEL ? `&feel=${encodeURIComponent(process.env.FEEL)}` : '';   // hoops-p01: feel-panel values for the run
@@ -68,6 +112,7 @@ for (let i = 0; i < 300; i++) { const ph = await ev(() => window.__phase); if (p
 const loadWallS = (Date.now() - T0) / 1000;
 await ev((c) => { window.__HG_CFG = Object.assign(window.__HG_CFG || {}, c); }, { noPoke: process.env.BOT_NOPOKE === '1', clipLog: !!process.env.POP_LIST, stageLog: !!process.env.POP_LIST });   // hoops-p04: BOT_NOPOKE=1, the bot never reaches (a possession plays out to its shot)
 say('playing after ' + loadWallS.toFixed(0) + ' s wall; page.js: ' + await ev(fs.readFileSync(path.join(HERE, 'page.js'), 'utf8')));
+await ev((sd) => window.__go(sd), SEED); GO = true;   // hoops-p05: the deterministic clock from here (see INIT)
 const shot = async (name) => { const f = path.join(SHOTS, `${MODE}-${name}.png`); await page.screenshot({ path: f }).catch(() => {}); return f; };
 const saveStrip = async (name) => { const urls = await ev((n) => window.__hg.strips[n] || [], name); const dir = path.join(SHOTS, `strip-${MODE}-${name}`); fs.mkdirSync(dir, { recursive: true }); urls.forEach((u, i) => { if (u) fs.writeFileSync(path.join(dir, `${String(i).padStart(2, '0')}.jpg`), Buffer.from(u.split(',')[1], 'base64')); }); return urls.length; };
 
@@ -105,7 +150,7 @@ async function possLoop() {
     await ev(() => { window.__hg.bot.on = true; window.__hg.autoStrip = true; });
     let endAt = null;
     for (;;) {
-      await new Promise((r) => setTimeout(r, 1500));
+      await runFrames(90);   // hoops-p05: 1.5 s of game, not of wall
       const st = await ev((a) => { const L = window.__LOG || []; const since = L.filter((l) => l.f >= a[0]); const pc = window.__hg.possCode(); return { pc, shot: since.some((l) => new RegExp(a[1] === 'def' ? 'rival release|rival dunk|swat at k|my block read' : 'my release|blocked at the release|drive contest|mate shot').test(l.m)), over: since.some((l) => /strip by the ai|ai reach resolve strip|STOLEN|resetPossession|charge|REF\]/.test(l.m)) }; }, [f0, side]);
       const g = (await gameNow()) - t0;
       if (endAt === null && (st.shot || st.over || (side === 'def' ? st.pc === 1 : st.pc === 2))) endAt = g + TAIL;
@@ -125,7 +170,7 @@ if (SCEN === 'game') {
   await ev(() => { window.__hg.start(); window.__hg.bot.on = true; window.__hg.autoStrip = true; });   // hoops-p02: auto-strips on block / strip events
   const t0 = await gameNow(); let nextShot = 0; let k = 0;
   for (;;) {
-    await new Promise((r) => setTimeout(r, 1500));
+    await runFrames(90);   // hoops-p05: 1.5 s of game, not of wall
     const g = ((await gameNow()) - t0) / 1000;
     const st = await ev((m) => { const s = window.__FEL_DEV__.scene.metadata[m]; return { ended: !!(s.ended && s.ended()), ph: window.__phase, hud: window.__hudNow }; }, MODE);
     if (g >= nextShot) { await shot(`game-${String(k++).padStart(2, '0')}`); nextShot += GAME_S / 8; }
@@ -149,7 +194,7 @@ if (SCEN === 'game') {
   const S = (fn, arg) => ev(fn, arg);
   const setOff = () => S((m) => { const s = window.__FEL_DEV__.scene.metadata[m]; s.offense(); }, MODE);
   const setDef = () => S((m) => { const s = window.__FEL_DEV__.scene.metadata[m]; s.defend(); }, MODE);
-  const T = (name, arg) => ev(([n, a]) => window.__hg.test[n](a), [name, arg]);
+  const T = (name, arg) => ev(([n, a]) => window.__awaitFrames(window.__hg.test[n](a)), [name, arg]);   // hoops-p05: frames run until it settles, then hold
   // hoops-p01: a big play (an ankle break) cuts to a REPLAY on the next dead ball, and a press made during it has no game to land in
   // (the before run lost two jog flicks to one) — wait it out before a press
   const noReplay = async () => { for (let i = 0; i < 20; i++) { const busy = await ev(() => { const L = window.__LOG || []; const f = window.__frameNo || 0; return L.some((l) => /\[HOOPS-REPLAY\]/.test(l.m) && f - l.f < 360); }); if (!busy) return; await waitGame(500); } };
