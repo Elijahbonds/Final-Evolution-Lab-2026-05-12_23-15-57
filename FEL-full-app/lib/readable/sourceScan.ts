@@ -26,6 +26,13 @@ export function scanFontSizes(src: string, floor: number = READABLE.minPx): Size
     const px = m[3] === 'rem' ? Number(m[2]) * 16 : Number(m[2]);
     if (px < floor) out.push({ line: lineAt(src, m.index!), match: m[1], px });
   }
+  // text-[clamp(MIN,…,MAX)] is at least MIN; text-[min(a,b)] is at most its px term; text-[max(a,b)] at least its px term
+  for (const m of src.matchAll(/(?<![\w-])((?:[a-z0-9-]+:)*!?text-\[(min|clamp|max)\(([^\]]*)\)\])/g)) {
+    const px = [...m[3].matchAll(/(\d+(?:\.\d+)?)(px|rem)/g)].map((x) => (x[2] === 'rem' ? Number(x[1]) * 16 : Number(x[1])));
+    if (!px.length) continue;
+    const bound = m[2] === 'clamp' ? px[0] : m[2] === 'min' ? Math.min(...px) : Math.max(...px);
+    if (bound < floor) out.push({ line: lineAt(src, m.index!), match: m[1], px: bound });
+  }
   for (const m of src.matchAll(/\bfontSize:\s*(?:(\d+(?:\.\d+)?)|['"`](\d+(?:\.\d+)?)(px|rem)['"`])(?=\s*[,}\n])/g)) {
     const px = m[1] != null ? Number(m[1]) : m[3] === 'rem' ? Number(m[2]) * 16 : Number(m[2]);
     if (px < floor) out.push({ line: lineAt(src, m.index!), match: m[0], px });

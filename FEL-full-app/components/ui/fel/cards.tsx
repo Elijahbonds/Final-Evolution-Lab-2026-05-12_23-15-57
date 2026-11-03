@@ -74,7 +74,7 @@ export function ListRow({
       ) : null}
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className={`${TYPE.body} truncate font-semibold text-white`}>{title}</span>
-        {line && <span className={`${TYPE.small} truncate text-fel-dim`}>{line}</span>}
+        {line && <span className={`${TYPE.small} line-clamp-2 text-fel-dim`}>{line}</span>}
       </span>
       {trailing ?? <ChevronRight aria-hidden className="h-5 w-5 shrink-0 text-fel-quiet transition-transform group-hover:translate-x-0.5" />}
     </Link>

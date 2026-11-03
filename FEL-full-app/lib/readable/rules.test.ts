@@ -108,6 +108,10 @@ describe('the source scanner', () => {
       <i style={{ fontSize: '11px', lineHeight: 1 }}/> <b style={{ fontSize: 14 }}/>`;
     expect(scanFontSizes(src).map((f) => f.match)).toEqual(['text-[10px]', 'md:text-[11px]', '!text-[9.5px]', 'text-[0.6rem]', 'fontSize: 10', "fontSize: '11px'"]);
   });
+  it('reads the floor of a clamp(), the ceiling of a min() and the floor of a max()', () => {
+    const src = 'text-[clamp(28px,8vw,44px)] text-[min(2.4vh,11px)] text-[clamp(10px,2vw,14px)] text-[max(12px,1vw)] text-[min(3.2vh,16px)]';
+    expect(scanFontSizes(src).map((f) => f.match)).toEqual(['text-[min(2.4vh,11px)]', 'text-[clamp(10px,2vw,14px)]']);
+  });
   it('judges a text colour on the dark surfaces; ignores dark ink, disabled variants and non-colours', () => {
     const src = 'text-white/40 text-white/60 text-white text-black text-fel-bg disabled:text-white/30 text-center text-sm text-neutral-500 placeholder:text-white/30 text-fel-dim';
     expect(scanTextColours(src).map((f) => f.match)).toEqual(['text-white/40', 'text-neutral-500', 'placeholder:text-white/30']);

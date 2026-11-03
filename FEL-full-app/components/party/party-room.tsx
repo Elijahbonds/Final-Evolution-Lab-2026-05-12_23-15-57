@@ -190,7 +190,7 @@ function Lobby({ room, qr, origin, share, shared }: { room: Room; qr: string | n
 
         <div className="flex min-h-0 flex-col gap-[2vh]">
           {/* PLAYERS */}
-          <section data-testid="party-seats" className="grid grid-cols-4 gap-[1.2vh]">
+          <section data-testid="party-seats" className="grid grid-cols-2 gap-[1.2vh] sm:grid-cols-4">
             {Array.from({ length: PARTY_CAPACITY }, (_, i) => {
               const s = table.seats[i];
               return s ? <SeatCard key={s.key} seat={s} inGame={i < mode.maxPlayers} onRemove={() => room.removeSeat(s)} /> : <EmptySeat key={`empty-${i}`} index={i} hasPads={room.pads.length > 0} />;
@@ -267,7 +267,7 @@ function EmptySeat({ index, hasPads }: { index: number; hasPads: boolean }) {
   return (
     <div data-testid={`party-seat-empty-${index + 1}`} className="rounded-xl border border-dashed border-white/15 p-[1.3vh]">
       <span className="font-mono text-[min(3.2vh,16px)] font-black" style={{ color: `${SEAT_COLORS[index]}66` }}>P{index + 1}</span>
-      <p className="mt-0.5 text-[min(2.4vh,11px)] leading-snug text-white/50">{openSeatHint(hasPads)}</p>
+      <p className="mt-0.5 text-[12px] leading-snug text-white/60">{openSeatHint(hasPads)}</p>
     </div>
   );
 }
