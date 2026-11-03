@@ -1,6 +1,15 @@
 -- TEACHER PLATFORM v1 (platform phase 10, lane plat-p10, 2026-11-03; owner 2026-10-20: "One teacher role granted by owner
 -- approval (Camp-certified qualify automatically)"; courses free first).
 -- ADDITIVE ONLY: three new tables, their indexes and three foreign keys. No existing table or column is changed or dropped.
+-- RE-RUNNABLE (hardening 2026-11-03, AM gate on finish-release 05c73483): CREATE ... IF NOT EXISTS, and each foreign key and
+-- policy sits in a one-line DO block that checks the catalog first, so a second run changes nothing. Each DO block is kept on
+-- ONE line on purpose: tests/helpers/prismaDdl.ts splits statements on a `;` at the end of a line.
+-- ROW-LEVEL SECURITY: the app reads and writes these tables only on the server through Prisma (DATABASE_URL, the table
+-- owner, which RLS does not restrict without FORCE). There is no Supabase client and no browser access, and user ids are
+-- NextAuth TEXT ids, not auth.uid(). So the least privilege is: RLS on, no policy that opens anything, an explicit deny
+-- for anon and authenticated, and their table grants revoked. The Supabase API (PostgREST) then sees nothing.
+-- ADULTS ONLY (18+) stays in app code (lib/teach/apply.ts). User.dobYear is a nullable, year-only self-attestation, so a
+-- database check could not tell an 18th birthday apart from a 17-year-old, and it would block a null year. No DB check is added.
 --
 -- WHAT IS STORED.
 --   TeacherApplication — one row per application: the discipline (lib/teach/apply.ts DISCIPLINES), a bio, a teaching
@@ -84,9 +93,10 @@
 -- lib/data-rights/registry.ts (export and erase).
 --
 -- ROLLBACK (loses every application, role and course): DROP TABLE "TeachCourse"; DROP TABLE "TeacherRole"; DROP TABLE "TeacherApplication";
+-- (dropping a table drops its policies with it)
 
 -- CreateTable
-CREATE TABLE "TeacherApplication" (
+CREATE TABLE IF NOT EXISTS "TeacherApplication" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "discipline" TEXT NOT NULL,
@@ -103,7 +113,7 @@ CREATE TABLE "TeacherApplication" (
 );
 
 -- CreateTable
-CREATE TABLE "TeacherRole" (
+CREATE TABLE IF NOT EXISTS "TeacherRole" (
     "userId" TEXT NOT NULL,
     "source" TEXT NOT NULL,
     "grantedBy" TEXT,
@@ -114,7 +124,7 @@ CREATE TABLE "TeacherRole" (
 );
 
 -- CreateTable
-CREATE TABLE "TeachCourse" (
+CREATE TABLE IF NOT EXISTS "TeachCourse" (
     "id" TEXT NOT NULL,
     "teacherId" TEXT NOT NULL,
     "title" TEXT NOT NULL,
@@ -129,22 +139,40 @@ CREATE TABLE "TeachCourse" (
 );
 
 -- CreateIndex
-CREATE INDEX "TeacherApplication_status_createdAt_idx" ON "TeacherApplication"("status", "createdAt");
+CREATE INDEX IF NOT EXISTS "TeacherApplication_status_createdAt_idx" ON "TeacherApplication"("status", "createdAt");
 
 -- CreateIndex
-CREATE INDEX "TeacherApplication_userId_idx" ON "TeacherApplication"("userId");
+CREATE INDEX IF NOT EXISTS "TeacherApplication_userId_idx" ON "TeacherApplication"("userId");
 
 -- CreateIndex
-CREATE INDEX "TeachCourse_teacherId_idx" ON "TeachCourse"("teacherId");
+CREATE INDEX IF NOT EXISTS "TeachCourse_teacherId_idx" ON "TeachCourse"("teacherId");
 
 -- CreateIndex
-CREATE INDEX "TeachCourse_status_updatedAt_idx" ON "TeachCourse"("status", "updatedAt");
+CREATE INDEX IF NOT EXISTS "TeachCourse_status_updatedAt_idx" ON "TeachCourse"("status", "updatedAt");
 
 -- AddForeignKey
-ALTER TABLE "TeacherApplication" ADD CONSTRAINT "TeacherApplication_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'TeacherApplication_userId_fkey' AND conrelid = '"TeacherApplication"'::regclass) THEN ALTER TABLE "TeacherApplication" ADD CONSTRAINT "TeacherApplication_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE; END IF; END $$;
 
 -- AddForeignKey
-ALTER TABLE "TeacherRole" ADD CONSTRAINT "TeacherRole_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'TeacherRole_userId_fkey' AND conrelid = '"TeacherRole"'::regclass) THEN ALTER TABLE "TeacherRole" ADD CONSTRAINT "TeacherRole_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE; END IF; END $$;
 
 -- AddForeignKey
-ALTER TABLE "TeachCourse" ADD CONSTRAINT "TeachCourse_teacherId_fkey" FOREIGN KEY ("teacherId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'TeachCourse_teacherId_fkey' AND conrelid = '"TeachCourse"'::regclass) THEN ALTER TABLE "TeachCourse" ADD CONSTRAINT "TeachCourse_teacherId_fkey" FOREIGN KEY ("teacherId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE; END IF; END $$;
+
+-- RowLevelSecurity: on, with no policy that grants anything; the server (table owner) is unaffected
+ALTER TABLE "TeacherApplication" ENABLE ROW LEVEL SECURITY;
+
+-- DenyApiRoles: anon and authenticated (Supabase API roles) get no rows and no grants; skipped where the roles do not exist
+DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN REVOKE ALL ON TABLE "TeacherApplication" FROM anon, authenticated; IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = current_schema() AND tablename = 'TeacherApplication' AND policyname = 'TeacherApplication_deny_api') THEN CREATE POLICY "TeacherApplication_deny_api" ON "TeacherApplication" AS RESTRICTIVE FOR ALL TO anon, authenticated USING (false) WITH CHECK (false); END IF; END IF; END $$;
+
+-- RowLevelSecurity: on, with no policy that grants anything; the server (table owner) is unaffected
+ALTER TABLE "TeacherRole" ENABLE ROW LEVEL SECURITY;
+
+-- DenyApiRoles: anon and authenticated (Supabase API roles) get no rows and no grants; skipped where the roles do not exist
+DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN REVOKE ALL ON TABLE "TeacherRole" FROM anon, authenticated; IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = current_schema() AND tablename = 'TeacherRole' AND policyname = 'TeacherRole_deny_api') THEN CREATE POLICY "TeacherRole_deny_api" ON "TeacherRole" AS RESTRICTIVE FOR ALL TO anon, authenticated USING (false) WITH CHECK (false); END IF; END IF; END $$;
+
+-- RowLevelSecurity: on, with no policy that grants anything; the server (table owner) is unaffected
+ALTER TABLE "TeachCourse" ENABLE ROW LEVEL SECURITY;
+
+-- DenyApiRoles: anon and authenticated (Supabase API roles) get no rows and no grants; skipped where the roles do not exist
+DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN REVOKE ALL ON TABLE "TeachCourse" FROM anon, authenticated; IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = current_schema() AND tablename = 'TeachCourse' AND policyname = 'TeachCourse_deny_api') THEN CREATE POLICY "TeachCourse_deny_api" ON "TeachCourse" AS RESTRICTIVE FOR ALL TO anon, authenticated USING (false) WITH CHECK (false); END IF; END IF; END $$;
