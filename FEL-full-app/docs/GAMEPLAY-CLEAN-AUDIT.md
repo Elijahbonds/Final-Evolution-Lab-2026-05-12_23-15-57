@@ -350,6 +350,40 @@ a clip. FootPlanting alone, mounted on the same clip and body headless, does not
 (the posture, foot-plant and carry layers), routed in the lane report: re-keying clips cannot reach them, so the mode-level
 ≥ 70 % target holds for the karate family (7 → 0) and not for derby and football.
 
+## 4e. The runtime pops (lane/gameplay-clean-3), named by A/B and fixed
+
+The pops §4d left (derby, football) are not in any clip. To name the layer, the rig ran each mode with one layer off. It used a dev
+build with `?noplant=1` (new: no foot planting), `?noposture=1` and `?nomotion=1`, 14 s anim-only, same script as §4c/§4d.
+
+| Run | Derby: max thigh turn in a frame | Derby: in-clip hard pops | Football: max hips turn in a frame | Football: in-clip hard pops |
+|---|---|---|---|---|
+| layers on (before) | 62.0° | 5 (stance 3, swing 2) | **178.3°** (`football_spin_move`) | 4 |
+| foot planting off | **2.1°** | **0** | 178.3° | 3 |
+| posture off | 61.8° | 6 | **17.6°** | 4 (no spin) |
+| **after** (two runs) | **19.8° / 19.6°** | **0 / 0** | **18.1° / 18.1°** | 3 / 2 (no spin) |
+
+Hard-pop events in the run (any cause): derby **7 → 2 and 1**, football 10 → 9 and 11.
+
+**Derby: the foot planter** (`anim/FootPlanting.ts`). The layer solves a planted leg with its knee thrown toward the root's forward,
+whatever the target weight. So the first frame it solved, the leg swung from the clip's knee direction to the forward in one frame,
+with the foot unmoved; the batter's stance has its knees open toward the plate. When the pin came within 2 mm of the clip, it swung
+back. **Fix:** the knee pole eases over `anim.plantEngageSec` (0.1 s), from the clip's own knee direction (a solve that changes
+nothing) to the forward, and back when the solve stops. The pin is still solved at full weight, so a plant holds as hard as before
+(S30's tests are unchanged and green). Knob 0 gives back the old layer bit for bit (`rigLayers.equivalence.test`).
+
+**Football: the posture layer's hip strip** (`anim/PostureLayer.ts`). The `spin` window keeps half the clip's hip yaw by stripping
+half of the WRAPPED yaw. At the spin's half-turn, wrap jumps +180° → −180°, so the strip flipped and the hips turned 178° in a frame.
+**Fix:** the strip reads the yaw folded past 90° (`anim.hipYawFold`, on). It is exact up to ±90°, which covers every tuned hip swing,
+and comes back to 0 at ±180°, so it is continuous.
+
+**Left in derby and football:**
+- Derby's bat-flip vault plays `baseball_swing` at 1.7×, so its arms move 25–39° a frame. That is a tuned rate on a clip, not a layer.
+- Football's hurdle onsets (carry → `jump_up`) are blend pops from the clip's own fast first frames, as in §4c.
+- Football's carry **off-arm whips 26–31° a frame** in all four rig runs, with posture or the planter on or off, and at both 1× and
+  1.4× carry rate. It is the authored loop on this body (baked hand IK), routed to clip-smooth.
+- Football's thighs still reach 48–70° a frame at hurdle transitions. With the planter off they reach 29°, so the planter plays a part
+  at a jump. That is the release side at take-off, not the stance case fixed here; it is noted for the next pass.
+
 ## 5. For the dunk and hoops lanes (routed, not changed here)
 
 Measured by the same rig on `/play/dunk`, `/play/onevone` and `/play/threevthree`. The occluder fade is off for these
