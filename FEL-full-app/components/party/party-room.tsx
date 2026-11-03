@@ -157,7 +157,7 @@ function Lobby({ room, qr, origin, share, shared }: { room: Room; qr: string | n
         <p className="hidden font-mono text-[12px] text-white/50 sm:block">Phones are controllers · pads work too · no app, no account</p>
       </header>
 
-      <div className="grid min-h-0 flex-1 grid-cols-[auto_1fr] gap-[2.5vh]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-[2.5vh] sm:grid-cols-[auto_1fr]">
         {/* JOIN — the one thing a friend needs */}
         <section data-testid="party-join" className="flex min-h-0 flex-col items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] p-[2vh]">
           {room.error ? (

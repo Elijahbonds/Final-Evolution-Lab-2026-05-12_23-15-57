@@ -101,6 +101,16 @@ function textRects(el: Element): Rect[] {
   return out;
 }
 
+/** The nearest ancestor (or the element) that clips vertically, as a rect; null if none within a few levels. */
+function clipBoxOf(el: Element): Rect | null {
+  for (let p: Element | null = el, d = 0; p && d < 6; p = p.parentElement, d++) {
+    const oy = getComputedStyle(p).overflowY;
+    if (oy === 'hidden' || oy === 'clip') return rectOf(p.getBoundingClientRect());
+    if (oy === 'auto' || oy === 'scroll') return null;
+  }
+  return null;
+}
+
 /** What hides part of the run: an overflow-hidden / clip box it runs past, an ellipsis, a line clamp. */
 function clipOf(el: Element, box: Rect): Run['clip'] {
   for (let p: Element | null = el, depth = 0; p && p !== document.documentElement && depth < 12; p = p.parentElement, depth++) {
@@ -170,7 +180,10 @@ export function collect(): Run[] {
     seen.add(el);
     if (SKIP.has(el.tagName) || el.closest('[data-readable-ignore]')) continue;
     if (!shown(el)) continue;
-    const rects = textRects(el);
+    // lines a clipping box hides (a line clamp's third line) are not drawn: keep only the lines inside it
+    const box0 = clipBoxOf(el);
+    const allRects = textRects(el);
+    const rects = allRects.filter((r) => !box0 || ((r.top + r.bottom) / 2 >= box0.top && (r.top + r.bottom) / 2 <= box0.bottom));
     if (!rects.length) continue;
     const text = Array.from(el.childNodes).filter((c) => c.nodeType === Node.TEXT_NODE).map((c) => c.textContent).join(' ').replace(/\s+/g, ' ').trim();
     const s = getComputedStyle(el);
@@ -190,7 +203,7 @@ export function collect(): Run[] {
       placeholder: false,
       key: isKeyInfo(text, { tag: el.tagName, role: el.closest('[role="alert"],[role="status"]')?.getAttribute('role') ?? null, inControl: !!control }),
       hud: !!el.closest('[data-readable-hud],[data-hud-frame]'),
-      overMedia: mediaBehind(el, box), occluded: occludedByFixed(el, box), clip: clipOf(el, box), path: pathOf(el),
+      overMedia: mediaBehind(el, box), occluded: occludedByFixed(el, box), clip: clipOf(el, unionOf(allRects)), path: pathOf(el),
     });
   }
   // placeholders that are the only text in an empty field
