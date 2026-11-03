@@ -26,9 +26,11 @@ describe('size', () => {
     expect(sizeMiss(14, { words: 12, phone: true })).toBeNull();   // a supporting line (TYPE.small, ≤ 12 words)
     expect(sizeMiss(16, { words: 40, phone: true })).toBeNull();
   });
-  it('HUD text: 14 px on a phone, 24 px on a 1080p TV', () => {
-    expect(sizeMiss(13, { words: 2, phone: true, hud: 'phone' })).toBe('hud-small');
-    expect(sizeMiss(14, { words: 2, phone: true, hud: 'phone' })).toBeNull();
+  it('HUD lines: 14 px on a phone; all HUD text 24 px on a 1080p TV', () => {
+    expect(sizeMiss(13, { words: 3, phone: true, hud: 'phone' })).toBe('hud-small');   // a line
+    expect(sizeMiss(14, { words: 3, phone: true, hud: 'phone' })).toBeNull();
+    expect(sizeMiss(12, { words: 2, phone: true, hud: 'phone' })).toBeNull();          // a label or value: the 12 px floor
+    expect(sizeMiss(11, { words: 1, phone: true, hud: 'phone' })).toBe('tiny');
     expect(sizeMiss(22.5, { words: 2, phone: false, hud: 'tv' })).toBe('hud-tv-small');
     expect(sizeMiss(27, { words: 2, phone: false, hud: 'tv' })).toBeNull();
   });

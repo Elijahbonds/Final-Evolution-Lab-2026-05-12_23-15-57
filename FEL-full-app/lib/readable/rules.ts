@@ -15,8 +15,9 @@ export const READABLE = {
   bodyPx: TYPE_SIZES_PX.body.phone,
   /** A run of more words than this is body copy, not a label or a supporting line. */
   bodyWords: 12,
-  /** HUD text the player must read during play, on a 390 px phone (zoom 1). */
+  /** HUD text the player must read during play, on a 390 px phone (zoom 1): a LINE of hudLineWords or more. */
   hudPhonePx: 14,
+  hudLineWords: 3,
   /** The same text at 1080p (console zoom 2.25): the HUD's own 10-foot floor (tv-hud's TV_MIN_READ_PX; a test holds them equal). */
   hudTvPx: 24,
   /** Read time: 0.3 s a word (≈ 200 wpm, a slow reader's pace) plus 1 s to notice the message arrived. */
@@ -50,13 +51,15 @@ export type SizeMiss = 'tiny' | 'body-small' | 'hud-small' | 'hud-tv-small';
  * The size rule for one run of text, at its RENDERED px (the CSS font size times any CSS zoom on the way up).
  *   tiny          under 12 px: anything a user must read
  *   body-small    a run of body copy (more than 12 words) under 16 px on a phone
- *   hud-small     must-read HUD text under 14 px on a phone
+ *   hud-small     a HUD line (3+ words: a hint, a callout) under 14 px on a phone; a label or value keeps the 12 px floor
  *   hud-tv-small  must-read HUD text under 24 px on a 1080p TV
  */
 export function sizeMiss(px: number, ctx: { words: number; phone: boolean; hud?: 'phone' | 'tv' | null }): SizeMiss | null {
   if (!(px > 0)) return null;
   if (px < READABLE.minPx - 0.05) return 'tiny';
-  if (ctx.hud === 'phone' && px < READABLE.hudPhonePx - 0.05) return 'hud-small';
+  // a HUD label or value (≤ 2 words: HR, OUTS, 0:14) is learned once and found by place; a LINE (3+ words: a hint, a
+  // callout, a card's sub-line) is read mid-play, so it takes the HUD's floor
+  if (ctx.hud === 'phone' && ctx.words >= READABLE.hudLineWords && px < READABLE.hudPhonePx - 0.05) return 'hud-small';
   if (ctx.hud === 'tv' && px < READABLE.hudTvPx - 0.05) return 'hud-tv-small';
   if (!ctx.hud && ctx.phone && ctx.words > READABLE.bodyWords && px < READABLE.bodyPx - 0.05) return 'body-small';
   return null;

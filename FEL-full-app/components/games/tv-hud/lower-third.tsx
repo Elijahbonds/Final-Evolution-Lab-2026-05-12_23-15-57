@@ -97,7 +97,8 @@ export function HudLowerThird({ cardKey, tone = 'you', kicker, title, sub, aside
             <div className="flex flex-col">
               {kicker != null && kicker !== '' && <span style={{ ...hudType('caption'), color: hudColor(tone), letterSpacing: '0.18em', fontWeight: 800 }}>{kicker}</span>}
               <span style={{ ...hudType('banner'), color: hudColor('text'), letterSpacing: '0.03em' }}>{title}</span>
-              {sub != null && sub !== '' && <span style={{ ...hudType('label'), color: hudColor('text', 0.8) }}>{sub}</span>}
+              {/* READABLE (2026-11-02): the sub-line is a line read mid-play ("DUNK 4 OF 6 · WINDMILL"): the body step, 14 px on a phone (was the 12 px label step) */}
+              {sub != null && sub !== '' && <span style={{ ...hudType('body'), color: hudColor('text', 0.8) }}>{sub}</span>}
             </div>
             {aside != null && aside !== '' && <div className="ml-4 flex items-center whitespace-nowrap" style={{ ...hudType('score'), color: hudColor(tone) }}>{aside}</div>}
           </motion.div>

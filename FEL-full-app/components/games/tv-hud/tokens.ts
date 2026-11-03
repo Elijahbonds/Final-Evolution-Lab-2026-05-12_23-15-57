@@ -116,7 +116,7 @@ export const HUD_PLATE = {
  *  READABLE (2026-11-02): a tight dark edge first (0 0 2px at 0.95). Measured over the modes' own backdrops, a meter's
  *  POWER / READY on the old shadow (0 1px 2px 0.85 + a 10 px glow) was 1.4–2.9:1 over snow, sky and sunlit sand; the
  *  edge sits right under the strokes, so the letters hold their contrast on the brightest frame. */
-export const HUD_TEXT_SHADOW = '0 0 2px rgba(0, 0, 0, 0.95), 0 1px 2px rgba(0, 0, 0, 0.9), 0 0 10px rgba(0, 0, 0, 0.5)';
+export const HUD_TEXT_SHADOW = '0 0 1px rgba(0, 0, 0, 1), 0 0 2px rgba(0, 0, 0, 0.95), 0 1px 2px rgba(0, 0, 0, 0.9), 0 0 10px rgba(0, 0, 0, 0.5)';
 
 // ── The 10-foot type scale ───────────────────────────────────────────────────────────────────────────────────────────
 
