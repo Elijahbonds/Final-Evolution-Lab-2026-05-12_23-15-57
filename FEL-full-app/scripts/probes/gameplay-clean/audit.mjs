@@ -239,8 +239,12 @@ function auditScreen(where) {
     const s = n.textContent.replace(/\s+/g, ' ').trim(); if (!s) continue;
     const el = n.parentElement; if (!el || el.closest('[aria-hidden="true"] svg, script, style, noscript')) continue;
     if (el.closest('[data-testid="feel-tab"], [data-testid="feel-sheet"]')) continue;   // the owner's dev panel: the rig opens it; a player never sees it
+    // the controls are not the HUD: the touch deck's labels and the shell's buttons are counted apart (deckWords)
+    const inDeck = !!el.closest('[data-touch-deck], [data-fel-corner], [data-capture-ui]');
     const range = document.createRange(); range.selectNodeContents(n); const r = range.getBoundingClientRect();
-    if (r.width < 1 || r.height < 1 || r.right < 0 || r.bottom < 0 || r.left > vw || r.top > vh) continue;
+    // < 2 px: a screen-reader-only line (the caption region's sr-only box is 1x1) is not on the screen
+    if (r.width < 2 || r.height < 2 || r.right < 0 || r.bottom < 0 || r.left > vw || r.top > vh) continue;
+    { const cs0 = getComputedStyle(el); if (cs0.clip && cs0.clip !== 'auto' && /rect\(0/.test(cs0.clip)) continue; }
     const op = effOpacity(el); if (op < 0.05) continue;
     const cs = getComputedStyle(el);
     const px = parseFloat(cs.fontSize) * zoomOf(el);
@@ -252,7 +256,7 @@ function auditScreen(where) {
     const fgc = over(fg, bg); const L1 = lum(fgc), L2 = lum(bg); const ratio = (Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05);
     const shadow = cs.textShadow && cs.textShadow !== 'none';
     const bold = Number(cs.fontWeight) >= 700; const large = px >= 24 || (bold && px >= 18.66);
-    texts.push({ s: s.slice(0, 60), words: s.split(' ').filter((w) => /[A-Za-z0-9]/.test(w)).length, px: Math.round(px * 10) / 10, ratio: Math.round(ratio * 100) / 100, need: large ? 3 : 4.5, backed, shadow, el, r: { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) } });
+    texts.push({ deck: inDeck, s: s.slice(0, 60), words: s.split(' ').filter((w) => /[A-Za-z0-9]/.test(w)).length, px: Math.round(px * 10) / 10, ratio: Math.round(ratio * 100) / 100, need: large ? 3 : 4.5, backed, shadow, el, r: { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) } });
   }
   const small = texts.filter((t) => t.px < 12);
   const lowC = texts.filter((t) => t.ratio < t.need && !(t.shadow && !t.backed));
@@ -284,7 +288,8 @@ function auditScreen(where) {
   const label = (re) => q('button, a[href], [role="button"]').some((e) => re.test((e.getAttribute('aria-label') || '') + ' ' + (e.textContent || '')));
   const ss = window.__sessionStore ? window.__sessionStore.view() : null;
   return {
-    where, phase: ss ? ss.phase : null, words: texts.reduce((s, t) => s + t.words, 0), textNodes: texts.length,
+    where, phase: ss ? ss.phase : null, words: texts.filter((t) => !t.deck).reduce((s, t) => s + t.words, 0), deckWords: texts.filter((t) => t.deck).reduce((s, t) => s + t.words, 0),
+    endScreen: !!document.querySelector('[data-end-screen]'), textNodes: texts.length,
     small: small.length, smallEx: [...new Set(small.map((t) => `${t.s.slice(0, 28)} @${t.px}px`))].slice(0, 6),
     smallest: texts.length ? Math.min(...texts.map((t) => t.px)) : null,
     lowContrast: lowC.length, lowEx: lowC.slice(0, 5).map((t) => `${t.s.slice(0, 28)} ${t.ratio}:1`),
