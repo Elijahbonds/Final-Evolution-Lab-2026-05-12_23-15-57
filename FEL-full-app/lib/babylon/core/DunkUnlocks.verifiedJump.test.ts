@@ -83,7 +83,7 @@ describe('only a VERIFIED ADULT\'s jump is ever read', () => {
     expect(DUNK).toMatch(/withVerifiedJump\(loadUnlocks\(deviceStore\(\)\), verifiedCm, stakedRun\(\)\)/);
     // read after dunk 1, from the contest set that waits out the flight gate (no request in the air)
     const set = DUNK.slice(DUNK.indexOf('function startContestSet('), DUNK.indexOf('async function bringRival('));
-    expect(set).toMatch(/void rivalArrival\.finally\(\(\) => \{[\s\S]*void readVerifiedVertical\(ctx\);/);
+    expect(set).toMatch(/void rivalArrival\.finally\(\(\) => whenQuietBeat\(dunkQuiet, \(\) => ctx\.scene\.isDisposed\)\)\.then\(\(\) => \{[\s\S]*void readVerifiedVertical\(ctx\);/);
   });
 });
 
