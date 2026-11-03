@@ -1,7 +1,7 @@
 {
  "note": "tests/readable/source-floor.test.ts: a file may not rise above its line; numbers only go down. docs/READABLE.md.",
  "totals": {
-  "size": 46,
+  "size": 48,
   "colour": 27
  },
  "files": {
@@ -21,7 +21,7 @@
   },
   "app/play/drills/_components/drills-app.tsx": {
    "size": 4,
-   "colour": 4,
+   "colour": 3,
    "why": "routed: lanes plat-p09 / plat-p10 are editing it (trial merge, 2026-11-03)"
   },
   "app/play/drills/page.tsx": {
@@ -63,6 +63,11 @@
   "components/groups/teams-panel.tsx": {
    "colour": 1,
    "why": "reviewed: text-fel-violet / text-fel-indigo on an ICON (lucide draws currentColor): non-text, 3:1 is its bar (1.4.11)"
+  },
+  "components/hoops-cam/shot-chart.tsx": {
+   "size": 2,
+   "colour": 1,
+   "why": "routed: lane/plat-bbs04 is editing it (trial merge, 2026-11-03)"
   },
   "components/party/social/party-hub.tsx": {
    "size": 2,
