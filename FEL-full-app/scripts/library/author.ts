@@ -37,6 +37,7 @@ import { LEVEL_IDS, PREHAB_NOTE, levelRank } from '../../lib/library/vocab';
 import { DATA, gate, readDir, writeEntries, writeFilesIndex } from './common';
 import { BLOCKS } from './authoring/blocks';
 import { LATER_BLOCKS } from './authoring/later';
+import { applyCueStyle } from './authoring/cue-style';
 import type { Family, Variant } from './authoring/types';
 
 export const AUTHORED_LICENCE = 'FEL original (Final Evolution Lab)';
@@ -197,6 +198,9 @@ export function buildAll(seed: readonly LibraryExercise[]): { batches: Map<numbe
     batches.set(n, [...fam.entries, ...buildModifierBatch(modBase, n, known, later)]);
     linked.set(n, fam.linked);
   }
+  // PLAT-P08 (2026-11-02): last, CUE-REWRITE's wording (./authoring/cue-style.ts), so a re-run writes what is on disk.
+  // After the build, not inside it: the modifier batches derive from the generated bases, and the table is keyed by them.
+  for (const [n, list] of batches) batches.set(n, list.map(applyCueStyle));
   return { batches, linked };
 }
 

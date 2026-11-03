@@ -417,11 +417,16 @@ export function buildBetweenLegs(scene: Scene, sk: Skeleton): AnimationGroup | n
  * you would rock a cradle.
  */
 export function buildCradle(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  // THE ROCK IS A SEESAW (dunk flagship Phase 6, 2026-11-02): the ball goes back past the hip and the legs go FORWARD under it —
+  // the counterweight that lets one arm swing a ball behind a body in the air. They used to kick BACK here (AIR.kickBack), the
+  // same leg program as the behind-the-back (drive → kickBack → spread → long), and from the side the two were the closest real
+  // pair of the 16 (body path 0.246 m apart over the trick window, against a 0.332 m median; 0.324 m after, nearest the fake
+  // behind-the-back). The hands, the keys' times and the take-off and flush shapes are unchanged. docs/DUNK-FLAGSHIP.md §10.
   return buildPoseClip(scene, sk, 'dunk_cradle', CRADLE_SEC, [
     { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-4, 0, 0], ...AIR.drive(true) }, hands: { Right: [0.20, 1.66, 0.30], Left: [-0.20, 1.58, 0.28] }, poles: { Right: [0.8, -0.3, 0.2], Left: [-0.8, -0.3, 0.2] } },   // the ball up the front off the take-off, the lead knee driving
     { t: 0.2,  bones: { Hips: [6, 0, 0], Spine: [12, 6, 0], Neck: [10, 0, 0], ...AIR.drive(true) }, hands: { Right: [0.30, 0.98, 0.24], Left: [-0.40, 1.30, 0.12] }, poles: { Right: [0.8, -0.4, -0.3], Left: [-0.8, -0.4, 0.0] } },   // ROCKED DOWN: cradled on the forearm in front of the hip, the elbow bent, the off arm out
-    { t: CRADLE_BACK, bones: { Hips: [2, 6, 0], Spine: [2, 10, 0], Neck: [2, 0, 0], ...AIR.kickBack }, hands: { Right: [0.34, 0.98, -0.20], Left: [-0.46, 1.42, 0.18] }, poles: { Right: [0.6, -0.5, -0.6], Left: [-0.8, -0.4, 0.2] }, hold: true },   // ROCKED BACK past the hip — the pause at the bottom of the rock
-    { t: 0.6,  bones: { Hips: [-2, 0, 0], Spine: [-10, 0, 0], Neck: [-6, 0, 0], ...AIR.kickBack }, hands: { Right: [0.42, 1.66, -0.20], Left: [-0.42, 1.56, 0.28] }, poles: { Right: [0.8, 0.3, -0.5], Left: [-0.8, -0.4, 0.2] } },   // the arc: up behind the shoulder, the arm long
+    { t: CRADLE_BACK, bones: { Hips: [2, 6, 0], Spine: [2, 10, 0], Neck: [2, 0, 0], ...AIR.kickOut }, hands: { Right: [0.34, 0.98, -0.20], Left: [-0.46, 1.42, 0.18] }, poles: { Right: [0.6, -0.5, -0.6], Left: [-0.8, -0.4, 0.2] }, hold: true },   // ROCKED BACK past the hip — the pause at the bottom of the rock
+    { t: 0.6,  bones: { Hips: [-2, 0, 0], Spine: [-10, 0, 0], Neck: [-6, 0, 0], ...AIR.kickOut }, hands: { Right: [0.42, 1.66, -0.20], Left: [-0.42, 1.56, 0.28] }, poles: { Right: [0.8, 0.3, -0.5], Left: [-0.8, -0.4, 0.2] } },   // the arc: up behind the shoulder, the arm long
     { t: CRADLE_ROUND, bones: { Hips: [-4, 0, 0], Spine: [-16, 0, 0], Neck: [-10, 0, 0], ...AIR.spread }, hands: { Right: [0.20, 2.06, 0.02], Left: [-0.44, 1.52, 0.24] }, poles: { Right: UP.Right, Left: [-0.8, -0.5, 0.1] } },   // over the top, the body open under it
     { t: CRADLE_SEC, bones: { Hips: [-4, 0, 0], Spine: [-10, 0, 0], Neck: [-12, 0, 0], ...AIR.long }, hands: { Right: [0.16, 2.02, 0.26], Left: [-0.40, 1.44, 0.16] }, poles: { Right: UP.Right } },   // over the rim, ready to flush
   ]);

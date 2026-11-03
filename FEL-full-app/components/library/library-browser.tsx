@@ -10,13 +10,23 @@
 // existing "see a professional" lines and general prehab only). The server does both (/api/library/search, /ask);
 // this file only draws them. Batches 2–4 (5,000+ entries): a search hit is a BASE exercise; its matching variants
 // ("Paused …", "… on the Move") fold under it as "+N variants", opened on demand, so one exercise never fills a page.
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+//
+// PLAT-P08 (2026-11-02): search ON THE DEVICE as you type (use-device-library.ts: the viewer's slice of the library, indexed
+// once; the server answers until it is in), one row of quick chips (goal, equipment, body area, sport — the facets the
+// entries already carry, no new field), the results as a two-column grid of tiles, relevance first and then MOVING DEMOS
+// first (lib/library/search/engine.ts demosFirst), and the one exercise sheet (components/library/exercise-sheet.tsx: the
+// demo playing, the muscles, three cues, Try it).
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { AlertTriangle, ArrowDown, ArrowUp, Check, ChevronDown, ChevronUp, Loader2, MessageCircleQuestion, Plus, Search, SlidersHorizontal, Sparkles, X } from 'lucide-react';
-import { LibraryDemo, DEMO_TAB_LABEL, demoTabs, type DemoTab } from '@/components/library/library-demo';
+import { AlertTriangle, Loader2, MessageCircleQuestion, Play, Search, SlidersHorizontal, Sparkles, X } from 'lucide-react';
+import type { DemoTab } from '@/components/library/library-demo';
+import { ExerciseSheet } from '@/components/library/exercise-sheet';
+import { LIB_LOOK as LL } from '@/components/library/look';
 import type { LibraryCard } from '@/lib/library/server';
+import { useDeviceLibrary } from './use-device-library';
 import type { AskChip } from '@/lib/library/ask/parse';
+import { ASK_DOOR_CTA, ASK_DOOR_LINE } from '@/lib/program-ask/copy';
 
 type FacetKey = 'pattern' | 'equipment' | 'muscle' | 'level' | 'sport' | 'layer' | 'category' | 'goal';
 interface FacetValue { value: string; label: string; count: number }
@@ -33,14 +43,20 @@ interface AskPayload {
   question: string; chips: AskChip[]; filters: Filters & { equipmentOnly?: boolean }; text: string; intent: string;
   results: LibraryCard[]; total: number; plan: { slot: string; minutes: number; entry: LibraryCard }[] | null;
   anchor: { id: string; name: string } | null; safety: string[] | null; relaxed: string[]; ai: { used: boolean; why: string | null }; didYouMean: string | null;
+  /** PROGRAM-ASK (2026-11-02): the question asks for a whole program — the door to Build my program. */
+  program?: { href: string } | null;
 }
 
 const FACET_TITLES: Record<FacetKey, string> = {
   category: 'Type', pattern: 'Pattern', equipment: 'Equipment', muscle: 'Muscle', level: 'Level', goal: 'Goal', sport: 'Sport', layer: 'Skill layer',
 };
 const FACET_ORDER: FacetKey[] = ['category', 'pattern', 'equipment', 'level', 'goal', 'muscle', 'sport', 'layer'];
-const LEVEL_TONE: Record<string, string> = { beginner: '#7BD389', intermediate: '#00E5FF', advanced: '#A855F7' };
+/** PLAT-P08: the quick chips — the top values of four facets the entries already carry (goal, equipment, body area, sport). (new) */
+const QUICK: { key: FacetKey; n: number }[] = [{ key: 'goal', n: 3 }, { key: 'equipment', n: 3 }, { key: 'muscle', n: 3 }, { key: 'sport', n: 2 }];
 const ASK_EXAMPLES = ['knee-friendly vertical jump work with no equipment', 'something easier than a pistol squat', 'warm-up for basketball, 10 minutes'];
+
+/** Keystroke → request, while the library is not yet on the device (PLAT-P08: was 180); on the device there is none. */
+export const SEARCH_DEBOUNCE_MS = 120;
 
 function toParams(q: string, f: Filters, drafts: boolean, offset = 0): string {
   const p = new URLSearchParams();
@@ -77,7 +93,7 @@ export function LibraryBrowser({ onUse, onAdded, canAdd = false, title }: {
   const [question, setQuestion] = useState('');
   const [filters, setFilters] = useState<Filters>({});
   const [drafts, setDrafts] = useState(false);
-  const [data, setData] = useState<SearchPayload | null>(null);
+  const [served, setData] = useState<SearchPayload | null>(null);
   const [ask, setAsk] = useState<AskPayload | null>(null);
   const [loading, setLoading] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
@@ -97,12 +113,22 @@ export function LibraryBrowser({ onUse, onAdded, canAdd = false, title }: {
     finally { if (n === seq.current) setLoading(false); }
   }, []);
 
-  // search as you type (debounced); the Ask view keeps its own answer until a chip is removed
+  // PLAT-P08: search as you type ON THE DEVICE (use-device-library.ts): every keystroke, no round trip. The deferred
+  // values let the box take the letter first and the results follow in the same frame or the next.
+  const device = useDeviceLibrary(drafts);
+  const dq = useDeferredValue(q);
+  const df = useDeferredValue(filters);
+  const local = useMemo(() => (mode === 'search' && device ? device(new URLSearchParams(toParams(dq, df, drafts))) as unknown as SearchPayload : null), [device, dq, df, drafts, mode]);
+  const data = local ?? served;
+  useEffect(() => { if (device) { seq.current++; setMore([]); setLoading(false); } }, [device, dq, df, drafts]);
+
+  // …and until the library is on the device, the server answers (debounced); the Ask view keeps its own answer until a
+  // chip is removed
   useEffect(() => {
-    if (mode !== 'search') return;
-    const t = setTimeout(() => { void runSearch(q, filters, drafts); }, 180);
+    if (mode !== 'search' || device) return;
+    const t = setTimeout(() => { void runSearch(q, filters, drafts); }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(t);
-  }, [q, filters, drafts, mode, runSearch]);
+  }, [q, filters, drafts, mode, runSearch, device]);
 
   const runAsk = async (text: string) => {
     if (!text.trim()) return;
@@ -139,6 +165,7 @@ export function LibraryBrowser({ onUse, onAdded, canAdd = false, title }: {
 
   const loadMore = async () => {
     if (!data) return;
+    if (local && device) { const j = device(new URLSearchParams(toParams(dq, df, drafts, data.hits.length + more.length))) as unknown as SearchPayload; setMore((m) => [...m, ...j.hits]); return; }
     const r = await fetch(`/api/library/search?${toParams(q, filters, drafts, data.hits.length + more.length)}`);
     const j = r.ok ? await r.json() as SearchPayload : null;
     if (j) setMore((m) => [...m, ...j.hits]);
@@ -152,10 +179,11 @@ export function LibraryBrowser({ onUse, onAdded, canAdd = false, title }: {
     <div className="space-y-3" data-testid="library-browser">
       {title}
       {/* search ↔ ask */}
-      <div className="flex gap-1 rounded-xl border border-white/6 bg-[#0f0f13] p-1" role="tablist" aria-label="Search or ask">
+      {/* PLAT-P08: the toggle, Filters and Show more wear the chip look (one look for every small control on this screen) */}
+      <div className="flex gap-2" role="tablist" aria-label="Search or ask">
         {([['search', 'Search', Search], ['ask', 'Ask', MessageCircleQuestion]] as const).map(([k, label, Icon]) => (
           <button key={k} role="tab" aria-selected={mode === k} onClick={() => setMode(k)}
-            className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium ${mode === k ? 'bg-[#00E5FF]/15 text-[#00E5FF]' : 'text-white/45 hover:text-white/70'}`}>
+            className={`${LL.chip} flex-1 justify-center gap-1.5 ${mode === k ? LL.chipOn : ''}`}>
             <Icon className="h-3.5 w-3.5" />{label}
           </button>
         ))}
@@ -163,10 +191,10 @@ export function LibraryBrowser({ onUse, onAdded, canAdd = false, title }: {
 
       {mode === 'search' ? (
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search: goblet squat, RDL, pogo, ankle…" aria-label="Search the exercise library"
-            className="w-full rounded-xl border border-white/10 bg-[#16161a] py-2.5 pl-10 pr-10 text-sm text-white placeholder-white/30 focus:border-[#00E5FF]/40 focus:outline-none" />
-          {loading && <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-white/40" />}
+          <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Squat, RDL, pogo, ankle…" aria-label="Search the exercise library" enterKeyHint="search"
+            className={LL.search} />
+          {loading && <Loader2 className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-white/40" />}
         </div>
       ) : (
         <form onSubmit={(e) => { e.preventDefault(); void runAsk(question); }} className="space-y-2">
@@ -188,7 +216,7 @@ export function LibraryBrowser({ onUse, onAdded, canAdd = false, title }: {
       )}
 
       {/* what the library holds for this viewer, and the drafts opt-in */}
-      {data && (
+      {data && data.viewer.coach && (
         <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-white/40">
           <span data-testid="library-counts">{data.library.approved.toLocaleString()} approved{data.viewer.coach ? ` · ${data.library.drafts.toLocaleString()} drafts waiting for review` : ''}</span>
           <span className="flex items-center gap-3">
@@ -210,6 +238,11 @@ export function LibraryBrowser({ onUse, onAdded, canAdd = false, title }: {
               <AlertTriangle className="h-4 w-4 text-[#FFD700]" aria-hidden="true" />
               {ask.safety.map((s) => <p key={s}>{s}</p>)}
             </div>
+          )}
+          {ask.program && (
+            <a href={ask.program.href} data-testid="ask-program-door" className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-[#00E5FF]/40 bg-[#00E5FF]/[0.08] px-3 py-2 text-sm text-white">
+              <span>{ASK_DOOR_LINE}</span><span className="font-semibold text-[#00E5FF]">{ASK_DOOR_CTA} →</span>
+            </a>
           )}
           <div className="flex flex-wrap items-center gap-1.5" data-testid="ask-chips">
             <span className="text-[11px] text-white/40">Read as:</span>
@@ -245,13 +278,24 @@ export function LibraryBrowser({ onUse, onAdded, canAdd = false, title }: {
       {/* SEARCH: active filters, the facet panel */}
       {mode === 'search' && (
         <>
+          {/* PLAT-P08: one row of quick chips — goal, equipment, body area, sport (the facets' top values for this search) */}
+          {data && (
+            <div className={LL.chips} data-testid="library-quick-chips" aria-label="Quick filters">
+              {QUICK.flatMap(({ key, n }) => (data.facets[key] ?? []).slice(0, n).map((v) => ({ key, v })))
+                .concat(active.filter(({ k, v }) => QUICK.some((x) => x.key === k) && !QUICK.some(({ key, n }) => key === k && (data.facets[key] ?? []).slice(0, n).some((f) => f.value === v))).map(({ k, v }) => ({ key: k as FacetKey, v: { value: v, label: labelFor(k, v), count: 0 } })))
+                .map(({ key, v }) => {
+                  const on = (filters[key] ?? []).includes(v.value);
+                  return <button key={`${key}:${v.value}`} type="button" onClick={() => toggle(key, v.value)} aria-pressed={on} className={`${LL.chip} ${on ? LL.chipOn : ''}`}>{v.label}</button>;
+                })}
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-1.5">
             <button onClick={() => setShowFilters((s) => !s)} aria-expanded={showFilters}
-              className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] ${showFilters || active.length ? 'border-[#00E5FF]/30 text-[#00E5FF]' : 'border-white/10 text-white/50'}`}>
+              className={`${LL.chip} gap-1.5 ${showFilters || active.length ? LL.chipOn : ''}`}>
               <SlidersHorizontal className="h-3.5 w-3.5" /> Filters{active.length ? ` (${active.length})` : ''}
             </button>
             {filters.only && <Chip label="Only my equipment" onClear={() => setFilters((f) => { const o = { ...f }; delete o.only; return o; })} />}
-            {active.map(({ k, v }) => <Chip key={`${k}:${v}`} label={k === 'lowLoad' ? `Easy on the ${v}` : k === 'notCategory' ? `No ${v}` : k === 'notEquipment' ? `No ${v}` : labelFor(k, v)} onClear={() => setFilters((f) => { const list = (f[k as FacetKey] ?? []).filter((x) => x !== v); const o = { ...f, [k]: list }; if (!list.length) delete (o as Record<string, unknown>)[k]; return o; })} />)}
+            {active.filter(({ k }) => !QUICK.some((x) => x.key === k)).map(({ k, v }) => <Chip key={`${k}:${v}`} label={k === 'lowLoad' ? `Easy on the ${v}` : k === 'notCategory' ? `No ${v}` : k === 'notEquipment' ? `No ${v}` : labelFor(k, v)} onClear={() => setFilters((f) => { const list = (f[k as FacetKey] ?? []).filter((x) => x !== v); const o = { ...f, [k]: list }; if (!list.length) delete (o as Record<string, unknown>)[k]; return o; })} />)}
             {active.length > 0 && <button onClick={() => setFilters({})} className="text-[11px] text-white/40 hover:text-white/70">Clear all</button>}
           </div>
           {showFilters && data && (
@@ -290,21 +334,21 @@ export function LibraryBrowser({ onUse, onAdded, canAdd = false, title }: {
       )}
 
       {/* results */}
-      <div className="space-y-2" data-testid="library-results">
-        {results.map((e) => <ResultCard key={e.id} e={e} onOpen={(t) => { setSheetTab(t); setSelected(e); }} onOpenVariant={(id) => { setSheetTab(undefined); void openById(id, setSelected); }} />)}
+      <div className={LL.grid} data-testid="library-results" data-results-for={(data as { query?: string } | null)?.query ?? ''} data-results-from={local ? 'device' : 'server'}>
+        {results.map((e) => <ResultTile key={e.id} e={e} onOpen={() => { setSheetTab(undefined); setSelected(e); }} />)}
         {!loading && results.length === 0 && (mode === 'search' ? data : ask) && (
-          <div className="py-8 text-center text-sm text-white/35">
+          <div className="col-span-2 py-8 text-center text-sm text-white/35">
             {mode === 'search' && data && data.library.approved === 0 && !drafts
               ? (data.viewer.coach ? 'Nothing is approved yet. Turn on "Show drafts" to browse the drafts.' : 'The library opens as the owner approves it. Check back soon.')
               : 'Nothing matches. Try fewer words or another filter.'}
           </div>
         )}
         {mode === 'search' && data && (data.groups ?? data.total) > results.length && (
-          <button onClick={() => void loadMore()} className="w-full rounded-xl border border-white/10 py-2 text-xs text-white/60 hover:text-white">Show more ({((data.groups ?? data.total) - results.length).toLocaleString()} more)</button>
+          <button onClick={() => void loadMore()} className={`${LL.chip} col-span-2 w-full justify-center`}>Show more ({((data.groups ?? data.total) - results.length).toLocaleString()} more)</button>
         )}
       </div>
 
-      {selected && <EntrySheet e={selected} tab={sheetTab} onClose={() => { setSelected(null); setSheetTab(undefined); }} onUse={onUse} canAdd={canAdd} onAdded={onAdded} onOpen={(id) => void openById(id, setSelected)} />}
+      {selected && <ExerciseSheet e={selected} tab={sheetTab} onClose={() => { setSelected(null); setSheetTab(undefined); }} onUse={onUse} canAdd={canAdd} onAdded={onAdded} onOpen={(id) => void openById(id, setSelected)} />}
     </div>
   );
 }
@@ -324,140 +368,21 @@ function Chip({ label, onClear }: { label: string; onClear: () => void }) {
   );
 }
 
-function Badges({ e }: { e: LibraryCard }) {
-  return (
-    <span className="flex flex-wrap items-center gap-1.5 text-[10px]">
-      <span className="rounded-full border px-1.5 py-0.5" style={{ color: LEVEL_TONE[e.level], borderColor: `${LEVEL_TONE[e.level]}55` }}>{e.level}</span>
-      {e.review.status === 'draft' && <span className="rounded-full border border-[#FFD700]/40 px-1.5 py-0.5 text-[#FFD700]/90" data-testid="draft-badge">draft</span>}
-      <span className="text-white/40">{e.equipment.length ? e.equipment.join(', ').replace(/-/g, ' ') : 'no equipment'}</span>
-    </span>
-  );
-}
-
-function ResultCard({ e, onOpen, onOpenVariant }: { e: LibraryCard; onOpen: (tab?: DemoTab) => void; onOpenVariant: (id: string) => void }) {
-  const [open, setOpen] = useState(false);
+/**
+ * PLAT-P08: one result tile — the name, the level and the kit, and whether its demo MOVES (a faithful loop). A tile never
+ * says "Demo coming": an entry without a loop opens on its cue card in the sheet. "+N" counts the variants grouped under it.
+ */
+function ResultTile({ e, onOpen }: { e: LibraryCard; onOpen: () => void }) {
   const variants = e.variants ?? [];
   return (
-    <div className="fel-card w-full rounded-xl transition-colors hover:border-[#00E5FF]/20" data-testid="library-card">
-      <button onClick={() => onOpen()} className="w-full p-3 text-left">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1 space-y-1">
-            <div className="truncate text-sm font-medium text-white">{e.name}</div>
-            <Badges e={e} />
-            <p className="line-clamp-1 text-[12px] text-white/60">{e.cues[0]}</p>
-            {e.faults[0] && <p className="line-clamp-1 text-[11px] text-white/40"><span className="text-[#FF3366]/70">Watch for:</span> {e.faults[0].fault.toLowerCase()}</p>}
-          </div>
-          {e.avatarClip && <span className="shrink-0 rounded bg-[#00E5FF]/10 px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-[#00E5FF]/80">3D</span>}
-        </div>
-      </button>
-      {/* LIBRARY-ANATOMY (2026-10-25): the four ways to see it, one tap from the card (each opens the sheet on that tab) */}
-      <div className="flex flex-wrap gap-1.5 px-3 pb-2.5" data-testid="card-demo-links">
-        {demoTabs(e).map((t) => (
-          <button key={t} onClick={() => onOpen(t)} data-testid={`card-link-${t}`}
-            className="min-h-[28px] rounded-full border border-white/10 px-2.5 text-[11px] text-white/60 hover:border-[#00E5FF]/30 hover:text-white">
-            {t === 'demo' && !e.avatarClip ? 'How to' : DEMO_TAB_LABEL[t]}
-          </button>
-        ))}
-      </div>
-      {variants.length > 0 && (
-        <div className="border-t border-white/5 px-3 pb-2.5 pt-1.5">
-          <button onClick={() => setOpen((o) => !o)} aria-expanded={open} className="inline-flex items-center gap-1 text-[11px] text-[#00E5FF]/80 hover:text-[#00E5FF]" data-testid="variants-toggle">
-            {open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />} +{variants.length} variant{variants.length === 1 ? '' : 's'}
-          </button>
-          {open && (
-            <ul className="mt-1.5 flex flex-wrap gap-1.5" data-testid="variants-list">
-              {variants.map((v) => (
-                <li key={v.id}>
-                  <button onClick={() => onOpenVariant(v.id)} className="rounded-lg border border-white/10 px-2 py-0.5 text-[11px] text-white/70 hover:border-[#00E5FF]/30 hover:text-white">
-                    {v.name}{v.status === 'draft' ? <span className="ml-1 text-[#FFD700]/70">draft</span> : null}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-    </div>
+    <button type="button" onClick={onOpen} className={LL.tile} data-testid="library-card" data-moves={e.avatarClip ? '1' : '0'}>
+      <span className={LL.tileName}>{e.name}</span>
+      <span className="flex flex-col gap-1">
+        {e.avatarClip ? <span className={LL.moves} data-tile-moves><Play aria-hidden className="h-3 w-3" />Demo</span> : null}
+        <span className={LL.tileMeta}>
+          {e.level}{e.review.status === 'draft' ? ' · draft' : ''}{variants.length ? ` · +${variants.length}` : ''}
+        </span>
+      </span>
+    </button>
   );
-}
-
-const dose = (d: LibraryCard['dosage']) => [
-  `${d.sets} × ${d.reps ?? (d.seconds ? `${d.seconds} s` : d.contacts ? `${d.contacts} contacts` : d.meters ? `${d.meters} m` : '')}`,
-  d.restSec ? `rest ${d.restSec} s` : null, d.tempo ? `tempo ${d.tempo}` : null,
-].filter(Boolean).join(' · ');
-
-function EntrySheet({ e, tab, onClose, onUse, canAdd, onAdded, onOpen }: {
-  e: LibraryCard; tab?: DemoTab; onClose: () => void; onUse?: (e: LibraryCard) => Promise<void> | void; canAdd: boolean; onAdded?: () => void; onOpen: (id: string) => void;
-}) {
-  const [busy, setBusy] = useState<'add' | 'use' | null>(null);
-  const [added, setAdded] = useState(false);
-  const add = async () => {
-    setBusy('add');
-    try {
-      const r = await fetch('/api/coach/programs/exercises/from-library', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ libraryId: e.id }) });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok) { toast.error(j.error === 'name_taken_fel' ? 'Another coach already uses that exact name.' : 'Could not add that. Try again.'); return; }
-      setAdded(true);
-      toast.success(j.already ? `${e.name} is already in your catalogue` : `${e.name} added to your catalogue`);
-      onAdded?.();
-    } finally { setBusy(null); }
-  };
-  return (
-    <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center" role="dialog" aria-modal="true" aria-label={e.name}>
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative max-h-[88vh] w-full overflow-y-auto rounded-t-2xl border border-white/10 bg-[#0f0f13] p-5 sm:max-w-lg sm:rounded-2xl" data-testid="library-sheet">
-        <button onClick={onClose} aria-label="Close" className="absolute right-4 top-4 text-white/40 hover:text-white"><X className="h-5 w-5" /></button>
-        <h3 className="fel-heading pr-8 text-lg text-white">{e.name}</h3>
-        <div className="mt-1"><Badges e={e} /></div>
-        {e.review.status === 'draft' && <p className="mt-2 text-[11px] text-[#FFD700]/80">Draft: written for the owner&apos;s review and not approved yet.</p>}
-
-        {(canAdd || onUse) && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {onUse && (
-              <button disabled={busy !== null} onClick={async () => { setBusy('use'); try { await onUse(e); } finally { setBusy(null); } }}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-[#00E5FF]/40 bg-[#00E5FF]/10 px-3 py-1.5 text-xs text-[#00E5FF] disabled:opacity-50" data-testid="use-in-program">
-                {busy === 'use' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />} Use in program
-              </button>
-            )}
-            {canAdd && (
-              <button disabled={busy !== null || added} onClick={() => void add()}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-3 py-1.5 text-xs text-white/80 disabled:opacity-60" data-testid="add-to-catalogue">
-                {busy === 'add' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : added ? <Check className="h-3.5 w-3.5 text-[#7BD389]" /> : <Plus className="h-3.5 w-3.5" />} {added ? 'In your catalogue' : 'Add to my catalogue'}
-              </button>
-            )}
-          </div>
-        )}
-
-        <div className="mt-4">
-          <LibraryDemo entry={e} initialTab={tab} />
-        </div>
-
-        <div className="mt-4 space-y-3 text-sm">
-          <Section label="Set-up"><p className="text-white/75">{e.setup}</p></Section>
-          <Section label="Cues"><ul className="list-disc space-y-1 pl-4 text-white/75">{e.cues.map((c) => <li key={c}>{c}</li>)}</ul></Section>
-          {/* CUE-REWRITE (2026-10-27): "Common faults" → "Watch for" (the athlete's words, not the coach's), each with its fix */}
-          <Section label="Watch for">
-            <ul className="space-y-1.5">{e.faults.map((f) => <li key={f.fault} className="text-white/70"><span className="text-white/90">{f.fault}.</span> <span className="text-[#00E5FF]/80">Fix: {f.fix}</span></li>)}</ul>
-          </Section>
-          <Section label="Dose"><p className="text-white/75">{dose(e.dosage)}</p></Section>
-          {e.prehabNote && <p className="text-[11px] text-white/45">{e.prehabNote}</p>}
-          {e.cautions.length > 0 && <Section label="Before you load it"><ul className="list-disc space-y-1 pl-4 text-white/60">{e.cautions.map((c) => <li key={c}>{c}</li>)}</ul></Section>}
-          <Section label="Muscles">
-            <p className="text-white/70" data-testid="muscle-map"><span className="text-white/90">{e.primaryMuscles.join(', ').replace(/-/g, ' ')}</span>{e.secondaryMuscles.length ? <span className="text-white/45"> · also {e.secondaryMuscles.join(', ').replace(/-/g, ' ')}</span> : null}</p>
-          </Section>
-          {(e.regressionId || e.progressionId) && (
-            <div className="flex flex-wrap gap-2">
-              {e.regressionId && <button onClick={() => onOpen(e.regressionId!)} className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1 text-xs text-white/70"><ArrowDown className="h-3.5 w-3.5" /> Easier version</button>}
-              {e.progressionId && <button onClick={() => onOpen(e.progressionId!)} className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1 text-xs text-white/70"><ArrowUp className="h-3.5 w-3.5" /> Harder version</button>}
-            </div>
-          )}
-          <p className="text-[10px] text-white/30">{e.source.kind === 'seed' ? `From an open public-domain list (${e.source.licence}); words by FEL.` : e.source.kind === 'coach-submitted' ? 'Submitted by a FEL coach.' : 'Written by FEL.'}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Section({ label, children }: { label: string; children: ReactNode }) {
-  return <div><h5 className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-white/45">{label}</h5>{children}</div>;
 }
