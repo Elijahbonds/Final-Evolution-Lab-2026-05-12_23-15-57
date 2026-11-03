@@ -463,3 +463,26 @@ Rig, knob on, 5 of each on one page:
   same beat, the same clips, the same press frame, all made, 16 of 16; the turn never started on a called or armed trick.
   The beats differ on 2: the tap hung on the rim (its contact came inside the 60 ms A hold — the page jitter seen before) and
   the tomahawk's contact line differs only in a number. `DunkSlamVariant.test.ts`: the second read site pinned (test changed).
+
+## 13. Phase 8 — the show: replay, judges, crowd, sound, camera (lane/dunk-flagship-p8)
+
+Rig, the game's own cameras (no side camera), three makes on one page (`show`, filmed 18 s from the run through the replay and
+the judges to the next runway). The probe now records, every frame, whether the hips, the head and the rim's centre project
+inside the frame (`sin`), and the HUD's replay cut. Sheet: `round9/dunk-flagship/shots/phase8-show.jpg`.
+
+| Gate | Before | After |
+|---|---|---|
+| The dunker and the iron in frame on every replay frame | the iron 188/188; the dunker **187/188** on 2 of 3 makes | **188/188** on all 3 |
+| No camera cut outside the authored cuts | every jump matched (rim cut, 4 replay cuts, the cut's end, the judges, the next runway) — but the cut's end was **two** cuts in two frames | one cut at the end |
+| Sound and crowd within one frame of the iron | the slam thud and the crowd cheer on the contact frame (0 frames) | same |
+| The reveal-to-next-dunk dead time ≤ baseline | judging → the next dunk 5.55 s | 5.55 s (untouched) |
+
+**Fixed — one frame of the poster's camera at the end of every ordinary make.** The triple cut's clock ran past its last cut on
+its final frame; with no poster to hold (an ordinary make, `freezeSec` 0) the "frozen" branch still cut to the poster's camera —
+low under the rim — and `finish()` in the same frame put the live root back on the floor, so that frame drew the rim with the
+dunker out of it, before the judges' camera took over a frame later. A cut with no freeze now just ends
+(`scene/DunkReplayCam.ts`). Test: `DunkReplayCam.test.ts` "one cut, one camera" — checked against the old code first (it fails
+there: two jumps, 11.3 m and 3.4 m) and passes on the fix.
+
+Not changed: the replay's angles (three plus the orbit), the reveal's beats and its timing, the crowd and the sound — they
+already met their gates.
