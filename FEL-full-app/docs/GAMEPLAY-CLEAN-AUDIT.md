@@ -362,7 +362,7 @@ build with `?noplant=1` (new: no foot planting), `?noposture=1` and `?nomotion=1
 | posture off | 61.8° | 6 | **17.6°** | 4 (no spin) |
 | **after** (two runs) | **19.8° / 19.6°** | **0 / 0** | **18.1° / 18.1°** | 3 / 2 (no spin) |
 
-Hard-pop events in the run (any cause): derby **7 → 2 and 1**, football 10 → 9 and 11.
+Hard-pop events in the run (any cause; two runs each side): derby **7 and 8 → 2 and 1** (in-clip 5 and 7 → 0 and 0), football 10 and 13 → 9 and 11 (in-clip 4 and 3 → 3 and 2).
 
 **Derby: the foot planter** (`anim/FootPlanting.ts`). The layer solves a planted leg with its knee thrown toward the root's forward,
 whatever the target weight. So the first frame it solved, the leg swung from the clip's knee direction to the forward in one frame,
