@@ -40,7 +40,8 @@ const INIT = `(() => {
   // clock (fired inside the frame, in due order), and holds the page: from then on frames run only when __vtStep says (a count, or
   // Infinity while an awaited page promise settles: __awaitFrames), so nothing Node does lands on a frame chosen by wall time.
   const realNow = performance.now.bind(performance); window.__realNow = realNow;
-  let vt = 1000; let dtMs = 0.001;   // (a fixed start: absolute times are the same every run) const raf = window.requestAnimationFrame.bind(window);
+  let vt = 1000; let dtMs = 0.001;   // (a fixed start: absolute times are the same every run)
+  const raf = window.requestAnimationFrame.bind(window);
   performance.now = () => vt;
   window.__vtStep = null;
   const seedRandom = (s) => { let t = s >>> 0; Math.random = () => { t += 0x6D2B79F5; let r = Math.imul(t ^ (t >>> 15), 1 | t); r ^= r + Math.imul(r ^ (r >>> 7), 61 | r); return ((r ^ (r >>> 14)) >>> 0) / 4294967296; }; };
@@ -77,7 +78,8 @@ const INIT = `(() => {
     if (virt) runTimers();
     return true;
   };
-  window.requestAnimationFrame = (cb) => { const w = (ts) => { if (!tick(ts)) { raf(w); return; } cb(vt); }; return raf(w); };
+  window.__rafN = { req: 0, run: 0, held: 0 };
+  window.requestAnimationFrame = (cb) => { window.__rafN.req++; const w = (ts) => { if (!tick(ts)) { window.__rafN.held++; raf(w); return; } window.__rafN.run++; cb(vt); }; return raf(w); };
   window.__go = (seed) => {
     if (vt > 1010) console.warn('[HG-CLOCK] the load ran ' + (vt - 1000).toFixed(3) + ' ms of clock: the go time is not fixed');
     vt = Math.max(vt, 1010); dtMs = 1000 / 60; virt = true;
@@ -97,7 +99,7 @@ await page.addInitScript(INIT);
 const ev = (fn, arg) => page.evaluate(fn, arg);
 const gameNow = () => ev(() => performance.now());
 let GO = false;   // hoops-p05: after __go the page runs only the frames asked for
-const runFrames = async (n) => { await ev((k) => { window.__vtStep = k; }, Math.max(1, Math.round(n))); for (;;) { const v = await ev(() => window.__vtStep); if (!(v > 0)) return; await new Promise((r) => setTimeout(r, 15)); } };
+const runFrames = async (n) => { await ev((k) => { window.__vtStep = k; }, Math.max(1, Math.round(n))); const w0 = Date.now(); let lastSay = w0; for (;;) { const v = await ev(() => window.__vtStep); if (!(v > 0)) return; if (process.env.HG_DEBUG && Date.now() - lastSay > 5000) { lastSay = Date.now(); say(`runFrames(${Math.round(n)}): ${v} left after ${((Date.now() - w0) / 1000).toFixed(1)} s wall, frame ${await ev(() => window.__frameNo)}, now ${await ev(() => performance.now())}, raf ${JSON.stringify(await ev(() => [window.__rafN, document.visibilityState]))}`); } await new Promise((r) => setTimeout(r, 15)); } };
 const waitGame = async (ms) => { if (GO) return runFrames(ms * 60 / 1000); const t0 = await gameNow(); for (;;) { if ((await gameNow()) - t0 >= ms) return; await new Promise((r) => setTimeout(r, 200)); } };
 const start = () => ev(() => { window.__bus?.emit({ t: 'button', btn: 'START', pressed: true }); window.__bus?.emit({ t: 'button', btn: 'START', pressed: false }); });
 const seamOk = () => ev((m) => !!window.__FEL_DEV__?.scene?.metadata?.[m], MODE).catch(() => false);
@@ -112,7 +114,7 @@ for (let i = 0; i < 300; i++) { const ph = await ev(() => window.__phase); if (p
 const loadWallS = (Date.now() - T0) / 1000;
 await ev((c) => { window.__HG_CFG = Object.assign(window.__HG_CFG || {}, c); }, { noPoke: process.env.BOT_NOPOKE === '1', clipLog: !!process.env.POP_LIST, stageLog: !!process.env.POP_LIST });   // hoops-p04: BOT_NOPOKE=1, the bot never reaches (a possession plays out to its shot)
 say('playing after ' + loadWallS.toFixed(0) + ' s wall; page.js: ' + await ev(fs.readFileSync(path.join(HERE, 'page.js'), 'utf8')));
-await ev((sd) => window.__go(sd), SEED); GO = true;   // hoops-p05: the deterministic clock from here (see INIT)
+{ const v = await ev((sd) => window.__go(sd), SEED); GO = true; if (process.env.HG_DEBUG) say(`go at clock ${v}, raf ${JSON.stringify(await ev(() => window.__rafN))}`); }   // hoops-p05: the deterministic clock from here (see INIT)
 const shot = async (name) => { const f = path.join(SHOTS, `${MODE}-${name}.png`); await page.screenshot({ path: f }).catch(() => {}); return f; };
 const saveStrip = async (name) => { const urls = await ev((n) => window.__hg.strips[n] || [], name); const dir = path.join(SHOTS, `strip-${MODE}-${name}`); fs.mkdirSync(dir, { recursive: true }); urls.forEach((u, i) => { if (u) fs.writeFileSync(path.join(dir, `${String(i).padStart(2, '0')}.jpg`), Buffer.from(u.split(',')[1], 'base64')); }); return urls.length; };
 
