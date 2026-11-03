@@ -100,6 +100,7 @@ import { BODY_FIGHT } from '../combat/bodyFightFlags';
 import { readBodyKicks } from '@/lib/move/bodyPlayChoice';
 import type { BodyEvent } from '@/lib/pose/BodyReader';
 import type { BodyView } from '../core/ModeHarness';
+import { applyInertialBlend } from '../anim/inertialize';   // GAMEPLAY-CLEAN P2 #2
 
 let modeVenue: VenueHandle | null = null;   // ship pass 4: the mounted venue spec, disposed with the mode
 let crowd: Onlookers | null = null;         // Pass 7 phase 6: a ring of onlookers on the gravel, as the endless gauntlet has
@@ -1005,6 +1006,7 @@ export const KarateVSMode: ModeDefinition = (() => {
       installSafePlay(rival.animator, 'karate-vs-rival');
       ctx.groundLock?.track(rival.root, rival.skeleton);
       meAnim = newFighterAnim(new CombatAnimTree(player.animator));
+      applyInertialBlend(player.animator);   // GAMEPLAY-CLEAN P2 #2: AF-1 inertial transitions behind anim.inertial (default off: linear, unchanged)
       foeAnim = newFighterAnim(new CombatAnimTree(rival.animator));
       meAnim.tree.onSettle = (st) => { if (st.startsWith('strike_')) endStrike(true); };
       // phase 6 seam: when does the rival's swing land? (−1 = nothing in flight) — the probe's perfect-dodge / parry driver reads it

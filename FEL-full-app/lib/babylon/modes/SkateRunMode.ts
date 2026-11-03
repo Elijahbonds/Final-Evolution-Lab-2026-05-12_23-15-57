@@ -59,7 +59,7 @@ import { angulate } from '../core/DynamicPosture';   // a rider ANGULATES: the b
 import { MomentumBus } from '../core/MomentumBus';
 import { BoardSync, deckUnderFeet, type V3Like } from '../core/BoardPhysics';
 import { boneNode } from '../anim/boneLookup';
-import { GoalTracker, MovingRail, SKATE_GOALS, VENICE_PATROL_RAIL } from '../core/ParkGoals';
+import { GoalTracker, MovingRail, SKATE_GOALS, VENICE_PATROL_RAIL, openGoalsLine } from '../core/ParkGoals';
 import { Onlookers } from '../visual/Onlookers';
 import { SoundKit } from '../audio/SoundKit';
 import { refuse } from '../core/Refusal';
@@ -80,6 +80,7 @@ import { grabTrickFor, spinTrickFor } from '../core/rideTricks';
 // pop scales with the roll) and GC-13 (a body's HUD says a body's words)
 import { GrabBook, LandedTricks, skateLandingError01, skateAirLeft, skateAirBudget, fitToAir, popVy, popHeight, isBigAir } from './skateScore';
 import { RideHudSwitch, HudDelta, skateHudWords, setRingGlyph } from './rideHud';
+import { applyInertialBlend } from '../anim/inertialize';   // GAMEPLAY-CLEAN P2 #2
 
 const RUN_SEC = 90;
 /** phase 10: the banked score that wins the run */
@@ -683,6 +684,7 @@ export const SkateRunMode: ModeDefinition = (() => {
       rig = await buildRig(ctx, CFG.heroUrl, VENICE_PATROL_RAIL.spawn.clone(), 0, world.ground, '#22d3ee', 'skateboard', { carveAccel: 0, grindSpeed: 6.5, maxSpeed: SKATE_TUNING.maxSpeed * 1.4, stepUp: STEP_UP_M });   // BOARD-SPEED: the Rider's flat 16 clipped the boost (ceiling × 1.4) — the momentum model owns the cap
       rig.char.animator.play(SPORT_CLIP.boardIdle, { loop: true });
       animTree = new BoardAnimTree(rig.char.animator);
+      applyInertialBlend(rig.char.animator);   // GAMEPLAY-CLEAN P2 #2: AF-1 inertial transitions behind anim.inertial (default off: linear, unchanged)
       posture?.dispose();
       posture = mountPostureLayer(ctx.scene, rig.char.skeleton, rig.char.root, () => {
         const { window, pose, legs } = boardPose(bio);
@@ -1433,7 +1435,7 @@ export const SkateRunMode: ModeDefinition = (() => {
         goalsShown = goals.doneCount;
         pushHud(ctx, {
           goals: `${goals.doneCount}/${SKATE_GOALS.length}`,
-          goalList: goals.goals.map((g) => `${g.done ? '✓' : '○'} ${g.label}`).join(' · '),
+          goalList: openGoalsLine(goals.goals),   // GAMEPLAY-CLEAN P2 #8: the next three open goals, not all nine (ParkGoals)
         });
       }
 

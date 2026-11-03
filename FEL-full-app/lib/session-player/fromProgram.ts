@@ -15,10 +15,12 @@
 // Pure. Client-safe.
 import type { ProgramDay, ProgramItem, TimedStep } from '@/lib/program-ask/types';
 import type { Session, Step } from './model';
+import { warmupDemoLoop } from '@/lib/library/surfaceDemo';
 
 const timed = (kind: 'warmup' | 'cooldown', s: TimedStep): Step => ({
   exId: `${kind}:${s.id}`, name: s.name, sets: 1, reps: null, workSeconds: Math.max(1, Math.round(s.seconds)), restSeconds: 0,
-  setup: s.dose ?? '', cue: s.cue, clip: null,
+  // DEMO-LOOPS-4: the generated warm-up's and cool-down's steps play their loops (lib/library/surfaceDemo.ts WARMUP_DEMO_LOOPS)
+  setup: s.dose ?? '', cue: s.cue, clip: warmupDemoLoop(s.id),
 });
 
 function itemStep(i: ProgramItem, sets: number, rest: number, clips: Readonly<Record<string, string | null>>): Step {
