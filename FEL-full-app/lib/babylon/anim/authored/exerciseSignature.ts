@@ -349,12 +349,12 @@ function piriformisSmr(scene: Scene, sk: Skeleton): AnimationGroup | null {
 }
 
 // ── shooting and finishing (the ball is not drawn: the stage says so, demo.ts isBallClip) ──────────────────────────
-const SET_POINT: Pair = { Right: [0.14, 1.62, 0.22], Left: [0.02, 1.60, 0.26] };
-const RELEASE: Pair = { Right: [0.14, 2.02, 0.44], Left: [0.04, 1.80, 0.32] };
-const AT_CHEST: Pair = { Right: [0.12, 1.16, 0.28], Left: [-0.06, 1.16, 0.30] };
-const SHOOT_POLES: Pair = { Right: [0.5, -1, 0.1], Left: [-0.8, -0.4, 0] };
+export const SET_POINT: Pair = { Right: [0.14, 1.62, 0.22], Left: [0.02, 1.60, 0.26] };
+export const RELEASE: Pair = { Right: [0.14, 2.02, 0.44], Left: [0.04, 1.80, 0.32] };
+export const AT_CHEST: Pair = { Right: [0.12, 1.16, 0.28], Left: [-0.06, 1.16, 0.30] };
+export const SHOOT_POLES: Pair = { Right: [0.5, -1, 0.1], Left: [-0.8, -0.4, 0] };
 /** The shooter's stance: feet hip-width, the right a half step ahead, knees soft. */
-const shooter = (hands: Pair, dip: number, toes: number, o: Partial<Pose> = {}): Pose => ({
+export const shooter = (hands: Pair, dip: number, toes: number, o: Partial<Pose> = {}): Pose => ({
   bones: { Hips: [6 + dip * 14, 0, 0], Spine: [2, 0, 0], Neck: [-6 - dip * 4, 0, 0], LeftFoot: [-dip * 18 + toes * 30, 0, 0], RightFoot: [-dip * 18 + toes * 30, 0, 0] },
   feet: { Left: [-0.13, ANKLE + toes * 0.08, 0.04], Right: [0.13, ANKLE + toes * 0.08, 0.14] }, kneePoles: bothDir(0.12, 0, 1),
   hands, poles: SHOOT_POLES, hipsY: -dip * 0.14 + toes * 0.08, ...o,
@@ -369,9 +369,9 @@ function setShot(scene: Scene, sk: Skeleton, name: string, oneHand: boolean): An
     at(shooter(guide(RELEASE), 0, 1), 1.75, true), at(shooter(guide(AT_CHEST), 0, 0), 2.6, true),
   ]);
 }
-const JUMP_LEGS = { LeftUpLeg: [-8, 0, 4] as Deg3, RightUpLeg: [-8, 0, -4] as Deg3, LeftLeg: [10, 0, 0] as Deg3, RightLeg: [10, 0, 0] as Deg3, LeftFoot: [30, 0, 0] as Deg3, RightFoot: [30, 0, 0] as Deg3 };
+export const JUMP_LEGS = { LeftUpLeg: [-8, 0, 4] as Deg3, RightUpLeg: [-8, 0, -4] as Deg3, LeftLeg: [10, 0, 0] as Deg3, RightLeg: [10, 0, 0] as Deg3, LeftFoot: [30, 0, 0] as Deg3, RightFoot: [30, 0, 0] as Deg3 };
 /** The jumper's flight: legs long under the body, the ball released at the top. */
-const jumpShotAir = (z: number, y: number, hands: Pair): Pose => ({ bones: { Hips: [2, 0, 0], Spine: [0, 0, 0], Neck: [-6, 0, 0], ...JUMP_LEGS }, hands: { Right: [hands.Right![0], hands.Right![1] + y, hands.Right![2] + z], Left: [hands.Left![0], hands.Left![1] + y, hands.Left![2] + z] }, poles: SHOOT_POLES, hipsY: y, hipsZ: z });
+export const jumpShotAir = (z: number, y: number, hands: Pair): Pose => ({ bones: { Hips: [2, 0, 0], Spine: [0, 0, 0], Neck: [-6, 0, 0], ...JUMP_LEGS }, hands: { Right: [hands.Right![0], hands.Right![1] + y, hands.Right![2] + z], Left: [hands.Left![0], hands.Left![1] + y, hands.Left![2] + z] }, poles: SHOOT_POLES, hipsY: y, hipsZ: z });
 const shiftZ = (p: Pose, z: number): Pose => {
   const f = (q?: Pair): Pair | undefined => q && Object.fromEntries(Object.entries(q).map(([k, v]) => [k, [v[0], v[1], v[2] + z]])) as Pair;
   return { ...p, feet: f(p.feet), hands: f(p.hands), hipsZ: (p.hipsZ ?? 0) + z };
