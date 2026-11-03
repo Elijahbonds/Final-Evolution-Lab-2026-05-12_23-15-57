@@ -697,6 +697,9 @@ export const DEMO_RULES: readonly DemoRule[] = [
   // the program-ask's Step-In Mountain Climber (lane/program-ask-2's entry: high plank, a foot steps in under the chest and
   // back out, then the other): the loop authored for it in DEMO-LOOPS-4 (exerciseAsks.ts)
   { clip: 'ex_stepin_climber', families: ['cardio'], bases: /^step-in-mountain-climber$/ },
+  // and its Pike Push-Up (hands down, hips high in an upside-down V, the head lowered toward the floor in front of the hands):
+  // the loop authored for it (exerciseAsks.ts), which the coach catalogue's row played by name until the entry existed
+  { clip: 'ex_pike_pushup', families: ['push-up'], bases: /^pike$/ },
 ];
 
 const RULES_BY_FAMILY: ReadonlyMap<string, readonly DemoRule[]> = (() => {
