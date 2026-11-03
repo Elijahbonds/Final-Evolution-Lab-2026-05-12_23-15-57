@@ -100,7 +100,7 @@ function installRecorder(cfg) {
   const clean = (n) => n.replace(/^mixamorig:?/, '').replace(/_c\d+$/, '').replace(/^.*[:|]/, '');
   const JN = ['Hips', 'LeftFoot', 'RightFoot', 'LeftToeBase', 'RightToeBase', 'LeftHand', 'RightHand', 'Head', 'LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm', 'Spine2'];
   const QN = ['Hips', 'Spine', 'Spine1', 'Spine2', 'Neck', 'Head', 'LeftShoulder', 'RightShoulder', 'LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand', 'LeftUpLeg', 'RightUpLeg', 'LeftLeg', 'RightLeg', 'LeftFoot', 'RightFoot', 'LeftToeBase', 'RightToeBase'];
-  let heroRef = null, jn = null, qn = null, rest = null, heroMeshes = null, bindAt = -99;
+  let heroRef = null, jn = null, qn = null, rest = null, heroMeshes = null, bindAt = -99; const heroGroups = new Map();
   const bind = (hero) => {
     heroRef = hero; jn = qn = rest = null; heroMeshes = new Set();
     if (!hero) return;
@@ -168,7 +168,19 @@ function installRecorder(cfg) {
           const [b, who] = occlusion(pts); f.oc = b; f.ow = who; f.inf = pts[1] ? projIn(pts[1]) : -1;
         }
       } catch (e) { f.err = String(e).slice(0, 80); }
-      try { const a = dev.anim && dev.anim(); if (a && a.playing) { const top = a.playing.filter((p) => p.weight > 0.3).map((p) => p.clip).sort().join('+'); f.c = ix(R.clipIx, R.clips, top); } } catch {}
+      // the hero's playing clips, read off the scene's animation groups (each group is one clip on one body; the anim probe's
+      // readout came back empty on the CharacterAnimator bodies): the ones targeting the hero's nodes, weight > 0.3
+      try {
+        const names = [];
+        for (const g of scene.animationGroups) {
+          if (!g.isPlaying) continue;
+          let isH = heroGroups.get(g);
+          if (isH === undefined) { const t = g.targetedAnimations[0] && g.targetedAnimations[0].target; isH = !!(t && (t === heroRef || (t.isDescendantOf && t.isDescendantOf(heroRef)))); heroGroups.set(g, isH); }
+          const w = g.weight < 0 ? 1 : g.weight;
+          if (isH && w > 0.3) names.push(g.name.replace(/_c\d+$/, '').slice(0, 40));
+        }
+        f.c = ix(R.clipIx, R.clips, names.sort().join('+'));
+      } catch {}
     }
     f.cam = camPose();
     if (R.frameNo % 30 === 0) { const txt = (document.body.innerText || '').replace(/\s+/g, ' '); let hsh = 0; for (let i = 0; i < txt.length; i++) hsh = (hsh * 31 + txt.charCodeAt(i)) | 0; f.dom = hsh; }
@@ -309,19 +321,21 @@ function analyze(mode, rec, S) {
       const w = speeds[i]?.[b]; if (w === null || w === undefined || w < 600) continue;
       if (F[i].ph !== 'playing' || F[i - 1].ph !== 'playing') continue;
       const nb = []; for (let k = i - 6; k <= i + 6; k++) if (k !== i && speeds[k]?.[b] != null) nb.push(speeds[k][b]);
-      const m = med(nb) ?? 0; if (w >= 3.5 * Math.max(m, 60)) pops.push({ t: F[i].t, i, bone: QN[b], degS: Math.round(w), clip: rec.clips[F[i].c] ?? '' });
+      const m = med(nb) ?? 0; if (w >= 3.5 * Math.max(m, 60)) pops.push({ t: F[i].t, i, bone: QN[b], degS: Math.round(w), clip: rec.clips[F[i].c] ?? '', from: rec.clips[F[Math.max(0, i - 3)].c] ?? '' });
     }
   }
   // one EVENT is every bone that pops within 10 frames of another (a snap into a pose moves many bones at once); the
   // control (karate, raw): RightUpLeg 70° then 63° in two frames, then held — the same pair at 3.35, 4.27, 5.40, 9.67 s
   const byFrame = [...pops].sort((a, b) => a.i - b.i); const events = [];
-  for (const p0 of byFrame) { const last = events[events.length - 1]; if (last && p0.i - last.end <= 10) { last.end = p0.i; last.bones.add(p0.bone); last.peak = Math.max(last.peak, p0.degS); } else events.push({ t: p0.t, end: p0.i, bones: new Set([p0.bone]), peak: p0.degS }); }
+  for (const p0 of byFrame) { const last = events[events.length - 1]; if (last && p0.i - last.end <= 10) { last.end = p0.i; last.bones.add(p0.bone); last.peak = Math.max(last.peak, p0.degS); } else events.push({ t: p0.t, end: p0.i, bones: new Set([p0.bone]), peak: p0.degS, from: p0.from, to: p0.clip }); }
   // HARD pops: a peak of 1500°/s or more (25° in one frame) — fast dance and swing motion lives around 900–1300 °/s at its
   // peak (carnival, dance), a snap into a pose at 3700–10000 (baseball's swing contact, karate's strikes)
   const hard = events.filter((e) => e.peak >= 1500);
   out.hardPopEvents = hard.length; out.hardPopsPerMin = r2(hard.length / Math.max(1e-6, play.length / 3600));
   out.popEvents = events.length; out.popEventsPerMin = r2(events.length / Math.max(1e-6, play.length / 3600));
-  out.popEventEx = events.sort((a, b) => b.peak - a.peak).slice(0, 4).map((e) => `${e.t}s ${e.peak}°/s ${[...e.bones].slice(0, 4).join('+')}`);
+  out.popEventEx = [...events].sort((a, b) => b.peak - a.peak).slice(0, 4).map((e) => `${e.t}s ${e.peak}°/s ${[...e.bones].slice(0, 4).join('+')} [${e.from} → ${e.to}]`);
+  // which clip changes the hard pops sit on: the transitions to soften first
+  { const tr = {}; for (const e of events) if (e.peak >= 1500) { const k = `${e.from} → ${e.to}`; tr[k] = (tr[k] || 0) + 1; } out.hardPopTransitions = Object.entries(tr).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, n]) => `${n}× ${k}`); }
   out.pops = pops.length; out.popsPerMin = r2(pops.length / Math.max(1e-6, play.length / 3600)); out.popEx = pops.sort((a, b) => b.degS - a.degS).slice(0, 5);
   // root jumps (teleports) during play
   const jumps = []; for (let i = 1; i < F.length; i++) { if (F[i].ph !== 'playing' || F[i - 1].ph !== 'playing') continue; const d = dist(F[i].r, F[i - 1].r); if (d !== null && d > 0.35) jumps.push({ t: F[i].t, m: r2(d) }); }
