@@ -14,6 +14,7 @@ import { DESNAP_CLIPS, SNAP_DEG_PER_SEC, desnapTrack, snapSteps, stepSpeeds, typ
 import { CharacterAnimator } from './CharacterAnimator';
 import { buildAuthoredClip } from './authored';
 import { MOCAP_OPPONENT_CLIPS, buildMocapOpponentClip } from './authored/mocapOpponents';
+import { MOCAP_STYLE_CLIPS, buildMocapStyleClip } from './authored/mocapStyles';
 import { boneNode } from './boneLookup';
 
 const yaw = (deg: number) => Quaternion.RotationAxis(new Vector3(0, 1, 0), (deg * Math.PI) / 180);
@@ -44,7 +45,8 @@ describe('the re-keying', () => {
 
 // ── on the rig ──────────────────────────────────────────────────────────────────────────────────────────────────────
 const QN = ['Hips', 'Spine', 'Spine1', 'Spine2', 'Neck', 'Head', 'LeftShoulder', 'RightShoulder', 'LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand', 'LeftUpLeg', 'RightUpLeg', 'LeftLeg', 'RightLeg', 'LeftFoot', 'RightFoot', 'LeftToeBase', 'RightToeBase'];
-/** The gameplay clips the audit's modes play (karate, karate VS, showdown, football, derby, skateboard, penalty), authored and captured. */
+/** The gameplay clips the audit's modes play (karate, karate VS, showdown, football, derby, skateboard, penalty), authored and captured,
+ *  and every style capture (the parkour, trick, capoeira and breaking moves). */
 const GAMEPLAY = /^(karate_|football_|baseball_|board_|skate_|pk_|soccer_)/;
 let scene: Scene, sk: Skeleton, reset: () => void;
 beforeAll(async () => {
@@ -62,6 +64,8 @@ function build(name: string): AnimationGroup | null {
   for (const g of scene.animationGroups.filter((x) => x.name === name)) g.dispose();
   const mc = MOCAP_OPPONENT_CLIPS.find((c) => c.name === name);
   if (mc) return buildMocapOpponentClip(scene, sk, mc);
+  const st = MOCAP_STYLE_CLIPS.find((c) => c.name === name);
+  if (st) return buildMocapStyleClip(scene, sk, st);
   return buildAuthoredClip(new CharacterAnimator(scene, []), scene, sk, name, null) ? scene.animationGroups.find((x) => x.name === name) ?? null : null;
 }
 /** The clip's hard pop events at 60 fps (the audit's rule). */
@@ -86,7 +90,7 @@ function hardPops(g: AnimationGroup): number {
 function gameplayClips(): string[] {
   const src = readFileSync('lib/babylon/anim/authored/index.ts', 'utf8');
   const authored = [...src.matchAll(/^\s+\['([a-z0-9_]+)', \(\) =>/gm)].map((m) => m[1]);
-  return [...new Set([...authored, ...MOCAP_OPPONENT_CLIPS.map((c) => c.name)])].filter((n) => GAMEPLAY.test(n)).sort();
+  return [...new Set([...[...authored, ...MOCAP_OPPONENT_CLIPS.map((c) => c.name)].filter((n) => GAMEPLAY.test(n)), ...MOCAP_STYLE_CLIPS.map((c) => c.name)])].sort();
 }
 
 describe('the clips, measured', () => {

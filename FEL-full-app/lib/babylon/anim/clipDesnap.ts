@@ -2,9 +2,10 @@
 //
 // The gameplay-clean audit (docs/GAMEPLAY-CLEAN-AUDIT.md §4c) counts a HARD pop where one bone turns ≥ 1500°/s (25° in a 60 fps
 // frame) and ≥ 3.5× its ±6-frame median. Measured on the clips alone (each clip played on the hero, the kit bodies and the scan,
-// sampled at 60 fps — clipDesnap.test), six clips carry such a snap in their own keys, all karate captures retargeted to pose
-// keys: the hit react's right thigh (52° in a frame), the knockdown, the get-up's right arm, the high kick, the roundhouse and
-// the typhoon. Every other "in-clip" pop the audit attributes to a clip is not in the clip's keys (see the lane report).
+// sampled at 60 fps — clipDesnap.test), twelve clips carry such a snap in their own keys, all captures retargeted to pose keys:
+// six karate opponents' (the hit react's right thigh, 52° in a frame; the knockdown, the get-up's right arm, the high kick, the
+// roundhouse, the typhoon) and six style captures (the wall flip karate plays, the dive roll, the backflip, the au kick, the
+// windmill, the helicopter). Every other "in-clip" pop the audit attributes to a clip is not in the clip's keys (see the lane report).
 //
 // The fix is local: where one key-to-key step is a snap, the keys either side of it stay where they are and the step is spread
 // over the interval before and after it (the bone's path between the same two poses, at constant speed) — the pose before and
@@ -24,7 +25,11 @@ const MEDIAN_FLOOR_DEG_PER_SEC = 60;
 
 /** The clips whose own keys snap (measured, clipDesnap.test holds the list to the measurement). */
 export const DESNAP_CLIPS: ReadonlySet<string> = new Set([
+  // the karate opponents' captures (mocapOpponents.ts)
   'karate_mc_hit_react', 'karate_mc_knockdown', 'karate_mc_get_up', 'karate_mc_high_kick', 'karate_mc_roundhouse', 'karate_mc_typhoon',
+  // the style captures (mocapStyles.ts): karate's wall flip (pk_backflip, a thigh snap at 0.57 s the audit saw in play), the
+  // dive roll, the backflip, the au kick, the windmill and the helicopter
+  'pk_backflip', 'pk_dive_roll', 'trick_backflip', 'cap_au_kick', 'brk_windmill', 'brk_helicopter',
 ]);
 
 /** Is the re-keying on (feel knob `anim.clipSmooth`, default on)? Read when a clip is built (at spawn). */
