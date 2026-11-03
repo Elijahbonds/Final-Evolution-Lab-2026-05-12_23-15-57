@@ -93,7 +93,10 @@ describe('DunkDuelMode: the first press decides, the take-off is not it, and A o
     const flight = onInput.indexOf("if (e.t === 'button' && e.btn === 'A' && e.pressed && phase === 'cinematic') {");
     expect(jump).toBeGreaterThan(0);
     expect(flight).toBeGreaterThan(jump);
-    expect(onInput).toMatch(/if \(e\.value === 0\) launchDunk\(ctx, 'press'\);/);
+    // test changed (gameplay-clean, routed from dunk-flagship P5): RUN let go is the FOLDED pull (the hand's and the body's,
+    // dunkDuelRules RunPull) reaching 0, not one event's own value — an idle pad's re-sent 0 no longer launches a body's run
+    expect(onInput).toMatch(/const rt = runPull\.take\(e\);/);
+    expect(onInput).toMatch(/if \(rt === 0\) \{[\s\S]*?launchDunk\(ctx, 'press'\); \}/);
     expect(DUEL.match(/launchDunk\(ctx, 'press'\)/g)).toHaveLength(2);
     expect(DUEL.match(/launchDunk\(ctx\)/g)).toHaveLength(2);   // the line and the watchdog are the mode's own
   });

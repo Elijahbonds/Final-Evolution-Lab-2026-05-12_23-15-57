@@ -18,6 +18,8 @@ import Link from 'next/link';
 import { MEASURE_VERTICAL_HREF } from '@/lib/vertical/door';   // VERTICAL-EASY: the one front door
 import { MEASURE_VERTICAL } from '@/lib/vertical/copy';
 import { JUMP_TAB_LINE } from '@/lib/tools-easy/copy';
+import { ResultCard } from '@/components/result-card/result-card';
+import { mirrorReviewView } from '@/lib/coach-tools/reviewResult';
 import { ArrowLeft, Loader2, PauseCircle, ScanLine, Volume2, VolumeX } from 'lucide-react';
 import { NOT_SAVED_ON_DEVICE, mirrorSave } from './mirror-save';   // R-HEALTH-CLIENT: no save request unless the server said so
 // MIRROR-FIRST P1 (2026-10-07): the camera, the pose runtime, the screen-awake lock and the pause on a hidden tab live in
@@ -1845,8 +1847,16 @@ export function MirrorHarness({
         </section>
 
         {/* The review of a guided squat — what faulted, what was said, and whether it held. */}
+        {/* COACH-TOOLS-EASY (2026-11-02; the coordinator's item 4): the squat review is the P3 result card's "no number"
+            variant — the verdict (squatReviewVerdict, unchanged) in one line, and what the camera saw and the coach said
+            under Details, unchanged */}
         {pattern === 'squat' && squatStage === 'review' && (
-          <section className="mt-6 rounded-2xl border border-white/8 bg-white/[0.02] p-5">
+          <section className="mt-6" data-squat-review>
+            <ResultCard reveal={false} seeAll={false} view={mirrorReviewView(MOVEMENT_NAMES.squat, squatWorkReps.length, squatReviewVerdict(squatWorkReps, cueLog, {
+                cueable: (f) => cueableFaults(f),
+                // a knee never read square was not judged, cue or no cue (MIRROR-COACH P2)
+                kneeJudged: VALGUS_CUE_VERIFIED && kneeRecord.squareFrames > 0,
+              }).line)} details={(<>
             <h2 className="fel-heading text-[15px] font-bold text-white/80">{REVIEW_COPY.heading}</h2>
             <div className="mt-3 grid gap-5 sm:grid-cols-2">
               <div>
@@ -1913,14 +1923,9 @@ export function MirrorHarness({
             {/* MIRROR-COACH P1 (2026-09-25): "held" is read from the last reps (lib/mirror/squatStage.ts
                 squatReviewVerdict). It used to be "any cue and no regress", which said "The correction held" over a
                 set whose heels rose on all eight reps. */}
-            <p className="mt-4 border-t border-white/[0.06] pt-4 text-[13px] leading-relaxed text-white/50">
-              {squatReviewVerdict(squatWorkReps, cueLog, {
-                cueable: (f) => cueableFaults(f),
-                // a knee never read square was not judged, cue or no cue (MIRROR-COACH P2)
-                kneeJudged: VALGUS_CUE_VERIFIED && kneeRecord.squareFrames > 0,
-              }).line}
-            </p>
+
             <FadeLines lines={fadeLines} />
+            </>)} />
           </section>
         )}
 

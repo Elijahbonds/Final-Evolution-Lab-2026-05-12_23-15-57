@@ -15,7 +15,7 @@
 //      so, and a minor never gets one.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Camera, CheckCircle2, Loader2, Send, Square, Trash2 } from 'lucide-react';
+import { Camera, CheckCircle2, Loader2, Square, Trash2 } from 'lucide-react';
 import { poseService } from '@/lib/pose/PoseService';
 import type { Lm, PoseFrame } from '@/lib/pose/landmarks';
 import { HUD_HZ, MirrorWakeLock, type WakeLockApiLike } from '@/lib/mirror/liveCamera';
@@ -34,6 +34,8 @@ import { SetupCard } from '@/components/tools-easy/setup-card';
 import { useOneVoice } from '@/components/tools-easy/use-one-voice';
 import { SetupReader, type SetupWord } from '@/lib/tools-easy/setup';
 import { READY_LINE, STOP_AND_READ } from '@/lib/tools-easy/copy';
+import { ResultCard } from '@/components/result-card/result-card';
+import { formReviewView } from '@/lib/coach-tools/reviewResult';
 
 /** The movements that start standing, so the standing framing check reads them (a push-up is read lying down: no card). */
 const STANDING_START: ReadonlySet<string> = new Set(['squat', 'lunge', 'hinge']);
@@ -227,9 +229,15 @@ export function RecordSet({ ctx, api = FORM_REVIEWS_API }: { ctx: RecordContext;
         )}
       </div>
 
+      {/* COACH-TOOLS-EASY (2026-11-02; the coordinator's item 4): the set's read is the P3 result card's "no number" variant
+          (lib/results/view.ts value null) — what the camera saw in one line, one next step (send it to the coach, or film it
+          again), and everything else unchanged under Details */}
       {result && (
-        <div className="fel-card space-y-3 rounded-xl p-4" data-set-result>
-          <p className="text-base font-semibold text-white" data-set-headline>{setHeadline(ctx.movement, result.set, result.flags)}</p>
+        <div data-set-result>
+          <ResultCard view={formReviewView(ctx.exerciseName, result.set.reps, setHeadline(ctx.movement, result.set, result.flags), canSend && phase !== 'sent')}
+            onNext={canSend && phase !== 'sent' ? () => void send() : () => void start()} reveal={false} seeAll={false} details={(
+        <div className="space-y-3">
+          <p className="sr-only" data-set-headline>{setHeadline(ctx.movement, result.set, result.flags)}</p>
           {result.set.setScore !== null && (
             <p className="text-xs text-white/50">Set score {result.set.setScore} / 100 (estimated) · {result.set.clean} of {result.set.read} read reps clean</p>
           )}
@@ -261,12 +269,7 @@ export function RecordSet({ ctx, api = FORM_REVIEWS_API }: { ctx: RecordContext;
           <p className="text-xs text-white/55" data-video-line>{VIDEO_STAYS_LINE}</p>
           {phase === 'sent' ? (
             <p className="flex items-center gap-2 text-sm font-semibold text-fel-emerald" data-sent><CheckCircle2 className="h-4 w-4" /> Sent to your coach.</p>
-          ) : canSend ? (
-            <button type="button" onClick={() => void send()} disabled={phase === 'sending'} data-send
-              className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-fel-cyan/50 bg-fel-cyan/10 px-4 font-bold text-fel-cyan disabled:opacity-50">
-              {phase === 'sending' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Send the rep data to my coach
-            </button>
-          ) : !ctx.send.ok ? (
+          ) : canSend ? null /* COACH-TOOLS-EASY: the card's own button sends it */ : !ctx.send.ok ? (
             <p className="text-sm text-white/65" data-send-refused={ctx.send.error}>
               {ctx.send.message}{' '}
               {ctx.send.href && ctx.send.action && <Link href={ctx.send.href} className="text-fel-cyan underline">{ctx.send.action}</Link>}
@@ -275,6 +278,8 @@ export function RecordSet({ ctx, api = FORM_REVIEWS_API }: { ctx: RecordContext;
             <p className="text-sm text-white/65" data-send-not-ready>Sending sets to your coach opens soon. Your flags are above, and nothing was sent.</p>
           ) : null}
           {sendError && <p role="alert" className="text-sm text-fel-crimson">{sendError}</p>}
+        </div>
+          )} />
         </div>
       )}
 

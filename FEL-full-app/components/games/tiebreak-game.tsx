@@ -157,8 +157,11 @@ export default function TiebreakGame({ grade, prq, onEnd }: GameProps) {
           onStart={tapStart}
           onRetry={retryBoot}
         />
+        {/* gameplay-clean (2026-10-28): z-50, above the splash. At z-10 the boot splash (z-40, phase 'loading' until this card
+            starts the boot) covered it: the player saw LOADING ARENA… with no end — the audit rig sat on it 170 s, twice —
+            and the FIRST SERVE card that starts everything was underneath. */}
         {!started && (
-          <div onPointerDown={wake.onPointerDown} className="absolute inset-0 z-10 flex cursor-pointer flex-col items-center justify-center gap-4 bg-black/80 p-6 text-center">
+          <div onPointerDown={wake.onPointerDown} className="absolute inset-0 z-50 flex cursor-pointer flex-col items-center justify-center gap-4 bg-black/80 p-6 text-center">
             <h2 className="fel-heading text-4xl text-white">TIEBREAK BLITZ</h2>
             <p className="max-w-md text-sm text-gray-300">
               First to {TARGET}, win by 2. The ball comes in on one side — swing <span className="text-[#00FF9D]">← / →</span> when the green ring closes on it. The window tightens as the rally and the lead grow.

@@ -10,11 +10,19 @@ import { inParty } from '@/lib/party/social/state';
 import { parsePartyCode, PARTY_CODE_LEN, PARTY_MAX } from '@/server/netd/src/partyRules';
 import { cleanPlayerName, recallPlayerName, rememberPlayerName, PLAYER_NAME_MAX } from '@/lib/party/playerName';
 import { loginPath } from '@/lib/auth/safeNext';
+import { useVisitorKind } from '@/components/auth/use-visitor';
 import { useParty } from './use-party';
 import { InviteBlock } from './party-bits';
 
 export function LocalPartyFallback({ outdated = false }: { outdated?: boolean }) {
-  const href = loginPath('/play/party');
+  // PUBLIC-POLISH (2026-11-02, live sweep D1): a signed-out visitor met "Online parties aren't switched on here yet" and a
+  // button that opened a sign-in form without saying so. They now get what a party is and how to start one today, and
+  // the button says it signs them in. Still honest that online parties are off. A signed-in host goes straight to the
+  // room (it used to bounce through /login, which only sent them on). With no session provider (tests) this renders
+  // as it did before: the visitor is treated as signed out and the room goes through sign-in.
+  const visitor = useVisitorKind();
+  const signedIn = visitor === 'signed-in';
+  const href = signedIn ? '/play/party' : loginPath('/play/party');
   return (
     <section data-testid="party-local-fallback" className="space-y-3 rounded-xl bg-white/[0.06] p-4 text-sm text-white/70">
       <p role="status" data-testid={outdated ? 'party-outdated' : undefined}>
@@ -22,12 +30,23 @@ export function LocalPartyFallback({ outdated = false }: { outdated?: boolean })
           ? 'Parties need a server update. Everything else works as usual.'
           : "Online parties aren't switched on here yet. Everything else works as usual."}
       </p>
-      <p>
-        Want to play with friends now? Sign in as the host and use the local party room for same-screen games with phones as controllers.
-      </p>
-      <Link href={href} className="inline-flex rounded-xl bg-[#00E5FF] px-4 py-2 font-bold text-black">
-        Open local party room
-      </Link>
+      {signedIn ? (
+        <p>
+          Want to play with friends now? Use the local party room for same-screen games with phones as controllers.
+        </p>
+      ) : (
+        <p data-testid="party-guest-explainer">
+          You can still play together on one screen: the host signs in and opens the party room on a TV or laptop, and
+          friends join from their phones with a code. Friends don&apos;t need an account.
+        </p>
+      )}
+      <div className="flex flex-wrap items-center gap-3">
+        <Link href={href} className="inline-flex rounded-xl bg-[#00E5FF] px-4 py-2 font-bold text-black">
+          Open local party room
+        </Link>
+        <Link href="/join" className="font-semibold text-[#00E5FF] underline underline-offset-2">Got a code? Join a game</Link>
+      </div>
+      {signedIn ? null : <p className="text-white/55">Hosting signs you in first. Making an account is free.</p>}
     </section>
   );
 }
