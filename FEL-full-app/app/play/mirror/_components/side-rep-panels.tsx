@@ -79,10 +79,11 @@ export function SideRepChecks<F extends string>({ spec, state, label, live }: { 
 }
 
 /** The review: each stage's reps, the faults by how many reps showed them, what was cued, what the fade did, the verdict. */
-export function SideRepReviewCard<F extends string>({ spec, state, label, cueLog, fadeLines, movement }: {
+export function SideRepReviewCard<F extends string>({ spec, state, label, cueLog, fadeLines, movement = 'Your set' }: {
   spec: SideRepSpec<F>; state: SideRepState<F>; label: (f: F) => string; cueLog: readonly CueEvent<string>[]; fadeLines: readonly string[];
-  /** MIRROR-RESULTS (2026-11-03): the movement's canonical name, for the result card's "<Movement> · N reps". */
-  movement: string;
+  /** MIRROR-RESULTS (2026-11-03): the movement's canonical name, for the result card's "<Movement> · N reps" (the
+   *  harness passes it; a caller that does not reads "Your set"). */
+  movement?: string;
 }) {
   const r = sideRepReview(spec, state, label);
   const stage = (name: string, s: typeof r.check) => (
