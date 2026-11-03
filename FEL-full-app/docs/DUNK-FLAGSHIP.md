@@ -399,3 +399,40 @@ forces one, the control). No DunkMode change: the bus never stood between a game
 fade there would have nothing to fade (gameplay-clean's `OccluderFade` leaves dunk out; it is not needed for this).
 Also in the probe: `NEWMESH=1` (what appeared or moved near the court before each attempt), GO AGAIN on a continuous
 night's card, so 5+ attempts run on one page.
+
+## 12. Phase 7 — the slam variants: REVERSE and TWO-HAND POWER (knob, off)
+
+All sixteen direction + button slots in the air are the named tricks, and A inside the slam window is the slam, so the two
+finishes the bodies carry and the contest never used are called WITH the slam: the **left stick held at the live A press inside
+the slam window** — back = REVERSE (`dunk_finish_reverse`; the hero plays its mocap `dunk_mc_reverse`), up = TWO-HAND POWER
+(`dunk_finish_two_hand`). Behind `dunk.slamVariants` (OFF; never in ranked, staked or paid play). Named on the banner, the
+replay's call and the card's AIR line; +0.6 / +0.3 difficulty (NEW numbers). A called air trick keeps its own flush; a buffered
+press (made before the window) never reads the stick; the rival's turn never does. `core/DunkSlamVariant.ts`.
+Sheet: `round9/dunk-flagship/shots/phase7-slam-variants.jpg`.
+
+| Gate | TWO-HAND POWER | REVERSE |
+|---|---|---|
+| GATE 0 | the same hero as Phase 6 (`Human.rig_c57`, 22 FEL bones); both clips play on it on the rig | same |
+| Fires from its input on the rig | 9 of 9 (3 runs) | 9 of 9 |
+| On the iron at contact (ball centre to ring centre) | 3 of 3 makes, 0.22–0.24 m | **2 of 3** — 0.17, 0.19 m; **1 SHORT OF THE IRON** (0.215 m off) |
+| Its own name on the card | TWO-HAND POWER! | REVERSE! |
+| Distinct from its nearest neighbour (Phase 6 metric over the finish: the press + 0.5 s) | 0.36 m (tomahawk) | 0.43 m (double clutch) |
+
+The finish-window median is 0.052 m: every called trick flushes on the same one-hand flush. **The ≤ 0.2 m gate as written is
+not met by the shipped flush either** — the plain one-hand flush measured 0.20–0.34 m in the same runs, because the contact is
+geometric at the iron and the ring's radius is 0.23 m; the power sits inside that spread.
+
+**The REVERSE does not pass yet**, and the knob should stay off until it does. With the back to the iron the ball arm reaches up
+and BACK over the head: the reach IK off, 0 of 3 (the mocap reverse flushes in front); on, 1 of 3 (the jam's carry-in, sized
+for a ball in front, parked the hips under the ring); no carry-in on the reverse and its jam 0.2 m higher
+(`REVERSE_JAM_LIFT`), 2 of 3. The misses start the jam with the ball lower and nearer than the makes. What would fix it is the
+turn starting before the window (a reverse is turned on the way up, not at the iron) — a flight change, the owner's call.
+
+**The sixteen tricks are untouched**, knob on or off: `DunkSlamVariant.test.ts` replays all 16 inputs through the real
+recognizer with the stick neutral, back and up, knob on and off — identical; a scan pins the one read site. On the rig, all
+16 with the stick held BACK the whole flight, knob on vs off: the same trick on the same beat, the same clips, the same press
+frame, all made (16 of 16); the knob-on run logs the reverse it did not take ("the called trick keeps its flush"). One
+difference: the tap's knob-on contact came 17 ms after the press, inside the 60 ms A hold, so it hung on the rim — two pages
+of the rig differ by a frame like this anyway (they differ by 1–3 cm on the standing frame, before any input).
+
+Also in Phase 7: the probe's `finishes` scenario, the slam stick, `STICK_FLIGHT`, and the side camera aimed at the chest.
