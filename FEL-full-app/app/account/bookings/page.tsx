@@ -11,11 +11,13 @@ import { isMissingTable, logStoreUnavailable } from '@/lib/coach-store/gate';
 import { bookingRowView, HIDDEN_BOOKING_STATUSES } from '@/lib/coach-store/myBookings';
 import { siteOrigin } from '@/lib/stripe/site-origin';
 import { AddToCalendar } from '@/components/coach-store/add-to-calendar';
+import { SHOP_LOOK as L } from '@/components/shop/look';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { robots: { index: false, follow: false }, title: 'Your bookings' };
 
-const ACTION = 'rounded-md border border-white/20 px-3 py-1.5 text-sm font-semibold hover:border-white/50';
+// PLAT-P07 (2026-11-02): one action look on this page (the shop's outlined button)
+const ACTION = L.buy.replace('mt-3 ', '');
 
 /**
  * YOUR BOOKINGS — the way back to a paid video review or live call after the thanks page (owner 2026-10-13).
@@ -39,43 +41,41 @@ export default async function BookingsPage() {
   } catch (err) {
     if (!isMissingTable(err)) throw err;
     logStoreUnavailable();
-    return <main className="mx-auto max-w-xl px-4 py-8 text-white">Coach store is not set up yet.</main>;
+    return <main className={L.page}><h1 className={L.title}>Bought and booked</h1><p className={L.lede}>Coach store is not set up yet.</p></main>;
   }
 
   const now = new Date();
   const origin = siteOrigin();
   const views = rows.map((row) => bookingRowView(row, now, (id, s, e) => (origin ? icsFor(id, s, e, origin) : null)));
 
+  // PLAT-P07: one list of everything bought or booked — the coach store's bookings (each with its own actions: Upload
+  // clips, Join call, Add to calendar, Receipt; lib/coach-store/myBookings.ts), then one line each to the books and the
+  // coaching you own, which keep their own pages (My Library, /account/coaching).
   return (
-    <main className="mx-auto max-w-xl px-4 py-8 text-white">
-      <h1 className="text-2xl font-black">Your bookings</h1>
-      <p className="mt-2 text-sm text-white/60">Video reviews and live calls you bought. Newest first.</p>
-      {views.length === 0 ? (
-        <div className="mt-6 rounded-xl border border-white/10 p-4 text-sm">
-          <p>No bookings yet.</p>
-          <Link className="mt-2 inline-block underline" href="/coach">Browse coaching</Link>
-        </div>
-      ) : (
-        <ul className="mt-6 space-y-3">
-          {views.map((v) => (
-            <li key={v.id} className="rounded-xl border border-white/10 p-4">
-              <p className="font-semibold">{v.title}</p>
-              <p className="mt-1 text-sm text-white/70">{v.statusLine}</p>
-              {v.whenLine ? <p className="mt-1 text-sm text-white/60">{v.whenLine}</p> : null}
-              {v.joinHint ? <p className="mt-1 text-xs text-white/50">{v.joinHint}</p> : null}
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                {v.review ? <Link className={ACTION} href={v.review.href}>{v.review.label}</Link> : null}
-                {v.join ? <Link className={ACTION} href={v.join.href}>{v.join.label}</Link> : null}
-                {v.calendarIcs ? <AddToCalendar ics={v.calendarIcs} className={ACTION} /> : null}
-                {v.receipt ? <a className="text-sm underline" href={v.receipt.href}>{v.receipt.label}</a> : null}
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-      <p className="mt-8 text-sm text-white/60">
-        Programs and memberships are under <Link className="underline" href="/account/coaching">Coaching</Link>.
-      </p>
+    <main className={L.page}>
+      <p className={L.eyebrow}>Account</p>
+      <h1 className={L.title}>Bought and booked</h1>
+      <ul className="mt-6 space-y-3" data-bookings>
+        {views.map((v) => (
+          <li key={v.id} className={L.card} data-booking={v.id}>
+            <p className={L.cardTitle}>{v.title}</p>
+            <p className={L.cardLine}>{v.statusLine}{v.whenLine ? ` · ${v.whenLine}` : ''}</p>
+            {v.joinHint ? <p className={L.cardSide}>{v.joinHint}</p> : null}
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              {v.review ? <Link className={ACTION} href={v.review.href}>{v.review.label}</Link> : null}
+              {v.join ? <Link className={ACTION} href={v.join.href}>{v.join.label}</Link> : null}
+              {v.calendarIcs ? <AddToCalendar ics={v.calendarIcs} className={ACTION} /> : null}
+              {v.receipt ? <a className={`${L.cardSide} underline`} href={v.receipt.href}>{v.receipt.label}</a> : null}
+            </div>
+          </li>
+        ))}
+      </ul>
+      {views.length === 0 ? <p className={L.lede}>No bookings yet. <Link className="underline" href="/coach">Browse coaching</Link></p> : null}
+      <ul className={`${L.rows} mt-6`} aria-label="More you own">
+        <li><Link className={L.row} href="/press/library"><span>Audiobooks</span><span aria-hidden className={L.rowSide}>›</span></Link></li>
+        <li><Link className={L.row} href="/account/coaching"><span>Programs and memberships</span><span aria-hidden className={L.rowSide}>›</span></Link></li>
+        <li><Link className={L.row} href="/coaches"><span>Find a coach</span><span aria-hidden className={L.rowSide}>›</span></Link></li>
+      </ul>
     </main>
   );
 }

@@ -29,6 +29,7 @@ import { PrimaryCta } from '@/components/ui/fel/primary-cta';
 import { warmAvatarDemo } from '@/components/library/avatar-demo';
 import { Chip } from '@/components/ui/fel/chip';
 import { SIG_LOOK } from './look';
+import { Layer } from '@/components/session-player/layer';
 
 // the player (and its 3D demo) loads only when Start is tapped: a phone reading the page pays nothing for it
 const SessionPlayer = dynamic(() => import('@/components/session-player/session-player').then((m) => m.SessionPlayer), { ssr: false });
@@ -268,8 +269,11 @@ export function ProgramPage({ initial, clips = {} }: { initial: ProgramView; cli
         )}
       </Fold>
 
+      {/* PLAT-P07 (2026-11-02): drawn at the end of <body> (components/session-player/layer.tsx). Inside TabPage's
+          animated <main> the player's fixed layer sat UNDER the shell: on a phone the tab bar covered Start now / Set done
+          and the status rail covered the close button (measured, rig scene sigplayer). */}
       {playing && (
-        <SessionPlayer session={playing.session} mode={playing.mode} onFinish={finish} onClose={() => setPlaying(null)} />
+        <Layer><SessionPlayer session={playing.session} mode={playing.mode} onFinish={finish} onClose={() => setPlaying(null)} /></Layer>
       )}
     </div>
   );
