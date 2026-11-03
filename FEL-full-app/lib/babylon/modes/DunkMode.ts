@@ -89,7 +89,7 @@ import { applyVeniceDunkLookPass } from '../visual/veniceSurroundVisibility';
 import { DUNK_CONFIG as CFG } from './modeConfigs';
 import { readDisplaySetting } from '@/lib/controller-link/tvMode';   // TV MODE: the slam window widens on a mirrored display
 import { LAND_LEAD_SEC, timeToFloor, OOP_LOB_FLIGHT_SEC, OOP_WINDUP_SEC, OOP_LATE_CATCH_CLIP_T, whiffWhy, GLASS_RUN_CATCH_CLIP_T, GLASS_RELEASE_MIN_M, SELF_LOB_RELEASE_Y, glassThrowDue, OOP_GLASS_PASSER_X, OOP_GLASS_PASSER_FROM_RIM_M, OOP_GLASS_HIT_OVER_RIM_M, OOP_BOUNCE_FLIGHT_SEC, LOB_FRAME_LIFT, REAL_JUMP_PERSONAL, SLAM_BIG_FROM, personalFullRiseM, riseToPower, LOB_FRAME_TAU, oopThrowDue, RUNWAY_STRIDE_MPS, RUNWAY_STRIDE_SCALE, RUNWAY_RATE_MIN, RUNWAY_RATE_MAX, slamImpact, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG } from '../core/DunkFlagship';   // DUNK-FLAGSHIP: the pass's numbers (feel-panel knobs)
-import { slamVariantOf, SLAM_VARIANTS, SLAM_VARIANTS_ON, REVERSE_TURN_RATE, REVERSE_CONTACT_FROM, REVERSE_JAM_LIFT, type SlamVariant } from '../core/DunkSlamVariant';   // DUNK-FLAGSHIP Phase 7: the finish called with the slam (knob, off)
+import { slamVariantOf, SLAM_VARIANTS, SLAM_VARIANTS_ON, REVERSE_TURN_RATE, REVERSE_CONTACT_FROM, REVERSE_JAM_LIFT, REVERSE_TURN_FROM, REVERSE_COMMIT_SEC, type SlamVariant } from '../core/DunkSlamVariant';   // DUNK-FLAGSHIP Phase 7: the finish called with the slam (knob, off)
 import { feel } from '../../feel-panel/feel';
 import { rimCutSpot, clearOfHoop, runUpTune, tuneKey, dunkFramingOn } from '../core/dunkCamFraming';   // CAMERA TIP: cam.dunkFraming (default off)
 import { DUNK_BACKBOARD_Z } from '../visual/venuePropSets';
@@ -2222,7 +2222,8 @@ export const DunkMode: ModeDefinition = (() => {
         airDriftX += airLean * AIR_DRIFT * dt;
         // an angled run-up launches yawed off the iron: the body OPENS onto it through the rise (phase 7: slower there, so the
         // turn is something the hips and chest do in the air rather than a snap at the take-off), square by the hang
-        faceToward(rim, dt * (clipTime < EASTBAY_TIMING.rise + 0.35 ? FACE_RIM_RATE_RISE : FACE_RIM_RATE));
+        if (reverseOnTheWayUp(dt)) faceAwayStep(dt);   // DUNK-FLAGSHIP Phase 7b: a REVERSE is turned on the way up, not at the iron
+        else faceToward(rim, dt * (clipTime < EASTBAY_TIMING.rise + 0.35 ? FACE_RIM_RATE_RISE : FACE_RIM_RATE));
 
         // THE PROP IS PHYSICAL. Crossing the obstacle with your feet below
         // its top is not a scoring penalty — the dunk DIES at the chair,
@@ -2452,7 +2453,7 @@ export const DunkMode: ModeDefinition = (() => {
               const touch = clearOfIron(jamPrevLive ? sweptTouch(jamPrevBall, bp, rim, RIM_RADIUS, ballSim.radius) : bp, rim, RIM_RADIUS, ballSim.radius);
               releaseBall(ball); ball.position.set(touch.x, touch.y, touch.z);
               jamContact = true; flushRealSec = performance.now() / 1000; releasePos.copyFrom(ball.position); sinceRelease = 0; flush = startFlush(ball.position, rim, RIM_RADIUS, ballSim.radius, NET_THROW_MIN + (NET_THROW_MAX - NET_THROW_MIN) * Math.max(0, Math.min(1, qteAccuracy)));   // NET EXIT: a clean slam spits it out
-              console.info(`[HANDS] iron contact ${(jamSec * 1000).toFixed(0)} ms into the jam: ball ${Vector3.Distance(bp, rim).toFixed(2)} m from the rim centre (${bp.y.toFixed(2)} m) · iron ${ringDistance(bp, rim, RIM_RADIUS).toFixed(3)} m (last frame ${jamPrevLive ? ringDistance(jamPrevBall, rim, RIM_RADIUS).toFixed(3) : '—'}) → let go at ${ringDistance(touch, rim, RIM_RADIUS).toFixed(3)}`);
+              console.info(`[HANDS] iron contact ${(jamSec * 1000).toFixed(0)} ms into the jam: ball ${Vector3.Distance(bp, rim).toFixed(2)} m from the rim centre (${bp.y.toFixed(2)} m) · iron ${ringDistance(bp, rim, RIM_RADIUS).toFixed(3)} m (last frame ${jamPrevLive ? ringDistance(jamPrevBall, rim, RIM_RADIUS).toFixed(3) : '—'}) → let go at ${ringDistance(touch, rim, RIM_RADIUS).toFixed(3)} · flat ${Math.hypot(touch.x - rim.x, touch.z - rim.z).toFixed(3)} m of the ring's ${RIM_RADIUS}`);
               // CONTACT-RIM-SOUND: the CONTACT is this frame — the hand with the ball at the iron by geometry — and only this frame. (A jam
               // that timed out used to let go short of it, 9 cm of daylight on a late slam, and punch later from the flush step.)
               setWin('contact'); contactPunch(ctx); dunkHooks.contact(aerialClip, ironStep.quality, tierFromAccuracy(qteAccuracy, aHeld), hookWho());
@@ -2886,6 +2887,20 @@ export const DunkMode: ModeDefinition = (() => {
   /** DUNK-FLAGSHIP Phase 7: the finish the stick called on the live slam press (knob `dunk.slamVariants`, off) — and the one the
    *  resolve settled on (null on a called trick, a left-hand carry or a miss: a called trick keeps its own flush). */
   let slamVariant: SlamVariant | null = null, finishVariant: SlamVariant | null = null;
+  /** DUNK-FLAGSHIP Phase 7b: the REVERSE's turn, started on the way up (the stick held back from the hang, nothing called) */
+  let reverseCommitSec = 0, reverseTurning = false;
+  /** The second, earlier read of the stick (Phase 7b, the coordinator's decision): from the hang until the slam window opens, the
+   *  stick held BACK for REVERSE_COMMIT_SEC with no air trick called or armed starts the turn away from the iron. The slam press
+   *  still decides the finish (readSlamVariant): back at the press is the REVERSE; anything else turns him back square (the
+   *  resolve faces the iron). Knob off: never. The d-pad tricks are not read here, and a trick thrown after it stops it. */
+  function reverseOnTheWayUp(dt: number): boolean {
+    if (reverseTurning) return true;
+    const calling = turn === 'player' && !lob.live && !obstacle && !qteWindowOpen && clipTime >= REVERSE_TURN_FROM && !flight.attempt.tricks.length && !armedAir
+      && slamVariantOf(feel('dunk.slamVariants', SLAM_VARIANTS_ON) >= 0.5, stickX, stickY) === 'reverse';
+    reverseCommitSec = calling ? reverseCommitSec + dt : 0;
+    if (reverseCommitSec >= REVERSE_COMMIT_SEC) { reverseTurning = true; console.info(`[DUNK-SLAM] reverse: the turn away from the iron starts @${clipTime.toFixed(2)}`); }
+    return reverseTurning;
+  }
   let clipFloorY = 0, clipBackZ = 0;          // where a clipped dunker comes down (the top he caught, or the floor before the side he hit)
 
   /** DUNK-BODY-MID: the SLAM lands. Called on the press inside the window, and from the window's opening frame for a
@@ -3012,6 +3027,7 @@ export const DunkMode: ModeDefinition = (() => {
   /** The named trick fires: the air budget pays for it (or says why not), its body plays, a spinThrough trick starts the
    *  turn that resolves rim-facing by SPIN_RESOLVE_T whatever flight is left (momentum-led: later = quicker). */
   function fireTrick(ctx: ModeContext, trick: DunkTrick, how: 'window' | 'armed', grade: BeatGrade | null = null): void {
+    if (reverseTurning) { reverseTurning = false; reverseCommitSec = 0; console.info('[DUNK-SLAM] reverse: the turn stops — a trick was called'); }   // DUNK-FLAGSHIP Phase 7b
     const g = how === 'armed' ? armedGrade : grade; if (how === 'armed') armedGrade = null;   // dunk-next: how it was thrown (none = held for a grab: neutral)
     const got = flight.take(trick);
     if (!got) {
@@ -3158,7 +3174,7 @@ export const DunkMode: ModeDefinition = (() => {
     dubbleGrabbed = false; dubbleReachK = 0; straddleK = 0; dubblePassed = false; dubbleAir = null;
     launchX = player.root.position.x; launchBank = runBank; runBank = 0; airDriftX = 0;   // DUNK MOTION phase 7
     activeHandOff = null; ikSideK = 0;
-    slamVariant = null; finishVariant = null;   // DUNK-FLAGSHIP Phase 7: a variant is one slam's
+    slamVariant = null; finishVariant = null; reverseCommitSec = 0; reverseTurning = false;   // DUNK-FLAGSHIP Phase 7: a variant is one slam's
     clipTime = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; shortOfIron = false; ebState.inLeftHand = hs('Right') === 'Left';
     meterSpan = EASTBAY_TIMING.extend + slamWindowNow() / 2 + 0.16; meter3d?.begin(slamGreen());
     // the broadcast cut is per-attempt: hand the follow camera back or the next runway is shot from the rim
@@ -4995,7 +5011,7 @@ export const DunkMode: ModeDefinition = (() => {
     airHeld = false; dropToFloor = false; dropVy = 0; liveLandAt = -1; cancelLiveCeleb(); replaying = false; replayAir = false; player.root.rotationQuaternion = null;   // A+ P8
     cutting = false; celebPick = null; soundGapUntil = 0; celebFace = null; ctx.setHud({ cut: '', call: '', poster: null });   // DUNK MOTION phase 12
     armedAir = null; spin.reset(); replaySpinYaw = 0; clearBeats(ctx);   // dunk-next: the strip goes with the attempt
-    slamVariant = null; finishVariant = null;   // DUNK-FLAGSHIP Phase 7
+    slamVariant = null; finishVariant = null; reverseCommitSec = 0; reverseTurning = false;   // DUNK-FLAGSHIP Phase 7
     playClip(SPORT_CLIP.idle, { loop: true });
     charge = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; shortOfIron = false; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
     dunkHooks.reset();   // CONTACT-RIM-SOUND: the hooks latch per attempt, reset with contactLatch (DUNK-MODE-PLAN §11.2 H2)

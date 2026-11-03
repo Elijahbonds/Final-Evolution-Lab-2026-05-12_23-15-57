@@ -42,6 +42,11 @@ export const SLAM_VARIANTS: Record<SlamVariant, SlamVariantSpec> = {
 /** The rate (rad/s) the reverse turns the body away from the iron after the press: half a turn in ~0.2 s, about the 360's own
  *  peak step (17°/frame at 60 fps). NEW. */
 export const REVERSE_TURN_RATE = 15.7;
+/** PHASE 7b (coordinator's decision): a reverse is turned ON THE WAY UP — at the iron it was 2 of 3 (the turned arm reached the
+ *  ring from too low). From this clip second (the hang beat, CUE_BEAT_T.hang) until the slam window opens, the stick held back
+ *  for REVERSE_COMMIT_SEC with nothing called starts the turn; the press still decides the finish. NEW numbers. */
+export const REVERSE_TURN_FROM = 0.7;
+export const REVERSE_COMMIT_SEC = 0.1;
 /** The REVERSE's jam rides this much higher (m) than a flush (JAM_Y 1.15): with the back to the iron the ball arm reaches up and
  *  BACK over the head, and it topped out 0.10–0.25 m under the ring (measured: 2 of 3 reverses short of the iron, the ball at
  *  2.80–2.95 m against a 3.05 m ring; the one that met it started the jam with the ball already over the ring). NEW. */

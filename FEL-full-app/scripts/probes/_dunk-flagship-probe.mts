@@ -370,7 +370,7 @@ function cfgFor(scen: string, rep: number): AttemptCfg {
     case 'show': return { ...base, recMs: 14000 };
     default: if (scen.startsWith('trick:')) { const a = AIR[scen.slice(6)]; return { ...base, walkMs: 400, air: [DPAD_I[a[0]], BTN_I[a[1]]], airAfterMs: Number(process.env.AIR_AFTER_MS ?? 300), flightStick: Number(process.env.STICK_FLIGHT ?? 0) }; }
       // Phase 7: a plain flight slammed on the beat with the stick back (the REVERSE), up (the TWO-HAND POWER) or neutral
-      if (scen.startsWith('finish:')) { const k = scen.slice(7); return { ...base, walkMs: 400, slamStick: k === 'reverse' ? 1 : k === 'power' ? -1 : 0 }; }
+      if (scen.startsWith('finish:')) { const k = scen.slice(7); return { ...base, walkMs: 400, slamStick: k === 'reverse' ? 1 : k === 'power' ? -1 : 0, flightStick: k === 'reverse' ? 1 : 0 }; }   // 7b: the reverse holds the stick back from the take-off (the turn starts on the way up)
   }
   throw new Error('unknown scenario ' + scen);
 }
