@@ -1559,7 +1559,7 @@ export const DunkMode: ModeDefinition = (() => {
       // THE SKY TIER: the court's own thing over the lane (a rocket in Orbit, a balloon at Blossom, …), its underside a surface for R1;
       // Venice hangs nothing (the blimp is out — owner: "the grey thing on top of the hoop, its an eye sore")
       skyRoot?.dispose(); skyTier = skyTierFor(ctx.location); skyRoot = skyTier ? buildSkyTier(ctx.scene, skyTier, gatherLine() - SKY.zAhead) : null; skyTapped = false;
-      void readSeasonLane().then((lane) => { seasonLane = lane; console.info(`[DUNK-SEASON] lane ${lane} — specials ${specialOpen(lane) ? 'OPEN' : 'LOCKED'}`); ctx.setHud({ specials: specialOpen(lane) ? 'PRO' : 'LOCKED' }); });
+      void readSeasonLane().then((lane) => { seasonLane = lane; console.info(`[DUNK-SEASON] lane ${lane} — specials ${specialOpen(lane) ? 'OPEN' : 'LOCKED'}`); ctx.setHud({ specials: lane === 'guest' ? null : specialOpen(lane) ? 'PRO' : 'LOCKED' }); });   // TRY-AGE-PLACEHOLDER-1: a guest is shown no pass chip
       console.info(skyTier ? `[DUNK-SKY] ${skyTier.tag} over the lane (underside ${SKY.underY} m)` : '[DUNK-SKY] nothing over this lane');
       ride = cornerRideFor(ctx.location);
       if (ride.kind === 'shuttle') {   // ORBIT's other corner (owner, 2026-09-18: "replace the red tent with a space station")

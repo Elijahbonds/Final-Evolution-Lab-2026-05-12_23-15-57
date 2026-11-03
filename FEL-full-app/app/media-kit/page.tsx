@@ -48,6 +48,9 @@ export default async function MediaKitPage() {
         </ul>
       </section>
 
+      {/* TRY-AGE-PLACEHOLDER-1 (live audit 2026-11-02): fixture audience numbers are never shown publicly; the section renders
+          only once AUDIENCE_STATS carries real numbers (isExample false). */}
+      {!audience.isExample && (
       <section className="mt-10">
         <div className="flex items-center">
           <SectionTitle>Audience</SectionTitle>
@@ -65,6 +68,7 @@ export default async function MediaKitPage() {
           <p className="mt-2 text-[11px] text-white/35">Fixture numbers, not real stats.</p>
         ) : null}
       </section>
+      )}
 
       <section className="mt-10">
         <div className="flex items-center">
