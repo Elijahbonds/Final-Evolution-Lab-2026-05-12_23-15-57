@@ -164,10 +164,11 @@ const RECORDER = `(() => {
       const sb = window.__hud().slamBeat;
       if (stick && (sb === 'open' || sb === 'beat') && held === 0) { window.__PAD.axes[1] = stick; window.__PAD.timestamp = performance.now(); held = 1; requestAnimationFrame(tick); return; }
       if (stick && held > 0 && held < 3) { held++; requestAnimationFrame(tick); return; }
-      if (stick) setTimeout(() => { window.__PAD.axes[1] = 0; window.__PAD.timestamp = performance.now(); }, 360);
       if (!(mode === 'open' ? (sb === 'open' || sb === 'beat') : sb === 'beat')) { requestAnimationFrame(tick); return; }
       const b = window.__PAD.buttons[0];
-      const press = () => { b.pressed = true; b.value = 1; window.__PAD.timestamp = performance.now(); setTimeout(() => { b.pressed = false; b.value = 0; window.__PAD.timestamp = performance.now(); }, 60); };
+      // (the stick is let go 360 ms AFTER the press — let go on a timer from the window's opening, the hang's slow-mo outlasted it)
+      const press = () => { b.pressed = true; b.value = 1; window.__PAD.timestamp = performance.now(); setTimeout(() => { b.pressed = false; b.value = 0; window.__PAD.timestamp = performance.now(); }, 60);
+        if (stick) setTimeout(() => { window.__PAD.axes[1] = 0; window.__PAD.timestamp = performance.now(); }, 360); };
       // Phase 5: 'late' = an ordinary make — the beat, then SLAM_LATE_MS (default 70) late: 120 ms graded 0.15–0.27, an IRON miss
       if (mode === 'late') setTimeout(press, LATE_MS); else press();
     };

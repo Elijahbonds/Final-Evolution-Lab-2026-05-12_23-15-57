@@ -89,7 +89,7 @@ import { applyVeniceDunkLookPass } from '../visual/veniceSurroundVisibility';
 import { DUNK_CONFIG as CFG } from './modeConfigs';
 import { readDisplaySetting } from '@/lib/controller-link/tvMode';   // TV MODE: the slam window widens on a mirrored display
 import { LAND_LEAD_SEC, timeToFloor, OOP_LOB_FLIGHT_SEC, OOP_WINDUP_SEC, OOP_LATE_CATCH_CLIP_T, whiffWhy, GLASS_RUN_CATCH_CLIP_T, GLASS_RELEASE_MIN_M, SELF_LOB_RELEASE_Y, glassThrowDue, OOP_GLASS_PASSER_X, OOP_GLASS_PASSER_FROM_RIM_M, OOP_GLASS_HIT_OVER_RIM_M, OOP_BOUNCE_FLIGHT_SEC, LOB_FRAME_LIFT, REAL_JUMP_PERSONAL, SLAM_BIG_FROM, personalFullRiseM, riseToPower, LOB_FRAME_TAU, oopThrowDue, RUNWAY_STRIDE_MPS, RUNWAY_STRIDE_SCALE, RUNWAY_RATE_MIN, RUNWAY_RATE_MAX, slamImpact, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG } from '../core/DunkFlagship';   // DUNK-FLAGSHIP: the pass's numbers (feel-panel knobs)
-import { slamVariantOf, SLAM_VARIANTS, SLAM_VARIANTS_ON, REVERSE_TURN_RATE, REVERSE_CONTACT_FROM, type SlamVariant } from '../core/DunkSlamVariant';   // DUNK-FLAGSHIP Phase 7: the finish called with the slam (knob, off)
+import { slamVariantOf, SLAM_VARIANTS, SLAM_VARIANTS_ON, REVERSE_TURN_RATE, REVERSE_CONTACT_FROM, REVERSE_FINISH_RATE, type SlamVariant } from '../core/DunkSlamVariant';   // DUNK-FLAGSHIP Phase 7: the finish called with the slam (knob, off)
 import { feel } from '../../feel-panel/feel';
 import { rimCutSpot, clearOfHoop, runUpTune, tuneKey, dunkFramingOn } from '../core/dunkCamFraming';   // CAMERA TIP: cam.dunkFraming (default off)
 import { DUNK_BACKBOARD_Z } from '../visual/venuePropSets';
@@ -2571,7 +2571,7 @@ export const DunkMode: ModeDefinition = (() => {
       // arm to the rim through the tomahawk's cock-back and the windmill's top, the moments that make those dunks what they are
       const reachFrom = airTrick ? Math.max(HAND_IK_FROM, airTrick.t0 + (TRICK_READY_AT[airTrick.trick.id] ?? player.animator.durationOf(airTrick.trick.clip) ?? 0.8) / airTrick.rate - 0.08) : HAND_IK_FROM;
       const reachWant = (phase === 'cinematic' && clipTime >= reachFrom && !obstacleClipped)
-        || (phase === 'resolve' && qteHit && (!contactLatch || hangOn) && !obstacleClipped && finishRelease < 0)   // DUNK-HANDS-RIM: on through the jam to the iron, held through a hang
+        || (phase === 'resolve' && qteHit && (!contactLatch || hangOn) && !obstacleClipped && finishRelease < 0 && finishVariant !== 'reverse')   // DUNK-HANDS-RIM: on through the jam to the iron, held through a hang (DUNK-FLAGSHIP Phase 7: not on the REVERSE — the iron is BEHIND the turned body, where the reach's anti-flip shaping caps the arm short of it; the clip's arch carries the ball back over the head to it)
         || (replaying && replayAir && (replayAerial || replayClipNow >= HAND_IK_FROM));   // DUNK-BALL-ARMS-RIM: the replay reaches on the live flight's clip beat — on from the replay's first airborne frame, the reach whipped the arms 0.31–0.36 m a frame toward a rim 2 m away
       const ikScale = ctx.scene.animationTimeScale ?? 1;
       const ikStep = dt * (phase === 'cinematic' && Number.isFinite(ikScale) && ikScale > 0 ? ikScale : 1) / HAND_IK_LAG_SEC;
@@ -3344,6 +3344,7 @@ export const DunkMode: ModeDefinition = (() => {
     finishRelease = qteHit && !lob.live && aerialClip === SPORT_CLIP.dunkFinishWindmill ? WINDMILL_RELEASE_T : -1; finishT = 0;
     // the finish is paced so it ends with the flush (release + the 0.47 s flush), never a held clip-less pose before CONTACT
     finishRate = finishRelease >= 0 ? Math.min(1, (player.animator.durationOf(aerialClip) ?? 0.85) / (finishRelease + 0.5)) : 1;
+    if (finishVariant === 'reverse') finishRate = REVERSE_FINISH_RATE;   // DUNK-FLAGSHIP Phase 7: the arch over the head lands inside the jam's 0.6 s
     if (lob.live) { setTrail('off'); armSettle(); }   // the lost lob is already bouncing — no clank, the miss is the ball on the floor
     // DUNK-NO-PRESS-MISS (a): NO PRESS, NO IRON. The flight never threw the ball at the rim, so it does not clank off it: it drops
     // away in the air (core/DunkNoPress airDropVelocity, TUNE), with no graze, no ring or net, no thud — onMiss('noSlam')
@@ -4644,7 +4645,9 @@ export const DunkMode: ModeDefinition = (() => {
     // own — the KICK-UP EASTBAY — announced by its name and its author instead of "KICK-UP → EASTBAY DUNK!", and worth
     // a nod on top of its parts for doing the whole thing.
     const signature = signatureFor(runwayIds, flight.attempt.tricks.map((t) => t.id));
-    const trickDifficulty = flight.attempt.difficulty - STYLE_TIER[style] + (turn === 'player' && finishVariant ? SLAM_VARIANTS[finishVariant].difficulty : 0);   // DUNK-FLAGSHIP Phase 7: + the called finish
+    const trickDifficulty = flight.attempt.difficulty - STYLE_TIER[style];
+    // DUNK-FLAGSHIP Phase 7: the finish the stick called is named on the card and adds its difficulty (the player's own slam only)
+    const calledFinish = turn === 'player' && finishVariant ? SLAM_VARIANTS[finishVariant] : null;
     // dunk-next phase 1: THE BEATS — tricks thrown on the beat lift execution; every trick on its beat and the slam on time is a PERFECT
     // FLIGHT (style, and the building). A flight that only armed its tricks is the card it always was.
     const flow = flightFlow(beatMarks, beatSlam);
@@ -4672,7 +4675,7 @@ export const DunkMode: ModeDefinition = (() => {
     // and the STYLE TIER moved to STYLE, where calling your signature belongs. Measured before: every attempt in the
     // lab scored DIFF 10.0, the cap, so a WINDMILL and a BETWEEN THE LEGS off a self-lob were the same dunk.
     const { difficulty, execution, style: styleScore } = dunkCard({
-      trickDifficulty, runwayDifficulty: runwayDifficulty + (signature?.nod ?? 0) + (doubleLaunched ? DOUBLE_LAUNCH.difficulty : 0), propBonus: PROP_BONUS[prop],
+      trickDifficulty: trickDifficulty + (calledFinish?.difficulty ?? 0), runwayDifficulty: runwayDifficulty + (signature?.nod ?? 0) + (doubleLaunched ? DOUBLE_LAUNCH.difficulty : 0), propBonus: PROP_BONUS[prop],
       charge, launchSpeed01, styleTier: STYLE_TIER[style], styleTaps,
       hype, hang: hangBonus > 0, repeat: seenIt, execution01: qteAccuracy,
       chainTricks: Math.max(0, flight.attempt.tricks.length - 1),
@@ -4690,7 +4693,7 @@ export const DunkMode: ModeDefinition = (() => {
     // takeoff, the runway beats, the caught toss), the AIR (the tricks, the taps, the hang), the PRECISION (the slam's timing)
     // and the room (HYPE, and whether the panel has seen this one) — so a card is a lesson, not a number
     const approachBits = [launchSpeed01 >= 0.8 ? 'FULL RUN' : launchSpeed01 >= 0.45 ? 'JOG' : 'WALK-UP', launchTag, ...runwayLabels, lob.caught ? lob.label : '', doubleLaunched && !boardTopFlip ? 'DOUBLE-LAUNCH' : ''].filter(Boolean);   // the sky tap, the board top and the board run are runway labels
-    const airBits = [...flight.attempt.tricks.map((t) => t.id.toUpperCase()), turn === 'player' && finishVariant ? SLAM_VARIANTS[finishVariant].label : '', flow.label, styleTaps > 0 ? `${styleTaps} STYLE TAP${styleTaps > 1 ? 'S' : ''}` : '', pumpStyle > 0 ? 'HANG PUMP' : '', hangBonus > 0 ? 'HANG' : ''].filter(Boolean);
+    const airBits = [...flight.attempt.tricks.map((t) => t.id.toUpperCase()), calledFinish?.label ?? '', flow.label, styleTaps > 0 ? `${styleTaps} STYLE TAP${styleTaps > 1 ? 'S' : ''}` : '', pumpStyle > 0 ? 'HANG PUMP' : '', hangBonus > 0 ? 'HANG' : ''].filter(Boolean);
     const judgeWhy = `APPROACH ${approachBits.join(' · ')} │ AIR ${airBits.join(' · ') || 'straight up'} │ PRECISION ${Math.round(qteAccuracy * 100)}% │ HYPE ${Math.round(momentum.score01 * 100)}% · FRESH ${Math.round(fresh.freshness01 * 100)}%${seenIt ? ' · SEEN IT' : ''}`;
     lastJudgeWhy = judgeWhy; lastDifficulty = difficulty; lastExecution = execution; lastStyleScore = styleScore;
     // HOOPS-TO-75 HP-1: the timing line waits until the judge cards finish — one overlay at a time
