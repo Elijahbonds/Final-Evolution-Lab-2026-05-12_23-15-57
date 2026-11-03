@@ -1300,6 +1300,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'How long the foot planter takes to take a leg over when it starts holding a foot, and to hand it back. 0 = the old one-frame step (the derby batter thigh jumped 25 degrees in a frame standing still).',
   },
   {
+    id: 'anim.plantReleaseSec', label: 'Foot plant: release blend time', def: 0.1, min: 0, max: 0.4, step: 0.02, unit: 's', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/FootPlanting.ts PLANT_RELEASE_SEC',
+    hint: 'How long a leg the foot planter lets go of takes to ease back onto the clip, in rotation. 0 = the old release, a target fade that rebuilt the leg in one frame when the body jumped or landed (football hurdle, 41 to 70 degrees a frame).',
+  },
+  {
     id: 'anim.hipYawFold', label: 'Posture hip strip folds past 90 degrees on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
     source: 'lib/babylon/anim/PostureLayer.ts HIP_YAW_FOLD_ON',
     hint: 'On: a window that keeps part of the hips turn (football spin) reads a turn past 90 degrees folded back, so the hips never flip 180 degrees in a frame at the half-turn. Off: the old wrapped read.',

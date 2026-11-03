@@ -421,4 +421,10 @@ yet.
   180 degrees in one frame at the half-turn. The read is folded past 90 degrees (unchanged up to 90, back to 0 at 180), so the strip
   is continuous. 0 = the old wrapped read exactly.
 
+- Same group (`anim/FootPlanting.ts`, lane/gameplay-clean-4), **TUNED (new behaviour)**: `anim.plantReleaseSec` 0.1 s, the release
+  fade's own time. A pin the clip lets go of (a lift, a take-off, a landing) now eases back onto the clip in ROTATION: the hip and knee
+  the layer wrote last are held and slerped onto the clip's. The old release faded the target and solved it each frame, which rebuilt
+  the leg in one frame when the root or the clip jumped on that frame (Football Rush's hurdle and TD spike: thighs 41 to 70 degrees a
+  frame). 0 = the old target fade exactly.
+
 **assumption:** the bounds (0 to 0.4 s) are safe, not tuned. A ranked, staked or head-to-head run reads the defaults.

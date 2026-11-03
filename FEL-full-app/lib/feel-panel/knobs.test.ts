@@ -41,7 +41,7 @@ import { PORTRAIT_HERO_MARGIN } from '@/lib/babylon/modes/netPortraitCam';
 import { OCCLUDER_FADE_ALPHA, OCCLUDER_FADE_SEC, OCCLUDER_HOLD_SEC } from '@/lib/babylon/core/OccluderFade';   // gameplay-clean
 import { FOOTBALL_CARRY_RATE_MAX } from '@/lib/babylon/anim/footballTree';   // gameplay-clean P2 #6
 import { CAM_LEAD_EASE_SEC, CAM_LEAD_FULL_MPS } from '@/lib/babylon/core/CameraDirector';   // gameplay-clean P2 #10
-import { PLANT_ENGAGE_SEC } from '@/lib/babylon/anim/FootPlanting';   // gameplay-clean P3
+import { PLANT_ENGAGE_SEC, PLANT_RELEASE_SEC } from '@/lib/babylon/anim/FootPlanting';   // gameplay-clean P3 / P4
 import { HIP_YAW_FOLD_ON } from '@/lib/babylon/anim/PostureLayer';   // gameplay-clean P3
 import { AI_REACT_ROOKIE_MS, AI_REACT_PRO_MS, AI_REACT_ELITE_MS } from '@/lib/babylon/hoops/reaction';   // lane/hoops-round2
 import { DOUBLE_TEAM_ON, DOUBLE_PAINT_M, DOUBLE_AFTER_SEC, DOUBLE_MAX_SEC, DOUBLE_COOLDOWN_SEC, SWITCH_ON_SCREEN_ON, SWITCH_HELP_M, SWITCH_COOLDOWN_SEC } from '@/lib/babylon/hoops/teamDefense';
@@ -101,6 +101,7 @@ describe('the feel knob catalogue', () => {
     expect(def('camera.leadFullMps')).toBe(CAM_LEAD_FULL_MPS);
     expect(def('anim.plantEngageSec')).toBe(PLANT_ENGAGE_SEC);
     expect(def('anim.hipYawFold')).toBe(HIP_YAW_FOLD_ON);
+    expect(def('anim.plantReleaseSec')).toBe(PLANT_RELEASE_SEC);
     // hoops-round2 (HOP-02 "Hoops · AI reaction", HOP-03 "Hoops · team defense", HOP-04 "Hoops · contact"): the owner's 420 / 220 / 120
     expect(def('hoops.aiReactRookieMs')).toBe(AI_REACT_ROOKIE_MS);
     expect(def('hoops.aiReactProMs')).toBe(AI_REACT_PRO_MS);
