@@ -953,6 +953,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'How long the game holds on the iron for a perfect slam. An ordinary make stays at 70 ms; cleaner slams grow toward this.',
   },
   {
+    id: 'dunk.preloadSet', label: 'Load the contest before dunk 1 on (1) / off (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Dunk · loading',
+    source: 'lib/babylon/modes/dunkContestDefer.ts DUNK_PRELOAD_SET_ON',
+    hint: 'On: the rival and the five boardwalk onlookers load and set up, and the landing and replay shaders compile, while the contest intro plays. The first run waits for them (20 s at most). Off: they load between rounds. Read when the dunk loads.',
+  },
+  {
     id: 'dunk.slamShakeBig', label: 'Slam: shake on a perfect flush', def: 0.18, min: 0.12, max: 0.3, step: 0.01, unit: '', group: 'Dunk · slam',
     source: 'lib/babylon/core/DunkFlagship.ts SLAM_SHAKE_BIG',
     hint: 'Camera shake for a perfect slam. An ordinary make stays at 0.12. Reduced motion turns shake off.',
