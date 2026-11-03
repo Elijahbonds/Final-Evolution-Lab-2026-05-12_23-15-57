@@ -50,7 +50,7 @@ const ripThrough: Builder = (scene, sk) => {
   const hipR: Pair = { Right: [0.24, 0.84, 0.18], Left: [0.10, 0.86, 0.26] };
   const knees: Pair = { Right: [0.04, 0.56, 0.38], Left: [-0.12, 0.58, 0.36] };
   const hipL: Pair = { Right: [-0.10, 0.80, 0.26], Left: [-0.26, 0.82, 0.16] };
-  const through = low({ Right: [-0.16, 0.66, 0.40], Left: [-0.30, 0.68, 0.30] }, { bones: { Hips: [30, -14, 0], Spine: [8, -8, 0], Neck: [-20, 10, 0], LeftFoot: [-16, 0, 0], RightFoot: [-10, 0, 0] }, feet: { Left: [-0.18, ANKLE, 0.06], Right: [-0.24, ANKLE, 0.52] }, kneePoles: { Left: [-0.2, 0, 1], Right: [-0.3, 0, 1] }, hipsX: -0.10, hipsZ: 0.18, hipsY: -0.22 });
+  const through = low({ Right: [-0.16, 0.66, 0.40], Left: [-0.30, 0.68, 0.30] }, { bones: { Hips: [30, -14, 0], Spine: [8, -8, 0], Neck: [-20, 10, 0], LeftFoot: [-26, 0, 0], RightFoot: [-10, 0, 0] }, feet: { Left: [-0.18, ANKLE, 0.06], Right: [-0.24, ANKLE, 0.52] }, kneePoles: { Left: [-0.2, 0, 1], Right: [-0.3, 0, 1] }, hipsX: -0.10, hipsZ: 0.18, hipsY: -0.20 });
   return run(scene, sk, 'ex_rip_through', 3.6, [
     at(low(hipR), 0, true), at(low(knees), 0.35), at(low(hipL), 0.6, true), at(through, 1.1, true), at(through, 1.5, true), at(low(hipL), 2.3, true), at(low(knees), 2.7), at(low(hipR), 3.0, true),
   ], true);
