@@ -9,6 +9,7 @@
 // position, labelled "Demo coming" — never a T-pose, never another movement.
 //
 // Pure. Client-safe.
+import { nameKey } from './search/text';
 
 /** A drill (lib/drills/drills.ts DRILLS id) → the authored loop that shows its movement. null: no loop is its movement. */
 export const DRILL_DEMO_LOOPS: Readonly<Record<string, string | null>> = {
@@ -62,6 +63,21 @@ export const WARMUP_DEMO_LOOPS: Readonly<Record<string, string | null>> = {
 
 /** A warm-up or cool-down step's loop, or null (the still). */
 export const warmupDemoLoop = (id: string): string | null => WARMUP_DEMO_LOOPS[id] ?? null;
+
+/**
+ * DEMO-LOOPS-4: coach catalogue rows the library cannot answer by name (lib/library/match.ts: no entry by that name or an
+ * alias), keyed by the catalogue's exact name (folded by nameKey) → the loop that IS that row's movement, by the row's own
+ * set-up (lib/coach/templateCatalogue.ts). Only names with no library entry: once the library has one, its own loop wins.
+ */
+export const CATALOGUE_DEMO_LOOPS: Readonly<Record<string, string>> = {
+  // "Hands on the floor, hips high, heels lifted. Lower your head toward a spot just in front of your hands, then press away."
+  'Pike Push-Up': 'ex_pike_pushup',
+  // "Hold both sides of a sturdy door frame, … lean back … Pull your chest to the frame"
+  'Door Frame Row, Upright': 'ex_door_row', 'Door Frame Row': 'ex_door_row',
+};
+const CATALOGUE_BY_KEY: ReadonlyMap<string, string> = new Map(Object.entries(CATALOGUE_DEMO_LOOPS).map(([n, c]) => [nameKey(n), c]));
+/** A catalogue row's loop by its name, for a row the library has no entry for; null otherwise. */
+export const catalogueDemoLoop = (name: string | null | undefined): string | null => (name ? CATALOGUE_BY_KEY.get(nameKey(name)) ?? null : null);
 
 /** The still a surface with no loop shows: the body standing in the start position (held, not looping), "Demo coming". */
 export const STILL_DEMO_CLIP = 'idle_stand';

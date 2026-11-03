@@ -20,4 +20,8 @@ export const PROPPED_LOOPS = {
   ex_decline_press: 'decline', ex_decline_fly: 'decline', ex_decline_fly_one: 'decline', ex_decline_skull: 'decline', ex_decline_skull_one: 'decline',
   // exerciseWarmup.ts (DEMO-LOOPS-4): the wall the calf rock and the Wake-Up's locks lean on; the door post and the doorway
   ex_wall_calf_rock: 'wall', ex_wall_locks: 'wall', ex_doorway_chest_rock: 'doorpost', ex_door_row: 'doorway',
+  // exerciseFamilies.ts (DEMO-LOOPS-4): the bar the hanging raises hang from, the parallel bars the knee raise holds itself up on
+  ex_hang_leg_raise: 'pullbar', ex_hang_pike: 'pullbar', ex_bar_leg_raise: 'dipbars',
+  // exerciseAsks.ts: the seat the one-leg calf raise sits on; the box the push-off (in front) and the stride jumps (beside) drive up from
+  ex_seated_calf_one: 'seat', ex_box_pushoff: 'box', ex_stride_jump: 'boxside', ex_stride_jump_cross: 'boxside',
 } as const satisfies Record<string, string>;

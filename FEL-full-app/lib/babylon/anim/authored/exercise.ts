@@ -35,6 +35,8 @@ import { VARIANT_BUILDERS } from './exerciseVariants';
 import { DRILL_BUILDERS } from './exerciseDrills';
 import { SIGNATURE_BUILDERS } from './exerciseSignature';
 import { WARMUP_BUILDERS } from './exerciseWarmup';
+import { ASK_BUILDERS } from './exerciseAsks';
+import { FAMILY_BUILDERS } from './exerciseFamilies';
 
 
 // ── lower body ───────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -428,6 +430,9 @@ export const EXERCISE_BUILDERS: readonly [string, (scene: Scene, sk: Skeleton) =
   ...SIGNATURE_BUILDERS,
   // DEMO-LOOPS-4 (2026-11-03): the generated warm-up's and cool-down's steps (exerciseWarmup.ts)
   ...WARMUP_BUILDERS,
+  // DEMO-LOOPS-4: what the programs ask for and the single-leg search (exerciseAsks.ts)
+  ...ASK_BUILDERS,
+  ...FAMILY_BUILDERS,
 ];
 /** Build one exercise loop by name (authored/index.ts registers each name through this). */
 export function buildExerciseClip(name: string, scene: Scene, sk: Skeleton): AnimationGroup | null {

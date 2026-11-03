@@ -5,7 +5,11 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { DRILLS } from '@/lib/drills/drills';
 import { DEMO_CLIPS } from './demo';
-import { DRILL_DEMO_LOOPS, SCREEN_DEMO_LOOPS, WARMUP_DEMO_LOOPS, drillDemoLoop, warmupDemoLoop } from './surfaceDemo';
+import { CATALOGUE_DEMO_LOOPS, DRILL_DEMO_LOOPS, SCREEN_DEMO_LOOPS, WARMUP_DEMO_LOOPS, catalogueDemoLoop, drillDemoLoop, warmupDemoLoop } from './surfaceDemo';
+import { fromProgram } from '@/lib/session-player/fromProgram';
+import { loadLibraryFiles } from './files';
+import { matchLibraryByName } from './match';
+import { TEMPLATE_EXERCISES } from '@/lib/coach/templateCatalogue';
 import { WAKE_UP } from '@/lib/drills/drills';
 import { PRIMERS, ROCK_HOLDS } from '@/lib/coach/warmupContent';
 import { RECOVERY_BREATH_STEP } from '@/lib/coach/cooldown';
@@ -47,5 +51,23 @@ describe('the warm-up and cool-down steps', () => {
     const today = { block: { label: 'B' }, session: { id: 's', label: 'S', exercises: [] } } as unknown as Parameters<typeof fromCoachToday>[0];
     const s = fromCoachToday(today, { warmup: { steps: [{ id: 'ankle-rock', name: 'Ankle Rock and Hold', seconds: 60, cue: 'c', dose: null }] } as never, cooldown: { steps: [{ id: 'recovery-breath', name: 'Breath', seconds: 90, cue: 'c', dose: null }] } as never });
     expect(s.session.steps.map((x) => x.clip)).toEqual(['ex_ankle_rock', 'ex_breathe_supine']);
+  });
+});
+
+// DEMO-LOOPS-4: a coach catalogue row the library cannot name plays its own loop; only rows the library has NO entry for
+describe('coach catalogue rows with no library entry', () => {
+  it('play the loop their set-up describes, by their exact name; a name the library answers is never here', () => {
+    expect(catalogueDemoLoop('Pike Push-Up')).toBe('ex_pike_pushup');
+    expect(catalogueDemoLoop('pike push up')).toBe('ex_pike_pushup');
+    expect(catalogueDemoLoop('Hands-Elevated Pike Push-Up')).toBeNull();
+    const docs = loadLibraryFiles();
+    for (const n of Object.keys(CATALOGUE_DEMO_LOOPS)) expect(matchLibraryByName(docs, [n]), n).toBeNull();
+    const names = new Set(TEMPLATE_EXERCISES.map((x) => x.catalogue.name));
+    for (const n of Object.keys(CATALOGUE_DEMO_LOOPS)) expect(names.has(n), n).toBe(true);
+    for (const c of Object.values(CATALOGUE_DEMO_LOOPS)) expect(DEMO_CLIPS, c).toContain(c);
+  });
+  it('a built program\'s warm-up and cool-down steps play their loops too', () => {
+    const day = { id: 'd', title: 'D', warmup: [{ id: 'hinge-rock', name: 'Hinge Rock and Hold', seconds: 60, cue: null, dose: null }], blocks: [], cooldown: [{ id: 'recovery-breath', name: 'Breath', seconds: 90, cue: null, dose: null }] } as unknown as Parameters<typeof fromProgram>[0];
+    expect(fromProgram(day, { title: 'T' }).steps.map((s) => s.clip)).toEqual(['ex_hinge_rock', 'ex_breathe_supine']);
   });
 });
