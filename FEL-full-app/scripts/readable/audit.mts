@@ -322,7 +322,8 @@ for (const route of only ?? allRoutes) {
   // --redo-before=<epoch ms>: re-read a route last read before then (the rig's page script changed since)
   if (existsSync(file) && !args.includes('--redo') && Date.parse(JSON.parse(readFileSync(file, 'utf8')).when) >= Number(flag('redo-before') ?? 0)) continue;
   if ((Date.now() - T0) / 1000 > BUDGET_S) { console.log(`budget reached after ${did} routes; run again to continue`); break; }
-  const res: Record<string, unknown> = { route, when: new Date().toISOString() };
+  // --configs=<subset> re-reads only those set-ups and keeps the rest of the route's file
+  const res: Record<string, unknown> = { ...(flag('configs') && existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {}), route, when: new Date().toISOString() };
   for (const cfg of configs) {
     const t = Date.now();
     let { page, errors, ok } = await open(`${ORIGIN}/index.html#${route}${cfg.query ? `?${cfg.query}` : ''}`, cfg);
