@@ -128,7 +128,7 @@ export function ModeCarousel({ lead, value, onChange, accent }: CarouselProps) {
                 <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-[#050505] via-[#050505]/35 to-transparent" />
                 <span className="absolute inset-x-0 bottom-0 p-3">
                   <span className="fel-heading block text-[14px] font-bold leading-tight text-white">{info.name}</span>
-                  <span className="mt-1 block truncate font-mono text-[12px] uppercase tracking-[0.14em] text-white/50">
+                  <span className="mt-1 block font-mono text-[12px] uppercase leading-tight tracking-[0.06em] text-white/60">
                     {info.venue}
                   </span>
                 </span>

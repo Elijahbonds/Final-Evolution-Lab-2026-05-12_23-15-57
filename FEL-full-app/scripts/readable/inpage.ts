@@ -222,7 +222,9 @@ function fixedLayers(): { el: Element; r: Rect; side: 'top' | 'bottom' | 'any' }
     if (r.width < 8 || r.height < 8) continue;
     // nested fixed layers: the outermost one is the layer
     if (el.parentElement && inFixed(el.parentElement)) continue;
-    const side = r.top <= 2 ? 'top' : r.bottom >= innerHeight - 2 ? 'bottom' : 'any';
+    // a layer floating off the edges (a docked button above the tab bar) belongs to the half it sits in: at the top of
+    // the page only the top half's layers hide what can never be scrolled clear, at the end only the bottom half's
+    const side = r.top <= 2 || (r.bottom < innerHeight - 2 && (r.top + r.bottom) / 2 < innerHeight / 2) ? 'top' : 'bottom';
     out.push({ el, r: rectOf(r), side });
   }
   return out;
@@ -240,7 +242,7 @@ export function covered(where: 'top' | 'bottom'): Cover[] {
   for (const run of collect()) {
     if (run.fixed) continue;
     for (const L of layers) {
-      if (scrolls && L.side !== where && L.side !== 'any') continue;
+      if (scrolls && L.side !== where) continue;
       for (const r of run.rects) {
         const x = (r.left + r.right) / 2, y = (r.top + r.bottom) / 2;
         if (x < L.r.left || x > L.r.right || y < L.r.top || y > L.r.bottom) continue;
