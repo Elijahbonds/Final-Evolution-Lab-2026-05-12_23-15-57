@@ -19,6 +19,7 @@ export const START_TODAY = 'Start today';
 export const READ_BACK = 'What FEL read';
 export const EDIT_HINT = 'Tap a chip to change it.';
 export const SAVED_LINE = 'Saved on this phone.';
+export const SAVED_ACCOUNT_LINE = 'Saved on this phone and your account.';
 export const WEEK_VIEW = 'The weeks';
 export const CHECKPOINT_TITLE = 'Checkpoint';
 export const LIGHTER_TAG = 'Lighter';
@@ -46,9 +47,9 @@ export const SLOT_LABEL: Record<SlotId, string> = {
   rear: 'upper back', power: 'jumps', speed: 'speed', cond: 'conditioning', mobility: 'mobility',
 };
 
-export function kitWords(eq: readonly string[], tension: BandTension | null): string {
+export function kitWords(eq: readonly string[], tension: BandTension | null, bands?: readonly BandTension[]): string {
   if (!eq.length) return 'no equipment';
-  return eq.map((id) => (id === 'band' ? (tension ? `one ${tension} band` : 'one band') : (EQUIPMENT.find((e) => e.id === id)?.label ?? id).toLowerCase())).join(', ');
+  return eq.map((id) => (id === 'band' ? (bands && bands.length > 1 ? `${bands.join(', ')} bands` : tension ? `one ${tension} band` : 'one band') : (EQUIPMENT.find((e) => e.id === id)?.label ?? id).toLowerCase())).join(', ');
 }
 
 const HOLD_WORDS: Record<WaveBand, string> = { idle: 'just breathe', cruise: 'easy, could go longer', drive: 'steady, some left at the end', surge: 'hard, still clean' };
@@ -106,7 +107,7 @@ export function programTitle(r: ProgramRequest): string {
 /** ≤ 50 words: what it is, and how it moves. */
 export function programSummary(r: ProgramRequest, blockLen: number): string {
   const lighter = Math.min(blockLen, r.weeks);
-  return `${days(r.days)}, ${r.minutes} minutes, ${r.weeks} weeks, with ${kitWords(r.equipment, r.tension)}. Every session has a warm-up, the main work in pairs, and a cool-down. Reps and difficulty climb each week; week ${lighter} is lighter, then a checkpoint decides the next block.`;
+  return `${days(r.days)}, ${r.minutes} minutes, ${r.weeks} weeks, with ${kitWords(r.equipment, r.tension, r.bands)}. Every session has a warm-up, the main work in pairs, and a cool-down. Reps and difficulty climb each week; week ${lighter} is lighter, then a checkpoint decides the next block.`;
 }
 
 /** FEL's own "why this plan" (the AI may replace it with its own, through ./ai.ts's guards). */

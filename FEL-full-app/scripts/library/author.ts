@@ -17,7 +17,9 @@
 //   2 — new families in the owner's priorities: basketball (handle combos, finishing, shooting, defense, passing),
 //       jump-and-land ladders and jump progressions, sprint starts, cuts and footwork (./authoring/later.ts);
 //   3 — new mobility flows, prehab and conditioning families, plus the sport, speed and prehab modifiers;
-//   4 — the strength modifiers (paused, tempo, single-arm, offset…), rule-checked.
+//   4 — the strength modifiers (paused, tempo, single-arm, offset…), rule-checked;
+//   5 — PROGRAM-ASK-2 (2026-11-02): six band and home entries Build my program found missing (./authoring/program-ask.ts),
+//       written out whole rather than from a matrix.
 // A modifier entry and an axis variant carry `variantOf` (the base), so search shows the base once with "+N variants".
 //
 // Run:
@@ -37,11 +39,12 @@ import { LEVEL_IDS, PREHAB_NOTE, levelRank } from '../../lib/library/vocab';
 import { DATA, gate, readDir, writeEntries, writeFilesIndex } from './common';
 import { BLOCKS } from './authoring/blocks';
 import { LATER_BLOCKS } from './authoring/later';
+import { PROGRAM_ASK_BATCH, PROGRAM_ASK_ENTRIES } from './authoring/program-ask';
 import { applyCueStyle } from './authoring/cue-style';
 import type { Family, Variant } from './authoring/types';
 
 export const AUTHORED_LICENCE = 'FEL original (Final Evolution Lab)';
-export const BATCHES = [1, 2, 3, 4] as const;
+export const BATCHES = [1, 2, 3, 4, 5] as const;
 
 function arg(name: string): string | null {
   const i = process.argv.indexOf(name);
@@ -198,6 +201,10 @@ export function buildAll(seed: readonly LibraryExercise[]): { batches: Map<numbe
     batches.set(n, [...fam.entries, ...buildModifierBatch(modBase, n, known, later)]);
     linked.set(n, fam.linked);
   }
+  // PROGRAM-ASK-2 (2026-11-03): batch 5, written out whole (./authoring/program-ask.ts); before the cue-style step, so it
+  // goes through the same lookup as every other batch
+  batches.set(PROGRAM_ASK_BATCH, PROGRAM_ASK_ENTRIES.map((e) => ({ ...e })));
+  linked.set(PROGRAM_ASK_BATCH, []);
   // PLAT-P08 (2026-11-02): last, CUE-REWRITE's wording (./authoring/cue-style.ts), so a re-run writes what is on disk.
   // After the build, not inside it: the modifier batches derive from the generated bases, and the table is keyed by them.
   for (const [n, list] of batches) batches.set(n, list.map(applyCueStyle));
