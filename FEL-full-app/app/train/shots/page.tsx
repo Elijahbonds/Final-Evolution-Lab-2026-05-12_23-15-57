@@ -1,6 +1,5 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
-import Link from 'next/link';
 import { authOptions } from '@/lib/auth';
 import { loginPath } from '@/lib/auth/safeNext';
 import { prisma } from '@/lib/db';
@@ -26,8 +25,8 @@ export default async function ShotsPage({ searchParams }: { searchParams?: Recor
   if (!me) redirect(loginPath(mode === 'dribble' ? '/train/shots?mode=dribble' : '/train/shots'));
   const access = hoopsCamAccess({ signedIn: true, dobYear: await readDobYear(prisma, me, 'hoops_cam_page') });
   return (
-    <TabPage eyebrow="Train" title="Shots & dribbles" lede="Your makes, misses and dribbles from your phone's camera. A beta: fix any call with a tap." accent="#FF8A3D"
-      aside={<Link href="/train" className="rounded-xl border border-white/10 px-3 py-2 text-[12px] font-bold text-white/75 hover:bg-white/[0.05] hover:text-white">← Train</Link>}>
+    // PLAT-P09: no lede and no second "Train" link (the session's own footer has one): fewer words before the camera
+    <TabPage eyebrow="Train" title="Shots & dribbles" accent="#FF8A3D">
       <div className="mx-auto max-w-md">
         {access.ok ? <ShotSession tier={access.tier} startMode={mode} /> : (
           <div className="fel-card rounded-xl p-5 text-sm text-white/75" data-hoops-refused={access.error}>{access.error === 'under_13' ? UNDER_13_LINE : AGE_UNKNOWN_LINE}</div>

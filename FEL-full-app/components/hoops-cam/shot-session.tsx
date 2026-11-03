@@ -14,7 +14,7 @@
 // (frame-grab.ts) is never shown or sent; nothing here sends anything at all.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Check, Crosshair, Loader2, Plus, RotateCcw, Square, Trash2, X } from 'lucide-react';
+import { Check, CheckCircle2, Crosshair, Loader2, RotateCcw, Square, Trash2, X, XCircle } from 'lucide-react';
 import { Layer } from '@/components/session-player/layer';
 import { PrimaryCta } from '@/components/ui/fel/primary-cta';
 import { HOOPS_LOOK as K } from './look';
@@ -176,7 +176,7 @@ export function ShotSession({ tier, grab, startMode = 'shots' }: { tier: HoopsTi
             {(['shots', 'dribble'] as const).map((m) => (
               <button key={m} type="button" role="tab" aria-selected={mode === m} data-hoops-tab={m}
                 onClick={() => { setMode(m); setFront(m === 'dribble'); }}
-                className={`min-h-10 rounded-lg border px-3 text-sm font-bold ${mode === m ? 'border-[#FF8A3D] bg-[#FF8A3D]/15 text-[#FF8A3D]' : 'border-white/15 text-white/70'}`}>
+                className={`${K.chip} font-bold ${mode === m ? K.chipOn : ''}`}>
                 {m === 'shots' ? 'Shots' : 'Dribbles'}
               </button>
             ))}
@@ -188,12 +188,12 @@ export function ShotSession({ tier, grab, startMode = 'shots' }: { tier: HoopsTi
                 <div className="flex flex-wrap gap-1.5">
                   {PLACEMENT_IDS.map((p) => (
                     <button key={p} type="button" aria-pressed={placement === p} data-hoops-place={p} onClick={() => setPlacement(p)}
-                      className={`min-h-9 rounded-full border px-3 text-[13px] ${placement === p ? 'border-white bg-white text-black' : 'border-white/15 text-white/75'}`}>{PLACEMENTS[p].label}</button>
+                      className={`${K.chip} ${placement === p ? K.chipOn : ''}`}>{PLACEMENTS[p].label}</button>
                   ))}
                 </div>
-                <p className="mt-1 text-[11px] text-white/45">{placementLine(placement)}</p>
+                <p className="mt-1 text-xs text-white/60">{placementLine(placement)}</p>
               </div>
-              <label className="block text-xs text-white/55">Your height (cm), for the shot chart&apos;s distances
+              <label className="block text-xs text-white/55">Your height (cm)
                 <input inputMode="numeric" value={height} onChange={(e) => setHeight(e.target.value.replace(/[^0-9]/g, ''))} data-hoops-height
                   className="mt-1 block min-h-11 w-full rounded-lg border border-white/15 bg-black/40 px-3 text-base text-white" placeholder="178" />
               </label>
@@ -205,13 +205,13 @@ export function ShotSession({ tier, grab, startMode = 'shots' }: { tier: HoopsTi
           </label>
           {/* PLAT-P09: the set-up guide folds away (fewer words before the camera; one tap to read it) */}
           <details className="text-xs text-white/60" data-hoops-guide-box>
-            <summary className="min-h-10 cursor-pointer py-2 text-[13px] font-semibold text-white/80">How to set the phone up</summary>
+            <summary className="min-h-10 cursor-pointer py-2 text-sm font-semibold text-white/80">How to set the phone up</summary>
             <ul className="list-disc space-y-0.5 pl-4" data-hoops-guide>
               {(mode === 'shots' ? SHOT_GUIDE : DRIBBLE_GUIDE).map((l) => <li key={l}>{l}</li>)}
             </ul>
           </details>
-          <p className="text-[11px] text-[#FFB020]/90" data-hoops-beta>{BETA_LINE}</p>
-          <p className="text-[11px] text-white/40">{PRIVACY_LINE}</p>
+          <p className="text-xs text-[#FFB020]/90" data-hoops-beta>{BETA_LINE}</p>
+          <p className="text-xs text-white/60">{PRIVACY_LINE}</p>
         </div>
       )}
 
@@ -268,8 +268,8 @@ export function ShotSession({ tier, grab, startMode = 'shots' }: { tier: HoopsTi
                     <button type="button" onClick={() => drop(view.last!.index)} aria-label={`Shot ${view.last.index} was not a shot`} data-hoops-drop className={K.icon}><Trash2 className="h-5 w-5" /></button>
                   </>
                 )}
-                <button type="button" onClick={() => byHand(true)} aria-label="Add a make it missed" data-hoops-add-make className={K.icon}><Plus className="h-5 w-5 text-[#00FF9D]" /></button>
-                <button type="button" onClick={() => byHand(false)} aria-label="Add a miss it missed" data-hoops-add-miss className={K.icon}><Plus className="h-5 w-5 text-[#FF6B8A]" /></button>
+                <button type="button" onClick={() => byHand(true)} aria-label="Add a make it missed" data-hoops-add-make className={K.icon}><CheckCircle2 className="h-5 w-5 text-[#00FF9D]" /></button>
+                <button type="button" onClick={() => byHand(false)} aria-label="Add a miss it missed" data-hoops-add-miss className={K.icon}><XCircle className="h-5 w-5 text-[#FF6B8A]" /></button>
                 <button type="button" onClick={() => { setPhase('rim'); setTap(null); }} aria-label="Mark the rim again" data-hoops-remark className={K.icon}><Crosshair className="h-5 w-5" /></button>
               </div>
             )}
@@ -288,28 +288,28 @@ export function ShotSession({ tier, grab, startMode = 'shots' }: { tier: HoopsTi
             <div className="fel-card space-y-3 rounded-xl p-4">
               <div className="flex items-baseline justify-between">
                 <div className="text-2xl font-black tabular-nums text-white" data-hoops-sum-count>{view.made}/{view.taken} · {pctText(view.made, view.taken)}</div>
-                <div className="text-xs text-white/45">{PLACEMENTS[placement].label}</div>
+                <div className="text-xs text-white/60">{PLACEMENTS[placement].label}</div>
               </div>
               <ShotChart shots={chartShots} zones={zones} />
               <ol className="max-h-56 space-y-1 overflow-y-auto" data-hoops-shot-list>
                 {shots.map((s) => (
-                  <li key={s.index} className="flex items-center justify-between gap-2 text-[13px] tabular-nums text-white/85" data-hoops-shot={s.index}>
+                  <li key={s.index} className="flex items-center justify-between gap-2 text-sm tabular-nums text-white/85" data-hoops-shot={s.index}>
                     <span className="flex items-center gap-1.5">{s.made ? <Check className="h-3.5 w-3.5 text-[#00FF9D]" aria-label="make" /> : <X className="h-3.5 w-3.5 text-[#FF6B8A]" aria-label="miss" />}
                       Shot {s.index}{s.spot ? ` · ${s.spot.distM} m` : ''}{s.fixed ? ' · fixed' : s.ask ? ' · not sure' : ''}</span>
                     <button type="button" onClick={() => fix(s.index, !s.made)} data-hoops-sum-flip={s.index} className="min-h-8 rounded-md border border-white/15 px-2 text-xs text-white/75">Make it a {s.made ? 'miss' : 'make'}</button>
                   </li>
                 ))}
               </ol>
-              <p className="text-[11px] text-white/45">{SPOT_LINE}{heightM ? '' : ' Enter your height for steadier distances.'}</p>
+              <p className="text-xs text-white/60">{SPOT_LINE}{heightM ? '' : ' Enter your height for steadier distances.'}</p>
             </div>
           ) : (
             <div className="fel-card space-y-2 rounded-xl p-4" data-hoops-dribble-sum>
               <dl className="grid grid-cols-3 gap-2 text-center">
-                <div className="rounded-lg bg-white/5 p-2"><dt className="text-[11px] text-white/45">Dribbles</dt><dd className="font-bold tabular-nums text-white" data-hoops-sum-dribbles>{d?.count ?? 0}</dd></div>
-                <div className="rounded-lg bg-white/5 p-2"><dt className="text-[11px] text-white/45">Crossovers</dt><dd className="font-bold tabular-nums text-white" data-hoops-sum-crossovers>{d?.crossovers ?? 0}</dd></div>
-                <div className="rounded-lg bg-white/5 p-2"><dt className="text-[11px] text-white/45">A second</dt><dd className="font-bold tabular-nums text-white" data-hoops-sum-rate>{d?.rateHz != null ? d.rateHz.toFixed(1) : '—'}</dd></div>
+                <div className="rounded-lg bg-white/5 p-2"><dt className="text-xs text-white/60">Dribbles</dt><dd className="font-bold tabular-nums text-white" data-hoops-sum-dribbles>{d?.count ?? 0}</dd></div>
+                <div className="rounded-lg bg-white/5 p-2"><dt className="text-xs text-white/60">Crossovers</dt><dd className="font-bold tabular-nums text-white" data-hoops-sum-crossovers>{d?.crossovers ?? 0}</dd></div>
+                <div className="rounded-lg bg-white/5 p-2"><dt className="text-xs text-white/60">A second</dt><dd className="font-bold tabular-nums text-white" data-hoops-sum-rate>{d?.rateHz != null ? d.rateHz.toFixed(1) : '—'}</dd></div>
               </dl>
-              <p className="text-[13px] text-white/70" data-hoops-sum-rhythm>
+              <p className="text-sm text-white/70" data-hoops-sum-rhythm>
                 {d?.rhythmCv != null ? `Rhythm: the gaps between dribbles vary ${Math.round(d.rhythmCv)}% (lower is steadier).` : 'Dribble a little longer for a rhythm read.'}
                 {d && (d.left || d.right) ? ` Left hand ${d.left}, right hand ${d.right}.` : ''}
                 {d?.height ? ` Mostly ${d.height === 'low' ? 'below the knee' : d.height === 'mid' ? 'knee to hip' : 'above the hip'}.` : ''}
@@ -318,11 +318,11 @@ export function ShotSession({ tier, grab, startMode = 'shots' }: { tier: HoopsTi
           )}
           {mode === 'shots' && days.length > 0 && <div className="fel-card rounded-xl p-4"><MakeTrend days={days} /></div>}
           <p className="text-xs text-white/50" data-hoops-kept={kept ?? ''}>{kept === 'device' ? DEVICE_LINE : tier === 'teen' ? 'Not kept.' : 'Nothing to keep.'}</p>
-          <p className="text-[11px] text-[#FFB020]/80">{BETA_LINE}</p>
+          <p className="text-xs text-[#FFB020]/80">{BETA_LINE}</p>
           <button type="button" onClick={() => { setPhase('setup'); setView(null); }} data-hoops-again className="flex min-h-12 w-full items-center justify-center rounded-xl bg-[#FF8A3D] px-4 font-bold text-black">New session</button>
         </div>
       )}
-      <p className="text-center text-xs text-white/40">
+      <p className="text-center text-xs text-white/60">
         <Link href="/train" className="underline">Back to Train</Link> · <Link href="/play/drills?shelf=hoops" className="underline" data-hoops-drills-door>Ball-skill drills</Link>
       </p>
     </div>

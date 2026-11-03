@@ -11,7 +11,7 @@ export const HOOPS_LOOK = {
   pct: `${TYPE.heading} tabular-nums text-white/80`,
   call: `${TYPE.label} rounded-full px-2.5 py-1 text-black`,
   line: `${TYPE.small} px-4 pb-2 text-center text-white/70`,
-  stage: 'relative mx-auto w-full max-w-3xl flex-1 overflow-hidden bg-black',
+  stage: 'relative mx-auto flex w-full max-w-3xl flex-1 items-center overflow-hidden bg-black',
   bar: 'flex items-center justify-center gap-3 px-4 pt-3',
   icon: 'fel-press grid h-12 w-12 place-items-center rounded-full border border-white/20 text-white',
   end: 'fel-press grid h-12 w-12 place-items-center rounded-full bg-white text-black',
@@ -19,4 +19,7 @@ export const HOOPS_LOOK = {
   ask: 'mx-4 flex items-center justify-between gap-2 rounded-2xl border border-[#FFB020]/40 bg-[#FFB020]/[0.08] px-4 py-2',
   yes: `${TYPE.label} fel-press min-h-12 rounded-full bg-[#00FF9D] px-5 text-black`,
   no: `${TYPE.label} fel-press min-h-12 rounded-full bg-[#FF6B8A] px-5 text-black`,
+  // the set-up: one chip look for the mode tabs and the phone's spot (on = the accent's ring and text, no fill)
+  chip: `${TYPE.small} fel-press min-h-10 rounded-full border border-white/15 px-3 text-white/75`,
+  chipOn: 'border-[#FF8A3D] text-[#FF8A3D]',
 } as const;

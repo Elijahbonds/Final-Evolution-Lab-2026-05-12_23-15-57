@@ -98,7 +98,8 @@ function Shelf({ access, unlockLive, shelf = 'playbook' }: { access: DrillsAcces
                   <Badge gate={a.gate} />
                 </span>
                 <span className="text-[13px] leading-relaxed text-white/55">{d.blurb}</span>
-                <span className="mt-auto flex items-center gap-3 font-mono text-[10.5px] uppercase tracking-[0.12em] text-white/40">
+                {/* PLAT-P09: 60% white (was 40%: 3.8:1 at 10.5 px, under 4.5) */}
+                <span className="mt-auto flex items-center gap-3 font-mono text-[10.5px] uppercase tracking-[0.12em] text-white/60">
                   <span>{drillShortSource(d)}</span>
                   <span className="flex items-center gap-1"><Clock aria-hidden className="h-3 w-3" />{drillMinutes(d)} min</span>
                 </span>
