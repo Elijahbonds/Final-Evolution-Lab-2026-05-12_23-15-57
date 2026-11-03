@@ -11,8 +11,8 @@ import { ArrowLeft, BookOpen, Camera, Clock } from 'lucide-react';
 import { setBodyPlayDobYear } from '@/lib/move/bodyPlayGrownUp';
 import { drillById } from '@/lib/drills/drills';
 import {
-  DRILLS_PATH, LANDING_CHECK_ENTRY, LANDING_UNLOCK_LABEL, LANDING_UNLOCK_LIVE, ROUTE_DRILLS, drillChapterHref, drillHref,
-  drillMinutes, drillSourceLine,
+  DRILLS_PATH, LANDING_CHECK_ENTRY, LANDING_UNLOCK_LABEL, LANDING_UNLOCK_LIVE, SHELF_DRILLS, drillChapterHref, drillHref,
+  drillMinutes, drillShortSource, drillSourceLine, shelfHref, type DrillShelf,
 } from '@/lib/drills/route';
 import { drillToRun, type DrillAccess, type DrillsAccess } from '@/lib/drills/gate';
 import type { BookLesson } from '@/lib/drills/playbookLinks';
@@ -59,13 +59,26 @@ export function LandingUnlock({ access, live = LANDING_UNLOCK_LIVE }: { access: 
   );
 }
 
-function Shelf({ access, unlockLive }: { access: DrillsAccess; unlockLive?: boolean }) {
+/** PLAT-P09 (BBS-03): the two shelves, one tap apart. */
+export const SHELF_LABEL: Record<DrillShelf, string> = { playbook: 'Playbook drills', hoops: 'Ball skills' };
+
+function Shelf({ access, unlockLive, shelf = 'playbook' }: { access: DrillsAccess; unlockLive?: boolean; shelf?: DrillShelf }) {
+  const list = SHELF_DRILLS[shelf];
+  const shown = access.drills.filter((d) => list.some((x) => x.id === d.id));
   return (
     <div className="space-y-4">
+      <nav className="flex gap-2" aria-label="Drill shelves" data-drill-shelves>
+        {(['playbook', 'hoops'] as const).map((s) => (
+          <Link key={s} href={shelfHref(s)} aria-current={s === shelf ? 'page' : undefined} data-drill-shelf={s}
+            className={`inline-flex min-h-10 items-center rounded-full border px-4 text-[13px] font-bold ${s === shelf ? 'border-[#00FF9D]/60 text-[#00FF9D]' : 'border-white/15 text-white/70'}`}>
+            {SHELF_LABEL[s]}
+          </Link>
+        ))}
+      </nav>
       <Note access={access} />
-      {access.drills.some((d) => d.gate !== 'open') && <LandingUnlock access={access} live={unlockLive} />}
+      {shown.some((d) => d.gate !== 'open') && <LandingUnlock access={access} live={unlockLive} />}
       <ul className="grid gap-3 sm:grid-cols-2">
-        {ROUTE_DRILLS.map((d) => {
+        {list.map((d) => {
           const a = access.drills.find((x) => x.id === d.id)!;
           return (
             <li key={d.id}>
@@ -77,7 +90,7 @@ function Shelf({ access, unlockLive }: { access: DrillsAccess; unlockLive?: bool
                 </span>
                 <span className="text-[13px] leading-relaxed text-white/55">{d.blurb}</span>
                 <span className="mt-auto flex items-center gap-3 font-mono text-[10.5px] uppercase tracking-[0.12em] text-white/40">
-                  <span>Playbook ch. {d.source.chapter}</span>
+                  <span>{drillShortSource(d)}</span>
                   <span className="flex items-center gap-1"><Clock aria-hidden className="h-3 w-3" />{drillMinutes(d)} min</span>
                 </span>
               </Link>
@@ -121,7 +134,7 @@ function DrillPage({ id, access, lessons, unlockLive }: { id: string; access: Dr
   if (live && run) return <DrillLive drill={run} onLeave={() => setLive(false)} />;
   return (
     <article className="space-y-4" data-drill-page={id}>
-      <Link href={DRILLS_PATH} className="inline-flex items-center gap-1.5 text-[13px] text-white/55 hover:text-white">
+      <Link href={drill.source.book === 'fel' ? shelfHref('hoops') : DRILLS_PATH} className="inline-flex items-center gap-1.5 text-[13px] text-white/55 hover:text-white">
         <ArrowLeft aria-hidden className="h-4 w-4" /> All drills
       </Link>
       <header className="space-y-1">
@@ -154,8 +167,10 @@ function DrillPage({ id, access, lessons, unlockLive }: { id: string; access: Dr
   );
 }
 
-export function DrillsApp({ access, drillId, lessons, dobYear, unlockLive }: {
+export function DrillsApp({ access, drillId, lessons, dobYear, unlockLive, shelf = 'playbook' }: {
   access: DrillsAccess; drillId: string | null; lessons: BookLesson[]; dobYear: number | null;
+  /** PLAT-P09: which shelf the list shows (?shelf=hoops: the ball skills). */
+  shelf?: DrillShelf;
   /** Tests only: the landing-unlock button with LANDING_UNLOCK_LIVE's value overridden. */
   unlockLive?: boolean;
 }) {
@@ -183,5 +198,5 @@ export function DrillsApp({ access, drillId, lessons, dobYear, unlockLive }: {
   }
   return drillId
     ? <DrillPage key={drillId} id={drillId} access={access} lessons={lessons} unlockLive={unlockLive} />
-    : <Shelf access={access} unlockLive={unlockLive} />;
+    : <Shelf access={access} unlockLive={unlockLive} shelf={shelf} />;
 }

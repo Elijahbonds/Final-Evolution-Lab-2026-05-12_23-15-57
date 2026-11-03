@@ -9,7 +9,7 @@ import { loadWarmupContext } from '@/lib/coach/warmupServer';
 import { FALLBACK_WARMUP_CONTEXT, type WarmupContext } from '@/lib/coach/warmup';
 import { logGateFailure } from '@/lib/privacy/scanSaveGate';
 import { drillsAccess } from '@/lib/drills/access';
-import { DRILLS_PATH, DRILL_PARAM, drillHref, routeDrill } from '@/lib/drills/route';
+import { DRILLS_PATH, DRILL_PARAM, SHELF_PARAM, drillHref, routeDrill, shelfHref, shelfOf } from '@/lib/drills/route';
 import { bookLessonsFor } from '@/lib/drills/playbookLinks';
 import { DrillsApp } from './_components/drills-app';
 
@@ -32,9 +32,12 @@ export const dynamic = 'force-dynamic';
 export default async function DrillsPage({ searchParams }: { searchParams?: Record<string, string | string[] | undefined> }) {
   const raw = searchParams?.[DRILL_PARAM];
   const drill = routeDrill(typeof raw === 'string' ? raw : null);
+  // PLAT-P09 (BBS-03): ?shelf=hoops is the ball-skill shelf (lib/drills/hoopsDrills.ts)
+  const shelfRaw = searchParams?.[SHELF_PARAM];
+  const shelf = shelfOf(typeof shelfRaw === 'string' ? shelfRaw : null);
   const session = await getServerSession(authOptions);
   const userId = (session?.user as { id?: string } | undefined)?.id;
-  if (!userId) redirect(loginPath(drill ? drillHref(drill.id) : DRILLS_PATH));
+  if (!userId) redirect(loginPath(drill ? drillHref(drill.id) : shelf === 'hoops' ? shelfHref('hoops') : DRILLS_PATH));
 
   const [ctx, user] = await Promise.all([
     loadWarmupContext(prisma, userId).catch((e: unknown): WarmupContext => {
@@ -53,10 +56,19 @@ export default async function DrillsPage({ searchParams }: { searchParams?: Reco
         </Link>
         <header className="space-y-1">
           <p className="font-mono text-[10.5px] font-bold uppercase tracking-[0.18em] text-[#00FF9D]">Drills</p>
-          <h1 className="text-3xl font-black text-white">The Playbook&apos;s drills, on your camera</h1>
-          <p className="text-[14px] text-white/55">The wake-up from chapter 5 and the jump-and-land drills from chapter 6. Set the phone up, run the space check, follow the targets.</p>
+          {shelf === 'hoops' && !drill ? (
+            <>
+              <h1 className="text-3xl font-black text-white">Ball skills, on your camera</h1>
+              <p className="text-[14px] text-white/55">Shooting form, footwork and defense, in place. Follow the targets.</p>
+            </>
+          ) : (
+            <>
+              <h1 className="text-3xl font-black text-white">The Playbook&apos;s drills, on your camera</h1>
+              <p className="text-[14px] text-white/55">The wake-up from chapter 5 and the jump-and-land drills from chapter 6. Set the phone up, run the space check, follow the targets.</p>
+            </>
+          )}
         </header>
-        <DrillsApp access={access} drillId={drill?.id ?? null} lessons={drill ? bookLessonsFor(drill) : []} dobYear={user?.dobYear ?? null} />
+        <DrillsApp access={access} drillId={drill?.id ?? null} lessons={drill ? bookLessonsFor(drill) : []} dobYear={user?.dobYear ?? null} shelf={shelf} />
       </div>
     </div>
   );
