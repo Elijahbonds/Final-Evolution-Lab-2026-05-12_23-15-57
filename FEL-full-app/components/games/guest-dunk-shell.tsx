@@ -10,6 +10,7 @@ import { is3D, isBabylon } from '@/components/three/flags';
 import { track, flush } from '@/lib/analytics';
 import { AgeStep, ageBlockPresent, writeAgeBlockFlag } from '@/components/age-step';
 import { ageScreenOutcome } from '@/lib/privacy/ageScreen';
+import { lockTryAge, tabStorage, tryAgeBand } from '@/lib/privacy/tryAgeGate';   // TRY-AGE-PLACEHOLDER-1 (flag ageBands)
 import type { GameProps, GameResult } from '@/components/games/game-shell';
 import { REVIEW_BUTTON_LABEL } from '@/lib/coach-store/storeOffers';   // STORE-OFFER-1 (a constant: no flag read on the client)
 
@@ -39,7 +40,7 @@ const DunkBabylon = dynamicImport(() => import('@/components/games/dunk-babylon'
  */
 type GuestGate = 'ask' | 'blocked' | 'local' | 'adult';
 
-export function GuestDunkShell({ challengeCode, reviewHref = null }: { challengeCode?: string | null; reviewHref?: string | null }) {
+export function GuestDunkShell({ challengeCode, reviewHref = null, ageBands = false }: { challengeCode?: string | null; reviewHref?: string | null; /** TRY-AGE-PLACEHOLDER-1: TRY_AGE_BANDS_ENABLED (default off) */ ageBands?: boolean }) {
   // Engine selection must match /play/dunk: isBabylon FIRST, then the 3D
   // fallback. This shell checked only is3D, so the guest path — the PLAY NOW
   // button, and therefore the first thing every new player ever sees — mounted
@@ -95,11 +96,20 @@ export function GuestDunkShell({ challengeCode, reviewHref = null }: { challenge
       void flush();
     })();
   };
-  const onAgeLocked = (year: number) => {
+  const onAgeLocked = (year: number, birthDate?: string) => {
+    if (ageBands) {
+      // TRY-AGE-PLACEHOLDER-1: the full date picks the band; only the band is kept (the session lock), never the date
+      const g = lockTryAge(tabStorage(), tryAgeBand(birthDate));
+      if (g === 'adult') startGuest();
+      else if (g === 'blocked') { writeAgeBlockFlag(); setGate('blocked'); }
+      else setGate('local');
+      return;
+    }
     if (ageScreenOutcome(year) === 'adult') startGuest();
     else setGate('local');
   };
   const onAgeBlocked = () => {
+    if (ageBands) lockTryAge(tabStorage(), 'under-13');   // TRY-AGE-PLACEHOLDER-1: a blocked answer holds for the session
     writeAgeBlockFlag();
     setGate('blocked');
   };

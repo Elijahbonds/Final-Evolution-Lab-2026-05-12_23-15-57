@@ -29,4 +29,7 @@ export const PROPPED_LOOPS = {
   ex_bench_leg_raise: 'bench', ex_bench_leg_pull_in: 'bench', ex_seated_leg_tuck: 'seat', ex_rope_crunch_seat: 'seat', ex_seat_side_bend: 'seat', ex_seat_twist: 'seat',
   // exerciseGrip.ts (DEMO-LOOPS-6): the bench the seated wrist curls sit on; the bench the kneeling ones lean across
   ex_wrist_curl: 'seat', ex_wrist_curl_down: 'seat', ex_wrist_curl_one: 'seat', ex_wrist_curl_one_down: 'seat', ex_wrist_curl_bench: 'handbench', ex_wrist_curl_bench_down: 'handbench',
+  // exerciseFamilies7.ts (DEMO-LOOPS-7): the benches the presses, raises and twists sit or lie on; the decline bench; the bar
+  ex_bench_press_one: 'bench', ex_chest_press_seat: 'seat', ex_chest_press_incline: 'seat', ex_chest_press_decline: 'seat', ex_incline_shoulder_raise: 'incline', ex_front_raise_incline: 'incline',
+  ex_arnold_seated: 'seat', ex_bradford_seated: 'seat', ex_seat_twist_bar: 'seat', ex_decline_crunch: 'decline', ex_decline_oblique: 'decline', ex_decline_situp: 'decline', ex_gorilla_chin: 'pullbar',
 } as const satisfies Record<string, string>;

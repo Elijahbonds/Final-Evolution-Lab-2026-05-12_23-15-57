@@ -196,7 +196,7 @@ import { PlayerStateMachine } from '../core/PlayerStateMachine';   // HOOPS-10PH
 import { BasketballAnimTree, FootPlant } from '../anim/basketballTree';
 import { MoveLegs } from '../anim/moveLegs';   // H2: the legs keep running under a handle move
 import { MoveDip } from '../anim/moveDip';   // hoops-dip
-import { LocoAccent } from '../anim/locoAccent';   // hoops-dip movement pass
+import { LocoAccent, accentState } from '../anim/locoAccent';   // hoops-dip movement pass
 import { HandlerRest } from './handlerRest';   // lane/h3-handler (#312 port): the eyes on the defender, the protect's turn / sink / guard
 import { JumperRise } from '../core/JumperHop';   // lane/h3-handler (#314 port): the jump shot's hop timed to the release, the hang
 import { FootGlide } from '../anim/footGlide';   // hoops-dip movement pass
@@ -1138,7 +1138,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       const ppOff = process.env.NODE_ENV === 'development' && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('pp') === '0';
       if (ppOff) console.info('[1V1-DEV] posture layer OFF (?pp=0)');
       if (!ppOff) mePosture = mountPostureLayer(ctx.scene, me.skeleton, me.root, () => meRest.dress(feedFor(meBio, possession === 'mine' ? RIM : foe.root.position, possession === 'mine' ? RIM : ballWorld(), meMotion, Math.max(1 - turbo.t01, meIntensity01 * 0.7), myJumpAge !== Infinity || dunking)), '1V1-PP');   // (+ h3-handler: meRest.dress) DRIBBLE PACE: a sprint LOOKS like work
-      LocoAccent.for(ctx.scene, me.skeleton, me.root, () => meAnimTree.state); meRest.mount(ctx.scene, me.skeleton, me.root);   // (+ h3-handler: the protect's sink, same slot)   // hoops-dip movement pass: the decel step and the push-off drawn on the body (anim/locoAccent; after the posture, before the carry)
+      LocoAccent.for(ctx.scene, me.skeleton, me.root, () => accentState(meAnimTree)); meRest.mount(ctx.scene, me.skeleton, me.root);   // (+ h3-handler: the protect's sink, same slot)   // hoops-dip movement pass: the decel step and the push-off drawn on the body (anim/locoAccent; after the posture, before the carry)
       if (!ppOff) foePosture = mountPostureLayer(ctx.scene, foe.skeleton, foe.root, () => feedFor(foeBio, possession === 'mine' ? me.root.position : RIM, possession === 'mine' ? ballWorld() : RIM, foeMotion, 0, foeBlockJumpAge !== Infinity || !!foeDunkFlight), '1V1-PP-FOE');
       // HOOPS MOTION phase 3c: THE MOTION LAYERS (anim/motionLayers — the dunk pass's, lifted out of DunkMode) on both bodies: the limb drag
       // insert-first (the legs only in the air, the ball arm left on its clip around a release), the side lean right after the posture

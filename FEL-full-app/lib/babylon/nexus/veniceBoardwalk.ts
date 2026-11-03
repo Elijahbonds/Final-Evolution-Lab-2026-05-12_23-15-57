@@ -246,7 +246,7 @@ export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode, scanS
   // biggest thing on the dunk's first download after the bus)
   const fillRail = (): void => {
     if (holder.isDisposed()) return;
-    const rail = new Onlookers(scene, Array.from({ length: 9 }, (_, i) => new Vector3(railX + (i % 2) * 0.7, 0, SCAN_N + 1.5 + i * 3.0)), '#2b3550', new Vector3(0, 0, SCAN_MID));
+    const rail = new Onlookers(scene, Array.from({ length: 9 }, (_, i) => new Vector3(railX + (i % 2) * 0.7, 0, SCAN_N + 1.5 + i * 3.0)), '#2b3550', new Vector3(0, 0, SCAN_MID), dressing ? { oneBodyPerFrame: true } : {});   // RUNUP-STALL-1 v3: the deferred (dunk) rail lands one body a frame
     const life = scene.onBeforeRenderObservable.add(() => rail.update(scene.getEngine().getDeltaTime() / 1000));
     holder.onDisposeObservable.add(() => { scene.onBeforeRenderObservable.remove(life); rail.dispose(); });
   };
