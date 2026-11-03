@@ -1492,7 +1492,7 @@
           "seconds": 13.97,
           "positioningFrames": 0,
           "holdingFrames": 419,
-          "firstSay": "Turn and face the camera. Stand the same way. Do not fix anything.",
+          "firstSay": "Face the camera, feet hip-width, toes straight ahead. Do not fix anything.",
           "heldBy": null
         },
         {
@@ -1671,7 +1671,7 @@
           "seconds": 13.97,
           "positioningFrames": 0,
           "holdingFrames": 419,
-          "firstSay": "Turn and face the camera. Stand the same way. Do not fix anything.",
+          "firstSay": "Face the camera, feet hip-width, toes straight ahead. Do not fix anything.",
           "heldBy": null
         },
         {

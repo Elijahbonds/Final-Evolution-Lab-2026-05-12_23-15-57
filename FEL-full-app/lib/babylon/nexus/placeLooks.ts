@@ -6,12 +6,14 @@
 // court's size and lines are the game and never change), a different sky, floor colour, horizon and dressing. It is
 // applied over the spec at mount (NexusVenue.applyLook), picked on the boot splash like the others (`?place=`).
 //
-// The FIRST look of every list is `home`: no overrides at all, so the default is exactly what shipped before this file.
+// The FIRST look of every list is `home`: no overrides at all, so the default is exactly what shipped before this file — unless
+// the owner has PUBLISHED a Nexus Studio venue for the mode (NEX-02, `looksFor`): that venue is then first, and `home` second.
 
 import type { BackdropKind, GroundKind, PropKind } from './NexusWebScene';
 import type { VenueMood } from '../scene/moods';
 import type { BackdropFamily } from '../visual/Backdrops';
 import { FREERUN_TRACKS } from './freeRunTracks';
+import { publishedPlaceLooks } from '../../nexus-studio/published';
 
 export interface PlaceLook {
   id: string; name: string; sub: string; tint: string;
@@ -126,8 +128,16 @@ export const PLACE_LOOKS: Record<string, PlaceLook[]> = {
 
 export const PLACE_MODE_IDS = new Set(Object.keys(PLACE_LOOKS));
 
+/**
+ * A mode's places, in the splash's order. NEX-02 (owner 2026-10-20: "a published venue is the mode's default, with Restore"):
+ * venues the owner PUBLISHED from Nexus Studio for this mode come first (lib/nexus-studio/published.ts — committed, reviewed JSON),
+ * so with no pick of the player's own the published venue plays; the shipped places follow, `home` first, so Restore is one tap.
+ * With nothing published this is exactly the shipped list — the same array.
+ */
 export function looksFor(modeId: string): PlaceLook[] {
-  return PLACE_LOOKS[modeId] ?? [];
+  const shipped = PLACE_LOOKS[modeId] ?? [];
+  const published = publishedPlaceLooks(modeId);
+  return published.length ? [...published, ...shipped] : shipped;
 }
 
 export const PLACE_KEY_PREFIX = 'fel-place-';

@@ -23,7 +23,7 @@ export default async function VelocityPage() {
   if (!me) redirect(loginPath('/train/velocity'));
   const access = vbtAccess({ signedIn: true, dobYear: await readDobYear(prisma, me, 'vbt_page') });
   return (
-    <TabPage eyebrow="Train" title="Bar speed" lede="Rep speed from your camera: zones, speed loss, and your load-velocity line. Estimates, not lab numbers." accent="#00E5FF"
+    <TabPage eyebrow="Train" title="Bar speed" lede="Rep speed from your camera, side-on. Every number is an estimate, not a lab number." accent="#00E5FF"
       aside={<Link href="/train" className="rounded-xl border border-white/10 px-3 py-2 text-[12px] font-bold text-white/75 hover:bg-white/[0.05] hover:text-white">← Train</Link>}>
       <div className="mx-auto max-w-md">
         {access.ok ? <VelocitySession /> : (
