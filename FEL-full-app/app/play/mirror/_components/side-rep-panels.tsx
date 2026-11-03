@@ -8,6 +8,8 @@ import { REVIEW_COPY, levelWord, repsLine } from '@/lib/cue-style/review';   // 
 import type { CueEvent } from '@/lib/babylon/nexus/neuro-mirror/rules/cue-engine';
 import { SIDE_TURNED } from '@/lib/mirror/framing';
 import { sideRepReview, type SideRepSpec, type SideRepState } from '@/lib/mirror/sideRepStage';
+import { ResultCard } from '@/components/result-card/result-card';
+import { mirrorReviewView } from '@/lib/coach-tools/reviewResult';
 
 /** Before Start: how to set the phone up for a side-on movement, and the safety line. */
 export function SideRepFraming({ lines }: { lines: readonly string[] }) {
@@ -77,8 +79,11 @@ export function SideRepChecks<F extends string>({ spec, state, label, live }: { 
 }
 
 /** The review: each stage's reps, the faults by how many reps showed them, what was cued, what the fade did, the verdict. */
-export function SideRepReviewCard<F extends string>({ spec, state, label, cueLog, fadeLines }: {
+export function SideRepReviewCard<F extends string>({ spec, state, label, cueLog, fadeLines, movement = 'Your set' }: {
   spec: SideRepSpec<F>; state: SideRepState<F>; label: (f: F) => string; cueLog: readonly CueEvent<string>[]; fadeLines: readonly string[];
+  /** MIRROR-RESULTS (2026-11-03): the movement's canonical name, for the result card's "<Movement> · N reps" (the
+   *  harness passes it; a caller that does not reads "Your set"). */
+  movement?: string;
 }) {
   const r = sideRepReview(spec, state, label);
   const stage = (name: string, s: typeof r.check) => (
@@ -105,7 +110,10 @@ export function SideRepReviewCard<F extends string>({ spec, state, label, cueLog
     </div>
   );
   return (
-    <section data-side-review className="mt-6 rounded-2xl border border-white/8 bg-white/[0.02] p-5">
+    // MIRROR-RESULTS (2026-11-03): the P3 result card's "no number" variant, as the squat's (COACH-TOOLS-EASY): the
+    // movement and its reps, the verdict (sideRepReview's, unchanged) as the line, everything else under Details
+    <section data-side-review className="mt-6">
+      <ResultCard reveal={false} seeAll={false} view={mirrorReviewView(movement, r.check.reps + r.work.reps, r.verdict)} details={(<>
       <h2 className="fel-heading text-[15px] font-bold text-white/80">{REVIEW_COPY.heading}</h2>
       <div className="mt-3 grid gap-5 sm:grid-cols-3">
         {stage(REVIEW_COPY.checkStage, r.check)}
@@ -125,12 +133,13 @@ export function SideRepReviewCard<F extends string>({ spec, state, label, cueLog
           )}
         </div>
       </div>
-      <p className="mt-4 border-t border-white/[0.06] pt-4 text-[13px] leading-relaxed text-white/50" data-side-verdict>{r.verdict}</p>
+      <span hidden data-side-verdict>{r.verdict}</span>
       {fadeLines.length > 0 && (
         <ul data-fade-lines className="mt-3 space-y-1 text-[12.5px] leading-relaxed text-white/55">
           {fadeLines.map((l) => <li key={l}>{l}</li>)}
         </ul>
       )}
+      </>)} />
     </section>
   );
 }

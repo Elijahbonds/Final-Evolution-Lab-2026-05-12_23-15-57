@@ -19,7 +19,7 @@ import { MEASURE_VERTICAL_HREF } from '@/lib/vertical/door';   // VERTICAL-EASY:
 import { MEASURE_VERTICAL } from '@/lib/vertical/copy';
 import { JUMP_TAB_LINE } from '@/lib/tools-easy/copy';
 import { ResultCard } from '@/components/result-card/result-card';
-import { mirrorReviewView } from '@/lib/coach-tools/reviewResult';
+import { lungeVerdict, mirrorReviewView } from '@/lib/coach-tools/reviewResult';
 import { ArrowLeft, Loader2, PauseCircle, ScanLine, Volume2, VolumeX } from 'lucide-react';
 import { NOT_SAVED_ON_DEVICE, mirrorSave } from './mirror-save';   // R-HEALTH-CLIENT: no save request unless the server said so
 // MIRROR-FIRST P1 (2026-10-07): the camera, the pose runtime, the screen-awake lock and the pause on a hidden tab live in
@@ -1931,8 +1931,13 @@ export function MirrorHarness({
 
         {/* The lunge's review — the PER-SIDE result (MIRROR-COACH P4 lane 1: "the review card, and the per-side
             result"). A squat lets the strong side hide; the lunge cannot, so the two sides are read side by side. */}
+        {/* MIRROR-RESULTS (2026-11-03): the lunge's review on the result card's "no number" variant, as the squat's — "Lunge ·
+            N reps", each side's own "what we saw" as the line (lungeVerdict), the per-side panel under Details, unchanged */}
         {pattern === 'lunge' && lungeSession.stage === 'review' && (
-          <section className="mt-6 rounded-2xl border border-white/8 bg-white/[0.02] p-5">
+          <section className="mt-6" data-lunge-review>
+            <ResultCard reveal={false} seeAll={false} view={mirrorReviewView(MOVEMENT_NAMES.lunge,
+              lungeSession.workReps.left.length + lungeSession.workReps.right.length,
+              lungeVerdict((['left', 'right'] as LungeSide[]).map((side) => lungeSideResult(lungeSession, side))))} details={(<>
             <h2 className="fel-heading text-[15px] font-bold text-white/80">{REVIEW_COPY.headingEachSide}</h2>
             <div className="mt-3 grid gap-5 sm:grid-cols-2">
               {(['left', 'right'] as LungeSide[]).map((side) => {
@@ -1974,14 +1979,15 @@ export function MirrorHarness({
               </ul>
             )}
             <FadeLines lines={fadeLines} />
+            </>)} />
           </section>
         )}
 
         {pattern === 'hinge' && hingeSession.stage === 'review' && (
-          <SideRepReviewCard spec={HINGE_LIVE} state={hingeSession} label={hingeLabel} cueLog={cueLog} fadeLines={fadeLines} />
+          <SideRepReviewCard spec={HINGE_LIVE} state={hingeSession} label={hingeLabel} cueLog={cueLog} fadeLines={fadeLines} movement={MOVEMENT_NAMES.hinge} />
         )}
         {pattern === 'pushup' && pushupSession.stage === 'review' && (
-          <SideRepReviewCard spec={PUSHUP_LIVE} state={pushupSession} label={pushupLabel} cueLog={cueLog} fadeLines={fadeLines} />
+          <SideRepReviewCard spec={PUSHUP_LIVE} state={pushupSession} label={pushupLabel} cueLog={cueLog} fadeLines={fadeLines} movement={MOVEMENT_NAMES.pushup} />
         )}
 
         {/* MIRROR-PROGRESS: "vs your last 3" for the set End just closed — on its own tab only */}

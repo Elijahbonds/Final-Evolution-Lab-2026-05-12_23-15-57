@@ -27,3 +27,11 @@ export function mirrorReviewView(movement: string, reps: number, headline: strin
     next: { label: REVIEW_RESULT_COPY.next, href: null },
   };
 }
+
+/**
+ * The lunge's verdict for the card's line (MIRROR-RESULTS, 2026-11-03): each side's own "what we saw" (lungeStage.ts
+ * lungeSideResult, word for word), left then right. The lunge had no single verdict line; its two sides are its read.
+ */
+export function lungeVerdict(sides: readonly { result: { saw: string } }[]): string {
+  return sides.map((s) => s.result.saw.trim()).join(' ');
+}
