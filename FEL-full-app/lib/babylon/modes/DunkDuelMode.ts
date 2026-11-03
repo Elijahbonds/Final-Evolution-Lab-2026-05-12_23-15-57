@@ -58,6 +58,8 @@ import { DUNK_BODY, DunkBodyBinder } from '@/lib/move/dunkBody';
 import { BallSim } from '../core/BallPhysics';
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
+import { LOCO_CLIP, LOCO_TUNE, locoPick } from '../anim/LocoBus';   // GAMEPLAY-CLEAN P2 #6: the run-up's gait and stride
+import { StrideRateFilter, strideRate } from '../core/StrideMatch';
 import { MOCAP_DUNK } from '../nexus/dressingFlags';
 import { attachBallToHand, releaseBall, runHandOffPath, handOffK, flushThroughRim, clankOffRim, EASTBAY_PASSES, handOffSpecAt, type HandOffSpec } from '../anim/ballRig';
 import { OBSTACLE_SPECS, clipsObstacle, heightAt, nextObstacle, type ObstacleKind, OBSTACLE_KINDS } from '../core/DunkObstacles';
@@ -180,6 +182,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
   let ambient: AmbientHandle | null = null;       // #14
   const flight = new DunkFlight();                // #8: the contest's air budget and d-pad recognizer
   let armedAir: DunkTrick | null = null, airTricks: DunkTrick[] = [];
+  const duelStride = new StrideRateFilter();          // GAMEPLAY-CLEAN P2 #6: the run-up loop's rate (LocoBus gait + StrideMatch)
   let loopClip: string | null = null;             // #19: the loop the active body is on (playClip on change only)
   let benchAcc = BENCH_TICK_SEC;                  // #16
   const _vel = new Vector3(), _faceV = new Vector3(), _want = new Vector3(), _camPos = new Vector3(), _camAt = new Vector3();   // #18 #20
@@ -1053,8 +1056,15 @@ export const DunkDuelMode: ModeDefinition = (() => {
         launchSpeed01 = Math.max(0, Math.min(1, (runUpPeak - 2) / 6));
         // IMPROVE (2026-10-06) #19: only on a change — every frame's call bumped clipToken and ran the animator's clip resolution and
         // scope check before its own same-clip early-out
-        const runClip = Math.hypot(vel.x, vel.z) > 0.5 ? SPORT_CLIP.moveLoop : SPORT_CLIP.idle;
+        // GAMEPLAY-CLEAN P2 #6 (2026-11-03): THE RUN-UP'S FEET KEEP UP. The run-up played the `run` loop at 1× for any speed over
+        // 0.5 m/s, so the rig read the planted feet covering 0.45–0.56 of the ground at 5.9 m/s and next to none at 1.7 (a jog-speed
+        // stick walking the body on a sprint cadence). LocoBus's gait (the shared, calibrated one Sprint runs on) picks idle / walk /
+        // run by speed and paces the loop to it (StrideMatch against the walk and run references).
+        const loco = locoPick({ speed: Math.hypot(vel.x, vel.z) });
+        const runClip = loco.window === 'idle' ? SPORT_CLIP.idle : loco.window === 'walk' ? LOCO_CLIP.walk : SPORT_CLIP.moveLoop;
+        if (runClip !== loopClip) duelStride.set(loco.rate);   // a gait change adopts the new loop's rate
         if (runClip !== loopClip) playClip(runClip, { loop: true });
+        if (runClip !== SPORT_CLIP.idle) c.animator.setPlaybackScale(runClip, duelStride.step(loco.rate, dt));
         if (c.root.position.z <= gatherLine() + 0.2) {
           ctx.setHud({
             hint: runUpPeak < 3.5
@@ -1071,6 +1081,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
         c.root.position.x = Math.max(-6, Math.min(6, c.root.position.x + steer * dt));
         c.root.position.z -= holdRunSpeed * dt;
         faceVel(_faceV.set(steer, 0, -holdRunSpeed), dt);   // IMPROVE (2026-10-06) #18: a scratch vector
+        if (loopClip === SPORT_CLIP.moveLoop) c.animator.setPlaybackScale(SPORT_CLIP.moveLoop, duelStride.step(strideRate(Math.hypot(steer, holdRunSpeed), LOCO_TUNE.runRef), dt));   // P2 #6: the hold-run paces too
         runUpPeak = Math.max(runUpPeak, Math.hypot(steer, holdRunSpeed));
         launchSpeed01 = Math.max(0, Math.min(1, (runUpPeak - 2) / 6));
         const line = gatherLine();

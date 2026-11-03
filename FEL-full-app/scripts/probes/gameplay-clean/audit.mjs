@@ -47,7 +47,11 @@ const MODE_WALL_S = Number(process.env.MODE_WALL_S ?? 300);   // the play loop's
 fs.mkdirSync(OUT, { recursive: true });
 
 // ── the page's clock, input and recorder (installed before any module runs) ───────────────────────────────────────────
+// FEEL='anim.inertial=1,camera.leadEaseSec=0': feel-panel overrides for an A/B run (with QS='&playtest=1', the panel's own gate:
+// lib/feel-panel/sessionGate.ts). The overrides go into this device's storage before the page loads, exactly as the panel keeps them.
+const FEEL = Object.fromEntries((process.env.FEEL ?? '').split(',').filter(Boolean).map((kv) => { const [k, v] = kv.split('='); return [k, Number(v)]; }));
 const INIT = `(() => {
+  ${Object.keys(FEEL).length ? `try { localStorage.setItem('fel.feel.overrides.v1', ${JSON.stringify(JSON.stringify(FEEL))}); } catch {}` : ''}
   const realNow = performance.now.bind(performance); window.__realNow = realNow;
   { let t = 7 >>> 0; Math.random = () => { t += 0x6D2B79F5; let r = Math.imul(t ^ (t >>> 15), 1 | t); r ^= r + Math.imul(r ^ (r >>> 7), 61 | r); return ((r ^ (r >>> 14)) >>> 0) / 4294967296; }; }
   window.__name = window.__name || function (f) { return f; };
@@ -300,7 +304,7 @@ function auditScreen(where) {
     controlsRows: document.querySelectorAll('[data-controls-panel] [data-controls-rows] > span').length,
     pausedHeadline: /PAUSED — TAP TO RESUME/.test(document.body.innerText),
     pauseButton: label(/\bpause\b/i), leaveButton: label(/leave the game|^\s*home\b|quit|exit/i),
-    feelTab: q('[data-testid="feel-tab"]').length > 0, touchDeck: q('[data-touch-deck]').length > 0,
+    feelTab: q('[data-testid="feel-tab"]').length > 0, feelActive: q('[data-testid="feel-tab"]').some((e) => String(e.className).includes('amber')), touchDeck: q('[data-touch-deck]').length > 0,
     fullscreen: label(/full screen/i), tapToStart: /TAP TO START/.test(document.body.innerText),
     text: [...new Set(texts.map((t) => t.s))].slice(0, 40).join(' | ').slice(0, 900),
   };

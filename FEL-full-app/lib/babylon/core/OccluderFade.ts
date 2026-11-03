@@ -41,6 +41,13 @@ export const OCCLUDER_MIN_RADIUS_M = 0.3;
 export const OCCLUDER_MAX_RADIUS_M = 30;
 /** The rays stop this far short of the hero's head, chest and hips (m): what is that close is the hero's own gear or ride. */
 export const OCCLUDER_NEAR_HERO_M = 1;
+/** GAMEPLAY-CLEAN P2 #9 (2026-11-03): a mesh with more vertices than this is never ray-tested. The start profile caught this file as
+ *  Penalty's top CPU cost — 1.05 s of a 4.4 s window in Babylon's _intersectTriangles (multiPickWithRay), the rays walking every
+ *  triangle of the dense set dressing whose bounding boxes they cross. A prop that hides a body (a pole, a tree, a wall, a car) is
+ *  well under it; a mesh over it is a stand, a crowd block or a venue shell, which a fade would only smear. Perf guard, not feel. */
+export const OCCLUDER_MAX_VERTS = 12_000;
+/** Line-of-sight checks between rebuilds of the candidate list (the static half of fadeCandidate, read once, not per ray). */
+export const OCCLUDER_CAND_REFRESH = 20;
 /** Modes held by their own lanes: the finding is routed, not applied (docs/GAMEPLAY-CLEAN-AUDIT.md). */
 export const OCCLUDER_FADE_OFF: ReadonlySet<string> = new Set(['dunk', 'onevone', 'threevthree']);
 /** Never faded, by name: the floor the hero stands on and the sky behind it. */
@@ -51,9 +58,10 @@ interface Faded { mesh: AbstractMesh; orig: number; origVisible: boolean; instan
 /** Pure: may this mesh be faded, given what we know of it. Exported for the test. */
 export function fadeCandidate(m: {
   name: string; radius: number; visibility: number; enabled: boolean; visible: boolean; hero: boolean; optOut: boolean;
-  thinInstances: number; materialAlpha: number; skinned?: boolean;
+  thinInstances: number; materialAlpha: number; skinned?: boolean; verts?: number;
 }): boolean {
   if (!m.enabled || !m.visible || m.hero || m.optOut || m.skinned) return false;
+  if (m.verts !== undefined && (m.verts <= 0 || m.verts > OCCLUDER_MAX_VERTS)) return false;
   if (m.thinInstances > 1) return false;
   if (m.radius < OCCLUDER_MIN_RADIUS_M || m.radius > OCCLUDER_MAX_RADIUS_M) return false;
   if (m.visibility < 0.5 || m.materialAlpha < 0.5) return false;   // already see-through: leave it to its owner
@@ -86,6 +94,9 @@ export class OccluderFade {
   private heroMeshes = new Set<AbstractMesh>();
   private aims: (TransformNode | null)[] = [];
   private readonly ray = new Ray(Vector3.Zero(), Vector3.Forward(), 1);
+  /** The meshes that may be faded (fadeCandidate), rebuilt every OCCLUDER_CAND_REFRESH checks — the rays only test these. */
+  private cand = new Set<number>();
+  private checks = 0;
 
   constructor(private scene: Scene, private hero: () => TransformNode | null, private modeId: string) {}
 
@@ -145,6 +156,7 @@ export class OccluderFade {
     const h = this.hero();
     if (h !== this.heroNode) this.bindHero(h);
     if (!cam || !h) return;
+    if (this.checks++ % OCCLUDER_CAND_REFRESH === 0) { this.cand.clear(); for (const m of this.scene.meshes) if (this.pickable(m)) this.cand.add(m.uniqueId); }
     const eye = cam.globalPosition;
     const root = h.getAbsolutePosition();
     const pts = this.aims.some(Boolean)
@@ -155,7 +167,7 @@ export class OccluderFade {
       const d = p.subtract(eye); const len = d.length(); if (len < OCCLUDER_NEAR_HERO_M + 0.2) continue;
       // stop short of the body: the hero's own gear and ride (a kart's shell, a plane's wing, a scarf) is not in the way
       this.ray.origin.copyFrom(eye); this.ray.direction.copyFrom(d.scaleInPlace(1 / len)); this.ray.length = len - OCCLUDER_NEAR_HERO_M;
-      const hits = this.scene.multiPickWithRay(this.ray, (m) => this.pickable(m)) ?? [];
+      const hits = this.scene.multiPickWithRay(this.ray, (m) => this.faded.has(m.uniqueId) || (this.cand.has(m.uniqueId) && m.isVisible && m.isEnabled())) ?? [];
       for (const hit of hits) {
         const m = hit.pickedMesh; if (!m) continue;
         if (!facesCamera(hit, this.ray.direction)) continue;   // a culled back face is already see-through
@@ -168,7 +180,6 @@ export class OccluderFade {
   }
 
   private pickable(m: AbstractMesh): boolean {
-    if (this.faded.has(m.uniqueId)) return true;   // still on the line: keep it faded
     const mat = m.material as { alpha?: number } | null;
     return fadeCandidate({
       name: m.name, radius: m.getBoundingInfo().boundingSphere.radiusWorld, visibility: m.visibility,
@@ -176,7 +187,7 @@ export class OccluderFade {
       optOut: Boolean((m.metadata as { felNoFade?: boolean } | null)?.felNoFade),
       thinInstances: (m as { thinInstanceCount?: number }).thinInstanceCount ?? 0,
       materialAlpha: mat?.alpha ?? 1,
-      skinned: Boolean(m.skeleton),
-    }) && m.getTotalVertices() > 0;
+      skinned: Boolean(m.skeleton), verts: m.getTotalVertices(),
+    });
   }
 }

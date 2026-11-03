@@ -38,6 +38,8 @@ import {
 } from '@/lib/babylon/core/HoopsStick';
 import { PORTRAIT_HERO_MARGIN } from '@/lib/babylon/modes/netPortraitCam';
 import { OCCLUDER_FADE_ALPHA, OCCLUDER_FADE_SEC, OCCLUDER_HOLD_SEC } from '@/lib/babylon/core/OccluderFade';   // gameplay-clean
+import { FOOTBALL_CARRY_RATE_MAX } from '@/lib/babylon/anim/footballTree';   // gameplay-clean P2 #6
+import { CAM_LEAD_EASE_SEC, CAM_LEAD_FULL_MPS } from '@/lib/babylon/core/CameraDirector';   // gameplay-clean P2 #10
 import { AI_REACT_ROOKIE_MS, AI_REACT_PRO_MS, AI_REACT_ELITE_MS } from '@/lib/babylon/hoops/reaction';   // lane/hoops-round2
 import { DOUBLE_TEAM_ON, DOUBLE_PAINT_M, DOUBLE_AFTER_SEC, DOUBLE_MAX_SEC, DOUBLE_COOLDOWN_SEC, SWITCH_ON_SCREEN_ON, SWITCH_HELP_M, SWITCH_COOLDOWN_SEC } from '@/lib/babylon/hoops/teamDefense';
 import { HAND_CHECK_ON, HAND_CHECK_REACH_OVER_M, HAND_CHECK_GAP_SEC, HAND_CHECK_FOUL_COUNT, HAND_CHECK_WINDOW_SEC, CONTACT_POSE_ON, CONTACT_EASE_IN_SEC, CONTACT_EASE_OUT_SEC } from '@/lib/babylon/hoops/handCheck';
@@ -91,6 +93,9 @@ describe('the feel knob catalogue', () => {
     expect(def('camera.occluderFadeAlpha')).toBe(OCCLUDER_FADE_ALPHA);
     expect(def('camera.occluderFadeSec')).toBe(OCCLUDER_FADE_SEC);
     expect(def('camera.occluderHoldSec')).toBe(OCCLUDER_HOLD_SEC);
+    expect(def('football.carryStrideMax')).toBe(FOOTBALL_CARRY_RATE_MAX);
+    expect(def('camera.leadEaseSec')).toBe(CAM_LEAD_EASE_SEC);
+    expect(def('camera.leadFullMps')).toBe(CAM_LEAD_FULL_MPS);
     // hoops-round2 (HOP-02 "Hoops · AI reaction", HOP-03 "Hoops · team defense", HOP-04 "Hoops · contact"): the owner's 420 / 220 / 120
     expect(def('hoops.aiReactRookieMs')).toBe(AI_REACT_ROOKIE_MS);
     expect(def('hoops.aiReactProMs')).toBe(AI_REACT_PRO_MS);
