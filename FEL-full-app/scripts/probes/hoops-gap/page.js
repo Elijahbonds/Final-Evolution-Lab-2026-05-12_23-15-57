@@ -42,7 +42,7 @@
     const sk = skelOf(root); if (!sk) return null;
     const by = new Map(); for (const b of sk.bones) { const t = b.getTransformNode(); if (t) by.set(clean(t.name), t); }
     const set = new Set(by.values());
-    return { id, root, set, w: WATCH.map((n) => by.get(n) || null), lf: by.get('LeftFoot'), rf: by.get('RightFoot'), lh: by.get('LeftHand'), rh: by.get('RightHand'), head: by.get('Head'), hips: by.get('Hips'), prevQ: WATCH.map(() => null) };
+    return { id, root, set, w: WATCH.map((n) => by.get(n) || null), lf: by.get('LeftFoot'), rf: by.get('RightFoot'), lh: by.get('LeftHand'), rh: by.get('RightHand'), lfa: by.get('LeftForeArm'), rfa: by.get('RightForeArm'), head: by.get('Head'), hips: by.get('Hips'), prevQ: WATCH.map(() => null) };
   };
   const B = [];
   const bind = () => {
@@ -57,7 +57,7 @@
   bind();
   const NB = 6;
   const MAXF = CFG.maxFrames || 20000;
-  const K = 17;   // root xyz yaw | lf xyz | rf xyz | lh xyz | rh xyz | head y
+  const K = 23;   // root xyz yaw | lf xyz | rf xyz | lh xyz | rh xyz | head y | lfa xyz | rfa xyz (hoops-p05: the forearms, for the palm)
   const ang = new Float32Array(MAXF * NB * NW);
   const pos = new Float32Array(MAXF * NB * K);
   const ballA = new Float32Array(MAXF * 5);       // x y z holderBody(-1 none) heldByBone(0/1)
@@ -91,7 +91,7 @@
       const b = B[bi]; const o = (F * NB + bi) * K; const r = b.root.getAbsolutePosition(); const m = b.root.getWorldMatrix().m;
       pos[o] = r.x; pos[o + 1] = r.y; pos[o + 2] = r.z; pos[o + 3] = Math.atan2(m[8], m[10]);
       const put = (n, at) => { if (!n) { pos[o + at] = NaN; pos[o + at + 1] = NaN; pos[o + at + 2] = NaN; return; } const p = n.getAbsolutePosition(); pos[o + at] = p.x; pos[o + at + 1] = p.y; pos[o + at + 2] = p.z; };
-      put(b.lf, 4); put(b.rf, 7); put(b.lh, 10); put(b.rh, 13); pos[o + 16] = b.head ? b.head.getAbsolutePosition().y : NaN;
+      put(b.lf, 4); put(b.rf, 7); put(b.lh, 10); put(b.rh, 13); put(b.lfa, 17); put(b.rfa, 20); pos[o + 16] = b.head ? b.head.getAbsolutePosition().y : NaN;
       const ao = (F * NB + bi) * NW;
       for (let j = 0; j < NW; j++) {
         const t = b.w[j]; if (!t) { ang[ao + j] = NaN; continue; }
@@ -416,7 +416,21 @@
         if (by > yP && by >= yN && by > 0.5 && by < 1.4) { let bestD = Infinity; for (let bi = 0; bi < B.length; bi++) bestD = Math.min(bestD, near(bi)); if (bestD < 0.8) apex.push(bestD); }
       }
     }
-    out.ball = { heldFrames: held.length, heldMedCm: r2(pctl(held, 0.5) * 100), heldP90Cm: r2(pctl(held, 0.9) * 100), apexN: apex.length, apexMedCm: r2(pctl(apex, 0.5) * 100), apexP90Cm: r2(pctl(apex, 0.9) * 100), pathP99Cm: r2(pctl(path, 0.99) * 100), warpsOver15cm: warps };
+    // hoops-p05 (phase 5, "the ball lives in the hand"): the PALM — the hand bone, PALM_M on along forearm → hand (assumption: the rig has
+    // no finger bones; 8 cm is the hero's wrist-to-palm-centre) — and the ball's SURFACE (centre less BALL_R): the apex gate is the
+    // carrier's nearer palm within 5 cm of the ball at the top of each bounce; at each release the ball's height; at each catch the ball's
+    // one-frame jump and whether BOTH palms are on it (within TWO_HAND_CM of its surface: a board's two hands)
+    const PALM_M = 0.08, BALL_R = 0.12, TWO_HAND_CM = 8;
+    const palmD = (i, bi, side) => { const o = (i * NB + bi) * K, h = side ? 13 : 10, f = side ? 20 : 17; const hx = pos[o + h], hy = pos[o + h + 1], hz = pos[o + h + 2]; let dx = hx - pos[o + f], dy = hy - pos[o + f + 1], dz = hz - pos[o + f + 2]; const L = Math.hypot(dx, dy, dz) || 1; const px = hx + dx / L * PALM_M, py = hy + dy / L * PALM_M, pz = hz + dz / L * PALM_M; return Math.hypot(ballA[i * 5] - px, ballA[i * 5 + 1] - py, ballA[i * 5 + 2] - pz) - BALL_R; };
+    const apexPalm = [], releases = [], catches = [];
+    for (let i = 2; i < n - 1; i++) {
+      if (cuts.has(i) || !isFinite(ballA[i * 5])) continue;
+      const hb = ballA[i * 5 + 3], hbW = ballA[(i - 1) * 5 + 3], by = ballA[i * 5 + 1];
+      if (hb < 0) { const yP = ballA[(i - 1) * 5 + 1], yN = ballA[(i + 1) * 5 + 1]; if (by > yP && by >= yN && by > 0.5 && by < 1.4) { let best = Infinity; for (let bi = 0; bi < B.length; bi++) best = Math.min(best, palmD(i, bi, 0), palmD(i, bi, 1)); if (best < 0.7) apexPalm.push(best); } }
+      if (hbW >= 0 && hb < 0) releases.push({ f: HG.f0 + i, body: B[hbW] ? B[hbW].id : '?', y: r2(ballA[(i - 1) * 5 + 1]) });
+      if (hbW < 0 && hb >= 0) { const j = Math.hypot(ballA[i * 5] - ballA[(i - 1) * 5], by - ballA[(i - 1) * 5 + 1], ballA[i * 5 + 2] - ballA[(i - 1) * 5 + 2]); const l = palmD(i, hb, 0), r = palmD(i, hb, 1); catches.push({ f: HG.f0 + i, body: B[hb] ? B[hb].id : '?', jumpCm: r2(j * 100), twoHand: Math.max(l, r) * 100 <= TWO_HAND_CM, palmsCm: [r2(l * 100), r2(r * 100)] }); }
+    }
+    out.ball = { heldFrames: held.length, heldMedCm: r2(pctl(held, 0.5) * 100), heldP90Cm: r2(pctl(held, 0.9) * 100), apexN: apex.length, apexMedCm: r2(pctl(apex, 0.5) * 100), apexP90Cm: r2(pctl(apex, 0.9) * 100), pathP99Cm: r2(pctl(path, 0.99) * 100), warpsOver15cm: warps, apexPalmN: apexPalm.length, apexPalmMedCm: r2(pctl(apexPalm, 0.5) * 100), apexPalmWithin5Pct: apexPalm.length ? r2(100 * apexPalm.filter((d) => d <= 0.05).length / apexPalm.length) : null, releases, catches, catchJumpP90Cm: r2(pctl(catches.map((c) => c.jumpCm / 100), 0.9) * 100), catchTwoHandPct: catches.length ? r2(100 * catches.filter((c) => c.twoHand).length / catches.length) : null };
     // the camera: speed, turn rate, snaps, hero framing
     const cs = [], cw = [], cj = []; let snaps = 0, inFrame = 0, nF = 0, fovs = new Set();
     for (let i = 1; i < n; i++) {

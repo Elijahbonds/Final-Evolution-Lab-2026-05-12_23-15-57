@@ -114,6 +114,9 @@ for (let i = 0; i < 300; i++) { const ph = await ev(() => window.__phase); if (p
 const loadWallS = (Date.now() - T0) / 1000;
 await ev((c) => { window.__HG_CFG = Object.assign(window.__HG_CFG || {}, c); }, { noPoke: process.env.BOT_NOPOKE === '1', clipLog: !!process.env.POP_LIST, stageLog: !!process.env.POP_LIST });   // hoops-p04: BOT_NOPOKE=1, the bot never reaches (a possession plays out to its shot)
 say('playing after ' + loadWallS.toFixed(0) + ' s wall; page.js: ' + await ev(fs.readFileSync(path.join(HERE, 'page.js'), 'utf8')));
+// hoops-p05: the load SETTLES before the clock starts — no pending loads and the mesh count unchanged for 3 s of wall (a prop that
+// landed after the start ran its callbacks on a wall-chosen frame: one run spawned 176 meshes, two 178, and that run's play differed)
+{ let last = -1, stable = 0; for (let i = 0; i < 240 && stable < 6; i++) { const st = await ev(() => { const sc = window.__FEL_DEV__.scene; return [typeof sc.getWaitingItemsCount === 'function' ? sc.getWaitingItemsCount() : 0, sc.meshes.length]; }); if (st[0] === 0 && st[1] === last) stable++; else stable = 0; last = st[1]; await new Promise((r) => setTimeout(r, 500)); } say(`settled: ${last} meshes`); }
 { const v = await ev((sd) => window.__go(sd), SEED); GO = true; if (process.env.HG_DEBUG) say(`go at clock ${v}, raf ${JSON.stringify(await ev(() => window.__rafN))}`); }   // hoops-p05: the deterministic clock from here (see INIT)
 const shot = async (name) => { const f = path.join(SHOTS, `${MODE}-${name}.png`); await page.screenshot({ path: f }).catch(() => {}); return f; };
 const saveStrip = async (name) => { const urls = await ev((n) => window.__hg.strips[n] || [], name); const dir = path.join(SHOTS, `strip-${MODE}-${name}`); fs.mkdirSync(dir, { recursive: true }); urls.forEach((u, i) => { if (u) fs.writeFileSync(path.join(dir, `${String(i).padStart(2, '0')}.jpg`), Buffer.from(u.split(',')[1], 'base64')); }); return urls.length; };
