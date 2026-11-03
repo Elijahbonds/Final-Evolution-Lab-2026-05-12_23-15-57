@@ -21,9 +21,9 @@ export function CoursePlayer({ course, startAt }: { course: Course; startAt?: nu
   if (!lesson) return <p className={L.text}>This course has no lessons yet.</p>;
   return (
     <article className="space-y-4 pb-24" data-course-player={course.id} data-lesson-index={i}>
-      <header className="space-y-1">
-        <p className={L.label}>Lesson {i + 1} of {course.lessons.length}</p>
+      <header className="flex items-baseline justify-between gap-3">
         <h2 className={L.title} data-lesson-title>{lesson.title}</h2>
+        <span className={L.label} aria-label={`Lesson ${i + 1} of ${course.lessons.length}`}>{i + 1}/{course.lessons.length}</span>
       </header>
       <CourseLesson lesson={lesson} />
       {i < last

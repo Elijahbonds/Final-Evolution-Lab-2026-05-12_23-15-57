@@ -106,7 +106,7 @@ export function CourseStudio({ initial, teacherId }: { initial: Course | null; t
                   {HELD_BLOCK_KINDS.map((k) => <button key={k} type="button" disabled className={L.chip} title="Opens with media storage">{BLOCK_LABEL[k]} · soon</button>)}
                 </div>
               ) : (
-                <button type="button" className={L.row} onClick={() => setPicking(true)} data-teach-add-block><span>{T.addBlock}</span><Plus className="h-4 w-4" /></button>
+                <button type="button" className={L.chip} onClick={() => setPicking(true)} data-teach-add-block><Plus className="h-4 w-4" />{T.addBlock}</button>
               )}
             </div>
           )}
