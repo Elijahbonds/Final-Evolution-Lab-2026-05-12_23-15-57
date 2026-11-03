@@ -373,3 +373,29 @@ every attempt), `SIDECAM=1`, `GATE0=1`, FAST + STRIP draws only the strip frames
 each photo (hidden, it made the page's next attempt read "no approach"). Found on the way: from the second attempt on a page
 an obstacle prop (an orange car, by the look of it) stands between the side camera and the dunker, so the strips and the numbers above are one trick per page
 (`PER_PAGE=1`).
+
+## 11. Phase 7 — item 1: the prop in the side camera's line (lane/dunk-flagship-p7)
+
+Phase 6 found that from a page's second attempt an orange prop stood between the side camera and the dunker. Rig, build
+`a1b38f52` + P6. Sheet: `round9/dunk-flagship/shots/phase7-occlusion.jpg`.
+
+**What it is.** The hoopbus (`dunk_hoopbus`), and it neither moves nor respawns. FIRST-DUNK-BUDGET loads the contest set
+after dunk 1 — the rival's body first, then the venue's dressing and the corner props (`parkCornerProps`) — and the bus
+parks once on the right corner: bounding centre (5.58, 1.48, −7.68), radius 5.4. From the next attempt it stands where
+the probe's side camera was put (the hips + 6.2 m in x): the camera was inside it. The game's own cameras never were.
+
+**Measured** (camera → hips and head rays, every 2nd frame; `OCCL=1`), 5 attempts on ONE page (night 1's four, GO AGAIN,
+night 2's first, `?continuous=1` as /try runs it):
+
+| Camera | Attempt 1 | Attempts 2–5 |
+|---|---|---|
+| Side camera forced to the right (the Phase 6 placement; the control) | 0 of 155 blocked | **107 of 155** each, by `dunk_hoopbus` |
+| Side camera on the clear side (the fix) | 0 of 155 | **0 of 155** each |
+| The game's follow and rim cameras | 0 of 153 | 0 of 153 each |
+| The replay and the card (`show`, 3 attempts) | ~4 % of frames: the hoop and the ball in front of the hand at the slam (the subject, not an occluder); the bus 0 | |
+
+**Fixed (probe only).** SIDECAM checks its line to the hips every 15 frames and stands on the clear side (`SIDECAM_SIDE=1/-1`
+forces one, the control). No DunkMode change: the bus never stood between a game camera and the dunker, so an occluder
+fade there would have nothing to fade (gameplay-clean's `OccluderFade` leaves dunk out; it is not needed for this).
+Also in the probe: `NEWMESH=1` (what appeared or moved near the court before each attempt), GO AGAIN on a continuous
+night's card, so 5+ attempts run on one page.
