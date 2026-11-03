@@ -57,6 +57,7 @@ import { enforceStandoff } from './CameraStandoff';   // M69: last-guard standof
 import { reportDiag } from './diag';
 import { INTRO, introLetterbox, introPose, orbitBlend, smoothstep, type IntroKind } from '../scene/broadcastShots';   // vis-foundation-2 A9.12
 import { motionPolicy } from '../../a11y/reducedMotion';
+import { feel } from '../../feel-panel/feel';
 
 export type CamMode = 'follow' | 'fixed';
 
@@ -235,6 +236,15 @@ function rotateY(v: Vector3, rad: number): Vector3 {
 
 /** Share of lookAhead a vertical velocity component may claim (see aim()). */
 const VERTICAL_LEAD_SHARE = 0.25;
+
+/** GAMEPLAY-CLEAN P2 #10 (2026-11-03): THE LOOK-AHEAD EASES. aim() rebuilt the lead from the velocity's DIRECTION every frame, at full
+ *  length from 0.1 m/s up — so a rider stopping, an ollie (the flat part of a near-vertical velocity), a bail or a turnaround swung the
+ *  look-target across up to two lead lengths in ONE frame. The rig read those as view cuts nobody asked for (skateboard 17–20° in a
+ *  frame, freerun 19°, dunk duel 31°: scratchpad camCutEx). The lead now eases toward its target over CAM_LEAD_EASE_SEC (feel knob
+ *  `camera.leadEaseSec`) and grows with the ground speed up to CAM_LEAD_FULL_MPS (`camera.leadFullMps`); a cut (snapTo) still lands
+ *  at once. TUNED (new) — steady running above 1 m/s keeps the same lead as before; what changes is how fast it may swing. */
+export const CAM_LEAD_EASE_SEC = 0.2;
+export const CAM_LEAD_FULL_MPS = 1.0;
 /** How much of the frustum half-height an objective may pull the target by. */
 const OBJECTIVE_BIAS_SHARE = 0.6;
 
@@ -437,6 +447,10 @@ export class CameraDirector {
    * signal can drive it without re-deriving a camera.
    */
   public broadcast = 0;
+  /** GAMEPLAY-CLEAN P2 #10: ease the look-ahead (ModeHarness turns it off for the modes their own lanes hold). */
+  public leadEase = true;
+  private leadSm: Vector3 | null = null;
+  private leadRear = false;
 
   /** The active preset, blended toward the broadcast framing by `broadcast`, with the mode's tuneFollow overlay on top. */
   private effCfg(): FollowConfig {
@@ -885,6 +899,7 @@ export class CameraDirector {
     // A little vertical lead is still wanted, so you can see what you are
     // dropping into; it is just not worth a full metre-for-metre share.
     let ahead = chest;
+    const easeLead = this.leadEase && velocity !== undefined;
     if (velocity && velocity.lengthSquared() > 0.01) {
       const dir = velocity.normalizeToNew();
       const flat = new Vector3(dir.x, 0, dir.z);
@@ -897,10 +912,22 @@ export class CameraDirector {
       const sep = Math.hypot(this.camera.position.x - subject.x, this.camera.position.z - subject.z);
       const leadScale = Math.max(0, Math.min(1, (sep - 1.0) / (FRAMING_MIN_DISTANCE - 1.0)));
       // LOOK BACK: the lead points past the subject, down the course behind them — what the look-back is FOR
-      const lead = cfg.lookAhead * leadScale * (this.rearView ? -1 : 1);
+      const groundK = easeLead ? Math.min(1, Math.hypot(velocity.x, velocity.z) / Math.max(0.05, feel('camera.leadFullMps', CAM_LEAD_FULL_MPS))) : 1;
+      const lead = cfg.lookAhead * leadScale * groundK * (this.rearView ? -1 : 1);
       ahead = chest
         .add(flat.scale(lead))
         .add(new Vector3(0, dir.y * lead * VERTICAL_LEAD_SHARE, 0));
+    }
+    if (easeLead) {
+      // P2 #10: the lead (ahead − chest) eases; a cut (snapTo: no velocity) resets it, a LOOK BACK is a cut both ways
+      const want = ahead.subtract(chest);
+      const tau = feel('camera.leadEaseSec', CAM_LEAD_EASE_SEC);
+      if (!this.leadSm || tau <= 0 || this.rearView !== this.leadRear) this.leadSm = want;
+      else this.leadSm.addInPlace(want.subtractInPlace(this.leadSm).scaleInPlace(1 - Math.exp(-Math.min(0.1, this.scene.getEngine().getDeltaTime() / 1000) / tau)));
+      this.leadRear = this.rearView;
+      ahead = chest.add(this.leadSm);
+    } else if (velocity === undefined) {
+      this.leadSm = null;
     }
 
     let target = ahead;

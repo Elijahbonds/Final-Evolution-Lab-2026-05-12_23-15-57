@@ -300,6 +300,13 @@ lane/dunk-flagship (group "Dunk · slam"), TUNED, flagged: `dunk.slamHitStopBigM
 shook 0.12 before; an ordinary make (accuracy ≤ 0.5) still does, and cleaner ones grow toward these (`slamImpact`).
 **assumption:** the bounds (70–160 ms, 0.12–0.30) are safe, not tuned.
 
+lane/dunk-flagship Phase 7 (group "Dunk · finishes"), new, OFF by default: `dunk.slamVariants` 0 (`DunkSlamVariant.ts`
+`SLAM_VARIANTS_ON`): on, the LEFT STICK held at the A press inside the slam window calls the finish — back (away from the rim)
+a REVERSE (`dunk_finish_reverse`; the body turns its back to the iron at 15.7 rad/s and meets it once 0.8 of the half-turn is
+done), up a TWO-HAND POWER (`dunk_finish_two_hand`), each named on the card (+0.6 / +0.3 difficulty, new numbers). Read only on
+the live press inside the window; a called air trick keeps its own flush; the d-pad tricks are untouched (DunkSlamVariant.test).
+Like every knob, never in ranked, staked or paid play.
+
 lane/hoops-round2 (owner 2026-10-20, HOOPS DEFENSE / CONTACT; every number new, the owner has felt none of them yet):
 
 - Group "Hoops · AI reaction" (`hoops/reaction.ts`), **TUNED (new behaviour)**: `hoops.aiReactRookieMs` 420 ms, `hoops.aiReactProMs`
