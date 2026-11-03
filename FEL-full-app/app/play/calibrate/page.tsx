@@ -31,7 +31,7 @@ export default async function CalibratePage({ searchParams }: { searchParams?: R
           device: the Cypher and the Groove Academy&apos;s PERFORM stage judge your taps by it. Other rhythm modes
           don&apos;t use it yet.
         </p>
-        <p className="mt-1 text-xs text-white/40">
+        <p className="mt-1 text-xs text-white/50">
           Measure on the speakers or headphones you play with: Bluetooth headphones often add 200–300 ms, and a TV can
           add more. Switched devices? Measure again.
         </p>

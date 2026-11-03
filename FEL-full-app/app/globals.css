@@ -133,7 +133,8 @@ body {
   color: #ffffff;
   font-size: 0.9rem;
 }
-.fel-input::placeholder { color: rgba(255, 255, 255, 0.3); }
+/* READABLE (2026-11-02): placeholder text is read (it says what goes in the field): 0.3 was 2.54:1 on the field, 0.5 clears 4.5:1 */
+.fel-input::placeholder { color: rgba(255, 255, 255, 0.5); }
 .fel-input:focus {
   outline: none;
   border-color: rgba(168, 85, 247, 0.6);

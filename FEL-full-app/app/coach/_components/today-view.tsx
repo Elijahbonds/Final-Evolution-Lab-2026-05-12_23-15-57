@@ -393,7 +393,7 @@ export function TodayView({ api = TODAY_API, onSession }: { api?: TodayApi; onSe
       <div className="fel-card rounded-xl p-4" data-session-kind={today.session.kind}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="text-[11px] uppercase tracking-wider text-fel-dim">{program.name} · coach {program.coachName}</div>
+            <div className="text-[12px] uppercase tracking-wider text-fel-dim">{program.name} · coach {program.coachName}</div>
             <div className="fel-heading text-lg text-white mt-1">{today.block.label} · {today.session.label}</div>
             <div className="text-xs text-fel-dim mt-0.5">Session {today.index + 1} of {today.total}</div>
             {recovery && <div className="text-xs text-[#7BD389]/90 mt-1">{OFF_DAY_LINE}</div>}
@@ -409,14 +409,14 @@ export function TodayView({ api = TODAY_API, onSession }: { api?: TodayApi; onSe
       {layout.map((sec) => (
         <section key={sec.section} className="space-y-2" data-section={sec.section} aria-label={sec.label}>
           <div className="px-1">
-            <div className="text-[11px] uppercase tracking-wider text-white/50">{sec.label}</div>
-            <div className="text-[11px] text-fel-quiet">{sec.meaning}</div>
+            <div className="text-[12px] uppercase tracking-wider text-white/50">{sec.label}</div>
+            <div className="text-[12px] text-fel-quiet">{sec.meaning}</div>
           </div>
           {sec.blocks.map((b) => b.kind === 'single' ? card(b.item, b.label) : (
             <div key={`ss-${b.group}-${b.items[0].item.id}`} className="rounded-xl border border-fel-cyan/20 p-2 space-y-2" data-superset={b.group}>
               <div className="px-1">
                 <div className="text-xs font-medium text-fel-cyan">Superset {b.group}</div>
-                <div className="text-[11px] text-fel-dim">{supersetHint(b.items.map((x) => x.label))}</div>
+                <div className="text-[12px] text-fel-dim">{supersetHint(b.items.map((x) => x.label))}</div>
               </div>
               {b.items.map((x) => card(x.item, x.label))}
             </div>
@@ -441,12 +441,12 @@ export function TodayView({ api = TODAY_API, onSession }: { api?: TodayApi; onSe
         <div className="space-y-4">
         {data.recentComments.length > 0 && (
           <div className="fel-card rounded-xl p-4 space-y-2">
-            <div className="text-[11px] uppercase tracking-wider text-fel-dim">Coach comments</div>
+            <div className="text-[12px] uppercase tracking-wider text-fel-dim">Coach comments</div>
             {data.recentComments.map((c, i) => <div key={i} className="text-sm text-white/80"><span className="text-white/50">{c.exercise}:</span> {c.comment}</div>)}
           </div>
         )}
         <div className="fel-card rounded-xl p-4 space-y-2">
-          <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-fel-dim"><MessageSquare className="h-3.5 w-3.5" /> Thread with {program.coachName}<UnreadPill n={unread} /><LiveSessionLink programId={program.id} role="client" /></div>
+          <div className="flex items-center gap-2 text-[12px] uppercase tracking-wider text-fel-dim"><MessageSquare className="h-3.5 w-3.5" /> Thread with {program.coachName}<UnreadPill n={unread} /><LiveSessionLink programId={program.id} role="client" /></div>
           <ThreadMessages thread={thread} />
           <div className="flex gap-2"><input value={msg} onChange={(e) => setMsg(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void send(); }} placeholder="Message your coach" className="flex-1 min-w-0 rounded-lg bg-white/5 border border-white/10 px-2 py-1.5 text-white text-sm" /><button onClick={send} className="rounded-lg border border-white/10 px-3 text-sm text-white/80">Send</button></div>
         </div>
@@ -545,11 +545,11 @@ export function WeekStrip({ label, entries }: { label: string; entries: readonly
       : e.kind === 'recovery' ? 'border-dashed border-[#7BD389]/40 text-[#7BD389]/80' : 'border-white/15 text-white/60';
   return (
     <div className="mt-3 space-y-1" data-testid="week-strip">
-      <div className="text-[10px] uppercase tracking-wider text-fel-quiet">This week · {label}</div>
+      <div className="text-[12px] uppercase tracking-wider text-fel-quiet">This week · {label}</div>
       <ol className="flex flex-wrap gap-1" aria-label={`This week, ${label}`}>
         {entries.map((e) => (
           <li key={e.id} data-week-entry={e.id} data-kind={e.kind} data-state={e.state}
-            className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] leading-tight ${look(e)}`}>
+            className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[12px] leading-tight ${look(e)}`}>
             {e.state === 'done' && <CheckCircle2 className="h-3 w-3" aria-hidden="true" />}
             <span>{e.label}</span>
             {e.state === 'today' && <span className="sr-only">(today)</span>}
@@ -594,14 +594,14 @@ function ExerciseCard({ e, label, draft, unit, error, prev, simpleLog = false, r
     <div ref={cardRef} className={`fel-card rounded-xl p-4 space-y-3 ${e.isKeySet ? 'border border-fel-gold/30' : ''}`} data-exercise={e.id} data-key-set={e.isKeySet ? 'true' : undefined}>
       <div className="space-y-0.5">
         <div className="flex flex-wrap items-center gap-1.5">
-          {label && <span className="rounded bg-fel-cyan/15 px-1 text-[10px] font-semibold text-fel-cyan" data-label>{label}</span>}
-          {e.isKeySet && <span className="inline-flex items-center gap-0.5 rounded bg-fel-gold/15 px-1 text-[10px] font-semibold text-fel-gold" data-key-badge><KeyRound className="h-2.5 w-2.5" aria-hidden="true" />KEY SET</span>}
+          {label && <span className="rounded bg-fel-cyan/15 px-1 text-[12px] font-semibold text-fel-cyan" data-label>{label}</span>}
+          {e.isKeySet && <span className="inline-flex items-center gap-0.5 rounded bg-fel-gold/15 px-1 text-[12px] font-semibold text-fel-gold" data-key-badge><KeyRound className="h-2.5 w-2.5" aria-hidden="true" />KEY SET</span>}
           <span className="text-white font-medium" data-name>{e.name}</span>
         </div>
         <div className="text-xs text-white/60" data-dose>{e.dose} · tempo {e.tempo} · rest {e.restSeconds}s</div>
         {lastTime && <div className="text-xs text-fel-cyan/75" data-last-time>{lastTime}</div>}
-        {tags && <div className="text-[11px] text-fel-quiet">{tags}</div>}
-        {e.isKeySet && <div className="text-[11px] text-fel-gold/80">{KEY_SET_LINE}</div>}
+        {tags && <div className="text-[12px] text-fel-quiet">{tags}</div>}
+        {e.isKeySet && <div className="text-[12px] text-fel-gold/80">{KEY_SET_LINE}</div>}
       </div>
       {/* MIRROR-COACH P8: the protocol gate served this easier step in place of what was prescribed, and says why */}
       {e.protocolGate && <GateSwapLine note={e.protocolGate} />}
@@ -611,20 +611,20 @@ function ExerciseCard({ e, label, draft, unit, error, prev, simpleLog = false, r
       {c.band && <div className="text-xs text-white/70" data-band={c.band.id}><span className="font-medium text-white">{c.band.label}</span> <span className="text-fel-dim">({c.band.rir})</span>: {c.band.meaning}</div>}
       {c.setup.length > 0 && (
         <div className="space-y-0.5" data-setup>
-          <div className="text-[11px] uppercase tracking-wider text-fel-dim">Before the first rep</div>
+          <div className="text-[12px] uppercase tracking-wider text-fel-dim">Before the first rep</div>
           {c.setup.map((s) => <div key={s.id} className="text-sm text-white/85">· {s.text}</div>)}
         </div>
       )}
       {e.coachNote && <CoachNote note={e.coachNote} />}
       {c.cues.length > 0 && (
         <div className="space-y-0.5" data-cues>
-          <div className="text-[11px] uppercase tracking-wider text-fel-dim">Cues</div>
+          <div className="text-[12px] uppercase tracking-wider text-fel-dim">Cues</div>
           {c.cues.map((q) => <div key={q} className="text-sm text-white/85">· {q}</div>)}
         </div>
       )}
       {c.faults.length > 0 && (
         <div className="space-y-0.5" data-faults>
-          <div className="text-[11px] uppercase tracking-wider text-fel-dim">Common faults</div>
+          <div className="text-[12px] uppercase tracking-wider text-fel-dim">Common faults</div>
           {c.faults.map((f) => <div key={f.fault} className="text-sm text-white/75"><span className="text-white/90">{f.fault}</span>{f.fix && <span className="text-white/55"> → {f.fix}</span>}</div>)}
         </div>
       )}

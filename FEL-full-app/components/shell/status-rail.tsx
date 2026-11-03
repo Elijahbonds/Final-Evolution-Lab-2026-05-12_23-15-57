@@ -64,7 +64,10 @@ export function StatusRail() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-[color:var(--fel-hairline)] bg-fel-bg/85 backdrop-blur-xl">
-      <div data-couch-scale className="mx-auto flex h-14 max-w-[1200px] items-center gap-3 px-4">
+      {/* READABLE (2026-11-02): min-h + wrap, not a fixed h-14. With the root font at 150 % (iOS larger text) the wallet
+          cluster is ~95 px wider than a 390 px phone, and a fixed one-row rail pushed it off the right edge: the whole page
+          scrolled sideways. Now the cluster drops to a second row instead; at the default size it is still one 56 px row. */}
+      <div data-couch-scale className="mx-auto flex min-h-14 max-w-[1200px] flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2">
         <Link href="/play" className="fel-heading inline-flex min-h-10 shrink-0 items-center text-[20px] font-bold leading-none text-white">
           <span className="text-fel-cyan">FE</span>L
         </Link>
@@ -75,7 +78,7 @@ export function StatusRail() {
         </div>
         <div className="flex-1 md:hidden" />
 
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
           {/* P10 (2026-10-27): the PRQ ring and the wallet are always there — a dash and an empty track until the profile
               answers — so nothing swaps in and the cluster never shifts (the rig measured 0.006 CLS from the old skeleton swap) */}
           <>

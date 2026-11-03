@@ -370,7 +370,7 @@ export function CouchSplash({ title, phase, error, onStart }: { title: string; p
 export function CouchSeats({ table, hasPads }: { table: SeatTable; hasPads: boolean }) {
   const open = Math.max(0, COUCH_SEATS - table.seats.length);
   return (
-    <div data-testid="couch-seats" className="pointer-events-none absolute bottom-4 left-4 z-30 flex flex-col gap-1 font-mono text-[11px]">
+    <div data-testid="couch-seats" className="pointer-events-none absolute bottom-4 left-4 z-30 flex flex-col gap-1 font-mono text-[12px]">
       <div className="flex gap-1">
         {table.seats.map((s) => (
           <span key={s.key} data-seat={s.label} data-kind={s.kind} className="rounded bg-black/70 px-2 py-0.5 font-bold" style={{ color: s.color }}>
@@ -378,7 +378,7 @@ export function CouchSeats({ table, hasPads }: { table: SeatTable; hasPads: bool
           </span>
         ))}
         {Array.from({ length: open }, (_, i) => (
-          <span key={`open-${i}`} className="rounded border border-white/15 px-2 py-0.5 text-white/40">P{table.seats.length + i + 1}</span>
+          <span key={`open-${i}`} className="rounded border border-white/15 px-2 py-0.5 text-white/50">P{table.seats.length + i + 1}</span>
         ))}
       </div>
       {open > 0 ? <span className="text-white/50">{openSeatHint(hasPads)}</span> : null}

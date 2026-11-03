@@ -143,7 +143,7 @@ export function CoinStore() {
           <ShoppingCart className="h-4 w-4 text-[#00E5FF]" />
           <h2 className="text-lg font-semibold text-white">Coin Packs</h2>
           {copy.badge && (
-            <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] uppercase tracking-wide text-white/50">{copy.badge}</span>
+            <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[12px] uppercase tracking-wide text-white/50">{copy.badge}</span>
           )}
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -158,7 +158,7 @@ export function CoinStore() {
                 className="relative flex flex-col rounded-xl border border-[#FFD700]/25 bg-gradient-to-b from-[#FFD700]/[0.06] to-transparent p-4"
               >
                 {pack.tag && (
-                  <span className="absolute -top-2 right-3 rounded-full bg-[#00E5FF] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-black">{pack.tag}</span>
+                  <span className="absolute -top-2 right-3 rounded-full bg-[#00E5FF] px-2 py-0.5 text-[12px] font-bold uppercase tracking-wide text-black">{pack.tag}</span>
                 )}
                 <div className="mb-1 flex items-center gap-2 text-[#FFD700]">
                   <Coins className="h-5 w-5" />
@@ -202,7 +202,7 @@ export function CoinStore() {
                 </span>
                 <span className={`inline-flex items-center gap-1 text-xs ${isShard ? 'text-[#C79BFF]' : 'text-[#FFD700]'}`}>
                   {isShard ? <Gem className="h-3.5 w-3.5" /> : <Coins className="h-3.5 w-3.5" />} {w.currency}
-                  <ChevronRight className="h-4 w-4 text-white/40" />
+                  <ChevronRight className="h-4 w-4 text-white/50" />
                 </span>
               </Link>
             );

@@ -45,7 +45,7 @@ const S: Record<string, React.CSSProperties> = {
   off: { opacity: 0.45, cursor: 'not-allowed' },
   step: { fontSize: 13, marginTop: 8 },
   cells: { display: 'grid', gridTemplateColumns: 'repeat(16, minmax(0, 1fr))', gap: 2, marginTop: 6 },
-  cell: { textAlign: 'center', fontSize: 11, padding: '4px 0', borderRadius: 4, background: 'rgba(255,255,255,0.06)' },
+  cell: { textAlign: 'center', fontSize: 12, padding: '4px 0', borderRadius: 4, background: 'rgba(255,255,255,0.06)' },
   cellHit: { background: '#ffb347', color: '#2a1a10', fontWeight: 800 },
 };
 
@@ -104,7 +104,7 @@ export default function FlipLesson({ pack, packError, loadedId, ready, onLoad, o
           </button>
         ))}
       </div>
-      <div style={{ fontSize: 11, opacity: 0.75, marginTop: 6 }}>{theme.bpm} BPM · {theme.key} · {theme.character}</div>
+      <div style={{ fontSize: 12, opacity: 0.75, marginTop: 6 }}>{theme.bpm} BPM · {theme.key} · {theme.character}</div>
 
       <div style={S.step}>
         <strong>1.</strong>{' '}
@@ -128,7 +128,7 @@ export default function FlipLesson({ pack, packError, loadedId, ready, onLoad, o
           <span data-qa="lesson-tip" style={{ fontSize: 12 }}>{theme.lesson.tip}</span>
         </div>
       </div>
-      <div style={{ fontSize: 11, opacity: 0.7, marginTop: 8 }}>Your turn: ARM REC, press PLAY and tap the flip in — your hits land in the STUDIO grid.</div>
+      <div style={{ fontSize: 12, opacity: 0.7, marginTop: 8 }}>Your turn: ARM REC, press PLAY and tap the flip in — your hits land in the STUDIO grid.</div>
     </div>
   );
 }

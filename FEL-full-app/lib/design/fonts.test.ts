@@ -79,7 +79,7 @@ describe('--fel-font-display is defined once, from the next/font variables', () 
     const files = consumers();
     expect(files).toEqual(expect.arrayContaining([
       'app/theme.css', 'components/games/body-play.tsx', 'components/games/boot-splash.tsx',
-      'components/reliability/global-error-boundary.tsx', 'lib/babylon/premium/JuiceKit.ts',
+      'components/reliability/global-error-boundary.tsx', 'lib/babylon/premium/juiceStyles.ts',   // JuiceKit's text styles (lane/readable moved them here, 2026-11-02)
     ]));
     for (const f of files) {
       const src = noComments(read(f));

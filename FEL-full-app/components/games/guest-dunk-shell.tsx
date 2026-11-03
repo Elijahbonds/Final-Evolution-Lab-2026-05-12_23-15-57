@@ -234,7 +234,7 @@ export function GuestDunkShell({ challengeCode, reviewHref = null, ageBands = fa
               type="button"
               aria-label="Close"
               onClick={() => setClaimOpen(false)}
-              className="absolute right-3 top-3 rounded-md p-1 text-white/40 transition-colors hover:text-white"
+              className="absolute right-3 top-3 rounded-md p-1 text-white/50 transition-colors hover:text-white"
             >
               <X className="h-4 w-4" />
             </button>
@@ -281,7 +281,7 @@ export function GuestDunkShell({ challengeCode, reviewHref = null, ageBands = fa
               <span className="text-[#00E5FF] fel-glow-cyan">FINAL EVOLUTION</span> LAB
             </span>
           )}
-          <span className="ml-auto rounded-md border border-[#00FF9D]/40 px-2.5 py-1 font-mono text-[10px] text-[#00FF9D]">
+          <span className="ml-auto rounded-md border border-[#00FF9D]/40 px-2.5 py-1 font-mono text-[12px] text-[#00FF9D]">
             GUEST · NO ACCOUNT NEEDED
           </span>
           {/* TRY-ONBOARD G3: after the first night the claim is ALWAYS reachable and NEVER in
@@ -291,7 +291,7 @@ export function GuestDunkShell({ challengeCode, reviewHref = null, ageBands = fa
           {resultHref && !result && (
             <Link
               href={resultHref}
-              className="rounded-md border border-[#FFD700]/40 px-2.5 py-1 font-mono text-[10px] text-[#FFD700] transition-colors hover:bg-[#FFD700]/10"
+              className="inline-flex min-h-[40px] items-center rounded-md border border-[#FFD700]/40 px-3 font-mono text-[12px] text-[#FFD700] transition-colors hover:bg-[#FFD700]/10"
               data-action="challenge-result"
             >
               RESULT
@@ -301,7 +301,7 @@ export function GuestDunkShell({ challengeCode, reviewHref = null, ageBands = fa
             <button
               type="button"
               onClick={() => setClaimOpen(true)}
-              className="rounded-md border border-[#00E5FF]/40 px-2.5 py-1 font-mono text-[10px] text-[#00E5FF] transition-colors hover:bg-[#00E5FF]/10"
+              className="inline-flex min-h-[40px] items-center rounded-md border border-[#00E5FF]/40 px-3 font-mono text-[12px] text-[#00E5FF] transition-colors hover:bg-[#00E5FF]/10"
             >
               CLAIM
             </button>
@@ -311,7 +311,7 @@ export function GuestDunkShell({ challengeCode, reviewHref = null, ageBands = fa
           {!result && (
             <Link
               href="/"
-              className="rounded-md border border-white/15 px-2.5 py-1 font-mono text-[10px] text-white/45 transition-colors hover:border-white/40 hover:text-white"
+              className="inline-flex min-h-[40px] min-w-[44px] items-center justify-center rounded-md border border-white/25 px-3 font-mono text-[12px] text-white/75 transition-colors hover:border-white/40 hover:text-white"
             >
               QUIT
             </Link>
@@ -331,12 +331,12 @@ export function GuestDunkShell({ challengeCode, reviewHref = null, ageBands = fa
               onClick={() => setGate('local')}
               disabled={!hydrated}
               aria-busy={!hydrated}
-              className="mx-auto mt-4 block font-mono text-xs text-white/45 transition-colors hover:text-white disabled:cursor-wait disabled:opacity-40"
+              className="mx-auto mt-4 block min-h-[44px] px-4 font-sans text-[14px] font-medium text-white/70 underline-offset-4 transition-colors hover:text-white hover:underline disabled:cursor-wait disabled:opacity-60"
             >
               Play without saving
             </button>
             {!hydrated && (
-              <p role="status" className="mt-2 text-center font-mono text-[11px] text-white/40">Loading…</p>
+              <p role="status" className="mt-2 text-center font-mono text-[12px] text-white/50">Loading…</p>
             )}
           </div>
         ) : babylon ? (
@@ -370,7 +370,7 @@ export function GuestDunkShell({ challengeCode, reviewHref = null, ageBands = fa
                 transition={{ type: 'spring', damping: 22 }}
                 className="fel-panel w-full max-w-md rounded-2xl p-7 text-center"
               >
-                <Trophy className={`mx-auto h-12 w-12 ${result.won ? 'text-[#FFD700]' : 'text-white/30'}`} />
+                <Trophy className={`mx-auto h-12 w-12 ${result.won ? 'text-[#FFD700]' : 'text-white/50'}`} />
                 <h2 className="fel-heading mt-3 text-4xl font-bold text-white">
                   {result.headline ?? 'NICE DUNK'}
                 </h2>

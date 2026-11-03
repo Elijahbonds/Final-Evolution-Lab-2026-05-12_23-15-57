@@ -4,7 +4,7 @@
 //   - app/theme.css's --fel-* custom properties (the console identity, measured and written down 2026-09-20),
 //   - lib/design/palette.ts (the same accents as hex, for colours built from data: `${accent}14`),
 //   - components/games/tv-hud/tokens.ts's HUD_RGB (the HUD's ten tones, eight of them the theme's accents),
-// and, in practice, a fourth: ad-hoc Tailwind on every page (`text-white/35`, `bg-[#050505]`, `border-[#00E5FF]/45`).
+// and, in practice, a fourth: ad-hoc Tailwind on every page (`text-white/50`, `bg-[#050505]`, `border-[#00E5FF]/45`).
 // The fourth is where the accessibility audit's contrast misses came from: white at 30–45 % on the page ink is 2.5:1
 // to 4.46:1, under the WCAG 1.4.3 floor of 4.5:1 for body text.
 //
@@ -46,6 +46,13 @@ export const COLOR = {
   /** A quiet secondary HUD read (HUD_RGB.info). --fel-info */
   info: '#9ad7ff',
 
+  /** READABLE (2026-11-02): the brand violet and indigo as SMALL TEXT. The accents themselves are 4.28:1 (#A855F7) and
+   *  4.03:1 (#7B61FF) on the raised panel, under 4.5:1; these are the same hues, lightened the least that clears 4.5:1 on
+   *  every surface (6 % and 9 % toward white). The accents stay for large text, icons and fills. --fel-violet-text,
+   *  --fel-indigo-text */
+  violetText: '#ad5ff7',
+  indigoText: '#876fff',
+
   /** The keyboard / pad / remote focus ring (the primary-action cyan). --fel-focus (new) */
   focus: PALETTE.cyan,
 } as const;
@@ -58,6 +65,7 @@ export const COLOR_VAR: Record<ColorToken, string> = {
   text: '--fel-text', textSoft: '--fel-text-soft', textDim: '--fel-text-dim', textQuiet: '--fel-text-quiet',
   cyan: '--fel-cyan', gold: '--fel-gold', ember: '--fel-ember', crimson: '--fel-crimson', emerald: '--fel-emerald',
   violet: '--fel-violet', indigo: '--fel-indigo', them: '--fel-them', info: '--fel-info', focus: '--fel-focus',
+  violetText: '--fel-violet-text', indigoText: '--fel-indigo-text',
 };
 
 /** The text steps, in order. */
@@ -79,6 +87,7 @@ export const TAILWIND_FEL = {
   text: COLOR.text, soft: COLOR.textSoft, dim: COLOR.textDim, quiet: COLOR.textQuiet,
   cyan: COLOR.cyan, gold: COLOR.gold, ember: COLOR.ember, crimson: COLOR.crimson, emerald: COLOR.emerald,
   violet: COLOR.violet, indigo: COLOR.indigo, them: COLOR.them, info: COLOR.info, focus: COLOR.focus,
+  'violet-text': COLOR.violetText, 'indigo-text': COLOR.indigoText,
 } as const;
 
 /** The focus ring every keyboard, pad and remote stop draws (2.4.7, and visible on every surface: 1.4.11's 3:1). */

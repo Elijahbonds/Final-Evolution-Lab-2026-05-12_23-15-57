@@ -17,10 +17,10 @@ export function StepBreathRing({ view, spec = STEP_BREATH.spec, size = 'md' }: {
         <BreathPacer id="step-breath" spec={stepPacerSpec(spec)} elapsedSec={view.stepCount} size={size} />
       </div>
       <div className="min-w-0 flex-1 space-y-1">
-        <div className="text-[11px] uppercase tracking-wider text-white/40">{STEP_BREATH.name}</div>
+        <div className="text-[12px] uppercase tracking-wider text-white/50">{STEP_BREATH.name}</div>
         <div className="text-sm text-white" aria-live="polite" data-step-breath-line>{view.line}</div>
-        {view.spm !== null && <div className="text-[11px] text-white/50" data-step-breath-spm>About {view.spm} steps a minute (estimated)</div>}
-        <div className="text-[11px] text-white/40">{STEP_BREATH_HONESTY}</div>
+        {view.spm !== null && <div className="text-[12px] text-white/50" data-step-breath-spm>About {view.spm} steps a minute (estimated)</div>}
+        <div className="text-[12px] text-white/50">{STEP_BREATH_HONESTY}</div>
       </div>
     </div>
   );

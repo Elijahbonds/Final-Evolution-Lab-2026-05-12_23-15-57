@@ -253,7 +253,7 @@ export function SprintRunner({ base, onResult, facingMode = 'environment', onLiv
           {phase === 'reading' ? <><Loader2 className="h-4 w-4 animate-spin" /> Reading…</> : <><Square className="h-4 w-4" /> Stop and read the run</>}
         </button>
       )}
-      <p className="text-[11px] text-white/45">{PRIVACY_LINE}</p>
+      <p className="text-[12px] text-white/50">{PRIVACY_LINE}</p>
     </div>
   );
 }

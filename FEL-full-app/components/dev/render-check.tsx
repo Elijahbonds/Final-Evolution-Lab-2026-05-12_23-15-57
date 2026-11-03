@@ -166,7 +166,7 @@ export default function RenderCheck() {
         >
           {MOOD_KEYS.map((k) => <option key={k} value={k}>{k}</option>)}
         </select>
-        <div className="max-w-[190px] text-[10px] leading-relaxed text-white/60">
+        <div className="max-w-[190px] text-[12px] leading-relaxed text-white/60">
           metallic → left to right · roughness → bottom to top. With IBL off the
           metallic (right) columns should go flat and lifeless.
         </div>

@@ -82,7 +82,7 @@ const S = {
     // matched here either (FONT-SHARED).
     fontFamily: 'var(--fel-font-display, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace)',
   },
-  brand: { margin: 0, fontSize: 11, fontWeight: 900, letterSpacing: '0.4em', color: '#67e8f9' },
+  brand: { margin: 0, fontSize: 12, fontWeight: 900, letterSpacing: '0.4em', color: '#67e8f9' },
   title: { margin: 0, fontSize: 24, lineHeight: '32px', fontWeight: 900 },
   copy: { margin: 0, maxWidth: 384, fontSize: 14, lineHeight: '20px', color: '#94a3b8' },
   row: { display: 'flex', gap: 8 },

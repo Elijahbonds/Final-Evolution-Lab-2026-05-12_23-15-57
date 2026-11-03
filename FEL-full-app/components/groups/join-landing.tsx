@@ -25,7 +25,7 @@ export function JoinLanding({ token, kind, name, color, signedIn, loginHref }: {
   const accent = GROUP_COLORS[color];
   return (
     <section className="rounded-2xl border p-5" style={{ borderColor: `${accent}55`, background: `${accent}0d` }} data-join-landing>
-      <p className="font-mono text-[10px] uppercase tracking-[0.16em]" style={{ color: accent }}>{KIND_LABEL[kind]} invite</p>
+      <p className="font-mono text-[12px] uppercase tracking-[0.16em]" style={{ color: accent }}>{KIND_LABEL[kind]} invite</p>
       <h2 className="fel-heading mt-1 break-words text-[24px] font-black text-white">{name}</h2>
       <p className="mt-2 text-[13px] text-white/60">
         {kind === 'team' ? 'Joining puts you on this coach’s roster and on the team.' : 'Train together: daily drills, a weekly league and reactions. No messages.'}

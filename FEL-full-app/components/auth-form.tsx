@@ -303,7 +303,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
         {mode === 'signup' && path !== 'play' && (
           <div className="mb-6 rounded-2xl border p-4" data-first-win-preview={path}
             style={{ borderColor: `${FIRST_WINS[path].accent}40`, background: `${FIRST_WINS[path].accent}0A` }}>
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: FIRST_WINS[path].accent }}>Your first win</p>
+            <p className="font-mono text-[12px] font-bold uppercase tracking-[0.16em]" style={{ color: FIRST_WINS[path].accent }}>Your first win</p>
             <p className="fel-heading mt-1 text-[14px] font-bold text-white">{FIRST_WINS[path].title}</p>
             <p className="mt-1.5 text-[12.5px] leading-relaxed text-white/60">
               {FIRST_WINS[path].steps[0].text} About {FIRST_WINS[path].aboutSec} seconds, right after you join.
@@ -325,7 +325,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
               placeholder="Athlete name"
               value={name}
               onChange={(e) => setName(e?.target?.value ?? '')}
-              className="w-full rounded-md border border-white/10 bg-[#16161A] px-4 py-3 text-sm text-white placeholder-white/30 outline-none transition-colors focus:border-[#00E5FF]/60"
+              className="w-full rounded-md border border-white/10 bg-[#16161A] px-4 py-3 text-sm text-white placeholder-white/50 outline-none transition-colors focus:border-[#00E5FF]/60"
             />
           )}
           <input
@@ -335,7 +335,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e?.target?.value ?? '')}
-            className="w-full rounded-md border border-white/10 bg-[#16161A] px-4 py-3 text-sm text-white placeholder-white/30 outline-none transition-colors focus:border-[#00E5FF]/60"
+            className="w-full rounded-md border border-white/10 bg-[#16161A] px-4 py-3 text-sm text-white placeholder-white/50 outline-none transition-colors focus:border-[#00E5FF]/60"
           />
           <input
             type="password"
@@ -345,7 +345,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
             placeholder="Password (6+ characters)"
             value={password}
             onChange={(e) => setPassword(e?.target?.value ?? '')}
-            className="w-full rounded-md border border-white/10 bg-[#16161A] px-4 py-3 text-sm text-white placeholder-white/30 outline-none transition-colors focus:border-[#00E5FF]/60"
+            className="w-full rounded-md border border-white/10 bg-[#16161A] px-4 py-3 text-sm text-white placeholder-white/50 outline-none transition-colors focus:border-[#00E5FF]/60"
           />
           {mode === 'signup' && (
             <label className="flex items-start gap-3 cursor-pointer select-none">

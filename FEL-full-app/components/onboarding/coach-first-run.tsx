@@ -23,7 +23,7 @@ export function CoachFirstRun({ invited }: { invited: boolean }) {
             const ok = done.has(s.id);
             return (
               <li key={s.id} className="flex gap-3" data-coach-step={s.id} data-done={ok ? 'true' : 'false'}>
-                <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full font-mono text-[11px] font-bold ${ok ? 'bg-[#00FF9D] text-black' : 'border border-white/25 text-white/70'}`}>
+                <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full font-mono text-[12px] font-bold ${ok ? 'bg-[#00FF9D] text-black' : 'border border-white/25 text-white/70'}`}>
                   {ok ? <Check aria-hidden className="h-3.5 w-3.5" strokeWidth={3} /> : i + 1}
                 </span>
                 <span className="min-w-0">
@@ -42,7 +42,7 @@ export function CoachFirstRun({ invited }: { invited: boolean }) {
       <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="fel-heading text-sm font-bold uppercase tracking-wide text-white">A combine day, before your first</h2>
-          <span className="rounded border border-[#F5C518]/50 bg-[#F5C518]/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[#F5C518]" data-sample-label>
+          <span className="rounded border border-[#F5C518]/50 bg-[#F5C518]/10 px-1.5 py-0.5 text-[12px] font-semibold uppercase tracking-wider text-[#F5C518]" data-sample-label>
             {SAMPLE_LABEL}
           </span>
         </div>

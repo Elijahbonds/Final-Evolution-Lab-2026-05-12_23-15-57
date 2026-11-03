@@ -149,19 +149,19 @@ export function ScreenSelfReport({ screen, screenId, save = patchAnswers, asked 
               </li>
             ))}
           </ol>
-          <p aria-live="polite" className="mt-3 min-h-[1.25em] text-[12px] text-white/45">{SAVE_LINE[saveState]}</p>
+          <p aria-live="polite" className="mt-3 min-h-[1.25em] text-[12px] text-white/50">{SAVE_LINE[saveState]}</p>
         </>
       )}
 
       {coachChecks.length > 0 && (
         <div className={questions.length || unasked.length ? 'mt-5 border-t border-white/8 pt-4' : ''}>
           {!questions.length && !unasked.length && <h2 id="screen-self-report-heading" className="sr-only">Checked by your coach</h2>}
-          <p className="font-mono text-[9.5px] font-bold uppercase tracking-[0.18em] text-white/40">Checked by your coach</p>
+          <p className="font-mono text-[12px] font-bold uppercase tracking-[0.18em] text-white/50">Checked by your coach</p>
           <ul className="mt-2 grid gap-2">
             {coachChecks.map((c) => (
               <li key={c.id} className="rounded-xl border border-white/8 px-4 py-2.5">
                 <span className="block text-[13px] font-semibold text-white/80">{c.label}</span>
-                <span className="mt-0.5 block text-[12px] text-white/45">{COACH_CHECK_LINE}</span>
+                <span className="mt-0.5 block text-[12px] text-white/50">{COACH_CHECK_LINE}</span>
               </li>
             ))}
           </ul>

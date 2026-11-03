@@ -5,7 +5,7 @@ import { useState } from 'react';
 interface Option { value: string; label: string }
 type Issue = { field: string; message: string };
 
-const input = 'mt-1 w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#F5C518]/70';
+const input = 'mt-1 w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none placeholder:text-white/50 focus:border-[#F5C518]/70';
 
 /** Posts to /api/creator/inquiry. The server re-validates everything; these checks are only for the user. */
 export function InquiryForm({ budgets, profile, source }: { budgets: readonly Option[]; profile: string | null; source: string }) {

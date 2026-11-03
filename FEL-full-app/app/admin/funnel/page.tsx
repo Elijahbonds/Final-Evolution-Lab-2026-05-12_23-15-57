@@ -63,23 +63,23 @@ export default async function AdminFunnelPage() {
                 <div className="text-3xl font-black" style={{ color: meta.color }}>
                   {n}
                 </div>
-                <div className="mt-1 font-mono text-[11px] uppercase tracking-wider text-white/60">
+                <div className="mt-1 font-mono text-[12px] uppercase tracking-wider text-white/60">
                   {meta.label}
                 </div>
-                <div className="mt-1 text-[11px] text-white/40">{meta.blurb}</div>
+                <div className="mt-1 text-[12px] text-white/50">{meta.blurb}</div>
               </div>
             );
           })}
         </div>
 
         <h2 className="mt-10 fel-heading text-xl font-bold text-white">Where sign-ups came from</h2>
-        <p className="mt-1 font-mono text-[11px] text-white/45">
+        <p className="mt-1 font-mono text-[12px] text-white/50">
           Last {ATTRIBUTION_WINDOW_DAYS} days. utm_source / medium / campaign and ?ref from the first visit, kept on the
           visitor&apos;s own browser and sent with the sign-up. First purchase = their first paid order. No pixels.
         </p>
         <div className="mt-3 overflow-x-auto rounded-2xl border border-white/10" data-funnel-sources>
           <table className="w-full text-left text-sm">
-            <thead className="bg-white/[0.04] font-mono text-[11px] uppercase tracking-wider text-white/50">
+            <thead className="bg-white/[0.04] font-mono text-[12px] uppercase tracking-wider text-white/50">
               <tr>
                 <th className="px-4 py-3">Source</th>
                 <th className="px-4 py-3">Medium</th>
@@ -92,7 +92,7 @@ export default async function AdminFunnelPage() {
             </thead>
             <tbody>
               {sources.length === 0 ? (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-white/40">No sign-ups in this window.</td></tr>
+                <tr><td colSpan={7} className="px-4 py-8 text-center text-white/50">No sign-ups in this window.</td></tr>
               ) : sources.map((l) => (
                 <tr key={`${l.source}|${l.medium}|${l.campaign}|${l.ref}`} className="border-t border-white/5" data-source-row={l.source}>
                   <td className="px-4 py-3 text-white/80">{l.source}</td>
@@ -109,7 +109,7 @@ export default async function AdminFunnelPage() {
         </div>
 
         <h2 className="mt-10 fel-heading text-xl font-bold text-white">First wins by path</h2>
-        <p className="mt-1 font-mono text-[11px] text-white/45">
+        <p className="mt-1 font-mono text-[12px] text-white/50">
           Last {ATTRIBUTION_WINDOW_DAYS} days, timed on /welcome from the page to &quot;You did it&quot;. Play&apos;s win is the
           first dunk, inside the game. The bar is {FIRST_WIN_CAP_SEC} seconds.
         </p>
@@ -117,8 +117,8 @@ export default async function AdminFunnelPage() {
           {wins.map((w) => (
             <div key={w.path} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
               <div className="text-3xl font-black" style={{ color: FIRST_WINS[w.path].accent }}>{w.wins}</div>
-              <div className="mt-1 font-mono text-[11px] uppercase tracking-wider text-white/60">{FIRST_WINS[w.path].label}</div>
-              <div className="mt-1 text-[11px] text-white/40">
+              <div className="mt-1 font-mono text-[12px] uppercase tracking-wider text-white/60">{FIRST_WINS[w.path].label}</div>
+              <div className="mt-1 text-[12px] text-white/50">
                 {w.medianSec === null ? 'No wins yet' : `median ${w.medianSec.toFixed(1)} s · ${w.underCap} under ${FIRST_WIN_CAP_SEC} s`}
               </div>
             </div>
@@ -128,7 +128,7 @@ export default async function AdminFunnelPage() {
         <h2 className="mt-10 fel-heading text-xl font-bold text-white">Recent leads</h2>
         <div className="mt-3 overflow-x-auto rounded-2xl border border-white/10">
           <table className="w-full text-left text-sm">
-            <thead className="bg-white/[0.04] font-mono text-[11px] uppercase tracking-wider text-white/50">
+            <thead className="bg-white/[0.04] font-mono text-[12px] uppercase tracking-wider text-white/50">
               <tr>
                 <th className="px-4 py-3">Email</th>
                 <th className="px-4 py-3">Name</th>
@@ -141,7 +141,7 @@ export default async function AdminFunnelPage() {
             <tbody>
               {recent.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-white/40">
+                  <td colSpan={6} className="px-4 py-8 text-center text-white/50">
                     No leads captured yet.
                   </td>
                 </tr>
@@ -155,14 +155,14 @@ export default async function AdminFunnelPage() {
                       <td className="px-4 py-3 text-white/50">{r.source}</td>
                       <td className="px-4 py-3">
                         <span
-                          className="rounded-full px-2 py-0.5 font-mono text-[10px] uppercase"
+                          className="rounded-full px-2 py-0.5 font-mono text-[12px] uppercase"
                           style={{ color: meta.color, backgroundColor: `${meta.color}1a` }}
                         >
                           {meta.label}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-white/40">{r.referredByCode ?? '\u2014'}</td>
-                      <td className="px-4 py-3 text-white/40">
+                      <td className="px-4 py-3 text-white/50">{r.referredByCode ?? '\u2014'}</td>
+                      <td className="px-4 py-3 text-white/50">
                         {new Date(r.createdAt).toLocaleDateString('en-US', {
                           month: 'short',
                           day: 'numeric',

@@ -690,7 +690,7 @@ export default function FlipPad({ engine, playing, playhead, steps, flip: flipAl
     padOn: { background: '#ffb347', color: '#2a1a10', borderColor: '#ffd75e' },
     padEmpty: { opacity: 0.35, cursor: 'default' },
     padSel: { outline: '2px solid #22d3ee' },
-    note: { fontSize: 11, opacity: 0.72 },
+    note: { fontSize: 12, opacity: 0.72 },
   };
   const edited = selected !== null ? pads[selected] : null;
   return (
@@ -766,7 +766,7 @@ export default function FlipPad({ engine, playing, playhead, steps, flip: flipAl
             <button data-qa="flip-zoom" aria-pressed={zoom} style={{ ...S.alt, ...(zoom ? S.on : {}) }} onClick={() => setZoom((z) => !z)} disabled={!live || selected === null}>ZOOM</button>
             {selected !== null && live && (['start', 'end'] as const).map((edge) => (
               <span key={edge} role="group" aria-label={`move pad ${selected + 1}'s ${edge}`} style={{ display: 'inline-flex', gap: 2, alignItems: 'center' }}>
-                <span style={{ fontSize: 11, opacity: 0.8 }}>{edge.toUpperCase()}</span>
+                <span style={{ fontSize: 12, opacity: 0.8 }}>{edge.toUpperCase()}</span>
                 <button data-qa={`flip-nudge-${edge}-back`} style={{ ...S.alt, padding: '4px 10px' }} aria-label={`${edge} 5 ms earlier`} onClick={() => onNudge(edge, -1, false)}>◀</button>
                 <button data-qa={`flip-nudge-${edge}-on`} style={{ ...S.alt, padding: '4px 10px' }} aria-label={`${edge} 5 ms later`} onClick={() => onNudge(edge, 1, false)}>▶</button>
               </span>
@@ -780,7 +780,7 @@ export default function FlipPad({ engine, playing, playhead, steps, flip: flipAl
           <button key={i} style={{ ...S.pad, ...(p.slice ? {} : S.padEmpty), ...(lit === i ? S.padOn : {}), ...(selected === i ? S.padSel : {}) }}
             onPointerDown={(e) => { e.preventDefault(); if (p.slice) { play(i); setSelected(i); } }} disabled={!p.slice} aria-label={`pad ${i + 1}${bank ? ` (bank ${L})` : ''}`}>
             <span style={{ fontWeight: 800 }}>{i + 1}</span>
-            <span style={{ fontSize: 10, opacity: 0.8 }}>{PAD_KEYS[i]}{p.pitch ? ` · ${p.pitch > 0 ? '+' : ''}${p.pitch}` : ''}{p.reverse ? ' · rev' : ''}{rowPads?.has(i) ? ' · row' : ''}</span>
+            <span style={{ fontSize: 12, opacity: 0.8 }}>{PAD_KEYS[i]}{p.pitch ? ` · ${p.pitch > 0 ? '+' : ''}${p.pitch}` : ''}{p.reverse ? ' · rev' : ''}{rowPads?.has(i) ? ' · row' : ''}</span>
           </button>
         ))}
       </div>

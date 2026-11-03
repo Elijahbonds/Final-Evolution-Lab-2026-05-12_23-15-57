@@ -237,9 +237,9 @@ export function ClientsView({ me = null, chatOn = false }: { me?: SharedBy | nul
                               the route as setLines — are listed under it instead of being dropped on the floor */}
                           <div><span className="text-white">{l.exercise}</span> <span className="text-fel-dim">({l.prescribed})</span> → {l.actualSets ?? '–'}×{l.actualReps ?? '–'} @ {l.actualLoad ?? '–'} · {l.setLines?.length ? 'top effort' : 'RPE'} {l.rpe ?? '–'}{l.clientNote ? ` · “${l.clientNote}”` : ''}{l.videoUrl && <a href={l.videoUrl} target="_blank" rel="noreferrer" className="ml-2 inline-flex items-center gap-1 text-fel-cyan"><Video className="h-3 w-3" /> video</a>}</div>
                           {/* MIRROR-COACH P8 FIX (2026-09-30): a slot the protocol gate swapped says what was done instead */}
-                          {l.servedLine && <div className="pl-3 text-[11px] text-fel-gold/85" data-served-line>{l.servedLine}</div>}
+                          {l.servedLine && <div className="pl-3 text-[12px] text-fel-gold/85" data-served-line>{l.servedLine}</div>}
                           {!!l.setLines?.length && (
-                            <ul className="space-y-0.5 pl-3 text-[11px] text-white/55" data-set-lines>
+                            <ul className="space-y-0.5 pl-3 text-[12px] text-white/55" data-set-lines>
                               {l.setLines.map((line, k) => <li key={k}>{line}</li>)}
                             </ul>
                           )}

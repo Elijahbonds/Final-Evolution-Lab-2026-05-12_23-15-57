@@ -39,7 +39,7 @@ function StatCard({ icon: Icon, label, value, accent }: { icon: any; label: stri
     <div className="fel-card rounded-xl p-4">
       <div className="flex items-center gap-2">
         <Icon className="h-4 w-4" style={{ color: accent }} />
-        <span className="font-mono text-[11px] uppercase tracking-wide text-white/50">{label}</span>
+        <span className="font-mono text-[12px] uppercase tracking-wide text-white/50">{label}</span>
       </div>
       <div className="mt-2 fel-heading text-2xl font-bold text-white">{value}</div>
     </div>
@@ -85,7 +85,7 @@ export function MetricsDashboard() {
   return (
     <div className="mt-6">
       <div className="mb-4 flex items-center justify-between">
-        <span className="font-mono text-xs text-white/40">
+        <span className="font-mono text-xs text-white/50">
           {loading ? 'Loading…' : error ? `Error: ${error}` : 'Live snapshot (today, UTC) + stored daily rollups'}
         </span>
         <button
@@ -117,7 +117,7 @@ export function MetricsDashboard() {
         <h2 className="fel-heading mb-3 text-lg font-bold text-white">Daily rollups</h2>
         <table className="w-full min-w-[720px] border-collapse text-left">
           <thead>
-            <tr className="border-b border-white/10 font-mono text-[10px] uppercase tracking-wide text-white/40">
+            <tr className="border-b border-white/10 font-mono text-[12px] uppercase tracking-wide text-white/50">
               <th className="py-2 pr-3">Day</th>
               <th className="py-2 pr-3">DAU</th>
               <th className="py-2 pr-3">Guest</th>
@@ -133,7 +133,7 @@ export function MetricsDashboard() {
           <tbody className="font-mono text-xs text-white/70">
             {(data?.rollups ?? []).length === 0 && (
               <tr>
-                <td colSpan={10} className="py-6 text-center text-white/40">
+                <td colSpan={10} className="py-6 text-center text-white/50">
                   No stored rollups yet. Click “Recompute” to generate them from traffic.
                 </td>
               </tr>

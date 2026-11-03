@@ -2263,7 +2263,7 @@ export default function StudioMode({
     <div ref={helpRef} data-qa="keys-help-panel" role="dialog" aria-label="Keyboard keys" style={{ ...S.card, display: 'block', border: '1px solid #7a5c9e' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
         <span style={{ fontWeight: 800 }}>KEYS</span>
-        <span style={{ fontSize: 11, opacity: 0.7 }}>never while you type in a field</span>
+        <span style={{ fontSize: 12, opacity: 0.7 }}>never while you type in a field</span>
         <button type="button" style={{ ...S.btnAlt, marginLeft: 'auto', padding: '4px 10px' }} onClick={() => setHelpOpen(false)}>CLOSE</button>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(84px, max-content) minmax(0, 1fr)', gap: '4px 12px', fontSize: 12 }}>
@@ -2679,7 +2679,7 @@ export default function StudioMode({
       {libraryLine && (
         <div data-qa="library-line" role="status" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', margin: '4px 0', fontSize: 12, color: '#ffd7a8' }}>
           <span>LIBRARY: {libraryLine}</span>
-          <button type="button" aria-label="dismiss the library line" onClick={() => setLibraryLine(null)} style={{ ...S.btnAlt, padding: '2px 10px', fontSize: 11 }}>OK</button>
+          <button type="button" aria-label="dismiss the library line" onClick={() => setLibraryLine(null)} style={{ ...S.btnAlt, padding: '2px 10px', fontSize: 12 }}>OK</button>
         </div>
       )}
 
@@ -2735,7 +2735,7 @@ export default function StudioMode({
             {arenaPhase === 'playing' && (
               <>
                 <span data-qa="perform-status" style={{ fontSize: 13 }}>{performStatusLine({ bars: setRef.current.bars, bar: perfBar, score, combo, judgement })}</span>
-                <span style={{ fontSize: 11, opacity: 0.7 }}>it ends on its own · no pause · H J K L / ← ↓ ↑ →, a pad, the pads below or a paired phone</span>
+                <span style={{ fontSize: 12, opacity: 0.7 }}>it ends on its own · no pause · H J K L / ← ↓ ↑ →, a pad, the pads below or a paired phone</span>
               </>
             )}
             {/* MUSIC-SUITE P6 FIX PASS: a phone pairs from here (a pad's row is its lane; judged on arrival in the Arena) */}
@@ -2829,13 +2829,13 @@ export default function StudioMode({
                 {/* Only a staked set has a length, so only a staked set says so (an Arena run plays in the Arena panel). */}
                 {arenaSet && <span style={{ fontSize: 12, color: '#ffd75e' }}>{ARENA_SET_NOTE}</span>}
               </div>
-              <div data-qa="perform-hint" style={{ fontSize: 11, opacity: 0.75, marginTop: 4 }}>
+              <div data-qa="perform-hint" style={{ fontSize: 12, opacity: 0.75, marginTop: 4 }}>
                 {playing
                   ? 'Play the lanes: H J K L or ← ↓ ↑ →, a pad\'s X A Y B or D-pad, the pads below, or a paired phone · Space pauses'
                   : performFoundationHint(setRef.current.stepCount === 0 ? performFoundationFor(performLanesWithNotes(perfSongRows())) : setRef.current.band.foundation)}
                 {/* MUSIC-SUITE P6 FIX PASS: pair a phone without the detour to FLIP */}
                 {!phoneRoom && (
-                  <button data-qa="perform-pair-phone" style={{ ...S.btnAlt, marginLeft: 8, padding: '2px 10px', fontSize: 11 }} onClick={pairPhone}>📱 PAIR A PHONE</button>
+                  <button data-qa="perform-pair-phone" style={{ ...S.btnAlt, marginLeft: 8, padding: '2px 10px', fontSize: 12 }} onClick={pairPhone}>📱 PAIR A PHONE</button>
                 )}
               </div>
               <PerformLanes lanes={laneViews} playhead={playhead} compact={layout.compact} onLane={(l) => performLaneTap(l)} live={playing} />
@@ -2855,7 +2855,7 @@ export default function StudioMode({
             {tierChips(progress).map((c) => (
               <div key={c.tier} data-qa="tier-chip" data-tier={c.tier} data-state={c.state}
                 style={{
-                  flex: '1 1 180px', padding: '6px 10px', borderRadius: 10, fontSize: 11,
+                  flex: '1 1 180px', padding: '6px 10px', borderRadius: 10, fontSize: 12,
                   border: `1px solid ${c.state === 'current' ? '#ffd75e' : c.state === 'next' ? '#22d3ee' : '#5a4470'}`,
                   background: c.state === 'current' ? 'rgba(255,215,94,0.12)' : 'rgba(0,0,0,0.2)',
                   opacity: c.state === 'later' ? 0.7 : 1,
@@ -2895,7 +2895,7 @@ export default function StudioMode({
                 {SCALE_IDS.map((id) => <option key={id} value={id}>{SCALES[id].label}</option>)}
               </select>
               <span data-qa="key-sig" style={{ fontWeight: 800, color: '#ffd75e' }}>{keySignature(project.key)}</span>
-              <span style={{ opacity: 0.7, fontSize: 11 }}>♪ rows play only this key&apos;s notes</span>
+              <span style={{ opacity: 0.7, fontSize: 12 }}>♪ rows play only this key&apos;s notes</span>
             </div>
           )}
           {/* MUSIC-SUITE P4: THE POCKET GRID (ui/StepGrid): pages of 8 under 640 px (≥ 40 px cells), drag-to-paint (one undo
@@ -2904,7 +2904,7 @@ export default function StudioMode({
           <StepGrid
             kit={rows.kit.map(gridRow)} flip={rows.flip.map(gridRow)}
             flipHead={(
-              <div data-qa="flip-rows-head" style={{ fontSize: 11, opacity: 0.8, marginTop: 10 }}>
+              <div data-qa="flip-rows-head" style={{ fontSize: 12, opacity: 0.8, marginTop: 10 }}>
                 FLIP ROWS — pads you sent from the FLIP tab ({rows.flip.length}) · every pad gets a row, at every tier
               </div>
             )}
@@ -2919,7 +2919,7 @@ export default function StudioMode({
                 onLocked={() => say(lockLine())} onClose={() => openNoteRow(null)} />
             )} />
           {!gridLock && hiddenHits(tracks, caps) > 0 && (
-            <div data-qa="hidden-hits" style={{ fontSize: 11, opacity: 0.75, marginTop: 4 }}>
+            <div data-qa="hidden-hits" style={{ fontSize: 12, opacity: 0.75, marginTop: 4 }}>
               {hiddenHits(tracks, caps)} hit{hiddenHits(tracks, caps) === 1 ? '' : 's'} sit on rows {caps.name} doesn&apos;t show yet — silent until a tier opens them.
             </div>
           )}
@@ -2962,7 +2962,7 @@ export default function StudioMode({
                     onKeyDown={(e) => { if (isRepeatedActivation(e)) e.preventDefault(); }}
                     onPointerDown={(e) => { if (e.button === 0) tapCheck(); }}
                     onClick={(e) => { if (e.detail === 0) tapCheck(); }}>TAP</button>
-                  <span style={{ fontSize: 11, opacity: 0.75 }}>or Space / J / Enter · 1 + 2 bars at {CHECK_BPM} BPM</span>
+                  <span style={{ fontSize: 12, opacity: 0.75 }}>or Space / J / Enter · 1 + 2 bars at {CHECK_BPM} BPM</span>
                   <button style={S.btnAlt} onClick={() => finishCheck(true)}>CANCEL</button>
                 </>
               ) : (
@@ -3050,11 +3050,11 @@ export default function StudioMode({
                     rows the player can see; it is drawn here and HEAR IT plays it. BUY lays exactly this one. */}
                 {shop.pending.kind === 'assist' && cellPreview && (
                   <div data-qa="cell-preview" style={{ width: '100%' }}>
-                    <div style={{ fontSize: 11, opacity: 0.8, marginBottom: 3 }}>What BUY lays on your {Object.keys(cellPreview).length} rows (your other rows are untouched):</div>
+                    <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 3 }}>What BUY lays on your {Object.keys(cellPreview).length} rows (your other rows are untouched):</div>
                     <div style={{ display: 'grid', gridTemplateColumns: `52px repeat(${STEPS}, 1fr)`, gap: 2, maxWidth: 520 }}>
                       {heardTracks(tracks, caps).filter((t) => cellPreview[t.sampleId]).map((t) => (
                         <React.Fragment key={t.sampleId}>
-                          <div style={{ fontSize: 10, opacity: 0.85 }}>{KIT_SLOTS.find((k) => k.id === t.sampleId)?.name ?? t.sampleId}</div>
+                          <div style={{ fontSize: 12, opacity: 0.85 }}>{KIT_SLOTS.find((k) => k.id === t.sampleId)?.name ?? t.sampleId}</div>
                           {cellPreview[t.sampleId].map((on, i) => (
                             <div key={i} data-qa="cell-preview-step" data-on={on ? '1' : '0'} style={{ height: 10, borderRadius: 2, background: on ? '#22d3ee' : '#33244a' }} />
                           ))}
@@ -3188,12 +3188,12 @@ export default function StudioMode({
             <div key={t.id} style={S.card}>
               <div style={{ minWidth: 160 }}>
                 <div style={{ fontWeight: 700 }}>{t.title}</div>
-                <div style={{ fontSize: 11, opacity: 0.75 }}>
+                <div style={{ fontSize: 12, opacity: 0.75 }}>
                   {t.authorName} · {KIT_META[t.kit].label} · {t.bpm}bpm{t.key ? ` · ${keySignature(t.key)}` : ''}{t.polished ? ' · mastered' : ''}
                   {t.remixOf ? ` · remix of "${t.remixOf.title}"` : ''}
                   {t.isWalkOut ? ' · your walk-out' : ''}{t.audio === 'visit' ? ' · this visit only' : t.audio === 'none' ? ' · no audio on this device' : ''}
                 </div>
-                <div style={{ fontSize: 11, opacity: 0.6 }}>{t.plays} plays · {t.saves} saves</div>
+                <div style={{ fontSize: 12, opacity: 0.6 }}>{t.plays} plays · {t.saves} saves</div>
               </div>
               <button style={S.btn} onClick={() => playRecord(t)}>▶ PLAY</button>
               <button style={S.btnAlt} onClick={() => { const kept = StudioLibrary.saveToMyLibrary(t.id); setLibraryRev((r) => r + 1); if (kept) { say('Saved to your library'); setLibraryLine(null); } else setLibraryLine("Could not save — this device's storage is full"); }}>
@@ -3247,7 +3247,7 @@ export default function StudioMode({
           Audio at all: VoiceKit.play resolves false and the words still land, same as ModeMic.showCaption). */}
       {oktaSay.text && (
         <div data-qa="okta-caption" role="status" aria-live="polite" style={S.oktaCaption}>
-          <span style={{ marginRight: 8, fontWeight: 800, letterSpacing: '0.08em', fontSize: 10, color: '#ffb347' }}>{oktaSay.name}</span>
+          <span style={{ marginRight: 8, fontWeight: 800, letterSpacing: '0.08em', fontSize: 12, color: '#ffb347' }}>{oktaSay.name}</span>
           {oktaSay.text}
         </div>
       )}

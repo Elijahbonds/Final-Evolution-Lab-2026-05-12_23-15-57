@@ -76,7 +76,7 @@ export function CheckinsPanel({ api = COACH_CHECKINS_API }: { api?: string }) {
   return (
     <section className="fel-card space-y-3 rounded-xl p-4" data-checkins-panel>
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-fel-dim"><ClipboardCheck className="h-3.5 w-3.5" /> Check-ins</div>
+        <div className="flex items-center gap-2 text-[12px] uppercase tracking-wider text-fel-dim"><ClipboardCheck className="h-3.5 w-3.5" /> Check-ins</div>
         {!building && <button type="button" onClick={() => setBuilding(true)} className="flex min-h-10 items-center gap-1 rounded-lg border border-fel-cyan/50 px-3 text-sm text-fel-cyan" data-checkin-new><Plus className="h-4 w-4" /> New</button>}
       </div>
       {msg && <p className="text-xs text-white/60" data-checkin-msg>{msg}</p>}
@@ -125,7 +125,7 @@ export function CheckinsPanel({ api = COACH_CHECKINS_API }: { api?: string }) {
             {f.assigned.length > 0 && (
               <div className="flex flex-wrap gap-1">
                 {f.assigned.map((a) => (
-                  <span key={`${a.scope}:${a.scopeId}`} className="inline-flex items-center gap-1 rounded-full bg-white/8 px-2 py-0.5 text-[11px] text-white/70">
+                  <span key={`${a.scope}:${a.scopeId}`} className="inline-flex items-center gap-1 rounded-full bg-white/8 px-2 py-0.5 text-[12px] text-white/70">
                     {a.name}
                     <button type="button" aria-label={`Unassign ${a.name}`} onClick={() => void post({ action: 'unassign', formId: f.id, scope: a.scope, scopeId: a.scopeId }).then(() => load())}><X className="h-3 w-3" /></button>
                   </span>
@@ -148,7 +148,7 @@ export function CheckinsPanel({ api = COACH_CHECKINS_API }: { api?: string }) {
                     <div className="flex items-baseline justify-between text-xs"><span className="font-semibold text-white">{a.name}</span><span className="text-fel-dim">{a.compliance.answered}/{a.compliance.of} {f.cadence === 'weekly' ? 'weeks' : ''}{a.healthShared ? '' : ' · health not shared'}</span></div>
                     {a.rows.length > 0 && (
                       <div className="overflow-x-auto">
-                        <table className="w-full text-left text-[11px] text-white/75">
+                        <table className="w-full text-left text-[12px] text-white/75">
                           <thead><tr><th className="pr-2 font-normal text-fel-dim">Week of</th>{a.columns.map((c) => <th key={c.id} className="max-w-[9rem] pr-2 font-normal text-fel-dim">{c.prompt} {a.series[c.id] && <Spark points={a.series[c.id]} />}</th>)}</tr></thead>
                           <tbody>{a.rows.map((r) => <tr key={r.period} className="border-t border-white/5"><td className="whitespace-nowrap pr-2 text-white/50">{r.period === 'once' ? '—' : r.period.slice(5)}</td>{a.columns.map((c) => <td key={c.id} className="pr-2 align-top">{r.cells[c.id]}</td>)}</tr>)}</tbody>
                         </table>
@@ -158,7 +158,7 @@ export function CheckinsPanel({ api = COACH_CHECKINS_API }: { api?: string }) {
                 ))}
               </div>
             )}
-            <button type="button" onClick={() => void post({ action: 'archive', id: f.id }).then(() => load())} className="text-[11px] text-fel-quiet">Archive</button>
+            <button type="button" onClick={() => void post({ action: 'archive', id: f.id }).then(() => load())} className="text-[12px] text-fel-quiet">Archive</button>
           </li>
         ))}
       </ul>

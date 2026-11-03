@@ -19,7 +19,7 @@ export function PlanUpdateCard({ api = PLAN_UPDATES_API, coachName }: { api?: st
 export function PlanUpdateBody({ view, coachName }: { view: PlanUpdateView; coachName?: string | null }) {
   return (
     <section aria-labelledby="plan-update-h" className="fel-card rounded-xl border border-fel-cyan/25 p-4 space-y-2" data-testid="plan-update">
-      <h2 id="plan-update-h" className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-fel-cyan">
+      <h2 id="plan-update-h" className="flex items-center gap-2 text-[12px] uppercase tracking-wider text-fel-cyan">
         <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" /> {PLAN_UPDATE_COPY.heading}
       </h2>
       {view.lines.length > 0 && (
@@ -29,7 +29,7 @@ export function PlanUpdateBody({ view, coachName }: { view: PlanUpdateView; coac
       )}
       {view.notes.map((n, i) => (
         <p key={i} className="rounded-lg bg-white/[0.04] px-3 py-2 text-sm text-white/80">
-          <span className="text-[11px] uppercase tracking-wider text-fel-dim">{coachName ? `${coachName}` : PLAN_UPDATE_COPY.note}: </span>{n}
+          <span className="text-[12px] uppercase tracking-wider text-fel-dim">{coachName ? `${coachName}` : PLAN_UPDATE_COPY.note}: </span>{n}
         </p>
       ))}
     </section>

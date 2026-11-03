@@ -33,7 +33,7 @@ export function FeelSheet(p: FeelSheetProps) {
   const count = Object.keys(state.values).length;
   const chip = state.active ? (
     <div data-testid="feel-on-chip" role="status" aria-live="polite"
-      className="pointer-events-none fixed left-1/2 top-[calc(env(safe-area-inset-top)+40px)] z-[95] -translate-x-1/2 whitespace-nowrap rounded-full border border-amber-300/70 bg-amber-400/90 px-3 py-1 font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-black shadow-lg">
+      className="pointer-events-none fixed left-1/2 top-[calc(env(safe-area-inset-top)+40px)] z-[95] -translate-x-1/2 whitespace-nowrap rounded-full border border-amber-300/70 bg-amber-400/90 px-3 py-1 font-mono text-[12px] font-bold uppercase tracking-[0.14em] text-black shadow-lg">
       FEEL OVERRIDES ON · {count}
     </div>
   ) : null;
@@ -43,7 +43,7 @@ export function FeelSheet(p: FeelSheetProps) {
       <>
         {chip}
         <button type="button" data-testid="feel-tab" onClick={() => p.onOpen(true)} aria-label="Open the feel panel"
-          className={`fixed left-0 top-1/2 z-[95] -translate-y-1/2 rounded-r-lg border border-l-0 px-1.5 py-3 font-mono text-[10px] font-bold uppercase tracking-[0.2em] [writing-mode:vertical-rl] ${state.active ? 'border-amber-300/70 bg-amber-400/90 text-black' : 'border-white/25 bg-black/70 text-white/80'}`}>
+          className={`fixed left-0 top-1/2 z-[95] -translate-y-1/2 rounded-r-lg border border-l-0 px-1.5 py-3 font-mono text-[12px] font-bold uppercase tracking-[0.2em] [writing-mode:vertical-rl] ${state.active ? 'border-amber-300/70 bg-amber-400/90 text-black' : 'border-white/25 bg-black/70 text-white/80'}`}>
           FEEL
         </button>
       </>
@@ -66,7 +66,7 @@ export function FeelSheet(p: FeelSheetProps) {
         className="fixed inset-x-0 bottom-0 z-[96] mx-auto flex max-h-[72vh] w-full max-w-[520px] flex-col rounded-t-2xl border border-white/15 bg-[#0B0F17]/95 pb-[env(safe-area-inset-bottom)] text-white shadow-2xl backdrop-blur">
         <div className="flex items-center gap-2 border-b border-white/10 px-4 py-3">
           <span className="font-mono text-xs font-bold uppercase tracking-[0.18em] text-white/90">Feel panel</span>
-          <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">{knobs.length} knobs · {count} changed</span>
+          <span className="font-mono text-[12px] uppercase tracking-[0.14em] text-white/50">{knobs.length} knobs · {count} changed</span>
           <button type="button" data-testid="feel-close" onClick={() => p.onOpen(false)} aria-label="Close the feel panel"
             className="ml-auto rounded-full border border-white/20 px-3 py-1 text-xs text-white/80">Close</button>
         </div>
@@ -79,7 +79,7 @@ export function FeelSheet(p: FeelSheetProps) {
         <div className="flex-1 overflow-y-auto overscroll-contain px-4 pb-2">
           {groups.map((g) => (
             <section key={g} className="pt-2">
-              <h3 className="pb-1 font-mono text-[10px] uppercase tracking-[0.16em] text-white/45">{g}</h3>
+              <h3 className="pb-1 font-mono text-[12px] uppercase tracking-[0.16em] text-white/50">{g}</h3>
               {knobs.filter((k) => k.group === g).map((k) => {
                 const has = Object.prototype.hasOwnProperty.call(state.values, k.id);
                 const cur = has ? state.values[k.id] : k.def;
@@ -90,18 +90,18 @@ export function FeelSheet(p: FeelSheetProps) {
                       <span data-testid={`feel-cur-${k.id}`} className={`ml-auto font-mono text-[13px] ${has ? 'text-amber-300' : 'text-white/80'}`}>{fmt(k, cur)}</span>
                     </div>
                     <div className="flex items-center gap-2 pt-1">
-                      <span className="font-mono text-[10px] text-white/40">{k.id}</span>
-                      <span data-testid={`feel-def-${k.id}`} className="ml-auto font-mono text-[10px] text-white/50">default {fmt(k, k.def)}</span>
+                      <span className="font-mono text-[12px] text-white/50">{k.id}</span>
+                      <span data-testid={`feel-def-${k.id}`} className="ml-auto font-mono text-[12px] text-white/50">default {fmt(k, k.def)}</span>
                     </div>
                     <div className="flex items-center gap-2 pt-1">
-                      <span className="w-10 text-right font-mono text-[10px] text-white/40">{k.min}</span>
+                      <span className="w-10 text-right font-mono text-[12px] text-white/50">{k.min}</span>
                       <input type="range" aria-label={k.label} data-testid={`feel-slider-${k.id}`}
                         min={k.min} max={k.max} step={k.step} value={cur}
                         onChange={(e) => p.onSet(k.id, Number(e.currentTarget.value))}
                         className={`h-8 flex-1 ${has ? 'accent-amber-400' : 'accent-slate-400'}`} />
-                      <span className="w-10 font-mono text-[10px] text-white/40">{k.max}</span>
+                      <span className="w-10 font-mono text-[12px] text-white/50">{k.max}</span>
                       <button type="button" data-testid={`feel-reset-${k.id}`} onClick={() => p.onReset(k.id)} disabled={!has}
-                        className="rounded-md border border-white/20 px-2 py-1 text-[11px] text-white/80 disabled:opacity-30">Reset</button>
+                        className="rounded-md border border-white/20 px-2 py-1 text-[12px] text-white/80 disabled:opacity-30">Reset</button>
                     </div>
                   </div>
                 );

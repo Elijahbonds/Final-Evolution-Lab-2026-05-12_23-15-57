@@ -46,7 +46,7 @@ export function RepChallengeButton({ metric, label, canShowName }: { metric: Rep
         </label>
       )}
       {state.s === 'sent' && (
-        <p className="mt-2 flex items-start gap-2 break-all font-mono text-[11px] text-[#00FF9D]"><Check className="h-4 w-4 shrink-0" aria-hidden /> {state.url}</p>
+        <p className="mt-2 flex items-start gap-2 break-all font-mono text-[12px] text-[#00FF9D]"><Check className="h-4 w-4 shrink-0" aria-hidden /> {state.url}</p>
       )}
       {state.s === 'line' && (
         <p className="mt-2 text-xs text-white/60" role="status">{state.line} {state.href && <Link href={state.href} className="text-[#00E5FF] underline">Go</Link>}</p>
