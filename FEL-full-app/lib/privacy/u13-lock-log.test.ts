@@ -110,9 +110,9 @@ const UA = 'AgeScreenTest/1.0';
 // TEACHER PLATFORM (lane/plat-p10, 2026-11-03) prisma/pending/2026-11-03-teacher.sql (pending SQL only; schema.prisma
 // untouched; TeacherApplication + TeacherRole + TeachCourse, additive) at 882bf0f9, the lane commit carrying it on top of
 // every file above.
-// Both lanes merged at MERGE_SHA (lane/plat-p10's merge of lane/finish-release), the first commit carrying every pending
+// Both lanes merged at 91ba351b (lane/plat-p10's merge of lane/finish-release), the first commit carrying every pending
 // file above.
-const PARENT = 'f093256cb2b4266f4a687d4f5440d60d81614e3f';
+const PARENT = '91ba351b9b2b612a4da5d6c49af8c5eded53dd6d';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {
