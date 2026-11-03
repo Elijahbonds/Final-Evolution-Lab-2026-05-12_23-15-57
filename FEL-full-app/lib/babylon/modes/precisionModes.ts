@@ -1895,7 +1895,7 @@ export const PenaltyMode: ModeDefinition = (() => {
     if (held || brk.slideSec >= 0) return;
     brkStill = sp < (brkStill ? BREAK_GO_MPS : BREAK_STILL_MPS);
     meAnim.loop(brkStill ? SPORT_CLIP.penaltyIdle : SPORT_CLIP.moveLoop, { fadeSec: 0.2 });
-    if (!brkStill && !meAnim.busy) me.animator.setPlaybackScale(SPORT_CLIP.moveLoop, brkStride.step(strideRate(sp, LOCO_TUNE.runRef), dt));
+    if (!brkStill && !meAnim.busy) me.animator.setPlaybackScale?.(SPORT_CLIP.moveLoop, brkStride.step(strideRate(sp, LOCO_TUNE.runRef), dt));
   }
   function tickBreak(ctx: ModeContext, dt: number): void {
     if (!ctx.camDirector.inIntro) brk.clock -= dt;   // VIS-COURT: the broadcast intro holds the shot clock (the player cannot run what they cannot see)
