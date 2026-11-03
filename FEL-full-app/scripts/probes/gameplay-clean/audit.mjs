@@ -47,7 +47,11 @@ const MODE_WALL_S = Number(process.env.MODE_WALL_S ?? 300);   // the play loop's
 fs.mkdirSync(OUT, { recursive: true });
 
 // ── the page's clock, input and recorder (installed before any module runs) ───────────────────────────────────────────
+// FEEL='anim.inertial=1,camera.leadEaseSec=0': feel-panel overrides for an A/B run (with QS='&playtest=1', the panel's own gate:
+// lib/feel-panel/sessionGate.ts). The overrides go into this device's storage before the page loads, exactly as the panel keeps them.
+const FEEL = Object.fromEntries((process.env.FEEL ?? '').split(',').filter(Boolean).map((kv) => { const [k, v] = kv.split('='); return [k, Number(v)]; }));
 const INIT = `(() => {
+  ${Object.keys(FEEL).length ? `try { localStorage.setItem('fel.feel.overrides.v1', ${JSON.stringify(JSON.stringify(FEEL))}); } catch {}` : ''}
   const realNow = performance.now.bind(performance); window.__realNow = realNow;
   { let t = 7 >>> 0; Math.random = () => { t += 0x6D2B79F5; let r = Math.imul(t ^ (t >>> 15), 1 | t); r ^= r + Math.imul(r ^ (r >>> 7), 61 | r); return ((r ^ (r >>> 14)) >>> 0) / 4294967296; }; }
   window.__name = window.__name || function (f) { return f; };
@@ -100,7 +104,7 @@ function installRecorder(cfg) {
   const clean = (n) => n.replace(/^mixamorig:?/, '').replace(/_c\d+$/, '').replace(/^.*[:|]/, '');
   const JN = ['Hips', 'LeftFoot', 'RightFoot', 'LeftToeBase', 'RightToeBase', 'LeftHand', 'RightHand', 'Head', 'LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm', 'Spine2'];
   const QN = ['Hips', 'Spine', 'Spine1', 'Spine2', 'Neck', 'Head', 'LeftShoulder', 'RightShoulder', 'LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand', 'LeftUpLeg', 'RightUpLeg', 'LeftLeg', 'RightLeg', 'LeftFoot', 'RightFoot', 'LeftToeBase', 'RightToeBase'];
-  let heroRef = null, jn = null, qn = null, rest = null, heroMeshes = null, bindAt = -99;
+  let heroRef = null, jn = null, qn = null, rest = null, heroMeshes = null, bindAt = -99; const heroGroups = new Map();
   const bind = (hero) => {
     heroRef = hero; jn = qn = rest = null; heroMeshes = new Set();
     if (!hero) return;
@@ -168,7 +172,19 @@ function installRecorder(cfg) {
           const [b, who] = occlusion(pts); f.oc = b; f.ow = who; f.inf = pts[1] ? projIn(pts[1]) : -1;
         }
       } catch (e) { f.err = String(e).slice(0, 80); }
-      try { const a = dev.anim && dev.anim(); if (a && a.playing) { const top = a.playing.filter((p) => p.weight > 0.3).map((p) => p.clip).sort().join('+'); f.c = ix(R.clipIx, R.clips, top); } } catch {}
+      // the hero's playing clips, read off the scene's animation groups (each group is one clip on one body; the anim probe's
+      // readout came back empty on the CharacterAnimator bodies): the ones targeting the hero's nodes, weight > 0.3
+      try {
+        const names = [];
+        for (const g of scene.animationGroups) {
+          if (!g.isPlaying) continue;
+          let isH = heroGroups.get(g);
+          if (isH === undefined) { const t = g.targetedAnimations[0] && g.targetedAnimations[0].target; isH = !!(t && (t === heroRef || (t.isDescendantOf && t.isDescendantOf(heroRef)))); heroGroups.set(g, isH); }
+          const w = g.weight < 0 ? 1 : g.weight;
+          if (isH && w > 0.3) names.push(g.name.replace(/_c\d+$/, '').slice(0, 40));
+        }
+        f.c = ix(R.clipIx, R.clips, names.sort().join('+'));
+      } catch {}
     }
     f.cam = camPose();
     if (R.frameNo % 30 === 0) { const txt = (document.body.innerText || '').replace(/\s+/g, ' '); let hsh = 0; for (let i = 0; i < txt.length; i++) hsh = (hsh * 31 + txt.charCodeAt(i)) | 0; f.dom = hsh; }
@@ -227,8 +243,12 @@ function auditScreen(where) {
     const s = n.textContent.replace(/\s+/g, ' ').trim(); if (!s) continue;
     const el = n.parentElement; if (!el || el.closest('[aria-hidden="true"] svg, script, style, noscript')) continue;
     if (el.closest('[data-testid="feel-tab"], [data-testid="feel-sheet"]')) continue;   // the owner's dev panel: the rig opens it; a player never sees it
+    // the controls are not the HUD: the touch deck's labels and the shell's buttons are counted apart (deckWords)
+    const inDeck = !!el.closest('[data-touch-deck], [data-fel-corner], [data-capture-ui]');
     const range = document.createRange(); range.selectNodeContents(n); const r = range.getBoundingClientRect();
-    if (r.width < 1 || r.height < 1 || r.right < 0 || r.bottom < 0 || r.left > vw || r.top > vh) continue;
+    // < 2 px: a screen-reader-only line (the caption region's sr-only box is 1x1) is not on the screen
+    if (r.width < 2 || r.height < 2 || r.right < 0 || r.bottom < 0 || r.left > vw || r.top > vh) continue;
+    { const cs0 = getComputedStyle(el); if (cs0.clip && cs0.clip !== 'auto' && /rect\(0/.test(cs0.clip)) continue; }
     const op = effOpacity(el); if (op < 0.05) continue;
     const cs = getComputedStyle(el);
     const px = parseFloat(cs.fontSize) * zoomOf(el);
@@ -240,7 +260,7 @@ function auditScreen(where) {
     const fgc = over(fg, bg); const L1 = lum(fgc), L2 = lum(bg); const ratio = (Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05);
     const shadow = cs.textShadow && cs.textShadow !== 'none';
     const bold = Number(cs.fontWeight) >= 700; const large = px >= 24 || (bold && px >= 18.66);
-    texts.push({ s: s.slice(0, 60), words: s.split(' ').filter((w) => /[A-Za-z0-9]/.test(w)).length, px: Math.round(px * 10) / 10, ratio: Math.round(ratio * 100) / 100, need: large ? 3 : 4.5, backed, shadow, el, r: { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) } });
+    texts.push({ deck: inDeck, s: s.slice(0, 60), words: s.split(' ').filter((w) => /[A-Za-z0-9]/.test(w)).length, px: Math.round(px * 10) / 10, ratio: Math.round(ratio * 100) / 100, need: large ? 3 : 4.5, backed, shadow, el, r: { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) } });
   }
   const small = texts.filter((t) => t.px < 12);
   const lowC = texts.filter((t) => t.ratio < t.need && !(t.shadow && !t.backed));
@@ -272,7 +292,8 @@ function auditScreen(where) {
   const label = (re) => q('button, a[href], [role="button"]').some((e) => re.test((e.getAttribute('aria-label') || '') + ' ' + (e.textContent || '')));
   const ss = window.__sessionStore ? window.__sessionStore.view() : null;
   return {
-    where, phase: ss ? ss.phase : null, words: texts.reduce((s, t) => s + t.words, 0), textNodes: texts.length,
+    where, phase: ss ? ss.phase : null, words: texts.filter((t) => !t.deck).reduce((s, t) => s + t.words, 0), deckWords: texts.filter((t) => t.deck).reduce((s, t) => s + t.words, 0),
+    endScreen: !!document.querySelector('[data-end-screen]'), textNodes: texts.length,
     small: small.length, smallEx: [...new Set(small.map((t) => `${t.s.slice(0, 28)} @${t.px}px`))].slice(0, 6),
     smallest: texts.length ? Math.min(...texts.map((t) => t.px)) : null,
     lowContrast: lowC.length, lowEx: lowC.slice(0, 5).map((t) => `${t.s.slice(0, 28)} ${t.ratio}:1`),
@@ -283,7 +304,7 @@ function auditScreen(where) {
     controlsRows: document.querySelectorAll('[data-controls-panel] [data-controls-rows] > span').length,
     pausedHeadline: /PAUSED — TAP TO RESUME/.test(document.body.innerText),
     pauseButton: label(/\bpause\b/i), leaveButton: label(/leave the game|^\s*home\b|quit|exit/i),
-    feelTab: q('[data-testid="feel-tab"]').length > 0, touchDeck: q('[data-touch-deck]').length > 0,
+    feelTab: q('[data-testid="feel-tab"]').length > 0, feelActive: q('[data-testid="feel-tab"]').some((e) => String(e.className).includes('amber')), touchDeck: q('[data-touch-deck]').length > 0,
     fullscreen: label(/full screen/i), tapToStart: /TAP TO START/.test(document.body.innerText),
     text: [...new Set(texts.map((t) => t.s))].slice(0, 40).join(' | ').slice(0, 900),
   };
@@ -309,19 +330,21 @@ function analyze(mode, rec, S) {
       const w = speeds[i]?.[b]; if (w === null || w === undefined || w < 600) continue;
       if (F[i].ph !== 'playing' || F[i - 1].ph !== 'playing') continue;
       const nb = []; for (let k = i - 6; k <= i + 6; k++) if (k !== i && speeds[k]?.[b] != null) nb.push(speeds[k][b]);
-      const m = med(nb) ?? 0; if (w >= 3.5 * Math.max(m, 60)) pops.push({ t: F[i].t, i, bone: QN[b], degS: Math.round(w), clip: rec.clips[F[i].c] ?? '' });
+      const m = med(nb) ?? 0; if (w >= 3.5 * Math.max(m, 60)) pops.push({ t: F[i].t, i, bone: QN[b], degS: Math.round(w), clip: rec.clips[F[i].c] ?? '', from: rec.clips[F[Math.max(0, i - 3)].c] ?? '' });
     }
   }
   // one EVENT is every bone that pops within 10 frames of another (a snap into a pose moves many bones at once); the
   // control (karate, raw): RightUpLeg 70° then 63° in two frames, then held — the same pair at 3.35, 4.27, 5.40, 9.67 s
   const byFrame = [...pops].sort((a, b) => a.i - b.i); const events = [];
-  for (const p0 of byFrame) { const last = events[events.length - 1]; if (last && p0.i - last.end <= 10) { last.end = p0.i; last.bones.add(p0.bone); last.peak = Math.max(last.peak, p0.degS); } else events.push({ t: p0.t, end: p0.i, bones: new Set([p0.bone]), peak: p0.degS }); }
+  for (const p0 of byFrame) { const last = events[events.length - 1]; if (last && p0.i - last.end <= 10) { last.end = p0.i; last.bones.add(p0.bone); last.peak = Math.max(last.peak, p0.degS); } else events.push({ t: p0.t, end: p0.i, bones: new Set([p0.bone]), peak: p0.degS, from: p0.from, to: p0.clip }); }
   // HARD pops: a peak of 1500°/s or more (25° in one frame) — fast dance and swing motion lives around 900–1300 °/s at its
   // peak (carnival, dance), a snap into a pose at 3700–10000 (baseball's swing contact, karate's strikes)
   const hard = events.filter((e) => e.peak >= 1500);
   out.hardPopEvents = hard.length; out.hardPopsPerMin = r2(hard.length / Math.max(1e-6, play.length / 3600));
   out.popEvents = events.length; out.popEventsPerMin = r2(events.length / Math.max(1e-6, play.length / 3600));
-  out.popEventEx = events.sort((a, b) => b.peak - a.peak).slice(0, 4).map((e) => `${e.t}s ${e.peak}°/s ${[...e.bones].slice(0, 4).join('+')}`);
+  out.popEventEx = [...events].sort((a, b) => b.peak - a.peak).slice(0, 4).map((e) => `${e.t}s ${e.peak}°/s ${[...e.bones].slice(0, 4).join('+')} [${e.from} → ${e.to}]`);
+  // which clip changes the hard pops sit on: the transitions to soften first
+  { const tr = {}; for (const e of events) if (e.peak >= 1500) { const k = `${e.from} → ${e.to}`; tr[k] = (tr[k] || 0) + 1; } out.hardPopTransitions = Object.entries(tr).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, n]) => `${n}× ${k}`); }
   out.pops = pops.length; out.popsPerMin = r2(pops.length / Math.max(1e-6, play.length / 3600)); out.popEx = pops.sort((a, b) => b.degS - a.degS).slice(0, 5);
   // root jumps (teleports) during play
   const jumps = []; for (let i = 1; i < F.length; i++) { if (F[i].ph !== 'playing' || F[i - 1].ph !== 'playing') continue; const d = dist(F[i].r, F[i - 1].r); if (d !== null && d > 0.35) jumps.push({ t: F[i].t, m: r2(d) }); }

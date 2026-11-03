@@ -1090,6 +1090,23 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/core/OccluderFade.ts OCCLUDER_HOLD_SEC',
     hint: 'How long after it stops blocking before it comes back (stops a pole flickering as the camera sweeps past).',
   },
+  // GAMEPLAY-CLEAN P2 #10 (2026-11-03): the follow camera's look-ahead eases instead of swinging in a frame (CameraDirector.aim)
+  {
+    id: 'camera.leadEaseSec', label: 'Look-ahead: ease time', def: 0.2, min: 0, max: 1, step: 0.05, unit: 's', group: 'Camera · follow',
+    source: 'lib/babylon/core/CameraDirector.ts CAM_LEAD_EASE_SEC',
+    hint: 'How long the point the camera looks at (ahead of the player) takes to swing to a new direction. 0 = the old instant swing (a stop, an ollie or a turnaround jerked the view).',
+  },
+  {
+    id: 'camera.leadFullMps', label: 'Look-ahead: full at speed', def: 1, min: 0.1, max: 4, step: 0.1, unit: 'm/s', group: 'Camera · follow',
+    source: 'lib/babylon/core/CameraDirector.ts CAM_LEAD_FULL_MPS',
+    hint: 'Ground speed at which the camera looks its full distance ahead; slower than this it looks closer to the player (no lead flicking around a near-standstill).',
+  },
+  // GAMEPLAY-CLEAN P2 #6 (2026-11-03): the football carry's stride paces to the carrier (footballTree)
+  {
+    id: 'football.carryStrideMax', label: 'Football carry: top stride rate', def: 1.4, min: 1, max: 1.85, step: 0.05, unit: '×', group: 'Anim · stride',
+    source: 'lib/babylon/anim/footballTree.ts FOOTBALL_CARRY_RATE_MAX',
+    hint: 'How fast the carry loop may cycle to keep the feet with the ground at speed. 1 = the old fixed cadence (feet skate); higher = quicker legs at top speed.',
+  },
   // hoops-p03 (1v1/3v3 phase 3 "rivals that play basketball"): the 1v1 rival's kit and reads (hoops/rivalOffense), the 3v3 team offence
   // (hoops/teamOffense3v3). Every default is this lane's; the owner has felt none of them.
   {

@@ -113,8 +113,14 @@ export default function TiebreakGame({ grade, prq, onEnd }: GameProps) {
   const warmTotal = Number(hud.warmTotal ?? 0);
 
   return (
-    <div className="relative w-full">
-      <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl border border-white/10 bg-black">
+    // gameplay-clean-2 (2026-11-03): THE COURT ON A SIDEWAYS PHONE. The court box used to sit inside a plain `relative w-full`
+    // wrapper with the SWING buttons under it. On a short landscape screen app/game-surface.css sets every aspect-[16/10] box to
+    // height:100% of its parent, and that wrapper had no height, so the court collapsed to 0 px: a black screen before the
+    // first press, then only the two SWING buttons (the gameplay-clean rig's photographs). The box is now the host's root,
+    // holding its canvas directly, so the console stage's own rule (game-surface.css §1, `> div:has(> canvas)`) frames it like
+    // every other host; the SWING buttons ride inside it, one per bottom corner (thumbs; the shell's buttons own the
+    // bottom centre).
+    <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl border border-white/10 bg-black">
         <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" />
         {started && phase === 'playing' && (
           <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between px-4 py-3 font-mono">
@@ -170,12 +176,11 @@ export default function TiebreakGame({ grade, prq, onEnd }: GameProps) {
             <p className="font-mono text-[11px] tracking-widest text-white/50">ANY KEY · ANY BUTTON · TAP</p>
           </div>
         )}
-      </div>
       {started && (
-        <div className="mt-3 flex justify-center gap-3">
-          <button className="rounded-lg bg-[#00FF9D]/20 px-12 py-4 font-bold text-[#00FF9D] active:bg-[#00FF9D]/40" onPointerDown={(e) => { e.preventDefault(); emit({ t: 'dpad', dir: 'left', pressed: true }); }}>← SWING</button>
-          <button className="rounded-lg bg-[#00FF9D]/20 px-12 py-4 font-bold text-[#00FF9D] active:bg-[#00FF9D]/40" onPointerDown={(e) => { e.preventDefault(); emit({ t: 'dpad', dir: 'right', pressed: true }); }}>SWING →</button>
-        </div>
+        <>
+          <button className="absolute bottom-4 left-4 z-20 rounded-lg bg-[#00FF9D]/20 px-10 py-4 font-bold text-[#00FF9D] backdrop-blur-sm active:bg-[#00FF9D]/40" onPointerDown={(e) => { e.preventDefault(); emit({ t: 'dpad', dir: 'left', pressed: true }); }}>← SWING</button>
+          <button className="absolute bottom-4 right-4 z-20 rounded-lg bg-[#00FF9D]/20 px-10 py-4 font-bold text-[#00FF9D] backdrop-blur-sm active:bg-[#00FF9D]/40" onPointerDown={(e) => { e.preventDefault(); emit({ t: 'dpad', dir: 'right', pressed: true }); }}>SWING →</button>
+        </>
       )}
     </div>
   );

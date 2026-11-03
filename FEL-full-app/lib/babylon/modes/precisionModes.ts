@@ -45,6 +45,9 @@ import {
   spawnAthlete, Reticle, PowerMeter, POWER_METER_RATE, Flight, swingQuality, swingSide,
   buildGolfGreen, buildPlateAndMound, buildGoal, buildBallparkOutfield, spawnFoe } from './aimSwingCore';
 import { SPORT_CLIP } from '../anim/clipRegistry';
+import { applyInertialBlend } from '../anim/inertialize';   // GAMEPLAY-CLEAN P2 #2
+import { StrideRateFilter, strideRate } from '../core/StrideMatch';   // GAMEPLAY-CLEAN P2 #6: the breakaway striker's stride
+import { LOCO_TUNE } from '../anim/LocoBus';
 import { BeatOwner } from '../anim/beatOwner';
 import { registerMirroredClips } from '../anim/mirrored-clips';
 import { GOLF_CONTACT_SEC } from '../anim/authored/golf';
@@ -1357,6 +1360,7 @@ export const DerbyMode: ModeDefinition = (() => {
       stands = mountModeCrowd(ctx, 'derby');   // w3-crowds
       me = await spawnAthlete(ctx, CFG.heroUrl, new Vector3(-0.7, 0, 0), Math.PI / 2, SPORT_CLIP.derbyStance);
       meAnim = new BeatOwner(me.animator); meAnim.loop(SPORT_CLIP.derbyStance);
+      applyInertialBlend(me.animator);   // GAMEPLAY-CLEAN P2 #2: AF-1 inertial transitions behind anim.inertial (default off: linear, unchanged)
       // The bat (Phase 6, 2026-09-03): the stance and swing are real now; the
       // hands were empty.
       // ANIM-SURGICAL (2026-09-14): NOT a hand prop any more. It was a RightHand child with one grip solved after 8 stance
@@ -1704,6 +1708,10 @@ export const PenaltyMode: ModeDefinition = (() => {
   let kickPressure: string | null = null;
   /** IMPROVE (2026-10-06, Penalty #14 / #15 / #17): scratch, so the ball's substeps and the run allocate nothing a frame. */
   const ZERO_V = Vector3.Zero(), RUN_V = new Vector3(), GLASS_N = new Vector3();
+  // GAMEPLAY-CLEAN P2 #6 — paceStride(): the run's rate filter, and a standing striker (hysteresis: stands under 0.4 m/s, runs again over 0.8)
+  const BREAK_STILL_MPS = 0.4, BREAK_GO_MPS = 0.8;
+  const brkStride = new StrideRateFilter();
+  let brkStill = true;
   // ── BREAKAWAY (owner brief, 2026-09-18): your kick is a RUN at the keeper from midfield on a shot clock — kinetic shot
   // stacking off a flow gauge, the bank off the glass, the rainbow flick, the slide-cancel curler; the keeper comes off
   // his line, slide-tackles, vaults for the top corners and parry-kicks a save back at you (an overdrive if you hit it
@@ -1794,7 +1802,7 @@ export const PenaltyMode: ModeDefinition = (() => {
     phase = 'break'; Object.assign(brk, { on: true, clock: BREAK.clockSec, flow: 0, kineticAt: -1e9, run: { vx: 0, vz: 0 }, wall: 0, wallSec: 0, slideSec: -1, slideCool: 0, vaultT: -1, vault: null, counterLive: false, struck: false, shotKind: 'strike', lastHigh: false, lastAimSign: 1, stylePts: 0, keeperSlide: null, keeperCool: 1.0, hudClock: -1, hudFlow: -1, hudKin: '' });
     me.root.position.set(0, 0, BREAK.startZ); me.root.rotation.set(0, 0, 0);
     keeper.root.position.set(0, 0, BREAK.keeperZ); keeper.root.rotation.set(0, Math.PI, 0);
-    keeperAnim.loop(SPORT_CLIP.keeperIdle, { fadeSec: 0.25 }); meAnim.loop(SPORT_CLIP.moveLoop, { fadeSec: 0.2 });
+    keeperAnim.loop(SPORT_CLIP.keeperIdle, { fadeSec: 0.25 }); meAnim.loop(SPORT_CLIP.penaltyIdle, { fadeSec: 0.2 }); brkStill = true;   // GAMEPLAY-CLEAN P2 #6: he stands until he runs (paceStride)
     pball.stop(); ball.position.set(0, 0.11, BREAK.startZ + BREAK.dribbleAhead); frameKind = null; flightSec = 0;
     ctx.camDirector.setPreset('court'); ctx.camDirector.snapTo(me.root.position, new Vector3(0, 1, PEN_GOAL.z));
     // IMPROVE (2026-10-06, Penalty #2 / #4): the hint names the real clock (BREAK.clockSec; it said 9 s of 11) and what
@@ -1877,6 +1885,18 @@ export const PenaltyMode: ModeDefinition = (() => {
     console.info(`[BREAK] ${kind} power ${prof.power01.toFixed(2)} x${prof.speedMult.toFixed(2)} flow ${brk.flow.toFixed(0)} kinetic ${kinetic} clock ${brk.clock.toFixed(1)}`);
   }
   /** The run: the clock, the body with momentum, the glass, the slide, the rainbow's arc, the ball at the feet, the keeper. */
+  /** GAMEPLAY-CLEAN P2 #6 (2026-11-03): THE STRIKER'S STRIDE PACES HIS RUN. The breakaway played the one `run` loop at 1× for every
+   *  speed (stepRun tops out near 8 m/s) and kept it on a standing striker, so the rig read his planted feet skating at 0.69 of his
+   *  travel (`run` @7+ m/s: the clip's own pace 5.06 m/s against a root at 7.8) and running on the spot at the kick's start. The loop is
+   *  paced by StrideMatch against LocoBus's calibrated `run` reference (LOCO_TUNE.runRef, the same number Sprint's runner paces on —
+   *  this rig measured the clip at 5.0 m/s, in agreement), and a striker under BREAK_STILL_MPS stands. Not during a beat (the strike,
+   *  the slide), a vault or the slide window: those are choreography. */
+  function paceStride(sp: number, held: boolean, dt: number): void {
+    if (held || brk.slideSec >= 0) return;
+    brkStill = sp < (brkStill ? BREAK_GO_MPS : BREAK_STILL_MPS);
+    meAnim.loop(brkStill ? SPORT_CLIP.penaltyIdle : SPORT_CLIP.moveLoop, { fadeSec: 0.2 });
+    if (!brkStill && !meAnim.busy) me.animator.setPlaybackScale?.(SPORT_CLIP.moveLoop, brkStride.step(strideRate(sp, LOCO_TUNE.runRef), dt));
+  }
   function tickBreak(ctx: ModeContext, dt: number): void {
     if (!ctx.camDirector.inIntro) brk.clock -= dt;   // VIS-COURT: the broadcast intro holds the shot clock (the player cannot run what they cannot see)
     brk.slideCool = Math.max(0, brk.slideCool - dt); brk.keeperCool = Math.max(0, brk.keeperCool - dt);
@@ -1901,6 +1921,7 @@ export const PenaltyMode: ModeDefinition = (() => {
     if (brk.vaultT >= 0 && brk.vault) { brk.vaultT += dt; const u = Math.min(1, brk.vaultT / BREAK.rainbowSec); const q = rainbowArc(brk.vault.from, brk.vault.dir, u); p.set(q.x, q.y, q.z); if (u >= 1) { brk.vaultT = -1; p.y = 0; } }
     const sp = Math.hypot(vel.x, vel.z);
     if (sp > 0.5 && !held) { const want = Math.atan2(vel.x, vel.z); let d = want - me.root.rotation.y; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; me.root.rotation.y += Math.max(-10 * dt, Math.min(10 * dt, d)); }
+    paceStride(sp, held, dt);
     if (sp >= 6) brk.flow = flowAdd(brk.flow, FLOW.dribblePerSec * dt);
     if (!brk.counterLive) ball.position.set(p.x + Math.sin(me.root.rotation.y) * BREAK.dribbleAhead, 0.11, p.z + Math.cos(me.root.rotation.y) * BREAK.dribbleAhead);
     else { stepBall(dt); if (!pball.active && Vector3.Distance(ball.position, p) > BREAK.strikeReach + 2.5) { resolveKick(ctx, 'saved', 'PARRIED CLEAR — SAVED'); return; } }
