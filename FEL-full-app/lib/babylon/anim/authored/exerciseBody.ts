@@ -245,9 +245,9 @@ const highKnees = (scene: Scene, sk: Skeleton) => inPlace(scene, sk, 'ex_high_kn
 const buttKicks = (scene: Scene, sk: Skeleton) => inPlace(scene, sk, 'ex_butt_kicks', 0.6, [stride('Left', heelUp('Left'), 0.02), stride('Right', heelUp('Right'), 0.02)]);
 /** ex_a_skip / ex_power_skip — the skip: a knee drives up as the other foot hops (higher, and the arms bigger, for the power
  *  skip), the foot steps down, and the other side. */
-function skip(scene: Scene, sk: Skeleton, name: string, hop: number): AnimationGroup | null {
+function skip(scene: Scene, sk: Skeleton, name: string, hop: number, period = 1.2): AnimationGroup | null {
   const down = (s: Side): Pose => ({ ...stride(s, { [`${s}UpLeg`]: [-20, 0, 0], [`${s}Leg`]: [30, 0, 0] }, 0), feet: both(0.11, ANKLE, 0.04), hipsY: -0.02 });
-  return inPlace(scene, sk, name, 1.2, [down('Right'), stride('Left', kneeUp('Left'), hop), down('Left'), stride('Right', kneeUp('Right'), hop)]);
+  return inPlace(scene, sk, name, period, [down('Right'), stride('Left', kneeUp('Left'), hop), down('Left'), stride('Right', kneeUp('Right'), hop)]);
 }
 /** ex_b_skip — the A-skip whose raised leg then reaches out long and paws back down under the hip. */
 function bSkip(scene: Scene, sk: Skeleton): AnimationGroup | null {
@@ -370,6 +370,8 @@ export const BODY_BUILDERS: readonly [string, Builder][] = [
   ['ex_side_plank', (scene, sk) => sidePlank(scene, sk, 'ex_side_plank', false)], ['ex_side_plank_leg', (scene, sk) => sidePlank(scene, sk, 'ex_side_plank_leg', true)],
   ['ex_squat_thrust', (scene, sk) => burpee(scene, sk, 'ex_squat_thrust', false)], ['ex_burpee', (scene, sk) => burpee(scene, sk, 'ex_burpee', true)], ['ex_seal_jack', sealJack],
   ['ex_high_knees', highKnees], ['ex_butt_kicks', buttKicks], ['ex_a_skip', (scene, sk) => skip(scene, sk, 'ex_a_skip', 0.06)], ['ex_power_skip', (scene, sk) => skip(scene, sk, 'ex_power_skip', 0.22)], ['ex_b_skip', bSkip],
+  // DEMO-LOOPS-8: the fast skip (low and quick: the step-hop barely leaves the floor)
+  ['ex_fast_skip', (scene, sk) => skip(scene, sk, 'ex_fast_skip', 0.025, 0.8)],
   ['ex_tuck_jump', (scene, sk) => jump(scene, sk, 'ex_tuck_jump', TUCK)], ['ex_star_jump', (scene, sk) => jump(scene, sk, 'ex_star_jump', STAR)], ['ex_split_jump', splitJump], ['ex_sl_jump', slJump],
   ['ex_pogo_fb', (scene, sk) => hops(scene, sk, 'ex_pogo_fb', [[0, 0.12], [0, -0.12]], false, 0.10, 0.9)],
   ['ex_pogo_lat', (scene, sk) => hops(scene, sk, 'ex_pogo_lat', [[0.14, 0], [-0.14, 0]], false, 0.10, 0.9)],
