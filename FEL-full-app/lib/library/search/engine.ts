@@ -25,6 +25,7 @@ import { PATTERN_INFO } from '@/lib/coach/catalogue';
 import { SKILL_LAYERS } from '@/lib/coach/taxonomy';
 import type { LibraryExercise } from '../types';
 import { SYNONYM_GROUPS } from './synonyms';
+import { demoFor } from '../demo';
 import { editDistance, terms, typoBudget, words, STOP, stem } from './text';
 
 // ── filters and facets ──────────────────────────────────────────────────────────────────────────────────────────────
@@ -68,7 +69,47 @@ export interface SearchOptions {
   preferLevel?: string;
   /** Group variants under their base (default true). false = one hit per entry (the review screen, the tests' controls). */
   group?: boolean;
+  /**
+   * PLAT-P08 (2026-11-02): moving demos first — after relevance (the brief's order: relevance, then "has a faithful
+   * loop"). Inside the first DEMO_FIRST_WINDOW results, hits are banded by score relative to the top one (a band spans a
+   * DEMO_FIRST_BAND score ratio); inside each band the entries whose demo is a faithful loop (lib/library/demo.ts demoFor)
+   * come first, each side keeping its relevance order. So a clearly better match (the exact name typed) is never pushed
+   * under a weaker one that moves; with no words typed every hit is one band. Off by default: Ask (lib/library/ask/**) and
+   * its top-5 bench rank exactly as before; the library's own search screen turns it on (lib/library/search/page.ts).
+   */
+  demosFirst?: boolean;
   now?: () => number;
+}
+
+/** The results the moving-demos-first order applies to: a phone's first two screens of tiles. (new) */
+export const DEMO_FIRST_WINDOW = 24;
+
+const movesCache = new WeakMap<LibraryIndex, Uint8Array>();
+/** Per doc: 1 when its demo is a faithful loop (computed once per index). */
+function movesOf(index: LibraryIndex): Uint8Array {
+  let m = movesCache.get(index);
+  if (!m) { m = Uint8Array.from(index.docs, (e) => (demoFor(e)?.clip ? 1 : 0)); movesCache.set(index, m); }
+  return m;
+}
+
+/** A relevance band spans this score ratio: hits within it count as equally good matches for the demos-first order. (new) */
+export const DEMO_FIRST_BAND = 0.6;
+
+/** Stable: within the window, by relevance band, then moving entries first, then the existing order. */
+function demosFirstOrder(index: LibraryIndex, ranked: RankedGroup[], score: Float64Array, scored: boolean): void {
+  const moves = movesOf(index);
+  const n = Math.min(DEMO_FIRST_WINDOW, ranked.length);
+  const top = scored ? Math.abs(score[ranked[0].rep]) : 0;
+  const band = (g: RankedGroup) => {
+    if (!scored || !(top > 0)) return 0;
+    const s = Math.abs(score[g.rep]);
+    return s >= top ? 0 : s <= 0 ? 99 : Math.floor(Math.log(top / s) / Math.log(1 / DEMO_FIRST_BAND));
+  };
+  // raw score bands (the brief's order: relevance, then the loop). Inside the window this also settles a family-variety
+  // pick that scored a band lower (diversify) below the stronger matches; past the window diversify's order stands.
+  const head = ranked.slice(0, n).map((g, i) => ({ g, i, b: band(g), m: moves[g.rep] ? 0 : 1 }));
+  head.sort((x, y) => x.b - y.b || x.m - y.m || x.i - y.i);
+  ranked.splice(0, n, ...head.map((x) => x.g));
 }
 
 export interface SearchHit {
@@ -353,11 +394,18 @@ function scoreGroup(index: LibraryIndex, g: Group, out: Float64Array, hit: Uint8
   for (const [d, v] of best) { out[d] += v; hit[d]++; }
 }
 
-function passes(index: LibraryIndex, d: number, f: SearchFilters, opts: SearchOptions, skip?: FacetKey | 'lowLoad'): boolean {
-  const e = index.docs[d];
+/** Who may see an entry at all: approved (drafts too for a coach who opted in), never rejected, youth rules applied.
+ *  PLAT-P08: exported so the on-device copy of the library (/api/library/all) holds exactly what search would show. */
+export function visibleTo(e: LibraryExercise, opts: Pick<SearchOptions, 'drafts' | 'youth'>): boolean {
   if (!opts.drafts && e.review.status !== 'approved') return false;
   if (e.review.status === 'rejected') return false;
   if (opts.youth && !e.youthOk) return false;
+  return true;
+}
+
+function passes(index: LibraryIndex, d: number, f: SearchFilters, opts: SearchOptions, skip?: FacetKey | 'lowLoad'): boolean {
+  const e = index.docs[d];
+  if (!visibleTo(e, opts)) return false;
   if (f.ids && !f.ids.includes(e.id)) return false;
   if (f.notCategory?.includes(e.category)) return false;
   if (f.notEquipment?.length && e.equipment.some((x) => f.notEquipment!.includes(x))) return false;
@@ -484,6 +532,7 @@ export function search(index: LibraryIndex, q: string, filters: SearchFilters = 
   const scored = !(textless && !boost.size && prefer === null && !opts.boostPrimary?.length);
   const ranked = opts.group === false ? matched.map((d) => ({ rep: d, members: [d] })) : groupHits(index, matched, score, scored);
   if (scored && ranked.length > 1) diversify(index, ranked, score);
+  if (opts.demosFirst && ranked.length > 1) demosFirstOrder(index, ranked, score, scored);
   const round = (d: number) => Math.round(score[d] * 1000) / 1000;
   return {
     query: q, total: matched.length, groups: ranked.length,

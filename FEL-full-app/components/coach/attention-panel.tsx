@@ -31,7 +31,7 @@ interface Flag {
 }
 interface DriftRow { clientId: string; name: string; state: string; daysSince: number | null; note: string; games?: number }
 /** MIRROR-COACH P5 (2026-09-29) — lib/health/pain.ts coachPainFlag, one per client that has one. Without a live
- *  coach_view HealthConsent grant `items` is absent and `label` is the generic "Client paused an exercise": this
+ *  coach_view HealthConsent grant `items` is absent and `label` is the generic "Athlete paused an exercise": this
  *  panel never has more detail than the API already decided to give it. */
 interface PainFlagRow { clientId: string; name: string; view: { present: boolean; detailed: boolean; label: string; items?: { exerciseName: string; bodyArea: string; decision: string; copy: string; createdAt: string }[] } }
 /** MIRROR-COACH P6 (2026-09-29) — lib/health/readiness.ts coachReadinessView, one per client who checked in AND gave

@@ -39,7 +39,7 @@ export const TABS: TabDef[] = [
   },
   {
     id: 'train', label: t('shell.tabs.train'), href: '/train', icon: Dumbbell, accent: PALETTE.emerald,
-    owns: ['/train', '/training', '/coach', '/kitchens', '/workout', '/education', '/camp', '/live', '/learn'],
+    owns: ['/train', '/training', '/coach', '/kitchens', '/workout', '/education', '/camp', '/live', '/learn', '/groups'],
   },
   {
     id: 'profile', label: t('shell.tabs.profile'), href: '/profile', icon: UserRound, accent: PALETTE.gold,

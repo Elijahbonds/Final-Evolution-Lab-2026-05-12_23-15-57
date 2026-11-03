@@ -333,6 +333,8 @@ export const REGISTRY: Record<string, TableRights> = {
   // SIGNATURE-PROGRAMS (#451)
   SignatureEnrollment: { subjects: [{ col: 'userId', export: true, erase: 'delete', why: "The athlete's place in a signature program: the sessions done and the plan's adaptations. Their own training data." }] },
   SignatureProgramReview: { subjects: [{ col: 'reviewerId', export: OTHERS, erase: 'nullify', why: "The owner's review of FEL's own program (one row per program); the program stays, the reviewer is no longer named." }] },
+  // PROGRAM-ASK-2 (lane/program-ask-2; prisma/pending/2026-11-03-program-ask.sql). Adults only; no health answer or body number.
+  AskedProgram: { subjects: [{ col: 'userId', export: true, erase: 'delete', why: "The person's own asked-for training plan: the ask, the chips they changed, the sessions done and the checkpoint answers. Their own training data." }] },
   // TEAMS-SQUADS (#441)
   TrainingGroup: { omit: ['inviteToken'], subjects: [{ col: 'ownerId', export: true, erase: 'delete', why: 'An owner cannot leave a group, only delete it (lib/groups/rules.ts); erasing the owner deletes it, and its members and feed cascade.' }] },
   TrainingGroupMember: { subjects: [{ col: 'userId', export: true, erase: 'delete', why: 'Leaves every group.' }] },
@@ -399,6 +401,36 @@ export const REGISTRY: Record<string, TableRights> = {
     subjects: [
       { col: 'athleteId', export: true, erase: 'delete', why: "The athlete's own review of a coach: their words, so they go with them." },
       { col: 'coachId', export: OTHERS, erase: 'delete', why: "Reviews of an erased coach: the page they were shown on is gone, so they go too (owner call: docs/COACH-DELIVERY.md)." },
+    ],
+  },
+
+  // ── group classes and in-person 1:1 (GROUP-BOOKING, pending SQL 2026-11-02-group-booking.sql) ─────────────────────
+  GroupTrainer: {
+    omit: ['inviteCode'],
+    subjects: [
+      { col: 'ownerId', export: OTHERS, erase: 'delete', why: "The business owner's list of trainers: it goes with the owner's account." },
+      { col: 'trainerUserId', export: true, erase: 'delete', why: "The trainer's own place on the owner's team (name, gyms, hours); it goes with them." },
+    ],
+  },
+  GroupClass: {
+    subjects: [
+      { col: 'ownerId', export: true, erase: 'keep', why: "The owner's group schedule. Other people's seats and passes (money records) point at it, so it stays; it holds no personal detail beyond the group's name." },
+      { col: 'trainerUserId', export: true, erase: 'keep', why: 'Which trainer runs a group. The group stays for its members; the id then points at the tombstone account, which has no name.' },
+    ],
+  },
+  GroupPass: {
+    subjects: [
+      { col: 'userId', export: true, erase: 'keep', why: 'What was reserved, the price and when it was paid in person. ' + MONEY },
+      { col: 'markedPaidByUserId', export: OTHERS, erase: 'keep', why: 'Who marked a payment received: part of the money record. ' + MONEY },
+    ],
+  },
+  GroupSeat: { subjects: [{ col: 'userId', export: true, erase: 'delete', why: "The person's own seats and attendance; deleting a future seat frees it for someone else. The pass (the money record) stays." }] },
+  GroupWaitlist: { subjects: [{ col: 'userId', export: true, erase: 'delete', why: OWN }] },
+  InPersonSession: {
+    subjects: [
+      { col: 'clientUserId', export: true, erase: 'keep', why: 'A booked 1:1: the price, the gym, the time and whether it was paid. ' + MONEY },
+      { col: 'trainerUserId', export: true, erase: 'keep', why: "The trainer's side of a client's 1:1, a money record. " + MONEY },
+      { col: 'markedPaidByUserId', export: OTHERS, erase: 'keep', why: 'Who marked a payment received: part of the money record. ' + MONEY },
     ],
   },
 

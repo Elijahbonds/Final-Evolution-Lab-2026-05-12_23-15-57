@@ -100,7 +100,14 @@ const UA = 'AgeScreenTest/1.0';
 // the first commit carrying every pending file above.
 // STUDIO-EASY (lane/studio-easy, 2026-10-28) merged lane/nexus-publish (its studio-share.sql) onto the release's pending files:
 // pinned at that merge, 47a0ee64, the first commit carrying every pending file above.
-const PARENT = '47a0ee648daa5ba349abcfbc1f59dc57c541f8f2';
+// GROUP-BOOKING (lane/group-booking, 2026-11-02) prisma/pending/2026-11-02-group-booking.sql (pending SQL only; schema.prisma
+// untouched; GroupGym + GroupTrainer + GroupClass + GroupPass + GroupSeat + GroupWaitlist + InPersonSession, additive raw
+// SQL) at 58ac9a29, the lane commit carrying it on top of every file above.
+// PROGRAM-ASK-2 (lane/program-ask-2, 2026-11-03) prisma/pending/2026-11-03-program-ask.sql (pending SQL only; schema.prisma
+// untouched; AskedProgram, additive) at 115a8eaf; pinned at cc22c276, this lane's merge of lane/program-ask (finish-release at
+// 6a3933ba), the first commit carrying every pending file above.
+// MERGE (coordinator, 2026-11-03): lane/program-ask-2 + finish-release (group-booking): both pending files; pinned at the merge.
+const PARENT = 'f093256cb2b4266f4a687d4f5440d60d81614e3f';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {

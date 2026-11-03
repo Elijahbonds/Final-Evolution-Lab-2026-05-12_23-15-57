@@ -140,7 +140,8 @@ export const DEMO_RULES: readonly DemoRule[] = [
   { clip: 'ex_reverse_lunge', families: ['landmine-lower', 'sandbag'], bases: /^reverse-lunge$/ },
   { clip: 'ex_reverse_lunge', families: ['db-lower'], bases: /^step-back-knee$/ },
   { clip: 'ex_split_squat', families: ['lunge'], bases: /^split-squat$/ },
-  { clip: 'ex_split_squat', families: ['split-squat'], bases: /^(bw|offset-kb|landmine)$/ },
+  // PROGRAM-ASK-2 (2026-11-02): + 'band' — the Band Split Squat (data/library/authored/b5-program-ask.json) is the same movement
+  { clip: 'ex_split_squat', families: ['split-squat'], bases: /^(bw|offset-kb|landmine|band)$/ },
   { clip: 'ex_bridge', families: ['bridge'], bases: /^(bw|mini-band)$/ },
   { clip: 'ex_bridge', families: ['bridge-thrust'], bases: /^(glut-bridg|hip-lift)$/ },
   { clip: 'ex_bridge', families: ['db-hinge'], bases: /^bridge$/ },
@@ -305,7 +306,7 @@ export const DEMO_RULES: readonly DemoRule[] = [
   { clip: (b) => ({ 'lat-hold': 'ex_step_down_lat', 'fwd-high': 'ex_step_down' } as Record<string, string>)[b] ?? null, families: ['knee-capacity'], bases: /^(lat-hold|fwd-high)$/, emits: ['ex_step_down_lat', 'ex_step_down'] },
   { clip: (b) => ({ 'box-high': 'ex_sl_box_squat', 'box-mid': 'ex_sl_box_squat', 'singl-leg-high-box-squat': 'ex_sl_box_squat', 'pistol-box': 'ex_sl_box_squat', pistol: 'ex_pistol', 'pistol-squat': 'ex_pistol_goblet', skater: 'ex_skater_squat', 'skater-pad': 'ex_skater_squat' } as Record<string, string>)[b] ?? null, families: ['single-leg-squat'], bases: /^(singl-leg-high-box-squat|pistol-squat|pistol-box|skater-pad|box-high|box-mid|pistol|skater)$/, emits: ['ex_sl_box_squat', 'ex_pistol', 'ex_pistol_goblet', 'ex_skater_squat'] },
   { clip: (b) => ({ 'sl-box': 'ex_sl_box_squat' } as Record<string, string>)[b] ?? null, families: ['db-lower'], bases: /^(sl-box)$/, emits: ['ex_sl_box_squat'] },
-  { clip: (b) => ({ 'rfe-bw': 'ex_bulgarian', 'rfe-db': 'ex_bulgarian', 'rfe-bb': 'ex_bulgarian_bar' } as Record<string, string>)[b] ?? null, families: ['split-squat'], bases: /^(rfe-bw|rfe-db|rfe-bb)$/, emits: ['ex_bulgarian', 'ex_bulgarian_bar'] },
+  { clip: (b) => ({ 'rfe-bw': 'ex_bulgarian', 'rfe-db': 'ex_bulgarian', 'rfe-band': 'ex_bulgarian', 'rfe-bb': 'ex_bulgarian_bar' } as Record<string, string>)[b] ?? null, families: ['split-squat'], bases: /^(rfe-bw|rfe-db|rfe-band|rfe-bb)$/, emits: ['ex_bulgarian', 'ex_bulgarian_bar'] },
   { clip: (b) => ({ 'lying-leg-curl': 'ex_lying_leg_curl', 'seat-leg-curl': 'ex_seated_leg_curl', 'seat-hamstr-curl': 'ex_seated_leg_curl', 'stand-leg-curl': 'ex_standing_leg_curl', 'platform-hamstr-slid': 'ex_slider_curl' } as Record<string, string>)[b] ?? null, families: ['leg-curl'], bases: /^(platform-hamstr-slid|seat-hamstr-curl|lying-leg-curl|stand-leg-curl|seat-leg-curl)$/, emits: ['ex_lying_leg_curl', 'ex_seated_leg_curl', 'ex_standing_leg_curl', 'ex_slider_curl'] },
   { clip: (b) => ({ 'leg-extension': 'ex_leg_extension', 'singl-leg-leg-extension': 'ex_leg_extension_one' } as Record<string, string>)[b] ?? null, families: ['leg-extension'], bases: /^(singl-leg-leg-extension|leg-extension)$/, emits: ['ex_leg_extension', 'ex_leg_extension_one'] },
   { clip: (b) => ({ 'seat-calf-rais': 'ex_seated_calf', 'seated-db': 'ex_seated_calf' } as Record<string, string>)[b] ?? null, families: ['calf-raise'], bases: /^(seat-calf-rais|seated-db)$/, emits: ['ex_seated_calf'] },

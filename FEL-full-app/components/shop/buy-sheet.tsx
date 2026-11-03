@@ -31,9 +31,14 @@ export interface BuyEntryProps {
   extra?: ReactNode;
   /** The entry button's data-action (a page's tests and probes find "book" by it). */
   action?: string;
+  /** GROUP-BOOKING: the sheet's last button in "Reserve, pay at the gym" mode (else "Continue to pay"), and its busy line. */
+  payLabel?: string;
+  busyLabel?: string;
+  /** GROUP-BOOKING: shown under the done line once a reservation is made (an add-to-calendar button). */
+  after?: ReactNode;
 }
 
-export function BuyEntry({ item, label, includes = [], terms, pay, primary = false, extra, action }: BuyEntryProps) {
+export function BuyEntry({ item, label, includes = [], terms, pay, primary = false, extra, action, payLabel, busyLabel, after }: BuyEntryProps) {
   const [open, setOpen] = useState(false);
   if (item.state !== 'buy') return null;
   return (
@@ -41,13 +46,14 @@ export function BuyEntry({ item, label, includes = [], terms, pay, primary = fal
       {primary
         ? <div className="mt-4 [&>[data-fel-primary]]:w-full" data-buy-entry={item.kind}><PrimaryCta onClick={() => setOpen(true)}>{label}</PrimaryCta></div>
         : <button type="button" className={L.buy} onClick={() => setOpen(true)} data-buy-entry={item.kind} data-action={action}>{label}</button>}
-      {open && <BuySheet item={item} includes={includes} terms={terms} pay={pay} extra={extra} onClose={() => setOpen(false)} />}
+      {open && <BuySheet item={item} includes={includes} terms={terms} pay={pay} extra={extra} payLabel={payLabel} busyLabel={busyLabel} after={after} onClose={() => setOpen(false)} />}
     </>
   );
 }
 
-export function BuySheet({ item, includes = [], terms, pay, extra, onClose }: Omit<BuyEntryProps, 'label' | 'primary' | 'action'> & { onClose: () => void }) {
+export function BuySheet({ item, includes = [], terms, pay, extra, onClose, payLabel, busyLabel, after }: Omit<BuyEntryProps, 'label' | 'primary' | 'action'> & { onClose: () => void }) {
   const [agreed, setAgreed] = useState(!terms);
+  const [done, setDone] = useState<string | null>(null);
   const [nudge, setNudge] = useState(false);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<{ line: string; href?: string } | null>(null);
@@ -60,6 +66,7 @@ export function BuySheet({ item, includes = [], terms, pay, extra, onClose }: Om
     if (out.kind === 'sign_in') { window.location.href = out.href; return; }
     setBusy(false);
     if (out.kind === 'terms_changed') { setAgreed(false); setNote({ line: out.line }); return; }
+    if (out.kind === 'done') { setDone(out.line); return; }
     setNote({ line: out.line, href: out.href });
   };
   return (
@@ -87,7 +94,11 @@ export function BuySheet({ item, includes = [], terms, pay, extra, onClose }: Om
             {nudge && !agreed ? <p className={L.alert} role="alert">{T.tickFirst}</p> : null}
           </>
         ) : null}
-        <div className={L.cta} data-buy-pay><PrimaryCta onClick={() => { void go(); }}>{busy ? T.opening : T.pay}</PrimaryCta></div>
+        {done ? (
+          <><p role="status" className={L.done} data-buy-done>{done}</p>{after}</>
+        ) : (
+          <div className={L.cta} data-buy-pay><PrimaryCta onClick={() => { void go(); }}>{busy ? busyLabel ?? T.opening : payLabel ?? T.pay}</PrimaryCta></div>
+        )}
         {note ? <p role="alert" className={L.alert}>{note.line}{note.href ? <> <a className="underline" href={note.href}>Open</a></> : null}</p> : null}
       </div>
     </Layer>

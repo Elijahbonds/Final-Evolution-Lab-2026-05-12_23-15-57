@@ -27,6 +27,7 @@ export const DOORS: Door[] = [
   { href: '/camp', label: 'Camp', tab: 'train' },
   { href: '/learn', label: 'Learn', tab: 'train' },   // PLAT-P04 (2026-10-27): one Learn door for Education + Learn feed
   { href: '/coach', label: 'Coaching', tab: 'train' },
+  { href: '/groups', label: 'Groups', tab: 'train' },   // GROUP-BOOKING (2026-11-02): in-person groups and 1:1 sessions
 
   // PROFILE — what you own, what you have done, what you make.
   { href: '/press', label: 'Books', tab: 'profile' },
