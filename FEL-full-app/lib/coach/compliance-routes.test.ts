@@ -261,7 +261,7 @@ describe('GET /api/coach/attention — painFlags (consent-gated pain check-in vi
     const b = await get<BoardWithPainFlags>(attentionGET);
     const flag = b.painFlags.find((f) => f.clientId === 'cole')!;
     expect(flag).toBeTruthy();
-    expect(flag.view).toEqual({ present: true, detailed: false, label: 'Client paused an exercise' });
+    expect(flag.view).toEqual({ present: true, detailed: false, label: 'Athlete paused an exercise' });
     expect(flag.view.items).toBeUndefined();
     // the generic label never leaks which exercise, body area or decision it was
     expect(JSON.stringify(flag)).not.toMatch(/goblet|knee|step_down/i);

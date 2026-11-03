@@ -286,7 +286,7 @@ export interface CoachPainFlagView {
   items?: { exerciseName: string; bodyArea: string; decision: PainDecision; copy: string; createdAt: string }[];
 }
 
-const GENERIC_FLAG_LABEL = 'Client paused an exercise';
+const GENERIC_FLAG_LABEL = 'Athlete paused an exercise';
 
 /**
  * What a coach sees for one client's recent pain flags. `hasCoachViewConsent` is a live 'coach_view' HealthConsent

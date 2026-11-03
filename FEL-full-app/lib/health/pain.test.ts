@@ -340,7 +340,7 @@ describe('coachPainFlag', () => {
     const view = coachPainFlag([row({ decision: 'step_down_flag_coach' })], false);
     expect(view.present).toBe(true);
     expect(view.detailed).toBe(false);
-    expect(view.label).toBe('Client paused an exercise');
+    expect(view.label).toBe('Athlete paused an exercise');
     expect(view.items).toBeUndefined();
     expect(JSON.stringify(view)).not.toMatch(/Goblet Squat|knee/);
   });
