@@ -436,3 +436,30 @@ difference: the tap's knob-on contact came 17 ms after the press, inside the 60 
 of the rig differ by a frame like this anyway (they differ by 1–3 cm on the standing frame, before any input).
 
 Also in Phase 7: the probe's `finishes` scenario, the slam stick, `STICK_FLIGHT`, and the side camera aimed at the chest.
+
+### 12b. Phase 7b — the REVERSE turned on the way up; the contact gate made horizontal (lane/dunk-flagship-p7b)
+
+The coordinator's decisions: the contact gate is now **the ball's horizontal distance from the ring centre at contact ≤ the
+ring's inner radius** (DunkMode `RIM_RADIUS` 0.225 m; the `[HANDS] iron contact` line ends with it, "flat"), and the REVERSE
+is turned on the way up. From the hang (`REVERSE_TURN_FROM` 0.7) until the slam window opens, the stick held back for
+`REVERSE_COMMIT_SEC` 0.1 s with no air trick called or armed starts the turn away from the iron (NEW numbers, behind the same
+knob, off). The A press still decides the finish; a trick thrown after the turn began stops it. Sheet:
+`round9/dunk-flagship/shots/phase7b-reverse.jpg`.
+
+Rig, knob on, 5 of each on one page:
+
+| | Made | Horizontal at contact ≤ 0.225 m | flat (m) |
+|---|---|---|---|
+| plain (the shipped flush) | 5/5 | **2/5** | 0.178, 0.339, 0.253, 0.152, 0.273 |
+| REVERSE (back held from the take-off) | **5/5** (was 2/3) | **4/5** | 0.140, 0.103, 0.218, 0.196, 0.323 |
+| TWO-HAND POWER | 5/5 | **1/5** | 0.245, 0.278, 0.152, 0.323, 0.290 |
+
+- **The REVERSE makes 5 of 5** — the target. On the horizontal gate it is the best of the three (4/5).
+- **The horizontal gate fails for the shipped flush too (2 of 5), and for the power (1 of 5).** A 'flat' over 0.225 m is a
+  ball that met the FRONT iron from outside the ring; the flush (startFlush) then carries it in, so every one of them is a
+  make. Making the jam carry the ball over the ring before the contact counts would change every dunk in the game (a tuned
+  flush) — the owner's call; nothing changed here. **The knob stays off** (decision 3): the power does not pass this gate.
+- **The sixteen tricks, re-run on the new code** (the stick held BACK the whole flight, knob on vs off): the same trick on the
+  same beat, the same clips, the same press frame, all made, 16 of 16; the turn never started on a called or armed trick.
+  The beats differ on 2: the tap hung on the rim (its contact came inside the 60 ms A hold — the page jitter seen before) and
+  the tomahawk's contact line differs only in a number. `DunkSlamVariant.test.ts`: the second read site pinned (test changed).
