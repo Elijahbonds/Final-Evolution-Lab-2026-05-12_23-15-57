@@ -52,7 +52,7 @@ export default async function DrillsPage({ searchParams }: { searchParams?: Reco
           <ArrowLeft aria-hidden className="h-4 w-4" /> Train
         </Link>
         <header className="space-y-1">
-          <p className="font-mono text-[12px] font-bold uppercase tracking-[0.18em] text-[#00FF9D]">Drills</p>
+          <p className="font-mono text-[10.5px] font-bold uppercase tracking-[0.18em] text-[#00FF9D]">Drills</p>
           <h1 className="text-3xl font-black text-white">The Playbook&apos;s drills, on your camera</h1>
           <p className="text-[14px] text-white/55">The wake-up from chapter 5 and the jump-and-land drills from chapter 6. Set the phone up, run the space check, follow the targets.</p>
         </header>
