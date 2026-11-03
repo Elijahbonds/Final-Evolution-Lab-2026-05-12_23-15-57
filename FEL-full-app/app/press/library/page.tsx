@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { loginPath } from '@/lib/auth/safeNext';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { getBook } from '@/lib/books/bookCatalog';
@@ -36,9 +37,16 @@ export default async function LibraryPage() {
             <p className="mt-2 max-w-lg text-sm text-white/55">
               Audiobooks are for signed-in, verified adults (18+). Sign in with the account you bought with.
             </p>
-            <Link href="/login" className="mt-4 inline-block rounded-md bg-[#F5C518] px-4 py-2 text-sm font-semibold text-black">
-              Log in
-            </Link>
+            {/* PUBLIC-POLISH (2026-11-02, live sweep D3): sign-in comes back here (it went to /login with no next and left
+                the reader on the home screen), and a visitor with no books yet has a way to the shop */}
+            <div className="mt-4 flex flex-wrap gap-3">
+              <Link href={loginPath('/press/library')} className="inline-block rounded-md bg-[#F5C518] px-4 py-2 text-sm font-semibold text-black">
+                Log in
+              </Link>
+              <Link href="/press" className="inline-block rounded-md border border-white/15 px-4 py-2 text-sm font-semibold text-white/80">
+                Browse the books
+              </Link>
+            </div>
           </div>
         </section>
       </PressFrame>

@@ -38,12 +38,17 @@ class FakeStorage {
 }
 const g = globalThis as { window?: unknown };
 let ls: FakeStorage;
-beforeEach(() => { resetFeelForTests(); ls = new FakeStorage(); g.window = { localStorage: ls }; });
-afterEach(() => { resetFeelForTests(); delete g.window; });
-const knobOn = () => {
-  ls.m.set(FEEL_STORAGE_KEY, JSON.stringify({ 'anim.holdLast': 1 }));
+// test changed (hoops-p04): these tests read AF-11 alone, against each state's own fade — they run with the hoops-p04 transition rule
+// at its A/B off (`hoops.transitionRuleOn` 0: every state's own fade and the old dwell exactly). The rule floors those fades and has
+// its own tests (anim/hoopsTransitions.test.ts); with it on, AF-11 plays the same calls at the rule's fades.
+const RULE_OFF = { 'hoops.transitionRuleOn': 0 };
+const open = (o: Record<string, number>) => {
+  resetFeelForTests(); ls.m.set(FEEL_STORAGE_KEY, JSON.stringify(o));
   setFeelUser(true); setFeelSession(feelSessionBlock('/play/threevthree', '?playtest=1'));
 };
+beforeEach(() => { resetFeelForTests(); ls = new FakeStorage(); g.window = { localStorage: ls }; open(RULE_OFF); });
+afterEach(() => { resetFeelForTests(); delete g.window; });
+const knobOn = () => open({ ...RULE_OFF, 'anim.holdLast': 1 });
 
 describe('AF-11, knob OFF (the default): the tree plays exactly what it played before', () => {
   it('AF11-OFF-1: the knob defaults off and the clip table is unchanged (both rows still loops)', () => {
