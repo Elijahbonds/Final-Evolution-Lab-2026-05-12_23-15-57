@@ -4,7 +4,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { DRILLS } from '@/lib/drills/drills';
-import { DEMO_CLIPS } from './demo';
+import { DEMO_CLIPS, demoClipFor } from './demo';
 import { CATALOGUE_DEMO_LOOPS, DRILL_DEMO_LOOPS, SCREEN_DEMO_LOOPS, WARMUP_DEMO_LOOPS, catalogueDemoLoop, drillDemoLoop, warmupDemoLoop } from './surfaceDemo';
 import { fromProgram } from '@/lib/session-player/fromProgram';
 import { loadLibraryFiles } from './files';
@@ -57,8 +57,11 @@ describe('the warm-up and cool-down steps', () => {
 // DEMO-LOOPS-4: a coach catalogue row the library cannot name plays its own loop; only rows the library has NO entry for
 describe('coach catalogue rows with no library entry', () => {
   it('play the loop their set-up describes, by their exact name; a name the library answers is never here', () => {
-    expect(catalogueDemoLoop('Pike Push-Up')).toBe('ex_pike_pushup');
-    expect(catalogueDemoLoop('pike push up')).toBe('ex_pike_pushup');
+    // the pike push-up is a library entry now (program-ask-2): the library answers it, so the catalogue map does not, and the
+    // library's own entry plays the same loop
+    expect(catalogueDemoLoop('Pike Push-Up')).toBeNull();
+    expect(demoClipFor({ family: 'push-up', variation: 'pike', equipment: [] })).toBe('ex_pike_pushup');
+    expect(matchLibraryByName(loadLibraryFiles(), ['Pike Push-Up'])?.slug).toBe('pike-push-up');
     expect(catalogueDemoLoop('Hands-Elevated Pike Push-Up')).toBeNull();
     const docs = loadLibraryFiles();
     for (const n of Object.keys(CATALOGUE_DEMO_LOOPS)) expect(matchLibraryByName(docs, [n]), n).toBeNull();

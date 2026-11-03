@@ -372,6 +372,9 @@ export const DEMO_RULES: readonly DemoRule[] = [
   { clip: 'ex_decline_skull', families: ['triceps'], bases: /^(declin-tricep-extension|declin-ez-bar-tricep-extension)$/ },
   { clip: 'ex_spiderman_pushup', families: ['push-extra'], bases: /^spiderman$/ },
   { clip: 'ex_archer_pushup', families: ['push-up'], bases: /^archer$/ },
+  // RELEASE FIX (2026-11-03): program-ask-2 put the pike push-up in the library (b5-program-ask.json); it plays the loop
+  // demo-loops-4 authored for the coach catalogue's row of the same name (that row left CATALOGUE_DEMO_LOOPS for this)
+  { clip: 'ex_pike_pushup', families: ['push-up'], bases: /^pike$/ },
   { clip: 'ex_seated_reverse_fly', families: ['raise'], bases: /^seat-bent-over-rear-shoulder-rais$/ },
   { clip: 'ex_seated_kickback', families: ['triceps'], bases: /^seat-bent-over-two-arm-tricep-extension$/ },
   { clip: 'ex_seated_kickback_one', families: ['triceps'], bases: /^seat-bent-over-singl-arm-tricep-extension$/ },
