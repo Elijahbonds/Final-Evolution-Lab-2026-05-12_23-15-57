@@ -16,10 +16,11 @@ import { youthRules } from '@/lib/coach/taxonomy';
 import { createCatalogueItem, type CatalogueDb } from '@/lib/coach/catalogueServer';
 import { nameKey as catalogueNameKey } from '@/lib/coach/catalogue';
 import { answerAsk } from './ask/answer';
+import { wantsProgram } from '@/lib/program-ask/request';
 import { libraryToCatalogue, catalogueToSubmission, submissionToEntry } from './bridge';
-import { demoFor, muscleMap } from './demo';
 import { loadLibraryFiles } from './files';
-import { buildIndex, search, FACET_KEYS, type LibraryIndex, type SearchFilters } from './search/engine';
+import { buildIndex, visibleTo, type LibraryIndex } from './search/engine';
+import { libraryCounts, searchPage, toCard, toVariantRef, type LibraryCard } from './search/page';
 import {
   catalogueLinks, createSubmission, decideSubmission, linkCatalogueRow, mySubmissions, overlayVersion, readOverlay, submissionById,
   submissionQueue, upsertEntries, withdrawSubmission, libraryReady, type RawDb,
@@ -82,52 +83,29 @@ export async function libraryViewer(userId: string, role: string | undefined): P
 // ── what a card shows ───────────────────────────────────────────────────────────────────────────────────────────────
 
 /** A search hit's other group members (its base and the base's variants), as the "+N variants" list shows them. */
-export interface VariantRef { id: string; name: string; level: LibraryExercise['level']; status: LibraryExercise['review']['status'] }
-
-export interface LibraryCard extends LibraryExercise {
-  muscleMap: { primary: string[]; secondary: string[] };
-  /** LIBRARY-ANATOMY (2026-10-25): the loop the 3D demo plays (lib/library/demo.ts demoFor), or null — the cue card. */
-  avatarClip: string | null;
-  /** …and, for an isometric hold, the second of that loop it holds still at (null: it loops). */
-  avatarHold: number | null;
-  /** On a search hit: the other matching members of its group. Absent elsewhere. */
-  variants?: VariantRef[];
-}
-
-export const toCard = (e: LibraryExercise): LibraryCard => { const d = demoFor(e); return { ...e, muscleMap: muscleMap(e), avatarClip: d?.clip ?? null, avatarHold: d?.hold ?? null }; };
-export const toVariantRef = (e: LibraryExercise): VariantRef => ({ id: e.id, name: e.name, level: e.level, status: e.review.status });
-
-const LIST = (v: string | null): string[] | undefined => {
-  const out = (v ?? '').split(',').map((x) => x.trim()).filter(Boolean).slice(0, 12);
-  return out.length ? out : undefined;
-};
-
-/** The search screen's request, read from a URL's query string. */
-export function filtersFromParams(p: URLSearchParams): SearchFilters {
-  const f: SearchFilters = {};
-  for (const k of FACET_KEYS) { const v = LIST(p.get(k)); if (v) (f as Record<string, string[]>)[k] = v; }
-  const low = LIST(p.get('lowLoad'));
-  if (low) f.lowLoad = low;
-  const not = LIST(p.get('notCategory'));
-  if (not) f.notCategory = not;
-  const notEq = LIST(p.get('notEquipment'));
-  if (notEq) f.notEquipment = notEq;
-  if (p.get('only') === '1') { f.equipmentOnly = true; if (!f.equipment) f.equipment = []; }
-  return f;
-}
+// PLAT-P08 (2026-11-02): a card, a variant ref and the query-string filters moved to lib/library/search/page.ts (pure, so
+// the search screen runs the same search on the device); re-exported here for every existing importer.
+export { toCard, toVariantRef, filtersFromParams } from './search/page';
+export type { LibraryCard, VariantRef } from './search/page';
 
 export async function searchLibrary(viewer: LibraryViewer, params: URLSearchParams) {
   const { index, ready } = await libraryState();
-  const q = (params.get('q') ?? '').slice(0, 120);
-  const drafts = viewer.isCoach && params.get('drafts') === '1';
-  const offset = Math.max(0, Number(params.get('offset') ?? 0) || 0);
-  const limit = Math.min(48, Math.max(1, Number(params.get('limit') ?? 24) || 24));
-  const r = search(index, q, filtersFromParams(params), { drafts, youth: viewer.youth, offset, limit });
-  const approved = index.docs.filter((e) => e.review.status === 'approved' && (!viewer.youth || e.youthOk)).length;
+  // PLAT-P08 (2026-11-02): lib/library/search/page.ts — the same page the device computes (moving demos first)
+  return searchPage(index, params, viewer, libraryCounts(index, viewer, ready));
+}
+
+/**
+ * PLAT-P08 (2026-11-02): the viewer's slice of the library, for the search screen to search ON THE DEVICE as they type:
+ * exactly what search could show this viewer (engine.ts visibleTo — approved; drafts only for a coach who asked; youth
+ * rules applied here, so a teen's device never holds an adults-only entry), plus the counts the coach's line shows.
+ */
+export async function libraryForDevice(viewer: LibraryViewer, wantDrafts: boolean) {
+  const { index, ready } = await libraryState();
+  const drafts = viewer.isCoach && wantDrafts;
   return {
-    ...r, hits: r.hits.map((h) => ({ ...toCard(h.entry), variants: h.variants.map(toVariantRef) })),
+    entries: index.docs.filter((e) => visibleTo(e, { drafts, youth: viewer.youth })),
     viewer: { coach: viewer.isCoach, admin: viewer.isAdmin, drafts, youth: viewer.youth },
-    library: { total: index.docs.length, approved, drafts: index.docs.filter((e) => e.review.status === 'draft').length, ready },
+    library: libraryCounts(index, viewer, ready),
   };
 }
 
@@ -162,6 +140,9 @@ export async function askLibrary(viewer: LibraryViewer, question: string, ai: ((
     question: a.parsed.question, chips: a.chips, filters: a.filters, text: a.parsed.text, relation: a.parsed.relation, intent: a.parsed.intent,
     results: a.results.map(toCard), total: a.total, plan: a.plan?.map((p) => ({ slot: p.slot, minutes: p.minutes, entry: toCard(p.entry) })) ?? null,
     anchor: a.anchor ? { id: a.anchor.id, name: a.anchor.name } : null, safety: a.safety, relaxed: a.relaxed, ai: a.ai, didYouMean: a.didYouMean,
+    // PROGRAM-ASK (2026-11-02): a question that asks for a whole program also gets the door to Build my program (never
+    // for a pain or injury question: that answer is the safety lines and general prehab only)
+    program: !a.safety && wantsProgram(question) ? { href: `/train/build?q=${encodeURIComponent(question.slice(0, 400))}` } : null,
   };
 }
 
