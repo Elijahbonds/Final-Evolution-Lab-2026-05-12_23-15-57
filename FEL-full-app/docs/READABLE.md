@@ -111,10 +111,13 @@ Counts are runs of text; before is `82e88b7c`, after is this branch with `lane/f
 | Rule | phone | desktop | 200 % zoom | 150 % root font |
 |---|---|---|---|---|
 | under 12 px | 507 → **8** | 459 → **8** | – | – |
-| contrast under AA (from pixels) | 216 → **27** | 191 → **23** | – | – |
+| contrast under AA (from pixels) | 216 → **23** | 191 → **19** | – | – |
 | unreadable over a photo | 4 → **1** | 7 → **2** | – | – |
-| key information clipped | 53 → **19** | 19 → **17** | 22 → **21** | 86 → **21** |
+| key information clipped | 53 → **15** | 19 → **17** | 22 → **18** | 86 → **18** |
 | overlapped (under a fixed bar / text on text) | 9 → **6** | 3 → **3** | 4 → **4** | 1 → **1** |
+
+No clip, overlap or sideways scroll in the after-crawl is new against the before: the ones the floor caused (the
+sign-up mode shelf, `/train`'s rows, the party room on a phone, the docked primary at 150 %) were fixed and re-read.
 | page scrolls sideways | 0 → 0 | 0 → 0 | 0 → 0 | 72 → **6** |
 | body copy under 16 px on a phone | 424 → 440 | – | – | – |
 
