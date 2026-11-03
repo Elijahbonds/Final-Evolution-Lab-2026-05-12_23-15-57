@@ -41,11 +41,15 @@ export const OCCLUDER_MIN_RADIUS_M = 0.3;
 export const OCCLUDER_MAX_RADIUS_M = 30;
 /** The rays stop this far short of the hero's head, chest and hips (m): what is that close is the hero's own gear or ride. */
 export const OCCLUDER_NEAR_HERO_M = 1;
-/** GAMEPLAY-CLEAN P2 #9 (2026-11-03): a mesh with more vertices than this is never ray-tested. The start profile caught this file as
- *  Penalty's top CPU cost — 1.05 s of a 4.4 s window in Babylon's _intersectTriangles (multiPickWithRay), the rays walking every
- *  triangle of the dense set dressing whose bounding boxes they cross. A prop that hides a body (a pole, a tree, a wall, a car) is
- *  well under it; a mesh over it is a stand, a crowd block or a venue shell, which a fade would only smear. Perf guard, not feel. */
+/** GAMEPLAY-CLEAN P2 #9 (2026-11-03): a mesh with more vertices than this is never TRIANGLE-tested. The start profile caught this file
+ *  as Penalty's top CPU cost — 1.05 s of a 4.4 s window in Babylon's _intersectTriangles (multiPickWithRay), the rays walking every
+ *  triangle of the dense meshes whose bounding boxes they cross. A dense PROP (a Meshy hoop, a scanned tree: radius up to
+ *  OCCLUDER_BOX_MAX_RADIUS_M) is tested by its bounding box instead — the dunk duel's hoop is one, and the first cut of this cap,
+ *  which skipped them, let it hide the hero again; a dense mesh larger than that (a stand, a crowd block, a venue shell) is skipped:
+ *  a fade would only smear it. Perf guard, not feel. */
 export const OCCLUDER_MAX_VERTS = 12_000;
+/** The largest dense mesh still tested (by its box) and faded: a prop, not a stand (m, bounding-sphere radius). */
+export const OCCLUDER_BOX_MAX_RADIUS_M = 4;
 /** Line-of-sight checks between rebuilds of the candidate list (the static half of fadeCandidate, read once, not per ray). */
 export const OCCLUDER_CAND_REFRESH = 20;
 /** Modes held by their own lanes: the finding is routed, not applied (docs/GAMEPLAY-CLEAN-AUDIT.md). */
@@ -61,7 +65,7 @@ export function fadeCandidate(m: {
   thinInstances: number; materialAlpha: number; skinned?: boolean; verts?: number;
 }): boolean {
   if (!m.enabled || !m.visible || m.hero || m.optOut || m.skinned) return false;
-  if (m.verts !== undefined && (m.verts <= 0 || m.verts > OCCLUDER_MAX_VERTS)) return false;
+  if (m.verts !== undefined && (m.verts <= 0 || (m.verts > OCCLUDER_MAX_VERTS && m.radius > OCCLUDER_BOX_MAX_RADIUS_M))) return false;
   if (m.thinInstances > 1) return false;
   if (m.radius < OCCLUDER_MIN_RADIUS_M || m.radius > OCCLUDER_MAX_RADIUS_M) return false;
   if (m.visibility < 0.5 || m.materialAlpha < 0.5) return false;   // already see-through: leave it to its owner
@@ -96,6 +100,8 @@ export class OccluderFade {
   private readonly ray = new Ray(Vector3.Zero(), Vector3.Forward(), 1);
   /** The meshes that may be faded (fadeCandidate), rebuilt every OCCLUDER_CAND_REFRESH checks — the rays only test these. */
   private cand = new Set<number>();
+  /** The dense props (over OCCLUDER_MAX_VERTS, at most OCCLUDER_BOX_MAX_RADIUS_M): tested by their bounding box. */
+  private boxed: AbstractMesh[] = [];
   private checks = 0;
 
   constructor(private scene: Scene, private hero: () => TransformNode | null, private modeId: string) {}
@@ -156,7 +162,13 @@ export class OccluderFade {
     const h = this.hero();
     if (h !== this.heroNode) this.bindHero(h);
     if (!cam || !h) return;
-    if (this.checks++ % OCCLUDER_CAND_REFRESH === 0) { this.cand.clear(); for (const m of this.scene.meshes) if (this.pickable(m)) this.cand.add(m.uniqueId); }
+    if (this.checks++ % OCCLUDER_CAND_REFRESH === 0) {
+      this.cand.clear(); this.boxed = [];
+      for (const m of this.scene.meshes) {
+        if (!this.faded.has(m.uniqueId) && !this.pickable(m)) continue;   // a faded mesh stays a candidate (it reads see-through now)
+        if (m.getTotalVertices() > OCCLUDER_MAX_VERTS) this.boxed.push(m); else this.cand.add(m.uniqueId);
+      }
+    }
     const eye = cam.globalPosition;
     const root = h.getAbsolutePosition();
     const pts = this.aims.some(Boolean)
@@ -167,16 +179,28 @@ export class OccluderFade {
       const d = p.subtract(eye); const len = d.length(); if (len < OCCLUDER_NEAR_HERO_M + 0.2) continue;
       // stop short of the body: the hero's own gear and ride (a kart's shell, a plane's wing, a scarf) is not in the way
       this.ray.origin.copyFrom(eye); this.ray.direction.copyFrom(d.scaleInPlace(1 / len)); this.ray.length = len - OCCLUDER_NEAR_HERO_M;
-      const hits = this.scene.multiPickWithRay(this.ray, (m) => this.faded.has(m.uniqueId) || (this.cand.has(m.uniqueId) && m.isVisible && m.isEnabled())) ?? [];
+      const hits = this.scene.multiPickWithRay(this.ray, (m) => this.cand.has(m.uniqueId) && (this.faded.has(m.uniqueId) || (m.isVisible && m.isEnabled()))) ?? [];
       for (const hit of hits) {
         const m = hit.pickedMesh; if (!m) continue;
         if (!facesCamera(hit, this.ray.direction)) continue;   // a culled back face is already see-through
-        const f = this.faded.get(m.uniqueId);
-        if (f) { f.lastSeen = this.t; continue; }
-        const instance = m.getClassName() === 'InstancedMesh';
-        this.faded.set(m.uniqueId, { mesh: m, orig: m.visibility, origVisible: m.isVisible, instance, lastSeen: this.t, level: 1 });
+        this.mark(m);
+      }
+      // the dense props: their bounding box, on the line and in front of the hero (no triangle walk)
+      for (const m of this.boxed) {
+        if (m.isDisposed() || !m.isEnabled() || (!m.isVisible && !this.faded.has(m.uniqueId))) continue;
+        const bb = m.getBoundingInfo().boundingBox;
+        if (!this.ray.intersectsBoxMinMax(bb.minimumWorld, bb.maximumWorld)) continue;   // (intersectsBox reads the LOCAL box)
+        const along = Vector3.Dot(bb.centerWorld.subtract(this.ray.origin), this.ray.direction);
+        if (along > 0 && along < this.ray.length) this.mark(m);
       }
     }
+  }
+
+  private mark(m: AbstractMesh): void {
+    const f = this.faded.get(m.uniqueId);
+    if (f) { f.lastSeen = this.t; return; }
+    const instance = m.getClassName() === 'InstancedMesh';
+    this.faded.set(m.uniqueId, { mesh: m, orig: m.visibility, origVisible: m.isVisible, instance, lastSeen: this.t, level: 1 });
   }
 
   private pickable(m: AbstractMesh): boolean {
