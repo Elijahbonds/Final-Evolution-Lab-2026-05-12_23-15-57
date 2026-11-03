@@ -212,3 +212,21 @@ Each cell: font sizes · button looks · controls · visible words. 0 sideways s
 4. Tap **Form reviews**, open a set, and tap a cue. Expect "Sent to …'s thread".
 5. Tap **Combine day**, then New combine, then Start the combine.
 6. Open **Your coaching business**. Expect "Still to do" at the top, and each item jumping to its card.
+
+## 9. The gate (with the release `834ec076` merged in, 2026-11-03)
+
+| Step | Result |
+|---|---|
+| `tsc --noEmit` | 0 errors |
+| `ci-suite` | 209 passed, 0 failed, 11 skipped (the DB suites) |
+| `vitest run` | 2,090 files passed, 2 failed, 6 skipped; 27,731 tests passed, 2 failed, 54 skipped, 1 todo |
+| `eslint` on this lane's files | 0 errors |
+
+The two vitest failures are the ones from TOOLS-EASY §9: "where the captures are on this machine" in
+`lib/session-payout.test.ts` and `lib/sessions/modeScoreRules.test.ts`. Each needs a capture file this container does
+not have. The signature-programs clock test passes since #502.
+
+This lane's own suite is `tests/coach-tools-easy` (10 tests). The coach suites it touches (`tests/coach-queue`,
+`components/coach`, `tests/coach-video-review`, `tests/coach-business`) pass unchanged.
+
+Contact sheet: `coach-tools-easy-before-after.jpg` in this lane's scratchpad.
