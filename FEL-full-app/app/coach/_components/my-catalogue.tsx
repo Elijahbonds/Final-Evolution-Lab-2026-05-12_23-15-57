@@ -140,7 +140,7 @@ export function MyCatalogue({ onBrowseKb, onChange, refreshKey = 0 }: { onBrowse
         <>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-fel-quiet" />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search your catalogue..." className="w-full rounded-xl bg-[#16161a] border border-white/10 pl-10 pr-4 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-fel-cyan/40" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search your catalogue..." className="w-full rounded-xl bg-[#16161a] border border-white/10 pl-10 pr-4 py-2 text-sm text-white placeholder-white/50 focus:outline-none focus:border-fel-cyan/40" />
           </div>
           <div className="flex gap-1.5 flex-wrap">
             {(['all', ...PATTERNS, 'untagged'] as Filter[]).map((f) => (
@@ -207,7 +207,7 @@ function Field({ label, hint, error, group, children }: { label: string; hint?: 
   );
 }
 
-const input = 'w-full rounded-lg bg-white/5 border border-white/10 px-2.5 py-1.5 text-sm text-white placeholder-white/25 focus:outline-none focus:border-fel-cyan/40';
+const input = 'w-full rounded-lg bg-white/5 border border-white/10 px-2.5 py-1.5 text-sm text-white placeholder-white/50 focus:outline-none focus:border-fel-cyan/40';
 
 const COACH_VIDEO_API = '/api/coach/catalogue/video';
 

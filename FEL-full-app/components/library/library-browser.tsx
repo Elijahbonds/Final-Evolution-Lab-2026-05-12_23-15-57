@@ -201,7 +201,7 @@ export function LibraryBrowser({ onUse, onAdded, canAdd = false, title }: {
         <form onSubmit={(e) => { e.preventDefault(); void runAsk(question); }} className="space-y-2">
           <div className="flex gap-2">
             <input value={question} onChange={(e) => setQuestion(e.target.value)} maxLength={300} placeholder="Ask in plain words…" aria-label="Ask the exercise library"
-              className="min-w-0 flex-1 rounded-xl border border-white/10 bg-[#16161a] px-3 py-2.5 text-sm text-white placeholder-white/30 focus:border-[#00E5FF]/40 focus:outline-none" />
+              className="min-w-0 flex-1 rounded-xl border border-white/10 bg-[#16161a] px-3 py-2.5 text-sm text-white placeholder-white/50 focus:border-[#00E5FF]/40 focus:outline-none" />
             <button type="submit" disabled={loading || !question.trim()} className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-[#00E5FF]/40 bg-[#00E5FF]/10 px-3 text-xs font-medium text-[#00E5FF] disabled:opacity-40">
               {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />} Ask
             </button>

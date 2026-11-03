@@ -115,6 +115,7 @@ describe('the source scanner', () => {
   it('judges a text colour on the dark surfaces; ignores dark ink, disabled variants and non-colours', () => {
     const src = 'text-white/40 text-white/60 text-white text-black text-fel-bg disabled:text-white/30 text-center text-sm text-neutral-500 placeholder:text-white/30 text-fel-dim';
     expect(scanTextColours(src).map((f) => f.match)).toEqual(['text-white/40', 'text-neutral-500', 'placeholder:text-white/30']);
+    expect(scanTextColours('placeholder-white/30 placeholder-white/50').map((f) => f.match)).toEqual(['placeholder-white/30']);
   });
   it('white needs 50 % to clear 4.5:1 on every surface; the ladder’s quietest step clears it solid', () => {
     expect(textColourHex('fel-quiet')).toBe('#7d8794');

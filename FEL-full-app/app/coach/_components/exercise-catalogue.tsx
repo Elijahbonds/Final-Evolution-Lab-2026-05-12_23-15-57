@@ -150,7 +150,7 @@ export function ExerciseCatalogue({ coach = false }: { coach?: boolean }) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search exercises..."
-            className="w-full rounded-xl bg-[#16161a] border border-white/10 pl-10 pr-4 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:border-fel-cyan/40 transition-colors"
+            className="w-full rounded-xl bg-[#16161a] border border-white/10 pl-10 pr-4 py-2.5 text-sm text-white placeholder-white/50 focus:outline-none focus:border-fel-cyan/40 transition-colors"
           />
         </div>
         <div className="flex gap-2 flex-wrap">

@@ -72,7 +72,7 @@ export function minPassingAlpha(hex: string, from = 0): number | null {
 /** `text-<colour>[/<alpha>]` classes (any variant prefix but disabled:) that are under AA on the dark surfaces. */
 export function scanTextColours(src: string): ColourFinding[] {
   const out: ColourFinding[] = [];
-  for (const m of src.matchAll(/(?<![\w/-])((?:[a-z0-9-]+:)*)!?text-([a-z]+(?:-[a-z]+){0,2}(?:-\d{2,3})?)(?:\/(\d{1,3}))?(?![\w\-[/])/g)) {
+  for (const m of src.matchAll(/(?<![\w/-])((?:[a-z0-9-]+:)*)!?(?:text|placeholder)-([a-z]+(?:-[a-z]+){0,2}(?:-\d{2,3})?)(?:\/(\d{1,3}))?(?![\w\-[/])/g)) {
     const variants = m[1];
     if (/(^|:)(group-|peer-)?disabled:/.test(variants) || /aria-disabled/.test(variants)) continue;
     const hex = textColourHex(m[2]);

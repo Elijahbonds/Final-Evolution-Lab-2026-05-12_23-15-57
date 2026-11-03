@@ -41,13 +41,13 @@ export function fixSource(src: string): { out: string; size: number; colour: num
     size++;
     return num != null ? `fontSize:${sp}12` : `fontSize:${sp}${q}12px${q}`;
   });
-  out = out.replace(/(?<![\w/-])((?:[a-z0-9-]+:)*)(!?)text-([a-z]+(?:-[a-z]+){0,2}(?:-\d{2,3})?)(?:\/(\d{1,3}))?(?![\w\-[/])/g, (m, variants: string, bang: string, name: string, alpha?: string) => {
+  out = out.replace(/(?<![\w/-])((?:[a-z0-9-]+:)*)(!?)(text|placeholder)-([a-z]+(?:-[a-z]+){0,2}(?:-\d{2,3})?)(?:\/(\d{1,3}))?(?![\w\-[/])/g, (m, variants: string, bang: string, kind: string, name: string, alpha?: string) => {
     if (/(^|:)(group-|peer-)?disabled:/.test(variants)) return m;
     const found = scan.scanTextColours(m);
     if (!found.length) return m;
-    if (GREY_UP[name]) { colour++; return `${variants}${bang}text-${GREY_UP[name]}${alpha ? `/${alpha}` : ''}`; }
+    if (GREY_UP[name]) { colour++; return `${variants}${bang}${kind}-${GREY_UP[name]}${alpha ? `/${alpha}` : ''}`; }
     const f = found[0];
-    if (alpha != null && f.minAlpha != null) { colour++; return `${variants}${bang}text-${name}/${Math.round(f.minAlpha * 100)}`; }
+    if (alpha != null && f.minAlpha != null) { colour++; return `${variants}${bang}${kind}-${name}/${Math.round(f.minAlpha * 100)}`; }
     left.push(m);
     return m;
   });

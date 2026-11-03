@@ -978,7 +978,7 @@ export function StudioWorkspace({ onComingSoon }: { onComingSoon: () => void }) 
                       }}
                       placeholder="Describe what you want to build…  (Enter to send, Shift+Enter for newline)"
                       rows={2}
-                      className="w-full resize-none bg-transparent px-4 py-3 text-sm text-white placeholder-white/30 outline-none font-mono"
+                      className="w-full resize-none bg-transparent px-4 py-3 text-sm text-white placeholder-white/50 outline-none font-mono"
                       disabled={streaming}
                     />
                   </div>
