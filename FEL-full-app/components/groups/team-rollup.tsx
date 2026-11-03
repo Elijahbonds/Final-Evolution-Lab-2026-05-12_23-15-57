@@ -6,7 +6,7 @@
 
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { ArrowDown, ArrowUp, CopyPlus, Minus } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, CopyPlus, Minus } from 'lucide-react';
 import type { Rollup } from '@/lib/groups/activity';
 
 const card = 'rounded-2xl border border-white/10 bg-white/[0.03] p-4 sm:p-5';
@@ -64,7 +64,12 @@ export function TeamRollup({ groupId, rollup, onChanged }: { groupId: string; ro
         {rollup.rows.length === 0 && <li className="py-2 text-[13px] text-fel-dim">No athletes yet. Share the team code below.</li>}
       </ul>
       <label className="mt-3 flex min-h-[44px] items-center gap-3 text-[13px] text-white/80">
-        <input type="checkbox" className="h-5 w-5 accent-fel-emerald" checked={rollup.drillAssigned} disabled={busy} onChange={(e) => setDrill(e.target.checked)} />
+        {/* PLAT-BBS04-2 (coordinator 2026-11-03): the box itself is the 44 px target (it was 20 x 20: rig a11y, 2.5.8
+            serious); the tick is drawn over it and never takes the tap */}
+        <span className="relative grid h-11 w-11 shrink-0 place-items-center">
+          <input type="checkbox" className="peer h-11 w-11 cursor-pointer appearance-none rounded-lg border border-white/40 bg-black/40 checked:border-fel-emerald checked:bg-fel-emerald focus-visible:outline focus-visible:outline-2 focus-visible:outline-fel-cyan disabled:opacity-50" checked={rollup.drillAssigned} disabled={busy} onChange={(e) => setDrill(e.target.checked)} data-rollup-drill />
+          <Check aria-hidden className="pointer-events-none absolute h-5 w-5 text-fel-bg opacity-0 peer-checked:opacity-100" />
+        </span>
         Assign the daily drill to the whole team
       </label>
       {ids.length > 0 && (programs === null
