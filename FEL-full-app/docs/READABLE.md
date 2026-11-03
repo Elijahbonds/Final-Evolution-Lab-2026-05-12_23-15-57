@@ -93,7 +93,46 @@ against the read time.
 
 ## 3. Results
 
-_Filled from the runs below._
+**The rig is validated** (`--plant`): on every bundle this lane built, phone and desktop, it flagged exactly the five
+planted faults and none of the good controls.
+
+### The source (every user-facing file; `tests/readable/source-floor.test.ts`)
+
+| | before (`82e88b7c`) | after |
+|---|---|---|
+| text under 12 px | 1,356 uses in 298 files | **46** uses in 16 files (all routed or reviewed) |
+| text colours under AA on the dark surfaces | 785 classes in 209 files | **27** (routed, or a brand accent on an icon) |
+| passing messages up for less than the read time (literal call sites) | 75 of 211 | **0** of 211 |
+
+### The pages (the rig: 170 routes before, 180 after; 123 / 130 render on the stubbed server)
+
+Counts are runs of text; before is `82e88b7c`, after is this branch with `lane/finish-release` at `349a8f72` merged in.
+
+| Rule | phone | desktop | 200 % zoom | 150 % root font |
+|---|---|---|---|---|
+| under 12 px | 507 → **8** | 459 → **8** | – | – |
+| contrast under AA (from pixels) | 216 → **27** | 191 → **23** | – | – |
+| unreadable over a photo | 4 → **1** | 7 → **2** | – | – |
+| key information clipped | 53 → **19** | 19 → **17** | 22 → **21** | 86 → **21** |
+| overlapped (under a fixed bar / text on text) | 9 → **6** | 3 → **3** | 4 → **4** | 1 → **1** |
+| page scrolls sideways | 0 → 0 | 0 → 0 | 0 → 0 | 72 → **6** |
+| body copy under 16 px on a phone | 424 → 440 | – | – | – |
+
+The 8 left under 12 px are the owner's `[OWNER: …]` placeholders on /press, /media-kit, /team and /work-with-us
+(bracketed copy waiting for the owner). Body copy under 16 px went up because text that was 9–11 px (and so counted as
+"under 12") is now 12–14 px and counts here instead, and the merged lanes added pages; it is section 5's owner call.
+
+### The HUD over real frames (the shared TV HUD; JuiceKit's banner, score pop and callout)
+
+| | before | after |
+|---|---|---|
+| HUD text under 12 px on a phone | 90 (9 runs × 10 frames) | **0** |
+| HUD lines under 14 px on a phone | 10 | **0** |
+| HUD text under AA / 3:1 over the frames (phone + 1080p) | 17 | **1** (the decorative "·" divider, on pure white only) |
+| JuiceKit text under its floor over the frames | 26 contrast + 10 size | **0** |
+
+Contact sheets (JPG): the worst screens before (`before/contact.jpg`) and after (`after/contact-after.jpg`), and the
+HUD before / after (`contact-hud.jpg`), in the lane's scratchpad; the route JSONs beside them.
 
 ## 4. What was fixed
 

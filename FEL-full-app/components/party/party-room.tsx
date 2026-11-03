@@ -145,7 +145,7 @@ function Lobby({ room, qr, origin, share, shared }: { room: Room; qr: string | n
   const { mode, code, table } = room;
   const host = origin.replace(/^https?:\/\//, '');
   return (
-    <div className="absolute inset-0 flex flex-col gap-[2vh] p-[2.5vh] sm:p-5">
+    <div className="flex min-h-full flex-col gap-[2vh] p-[2.5vh] sm:p-5 md:absolute md:inset-0">
       <header className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link href="/play" aria-label="Back to Play" className="rounded-full border border-white/10 p-1.5 text-white/60 hover:text-white"><ArrowLeft className="h-4 w-4" /></Link>
