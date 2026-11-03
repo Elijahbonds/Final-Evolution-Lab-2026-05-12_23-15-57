@@ -64,10 +64,12 @@ const reboundChin: Builder = (scene, sk) => {
   const legs = { LeftUpLeg: [-8, 0, 4] as Deg3, RightUpLeg: [-8, 0, -4] as Deg3, LeftLeg: [12, 0, 0] as Deg3, RightLeg: [12, 0, 0] as Deg3, LeftFoot: [30, 0, 0] as Deg3, RightFoot: [30, 0, 0] as Deg3 };
   const air: Pose = { bones: { Hips: [0, 0, 0], Spine: [-2, 0, 0], Neck: [-14, 0, 0], ...legs }, hands: both(0.12, 2.22, 0.20), poles: bothDir(0.8, 0.1, -0.3), hipsY: 0.22 };
   const chin: Pose = { bones: { Hips: [22, 0, 0], Spine: [8, 0, 0], Neck: [-12, 0, 0], LeftFoot: [-18, 0, 0], RightFoot: [-18, 0, 0] }, feet: both(0.22, ANKLE, 0.06), kneePoles: bothDir(0.3, 0, 1), hands: both(0.10, 1.18, 0.24), poles: bothDir(1, 0.1, 0.1), hipsY: -0.20 };
+  // up onto the toes before the feet leave the floor (no toes through it on the way up)
+  const takeoff: Pose = { bones: { Hips: [6, 0, 0], Spine: [0, 0, 0], Neck: [-12, 0, 0], LeftFoot: [30, 0, 0], RightFoot: [30, 0, 0] }, feet: both(0.15, ANKLE + 0.09, 0.06), kneePoles: bothDir(0.15, 0, 1), hands: both(0.16, 1.80, 0.20), poles: bothDir(0.8, 0.1, -0.3), hipsY: 0.06 };
   // the feet reach the floor flat before the knees give (no toes through the floor on the way down)
   const touch: Pose = { ...chin, bones: { Hips: [8, 0, 0], Spine: [2, 0, 0], Neck: [-12, 0, 0], LeftFoot: [4, 0, 0], RightFoot: [4, 0, 0] }, hands: both(0.12, 1.50, 0.24), hipsY: 0.0 };
   return run(scene, sk, 'ex_rebound_chin', 3.6, [
-    at(stand, 0, true), at(load, 0.45, true), at(air, 0.8, true), at(air, 0.95, true), at(touch, 1.1), at(chin, 1.3, true), at(chin, 2.3, true), at(stand, 3.0, true),
+    at(stand, 0, true), at(load, 0.45, true), at(takeoff, 0.62), at(air, 0.8, true), at(air, 0.95, true), at(touch, 1.1), at(chin, 1.3, true), at(chin, 2.3, true), at(stand, 3.0, true),
   ], true);
 };
 
