@@ -56,6 +56,8 @@ export const REAL_CLIPS = new Set<string>([
   'ex_catch_shoot_12', 'ex_layup_steps', 'ex_rip_through', 'ex_rebound_chin',
   // DEMO-LOOPS-6: the grip family (exerciseGrip.ts)
   'ex_wrist_curl', 'ex_wrist_curl_down', 'ex_wrist_curl_one', 'ex_wrist_curl_one_down', 'ex_wrist_curl_bench', 'ex_wrist_curl_bench_down', 'ex_wrist_curl_behind', 'ex_wrist_roller',
+  // DEMO-LOOPS-7: presses, raises, trunk, warm-up (exerciseFamilies7.ts)
+  'ex_floor_press_one', 'ex_floor_press_alt', 'ex_bench_press_one', 'ex_chest_press_seat', 'ex_chest_press_incline', 'ex_chest_press_decline', 'ex_chest_press_stand', 'ex_incline_shoulder_raise', 'ex_front_raise_incline', 'ex_front_to_lateral', 'ex_single_db_raise', 'ex_cuban_press', 'ex_arnold_seated', 'ex_arnold_one', 'ex_press_behind_neck', 'ex_bradford_press', 'ex_bradford_seated', 'ex_jammer', 'ex_jammer_one', 'ex_seat_twist_bar', 'ex_side_bend_bar', 'ex_landmine_180', 'ex_car_driver', 'ex_rope_crunch_twist', 'ex_decline_crunch', 'ex_decline_oblique', 'ex_decline_situp', 'ex_gorilla_chin', 'ex_elbow_circles', 'ex_shoulder_rolls', 'ex_groiner', 'ex_hip_circle_quad',
   'idle_stand', 'strafe_left', 'strafe_right', 'jump_up', 'jump_land',
   'dunk_charge_gather', 'dunk_launch', 'dunk_mocap', 'dunk_360_eastbay', 'dunk_score_hang', 'dunk_land_crouch', 'dunk_land_absorb',
   'dunk_finish_windmill', 'dunk_finish_tomahawk', 'dunk_finish_blown', 'dunk_celebrate_big',

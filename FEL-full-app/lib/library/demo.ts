@@ -258,7 +258,8 @@ export const DEMO_RULES: readonly DemoRule[] = [
   { clip: (b) => ({ hk: 'ex_scoop_hk', scoop: 'ex_scoop_standing', 'shot-put': 'ex_shotput_standing' } as Record<string, string>)[b] ?? null, families: ['rotational-power'], bases: /^(hk|scoop|shot-put)$/, emits: ['ex_scoop_hk', 'ex_scoop_standing', 'ex_shotput_standing'] },
   { clip: 'ex_chop_standing', families: ['rotation'], bases: /^stand-wood-chop$/ },
   { clip: 'ex_lift_standing', families: ['rotation'], bases: /^stand-lift$/ },
-  { clip: (_b, eq) => (eq.includes('dumbbell') ? 'ex_side_bend' : null), families: ['rotation'], bases: /^sid-bend$/, emits: ['ex_side_bend'] },
+  // DEMO-LOOPS-7: the barbell side bend (the bar across the back) has its own loop
+  { clip: (_b, eq) => (eq.includes('dumbbell') ? 'ex_side_bend' : eq.includes('barbell') ? 'ex_side_bend_bar' : null), families: ['rotation'], bases: /^sid-bend$/, emits: ['ex_side_bend', 'ex_side_bend_bar'] },
   { clip: 'ex_halo', families: ['get-up-windmill'], bases: /^halo$/ },
   // ── carries, marches, swings, the rotator cuff, single-arm cable work ──
   { clip: 'ex_carry_rack', families: ['carry'], bases: /^rack$/, notMods: /^offset$/ },
@@ -700,6 +701,56 @@ export const DEMO_RULES: readonly DemoRule[] = [
   // and its Pike Push-Up (hands down, hips high in an upside-down V, the head lowered toward the floor in front of the hands):
   // the loop authored for it (exerciseAsks.ts), which the coach catalogue's row played by name until the entry existed
   { clip: 'ex_pike_pushup', families: ['push-up'], bases: /^pike$/ },
+  // DEMO-LOOPS-7 (anim/authored/exerciseFamilies7.ts), each read against the movement the entry was imported as. The bench
+  // press family: the one-arm floor press (bar or bell), the floor press arm after arm, the one-arm dumbbell bench press, and
+  // the machine and cable chest presses seated (flat, incline, decline) and standing
+  { clip: 'ex_floor_press_one', families: ['bench-press'], bases: /^singl-arm-floor-press$/ },
+  { clip: 'ex_floor_press_alt', families: ['bench-press'], bases: /^alternat-floor-press$/ },
+  { clip: 'ex_bench_press_one', families: ['bench-press'], bases: /^singl-arm-bench-press$/ },
+  { clip: 'ex_chest_press_seat', families: ['bench-press'], bases: /^(chest-press|leverag-chest-press)$/ },
+  { clip: 'ex_chest_press_incline', families: ['bench-press'], bases: /^(inclin-chest-press|leverag-inclin-chest-press)$/ },
+  { clip: 'ex_chest_press_decline', families: ['bench-press'], bases: /^leverag-declin-chest-press$/ },
+  { clip: 'ex_chest_press_stand', families: ['bench-press'], bases: /^stand-chest-press$/ },
+  // the raises: lying back on an incline, the shoulder blades push the straight arms up (the dumbbell, the bar, the Smith);
+  // the front raise sitting on an incline; the front raise swept out to the sides; one dumbbell in both hands; the Cuban
+  // press; and existing loops that are these: the dumbbell raise lifts out to the sides (the lateral raise), the standing
+  // low-pulley deltoid raise is the one-arm lateral raise, the lying rear delt raise is the prone T (on a flat bench in the
+  // source; the stage's bench is inclined)
+  { clip: 'ex_incline_shoulder_raise', families: ['raise'], bases: /^(inclin-shoulder-rais|smith-inclin-shoulder-rais)$/ },
+  { clip: 'ex_front_raise_incline', families: ['raise'], bases: /^front-inclin-rais$/ },
+  { clip: 'ex_front_to_lateral', families: ['raise'], bases: /^sid-lateral-front-rais$/ },
+  { clip: 'ex_single_db_raise', families: ['raise'], bases: /^singl-rais$/ },
+  { clip: 'ex_cuban_press', families: ['raise'], bases: /^cuban-press$/ },
+  { clip: 'ex_lateral_raise', families: ['raise'], bases: /^rais$/ },
+  { clip: 'ex_lateral_raise_one', families: ['raise'], bases: /^stand-low-pulley-deltoid-rais$/ },
+  { clip: 'ex_incline_t', families: ['raise'], bases: /^lying-rear-shoulder-rais$/ },
+  // the overhead presses: the Arnold press (the dumbbells seated; the kettlebell standing, one arm), the press behind the
+  // neck, the Bradford press (standing; the Rocky press seated), the landmine's linear jammer (both hands; one arm)
+  { clip: (_b, eq) => (eq.includes('kettlebell') ? 'ex_arnold_one' : 'ex_arnold_seated'), families: ['overhead-press'], bases: /^arnold-press$/, emits: ['ex_arnold_one', 'ex_arnold_seated'] },
+  { clip: 'ex_press_behind_neck', families: ['overhead-press'], bases: /^stand-press-behind-neck$/ },
+  { clip: 'ex_bradford_press', families: ['overhead-press'], bases: /^stand-bradford-press$/ },
+  { clip: 'ex_bradford_seated', families: ['overhead-press'], bases: /^bradford-rocky-press$/ },
+  { clip: 'ex_jammer', families: ['overhead-press'], bases: /^landmin-linear-jammer$/ },
+  { clip: 'ex_jammer_one', families: ['overhead-press'], bases: /^singl-arm-linear-jammer$/ },
+  // the trunk: the seated bar twist, the bar side bend, the landmine 180, car drivers, the kneeling rope crunch with twists;
+  // the decline crunch, oblique crunch and band sit-up; the gorilla chin and crunch
+  { clip: 'ex_seat_twist_bar', families: ['rotation'], bases: /^seat-twist$/ },
+  { clip: 'ex_landmine_180', families: ['rotation'], bases: /^landmin-180s$/ },
+  { clip: 'ex_car_driver', families: ['rotation'], bases: /^car-driver$/ },
+  { clip: 'ex_rope_crunch_twist', families: ['rotation'], bases: /^kneel-crunch-alternat-obliqu-twist$/ },
+  { clip: 'ex_decline_crunch', families: ['flexion'], bases: /^declin-crunch$/ },
+  { clip: 'ex_decline_oblique', families: ['flexion'], bases: /^declin-obliqu-crunch$/ },
+  { clip: 'ex_decline_situp', families: ['flexion'], bases: /^weight-sit-ups$/ },
+  { clip: 'ex_gorilla_chin', families: ['flexion'], bases: /^gorilla-chin-crunch$/ },
+  // the dynamic warm-up: elbow circles, shoulder circles (rolls), groiners, prone hip circles; the spider crawl's knee-to-elbow
+  // from the low plank is the spiderman push-up's (in place: the crawl's travel is not shown)
+  { clip: 'ex_elbow_circles', families: ['dynamic-warmup'], bases: /^elbow-circl$/ },
+  { clip: 'ex_shoulder_rolls', families: ['dynamic-warmup'], bases: /^shoulder-circl$/ },
+  { clip: 'ex_groiner', families: ['dynamic-warmup'], bases: /^groiner$/ },
+  { clip: 'ex_hip_circle_quad', families: ['dynamic-warmup'], bases: /^hip-circl-pron$/ },
+  { clip: 'ex_spiderman_pushup', families: ['dynamic-warmup'], bases: /^spider-crawl$/ },
+  // the side-to-side box shuffle is the stride jump crossover (one foot up on the box, over to the other side and back)
+  { clip: 'ex_stride_jump_cross', families: ['jump'], bases: /^sid-sid-box-shuffl$/ },
 ];
 
 const RULES_BY_FAMILY: ReadonlyMap<string, readonly DemoRule[]> = (() => {
@@ -809,7 +860,7 @@ export const DEMO_CLIPS: readonly string[] = (() => {
 })();
 
 /** Floor loops: the stage frames these from the side, low (a push-up seen from the front is a head). */
-export const FLOOR_CLIPS: ReadonlySet<string> = new Set(['ex_stepin_climber', 'ex_leg_pull_in', 'ex_crunch_weight', 'ex_frog_situp', 'ex_cocoon', 'ex_bottoms_up', 'ex_butterfly_side_reach', 'ex_crunch_overhead', 'ex_crunch_tuck', 'ex_russian_twist', 'ex_leg_raise_back', 'ex_pushup', 'ex_plank', 'ex_plank_high', 'ex_mountain_climber', 'ex_bridge', 'ex_dead_bug', 'ex_bird_dog', 'ex_crunch', 'ex_floor_press', 'ex_spiderman_pushup', 'ex_archer_pushup', 'ex_prone_t', 'ex_adductor_squeeze', 'ex_copenhagen_knee', 'ex_copenhagen_raise_knee', 'ex_calf_smr', 'ex_piriformis_smr'].concat(
+export const FLOOR_CLIPS: ReadonlySet<string> = new Set(['ex_floor_press_one', 'ex_floor_press_alt', 'ex_groiner', 'ex_hip_circle_quad', 'ex_stepin_climber', 'ex_leg_pull_in', 'ex_crunch_weight', 'ex_frog_situp', 'ex_cocoon', 'ex_bottoms_up', 'ex_butterfly_side_reach', 'ex_crunch_overhead', 'ex_crunch_tuck', 'ex_russian_twist', 'ex_leg_raise_back', 'ex_pushup', 'ex_plank', 'ex_plank_high', 'ex_mountain_climber', 'ex_bridge', 'ex_dead_bug', 'ex_bird_dog', 'ex_crunch', 'ex_floor_press', 'ex_spiderman_pushup', 'ex_archer_pushup', 'ex_prone_t', 'ex_adductor_squeeze', 'ex_copenhagen_knee', 'ex_copenhagen_raise_knee', 'ex_calf_smr', 'ex_piriformis_smr'].concat(
   // LIBRARY-ANATOMY-2: the floor positions and every flow (a flow spends most of its time on the floor)
   ['dog', 'child', 'pigeon', 'halfsplit', 'lowlunge', 'kneel', 'ninety', 'shinbox', 'catcamel', 'thread', 'bear', 'cobra', 'lizard', 'butterfly', 'couch', 'frog', 'spider', 'inchworm',
     'supine', 'supine9090', 'legsup', 'kneehug', 'oneknee', 'happybaby', 'kneerock', 'figure4', 'lyinghams', 'prone', 'pike', 'straddle', 'switch', 'rockback', 'childside', 'dogpedal',
