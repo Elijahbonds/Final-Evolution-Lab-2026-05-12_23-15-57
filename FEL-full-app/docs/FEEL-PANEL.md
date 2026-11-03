@@ -380,3 +380,22 @@ these yet — every default is flagged in the lane report). Group "Hoops · riva
 
 **assumption:** the bounds are safe, not tuned; the defaults are this lane's calibration on the headless possession sim
 (`scripts/probes/hoops-gap/rival-sim.mts`) and the rig, not owner numbers. A ranked, staked or head-to-head run reads every default above.
+
+lane/hoops-p04 (1v1 / 3v3 ten-phase pass, phase 4 "feet and transitions"; owner 2026-10-20: "blend + minimum-hold rules on every clip
+change"). The owner has felt none of these yet; every default is flagged in the lane report.
+
+- Group "Hoops · transitions" (`anim/hoopsTransitions.ts`), **TUNED (new behaviour)**: `hoops.transitionRuleOn` 1 (0 = every state's
+  own fade and the old dwell exactly); the fade floors — `hoops.gaitFadeSec` 0.22 s (dribble / run loop to loop; was 0.10–0.18),
+  `hoops.defenseFadeSec` 0.2 s (slide / backpedal / closeout / crossover step; was 0.12–0.20), `hoops.crossFadeSec` 0.2 s (offence ↔
+  defence, a loop after a beat), `hoops.beatFadeFloorSec` 0.1 s (a mode's beat: a move, a reach, a shot — the clip still starts on the
+  press's frame; was as low as 0.05), `hoops.priorityFadeSec` 0.08 s (a stagger, the floor, a dunk); `hoops.minHoldSec` 0.22 s (a loop
+  plays this long before a sibling loop replaces it — the release's dwell, now for every loop group).
+- Same group (`hoops/releaseTiming.ts`): `hoops.releaseToClipOn` 1 (the rival's jumper / finish clip is paced so the ball leaves on its
+  release key — the 3v3 tell, the 1v1 gather; 0 = the clip from its first frame, as before) and `hoops.jumperFromRiseOn` 1 (the hero's
+  jumper is entered at its rise, its load dip skipped, and paced from there to the green; 0 = from the first frame). Neither moves a
+  release in time or a make chance: only the clip moves.
+- Same group (`anim/basketballTree.ts`, **TUNED (new behaviour)**): `hoops.plantReleaseFadeSec` 0.12 s — the plant-and-cut lock (0.18 s)
+  lets its foot back to the clip over this instead of in one frame (the rig read the hero's thigh at 8–10 000 °/s on those frames); 0 =
+  the old one-frame release.
+
+**assumption:** the bounds are safe, not tuned. A ranked, staked or head-to-head run reads every default above.
