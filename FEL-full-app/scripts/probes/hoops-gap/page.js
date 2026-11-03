@@ -126,7 +126,7 @@
   // the traced bones (in → out, as a rotation) is kept per frame, and a frame where that change itself turns over 600 deg/s against the frame
   // before is logged against the layer — [frame, body, bone, stage, deg/s]. Stage 'clip' is the evaluated clips' own speed (what the
   // animations left before the first observer). Observers are named by their index and the head of their source.
-  const TRACE = ['LeftUpLeg', 'RightUpLeg', 'LeftLeg', 'RightLeg', 'LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand'];
+  const TRACE = ['Hips', 'Spine', 'LeftUpLeg', 'RightUpLeg', 'LeftLeg', 'RightLeg', 'LeftFoot', 'RightFoot', 'LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand'];
   HG.stageEv = []; HG.stageNames = {};
   if (CFG.stageLog) {
     const tq = (bi, j) => { const t = B[bi] && B[bi].w[WATCH.indexOf(TRACE[j])]; const q = t && lqOf(t); return q ? [q.x, q.y, q.z, q.w] : null; };
@@ -135,7 +135,8 @@
     const off = (a, b) => { if (!a || !b) return null; const [ax, ay, az, aw] = [-a[0], -a[1], -a[2], a[3]]; const [bx, by, bz, bw] = b; return [aw * bx + ax * bw + ay * bz - az * by, aw * by - ax * bz + ay * bw + az * bx, aw * bz + ax * by - ay * bx + az * bw, aw * bw - ax * bx - ay * by - az * bz]; };
     const snap = () => B.map((b, bi) => TRACE.map((n, j) => tq(bi, j)));
     const prevOff = new Map(); let prevClip = null;
-    const note = (bi, j, stage, deg) => { if (HG.rec && HG.stageEv.length < 3000) HG.stageEv.push([HG.frame + 1, B[bi].id, TRACE[j], stage, Math.round(deg * 60)]); };
+    const mag = (q) => (q ? Math.round(2 * Math.acos(Math.min(1, Math.abs(q[3]))) * 180 / Math.PI) : -1);
+    const note = (bi, j, stage, deg, a, b) => { if (HG.rec && HG.stageEv.length < 3000) HG.stageEv.push([HG.frame + 1, B[bi].id, TRACE[j], stage, Math.round(deg * 60), mag(b), mag(a)]); };   // … the layer's offset (deg) the frame before and now
     const obsv = scene.onAfterAnimationsObservable;
     obsv.add(() => { try {
       const cur = snap();
@@ -147,13 +148,13 @@
         HG.stageNames[key] = true;
         o.callback = function (ev, st) {
           let before = null; try { before = HG.rec ? snap() : null; } catch (e) { before = null; } const r = cb.call(this, ev, st);
-          if (before) try { const after = snap(); after.forEach((row, bi) => row.forEach((q, j) => { const of = off(before[bi][j], q); const pk = key + '|' + bi + '|' + j; const po = prevOff.get(pk); if (of && po) { const d = angQ(of, po); if (d * 60 > 600) note(bi, j, key, d); } prevOff.set(pk, of); })); } catch (e) { if (HG.errors.length < 20) HG.errors.push('stage ' + String(e && e.message || e).slice(0, 120)); }
+          if (before) try { const after = snap(); after.forEach((row, bi) => row.forEach((q, j) => { const of = off(before[bi][j], q); const pk = key + '|' + bi + '|' + j; const po = prevOff.get(pk); if (of && po) { const d = angQ(of, po); if (d * 60 > 600) note(bi, j, key, d, of, po); } prevOff.set(pk, of); })); } catch (e) { if (HG.errors.length < 20) HG.errors.push('stage ' + String(e && e.message || e).slice(0, 120)); }
           return r;
         };
       }
     } catch (e) { if (HG.errors.length < 20) HG.errors.push('stage0 ' + String(e && e.message || e).slice(0, 120)); } }, undefined, true);   // first: the clips as evaluated
   }
-  scene.onAfterRenderObservable.add(() => { HG.frame++; window.__frameNo = HG.frame; try { record(); } catch (e) { if (HG.errors.length < 20) HG.errors.push('rec ' + String(e && e.message || e).slice(0, 160)); } });
+  scene.onAfterRenderObservable.add(() => { HG.frame++; window.__frameNo = HG.frame; try { record(); } catch (e) { if (HG.errors.length < 20) HG.errors.push('rec ' + String(e && e.message || e).slice(0, 160)); } }, undefined, true);   // hoops-p04b: FIRST after the render — the pose as DRAWN (hoops/contactPoses puts its arm bar, forearm and chest lean back on this observable; recorded after it, the rig never saw them)
   HG.start = () => { HG.rec = true; HG.f0 = HG.frame; F = 0; for (const b of B) b.prevQ = WATCH.map(() => null); };
   HG.stop = () => { HG.rec = false; return F; };
 
@@ -394,7 +395,7 @@
         const o = (i * NB + bi) * K, p = ((i - 1) * NB + bi) * K;
         for (const [fa, ob] of [[4, 7], [7, 4]]) {
           const y = pos[o + fa + 1], yWas = pos[p + fa + 1], yo = pos[o + ob + 1]; if (!isFinite(y) || !isFinite(yWas)) continue;
-          if (y < floorY + 0.05 && (!isFinite(yo) || y <= yo) && !(y - yWas > 0.002)) { const s = Math.hypot(pos[o + fa] - pos[p + fa], pos[o + fa + 2] - pos[p + fa + 2]); slides.push(s); if (opts.popList && s > 0.05 && (R.skateAt || (R.skateAt = [])).length < 400) R.skateAt.push([HG.f0 + i, fa === 4 ? 'L' : 'R', Math.round(s * 1000) / 10]); if (vel[i] > 0.5) { movingPlanted++; movingSlide += s; } }
+          if (y < floorY + 0.05 && (!isFinite(yo) || y <= yo) && !(y - yWas > 0.002)) { const s = Math.hypot(pos[o + fa] - pos[p + fa], pos[o + fa + 2] - pos[p + fa + 2]); slides.push(s); if (opts.popList && s > 0.05 && (R.skateAt || (R.skateAt = [])).length < 400) R.skateAt.push([HG.f0 + i, fa === 4 ? 'L' : 'R', Math.round(s * 1000) / 10, Math.round((vel[i] || 0) * 100 / 60 * 10) / 10, Math.round((y - floorY) * 1000) / 10, Math.round((yo - floorY) * 1000) / 10]); /* … the root's cm a frame, this foot's and the other's height over the floor (cm) */ if (vel[i] > 0.5) { movingPlanted++; movingSlide += s; } }
         }
       }
       R.plantedFrames = slides.length; R.slideP90Cm = r2(pctl(slides, 0.9) * 100); R.skates = slides.filter((s) => s > 0.05).length;
