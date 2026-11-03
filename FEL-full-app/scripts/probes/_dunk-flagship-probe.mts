@@ -155,11 +155,16 @@ const RECORDER = `(() => {
   setInterval(() => { const h = window.__hud(); const s = [h.banner, h.hint, h.slamBeat].filter(Boolean).join(' | '); if (s && s !== last) { last = s; window.__HUDLOG.push({ t: performance.now(), s }); } }, 16);
   // the slam on the beat the mode publishes (slamBeat 'beat' = the window's centre), pressed in the page
   const LATE_MS = ${Number(process.env.SLAM_LATE_MS ?? 70)};
-  window.__armSlam = (mode) => {
-    const t0 = performance.now();
+  // Phase 7: \`stick\` (+1 back / −1 up) is held on the left stick from the window's opening, at least 2 frames before the press,
+  // and let go 300 ms after it: the slam variant's input (dunk.slamVariants)
+  window.__armSlam = (mode, stick) => {
+    const t0 = performance.now(); let held = 0;
     const tick = () => {
       if (performance.now() - t0 > 5000) return;
       const sb = window.__hud().slamBeat;
+      if (stick && (sb === 'open' || sb === 'beat') && held === 0) { window.__PAD.axes[1] = stick; window.__PAD.timestamp = performance.now(); held = 1; requestAnimationFrame(tick); return; }
+      if (stick && held > 0 && held < 3) { held++; requestAnimationFrame(tick); return; }
+      if (stick) setTimeout(() => { window.__PAD.axes[1] = 0; window.__PAD.timestamp = performance.now(); }, 360);
       if (!(mode === 'open' ? (sb === 'open' || sb === 'beat') : sb === 'beat')) { requestAnimationFrame(tick); return; }
       const b = window.__PAD.buttons[0];
       const press = () => { b.pressed = true; b.value = 1; window.__PAD.timestamp = performance.now(); setTimeout(() => { b.pressed = false; b.value = 0; window.__PAD.timestamp = performance.now(); }, 60); };
@@ -172,7 +177,7 @@ const RECORDER = `(() => {
 
 interface PadLike { buttons: { pressed: boolean; value: number }[]; axes: number[]; timestamp: number }
 interface QaLike { events(n?: number): { t: number; kind: string; key?: string }[] }
-interface DunkWin { __vc: { pause(): void; resume(): void; reseed(seed: number): void; C: { vt: number; frames: number; paused: boolean } }; __rec: { on: boolean; frames: Frame[]; strip: number[] | null; stripWait: boolean; f0: number }; __smp: { marks: { t: number; msg: string }[] }; __PAD: PadLike; __hud(): Record<string, unknown>; __armSlam(mode?: string): void; __HUDLOG: { t: number; s: string }[]; __FEL_QA__?: QaLike }
+interface DunkWin { __vc: { pause(): void; resume(): void; reseed(seed: number): void; C: { vt: number; frames: number; paused: boolean } }; __rec: { on: boolean; frames: Frame[]; strip: number[] | null; stripWait: boolean; f0: number }; __smp: { marks: { t: number; msg: string }[] }; __PAD: PadLike; __hud(): Record<string, unknown>; __armSlam(mode?: string, stick?: number): void; __HUDLOG: { t: number; s: string }[]; __FEL_QA__?: QaLike }
 
 async function startInPage(settleMs: number): Promise<{ playing: boolean; frames: number }> {
   const w = window as unknown as DunkWin; const pad = w.__PAD;
@@ -189,7 +194,7 @@ async function startInPage(settleMs: number): Promise<{ playing: boolean; frames
 }
 
 interface AttemptCfg { scen: string; seed: number; standMs: number; walkMs: number; walkY: number; holdMs: number; takeoff: 'auto' | 'press' | 'release'; pressAfterMs: number;
-  airAfterMs?: number; preY: boolean; postYMs?: number; cueRe?: string; reactMs?: number; body?: unknown[]; runY: boolean; air: [number, number] | null; slam: 'beat' | 'open' | 'late' | 'none'; recMs: number; strip: number[] | null }
+  airAfterMs?: number; preY: boolean; postYMs?: number; cueRe?: string; reactMs?: number; body?: unknown[]; runY: boolean; air: [number, number] | null; slam: 'beat' | 'open' | 'late' | 'none'; recMs: number; strip: number[] | null; slamStick?: number; flightStick?: number }
 type AttemptOut = { err: string } | { t0: number; pressAt: number | null; frames: Frame[]; marks: { t: number; msg: string }[]; qa: { t: number; kind: string; name: string }[]; hud: string[] };
 
 /** One attempt in the page, on the virtual clock. */
@@ -255,10 +260,11 @@ async function attemptInPage(c: AttemptCfg): Promise<AttemptOut> {
     // Phase 6: the trick goes in after LATE_JUMP_MS (core/slamPress: after an automatic launch, an A inside 250 ms is the jump press
     // the player was about to make — measured: the windmill and the cradle, A tricks thrown at +0.1 s, never fired)
     if (c.air) { await sleep(AIR_AFTER_MS); setB(c.air[0], true); await sleep(80); await tap(c.air[1], 60); await sleep(50); setB(c.air[0], false); }
-    if (c.slam !== 'none') w.__armSlam(c.slam);
+    if (c.flightStick) { pad.axes[1] = c.flightStick; pad.timestamp = now(); }   // Phase 7: STICK_FLIGHT — the stick held the whole flight (the on/off check)
+    if (c.slam !== 'none') w.__armSlam(c.slam, c.slamStick ?? 0);
     const end = launch + c.recMs;
     while (now() < end) { await sleep(100); }
-    R.on = false;
+    R.on = false; if (c.flightStick) { pad.axes[1] = 0; pad.timestamp = now(); }
     const qa = w.__FEL_QA__ ? w.__FEL_QA__.events(4000).filter((e) => e.t >= t0).map((e) => ({ t: e.t, kind: String(e.kind), name: String(e.key ?? '') })) : [];
     return { t0, pressAt, frames: R.frames, marks: w.__smp.marks.filter((m) => m.t >= t0 || m.msg.startsWith('[YTRAP]')), qa, hud: w.__HUDLOG.filter((h) => h.t >= t0).map((h) => h.s) };
   } finally { w.__vc.pause(); }
@@ -359,7 +365,9 @@ function cfgFor(scen: string, rep: number): AttemptCfg {
     case 'ooppress': return { ...base, walkMs: 400, takeoff: 'press', pressAfterMs: 500 + jit };          // A early on the run
     case 'ooprelease': return { ...base, walkMs: 400, takeoff: 'release', pressAfterMs: 450 + jit };      // RT let go early
     case 'show': return { ...base, recMs: 14000 };
-    default: if (scen.startsWith('trick:')) { const a = AIR[scen.slice(6)]; return { ...base, walkMs: 400, air: [DPAD_I[a[0]], BTN_I[a[1]]], airAfterMs: Number(process.env.AIR_AFTER_MS ?? 300) }; }
+    default: if (scen.startsWith('trick:')) { const a = AIR[scen.slice(6)]; return { ...base, walkMs: 400, air: [DPAD_I[a[0]], BTN_I[a[1]]], airAfterMs: Number(process.env.AIR_AFTER_MS ?? 300), flightStick: Number(process.env.STICK_FLIGHT ?? 0) }; }
+      // Phase 7: a plain flight slammed on the beat with the stick back (the REVERSE), up (the TWO-HAND POWER) or neutral
+      if (scen.startsWith('finish:')) { const k = scen.slice(7); return { ...base, walkMs: 400, slamStick: k === 'reverse' ? 1 : k === 'power' ? -1 : 0 }; }
   }
   throw new Error('unknown scenario ' + scen);
 }
@@ -369,7 +377,9 @@ async function runScen(b: Browser, scen: string, reps: number): Promise<Rec[]> {
     : scen === 'selflobrun' ? 'selflob' : scen === 'glass' || scen === 'glassstand' ? 'offglass' : scen === 'bounce' || scen === 'bouncestand' ? 'bounce' : (process.env.PROP ?? null);
   // Phase 6: TRICKS=a,b,… throws only those (the 16 split across ≤ 15-minute lock holds)
   const pick = (process.env.TRICKS ?? '').split(',').map((x) => x.trim()).filter(Boolean);
-  const list = scen === 'tricks' ? Object.keys(AIR).filter((k) => !pick.length || pick.includes(k)).map((k) => `trick:${k}`) : Array.from({ length: reps }, () => scen);
+  const list = scen === 'tricks' ? Object.keys(AIR).filter((k) => !pick.length || pick.includes(k)).map((k) => `trick:${k}`)
+    : scen === 'finishes' ? Array.from({ length: reps }, () => ['plain', 'reverse', 'power']).flat().map((k) => `finish:${k}`)   // Phase 7
+    : Array.from({ length: reps }, () => scen);
   const out: Rec[] = [];
   let pg: { p: Page; errors: string[] } | null = null; let used = 0;
   for (let i = 0; i < list.length; i++) {
