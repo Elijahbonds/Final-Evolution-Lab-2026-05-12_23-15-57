@@ -15,7 +15,7 @@ export function PublicTopBar() {
         </Link>
         <Link
           href="/login"
-          className="rounded-md border border-white/10 px-3 py-1.5 font-mono text-xs text-white/70 transition-colors hover:border-[#00E5FF]/50 hover:text-[#00E5FF]"
+          className="inline-flex min-h-[44px] items-center rounded-md border border-white/10 px-4 font-mono text-xs text-white/70 transition-colors hover:border-[#00E5FF]/50 hover:text-[#00E5FF]"
         >
           LOG IN
         </Link>
@@ -27,7 +27,7 @@ export function PublicTopBar() {
 export function PublicLegalFooter() {
   return (
     <footer className="mt-10 border-t border-white/10 py-6">
-      <div className="flex flex-wrap items-center justify-center gap-4 text-[11px] text-white/40">
+      <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-[14px] text-white/60 [&>a]:inline-flex [&>a]:min-h-[44px] [&>a]:items-center">
         <Link href="/terms" className="hover:text-white/70">Terms</Link>
         <Link href="/privacy" className="hover:text-white/70">Privacy</Link>
         {/* OWNER-APPROVALS (2026-10-27, cards C28/C12): the two new legal texts, beside the other legal pages; the buy and

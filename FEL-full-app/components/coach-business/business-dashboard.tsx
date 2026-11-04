@@ -98,7 +98,7 @@ function PlanCard({ d, api, onNote }: CardProps) {
       ) : null}
       <ul className="mt-3 space-y-1 text-sm text-white/80">
         {PRO_FEATURES.map((f) => (
-          <li key={f} className="flex gap-2"><span aria-hidden="true" className={d.plan.plan === 'pro' || !d.plan.gatesOn ? 'text-cyan-300' : 'text-white/30'}>✓</span><span>{PRO_FEATURE_LABELS[f]}</span></li>
+          <li key={f} className="flex gap-2"><span aria-hidden="true" className={d.plan.plan === 'pro' || !d.plan.gatesOn ? 'text-cyan-300' : 'text-white/50'}>✓</span><span>{PRO_FEATURE_LABELS[f]}</span></li>
         ))}
       </ul>
       {d.plan.plan === 'pro' ? null : !d.plan.gatesOn ? (

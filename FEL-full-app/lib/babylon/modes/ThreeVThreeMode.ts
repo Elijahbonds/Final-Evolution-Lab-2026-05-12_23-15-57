@@ -55,7 +55,7 @@ import type { AbstractMesh, TransformNode, Mesh } from '@babylonjs/core';
 import { BasketballAnimTree, FootPlant } from '../anim/basketballTree';
 import { MoveLegs } from '../anim/moveLegs';   // H2: the legs keep running under a handle move
 import { MoveDip } from '../anim/moveDip';   // hoops-dip
-import { LocoAccent } from '../anim/locoAccent';   // hoops-dip movement pass
+import { LocoAccent, accentState } from '../anim/locoAccent';   // hoops-dip movement pass
 import { HandlerRest } from './handlerRest';   // lane/h3-handler (#312 port): the eyes on the defender, the protect's turn / sink / guard
 import { JumperRise } from '../core/JumperHop';   // lane/h3-handler (#314 port): the jump shot's hop timed to the release, the hang
 import { FootGlide } from '../anim/footGlide';   // hoops-dip movement pass
@@ -1100,7 +1100,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       if (agentCtl) { ctx.agent.control = agentCtl; ctx.agent.getScore = () => myScore; }
       me = await spawnBody(new Vector3(0, 0, 6), undefined, false, 'teammate');
       MoveDip.for(ctx.scene, me.char.skeleton, me.char.root, (n) => me.char.animator.groupFor(n));   // hoops-dip (owner 10-20; BEFORE MoveLegs: both insert first, so the pass runs moveLegs → the dip → the foot planter): the body sinks into the crossover / momentum cross / behind-the-back (anim/moveDip)
-      LocoAccent.for(ctx.scene, me.char.skeleton, me.char.root, () => me.tree.state); meRest.mount(ctx.scene, me.char.skeleton, me.char.root);   // (+ h3-handler: the protect's sink, same slot)   // hoops-dip movement pass: the decel step and the push-off drawn on the body (anim/locoAccent; after the posture, before the carries)
+      LocoAccent.for(ctx.scene, me.char.skeleton, me.char.root, () => accentState(me.tree)); meRest.mount(ctx.scene, me.char.skeleton, me.char.root);   // (+ h3-handler: the protect's sink, same slot)   // hoops-dip movement pass: the decel step and the push-off drawn on the body (anim/locoAccent; after the posture, before the carries)
       me.tree.attachLegs(MoveLegs.for(ctx.scene, me.char.skeleton, (n) => me.char.animator.groupFor(n)));   // H2: the legs keep running under a handle move
       ring?.dispose(); ring = mountPlayerRing(ctx.scene, me.char.root, { color: TEAM_JERSEY.mine, icon: readPlayerIcon() });   // PLAYER RING: the one you steer, in your team's colour
       // Each defender MARKS A MAN: allyPositions() is [me, mate0, mate1], so

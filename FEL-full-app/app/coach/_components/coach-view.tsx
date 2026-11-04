@@ -55,7 +55,7 @@ export function CoachView() {
   }
 
   return (
-    <main className={`fel-fade mx-auto max-w-[900px] px-5 pb-28 pt-8 md:pb-10 ${known ? '' : 'invisible'}`}>
+    <main className={`fel-fade mx-auto max-w-[900px] px-5 pb-[8.75rem] pt-8 md:pb-10 ${known ? '' : 'invisible'}`}>
       {/* PREMIUM-UI P8 (2026-10-27): the page says where you are (it was a screen-reader-only heading), Court session is the
           ONE primary — the one-accent pill, docked on a phone (was a fourth accent, pink) */}
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">

@@ -1286,6 +1286,22 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/anim/basketballTree.ts PLANT_RELEASE_FADE_SEC',
     hint: 'A planted foot slides back to the clip over this when the cut lock ends, instead of in one frame. 0 = the old one-frame release.',
   },
+  // hoops-p04b (1v1/3v3 phase 4b): the pops the rig traced to a layer
+  {
+    id: 'hoops.accentOffBeatsOn', label: 'Stop and start accent: off during a beat (0 = off)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · transitions',
+    source: 'lib/babylon/anim/locoAccent.ts ACCENT_OFF_BEATS_ON',
+    hint: 'The stop and start sink is drawn on the dribble and run loops only, never over a gather or a move. 0 = it also drew over a beat started on its brake (the step-back thigh spike).',
+  },
+  {
+    id: 'hoops.contactArmSwapSec', label: 'Contact poses: arm swap ease', def: 0.15, min: 0, max: 0.4, step: 0.01, unit: 's', group: 'Hoops · transitions',
+    source: 'lib/babylon/hoops/contactPoses.ts CONTACT_ARM_SWAP_SEC',
+    hint: 'When the hand-check arm or the handler arm bar changes sides, or a handle move drops the bar, each arm eases over this. 0 = the one-frame swap.',
+  },
+  {
+    id: 'hoops.carryArmSpeedSec', label: 'Ball carry: arm weights ease on a gear change', def: 0.12, min: 0, max: 0.4, step: 0.01, unit: 's', group: 'Hoops · transitions',
+    source: 'lib/babylon/anim/ballCarry.ts CARRY_ARM_SPEED_SEC',
+    hint: 'The dribble arm reach and the off arm swing follow the body speed eased over this, so a gear change does not move an arm in one frame. 0 = the frame speed, as before.',
+  },
   // AF-1 (ANIM-FEEL-SPEC 2026-10-28): inertialized clip transitions, default OFF — off is the linear crossfade, unchanged.
   {
     id: 'anim.inertial', label: 'Inertial clip transitions on (1) / off (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
@@ -1298,6 +1314,17 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'How long the old pose takes to wash out, as a fraction of each clip switch\'s fade time. Only read when inertial transitions are on.',
   },
   // CLIP-SMOOTH (2026-11-03, owner: "Yes, smooth them"): the karate captures' own single-frame snaps re-keyed, default ON.
+  // GAMEPLAY-CLEAN P3 (2026-11-03): the foot planter's leg solve eases in and out instead of stepping (anim/FootPlanting)
+  {
+    id: 'anim.plantEngageSec', label: 'Foot plant: solve blend time', def: 0.1, min: 0, max: 0.4, step: 0.02, unit: 's', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/FootPlanting.ts PLANT_ENGAGE_SEC',
+    hint: 'How long the foot planter takes to take a leg over when it starts holding a foot, and to hand it back. 0 = the old one-frame step (the derby batter thigh jumped 25 degrees in a frame standing still).',
+  },
+  {
+    id: 'anim.hipYawFold', label: 'Posture hip strip folds past 90 degrees on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/PostureLayer.ts HIP_YAW_FOLD_ON',
+    hint: 'On: a window that keeps part of the hips turn (football spin) reads a turn past 90 degrees folded back, so the hips never flip 180 degrees in a frame at the half-turn. Off: the old wrapped read.',
+  },
   {
     id: 'anim.clipSmooth', label: 'Smooth the snaps inside clips on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Anim · clips',
     source: 'lib/babylon/anim/clipDesnap.ts CLIP_SMOOTH_ON',

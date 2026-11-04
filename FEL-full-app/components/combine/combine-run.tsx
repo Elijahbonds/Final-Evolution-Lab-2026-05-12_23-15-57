@@ -40,10 +40,10 @@ function Slots({ ev, athleteId, st }: { ev: CombineEvent; athleteId: string; st:
         const s = slots[i] ?? null;
         return (
           <li key={i} className={`min-w-[84px] rounded-lg border px-2 py-1.5 text-center ${s ? 'border-white/20 bg-white/[0.06]' : 'border-dashed border-white/15'}`} data-slot={i + 1}>
-            <span className="block text-[10px] uppercase tracking-wider text-fel-dim">Try {i + 1}</span>
+            <span className="block text-[12px] uppercase tracking-wider text-fel-dim">Try {i + 1}</span>
             <span className="block font-mono text-sm font-bold tabular-nums text-white">{s ? (s.value === null ? 'No mark' : formatValue(st.kind, s.value)) : '—'}</span>
-            {s?.touchCm != null && <span className="block text-[10px] text-white/50">touch {formatValue('approach', s.touchCm)}</span>}
-            {s?.method === 'camera' && <span className="block text-[10px] text-[#00E5FF]" data-slot-camera>camera</span>}
+            {s?.touchCm != null && <span className="block text-[12px] text-white/50">touch {formatValue('approach', s.touchCm)}</span>}
+            {s?.method === 'camera' && <span className="block text-[12px] text-[#00E5FF]" data-slot-camera>camera</span>}
           </li>
         );
       })}
@@ -112,7 +112,7 @@ export function CombineRun({ ev, onChange, onReport, onHome, roster, saving, sta
             <button key={s.id} type="button" onClick={() => setStationIdx(i)} aria-current={i === stationIdx} data-combine-tab={s.id}
               className={`shrink-0 rounded-xl border px-3 py-2 text-left ${i === stationIdx ? 'border-fel-cyan bg-fel-cyan/10' : 'border-white/10'}`}>
               <span className="block max-w-[150px] truncate text-xs font-bold text-white">{stationName(s)}</span>
-              <span className="block text-[10px] text-fel-dim">{p.done}/{p.total}{p.total > 0 && p.done >= p.total ? ' · done' : ''}</span>
+              <span className="block text-[12px] text-fel-dim">{p.done}/{p.total}{p.total > 0 && p.done >= p.total ? ' · done' : ''}</span>
             </button>
           );
         })}
@@ -121,7 +121,7 @@ export function CombineRun({ ev, onChange, onReport, onHome, roster, saving, sta
       <section className="fel-card space-y-1 rounded-xl p-3">
         <h2 className="text-base font-black text-white">{stationName(st)}</h2>
         <p className="text-xs text-white/50">{st.timing === 'camera' ? CAMERA_STATION_HOW : def.how}</p>
-        {status && <p className="text-[11px] text-fel-dim" data-combine-status>{status}</p>}
+        {status && <p className="text-[12px] text-fel-dim" data-combine-status>{status}</p>}
       </section>
 
       <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1" data-combine-line>
@@ -195,7 +195,7 @@ export function CombineRun({ ev, onChange, onReport, onHome, roster, saving, sta
             className="flex min-h-11 items-center gap-1 rounded-xl border border-white/20 px-3 text-sm font-bold text-white/80 disabled:opacity-40"><UserPlus className="h-4 w-4" /> Add</button>
         </div>
       )}
-      {def.method !== 'hand' && <p className="text-[11px] text-fel-dim">{NO_ACCURACY_LINE}</p>}
+      {def.method !== 'hand' && <p className="text-[12px] text-fel-dim">{NO_ACCURACY_LINE}</p>}
     </div>
   );
 }

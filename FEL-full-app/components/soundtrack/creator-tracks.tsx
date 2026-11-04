@@ -29,9 +29,9 @@ export async function CreatorTracks({ ownerId, accent = '#00E5FF' }: { ownerId: 
           <li key={t.id} className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
             <span aria-hidden className="text-lg" style={{ color: accent }}>♪</span>
             <span className="min-w-0 flex-1 truncate text-sm font-semibold text-white">{t.title}</span>
-            {t.inRotation && <span className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[10px] uppercase text-white/70">in the FEL soundtrack</span>}
-            {t.durationLabel && <span className="font-mono text-[11px] text-white/40">{t.durationLabel}</span>}
-            <span className="font-mono text-[11px] text-white/60">{t.plays.toLocaleString()} {t.plays === 1 ? 'play' : 'plays'}</span>
+            {t.inRotation && <span className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[12px] uppercase text-white/70">in the FEL soundtrack</span>}
+            {t.durationLabel && <span className="font-mono text-[12px] text-white/50">{t.durationLabel}</span>}
+            <span className="font-mono text-[12px] text-white/60">{t.plays.toLocaleString()} {t.plays === 1 ? 'play' : 'plays'}</span>
           </li>
         ))}
       </ul>

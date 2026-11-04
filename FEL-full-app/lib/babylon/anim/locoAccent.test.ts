@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import { Vector3 } from '@babylonjs/core';
 import { hoopsNodeRig } from '../../../tests/helpers/hoopsNodeRig';
-import { LocoAccent, stepAccent, accentIdle, accentFor, accentShape, ACCENT_SEC, ACCENT_GAP_SEC, STOP_FROM_MPS, STOP_DECEL_MPS2, START_ACCEL_MPS2 } from './locoAccent';
+import { LocoAccent, stepAccent, accentIdle, accentFor, accentShape, accentState, ACCENT_SEC, ACCENT_GAP_SEC, STOP_FROM_MPS, STOP_DECEL_MPS2, START_ACCEL_MPS2 } from './locoAccent';
 
 const DT = 1 / 60;
 /** Feed a speed trace (m/s a frame); the accents seen, with the frame each started. */
@@ -78,6 +78,39 @@ describe('the accent on the node rig (a run braked to a stop)', () => {
     expect(deepest).toBeGreaterThan(0.04);
     expect(leanMin, 'the chest leans back').toBeLessThan(-0.08);
     void hipsPost;
+    r.dispose();
+  });
+});
+
+// hoops-p04b: the tree's `state` is `override.state ?? current`, so a beat started without a state read as the loop under it, and the stop
+// accent fired by the same frame's brake sank the hips and re-solved the legs through the step-back gather (the rig traced the hero's
+// 8–10 000 deg/s thigh spike to this layer). A beat or a hold in flight is off the loop now.
+describe('a beat or a hold is off the loop (hoops-p04b)', () => {
+  it('accentState: null while the tree is busy, the loop state otherwise', () => {
+    expect(accentState({ busy: true, state: 'drive' })).toBeNull();
+    expect(accentState({ busy: false, state: 'drive' })).toBe('drive');
+    expect(accentState({ busy: false, state: null })).toBeNull();
+  });
+  it('a run braked to a stop UNDER a beat draws no accent, and the legs are the layers-before pose', () => {
+    const r = hoopsNodeRig('right');
+    (r.scene.getEngine() as unknown as { getDeltaTime: () => number }).getDeltaTime = () => 1000 / 60;
+    const tree = { busy: false, state: 'speed_dribble' as string | null };
+    const acc = LocoAccent.for(r.scene, r.sk, r.root, () => accentState(tree));
+    const legs = ['LeftUpLeg', 'RightUpLeg', 'LeftLeg', 'RightLeg'].map((n) => r.nodes[n]);
+    let pre: string[] = [], post: string[] = [];
+    const q = () => legs.map((n) => (n.rotationQuaternion ? n.rotationQuaternion.asArray().map((x) => x.toFixed(5)).join(',') : ''));
+    r.scene.onAfterAnimationsObservable.add(() => { pre = q(); }, undefined, true);
+    r.scene.onAfterAnimationsObservable.add(() => { post = q(); });
+    const frame = () => { r.scene.onBeforeAnimationsObservable.notifyObservers(r.scene); r.scene.onAfterAnimationsObservable.notifyObservers(r.scene); };
+    const speeds = [...hold(5.5, 1), ...ramp(5.5, 0, 0.3), ...hold(0, 0.6)];
+    let saw = false;
+    speeds.forEach((v, i) => {
+      if (i === 60) tree.busy = true;   // the gather beat starts on the brake's first frame
+      r.root.position.z -= v / 60; frame();
+      if (i >= 60 && acc.now) saw = true;   // (the run-up from standing draws its start accent: before the beat)
+      if (i >= 60) expect(post, `frame ${i}: the legs untouched`).toEqual(pre);
+    });
+    expect(saw).toBe(false);
     r.dispose();
   });
 });

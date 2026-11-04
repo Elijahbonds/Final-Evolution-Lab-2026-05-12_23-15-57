@@ -88,8 +88,15 @@ describe('DunkMode reads the stick ONLY on the live A press inside the slam wind
     expect(DUNK.split('readSlamVariant();').length - 1).toBe(1);   // the one call (the definition reads 'readSlamVariant(): void')
     expect(DUNK).toMatch(/if \(e\.t === 'button' && e\.btn === 'A' && e\.pressed && qteWindowOpen && !lob\.live && !echoA\) \{ if \(phase === 'cinematic' && slamLatch\.press\(clipTime, true\) === 'spent'\) console\.info\([^\n]*\); else \{ readSlamVariant\(\); slamNow\(ctx, clipTime\); \} \}/);
   });
-  it('slamVariantOf is read in readSlamVariant only, behind the knob, from the stick', () => {
-    expect(DUNK.split('slamVariantOf(').length - 1).toBe(1);
+  it('slamVariantOf is read in two places only, both behind the knob, both from the stick', () => {
+    // test changed (Phase 7b, the coordinator's decision): the REVERSE's turn starts on the way up, so the stick is read a second
+    // time — before the window, only with no trick called or armed, and it only starts the turn; the press still decides the finish
+    expect(DUNK.split('slamVariantOf(').length - 1).toBe(2);
+    const up = fn('reverseOnTheWayUp');
+    expect(up).toMatch(/!qteWindowOpen && clipTime >= REVERSE_TURN_FROM && !flight\.attempt\.tricks\.length && !armedAir/);
+    expect(up).toMatch(/slamVariantOf\(feel\('dunk\.slamVariants', SLAM_VARIANTS_ON\) >= 0\.5, stickX, stickY\) === 'reverse'/);
+    expect(up).toMatch(/turn === 'player'/);
+    expect(fn('fireTrick')).toMatch(/if \(reverseTurning\) \{ reverseTurning = false;/);   // a trick thrown after it stops the turn
     expect(fn('readSlamVariant')).toMatch(/slamVariantOf\(feel\('dunk\.slamVariants', SLAM_VARIANTS_ON\) >= 0\.5, stickX, stickY\)/);
     expect(fn('readSlamVariant')).toMatch(/turn !== 'player'/);
   });

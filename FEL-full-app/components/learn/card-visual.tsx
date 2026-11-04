@@ -43,7 +43,7 @@ export function CardVisual({ visual, accent, compact = false }: { visual: Visual
           {([visual.left, visual.right] as const).map((side, i) => (
             <div key={i} className="rounded-2xl border p-3 text-center md:p-5"
               style={{ borderColor: i === 0 ? 'rgba(255,255,255,0.14)' : `${accent}66`, background: i === 0 ? 'rgba(255,255,255,0.03)' : `${accent}12` }}>
-              <div className="text-[11px] font-bold uppercase tracking-[0.14em] md:text-sm" style={{ color: i === 0 ? 'rgba(255,255,255,0.55)' : accent }}>{side.label}</div>
+              <div className="text-[12px] font-bold uppercase tracking-[0.14em] md:text-sm" style={{ color: i === 0 ? 'rgba(255,255,255,0.55)' : accent }}>{side.label}</div>
               <div className="mt-1.5 text-[15px] font-semibold leading-snug text-white md:text-xl">{side.text}</div>
             </div>
           ))}
@@ -56,7 +56,7 @@ export function CardVisual({ visual, accent, compact = false }: { visual: Visual
             <span key={s} className="flex items-center gap-1.5">
               <span className="rounded-full border px-3 py-1.5 text-[13px] font-semibold text-white md:px-4 md:py-2 md:text-lg"
                 style={{ borderColor: `${accent}77`, background: `${accent}14` }}>{s}</span>
-              <span aria-hidden className="text-white/40">{i < visual.steps.length - 1 ? '→' : '↺'}</span>
+              <span aria-hidden className="text-white/50">{i < visual.steps.length - 1 ? '→' : '↺'}</span>
             </span>
           ))}
         </div>
@@ -68,7 +68,7 @@ export function CardVisual({ visual, accent, compact = false }: { visual: Visual
           <ol className="relative grid" style={{ gridTemplateColumns: `repeat(${visual.points.length}, minmax(0, 1fr))` }}>
             {visual.points.map((p) => (
               <li key={p.at + p.label} className="flex flex-col items-center px-1 text-center">
-                <span className="font-mono text-[11px] font-bold text-white/70 md:text-sm">{p.at}</span>
+                <span className="font-mono text-[12px] font-bold text-white/70 md:text-sm">{p.at}</span>
                 <span className="my-1 h-2.5 w-2.5 rounded-full md:h-3.5 md:w-3.5" style={{ background: accent, boxShadow: `0 0 10px ${accent}` }} />
                 <span className="text-[12px] leading-tight text-white/85 md:text-base">{p.label}</span>
               </li>

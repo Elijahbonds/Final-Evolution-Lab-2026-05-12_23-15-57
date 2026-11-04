@@ -152,7 +152,7 @@ export function FormReviewQueue({ api = FORM_REVIEW_QUEUE_API }: { api?: string 
   return (
     <div id={FORM_REVIEW_ANCHOR} className="fel-card space-y-3 rounded-xl p-4" data-form-review-queue>
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-fel-dim"><ScanLine className="h-3.5 w-3.5" /> Form reviews</div>
+        <div className="flex items-center gap-2 text-[12px] uppercase tracking-wider text-fel-dim"><ScanLine className="h-3.5 w-3.5" /> Form reviews</div>
         <div className="text-xs text-fel-gold" data-review-count>{waiting.length} to review</div>
       </div>
       {!data.available ? (

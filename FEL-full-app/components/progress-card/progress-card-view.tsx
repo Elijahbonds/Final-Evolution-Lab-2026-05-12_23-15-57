@@ -14,7 +14,7 @@ function Games({ games }: { games: CardGames }) {
   return (
     <div className="mt-4 rounded-2xl border border-white/[0.07] bg-[#0c0c11] p-3.5">
       <div className="flex items-baseline justify-between gap-2">
-        <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-[#FFD700]">Games</p>
+        <p className="font-mono text-[12px] font-bold uppercase tracking-[0.16em] text-[#FFD700]">Games</p>
         {games.runsLine && <p className="text-right text-[12px] text-fel-dim">{games.runsLine}</p>}
       </div>
       {games.modes.length > 0 ? (
@@ -27,14 +27,14 @@ function Games({ games }: { games: CardGames }) {
                 <span className="min-w-0">
                   <span className="block truncate text-[13px] font-semibold text-white/85">{m.name}</span>
                   {m.vsLine && (
-                    <span className="mt-0.5 flex items-start gap-1 text-[11.5px] leading-snug" style={{ color: tone }}>
+                    <span className="mt-0.5 flex items-start gap-1 text-[12px] leading-snug" style={{ color: tone }}>
                       {m.compare.trend && <Arrow aria-hidden className="mt-px h-3.5 w-3.5 shrink-0" strokeWidth={2.4} />}
                       <span>{m.vsLine}</span>
                     </span>
                   )}
                 </span>
                 <span className="shrink-0 text-right">
-                  <span className={`fel-heading text-[17px] font-black tabular-nums ${m.compare.thisWeek === null ? 'text-white/25' : 'text-[#FFD700]'}`}
+                  <span className={`fel-heading text-[17px] font-black tabular-nums ${m.compare.thisWeek === null ? 'text-white/50' : 'text-[#FFD700]'}`}
                     aria-label={m.compare.thisWeek === null ? 'not played this week' : undefined}>
                     {m.compare.thisWeek === null ? '—' : Math.round(m.compare.thisWeek).toLocaleString('en-US')}
                   </span>
@@ -65,7 +65,7 @@ export function ProgressCardView({ card }: { card: ProgressCard }) {
       className="rounded-3xl border border-white/[0.08] bg-[linear-gradient(160deg,rgba(11,42,51,0.55)_0%,#08080c_55%)] p-3.5 sm:p-5">
       <div className="flex items-baseline justify-between gap-2">
         <p className="font-sans text-[12px] font-semibold uppercase tracking-[0.14em] text-fel-dim">Your week</p>
-        <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#00E5FF]">{weekLabel(card)}</p>
+        <p className="font-mono text-[12px] uppercase tracking-[0.14em] text-[#00E5FF]">{weekLabel(card)}</p>
       </div>
       <h2 id="week-card-h" className="fel-heading mt-2 text-[21px] font-black leading-tight text-white">{card.headline}</h2>
       <p className="mt-1 text-[12px] text-fel-dim">Last 7 days against the 7 before. A dash is something nobody measured.</p>

@@ -41,7 +41,7 @@ export function CameraSprintTimer({ kind, variant, onTime }: {
           Record {timeWithBand(ok.timeS, ok.sdS)} (camera)
         </button>
       )}
-      <p className="flex items-center gap-1.5 text-[11px] text-white/45"><Video className="h-3.5 w-3.5" /> {ESTIMATE_LINE}</p>
+      <p className="flex items-center gap-1.5 text-[12px] text-white/50"><Video className="h-3.5 w-3.5" /> {ESTIMATE_LINE}</p>
     </div>
   );
 }

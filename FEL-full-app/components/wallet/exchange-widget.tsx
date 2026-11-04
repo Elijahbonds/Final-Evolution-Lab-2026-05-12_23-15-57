@@ -86,7 +86,7 @@ export function ExchangeWidget() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="flex items-center gap-2 rounded-xl bg-black/30 px-4 py-3 text-sm font-bold text-white">
             <Coins className="h-4 w-4 text-[#FFD700]" /> {coinCost.toLocaleString()}
-            <ArrowRight className="h-4 w-4 text-white/40" />
+            <ArrowRight className="h-4 w-4 text-white/50" />
             <Gem className="h-4 w-4 text-[#C79BFF]" /> {shards.toLocaleString()}
           </div>
           <button onClick={doExchange} disabled={busy || !affordable} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#A855F7] py-3 text-sm font-bold text-white transition hover:bg-[#9333EA] disabled:opacity-50">

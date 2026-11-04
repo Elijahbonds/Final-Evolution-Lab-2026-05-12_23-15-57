@@ -15,11 +15,11 @@ export default function FashionMode({ onPublish, submitLabel = 'Publish look' }:
       <h2 className="text-2xl font-black">Look</h2>
       <p className="mt-1 text-sm text-neutral-400">Pick up to 12 pieces you own, name the look, choose its colours.</p>
       <input value={title} maxLength={60} onChange={(e) => setTitle(e.target.value)} placeholder="Look name" className="mt-4 w-full rounded-lg bg-neutral-900 px-3 py-2 text-sm" />
-      <div className="mt-3 text-xs uppercase tracking-wider text-neutral-500">Your closet</div>
-      {owned === null ? <p className="text-sm text-neutral-500">Loading…</p> : owned.length === 0 ? <p className="text-sm text-neutral-500">Nothing owned yet — earn or buy wearables in the Closet first.</p> : (
+      <div className="mt-3 text-xs uppercase tracking-wider text-neutral-400">Your closet</div>
+      {owned === null ? <p className="text-sm text-neutral-400">Loading…</p> : owned.length === 0 ? <p className="text-sm text-neutral-400">Nothing owned yet — earn or buy wearables in the Closet first.</p> : (
         <div className="mt-2 flex flex-wrap gap-1.5">{owned.map((id) => <button key={id} onClick={() => setPicked((a) => a.includes(id) ? a.filter((x) => x !== id) : a.length >= 12 ? a : [...a, id])} className={`rounded-lg px-3 py-1.5 text-xs ${picked.includes(id) ? 'bg-pink-500 text-black' : 'bg-neutral-800'}`}>{id.replace(/_/g, ' ')}</button>)}</div>
       )}
-      <div className="mt-3 text-xs uppercase tracking-wider text-neutral-500">Palette</div>
+      <div className="mt-3 text-xs uppercase tracking-wider text-neutral-400">Palette</div>
       <div className="mt-2 flex flex-wrap gap-2">{SWATCHES.map((c) => <button key={c} onClick={() => setPalette((a) => a.includes(c) ? a.filter((x) => x !== c) : a.length >= 6 ? a : [...a, c])} className={`h-8 w-8 rounded-full ring-2 ${palette.includes(c) ? 'ring-white' : 'ring-transparent'}`} style={{ background: c }} aria-label={c} />)}</div>
       <input value={photoUrl} onChange={(e) => setPhotoUrl(e.target.value)} placeholder="Photo link (https://…, optional)" className="mt-3 w-full rounded-lg bg-neutral-900 px-3 py-2 text-sm" />
       <button disabled={!ready} onClick={() => onPublish({ title, lookId: `look_${Date.now()}`, wearableIds: picked, palette, photoUrl: photoUrl.trim() || undefined })} className="mt-6 rounded-xl bg-pink-500 px-6 py-3 font-bold text-black disabled:opacity-40">{submitLabel}</button>

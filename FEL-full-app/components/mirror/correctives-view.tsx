@@ -52,7 +52,7 @@ export function CorrectivesView({ youth, program, hold = null }: CorrectivesView
           <ArrowLeft className="h-[18px] w-[18px]" />
         </Link>
         <div className="min-w-0">
-          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-[#00E5FF]">The Mirror</p>
+          <p className="font-mono text-[12px] font-bold uppercase tracking-[0.22em] text-[#00E5FF]">The Mirror</p>
           <h1 className="fel-heading truncate text-[22px] font-black leading-none tracking-tight text-white md:text-[26px]">Correctives</h1>
         </div>
       </header>
@@ -88,7 +88,7 @@ export function CorrectivesView({ youth, program, hold = null }: CorrectivesView
           <section id="band-drills" aria-labelledby="band-drills-h" className="mt-6 rounded-2xl border border-white/8 bg-white/[0.02] p-5">
             <h2 id="band-drills-h" className="fel-heading text-[16px] font-bold text-white/85">{MIRROR_CORRECTIVE_SESSIONS[0].title}</h2>
             <p className="mt-1 text-[12.5px] leading-relaxed text-white/55">{MIRROR_CORRECTIVE_SESSIONS[0].what}</p>
-            <p className="mt-1 text-[12px] text-white/45">Dose: {doseLadderLine()}</p>
+            <p className="mt-1 text-[12px] text-white/50">Dose: {doseLadderLine()}</p>
             <ol className="mt-3 grid gap-3">
               {SIGNALS.map((sig) => {
                 const d = BAND_DRILLS[sig];
@@ -120,7 +120,7 @@ export function CorrectivesView({ youth, program, hold = null }: CorrectivesView
                     <p className="mt-0.5 text-white/60">{sentence(r.tool)} {sentence(r.pin)}</p>
                     <p className="mt-0.5 text-white/60">{sentence(r.stretch)}</p>
                     <p className="mt-0.5 text-white/55">Breath: {sentence(r.breath)}</p>
-                    <p className="mt-0.5 text-white/45">{r.avoid}</p>
+                    <p className="mt-0.5 text-white/50">{r.avoid}</p>
                   </li>
                 );
               })}
@@ -149,7 +149,7 @@ export function CorrectivesView({ youth, program, hold = null }: CorrectivesView
                         <ul className="mt-0.5 list-disc pl-5 text-white/60">
                           {b.movements.map((m) => <li key={m}>{m}</li>)}
                         </ul>
-                        <p className="mt-0.5 text-white/45">{b.because}</p>
+                        <p className="mt-0.5 text-white/50">{b.because}</p>
                       </li>
                     ))}
                   </ol>
@@ -157,7 +157,7 @@ export function CorrectivesView({ youth, program, hold = null }: CorrectivesView
                 {program.cycle.line && <p data-retest-schedule className="mt-3 text-[12.5px] leading-relaxed text-white/70">{program.cycle.line}</p>}
                 {program.cycle.lastRetest && program.cycle.lastRetest.lines.length > 0 && (
                   <div data-last-retest className="mt-3">
-                    <p className="font-mono text-[9.5px] font-bold uppercase tracking-[0.18em] text-white/40">Last retest</p>
+                    <p className="font-mono text-[12px] font-bold uppercase tracking-[0.18em] text-white/50">Last retest</p>
                     <ul className="mt-1 grid gap-1 text-[12.5px] text-white/60">
                       {program.cycle.lastRetest.lines.map((l) => <li key={l.zone}>{l.title}: {l.line}</li>)}
                     </ul>
@@ -165,10 +165,10 @@ export function CorrectivesView({ youth, program, hold = null }: CorrectivesView
                 )}
               </>
             ) : null}
-            <p className="mt-3 text-[11.5px] leading-relaxed text-white/40">{program.disclaimer}</p>
+            <p className="mt-3 text-[12px] leading-relaxed text-white/50">{program.disclaimer}</p>
           </section>
 
-          <p className="mt-4 text-[11.5px] leading-relaxed text-white/40">{CORRECTIVE_CAUTION}</p>
+          <p className="mt-4 text-[12px] leading-relaxed text-white/50">{CORRECTIVE_CAUTION}</p>
         </>
       )}
 

@@ -107,7 +107,17 @@ const UA = 'AgeScreenTest/1.0';
 // untouched; AskedProgram, additive) at 115a8eaf; pinned at cc22c276, this lane's merge of lane/program-ask (finish-release at
 // 6a3933ba), the first commit carrying every pending file above.
 // MERGE (coordinator, 2026-11-03): lane/program-ask-2 + finish-release (group-booking): both pending files; pinned at the merge.
-const PARENT = 'f093256cb2b4266f4a687d4f5440d60d81614e3f';
+// BBS-04 (lane/plat-bbs04, 2026-11-03) prisma/pending/2026-11-03-hoops-cam.sql (pending SQL only; schema.prisma untouched;
+// HoopsCamSession, additive) at 72693f90, the lane commit carrying it on top of every file above (cut from finish-release
+// at 67169fd2). lane/plat-p10's teacher.sql is not on this base: whichever lands second re-pins at its merge.
+// TEACHER PLATFORM (lane/plat-p10, 2026-11-03) prisma/pending/2026-11-03-teacher.sql (pending SQL only; schema.prisma
+// untouched; TeacherApplication + TeacherRole + TeachCourse, additive) at 882bf0f9, the lane commit carrying it on top of
+// every file above.
+// Both lanes merged at 91ba351b (lane/plat-p10's merge of lane/finish-release), the first commit carrying every pending
+// file above.
+// MERGE (lane/plat-bbs04 + finish-release 05c73483, 2026-11-03): hoops-cam.sql + teacher.sql, both pending files; pinned at
+// the merge (pinned at the merge commit). SQL HARDEN (2026-11-03): both pending files hardened (RLS, guards); re-pinned there.
+const PARENT = '4dae9fd412f6d4de17f2581029d40e0af25a655f';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {

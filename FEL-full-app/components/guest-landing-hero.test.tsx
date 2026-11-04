@@ -42,7 +42,9 @@ describe('the signed-out landing on / (GuestLandingHero)', () => {
     expect(html).toContain('PLAY NOW');
     expect(html).toContain('href="/try"');
     expect(html).toContain('href="/login"');
-    expect(html).toContain('60 SECONDS');
+    expect(html).toContain('Dunk in Venice now.<br/>Then train to dunk for real. <span');
+    expect(html).toContain('Built by pro dunker Elijah Bonds.</span>');
+    expect(html).not.toContain('60 SECONDS');
   });
 
   it("with the switch 'true', the form is back: the switch is what hides it", () => {

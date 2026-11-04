@@ -123,7 +123,7 @@ function PartyBar({ s, place, onOpen }: { s: PartyState; place: DockPlace; onOpe
             {s.members.slice(0, 6).map((m) => <Avatar key={m.peer} name={m.name} pub={m.pub} size={tucked ? 22 : 26} dim={!m.connected} speaking={!!v.speaking[m.peer]} />)}
             {!s.members.length ? <Users className="h-5 w-5 text-white/70" /> : null}
           </span>
-          <span className="whitespace-nowrap font-mono text-[11px] font-bold text-white/80">{status}</span>
+          <span className="whitespace-nowrap font-mono text-[12px] font-bold text-white/80">{status}</span>
         </button>
         {v.joined ? (
           <button type="button" data-testid="party-bar-mute" aria-pressed={v.muted} aria-label={v.muted ? 'Unmute your microphone' : 'Mute your microphone'}

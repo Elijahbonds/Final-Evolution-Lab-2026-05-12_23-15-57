@@ -60,7 +60,7 @@ export function PadChips({ bus, className = 'left-3 bottom-3', toast: toastOn = 
           <span
             key={p.slot}
             data-pad-chip={`P${p.slot + 1}`}
-            className={`rounded-full border px-2 py-0.5 text-[10px] ${p.unsupported ? 'border-[#ffd75e]/60 text-[#ffd75e]' : 'border-[#22d3ee]/50 text-[#22d3ee]'}`}
+            className={`rounded-full border px-2 py-0.5 text-[12px] ${p.unsupported ? 'border-[#ffd75e]/60 text-[#ffd75e]' : 'border-[#22d3ee]/50 text-[#22d3ee]'}`}
             style={{ background: '#000000aa' }}
           >
             P{p.slot + 1} {p.name}
@@ -68,7 +68,7 @@ export function PadChips({ bus, className = 'left-3 bottom-3', toast: toastOn = 
         ))}
       </div>
       {view.warnings.map((p) => (
-        <span key={`why-${p.slot}`} className="max-w-[320px] rounded bg-black/70 px-2 py-1 text-[10px] leading-snug text-[#ffd75e]">
+        <span key={`why-${p.slot}`} className="max-w-[320px] rounded bg-black/70 px-2 py-1 text-[12px] leading-snug text-[#ffd75e]">
           P{p.slot + 1}: {p.unsupported}
         </span>
       ))}

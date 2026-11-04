@@ -22,7 +22,7 @@ export function MasteryBadge({ tierIndex, className = '' }: { tierIndex: number;
   const color = TIER_COLOR[tierIndex] ?? '#FFD700';
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[10px] font-bold ${className}`}
+      className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[12px] font-bold ${className}`}
       style={{ background: `${color}1c`, color, border: `1px solid ${color}66` }}
       title={`Mastery: ${TIER_NAME[tierIndex]}`}
     >

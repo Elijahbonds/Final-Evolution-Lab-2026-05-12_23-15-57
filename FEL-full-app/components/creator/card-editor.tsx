@@ -144,21 +144,21 @@ export function CardEditor() {
 
         {/* lane 5 — the scouting profile: which blocks show, and the pinned highlights */}
         <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.02] p-3">
-          <div className="font-mono text-[10px] uppercase tracking-widest text-white/40">What your card shows</div>
+          <div className="font-mono text-[12px] uppercase tracking-widest text-white/50">What your card shows</div>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {STAT_BLOCKS.map((k) => (
-              <button key={k} type="button" onClick={() => setShowStats((s) => ({ ...s, [k]: !s[k] }))} className={`rounded-lg border px-2.5 py-1 text-xs capitalize ${showStats[k] ? 'border-[#00E5FF]/50 bg-[#00E5FF]/10 text-[#00E5FF]' : 'border-white/10 text-white/40'}`}>{k === 'prq' ? 'PRQ profile' : k}</button>
+              <button key={k} type="button" onClick={() => setShowStats((s) => ({ ...s, [k]: !s[k] }))} className={`rounded-lg border px-2.5 py-1 text-xs capitalize ${showStats[k] ? 'border-[#00E5FF]/50 bg-[#00E5FF]/10 text-[#00E5FF]' : 'border-white/10 text-white/50'}`}>{k === 'prq' ? 'PRQ profile' : k}</button>
             ))}
           </div>
-          <div className="mt-3 font-mono text-[10px] uppercase tracking-widest text-white/40">Highlights · pin up to {MAX_HIGHLIGHTS}</div>
-          {candidates.length === 0 && <p className="mt-1 text-xs text-white/40">Play a mode — your personal bests, wins and signature attempts show up here to pin.</p>}
+          <div className="mt-3 font-mono text-[12px] uppercase tracking-widest text-white/50">Highlights · pin up to {MAX_HIGHLIGHTS}</div>
+          {candidates.length === 0 && <p className="mt-1 text-xs text-white/50">Play a mode — your personal bests, wins and signature attempts show up here to pin.</p>}
           <div className="mt-1.5 max-h-44 space-y-1 overflow-y-auto">
             {candidates.slice(0, 20).map((c) => {
               const key = `${c.kind}:${c.id}`; const pinned = pins.find((h) => `${h.kind}:${h.id}` === key);
               return (
                 <div key={key} className="flex items-center gap-2 text-xs">
                   <button type="button" onClick={() => setPins((ps) => pinned ? ps.filter((h) => `${h.kind}:${h.id}` !== key) : ps.length >= MAX_HIGHLIGHTS ? ps : [...ps, { ...c, label: null }])} className={`rounded-md border px-2 py-1 ${pinned ? 'border-[#FFD700]/50 text-[#FFD700]' : 'border-white/10 text-white/50'}`}>{pinned ? 'Pinned' : 'Pin'}</button>
-                  <span className="flex-1 text-white/75">{c.kind === 'signature' ? 'Signature · ' : ''}{mpModeLabel(c.mode)}{c.won ? ' · W' : ''} <span className="font-mono text-white/50">{c.score}</span> <span className="text-white/30">{new Date(c.at).toLocaleDateString()}</span></span>
+                  <span className="flex-1 text-white/75">{c.kind === 'signature' ? 'Signature · ' : ''}{mpModeLabel(c.mode)}{c.won ? ' · W' : ''} <span className="font-mono text-white/50">{c.score}</span> <span className="text-white/50">{new Date(c.at).toLocaleDateString()}</span></span>
                   {pinned && <input value={pinned.label ?? ''} maxLength={40} placeholder="label" onChange={(e) => setPins((ps) => ps.map((h) => `${h.kind}:${h.id}` === key ? { ...h, label: e.target.value || null } : h))} className="w-28 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-white" />}
                 </div>
               );
@@ -190,7 +190,7 @@ export function CardEditor() {
 
       {/* live preview */}
       <div className="flex flex-col items-center justify-start">
-        <span className="mb-3 font-mono text-[11px] uppercase tracking-widest text-white/40">Live preview</span>
+        <span className="mb-3 font-mono text-[12px] uppercase tracking-widest text-white/50">Live preview</span>
         <CreatorCard card={preview} />
       </div>
     </div>
@@ -200,7 +200,7 @@ export function CardEditor() {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="mt-3">
-      <label className="font-mono text-[11px] uppercase tracking-wider text-white/50">{label}</label>
+      <label className="font-mono text-[12px] uppercase tracking-wider text-white/50">{label}</label>
       <div className="mt-1">{children}</div>
     </div>
   );

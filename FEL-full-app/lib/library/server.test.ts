@@ -146,7 +146,8 @@ describe('after the pending SQL', () => {
     const id = (s as { submission: { id: string } }).submission.id;
     const done = await server.reviewAct('owner', { action: 'moderate', submissionId: id, decision: 'approved' });
     expect(done).toMatchObject({ ok: true, written: 1 });
-    const found = await server.searchLibrary(athlete, new URLSearchParams('q=wall drill'));
+    // (DEMO-LOOPS-8: by its own name — a generic "wall drill" now ranks the moving One Arm Against Wall first)
+    const found = await server.searchLibrary(athlete, new URLSearchParams('q=Coach Bonds Wall Drill'));
     expect(found.hits[0]).toMatchObject({ name: 'Coach Bonds Wall Drill', source: { kind: 'coach-submitted' }, review: { status: 'approved' } });
     expect(await server.reviewAct('owner', { action: 'moderate', submissionId: id, decision: 'approved' })).toMatchObject({ status: 404 });
   });

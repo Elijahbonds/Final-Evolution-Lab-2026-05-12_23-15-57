@@ -69,7 +69,7 @@ export function BodyControls({ body, frame, scanOwned, numbersSaved, onBody, onF
             onChange={(v) => onFrame({ ...f, heightScale: v }, 'frame:height')} />
           <NumSlider label="Build" value={f.buildScale} min={COSMETIC_CLAMP.build[0]} max={COSMETIC_CLAMP.build[1]} step={0.005}
             onChange={(v) => onFrame({ ...f, buildScale: v }, 'frame:build')} />
-          <p className="text-[10px] leading-snug text-white/40">
+          <p className="text-[12px] leading-snug text-white/50">
             Looks only: ranked and fixed-frame modes play every body at 1.0.
             {studioEdit ? STUDIO_EDIT_FRAME_NOTE : !numbersSaved && ' Height and build stay on this device unless you allow saving look numbers above.'}
           </p>
@@ -96,7 +96,7 @@ export function EyeControls({ eyes, onChange }: { eyes: CreatorEyes | undefined;
         <span className="w-24 shrink-0">Pupil</span>
         {PUPIL_SHAPES.map((p) => (
           <button key={p} type="button" aria-pressed={e.pupil === p} onClick={() => set({ pupil: p })}
-            className="rounded-full px-3 py-1 text-[11px] transition"
+            className="rounded-full px-3 py-1 text-[12px] transition"
             style={{ backgroundColor: e.pupil === p ? '#00E5FF' : 'rgba(255,255,255,0.05)', color: e.pupil === p ? '#050505' : 'rgba(255,255,255,0.75)' }}>{PUPIL_LABEL[p]}</button>
         ))}
       </div>
@@ -126,7 +126,7 @@ export function HideControls({ hide, onChange }: { hide: Partial<Record<HideKey,
           );
         })}
       </div>
-      <p className="mt-1.5 text-[10px] leading-snug text-white/40">For masks, helmets and mascot heads built from parts. Looks only — nothing about how you play changes.</p>
+      <p className="mt-1.5 text-[12px] leading-snug text-white/50">For masks, helmets and mascot heads built from parts. Looks only — nothing about how you play changes.</p>
     </div>
   );
 }

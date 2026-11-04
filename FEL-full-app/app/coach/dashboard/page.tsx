@@ -5,7 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { loginPath } from '@/lib/auth/safeNext';
 import { prisma } from '@/lib/db';
 import { isCoachStoreEnabled } from '@/lib/flags';
-import { isAllowlistedCoach } from '@/lib/coach-store/coaches';
+import { isStoreCoach } from '@/lib/coach-store/gate';
 import { isMissingTable, logStoreUnavailable } from '@/lib/coach-store/gate';
 import { reviewUrgency } from '@/lib/coach-store/reviews';
 import { reviewHref, reviewStudioOpen } from '@/lib/coach-store/reviewLink';
@@ -23,7 +23,7 @@ export default async function DashboardPage() {
   const session = await getServerSession(authOptions);
   const userId = (session?.user as { id?: string } | undefined)?.id;
   if (!userId) redirect(loginPath('/coach/dashboard'));
-  if (!isAllowlistedCoach(userId)) notFound();
+  if (!(await isStoreCoach(userId))) notFound();
   const now = new Date();
   let bookings: Awaited<ReturnType<typeof prisma.booking.findMany>> = [];
   try {

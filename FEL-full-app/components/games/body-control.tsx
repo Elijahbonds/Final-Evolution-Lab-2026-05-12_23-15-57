@@ -71,11 +71,11 @@ function Moves({ view }: { view: SessionView }) {
             className={`flex items-baseline justify-between gap-2 ${i === view.lines.length && view.lines.length ? 'border-t border-white/[0.08] pt-1.5' : ''}`}
           >
             <span className="truncate text-[12.5px] text-white/75">{l.move}</span>
-            <span className="shrink-0 font-mono text-[10px] font-bold uppercase text-[#00E5FF]">{l.verb}</span>
+            <span className="shrink-0 font-mono text-[12px] font-bold uppercase text-[#00E5FF]">{l.verb}</span>
           </li>
         ))}
       </ul>
-      {notes.map((n) => <p key={n} className="mt-2 text-[11px] leading-snug text-white/40">{n}</p>)}
+      {notes.map((n) => <p key={n} className="mt-2 text-[12px] leading-snug text-white/50">{n}</p>)}
     </>
   );
 }
@@ -115,7 +115,7 @@ export function BodyControl({ compact = false }: { compact?: boolean }) {
         onClick={(e) => { e.currentTarget.blur(); toggle(); }}
         aria-pressed={on}
         aria-label={on ? 'Turn body play off' : 'Play with your body'}
-        className={`inline-flex items-center gap-2 rounded-lg border px-2.5 py-1.5 font-mono text-[10.5px]
+        className={`inline-flex items-center gap-2 rounded-lg border px-2.5 py-1.5 font-mono text-[12px]
                     font-bold uppercase tracking-[0.12em] transition-colors ${compact ? '' : 'sm:px-3'}`}
         style={{
           borderColor: on ? 'rgba(0,255,157,0.45)' : 'rgba(255,255,255,0.12)',
@@ -139,7 +139,7 @@ export function BodyControl({ compact = false }: { compact?: boolean }) {
                         border-white/12 bg-black/85 p-4 backdrop-blur-xl sm:inset-x-auto sm:right-4 sm:w-[340px]">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="font-mono text-[9.5px] font-bold uppercase tracking-[0.18em] text-[#00FF9D]">
+              <p className="font-mono text-[12px] font-bold uppercase tracking-[0.18em] text-[#00FF9D]">
                 Body control
               </p>
               <p className="mt-1 text-[13px] font-semibold leading-tight text-white">
@@ -156,7 +156,7 @@ export function BodyControl({ compact = false }: { compact?: boolean }) {
               type="button"
               onClick={() => setShowCard(false)}
               aria-label="Hide the move list"
-              className="shrink-0 rounded-md p-1 text-white/40 transition-colors hover:text-white"
+              className="shrink-0 rounded-md p-1 text-white/50 transition-colors hover:text-white"
             >
               <X className="h-4 w-4" />
             </button>
@@ -169,7 +169,7 @@ export function BodyControl({ compact = false }: { compact?: boolean }) {
               <button
                 type="button"
                 onClick={(e) => { e.currentTarget.blur(); bodyPlay.again(); }}
-                className="rounded-lg border border-white/12 py-2 font-mono text-[10px] font-bold
+                className="rounded-lg border border-white/12 py-2 font-mono text-[12px] font-bold
                            uppercase tracking-[0.14em] text-white/50 transition-colors hover:text-white"
               >
                 Check my space again
@@ -177,7 +177,7 @@ export function BodyControl({ compact = false }: { compact?: boolean }) {
               <button
                 type="button"
                 onClick={(e) => { e.currentTarget.blur(); bodyPlay.end(view.key ?? play.key); setShowCard(false); }}
-                className="rounded-lg border border-white/12 py-2 font-mono text-[10px] font-bold
+                className="rounded-lg border border-white/12 py-2 font-mono text-[12px] font-bold
                            uppercase tracking-[0.14em] text-white/50 transition-colors hover:text-white"
               >
                 Camera off
@@ -188,7 +188,7 @@ export function BodyControl({ compact = false }: { compact?: boolean }) {
       )}
 
       {state === 'error' && detail && (
-        <span className="font-mono text-[10px] text-[#FF3366]">{detail}</span>
+        <span className="font-mono text-[12px] text-[#FF3366]">{detail}</span>
       )}
     </>
   );

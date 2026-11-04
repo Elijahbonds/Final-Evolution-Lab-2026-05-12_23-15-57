@@ -7,6 +7,8 @@
 //   BannerSlot — ONE banner with an expiry. Every banner used to start its own `setTimeout` that cleared the banner
 //                whatever it said by then, so an older timer wiped a newer banner early.
 
+import { readableMs } from '../../readable/rules';
+
 /** Callbacks due after `sec` of whatever clock `tick` is fed. */
 export class GameTimers {
   private items: { left: number; fn: () => void }[] = [];
@@ -36,7 +38,9 @@ export class BannerSlot {
 
   /** Show `text` until `clock + sec` (Infinity = until replaced or cleared). Returns the text to publish. */
   show(text: string, sec: number, clock: number): string {
-    this.text = text; this.until = clock + Math.max(0, sec);
+    // READABLE (2026-11-02): up for at least its read time (words × 0.3 s + 1 s); Infinity stays Infinity, and a newer
+    // banner still replaces this one at once
+    this.text = text; this.until = clock + Math.max(0, text ? readableMs(text, sec * 1000) / 1000 : sec);
     return text;
   }
 

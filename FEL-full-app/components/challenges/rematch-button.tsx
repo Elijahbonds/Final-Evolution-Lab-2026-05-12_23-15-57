@@ -48,8 +48,8 @@ export function RematchButton({ code, receipt, canShowName }: { code: string; re
     return (
       <div className="rounded-xl border border-[#00FF9D]/40 bg-[#00FF9D]/10 px-4 py-3 text-left" data-rematch="sent">
         <div className="flex items-center gap-2 font-mono text-xs text-[#00FF9D]"><Check className="h-4 w-4" aria-hidden /> Rematch sent{state.copied ? ' — link copied' : ''}</div>
-        <div className="mt-1 break-all font-mono text-[11px] text-white/60">{state.url}</div>
-        <div className="mt-1 text-[11px] text-white/40">Open for 48 hours.</div>
+        <div className="mt-1 break-all font-mono text-[12px] text-white/60">{state.url}</div>
+        <div className="mt-1 text-[12px] text-white/50">Open for 48 hours.</div>
       </div>
     );
   }

@@ -9,7 +9,7 @@ import { FURTHER_READING, FURTHER_READING_HEADING, FURTHER_READING_NOTE, citatio
 export function FurtherReading() {
   return (
     <section aria-labelledby="further-reading-h" data-further-reading className="mt-8 border-t border-white/[0.06] pt-5">
-      <h2 id="further-reading-h" className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-fel-dim">
+      <h2 id="further-reading-h" className="font-mono text-[12px] font-bold uppercase tracking-[0.18em] text-fel-dim">
         {FURTHER_READING_HEADING}
       </h2>
       <ul className="mt-2 space-y-1 text-[13px] leading-relaxed text-white/60">

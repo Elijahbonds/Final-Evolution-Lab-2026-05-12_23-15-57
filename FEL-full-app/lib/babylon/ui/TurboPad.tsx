@@ -44,7 +44,7 @@ export function TurboPad({ bus, shape }: { bus: InputBus; shape: 'pill' | 'round
     ctl.current.press(); setHeld(true);
   };
   const up = () => { ctl.current.release(); setHeld(false); };
-  const size = shape === 'round' ? 'h-14 w-14 rounded-full text-[10px]' : 'h-[52px] w-[104px] rounded-full text-[12px]';
+  const size = shape === 'round' ? 'h-14 w-14 rounded-full text-[12px]' : 'h-[52px] w-[104px] rounded-full text-[12px]';
   return (
     <button data-turbo-pad aria-label="Turbo (R2), hold" aria-pressed={held}
       onPointerDown={down} onPointerUp={up} onPointerCancel={up} onPointerLeave={up} onContextMenu={(e) => e.preventDefault()}

@@ -103,7 +103,7 @@ export function ChallengeLanding({
       <div className="space-y-5">
         {v2.result && <ChallengeResultCard {...v2.result} />}
         <div className="fel-panel rounded-2xl p-8 text-center" data-challenge-state="expired">
-          <Clock className="mx-auto h-10 w-10 text-white/40" aria-hidden />
+          <Clock className="mx-auto h-10 w-10 text-white/50" aria-hidden />
           <h1 className="mt-3 fel-heading text-2xl font-bold text-white">This challenge ended</h1>
           <p className="mt-2 text-sm text-white/60">It was open for 48 hours. The score to beat was {scoreText} in {title}.</p>
           <Link href={isAuthed ? '/play' : '/try'} className="mt-6 inline-block rounded-lg bg-[#00E5FF] px-6 py-3 font-bold text-black">
@@ -122,7 +122,7 @@ export function ChallengeLanding({
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#FF3366]/15">
           {v2.rep ? <Ruler className="h-7 w-7 text-[#FF3366]" /> : <Swords className="h-7 w-7 text-[#FF3366]" />}
         </div>
-        <div className="mt-4 font-mono text-[11px] uppercase tracking-[0.2em] text-white/40">
+        <div className="mt-4 font-mono text-[12px] uppercase tracking-[0.2em] text-white/50">
           {v2.answers ? 'Rematch' : 'You’ve been challenged'}
         </div>
         <h1 className="mt-1 fel-heading text-3xl font-bold text-white">{heading}</h1>
@@ -133,7 +133,7 @@ export function ChallengeLanding({
           <Trophy className="h-4 w-4 text-[#FFD700]" />
           <span className="font-mono text-sm text-[#FFD700]">{v2.rep ? 'To beat' : 'Score to beat'}: {scoreText}</span>
         </div>
-        {left && <div className="mt-3 font-mono text-[11px] text-white/45" data-time-left>{left}</div>}
+        {left && <div className="mt-3 font-mono text-[12px] text-white/50" data-time-left>{left}</div>}
 
         {!(v2.blocked && ctaIsSignup) && (
           <a
@@ -148,12 +148,12 @@ export function ChallengeLanding({
         {v2.rep && isAuthed && <RepAnswer code={code} />}
 
         {!isAuthed && guestHref && !v2.rep && (
-          <p className="mt-3 text-[11px] text-white/40">
+          <p className="mt-3 text-[12px] text-white/50">
             No account needed to play. Sign up after, only to save it or send a rematch.
           </p>
         )}
         {v2.rep && (
-          <p className="mt-3 text-[11px] text-white/40">
+          <p className="mt-3 text-[12px] text-white/50">
             {isAuthed
               ? 'Your best jump measured since this was sent counts. Measure, then check here.'
               : 'Jump numbers are saved for adults who turn saving on. Everyone else keeps theirs on their phone.'}
