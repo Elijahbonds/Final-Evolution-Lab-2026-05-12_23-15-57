@@ -1347,6 +1347,27 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/visual/crowd/crowdFront.ts CROWD_FORGE_FRONT_ON',
     hint: 'On: the front row of every stand is forge rivals (about 31k triangles each), the five Meshy fans sit behind. Off: the Meshy crowd in every row, no forge body loads. Read when the crowd bakes (next venue).',
   },
+  // VENUE-QUALITY v1 (box overlay 2026-10-31, switch-on 2026-11-03)
+  {
+    id: 'venue.veniceHoopsV1', label: 'Venice sand for 1v1 / 3v3 on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Venue · quality',
+    source: 'lib/babylon/scene/venueQualityV1.ts VQ',
+    hint: 'On: 1v1, 3v3 and carnival use the dunk Venice boardwalk (sand, no kit palms / bushes / lawn tufts). Off: the lawn.',
+  },
+  {
+    id: 'venue.iblEnvV1', label: 'Prefiltered .env sky light on (1) / off (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Venue · quality',
+    source: 'lib/babylon/scene/venueQualityV1.ts VQ',
+    hint: 'On: each mood lights from a prefiltered CC0 .env (public/env). Off: the procedural environment light.',
+  },
+  {
+    id: 'venue.stageLmV1', label: 'AO-baked arena stage pieces on (1) / off (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Venue · quality',
+    source: 'lib/babylon/scene/venueQualityV1.ts VQ',
+    hint: 'On: mini-arena wall / column / statue / banner / block / gate load the AO-baked copies in public/models/props/mini-arena-lm-v1. Off: the originals.',
+  },
+  {
+    id: 'venue.freezeV1', label: 'Freeze static venue meshes on (1) / off (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Venue · quality',
+    source: 'lib/babylon/scene/venueQualityV1.ts VQ',
+    hint: 'On: static venue meshes freeze their world matrices. Off: as before.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));
