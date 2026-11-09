@@ -14,6 +14,7 @@ import { checkTerms, coachTermsView } from '@/lib/payments/terms';
 import { coachFeatureRefusal } from '@/lib/coach-business/planServer';
 import { connectFor, keepConnect, updateConnect } from '@/lib/coach-business/store';
 import { bad, connectStripe, isVerifiedAdultUser, json, notReady, planDb, rawDb, readJson, currentUserId } from '@/lib/coach-business/server';
+import { sellerGate } from '@/lib/seller/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,6 +56,9 @@ export async function GET() {
   const userId = await currentUserId();
   if (!userId) return bad('unauthorized', 401);
   if (!rateLimit(`coach-business:connect-status:${userId}`, 30, 60_000).ok) return bad('rate_limited', 429);
+  // SELLER-18-1 (S-2): a seller action — the coach must be a verified adult (unknown age is refused).
+  const seller = await sellerGate(userId, 'coach_business');
+  if (seller) return seller;
   const db = rawDb();
   const off = await notReady(db);
   if (off) return off;

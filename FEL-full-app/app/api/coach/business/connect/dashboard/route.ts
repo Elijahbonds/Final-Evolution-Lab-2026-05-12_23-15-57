@@ -4,6 +4,7 @@ import { rateLimit } from '@/lib/rate-limit';
 import { connectGate, expressDashboardLink, paymentsClosed } from '@/lib/coach-business/connect';
 import { connectFor } from '@/lib/coach-business/store';
 import { bad, connectStripe, json, notReady, rawDb, currentUserId } from '@/lib/coach-business/server';
+import { sellerGate } from '@/lib/seller/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +14,9 @@ export async function POST() {
   const userId = await currentUserId();
   if (!userId) return bad('unauthorized', 401);
   if (!rateLimit(`coach-business:dash:${userId}`, 10, 60_000).ok) return bad('rate_limited', 429);
+  // SELLER-18-1 (S-2): a seller action — the coach must be a verified adult (unknown age is refused).
+  const seller = await sellerGate(userId, 'coach_business');
+  if (seller) return seller;
   const db = rawDb();
   const off = await notReady(db);
   if (off) return off;

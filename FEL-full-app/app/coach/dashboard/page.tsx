@@ -15,6 +15,8 @@ import { platformFeePolicy } from '@/lib/coach-business/config';
 import { platformFeeLabel } from '@/lib/coach-business/fees';
 import { readCoachPlan } from '@/lib/coach-business/planServer';
 import { planDb } from '@/lib/coach-business/server';
+import { sellerNeedsBirthYear } from '@/lib/seller/server';
+import { SellerBirthYearPrompt } from '@/components/seller/birth-year-prompt';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,7 +25,13 @@ export default async function DashboardPage() {
   const session = await getServerSession(authOptions);
   const userId = (session?.user as { id?: string } | undefined)?.id;
   if (!userId) redirect(loginPath('/coach/dashboard'));
-  if (!(await isStoreCoach(userId))) notFound();
+  // SELLER-18-1 v2: a coach with no birth year is asked for one — instead of a 404 once SELLER_ADULT_GATE_ENABLED refuses
+  // them, and as a line on the dashboard while it is off. Anyone else without the gate's yes still gets the 404.
+  const askYear = await sellerNeedsBirthYear(userId, 'coach_store');
+  if (!(await isStoreCoach(userId))) {
+    if (askYear) return <main className="mx-auto max-w-3xl px-4 py-8 text-white"><SellerBirthYearPrompt next="/coach/dashboard" /></main>;
+    notFound();
+  }
   const now = new Date();
   let bookings: Awaited<ReturnType<typeof prisma.booking.findMany>> = [];
   try {
@@ -39,6 +47,7 @@ export default async function DashboardPage() {
     <main className="mx-auto max-w-3xl px-4 py-8 text-white">
       <h1 className="text-2xl font-black">Today</h1>
       <p className="mt-2 text-sm">All times Pacific.</p>
+      {askYear ? <SellerBirthYearPrompt next="/coach/dashboard" /> : null}
       <p className="mt-2 text-sm"><Link className="underline" href="/coach/dashboard/settings">Hours and days off</Link></p>
       <p className="mt-2"><SyncWithStripe /></p>
       <p className="mt-2 text-sm">Balance (accrued) ${(earned / 100).toFixed(2)}. Payouts are manual for now.</p>
