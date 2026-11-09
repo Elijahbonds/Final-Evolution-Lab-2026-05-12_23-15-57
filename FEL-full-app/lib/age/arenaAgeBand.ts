@@ -17,8 +17,7 @@ export type ArenaBand = 'adult' | 'teen';
 export const ARENA_BIRTH_YEAR_HREF = `/age?next=${encodeURIComponent('/arena')}`;
 
 /**
- * DRAFT copy, pending Elijah's review. A refusal always says why (PM decision 4: no silent hard-block); an unknown age
- * is told how to fix it.
+ * A refusal always says why (PM decision 4: no silent hard-block); an unknown age is told how to fix it.
  */
 export const ARENA_AGE_MESSAGES: Record<BuyerAgeRefusal, string> = {
   under_18: 'Entry duels are for players 18 and over. Practice duels are free to play.',

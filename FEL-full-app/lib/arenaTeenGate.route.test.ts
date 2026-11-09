@@ -30,7 +30,9 @@ vi.mock('@/lib/arena', async (orig) => ({
   appendMatchEvent: vi.fn(async () => undefined),
 }));
 const tx = {
+  $queryRawUnsafe: async () => [],
   competitionMatch: {
+    count: async () => 0,
     create: async ({ data }: { data: Record<string, unknown> }) => { h.created.push(data); return { id: `m${h.created.length}`, ...data }; },
     findUnique: async () => (h.match ? { ...h.match } : null),
     update: async ({ data }: { data: Record<string, unknown> }) => ({ ...h.match, ...data }),

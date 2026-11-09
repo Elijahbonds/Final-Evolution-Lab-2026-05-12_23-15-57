@@ -6,13 +6,12 @@
  *   - T1: no entry of any kind — entryFeeCents 0, rakePercent 0, no arenaLockEntry; a teen duel never debits LC.
  *   - T2: a win pays a FIXED, game-funded prize set here on the server. No pot, no house cut, nothing tied to what
  *         anyone else put in. A loss or a tie pays nothing and takes nothing.
- *   - T3: a server-enforced daily prize cap (UTC day), counted from the wallet ledger under the player's row lock
- *         (lib/economy-caps-db.ts lockPlayerForDailyCap), so concurrent submits can't each read the same headroom.
+ *   - T3: a server-enforced daily prize cap (UTC day), counted from the wallet ledger under the account's User-row lock
+ *         (lockTeenAccount below), so concurrent submits can't each read the same headroom.
  *         The score is server-verified before any prize (submit-score: readDuelRun / checkStakeScore).
  * No schema change: matchType is a free string on CompetitionMatch.
  */
 import { applyLc } from '@/lib/wallet/wallet-service';
-import { lockPlayerForDailyCap } from '@/lib/economy-caps-db';
 import { utcDayStart } from '@/lib/economy-caps';
 
 export const TEEN_PRACTICE = 'TEEN_PRACTICE';
@@ -21,8 +20,8 @@ export const TEEN_PRACTICE_EXPIRED_REASON = 'teen_practice_expired';
 /** Open (unplayed) practice duels one account may hold at once. */
 export const TEEN_MAX_OPEN = 5;
 
-// TUNE(elijah): PENDING ELIJAH APPROVAL. PM set 25 per win and 100 per UTC day on 2026-11-04. Both are server-side
-// settings: TEEN_ARENA_PRIZE_LC / TEEN_ARENA_DAILY_LC_CAP override them; an unusable value falls back to the default.
+// PM set 25 per win and 100 per UTC day on 2026-11-04. Both are server-side settings: TEEN_ARENA_PRIZE_LC /
+// TEEN_ARENA_DAILY_LC_CAP override them; an unusable value falls back to the default.
 export const TEEN_PRIZE_DEFAULT = 25;
 export const TEEN_DAILY_CAP_DEFAULT = 100;
 const PRIZE_MAX = 100;
@@ -52,16 +51,29 @@ export function teenPrizeFor(earnedToday: number, prize = teenPrizeLc(), cap = t
   return Math.min(prize, room);
 }
 
+/** The per-account lock for the teen daily prize cap and the open practice-duel limit. */
+export const TEEN_ACCOUNT_LOCK_SQL = 'SELECT 1 FROM "User" WHERE "id" = $1 FOR UPDATE';
+
 /**
- * Pay a teen practice win, inside the submit transaction. Locks the player's row first (daily-cap TOCTOU), sums today's
- * prizes, and pays what fits under the cap. Idempotent per match (one prize per duel, ever).
+ * Lock the account's User row for the rest of the transaction (Cyber v4 review C2). The User row always exists for a
+ * signed-in account; a PlayerProfile row is created lazily (lib/profile-service.ts), and FOR UPDATE on a row that is not
+ * there locks nothing, so two first-ever submits could each read the same headroom. Call it before any count or sum it
+ * guards.
+ */
+export async function lockTeenAccount(tx: any, userId: string): Promise<void> {
+  await tx.$queryRawUnsafe(TEEN_ACCOUNT_LOCK_SQL, userId);
+}
+
+/**
+ * Pay a teen practice win, inside the submit transaction. Locks the account's User row first (daily-cap TOCTOU), sums
+ * today's prizes, and pays what fits under the cap. Idempotent per match (one prize per duel, ever).
  */
 export async function awardTeenPrize(
   tx: any,
   a: { userId: string; matchId: string; now?: Date },
 ): Promise<{ awarded: number; capped: boolean }> {
   const now = a.now ?? new Date();
-  await lockPlayerForDailyCap(tx, a.userId);
+  await lockTeenAccount(tx, a.userId);
   const agg = await tx.walletLedgerEntry.aggregate({
     where: {
       wallet: { playerId: a.userId },

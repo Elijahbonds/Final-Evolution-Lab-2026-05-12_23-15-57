@@ -1,6 +1,6 @@
 /**
  * lib/arena-teen-copy.ts — ARENA-AGE-1 teen Arena copy (Cyber T6, EASE-OF-USE R2-4).
- * DRAFT, pending Elijah's review. Uses "entry" and "prize"; one plain name per currency ("Credits"). Never stake, pot,
+ * Uses "entry" and "prize"; one plain name per currency ("Credits"). Never stake, pot,
  * wager, forfeit, odds or the "LC" abbreviation; no near-miss, "double or nothing" or countdown pressure.
  * Guarded by components/arena/teen-arena-copy.test.ts.
  */

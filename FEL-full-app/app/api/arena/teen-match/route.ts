@@ -12,7 +12,7 @@ import { recordServerEvent } from '@/lib/analytics-server';
 import { isStakingPaused } from '@/lib/stakingPause';
 import { isUnlistedMode } from '@/lib/unlisted-modes';
 import { arenaBand } from '@/lib/age/arenaAgeBand';
-import { TEEN_PRACTICE, TEEN_MAX_OPEN, teenPrizeLc, teenDailyCapLc } from '@/lib/arena-teen';
+import { TEEN_PRACTICE, TEEN_MAX_OPEN, teenPrizeLc, teenDailyCapLc, lockTeenAccount } from '@/lib/arena-teen';
 
 /**
  * POST /api/arena/teen-match
@@ -21,7 +21,8 @@ import { TEEN_PRACTICE, TEEN_MAX_OPEN, teenPrizeLc, teenDailyCapLc } from '@/lib
  * ARENA-AGE-1: the practice duel for a teen or unknown-age account (age read from the DB, never the request — T5). A
  * House Rival takes seat 2 (no human pairing — T4). Entry 0, house cut 0, no Lab Credits locked (T1). A win pays the
  * fixed server prize under the daily cap at /api/arena/submit-score (T2, T3). A verified adult is sent to Quick Match:
- * this route is not a free-prize door for adults.
+ * this route is not a free-prize door for adults. The open-duel limit is counted inside the create transaction, under
+ * the account's User-row lock, so concurrent requests can't each see room for one more (Cyber v4 review C2).
  */
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -41,15 +42,13 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const open = await prisma.competitionMatch.count({
-      where: { currency: 'LC', matchType: TEEN_PRACTICE, player1Id: userId, status: 'ACTIVE', player1Score: null, expiresAt: { gt: new Date() } },
-    });
-    if (open >= TEEN_MAX_OPEN) {
-      return NextResponse.json({ error: 'TOO_MANY_OPEN', detail: 'Finish one of your practice duels first.' }, { status: 409 });
-    }
-
     const houseIds = await ensureHouseRivals(prisma);
     const result = await prisma.$transaction(async (tx: any) => {
+      await lockTeenAccount(tx, userId);
+      const open = await tx.competitionMatch.count({
+        where: { currency: 'LC', matchType: TEEN_PRACTICE, player1Id: userId, status: 'ACTIVE', player1Score: null, expiresAt: { gt: new Date() } },
+      });
+      if (open >= TEEN_MAX_OPEN) throw new ArenaError('TOO_MANY_OPEN', 'Finish one of your practice duels first.', 409);
       const seed = generateMatchSeed();
       const rival = pickHouseRival(seed);
       const rivalId = houseIds.get(rival.key);
