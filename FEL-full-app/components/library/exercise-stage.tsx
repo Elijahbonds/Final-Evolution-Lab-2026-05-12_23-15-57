@@ -188,7 +188,9 @@ async function buildStage(first: ExerciseStageProps, gone: () => boolean): Promi
   // the early fetch has the body in the HTTP cache (or failed: the loader then fetches it itself)
   await body;
   // the player's hoops captures are built the first time a clip that one can replace is played (play() below), not here
-  const hero = await CharacterLibrary.spawn(scene, DEFAULT_HERO_URL, { role: 'player', startClip: 'idle_stand', deferHeroCapture: true });
+  // DEMO-MODELS-1: the stage's body is the demo's DEMONSTRATOR — the coach body for every viewer while DEMO_LIBRARY_COACH_ENABLED is
+  // on (CharacterLibrary / demoModels.planPlayerBody); off, the viewer's own body, as before
+  const hero = await CharacterLibrary.spawn(scene, DEFAULT_HERO_URL, { role: 'player', startClip: 'idle_stand', deferHeroCapture: true, demonstrator: true });
   if (anatomyFirst) await anatomyFirst.catch(() => null);
   if (gone()) { hero.dispose(); scene.dispose(); engine.dispose(); return null; }
   mark('spawned');

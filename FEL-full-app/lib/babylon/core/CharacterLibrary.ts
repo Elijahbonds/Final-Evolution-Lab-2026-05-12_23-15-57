@@ -23,7 +23,9 @@ import { snapToGround } from './groundSnap';                // M69: feet-on-cour
 import { PROCEDURAL_CHARACTERS } from '../characters/CharacterProvider';
 import { spawnProceduralAthlete } from '../characters/ProceduralAthlete';
 import { rosterUrlFor, normalizeHeroUrl, DEFAULT_HERO_URL, takeRivalRotation } from './athleteRoster';
-import { urlForHeroBody, KIT_BODY_URL, bodyUrlForTier } from './heroBody';
+import { KIT_BODY_URL, bodyUrlForTier } from './heroBody';
+import { demoModelFlags, planPlayerBody } from './demoModels';
+import { signedOutVisitor } from './visitor';
 import { installOpponentMotion, HERO_CAPTURE } from '../anim/opponentMotion';
 import { installStyleMotion } from '../anim/styleMotion';
 import { pickedVocab } from '../combat/styleVocab';
@@ -89,6 +91,10 @@ export interface SpawnOpts {
    *  `installHeroCapture` instead. For the library stage, whose idle and exercise loops no capture replaces: building the
    *  captures was ~0.4 s of the spawn on the phone profile, before the first frame of a squat that never plays one. */
   deferHeroCapture?: boolean;
+  /** DEMO-MODELS-1 (2026-11-09): this player spawn is a coach / library demo's demonstrator. With the server setting
+   *  DEMO_LIBRARY_COACH_ENABLED on it wears the coach body for every viewer, and the viewer's own look is not painted on it;
+   *  off (the default), it is the viewer's own body exactly as before. */
+  demonstrator?: boolean;
 }
 
 // ── WHO IS THE PLAYER (EVERYONE-BODY-MOCAP-OPPONENTS, 2026-09-14) ───────────────────────────────────────────────────
@@ -226,12 +232,19 @@ export const CharacterLibrary = {
     const role = decideRole(scene, heroRequest, opts);
     // Ship pass 3 rollout flag: the dev harness and the Closet can point the DEFAULT hero at a candidate body.
     const override = (scene.metadata as { felHeroOverride?: string } | undefined)?.felHeroOverride;
+    // DEMO-MODELS-1: the file to fall back to if the player's file will not load (null: none, as before), and whether the body is
+    // the coach demonstrator (the viewer's look stays off it)
+    let playerFallback: string | null = null;
+    let coachDemonstrator = false;
     if (override && heroRequest && role === 'player') url = override;
     else if (heroRequest && role === 'player') {
       // THE PLAYER'S BODY: the scan for the owner's account, otherwise the kit body their creator chose (heroBody.ts).
       // The server decides; a guest or a failed request plays the male kit body — never the owner's scan.
+      // DEMO-MODELS-1: the demo-model server settings (demoModels.ts) may put the coach body here instead; with every one off
+      // the plan is urlForHeroBody(kind) with no fallback, exactly as before.
       const id = await resolveIdentity().catch(() => null);
-      url = urlForHeroBody(id?.body ?? 'kit-male');
+      const plan = planPlayerBody({ kind: id?.body ?? 'kit-male', signedOut: signedOutVisitor(), demonstrator: opts.demonstrator === true, flags: demoModelFlags() });
+      url = plan.url; playerFallback = plan.fallback; coachDemonstrator = plan.demonstrator;
     }
     // M105 (Path A): the Meshy hero GLB is visually broken. When
     // PROCEDURAL_CHARACTERS is on, bypass the GLB entirely and spawn a clean,
@@ -286,6 +299,15 @@ export const CharacterLibrary = {
       } catch {
         // a roster file that will not load must not hand an opponent the player's body: the kit body, tinted below
         ({ container, url: effectiveUrl } = await loadHero(scene, heroRequest ? KIT_BODY_URL.male : url));
+      }
+    } else if (playerFallback) {
+      // DEMO-MODELS-1: the coach body that will not load is never a broken spawn: the body it replaced loads instead (the Meshy scan
+      // for the owner, the kit body for a guest, the viewer's own body for a demo)
+      try { ({ container, url: effectiveUrl } = await loadHero(scene, url)); }
+      catch (e) {
+        console.warn(`[FEL-CHAR] "${url}" unavailable, using "${playerFallback}": ${(e as Error)?.message ?? e}`);
+        coachDemonstrator = false;
+        ({ container, url: effectiveUrl } = await loadHero(scene, playerFallback));
       }
     } else {
       ({ container, url: effectiveUrl } = await loadHero(scene, url));
@@ -445,7 +467,7 @@ export const CharacterLibrary = {
     // materials skin/jersey/shorts/shoes/hair precisely so applyIdentity's
     // name-matched slots find them. Roster athletes carry their own baked
     // colorway and are never over-painted.
-    if (!rosterPicked && role === 'player' && opts.tint == null && opts.skinTone == null && opts.identity !== false) {
+    if (!rosterPicked && role === 'player' && opts.tint == null && opts.skinTone == null && opts.identity !== false && !coachDemonstrator) {
       try {
         const id = await resolveIdentity();
         if (id.custom) applyIdentity(spawned, id);

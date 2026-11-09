@@ -18,6 +18,8 @@ import { decideHeroBody, ownsScan, parseOwnerEmails, type HeroBodyKind } from '@
 import { activeLook } from '@/lib/creator/look/slots';
 import { paletteOverrides } from '@/lib/creator/look/buildPalette';
 import type { PaletteOverrides } from '@/lib/creator/look/palette';
+import { demoModelFlagsFromEnv } from '@/lib/flags';
+import { anyDemoModelFlag, type DemoModelFlags } from '@/lib/babylon/core/demoModels';
 
 export interface HeroBodyResponse {
   body: HeroBodyKind;
@@ -29,6 +31,15 @@ export interface HeroBodyResponse {
   /** IMPROVE (2026-10-06), CREATOR-PLAN phase 4a: whether this account owns a scan body, so the Closet can offer it as a
    *  slot's body. Only ever this account's own yes/no; who the owners are stays here. */
   scanOwned: boolean;
+  /** DEMO-MODELS-1 (2026-11-09): the demo-model server settings (lib/babylon/core/demoModels.ts). Sent ONLY while at least one is
+   *  on, so with every setting off this answer is byte-for-byte what it was. The same for every visitor: no identity in it. */
+  demo?: DemoModelFlags;
+}
+
+/** The `demo` part of the answer: present only when a setting is on. */
+function demoPart(): { demo?: DemoModelFlags } {
+  const f = demoModelFlagsFromEnv();
+  return anyDemoModelFlag(f) ? { demo: f } : {};
 }
 
 export async function GET() {
@@ -36,7 +47,7 @@ export async function GET() {
   const user = session?.user as { id?: string; email?: string | null } | undefined;
   const owners = parseOwnerEmails(process.env.FEL_SCAN_OWNER_EMAILS);
   if (!user?.id) {
-    return NextResponse.json({ body: decideHeroBody(null, owners, null), guest: true, frame: null, palette: null, scanOwned: false } satisfies HeroBodyResponse);
+    return NextResponse.json({ body: decideHeroBody(null, owners, null), guest: true, frame: null, palette: null, scanOwned: false, ...demoPart() } satisfies HeroBodyResponse);
   }
   let frame: Record<string, unknown> | null = null;
   let palette: PaletteOverrides | null = null;
@@ -62,5 +73,5 @@ export async function GET() {
     console.warn('[hero-body] look unavailable, using the default body:', (e as Error)?.message ?? e);
   }
   const email = user.email ?? null;
-  return NextResponse.json({ body: decideHeroBody(email, owners, frame, preferred), guest: false, frame, palette, scanOwned: ownsScan(email, owners) } satisfies HeroBodyResponse);
+  return NextResponse.json({ body: decideHeroBody(email, owners, frame, preferred), guest: false, frame, palette, scanOwned: ownsScan(email, owners), ...demoPart() } satisfies HeroBodyResponse);
 }

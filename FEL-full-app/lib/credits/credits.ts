@@ -233,6 +233,23 @@ export const CREDITS: Credit[] = [
     covers: ['models/skins/', 'models/fel-hero.glb', 'models/fel-hero.json', 'models/fel-hero.mobile.glb', 'models/candidates/', 'models/rivals/'],
     manifestLicences: ['CC0 (MakeHuman community assets)'],
   },
+  // DEMO-MODELS-1 (2026-11-09; owner "Yes full swap"): the coach body that replaces the Meshy scan behind DEMO_COACH_BODY_ENABLED
+  // and friends. Built on the MPFB2 builder body (the same topology and 22-bone rig as the kit bodies) with the owner's approved
+  // likeness (v7.2) and outfit C; files copied byte-for-byte from QC-coach-prep2 (sha256 051adcc0…7643 / e05d1822…9244).
+  {
+    id: 'coach-body',
+    section: 'models',
+    title: 'The coach body (MPFB2 builder body with the owner’s likeness)',
+    by: 'MakeHuman Community (MPFB2 builder body); likeness and outfit by the owner',
+    used: 'The coach and demo body: the owner’s own likeness on the MakeHuman builder body, with its hair, tee, shorts, socks and shoes.',
+    licence: 'CC0',
+    licenceUrl: OPEN_LICENCES.CC0,
+    status: 'open',
+    link: 'https://github.com/makehumancommunity/mpfb2',
+    recordedIn: ['lib/babylon/core/heroBody.ts', 'lib/babylon/core/demoModels.ts'],
+    covers: ['models/coach/'],
+    manifestLicences: ['CC0 (MakeHuman community assets)'],
+  },
   {
     id: 'openai-image',
     section: 'models',
