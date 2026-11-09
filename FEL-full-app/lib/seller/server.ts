@@ -9,6 +9,7 @@ import { prisma } from '@/lib/db';
 import { isVerifiedAdult } from '@/lib/coach-store/adult';
 import { isSellerAdultGateEnabled } from '@/lib/flags';
 import type { GateDb } from '@/lib/privacy/scanSaveGate';
+import { SELLER_REVIEW_EVENT } from '@/lib/analyticsReserved';
 import { isStoreCoachWith } from '@/lib/teach/role';
 import { teacherRoleDeps } from '@/lib/teach/server';
 import { SELLER_AGE_MESSAGES, sellerRefusal, type SellerRefusal, type SellerRole } from './canSell';
@@ -21,7 +22,9 @@ import { PAYOUT_HOLD_META, reviewRef, takeDownMinorSeller, type PayoutFreeze, ty
  *   SELECT "userId", "props", "createdAt" FROM "AnalyticsEvent" WHERE "name" = 'seller_age_review' ORDER BY "createdAt" DESC;
  * The newest row per account is also the "already held" marker the takedown checks first (lib/seller/takedown.ts).
  */
-export const SELLER_REVIEW_EVENT = 'seller_age_review';
+export { SELLER_REVIEW_EVENT };
+// v3 (Cyber N1 / C1): the name lives in lib/analyticsReserved.ts, which /api/analytics uses to drop it from client
+// batches; so the only writer of this row is recordReview below, and priorHold reads only rows the server wrote.
 
 const PAYOUT_STATES: readonly PayoutFreeze[] = ['frozen', 'no_account', 'failed'];
 
@@ -172,10 +175,14 @@ export async function sellerAgeGate(userId: string | null | undefined, role: Sel
 /**
  * v2 (PM 2026-11-09): should this seller be asked for their birth year? True when the account holds the role and has no
  * birth year on file — with the setting off or on. A failed read is no (nothing is shown).
+ * v3 (Cyber N5 / C2): the coach business and Studio have no role of their own (roleFor is "everyone"), so there the
+ * account must really sell (sellerRowsFor: a Connect account, market profile or package; an active cartridge). A plain
+ * visitor with no birth year is never told to add one "to sell".
  */
 export async function sellerNeedsBirthYear(userId: string | null | undefined, role: SellerRole): Promise<boolean> {
   if (typeof userId !== 'string' || !userId) return false;
-  if (!(await roleFor(role)(userId).catch(() => false))) return false;
+  const holds = role === 'coach_business' || role === 'studio' ? sellerRowsFor(role) : roleFor(role);
+  if (!(await holds(userId).catch(() => false))) return false;
   const row = await prisma.user.findUnique({ where: { id: userId }, select: { dobYear: true } }).catch(() => undefined);
   return row !== undefined && row !== null && row.dobYear == null;
 }

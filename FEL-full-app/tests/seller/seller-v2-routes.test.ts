@@ -234,6 +234,8 @@ describe('F5: the coach dashboard and settings pages, rendered', () => {
   });
 
   it('the business page asks an unknown-age coach for a birth year, and nobody else', async () => {
+    // v3 (Cyber C2): a coach-business seller is an account with seller rows; here, a Connect account for each.
+    h.connect = { [UNKNOWN]: 'acct_u', [ADULT]: 'acct_a', [TEEN]: 'acct_t' };
     as(UNKNOWN);
     expect(contains(await CoachBusinessPage(), SellerBirthYearPrompt)).toBe(true);
     as(ADULT);
