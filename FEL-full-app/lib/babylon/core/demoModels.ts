@@ -22,10 +22,8 @@ export interface DemoModelFlags {
   coachBodyMask: boolean;
   /** 3. Flight Night fetches tonight's rival's body file as soon as your first dunk is in. DUNK_RIVAL_PREFETCH_ENABLED */
   rivalPrefetch: boolean;
-  /** 4. A signed-out guest on /try plays the coach body instead of the male kit body. TRY_GUEST_COACH_BODY_ENABLED */
+  /** 4. A signed-out guest in /try's dunk demo (and only there) plays the coach body instead of the male kit body. TRY_GUEST_COACH_BODY_ENABLED */
   tryGuestCoach: boolean;
-  /** 5. The coach and library demos show the coach body as the demonstrator, for every viewer. DEMO_LIBRARY_COACH_ENABLED */
-  libraryCoach: boolean;
   /** 6. The crowd's forge front row is on by default (the feel knob crowd.forgeFront still overrides). CROWD_FORGE_FRONT_ENABLED */
   crowdForgeFront: boolean;
 }
@@ -36,13 +34,12 @@ export const DEMO_MODEL_FLAG_ENV: Readonly<Record<keyof DemoModelFlags, string>>
   coachBodyMask: 'COACH_BODY_MASK_ENABLED',
   rivalPrefetch: 'DUNK_RIVAL_PREFETCH_ENABLED',
   tryGuestCoach: 'TRY_GUEST_COACH_BODY_ENABLED',
-  libraryCoach: 'DEMO_LIBRARY_COACH_ENABLED',
   crowdForgeFront: 'CROWD_FORGE_FRONT_ENABLED',
 };
 export const DEMO_MODEL_FLAG_KEYS = Object.keys(DEMO_MODEL_FLAG_ENV) as (keyof DemoModelFlags)[];
 
 export const NO_DEMO_MODEL_FLAGS: Readonly<DemoModelFlags> = Object.freeze({
-  coachBody: false, coachBodyMask: false, rivalPrefetch: false, tryGuestCoach: false, libraryCoach: false, crowdForgeFront: false,
+  coachBody: false, coachBodyMask: false, rivalPrefetch: false, tryGuestCoach: false, crowdForgeFront: false,
 });
 
 /** The settings from a wire answer: a setting is on only when it is exactly `true`; anything else (absent, junk) is off. */
@@ -65,21 +62,29 @@ export interface PlayerBodyPlan {
   url: string;
   /** The file to load instead if `url` will not load; null when there is nothing to fall back to (today's path). */
   fallback: string | null;
-  /** The coach body is the demonstrator (item 5): the viewer's own look is NOT painted onto it. */
-  demonstrator: boolean;
 }
 
 /**
- * The player's body file. `kind` is the server's decision (hero-body), `signedOut` is the host's word that this visitor is a
- * known guest (only /try's guest shell says so: visitor.ts), `demonstrator` marks a coach / library demo stage.
- * Order: the library demonstrator (5), the /try guest (4), the owner's scan (1). Each falls back to what it replaced.
+ * WHERE the player's body is being spawned, said explicitly by the caller (v2, PM 2026-11-09: setting 4 leaked into the
+ * workouts and anatomy stages for any signed-out viewer).
+ *   'tryDunkGuest' — the /try guest dunk demo: a scene the harness stamped for a known-guest `dunk` mount
+ *                    (ModeHarness: scene.metadata.felTryDunkGuest), with the host's signed-out word still standing (visitor.ts).
+ *   'other'        — everything else: every signed-in mode, the exercise / anatomy stages (owner 10:09 AM: "Each viewer sees
+ *                    their own body in workouts and anatomy"), the Studio, the profile. The default.
+ * Never read from the URL: a stage's scene is its own Scene object and is never stamped.
  */
-export function planPlayerBody(a: { kind: HeroBodyKind; signedOut: boolean; demonstrator: boolean; flags: DemoModelFlags }): PlayerBodyPlan {
+export type PlayerBodyContext = 'tryDunkGuest' | 'other';
+
+/**
+ * The player's body file. `kind` is the server's decision for THIS viewer (hero-body: 'scan' only for an account that owns the
+ * scan, so setting 1 can only ever change the owner's own body, in any view). Order: the /try dunk guest (4), the owner's scan
+ * (1). Each falls back to what it replaced; anything else is exactly today's body.
+ */
+export function planPlayerBody(a: { kind: HeroBodyKind; context: PlayerBodyContext; flags: DemoModelFlags }): PlayerBodyPlan {
   const today = urlForHeroBody(a.kind);
-  if (a.demonstrator && a.flags.libraryCoach) return { url: COACH_BODY_URL, fallback: today, demonstrator: true };
-  if (a.signedOut && a.flags.tryGuestCoach) return { url: COACH_BODY_URL, fallback: KIT_BODY_URL.male, demonstrator: false };
-  if (a.kind === 'scan' && a.flags.coachBody) return { url: COACH_BODY_URL, fallback: SCAN_BODY_URL, demonstrator: false };
-  return { url: today, fallback: null, demonstrator: false };
+  if (a.context === 'tryDunkGuest' && a.flags.tryGuestCoach) return { url: COACH_BODY_URL, fallback: KIT_BODY_URL.male };
+  if (a.kind === 'scan' && a.flags.coachBody) return { url: COACH_BODY_URL, fallback: SCAN_BODY_URL };
+  return { url: today, fallback: null };
 }
 
 /** The coach body's garments, by node name (the loader may add `_primitive<n>` and `_c<n>`): its tee, shorts, socks and shoes. */

@@ -78,10 +78,17 @@ describe('the demo stage\'s early fetch (demoWarm) asks for the file the spawn l
     for (const body of ['scan', 'kit-male', 'kit-female', undefined] as const)
       for (const tier of ['desktop', 'mobile']) expect(demoStageBodyUrl(body ? { body } : null, tier)).toBe(demoBodyUrl(body, tier));
   });
-  it('DEMO_LIBRARY_COACH_ENABLED on: the coach file (the phone file on a phone), and unscaledBodyUrl maps it back', () => {
-    const demo = { ...NO_DEMO_MODEL_FLAGS, libraryCoach: true };
-    expect(demoStageBodyUrl({ body: 'kit-female', demo }, 'desktop')).toBe(COACH_BODY_URL);
-    expect(demoStageBodyUrl({ body: 'kit-female', demo }, 'mobile')).toBe(COACH_BODY_MOBILE_URL);
+  // v2: setting 5 (DEMO_LIBRARY_COACH_ENABLED) and its test removed — each viewer sees their own body in workouts and anatomy
+  it('v2: with ALL settings on, a non-owner\'s (or a guest\'s) demo stage fetches their own body file', () => {
+    const demo = { ...NO_DEMO_MODEL_FLAGS, coachBody: true, coachBodyMask: true, rivalPrefetch: true, tryGuestCoach: true, crowdForgeFront: true };
+    for (const body of ['kit-male', 'kit-female', undefined] as const)
+      for (const tier of ['desktop', 'mobile']) expect(demoStageBodyUrl({ body, demo }, tier)).toBe(demoBodyUrl(body, tier));
+  });
+  it('v2: setting 1 changes only the scan owner\'s own demo body (coach file, its phone file on a phone); unscaledBodyUrl maps it back', () => {
+    const demo = { ...NO_DEMO_MODEL_FLAGS, coachBody: true };
+    expect(demoStageBodyUrl({ body: 'scan', demo }, 'desktop')).toBe(COACH_BODY_URL);
+    expect(demoStageBodyUrl({ body: 'scan', demo }, 'mobile')).toBe(COACH_BODY_MOBILE_URL);
+    expect(demoStageBodyUrl({ body: 'kit-female', demo }, 'desktop')).toBe(demoBodyUrl('kit-female', 'desktop'));
     expect(unscaledBodyUrl(COACH_BODY_MOBILE_URL)).toBe(COACH_BODY_URL);
   });
 });

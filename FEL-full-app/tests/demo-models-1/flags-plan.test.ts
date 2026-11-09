@@ -1,12 +1,14 @@
-// DEMO-MODELS-1 (2026-11-09): the six server settings, each OFF by default, and the player-body plan they drive.
+// DEMO-MODELS-1 (2026-11-09; v2): the five server settings, each OFF by default, and the player-body plan they drive.
+// v2: setting 5 (DEMO_LIBRARY_COACH_ENABLED) is gone (owner 10:09 AM: each viewer sees their own body in workouts and anatomy),
+// and setting 4 applies only in the /try dunk demo's context.
 // With every setting off the plan, the hero-body answer, the masks, the hair and the crowd are exactly what live does today.
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   DEMO_MODEL_FLAG_ENV, DEMO_MODEL_FLAG_KEYS, NO_DEMO_MODEL_FLAGS, anyDemoModelFlag, coachGarmentSlotOf, demoModelFlags, demoModelFlagsFrom,
-  isCoachHairName, planPlayerBody, setDemoModelFlags, type DemoModelFlags,
+  isCoachHairName, planPlayerBody, setDemoModelFlags, type DemoModelFlags, type PlayerBodyContext,
 } from '@/lib/babylon/core/demoModels';
 import {
-  demoModelFlagsFromEnv, isCoachBodyMaskEnabled, isCrowdForgeFrontEnabled, isDemoCoachBodyEnabled, isDemoLibraryCoachEnabled,
+  demoModelFlagsFromEnv, isCoachBodyMaskEnabled, isCrowdForgeFrontEnabled, isDemoCoachBodyEnabled,
   isDunkRivalPrefetchEnabled, isTryGuestCoachBodyEnabled,
 } from '@/lib/flags';
 import { DEFAULT_HERO_URL } from '@/lib/babylon/core/athleteRoster';
@@ -16,13 +18,14 @@ const ENV = Object.values(DEMO_MODEL_FLAG_ENV);
 const only = (k: keyof DemoModelFlags): DemoModelFlags => ({ ...NO_DEMO_MODEL_FLAGS, [k]: true });
 afterEach(() => { for (const e of ENV) delete process.env[e]; setDemoModelFlags(NO_DEMO_MODEL_FLAGS); });
 
-describe('the six server settings', () => {
+describe('the five server settings', () => {
   it('are named as the brief asks, one env var each, all distinct', () => {
     expect(DEMO_MODEL_FLAG_ENV).toEqual({
       coachBody: 'DEMO_COACH_BODY_ENABLED', coachBodyMask: 'COACH_BODY_MASK_ENABLED', rivalPrefetch: 'DUNK_RIVAL_PREFETCH_ENABLED',
-      tryGuestCoach: 'TRY_GUEST_COACH_BODY_ENABLED', libraryCoach: 'DEMO_LIBRARY_COACH_ENABLED', crowdForgeFront: 'CROWD_FORGE_FRONT_ENABLED',
+      tryGuestCoach: 'TRY_GUEST_COACH_BODY_ENABLED', crowdForgeFront: 'CROWD_FORGE_FRONT_ENABLED',
     });
-    expect(new Set(ENV).size).toBe(6);
+    expect(new Set(ENV).size).toBe(5);
+    expect(ENV).not.toContain('DEMO_LIBRARY_COACH_ENABLED');   // v2: setting 5 removed
   });
   it('are all OFF when unset', () => {
     for (const e of ENV) delete process.env[e];
@@ -32,7 +35,7 @@ describe('the six server settings', () => {
   });
   const readers: Record<keyof DemoModelFlags, () => boolean> = {
     coachBody: isDemoCoachBodyEnabled, coachBodyMask: isCoachBodyMaskEnabled, rivalPrefetch: isDunkRivalPrefetchEnabled,
-    tryGuestCoach: isTryGuestCoachBodyEnabled, libraryCoach: isDemoLibraryCoachEnabled, crowdForgeFront: isCrowdForgeFrontEnabled,
+    tryGuestCoach: isTryGuestCoachBodyEnabled, crowdForgeFront: isCrowdForgeFrontEnabled,
   };
   for (const k of DEMO_MODEL_FLAG_KEYS) {
     it(`${DEMO_MODEL_FLAG_ENV[k]}: on for 1/true/on/yes, off otherwise, and alone`, () => {
@@ -44,34 +47,43 @@ describe('the six server settings', () => {
     expect(demoModelFlagsFrom(undefined)).toEqual(NO_DEMO_MODEL_FLAGS);
     expect(demoModelFlagsFrom(null)).toEqual(NO_DEMO_MODEL_FLAGS);
     expect(demoModelFlagsFrom('yes')).toEqual(NO_DEMO_MODEL_FLAGS);
-    expect(demoModelFlagsFrom({ coachBody: 'true', coachBodyMask: 1, libraryCoach: true })).toEqual(only('libraryCoach'));
+    expect(demoModelFlagsFrom({ coachBody: 'true', coachBodyMask: 1, tryGuestCoach: true })).toEqual(only('tryGuestCoach'));
+    expect(demoModelFlagsFrom({ libraryCoach: true })).toEqual(NO_DEMO_MODEL_FLAGS);   // v2: the removed key is not a setting
+    expect(Object.keys(demoModelFlagsFrom({ libraryCoach: true }))).not.toContain('libraryCoach');
   });
 });
 
 describe('planPlayerBody — which file the player spawns', () => {
   const kinds: HeroBodyKind[] = ['scan', 'kit-male', 'kit-female'];
-  const cases = [false, true].flatMap((signedOut) => [false, true].flatMap((demonstrator) => kinds.map((kind) => ({ kind, signedOut, demonstrator }))));
-  it('every setting off: exactly today\'s body, no fallback, for every visitor and stage', () => {
-    for (const c of cases) expect(planPlayerBody({ ...c, flags: NO_DEMO_MODEL_FLAGS }), JSON.stringify(c)).toEqual({ url: urlForHeroBody(c.kind), fallback: null, demonstrator: false });
+  const contexts: PlayerBodyContext[] = ['tryDunkGuest', 'other'];
+  const cases = contexts.flatMap((context) => kinds.map((kind) => ({ kind, context })));
+  const ALL_ON = demoModelFlagsFrom(Object.fromEntries(DEMO_MODEL_FLAG_KEYS.map((k) => [k, true])));
+  it('every setting off: exactly today\'s body, no fallback, in every context', () => {
+    for (const c of cases) expect(planPlayerBody({ ...c, flags: NO_DEMO_MODEL_FLAGS }), JSON.stringify(c)).toEqual({ url: urlForHeroBody(c.kind), fallback: null });
   });
   it('the settings that are not about the player body never change it (mask, rivals, crowd)', () => {
     for (const k of ['coachBodyMask', 'rivalPrefetch', 'crowdForgeFront'] as const)
-      for (const c of cases) expect(planPlayerBody({ ...c, flags: only(k) })).toEqual({ url: urlForHeroBody(c.kind), fallback: null, demonstrator: false });
+      for (const c of cases) expect(planPlayerBody({ ...c, flags: only(k) })).toEqual({ url: urlForHeroBody(c.kind), fallback: null });
   });
   it('1 DEMO_COACH_BODY_ENABLED: the scan owner plays the coach body, the Meshy scan is the fallback; nobody else changes', () => {
-    expect(planPlayerBody({ kind: 'scan', signedOut: false, demonstrator: false, flags: only('coachBody') })).toEqual({ url: COACH_BODY_URL, fallback: SCAN_BODY_URL, demonstrator: false });
-    for (const kind of ['kit-male', 'kit-female'] as const) expect(planPlayerBody({ kind, signedOut: false, demonstrator: false, flags: only('coachBody') }).url).toBe(urlForHeroBody(kind));
-  });
-  it('4 TRY_GUEST_COACH_BODY_ENABLED: a /try guest plays the coach body (kit-male fallback); a signed-in visitor does not', () => {
-    expect(planPlayerBody({ kind: 'kit-male', signedOut: true, demonstrator: false, flags: only('tryGuestCoach') })).toEqual({ url: COACH_BODY_URL, fallback: KIT_BODY_URL.male, demonstrator: false });
-    expect(planPlayerBody({ kind: 'kit-male', signedOut: false, demonstrator: false, flags: only('tryGuestCoach') }).url).toBe(KIT_BODY_URL.male);
-    expect(planPlayerBody({ kind: 'kit-female', signedOut: false, demonstrator: false, flags: only('tryGuestCoach') }).url).toBe(KIT_BODY_URL.female);
-  });
-  it('5 DEMO_LIBRARY_COACH_ENABLED: every viewer\'s demo shows the coach body, falling back to their own; play spawns do not change', () => {
-    for (const kind of kinds) {
-      expect(planPlayerBody({ kind, signedOut: false, demonstrator: true, flags: only('libraryCoach') })).toEqual({ url: COACH_BODY_URL, fallback: urlForHeroBody(kind), demonstrator: true });
-      expect(planPlayerBody({ kind, signedOut: false, demonstrator: false, flags: only('libraryCoach') }).url).toBe(urlForHeroBody(kind));
+    for (const context of contexts) {
+      expect(planPlayerBody({ kind: 'scan', context, flags: only('coachBody') })).toEqual({ url: COACH_BODY_URL, fallback: SCAN_BODY_URL });
+      for (const kind of ['kit-male', 'kit-female'] as const) expect(planPlayerBody({ kind, context, flags: only('coachBody') }).url).toBe(urlForHeroBody(kind));
     }
+  });
+  it('4 TRY_GUEST_COACH_BODY_ENABLED: only the /try dunk guest context plays the coach body (kit-male fallback)', () => {
+    expect(planPlayerBody({ kind: 'kit-male', context: 'tryDunkGuest', flags: only('tryGuestCoach') })).toEqual({ url: COACH_BODY_URL, fallback: KIT_BODY_URL.male });
+    expect(planPlayerBody({ kind: 'kit-male', context: 'other', flags: only('tryGuestCoach') })).toEqual({ url: KIT_BODY_URL.male, fallback: null });
+    expect(planPlayerBody({ kind: 'kit-female', context: 'other', flags: only('tryGuestCoach') })).toEqual({ url: KIT_BODY_URL.female, fallback: null });
+  });
+  it('v2: with ALL settings on, the \'other\' context (workouts, anatomy) is the viewer\'s own body for every non-owner', () => {
+    for (const kind of ['kit-male', 'kit-female'] as const) expect(planPlayerBody({ kind, context: 'other', flags: ALL_ON })).toEqual({ url: urlForHeroBody(kind), fallback: null });
+  });
+  it('v2: the owner\'s scan → coach (setting 1) depends only on HIS kind: another viewer never gets it, in any context', () => {
+    // hero-body decides 'scan' per viewer (only the scan owner's account); a different viewer's kind is a kit kind
+    for (const context of contexts) for (const kind of ['kit-male', 'kit-female'] as const)
+      expect(planPlayerBody({ kind, context, flags: { ...only('coachBody'), tryGuestCoach: false } }).url).not.toBe(COACH_BODY_URL);
+    expect(planPlayerBody({ kind: 'scan', context: 'other', flags: ALL_ON }).url).toBe(COACH_BODY_URL);   // his own view only
   });
 });
 

@@ -378,6 +378,9 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       hitch = mountHitchProbe({ scene, publish: devOrAgentHooks() });
       perfStats = mountPerfStats({ engine, tier, guard: () => { const g = guard.snapshot(); return g.policy.governor || g.policy.pacing ? g : null; } });   // PERF-LAG
       if (opts.heroOverride) scene.metadata.felHeroOverride = opts.heroOverride;   // dev rollout flag (?hero=)
+      // DEMO-MODELS-1 v2: this scene is /try's guest dunk demo (the host's known-guest mount of `dunk`), the ONE place setting 4
+      // (TRY_GUEST_COACH_BODY_ENABLED) may apply (CharacterLibrary.playerBodyContextOf). Scene-scoped: no other scene is stamped.
+      if (opts.guest === true && def.modeId === 'dunk') scene.metadata.felTryDunkGuest = true;
       Object.assign(scene.metadata, pagePlayStamp());   // NEX-03: felCompetitive / felRanked from the page's ?arena= ?c= ?mp= ?signature= (playFrame.ts), before the mode loads
       // M69: publish the agent control bridge (no-op unless ?agent=1). Idempotent —
       // re-registers the same mode list and re-binds window.__NEXUS_AGENT__ each mount.

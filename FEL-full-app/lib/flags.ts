@@ -163,8 +163,9 @@ export function isFeelPanelUser(userId: string | null | undefined, env: NodeJS.P
 }
 
 // ── DEMO-MODELS-1 (owner, 2026-11-09: "Yes full swap") ─────────────────────────────────────────────────────────────────────
-// Six server settings, each OFF by default, each its own switch (lib/babylon/core/demoModels.ts names what each does). With all
-// six off the app is exactly as live: /api/v1/hero-body sends no `demo` and the client keeps every body and request as before.
+// Five server settings, each OFF by default, each its own switch (lib/babylon/core/demoModels.ts names what each does; v2 removed
+// setting 5, the library-demo coach body: owner 10:09 AM, "Each viewer sees their own body in workouts and anatomy"). With all
+// five off the app is exactly as live: /api/v1/hero-body sends no `demo` and the client keeps every body and request as before.
 // AM turns each on only after Elijah's yes on its before/after shots.
 
 /** 1. DEMO_COACH_BODY_ENABLED: the scan owner plays the prep2 coach body (the Meshy scan is the fallback). */
@@ -173,21 +174,19 @@ export function isDemoCoachBodyEnabled(): boolean { return envOn(DEMO_MODEL_FLAG
 export function isCoachBodyMaskEnabled(): boolean { return envOn(DEMO_MODEL_FLAG_ENV.coachBodyMask); }
 /** 3. DUNK_RIVAL_PREFETCH_ENABLED: Flight Night fetches the rival's body file once the first dunk is in. */
 export function isDunkRivalPrefetchEnabled(): boolean { return envOn(DEMO_MODEL_FLAG_ENV.rivalPrefetch); }
-/** 4. TRY_GUEST_COACH_BODY_ENABLED: a signed-out guest on /try plays the coach body (reverses the 2026-09-14 rule while on). */
+/** 4. TRY_GUEST_COACH_BODY_ENABLED: a signed-out guest in /try's dunk demo (only there) plays the coach body (reverses the
+ *  2026-09-14 rule while on, for that demo; workouts and anatomy keep the viewer's own body). */
 export function isTryGuestCoachBodyEnabled(): boolean { return envOn(DEMO_MODEL_FLAG_ENV.tryGuestCoach); }
-/** 5. DEMO_LIBRARY_COACH_ENABLED: every viewer's coach / library demo shows the coach body as the demonstrator. */
-export function isDemoLibraryCoachEnabled(): boolean { return envOn(DEMO_MODEL_FLAG_ENV.libraryCoach); }
 /** 6. CROWD_FORGE_FRONT_ENABLED: the crowd's forge front row defaults on (the feel knob crowd.forgeFront still overrides). */
 export function isCrowdForgeFrontEnabled(): boolean { return envOn(DEMO_MODEL_FLAG_ENV.crowdForgeFront); }
 
-/** All six, as the hero-body answer carries them. */
+/** All five, as the hero-body answer carries them. */
 export function demoModelFlagsFromEnv(): DemoModelFlags {
   return {
     coachBody: isDemoCoachBodyEnabled(),
     coachBodyMask: isCoachBodyMaskEnabled(),
     rivalPrefetch: isDunkRivalPrefetchEnabled(),
     tryGuestCoach: isTryGuestCoachBodyEnabled(),
-    libraryCoach: isDemoLibraryCoachEnabled(),
     crowdForgeFront: isCrowdForgeFrontEnabled(),
   };
 }

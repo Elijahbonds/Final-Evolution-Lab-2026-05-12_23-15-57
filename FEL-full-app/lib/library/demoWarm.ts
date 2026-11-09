@@ -27,11 +27,12 @@ export function demoBodyUrl(kind: HeroBodyKind | null | undefined, tier: string)
   return bodyUrlForTier(urlForHeroBody(kind ?? 'kit-male'), tier);
 }
 
-/** DEMO-MODELS-1 (2026-11-09): the file a DEMO stage spawns for this hero-body answer: the stage's demonstrator follows the
- *  demo-model settings the answer carries (demoModels.planPlayerBody, the rule CharacterLibrary spawns by). With no `demo` on the
- *  answer (every setting off) it is exactly demoBodyUrl(answer.body, tier). */
+/** DEMO-MODELS-1 (2026-11-09; v2): the file a DEMO stage spawns for this hero-body answer, by the rule CharacterLibrary spawns by
+ *  (demoModels.planPlayerBody, context 'other': a stage is never the /try dunk demo). The stage shows the viewer's OWN body; the
+ *  only setting that changes it is 1, and only for the scan owner's own view (his own body is the coach body then). With no
+ *  `demo` on the answer (every setting off) it is exactly demoBodyUrl(answer.body, tier). */
 export function demoStageBodyUrl(answer: HeroBodyAnswer | null | undefined, tier: string): string {
-  const plan = planPlayerBody({ kind: answer?.body ?? 'kit-male', signedOut: false, demonstrator: true, flags: demoModelFlagsFrom(answer?.demo) });
+  const plan = planPlayerBody({ kind: answer?.body ?? 'kit-male', context: 'other', flags: demoModelFlagsFrom(answer?.demo) });
   return bodyUrlForTier(plan.url, tier);
 }
 
