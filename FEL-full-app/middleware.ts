@@ -1,8 +1,59 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { isBinjgbShelfEnabled } from './lib/flags';
 
 /** Screen paths only — enforced on every matched response (307, 200, RSC). */
 export const SCREEN_PERMISSIONS_POLICY = 'camera=(self), microphone=()';
+
+/**
+ * BINJGB-SHELF-1 (Cyber G2, review 067e0dce): the Homebrew Shelf's own policy — no camera, no microphone, no location;
+ * gamepad and fullscreen for the shelf itself only. next.config.js's appended shelf rule sends the SAME value (Cyber N-2),
+ * so the two agree; the PR-time `curl -sI /play/gb-shelf` must show exactly one Permissions-Policy (Cyber F-A).
+ */
+export const SHELF_PERMISSIONS_POLICY = 'camera=(), microphone=(), geolocation=(), gamepad=(self), fullscreen=(self)';
+export const SHELF_REFERRER_POLICY = 'no-referrer';
+
+/**
+ * PER-ROUTE POLICY TABLE (Cyber G2). One row per route group; the first row whose prefix matches wins, so the local frame
+ * (framed by the shelf page itself) sits above the shelf. 'wasm-unsafe-eval' is only ever in a row here — never in a
+ * default or global policy — and only /screen*, /play/mirror/assess* and /play/gb-shelf* have one.
+ *   wasm         'wasm-unsafe-eval' in script-src
+ *   permissions  the Permissions-Policy header
+ *   enforce      true → Content-Security-Policy (enforced); false → Content-Security-Policy-Report-Only (legacy pose routes)
+ */
+export interface RoutePolicy {
+  prefix: string;
+  wasm: boolean;
+  permissions: string;
+  enforce: boolean;
+  frameAncestors: "'none'" | "'self'";
+  referrer: string | null;
+}
+
+export const ROUTE_POLICIES: readonly RoutePolicy[] = [
+  { prefix: '/play/gb-shelf/local-frame', wasm: true, permissions: SHELF_PERMISSIONS_POLICY, enforce: true, frameAncestors: "'self'", referrer: SHELF_REFERRER_POLICY },
+  { prefix: '/play/gb-shelf', wasm: true, permissions: SHELF_PERMISSIONS_POLICY, enforce: true, frameAncestors: "'none'", referrer: SHELF_REFERRER_POLICY },
+  { prefix: '/screen', wasm: true, permissions: SCREEN_PERMISSIONS_POLICY, enforce: false, frameAncestors: "'none'", referrer: null },
+  { prefix: '/play/mirror/assess', wasm: true, permissions: SCREEN_PERMISSIONS_POLICY, enforce: false, frameAncestors: "'none'", referrer: null },
+];
+
+const underPrefix = (path: string, prefix: string) => path === prefix || path.startsWith(prefix + '/');
+
+/** The policy row for a path, or null. */
+export function routePolicyFor(pathname: string): RoutePolicy | null {
+  const path = pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname;
+  return ROUTE_POLICIES.find((p) => underPrefix(path, p.prefix)) ?? null;
+}
+
+/**
+ * BINJGB-SHELF-1 (Cyber G10): public/ files skip the flag, so while BINJGB_SHELF_ENABLED is off middleware answers 404
+ * for the vendored player and anything under /gb-shelf/ — no wasm, no player script, no game bytes from the live site.
+ */
+export const SHELF_STATIC_PREFIXES = ['/vendor/binjgb', '/gb-shelf'] as const;
+
+export function isShelfStaticPath(pathname: string): boolean {
+  return SHELF_STATIC_PREFIXES.some((p) => underPrefix(pathname, p));
+}
 
 /**
  * Open with no session. Middleware must never send these to /login.
@@ -23,10 +74,14 @@ function makeNonce(): string {
   return btoa(raw);
 }
 
-function cspReportOnly(nonce: string): string {
+function scriptSrc(nonce: string, policy: RoutePolicy): string {
+  return `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${policy.wasm ? " 'wasm-unsafe-eval'" : ''}`;
+}
+
+function cspReportOnly(nonce: string, policy: RoutePolicy): string {
   return [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'wasm-unsafe-eval'`,
+    scriptSrc(nonce, policy),
     "connect-src 'self'",
     "img-src 'self' data: blob:",
     "media-src 'self' blob:",
@@ -36,7 +91,7 @@ function cspReportOnly(nonce: string): string {
     "manifest-src 'self'",
     "object-src 'none'",
     "base-uri 'none'",
-    "frame-ancestors 'none'",
+    `frame-ancestors ${policy.frameAncestors}`,
     "form-action 'self'",
     // No `upgrade-insecure-requests` here: a report-only policy ignores it, and every page that carries this header
     // logged "The Content Security Policy directive 'upgrade-insecure-requests' is ignored when delivered in a
@@ -45,27 +100,62 @@ function cspReportOnly(nonce: string): string {
   ].join('; ');
 }
 
+/**
+ * BINJGB-SHELF-1 (Cyber G2): the shelf's ENFORCED policy, exactly as specified (spec §3.3.2 item 3). connect-src 'self'
+ * backs the no-upload / no-third-party rules (G5, T-LOCAL-NET); frame-ancestors is 'none' for the shelf and 'self' for
+ * the local frame, which only the shelf page embeds.
+ */
+export function cspEnforced(nonce: string, policy: RoutePolicy): string {
+  return [
+    "default-src 'self'",
+    scriptSrc(nonce, policy),
+    "style-src 'self' 'unsafe-inline'",
+    "font-src 'self'",
+    "manifest-src 'self'",
+    "connect-src 'self'",
+    "img-src 'self' data: blob:",
+    "media-src 'self' blob:",
+    "worker-src 'self'",
+    "object-src 'none'",
+    "base-uri 'none'",
+    `frame-ancestors ${policy.frameAncestors}`,
+    "form-action 'self'",
+  ].join('; ');
+}
+
 /** Next 14 reads the nonce from the request's content-security-policy header (not report-only alone). */
-function requestCsp(nonce: string): string {
-  return `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'wasm-unsafe-eval'`;
+function requestCsp(nonce: string, policy: RoutePolicy): string {
+  return scriptSrc(nonce, policy);
 }
 
 export function middleware(request: NextRequest) {
-  if (isPublicRoute(request.nextUrl.pathname)) {
+  const pathname = request.nextUrl.pathname;
+  if (isPublicRoute(pathname)) {
     return NextResponse.next();
   }
+  if (isShelfStaticPath(pathname)) {
+    return isBinjgbShelfEnabled() ? NextResponse.next() : new NextResponse(null, { status: 404 });
+  }
+  const policy = routePolicyFor(pathname);
+  if (!policy) return NextResponse.next();
 
   const nonce = makeNonce();
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-nonce', nonce);
-  requestHeaders.set('content-security-policy', requestCsp(nonce));
+  requestHeaders.set('content-security-policy', requestCsp(nonce, policy));
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });
-  response.headers.set('Content-Security-Policy-Report-Only', cspReportOnly(nonce));
-  response.headers.set('Permissions-Policy', SCREEN_PERMISSIONS_POLICY);
+  if (policy.enforce) response.headers.set('Content-Security-Policy', cspEnforced(nonce, policy));
+  else response.headers.set('Content-Security-Policy-Report-Only', cspReportOnly(nonce, policy));
+  response.headers.set('Permissions-Policy', policy.permissions);
+  if (policy.referrer) response.headers.set('Referrer-Policy', policy.referrer);
   return response;
 }
 
 export const config = {
-  matcher: ['/links', '/books', '/elijah', '/screen', '/screen/:path*', '/play/mirror/assess', '/play/mirror/assess/:path*'],
+  matcher: [
+    '/links', '/books', '/elijah', '/screen', '/screen/:path*', '/play/mirror/assess', '/play/mirror/assess/:path*',
+    // BINJGB-SHELF-1: the shelf routes (G2 policy) and its static files (G10 flag-off 404). No /play/gb-local (OQ-6).
+    '/play/gb-shelf', '/play/gb-shelf/:path*', '/vendor/binjgb/:path*', '/gb-shelf/:path*',
+  ],
 };

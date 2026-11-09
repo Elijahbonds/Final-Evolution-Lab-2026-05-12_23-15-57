@@ -159,3 +159,16 @@ export function feelPanelUserIds(env: NodeJS.ProcessEnv = process.env): Set<stri
 export function isFeelPanelUser(userId: string | null | undefined, env: NodeJS.ProcessEnv = process.env): boolean {
   return !!userId && feelPanelUserIds(env).has(userId);
 }
+
+/** BINJGB-SHELF-1. Default OFF. /play/gb-shelf* 404 while unset. */
+export function isBinjgbShelfEnabled(): boolean {
+  return envOn('BINJGB_SHELF_ENABLED');
+}
+
+/**
+ * BINJGB-SHELF-1 load-your-own. Default OFF. OQ-1 ANSWERED — build switched off.
+ * Requires BINJGB_SHELF_ENABLED (OQ-6). Cyber reviews local-file path in PR; G-FILE before ON.
+ */
+export function isBinjgbLocalFileEnabled(): boolean {
+  return envOn('BINJGB_LOCAL_FILE_ENABLED');
+}
