@@ -140,7 +140,8 @@ const h = vi.hoisted(() => {
       },
       findMany: async ({ where, orderBy }: Row) => { await tick(); return sortBy(store.events.filter((e) => rowMatch(e, where)), Array.isArray(orderBy) ? orderBy[0] : orderBy); },
     },
-    user: { findMany: async () => [{ id: 'u1', name: 'You' }, { id: 'u2', name: 'Rival' }, { id: 'house', name: 'House' }] },
+    // ARENA-AGE-1: the Arena entry routes read the DB birth year (adults only); these players are adults.
+    user: { findUnique: async () => ({ dobYear: 1990 }), findMany: async () => [{ id: 'u1', name: 'You' }, { id: 'u2', name: 'Rival' }, { id: 'house', name: 'House' }] },
     gameSession: { findMany: async () => [] },
     sessionRun: { findUnique: async ({ where }: Row) => (store.runs[where.id] ? { ...store.runs[where.id] } : null) },
     $queryRaw: async () => [],   // the run row's FOR UPDATE lock (raced in arenaDuelRunRace.test.ts)

@@ -465,6 +465,8 @@ function GameShellInner({
                     iWon: ar.iWon,
                     payout: ar.payout,
                     feeLc: ar.feeLc,
+                    // ARENA-AGE-1: a practice duel's card says "prize", never the entry-duel words
+                    ...(ar.teenPractice ? { teenPractice: true, prize: Number(ar.prize) || 0, prizeCapped: Boolean(ar.prizeCapped) } : {}),
                     myScore: arenaScore,
                     oppScore: p1 === undefined || p2 === undefined ? undefined : p1 === arenaScore ? p2 : p1,
                   });

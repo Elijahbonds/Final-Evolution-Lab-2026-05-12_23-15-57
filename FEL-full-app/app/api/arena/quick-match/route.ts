@@ -20,6 +20,7 @@ import { MODE_INFO } from '@/lib/game-data';
 import { recordServerEvent } from '@/lib/analytics-server';
 import { isStakingPaused, stakingPausedDetail, STAKING_PAUSED_CODE, STAKING_PAUSED_STATUS } from '@/lib/stakingPause';
 import { isUnlistedMode } from '@/lib/unlisted-modes';
+import { arenaEntryGate } from '@/lib/age/arenaAgeBand';
 
 /**
  * POST /api/arena/quick-match
@@ -63,6 +64,10 @@ export async function POST(req: NextRequest) {
   }
   const feeCheck = validateArenaFee(feeLc);
   if (!feeCheck.ok) return NextResponse.json({ error: feeCheck.reason, detail: feeCheck.detail }, { status: 400 });
+  // ARENA-AGE-1 (Cyber F1 fix 1, T5): adults only, from the DB birth year, before the house roster or any LC moves.
+  // Teens and unknown age play /api/arena/teen-match instead.
+  const ageRefusal = await arenaEntryGate(prisma as any, userId);
+  if (ageRefusal) return ageRefusal;
 
   try {
     // House roster lives outside the match transaction (find-or-create).

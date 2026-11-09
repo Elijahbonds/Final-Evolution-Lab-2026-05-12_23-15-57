@@ -13,17 +13,26 @@
 import { arenaModeKey } from '@/lib/arena';
 import { RUN_STATUS } from '@/lib/sessions/sessionRuns';
 import { runTierOf, STAKED_TIER } from '@/lib/sessions/runTier';
+import { isTeenPractice } from '@/lib/arena-teen';
 
 export type DuelRunVerdict =
   | { ok: true; runId: string; score: number }
-  | { ok: false; code: 'NO_RUN' | 'RUN_NOT_YOURS' | 'RUN_NOT_FINISHED' | 'RUN_WRONG_MODE' | 'RUN_BEFORE_DUEL' | 'RUN_ALREADY_USED' | 'SCORE_MISMATCH' | 'RUN_NOT_STAKED'; detail: string; status: number };
+  | { ok: false; code: 'NO_RUN' | 'RUN_NOT_YOURS' | 'RUN_NOT_FINISHED' | 'RUN_WRONG_MODE' | 'RUN_BEFORE_DUEL' | 'RUN_ALREADY_USED' | 'SCORE_MISMATCH' | 'RUN_NOT_STAKED' | 'NOT_PRACTICE_SEAT'; detail: string; status: number };
 
 const FINISHED: readonly string[] = [RUN_STATUS.paid, RUN_STATUS.recorded];
 
 export async function readDuelRun(
   tx: any,
-  a: { runId: unknown; userId: string; match: { id: string; mode: string; createdAt?: Date | string | null }; postedScore: number },
+  a: { runId: unknown; userId: string; match: { id: string; mode: string; createdAt?: Date | string | null; matchType?: string | null; player1Id?: string | null }; postedScore: number },
 ): Promise<DuelRunVerdict> {
+  // ARENA-AGE-1: a TEEN_PRACTICE duel takes a run only from its own teen seat (player 1; seat 2 is the house). Checked
+  // first, before the run is even read. The run itself must still pass EVERY check below, the PRO head-to-head one
+  // included: /api/sessions/start records any run started with an arenaMatchId as staked at PRO
+  // (lib/sessions/runTier.ts serverTierFor), so a practice run started from the duel's link qualifies exactly like a
+  // Quick Match run. Nothing is relaxed for any other duel.
+  if (isTeenPractice(a.match) && (!a.match.player1Id || a.userId !== a.match.player1Id)) {
+    return { ok: false, code: 'NOT_PRACTICE_SEAT', detail: 'Only the player who opened this practice duel can post a score to it.', status: 403 };
+  }
   const runId = typeof a.runId === 'string' && a.runId.length > 0 && a.runId.length <= 64 ? a.runId : null;
   if (!runId) return { ok: false, code: 'NO_RUN', detail: 'A duel score has to come from a run you played: play the duel from its link and it submits itself.', status: 409 };
   // The run row is locked for the rest of the settle transaction (SELECT … FOR UPDATE): a second submit of the same run,
