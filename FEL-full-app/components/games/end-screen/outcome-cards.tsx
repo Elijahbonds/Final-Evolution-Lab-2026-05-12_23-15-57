@@ -9,6 +9,7 @@ import { PartyPopper, BookOpen } from 'lucide-react';
 import { ArenaRefusedLine } from '../end-card-refusal';
 import { carnivalRunTotalScore, type CarnivalRunState } from '@/lib/carnival-run';
 import type { EndArenaResult, EndChallengeResult, EndMpResult, EndStoryReward } from './types';
+import { TEEN_ARENA_COPY } from '@/lib/arena-teen-copy';
 
 const n = (v: number) => v.toLocaleString('en-US');
 
@@ -48,7 +49,34 @@ export function ChallengeCard({ r, onNavigate }: { r: EndChallengeResult; onNavi
   );
 }
 
+/** ARENA-AGE-1: the result line of a teen practice duel (DRAFT copy, lib/arena-teen-copy.ts). Pure, tested. */
+export function practiceResultLine(r: Pick<EndArenaResult, 'settled' | 'result' | 'iWon' | 'prize'>): string {
+  const C = TEEN_ARENA_COPY;
+  if (!r.settled) return C.resultPending;
+  if (r.result === 'tie') return C.rowTie;
+  if (!r.iWon) return C.resultLost;
+  return (r.prize ?? 0) > 0 ? C.resultWon(r.prize ?? 0) : C.resultWonCapped;
+}
+
 export function ArenaCard({ r, onNavigate }: { r: EndArenaResult; onNavigate: (href: string) => void }) {
+  if (r.teenPractice) {
+    return (
+      <div
+        data-recap="arena"
+        data-arena-practice
+        className={`rounded-2xl border p-[0.7em] text-center [&_[data-arena=refused]]:!text-[0.85em] ${
+          !r.settled || r.result === 'tie' ? 'border-white/25 bg-white/[0.05]' : r.iWon ? 'border-[#00FF9D]/40 bg-[#00FF9D]/10' : 'border-white/25 bg-white/[0.05]'
+        }`}
+      >
+        <p className="text-[0.8em] font-bold tracking-wide text-white/80">{TEEN_ARENA_COPY.resultTitle}</p>
+        {r.refused ? <ArenaRefusedLine refusal={r.refused} /> : <p className="mt-[0.2em] text-white/85">{practiceResultLine(r)}</p>}
+        {r.settled && typeof r.myScore === 'number' && typeof r.oppScore === 'number' && (
+          <p className="mt-[0.2em] font-display tabular-nums text-[0.8em] text-white/65">Your {n(r.myScore)} vs the house rival&apos;s {n(r.oppScore)}</p>
+        )}
+        <NavLink href="/arena" id="arena" onNavigate={onNavigate}>{TEEN_ARENA_COPY.resultBack}</NavLink>
+      </div>
+    );
+  }
   return (
     <div
       data-recap="arena"
