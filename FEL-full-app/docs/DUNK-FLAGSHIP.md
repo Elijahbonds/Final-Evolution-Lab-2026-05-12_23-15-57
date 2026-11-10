@@ -486,3 +486,28 @@ there: two jumps, 11.3 m and 3.4 m) and passes on the fix.
 
 Not changed: the replay's angles (three plus the orbit), the reveal's beats and its timing, the crowd and the sound — they
 already met their gates.
+
+## 14. Phase 9 — modes and progression (lane/dunk-flagship-p9)
+
+**The verified vertical on the ladder.** The two jumping feats on the unlock ladder — OVER FIVE IN A ROW and THE DUBBLE UP OVER
+6 TO 10 — also open with the player's verified adult jump: 50 cm and 60 cm (`VERIFIED_JUMP_ROW5_CM`, `VERIFIED_JUMP_DUBBLE_CM`,
+NEW numbers: a strong and an elite hands-on-hips countermovement jump). The won nights still open them exactly as before (3 and 4
+nights); the jump is a second road, never a gate, and nothing that was open is locked. A locked rung says both roads ("LOCKED — OVER
+FIVE IN A ROW · WIN 3 MORE NIGHTS OR A VERIFIED 50 CM JUMP"), except on a staked run.
+
+**Who.** The server answers for the signed-in account (GET /api/dunk/verified-jump, Phase 5): a number only for a verified 18+
+athlete who opted in, with a verified jump saved. That answer is the adult gate — without it the phone's jump history
+(`lib/jump/historyStore`, read only) is never read, so a teen's, a kid's, a guest's session on a shared phone never sees an adult's
+jumps (the history itself only ever holds adults' jumps: `keepJump` refuses anything but `adult: true`). With it, the best of the
+saved jump and the phone's verified hands-on-hips jumps; hand-picked frames and the arm-swing vertical never count (another
+series). The visit's jump is never stored, and a staked, ladder or challenge run never counts it (props carry card bonuses: a real
+rep never sells an advantage in ranked, staked or paid play). Read after dunk 1, from the contest set behind the flight gate.
+`assumption:` an adult with jumps on the phone but none saved on the server is not read (the server's answer is the only adult
+signal the mode has); a looser gate would need an account-age read on the client — the owner's call.
+
+**The friends battle.** A Flight Night challenge link is `/play/dunk?c=<code>` (`challengePlayHref('dunkContest', …)`), and
+`?c=` is a staked run: the classic night — one rival, four judged dunks (`DUNK_CONTEST_ATTEMPTS`), no field, no cut — so the card
+is the integrity cap's card, unchanged. No knob reaches it: the feel gate blocks a challenge link even with `?playtest=1`.
+
+Tests: `core/DunkUnlocks.verifiedJump.test.ts` (11). Rig: the mode boots and plays a night with the new read (a rig has no server:
+"none read", nothing changes).

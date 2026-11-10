@@ -10,8 +10,10 @@
 //   3. LIVE: made / taken / %, the last shot's call, and a tap to fix any call ("Did that one go in?" when the read was
 //      not sure); a shot it missed can be added by hand. Dribbles: the count, crossovers, the rate and the rhythm.
 //   4. SUMMARY: the shot chart, the zones, the make-% trend; kept on this phone for an adult, nowhere for a teen.
+//      BBS-04: also saved to the account when the page says the server keeps it (`serverKeep`: a verified adult who opted
+//      in, and the table applied); the route runs the movement-save gate again. Only the numbers are sent, never a frame.
 // The camera picture is shown ONLY through SelfView and never leaves the phone; the colour copy the ball detector reads
-// (frame-grab.ts) is never shown or sent; nothing here sends anything at all.
+// (frame-grab.ts) is never shown or sent; the only thing ever sent is a finished session's numbers (serverKeep above).
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Check, CheckCircle2, Crosshair, Loader2, RotateCcw, Square, Trash2, X, XCircle } from 'lucide-react';
@@ -29,7 +31,7 @@ import { PLACEMENTS, PLACEMENT_IDS, isPlacement, type Placement } from '@/lib/ho
 import { byZone, keepDeviceSession, readDeviceSessions, trend, type HoopsSession } from '@/lib/hoops-cam/log';
 import { keepsSessions, type HoopsTier } from '@/lib/hoops-cam/gate';
 import {
-  ASK_LINE, BETA_LINE, DEVICE_LINE, DRIBBLE_GUIDE, PRIVACY_LINE, RIM_LINE, RIM_SUGGEST_LINE, SHOT_GUIDE, SPOT_LINE, TEEN_LINE,
+  ASK_LINE, BETA_LINE, DEVICE_LINE, DRIBBLE_GUIDE, PRIVACY_LINE, RIM_LINE, RIM_SUGGEST_LINE, SERVER_LINE, SHOT_GUIDE, SPOT_LINE, TEEN_LINE,
   pctText, placementLine, statusLine,
 } from '@/lib/hoops-cam/copy';
 import { ShotChart, MakeTrend } from './shot-chart';
@@ -50,7 +52,9 @@ const readRim = (): Rim | null => {
   } catch { return null; }
 };
 
-export function ShotSession({ tier, grab, startMode = 'shots' }: { tier: HoopsTier; grab?: RgbGrab; startMode?: HoopsMode }) {
+export const HOOPS_SESSIONS_API = '/api/hoops-cam/sessions';
+
+export function ShotSession({ tier, grab, startMode = 'shots', serverKeep = false }: { tier: HoopsTier; grab?: RgbGrab; startMode?: HoopsMode; serverKeep?: boolean }) {
   const [mode, setMode] = useState<HoopsMode>(startMode);
   const [placement, setPlacement] = useState<Placement>('left_wing');
   const [height, setHeight] = useState('');
@@ -62,7 +66,7 @@ export function ShotSession({ tier, grab, startMode = 'shots' }: { tier: HoopsTi
   const [suggest, setSuggest] = useState<Rim | null>(null);
   const [lastRim, setLastRim] = useState<Rim | null>(null);
   const [why, setWhy] = useState<string | null>(null);
-  const [kept, setKept] = useState<'device' | 'none' | null>(null);
+  const [kept, setKept] = useState<'device' | 'server' | 'none' | null>(null);
   const [history, setHistory] = useState<HoopsSession[]>([]);
   const live = useRef<HoopsLive | null>(null);
   const off = useRef<(() => void)[]>([]);
@@ -152,7 +156,12 @@ export function ShotSession({ tier, grab, startMode = 'shots' }: { tier: HoopsTi
     const ok = keepDeviceSession(store(), session);
     setKept(ok ? 'device' : 'none');
     setHistory(readDeviceSessions(store()));
-  }, [keep, mode, release]);
+    // BBS-04: the account copy, for a coach the player shares with (a teen never has serverKeep, and the route refuses one)
+    if (serverKeep && tier === 'adult') {
+      void fetch(HOOPS_SESSIONS_API, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(session) })
+        .then((r) => { if (r.ok) setKept('server'); }).catch(() => { /* kept on the phone */ });
+    }
+  }, [keep, mode, release, serverKeep, tier]);
 
   const fix = (index: number, made: boolean) => { const l = live.current; if (l) setView(l.fix(index, made)); };
   const drop = (index: number) => { const l = live.current; if (l) setView(l.drop(index)); };
@@ -317,7 +326,7 @@ export function ShotSession({ tier, grab, startMode = 'shots' }: { tier: HoopsTi
             </div>
           )}
           {mode === 'shots' && days.length > 0 && <div className="fel-card rounded-xl p-4"><MakeTrend days={days} /></div>}
-          <p className="text-xs text-white/50" data-hoops-kept={kept ?? ''}>{kept === 'device' ? DEVICE_LINE : tier === 'teen' ? 'Not kept.' : 'Nothing to keep.'}</p>
+          <p className="text-xs text-white/50" data-hoops-kept={kept ?? ''}>{kept === 'server' ? SERVER_LINE : kept === 'device' ? DEVICE_LINE : tier === 'teen' ? 'Not kept.' : 'Nothing to keep.'}</p>
           <p className="text-xs text-[#FFB020]/80">{BETA_LINE}</p>
           <button type="button" onClick={() => { setPhase('setup'); setView(null); }} data-hoops-again className="flex min-h-12 w-full items-center justify-center rounded-xl bg-[#FF8A3D] px-4 font-bold text-black">New session</button>
         </div>

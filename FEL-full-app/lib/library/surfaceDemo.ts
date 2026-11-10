@@ -82,6 +82,24 @@ export const WARMUP_DEMO_LOOPS: Readonly<Record<string, string | null>> = {
 export const warmupDemoLoop = (id: string): string | null => WARMUP_DEMO_LOOPS[id] ?? null;
 
 /**
+ * DEMO-LOOPS-8 (2026-11-03): a Playbook lesson's own sequence, where the book's steps are neither a charted drill nor one
+ * library entry (lib/education/lessonDemo.ts, source kind 'lesson') → the loop authored for it (anim/authored/
+ * exerciseFamilies8.ts), keyed by the movement the lesson teaches.
+ */
+export const LESSON_DEMO_LOOPS: Readonly<Record<string, string | null>> = {
+  // ch. 2: on one foot, the tripod set and the short foot held for three, twice; then the one-foot pogo
+  'ankle-architecture-reset': 'ex_ankle_reset',
+  // ch. 4: sitting on the edge of a chair, slow circles with one foot then the other; then up to the wall for the knee-to-wall
+  'ankle-circles-knee-to-wall': 'ex_ankle_unlock',
+  // ch. 4: the 90/90 sit, tall, the chest turning toward the front leg without either sit bone lifting
+  'hip-90-90-turn': 'ex_ninety_turn',
+  // ch. 8: the bodyweight RDL, the hands sliding down the thighs to the knees, the back flat, about 45°
+  'bodyweight-hip-hinge': 'ex_bw_hinge',
+};
+/** A lesson sequence's loop, or null (the still). */
+export const lessonDemoLoop = (id: string): string | null => LESSON_DEMO_LOOPS[id] ?? null;
+
+/**
  * DEMO-LOOPS-4: coach catalogue rows the library cannot answer by name (lib/library/match.ts: no entry by that name or an
  * alias), keyed by the catalogue's exact name (folded by nameKey) → the loop that IS that row's movement, by the row's own
  * set-up (lib/coach/templateCatalogue.ts). Only names with no library entry: once the library has one, its own loop wins.

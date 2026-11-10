@@ -44,6 +44,7 @@ export function SetupScreen({ open = null }: { open?: string | null }) {
         </details>
       ))}
       <Link href="/coach/velocity" className={LOOK.row} data-coach-velocity-door><span>Bar speed</span><ChevronRight className="h-5 w-5 text-fel-dim" aria-hidden /></Link>
+      <Link href="/coach/shots" className={LOOK.row} data-coach-shots-door><span>Shot charts</span><ChevronRight className="h-5 w-5 text-fel-dim" aria-hidden /></Link>
       <Link href="/coach/business" className={LOOK.row} data-team-fee-entry><span>Team fees and packages</span><ChevronRight className="h-5 w-5 text-fel-dim" aria-hidden /></Link>
     </div>
   );
