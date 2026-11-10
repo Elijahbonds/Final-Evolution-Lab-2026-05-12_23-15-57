@@ -1383,6 +1383,17 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/visual/crowd/crowdFront.ts CROWD_FORGE_FRONT_ON',
     hint: 'On: the front row of every stand is forge rivals (about 31k triangles each), the five Meshy fans sit behind. Off: the Meshy crowd in every row, no forge body loads. Read when the crowd bakes (next venue).',
   },
+  // BAT-GRIP-2 (2026-11-10): the baseball bat is drawn only while both fists can be on it (modes/baseballBat.ts). NEW numbers.
+  {
+    id: 'baseball.batGripLostM', label: 'Bat hides when the fists are this far apart', def: 0.4, min: 0.25, max: 2, step: 0.05, unit: 'm', group: 'Baseball · bat',
+    source: 'lib/babylon/modes/baseballBat.ts BAT_GRIP_LOST_M',
+    hint: 'The bat is not drawn while the batter fists are further apart than this (the batter coming back to the stance from a run or a strikeout). 2 = never hides: the old behaviour, a bat strung between two far-apart hands.',
+  },
+  {
+    id: 'baseball.batGripBackM', label: 'Bat comes back when the fists are this close', def: 0.3, min: 0.1, max: 0.4, step: 0.05, unit: 'm', group: 'Baseball · bat',
+    source: 'lib/babylon/modes/baseballBat.ts BAT_GRIP_BACK_M',
+    hint: 'A hidden bat is drawn again once the fists close to this. Lower = it appears later in the blend into the stance, with the hands nearer together.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));

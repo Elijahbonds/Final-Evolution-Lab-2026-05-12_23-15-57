@@ -63,6 +63,8 @@ import { CARRY_ARM_SPEED_SEC } from '@/lib/babylon/anim/ballCarry';   // hoops-p
 import { STEAL_DICE_ON, STRIP_REACH_M, STRIP_SHIELD_M, STRIP_BALL_MAX_Y } from '@/lib/babylon/hoops/steals';   // hoops-p02
 import { ONBALL_CUSHION_M, ONBALL_CUSHION_PER_MPS } from '@/lib/babylon/hoops/pressure';   // hoops-p02
 
+import { BAT_GRIP_LOST_M, BAT_GRIP_BACK_M } from '@/lib/babylon/modes/baseballBat';   // bat-grip-2
+
 function tsFiles(dir: string): string[] {
   const out: string[] = [];
   for (const n of readdirSync(dir)) {
@@ -344,6 +346,8 @@ describe('the feel knob catalogue', () => {
     expect(def('dunk.slamShakeBig')).toBe(SLAM_SHAKE_BIG);
     expect(def('dunk.landLeadSec')).toBe(LAND_LEAD_SEC);             // dunk-flagship Phase 2 (new)           // dunk-flagship TUNED (new; every make was 0.12)
     expect(OVERTIME_3V3_SEC).toBe(30);
+    expect(def('baseball.batGripLostM')).toBe(BAT_GRIP_LOST_M);   // bat-grip-2 (new)
+    expect(def('baseball.batGripBackM')).toBe(BAT_GRIP_BACK_M);
   });
 
   it('every row is well formed: unique `<area>.<camelName>` id, min ≤ default ≤ max, the default on the step grid, a source', () => {
