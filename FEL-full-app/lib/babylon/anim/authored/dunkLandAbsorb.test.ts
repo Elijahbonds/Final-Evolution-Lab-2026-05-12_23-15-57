@@ -6,7 +6,7 @@ import { FreeCamera, NullEngine, Quaternion, Scene, SceneLoader, Vector3 } from 
 import type { AnimationGroup, Skeleton, TransformNode } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { boneNode } from '../boneLookup';
-import { buildDunkLandAbsorb, LAND_ABSORB_SEC, HEEL_DOWN_T, ABSORB_BOTTOM_T } from './dunkLandAbsorb';
+import { buildDunkLandAbsorb, buildDunkLandAbsorbDeep, LAND_ABSORB_SEC, HEEL_DOWN_T, ABSORB_BOTTOM_T, DEEP_HEEL_DOWN_T, DEEP_BOTTOM_T, RISE_START_T } from './dunkLandAbsorb';
 
 let scene: Scene; let sk: Skeleton;
 const bind = new Map<TransformNode, { p: Vector3; q: Quaternion }>();
@@ -86,5 +86,50 @@ describe('dunk_land_absorb', () => {
     expect(pos('RightHand').z).toBeGreaterThan(hips.z);
     expect(pos('LeftHand').z).toBeGreaterThan(hips.z);
     expect(Math.abs(pos('RightHand').x - pos('LeftHand').x)).toBeLessThan(0.7);
+  });
+});
+
+// DUNK SWITCH-ON (owner 2026-11-10, GATE 0 sign-off given): the deep absorb — the knees take the fall from the rim. The old clip's
+// tests above are unchanged (it is still what dunk.landAbsorbDeep 0 plays).
+describe('dunk_land_absorb_deep', () => {
+  it('reaches its bottom 0.10–0.16 s after contact (the old clip: 0.20–0.30 s), at least 0.10 m down, with no one-frame snap', () => {
+    const g = buildDunkLandAbsorbDeep(scene, sk)!;
+    at(g, 0); const hips0 = pos('Hips').y;
+    let lowest = hips0, lowestT = 0, prevH = hips0;
+    for (let f = 0; f <= Math.round(LAND_ABSORB_SEC * 60); f++) {
+      at(g, f / 60); const h = pos('Hips').y;
+      expect(h - prevH, `frame ${f}`).toBeGreaterThan(-HIP_DROP_SNAP_MAX);
+      if (h < lowest) { lowest = h; lowestT = f / 60; }
+      prevH = h;
+    }
+    console.info(`[land] deep: hips down ${(hips0 - lowest).toFixed(3)} m at ${lowestT.toFixed(3)} s`);
+    expect(hips0 - lowest).toBeGreaterThanOrEqual(0.10);   // the clip's own share; DunkMode's LandingAbsorb adds up to 0.11 m by the fall's speed (DunkMode scan)
+    expect(lowestT).toBeGreaterThanOrEqual(0.10); expect(lowestT).toBeLessThanOrEqual(0.16);
+  });
+  it('no lower toe than the old clip: the old one\'s lowest toe over its own absorb is the bar', () => {
+    const lowToe = (g: AnimationGroup, ts: number[]) => Math.min(...ts.map((t) => { at(g, t); return Math.min(footY('Left', 'ToeBase'), footY('Right', 'ToeBase')); }));
+    const old = lowToe(buildDunkLandAbsorb(scene, sk)!, [HEEL_DOWN_T, ABSORB_BOTTOM_T, RISE_START_T]);
+    const deep = lowToe(buildDunkLandAbsorbDeep(scene, sk)!, [DEEP_HEEL_DOWN_T, DEEP_BOTTOM_T, RISE_START_T]);
+    console.info(`[land] lowest toe: old ${old.toFixed(3)} m, deep ${deep.toFixed(3)} m`);
+    expect(deep).toBeGreaterThanOrEqual(old - 0.01);
+  });
+  it('the feet stay on the floor through the absorb, the knees over the toes, the lead foot ahead', () => {
+    const g = buildDunkLandAbsorbDeep(scene, sk)!;
+    for (const t of [DEEP_HEEL_DOWN_T, DEEP_BOTTOM_T, RISE_START_T]) {
+      at(g, t);
+      console.info(`[land] t ${t}: feet ${footY('Left', 'Foot').toFixed(3)} ${footY('Right', 'Foot').toFixed(3)}`);
+      for (const side of ['Left', 'Right'] as const) expect(footY(side, 'Foot'), `${side} ${t}`).toBeGreaterThan(FLOOR_MIN);
+      for (const side of ['Left', 'Right'] as const) {
+        const hip = pos(`${side}UpLeg`), knee = pos(`${side}Leg`), ankle = pos(`${side}Foot`);
+        const inside = side === 'Left' ? knee.x > hip.x && knee.x < ankle.x : knee.x < hip.x && knee.x > ankle.x;
+        expect(inside ? (Math.abs(knee.x - (hip.x + ankle.x) / 2) / (Math.abs(ankle.x - hip.x) || 0.01)) * 90 : 0, `${side} valgus ${t}`).toBeLessThanOrEqual(VALGUS_DEG_MAX);
+      }
+    }
+    at(g, DEEP_BOTTOM_T);
+    expect(pos('RightFoot').z - pos('LeftFoot').z).toBeGreaterThanOrEqual(STAGGER_MIN);
+  });
+  it('the same length and rise start as the old clip, so the celebration and the card keep their beats', () => {
+    expect(buildDunkLandAbsorbDeep(scene, sk)!.to / 30).toBeCloseTo(buildDunkLandAbsorb(scene, sk)!.to / 30, 3);
+    expect(DEEP_BOTTOM_T).toBeLessThan(RISE_START_T);
   });
 });

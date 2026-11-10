@@ -19,6 +19,26 @@ import type { AnimationGroup, Scene, Observer } from '@babylonjs/core';
 import { resolveClip } from './clipResolver';
 import { ledgerFor, requestAllowed, scopeFallback, suiteOfClip, type ClipScope } from './clipScope';
 import { inertialDt, inertialHalfLife, inertialStep, quatFromAxisAngle, quatMul, quatMulConj, quatToAxisAngle, type Quat } from './inertialize';
+import { feel } from '../../feel-panel/feel';
+
+/**
+ * GAMEPLAY-CLEAN P5 (2026-11-10): A ONE-SHOT THAT RUNS OUT INSIDE ITS OWN FADE-OUT IS HELD, feel knob `anim.fadeHoldEnded` (1 on).
+ *
+ * A crossfade ramps the outgoing clip's weight down over fadeSec. When that clip is a one-shot cut a few frames before its natural
+ * end — a strike or a hit react whose beat the mode ends by a timer, the settle arriving while the clip still has 3–5 frames to play —
+ * the clip reaches its end INSIDE the fade and Babylon stops its group: the weight it still had (0.6–0.8 of the body on a 0.18–0.2 s
+ * fade) is gone in ONE frame. Babylon fills a weight total under 1 with the incoming clip's "original value", the pose the bones held
+ * on the frame that clip STARTED, layers and all — a stale pose, so the body jumps from the one-shot's last frame toward where it was
+ * several frames earlier, then fades on from there. Measured in play (the rig, 14 s runs): Showdown's `karate_mc_hit_react` → `guard`,
+ * every bone on the frame after the react ran out (arms 21–30°, thighs 22–25°, spine 15° — the same numbers at 3.30, 4.75 and 9.32 s);
+ * Karate's jab → run, the right forearm 31–39° (2.47, 11.63, 12.95 s). freezeAtEnd already holds a fading-out clip's last frame, but
+ * only when a caller asks from the clip's end callback — and a cut clip's callback is detached when the cut starts (3d, final review),
+ * so nothing asked. Now the fade itself watches its outgoing clip: a ONE-SHOT that stopped at its natural end while the fade is still
+ * running is restarted as the frozen loop on its last frame (startFrozen, the freeze's own mechanism) at the weight the fade has it at,
+ * and fades out from there. 0 = the outgoing clip is left stopped, exactly as before. A loop, a clip stopped from anywhere else, a
+ * reverse-played clip and the inertial blend are untouched.
+ */
+export const FADE_HOLD_ENDED_ON = 1;
 
 /** AF-1: how a clip switch with fadeSec > 0 blends — 'linear' (the weight crossfade, the default) or 'inertial' (inertialize.ts). */
 export type BlendMode = 'linear' | 'inertial';
@@ -241,9 +261,20 @@ export class CharacterAnimator {
     const w0 = prev && prev !== next ? CharacterAnimator.weightOf(prev) : 1;
     this.fadingOutWeight = w0;
     let t = 0;
+    // P5: the outgoing one-shot's playhead as the fade last saw it (and the step before): how it is known to have run to its END
+    const out = prev && prev !== next ? prev : null;
+    const outOneShot = !!out && (out as unknown as { loopAnimation?: boolean }).loopAnimation === false;
+    let seen = out ? CharacterAnimator.frameOf(out) : NaN, step = 0;
     this.fadeObs = this.scene.onBeforeRenderObservable.add(() => {
       t += this.scene.getEngine().getDeltaTime() / 1000;
       const k = Math.min(1, t / fadeSec);
+      if (out && outOneShot) {
+        if (out.isPlaying) { const f = CharacterAnimator.frameOf(out); if (Number.isFinite(f)) { if (Number.isFinite(seen)) step = f - seen; seen = f; } }
+        else if (k < 1 && this.fadingOut === out && !out.isStarted && !this.pendingFreeze.has(out) && step >= 0 && Number.isFinite(seen)
+          && seen + 2 * Math.max(step, 1) >= out.to && feel('anim.fadeHoldEnded', FADE_HOLD_ENDED_ON) >= 0.5) {
+          this.startFrozen(out, w0 * (1 - k));   // ran out inside its own fade-out: its last frame, at the fade's weight (set again below)
+        }
+      }
       next.setWeightForAllAnimatables(k);
       this.fadingOutWeight = w0 * (1 - k);
       if (prev && prev !== next) prev.setWeightForAllAnimatables(w0 * (1 - k));
@@ -280,6 +311,12 @@ export class CharacterAnimator {
   private detachEnd(g: AnimationGroup): void {
     this.endObs.get(g)?.remove(true);
     this.endObs.delete(g);
+  }
+
+  /** A playing group's playhead (its first animatable's master frame), or NaN. */
+  private static frameOf(g: AnimationGroup): number {
+    const f = (g as unknown as { animatables?: { masterFrame?: number }[] }).animatables?.[0]?.masterFrame;
+    return typeof f === 'number' ? f : NaN;
   }
 
   /** A playing group's blend weight (its animatables carry it; −1 = never set = full). */
