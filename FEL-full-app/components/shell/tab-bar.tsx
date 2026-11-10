@@ -146,7 +146,7 @@ export function TabBar({ variant = 'bar' }: { variant?: 'bar' | 'inline' } = {})
     // PHONE-FIRST-SCREEN (owner's pick, 2026-10-17): the bar's glass also carries the soundtrack strip. SoundtrackDock
     // fills [data-tabbar-strip] with the Now Playing chip while a song plays, so the chip is chrome the page scrolls
     // under, like the tabs, and never a pill floating on a card. Empty, the strip has no height.
-    <div className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-fel-bg/90 backdrop-blur-xl md:hidden">
+    <div className="fel-bar fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-fel-bg/90 backdrop-blur-xl md:hidden">
       <div data-tabbar-strip />
       <nav aria-label={t('shell.nav.main')}>
         <ul className="mx-auto flex max-w-md items-stretch justify-around">{items}</ul>

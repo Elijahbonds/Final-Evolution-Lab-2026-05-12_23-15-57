@@ -83,7 +83,8 @@ export function PlayShelf({ initialFamily }: { initialFamily?: string }) {
                     530px of the page and told you nothing you could act on, directly above a venue grid that shows
                     fourteen places with artwork. Listing the modes makes the shelf worth reading at rest; the
                     family's own line takes over once it is open and the modes are on screen underneath anyway. */}
-                <span className={`${TYPE.small} min-w-0 truncate leading-none text-fel-dim`}>
+                {/* READABLE (lane/readable-2): two lines, then the clamp — the one-line list cut most of each family's modes at 390 px */}
+                <span className={`${TYPE.small} min-w-0 line-clamp-2 leading-snug text-fel-dim`}>
                   {isOpen ? f.blurb : modes.map((m) => m.name).join('  ·  ')}
                 </span>
               </span>
@@ -135,9 +136,9 @@ export function PlayShelf({ initialFamily }: { initialFamily?: string }) {
                             <Icon className="h-5 w-5" />
                           </span>
                           <span className="min-w-0">
-                            <span className={`${TYPE.body} block truncate font-semibold leading-tight text-white`}>{m.name} <PartyBadge modeKey={m.key} className="ml-1" /></span>
+                            <span className={`${TYPE.body} line-clamp-2 font-semibold leading-tight text-white`}>{m.name} <PartyBadge modeKey={m.key} className="ml-1" /></span>
                             {/* premium-ui P10: on a phone the row is the game's name — a label, not a sentence; the line returns from sm up */}
-                            <span className={`${TYPE.small} mt-0.5 hidden truncate text-fel-dim sm:block`}>{m.desc}</span>
+                            <span className={`${TYPE.small} mt-0.5 hidden line-clamp-2 text-fel-dim sm:[display:-webkit-box]`}>{m.desc}</span>
                             {m.venue && venueDistinguishes && (
                               <span className="mt-1.5 block truncate font-sans text-[12px] uppercase tracking-[0.14em] text-fel-quiet">
                                 {m.venue}

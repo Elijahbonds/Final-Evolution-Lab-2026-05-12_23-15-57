@@ -53,7 +53,7 @@ export function CorrectivesView({ youth, program, hold = null }: CorrectivesView
         </Link>
         <div className="min-w-0">
           <p className="font-mono text-[12px] font-bold uppercase tracking-[0.22em] text-[#00E5FF]">The Mirror</p>
-          <h1 className="fel-heading truncate text-[22px] font-black leading-none tracking-tight text-white md:text-[26px]">Correctives</h1>
+          <h1 className="fel-heading truncate pb-[2px] text-[22px] font-black leading-tight tracking-tight text-white md:text-[26px]">Correctives</h1>
         </div>
       </header>
 

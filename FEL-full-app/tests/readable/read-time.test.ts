@@ -47,3 +47,15 @@ describe('every literal sonner toast reads inside sonner’s 4 s (a longer one u
     expect(long, 'use readToast from @/components/ui/fel/toast').toEqual([]);
   });
 });
+
+describe('reduced transparency (READABLE.md section 1, Themes)', () => {
+  it('under prefers-reduced-transparency the glass and the two bars are solid, with no blur', () => {
+    const css = read('app/theme.css');
+    const block = css.slice(css.indexOf('@media (prefers-reduced-transparency: reduce)'));
+    expect(block).toMatch(/\.fel-glass, \.fel-bar, \.fel-panel \{[^}]*backdrop-filter: none !important/);
+    expect(block).toMatch(/\.fel-glass \{ background: #[0-9a-f]{6} !important; \}/);
+    expect(block).toMatch(/\.fel-panel \{ background: #[0-9a-f]{6} !important; \}/);
+    expect(block).toMatch(/\.fel-bar \{ background: var\(--fel-bg\) !important; \}/);
+    for (const f of ['components/shell/tab-bar.tsx', 'components/shell/status-rail.tsx']) expect(read(f), f).toMatch(/className="fel-bar /);
+  });
+});
