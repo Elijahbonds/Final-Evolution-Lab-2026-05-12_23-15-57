@@ -23,6 +23,7 @@ import { recordServerEvents } from '@/lib/analytics-server';
 import { isAnonymousEvent } from '@/lib/analyticsAnon';   // perf-lag: the fps / ttfp perf stats carry no user or guest id
 import { guestIdFrom } from '@/lib/guestSession';
 import { AGE_BLOCK_COOKIE } from '@/lib/privacy/ageScreen';
+import { isServerOnlyEventName } from '@/lib/analyticsReserved';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,8 +52,14 @@ export async function POST(req: Request) {
     if (!userId && jar.get(AGE_BLOCK_COOKIE)) return new NextResponse(null, { status: 204 });
     const guestId = userId ? null : guestIdFrom(jar);
 
+    // SELLER-18-1 v3 (Cyber N1): a client never writes a server-only record (the seller takedown's review row), so a
+    // signed-in seller can't forge the "already held" marker that would skip their payout freeze. Dropped silently.
+    const events = parsed.data.events.filter((e) => !isServerOnlyEventName(e.name));
+    if (events.length !== parsed.data.events.length) console.warn('[analytics] dropped a server-only event name from a client batch');
+    if (!events.length) return new NextResponse(null, { status: 204 });
+
     await recordServerEvents(
-      parsed.data.events.map((e) => ({
+      events.map((e) => ({
         name: e.name,
         props: e.props ?? null,
         ts: e.ts,

@@ -6,6 +6,7 @@ import { rateLimit } from '@/lib/rate-limit';
 import { connectGate, paymentsClosed } from '@/lib/coach-business/connect';
 import { sendTeamFee, type TeamFeeDeps } from '@/lib/coach-business/teamFee';
 import { bad, json, liveDeps, readJson, currentUserId } from '@/lib/coach-business/server';
+import { sellerGate } from '@/lib/seller/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,6 +16,9 @@ export async function POST(req: Request) {
   const userId = await currentUserId();
   if (!userId) return bad('unauthorized', 401);
   if (!rateLimit(`coach-business:team-fee:${userId}`, 5, 60_000).ok) return bad('rate_limited', 429);
+  // SELLER-18-1 (S-2): a seller action — the coach must be a verified adult (unknown age is refused).
+  const seller = await sellerGate(userId, 'coach_business');
+  if (seller) return seller;
   const d = liveDeps();
   const r = await sendTeamFee({ db: prisma as unknown as TeamFeeDeps['db'], env: d.env, now: d.now, coachSlug: d.coachSlug }, userId, await readJson(req));
   if (!r.ok) return r.error === 'store_closed' && r.reason ? paymentsClosed(r.reason as never) : bad(r.error, r.status);

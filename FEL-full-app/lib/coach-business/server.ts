@@ -13,6 +13,7 @@ import { ensureStripeCustomer } from '@/lib/stripe/product-checkout';
 import { readCoachPlan } from './planServer';
 import type { ConnectDeps } from './webhook';
 import type { PlanDb } from './planServer';
+import { canSell } from '@/lib/seller/server';
 
 export async function currentUserId(): Promise<string | null> {
   const session = await getServerSession(authOptions);
@@ -80,6 +81,7 @@ export function liveDeps() {
     now: new Date(),
     stripe: connectStripe,
     isAdult: isVerifiedAdultUser,
+    sellerOk: async (coachId: string) => (await canSell(coachId, 'coach_business')) === null,
     plan: (coachId: string) => readCoachPlan(planDb(), coachId),
     ensureCustomer: (buyerId: string) => ensureStripeCustomer(getStripe(), buyerId),
     async coachSlug(coachId: string) {

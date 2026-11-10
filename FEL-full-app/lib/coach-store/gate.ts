@@ -4,8 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { isCoachStoreEnabled, isCoachStorePaymentsEnabled, isCoachReviewUploadsEnabled } from '@/lib/flags';
 import { STORE_CLOSED_MESSAGE } from './constants';
 import type { StoreClosedReason } from './stripeMode';
-import { isStoreCoachWith } from '@/lib/teach/role';
-import { teacherRoleDeps } from '@/lib/teach/server';
+import { canSell } from '@/lib/seller/server';
 
 /** Named so public coach-store routes match the route-contract guard. Flag off is a 404. */
 export function assertCoachStoreOn(): NextResponse | null {
@@ -60,7 +59,11 @@ export function notSetUp(): NextResponse {
  * PLAT-P10 (EDU-01, 2026-11-03): who may sell in the coach store. The teacher role replaces COACH_STORE_COACH_USER_IDS as
  * the way in (lib/teach/role.ts: the owner-granted role, or a Camp-certified facilitator); the env list stays a fallback,
  * checked first and with no database read, so the owner's own store keeps working before the teacher SQL is applied.
+ *
+ * SELLER-18-1 (Cyber S-2): the role is no longer enough. Every caller (the store checkout, settings and prices, the
+ * review studio's coach side, the coach dashboard pages) now also needs a verified adult by User.dobYear; unknown age
+ * is refused, and a Camp-certified teen is refused. lib/seller/canSell.ts.
  */
 export async function isStoreCoach(userId: string | null | undefined): Promise<boolean> {
-  return isStoreCoachWith(userId, teacherRoleDeps());
+  return (await canSell(userId, 'coach_store')) === null;
 }
