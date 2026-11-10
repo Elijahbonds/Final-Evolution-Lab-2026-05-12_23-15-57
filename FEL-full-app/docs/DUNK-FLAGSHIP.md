@@ -511,3 +511,111 @@ is the integrity cap's card, unchanged. No knob reaches it: the feel gate blocks
 
 Tests: `core/DunkUnlocks.verifiedJump.test.ts` (11). Rig: the mode boots and plays a night with the new read (a rig has no server:
 "none read", nothing changes).
+
+## 15. Phase 10 — the look, the phone, and the whole pass re-measured (lane/dunk-flagship-p10)
+
+**The rig is in the repo now** (`scripts/probes/dunk-flagship/`: `build.sh`, `srv.sh`, `hold.sh`, `extras.sh`, the page, the
+analysis scripts, `jobs-p10.txt`). The scratch folder that held it was wiped once. On 2026-11-10 its static server, started from
+inside a lock hold, kept the shared browser lock for 46 minutes after the run and blocked every lane's rig; the holds now take
+the lock through `/home/user/wt/gate-run.sh` (`flock -o`), the server is started with the lock's descriptor closed, and each
+hold stops the server by its PID on the way out (checked on a private lock file: the lock is free the moment the hold ends).
+
+### Gate 1 — the dunk host on the design system, no layout shift at 390×844
+The host draws its whole HUD through the TV HUD kit (`components/games/tv-hud`), whose palette is the app theme's `--fel-*`
+tokens (a test reads `app/theme.css`) and whose type scale is the 10-foot scale; the migration scan holds the host and its
+pieces to it (no raw hex, no sub-floor text, no mono face): green. `assumption:` that kit is what "the design system's tokens"
+means for the in-game HUD; moving the HUD onto `components/ui/fel` would be the tv-hud / hud-hoops owners' work, not done here.
+
+Layout shift, measured on the REAL host (`components/games/dunk-babylon.tsx` as /try mounts it, with the app's CSS and fonts;
+`scripts/probes/_dunk-host-cls.mts`), 390×844, one dunk from the READY card through the judges to the next runway:
+
+| Part | Before (sum · worst 5 s window) | After | What moves |
+|---|---|---|---|
+| READY card while the arena loads | 0.236 · 0.097 | 0.205 · 0.080 (no change made; run-to-run) | the controls card under the title, as the location and ball rows load — `boot-splash.tsx`, every mode's, a caution file: **not this lane's to edit; routed** |
+| Start (the card goes, the HUD mounts) | 0 | 0 | — |
+| Play (the dunk host's own HUD) | **0.161 · 0.045** (18 shifts) | **0.074 · 0.032** (16) | before: the bottom column, every time the runway hint changed between one and two lines; after: the MC's caption and the beat strip when a row above or below them comes or goes |
+
+**Fixed:** the bottom column's box is fixed (anchored at the top of the stage and at the hint's slot) and the hint's row always
+reserves two lines, so a hint that re-words itself no longer moves the rows above it. Play shift −54 %; the worst window is under
+the Web Vitals "good" line (0.1) before and after. **Not zero**: the caption and the strip still move when the take-off chip or
+the beat strip appears; giving every row its own fixed slot is a bigger HUD layout change (the hud-hoops owners' column) and is
+left open. Test: `components/games/dunk-hud-stable.test.ts` (fails on the old column).
+
+### Gate 2 — the phone-profile frame time
+390×844, DPR 3, the CPU throttled 4× (Chrome's own throttle), `tier=mobile`, the dunker running the runway; each frame's
+work timed from the scene's first callback to its last (`scripts/probes/_dunk-phone-perf.mts`), the baseline (`36593d3a`) and
+this branch on the same browser, interleaved:
+
+| Build | Median frame work (ms) | Frames timed |
+|---|---|---|
+| Baseline 36593d3a | 81.7 (one run; the second did not reach play in 120 s) | 17 |
+| This branch | 60.4 · 42.0 (two runs) | 20 · 21 |
+
+Not above the baseline: **met**, with low confidence — the machine was shared with four other lanes' rigs, SwiftShader draws on
+the CPU, and only ~20 frames fit in the budget, so the spread between runs (60 vs 42 ms) is as large as the difference. It says
+the pass made the phone no slower; it does not measure a gain. The first two attempts at this measure never produced a number
+(the probe never started the game, then tsx's `__name` helper was missing in the page); both fixed in the probe.
+
+### Gate 3 — every earlier gate, re-run on the final build (`cur10` = this branch; knobs off unless named)
+The FAST rig (drawing off, validated in Phase 4), phone tier, the virtual clock, on the shared machine, 2026-11-10 (build
+`f4428bd0` + the probe commits; the game code of the dunk mode is the same as the merged Phase 9).
+
+| Phase | Gate | Then | Now | |
+|---|---|---|---|---|
+| 1 | Largest one-frame root-speed change before the plant | 0.53 m/s | 0.60 · 0.60 · 0.53 (0 frames over 0.6, 3 runs) | met (at the edge) |
+| 1 | Bone pops before the take-off (≤ 31) | 28 | 30 · 28 · 30 | met |
+| 1 | Foot skate on the run-up | not met at the default stride (Phase 4: 1.22 m/s, 1.10 knob 0.97) | run band 0.82 · 1.25 · 0.65 m/s | **still open** (the owner's stride knob) |
+| 2 | Press → feet off, A on the run / RT let go (≤ 150 ms) | 67 / 67 | 67 / 67 ms | met |
+| 2 | Root height step at take-off (≤ 2 cm) | 0.2 cm | 0.2 · 0.2 · 0 · 0.2 · 0.2 cm | met |
+| 2 | Landing: hard cuts · hip pops (≤ 2) | 0 · 1 | 0 · 1–3 (one run of five: 3) | cuts met; hip pops one over in one run |
+| 3 | Alley-oop flight ≥ 0.9 s, top ≥ 0.5 m over the catch, caught | 1.13 s, 0.55 m | 1.12–1.18 s, 0.53–0.60 m, 3/3, 4.6–4.7 m/s into the hand | met |
+| 4 | Every lob type caught, in frame | 63/63 | oop 3/3 · glass oop 2/2 · bounce oop 2/2 · off the glass 2/2 · bounce 2/2 · self-lob on the run 2/2: 13/13, the ball in frame 100 % of every flight; no LOST | met |
+| 4 | The standing throws (Y standing, then run) | 15/15 | not re-run (the hold was given to the over-the-ring A/B) | not measured |
+| 5 | The slam beat by the slam | on the beat 100 ms / 0.18; a late one 70–76 ms / 0.12–0.13 | 100 ms / 0.18 (3 of 3 on the beat); a late one (0.52) 76 ms / 0.132 | met |
+| 5 | The body dunk at 30 / 50 / 70 cm | monotonic | not re-run | not measured |
+| 6 | All 16 air tricks fire | 16/16 | 16/16, all made, every slam on the same beat (press @1.26) | met |
+| 6 | Distinctness | nearest-neighbour median 0.332 m, all-pairs 0.509, cradle 0.324, behind-the-back 0.319 | 0.330 · 0.508 · 0.324 · 0.319 (closest pair: the fakes, 0.224, by design) | unchanged |
+| 7 | The finishes, 5 of each (`dunk.slamVariants` on for the test; it ships off) | made 5/5 each; inside the ring plain 2/5, REVERSE 4/5, POWER 1/5 | made 5/5 each; inside 2/5 · **5/5** · 2/5 | REVERSE met; plain and POWER as before (the owner's call: off) |
+| 8 | The replay frames the dunker and the iron; no cut outside the authored ones; sound on the iron; reveal → next dunk | 188/188; one cut at the end; 0 frames; 5.55 s | 188/188 and 188/188; 7 cuts, none unauthored, one at the end; the thud and the cheer on the contact frame; 5.55 s | met |
+| 9 | Unlocks, the friends battle, no knob in ranked / staked / paid play | the tests | `DunkUnlocks.verifiedJump.test` green (and extended in P11) | met |
+
+What this table does not say: one run per row is one attempt on a loaded machine; the FAST rig draws no pixels, so it measures
+motion and timing, not looks. Looks were judged on the drawn strips of each phase (their sheets are listed in §5–§14).
+
+## 16. The ten-phase pass on one screen (for the owner)
+
+**What changed for a player, phase by phase** (every number measured on the rig, before → after):
+
+| # | What you notice now | The number |
+|---|---|---|
+| 1 | The run keeps its speed into the last two steps and the take-off: no brake into the jump. The first runway of the night shows the dunker, not a taco stand. | biggest one-frame speed jump 2.08 → 0.53 m/s |
+| 2 | The body no longer drops a few centimetres as it leaves the floor; the jump answers the button at once. | drop at take-off 2.8 → 0.2 cm; button to feet off 67 ms |
+| 3 | The alley-oop is a real lob thrown while you run: it hangs, a ring on the floor shows where you meet it, and it lands soft in the hand. | in the air 0.55 → 1.13 s; arrives at 11.8 → 4.7 m/s |
+| 4 | Every lob can be caught — off the glass, the bounce, the passer's glass and bounce oops — the camera keeps the ball in the picture, and a miss says why. | off the glass 0/8 → 14/14; glass oop 0/2 → 6/6; bounce oop 0/6 → 6/6 |
+| 5 | A perfect slam hits harder than a sloppy one; the rim, net and glass react on every make; a body dunk takes off from your real run. | freeze 70 ms for every make → 70 (ordinary) to 100 ms (perfect) |
+| 6 | All 16 air tricks fire, and the cradle no longer looks like the behind-the-back (its legs swing forward). | cradle's nearest look-alike 0.25 → 0.32 m apart |
+| 7 | Nothing yet: two new finishes (REVERSE, TWO-HAND POWER) are built and switched off, your call of 2026-11-10. | REVERSE makes 5/5 and meets the iron inside the ring 5/5 |
+| 8 | The slow-motion replay no longer ends on one frame of an empty rim. | dunker in frame 187/188 → 188/188 replay frames |
+| 9 | A verified adult jump opens two ladder feats (50 cm, 60 cm); a dunk challenge link plays the classic four-dunk night; no test setting reaches ranked, staked or challenge play. | 11 tests |
+| 10 | The hint line at the bottom of the phone screen no longer bumps the lines above it each time it changes. | layout shift in play 0.161 → 0.074 |
+
+**Feel-checks to do on the phone** (one night each, in this order):
+1. Hold RUN from a walk and watch the feet from behind, then tap A from three distances: no brake-pop, no hitch at take-off.
+2. ALLEY-OOP at a slow and a fast run: the pass goes up as you run, hangs, and lands in your hand at the top of the ring's mark.
+3. Off the glass and the bounce, slow and fast; and Y standing, then run.
+4. A sloppy slam, then one right on the beat: the second should hit visibly harder.
+5. Each air trick once from the practice runway (R1); the cradle should read as its own move.
+6. Land a big one and watch it through the replay and the judges to the next runway.
+7. On the runway, watch the hint line at the bottom while it changes: the lines above it should stay put.
+
+**Still open (with a recommendation where there is one):**
+- **Foot skate on the run-up** (Phase 1): not met at the shipped stride. The setting `dunk.runwayStrideScale` 1.1 skated 17 % less;
+  feel it on the panel — your call, it is a tuned number.
+- **The finish's contact** (Phases 7, 11): the shipped flush meets the front of the rim from outside 3 times in 5 and carries
+  the ball in. The over-the-ring version is built as a switched-off setting on `lane/dunk-flagship-p11` (§17 there) — it is not
+  ready to flip yet.
+- **The two finishes, REVERSE and TWO-HAND POWER**: off, by your call. REVERSE is ready whenever you want it.
+- **The landing absorb** (Phase 2): the knees take too little of the fall; an authored-clip change waiting for your sign-off.
+- **The READY card's layout shift while the arena loads** (0.2, the shared start screen of every mode): routed to its owner.
+- **The HUD's last shifts in play** (the caption and the beat strip, 0.074): a fixed slot per row is the HUD owners' change.
+- Not re-measured in Phase 10: the standing throws and the body dunk (their Phase 4 / 5 numbers stand).
