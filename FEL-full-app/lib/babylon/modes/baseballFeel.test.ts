@@ -9,7 +9,7 @@ import path from 'node:path';
 import { BaseballGame, crossSec, gradeSwing, type SwingKind } from './baseballGame';
 import { pitchSpec, PITCH_RELEASE_SEC } from './baseballPitch';
 import { BaseballSlots, SlotDriver, HIT_STOP_MS, HIT_STOP_CAP_MS, SWING_STOP_T, hitStopFor } from './baseballSlots';
-import { batGlbFit, BAT_GLB_HANDLE, BAT_GLB_BARREL, BAT_LEN } from './baseballBat';
+import { batGlbFit, batGlbInScene, BAT_GLB_HANDLE, BAT_GLB_BARREL, BAT_LEN } from './baseballBat';
 import { BaseballAnimTree, BASEBALL_CLIP_FOR, chooseBaseballClip, type BaseballAnimState, type BaseballAnimInput } from '../anim/baseballTree';
 import { CLIP_ALIASES } from '../anim/clipAliases';
 import { REAL_CLIPS } from '../anim/clipRegistry';
@@ -170,7 +170,10 @@ describe('BASEBALL-FEEL bat.glb fit (PM order)', () => {
       const x = v[0] * f.scale, y = v[1] * f.scale;
       return [x * Math.cos(f.rotZ) - y * Math.sin(f.rotZ), x * Math.sin(f.rotZ) + y * Math.cos(f.rotZ) + f.offsetY];
     };
-    const h = tf(BAT_GLB_HANDLE), b = tf(BAT_GLB_BARREL);
+    // test changed (BAT-GRIP, 2026-11-03): the fit is checked on the ends AS LOADED (batGlbInScene: the glTF loader mirrors
+    // the file's X). It used to do the math on the file's own numbers, which passed while the game drew the bat upside
+    // down; baseballBatGrip.test.ts loads the real file through the same code.
+    const h = tf(batGlbInScene(BAT_GLB_HANDLE)), b = tf(batGlbInScene(BAT_GLB_BARREL));
     expect(h[0]).toBeCloseTo(0, 6); expect(h[1]).toBeCloseTo(0, 6);
     expect(b[0]).toBeCloseTo(0, 6); expect(b[1]).toBeCloseTo(0.86, 6);
   });

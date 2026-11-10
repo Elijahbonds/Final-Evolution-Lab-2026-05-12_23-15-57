@@ -432,4 +432,21 @@ yet.
   180 degrees in one frame at the half-turn. The read is folded past 90 degrees (unchanged up to 90, back to 0 at 180), so the strip
   is continuous. 0 = the old wrapped read exactly.
 
+- Same group (`anim/FootPlanting.ts`, lane/gameplay-clean-4), **TUNED (new behaviour)**: `anim.plantReleaseSec` 0.1 s, the release
+  fade's own time. A pin the clip lets go of (a lift, a take-off, a landing) now eases back onto the clip in ROTATION: the hip and knee
+  the layer wrote last are held and slerped onto the clip's. The old release faded the target and solved it each frame, which rebuilt
+  the leg in one frame when the root or the clip jumped on that frame (Football Rush's hurdle and TD spike: thighs 41 to 70 degrees a
+  frame). 0 = the old target fade exactly.
+
 **assumption:** the bounds (0 to 0.4 s) are safe, not tuned. A ranked, staked or head-to-head run reads the defaults.
+
+## Owner calls, 2026-11-10 (delegated: "handle those 5 open calls"; lane/owner-calls-1110)
+
+The owner has not felt this yet.
+
+- Group "Anim · transitions" (`anim/footballTree.ts`), **TUNED (flagged)**: `football.hurdleFadeSec` 0.12 s (was the stiff-arm slot's
+  0.06 s, which the hurdle shared). How long the carry blends into the hurdle's jump. Measured headless on the hero over 24 carry
+  phases, at 1× and 1.4× carry rate (`footballTree.hurdleFade.test.ts`): the worst one-frame thigh turn is 24–25° at 0.06 s (the rig
+  read 26° in play), 15–17° at 0.12 s, 13–15° at 0.15 s; the knee 12–13° → 7.5–8.7°. The carry's own stride is about 6° a frame.
+  0.06 = the old blend exactly. The juke, the spin and the stiff arm keep 0.06 s. Feel-check: football, hurdle a downed man at a
+  sprint; do the legs tuck with the hop, or lag it?

@@ -384,6 +384,29 @@ and comes back to 0 at ±180°, so it is continuous.
 - Football's thighs still reach 48–70° a frame at hurdle transitions. With the planter off they reach 29°, so the planter plays a part
   at a jump. That is the release side at take-off, not the stance case fixed here; it is noted for the next pass.
 
+## 4f. The planter's release (lane/gameplay-clean-4)
+
+**What the 48–70° football thighs were.** Read frame by frame, the football thigh spikes counted in §4e almost all fall on a frame where
+the hero is RESET: after a touchdown or a tackle, the toe moves 6–15 m in one frame. A reset frame is a cut, not a pop. With those
+frames (the root moving more than 1 m in a frame, and the frame after) left out, football's thighs peak at **26.2–26.5°** in every run,
+planter on or off. That is the clip's own carry → `jump_up` blend at the hurdle. What the planter still added was at the **knees**,
+on the take-off release.
+
+**Fix:** `anim/FootPlanting.ts` now lets a leg go in rotation. The hip and knee it wrote on the frame before are held and slerped
+onto the clip's over `anim.plantReleaseSec`. That is 0.1 s, the old release fade's own time, so no tuned time moved. 0 restores the
+old target fade exactly. The old fade solved the leg each frame toward a target that the jumped body no longer reached.
+
+Same rig, 14 s anim-only, reset frames left out:
+
+| Run | Football max knee turn / frame | Football max thigh | Derby max thigh | 1v1 max thigh (hoops check) | 1v1 hard-pop events |
+|---|---|---|---|---|---|
+| before (clean-3 planter; 3 football runs, 1 1v1) | 31.8 / 29.6 / 31.0° | 26.5 / 26.2 / 26.2° | 19.8 / 19.6° | 71.4° | 17 |
+| after (2 runs each) | **23.7 / 12.5°** | 26.2 / 26.2° | 14.1° | 66.2 / 64.2° | 15 / 13 |
+
+No regression in derby or 1v1. 1v1's 64–71° thighs come from the hoops lane's plant-and-cut lock: it claims the leg, and a claim
+hand-over keeps the old fade. They predate this pass and are theirs. The audit's pop counter does not skip reset frames yet; the
+analysis script does (`legmax.mjs` in the lane scratchpad).
+
 ## 5. For the dunk and hoops lanes (routed, not changed here)
 
 Measured by the same rig on `/play/dunk`, `/play/onevone` and `/play/threevthree`. The occluder fade is off for these
