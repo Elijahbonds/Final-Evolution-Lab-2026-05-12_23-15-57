@@ -89,6 +89,13 @@ describe('3. the bars: 44 px targets, and the rail does not arrive late', () => 
   it('on a phone the wallet cluster is its own row from the first frame, so its count-up cannot wrap it mid-load', () => {
     expect(rail).toContain('ml-auto flex min-w-0 basis-full flex-wrap items-center justify-end gap-2 sm:basis-auto');
   });
+  it('the doors row at the foot of Train, Play and Profile: each door is a 44 px target (they were 15 px of words)', async () => {
+    const { DoorsRow } = await import('@/components/shell/doors-row');
+    const html = renderToStaticMarkup(h(DoorsRow, { tab: 'train' }));
+    const links = html.match(/<a [^>]*>/g) ?? [];
+    expect(links.length).toBeGreaterThan(0);
+    for (const l of links) expect(l).toContain('inline-flex min-h-11 items-center');
+  });
   it('the game header: Home, body play, the graphics menu, pause and full screen are 44 px; the late parts hold their place', () => {
     const shell = read('components/games/game-shell.tsx');
     expect(shell).toContain('flex min-h-11 shrink-0 items-center gap-1.5');

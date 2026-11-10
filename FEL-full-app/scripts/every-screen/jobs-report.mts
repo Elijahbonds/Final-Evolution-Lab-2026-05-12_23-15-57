@@ -40,7 +40,7 @@ export async function jobsReport(): Promise<void> {
     for (const w of rows) {
       const b = before && after ? before.find((x) => x.id === w.id) : null;
       const was = before && after ? `${b ? (b.done ? `${b.taps} taps, ${b.seconds} s` : `stopped at step ${b.stop?.step}`) : '–'} | ` : '';
-      P(`| ${esc(w.name)} | ${w.taps}${w.skips ? ` (+ ${w.skips} waits the rig skipped)` : ''} | ${w.typed || '–'} | ${w.seconds} | ${was}${esc(how(w))} | ${esc(w.planBudget ?? '–')} |`);
+      P(`| ${esc(w.name)} | ${w.taps}${w.sets ? ` (${w.sets} sets + ${w.taps - w.sets} other)` : ''}${w.skips ? ` (+ ${w.skips} waits the rig skipped)` : ''} | ${w.typed || '–'} | ${w.seconds} | ${was}${esc(how(w))} | ${esc(w.planBudget ?? '–')} |`);
     }
     P();
   }
