@@ -98,6 +98,12 @@ describe('2. a switched-off screen says why and what to do instead', () => {
       expect(dark, f).toContain("href: '/coach'");
     }
   });
+  it('squads and teams while they are off (reached from Train): the drill and a game the line names, as links', () => {
+    const src = read('components/groups/groups-home.tsx');
+    const dark = src.split('\n').find((l) => /data-groups-coming-soon/.test(l)) ?? '';
+    expect(dark).toContain('<DarkInstead');
+    expect(dark).toContain("href: '/train/today-drill'");
+  });
   it('DarkInstead draws tap targets of 44 px, and nothing when it has no link', () => {
     const html = renderToStaticMarkup(h(DarkInstead, { links: [{ href: '/coach', label: 'Back to Coach' }] }));
     expect(html).toContain('min-h-11');

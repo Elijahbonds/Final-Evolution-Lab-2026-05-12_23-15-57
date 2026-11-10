@@ -13,6 +13,7 @@ import type { GroupSummary } from '@/lib/groups/view';
 import { GROUP_COLORS, type GroupColor, type GroupKind } from '@/lib/groups/types';
 import { squadNameChoices } from '@/lib/groups/rules';
 import { COMING_SOON, KIND_LABEL, TEEN_SAFE_LINE } from '@/lib/groups/copy';
+import { DarkInstead } from '@/components/every-screen/dark-instead';
 
 const card = 'rounded-2xl border border-white/10 bg-white/[0.03] p-4 sm:p-5';
 
@@ -28,7 +29,8 @@ export function GroupsHome({ initial, initialNames }: { initial: GroupsHomeData;
   const [busy, setBusy] = useState(false);
 
   if (!initial.available) {
-    return <section className={card} data-groups-coming-soon><p className="text-[14px] leading-relaxed text-white/70">{COMING_SOON}</p></section>;
+    // EVERY-SCREEN P1: the notice names the drills and the streak; they are links now (the screen had no way on)
+    return <section className={card} data-groups-coming-soon><p className="text-[14px] leading-relaxed text-white/70">{COMING_SOON}</p><DarkInstead links={[{ href: '/train/today-drill', label: "Today's drill" }, { href: '/play', label: 'Play a game' }]} /></section>;
   }
 
   const post = async (url: string, body: Record<string, unknown>) => {
