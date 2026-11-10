@@ -34,18 +34,49 @@ export const BAT_DIAM = { top: 0.065, bottom: 0.03 } as const;
 export type BatLook = 'glb' | 'cylinder';
 export const BAT_LOOK: BatLook = 'glb';
 
-/** bat.glb as measured (2026-10-23): the bat lies diagonally in its XY plane, handle ≈ (−0.40, −0.17, 0), barrel
- *  ≈ (+0.40, +0.17, 0), centred on the origin, ≈ 0.87 m long. */
+/** bat.glb as measured (2026-10-23) IN THE FILE (glTF's own axes): the bat lies diagonally in its XY plane, handle (its
+ *  thin end) ≈ (−0.40, −0.17, 0), barrel ≈ (+0.40, +0.17, 0), centred on the origin, ≈ 0.87 m long. */
 export const BAT_GLB_HANDLE = [-0.40, -0.17, 0] as const;
 export const BAT_GLB_BARREL = [0.40, 0.17, 0] as const;
 
-/** The fit that turns the GLB's handle→barrel onto +Y with the handle at the origin, scaled to BAT_LEN. Pure. */
-export function batGlbFit(handle: readonly number[] = BAT_GLB_HANDLE, barrel: readonly number[] = BAT_GLB_BARREL, len = BAT_LEN): { rotZ: number; scale: number; offsetY: number } {
+/** BAT-GRIP (owner, 2026-11-03: "the character holds the bat upside down"): where a FILE point sits once Babylon's glTF
+ *  loader has it. The loader hangs every glTF under a __root__ node turned 180° about Y with Z scaled −1 (glTF is
+ *  right-handed, Babylon left-handed), so a file point (x, y, z) loads at (−x, y, z). The fit below used the file's own
+ *  numbers, turned the MIRRORED bat by the file's angle, and drew it 134° off its line: the knob up by the barrel's end,
+ *  the barrel down through the fists (measured on the real rig, /dev/mode/baseball: GLB 137.8° off the placed line, its
+ *  thick end 0.31 m from the fists and its thin end 0.74 m). Pure. */
+export function batGlbInScene(p: readonly number[]): [number, number, number] {
+  return [-p[0], p[1], p[2]];
+}
+
+/** The fit that turns the LOADED GLB's handle→barrel onto +Y with the handle at the origin, scaled to BAT_LEN. Pure.
+ *  The defaults are the file's measured ends as the loader leaves them (batGlbInScene). */
+export function batGlbFit(
+  handle: readonly number[] = batGlbInScene(BAT_GLB_HANDLE), barrel: readonly number[] = batGlbInScene(BAT_GLB_BARREL), len = BAT_LEN,
+): { rotZ: number; scale: number; offsetY: number } {
   const dx = barrel[0] - handle[0], dy = barrel[1] - handle[1];
-  const rotZ = Math.PI / 2 - Math.atan2(dy, dx);   // the handle→barrel angle (≈ 23° off +X) turned onto +Y
+  // Babylon's rotation.z turns +X toward +Y (x' = x cos − y sin, y' = x sin + y cos): the handle→barrel angle onto +Y
+  const rotZ = Math.PI / 2 - Math.atan2(dy, dx);
   const scale = len / Math.hypot(dx, dy);
   // the GLB is centred on its origin, so after the turn and the scale the handle sits at −len/2 on Y: lift it to the origin
   return { rotZ, scale, offsetY: len / 2 };
+}
+
+/** Put a spawned bat.glb (spawnMeshyProp's root, the loader's __root__ under it) on the fit: handle at its parent's origin,
+ *  barrel along its parent's +Y. What dressBatGlb runs, and what baseballBatGrip.test.ts loads the real file through. */
+export function fitBatModel(model: TransformNode, len = BAT_LEN): void {
+  const fit = batGlbFit(batGlbInScene(BAT_GLB_HANDLE), batGlbInScene(BAT_GLB_BARREL), len);
+  model.rotation.set(0, 0, fit.rotZ);
+  model.scaling.setAll(fit.scale);
+  model.position.set(0, fit.offsetY, 0);
+}
+
+/** The handle's end of a placed carrier cylinder (centred on its origin, barrel along its +Y): half a bat back along +Y.
+ *  The GLB wrapper's origin. Writes into `out`. */
+const sUp = new Vector3();
+export function batHandleEnd(carrier: AbstractMesh, len: number, out: Vector3): Vector3 {
+  sUp.set(0, 1, 0).rotateByQuaternionToRef(carrier.rotationQuaternion ?? Quaternion.Identity(), sUp);   // per frame: no allocation
+  return carrier.position.subtractToRef(sUp.scaleInPlace(len / 2), out);
 }
 
 export interface BatLookHandle { setVisible(on: boolean): void; dispose(): void }
@@ -60,20 +91,15 @@ export function dressBatGlb(scene: Scene, carrier: AbstractMesh, len = BAT_LEN, 
   let loaded = false;
   outer.rotationQuaternion = new Quaternion();
   outer.setEnabled(false);
-  const up = new Vector3(), knob = new Vector3();
   const obs: Observer<Scene> | null = scene.onBeforeRenderObservable.add(() => {
     if (!outer || carrier.isDisposed()) return;
     // the carrier is centred; the wrapper's origin is the handle's end: half a bat back along the carrier's +Y
-    up.set(0, 1, 0).rotateByQuaternionToRef(carrier.rotationQuaternion ?? Quaternion.Identity(), up);
-    outer.position.copyFrom(carrier.position.subtractToRef(up.scaleToRef(len / 2, knob), knob));
+    batHandleEnd(carrier, len, outer.position);
     outer.rotationQuaternion!.copyFrom(carrier.rotationQuaternion ?? Quaternion.Identity());
   });
   void spawnMeshyProp(scene, 'bat', null, `${carrier.name}_meshy`).then((model) => {
     if (!model || !outer || carrier.isDisposed()) { model?.dispose(); return; }
-    const fit = batGlbFit(BAT_GLB_HANDLE, BAT_GLB_BARREL, len);
-    model.rotation.set(0, 0, fit.rotZ);
-    model.scaling.setAll(fit.scale);
-    model.position.set(0, fit.offsetY, 0);
+    fitBatModel(model, len);   // BAT-GRIP: the fit in the scene's axes, not the file's (the bat was drawn upside down)
     model.parent = outer;
     loaded = true;
     outer.setEnabled(shown);
