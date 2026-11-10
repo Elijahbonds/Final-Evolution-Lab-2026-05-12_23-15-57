@@ -42,9 +42,10 @@ export function inertialOn(): boolean {
 /**
  * SWITCH-ON (2026-11-10): feel knob `anim.inertialMinHalfLifeSec` default — the shortest half-life a switch's offset decays with (s).
  * K × fadeSec alone gives a 0.02–0.03 s half-life on the fighters' 0.04–0.06 s switches: two thirds of a 80° offset went in ONE frame
- * (karate VS, jab → run, arms 55–58° a frame in the rig). 0 = AF-1's K × fadeSec exactly.
+ * (karate VS, jab → run, arms 55–58° a frame in the rig). 0.045 s: the rig's best of 0 / 0.045 / 0.07 on the fighters (§6).
+ * 0 = AF-1's K × fadeSec exactly.
  */
-export const ANIM_INERTIAL_MIN_HALF_LIFE_SEC = 0;
+export const ANIM_INERTIAL_MIN_HALF_LIFE_SEC = 0.045;
 
 /** The decay half-life (s) for a call site's fadeSec. ≤ 0 → 0 (a hard cut stays a hard cut). */
 export function inertialHalfLife(fadeSec: number): number {
@@ -52,9 +53,20 @@ export function inertialHalfLife(fadeSec: number): number {
   return Math.max(feel('anim.inertialHalfLifeK', ANIM_INERTIAL_HALF_LIFE_K) * fadeSec, feel('anim.inertialMinHalfLifeSec', ANIM_INERTIAL_MIN_HALF_LIFE_SEC));
 }
 
-/** Opt a body in: inertial when the knob is on, otherwise untouched (returns whether it switched). */
-export function applyInertialBlend(animator: { setBlendMode(mode: 'linear' | 'inertial'): void }): boolean {
-  if (!inertialOn()) return false;
+/**
+ * SWITCH-ON (2026-11-10): feel knob `anim.inertialModesOn` default — 1 = the inertial blend is ON by default on the hero of the modes
+ * where the gameplay-clean rig measured it better than the linear crossfade (karate, karate VS, showdown, mixed combat, duel,
+ * skateboard: docs/SWITCH-ON.md §6). 0 = those modes linear, exactly as before. The modes opt in with
+ * applyInertialBlend(animator, 'measured'); every other mode stays linear unless `anim.inertial` is on.
+ */
+export const ANIM_INERTIAL_MODES_ON = 1;
+export type InertialScope = 'measured';
+
+/** Opt a body in: inertial when the knob is on (or, for a measured mode, unless anim.inertialModesOn is 0), otherwise untouched
+ *  (returns whether it switched). */
+export function applyInertialBlend(animator: { setBlendMode(mode: 'linear' | 'inertial'): void }, scope?: InertialScope): boolean {
+  const on = inertialOn() || (scope === 'measured' && feel('anim.inertialModesOn', ANIM_INERTIAL_MODES_ON) >= 0.5);
+  if (!on) return false;
   animator.setBlendMode('inertial');
   return true;
 }

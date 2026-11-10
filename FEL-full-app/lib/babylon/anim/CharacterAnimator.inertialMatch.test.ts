@@ -117,14 +117,14 @@ describe('anim.inertialMatchVel', () => {
       r.engine.dispose();
       return w;
     };
-    const base = worst(null), zero = worst(0), floored = worst(0.045);
+    const zero = worst(0), dflt = worst(null), floored = worst(0.045);
     // AF-1: half-life 0.02 s on a 90° offset — the decay's fastest frame is about a third of it
     let s = { x: 90, v: 0 }, step = 0;
     for (let i = 0; i < 30; i++) { const n = inertialStep(s.x, s.v, 0.02, 1 / 60); step = Math.max(step, s.x - n.x); s = n; }
-    expect(Math.abs(base - step)).toBeLessThan(0.05);
-    expect(zero).toBeCloseTo(base, 6);
+    expect(Math.abs(zero - step)).toBeLessThan(0.05);   // 0: AF-1's half-life exactly
+    expect(zero).toBeGreaterThan(25);
     expect(floored).toBeLessThan(18);
-    expect(base).toBeGreaterThan(25);
+    expect(dflt).toBeCloseTo(floored, 6);               // the default is 0.045 s
   });
 
   it('anim.inertialAllBones: a bone the last clip did not key starts from where it was (0 = AF-1: it jumped)', () => {

@@ -1331,9 +1331,14 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'On: the old pose\'s difference decays out starting at the speed the body had, minus the new clip\'s own speed, so a clip that starts fast (a strike) does not stack its speed on the old motion. Off: the first inertial version (one axis, the old speed only).',
   },
   {
-    id: 'anim.inertialMinHalfLifeSec', label: 'Inertial: shortest half-life', def: 0, min: 0, max: 0.15, step: 0.005, unit: 's', group: 'Anim · transitions',
+    id: 'anim.inertialMinHalfLifeSec', label: 'Inertial: shortest half-life', def: 0.045, min: 0, max: 0.15, step: 0.005, unit: 's', group: 'Anim · transitions',
     source: 'lib/babylon/anim/inertialize.ts ANIM_INERTIAL_MIN_HALF_LIFE_SEC',
     hint: 'A switch\'s old-pose offset never decays faster than this half-life (a 0.04 s fade gave 0.02 s: most of the offset went in one frame). 0 = the half-life × fade time alone. Read only while inertial transitions are on.',
+  },
+  {
+    id: 'anim.inertialModesOn', label: 'Inertial transitions in karate, karate VS, showdown, mixed combat, duel, skateboard on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/inertialize.ts ANIM_INERTIAL_MODES_ON',
+    hint: 'On: those six modes use the inertial blend on the hero (the rig measured fewer hard pops in each). Off: the linear crossfade there, exactly as before. Every other mode follows the knob above. Takes effect on the next spawn.',
   },
   {
     id: 'anim.inertialAllBones', label: 'Inertial: every bone keeps its history on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',

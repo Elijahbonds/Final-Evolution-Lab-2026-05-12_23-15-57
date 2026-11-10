@@ -873,7 +873,7 @@ export const DuelMode: ModeDefinition = (() => {
       meMove.lockTarget = rival.root.position; foeMove.lockTarget = player.root.position;
       meDef = new DefenseController(); foeDef = new DefenseController();
       meAnim = new CombatAnimTree(player.animator); foeAnim = new CombatAnimTree(rival.animator);
-      applyInertialBlend(player.animator);   // SWITCH-ON (2026-11-10): AF-1's inertial transitions, as on its siblings karate VS and showdown (the knob's off value leaves the duel linear)
+      applyInertialBlend(player.animator, 'measured');   // SWITCH-ON: on by default here (anim.inertialModesOn; 0 = linear, as before)   // SWITCH-ON (2026-11-10): AF-1's inertial transitions, as on its siblings karate VS and showdown (the knob's off value leaves the duel linear)
       // GUARD is the exertion signal here, the same reading karate_vs uses: a fighter whose guard is gone
       // is a fighter who has been working, and the dynamic layer leans the body accordingly.
       mePosture = mountPostureLayer(ctx.scene, player.skeleton, player.root, () => feedFor(meBio, () => rival, meMotion, 1 - meState.guard / 100), 'DUEL-PP');
