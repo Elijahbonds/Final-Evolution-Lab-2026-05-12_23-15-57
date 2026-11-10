@@ -43,6 +43,11 @@ if (TV && body === 'me') {
   const by2 = new Map(); for (const r of rows) { const k = `${r.st} | ${r.dir || '?'}`; if (!by2.has(k)) by2.set(k, []); by2.get(k).push(r); }
   for (const [k, a] of [...by2.entries()].sort((x, y) => y[1].filter((r) => r.cm > 3).length - x[1].filter((r) => r.cm > 3).length)) console.log(`  ${k.slice(0, 60).padEnd(60)} ${String(a.length).padStart(5)} ${String(a.filter((r) => r.cm > 3).length).padStart(5)} ${r1(pct(a.map((r) => r.cm), 0.9)).padStart(6)} ${r1(pct(a.map((r) => r.sp || 0), 0.5)).padStart(5)} ${String(pct(a.filter((r) => r.deg !== undefined).map((r) => r.deg), 0.5) ?? '-').padStart(5)}`);
 }
+// an input run's defence-movement cases (drive.mjs TESTS=defmove): the slide inside each case's own window
+if (R.tests && R.tests.defmove && R.tests.defmove.length) {
+  console.log('\ndefence-movement cases: planted, over 3 cm, slide p50 / p90 cm a frame, the root p50 cm a frame, the states seen (frames)');
+  for (const t of R.tests.defmove) { const a = rows.filter((r) => r.f >= t.f0 && r.f <= t.f1); const nm = `${t.dir}${t.turbo ? ' turbo' : ''}${t.hand ? ' + hand ' + t.hand : ''}`; console.log(`  ${nm.padEnd(26)} ${String(a.length).padStart(4)} ${String(a.filter((r) => r.cm > 3).length).padStart(4)} ${r1(pct(a.map((r) => r.cm), 0.5)).padStart(5)} ${r1(pct(a.map((r) => r.cm), 0.9)).padStart(5)} ${r1(pct(a.map((r) => r.root), 0.5)).padStart(5)}  ${Object.entries(t.states || {}).sort((x, y) => y[1] - x[1]).slice(0, 3).map(([k, v]) => `${k} ${v}`).join(', ')}`); }
+}
 // how much of the over-3 cm set is a foot held up (footGlide's lift) against a foot on the floor
 const over = rows.filter((r) => r.cm > 3);
 console.log(`over 3 cm: ${over.filter((r) => r.y >= 3).length} with the foot 3 cm or more over the floor (lifted, moving with the body), ${over.filter((r) => r.y < 3).length} with it on the floor`);

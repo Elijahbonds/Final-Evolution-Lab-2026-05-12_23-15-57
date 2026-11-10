@@ -163,7 +163,7 @@ let startFrame = -1;
 for (let i = 0; i < 20; i++) { const ph = await ev(() => window.__phase); if (ph === 'playing') { startFrame = await ev(() => window.__frameNo); break; } if (ph === 'ready' || ph === 'paused') await start(); await runFrames(2); }
 if (startFrame < 0) { say('never reached playing: ' + JSON.stringify(await ev(() => [window.__phase, window.__err]))); await browser.close(); process.exit(2); }
 say(`playing at frame ${startFrame}`);
-const shot = async (name) => { const f = path.join(SHOTS, `${MODE}-${name}.png`); await page.screenshot({ path: f }).catch(() => {}); return f; };
+const shot = async (name) => { const f = path.join(SHOTS, `${MODE}-${name}.jpg`); await page.screenshot({ path: f, type: 'jpeg', quality: 72 }).catch(() => {}); return f; };   // (lane rule: JPG only)
 const saveStrip = async (name) => { const urls = await ev((n) => window.__hg.strips[n] || [], name); const dir = path.join(SHOTS, `strip-${MODE}-${name}`); fs.mkdirSync(dir, { recursive: true }); urls.forEach((u, i) => { if (u) fs.writeFileSync(path.join(dir, `${String(i).padStart(2, '0')}.jpg`), Buffer.from(u.split(',')[1], 'base64')); }); return urls.length; };
 
 const result = { mode: MODE, scen: SCEN, tier: TIER, seed: SEED, view: `${VW}x${VH}`, loadWallS, settled, startFrame, nodraw: NODRAW };
@@ -266,6 +266,23 @@ if (SCEN === 'game') {
   if (ON.has('stop')) for (let k = 0; k < 2; k++) { await setOff(); await waitGame(1200); R.stopSprint.push(await T('stopLine', { turbo: true, sec: 1.1, strip: k === 0 ? 'stop-sprint' : null })); if (k === 0) { await waitGame(300); await saveStrip('stop-sprint'); } }
   if (ON.has('shot')) for (let k = 0; k < 3; k++) { await setOff(); await waitGame(1200); if (k === 0) { ev(() => window.__hg.strip('jumper', 16, 3)); } R.shot.push(await T('shot')); if (k === 0) { await waitGame(300); await saveStrip('jumper'); } await waitGame(2500); }
   if (ON.has('stop') || ON.has('shot')) await checkpoint('stop+shot');
+  // hoops-p05: TESTS=defmove (not in the default list) — the hero on defence, the stick held against the rival: back, across and on the
+  // diagonal, at a jog and with the turbo, then with the hand up and with a reach; the first two take a strip (STRIPS=1)
+  R.defmove = [];
+  if (ON.has('defmove')) {
+    const cases = [{ dir: 'back', turbo: false }, { dir: 'back', turbo: true }, { dir: 'side', turbo: false }, { dir: 'side', turbo: true }, { dir: 'diag', turbo: true }, { dir: 'back', turbo: true, hand: 'up' }, { dir: 'side', turbo: true, hand: 'up' }, { dir: 'back', turbo: true, hand: 'reach' }].slice(0, Number(process.env.DEFMOVE_N ?? 8));
+    for (const [k, c] of cases.entries()) {
+      await setDef(); await waitGame(500);
+      const nm = `def-${c.dir}${c.turbo ? '-turbo' : ''}${c.hand ? '-' + c.hand : ''}`;
+      if (process.env.STRIPS && k < 2) ev((n) => window.__hg.strip(n, 16, 3), nm);
+      R.defmove.push(await T('defmove', { ...c, sec: 1.2 }));
+      if (process.env.STRIPS && k < 2) await saveStrip(nm);
+      await waitGame(300);
+    }
+    const an = await ev((o) => window.__hg.analyse(o), { popFrames: true, popList: !!process.env.POP_LIST }); result.heroMotion = an.perBody.me ? { ...an.perBody.me, popAt: undefined } : null;
+    if (process.env.POP_LIST) { result.clips = await ev(() => window.__hg.clips || []); result.stageEv = await ev(() => window.__hg.stageEv || []); result.states = await ev(() => window.__hg.states || []); }
+    await checkpoint('defmove');
+  }
   // hoops-p05: TESTS=stepback (not in the default list) — the step-back jumper, three times; the first takes a strip
   R.stepback = [];
   if (ON.has('stepback')) for (let k = 0; k < 3; k++) { await setOff(); await waitGame(1200); await noReplay(); if (k === 0) ev(() => window.__hg.strip('stepback', 20, 2)); R.stepback.push(await T('stepback')); if (k === 0) await saveStrip('stepback'); await waitGame(2000); }

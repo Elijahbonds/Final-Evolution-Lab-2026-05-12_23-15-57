@@ -365,6 +365,27 @@
     await watch(() => { const mm = meterNow(); return mm.t >= mm.c; }, 2); release('X'); o.releaseF = HG.frame - f0;
     await waitSec(1.0); o.endF = HG.frame - f0; o.f0 = f0; return o;
   };
+  // T3d (hoops-p05): THE RETREAT AND THE SLIDE ON DEFENCE — the stick held one way against the rival for `sec`: 'back' (straight away
+  // from him: the backpedal), 'side' (across his line: the slide, the crossover run with the turbo), 'diag' (back and across). Optionally
+  // the hand up (Square held) or a reach (a Square tap) on the way. The planted-foot slide over the window is read by slide-states.mjs
+  // from the run's motion; this returns the window and the tree's states seen in it.
+  HG.test.defmove = async (arg) => {
+    const o = { ...arg }; const s = S(); const f0 = HG.frame; const seen = {};
+    const foe = () => (MODE === 'onevone' ? s.foeRoot.getAbsolutePosition() : (s.driverRoot() || B[1].root).getAbsolutePosition());
+    if (arg.turbo) turbo(true);
+    if (arg.hand === 'up') press('X');
+    let k = 0;
+    await watch(() => {
+      const me = meP(), fp = foe(); let ax = me.x - fp.x, az = me.z - fp.z; const l = Math.hypot(ax, az) || 1; ax /= l; az /= l;   // away from him
+      const sx = -az, sz = ax;   // across his line
+      if (arg.dir === 'back') steer(ax, az, 1); else if (arg.dir === 'side') steer(sx, sz, 1); else steer(ax + sx, az + sz, 1);
+      if (arg.hand === 'reach' && k++ % 40 === 12) tap('X');
+      if (MODE === 'onevone') { try { const a = s.animState(); const key = (a.me || '-') + (a.meHeld ? '+' + a.meHeld : ''); seen[key] = (seen[key] || 0) + 1; } catch (e) { /* no seam */ } }
+      return false;
+    }, arg.sec || 1.2);
+    stick(0, 0); if (arg.turbo) turbo(false); if (arg.hand === 'up') release('X');
+    o.f0 = f0; o.f1 = HG.frame; o.states = seen; return o;
+  };
   // T4: a right-stick flick — did a move fire (a HANDLE / STICK / MOVE log line), and how long until the ball moved sideways
   HG.test.flick = async (dir) => {
     const o = { dir }; const f0 = HG.frame; const b0 = ballP(); const me0 = meP();
