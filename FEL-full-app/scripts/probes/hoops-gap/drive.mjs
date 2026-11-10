@@ -148,7 +148,7 @@ for (let i = 0; i < 900; i++) {
 }
 if (!ready) { say('no seam ' + JSON.stringify(await ev(() => [window.__phase, window.__err]))); say(pageErrs.join('\n')); await browser.close(); process.exit(2); }
 const loadWallS = (Date.now() - T0) / 1000;
-await ev((c) => { window.__HG_CFG = Object.assign(window.__HG_CFG || {}, c); }, { noPoke: process.env.BOT_NOPOKE === '1', clipLog: !!process.env.POP_LIST, stageLog: process.env.STAGE === '1' || (!!process.env.POP_LIST && process.env.STAGE !== '0') });   // hoops-p05: STAGE=0 keeps the clip / state log and the pop list but not the stage tracer (it snapshots 14 bones a body around every after-animations observer: the rig's most expensive recorder)   // hoops-p04: BOT_NOPOKE=1, the bot never reaches (a possession plays out to its shot)
+await ev((c) => { window.__HG_CFG = Object.assign(window.__HG_CFG || {}, c); }, { handTrace: process.env.HAND_TRACE ? process.env.HAND_TRACE.split('-').map(Number) : null, noPoke: process.env.BOT_NOPOKE === '1', clipLog: !!process.env.POP_LIST, stageLog: process.env.STAGE === '1' || (!!process.env.POP_LIST && process.env.STAGE !== '0') });   // hoops-p05: STAGE=0 keeps the clip / state log and the pop list but not the stage tracer (it snapshots 14 bones a body around every after-animations observer: the rig's most expensive recorder)   // hoops-p04: BOT_NOPOKE=1, the bot never reaches (a possession plays out to its shot)
 say('ready after ' + loadWallS.toFixed(0) + ' s wall; page.js: ' + await ev(fs.readFileSync(path.join(HERE, 'page.js'), 'utf8')));
 // hoops-p05: the load SETTLES before the clock starts — no pending loads, no request in flight and the mesh count unchanged for 3 s of
 // wall (a prop that landed after the start ran its callbacks on a wall-chosen frame: one run spawned 176 meshes, two 178, and that run's
@@ -249,7 +249,7 @@ if (SCEN === 'game') {
 } else if (SCEN === 'poss') {   // hoops-p02: the possession loop alone
   if (process.env.POSS_MOTION) await ev(() => window.__hg.start());   // hoops-p03: record the bodies over the loop (per-body root accel p99, pops)
   result.poss = await possLoop();
-  if (process.env.POSS_MOTION) { await ev(() => window.__hg.stop()); result.analysis = await ev((o) => window.__hg.analyse(o), { popList: !!process.env.POP_LIST }); if (process.env.POP_LIST) { result.clips = await ev(() => window.__hg.clips || []); result.stageEv = await ev(() => window.__hg.stageEv || []); result.states = await ev(() => window.__hg.states || []); } } result.log = await ev(() => window.__LOG); result.hud = await ev(() => window.__hud); result.snaps = await ev(() => window.__hg.snaps || []);
+  if (process.env.POSS_MOTION) { await ev(() => window.__hg.stop()); result.handEv = await ev(() => window.__hg.handEv || []); result.analysis = await ev((o) => window.__hg.analyse(o), { popList: !!process.env.POP_LIST }); if (process.env.POP_LIST) { result.clips = await ev(() => window.__hg.clips || []); result.stageEv = await ev(() => window.__hg.stageEv || []); result.states = await ev(() => window.__hg.states || []); } } result.log = await ev(() => window.__LOG); result.hud = await ev(() => window.__hud); result.snaps = await ev(() => window.__hg.snaps || []);
   { const names = await ev(() => Object.keys(window.__hg.strips).filter((k) => k.startsWith('auto-'))); for (const nm of names) await saveStrip(nm); result.autoStrips = names; }
 } else if (SCEN === 'input') {
   const S = (fn, arg) => ev(fn, arg);
@@ -315,7 +315,8 @@ if (SCEN === 'game') {
     await ev(() => window.__hg.stick(0, 0));
   }
   if (ON.has('flick')) await checkpoint('flick');
-  if (MODE === 'threevthree' && ON.has('pass')) for (let k = 0; k < 3; k++) { await setOff(); await waitGame(1200); R.pass.push(await T('pass')); await waitGame(1500); }
+  if (MODE === 'threevthree' && ON.has('pass')) { const N = Number(process.env.PASS_N ?? 3); for (let k = 0; k < N; k++) { await setOff(); await waitGame(Number(process.env.PASS_PRE_MS ?? 1200)); R.pass.push(await T('pass')); await waitGame(Number(process.env.PASS_WAIT_MS ?? 1500)); } }   // hoops-p05b: PASS_N, PASS_PRE_MS, PASS_WAIT_MS (the mate's read: he swings it back inside hoops.mateHoldMaxSec)
+  if (MODE === 'threevthree' && ON.has('pass') && process.env.PASS_BALL) { const an = await ev((o) => window.__hg.analyse(o), {}); result.ball = an.ball; result.passLog = await ev(() => (window.__LOG || []).filter((l) => /3V3-OFF|pass|swing|catch/i.test(l.m)).map((l) => [l.f, l.m.slice(0, 120)])); await checkpoint('pass'); }
   if (ON.has('poke')) for (let k = 0; k < 3; k++) {
     await setDef(); await waitGame(1400 + k * 250);
     if (k === 0) ev(() => window.__hg.strip('defense', 16, 4));

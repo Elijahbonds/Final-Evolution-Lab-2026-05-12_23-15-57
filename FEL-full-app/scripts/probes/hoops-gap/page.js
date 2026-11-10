@@ -176,6 +176,20 @@
   };
   HG.zero = () => { HG.frame = 0; window.__frameNo = 0; TR.n = 0; };
   HG.traceOut = () => { const a = (x) => Array.from(x.subarray(0, TR.n)); return { n: TR.n, root: a(TR.root), bone: a(TR.bone), rf: a(TR.rf), rl: a(TR.rl), v: Array.from(TR.v.subarray(0, TR.n * 6)).map((x) => Math.round(x * 1e5) / 1e5) }; };
+  // hoops-p05b: THE HAND TRACER (CFG.handTrace = [a, b]): on frames a..b, the hero's two hand bones (world) after EVERY after-animations
+  // observer (named like the stage tracer's), after the before-camera pass (the carry's last word on the ball) and as drawn, with the ball
+  // as drawn — so a palm that misses the ball at the top of a bounce names the layer that moved the hand away (or the ball).
+  HG.handEv = [];
+  if (Array.isArray(CFG.handTrace) && B[0]) {
+    const [ha, hb] = CFG.handTrace; const me = B[0];
+    const hp = () => { const out = []; for (const n of [me.lh, me.rh, me.lfa, me.rfa]) { if (!n) { out.push(null); continue; } n.computeWorldMatrix(true); const p = n.getAbsolutePosition(); out.push([+p.x.toFixed(4), +p.y.toFixed(4), +p.z.toFixed(4)]); } return out; };
+    const inWin = () => HG.frame + 1 >= ha && HG.frame + 1 <= hb;
+    const push = (stage) => { if (inWin() && HG.handEv.length < 20000) { const bl = ball(); let bp = null; if (bl) { bl.computeWorldMatrix(true); const q = bl.getAbsolutePosition(); bp = [+q.x.toFixed(4), +q.y.toFixed(4), +q.z.toFixed(4)]; } HG.handEv.push([HG.frame + 1, stage, hp(), bp]); } };
+    const obsv = scene.onAfterAnimationsObservable;
+    obsv.add(() => { push('clip'); for (let k = 0; k < obsv.observers.length; k++) { const o = obsv.observers[k]; if (o.__hgHand) continue; o.__hgHand = true; const label = 'obs' + k + ' ' + String(o.callback).replace(/\s+/g, ' ').slice(0, 70); const cb = o.callback; o.callback = function (ev, st) { const r = cb.call(this, ev, st); push(label); return r; }; } }, undefined, true);
+    scene.onBeforeCameraRenderObservable.add(() => push('beforeCamera'));
+    scene.onAfterRenderObservable.add(() => { if (HG.frame >= ha && HG.frame <= hb && HG.handEv.length < 20000) { const bl = ball(); let bp = null; if (bl) { const q = bl.getAbsolutePosition(); bp = [+q.x.toFixed(4), +q.y.toFixed(4), +q.z.toFixed(4)]; } HG.handEv.push([HG.frame, 'drawn', hp(), bp]); } });
+  }
   scene.onAfterRenderObservable.add(() => { HG.frame++; window.__frameNo = HG.frame; try { trace(); } catch (e) { if (HG.errors.length < 20) HG.errors.push('trace ' + String(e && e.message || e).slice(0, 160)); } try { record(); } catch (e) { if (HG.errors.length < 20) HG.errors.push('rec ' + String(e && e.message || e).slice(0, 160)); } }, undefined, true);   // hoops-p04b: FIRST after the render — the pose as DRAWN (hoops/contactPoses puts its arm bar, forearm and chest lean back on this observable; recorded after it, the rig never saw them)
   HG.start = () => { HG.rec = true; HG.f0 = HG.frame; F = 0; for (const b of B) b.prevQ = WATCH.map(() => null); };
   HG.stop = () => { HG.rec = false; return F; };

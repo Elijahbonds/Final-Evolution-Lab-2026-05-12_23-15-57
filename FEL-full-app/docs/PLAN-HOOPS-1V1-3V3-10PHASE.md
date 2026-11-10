@@ -26,7 +26,7 @@ instrument it left behind (`scripts/probes/hoops-gap/`). Every exit gate below i
 | 2 | Defence is skill, not dice | AI and flow | **shared** (modes, BasketballCore) | 0 dice-decided blocks; my block rate ≤ 25 % of their shots (today far higher); the AI gets ≥ 1 stop per 10 of my possessions |
 | 3 | Rivals that play basketball | AI and flow | **shared** (BasketballCore, ThreeVThreeMode) | ≥ 6 distinct rival actions per 10 possessions; 3v3 rival possession ≥ 6 s median; AI root accel p99 ≤ 34 m/s² |
 | 4 | Feet and transitions | movement | free if kept to `anim/**` | planted-foot slide p90 ≤ 3 cm/frame; hero pops ≤ 4 per possession, severe 0; root snaps 0 |
-| 5 | The ball lives in the hand | movement | **shared** (Dribble.ts, mode call sites) | dribble-apex palm gap ≤ 5 cm; ball warps (> 15 cm/frame held) 0; catch jump ≤ 0.12 m |
+| 5 | The ball lives in the hand | movement | **shared** (Dribble.ts, mode call sites) | dribble-apex palm gap ≤ 5 cm; ball warps (> 15 cm/frame held) 0; the catch leaves the ball's own path by ≤ 0.12 m (gate changed 2026-11-10, see phase 5) |
 | 6 | Flow and pace | AI and flow | **shared** (modes, HoopsOffball) | rebound jitter gone; make → next possession ≤ 2.5 s; possession medians in band |
 | 7 | Bodies that touch | movement | **shared** (BasketballCore standoff, ContactSystem) | overlap frames (roots < 0.6 m) 0; defence clip changes ≤ 2.5 /s |
 | 8 | Broadcast camera, a live court | presentation | free | camera snaps 0 outside cuts; hero in frame 100 %; replay cut ≤ 2.5 s on big plays only |
@@ -182,7 +182,12 @@ down in two hands on a board. "The ball not in the hand" is on the owner's list.
 - dribble apex: the carrier's palm within 5 cm of the ball (centre − 12 cm radius) on ≥ 90 % of bounces (today in the gap doc);
 - held ball: centre ≤ 17 cm from the hand bone p90;
 - ball warps (> 15 cm in one frame while held) 0 (hoops-motion phase 4 gate);
-- passes leave from chest / overhead / bounce height (not the dribble point); catch jump ≤ 0.12 m (phase 11 gate);
+- passes leave from chest / overhead / bounce height (not the dribble point); the catch: the ball leaves its own path by ≤ 0.12 m on the
+  catch frame, p90 (the rig's `catchDevP90Cm`: this frame's step less the last one's). **GATE CHANGED (hoops-p05b, 2026-11-10; for the
+  owner's sign-off):** the gate was "catch jump ≤ 0.12 m" (hoops-motion phase 11, set against 0.54–0.79 m warps into the palm), read as
+  the ball's raw step on the frame it is first held. At the shipped pass speed that cannot hold: `PassFlight` flies a chest pass at a
+  constant 14 m/s, 23 cm a frame up to the hands, so a clean catch reads 23 cm. The new read keeps the gate's intent (no warp into the
+  hand) and its number; the raw step is still printed beside it (`catchJumpP90Cm`);
 - rebounds: two hands, then chinned; no 0.7–1.4 m palm warps.
 
 **Strips:** a dribble at rest and on the move, a 3v3 pass and catch, a defensive rebound.
