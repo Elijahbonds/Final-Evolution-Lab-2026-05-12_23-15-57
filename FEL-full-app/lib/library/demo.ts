@@ -749,7 +749,6 @@ export const DEMO_RULES: readonly DemoRule[] = [
   { clip: 'ex_shoulder_rolls', families: ['dynamic-warmup'], bases: /^shoulder-circl$/ },
   { clip: 'ex_groiner', families: ['dynamic-warmup'], bases: /^groiner$/ },
   { clip: 'ex_hip_circle_quad', families: ['dynamic-warmup'], bases: /^hip-circl-pron$/ },
-  { clip: 'ex_spiderman_pushup', families: ['dynamic-warmup'], bases: /^spider-crawl$/ },
   // the side-to-side box shuffle is the stride jump crossover (one foot up on the box, over to the other side and back)
   { clip: 'ex_stride_jump_cross', families: ['jump'], bases: /^sid-sid-box-shuffl$/ },
   // DEMO-LOOPS-8 (anim/authored/exerciseFamilies8.ts): the entries the Playbook's lessons play. The short foot hold and the
@@ -887,7 +886,9 @@ export const DEMO_RULES: readonly DemoRule[] = [
   { clip: 'ex_ham_leg_up', families: ['stretch-hamstring'], bases: /^leg-up-hamstr-stretch$/ },
   { clip: 'ex_runner_stretch', families: ['stretch-hamstring'], bases: /^runner-stretch$/ },
   { clip: 'ex_pos_pike', families: ['stretch-hamstring'], bases: /^seat-hamstr-calf-stretch$/ },
-  { clip: 'ex_split_jump', families: ['stretch-hamstring'], bases: /^split-squat-stretch$/ },
+  // EVERY-SCREEN P3 (owner via coordinator, 2026-11-10): the split-squat stretch (front leg long, fold forward) played the
+  // jumping split switch, and the spider crawl (a travelling crawl) a push-up in place: both removed, so each shows the
+  // labelled still until a loop of its own exists (docs/every-screen/demos.md)
   { clip: 'ex_stand_ham_calf', families: ['stretch-hamstring'], bases: /^stand-hamstr-calf-stretch$/ },
   { clip: 'ex_leg_grab', families: ['stretch-hamstring'], bases: /^upper-back-leg-grab$/ },
   // the quads and hip flexors: on all fours, face down with the belt (flag: not drawn), the half locust, the kneeling arch,

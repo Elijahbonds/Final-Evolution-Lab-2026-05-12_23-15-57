@@ -7,6 +7,9 @@
 //
 // Pure: no DOM, no I/O. Every number is in BUDGET so the rig, the tests and docs/EVERY-SCREEN-SCORECARD.md cannot drift.
 
+/** The approved body size: it does not count against BUDGET.textSizes (owner, 2026-11-10). */
+export const BODY_PX = '16px';
+
 export const BUDGET = {
   /** check 1: a do-this screen shows at most this many words before scrolling (the plan's number) */
   wordsFoldDo: 40,
@@ -14,7 +17,9 @@ export const BUDGET = {
   tapPx: 44,
   /** check 1: one obvious main action: more bright filled buttons than this on the first screen compete */
   primaryMax: 1,
-  /** check 2: at most this many text sizes and button looks on a screen (the plan's numbers) */
+  /** check 2: at most this many text sizes and button looks on a screen (the plan's numbers). OWNER DECISION 2026-11-10:
+   *  body text at the approved 16 px (lib/design/type.ts TYPE.body) does not count against the text sizes; every other
+   *  size, on the scale or off it, still does */
   textSizes: 4,
   buttonLooks: 3,
   /** check 3 (owner-approved with the plan, 2026-11-10; "the owner can move them"): on the phone with the CPU 4× slower */
@@ -117,7 +122,8 @@ export function faultsOf(f: ScreenFacts): Fault[] {
   }
   if (f.tiny > 0) add('finished', 'tiny-text', Math.min(58, 35 + f.tiny), `${plural(f.tiny, 'piece')} of text under 12 px.`);
   if (f.bodySmall > 0) add('finished', 'body-small', Math.min(50, 30 + f.bodySmall), `${plural(f.bodySmall, 'paragraph')} of body copy under 16 px.`);
-  if (f.textSizes.length > BUDGET.textSizes) add('finished', 'text-sizes', Math.min(44, 20 + 2 * (f.textSizes.length - BUDGET.textSizes)), `${f.textSizes.length} text sizes on one screen (at most ${BUDGET.textSizes}).`);
+  const sized = f.textSizes.filter((x) => x !== BODY_PX);
+  if (sized.length > BUDGET.textSizes) add('finished', 'text-sizes', Math.min(44, 20 + 2 * (sized.length - BUDGET.textSizes)), `${sized.length} text sizes on one screen besides 16 px body text (at most ${BUDGET.textSizes}).`);
   if (f.buttonLooks > BUDGET.buttonLooks) add('finished', 'button-looks', Math.min(42, 20 + 2 * (f.buttonLooks - BUDGET.buttonLooks)), `${f.buttonLooks} button looks on one screen (at most ${BUDGET.buttonLooks}).`);
 
   // 3. Fast and smooth
