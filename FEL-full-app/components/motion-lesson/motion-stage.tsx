@@ -78,7 +78,7 @@ async function buildStage(gone: () => boolean): Promise<Host | null> {
   canvas.setAttribute('data-testid', 'motion-stage');
   canvas.setAttribute('data-state', 'loading');
   canvas.setAttribute('aria-label', 'Your athlete doing this movement. Drag sideways to turn.');
-  const engine = new Engine(canvas, true, { alpha: true, adaptToDeviceRatio: false, powerPreference: 'low-power', stencil: false, doNotHandleTouchAction: true, preserveDrawingBuffer: process.env.NODE_ENV === 'development' });
+  const engine = new Engine(canvas, true, { alpha: true, adaptToDeviceRatio: false, powerPreference: 'low-power', stencil: false, doNotHandleTouchAction: true, canvasTabIndex: 0, preserveDrawingBuffer: process.env.NODE_ENV === 'development' });
   engine.setHardwareScalingLevel(1 / Math.min(1.5, window.devicePixelRatio || 1));
   // Babylon gives its canvas tabindex 1, which pulls it ahead of the whole page in the tab order (the rig's audit: WCAG
   // 2.4.3, serious). 0 keeps it a keyboard stop in its place: the arrow keys turn the camera, and it shows a focus ring.
