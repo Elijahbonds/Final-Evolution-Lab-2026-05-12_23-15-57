@@ -6,13 +6,17 @@ import { createRoot } from 'react-dom/client';
 import DunkBabylon from '@/components/games/dunk-babylon';
 import { prqGrade } from '@/lib/prq';
 
-type Shift = { v: number; t: number; input: boolean; src: string[] };
+type Shift = { v: number; t: number; input: boolean; src: string[]; rects: string[] };
 const w = window as unknown as { __PATH: string; __CLS: Shift[]; __SESSION: unknown };
 w.__PATH = '/try'; w.__SESSION = null; w.__CLS = [];
 try {
   new PerformanceObserver((list) => {
-    for (const e of list.getEntries() as unknown as { value: number; startTime: number; hadRecentInput: boolean; sources?: { node?: Element | null }[] }[]) {
-      w.__CLS.push({ v: e.value, t: Math.round(e.startTime), input: e.hadRecentInput, src: (e.sources ?? []).map((s) => s.node ? `${s.node.nodeName}.${String((s.node as HTMLElement).className ?? '').slice(0, 80)} "${(s.node.textContent ?? '').slice(0, 40)}"` : '?') });
+    type Rect = { x: number; y: number; width: number; height: number };
+    const rc = (r?: Rect) => r ? `${Math.round(r.x)},${Math.round(r.y)} ${Math.round(r.width)}x${Math.round(r.height)}` : '?';
+    for (const e of list.getEntries() as unknown as { value: number; startTime: number; hadRecentInput: boolean; sources?: { node?: Element | null; previousRect?: Rect; currentRect?: Rect }[] }[]) {
+      w.__CLS.push({ v: e.value, t: Math.round(e.startTime), input: e.hadRecentInput,
+        src: (e.sources ?? []).map((s) => s.node ? `${s.node.nodeName}.${String((s.node as HTMLElement).className ?? '').slice(0, 80)} "${(s.node.textContent ?? '').slice(0, 40)}"` : '?'),
+        rects: (e.sources ?? []).map((s) => `${rc(s.previousRect)} -> ${rc(s.currentRect)}`) });   // where each moved from and to (CSS px)
     }
   }).observe({ type: 'layout-shift', buffered: true });
 } catch { /* no layout-shift entries in this browser */ }
