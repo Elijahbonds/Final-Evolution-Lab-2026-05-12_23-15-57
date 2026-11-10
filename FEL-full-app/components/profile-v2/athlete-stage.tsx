@@ -137,7 +137,7 @@ function OwnStage({ name, accent, poster }: { name: string; accent: string; post
         </div>
       )}
       {three === 'failed' && !posterShown && (
-        <p className="absolute inset-x-0 bottom-2 text-center text-[12px] text-fel-quiet">3D isn’t available on this device.</p>
+        <p className="absolute inset-x-0 bottom-2 text-center text-[12px] text-fel-soft">3D isn’t available on this device.</p>
       )}
     </div>
   );

@@ -213,6 +213,8 @@ async function readPage(page: Page, cfg: Config, shot: string | null): Promise<{
   for (const y of cfg.pixels || cfg.hud ? ys : []) {
     await evalJ(`window.scrollTo(0, ${y})`);
     await page.waitForTimeout(140);
+    // a reveal (fel-rise, a framer fade) started by the scroll: read the text once it has arrived, not mid-fade
+    await evalJ('Promise.race([Promise.all(document.getAnimations().filter((a) => a.effect && a.effect.getComputedTiming().iterations !== Infinity).map((a) => a.finished.catch(() => null))), new Promise((r) => setTimeout(r, 1200))])');
     steps++;
     const runs = await evalJ<Run[]>('window.__readable.collect()');
     if (y !== 0) addCollisions(await evalJ<Collision[]>('window.__readable.collisions()'));

@@ -52,7 +52,7 @@ export function ShotChart({ shots, zones, title = 'Shot chart', total, noSpot }:
           </g>
         ))}
       </svg>
-      <figcaption className="flex flex-wrap items-center gap-3 text-[11px] text-white/60">
+      <figcaption className="flex flex-wrap items-center gap-3 text-[12px] text-white/60">
         <span className="flex items-center gap-1"><svg width="10" height="10" aria-hidden><circle cx="5" cy="5" r="4" fill={MAKE} /></svg>Make</span>
         <span className="flex items-center gap-1"><svg width="10" height="10" aria-hidden><circle cx="5" cy="5" r="3.3" fill="none" stroke={MISS} strokeWidth="1.5" /></svg>Miss</span>
         {unplaced > 0 && <span>{unplaced} with no spot (counted in the totals)</span>}
@@ -91,7 +91,7 @@ export function MakeTrend({ days }: { days: readonly TrendDay[] }) {
         <text x={0} y={H + 5} fontSize={3.2} fill="rgba(255,255,255,0.5)">{days[0].day.slice(5)}</text>
         <text x={W} y={H + 5} fontSize={3.2} fill="rgba(255,255,255,0.5)" textAnchor="end">{days[days.length - 1].day.slice(5)}</text>
       </svg>
-      <figcaption className="text-[11px] text-white/50">Make % a day (the half line is 50%). Latest: {Math.round(days[days.length - 1].pct)}%.</figcaption>
+      <figcaption className="text-[12px] text-white/50">Make % a day (the half line is 50%). Latest: {Math.round(days[days.length - 1].pct)}%.</figcaption>
     </figure>
   );
 }

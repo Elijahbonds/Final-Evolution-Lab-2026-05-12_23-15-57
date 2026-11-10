@@ -62,7 +62,7 @@ export function MultiplayerLobby() {
         Async challenges — play on your own time. Winner banks shards, both players earn coins.
       </p>
 
-      <div className="mt-5 flex gap-2">
+      <div className="mt-5 flex flex-wrap gap-2">
         <TabBtn active={tab === 'online'} onClick={() => setTab('online')} icon={<Radio className="h-4 w-4" />} label="Challenge online" />
         <TabBtn active={tab === 'join'} onClick={() => setTab('join')} icon={<Share2 className="h-4 w-4" />} label="Accept a code" />
         <TabBtn active={tab === 'local'} onClick={() => setTab('local')} icon={<Users className="h-4 w-4" />} label="Pass & play" />
@@ -93,7 +93,7 @@ function TabBtn({ active, onClick, icon, label }: { active: boolean; onClick: ()
     <button
       onClick={onClick}
       className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${
-        active ? 'bg-[#FF3366] text-white' : 'border border-white/10 bg-white/[0.03] text-white/60 hover:text-white'
+        active ? 'bg-[#FF3366] text-[#050505]' : 'border border-white/10 bg-white/[0.03] text-white/60 hover:text-white'
       }`}
     >
       {icon}

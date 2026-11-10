@@ -161,12 +161,18 @@ function mediaBehind(el: Element, box: Rect): boolean {
   return false;
 }
 
+/** A fixed layer is drawn over any part of the run right now (its middle or a corner): read its pixels at another
+ *  scroll step. A run half under the docked primary had its covered half measured as "behind" it (/profile, 1.3:1). */
 function occludedByFixed(el: Element, box: Rect): boolean {
   if (inFixed(el)) return false;
-  const x = (box.left + box.right) / 2, y = (box.top + box.bottom) / 2;
-  if (x < 0 || y < 0 || x > innerWidth || y > innerHeight) return false;
-  const hit = document.elementFromPoint(x, y);
-  return !!hit && hit !== el && !el.contains(hit) && inFixed(hit);
+  const pts = [[0.5, 0.5], [0.08, 0.15], [0.92, 0.15], [0.08, 0.85], [0.92, 0.85]];
+  for (const [fx, fy] of pts) {
+    const x = box.left + (box.right - box.left) * fx, y = box.top + (box.bottom - box.top) * fy;
+    if (x < 0 || y < 0 || x > innerWidth || y > innerHeight) continue;
+    const hit = document.elementFromPoint(x, y);
+    if (hit && hit !== el && !el.contains(hit) && inFixed(hit)) return true;
+  }
+  return false;
 }
 
 /** Every visible run of text on the page (each element with text of its own), plus each empty field's placeholder. */

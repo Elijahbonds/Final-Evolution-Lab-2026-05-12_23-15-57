@@ -12,8 +12,12 @@
 // Tailwind only generates classes it can read in this file, so every class is written out in full; none may be built at
 // runtime.
 
+// READABLE (lane/readable-2, 2026-11-10): legal text is long-form body copy, so it takes TYPE.body's 16 px on every screen
+// (was text-sm, 14 px: the rig counted 131 runs of more than 12 words under 16 px on /store-terms alone). Tables scroll
+// inside themselves and a long word or code run breaks anywhere — at 150 % root font they pushed /store-terms 105 px and
+// /purchase-terms 48 px sideways. Size and wrapping only; no wording changes.
 export const LEGAL_PROSE = [
-  'text-sm leading-[1.7] text-white/70',
+  'text-base leading-[1.7] text-white/70 [overflow-wrap:anywhere]',
   '[&>div>:first-child]:mt-0',
   '[&_h1]:mb-3 [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:leading-tight [&_h1]:text-white [&_h1]:font-display [&_h1]:uppercase [&_h1]:tracking-[0.04em]',
   '[&_h2]:mb-2 [&_h2]:mt-7 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:leading-snug [&_h2]:text-white [&_h2]:font-display [&_h2]:uppercase [&_h2]:tracking-[0.04em]',
@@ -23,7 +27,8 @@ export const LEGAL_PROSE = [
   '[&_strong]:font-semibold [&_strong]:text-white [&_em]:italic [&_em]:text-white/50',
   '[&_blockquote]:my-4 [&_blockquote]:border-l-4 [&_blockquote]:pl-4 [&_blockquote]:italic',
   '[&_a]:text-cyan-300 [&_a]:underline [&_a]:underline-offset-2',
-  '[&_table]:my-4 [&_table]:w-full [&_table]:border-collapse [&_table]:text-[0.8125rem]',
+  '[&_table]:my-4 [&_table]:block [&_table]:w-full [&_table]:max-w-full [&_table]:overflow-x-auto [&_table]:border-collapse [&_table]:text-[0.875rem]',
+  '[&_code]:[overflow-wrap:anywhere] [&_pre]:max-w-full [&_pre]:overflow-x-auto',
   '[&_td]:border [&_td]:border-white/10 [&_td]:px-2 [&_td]:py-1 [&_td]:align-top',
   '[&_th]:border [&_th]:border-white/10 [&_th]:px-2 [&_th]:py-1 [&_th]:text-left [&_th]:align-top [&_th]:text-white',
   '[&_hr]:my-6 [&_hr]:border-white/10',
