@@ -17,7 +17,7 @@ describe('the deep landing (dunk.landAbsorbDeep)', () => {
     // the swap only ever replaces the old absorb clip, and only with the knob on
     expect(land).toContain("const deep = landingClip === DUNK_LAND_ABSORB_CLIP && feel('dunk.landAbsorbDeep', LAND_ABSORB_DEEP) >= 0.5;");
     expect(land).toContain('const clip = deep ? LAND_ABSORB_DEEP_CLIP : landingClip;');
-    expect(land).toMatch(/if \(deep && ikScene && player\) \{ landAbsorb \?\?= mountLandingAbsorb\(ikScene, player\.skeleton, player\.root, \{ auto: false \}\); landAbsorb\.impact\(Math\.max\(dropVy, LAND_ABSORB_MIN_MPS\)\); \}/);
+    expect(land).toMatch(/if \(deep && ikScene && player\) \{ landAbsorb \?\?= mountLandingAbsorb\(ikScene, player\.skeleton, player\.root, \{ auto: false, intensity: LAND_ABSORB_INTENSITY \}\); landAbsorb\.impact\(Math\.max\(dropVy, LAND_ABSORB_MIN_MPS\)\); \}/);
     expect(land).toContain("playClip(clip, { ...(fadeSec !== undefined ? { fadeSec } : {}), onEnd: () => { playClip(SPORT_CLIP.idle, { loop: true }); setWin('run'); } });");
     expect(DUNK.split('mountLandingAbsorb(').length - 1).toBe(1);   // mounted nowhere else: off, nothing new runs on the legs
     expect(LAND_ABSORB_DEEP_CLIP).toBe('dunk_land_absorb_deep');
