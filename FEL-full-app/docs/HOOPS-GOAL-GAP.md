@@ -227,6 +227,33 @@ covers about 0.9 m/s at its rate cap (bench, the man 2 m ahead: p90 0.9 / 9.2 / 
 the real possession (6–15 cm frames). Running its legs from the run loop was tried and reverted (worse on the diagonal, 3–4 new severe
 pops with a reach): it needs a stepping closeout clip. The made shot's celebration still pops the ball arm (the carry layer).
 
+**3v3, the same three knobs** (seed 7, a defensive possession to frame 130, knobs off → on): every other body unchanged; the hero's
+slide p90 12.27 → 12.65 cm, pops 4 → 3, severe 0 → 0. Frames 110–113 improve (11 → 2 cm, a closeout over a slide); frames 115–126 get
+worse (4 → 8–11 cm) under a contact reaction that lands while the hips are turned. Holding the turn under such a beat (instead of
+unwinding it) took a pop away but not this. Most of the 3v3 hero's 12 cm is a sprint to his man with footGlide holding the foot 5 cm up
+while the body moves 10 cm a frame: the rig's 5 cm band counts that lifted foot as planted (before and after alike).
+
+### 3g. Phase 5 (the ball lives in the hand) — the baseline on the deterministic rig, and the first change
+
+| bar (seed 7, PRO, my possession) | 1v1 (200 frames) | 3v3 (180 frames) |
+|---|---|---|
+| held ball, centre to the hand bone p90 (bar ≤ 17 cm) | 15.1 cm | 16.4 cm |
+| ball warps while held (> 15 cm a frame; bar 0) | 0 | 0 |
+| release warps (new read: the step out of the hand well over the flight's own) | 0 | 0 |
+| dribble tops with the palm within 5 cm (bar ≥ 90 %) | 2 of 4 | 1 of 2 |
+| catch | none | the finish's own gather off the dribble at 4.2 m/s: 13.5 cm (the gather's 8.1 m/s cap) |
+
+Both misses of the palm are the FIRST top after the dribble starts with a launch from a stand (frame 74 in both: 11 / 12.9 cm), the
+frames after "gear stop → sprint". The headless dribble bench (`ball-bench.mts`, the carry and the clips only, a launch to 3.7 / 6.4 m/s)
+keeps every top 4 cm off the palm, so the miss is in the layers the bench leaves out — the rest dribble and the posture layers, which
+p04b already saw snapping on that gear change. Next: the same run with the stage tracer on.
+
+The plan's "catch jump ≤ 0.12 m" cannot be read raw at the shipped pass speed: `PassFlight` flies a chest pass at a constant 14 m/s,
+23 cm a frame up to the hands. The rig now reads the catch's departure from the ball's own path too (`devCm`).
+
+First change (`hoops.passFromHandOn`, hoops/ballHandoff): a 3v3 teammate's pass starts its flight from the ball, not his root + 1.2 m.
+Unit-tested; not yet seen on the rig (no teammate passed in the recorded windows).
+
 ## 4. Ranked gaps
 
 Ranked by what the owner feels first × how far from the bar. "Shared" = touches one of the shared hoops files.

@@ -40,6 +40,9 @@ const BT = un(await import(APP + '/lib/babylon/anim/basketballTree.ts'));
 const { NullEngine, Scene, FreeCamera, Vector3, SceneLoader, MeshBuilder } = BJS;
 
 const SPEEDS = arg('--speeds', '0,1.6,3.7,6.4').split(',').map(Number);
+// --launch: the ball HELD (the carry inactive) for 1 s standing, then the dribble starts and the body accelerates to the speed at
+// LAUNCH_ACCEL m/s^2 (the hoops sprint's cap, 26) — the rig's off-palm first top (1v1 / 3v3 seed 7, frame 74: 11-13 cm) is a launch
+const LAUNCH = process.argv.includes('--launch'); const LAUNCH_ACCEL = 26;
 const SEC = Number(arg('--sec', '6'));
 const TOP_MPS = 6.4, PALM_M = 0.08, BALL_R = 0.12;
 const pct = (a: number[], p: number) => { if (!a.length) return NaN; const s = [...a].sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(p * (s.length - 1)))]; };
@@ -75,17 +78,21 @@ for (const speed of SPEEDS) {
   const speed01 = Math.min(1, speed / TOP_MPS);
   const rec: { by: number; palm: number; hand: number; step: number }[] = []; let last: InstanceType<typeof Vector3> | null = null; let state = '';
   const n = Math.round(SEC * 60) + 90;
+  let v = LAUNCH ? 0 : speed;
   for (let k = 0; k < n; k++) {
     vt += DT * 1000;
-    root.position.z += speed * DT;
-    state = String(tree.update({ dtSec: DT, speedMps: speed, speed01, crossover: false, nearestDefender: Infinity, hasBall: true, shooting: false, dunking: false, driving: false, defending: false, bracing: false, staggered: false, ballHand: 'right' }));
-    carry.update(DT, speed01, true);
+    const live = !LAUNCH || k >= 60;
+    if (LAUNCH && live) v = Math.min(speed, v + LAUNCH_ACCEL * DT);
+    root.position.z += v * DT;
+    const sp01 = Math.min(1, v / TOP_MPS);
+    state = String(tree.update({ dtSec: DT, speedMps: v, speed01: sp01, crossover: false, nearestDefender: Infinity, hasBall: true, shooting: false, dunking: false, driving: false, defending: false, bracing: false, staggered: false, ballHand: 'right' }));
+    carry.update(DT, sp01, live);
     scene.render();
     ball.computeWorldMatrix(true); const b = ball.getAbsolutePosition().clone();
     let palm = Infinity, hand = Infinity;
     for (const { h, f } of hands) { h.computeWorldMatrix(true); f.computeWorldMatrix(true); const hp = h.getAbsolutePosition(), fp = f.getAbsolutePosition(); const d = hp.subtract(fp).normalize(); const pp = hp.add(d.scale(PALM_M)); palm = Math.min(palm, Vector3.Distance(pp, b) - BALL_R); hand = Math.min(hand, Vector3.Distance(hp, b)); }
     const relStep = last ? Vector3.Distance(b, last) : 0; last = b;
-    if (k >= 90) rec.push({ by: b.y, palm, hand, step: relStep });
+    if (LAUNCH ? k >= 60 : k >= 90) rec.push({ by: b.y, palm, hand, step: relStep });
   }
   const tops = rec.filter((x, i) => i > 0 && i < rec.length - 1 && x.by > rec[i - 1].by && x.by >= rec[i + 1].by && x.by > 0.5 && x.by < 1.4);
   const gaps = tops.map((t) => t.palm * 100), hd = tops.map((t) => t.hand * 100), steps = rec.map((x) => x.step * 100);
