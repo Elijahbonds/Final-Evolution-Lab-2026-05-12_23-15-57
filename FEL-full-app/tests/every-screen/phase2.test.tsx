@@ -15,6 +15,7 @@ import { TODAY_HREF, TODAY_START_HREF, todayCardHref } from '@/lib/coach/todayCa
 import { RESUME_PROGRAM_HREF, ResumeProgramView, resumeView } from '@/components/every-screen/resume-program-card';
 import { TYPE, lineSize } from '@/lib/design/type';
 import { isSignedInOnly } from '@/lib/screen/config';
+import { reservesRail } from '@/components/shell/status-rail';
 
 const ROOT = join(__dirname, '..', '..');
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
@@ -76,9 +77,17 @@ describe('3. the bars: 44 px targets, and the rail does not arrive late', () => 
     expect(rail).toContain('className="inline-flex min-h-11 items-center transition-transform');
   });
   it('on a signed-in-only path the rail is drawn while the session loads, so nothing moves when it fills', () => {
-    expect(rail).toMatch(/status === 'loading' && isSignedInOnly\(pathname\)/);
+    expect(rail).toMatch(/status === 'loading' && reservesRail\(pathname\)/);
     expect(isSignedInOnly('/train')).toBe(true);
-    expect(isSignedInOnly('/')).toBe(false);
+    for (const p of ['/train', '/coach', '/coach/admin', '/play', '/profile', '/train/build']) expect(reservesRail(p), p).toBe(true);
+    expect(reservesRail('/')).toBe(false);
+  });
+  it('but not where a signed-out visitor stays (the rail would vanish under them): sign-in, an invite, the free games', () => {
+    for (const p of ['/login', '/signup', '/coach/join', '/coach/join/abc', '/play/adventure', '/play/adventure-br', '/play/mirror/assess/results', '/squads/join/x', '/SIGNUP/'])
+      expect(reservesRail(p), p).toBe(false);
+  });
+  it('on a phone the wallet cluster is its own row from the first frame, so its count-up cannot wrap it mid-load', () => {
+    expect(rail).toContain('ml-auto flex min-w-0 basis-full flex-wrap items-center justify-end gap-2 sm:basis-auto');
   });
   it('the game header: Home, body play, the graphics menu, pause and full screen are 44 px; the late parts hold their place', () => {
     const shell = read('components/games/game-shell.tsx');
@@ -100,5 +109,14 @@ describe('4. a long line is body size, a short one keeps its look', () => {
   it('the shared parts use it: the TabPage lede and the ListRow line', () => {
     expect(read('components/shell/tab-page.tsx')).toContain('lineSize(lede)');
     expect(read('components/ui/fel/cards.tsx')).toContain('lineSize(line)');
+  });
+  it('a short line can keep a smaller look of its own; a long one is still body', () => {
+    expect(lineSize('Build phase.', 'text-[12px]')).toBe('text-[12px]');
+    expect(lineSize('Hold this week: your landing check came back sore, so the jumps wait and the strength work stays.', 'text-[12px]')).toBe(TYPE.body);
+  });
+  it('the signature program page sizes its notes, week decisions and phase goals by length', () => {
+    const page = read('components/signature/program-page.tsx');
+    for (const s of ['lineSize(n.text)', 'lineSize(view.prehabNote)', 'lineSize(view.premium.line)', "lineSize(ph.goal, 'text-[12px]')"]) expect(page).toContain(s);
+    expect(read('components/signature/look.ts')).toContain("note: 'flex gap-2',");
   });
 });

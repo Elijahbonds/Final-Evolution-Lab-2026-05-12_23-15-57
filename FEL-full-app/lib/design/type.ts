@@ -42,8 +42,8 @@ export const TYPE: Record<TypeRole, string> = {
  *  a run of more than 12 words is body copy and takes TYPE.body (16 px) on a phone; a supporting line of 12 words or
  *  fewer may stay TYPE.small. So a short line keeps the designed look and a long one becomes readable, wording unchanged. */
 export const MAX_SMALL_WORDS = 12;
-export const lineSize = (text: string | null | undefined): string =>
-  (text ?? '').split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length > MAX_SMALL_WORDS ? TYPE.body : TYPE.small;
+export const lineSize = (text: string | null | undefined, short: string = TYPE.small): string =>
+  (text ?? '').split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length > MAX_SMALL_WORDS ? TYPE.body : short;
 
 
 /** Numbers: the display face, tabular figures. Add a size role beside it (TYPE.display / TYPE.title). */

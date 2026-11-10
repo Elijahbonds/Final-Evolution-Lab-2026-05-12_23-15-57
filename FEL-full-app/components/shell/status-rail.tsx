@@ -32,6 +32,20 @@ import { t } from '@/lib/i18n';
 // QA P0-01: the chip prints the MEASURED PRQ (lib/prq-display) — `prq` on the profile body is the seeded gameplay number.
 interface RailData { prq: PrqDisplay; isAdmin: boolean }
 
+/**
+ * EVERY-SCREEN P2: signed-in-only paths (lib/screen/config.ts) that a signed-out visitor still stays on — the sign-in
+ * pages, an invite, the free games. The rail must not be drawn there while the session loads: for a visitor it would
+ * vanish as the answer arrives and push the page up (the rig measured /coach/join go from 0 to 0.072). The list is the
+ * crawl's: every screen it scored signed out on a signed-in-only path (docs/every-screen/scorecard.json).
+ * assumption: a coach's public page (/coach/<name>, off while the coach store is) is not handled; it would jump for a
+ * visitor once the store opens.
+ */
+export const RAIL_OPEN_TO_VISITORS: readonly string[] = ['/login', '/signup', '/coach/join', '/play/adventure', '/play/adventure-br', '/play/mirror/assess', '/squads/join'];
+export const reservesRail = (pathname: string): boolean => {
+  const p = pathname.toLowerCase().replace(/\/+$/, '') || '/';
+  return isSignedInOnly(p) && !RAIL_OPEN_TO_VISITORS.some((r) => p === r || p.startsWith(`${r}/`));
+};
+
 export function StatusRail() {
   const pathname = usePathname() || '/';
   const { status } = useSession();
@@ -67,7 +81,7 @@ export function StatusRail() {
   // page that rendered at all means someone is signed in: there the rail is drawn while the session loads, empty, so
   // nothing moves when it fills. Elsewhere (the home, a public page) nothing is drawn until the answer, as before.
   if (chromeHiddenFor(pathname)) return null;
-  if (status !== 'authenticated' && !(status === 'loading' && isSignedInOnly(pathname))) return null;
+  if (status !== 'authenticated' && !(status === 'loading' && reservesRail(pathname))) return null;
 
   return (
     <header className="fel-bar sticky top-0 z-40 border-b border-[color:var(--fel-hairline)] bg-fel-bg/85 backdrop-blur-xl">
@@ -87,7 +101,10 @@ export function StatusRail() {
         </div>
         <div className="flex-1 md:hidden" />
 
-        <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
+        {/* EVERY-SCREEN P2: on a phone the cluster is always its own row. It did not fit beside the wordmark once the wallet
+            counted up from 0 to its balance, so it wrapped mid-load and pushed the page down (0.06 of layout shift on every
+            signed-in screen); the row it ends on is now the row it starts on. Wider than 640 px it sits beside the wordmark. */}
+        <div className="ml-auto flex min-w-0 basis-full flex-wrap items-center justify-end gap-2 sm:basis-auto">
           {/* P10 (2026-10-27): the PRQ ring and the wallet are always there — a dash and an empty track until the profile
               answers — so nothing swaps in and the cluster never shifts (the rig measured 0.006 CLS from the old skeleton swap) */}
           <>

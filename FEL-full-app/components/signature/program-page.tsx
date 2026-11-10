@@ -29,6 +29,7 @@ import { PrimaryCta } from '@/components/ui/fel/primary-cta';
 import { warmAvatarDemo } from '@/components/library/avatar-demo';
 import { Chip } from '@/components/ui/fel/chip';
 import { SIG_LOOK } from './look';
+import { TYPE, lineSize } from '@/lib/design/type';
 import { Layer } from '@/components/session-player/layer';
 
 // the player (and its 3D demo) loads only when Start is tapped: a phone reading the page pays nothing for it
@@ -103,7 +104,7 @@ function Weeks({ weeks, current, premiumLine }: { weeks: WeekView[]; current: nu
                 </li>
               ))}
             </ul>
-            {w.decision && <p data-decision={w.decision.kind} className="mt-1.5 text-[12px] text-amber-100/85"><span className="font-bold">{w.decision.label}.</span> {w.decision.line}</p>}
+            {w.decision && <p data-decision={w.decision.kind} className={`mt-1.5 ${lineSize(`${w.decision.label}. ${w.decision.line}`, 'text-[12px]')} text-amber-100/85`}><span className="font-bold">{w.decision.label}.</span> {w.decision.line}</p>}
           </li>
         ))}
       </ol>
@@ -196,11 +197,11 @@ export function ProgramPage({ initial, clips = {} }: { initial: ProgramView; cli
   return (
     <div data-testid="signature-program" data-program={view.id} data-keep={view.keep} data-status={view.status} className="mx-auto max-w-[720px]">
       {view.draft && <p className="mb-3" data-draft title={DRAFT_BADGE} aria-label={`${view.status === 'rejected' ? 'Rejected. ' : ''}${DRAFT_BADGE}`}><Chip tone="warning">{view.status === 'rejected' ? 'Rejected' : 'Draft'}</Chip></p>}
-      {view.prehabNote && <p data-prehab-note className={`mb-3 ${SIG_LOOK.note} font-semibold text-amber-100`}>{view.prehabNote}</p>}
+      {view.prehabNote && <p data-prehab-note className={`mb-3 ${SIG_LOOK.note} ${lineSize(view.prehabNote)} font-semibold text-amber-100`}>{view.prehabNote}</p>}
 
       <section data-testid="today-session" data-session={today?.id} data-blocked={today?.blocked ? '1' : '0'} className={SIG_LOOK.today}>
         {view.premium.locked ? (
-          <p data-locked className={`${SIG_LOOK.note} text-fel-soft`}><Lock aria-hidden className="mt-0.5 h-4 w-4 shrink-0" />{view.premium.line}</p>
+          <p data-locked className={`${SIG_LOOK.note} ${lineSize(view.premium.line)} text-fel-soft`}><Lock aria-hidden className="mt-0.5 h-4 w-4 shrink-0" />{view.premium.line}</p>
         ) : today ? (
           <>
             <p className={SIG_LOOK.meta}>{today.day} · {today.label}</p>
@@ -208,7 +209,7 @@ export function ProgramPage({ initial, clips = {} }: { initial: ProgramView; cli
             {today.notes.length > 0 && (
               <ul className="mt-3 grid gap-1.5">
                 {today.notes.map((n) => (
-                  <li key={n.id + n.text} data-note={n.id} className={`${SIG_LOOK.note} ${n.id === 'readiness' || n.id === 'impact' ? 'text-[#7FEFFF]' : 'text-amber-100'}`}>
+                  <li key={n.id + n.text} data-note={n.id} className={`${SIG_LOOK.note} ${lineSize(n.text)} ${n.id === 'readiness' || n.id === 'impact' ? 'text-[#7FEFFF]' : 'text-amber-100'}`}>
                     <span aria-hidden className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-current" />
                     <span>{n.text}{n.href && <> <a href={n.href} className={SIG_LOOK.link}>Do the landing check →</a></>}</span>
                   </li>
@@ -216,7 +217,7 @@ export function ProgramPage({ initial, clips = {} }: { initial: ProgramView; cli
               </ul>
             )}
             {!today.blocked && today.retest.length > 0 && (
-              <p data-retests className={`mt-2 ${SIG_LOOK.note} text-fel-soft`}>
+              <p data-retests className={`mt-2 ${SIG_LOOK.note} ${TYPE.small} text-fel-soft`}>
                 <Target aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-fel-cyan" />
                 <span>{RETEST_FIRST}: {today.retest.map((r, i) => <span key={r}>{i ? ' · ' : ''}<a href={RETEST[r].href} className={SIG_LOOK.link}>{RETEST[r].label}</a></span>)}</span>
               </p>
@@ -252,7 +253,7 @@ export function ProgramPage({ initial, clips = {} }: { initial: ProgramView; cli
           {view.phases.map((ph, i) => (
             <li key={ph.id} className="rounded-xl border border-white/8 bg-white/[0.02] px-3 py-2">
               <p className="text-[13px] font-bold text-white">{i + 1}. {ph.label} <span className="font-normal text-white/50">· {ph.weeks} {ph.weeks === 1 ? 'week' : 'weeks'}</span></p>
-              <p className="text-[12px] text-white/55">{ph.goal}</p>
+              <p className={`${lineSize(ph.goal, 'text-[12px]')} text-white/55`}>{ph.goal}</p>
               {ph.retests.length > 0 && <p className="mt-0.5 text-[12px] text-[#00E5FF]/85">Re-tests: {ph.retests.map((r) => RETEST[r].label).join(', ')}</p>}
             </li>
           ))}
