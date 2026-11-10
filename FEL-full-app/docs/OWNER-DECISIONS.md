@@ -313,3 +313,22 @@ standing rule above), is reversible, and is flagged here so it can be overturned
 - **"I approve, go"** on `docs/PLAN-EVERY-SCREEN-10PHASE.md` as written, including its three new speed budgets (first
   content ≤ 2.5 s, layout shift ≤ 0.02, tap response ≤ 200 ms on the throttled phone).
 - The seven stopped lanes were restarted the same day at the owner's word ("restart those lanes and finish those").
+
+## 2026-11-10 — fix the demos, fix the screens
+
+The owner: **"Fix the demos, fix the screens, address what you found above."** Taken on the owner's word (each is
+reversible). Work is on `lane/screen-fixes` (the screens) and the demos lane (the demos).
+
+1. **Coach templates may play draft entries' demos** (the animation only; nothing else about a draft entry is shown).
+2. **Body text at the approved 16 px does not count against the per-screen text-size budget** (the scorer's "at most 4
+   text sizes"; `TYPE.body`). Every other size, on the scale or off it, still counts.
+3. **The Play shelf's mode lists may wrap to 3 lines** (`line-clamp-3`; it was 2). Recommended by readable-2: three lines
+   show five of the six cut-off lists in full on a phone.
+4. **/account and /profile/edit long copy moves to 16 px** (`TYPE.body`). Size only: not a word of the wording changes.
+   The other screens' supporting lines stay as they are.
+5. **Everything the earlier lanes measured and did not fix is fixed:** the home hero's two headline lines drawn on each
+   other (the owner-approved wording of PR #540 stays exactly as it is); /play/party's contrast and its cut-off join
+   banner; /profile/edit's "Save card" contrast; /train's "Your week" label; the layout shift on /store, /workout, /modes
+   and the shared start screen (`boot-splash.tsx`: the layout only, never what it loads or when); the React hydration
+   mismatch on every game screen (its cause, not the warning); the 3D canvas's name and Tab order wherever a 3D stage is
+   mounted; and the start screens' "learn" card text, moved onto the type scale (size only).
