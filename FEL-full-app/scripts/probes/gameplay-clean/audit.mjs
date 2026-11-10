@@ -35,6 +35,7 @@ const [OUT, MODES_ARG] = process.argv.slice(2);
 if (!OUT || !MODES_ARG) { console.error('usage: node audit.mjs <outDir> <mode,...>'); process.exit(2); }
 const MODES = MODES_ARG.split(',').filter(Boolean);
 const PORT = process.env.PORT ?? '3661';
+const HOST = process.env.HOST ?? '127.0.0.1';   // serve.mjs picks the site by host name (a before- and an after-build on one port)
 const PLAY_S = Number(process.env.PLAY_S ?? 22);   // 22 s of scripted play (was 30: on the shared box at load 10–19 the 230 s wall budget cut most runs to 15–25 s anyway)
 const PAUSE_AT = Number(process.env.PAUSE_AT ?? 10);
 const PERF_S = Number(process.env.PERF_S ?? 2.5);
@@ -181,7 +182,10 @@ function installRecorder(cfg) {
           if (!g.isPlaying) continue;
           let isH = heroGroups.get(g);
           if (isH === undefined) { const t = g.targetedAnimations[0] && g.targetedAnimations[0].target; isH = !!(t && (t === heroRef || (t.isDescendantOf && t.isDescendantOf(heroRef)))); heroGroups.set(g, isH); }
-          const w = g.weight < 0 ? 1 : g.weight;
+          // the weight a crossfade gives a clip is on its ANIMATABLES (CharacterAnimator.weightOf); the group's own `weight` stays −1.
+          // (Before clean-5 this read g.weight, so every playing clip read 1: the "> 0.3" below never dropped a fading clip.)
+          const aw = g.animatables && g.animatables[0] ? g.animatables[0].weight : null;
+          const w = aw == null || aw < 0 ? 1 : Math.max(0, Math.min(1, aw));
           if (isH && w > 0.3) names.push(g.name.replace(/_c\d+$/, '').slice(0, 40));
           // clean-5: every playing hero clip with its weight (a third clip under a fade, a clip dropped at a weight: poprank.mjs)
           if (isH) all.push([ix(R.gIx, R.gNames, g.name.replace(/_c\d+$/, '').slice(0, 40)), Math.round(w * 100) / 100]);
@@ -522,7 +526,7 @@ for (const mode of MODES) {
   const unshot = () => ev((fast) => { window.__drawOn = !fast; window.__freeze = false; }, FAST);
   try {
     const cdp = await ctx.newCDPSession(p);
-    await p.goto(`http://127.0.0.1:${PORT}/index.html?mode=${mode}&perf=off${QS}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+    await p.goto(`http://${HOST}:${PORT}/index.html?mode=${mode}&perf=off${QS}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
     // READY: the TAP TO START card (or a mode with no splash: playing / its own card)
     let st = {}; const tB = Date.now();
     for (;;) {
@@ -599,7 +603,7 @@ for (const mode of MODES) {
       await sleep(250);
     }
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 }).catch(() => {});
-    const rec = await ev(() => { const R = window.__rec; const thrFrom = R.frames.findIndex((f) => f.t >= (window.__thrT ?? 1e9)); return { frames: R.frames, clips: R.clips, gNames: R.gNames, occNames: R.occNames, presses: R.presses, bus: R.bus.slice(0, 50), skel: R.skel }; });
+    const rec = await ev(() => { const R = window.__rec; const thrFrom = R.frames.findIndex((f) => f.t >= (window.__thrT ?? 1e9)); return { frames: R.frames, clips: R.clips, gNames: R.gNames, cwv: 2, occNames: R.occNames, presses: R.presses, bus: R.bus.slice(0, 50), skel: R.skel }; });
     // frames the throttle covered: the last PERF_S seconds of the script
     const S = await ev(() => ({ ...window.__S, tapUntil: undefined }));
     const tEnd = rec.frames.length ? rec.frames[rec.frames.length - 1].t : 0;
@@ -614,6 +618,9 @@ for (const mode of MODES) {
   try { row.scriptErr = await p.evaluate(() => window.__scriptErr ?? null); row.api = await p.evaluate(() => [...new Set(window.__api)].slice(0, 20)); } catch {}
   fs.writeFileSync(path.join(OUT, `${mode}-${TAG}.json`), JSON.stringify(row, null, 1));
   console.log(`${mode.padEnd(17)} ready ${row.readyS}s play ${row.firstPlayS}s frames ${row.frames} pops ${row.pops} cuts ${row.camCuts} hidden ${row.heroHiddenPct}% cpu ${row.cpuMsP50}/${row.cpuMsP95} phone ${row.phoneCpuMsP50}/${row.phoneCpuMsP95} draws ${row.drawsMean}/${row.drawsMax} resp ${row.respMsMed}ms pause ${row.pause?.state} err ${row.errorCount}${row.fail ? ' FAIL ' + row.fail : ''} (${row.wallS}s)`);
-  await ctx.close();
+  // clean-5: closing a context whose page is still spinning the virtual clock took about 110 s a mode on the shared box (the first
+  // sweep hold: 6 modes in 700 s, each reporting ~120 s). The row is written; give the close 5 s and move on.
+  await Promise.race([ctx.close().catch(() => {}), sleep(5000)]);
 }
-await b.close();
+await Promise.race([b.close().catch(() => {}), sleep(5000)]);
+process.exit(0);   // (playwright kills the browser it launched when this process exits)
