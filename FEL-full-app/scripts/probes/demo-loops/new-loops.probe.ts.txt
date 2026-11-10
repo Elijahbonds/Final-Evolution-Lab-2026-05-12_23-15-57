@@ -1,0 +1,72 @@
+// scratch (git-excluded): new loops' floor, closure and bind check, and a joint probe
+import { readFileSync, writeFileSync } from 'node:fs';
+import { beforeAll, it } from 'vitest';
+import { FreeCamera, NullEngine, Quaternion, Scene, SceneLoader, Vector3 } from '@babylonjs/core';
+import type { AnimationGroup, Skeleton, TransformNode } from '@babylonjs/core';
+import '@babylonjs/loaders/glTF';
+import { boneNode } from '../boneLookup';
+import { EXERCISE_BUILDERS } from './exercise';
+import { bindPoseDeviationDeg } from '../../library/poseGuard';
+
+const NEW = (process.env.NEW_CLIPS ?? '').split(/[ ,]+/).filter(Boolean);
+const BODIES = { hero: process.env.FEL_HERO_GLB ?? 'public/models/fel-hero.glb', female: 'public/models/candidates/fel-kit-female.glb' } as const;
+type Body = keyof typeof BODIES;
+const rigs: Partial<Record<Body, { scene: Scene; sk: Skeleton; bind: Map<TransformNode, { p: Vector3; q: Quaternion }>; clips: Map<string, AnimationGroup> }>> = {};
+
+beforeAll(async () => {
+  if (!NEW.length) return;
+  for (const [body, file] of Object.entries(BODIES) as [Body, string][]) {
+    const scene = new Scene(new NullEngine()); new FreeCamera('c', new Vector3(0, 1, -3), scene);
+    const r = await SceneLoader.ImportMeshAsync('', '', 'data:model/gltf-binary;base64,' + readFileSync(file).toString('base64'), scene, undefined, '.glb');
+    for (const g of r.animationGroups) g.stop();
+    const sk = r.skeletons[0];
+    const bind = new Map<TransformNode, { p: Vector3; q: Quaternion }>();
+    for (const b of sk.bones) { const n = b.getTransformNode(); if (n) bind.set(n, { p: n.position.clone(), q: (n.rotationQuaternion ?? Quaternion.Identity()).clone() }); }
+    const rig = { scene, sk, bind, clips: new Map<string, AnimationGroup>() };
+    rigs[body] = rig;
+    for (const [name, build] of EXERCISE_BUILDERS.filter(([n]) => NEW.includes(n))) { reset(body); const g = build(scene, sk); if (g) rig.clips.set(name, g); }
+  }
+}, 180_000);
+
+function reset(body: Body): void {
+  const r = rigs[body]!;
+  for (const x of [...r.scene.animationGroups]) x.stop();
+  for (const [n, t] of r.bind) { n.position.copyFrom(t.p); n.rotationQuaternion = t.q.clone(); }
+  r.scene.render();
+}
+function at(body: Body, clip: string, sec: number): void {
+  reset(body);
+  const g = rigs[body]!.clips.get(clip)!;
+  g.start(false, 1, g.from, g.to, false); g.goToFrame(g.from + sec * 30); rigs[body]!.scene.render();
+}
+const dur = (body: Body, clip: string) => { const g = rigs[body]!.clips.get(clip)!; return (g.to - g.from) / 30; };
+function pos(body: Body, name: string): Vector3 { const n = boneNode(rigs[body]!.sk, name)!; n.computeWorldMatrix(true); return n.getAbsolutePosition().clone(); }
+
+it.skipIf(!process.env.NEW_OUT)('new loops: floor, closure, bind', () => {
+  const out: string[] = [];
+  for (const body of Object.keys(BODIES) as Body[]) for (const name of NEW) {
+    if (!rigs[body]!.clips.has(name)) { out.push(`${body} ${name}: NOT BUILT <<<`); continue; }
+    const D = dur(body, name);
+    const joints = ['Hips', 'Head', 'LeftHand', 'RightHand', 'LeftFoot', 'RightFoot'];
+    at(body, name, 0); const a = joints.map((j) => pos(body, j)); at(body, name, D); const b = joints.map((j) => pos(body, j));
+    const close = Math.max(...a.map((p, i) => Vector3.Distance(p, b[i])));
+    let low = 9, lowJ = '', lowT = 0, minBind = 999;
+    for (let i = 0; i <= 120; i++) {
+      at(body, name, (D * i) / 120);
+      for (const j of ['LeftFoot', 'RightFoot', 'LeftToeBase', 'RightToeBase', 'LeftHand', 'RightHand', 'Head', 'LeftLeg', 'RightLeg']) { const y = pos(body, j).y; if (y < low) { low = y; lowJ = j; lowT = i / 120; } }
+      const d = bindPoseDeviationDeg(rigs[body]!.sk); if (d != null) minBind = Math.min(minBind, d);
+    }
+    const flag = close > 0.02 || low < -0.035 || minBind <= 4 ? ' <<<' : '';
+    out.push(`${body} ${name} dur=${D.toFixed(1)} close=${close.toFixed(3)} low=${low.toFixed(3)}(${lowJ}@${lowT.toFixed(2)}) bind=${minBind.toFixed(1)}${flag}`);
+  }
+  // the joint probe: PROBE_AT=0,0.3,0.7 (fractions of the loop) prints where the hero's joints are (x right, y up, z front)
+  if (process.env.PROBE_AT) for (const name of NEW) {
+    if (!rigs.hero!.clips.has(name)) continue;
+    const D = dur('hero', name);
+    for (const f of process.env.PROBE_AT.split(',').map(Number)) {
+      at('hero', name, D * f);
+      out.push(`  ${name} @${f}: ` + ['Hips', 'Head', 'LeftArm', 'RightArm', 'LeftHand', 'RightHand', 'LeftLeg', 'RightLeg', 'LeftFoot', 'RightFoot', 'LeftToeBase', 'RightToeBase'].map((j) => { const v = pos('hero', j); return `${j.replace('Left', 'L').replace('Right', 'R')}(${v.x.toFixed(2)},${v.y.toFixed(2)},${v.z.toFixed(2)})`; }).join(' '));
+    }
+  }
+  writeFileSync(process.env.NEW_OUT!, out.join('\n') + '\n');
+}, 900_000);

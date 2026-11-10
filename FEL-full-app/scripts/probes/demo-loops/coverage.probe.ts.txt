@@ -1,0 +1,14 @@
+// scratch (git-excluded): library loop coverage
+import { it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { loadLibraryFiles } from './files';
+import { demoFor } from './demo';
+import { EXERCISE_CLIPS } from '@/lib/babylon/anim/authored/exercise';
+it.skipIf(!process.env.MEASURE_OUT)('measure', () => {
+  const all = loadLibraryFiles();
+  const approved = all.filter((e) => e.review.status === 'approved');
+  const fam = new Map<string, string[]>();
+  for (const e of approved) { if (demoFor(e)) continue; (fam.get(e.family) ?? fam.set(e.family, []).get(e.family)!).push(`${e.name} [${e.variation}|${e.equipment.join(',')}]`); }
+  writeFileSync(process.env.MEASURE_OUT!, JSON.stringify({ approved: approved.length, approvedWithLoop: approved.filter((e) => demoFor(e)).length, clips: EXERCISE_CLIPS.length,
+    families: [...fam.entries()].sort((a, b) => b[1].length - a[1].length).map(([family, miss]) => ({ family, n: miss.length, miss })) }, null, 1));
+});

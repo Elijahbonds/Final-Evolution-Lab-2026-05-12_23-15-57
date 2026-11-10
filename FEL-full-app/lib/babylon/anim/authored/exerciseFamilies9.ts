@@ -86,7 +86,8 @@ const kneelJumpSquat: Builder = (scene, sk) => {
   const half: Pose = kneelIK({ bones: { Hips: [4, 0, 0], Spine: [0, 0, 0], Neck: [0, 0, 0] }, rel, poles, hipsY: 0 }, ['Right']);
   return run(scene, sk, 'ex_kneel_jump_squat', 5.0, [
     at(tall, 0, true), at(back, 0.7, true), at(back, 0.9, true), at(pop, 1.02), at(air, 1.16), at(squat, 1.36, true), at(squat, 1.7, true), at(stand, 2.4, true), at(stand, 2.8, true),
-    at({ ...half, hipsY: KNEEL_Y + 0.16 }, 3.5), at(half, 3.9, true), at(tall, 4.5, true),
+    // (stepping back down, the back knee still in the air: its ankle higher and the foot less pointed, or the toes dip through the floor)
+    at({ ...half, bones: { ...half.bones, RightFoot: [40, 0, 0] }, feet: { ...half.feet, Right: [0.11, 0.15, -0.38] }, hipsY: KNEEL_Y + 0.16 }, 3.5), at(half, 3.9, true), at(tall, 4.5, true),
   ], true);
 };
 
@@ -246,8 +247,9 @@ const TALL_KNEEL = (rel: Pair, poles: Pair): Pose => kneel({ bones: { Hips: [0, 
 /** ex_kneel_high_row — kneeling facing a high pulley, the rope held up and out in front, arms long: pulled down to the upper
  *  chest, the elbows out wide and the shoulder blades squeezed; back out. */
 const kneelHighRow: Builder = (scene, sk) => rep(scene, sk, 'ex_kneel_high_row',
-  TALL_KNEEL({ Left: [0.08, 0.30, 0.46], Right: [-0.08, 0.30, 0.46] }, bothDir(0.6, -0.4, -0.2)),
-  TALL_KNEEL({ Left: [0.04, 0.02, 0.18], Right: [-0.04, 0.02, 0.18] }, bothDir(1, 0.2, -0.4)), 0.9, 0.3, 1.0, 0.3);
+  // (the wrists no closer than the shoulders are wide: with the elbows out, closer hands crossed the forearms over the chest)
+  TALL_KNEEL({ Left: [0.05, 0.30, 0.46], Right: [-0.05, 0.30, 0.46] }, bothDir(0.6, -0.4, -0.2)),
+  TALL_KNEEL({ Left: [-0.01, 0.02, 0.16], Right: [0.01, 0.02, 0.16] }, bothDir(1, 0.2, -0.4)), 0.9, 0.3, 1.0, 0.3);
 /** ex_kneel_high_row_one — kneeling in front of a high pulley, one handle in the right hand, the arm up and out in front, palm
  *  forward: pulled down to the side of the chest, the elbow back and the palm turning in; the left hand at the side. */
 const kneelHighRowOne: Builder = (scene, sk) => rep(scene, sk, 'ex_kneel_high_row_one',
@@ -257,12 +259,12 @@ const ELBOWS_BACK_LOW: Pair = bothDir(0.3, -0.5, -1);
 /** ex_seated_high_row — the high-row machine: seated, the handles up and in front, overhand: pulled down and back to the
  *  sides of the chest, the shoulder blades squeezed, a pause, and back up. */
 const seatedHighRow: Builder = (scene, sk) => rep(scene, sk, 'ex_seated_high_row',
-  seat({ rel: { Left: [0.04, 0.40, 0.34], Right: [-0.04, 0.40, 0.34] }, poles: bothDir(0.6, -0.4, -0.2) }),
-  seat({ rel: { Left: [0.02, -0.14, 0.06], Right: [-0.02, -0.14, 0.06] }, poles: ELBOWS_BACK_LOW }), 0.9, 0.4, 1.0, 0.3);
+  seat({ rel: { Left: [-0.02, 0.40, 0.34], Right: [0.02, 0.40, 0.34] }, poles: bothDir(0.6, -0.4, -0.2) }),
+  seat({ rel: { Left: [-0.05, -0.14, 0.06], Right: [0.05, -0.14, 0.06] }, poles: ELBOWS_BACK_LOW }), 0.9, 0.4, 1.0, 0.3);
 /** ex_row_to_neck — seated at the low pulley, a rope, the back upright and the arms long in front: the elbows lift high and
  *  wide as the rope comes up to the neck; back out. */
 const rowToNeck: Builder = (scene, sk) => rep(scene, sk, 'ex_row_to_neck',
-  SEATED_ROW.a, { ...SEATED_ROW.a, rel: { Left: [0.06, 0.04, 0.14], Right: [-0.06, 0.04, 0.14] }, poles: bothDir(1, 0.5, -0.3) }, 0.9, 0.3, 1.0, 0.3);
+  SEATED_ROW.a, { ...SEATED_ROW.a, rel: { Left: [-0.01, 0.04, 0.14], Right: [0.01, 0.04, 0.14] }, poles: bothDir(1, 0.5, -0.3) }, 0.9, 0.3, 1.0, 0.3);
 
 export const FAMILY9_BUILDERS: readonly [string, Builder][] = [
   ['ex_box_jump_lat', boxJumpLat], ['ex_hurdle_hops', hurdleHops], ['ex_side_long_jump', sideLongJump], ['ex_kneel_jump_squat', kneelJumpSquat],
