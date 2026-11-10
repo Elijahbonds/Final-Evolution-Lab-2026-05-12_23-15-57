@@ -1118,6 +1118,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/anim/footballTree.ts FOOTBALL_HURDLE_FADE_SEC',
     hint: 'How long the run blends into the hurdle jump. 0.06 = the old snap (thigh turns about 25 degrees in one frame); 0.12 = smoother (about 15); longer starts to lag behind the hop.',
   },
+  {
+    id: 'football.hurdleExitFadeSec', label: 'Football hurdle: blend-out time', def: 0.2, min: 0.06, max: 0.4, step: 0.02, unit: 's', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/footballTree.ts FOOTBALL_HURDLE_EXIT_FADE_SEC',
+    hint: 'How long the hurdle jump blends back into the run. 0.1 = the old snap (the off arm turns about 31 degrees a frame for six frames); 0.2 = smoother (about 16); longer leaves the arms up after the landing.',
+  },
   // hoops-p03 (1v1/3v3 phase 3 "rivals that play basketball"): the 1v1 rival's kit and reads (hoops/rivalOffense), the 3v3 team offence
   // (hoops/teamOffense3v3). Every default is this lane's; the owner has felt none of them.
   {
@@ -1330,6 +1335,21 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'anim.plantReleaseSec', label: 'Foot plant: release blend time', def: 0.1, min: 0, max: 0.4, step: 0.02, unit: 's', group: 'Anim · transitions',
     source: 'lib/babylon/anim/FootPlanting.ts PLANT_RELEASE_SEC',
     hint: 'How long a leg the foot planter lets go of takes to ease back onto the clip, in rotation. 0 = the old release, a target fade that rebuilt the leg in one frame when the body jumped or landed (football hurdle, 41 to 70 degrees a frame).',
+  },
+  {
+    id: 'anim.plantReplantEase', label: 'Foot plant: a replant keeps easing on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/FootPlanting.ts PLANT_REPLANT_EASE_ON',
+    hint: 'On: a foot that plants again while its leg is still easing off the last plant keeps easing. Off: the old behaviour, the leg snapped onto the new plant in one frame (a body sliding in a wide stance popped a thigh about 33 degrees at every re-plant).',
+  },
+  {
+    id: 'anim.plantSeatedOff', label: 'Foot plant: off for a seated pilot on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/FootPlanting.ts PLANT_SEATED_OFF_ON',
+    hint: 'On: a body its mode seats in a vehicle (the Aero Aces pilot) holds no foot plant. Off: the old behaviour, the seated feet were pinned to the ground as the plane flew and the knees snapped 50 to 60 degrees in a frame.',
+  },
+  {
+    id: 'anim.fadeHoldEnded', label: 'Crossfade: hold a move that ends mid-blend on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/CharacterAnimator.ts FADE_HOLD_ENDED_ON',
+    hint: 'On: a strike or hit react that reaches its last frame while it is still blending out is held on that frame until the blend ends. Off: the old behaviour, it vanished mid-blend and the whole body jumped in one frame (Showdown hit react into guard, arms about 30 degrees).',
   },
   {
     id: 'anim.hipYawFold', label: 'Posture hip strip folds past 90 degrees on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',

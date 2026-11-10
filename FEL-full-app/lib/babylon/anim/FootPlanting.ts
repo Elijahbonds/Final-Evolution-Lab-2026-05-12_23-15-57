@@ -133,6 +133,22 @@ export const PLANT_ENGAGE_SEC = 0.1;
  */
 export const PLANT_RELEASE_SEC = RELEASE_FADE_SEC;
 
+/**
+ * GAMEPLAY-CLEAN P5 (2026-11-10): A FOOT THAT PLANTS AGAIN CARRIES ITS RELEASE THROUGH, feel knob `anim.plantReplantEase` (1 on).
+ *
+ * P4's rotation release holds the leg the layer last wrote and slerps it onto the clip's over PLANT_RELEASE_SEC. A foot that planted
+ * AGAIN inside that time ENDED the release on the spot (`relLeft = 0`) — and the release had also zeroed the engage, so the new plant's
+ * first solve is the clip's own pose: the leg jumped the rest of the way from the held pose to the clip in ONE frame, then eased back
+ * out to the pole. It happens every time a pin is let go and taken straight back: a stance foot sliding to the drift limit (released
+ * there, low and still, so planted again on the next frame — "a clip that never steps slides smoothly at the drift limit", S7), a
+ * one-frame airborne read on a landing or a step down. Measured headless on a stance with its knees turned out 40°, the root sliding
+ * at 0.5–3 m/s: the thigh 33.5° in a frame at every release (6.4° with P4 off; 40° before P3) — P4 had put back most of the pop P3
+ * took out, on this path only. Now the release carries on under the new plant: the held hip and knee keep slerping onto whatever the
+ * layer solves this frame (the clip's pose at first, the pinned one as the engage comes back), for what is left of the release time.
+ * 0 = a replant ends the release at once, exactly as P4 shipped. The pin, its weight, the engage and the release time are unchanged.
+ */
+export const PLANT_REPLANT_EASE_ON = 1;
+
 /** The solve's engage weight one frame on (pure): toward 1 while the layer solves the leg, toward 0 when it stops, at 1/`sec` a second
  *  — a hard step at `sec` ≤ 0 (the old behaviour). */
 export function stepEngage(w: number, solving: boolean, dt: number, sec: number): number {
@@ -141,6 +157,20 @@ export function stepEngage(w: number, solving: boolean, dt: number, sec: number)
   const k = Math.max(0, dt) / sec;
   return want > w ? Math.min(want, w + k) : Math.max(want, w - k);
 }
+/**
+ * GAMEPLAY-CLEAN P5 (2026-11-10): A SEATED BODY HOLDS NO PIN, feel knob `anim.plantSeatedOff` (1 on). Every spawned hero carries this
+ * layer (CharacterLibrary.spawn), and contact is read from the clip's ankle height over the root: a pilot sitting in a cockpit has
+ * his ankles at the root's height, so the layer read his feet as DOWN and pinned them to the world while the plane flew on at
+ * 14–30 m/s — let go at the drift limit a frame later, pinned again, every few frames. Aero Aces in play (the rig, 14 s): knees 51–63°
+ * and thighs 22–40° in one frame, 2–3 hard pops a run; with `?noplant=1` none, every bone under 1.3° a frame. A mode that seats its
+ * body says so (setPlantingSeated); the layer then treats the body as AIRBORNE (MOVEMENT POLISH below): a pin it holds is let go
+ * through the release, and none is taken. A body not marked seated runs exactly as before. 0 = the mark is ignored.
+ */
+export const PLANT_SEATED_OFF_ON = 1;
+const seatedBodies = new WeakSet<Skeleton>();
+/** A mode that seats this body in a vehicle (a cockpit, a kart) marks it: its feet hold no pin until unmarked. */
+export function setPlantingSeated(skeleton: Skeleton, seated: boolean): void { if (seated) seatedBodies.add(skeleton); else seatedBodies.delete(skeleton); }
+
 /** MOVEMENT POLISH (2026-10-06): a root moving vertically faster than this (m/s) is in the air — a jump, a drop — and holds no pin. A
  *  walking body's root does not bob (the clips carry the bob below it); steps and ramps move it well under this. */
 export const AIRBORNE_VY = 1.2;
@@ -269,6 +299,7 @@ export function mountFootPlanting(scene: Scene, skinned: AbstractMesh, skeleton:
     const dt = Math.min(0.1, Math.max(1e-4, scene.getEngine().getDeltaTime() / 1000));
     const engageSec = feel('anim.plantEngageSec', PLANT_ENGAGE_SEC);
     const releaseSec = feel('anim.plantReleaseSec', PLANT_RELEASE_SEC);
+    const replantEase = feel('anim.plantReplantEase', PLANT_REPLANT_EASE_ON) >= 0.5;
     frameNo++;
     for (let li = 0; li < legs.length; li++) {
       const leg = legs[li];
@@ -284,7 +315,8 @@ export function mountFootPlanting(scene: Scene, skinned: AbstractMesh, skeleton:
       // jump lifts the root with the ankle — so the foot planted at take-off stayed pinned to the floor's XZ while the body flew on, and
       // let go only at the drift limit (Free Run's take-off at 6 m/s: the trailing foot dragged back, then caught up 34 cm/frame² in a
       // frame on a hard jump, 25 with this, _movement-probe). The root rising or falling faster than AIRBORNE_VY lifts every pin (with the release fade).
-      const flying = !!pr && Math.abs(rootPos.y - pr.y) / dt > AIRBORNE_VY;
+      // (P5: a body its mode has seated is airborne for this layer — no pin is taken, a held one is let go)
+      const flying = (seatedBodies.has(skeleton) && feel('anim.plantSeatedOff', PLANT_SEATED_OFF_ON) >= 0.5) || (!!pr && Math.abs(rootPos.y - pr.y) / dt > AIRBORNE_VY);
       leg.prevClip = pc ?? new Vector3(); leg.prevClip.copyFrom(ankle); leg.prevRoot = pr ?? new Vector3(); leg.prevRoot.copyFrom(rootPos);
       if (jumped) { debug[leg.side === 'Left' ? 'left' : 'right'] = { planted: false, pin: { x: ankle.x, y: ankle.y, z: ankle.z } }; leg.fadeLeft = 0; leg.claimPin = null; leg.engage = 0; leg.relLeft = 0; continue; }   // a teleport: nothing to hold
       const key = leg.side === 'Left' ? 'left' : 'right';
@@ -327,7 +359,8 @@ export function mountFootPlanting(scene: Scene, skinned: AbstractMesh, skeleton:
         solveEngaged(leg, ankle, false, dt, engageSec);
         continue;
       }
-      leg.fadeLeft = 0; leg.relLeft = 0;   // (P4: a foot that plants again ends a release in flight)
+      leg.fadeLeft = 0;
+      if (!(replantEase && releaseSec > 0)) leg.relLeft = 0;   // (P4: a foot that plants again ends a release in flight; P5: it carries it through — carryRelease)
       if (!prev.planted && !handover) {
         // touchdown: remember where the foot is, in the root's frame
         leg.rootAtPlant.copyFrom(rootPos);
@@ -338,11 +371,23 @@ export function mountFootPlanting(scene: Scene, skinned: AbstractMesh, skeleton:
       const drift = Math.hypot(ankle.x - target.x, ankle.z - target.z);
       const w = pinWeight(drift, params.maxDrift) * intensity;
       leg.fadeW = w; leg.fadeTarget.copyFrom(target);   // what a release fades out from
-      if (w <= 0.001 || drift < 0.002) { solveEngaged(leg, ankle, false, dt, engageSec); continue; }
+      if (w <= 0.001 || drift < 0.002) { solveEngaged(leg, ankle, false, dt, engageSec); carryRelease(leg, dt, releaseSec); continue; }
       Vector3.LerpToRef(ankle, target, w, target);
       solveEngaged(leg, target, true, dt, engageSec);
+      carryRelease(leg, dt, releaseSec);
     }
   });
+  /** P5: a release still in flight when its foot planted again — the held hip and knee go on slerping onto what the layer wrote this
+   *  frame (the clip's pose, or the new plant's solve), over what is left of the release. Nothing when no release is in flight. */
+  function carryRelease(leg: Leg, dt: number, releaseSec: number): void {
+    if (!(leg.relLeft > 0)) return;
+    leg.relLeft = Math.max(0, leg.relLeft - dt);
+    const k = releaseSec > 0 ? 1 - leg.relLeft / releaseSec : 1;
+    Quaternion.SlerpToRef(leg.relHip, leg.hip.rotationQuaternion!, k, leg.hip.rotationQuaternion!);
+    Quaternion.SlerpToRef(leg.relKnee, leg.knee.rotationQuaternion!, k, leg.knee.rotationQuaternion!);
+    leg.hip.computeWorldMatrix(true); leg.knee.computeWorldMatrix(true); leg.ankle.computeWorldMatrix(true);
+    leg.outHip.copyFrom(leg.hip.rotationQuaternion!); leg.outKnee.copyFrom(leg.knee.rotationQuaternion!); leg.outFrame = frameNo;   // what a later release holds
+  }
   /** P3: solve the leg with its KNEE POLE eased by the engage. The pin's target is solved at full weight (the plant is as strong as
    *  ever); what blends is where the solve throws the knee: from the clip's own knee (engage 0 — a solve toward the clip's ankle
    *  with the clip's knee IS the clip's pose: nothing moves) to the root's forward (engage 1, the layer as it was). Not solving
