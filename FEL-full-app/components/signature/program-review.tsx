@@ -17,7 +17,7 @@ const STATUS_STYLE: Record<string, string> = {
 
 function NumberBox({ label, value, onChange }: { label: string; value: number | undefined; onChange: (v: number | undefined) => void }) {
   return (
-    <label className="flex flex-col text-[10.5px] text-white/45">
+    <label className="flex flex-col text-[12px] text-white/50">
       {label}
       <input inputMode="numeric" value={value ?? ''} onChange={(e) => onChange(e.target.value === '' ? undefined : Number(e.target.value))}
         className="mt-0.5 h-9 w-16 rounded-lg border border-white/10 bg-black/40 px-2 text-[13px] text-white" />
@@ -54,7 +54,7 @@ function ProgramCardReview({ row, onSaved }: { row: ReviewRow; onSaved: (o: Over
     <li data-review={row.id} data-status={row.status} className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="fel-heading text-[17px] font-black text-white">{row.title}</p>
-        <span className={`rounded-lg px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.12em] ${STATUS_STYLE[row.status]}`}>{row.status}</span>
+        <span className={`rounded-lg px-2 py-1 font-mono text-[12px] font-bold uppercase tracking-[0.12em] ${STATUS_STYLE[row.status]}`}>{row.status}</span>
       </div>
       <p className="mt-1 text-[12.5px] text-white/60">
         {row.exercises} exercises · <span data-draft-count>{row.draftExercises.length} still drafts in the library</span> · {row.gaps.length} gaps · {Object.keys(row.edits).length} edits
@@ -79,7 +79,7 @@ function ProgramCardReview({ row, onSaved }: { row: ReviewRow; onSaved: (o: Over
         <div data-editor className="mt-1 grid gap-3">
           {row.program.phases.map((ph) => (
             <div key={ph.id}>
-              <p className="text-[13px] font-bold text-white">{ph.label} <span className="font-normal text-white/45">· {ph.weeks.length} weeks</span></p>
+              <p className="text-[13px] font-bold text-white">{ph.label} <span className="font-normal text-white/50">· {ph.weeks.length} weeks</span></p>
               {ph.sessions.map((s) => (
                 <div key={s.key} className="mt-2 rounded-xl border border-white/8 p-2.5">
                   <p className="text-[12.5px] font-bold text-white/80">{s.day} · {s.key} · {s.label}</p>
@@ -89,13 +89,13 @@ function ProgramCardReview({ row, onSaved }: { row: ReviewRow; onSaved: (o: Over
                       const e = edits[key] ?? {};
                       return (
                         <li key={key} data-edit-item={key} className="flex flex-wrap items-end gap-2 border-t border-white/5 pt-2">
-                          <label className="flex min-w-[180px] flex-1 flex-col text-[10.5px] text-white/45">
+                          <label className="flex min-w-[180px] flex-1 flex-col text-[12px] text-white/50">
                             {it.section} · {row.names[e.ex ?? it.ex] ?? e.ex ?? it.ex}
                             <input value={e.ex ?? it.ex} onChange={(ev) => setEdit(key, { ex: ev.target.value.trim() })}
                               className="mt-0.5 h-9 rounded-lg border border-white/10 bg-black/40 px-2 font-mono text-[12px] text-white" />
                           </label>
                           <NumberBox label="Sets" value={e.sets ?? it.sets} onChange={(v) => setEdit(key, { sets: v })} />
-                          <label className="flex flex-col text-[10.5px] text-white/45">
+                          <label className="flex flex-col text-[12px] text-white/50">
                             Reps
                             <input value={e.reps ?? it.reps ?? ''} onChange={(ev) => setEdit(key, { reps: ev.target.value })}
                               className="mt-0.5 h-9 w-28 rounded-lg border border-white/10 bg-black/40 px-2 text-[13px] text-white" />
@@ -112,7 +112,7 @@ function ProgramCardReview({ row, onSaved }: { row: ReviewRow; onSaved: (o: Over
           ))}
         </div>
       )}
-      <label className="mt-3 flex flex-col text-[11px] text-white/45">
+      <label className="mt-3 flex flex-col text-[12px] text-white/50">
         Note
         <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} maxLength={500}
           className="mt-1 rounded-lg border border-white/10 bg-black/40 p-2 text-[13px] text-white" />
@@ -138,7 +138,7 @@ export function ProgramReview({ initial }: { initial?: Overview | null }) {
   useEffect(() => { if (!initial) void load(); }, [initial, load]);
   return (
     <div data-testid="signature-review" className="mx-auto max-w-[860px] px-5 pt-8">
-      <p className="font-mono text-[10.5px] font-bold uppercase tracking-[0.22em] text-[#FFD700]"><ShieldCheck className="mr-1 inline h-3.5 w-3.5" />Owner review</p>
+      <p className="font-mono text-[12px] font-bold uppercase tracking-[0.22em] text-[#FFD700]"><ShieldCheck className="mr-1 inline h-3.5 w-3.5" />Owner review</p>
       <h1 className="fel-heading mt-2 text-[28px] font-black text-white">Signature programs</h1>
       <p className="mt-2 max-w-xl text-[13px] text-white/50">The owner approved all four programs as drafted (2026-10-27), so each one is approved until you reject it or send it back to draft here. Only an approved program is shown to athletes. Edit any exercise (a library id) or dose; the checks run before anything saves.</p>
       {data && !data.ready && <p data-not-ready className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-[12.5px] text-white/60">The review tables are not applied yet (prisma/pending/2026-10-25-signature-programs.sql): you can read every program and its checks; approving and editing open once they are.</p>}

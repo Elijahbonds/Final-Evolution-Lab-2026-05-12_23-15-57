@@ -73,7 +73,7 @@ const chakraPetch = localFont({
 // a category, not a hook, and a different pitch from the landing page's "60 seconds to a
 // dunk — no account, no download". Whoever opened the link was sold something vaguer than
 // what they were about to get.
-const HOOK = '60 seconds to a dunk. No account, no download — drop into Venice Beach and throw down right now.'
+const HOOK = 'Play free on Venice Beach, then train for real. Built by pro dunker Elijah Bonds. No account needed to start.'
 
 // THE FAVICON, ONCE (FDB-2, 2026-10-17). `metadata.icons` rendered two links (icon + shortcut, the same file) inside the
 // metadata Next re-renders on every client navigation, and public/ files are served with max-age=0, so /links → /try
@@ -95,13 +95,13 @@ export const metadata = {
   openGraph: {
     type: 'website',
     siteName: 'Final Evolution Lab',
-    title: '60 Seconds to a Dunk',
+    title: 'Dunk in Venice now. Then train to dunk for real.',
     description: HOOK,
     images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'Final Evolution Lab — Venice Beach court at golden hour' }],
   },
   twitter: {
     card: 'summary_large_image',
-    title: '60 Seconds to a Dunk',
+    title: 'Dunk in Venice now. Then train to dunk for real.',
     description: HOOK,
     images: ['/og-image.png'],
   },

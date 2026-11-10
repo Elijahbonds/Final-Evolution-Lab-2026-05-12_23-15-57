@@ -48,8 +48,11 @@ export function TabPage({
           {aside}
         </HeroHeader>
       )}
+      {/* READABLE (2026-11-02): with a docked primary, the column ends 8.75rem up — the dock's own rem offset (4.75rem) plus
+          its height (3.5rem) and a gap — so the last line clears the dock at every root font size (pb-20 left the last
+          line under it at 150 %). */}
       {/* data-couch-scale: the couch view (lib/design/couch.ts) zooms this column on a TV driven by a pad or a remote */}
-      <main data-couch-scale className={`fel-fade relative mx-auto max-w-[1080px] px-5 ${hero ? 'pt-2' : 'pt-8 md:pt-10'} ${hero?.primary ? 'pb-20 md:pb-0' : ''}`}>
+      <main data-couch-scale className={`fel-fade relative mx-auto max-w-[1080px] px-5 ${hero ? 'pt-2' : 'pt-8 md:pt-10'} ${hero?.primary ? 'pb-[8.75rem] md:pb-0' : ''}`}>
         {!hero && (
           <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
             <div className="flex min-w-0 flex-col gap-2">

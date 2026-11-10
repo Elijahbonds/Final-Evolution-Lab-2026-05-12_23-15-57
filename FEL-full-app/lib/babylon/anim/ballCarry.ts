@@ -43,6 +43,7 @@ import { WristLayer, flexAxisLocal, handFlexAxisFromPoints, handPointsFromMeshes
 import { rigHandOnSide, sideOfRigHand, type AthleteSide, type RigHand } from './athleteSide';
 import { animDt } from './motionLayers';
 import { ClipHandClock, clipLockTune, guardTune, stepGuardK, GUARD_BAR_POLE } from './RestDribble';   // lane/h3-handler (#312 port): the bounce at rest, the guard
+import { feel } from '../../feel-panel/feel';   // hoops-p04b: knob hoops.carryArmSpeedSec (lib/feel-panel/knobs.ts)
 import { ArmEase } from './MoveEase';   // lane/h3-handler (#314 port): a move's hand-overs ease
 
 export interface BallCarryOpts {
@@ -160,6 +161,11 @@ export function heldReachOverride(search: string | null | undefined, dev: boolea
 const HELD_REACH = heldReachOverride(typeof location !== 'undefined' ? location.search : null, process.env.NODE_ENV === 'development');
 /** How far the elbow's twist may leave the clip's side at full weight (the dunk's REACH_POLE_CAP). */
 const REACH_POLE_CAP = Math.PI / 2;
+/** hoops-p04b: the dribble's arm weights (the ball arm's pace reach, the off arm's swing in and out at 0.35–0.65) read the body's speed01
+ *  eased over this long (s), not the frame's own: a gear change steps speed01 (stop → sprint), and with it the reach's weight, in one
+ *  frame — an arm turned 1 000–2 300 deg/s on the frames after `gear stop → sprint` (the rig's stage tracer: the carry). 0 = the frame's
+ *  speed01, as before. TUNED (new). Knob `hoops.carryArmSpeedSec`. The ball's own push-ahead and the guard keep their own easing. */
+export const CARRY_ARM_SPEED_SEC = 0.12;
 /** The fastest the carrying arm's elbow may swing round the shoulder→hand line between two drawn frames (deg per second). */
 export const ELBOW_SWING_RATE_DEG = 720;
 /** DUNK MOTION (2026-09-23): elbow pole DIRECTIONS in the root frame (x toward the arm's own side, then up, then forward). */
@@ -319,6 +325,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   let pending = false;   // a frame was recorded since the last after-animations pass
   let frameDt = 0, stamp = 0;   // the recorded frame's dt, and a counter of drawn frames (the arm memo's continuity)
   let lastSpeed01 = 0;
+  let armSpeed01 = 0;   // hoops-p04b: lastSpeed01 eased for the arm weights (CARRY_ARM_SPEED_SEC)
   let releaseLeft = 0, releaseDt = 1 / 60, releaseTotal = RELEASE_FADE_SEC;   // the let-go fade (see apply)
   let offArm: ArmChain | null = armChain(opts.skeleton, side === 'Right' ? 'Left' : 'Right');
   const offT = new Vector3(), offPole = new Vector3();
@@ -960,6 +967,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     }
     // lane/h3-handler (#312 port): the protect's guard weight, eased (at rest only: a body on the move lets it go)
     const gt = guardTune(); guardK = stepGuardK(guardK, gt.on ? guardTarget : 0, lastSpeed01, dt, gt.sec);
+    { const tau = feel('hoops.carryArmSpeedSec', CARRY_ARM_SPEED_SEC); armSpeed01 = tau > 0 ? armSpeed01 + (lastSpeed01 - armSpeed01) * Math.min(1, dt / tau) : lastSpeed01; }
     if (mv) { applyMove(dt); applyWrists(dt); settleHeld(mv); return; }   // HOOPS MOTION phase 4b: a move's path owns the ball and the hands
     pg.palmY = p.palmY - gt.dropM * guardK;   // (= p.palmY with no guard)
     const s = dribbleAtPushed(phase, guardK > 0 ? pg : p);
@@ -988,13 +996,13 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
       const ks = switchLeft > 0 ? 1 - switchLeft / SWITCH_FADE_SEC : 1;
       // hoops-handle: never under the rising ball — the clip's hand (a stance with no ball arm) is lifted clear of the ball's top
       arm.hand.computeWorldMatrix(true);
-      const w = Math.max(s.handWeight, Math.min(1, lastSpeed01 * 1.6), clearOfBallWeight(arm.hand.getAbsolutePosition().y, handT.y, world.y + p.ballR));
+      const w = Math.max(s.handWeight, Math.min(1, armSpeed01 * 1.6), clearOfBallWeight(arm.hand.getAbsolutePosition().y, handT.y, world.y + p.ballR));
       reachShaped(arm, handT, pole, w * armW * ks, frameDt, stamp);
       if (w * armW * ks > 0.05) reachedAt = stamp;   // (the clip clock's held-pose read)
       if (prevArm && ks < 1) reachShaped(prevArm, prevHandT, prevPole, w * armW * (1 - ks), frameDt, stamp);
-      if (!(offArm && (lastSpeed01 > 0.35 || guardK > 0.01))) offW = 0;
-      if (offArm && lastSpeed01 > 0.35) {
-        const ow = Math.min(1, (lastSpeed01 - 0.35) / 0.3) * armW;
+      if (!(offArm && (armSpeed01 > 0.35 || guardK > 0.01))) offW = 0;
+      if (offArm && armSpeed01 > 0.35) {
+        const ow = Math.min(1, (armSpeed01 - 0.35) / 0.3) * armW;
         const knee = kneeForward(-sx);
         const swing = Math.max(-1, Math.min(1, -knee / 0.35));
         const baseY = Math.max(0.9, offFloorY) + 0.04;

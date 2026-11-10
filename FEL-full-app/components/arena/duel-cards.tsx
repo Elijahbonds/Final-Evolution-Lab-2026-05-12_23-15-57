@@ -33,11 +33,11 @@ export function DuelCards(props: {
       <CardPanel title="YOU" score={props.myScore} card={mine} tint="#00E5FF" />
       {props.oppCardLocked ? (
         <div className="rounded-xl border border-white/10 bg-black/40 p-3">
-          <p className="text-[10px] font-black tracking-[0.3em] text-white/45">{them}</p>
+          <p className="text-[12px] font-black tracking-[0.3em] text-white/50">{them}</p>
           <p className="mt-2 text-sm text-white/70">
             Their card unlocks once you&rsquo;ve posted your score.
           </p>
-          <p className="mt-1 text-[11px] leading-snug text-white/40">
+          <p className="mt-1 text-[12px] leading-snug text-white/50">
             You shouldn&rsquo;t get to see the dunks you have to beat before you take your run.
           </p>
         </div>
@@ -57,29 +57,29 @@ export function DuelCards(props: {
 function CardPanel({ title, score, card, tint }: { title: string; score: number | null; card: DunkCard | null; tint: string }) {
   return (
     <div className="rounded-xl border p-3" style={{ borderColor: `${tint}33`, background: 'rgba(5,6,10,0.55)' }}>
-      <p className="text-[10px] font-black tracking-[0.3em]" style={{ color: tint }}>{title}</p>
+      <p className="text-[12px] font-black tracking-[0.3em]" style={{ color: tint }}>{title}</p>
 
       {/* the score is ALWAYS shown, card or no card — that is the fallback for a run posted by an older build */}
       <p className="mt-1 text-3xl font-black text-white">{score ?? '—'}</p>
 
       {card ? (
         <>
-          <p className="mt-0.5 text-[11px] text-white/50">{cardHeadline(card, '').replace(/^ — /, '')}</p>
+          <p className="mt-0.5 text-[12px] text-white/50">{cardHeadline(card, '').replace(/^ — /, '')}</p>
           <ul className="mt-2 space-y-1">
             {card.attempts.map((a, i) => (
               <li
                 key={i}
-                className="flex items-baseline justify-between gap-2 font-mono text-[11px]"
+                className="flex items-baseline justify-between gap-2 font-mono text-[12px]"
                 style={{ opacity: a.made ? 1 : 0.55 }}
               >
                 <span className="text-white/75">{attemptLine(a)}</span>
-                {!a.made && <span className="text-[10px] font-bold text-rose-300">MISS</span>}
+                {!a.made && <span className="text-[12px] font-bold text-rose-300">MISS</span>}
               </li>
             ))}
           </ul>
         </>
       ) : (
-        <p className="mt-2 text-[11px] text-white/40">No card for this run.</p>
+        <p className="mt-2 text-[12px] text-white/50">No card for this run.</p>
       )}
     </div>
   );

@@ -119,7 +119,7 @@ export function KBAdmin() {
           onChange={e => setNewCatName(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && addCategory()}
           placeholder="New category name…"
-          className="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-fel-violet/50 focus:outline-none"
+          className="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/50 focus:border-fel-violet/50 focus:outline-none"
         />
         <button onClick={addCategory} className="flex items-center gap-1.5 rounded-lg bg-fel-violet px-4 py-2 text-sm font-bold text-white transition hover:bg-fel-violet/80">
           <FolderPlus className="h-4 w-4" /> Add Category
@@ -152,7 +152,7 @@ export function KBAdmin() {
                       <span className="flex-1 text-sm font-medium text-white/85">{ex.name || 'Untitled'}</span>
                       {ex.videoUrl && <Video className="h-3.5 w-3.5 text-fel-gold" />}
                       {ex.published ? <Eye className="h-3.5 w-3.5 text-fel-emerald" /> : <EyeOff className="h-3.5 w-3.5 text-fel-quiet" />}
-                      <span className="font-mono text-[10px] text-fel-quiet">Ph{ex.phase} Ch{ex.chapter}</span>
+                      <span className="font-mono text-[12px] text-fel-quiet">Ph{ex.phase} Ch{ex.chapter}</span>
                     </button>
 
                     {isOpen && (
@@ -221,23 +221,23 @@ export function KBAdmin() {
 function Field({ label, value, onChange, placeholder, className }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; className?: string }) {
   return (
     <div className={className}>
-      <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-fel-dim">{label}</label>
-      <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white placeholder:text-white/25 focus:border-fel-cyan/50 focus:outline-none" />
+      <label className="mb-1 block text-[12px] font-bold uppercase tracking-wider text-fel-dim">{label}</label>
+      <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white placeholder:text-white/50 focus:border-fel-cyan/50 focus:outline-none" />
     </div>
   );
 }
 function TextArea({ label, value, onChange, rows }: { label: string; value: string; onChange: (v: string) => void; rows: number }) {
   return (
     <div>
-      <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-fel-dim">{label}</label>
-      <textarea value={value} onChange={e => onChange(e.target.value)} rows={rows} className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/25 focus:border-fel-cyan/50 focus:outline-none" />
+      <label className="mb-1 block text-[12px] font-bold uppercase tracking-wider text-fel-dim">{label}</label>
+      <textarea value={value} onChange={e => onChange(e.target.value)} rows={rows} className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/50 focus:border-fel-cyan/50 focus:outline-none" />
     </div>
   );
 }
 function Select({ label, value, options, onChange }: { label: string; value: string; options: { v: string; l: string }[]; onChange: (v: string) => void }) {
   return (
     <div>
-      <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-fel-dim">{label}</label>
+      <label className="mb-1 block text-[12px] font-bold uppercase tracking-wider text-fel-dim">{label}</label>
       <select value={value} onChange={e => onChange(e.target.value)} className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white focus:border-fel-cyan/50 focus:outline-none">
         {options.map(o => <option key={o.v} value={o.v} className="bg-[#111]">{o.l}</option>)}
       </select>

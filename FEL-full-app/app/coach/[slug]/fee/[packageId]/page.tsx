@@ -34,7 +34,7 @@ export default async function TeamFeePage({ params }: { params: { slug: string; 
       <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-white/70">{pkg.includes.map((i) => <li key={i}>{i}</li>)}</ul>
       <div className="mt-6">
         {live ? <BookButton slug={params.slug} packageId={pkg.id} /> : <p className="text-sm text-amber-200">Payments aren&apos;t live yet. Your coach will tell you another way to pay.</p>}
-        <p className="mt-3 text-xs text-white/45">Payments are for adults (18+). Under 18? A parent or guardian pays.</p>
+        <p className="mt-3 text-xs text-white/50">Payments are for adults (18+). Under 18? A parent or guardian pays.</p>
       </div>
     </main>
   );

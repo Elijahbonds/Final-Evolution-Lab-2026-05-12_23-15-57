@@ -60,12 +60,12 @@ export default async function PressPage() {
 
       {/* ONB-05: Appendix B as approved (2026-10-20); [OWNER: …] marks a blank the owner still fills. */}
       <section className="mt-10" data-press-about>
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#F5C518]">About Final Evolution Lab</h2>
+        <h2 className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#F5C518]">About Final Evolution Lab</h2>
         <OwnerCopy parts={PUBLIC_PAGE_COPY.press.body} className="mt-2 max-w-2xl text-sm leading-relaxed text-white/75" />
       </section>
 
       <section className="mt-10">
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#F5C518]">My Library</h2>
+        <h2 className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#F5C518]">My Library</h2>
         <div className="mt-3 rounded-2xl border border-white/10 bg-[#101010] p-5">
           <p className="text-sm text-white/70">
             {session
@@ -79,7 +79,7 @@ export default async function PressPage() {
       </section>
 
       <section className="mt-10">
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#F5C518]">More from Elijah</h2>
+        <h2 className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#F5C518]">More from Elijah</h2>
         <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {PARTNERS.map((partner) => (
             <a
@@ -90,23 +90,23 @@ export default async function PressPage() {
               className="rounded-xl border border-white/10 bg-[#141414] p-4 hover:border-white/30"
             >
               <p className="text-sm font-semibold text-white">{partner.name}</p>
-              <p className="mt-1 text-[11px] text-white/45">{partner.detail}</p>
+              <p className="mt-1 text-[12px] text-white/50">{partner.detail}</p>
               {partner.code ? (
                 <p className="mt-2 font-mono text-sm text-[#F5C518]">Code {partner.code}</p>
               ) : null}
             </a>
           ))}
         </div>
-        <p className="mt-2 text-[11px] text-white/35">
+        <p className="mt-2 text-[12px] text-white/50">
           PJF Performance Band is an affiliate link. Final Evolution may earn a commission.
         </p>
       </section>
 
       <section className="mt-10 rounded-2xl border border-white/10 bg-[#101010] p-5">
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#F5C518]">Join the Lab</h2>
+        <h2 className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#F5C518]">Join the Lab</h2>
         <p className="mt-2 text-sm text-white">Get a free Blueprint chapter and drop alerts.</p>
         <JoinForm />
-        <p className="mt-2 text-[11px] text-white/35">The free chapter is the Blueprint sample. Unsubscribe any time.</p>
+        <p className="mt-2 text-[12px] text-white/50">The free chapter is the Blueprint sample. Unsubscribe any time.</p>
       </section>
     </PressFrame>
   );

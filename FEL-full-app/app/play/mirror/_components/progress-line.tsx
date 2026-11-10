@@ -16,7 +16,7 @@ export function ProgressLine({ view, forgotten = false, onForget }: { view: Prog
     >
       <h2 className="fel-heading text-[15px] font-bold text-white/80">{view.heading}</h2>
       <p className="mt-2 text-[13px] leading-relaxed text-white/70">{forgotten ? FORGOTTEN_LINE : view.line}</p>
-      {!forgotten && <p className="mt-2 font-mono text-[10.5px] uppercase tracking-[0.12em] text-white/35">{view.where}</p>}
+      {!forgotten && <p className="mt-2 font-mono text-[12px] uppercase tracking-[0.12em] text-white/50">{view.where}</p>}
       {view.source === 'device' && !forgotten && onForget && (
         <button
           type="button"

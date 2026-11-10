@@ -66,7 +66,7 @@ export function ModeCarousel({ lead, value, onChange, accent }: CarouselProps) {
   return (
     <div className="relative">
       <div className="mb-2 flex items-center justify-between gap-3">
-        <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-fel-quiet">
+        <p className="font-mono text-[12px] font-bold uppercase tracking-[0.18em] text-fel-quiet">
           Your first game
         </p>
         <div className="hidden gap-1.5 sm:flex">
@@ -76,7 +76,7 @@ export function ModeCarousel({ lead, value, onChange, accent }: CarouselProps) {
               type="button"
               onClick={() => step(d)}
               aria-label={d === -1 ? 'Previous game' : 'Next game'}
-              className="grid h-7 w-7 place-items-center rounded-lg border border-white/10 text-white/45
+              className="grid h-7 w-7 place-items-center rounded-lg border border-white/10 text-white/50
                          transition-colors hover:border-white/30 hover:text-white"
             >
               {d === -1 ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
@@ -128,7 +128,7 @@ export function ModeCarousel({ lead, value, onChange, accent }: CarouselProps) {
                 <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-[#050505] via-[#050505]/35 to-transparent" />
                 <span className="absolute inset-x-0 bottom-0 p-3">
                   <span className="fel-heading block text-[14px] font-bold leading-tight text-white">{info.name}</span>
-                  <span className="mt-1 block truncate font-mono text-[9px] uppercase tracking-[0.14em] text-white/45">
+                  <span className="mt-1 block font-mono text-[12px] uppercase leading-tight tracking-[0.06em] text-white/60">
                     {info.venue}
                   </span>
                 </span>

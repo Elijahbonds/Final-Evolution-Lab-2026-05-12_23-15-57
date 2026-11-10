@@ -83,7 +83,7 @@ export function CameraHelp({ why, onRetry, onBack }: { why: string | null; onRet
           Try again
         </button>
         {onBack ? <button type="button" onClick={onBack} className="mt-2 inline-flex min-h-12 w-full items-center justify-center text-[16px] text-white/60">Back to the start</button> : null}
-        <p className="mt-6 text-[16px] text-white/45">{DISCLAIMER}</p>
+        <p className="mt-6 text-[16px] text-white/50">{DISCLAIMER}</p>
       </div>
     </div>
   );

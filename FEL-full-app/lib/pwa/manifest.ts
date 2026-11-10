@@ -37,7 +37,7 @@ export const FEL_MANIFEST: MetadataRoute.Manifest = {
   id: '/',
   name: APP_NAME,
   short_name: APP_SHORT_NAME,
-  description: '60 seconds to a dunk. Games, training and coaching on your phone, laptop and TV.',
+  description: 'Play free on Venice Beach, then train for real. Built by pro dunker Elijah Bonds. No account needed to start.',
   start_url: '/',
   scope: '/',
   display: 'standalone',

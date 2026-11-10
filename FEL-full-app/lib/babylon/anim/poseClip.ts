@@ -21,6 +21,7 @@ import { bindFrame } from './bindFrame';
 import { plantLeg } from './FootPlanting';
 import { smoothByDefault, smoothQuatKeys, smoothScalarKeys, HOOPS_MOTION_MODES, hoopsMotionModeOf, type Q4 } from './smoothKeys';
 import { HOOPS_OVERHEAD_CLIPS } from './authored/hoopsOverhead';   // (a data table: the clip-scope test reads anim/authored/ as data)
+import { DESNAP_CLIPS, clipSmoothOn, desnapTracks } from './clipDesnap';
 
 export type Deg3 = [number, number, number];
 export interface PoseKey {
@@ -384,5 +385,8 @@ export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration
     }
     if (hipsY.length > 1) { const dense = smoothScalarKeys(hipsY.map(([t, v]) => ({ t, v })), so); hipsY.length = 0; for (const k of dense) hipsY.push([k.t, k.v]); }
   }
+  // CLIP-SMOOTH (2026-11-03): the measured clips' own single-frame snaps re-keyed over the keys either side (clipDesnap.ts), the
+  // holds untouched; feel knob anim.clipSmooth (default on) — off builds the clip exactly as before
+  if (DESNAP_CLIPS.has(name) && clipSmoothOn()) desnapTracks(out, keys.filter((k) => k.hold).map((k) => k.t));
   return buildQuatClip(scene, sk, name, duration, out, hipsY.length ? hipsY : undefined);
 }

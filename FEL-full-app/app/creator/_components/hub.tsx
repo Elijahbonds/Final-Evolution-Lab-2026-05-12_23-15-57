@@ -31,7 +31,7 @@ export function CreatorHub() {
   return (
     <div className="min-h-screen w-full" style={{ background: BG, color: '#fff' }}>
       <div className="mx-auto max-w-5xl px-5 py-10">
-        <div className="mb-2 text-xs font-semibold tracking-[0.4em] text-white/40">FEL · CREATOR</div>
+        <div className="mb-2 text-xs font-semibold tracking-[0.4em] text-white/50">FEL · CREATOR</div>
         <h1 className="text-4xl font-black tracking-tight sm:text-5xl">Creator Hub</h1>
         <p className="mt-3 max-w-2xl text-sm text-white/55">
           Nine creator disciplines, one arena. Pick a craft and perform or publish — each one scores or showcases
@@ -50,7 +50,7 @@ export function CreatorHub() {
               <UserRound className="h-7 w-7 text-white" />
             </div>
             <div>
-              <div className="text-xs font-semibold uppercase tracking-[0.32em] text-white/35">Character Creator</div>
+              <div className="text-xs font-semibold uppercase tracking-[0.32em] text-white/50">Character Creator</div>
               <h2 className="mt-1 text-2xl font-black">Build your athlete</h2>
               <p className="mt-2 max-w-2xl text-sm text-white/55">
                 Shape the hero every shipped mode wears — face, body, palette, nameplate, and active look.

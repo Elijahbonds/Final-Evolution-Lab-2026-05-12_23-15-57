@@ -37,8 +37,11 @@ describe('the 10-foot type scale', () => {
     for (const s of HUD_SIZES) expect(hudDesignPx(s, 1)).toBe(HUD_TYPE[s].phone);
     expect(consoleLayout(844, 390).hudZoom).toBe(1);
     expect(consoleLayout(390, 844).hudZoom).toBe(1);
-    // the phone sizes are the roles' sizes in the hosts before the migration (text-[10px], [11px], text-xs, text-sm, text-lg, text-2xl, text-3xl)
-    expect(HUD_SIZES.map((s) => HUD_TYPE[s].phone)).toEqual([10, 11, 12, 14, 18, 24, 24, 30]);
+    // the phone sizes were the roles' sizes in the hosts before the migration (text-[10px], [11px], text-xs, text-sm, text-lg,
+    // text-2xl, text-3xl); lane/readable (2026-11-02) lifted the three small ones to the floors in docs/READABLE.md — 12 px for a
+    // caption or a label, 14 px for a line the player reads mid-play
+    expect(HUD_SIZES.map((s) => HUD_TYPE[s].phone)).toEqual([12, 12, 14, 14, 18, 24, 24, 30]);
+    expect(Math.min(...HUD_SIZES.map((s) => HUD_TYPE[s].phone))).toBeGreaterThanOrEqual(12);
   });
 
   it('grows monotonically with the zoom, and junk zooms read as 1', () => {

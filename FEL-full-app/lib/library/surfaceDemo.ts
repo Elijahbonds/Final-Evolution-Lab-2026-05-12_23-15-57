@@ -28,6 +28,23 @@ export const DRILL_DEMO_LOOPS: Readonly<Record<string, string | null>> = {
   't-drill': 'ex_t_drill',
   'approach-one-foot': 'ex_approach_one',
   'approach-two-foot': 'ex_approach_two',
+  // DEMO-LOOPS-6 (2026-11-03): platform P9's ball-skill drills (lib/drills/hoopsDrills.ts), done in place. The loops that ARE
+  // the drill's movement: the one-hand form shot and the free throw's set shot (exerciseSignature.ts), the court's jab, pivot,
+  // drop step, euro step, closeout and defensive slide (the library stage's hoops borrow), the jump stop; and four authored
+  // for the drill (anim/authored/exerciseHoops.ts): the 1-2 step into the shot, the layup's steps, the rip-through, the rebound
+  'hoops-form-shooting': 'ex_form_shot_one',
+  'hoops-free-throw': 'ex_set_shot',
+  'hoops-catch-and-shoot': 'ex_catch_shoot_12',
+  'hoops-jab-series': 'bball_jab',
+  'hoops-jump-stop': 'ex_jump_stop',
+  'hoops-pivots': 'bball_pivot',
+  'hoops-drop-step': 'bball_drop_step',
+  'hoops-layup-footwork': 'ex_layup_steps',
+  'hoops-euro-step': 'bball_euro_step',
+  'hoops-rip-through': 'ex_rip_through',
+  'hoops-closeout': 'bball_closeout',
+  'hoops-defensive-slide': 'bball_defend_slide_left',
+  'hoops-rebound': 'ex_rebound_chin',
 };
 
 /** A Quick Screen test (lib/screen/copy.ts SCREEN_TEST_NAMES) → its loop: the overhead squat, the knee-to-wall ankle
@@ -65,13 +82,30 @@ export const WARMUP_DEMO_LOOPS: Readonly<Record<string, string | null>> = {
 export const warmupDemoLoop = (id: string): string | null => WARMUP_DEMO_LOOPS[id] ?? null;
 
 /**
+ * DEMO-LOOPS-8 (2026-11-03): a Playbook lesson's own sequence, where the book's steps are neither a charted drill nor one
+ * library entry (lib/education/lessonDemo.ts, source kind 'lesson') → the loop authored for it (anim/authored/
+ * exerciseFamilies8.ts), keyed by the movement the lesson teaches.
+ */
+export const LESSON_DEMO_LOOPS: Readonly<Record<string, string | null>> = {
+  // ch. 2: on one foot, the tripod set and the short foot held for three, twice; then the one-foot pogo
+  'ankle-architecture-reset': 'ex_ankle_reset',
+  // ch. 4: sitting on the edge of a chair, slow circles with one foot then the other; then up to the wall for the knee-to-wall
+  'ankle-circles-knee-to-wall': 'ex_ankle_unlock',
+  // ch. 4: the 90/90 sit, tall, the chest turning toward the front leg without either sit bone lifting
+  'hip-90-90-turn': 'ex_ninety_turn',
+  // ch. 8: the bodyweight RDL, the hands sliding down the thighs to the knees, the back flat, about 45°
+  'bodyweight-hip-hinge': 'ex_bw_hinge',
+};
+/** A lesson sequence's loop, or null (the still). */
+export const lessonDemoLoop = (id: string): string | null => LESSON_DEMO_LOOPS[id] ?? null;
+
+/**
  * DEMO-LOOPS-4: coach catalogue rows the library cannot answer by name (lib/library/match.ts: no entry by that name or an
  * alias), keyed by the catalogue's exact name (folded by nameKey) → the loop that IS that row's movement, by the row's own
  * set-up (lib/coach/templateCatalogue.ts). Only names with no library entry: once the library has one, its own loop wins.
  */
 export const CATALOGUE_DEMO_LOOPS: Readonly<Record<string, string>> = {
-  // "Hands on the floor, hips high, heels lifted. Lower your head toward a spot just in front of your hands, then press away."
-  'Pike Push-Up': 'ex_pike_pushup',
+  // (Pike Push-Up left this table in DEMO-LOOPS-6: the library has its entry now — program-ask-2's — and plays its loop)
   // "Hold both sides of a sturdy door frame, … lean back … Pull your chest to the frame"
   'Door Frame Row, Upright': 'ex_door_row', 'Door Frame Row': 'ex_door_row',
 };

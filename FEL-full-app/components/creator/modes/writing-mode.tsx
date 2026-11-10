@@ -12,7 +12,7 @@ export default function WritingMode({ onPublish, submitLabel = 'Submit for revie
       <div className="mt-4 space-y-3">
         <input value={title} maxLength={60} onChange={(e) => setTitle(e.target.value)} placeholder="Title" className="w-full rounded-lg bg-neutral-900 px-3 py-2 text-sm" />
         <textarea value={text} onChange={(e) => setText(e.target.value)} rows={12} maxLength={4000} placeholder="Write." className="w-full rounded-lg bg-neutral-900 px-3 py-2 text-sm" />
-        <div className="text-right text-xs text-neutral-500">{text.length} / 4000</div>
+        <div className="text-right text-xs text-neutral-400">{text.length} / 4000</div>
         <input value={coverUrl} onChange={(e) => setCoverUrl(e.target.value)} placeholder="Cover image link (https://…, optional)" className="w-full rounded-lg bg-neutral-900 px-3 py-2 text-sm" />
       </div>
       <button disabled={!ready} onClick={() => onPublish({ title, text, coverUrl: coverUrl.trim() || undefined })} className="mt-6 rounded-xl bg-lime-500 px-6 py-3 font-bold text-black disabled:opacity-40">{submitLabel}</button>

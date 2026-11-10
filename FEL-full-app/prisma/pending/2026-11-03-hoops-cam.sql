@@ -1,6 +1,11 @@
 -- HOOPS-CAM (BBS-04, platform lane plat-bbs04, 2026-11-03): an adult's shot and dribble sessions from the phone camera,
 -- kept so a coach can see a per-athlete shot chart in the team panel and on /coach/shots.
 -- ADDITIVE ONLY: one new table, one index and one foreign key. No existing table or column is changed or dropped.
+-- RE-RUNNABLE (hardening 2026-11-03): CREATE ... IF NOT EXISTS, and the foreign key and policy sit in one-line DO blocks that
+-- check the catalog first, so a second run changes nothing (one line each: tests/helpers/prismaDdl.ts splits on a `;` at the
+-- end of a line). ROW-LEVEL SECURITY: the app reads and writes this table only on the server through Prisma (DATABASE_URL,
+-- the table owner, which RLS does not restrict without FORCE); there is no Supabase client and ids are NextAuth TEXT ids. So:
+-- RLS on, no policy that opens anything, a restrictive deny for anon and authenticated, and their grants revoked.
 --
 -- WHAT IS STORED.
 --   HoopsCamSession — one row per camera session: its kind ('shots' | 'dribble'), the athlete's own calendar day
@@ -51,10 +56,10 @@
 -- RETENTION (OWNER CALL): kept until the athlete deletes it (DELETE /api/hoops-cam/sessions removes every session of
 -- theirs) or the account goes (cascade). In lib/data-rights/registry.ts (export and erase).
 --
--- ROLLBACK (loses every saved session): DROP TABLE "HoopsCamSession";
+-- ROLLBACK (loses every saved session): DROP TABLE "HoopsCamSession"; (its policies go with it)
 
 -- CreateTable
-CREATE TABLE "HoopsCamSession" (
+CREATE TABLE IF NOT EXISTS "HoopsCamSession" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "kind" TEXT NOT NULL,
@@ -67,7 +72,13 @@ CREATE TABLE "HoopsCamSession" (
 );
 
 -- CreateIndex
-CREATE INDEX "HoopsCamSession_userId_createdAt_idx" ON "HoopsCamSession"("userId", "createdAt");
+CREATE INDEX IF NOT EXISTS "HoopsCamSession_userId_createdAt_idx" ON "HoopsCamSession"("userId", "createdAt");
 
 -- AddForeignKey
-ALTER TABLE "HoopsCamSession" ADD CONSTRAINT "HoopsCamSession_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'HoopsCamSession_userId_fkey' AND conrelid = '"HoopsCamSession"'::regclass) THEN ALTER TABLE "HoopsCamSession" ADD CONSTRAINT "HoopsCamSession_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE; END IF; END $$;
+
+-- RowLevelSecurity: on, with no policy that grants anything; the server (table owner) is unaffected
+ALTER TABLE "HoopsCamSession" ENABLE ROW LEVEL SECURITY;
+
+-- DenyApiRoles: anon and authenticated (Supabase API roles) get no rows and no grants; skipped where the roles do not exist
+DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN REVOKE ALL ON TABLE "HoopsCamSession" FROM anon, authenticated; IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = current_schema() AND tablename = 'HoopsCamSession' AND policyname = 'HoopsCamSession_deny_api') THEN CREATE POLICY "HoopsCamSession_deny_api" ON "HoopsCamSession" AS RESTRICTIVE FOR ALL TO anon, authenticated USING (false) WITH CHECK (false); END IF; END IF; END $$;

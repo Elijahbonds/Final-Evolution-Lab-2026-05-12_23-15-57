@@ -39,7 +39,7 @@ export default async function JoinPage({ params }: { params: { token: string } }
   if (state !== 'open') {
     return (
       <Shell>
-        <p className="font-mono text-[11px] uppercase tracking-widest text-fel-dim">Coach invite</p>
+        <p className="font-mono text-[12px] uppercase tracking-widest text-fel-dim">Coach invite</p>
         <h1 className="fel-heading mt-3 text-2xl font-bold text-white">
           {state === 'expired' ? 'This invite has expired' : 'This invite has been used'}
         </h1>
@@ -66,7 +66,7 @@ export default async function JoinPage({ params }: { params: { token: string } }
 
   return (
     <Shell>
-      <p className="font-mono text-[11px] uppercase tracking-widest text-fel-dim">Coach invite</p>
+      <p className="font-mono text-[12px] uppercase tracking-widest text-fel-dim">Coach invite</p>
       <h1 className="fel-heading mt-3 text-3xl font-bold text-white">
         {invite.coachName} <span className="text-white/50">wants to coach you</span>
       </h1>

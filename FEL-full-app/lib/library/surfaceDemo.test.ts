@@ -57,9 +57,9 @@ describe('the warm-up and cool-down steps', () => {
 // DEMO-LOOPS-4: a coach catalogue row the library cannot name plays its own loop; only rows the library has NO entry for
 describe('coach catalogue rows with no library entry', () => {
   it('play the loop their set-up describes, by their exact name; a name the library answers is never here', () => {
-    expect(catalogueDemoLoop('Pike Push-Up')).toBe('ex_pike_pushup');
-    expect(catalogueDemoLoop('pike push up')).toBe('ex_pike_pushup');
-    expect(catalogueDemoLoop('Hands-Elevated Pike Push-Up')).toBeNull();
+    expect(catalogueDemoLoop('Door Frame Row')).toBe('ex_door_row');
+    expect(catalogueDemoLoop('door frame row')).toBe('ex_door_row');
+    expect(catalogueDemoLoop('Pike Push-Up')).toBeNull();   // the library answers it now (DEMO-LOOPS-6)
     const docs = loadLibraryFiles();
     for (const n of Object.keys(CATALOGUE_DEMO_LOOPS)) expect(matchLibraryByName(docs, [n]), n).toBeNull();
     const names = new Set(TEMPLATE_EXERCISES.map((x) => x.catalogue.name));

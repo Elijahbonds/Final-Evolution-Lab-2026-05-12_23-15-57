@@ -27,8 +27,10 @@ import { hnode, hnum } from './hud-format';
 import { DunkPoster } from './dunk-poster';
 import { DunkBeatStrip } from './dunk-beat-strip';
 import { DunkFieldBoard } from './dunk-field-board';
+import { DunkSpecialsChip } from './dunk-specials-chip';
 import { decodeTakeoff, ZONE_HEX } from '@/lib/babylon/core/DunkTakeoffRead';
 import { MicCaption, MicToggle } from './mic-caption';
+import { DunkPreloadCard } from './dunk-preload-card';   // RUNUP-STALL-3
 import { HUD_PLATE, HUD_TEXT_ALPHA, HudBanner, HudChip, HudFrame, HudMeter, HudPlate, HudText, LINE_CLAMP_STYLE, ScoreValue, Scorebug, hudColor, hudType, type HudTone } from './tv-hud';
 import { JudgeCards } from './judge-cards';
 import type { HudPoster } from '@/lib/babylon/core/ModeHarness';
@@ -283,6 +285,7 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
           {/* WHOSE TRACK IS PLAYING. The walk-out is audio first -- it plays whether or not this draws -- but a
               player should be able to see that the thing they authored in the Music Room is the thing coming
               out of the speakers. Phrased by walkOutLine so the wording lives in one place. */}
+          {typeof hud.preloadReady === 'number' && phase === 'playing' && <DunkPreloadCard value={hud.preloadReady} />}
           {typeof hud.walkOutNow === 'string' && hud.walkOutNow && phase === 'playing' && (
             <HudChip tone="you" alpha={0.85} size="caption" className="uppercase">{hud.walkOutNow}</HudChip>
           )}
@@ -307,10 +310,8 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
             {hud.prop != null && (
               <HudChip tone="power" size="body">{hnode(hud.prop)}</HudChip>
             )}
-            {/* SEASON SPECIALS: the kangaroo, the sky tap, the board-top flip and the backboard run are the PRO lane's — named and locked, never missing */}
-            {hud.specials === 'LOCKED' && (
-              <HudChip tone="score" alpha={0.8} size="caption" style={{ fontWeight: 700 }}>SPECIALS · SEASON PASS</HudChip>
-            )}
+            {/* SEASON SPECIALS: the kangaroo, the sky tap, the board-top flip and the backboard run are the PRO lane's — named and locked, never missing (a guest is not shown the pass label) */}
+            <DunkSpecialsChip specials={hud.specials} guest={guest} />
             {hud.style != null && (
               <HudChip tone="score" size="body">{hnode(hud.style)}</HudChip>
             )}

@@ -38,7 +38,7 @@ export default function CreativeHub({ publicCreator }: { publicCreator: boolean 
               <span className={`absolute left-0 top-4 h-8 w-1 rounded-r ${g.color}`} aria-hidden />
               <span className="text-lg font-black">{g.label}</span>
               <span className="text-sm text-neutral-400">{g.blurb}</span>
-              <span className="mt-3 text-[10px] uppercase tracking-widest text-neutral-500">Shows up in</span>
+              <span className="mt-3 text-[12px] uppercase tracking-widest text-neutral-400">Shows up in</span>
               <ul className="mt-1 space-y-0.5 text-xs">
                 {rows.map((s) => <li key={s.where} className="text-neutral-200">● {s.where}</li>)}
               </ul>

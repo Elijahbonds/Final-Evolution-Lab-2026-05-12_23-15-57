@@ -7,6 +7,8 @@ import type { Scene, TargetCamera } from '@babylonjs/core';
 import { vibrate } from './Haptics';
 import { captions } from '../core/captions';
 import { motionPolicy, type JuicePolicy } from '../../a11y/reducedMotion';
+import { readableMs } from '../../readable/rules';
+import { bannerCss, calloutCss, scorePopCss } from './juiceStyles';
 
 /** How long the same callout stays "already said" for the caption bus. On screen it may repeat as often as it likes. */
 const CALLOUT_REPEAT_MS = 4000;
@@ -213,8 +215,7 @@ export class JuiceKit {
     el.textContent = text;
     el.style.cssText =
       `position:absolute;left:${px}px;top:${py}px;transform:translate(-50%,-50%);` +
-      `font:900 clamp(22px,4vw,34px) var(--fel-font-display,ui-monospace);color:${accent};` +
-      `text-shadow:0 2px 12px rgba(0,0,0,.65),0 0 22px ${accent}55;` +
+      scorePopCss(accent) +
       `transition:transform .8s cubic-bezier(.16,.8,.3,1),opacity .8s ease-out;will-change:transform;`;
     this.overlay.appendChild(el);
     requestAnimationFrame(() => {
@@ -232,18 +233,22 @@ export class JuiceKit {
     // same reason the QA trace wraps these methods instead of asking each mode to report itself.
     captions.cue(text, 'feedback');
     const travel = this.motion().travel;   // reduced motion: the banner fades in at size, no pop-and-overshoot
+    // READABLE (2026-11-02): up for at least the read time (words × 0.3 s + 1 s; lib/readable/rules.ts), and ONE at a
+    // time — two banners drawn in the same spot were text on text. The newer one replaces the older at once.
+    const hold = readableMs(text, ms);
+    this.bannerEl?.remove();
     const el = document.createElement('div');
     el.textContent = text;
     el.style.cssText =
-      `position:absolute;left:50%;top:32%;transform:translate(-50%,-50%) scale(${travel ? '.7' : '1'});` +
-      `font:900 clamp(28px,6vw,52px) var(--fel-font-display,ui-monospace);color:${accent};` +
-      `letter-spacing:.06em;text-shadow:0 4px 24px rgba(0,0,0,.7),0 0 34px ${accent}66;` +
+      bannerCss(accent) + `transform:translate(-50%,-50%) scale(${travel ? '.7' : '1'});` +
       'transition:transform .18s cubic-bezier(.2,1.4,.4,1),opacity .25s ease-out;opacity:0;';
     this.overlay.appendChild(el);
+    this.bannerEl = el;
     requestAnimationFrame(() => { el.style.opacity = '1'; el.style.transform = 'translate(-50%,-50%) scale(1)'; });
-    setTimeout(() => { el.style.opacity = '0'; }, ms);
-    setTimeout(() => el.remove(), ms + 300);
+    setTimeout(() => { el.style.opacity = '0'; }, hold);
+    setTimeout(() => { el.remove(); if (this.bannerEl === el) this.bannerEl = null; }, hold + 300);
   }
+  private bannerEl: HTMLDivElement | null = null;
 
   /** A small, quick line under the action — the answer to a press that cannot act ("WAIT FOR THE QUESTION", "NO BALL").
    *  Deliberately quieter than banner(): a refusal informs, it does not celebrate. One at a time. */
@@ -263,18 +268,17 @@ export class JuiceKit {
       captions.cue(text, 'feedback');
       this.lastCalloutText = text; this.lastCalloutAt = now;
     }
+    // READABLE (2026-11-02): up for at least the read time; the next callout still replaces it at once.
+    const hold = readableMs(text, ms);
     this.calloutEl?.remove();
     const el = document.createElement('div');
     el.textContent = text;
-    el.style.cssText =
-      'position:absolute;left:50%;top:68%;transform:translate(-50%,-50%);padding:4px 12px;border-radius:999px;' +
-      `background:rgba(5,6,10,.62);font:800 clamp(12px,1.8vw,16px) var(--fel-font-display,ui-monospace);color:${color};` +
-      'letter-spacing:.12em;opacity:0;transition:opacity .12s ease-out;pointer-events:none;';
+    el.style.cssText = calloutCss(color) + 'opacity:0;transition:opacity .12s ease-out;';
     this.overlay.appendChild(el);
     this.calloutEl = el;
     requestAnimationFrame(() => { el.style.opacity = '1'; });
-    setTimeout(() => { el.style.opacity = '0'; }, ms);
-    setTimeout(() => { el.remove(); if (this.calloutEl === el) this.calloutEl = null; }, ms + 200);
+    setTimeout(() => { el.style.opacity = '0'; }, hold);
+    setTimeout(() => { el.remove(); if (this.calloutEl === el) this.calloutEl = null; }, hold + 200);
   }
 
   /** Composite signature moment: slam/KO/hole-in-one. One call in mode code. */

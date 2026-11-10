@@ -50,7 +50,7 @@ export function InviteBlock({ code }: { code: string }) {
     <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-3" data-testid="party-invite">
       {qr ? <img src={qr} alt={`QR code for the party invite link, code ${code}`} className="h-20 w-20 rounded bg-white p-1" /> : <div className="h-20 w-20 rounded bg-white/10" />}
       <div className="min-w-0 flex-1">
-        <p className="font-mono text-[10px] tracking-[0.25em] text-white/45">PARTY CODE</p>
+        <p className="font-mono text-[12px] tracking-[0.25em] text-white/50">PARTY CODE</p>
         <p data-testid="party-code" className="font-mono text-2xl font-black tracking-[0.25em] text-[#00E5FF]" aria-label={`Party code ${code.split('').join(' ')}`}>{code}</p>
         <div className="mt-1 flex gap-2">
           <button type="button" onClick={() => { void copy(); }} className="inline-flex items-center gap-1 rounded-md border border-white/20 px-2 py-1 text-xs text-white/80 hover:border-white/50">
