@@ -253,6 +253,8 @@ export async function report(): Promise<void> {
   P('- **Network.** The rig serves from the same machine, so there is no mobile-network delay in the first-content number: a real phone on mobile data is slower than these numbers. The JavaScript each screen downloads is recorded (`jsKb` in the JSON) for the speed work in phase 10.');
   P('- **A shared machine.** Other lanes run at the same time. A screen that misses the first-content budget by less than double is read twice and the better number stands.');
   P('- **Contrast** is the accessibility scan\'s computed contrast, not the readable lane\'s pixel measurement (`docs/READABLE.md`), which stays that lane\'s number.');
+  P('- **A tap time is one sample.** Re-reading the same screen moved one tap from 168 ms to 296 ms on the shared machine (the machine\'s load is recorded beside each screen, `load.machineLoad`). Phase 10 should take the median of three; until then a screen just over 200 ms is a candidate, not a verdict.');
+  P('- **First content is measured from the same machine**, so it is a floor: every scored screen met 2.5 s here (median about 0.6 s), and that number says nothing about a phone on mobile data.');
   P('- **Only the main action is tapped.** The other buttons on a screen are not pressed by the scorer; in training and coaching the job walks press them (`docs/EVERY-SCREEN-JOBS.md`).');
   P();
   const ns = all.filter((r) => r.state === 'not-scored');

@@ -21,7 +21,7 @@ export async function jobsReport(): Promise<void> {
   const P = (s = '') => L.push(s);
   P('# Training and coaching: every job, walked');
   P();
-  P('**Phase 1, part B of `docs/PLAN-EVERY-SCREEN-10PHASE.md`.** Fifteen jobs, walked on the real app as three people. Written by `scripts/every-screen/jobs.mts --report`; the walks are `scripts/every-screen/jobs-list.mts`.');
+  P('**Phase 1, part B of `docs/PLAN-EVERY-SCREEN-10PHASE.md`.** The fifteen jobs of the phase-1 brief, walked on the real app as three people: 18 walks, because starting, logging and finishing a session are walked both as an athlete alone (the program the AI built) and as a coached client (the coach's session). Written by `scripts/every-screen/jobs.mts --report`; the walks are `scripts/every-screen/jobs-list.mts`.');
   P();
   P('**How to read it.** Taps are counted from the signed-in home; the Train tab is one tap. Typing is counted apart. Seconds are the rig\'s own, with no reading time: a floor, not a person\'s time. A camera job is walked to the moment it needs a person in front of the camera. "Stops" means a person cannot go further on that path today, and says where.');
   P();

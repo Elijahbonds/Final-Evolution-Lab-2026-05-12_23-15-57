@@ -183,7 +183,10 @@ async function scoreUrl(browser: Browser, state: ReturnType<typeof storageState>
     // roster, and /train/readiness then showed a coach's rule to someone with no coach.) A stopped write still counts
     // as the button doing something.
     let writes = 0;
-    await page.route('**/*', (route) => { if (route.request().method() === 'GET') return route.continue(); writes++; return route.abort(); });
+    // answered, not dropped: a dropped request is "Failed to fetch" in the page, an error the rig made, not the app (seen
+    // on /admin/metrics' Recompute); 503 is what the app's own routes answer when a feature is off
+    await page.route('**/*', (route) => { if (route.request().method() === 'GET') return route.continue(); writes++; return route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"every_screen_rig","message":"The scorer does not send writes."}' }); });
+    const errorsBeforeTap = L.errors.length;
     await page.evaluate('window.__es.armTap()');
     const before = L.counts();
     let navigated = false;
@@ -192,6 +195,8 @@ async function scoreUrl(browser: Browser, state: ReturnType<typeof storageState>
     await page.waitForTimeout(1000);
     const after = L.counts();
     const tap = await page.evaluate('window.__es.readTap()').catch(() => null) as { dur: number; mutations: number; urlChanged: boolean; requests: number } | null;
+    // an error the stopped write caused is the rig's, not the screen's
+    if (writes) L.errors.splice(errorsBeforeTap, L.errors.length - errorsBeforeTap, ...L.errors.slice(errorsBeforeTap).filter((e) => !/Failed to fetch|every_screen_rig|503/.test(e)));
     if (ok && tap) {
       tapMs = Math.max(16, tap.dur);
       tapDidNothing = !tap.urlChanged && tap.mutations === 0 && tap.requests === 0 && writes === 0 && !navigated && after.dialogs === before.dialogs && after.popups === before.popups;
