@@ -95,6 +95,15 @@ describe('hipSteer — on the hero rig', () => {
       expect(wrap(off.hip - base.hip)).toBeCloseTo(0, 6);
     } finally { R.dispose(); }
   });
+  it('a hold keeps the turn where it is (a bump on defence), and steering resumes from there', () => {
+    const st = new HipSteer({ onAfterAnimationsObservable: { add: () => null } } as never, { bones: [] } as never, {} as never);
+    for (let i = 0; i < 120; i++) st.drive({ state: 'defend_slide', travelOffRad: -130 * RAD, speedMps: 3, dtSec: 1 / 60 });
+    const t = st.turnDeg; expect(t).toBeCloseTo(-40, 1);
+    for (let i = 0; i < 30; i++) st.drive({ state: null, hold: true, travelOffRad: -130 * RAD, speedMps: 3, dtSec: 1 / 60 });
+    expect(st.turnDeg).toBe(t);
+    st.drive({ state: null, travelOffRad: -130 * RAD, speedMps: 3, dtSec: 1 / 60 });
+    expect(Math.abs(st.turnDeg)).toBeLessThan(Math.abs(t));   // released: it eases out again
+  });
   it('knob hoops.hipSteerOn 0: nothing is written (today\'s legs exactly)', async () => {
     setFeelUser(true); setFeelSession(null); setFeelOverride('hoops.hipSteerOn', 0);
     const R = await rig();

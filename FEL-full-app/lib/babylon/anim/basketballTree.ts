@@ -327,7 +327,9 @@ export class BasketballAnimTree {
     const s = this.steer; if (!s) return;
     // the loop the legs are in: the tree's own; under a defensive beat, the legs layer's; under any other beat or off the floor, none
     const st = !input.defending || input.airborne ? null : this.override ? (this.legsFree && this.legsLoop && this.legs?.live ? this.legsLoop.state : null) : this.current;
-    s.drive({ state: st, ...(st === 'defend_backpedal' && this.strideSign(st) < 0 ? { loopDeg: BACKPEDAL_REVERSED_TRAVEL_DEG } : {}), travelOffRad: input.travelOffRad, speedMps: input.speedMps ?? 0, dtSec: input.dtSec ?? 1 / 60 });
+    // a beat with its own legs on defence (not a defensive beat stepping a loop): the turn holds, never unwinds under it (hipSteer.hold)
+    const hold = input.defending && !input.airborne && !!this.override && !(this.legsFree && this.legs?.live);
+    s.drive({ state: st, hold, ...(st === 'defend_backpedal' && this.strideSign(st) < 0 ? { loopDeg: BACKPEDAL_REVERSED_TRAVEL_DEG } : {}), travelOffRad: input.travelOffRad, speedMps: input.speedMps ?? 0, dtSec: input.dtSec ?? 1 / 60 });
   }
   /** H2: drive the legs layer for this frame — under a move beat, the loop the body would be in and its stride rate; after it, fading. */
   private stepLegs(input: AnimTreeInput): void {

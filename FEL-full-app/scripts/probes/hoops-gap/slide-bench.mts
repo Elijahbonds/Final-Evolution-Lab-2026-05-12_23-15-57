@@ -118,6 +118,7 @@ async function run(over: string, dir: string, speed: number): Promise<Row> {
       if (over === 'hand_up' && !tree.busy) tree.hold('bball_hand_up', { fadeSec: 0.14 });
       if (over === 'steal' && k % 54 === 6) tree.beat('bball_steal_reach', { fadeSec: 0.1 });
       if (over === 'block' && k % 72 === 6) tree.beat('bball_block_reach');
+      if (over === 'react' && k % 60 === 20) tree.beat('bball_contact_react', { fadeSec: 0.06 });   // (a bump: a beat with its own legs)
     }
     scene.render();
     if (rec) {

@@ -15,7 +15,7 @@ const rigOf = (captured = true) => {
   const animator = { play: (clip: string, opts: Play['opts'] = {}) => { plays.push({ clip, opts }); return null; }, setPlaybackScale: (n: string, s: number) => { scales.push([n, s]); }, clipNames: new Set<string>(captured ? ['bball_mc_run', 'bball_mc_defend_backpedal'] : []) };
   const drives: { loopClip: string | null; speedMps: number; free?: boolean; reverse?: boolean; fadeSec?: number }[] = []; const begins: (string | null)[] = [];
   const legs = { live: false, begin: (c: string | null) => { begins.push(c); }, drive: (d: (typeof drives)[number]) => { drives.push(d); legs.live = !!d.loopClip; }, end: () => { legs.live = false; }, phaseFor: () => undefined };
-  const steers: { state: string | null; loopDeg?: number; travelOffRad: number | undefined }[] = [];
+  const steers: { state: string | null; hold?: boolean; loopDeg?: number; travelOffRad: number | undefined }[] = [];
   const steer = { drive: (d: (typeof steers)[number]) => { steers.push(d); } };
   const tree = new BasketballAnimTree(animator as never);
   tree.attachLegs(legs as never); tree.attachSteer(steer as never);
@@ -132,6 +132,8 @@ describe('the tree drives the pelvis steer with the loop the legs are in', () =>
     const Q = rigOf();
     Q.tree.update(slide); Q.tree.beat('bball_contact_react'); Q.tree.update(slide);
     expect(Q.steers[Q.steers.length - 1].state).toBeNull();
+    expect(Q.steers[Q.steers.length - 1].hold).toBe(true);   // …and the turn HOLDS under it (unwound, it dragged the planted foot: hipSteer)
+    expect(R.steers[R.steers.length - 1].hold).toBe(false);   // in the air it is not held: off the floor the turn eases out
   });
   it('under a defensive beat: the legs layer\'s loop', () => {
     const R = rigOf();

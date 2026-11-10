@@ -78,7 +78,11 @@ export function stepSteer(deg: number, target: number, dt: number, tauSec = HIP_
   return target + (deg - target) * Math.exp(-dt / tauSec);
 }
 
-export interface SteerDrive { /** The loop state the legs are in (null: none — a beat with its own legs, a one-shot). */ state: string | null; /** The loop's travel when it is not the table's (the reversed backpedal). */ loopDeg?: number; travelOffRad: number | undefined; speedMps: number; dtSec: number }
+export interface SteerDrive { /** The loop state the legs are in (null: none — a one-shot, off the floor). */ state: string | null;
+  /** A beat with its own legs is playing (a contact reaction, a stagger): the turn HOLDS where it is — unwound under the beat, the pelvis
+   *  dragged the clip's planted foot round with it (the rig, 3v3 seed 7: 4 -> 8-11 cm a frame under bball_contact_react). It resumes from
+   *  there when the beat ends. */
+  hold?: boolean; /** The loop's travel when it is not the table's (the reversed backpedal). */ loopDeg?: number; travelOffRad: number | undefined; speedMps: number; dtSec: number }
 
 const PER_SKELETON = new WeakMap<Skeleton, HipSteer>();
 const UP = Vector3.Up();
@@ -107,6 +111,7 @@ export class HipSteer {
   /** Every frame from the tree. */
   drive(d: SteerDrive): void {
     const on = feel('hoops.hipSteerOn', HIP_STEER_ON) >= 0.5;
+    if (on && d.hold) { this.target = this.deg; return; }
     const loopDeg = d.state === null ? null : d.loopDeg ?? LOOP_TRAVEL_DEG[d.state] ?? null;
     this.target = on ? steerWantedDeg(loopDeg, d.travelOffRad, d.speedMps, feel('hoops.hipSteerMaxDeg', HIP_STEER_MAX_DEG), feel('hoops.hipSteerFromMps', HIP_STEER_FROM_MPS), feel('hoops.hipSteerFullMps', HIP_STEER_FULL_MPS)) : 0;
     this.deg = on ? stepSteer(this.deg, this.target, d.dtSec, feel('hoops.hipSteerSec', HIP_STEER_SEC)) : 0;
