@@ -165,6 +165,10 @@ Match each statement to its file.
 Each file is additive: new tables, new nullable or defaulted columns, new foreign keys. None changes or drops existing
 data. It is still marked irreversible, because the only undo is a `DROP`, which loses whatever was written after it.
 
+> **One command now does §5.1–5.3 (2026-11-10):** `npx tsx scripts/pending-sql/cli.ts plan`, then `apply`. It reads what
+> production already has, skips those files, orders the rest by what they depend on, and stops on anything unexpected.
+> See `docs/PENDING-SQL.md`. The table and the by-hand steps below stay as the reference.
+
 ### 5.1 The files, in order
 
 Apply **only the files whose statements the preview listed**. Skip a file whose objects production already has: a

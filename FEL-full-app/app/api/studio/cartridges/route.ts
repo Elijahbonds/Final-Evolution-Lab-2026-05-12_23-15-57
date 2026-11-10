@@ -6,6 +6,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { isStudioCreatorEnabled, FEATURE_DISABLED } from '@/lib/flags';
 import { resolveStudioTier, validateCartridgeManifest } from '@/lib/studio-service';
+import { sellerGate } from '@/lib/seller/server';
 
 /**
  * GET /api/studio/cartridges
@@ -50,6 +51,9 @@ export async function POST(req: NextRequest) {
   if (tier === 'FREE') {
     return NextResponse.json({ error: 'creator_required', message: 'A Creator subscription is required to publish cartridges.' }, { status: 402 });
   }
+  // SELLER-18-1 (S-2): publishing a priced cartridge is selling — a verified adult only (unknown age is refused).
+  const seller = await sellerGate(userId, 'studio');
+  if (seller) return seller;
 
   const body = await req.json().catch(() => ({}));
   const title = String(body?.title ?? '').trim();

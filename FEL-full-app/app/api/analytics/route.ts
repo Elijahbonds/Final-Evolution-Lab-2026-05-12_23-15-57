@@ -24,6 +24,7 @@ import { isAnonymousEvent } from '@/lib/analyticsAnon';   // perf-lag: the fps /
 import { guestIdFrom } from '@/lib/guestSession';
 import { AGE_BLOCK_COOKIE } from '@/lib/privacy/ageScreen';
 import { normaliseHomebrewEvent } from '@/lib/binjgb/analyticsProps';   // BINJGB-SHELF-1 F5: allowlisted props for the anonymous homebrew events
+import { isServerOnlyEventName } from '@/lib/analyticsReserved';
 
 export const dynamic = 'force-dynamic';
 
@@ -52,13 +53,18 @@ export async function POST(req: Request) {
     if (!userId && jar.get(AGE_BLOCK_COOKIE)) return new NextResponse(null, { status: 204 });
     const guestId = userId ? null : guestIdFrom(jar);
 
+    // SELLER-18-1 v3 (Cyber N1): a client never writes a server-only record (the seller takedown's review row), so a
+    // signed-in seller can't forge the "already held" marker that would skip their payout freeze. Dropped silently.
+    const allowed = parsed.data.events.filter((e) => !isServerOnlyEventName(e.name));
+    if (allowed.length !== parsed.data.events.length) console.warn('[analytics] dropped a server-only event name from a client batch');
     // BINJGB-SHELF-1 F5 (Cyber build review dcbbec16): the two anonymous homebrew events get their props REBUILT from an
     // allowlist ({ source: 'local' }; a shipped { slug } or the event is dropped), so a crafted POST can't store a file
     // name or a hash under them. Every other event is unchanged.
-    const events = parsed.data.events.flatMap((e) => {
+    const events = allowed.flatMap((e) => {
       const n = normaliseHomebrewEvent(e.name, e.props);
       return n.keep ? [{ ...e, props: n.props }] : [];
     });
+    if (!events.length) return new NextResponse(null, { status: 204 });
 
     await recordServerEvents(
       events.map((e) => ({
