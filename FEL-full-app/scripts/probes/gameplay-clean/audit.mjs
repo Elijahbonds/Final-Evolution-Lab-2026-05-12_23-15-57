@@ -27,6 +27,7 @@ import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import { countPops } from './popCount.mjs';
 const require = createRequire(new URL('../../../package.json', import.meta.url).pathname);
 const { chromium } = require('playwright-core');
 
@@ -34,6 +35,7 @@ const [OUT, MODES_ARG] = process.argv.slice(2);
 if (!OUT || !MODES_ARG) { console.error('usage: node audit.mjs <outDir> <mode,...>'); process.exit(2); }
 const MODES = MODES_ARG.split(',').filter(Boolean);
 const PORT = process.env.PORT ?? '3661';
+const HOST = process.env.HOST ?? '127.0.0.1';   // serve.mjs picks the site by host name (a before- and an after-build on one port)
 const PLAY_S = Number(process.env.PLAY_S ?? 22);   // 22 s of scripted play (was 30: on the shared box at load 10–19 the 230 s wall budget cut most runs to 15–25 s anyway)
 const PAUSE_AT = Number(process.env.PAUSE_AT ?? 10);
 const PERF_S = Number(process.env.PERF_S ?? 2.5);
@@ -88,7 +90,7 @@ const INIT = `(() => {
 // ── the recorder: binds to __FEL_DEV__ (scene, hero), counts draws, times frames, samples the hero's visibility ─────────
 function installRecorder(cfg) {
   const W = window, dev = W.__FEL_DEV__, scene = dev.scene, engine = scene.getEngine();
-  const R = W.__rec = { frames: [], clips: [], clipIx: new Map(), occNames: [], occIx: new Map(), presses: [], bus: [], keys: new Set(), heroOk: false, skel: false, frameNo: 0 };
+  const R = W.__rec = { frames: [], clips: [], clipIx: new Map(), gNames: [], gIx: new Map(), occNames: [], occIx: new Map(), presses: [], bus: [], keys: new Set(), heroOk: false, skel: false, frameNo: 0 };
   const ix = (map, arr, s) => { let i = map.get(s); if (i === undefined) { i = arr.length; arr.push(s); map.set(s, i); } return i; };
   // DRAWS: counted always; skipped while FAST unless a photograph needs the pixels
   let draws = 0; W.__fast = cfg.fast; W.__drawOn = !cfg.fast; W.__drawnFrames = 0;
@@ -175,15 +177,20 @@ function installRecorder(cfg) {
       // the hero's playing clips, read off the scene's animation groups (each group is one clip on one body; the anim probe's
       // readout came back empty on the CharacterAnimator bodies): the ones targeting the hero's nodes, weight > 0.3
       try {
-        const names = [];
+        const names = [], all = [];
         for (const g of scene.animationGroups) {
           if (!g.isPlaying) continue;
           let isH = heroGroups.get(g);
           if (isH === undefined) { const t = g.targetedAnimations[0] && g.targetedAnimations[0].target; isH = !!(t && (t === heroRef || (t.isDescendantOf && t.isDescendantOf(heroRef)))); heroGroups.set(g, isH); }
-          const w = g.weight < 0 ? 1 : g.weight;
+          // the weight a crossfade gives a clip is on its ANIMATABLES (CharacterAnimator.weightOf); the group's own `weight` stays −1.
+          // (Before clean-5 this read g.weight, so every playing clip read 1: the "> 0.3" below never dropped a fading clip.)
+          const aw = g.animatables && g.animatables[0] ? g.animatables[0].weight : null;
+          const w = aw == null || aw < 0 ? 1 : Math.max(0, Math.min(1, aw));
           if (isH && w > 0.3) names.push(g.name.replace(/_c\d+$/, '').slice(0, 40));
+          // clean-5: every playing hero clip with its weight (a third clip under a fade, a clip dropped at a weight: poprank.mjs)
+          if (isH) all.push([ix(R.gIx, R.gNames, g.name.replace(/_c\d+$/, '').slice(0, 40)), Math.round(w * 100) / 100]);
         }
-        f.c = ix(R.clipIx, R.clips, names.sort().join('+'));
+        f.c = ix(R.clipIx, R.clips, names.sort().join('+')); f.cw = all;
       } catch {}
     }
     f.cam = camPose();
@@ -322,29 +329,17 @@ const RIDE = new Set(['skateboard', 'snowboard_slalom', 'surf', 'velocitykart', 
 function analyze(mode, rec, S) {
   const F = rec.frames; const play = F.filter((f) => f.ph === 'playing');
   const dt = 1 / 60; const out = { frames: F.length, playFrames: play.length };
-  // pops
-  const pops = []; const nB = QN.length;
-  const speeds = F.map((f, i) => (i && f.q && F[i - 1].q ? f.q.map((q, b) => { const a = qang(q, F[i - 1].q[b]); return a === null ? null : a / dt; }) : null));
-  for (let b = 0; b < nB; b++) {
-    for (let i = 6; i < F.length - 6; i++) {
-      const w = speeds[i]?.[b]; if (w === null || w === undefined || w < 600) continue;
-      if (F[i].ph !== 'playing' || F[i - 1].ph !== 'playing') continue;
-      const nb = []; for (let k = i - 6; k <= i + 6; k++) if (k !== i && speeds[k]?.[b] != null) nb.push(speeds[k][b]);
-      const m = med(nb) ?? 0; if (w >= 3.5 * Math.max(m, 60)) pops.push({ t: F[i].t, i, bone: QN[b], degS: Math.round(w), clip: rec.clips[F[i].c] ?? '', from: rec.clips[F[Math.max(0, i - 3)].c] ?? '' });
-    }
-  }
-  // one EVENT is every bone that pops within 10 frames of another (a snap into a pose moves many bones at once); the
-  // control (karate, raw): RightUpLeg 70° then 63° in two frames, then held — the same pair at 3.35, 4.27, 5.40, 9.67 s
-  const byFrame = [...pops].sort((a, b) => a.i - b.i); const events = [];
-  for (const p0 of byFrame) { const last = events[events.length - 1]; if (last && p0.i - last.end <= 10) { last.end = p0.i; last.bones.add(p0.bone); last.peak = Math.max(last.peak, p0.degS); } else events.push({ t: p0.t, end: p0.i, bones: new Set([p0.bone]), peak: p0.degS, from: p0.from, to: p0.clip }); }
-  // HARD pops: a peak of 1500°/s or more (25° in one frame) — fast dance and swing motion lives around 900–1300 °/s at its
-  // peak (carnival, dance), a snap into a pose at 3700–10000 (baseball's swing contact, karate's strikes)
-  const hard = events.filter((e) => e.peak >= 1500);
-  out.hardPopEvents = hard.length; out.hardPopsPerMin = r2(hard.length / Math.max(1e-6, play.length / 3600));
-  out.popEvents = events.length; out.popEventsPerMin = r2(events.length / Math.max(1e-6, play.length / 3600));
+  // pops (popCount.mjs: the shared counter; RESET frames — the root over 1 m in a frame, and the frame after — are cuts, skipped
+  // since clean-5; `hardPopEventsWithResets` keeps the old count beside it so tables from before clean-5 stay comparable)
+  const pc = countPops(F, rec.clips ?? [], QN);
+  const { pops, events, hard } = pc;
+  out.resetFrames = pc.resetFrames;
+  out.hardPopEventsWithResets = countPops(F, rec.clips ?? [], QN, { skipResets: false }).hard.length;
+  out.hardPopEvents = hard.length; out.hardPopsPerMin = pc.perMin(hard.length);
+  out.popEvents = events.length; out.popEventsPerMin = pc.perMin(events.length);
   out.popEventEx = [...events].sort((a, b) => b.peak - a.peak).slice(0, 4).map((e) => `${e.t}s ${e.peak}°/s ${[...e.bones].slice(0, 4).join('+')} [${e.from} → ${e.to}]`);
   // which clip changes the hard pops sit on: the transitions to soften first
-  { const tr = {}; for (const e of events) if (e.peak >= 1500) { const k = `${e.from} → ${e.to}`; tr[k] = (tr[k] || 0) + 1; } out.hardPopTransitions = Object.entries(tr).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, n]) => `${n}× ${k}`); }
+  { const tr = {}; for (const e of hard) { const k = `${e.from} → ${e.to}`; tr[k] = (tr[k] || 0) + 1; } out.hardPopTransitions = Object.entries(tr).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, n]) => `${n}× ${k}`); }
   out.pops = pops.length; out.popsPerMin = r2(pops.length / Math.max(1e-6, play.length / 3600)); out.popEx = pops.sort((a, b) => b.degS - a.degS).slice(0, 5);
   // root jumps (teleports) during play
   const jumps = []; for (let i = 1; i < F.length; i++) { if (F[i].ph !== 'playing' || F[i - 1].ph !== 'playing') continue; const d = dist(F[i].r, F[i - 1].r); if (d !== null && d > 0.35) jumps.push({ t: F[i].t, m: r2(d) }); }
@@ -531,7 +526,7 @@ for (const mode of MODES) {
   const unshot = () => ev((fast) => { window.__drawOn = !fast; window.__freeze = false; }, FAST);
   try {
     const cdp = await ctx.newCDPSession(p);
-    await p.goto(`http://127.0.0.1:${PORT}/index.html?mode=${mode}&perf=off${QS}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+    await p.goto(`http://${HOST}:${PORT}/index.html?mode=${mode}&perf=off${QS}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
     // READY: the TAP TO START card (or a mode with no splash: playing / its own card)
     let st = {}; const tB = Date.now();
     for (;;) {
@@ -608,7 +603,7 @@ for (const mode of MODES) {
       await sleep(250);
     }
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 }).catch(() => {});
-    const rec = await ev(() => { const R = window.__rec; const thrFrom = R.frames.findIndex((f) => f.t >= (window.__thrT ?? 1e9)); return { frames: R.frames, clips: R.clips, occNames: R.occNames, presses: R.presses, bus: R.bus.slice(0, 50), skel: R.skel }; });
+    const rec = await ev(() => { const R = window.__rec; const thrFrom = R.frames.findIndex((f) => f.t >= (window.__thrT ?? 1e9)); return { frames: R.frames, clips: R.clips, gNames: R.gNames, cwv: 2, occNames: R.occNames, presses: R.presses, bus: R.bus.slice(0, 50), skel: R.skel }; });
     // frames the throttle covered: the last PERF_S seconds of the script
     const S = await ev(() => ({ ...window.__S, tapUntil: undefined }));
     const tEnd = rec.frames.length ? rec.frames[rec.frames.length - 1].t : 0;
@@ -623,6 +618,9 @@ for (const mode of MODES) {
   try { row.scriptErr = await p.evaluate(() => window.__scriptErr ?? null); row.api = await p.evaluate(() => [...new Set(window.__api)].slice(0, 20)); } catch {}
   fs.writeFileSync(path.join(OUT, `${mode}-${TAG}.json`), JSON.stringify(row, null, 1));
   console.log(`${mode.padEnd(17)} ready ${row.readyS}s play ${row.firstPlayS}s frames ${row.frames} pops ${row.pops} cuts ${row.camCuts} hidden ${row.heroHiddenPct}% cpu ${row.cpuMsP50}/${row.cpuMsP95} phone ${row.phoneCpuMsP50}/${row.phoneCpuMsP95} draws ${row.drawsMean}/${row.drawsMax} resp ${row.respMsMed}ms pause ${row.pause?.state} err ${row.errorCount}${row.fail ? ' FAIL ' + row.fail : ''} (${row.wallS}s)`);
-  await ctx.close();
+  // clean-5: closing a context whose page is still spinning the virtual clock took about 110 s a mode on the shared box (the first
+  // sweep hold: 6 modes in 700 s, each reporting ~120 s). The row is written; give the close 5 s and move on.
+  await Promise.race([ctx.close().catch(() => {}), sleep(5000)]);
 }
-await b.close();
+await Promise.race([b.close().catch(() => {}), sleep(5000)]);
+process.exit(0);   // (playwright kills the browser it launched when this process exits)

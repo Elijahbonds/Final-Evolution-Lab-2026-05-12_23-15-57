@@ -63,6 +63,12 @@ W.__BABYLON_TOOLS = Tools;
 W.__api = [] as string[];
 setAgentRunHooksAllowed(true);
 try { localStorage.clear(); } catch { /* fresh anyway */ }
+// clean-5: a knob A/B in the rig. `&playtest=1&feel=anim.plantReleaseSec:0,anim.clipSmooth:0` puts those overrides in this device's
+// storage exactly as the feel panel keeps them (lib/feel-panel/feel.ts FEEL_STORAGE_KEY), AFTER the clear above — audit.mjs's FEEL=
+// wrote them before the page loaded, and the clear wiped them, which is why GAMEPLAY-CLEAN-AUDIT §4c's A/B "never went active". The
+// panel's own gates still decide: the server's yes (stubbed below) and a playtest run (`playtest=1`, sessionGate.feelSessionBlock).
+{ const fv = q.get('feel');
+  if (fv) try { localStorage.setItem('fel.feel.overrides.v1', JSON.stringify(Object.fromEntries(fv.split(',').filter(Boolean).map((kv) => { const [k, v] = kv.split(':'); return [k, Number(v)]; })))); } catch { /* no storage: the defaults */ } }
 
 const realFetch = window.fetch.bind(window);
 window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
