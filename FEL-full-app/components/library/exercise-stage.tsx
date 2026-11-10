@@ -33,6 +33,7 @@ import type { AnatomyHandle } from '@/lib/babylon/library/anatomyLook';
 import type { DemoProp } from '@/lib/library/demo';
 import { unscaledBodyUrl, warmDemoBody, warmedBodyUrl } from '@/lib/library/demoWarm';
 import { dropParkedStage, holdParkedStage } from '@/lib/babylon/core/parkedStage';
+import { quietCanvas } from '@/lib/babylon/core/canvasA11y';
 
 export type StageView = 'demo' | 'muscles';
 export type StageSide = 'front' | 'back';
@@ -134,6 +135,8 @@ async function buildStage(first: ExerciseStageProps, gone: () => boolean): Promi
   canvas.setAttribute('data-state', 'loading');
   const engine = new Engine(canvas, true, { alpha: true, adaptToDeviceRatio: false, powerPreference: 'low-power', stencil: false, doNotHandleTouchAction: true, preserveDrawingBuffer: process.env.NODE_ENV === 'development' });
   engine.setHardwareScalingLevel(1 / Math.min(1.5, window.devicePixelRatio || 1));
+  // SCREEN-FIXES (2026-11-10): named, and out of the Tab order (Babylon makes it 1): lib/babylon/core/canvasA11y.ts
+  quietCanvas(engine, canvas, 'Your athlete doing this exercise. Drag sideways to turn.');
   const scene = new Scene(engine);
   (scene.metadata ??= {}).felModeId = 'library';
   // the tier a mode would get on this device (phone: the scan's phone file, the phone texture cap, the phone skin shading)

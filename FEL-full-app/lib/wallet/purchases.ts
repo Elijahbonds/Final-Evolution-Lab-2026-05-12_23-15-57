@@ -7,6 +7,8 @@
  * can only flip when the flag flips. Pure: no React, no network — unit-tested in purchases.test.ts.
  */
 
+import { allowlistPermits } from '@/lib/payments/allowlist';
+
 /**
  * Real-money checkout exists only when Stripe is configured AND the B10 live-key fence
  * (VIRTUAL_PURCHASES_ENABLED) is on. Default OFF: no real-money product outside the coach store
@@ -17,6 +19,12 @@ export function purchasesEnabledFromEnv(env: Record<string, string | undefined> 
   if (!Boolean(env.STRIPE_SECRET_KEY)) return false;
   const v = (env.VIRTUAL_PURCHASES_ENABLED ?? '').trim().toLowerCase();
   return v === '1' || v === 'true' || v === 'on' || v === 'yes';
+}
+
+/** Coin packs on /store: real money on, and PURCHASES_ALLOWLIST lets coins through. The one answer GET /api/v1/wallet/config
+ *  gives the client and app/store/page.tsx gives the first draw (SCREEN-FIXES 2026-11-10). */
+export function coinPacksOnSale(env: Record<string, string | undefined> = process.env): boolean {
+  return purchasesEnabledFromEnv(env) && allowlistPermits('coins', env);
 }
 
 /** `null` = the client has not heard from the server yet — copy must stay neutral, never promise a sale or deny one. */

@@ -37,3 +37,14 @@ describe('purchases truth', () => {
     expect(pending.badge).toBe('');
   });
 });
+
+describe('coinPacksOnSale (SCREEN-FIXES 2026-11-10: the server answer /store draws from)', async () => {
+  const { coinPacksOnSale } = await import('./purchases');
+  it('needs Stripe, the live-key fence, and the allow list to let coins through', () => {
+    expect(coinPacksOnSale({})).toBe(false);
+    expect(coinPacksOnSale({ STRIPE_SECRET_KEY: 'sk_test_x' })).toBe(false);
+    expect(coinPacksOnSale({ STRIPE_SECRET_KEY: 'sk_test_x', VIRTUAL_PURCHASES_ENABLED: 'true' })).toBe(true);
+    expect(coinPacksOnSale({ STRIPE_SECRET_KEY: 'sk_test_x', VIRTUAL_PURCHASES_ENABLED: 'true', PURCHASES_ALLOWLIST: 'fel_pro' })).toBe(false);
+    expect(coinPacksOnSale({ STRIPE_SECRET_KEY: 'sk_test_x', VIRTUAL_PURCHASES_ENABLED: 'true', PURCHASES_ALLOWLIST: 'coins' })).toBe(true);
+  });
+});

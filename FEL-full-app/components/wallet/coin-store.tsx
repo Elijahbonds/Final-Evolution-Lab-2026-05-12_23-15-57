@@ -57,11 +57,12 @@ function usd(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`;
 }
 
-export function CoinStore() {
+/** `initialPurchasesEnabled`: the server's answer (app/store/page.tsx), so the coin packs are drawn, or not, from the start. */
+export function CoinStore({ initialPurchasesEnabled = null }: { initialPurchasesEnabled?: boolean | null } = {}) {
   const [balances, setBalances] = useState<Balances>({ coins: 0, shards: 0 });
   // FEATURES-UX-SHOP (2026-09-08): ONE purchases truth (lib/wallet/purchases.ts) — this store said "shard packs are sold
   // separately" while /shop/shards showed a disabled placeholder on every Buy. Both now read the same flag and the same copy.
-  const purchasesEnabled = usePurchasesEnabled();
+  const purchasesEnabled = usePurchasesEnabled(initialPurchasesEnabled);
   const copy = shardSaleCopy(purchasesEnabled);
   const [busy, setBusy] = useState<string | null>(null);
 

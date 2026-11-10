@@ -27,6 +27,11 @@ import { openSeatHint, PARTY_CAPACITY, SEAT_COLORS, type Seat } from '@/lib/part
 import { turnStandings } from '@/lib/party/turns';
 import { prqGrade } from '@/lib/prq';
 import { usePartyRoom } from './use-party-room';
+import { badgeBackgrounds, quietInk, readableInk } from './ink';
+
+// SCREEN-FIXES (2026-11-10): the small coloured text at AA (components/party/ink.ts). Worked out once: the colours are fixed.
+const SEAT_INK = SEAT_COLORS.map((c) => quietInk(c));
+const BADGE_INK: Record<string, string> = Object.fromEntries(PARTY_MODES.map((m) => [m.id, readableInk(m.color, badgeBackgrounds(m.color))]));
 
 const loading = () => (
   <div className="grid h-full w-full place-items-center bg-black"><Loader2 className="h-8 w-8 animate-spin text-[#00E5FF]" /></div>
@@ -218,7 +223,7 @@ function Lobby({ room, qr, origin, share, shared }: { room: Room; qr: string | n
                       <span className="mt-1 hidden text-[12px] leading-snug text-white/50 md:block">{m.blurb}</span>
                     </span>
                     <span className="mt-1 flex flex-wrap gap-1 font-mono text-[12px] font-bold">
-                      <span className="rounded px-1.5 py-0.5" style={{ background: `${m.color}33`, color: m.color }}>{playersBadge(m)}</span>
+                      <span data-party-players className="rounded px-1.5 py-0.5" style={{ background: `${m.color}33`, color: BADGE_INK[m.id] }}>{playersBadge(m)}</span>
                       <span className="rounded bg-white/10 px-1.5 py-0.5 text-white/60">{styleLine(m)}</span>
                     </span>
                   </button>
@@ -230,7 +235,9 @@ function Lobby({ room, qr, origin, share, shared }: { room: Room; qr: string | n
       </div>
 
       <footer className="flex items-center justify-between gap-3">
-        <p data-testid="party-banner" className="min-w-0 truncate font-mono text-[min(2.6vh,13px)] text-white/60">{room.banner}</p>
+        {/* SCREEN-FIXES (2026-11-10): the banner wraps. On a 390 px phone "Scan the code to join — or press any button" ran
+            past the START button and was cut off (readable-2); the instruction is the line a newcomer needs whole */}
+        <p data-testid="party-banner" className="min-w-0 font-mono text-[min(2.6vh,13px)] leading-snug text-white/60">{room.banner}</p>
         <button type="button" data-testid="party-start" onClick={room.start} disabled={table.seats.length < mode.minPlayers}
           className="shrink-0 rounded-xl px-[3vh] py-[1.4vh] font-mono text-[min(3vh,15px)] font-black tracking-[0.15em] text-[#04202a] disabled:opacity-35"
           style={{ background: room.canStart ? '#00E5FF' : '#7dd3e0' }}>
@@ -266,7 +273,7 @@ function SeatCard({ seat, inGame, onRemove }: { seat: Seat; inGame: boolean; onR
 function EmptySeat({ index, hasPads }: { index: number; hasPads: boolean }) {
   return (
     <div data-testid={`party-seat-empty-${index + 1}`} className="rounded-xl border border-dashed border-white/15 p-[1.3vh]">
-      <span className="font-mono text-[min(3.2vh,16px)] font-black" style={{ color: `${SEAT_COLORS[index]}66` }}>P{index + 1}</span>
+      <span className="font-mono text-[min(3.2vh,16px)] font-black" style={{ color: SEAT_INK[index] }}>P{index + 1}</span>
       <p className="mt-0.5 text-[12px] leading-snug text-white/60">{openSeatHint(hasPads)}</p>
     </div>
   );

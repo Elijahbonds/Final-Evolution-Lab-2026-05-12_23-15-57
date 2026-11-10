@@ -68,3 +68,25 @@ describe('the copy that tells people what Shards buy', () => {
     expect(renderToStaticMarkup(createElement(CoinStore))).not.toMatch(/training plan/i);
   });
 });
+
+// SCREEN-FIXES (2026-11-10): /store jumped as it loaded (layout shift 0.421 on the every-screen rig; the budget is 0.02).
+// The coin packs were drawn while the client asked whether they sell, then removed when the answer was "no". The server
+// knows the answer, so /store passes it and the first draw is the final one.
+describe('/store draws the coin packs, or not, from the first render', () => {
+  it('with real money off, the first draw has no coin packs (nothing to remove later)', () => {
+    const off = renderToStaticMarkup(createElement(CoinStore, { initialPurchasesEnabled: false }));
+    expect(off).not.toContain('Coin Packs');
+    expect(off.match(/<button/g) ?? []).toHaveLength(0);
+  });
+  it('with real money on, the first draw has them; with no answer it is as before', () => {
+    expect(renderToStaticMarkup(createElement(CoinStore, { initialPurchasesEnabled: true }))).toContain('Coin Packs');
+    expect(renderToStaticMarkup(createElement(CoinStore))).toContain('Coin Packs');
+  });
+  it('the page passes the server\'s answer, the same one the config route gives the client', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const root = join(__dirname, '..', '..');
+    expect(readFileSync(join(root, 'app/store/page.tsx'), 'utf8')).toMatch(/<CoinStore initialPurchasesEnabled=\{coinPacksOnSale\(\)\} \/>/);
+    expect(readFileSync(join(root, 'app/api/v1/wallet/config/route.ts'), 'utf8')).toMatch(/purchasesEnabled: coinPacksOnSale\(\)/);
+  });
+});

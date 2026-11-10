@@ -15,6 +15,7 @@
 // lib/a11y/reducedMotion), a sideways drag turns it, and a vertical swipe still scrolls the page (touch-action: pan-y).
 import { useEffect, useRef } from 'react';
 import { identityHash, posterCrop, snapshotScaling } from '@/lib/profile-v2/athletePoster';
+import { quietCanvas } from '@/lib/babylon/core/canvasA11y';
 
 export interface Athlete3DProps {
   /** the 3D is drawing the athlete; `idHash` is the identity it wears */
@@ -68,6 +69,8 @@ export default function Athlete3D(props: Athlete3DProps) {
         const canvas = ref.current;
         if (disposed || !canvas) return;
         const engine = new Engine(canvas, true, { alpha: true, adaptToDeviceRatio: false, powerPreference: 'low-power', stencil: false, doNotHandleTouchAction: true, loseContextOnDispose: true });
+        // SCREEN-FIXES (2026-11-10): named, and out of the Tab order (Babylon makes it 1): lib/babylon/core/canvasA11y.ts
+        quietCanvas(engine, canvas);
         const liveScale = 1 / Math.min(2, window.devicePixelRatio || 1);
         engine.setHardwareScalingLevel(liveScale);
         const scene = new Scene(engine);

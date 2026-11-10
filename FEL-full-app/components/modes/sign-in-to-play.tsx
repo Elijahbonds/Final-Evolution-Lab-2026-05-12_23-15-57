@@ -12,9 +12,22 @@ import { useVisitorKind } from '@/components/auth/use-visitor';
 
 export const SIGN_IN_TO_PLAY = 'Sign in to play — free';
 
+/**
+ * SCREEN-FIXES (2026-11-10): `serverGuest` is the server's answer (app/modes/page.tsx reads the session). While the
+ * browser's session read is still loading, it decides, so a signed-out visitor gets the note and the chips in the first
+ * draw instead of after it: they used to arrive late and push every card down (a layout shift). A signed-in player is
+ * still never shown a hint, and the browser's own answer wins once it has one. Without `serverGuest`, as before.
+ */
+export function useGuestHint(serverGuest?: boolean): boolean {
+  const kind = useVisitorKind();
+  if (kind === 'guest') return true;
+  if (kind === 'signed-in') return false;
+  return serverGuest === true;
+}
+
 /** The line above the game list. */
-export function ModesSignInNote() {
-  if (useVisitorKind() !== 'guest') return null;
+export function ModesSignInNote({ serverGuest }: { serverGuest?: boolean } = {}) {
+  if (!useGuestHint(serverGuest)) return null;
   return (
     <p data-testid="modes-signin-note" className="rounded-2xl border border-[#00E5FF]/25 bg-[#00E5FF]/[0.06] px-4 py-3 text-[14px] leading-relaxed text-fel-dim">
       <span className="font-bold text-white">{SIGN_IN_TO_PLAY}.</span>{' '}
@@ -27,8 +40,8 @@ export function ModesSignInNote() {
 }
 
 /** The hint inside each card (a span: the card itself is the link). */
-export function SignInChip() {
-  if (useVisitorKind() !== 'guest') return null;
+export function SignInChip({ serverGuest }: { serverGuest?: boolean } = {}) {
+  if (!useGuestHint(serverGuest)) return null;
   return (
     <span data-testid="mode-signin-chip" className="mt-2 block text-[14px] font-semibold text-[#00E5FF]">
       {SIGN_IN_TO_PLAY}

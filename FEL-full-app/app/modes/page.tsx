@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { DoorsRow } from '@/components/shell/doors-row';
 import { TabPage } from '@/components/shell/tab-page';
 import { FAMILIES, OFF_SHELF, SHELF_MODE_COUNT, shelvedModes, type Family } from '@/lib/nav/families';
@@ -29,7 +31,7 @@ function tileFor([key, info]: ReturnType<typeof visibleModeEntries>[number]): Mo
   };
 }
 
-function ModeCard({ tile }: { tile: ModeTile }) {
+function ModeCard({ tile, guest }: { tile: ModeTile; guest: boolean }) {
   const { Icon } = tile;
   return (
     <Link
@@ -51,7 +53,7 @@ function ModeCard({ tile }: { tile: ModeTile }) {
           {tile.venue}
         </span>
         <span className="mt-2 block text-[14px] leading-relaxed text-fel-dim">{tile.desc}</span>
-        <SignInChip />
+        <SignInChip serverGuest={guest} />
       </span>
     </Link>
   );
@@ -62,11 +64,13 @@ function ModeSection({
   blurb,
   accent,
   tiles,
+  guest,
 }: {
   title: string;
   blurb: string;
   accent: string;
   tiles: ModeTile[];
+  guest: boolean;
 }) {
   if (!tiles.length) return null;
   return (
@@ -82,13 +86,16 @@ function ModeSection({
         </p>
       </header>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {tiles.map((tile) => <ModeCard key={tile.key} tile={tile} />)}
+        {tiles.map((tile) => <ModeCard key={tile.key} tile={tile} guest={guest} />)}
       </div>
     </section>
   );
 }
 
-export default function ModesPage() {
+export default async function ModesPage() {
+  // SCREEN-FIXES (2026-11-10): who is looking, from the server, so the sign-in note and the cards' chips are in the first
+  // draw for a signed-out visitor (they arrived after the browser's session read and moved every card down)
+  const guest = !(await getServerSession(authOptions));
   const byKey = new Map(visibleModeEntries().map((entry) => [entry[0], tileFor(entry)]));
   const shelved = new Set(shelvedModes());
   const sections = FAMILIES.map((family: Family) => ({
@@ -109,13 +116,14 @@ export default function ModesPage() {
       accent="#00E5FF"
     >
       <div className="space-y-5">
-        <ModesSignInNote />
-        {sections.map((section) => <ModeSection key={section.title} {...section} />)}
+        <ModesSignInNote serverGuest={guest} />
+        {sections.map((section) => <ModeSection key={section.title} {...section} guest={guest} />)}
         <ModeSection
           title="Training floor"
           blurb={offShelf.map((tile) => OFF_SHELF[tile.key]).filter(Boolean).join(' · ') || 'Training tools that live outside the game list.'}
           accent="#00FF9D"
           tiles={offShelf}
+          guest={guest}
         />
       </div>
       <DoorsRow tab="play" />
