@@ -52,11 +52,14 @@ export const BACKPEDAL_REVERSED_TRAVEL_DEG = 147;
  * acting in a real defensive possession, and it was not better everywhere: 3v3 the hero's slide p90 12.27 -> 12.65 cm (a bump landing on
  * turned hips), 1v1 its two severe foot pops 4 735 / 3 262 -> 5 120 / 3 789 deg/s (pops 5 -> 3). Where it measured better is the retreat:
  * the reversed backpedal capture steps 33 deg off straight back, and the steer lines its legs up with the retreat. So by default it runs on
- * the backpedal only; knob `hoops.hipSteerAllLoopsOn` 1 = every stepping loop (the slides, the crossover run, the run, the closeout), as
+ * the backpedal and the closeout only; knob `hoops.hipSteerAllLoopsOn` 1 = every stepping loop (the slides, the crossover run, the run), as
  * shipped in P5a. `hoops.hipSteerOn` 0 still turns it off everywhere.
  */
 export const HIP_STEER_ALL_LOOPS_ON = 0;
-export const HIP_STEER_DEFAULT_STATES: ReadonlySet<string> = new Set(['defend_backpedal']);
+export const HIP_STEER_DEFAULT_STATES: ReadonlySet<string> = new Set(['defend_backpedal', 'closeout']);
+// (…and the closeout: the stepping closeout, bball_closeout_step, steps straight ahead, so a closeout on a diagonal skates 10-23 cm a frame
+// without the turn and 0.1-0.3 with it — slide-bench --man 2.0, fwdleft 3-6 m/s. The rig's harm from the steer was a bump after a slide
+// (3v3) and a crossover run -> slide change (1v1), never a closeout.)
 
 /** Where a body is travelling against where it faces (rad, 0 = straight ahead, + = body-right), or undefined under 0.6 m/s — OneVOneMode's
  *  `travelOff`, for a mode that has none of its own (the tree's `travelOffRad`). */

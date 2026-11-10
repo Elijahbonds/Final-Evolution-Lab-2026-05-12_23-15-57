@@ -73,6 +73,7 @@ describe('hipSteer — where it runs (hoops-p05b)', () => {
     const run = (st: HipSteer, state: string, off: number) => { for (let i = 0; i < 120; i++) st.drive({ state, travelOffRad: off * RAD, speedMps: 3, dtSec: 1 / 60 }); return st.turnDeg; };
     expect(run(mk(), 'defend_slide', -130)).toBe(0);
     expect(run(mk(), 'defend_backpedal', 150)).toBeCloseTo(-30, 1);
+    expect(run(mk(), 'closeout', -40)).toBeCloseTo(-40, 1);   // the stepping closeout on a diagonal
     setFeelUser(true); setFeelSession(null); setFeelOverride('hoops.hipSteerAllLoopsOn', 1);
     expect(run(mk(), 'defend_slide', -130)).toBeCloseTo(-40, 1);
   });

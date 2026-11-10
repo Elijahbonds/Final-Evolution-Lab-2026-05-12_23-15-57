@@ -854,11 +854,15 @@ export const CLOSEOUT_STEP_Z = 0.27;   // = 3.6 m/s × (CLOSEOUT_STEP_SEC / 2) /
 const closeoutStepKeys = (): PoseKey[] => {
   const keys: PoseKey[] = [];
   const Z = CLOSEOUT_STEP_Z, LIFT = 0.09, W = 0.17, T = CLOSEOUT_STEP_SEC;
-  for (let k = 0; k <= 8; k++) {
-    const p = k / 8;
-    const stance = (q: number) => Z - 4 * Z * q;                              // q 0..0.5: +Z -> -Z (planted)
-    const swing = (q: number) => -Z + 4 * Z * (q - 0.5);                      // q 0.5..1: -Z -> +Z (in the air)
-    const lift = (q: number) => LIFT * Math.sin(Math.PI * (q - 0.5) / 0.5);
+  // 16 keys, and a swing with no corners: the foot leaves and meets the floor with a flat lift (sin^2) and an eased travel (smoothstep) —
+  // with 8 keys and a sine lift the knee turned ~600 deg/s on a few key intervals at rate 1 (clip-flip.mts), ~1 000 at a closeout's 6 m/s
+  const N = 16;
+  for (let k = 0; k <= N; k++) {
+    const p = k / N;
+    const stance = (q: number) => Z - 4 * Z * q;                              // q 0..0.5: +Z -> -Z (planted, the paced speed)
+    const ease = (u: number) => u * u * (3 - 2 * u);
+    const swing = (q: number) => -Z + 2 * Z * ease((q - 0.5) / 0.5);          // q 0.5..1: -Z -> +Z (in the air), eased
+    const lift = (q: number) => LIFT * Math.sin(Math.PI * (q - 0.5) / 0.5) ** 2;
     const pl = (p + 0.5) % 1;                                                 // the left foot half a loop behind
     const right: V3 = p <= 0.5 ? [W, ANKLE_Y, stance(p)] : [W, ANKLE_Y + lift(p), swing(p)];
     const left: V3 = pl <= 0.5 ? [-W, ANKLE_Y, stance(pl)] : [-W, ANKLE_Y + lift(pl), swing(pl)];
