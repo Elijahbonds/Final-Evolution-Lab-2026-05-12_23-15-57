@@ -2573,7 +2573,7 @@ export const DunkMode: ModeDefinition = (() => {
               // reads as the body dropping onto the iron, not a snap.
               // DUNK-FLAGSHIP P11 (knob, off = the shipped line below): over the ring the body does not come DOWN onto the iron until the ball
               // is over the hole — it holds its height through the lift and the way in (it is still pulled UP to the jam height from under it)
-              if (overRing && player.root.position.y > jamY && overRingHoldsBody(overLeg)) { /* held */ }
+              if (overRing && player.root.position.y > jamY && overRingHoldsBody(overLeg, ball.getAbsolutePosition().y - rim.y, ballSim.radius)) { /* held */ }
               else player.root.position.y = jamRootStep(player.root.position.y, jamY, dt, JAM_LIFT_TAU, JAM_DROP_TAU);
             }
             ball.computeWorldMatrix(true);
