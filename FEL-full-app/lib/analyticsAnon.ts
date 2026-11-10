@@ -8,8 +8,15 @@
 /** game_diag kinds that are stored anonymously. */
 export const ANONYMOUS_DIAG_KINDS: ReadonlySet<string> = new Set(['fps', 'ttfp']);
 
+/**
+ * BINJGB-SHELF-1 (Cyber G9, review 067e0dce): the Homebrew Shelf's events are stored anonymously too — a per-user game
+ * history isn't needed. Their payloads are a shelf slug or { source: 'local' } only.
+ */
+export const ANONYMOUS_EVENT_NAMES: ReadonlySet<string> = new Set(['homebrew_shelf_play', 'homebrew_local_play']);
+
 /** Pure: is this event stored with no user or guest id? */
 export function isAnonymousEvent(name: string, props: unknown): boolean {
+  if (ANONYMOUS_EVENT_NAMES.has(name)) return true;
   if (name !== 'game_diag' || !props || typeof props !== 'object') return false;
   const kind = (props as { kind?: unknown }).kind;
   return typeof kind === 'string' && ANONYMOUS_DIAG_KINDS.has(kind);
