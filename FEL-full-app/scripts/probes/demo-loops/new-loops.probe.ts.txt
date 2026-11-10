@@ -1,4 +1,9 @@
-// scratch (git-excluded): new loops' floor, closure and bind check, and a joint probe
+// DEMO-LOOPS probe: new loops' floor, closure and bind check, and a joint probe. A copy of the lane's scratch test (vitest only
+// collects *.test.ts under lib/, and the scratch file is git-excluded), kept here so the next batch has it. To run:
+//   cp scripts/probes/demo-loops/new-loops.probe.ts.txt lib/babylon/anim/authored/zz-new.test.ts
+//   NEW_CLIPS="ex_a ex_b" NEW_OUT=/path/out.txt [PROBE_AT=0,0.3,0.7] npx vitest run lib/babylon/anim/authored/zz-new.test.ts
+// A line ending in <<< fails: the seam is open (> 0.02 m), a joint is under the floor (< -0.035 m) or the body is at bind.
+// Delete the copy afterwards (never commit a zz-*.test.ts).
 import { readFileSync, writeFileSync } from 'node:fs';
 import { beforeAll, it } from 'vitest';
 import { FreeCamera, NullEngine, Quaternion, Scene, SceneLoader, Vector3 } from '@babylonjs/core';

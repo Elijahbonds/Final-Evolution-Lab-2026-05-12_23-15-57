@@ -1,4 +1,8 @@
-// scratch (git-excluded): library loop coverage
+// DEMO-LOOPS probe: how many approved library entries have a loop, and the entries without one by family (largest first).
+// A copy of the lane's scratch test, kept here so the next batch has it. To run:
+//   cp scripts/probes/demo-loops/coverage.probe.ts.txt lib/library/zz-measure.test.ts
+//   MEASURE_OUT=/path/measure.json npx vitest run lib/library/zz-measure.test.ts
+// Delete the copy afterwards (never commit a zz-*.test.ts).
 import { it } from 'vitest';
 import { writeFileSync } from 'node:fs';
 import { loadLibraryFiles } from './files';
