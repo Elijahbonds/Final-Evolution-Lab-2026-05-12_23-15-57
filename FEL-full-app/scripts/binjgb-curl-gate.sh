@@ -15,7 +15,21 @@
 #       the middleware's ENFORCED CSP present ('nonce-, 'wasm-unsafe-eval', style-src 'self' 'unsafe-inline'), with no
 #       'unsafe-eval' and no 'unsafe-inline' in script-src (rule 0's frame-ancestors-only CSP may be a second header);
 #       local-frame: the CSP carries `sandbox allow-scripts` and never allow-same-origin (F3); the shelf's CSP: no sandbox.
-#     /vendor/binjgb/binjgb.js → 200 (the flag opens the static path).
+#     /vendor/binjgb/binjgb.js → 200 (the flag opens the route).
+#   MODE=static (G1(a), Cyber A7): BASE_URL is a Hosting stand-in (superstatic on loopback) serving ONLY the static layer
+#     the Firebase frameworks build would upload — no function behind it. Every vendor spelling and /play row → 404 (or a
+#     G2-valid 308 then 404): the player's bytes must not be in the static layer at all.
+#   G1(a) (Cyber A2/A3): /vendor/binjgb/<file> is a route handler now (app/vendor/binjgb/[file]/route.ts), not a public/
+#     file. MODE=on: binjgb.js / binjgb.wasm → 200 with exactly `application/javascript; charset=utf-8` / `application/wasm`,
+#     X-Content-Type-Options: nosniff and Cache-Control: no-store; LICENSE, VENDOR.md, a wrong case and an unlisted name →
+#     404; the %2F spellings → 404 (the flag-on pass-through is gone). MODE=off: the canonical rows are the one empty 404
+#     with nosniff and no-store. Run MODE=off / MODE=on both straight at `next start` AND through the stand-in with its
+#     catch-all rewrite proxied to that `next start` (how Hosting reaches the function). INFO lines also record nosniff
+#     and Cache-Control.
+#   F3 (Cyber G1(a) review 467aa397): the three case variants (/Vendor/…, /VENDOR/…/BINJGB.JS, /vendor/Binjgb/…) must give
+#     the SAME status and body sha256 with the flag off and on. MODE=off writes them to FEL_GATE_CASE_FILE; MODE=on reads
+#     that file (required) and compares. MODE=on also sends HEAD (200, 0 body bytes) and OPTIONS (0 body bytes, no-store)
+#     to /vendor/binjgb/binjgb.js over a raw loopback socket (perl core IO::Socket::INET), so a body sent on HEAD is seen.
 #   G2 / G3 (Cyber gate ruling on the 2026-11-09 real-build run): a redirect counts only as a 308 whose Location is the
 #     same-origin canonical path (relative, or exactly BASE_URL's origin); it is followed one hop and the hop must give 404
 #     (off) or the expected 200 (on). Any other redirect or Location FAILs. Every vendor row, in both modes, prints an INFO
@@ -40,6 +54,8 @@
 #   (stop it) BINJGB_SHELF_ENABLED=1 BINJGB_LOCAL_FILE_ENABLED=1 npx next start -p 3100 &
 #   BASE_URL=http://localhost:3100 MODE=on FEL_GATE_COOKIE='<local test ADULT session>' \
 #     [FEL_GATE_TEEN_COOKIE='<local test TEEN session>'] scripts/binjgb-curl-gate.sh
+#   (static layer only, G1(a)) BASE_URL=http://127.0.0.1:<stand-in port> MODE=static scripts/binjgb-curl-gate.sh
+#   F3: pass the same FEL_GATE_CASE_FILE=<file> to the MODE=off and the MODE=on run of one server (or one stand-in).
 set -u
 
 BASE_URL="${BASE_URL:-http://localhost:3000}"
@@ -50,6 +66,8 @@ TEEN_COOKIE="${FEL_GATE_TEEN_COOKIE:-}"
 # server started with BOTH flags on, teen row REQUIRED; `shelf` = BINJGB_SHELF_ENABLED only, server started with
 # BINJGB_LOCAL_FILE_ENABLED=0, the local frame must 404 even for the adult, and a missing teen row is a loud SKIP.
 GATE="${FEL_GATE_FOR:-local}"
+CASE_FILE="${FEL_GATE_CASE_FILE:-}"
+CASE_ROWS='/Vendor/binjgb/binjgb.wasm /VENDOR/BINJGB/BINJGB.JS /vendor/Binjgb/binjgb.wasm'
 FAILS=0
 SKIPS=0
 
@@ -63,7 +81,7 @@ case "$BASE_URL" in
        exit 2
      fi ;;
 esac
-if [ "$MODE" != "on" ] && [ "$MODE" != "off" ]; then echo "MODE must be on or off" >&2; exit 2; fi
+if [ "$MODE" != "on" ] && [ "$MODE" != "off" ] && [ "$MODE" != "static" ]; then echo "MODE must be on, off or static" >&2; exit 2; fi
 if [ "$GATE" != "shelf" ] && [ "$GATE" != "local" ]; then echo "FEL_GATE_FOR must be shelf or local" >&2; exit 2; fi
 command -v curl >/dev/null || { echo "curl not found" >&2; exit 2; }
 
@@ -87,14 +105,14 @@ values_of() { printf '%s\n' "$1" | awk -v k="$(echo "$2" | tr '[:upper:]' '[:low
 expect_404() {
   local path="$1" h s loc c
   h="$(headers "$path")"; s="$(status_of "$h")"
-  if [ "$s" = "404" ]; then pass "off: $path -> 404"; return; fi
+  if [ "$s" = "404" ]; then pass "$MODE: $path -> 404"; return; fi
   # G2 (Cyber gate ruling, 2026-11-09): only a 308 to the same-origin canonical path counts, followed exactly one hop.
   loc="$(values_of "$h" 'Location' | tail -1)"
   if [ "$s" = "308" ] && c="$(canonical_location "$loc")"; then
     s="$(status_of "$(headers "$c")")"
-    if [ "$s" = "404" ]; then pass "off: $path -> 308 $c -> 404"; else fail "off: $path -> 308 $c -> ${s:-no response} (want 404)"; fi
+    if [ "$s" = "404" ]; then pass "$MODE: $path -> 308 $c -> 404"; else fail "$MODE: $path -> 308 $c -> ${s:-no response} (want 404)"; fi
   else
-    fail "off: $path -> ${s:-no response}${loc:+ Location $loc} (want 404; a redirect counts only as a 308 to the same-origin canonical path)"
+    fail "$MODE: $path -> ${s:-no response}${loc:+ Location $loc} (want 404; a redirect counts only as a 308 to the same-origin canonical path)"
   fi
 }
 
@@ -114,7 +132,7 @@ canonical_location() {
 
 # G3 (Cyber gate ruling): every vendor row in both modes is fetched once with its body, and the status, Content-Type,
 # Content-Length and body sha256 are recorded on an INFO line. fetch_row <path> sets R_STATUS R_TYPE R_LEN R_BYTES R_SHA
-# R_LOC. The session cookie (if any) goes in a header only, never on the screen.
+# R_LOC R_NOSNIFF R_CACHE (G1(a)). The session cookie (if any) goes in a header only, never on the screen.
 sha256_stdin() { if command -v sha256sum >/dev/null; then sha256sum | cut -d' ' -f1; else shasum -a 256 | cut -d' ' -f1; fi; }
 fetch_row() {
   local path="$1" body h
@@ -125,10 +143,38 @@ fetch_row() {
     h="$(curl -s --path-as-is -o "$body" -D - "$BASE_URL$path" | tr -d '\r')"
   fi
   R_STATUS="$(status_of "$h")"; R_TYPE="$(values_of "$h" 'Content-Type' | tail -1)"; R_LEN="$(values_of "$h" 'Content-Length' | tail -1)"
-  R_LOC="$(values_of "$h" 'Location' | tail -1)"; R_BYTES="$(wc -c < "$body" | tr -d ' ')"; R_SHA="$(sha256_stdin < "$body")"
+  R_LOC="$(values_of "$h" 'Location' | tail -1)"; R_NOSNIFF="$(values_of "$h" 'X-Content-Type-Options' | tr '\n' ',' | sed 's/,$//')"
+  R_CACHE="$(values_of "$h" 'Cache-Control' | tr '\n' ',' | sed 's/,$//')"; R_BYTES="$(wc -c < "$body" | tr -d ' ')"; R_SHA="$(sha256_stdin < "$body")"
   rm -f "$body"
 }
-record_row() { printf 'INFO  %s\n' "$MODE: $1 status=${R_STATUS:-none} type=${R_TYPE:--} length=${R_LEN:--} bytes=$R_BYTES sha256=$R_SHA${R_LOC:+ location=$R_LOC}"; }
+record_row() { printf 'INFO  %s\n' "$MODE: $1 status=${R_STATUS:-none} type=${R_TYPE:--} length=${R_LEN:--} bytes=$R_BYTES sha256=$R_SHA${R_LOC:+ location=$R_LOC} nosniff=${R_NOSNIFF:--} cache=${R_CACHE:--}"; }
+
+# F3 (Cyber review 467aa397): raw_request <METHOD> <path> sends one request on a fresh loopback socket and sets RAW_STATUS,
+# RAW_BODY (bytes after the header block, as received — curl never reads a HEAD body, so it can't see one) and RAW_CACHE.
+raw_request() {
+  local out
+  out="$(BASE="$BASE_URL" perl -MIO::Socket::INET -e '
+    my ($m, $p) = @ARGV; my ($h, $port) = $ENV{BASE} =~ m{^http://(\[?[^/\]]+\]?|[^/:]+)(?::(\d+))?}; $port ||= 80; $h =~ s/^\[|\]$//g;
+    $SIG{ALRM} = sub { print "000 0 -\n"; exit 0 }; alarm 15;
+    my $s = IO::Socket::INET->new(PeerAddr => $h, PeerPort => $port, Proto => "tcp") or do { print "000 0 -\n"; exit 0 };
+    print $s "$m $p HTTP/1.1\r\nHost: $h:$port\r\nConnection: close\r\n\r\n"; local $/; my $r = <$s> // ""; my $i = index($r, "\r\n\r\n");
+    if ($i < 0) { print "000 0 -\n"; exit 0 }
+    my $head = substr($r, 0, $i); my $body = length($r) - $i - 4;
+    my ($st) = $head =~ m{^HTTP/\S+ (\d{3})}; my @cc = $head =~ m{^cache-control:\s*([^\r\n]*)}mig;
+    print(($st // "000") . " $body " . (@cc ? join(",", @cc) : "-") . "\n");' "$1" "$2")"
+  RAW_STATUS="${out%% *}"; out="${out#* }"; RAW_BODY="${out%% *}"; RAW_CACHE="${out#* }"
+}
+
+# G1(a) (Cyber A3): the headers every route response carries. route_headers <label> <want Content-Type or empty for a 404>
+# judges the row fetch_row last recorded: exactly that Content-Type on a 200, one nosniff, and no-store in Cache-Control.
+route_headers() {
+  local label="$1" want_type="$2"
+  if [ -n "$want_type" ]; then
+    if [ "$R_TYPE" = "$want_type" ]; then pass "$MODE: $label Content-Type $want_type"; else fail "$MODE: $label Content-Type '${R_TYPE:-none}' (want exactly '$want_type')"; fi
+  fi
+  if [ "$R_NOSNIFF" = "nosniff" ]; then pass "$MODE: $label X-Content-Type-Options: nosniff"; else fail "$MODE: $label X-Content-Type-Options '${R_NOSNIFF:-none}' (want exactly one nosniff)"; fi
+  case ",$R_CACHE," in *no-store*) pass "$MODE: $label Cache-Control has no-store";; *) fail "$MODE: $label Cache-Control '${R_CACHE:-none}' (want no-store)";; esac
+}
 
 # vendor_row <path> <want status> [<sha256 a 200 must match>]: want is 404 (flag off) or 200 (flag on). A 308 to the
 # same-origin canonical path is followed one hop and the hop must give <want>; any other status or Location is a FAIL.
@@ -180,7 +226,8 @@ check_page() {
   fi
 }
 
-if [ "$MODE" = "off" ]; then
+if [ "$MODE" = "off" ] || [ "$MODE" = "static" ]; then
+  # MODE=static runs every row below against the Hosting static layer alone (G1(a), Cyber A7): all must 404.
   for p in \
     /vendor/binjgb/binjgb.wasm /vendor/binjgb/binjgb.js /vendor/binjgb/LICENSE /vendor/binjgb/VENDOR.md \
     /vendor%2Fbinjgb/binjgb.wasm /vendor%2fbinjgb/binjgb.js /vendor/binjgb%2Fbinjgb.js /vendor/binjgb%2fbinjgb.wasm \
@@ -197,6 +244,20 @@ if [ "$MODE" = "off" ]; then
     # G3: with the flag off, every vendor row must end in 404 (after at most one canonical 308 hop); anything else FAILs.
     case "$p" in /play/*) expect_404 "$p" ;; *) vendor_row "$p" 404 ;; esac
   done
+  if [ "$MODE" = "off" ]; then
+    # G1(a) (Cyber A2/A3): flag off, the route's canonical names are the one 404 — empty body, nosniff, no-store.
+    for p in /vendor/binjgb/binjgb.js /vendor/binjgb/binjgb.wasm /vendor/binjgb/LICENSE /vendor/binjgb/x.js; do
+      fetch_row "$p"; record_row "$p (route 404)"
+      if [ "$R_STATUS" = "404" ] && [ "$R_BYTES" = "0" ]; then pass "off: route $p -> 404, empty body"; else fail "off: route $p -> ${R_STATUS:-no response}, $R_BYTES bytes (want 404 with an empty body)"; fi
+      route_headers "route $p" ""
+    done
+    # F3: record the case variants (flag off) for the MODE=on run of the same server to compare against.
+    if [ -n "$CASE_FILE" ]; then
+      : > "$CASE_FILE"
+      for p in $CASE_ROWS; do fetch_row "$p"; printf '%s %s %s\n' "$p" "$R_STATUS" "$R_SHA" >> "$CASE_FILE"; done
+      pass "off: case variants recorded to FEL_GATE_CASE_FILE"
+    fi
+  fi
 else
   if [ -z "$COOKIE" ]; then fail "on: FEL_GATE_COOKIE not set (a LOCAL test adult account's session; C4)"; fi
   check_page /play/gb-shelf shelf
@@ -239,12 +300,22 @@ else
   fi
   h="$(headers /vendor/binjgb/binjgb.js)"; s="$(status_of "$h")"
   if [ "$s" = "200" ]; then pass "on: /vendor/binjgb/binjgb.js -> 200 (flag read at runtime)"; else fail "on: /vendor/binjgb/binjgb.js -> ${s:-no response} (want 200; if this build was started flag-off before, flips need a redeploy)"; fi
-  # G3: the canonical vendor rows, recorded; then odd spellings. The six encoded spellings may only 404, or serve exactly the
+  # G3: the canonical vendor rows, recorded; then odd spellings. The two encoded-letter spellings may only 404, or serve exactly the
   # canonical file's bytes (the flag is on, so that is the same allow-listed file); double-encoded, backslash and
   # dot-segment spellings must 404.
   vendor_row /vendor/binjgb/binjgb.js 200; JS_SHA="$R_SHA"
+  route_headers "route /vendor/binjgb/binjgb.js" "application/javascript; charset=utf-8"
   vendor_row /vendor/binjgb/binjgb.wasm 200; WASM_SHA="$R_SHA"
-  for p in /vendor%2Fbinjgb/binjgb.wasm /vendor%2fbinjgb/binjgb.js /vendor/binjgb%2Fbinjgb.js /vendor/binjgb%2fbinjgb.wasm /%76endor/binjgb/binjgb.js /vendor/%62injgb/binjgb.wasm; do
+  route_headers "route /vendor/binjgb/binjgb.wasm" "application/wasm"
+  # G1(a) (Cyber A2): the allow-list is exact and case-sensitive; the records are never served; an unlisted name is 404.
+  for p in /vendor/binjgb/LICENSE /vendor/binjgb/VENDOR.md /vendor/binjgb/BINJGB.JS /vendor/binjgb/Binjgb.wasm /vendor/binjgb/x.js /vendor/binjgb/binjgb.wasm.map; do
+    vendor_row "$p" 404
+  done
+  # G1(a) (Cyber A5): an encoded slash is refused with the flag on too.
+  for p in /vendor%2Fbinjgb/binjgb.wasm /vendor%2fbinjgb/binjgb.js /vendor/binjgb%2Fbinjgb.js /vendor/binjgb%2fbinjgb.wasm; do
+    vendor_row "$p" 404
+  done
+  for p in /%76endor/binjgb/binjgb.js /vendor/%62injgb/binjgb.wasm; do
     case "$p" in *.wasm) pin="$WASM_SHA" ;; *) pin="$JS_SHA" ;; esac
     fetch_row "$p"; record_row "$p"
     if [ "$R_STATUS" = "404" ]; then pass "on: vendor $p -> 404"
@@ -254,6 +325,25 @@ else
   for p in /vendor%252Fbinjgb/binjgb.js /vendor/binjgb/%2E%2E/binjgb/binjgb.js /vendor/%2e%2e/vendor/binjgb/binjgb.wasm /vendor/binjgb/%5Cbinjgb.js /vendor/binjgb/%252E%252E/binjgb.js; do
     vendor_row "$p" 404
   done
+  # F3 (Cyber review 467aa397): the case variants never reach middleware or the route (case-sensitive matchers), so they
+  # must be 404 with exactly the flag-off status and body sha256 — nothing about them tells the flag's state.
+  # Fetched with no cookie, exactly like the MODE=off record, so a signed-in page chrome can't differ for a reason other than the flag.
+  saved_cookie="$COOKIE"; COOKIE=""
+  for p in $CASE_ROWS; do
+    vendor_row "$p" 404
+    if [ -z "$CASE_FILE" ] || [ ! -s "$CASE_FILE" ]; then fail "on: case $p: no flag-off record (set FEL_GATE_CASE_FILE to the MODE=off run's file)"; continue; fi
+    off="$(awk -v p="$p" '$1 == p { print $2 " " $3 }' "$CASE_FILE")"
+    if [ "$off" = "$R_STATUS $R_SHA" ]; then pass "on: case $p same status and sha256 as flag off ($R_STATUS)"; else fail "on: case $p is '$R_STATUS $R_SHA', flag off was '${off:-none}'"; fi
+  done
+  COOKIE="$saved_cookie"
+  # F3: HEAD gives the headers only; OPTIONS has no body (I-2: and no-store).
+  raw_request HEAD /vendor/binjgb/binjgb.js
+  printf 'INFO  %s\n' "on: HEAD /vendor/binjgb/binjgb.js status=$RAW_STATUS body_bytes=$RAW_BODY cache=$RAW_CACHE"
+  if [ "$RAW_STATUS" = "200" ] && [ "$RAW_BODY" = "0" ]; then pass "on: HEAD /vendor/binjgb/binjgb.js -> 200, 0 body bytes"; else fail "on: HEAD /vendor/binjgb/binjgb.js -> $RAW_STATUS with $RAW_BODY body bytes (want 200, 0)"; fi
+  raw_request OPTIONS /vendor/binjgb/binjgb.js
+  printf 'INFO  %s\n' "on: OPTIONS /vendor/binjgb/binjgb.js status=$RAW_STATUS body_bytes=$RAW_BODY cache=$RAW_CACHE"
+  if [ "$RAW_STATUS" != "000" ] && [ "$RAW_BODY" = "0" ]; then pass "on: OPTIONS /vendor/binjgb/binjgb.js -> $RAW_STATUS, 0 body bytes"; else fail "on: OPTIONS /vendor/binjgb/binjgb.js -> $RAW_STATUS with $RAW_BODY body bytes (want 0)"; fi
+  case ",$RAW_CACHE," in *no-store*) pass "on: OPTIONS Cache-Control has no-store";; *) fail "on: OPTIONS Cache-Control '$RAW_CACHE' (want no-store)";; esac
 fi
 
 if [ "$FAILS" -eq 0 ] && [ "$SKIPS" -gt 0 ]; then echo "RESULT PASS ($MODE, gate $GATE) WITH $SKIPS SKIP - NOT VALID FOR BINJGB_LOCAL_FILE_ENABLED"; exit 0; fi

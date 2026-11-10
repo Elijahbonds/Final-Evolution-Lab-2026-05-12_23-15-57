@@ -4,9 +4,14 @@ The homebrew player's engine. Vendored by hand; no npm package, no CDN, no build
 (Cyber G3, review 067e0dce). Served only while `BINJGB_SHELF_ENABLED` is on: middleware returns 404 for
 `/vendor/binjgb/*` while the flag is off (G10).
 
+G1(a) (Cyber A1/A6, 2026-11-09): these files live in `third_party/binjgb/`, outside `public/`, because Firebase Hosting
+serves `public/` before the function (and so before middleware and the flag) is reached. They are the source copies and
+are not served. What ships is `lib/binjgb/vendor-bytes.server.ts` (the same bytes, base64, bundled into the server only),
+served by `app/vendor/binjgb/[file]/route.ts`; `/credits` shows `LICENSE` verbatim, bundled from this folder.
+
 - Upstream: https://github.com/binji/binjgb
 - Commit: `16621111ed0ee73bcc45c912a823bcebedcffc0f` (committed 2026-09-25 16:59:08Z = 9:59 AM PT Sep 25, 2026)
-- Licence: MIT, Copyright (c) 2016 Ben Smith — the upstream root `LICENSE`, copied verbatim beside these files.
+- Licence: MIT, Copyright (c) 2016 Ben Smith — the upstream root `LICENSE`, copied verbatim beside these files (shown verbatim on `/credits`).
 - Fetched: 2026-11-09 (PT) from raw.githubusercontent.com at the commit above; hashes re-computed on the download and
   matched the pins in the spec and in Cyber's review before the files were added.
 

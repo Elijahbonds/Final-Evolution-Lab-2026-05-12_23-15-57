@@ -25,7 +25,11 @@ describe('middleware: percent-encoded spellings of the static paths count too', 
   it('flag off → 404 for each when middleware sees it; flag read per request (no restart)', () => {
     for (const p of ENCODED) expect(middleware(new NextRequest(`http://fel.test${p}`)).status, p).toBe(404);
     process.env.BINJGB_SHELF_ENABLED = '1';
-    for (const p of ENCODED) expect(middleware(new NextRequest(`http://fel.test${p}`)).headers.get('x-middleware-next'), p).toBe('1');
+    for (const p of ENCODED) {
+      const res = middleware(new NextRequest(`http://fel.test${p}`));
+      if (/%2f/i.test(p)) expect(res.status, p).toBe(404);
+      else expect(res.headers.get('x-middleware-next'), p).toBe('1');
+    }
   });
 });
 

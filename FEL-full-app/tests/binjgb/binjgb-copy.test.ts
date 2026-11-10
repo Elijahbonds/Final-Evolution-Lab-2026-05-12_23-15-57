@@ -50,7 +50,7 @@ describe('T-NO-ROM-SITE-COPY (G5): no ROM-site link or the word "ROM" in UI copy
   const BANNED_HOSTS = ['emuparadise', 'romsmania', 'romspure', 'coolrom', 'vimm.net', 'romhustler', 'archive.org', 'cdromance', 'wowroms', 'romsfun'];
 
   it('no banned host anywhere in the shelf code, copy or vendored notes', () => {
-    const texts = [...sources(SHELF_CODE_DIRS).map(read), read('public/vendor/binjgb/VENDOR.md'), ...allShelfCopy()];
+    const texts = [...sources(SHELF_CODE_DIRS).map(read), read('third_party/binjgb/VENDOR.md'), ...allShelfCopy()];
     for (const t of texts) for (const h of BANNED_HOSTS) expect(t.toLowerCase()).not.toContain(h);
   });
 

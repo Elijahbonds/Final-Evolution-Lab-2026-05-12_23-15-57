@@ -1,7 +1,8 @@
 // lib/binjgb/vendor.ts — BINJGB-SHELF-1: where the vendored player lives and what its bytes must hash to (Cyber G3).
-// The record is public/vendor/binjgb/VENDOR.md; tests/binjgb/binjgb-vendor.test.ts pins both.
+// The record is third_party/binjgb/VENDOR.md (G1(a): outside public/); tests/binjgb/binjgb-vendor.test.ts pins both, and
+// tests/binjgb/binjgb-g1a-route.test.ts pins the bytes app/vendor/binjgb/[file]/route.ts actually serves.
 
-/** Same-origin vendor folder (G5: locateFile points here, never a CDN). 404 while BINJGB_SHELF_ENABLED is off (G10). */
+/** Same-origin vendor URL (G5: locateFile points here, never a CDN), served by a route handler. 404 while BINJGB_SHELF_ENABLED is off (G10). */
 export const BINJGB_VENDOR_PATH = '/vendor/binjgb/';
 export const BINJGB_JS_PATH = '/vendor/binjgb/binjgb.js';
 export const BINJGB_WASM_PATH = '/vendor/binjgb/binjgb.wasm';

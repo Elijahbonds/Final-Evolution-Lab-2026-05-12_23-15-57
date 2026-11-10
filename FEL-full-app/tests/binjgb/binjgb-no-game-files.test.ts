@@ -49,7 +49,7 @@ describe('T-NO-GAME-FILES: the app tree holds no game file of any name', () => {
 
   it('walked the real tree', () => {
     expect(files.length).toBeGreaterThan(1000);
-    expect(files.some((f) => f.endsWith(join('public', 'vendor', 'binjgb', 'binjgb.wasm')))).toBe(true);
+    expect(files.some((f) => f.endsWith(join('third_party', 'binjgb', 'binjgb.wasm')))).toBe(true);
   });
 
   it('(1) no .gb / .gbc / .sgb file anywhere (case-insensitive)', () => {

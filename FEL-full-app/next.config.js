@@ -73,6 +73,12 @@ const nextConfig = {
       },
     ];
 
+    // BINJGB-SHELF-1 G1(a) (Cyber A6): `import x from '…/third_party/binjgb/LICENSE?raw'` bundles that one file as a
+    // string (webpack 5's built-in asset/source; no loader dep). Scoped to the file and the query, so nothing else changes.
+    if (config.module && Array.isArray(config.module.rules)) {
+      config.module.rules.push({ test: /[\\/]third_party[\\/]binjgb[\\/]LICENSE$/, resourceQuery: /^\?raw$/, type: 'asset/source' });
+    }
+
     if (!isServer) {
       config.output.filename = 'static/chunks/[name]-[contenthash:8].js';
       config.output.chunkFilename = 'static/chunks/[contenthash:16].js';

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { isBinjgbShelfEnabled } from './lib/flags';
+import { BINJGB_VENDOR_COMMON_HEADERS } from './lib/binjgb/vendorHttp';
 
 /** Screen paths only — enforced on every matched response (307, 200, RSC). */
 export const SCREEN_PERMISSIONS_POLICY = 'camera=(self), microphone=()';
@@ -53,8 +54,9 @@ export function routePolicyFor(pathname: string): RoutePolicy | null {
 }
 
 /**
- * BINJGB-SHELF-1 (Cyber G10): public/ files skip the flag, so while BINJGB_SHELF_ENABLED is off middleware answers 404
- * for the vendored player and anything under /gb-shelf/ — no wasm, no player script, no game bytes from the live site.
+ * BINJGB-SHELF-1 (Cyber G10): while BINJGB_SHELF_ENABLED is off middleware answers 404 for the vendored player and
+ * anything under /gb-shelf/ — no wasm, no player script, no game bytes from the live site. G1(a): the player is no longer
+ * a public/ file (Hosting served public/ before middleware ran); the route handler serves it and checks the flag too.
  */
 export const SHELF_STATIC_PREFIXES = ['/vendor/binjgb', '/gb-shelf'] as const;
 
@@ -130,6 +132,11 @@ export function isPublicRoute(pathname: string): boolean {
   return (PUBLIC_ROUTE_ALLOWLIST as readonly string[]).includes(path);
 }
 
+/** G1(a) (Cyber A2/A3): the same empty 404 the route sends — no-store, nosniff — so the two layers are indistinguishable. */
+function vendorNotFound(): NextResponse {
+  return new NextResponse(null, { status: 404, headers: { ...BINJGB_VENDOR_COMMON_HEADERS } });
+}
+
 function makeNonce(): string {
   const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);
@@ -195,20 +202,16 @@ function requestCsp(nonce: string, policy: RoutePolicy): string {
 
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
-  // G1(b): odd spellings under /vendor, /play and /gb-shelf are refused before anything else.
-  // HELD (needs an existing-test change, not made): with the flag ON, an encoded slash inside the vendored folder's own
-  // spelling still passes through, because tests/binjgb/binjgb-f6-gate.test.ts:28 pins x-middleware-next for those
-  // spellings with the flag on. It reaches the same public file the canonical path serves (the flag is on); with the flag
-  // OFF every one of them is a 404 here.
-  const rejected = rejectedSpelling(pathname);
-  if (rejected && !(rejected === 'encoded-slash' && isShelfStaticPath(pathname) && isBinjgbShelfEnabled())) {
-    return new NextResponse(null, { status: 404 });
-  }
+  // G1(b): odd spellings under /vendor, /play and /gb-shelf are refused before anything else, flag on or off.
+  // G1(a) (Cyber A5): the flag-on pass-through for an encoded slash inside the vendored folder's spelling is gone; every
+  // rejected spelling is the one vendor 404 (empty, no-store, nosniff).
+  if (rejectedSpelling(pathname)) return vendorNotFound();
   if (isPublicRoute(pathname)) {
     return NextResponse.next();
   }
   if (isShelfStaticPath(pathname)) {
-    return isBinjgbShelfEnabled() ? NextResponse.next() : new NextResponse(null, { status: 404 });
+    // Flag on: the route handler (app/vendor/binjgb/[file]/route.ts) answers; it checks the flag again (two layers).
+    return isBinjgbShelfEnabled() ? NextResponse.next() : vendorNotFound();
   }
   const policy = routePolicyFor(pathname);
   if (!policy) {

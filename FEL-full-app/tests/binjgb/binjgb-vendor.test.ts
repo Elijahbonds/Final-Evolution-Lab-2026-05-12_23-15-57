@@ -8,7 +8,7 @@ import { BINJGB_CREDIT_LINE } from '@/lib/binjgb/copy';
 import { CREDITS, creditForPublicPath, licenceRule, OPEN_LICENCES } from '@/lib/credits/credits';
 import { ROOT } from './helpers';
 
-const DIR = join(ROOT, 'public/vendor/binjgb');
+const DIR = join(ROOT, 'third_party/binjgb');
 const sha256 = (f: string) => createHash('sha256').update(readFileSync(join(DIR, f))).digest('hex');
 
 describe('the vendored files are exactly the pinned ones (G3)', () => {
