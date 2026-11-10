@@ -440,6 +440,12 @@ half of P9 wait for the feel lanes. P8 last (most legal work). The audience orde
   (storage) — a teacher's recording is a new data use, so it needs the Privacy line and the consent clause above; item 4
   (compare); a `motion` block in a course (`lib/teach/course.ts`). Done-when 1 (a squat pattern and an 8-count dance
   phrase recorded on a phone) needs a person and a phone: the takes used are jumps and dunk approaches.
+  Measured on the rig (2026-11-10, `scripts/probes/motion-lesson/{rig,speed}.mts`): the first screen 36 words, 4 font
+  sizes, no sideways scroll, every control ≥ 44 px, 0 accessibility findings; both bodies (the male kit, the owner's scan)
+  with feet planted (slide p90 0.3–3.6 cm a frame); jumps leave the floor (0.22–0.75 m). The every-screen speed budgets
+  on the 4×-slowed phone: first content 0.9 s (≤ 2.5 s, passes), layout shift 0.0001 (≤ 0.02, passes), a tap answered
+  in 0.64–1.16 s (≤ 0.2 s, FAILS on the rig). A 3D frame alone took 150–167 ms there (SwiftShader, a software GPU, on a
+  machine at load ~14); a new clip's build, 130–450 ms, now runs after the tap's frame. Not measured on a real phone.
 
 ### P4. Media layer (M)
 
