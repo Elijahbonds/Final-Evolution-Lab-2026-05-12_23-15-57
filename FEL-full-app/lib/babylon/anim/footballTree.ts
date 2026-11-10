@@ -61,6 +61,15 @@ export const FOOTBALL_CARRY_PACE_MPS = 2.1;
  *  1.4× (0.6 s cycle → 4.7 steps a second, a ball carrier's sprint cadence); the rest of the gap is the clip's short stride, which
  *  is clip work (GATE 0) and is routed, not hidden here. Feel knob `football.carryStrideMax`. */
 export const FOOTBALL_CARRY_RATE_MAX = 1.4;
+/** OWNER CALL (2026-11-10, delegated; recommended option): the hurdle's own way in. The hurdle rides the stiff-arm slot (its
+ *  clip arrives through `moveClip`), so it took that slot's 0.06 s fade: the carry's stride to the jump's tuck in under four
+ *  frames. Measured headless on the hero over 24 carry phases (footballTree.hurdleFade.test): the thigh turns 24-25 deg in ONE
+ *  frame at 0.06 s (the rig read 26 deg in play), 15-17 deg at 0.12 s, 13-15 deg at 0.15 s; the carry's own stride is 6 deg a
+ *  frame, so past ~0.15 s there is little left to win. 0.12 s keeps the tuck inside the first quarter of the 0.5 s hop.
+ *  TUNED (flagged): the hurdle's fade 0.06 -> 0.12 s. Feel knob `football.hurdleFadeSec`; 0.06 is the old blend exactly.
+ *  The juke, the spin and the stiff arm itself keep 0.06 s. */
+export const FOOTBALL_HURDLE_CLIP = 'jump_up';
+export const FOOTBALL_HURDLE_FADE_SEC = 0.12;
 const STRIDE_STATES: ReadonlySet<FootballAnimState> = new Set<FootballAnimState>(['route_run', 'carry', 'truck']);
 
 export interface FootballClipChoice { state: FootballAnimState; clip: string; loop: boolean; fadeSec: number }
@@ -106,6 +115,7 @@ export function chooseFootballClip(i: FootballAnimInput): FootballClipChoice {
   else state = 'presnap_idle';
   const c: FootballClipChoice = { state, ...CLIP_FOR[state] };
   if (i.moveClip && (state === 'juke' || state === 'spin' || state === 'stiff_arm')) c.clip = i.moveClip;
+  if (state === 'stiff_arm' && c.clip === FOOTBALL_HURDLE_CLIP) c.fadeSec = feel('football.hurdleFadeSec', FOOTBALL_HURDLE_FADE_SEC);
   return c;
 }
 

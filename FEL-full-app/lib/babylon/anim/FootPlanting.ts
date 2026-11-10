@@ -120,6 +120,19 @@ export const RELEASE_FADE_SEC = 0.1;
  * curve and its release fade are unchanged.
  */
 export const PLANT_ENGAGE_SEC = 0.1;
+/**
+ * GAMEPLAY-CLEAN P4 (2026-11-03): THE RELEASE EASES IN ROTATION, feel knob `anim.plantReleaseSec` (default RELEASE_FADE_SEC's 0.1 s).
+ *
+ * A let-go pin faded by moving its TARGET from the pin back onto the clip's ankle over RELEASE_FADE_SEC, each frame a full solve to
+ * that target. When the release comes with a jump in the clip or the root — a take-off (the root rising past AIRBORNE_VY lifts every
+ * pin), a landing that drops the root 0.36 m in a frame, the TD spike cutting the hurdle, a get-up off the floor — the solve to a
+ * target the new pose no longer reaches rebuilt the leg in one frame: Football Rush's thighs 41–70° a frame there (29° with the
+ * planter off). Now the leg lets go in ROTATION: the hip and knee the layer last wrote are held and slerped onto the clip's over
+ * this long, so a release can never move the leg more than the clip itself plus 1/this of the gap a frame. 0 = the old target fade
+ * exactly. The engage (anim.plantEngageSec), the pin and its weight are unchanged.
+ */
+export const PLANT_RELEASE_SEC = RELEASE_FADE_SEC;
+
 /** The solve's engage weight one frame on (pure): toward 1 while the layer solves the leg, toward 0 when it stops, at 1/`sec` a second
  *  — a hard step at `sec` ≤ 0 (the old behaviour). */
 export function stepEngage(w: number, solving: boolean, dt: number, sec: number): number {
@@ -227,14 +240,17 @@ export function mountFootPlanting(scene: Scene, skinned: AbstractMesh, skeleton:
   type Leg = { side: Side; hip: TransformNode; knee: TransformNode; ankle: TransformNode; pinLocal: Vector3; rootAtPlant: Vector3;
     prevClip: Vector3 | null; prevRoot: Vector3 | null; fadeLeft: number; fadeW: number; fadeTarget: Vector3; claimPin: Vector3 | null;
     /** P3: the solve's engage weight (stepEngage). */
-    engage: number };
+    engage: number;
+    /** P4: the hip / knee rotations the layer wrote last (and on which frame), and a rotation release in flight (held pose, time left). */
+    outHip: Quaternion; outKnee: Quaternion; outFrame: number; relHip: Quaternion; relKnee: Quaternion; relLeft: number };
   const legs: Leg[] = [];
   for (const side of ['Left', 'Right'] as Side[]) {
     const hip = bone(skeleton, `${side}UpLeg`)?.getTransformNode() ?? null;
     const knee = bone(skeleton, `${side}Leg`)?.getTransformNode() ?? null;
     const ankle = bone(skeleton, `${side}Foot`)?.getTransformNode() ?? null;
     if (!hip || !knee || !ankle) continue;
-    legs.push({ side, hip, knee, ankle, pinLocal: new Vector3(), rootAtPlant: new Vector3(), prevClip: null, prevRoot: null, fadeLeft: 0, fadeW: 0, fadeTarget: new Vector3(), claimPin: null, engage: 0 });
+    legs.push({ side, hip, knee, ankle, pinLocal: new Vector3(), rootAtPlant: new Vector3(), prevClip: null, prevRoot: null, fadeLeft: 0, fadeW: 0, fadeTarget: new Vector3(), claimPin: null, engage: 0,
+      outHip: new Quaternion(), outKnee: new Quaternion(), outFrame: -2, relHip: new Quaternion(), relKnee: new Quaternion(), relLeft: 0 });
   }
   if (legs.length === 0) return { dispose() { /* no legs */ }, debug };
 
@@ -242,6 +258,7 @@ export function mountFootPlanting(scene: Scene, skinned: AbstractMesh, skeleton:
   // the scratches below instead of fresh clones and literals (the same values, the same arithmetic); the legs loop is indexed.
   // A contact state still changes object only when stepContact makes a new one, as before.
   const target = new Vector3(), pole = new Vector3();
+  let frameNo = 0;   // P4: the layer's own frame count (a release holds only a pose written on the frame before)
   const rootPos = new Vector3(), ankle = new Vector3(), rel = new Vector3();
   const rootRot = new Quaternion(), rootInv = new Quaternion();
   const rootStepS = { x: 0, z: 0 }, relStep = { x: 0, z: 0 }, ankleXYZ = { x: 0, y: 0, z: 0 };
@@ -251,6 +268,8 @@ export function mountFootPlanting(scene: Scene, skinned: AbstractMesh, skeleton:
     rootRot.copyFrom(opts.root.absoluteRotationQuaternion);
     const dt = Math.min(0.1, Math.max(1e-4, scene.getEngine().getDeltaTime() / 1000));
     const engageSec = feel('anim.plantEngageSec', PLANT_ENGAGE_SEC);
+    const releaseSec = feel('anim.plantReleaseSec', PLANT_RELEASE_SEC);
+    frameNo++;
     for (let li = 0; li < legs.length; li++) {
       const leg = legs[li];
       leg.ankle.computeWorldMatrix(true);
@@ -267,7 +286,7 @@ export function mountFootPlanting(scene: Scene, skinned: AbstractMesh, skeleton:
       // frame on a hard jump, 25 with this, _movement-probe). The root rising or falling faster than AIRBORNE_VY lifts every pin (with the release fade).
       const flying = !!pr && Math.abs(rootPos.y - pr.y) / dt > AIRBORNE_VY;
       leg.prevClip = pc ?? new Vector3(); leg.prevClip.copyFrom(ankle); leg.prevRoot = pr ?? new Vector3(); leg.prevRoot.copyFrom(rootPos);
-      if (jumped) { debug[leg.side === 'Left' ? 'left' : 'right'] = { planted: false, pin: { x: ankle.x, y: ankle.y, z: ankle.z } }; leg.fadeLeft = 0; leg.claimPin = null; leg.engage = 0; continue; }   // a teleport: nothing to hold
+      if (jumped) { debug[leg.side === 'Left' ? 'left' : 'right'] = { planted: false, pin: { x: ankle.x, y: ankle.y, z: ankle.z } }; leg.fadeLeft = 0; leg.claimPin = null; leg.engage = 0; leg.relLeft = 0; continue; }   // a teleport: nothing to hold
       const key = leg.side === 'Left' ? 'left' : 'right';
       const prev = debug[key];
       let next: ContactState;
@@ -276,7 +295,7 @@ export function mountFootPlanting(scene: Scene, skinned: AbstractMesh, skeleton:
       debug[key] = next;
       // S30: a claimed leg is the claimant's (the contact state above still reads the clip); the claim's end hands the foot over from its pin
       const claim = legClaims.get(skeleton)?.get(leg.side);
-      if (claim) { (leg.claimPin ??= new Vector3()).copyFrom(claim); leg.fadeLeft = 0; leg.engage = 1; continue; }   // (the claimant solves the leg, its knee to the forward: the hand-over carries on from there)
+      if (claim) { (leg.claimPin ??= new Vector3()).copyFrom(claim); leg.fadeLeft = 0; leg.engage = 1; leg.relLeft = 0; continue; }   // (the claimant solves the leg, its knee to the forward: the hand-over carries on from there)
       let handover = false;
       if (leg.claimPin) {
         handover = true;
@@ -285,6 +304,18 @@ export function mountFootPlanting(scene: Scene, skinned: AbstractMesh, skeleton:
         leg.claimPin = null;
       }
       if (!next.planted) {
+        // P4: let go in ROTATION — the leg the layer wrote last frame, slerped onto the clip's (PLANT_RELEASE_SEC)
+        if (prev.planted && !handover && releaseSec > 0 && leg.outFrame === frameNo - 1) {
+          leg.relHip.copyFrom(leg.outHip); leg.relKnee.copyFrom(leg.outKnee); leg.relLeft = releaseSec; leg.fadeLeft = 0; leg.engage = 0;
+        }
+        if (leg.relLeft > 0) {
+          leg.relLeft = Math.max(0, leg.relLeft - dt);
+          const k = releaseSec > 0 ? 1 - leg.relLeft / releaseSec : 1;
+          Quaternion.SlerpToRef(leg.relHip, leg.hip.rotationQuaternion!, k, leg.hip.rotationQuaternion!);
+          Quaternion.SlerpToRef(leg.relKnee, leg.knee.rotationQuaternion!, k, leg.knee.rotationQuaternion!);
+          leg.hip.computeWorldMatrix(true); leg.knee.computeWorldMatrix(true); leg.ankle.computeWorldMatrix(true);
+          continue;
+        }
         // let go by the clip: the pin FADES instead of dropping — a planted foot the clip lifts or swings eases onto the clip
         if (prev.planted && !handover) leg.fadeLeft = RELEASE_FADE_SEC;
         if (leg.fadeLeft > 0 && leg.fadeW > 0.001) {
@@ -296,7 +327,7 @@ export function mountFootPlanting(scene: Scene, skinned: AbstractMesh, skeleton:
         solveEngaged(leg, ankle, false, dt, engageSec);
         continue;
       }
-      leg.fadeLeft = 0;
+      leg.fadeLeft = 0; leg.relLeft = 0;   // (P4: a foot that plants again ends a release in flight)
       if (!prev.planted && !handover) {
         // touchdown: remember where the foot is, in the root's frame
         leg.rootAtPlant.copyFrom(rootPos);
@@ -321,6 +352,7 @@ export function mountFootPlanting(scene: Scene, skinned: AbstractMesh, skeleton:
     if (leg.engage <= 0.001) return;
     if (to !== target) target.copyFrom(to);
     plantLeg(leg.hip, leg.knee, leg.ankle, target, engagePole(leg, opts.root.forward, leg.engage, pole), 1);
+    leg.outHip.copyFrom(leg.hip.rotationQuaternion!); leg.outKnee.copyFrom(leg.knee.rotationQuaternion!); leg.outFrame = frameNo;   // P4: what a release holds
   }
   return {
     debug,

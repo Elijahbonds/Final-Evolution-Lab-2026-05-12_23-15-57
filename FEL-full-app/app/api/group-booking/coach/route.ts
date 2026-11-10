@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import { currentUserId, bad } from '@/lib/camp/server';
 import { coachAct, coachBoard, coachRoster, type GroupDb } from '@/lib/group-booking/server';
+import { sellerAgeGate } from '@/lib/seller/server';
 
 /**
  * GROUP-BOOKING: the coach's groups (the business owner, or one of their active trainers for the groups they run).
@@ -14,6 +15,9 @@ import { coachAct, coachBoard, coachRoster, type GroupDb } from '@/lib/group-boo
 export async function GET(req: NextRequest) {
   const userId = await currentUserId();
   if (!userId) return bad('unauthorized', 401);
+  // SELLER-18-1 (S-2): the owner and trainers take money — with SELLER_ADULT_GATE_ENABLED on they must be verified adults.
+  const seller = await sellerAgeGate(userId, 'group_booking');
+  if (seller) return seller;
   const slot = req.nextUrl.searchParams.get('slot');
   const db = prisma as unknown as GroupDb;
   const r = slot ? await coachRoster(db, userId, slot) : await coachBoard(db, userId);
@@ -23,6 +27,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const userId = await currentUserId();
   if (!userId) return bad('unauthorized', 401);
+  const seller = await sellerAgeGate(userId, 'group_booking');
+  if (seller) return seller;
   const r = await coachAct(prisma as unknown as GroupDb, userId, await req.json().catch(() => null));
   return NextResponse.json(r.body, { status: r.status });
 }

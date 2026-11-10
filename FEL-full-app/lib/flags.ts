@@ -190,3 +190,14 @@ export function demoModelFlagsFromEnv(): DemoModelFlags {
     crowdForgeFront: isCrowdForgeFrontEnabled(),
   };
 }
+
+/**
+ * SELLER-18-1 (Cyber BOOK-SIGNOFF S-2; PM 2026-11-09) — the seller-side 18+ gate (lib/seller/canSell.ts). Default OFF:
+ * every seller surface behaves as it does today and nothing is taken down; sellers with no birth year only see a prompt to
+ * add one. ON: selling needs the role AND a verified adult by the database birth year (unknown age refused), and a seller
+ * found to be under 18 is taken down with payouts frozen. Switching it on needs Elijah's own words.
+ */
+export function isSellerAdultGateEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  const v = (env.SELLER_ADULT_GATE_ENABLED ?? '').trim().toLowerCase();
+  return v === '1' || v === 'true' || v === 'on' || v === 'yes';
+}
