@@ -7,6 +7,9 @@
 //   PARTIAL CLIPS: a node the current clip does not key (the authored `guard` keys 7 bones) went unrecorded, so the next clip that
 //     keys it found no fresh pose and applied no offset (jab → guard → guard step: the right leg 35.7° in one frame). Every tracked
 //     node is recorded every frame now.
+//   UNTRACKED NODES (clean-6): a node got a track only once a clip keying it was current, so a body that had only shown clips that
+//     leave it alone (the authored idle and guard key 7 bones each) switched it with no offset (guard → the high kick: the right
+//     knee 68.4° in one frame; linear 17.5°). Every node any of the body's clips keys is tracked from the first inertial frame.
 // Linear (the shipped default) is untouched: nothing here runs unless a body is in inertial mode.
 import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -35,8 +38,8 @@ const pose = () => BONES.map((b) => (boneNode(sk, b)?.rotationQuaternion ?? Quat
 type Step = [string, { loop?: boolean; fadeSec: number }, number];
 const cur = () => (A as unknown as { currentName: string }).currentName;
 /**
- * Play the steps in `mode` after a warm-up on `idle_stand` (it keys every bone; a mode sets the blend at spawn, so the blend has a pose
- * history). Returns the largest one-frame turn of each bone in the frames `window` picks (frame index, the clip now current).
+ * Play the steps in `mode` after a warm-up on `idle_stand` (a mode sets the blend at spawn, so the blend has a pose history; it keys 7
+ * rotations, like the guard). Returns the largest one-frame turn of each bone in the frames `window` picks (frame index, the clip now current).
  */
 function turns(steps: Step[], mode: 'linear' | 'inertial', window: (f: number, clip: string, prevClip: string) => boolean): Record<string, number> {
   A.setBlendMode('linear'); A.setBlendMode(mode); A.play('idle_stand', { loop: true, fadeSec: 0, restart: true }); for (let i = 0; i < 20; i++) scene.render();
@@ -79,6 +82,17 @@ describe('the inertial blend: a clip that keys fewer bones in between (PARTIAL C
     const lin = turns(steps, 'linear', (f) => f >= 21 && f <= 26);
     expect(inert.RightLeg, JSON.stringify(inert)).toBeLessThan(5);
     expect(inert.all, `inertial ${inert.all.toFixed(1)}°, linear ${lin.all.toFixed(1)}°`).toBeLessThan(lin.all);
+  }, 60_000);
+});
+
+describe('the inertial blend: a node no clip shown so far has keyed (UNTRACKED NODES)', () => {
+  it('idle → guard → the high kick: the right knee turns under 20° a frame on the switch (68.4° before clean-6; linear 17.5°)', () => {
+    const steps: Step[] = [['guard', { loop: true, fadeSec: 0.2 }, 30], ['karate_mc_high_kick', { fadeSec: 0.06 }, 14]];
+    const inert = turns(steps, 'inertial', (f) => f >= 29 && f <= 36);
+    const lin = turns(steps, 'linear', (f) => f >= 29 && f <= 36);
+    expect(lin.RightLeg, JSON.stringify(lin)).toBeGreaterThan(5);   // the window holds the kick's start
+    expect(inert.RightLeg, JSON.stringify(inert)).toBeLessThan(20);
+    expect(inert.RightLeg, `inertial ${inert.RightLeg.toFixed(1)}°, linear ${lin.RightLeg.toFixed(1)}°`).toBeLessThanOrEqual(lin.RightLeg);
   }, 60_000);
 });
 

@@ -117,6 +117,8 @@ export class CharacterAnimator {
   private inertialTargets = new Map<AnimationGroup, InertialTarget[]>();
   private inertialHistDt = 0;
   private inertialFrameNo = 0;
+  /** GAMEPLAY-CLEAN P6, UNTRACKED NODES: every node any of this body's clips keys has a track (built once per registration change). */
+  private inertialAllTracked = false;
 
   constructor(private scene: Scene, groups: AnimationGroup[]) {
     for (const g of groups) this.register(g);
@@ -126,6 +128,7 @@ export class CharacterAnimator {
     g.stop();
     this.groups.set(g.name, g);
     this.names = null;
+    this.inertialAllTracked = false;   // P6: a clip registered later brings nodes to track (UNTRACKED NODES)
   }
 
   /**
@@ -525,6 +528,7 @@ export class CharacterAnimator {
       this.animBeginObs?.remove(); this.animBeginObs = null; this.inAnimate = false;
       this.inertialCut();
       this.inertialTracks.clear();
+      this.inertialAllTracked = false;
     }
   }
 
@@ -577,6 +581,14 @@ export class CharacterAnimator {
     const dt = inertialDt(this.scene.getEngine().getDeltaTime() / 1000, this.scene.animationTimeScale);
     const targets = this.inertialTargetsOf(cur);
     const frame = ++this.inertialFrameNo;
+    // P6, UNTRACKED NODES: a node gets a pose history only once a clip that keys it is current — so the first clip that keys it found
+    // none and switched to its pose with no offset. A body that spawns into the authored `guard` (7 bones) and throws the high kick
+    // turned the right knee 68.4° in one frame on the hero (linear: 17.5°); the rig saw it in carnival (46.4°). Every node any of
+    // this body's clips keys is tracked from the first inertial frame, so the PARTIAL CLIPS record below keeps all of them fresh.
+    if (!this.inertialAllTracked) {
+      this.inertialAllTracked = true;
+      this.groups.forEach((g) => { for (const { n } of this.inertialTargetsOf(g)) this.inertialTrack(n); });
+    }
     const sw = this.inertialSwitch;
     const late = !!sw?.defer;
     if (sw && late) sw.defer = false;   // P6: LATE SWITCH — captured on the next frame; this frame decays and records as usual
