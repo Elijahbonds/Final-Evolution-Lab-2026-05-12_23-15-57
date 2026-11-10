@@ -44,6 +44,7 @@ interface Answer {
 
 const CHIP = 'inline-flex min-h-11 items-center gap-1 rounded-full border px-3';
 
+// EVERY-SCREEN P3: the − and + are 44 px wide (they were 36: under the tap-target floor)
 function ChipControl({ c, onEdit, busy }: { c: ProgramChip; onEdit: (f: RequestField, v: string | number) => void; busy: boolean }) {
   const [open, setOpen] = useState(false);
   const tone = c.assumed ? 'border-white/15 bg-white/[0.04] text-fel-soft' : 'border-fel-cyan/40 bg-fel-cyan/[0.12] text-fel-cyan';
@@ -51,9 +52,9 @@ function ChipControl({ c, onEdit, busy }: { c: ProgramChip; onEdit: (f: RequestF
     const s = c.step;
     return (
       <span data-chip={c.field} className={`${CHIP} ${TYPE.label} ${tone} gap-0 px-1`}>
-        <button type="button" aria-label={`Fewer: ${c.label}`} disabled={busy || s.value <= s.min} onClick={() => onEdit(c.field, s.value - s.by)} className="grid h-11 w-9 place-items-center disabled:opacity-30"><Minus className="h-4 w-4" /></button>
+        <button type="button" aria-label={`Fewer: ${c.label}`} disabled={busy || s.value <= s.min} onClick={() => onEdit(c.field, s.value - s.by)} className="grid h-11 w-11 place-items-center disabled:opacity-30"><Minus className="h-4 w-4" /></button>
         <span className="px-1">{c.label}</span>
-        <button type="button" aria-label={`More: ${c.label}`} disabled={busy || s.value >= s.max} onClick={() => onEdit(c.field, s.value + s.by)} className="grid h-11 w-9 place-items-center disabled:opacity-30"><Plus className="h-4 w-4" /></button>
+        <button type="button" aria-label={`More: ${c.label}`} disabled={busy || s.value >= s.max} onClick={() => onEdit(c.field, s.value + s.by)} className="grid h-11 w-11 place-items-center disabled:opacity-30"><Plus className="h-4 w-4" /></button>
       </span>
     );
   }

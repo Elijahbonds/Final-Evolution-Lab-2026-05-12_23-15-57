@@ -546,6 +546,12 @@ export function buildProgram(input: BuildInput): BuiltProgram {
       if (!noTempo.has(t.key) && steps.some((x) => x.tempo)) { noTempo.add(t.key); continue; }
       if (!noBump.has(t.key) && t.blocks.some((b) => b.items.some((i) => i.key))) { noBump.add(t.key); continue; }
       if (movePull(t, all.filter((i) => slotWeight(i.slot, 'pull') > 0 && !i.key && left(i) > 1).sort((a, b) => order(a) - order(b) || left(b) - left(a)))) continue;
+      // and last, an accessory (arms, rear delts, calves) leaves this day, while pulling stays at or above pushing
+      const extra = all.filter((i) => ACCESSORY.has(i.wanted) && !i.key).find((i) => {
+        const occ = occurrences.filter((o) => o === t).length;
+        return weekVol('pull') - slotWeight(i.slot, 'pull') * left(i) * occ >= weekVol('push') - slotWeight(i.slot, 'push') * left(i) * occ;
+      });
+      if (extra) { removeItem(extra); continue; }
       break;
     }
     // room to spare: more work first — a set at a time on the main lifts, while every group stays inside its range

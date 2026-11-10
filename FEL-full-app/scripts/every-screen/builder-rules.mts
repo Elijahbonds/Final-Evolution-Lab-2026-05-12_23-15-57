@@ -6,32 +6,36 @@
 // Read only: it calls the builder as the server does (lib/program-ask/build.ts buildProgram) and prints each rule's
 // failures, grouped, with one example request each.
 //
-//   npx tsx scripts/every-screen/builder-rules.mts [--minutes=20,45,75] [--examples=3]
+//   npx tsx scripts/every-screen/builder-rules.mts [--minutes=20,45,75] [--goals=full-body,…] [--weeks=4] [--examples=3] [--list=failing.tsv]
+//   (one goal at one length is ~240 builds: under the 3-minute short lane)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const load = async (p: string): Promise<any> => { const m = await import(p); return { ...(m.default ?? {}), ...m }; };
 const { loadLibraryFiles } = await load('@/lib/library/files');
-const { buildProgram } = await load('@/lib/program-ask/build');
-const { builderRuleFailures } = await load('@/lib/program-ask/rules24');
+const { buildKept } = await load('@/lib/program-ask/kept');
 
 const flag = (k: string) => process.argv.find((a) => a.startsWith(`--${k}=`))?.split('=')[1];
 const MINUTES = (flag('minutes') ?? '20,45,75').split(',').map(Number);
 const EXAMPLES = Number(flag('examples') ?? 2);
+const WEEKS = Number(flag('weeks') ?? 4);
 const LIB = loadLibraryFiles();
-const GOALS = ['full-body', 'strength', 'muscle', 'conditioning', 'athletic', 'mobility', 'sport'];
+const GOALS = (flag('goals') ?? 'full-body,strength,muscle,conditioning,athletic,mobility,sport').split(',');
 const KITS: string[][] = [[], ['band'], ['dumbbell'], ['barbell', 'dumbbell', 'kettlebell', 'cable', 'machine', 'pull-up-bar', 'bench', 'box', 'band', 'trap-bar']];
 
 let builds = 0, failed = 0, crashed = 0;
+const longer = new Map<number, number>();
 const byRule = new Map<string, { n: number; examples: string[] }>();
 const byCat = new Map<string, number>();
 const failing: string[] = [];
 for (const minutes of MINUTES) for (const goal of GOALS) for (const level of ['beginner', 'intermediate', 'advanced']) for (const age of ['adult', 'teen', 'child'])
   for (const equipment of KITS) for (const days of [2, 3, 4, 5, 6]) for (const jumpsOpen of age === 'adult' ? [false, true] : [false]) {
-    const request = { equipment, tension: null, bands: [], goal, sport: goal === 'sport' ? 'basketball' : null, days, minutes, level, weeks: 4, age, lowLoad: [] };
+    const request = { equipment, tension: null, bands: [], goal, sport: goal === 'sport' ? 'basketball' : null, days, minutes, level, weeks: WEEKS, age, lowLoad: [] };
     const label = `${goal} ${level} ${age} [${equipment.join(',') || 'none'}] ${days}d ${minutes}min${jumpsOpen ? ' jumps' : ''}`;
     let fails: string[];
     try {
-      const p = buildProgram({ request, library: LIB, jumpsOpen });
-      fails = builderRuleFailures(p, LIB, { jumpsOpen });
+      // as the server builds it: the request, or the nearest longer one that keeps every rule (lib/program-ask/kept.ts)
+      const k = buildKept({ request, library: LIB, jumpsOpen });
+      fails = k.failures;
+      if (k.longer) longer.set(k.longer, (longer.get(k.longer) ?? 0) + 1);
     } catch (e) { crashed++; fails = [`crash: ${String(e).slice(0, 120)}`]; }
     builds++;
     if (builds % 250 === 0) process.stderr.write(`${builds} built, ${failed} failing so far\n`);
@@ -44,12 +48,12 @@ for (const minutes of MINUTES) for (const goal of GOALS) for (const level of ['b
       byRule.set(rule, g);
     }
   }
-console.log(`${builds} builds, ${failed} with a failure, ${crashed} crashed`);
+console.log(`${builds} builds, ${failed} with a failure, ${crashed} crashed; ${[...longer.entries()].map(([m, n]) => `${n} built ${m} minutes longer than asked`).join(', ') || 'none longer than asked'}`);
 console.log(`builds failing each rule: ${[...byCat.entries()].map(([k, n]) => `${k} ${n}`).join(', ')}`);
 for (const [rule, g] of [...byRule.entries()].sort((a, b) => b[1].n - a[1].n)) {
   console.log(`${String(g.n).padStart(5)}  ${rule}`);
   for (const x of g.examples) console.log(`         ${x}`);
 }
 const out = flag('list');
-if (out) (await import('node:fs')).writeFileSync(out, failing.join('\n') + '\n');
+if (out) (await import('node:fs')).appendFileSync(out, failing.map((x) => `${x}\n`).join(''));
 process.exit(failed ? 1 : 0);

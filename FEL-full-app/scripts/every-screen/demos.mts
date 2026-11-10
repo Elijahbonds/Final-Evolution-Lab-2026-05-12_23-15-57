@@ -127,7 +127,7 @@ for (const t of TEMPLATES) {
 
 // ── builder ──────────────────────────────────────────────────────────────────────────────────────────────────────
 const GOALS: ProgramGoal[] = ['full-body', 'strength', 'muscle', 'conditioning', 'athletic', 'mobility', 'sport'];
-const KITS: string[][] = [[], ['resistance-band'], ['dumbbell'], ['barbell', 'dumbbell', 'kettlebell', 'cable', 'machine', 'pull-up-bar', 'bench', 'box', 'resistance-band', 'trap-bar']];
+const KITS: string[][] = [[], ['band'], ['dumbbell'], ['barbell', 'dumbbell', 'kettlebell', 'cable', 'machine', 'pull-up-bar', 'bench', 'box', 'band', 'trap-bar']];
 let builds = 0, buildFails = 0;
 for (const goal of GOALS) for (const level of ['beginner', 'intermediate', 'advanced'] as const) for (const age of ['adult', 'teen', 'child'] as AgeBand[])
   for (const equipment of KITS) for (const days of [2, 3, 4, 5, 6]) for (const jumpsOpen of age === 'adult' ? [false, true] : [false]) {

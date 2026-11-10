@@ -8,6 +8,8 @@
 import { describe, expect, it } from 'vitest';
 import { loadLibraryFiles } from '@/lib/library/files';
 import { buildProgram } from './build';
+import { LONGER_THAN_ASKED } from './copy';
+import { buildKept } from './kept';
 import { readProgramAsk } from './request';
 import { builderRuleFailures } from './rules24';
 import type { BuiltProgram, ProgramRequest } from './types';
@@ -85,6 +87,22 @@ describe('the five rules each catch a planted break (on a program that passes th
   });
 });
 
+describe('a request the builder cannot fit as asked gets the nearest one that keeps every rule, said so (./kept.ts)', () => {
+  it('a 20-minute muscle plan with no kit, two days, intermediate: built 25 or 30 minutes long, and the plan says why', () => {
+    const request = { ...readProgramAsk('No equipment, build muscle, 2 days a week, 20 minutes, intermediate.').request };
+    expect(builderRuleFailures(buildProgram({ request, library: LIB }), LIB, { jumpsOpen: false }).length).toBeGreaterThan(0);
+    const k = buildKept({ request, library: LIB });
+    expect(k.failures).toEqual([]);
+    expect(k.longer).toBeGreaterThan(0);
+    expect(k.program.notes[0]).toMatch(/^These sessions run about (25|30) minutes, not 20: /);
+  });
+  it('a request that fits is built exactly as asked, with no such line', () => {
+    const k = buildKept({ request: readProgramAsk(ASKS24[0].q).request, library: LIB });
+    expect(k.longer).toBe(0);
+    expect(k.program.notes.join(' ')).not.toMatch(/These sessions run about/);
+  });
+});
+
 describe('the 24 asks, read as typed and built as the server builds them', () => {
   for (const a of ASKS24) {
     it(a.q, () => {
@@ -97,8 +115,11 @@ describe('the 24 asks, read as typed and built as the server builds them', () =>
         return;
       }
       expect(read.injury.flagged).toBe(false);
-      const p = buildProgram({ request: read.request, library: LIB, jumpsOpen: a.jumps });
+      const { program: p, longer } = buildKept({ request: read.request, library: LIB, jumpsOpen: a.jumps });
       expect(builderRuleFailures(p, LIB, { jumpsOpen: !!a.jumps })).toEqual([]);
+      // the asked length, or (said on the plan) the nearest longer one that keeps every rule
+      if (longer) expect(p.notes[0]).toBe(LONGER_THAN_ASKED(read.request.minutes, read.request.minutes + longer));
+      else expect(p.request.minutes).toBe(read.request.minutes);
       // and the plan is a real one: every exercise is a library entry
       for (const i of items(p)) expect(byId.get(i.exId)?.name).toBe(i.name);
     });

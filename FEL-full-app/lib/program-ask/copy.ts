@@ -123,3 +123,7 @@ export function felWhy(r: ProgramRequest, splitWords: string): string {
   };
   return `${splitWords}: ${goal[r.goal]}. Pairs alternate a lower and an upper move, so one rests while the other works and the session fits your ${r.minutes} minutes. Pulling is kept at least equal to pushing.`;
 }
+
+/** EVERY-SCREEN P3: the plan needed longer sessions than asked to keep every rule (./kept.ts). Plain words, no dose. */
+export const LONGER_THAN_ASKED = (asked: number, got: number): string =>
+  `These sessions run about ${got} minutes, not ${asked}: ${asked} minutes was too short for the warm-up and every movement this plan covers. Ask for fewer days of more minutes, or a lighter goal, to change it.`;
