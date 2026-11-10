@@ -52,6 +52,7 @@ const DIRS = arg('--dirs', 'left,right,back,fwd,backleft,fwdleft').split(',');
 const OVERS = arg('--over', 'none,hand_up,steal,block').split(',');
 const SEC = Number(arg('--sec', '2.5'));
 const TRACE = arg('--trace', '');
+const MAN_M = Number(arg('--man', '3.0'));   // how far ahead the man is (m): 0.9-2.6 with travel at him is a closeout
 // --ref state=mps[,state=mps]: a calibration sweep's stride reference for a state (the bench only: it writes into this process's copy of
 // StrideMatch's captured table) — which reference plants the loop's feet best at a speed
 { const refs = arg('--ref', ''); if (refs) { const SM = un(await import(APP + '/lib/babylon/core/StrideMatch.ts')); const by = SM.HOOPS_STRIDE_CAPTURE.byState as Record<string, number>; for (const kv of refs.split(',')) { const [k, v] = kv.split('='); if (k === 'slide') (SM.HOOPS_STRIDE_CAPTURE as { slide: number }).slide = Number(v); else by[k] = Number(v); } } }
@@ -95,7 +96,7 @@ async function run(over: string, dir: string, speed: number): Promise<Row> {
   const lf = boneNode(sk, 'LeftFoot')!, rf = boneNode(sk, 'RightFoot')!;
   const [bx, bz] = DIR[dir]; const yaw = 0;   // facing +z: body-right is +x
   const vel = new Vector3(bx * speed, 0, bz * speed);
-  const man = () => new Vector3(root.position.x, 0, root.position.z + 3.0);   // 3 m ahead, always: the chest stays on him
+  const man = () => new Vector3(root.position.x, 0, root.position.z + MAN_M);   // MAN_M ahead, always: the chest stays on him
   const feet: number[][] = []; const stateCount: Record<string, number> = {};
   // the rig's POPS on the lower body and the spine (page.js analyse: a bone's local turn >= 600 deg/s, >= 3.5x the median of the 6 frames
   // either side (floored at 60) and >= 3x the speed 3 frames away; severe >= 3000)
