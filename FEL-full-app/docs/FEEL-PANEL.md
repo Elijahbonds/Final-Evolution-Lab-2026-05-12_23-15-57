@@ -438,6 +438,21 @@ yet.
   the leg in one frame when the root or the clip jumped on that frame (Football Rush's hurdle and TD spike: thighs 41 to 70 degrees a
   frame). 0 = the old target fade exactly.
 
+- Same group (`anim/FootPlanting.ts`, lane/gameplay-clean-5), **NEW (on / off, no tuned number)**: `anim.plantReplantEase` 1. A foot
+  that plants again while its leg is still easing off the last plant keeps easing (the release carries on under the new plant). The
+  clean-4 release ended on the spot at a replant and the leg snapped the rest of the way in one frame: a body sliding in a stance let
+  each foot go at the drift limit and took it straight back, so a thigh jumped about 33 degrees at every replant (measured headless,
+  `FootPlanting.replant.test.ts`; 6 degrees with the clean-4 release off). 0 = a replant ends the release at once, exactly as before.
+  Feel-check: Showdown or Karate, walk and strafe in guard; watch the knees.
+
+- Same group (`anim/CharacterAnimator.ts`, lane/gameplay-clean-5), **NEW (on / off, no tuned number)**: `anim.fadeHoldEnded` 1. A
+  one-shot move (a strike, a hit react) that reaches its last frame while it is still blending out is held on that frame until the
+  blend ends. Before, it stopped mid-blend, the weight it still had was gone in one frame, and the body jumped toward a stale pose:
+  Showdown's hit react into guard moved the arms 21 to 30 degrees and the thighs 22 to 25 in one frame, every time (the rig); on the
+  hero headless 33 degrees, now 16, no worse than the blend around it (`CharacterAnimator.fadeHold.test.ts`). 0 = the old behaviour
+  exactly. No blend time changed. This is the shared animator: every mode's moves blend out through it, the hoops modes included.
+  Feel-check: Showdown, take a hit and watch the body come back to guard.
+
 **assumption:** the bounds (0 to 0.4 s) are safe, not tuned. A ranked, staked or head-to-head run reads the defaults.
 
 ## Owner calls, 2026-11-10 (delegated: "handle those 5 open calls"; lane/owner-calls-1110)
@@ -450,3 +465,13 @@ The owner has not felt this yet.
   read 26° in play), 15–17° at 0.12 s, 13–15° at 0.15 s; the knee 12–13° → 7.5–8.7°. The carry's own stride is about 6° a frame.
   0.06 = the old blend exactly. The juke, the spin and the stiff arm keep 0.06 s. Feel-check: football, hurdle a downed man at a
   sprint; do the legs tuck with the hop, or lag it?
+
+## gameplay-clean-5, 2026-11-10 (the hurdle's way out; the owner has not felt this yet)
+
+- Group "Anim · transitions" (`anim/footballTree.ts`), **TUNED (new, flagged)**: `football.hurdleExitFadeSec` 0.2 s (the hurdle used
+  the carry's own 0.1 s on the way out). How long the hurdle's jump blends back into the carry. The jump's clip runs out a few frames
+  before the landing and the arms came down from the jump's reach to the tuck in six frames: the rig read LeftArm 31, RightArm 23 and
+  RightForeArm 15 degrees a frame at every hurdle, football's last repeating hard pop. Measured headless on the hero over 6 carry
+  phases at 1× and 1.4× (`footballTree.hurdleExit.test.ts`): the off arm 30.9° a frame at 0.1 s, 19.6° at 0.16, 15.7° at 0.2, 12.6°
+  at 0.25. 0.1 = the old blend exactly. Every other way into the carry (the snap, a juke, a spin, the stiff arm) keeps 0.1 s.
+  Feel-check: football, hurdle at a sprint; do the arms come down with the landing, or hang in the air after it?
