@@ -127,3 +127,6 @@ export function felWhy(r: ProgramRequest, splitWords: string): string {
 /** EVERY-SCREEN P3: the plan needed longer sessions than asked to keep every rule (./kept.ts). Plain words, no dose. */
 export const LONGER_THAN_ASKED = (asked: number, got: number): string =>
   `These sessions run about ${got} minutes, not ${asked}: ${asked} minutes was too short for the warm-up and every movement this plan covers. Ask for fewer days of more minutes, or a lighter goal, to change it.`;
+/** EVERY-SCREEN P3: the plan's weekly limits fill fewer minutes than asked (./kept.ts). */
+export const SHORTER_THAN_ASKED = (asked: number, got: number): string =>
+  `These sessions run about ${got} minutes, not ${asked}: that is all the work this plan's weekly limits allow, without filler.`;

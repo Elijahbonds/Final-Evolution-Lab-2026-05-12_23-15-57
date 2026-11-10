@@ -48,7 +48,7 @@ for (const minutes of MINUTES) for (const goal of GOALS) for (const level of ['b
       byRule.set(rule, g);
     }
   }
-console.log(`${builds} builds, ${failed} with a failure, ${crashed} crashed; ${[...longer.entries()].map(([m, n]) => `${n} built ${m} minutes longer than asked`).join(', ') || 'none longer than asked'}`);
+console.log(`${builds} builds, ${failed} with a failure, ${crashed} crashed; ${[...longer.entries()].map(([m, n]) => `${n} built ${Math.abs(m)} minutes ${m > 0 ? 'longer' : 'shorter'} than asked`).join(', ') || 'all built as asked'}`);
 console.log(`builds failing each rule: ${[...byCat.entries()].map(([k, n]) => `${k} ${n}`).join(', ')}`);
 for (const [rule, g] of [...byRule.entries()].sort((a, b) => b[1].n - a[1].n)) {
   console.log(`${String(g.n).padStart(5)}  ${rule}`);

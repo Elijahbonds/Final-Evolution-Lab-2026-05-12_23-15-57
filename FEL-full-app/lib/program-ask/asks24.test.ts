@@ -8,7 +8,7 @@
 import { describe, expect, it } from 'vitest';
 import { loadLibraryFiles } from '@/lib/library/files';
 import { buildProgram } from './build';
-import { LONGER_THAN_ASKED } from './copy';
+import { LONGER_THAN_ASKED, SHORTER_THAN_ASKED } from './copy';
 import { buildKept } from './kept';
 import { readProgramAsk } from './request';
 import { builderRuleFailures } from './rules24';
@@ -96,6 +96,12 @@ describe('a request the builder cannot fit as asked gets the nearest one that ke
     expect(k.longer).toBeGreaterThan(0);
     expect(k.program.notes[0]).toMatch(/^These sessions run about (25|30) minutes, not 20: /);
   });
+  it('a 90-minute mobility plan six days a week, advanced, with nothing: the weekly limits fill less, so it is built shorter and says so', () => {
+    const request = { ...readProgramAsk('Mobility, 6 days a week, 90 minutes, advanced, no equipment, 8 weeks.').request };
+    const k = buildKept({ request, library: LIB });
+    expect(k.failures).toEqual([]);
+    if (k.longer) expect(k.program.notes[0]).toMatch(/^These sessions run about \d+ minutes, not 90: /);
+  });
   it('a request that fits is built exactly as asked, with no such line', () => {
     const k = buildKept({ request: readProgramAsk(ASKS24[0].q).request, library: LIB });
     expect(k.longer).toBe(0);
@@ -118,7 +124,7 @@ describe('the 24 asks, read as typed and built as the server builds them', () =>
       const { program: p, longer } = buildKept({ request: read.request, library: LIB, jumpsOpen: a.jumps });
       expect(builderRuleFailures(p, LIB, { jumpsOpen: !!a.jumps })).toEqual([]);
       // the asked length, or (said on the plan) the nearest longer one that keeps every rule
-      if (longer) expect(p.notes[0]).toBe(LONGER_THAN_ASKED(read.request.minutes, read.request.minutes + longer));
+      if (longer) expect(p.notes[0]).toBe((longer > 0 ? LONGER_THAN_ASKED : SHORTER_THAN_ASKED)(read.request.minutes, read.request.minutes + longer));
       else expect(p.request.minutes).toBe(read.request.minutes);
       // and the plan is a real one: every exercise is a library entry
       for (const i of items(p)) expect(byId.get(i.exId)?.name).toBe(i.name);

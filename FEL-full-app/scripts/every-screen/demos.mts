@@ -150,6 +150,7 @@ const MOVE_WORDS: [Move, RegExp][] = [
   ['ball', /^bball_|jumpshot|jumper|shot|shoot|layup|dribble|free_throw/],
   ['calf', /calf|tibialis|toe_raise|heel_raise/],
   ['throw', /throw|toss|scoop|shotput|slam|underhand|chest_pass|jammer|_chest_|overhead_(standing|hk|tk|split|lateral|single|stepin)|sidetoss|singlepush|rotoverhead/],
+  ['rotation', /pallof/],   // a Pallof press resists the turn, in any stance (P3: the band kit brought its variants in)
   ['hinge', /hinge|rdl|deadlift|good_morning|swing|kickstand|hip_thrust|thrust|bridge|glute|nordic|ham_?string_curl|ham_curl|slider|clean|snatch|back_ext|hyper|pull_through/],
   ['jump', /jump|hop|bound|pogo|skip|burpee|depth|leap|broad|snap_down|landing/],
   ['carry', /carry|farmer|waiter|suitcase_walk/],
@@ -160,7 +161,7 @@ const MOVE_WORDS: [Move, RegExp][] = [
   ['rotation', /rot|twist|chop|lift|pallof|windmill|woodchop/],
   ['run', /sprint|run|shuffle|carioca|backpedal|a_march|high_knee|butt_kick|accel|decel|cut|agility|ladder|march|start|arm_swing|crawl|stance|walk|climber/],
   ['core', /plank|crunch|dead_bug|bird_dog|hollow|sit_?up|leg_raise|bear|ab_|rollout|copenhagen|v_up|jackknife|flutter|mountain|superman|side_bend|tap|balance|tripod|clamshell|adductor|tke|chin_tuck/],
-  ['mobility', /stretch|smr|roll|9090|ninety|cat|cow|thread|open|circle|opener|rock|breath|legsup|prone|child|cobra|pigeon|frog|spider|groiner|world|ankle|knee_to_wall|hip_|t_spine|thoracic|quad|reach|sweep|halo|couch|pike|shinbox|switch|inchworm|elbows|sit_squat/],
+  ['mobility', /stretch|smr|roll|9090|ninety|cat|cow|thread|open|circle|opener|rock|breath|legsup|prone|child|cobra|pigeon|frog|spider|groiner|world|ankle|knee_to_wall|hip_|t_spine|thoracic|quad|reach|sweep|halo|couch|pike|shinbox|switch|inchworm|elbows|sit_squat|leg_across|leg_out/],
 ];
 function moveOf(clip: string): Move {
   const c = clip.replace(/^ex_/, '');

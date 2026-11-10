@@ -6,42 +6,39 @@ Generated 2026-11-10 by `scripts/every-screen/demos.mts` (read only). Each exerc
 |---|---|---|---|---|---|---|
 | Signature (4 programs, every gate) | 136 | 126 | 10 | 10 | 0 | 0 |
 | Coach templates (7, every wave and ladder rung) | 104 | 17 | 87 | 3 | 84 | 0 |
-| Program builder (1680 requests) | 443 | 338 | 105 | 105 | 0 | 2 |
+| Program builder (1680 requests) | 496 | 378 | 118 | 118 | 0 | 0 |
 
 Served signature exercises missing from the page's demo map: 0.
 
-How "wrong" is checked: each loop's name is read into a movement and compared with the exercise's own pattern tag and its name. 22 pairs disagreed and each was looked at by hand (verdicts in the script, with reasons): 2 wrong. The read cannot catch a loop that is the right kind of movement but the wrong version (a front squat shown as a back squat).
-
-## Wrong demos
-
-| Exercise | Plays | Where | Why it is wrong |
-|---|---|---|---|
-| Spider Crawl (`spider-crawl`) | `ex_spiderman_pushup` | builder: mobility | a travelling crawl warm-up plays a push-up in place: the chest drops to the floor and nothing travels. lib/library/demo.ts line 752 (demo-loops); assumption: the crawl is not done as a push-up |
-| Split Squat Stretch (`split-squat-stretch`) | `ex_split_jump` | builder: full-body, strength, muscle, conditioning, athletic, mobility | a hamstring stretch (front leg long, fold forward, "no bouncing") plays a jumping split-switch plyometric. lib/library/demo.ts line 890 (demo-loops) |
+How "wrong" is checked: each loop's name is read into a movement and compared with the exercise's own pattern tag and its name. 16 pairs disagreed and each was looked at by hand (verdicts in the script, with reasons): 0 wrong. The read cannot catch a loop that is the right kind of movement but the wrong version (a front squat shown as a back squat).
 
 ## For the animation lane: exercises with no loop yet
 
-117 exercises have no loop at all and show the labelled still. Most-used first.
+130 exercises have no loop at all and show the labelled still. Most-used first.
 
 | Exercise | Pattern | Family / variation | Appears in |
 |---|---|---|---|
 | Wall Hip Hinge (`wall-hip-hinge`) | hinge | hinge-pattern / wall-tap | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength, template:adult-bw-3, template:adult-bw-4, template:camp-session, template:youth-bw-2, template:youth-bw-3 |
 | Anti-Gravity Press (`anti-gravity-press`) | push | overhead-press / anti-gravity-press | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
+| Band Anti-Rotation March (`band-anti-rotation-march`) | rotation | anti-rotation / march | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
+| Banded Ankle Rock (`banded-ankle-rock`) | mobility | ankle-mobility / banded | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
+| Banded Knee Squat (`banded-knee-squat`) | squat | spanish-squat / reps | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
 | Barbell Ab Rollout (`barbell-ab-rollout`) | other | rollout / ab-rollout | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
 | Barbell Ab Rollout - On Knees (`barbell-ab-rollout-on-knees`) | other | rollout / ab-rollout-kne | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
 | Barbell Box Step-Up (`barbell-box-step-up`) | lunge | step-up / bb | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
-| Barbell Rear Delt Row (`barbell-rear-delt-row`) | pull | rear-delt-face-pull / rear-shoulder-row | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
 | Barbell Rollout from Bench (`barbell-rollout-from-bench`) | other | rollout / rollout-bench | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
 | Barbell Side Split Squat (`barbell-side-split-squat`) | lunge | lunge / sid-split-squat | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
 | Barbell Walking Lunge (`barbell-walking-lunge`) | lunge | lunge / walk-lung | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
 | Bird Dog Hold, Knee Hover (`bird-dog-hold-knee-hover`) | other | dead-bug-bird-dog / bird-hover | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
 | Bird Dog Row (`bird-dog-row`) | other | dead-bug / bird-dog-row | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
+| Bird Dog with Band Row (`bird-dog-with-band-row`) | other | dead-bug-bird-dog / bird-band | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
 | Bodyweight Walking Lunge (`bodyweight-walking-lunge`) | lunge | lunge / bodyweight-walk-lung | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
 | Butt Lift (Bridge) (`butt-lift-bridge`) | hinge | bridge-thrust / glut-lift-bridg | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
 | Calf Press (`calf-press`) | other | calf-raise / calf-press | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
 | Copenhagen Plank (`copenhagen-plank`) | other | side-plank / copenhagen-long | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
 | Couch Stretch Knee Lift-Off (`couch-stretch-knee-lift-off`) | mobility | active-mobility / couch-liftoff | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
 | Dead Bug with Kettlebell Press (`dead-bug-with-kettlebell-press`) | other | dead-bug-bird-dog / kb | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
+| Diagonal Band Pull-Apart (`diagonal-band-pull-apart`) | pull | scap-work / pull-apart-diag | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
 | Dumbbell Push Press (`dumbbell-push-press`) | push | push-extra / db-push-press | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
 | Dumbbell Renegade Row (`dumbbell-renegade-row`) | pull | db-upper / renegade | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
 | Dumbbell Walking Lunge (`dumbbell-walking-lunge`) | lunge | lunge / walking-db | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
@@ -64,12 +61,15 @@ How "wrong" is checked: each loop's name is read into a movement and compared wi
 | Lying Crossover (`lying-crossover`) | mobility | stretch-hip / lying-crossover | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
 | Lying Glute (`lying-glute`) | mobility | stretch-hip / lying-glut | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
 | Muscle Up (`muscle-up`) | pull | pull-up / muscl-up | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
+| Overhead Band Pull-Apart (`overhead-band-pull-apart`) | pull | upper-back / pull-apart-overhead | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
+| Pallof Press Walkout (`pallof-press-walkout`) | rotation | anti-rotation / walkout | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
 | Pallof Press With Rotation (`pallof-press-with-rotation`) | rotation | plank / pallof-press-rotation | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
 | Pigeon Back-Knee Lift-Off (`pigeon-back-knee-lift-off`) | mobility | active-mobility / pigeon-liftoff | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
 | Plank Bird Dog (`plank-bird-dog`) | other | dead-bug-bird-dog / bird-plank | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
 | Prone Dumbbell Rear Fly (`prone-dumbbell-rear-fly`) | pull | upper-back / rear-fly-prone | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
 | Prone W Raise (`prone-w-raise`) | pull | shoulder-care / prone-w | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
 | Prone Y Raise (`prone-y-raise`) | pull | shoulder-care / prone-y | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
+| Reverse Band Sumo Deadlift (`reverse-band-sumo-deadlift`) | hinge | deadlift / revers-sumo-deadlift | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
 | Reverse Flyes With External Rotation (`reverse-flyes-with-external-rotation`) | pull | rear-delt-face-pull / revers-fly-external-rotation | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
 | Reverse Plank with Leg Lift (`reverse-plank-with-leg-lift`) | other | plank-matrix / reverse-leg-lift | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
 | Seated Biceps (`seated-biceps`) | mobility | stretch-upper / seat-bicep | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
@@ -78,6 +78,7 @@ How "wrong" is checked: each loop's name is read into a movement and compared wi
 | Side Plank Hip Dip (`side-plank-hip-dip`) | other | rollout-matrix / side-dip | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
 | Side Plank Reach-Through (`side-plank-reach-through`) | other | rollout-matrix / side-reach | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
 | Side Plank with Arm Reach (`side-plank-with-arm-reach`) | other | plank-matrix / side-arm-reach | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
+| Side Plank with Row (`side-plank-with-row`) | other | side-plank / row | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
 | Single-Arm Push-Up (`single-arm-push-up`) | push | push-up / singl-arm-push-up | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
 | Single-Leg Hip Airplane (`single-leg-hip-airplane`) | hinge | single-leg-hinge / airplane | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
 | Spinal Wave (`spinal-wave`) | mobility | shoulder-mobility / spinal-wave | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
@@ -86,7 +87,9 @@ How "wrong" is checked: each loop's name is read into a movement and compared wi
 | T Push-Up with 4-Second Lower (`t-push-up-with-4-second-lower`) | push | push-extra / t-push-up+tempo | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
 | Zottman Preacher Curl (`zottman-preacher-curl`) | pull | curl / zottman-preacher-curl | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:sport, builder:strength |
 | Adductor/Groin (`adductor-groin`) | mobility | stretch-hip / adductor-groin | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:strength |
+| Band Good Morning (Pull Through) (`band-good-morning-pull-through`) | hinge | good-morning / morn-pull-through | builder:athletic, builder:conditioning, builder:full-body, builder:muscle, builder:sport, builder:strength |
 | Barbell Step Ups (`barbell-step-ups`) | lunge | step-up / step-ups | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:strength |
+| Bear Plank with Band Row (`bear-plank-with-band-row`) | other | plank-matrix / bear-band-row | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:strength |
 | Chair Squat (`chair-squat`) | squat | squat / chair-squat | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:strength |
 | Clock Push-Up (`clock-push-up`) | push | push-up / clock-push-up | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:strength |
 | Hack Squat (`hack-squat`) | squat | leg-press-hack / hack-squat | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:strength |
@@ -96,16 +99,18 @@ How "wrong" is checked: each loop's name is read into a movement and compared wi
 | Lying Prone Quadriceps (`lying-prone-quadriceps`) | mobility | stretch-quad-hip / lying-pron-quadricep | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:strength |
 | Muscle Up with 4-Second Lower (`muscle-up-with-4-second-lower`) | pull | pull-up / muscl-up+tempo | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:strength |
 | Seated Front Deltoid (`seated-front-deltoid`) | mobility | stretch-upper / seat-front-deltoid | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:strength |
+| Split Squat Stretch (`split-squat-stretch`) | mobility | stretch-hamstring / split-squat-stretch | builder:athletic, builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:strength |
 | Eccentric Push-Up (`eccentric-push-up`) | push | push-up / eccentric | builder:conditioning, builder:full-body, builder:muscle, builder:sport, builder:strength |
+| High Plank with Band Row (`high-plank-with-band-row`) | other | plank-matrix / high-band-row | builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:strength |
 | Long-Lever Forearm Plank with Arm Reach (`long-lever-forearm-plank-with-arm-reach`) | other | plank-matrix / long-lever-arm-reach | builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:strength |
 | Long-Lever Forearm Plank with Knee-to-Elbow (`long-lever-forearm-plank-with-knee-to-elbow`) | other | plank-matrix / long-lever-knee-elbow | builder:conditioning, builder:full-body, builder:mobility, builder:muscle, builder:strength |
 | Supported Split Squat (`supported-split-squat`) | lunge | split-squat / supported | template:adult-bw-3, template:adult-bw-4, template:camp-session, template:youth-bw-2, template:youth-bw-3 |
 | Barbell Guillotine Bench Press (`barbell-guillotine-bench-press`) | push | bench-press / guillotin-bench-press | builder:conditioning, builder:full-body, builder:muscle, builder:strength |
-| Barbell Hack Squat (`barbell-hack-squat`) | squat | leg-press-hack / hack-squat | builder:conditioning, builder:full-body, builder:muscle, builder:strength |
 | Kettlebell Gorilla Row (`kettlebell-gorilla-row`) | pull | row / kb-gorilla | builder:athletic, builder:conditioning, builder:full-body, builder:sport |
 | Kettlebell Gorilla Row with 4-Second Lower (`kettlebell-gorilla-row-with-4-second-lower`) | pull | row / kb-gorilla+tempo | builder:athletic, builder:conditioning, builder:full-body, builder:sport |
 | 5-10-5 Shuttle (`5-10-5-shuttle`) | locomotion | change-of-direction / 5-10-5 | signature:athletic-foundation, signature:basketball-skills |
 | Ankling (`ankling`) | locomotion | sprint-mechanics / ankling | builder:athletic, builder:sport |
+| Barbell Hack Squat (`barbell-hack-squat`) | squat | leg-press-hack / hack-squat | builder:conditioning, builder:full-body |
 | Dead Bug, Legs Only (`dead-bug-legs-only`) | other | dead-bug-bird-dog / legs | builder:muscle, builder:strength |
 | Dead Bug, Wall Press (`dead-bug-wall-press`) | other | dead-bug-bird-dog / wall | builder:muscle, builder:strength |
 | Dot Drill (`dot-drill`) | locomotion | quick-feet / dot | builder:athletic, builder:sport |
@@ -115,7 +120,6 @@ How "wrong" is checked: each loop's name is read into a movement and compared wi
 | Kettlebell Hike Pass (`kettlebell-hike-pass`) | hinge | kb-swing / hike | builder:athletic, builder:sport |
 | Line Quick Steps (`line-quick-steps`) | locomotion | quick-feet / line-steps | builder:athletic, builder:sport |
 | Lunge Sprint (`lunge-sprint`) | locomotion | sprint-drill / lung-sprint | builder:athletic, builder:sport |
-| Lying Machine Squat (`lying-machine-squat`) | squat | leg-press-hack / lying-squat | builder:conditioning, builder:full-body |
 | Prone Scorpion Reach (`prone-scorpion-reach`) | mobility | shoulder-mobility / scorpion | builder:mobility, builder:sport |
 | Push Up to Side Plank (`push-up-to-side-plank`) | push | push-up / push-up-sid-plank | builder:conditioning, builder:full-body |
 | Quick Feet in Place (`quick-feet-in-place`) | locomotion | quick-feet / in-place | builder:athletic, builder:sport |
@@ -125,11 +129,12 @@ How "wrong" is checked: each loop's name is read into a movement and compared wi
 | 45-Degree Back Extension (`45-degree-back-extension`) | hinge | hinge-accessory / 45-ext | builder:sport |
 | 45-Degree Back Extension with 4-Second Lower (`45-degree-back-extension-with-4-second-lower`) | hinge | hinge-accessory / 45-ext+tempo | builder:sport |
 | 90/90 Back-Leg Lift-Off (`90-90-back-leg-lift-off`) | mobility | active-mobility / ninety-liftoff | builder:sport |
+| Banded Hip Distraction Stretch (`banded-hip-distraction-stretch`) | mobility | loaded-mobility / band-hip | builder:mobility |
+| Banded Shoulder Distraction Stretch (`banded-shoulder-distraction-stretch`) | mobility | loaded-mobility / band-shoulder | builder:mobility |
 | Barbell Side Split Squat with 4-Second Lower (`barbell-side-split-squat-with-4-second-lower`) | lunge | lunge / sid-split-squat+tempo | builder:athletic |
 | Between-Behind Combo (`between-behind-combo`) | other | handle-combos / between-behind | signature:basketball-skills |
 | Box-Out (`box-out`) | locomotion | defense / box-out | signature:basketball-skills |
 | Cone Change-of-Pace Dribble (`cone-change-of-pace-dribble`) | other | ball-handling / change-of-pace | signature:basketball-skills |
-| Controlled Thoracic Circle, Seated (`controlled-thoracic-circle-seated`) | mobility | joint-circles / thoracic-seated | builder:mobility |
 | Crossover into Layup (`crossover-into-layup`) | locomotion | moving-handles / cross-layup | signature:basketball-skills |
 | Crossover-Between Combo (`crossover-between-combo`) | other | handle-combos / cross-between | signature:basketball-skills |
 | Elevated Back Lunge (`elevated-back-lunge`) | lunge | lunge / elevat-back-lung | builder:athletic |
@@ -140,6 +145,7 @@ How "wrong" is checked: each loop's name is read into a movement and compared wi
 | Latissimus Dorsi-SMR (`latissimus-dorsi-smr`) | mobility | roll / latissimus-dorsi-smr | signature:pain-free |
 | Seated Hip Rotation Lift-Off (`seated-hip-rotation-lift-off`) | mobility | active-mobility / hip-rot-liftoff | builder:mobility |
 | Slide-Run-Slide (`slide-run-slide`) | locomotion | defense / slide-run | signature:basketball-skills |
+| Spider Crawl (`spider-crawl`) | mobility | dynamic-warmup / spider-crawl | builder:mobility |
 | Tall-Kneeling Hip Rotation (`tall-kneeling-hip-rotation`) | mobility | shoulder-mobility / tall-kneel-rotation | builder:mobility |
 | Walking Knee Hug (`walking-knee-hug`) | mobility | dynamic-flow / knee-hug | builder:sport |
 
