@@ -2,7 +2,7 @@
 
 **Owner, 2026-11-10:** "To improve the total quality of the product from improving every screen."
 
-**Status: PLAN ONLY. Nothing here is built until the owner approves the plan.**
+**Status: APPROVED by the owner, 2026-11-10 ("I approve, go").** The plan as written, including the three speed budgets in check 3. Phase 1 started the same day.
 
 | Question | The owner's answer |
 |---|---|
@@ -14,7 +14,7 @@
 | When real people use it | Already, or this month. |
 | What bothers the owner most | Too many steps. Looks unfinished. Demos and animations. Numbers I don't trust. |
 | How each phase is checked | Screenshots and numbers after each phase; the owner plays it when a batch is deployed. |
-| When it starts | Plan now; build as the running lanes finish. |
+| When it starts | Plan first, then "go" on approval (2026-11-10): phase 1 runs alongside the lanes already running. |
 
 **The size of it (counted 2026-11-10):** 218 pages in `app/`. 34 are developer pages nobody outside reaches, so about
 **184 screens** count. 52 of those are training and coaching. Phase 1 makes the exact list.
@@ -152,9 +152,9 @@ scorecard before → after for every screen, and a 15-minute phone check.
 - No new exercise animations (listed for the animation lane) and no gameplay changes (the game lanes).
 - No change to how a measurement is calculated without the fixture numbers before and after.
 
-## Owner calls before it starts (recommendation first)
+## Owner calls (recommendation first)
 
-1. **Approve this plan** as written, or change the order. *Recommend:* approve.
+1. ~~Approve this plan.~~ **Approved 2026-11-10.**
 2. **Run the pending-tables command.** *Recommend:* now, so phase 1 scores the real screens and not the dark ones.
 3. **Booking setup.** *Recommend:* before phase 5.
-4. **The three speed budgets in check 3** (2.5 s, 0.02, 200 ms). *Recommend:* keep them; phase 1 will show how far off we are.
+4. ~~The three speed budgets in check 3.~~ **Kept (approved with the plan).** Phase 1 reports how far off we are; the owner can move them.
