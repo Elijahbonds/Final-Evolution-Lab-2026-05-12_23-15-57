@@ -18,7 +18,7 @@
 import type { AnimationGroup, Scene, Observer } from '@babylonjs/core';
 import { resolveClip } from './clipResolver';
 import { ledgerFor, requestAllowed, scopeFallback, suiteOfClip, type ClipScope } from './clipScope';
-import { inertialDt, inertialHalfLife, inertialStep, quatFromAxisAngle, quatMul, quatMulConj, quatToAxisAngle, type Quat } from './inertialize';
+import { inertialDt, inertialHalfLife, inertialMatchVelOn, inertialStep, quatFromAxisAngle, quatMul, quatMulConj, quatToAxisAngle, type Quat } from './inertialize';
 import { feel } from '../../feel-panel/feel';
 
 /**
@@ -53,6 +53,9 @@ interface InertialTrack {
   lastP: [number, number, number] | null; priorP: [number, number, number] | null;
   axis: [number, number, number]; x: number; v: number; rotOn: boolean;
   pOff: [number, number, number]; pVel: [number, number, number]; posOn: boolean;
+  /** SWITCH-ON (anim.inertialMatchVel): the offset as a rotation vector (axis × angle) and its velocity, both 3-D, and the new clip's
+   *  raw pose on the switch frame, read again one frame later to take the new clip's own motion out of the offset's start. */
+  r3: [number, number, number]; w3: [number, number, number]; raw0: Quat | null; raw0P: [number, number, number] | null; dstDue: boolean;
   halfLife: number; hips: boolean; bone: boolean;
   /** The inertial frame number the pose was last recorded on (history older than the frame before is stale). */
   stamp: number;
@@ -519,7 +522,7 @@ export class CharacterAnimator {
   /** AF-1: drop the pending switch and every live offset (history stays: it is what the body showed). */
   private inertialCut(): void {
     this.inertialSwitch = null;
-    this.inertialTracks.forEach((t) => { t.rotOn = false; t.posOn = false; t.x = 0; t.v = 0; });
+    this.inertialTracks.forEach((t) => { t.rotOn = false; t.posOn = false; t.x = 0; t.v = 0; t.r3 = [0, 0, 0]; t.w3 = [0, 0, 0]; t.dstDue = false; });
   }
 
   /** AF-1: the nodes a clip keys — rotation-quaternion tracks, plus the Hips' position track — once per group. Only KEYED channels
@@ -550,6 +553,7 @@ export class CharacterAnimator {
       t = {
         last: null, prior: null, lastP: null, priorP: null,
         axis: [1, 0, 0], x: 0, v: 0, rotOn: false, pOff: [0, 0, 0], pVel: [0, 0, 0], posOn: false,
+        r3: [0, 0, 0], w3: [0, 0, 0], raw0: null, raw0P: null, dstDue: false,
         halfLife: 0, hips: INERTIAL_HIPS.test(n.name), bone: n.getClassName?.() === 'Bone', stamp: -1, scratchQ: null, scratchP: null,
       };
       this.inertialTracks.set(n, t);
@@ -565,9 +569,11 @@ export class CharacterAnimator {
     const targets = this.inertialTargetsOf(cur);
     const frame = ++this.inertialFrameNo;
     const sw = this.inertialSwitch;
+    // SWITCH-ON: the velocity-matched variant (anim.inertialMatchVel, inertialize.ts). Off: AF-1's one-axis offset, exactly as it was.
+    const mv = inertialMatchVelOn();
     if (sw) {
       this.inertialSwitch = null;
-      this.inertialTracks.forEach((t) => { t.rotOn = false; t.posOn = false; });
+      this.inertialTracks.forEach((t) => { t.rotOn = false; t.posOn = false; t.dstDue = false; });
       const hd = this.inertialHistDt;
       for (const { n, rot, pos } of targets) {
         const t = this.inertialTrack(n);
@@ -584,6 +590,19 @@ export class CharacterAnimator {
             v0 = Math.max(-INERTIAL_MAX_ANG_VEL, Math.min(INERTIAL_MAX_ANG_VEL, v0));
           }
           if (angle > 1e-9 || Math.abs(v0) > 1e-9) { t.axis = axis; t.x = angle; t.v = v0; t.rotOn = true; }
+          if (mv) {
+            // the offset as a 3-D rotation vector; its velocity the OLD motion's full angular velocity (not its share along the offset's
+            // axis), the new clip's own velocity taken out one frame later (below), so the body's motion carries across the switch
+            t.r3 = [axis[0] * angle, axis[1] * angle, axis[2] * angle];
+            t.w3 = [0, 0, 0];
+            if (t.prior && hd > 0) {
+              const w = quatToAxisAngle(quatMulConj(t.last, t.prior));
+              const sp = Math.min(INERTIAL_MAX_ANG_VEL, w.angle / hd);
+              t.w3 = [w.axis[0] * sp, w.axis[1] * sp, w.axis[2] * sp];
+            }
+            t.raw0 = now; t.dstDue = true;
+            t.rotOn = angle > 1e-9 || Math.hypot(t.w3[0], t.w3[1], t.w3[2]) > 1e-9;
+          }
         }
         const p = pos ? n.position : null;
         if (p && fresh && t.lastP) {
@@ -595,9 +614,10 @@ export class CharacterAnimator {
             }
           }
           t.posOn = true;
+          if (mv) { t.raw0P = [p.x, p.y, p.z]; t.dstDue = true; }
         }
       }
-    } else if (dt > 0) {
+    } else if (dt > 0 && !mv) {
       this.inertialTracks.forEach((t) => {
         if (t.rotOn) {
           const s = inertialStep(t.x, t.v, t.halfLife, dt);
@@ -618,7 +638,14 @@ export class CharacterAnimator {
     for (const { n, rot, pos } of targets) {
       const t = this.inertialTrack(n);
       const rq = rot ? n.rotationQuaternion : null;
-      if (rq && t.rotOn) {
+      if (mv && !sw && dt > 0) this.inertialStepMatched(t, rq ?? null, pos ? n.position ?? null : null, dt);
+      if (mv && rq && t.rotOn) {
+        const ang = Math.hypot(t.r3[0], t.r3[1], t.r3[2]);
+        const ax: [number, number, number] = ang > 1e-12 ? [t.r3[0] / ang, t.r3[1] / ang, t.r3[2] / ang] : [1, 0, 0];
+        const q = quatMul(quatFromAxisAngle(ax, ang), [rq.x, rq.y, rq.z, rq.w]);
+        if (t.bone) { const sq = (t.scratchQ ??= rq.clone()); sq.set(q[0], q[1], q[2], q[3]); n.rotationQuaternion = sq; }
+        else rq.set(q[0], q[1], q[2], q[3]);
+      } else if (rq && t.rotOn) {
         const q = quatMul(quatFromAxisAngle(t.axis, t.x), [rq.x, rq.y, rq.z, rq.w]);
         if (t.bone) { const sq = (t.scratchQ ??= rq.clone()); sq.set(q[0], q[1], q[2], q[3]); n.rotationQuaternion = sq; }
         else rq.set(q[0], q[1], q[2], q[3]);
@@ -637,5 +664,48 @@ export class CharacterAnimator {
       t.stamp = frame;
     }
     this.inertialHistDt = dt;
+  }
+
+  /**
+   * SWITCH-ON (anim.inertialMatchVel): one frame of the velocity-matched offset for one node, BEFORE it is applied. On the first frame
+   * after a switch, the new clip's own motion over that frame (its raw pose now against its raw pose on the switch frame) is taken out of
+   * the offset's velocity — Holden's v₀ = v_old − v_new — so a clip that starts fast (a strike's first frames) does not add its full speed
+   * on top of the old motion; the body keeps the speed it had and eases into the new clip's. Then each axis of the rotation vector (and
+   * the Hips offset) takes the same critically damped step as AF-1's.
+   */
+  private inertialStepMatched(t: InertialTrack, rq: InertialQuat | null, p: InertialVec | null, dt: number): void {
+    if (t.dstDue) {
+      t.dstDue = false;
+      if (rq && t.rotOn && t.raw0) {
+        const d = quatToAxisAngle(quatMulConj([rq.x, rq.y, rq.z, rq.w], t.raw0));
+        const sp = Math.min(INERTIAL_MAX_ANG_VEL, d.angle / dt);
+        for (let i = 0; i < 3; i++) t.w3[i] -= d.axis[i] * sp;
+        const m = Math.hypot(t.w3[0], t.w3[1], t.w3[2]);
+        if (m > INERTIAL_MAX_ANG_VEL) for (let i = 0; i < 3; i++) t.w3[i] *= INERTIAL_MAX_ANG_VEL / m;
+      }
+      if (p && t.posOn && t.raw0P) {
+        const v = [p.x, p.y, p.z];
+        for (let i = 0; i < 3; i++) t.pVel[i] = Math.max(-INERTIAL_MAX_LIN_VEL, Math.min(INERTIAL_MAX_LIN_VEL, t.pVel[i] - (v[i] - t.raw0P[i]) / dt));
+      }
+      t.raw0 = null; t.raw0P = null;
+    }
+    if (t.rotOn) {
+      let live = false;
+      for (let i = 0; i < 3; i++) {
+        const s = inertialStep(t.r3[i], t.w3[i], t.halfLife, dt);
+        t.r3[i] = s.x; t.w3[i] = s.v;
+        if (Math.abs(s.x) >= 1e-7 || Math.abs(s.v) >= 1e-6) live = true;
+      }
+      if (!live) { t.rotOn = false; t.r3 = [0, 0, 0]; t.w3 = [0, 0, 0]; }
+    }
+    if (t.posOn) {
+      let live = false;
+      for (let i = 0; i < 3; i++) {
+        const s = inertialStep(t.pOff[i], t.pVel[i], t.halfLife, dt);
+        t.pOff[i] = s.x; t.pVel[i] = s.v;
+        if (Math.abs(s.x) >= 1e-7 || Math.abs(s.v) >= 1e-6) live = true;
+      }
+      if (!live) t.posOn = false;
+    }
   }
 }

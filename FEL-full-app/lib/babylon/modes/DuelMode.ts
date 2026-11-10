@@ -47,6 +47,7 @@ import { XButtonReader, LAUNCH_AIR_SEC, launchHeight } from '../core/StormCombat
 import { FOCUS, FocusMeter } from '../core/MatrixFocus';   // phase 8: bullet time on R2, a clock per rig
 import { StringBook, type StickDir, type StrikeBtn } from '../core/HordeDynamics';   // phase 4   // combat pass phase 3: X = tap dash / double = chakra dash / hold = guard, the same reader the Storm modes use
 import { CombatAnimTree } from '../anim/combatTree';
+import { applyInertialBlend } from '../anim/inertialize';   // SWITCH-ON
 import { SoundKit } from '../audio/SoundKit';
 import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
 import { EffectsKit } from '../visual/EffectsKit';
@@ -872,6 +873,7 @@ export const DuelMode: ModeDefinition = (() => {
       meMove.lockTarget = rival.root.position; foeMove.lockTarget = player.root.position;
       meDef = new DefenseController(); foeDef = new DefenseController();
       meAnim = new CombatAnimTree(player.animator); foeAnim = new CombatAnimTree(rival.animator);
+      applyInertialBlend(player.animator);   // SWITCH-ON (2026-11-10): AF-1's inertial transitions, as on its siblings karate VS and showdown (the knob's off value leaves the duel linear)
       // GUARD is the exertion signal here, the same reading karate_vs uses: a fighter whose guard is gone
       // is a fighter who has been working, and the dynamic layer leans the body accordingly.
       mePosture = mountPostureLayer(ctx.scene, player.skeleton, player.root, () => feedFor(meBio, () => rival, meMotion, 1 - meState.guard / 100), 'DUEL-PP');
