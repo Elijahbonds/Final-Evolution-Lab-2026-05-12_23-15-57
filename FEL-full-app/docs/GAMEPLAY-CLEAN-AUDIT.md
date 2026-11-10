@@ -412,6 +412,121 @@ No regression in derby or 1v1. 1v1's 64–71° thighs come from the hoops lane's
 hand-over keeps the old fade. They predate this pass and are theirs. The audit's pop counter did not skip reset frames at this point; the
 analysis script did (`legmax.mjs`, which lived only in the lane scratchpad and was lost with it). Clean-5 put the rule in the counter itself (§4g).
 
+## 4g. Clean-5: a reset-aware counter, every mode swept, four pops fixed (lane/gameplay-clean-5)
+
+> **NEW COUNTER from here on.** A frame where the hero's root moves more than 1 m (a reset after a touchdown, a tackle, a drive
+> restart) and the frame after it are scene cuts and are not counted (`popCount.mjs`; its control in `gameplay-clean-pops-tests.ts`:
+> the same 40° thigh step on an ordinary frame, and two frames after a reset, still counts). Every pop number in §2–§4e, and §4f's 1v1
+> count, used the OLD counter. **The two are not comparable.** On this sweep the reset skip changed five modes only: football 6 → 4
+> hard pops, penalty 3 → 1, tennis 2 → 0, freerun 2 → 1, dunk duel 3 → 2. Every other mode counted the same.
+
+**The rig, all in the repo** (`scripts/probes/gameplay-clean/`; the lost scratch helper `legmax.mjs` is replaced):
+`popCount.mjs` (the counter), `poprank.mjs` (per mode: hard pops, blend or in-clip, the clips and bones, the largest turn a frame
+per bone group off reset frames; `--vs` gives a before → after table), `popdetail.mjs` (each hard pop frame by frame; `--win`
+dumps frames; `--ab` puts the layer-off runs beside it), `serve.mjs` (one port, a before-build and an after-build by host name),
+`run-jobs.sh` (mixed jobs in one gate hold). Three rig bugs were found and fixed on the way:
+- the recorder read a clip's blend weight off the group (always −1), so every playing clip read weight 1; it now reads the
+  animatables' weight, the one the crossfade sets (recordings say `cwv: 2`);
+- `FEEL=` knob overrides were written before the page loaded and wiped by the page's own storage clear (why §4c's A/B "never went
+  active"); `&playtest=1&feel=<knob>:<value>` now writes them after;
+- closing a page took ~110 s a mode; capped at 5 s (holds now fit 12 modes, not 6).
+
+**Method.** 14 s anim-only runs (no pause, no perf window, no photographs), the same scripted player, a dev build (the layer-off
+flags `?noplant=1`, `?noposture=1`, `?nomotion=1` work only there). "Before" = release `a5bb51e9` + clean-4; "after" = this lane's
+head. Runs of the same build differ by the AI's choices, so a single run is a sample, not a measurement of a rate.
+
+### What was found and fixed (each behind its own knob; 0 or the old value gives the old behaviour exactly)
+
+| # | Pop | Cause | Fix | Measured |
+|---|---|---|---|---|
+| 1 | Showdown hit react → guard: every bone on one frame (arms 21–30°, thighs 22–25°), the same numbers at 3.30, 4.75, 9.32 s. Karate jab → run: right forearm 31–39°. Baseball swing → stance: right arm 54.9° (2.55 and 8.55 s). | A one-shot cut a few frames before its end runs out INSIDE its own fade-out. Babylon stops it, the weight it still had (0.4–0.8) is gone in one frame, and the gap is filled with a pose captured frames earlier. | `CharacterAnimator` holds such a clip on its last frame until the fade ends (the freeze's own mechanism). Knob `anim.fadeHoldEnded` (1). | Headless, the hero: hit react → guard 33.4° → **16.4°** (the fade around it 19.0°); jab → run 23.1° → **8.4°**; over 7 one-shots × 7 cut points, identical wherever the clip does not end inside the fade, never above 23.5°. |
+| 2 | Football: LeftArm 31°, RightArm 23°, RightForeArm 15° a frame at EVERY hurdle (2.78, 4.08, 6.72 s), the landing. | The hurdle's clip runs out before the landing and the tree settled on the carry over the carry's 0.1 s: arms from the jump's reach to the tuck in 6 frames. Not the carry loop (§4e): its arms turn under 7° a frame. | The hurdle → carry blend gets its own time. **TUNED (new): `football.hurdleExitFadeSec` 0.2 s** (0.1 = the old blend). The way in (`football.hurdleFadeSec`, #546) is untouched. | Headless, the real tree on the hero, 6 phases at 1× and 1.4×: 30.9° → **15.7°**. |
+| 3 | Any stance that slides: a thigh ~33° in one frame at every replant (headless). | Clean-4's rotation release ended on the spot when the foot planted again (a stance foot let go at the drift limit is planted on the next frame), and the engage was 0: the leg jumped the rest of the way at once. | The release carries on under the new plant. Knob `anim.plantReplantEase` (1). Same plants and releases (asserted). | Headless: 33.5° → **under 12.5°** at 0.5–3 m/s (6.4° with clean-4's release off). |
+| 4 | Aero Aces: knees 51–63°, thighs 22–40° in one frame, 2–3 hard pops a run, all on the seated pose alone. | Every hero carries the foot planter; the pilot sits with his ankles at root height, so his feet read as down and were pinned to the ground while the plane flew on at 14–30 m/s. The planter-off flag removes every one. | A mode marks a seated body (`setPlantingSeated`); the planter treats it as airborne (no pin; a held one let go through the release). Aero marks its pilot. Knob `anim.plantSeatedOff` (1). A speed rule was rejected: on-foot modes reach 12.8–35 m/s in bursts. | Rig A/B: 3 hard pops → **0** with the planter off. Headless: pinned 160 of 240 flying frames, legs 12–19° a frame → no pin, under 1°. |
+
+**Hurdle way in** (asked: did #546's 0.12 s fade drop the hurdle's thigh peak from ~26° a frame?): in play, before this lane's
+changes, football's largest thigh turn off reset frames was **17.1°** (the hurdle entry, t = 6.17 s), against 26.2–26.5° in all
+three §4f runs. Yes, as measured headless (15–17°).
+
+**Tried and taken back (not committed):** an orphan rule under the same knob. A third clip played inside a fade retires the clip
+being faded out on the spot (Duel: a jab at 0.75 fading into guard, the guard step played 3 frames in, arms 24–27°; the hero
+headless 23.2°). Keeping that clip fading out took the hero's frame to 9.6°, but in play it made three-clip blends, and Babylon
+blends three clips by chained slerps that can flip: Karate's thigh **117.9°** in one frame (`after-orphan` runs). Open, §4g list.
+
+### Every mode, before (new counter; 14 s each, one run; "before" = release + clean-4)
+
+Hard pop events in the run (per minute), the biggest cause read frame by frame (`popdetail.mjs`), and whose it is.
+
+| Mode | Hard pops (per min) | What they are | Owner |
+|---|---|---|---|
+| dunk | 19 (80.8) | 14 inside `bball_mc_dribble_run` on the run-up: arms up to 102.6° a frame | dunk-flagship |
+| karate VS | 11 (46.8) | hit react → guard ending inside its fade (fixed, #1); strike onsets (run → jab: the capture's first frames inside a 0.06 s fade); one orphan (open) | this lane / tuned fade |
+| showdown | 10 (42.6) | hit react → guard ending inside its fade ×3 (fixed, #1); guard step → hit react onsets | this lane |
+| karate | 10 (42.2) | jab → run ending inside its fade (fixed, #1); run → jab onsets, right forearm 33° (tuned 0.06 s fade); hit react legs | this lane / tuned fade |
+| 3PT | 9 (38.3) | catch hop → follow-through ×7: left arm and hand | hoops-motion |
+| duel | 8 (34.0) | the orphan ×3 (open); hit react / roundhouse endings (fixed, #1) | this lane |
+| 1v1 | 6 (25.4) | the plant-and-cut lock: a thigh **167°** in one frame (179° in the after-run); dribble-run blends | hoops lanes |
+| skateboard | 6 (25.4) | idle / push → `skate_ollie` onsets, right arm 27–40°; one frame of `board_push` alone, right thigh 47° | §4g list |
+| mixed combat | 5 (21.2) | strike onsets (run → cross, shuffle → high kick, legs 38°), backspin | tuned fades |
+| football | 4 (17.1) | the hurdle's way out ×3 (fixed, #2); the tackle (idle → fall, 0.05 s fade, forearm 31°) | this lane / tuned fade |
+| 3v3 | 4 (17.0) | defend backpedal / slide, legs | hoops lanes |
+| tiebreak | 3 (12.7) | swing onsets (arms 42° in a 3-frame fade); one frame inside `tennis_swing.M` alone, right thigh 34° | tuned fade / §4g list |
+| baseball | 3 (12.7) | swing → stance ending inside its fade ×2, right arm 54.9° (fixed, #1); the swing's contact, arms 27–35° | this lane / bat-grip |
+| dunk duel | 2 (8.5) | `dunk_mocap` → score hang, hang → land: arms 69° | dunk-flagship |
+| aero | 2 (8.5) | the foot planter on the seated pilot: knees 51–63° (fixed, #4) | this lane |
+| dance, freerun, penalty, big air, surf | 1 each (4.2–4.3) | dance stumble; freerun air hold → run landing; keeper dive (mirrored); grab → sketchy landing (26°); **surf: `board_air` restarted while playing, weight 0.81 → 0.14 in a frame, right arm 78°** (open) | animation / §4g list |
+| carnival, derby, golf, tennis, volleyball, sprint, snowboard, kart, brain brawl, who-scene-it | 0 | — | — |
+
+Derby: 0 hard pops, but the bat-flip vault's swing at 1.7× moves the arms up to 38.8° a frame for several frames running (fast
+throughout, so not a pop by the rule). A tuned rate on a clip, not changed.
+
+### After (the lane's head; one run each; the AI's choices differ run to run)
+
+| Mode | Hard pops in the run (per min) | Blend · in-clip | Max turn a frame: thigh · knee · hips · arm |
+|---|---|---|---|
+| dunk | 19 (80.76) → **19** (79.53) | 5 · 14 → 5 · 14 | 15.4° · 22° · 2.9° · 102.6° → 15.4° · 22° · 2.9° · 102.5° |
+| karate_vs | 11 (46.81) → **6** (25.32) | 11 · 0 → 6 · 0 | 34.3° · 39.4° · 17.2° · 49.5° → 34.5° · 37.5° · 17.1° · 49.5° |
+| showdown | 10 (42.6) → **5** (21) | 10 · 0 → 5 · 0 | 45° · 28.9° · 10.2° · 40° → 58.7° · 38.3° · 10° · 38.9° |
+| karate | 10 (42.2) → **8** (33.88) | 10 · 0 → 8 · 0 | 53.8° · 32.6° · 11.3° · 40.9° → 53.8° · 29.8° · 11.3° · 40.9° |
+| duel | 8 (33.96) → **4** (17) | 8 · 0 → 4 · 0 | 58.7° · 32.7° · 10.2° · 41.4° → 44° · 29° · 10.1° · 97.8° |
+| onevone | 6 (25.41) → **5** (21.35) | 5 · 1 → 4 · 1 | 167.3° · 18.7° · 5.2° · 104.3° → 179° · 21° · 5.4° · 95.7° |
+| skateboard | 6 (25.38) → **5** (21.28) | 6 · 0 → 5 · 0 | 47.1° · 24.5° · 13.2° · 39.9° → 22° · 18.8° · 7.9° · 39.9° |
+| mixedcombat | 5 (21.15) → **5** (21.1) | 5 · 0 → 5 · 0 | 42.8° · 38° · 17.1° · 47.2° → 42.8° · 37.8° · 17.1° · 47.2° |
+| football | 4 (17.1) → **1** (4.27) | 4 · 0 → 1 · 0 | 17.1° · 12.4° · 18.1° · 31.1° → 17.1° · 11.1° · 18.1° · 30.8° |
+| derby | 0 (0) → **0** (0) | 0 · 0 → 0 · 0 | 14° · 3.7° · 15.6° · 38.8° → 14° · 3.9° · 15.6° · 38.8° |
+
+| Mode, same build | knobs off (`anim.fadeHoldEnded` 0, `anim.plantReplantEase` 0) | knobs on |
+|---|---|---|
+| showdown | 8 hard pops | **4** |
+| karate | 10 | **8** |
+
+Aero Aces, the planter A/B on the before-build: 3 hard pops, knee 63.1° → **0**, every bone under 1.3° with `?noplant=1`. The
+fix (#4) marks the pilot seated; its after-run: see below.
+
+### What is left, ranked (hard pops a minute × how many modes), with its owner
+
+1. **Strike and swing onsets** — karate, karate VS, mixed combat, showdown, tiebreak, skateboard's ollie, the football tackle: a
+   capture's fast first frames landing inside a 0.04–0.07 s fade (arms 30–42°). Every one is a tuned fade time. *Owner: you (a feel
+   call), then the animation lane.* `anim.inertial` (AF-1, off) is the lever that does not slow the strikes.
+2. **The dunk's dribble run-up** (`bball_mc_dribble_run`, arms to 103° a frame, 14 hard pops in 14 s). *dunk-flagship.*
+3. **1v1 / 3v3 / 3PT** — the plant-and-cut lock (a thigh 167–179° in one frame), the defend slides, the catch hop → follow-through.
+   Not touched here. *Hoops lanes.*
+4. **The orphan** — a third clip played inside a fade retires the clip being faded out on the spot (duel ×3 a run, arms 24–27°).
+   Keeping it fading fixed the frame but made three-clip blends that flip (118°, karate). *This lane, next pass: keep the blend to two
+   clips, or the inertial blend.*
+5. **Knockdown → get-up** (karate family): the right arm 98–153° in ONE frame at the end of the 0.1 s fade, in 3 runs, **with this
+   lane's knobs off as well as on** (so not caused by them); not reproduced headless on the bare hero, so a layer is in it. *This
+   lane, next pass, with the layer-off flags on a run that reaches it.*
+6. **Surf's air restarted while playing** — the animator's same-clip restart drops the clip to weight 0 and fades it back in (0.81 →
+   0.14 in one frame, right arm 78°). *This lane (CharacterAnimator), next pass.*
+7. **Clip content** — `tennis_swing.M` (a right-thigh frame of 34°), `board_push` (right thigh 47°), the dance stumble, the keeper's
+   mirrored dive, the baseball swing's contact (arms 27–35°, with the bat-grip lane's hold). *Animation lane / bat-grip.*
+8. **The dunk duel's** `dunk_mocap` → hang → land (arms 69°). *dunk-flagship.*
+
+Not touched, as asked: the hoops plant-and-cut lock, `legSink`, `FootGlide`, `basketballTree.ts`, `baseballBat.ts`, the derby
+vault's 1.7× rate.
+
+
 ## 5. For the dunk and hoops lanes (routed, not changed here)
 
 Measured by the same rig on `/play/dunk`, `/play/onevone` and `/play/threevthree`. The occluder fade is off for these
