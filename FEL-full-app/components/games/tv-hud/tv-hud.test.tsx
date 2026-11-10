@@ -151,8 +151,9 @@ describe('wiring: presentation only', () => {
   // TEST CHANGED (A11-03, lane/a11y-design, 2026-10-25): the colour-vision preference joins the motion preference on the
   // list. It is the same kind of import — a player's presentation choice (lib/a11y/colorVision.ts: tones and band patterns,
   // no number, window or size) — and the next test still holds that nothing about scores or timing comes in.
-  it('the system imports only React, framer-motion, its own files, the console view and the motion and colour-vision preferences', () => {
-    const allowed = /^(react|framer-motion|\.\/[\w-]+|@\/lib\/ui\/consoleView|@\/lib\/a11y\/reducedMotion|@\/lib\/a11y\/colorVision)$/;
+  it('the system imports only React, framer-motion, its own files, the console view, the motion and colour-vision preferences and the read-time rule', () => {
+    // lib/readable/rules (lane/readable, 2026-11-02): pure, presentation only — how long a card stays up to be read
+    const allowed = /^(react|framer-motion|\.\/[\w-]+|@\/lib\/ui\/consoleView|@\/lib\/a11y\/reducedMotion|@\/lib\/a11y\/colorVision|@\/lib\/readable\/rules)$/;
     for (const f of sources) {
       const src = readFileSync(path.join(dir, f), 'utf8');
       for (const [, spec] of src.matchAll(/from '([^']+)'/g)) expect(spec, `${f} imports ${spec}`).toMatch(allowed);

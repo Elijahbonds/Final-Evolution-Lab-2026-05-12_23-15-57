@@ -108,13 +108,13 @@ export function ShardStore() {
           <h1 className="flex items-center gap-2 text-2xl font-bold text-white">
             <Gem className="h-6 w-6 text-[#C79BFF]" /> Get Shards
             {copy.badge && (
-              <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white/50">{copy.badge}</span>
+              <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[12px] font-semibold uppercase tracking-wide text-white/50">{copy.badge}</span>
             )}
           </h1>
           <p className="mt-1 text-sm text-white/50">{copy.shardStoreIntro}</p>
         </div>
         <div className="shrink-0 rounded-xl border border-[#C79BFF]/30 bg-[#C79BFF]/5 px-3 py-2 text-right">
-          <div className="text-[10px] uppercase tracking-wide text-white/40">Balance</div>
+          <div className="text-[12px] uppercase tracking-wide text-white/50">Balance</div>
           <div className="flex items-center justify-end gap-1 text-lg font-bold text-[#C79BFF]">
             <Gem className="h-4 w-4" /> {balance === null ? '—' : balance.toLocaleString()}
           </div>
@@ -133,7 +133,7 @@ export function ShardStore() {
               className="relative flex flex-col rounded-2xl border border-white/10 bg-white/[0.03] p-5 transition hover:border-[#C79BFF]/40 hover:bg-[#C79BFF]/[0.04]"
             >
               {pack.badge && (
-                <span className="absolute -top-2 right-4 rounded-full bg-[#A855F7] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow-lg">
+                <span className="absolute -top-2 right-4 rounded-full bg-[#A855F7] px-2.5 py-0.5 text-[12px] font-bold uppercase tracking-wide text-white shadow-lg">
                   {pack.badge}
                 </span>
               )}
@@ -141,7 +141,7 @@ export function ShardStore() {
               <div className="mt-2 flex items-baseline gap-2">
                 <Gem className="h-6 w-6 text-[#C79BFF]" />
                 <span className="text-3xl font-extrabold text-white">{total.toLocaleString()}</span>
-                <span className="text-sm text-white/40">shards</span>
+                <span className="text-sm text-white/50">shards</span>
               </div>
               {pack.bonus > 0 && (
                 <div className="mt-1 flex items-center gap-1 text-xs font-semibold text-[#00FF9D]">

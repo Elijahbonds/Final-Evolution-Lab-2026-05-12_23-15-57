@@ -37,12 +37,12 @@ function Item({ item }: { item: SharedItem }) {
     <li className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
       <div className="flex flex-wrap items-baseline gap-x-2">
         <span className="font-medium text-white/90">{item.title}</span>
-        {item.frequency ? <span className="text-xs text-white/45">{item.frequency}x/week</span> : null}
-        <span className="text-xs text-white/35">{item.minutes} min</span>
+        {item.frequency ? <span className="text-xs text-white/50">{item.frequency}x/week</span> : null}
+        <span className="text-xs text-white/50">{item.minutes} min</span>
       </div>
       {item.prescription ? <p className="mt-1 text-sm text-white/70">{item.prescription}</p> : null}
       {item.opensAt?.length ? (
-        <p className="mt-2 flex items-center gap-1.5 text-[11px] text-white/40">
+        <p className="mt-2 flex items-center gap-1.5 text-[12px] text-white/50">
           <Lock className="h-3 w-3" />
           Opens at {item.opensAt.map((o) => `${o.label} ${o.need}`).join(', ')}
         </p>
@@ -68,14 +68,14 @@ function Body({ share }: { share: Share }) {
           <div className="space-y-5">
             {share.weeks.map((w) => (
               <section key={w.week}>
-                <h2 className="mb-2 font-mono text-[11px] uppercase tracking-widest text-white/40">
+                <h2 className="mb-2 font-mono text-[12px] uppercase tracking-widest text-white/50">
                   Week {w.week} · {w.focus}
                 </h2>
                 <ul className="space-y-2">{w.items.map((i, n) => <Item key={`${i.protocolKey}-${n}`} item={i} />)}</ul>
               </section>
             ))}
           </div>
-          <p className="mt-5 flex items-center gap-1.5 text-xs text-white/45">
+          <p className="mt-5 flex items-center gap-1.5 text-xs text-white/50">
             <Clock className="h-3.5 w-3.5" /> Retest after week {share.retestAfterWeeks}.
           </p>
         </>
@@ -160,7 +160,7 @@ export default async function SharePage({ params }: { params: { token: string } 
         </div>
       )}
 
-      <p className="mt-6 text-[11px] leading-relaxed text-white/30">
+      <p className="mt-6 text-[12px] leading-relaxed text-white/50">
         Training guidance from an independent coach. Final Evolution Lab is a performance and movement
         platform — nothing here is medical advice, diagnosis or treatment.
       </p>

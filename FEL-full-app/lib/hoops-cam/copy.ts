@@ -17,6 +17,11 @@ export const SPOT_LINE = 'Spots are approximate: read from where your feet were 
 export const RIM_LINE = 'Tap the left end of the rim, then the right end.';
 export const RIM_SUGGEST_LINE = 'Is that the rim? Use it, or tap the two ends yourself.';
 export const ASK_LINE = 'Did that one go in?';
+// BBS-04 (2026-11-03): saved to the account (a verified adult who opted in, once the table is applied), and the coach's side
+export const SERVER_LINE = 'Saved to your account. A coach sees it only if you share your numbers with them.';
+export const COACH_LINE = 'From the camera beta: a shot can be missed or called wrong, and spots are approximate.';
+export const COACH_DARK_LINE = 'Shot charts open for coaches when their table is applied. Players can already track shots on their phones.';
+export const NOT_SHARED_LINE = 'Not shared with you.';
 
 /** The set-up guide for shots. */
 export const SHOT_GUIDE: readonly string[] = [
@@ -52,4 +57,4 @@ export function statusLine(s: HoopsStatus, mode: 'shots' | 'dribble'): string {
 export const pctText = (made: number, taken: number): string => (taken ? `${Math.round((made / taken) * 100)}%` : '—');
 
 /** Every fixed line, for the copy test. */
-export const FIXED_LINES = [BETA_LINE, PRIVACY_LINE, DEVICE_LINE, TEEN_LINE, UNDER_13_LINE, AGE_UNKNOWN_LINE, SPOT_LINE, RIM_LINE, RIM_SUGGEST_LINE, ASK_LINE, ...SHOT_GUIDE, ...DRIBBLE_GUIDE];
+export const FIXED_LINES = [BETA_LINE, PRIVACY_LINE, DEVICE_LINE, SERVER_LINE, COACH_LINE, COACH_DARK_LINE, NOT_SHARED_LINE, TEEN_LINE, UNDER_13_LINE, AGE_UNKNOWN_LINE, SPOT_LINE, RIM_LINE, RIM_SUGGEST_LINE, ASK_LINE, ...SHOT_GUIDE, ...DRIBBLE_GUIDE];

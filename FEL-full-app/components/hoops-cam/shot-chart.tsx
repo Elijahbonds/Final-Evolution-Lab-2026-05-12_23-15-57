@@ -30,12 +30,15 @@ function Court() {
   );
 }
 
-export function ShotChart({ shots, zones, title = 'Shot chart' }: { shots: readonly ChartShot[]; zones: Record<keyof typeof ZONES, Tally>; title?: string }) {
+/** `total` / `noSpot` (BBS-04): a coach's window passes its own totals when `shots` is only the (capped) dots. */
+export function ShotChart({ shots, zones, title = 'Shot chart', total, noSpot }: { shots: readonly ChartShot[]; zones: Record<keyof typeof ZONES, Tally>; title?: string; total?: Tally; noSpot?: number }) {
   const placed = shots.filter((s) => s.x !== null && s.z !== null);
-  const made = shots.filter((s) => s.made).length;
+  const made = total ? total.made : shots.filter((s) => s.made).length;
+  const taken = total ? total.taken : shots.length;
+  const unplaced = noSpot ?? shots.length - placed.length;
   return (
     <figure className="space-y-2" data-hoops-chart>
-      <svg viewBox={`${X0} ${Z0} ${X1 - X0} ${Z1 - Z0}`} role="img" aria-label={`${title}: ${made} made of ${shots.length}, ${placed.length} with a spot`}
+      <svg viewBox={`${X0} ${Z0} ${X1 - X0} ${Z1 - Z0}`} role="img" aria-label={`${title}: ${made} made of ${taken}, ${taken - unplaced} with a spot`}
         className="w-full rounded-lg bg-white/[0.03]">
         <Court />
         {placed.map((s, i) => (
@@ -52,10 +55,10 @@ export function ShotChart({ shots, zones, title = 'Shot chart' }: { shots: reado
       <figcaption className="flex flex-wrap items-center gap-3 text-[11px] text-white/60">
         <span className="flex items-center gap-1"><svg width="10" height="10" aria-hidden><circle cx="5" cy="5" r="4" fill={MAKE} /></svg>Make</span>
         <span className="flex items-center gap-1"><svg width="10" height="10" aria-hidden><circle cx="5" cy="5" r="3.3" fill="none" stroke={MISS} strokeWidth="1.5" /></svg>Miss</span>
-        {placed.length < shots.length && <span>{shots.length - placed.length} with no spot (counted in the totals)</span>}
+        {unplaced > 0 && <span>{unplaced} with no spot (counted in the totals)</span>}
       </figcaption>
       <table className="w-full text-left text-[12px] tabular-nums text-white/75" data-hoops-zones>
-        <thead><tr className="text-white/45"><th className="font-normal">Zone</th><th className="font-normal">Made</th><th className="font-normal">%</th></tr></thead>
+        <thead><tr className="text-white/60"><th className="font-normal">Zone</th><th className="font-normal">Made</th><th className="font-normal">%</th></tr></thead>
         <tbody>
           {ZONE_IDS.filter((z) => zones[z].taken > 0).map((z) => (
             <tr key={z} data-hoops-zone={z}><td>{ZONES[z]}</td><td>{zones[z].made}/{zones[z].taken}</td><td>{Math.round((zones[z].made / zones[z].taken) * 100)}%</td></tr>

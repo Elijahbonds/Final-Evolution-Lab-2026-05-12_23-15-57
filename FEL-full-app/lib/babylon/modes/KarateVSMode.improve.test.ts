@@ -89,8 +89,10 @@ describe('#14 BannerSlot — an older banner\'s expiry never wipes a newer one',
     b.show('COUNTER!', 0.6, 0.5);
     expect(b.tick(0.95)).toBeNull();              // past the first banner's expiry: the second stays up
     expect(b.current).toBe('COUNTER!');
-    expect(b.tick(1.1)).toBe('');                  // its own expiry clears it, once
-    expect(b.tick(1.2)).toBeNull();
+    // READABLE (2026-11-02): up for its read time (1 word → 1.3 s, its life was 0.6 s): it expires at 1.8, not 1.1
+    expect(b.tick(1.1)).toBeNull();
+    expect(b.tick(1.81)).toBe('');                 // its own expiry clears it, once
+    expect(b.tick(1.9)).toBeNull();
   });
   it('Infinity holds until the next banner; clear() empties it', () => {
     const b = new BannerSlot();

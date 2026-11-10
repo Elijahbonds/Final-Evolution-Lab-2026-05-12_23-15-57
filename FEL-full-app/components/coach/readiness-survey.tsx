@@ -38,7 +38,7 @@ export function ReadinessSurvey({ api = READINESS_SURVEY_API }: { api?: string }
   if (!ctx.ready) return null;   // before the pending SQL the jump check stands alone
   return (
     <section className="fel-card min-w-0 space-y-3 rounded-xl p-4" data-readiness-survey>
-      <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/40"><ClipboardList className="h-3.5 w-3.5" /> Five-question check-in</div>
+      <div className="flex items-center gap-2 text-[12px] uppercase tracking-wider text-white/50"><ClipboardList className="h-3.5 w-3.5" /> Five-question check-in</div>
       <p className="text-sm text-white/70">{SURVEY_INTRO}</p>
       {view ? (
         <div className="space-y-1" data-survey-result={view.band}>
@@ -60,7 +60,7 @@ export function ReadinessSurvey({ api = READINESS_SURVEY_API }: { api?: string }
                     className={`min-h-10 rounded-lg border text-sm ${answers[item.id] === v ? 'border-[#00E5FF]/60 bg-[#00E5FF]/10 text-[#00E5FF]' : 'border-white/10 text-white/60'}`}>{v}</button>
                 ))}
               </div>
-              <div className="flex justify-between text-[11px] text-white/40"><span>{item.anchors[1]}</span><span>{item.anchors[5]}</span></div>
+              <div className="flex justify-between text-[12px] text-white/50"><span>{item.anchors[1]}</span><span>{item.anchors[5]}</span></div>
             </fieldset>
           ))}
           {msg && <p className="text-xs text-[#FFB020]" role="alert">{msg}</p>}

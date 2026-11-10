@@ -12,6 +12,8 @@
 //   #13 the arrow turned between two exact predictions (rotateAbout);
 //   #17 the swing meter's HUD pushed only when a published value changes.
 
+import { readableMs } from '../../readable/rules';
+
 /** Pars of the loop's holes, by length (m from the tee). The field is 60 x 90 and the pin stays inside x ±10, z ≤ 38, so a
  *  par 5 here is ~36 m: par is the hole's difficulty on this course's scale, not a real-golf yardage. */
 export const PAR_BANDS: Readonly<Record<3 | 4 | 5, readonly [number, number]>> = { 3: [22, 26], 4: [28, 32], 5: [34, 37.4] };
@@ -176,7 +178,9 @@ export class BannerChannel {
   /** Shown, then cleared after `ms` — unless something newer took the channel first. */
   flash(text: string, ms: number): void {
     this.cancel(); this.push(text);
-    this.clearT = this.timers.later(() => { this.clearT = null; this.push(''); }, ms);
+    // READABLE (2026-11-02): up for at least its read time (words × 0.3 s + 1 s; lib/readable/rules.ts). A newer flash
+    // still takes the channel at once, so a fast run of banners is never queued behind a slow one.
+    this.clearT = this.timers.later(() => { this.clearT = null; this.push(''); }, readableMs(text, ms));
   }
   /** A banner some other line is publishing (with its own clear): any pending flash clear is cancelled so it cannot wipe it. */
   cancel(): void { this.timers.cancel(this.clearT); this.clearT = null; }

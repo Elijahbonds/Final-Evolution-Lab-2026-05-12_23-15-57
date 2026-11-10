@@ -64,7 +64,7 @@ export function CoachCalendar({ api = COACH_SCHEDULE_API }: { api?: string }) {
   return (
     <section className="fel-card min-w-0 space-y-3 rounded-xl p-4" data-coach-calendar>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/40"><CalendarDays className="h-3.5 w-3.5" /> Calendar · next 4 weeks</div>
+        <div className="flex items-center gap-2 text-[12px] uppercase tracking-wider text-white/50"><CalendarDays className="h-3.5 w-3.5" /> Calendar · next 4 weeks</div>
         {!adding && <button type="button" onClick={() => setAdding(true)} className="flex min-h-10 items-center gap-1 rounded-lg border border-[#00E5FF]/50 px-3 text-sm text-[#00E5FF]" data-calendar-new><Plus className="h-4 w-4" /> Session</button>}
       </div>
       {msg && <p className="break-words text-xs text-white/60" data-calendar-msg>{msg}</p>}
@@ -92,10 +92,10 @@ export function CoachCalendar({ api = COACH_SCHEDULE_API }: { api?: string }) {
       {!live.length && !adding && <p className="text-sm text-white/50">Nothing scheduled. Add a practice and your roster sees it on Today.</p>}
       {groupByDay(live).map(([day, rows]) => (
         <div key={day} className="space-y-1">
-          <div className="text-[11px] uppercase tracking-wider text-white/40">{day}</div>
+          <div className="text-[12px] uppercase tracking-wider text-white/50">{day}</div>
           {rows.map((s) => (
             <div key={s.id} className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-lg border border-white/8 bg-white/[0.02] px-2 py-1.5 text-xs" data-calendar-session>
-              <span className="min-w-0 break-words text-white">{time(s.startsAt)}–{time(s.endsAt)} · {s.title}<span className="text-white/45"> · {s.reaches}{s.place ? ` · ${s.place}` : ''}</span></span>
+              <span className="min-w-0 break-words text-white">{time(s.startsAt)}–{time(s.endsAt)} · {s.title}<span className="text-white/50"> · {s.reaches}{s.place ? ` · ${s.place}` : ''}</span></span>
               <button type="button" onClick={() => void post({ action: 'cancel', id: s.id }).then(load)} className="min-h-9 shrink-0 rounded-md border border-white/15 px-2 text-white/55">Cancel</button>
             </div>
           ))}

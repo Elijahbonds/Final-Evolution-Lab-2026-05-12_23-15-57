@@ -66,7 +66,7 @@ for (let i = 0; i < 900 && !(await seamOk()); i++) {
 if (!(await seamOk())) { say('no seam ' + JSON.stringify(await ev(() => [window.__phase, window.__err]))); say(pageErrs.join('\n')); await browser.close(); process.exit(2); }
 for (let i = 0; i < 300; i++) { const ph = await ev(() => window.__phase); if (ph === 'playing') break; if (ph === 'ready' || ph === 'paused') await start(); await new Promise((r) => setTimeout(r, 400)); }
 const loadWallS = (Date.now() - T0) / 1000;
-await ev((c) => { window.__HG_CFG = Object.assign(window.__HG_CFG || {}, c); }, { noPoke: process.env.BOT_NOPOKE === '1' });   // hoops-p04: BOT_NOPOKE=1, the bot never reaches (a possession plays out to its shot)
+await ev((c) => { window.__HG_CFG = Object.assign(window.__HG_CFG || {}, c); }, { noPoke: process.env.BOT_NOPOKE === '1', clipLog: !!process.env.POP_LIST, stageLog: !!process.env.POP_LIST });   // hoops-p04: BOT_NOPOKE=1, the bot never reaches (a possession plays out to its shot)
 say('playing after ' + loadWallS.toFixed(0) + ' s wall; page.js: ' + await ev(fs.readFileSync(path.join(HERE, 'page.js'), 'utf8')));
 const shot = async (name) => { const f = path.join(SHOTS, `${MODE}-${name}.png`); await page.screenshot({ path: f }).catch(() => {}); return f; };
 const saveStrip = async (name) => { const urls = await ev((n) => window.__hg.strips[n] || [], name); const dir = path.join(SHOTS, `strip-${MODE}-${name}`); fs.mkdirSync(dir, { recursive: true }); urls.forEach((u, i) => { if (u) fs.writeFileSync(path.join(dir, `${String(i).padStart(2, '0')}.jpg`), Buffer.from(u.split(',')[1], 'base64')); }); return urls.length; };
@@ -143,7 +143,7 @@ if (SCEN === 'game') {
 } else if (SCEN === 'poss') {   // hoops-p02: the possession loop alone
   if (process.env.POSS_MOTION) await ev(() => window.__hg.start());   // hoops-p03: record the bodies over the loop (per-body root accel p99, pops)
   result.poss = await possLoop();
-  if (process.env.POSS_MOTION) { await ev(() => window.__hg.stop()); result.analysis = await ev(() => window.__hg.analyse()); } result.log = await ev(() => window.__LOG); result.hud = await ev(() => window.__hud); result.snaps = await ev(() => window.__hg.snaps || []);
+  if (process.env.POSS_MOTION) { await ev(() => window.__hg.stop()); result.analysis = await ev((o) => window.__hg.analyse(o), { popList: !!process.env.POP_LIST }); if (process.env.POP_LIST) { result.clips = await ev(() => window.__hg.clips || []); result.stageEv = await ev(() => window.__hg.stageEv || []); } } result.log = await ev(() => window.__LOG); result.hud = await ev(() => window.__hud); result.snaps = await ev(() => window.__hg.snaps || []);
   { const names = await ev(() => Object.keys(window.__hg.strips).filter((k) => k.startsWith('auto-'))); for (const nm of names) await saveStrip(nm); result.autoStrips = names; }
 } else if (SCEN === 'input') {
   const S = (fn, arg) => ev(fn, arg);
@@ -201,7 +201,8 @@ if (SCEN === 'game') {
   if (POSS > 0) { await ev(() => window.__hg.stop()); result.poss = await possLoop(); const names = await ev(() => Object.keys(window.__hg.strips).filter((k) => k.startsWith('auto-'))); for (const nm of names) await saveStrip(nm); result.autoStrips = names; }   // hoops-p02
   await ev(() => window.__hg.stop());
   // hoops-p01: the hero's pops in the 0.75 s from each stop's first frame (a stop / launch touch must not add pops)
-  const an = await ev(() => window.__hg.analyse({ popFrames: true }));
+  const an = await ev((o) => window.__hg.analyse(o), { popFrames: true, popList: !!process.env.POP_LIST });
+  if (process.env.POP_LIST) { result.clips = await ev(() => window.__hg.clips || []); result.stageEv = await ev(() => window.__hg.stageEv || []); }   // hoops-p04b
   const popAt = (an.perBody.me && an.perBody.me.popAt) || []; const hf0 = an.f0 || 0;
   const popsAfter = (s0) => popAt.filter((i) => i >= s0 - hf0 && i <= s0 - hf0 + 45).length;
   result.stopPops = { afterReversal: [...R.stick, ...R.stickTurbo].map((x) => popsAfter(x.frames.s0)), jog: R.stopJog.map((x) => popsAfter(x.frames.s0)), sprint: R.stopSprint.map((x) => popsAfter(x.frames.s0)) };

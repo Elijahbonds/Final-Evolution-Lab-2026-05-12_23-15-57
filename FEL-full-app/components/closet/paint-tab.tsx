@@ -92,14 +92,14 @@ export function PaintTab({ layers, suit, onChange, onSuit, accent, marks, onMark
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-white/10 bg-white/[0.02] p-3">
         <div className="min-w-[140px] flex-1">
-          <div className="flex items-center justify-between text-[11px] text-white/60">
+          <div className="flex items-center justify-between text-[12px] text-white/60">
             <span className="flex items-center gap-1"><Paintbrush className="h-3.5 w-3.5 text-cyan-400" /> Paint layers</span>
             <span className="tabular-nums" aria-label="layers used">{layers.length} / {PAINT_BUDGET}</span>
           </div>
           <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/10">
             <div className="h-full rounded-full transition-all" style={{ width: `${(100 * layers.length) / PAINT_BUDGET}%`, backgroundColor: full ? '#FF3366' : '#00E5FF' }} />
           </div>
-          <p className="mt-1 text-[10px] text-white/35">The top of the list paints over the layers under it.</p>
+          <p className="mt-1 text-[12px] text-white/50">The top of the list paints over the layers under it.</p>
         </div>
         <button type="button" onClick={onUndo} disabled={!canUndo} aria-label="Undo" title="Undo (Ctrl+Z)"
           className="flex items-center gap-1 rounded-lg bg-white/5 px-2.5 py-1.5 text-xs text-white/80 transition hover:bg-white/10 disabled:opacity-30"><Undo2 className="h-3.5 w-3.5" /> Undo</button>
@@ -122,7 +122,7 @@ export function PaintTab({ layers, suit, onChange, onSuit, accent, marks, onMark
         <div className="grid grid-cols-5 gap-1.5">
           {TYPES.map((t) => (
             <button key={t} type="button" disabled={full || (t === 'mark' && (!onMarks || !fitsMarkBudget(marks)))} onClick={() => add(t)} title={t === 'mark' ? `Draw your own stamp (up to ${MAX_MARKS})` : `Add a ${TYPE_LABELS[t].toLowerCase()} layer`}
-              className="flex items-center justify-center gap-1 rounded-lg border border-white/10 bg-white/[0.03] px-2 py-1.5 text-[11px] text-white/80 transition hover:border-cyan-400/50 hover:bg-cyan-400/10 disabled:opacity-30">
+              className="flex items-center justify-center gap-1 rounded-lg border border-white/10 bg-white/[0.03] px-2 py-1.5 text-[12px] text-white/80 transition hover:border-cyan-400/50 hover:bg-cyan-400/10 disabled:opacity-30">
               <Plus className="h-3 w-3 text-cyan-300/80" /> {TYPE_LABELS[t]}
             </button>
           ))}
@@ -132,7 +132,7 @@ export function PaintTab({ layers, suit, onChange, onSuit, accent, marks, onMark
       <section>
         <h3 className="mb-2 text-sm font-semibold text-white/80">Layers</h3>
         {layers.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-white/10 p-4 text-center text-xs text-white/40">No paint yet. Add a fill, a pattern, a stamp or text above — or switch on suit mode and paint the whole body.</p>
+          <p className="rounded-lg border border-dashed border-white/10 p-4 text-center text-xs text-white/50">No paint yet. Add a fill, a pattern, a stamp or text above — or switch on suit mode and paint the whole body.</p>
         ) : (
           <ul className="max-h-56 space-y-1 overflow-y-auto pr-1" aria-label="Paint layers">
             {[...layers].reverse().map((l, ri) => {
@@ -165,7 +165,7 @@ export function PaintTab({ layers, suit, onChange, onSuit, accent, marks, onMark
       {selected && (
         <section className="space-y-4 rounded-xl border border-cyan-400/20 bg-cyan-400/[0.03] p-4" aria-label="Selected layer">
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="flex flex-col gap-1 text-[11px] text-white/60">
+            <label className="flex flex-col gap-1 text-[12px] text-white/60">
               <span>Where</span>
               <select value={selected.region} aria-label="Region" onChange={(e) => edit({ region: e.target.value as PaintRegion })}
                 className="rounded-md border border-white/10 bg-[#0b1220] px-2 py-1.5 text-xs text-white">
@@ -176,8 +176,8 @@ export function PaintTab({ layers, suit, onChange, onSuit, accent, marks, onMark
                 ))}
               </select>
             </label>
-            <div className="flex flex-col gap-1 text-[11px] text-white/60">
-              <span>Paints {suit && <span className="text-white/35">(suit mode: the skin)</span>}</span>
+            <div className="flex flex-col gap-1 text-[12px] text-white/60">
+              <span>Paints {suit && <span className="text-white/50">(suit mode: the skin)</span>}</span>
               <div className="flex gap-1" role="group" aria-label="Surface">
                 {PAINT_SURFACES.map((s: PaintSurface) => (
                   <Pill key={s} on={selected.surface === s} disabled={suit} onClick={() => edit({ surface: s })}>{SURFACE_LABELS[s]}</Pill>
@@ -200,22 +200,22 @@ export function PaintTab({ layers, suit, onChange, onSuit, accent, marks, onMark
           )}
 
           <div className="space-y-2">
-            <h4 className="text-[11px] font-semibold uppercase tracking-wider text-white/45">Colours</h4>
+            <h4 className="text-[12px] font-semibold uppercase tracking-wider text-white/50">Colours</h4>
             {selected.colours.map((c, i) => (
-              <div key={i} className="flex flex-wrap items-center gap-2 text-[11px] text-white/60">
+              <div key={i} className="flex flex-wrap items-center gap-2 text-[12px] text-white/60">
                 <span className="w-14">{roles[i] ?? `Colour ${i + 1}`}</span>
                 <input type="color" value={c.toLowerCase()} aria-label={`${roles[i] ?? 'Colour'} colour`}
                   onChange={(e) => setColour(i, e.target.value, `colour${i}`)} className="h-8 w-10 cursor-pointer rounded border border-white/15 bg-transparent" />
                 <HexField value={c} label={`${roles[i] ?? 'Colour'} hex`} onCommit={(hex) => setColour(i, hex)} />
                 {i > 0 && (
                   <button type="button" onClick={() => edit({ colours: selected.colours.filter((_, k) => k !== i) })}
-                    className="rounded px-1.5 py-0.5 text-white/40 hover:bg-white/10 hover:text-white/80" aria-label={`Remove the ${roles[i] ?? 'colour'}`}>×</button>
+                    className="rounded px-1.5 py-0.5 text-white/50 hover:bg-white/10 hover:text-white/80" aria-label={`Remove the ${roles[i] ?? 'colour'}`}>×</button>
                 )}
               </div>
             ))}
             {selected.colours.length < roles.length && (
               <button type="button" onClick={() => edit({ colours: [...selected.colours, selected.colours.length === 1 ? SECOND : THIRD] })}
-                className="flex items-center gap-1 text-[11px] text-cyan-300/80 hover:text-cyan-200"><Plus className="h-3 w-3" /> Add {roles[selected.colours.length].toLowerCase()}</button>
+                className="flex items-center gap-1 text-[12px] text-cyan-300/80 hover:text-cyan-200"><Plus className="h-3 w-3" /> Add {roles[selected.colours.length].toLowerCase()}</button>
             )}
           </div>
 
@@ -225,7 +225,7 @@ export function PaintTab({ layers, suit, onChange, onSuit, accent, marks, onMark
                 <Pill key={b} on={(selected.blend ?? 'normal') === b} onClick={() => edit({ blend: b === 'normal' ? undefined : b })}>{BLEND_LABELS[b]}</Pill>
               ))}
             </div>
-            <label className="flex items-center gap-2 text-[11px] text-white/70" title={placed ? 'Also on the other side, mirrored' : 'Mirror left and right'}>
+            <label className="flex items-center gap-2 text-[12px] text-white/70" title={placed ? 'Also on the other side, mirrored' : 'Mirror left and right'}>
               <input type="checkbox" checked={selected.mirror} onChange={(e) => edit({ mirror: e.target.checked })} className="accent-cyan-400" aria-label="Mirror" />
               <FlipHorizontal className="h-3.5 w-3.5" /> Mirror
             </label>
@@ -261,7 +261,7 @@ function IconBtn({ label, onClick, disabled, danger, children }: { label: string
 function Pill({ on, onClick, disabled, children }: { on: boolean; onClick: () => void; disabled?: boolean; children: React.ReactNode }) {
   return (
     <button type="button" aria-pressed={on} disabled={disabled} onClick={onClick}
-      className="rounded-full px-2.5 py-1 text-[11px] transition disabled:opacity-40"
+      className="rounded-full px-2.5 py-1 text-[12px] transition disabled:opacity-40"
       style={{ backgroundColor: on ? '#00E5FF' : 'rgba(255,255,255,0.05)', color: on ? '#050505' : 'rgba(255,255,255,0.75)', border: `1px solid ${on ? '#00E5FF' : 'rgba(255,255,255,0.12)'}` }}>
       {children}
     </button>
@@ -271,11 +271,11 @@ function Pill({ on, onClick, disabled, children }: { on: boolean; onClick: () =>
 function Picker<T extends string>({ label, items, names, value, onPick }: { label: string; items: readonly T[]; names: Record<T, string>; value: T; onPick: (v: T) => void }) {
   return (
     <div>
-      <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-white/45">{label}</h4>
+      <h4 className="mb-1.5 text-[12px] font-semibold uppercase tracking-wider text-white/50">{label}</h4>
       <div className="grid grid-cols-3 gap-1 sm:grid-cols-4" role="group" aria-label={label}>
         {items.map((it) => (
           <button key={it} type="button" aria-pressed={value === it} onClick={() => onPick(it)}
-            className="rounded-md border px-2 py-1 text-[11px] transition"
+            className="rounded-md border px-2 py-1 text-[12px] transition"
             style={{ borderColor: value === it ? '#00E5FF' : 'rgba(255,255,255,0.1)', backgroundColor: value === it ? 'rgba(0,229,255,0.12)' : 'rgba(255,255,255,0.02)', color: 'rgba(255,255,255,0.8)' }}>
             {names[it]}
           </button>
@@ -291,8 +291,8 @@ function TextField({ value, onCommit }: { value: string; onCommit: (t: string) =
   const shown = draft ?? value;
   const commit = () => { const t = sanitizeStampText(draft ?? value); if (draft !== null && t) onCommit(t); setDraft(null); };
   return (
-    <label className="flex flex-col gap-1 text-[11px] text-white/60">
-      <span>Text <span className="text-white/35">(A–Z, 0–9, space and hyphen; 12 characters)</span></span>
+    <label className="flex flex-col gap-1 text-[12px] text-white/60">
+      <span>Text <span className="text-white/50">(A–Z, 0–9, space and hyphen; 12 characters)</span></span>
       <input type="text" value={shown} maxLength={12} aria-label="Layer text" spellCheck={false}
         onChange={(e) => setDraft(e.target.value.toUpperCase())}
         onBlur={commit} onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setDraft(null); }}

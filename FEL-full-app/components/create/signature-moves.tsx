@@ -33,7 +33,7 @@ export async function SignatureMoves({ ownerId, accent = '#00E5FF' }: { ownerId:
         {items.map((m) => (
           <li key={m.id} className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
             <p className="truncate text-sm font-semibold text-white"><span aria-hidden style={{ color: accent }}>◆ </span>{m.name}</p>
-            {m.detail && <p className="truncate font-mono text-[11px] text-white/50">{m.detail}</p>}
+            {m.detail && <p className="truncate font-mono text-[12px] text-white/50">{m.detail}</p>}
           </li>
         ))}
       </ul>

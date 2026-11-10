@@ -64,15 +64,15 @@ function ScreenedField({
   return (
     <div>
       <div className="mb-1 flex items-baseline justify-between">
-        <label className="text-[11px] uppercase tracking-wider text-fel-dim">{label}</label>
-        <span className={`text-[11px] ${over ? 'text-red-400' : 'text-fel-quiet'}`}>{value.length}/{max}</span>
+        <label className="text-[12px] uppercase tracking-wider text-fel-dim">{label}</label>
+        <span className={`text-[12px] ${over ? 'text-red-400' : 'text-fel-quiet'}`}>{value.length}/{max}</span>
       </div>
       <textarea
         rows={rows}
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
-        className={`w-full resize-y rounded-lg bg-white/[0.03] px-3 py-2 text-sm text-white/90 outline-none transition-colors placeholder:text-white/25 ${
+        className={`w-full resize-y rounded-lg bg-white/[0.03] px-3 py-2 text-sm text-white/90 outline-none transition-colors placeholder:text-white/50 ${
           flags.length ? 'border border-amber-500/50 focus:border-amber-400' : 'border border-white/8 focus:border-fel-cyan/50'
         }`}
       />
@@ -91,7 +91,7 @@ function Flags({ flags }: { flags: TextFlag[] }) {
           <p className="text-xs leading-relaxed text-amber-200/90">{screenSummary(flags)}</p>
           <ul className="space-y-1">
             {flags.map((f, i) => (
-              <li key={`${f.at}-${i}`} className="text-[11px] text-white/55">
+              <li key={`${f.at}-${i}`} className="text-[12px] text-white/55">
                 <span className="rounded bg-amber-500/20 px-1 py-0.5 font-mono text-amber-200">{f.found}</span>
                 {' — '}{f.fix}
               </li>
@@ -108,13 +108,13 @@ function Field({ label, value, onChange, placeholder, max }: {
 }) {
   return (
     <div>
-      <label className="mb-1 block text-[11px] uppercase tracking-wider text-fel-dim">{label}</label>
+      <label className="mb-1 block text-[12px] uppercase tracking-wider text-fel-dim">{label}</label>
       <input
         value={value}
         maxLength={max}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-white/8 bg-white/[0.03] px-3 py-2 text-sm text-white/90 outline-none transition-colors placeholder:text-white/25 focus:border-fel-cyan/50"
+        className="w-full rounded-lg border border-white/8 bg-white/[0.03] px-3 py-2 text-sm text-white/90 outline-none transition-colors placeholder:text-white/50 focus:border-fel-cyan/50"
       />
     </div>
   );
@@ -142,7 +142,7 @@ function ProtocolPicker({ selected, onToggle, max }: {
             }`}
           >
             {p.title}
-            {p.unlock ? <span className="ml-1 text-[10px] opacity-50">gated</span> : null}
+            {p.unlock ? <span className="ml-1 text-[12px] opacity-50">gated</span> : null}
           </button>
         );
       })}
@@ -279,7 +279,7 @@ export function SendView({ me }: { me: SharedBy }) {
     <div className="space-y-4">
       {/* what am I sending */}
       <div className="fel-card rounded-xl p-4">
-        <div className="mb-3 text-[11px] uppercase tracking-wider text-fel-dim">Send to a client</div>
+        <div className="mb-3 text-[12px] uppercase tracking-wider text-fel-dim">Send to a client</div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {KINDS.map((k) => {
             const Icon = k.icon;
@@ -294,7 +294,7 @@ export function SendView({ me }: { me: SharedBy }) {
               >
                 <Icon className={`mb-1.5 h-4 w-4 ${on ? 'text-fel-cyan' : 'text-white/50'}`} />
                 <div className={`text-sm font-medium ${on ? 'text-fel-cyan' : 'text-white/80'}`}>{k.label}</div>
-                <div className="mt-0.5 text-[11px] leading-snug text-fel-quiet">{k.blurb}</div>
+                <div className="mt-0.5 text-[12px] leading-snug text-fel-quiet">{k.blurb}</div>
               </button>
             );
           })}
@@ -308,7 +308,7 @@ export function SendView({ me }: { me: SharedBy }) {
         {kind === 'drill' && (
           <>
             <div>
-              <label className="mb-1.5 block text-[11px] uppercase tracking-wider text-fel-dim">Which drill</label>
+              <label className="mb-1.5 block text-[12px] uppercase tracking-wider text-fel-dim">Which drill</label>
               <ProtocolPicker selected={drillKey ? [drillKey] : []} onToggle={(k) => setDrillKey(k)} />
             </div>
             <Field label="Dose" value={prescription} onChange={setPrescription} placeholder="3 x 5, quiet landings" max={MAX_NOTE_CHARS} />
@@ -321,7 +321,7 @@ export function SendView({ me }: { me: SharedBy }) {
           <>
             <Field label="Title" value={listTitle} onChange={setListTitle} placeholder="Your work this week" max={80} />
             <div>
-              <label className="mb-1.5 block text-[11px] uppercase tracking-wider text-fel-dim">
+              <label className="mb-1.5 block text-[12px] uppercase tracking-wider text-fel-dim">
                 Pick up to {MAX_SELECTION_ITEMS} <span className="text-fel-quiet">· {picked.length} chosen</span>
               </label>
               <ProtocolPicker
@@ -364,7 +364,7 @@ export function SendView({ me }: { me: SharedBy }) {
       {/* THE MESSAGE ITSELF — what actually goes on the clipboard */}
       {preview && !result && (
         <div className="fel-card rounded-xl p-4">
-          <div className="mb-2 flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-fel-dim">
+          <div className="mb-2 flex items-center gap-1.5 text-[12px] uppercase tracking-wider text-fel-dim">
             <Eye className="h-3.5 w-3.5" /> What they'll get
           </div>
           <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-lg bg-black/40 p-3 font-sans text-[13px] leading-relaxed text-white/80">
@@ -392,7 +392,7 @@ export function SendView({ me }: { me: SharedBy }) {
       {/* the result: the link, and the text to paste */}
       {result && (
         <div className="fel-card space-y-3 rounded-xl border-fel-cyan/25 p-4">
-          <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-fel-cyan">
+          <div className="flex items-center gap-1.5 text-[12px] uppercase tracking-wider text-fel-cyan">
             <Link2 className="h-3.5 w-3.5" /> Ready to send
           </div>
           <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-lg bg-black/40 p-3 font-sans text-[13px] leading-relaxed text-white/85">
@@ -419,7 +419,7 @@ export function SendView({ me }: { me: SharedBy }) {
 
       {/* what I've sent */}
       <div className="fel-card rounded-xl p-4">
-        <div className="mb-2 text-[11px] uppercase tracking-wider text-fel-dim">Links you've sent</div>
+        <div className="mb-2 text-[12px] uppercase tracking-wider text-fel-dim">Links you've sent</div>
         {sent === null && <div className="py-4 text-center text-fel-quiet"><Loader2 className="mx-auto h-4 w-4 animate-spin" /></div>}
         {sent?.length === 0 && <div className="text-sm text-fel-dim">Nothing sent yet.</div>}
         <div className="space-y-1.5">
@@ -432,7 +432,7 @@ export function SendView({ me }: { me: SharedBy }) {
                     {s.title}
                     {s.forName ? <span className="text-fel-dim"> · for {s.forName}</span> : null}
                   </div>
-                  <div className="text-[11px] text-fel-quiet">
+                  <div className="text-[12px] text-fel-quiet">
                     {s.kind} · {new Date(s.createdAt).toLocaleDateString()} · {s.views} view{s.views === 1 ? '' : 's'}
                     {s.revokedAt ? ' · revoked' : ''}
                   </div>
@@ -488,7 +488,7 @@ function ProgramBuilder({
         {weeks.map((w, i) => (
           <div key={i} className="rounded-lg border border-white/8 bg-white/[0.02] p-3">
             <div className="mb-2 flex items-center gap-2">
-              <span className="font-mono text-[11px] uppercase tracking-wider text-fel-dim">Week {w.week}</span>
+              <span className="font-mono text-[12px] uppercase tracking-wider text-fel-dim">Week {w.week}</span>
               <input
                 value={w.focus}
                 placeholder="What this week is for"
@@ -538,7 +538,7 @@ function ProgramBuilder({
                 Otherwise a trainer adds a week, forgets to fill it, and sends a shorter block than they
                 think they sent — silently, because the preview simply does not mention it. */}
             {!w.items.length && (
-              <p className="mt-2 text-[11px] text-fel-quiet">Nothing in this week yet — it won&apos;t be sent.</p>
+              <p className="mt-2 text-[12px] text-fel-quiet">Nothing in this week yet — it won&apos;t be sent.</p>
             )}
             {/* prescriptions are screened like any other trainer text */}
             <Flags flags={w.items.flatMap((it) => screenText(it.prescription ?? ''))} />

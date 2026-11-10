@@ -27,7 +27,7 @@
 //     timed breath item's ring) turn it on.
 //
 // Opacity steps are Tailwind 3.3's own scale (…/40, /50, /60): a step outside it (/45, /35) generates no CSS at all in
-// this app's Tailwind (measured on the P7 proof build: text-white/45 → 0 rules), and the text falls back to solid white.
+// this app's Tailwind (measured on the P7 proof build: text-white/50 → 0 rules), and the text falls back to solid white.
 import { useSyncExternalStore } from 'react';
 import { onMotionChange, reducedMotion as readReducedMotion } from '@/lib/a11y/reducedMotion';
 import { pacerView, ringLook, type PacerSpec, type PacerView } from '@/lib/breath/pacer';
@@ -101,7 +101,7 @@ export function BreathPacer({ spec, elapsedSec, size = 'md', reducedMotion, capt
       {captions && (
         <div className="text-center leading-tight">
           <div className="text-sm font-medium text-[#00E5FF]" data-pacer-caption aria-live={liveCaption ? 'polite' : undefined}>{view.caption}</div>
-          {round && <div className="text-[11px] text-white/50" data-pacer-round>{round}</div>}
+          {round && <div className="text-[12px] text-white/50" data-pacer-round>{round}</div>}
         </div>
       )}
     </div>

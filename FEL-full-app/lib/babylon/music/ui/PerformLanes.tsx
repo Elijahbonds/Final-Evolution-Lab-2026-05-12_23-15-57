@@ -97,8 +97,8 @@ export default function PerformLanes({ lanes, playhead, compact, onLane, live }:
               opacity: live ? 1 : 0.6,
             }}>
             <span style={{ fontWeight: 900, fontSize: compact ? 13 : 15, color: l.color }}>{l.label}</span>
-            <span style={{ fontSize: 10, opacity: 0.75 }}>{compact ? l.keys.split(' ')[0] : `${l.keys} · ${l.pad}`}</span>
-            <span data-qa="perform-pad-flash" style={{ fontSize: 10, minHeight: 12, fontWeight: 700, color: l.flash && /WRONG|EXTRA|MISS/.test(l.flash) ? '#ffb4a2' : '#b8e6c1' }}>{l.flash ?? ''}</span>
+            <span style={{ fontSize: 12, opacity: 0.75 }}>{compact ? l.keys.split(' ')[0] : `${l.keys} · ${l.pad}`}</span>
+            <span data-qa="perform-pad-flash" style={{ fontSize: 12, minHeight: 12, fontWeight: 700, color: l.flash && /WRONG|EXTRA|MISS/.test(l.flash) ? '#ffb4a2' : '#b8e6c1' }}>{l.flash ?? ''}</span>
           </button>
         ))}
       </div>
@@ -157,7 +157,7 @@ export function PerformRecap({ result: r, labels, colors, arenaLine = null, onCl
           })}
           <div aria-hidden style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 1, background: '#fff', opacity: 0.6 }} />
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, opacity: 0.7 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, opacity: 0.7 }}>
           <span>← early 250 ms</span><span>on the beat</span><span>250 ms late →</span>
         </div>
         <div data-qa="recap-timing" style={{ fontSize: 12, marginTop: 2 }}>{performTimingLine(r.meanErrorMs)}</div>

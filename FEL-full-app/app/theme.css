@@ -54,6 +54,11 @@
   --fel-them: #facc15;
   --fel-info: #9ad7ff;
 
+  /* READABLE (2026-11-02): the brand violet and indigo as small text, lightened the least that clears 4.5:1 on every
+     surface (lib/design/tokens.ts violetText / indigoText). The accents stay for large text, icons and fills. */
+  --fel-violet-text: #ad5ff7;
+  --fel-indigo-text: #876fff;
+
   /* Keyboard, pad and remote focus (A11-01 / A11-02): one ring everywhere (app/globals.css draws it). */
   --fel-focus: #00E5FF;
 

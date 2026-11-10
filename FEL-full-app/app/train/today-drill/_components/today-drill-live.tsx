@@ -124,7 +124,7 @@ export function DrillResultView({ slot, drillId, refs, tomorrow, claim }: { slot
   const done = slot.result.status === 'complete';
   const row = (label: string, text: string, key: string) => (
     <div className="rounded-xl bg-white/[0.04] px-4 py-3" data-daily-read={key}>
-      <p className="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-[#00E5FF]">{label}</p>
+      <p className="font-mono text-[12px] font-bold uppercase tracking-[0.14em] text-[#00E5FF]">{label}</p>
       <p className="mt-1 text-[16px] leading-snug text-white">{text}</p>
     </div>
   );

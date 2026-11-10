@@ -17,6 +17,7 @@ import { DAILY_DRILL_PATH } from '@/lib/daily-drill/copy';
 import { GroupInvite } from './group-invite';
 import { GroupManage } from './group-manage';
 import { TeamRollup } from './team-rollup';
+import { TeamShots } from '@/components/hoops-cam/coach-shots';
 
 const card = 'rounded-2xl border border-white/10 bg-white/[0.03] p-4 sm:p-5';
 const h2 = 'fel-heading text-[13px] font-bold uppercase tracking-wide text-white';
@@ -58,7 +59,7 @@ export function GroupScreen({ initial }: { initial: GroupView }) {
             <Users className="h-5 w-5" style={{ color: accent }} />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="font-mono text-[10px] uppercase tracking-[0.16em]" style={{ color: accent }}>{KIND_LABEL[g.kind]} · {g.members.length} {g.members.length === 1 ? 'member' : 'members'}</p>
+            <p className="font-mono text-[12px] uppercase tracking-[0.16em]" style={{ color: accent }}>{KIND_LABEL[g.kind]} · {g.members.length} {g.members.length === 1 ? 'member' : 'members'}</p>
             <h2 className="fel-heading mt-0.5 break-words text-[24px] font-black leading-tight text-white">{g.name}</h2>
             {g.homeCourt && <p className="mt-0.5 text-[12.5px] text-white/55">Home court: {g.homeCourt.name}</p>}
           </div>
@@ -68,7 +69,7 @@ export function GroupScreen({ initial }: { initial: GroupView }) {
           {g.trophies.length === 0
             ? <span className="text-[12px] text-fel-dim">Trophy shelf: empty. Win a week to put one here.</span>
             : g.trophies.slice(0, 8).map((t) => (
-              <span key={t.weekKey} className="rounded-full border border-fel-gold/30 bg-fel-gold/10 px-2.5 py-1 text-[11.5px] text-[#FFE680]" title={`Week of ${t.weekKey}`}>
+              <span key={t.weekKey} className="rounded-full border border-fel-gold/30 bg-fel-gold/10 px-2.5 py-1 text-[12px] text-[#FFE680]" title={`Week of ${t.weekKey}`}>
                 {t.name} · wk {t.weekKey.slice(5)}
               </span>
             ))}
@@ -104,7 +105,7 @@ export function GroupScreen({ initial }: { initial: GroupView }) {
                 {b.doneToday ? <Check className="h-4 w-4" /> : '·'}
               </span>
               <span className="min-w-0 flex-1 truncate text-[14px] text-white">{b.name}{g.members.find((m) => m.userId === b.userId)?.you ? ' (you)' : ''}</span>
-              <span className="text-[11.5px] text-fel-dim">{b.doneToday ? 'Drill done' : 'Not yet'}</span>
+              <span className="text-[12px] text-fel-dim">{b.doneToday ? 'Drill done' : 'Not yet'}</span>
               {b.canNudge && (
                 <span className="flex gap-1">
                   {(Object.keys(NUDGES) as NudgeKey[]).map((k) => (
@@ -113,7 +114,7 @@ export function GroupScreen({ initial }: { initial: GroupView }) {
                   ))}
                 </span>
               )}
-              {b.nudgedByMe && <span className="text-[11px] text-fel-quiet">nudged</span>}
+              {b.nudgedByMe && <span className="text-[12px] text-fel-quiet">nudged</span>}
             </li>
           ))}
         </ul>
@@ -146,7 +147,7 @@ export function GroupScreen({ initial }: { initial: GroupView }) {
             <li key={s.userId} className="flex min-h-[40px] items-center gap-3 rounded-lg px-2 text-[13.5px] odd:bg-white/[0.02]" data-standing={s.userId}>
               <span className="w-5 text-right font-mono text-fel-dim">{s.place}</span>
               <span className="min-w-0 flex-1 truncate text-white">{s.name}</span>
-              <span className="hidden text-[11px] text-fel-dim sm:inline">{s.drillDays} drills · {s.runs} games · {s.wins} wins</span>
+              <span className="hidden text-[12px] text-fel-dim sm:inline">{s.drillDays} drills · {s.runs} games · {s.wins} wins</span>
               <span className="font-mono font-bold" style={{ color: accent }}>{s.points}</span>
             </li>
           ))}
@@ -177,7 +178,7 @@ export function GroupScreen({ initial }: { initial: GroupView }) {
               ))}
             </ol>
           )}
-        {board !== 'drill' && hiddenLine(g.boards.measuredHidden) && <p className="mt-2 text-[11.5px] text-fel-quiet">{hiddenLine(g.boards.measuredHidden)}</p>}
+        {board !== 'drill' && hiddenLine(g.boards.measuredHidden) && <p className="mt-2 text-[12px] text-fel-quiet">{hiddenLine(g.boards.measuredHidden)}</p>}
         {g.me.canShareMeasured && (
           <label className="mt-3 flex min-h-[44px] items-center gap-3 text-[13px] text-white/75">
             <input type="checkbox" className="h-5 w-5 accent-fel-emerald" checked={g.me.shareMeasured} disabled={busy !== null}
@@ -189,7 +190,7 @@ export function GroupScreen({ initial }: { initial: GroupView }) {
 
       <section className={card} data-feed>
         <h2 className={h2}>{KIND_LABEL[g.kind]} feed</h2>
-        <p className="mt-1 text-[11.5px] text-fel-dim">{TEEN_SAFE_LINE}</p>
+        <p className="mt-1 text-[12px] text-fel-dim">{TEEN_SAFE_LINE}</p>
         {g.feed.length === 0 && <p className="mt-3 text-[13px] text-white/50">Quiet so far this week. A daily drill shows up here.</p>}
         <ul className="mt-3 space-y-2">
           {g.feed.map((f) => (
@@ -201,7 +202,7 @@ export function GroupScreen({ initial }: { initial: GroupView }) {
                 {f.reactions.map((r) => (
                   <button key={r.key} onClick={() => react(f.key, r.key, r.mine)} disabled={busy !== null} aria-pressed={r.mine} aria-label={`${r.key}${r.count ? `, ${r.count}` : ''}`}
                     className={`inline-flex h-9 min-w-[44px] items-center justify-center gap-1 rounded-full border px-2 text-[14px] disabled:opacity-50 ${r.mine ? 'border-fel-cyan/50 bg-fel-cyan/10' : 'border-white/10'}`}>
-                    <span aria-hidden>{r.glyph}</span>{r.count > 0 && <span className="text-[11.5px] text-white/70">{r.count}</span>}
+                    <span aria-hidden>{r.glyph}</span>{r.count > 0 && <span className="text-[12px] text-white/70">{r.count}</span>}
                   </button>
                 ))}
               </div>
@@ -227,6 +228,8 @@ export function GroupScreen({ initial }: { initial: GroupView }) {
       )}
 
       {g.rollup && <TeamRollup groupId={g.id} rollup={g.rollup} onChanged={reload} />}
+      {/* BBS-04: the team's shot charts, for whoever sees the roll-up; dark (nothing) until its table is applied */}
+      {g.rollup && <TeamShots teamId={g.id} />}
       {g.invite && <GroupInvite groupId={g.id} invite={g.invite} canEdit={g.can.edit} onChanged={reload} />}
       <GroupManage view={g} onChanged={reload} />
       {busy && <Loader2 className="fixed bottom-24 right-5 h-5 w-5 animate-spin text-white/50" aria-label="Saving" />}

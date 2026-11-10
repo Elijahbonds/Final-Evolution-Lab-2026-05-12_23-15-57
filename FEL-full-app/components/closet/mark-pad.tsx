@@ -55,7 +55,7 @@ export function MarkPad({ cells, onCommit }: MarkPadProps) {
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap items-center gap-2 text-[11px] text-white/60">
+      <div className="flex flex-wrap items-center gap-2 text-[12px] text-white/60">
         <button type="button" aria-pressed={ink} onClick={() => setInk(true)} className={`flex items-center gap-1 rounded-full px-2.5 py-1 ${ink ? 'bg-cyan-400 text-black' : 'bg-white/5'}`}><Paintbrush className="h-3 w-3" /> Draw</button>
         <button type="button" aria-pressed={!ink} onClick={() => setInk(false)} className={`flex items-center gap-1 rounded-full px-2.5 py-1 ${!ink ? 'bg-cyan-400 text-black' : 'bg-white/5'}`}><Eraser className="h-3 w-3" /> Erase</button>
         <label className="flex items-center gap-1"><input type="checkbox" checked={mirror} onChange={(e) => setMirror(e.target.checked)} className="accent-cyan-400" aria-label="Mirror drawing" /><FlipHorizontal className="h-3 w-3" /> Mirror</label>
@@ -68,7 +68,7 @@ export function MarkPad({ cells, onCommit }: MarkPadProps) {
         onPointerMove={(e) => { if (!last.current) return; const p = at(e); strokeMark(work.current, last.current.x, last.current.y, p.x, p.y, brush, ink, mirror); last.current = p; paint(); }}
         onPointerUp={() => { if (!last.current) return; last.current = null; commit(work.current); }}
         onPointerCancel={() => { last.current = null; commit(work.current); }} />
-      <div className="text-[10px] text-white/40">
+      <div className="text-[12px] text-white/50">
         Detail {runs} / {MAX_MARK_RUNS}{refused && <span className="ml-2 text-amber-300">That stroke made it empty or too detailed — kept the last drawing.</span>}
         <span className="block">Draw your own emblem. Colour, outline, size and where it sits are set below like any stamp.</span>
       </div>

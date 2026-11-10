@@ -25,7 +25,7 @@ function accentFor(d: string): string {
 export function PathwayPanelError({ onRetry }: { onRetry?: () => void }) {
   return (
     <section className="rounded-2xl border border-amber-300/20 bg-amber-300/[0.06] p-5" data-guidance-error>
-      <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-amber-200/70">
+      <p className="font-mono text-[12px] font-bold uppercase tracking-[0.18em] text-amber-200/70">
         Pathways paused
       </p>
       <h2 className="fel-heading mt-2 text-[20px] font-bold text-white">
@@ -76,13 +76,13 @@ export function PathwayPanel() {
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="font-mono text-[9.5px] font-bold uppercase tracking-[0.18em]" style={{ color: accent }}>
+                    <p className="font-mono text-[12px] font-bold uppercase tracking-[0.18em]" style={{ color: accent }}>
                       {s.discipline}
                     </p>
                     <h3 className="fel-heading mt-1 text-[18px] font-bold leading-tight text-white">{s.title}</h3>
                   </div>
                   {s.exploratory && (
-                    <span className="shrink-0 rounded-md bg-white/[0.06] px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.12em] text-white/40">
+                    <span className="shrink-0 rounded-md bg-white/[0.06] px-2 py-0.5 font-mono text-[12px] uppercase tracking-[0.12em] text-white/50">
                       Worth a try
                     </span>
                   )}
@@ -91,7 +91,7 @@ export function PathwayPanel() {
                 <p className="mt-2.5 text-[13.5px] leading-relaxed text-white/60">{s.looksLike}</p>
 
                 <div className="mt-4 rounded-xl border border-white/[0.07] bg-black/20 p-3.5">
-                  <p className="font-mono text-[9.5px] font-bold uppercase tracking-[0.16em] text-white/35">
+                  <p className="font-mono text-[12px] font-bold uppercase tracking-[0.16em] text-white/50">
                     One next step
                   </p>
                   <p className="mt-1.5 text-[13.5px] leading-relaxed text-white/80">{s.firstStep}</p>
@@ -101,7 +101,7 @@ export function PathwayPanel() {
                 {s.because.length > 0 && (
                   <ul className="mt-auto space-y-1 pt-4">
                     {s.because.map((b, n) => (
-                      <li key={n} className="flex gap-2 font-mono text-[10.5px] leading-relaxed text-white/30">
+                      <li key={n} className="flex gap-2 font-mono text-[12px] leading-relaxed text-white/50">
                         <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full" style={{ background: accent }} />
                         {b}
                       </li>
@@ -117,9 +117,9 @@ export function PathwayPanel() {
       {data.adjacent.length > 0 && (
         <section className="mt-8">
           <h2 className="fel-heading flex items-center gap-2 text-[15px] font-bold text-white/80">
-            <Compass className="h-4 w-4 text-white/40" /> Next door to these
+            <Compass className="h-4 w-4 text-white/50" /> Next door to these
           </h2>
-          <p className="mt-1 text-[12.5px] text-white/40">
+          <p className="mt-1 text-[12.5px] text-white/50">
             Interests move. These sit beside what you are already doing.
           </p>
           <ul className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -129,14 +129,14 @@ export function PathwayPanel() {
                   <ArrowUpRight className="h-3.5 w-3.5" style={{ color: accentFor(p.discipline) }} />
                   {p.title}
                 </p>
-                <p className="mt-1 text-[12px] leading-snug text-white/40">{p.looksLike}</p>
+                <p className="mt-1 text-[12px] leading-snug text-white/50">{p.looksLike}</p>
               </li>
             ))}
           </ul>
         </section>
       )}
 
-      <p className="mt-8 flex items-start gap-2 text-[12px] leading-relaxed text-white/30">
+      <p className="mt-8 flex items-start gap-2 text-[12px] leading-relaxed text-white/50">
         <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0" />
         This reads what you actually do, not a quiz you filled in. It is a suggestion, never a verdict — every
         one of these stays open to you whatever it says.

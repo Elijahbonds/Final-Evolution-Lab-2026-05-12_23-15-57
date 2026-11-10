@@ -341,7 +341,7 @@ export function ArenaView() {
 
   if (loading) {
     return (
-      <div className="mt-10 flex items-center justify-center gap-2 font-mono text-sm text-white/40">
+      <div className="mt-10 flex items-center justify-center gap-2 font-mono text-sm text-white/50">
         <Loader2 className="h-4 w-4 animate-spin" />
         Loading the Arena…
       </div>
@@ -356,7 +356,7 @@ export function ArenaView() {
           <Swords className="h-6 w-6 text-[#FF3366]" />
           <div>
             <div className="fel-heading text-base font-bold text-white">Your War Chest</div>
-            <div className="font-mono text-[11px] text-white/50">
+            <div className="font-mono text-[12px] text-white/50">
               House rake {rakePercent}% per settled pot &middot; ties fully refunded
             </div>
           </div>
@@ -387,7 +387,7 @@ export function ArenaView() {
         </div>
 
         <div className="mt-4">
-          <div className="font-mono text-[11px] uppercase tracking-wider text-white/40">Choose your arena</div>
+          <div className="font-mono text-[12px] uppercase tracking-wider text-white/50">Choose your arena</div>
           <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
             {config?.modes.map((m) => (
               <button
@@ -400,14 +400,14 @@ export function ArenaView() {
                 }`}
               >
                 <div className="font-mono text-xs font-bold">{m.name}</div>
-                <div className="truncate font-mono text-[10px] text-white/35">{m.venue}</div>
+                <div className="truncate font-mono text-[12px] text-white/50">{m.venue}</div>
               </button>
             ))}
           </div>
           {/* MUSIC-SUITE P1 (2026-09-25, owner decision #9: "pause staking both now"): the paused modes are named here so a
               player looking for them reads why they are missing. Free play is open; a duel already running still plays. */}
           {(config?.pausedModes?.length ?? 0) > 0 && (
-            <p className="mt-2 font-mono text-[10px] leading-relaxed text-white/35">
+            <p className="mt-2 font-mono text-[12px] leading-relaxed text-white/50">
               Staking paused: {config!.pausedModes!.map((p) => p.name).join(', ')} &mdash; while their duels are made
               fair. Free play is open, and a duel you already have still plays and settles.
             </p>
@@ -415,14 +415,14 @@ export function ArenaView() {
           {/* MUSIC-SUITE P6 (2026-09-26, owner decisions #12 and #29): music is staked again, on the match's house beat
               with one attempt — said here before anything is staked, and by the room again before its count-in. */}
           {pickMode === 'music' && (
-            <p className="mt-2 font-mono text-[10px] leading-relaxed text-[#00E5FF]/70">
+            <p className="mt-2 font-mono text-[12px] leading-relaxed text-[#00E5FF]/70">
               Groove Academy duels: {HOUSE_ARENA_RULES}
             </p>
           )}
         </div>
 
         <div className="mt-5">
-          <div className="font-mono text-[11px] uppercase tracking-wider text-white/40">Stake (Lab Credits)</div>
+          <div className="font-mono text-[12px] uppercase tracking-wider text-white/50">Stake (Lab Credits)</div>
           <div className="mt-2 flex flex-wrap gap-2">
             {config?.feeTiers.map((fee) => {
               const affordable = balance >= fee;
@@ -436,7 +436,7 @@ export function ArenaView() {
                       ? 'border-[#FFD700] bg-[#FFD700]/10 text-[#FFD700]'
                       : affordable
                         ? 'border-white/10 bg-white/[0.02] text-white/70 hover:border-[#FFD700]/40'
-                        : 'cursor-not-allowed border-white/5 bg-white/[0.01] text-white/20'
+                        : 'cursor-not-allowed border-white/5 bg-white/[0.01] text-white/50'
                   }`}
                 >
                   {fee} LC
@@ -448,13 +448,13 @@ export function ArenaView() {
 
         {preview && (
           <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-1 rounded-lg border border-white/5 bg-white/[0.02] px-4 py-3 font-mono text-xs">
-            <span className="text-white/40">
+            <span className="text-white/50">
               Total pot <span className="text-white">{preview.pot} LC</span>
             </span>
-            <span className="text-white/40">
+            <span className="text-white/50">
               Winner takes <span className="text-[#00FF9D]">{preview.payout} LC</span>
             </span>
-            <span className="text-white/40">
+            <span className="text-white/50">
               Rake <span className="text-white/60">{preview.rake} LC</span>
             </span>
           </div>
@@ -478,7 +478,7 @@ export function ArenaView() {
             {canAfford || pickFee <= 0 ? 'STAKE & POST DUEL' : 'INSUFFICIENT LC'}
           </button>
         </div>
-        <p className="mt-2 max-w-xl font-mono text-[10px] leading-relaxed text-white/35">
+        <p className="mt-2 max-w-xl font-mono text-[12px] leading-relaxed text-white/50">
           QUICK MATCH seats a House Rival instantly — a simulated athlete whose
           score is drawn from the match seed, banded to your own recent form in
           the mode. STAKE &amp; POST waits for a human challenger.
@@ -491,11 +491,11 @@ export function ArenaView() {
           <div className="flex items-center gap-2">
             <Users className="h-5 w-5 text-[#00E5FF]" />
             <h2 className="fel-heading text-xl font-bold text-white">OPEN CHALLENGES</h2>
-            <span className="font-mono text-xs text-white/40">{open.length}</span>
+            <span className="font-mono text-xs text-white/50">{open.length}</span>
           </div>
           <button
             onClick={refreshAll}
-            className="inline-flex items-center gap-1.5 rounded-md border border-white/10 px-2.5 py-1 font-mono text-[11px] text-white/50 transition-colors hover:border-[#00E5FF]/40 hover:text-[#00E5FF]"
+            className="inline-flex items-center gap-1.5 rounded-md border border-white/10 px-2.5 py-1 font-mono text-[12px] text-white/50 transition-colors hover:border-[#00E5FF]/40 hover:text-[#00E5FF]"
           >
             <RefreshCw className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} />
             REFRESH
@@ -503,7 +503,7 @@ export function ArenaView() {
         </div>
 
         {open.length === 0 ? (
-          <div className="mt-3 rounded-xl border border-dashed border-white/10 px-5 py-8 text-center font-mono text-xs text-white/30">
+          <div className="mt-3 rounded-xl border border-dashed border-white/10 px-5 py-8 text-center font-mono text-xs text-white/50">
             No open duels right now. Post one above and be the first on the board.
           </div>
         ) : (
@@ -519,7 +519,7 @@ export function ArenaView() {
                 >
                   <div className="min-w-0">
                     <div className="fel-heading text-sm font-bold text-white">{d.name}</div>
-                    <div className="truncate font-mono text-[11px] text-white/40">
+                    <div className="truncate font-mono text-[12px] text-white/50">
                       by {d.creator ?? 'Athlete'} &middot; winner takes{' '}
                       <span className="text-[#00FF9D]">{pv.payout} LC</span>
                     </div>
@@ -529,7 +529,7 @@ export function ArenaView() {
                     <button
                       onClick={() => joinDuel(d)}
                       disabled={busyId === d.id || balance < d.feeLc}
-                      className="inline-flex items-center gap-1.5 rounded-md bg-[#00E5FF] px-3 py-1.5 font-mono text-[11px] font-bold text-black transition-transform active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="inline-flex items-center gap-1.5 rounded-md bg-[#00E5FF] px-3 py-1.5 font-mono text-[12px] font-bold text-black transition-transform active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       {busyId === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Swords className="h-3 w-3" />}
                       {balance < d.feeLc ? 'NEED LC' : 'ACCEPT'}
@@ -547,11 +547,11 @@ export function ArenaView() {
         <div className="flex items-center gap-2">
           <Trophy className="h-5 w-5 text-[#FFD700]" />
           <h2 className="fel-heading text-xl font-bold text-white">MY DUELS</h2>
-          <span className="font-mono text-xs text-white/40">{mine.length}</span>
+          <span className="font-mono text-xs text-white/50">{mine.length}</span>
         </div>
 
         {mine.length === 0 ? (
-          <div className="mt-3 rounded-xl border border-dashed border-white/10 px-5 py-8 text-center font-mono text-xs text-white/30">
+          <div className="mt-3 rounded-xl border border-dashed border-white/10 px-5 py-8 text-center font-mono text-xs text-white/50">
             You haven&rsquo;t entered any duels yet.
           </div>
         ) : (
@@ -570,16 +570,16 @@ export function ArenaView() {
                       <div className="flex items-center gap-2">
                         <span className="fel-heading text-sm font-bold text-white">{d.name}</span>
                         <span
-                          className="rounded px-1.5 py-0.5 font-mono text-[10px]"
+                          className="rounded px-1.5 py-0.5 font-mono text-[12px]"
                           style={{ color: meta.color, backgroundColor: `${meta.color}18` }}
                         >
                           {meta.label}
                         </span>
                       </div>
-                      <div className="mt-0.5 truncate font-mono text-[11px] text-white/40">
+                      <div className="mt-0.5 truncate font-mono text-[12px] text-white/50">
                         vs {d.opponent ?? 'awaiting challenger'}
                         {d.ghost && (
-                          <span className="ml-1.5 inline-flex items-center gap-0.5 rounded bg-[#00E5FF]/10 px-1 py-px align-middle text-[9px] text-[#00E5FF]">
+                          <span className="ml-1.5 inline-flex items-center gap-0.5 rounded bg-[#00E5FF]/10 px-1 py-px align-middle text-[12px] text-[#00E5FF]">
                             <Bot className="h-2.5 w-2.5" /> HOUSE
                           </span>
                         )}
@@ -596,21 +596,21 @@ export function ArenaView() {
                           </>
                         )}
                         {d.status === 'VOIDED' && <span className="text-[#A855F7]"> &middot; refunded</span>}
-                        {left && <span className="text-white/35"> &middot; {left}</span>}
+                        {left && <span className="text-white/50"> &middot; {left}</span>}
                       </div>
                       {/* MUSIC-SUITE P6 (owner decision #30): what an expiry did, in words */}
                       {d.expired === 'refunded' && (
-                        <div className="mt-1 font-mono text-[11px] text-[#A855F7]/80">
+                        <div className="mt-1 font-mono text-[12px] text-[#A855F7]/80">
                           Nobody played before the deadline — your {d.feeLc} LC stake came back in full.
                         </div>
                       )}
                       {d.expired === 'won_by_forfeit' && (
-                        <div className="mt-1 font-mono text-[11px] text-[#00FF9D]/80">
+                        <div className="mt-1 font-mono text-[12px] text-[#00FF9D]/80">
                           {d.opponent ?? 'Your opponent'} didn&rsquo;t play before the deadline — you took the pot by forfeit.
                         </div>
                       )}
                       {d.expired === 'lost_by_forfeit' && (
-                        <div className="mt-1 font-mono text-[11px] text-[#FF3366]/80">
+                        <div className="mt-1 font-mono text-[12px] text-[#FF3366]/80">
                           {/* MUSIC-SUITE P6 FIX PASS: a Quick Match nobody played goes to the house (arena-reclaim GHOST_UNPLAYED) */}
                           {d.ghost
                             ? <>You didn&rsquo;t play before the deadline — the {d.feeLc} LC stake went to the house.</>
@@ -618,29 +618,29 @@ export function ArenaView() {
                         </div>
                       )}
                       {(d.expired === 'won_at_deadline' || d.expired === 'lost_at_deadline') && (
-                        <div className={`mt-1 font-mono text-[11px] ${d.expired === 'won_at_deadline' ? 'text-[#00FF9D]/80' : 'text-[#FF3366]/80'}`}>
+                        <div className={`mt-1 font-mono text-[12px] ${d.expired === 'won_at_deadline' ? 'text-[#00FF9D]/80' : 'text-[#FF3366]/80'}`}>
                           Settled at the deadline on the set you played (it was never posted) — you {d.expired === 'won_at_deadline' ? 'won' : 'lost'}.
                         </div>
                       )}
                       {d.status === 'ACTIVE' && !d.mySubmitted && d.musicAttempt && !d.pastExpiry && (
-                        <div className="mt-1 font-mono text-[11px] text-[#FFD700]/80">
+                        <div className="mt-1 font-mono text-[12px] text-[#FFD700]/80">
                           {d.musicAttempt === 'finished'
                             ? 'Your set is played but its score never reached the Arena — PLAY posts it.'
                             : 'Your one attempt was started and left — it scores 0. PLAY posts it now; otherwise it counts at the deadline.'}
                         </div>
                       )}
                       {d.pastExpiry && !d.expired && (
-                        <div className="mt-1 font-mono text-[11px] text-white/45">
+                        <div className="mt-1 font-mono text-[12px] text-white/50">
                           This duel passed its deadline and can&rsquo;t be played. Unplayed stakes are refunded; a side that played wins by forfeit.
                         </div>
                       )}
                       {d.unlistedMode && (d.status === 'ACTIVE' || d.status === 'WAITING') && !d.pastExpiry && (
-                        <div className="mt-1 font-mono text-[11px] text-[#FFD700]/80">
+                        <div className="mt-1 font-mono text-[12px] text-[#FFD700]/80">
                           {d.name} is parked right now, so PLAY is hidden instead of sending you to a redirect. Waiting duels can still be cancelled; live duels settle when the Arena deadline runs.
                         </div>
                       )}
                       {(d.myScore !== null || d.oppScore !== null || d.oppSubmitted) && (
-                        <div className="mt-1 font-mono text-[11px] text-white/55">
+                        <div className="mt-1 font-mono text-[12px] text-white/55">
                           You{' '}
                           <span className="text-white">{d.myScore ?? '—'}</span> &middot; Opponent{' '}
                           {/* HOTFIX (2026-09-24): their score is held back until you post yours — say that they posted */}
@@ -650,7 +650,7 @@ export function ArenaView() {
                       {/* MUSIC-SUITE P1 (2026-09-25): nobody can accept a posted duel on a paused mode, so its creator is
                           told the way out — CANCEL refunds the stake in full (/api/arena/cancel has no mode check). */}
                       {d.stakingPaused && d.status === 'WAITING' && d.role === 'p1' && (
-                        <div className="mt-1 font-mono text-[11px] text-[#FFD700]/80">
+                        <div className="mt-1 font-mono text-[12px] text-[#FFD700]/80">
                           Staking on {d.name} is paused, so nobody can accept this duel. Cancel it to get your {d.feeLc} LC back.
                         </div>
                       )}
@@ -674,14 +674,14 @@ export function ArenaView() {
                       {playable && (
                         <Link
                           href={`${d.href}?arena=${d.id}`}
-                          className="inline-flex items-center gap-1.5 rounded-md bg-[#00FF9D] px-3 py-1.5 font-mono text-[11px] font-bold text-black transition-transform active:scale-95"
+                          className="inline-flex items-center gap-1.5 rounded-md bg-[#00FF9D] px-3 py-1.5 font-mono text-[12px] font-bold text-black transition-transform active:scale-95"
                         >
                           <Play className="h-3 w-3" />
                           PLAY
                         </Link>
                       )}
                       {d.status === 'ACTIVE' && d.mySubmitted && !d.pastExpiry && (
-                        <span className="inline-flex items-center gap-1 font-mono text-[11px] text-white/40">
+                        <span className="inline-flex items-center gap-1 font-mono text-[12px] text-white/50">
                           <Clock className="h-3 w-3" />
                           awaiting opponent
                         </span>
@@ -692,7 +692,7 @@ export function ArenaView() {
                         <button
                           onClick={() => cancelDuel(d)}
                           disabled={busyId === d.id}
-                          className="inline-flex items-center gap-1 rounded-md border border-white/10 px-2.5 py-1.5 font-mono text-[11px] text-white/50 transition-colors hover:border-[#FF3366]/50 hover:text-[#FF3366] disabled:opacity-40"
+                          className="inline-flex items-center gap-1 rounded-md border border-white/10 px-2.5 py-1.5 font-mono text-[12px] text-white/50 transition-colors hover:border-[#FF3366]/50 hover:text-[#FF3366] disabled:opacity-40"
                         >
                           {busyId === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3" />}
                           CANCEL
@@ -712,7 +712,7 @@ export function ArenaView() {
           athlete plays their own run of the mode. It now says that, and what the server does check: a mode's limit is
           the most its rules can award, or — for a mode with no maximum (a combo, endless waves) — the Arena's own limit
           (lib/arena-score-integrity.ts BOUND_MARGIN × a flawless run), never a claim that the score was impossible. */}
-      <div className="flex items-start gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-4 py-3 font-mono text-[11px] text-white/35">
+      <div className="flex items-start gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-4 py-3 font-mono text-[12px] text-white/50">
         <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#00FF9D]" />
         <span>
           Lab Credits are an in-app skill currency with no cash value and cannot be
