@@ -1,6 +1,6 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
-import { Activity, ArrowUpFromLine, BookOpen, ClipboardList, Dumbbell, Footprints, Gauge, Layers, Library, UtensilsCrossed, Users, ScanLine, Timer, Wand2 } from 'lucide-react';
+import { Activity, ArrowUpFromLine, BookOpen, ClipboardList, Dumbbell, Footprints, Gauge, Layers, Library, UtensilsCrossed, Users, ScanLine, Timer, TrendingUp, Wand2 } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
 import { FULL_SCREEN_HREF } from '@/lib/screen-easy/door';
 import { loginPath } from '@/lib/auth/safeNext';
@@ -163,6 +163,14 @@ export default async function TrainPage() {
       href: '/train/combine', group: 'program' as Group, icon: Timer, accent: PALETTE.cyan, title: t('train.cards.combines.title'),
       line: t('train.cards.combines.line'),
     }] : []),
+    {
+      // EVERY-SCREEN P1 (2026-11-10): My progress had no door here. /train/progress ("Your numbers over time") was linked
+      // only from a result card, so a person who wanted to see their progress had to take a test first to find the page.
+      // (the address is the result card's PROGRESS_HREF; that file is a client module, so it is spelled here and a test
+      // holds the two equal)
+      href: '/train/progress', group: 'measure' as Group, icon: TrendingUp, accent: PALETTE.cyan, title: t('train.cards.progress.title'),
+      line: t('train.cards.progress.line'),
+    },
     {
       href: '/profile', group: 'measure' as Group, icon: Activity, accent: PALETTE.indigo, title: t('train.cards.standing.title'),
       line: t('train.cards.standing.line'),

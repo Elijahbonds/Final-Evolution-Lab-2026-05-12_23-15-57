@@ -247,6 +247,71 @@ function overhead(name: string, kind: 'push' | 'jerk', arms: Arms): Builder {
   return (scene, sk) => run(scene, sk, name, kind === 'push' ? 2.8 : 3.3, keys, true);
 }
 
+/** DEMO-LOOPS-9: the clean and the jerk joined, one bell — hike, clean to the rack, a beat; dip, drive, drop under the
+ *  locked arm and stand; lower to the rack and back down into the hike. */
+const cleanJerkOne: Builder = (scene, sk) => {
+  const hike = kb(HIKE, armsOf('one', [-0.10, -0.52, -0.22]), bothDir(0.2, 0, -1), -0.14, 24);
+  const drive = kb(UP, armsOf('one', [-0.08, -0.36, 0.20]), bothDir(0.5, -0.6, 0), 0, 2);
+  const pull = kb(UP, armsOf('one', [-0.08, -0.16, 0.24]), bothDir(1, 0.2, -0.2), 0.0, 2);
+  const rack = kb(UP, armsOf('one', RACK_R), RACK_POLES('one'), 0, 2);
+  const caught = kb(UP, armsOf('one', RACK_R), RACK_POLES('one'), -0.03, 8);
+  const dip = kb(DIPPED, armsOf('one', RACK_R), RACK_POLES('one'), -0.09, 24);
+  const push = kb({ ...UP, LeftFoot: [14, 0, 0], RightFoot: [14, 0, 0] }, armsOf('one', [-0.06, 0.20, 0.08]), { Right: [0.8, -0.3, 0.2], Left: HANG_POLES.Left }, 0.02, 0);
+  const under = kb({ ...DIPPED, Hips: [14, 0, 0] }, armsOf('one', OVER_R), OVER_POLES('one'), -0.20, 44);
+  const lock = kb(UP, armsOf('one', OVER_R), OVER_POLES('one'), 0, 2);
+  return run(scene, sk, 'ex_kb_clean_jerk_one', 5.6, [
+    at(hike, 0, true), at(drive, 0.38), at(pull, 0.56), at(caught, 0.76, true), at(rack, 1.2, true), at(dip, 1.6, true), at(push, 1.77), at(under, 2.0, true), at(under, 2.25, true),
+    at(lock, 2.75, true), at(lock, 3.1, true), at(rack, 3.8, true), at(rack, 4.1, true), at(pull, 4.45), at(drive, 4.75), at(hike, 5.15, true),
+  ], true);
+};
+/** The split receive: the left foot forward, the right back on its ball, the hips low between them. */
+const SPLIT_FEET: Pair = { Left: [-0.13, ANKLE, 0.34], Right: [0.13, ANKLE + 0.06, -0.40] };
+const splitUnder = (rel: Pair, poles: Pair): Pose => ({ bones: { Hips: [4, 0, 0], Spine: [0, 0, 0], Neck: [-2, 0, 0], RightFoot: [26, 0, 0], LeftFoot: [-6, 0, 0] }, feet: SPLIT_FEET, kneePoles: { Left: [-0.1, 0, 1], Right: [0.1, -0.6, 0.6] }, rel, poles, hipsY: -0.30 });
+/** ex_kb_split_jerk_one — the bell racked: dip, drive, and drop under the locked arm into a split, the front foot flat and
+ *  the back on its ball; step the front foot back and the back foot up to stand; lower to the rack. */
+const splitJerkOne: Builder = (scene, sk) => {
+  const rack = kb(UP, armsOf('one', RACK_R), RACK_POLES('one'), 0, 2);
+  const dip = kb(DIPPED, armsOf('one', RACK_R), RACK_POLES('one'), -0.09, 24);
+  const push = kb({ ...UP, LeftFoot: [14, 0, 0], RightFoot: [14, 0, 0] }, armsOf('one', [-0.06, 0.20, 0.08]), { Right: [0.8, -0.3, 0.2], Left: HANG_POLES.Left }, 0.02, 0);
+  const split = splitUnder(armsOf('one', OVER_R), OVER_POLES('one'));
+  const half: Pose = { ...split, feet: { Left: [-0.15, ANKLE, 0.14], Right: SPLIT_FEET.Right }, hipsY: -0.16 };
+  const lock = kb(UP, armsOf('one', OVER_R), OVER_POLES('one'), 0, 2);
+  return run(scene, sk, 'ex_kb_split_jerk_one', 4.2, [at(rack, 0, true), at(dip, 0.45, true), at(push, 0.62), at(split, 0.88, true), at(split, 1.3, true), at(half, 1.75, true), at(lock, 2.2, true), at(lock, 2.6, true), at(rack, 3.4, true)], true);
+};
+/** ex_kb_split_snatch_one — hike the bell back, drive the hips through and pull it up overhead, dropping into a split to catch
+ *  it on a locked arm; stand up out of the split, and bring it back down into the hike. */
+const splitSnatchOne: Builder = (scene, sk) => {
+  const hike = kb(HIKE, armsOf('one', [-0.10, -0.52, -0.22]), bothDir(0.2, 0, -1), -0.14, 24);
+  const drive = kb(UP, armsOf('one', [-0.08, -0.36, 0.20]), bothDir(0.5, -0.6, 0), 0, 2);
+  const pull = kb(UP, armsOf('one', [-0.06, 0.06, 0.24]), bothDir(1, 0.2, -0.2), 0.02, 2);
+  const split = splitUnder(armsOf('one', OVER_R), OVER_POLES('one'));
+  const half: Pose = { ...split, feet: { Left: [-0.15, ANKLE, 0.14], Right: SPLIT_FEET.Right }, hipsY: -0.16 };
+  const top = kb(UP, armsOf('one', OVER_R), OVER_POLES('one'), 0, 2);
+  return run(scene, sk, 'ex_kb_split_snatch_one', 4.4, [
+    at(hike, 0, true), at(drive, 0.38), at(pull, 0.6), at(split, 0.86, true), at(split, 1.3, true), at(half, 1.75, true), at(top, 2.2, true), at(top, 2.6, true), at(pull, 3.0), at(drive, 3.3), at(hike, 3.8, true),
+  ], true);
+};
+/** ex_kb_dead_clean — the bell on the floor between the feet: hips back and down to take it, then up through the legs and
+ *  hips, the bell travelling close up to the rack at the shoulder, the wrist turning in; a beat, and back down to the
+ *  floor (no swing between reps). */
+const deadClean: Builder = (scene, sk) => {
+  const floor = kb({ Hips: [46, 0, 0], Spine: [6, 0, 0], Neck: [-26, 0, 0], LeftFoot: [-16, 0, 0], RightFoot: [-16, 0, 0] }, armsOf('one', [-0.12, -0.50, 0.06], [0.04, -0.42, 0.12]), bothDir(0.3, 0, -1), -0.30, 0);
+  const drive = kb(UP, armsOf('one', [-0.08, -0.34, 0.16]), bothDir(0.5, -0.6, 0), 0, 2);
+  const pull = kb(UP, armsOf('one', [-0.08, -0.16, 0.22]), bothDir(1, 0.2, -0.2), 0.0, 2);
+  const caught = kb(UP, armsOf('one', RACK_R), RACK_POLES('one'), -0.03, 8);
+  const rack = kb(UP, armsOf('one', RACK_R), RACK_POLES('one'), 0, 2);
+  return run(scene, sk, 'ex_kb_dead_clean', 3.6, [at(floor, 0, true), at(floor, 0.3, true), at(drive, 0.75), at(pull, 0.95), at(caught, 1.15, true), at(rack, 1.5, true), at(rack, 1.9, true), at(pull, 2.3), at(drive, 2.6), at(floor, 3.1, true)], true);
+};
+/** ex_kb_clean_alt (the alternating hang clean) — one bell racked at the shoulder, the other hanging: the racked bell drops as
+ *  the hips sit back and the hanging one drives up to the rack, in one fluid move; then back the other way. */
+const cleanAlt: Builder = (scene, sk) => {
+  const L = (r: [number, number, number]): [number, number, number] => [-r[0], r[1], r[2]];
+  const hang: [number, number, number] = [-0.06, -0.48, 0.06];
+  const pose = (rackSide: 'Left' | 'Right'): Pose => kb(UP, rackSide === 'Right' ? { Right: RACK_R, Left: L(hang) } : { Left: L(RACK_R), Right: hang }, rackSide === 'Right' ? { Right: [0.2, -1, 0.2], Left: HANG_POLES.Left } : { Left: [-0.2, -1, 0.2], Right: HANG_POLES.Right }, 0, 2);
+  const swap = kb({ Hips: [30, 0, 0], Spine: [4, 0, 0], Neck: [-16, 0, 0] }, { Left: L([-0.08, -0.34, 0.10]), Right: [-0.08, -0.34, 0.10] }, bothDir(0.6, -0.4, -0.4), -0.08, 14);
+  return run(scene, sk, 'ex_kb_clean_alt', 3.2, [at(pose('Right'), 0, true), at(pose('Right'), 0.4, true), at(swap, 0.8), at(pose('Left'), 1.2, true), at(pose('Left'), 2.0, true), at(swap, 2.4)], true);
+};
+
 /** ex_kb_thruster — the two bells racked: a full front squat, and out of the bottom drive up and press them overhead in one
  *  move; back to the rack. */
 const thruster: Builder = (scene, sk) => {
@@ -336,6 +401,9 @@ export const FAMILY_BUILDERS: readonly [string, Builder][] = [
   ['ex_kb_push_press_one', overhead('ex_kb_push_press_one', 'push', 'one')], ['ex_kb_push_press_two', overhead('ex_kb_push_press_two', 'push', 'two')],
   ['ex_kb_jerk_one', overhead('ex_kb_jerk_one', 'jerk', 'one')], ['ex_kb_jerk_two', overhead('ex_kb_jerk_two', 'jerk', 'two')],
   ['ex_kb_thruster', thruster], ['ex_kb_high_pull', highPull],
+  // DEMO-LOOPS-9: two bells cleaned; the clean and jerk; the split jerk and split snatch; the dead clean; the alternating hang clean
+  ['ex_kb_clean_two', ballistic('ex_kb_clean_two', 'rack', 'two')], ['ex_kb_clean_jerk_one', cleanJerkOne], ['ex_kb_split_jerk_one', splitJerkOne],
+  ['ex_kb_split_snatch_one', splitSnatchOne], ['ex_kb_dead_clean', deadClean], ['ex_kb_clean_alt', cleanAlt],
   ['ex_hang_leg_raise', hangRaise('ex_hang_leg_raise', false)], ['ex_hang_pike', hangRaise('ex_hang_pike', true)], ['ex_bar_leg_raise', barLegRaise],
   ['ex_crunch_overhead', crunchOverhead], ['ex_crunch_tuck', crunchTuck], ['ex_russian_twist', russianTwist],
 ];

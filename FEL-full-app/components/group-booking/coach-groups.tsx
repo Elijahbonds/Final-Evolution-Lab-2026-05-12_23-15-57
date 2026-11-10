@@ -8,7 +8,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { SHOP_LOOK as L } from '@/components/shop/look';
 import { OpensSoon } from '@/components/shop/opens-soon';
 import { COACH_API, postJson } from '@/lib/group-booking/client';
-import { errorLine } from '@/lib/group-booking/copy';
+import { errorLine, GROUP_DARK } from '@/lib/group-booking/copy';
 
 interface SessionRow { slotKey: string; label: string; startsAt: string; taken: number }
 interface GroupRow {
@@ -158,7 +158,7 @@ export function CoachGroups() {
   }, [load]);
   if (board === null) return <p className={L.lede}>Loading…</p>;
   if (board.error === 'not_a_coach') return <p className={L.lede}>Groups are run by the coach and their trainers.</p>;
-  if (!board.available) return <OpensSoon />;
+  if (!board.available) return <OpensSoon why={GROUP_DARK.coach.why} instead={GROUP_DARK.coach.instead} />;
   const owner = board.role === 'owner';
   return (
     <section data-coach-groups>

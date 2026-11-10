@@ -14,7 +14,7 @@ import { OpensSoon } from '@/components/shop/opens-soon';
 import { ProductCard } from '@/components/shop/product-card';
 import { AddToCalendar } from '@/components/coach-store/add-to-calendar';
 import type { ShopItem } from '@/lib/shop/model';
-import { GROUP_COPY as T } from '@/lib/group-booking/copy';
+import { GROUP_COPY as T, GROUP_DARK } from '@/lib/group-booking/copy';
 import { ONE_ON_ONE_API, reserveThenPay } from '@/lib/group-booking/client';
 import { loginPath } from '@/lib/auth/safeNext';
 
@@ -57,7 +57,7 @@ export function OneOnOneBooker({ view }: { view: OneOnOneView }) {
     return () => { live = false; };
   }, [t?.id, mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!view.available || !trainers.length) return <OpensSoon />;
+  if (!view.available || !trainers.length) return <OpensSoon why={GROUP_DARK.oneOnOne.why} instead={GROUP_DARK.oneOnOne.instead} />;
   const ready = !!t && !!choice && choice.available && (!choice.needsGym || !!gym) && !!slot;
   const item: ShopItem | null = t && choice ? {
     id: `${t.id}-${mode}`, kind: 'session', title: `1:1 with ${t.name} · ${mode === 'online' ? 'online' : 'in person'}`,

@@ -82,7 +82,7 @@ export function PartyHub({ initialCode = '' }: { initialCode?: string }) {
   return (
     <main data-live={live ? '1' : '0'} className="mx-auto flex min-h-[80dvh] w-full max-w-md flex-col gap-5 px-4 pb-28 pt-8 text-white">
       <div>
-        <p className="font-mono text-xs tracking-[0.3em] text-white/40">PARTY</p>
+        <p className="font-mono text-xs tracking-[0.3em] text-white/50">PARTY</p>
         <h1 className="fel-heading mt-1 text-3xl font-black">Play with friends, together</h1>
         <p className="mt-1 text-sm text-white/55">Up to {PARTY_MAX} people. Chat, quick chat and emotes — and voice for 18+ accounts. Everyone plays their own game, or the host starts one for everybody. Nothing said in a party is recorded or kept.</p>
       </div>
@@ -100,7 +100,7 @@ export function PartyHub({ initialCode = '' }: { initialCode?: string }) {
             <button type="button" data-testid="party-open" onClick={() => window.dispatchEvent(new Event('fel:party-open'))} className="flex-1 rounded-xl bg-[#00E5FF] py-3 font-bold text-black">Open party</button>
             <Link href="/play" className="flex-1 rounded-xl border border-white/20 py-3 text-center font-bold">Go play</Link>
           </div>
-          <p className="text-xs text-white/45">The party stays with you on every page and in every game.</p>
+          <p className="text-xs text-white/50">The party stays with you on every page and in every game.</p>
         </section>
       ) : (
         <>
@@ -116,7 +116,7 @@ export function PartyHub({ initialCode = '' }: { initialCode?: string }) {
               autoComplete="off"
               className="w-full rounded-xl bg-white/10 px-4 py-3 font-mono text-lg font-bold uppercase tracking-wider outline-none focus:ring-2 focus:ring-[#00E5FF]/60"
             />
-            <span className="mt-1 block text-[11px] text-white/40">Shown to the party as {cleanName || 'PLAYER'} — letters, numbers, up to {PLAYER_NAME_MAX}. Not your real name.</span>
+            <span className="mt-1 block text-[12px] text-white/50">Shown to the party as {cleanName || 'PLAYER'} — letters, numbers, up to {PLAYER_NAME_MAX}. Not your real name.</span>
           </label>
           <button type="button" data-testid="party-create" disabled={busy} onClick={() => go('create')}
             className="flex items-center justify-center gap-2 rounded-xl bg-[#00E5FF] py-4 font-bold text-black disabled:opacity-50">
@@ -136,7 +136,7 @@ export function PartyHub({ initialCode = '' }: { initialCode?: string }) {
               />
               <button type="submit" data-testid="party-join" disabled={busy || !parsed} className="rounded-xl border border-white/25 px-5 font-bold disabled:opacity-40">Join</button>
             </div>
-            <p className="text-[11px] text-white/40">Got a link or a QR? Opening it brings you here with the code filled in.</p>
+            <p className="text-[12px] text-white/50">Got a link or a QR? Opening it brings you here with the code filled in.</p>
           </form>
         </>
       )}

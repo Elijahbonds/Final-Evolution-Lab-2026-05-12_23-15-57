@@ -80,7 +80,7 @@ function BlockView({ b, preview }: { b: Block; preview: boolean }) {
       return (
         <section className={L.card} data-block="card">
           {b.title && <h3 className={L.title}>{b.title}</h3>}
-          {b.text && <p className={L.text}>{b.text}</p>}
+          {b.text && <p className={L.lesson}>{b.text}</p>}
         </section>
       );
     case 'camera':
@@ -110,7 +110,7 @@ function Quiz({ b }: { b: QuizBlock }) {
   const [pick, setPick] = useState<number | null>(null);
   return (
     <section className={L.card} data-block="quiz">
-      <p className={`${L.text} font-semibold text-white`}>{b.question}</p>
+      <p className={`${L.lesson} font-semibold text-white`}>{b.question}</p>
       <div className="grid gap-2">
         {b.options.map((o, i) => {
           const shown = pick !== null;
@@ -123,7 +123,7 @@ function Quiz({ b }: { b: QuizBlock }) {
           );
         })}
       </div>
-      {pick !== null && <p className={L.text} data-quiz-why>{pick === b.answer ? 'Right. ' : 'Not quite. '}{b.why}</p>}
+      {pick !== null && <p className={L.lesson} data-quiz-why>{pick === b.answer ? 'Right. ' : 'Not quite. '}{b.why}</p>}
     </section>
   );
 }
@@ -138,7 +138,7 @@ function Practice({ b, preview }: { b: PracticeBlock; preview: boolean }) {
   }, [b.mode, preview]);
   return (
     <section className={L.card} data-block="practice">
-      {b.goal && <p className={L.text}>{b.goal}</p>}
+      {b.goal && <p className={L.lesson}>{b.goal}</p>}
       <a href={practiceHref(b.mode)} className={L.row} data-practice-mode={b.mode}>
         <span className="flex items-center gap-2"><Gamepad2 aria-hidden className="h-4 w-4 text-fel-cyan" />Practice in {practiceLabel(b.mode)}</span>
         {best !== null && <span className={L.label} data-practice-best>Your best {best}</span>}

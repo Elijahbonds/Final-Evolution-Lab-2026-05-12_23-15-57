@@ -118,7 +118,7 @@ export function ScreenFrame({ children, right, back = SCREEN_HOME, title = 'Quic
           )}
           <div className="min-w-0">
             <p className="text-[16px] font-bold uppercase tracking-[0.18em] text-[#00E5FF]">Free movement check</p>
-            <h1 className="truncate text-[22px] font-black leading-none tracking-tight">{title}</h1>
+            <h1 className="truncate pb-[2px] text-[22px] font-black leading-tight tracking-tight">{title}</h1>
           </div>
           {right ? <div className="ml-auto">{right}</div> : null}
         </header>

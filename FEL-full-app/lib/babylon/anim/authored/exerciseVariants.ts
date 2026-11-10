@@ -108,7 +108,7 @@ const ROW_SIT: Pose = {
   bones: { Hips: [8, 0, 0], Spine: [0, 0, 0], Neck: [-6, 0, 0], LeftFoot: [-14, 0, 0], RightFoot: [-14, 0, 0] },
   feet: both(0.15, 0.22, 0.66), kneePoles: bothDir(0.15, 1, 0.3), hipsY: ROW_SEAT_Y,
 };
-const SEATED_ROW = {
+export const SEATED_ROW = {
   a: { ...ROW_SIT, rel: { Left: [0.08, -0.12, 0.52] as V3, Right: [-0.08, -0.12, 0.52] as V3 }, poles: bothDir(0.3, -1, 0), hipsY: ROW_SEAT_Y },
   b: { ...ROW_SIT, bones: { ...ROW_SIT.bones, Hips: [-4, 0, 0] as Deg3, Neck: [2, 0, 0] as Deg3 }, rel: { Left: [0.06, -0.36, 0.14] as V3, Right: [-0.06, -0.36, 0.14] as V3 }, poles: ELBOWS_BACK, hipsY: ROW_SEAT_Y },
   t: [0.8, 0.3, 1.0, 0.3] as [number, number, number, number],

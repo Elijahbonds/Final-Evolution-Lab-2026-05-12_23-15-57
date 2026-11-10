@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { Bone, FreeCamera, Matrix, MeshBuilder, NullEngine, Quaternion, Scene, Skeleton, TransformNode, Vector3 } from '@babylonjs/core';
 import { mountBallCarry, dribbleWristDeg, moveWristDeg, MOVE_WRIST_DEG, WRIST_DEG, HELD_STEP_M, HELD_MPS, type BallCarry } from './ballCarry';
 import { attachBallToHand, releaseBall, ballGathering } from './ballRig';
+import { resetFeelForTests, setFeelOverride, setFeelSession, setFeelUser } from '../../feel-panel/feel';
 import { HOOPS_DRIBBLE, PUSHED_FLOOR_PHASE, PUSHED_PEAK_RATE, dribbleAtPushed, pushedBounce01, strideLockHz, STRIDE_LOCK_HZ_MAX } from './Dribble';
 
 function rig(scene: Scene) {
@@ -604,6 +605,61 @@ describe('a gear change eases the carry arms in (hoops-p04b)', () => {
     const total = ang(off.rotationQuaternion!, clipOff);
     expect(total).toBeGreaterThan(5);              // the off arm does swing in at a sprint
     expect(maxStep).toBeLessThan(0.4 * total);     // …over several frames, not in one
+    carry.dispose();
+  });
+});
+
+// hoops-p05: the let-go fade scaled the reach's TARGET weight, but the solve kept its own elbow plane: the arm sat 44° off the clip on
+// the fade's last frame and snapped there (1v1 seed 7, the step-back gather, 3 967 deg/s). The let-go also blends the arm back to the clip.
+describe('the let-go ends on the clip (hoops-p05)', () => {
+  /** The ball arm's angle off its clip on each of the 20 frames after a release out of a sprint's reach. */
+  const letGo = (): number[] => {
+    const scene = new Scene(new NullEngine());
+    const r = rig(scene);
+    attachBallToHand(r.ball, r.sk, 'LeftHand');
+    const carry = mountBallCarry({ scene, ball: r.ball, root: r.root, skeleton: r.sk, hoops: true });
+    const d = driver(scene, carry, r.ball);
+    const nodes = ['LeftArm', 'LeftForeArm'].map((n) => r.nodes[n]);
+    const clipQ = nodes.map((n) => n.rotationQuaternion!.clone());
+    const clip = () => nodes.forEach((n, i) => n.rotationQuaternion!.copyFrom(clipQ[i]));
+    for (let i = 0; i < 60; i++) { clip(); d.frame(1 / 60, 1, true); }
+    const off = () => Math.max(...nodes.map((n, i) => 2 * Math.acos(Math.min(1, Math.abs(Quaternion.Dot(n.rotationQuaternion!, clipQ[i])))) * 180 / Math.PI));
+    releaseBall(r.ball); (r.ball.metadata ??= {}).felReleased = true;
+    carry.update(0, 0, false);
+    const seen: number[] = [];
+    for (let i = 0; i < 20; i++) { clip(); d.frame(1 / 60, 0, false); seen.push(off()); }
+    carry.dispose();
+    return seen;
+  };
+  it('knob hoops.carryLetGoToClipOn 0 gives the old let-go back: most of the way in one frame at the fade\'s end (the control)', () => {
+    resetFeelForTests(); setFeelUser(true); setFeelSession(null); setFeelOverride('hoops.carryLetGoToClipOn', 0);
+    try {
+      const seen = letGo(); const start = Math.max(...seen.slice(0, 2));
+      let worst = 0; for (let i = 1; i < seen.length; i++) worst = Math.max(worst, seen[i - 1] - seen[i]);
+      expect(start).toBeGreaterThan(5);
+      expect(worst).toBeGreaterThan(0.45 * start);   // the cut this phase removed
+    } finally { resetFeelForTests(); }
+  });
+  it('released after a reach: the arm comes back over the fade, never most of the way in one frame, and ends exactly on the clip', () => {
+    const scene = new Scene(new NullEngine());
+    const r = rig(scene);
+    attachBallToHand(r.ball, r.sk, 'LeftHand');
+    const carry = mountBallCarry({ scene, ball: r.ball, root: r.root, skeleton: r.sk, hoops: true });
+    const d = driver(scene, carry, r.ball);
+    const nodes = ['LeftArm', 'LeftForeArm'].map((n) => r.nodes[n]);
+    const clipQ = nodes.map((n) => n.rotationQuaternion!.clone());
+    const clip = () => nodes.forEach((n, i) => n.rotationQuaternion!.copyFrom(clipQ[i]));
+    for (let i = 0; i < 60; i++) { clip(); d.frame(1 / 60, 1, true); }   // a reach at a sprint (the pace reach's full weight)
+    const off = () => Math.max(...nodes.map((n, i) => 2 * Math.acos(Math.min(1, Math.abs(Quaternion.Dot(n.rotationQuaternion!, clipQ[i])))) * 180 / Math.PI));
+    releaseBall(r.ball); (r.ball.metadata ??= {}).felReleased = true;
+    carry.update(0, 0, false);
+    const seen: number[] = [];
+    for (let i = 0; i < 20; i++) { clip(); d.frame(1 / 60, 0, false); seen.push(off()); }
+    const start = Math.max(...seen.slice(0, 2));
+    expect(start).toBeGreaterThan(5);                    // the reach really had the arm off its clip
+    let worst = 0; for (let i = 1; i < seen.length; i++) worst = Math.max(worst, seen[i - 1] - seen[i]);
+    expect(worst).toBeLessThan(0.45 * start);            // no cut: the fade spreads it
+    expect(seen[seen.length - 1]).toBeLessThan(0.01);   // and it ends on the clip
     carry.dispose();
   });
 });

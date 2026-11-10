@@ -278,6 +278,28 @@ function reachShaped(arm: ArmChain, target: Vector3, pole: Vector3, weight: numb
 }
 
 /**
+ * hoops-p05: THE LET-GO ENDS ON THE CLIP. The release fade scaled the reach's TARGET weight (k → 0), but the two-bone solve keeps its own
+ * elbow plane at any weight: with the hand target nearly back on the clip's hand, the arm still sat 44° off the clip, and the frame the
+ * fade ended it snapped there (1v1 seed 7, the step-back gather: the ball arm 108 → 95 → 82 → 71 → 59 → 44 → 0°, 3 967 deg/s; the rig's
+ * stage tracer). So through the let-go the solved arm is also blended back toward the clip's pose by the same weight (a slerp per bone,
+ * from the pose the clip drew this frame): at k = 0 it IS the clip's. Only the let-go: a live reach keeps its weight in the target.
+ * No new time: the fade is RELEASE_FADE_SEC (or the caller's releaseSec), unchanged — `hoops.carryArmSpeedSec` did not fit (it eases a
+ * speed, this is a fade that already had a length; what was missing was where it ends).
+ */
+export const CARRY_LET_GO_TO_CLIP_ON = 1;
+function reachLettingGo(arm: ArmChain, target: Vector3, pole: Vector3, weight: number, dt: number, stamp: number): void {
+  // knob `hoops.carryLetGoToClipOn` (1): 0 = the let-go as it was (the reach's target weight alone: the one-frame cut at the fade's end)
+  if (feel('hoops.carryLetGoToClipOn', CARRY_LET_GO_TO_CLIP_ON) < 0.5) { reachShaped(arm, target, pole, weight, dt, stamp); return; }
+  const nodes = [arm.shoulder, arm.elbow, arm.hand];
+  const clip = nodes.map((n) => (n.rotationQuaternion ?? Quaternion.FromEulerVector(n.rotation)).clone());
+  reachShaped(arm, target, pole, weight, dt, stamp);
+  const w = Math.min(1, Math.max(0, weight));
+  if (w >= 1) return;
+  nodes.forEach((n, i) => { const q = n.rotationQuaternion; if (q) Quaternion.SlerpToRef(clip[i], q, w, q); });
+  for (const n of nodes) n.computeWorldMatrix(true);
+}
+
+/**
  * The lowest this body's hand can get above the root, in metres: the shoulder's height less the arm's length.
  * Measured off the live rig rather than assumed — the roster's arms are not the hero's.
  */
@@ -932,8 +954,8 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
         // …and the elbow's swing limit runs on the drawn frame's clock even while a held reach's fade is paused: handed a 0 dt it did not
         // run at all, so a held arm's elbow flipped free as the clip under it moved (rF, the fade's off arm: 5900–6700°/s at the hand-overs)
         const ldt = rdt > 0 ? rdt : dt;
-        if (arm && armW > 0) { toWorld(handLocal.x, handLocal.y, handLocal.z, handT); reachShaped(arm, handT, pole, k * armW, ldt, stamp); }
-        if (offArm && offW > 0) { toWorld(offLocal.x, offLocal.y, offLocal.z, offT); reachShaped(offArm, offT, offPole, k * offW, ldt, stamp); }
+        if (arm && armW > 0) { toWorld(handLocal.x, handLocal.y, handLocal.z, handT); reachLettingGo(arm, handT, pole, k * armW, ldt, stamp); }   // hoops-p05: ends on the clip
+        if (offArm && offW > 0) { toWorld(offLocal.x, offLocal.y, offLocal.z, offT); reachLettingGo(offArm, offT, offPole, k * offW, ldt, stamp); }
       }
       if (holdK > 1e-3 && ballHandNow()) applyHold(dt);
       applyWrists(dt);

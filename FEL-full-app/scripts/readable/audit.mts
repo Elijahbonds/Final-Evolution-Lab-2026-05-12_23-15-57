@@ -16,9 +16,12 @@
 // pixelContrast). A photo, a gradient or a translucent panel is measured as drawn.
 //
 //   npx tsx scripts/readable/audit.mts <outDir> <label> --build-only            bundle now (no browser, no lock needed)
-//   flock /home/user/wt/gate-queue.lock timeout 900 npx tsx scripts/readable/audit.mts <outDir> <label> [options]
+//   /home/user/wt/gate-run.sh 900 npx tsx scripts/readable/audit.mts <outDir> <label> [options]
 //     --routes=/coach,/train       only these (default: every route; finished ones are skipped, so a run resumes)
 //     --budget=780                 stop starting new routes after this many seconds (a lock hold is ≤ 15 min)
+//     --workers=3                  read this many routes at a time, in one browser (default 1)
+//     --trace=No duels,Jump check  print the measured ratio of every run whose text contains one of these, pass or
+//                                  fail, and say so when such a run was never read (covered by a fixed layer at every step)
 //     --configs=phone,desktop      a subset of the four
 //     --plant                      the control scene only: exits 1 unless exactly the planted faults are flagged
 //     --hud                        the HUD-over-frame scenes only
@@ -54,6 +57,8 @@ const OUT = join(OUT_ROOT, LABEL);
 const BUILD = join(OUT_ROOT, `.build-${LABEL}`);
 const T0 = Date.now();
 const BUDGET_S = Number(flag('budget') ?? 780);
+const TRACE = (flag('trace') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+const traced = (text: string) => TRACE.some((t) => text.includes(t));
 
 // ── The routes ───────────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -213,6 +218,8 @@ async function readPage(page: Page, cfg: Config, shot: string | null): Promise<{
   for (const y of cfg.pixels || cfg.hud ? ys : []) {
     await evalJ(`window.scrollTo(0, ${y})`);
     await page.waitForTimeout(140);
+    // a reveal (fel-rise, a framer fade) started by the scroll: read the text once it has arrived, not mid-fade
+    await evalJ('Promise.race([Promise.all(document.getAnimations().filter((a) => a.effect && a.effect.getComputedTiming().iterations !== Infinity).map((a) => a.finished.catch(() => null))), new Promise((r) => setTimeout(r, 1200))])');
     steps++;
     const runs = await evalJ<Run[]>('window.__readable.collect()');
     if (y !== 0) addCollisions(await evalJ<Collision[]>('window.__readable.collisions()'));
@@ -229,12 +236,14 @@ async function readPage(page: Page, cfg: Config, shot: string | null): Promise<{
       const s = samplesOf(A, B, r.rects, cfg.dpr, !r.fg);
       const ratio = pixelContrast(r.fg, s);
       const miss = contrastMiss(ratio, r.px, r.weight);
+      if (TRACE.length && traced(r.text)) console.log(`trace [${cfg.name}] "${r.text.slice(0, 60)}" ${Math.round(ratio * 100) / 100}:1 at ${r.px}px (scroll ${y}) ${miss ? 'MISS' : 'ok'}`);
       const media = r.overMedia || r.hud;
       if (miss && !r.disabled) findings.push({ rule: media ? 'contrast-media' : miss, text: r.text, px: r.px, ratio: Math.round(ratio * 100) / 100, need: r.px >= 24 || (r.px >= 18.66 && r.weight >= 700) ? 3 : 4.5, key: r.key, media, path: r.path });
       else if (miss && r.disabled) findings.push({ rule: 'contrast-disabled', text: r.text, px: r.px, ratio: Math.round(ratio * 100) / 100, path: r.path });
       if (y === 0) boxes.push({ r: r.box, bad: !!miss || !!sizeMiss(r.px, { words: r.words, phone: cfg.phone, hud: r.hud ? cfg.hud ?? 'phone' : null }) || !!r.clip });
     }
   }
+  if (TRACE.length && (cfg.pixels || cfg.hud)) for (const r of all) if (traced(r.text) && !done.has(r.id)) console.log(`trace [${cfg.name}] "${r.text.slice(0, 60)}" NEVER READ (covered, or never 95 % on screen, at each of ${steps} scroll steps)`);
   if (maxY > 0) { await evalJ(`window.scrollTo(0, ${maxY})`); await page.waitForTimeout(140); }
   const coverBottom = await evalJ<Cover[]>("window.__readable.covered('bottom')");
   for (const c of [...coverTop, ...coverBottom]) findings.push({ rule: 'overlap-fixed', text: c.text, detail: `under ${c.by} (${c.side})` });
@@ -317,11 +326,16 @@ const allRoutes = JSON.parse(readFileSync(join(BUILD, 'routes.json'), 'utf8')) a
 const only = flag('routes')?.split(',').filter(Boolean);
 const configs = (flag('configs')?.split(',') ?? CONFIGS.map((c) => c.name)).map((n) => CONFIGS.find((c) => c.name === n)!).filter(Boolean);
 let did = 0;
-for (const route of only ?? allRoutes) {
+// --workers=N: N pages of the one browser at a time. The gate lock is one hold of ≤ 15 min and the queue behind it is
+// long, so a crawl has to fit in as few holds as it can; each page still waits for its own render and reveals.
+const WORKERS = Math.max(1, Number(flag('workers') ?? 1));
+const queue = [...(only ?? allRoutes)];
+let stop = false;
+const readRoute = async (route: string): Promise<void> => {
   const file = join(OUT, 'routes', `${slug(route)}.json`);
   // --redo-before=<epoch ms>: re-read a route last read before then (the rig's page script changed since)
-  if (existsSync(file) && !args.includes('--redo') && Date.parse(JSON.parse(readFileSync(file, 'utf8')).when) >= Number(flag('redo-before') ?? 0)) continue;
-  if ((Date.now() - T0) / 1000 > BUDGET_S) { console.log(`budget reached after ${did} routes; run again to continue`); break; }
+  if (existsSync(file) && !args.includes('--redo') && Date.parse(JSON.parse(readFileSync(file, 'utf8')).when) >= Number(flag('redo-before') ?? 0)) return;
+  if ((Date.now() - T0) / 1000 > BUDGET_S) { if (!stop) console.log(`budget reached after ${did} routes; run again to continue`); stop = true; return; }
   // --configs=<subset> re-reads only those set-ups and keeps the rest of the route's file
   const res: Record<string, unknown> = { ...(flag('configs') && existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {}), route, when: new Date().toISOString() };
   for (const cfg of configs) {
@@ -345,6 +359,7 @@ for (const route of only ?? allRoutes) {
   did++;
   const p = res.phone as { ok: boolean; findings?: Finding[] } | undefined;
   console.log(`${route.padEnd(40)} ${p?.ok ? `${p.findings!.length} findings (phone)` : 'did not render'}`);
-}
+};
+await Promise.all(Array.from({ length: WORKERS }, async () => { while (queue.length && !stop) await readRoute(queue.shift()!); }));
 await browser.close();
 server.close();
