@@ -285,7 +285,7 @@ if (SCEN === 'game') {
       if (process.env.STRIPS && k < 2) await saveStrip(nm);
       await waitGame(300);
     }
-    const an = await ev((o) => window.__hg.analyse(o), { popFrames: true, popList: !!process.env.POP_LIST }); result.heroMotion = an.perBody.me ? { ...an.perBody.me, popAt: undefined } : null;
+    const an = await ev((o) => window.__hg.analyse(o), { popFrames: true, popList: !!process.env.POP_LIST }); result.heroMotion = an.perBody.me ? { ...an.perBody.me, popAt: undefined } : null; result.ball = an.ball;   // (hoops-p05: + the ball measures)
     if (process.env.POP_LIST) { result.clips = await ev(() => window.__hg.clips || []); result.stageEv = await ev(() => window.__hg.stageEv || []); result.states = await ev(() => window.__hg.states || []); }
     await checkpoint('defmove');
   }
