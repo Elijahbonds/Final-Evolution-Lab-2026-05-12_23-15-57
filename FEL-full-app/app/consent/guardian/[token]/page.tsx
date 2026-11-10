@@ -60,12 +60,12 @@ export default async function GuardianAcceptPage({ params }: { params: { token: 
       {consent.revokedAt ? (
         <>
           <h1 className="fel-heading mt-3 text-2xl font-bold text-white">This request was withdrawn</h1>
-          <p className="mt-3 max-w-sm text-sm text-white/55">Ask {menteeName} to send a fresh link if this is still needed.</p>
+          <p className="mt-3 max-w-sm text-base text-white/55">Ask {menteeName} to send a fresh link if this is still needed.</p>
         </>
       ) : consent.acceptedAt ? (
         <>
           <h1 className="fel-heading mt-3 text-2xl font-bold text-white">Already confirmed</h1>
-          <p className="mt-3 max-w-sm text-sm text-white/55">
+          <p className="mt-3 max-w-sm text-base text-white/55">
             You (or someone with this link) already said yes, on {new Date(consent.acceptedAt).toLocaleDateString()}. Nothing else to do.
           </p>
         </>
@@ -76,7 +76,7 @@ export default async function GuardianAcceptPage({ params }: { params: { token: 
           <h1 className="fel-heading mt-3 text-3xl font-bold text-white">
             {menteeName} <span className="text-white/50">wants your OK</span>
           </h1>
-          <p className="mt-4 max-w-sm text-sm leading-relaxed text-white/60">
+          <p className="mt-4 max-w-sm text-base leading-relaxed text-white/60">
             {guardianConsentAsk(menteeName)} That&apos;s all this does — it doesn&apos;t create an account for you, and
             FEL never contacts you about anything else.
           </p>

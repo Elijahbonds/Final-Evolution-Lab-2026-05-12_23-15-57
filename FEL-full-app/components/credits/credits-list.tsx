@@ -31,7 +31,7 @@ function Entry({ c }: { c: Credit }) {
       </h3>
       <p className="mt-0.5 text-xs text-white/50">{c.by}</p>
       <p className="mt-2 text-base text-white/70">{c.used}</p>
-      <p className="mt-2 text-xs text-white/50">
+      <p className="mt-2 text-base text-white/50">
         Licence: <Licence c={c} />
         {c.notice ? <> · acknowledgement above</> : null}
       </p>

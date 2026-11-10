@@ -327,6 +327,13 @@ export function hScrollCulprits(): string[] {
     const r = el.getBoundingClientRect();
     if (r.right <= vw + 1 || r.width < 1) continue;
     if (el.parentElement && el.parentElement.getBoundingClientRect().right > vw + 1) continue;
+    // inside a sideways shelf (an ancestor that scrolls or clips x and itself ends on screen): it does not widen the PAGE.
+    // Without this the first three "culprits" of /learn at 150 % were its chapter rings, and the real one went unnamed.
+    let shelved = false;
+    for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+      if (getComputedStyle(p).overflowX !== 'visible' && p.getBoundingClientRect().right <= vw + 1) { shelved = true; break; }
+    }
+    if (shelved) continue;
     out.push(`${pathOf(el)} (${Math.round(r.right - vw)}px)`);
     if (out.length >= 3) break;
   }

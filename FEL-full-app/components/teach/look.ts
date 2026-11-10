@@ -8,6 +8,9 @@ export const TEACH_LOOK = {
   label: `${TYPE.label} text-fel-soft`,
   title: `${TYPE.heading} text-white`,
   text: `${TYPE.small} text-white/80`,
+  /** READABLE (lane/readable-2): what a student READS in a lesson (a card's text, a quiz question and its why, a practice
+   *  goal) is body copy, so it takes TYPE.body's 16 px; `text` stays the forms' supporting line. */
+  lesson: `${TYPE.body} text-white/80`,
   input: `${TYPE.body} min-h-12 w-full rounded-xl border border-white/15 bg-black/40 px-3 text-white placeholder-white/50 focus:border-fel-cyan/60 focus:outline-none`,
   area: `${TYPE.body} min-h-24 w-full rounded-xl border border-white/15 bg-black/40 px-3 py-2 text-white placeholder-white/50 focus:border-fel-cyan/60 focus:outline-none`,
   chips: 'flex flex-wrap gap-2',

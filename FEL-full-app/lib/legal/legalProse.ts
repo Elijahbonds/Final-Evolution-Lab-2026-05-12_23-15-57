@@ -16,6 +16,8 @@
 // (was text-sm, 14 px: the rig counted 131 runs of more than 12 words under 16 px on /store-terms alone). Tables scroll
 // inside themselves and a long word or code run breaks anywhere — at 150 % root font they pushed /store-terms 105 px and
 // /purchase-terms 48 px sideways. Size and wrapping only; no wording changes.
+// A table's cells are sentences too (refund terms of 13–30 words), so the table keeps the page's 16 px (it was 13 px); it
+// scrolls inside itself when it is wider than the phone.
 export const LEGAL_PROSE = [
   'text-base leading-[1.7] text-white/70 [overflow-wrap:anywhere]',
   '[&>div>:first-child]:mt-0',
@@ -27,7 +29,7 @@ export const LEGAL_PROSE = [
   '[&_strong]:font-semibold [&_strong]:text-white [&_em]:italic [&_em]:text-white/50',
   '[&_blockquote]:my-4 [&_blockquote]:border-l-4 [&_blockquote]:pl-4 [&_blockquote]:italic',
   '[&_a]:text-cyan-300 [&_a]:underline [&_a]:underline-offset-2',
-  '[&_table]:my-4 [&_table]:block [&_table]:w-full [&_table]:max-w-full [&_table]:overflow-x-auto [&_table]:border-collapse [&_table]:text-[0.875rem]',
+  '[&_table]:my-4 [&_table]:block [&_table]:w-full [&_table]:max-w-full [&_table]:overflow-x-auto [&_table]:border-collapse',
   '[&_code]:[overflow-wrap:anywhere] [&_pre]:max-w-full [&_pre]:overflow-x-auto',
   '[&_td]:border [&_td]:border-white/10 [&_td]:px-2 [&_td]:py-1 [&_td]:align-top',
   '[&_th]:border [&_th]:border-white/10 [&_th]:px-2 [&_th]:py-1 [&_th]:text-left [&_th]:align-top [&_th]:text-white',

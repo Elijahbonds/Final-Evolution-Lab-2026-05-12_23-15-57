@@ -34,7 +34,7 @@ function ModeCard({ tile }: { tile: ModeTile }) {
   return (
     <Link
       href={tile.href}
-      className="group flex h-full gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.025] p-4 transition-all duration-200 hover:bg-white/[0.055]"
+      className="group flex h-full min-w-0 gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.025] p-4 transition-all duration-200 hover:bg-white/[0.055]"
       style={{ ['--mode-accent' as string]: tile.color }}
     >
       <span
@@ -43,9 +43,11 @@ function ModeCard({ tile }: { tile: ModeTile }) {
       >
         <Icon className="h-5 w-5" />
       </span>
+      {/* READABLE (lane/readable-2): the name and the venue line wrap (they were one-line truncates, whose full width set the
+          card's minimum: at 150 % root font the page scrolled 6 px sideways); the card itself may shrink (min-w-0). */}
       <span className="min-w-0">
-        <span className="fel-heading block truncate text-[15px] font-bold text-white">{tile.name} <PartyBadge modeKey={tile.key} className="ml-1" /></span>
-        <span className="mt-0.5 block truncate font-sans text-[12px] uppercase tracking-[0.14em] text-fel-quiet">
+        <span className="fel-heading block text-[15px] font-bold text-white">{tile.name} <PartyBadge modeKey={tile.key} className="ml-1" /></span>
+        <span className="mt-0.5 block font-sans text-[12px] uppercase tracking-[0.14em] text-fel-quiet">
           {tile.venue}
         </span>
         <span className="mt-2 block text-[14px] leading-relaxed text-fel-dim">{tile.desc}</span>

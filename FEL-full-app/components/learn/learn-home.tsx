@@ -139,13 +139,15 @@ export function LearnHome() {
 function PracticeRowLink({ href, camera, title, line, testId }: { href: string; camera: boolean; title: string; line: string; testId: string }) {
   const Icon = camera ? Camera : Activity;
   return (
-    <a href={href} data-testid={testId} data-fel-card="row" className="fel-press group flex min-h-[60px] items-center gap-3 rounded-[16px] px-3 py-2.5 hover:bg-white/[0.04]">
+    <a href={href} data-testid={testId} data-fel-card="row" className="fel-press group flex min-h-[60px] min-w-0 items-center gap-3 rounded-[16px] px-3 py-2.5 hover:bg-white/[0.04]">
       <span aria-hidden className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] bg-fel-cyan/[0.12] shadow-[inset_0_0_0_1px_rgba(0,229,255,0.28)]">
         <Icon className="h-5 w-5 text-fel-cyan" strokeWidth={2.1} />
       </span>
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className={`${TYPE.small} truncate font-semibold text-white`}>{title}</span>
-        <span className={`${TYPE.label} truncate normal-case tracking-normal text-fel-dim`}>{line}</span>
+        {/* READABLE (lane/readable-2): the row may shrink (min-w-0) and its two lines wrap. With one-line truncation and no
+            min-w-0, the longest lesson title set the grid track's width: at 150 % root font /learn scrolled 34 px sideways. */}
+        <span className={`${TYPE.small} line-clamp-2 font-semibold text-white`}>{title}</span>
+        <span className={`${TYPE.label} normal-case tracking-normal text-fel-dim`}>{line}</span>
       </span>
       <ChevronRight aria-hidden className="h-5 w-5 shrink-0 text-fel-quiet transition-transform group-hover:translate-x-0.5" />
     </a>

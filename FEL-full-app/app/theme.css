@@ -213,12 +213,14 @@ html[data-fel-motion="reduce"] :is(.fel-enter, .fel-fade, .fel-skeleton, .fel-ri
   -webkit-backdrop-filter: blur(18px) saturate(1.2);
   backdrop-filter: blur(18px) saturate(1.2);
 }
-/* READABLE (lane/readable-2, 2026-11-10): with "reduce transparency" on (prefers-reduced-transparency), the glass and the
-   two bars the app keeps on screen are solid: text on them never sits over whatever scrolls behind. */
+/* READABLE (lane/readable-2, 2026-11-10): with "reduce transparency" on (prefers-reduced-transparency), the glass, the
+   HUD panels and the two bars the app keeps on screen are solid: text on them never sits over whatever scrolls or plays
+   behind. Measured by scripts/probes/readable/reduced-transparency.mts; held by tests/readable/read-time.test.ts. */
 @media (prefers-reduced-transparency: reduce) {
-  .fel-glass, .fel-bar { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+  .fel-glass, .fel-bar, .fel-panel { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
   .fel-glass { background: #141a22 !important; }   /* --fel-elev-2 without its alpha */
   .fel-bar { background: var(--fel-bg) !important; }
+  .fel-panel { background: #0d1117 !important; }   /* --fel-glass (rgba(13, 17, 23, 0.72)) without its alpha */
 }
 .fel-press {                 /* every tappable thing: it gives under the finger */
   transition: transform var(--fel-dur-fast) var(--fel-ease-pop), background-color var(--fel-dur-base) ease,
