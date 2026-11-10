@@ -431,6 +431,15 @@ half of P9 wait for the feel lanes. P8 last (most legal work). The audience orde
   optional short video beside it).
 - **Needs from the owner:** RIG-ADJACENT sign-off (Q7); Privacy line for teachers' motion recordings; the teacher
   agreement's consent clause.
+- **Status (lane/plat-next, 2026-11-10).** Built, dark: §2.3 item 1 (the runtime adapter, `lib/motion-lesson/adapter.ts`:
+  the pelvis lift, the leg fit, and a jump's flight read from the picture), item 2 (the lesson file, `format.ts`:
+  24–35 KB a minute measured), and the PLAYER half of item 3 (`components/motion-lesson/**`: speed, mirror, loop a
+  phrase, turn the camera) on a preview page, `/teach/motion`, that only the owner's roles and course authors can open.
+  The preview plays the owner's own committed takes, so done-when 3 (two bodies, feet planted) and 5 (the owner watches
+  on a phone and signs off) can be answered. NOT built, each waiting on the owner: the recorder half of item 3 and item 5
+  (storage) — a teacher's recording is a new data use, so it needs the Privacy line and the consent clause above; item 4
+  (compare); a `motion` block in a course (`lib/teach/course.ts`). Done-when 1 (a squat pattern and an 8-count dance
+  phrase recorded on a phone) needs a person and a phone: the takes used are jumps and dunk approaches.
 
 ### P4. Media layer (M)
 
