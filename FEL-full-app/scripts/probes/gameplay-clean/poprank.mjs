@@ -1,5 +1,5 @@
 // gameplay-clean: rank what is left of the hard pops, by mode, from the audit's saved recordings (no browser).
-//   node poprank.mjs <dir> <tag> [--md]     reads <dir>/<mode>-<tag>-raw.json.gz
+//   node poprank.mjs <dir> <tag> [--md] [--vs=<dir2>:<tag2>]     reads <dir>/<mode>-<tag>-raw.json.gz
 // Per mode: hard pop events per minute (popCount.mjs: reset frames skipped), split BLEND (a crossfade running or the clip set
 // changing within ±2 frames: a transition's rule or timing, or a clip's fast first frames inside its fade) and IN-CLIP (one clip,
 // steady: the clip's own keys — or a runtime layer, which the rig's ?noplant=1 / ?noposture=1 / ?nomotion=1 A/B tells apart),
@@ -15,7 +15,11 @@ const MD = process.argv.includes('--md');
 export function rankOne(rec) {
   const F = rec.frames, clips = rec.clips ?? [];
   const r = countPops(F, clips, QN);
-  const cl = (i) => String(clips[F[Math.max(0, Math.min(F.length - 1, i))].c] ?? '?');
+  // the clips on the body on frame i: every playing hero clip with any weight (clean-5 recordings carry the real weights in `cw`;
+  // before that the recorder listed every playing clip, fading or not — the same set)
+  const cl = (i) => { const f = F[Math.max(0, Math.min(F.length - 1, i))];
+    if (rec.cwv === 2 && f.cw) return f.cw.filter(([, w]) => w > 0.02).map(([g]) => rec.gNames[g]).sort().join('+') || '?';
+    return String(clips[f.c] ?? '?'); };
   const by = { blend: {}, inclip: {} };
   for (const e of r.hard) {
     let blend = false;
@@ -37,7 +41,18 @@ export function rankOne(rec) {
   return { hard: r.hard.length, perMin: r.perMin(r.hard.length), blend: n(by.blend), inclip: n(by.inclip), resets: r.resetFrames, topBlend: top(by.blend), topInclip: top(by.inclip), max };
 }
 
-if (DIR) {
+// --vs=<dir2>:<tag2>: a before → after table (this run → that run) for the modes both have
+const VS = process.argv.find((a) => a.startsWith('--vs='));
+const readRun = (dir, tag) => { const o = {}; for (const f of fs.readdirSync(dir).filter((x) => x.endsWith(`-${tag}-raw.json.gz`)).sort()) o[f.replace(`-${tag}-raw.json.gz`, '')] = rankOne(JSON.parse(zlib.gunzipSync(fs.readFileSync(path.join(dir, f))).toString()).rec); return o; };
+if (DIR && VS) {
+  const [d2, t2] = VS.slice(5).split(':'); const A = readRun(DIR, TAG), B = readRun(d2, t2);
+  console.log('| Mode | Hard pops in the run (per min) | Blend · in-clip | Max turn a frame: thigh · knee · hips · arm |');
+  console.log('|---|---|---|---|');
+  for (const m of Object.keys(A).filter((k) => B[k]).sort((x, y) => A[y].perMin - A[x].perMin)) {
+    const a = A[m], b = B[m];
+    console.log(`| ${m} | ${a.hard} (${a.perMin}) → **${b.hard}** (${b.perMin}) | ${a.blend} · ${a.inclip} → ${b.blend} · ${b.inclip} | ${a.max.thigh}° · ${a.max.knee}° · ${a.max.hips}° · ${a.max.arm}° → ${b.max.thigh}° · ${b.max.knee}° · ${b.max.hips}° · ${b.max.arm}° |`);
+  }
+} else if (DIR) {
   const rows = [];
   for (const f of fs.readdirSync(DIR).filter((x) => x.endsWith(`-${TAG}-raw.json.gz`)).sort()) {
     const mode = f.replace(`-${TAG}-raw.json.gz`, '');

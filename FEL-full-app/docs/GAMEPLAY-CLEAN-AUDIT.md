@@ -25,7 +25,7 @@ lanes, so their findings are routed to those lanes (§5) and their files are not
 
   | Area | Measure |
   |---|---|
-  | Pops | Each of the 22 bones' angular speed, flagged at ≥ 600°/s and ≥ 3.5× its ±6-frame median. Bones flagged within 10 frames of each other count as one event. A **hard** pop peaks at ≥ 1500°/s (25° in one frame). |
+  | Pops | Each of the 22 bones' angular speed, flagged at ≥ 600°/s and ≥ 3.5× its ±6-frame median. Bones flagged within 10 frames of each other count as one event. A **hard** pop peaks at ≥ 1500°/s (25° in one frame). **Since clean-5 (§4g):** a frame where the hero's root moves more than 1 m, and the frame after it, is a scene cut and is not counted. Every pop number in §2–§4e was counted the old way. |
   | Pose | T-pose: arms level and spread, held for 6+ frames. Rest pose: ≥ 90 % of bones within 3° of the rest pose. |
   | Skate | At each foot's low point in a stride, the foot's slowest ground speed within ±4 frames, divided by the body's speed. A planted foot reads ~0; a sliding one reads ~1. |
   | Occlusion | Three rays (head, chest, hips) from the eye to the hero, stopping 1 m short of the body. A hit counts only on a visible, non-skinned mesh larger than a ball, and only on a face turned toward the camera. Hidden = 2 of 3 rays blocked. Also: the hero's chest projected inside the frame. |
@@ -76,6 +76,9 @@ Saved raw recordings (`*-raw.json.gz`) let every rule be re-run without a browse
 | Stuck | still ≤ 4 s | ≤ 8 s | more, or no play at all |
 
 ## 2. Per mode (baseline: the code as `f7b6de6b`, before this lane's fixes)
+
+> **Pop counts in this section use the OLD counter (reset frames counted as pops).** They are not comparable with §4g's numbers.
+> Modes that reposition the hero (football after a touchdown or tackle) read too high here.
 
 <!-- AUDIT-TABLES:BEGIN (scripts/probes/gameplay-clean/report.mjs on the baseline run, 30 / 30 enabled modes) -->
 **Play.** Each cell is the grade, then the value. Pop events count the bones that pop within 10 frames as one; "hard"
@@ -288,7 +291,7 @@ per frame (animation groups that target the hero's bones), and `FEEL=` runs the 
 | 2 | **Hard pops** | AF-1's `anim.inertial` is wired (default **off**: no change) on the hero of karate, karate VS, showdown, mixed combat, football, skateboard and derby, so it can be A/B'd from the feel panel. No crossfade time was changed. | The clip-attributed split in the next table shows why: much of the count is inside the clips. **The A/B with the knob on was not measured.** The rig's `FEEL=` override never went active (the feel tab read inactive in every snapshot), so the owner's panel is the way to try it. |
 | 8 | **Busy screens** | Skate's play screen names the next 3 open goals and "+N MORE" (it listed all 9, done and open). | Skateboard words in play **60 → 34 / 23** (corrected counter). Penalty 20, football 35, derby 18, karate 8–23, tiebreak 10–16: already under 40. READY over 80: karate 126, showdown 108, football 103, skate 82, karate VS 81. Their READY is the owner-signed CONTROLS panel (`panelLines.ts`) plus venue and style pickers; §6. |
 
-**Where the hard pops are** (14 s anim-only runs; an event is any frame with a bone ≥ 1500°/s, clustered within 10 frames;
+**Where the hard pops are** — OLD counter (reset frames counted; not comparable with §4g) — (14 s anim-only runs; an event is any frame with a bone ≥ 1500°/s, clustered within 10 frames;
 "blend" means a crossfade is running or the clip set changes within ±2 frames, "in-clip" means one clip, steady):
 
 | Mode | Events/min | Blend | In-clip | The biggest |
@@ -331,7 +334,7 @@ hard snap in their own keys, all captures retargeted to pose keys: `karate_mc_hi
 `clipDesnap.ts` spreads a snapping key step over the keys either side when the clip is built (the poses before and after
 kept, a hold never moved, no key time moved). **In-clip hard snaps on the clips: 16 → 0**; no other gameplay clip has one.
 
-**In play** (anim-only runs, 14 s, the same script; in-clip as §4c; runs differ by the AI's choices):
+**In play** — OLD counter (reset frames counted; not comparable with §4g) — (anim-only runs, 14 s, the same script; in-clip as §4c; runs differ by the AI's choices):
 
 | Mode | In-clip hard pops before → after | Hard pops in the run |
 |---|---|---|
@@ -354,6 +357,8 @@ a clip. FootPlanting alone, mounted on the same clip and body headless, does not
 
 The pops §4d left (derby, football) are not in any clip. To name the layer, the rig ran each mode with one layer off. It used a dev
 build with `?noplant=1` (new: no foot planting), `?noposture=1` and `?nomotion=1`, 14 s anim-only, same script as §4c/§4d.
+
+OLD counter in this table (reset frames counted; not comparable with §4g). Derby never resets its batter, so its columns stand; football's do not.
 
 | Run | Derby: max thigh turn in a frame | Derby: in-clip hard pops | Football: max hips turn in a frame | Football: in-clip hard pops |
 |---|---|---|---|---|
@@ -396,7 +401,7 @@ on the take-off release.
 onto the clip's over `anim.plantReleaseSec`. That is 0.1 s, the old release fade's own time, so no tuned time moved. 0 restores the
 old target fade exactly. The old fade solved the leg each frame toward a target that the jumped body no longer reached.
 
-Same rig, 14 s anim-only, reset frames left out:
+Same rig, 14 s anim-only, reset frames left out (the max-turn columns are comparable with §4g; the 1v1 hard-pop count is the OLD counter):
 
 | Run | Football max knee turn / frame | Football max thigh | Derby max thigh | 1v1 max thigh (hoops check) | 1v1 hard-pop events |
 |---|---|---|---|---|---|
@@ -404,8 +409,8 @@ Same rig, 14 s anim-only, reset frames left out:
 | after (2 runs each) | **23.7 / 12.5°** | 26.2 / 26.2° | 14.1° | 66.2 / 64.2° | 15 / 13 |
 
 No regression in derby or 1v1. 1v1's 64–71° thighs come from the hoops lane's plant-and-cut lock: it claims the leg, and a claim
-hand-over keeps the old fade. They predate this pass and are theirs. The audit's pop counter does not skip reset frames yet; the
-analysis script does (`legmax.mjs` in the lane scratchpad).
+hand-over keeps the old fade. They predate this pass and are theirs. The audit's pop counter did not skip reset frames at this point; the
+analysis script did (`legmax.mjs`, which lived only in the lane scratchpad and was lost with it). Clean-5 put the rule in the counter itself (§4g).
 
 ## 5. For the dunk and hoops lanes (routed, not changed here)
 
