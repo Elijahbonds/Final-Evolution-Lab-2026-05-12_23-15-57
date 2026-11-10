@@ -26,12 +26,29 @@ import { chainRotationToRef, frameAbove } from './TwoBoneIK';
 import { boneNode } from './boneLookup';
 import { POSTURE, easePoseInto, clonePose, chestAimCorrection, hipYawStrip, lowPassK, wrapRad, clamp, POSTURE_TAU, AIM_TAU, AIM_SPLIT, EYES_SPLIT, HEAD_YAW_CAP, HEAD_PITCH_CAP, type PosturePose } from '../core/DunkPosture';
 import { LEGS, easeLegPoseInto, cloneLegPose, FOOT_PITCH_CAP, type LegPose } from '../core/DunkLegs';
+import { feel } from '../../feel-panel/feel';
 
 /** Clavicle key signs (measured on the shipped hero, DUNK-POSTURE): +Z lifts the LEFT clavicle / drops the right; +Y pulls
  *  the left BACK / the right forward. */
 export const CLAVICLE_SIGN = { Left: { shrug: 1, forward: -1 }, Right: { shrug: -1, forward: 1 } } as const;
 /** Dev probes only: `?noposture=1` plays the clips with no Posture Poses layer (the before / after of a biomech pass). */
 export const POSTURE_OFF = process.env.NODE_ENV === 'development' && typeof location !== 'undefined' && /[?&]noposture=1/.test(location.search);
+
+/**
+ * GAMEPLAY-CLEAN P3 (2026-11-03): THE HIP STRIP NEVER JUMPS AT ±180°. The strip keeps `hipYawKeep` of the clip's hip yaw by taking
+ * (1 − keep) of the WRAPPED yaw off it, and a wrapped angle jumps from +π to −π: on a clip whose hips turn past 180° under a window
+ * with keep < 1 (Football Rush's `spin`: keep 0.5, `football_spin_move` turns the hips all the way round) the strip flipped from −90°
+ * to +90° in ONE frame — the rig read football's hips at 178° in a frame, a value no clip key holds (clip-smooth §4d). The yaw the
+ * strip reads is FOLDED: exactly the clip's own up to ±90° (every hip swing a window was tuned on — a gather's ±35° — strips exactly as
+ * before), then back down to 0 at ±180°, so the strip is continuous and periodic. Across a full spin the hips turn 1.5× fast near the
+ * back and 0.5× near the front and still end where the clip does. Pure.
+ */
+/** Feel knob `anim.hipYawFold` default: 1 = the folded strip (foldHipYaw); 0 = the wrapped strip exactly as before. */
+export const HIP_YAW_FOLD_ON = 1;
+export function foldHipYaw(yaw: number): number {
+  const y = wrapRad(yaw), a = Math.abs(y);
+  return a <= Math.PI / 2 ? y : Math.sign(y) * (Math.PI - a);
+}
 
 interface PpNode { n: TransformNode; raw: Quaternion; out: Quaternion; layered: boolean; bindChain: Quaternion; bindChainInv: Quaternion }
 
@@ -191,7 +208,7 @@ export class PostureLayer {
       if (!held) this.hipsRaw.copyFrom(q);
       const keep = POSTURE_OFF ? 1 : clamp(P.hipYawKeep, 0, 1);
       this.clipHipYaw = keep < 0.999 ? this.frameYawOf(h, this.hipsRaw) : 0;
-      const yaw = spinYaw + hipYawStrip(this.clipHipYaw, keep);
+      const yaw = spinYaw + hipYawStrip(keep < 0.999 && feel('anim.hipYawFold', HIP_YAW_FOLD_ON) >= 0.5 ? foldHipYaw(this.clipHipYaw) : this.clipHipYaw, keep);
       if (Math.abs(yaw) < 1e-4) { if (held) q.copyFrom(this.hipsRaw); this.hipsLayered = false; }
       else {
         bf.keyedQToRef(h.n, Quaternion.RotationAxisToRef(UP, yaw, this._rho), this._k).multiplyToRef(h.bindChainInv, this._d);

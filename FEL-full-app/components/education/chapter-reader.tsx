@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Check, Lightbulb } from 'lucide-react';
 import { toast } from 'sonner';
+import { readToast } from '@/components/ui/fel/toast';
 import type { Chapter, Lesson } from '@/lib/education/course';
 import { chapterProgress, lessonId, nextChapterHref } from '@/lib/education/course';
 // EDU-LINKS (2026-10-07), Mirror & coaching plan Phase 5: "Next chapter" opens the next chapter, a lesson that teaches a
@@ -96,7 +97,7 @@ export function ChapterReader({ chapter, filmFor, startAt }: { chapter: Chapter;
     } catch {
       // EDU-LINKS (2026-10-07): this promised the place was saved on the device, and nothing saved it — the lesson was
       // not kept anywhere, so a reload lost it. Say what happened instead.
-      toast.error('Could not save that lesson. Check your connection and tap it again.');
+      readToast.error('Could not save that lesson. Check your connection and tap it again.');
     } finally {
       setBusy(false);
     }
@@ -109,7 +110,7 @@ export function ChapterReader({ chapter, filmFor, startAt }: { chapter: Chapter;
   const nextLabel = next === '/education/playbook' ? 'All chapters' : 'Next chapter';
 
   return (
-    <div className="pb-24 md:pb-0">
+    <div className="pb-[8.75rem] md:pb-0">
       <div className="mb-4 flex items-center gap-3" data-lesson-progress>
         <StatRing value={progress.pct} max={100} label="Chapter progress" display="" size={36} stroke={4} />
         <p className={`${TYPE.label} flex-1 text-fel-dim`}>Lesson {i + 1} of {chapter.lessons.length}</p>

@@ -32,7 +32,7 @@ export default async function TeamProfilePage({ params }: { params: { slug: stri
 
   return (
     <CreatorFrame signedIn={viewer.signedIn} title={profile.name} lede={publicProfileSpecialty(profile)}>
-      <p className="mt-6 text-xs text-white/40">
+      <p className="mt-6 text-xs text-white/50">
         <Link href="/team" className="hover:text-white">Team</Link>
         <span> / {profile.name}</span>
       </p>
@@ -97,7 +97,7 @@ export default async function TeamProfilePage({ params }: { params: { slug: stri
 
       <section className="mt-10">
         <SectionTitle>Services</SectionTitle>
-        <p className="mt-1 text-[11px] text-white/40">Prices and times are set in the coach store. Booking there is for adults (18+).</p>
+        <p className="mt-1 text-[12px] text-white/50">Prices and times are set in the coach store. Booking there is for adults (18+).</p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           {services.map((s) => (
             <div key={s.id} className="rounded-xl border border-white/10 bg-[#141414] p-4">
@@ -121,7 +121,7 @@ export default async function TeamProfilePage({ params }: { params: { slug: stri
               </div>
             </div>
           ))}
-          {services.length === 0 ? <p className="text-sm text-white/45">No services are listed yet.</p> : null}
+          {services.length === 0 ? <p className="text-sm text-white/50">No services are listed yet.</p> : null}
         </div>
       </section>
     </CreatorFrame>

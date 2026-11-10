@@ -50,7 +50,7 @@ export default async function SupportPage() {
             <FileText className="h-5 w-5 text-[#FFD700]" />
             <div>
               <h3 className="fel-heading text-sm font-bold text-white">Terms of Service</h3>
-              <p className="text-[10px] text-white/40">Usage terms &amp; conditions</p>
+              <p className="text-[12px] text-white/50">Usage terms &amp; conditions</p>
             </div>
           </Link>
           <Link
@@ -60,7 +60,7 @@ export default async function SupportPage() {
             <Shield className="h-5 w-5 text-[#A855F7]" />
             <div>
               <h3 className="fel-heading text-sm font-bold text-white">Privacy Policy</h3>
-              <p className="text-[10px] text-white/40">How we handle your data</p>
+              <p className="text-[12px] text-white/50">How we handle your data</p>
             </div>
           </Link>
           <Link
@@ -70,7 +70,7 @@ export default async function SupportPage() {
             <Award className="h-5 w-5 text-[#00E5FF]" />
             <div>
               <h3 className="fel-heading text-sm font-bold text-white">Credits &amp; Licences</h3>
-              <p className="text-[10px] text-white/40">Who made what we use</p>
+              <p className="text-[12px] text-white/50">Who made what we use</p>
             </div>
           </Link>
         </div>

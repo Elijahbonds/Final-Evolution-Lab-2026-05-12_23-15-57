@@ -87,7 +87,7 @@ export function PerfOverlay({
   const logicPct = Math.round((logicMs / FRAME_BUDGET_MS) * 100);
   return (
     <div
-      className="absolute bottom-2 left-2 px-2 py-1 rounded text-[11px] leading-tight font-mono pointer-events-none"
+      className="absolute bottom-2 left-2 px-2 py-1 rounded text-[12px] leading-tight font-mono pointer-events-none"
       style={{ background: 'rgba(0,0,0,0.72)', color }}
     >
       <div>

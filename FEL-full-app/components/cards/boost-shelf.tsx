@@ -48,7 +48,7 @@ export function BoostShelf({ shards, owned }: { shards: number; owned: string[] 
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
         <div>
           <h2 className="fel-heading text-[19px] font-bold text-white">Creator cards</h2>
-          <p className="mt-1 text-[12.5px] text-white/40">
+          <p className="mt-1 text-[12.5px] text-white/50">
             Cosmetic cards: a card frame and links to the creator&apos;s own work. They never change a rating, PRQ,
             vertical or any game stat.
           </p>
@@ -79,7 +79,7 @@ export function BoostShelf({ shards, owned }: { shards: number; owned: string[] 
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p
-                    className="font-mono text-[9.5px] font-bold uppercase tracking-[0.18em]"
+                    className="font-mono text-[12px] font-bold uppercase tracking-[0.18em]"
                     style={{ color: mine ? c.accent : 'rgba(255,255,255,0.35)' }}
                   >
                     {c.creator}
@@ -97,13 +97,13 @@ export function BoostShelf({ shards, owned }: { shards: number; owned: string[] 
                 )}
               </div>
 
-              <p className="mt-2 text-[12.5px] italic leading-relaxed text-white/45">“{c.tagline}”</p>
+              <p className="mt-2 text-[12.5px] italic leading-relaxed text-white/50">“{c.tagline}”</p>
 
-              <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.14em] text-white/35">Cosmetic · no stat effect</p>
+              <p className="mt-3 font-mono text-[12px] uppercase tracking-[0.14em] text-white/50">Cosmetic · no stat effect</p>
 
               <div className="mt-auto pt-4">
                 {mine ? (
-                  <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: c.accent }}>
+                  <p className="font-mono text-[12px] font-bold uppercase tracking-[0.16em]" style={{ color: c.accent }}>
                     In your deck
                   </p>
                 ) : (
@@ -122,7 +122,7 @@ export function BoostShelf({ shards, owned }: { shards: number; owned: string[] 
                         <Gem className="h-3.5 w-3.5" style={{ color: c.accent }} />
                         {c.costShards.toLocaleString()}
                         {check.reason === 'insufficient_shards' && (
-                          <span className="font-mono text-[10px] font-normal text-white/40">
+                          <span className="font-mono text-[12px] font-normal text-white/50">
                             · {(c.costShards - purse).toLocaleString()} short
                           </span>
                         )}

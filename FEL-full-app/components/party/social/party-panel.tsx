@@ -38,8 +38,8 @@ export function PartyPanel({ s, onClose }: { s: PartyState; onClose: () => void 
       >
         <header className="flex items-center gap-2 border-b border-white/10 px-4 py-3">
           <h2 className="fel-heading text-lg font-black tracking-wide">Party</h2>
-          <span className="font-mono text-xs text-white/45">{s.members.length}/{6}</span>
-          {s.status === 'reconnecting' ? <span className="rounded bg-amber-400/15 px-2 py-0.5 text-[11px] text-amber-300" role="status">Reconnecting…</span> : null}
+          <span className="font-mono text-xs text-white/50">{s.members.length}/{6}</span>
+          {s.status === 'reconnecting' ? <span className="rounded bg-amber-400/15 px-2 py-0.5 text-[12px] text-amber-300" role="status">Reconnecting…</span> : null}
           <button type="button" onClick={onClose} aria-label="Close party panel" className="ml-auto rounded-md p-1.5 text-white/70 hover:bg-white/10">
             <X className="h-5 w-5" />
           </button>
@@ -58,7 +58,7 @@ export function PartyPanel({ s, onClose }: { s: PartyState; onClose: () => void 
 
           {host && s.knocking.length ? (
             <section aria-label="Waiting to join" className="space-y-2">
-              <h3 className="font-mono text-[10px] tracking-[0.25em] text-white/45">WAITING TO JOIN</h3>
+              <h3 className="font-mono text-[12px] tracking-[0.25em] text-white/50">WAITING TO JOIN</h3>
               {s.knocking.map((k) => (
                 <div key={k.peer} className="flex items-center gap-2 rounded-lg bg-white/[0.04] px-3 py-2" data-testid="party-knock">
                   <span className="flex-1 text-sm font-bold">{k.name}</span>
@@ -95,7 +95,7 @@ function Members({ s, host }: { s: PartyState; host: boolean }) {
   const voice = useVoice();
   return (
     <section aria-label="Members" className="space-y-1.5">
-      <h3 className="font-mono text-[10px] tracking-[0.25em] text-white/45">IN THE PARTY</h3>
+      <h3 className="font-mono text-[12px] tracking-[0.25em] text-white/50">IN THE PARTY</h3>
       <ul className="space-y-1.5">
         {s.members.map((m) => (
           <MemberRow key={m.peer} m={m} you={m.peer === s.you} host={host} speaking={!!voice.speaking[m.peer]} conn={voice.peers[m.peer]} />
@@ -119,13 +119,13 @@ function MemberRow({ m, you, host, speaking, conn }: { m: PartyMember; you: bool
         <Avatar name={m.name} pub={m.pub} speaking={speaking} dim={!m.connected} />
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-1.5 truncate text-sm font-bold">
-            {m.name}{you ? <span className="text-white/40">(you)</span> : null}
+            {m.name}{you ? <span className="text-white/50">(you)</span> : null}
             {m.host ? <Crown className="h-3.5 w-3.5 text-[#facc15]" aria-label="Host" /> : null}
           </p>
           <p className="truncate text-xs text-white/50">
             {!m.connected ? 'Reconnecting…' : m.activity ?? 'In the menus'}
             {voiceLine ? <span className={conn === 'failed' ? 'text-amber-300' : 'text-[#00FF9D]'}> · {voiceLine}</span> : null}
-            {muted ? <span className="text-white/40"> · muted for you</span> : null}
+            {muted ? <span className="text-white/50"> · muted for you</span> : null}
           </p>
         </div>
         {!you ? (
@@ -167,7 +167,7 @@ function BlockedList() {
   if (!list.length) return null;
   return (
     <details className="rounded-lg bg-white/[0.03] px-3 py-2 text-sm" data-testid="party-blocked">
-      <summary className="cursor-pointer font-mono text-[10px] tracking-[0.25em] text-white/45">BLOCKED ({list.length})</summary>
+      <summary className="cursor-pointer font-mono text-[12px] tracking-[0.25em] text-white/50">BLOCKED ({list.length})</summary>
       <ul className="mt-2 space-y-1">
         {list.map((b) => (
           <li key={b.pub} className="flex items-center justify-between">
@@ -177,7 +177,7 @@ function BlockedList() {
           </li>
         ))}
       </ul>
-      <p className="mt-1 text-[11px] text-white/40">Blocked accounts can&apos;t message you or talk to you in any party (a guest only for this party).</p>
+      <p className="mt-1 text-[12px] text-white/50">Blocked accounts can&apos;t message you or talk to you in any party (a guest only for this party).</p>
     </details>
   );
 }

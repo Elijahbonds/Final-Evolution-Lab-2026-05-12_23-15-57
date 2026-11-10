@@ -403,7 +403,7 @@ export function VirtualController({ scheme }: { scheme: VCScheme }) {
           type="button"
           onClick={() => setShowLegend((s) => !s)}
           aria-label="Controls help"
-          className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-white/15 bg-black/60 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/75 backdrop-blur-md transition hover:border-[#00E5FF]/50 hover:text-[#00E5FF]"
+          className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-white/15 bg-black/60 px-3 py-1 text-[12px] font-semibold uppercase tracking-wider text-white/75 backdrop-blur-md transition hover:border-[#00E5FF]/50 hover:text-[#00E5FF]"
         >
           <Info className="h-3 w-3" /> Controls
         </button>
@@ -425,7 +425,7 @@ export function VirtualController({ scheme }: { scheme: VCScheme }) {
             exit={{ opacity: 0, y: 8 }}
             className="pointer-events-none relative mx-auto mb-1.5 max-w-md px-4"
           >
-            <div className="pointer-events-auto rounded-xl border border-[#00E5FF]/25 bg-black/80 px-3.5 py-2 text-center font-mono text-[11px] leading-snug text-white/80 backdrop-blur-md" style={{ boxShadow: '0 0 24px rgba(0,229,255,0.12)' }}>
+            <div className="pointer-events-auto rounded-xl border border-[#00E5FF]/25 bg-black/80 px-3.5 py-2 text-center font-mono text-[12px] leading-snug text-white/80 backdrop-blur-md" style={{ boxShadow: '0 0 24px rgba(0,229,255,0.12)' }}>
               {scheme.hint}
             </div>
           </motion.div>

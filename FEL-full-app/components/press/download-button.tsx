@@ -51,7 +51,7 @@ export function DownloadButton({
       >
         {busy ? 'Preparing…' : label}
       </button>
-      {error ? <p className="mt-1 text-[11px] text-[#ff8b8b]">{error}</p> : null}
+      {error ? <p className="mt-1 text-[12px] text-[#ff8b8b]">{error}</p> : null}
     </div>
   );
 }

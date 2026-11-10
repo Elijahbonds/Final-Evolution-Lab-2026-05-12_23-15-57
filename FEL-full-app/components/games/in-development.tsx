@@ -15,13 +15,13 @@ import Link from 'next/link';
 export function InDevelopment({ title, reason }: { title: string; reason: string }) {
   return (
     <div className="mx-auto flex min-h-[60vh] max-w-lg flex-col items-center justify-center gap-4 px-6 text-center">
-      <p className="text-[10px] font-black tracking-[0.4em] text-[#FFD700]">IN DEVELOPMENT</p>
+      <p className="text-[12px] font-black tracking-[0.4em] text-[#FFD700]">IN DEVELOPMENT</p>
       <h1 className="fel-heading text-3xl font-black text-white">{title}</h1>
 
       {/* the real gap, named */}
       <p className="max-w-sm text-sm leading-relaxed text-white/70">{reason}</p>
 
-      <p className="max-w-sm text-[11px] leading-relaxed text-white/40">
+      <p className="max-w-sm text-[12px] leading-relaxed text-white/50">
         It&rsquo;s playable internally and it isn&rsquo;t going anywhere &mdash; we&rsquo;d just rather you
         met it finished.
       </p>

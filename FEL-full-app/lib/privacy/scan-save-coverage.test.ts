@@ -40,6 +40,8 @@ const DETECTORS: { what: string; re: RegExp }[] = [
   { what: 'CombineResult', re: /INSERT\s+INTO\s+"?CombineResult\b|\bwriteResults\s*\(|\bsaveCombine\s*\(/ },
   // VBT (2026-10-25): a tracked set's bar-speed numbers (pending SQL, raw writes), and the calls that reach them
   { what: 'VbtSet', re: /INSERT\s+INTO\s+"?VbtSet\b|\bkeepSet\s*\(|\bsaveSet\s*\(/ },
+  // BBS-04 (2026-11-03): a shot or dribble session's numbers (pending SQL, raw writes), and the calls that reach them
+  { what: 'HoopsCamSession', re: /INSERT\s+INTO\s+"?HoopsCamSession\b|\bkeepSession\s*\(|\bsaveSession\s*\(/ },
   { what: 'raw SQL', re: /INSERT\s+INTO\s+"?(?:WorkoutScan|PrqEntry|MirrorSession|AthleteBuild|CampSession)\b|UPDATE\s+"?(?:WorkoutScan|PrqEntry|MirrorSession|AthleteBuild|CampSession)\b/i },
 ];
 

@@ -26,13 +26,13 @@ export function DialogueBox({ d, cmd }: { d: StoryDialogueSnapshot; cmd: StoryUi
           </span>
           <span className="text-sm font-black tracking-wide text-[#7dd3fc]">{d.speaker.toUpperCase()}</span>
           {d.placeholder && (
-            <span className="rounded border border-amber-300/70 bg-amber-300/15 px-1.5 py-0.5 text-[9px] font-black tracking-[0.2em] text-amber-200"
+            <span className="rounded border border-amber-300/70 bg-amber-300/15 px-1.5 py-0.5 text-[12px] font-black tracking-[0.2em] text-amber-200"
               data-testid="adventure-placeholder-tag" title="Placeholder story text until the owner's chapters arrive">
               PLACEHOLDER
             </span>
           )}
           <button type="button" onClick={(e) => { e.currentTarget.blur(); cmd.skip(); }}
-            className="ml-auto rounded px-2 py-0.5 text-[10px] font-bold tracking-widest text-white/60 hover:bg-white/10">SKIP ▸▸</button>
+            className="ml-auto rounded px-2 py-0.5 text-[12px] font-bold tracking-widest text-white/60 hover:bg-white/10">SKIP ▸▸</button>
         </div>
         <p className="min-h-[3rem] text-base leading-snug" aria-live="off">{shown}<span className="opacity-0">{d.text.slice(shown.length)}</span></p>
         {d.choices && d.shown >= d.text.length && (
@@ -50,7 +50,7 @@ export function DialogueBox({ d, cmd }: { d: StoryDialogueSnapshot; cmd: StoryUi
             <div className="h-full bg-white/70" style={{ width: `${Math.round(d.hold01 * 100)}%` }} />
           </div>
         )}
-        <p className="mt-1 text-right text-[9px] tracking-widest text-white/35">TAP · HOLD TO SKIP</p>
+        <p className="mt-1 text-right text-[12px] tracking-widest text-white/50">TAP · HOLD TO SKIP</p>
       </div>
     </div>
   );

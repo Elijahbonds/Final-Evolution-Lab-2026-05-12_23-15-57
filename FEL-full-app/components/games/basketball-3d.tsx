@@ -736,7 +736,7 @@ export default function Basketball3D(props: GameProps) {
               style={{ background: 'rgba(5,5,8,0.75)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,229,255,0.2)' }}
             >
               <span className="text-5xl font-black text-[#00E5FF] leading-none" style={{ textShadow: '0 0 18px rgba(0,229,255,0.55)' }}>{hud.myScore}</span>
-              <span className="text-[11px] text-white/60 font-mono">1V1 · FIRST TO {TARGET}</span>
+              <span className="text-[12px] text-white/60 font-mono">1V1 · FIRST TO {TARGET}</span>
               <span className="text-5xl font-black text-[#FF3366] leading-none" style={{ textShadow: '0 0 18px rgba(255,51,102,0.5)' }}>{hud.aiScore}</span>
             </div>
 
@@ -756,7 +756,7 @@ export default function Basketball3D(props: GameProps) {
                 />
               </div>
               <span
-                className="font-mono text-[10px] font-bold"
+                className="font-mono text-[12px] font-bold"
                 style={{
                   color: hud.momentum >= 3 ? '#FFD700' : hud.momentum <= -3 ? '#FF3366' : 'rgba(255,255,255,0.92)',
                   textShadow: '0 1px 3px rgba(0,0,0,0.9)', // M8.4 fix: keep label legible over bright backdrops // TUNE(elijah)
@@ -766,7 +766,7 @@ export default function Basketball3D(props: GameProps) {
               </span>
             </div>
             <div
-              className="flex gap-3 items-center px-3 py-0.5 rounded-lg font-mono text-[10px] text-white/70"
+              className="flex gap-3 items-center px-3 py-0.5 rounded-lg font-mono text-[12px] text-white/70"
               style={{ background: 'rgba(5,5,8,0.8)', border: '1px solid rgba(255,255,255,0.08)' }}
             >
               <span style={{ color: hud.prqColor }}>{hud.prqLabel}</span>
@@ -853,7 +853,7 @@ export default function Basketball3D(props: GameProps) {
               pointerEvents: 'none',
             }}>
               {/* CLUTCH TIME label */}
-              <div className="absolute top-[68px] left-1/2 -translate-x-1/2 text-[10px] font-mono font-bold tracking-widest" style={{
+              <div className="absolute top-[68px] left-1/2 -translate-x-1/2 text-[12px] font-mono font-bold tracking-widest" style={{
                 color: `rgba(255,51,102,${Math.min(hud.clutchIntensity * 1.2, 1)})`,
                 textShadow: '0 0 12px rgba(255,51,102,0.5)',
               }}>CLUTCH TIME</div>

@@ -104,7 +104,7 @@ export function refuseScanSave(): NextResponse {
   return NextResponse.json({ ...SCAN_SAVE_REFUSED }, { status: 403 });
 }
 
-export type ScanSaveRouteId = '1a' | '1b' | '1c' | '1d' | '1e' | '1f' | '1g' | '1h' | '1i' | '1j' | '1k' | '1l' | '1m' | '1n';
+export type ScanSaveRouteId = '1a' | '1b' | '1c' | '1d' | '1e' | '1f' | '1g' | '1h' | '1i' | '1j' | '1k' | '1l' | '1m' | '1n' | '1o';
 
 export interface ScanSaveRoute {
   id: ScanSaveRouteId;
@@ -148,4 +148,8 @@ export const SCAN_SAVE_ROUTES: readonly ScanSaveRoute[] = [
   // VBT (2026-10-25): a tracked set's bar-speed NUMBERS (speeds, reps, velocity loss, a warm-up's band), never a frame.
   // Verified adults who opted in; an adult who has not keeps sets on the phone; a teen's are kept nowhere (lib/vbt/gate.ts).
   { id: '1n', file: 'app/api/vbt/sets/route.ts', handler: 'POST', writes: 'VbtSet (a set\'s bar-speed numbers; pending SQL 2026-10-26-vbt.sql)', status: 'gated', holder: null, via: ['lib/vbt/server.ts', 'lib/vbt/store.ts'] },
+  // BBS-04 (2026-11-03): a shot or dribble session's NUMBERS from the phone camera (made / missed, an approximate spot,
+  // dribble counts), never a frame. Verified adults who opted in; an adult who has not keeps sessions on the phone; a
+  // teen's are kept nowhere (lib/hoops-cam/gate.ts TEEN_SHOT_SAVE).
+  { id: '1o', file: 'app/api/hoops-cam/sessions/route.ts', handler: 'POST', writes: 'HoopsCamSession (a shot or dribble session\'s numbers; pending SQL 2026-11-03-hoops-cam.sql)', status: 'gated', holder: null, via: ['lib/hoops-cam/server.ts', 'lib/hoops-cam/store.ts'] },
 ];

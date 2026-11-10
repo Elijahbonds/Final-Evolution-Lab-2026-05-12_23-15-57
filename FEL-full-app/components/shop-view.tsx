@@ -139,7 +139,7 @@ export function ShopView({
                 </div>
                 <div>
                   <h3 className="fel-heading text-lg font-bold leading-tight text-white">{card.name}</h3>
-                  <span className="font-mono text-[10px] uppercase tracking-wider text-white/40">{meta?.label}</span>
+                  <span className="font-mono text-[12px] uppercase tracking-wider text-white/50">{meta?.label}</span>
                 </div>
               </div>
               <p className="mt-3 flex-1 text-xs leading-relaxed text-white/55">{card.description}</p>
@@ -153,7 +153,7 @@ export function ShopView({
                       : 'cursor-default bg-[#FFD700]/10 text-[#FFE680]'
                     : onSale && canAfford
                       ? 'bg-[#00E5FF] text-black hover:bg-[#00E5FF]/85 hover:shadow-[0_0_18px_rgba(0,229,255,0.4)]'
-                      : 'cursor-not-allowed bg-white/10 text-white/35'
+                      : 'cursor-not-allowed bg-white/10 text-white/50'
                 }`}
               >
                 {busy === card.key ? (

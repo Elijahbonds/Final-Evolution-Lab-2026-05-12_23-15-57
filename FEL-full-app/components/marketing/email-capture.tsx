@@ -71,7 +71,7 @@ export function EmailCapture({ source = 'landing', heading = 'Join the Lab', sub
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@email.com"
-            className="flex-1 rounded-lg border border-white/15 bg-white/5 px-4 py-3 text-sm text-white placeholder-white/35 outline-none focus:border-[#00E5FF]/60"
+            className="flex-1 rounded-lg border border-white/15 bg-white/5 px-4 py-3 text-sm text-white placeholder-white/50 outline-none focus:border-[#00E5FF]/60"
           />
           <button
             type="submit"

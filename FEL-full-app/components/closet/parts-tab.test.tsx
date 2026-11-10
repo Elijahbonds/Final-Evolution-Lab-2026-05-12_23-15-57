@@ -25,8 +25,8 @@ describe('the Parts tab', () => {
 
   it('lists the placed parts with readable names, and edits the first one: bone list, colour, finish, mirror, sliders with typed values', () => {
     const html = render([part(1, { mirror: true }), part(2, { shape: 'plate', bone: 'Spine2' })]);
-    expect(html).toContain('Horn <span class="text-white/40">· Head</span>');
-    expect(html).toContain('Plate <span class="text-white/40">· Chest</span>');
+    expect(html).toContain('Horn <span class="text-white/50">· Head</span>');
+    expect(html).toContain('Plate <span class="text-white/50">· Chest</span>');
     expect(html).toMatch(/<optgroup label="Left arm">.*L forearm/);
     expect(html).toContain('aria-label="Part colour"');
     expect(html).toContain('value="#FF3366"');

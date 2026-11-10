@@ -30,7 +30,7 @@ export function HistoryStrip({ entries, canUndo, canRedo, onUndo, onRedo, onJump
           <li key={e.offset}>
             <button type="button" data-current={e.current} onClick={() => onJump(e.offset)} aria-current={e.current ? 'step' : undefined}
               title={e.offset === 0 ? 'Now' : e.offset < 0 ? `${-e.offset} step${e.offset === -1 ? '' : 's'} back` : `${e.offset} step${e.offset === 1 ? '' : 's'} forward (redo)`}
-              className="whitespace-nowrap rounded-md border px-2 py-1 font-display text-[10px] uppercase tracking-wide transition"
+              className="whitespace-nowrap rounded-md border px-2 py-1 font-display text-[12px] uppercase tracking-wide transition"
               style={{
                 borderColor: e.current ? 'var(--fel-cyan)' : 'rgba(255,255,255,0.1)',
                 background: e.current ? 'rgba(0,229,255,0.15)' : e.offset > 0 ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.45)',

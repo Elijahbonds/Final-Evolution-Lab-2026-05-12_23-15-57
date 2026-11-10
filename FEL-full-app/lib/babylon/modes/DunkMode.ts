@@ -41,7 +41,8 @@ import type { BodyView, ModeContext, ModeDefinition } from '../core/ModeHarness'
 import type { FelInput } from '../core/InputBus';
 import type { BodyEvent } from '@/lib/pose/BodyReader';
 import { DUNK_BODY, DunkBodyBinder, DUNK_FULL_RISE_M, DUNK_RUN_HOLD } from '@/lib/move/dunkBody';
-import { fetchVerifiedJumpCm } from '@/lib/dunk/verifiedJumpClient';   // dunk-flagship Phase 5: the verified real jump
+import { fetchVerifiedJumpCm } from '@/lib/dunk/verifiedJumpClient';
+import { loadJumps } from '@/lib/jump/historyStore';   // dunk-flagship Phase 9: READ ONLY, and only for a verified adult (DunkUnlocks.verifiedVertical)   // dunk-flagship Phase 5: the verified real jump
 import { BallSim } from '../core/BallPhysics';
 import { firstNight, nextNight, cardWon, cardVerdict, dunkOffDecide, dunkOffRuleLine, dunkOffByLine, type NightState, type DunkOffCard } from '../core/ContinuousNight';   // TRY-ONBOARD G1: the GO AGAIN ledger
 import { neverBindPose } from '../anim/importSanitizer';
@@ -89,7 +90,7 @@ import { applyVeniceDunkLookPass } from '../visual/veniceSurroundVisibility';
 import { DUNK_CONFIG as CFG } from './modeConfigs';
 import { readDisplaySetting } from '@/lib/controller-link/tvMode';   // TV MODE: the slam window widens on a mirrored display
 import { LAND_LEAD_SEC, timeToFloor, OOP_LOB_FLIGHT_SEC, OOP_WINDUP_SEC, OOP_LATE_CATCH_CLIP_T, whiffWhy, GLASS_RUN_CATCH_CLIP_T, GLASS_RELEASE_MIN_M, SELF_LOB_RELEASE_Y, glassThrowDue, OOP_GLASS_PASSER_X, OOP_GLASS_PASSER_FROM_RIM_M, OOP_GLASS_HIT_OVER_RIM_M, OOP_BOUNCE_FLIGHT_SEC, LOB_FRAME_LIFT, REAL_JUMP_PERSONAL, SLAM_BIG_FROM, personalFullRiseM, riseToPower, LOB_FRAME_TAU, oopThrowDue, RUNWAY_STRIDE_MPS, RUNWAY_STRIDE_SCALE, RUNWAY_RATE_MIN, RUNWAY_RATE_MAX, slamImpact, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG } from '../core/DunkFlagship';   // DUNK-FLAGSHIP: the pass's numbers (feel-panel knobs)
-import { slamVariantOf, SLAM_VARIANTS, SLAM_VARIANTS_ON, REVERSE_TURN_RATE, REVERSE_CONTACT_FROM, REVERSE_JAM_LIFT, type SlamVariant } from '../core/DunkSlamVariant';   // DUNK-FLAGSHIP Phase 7: the finish called with the slam (knob, off)
+import { slamVariantOf, SLAM_VARIANTS, SLAM_VARIANTS_ON, REVERSE_TURN_RATE, REVERSE_CONTACT_FROM, REVERSE_JAM_LIFT, REVERSE_TURN_FROM, REVERSE_COMMIT_SEC, type SlamVariant } from '../core/DunkSlamVariant';   // DUNK-FLAGSHIP Phase 7: the finish called with the slam (knob, off)
 import { feel } from '../../feel-panel/feel';
 import { rimCutSpot, clearOfHoop, runUpTune, tuneKey, dunkFramingOn } from '../core/dunkCamFraming';   // CAMERA TIP: cam.dunkFraming (default off)
 import { DUNK_BACKBOARD_Z } from '../visual/venuePropSets';
@@ -125,8 +126,8 @@ import { MomentumBus } from '../core/MomentumBus';
 import type { RivalSituation } from '../core/RivalNerve';   // the rival feels the contest too (his nerve is read in core/DunkRivalSim.rollRivalAttempt)
 import { rivalSlamOffset, rivalPressAt } from '../core/RivalPlay';
 import { DUNK_CHALLENGES, nextChallenge, checkChallenge, challengeLine, challengeChip, challengeCard, type DunkChallenge } from '../core/DunkChallenges';   // dunk-next phase 6: set pieces on the practice runway
-import { emptyUnlocks, loadUnlocks, saveUnlocks, refOpen, needLine, nextUnlockLine, recordNightWon, recordChallenge, devUnlockOverride, allOpen, type UnlockState, type DunkUnlock } from '../core/DunkUnlocks';   // dunk-next phase 6: what winning opens, on the device
-import { newField, bookCard, cutField, cutTiebreak, placeOf, highlightSituation, simFinal, encodeField, fieldTotal, nightFormat, cardDunks, PLAYER_ID, FIELD_SIZE, FINALISTS, type FieldDunker, type NightFormat } from '../core/DunkField';   // dunk-next phase 5: the four-dunker night (casual nights only: owner 2026-10-06)
+import { emptyUnlocks, loadUnlocks, saveUnlocks, refOpen, needLine, nextUnlockLine, recordNightWon, recordChallenge, devUnlockOverride, allOpen, withVerifiedJump, jumpRoadLine, verifiedVertical, type UnlockState, type DunkUnlock } from '../core/DunkUnlocks';   // dunk-next phase 6: what winning opens, on the device
+import { newField, bookCard, cutField, cutTiebreak, placeOf, highlightSituation, simFinal, encodeField, fieldTotal, nightFormat, isStakedRun, cardDunks, PLAYER_ID, FIELD_SIZE, FINALISTS, type FieldDunker, type NightFormat } from '../core/DunkField';   // dunk-next phase 5: the four-dunker night (casual nights only: owner 2026-10-06)
 import { rollRivalAttempt, simRivalDunk, DEFAULT_RIVAL_RUNUP, type RivalAttempt, type RivalRunUp, type RivalDunkResult, type RivalJudgeContext } from '../core/DunkRivalSim';   // dunk-next phase 4: a rival's dunk, judged without flying it
 import { beatsCrossed, gradeTrickPress, flightFlow, encodeBeatStrip, BEAT_ORDER, BEAT_TOL_SEC, BEAT_TICK_PITCH, BEAT_TICK_VOLUME, type BeatGrade, type BeatMark, type SlamZone } from '../core/DunkBeats';   // dunk-next phase 1: the flight is a four-beat bar
 import { motionPolicy } from '@/lib/a11y/reducedMotion';   // WAVE 3: the orbit angle is camera travel
@@ -148,6 +149,10 @@ import { soundtrackFirstDunkIn } from '@/lib/soundtrack/client';
 import { createFlightGate } from './flightGate';   // PERF-834-LCP (b): no late-asset work between takeoff and the slam   // FDB-2: /try's soundtrack waits for dunk 1 (policy.holdsForFirstDunk)
 import { isStaticControlsHint } from '../ui/staticControls';   // DUNK-LIVE-TIMING-FIX LP-04: the runway's default line is static (the harness blanks it in play)
 import { HOOP, DUNK_RIM_RADIUS } from '../core/courtDims';   // HOOP-UNIFY step 1: the glass box and the ring read the shared dims (values unchanged)
+import { createContestDefer, isQuietDunkPhase, whenQuietBeat, DUNK_PRELOAD_SET_ON, PRELOAD_CAP_MS, PRELOAD_BURSTS, finalistCandidates } from './dunkContestDefer';   // RUNUP-STALL-1
+import { Onlookers } from '../visual/Onlookers';   // RUNUP-STALL-2 (a): the preload waits for the rail's bodies
+import { warmSceneShaders } from '../core/warmShaders';   // RUNUP-STALL-2 (a)
+import { setMaskOnePerFrame } from '../core/bodyMask';   // RUNUP-STALL-4 (knob dunk.preloadSet)
 
 type Phase = 'approach' | 'charge' | 'cinematic' | 'resolve' | 'judging' | 'rivalTurn' | 'fieldCut' | 'contestOver';   // fieldCut: dunk-next phase 5 (the highlights, the cut)
 /** Venice DualShock pad (2026-09-05): a miss is one beat, not the full judged reveal — the next run-up follows at once. */
@@ -998,7 +1003,7 @@ export const DunkMode: ModeDefinition = (() => {
   /** The attempt chip: the stakes on a judged dunk, PRACTICE on the practice runway. */
   function attemptChip(): string { return practice ? PRACTICE_CHIP : stakesLabel(stakes, calledLabel()); }
   const propAllowed = (p: Prop): boolean => !(p === 'oopalien' && skyTier?.kind !== 'saucer') && !(SPECIAL_PROPS.has(p) && !specialsOpen()) && refOpen('prop', p, unlocks);   // (dunk-next phase 6: + the won-nights ladder)
-  const propLockLine = (p: Prop): string => !refOpen('prop', p, unlocks) ? needLine('prop', p, unlocks) : p === 'oopalien' ? 'NO ALIENS OVER THIS COURT' : specialLockLine(p as 'kangaroo');
+  const propLockLine = (p: Prop): string => !refOpen('prop', p, unlocks) ? [needLine('prop', p, unlocks), stakedRun() ? '' : jumpRoadLine('prop', p, unlocks)].filter(Boolean).join(' ') : p === 'oopalien' ? 'NO ALIENS OVER THIS COURT' : specialLockLine(p as 'kangaroo');
   function togglePractice(ctx: ModeContext): void {
     practice = !practice;
     if (!practice) challenge = null;   // dunk-next phase 6: a challenge lives on the practice runway
@@ -1267,7 +1272,9 @@ export const DunkMode: ModeDefinition = (() => {
   async function swapRivalBody(ctx: ModeContext, who: DunkRival): Promise<void> {
     const token = ++rivalSwapToken;
     let next: SpawnedCharacter;
-    try { next = await spawnRivalBody(ctx, who); } catch (e) { console.error('[DUNK-RIVAL] body swap failed; keeping the current body', e); return; }
+    const kept = takeFinalistBody(ctx, who.id);   // RUNUP-STALL-2b: the preload (knob on) already set this finalist up, hidden
+    if (kept) next = kept;
+    else try { next = await spawnRivalBody(ctx, who); } catch (e) { console.error('[DUNK-RIVAL] body swap failed; keeping the current body', e); return; }
     while (turn !== 'player' && token === rivalSwapToken && !ctx.scene.isDisposed) await new Promise((r) => setTimeout(r, 250));
     if (token !== rivalSwapToken || ctx.scene.isDisposed) { ctx.groundLock?.untrack(next.root); next.dispose(); return; }
     const old = rival;
@@ -1288,8 +1295,12 @@ export const DunkMode: ModeDefinition = (() => {
   const flightGate = createFlightGate(() => phase === 'cinematic' || (phase === 'resolve' && !finishing), () => !ended);
   let rivalArrival: Promise<void> | null = null;
   let awaitingRival = false;   // his turn is up and his body is still on its way: the judging beat holds (rivalRound)
+  const contestDefer = createContestDefer();   // RUNUP-STALL-1: a set asked for mid-dunk waits for the landing (update() starts it)
+  const dunkQuiet = (): boolean => isQuietDunkPhase(phase) && !replaying;   // only rivalTurn/fieldCut/contestOver, no replay running
+  let contestHisTurn = false;   // RUNUP-STALL-1 v3: his turn is up (rivalRound) and needs his body: the set starts now, between dunks
   function startContestSet(ctx: ModeContext): void {
     if (contestSetStarted || ctx.scene.isDisposed) return;
+    if (!contestHisTurn && !contestDefer.ask(dunkQuiet())) { console.info('[DUNK-BUDGET] not a quiet beat — the contest set waits for one'); return; }
     contestSetStarted = true;
     console.info('[DUNK-BUDGET] dunk 1 is in — the contest set loads now (his body first)');
     // FDB-2 (2026-10-17): the same moment on the page's own clock. AM's run counted CASS's body (rivals/jinx.glb) "before dunk 1",
@@ -1300,17 +1311,24 @@ export const DunkMode: ModeDefinition = (() => {
     // FDB-2 (PM, 2026-10-17): the menu soundtrack's first song (a 0.43–0.51 MB preview) waited on /try for this moment; it starts now
     soundtrackFirstDunkIn();
     rivalArrival = bringRival(ctx);
-    void rivalArrival.finally(() => {
+    void rivalArrival.finally(() => whenQuietBeat(dunkQuiet, () => ctx.scene.isDisposed)).then(() => {   // RUNUP-STALL-1: and what follows him waits for a quiet beat
       if (ctx.scene.isDisposed) return;
       // the venue's set and the corner props in one breath: the tent and the bus are each one download, shared (copyKitModel)
       void dunkVenue?.mountDressing();
+      void readVerifiedVertical(ctx);   // dunk-flagship Phase 9: the verified jump's road on the ladder (after dunk 1, out of the air)
       parkCornerProps(ctx);
       mic?.loadAudio();
       if (!walkCue) void walkPlayer.prepare(null, (line) => ctx.setHud({ walkOutNow: line })).then(() => { if (!ended && !ctx.scene.isDisposed) startWalkOut(); });
     });
   }
   /** His body, tried again (backing off) until it lands: on a dead line the night waits at his turn instead of failing. */
+  let rivalBringing: Promise<void> | null = null;   // RUNUP-STALL-2: one load of his body at a time (the preload and the contest set share it)
   async function bringRival(ctx: ModeContext): Promise<void> {
+    if (rivalBringing) return rivalBringing;
+    rivalBringing = bringRivalOnce(ctx);
+    try { await rivalBringing; } finally { rivalBringing = null; }
+  }
+  async function bringRivalOnce(ctx: ModeContext): Promise<void> {
     for (let tries = 0; !rival && !ctx.scene.isDisposed; tries++) {
       await flightGate.clear();   // PERF-834-LCP (b): no request starts in a flight (a retry lands after the slam)
       try {
@@ -1324,6 +1342,85 @@ export const DunkMode: ModeDefinition = (() => {
     }
     // PERF-834-LCP (b): the rest of the contest set (dressing, bus, tent, voices, walk-out) rides on this promise — it starts after a slam
     await flightGate.clear();
+  }
+  // ── RUNUP-STALL-2 (a): THE PRELOAD (feel knob dunk.preloadSet, default off) ────────────────────────────────────────────
+  // Knob on: behind the contest intro on the first runway, his body, then the venue dressing and its five onlookers (one a
+  // frame), then every shader the scene will draw, the slam's sparks and confetti included. The run is held (beginRun)
+  // until it is all in, or PRELOAD_CAP_MS passes. The contest set still starts after dunk 1 (its mark, its soundtrack, its
+  // corner props and voices); his body and the onlookers are already here by then, so it has nothing heavy left to set up.
+  let preloadHold = false;
+  async function preloadContestSet(ctx: ModeContext): Promise<void> {
+    if (preloadHold || ctx.scene.isDisposed) return;
+    preloadHold = true;
+    setMaskOnePerFrame(ctx.scene, true);   // RUNUP-STALL-4: each body's mask fitting on its own frame (this scene, knob on)
+    dunkVenue?.paceDressing?.();   // RUNUP-STALL-4: the venue's dressing jobs one a frame
+    const t0 = performance.now();
+    console.info('[DUNK-PRELOAD] the contest loads behind the intro (his body, the onlookers, the shaders)');
+    // RUNUP-STALL-3: a frame between the heavy steps (each body, the particles, each shader batch), and the card's bar
+    const frame = (): Promise<void> => nextFrameOf(ctx);
+    const progress = (f: number): void => { ctx.setHud({ preloadReady: Math.round(Math.max(0, Math.min(1, f)) * 100) / 100 }); };
+    progress(0);
+    const work = (async () => {
+      await bringRival(ctx);
+      if (ctx.scene.isDisposed) return;
+      progress(0.15); await frame();
+      await dunkVenue?.mountDressing();
+      progress(0.2); await frame();
+      await Onlookers.settled(ctx.scene);
+      if (ctx.scene.isDisposed) return;
+      progress(0.5); await frame();
+      await prespawnFinalists(ctx);   // RUNUP-STALL-2b: both possible finalists, hidden (their shaders warm below with the rest)
+      for (const b of [rival, ...finalistBodies.values()]) { if (!b || ctx.scene.isDisposed) continue; await frame(); motionFor(b); }   // RUNUP-STALL-5: his and the finalists' motion layers, one body a frame (the swaps reuse them)
+      if (ctx.scene.isDisposed) return;
+      progress(0.65);
+      for (const kind of PRELOAD_BURSTS) { await frame(); EffectsKit.burst(ctx.scene, new Vector3(0, -60, 0), kind, 0.05); }   // the slam's particles, under the court: one kind a frame
+      await frame();
+      progress(0.7);
+      const pairs = await warmSceneShaders(ctx.scene);   // RUNUP-STALL-3: WARM_BATCH pairs a frame on the scene's own clock
+      progress(1);
+      console.info(`[DUNK-PRELOAD] in after ${Math.round(performance.now() - t0)} ms (${pairs} shader pairs)`);
+    })();
+    try { await Promise.race([work, new Promise<void>((r) => setTimeout(r, PRELOAD_CAP_MS))]); }
+    catch (e) { console.warn('[DUNK-PRELOAD] failed; the set loads between rounds', e); }
+    finally { preloadHold = false; }
+    if (!ctx.scene.isDisposed) ctx.setHud({ preloadReady: null });   // RUNUP-STALL-3: the card goes with the hold
+  }
+  /** RUNUP-STALL-3: resolves on the scene's next frame (at once on a disposed scene). */
+  function nextFrameOf(ctx: ModeContext): Promise<void> {
+    return new Promise((r) => { if (ctx.scene.isDisposed) r(); else ctx.scene.onBeforeRenderObservable.addOnce(() => r()); });
+  }
+  // ── RUNUP-STALL-2b: THE FINALISTS, SET UP AHEAD (knob dunk.preloadSet; only the preload fills this) ─────────────────────
+  // AM's c9e199db trace: the cut's walk-out (finishCut → swapRivalBody) set up a whole body (431 + 338 ms) at the start of your
+  // final run-up. With the knob on, the preload spawns both rivals who can walk out, hidden and off the ground lock, one at
+  // a time; the swap takes the one who made the cut and the other goes. Knob off: the map stays empty and the swap spawns.
+  const finalistBodies = new Map<string, SpawnedCharacter>();
+  async function prespawnFinalists(ctx: ModeContext): Promise<void> {
+    for (const id of finalistCandidates(field, foe.id, PLAYER_ID)) {
+      if (finalistBodies.has(id) || ctx.scene.isDisposed) continue;
+      await nextFrameOf(ctx);   // RUNUP-STALL-3: one body a frame
+      try {
+        const body = await spawnRivalBody(ctx, rivalById(id));
+        ctx.groundLock?.untrack(body.root);
+        body.root.setEnabled(false);
+        if (ctx.scene.isDisposed) { body.dispose(); return; }
+        finalistBodies.set(id, body);
+      } catch (e) { console.warn(`[DUNK-PRELOAD] finalist ${id} did not set up — the cut spawns him`, e); }
+    }
+  }
+  /** The hidden finalist for `id`, shown and back on the ground lock; the other hidden finalists are dropped. Null: spawn him. */
+  function takeFinalistBody(ctx: ModeContext, id: string): SpawnedCharacter | null {
+    const body = finalistBodies.get(id) ?? null;
+    if (!body) return null;
+    finalistBodies.delete(id);
+    dropFinalistBodies(ctx);
+    body.root.setEnabled(true);
+    ctx.groundLock?.track(body.root, body.skeleton);
+    console.info(`[DUNK-PRELOAD] ${id} walks out on the body the preload set up`);
+    return body;
+  }
+  function dropFinalistBodies(ctx: ModeContext | null): void {   // null: the mode is going (its ground lock with it)
+    for (const body of finalistBodies.values()) { ctx?.groundLock?.untrack(body.root); body.dispose(); }
+    finalistBodies.clear();
   }
   /** The corner props: the bus (Orbit's shuttle) across the right corner, the tent across the left. A face counts for the
    *  rebound and the wall run once its prop stands on it (parkedPanes) — nobody kicks off a bus they cannot see. */
@@ -1345,6 +1442,28 @@ export const DunkMode: ModeDefinition = (() => {
       console.info('[DUNK-PARKOUR] tent on the left corner (no sign)');
     }).catch((e) => console.warn('[DUNK-PARKOUR] tent did not load', e));
   }
+  // RUNUP-STALL-5 (2026-10-30, knob dunk.preloadSet): THE SWAP BETWEEN TURNS. AM's desktop gate on 99d89dd5 had two 77 ms tasks,
+  // judging → approach (rivalRound → swapBodies) and judging → fieldCut (endRivalTurn → swapBodies): each swap re-ran bindBody,
+  // whose MotionLayers.forBody reads the new dunker's hand meshes' skinned vertices for the wrist axis (handPointsFromMeshes).
+  // With the knob on, a body's layers are built once (the preload builds his and the finalists') and a swap reuses them, reset.
+  // Off: built on every bind, exactly as before.
+  const motionByBody = new WeakMap<object, MotionLayers>();
+  const motionCacheOn = (): boolean => feel('dunk.preloadSet', DUNK_PRELOAD_SET_ON) >= 0.5;
+  /** Knob on: this body's layers from an earlier bind (or the preload), reset; null (always, knob off): bindBody builds them. */
+  function motionReused(b: typeof player): MotionLayers | null {
+    if (!motionCacheOn()) return null;
+    const hit = motionByBody.get(b.skeleton) ?? null;
+    hit?.reset();
+    return hit;
+  }
+  /** Knob on: keep the layers bindBody built for this body. */
+  function motionKeep(b: typeof player, m: MotionLayers): void { if (motionCacheOn()) motionByBody.set(b.skeleton, m); }
+  /** The preload: build a body's layers ahead of its first bind (knob on: the preload is the only caller). */
+  function motionFor(b: typeof player): MotionLayers {
+    const hit = motionReused(b); if (hit) return hit;
+    const m = MotionLayers.forBody(b.skeleton, { bind: bindFrame(b.skeleton), meshes: b.root.getChildMeshes(false).filter((m) => !!m.skeleton && m.getTotalVertices() > 0) as never, wrists: true });
+    motionKeep(b, m); return m;
+  }
   function bindBody(ctx: ModeContext): void {
     // A+ P8 H1: the arm chains once (the eastbay's left hand carries the ball after the hand-off); the reach is applied
     // AFTER the clips evaluate, on top of the frame's pose — the slot the dribble's HandIK and foot planting use
@@ -1359,8 +1478,11 @@ export const DunkMode: ModeDefinition = (() => {
     // HOOPS MOTION phase 3c: the limb followers, the wrists (their axis off the body's own hand mesh) and the hinged arms are built by
     // MotionLayers.forBody — this construction, lifted so every hoops body can mount the same layers; the contest calls them from the
     // same places as before (applyLimbDrag / applyWrists / the hinge observer below)
+    const reusedMotion = motionReused(player);   // RUNUP-STALL-5: with dunk.preloadSet on, a body's layers are built once (null: build)
+    if (reusedMotion) motion = reusedMotion; else
     motion = MotionLayers.forBody(player.skeleton, { bind: hipsBf, arms, meshes: player.root.getChildMeshes(false).filter((m) => !!m.skeleton && m.getTotalVertices() > 0) as never, wrists: true });
     limbDrag = motion.drag; wristLayer = motion.wrists;
+    motionKeep(player, motion);   // RUNUP-STALL-5 (knob on only)
     if (ikScene && handIkObs) ikScene.onAfterAnimationsObservable.remove(handIkObs);
     ikScene = ctx.scene; handIkObs = ctx.scene.onAfterAnimationsObservable.add(handIkApply);
     dribble?.dispose();
@@ -1423,6 +1545,8 @@ export const DunkMode: ModeDefinition = (() => {
       // PIPELINES: no song → a soundtrack track. FIRST-DUNK-BUDGET: that track is the catalogue's (a download) and comes with the
       // contest set; your own song is a local mixdown and walks out now, as it always did.
       contestSetStarted = false; rivalArrival = null; awaitingRival = false;
+      contestDefer.reset();
+      rivalBringing = null; preloadHold = false;
       if (walkCue) void walkPlayer.prepare(walkCue, (line) => ctx.setHud({ walkOutNow: line }));
       // M74: try Nexus venue first; fallback to VenueKit if no spec
       // FIRST-DUNK-BUDGET: the venue's dressing (its CC0 set, the parked bus and sedan, the onlookers) waits for the contest set
@@ -1437,7 +1561,7 @@ export const DunkMode: ModeDefinition = (() => {
       // THE SKY TIER: the court's own thing over the lane (a rocket in Orbit, a balloon at Blossom, …), its underside a surface for R1;
       // Venice hangs nothing (the blimp is out — owner: "the grey thing on top of the hoop, its an eye sore")
       skyRoot?.dispose(); skyTier = skyTierFor(ctx.location); skyRoot = skyTier ? buildSkyTier(ctx.scene, skyTier, gatherLine() - SKY.zAhead) : null; skyTapped = false;
-      void readSeasonLane().then((lane) => { seasonLane = lane; console.info(`[DUNK-SEASON] lane ${lane} — specials ${specialOpen(lane) ? 'OPEN' : 'LOCKED'}`); ctx.setHud({ specials: specialOpen(lane) ? 'PRO' : 'LOCKED' }); });
+      void readSeasonLane().then((lane) => { seasonLane = lane; console.info(`[DUNK-SEASON] lane ${lane} — specials ${specialOpen(lane) ? 'OPEN' : 'LOCKED'}`); ctx.setHud({ specials: lane === 'guest' ? null : specialOpen(lane) ? 'PRO' : 'LOCKED' }); });   // TRY-AGE-PLACEHOLDER-1: a guest is shown no pass chip
       console.info(skyTier ? `[DUNK-SKY] ${skyTier.tag} over the lane (underside ${SKY.underY} m)` : '[DUNK-SKY] nothing over this lane');
       ride = cornerRideFor(ctx.location);
       if (ride.kind === 'shuttle') {   // ORBIT's other corner (owner, 2026-09-18: "replace the red tent with a space station")
@@ -1540,6 +1664,7 @@ export const DunkMode: ModeDefinition = (() => {
       });
       if (turn === 'player' && isStaticControlsHint(runwayHint)) ctx.setHud({ hint: liveRunwayHint() });   // DUNK-LIVE-TIMING-FIX LP-04: input is live (setPhase('approach')), so is the run line
       startField(ctx);   // dunk-next phase 5: tonight's four dunkers
+      if (feel('dunk.preloadSet', DUNK_PRELOAD_SET_ON) >= 0.5) void preloadContestSet(ctx);   // RUNUP-STALL-2 (a): knob on only
       readUnlocks(); challenge = null; ctx.setHud({ challenge: '', nightUnlock: '' });   // dunk-next phase 6: the device's ladder
     },
 
@@ -1859,6 +1984,7 @@ export const DunkMode: ModeDefinition = (() => {
     },
 
     update(ctx: ModeContext, dt: number) {
+      if (contestDefer.tick(dunkQuiet())) startContestSet(ctx);   // RUNUP-STALL-1: the set asked for mid-dunk starts on the first quiet beat
       // A RUN HELD THROUGH THE WAIT STILL COUNTS (2026-09-19). The run started on a trigger EVENT inside the approach,
       // so a finger already down when the runway opened — held through the judges' card and the rival's turn, which is
       // exactly what a player does between attempts — produced no event and no run: the attempt launched off a walk
@@ -2222,7 +2348,8 @@ export const DunkMode: ModeDefinition = (() => {
         airDriftX += airLean * AIR_DRIFT * dt;
         // an angled run-up launches yawed off the iron: the body OPENS onto it through the rise (phase 7: slower there, so the
         // turn is something the hips and chest do in the air rather than a snap at the take-off), square by the hang
-        faceToward(rim, dt * (clipTime < EASTBAY_TIMING.rise + 0.35 ? FACE_RIM_RATE_RISE : FACE_RIM_RATE));
+        if (reverseOnTheWayUp(dt)) faceAwayStep(dt);   // DUNK-FLAGSHIP Phase 7b: a REVERSE is turned on the way up, not at the iron
+        else faceToward(rim, dt * (clipTime < EASTBAY_TIMING.rise + 0.35 ? FACE_RIM_RATE_RISE : FACE_RIM_RATE));
 
         // THE PROP IS PHYSICAL. Crossing the obstacle with your feet below
         // its top is not a scoring penalty — the dunk DIES at the chair,
@@ -2452,7 +2579,7 @@ export const DunkMode: ModeDefinition = (() => {
               const touch = clearOfIron(jamPrevLive ? sweptTouch(jamPrevBall, bp, rim, RIM_RADIUS, ballSim.radius) : bp, rim, RIM_RADIUS, ballSim.radius);
               releaseBall(ball); ball.position.set(touch.x, touch.y, touch.z);
               jamContact = true; flushRealSec = performance.now() / 1000; releasePos.copyFrom(ball.position); sinceRelease = 0; flush = startFlush(ball.position, rim, RIM_RADIUS, ballSim.radius, NET_THROW_MIN + (NET_THROW_MAX - NET_THROW_MIN) * Math.max(0, Math.min(1, qteAccuracy)));   // NET EXIT: a clean slam spits it out
-              console.info(`[HANDS] iron contact ${(jamSec * 1000).toFixed(0)} ms into the jam: ball ${Vector3.Distance(bp, rim).toFixed(2)} m from the rim centre (${bp.y.toFixed(2)} m) · iron ${ringDistance(bp, rim, RIM_RADIUS).toFixed(3)} m (last frame ${jamPrevLive ? ringDistance(jamPrevBall, rim, RIM_RADIUS).toFixed(3) : '—'}) → let go at ${ringDistance(touch, rim, RIM_RADIUS).toFixed(3)}`);
+              console.info(`[HANDS] iron contact ${(jamSec * 1000).toFixed(0)} ms into the jam: ball ${Vector3.Distance(bp, rim).toFixed(2)} m from the rim centre (${bp.y.toFixed(2)} m) · iron ${ringDistance(bp, rim, RIM_RADIUS).toFixed(3)} m (last frame ${jamPrevLive ? ringDistance(jamPrevBall, rim, RIM_RADIUS).toFixed(3) : '—'}) → let go at ${ringDistance(touch, rim, RIM_RADIUS).toFixed(3)} · flat ${Math.hypot(touch.x - rim.x, touch.z - rim.z).toFixed(3)} m of the ring's ${RIM_RADIUS}`);
               // CONTACT-RIM-SOUND: the CONTACT is this frame — the hand with the ball at the iron by geometry — and only this frame. (A jam
               // that timed out used to let go short of it, 9 cm of daylight on a late slam, and punch later from the flush step.)
               setWin('contact'); contactPunch(ctx); dunkHooks.contact(aerialClip, ironStep.quality, tierFromAccuracy(qteAccuracy, aHeld), hookWho());
@@ -2759,6 +2886,7 @@ export const DunkMode: ModeDefinition = (() => {
       stopWalkOut(); walkCue = null; walkOut = null;
       clearProps(); SoundKit.stopAmbient(); feet = { L: null, R: null };
       sparePasser?.dispose(); sparePasser = null;   // IMPROVE (2026-10-06): the kept passer goes with the mode
+      dropFinalistBodies(null);   // RUNUP-STALL-2b: unused hidden finalists go with the mode
       dunkVenue?.dispose(); dunkVenue = null;  // M74
       for (const p of sideProps) p.dispose(); sideProps = [];
     },
@@ -2886,6 +3014,20 @@ export const DunkMode: ModeDefinition = (() => {
   /** DUNK-FLAGSHIP Phase 7: the finish the stick called on the live slam press (knob `dunk.slamVariants`, off) — and the one the
    *  resolve settled on (null on a called trick, a left-hand carry or a miss: a called trick keeps its own flush). */
   let slamVariant: SlamVariant | null = null, finishVariant: SlamVariant | null = null;
+  /** DUNK-FLAGSHIP Phase 7b: the REVERSE's turn, started on the way up (the stick held back from the hang, nothing called) */
+  let reverseCommitSec = 0, reverseTurning = false;
+  /** The second, earlier read of the stick (Phase 7b, the coordinator's decision): from the hang until the slam window opens, the
+   *  stick held BACK for REVERSE_COMMIT_SEC with no air trick called or armed starts the turn away from the iron. The slam press
+   *  still decides the finish (readSlamVariant): back at the press is the REVERSE; anything else turns him back square (the
+   *  resolve faces the iron). Knob off: never. The d-pad tricks are not read here, and a trick thrown after it stops it. */
+  function reverseOnTheWayUp(dt: number): boolean {
+    if (reverseTurning) return true;
+    const calling = turn === 'player' && !lob.live && !obstacle && !qteWindowOpen && clipTime >= REVERSE_TURN_FROM && !flight.attempt.tricks.length && !armedAir
+      && slamVariantOf(feel('dunk.slamVariants', SLAM_VARIANTS_ON) >= 0.5, stickX, stickY) === 'reverse';
+    reverseCommitSec = calling ? reverseCommitSec + dt : 0;
+    if (reverseCommitSec >= REVERSE_COMMIT_SEC) { reverseTurning = true; console.info(`[DUNK-SLAM] reverse: the turn away from the iron starts @${clipTime.toFixed(2)}`); }
+    return reverseTurning;
+  }
   let clipFloorY = 0, clipBackZ = 0;          // where a clipped dunker comes down (the top he caught, or the floor before the side he hit)
 
   /** DUNK-BODY-MID: the SLAM lands. Called on the press inside the window, and from the window's opening frame for a
@@ -3012,6 +3154,7 @@ export const DunkMode: ModeDefinition = (() => {
   /** The named trick fires: the air budget pays for it (or says why not), its body plays, a spinThrough trick starts the
    *  turn that resolves rim-facing by SPIN_RESOLVE_T whatever flight is left (momentum-led: later = quicker). */
   function fireTrick(ctx: ModeContext, trick: DunkTrick, how: 'window' | 'armed', grade: BeatGrade | null = null): void {
+    if (reverseTurning) { reverseTurning = false; reverseCommitSec = 0; console.info('[DUNK-SLAM] reverse: the turn stops — a trick was called'); }   // DUNK-FLAGSHIP Phase 7b
     const g = how === 'armed' ? armedGrade : grade; if (how === 'armed') armedGrade = null;   // dunk-next: how it was thrown (none = held for a grab: neutral)
     const got = flight.take(trick);
     if (!got) {
@@ -3158,7 +3301,7 @@ export const DunkMode: ModeDefinition = (() => {
     dubbleGrabbed = false; dubbleReachK = 0; straddleK = 0; dubblePassed = false; dubbleAir = null;
     launchX = player.root.position.x; launchBank = runBank; runBank = 0; airDriftX = 0;   // DUNK MOTION phase 7
     activeHandOff = null; ikSideK = 0;
-    slamVariant = null; finishVariant = null;   // DUNK-FLAGSHIP Phase 7: a variant is one slam's
+    slamVariant = null; finishVariant = null; reverseCommitSec = 0; reverseTurning = false;   // DUNK-FLAGSHIP Phase 7: a variant is one slam's
     clipTime = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; shortOfIron = false; ebState.inLeftHand = hs('Right') === 'Left';
     meterSpan = EASTBAY_TIMING.extend + slamWindowNow() / 2 + 0.16; meter3d?.begin(slamGreen());
     // the broadcast cut is per-attempt: hand the follow camera back or the next runway is shot from the rim
@@ -3726,6 +3869,7 @@ export const DunkMode: ModeDefinition = (() => {
    *  already down when the runway opened. */
   function beginRun(ctx: ModeContext): void {
     if (phase !== 'approach') return;
+    if (preloadHold) { refuse(ctx, 'THE CONTEST IS GETTING READY'); return; }   // RUNUP-STALL-2 (a): knob on, dunk 1 waits for the preload
     flushPropSetup(ctx);   // IMPROVE (2026-10-06): a pick still settling is built now (it starts rolling when it lands: setupProp)
     setPhase('charge');
     obstacle?.start();   // a rolling prop comes when you commit to the run (owner, 2026-09-16)
@@ -4869,8 +5013,25 @@ export const DunkMode: ModeDefinition = (() => {
   function readUnlocks(): void {
     const o = process.env.NODE_ENV === 'development' && typeof location !== 'undefined' ? devUnlockOverride(location.search) : null;
     unlocksDev = o === 'all';
-    unlocks = unlocksDev ? allOpen() : loadUnlocks(deviceStore());
+    unlocks = unlocksDev ? allOpen() : withVerifiedJump(loadUnlocks(deviceStore()), verifiedCm, stakedRun()).state;   // Phase 9: this visit's verified jump, if one was read
     console.info(`[DUNK-UNLOCKS] ${unlocksDev ? 'dev: all open' : `${unlocks.nightsWon} nights won · ${unlocks.beaten.length} challenges beaten`}`);
+  }
+  /**
+   * dunk-flagship Phase 9: THE VERIFIED VERTICAL OPENS THE JUMPING FEATS. The server answers for the signed-in account: a number only
+   * for a verified 18+ athlete who opted in and has a verified jump saved (GET /api/dunk/verified-jump, Phase 5) — that answer is the
+   * adult gate, and without it this phone's jump history is NEVER read (a teen's or a kid's session, a guest, the rig). With it, the
+   * best of the saved jump and the phone's own verified hands-on-hips jumps. A staked or ladder run ignores it (withVerifiedJump).
+   */
+  let verifiedCm: number | null = null;
+  const stakedRun = (): boolean => typeof location !== 'undefined' && isStakedRun(location.search);
+  async function readVerifiedVertical(ctx: ModeContext): Promise<void> {
+    const serverCm = await fetchVerifiedJumpCm();
+    const device = verifiedVertical({ verifiedAdult: serverCm !== null }, () => loadJumps(deviceStore()));
+    verifiedCm = serverCm === null ? null : Math.max(serverCm, device ?? 0);
+    if (unlocksDev || ended || ctx.scene.isDisposed) return;
+    const r = withVerifiedJump(unlocks, verifiedCm, stakedRun()); unlocks = r.state;
+    console.info(`[DUNK-UNLOCKS] verified jump: ${verifiedCm === null ? 'none read' : `${verifiedCm} cm${stakedRun() ? ' (a staked run: not counted)' : ''}`}${r.opened.length ? ` · ${openedLine(r.opened)}` : ''}`);
+    if (r.opened.length) flash(ctx, `YOUR VERIFIED ${Math.round(verifiedCm ?? 0)} CM JUMP — ${openedLine(r.opened)}`, 1600);
   }
   /** Keep the ladder on the device (never the dev override's all-open state). */
   function keepUnlocks(): void { if (!unlocksDev) saveUnlocks(deviceStore(), unlocks); }
@@ -4995,7 +5156,7 @@ export const DunkMode: ModeDefinition = (() => {
     airHeld = false; dropToFloor = false; dropVy = 0; liveLandAt = -1; cancelLiveCeleb(); replaying = false; replayAir = false; player.root.rotationQuaternion = null;   // A+ P8
     cutting = false; celebPick = null; soundGapUntil = 0; celebFace = null; ctx.setHud({ cut: '', call: '', poster: null });   // DUNK MOTION phase 12
     armedAir = null; spin.reset(); replaySpinYaw = 0; clearBeats(ctx);   // dunk-next: the strip goes with the attempt
-    slamVariant = null; finishVariant = null;   // DUNK-FLAGSHIP Phase 7
+    slamVariant = null; finishVariant = null; reverseCommitSec = 0; reverseTurning = false;   // DUNK-FLAGSHIP Phase 7
     playClip(SPORT_CLIP.idle, { loop: true });
     charge = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; shortOfIron = false; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
     dunkHooks.reset();   // CONTACT-RIM-SOUND: the hooks latch per attempt, reset with contactLatch (DUNK-MODE-PLAN §11.2 H2)
@@ -5175,6 +5336,16 @@ export const DunkMode: ModeDefinition = (() => {
       startContestSet(ctx);   // the guard, not the path: dunk 1 has always started it by now
       awaitingRival = true;
       console.info('[DUNK-BUDGET] his turn is up — waiting on his body');
+      // RUNUP-STALL-1: a set still queued (not a quiet beat yet) has no arrival to wait on: wait for the beat, then start it
+      // (rivalRound runs in judging and sets rivalTurn only once he is here, so it cannot wait for the allow-list: his turn IS the
+      // between-dunks beat. It waits out a running replay, then starts the set itself.)
+      if (!rivalArrival && !ctx.scene.isDisposed && !ended) {
+        await whenQuietBeat(() => !replaying, () => ctx.scene.isDisposed);
+        // RUNUP-STALL-2 (b): his turn opens on its own beat BEFORE his body is asked for, so the set never starts in judging.
+        // awaitingRival holds the watchdog (and with it advanceAfterRivalTurn) and every judging advance while he loads.
+        if (!ctx.scene.isDisposed && !ended) setPhase('rivalTurn');
+        contestHisTurn = true; try { startContestSet(ctx); } finally { contestHisTurn = false; }
+      }
       try { await rivalArrival; } finally { awaitingRival = false; }
       if (!rival || ended || ctx.scene.isDisposed) return;
     }
@@ -5290,6 +5461,7 @@ export const DunkMode: ModeDefinition = (() => {
   function startField(ctx: ModeContext): void {
     nightFmt = nightFormat(typeof location !== 'undefined' ? location.search : '');
     field = nightFmt === 'field' ? newField(foe) : [];
+    dropFinalistBodies(ctx);   // RUNUP-STALL-2b: a new field has its own finalists (the preload sets them up again, knob on)
     console.info(`[DUNK-FIELD] night format: ${nightFmt}${nightFmt === 'classic' ? ' (a staked / ladder run — one rival, four dunks)' : ''}`);
     fieldStage = 'round1'; fieldChamp = ''; fieldNote = ''; cutSeq++; fieldCombos.clear();
     ctx.setHud({ field: field.length ? encodeField(field, 'round1') : '', nightField: '' });

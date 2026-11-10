@@ -59,7 +59,7 @@ export default async function BookPage({
 
   return (
     <PressFrame signedIn={signedIn}>
-      <p className="mt-6 text-xs text-white/40">
+      <p className="mt-6 text-xs text-white/50">
         <Link href="/press" className="hover:text-white">Press</Link>
         <span> / {book.title}</span>
       </p>
@@ -71,12 +71,12 @@ export default async function BookPage({
       <div className="mt-4 grid gap-6 md:grid-cols-[220px_1fr]">
         <BookCover title={book.title} tall />
         <div>
-          {book.eyebrow ? <p className="text-[11px] uppercase tracking-[0.16em] text-white/45">{book.eyebrow}</p> : null}
-          {book.track ? <p className="text-[11px] uppercase tracking-[0.16em] text-white/45">{book.track}</p> : null}
+          {book.eyebrow ? <p className="text-[12px] uppercase tracking-[0.16em] text-white/50">{book.eyebrow}</p> : null}
+          {book.track ? <p className="text-[12px] uppercase tracking-[0.16em] text-white/50">{book.track}</p> : null}
           <h2 className="fel-heading text-4xl text-white">{book.title}</h2>
           <p className="mt-2 text-sm text-white/60">{publicBookDescription(book)}</p>
           {chapterNotice ? (
-            <p className="mt-2 text-[11px] text-white/35">{chapterNotice}</p>
+            <p className="mt-2 text-[12px] text-white/50">{chapterNotice}</p>
           ) : null}
         </div>
       </div>
