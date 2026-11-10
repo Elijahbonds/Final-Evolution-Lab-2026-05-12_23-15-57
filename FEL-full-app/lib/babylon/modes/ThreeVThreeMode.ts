@@ -54,6 +54,7 @@ import { dressBall } from '../visual/meshyProps';
 import type { AbstractMesh, TransformNode, Mesh } from '@babylonjs/core';
 import { BasketballAnimTree, FootPlant } from '../anim/basketballTree';
 import { MoveLegs } from '../anim/moveLegs';   // H2: the legs keep running under a handle move
+import { HipSteer, travelOffOf } from '../anim/hipSteer';   // hoops-p05: on defence the hero's pelvis turns toward his travel
 import { MoveDip } from '../anim/moveDip';   // hoops-dip
 import { LocoAccent, accentState } from '../anim/locoAccent';   // hoops-dip movement pass
 import { HandlerRest } from './handlerRest';   // lane/h3-handler (#312 port): the eyes on the defender, the protect's turn / sink / guard
@@ -1102,6 +1103,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       MoveDip.for(ctx.scene, me.char.skeleton, me.char.root, (n) => me.char.animator.groupFor(n));   // hoops-dip (owner 10-20; BEFORE MoveLegs: both insert first, so the pass runs moveLegs → the dip → the foot planter): the body sinks into the crossover / momentum cross / behind-the-back (anim/moveDip)
       LocoAccent.for(ctx.scene, me.char.skeleton, me.char.root, () => accentState(me.tree)); meRest.mount(ctx.scene, me.char.skeleton, me.char.root);   // (+ h3-handler: the protect's sink, same slot)   // hoops-dip movement pass: the decel step and the push-off drawn on the body (anim/locoAccent; after the posture, before the carries)
       me.tree.attachLegs(MoveLegs.for(ctx.scene, me.char.skeleton, (n) => me.char.animator.groupFor(n)));   // H2: the legs keep running under a handle move
+      me.tree.attachSteer(HipSteer.for(ctx.scene, me.char.skeleton, me.char.root));   // hoops-p05 (owner 2026-11-10, the hero's slide)
       ring?.dispose(); ring = mountPlayerRing(ctx.scene, me.char.root, { color: TEAM_JERSEY.mine, icon: readPlayerIcon() });   // PLAYER RING: the one you steer, in your team's colour
       // Each defender MARKS A MAN: allyPositions() is [me, mate0, mate1], so
       // 0/1/2 is a real matchup. Three defenders with no assignment all solved
@@ -2029,6 +2031,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         defending: carrierId === 'foeTeam', bracing: meBoxing, staggered: false, slideDir: slideDirFor(me.char.root.rotation.y, me.drib.vel),
         retreat: retreatFor(me.char.root.position, me.drib.vel, driver?.char.root.position ?? null), closeout: closeoutFor(me.char.root.position, me.drib.vel, driver?.char.root.position ?? null, me.speed01), intense: !!me.slot.intent.intense,   // DEFENSE-LOOK
         defendRun: carrierId === 'foeTeam' && defendRunFor(me.char.root.rotation.y, me.drib.vel, me.tree.state), approach: carrierId === 'foeTeam' && approachFor(me.char.root.position, me.drib.vel, driver?.char.root.position ?? null, me.tree.state),   // H2c
+        ...(carrierId === 'foeTeam' ? { travelOffRad: travelOffOf(me.char.root.rotation.y, me.drib.vel), airborne: myJumpAge !== Infinity } : {}),   // hoops-p05: on defence only (with the ball this tree is fed no travel, as before)
       });
       bioTick(me, dt, carrierId === 'foeTeam' ? 'defense' : 'offense', iAmCarrier && !passFlight.active, nearestFoeDist, me.tree.held === 'bball_block_reach' || meHandUp);
       Object.assign(me.bio, { posting, spinning: !!spin });   // HOOPS-MOVE-KIT-B: the seal turns the chest AWAY from the rim; the pivot owns it through the turn

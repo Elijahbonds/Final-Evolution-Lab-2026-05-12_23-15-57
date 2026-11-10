@@ -415,6 +415,10 @@ change"). The owner has felt none of these yet; every default is flagged in the 
 - hoops-p04b, same group (`anim/ballCarry.ts`, **TUNED (new)**): `hoops.carryArmSpeedSec` 0.12 s — the dribble's arm weights (the ball
   arm's pace reach, the off arm's swing in at 0.35–0.65 of speed) follow the body's speed eased over this; a gear change stepped them in
   a frame. 0 = the frame's speed, as before. The ball's push-ahead and the guard keep their own easing.
+- hoops-p05, same group (`anim/ballCarry.ts`): `hoops.carryLetGoToClipOn` 1 — when a shot, a pass or a pick-up takes the ball out of the
+  dribble, the ball arm (and the off arm) eases ALL the way back to the clip's pose over the let-go's own fade (0.14 s, unchanged). 0 = the
+  let-go as it was: the reach's target faded but the solved arm still sat about 44° off the clip on the fade's last frame and cut there in
+  one frame (the step-back gather, 1v1 seed 7: about 3 967 °/s, the hero's last severe pop in phase 4b). No new time, so no new number.
 
 **assumption:** the bounds are safe, not tuned. A ranked, staked or head-to-head run reads every default above.
 

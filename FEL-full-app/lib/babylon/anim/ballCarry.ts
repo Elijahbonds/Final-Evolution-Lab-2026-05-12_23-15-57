@@ -283,8 +283,13 @@ function reachShaped(arm: ArmChain, target: Vector3, pole: Vector3, weight: numb
  * fade ended it snapped there (1v1 seed 7, the step-back gather: the ball arm 108 → 95 → 82 → 71 → 59 → 44 → 0°, 3 967 deg/s; the rig's
  * stage tracer). So through the let-go the solved arm is also blended back toward the clip's pose by the same weight (a slerp per bone,
  * from the pose the clip drew this frame): at k = 0 it IS the clip's. Only the let-go: a live reach keeps its weight in the target.
+ * No new time: the fade is RELEASE_FADE_SEC (or the caller's releaseSec), unchanged — `hoops.carryArmSpeedSec` did not fit (it eases a
+ * speed, this is a fade that already had a length; what was missing was where it ends).
  */
+export const CARRY_LET_GO_TO_CLIP_ON = 1;
 function reachLettingGo(arm: ArmChain, target: Vector3, pole: Vector3, weight: number, dt: number, stamp: number): void {
+  // knob `hoops.carryLetGoToClipOn` (1): 0 = the let-go as it was (the reach's target weight alone: the one-frame cut at the fade's end)
+  if (feel('hoops.carryLetGoToClipOn', CARRY_LET_GO_TO_CLIP_ON) < 0.5) { reachShaped(arm, target, pole, weight, dt, stamp); return; }
   const nodes = [arm.shoulder, arm.elbow, arm.hand];
   const clip = nodes.map((n) => (n.rotationQuaternion ?? Quaternion.FromEulerVector(n.rotation)).clone());
   reachShaped(arm, target, pole, weight, dt, stamp);

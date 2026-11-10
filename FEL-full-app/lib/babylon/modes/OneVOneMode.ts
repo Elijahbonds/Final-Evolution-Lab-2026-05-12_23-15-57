@@ -195,6 +195,7 @@ import { MomentumBus } from '../core/MomentumBus';
 import { PlayerStateMachine } from '../core/PlayerStateMachine';   // HOOPS-10PHASE-2 phase 4: the explicit idle/dribble/gather/shoot/pass/dunk/land state, published read-only
 import { BasketballAnimTree, FootPlant } from '../anim/basketballTree';
 import { MoveLegs } from '../anim/moveLegs';   // H2: the legs keep running under a handle move
+import { HipSteer } from '../anim/hipSteer';   // hoops-p05: on defence the hero's pelvis turns toward his travel (the chest stays on the man)
 import { MoveDip } from '../anim/moveDip';   // hoops-dip
 import { LocoAccent, accentState } from '../anim/locoAccent';   // hoops-dip movement pass
 import { HandlerRest } from './handlerRest';   // lane/h3-handler (#312 port): the eyes on the defender, the protect's turn / sink / guard
@@ -1124,6 +1125,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       meAnimTree = new BasketballAnimTree(me.animator);
       MoveDip.for(ctx.scene, me.skeleton, me.root, (n) => me.animator.groupFor(n));   // hoops-dip (owner 10-20; BEFORE MoveLegs: both insert first, so the pass runs moveLegs → the dip → the foot planter): the body sinks into the crossover / momentum cross / behind-the-back (anim/moveDip)
       meAnimTree.attachLegs(MoveLegs.for(ctx.scene, me.skeleton, (n) => me.animator.groupFor(n)));   // H2: the legs keep running under a handle move
+      meAnimTree.attachSteer(HipSteer.for(ctx.scene, me.skeleton, me.root));   // hoops-p05 (owner 2026-11-10, the hero's slide): insert-first, like the legs layer
       foeAnimTree = new BasketballAnimTree(foe.animator);
       meFootPlant = new FootPlant(me.skeleton, me.meshes[0] as never);
       foeFootPlant = new FootPlant(foe.skeleton, foe.meshes[0] as never);   // HOOPS MOTION phase 3b: every body plants
@@ -2225,6 +2227,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           defending: true, bracing: intent.brace ?? false, staggered: false, slideDir: slideDirFor(defYaw, meDribble.vel),
           retreat: retreatFor(me.root.position, meDribble.vel, foe.root.position), closeout: closeoutFor(me.root.position, meDribble.vel, foe.root.position, drib.speed01), intense: sitting,   // DEFENSE-LOOK
           defendRun: defendRunFor(defYaw, meDribble.vel, meAnimTree.state), approach: approachFor(me.root.position, meDribble.vel, foe.root.position, meAnimTree.state),   // H2c
+          travelOffRad: travelOff(defYaw, meDribble.vel), airborne: myJumpAge !== Infinity,   // hoops-p05: the hip steer's travel; the stepping legs under a reach stand down in a block jump's flight (a defending tree never reads travelOffRad for its clip)
         });
         const dist = Vector3.Distance(me.root.position, foe.root.position);
         // D3: X HELD = the grounded hand-up (verticality) — a hold the tree never interrupts; re-held after a reach beat

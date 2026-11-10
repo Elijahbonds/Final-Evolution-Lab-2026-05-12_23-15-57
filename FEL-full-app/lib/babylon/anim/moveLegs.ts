@@ -53,7 +53,13 @@ export function advancePhase(phase: number, dt: number, rate: number, durSec: nu
 }
 
 /** What the tree drives the layer with each frame: the loop under the move (or none) and its stride rate, the body's ground speed. */
-export interface LegsDrive { loopClip: string | null; rate: number; speedMps: number; dtSec: number }
+export interface LegsDrive { loopClip: string | null; rate: number; speedMps: number; dtSec: number;
+  /** hoops-p05 (the defensive beats: basketballTree DEFENSE_LEGS_BEAT): the loop is NOT locked for the beat — a hand-up held through a
+   *  slide one way and back needs the loop the body is in now. A change of loop crossfades over `fadeSec` (the old loop's legs keep
+   *  stepping under it), never a one-frame swap. A handle move leaves both unset: its loop stays locked, as before. */
+  free?: boolean; fadeSec?: number;
+  /** hoops-p05: the loop is one the tree plays in REVERSE (the captured backpedal): the phase runs backward. */
+  reverse?: boolean }
 
 /**
  * One body's legs layer. `groupOf` resolves a clip name to this body's animation group (the animator's own resolution). Built once per
@@ -77,6 +83,10 @@ export class MoveLegs {
   private clip: string | null = null;
   private tracks: { node: TransformNode; evaluate: (frame: number) => unknown }[] = [];
   private readonly scratch = new Quaternion();
+  /** hoops-p05: the loop the layer is fading OUT of under a free beat (its legs, its own phase), and how far the fade has got (0..1). */
+  private prev: { group: AnimationGroup; tracks: Map<TransformNode, (frame: number) => unknown>; phase: number } | null = null;
+  private mix = 1; private mixSec = 0.14;
+  private readonly scratchPrev = new Quaternion();
 
   constructor(private scene: Scene, skeleton: Skeleton, private groupOf: (name: string) => AnimationGroup | null) {
     this.legs = new Set(MOVE_LEG_BONES.map((n) => findBone(skeleton, n)?.getTransformNode()).filter((n): n is TransformNode => !!n));
@@ -107,7 +117,7 @@ export class MoveLegs {
    *  loop is LOCKED for the move: the ball changing hands flips the tree's loop to its mirrored twin mid-move, and the twin's legs at
    *  the same phase are the other leg forward (the first probe: leg pops at every crossing). */
   begin(loopClip: string | null): void {
-    this.locked = false;
+    this.locked = false; this.prev = null; this.mix = 1;
     if (!loopClip) return;
     const g = this.bind(loopClip); this.locked = !!g;
     const f = (g as unknown as { animatables?: { masterFrame?: number }[] } | null)?.animatables?.[0]?.masterFrame;
@@ -116,15 +126,30 @@ export class MoveLegs {
 
   /** Every frame from the tree while a move beat plays (loopClip null when the body would not be in a locomotion loop). */
   drive(d: LegsDrive): void {
-    const g = d.loopClip ? (this.locked ? this.group : this.bind(d.loopClip)) : null;
-    if (g && !this.locked) this.locked = true;
+    let g: AnimationGroup | null = null;
+    if (d.loopClip && d.free) {
+      // hoops-p05: a free beat follows the loop the body is in; the loop it leaves fades out under the new one
+      if (d.loopClip !== this.clip && this.group && this.tracks.length && this.w > 1e-3 && (d.fadeSec ?? 0) > 0) {
+        this.prev = { group: this.group, tracks: new Map(this.tracks.map((t) => [t.node, t.evaluate])), phase: this.phase };
+        this.mix = 0; this.mixSec = d.fadeSec as number;
+      }
+      g = this.bind(d.loopClip);
+    } else if (d.loopClip) {
+      g = this.locked ? this.group : this.bind(d.loopClip);
+      if (g && !this.locked) this.locked = true;
+    }
     this.target = g && !MOVE_LEGS_OFF ? legsWeightFor(d.speedMps) : 0;
     this.w = stepLegsWeight(this.w, this.target, d.dtSec);
-    if (g) this.phase = advancePhase(this.phase, d.dtSec, d.rate, this.durSec(g));
+    if (g) this.phase = d.reverse ? 1 - advancePhase(1 - this.phase, d.dtSec, d.rate, this.durSec(g)) : advancePhase(this.phase, d.dtSec, d.rate, this.durSec(g));
+    if (this.prev) {
+      this.mix = d.dtSec > 0 ? Math.min(1, this.mix + d.dtSec / Math.max(1e-3, this.mixSec)) : this.mix;
+      this.prev.phase = advancePhase(this.prev.phase, d.dtSec, d.rate, this.durSec(this.prev.group));
+      if (this.mix >= 1) this.prev = null;
+    }
   }
   /** The move is over: fade out (the tree has restarted the loop at phase01). Keeps the phase running while it fades. */
   end(d: Omit<LegsDrive, 'loopClip'>): void {
-    this.target = 0; this.locked = false;
+    this.target = 0; this.locked = false; this.prev = null; this.mix = 1;
     this.w = stepLegsWeight(this.w, 0, d.dtSec);
     if (this.group) this.phase = advancePhase(this.phase, d.dtSec, d.rate, this.durSec(this.group));
     if (this.w < 1e-3) this.w = 0;
@@ -149,10 +174,13 @@ export class MoveLegs {
     if (this.w <= 1e-3 || !this.group || !this.tracks.length) return;
     if (this.tracks[0].node.isDisposed()) { this.dispose(); return; }   // the body is gone (a reload rebuilt it)
     const g = this.group, frame = g.from + this.phase * (g.to - g.from);
+    const pv = this.prev, pFrame = pv ? pv.group.from + pv.phase * (pv.group.to - pv.group.from) : 0;
+    const k = pv ? this.mix * this.mix * (3 - 2 * this.mix) : 1;   // (hoops-p05) the new loop's share while the old one fades out
     for (const t of this.tracks) {
-      const q = t.evaluate(frame) as Quaternion | null;
+      let q = t.evaluate(frame) as Quaternion | null;
       const cur = t.node.rotationQuaternion;
       if (!q || !cur) continue;
+      if (pv) { const qp = pv.tracks.get(t.node)?.(pFrame) as Quaternion | null | undefined; if (qp) { Quaternion.SlerpToRef(qp, q, k, this.scratchPrev); q = this.scratchPrev; } }
       Quaternion.SlerpToRef(cur, q, this.w, this.scratch);
       cur.copyFrom(this.scratch);
     }
