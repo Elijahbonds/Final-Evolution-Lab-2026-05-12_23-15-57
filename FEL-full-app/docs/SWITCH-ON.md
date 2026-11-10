@@ -1,7 +1,7 @@
 # Switch on: every switch that is off, why, and what turns it on
 
 **Owner, 2026-11-10:** "anything that's turned off because it needs to be improved, let's improve it and turn it on."
-Lane `lane/switch-on`. Read on `lane/finish-release` at `d394b11b`.
+Lane `lane/switch-on`. Read on `lane/finish-release` at `d394b11b`; rechecked after merging `84e9ef8c` (the dunk lane's #560).
 
 Each switch is in exactly one class:
 
@@ -37,7 +37,7 @@ comment at the line, `docs/`, `docs/OWNER-DECISIONS.md`, and the git log of the 
 | `dunk.preloadSet` | dunk | Loads the rival and onlookers during the intro. Off: they load between rounds. | A (dunk lane turning it on) |
 | `dunk.landLeadSec` (0) | dunk | Landing crouch starts before touchdown. 0 = as shipped. | A (dunk lane) |
 | `dunk.realJumpPersonal` | dunk | A verified adult's own best jump fills the take-off. | A (dunk lane); uses verified-adult data |
-| `dunk.slamVariants` | dunk | Stick held at the slam picks REVERSE / TWO-HAND POWER. Kept off by the 2026-11-10 delegated call 1. | B (owner call) then dunk lane |
+| `dunk.slamVariants` | dunk | Stick held at the slam picks REVERSE / TWO-HAND POWER. Off by the 2026-11-10 delegated call 1, then turned on by the dunk lane (#560, merged into release the same evening: default 1; `docs/DUNK-FLAGSHIP.md` §18). | on (dunk lane) |
 | `cam.dunkFraming` | dunk | The dunk contest's camera fixes (QA 1–3, 8). | A (dunk lane) |
 | the dunk landing | dunk | — | dunk lane |
 | `hoops.blockDiceOn`, `hoops.stealDiceOn`, `hoops.aiBlockReactOn` | hoops | 1 puts back the old dice rolls / the AI's block wait. 0 is the newer "hand meets ball" rule (owner 2026-10-20). | C |
