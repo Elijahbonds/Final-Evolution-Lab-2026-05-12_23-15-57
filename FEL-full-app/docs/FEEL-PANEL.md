@@ -419,6 +419,11 @@ change"). The owner has felt none of these yet; every default is flagged in the 
   dribble, the ball arm (and the off arm) eases ALL the way back to the clip's pose over the let-go's own fade (0.14 s, unchanged). 0 = the
   let-go as it was: the reach's target faded but the solved arm still sat about 44° off the clip on the fade's last frame and cut there in
   one frame (the step-back gather, 1v1 seed 7: about 3 967 °/s, the hero's last severe pop in phase 4b). No new time, so no new number.
+- hoops-p05b, same group (`anim/ballCarry.ts`): `hoops.carryStartHandOn` 1 — a dribble starts from where the palm had the ball, and that
+  offset fades out over the first bounce (START_FADE_PHASE, unchanged). Only the ball took it: the hand went straight to the stroke's own
+  point, so the palm sat the offset off the ball through the whole first bounce (1v1 seed 7, the gear stop into the sprint: the first top
+  drawn 12.8 cm off; the hand tracer has the carry's own pass take the palm from on the ball to 13.5 cm off it). The hand now takes the
+  same faded offset. 0 = as it was. No new number.
 - hoops-p05, the hero's slide (owner 2026-11-10: "fix it"), same group. Each is NEW BEHAVIOUR, on by default, with 0 = today's exactly:
   - `hoops.backpedalReverseOn` 1 (`anim/basketballTree.ts`) — the captured backpedal (CMU 78_24) is a forward run on the hero rig, so a
     retreat was a moonwalk (the feet ran forward on the spot while the body backed off). 1 plays it in reverse: the feet plant and the body

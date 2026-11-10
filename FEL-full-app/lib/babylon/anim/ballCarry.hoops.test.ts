@@ -664,3 +664,45 @@ describe('the let-go ends on the clip (hoops-p05)', () => {
   });
 });
 
+// hoops-p05b: the dribble starts from where the palm had the ball (startOff, faded over START_FADE_PHASE) — but only the BALL carried the
+// offset: the hand went to the stroke's own point, and the palm sat the offset off the ball for the whole first bounce (1v1 seed 7, the
+// gear stop into the sprint: the first top drawn 12.8 cm off; the hand tracer has the carry's own pass take the palm off the ball).
+describe('the first bounce\'s palm rides the same fade as its ball (hoops-p05b)', () => {
+  /** The hand bone's distance off where the stroke puts it on the ball (the ball's centre + the stroke's own hand-over-ball), on each frame
+   *  of the first bounce's rise and top (where the stroke has the hand on the ball), for a dribble started from a held ball the clip carries well off the stroke. */
+  const firstBounce = (): number[] => {
+    const scene = new Scene(new NullEngine());
+    const r = rig(scene);
+    // the clip holds the ball arm out and up (the held ball well off the stroke's own point)
+    const armQ = Quaternion.RotationAxis(new Vector3(1, 0, 0), -0.9).multiply(r.nodes.LeftArm.rotationQuaternion!);
+    const clip = () => { r.nodes.LeftArm.rotationQuaternion!.copyFrom(armQ); r.nodes.LeftForeArm.rotationQuaternion = Quaternion.RotationAxis(Vector3.Right(), 0.4); };
+    clip(); r.nodes.LeftArm.computeWorldMatrix(true);
+    attachBallToHand(r.ball, r.sk, 'LeftHand');
+    const carry = mountBallCarry({ scene, ball: r.ball, root: r.root, skeleton: r.sk, hoops: true });
+    const d = driver(scene, carry, r.ball);
+    clip(); d.frame(1 / 60, 0, false);
+    const off: number[] = [];
+    for (let i = 0; i < 18; i++) {
+      clip(); d.frame(1 / 60, 0.2, true);
+      r.nodes.LeftHand.computeWorldMatrix(true);
+      const s = dribbleAtPushed(carry.phase, HOOPS_DRIBBLE);
+      // the rise and the top (this test rig's straight arm bottoms out at ~1.03 m, so the follow down is out of its reach either way)
+      if (!(s.phase > PUSHED_FLOOR_PHASE || s.phase < 0.1)) continue;
+      const want = r.ball.getAbsolutePosition().add(new Vector3(0, s.hand.y - s.ball.y, 0));
+      off.push(Vector3.Distance(r.nodes.LeftHand.getAbsolutePosition(), want));
+    }
+    carry.dispose();
+    return off;
+  };
+  const mean = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length;
+  it('the hand is on the ball through the first bounce, as it is on every later one; knob hoops.carryStartHandOn 0 (the control) leaves it the offset off', () => {
+    resetFeelForTests(); setFeelUser(true); setFeelSession(null); setFeelOverride('hoops.carryStartHandOn', 0);
+    let was: number[];
+    try { was = firstBounce(); } finally { resetFeelForTests(); }
+    const now = firstBounce();
+    expect(mean(was)).toBeGreaterThan(0.05);            // the control: the miss this fix removes (0.08–0.13 m here)
+    expect(was.length).toBeGreaterThan(5);
+    expect(Math.max(...now)).toBeLessThan(0.01);        // on the ball, every frame the stroke has it there
+  });
+});
+

@@ -1314,6 +1314,12 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/anim/ballCarry.ts CARRY_LET_GO_TO_CLIP_ON',
     hint: 'When a shot or a pass takes the ball out of the dribble, the ball arm eases all the way back to the clip pose over the same fade. 0 = it eased part of the way and cut the rest in one frame.',
   },
+  // hoops-p05b: the first bounce's palm rides the same fade as its ball (the gear stop into the sprint: the first top 12.8 cm off the palm)
+  {
+    id: 'hoops.carryStartHandOn', label: 'Ball carry: the first bounce palm follows the ball (0 = off)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · transitions',
+    source: 'lib/babylon/anim/ballCarry.ts CARRY_START_HAND_ON',
+    hint: 'A dribble starts from where the palm had the ball, and that offset fades over the first bounce. The hand now takes the same offset, so the palm stays on the ball. 0 = only the ball took it (the palm sat up to 13 cm off it).',
+  },
   // hoops-p05 (owner 2026-11-10: the hero's slide — fix it): stepping legs under the defensive beats
   {
     id: 'hoops.defenseLegsOn', label: 'Defense: legs keep stepping under a reach, a block or a hand up (0 = off)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · transitions',
