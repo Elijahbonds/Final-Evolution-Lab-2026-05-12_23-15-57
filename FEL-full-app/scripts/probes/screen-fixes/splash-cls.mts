@@ -53,10 +53,14 @@ try {
     p.on('pageerror', (e) => errors.push(e.message.slice(0, 160)));
     await p.goto(`${BASE}/index.html?mode=${mode}&readyAt=${READY_AT}`, { waitUntil: 'load', timeout: 120000 });
     await p.waitForTimeout(1500);
+    await p.waitForFunction(() => document.querySelector('[data-learn-idle]'), null, { timeout: 8000 }).catch(() => {});
+    await p.waitForTimeout(300);
+    const hLoad = await p.evaluate(() => ({ card: Math.round(document.querySelector('[data-learn-idle]')?.getBoundingClientRect().height ?? 0), slot: Math.round(document.querySelector('[data-splash-slot]')?.getBoundingClientRect().height ?? 0) }));
     await p.screenshot({ path: path.join(SITE, `splash-${mode}-loading.jpg`), type: 'jpeg', quality: 70 });
     await p.waitForFunction(() => document.querySelector('[data-phase="ready"]'), null, { timeout: 60000 });
     await p.waitForTimeout(4000);
     await p.screenshot({ path: path.join(SITE, `splash-${mode}-ready.jpg`), type: 'jpeg', quality: 70 });
+    const hReady = await p.evaluate(() => Math.round(document.querySelector('[data-splash-slot]')?.getBoundingClientRect().height ?? 0));
     const r = await p.evaluate(() => {
       const w = window as unknown as { __CLS: Shift[]; __readyT?: number };
       return { shifts: w.__CLS, tReady: w.__readyT ?? null };
@@ -65,9 +69,9 @@ try {
     const sum = (xs: Shift[]) => Math.round(xs.reduce((a, s) => a + s.v, 0) * 1000) / 1000;
     const tr = r.tReady ?? Infinity;
     const loading = shifts.filter((s) => s.t < tr), swap = shifts.filter((s) => s.t >= tr && s.t < tr + 250), after = shifts.filter((s) => s.t >= tr + 250);
-    out[mode] = { cls: sum(shifts), loading: sum(loading), swap: sum(swap), after: sum(after), count: shifts.length, tReady: r.tReady, errors,
+    out[mode] = { learnCardPx: hLoad.card, slotLoadingPx: hLoad.slot, slotReadyPx: hReady, cls: sum(shifts), loading: sum(loading), swap: sum(swap), after: sum(after), count: shifts.length, tReady: r.tReady, errors,
       shifts: shifts.map((s) => ({ v: Math.round(s.v * 1000) / 1000, t: s.t, src: s.src.slice(0, 4), rects: s.rects.slice(0, 4) })) };
-    console.log(`${mode.padEnd(14)} cls ${sum(shifts)} = loading ${sum(loading)} + READY swap ${sum(swap)} + after ${sum(after)} (${shifts.length} shifts, ready at ${r.tReady} ms)${errors.length ? `  errors: ${errors[0]}` : ''}`);
+    console.log(`${mode.padEnd(14)} cls ${sum(shifts)} = loading ${sum(loading)} + READY swap ${sum(swap)} + after ${sum(after)} (${shifts.length} shifts, ready at ${r.tReady} ms; learn card ${hLoad.card} px, slot ${hLoad.slot} -> ${hReady} px)${errors.length ? `  errors: ${errors[0]}` : ''}`);
     for (const s of shifts.filter((x) => x.v >= 0.001)) console.log(`   ${s.t}ms  ${s.v.toFixed(3)}  ${s.src[0] ?? ''}  ${s.rects[0] ?? ''}`);
     await ctx.close();
   }

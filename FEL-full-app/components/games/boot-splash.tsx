@@ -47,6 +47,12 @@ import {
   type StyleBlend,
 } from '@/lib/babylon/combat/schools';
 
+/** SCREEN-FIXES (2026-11-10): the start card's middle slot (the loading bar and the learn card, or START and its lines),
+ *  held at one height from the first frame so nothing under it moves when the learn card arrives or START replaces it.
+ *  NEW number, measured (splash-cls.mts): the loading bar (26 px) + the gap (16) + the compact learn card (175-185 px for a
+ *  lesson or fact card at the 2026-11-10 sizes). A taller card (a quiz) still grows the slot. Not a feel number. */
+export const SPLASH_SLOT_MIN_PX = 230;
+
 // M37 E12 FIX: venue slugs resolve to PROCEDURAL canvas thumbnails (venueThumbs)
 // instead of /img/venues/*.jpg files that 404 on every mode route.
 const VENUE_ART: Record<string, { venue: string; sub: string; tint: string }> = {
@@ -393,6 +399,15 @@ export function SplashCard(props: BootSplashProps) {
         )}
         {(props.phase === 'ready' || props.phase === 'loading') && props.readyLead}
 
+        {/* SCREEN-FIXES (2026-11-10): ONE SLOT for the part of the card that changes while the arena loads, the same height in
+            both phases (SPLASH_SLOT_MIN_PX, a phone held upright; sideways the slot is display: contents, game-surface.css 4b).
+            Loading, it holds the bar and the learn card, which arrives after a lazy import; READY, it holds START and its
+            lines, centred. Before, the card's arrival pushed the CONTROLS panel and every picker down, and the swap to START
+            pulled them back up: a layout shift of 0.06-0.29 on the card alone (scripts/probes/screen-fixes/splash-cls.mts),
+            0.21-0.24 on the dunk host (DUNK-FLAGSHIP §15). Layout only: what loads, and when, is unchanged. */}
+        {(props.phase === 'ready' || props.phase === 'loading') && (
+        <div data-splash-slot={props.phase} className={`flex w-full shrink-0 flex-col items-center gap-4 ${props.phase === 'ready' ? 'justify-center' : 'justify-start'}`}
+          style={{ minHeight: SPLASH_SLOT_MIN_PX }}>
         {props.phase === 'loading' && (
           <div className="w-56">
             <div className="h-1.5 overflow-hidden rounded-full bg-white/15">
@@ -431,6 +446,8 @@ export function SplashCard(props: BootSplashProps) {
         {props.phase === 'ready' && <PlayAsSwitcher tint={v.tint} />}
         {/* MULTIPLAYER (2026-10-06): a game friends can play together says so, and opens the party room with it picked */}
         {props.phase === 'ready' && <PartyInvite modeId={props.modeId} />}
+        </div>
+        )}
         {/* CONTROLS SCREEN (console-view lane, 2026-10-06). Owner: "take off that wall of text when the game starts, maybe
             have that show as a beginning screen for the controls." The mode's button map for the device in use, and its
             own words — which the harness now keeps off the play screen (lib/babylon/ui/staticControls.ts). The pause
