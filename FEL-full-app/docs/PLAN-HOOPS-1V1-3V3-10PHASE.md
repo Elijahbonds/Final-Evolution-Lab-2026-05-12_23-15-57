@@ -183,7 +183,8 @@ down in two hands on a board. "The ball not in the hand" is on the owner's list.
 - held ball: centre ≤ 17 cm from the hand bone p90;
 - ball warps (> 15 cm in one frame while held) 0 (hoops-motion phase 4 gate);
 - passes leave from chest / overhead / bounce height (not the dribble point); the catch: the ball leaves its own path by ≤ 0.12 m on the
-  catch frame, p90 (the rig's `catchDevP90Cm`: this frame's step less the last one's). **GATE CHANGED (hoops-p05b, 2026-11-10; for the
+  catch frame, p90 (the rig's `catchDevP90Cm`: this frame's step less the last one's, ACROSS the last step's line — a ball that stops in
+  the hand on its own line is a catch, not a warp; the change along the line is printed beside it as `alongCm`). **GATE CHANGED (hoops-p05b, 2026-11-10; for the
   owner's sign-off):** the gate was "catch jump ≤ 0.12 m" (hoops-motion phase 11, set against 0.54–0.79 m warps into the palm), read as
   the ball's raw step on the frame it is first held. At the shipped pass speed that cannot hold: `PassFlight` flies a chest pass at a
   constant 14 m/s, 23 cm a frame up to the hands, so a clean catch reads 23 cm. The new read keeps the gate's intent (no warp into the

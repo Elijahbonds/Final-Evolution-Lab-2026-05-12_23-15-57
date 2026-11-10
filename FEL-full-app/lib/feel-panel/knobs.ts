@@ -1337,6 +1337,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'A closeout plays chop steps that cover the ground you are covering, the high hand up. 0 = the old closeout, whose feet swung in place while the body slid.',
   },
   {
+    id: 'hoops.loopInStepOn', label: 'Defense: a run into the stepping closeout stays in step (0 = off)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · transitions',
+    source: 'lib/babylon/anim/basketballTree.ts LOOP_IN_STEP_ON',
+    hint: 'The stepping closeout starts on the same foot the run was on, so the crossfade does not sweep the legs. 0 = it started on its first frame wherever the run was.',
+  },
+  {
     id: 'hoops.hipSteerOn', label: 'Defense: hips turn toward the travel (0 = off)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · transitions',
     source: 'lib/babylon/anim/hipSteer.ts HIP_STEER_ON',
     hint: 'On defense the pelvis and legs turn toward where you are going while the chest stays on your man, so a diagonal slide or retreat steps along its travel. 0 = square hips, as before.',

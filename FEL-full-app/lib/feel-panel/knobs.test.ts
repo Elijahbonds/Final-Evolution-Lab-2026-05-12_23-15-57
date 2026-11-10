@@ -54,7 +54,7 @@ import * as P3R from '@/lib/babylon/hoops/rivalOffense';   // hoops-p03
 import * as P3T from '@/lib/babylon/hoops/teamOffense3v3';   // hoops-p03
 import * as P4T from '@/lib/babylon/anim/hoopsTransitions';   // hoops-p04
 import * as P4R from '@/lib/babylon/hoops/releaseTiming';   // hoops-p04
-import { PLANT_RELEASE_FADE_SEC, DEFENSE_LEGS_ON, BACKPEDAL_REVERSE_ON, CLOSEOUT_STEP_ON } from '@/lib/babylon/anim/basketballTree';   // hoops-p04, hoops-p05
+import { PLANT_RELEASE_FADE_SEC, DEFENSE_LEGS_ON, BACKPEDAL_REVERSE_ON, CLOSEOUT_STEP_ON, LOOP_IN_STEP_ON } from '@/lib/babylon/anim/basketballTree';   // hoops-p04, hoops-p05
 import * as P5S from '@/lib/babylon/anim/hipSteer';   // hoops-p05
 import { PASS_FROM_HAND_ON, PASS_HOME_ON } from '@/lib/babylon/hoops/ballHandoff';   // hoops-p05, phase 5; hoops-p05b
 import * as P4B from '@/lib/babylon/anim/locoAccent';   // hoops-p04b
@@ -246,6 +246,7 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.defenseLegsOn')).toBe(DEFENSE_LEGS_ON);   // hoops-p05: stepping legs under the defensive beats
     expect(def('hoops.backpedalReverseOn')).toBe(BACKPEDAL_REVERSE_ON);
     expect(def('hoops.closeoutStepOn')).toBe(CLOSEOUT_STEP_ON);   // hoops-p05b
+    expect(def('hoops.loopInStepOn')).toBe(LOOP_IN_STEP_ON);   // hoops-p05b
     expect(def('hoops.hipSteerOn')).toBe(P5S.HIP_STEER_ON);
     expect(def('hoops.hipSteerAllLoopsOn')).toBe(P5S.HIP_STEER_ALL_LOOPS_ON);   // hoops-p05b
     expect(def('hoops.hipSteerMaxDeg')).toBe(P5S.HIP_STEER_MAX_DEG);

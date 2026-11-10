@@ -442,6 +442,11 @@ change"). The owner has felt none of these yet; every default is flagged in the 
   its rate cap), so every closeout skated. The new clip is the same picture (chest up, hips low, one hand high) on chop steps paced to the
   closeout's stride reference, 3.6 m/s at rate 1 (2.0–6.7 m/s across the stride matcher's range). Bench, the man 2 m ahead, 3–6 m/s:
   slide p90 9–12 → 0.1–1.0 cm a frame. 0 = the old closeout clip exactly. No new feel number (the clip's own keys are pinned by a test).
+- hoops-p05b, same group: `hoops.loopInStepOn` 1 (`anim/basketballTree.ts` RIGHT_STRIKE_PHASE) — the stepping closeout started on its
+  first frame (the right foot landing) wherever the run it cut was in its stride, so through the crossfade the two clips had the legs in
+  opposite stances (3v3 seed 7: the two leg pops the switches added, 741–809 °/s). A run into it now starts it at the same point of the
+  stride. The table's numbers are where each clip's right foot lands (bball_mc_run 0.88, measured with the slide bench), not feel
+  numbers. 0 = as it was.
 - hoops-p05, phase 5 (the ball lives in the hand), same group: `hoops.passFromHandOn` 1 (`hoops/ballHandoff.ts`) — a 3v3 teammate's
   pass (the swing, the ball back to me, the lob) starts its flight where the ball is in his hands; it started at his root + 1.2 m, so the
   ball jumped out of the hand on the release. The aim point and the pass speed are unchanged. 0 = the old start.
