@@ -108,6 +108,23 @@ export const CATALOGUE_DEMO_LOOPS: Readonly<Record<string, string>> = {
   // (Pike Push-Up left this table in DEMO-LOOPS-6: the library has its entry now — program-ask-2's — and plays its loop)
   // "Hold both sides of a sturdy door frame, … lean back … Pull your chest to the frame"
   'Door Frame Row, Upright': 'ex_door_row', 'Door Frame Row': 'ex_door_row',
+  // DEMOS-FIX (2026-11-10): FEL's coach-template rows the library has no entry for (lib/coach/templateCatalogue.ts), each
+  // read against the row's own cues. "One hand on the frame, feet in, lean back. Pull straight toward the door frame"
+  'Single-Arm Door Frame Row': 'ex_door_row_one', 'Single-Arm Door Frame Row, 3-Second Lower': 'ex_door_row_one',
+  // "Sit down under control, then stand up as fast as you can. Heels stay on the floor" (the Fast Squat Primer's loop)
+  'Fast Bodyweight Squat': 'ex_fast_squat',
+  // "Push your hips back toward the wall behind you, hands resting on them. Snap up tall, fast" (the Hip Snap Primer's loop)
+  'Hip Snap': 'ex_hip_snap',
+  // "Push the wall behind you with your hips, hands sliding down the fronts of your thighs … hold three seconds" (ch. 8's hinge)
+  'Bodyweight RDL, 3-Second Hold': 'ex_bw_hinge',
+  // "One foot down, the other knee pulled toward your chest … hold the top still for five seconds"; with the backpack across
+  // the hips, held with both hands
+  'Single-Leg Bridge, 5-Second Squeeze': 'ex_bridge_sl_hug', 'Single-Leg Bridge with a Backpack': 'ex_bridge_sl_load',
+  // "Lift your arms off the floor in a Y, lower, then in a T, lower: one rep"
+  'Prone Y-T Raise': 'ex_prone_yt', 'Prone Y-T Raise, 3-Second Holds': 'ex_prone_yt',
+  // the holds stand still and breathe; the carries walk (in place); the march lifts each knee toward the bag
+  'Two-Bag Farmer Hold': 'ex_hold_farmer', 'Dumbbell Farmer Hold': 'ex_hold_farmer', 'Goblet Hold': 'ex_hold_goblet', 'Goblet Carry': 'ex_carry_goblet',
+  'Backpack Hug Hold': 'ex_hold_hug', 'Backpack Hug March': 'ex_march_hug',
 };
 const CATALOGUE_BY_KEY: ReadonlyMap<string, string> = new Map(Object.entries(CATALOGUE_DEMO_LOOPS).map(([n, c]) => [nameKey(n), c]));
 /** A catalogue row's loop by its name, for a row the library has no entry for; null otherwise. */

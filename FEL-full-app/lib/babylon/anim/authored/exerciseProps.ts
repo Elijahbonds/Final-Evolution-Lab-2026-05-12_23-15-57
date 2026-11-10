@@ -27,9 +27,10 @@ const CHEST: Pair = { Left: [0.13, -0.24, 0.26], Right: [-0.13, -0.24, 0.26] };
 // ── on a box ───────────────────────────────────────────────────────────────────────────────────────────────────────
 /** ex_step_up — the right foot onto the box in front, drive up to stand on it, the left foot joins; step down left, then right.
  *  `drive`: the left knee drives up at the top instead of joining (step-up with knee drive). */
-function stepUp(scene: Scene, sk: Skeleton, name: string, drive: boolean): AnimationGroup | null {
+// DEMOS-FIX (2026-11-10): exported, `arms` added (default: the arms hanging, exactly as before) for the barbell step-up
+export function stepUp(scene: Scene, sk: Skeleton, name: string, drive: boolean, arms: Pose = { rel: HANG_REL, poles: HANG_POLES }): AnimationGroup | null {
   const on = BOX_TOP + ANKLE;
-  const home: Pose = { bones: { ...STAND }, feet: both(0.13, ANKLE, -0.04), kneePoles: bothDir(0.1, 0, 1), rel: HANG_REL, poles: HANG_POLES, hipsY: 0 };
+  const home: Pose = { bones: { ...STAND }, feet: both(0.13, ANKLE, -0.04), kneePoles: bothDir(0.1, 0, 1), ...arms, hipsY: 0 };
   const foot: Pose = { ...home, bones: { ...STAND, Hips: [10, 0, 0] }, feet: { Left: [-0.13, ANKLE, -0.04], Right: [0.13, on, 0.40] }, hipsY: -0.02, hipsZ: 0.02 };
   const mid: Pose = { ...home, bones: { ...STAND, Hips: [14, 0, 0] }, feet: { Left: [-0.13, ANKLE + 0.12, 0.10], Right: [0.13, on, 0.40] }, hipsY: 0.20, hipsZ: 0.22 };
   const top: Pose = drive
