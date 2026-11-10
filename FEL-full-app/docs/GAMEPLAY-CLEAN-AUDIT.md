@@ -497,6 +497,10 @@ throughout, so not a pop by the rule). A tuned rate on a clip, not changed.
 | aeroaces | 2 (8.51) → **0** (0) | 0 · 2 → 0 · 0 | 30.5° · 60.8° · 1.3° · 0.9° → 0.9° · 1.1° · 1.3° · 0.9° |
 | derby | 0 (0) → **0** (0) | 0 · 0 → 0 · 0 | 14° · 3.7° · 15.6° · 38.8° → 14° · 3.9° · 15.6° · 38.8° |
 
+A second after-run of three modes, the same build: showdown 10 → **1**, duel 8 → **7** (the orphan, item 4, comes up more or less
+often with the AI's choices), aero 2 → **0**. The hoops and dunk modes the shared animator also drives show no regression: 3v3 4 → 3,
+dunk duel 2 → 2, 1v1 6 → 5, dunk 19 → 19; tiebreak 3 → 2.
+
 Where a max-turn cell went UP, it is a different moment in a different run, not something these fixes add: showdown's thigh 58.7° is
 the orphan (list item 4: roundhouse at 0.75 → guard step), duel's arm 97.8° is knockdown → get-up (item 5, seen with the knobs off
 too), 1v1's thigh 179° is the hoops plant-and-cut lock (item 3).
