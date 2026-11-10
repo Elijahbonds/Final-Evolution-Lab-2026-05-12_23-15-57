@@ -12,8 +12,11 @@ const DUNK = readFileSync(path.join(__dirname, '../modes/DunkMode.ts'), 'utf8');
 const fn = (name: string): string => { const i = DUNK.indexOf(`function ${name}(`); expect(i, name).toBeGreaterThan(0); return DUNK.slice(i, DUNK.indexOf('\n  }\n', i)); };
 
 describe('the stick at the slam press', () => {
-  it('is off by default: nothing is called', () => {
-    expect(SLAM_VARIANTS_ON).toBe(0);
+  // test changed (owner 2026-11-10, "turn all 4 on"): ON by default; off still calls nothing (the rows below), and the TWO-HAND POWER
+  // has its own sub-switch (off: the stick up calls nothing, the REVERSE unchanged)
+  it('is ON by default; off calls nothing; the POWER sub-switch off leaves the REVERSE alone', () => {
+    expect(SLAM_VARIANTS_ON).toBe(1);
+    expect(slamVariantOf(true, 0, -1, false)).toBeNull(); expect(slamVariantOf(true, 0, 1, false)).toBe('reverse');
     for (const [x, y] of [[0, 1], [0, -1], [0.2, 0.9], [0, 0]]) expect(slamVariantOf(false, x, y)).toBeNull();
   });
   it('on: back (down, +y) is the REVERSE, up (−y) the TWO-HAND POWER', () => {
@@ -94,10 +97,12 @@ describe('DunkMode reads the stick ONLY on the live A press inside the slam wind
     expect(DUNK.split('slamVariantOf(').length - 1).toBe(2);
     const up = fn('reverseOnTheWayUp');
     expect(up).toMatch(/!qteWindowOpen && clipTime >= REVERSE_TURN_FROM && !flight\.attempt\.tricks\.length && !armedAir/);
-    expect(up).toMatch(/slamVariantOf\(feel\('dunk\.slamVariants', SLAM_VARIANTS_ON\) >= 0\.5, stickX, stickY\) === 'reverse'/);
+    // test changed (owner 2026-11-10): both reads go through slamVariantsOn() — the knob, and never in a staked / ranked / challenge run
+    expect(up).toMatch(/slamVariantOf\(slamVariantsOn\(\), stickX, stickY\) === 'reverse'/);
+    expect(DUNK).toContain("const slamVariantsOn = (): boolean => !switchBlocked() && feel('dunk.slamVariants', SLAM_VARIANTS_ON) >= 0.5;");
     expect(up).toMatch(/turn === 'player'/);
     expect(fn('fireTrick')).toMatch(/if \(reverseTurning\) \{ reverseTurning = false;/);   // a trick thrown after it stops the turn
-    expect(fn('readSlamVariant')).toMatch(/slamVariantOf\(feel\('dunk\.slamVariants', SLAM_VARIANTS_ON\) >= 0\.5, stickX, stickY\)/);
+    expect(fn('readSlamVariant')).toMatch(/slamVariantOf\(slamVariantsOn\(\), stickX, stickY, feel\('dunk\.slamPower', SLAM_POWER_ON\) >= 0\.5\)/);
     expect(fn('readSlamVariant')).toMatch(/turn !== 'player'/);
   });
   it('the trick path never sees it: airButton and the recognizer feed are untouched', () => {

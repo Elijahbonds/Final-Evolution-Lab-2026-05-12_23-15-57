@@ -18,8 +18,9 @@ import { JUMPER_HOP_ON, JUMPER_APEX_AFTER_RELEASE_SEC, JUMPER_MIN_LOAD_SEC, JUMP
 import { FT_SETUP_SEC, FT_ROUTINE_SEC, FT_SET_SEC, FT_RESULT_SEC, FT_DIST_NARROW_01 } from '@/lib/babylon/core/FreeThrows';
 import { BANK_SET_DEG, BANK_GLANCE_MS } from '@/lib/babylon/hoops/shotLooks';
 import { OVERTIME_3V3_SEC } from '@/lib/babylon/modes/threevthreeOvertime';
-import { OOP_LOB_FLIGHT_SEC, OOP_LATE_CATCH_CLIP_T, REAL_JUMP_PERSONAL, RUNWAY_STRIDE_SCALE, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG, LAND_LEAD_SEC } from '@/lib/babylon/core/DunkFlagship';   // dunk-flagship
-import { SLAM_VARIANTS_ON } from '@/lib/babylon/core/DunkSlamVariant';   // dunk-flagship Phase 7
+import { OOP_LOB_FLIGHT_SEC, OOP_LATE_CATCH_CLIP_T, REAL_JUMP_PERSONAL, RUNWAY_STRIDE_SCALE, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG, LAND_LEAD_SEC, LAND_ABSORB_DEEP } from '@/lib/babylon/core/DunkFlagship';   // dunk-flagship
+import { SLAM_VARIANTS_ON, SLAM_POWER_ON } from '@/lib/babylon/core/DunkSlamVariant';   // dunk-flagship Phase 7
+import { FINISH_OVER_RING } from '@/lib/babylon/core/DunkOverRing';   // dunk-flagship P11
 import { BALL_SIDE_SHADE_ON, SHADE_OFFSET_M, SHADE_REACT_SEC, SHADE_SHIFT_MPS, SHADE_FLIP_M, SHADE_RANGE_M, SHADE_RESEED_M } from '@/lib/babylon/core/BallSideShade';
 import { OFF_BALL_LOOK_ON, MAN_GLANCE_EVERY_SEC, MAN_GLANCE_SEC } from '@/lib/babylon/core/OffBallLook';   // lane/h3-aware
 import { POSSESSION_SWAP_ON, FOE_SPACE_ANGLE_K, HAS_BALL_M } from '@/lib/babylon/core/PossessionSwap';
@@ -55,12 +56,16 @@ import * as P3R from '@/lib/babylon/hoops/rivalOffense';   // hoops-p03
 import * as P3T from '@/lib/babylon/hoops/teamOffense3v3';   // hoops-p03
 import * as P4T from '@/lib/babylon/anim/hoopsTransitions';   // hoops-p04
 import * as P4R from '@/lib/babylon/hoops/releaseTiming';   // hoops-p04
-import { PLANT_RELEASE_FADE_SEC } from '@/lib/babylon/anim/basketballTree';   // hoops-p04
+import { PLANT_RELEASE_FADE_SEC, DEFENSE_LEGS_ON, BACKPEDAL_REVERSE_ON } from '@/lib/babylon/anim/basketballTree';   // hoops-p04, hoops-p05
+import * as P5S from '@/lib/babylon/anim/hipSteer';   // hoops-p05
+import { PASS_FROM_HAND_ON } from '@/lib/babylon/hoops/ballHandoff';   // hoops-p05, phase 5
 import * as P4B from '@/lib/babylon/anim/locoAccent';   // hoops-p04b
 import { CONTACT_ARM_SWAP_SEC } from '@/lib/babylon/hoops/contactPoses';   // hoops-p04b
-import { CARRY_ARM_SPEED_SEC } from '@/lib/babylon/anim/ballCarry';   // hoops-p04b
+import { CARRY_ARM_SPEED_SEC, CARRY_LET_GO_TO_CLIP_ON } from '@/lib/babylon/anim/ballCarry';   // hoops-p04b, hoops-p05
 import { STEAL_DICE_ON, STRIP_REACH_M, STRIP_SHIELD_M, STRIP_BALL_MAX_Y } from '@/lib/babylon/hoops/steals';   // hoops-p02
 import { ONBALL_CUSHION_M, ONBALL_CUSHION_PER_MPS } from '@/lib/babylon/hoops/pressure';   // hoops-p02
+
+import { BAT_GRIP_LOST_M, BAT_GRIP_BACK_M } from '@/lib/babylon/modes/baseballBat';   // bat-grip-2
 
 function tsFiles(dir: string): string[] {
   const out: string[] = [];
@@ -244,6 +249,15 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.accentOffBeatsOn')).toBe(P4B.ACCENT_OFF_BEATS_ON ? 1 : 0);
     expect(def('hoops.contactArmSwapSec')).toBe(CONTACT_ARM_SWAP_SEC);
     expect(def('hoops.carryArmSpeedSec')).toBe(CARRY_ARM_SPEED_SEC);
+    expect(def('hoops.carryLetGoToClipOn')).toBe(CARRY_LET_GO_TO_CLIP_ON);   // hoops-p05
+    expect(def('hoops.defenseLegsOn')).toBe(DEFENSE_LEGS_ON);   // hoops-p05: stepping legs under the defensive beats
+    expect(def('hoops.backpedalReverseOn')).toBe(BACKPEDAL_REVERSE_ON);
+    expect(def('hoops.hipSteerOn')).toBe(P5S.HIP_STEER_ON);
+    expect(def('hoops.hipSteerMaxDeg')).toBe(P5S.HIP_STEER_MAX_DEG);
+    expect(def('hoops.hipSteerSec')).toBe(P5S.HIP_STEER_SEC);
+    expect(def('hoops.hipSteerFromMps')).toBe(P5S.HIP_STEER_FROM_MPS);
+    expect(def('hoops.hipSteerFullMps')).toBe(P5S.HIP_STEER_FULL_MPS);
+    expect(def('hoops.passFromHandOn')).toBe(PASS_FROM_HAND_ON);   // hoops-p05, phase 5
     expect(def('hoops.rivalKitOn')).toBe(P3R.RIVAL_KIT_ON ? 1 : 0);
     expect(def('hoops.rivalTightM')).toBe(P3R.RIVAL_TIGHT_M);
     expect(def('hoops.rivalHesiSec')).toBe(P3R.RIVAL_HESI_SEC);
@@ -335,12 +349,19 @@ describe('the feel knob catalogue', () => {
     expect(def('dunk.realJumpPersonal')).toBe(REAL_JUMP_PERSONAL);     // dunk-flagship Phase 5 (new, off)
     expect(REAL_JUMP_PERSONAL).toBe(0);
     expect(def('dunk.slamVariants')).toBe(SLAM_VARIANTS_ON);          // dunk-flagship Phase 7 (new, off)
-    expect(SLAM_VARIANTS_ON).toBe(0);
+    expect(SLAM_VARIANTS_ON).toBe(1);   // test changed (owner 2026-11-10, "turn all 4 on"): the default is ON; 0 still restores the old slam (DunkSlamVariant.test)
+    expect(def('dunk.slamPower')).toBe(SLAM_POWER_ON); expect(SLAM_POWER_ON).toBe(1);
+    expect(def('dunk.landAbsorbDeep')).toBe(LAND_ABSORB_DEEP); expect(LAND_ABSORB_DEEP).toBe(1);
+    expect(RUNWAY_STRIDE_SCALE).toBe(1.1);   // TUNED 1 → 1.1 (owner 2026-11-10)
+    expect(def('dunk.finishOverRing')).toBe(FINISH_OVER_RING);        // dunk-flagship P11 (new, off: 0 = the shipped finish)
+    expect(FINISH_OVER_RING).toBe(1);   // test changed (owner 2026-11-10): default ON; 0 restores the old finish (DunkOverRing.test)
     expect(def('dunk.runwayStrideScale')).toBe(RUNWAY_STRIDE_SCALE); // dunk-flagship (new, default = the shipped pace)
     expect(def('dunk.slamHitStopBigMs')).toBe(SLAM_HITSTOP_BIG_MS);  // dunk-flagship TUNED (new; every make was 70)
     expect(def('dunk.slamShakeBig')).toBe(SLAM_SHAKE_BIG);
     expect(def('dunk.landLeadSec')).toBe(LAND_LEAD_SEC);             // dunk-flagship Phase 2 (new)           // dunk-flagship TUNED (new; every make was 0.12)
     expect(OVERTIME_3V3_SEC).toBe(30);
+    expect(def('baseball.batGripLostM')).toBe(BAT_GRIP_LOST_M);   // bat-grip-2 (new)
+    expect(def('baseball.batGripBackM')).toBe(BAT_GRIP_BACK_M);
   });
 
   it('every row is well formed: unique `<area>.<camelName>` id, min ≤ default ≤ max, the default on the step grid, a source', () => {
