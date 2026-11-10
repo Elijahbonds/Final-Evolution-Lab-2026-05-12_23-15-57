@@ -1112,6 +1112,12 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/anim/footballTree.ts FOOTBALL_CARRY_RATE_MAX',
     hint: 'How fast the carry loop may cycle to keep the feet with the ground at speed. 1 = the old fixed cadence (feet skate); higher = quicker legs at top speed.',
   },
+  // OWNER CALL (2026-11-10, delegated): the hurdle blends in over its own time (footballTree)
+  {
+    id: 'football.hurdleFadeSec', label: 'Football hurdle: blend-in time', def: 0.12, min: 0.04, max: 0.25, step: 0.01, unit: 's', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/footballTree.ts FOOTBALL_HURDLE_FADE_SEC',
+    hint: 'How long the run blends into the hurdle jump. 0.06 = the old snap (thigh turns about 25 degrees in one frame); 0.12 = smoother (about 15); longer starts to lag behind the hop.',
+  },
   // hoops-p03 (1v1/3v3 phase 3 "rivals that play basketball"): the 1v1 rival's kit and reads (hoops/rivalOffense), the 3v3 team offence
   // (hoops/teamOffense3v3). Every default is this lane's; the owner has felt none of them.
   {
@@ -1319,6 +1325,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'anim.plantEngageSec', label: 'Foot plant: solve blend time', def: 0.1, min: 0, max: 0.4, step: 0.02, unit: 's', group: 'Anim · transitions',
     source: 'lib/babylon/anim/FootPlanting.ts PLANT_ENGAGE_SEC',
     hint: 'How long the foot planter takes to take a leg over when it starts holding a foot, and to hand it back. 0 = the old one-frame step (the derby batter thigh jumped 25 degrees in a frame standing still).',
+  },
+  {
+    id: 'anim.plantReleaseSec', label: 'Foot plant: release blend time', def: 0.1, min: 0, max: 0.4, step: 0.02, unit: 's', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/FootPlanting.ts PLANT_RELEASE_SEC',
+    hint: 'How long a leg the foot planter lets go of takes to ease back onto the clip, in rotation. 0 = the old release, a target fade that rebuilt the leg in one frame when the body jumped or landed (football hurdle, 41 to 70 degrees a frame).',
   },
   {
     id: 'anim.hipYawFold', label: 'Posture hip strip folds past 90 degrees on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
