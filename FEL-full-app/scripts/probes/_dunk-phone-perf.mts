@@ -21,7 +21,8 @@ for (const PAGE of PAGES) {
   const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
   await ctx.addInitScript(`(() => { const btn = () => ({ pressed: false, touched: false, value: 0 });
     const pad = { index: 0, id: 'fake-pad (STANDARD GAMEPAD)', connected: true, mapping: 'standard', axes: [0, 0, 0, 0], timestamp: 0, buttons: Array.from({ length: 17 }, btn) };
-    window.__PAD = pad; navigator.getGamepads = () => [pad, null, null, null]; })();`);
+    window.__PAD = pad; navigator.getGamepads = () => [pad, null, null, null];
+    window.__name = window.__name || function (f) { return f; }; })();`);   // tsx's esbuild wraps the evaluated functions in __name(...)
   const p = await ctx.newPage();
   try {
     await p.goto(`${BASE}/${PAGE}.html?mode=dunk&tier=mobile&perf=off&agent=1`, { waitUntil: 'domcontentloaded', timeout: 240000 });
