@@ -105,7 +105,7 @@ export const JOBS: Job[] = [
     id: 'coach-adjust-program', who: 'coach', name: 'Adjust a program (change one exercise)', planBudget: 'adjust one exercise in ≤ 4 taps (phase 5)',
     steps: [
       // the athlete from the roster strip (always there); the "Needs you" card that also opens them goes once it is acted on
-      ...COACH, { css: 'button[aria-label^="Casey Client:"]', expect: '/PROGRAM/', say: 'open the athlete' }, { css: '[data-open-builder]', expect: '/Edit Rig goblet squat|Rig goblet squat —/', say: 'Open the builder' },
+      ...COACH, { css: 'button[aria-label^="Casey Client:"]', expect: '/PROGRAM/', say: 'open the athlete' }, { tap: 'PROGRAM', expect: '[data-open-builder]', say: 'the Program tab' }, { css: '[data-open-builder]', expect: '/Edit Rig goblet squat|Rig goblet squat —/', say: 'Open the builder' },
       { tap: 'Edit Rig goblet squat', expect: '/NOTE TO YOUR ATHLETE/', say: 'Edit the exercise' }, { tap: 'Cruise RPE 4–5', say: 'pick an easier effort' }, { tap: 'Save', expect: '/^(?![\\s\\S]*NOTE TO YOUR ATHLETE)[\\s\\S]*Rig goblet squat/', say: 'Save' },
     ],
   },

@@ -63,6 +63,8 @@ export interface Walk {
   path: string[];
   errors: string[];
   shot?: string;
+  /** how a row was measured, when it is not this run's own walk */
+  note?: string;
 }
 
 async function see(page: Page, expect: string): Promise<boolean> {

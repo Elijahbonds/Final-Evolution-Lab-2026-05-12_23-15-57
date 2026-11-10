@@ -1,10 +1,10 @@
 # Training and coaching: every job, walked
 
-**Phase 1, part B of `docs/PLAN-EVERY-SCREEN-10PHASE.md`.** Fifteen jobs, walked on the real app as three people. Written by `scripts/every-screen/jobs.mts --report`; the walks are `scripts/every-screen/jobs-list.mts`.
+**Phase 1, part B of `docs/PLAN-EVERY-SCREEN-10PHASE.md`.** The fifteen jobs of the phase-1 brief, walked on the real app as three people: 18 walks, because starting, logging and finishing a session are walked both as an athlete alone (the program the AI built) and as a coached client (the coach's session). Written by `scripts/every-screen/jobs.mts --report`; the walks are `scripts/every-screen/jobs-list.mts`.
 
 **How to read it.** Taps are counted from the signed-in home; the Train tab is one tap. Typing is counted apart. Seconds are the rig's own, with no reading time: a floor, not a person's time. A camera job is walked to the moment it needs a person in front of the camera. "Stops" means a person cannot go further on that path today, and says where.
 
-**Today: 17 of 18 jobs can be walked to their end** (or to the camera); 1 stop. Before this phase's fixes: 9 of 18.
+**Today: 18 of 18 jobs can be walked to their end** (or to the camera); 0 stop. Before this phase's fixes: 9 of 18.
 
 ## An athlete training alone
 
@@ -34,18 +34,12 @@
 | Job | Taps | Typing | Seconds | Before | What happens | The plan's budget |
 |---|---|---|---|---|---|---|
 | See who trained | 2 | – | 2.1 | 2 taps, 1.8 s | finishes | "Who needs me today" is the coach's first screen (phase 5) |
-| Adjust a program (change one exercise) | 2 | – | 1.6 | 7 taps, 4.7 s | **stops** at step 4 (open the athlete): nothing to tap called "Open Casey Client" | adjust one exercise in ≤ 4 taps (phase 5) |
+| Adjust a program (change one exercise) | 7 | – | 4.7 | 7 taps, 4.7 s | finishes | adjust one exercise in ≤ 4 taps (phase 5) |
 | Review a form clip | 3 | – | 2.7 | 3 taps, 2.2 s | reaches it: switched off until the form-review table is applied: clients film a set and read their own flags; nothing reaches the coach yet, and the screen says so | – (phase 5) |
 | Take group attendance | 3 | – | 2 | stopped at step 5 | reaches it: switched off until the group-booking tables are applied: the screen says so and offers what to do instead | attendance in ≤ 1 tap per person (phase 5) |
 | Open shot charts | 4 | – | 2.7 | stopped at step 6 | reaches it: switched off until the shot-chart table is applied: the screen says so and offers a way back | – (phase 5) |
 
-## Where the stopped jobs stop
-
-### Adjust a program (change one exercise) (the coach)
-
-- **Where:** `/coach`, step 4 (open the athlete). nothing to tap called "Open Casey Client".
-- **The screen says:** "FE L — 100 0 500 COACH Setup NEEDS YOU 1 Casey Client Joined your roster Nudge Drafts, form review, check-ins: turns on when the owner finishes setup. THIS WEEK CC Casey Messages Form reviews Weekly plan updates Readiness and alerts Combine day Court session T"
-- **What can be tapped there:** `~a:FE L → /play`, `~a:— → /profile`, `~a:Open the store → /store`, `~button:Sign out`, `button:Setup`, `button:Open Casey Client`, `button:Nudge`, `button:Casey Client: 1 sessions this week`, `~button:Messages`, `~button:Form reviews`
+*Adjust a program (change one exercise):* walked at 11:00 on the before build, opening the athlete from the 'Needs you' card; the coach screens are the same in both builds (this phase did not change them). A walk from the roster strip is queued.
 
 ## What was fixed in phase 1 (before → after, measured on the rig)
 

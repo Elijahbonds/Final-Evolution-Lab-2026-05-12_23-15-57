@@ -1,7 +1,7 @@
 {
  "what": "The every-screen scorecard: docs/PLAN-EVERY-SCREEN-10PHASE.md, phase 1. Written by scripts/every-screen/score.mts --report.",
- "measuredAt": "2026-11-10T12:12:51.310Z",
- "commit": "da71093b",
+ "measuredAt": "2026-11-10T13:33:36.685Z",
+ "commit": "2829eb31",
  "budgets": {
   "wordsFoldDo": 40,
   "tapPx": 44,
@@ -14,36 +14,36 @@
  },
  "totals": {
   "screens": 184,
-  "scored": 151,
+  "scored": 152,
   "passAll": 4,
   "alias": 7,
   "off": 20,
-  "notScored": 6,
+  "notScored": 5,
   "byCheck": {
    "clear": {
     "pass": 12,
-    "fail": 139,
+    "fail": 140,
     "nm": 0
    },
    "finished": {
     "pass": 18,
-    "fail": 133,
+    "fail": 134,
     "nm": 0
    },
    "fast": {
     "pass": 47,
-    "fail": 81,
+    "fail": 82,
     "nm": 23
    },
    "right": {
-    "pass": 99,
-    "fail": 52,
+    "pass": 101,
+    "fail": 51,
     "nm": 0
    }
   },
   "trainingAndCoaching": {
    "screens": 61,
-   "scored": 43,
+   "scored": 44,
    "passAll": 1
   }
  },
@@ -51,13 +51,13 @@
   {
    "id": "small-targets-bars",
    "name": "Tap targets under 44 px in the app's own bars",
-   "screens": 121,
+   "screens": 122,
    "wouldPassIfFixed": 1
   },
   {
    "id": "body-small",
    "name": "Body copy under 16 px",
-   "screens": 100,
+   "screens": 101,
    "wouldPassIfFixed": 0
   },
   {
@@ -69,19 +69,19 @@
   {
    "id": "layout-shift",
    "name": "The screen jumps as it loads",
-   "screens": 73,
+   "screens": 74,
    "wouldPassIfFixed": 0
   },
   {
    "id": "text-sizes",
    "name": "More than 4 text sizes on one screen",
-   "screens": 68,
+   "screens": 69,
    "wouldPassIfFixed": 0
   },
   {
    "id": "too-many-words",
    "name": "More than 40 words before scrolling on a do-this screen",
-   "screens": 42,
+   "screens": 43,
    "wouldPassIfFixed": 5
   },
   {
@@ -93,7 +93,7 @@
   {
    "id": "page-error",
    "name": "The screen throws an error",
-   "screens": 32,
+   "screens": 31,
    "wouldPassIfFixed": 0
   },
   {
@@ -115,16 +115,16 @@
    "wouldPassIfFixed": 0
   },
   {
+   "id": "slow-tap",
+   "name": "The main action answers a tap in more than 200 ms",
+   "screens": 16,
+   "wouldPassIfFixed": 1
+  },
+  {
    "id": "empty-no-next",
    "name": "An empty state with no next step",
    "screens": 14,
    "wouldPassIfFixed": 0
-  },
-  {
-   "id": "slow-tap",
-   "name": "The main action answers a tap in more than 200 ms",
-   "screens": 14,
-   "wouldPassIfFixed": 1
   },
   {
    "id": "only-chrome",
@@ -402,14 +402,14 @@
     "clear": "fail",
     "finished": "fail",
     "fast": "fail",
-    "right": "fail"
+    "right": "pass"
    },
    "passAll": false,
-   "worst": "The screen throws an error: TypeError: Failed to fetch",
+   "worst": "The screen jumps as it loads (layout shift 0.274; the budget is 0.02).",
    "faults": [
-    "page-error",
     "layout-shift",
     "empty-no-next",
+    "slow-tap",
     "small-targets-bars",
     "text-sizes"
    ],
@@ -421,9 +421,9 @@
     "smallTargets": 4,
     "textSizes": 5,
     "buttonLooks": 1,
-    "firstContentMs": 692,
-    "layoutShift": 0.296,
-    "tapMs": 160,
+    "firstContentMs": 540,
+    "layoutShift": 0.274,
+    "tapMs": 224,
     "tapped": "Recompute (14d)",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -548,7 +548,7 @@
    "audience": "anyone",
    "scoredAs": "anon",
    "state": "off",
-   "reason": "the app's own 404 page",
+   "reason": "not switched off: a challenge code that does not exist is the app's 404 (a real challenge needs a row a player makes by sending one)",
    "checks": null,
    "passAll": false,
    "worst": null,
@@ -4462,7 +4462,7 @@
    "audience": "nobody (a 404 for everyone)",
    "scoredAs": null,
    "state": "off",
-   "reason": "a 404 for every person on the rig",
+   "reason": "a 404 by design: only its share links are pages (lib/nav/reachability.test.ts)",
    "checks": null,
    "passAll": false,
    "worst": null,
@@ -6820,21 +6820,49 @@
   },
   {
    "route": "/train/programs/[id]",
-   "url": "/train/programs/[id]",
+   "url": "/train/programs/vertical-jump",
    "phase": 2,
    "area": "training",
    "kind": "do",
-   "audience": "unknown (no fixture)",
-   "scoredAs": null,
-   "state": "not-scored",
-   "reason": "not scored: the programs page links to no program",
-   "checks": null,
+   "audience": "admin",
+   "scoredAs": "admin",
+   "state": "scored",
+   "reason": "the list links no program while it is switched off: opened by its address",
+   "checks": {
+    "clear": "fail",
+    "finished": "fail",
+    "fast": "fail",
+    "right": "pass"
+   },
    "passAll": false,
-   "worst": null,
-   "faults": [],
-   "review": [],
+   "worst": "274 words before scrolling (the budget is 40).",
+   "faults": [
+    "too-many-words",
+    "body-small",
+    "layout-shift",
+    "slow-tap",
+    "text-sizes",
+    "small-targets-bars"
+   ],
+   "review": [
+    "A measured number (\"120 s\") with no line saying how it was measured or how sure it is."
+   ],
    "unmeasured": [],
-   "numbers": null
+   "numbers": {
+    "wordsBeforeScroll": 274,
+    "brightButtons": 1,
+    "smallTargets": 4,
+    "textSizes": 7,
+    "buttonLooks": 1,
+    "firstContentMs": 1988,
+    "layoutShift": 0.068,
+    "tapMs": 216,
+    "tapped": "START TODAY'S SESSION",
+    "brokenLinks": 0,
+    "a11yCritical": 0,
+    "a11ySerious": 0,
+    "jsKb": 278
+   }
   },
   {
    "route": "/train/progress",

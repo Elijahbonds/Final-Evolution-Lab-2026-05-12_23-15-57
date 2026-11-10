@@ -11,21 +11,21 @@ This is phase 1 of `docs/PLAN-EVERY-SCREEN-10PHASE.md`: every screen a person ca
 | | Screens |
 |---|---|
 | Pages a person can reach (`app/**/page.tsx`, less the developer pages) | 184 |
-| Scored on the rig | 151 |
+| Scored on the rig | 152 |
 | Not a screen of its own: it only sends you on to another | 7 |
 | Switched off: a 404 for everyone today | 20 |
-| Not scored, with the reason (section 5) | 6 |
+| Not scored, with the reason (section 5) | 5 |
 | **Pass all four** | **4** |
-| Training and coaching (phases 2–5): pass all four | 1 of 61 (43 scored) |
+| Training and coaching (phases 2–5): pass all four | 1 of 61 (44 scored) |
 
 | Check | Pass | Fail | Not measured |
 |---|---|---|---|
-| 1. Clear and quick | 12 | **139** | 0 |
-| 2. Looks finished | 18 | **133** | 0 |
-| 3. Fast and smooth | 47 | **81** | 23 |
-| 4. Right and trustworthy | 99 | **52** | 0 |
+| 1. Clear and quick | 12 | **140** | 0 |
+| 2. Looks finished | 18 | **134** | 0 |
+| 3. Fast and smooth | 47 | **82** | 23 |
+| 4. Right and trustworthy | 101 | **51** | 0 |
 
-Of the 151 scored screens. "Not measured" is a 3D screen's tap time: the rig has no real GPU, so that one number is left open and the screen is not counted as passing.
+Of the 152 scored screens. "Not measured" is a 3D screen's tap time: the rig has no real GPU, so that one number is left open and the screen is not counted as passing.
 
 ## 1. How a screen is scored
 
@@ -42,7 +42,7 @@ The real app (a production build) runs against a throwaway local database, and a
 
 **Sorting screens into do-this, menu and reading pages** ("Kind" in the table) is a first sorting by address (`kindOf`), an `assumption:`; only a do-this screen takes the 40-word rule. Each phase corrects its own screens.
 
-**Controls: passed** on 2026-11-10 12:17 UTC (scorer version 4).
+**Controls: passed** on 2026-11-10 13:33 UTC (scorer version 4).
 
 **The scorer was checked before it was believed** (`score.mts --plant`, and again at the start of every crawl): a clean control page must pass all four, and each planted fault (three bright buttons, 120 words, a 30 px target, a dead end, "Coming soon", an owner placeholder, an empty state, a wordless spinner, sideways scroll, 10 px text, six text sizes, five button looks, slow first content, a jumping banner, a blocking tap handler, a link to a missing page, a link to nowhere, a button that does nothing, an unnamed button, a bare measured number) must be flagged on its own page and fail only its own check.
 
@@ -52,14 +52,14 @@ The plan's rule: fix the shared thing first. "Alone" is how many screens would p
 
 | # | Fault | Screens | Alone | Check |
 |---|---|---|---|---|
-| 1 | Tap targets under 44 px in the app's own bars | 121 | 1 | 1 |
-| 2 | Body copy under 16 px | 100 | 0 | 2 |
+| 1 | Tap targets under 44 px in the app's own bars | 122 | 1 | 1 |
+| 2 | Body copy under 16 px | 101 | 0 | 2 |
 | 3 | Tap targets under 44 px in the screen itself | 81 | 0 | 1 |
-| 4 | The screen jumps as it loads | 73 | 0 | 3 |
-| 5 | More than 4 text sizes on one screen | 68 | 0 | 2 |
-| 6 | More than 40 words before scrolling on a do-this screen | 42 | 5 | 1 |
+| 4 | The screen jumps as it loads | 74 | 0 | 3 |
+| 5 | More than 4 text sizes on one screen | 69 | 0 | 2 |
+| 6 | More than 40 words before scrolling on a do-this screen | 43 | 5 | 1 |
 | 7 | Critical accessibility findings | 35 | 1 | 4 |
-| 8 | The screen throws an error | 32 | 0 | 4 |
+| 8 | The screen throws an error | 31 | 0 | 4 |
 | 9 | Text under 12 px | 26 | 0 | 2 |
 | 10 | A spinner with no words | 26 | 0 | 2 |
 
@@ -91,16 +91,16 @@ Measured for that call: 41 scored screens use exactly 5 text sizes; with 5 allow
 
 **Small tap targets in the app's own bars (screens)**
 
-- 70 × `"FE L" 28×40 a.fel-heading.inline-flex.min-h-10.shrink-0 in [data-couch-scale]`
-- 70 × `"—" 65×40 a.fel-press.inline-flex.min-h-10.items-center in [data-couch-scale]`
-- 70 × `"Sign out" 40×40 button.fel-press.grid.h-10.w-10 in [data-couch-scale]`
+- 71 × `"FE L" 28×40 a.fel-heading.inline-flex.min-h-10.shrink-0 in [data-couch-scale]`
+- 71 × `"—" 65×40 a.fel-press.inline-flex.min-h-10.items-center in [data-couch-scale]`
+- 71 × `"Sign out" 40×40 button.fel-press.grid.h-10.w-10 in [data-couch-scale]`
 - 56 × `"Open the store" 188×26 a.transition-transform.active:scale-95 in [data-couch-scale]`
 - 32 × `"Home" 75×30 a.flex.shrink-0.items-center.gap-1.5 in [data-game-chrome]`
 - 32 × `"Play with your body" 81×32 button.inline-flex.items-center.gap-2.rounded-lg in [data-game-chrome]`
 - 32 × `"Auto Performance Quality" 118×32 select.h-8.rounded-md.border.border-white/10 in [data-game-chrome]`
 - 32 × `"Full screen" 32×32 button.grid.h-8.w-8.place-items-center in [data-game-chrome]`
 - 15 × `"FINAL EVOLUTION LAB" 206×32 a.fel-heading.text-2xl.font-bold.text-white`
-- 13 × `"Open the store" 181×26 a.transition-transform.active:scale-95 in [data-couch-scale]`
+- 14 × `"Open the store" 181×26 a.transition-transform.active:scale-95 in [data-couch-scale]`
 - 7 × `"Terms" 39×44 a.hover:text-white/70`
 - 7 × `"Log in" 37×44 a.hover:text-white/70`
 
@@ -127,24 +127,24 @@ Measured for that call: 41 scored screens use exactly 5 text sizes; with 5 allow
 - 1 × `"Download my data" 161×34 a.inline-flex.items-center.gap-2.rounded-md in [data-couch-scale]`
 - 1 × `"Erase my health data" 175×34 button.inline-flex.items-center.gap-2.rounded-md in [data-couch-scale]`
 
-**Text sizes per screen:** 0 sizes: 1 screens; 1 sizes: 1 screens; 2 sizes: 2 screens; 3 sizes: 49 screens; 4 sizes: 30 screens; 5 sizes: 41 screens; 6 sizes: 16 screens; 7 sizes: 8 screens; 8 sizes: 1 screens; 9 sizes: 1 screens; 10 sizes: 1 screens
+**Text sizes per screen:** 0 sizes: 1 screens; 1 sizes: 1 screens; 2 sizes: 2 screens; 3 sizes: 49 screens; 4 sizes: 30 screens; 5 sizes: 41 screens; 6 sizes: 16 screens; 7 sizes: 9 screens; 8 sizes: 1 screens; 9 sizes: 1 screens; 10 sizes: 1 screens
 
 **The sizes themselves (screens that use each)**
 
-- 141 × `12px`
-- 110 × `20px`
-- 104 × `14px`
+- 142 × `12px`
+- 111 × `20px`
+- 105 × `14px`
 - 83 × `16px`
-- 55 × `30px`
+- 56 × `30px`
 - 34 × `18px`
 - 32 × `24px`
-- 18 × `13px`
+- 19 × `13px`
 - 15 × `36px`
-- 8 × `12.5px`
+- 9 × `12.5px`
 - 7 × `44px`
 - 7 × `22px`
+- 6 × `13.5px`
 - 6 × `15px`
-- 5 × `13.5px`
 - 4 × `11.9px`
 - 4 × `21px`
 - 3 × `26px`
@@ -161,7 +161,7 @@ Measured for that call: 41 scored screens use exactly 5 text sizes; with 5 allow
 - 1 × `11px`
 - 1 × `60px`
 
-**Button looks per screen:** 0: 31; 1: 66; 2: 23; 3: 14; 4: 7; 5: 3; 6: 2; 7: 3; 8: 1; 12: 1
+**Button looks per screen:** 0: 31; 1: 67; 2: 23; 3: 14; 4: 7; 5: 3; 6: 2; 7: 3; 8: 1; 12: 1
 
 **Text under the READABLE floor**
 
@@ -203,10 +203,10 @@ Measured for that call: 41 scored screens use exactly 5 text sizes; with 5 allow
 
 **What moves as a screen loads**
 
-- 69 × `div.ml-auto.flex.min-w-0`
+- 70 × `div.ml-auto.flex.min-w-0`
 - 32 × `span.flex.items-center.gap-1.5`
 - 30 × `button.grid.h-8.w-8`
-- 24 × `div.relative.min-h-screen.bg-fel-bg`
+- 25 × `div.relative.min-h-screen.bg-fel-bg`
 - 12 × `div.min-h-screen.bg-[#050505].pb-20`
 - 9 × `div.min-h-screen.bg-[#050505].pb-24`
 - 6 × `#text`
@@ -271,20 +271,20 @@ Measured for that call: 41 scored screens use exactly 5 text sizes; with 5 allow
 
 Phase 1 fixed only what stops a person (`docs/EVERY-SCREEN-JOBS.md`). Everything else found in training and coaching is listed here for the phase that owns the screen, most common first.
 
-**Phase 2** (7 scored screens, 0 pass all four):
+**Phase 2** (8 scored screens, 0 pass all four):
 
-1. Tap targets under 44 px in the app's own bars: 7 screens (`/play/drills`, `/signature`, `/train`, `/train/library`, `/train/programs`, `/train/today-drill`, …)
-2. The screen jumps as it loads: 6 screens (`/signature`, `/train`, `/train/library`, `/train/programs`, `/train/today-drill`, `/workout`)
-3. Body copy under 16 px: 5 screens (`/play/drills`, `/signature`, `/train`, `/train/programs`, `/workout`)
-4. More than 4 text sizes on one screen: 4 screens (`/play/drills`, `/signature`, `/train`, `/train/today-drill`)
-5. More than 40 words before scrolling on a do-this screen: 3 screens (`/play/drills`, `/train/today-drill`, `/workout`)
+1. Tap targets under 44 px in the app's own bars: 8 screens (`/play/drills`, `/signature`, `/train`, `/train/library`, `/train/programs`, `/train/programs/[id]`, …)
+2. The screen jumps as it loads: 7 screens (`/signature`, `/train`, `/train/library`, `/train/programs`, `/train/programs/[id]`, `/train/today-drill`, …)
+3. Body copy under 16 px: 6 screens (`/play/drills`, `/signature`, `/train`, `/train/programs`, `/train/programs/[id]`, `/workout`)
+4. More than 4 text sizes on one screen: 5 screens (`/play/drills`, `/signature`, `/train`, `/train/programs/[id]`, `/train/today-drill`)
+5. More than 40 words before scrolling on a do-this screen: 4 screens (`/play/drills`, `/train/programs/[id]`, `/train/today-drill`, `/workout`)
 6. Tap targets under 44 px in the screen itself: 2 screens (`/train/library`, `/workout`)
-7. Text under 12 px: 1 screen (`/play/drills`)
-8. Serious accessibility findings: 1 screen (`/play/drills`)
-9. Text cut off (150 % text): 1 screen (`/train/library`)
-10. Unfinished mark: "coming soon": 1 screen (`/train/programs`)
-11. Only the app's bars lead on: 1 screen (`/train/programs`)
-12. An empty state with no next step: 1 screen (`/train/today-drill`)
+7. The main action answers a tap in more than 200 ms: 2 screens (`/train/programs/[id]`, `/train/today-drill`)
+8. Text under 12 px: 1 screen (`/play/drills`)
+9. Serious accessibility findings: 1 screen (`/play/drills`)
+10. Text cut off (150 % text): 1 screen (`/train/library`)
+11. Unfinished mark: "coming soon": 1 screen (`/train/programs`)
+12. Only the app's bars lead on: 1 screen (`/train/programs`)
 
 **Phase 3** (1 scored screens, 0 pass all four):
 
@@ -331,7 +331,7 @@ Scored in the state production has them in. `assumption:` the rig's database is 
 | Screen | Phase | What turns it on |
 |---|---|---|
 | `/account/bookings` | 5 | COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) |
-| `/c/[code]` | 7 | the app's own 404 page |
+| `/c/[code]` | 7 | not switched off: a challenge code that does not exist is the app's 404 (a real challenge needs a row a player makes by sending one) |
 | `/coach/[slug]` | 5 | COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL); or COACH_MARKETPLACE_ENABLED (find a coach) |
 | `/coach/[slug]/book/[listingId]` | 5 | COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) |
 | `/coach/[slug]/fee/[packageId]` | 5 | COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL); or COACH_MARKETPLACE_ENABLED (find a coach) |
@@ -344,7 +344,7 @@ Scored in the state production has them in. `assumption:` the rig's database is 
 | `/coach/thanks` | 5 | COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) |
 | `/coaches` | 5 | COACH_MARKETPLACE_ENABLED (find a coach) |
 | `/live/schedule` | 7 | LIVE_STREAM_SCHEDULE_ENABLED (the live schedule) |
-| `/play/shared` | 7 | a 404 for every person on the rig |
+| `/play/shared` | 7 | a 404 by design: only its share links are pages (lib/nav/reachability.test.ts) |
 | `/play/shared/[token]` | 7 | STUDIO_SHARE_ENABLED (Studio share links) |
 | `/program/[accessId]` | 2 | COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) |
 | `/program/unlock` | 2 | COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) |
@@ -404,7 +404,7 @@ Measured: the same build was served on a second throwaway database with every fi
 - **First content is measured from the same machine**, so it is a floor: every scored screen met 2.5 s here (median about 0.6 s), and that number says nothing about a phone on mobile data.
 - **Only the main action is tapped.** The other buttons on a screen are not pressed by the scorer; in training and coaching the job walks press them (`docs/EVERY-SCREEN-JOBS.md`).
 
-## 5. Not scored: 6
+## 5. Not scored: 5
 
 | Screen | Phase | Why |
 |---|---|---|
@@ -412,7 +412,6 @@ Measured: the same build was served on a second throwaway database with every fi
 | `/consent/guardian/[token]` | 6 | needs a guardian-consent row with its emailed token |
 | `/guardian/report/[token]` | 9 | needs a guardian report row with its emailed token |
 | `/p/[token]` | 8 | needs a coach share-link row (a coach sharing a client's progress); none exists on a new account |
-| `/train/programs/[id]` | 2 | the programs page links to no program |
 | `/u/[slug]` | 8 | needs a published creator card row; a new account has none |
 
 **Not a screen of its own (7):** `/age` → /; `/c/[code]/play` → /c/NONE00; `/education` → /learn; `/play/tiebreak` → /play/tennis; `/play/training` → /train; `/settings` → /account; `/training` → /coach.
@@ -421,7 +420,7 @@ Measured: the same build was served on a second throwaway database with every fi
 
 ✓ pass · ✗ fail · ? not measured. "Who" is measured: the rig opens each screen signed out, as an adult athlete, a coached client, a coach, an admin and a 15-year-old, and records who gets the page.
 
-### Phase 2 — from opening the app to finishing a workout (12 screens; 0 of 7 scored pass all four)
+### Phase 2 — from opening the app to finishing a workout (12 screens; 0 of 8 scored pass all four)
 
 | Screen | Who | Kind | 1 | 2 | 3 | 4 | The single worst problem |
 |---|---|---|---|---|---|---|---|
@@ -433,7 +432,7 @@ Measured: the same build was served on a second throwaway database with every fi
 | `/train` | signed-in | hub | ✗ | ✗ | ✗ | ✓ | The screen jumps as it loads (layout shift 0.124; the budget is 0.02). |
 | `/train/library` | signed-in | hub | ✗ | ✗ | ✗ | ✓ | The screen jumps as it loads (layout shift 0.124; the budget is 0.02). |
 | `/train/programs` | signed-in | hub | ✗ | ✗ | ✗ | ✓ | Unfinished mark on screen: "Signature programs are coming soon. The daily drill and the exercise library are". |
-| `/train/programs/[id]` | unknown (no fixture) | do | – | – | – | – | *not scored: the programs page links to no program* |
+| `/train/programs/[id]` | admin | do | ✗ | ✗ | ✗ | ✓ | 274 words before scrolling (the budget is 40). review: a number with no method line (the list links no program while it is switched off: opened by its address) |
 | `/train/today-drill` | signed-in | do | ✗ | ✗ | ✗ | ✓ | An empty state with no next step: "No scores yet.". |
 | `/training` | nobody (redirects away) | do | – | – | – | – | *not its own screen: redirects to /coach for everyone who is signed in* |
 | `/workout` | signed-in | do | ✗ | ✗ | ✗ | ✓ | The screen jumps as it loads (layout shift 0.818; the budget is 0.02). |
@@ -521,7 +520,7 @@ Measured: the same build was served on a second throwaway database with every fi
 | Screen | Who | Kind | 1 | 2 | 3 | 4 | The single worst problem |
 |---|---|---|---|---|---|---|---|
 | `/arena` | signed-in | hub | ✗ | ✗ | ✗ | ✗ | The screen jumps as it loads (layout shift 0.068; the budget is 0.02). |
-| `/c/[code]` | anyone | do | – | – | – | – | *switched off: a 404 (the app's own 404 page)* |
+| `/c/[code]` | anyone | do | – | – | – | – | *switched off: a 404 (not switched off: a challenge code that does not exist is the app's 404 (a real challenge needs a row a player makes by sending one))* |
 | `/c/[code]/play` | nobody (redirects away) | do | – | – | – | – | *not its own screen: redirects to /c/NONE00 for everyone who is signed in* |
 | `/controller/[code]` | anyone | do | ✓ | ✓ | ✓ | ✗ | 1 critical accessibility finding (label). (a made-up room code: the screen a phone shows before the TV answers) |
 | `/host` | anyone | do | ✗ | ✗ | ✓ | ✗ | 30 tap targets under 44 px (smallest: "Downtown"). |
@@ -559,7 +558,7 @@ Measured: the same build was served on a second throwaway database with every fi
 | `/play/music` | signed-in | do | ✗ | ✗ | ✗ | ✓ | A spinner with no words: it never says what it is waiting for. |
 | `/play/onevone` | signed-in | do | ✗ | ✗ | ✓ | ✗ | The screen throws an error: Error: Minified React error #425; visit https://react.dev/errors/425 for the full message  |
 | `/play/party` | signed-in | do | ✗ | ✗ | ✓ | ✗ | 4 critical accessibility findings (contrast). |
-| `/play/shared` | nobody (a 404 for everyone) | do | – | – | – | – | *switched off: a 404 (a 404 for every person on the rig)* |
+| `/play/shared` | nobody (a 404 for everyone) | do | – | – | – | – | *switched off: a 404 (a 404 by design: only its share links are pages (lib/nav/reachability.test.ts))* |
 | `/play/shared/[token]` | nobody (a 404 for everyone) | do | – | – | – | – | *switched off: a 404 (STUDIO_SHARE_ENABLED (Studio share links))* |
 | `/play/showdown` | signed-in | do | ✗ | ✗ | ? | ✗ | The screen throws an error: Error: Minified React error #425; visit https://react.dev/errors/425 for the full message  |
 | `/play/skateboard` | signed-in | do | ✗ | ✗ | ✓ | ✗ | The screen throws an error: Error: Minified React error #425; visit https://react.dev/errors/425 for the full message  |
@@ -582,7 +581,7 @@ Measured: the same build was served on a second throwaway database with every fi
 |---|---|---|---|---|---|---|---|
 | `/account` | signed-in | hub | ✗ | ✗ | ✗ | ✓ | The screen jumps as it loads (layout shift 0.292; the budget is 0.02). |
 | `/admin/funnel` | admin | hub | ✗ | ✗ | ✗ | ✓ | An empty state with no next step: "No wins yet". |
-| `/admin/metrics` | admin | hub | ✗ | ✗ | ✗ | ✗ | The screen throws an error: TypeError: Failed to fetch |
+| `/admin/metrics` | admin | hub | ✗ | ✗ | ✗ | ✓ | The screen jumps as it loads (layout shift 0.274; the budget is 0.02). |
 | `/admin/review` | admin | hub | ✗ | ✗ | ✗ | ✗ | "WAITING" does nothing when tapped. |
 | `/card/[slug]` | unknown (no fixture) | do | – | – | – | – | *not scored: needs a published creator card row; a new account has none* |
 | `/cards` | signed-in | hub | ✗ | ✗ | ✗ | ✗ | The screen jumps as it loads (layout shift 0.124; the budget is 0.02). |
