@@ -1,5 +1,6 @@
 // H2 (2026-10-16): the legs keep running under a handle move (anim/moveLegs) — the pure parts, and the tree's driving of the layer.
 import { describe, expect, it } from 'vitest';
+import { Bone, Matrix, NullEngine, Quaternion, Scene, Skeleton, TransformNode, Vector3 } from '@babylonjs/core';
 import { advancePhase, legsWeightFor, stepLegsWeight, MoveLegs, MOVE_LEGS_BEAT, LEGS_ON_MPS, LEGS_FULL_MPS, LEGS_TAU_SEC } from './moveLegs';
 import { BasketballAnimTree, type AnimTreeInput } from './basketballTree';
 
@@ -63,5 +64,51 @@ describe('the tree drives the layer only under a move beat (a fake layer and ani
     layer.live = true;                 // the layer is carrying the stride as the move ends
     tree.release();                    // the beat ends: the tree settles into the loop
     expect(plays.at(-1)).toMatchObject({ clip: 'bball_dribble_jog' }); expect(plays.at(-1)!.opts.phase01).toBe(0.4);
+  });
+});
+
+// hoops-p05: the defensive beats' free loop — a change of loop under the beat crossfades, and a reversed loop's phase runs backward
+describe('a free beat follows the loop the body is in (hoops-p05)', () => {
+  const mkGroup = (name: string, node: TransformNode, yawAt: (f: number) => number) => ({
+    name, from: 0, to: 60, isPlaying: false,
+    targetedAnimations: [{ target: node, animation: { targetProperty: 'rotationQuaternion', framePerSecond: 60, evaluate: (f: number) => Quaternion.RotationAxis(Vector3.Up(), yawAt(f)) } }],
+  });
+  const setup = () => {
+    const scene = new Scene(new NullEngine());
+    const sk = new Skeleton('sk', 'sk', scene);
+    const node = new TransformNode('LeftUpLeg', scene); node.rotationQuaternion = Quaternion.Identity();
+    new Bone('LeftUpLeg', sk, null, Matrix.Identity()).linkTransformNode(node);
+    const groups: Record<string, unknown> = { a: mkGroup('a', node, () => 0.2), b: mkGroup('b', node, () => 1.0), ramp: mkGroup('ramp', node, (f) => f / 60) };
+    const legs = new MoveLegs(scene, sk, (n) => (groups[n] ?? null) as never);
+    const yaw = () => { const q = node.rotationQuaternion!; return 2 * Math.atan2(q.y, q.w); };
+    const frame = () => { node.rotationQuaternion!.copyFromFloats(0, 0, 0, 1); scene.onAfterAnimationsObservable.notifyObservers(scene); return yaw(); };
+    return { legs, frame, scene };
+  };
+  it('a change of loop under a free beat is a crossfade over fadeSec, never a one-frame swap; a locked move ignores the new loop', () => {
+    const S = setup();
+    S.legs.begin('a');
+    for (let i = 0; i < 60; i++) S.legs.drive({ loopClip: 'a', rate: 1, speedMps: 4, dtSec: 1 / 60, free: true, fadeSec: 0.2 });
+    expect(S.frame()).toBeCloseTo(0.2, 2);
+    const seen: number[] = [];
+    for (let i = 0; i < 18; i++) { S.legs.drive({ loopClip: 'b', rate: 1, speedMps: 4, dtSec: 1 / 60, free: true, fadeSec: 0.2 }); seen.push(S.frame()); }
+    expect(seen[0]).toBeLessThan(0.3);                         // the first frame is still the old loop's
+    expect(seen[seen.length - 1]).toBeCloseTo(1.0, 2);          // …and it ends on the new one
+    let worst = 0; for (let i = 1; i < seen.length; i++) worst = Math.max(worst, seen[i] - seen[i - 1]);
+    expect(worst).toBeLessThan(0.2);                           // 0.8 rad spread over the fade, no cut
+    const L = setup();
+    L.legs.begin('a');
+    for (let i = 0; i < 30; i++) L.legs.drive({ loopClip: 'a', rate: 1, speedMps: 4, dtSec: 1 / 60 });
+    L.legs.drive({ loopClip: 'b', rate: 1, speedMps: 4, dtSec: 1 / 60 });
+    expect(L.frame()).toBeCloseTo(0.2, 2);                      // a handle move's loop stays locked, as before
+    S.scene.dispose(); L.scene.dispose();
+  });
+  it('a reversed loop runs its phase backward at the same rate', () => {
+    const S = setup();
+    S.legs.begin('ramp');
+    for (let i = 0; i < 30; i++) S.legs.drive({ loopClip: 'ramp', rate: 1, speedMps: 4, dtSec: 1 / 60, free: true, fadeSec: 0.2 });
+    const p0 = S.legs.phase01;
+    for (let i = 0; i < 6; i++) S.legs.drive({ loopClip: 'ramp', rate: 1, speedMps: 4, dtSec: 1 / 60, free: true, fadeSec: 0.2, reverse: true });
+    expect(S.legs.phase01).toBeCloseTo(p0 - 0.1, 6);
+    S.scene.dispose();
   });
 });

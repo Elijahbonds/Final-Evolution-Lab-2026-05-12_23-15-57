@@ -24,6 +24,7 @@ import { MOVE_LEGS_BEAT, type MoveLegs } from './moveLegs';   // H2: the legs ke
 import { feel } from '../../feel-panel/feel';   // AF-11: the anim.holdLast knob (default off); hoops-p04: the plant lock's release fade
 import { protectClip, protectDribbles, restTempoFor } from './RestDribble';   // lane/h3-handler (#312 port): the dribble at rest
 import { transitionFor, transitionRuleOn } from './hoopsTransitions';   // hoops-p04: one blend + minimum-hold rule for every clip change
+import { BACKPEDAL_REVERSED_TRAVEL_DEG, type HipSteer } from './hipSteer';   // hoops-p05: the pelvis turns toward the travel
 
 // ── Blend tree ─────────────────────────────────────────────────────────────
 export type BasketballAnimState =
@@ -101,6 +102,9 @@ export interface AnimTreeInput {
   /** HOOPS MOTION phase 4b: a handle move's renderer owns the ball (HandleMotion; carry.move) — the tree never chooses its own crossover
    *  state then (one source for a move's beat). */
   moveActive?: boolean;
+  /** hoops-p05: off the floor (a block jump's flight) — the stepping legs under a defensive beat stand down while this is true. Optional:
+   *  a mode that does not pass it is always on the floor. */
+  airborne?: boolean;
 }
 
 export interface AnimChoice { state: BasketballAnimState; clip: string; loop: boolean; fadeSec: number }
@@ -230,6 +234,32 @@ function withoutTrigger(i: AnimTreeInput, state: BasketballAnimState): AnimTreeI
     default: return i;
   }
 }
+/**
+ * hoops-p05 (owner 2026-11-10, "the hero's slide: fix it — stepping legs under the reach and block beats"): THE LEGS KEEP STEPPING UNDER
+ * A DEFENSIVE BEAT. The steal reach, the block reach and the held hand-up are whole-body clips whose feet stand still; the mode plays
+ * them over a body that is still sliding or running (the rig, 1v1 seed 7: the root 6–10 cm a frame under them, both feet carried along,
+ * no foot planted). While one of them plays on a body that is MOVING ON THE FLOOR, its legs are the defensive loop the tree would be
+ * in (the slide, the backpedal, the crossover run, the run), stride-matched, through the same legs layer the handle moves use
+ * (anim/moveLegs: by speed, none under LEGS_ON_MPS, all from LEGS_FULL_MPS — the layer's own numbers, unchanged). Unlike a handle move
+ * the loop is not locked for the beat: a hand-up held through a change of direction follows it, crossfading over the defence loops'
+ * own fade (hoopsTransitions), after the tree's own dwell. Off the floor (AnimTreeInput.airborne) the clip's legs are the jump's.
+ * Knob `hoops.defenseLegsOn` (1); 0 = the beat's own standing legs, as before.
+ */
+export const DEFENSE_LEGS_ON = 1;
+export const DEFENSE_LEGS_BEAT = /^bball_(steal_reach|block_reach|hand_up)$/;
+export function defenseLegsOn(): boolean { return feel('hoops.defenseLegsOn', DEFENSE_LEGS_ON) >= 0.5; }
+
+/**
+ * hoops-p05: THE BACKPEDAL STEPS BACKWARD. The captured backpedal (bball_mc_defend_backpedal, CMU 78_24 "DefensiveStraightNoStop") is a
+ * low defensive run going FORWARD: on the hero rig its low foot sweeps back under the body (0 → −0.29 m in z over its stance) and comes
+ * forward in the air, chest and pelvis square to the front (scripts/probes/hoops-gap/slide-bench.mts `--clips --dump defend_backpedal`).
+ * Played while the body retreats it is a moonwalk: the stance foot slides at the body's speed PLUS the stride's (bench: p90 9–15 cm a
+ * frame at 3.5–5.5 m/s; it is the retreat a defender spends a drive in). Played in REVERSE the same foot plants and the body backs off
+ * over it. The stride reference is the capture's own (3.31 m/s), unchanged. Knob `hoops.backpedalReverseOn` (1); 0 = forward, as before.
+ * Only on a rig that carries the capture (the authored fallback is not touched).
+ */
+export const BACKPEDAL_REVERSE_ON = 1;
+
 /** States that may cut a beat in flight. */
 const PRIORITY = new Set<BasketballAnimState>(['floor', 'contact_stagger', 'dunk']);
 
@@ -280,19 +310,63 @@ export class BasketballAnimTree {
   /** H2 (moveLegs): the body's legs layer, and whether the beat in flight runs it (a handle move's beat, MOVE_LEGS_BEAT). */
   private legs: MoveLegs | null = null;
   private legsBeat = false;
+  /** hoops-p05: the beat in flight is a DEFENSIVE one (DEFENSE_LEGS_BEAT): its loop is free to change, and holds count. */
+  private legsFree = false;
+  /** hoops-p05: the loop the legs are in under a defensive beat, and since when (the same dwell a loop change gets in update()). */
+  private legsLoop: { state: BasketballAnimState; clip: string; since: number } | null = null;
   attachLegs(legs: MoveLegs): void { this.legs = legs; }
+  /** hoops-p05: the body's pelvis steer (anim/hipSteer), driven with the loop the legs are in and the travel the mode reports. */
+  private steer: HipSteer | null = null;
+  attachSteer(steer: HipSteer): void { this.steer = steer; }
+  /** hoops-p05: +1, or −1 for a loop this rig plays in reverse (BACKPEDAL_REVERSE_ON). */
+  private strideSign(state: BasketballAnimState | null): 1 | -1 {
+    return state === 'defend_backpedal' && feel('hoops.backpedalReverseOn', BACKPEDAL_REVERSE_ON) >= 0.5
+      && !!(this.animator as { clipNames?: Set<string> }).clipNames?.has('bball_mc_defend_backpedal') ? -1 : 1;
+  }
+  private stepSteer(input: AnimTreeInput): void {
+    const s = this.steer; if (!s) return;
+    // the loop the legs are in: the tree's own; under a defensive beat, the legs layer's; under any other beat or off the floor, none
+    const st = !input.defending || input.airborne ? null : this.override ? (this.legsFree && this.legsLoop && this.legs?.live ? this.legsLoop.state : null) : this.current;
+    // a beat with its own legs on defence (not a defensive beat stepping a loop): the turn holds, never unwinds under it (hipSteer.hold)
+    const hold = input.defending && !input.airborne && !!this.override && !(this.legsFree && this.legs?.live);
+    s.drive({ state: st, hold, ...(st === 'defend_backpedal' && this.strideSign(st) < 0 ? { loopDeg: BACKPEDAL_REVERSED_TRAVEL_DEG } : {}), travelOffRad: input.travelOffRad, speedMps: input.speedMps ?? 0, dtSec: input.dtSec ?? 1 / 60 });
+  }
   /** H2: drive the legs layer for this frame — under a move beat, the loop the body would be in and its stride rate; after it, fading. */
   private stepLegs(input: AnimTreeInput): void {
     const l = this.legs; if (!l) return;
     const dtSec = input.dtSec ?? 1 / 60, speedMps = input.speedMps ?? 0;
-    if (this.legsBeat && this.override?.kind === 'beat') {
+    if (this.legsBeat && this.legsFree && this.override) {
+      // hoops-p05: a defensive beat or hold — the loop the body would be in NOW (it may change under the beat, after the dwell)
+      let c = this.owned(chooseBasketballClip({ ...input, crossover: false, moveActive: true }));
+      const now = typeof performance !== 'undefined' ? performance.now() / 1000 : 0;
+      const was = this.legsLoop;
+      const tr = transitionFor(was?.state ?? null, c.state, c.loop, c.fadeSec);
+      if (was && c.state !== was.state && c.loop) {
+        const holdSec = transitionRuleOn() ? tr.holdSec : this.sameGroup(was.state, c.state) ? BasketballAnimTree.DWELL_SEC : 0;
+        if (now - was.since < holdSec) c = { ...c, state: was.state, clip: was.clip };   // the dwell: the loop it is in stays
+      }
+      const rate = c.loop ? rateFor(c.state, speedMps, this.ref) : null;
+      const on = c.loop && rate !== null && !input.airborne;
+      if (on && (!was || was.state !== c.state || was.clip !== c.clip)) this.legsLoop = { state: c.state, clip: c.clip, since: now };
+      l.drive({ loopClip: on ? c.clip : null, rate: rate ?? 1, speedMps, dtSec, free: true, fadeSec: tr.fadeSec, ...(this.strideSign(c.state) < 0 ? { reverse: true } : {}) });
+    } else if (this.legsBeat && !this.legsFree && this.override?.kind === 'beat') {
       const c = this.owned(chooseBasketballClip({ ...input, crossover: false, moveActive: true }));
       const rate = c.loop ? rateFor(c.state, speedMps, this.ref) : null;
       l.drive({ loopClip: c.loop && rate !== null ? c.clip : null, rate: rate ?? 1, speedMps, dtSec });
     } else if (l.live) {
+      this.legsLoop = null;   // (hoops-p05) no defensive beat in flight: the next one seeds afresh
       const st = this.current ?? 'speed_dribble';
       l.end({ rate: rateFor(st, speedMps, this.ref) ?? 1, speedMps, dtSec });
-    }
+    } else this.legsLoop = null;
+  }
+  /** hoops-p05: a defensive beat starts. Out of a loop, the legs layer is seeded from that loop (its stride phase; the dwell counts from
+   *  the tree's own last change). Out of another defensive beat (a reach thrown under a held hand-up) the legs are already stepping:
+   *  they carry on in the loop they are in. */
+  private beginDefenseLegs(): void {
+    const l = this.legs; if (!l) return;
+    if (l.live && this.legsLoop) return;
+    l.begin(this.strideClip, true);
+    this.legsLoop = this.current && this.strideClip ? { state: this.current, clip: this.strideClip, since: this.stateSince } : null;
   }
   /** The stride references for THIS rig: a body running the CMU loops paces against their stride, not the authored one. */
   private get ref() { return strideRef(!!(this.animator as { clipNames?: Set<string> }).clipNames?.has('bball_mc_run')); }
@@ -323,6 +397,7 @@ export class BasketballAnimTree {
   update(input: AnimTreeInput): BasketballAnimState {
     this.last = input;
     this.stepLegs(input);
+    this.stepSteer(input);
     const raw = this.owned(chooseBasketballClip(input));
     if (this.settledState && raw.state !== this.settledState) this.settledState = null;
     const c = this.settledState ? this.owned(chooseBasketballClip(withoutTrigger(input, this.settledState))) : raw;
@@ -358,7 +433,12 @@ export class BasketballAnimTree {
         if (r0 !== null && !carryOn) this.strideFilter.set(r0);
         // H2 (moveLegs): out of a handle move, the loop picks up at the stride phase the legs layer carried through it
         const phase01 = this.legs?.live ? this.legs.phaseFor(c.clip) : undefined;   // (the other hand's twin: half a stride on)
-        if (!carryOn) this.animator.play(c.clip, { loop: true, fadeSec: tr.fadeSec, speedRatio: r0 ?? 1, ...(phase01 !== undefined ? { phase01 } : {}) });   // hoops-p04: the rule's fade
+        if (!carryOn) {
+          const sign = this.strideSign(c.state);
+          const g = this.animator.play(c.clip, { loop: true, fadeSec: tr.fadeSec, speedRatio: (r0 ?? 1) * sign, ...(phase01 !== undefined ? { phase01 } : {}) });   // hoops-p04: the rule's fade   // hoops-p05: a reversed loop starts from its end
+          // hoops-p05: …and a reversed loop picks up at the legs layer's phase too (the animator applies phase01 to a forward loop only)
+          if (g && sign < 0 && phase01 !== undefined && phase01 > 0 && g.to > g.from) g.goToFrame(g.from + Math.min(0.999, phase01) * (g.to - g.from));
+        }
         this.loopPlaying = c.clip;
       } else { this.strideClip = null; const isMove = c.state === 'crossover' || c.state === 'crossover_right'; this.playBeat(c.clip, { fadeSec: isMove && (input.moveRate ?? 1) > 1 ? moveFadeSec(true) : c.fadeSec, speedRatio: isMove ? input.moveRate ?? 1 : 1 }, c.state); }   // MOVE PACE   // (playBeat floors the fade: the rule)
     }
@@ -367,7 +447,7 @@ export class BasketballAnimTree {
     // frame. Only locomotion states have a rate; a shot or a knockdown returns null and is left alone.
     if (this.strideClip && !this.override) {
       const want = (input.speedMps !== undefined ? rateFor(c.state, input.speedMps, this.ref) : null) ?? restTempoFor(c.state);   // (#312 port: the tempo at rest)
-      if (want !== null) this.animator.setPlaybackScale(this.strideClip, this.strideFilter.step(want, input.dtSec ?? 1 / 60));   // IMPROVE (2026-10-06) #9: the real frame's dt when the mode passes it
+      if (want !== null) this.animator.setPlaybackScale(this.strideClip, this.strideSign(c.state) * this.strideFilter.step(want, input.dtSec ?? 1 / 60));   // IMPROVE (2026-10-06) #9: the real frame's dt when the mode passes it   // hoops-p05: a reversed loop keeps its sign
     }
     return c.state;
   }
@@ -378,6 +458,10 @@ export class BasketballAnimTree {
   /** A mode-owned loop the tree never interrupts — until release(). */
   hold(clip: string, opts: TreeHoldOpts = {}): void {
     this.token++; this.loopPlaying = null;
+    // hoops-p05: a defensive hold (the hand-up) on a moving body keeps the loop's legs under it (DEFENSE_LEGS_BEAT); any other hold none
+    this.legsFree = !!this.legs && defenseLegsOn() && DEFENSE_LEGS_BEAT.test(clip);
+    this.legsBeat = this.legsFree;
+    if (this.legsFree) this.beginDefenseLegs();
     this.override = { kind: 'hold', clip, state: null };
     this.current = null;
     this.animator.play(clip, { loop: true, fadeSec: transitionFor(null, null, false, opts.fadeSec ?? 0.12).fadeSec, speedRatio: opts.speedRatio ?? 1, ...(opts.from01 ? { from01: opts.from01 } : {}) });   // hoops-p04: the rule's floor; a hold may start at its rise
@@ -405,8 +489,10 @@ export class BasketballAnimTree {
   private playBeat(clip: string, opts: TreeBeatOpts, state: BasketballAnimState | null): void {
     const tok = ++this.token; this.loopPlaying = null;
     // H2 (moveLegs): a handle move's beat on a moving body runs the legs layer, seeded from the loop it cuts (its stride phase)
-    this.legsBeat = !!this.legs && MOVE_LEGS_BEAT.test(clip);
-    if (this.legsBeat) this.legs!.begin(this.strideClip);
+    this.legsFree = !!this.legs && defenseLegsOn() && DEFENSE_LEGS_BEAT.test(clip);   // hoops-p05: the defensive beats
+    this.legsBeat = !!this.legs && (MOVE_LEGS_BEAT.test(clip) || this.legsFree);
+    if (this.legsFree) this.beginDefenseLegs();
+    else if (this.legsBeat) this.legs!.begin(this.strideClip);
     this.override = { kind: 'beat', clip, state, ...(opts.holdState ? { holdState: true } : {}) };
     this.animator.play(clip, {
       loop: false, fadeSec: transitionFor(this.current, state, false, opts.fadeSec ?? 0.1).fadeSec, speedRatio: opts.speedRatio ?? 1, restart: true,   // POLISH: 0.08 → 0.10 — the reach and hand-up beats out of a stance popped a wrist 1 m in a frame   // hoops-p04: the rule's floor (a press is not delayed: the clip starts now)

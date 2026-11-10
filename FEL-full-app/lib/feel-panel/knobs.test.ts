@@ -56,10 +56,12 @@ import * as P3R from '@/lib/babylon/hoops/rivalOffense';   // hoops-p03
 import * as P3T from '@/lib/babylon/hoops/teamOffense3v3';   // hoops-p03
 import * as P4T from '@/lib/babylon/anim/hoopsTransitions';   // hoops-p04
 import * as P4R from '@/lib/babylon/hoops/releaseTiming';   // hoops-p04
-import { PLANT_RELEASE_FADE_SEC } from '@/lib/babylon/anim/basketballTree';   // hoops-p04
+import { PLANT_RELEASE_FADE_SEC, DEFENSE_LEGS_ON, BACKPEDAL_REVERSE_ON } from '@/lib/babylon/anim/basketballTree';   // hoops-p04, hoops-p05
+import * as P5S from '@/lib/babylon/anim/hipSteer';   // hoops-p05
+import { PASS_FROM_HAND_ON } from '@/lib/babylon/hoops/ballHandoff';   // hoops-p05, phase 5
 import * as P4B from '@/lib/babylon/anim/locoAccent';   // hoops-p04b
 import { CONTACT_ARM_SWAP_SEC } from '@/lib/babylon/hoops/contactPoses';   // hoops-p04b
-import { CARRY_ARM_SPEED_SEC } from '@/lib/babylon/anim/ballCarry';   // hoops-p04b
+import { CARRY_ARM_SPEED_SEC, CARRY_LET_GO_TO_CLIP_ON } from '@/lib/babylon/anim/ballCarry';   // hoops-p04b, hoops-p05
 import { STEAL_DICE_ON, STRIP_REACH_M, STRIP_SHIELD_M, STRIP_BALL_MAX_Y } from '@/lib/babylon/hoops/steals';   // hoops-p02
 import { ONBALL_CUSHION_M, ONBALL_CUSHION_PER_MPS } from '@/lib/babylon/hoops/pressure';   // hoops-p02
 
@@ -247,6 +249,15 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.accentOffBeatsOn')).toBe(P4B.ACCENT_OFF_BEATS_ON ? 1 : 0);
     expect(def('hoops.contactArmSwapSec')).toBe(CONTACT_ARM_SWAP_SEC);
     expect(def('hoops.carryArmSpeedSec')).toBe(CARRY_ARM_SPEED_SEC);
+    expect(def('hoops.carryLetGoToClipOn')).toBe(CARRY_LET_GO_TO_CLIP_ON);   // hoops-p05
+    expect(def('hoops.defenseLegsOn')).toBe(DEFENSE_LEGS_ON);   // hoops-p05: stepping legs under the defensive beats
+    expect(def('hoops.backpedalReverseOn')).toBe(BACKPEDAL_REVERSE_ON);
+    expect(def('hoops.hipSteerOn')).toBe(P5S.HIP_STEER_ON);
+    expect(def('hoops.hipSteerMaxDeg')).toBe(P5S.HIP_STEER_MAX_DEG);
+    expect(def('hoops.hipSteerSec')).toBe(P5S.HIP_STEER_SEC);
+    expect(def('hoops.hipSteerFromMps')).toBe(P5S.HIP_STEER_FROM_MPS);
+    expect(def('hoops.hipSteerFullMps')).toBe(P5S.HIP_STEER_FULL_MPS);
+    expect(def('hoops.passFromHandOn')).toBe(PASS_FROM_HAND_ON);   // hoops-p05, phase 5
     expect(def('hoops.rivalKitOn')).toBe(P3R.RIVAL_KIT_ON ? 1 : 0);
     expect(def('hoops.rivalTightM')).toBe(P3R.RIVAL_TIGHT_M);
     expect(def('hoops.rivalHesiSec')).toBe(P3R.RIVAL_HESI_SEC);

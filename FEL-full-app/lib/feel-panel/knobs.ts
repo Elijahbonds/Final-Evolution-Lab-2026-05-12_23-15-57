@@ -1318,6 +1318,54 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/anim/ballCarry.ts CARRY_ARM_SPEED_SEC',
     hint: 'The dribble arm reach and the off arm swing follow the body speed eased over this, so a gear change does not move an arm in one frame. 0 = the frame speed, as before.',
   },
+  // hoops-p05: the carry's let-go ends on the clip (the hero's last severe pop in the step-back gather)
+  {
+    id: 'hoops.carryLetGoToClipOn', label: 'Ball carry: the let-go ends on the clip (0 = off)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · transitions',
+    source: 'lib/babylon/anim/ballCarry.ts CARRY_LET_GO_TO_CLIP_ON',
+    hint: 'When a shot or a pass takes the ball out of the dribble, the ball arm eases all the way back to the clip pose over the same fade. 0 = it eased part of the way and cut the rest in one frame.',
+  },
+  // hoops-p05 (owner 2026-11-10: the hero's slide — fix it): stepping legs under the defensive beats
+  {
+    id: 'hoops.defenseLegsOn', label: 'Defense: legs keep stepping under a reach, a block or a hand up (0 = off)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · transitions',
+    source: 'lib/babylon/anim/basketballTree.ts DEFENSE_LEGS_ON',
+    hint: 'While you reach, jump to block or hold a hand up on the move, your legs keep the slide or run they were in. 0 = the reach clip standing legs slid along the floor, as before.',
+  },
+  {
+    id: 'hoops.backpedalReverseOn', label: 'Defense: the backpedal steps backward (0 = off)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · transitions',
+    source: 'lib/babylon/anim/basketballTree.ts BACKPEDAL_REVERSE_ON',
+    hint: 'The retreat capture is a forward run. 1 plays it in reverse, so the feet plant while you back off. 0 = it ran forward on the spot while the body went backward, as before.',
+  },
+  {
+    id: 'hoops.hipSteerOn', label: 'Defense: hips turn toward the travel (0 = off)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · transitions',
+    source: 'lib/babylon/anim/hipSteer.ts HIP_STEER_ON',
+    hint: 'On defense the pelvis and legs turn toward where you are going while the chest stays on your man, so a diagonal slide or retreat steps along its travel. 0 = square hips, as before.',
+  },
+  {
+    id: 'hoops.hipSteerMaxDeg', label: 'Defense: most the hips turn off the chest', def: 50, min: 0, max: 80, step: 5, unit: '°', group: 'Hoops · transitions',
+    source: 'lib/babylon/anim/hipSteer.ts HIP_STEER_MAX_DEG',
+    hint: 'The cap on the pelvis turn. Higher follows a diagonal further and twists the waist more.',
+  },
+  {
+    id: 'hoops.hipSteerSec', label: 'Defense: hip turn ease', def: 0.14, min: 0, max: 0.5, step: 0.01, unit: 's', group: 'Hoops · transitions',
+    source: 'lib/babylon/anim/hipSteer.ts HIP_STEER_SEC',
+    hint: 'How fast the pelvis follows a change of direction. 0 = at once.',
+  },
+  {
+    id: 'hoops.hipSteerFromMps', label: 'Defense: hip turn starts at', def: 0.8, min: 0, max: 3, step: 0.1, unit: 'm/s', group: 'Hoops · transitions',
+    source: 'lib/babylon/anim/hipSteer.ts HIP_STEER_FROM_MPS',
+    hint: 'No pelvis turn under this ground speed.',
+  },
+  {
+    id: 'hoops.hipSteerFullMps', label: 'Defense: hip turn is full at', def: 1.8, min: 0.5, max: 5, step: 0.1, unit: 'm/s', group: 'Hoops · transitions',
+    source: 'lib/babylon/anim/hipSteer.ts HIP_STEER_FULL_MPS',
+    hint: 'All of the pelvis turn from this ground speed.',
+  },
+  // hoops-p05 (phase 5, the ball lives in the hand)
+  {
+    id: 'hoops.passFromHandOn', label: '3v3: a teammate pass leaves from the ball (0 = off)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · transitions',
+    source: 'lib/babylon/hoops/ballHandoff.ts PASS_FROM_HAND_ON',
+    hint: 'A teammate pass starts its flight where the ball is in his hands. 0 = it started at his chest height over his feet, wherever the ball was: a jump out of the hand on the release.',
+  },
   // AF-1 (ANIM-FEEL-SPEC 2026-10-28): inertialized clip transitions, default OFF — off is the linear crossfade, unchanged.
   {
     id: 'anim.inertial', label: 'Inertial clip transitions on (1) / off (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
