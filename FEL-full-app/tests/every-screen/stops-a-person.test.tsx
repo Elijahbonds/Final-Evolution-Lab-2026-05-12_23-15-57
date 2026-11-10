@@ -11,6 +11,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { OpensSoon } from '@/components/shop/opens-soon';
 import { DarkInstead } from '@/components/every-screen/dark-instead';
+import { HighlightNotice, highlightLoadMessage } from '@/components/coach-business/highlight-consent';
 import { MyCombines, MINE_COMING_SOON } from '@/components/combine/my-combines';
 import { ProgramList } from '@/components/signature/program-list';
 import { OneOnOneBooker } from '@/components/group-booking/one-on-one-booker';
@@ -103,6 +104,13 @@ describe('2. a switched-off screen says why and what to do instead', () => {
     const dark = src.split('\n').find((l) => /data-groups-coming-soon/.test(l)) ?? '';
     expect(dark).toContain('<DarkInstead');
     expect(dark).toContain("href: '/train/today-drill'");
+  });
+  it('a coach\'s "share a result?" link while sharing is off: says it is off (not "not for this account") and offers a way on', () => {
+    expect(highlightLoadMessage(503)).toMatch(/isn't switched on yet/);
+    expect(highlightLoadMessage(404)).toBe('This link is not for this account.');
+    const html = renderToStaticMarkup(h(HighlightNotice, { msg: highlightLoadMessage(503) }));
+    expect(html).toContain('data-dark-instead');
+    expect(html).toContain('href="/coach"');
   });
   it('DarkInstead draws tap targets of 44 px, and nothing when it has no link', () => {
     const html = renderToStaticMarkup(h(DarkInstead, { links: [{ href: '/coach', label: 'Back to Coach' }] }));

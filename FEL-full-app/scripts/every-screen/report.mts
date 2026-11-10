@@ -168,6 +168,14 @@ export async function report(): Promise<void> {
   P();
   // the reading of the lists below (which shared component or token each fault comes from) is written by a person
   if (existsSync(join(ROOT, 'docs/every-screen/SHARED-FAULTS.md'))) { P(readFileSync(join(ROOT, 'docs/every-screen/SHARED-FAULTS.md'), 'utf8').trim()); P(); }
+  {
+    // the owner call in SHARED-FAULTS.md: what changes if the type scale's own five steps are the budget
+    const five = scored.filter((r) => r.facts!.textSizes.length === 5);
+    const passIfFive = scored.filter((r) => !r.verdict!.passAll && CHECKS.every((c) => r.verdict!.checks[c] !== 'n/m')
+      && r.verdict!.faults.every((f) => f.id === 'text-sizes' && r.facts!.textSizes.length === 5)).length;
+    P(`Measured for that call: ${five.length} scored screens use exactly 5 text sizes; with 5 allowed, ${passIfFive} more screen${passIfFive === 1 ? '' : 's'} would pass all four today (the other faults on them stay).`);
+    P();
+  }
   P('<details><summary>The elements behind them (the rig\'s own list)</summary>');
   P();
   const dump = (title: string, m: Map<string, number>, k = 12) => { if (!m.size) return; P(`**${title}**`); P(); for (const [key, c] of top(m, k)) P(`- ${c} × \`${key.replace(/`/g, "'")}\``); P(); };

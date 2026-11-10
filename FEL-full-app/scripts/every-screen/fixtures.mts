@@ -57,7 +57,8 @@ const MAKERS: Record<string, Maker> = {
   '/press/[slug]': async (p) => { const u = await firstLink(p, 'anon', '/press', /^\/press\/(?!library|receipt)[^/]+$/); return u ? { url: u } : { why: 'the press page links to no book' }; },
   '/team/[slug]': async (p) => { const u = await firstLink(p, 'anon', '/team', /^\/team\/[^/]+$/); return u ? { url: u } : { why: 'the team page links to no profile (no approved profile in the catalog)' }; },
   '/create/[discipline]': async (p) => { const u = await firstLink(p, 'solo', '/create', /^\/create\/[^/]+$/); return u ? { url: u } : { url: '/create/music' }; },
-  '/train/programs/[id]': async (p) => { const u = await firstLink(p, 'solo', '/train/programs', /^\/train\/programs\/[^/]+$/); return u ? { url: u } : { why: 'the programs page links to no program' }; },
+  // the programs list links none while its tables are off: the first signature program's own address (lib/signature)
+  '/train/programs/[id]': async (p) => { const u = await firstLink(p, 'solo', '/train/programs', /^\/train\/programs\/[^/]+$/); return { url: u ?? '/train/programs/vertical-jump', note: u ? undefined : 'the list links no program while it is switched off: opened by its address' }; },
   // a coach's invite, made through the coach's own API; the client's join link
   '/coach/join/[token]': async (p) => {
     const r = await post(p, 'coach', '/api/coach/invite', { use: 'many' });
@@ -74,7 +75,7 @@ const MAKERS: Record<string, Maker> = {
   '/groups/trainer/[code]': async () => ({ url: '/groups/trainer/NONE', as: 'coach', note: 'the group-booking table is not applied: any trainer invite shows the dark screen' }),
   '/squads/[id]': async () => ({ url: '/squads/none', note: 'the teams-and-squads tables are not applied' }),
   '/squads/join/[token]': async () => ({ url: '/squads/join/none', note: 'the teams-and-squads tables are not applied' }),
-  '/c/[code]': async () => ({ url: '/c/NONE00', note: 'no challenge row on the rig: the screen for a challenge link that no longer resolves' }),
+  '/c/[code]': async () => ({ url: '/c/NONE00', note: 'no challenge row on the rig: the screen for a challenge link that no longer resolves', offWhy: "not switched off: a challenge code that does not exist is the app's 404 (a real challenge needs a row a player makes by sending one)" }),
   '/c/[code]/play': async () => ({ url: '/c/NONE00/play' }),
   '/card/[slug]': async (p) => { const slug = sql(`select slug from "CreatorCard" where "ownerId" = '${p.ids.solo}' and published limit 1`); return slug ? { url: `/card/${slug}` } : { why: 'needs a published creator card row; a new account has none' }; },
   '/u/[slug]': async (p) => { const slug = sql(`select slug from "CreatorCard" where "ownerId" = '${p.ids.solo}' and published limit 1`); return slug ? { url: `/u/${slug}` } : { why: 'needs a published creator card row; a new account has none' }; },
@@ -102,6 +103,7 @@ export async function fixtureFor(s: Screen, p: People): Promise<Fixture> {
   else fx = { url: s.route };
   const sw = switchesOf(s);
   if (sw.length) fx.offWhy = `switched off: ${sw.join('; or ')}`;
+  else if (s.route === '/play/shared') fx.offWhy = 'a 404 by design: only its share links are pages (lib/nav/reachability.test.ts)';
   cache.set(s.route, fx);
   return fx;
 }

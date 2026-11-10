@@ -2,6 +2,25 @@
 // COACH-BUSINESS: a client approves (or withdraws) a result their coach would like to show. Nothing about them is shown
 // with it — not their name — and an under-18 account cannot approve one.
 import { useEffect, useState } from 'react';
+import { DarkInstead } from '@/components/every-screen/dark-instead';
+
+/** EVERY-SCREEN P1 (2026-11-10): what the screen says when the result does not load. A 503 is the feature switched off
+ *  (its pending tables), not a link meant for someone else: it said "This link is not for this account." either way. */
+export function highlightLoadMessage(status: number): string {
+  if (status === 503) return "Sharing results with your coach's page isn't switched on yet. Nothing about you is shared.";
+  if (status === 401) return 'Sign in to see this.';
+  return 'This link is not for this account.';
+}
+
+/** The notice, and a way on (the screen had none: only the tab bar led anywhere). */
+export function HighlightNotice({ msg }: { msg: string }) {
+  return (
+    <div data-highlight-notice>
+      <p role="alert" className="mt-4 text-sm text-amber-200">{msg}</p>
+      <DarkInstead links={[{ href: '/coach', label: 'Your coaching' }, { href: '/train', label: 'Train' }]} />
+    </div>
+  );
+}
 
 type H = { id: string; text: string; state: 'waiting' | 'approved' | 'withdrawn' };
 
@@ -9,7 +28,7 @@ export function HighlightConsent({ id, api = '/api/coach/business/highlights' }:
   const [h, setH] = useState<H | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   useEffect(() => {
-    fetch(`${api}/${encodeURIComponent(id)}`, { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((j) => (j ? setH(j) : setMsg('This link is not for this account.'))).catch(() => setMsg('This did not load.'));
+    fetch(`${api}/${encodeURIComponent(id)}`, { cache: 'no-store' }).then(async (r) => (r.ok ? setH(await r.json()) : setMsg(highlightLoadMessage(r.status)))).catch(() => setMsg('This did not load.'));
   }, [api, id]);
   const act = async (action: 'approve' | 'withdraw') => {
     const r = await fetch(`${api}/${encodeURIComponent(id)}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action }) });
@@ -31,7 +50,7 @@ export function HighlightConsent({ id, api = '/api/coach/business/highlights' }:
           </div>
         </>
       ) : null}
-      {msg ? <p role="alert" className="mt-4 text-sm text-amber-200">{msg}</p> : null}
+      {msg ? (h ? <p role="alert" className="mt-4 text-sm text-amber-200">{msg}</p> : <HighlightNotice msg={msg} />) : null}
     </main>
   );
 }
