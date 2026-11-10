@@ -27,6 +27,7 @@ import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import { countPops } from './popCount.mjs';
 const require = createRequire(new URL('../../../package.json', import.meta.url).pathname);
 const { chromium } = require('playwright-core');
 
@@ -322,29 +323,17 @@ const RIDE = new Set(['skateboard', 'snowboard_slalom', 'surf', 'velocitykart', 
 function analyze(mode, rec, S) {
   const F = rec.frames; const play = F.filter((f) => f.ph === 'playing');
   const dt = 1 / 60; const out = { frames: F.length, playFrames: play.length };
-  // pops
-  const pops = []; const nB = QN.length;
-  const speeds = F.map((f, i) => (i && f.q && F[i - 1].q ? f.q.map((q, b) => { const a = qang(q, F[i - 1].q[b]); return a === null ? null : a / dt; }) : null));
-  for (let b = 0; b < nB; b++) {
-    for (let i = 6; i < F.length - 6; i++) {
-      const w = speeds[i]?.[b]; if (w === null || w === undefined || w < 600) continue;
-      if (F[i].ph !== 'playing' || F[i - 1].ph !== 'playing') continue;
-      const nb = []; for (let k = i - 6; k <= i + 6; k++) if (k !== i && speeds[k]?.[b] != null) nb.push(speeds[k][b]);
-      const m = med(nb) ?? 0; if (w >= 3.5 * Math.max(m, 60)) pops.push({ t: F[i].t, i, bone: QN[b], degS: Math.round(w), clip: rec.clips[F[i].c] ?? '', from: rec.clips[F[Math.max(0, i - 3)].c] ?? '' });
-    }
-  }
-  // one EVENT is every bone that pops within 10 frames of another (a snap into a pose moves many bones at once); the
-  // control (karate, raw): RightUpLeg 70° then 63° in two frames, then held — the same pair at 3.35, 4.27, 5.40, 9.67 s
-  const byFrame = [...pops].sort((a, b) => a.i - b.i); const events = [];
-  for (const p0 of byFrame) { const last = events[events.length - 1]; if (last && p0.i - last.end <= 10) { last.end = p0.i; last.bones.add(p0.bone); last.peak = Math.max(last.peak, p0.degS); } else events.push({ t: p0.t, end: p0.i, bones: new Set([p0.bone]), peak: p0.degS, from: p0.from, to: p0.clip }); }
-  // HARD pops: a peak of 1500°/s or more (25° in one frame) — fast dance and swing motion lives around 900–1300 °/s at its
-  // peak (carnival, dance), a snap into a pose at 3700–10000 (baseball's swing contact, karate's strikes)
-  const hard = events.filter((e) => e.peak >= 1500);
-  out.hardPopEvents = hard.length; out.hardPopsPerMin = r2(hard.length / Math.max(1e-6, play.length / 3600));
-  out.popEvents = events.length; out.popEventsPerMin = r2(events.length / Math.max(1e-6, play.length / 3600));
+  // pops (popCount.mjs: the shared counter; RESET frames — the root over 1 m in a frame, and the frame after — are cuts, skipped
+  // since clean-5; `hardPopEventsWithResets` keeps the old count beside it so tables from before clean-5 stay comparable)
+  const pc = countPops(F, rec.clips ?? [], QN);
+  const { pops, events, hard } = pc;
+  out.resetFrames = pc.resetFrames;
+  out.hardPopEventsWithResets = countPops(F, rec.clips ?? [], QN, { skipResets: false }).hard.length;
+  out.hardPopEvents = hard.length; out.hardPopsPerMin = pc.perMin(hard.length);
+  out.popEvents = events.length; out.popEventsPerMin = pc.perMin(events.length);
   out.popEventEx = [...events].sort((a, b) => b.peak - a.peak).slice(0, 4).map((e) => `${e.t}s ${e.peak}°/s ${[...e.bones].slice(0, 4).join('+')} [${e.from} → ${e.to}]`);
   // which clip changes the hard pops sit on: the transitions to soften first
-  { const tr = {}; for (const e of events) if (e.peak >= 1500) { const k = `${e.from} → ${e.to}`; tr[k] = (tr[k] || 0) + 1; } out.hardPopTransitions = Object.entries(tr).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, n]) => `${n}× ${k}`); }
+  { const tr = {}; for (const e of hard) { const k = `${e.from} → ${e.to}`; tr[k] = (tr[k] || 0) + 1; } out.hardPopTransitions = Object.entries(tr).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, n]) => `${n}× ${k}`); }
   out.pops = pops.length; out.popsPerMin = r2(pops.length / Math.max(1e-6, play.length / 3600)); out.popEx = pops.sort((a, b) => b.degS - a.degS).slice(0, 5);
   // root jumps (teleports) during play
   const jumps = []; for (let i = 1; i < F.length; i++) { if (F[i].ph !== 'playing' || F[i - 1].ph !== 'playing') continue; const d = dist(F[i].r, F[i - 1].r); if (d !== null && d > 0.35) jumps.push({ t: F[i].t, m: r2(d) }); }
