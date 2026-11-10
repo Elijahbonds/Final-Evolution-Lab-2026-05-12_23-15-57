@@ -160,6 +160,19 @@ export function isFeelPanelUser(userId: string | null | undefined, env: NodeJS.P
   return !!userId && feelPanelUserIds(env).has(userId);
 }
 
+/** BINJGB-SHELF-1. Default OFF. /play/gb-shelf* 404 while unset. */
+export function isBinjgbShelfEnabled(): boolean {
+  return envOn('BINJGB_SHELF_ENABLED');
+}
+
+/**
+ * BINJGB-SHELF-1 load-your-own. Default OFF. OQ-1 ANSWERED — build switched off.
+ * Requires BINJGB_SHELF_ENABLED (OQ-6). Cyber reviews local-file path in PR; G-FILE before ON.
+ */
+export function isBinjgbLocalFileEnabled(): boolean {
+  return envOn('BINJGB_LOCAL_FILE_ENABLED');
+}
+
 /**
  * SELLER-18-1 (Cyber BOOK-SIGNOFF S-2; PM 2026-11-09) — the seller-side 18+ gate (lib/seller/canSell.ts). Default OFF:
  * every seller surface behaves as it does today and nothing is taken down; sellers with no birth year only see a prompt to

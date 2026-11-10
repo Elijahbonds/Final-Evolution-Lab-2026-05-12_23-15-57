@@ -16,6 +16,8 @@
 // an exact list: a new unlabeled entry fails the test, and so does a pending entry whose licence has been recorded.
 
 import { signedPdEntries, type PdEntry } from '../babylon/music/pdShelf';
+// G1(a) (Cyber A6): binjgb's upstream LICENSE, bundled as a string from the file itself (never retyped, never served).
+import BINJGB_LICENSE_TEXT from '../../third_party/binjgb/LICENSE?raw';
 
 /** CMU's required acknowledgement, word for word. The test fails if a character of it changes. */
 export const CMU_ACKNOWLEDGEMENT =
@@ -376,6 +378,24 @@ export const CREDITS: Credit[] = [
     link: 'https://github.com/BinomialLLC/basis_universal',
     recordedIn: ['public/loaders/basis/README.md'],
     covers: ['loaders/basis/'],
+    manifestLicences: [],
+  },
+  {
+    // BINJGB-SHELF-1 (spec §3.2, Cyber G3/G5): the Homebrew Shelf's player, vendored at a pinned commit. Text only: no
+    // outbound link (G5). Served only while BINJGB_SHELF_ENABLED is on, by app/vendor/binjgb/[file]/route.ts (middleware
+    // 404s /vendor/binjgb/* otherwise). G1(a) (Cyber A6): the records live in third_party/binjgb/, outside public/, and the
+    // MIT notice is shown on /credits verbatim from that LICENSE file.
+    id: 'binjgb',
+    section: 'software',
+    title: 'binjgb',
+    by: 'Ben Smith (binji)',
+    used: 'Homebrew player: binjgb by Ben Smith (binji), MIT License.',
+    licence: 'MIT',
+    licenceUrl: OPEN_LICENCES.MIT,
+    status: 'open',
+    notice: BINJGB_LICENSE_TEXT,
+    recordedIn: ['third_party/binjgb/LICENSE', 'third_party/binjgb/VENDOR.md'],
+    covers: ['vendor/binjgb/'],
     manifestLicences: [],
   },
   {

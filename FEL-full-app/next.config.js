@@ -34,7 +34,8 @@ const nextConfig = {
   // Acting mode, Music vocals, the Flip recorder and voice chat could never get a mic at all. Our own pages only;
   // geolocation stays off. lib/build-config.test.ts pins this header.
   async headers() {
-    return [{
+    return [
+    {
       source: '/(.*)',
       headers: [
         { key: 'X-Content-Type-Options', value: 'nosniff' },
@@ -43,7 +44,20 @@ const nextConfig = {
         { key: 'Content-Security-Policy', value: "frame-ancestors 'self'" },
         { key: 'Permissions-Policy', value: 'camera=(self), microphone=(self), geolocation=()' },
       ],
-    }];
+    },
+    // BINJGB-SHELF-1 (Cyber N-2 / F-A, reviews a412644b / b49060ae): rule 0 above stays exactly as it is
+    // (lib/build-config.test.ts pins it). These rules come AFTER it, so for the shelf Next sends these values for the same
+    // keys: no camera or mic for the game player, no referrer. middleware.ts SHELF_PERMISSIONS_POLICY is the same value.
+    // Proof is the PR-time `curl -sI /play/gb-shelf` on `next start` with the flag on: exactly one Permissions-Policy
+    // (camera=() and gamepad=(self)) and Referrer-Policy: no-referrer. BINJGB_SHELF_ENABLED stays off until that passes.
+    ...['/play/gb-shelf', '/play/gb-shelf/:path*'].map((source) => ({
+      source,
+      headers: [
+        { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), gamepad=(self), fullscreen=(self)' },
+        { key: 'Referrer-Policy', value: 'no-referrer' },
+      ],
+    })),
+    ];
   },
   // HOTFIX (2026-09-24): the Abacus platform's error reporter is gone. With NEXT_OUTPUT_MODE=standalone this hook
   // wrote a base64-encoded script into the tree and prepended it to the client entry, where it wrapped console.error
@@ -58,6 +72,12 @@ const nextConfig = {
         message: /Critical dependency: the request of a dependency is an expression/,
       },
     ];
+
+    // BINJGB-SHELF-1 G1(a) (Cyber A6): `import x from '…/third_party/binjgb/LICENSE?raw'` bundles that one file as a
+    // string (webpack 5's built-in asset/source; no loader dep). Scoped to the file and the query, so nothing else changes.
+    if (config.module && Array.isArray(config.module.rules)) {
+      config.module.rules.push({ test: /[\\/]third_party[\\/]binjgb[\\/]LICENSE$/, resourceQuery: /^\?raw$/, type: 'asset/source' });
+    }
 
     if (!isServer) {
       config.output.filename = 'static/chunks/[name]-[contenthash:8].js';
