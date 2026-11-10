@@ -30,6 +30,7 @@ import { BoostFx } from '../premium/BoostFx';
 import { Mesh, MeshBuilder, Vector3 } from '@babylonjs/core';
 import type { AnimationGroup, Scene } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
+import { setPlantingSeated } from '../anim/FootPlanting';
 import { DEFAULT_HERO_URL } from '../core/athleteRoster';
 import { buildPoseClip, REF_HIPS_Y } from '../anim/poseClip';
 import { seatedKeys } from '../anim/authored/seated';
@@ -575,6 +576,7 @@ export function makeAeroAcesMode(): ModeDefinition {
       resetPickups();
       if (!pilot) throw new Error('[FEL-AERO] the pilot did not spawn');
       pilot.animator.park();
+      setPlantingSeated(pilot.skeleton, true);   // GAMEPLAY-CLEAN P5: the feet ride the cockpit — no foot planting (knob anim.plantSeatedOff)
       pilot.root.parent = player.seat;
       pilot.root.scaling.setAll(PILOT_SCALE);
       pilot.root.position.set(0, -REF_HIPS_Y * PILOT_SCALE, 0);

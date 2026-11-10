@@ -453,6 +453,13 @@ yet.
   exactly. No blend time changed. This is the shared animator: every mode's moves blend out through it, the hoops modes included.
   Feel-check: Showdown, take a hit and watch the body come back to guard.
 
+- Same group (`anim/FootPlanting.ts` + one call in `modes/AeroAcesMode.ts`, lane/gameplay-clean-5), **NEW (on / off, no tuned
+  number)**: `anim.plantSeatedOff` 1. A body its mode seats in a vehicle holds no foot plant. Every spawned hero carries the foot
+  planter, and the Aero Aces pilot sits with his ankles at the root's height, so the planter pinned his feet to the ground while the
+  plane flew on and let them go a frame later: knees 51 to 63 degrees and thighs 22 to 40 in one frame, 2 to 3 hard pops a run (the
+  rig; none with the planter off). Aero now marks its pilot seated. 0 = the mark is ignored, exactly the old layer. Feel-check: Aero
+  Aces, watch the pilot's knees through a loop.
+
 **assumption:** the bounds (0 to 0.4 s) are safe, not tuned. A ranked, staked or head-to-head run reads the defaults.
 
 ## Owner calls, 2026-11-10 (delegated: "handle those 5 open calls"; lane/owner-calls-1110)

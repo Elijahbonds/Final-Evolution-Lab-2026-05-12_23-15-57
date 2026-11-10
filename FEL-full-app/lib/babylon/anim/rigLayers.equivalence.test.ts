@@ -12,7 +12,8 @@ import { describe, expect, it, vi } from 'vitest';
 // ones bit for bit there. The new behaviour has its own tests (FootPlanting.engage.test, PostureLayer.fold.test).
 // (P4 adds the third: the rotation release, `anim.plantReleaseSec`, 0 = the old target fade. P5 the fourth: a replant carrying a
 // release through, `anim.plantReplantEase`, 0 = a replant ends it at once — unreachable with the release at 0, held at 0 all the same.)
-vi.mock('../../feel-panel/feel', () => ({ feel: (id: string, def: number) => (id === 'anim.plantEngageSec' || id === 'anim.hipYawFold' || id === 'anim.plantReleaseSec' || id === 'anim.plantReplantEase' ? 0 : def) }));
+// (And `anim.plantSeatedOff`, held at 0: no body here is marked seated, so it is unreachable either way.)
+vi.mock('../../feel-panel/feel', () => ({ feel: (id: string, def: number) => (id === 'anim.plantEngageSec' || id === 'anim.hipYawFold' || id === 'anim.plantReleaseSec' || id === 'anim.plantReplantEase' || id === 'anim.plantSeatedOff' ? 0 : def) }));
 import { Quaternion, Vector3 } from '@babylonjs/core';
 import { firstDifference, runRigScenario, type RigImpl, type RigScenario, type RigTrace } from '@/tests/helpers/rigEquivalence';
 import * as LegacyPosture from '@/tests/helpers/rigLegacy/PostureLayer.legacy';

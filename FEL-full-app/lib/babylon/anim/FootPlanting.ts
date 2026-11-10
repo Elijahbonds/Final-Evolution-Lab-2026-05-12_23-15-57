@@ -157,6 +157,20 @@ export function stepEngage(w: number, solving: boolean, dt: number, sec: number)
   const k = Math.max(0, dt) / sec;
   return want > w ? Math.min(want, w + k) : Math.max(want, w - k);
 }
+/**
+ * GAMEPLAY-CLEAN P5 (2026-11-10): A SEATED BODY HOLDS NO PIN, feel knob `anim.plantSeatedOff` (1 on). Every spawned hero carries this
+ * layer (CharacterLibrary.spawn), and contact is read from the clip's ankle height over the root: a pilot sitting in a cockpit has
+ * his ankles at the root's height, so the layer read his feet as DOWN and pinned them to the world while the plane flew on at
+ * 14–30 m/s — let go at the drift limit a frame later, pinned again, every few frames. Aero Aces in play (the rig, 14 s): knees 51–63°
+ * and thighs 22–40° in one frame, 2–3 hard pops a run; with `?noplant=1` none, every bone under 1.3° a frame. A mode that seats its
+ * body says so (setPlantingSeated); the layer then treats the body as AIRBORNE (MOVEMENT POLISH below): a pin it holds is let go
+ * through the release, and none is taken. A body not marked seated runs exactly as before. 0 = the mark is ignored.
+ */
+export const PLANT_SEATED_OFF_ON = 1;
+const seatedBodies = new WeakSet<Skeleton>();
+/** A mode that seats this body in a vehicle (a cockpit, a kart) marks it: its feet hold no pin until unmarked. */
+export function setPlantingSeated(skeleton: Skeleton, seated: boolean): void { if (seated) seatedBodies.add(skeleton); else seatedBodies.delete(skeleton); }
+
 /** MOVEMENT POLISH (2026-10-06): a root moving vertically faster than this (m/s) is in the air — a jump, a drop — and holds no pin. A
  *  walking body's root does not bob (the clips carry the bob below it); steps and ramps move it well under this. */
 export const AIRBORNE_VY = 1.2;
@@ -301,7 +315,8 @@ export function mountFootPlanting(scene: Scene, skinned: AbstractMesh, skeleton:
       // jump lifts the root with the ankle — so the foot planted at take-off stayed pinned to the floor's XZ while the body flew on, and
       // let go only at the drift limit (Free Run's take-off at 6 m/s: the trailing foot dragged back, then caught up 34 cm/frame² in a
       // frame on a hard jump, 25 with this, _movement-probe). The root rising or falling faster than AIRBORNE_VY lifts every pin (with the release fade).
-      const flying = !!pr && Math.abs(rootPos.y - pr.y) / dt > AIRBORNE_VY;
+      // (P5: a body its mode has seated is airborne for this layer — no pin is taken, a held one is let go)
+      const flying = (seatedBodies.has(skeleton) && feel('anim.plantSeatedOff', PLANT_SEATED_OFF_ON) >= 0.5) || (!!pr && Math.abs(rootPos.y - pr.y) / dt > AIRBORNE_VY);
       leg.prevClip = pc ?? new Vector3(); leg.prevClip.copyFrom(ankle); leg.prevRoot = pr ?? new Vector3(); leg.prevRoot.copyFrom(rootPos);
       if (jumped) { debug[leg.side === 'Left' ? 'left' : 'right'] = { planted: false, pin: { x: ankle.x, y: ankle.y, z: ankle.z } }; leg.fadeLeft = 0; leg.claimPin = null; leg.engage = 0; leg.relLeft = 0; continue; }   // a teleport: nothing to hold
       const key = leg.side === 'Left' ? 'left' : 'right';

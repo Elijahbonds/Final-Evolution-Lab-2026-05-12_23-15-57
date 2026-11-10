@@ -1342,6 +1342,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'On: a foot that plants again while its leg is still easing off the last plant keeps easing. Off: the old behaviour, the leg snapped onto the new plant in one frame (a body sliding in a wide stance popped a thigh about 33 degrees at every re-plant).',
   },
   {
+    id: 'anim.plantSeatedOff', label: 'Foot plant: off for a seated pilot on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/FootPlanting.ts PLANT_SEATED_OFF_ON',
+    hint: 'On: a body its mode seats in a vehicle (the Aero Aces pilot) holds no foot plant. Off: the old behaviour, the seated feet were pinned to the ground as the plane flew and the knees snapped 50 to 60 degrees in a frame.',
+  },
+  {
     id: 'anim.fadeHoldEnded', label: 'Crossfade: hold a move that ends mid-blend on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
     source: 'lib/babylon/anim/CharacterAnimator.ts FADE_HOLD_ENDED_ON',
     hint: 'On: a strike or hit react that reaches its last frame while it is still blending out is held on that frame until the blend ends. Off: the old behaviour, it vanished mid-blend and the whole body jumped in one frame (Showdown hit react into guard, arms about 30 degrees).',
