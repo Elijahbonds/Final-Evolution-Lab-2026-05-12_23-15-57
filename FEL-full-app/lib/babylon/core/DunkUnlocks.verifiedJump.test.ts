@@ -14,6 +14,9 @@ import { nightFormat, cardDunks, isStakedRun } from './DunkField';
 import { DUNK_CONTEST_ATTEMPTS } from '@/lib/arena-score-integrity';
 import { challengePlayHref } from '@/lib/social/challenge-routes';
 import { feelSessionBlock } from '@/lib/feel-panel/sessionGate';
+import { FEEL_STORAGE_KEY, feel, resetFeelForTests, setFeelSession, setFeelUser } from '@/lib/feel-panel/feel';
+import { FEEL_KNOBS } from '@/lib/feel-panel/knobs';
+import { FINISH_OVER_RING, overRingOn } from './DunkOverRing';
 import { keepJump, loadJumps, historyId, type JumpHistoryEntry } from '@/lib/jump/historyStore';
 
 const DUNK = readFileSync(path.join(__dirname, '../modes/DunkMode.ts'), 'utf8');
@@ -102,5 +105,44 @@ describe('the friends battle: the ?c= link plays the classic staked night, the c
     expect(feelSessionBlock(p, q)).not.toBeNull();
     expect(feelSessionBlock(p, `${q}&playtest=1`)).not.toBeNull();
     expect(feelSessionBlock('/play/dunk', '?arena=1&playtest=1')).not.toBeNull();
+  });
+  // P11 (extends the gate above): the over-the-ring finish's knob, on the real feel store. The owner's device HOLDS the override
+  // and the server has opened the panel for them — and the mode still reads the shipped finish in every ranked, staked and
+  // challenge session, with or without ?playtest=1, and on an ordinary run that pays. Only the unpaid playtest run takes it.
+  it('`dunk.finishOverRing` held on the device reads 0 (the shipped finish) in ranked, staked and challenge play; 1 only in an unpaid playtest', () => {
+    const g = globalThis as { window?: unknown };
+    const dunkKnobs = FEEL_KNOBS.filter((k) => k.id.startsWith('dunk.'));
+    const held: Record<string, number> = Object.fromEntries(dunkKnobs.map((k) => [k.id, k.def === k.max ? k.min : k.max]));   // every dunk knob moved off its default
+    expect(held['dunk.finishOverRing']).toBe(1);
+    resetFeelForTests();
+    g.window = { localStorage: { getItem: (k: string) => (k === FEEL_STORAGE_KEY ? JSON.stringify(held) : null), setItem: () => {}, removeItem: () => {} } };
+    try {
+      setFeelUser(true);
+      const link = challengePlayHref('dunkContest', 'FRIEND42')!;
+      const blocked: [string, string][] = [
+        [link.slice(0, link.indexOf('?')), link.slice(link.indexOf('?'))],             // the friends battle, as the app builds it
+        ['/play/dunk', `${link.slice(link.indexOf('?'))}&playtest=1`],                   // …and with ?playtest=1 added on top
+        ['/play/dunk', '?arena=match_1&playtest=1'],                                     // a staked Arena duel
+        ['/play/dunk', '?mp=AB12CD&playtest=1'],                                         // an async friend challenge
+        ['/play/dunk', '?signature=1&playtest=1'],                                       // the Signature ladder (ranked)
+        ['/play/dunk', '?ranked=1&playtest=1'],                                          // a ranked session (reserved)
+        ['/play/dunk', '?story=n7&playtest=1'],                                          // a Story node (pays)
+        ['/play/dunk', '?net=r1&playtest=1'],                                            // online
+        ['/play/dunk', ''],                                                              // an ordinary run: it pays and records a score
+        ['/try', '?playtest=1'],                                                         // not a /play page
+      ];
+      for (const [p, q] of blocked) {
+        setFeelSession(feelSessionBlock(p, q));
+        expect(feelSessionBlock(p, q), `${p}${q}`).not.toBeNull();
+        expect(feel('dunk.finishOverRing', FINISH_OVER_RING), `${p}${q}`).toBe(0);
+        expect(overRingOn(feel('dunk.finishOverRing', FINISH_OVER_RING)), `${p}${q}`).toBe(false);
+        for (const k of dunkKnobs) expect(feel(k.id, k.def), `${k.id} on ${p}${q}`).toBe(k.def);   // no dunk knob reaches it
+      }
+      setFeelSession(feelSessionBlock('/play/dunk', '?playtest=1'));
+      expect(feel('dunk.finishOverRing', FINISH_OVER_RING)).toBe(1);   // the owner's unpaid playtest run: the A/B is live
+      expect(overRingOn(feel('dunk.finishOverRing', FINISH_OVER_RING))).toBe(true);
+      setFeelUser(false);                                               // …and for anyone the server has not opened the panel for: never
+      expect(feel('dunk.finishOverRing', FINISH_OVER_RING)).toBe(0);
+    } finally { resetFeelForTests(); delete g.window; }
   });
 });

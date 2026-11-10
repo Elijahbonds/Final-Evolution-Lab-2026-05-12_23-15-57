@@ -1,0 +1,118 @@
+// DunkOverRing — the finish that carries the ball OVER the ring (dunk-flagship P11, 2026-11-10; owner call 1 of 2026-11-10,
+// docs/OWNER-DECISIONS.md: "the over-the-ring contact as its own off-by-default knob, so the owner can feel it before any
+// default moves"). The pure side: the mode writes these onto the reach, the jam and the contact; nothing here touches Babylon.
+//
+// THE SHIPPED FINISH (knob 0, the default, unchanged): the hand brings the ball to the FRONT of the rim at the ring's height; the
+// ball meets the iron from outside the ring (its horizontal distance from the ring centre at contact, the `[HANDS] iron contact`
+// line's `flat`, measured 0.15–0.34 m against a 0.225 m ring) and the flush (RimFlush.startFlush) lifts it over the lip and in.
+//
+// OVER THE RING (knob 1), from the slam (the jam) to the contact; nothing before the slam changes. The hand path has three legs,
+// each a point the reach is sent to —
+//   lift   a ball under the clearance goes UP in front of the rim until it would clear the iron;
+//   in     …then in over the ring, still at that height;
+//   down   …and once its centre is inside the ring's radius, down through the middle.
+// …and the body holds its height until the `down` leg (overRingHoldsBody). A contact is then met from above with the ball over
+// the hole: `flat` ≤ the ring's radius. A ball the hand could not carry over in time is let go where the shipped finish lets it
+// go (a make, never a new miss): the knob changes the path, never the verdict.
+//
+// OFF BY DEFAULT: `dunk.finishOverRing` (lib/feel-panel/knobs.ts). Like every knob it never applies in ranked, staked or paid
+// play (lib/feel-panel's session gate).
+export type V3 = { x: number; y: number; z: number };
+
+/** The knob's default: OFF (0) — the shipped finish, bit for bit. */
+export const FINISH_OVER_RING = 0;
+
+/** NEW numbers (no tuned value changed; every one is read only with the knob on). Metres and seconds. */
+export const OVER_RING = {
+  /** A jam starts on the lift only when the ball is under the top of the contact's height band (0.6 of a ball over the
+   *  ring's plane) plus this, outside the ring. */
+  liftBelowM: 0.01,
+  /** lift → in: the ball's centre is this far over the ring's plane BEYOND its own radius (its underside clears the iron's top). */
+  clearM: 0.0,
+  /** The height the lift and the way in aim the ball's centre at, over the ring's plane beyond its radius: above `clearM`, so a
+   *  hand that lags its target still holds the ball over the lip. */
+  aimUpM: 0.10,
+  /** in → down: the ball's centre is at least this far inside the ring's radius. */
+  insideM: 0.05,
+  /** The push down through the ring aims this far under its plane (the shipped flush's own aim). */
+  downM: 0.06,
+  /** The lift holds the ball no nearer the ring's axis than the front lip plus a ball plus this (it rises in FRONT of the iron). */
+  frontGapM: 0.02,
+  /** This long into the jam the path ends: a ball inside the ring's radius goes down wherever it is, one still outside comes
+   *  down onto the front of the rim and is let go there, as the shipped finish lets it go. */
+  giveUpSec: 0.4,
+  /** …at this height over the ring's plane (inside the contact's own height band). */
+  bailUpM: 0.02,
+  /** …and this far inside a ball's touch on the iron's outside (so it is within the contact's reach of the ring). */
+  bailInM: 0.02,
+  /** Over the ring the jam's follow-through stops this far SHORT of the shipped one, and never takes the shipped late-press
+   *  extra: the jam lasts longer here, and the shipped carry-in would bring the head in under the ring (rig: 0.02 m from its axis). */
+  followBackM: 0.05,
+};
+
+/** Is the knob on? (The mode passes `feel('dunk.finishOverRing', FINISH_OVER_RING)`.) */
+export const overRingOn = (knob: number): boolean => knob >= 0.5;
+
+export type OverRingLeg = 'lift' | 'in' | 'down' | 'bail';
+
+/** The ball's horizontal distance from the ring's axis. */
+export const flatOf = (p: V3, rim: V3): number => Math.hypot(p.x - rim.x, p.z - rim.z);
+
+/**
+ * The next leg of the path, from the last one (`prev`, null on the jam's first frame) and where the ball is. The legs only go
+ * FORWARD (lift → in → down): the first cut read them off the ball's position alone, and a ball jittering across a threshold
+ * flipped between pushing down and holding up every frame (rig: the hand hovered for 0.4 s). `jamSec` = seconds into the jam;
+ * NEGATIVE while the push is not allowed yet (the REVERSE still turning its back to the iron): the ball is then held over the
+ * ring, never pushed down. Past `giveUpSec` the path ends one way or the other: a ball inside the ring's radius goes down
+ * wherever it is; one still outside comes down onto the front of the rim (`bail`), where the shipped finish meets it.
+ *   lift  only a ball that starts in or under the contact's height band outside the ring (it would meet the front iron): up first;
+ *   in    over the ring's centre, high;
+ *   down  through the middle.
+ */
+export function overRingLeg(prev: OverRingLeg | null, ball: V3, rim: V3, ringR: number, ballR: number, jamSec: number): OverRingLeg {
+  if (prev === 'down' || prev === 'bail') return prev;
+  const r = flatOf(ball, rim), dy = ball.y - rim.y;
+  if (jamSec >= OVER_RING.giveUpSec) return r <= ringR ? 'down' : 'bail';
+  if (r <= ringR - OVER_RING.insideM) return jamSec >= 0 ? 'down' : 'in';
+  if (prev === 'in') return 'in';
+  if (prev === 'lift') return dy >= ballR + OVER_RING.clearM ? 'in' : 'lift';
+  return dy < ballR * 0.6 + OVER_RING.liftBelowM ? 'lift' : 'in';
+}
+
+/**
+ * THE BODY WAITS FOR THE BALL. Measured on the shipped finish (rig, 2026-11-10): the slam finds the body at the top of its
+ * arc with the ball already 0.16–0.25 m over the ring's plane and 0.26–0.56 m out in front, and the jam then drops the body
+ * onto the iron (0.10 m in its first frame) while it carries in — a race the ball loses whenever it was the further out (it
+ * sinks into the contact's height band before it has crossed the lip, and meets the front of the rim from outside). Over the
+ * ring, the body holds its height until the ball is over the hole and comes down only with it (`down`). On `bail` it holds
+ * too: the hand alone lowers the ball onto the front of the rim (a body dropping 0.1 m a frame carried it past the iron).
+ */
+export function overRingHoldsBody(leg: OverRingLeg | null): boolean {
+  return leg !== 'down';
+}
+
+/** Where the reach sends the BALL this frame on `leg` (into `out`). */
+export function overRingAim(leg: OverRingLeg, ball: V3, rim: V3, ringR: number, ballR: number, out: V3): V3 {
+  if (leg === 'down') { out.x = rim.x; out.y = rim.y - OVER_RING.downM; out.z = rim.z; return out; }
+  const dx = ball.x - rim.x, dz = ball.z - rim.z, r = Math.hypot(dx, dz);
+  const ux = r > 1e-3 ? dx / r : 0, uz = r > 1e-3 ? dz / r : 1;   // dead on the axis: the court side (+z), as RimFlush
+  if (leg === 'bail') {   // down onto the front of the rim from where it is (no further out than a ball's touch on the iron)
+    const at = Math.min(r, ringR + ballR - OVER_RING.bailInM);
+    out.x = rim.x + ux * at; out.y = rim.y + OVER_RING.bailUpM; out.z = rim.z + uz * at; return out;
+  }
+  out.y = rim.y + ballR + OVER_RING.aimUpM;
+  if (leg === 'in') { out.x = rim.x; out.z = rim.z; return out; }
+  // lift: straight up where the ball is; a ball UNDER the ring's plane comes out from under the front lip first
+  const keep = ball.y < rim.y ? Math.max(r, ringR + ballR + OVER_RING.frontGapM) : r;
+  out.x = rim.x + ux * keep; out.z = rim.z + uz * keep;
+  return out;
+}
+
+/**
+ * The contact, deferred: with the knob on, a ball that is at the iron but still OUTSIDE the ring's radius is not let go yet —
+ * the hand is carrying it over. After `giveUpSec` of jam it is let go there, exactly as the shipped finish would (so the knob
+ * never turns a make into SHORT OF THE IRON).
+ */
+export function overRingDefers(ball: V3, rim: V3, ringR: number, jamSec: number): boolean {
+  return jamSec < OVER_RING.giveUpSec && flatOf(ball, rim) > ringR;
+}
