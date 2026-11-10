@@ -303,3 +303,13 @@ standing rule above), is reversible, and is flagged here so it can be overturned
    it. `scripts/pending-sql/cli.ts` makes it one command (`plan`, then `apply`), proven on throwaway Postgres 16
    databases; `docs/PENDING-SQL.md`. The owner runs it.
 5. **#527 closed** (the coordinator's own duplicate of a fix that #522 carried).
+
+## 2026-11-10 — the every-screen pass
+
+- The owner: "To improve the total quality of the product from improving every screen." Scope: **every screen,
+  training and coaching first.** A screen is done when it is clear and quick to use, looks finished, is fast and smooth
+  on a phone, and is right and trustworthy (all four). Polish what exists; an athlete training alone first; real people
+  are using training and coaching already or this month; review by screenshots and numbers after each phase.
+- **"I approve, go"** on `docs/PLAN-EVERY-SCREEN-10PHASE.md` as written, including its three new speed budgets (first
+  content ≤ 2.5 s, layout shift ≤ 0.02, tap response ≤ 200 ms on the throttled phone).
+- The seven stopped lanes were restarted the same day at the owner's word ("restart those lanes and finish those").
