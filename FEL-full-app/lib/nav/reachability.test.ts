@@ -40,6 +40,7 @@ const NOT_NAVIGABLE: Record<string, string> = {
   '/train': 'a tab',
   '/profile': 'a tab',
   '/studio': 'HOLD — not shipped, deliberately unlinked',
+  '/teach/motion': 'HOLD — EDU-05 motion lessons, a dark preview for the owner to sign off the look (owner 2026-10-20: "owner signs off the look"); only founder / admin and course authors can open it, and motion-player.test.tsx enforces that nothing links to it',
   '/workout': 'owner 2026-10-27: off the menus, still served by link',
   '/live': 'owner 2026-10-27: the Program guide is off the menus, still served by link',
   '/play/shared': 'a 404 by design: only its share links (/play/shared/[token]) are pages; it exists so every /play/* folder has a page.tsx (scripts/smokeTest.ts)',
