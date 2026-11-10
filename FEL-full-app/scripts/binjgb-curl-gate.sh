@@ -16,6 +16,14 @@
 #       'unsafe-eval' and no 'unsafe-inline' in script-src (rule 0's frame-ancestors-only CSP may be a second header);
 #       local-frame: the CSP carries `sandbox allow-scripts` and never allow-same-origin (F3); the shelf's CSP: no sandbox.
 #     /vendor/binjgb/binjgb.js → 200 (the flag opens the static path).
+#     C2 (Cyber F2F6 review): odd spellings of /play/gb-shelf/local-frame are either not served (404 / redirect) or served
+#     WITH `sandbox allow-scripts` — never the local-frame document without its sandbox.
+#     C4 / G6: /play/gb-shelf/local-frame with NO cookie → 404; with a TEEN test account (FEL_GATE_TEEN_COOKIE, if a local
+#     teen test account exists) → 404. Without FEL_GATE_TEEN_COOKIE the teen row prints SKIP (not a PASS, not a FAIL).
+#
+# Cookies (C4, Cyber F2F6 review): FEL_GATE_COOKIE / FEL_GATE_TEEN_COOKIE must be sessions of LOCAL TEST accounts on the
+# local or preview database only — never Elijah's session, never a production session. Never paste them into chat, NOTES or
+# logs (this script never prints them; don't run it under `bash -x`). Sign the test accounts out afterwards.
 #
 # Runtime flag read (F6): start ONE build with the flag off, run MODE=off; restart the SAME build (no `next build`) with
 # the flag on, run MODE=on. Both PASS → the middleware reads BINJGB_SHELF_ENABLED at runtime. If MODE=on still gets 404 on
@@ -26,13 +34,20 @@
 #   npm run build
 #   BINJGB_SHELF_ENABLED=0 npx next start -p 3100 &   ;  BASE_URL=http://localhost:3100 MODE=off scripts/binjgb-curl-gate.sh
 #   (stop it) BINJGB_SHELF_ENABLED=1 BINJGB_LOCAL_FILE_ENABLED=1 npx next start -p 3100 &
-#   BASE_URL=http://localhost:3100 MODE=on FEL_GATE_COOKIE='next-auth.session-token=…' scripts/binjgb-curl-gate.sh
+#   BASE_URL=http://localhost:3100 MODE=on FEL_GATE_COOKIE='<local test ADULT session>' \
+#     [FEL_GATE_TEEN_COOKIE='<local test TEEN session>'] scripts/binjgb-curl-gate.sh
 set -u
 
 BASE_URL="${BASE_URL:-http://localhost:3000}"
 MODE="${MODE:-}"
 COOKIE="${FEL_GATE_COOKIE:-}"
+TEEN_COOKIE="${FEL_GATE_TEEN_COOKIE:-}"
+# Which flip this MODE=on run is evidence for (Cyber C1C4 review): `local` (default, strict) = BINJGB_LOCAL_FILE_ENABLED,
+# server started with BOTH flags on, teen row REQUIRED; `shelf` = BINJGB_SHELF_ENABLED only, server started with
+# BINJGB_LOCAL_FILE_ENABLED=0, the local frame must 404 even for the adult, and a missing teen row is a loud SKIP.
+GATE="${FEL_GATE_FOR:-local}"
 FAILS=0
+SKIPS=0
 
 pass() { printf 'PASS  %s\n' "$1"; }
 fail() { printf 'FAIL  %s\n' "$1"; FAILS=$((FAILS + 1)); }
@@ -45,20 +60,23 @@ case "$BASE_URL" in
      fi ;;
 esac
 if [ "$MODE" != "on" ] && [ "$MODE" != "off" ]; then echo "MODE must be on or off" >&2; exit 2; fi
+if [ "$GATE" != "shelf" ] && [ "$GATE" != "local" ]; then echo "FEL_GATE_FOR must be shelf or local" >&2; exit 2; fi
 command -v curl >/dev/null || { echo "curl not found" >&2; exit 2; }
 
 [ -f .next/BUILD_ID ] && echo "BUILD_ID $(cat .next/BUILD_ID)"
-echo "BASE_URL $BASE_URL  MODE $MODE"
+echo "BASE_URL $BASE_URL  MODE $MODE  GATE $GATE"
 
 # HEAD-like fetch (GET, body discarded — some handlers don't answer HEAD) with the raw path kept as typed (--path-as-is).
-headers() {
-  local path="$1"
-  if [ -n "$COOKIE" ]; then
-    curl -s --path-as-is -o /dev/null -D - -H "Cookie: $COOKIE" "$BASE_URL$path" | tr -d '\r'
+# headers_as <cookie or empty> <path>: the cookie goes in a header only, never on the screen.
+headers_as() {
+  local cookie="$1" path="$2"
+  if [ -n "$cookie" ]; then
+    curl -s --path-as-is -o /dev/null -D - -H "Cookie: $cookie" "$BASE_URL$path" | tr -d '\r'
   else
     curl -s --path-as-is -o /dev/null -D - "$BASE_URL$path" | tr -d '\r'
   fi
 }
+headers() { headers_as "$COOKIE" "$1"; }
 status_of() { printf '%s\n' "$1" | awk 'toupper($1) ~ /^HTTP\// {s=$2} END {print s}'; }
 values_of() { printf '%s\n' "$1" | awk -v k="$(echo "$2" | tr '[:upper:]' '[:lower:]')" -F': ' 'tolower($1) == k { sub(/^[^:]*: /, ""); print }'; }
 
@@ -111,11 +129,40 @@ if [ "$MODE" = "off" ]; then
     expect_404 "$p"
   done
 else
+  if [ -z "$COOKIE" ]; then fail "on: FEL_GATE_COOKIE not set (a LOCAL test adult account's session; C4)"; fi
   check_page /play/gb-shelf shelf
-  check_page /play/gb-shelf/local-frame frame
+  if [ "$GATE" = "local" ]; then
+    check_page /play/gb-shelf/local-frame frame
+  else
+    h="$(headers /play/gb-shelf/local-frame)"; s="$(status_of "$h")"
+    if [ "$s" = "404" ]; then pass "on (shelf only): adult: /play/gb-shelf/local-frame -> 404"; else fail "on (shelf only): adult: /play/gb-shelf/local-frame -> ${s:-no response} (want 404; start the server with BINJGB_LOCAL_FILE_ENABLED=0)"; fi
+  fi
+  for p in /play/gb-shelf/local%2Dframe /play/gb-shelf/local%2dframe /play/gb-shelf//local-frame /play/gb-shelf/local-frame/ /play/%67b-shelf/local-frame /play/gb-shelf/%6Cocal-frame; do
+    h="$(headers "$p")"; s="$(status_of "$h")"; c="$(values_of "$h" 'Content-Security-Policy')"
+    case "$s" in
+      404|301|302|307|308) pass "on: $p -> $s (not served unsandboxed)";;
+      200) if printf '%s' "$c" | grep -q 'sandbox allow-scripts'; then pass "on: $p -> 200 sandboxed"; else fail "on: $p -> 200 WITHOUT sandbox allow-scripts"; fi;;
+      *) fail "on: $p -> ${s:-no response}";;
+    esac
+  done
+  # C4 / G6: the local frame is adults only, decided on the server.
+  h="$(headers_as "" /play/gb-shelf/local-frame)"; s="$(status_of "$h")"
+  if [ "$s" = "404" ]; then pass "on: no cookie: /play/gb-shelf/local-frame -> 404"; else fail "on: no cookie: /play/gb-shelf/local-frame -> ${s:-no response} (want 404)"; fi
+  if [ -n "$TEEN_COOKIE" ]; then
+    h="$(headers_as "$TEEN_COOKIE" /play/gb-shelf/local-frame)"; s="$(status_of "$h")"
+    if [ "$s" = "404" ]; then pass "on: teen account: /play/gb-shelf/local-frame -> 404"; else fail "on: teen account: /play/gb-shelf/local-frame -> ${s:-no response} (want 404)"; fi
+  else
+    SKIPS=$((SKIPS + 1))
+    if [ "$GATE" = "local" ]; then
+      fail "on: teen account row NOT RUN (FEL_GATE_TEEN_COOKIE not set) - REQUIRED for BINJGB_LOCAL_FILE_ENABLED (G-FILE)"
+    else
+      printf 'SKIP  %s\n' "on: teen account row NOT RUN (FEL_GATE_TEEN_COOKIE not set) - this run does NOT count for BINJGB_LOCAL_FILE_ENABLED"
+    fi
+  fi
   h="$(headers /vendor/binjgb/binjgb.js)"; s="$(status_of "$h")"
   if [ "$s" = "200" ]; then pass "on: /vendor/binjgb/binjgb.js -> 200 (flag read at runtime)"; else fail "on: /vendor/binjgb/binjgb.js -> ${s:-no response} (want 200; if this build was started flag-off before, flips need a redeploy)"; fi
 fi
 
-if [ "$FAILS" -eq 0 ]; then echo "RESULT PASS ($MODE)"; exit 0; fi
+if [ "$FAILS" -eq 0 ] && [ "$SKIPS" -gt 0 ]; then echo "RESULT PASS ($MODE, gate $GATE) WITH $SKIPS SKIP - NOT VALID FOR BINJGB_LOCAL_FILE_ENABLED"; exit 0; fi
+if [ "$FAILS" -eq 0 ]; then echo "RESULT PASS ($MODE, gate $GATE)"; exit 0; fi
 echo "RESULT FAIL ($MODE): $FAILS check(s) failed"; exit 1

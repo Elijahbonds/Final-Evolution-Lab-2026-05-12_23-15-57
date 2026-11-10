@@ -44,8 +44,12 @@ const underPrefix = (path: string, prefix: string) => path === prefix || path.st
 
 /** The policy row for a path, or null. */
 export function routePolicyFor(pathname: string): RoutePolicy | null {
-  const path = pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname;
-  return ROUTE_POLICIES.find((p) => underPrefix(path, p.prefix)) ?? null;
+  // F6/F3 hardening (Cyber F2F6 review): match the percent-decoded, slash-collapsed spelling first, so
+  // /play/gb-shelf/local%2Dframe and /play/gb-shelf//local-frame get the local-frame row (sandbox), not the shelf row.
+  const norm = (p: string) => (p.length > 1 ? p.replace(/\/{2,}/g, '/').replace(/\/+$/, '') : p);
+  const decoded = norm(decodedPath(pathname));
+  const raw = norm(pathname);
+  return ROUTE_POLICIES.find((p) => underPrefix(decoded, p.prefix)) ?? ROUTE_POLICIES.find((p) => underPrefix(raw, p.prefix)) ?? null;
 }
 
 /**
@@ -152,7 +156,12 @@ export function middleware(request: NextRequest) {
     return isBinjgbShelfEnabled() ? NextResponse.next() : new NextResponse(null, { status: 404 });
   }
   const policy = routePolicyFor(pathname);
-  if (!policy) return NextResponse.next();
+  if (!policy) {
+    if (!request.headers.has('x-nonce')) return NextResponse.next();
+    const stripped = new Headers(request.headers);
+    stripped.delete('x-nonce');   // only middleware mints the nonce (Cyber F2F6 C3)
+    return NextResponse.next({ request: { headers: stripped } });
+  }
 
   const nonce = makeNonce();
   const requestHeaders = new Headers(request.headers);

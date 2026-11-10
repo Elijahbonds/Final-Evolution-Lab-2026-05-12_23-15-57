@@ -56,3 +56,26 @@ export function fullLoadTarget(click: ClickLike, anchor: AnchorLike, here: { hre
 export function reloadAfterHistoryMove(pathname: string): boolean {
   return !inShelf(pathname);
 }
+
+/** F2 defence in depth: the pathname this DOCUMENT was first loaded at (Navigation Timing), or null when unknown. */
+export function firstLoadPath(
+  perf: { getEntriesByType(type: string): PerformanceEntryList } | undefined = typeof performance === 'undefined' ? undefined : performance,
+): string | null {
+  const e = perf?.getEntriesByType('navigation')[0];
+  if (!e || typeof e.name !== 'string' || !e.name) return null;
+  try { return new URL(e.name).pathname; } catch { return null; }
+}
+
+/**
+ * A shelf view in a document first loaded OUTSIDE the shelf got there by soft navigation: reload it once. The first-load
+ * path is compared percent-decoded and slash-collapsed (Cyber C1C4 review), so a spelling Next may serve as the shelf
+ * (/play/%67b-shelf, //play/gb-shelf) counts as the shelf and can never reload-loop.
+ */
+export function reloadOnShelfMount(firstPath: string | null): boolean {
+  if (firstPath === null) return false;
+  let p = firstPath;
+  try { p = decodeURIComponent(firstPath); } catch { /* malformed escape: keep the raw spelling */ }
+  p = p.replace(/\/{2,}/g, '/');
+  if (p.length > 1) p = p.replace(/\/+$/, '');
+  return !inShelf(p);
+}
