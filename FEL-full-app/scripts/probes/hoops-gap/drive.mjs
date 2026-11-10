@@ -65,8 +65,8 @@ const INIT = `(() => {
   const seedRandom = (s) => {
     const F = stream(s), L = stream((s ^ 0x5bd1e995) >>> 0);
     Math.random = () => {
-      if (!inFrame) { RN.l++; if (RN.stackFrames && RN.stacks.length < 4000) RN.stacks.push([window.__frameNo || 0, 'L', String(new Error().stack).split('\n').slice(2, 7).map((x) => x.trim().slice(0, 110)).join(' < ')]); return L(); }
-      RN.f++; if (RN.stackFrames && RN.stacks.length < 4000) { const fn = (window.__frameNo || 0) + 1; if (fn >= RN.stackFrames[0] && fn <= RN.stackFrames[1]) RN.stacks.push([fn, 'F', String(new Error().stack).split('\n').slice(2, 7).map((x) => x.trim().slice(0, 110)).join(' < ')]); }
+      if (!inFrame) { RN.l++; if (RN.stackFrames && RN.stacks.length < 4000) RN.stacks.push([window.__frameNo || 0, 'L', String(new Error().stack).split('\\n').slice(2, 7).map((x) => x.trim().slice(0, 110)).join(' < ')]); return L(); }
+      RN.f++; if (RN.stackFrames && RN.stacks.length < 4000) { const fn = (window.__frameNo || 0) + 1; if (fn >= RN.stackFrames[0] && fn <= RN.stackFrames[1]) RN.stacks.push([fn, 'F', String(new Error().stack).split('\\n').slice(2, 7).map((x) => x.trim().slice(0, 110)).join(' < ')]); }
       return F();
     };
   };
