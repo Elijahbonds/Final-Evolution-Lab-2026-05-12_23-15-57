@@ -12,6 +12,7 @@ import '@babylonjs/loaders/glTF';
 import { sportKitDefault } from './sportKitDefaults';
 import { ensureGarmentUVs, fixGarment, syncGarmentVisibility } from './garmentFixes';
 import { scheduleBodyMask, shareBodyBounds, isBodyMesh } from './bodyMask';
+import { coachGarmentSlotOf, demoModelFlags } from './demoModels';
 
 export type KitSlot = 'tops' | 'shorts' | 'shoes';
 export const KIT_SLOTS: readonly KitSlot[] = ['tops', 'shorts', 'shoes'];
@@ -56,7 +57,7 @@ function sceneModeId(meshes: AbstractMesh[]): string | undefined {
 export function applyKit(meshes: AbstractMesh[], wardrobe: Wardrobe | null | undefined, modeId: string | null = null, opts: KitOptions = {}): number {
   const bySlot = new Map<KitSlot, AbstractMesh[]>();
   for (const m of meshes) { const k = kitOf(m.name); if (!k) continue; (bySlot.get(k.slot) ?? bySlot.set(k.slot, []).get(k.slot)!).push(m); }
-  if (!bySlot.size) return 0;
+  if (!bySlot.size) { maskCoachBody(meshes); return 0; }
   const sport = sportKitDefault(modeId ?? sceneModeId(meshes));
   // CREATOR-PLAN phase 4e: the slots the player's code-built clothes cover show no kit garment at all (not the Closet pick,
   // not the sport's uniform); remembered on the body's node so a kit pack that lands later stays hidden too
@@ -84,6 +85,17 @@ export function applyKit(meshes: AbstractMesh[], wardrobe: Wardrobe | null | und
   const body = meshes.find((m) => isBodyMesh(m.name));
   if (body) { shareBodyBounds(body, meshes); scheduleBodyMask(meshes); }
   return found;
+}
+
+/** DEMO-MODELS-1 (2026-11-09): the coach body carries no Kit_ garments (its outfit is baked on as Top_/Bottom_/Shoe_/Sock_), so
+ *  applyKit's early return left its skin unmasked. With COACH_BODY_MASK_ENABLED on, a body with coach garments gets the same
+ *  bounds share and mask as a kit body; off, nothing runs (as before). Returns whether the mask was scheduled. */
+export function maskCoachBody(meshes: AbstractMesh[]): boolean {
+  if (!demoModelFlags().coachBodyMask) return false;
+  const body = meshes.find((m) => isBodyMesh(m.name));
+  if (!body || !meshes.some((m) => coachGarmentSlotOf(m.name))) return false;
+  shareBodyBounds(body, meshes); scheduleBodyMask(meshes);
+  return true;
 }
 
 /** CREATOR-PLAN phase 4e (2026-10-06): how applyKit is told what the player's code-built clothes cover. */
