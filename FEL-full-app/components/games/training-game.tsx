@@ -296,7 +296,7 @@ export default function TrainingGame({ grade, prq, onEnd, gamepad }: GameProps) 
             >
               CHALK UP
             </button>
-            <p className="font-mono text-[11px] tracking-widest text-white/50">ANY KEY · ANY BUTTON · TAP</p>
+            <p className="font-mono text-[12px] tracking-widest text-white/50">ANY KEY · ANY BUTTON · TAP</p>
           </div>
         )}
       </div>

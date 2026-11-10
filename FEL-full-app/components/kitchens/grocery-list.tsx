@@ -42,7 +42,7 @@ export function GroceryList({ rxId, items }: { rxId: string; items: GroceryItem[
     <section className="fel-panel rounded-2xl p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/50">Grocery list</p>
+          <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-white/50">Grocery list</p>
           <p className="mt-0.5 font-mono text-xs text-white/60">{done} / {items.length} in the basket</p>
         </div>
         <div className="flex items-center gap-2">
@@ -65,11 +65,11 @@ export function GroceryList({ rxId, items }: { rxId: string; items: GroceryItem[
                 <span className={`flex h-5 w-5 items-center justify-center rounded border ${on ? 'border-[#00FF9D] bg-[#00FF9D]/20 text-[#00FF9D]' : 'border-white/25 text-transparent'}`}>
                   <Check className="h-3.5 w-3.5" />
                 </span>
-                <span className={`flex-1 text-sm ${on ? 'text-white/40 line-through' : 'text-white/90'}`}>
-                  {i.name}{i.optional ? <span className="ml-1 text-white/40">(optional)</span> : null}
+                <span className={`flex-1 text-sm ${on ? 'text-white/50 line-through' : 'text-white/90'}`}>
+                  {i.name}{i.optional ? <span className="ml-1 text-white/50">(optional)</span> : null}
                 </span>
                 <span className="font-mono text-xs tabular-nums text-white/60">{i.qty} {i.unit}</span>
-                {i.aisleHint && <span className="hidden text-[10px] uppercase tracking-wider text-white/35 sm:inline">{i.aisleHint}</span>}
+                {i.aisleHint && <span className="hidden text-[12px] uppercase tracking-wider text-white/50 sm:inline">{i.aisleHint}</span>}
               </button>
             </li>
           );

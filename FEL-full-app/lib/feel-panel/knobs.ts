@@ -953,6 +953,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'How long the game holds on the iron for a perfect slam. An ordinary make stays at 70 ms; cleaner slams grow toward this.',
   },
   {
+    id: 'dunk.preloadSet', label: 'Load the contest before dunk 1 on (1) / off (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Dunk · loading',
+    source: 'lib/babylon/modes/dunkContestDefer.ts DUNK_PRELOAD_SET_ON',
+    hint: 'On: the rival and the five boardwalk onlookers load and set up, and the landing and replay shaders compile, while the contest intro plays. The first run waits for them (20 s at most). Off: they load between rounds. Read when the dunk loads.',
+  },
+  {
     id: 'dunk.slamShakeBig', label: 'Slam: shake on a perfect flush', def: 0.18, min: 0.12, max: 0.3, step: 0.01, unit: '', group: 'Dunk · slam',
     source: 'lib/babylon/core/DunkFlagship.ts SLAM_SHAKE_BIG',
     hint: 'Camera shake for a perfect slam. An ordinary make stays at 0.12. Reduced motion turns shake off.',
@@ -1309,6 +1314,17 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'How long the old pose takes to wash out, as a fraction of each clip switch\'s fade time. Only read when inertial transitions are on.',
   },
   // CLIP-SMOOTH (2026-11-03, owner: "Yes, smooth them"): the karate captures' own single-frame snaps re-keyed, default ON.
+  // GAMEPLAY-CLEAN P3 (2026-11-03): the foot planter's leg solve eases in and out instead of stepping (anim/FootPlanting)
+  {
+    id: 'anim.plantEngageSec', label: 'Foot plant: solve blend time', def: 0.1, min: 0, max: 0.4, step: 0.02, unit: 's', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/FootPlanting.ts PLANT_ENGAGE_SEC',
+    hint: 'How long the foot planter takes to take a leg over when it starts holding a foot, and to hand it back. 0 = the old one-frame step (the derby batter thigh jumped 25 degrees in a frame standing still).',
+  },
+  {
+    id: 'anim.hipYawFold', label: 'Posture hip strip folds past 90 degrees on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/PostureLayer.ts HIP_YAW_FOLD_ON',
+    hint: 'On: a window that keeps part of the hips turn (football spin) reads a turn past 90 degrees folded back, so the hips never flip 180 degrees in a frame at the half-turn. Off: the old wrapped read.',
+  },
   {
     id: 'anim.clipSmooth', label: 'Smooth the snaps inside clips on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Anim · clips',
     source: 'lib/babylon/anim/clipDesnap.ts CLIP_SMOOTH_ON',

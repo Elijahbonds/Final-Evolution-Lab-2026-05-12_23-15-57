@@ -35,14 +35,14 @@ export function MySchedule({ api = MY_SCHEDULE_API }: { api?: string }) {
   return (
     <section className="fel-card min-w-0 space-y-2 rounded-xl p-4" data-my-schedule>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/40"><CalendarDays className="h-3.5 w-3.5" /> Coming up</div>
+        <div className="flex items-center gap-2 text-[12px] uppercase tracking-wider text-white/50"><CalendarDays className="h-3.5 w-3.5" /> Coming up</div>
         <button type="button" onClick={() => void link()} className="min-h-9 rounded-md border border-white/15 px-2 text-xs text-white/70">Add to my calendar</button>
       </div>
       {msg && <p className="break-words text-xs text-white/55">{msg}</p>}
       {groupByDay(sessions.slice(0, 8)).map(([day, rows]) => (
         <div key={day} className="space-y-0.5">
-          <div className="text-[11px] text-white/40">{day}</div>
-          {rows.map((s) => <div key={s.id} className="break-words text-sm text-white/85">{time(s.startsAt)} · {s.title}<span className="text-white/45"> · {s.coachName}{s.place ? ` · ${s.place}` : ''}</span></div>)}
+          <div className="text-[12px] text-white/50">{day}</div>
+          {rows.map((s) => <div key={s.id} className="break-words text-sm text-white/85">{time(s.startsAt)} · {s.title}<span className="text-white/50"> · {s.coachName}{s.place ? ` · ${s.place}` : ''}</span></div>)}
         </div>
       ))}
     </section>

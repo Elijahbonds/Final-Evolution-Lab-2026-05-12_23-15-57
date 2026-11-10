@@ -80,7 +80,7 @@ export function MotionSetting({ compact = false, className = '' }: { compact?: b
         onClick={(e) => { e.currentTarget.blur(); if (chip.next) pick(chip.next); }}
         aria-label={chip.ariaLabel}
         title={t(url ? 'settings.motion.titleLink' : chip.reduced ? 'settings.motion.titleReduced' : 'settings.motion.titleFull')}
-        className={`${className} rounded-full border px-3 py-1 text-[10px] font-black tracking-wider transition ${chip.reduced ? 'border-white/60 bg-white/10 text-white' : 'border-white/30 text-white/70 hover:bg-white/10'}`}>
+        className={`${className} rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${chip.reduced ? 'border-white/60 bg-white/10 text-white' : 'border-white/30 text-white/70 hover:bg-white/10'}`}>
         {chip.text}
       </button>
     );
@@ -98,7 +98,7 @@ export function MotionSetting({ compact = false, className = '' }: { compact?: b
           </button>
         ))}
       </div>
-      <p className="mt-3 text-[11.5px] text-white/50" aria-live="polite">{motionStatus(pref, os, url)}</p>
+      <p className="mt-3 text-[12px] text-white/50" aria-live="polite">{motionStatus(pref, os, url)}</p>
     </div>
   );
 }

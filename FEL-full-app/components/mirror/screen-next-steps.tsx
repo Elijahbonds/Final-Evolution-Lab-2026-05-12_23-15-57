@@ -46,7 +46,7 @@ export function ScreenNextSteps({ screen, grades, youth = 'unknownAge' }: Screen
       <h2 id="screen-next-steps-heading" className="fel-heading text-[15px] font-bold text-white/80">What to work on · estimated</h2>
       {/* CUE-REWRITE (2026-10-27): the Quick Screen's plain words for the preview label ("Early version"), not the
           sign-off sheet's ("PROPOSED · preview · Scoring thresholds are proposed and pending coach approval") */}
-      <p className="mt-1 text-[11.5px] text-[#FFB020]/85" data-preview-label title={PREVIEW_LINE}>
+      <p className="mt-1 text-[12px] text-[#FFB020]/85" data-preview-label title={PREVIEW_LINE}>
         <span className="font-bold uppercase tracking-[0.08em]">{EARLY_VERSION}</span> · {EARLY_VERSION_LINE}.
       </p>
       <p className="mt-1 text-[13px] leading-relaxed text-white/70">{plan.headline}</p>
@@ -84,7 +84,7 @@ export function ScreenNextSteps({ screen, grades, youth = 'unknownAge' }: Screen
 
       {plan.retest.length > 0 && (
         <div className="mt-4">
-          <p className="font-mono text-[9.5px] font-bold uppercase tracking-[0.18em] text-white/40">Run these again</p>
+          <p className="font-mono text-[12px] font-bold uppercase tracking-[0.18em] text-white/50">Run these again</p>
           <ul className="mt-2 grid gap-2">
             {plan.retest.map((r, i) => (
               <li key={i} className="rounded-xl border border-white/8 px-4 py-2.5" data-retest-item>

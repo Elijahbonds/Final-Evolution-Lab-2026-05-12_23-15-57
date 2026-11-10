@@ -42,7 +42,7 @@ function CueLane({ cues }: { cues: readonly HudCue[] }) {
       {cues.map((c, i) => {
         const x = 12 + Math.max(-4, Math.min(88, (c.in / CUE_LOOKAHEAD_SEC) * 88));
         return (
-          <div key={`${c.name}-${i}-${c.move}`} className="absolute top-1/2 -translate-y-1/2 rounded-md px-1.5 py-0.5 text-[11px] font-black text-black"
+          <div key={`${c.name}-${i}-${c.move}`} className="absolute top-1/2 -translate-y-1/2 rounded-md px-1.5 py-0.5 text-[12px] font-black text-black"
             style={{ left: `${x}%`, background: c.color }}>
             {c.name}
           </div>

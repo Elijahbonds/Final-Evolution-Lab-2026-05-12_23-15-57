@@ -23,7 +23,7 @@ export default async function PurchaseTermsPage() {
           <div className={`${LEGAL_PROSE} ${LEGAL_QUOTE_GOLD}`}>
             <div dangerouslySetInnerHTML={{ __html: html }} />
           </div>
-          <div className="mt-4 text-center text-[10px] text-white/30">
+          <div className="mt-4 text-center text-[12px] text-white/50">
             Purchase terms version: {PURCHASE_TERMS_VERSION}
           </div>
         </div>

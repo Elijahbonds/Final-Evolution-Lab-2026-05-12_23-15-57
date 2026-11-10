@@ -89,7 +89,7 @@ function Stat({ icon, label, value, color }: { icon: React.ReactNode; label: str
         {icon}
         <span className="text-xl font-black">{value}</span>
       </div>
-      <div className="mt-1 font-mono text-[10px] uppercase tracking-wider text-white/50">{label}</div>
+      <div className="mt-1 font-mono text-[12px] uppercase tracking-wider text-white/50">{label}</div>
     </div>
   );
 }

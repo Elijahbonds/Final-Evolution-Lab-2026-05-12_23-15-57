@@ -52,9 +52,9 @@ export function VolumeMixer({ className, style, heading, output = true, buses }:
   return (
     <div
       className={className}
-      style={{ display: 'flex', flexDirection: 'column', gap: 6, fontFamily: 'ui-monospace, monospace', fontSize: 11, color: '#fff', ...style }}
+      style={{ display: 'flex', flexDirection: 'column', gap: 6, fontFamily: 'ui-monospace, monospace', fontSize: 12, color: '#fff', ...style }}
     >
-      {heading && <span style={{ opacity: 0.7, letterSpacing: '0.08em', fontSize: 10 }}>{heading}</span>}
+      {heading && <span style={{ opacity: 0.7, letterSpacing: '0.08em', fontSize: 12 }}>{heading}</span>}
       {BUSES.filter((b) => !buses || buses.includes(b.id)).map((b) => (
         <label key={b.id} title={b.hint} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ width: 48, letterSpacing: '0.06em', opacity: 0.85, fontWeight: 700 }}>{b.label}</span>
@@ -85,7 +85,7 @@ export function VolumeMixer({ className, style, heading, output = true, buses }:
                 <button key={id} type="button" role="radio" aria-checked={on} title={OUTPUT_PRESETS[id].hint} data-qa={`output-${id}`}
                   onClick={(e) => { pick(id); e.currentTarget.blur(); }} onMouseDown={(e) => e.preventDefault()}
                   style={{
-                    font: 'inherit', fontSize: 10, letterSpacing: '0.06em', padding: '3px 7px', borderRadius: 6, cursor: 'pointer',
+                    font: 'inherit', fontSize: 12, letterSpacing: '0.06em', padding: '3px 7px', borderRadius: 6, cursor: 'pointer',
                     border: `1px solid ${on ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.25)'}`,
                     background: on ? 'rgba(255,255,255,0.18)' : 'transparent', color: '#fff', fontWeight: on ? 700 : 400,
                   }}>
@@ -94,7 +94,7 @@ export function VolumeMixer({ className, style, heading, output = true, buses }:
               );
             })}
           </span>
-          <span style={{ width: 34, textAlign: 'right', opacity: 0.5, fontSize: 9 }}>{preset.picked ? '' : 'auto'}</span>
+          <span style={{ width: 34, textAlign: 'right', opacity: 0.5, fontSize: 12 }}>{preset.picked ? '' : 'auto'}</span>
         </div>
       )}
     </div>

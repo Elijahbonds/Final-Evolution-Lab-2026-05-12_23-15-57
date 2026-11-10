@@ -56,7 +56,7 @@ export default function MyProjects({ current, status, notice, projects, locked, 
   const [open, setOpen] = useState(false);
   const [renaming, setRenaming] = useState<{ id: string; title: string } | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
-  const small: React.CSSProperties = { ...S.btnAlt, padding: '4px 10px', fontSize: 11 };
+  const small: React.CSSProperties = { ...S.btnAlt, padding: '4px 10px', fontSize: 12 };
   const listed = projects.some((p) => p.id === current.id);
   const now = Date.now();
 
@@ -68,7 +68,7 @@ export default function MyProjects({ current, status, notice, projects, locked, 
           MY PROJECTS {open ? '▴' : '▾'}
         </button>
         <span data-qa="project-title" style={{ fontWeight: 700, fontSize: 13 }}>{current.title}</span>
-        <span data-qa="save-status" role="status" style={{ fontSize: 11, color: TONE[status.tone] }}>{status.line}</span>
+        <span data-qa="save-status" role="status" style={{ fontSize: 12, color: TONE[status.tone] }}>{status.line}</span>
       </div>
       {notice && <div data-qa="project-notice" role="status" style={{ fontSize: 12, color: '#ffd75e', marginTop: 4 }}>{notice}</div>}
       {conflict && (
@@ -89,11 +89,11 @@ export default function MyProjects({ current, status, notice, projects, locked, 
         <div data-qa="projects-list" style={{ ...S.card, flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <button data-qa="project-new" style={small} disabled={!!locked} onClick={onNew}>+ NEW PROJECT</button>
-            {locked && <span style={{ fontSize: 11, color: '#ffd75e' }}>{locked}</span>}
-            <span style={{ fontSize: 11, opacity: 0.65 }}>kept on this device · newest first</span>
+            {locked && <span style={{ fontSize: 12, color: '#ffd75e' }}>{locked}</span>}
+            <span style={{ fontSize: 12, opacity: 0.65 }}>kept on this device · newest first</span>
           </div>
           {persisted === false && (
-            <div data-qa="projects-best-effort" style={{ fontSize: 11, opacity: 0.6 }}>
+            <div data-qa="projects-best-effort" style={{ fontSize: 12, opacity: 0.6 }}>
               This browser keeps FEL&apos;s saved projects best-effort — it may clear them if the device runs low on space.
             </div>
           )}

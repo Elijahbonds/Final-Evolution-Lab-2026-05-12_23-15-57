@@ -59,7 +59,7 @@ export default async function CardPage({ params }: { params: { slug: string } })
         <Link href="/" className="fel-heading text-xl font-bold text-white">
           FINAL <span className="text-[#00E5FF]">EVOLUTION</span> LAB
         </Link>
-        <p className="mt-2 font-mono text-[11px] uppercase tracking-widest text-white/40">Creator Card</p>
+        <p className="mt-2 font-mono text-[12px] uppercase tracking-widest text-white/50">Creator Card</p>
 
         <div className="mt-8">
           <CreatorCard
@@ -89,7 +89,7 @@ export default async function CardPage({ params }: { params: { slug: string } })
         >
           <Sparkles className="h-4 w-4" /> Build your own card
         </Link>
-        <p className="mt-3 text-xs text-white/40">Train across {card.wins >= 0 ? '20+' : '20+'} modes. Earn your rarity.</p>
+        <p className="mt-3 text-xs text-white/50">Train across {card.wins >= 0 ? '20+' : '20+'} modes. Earn your rarity.</p>
       </div>
     </div>
   );

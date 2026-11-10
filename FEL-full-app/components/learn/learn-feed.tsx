@@ -13,6 +13,7 @@ import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'r
 import Link from 'next/link';
 import { SessionContext } from 'next-auth/react';
 import { toast } from 'sonner';
+import { readToast } from '@/components/ui/fel/toast';
 import { BarChart3, Bookmark, ChevronUp, EyeOff, Flame, Heart, Share2, SlidersHorizontal, X } from 'lucide-react';
 import { CARDS } from '@/lib/knowledge/catalog';
 import { availableTopics, topicBlurb } from '@/lib/knowledge/topics';
@@ -157,7 +158,7 @@ export function LearnFeed() {
     if (r.goalBonus > 0) toast(`+${r.goalBonus} XP to your account for today's goal`);
     if (r.capHit && !capToldRef.current) {
       capToldRef.current = true;
-      toast("That's today's learning XP for your account — your streak and progress still count.");
+      readToast("That's today's learning XP for your account — your streak and progress still count.");
     }
   }, []);
 
@@ -398,9 +399,9 @@ export function LearnFeed() {
       )}
 
       {view === 'feed' && active === 0 && slides.length > 1 && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-[max(1rem,env(safe-area-inset-bottom))] z-10 flex flex-col items-center text-white/45" aria-hidden>
+        <div className="pointer-events-none absolute inset-x-0 bottom-[max(1rem,env(safe-area-inset-bottom))] z-10 flex flex-col items-center text-white/50" aria-hidden>
           <ChevronUp className={reduced ? 'h-5 w-5' : 'h-5 w-5 animate-bounce'} />
-          <span className="text-[11px] font-bold uppercase tracking-[0.2em] md:text-sm">Swipe · scroll · ↓ · d-pad</span>
+          <span className="text-[12px] font-bold uppercase tracking-[0.2em] md:text-sm">Swipe · scroll · ↓ · d-pad</span>
         </div>
       )}
 
@@ -442,7 +443,7 @@ export function LearnFeed() {
 function RailButton({ label, on, onClick, icon, activeColor }: { label: string; on: boolean; onClick: () => void; icon: React.ReactNode; activeColor: string }) {
   return (
     <button type="button" onClick={(e) => { e.currentTarget.blur(); onClick(); }} aria-label={label} aria-pressed={on}
-      className="flex flex-col items-center gap-0.5 text-[10px] font-bold uppercase tracking-wider text-white/70 md:text-xs">
+      className="flex flex-col items-center gap-0.5 text-[12px] font-bold uppercase tracking-wider text-white/70 md:text-xs">
       <span className="grid h-11 w-11 place-items-center rounded-full bg-white/10 backdrop-blur md:h-12 md:w-12" style={{ color: on ? activeColor : '#fff' }}>{icon}</span>
       {label}
     </button>

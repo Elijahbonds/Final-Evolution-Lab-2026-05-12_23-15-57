@@ -19,6 +19,7 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
+import { readToast } from '@/components/ui/fel/toast';
 import { AlertTriangle, Loader2, MessageCircleQuestion, Play, Search, SlidersHorizontal, Sparkles, X } from 'lucide-react';
 import type { DemoTab } from '@/components/library/library-demo';
 import { ExerciseSheet } from '@/components/library/exercise-sheet';
@@ -135,7 +136,7 @@ export function LibraryBrowser({ onUse, onAdded, canAdd = false, title }: {
     setLoading(true);
     try {
       const r = await fetch('/api/library/ask', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ q: text, drafts }) });
-      if (r.status === 429) { toast.error('That is a lot of questions in a minute. Try again shortly.'); return; }
+      if (r.status === 429) { readToast.error('That is a lot of questions in a minute. Try again shortly.'); return; }
       const j = r.ok ? await r.json() as AskPayload : null;
       setAsk(j);
     } catch { setAsk(null); }
@@ -191,16 +192,16 @@ export function LibraryBrowser({ onUse, onAdded, canAdd = false, title }: {
 
       {mode === 'search' ? (
         <div className="relative">
-          <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
+          <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/50" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Squat, RDL, pogo, ankle…" aria-label="Search the exercise library" enterKeyHint="search"
             className={LL.search} />
-          {loading && <Loader2 className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-white/40" />}
+          {loading && <Loader2 className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-white/50" />}
         </div>
       ) : (
         <form onSubmit={(e) => { e.preventDefault(); void runAsk(question); }} className="space-y-2">
           <div className="flex gap-2">
             <input value={question} onChange={(e) => setQuestion(e.target.value)} maxLength={300} placeholder="Ask in plain words…" aria-label="Ask the exercise library"
-              className="min-w-0 flex-1 rounded-xl border border-white/10 bg-[#16161a] px-3 py-2.5 text-sm text-white placeholder-white/30 focus:border-[#00E5FF]/40 focus:outline-none" />
+              className="min-w-0 flex-1 rounded-xl border border-white/10 bg-[#16161a] px-3 py-2.5 text-sm text-white placeholder-white/50 focus:border-[#00E5FF]/40 focus:outline-none" />
             <button type="submit" disabled={loading || !question.trim()} className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-[#00E5FF]/40 bg-[#00E5FF]/10 px-3 text-xs font-medium text-[#00E5FF] disabled:opacity-40">
               {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />} Ask
             </button>
@@ -208,7 +209,7 @@ export function LibraryBrowser({ onUse, onAdded, canAdd = false, title }: {
           {!ask && (
             <div className="flex flex-wrap gap-1.5">
               {ASK_EXAMPLES.map((x) => (
-                <button key={x} type="button" onClick={() => { setQuestion(x); void runAsk(x); }} className="rounded-lg border border-white/10 px-2 py-1 text-[11px] text-white/55 hover:border-[#00E5FF]/30 hover:text-white/80">{x}</button>
+                <button key={x} type="button" onClick={() => { setQuestion(x); void runAsk(x); }} className="rounded-lg border border-white/10 px-2 py-1 text-[12px] text-white/55 hover:border-[#00E5FF]/30 hover:text-white/80">{x}</button>
               ))}
             </div>
           )}
@@ -217,7 +218,7 @@ export function LibraryBrowser({ onUse, onAdded, canAdd = false, title }: {
 
       {/* what the library holds for this viewer, and the drafts opt-in */}
       {data && data.viewer.coach && (
-        <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-white/40">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-white/50">
           <span data-testid="library-counts">{data.library.approved.toLocaleString()} approved{data.viewer.coach ? ` · ${data.library.drafts.toLocaleString()} drafts waiting for review` : ''}</span>
           <span className="flex items-center gap-3">
             {data.viewer.coach && (
@@ -245,25 +246,25 @@ export function LibraryBrowser({ onUse, onAdded, canAdd = false, title }: {
             </a>
           )}
           <div className="flex flex-wrap items-center gap-1.5" data-testid="ask-chips">
-            <span className="text-[11px] text-white/40">Read as:</span>
+            <span className="text-[12px] text-white/50">Read as:</span>
             {ask.chips.map((c) => (
               <button key={`${c.key}:${c.value}`} onClick={() => dropChip(c)} aria-label={`Remove ${c.label}`}
-                className="inline-flex items-center gap-1 rounded-full border border-[#00E5FF]/30 bg-[#00E5FF]/[0.07] px-2 py-0.5 text-[11px] text-[#00E5FF]/90 hover:border-[#FF3366]/50">
+                className="inline-flex items-center gap-1 rounded-full border border-[#00E5FF]/30 bg-[#00E5FF]/[0.07] px-2 py-0.5 text-[12px] text-[#00E5FF]/90 hover:border-[#FF3366]/50">
                 {c.label}<X className="h-3 w-3" />
               </button>
             ))}
-            {!ask.chips.length && <span className="text-[11px] text-white/40">nothing specific — showing the closest matches</span>}
+            {!ask.chips.length && <span className="text-[12px] text-white/50">nothing specific — showing the closest matches</span>}
           </div>
-          {ask.anchor && <p className="text-[11px] text-white/50">Compared with <button className="text-white/80 underline-offset-2 hover:underline" onClick={() => void openById(ask.anchor!.id, setSelected)}>{ask.anchor.name}</button>.</p>}
-          {ask.relaxed.length > 0 && <p className="text-[11px] text-[#FFD700]/80">Nothing matched everything, so this leaves out: {ask.relaxed.join(', ')}.</p>}
-          {ask.ai.used && ask.ai.why && <p className="text-[11px] text-white/55"><Sparkles className="mr-1 inline h-3 w-3 text-[#A855F7]" />{ask.ai.why}</p>}
+          {ask.anchor && <p className="text-[12px] text-white/50">Compared with <button className="text-white/80 underline-offset-2 hover:underline" onClick={() => void openById(ask.anchor!.id, setSelected)}>{ask.anchor.name}</button>.</p>}
+          {ask.relaxed.length > 0 && <p className="text-[12px] text-[#FFD700]/80">Nothing matched everything, so this leaves out: {ask.relaxed.join(', ')}.</p>}
+          {ask.ai.used && ask.ai.why && <p className="text-[12px] text-white/55"><Sparkles className="mr-1 inline h-3 w-3 text-[#A855F7]" />{ask.ai.why}</p>}
           {ask.plan && (
             <ol className="space-y-1.5" data-testid="ask-plan">
               {ask.plan.map((p, i) => (
                 <li key={p.entry.id}>
                   <button onClick={() => setSelected(p.entry)} className="fel-card flex w-full items-center justify-between gap-2 rounded-xl p-2.5 text-left">
                     <span className="min-w-0">
-                      <span className="block text-[10px] uppercase tracking-wider text-white/35">{i + 1}. {p.slot}</span>
+                      <span className="block text-[12px] uppercase tracking-wider text-white/50">{i + 1}. {p.slot}</span>
                       <span className="block truncate text-sm text-white">{p.entry.name}</span>
                     </span>
                     <span className="shrink-0 text-xs text-[#00E5FF]/80">{p.minutes} min</span>
@@ -296,20 +297,20 @@ export function LibraryBrowser({ onUse, onAdded, canAdd = false, title }: {
             </button>
             {filters.only && <Chip label="Only my equipment" onClear={() => setFilters((f) => { const o = { ...f }; delete o.only; return o; })} />}
             {active.filter(({ k }) => !QUICK.some((x) => x.key === k)).map(({ k, v }) => <Chip key={`${k}:${v}`} label={k === 'lowLoad' ? `Easy on the ${v}` : k === 'notCategory' ? `No ${v}` : k === 'notEquipment' ? `No ${v}` : labelFor(k, v)} onClear={() => setFilters((f) => { const list = (f[k as FacetKey] ?? []).filter((x) => x !== v); const o = { ...f, [k]: list }; if (!list.length) delete (o as Record<string, unknown>)[k]; return o; })} />)}
-            {active.length > 0 && <button onClick={() => setFilters({})} className="text-[11px] text-white/40 hover:text-white/70">Clear all</button>}
+            {active.length > 0 && <button onClick={() => setFilters({})} className="text-[12px] text-white/50 hover:text-white/70">Clear all</button>}
           </div>
           {showFilters && data && (
             <div className="fel-card grid max-h-[50vh] grid-cols-1 gap-3 overflow-y-auto rounded-xl p-3 sm:grid-cols-2" data-testid="library-facets">
               {FACET_ORDER.map((k) => data.facets[k]?.length ? (
                 <div key={k} className="space-y-1">
-                  <div className="text-[10px] uppercase tracking-wider text-white/40">{FACET_TITLES[k]}</div>
+                  <div className="text-[12px] uppercase tracking-wider text-white/50">{FACET_TITLES[k]}</div>
                   <div className="flex flex-wrap gap-1">
                     {data.facets[k].slice(0, 14).map((v) => {
                       const on = (filters[k] ?? []).includes(v.value);
                       return (
                         <button key={v.value} onClick={() => toggle(k, v.value)} aria-pressed={on}
-                          className={`rounded-md border px-1.5 py-0.5 text-[11px] ${on ? 'border-[#00E5FF]/40 bg-[#00E5FF]/15 text-[#00E5FF]' : 'border-white/8 text-white/60 hover:text-white/85'}`}>
-                          {v.label} <span className="text-white/35">{v.count}</span>
+                          className={`rounded-md border px-1.5 py-0.5 text-[12px] ${on ? 'border-[#00E5FF]/40 bg-[#00E5FF]/15 text-[#00E5FF]' : 'border-white/8 text-white/60 hover:text-white/85'}`}>
+                          {v.label} <span className="text-white/50">{v.count}</span>
                         </button>
                       );
                     })}
@@ -319,7 +320,7 @@ export function LibraryBrowser({ onUse, onAdded, canAdd = false, title }: {
             </div>
           )}
           {data && (data.didYouMean || data.fallback === 'any-term' || (data.total === 0 && data.relaxations.length > 0)) && (
-            <div className="space-y-1 text-[11px] text-white/55" data-testid="library-recovery">
+            <div className="space-y-1 text-[12px] text-white/55" data-testid="library-recovery">
               {data.didYouMean && <p>Showing results for <button className="text-[#00E5FF] underline-offset-2 hover:underline" onClick={() => setQ(data.didYouMean!)}>{data.didYouMean}</button>.</p>}
               {data.fallback === 'any-term' && <p>Nothing matched every word, so these match some of them.</p>}
               {data.total === 0 && data.relaxations.map((r) => (
@@ -337,7 +338,7 @@ export function LibraryBrowser({ onUse, onAdded, canAdd = false, title }: {
       <div className={LL.grid} data-testid="library-results" data-results-for={(data as { query?: string } | null)?.query ?? ''} data-results-from={local ? 'device' : 'server'}>
         {results.map((e) => <ResultTile key={e.id} e={e} onOpen={() => { setSheetTab(undefined); setSelected(e); }} />)}
         {!loading && results.length === 0 && (mode === 'search' ? data : ask) && (
-          <div className="col-span-2 py-8 text-center text-sm text-white/35">
+          <div className="col-span-2 py-8 text-center text-sm text-white/50">
             {mode === 'search' && data && data.library.approved === 0 && !drafts
               ? (data.viewer.coach ? 'Nothing is approved yet. Turn on "Show drafts" to browse the drafts.' : 'The library opens as the owner approves it. Check back soon.')
               : 'Nothing matches. Try fewer words or another filter.'}
@@ -362,7 +363,7 @@ async function openById(id: string, set: (e: LibraryCard) => void) {
 
 function Chip({ label, onClear }: { label: string; onClear: () => void }) {
   return (
-    <button onClick={onClear} aria-label={`Remove ${label}`} className="inline-flex items-center gap-1 rounded-full border border-[#00E5FF]/30 bg-[#00E5FF]/[0.07] px-2 py-0.5 text-[11px] text-[#00E5FF]/90">
+    <button onClick={onClear} aria-label={`Remove ${label}`} className="inline-flex items-center gap-1 rounded-full border border-[#00E5FF]/30 bg-[#00E5FF]/[0.07] px-2 py-0.5 text-[12px] text-[#00E5FF]/90">
       {label}<X className="h-3 w-3" />
     </button>
   );

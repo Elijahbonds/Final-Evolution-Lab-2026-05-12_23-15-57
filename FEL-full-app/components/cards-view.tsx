@@ -193,7 +193,7 @@ export function CardsView() {
                       <h3 className="fel-heading text-lg font-bold leading-tight text-white">
                         {card.title}
                       </h3>
-                      <span className="font-mono text-[10px] uppercase tracking-wider text-white/60">
+                      <span className="font-mono text-[12px] uppercase tracking-wider text-white/60">
                         {meta.label}
                       </span>
                     </div>
@@ -295,7 +295,7 @@ export function CardsView() {
                             <h3 className="fel-heading text-lg font-bold leading-tight text-white">
                               {card.title}
                             </h3>
-                            <span className="font-mono text-[10px] uppercase tracking-wider text-white/60">
+                            <span className="font-mono text-[12px] uppercase tracking-wider text-white/60">
                               {card.heroMode === 'dunking' ? 'Dunking' : 'Karate'}
                             </span>
                           </div>
@@ -311,7 +311,7 @@ export function CardsView() {
                               ? 'cursor-default bg-[#00FF9D]/15 text-[#00FF9D]'
                               : canAfford
                                 ? 'bg-[#00E5FF] text-black hover:bg-[#00E5FF]/85 hover:shadow-[0_0_18px_rgba(0,229,255,0.4)]'
-                                : 'cursor-not-allowed bg-white/10 text-white/35'
+                                : 'cursor-not-allowed bg-white/10 text-white/50'
                           }`}
                         >
                           {busy === card.id ? (

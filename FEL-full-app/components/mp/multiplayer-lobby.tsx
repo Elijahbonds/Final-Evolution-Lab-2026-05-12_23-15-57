@@ -15,6 +15,7 @@
 import { useEffect, useState } from 'react';
 import { Swords, Copy, Check, Loader2, Users, Radio, Trophy, Share2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { readToast } from '@/components/ui/fel/toast';
 import { MP_CHALLENGE_MODES, MP_PAUSED_MODES, mpModeLabel } from '@/lib/mp/match-core';
 import { syncWalletBalances } from '@/lib/wallet/client';
 
@@ -118,7 +119,7 @@ function ModeSelect({ value, onChange }: { value: string; onChange: (v: string) 
         ))}
       </select>
       {MP_PAUSED_MODES.length > 0 && (
-        <p className="mt-1.5 font-mono text-[10px] leading-relaxed text-white/35">
+        <p className="mt-1.5 font-mono text-[12px] leading-relaxed text-white/50">
           Challenges paused: {MP_PAUSED_MODES.map((m) => m.label).join(', ')} &mdash; while their duels are made fair.
           Free play is open, and a challenge code you already have can still be accepted.
         </p>
@@ -146,7 +147,7 @@ function OnlinePanel({ onDone }: { onDone: () => void }) {
       if (!res.ok) { toast.error(d?.error === 'invalid_mode' ? 'Pick a valid mode' : d?.error === 'STAKING_PAUSED' && d?.detail ? d.detail : 'Could not create challenge'); return; }
       setCode(d.code); setHostScore(d.hostScore);
       onDone();
-      if (!d.hostScore) toast.message('Heads up: your best score for this mode is 0 — play it first for a real challenge.');
+      if (!d.hostScore) readToast.message('Heads up: your best score for this mode is 0 — play it first for a real challenge.');
     } finally { setBusy(false); }
   };
 
@@ -158,7 +159,7 @@ function OnlinePanel({ onDone }: { onDone: () => void }) {
 
   return (
     <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-      <label className="font-mono text-[11px] uppercase tracking-wider text-white/50">Choose a mode</label>
+      <label className="font-mono text-[12px] uppercase tracking-wider text-white/50">Choose a mode</label>
       <div className="mt-2"><ModeSelect value={mode} onChange={setMode} /></div>
       <button
         onClick={create}
@@ -181,7 +182,7 @@ function OnlinePanel({ onDone }: { onDone: () => void }) {
               {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}{copied ? 'Copied' : 'Copy'}
             </button>
           </div>
-          <p className="mt-2 font-mono text-[11px] text-white/40">Code: {code}</p>
+          <p className="mt-2 font-mono text-[12px] text-white/50">Code: {code}</p>
         </div>
       )}
     </div>
@@ -220,25 +221,25 @@ function JoinPanel({ onDone, initialCode = '' }: { onDone: () => void; initialCo
 
   return (
     <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-      <label className="font-mono text-[11px] uppercase tracking-wider text-white/50">Enter a challenge code</label>
+      <label className="font-mono text-[12px] uppercase tracking-wider text-white/50">Enter a challenge code</label>
       <div className="mt-2 flex gap-2">
         <input
           value={code}
           onChange={(e) => setCode(e.target.value.toUpperCase())}
           placeholder="e.g. K7QP2M"
           maxLength={10}
-          className="flex-1 rounded-xl border border-white/10 bg-black/50 px-4 py-3 font-mono uppercase tracking-widest text-white placeholder:text-white/30"
+          className="flex-1 rounded-xl border border-white/10 bg-black/50 px-4 py-3 font-mono uppercase tracking-widest text-white placeholder:text-white/50"
         />
         <button onClick={join} disabled={busy} className="inline-flex items-center gap-2 rounded-xl bg-[#FF3366] px-5 py-3 font-bold text-white transition-transform hover:scale-[1.03] disabled:opacity-50">
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Swords className="h-4 w-4" />}Accept
         </button>
       </div>
-      <p className="mt-2 font-mono text-[11px] text-white/40">Your best recorded score for that mode is used automatically.</p>
+      <p className="mt-2 font-mono text-[12px] text-white/50">Your best recorded score for that mode is used automatically.</p>
 
       {result && (
         <div className="mt-5 rounded-xl border border-white/10 bg-black/30 p-4">
           <div className="flex items-center gap-2">
-            <Trophy className={`h-5 w-5 ${result.youWon ? 'text-[#FFD700]' : 'text-white/40'}`} />
+            <Trophy className={`h-5 w-5 ${result.youWon ? 'text-[#FFD700]' : 'text-white/50'}`} />
             <span className="font-bold text-white">{mpModeLabel(result.mode)} — {result.outcome === 'tie' ? 'Tie' : result.youWon ? 'You won' : 'You lost'}</span>
           </div>
           <div className="mt-2 grid grid-cols-2 gap-3 text-sm">
@@ -282,20 +283,20 @@ function LocalPanel({ onDone }: { onDone: () => void }) {
 
   return (
     <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-      <label className="font-mono text-[11px] uppercase tracking-wider text-white/50">Mode</label>
+      <label className="font-mono text-[12px] uppercase tracking-wider text-white/50">Mode</label>
       <div className="mt-2"><ModeSelect value={mode} onChange={setMode} /></div>
       <div className="mt-4 grid grid-cols-2 gap-3">
         <div>
-          <label className="font-mono text-[11px] uppercase tracking-wider text-white/50">Your score</label>
+          <label className="font-mono text-[12px] uppercase tracking-wider text-white/50">Your score</label>
           <input value={p1} onChange={(e) => setP1(e.target.value.replace(/[^0-9]/g, ''))} inputMode="numeric" placeholder="0" className="mt-1 w-full rounded-xl border border-white/10 bg-black/50 px-4 py-3 text-white" />
         </div>
         <div>
-          <label className="font-mono text-[11px] uppercase tracking-wider text-white/50">Opponent score</label>
+          <label className="font-mono text-[12px] uppercase tracking-wider text-white/50">Opponent score</label>
           <input value={p2} onChange={(e) => setP2(e.target.value.replace(/[^0-9]/g, ''))} inputMode="numeric" placeholder="0" className="mt-1 w-full rounded-xl border border-white/10 bg-black/50 px-4 py-3 text-white" />
         </div>
       </div>
       <div className="mt-3">
-        <label className="font-mono text-[11px] uppercase tracking-wider text-white/50">Opponent name</label>
+        <label className="font-mono text-[12px] uppercase tracking-wider text-white/50">Opponent name</label>
         <input value={p2name} onChange={(e) => setP2name(e.target.value)} maxLength={40} className="mt-1 w-full rounded-xl border border-white/10 bg-black/50 px-4 py-3 text-white" />
       </div>
       <button onClick={submit} disabled={busy} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#00FF9D] px-5 py-3 font-bold text-black transition-transform hover:scale-[1.03] disabled:opacity-50">
@@ -305,7 +306,7 @@ function LocalPanel({ onDone }: { onDone: () => void }) {
       {result && (
         <div className="mt-5 rounded-xl border border-white/10 bg-black/30 p-4">
           <div className="flex items-center gap-2">
-            <Trophy className={`h-5 w-5 ${result.youWon ? 'text-[#FFD700]' : 'text-white/40'}`} />
+            <Trophy className={`h-5 w-5 ${result.youWon ? 'text-[#FFD700]' : 'text-white/50'}`} />
             <span className="font-bold text-white">{result.outcome === 'tie' ? 'Tie game' : result.youWon ? 'You won' : `${result.guestName} won`}</span>
           </div>
           <div className="mt-2 grid grid-cols-2 gap-3 text-sm">
@@ -334,15 +335,15 @@ function MatchCard({ m }: { m: MatchRow }) {
       <div>
         <div className="flex items-center gap-2">
           <span className="font-semibold text-white">{mpModeLabel(m.mode)}</span>
-          <span className="rounded-full bg-white/10 px-2 py-0.5 font-mono text-[10px] uppercase text-white/50">{m.kind}</span>
+          <span className="rounded-full bg-white/10 px-2 py-0.5 font-mono text-[12px] uppercase text-white/50">{m.kind}</span>
           {settled && (
-            <span className={`rounded-full px-2 py-0.5 font-mono text-[10px] uppercase ${m.youWon ? 'bg-[#FFD700]/15 text-[#FFD700]' : 'bg-white/10 text-white/50'}`}>
+            <span className={`rounded-full px-2 py-0.5 font-mono text-[12px] uppercase ${m.youWon ? 'bg-[#FFD700]/15 text-[#FFD700]' : 'bg-white/10 text-white/50'}`}>
               {m.winnerId ? (m.youWon ? 'Won' : 'Lost') : 'Tie'}
             </span>
           )}
-          {!settled && <span className="rounded-full bg-[#00E5FF]/15 px-2 py-0.5 font-mono text-[10px] uppercase text-[#00E5FF]">{m.status}</span>}
+          {!settled && <span className="rounded-full bg-[#00E5FF]/15 px-2 py-0.5 font-mono text-[12px] uppercase text-[#00E5FF]">{m.status}</span>}
         </div>
-        <div className="mt-1 font-mono text-[11px] text-white/40">
+        <div className="mt-1 font-mono text-[12px] text-white/50">
           {m.hostName} {m.hostScore ?? 0} — {m.guestScore ?? 0} {m.guestName ?? 'waiting…'} · code {m.code}
         </div>
       </div>

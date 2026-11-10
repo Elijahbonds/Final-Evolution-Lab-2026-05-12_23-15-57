@@ -66,7 +66,7 @@ export function PhotoMode({ label, accent, makeCode, adult, capture, onClose, on
     finally { setBusy(false); }
   };
 
-  const chip = (on: boolean) => `rounded-full border px-2.5 py-1 font-display text-[10px] uppercase tracking-wide transition ${on ? 'border-cyan-400 bg-cyan-400/15 text-cyan-200' : 'border-white/10 bg-white/[0.03] text-white/60 hover:border-white/25'}`;
+  const chip = (on: boolean) => `rounded-full border px-2.5 py-1 font-display text-[12px] uppercase tracking-wide transition ${on ? 'border-cyan-400 bg-cyan-400/15 text-cyan-200' : 'border-white/10 bg-white/[0.03] text-white/60 hover:border-white/25'}`;
 
   return (
     <div role="dialog" aria-label="Photo mode" className="pointer-events-auto absolute inset-x-2 bottom-2 z-30 max-h-[85%] overflow-y-auto rounded-2xl border border-white/10 bg-[#0c0c11]/95 p-4 shadow-[0_12px_40px_rgba(0,0,0,0.55)] backdrop-blur md:inset-x-auto md:right-3 md:w-[380px]">
@@ -78,7 +78,7 @@ export function PhotoMode({ label, accent, makeCode, adult, capture, onClose, on
       <Row title="Backdrop">{Object.keys(CARD_BACKDROPS).map((b) => <button key={b} type="button" className={chip(backdrop === b)} onClick={() => setBackdrop(b)}>{BACKDROP_LABELS[b] ?? b}</button>)}</Row>
       <Row title="Frame">{CARD_FRAMES.map((f) => <button key={f} type="button" className={chip(frame === f)} onClick={() => setFrame(f)}>{FRAME_LABELS[f]}</button>)}</Row>
       {adult && (
-        <label className="mb-3 flex items-center gap-2 text-[11px] text-white/55" title="The face sculpt numbers (a face scan writes these). Off unless you choose.">
+        <label className="mb-3 flex items-center gap-2 text-[12px] text-white/55" title="The face sculpt numbers (a face scan writes these). Off unless you choose.">
           <input type="checkbox" checked={numbers} onChange={(e) => setNumbers(e.target.checked)} className="accent-cyan-400" /> Print my face sculpt numbers in the code
         </label>
       )}
@@ -86,7 +86,7 @@ export function PhotoMode({ label, accent, makeCode, adult, capture, onClose, on
         className="flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-400 py-2.5 font-display text-sm font-bold uppercase tracking-wide text-black transition hover:bg-cyan-300 disabled:opacity-60">
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />} {busy ? 'Posing…' : card ? 'Take another' : 'Take the photo'}
       </button>
-      {err && <p className="mt-2 text-[11px] text-[#FF3366]">{err}</p>}
+      {err && <p className="mt-2 text-[12px] text-[#FF3366]">{err}</p>}
       {card && (
         <div className="mt-3 space-y-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -99,7 +99,7 @@ export function PhotoMode({ label, accent, makeCode, adult, capture, onClose, on
               <Copy className="h-3.5 w-3.5" /> Code
             </button>
           </div>
-          <p className="text-[10px] leading-relaxed text-white/40">Saved to this device only — nothing is uploaded. The code on the card loads this look in anyone&apos;s Studio (Paste a code).</p>
+          <p className="text-[12px] leading-relaxed text-white/50">Saved to this device only — nothing is uploaded. The code on the card loads this look in anyone&apos;s Studio (Paste a code).</p>
         </div>
       )}
     </div>
@@ -109,7 +109,7 @@ export function PhotoMode({ label, accent, makeCode, adult, capture, onClose, on
 function Row({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="mb-3">
-      <div className="mb-1.5 font-display text-[10px] uppercase tracking-[0.2em] text-white/40">{title}</div>
+      <div className="mb-1.5 font-display text-[12px] uppercase tracking-[0.2em] text-white/50">{title}</div>
       <div className="flex flex-wrap gap-1.5">{children}</div>
     </div>
   );

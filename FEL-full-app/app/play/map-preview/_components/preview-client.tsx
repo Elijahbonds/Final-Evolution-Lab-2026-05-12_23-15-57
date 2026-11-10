@@ -178,7 +178,7 @@ export default function MapPreviewClient() {
                 ))}
               </div>
             )}
-            <div className="mt-1 text-white/40">
+            <div className="mt-1 text-white/50">
               Budget: {PERF_BUDGET.targetFps}fps target · {PERF_BUDGET.floorFps}fps floor · {PERF_BUDGET.maxTriangles.toLocaleString()} max tris · {PERF_BUDGET.maxDrawCalls} max draws
             </div>
           </div>

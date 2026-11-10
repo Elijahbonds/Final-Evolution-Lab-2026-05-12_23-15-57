@@ -9,7 +9,7 @@ export function LiveSessionLink({ programId, role }: { programId: string; role: 
   if (!coachLiveEnabled() || !programId) return null;
   return (
     <Link href={`/coach/live/p_${programId}`} data-live-link={role}
-      className="ml-auto rounded-md border border-cyan-300/40 px-2 py-0.5 text-[11px] font-semibold normal-case tracking-normal text-cyan-200">
+      className="ml-auto rounded-md border border-cyan-300/40 px-2 py-0.5 text-[12px] font-semibold normal-case tracking-normal text-cyan-200">
       {role === 'coach' ? 'Go live' : 'Live session'}
     </Link>
   );

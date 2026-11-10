@@ -39,7 +39,7 @@ function SetLine({ s }: { s: SetRow }) {
     <li className="flex items-center justify-between gap-3 py-1.5" data-vbt-coach-set>
       <div className="min-w-0">
         <div className="truncate text-[13px] text-white/85">{s.liftName}{s.loadKg ? ` · ${s.loadKg} kg` : ''}{s.warmup && s.band ? ` · warm-up ${s.band}` : ''}</div>
-        <div className="text-[11px] text-white/45">{s.day} · {s.reps} reps{s.partials ? ` +${s.partials} partial` : ''} · best {s.bestMcv?.toFixed(2) ?? '—'} m/s · <span className={over ? 'text-[#FF4D8D]' : ''} data-vbt-coach-loss>−{s.lossPct ?? 0}% (stop {s.stopPct}%)</span></div>
+        <div className="text-[12px] text-white/50">{s.day} · {s.reps} reps{s.partials ? ` +${s.partials} partial` : ''} · best {s.bestMcv?.toFixed(2) ?? '—'} m/s · <span className={over ? 'text-[#FF4D8D]' : ''} data-vbt-coach-loss>−{s.lossPct ?? 0}% (stop {s.stopPct}%)</span></div>
       </div>
       <Bars s={s} />
     </li>
@@ -68,25 +68,25 @@ export function CoachVelocity({ api = COACH_VBT_API }: { api?: string }) {
     <div className="space-y-4" data-vbt-coach>
       <div>
         <h1 className="text-xl font-black text-white">Bar speed</h1>
-        <p className="text-xs text-white/45">{ESTIMATE_LINE}</p>
+        <p className="text-xs text-white/50">{ESTIMATE_LINE}</p>
       </div>
 
       <section className="fel-card space-y-2 rounded-xl p-4" data-vbt-coach-clients>
-        <div className="text-[11px] uppercase tracking-wider text-white/40">Clients</div>
+        <div className="text-[12px] uppercase tracking-wider text-white/50">Clients</div>
         {!board.athletes?.length && <p className="text-sm text-white/50">No clients yet.</p>}
         {board.athletes?.map((a) => (
           <div key={a.id} className="border-t border-white/5 pt-2 first:border-0 first:pt-0" data-vbt-coach-athlete={a.id}>
             <div className="text-sm font-semibold text-white">{a.name}</div>
-            {!a.shares ? <p className="text-xs text-white/40">Not shared with you{!a.adult ? ' (under 18: bar speed stays with them)' : ''}.</p>
+            {!a.shares ? <p className="text-xs text-white/50">Not shared with you{!a.adult ? ' (under 18: bar speed stays with them)' : ''}.</p>
               : a.sets.length ? <ul className="divide-y divide-white/5">{a.sets.slice(0, 5).map((s, i) => <SetLine key={i} s={s} />)}</ul>
-              : <p className="text-xs text-white/40">No tracked sets in the last 4 weeks.</p>}
+              : <p className="text-xs text-white/50">No tracked sets in the last 4 weeks.</p>}
           </div>
         ))}
       </section>
 
       {!!board.teams?.length && (
         <section className="fel-card space-y-2 rounded-xl p-4" data-vbt-coach-teams>
-          <div className="text-[11px] uppercase tracking-wider text-white/40">Teams</div>
+          <div className="text-[12px] uppercase tracking-wider text-white/50">Teams</div>
           <div className="flex flex-wrap gap-1.5">
             {board.teams.map((t) => <button key={t.id} type="button" onClick={() => void openTeam(t.id)} data-vbt-team={t.id} className={`min-h-9 rounded-full border px-3 text-[13px] ${team?.team.id === t.id ? 'border-white bg-white text-black' : 'border-white/15 text-white/75'}`}>{t.name}</button>)}
           </div>
@@ -98,23 +98,23 @@ export function CoachVelocity({ api = COACH_VBT_API }: { api?: string }) {
                   <ul className="divide-y divide-white/5">{m.latest.map((s, i) => <SetLine key={i} s={s} />)}</ul>
                 </div>
               ))}
-              {team.hidden > 0 && <p className="pt-1 text-xs text-white/40">{team.hidden} member{team.hidden > 1 ? 's' : ''} not sharing measured numbers.</p>}
+              {team.hidden > 0 && <p className="pt-1 text-xs text-white/50">{team.hidden} member{team.hidden > 1 ? 's' : ''} not sharing measured numbers.</p>}
             </div>
           )}
         </section>
       )}
 
       <section className="fel-card space-y-2 rounded-xl p-4" data-vbt-coach-zones>
-        <div className="text-[11px] uppercase tracking-wider text-white/40">Target zones on your programs</div>
+        <div className="text-[12px] uppercase tracking-wider text-white/50">Target zones on your programs</div>
         {!board.slots?.length && <p className="text-sm text-white/50">No barbell, dumbbell or body-weight slots in your programs yet.</p>}
         {board.slots?.map((s) => (
           <div key={s.sessionExerciseId} className="space-y-1.5 border-t border-white/5 pt-2 first:border-0 first:pt-0" data-vbt-slot={s.sessionExerciseId}>
-            <div className="text-[13px] text-white/85">{s.client} · {s.session} · <b>{s.name}</b> <span className="text-white/45">{s.dose}</span></div>
+            <div className="text-[13px] text-white/85">{s.client} · {s.session} · <b>{s.name}</b> <span className="text-white/50">{s.dose}</span></div>
             <div className="flex flex-wrap items-center gap-1.5">
               {ZONE_IDS.map((z) => (
                 <button key={z} type="button" disabled={saving === s.sessionExerciseId} data-vbt-zone={z} aria-pressed={s.target?.zone === z}
                   onClick={() => void putZone(s.sessionExerciseId, { zone: z, lossStopPct: s.target?.lossStopPct ?? LOSS_STOP_PCT.default })}
-                  className="min-h-8 rounded-md border px-2 text-[11px] font-bold" style={s.target?.zone === z ? { borderColor: ZONES[z].color, color: '#000', background: ZONES[z].color } : { borderColor: 'rgba(255,255,255,.15)', color: ZONES[z].color }}>
+                  className="min-h-8 rounded-md border px-2 text-[12px] font-bold" style={s.target?.zone === z ? { borderColor: ZONES[z].color, color: '#000', background: ZONES[z].color } : { borderColor: 'rgba(255,255,255,.15)', color: ZONES[z].color }}>
                   {ZONES[z].name} {ZONES[z].lo.toFixed(2)}{ZONES[z].hi < 3 ? `–${ZONES[z].hi.toFixed(2)}` : '+'}
                 </button>
               ))}

@@ -30,7 +30,7 @@ export function NowPlayingCard({ className = '', showSkip = true }: { className?
       className={`flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 ${className}`}>
       <div aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#00E5FF]/15 text-[#00E5FF]">♪</div>
       <div className="min-w-0 flex-1">
-        <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-white/40">Now playing</p>
+        <p className="font-mono text-[12px] uppercase tracking-[0.18em] text-white/50">Now playing</p>
         <p className="truncate text-sm font-semibold text-white" title={t.title}>{t.title}</p>
         <p className="truncate text-xs text-white/60">
           {t.creator.href ? <Link href={t.creator.href} className="underline decoration-white/30 hover:text-white">{t.creator.name}</Link> : t.creator.name}

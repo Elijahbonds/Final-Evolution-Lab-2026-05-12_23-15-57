@@ -40,7 +40,7 @@ function DraftNowPlaying({ title, creator, cover, playing, onToggle }: { title: 
         {cover && /^https:\/\//.test(cover) && <img src={cover} alt="" className="h-full w-full object-cover" />}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="text-[10px] uppercase tracking-widest text-emerald-300">Now playing</div>
+        <div className="text-[12px] uppercase tracking-widest text-emerald-300">Now playing</div>
         <div className="truncate text-sm font-bold text-white">{title || 'Untitled'}</div>
         <div className="truncate text-xs text-white/60">by {creator}</div>
       </div>
@@ -118,7 +118,7 @@ function MusicPreview({ art, url, title, creator }: { art: Extract<ArtPayloadBod
           </div>
         </Frame>
       )}
-      {!url && <p className="text-xs text-neutral-500">No audio on this page: pick the song again in step 1 to hear it.</p>}
+      {!url && <p className="text-xs text-neutral-400">No audio on this page: pick the song again in step 1 to hear it.</p>}
     </div>
   );
 }
@@ -149,7 +149,7 @@ function DancePreview({ art }: { art: Extract<ArtPayloadBody, { kind: 'dance' }>
           {songs.map((s) => <option key={s.id} value={s.id}>{s.title} · {s.bpm} BPM</option>)}
         </select>
         <button onClick={() => { const a = audio.current; if (a) (a.paused ? void a.play().catch(() => {}) : a.pause()); }} className="rounded-lg bg-fuchsia-500 px-3 py-1.5 text-xs font-bold text-black">Play / pause</button>
-        <span className="text-xs text-neutral-500">Your routine is at {bpm} BPM; the floor plays it on the song&apos;s beat.</span>
+        <span className="text-xs text-neutral-400">Your routine is at {bpm} BPM; the floor plays it on the song&apos;s beat.</span>
       </div>
       <Frame label="Your routine on the beat">
         <div className="relative overflow-x-auto rounded-xl bg-neutral-900 p-3">
@@ -158,7 +158,7 @@ function DancePreview({ art }: { art: Extract<ArtPayloadBody, { kind: 'dance' }>
               const on = i === current;
               const clip = DANCE_LIBRARY.find((c) => c.id === s.clipId);
               return (
-                <div key={i} className={`absolute top-1 h-12 overflow-hidden rounded-md px-1 text-[10px] font-bold leading-tight transition ${on ? 'bg-fuchsia-400 text-black' : 'bg-fuchsia-900/60 text-fuchsia-100'}`}
+                <div key={i} className={`absolute top-1 h-12 overflow-hidden rounded-md px-1 text-[12px] font-bold leading-tight transition ${on ? 'bg-fuchsia-400 text-black' : 'bg-fuchsia-900/60 text-fuchsia-100'}`}
                   style={{ left: `${s.beat * 16}px`, width: `${Math.max(14, s.holdBeats * 16 - 2)}px` }}>
                   {clip?.name ?? s.clipId}{s.mirrored ? ' ⇋' : ''}
                 </div>
@@ -168,7 +168,7 @@ function DancePreview({ art }: { art: Extract<ArtPayloadBody, { kind: 'dance' }>
           </div>
         </div>
       </Frame>
-      <p className="text-xs text-neutral-500">A 3D dancer preview arrives with the Dance floor&apos;s routine pick (routed to the Dance room&apos;s lane).</p>
+      <p className="text-xs text-neutral-400">A 3D dancer preview arrives with the Dance floor&apos;s routine pick (routed to the Dance room&apos;s lane).</p>
     </div>
   );
 }
@@ -200,8 +200,8 @@ function ActingPreview({ art, url, creator }: { art: Extract<ArtPayloadBody, { k
     <Frame label={`The MC moment: ${art.voiceLineIds[0]?.replace(/_/g, ' ') ?? 'a game moment'}`}>
       <div className="space-y-3 rounded-2xl bg-gradient-to-b from-amber-950 to-neutral-950 p-4">
         <div className="rounded-lg bg-black/60 px-3 py-2 text-center text-sm text-white">🎙 <b>{creator}</b>: “{prompt?.line ?? 'your line'}”</div>
-        {url ? <audio src={url} controls className="w-full" /> : <p className="text-xs text-neutral-500">Record again in step 1 to hear it.</p>}
-        <p className="text-xs text-neutral-500">Approved lines play as an occasional crowd-mic call, captioned with your name (wiring routed to the voice lane).</p>
+        {url ? <audio src={url} controls className="w-full" /> : <p className="text-xs text-neutral-400">Record again in step 1 to hear it.</p>}
+        <p className="text-xs text-neutral-400">Approved lines play as an occasional crowd-mic call, captioned with your name (wiring routed to the voice lane).</p>
       </div>
     </Frame>
   );
@@ -212,16 +212,16 @@ function WritingPreview({ art, title, creator }: { art: Extract<ArtPayloadBody, 
     <div className="grid gap-4 sm:grid-cols-2">
       <Frame label="Story: Community reads">
         <article className="rounded-2xl border border-lime-400/20 bg-neutral-900 p-4">
-          <div className="text-[10px] uppercase tracking-widest text-lime-300">Community read</div>
+          <div className="text-[12px] uppercase tracking-widest text-lime-300">Community read</div>
           <h3 className="mt-1 text-lg font-black text-white">{title || 'Untitled'}</h3>
           <p className="mt-2 line-clamp-5 whitespace-pre-line text-sm text-neutral-300">{art.text}</p>
-          <p className="mt-2 text-xs text-neutral-500">by {creator}</p>
+          <p className="mt-2 text-xs text-neutral-400">by {creator}</p>
         </article>
       </Frame>
       <Frame label="Knowledge Feed: Community (routed)">
         <div className="rounded-2xl bg-neutral-800 p-4 text-sm text-neutral-200">
           <p className="line-clamp-4">{art.text}</p>
-          <p className="mt-2 text-[11px] text-neutral-500">by @{creator.replace(/\s+/g, '').toLowerCase()}: FEL Creator Card</p>
+          <p className="mt-2 text-[12px] text-neutral-400">by @{creator.replace(/\s+/g, '').toLowerCase()}: FEL Creator Card</p>
         </div>
       </Frame>
     </div>
@@ -234,9 +234,9 @@ function CookingPreview({ art, title, creator }: { art: Extract<ArtPayloadBody, 
       <div className="max-w-sm rounded-2xl bg-gradient-to-br from-rose-950 to-neutral-900 p-4">
         <h3 className="text-lg font-black text-white">{title || 'Recipe'}</h3>
         <p className="text-xs text-neutral-400">by {creator} · {art.ingredients.length} ingredients · {art.steps.length} steps</p>
-        <div className="mt-2 flex flex-wrap gap-1">{art.fuelTags.map((t) => <span key={t} className="rounded-full bg-rose-500/20 px-2 py-0.5 text-[10px] text-rose-200">{t}</span>)}</div>
+        <div className="mt-2 flex flex-wrap gap-1">{art.fuelTags.map((t) => <span key={t} className="rounded-full bg-rose-500/20 px-2 py-0.5 text-[12px] text-rose-200">{t}</span>)}</div>
         <p className="mt-2 text-xs text-neutral-300">{art.allergens?.length ? <>Contains: <b>{art.allergens.join(', ')}</b></> : 'No allergens declared.'}</p>
-        <p className="mt-1 text-[10px] text-neutral-500">Allergens are chef-declared from the ingredients, not tested.</p>
+        <p className="mt-1 text-[12px] text-neutral-400">Allergens are chef-declared from the ingredients, not tested.</p>
       </div>
     </Frame>
   );
@@ -258,7 +258,7 @@ function SportPreview({ art, title, creator }: { art: Extract<ArtPayloadBody, { 
   return (
     <Frame label="Your athlete card: Signature moves">
       <div className="max-w-sm rounded-2xl border border-orange-400/30 bg-neutral-950 p-4">
-        <div className="text-[10px] uppercase tracking-widest text-orange-300">Signature move</div>
+        <div className="text-[12px] uppercase tracking-widest text-orange-300">Signature move</div>
         <div className="mt-1 text-lg font-black text-white">{art.signatureMoveId || title || 'Your move'}</div>
         <div className="text-xs text-neutral-400">{title} · {creator}</div>
       </div>

@@ -88,27 +88,27 @@ export function ControlsPanel({ modeId, hint, chooser = true, className = '' }: 
       onPointerDown={chooser ? (e) => e.stopPropagation() : undefined}
       className={`flex w-[min(30rem,92vw)] min-h-0 flex-col gap-1.5 rounded-xl border border-white/10 bg-black/60 px-3 py-2 text-left ${className}`}>
       <span className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-        <span className="text-[10px] font-black tracking-[0.3em] text-white/70">CONTROLS</span>
+        <span className="text-[12px] font-black tracking-[0.3em] text-white/70">CONTROLS</span>
         {chooser ? (
           <span className="flex gap-1" role="group" aria-label="controls for">
             {CONTROLS_DEVICES.map((d) => (
               <button key={d} type="button" aria-pressed={d === device}
                 onClick={(e) => { e.currentTarget.blur(); setDevice(d); }}
-                className={`rounded-full border px-2 py-0.5 text-[9px] font-black tracking-wider transition ${d === device ? 'border-white bg-white text-black' : 'border-white/25 text-white/70 hover:bg-white/10'}`}>
+                className={`rounded-full border px-2 py-0.5 text-[12px] font-black tracking-wider transition ${d === device ? 'border-white bg-white text-black' : 'border-white/25 text-white/70 hover:bg-white/10'}`}>
                 {DEVICE_LABEL[d]}
               </button>
             ))}
           </span>
         ) : (
-          <span className="text-[9px] font-black tracking-wider text-white/50">{DEVICE_LABEL[device]}</span>
+          <span className="text-[12px] font-black tracking-wider text-white/50">{DEVICE_LABEL[device]}</span>
         )}
       </span>
       {sheet.rows.length > 0 && (
         <span data-controls-rows className="[zoom:var(--fel-controls-fit,1)] grid grid-cols-[auto_1fr_auto_1fr] gap-x-3 gap-y-0.5">
           {sheet.rows.map((r) => (
             <span key={`${r.input}-${r.action}`} className="contents">
-              <span className="whitespace-nowrap font-mono text-[11px] font-black text-[#22d3ee]">{r.input}</span>
-              <span className="font-mono text-[11px] text-white/85">{r.action}</span>
+              <span className="whitespace-nowrap font-mono text-[12px] font-black text-[#22d3ee]">{r.input}</span>
+              <span className="font-mono text-[12px] text-white/85">{r.action}</span>
             </span>
           ))}
         </span>
@@ -119,10 +119,10 @@ export function ControlsPanel({ modeId, hint, chooser = true, className = '' }: 
             <Fragment key={g.title ?? `group-${gi}`}>
               {g.title && (
                 <span data-controls-group={g.title} style={{ color: g.color }}
-                  className={`block text-[9px] font-black tracking-[0.3em]${gi > 0 ? ' pt-1.5' : ''}`}>{g.title}</span>
+                  className={`block text-[12px] font-black tracking-[0.3em]${gi > 0 ? ' pt-1.5' : ''}`}>{g.title}</span>
               )}
               {g.lines.map((l) => (
-                <span key={l} className="block pl-3 -indent-3 font-mono text-[10px] leading-snug text-white/75">· {l}</span>
+                <span key={l} className="block pl-3 -indent-3 font-mono text-[12px] leading-snug text-white/75">· {l}</span>
               ))}
             </Fragment>
           ))}

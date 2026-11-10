@@ -17,6 +17,7 @@ import { CLIP_ALIASES } from '../anim/clipAliases';
 import { REAL_CLIPS } from '../anim/clipRegistry';
 import { scopeAllows, scopeForMode, suiteOfClip } from '../anim/clipScope';
 import { stripComments } from '@/lib/testing/sourceScan';
+import { readableMs } from '@/lib/readable/rules';
 
 const ROOT = path.resolve(__dirname, '../../..');
 const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
@@ -226,10 +227,14 @@ describe('BB-6 a pause holds the banners: they run on the game clock, not setTim
     vi.advanceTimersByTime(60_000);   // a minute paused
     expect(r.banners).toEqual([`INNING 1 OF ${INNINGS}`]);
     expect(r.windups).toBe(0);
-    for (let t = 0; t < BANNER_MS / 1000 + DT; t += DT) r.game.tick(DT);
-    expect(r.banners.at(-1)).toBe('');   // cleared on the game clock
-    for (let t = 0; t < (NEXT_PITCH_MS - BANNER_MS) / 1000 + DT; t += DT) r.game.tick(DT);
+    // READABLE (2026-11-02): a banner is up for max(BANNER_MS, its read time). "INNING 1 OF 3" is 4 words → 2.2 s (it
+    // was 1.1 s), longer than NEXT_PITCH_MS, so the first pitch now winds up while it still shows; it clears after.
+    const hold = readableMs(`INNING 1 OF ${INNINGS}`, BANNER_MS);
+    for (let t = 0; t < NEXT_PITCH_MS / 1000 + DT; t += DT) r.game.tick(DT);
     expect(r.windups).toBe(1);
+    expect(r.banners.at(-1)).toBe(`INNING 1 OF ${INNINGS}`);   // still up: wall time never cleared it, the game clock has not yet
+    for (let t = NEXT_PITCH_MS / 1000 + DT; t < hold / 1000 + DT; t += DT) r.game.tick(DT);
+    expect(r.banners).toContain('');   // cleared on the game clock
   });
 
   it('a result banner set mid-game stays up while paused', () => {

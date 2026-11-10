@@ -78,7 +78,7 @@ export function CreditsList({ credits = CREDITS }: { credits?: Credit[] }) {
         );
       })}
 
-      <p className="mt-6 text-center text-xs text-white/40">
+      <p className="mt-6 text-center text-xs text-white/50">
         Something missing or wrong? Write to{' '}
         <a href="mailto:support@finalevolutionlab.com" className="text-[#00E5FF] hover:underline">support@finalevolutionlab.com</a>.
       </p>

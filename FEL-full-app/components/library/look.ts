@@ -5,7 +5,7 @@ import { TYPE } from '@/lib/design/type';
 
 export const LIB_LOOK = {
   // the search screen
-  search: `${TYPE.small} w-full rounded-full border border-white/10 bg-fel-surface-2 py-3 pl-11 pr-11 text-white placeholder-white/35 focus:border-fel-cyan/50 focus:outline-none`,
+  search: `${TYPE.small} w-full rounded-full border border-white/10 bg-fel-surface-2 py-3 pl-11 pr-11 text-white placeholder-white/50 focus:border-fel-cyan/50 focus:outline-none`,
   chips: 'flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
   chip: `${TYPE.label} fel-press inline-flex min-h-10 shrink-0 items-center gap-1 rounded-full border border-white/12 px-4 text-fel-soft`,
   chipOn: 'border-fel-cyan/60 text-fel-cyan',   // no fill: on and off stay one look (the premium rule's ≤ 3 button looks)

@@ -26,7 +26,7 @@ export async function CommunityReads() {
         <h2 id="community-reads" className="fel-heading text-xl font-bold text-white">Community reads</h2>
         <Link href="/create/writing" className="text-xs font-bold text-lime-300 hover:underline">Write one →</Link>
       </div>
-      <p className="mt-1 text-xs text-white/40">Stories, captions and verses by FEL creators, reviewed by FEL.</p>
+      <p className="mt-1 text-xs text-white/50">Stories, captions and verses by FEL creators, reviewed by FEL.</p>
       <ul className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
         {items.map((r) => (
           <li key={r.id} className="rounded-2xl border border-lime-400/15 bg-white/[0.03] p-4">

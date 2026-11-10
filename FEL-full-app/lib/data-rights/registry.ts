@@ -297,6 +297,12 @@ export const REGISTRY: Record<string, TableRights> = {
   // VBT (lane vbt, prisma/pending/2026-10-26-vbt.sql)
   VbtSet: { subjects: [{ col: 'userId', export: true, erase: 'delete', why: "The athlete's own bar-speed numbers (speeds, reps, velocity loss; never video). The feature's own delete (DELETE /api/vbt/sets) does the same." }] },
   VbtZoneTarget: { subjects: [{ col: 'coachId', export: true, erase: 'delete', why: "The coach's own velocity-zone targets on their program slots; the athlete's program stays as written." }] },
+  // BBS-04 (platform lane plat-bbs04, prisma/pending/2026-11-03-hoops-cam.sql)
+  HoopsCamSession: { subjects: [{ col: 'userId', export: true, erase: 'delete', why: "The player's own shot and dribble numbers (made / missed, approximate spots, dribble counts; never video). The feature's own delete (DELETE /api/hoops-cam/sessions) does the same." }] },
+  // TEACHER PLATFORM (plat-p10, prisma/pending/2026-11-03-teacher.sql)
+  TeacherApplication: { subjects: [{ col: 'userId', export: true, erase: 'delete', why: "The applicant's own application (discipline, bio, sample, links) and the owner's decision on it." }] },
+  TeacherRole: { subjects: [{ col: 'userId', export: true, erase: 'delete', why: 'The teacher role the owner granted; erased with the account (a re-joining teacher applies again).' }] },
+  TeachCourse: { subjects: [{ col: 'teacherId', export: true, erase: 'delete', why: "The teacher's own courses. No student progress is stored with them (it stays on the student's device)." }] },
   // COACH-BUSINESS (#442, #445)
   CoachConnectAccount: { subjects: [{ col: 'userId', export: true, erase: 'keep', why: 'The Stripe Connect account that CoachSale money records name. ' + MONEY }] },
   CoachPackage: { subjects: [{ col: 'coachId', export: true, erase: { scrub: { active: 'false' } }, why: 'Sales point at it (CoachSale.packageId Restrict): it stays, off sale.' }] },

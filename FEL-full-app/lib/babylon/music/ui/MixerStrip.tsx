@@ -148,12 +148,12 @@ export default function MixerPanel({ rows, mixer, engine, open, onOpen, onStrip,
       </div>
     );
   };
-  const small: React.CSSProperties = { ...S.btnAlt, padding: '4px 10px', fontSize: 11, minHeight: compact ? 40 : 26 };
+  const small: React.CSSProperties = { ...S.btnAlt, padding: '4px 10px', fontSize: 12, minHeight: compact ? 40 : 26 };
   // MUSIC-SUITE P4 FIX PASS: M / S are 40 × 40 on the phone
   const ms: React.CSSProperties = { ...small, ...(compact ? { minWidth: 40, padding: '4px 0' } : {}) };
   const toggle = (on: boolean, color: string): React.CSSProperties => (on ? { background: color, color: '#101018', border: `1px solid ${color}`, fontWeight: 800 } : {});
   const slider = (label: string, value: number, min: number, max: number, step: number, words: string, onChange: (v: number) => void, qa: string, key: string): React.ReactNode => (
-    <label style={{ display: 'grid', gridTemplateColumns: '44px 1fr 64px', alignItems: 'center', gap: 6, fontSize: 11 }}>
+    <label style={{ display: 'grid', gridTemplateColumns: '44px 1fr 64px', alignItems: 'center', gap: 6, fontSize: 12 }}>
       <span style={{ opacity: 0.8 }}>{label}</span>
       {fader(key, value, min, max, step, onChange, qa)}
       <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{words}</span>
@@ -167,7 +167,7 @@ export default function MixerPanel({ rows, mixer, engine, open, onOpen, onStrip,
         {open ? '▾ MIXER' : '▸ MIXER'}{full ? '' : ' · mute / solo'}
       </button>
       {open && !full && (
-        <div data-qa="mixer-more" style={{ fontSize: 11, opacity: 0.75, marginTop: 4 }}>
+        <div data-qa="mixer-more" style={{ fontSize: 12, opacity: 0.75, marginTop: 4 }}>
           VOL · PAN · ROOM · DELAY and the master LEVEL open at THE STUDIO{fullNeeds ? ` — ${fullNeeds}` : ''}
         </div>
       )}
@@ -177,11 +177,11 @@ export default function MixerPanel({ rows, mixer, engine, open, onOpen, onStrip,
           <div data-qa="master-strip" style={{ padding: 8, borderRadius: 10, background: 'rgba(255,215,94,0.08)', border: '1px solid #ffd75e', display: 'grid', gap: 6 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, fontWeight: 800 }}>
               <span>MASTER</span>
-              <span ref={limitRef} data-qa="limiter-label" style={{ fontSize: 10, color: '#ffd75e', fontWeight: 700 }} />
+              <span ref={limitRef} data-qa="limiter-label" style={{ fontSize: 12, color: '#ffd75e', fontWeight: 700 }} />
             </div>
             <div style={{ display: 'grid', gap: 4 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10 }}><span style={{ width: 10 }}>L</span><Meter id="master:l" reg={reg} wide /></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10 }}><span style={{ width: 10 }}>R</span><Meter id="master:r" reg={reg} wide /></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}><span style={{ width: 10 }}>L</span><Meter id="master:l" reg={reg} wide /></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}><span style={{ width: 10 }}>R</span><Meter id="master:r" reg={reg} wide /></div>
             </div>
             {full && slider('LEVEL', mixer.master, 0, MASTER_FADER_MAX, 0.01, faderLabel(mixer.master), (v) => onMaster(v, 'mix:master'), 'master-fader', 'master')}
           </div>
@@ -198,7 +198,7 @@ export default function MixerPanel({ rows, mixer, engine, open, onOpen, onStrip,
                       {isOpen ? '▾' : '▸'} {r.label}
                     </button>
                   ) : (
-                    <span data-qa="strip-name" style={{ flex: '1 1 auto', fontSize: 11, padding: '4px 6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{r.label}</span>
+                    <span data-qa="strip-name" style={{ flex: '1 1 auto', fontSize: 12, padding: '4px 6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{r.label}</span>
                   )}
                   <button type="button" data-qa="strip-mute" aria-pressed={c.mute} title="mute" style={{ ...ms, ...toggle(c.mute, '#ff8a5c') }}
                     onClick={() => onStrip(r.id, { mute: !c.mute })}>M</button>
