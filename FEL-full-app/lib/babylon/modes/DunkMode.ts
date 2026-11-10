@@ -91,7 +91,7 @@ import { DUNK_CONFIG as CFG } from './modeConfigs';
 import { readDisplaySetting } from '@/lib/controller-link/tvMode';   // TV MODE: the slam window widens on a mirrored display
 import { LAND_LEAD_SEC, timeToFloor, OOP_LOB_FLIGHT_SEC, OOP_WINDUP_SEC, OOP_LATE_CATCH_CLIP_T, whiffWhy, GLASS_RUN_CATCH_CLIP_T, GLASS_RELEASE_MIN_M, SELF_LOB_RELEASE_Y, glassThrowDue, OOP_GLASS_PASSER_X, OOP_GLASS_PASSER_FROM_RIM_M, OOP_GLASS_HIT_OVER_RIM_M, OOP_BOUNCE_FLIGHT_SEC, LOB_FRAME_LIFT, REAL_JUMP_PERSONAL, SLAM_BIG_FROM, personalFullRiseM, riseToPower, LOB_FRAME_TAU, oopThrowDue, RUNWAY_STRIDE_MPS, RUNWAY_STRIDE_SCALE, RUNWAY_RATE_MIN, RUNWAY_RATE_MAX, slamImpact, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG } from '../core/DunkFlagship';   // DUNK-FLAGSHIP: the pass's numbers (feel-panel knobs)
 import { slamVariantOf, SLAM_VARIANTS, SLAM_VARIANTS_ON, REVERSE_TURN_RATE, REVERSE_CONTACT_FROM, REVERSE_JAM_LIFT, REVERSE_TURN_FROM, REVERSE_COMMIT_SEC, type SlamVariant } from '../core/DunkSlamVariant';   // DUNK-FLAGSHIP Phase 7: the finish called with the slam (knob, off)
-import { FINISH_OVER_RING, OVER_RING, overRingOn, overRingAim, overRingLeg, overRingHoldsBody, overRingFollows, overRingDefers, type OverRingLeg } from '../core/DunkOverRing';   // DUNK-FLAGSHIP P11: the hand carries the ball over the ring (knob, off)
+import { FINISH_OVER_RING, OVER_RING, overRingOn, overRingAim, overRingLeg, overRingHoldsBody, overRingFollows, overRingSideStep, overRingDefers, type OverRingLeg } from '../core/DunkOverRing';   // DUNK-FLAGSHIP P11: the hand carries the ball over the ring (knob, off)
 import { feel } from '../../feel-panel/feel';
 import { rimCutSpot, clearOfHoop, runUpTune, tuneKey, dunkFramingOn } from '../core/dunkCamFraming';   // CAMERA TIP: cam.dunkFraming (default off)
 import { DUNK_BACKBOARD_Z } from '../visual/venuePropSets';
@@ -2561,7 +2561,7 @@ export const DunkMode: ModeDefinition = (() => {
               // over-the-ring path (null on the jam's first frame), then a follow-through that stops short of the shipped one
               const overRing = finishOverRing();
               if (overRing) overLeg = overRingLeg(jamSec <= dt ? null : overLeg, ball.getAbsolutePosition(), rim, RIM_RADIUS, ballSim.radius, overRingJamSec());
-              if (overRing) { if (overRingFollows(overLeg)) player.root.position.z += (rim.z + FLUSH_Z_AHEAD - JAM_FOLLOW_M + OVER_RING.followBackM - player.root.position.z) * Math.min(1, dt / JAM_FOLLOW_TAU); }
+              if (overRing) { if (overRingFollows(overLeg)) player.root.position.z += (rim.z + FLUSH_Z_AHEAD - JAM_FOLLOW_M + OVER_RING.followBackM - player.root.position.z) * Math.min(1, dt / JAM_FOLLOW_TAU); player.root.position.x += overRingSideStep(overLeg, ball.getAbsolutePosition().x, rim.x, dt, JAM_FOLLOW_TAU); }
               else player.root.position.z += (rim.z + FLUSH_Z_AHEAD - JAM_FOLLOW_M - jamExtra - player.root.position.z) * Math.min(1, dt / JAM_FOLLOW_TAU);
               // the pull-up on the iron (never down); the LEFT-hand carry (the eastbay after its pass) pulls up further — the pass leaves
               // that palm facing down with the ball riding UNDER the wrist, 0.15 m lower than the right hand's palm-out carry

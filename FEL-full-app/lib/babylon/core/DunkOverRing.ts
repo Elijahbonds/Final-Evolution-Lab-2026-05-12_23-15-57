@@ -48,6 +48,8 @@ export const OVER_RING = {
   /** Over the ring the jam's follow-through stops this far SHORT of the shipped one, and never takes the shipped late-press
    *  extra: the jam lasts longer here, and the shipped carry-in would bring the head in under the ring (rig: 0.02 m from its axis). */
   followBackM: 0.05,
+  /** The most the body slides sideways in one frame's worth of easing toward putting the ball over the centre. */
+  sideMaxM: 0.3,
 };
 
 /** Is the knob on? (The mode passes `feel('dunk.finishOverRing', FINISH_OVER_RING)`.) */
@@ -117,6 +119,17 @@ export function overRingDefers(ball: V3, rim: V3, ringR: number, ballR: number, 
   // only a ball still on the OUTSIDE half of the iron is held (it can still be lifted over): one already half across the lip is
   // let go where it is, as shipped — held, it would be carried through the metal (the model in DunkOverRing.test found it)
   return jamSec < OVER_RING.giveUpSec && flatOf(ball, rim) > ringR + ballR * 0.5;
+}
+
+/** THE BODY SLIDES UNDER THE BALL, sideways. Measured (rig, the over-the-ring cut of 2026-11-10): a slam carried in the off
+ *  hand rides 0.26 m to the side of the ring's centre, and an arm reaching across the body cannot bring it over the middle —
+ *  the jam timed out with the ball 0.30 m out to the side. Through the way in and the push, the body moves sideways by the
+ *  ball's sideways offset from the ring (eased, at most `sideMaxM`), so the ball comes over the centre. Returns the root's x
+ *  step for this frame. */
+export function overRingSideStep(leg: OverRingLeg | null, ballX: number, rimX: number, dt: number, tau: number): number {
+  if (!overRingFollows(leg)) return 0;
+  const want = Math.max(-OVER_RING.sideMaxM, Math.min(OVER_RING.sideMaxM, rimX - ballX));
+  return want * Math.min(1, tau > 0 ? dt / tau : 1);
 }
 
 /** The jam's follow-through carries the body in only once the ball is over the ring or going down through it: while the hand
