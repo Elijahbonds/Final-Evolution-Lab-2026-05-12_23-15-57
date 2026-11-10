@@ -166,9 +166,18 @@ describe('the contact: let go INSIDE the ring (the shipped jam meets the front o
     expect(now.kind).toBe('contact'); expect(now.flat).toBeLessThanOrEqual(RING_R); expect(now.sec).toBeLessThan(OVER_RING.giveUpSec);
     expect(overRingSideStep('in', rim.x - 0.26, rim.x, rim.x, rim.x, DT, 0.07)).toBeGreaterThan(0);   // the slide is what does it (the reach moves it sideways by a tenth here)
   });
-  it('the body holds its height while the ball is lifted and carried in, and comes down with it', () => {
+  it('a ball pushed down through the middle is seen in the contact\'s height band on the way (never skips it between two frames)', () => {
+    // the windmill the rig measured: over the ring's centre, 0.2 m up, the body held at the top of its arc
+    let ball = at(0.05, 0.2), seen = false; const aim = { x: 0, y: 0, z: 0 };
+    for (let i = 0; i < 40 && ball.y > rim.y - 0.1; i++) {
+      overRingAim('down', ball, rim, RING_R, BALL_R, aim); ball = lagToward(ball, aim, DT, WRIST_LAG_TAU);
+      if (jamIronStep({ ball, rim, rimRadius: RING_R, ballRadius: BALL_R, sincePress: 0.2, centred: true })?.kind === 'contact') { seen = true; break; }
+    }
+    expect(seen).toBe(true);
+  });
+  it('the body holds its height through the jam, and comes down at the give-up only while the ball is over the band', () => {
     expect(overRingHoldsBody('lift', 0.2, BALL_R)).toBe(true); expect(overRingHoldsBody('in', 0.2, BALL_R)).toBe(true); expect(overRingHoldsBody(null, 0.2, BALL_R)).toBe(true);
-    expect(overRingHoldsBody('down', 0.2, BALL_R)).toBe(false);
+    expect(overRingHoldsBody('down', 0.2, BALL_R)).toBe(true);   // the hand alone pushes it through (rig: a dropping body took the windmill's ball through the band between two frames, no contact)
     expect(overRingHoldsBody('bail', 0.27, BALL_R)).toBe(false);   // at the give-up, a ball over the band: the body comes down (rig: held, the double clutch missed)
     expect(overRingHoldsBody('bail', 0.03, BALL_R)).toBe(true);    // …and stops once the ball is in the band (lower takes it under the iron)
   });

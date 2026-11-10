@@ -86,14 +86,18 @@ export function overRingLeg(prev: OverRingLeg | null, ball: V3, rim: V3, ringR: 
  * arc with the ball already 0.16–0.25 m over the ring's plane and 0.26–0.56 m out in front, and the jam then drops the body
  * onto the iron (0.10 m in its first frame) while it carries in — a race the ball loses whenever it was the further out (it
  * sinks into the contact's height band before it has crossed the lip, and meets the front of the rim from outside). Over the
- * ring, the body holds its height until the ball is over the hole and comes down only with it (`down`), or at the give-up
+ * ring, the body holds its height through the jam — the hand takes the ball over and down through the ring — and comes down
+ * after the contact as the shipped finish's does, or at the give-up
  * (`bail`): it then comes straight down until the ball is in the contact's height band at the front of the rim (the carry-in
  * stays off, overRingFollows). Measured: with the
  * body held on `bail`, the double clutch — the highest flight, the ball 0.27 m over the ring and 0.25 m out where no arm could
  * bring it in — never came down to the iron and missed (SHORT OF THE IRON); the shipped finish makes it.
  */
 export function overRingHoldsBody(leg: OverRingLeg | null, ballOverRingM: number, ballR: number): boolean {
-  if (leg === 'down') return false;
+  // on the push down too: the hand alone takes the ball down through the ring. Measured (the windmill, knob on): with the body
+  // dropping ~0.09 m a frame on the push as well, the ball went from over the ring to under its plane between two frames
+  // without ever being seen in the contact's height band — no contact, SHORT OF THE IRON on a ball that went through the hole
+  if (leg === 'down') return true;
   // at the give-up: down while the ball is still over the contact's height band, held once it is in it (lower would take it under the iron)
   if (leg === 'bail') return ballOverRingM <= ballR * 0.6;
   return true;
