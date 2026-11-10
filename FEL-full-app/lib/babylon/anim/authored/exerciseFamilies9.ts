@@ -16,6 +16,16 @@ import { SEATED_ROW } from './exerciseVariants';
 type Pose = Omit<ExKey, 't'>;
 type Builder = (scene: Scene, sk: Skeleton) => AnimationGroup | null;
 
+/** Kneeling with the down shins on targets (exerciseMore kneel()'s legs keyed as ankles behind the knees instead of bone
+ *  angles): a loop that moves between kneeling and an IK-legged pose then blends target to target, where blending a keyed
+ *  knee into a solved one swung the feet through the floor (measured). */
+const kneelIK = (p: Pose, down: readonly ('Left' | 'Right')[]): Pose => {
+  const k = kneel(p, down);
+  const feet: Pair = { ...(k.feet ?? {}) }, kneePoles: Pair = { ...(k.kneePoles ?? {}) };
+  for (const s of down) { feet[s] = [s === 'Left' ? -0.11 : 0.11, 0.07, -0.38]; kneePoles[s] = [s === 'Left' ? -0.05 : 0.05, -0.3, 1]; }
+  return { ...k, feet, kneePoles };
+};
+
 // ── jumps ───────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 /** ex_box_jump_lat — standing beside a low box (demo.ts PROP_SHAPES boxside, at the right): a quick quarter dip and a jump up
@@ -63,15 +73,15 @@ const sideLongJump: Builder = (scene, sk) => {
  *  knees to land with both feet flat in a squat; stand, and step back down onto the knees. */
 const kneelJumpSquat: Builder = (scene, sk) => {
   const rel: Pair = { Left: [0.10, -0.20, 0.24], Right: [-0.10, -0.20, 0.24] }, poles = bothDir(0.3, -1, 0);
-  const tall: Pose = kneel({ bones: { Hips: [0, 0, 0], Spine: [0, 0, 0], Neck: [0, 0, 0] }, rel, poles, hipsY: 0 }, ['Left', 'Right']);
+  const tall: Pose = kneelIK({ bones: { Hips: [0, 0, 0], Spine: [0, 0, 0], Neck: [0, 0, 0] }, rel, poles, hipsY: 0 }, ['Left', 'Right']);
   // (the knees stay on the floor and the ankles behind them: the shins on targets, the knees pointed down and forward)
-  const back: Pose = { bones: { Hips: [26, 0, 0], Spine: [6, 0, 0], Neck: [-14, 0, 0], LeftFoot: [62, 0, 0], RightFoot: [62, 0, 0] }, feet: both(0.11, 0.08, -0.38), kneePoles: bothDir(0.05, -0.5, 1), rel: { Left: [0.12, -0.44, -0.14], Right: [-0.12, -0.44, -0.14] }, poles: bothDir(0.3, 0, -1), hipsY: -0.72, hipsZ: -0.36 };
+  const back: Pose = { bones: { Hips: [26, 0, 0], Spine: [6, 0, 0], Neck: [-14, 0, 0], LeftFoot: [62, 0, 0], RightFoot: [62, 0, 0] }, feet: both(0.11, 0.08, -0.38), kneePoles: bothDir(0.05, 0.2, 1), rel: { Left: [0.12, -0.44, -0.14], Right: [-0.12, -0.44, -0.14] }, poles: bothDir(0.3, 0, -1), hipsY: -0.66, hipsZ: -0.36 };
   // the pop: the hips drive up first, the shins folded up behind, before the legs swing through under the body
   const pop: Pose = { bones: { Hips: [10, 0, 0], Spine: [2, 0, 0], Neck: [-6, 0, 0], LeftUpLeg: [-40, 0, 3], RightUpLeg: [-40, 0, -3], LeftLeg: [150, 0, 0], RightLeg: [150, 0, 0], LeftFoot: [50, 0, 0], RightFoot: [50, 0, 0] }, rel: { Left: [0.08, -0.16, 0.34], Right: [-0.08, -0.16, 0.34] }, poles: bothDir(0.3, -1, 0), hipsY: -0.26, hipsZ: -0.14 };
   const air: Pose = { bones: { Hips: [14, 0, 0], Spine: [2, 0, 0], Neck: [-6, 0, 0], ...legs(-84, 112), LeftFoot: [-10, 0, 0], RightFoot: [-10, 0, 0] }, rel: { Left: [0.08, -0.10, 0.36], Right: [-0.08, -0.10, 0.36] }, poles: bothDir(0.3, -1, 0), hipsY: -0.30, hipsZ: -0.10 };
   const squat: Pose = { bones: { Hips: [28, 0, 0], Spine: [8, 0, 0], Neck: [-18, 0, 0], LeftFoot: [-30, 0, 0], RightFoot: [-30, 0, 0] }, feet: both(0.20, ANKLE, 0.02), kneePoles: bothDir(0.35, 0, 1), rel: { Left: [0.12, -0.24, 0.30], Right: [-0.12, -0.24, 0.30] }, poles: bothDir(0.3, -1, 0), hipsY: -0.44, hipsZ: -0.10 };
   const stand: Pose = { bones: { ...STAND }, feet: both(0.15, ANKLE, 0.02), kneePoles: bothDir(0.1, 0, 1), rel, poles, hipsY: 0, hipsZ: -0.04 };
-  const half: Pose = kneel({ bones: { Hips: [4, 0, 0], Spine: [0, 0, 0], Neck: [0, 0, 0] }, rel, poles, hipsY: 0 }, ['Right']);
+  const half: Pose = kneelIK({ bones: { Hips: [4, 0, 0], Spine: [0, 0, 0], Neck: [0, 0, 0] }, rel, poles, hipsY: 0 }, ['Right']);
   return run(scene, sk, 'ex_kneel_jump_squat', 5.0, [
     at(tall, 0, true), at(back, 0.7, true), at(back, 0.9, true), at(pop, 1.02), at(air, 1.16), at(squat, 1.36, true), at(squat, 1.7, true), at(stand, 2.4, true), at(stand, 2.8, true),
     at({ ...half, hipsY: KNEEL_Y + 0.12 }, 3.5), at(half, 3.9, true), at(tall, 4.5, true),
@@ -137,8 +147,8 @@ const battleRopes: Builder = (scene, sk) => {
  *  kneeling. */
 const chestPushFall: Builder = (scene, sk) => {
   const chest: Pair = { Left: [0.08, -0.18, 0.16], Right: [-0.08, -0.18, 0.16] }, poles = bothDir(0.6, -0.8, 0);
-  const tall: Pose = kneel({ bones: { Hips: [-2, 0, 0], Spine: [0, 0, 0], Neck: [0, 0, 0] }, rel: chest, poles, hipsY: 0 }, ['Left', 'Right']);
-  const load: Pose = kneel({ bones: { Hips: [-8, 0, 0], Spine: [-4, 0, 0], Neck: [2, 0, 0] }, rel: { Left: [0.08, -0.16, 0.10], Right: [-0.08, -0.16, 0.10] }, poles, hipsY: 0 }, ['Left', 'Right']);
+  const tall: Pose = kneelIK({ bones: { Hips: [-2, 0, 0], Spine: [0, 0, 0], Neck: [0, 0, 0] }, rel: chest, poles, hipsY: 0 }, ['Left', 'Right']);
+  const load: Pose = kneelIK({ bones: { Hips: [-8, 0, 0], Spine: [-4, 0, 0], Neck: [2, 0, 0] }, rel: { Left: [0.08, -0.16, 0.10], Right: [-0.08, -0.16, 0.10] }, poles, hipsY: 0 }, ['Left', 'Right']);
   // (the knees stay on the floor where they knelt, the shins flat behind: on targets, the knees pointed down)
   const shins = { bones: { LeftFoot: [62, 0, 0] as Deg3, RightFoot: [62, 0, 0] as Deg3 }, feet: both(0.11, 0.07, -0.38), kneePoles: bothDir(0.05, -1, 0.3) };
   const release: Pose = { ...shins, bones: { Hips: [24, 0, 0], Spine: [0, 0, 0], Neck: [-14, 0, 0], ...shins.bones }, rel: { Left: [0.06, -0.06, 0.56], Right: [-0.06, -0.06, 0.56] }, poles: bothDir(0.4, -1, 0), hipsY: KNEEL_Y - 0.03, hipsZ: 0.08 };
@@ -151,9 +161,11 @@ const slamOne: Builder = (scene, sk) => {
   const feet: Pair = { Left: [-0.14, ANKLE, 0.20], Right: [0.14, ANKLE, -0.16] };
   const free: V3 = [0.04, -0.40, 0.14];
   const low: Pose = { bones: { Hips: [4, 0, 0], Spine: [0, 0, 0], Neck: [0, 0, 0] }, feet, kneePoles: bothDir(0.1, 0, 1), rel: { Right: [0.0, -0.46, -0.08], Left: free }, poles: { Right: [0.3, 0, -1], Left: [-0.3, -0.4, -0.8] }, hipsY: -0.02 };
-  const wind: Pose = { bones: { Hips: [-6, 0, 0], Spine: [-6, 0, 0], Neck: [6, 0, 0], LeftFoot: [12, 0, 0], RightFoot: [16, 0, 0] }, feet: { Left: [-0.14, ANKLE + 0.04, 0.20], Right: [0.14, ANKLE + 0.05, -0.16] }, kneePoles: bothDir(0.1, 0, 1), rel: { Right: [-0.02, 0.62, -0.10], Left: [0.04, 0.10, 0.30] }, poles: { Right: [0.8, 0.3, 0], Left: [-0.4, -1, 0] }, hipsY: 0.03 };
+  const wind: Pose = { bones: { Hips: [-6, 0, 0], Spine: [-6, 0, 0], Neck: [6, 0, 0], LeftFoot: [8, 0, 0], RightFoot: [10, 0, 0] }, feet: { Left: [-0.14, ANKLE + 0.05, 0.20], Right: [0.14, ANKLE + 0.06, -0.16] }, kneePoles: bothDir(0.1, 0, 1), rel: { Right: [-0.02, 0.62, -0.10], Left: [0.04, 0.10, 0.30] }, poles: { Right: [0.8, 0.3, 0], Left: [-0.4, -1, 0] }, hipsY: 0.03 };
   const slam: Pose = { bones: { Hips: [44, 0, 0], Spine: [12, 0, 0], Neck: [-22, 0, 0], LeftFoot: [-26, 0, 0], RightFoot: [-22, 0, 0] }, feet, kneePoles: bothDir(0.2, 0, 1), rel: { Right: [-0.04, -0.52, 0.30], Left: [0.06, -0.40, 0.16] }, poles: { Right: [0.4, 0.4, -0.8], Left: [-0.3, -0.4, -0.8] }, hipsY: -0.26 };
-  return run(scene, sk, 'ex_slam_one', 2.8, [at(low, 0, true), at(wind, 0.6, true), at(slam, 0.95, true), at(slam, 1.4, true), at(low, 2.2, true)], true);
+  // (half way up the back foot's ankle is still flexed: a key there keeps its toes off the floor)
+  const rising: Pose = { ...slam, bones: { Hips: [22, 0, 0], Spine: [6, 0, 0], Neck: [-10, 0, 0], LeftFoot: [-14, 0, 0], RightFoot: [-14, 0, 0] }, rel: { Right: [-0.02, -0.50, 0.12], Left: free }, hipsY: -0.12 };
+  return run(scene, sk, 'ex_slam_one', 2.8, [at(low, 0, true), at(wind, 0.6, true), at(slam, 0.95, true), at(slam, 1.4, true), at(rising, 1.8), at(low, 2.2, true)], true);
 };
 /** The supine throws: on the back, knees bent, the feet flat. */
 const SUP: Pose = { ...SUPINE, hands: undefined };
@@ -196,9 +208,9 @@ const frankenstein: Builder = (scene, sk) => rep(scene, sk, 'ex_frankenstein_squ
 /** ex_kneel_squat — kneeling, the bar across the back: the hips sit back until the seat touches the calves, then drive forward
  *  to tall kneeling, the glutes squeezed. */
 const kneelSquat: Builder = (scene, sk) => {
-  const tall: Pose = kneel({ bones: { ...GRIP, Hips: [0, 0, 0], Spine: [0, 0, 0], Neck: [0, 0, 0] }, rel: BAR, poles: bothDir(0.3, -1, -0.3), hipsY: 0 }, ['Left', 'Right']);
+  const tall: Pose = kneelIK({ bones: { ...GRIP, Hips: [0, 0, 0], Spine: [0, 0, 0], Neck: [0, 0, 0] }, rel: BAR, poles: bothDir(0.3, -1, -0.3), hipsY: 0 }, ['Left', 'Right']);
   // (the knees stay on the floor and the ankles behind them: the shins on targets, the knees pointed down and forward)
-  const sit: Pose = { bones: { ...GRIP, Hips: [22, 0, 0], Spine: [4, 0, 0], Neck: [-12, 0, 0], LeftFoot: [62, 0, 0], RightFoot: [62, 0, 0] }, feet: both(0.11, 0.08, -0.38), kneePoles: bothDir(0.05, -0.5, 1), rel: BAR, poles: bothDir(0.3, -1, -0.3), hipsY: -0.72, hipsZ: -0.36 };
+  const sit: Pose = { bones: { ...GRIP, Hips: [22, 0, 0], Spine: [4, 0, 0], Neck: [-12, 0, 0], LeftFoot: [62, 0, 0], RightFoot: [62, 0, 0] }, feet: both(0.11, 0.08, -0.38), kneePoles: bothDir(0.05, 0.2, 1), rel: BAR, poles: bothDir(0.3, -1, -0.3), hipsY: -0.66, hipsZ: -0.36 };
   return run(scene, sk, 'ex_kneel_squat', 3.0, [at(tall, 0, true), at(sit, 1.0, true), at(sit, 1.3, true), at(tall, 2.2, true)], true);
 };
 /** ex_kb_overhead_squat_one — one bell locked out overhead on a straight right arm, the eyes ahead, the left hand out for
