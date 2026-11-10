@@ -198,6 +198,35 @@ that the clip alone does not have (clip-flip.mts), and the celebration (`dunk_mc
 traced pass. M1 slide: the hero's "planted" feet in a fast slide, a run and a block reach are footGlide's lift at 4.9–5.4 cm, just
 under the rig's 5 cm planted band, while the body moves 6–10 cm a frame: no foot is planted at all (clip pace, not a layer).
 
+### 3f. hoops-p05 (the deterministic rig, the carry's let-go, the hero's slide) — before → after, the rig, same seed
+
+**The rig is deterministic now** (`scripts/probes/hoops-gap/determinism.mjs`): three 1v1 runs of one bundle and seed (7, PRO, one defensive
+possession cut at frame 180) matched frame for frame — both roots and facings, every watched bone, the ball, the random numbers drawn
+(49 345 in frames, 39 693 outside), the game log, the pops and the slide. What was loose, all in the rig: START pressed during the load
+(the game ran a wall-chosen number of frames before the clock), the load still moving the clock, one shared random stream, `Date` on the
+wall clock, requests in flight at the start. Only the ORDER of announcer lines logged on one frame differs (each is logged when its audio
+clip's playback promise settles); the comparator reads one frame's lines as a set. The rig runs about one frame a second of wall on the
+shared box, drawing on or off: size a hold to ~700 frames (`MAX_FRAMES`, `run-set.sh`).
+
+| what (1v1, seed 7, PRO) | before (knobs off) | after |
+|---|---|---|
+| a defensive possession to frame 180: hero slide p90; pops, severe | 2.57 cm; 5, severe 2 | 2.57 cm; 3, severe 2 (the same two left-foot pops at frames 130–131: 4 735 / 3 262 → 5 120 / 3 789 °/s — not new) |
+| scripted turbo retreat, then the same with the hand held up: hero slide p90 over the run | 5.13 cm (the retreat 2.8, with the hand up 8.9) | 1.80 cm (1.8, 3.6) |
+| … pops, severe | 2, severe 0 | 6, severe 0 (646–1 301 °/s; four are leg turns under the held hand-up) |
+| step-back thrown at 5.7 m/s: the ball arm at the let-go's end (gather + 8 frames) | 5 577 °/s (severe) | gone |
+| … hero severe pops over the run | 6 | 5 (the one left in the step-back is the make's celebration, 5 929 °/s, on the ball-carry layer — not the let-go) |
+| step-back from a stand: arm pops / severe / the carry layer's fast-turn events | 5 / 0 / 39 | 4 / 0 / 29 |
+
+The fixes (each a knob, 0 = before): the captured backpedal is a FORWARD run on the hero rig, so a retreat was a moonwalk — it plays in
+reverse (`hoops.backpedalReverseOn`); the legs and pelvis keep the defensive loop under the steal reach, the block reach and the held
+hand-up (`hoops.defenseLegsOn`); on defence the hero's pelvis turns toward his travel and his chest stays on his man (`hoops.hipSteerOn`
+and four numbers); the carry's let-go ends on the clip (`hoops.carryLetGoToClipOn`).
+
+Left over, for the animation lane: **the closeout always skates** — `closeoutFor` fires only at 2.9 m/s and up, and the authored chop
+covers about 0.9 m/s at its rate cap (bench, the man 2 m ahead: p90 0.9 / 9.2 / 10.6 cm at 3 / 4 / 5 m/s); it is the worst leftover in
+the real possession (6–15 cm frames). Running its legs from the run loop was tried and reverted (worse on the diagonal, 3–4 new severe
+pops with a reach): it needs a stepping closeout clip. The made shot's celebration still pops the ball arm (the carry layer).
+
 ## 4. Ranked gaps
 
 Ranked by what the owner feels first × how far from the bar. "Shared" = touches one of the shared hoops files.
