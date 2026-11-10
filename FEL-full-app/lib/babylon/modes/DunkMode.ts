@@ -3611,8 +3611,10 @@ export const DunkMode: ModeDefinition = (() => {
   /** DUNK-BALL-ARMS-RIM: where the reach sends the ball this frame — the centre over the ring once the ball is above the iron
    *  (or already inside the ring), otherwise a point in front of the front rim and over it, so the ball never climbs through it. */
   /** DUNK-FLAGSHIP P11: the over-the-ring finish is on (the knob; never in ranked, staked or paid play — lib/feel-panel's gate). Read here and nowhere else. */
-  const finishOverRing = (): boolean => !switchBlocked() && overRingOn(feel('dunk.finishOverRing', FINISH_OVER_RING));
-  /** DUNK SWITCH-ON: a staked, ranked or challenge run — the play-changing switches are off there whatever their default. */
+  const finishOverRing = (): boolean => !switchBlocked() && finishVariant !== 'reverse' && overRingOn(feel('dunk.finishOverRing', FINISH_OVER_RING));
+  /** DUNK SWITCH-ON: a staked, ranked or challenge run — the play-changing switches are off there whatever their default. The REVERSE
+   *  keeps its own finish (Phase 7b's): measured with everything on, it met the iron inside the ring 4/5 over the ring (one at 483 ms)
+   *  against 5/5 on its own finish (P10, 67–350 ms) — the owner's rule: on where it passes. */
   const switchBlocked = (): boolean => typeof location !== 'undefined' && playSwitchBlocked(location.search);
   /** DUNK SWITCH-ON (owner 2026-11-10): the slam variants are ON by default — and OFF in a staked, ranked or challenge run whatever
    *  the default (the card there is the integrity cap's: no new finish, no new difficulty). The feel panel's own gate already keeps

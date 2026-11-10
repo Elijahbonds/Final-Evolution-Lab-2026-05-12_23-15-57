@@ -119,7 +119,7 @@ describe('the friends battle: the ?c= link plays the classic staked night, the c
     for (const open of ['', '?playtest=1', '?prop=alleyoop', '?arena=']) expect(playSwitchBlocked(open), open).toBe(false);   // an empty ?arena= stakes nothing (isStakedRun)
     expect(SLAM_VARIANTS_ON).toBe(1); expect(FINISH_OVER_RING).toBe(1);   // ON by default…
     expect(DUNK).toContain("const switchBlocked = (): boolean => typeof location !== 'undefined' && playSwitchBlocked(location.search);");
-    expect(DUNK).toContain("const finishOverRing = (): boolean => !switchBlocked() && overRingOn(feel('dunk.finishOverRing', FINISH_OVER_RING));");
+    expect(DUNK).toContain("const finishOverRing = (): boolean => !switchBlocked() && finishVariant !== 'reverse' && overRingOn(feel('dunk.finishOverRing', FINISH_OVER_RING));");
     expect(DUNK).toContain("const slamVariantsOn = (): boolean => !switchBlocked() && feel('dunk.slamVariants', SLAM_VARIANTS_ON) >= 0.5;");
     expect(DUNK.split("feel('dunk.slamVariants'").length - 1).toBe(1);    // …read in one place each, behind the block
     expect(DUNK.split("feel('dunk.finishOverRing'").length - 1).toBe(1);

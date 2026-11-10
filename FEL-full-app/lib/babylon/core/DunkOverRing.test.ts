@@ -223,7 +223,7 @@ describe('DunkMode: knob off is the shipped finish, line for line', () => {
   it('the knob is read in ONE place, through feel(), against the default', () => {
     expect(DUNK.split("feel('dunk.finishOverRing'").length - 1).toBe(1);
     // test changed (owner 2026-11-10): …and never in a staked, ranked or challenge run, whatever the default
-    expect(DUNK).toContain("const finishOverRing = (): boolean => !switchBlocked() && overRingOn(feel('dunk.finishOverRing', FINISH_OVER_RING));");
+    expect(DUNK).toContain("const finishOverRing = (): boolean => !switchBlocked() && finishVariant !== 'reverse' && overRingOn(feel('dunk.finishOverRing', FINISH_OVER_RING));");
   });
   it('every use sits behind the knob, and the shipped lines are still there, verbatim, on the other branch', () => {
     // the reach's aim: only through the jam (never before the slam, never in the replay); the shipped body of rimApproachAim follows untouched
