@@ -63,8 +63,10 @@ const sideLongJump: Builder = (scene, sk) => {
   const d = 0.80;
   const dip: Pose = { ...DIPPED(0.04), bones: { Hips: [24, 0, -6], Spine: [10, 0, -6], Neck: [-12, 0, 4], LeftFoot: [-20, 0, 0], RightFoot: [-20, 0, 0] }, hipsX: -0.04 };
   const push: Pose = { ...PUSH(0.04), bones: { Hips: [8, 0, 10], Spine: [2, 0, 6], LeftFoot: [12, 0, 0], RightFoot: [12, 0, 0] }, hands: { Left: [0.10, 1.20, 0.22], Right: [0.50, 1.30, 0.20] }, hipsX: 0.08 };
+  // (the feet flat as they meet the floor: pointed toes coming down sideways dipped through it)
+  const touch: Pose = { ...LANDED(0.04, d * 0.94), bones: { Hips: [12, 0, 0], Spine: [4, 0, 0], Neck: [-6, 0, 0], LeftFoot: [0, 0, 0], RightFoot: [0, 0, 0] }, feet: { Left: [d * 0.94 - 0.14, ANKLE + 0.04, 0.04], Right: [d * 0.94 + 0.14, ANKLE + 0.04, 0.04] }, hipsY: -0.04 };
   return run(scene, sk, 'ex_side_long_jump', 5.2, [
-    at(STANDING(0.04), 0, true), at(dip, 0.45, true), at(push, 0.6), at(FLIGHT(0.04, 0.18, d * 0.5), 0.82), at(LANDED(0.04, d), 1.06, true), at(LANDED(0.04, d), 1.8, true),
+    at(STANDING(0.04), 0, true), at(dip, 0.45, true), at(push, 0.6), at(FLIGHT(0.04, 0.18, d * 0.5), 0.82), at(touch, 0.95), at(LANDED(0.04, d), 1.06, true), at(LANDED(0.04, d), 1.8, true),
     at(STANDING(0.04, d), 2.2, true), ...walkBack(0.04, 2.2, 0.3, 0.45, d),
   ]);
 };
@@ -77,14 +79,14 @@ const kneelJumpSquat: Builder = (scene, sk) => {
   // (the knees stay on the floor and the ankles behind them: the shins on targets, the knees pointed down and forward)
   const back: Pose = { bones: { Hips: [26, 0, 0], Spine: [6, 0, 0], Neck: [-14, 0, 0], LeftFoot: [62, 0, 0], RightFoot: [62, 0, 0] }, feet: both(0.11, 0.08, -0.38), kneePoles: bothDir(0.05, 0.2, 1), rel: { Left: [0.12, -0.44, -0.14], Right: [-0.12, -0.44, -0.14] }, poles: bothDir(0.3, 0, -1), hipsY: -0.66, hipsZ: -0.36 };
   // the pop: the hips drive up first, the shins folded up behind, before the legs swing through under the body
-  const pop: Pose = { bones: { Hips: [10, 0, 0], Spine: [2, 0, 0], Neck: [-6, 0, 0], LeftUpLeg: [-40, 0, 3], RightUpLeg: [-40, 0, -3], LeftLeg: [150, 0, 0], RightLeg: [150, 0, 0], LeftFoot: [50, 0, 0], RightFoot: [50, 0, 0] }, rel: { Left: [0.08, -0.16, 0.34], Right: [-0.08, -0.16, 0.34] }, poles: bothDir(0.3, -1, 0), hipsY: -0.26, hipsZ: -0.14 };
-  const air: Pose = { bones: { Hips: [14, 0, 0], Spine: [2, 0, 0], Neck: [-6, 0, 0], ...legs(-84, 112), LeftFoot: [-10, 0, 0], RightFoot: [-10, 0, 0] }, rel: { Left: [0.08, -0.10, 0.36], Right: [-0.08, -0.10, 0.36] }, poles: bothDir(0.3, -1, 0), hipsY: -0.30, hipsZ: -0.10 };
+  const pop: Pose = { bones: { Hips: [10, 0, 0], Spine: [2, 0, 0], Neck: [-6, 0, 0], LeftFoot: [50, 0, 0], RightFoot: [50, 0, 0] }, feet: both(0.11, 0.28, -0.30), kneePoles: bothDir(0.05, -0.6, 1), rel: { Left: [0.08, -0.16, 0.34], Right: [-0.08, -0.16, 0.34] }, poles: bothDir(0.3, -1, 0), hipsY: -0.26, hipsZ: -0.14 };
+  const air: Pose = { bones: { Hips: [14, 0, 0], Spine: [2, 0, 0], Neck: [-6, 0, 0], LeftFoot: [-10, 0, 0], RightFoot: [-10, 0, 0] }, feet: both(0.15, 0.22, 0.0), kneePoles: bothDir(0.1, 0, 1), rel: { Left: [0.08, -0.10, 0.36], Right: [-0.08, -0.10, 0.36] }, poles: bothDir(0.3, -1, 0), hipsY: -0.30, hipsZ: -0.10 };
   const squat: Pose = { bones: { Hips: [28, 0, 0], Spine: [8, 0, 0], Neck: [-18, 0, 0], LeftFoot: [-30, 0, 0], RightFoot: [-30, 0, 0] }, feet: both(0.20, ANKLE, 0.02), kneePoles: bothDir(0.35, 0, 1), rel: { Left: [0.12, -0.24, 0.30], Right: [-0.12, -0.24, 0.30] }, poles: bothDir(0.3, -1, 0), hipsY: -0.44, hipsZ: -0.10 };
   const stand: Pose = { bones: { ...STAND }, feet: both(0.15, ANKLE, 0.02), kneePoles: bothDir(0.1, 0, 1), rel, poles, hipsY: 0, hipsZ: -0.04 };
   const half: Pose = kneelIK({ bones: { Hips: [4, 0, 0], Spine: [0, 0, 0], Neck: [0, 0, 0] }, rel, poles, hipsY: 0 }, ['Right']);
   return run(scene, sk, 'ex_kneel_jump_squat', 5.0, [
     at(tall, 0, true), at(back, 0.7, true), at(back, 0.9, true), at(pop, 1.02), at(air, 1.16), at(squat, 1.36, true), at(squat, 1.7, true), at(stand, 2.4, true), at(stand, 2.8, true),
-    at({ ...half, hipsY: KNEEL_Y + 0.12 }, 3.5), at(half, 3.9, true), at(tall, 4.5, true),
+    at({ ...half, hipsY: KNEEL_Y + 0.16 }, 3.5), at(half, 3.9, true), at(tall, 4.5, true),
   ], true);
 };
 
