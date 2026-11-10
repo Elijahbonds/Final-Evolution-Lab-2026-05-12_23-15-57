@@ -145,4 +145,30 @@ scripts/pending-sql/cli.ts plan`, then `apply`, against production (the owner's 
 
 ## 5. Nexus Studio
 
-(Filled in below.)
+The owner wants Nexus to be the best editor in the world. Its three switches are production environment variables, so "on" here
+means: the code works with the switch on and passes its gates, and the owner gets the exact line to set.
+
+| Switch | What it opens | Why it is off | Class | What turns it on |
+|---|---|---|---|---|
+| `NEXUS_STUDIO_ENABLED` | The editor at `/studio`, for **founder and admin accounts only** (the role is read from the database on every request; everyone else gets the same 404 as with the switch off, NEX-01) | The owner's decision: "/studio stays unlinked (flag-gated) until the owner says ship" (2026-10-14). Not a quality hold. | B | The owner sets `NEXUS_STUDIO_ENABLED=1` in production. Nothing links to `/studio`, so only an owner or admin who types the address sees it. |
+| `STUDIO_SHARE_ENABLED` | Share links (`/play/shared/<token>`) | The `StudioShareLink` table (`prisma/pending/2026-10-26-studio-share.sql`) is not applied; Terms §4 (user content shown to others), the Privacy lines, and the safety lane's report target are not done (`docs/NEXUS-ROADMAP.md` §2.3, §3.5) | B | Apply the SQL, approve the Terms and Privacy text, land the safety lane's report target, then `STUDIO_SHARE_ENABLED=1`. |
+| `STUDIO_CREATOR_ENABLED` | The paid surface: Studio credits, cartridges, partner keys | Money: it sells credit packs (`VIRTUAL_PURCHASES_ENABLED` and a refund rule first, `docs/LAUNCH-SALES.md` §8.7) | B | Never by this lane. |
+
+**Measured with the switch's code on (2026-11-10, release `d394b11b`).** The studio-easy rig (`scripts/probes/_studio-easy-probe.mts`:
+the real `/studio` page, its eleven creator tasks at a phone 390 × 844 and a desktop 1280 × 800) on today's code: **18 of 22 task
+runs done**, with the same tap counts as the studio-easy audit's "after" (`docs/STUDIO-EASY-AUDIT.md` §5): new project 2 taps,
+first court 2, place 3 + 1 key, AI builder 4 + 1, character 4, script 2 (5 graph nodes take focus), save 0 (autosave 1.5–1.6 s),
+reopen 1, publish 2 (the publish gate passed and downloaded the venue file on both). The four that did not finish were the rig, not
+the Studio:
+
+- **Play-test (both widths) and phone first court:** "Invalid URL" — the rig reads the new tab's address before the tab has one.
+  The same "Play it" button opened the game in the same run on desktop first court, and that code has not changed since the audit
+  measured it working (`components/nexus-studio/studio-app.tsx`, last change `00b6255b`).
+- **Phone, the light's colour** (the audit's one open item, "the colour fill timed out on the phone"): measured on its own
+  (`scripts/probes/switch-on/studio-colour.mts`): at 390 × 844 the colour field is there, enabled and not covered; it sits about
+  170 px below the first screen once Inspect is open, and filling it worked (`#ff3366`) on the phone and the desktop. Not reproduced.
+  JPG: `colour-390.jpg` in the lane's scratch folder.
+
+**Recommendation for the owner:** set `NEXUS_STUDIO_ENABLED=1` when you want to use the Studio in production yourself. It opens
+the editor to founder and admin accounts only, opens no paid surface and no share links, and is undone by unsetting it.
+
