@@ -89,7 +89,7 @@ const INIT = `(() => {
 // ── the recorder: binds to __FEL_DEV__ (scene, hero), counts draws, times frames, samples the hero's visibility ─────────
 function installRecorder(cfg) {
   const W = window, dev = W.__FEL_DEV__, scene = dev.scene, engine = scene.getEngine();
-  const R = W.__rec = { frames: [], clips: [], clipIx: new Map(), occNames: [], occIx: new Map(), presses: [], bus: [], keys: new Set(), heroOk: false, skel: false, frameNo: 0 };
+  const R = W.__rec = { frames: [], clips: [], clipIx: new Map(), gNames: [], gIx: new Map(), occNames: [], occIx: new Map(), presses: [], bus: [], keys: new Set(), heroOk: false, skel: false, frameNo: 0 };
   const ix = (map, arr, s) => { let i = map.get(s); if (i === undefined) { i = arr.length; arr.push(s); map.set(s, i); } return i; };
   // DRAWS: counted always; skipped while FAST unless a photograph needs the pixels
   let draws = 0; W.__fast = cfg.fast; W.__drawOn = !cfg.fast; W.__drawnFrames = 0;
@@ -176,15 +176,17 @@ function installRecorder(cfg) {
       // the hero's playing clips, read off the scene's animation groups (each group is one clip on one body; the anim probe's
       // readout came back empty on the CharacterAnimator bodies): the ones targeting the hero's nodes, weight > 0.3
       try {
-        const names = [];
+        const names = [], all = [];
         for (const g of scene.animationGroups) {
           if (!g.isPlaying) continue;
           let isH = heroGroups.get(g);
           if (isH === undefined) { const t = g.targetedAnimations[0] && g.targetedAnimations[0].target; isH = !!(t && (t === heroRef || (t.isDescendantOf && t.isDescendantOf(heroRef)))); heroGroups.set(g, isH); }
           const w = g.weight < 0 ? 1 : g.weight;
           if (isH && w > 0.3) names.push(g.name.replace(/_c\d+$/, '').slice(0, 40));
+          // clean-5: every playing hero clip with its weight (a third clip under a fade, a clip dropped at a weight: poprank.mjs)
+          if (isH) all.push([ix(R.gIx, R.gNames, g.name.replace(/_c\d+$/, '').slice(0, 40)), Math.round(w * 100) / 100]);
         }
-        f.c = ix(R.clipIx, R.clips, names.sort().join('+'));
+        f.c = ix(R.clipIx, R.clips, names.sort().join('+')); f.cw = all;
       } catch {}
     }
     f.cam = camPose();
@@ -597,7 +599,7 @@ for (const mode of MODES) {
       await sleep(250);
     }
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 }).catch(() => {});
-    const rec = await ev(() => { const R = window.__rec; const thrFrom = R.frames.findIndex((f) => f.t >= (window.__thrT ?? 1e9)); return { frames: R.frames, clips: R.clips, occNames: R.occNames, presses: R.presses, bus: R.bus.slice(0, 50), skel: R.skel }; });
+    const rec = await ev(() => { const R = window.__rec; const thrFrom = R.frames.findIndex((f) => f.t >= (window.__thrT ?? 1e9)); return { frames: R.frames, clips: R.clips, gNames: R.gNames, occNames: R.occNames, presses: R.presses, bus: R.bus.slice(0, 50), skel: R.skel }; });
     // frames the throttle covered: the last PERF_S seconds of the script
     const S = await ev(() => ({ ...window.__S, tapUntil: undefined }));
     const tEnd = rec.frames.length ? rec.frames[rec.frames.length - 1].t : 0;
