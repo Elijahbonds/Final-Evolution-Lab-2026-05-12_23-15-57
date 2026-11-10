@@ -530,3 +530,27 @@ lane/dunk-switch-on (owner 2026-11-10, "turn all 4 on"): `dunk.finishOverRing` a
 staked, ranked and challenge runs whatever the default; 0 restores the old finish / slam exactly); new `dunk.slamPower` 1 (the
 TWO-HAND POWER on its own); `dunk.runwayStrideScale` **TUNED 1 → 1.1** (1 = the old pace); new `dunk.landAbsorbDeep` 1 (the deep
 landing; 0 = the old `dunk_land_absorb` alone). Measurements in docs/DUNK-FLAGSHIP.md §18.
+
+## gameplay-clean-6, 2026-11-10 (owner: "address what you found"; the owner has not felt these yet)
+
+- Group "Anim · transitions" (`anim/ballCarry.ts`), **NEW (on / off, no tuned number)**: `anim.carryPushedBounce` 1. The dunk run-up's
+  dribble uses the pushed bounce the hoops modes already use: the ball is fastest at the floor and the hand meets it slowing at the
+  top. The old bounce was fastest at the hand and turned round there in one frame, and the ball arm turned with it: 35 to 60 degrees
+  in one frame at every bounce (the rig's dunk run-up: 14 hard pops in 14 s). Headless on the hero: 56.8 → 26.2 degrees. Only the dunk
+  runway uses this carry. 0 = the old bounce exactly. Feel-check: dunk, run up with the ball; watch the dribbling arm.
+- `anim.inertial` (AF-1's inertial clip transitions, existing knob, still **0**): when on it now reaches every spawned body (it was
+  the heroes of the modes that opted in), and three of its holes are fixed with no knob of their own (they only run while a body is
+  inertial): a switch made from a clip's end callback (the late switch: a hit react or knockdown running out into the idle threw the
+  arms 55 to 57 degrees in one frame), clips that key only some bones (a leg the guard does not key: 35.7 degrees), and a node no
+  clip shown so far had keyed (guard to the high kick: the knee 68.4 degrees; now held by `anim.inertialAllBones`).
+- The switch-on lane's inertial work, taken over by this lane (coordinator 2026-11-10; `docs/SWITCH-ON.md` section 6 on
+  lane/switch-on), merged on top of the three fixes above. All read only while a body is inertial; each off value restores AF-1:
+  - `anim.inertialAllBones` 1 (new): every bone any of the body's clips keys keeps its pose history; a bone the new clip does not key
+    eases onto its bind pose. 0 = AF-1.
+  - `anim.inertialMatchVel` 1 (new): the offset is a 3-D rotation vector starting at the old motion's speed minus the new clip's. 0 = AF-1.
+  - `anim.inertialMinHalfLifeSec` **0.045 s** (new number): the shortest half-life an offset decays with (AF-1's 0.5 x the fade is
+    0.02 to 0.03 s on the fighters' switches). 0 = AF-1.
+  - `anim.inertialModesOn` **1** (new switch, ON): the inertial blend on by default on the hero in karate, karate VS, showdown, mixed
+    combat, duel and skateboard, the modes measured better; 0 = those modes linear exactly as before. Every other mode stays linear
+    unless `anim.inertial` is 1. Measurements and the per-mode decision: GAMEPLAY-CLEAN-AUDIT section 4h. Feel-check: karate, throw
+    jabs out of a run; showdown, take a hit; skateboard, push and ollie.

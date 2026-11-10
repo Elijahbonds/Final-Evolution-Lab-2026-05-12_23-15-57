@@ -13,20 +13,60 @@ export const ANIM_INERTIAL_ON = 0;
 /** TUNE: the offset's half-life as a fraction of the call site's fadeSec (0.15 s fade → 0.075 s half-life). */
 export const ANIM_INERTIAL_HALF_LIFE_K = 0.5;
 
+/**
+ * SWITCH-ON (2026-11-10): feel knob `anim.inertialMatchVel` default. 1 = the offset is a 3-D rotation vector whose starting velocity is
+ * the old motion's minus the new clip's (Holden's v₀ = v_old − v_new, the new clip's read one frame after the switch), so a clip that
+ * starts fast does not stack its speed on the old motion's. 0 = AF-1's offset exactly: one axis, the old motion's speed along it.
+ * Read only while `anim.inertial` is on.
+ */
+export const ANIM_INERTIAL_MATCH_VEL_ON = 1;
+export function inertialMatchVelOn(): boolean {
+  return feel('anim.inertialMatchVel', ANIM_INERTIAL_MATCH_VEL_ON) >= 0.5;
+}
+
+/**
+ * SWITCH-ON (2026-11-10): feel knob `anim.inertialAllBones` default. 1 = the blend keeps the pose history of every node any of the
+ * body's clips keys, so a switch onto a clip that keys a bone the last clip did not (guard → run: the legs) still starts from what
+ * the body showed. 0 = AF-1 exactly: history for the current clip's nodes only. Read only while `anim.inertial` is on.
+ */
+export const ANIM_INERTIAL_ALL_BONES_ON = 1;
+export function inertialAllBonesOn(): boolean {
+  return feel('anim.inertialAllBones', ANIM_INERTIAL_ALL_BONES_ON) >= 0.5;
+}
+
 /** Is the inertial blend on (feel knob `anim.inertial`, default off)? */
 export function inertialOn(): boolean {
   return feel('anim.inertial', ANIM_INERTIAL_ON) >= 0.5;
 }
 
+/**
+ * SWITCH-ON (2026-11-10): feel knob `anim.inertialMinHalfLifeSec` default — the shortest half-life a switch's offset decays with (s).
+ * K × fadeSec alone gives a 0.02–0.03 s half-life on the fighters' 0.04–0.06 s switches: two thirds of a 80° offset went in ONE frame
+ * (karate VS, jab → run, arms 55–58° a frame in the rig). 0.045 s: the rig's best of 0 / 0.045 / 0.07 on the fighters (§6).
+ * 0 = AF-1's K × fadeSec exactly.
+ */
+export const ANIM_INERTIAL_MIN_HALF_LIFE_SEC = 0.045;
+
 /** The decay half-life (s) for a call site's fadeSec. ≤ 0 → 0 (a hard cut stays a hard cut). */
 export function inertialHalfLife(fadeSec: number): number {
   if (!(fadeSec > 0)) return 0;
-  return feel('anim.inertialHalfLifeK', ANIM_INERTIAL_HALF_LIFE_K) * fadeSec;
+  return Math.max(feel('anim.inertialHalfLifeK', ANIM_INERTIAL_HALF_LIFE_K) * fadeSec, feel('anim.inertialMinHalfLifeSec', ANIM_INERTIAL_MIN_HALF_LIFE_SEC));
 }
 
-/** Opt a body in: inertial when the knob is on, otherwise untouched (returns whether it switched). */
-export function applyInertialBlend(animator: { setBlendMode(mode: 'linear' | 'inertial'): void }): boolean {
-  if (!inertialOn()) return false;
+/**
+ * SWITCH-ON (2026-11-10): feel knob `anim.inertialModesOn` default — 1 = the inertial blend is ON by default on the hero of the modes
+ * where the gameplay-clean rig measured it better than the linear crossfade (karate, karate VS, showdown, mixed combat, duel,
+ * skateboard: docs/SWITCH-ON.md §6). 0 = those modes linear, exactly as before. The modes opt in with
+ * applyInertialBlend(animator, 'measured'); every other mode stays linear unless `anim.inertial` is on.
+ */
+export const ANIM_INERTIAL_MODES_ON = 1;
+export type InertialScope = 'measured';
+
+/** Opt a body in: inertial when the knob is on (or, for a measured mode, unless anim.inertialModesOn is 0), otherwise untouched
+ *  (returns whether it switched). */
+export function applyInertialBlend(animator: { setBlendMode(mode: 'linear' | 'inertial'): void }, scope?: InertialScope): boolean {
+  const on = inertialOn() || (scope === 'measured' && feel('anim.inertialModesOn', ANIM_INERTIAL_MODES_ON) >= 0.5);
+  if (!on) return false;
   animator.setBlendMode('inertial');
   return true;
 }
