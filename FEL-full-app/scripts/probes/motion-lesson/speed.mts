@@ -15,7 +15,8 @@
 // first-run probes do). Network not throttled: the files come from this machine.
 // Per run: first contentful paint, layout shift (every shift not caused by input, until the body is moving + 2 s), the
 // body's first moving frame (the stage's ready), and the tap response for three taps by Event Timing (input → the next
-// frame painted): a lesson chip, Slow, a phrase chip. Prints one line per run and the median; writes <siteDir>/speed.json.
+// frame painted): a lesson chip, Slow, a phrase chip; the 3D frame's own time while playing (the floor under any tap on a page
+// with a moving body); what each clip cost to build. Prints one line per run and the median; writes <siteDir>/speed.json.
 import { build, type Plugin } from 'esbuild';
 import { execFileSync } from 'node:child_process';
 import { createServer } from 'node:http';
@@ -138,6 +139,11 @@ for (let r = 0; r < runs; r++) {
   await page.waitForTimeout(2000);
   const fcp = await page.evaluate(`(performance.getEntriesByName('first-contentful-paint')[0] || {}).startTime ?? null`) as number | null;
   const cls = await page.evaluate('window.__cls') as number;
+  // the frame itself, while the body plays: every paint waits for the 3D frame drawn in it, so a tap can never answer
+  // faster than this (on this rig the GPU is SwiftShader, software, on a shared machine — not a phone's GPU)
+  const frames = await page.evaluate(`new Promise((done) => { const t = []; const step = (now) => { t.push(now); if (now - t[0] < 2000) requestAnimationFrame(step); else done(t.slice(1).map((x, i) => x - t[i])); }; requestAnimationFrame(step); })`) as number[];
+  const sorted = [...frames].sort((a, b) => a - b);
+  const frameMs = { median: Math.round(sorted[Math.floor(sorted.length / 2)] ?? 0), p90: Math.round(sorted[Math.floor(sorted.length * 0.9)] ?? 0), n: frames.length };
   const shifts = await page.evaluate('window.__shifts');
   // three taps, each answered by the next painted frame (Event Timing: input → paint)
   const taps: Record<string, number | null> = {};
@@ -152,7 +158,8 @@ for (let r = 0; r < runs; r++) {
     taps[label] = ev.length ? Math.max(...ev.map((e) => e.duration)) : 16;   // under the 16 ms reporting floor: one frame
     if (label === 'lesson chip') await page.waitForTimeout(2500);
   }
-  const row = { run: r + 1, fcpMs: fcp && Math.round(fcp), cls: +cls.toFixed(4), shifts, bodyMovingMs: readyMs && Math.round(readyMs), wallMs: Date.now() - t0, taps, errors };
+  const clipBuildMs = (await page.evaluate(`performance.getEntriesByName('fel-motion:clip').map((e) => Math.round(e.duration))`)) as number[];
+  const row = { run: r + 1, fcpMs: fcp && Math.round(fcp), cls: +cls.toFixed(4), shifts, bodyMovingMs: readyMs && Math.round(readyMs), wallMs: Date.now() - t0, frameMs, taps, clipBuildMs, errors };
   rows.push(row);
   console.log(JSON.stringify(row));
   await ctx.close();
@@ -162,7 +169,8 @@ const med = (xs: (number | null)[]) => { const s = xs.filter((x): x is number =>
 const summary = {
   firstContentMs: med(rows.map((x) => x.fcpMs as number | null)), layoutShiftMax: Math.max(...rows.map((x) => x.cls as number)), bodyMovingMs: med(rows.map((x) => x.bodyMovingMs as number | null)),
   tapMsMax: Math.max(...rows.flatMap((x) => Object.values(x.taps as Record<string, number | null>).filter((v): v is number => v != null))),
+  frameMsMedian: med(rows.map((x) => (x.frameMs as { median: number }).median)),
   budgets: { firstContentMs: 2500, layoutShift: 0.02, tapMs: 200 },
 };
 writeFileSync(join(SITE, 'speed.json'), JSON.stringify({ rows, summary }, null, 1));
-console.log(`MEDIAN of ${runs}: first content ${summary.firstContentMs} ms (budget 2500) · layout shift max ${summary.layoutShiftMax} (budget 0.02) · tap max ${summary.tapMsMax} ms (budget 200) · body moving ${summary.bodyMovingMs} ms`);
+console.log(`MEDIAN of ${runs}: first content ${summary.firstContentMs} ms (budget 2500) · layout shift max ${summary.layoutShiftMax} (budget 0.02) · tap max ${summary.tapMsMax} ms (budget 200) · a 3D frame while playing ${summary.frameMsMedian} ms (median) · body moving ${summary.bodyMovingMs} ms`);

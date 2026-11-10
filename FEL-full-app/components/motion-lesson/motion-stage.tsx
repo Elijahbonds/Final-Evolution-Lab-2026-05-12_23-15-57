@@ -133,7 +133,10 @@ async function buildStage(gone: () => boolean): Promise<Host | null> {
     if (!c) return null;
     const name = `ex_ml_${++clipSerial}`;
     // a capture: dense keys with the camera's jitter — the joint-space cubic, one [1 2 1] pass first (as the dunk captures)
+    const t0 = performance.now();
     const g = buildPoseClip(scene, hero.skeleton, name, c.total, c.keys, { smooth: true, prefilter: 1 });
+    // User Timing, in every build (the speed probe reads it on the throttled phone): what one clip costs to build
+    try { performance.measure('fel-motion:clip', { start: t0, end: performance.now() }); } catch { /* no User Timing */ }
     if (!g) return null;
     hero.animator.register(g);
     const made = { name, movement: c.movement };
@@ -150,15 +153,23 @@ async function buildStage(gone: () => boolean): Promise<Host | null> {
     }
     const k = `${p.lessonId}|${askKey(p.ask)}`;
     if (k !== shownAsk) {
-      const c = clipFor(p);
-      if (c) {
-        const g = hero.animator.play(c.name, { loop: true, fadeSec: 0.25, restart: true, speedRatio: p.speed });
-        current = g ? { ...c, from: p.ask.from } : null;
-        hero.secondary?.setActivity(() => 1);   // a body doing a movement is busy: no idle breathing layered over it
-        shownPlaying = true; shownSpeed = p.speed;
-      }
       shownAsk = k;
-      recheck(450);
+      const start = () => {
+        if (disposed || shownAsk !== k || !latest) return;   // a newer ask came in while this one waited
+        const c = clipFor(latest);
+        if (c) {
+          const g = hero.animator.play(c.name, { loop: true, fadeSec: 0.25, restart: true, speedRatio: latest.speed });
+          current = g ? { ...c, from: latest.ask.from } : null;
+          hero.secondary?.setActivity(() => 1);   // a body doing a movement is busy: no idle breathing layered over it
+          shownPlaying = true; shownSpeed = latest.speed;
+          if (!latest.playing && g) { g.pause(); shownPlaying = false; }
+        }
+        recheck(450);
+      };
+      // A clip already built plays at once. A new one is built AFTER the next frame is painted: building it is a solve per
+      // key (tens of keys), and done inside the tap it held the tapped chip's own paint back (the speed probe, 4x CPU)
+      if (clips.has(k)) start();
+      else requestAnimationFrame(() => setTimeout(start, 0));
     }
     if (p.playing !== shownPlaying && current) {
       const g = scene.getAnimationGroupByName(current.name);
