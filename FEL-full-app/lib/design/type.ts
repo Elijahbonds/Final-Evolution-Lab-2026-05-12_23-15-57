@@ -38,6 +38,14 @@ export const TYPE: Record<TypeRole, string> = {
   label: 'font-sans text-[12px] font-semibold uppercase leading-[1.2] tracking-[0.14em]',
 };
 
+/** EVERY-SCREEN P2 (2026-11-10): the size for a line whose length is the source's (a card's line, a lede). READABLE.md:
+ *  a run of more than 12 words is body copy and takes TYPE.body (16 px) on a phone; a supporting line of 12 words or
+ *  fewer may stay TYPE.small. So a short line keeps the designed look and a long one becomes readable, wording unchanged. */
+export const MAX_SMALL_WORDS = 12;
+export const lineSize = (text: string | null | undefined): string =>
+  (text ?? '').split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length > MAX_SMALL_WORDS ? TYPE.body : TYPE.small;
+
+
 /** Numbers: the display face, tabular figures. Add a size role beside it (TYPE.display / TYPE.title). */
 export const NUM = 'font-display font-extrabold tabular-nums tracking-[-0.01em]';
 

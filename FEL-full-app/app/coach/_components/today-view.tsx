@@ -294,7 +294,13 @@ export function TodayView({ api = TODAY_API, onSession }: { api?: TodayApi; onSe
     if (resumed.current || !data?.today || data.hardStopped || !warmupCtx) return;
     resumed.current = true;
     const r = readResume(data.today.session.id);
-    if (r) { writeResume(null); start(resumeState(r)); }
+    if (r) { writeResume(null); start(resumeState(r)); return; }
+    // EVERY-SCREEN P2: from Train's Today card ("Start today's session", /coach?start=today) the player opens by itself,
+    // once; the address is put back to /coach so closing the player does not start it again
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('start') === 'today') {
+      window.history.replaceState(null, '', window.location.pathname);
+      if (data.today.session.exercises.length > 0) start();
+    }
   }, [data, warmupCtx]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!data) return <div className="flex justify-center py-16 text-fel-dim"><Loader2 className="h-5 w-5 animate-spin" /></div>;

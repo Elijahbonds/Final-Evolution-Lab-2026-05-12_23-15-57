@@ -37,6 +37,12 @@ export const JOBS: Job[] = [
     endsAt: 'the drill is on camera: it needs a person in the picture',
   },
   {
+    // EVERY-SCREEN P2: the athlete alone's "today", once a program is kept on this phone: Train's first card starts it
+    id: 'solo-resume-program', who: 'solo', name: 'Start today\'s workout (a program kept on this phone)', planBudget: 'open app → first exercise in ≤ 2 taps and ≤ 10 s (phase 2)',
+    steps: [...IN_BUILT_SESSION.map((x) => ({ ...x })), { goto: '/play', say: 'home', pre: false }, { css: 'nav a[href="/train"]:visible', say: 'the Train tab' },
+      { css: '[data-resume-program]', expect: '[data-session-player]', say: 'Your program: Start today' }],
+  },
+  {
     id: 'solo-ask-builder', who: 'solo', name: 'Ask the AI builder for a program and start it', planBudget: 'ask → first rep in ≤ 4 taps (phase 3)',
     steps: [
       ...TRAIN, { tap: 'Build my program', expect: '[data-testid=program-ask-input]', say: 'Build my program' },
@@ -52,7 +58,7 @@ export const JOBS: Job[] = [
   },
   {
     id: 'solo-finish', who: 'solo', name: 'Finish a session (in the program the AI built)', planBudget: 'a 5-exercise session in ≤ 12 taps beyond the sets (phase 2)',
-    steps: [...IN_BUILT_SESSION, { loop: [PRIMARY, '[data-session-player][data-phase=finish]', 160], say: 'every set and rest, to the finish screen' }, { css: PRIMARY, expect: '/1 of \\d+ sessions done/', say: 'Back to the program' }],
+    steps: [...IN_BUILT_SESSION, { play: ['[data-session-player][data-phase=finish]', 200], say: 'every set, to the finish screen' }, { css: PRIMARY, expect: '/1 of \\d+ sessions done/', say: 'Back to the program' }],
   },
   {
     id: 'solo-test-jump', who: 'solo', name: 'Test a jump (measure my vertical)', planBudget: 'vertical in ≤ 3 taps (phase 4)',
@@ -86,7 +92,7 @@ export const JOBS: Job[] = [
   // ── a coached client ──
   {
     id: 'client-start-today', who: 'client', name: "Start today's workout (the coach's session)", planBudget: 'open app → first exercise in ≤ 2 taps and ≤ 10 s (phase 2)',
-    steps: [...TRAIN, { css: 'main a[href="/coach"]:visible', expect: '[data-testid=today-start]', say: "the Today card (Open today)" }, { css: '[data-testid=today-start]', expect: '[data-session-player]', say: "Start today's session" }, { expect: '[data-session-player][data-phase=work]', say: 'the ready count ends by itself' }],
+    steps: [...TRAIN, { css: '[data-testid=today-card]', expect: '[data-session-player]', say: "the Today card: Start today's session" }],
   },
   {
     id: 'client-log-set', who: 'client', name: "Log a set (the coach's session)", planBudget: 'log a set in 1 tap (phase 2)',
@@ -94,7 +100,7 @@ export const JOBS: Job[] = [
   },
   {
     id: 'client-finish', who: 'client', name: "Finish a session (the coach's session)", planBudget: 'a 5-exercise session in ≤ 12 taps beyond the sets (phase 2)',
-    steps: [...IN_COACH_SESSION, { loop: [PRIMARY, '[data-session-player][data-phase=finish]', 160], say: 'every set and rest, to the finish screen' }, { expect: '/Saved\\. Your coach will see it/', say: 'the finish screen says it is saved' }, { css: PRIMARY, expect: '/WEEK \\d+ · SESSION|How you feel/', say: 'Back to Today' }],
+    steps: [...IN_COACH_SESSION, { play: ['[data-session-player][data-phase=finish]', 200], say: 'every set, to the finish screen' }, { expect: '/Saved\\. Your coach will see it/', say: 'the finish screen says it is saved' }, { css: PRIMARY, expect: '/WEEK \\d+ · SESSION|How you feel/', say: 'Back to Today' }],
   },
   // ── the coach ──
   {

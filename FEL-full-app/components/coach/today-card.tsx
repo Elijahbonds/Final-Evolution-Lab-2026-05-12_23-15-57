@@ -4,14 +4,14 @@
 // active program, or a failed read) renders nothing.
 import Link from 'next/link';
 import { CalendarCheck } from 'lucide-react';
-import { TODAY_HREF, todayCardLines, type TodayCardView } from '@/lib/coach/todayCard';
+import { todayCardHref, todayCardLines, type TodayCardView } from '@/lib/coach/todayCard';
 
 export function TodayCard({ view }: { view: TodayCardView | null }) {
   if (!view) return null;
   const l = todayCardLines(view);
   return (
     <Link
-      href={TODAY_HREF}
+      href={todayCardHref(view)}
       data-testid="today-card"
       data-today-card={view.kind}
       className="mb-6 flex items-center gap-4 rounded-2xl border border-fel-cyan/35 bg-fel-cyan/[0.07] p-4 transition-colors hover:bg-fel-cyan/[0.12] sm:p-5"

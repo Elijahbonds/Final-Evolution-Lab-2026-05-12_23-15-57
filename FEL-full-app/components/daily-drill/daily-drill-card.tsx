@@ -3,6 +3,7 @@
 // shows the drill, why it was picked (the number, said as the player knows it), what finishing pays, and, with no number
 // yet, the one step that would give the pick one. Server-rendered: no script of its own.
 import Link from 'next/link';
+import { lineSize } from '@/lib/design/type';
 import { Target, CheckCircle2 } from 'lucide-react';
 import type { DailyDrillView } from '@/lib/daily-drill/load';
 import {
@@ -48,15 +49,18 @@ export function DailyDrillCard({ view }: { view: DailyDrillView | null }) {
           </p>
           {view.nudge && (
             <div className="mt-2" data-daily-nudge>
-              <p className="text-[14px] text-fel-dim">{view.nudge.text}</p>
+              <p className={`${lineSize(view.nudge.text)} text-fel-dim`}>{view.nudge.text}</p>
               <Link href={view.nudge.href} className="inline-flex min-h-[44px] items-center text-[14px] font-bold text-fel-cyan underline-offset-2 hover:underline">{view.nudge.cta} →</Link>
             </div>
           )}
         </div>
       </div>
       {!done && (
+        // EVERY-SCREEN P2 (2026-11-10): for someone who has done a drill before, Start goes straight to the drill on
+        // camera (?start=1): open the app → first move in 2 taps (Train, Start), not 3. A first-timer still gets the
+        // drill's page first: its 3 steps and 2 cues are the point of the first time.
         <Link
-          href={DAILY_DRILL_PATH}
+          href={view.newcomer ? DAILY_DRILL_PATH : `${DAILY_DRILL_PATH}?start=1`}
           data-daily-start
           className="fel-press mt-4 flex min-h-14 items-center justify-center rounded-full bg-gradient-to-b from-[#4df0ff] via-[#00E5FF] to-[#00c8e0] px-6 font-display text-[20px] font-extrabold uppercase tracking-[0.04em] text-[#021014] shadow-[0_10px_28px_-8px_rgba(0,229,255,0.55),inset_0_1px_0_rgba(255,255,255,0.45)]"
         >

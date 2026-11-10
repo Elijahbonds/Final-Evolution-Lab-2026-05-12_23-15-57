@@ -170,7 +170,7 @@ export function CaptureHudView(props: CaptureHudViewProps) {
         aria-expanded={menu.open}
         onClick={() => dispatch({ type: 'trigger' })}
         onKeyDown={onTriggerKeyDown}
-        style={{ ...btn, padding: '6px 12px', fontSize: 15, lineHeight: 1 }}
+        style={{ ...btn, padding: '6px 12px', fontSize: 15, lineHeight: 1, minWidth: 44, minHeight: 44 }}
       >
         ⋯
       </button>

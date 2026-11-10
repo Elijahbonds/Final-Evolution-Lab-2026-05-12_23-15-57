@@ -57,7 +57,14 @@ export function TodayDrillRun({ view, dobYear }: { view: DailyDrillView; dobYear
   const drill = useMemo(() => composeDailyDrill(plan), [plan]);
   const guide = guideFor(plan.drillId);
   const steps = useMemo(() => stepsFor(plan.drillId, plan.phases), [plan]);
+  // EVERY-SCREEN P2: Train's Start (?start=1, not for a first-timer: components/daily-drill/daily-drill-card.tsx) opens the
+  // drill on camera at once, a step that used to be this page's own Start; the address is put back so Leave returns here
   const [stage, setStage] = useState<'intro' | 'live' | 'hurt'>('intro');
+  useEffect(() => {
+    if (view.done || typeof window === 'undefined' || new URLSearchParams(window.location.search).get('start') !== '1') return;
+    window.history.replaceState(null, '', window.location.pathname);
+    setStage('live');
+  }, []);   // eslint-disable-line react-hooks/exhaustive-deps
   const hurt = useRef(false);
   const [claim, setClaim] = useState<Claim>(view.done ? { state: 'done', amount: view.done.amount, streakDays: view.done.streakDays } : { state: 'idle' });
   // body play's grown-up step reads the account's birth year, as on the drills page (drills-app.tsx)

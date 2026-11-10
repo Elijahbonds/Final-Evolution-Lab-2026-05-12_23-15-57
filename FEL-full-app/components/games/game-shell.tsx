@@ -707,7 +707,7 @@ function GameShellInner({
         <div className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5">
           <Link
             href="/"
-            className="flex shrink-0 items-center gap-1.5 rounded-md border border-white/10 px-2.5 py-1.5 text-xs font-medium text-white/60 transition-colors hover:border-[#00E5FF]/50 hover:text-[#00E5FF]"
+            className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-md border border-white/10 px-2.5 py-1.5 text-xs font-medium text-white/60 transition-colors hover:border-[#00E5FF]/50 hover:text-[#00E5FF]"
           >
             <ArrowLeft className="h-3.5 w-3.5" /> Home
           </Link>
@@ -722,26 +722,30 @@ function GameShellInner({
             <PauseButton />
             <BodyControl />
           </div>
-          {profile && (
+          {/* EVERY-SCREEN P2: the badge's place is held while the profile loads (it arrived late and the wrapped row
+              moved under it: layout shift on every game screen) */}
+          {profile ? (
             <span
               className="whitespace-nowrap rounded-md border px-2.5 py-1 font-mono text-xs"
               style={{ borderColor: `${profile.display.color}55`, color: profile.display.color }}
             >
               {profile.display.badge}
             </span>
-          )}
+          ) : <span aria-hidden className="invisible whitespace-nowrap rounded-md border px-2.5 py-1 font-mono text-xs">PRQ — · NOT MEASURED</span>}
           <GraphicsToggle />   {/* visual-foundation: Auto / Performance / Quality, applied on the next load */}
-          {fsAvailable && (
+          {/* EVERY-SCREEN P2: 44 px, and its place held until the browser says whether full screen exists (it appeared
+              after the first paint and moved the row) */}
+          {fsAvailable ? (
             <button
               type="button"
               onClick={onFullscreen}
               aria-label={fsOn ? 'Leave full screen' : 'Full screen'}
-              className="grid h-8 w-8 place-items-center rounded-md border border-white/10 text-white/50
+              className="grid h-11 w-11 place-items-center rounded-md border border-white/10 text-white/50
                          transition-colors hover:border-[#00E5FF]/50 hover:text-[#00E5FF]"
             >
               {fsOn ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
             </button>
-          )}
+          ) : <span aria-hidden className="h-11 w-11" />}
         </div>
       </header>
 

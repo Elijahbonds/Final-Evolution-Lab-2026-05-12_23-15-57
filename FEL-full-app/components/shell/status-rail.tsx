@@ -21,6 +21,7 @@ import { WALLET_REFRESH_EVENT } from '@/components/wallet-chip';
 import { DualWalletChip } from '@/components/dual-wallet-chip';
 import { readPrqDisplay, type PrqDisplay } from '@/lib/prq-display';
 import { TabBar, chromeHiddenFor } from '@/components/shell/tab-bar';
+import { isSignedInOnly } from '@/lib/screen/config';
 // A11-02 / A11-05 (2026-10-25): pad and remote focus in the menus, and the couch view — mounted here, once, for every page
 import { useMenuFocus } from '@/components/shell/use-menu-focus';
 // PREMIUM-UI P3: the app's Motion setting onto <html> (data-fel-motion), so the CSS motion tokens honour it on every page
@@ -60,7 +61,13 @@ export function StatusRail() {
 
   const ring = data && data.prq.score !== null ? ringGeometry(28, 6, data.prq.score, 100) : null;
   // A running mode gets the whole screen. A signed-out visitor gets PublicTopBar, which the legal pages mount.
-  if (chromeHiddenFor(pathname) || status !== 'authenticated') return null;
+  // EVERY-SCREEN P2 (2026-11-10): the rail used to appear only once the client had asked who is signed in, so on every
+  // signed-in screen it arrived late and pushed the whole page down (the rig measured 0.055-0.068 of layout shift on 122
+  // screens; the plan's budget is 0.02). On a path that sends a signed-out visitor to sign in (lib/screen/config.ts), a
+  // page that rendered at all means someone is signed in: there the rail is drawn while the session loads, empty, so
+  // nothing moves when it fills. Elsewhere (the home, a public page) nothing is drawn until the answer, as before.
+  if (chromeHiddenFor(pathname)) return null;
+  if (status !== 'authenticated' && !(status === 'loading' && isSignedInOnly(pathname))) return null;
 
   return (
     <header className="fel-bar sticky top-0 z-40 border-b border-[color:var(--fel-hairline)] bg-fel-bg/85 backdrop-blur-xl">
@@ -68,7 +75,9 @@ export function StatusRail() {
           cluster is ~95 px wider than a 390 px phone, and a fixed one-row rail pushed it off the right edge: the whole page
           scrolled sideways. Now the cluster drops to a second row instead; at the default size it is still one 56 px row. */}
       <div data-couch-scale className="mx-auto flex min-h-14 max-w-[1200px] flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2">
-        <Link href="/play" className="fel-heading inline-flex min-h-10 shrink-0 items-center text-[20px] font-bold leading-none text-white">
+        {/* EVERY-SCREEN P2: every target here is at least 44 px (it was 40, and the wallet's link 26: the rig's most common
+            fault, on 122 screens) */}
+        <Link href="/play" className="fel-heading inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center text-[20px] font-bold leading-none text-white">
           <span className="text-fel-cyan">FE</span>L
         </Link>
 
@@ -87,7 +96,7 @@ export function StatusRail() {
               <Link
                 href="/profile"
                 title={data?.prq.badge}
-                className="fel-press inline-flex min-h-10 items-center gap-2 rounded-full border border-[color:var(--fel-hairline)] bg-white/[0.04] py-1 pl-1 pr-3 font-sans text-[14px] font-semibold tabular-nums text-white"
+                className="fel-press inline-flex min-h-11 items-center gap-2 rounded-full border border-[color:var(--fel-hairline)] bg-white/[0.04] py-1 pl-1 pr-3 font-sans text-[14px] font-semibold tabular-nums text-white"
               >
                 <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden className="-rotate-90">
                   <circle cx="14" cy="14" r="11" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="4" />
@@ -100,7 +109,7 @@ export function StatusRail() {
                 {!data || data.prq.score === null ? '—' : Math.round(data.prq.score)}
                 {data && <span className="hidden text-fel-dim sm:inline">{data.prq.status}</span>}
               </Link>
-              <Link href="/store" aria-label={t('shell.rail.openStore')} className="transition-transform active:scale-95">
+              <Link href="/store" aria-label={t('shell.rail.openStore')} className="inline-flex min-h-11 items-center transition-transform active:scale-95">
                 <DualWalletChip />
               </Link>
               {data?.isAdmin && (
@@ -108,14 +117,14 @@ export function StatusRail() {
                   <Link
                     href="/admin/metrics"
                     aria-label={t('shell.rail.metrics')}
-                    className="fel-press hidden h-10 w-10 place-items-center rounded-full border border-[color:var(--fel-hairline)] text-fel-dim hover:text-white sm:inline-grid"
+                    className="fel-press hidden h-11 w-11 place-items-center rounded-full border border-[color:var(--fel-hairline)] text-fel-dim hover:text-white sm:inline-grid"
                   >
                     <BarChart3 className="h-4 w-4" />
                   </Link>
                   <Link
                     href="/coach/admin"
                     aria-label={t('shell.rail.kbAdmin')}
-                    className="fel-press hidden h-10 w-10 place-items-center rounded-full border border-[color:var(--fel-hairline)] text-fel-dim hover:text-white sm:inline-grid"
+                    className="fel-press hidden h-11 w-11 place-items-center rounded-full border border-[color:var(--fel-hairline)] text-fel-dim hover:text-white sm:inline-grid"
                   >
                     <BookOpen className="h-4 w-4" />
                   </Link>
@@ -125,7 +134,7 @@ export function StatusRail() {
           <button
             onClick={() => signOut({ callbackUrl: '/login' })}
             aria-label={t('shell.rail.signOut')}
-            className="fel-press grid h-10 w-10 place-items-center rounded-full border border-[color:var(--fel-hairline)] text-fel-dim hover:border-fel-crimson/50 hover:text-fel-crimson"
+            className="fel-press grid h-11 w-11 place-items-center rounded-full border border-[color:var(--fel-hairline)] text-fel-dim hover:border-fel-crimson/50 hover:text-fel-crimson"
           >
             <LogOut className="h-4 w-4" />
           </button>

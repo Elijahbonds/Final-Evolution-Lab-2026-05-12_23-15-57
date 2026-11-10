@@ -23,6 +23,8 @@ export async function jobsReport(): Promise<void> {
   P();
   P('**Phase 1, part B of `docs/PLAN-EVERY-SCREEN-10PHASE.md`.** The fifteen jobs of the phase-1 brief, walked on the real app as three people: 18 walks, because starting, logging and finishing a session are walked both as an athlete alone (the program the AI built) and as a coached client (the coach\'s session). Written by `scripts/every-screen/jobs.mts --report`; the walks are `scripts/every-screen/jobs-list.mts`.');
   P();
+  P('**Taps and waits (phase 2).** In the session player a tap is counted only where the screen asks for one (the bright button: a counted set, or a pause). The ready count, every rest and every timed set run by themselves; the rig presses the quiet "skip" there instead of waiting out the clock, and counts those apart as waits, not taps.');
+  P();
   P('**How to read it.** Taps are counted from the signed-in home; the Train tab is one tap. Typing is counted apart. Seconds are the rig\'s own, with no reading time: a floor, not a person\'s time. A camera job is walked to the moment it needs a person in front of the camera. "Stops" means a person cannot go further on that path today, and says where.');
   P();
   const done = now.filter((w) => w.done).length;
@@ -38,7 +40,7 @@ export async function jobsReport(): Promise<void> {
     for (const w of rows) {
       const b = before && after ? before.find((x) => x.id === w.id) : null;
       const was = before && after ? `${b ? (b.done ? `${b.taps} taps, ${b.seconds} s` : `stopped at step ${b.stop?.step}`) : '–'} | ` : '';
-      P(`| ${esc(w.name)} | ${w.taps} | ${w.typed || '–'} | ${w.seconds} | ${was}${esc(how(w))} | ${esc(w.planBudget ?? '–')} |`);
+      P(`| ${esc(w.name)} | ${w.taps}${w.skips ? ` (+ ${w.skips} waits the rig skipped)` : ''} | ${w.typed || '–'} | ${w.seconds} | ${was}${esc(how(w))} | ${esc(w.planBudget ?? '–')} |`);
     }
     P();
   }

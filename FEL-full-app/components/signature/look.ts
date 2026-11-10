@@ -7,7 +7,8 @@ import { TYPE } from '@/lib/design/type';
 
 export const SIG_LOOK = {
   meta: `${TYPE.label} text-fel-soft`,
-  body: `${TYPE.small} text-fel-soft`,
+  // EVERY-SCREEN P2: the program's paragraphs (more than 12 words) are body copy: TYPE.body (READABLE.md)
+  body: `${TYPE.body} text-fel-soft`,
   note: `flex gap-2 ${TYPE.small}`,
   /** the kit's PrimaryCta, stretched to the card (it sizes itself to its words) */
   start: 'mt-4 [&>[data-fel-primary]]:w-full',
