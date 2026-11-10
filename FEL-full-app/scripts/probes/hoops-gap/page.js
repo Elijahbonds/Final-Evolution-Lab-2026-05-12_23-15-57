@@ -355,9 +355,11 @@
   // T3c (hoops-p05): THE STEP-BACK JUMPER — the away flick (the step-back dribble), then Square inside its window, let go at the green.
   // The carry lets the ball arm go as the gather takes the ball: the frames the let-go's pop was on (letgo.mjs reads the hero's arm
   // bones from f0 to the release + 1 s).
-  HG.test.stepback = async () => {
+  HG.test.stepback = async (arg) => {
     const o = {}; const f0 = HG.frame;
-    flick('down');
+    // (hoops-p05) arg.jog: drive at the rim for arg.jog s first, so the step-back is thrown on the move (the carry's reach at full weight)
+    if (arg && arg.jog) { const p0 = meP(); steer(RIM.x - p0.x, RIM.z - p0.z, 0.95); await waitSec(arg.jog); o.jogMps = +speedSampler()().toFixed(2); }
+    flick('down'); if (arg && arg.jog) stick(0, 0);
     const lg = await watch(() => logSince(f0, /stepback/i), 0.8); o.logF = lg.frames; o.log = lg.v ? lg.v.m.slice(0, 90) : '';
     await waitSec(0.2);
     press('X');
