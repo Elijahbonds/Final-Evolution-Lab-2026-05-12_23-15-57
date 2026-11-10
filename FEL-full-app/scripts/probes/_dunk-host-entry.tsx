@@ -4,6 +4,7 @@
 import { createElement as h } from 'react';
 import { createRoot } from 'react-dom/client';
 import DunkBabylon from '@/components/games/dunk-babylon';
+import { prqGrade } from '@/lib/prq';
 
 type Shift = { v: number; t: number; input: boolean; src: string[] };
 const w = window as unknown as { __PATH: string; __CLS: Shift[]; __SESSION: unknown };
@@ -15,4 +16,4 @@ try {
     }
   }).observe({ type: 'layout-shift', buffered: true });
 } catch { /* no layout-shift entries in this browser */ }
-createRoot(document.getElementById('root')!).render(h('div', { style: { position: 'fixed', inset: 0 } }, h(DunkBabylon, { onEnd: () => {}, continuous: true, guest: true })));
+createRoot(document.getElementById('root')!).render(h('div', { style: { position: 'fixed', inset: 0 } }, h(DunkBabylon, { grade: prqGrade(50), prq: 50, onEnd: () => {}, continuous: true, guest: true })));

@@ -1,0 +1,20 @@
+# Phase 10: every earlier gate re-run on the final build (page cur10), FAST rig, knobs off unless Q= says so.
+# One block per gate-lock hold (hold.sh <budget> <file>); split by the blank-line markers below into jobs-p10-{a,b,c,d}.txt.
+#a  P1 / P2 / P5: the approach, the press, the release, an ordinary (late) slam
+f10a cur10 approach 3 0 FAST=1
+f10a cur10 press 2 0 FAST=1
+f10a cur10 release 2 0 FAST=1
+f10s cur10 approach 2 0 FAST=1 SLAM=late
+#b  P3 / P4: every lob type, swept
+f10l cur10 oop 3 0 FAST=1 SWEEP=1
+f10l cur10 oopglass 3 0 FAST=1 SWEEP=1
+f10l cur10 oopbounce 3 0 FAST=1 SWEEP=1
+f10l cur10 glass 3 0 FAST=1 SWEEP=1
+f10l cur10 bounce 3 0 FAST=1 SWEEP=1
+f10l cur10 selflobrun 3 0 FAST=1 SWEEP=1
+#c  P6: the 16 tricks (two halves), P8: the show
+f10t cur10 tricks 1 0 FAST=1 PER_PAGE=8 TRICKS=windmill,tomahawk,tap,windmill360,spin360,scorpion,cradle,fakeeastbay
+f10t2 cur10 tricks 1 0 FAST=1 PER_PAGE=8 TRICKS=eastbay,betweenlegs,clutch,doubleeastbay,lostfound,hideseek,behindback,fakeback
+f10w cur10 show 2 0 FAST=1 PER_PAGE=2 SHOW_REC_MS=18000
+#d  P7: the finishes, 5 of each on one page, the variants knob on (it ships off)
+f10f cur10 finishes 5 0 FAST=1 PER_PAGE=15 Q=feel=dunk.slamVariants:1
