@@ -24,7 +24,7 @@ import '@babylonjs/loaders/glTF';
 import { gateContainerRig } from '../../anim/rigNormalize';
 import { boneNode } from '../../anim/boneLookup';
 import { buildCrowdClip } from './crowdClips';
-import { CROWD_FRONT_URLS, forgeFrontOn } from './crowdFront';
+import { CROWD_FRONT_URLS, crowdBackBodyUrls, forgeFrontOn } from './crowdFront';
 import { CLOCK_T0, CROWD_CLIPS, CROWD_FPS, layoutClips, type ClipRange, type CrowdClipName } from './crowdVat';
 
 /** The five bodies, in the order a seat's `body` index picks them. */
@@ -78,8 +78,9 @@ async function buildBake(scene: Scene): Promise<CrowdBake | null> {
   if (!canBake(scene)) return null;
   const containers: AssetContainer[] = [];
   try {
-    for (let i = 0; i < CROWD_BODY_URLS.length; i++) {
-      const url = CROWD_BODY_URLS[i];
+    const backUrls = crowdBackBodyUrls(CROWD_BODY_URLS);   // DEMO-MODELS-1: the back-row hook (the Meshy five until forge ones land)
+    for (let i = 0; i < backUrls.length; i++) {
+      const url = backUrls[i];
       // eslint-disable-next-line no-await-in-loop
       const c = await LoadAssetContainerAsync(url, scene, { pluginOptions: { gltf: { skipMaterials: i > 0 } } });
       gateContainerRig(c, url);

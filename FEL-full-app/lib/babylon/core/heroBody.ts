@@ -43,11 +43,18 @@ export const KIT_BODY_MOBILE_URL: Record<BodyType, string> = {
   female: '/models/candidates/fel-kit-female.mobile.glb',
 };
 
-/** THE RULE for a body's phone file: on the mobile tier the scan and the kit bodies load their phone files; every other
- *  file and every other tier load as asked. */
+/** DEMO-MODELS-1 (owner, 2026-11-09): the coach body, prep2 1.73 m (the owner's approved likeness on the builder body), and its
+ *  phone file. Copied byte for byte (sha256 051adcc0…7643 / e05d1822…9244; lib/babylon/core/demoModels.ts says who wears it,
+ *  each use behind its own server setting). Same 22 joints and rest pose as SCAN_BODY_URL. */
+export const COACH_BODY_URL = '/models/coach/fel-elijah-coach.prep2.glb';
+export const COACH_BODY_MOBILE_URL = '/models/coach/fel-elijah-coach.prep2.mobile.glb';
+
+/** THE RULE for a body's phone file: on the mobile tier the scan, the coach and the kit bodies load their phone files; every
+ *  other file and every other tier load as asked. */
 export function bodyUrlForTier(url: string, tier: string | null | undefined): string {
   if (tier !== 'mobile') return url;
   if (url === SCAN_BODY_URL) return SCAN_BODY_MOBILE_URL;
+  if (url === COACH_BODY_URL) return COACH_BODY_MOBILE_URL;
   if (url === KIT_BODY_URL.male) return KIT_BODY_MOBILE_URL.male;
   if (url === KIT_BODY_URL.female) return KIT_BODY_MOBILE_URL.female;
   return url;
@@ -60,7 +67,8 @@ export function urlForHeroBody(kind: HeroBodyKind): string {
 /** Every file that IS a player body — an opponent spawn must never land on one of these. */
 export function isPlayerBodyUrl(url: string): boolean {
   return url === SCAN_BODY_URL || url === KIT_BODY_URL.male || url === KIT_BODY_URL.female
-    || url === SCAN_BODY_MOBILE_URL || url === KIT_BODY_MOBILE_URL.male || url === KIT_BODY_MOBILE_URL.female;
+    || url === SCAN_BODY_MOBILE_URL || url === KIT_BODY_MOBILE_URL.male || url === KIT_BODY_MOBILE_URL.female
+    || url === COACH_BODY_URL || url === COACH_BODY_MOBILE_URL;
 }
 
 /** Parse the server allowlist. Case- and whitespace-insensitive; empty entries dropped. */
