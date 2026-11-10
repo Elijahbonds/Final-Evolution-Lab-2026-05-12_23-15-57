@@ -8,13 +8,18 @@ import fs from 'node:fs';
 const files = process.argv.slice(2);
 if (files.length < 2) { console.error('usage: node determinism.mjs <run1.json> <run2.json> [...]'); process.exit(2); }
 const runs = files.map((f) => ({ f, R: JSON.parse(fs.readFileSync(f, 'utf8')) }));
-const seqOf = (R) => (R.log || []).map((l) => `${l.f} ${l.m}`);
+// The sequence: every log line with its frame. Lines logged ON THE SAME FRAME are compared as a set (sorted): the order inside one frame
+// is the order async callbacks resolved in — the announcer's lines are logged when each clip's playback promise settles (ModeMic
+// logCue, after VoiceKit.playEx), which follows the audio decode, not the game (seed 7: the same three lines on frame 7 of every run, in
+// three orders). The raw order is still compared and reported (`order`).
+const seqOf = (R) => { const by = new Map(); for (const l of R.log || []) { if (!by.has(l.f)) by.set(l.f, []); by.get(l.f).push(l.m); } return [...by.entries()].sort((a, b) => a[0] - b[0]).flatMap(([f, ms]) => ms.sort().map((m) => `${f} ${m}`)); };
+const rawSeqOf = (R) => (R.log || []).map((l) => `${l.f} ${l.m}`);
 const hash = (a) => { let h = 2166136261; for (const s of a) { const x = String(s); for (let i = 0; i < x.length; i++) h = Math.imul(h ^ x.charCodeAt(i), 16777619) >>> 0; h = Math.imul(h ^ 10, 16777619) >>> 0; } return h.toString(16).padStart(8, '0'); };
 const motion = (R) => { const P = (R.analysis && R.analysis.perBody) || (R.heroMotion ? { me: R.heroMotion } : null); if (!P) return null; const o = {}; for (const [id, b] of Object.entries(P)) o[id] = `${b.pops}/${b.severe} slide ${b.slideP90Cm}`; return o; };
-const row = ({ f, R }) => { const T = R.trace || { n: 0, root: [], bone: [], rf: [], rl: [] }; return { file: f.split('/').slice(-1)[0], frames: R.frames ?? null, startFrame: R.startFrame ?? null, logLines: (R.log || []).length, seq: hash(seqOf(R)), root: hash(T.root), bone: hash(T.bone), rand: `${T.rf[T.n - 1] ?? '-'}/${T.rl[T.n - 1] ?? '-'}`, lateReq: (R.lateRequests || []).length, poss: (R.poss || []).map((p) => `${p.side}:${p.f0}-${p.f1}`).join(' '), motion: JSON.stringify(motion(R)), errors: (R.pageErrors || []).length + (R.hgErrors || []).length }; };
+const row = ({ f, R }) => { const T = R.trace || { n: 0, root: [], bone: [], rf: [], rl: [] }; return { file: f.split('/').slice(-1)[0], frames: R.frames ?? null, startFrame: R.startFrame ?? null, logLines: (R.log || []).length, seq: hash(seqOf(R)), order: hash(rawSeqOf(R)), root: hash(T.root), bone: hash(T.bone), rand: `${T.rf[T.n - 1] ?? '-'}/${T.rl[T.n - 1] ?? '-'}`, lateReq: (R.lateRequests || []).length, poss: (R.poss || []).map((p) => `${p.side}:${p.f0}-${p.f1}`).join(' '), motion: JSON.stringify(motion(R)), errors: (R.pageErrors || []).length + (R.hgErrors || []).length }; };
 const rows = runs.map(row);
-console.log('run            frames start log  seq      root     bone     rand(in/out) lateReq errors');
-for (const r of rows) console.log(`${r.file.slice(0, 44).padEnd(44)} ${String(r.frames).padEnd(6)} ${String(r.startFrame).padEnd(5)} ${String(r.logLines).padEnd(4)} ${r.seq} ${r.root} ${r.bone} ${r.rand.padEnd(12)} ${r.lateReq}       ${r.errors}`);
+console.log('run                                          frames start log  seq      order    root     bone     rand(in/out) lateReq errors');
+for (const r of rows) console.log(`${r.file.slice(0, 44).padEnd(44)} ${String(r.frames).padEnd(6)} ${String(r.startFrame).padEnd(5)} ${String(r.logLines).padEnd(4)} ${r.seq} ${r.order} ${r.root} ${r.bone} ${r.rand.padEnd(12)} ${r.lateReq}       ${r.errors}`);
 for (const r of rows) console.log(`  ${r.file.slice(0, 44)}: possessions ${r.poss || '-'}; pops/severe + slide p90 cm per body ${r.motion}`);
 let same = true, partial = false;
 const A = runs[0].R, TA = A.trace || { n: 0 };
@@ -30,7 +35,7 @@ for (let k = 1; k < runs.length; k++) {
     console.log(`\n${rows[k].file} vs ${rows[0].file}: ${okLog ? 'IDENTICAL' : 'trace identical, LOG DIFFERS'} over the ${n} frames both ran (a run was cut by its wall cap; pops not compared)`);
     if (!okLog) same = false; partial = true; continue;
   }
-  if (ident) { console.log(`\n${rows[k].file} vs ${rows[0].file}: IDENTICAL over ${TA.n} frames (trace, sequence, pops)`); continue; }
+  if (ident) { const ord = rows[0].order === rows[k].order; console.log(`\n${rows[k].file} vs ${rows[0].file}: IDENTICAL over ${TA.n} frames (trace, sequence, pops)${ord ? '' : ' — the log lines inside a frame came in another order (async callbacks; see seqOf)'}`); continue; }
   same = false;
   console.log(`\n${rows[k].file} vs ${rows[0].file}: DIFFERENT`);
   if (TA.n !== TB.n) console.log(`  trace length ${TA.n} vs ${TB.n}`);
