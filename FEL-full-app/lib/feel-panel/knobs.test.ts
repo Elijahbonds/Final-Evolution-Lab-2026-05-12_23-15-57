@@ -39,7 +39,7 @@ import {
 } from '@/lib/babylon/core/HoopsStick';
 import { PORTRAIT_HERO_MARGIN } from '@/lib/babylon/modes/netPortraitCam';
 import { OCCLUDER_FADE_ALPHA, OCCLUDER_FADE_SEC, OCCLUDER_HOLD_SEC } from '@/lib/babylon/core/OccluderFade';   // gameplay-clean
-import { FOOTBALL_CARRY_RATE_MAX } from '@/lib/babylon/anim/footballTree';   // gameplay-clean P2 #6
+import { FOOTBALL_CARRY_RATE_MAX, FOOTBALL_HURDLE_FADE_SEC } from '@/lib/babylon/anim/footballTree';   // gameplay-clean P2 #6
 import { CAM_LEAD_EASE_SEC, CAM_LEAD_FULL_MPS } from '@/lib/babylon/core/CameraDirector';   // gameplay-clean P2 #10
 import { PLANT_ENGAGE_SEC } from '@/lib/babylon/anim/FootPlanting';   // gameplay-clean P3
 import { HIP_YAW_FOLD_ON } from '@/lib/babylon/anim/PostureLayer';   // gameplay-clean P3
@@ -100,6 +100,7 @@ describe('the feel knob catalogue', () => {
     expect(def('camera.occluderFadeSec')).toBe(OCCLUDER_FADE_SEC);
     expect(def('camera.occluderHoldSec')).toBe(OCCLUDER_HOLD_SEC);
     expect(def('football.carryStrideMax')).toBe(FOOTBALL_CARRY_RATE_MAX);
+    expect(def('football.hurdleFadeSec')).toBe(FOOTBALL_HURDLE_FADE_SEC);
     expect(def('camera.leadEaseSec')).toBe(CAM_LEAD_EASE_SEC);
     expect(def('camera.leadFullMps')).toBe(CAM_LEAD_FULL_MPS);
     expect(def('anim.plantEngageSec')).toBe(PLANT_ENGAGE_SEC);

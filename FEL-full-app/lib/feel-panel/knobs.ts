@@ -1112,6 +1112,12 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/anim/footballTree.ts FOOTBALL_CARRY_RATE_MAX',
     hint: 'How fast the carry loop may cycle to keep the feet with the ground at speed. 1 = the old fixed cadence (feet skate); higher = quicker legs at top speed.',
   },
+  // OWNER CALL (2026-11-10, delegated): the hurdle blends in over its own time (footballTree)
+  {
+    id: 'football.hurdleFadeSec', label: 'Football hurdle: blend-in time', def: 0.12, min: 0.04, max: 0.25, step: 0.01, unit: 's', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/footballTree.ts FOOTBALL_HURDLE_FADE_SEC',
+    hint: 'How long the run blends into the hurdle jump. 0.06 = the old snap (thigh turns about 25 degrees in one frame); 0.12 = smoother (about 15); longer starts to lag behind the hop.',
+  },
   // hoops-p03 (1v1/3v3 phase 3 "rivals that play basketball"): the 1v1 rival's kit and reads (hoops/rivalOffense), the 3v3 team offence
   // (hoops/teamOffense3v3). Every default is this lane's; the owner has felt none of them.
   {
