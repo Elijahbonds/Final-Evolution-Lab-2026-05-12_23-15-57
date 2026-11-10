@@ -68,6 +68,10 @@
       "title": "Your combines",
       "line": "Your combine numbers, and where you placed."
     },
+    "progress": {
+      "title": "My progress",
+      "line": "Your numbers over time."
+    },
     "standing": {
       "title": "Where you stand",
       "line": "PRQ, your grade, and what has moved."

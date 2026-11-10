@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { Layers, ShieldCheck } from 'lucide-react';
 import type { ProgramCard } from '@/lib/signature/view';
 import { DRAFT_BADGE, NONE_APPROVED_LINE, NOT_READY_LINE, YOUTH_DEVICE_LINE, FREE_WEEK_LINE } from '@/lib/signature/copy';
+import { DarkInstead } from '@/components/every-screen/dark-instead';
 import { Chip } from '@/components/ui/fel/chip';
 import { SIG_LOOK } from './look';
 
@@ -19,9 +20,13 @@ export function ProgramList({ ready, admin, youth, programs }: { ready: boolean;
   return (
     <div data-testid="signature-list" className="mx-auto max-w-[720px]">
       {closed && (
-        <p data-closed className={`fel-surface mb-4 rounded-2xl p-4 ${SIG_LOOK.body}`}>
-          {!ready ? NOT_READY_LINE : NONE_APPROVED_LINE}
-        </p>
+        <div data-closed className="mb-4">
+          <p className={`fel-surface rounded-2xl p-4 ${SIG_LOOK.body}`}>
+            {!ready ? NOT_READY_LINE : NONE_APPROVED_LINE}
+          </p>
+          {/* EVERY-SCREEN P1: the line names the daily drill and the library; here they are, as links (the screen had none) */}
+          <DarkInstead links={[{ href: '/train/today-drill', label: "Today's drill" }, { href: '/train/library', label: 'Exercise library' }]} />
+        </div>
       )}
       {admin && (
         <Link href="/coach/admin/programs" data-review-link className="mb-4 flex min-h-[44px] items-center gap-2 text-[13px] font-bold text-[#FFD700]/85 underline-offset-2 hover:underline">
