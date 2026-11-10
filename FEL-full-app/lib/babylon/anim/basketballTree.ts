@@ -363,7 +363,7 @@ export class BasketballAnimTree {
   private beginDefenseLegs(): void {
     const l = this.legs; if (!l) return;
     if (l.live && this.legsLoop) return;
-    l.begin(this.strideClip);
+    l.begin(this.strideClip, true);
     this.legsLoop = this.current && this.strideClip ? { state: this.current, clip: this.strideClip, since: this.stateSince } : null;
   }
   /** The stride references for THIS rig: a body running the CMU loops paces against their stride, not the authored one. */

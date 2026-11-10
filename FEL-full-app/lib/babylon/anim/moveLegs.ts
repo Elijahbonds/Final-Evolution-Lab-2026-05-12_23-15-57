@@ -17,7 +17,7 @@
 //
 // The pure parts (which beats, how much, the phase) are exported for the tests; the rig part evaluates the loop group's own leg
 // animations (Animation.evaluate) — no clip is played, so the animator's one-current-clip rule is untouched.
-import { Quaternion } from '@babylonjs/core';
+import { Quaternion, Vector3 } from '@babylonjs/core';
 import type { AnimationGroup, Observer, Scene, Skeleton, TransformNode } from '@babylonjs/core';
 import { findBone } from './boneLookup';
 
@@ -68,11 +68,17 @@ export interface LegsDrive { loopClip: string | null; rate: number; speedMps: nu
 const PER_SKELETON = new WeakMap<Skeleton, MoveLegs>();
 export class MoveLegs {
   /** One layer per body: a mode that rebuilds its trees on a reload gets the body's existing layer back (gone with the skeleton). */
-  static for(scene: Scene, skeleton: Skeleton, groupOf: (name: string) => AnimationGroup | null): MoveLegs {
-    const had = PER_SKELETON.get(skeleton); if (had) return had;
+  static for(scene: Scene, skeleton: Skeleton, groupOf: (name: string) => AnimationGroup | null, playedName?: (name: string) => string): MoveLegs {
+    const had = PER_SKELETON.get(skeleton); if (had) { if (playedName) had.playedName = playedName; return had; }
     const l = new MoveLegs(scene, skeleton, groupOf); PER_SKELETON.set(skeleton, l);   // (it removes its own observer once its legs are disposed)
+    if (playedName) l.playedName = playedName;
     return l;
   }
+  /** hoops-p05: the name the animator really PLAYS for a loop on this body (a capture for an authored name: opponentMotion.variantFor).
+   *  A free (defensive) beat binds that group — the loop the tree was playing, whose playhead seeds the phase and whose stride the tree's
+   *  rate is for. A handle move binds the name as asked, as it always did. Unset: the name as asked. */
+  private playedName: ((name: string) => string) | null = null;
+  private boundFree = false;
   private readonly legs: Set<TransformNode>;
   private obs: Observer<Scene> | null = null;
   private w = 0;
@@ -82,14 +88,22 @@ export class MoveLegs {
   private locked = false;
   private clip: string | null = null;
   private tracks: { node: TransformNode; evaluate: (frame: number) => unknown }[] = [];
+  /** hoops-p05: the loop's PELVIS (the hips' turn and their place: a slide's low wide stance, the crossover run's opened hips) — written
+   *  only under a free (defensive) beat, whose clips stand tall and square: the loop's legs hung from that pelvis floated 4 cm over the
+   *  floor and stepped 30° off their line (slide-bench, the hand-up over a slide). A handle move keeps its own hips, as before. */
+  private readonly hips: TransformNode | null;
+  private hipTracks: { pos: boolean; evaluate: (frame: number) => unknown }[] = [];
+  private free = false;
+  private readonly scratchV = new Vector3();
   private readonly scratch = new Quaternion();
   /** hoops-p05: the loop the layer is fading OUT of under a free beat (its legs, its own phase), and how far the fade has got (0..1). */
-  private prev: { group: AnimationGroup; tracks: Map<TransformNode, (frame: number) => unknown>; phase: number } | null = null;
+  private prev: { group: AnimationGroup; tracks: Map<TransformNode, (frame: number) => unknown>; hipTracks: { pos: boolean; evaluate: (frame: number) => unknown }[]; phase: number } | null = null;
   private mix = 1; private mixSec = 0.14;
   private readonly scratchPrev = new Quaternion();
 
   constructor(private scene: Scene, skeleton: Skeleton, private groupOf: (name: string) => AnimationGroup | null) {
     this.legs = new Set(MOVE_LEG_BONES.map((n) => findBone(skeleton, n)?.getTransformNode()).filter((n): n is TransformNode => !!n));
+    this.hips = findBone(skeleton, 'Hips')?.getTransformNode() ?? null;
     // insert-first: right after the clips evaluate, before every other after-animations layer (LimbDrag, FootPlanting, the posture)
     this.obs = scene.onAfterAnimationsObservable.add(() => this.apply(), undefined, true);
   }
@@ -116,10 +130,10 @@ export class MoveLegs {
   /** Start under a move: seed the phase from the loop's own playhead (it is fading out under the beat) so the stride carries on. The
    *  loop is LOCKED for the move: the ball changing hands flips the tree's loop to its mirrored twin mid-move, and the twin's legs at
    *  the same phase are the other leg forward (the first probe: leg pops at every crossing). */
-  begin(loopClip: string | null): void {
-    this.locked = false; this.prev = null; this.mix = 1;
+  begin(loopClip: string | null, free = false): void {
+    this.locked = false; this.prev = null; this.mix = 1; this.free = false;
     if (!loopClip) return;
-    const g = this.bind(loopClip); this.locked = !!g;
+    const g = this.bind(loopClip, free); this.locked = !!g;
     const f = (g as unknown as { animatables?: { masterFrame?: number }[] } | null)?.animatables?.[0]?.masterFrame;
     if (g && g.isPlaying && Number.isFinite(f) && g.to > g.from) this.phase = Math.min(0.999, Math.max(0, ((f as number) - g.from) / (g.to - g.from)));
   }
@@ -129,15 +143,16 @@ export class MoveLegs {
     let g: AnimationGroup | null = null;
     if (d.loopClip && d.free) {
       // hoops-p05: a free beat follows the loop the body is in; the loop it leaves fades out under the new one
-      if (d.loopClip !== this.clip && this.group && this.tracks.length && this.w > 1e-3 && (d.fadeSec ?? 0) > 0) {
-        this.prev = { group: this.group, tracks: new Map(this.tracks.map((t) => [t.node, t.evaluate])), phase: this.phase };
+      if ((d.loopClip !== this.clip || !this.boundFree) && this.group && this.tracks.length && this.w > 1e-3 && (d.fadeSec ?? 0) > 0) {
+        this.prev = { group: this.group, tracks: new Map(this.tracks.map((t) => [t.node, t.evaluate])), hipTracks: this.hipTracks, phase: this.phase };
         this.mix = 0; this.mixSec = d.fadeSec as number;
       }
-      g = this.bind(d.loopClip);
+      g = this.bind(d.loopClip, true);
     } else if (d.loopClip) {
       g = this.locked ? this.group : this.bind(d.loopClip);
       if (g && !this.locked) this.locked = true;
     }
+    if (d.loopClip) this.free = !!d.free;   // (the pelvis rides only under a free beat; it keeps riding while that beat's weight fades)
     this.target = g && !MOVE_LEGS_OFF ? legsWeightFor(d.speedMps) : 0;
     this.w = stepLegsWeight(this.w, this.target, d.dtSec);
     if (g) this.phase = d.reverse ? 1 - advancePhase(1 - this.phase, d.dtSec, d.rate, this.durSec(g)) : advancePhase(this.phase, d.dtSec, d.rate, this.durSec(g));
@@ -161,13 +176,16 @@ export class MoveLegs {
     const fps = g.targetedAnimations[0]?.animation.framePerSecond ?? 60;
     return (g.to - g.from) / fps;
   }
-  private bind(loopClip: string): AnimationGroup | null {
-    if (loopClip === this.clip) return this.group;
-    const g = this.groupOf(loopClip);
-    this.clip = loopClip; this.group = g;
+  private bind(loopClip: string, free = false): AnimationGroup | null {
+    if (loopClip === this.clip && free === this.boundFree) return this.group;
+    const g = this.groupOf(free && this.playedName ? this.playedName(loopClip) : loopClip);
+    this.clip = loopClip; this.group = g; this.boundFree = free;
     this.tracks = g ? g.targetedAnimations
       .filter((ta) => this.legs.has(ta.target as TransformNode) && ta.animation.targetProperty === 'rotationQuaternion')
       .map((ta) => ({ node: ta.target as TransformNode, evaluate: (frame: number) => ta.animation.evaluate(frame) })) : [];
+    this.hipTracks = g && this.hips ? g.targetedAnimations
+      .filter((ta) => ta.target === this.hips && (ta.animation.targetProperty === 'rotationQuaternion' || ta.animation.targetProperty === 'position'))
+      .map((ta) => ({ pos: ta.animation.targetProperty === 'position', evaluate: (frame: number) => ta.animation.evaluate(frame) })) : [];
     return g;
   }
   private apply(): void {
@@ -183,6 +201,24 @@ export class MoveLegs {
       if (pv) { const qp = pv.tracks.get(t.node)?.(pFrame) as Quaternion | null | undefined; if (qp) { Quaternion.SlerpToRef(qp, q, k, this.scratchPrev); q = this.scratchPrev; } }
       Quaternion.SlerpToRef(cur, q, this.w, this.scratch);
       cur.copyFrom(this.scratch);
+    }
+    // hoops-p05: under a free beat the loop's pelvis too (its turn, its place), the old loop's fading out under a change like the legs
+    const hips = this.hips;
+    if (!this.free || !hips) return;
+    for (const t of this.hipTracks) {
+      const pt = pv ? pv.hipTracks.find((x) => x.pos === t.pos) : undefined;
+      if (t.pos) {
+        const v = t.evaluate(frame) as Vector3 | null; if (!v) continue;
+        this.scratchV.copyFrom(v);
+        if (pt) { const vp = pt.evaluate(pFrame) as Vector3 | null; if (vp) Vector3.LerpToRef(vp, v, k, this.scratchV); }
+        Vector3.LerpToRef(hips.position, this.scratchV, this.w, hips.position);
+      } else {
+        let q = t.evaluate(frame) as Quaternion | null; const cur = hips.rotationQuaternion;
+        if (!q || !cur) continue;
+        if (pt) { const qp = pt.evaluate(pFrame) as Quaternion | null; if (qp) { Quaternion.SlerpToRef(qp, q, k, this.scratchPrev); q = this.scratchPrev; } }
+        Quaternion.SlerpToRef(cur, q, this.w, this.scratch);
+        cur.copyFrom(this.scratch);
+      }
     }
   }
 }

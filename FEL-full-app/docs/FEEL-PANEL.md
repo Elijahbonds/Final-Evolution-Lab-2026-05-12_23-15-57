@@ -419,6 +419,19 @@ change"). The owner has felt none of these yet; every default is flagged in the 
   dribble, the ball arm (and the off arm) eases ALL the way back to the clip's pose over the let-go's own fade (0.14 s, unchanged). 0 = the
   let-go as it was: the reach's target faded but the solved arm still sat about 44° off the clip on the fade's last frame and cut there in
   one frame (the step-back gather, 1v1 seed 7: about 3 967 °/s, the hero's last severe pop in phase 4b). No new time, so no new number.
+- hoops-p05, the hero's slide (owner 2026-11-10: "fix it"), same group. Each is NEW BEHAVIOUR, on by default, with 0 = today's exactly:
+  - `hoops.backpedalReverseOn` 1 (`anim/basketballTree.ts`) — the captured backpedal (CMU 78_24) is a forward run on the hero rig, so a
+    retreat was a moonwalk (the feet ran forward on the spot while the body backed off). 1 plays it in reverse: the feet plant and the body
+    backs off over them. The stride reference is unchanged (3.31 m/s). 0 = forward, as before. Every body with the capture (hero, rival,
+    3v3) gets it: it is the clip's direction, not a hero rule.
+  - `hoops.defenseLegsOn` 1 (`anim/basketballTree.ts`, `anim/moveLegs.ts`) — the steal reach, the block reach and the held hand-up are
+    whole-body clips whose feet stand still. While one plays on a body moving on the floor, the legs keep the defensive loop they were in
+    (stride-matched, by speed: none under 1.0 m/s, all from 2.4 — the legs layer's own numbers), follow a change of direction after the
+    usual 0.22 s hold with the defence loops' own 0.2 s blend, and stand down in a block jump's flight. 0 = the clip's standing legs.
+  - `hoops.hipSteerOn` 1 (`anim/hipSteer.ts`, the hero in 1v1 and 3v3, on defence only) — the pelvis and legs turn toward where the body
+    is going while the chest stays on the man, so a diagonal slide or retreat steps along its travel. **NEW NUMBERS (flagged):**
+    `hoops.hipSteerMaxDeg` 50° (the most the pelvis turns off the chest), `hoops.hipSteerSec` 0.14 s (the ease), `hoops.hipSteerFromMps`
+    0.8 m/s and `hoops.hipSteerFullMps` 1.8 m/s (no turn under the first, all of it from the second). 0 = square hips, as before.
 
 **assumption:** the bounds are safe, not tuned. A ranked, staked or head-to-head run reads every default above.
 

@@ -241,7 +241,7 @@ import { ReactiveDefender } from '../hoops/reaction';   // lane/hoops-round2 HOP
 import { aiReactMs } from '../hoops/reaction';   // hoops-p02: the AI's block jump is never before it could have read my shot
 import { RivalKit, rivalKitOn, KIT_RENDER, type KitMove } from '../hoops/rivalOffense';   // hoops-p03 (1v1/3v3 phase 3): the rival's move kit and reads
 import { jumperPace, finishPace, jumperFromRiseOn } from '../hoops/releaseTiming';   // hoops-p04: the rival's shot leaves on the clip's release; the hero's rise skips the load
-import { riseStartOf } from '../anim/opponentMotion';   // hoops-p04
+import { riseStartOf, variantFor } from '../anim/opponentMotion';   // hoops-p04; hoops-p05: the capture a loop really plays (the defensive beats' legs)
 import { blockDiceOn, meetsRelease, releaseFrom, handOnBall, deflect, aiBlockJumpAtSec, type Blocker, type P3 } from '../hoops/blocks';   // hoops-p02 (1v1/3v3 phase 2): the hand meets the ball, for everyone
 import { oneContestOn, contestFrom, closingSpeed } from '../hoops/contest';   // hoops-p02: one contest model for every shooter
 import { stealDiceOn, aiStripLands } from '../hoops/steals';   // hoops-p02: the AI's strip is a hand on the ball
@@ -1124,8 +1124,8 @@ export const OneVOneMode: ModeDefinition = (() => {
       void meDribbleSM;
       meAnimTree = new BasketballAnimTree(me.animator);
       MoveDip.for(ctx.scene, me.skeleton, me.root, (n) => me.animator.groupFor(n));   // hoops-dip (owner 10-20; BEFORE MoveLegs: both insert first, so the pass runs moveLegs → the dip → the foot planter): the body sinks into the crossover / momentum cross / behind-the-back (anim/moveDip)
-      meAnimTree.attachLegs(MoveLegs.for(ctx.scene, me.skeleton, (n) => me.animator.groupFor(n)));   // H2: the legs keep running under a handle move
-      meAnimTree.attachSteer(HipSteer.for(ctx.scene, me.skeleton, me.root));   // hoops-p05 (owner 2026-11-10, the hero's slide): insert-first, like the legs layer
+      meAnimTree.attachSteer(HipSteer.for(ctx.scene, me.skeleton, me.root));   // hoops-p05 (owner 2026-11-10, the hero's slide): insert-first and BEFORE MoveLegs is built, so the pass runs moveLegs (the loop's pelvis under a reach) → the steer → the dip
+      meAnimTree.attachLegs(MoveLegs.for(ctx.scene, me.skeleton, (n) => me.animator.groupFor(n), (n) => variantFor(n, me.animator.clipNames)));   // H2: the legs keep running under a handle move (hoops-p05: + the name the animator really plays, for the defensive beats' loop)
       foeAnimTree = new BasketballAnimTree(foe.animator);
       meFootPlant = new FootPlant(me.skeleton, me.meshes[0] as never);
       foeFootPlant = new FootPlant(foe.skeleton, foe.meshes[0] as never);   // HOOPS MOTION phase 3b: every body plants

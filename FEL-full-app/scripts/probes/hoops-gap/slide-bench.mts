@@ -35,7 +35,7 @@ const { CharacterAnimator } = un(await import(APP + '/lib/babylon/anim/Character
 const { registerAuthoredClips } = un(await import(APP + '/lib/babylon/anim/authored/index.ts'));
 const { sanitizeImportedGroups, neverBindPose } = un(await import(APP + '/lib/babylon/anim/importSanitizer.ts'));
 const { installSafePlay } = un(await import(APP + '/lib/babylon/anim/clipRegistry.ts'));
-const { installOpponentMotion, HERO_CAPTURE } = un(await import(APP + '/lib/babylon/anim/opponentMotion.ts'));
+const { installOpponentMotion, HERO_CAPTURE, variantFor } = un(await import(APP + '/lib/babylon/anim/opponentMotion.ts'));
 const { rightHandHoops, leftDribbleTwins } = un(await import(APP + '/lib/babylon/anim/hoopsHand.ts'));
 const { solveArmsDown } = un(await import(APP + '/lib/babylon/anim/restPose.ts'));
 const { applyRestPoseToSkeleton } = un(await import(APP + '/lib/babylon/anim/restPoseApply.ts'));
@@ -81,8 +81,8 @@ async function build(layers = true) {
   animator.play('idle_stand', { loop: true });
   rightHandHoops(animator, sk); leftDribbleTwins(animator, sk);
   const tree = new BT.BasketballAnimTree(animator);
-  if (layers) tree.attachLegs(MoveLegs.for(scene, sk, (n: string) => animator.groupFor(n)));
-  if (layers) tree.attachSteer(HipSteer.for(scene, sk, root));
+  if (layers) tree.attachSteer(HipSteer.for(scene, sk, root));   // (the mode's order: the steer is built before the legs layer)
+  if (layers) tree.attachLegs(MoveLegs.for(scene, sk, (n: string) => animator.groupFor(n), (n: string) => variantFor(n, animator.clipNames)));
   if (layers) FootGlide.for(scene, sk, root);
   return { engine, scene, root, sk, animator, tree };
 }
