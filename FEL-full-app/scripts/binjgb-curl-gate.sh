@@ -16,6 +16,10 @@
 #       'unsafe-eval' and no 'unsafe-inline' in script-src (rule 0's frame-ancestors-only CSP may be a second header);
 #       local-frame: the CSP carries `sandbox allow-scripts` and never allow-same-origin (F3); the shelf's CSP: no sandbox.
 #     /vendor/binjgb/binjgb.js → 200 (the flag opens the static path).
+#   G2 / G3 (Cyber gate ruling on the 2026-11-09 real-build run): a redirect counts only as a 308 whose Location is the
+#     same-origin canonical path (relative, or exactly BASE_URL's origin); it is followed one hop and the hop must give 404
+#     (off) or the expected 200 (on). Any other redirect or Location FAILs. Every vendor row, in both modes, prints an INFO
+#     line with its status, Content-Type, Content-Length, byte count and body sha256; with the flag off any non-404 FAILs.
 #     C2 (Cyber F2F6 review): odd spellings of /play/gb-shelf/local-frame are either not served (404 / redirect) or served
 #     WITH `sandbox allow-scripts` — never the local-frame document without its sandbox.
 #     C4 / G6: /play/gb-shelf/local-frame with NO cookie → 404; with a TEEN test account (FEL_GATE_TEEN_COOKIE, if a local
@@ -81,9 +85,66 @@ status_of() { printf '%s\n' "$1" | awk 'toupper($1) ~ /^HTTP\// {s=$2} END {prin
 values_of() { printf '%s\n' "$1" | awk -v k="$(echo "$2" | tr '[:upper:]' '[:lower:]')" -F': ' 'tolower($1) == k { sub(/^[^:]*: /, ""); print }'; }
 
 expect_404() {
-  local path="$1" h s
+  local path="$1" h s loc c
   h="$(headers "$path")"; s="$(status_of "$h")"
-  if [ "$s" = "404" ]; then pass "off: $path -> 404"; else fail "off: $path -> ${s:-no response} (want 404)"; fi
+  if [ "$s" = "404" ]; then pass "off: $path -> 404"; return; fi
+  # G2 (Cyber gate ruling, 2026-11-09): only a 308 to the same-origin canonical path counts, followed exactly one hop.
+  loc="$(values_of "$h" 'Location' | tail -1)"
+  if [ "$s" = "308" ] && c="$(canonical_location "$loc")"; then
+    s="$(status_of "$(headers "$c")")"
+    if [ "$s" = "404" ]; then pass "off: $path -> 308 $c -> 404"; else fail "off: $path -> 308 $c -> ${s:-no response} (want 404)"; fi
+  else
+    fail "off: $path -> ${s:-no response}${loc:+ Location $loc} (want 404; a redirect counts only as a 308 to the same-origin canonical path)"
+  fi
+}
+
+# G2: a Location is the same-origin canonical path when it is a path starting with exactly one "/" (relative), or exactly
+# BASE_URL's origin followed by such a path; and the path has no "%", no "//", no backslash and no "." or ".." segment.
+# Prints the path to follow; returns 1 (prints nothing) for any other Location, which the caller FAILs.
+canonical_location() {
+  local loc="$1" origin
+  origin="$(printf '%s' "$BASE_URL" | sed -E 's#^([a-z]+://[^/]+).*$#\1#')"
+  case "$loc" in "$origin"/*) loc="${loc#"$origin"}" ;; esac
+  case "$loc" in
+    ''|//*|*'%'*|*'//'*|*\\*|*'/./'*|*'/../'*|*'/.'|*'/..') return 1 ;;
+    /*) printf '%s' "$loc" ;;
+    *) return 1 ;;
+  esac
+}
+
+# G3 (Cyber gate ruling): every vendor row in both modes is fetched once with its body, and the status, Content-Type,
+# Content-Length and body sha256 are recorded on an INFO line. fetch_row <path> sets R_STATUS R_TYPE R_LEN R_BYTES R_SHA
+# R_LOC. The session cookie (if any) goes in a header only, never on the screen.
+sha256_stdin() { if command -v sha256sum >/dev/null; then sha256sum | cut -d' ' -f1; else shasum -a 256 | cut -d' ' -f1; fi; }
+fetch_row() {
+  local path="$1" body h
+  body="$(mktemp)"
+  if [ -n "$COOKIE" ]; then
+    h="$(curl -s --path-as-is -o "$body" -D - -H "Cookie: $COOKIE" "$BASE_URL$path" | tr -d '\r')"
+  else
+    h="$(curl -s --path-as-is -o "$body" -D - "$BASE_URL$path" | tr -d '\r')"
+  fi
+  R_STATUS="$(status_of "$h")"; R_TYPE="$(values_of "$h" 'Content-Type' | tail -1)"; R_LEN="$(values_of "$h" 'Content-Length' | tail -1)"
+  R_LOC="$(values_of "$h" 'Location' | tail -1)"; R_BYTES="$(wc -c < "$body" | tr -d ' ')"; R_SHA="$(sha256_stdin < "$body")"
+  rm -f "$body"
+}
+record_row() { printf 'INFO  %s\n' "$MODE: $1 status=${R_STATUS:-none} type=${R_TYPE:--} length=${R_LEN:--} bytes=$R_BYTES sha256=$R_SHA${R_LOC:+ location=$R_LOC}"; }
+
+# vendor_row <path> <want status> [<sha256 a 200 must match>]: want is 404 (flag off) or 200 (flag on). A 308 to the
+# same-origin canonical path is followed one hop and the hop must give <want>; any other status or Location is a FAIL.
+vendor_row() {
+  local path="$1" want="$2" pin="${3:-}" c
+  fetch_row "$path"; record_row "$path"
+  if [ "$R_STATUS" = "308" ]; then
+    if c="$(canonical_location "$R_LOC")"; then
+      fetch_row "$c"; record_row "$path => $c"
+    else
+      fail "$MODE: $path -> 308 to a non-canonical Location: ${R_LOC:-none}"; return
+    fi
+  fi
+  if [ "$R_STATUS" != "$want" ]; then fail "$MODE: vendor $path -> ${R_STATUS:-no response} (want $want)"; return; fi
+  if [ -n "$pin" ] && [ "$R_SHA" != "$pin" ]; then fail "$MODE: vendor $path -> 200 with bytes that differ from the canonical file"; return; fi
+  pass "$MODE: vendor $path -> $want"
 }
 
 check_page() {
@@ -125,8 +186,16 @@ if [ "$MODE" = "off" ]; then
     /vendor%2Fbinjgb/binjgb.wasm /vendor%2fbinjgb/binjgb.js /vendor/binjgb%2Fbinjgb.js /vendor/binjgb%2fbinjgb.wasm \
     /%76endor/binjgb/binjgb.js /vendor/%62injgb/binjgb.wasm /vendor/binjgb/binjgb%2Ewasm /vendor/binjgb/%62injgb.js \
     /vendor%252Fbinjgb/binjgb.js /vendor/binjgb/./binjgb.js /vendor/./binjgb/binjgb.wasm //vendor/binjgb/binjgb.js \
-    /vendor//binjgb/binjgb.wasm /play/gb-shelf /play/gb-shelf/local-frame /play/gb-shelf/any-slug ; do
-    expect_404 "$p"
+    /vendor//binjgb/binjgb.wasm /play/gb-shelf /play/gb-shelf/local-frame /play/gb-shelf/any-slug \
+    /vendor/binjgb/%2E%2E/binjgb/binjgb.js /vendor/%2e%2e/vendor/binjgb/binjgb.wasm /vendor/binjgb/%5Cbinjgb.js \
+    /vendor/binjgb/%252E%252E/binjgb.js /%67b-shelf/x/y.bin \
+    /Vendor/binjgb/binjgb.wasm /VENDOR/BINJGB/BINJGB.JS /vendor/Binjgb/binjgb.wasm /vendor/binjgb/BINJGB.WASM \
+    /vendor/binjgb/binjgb.wasm/ '/vendor/binjgb/binjgb.wasm;x' '/vendor/binjgb/binjgb.wasm?x=1' ; do
+    # Cyber G1 clearance (efc40be6): the case / trailing-slash / ';' / '?' rows above carry no '%', so they test the
+    # matcher's case-sensitivity against a case-insensitive disk (the Mini's APFS). Middleware does not special-case them;
+    # the real build decides whether that is needed.
+    # G3: with the flag off, every vendor row must end in 404 (after at most one canonical 308 hop); anything else FAILs.
+    case "$p" in /play/*) expect_404 "$p" ;; *) vendor_row "$p" 404 ;; esac
   done
 else
   if [ -z "$COOKIE" ]; then fail "on: FEL_GATE_COOKIE not set (a LOCAL test adult account's session; C4)"; fi
@@ -139,8 +208,17 @@ else
   fi
   for p in /play/gb-shelf/local%2Dframe /play/gb-shelf/local%2dframe /play/gb-shelf//local-frame /play/gb-shelf/local-frame/ /play/%67b-shelf/local-frame /play/gb-shelf/%6Cocal-frame; do
     h="$(headers "$p")"; s="$(status_of "$h")"; c="$(values_of "$h" 'Content-Security-Policy')"
+    # G2: a redirect counts only as a 308 to the same-origin canonical path; follow that one hop and judge the hop.
+    if [ "$s" = "308" ]; then
+      loc="$(values_of "$h" 'Location' | tail -1)"
+      if hop="$(canonical_location "$loc")"; then
+        h="$(headers "$hop")"; s="$(status_of "$h")"; c="$(values_of "$h" 'Content-Security-Policy')"; p="$p => 308 $hop"
+      else
+        fail "on: $p -> 308 to a non-canonical Location: ${loc:-none}"; continue
+      fi
+    fi
     case "$s" in
-      404|301|302|307|308) pass "on: $p -> $s (not served unsandboxed)";;
+      404) pass "on: $p -> $s (not served unsandboxed)";;
       200) if printf '%s' "$c" | grep -q 'sandbox allow-scripts'; then pass "on: $p -> 200 sandboxed"; else fail "on: $p -> 200 WITHOUT sandbox allow-scripts"; fi;;
       *) fail "on: $p -> ${s:-no response}";;
     esac
@@ -161,6 +239,21 @@ else
   fi
   h="$(headers /vendor/binjgb/binjgb.js)"; s="$(status_of "$h")"
   if [ "$s" = "200" ]; then pass "on: /vendor/binjgb/binjgb.js -> 200 (flag read at runtime)"; else fail "on: /vendor/binjgb/binjgb.js -> ${s:-no response} (want 200; if this build was started flag-off before, flips need a redeploy)"; fi
+  # G3: the canonical vendor rows, recorded; then odd spellings. The six encoded spellings may only 404, or serve exactly the
+  # canonical file's bytes (the flag is on, so that is the same allow-listed file); double-encoded, backslash and
+  # dot-segment spellings must 404.
+  vendor_row /vendor/binjgb/binjgb.js 200; JS_SHA="$R_SHA"
+  vendor_row /vendor/binjgb/binjgb.wasm 200; WASM_SHA="$R_SHA"
+  for p in /vendor%2Fbinjgb/binjgb.wasm /vendor%2fbinjgb/binjgb.js /vendor/binjgb%2Fbinjgb.js /vendor/binjgb%2fbinjgb.wasm /%76endor/binjgb/binjgb.js /vendor/%62injgb/binjgb.wasm; do
+    case "$p" in *.wasm) pin="$WASM_SHA" ;; *) pin="$JS_SHA" ;; esac
+    fetch_row "$p"; record_row "$p"
+    if [ "$R_STATUS" = "404" ]; then pass "on: vendor $p -> 404"
+    elif [ "$R_STATUS" = "200" ] && [ -n "$pin" ] && [ "$R_SHA" = "$pin" ]; then pass "on: vendor $p -> 200, same bytes as the canonical file"
+    else fail "on: vendor $p -> ${R_STATUS:-no response} (want 404, or 200 with the canonical file's bytes)"; fi
+  done
+  for p in /vendor%252Fbinjgb/binjgb.js /vendor/binjgb/%2E%2E/binjgb/binjgb.js /vendor/%2e%2e/vendor/binjgb/binjgb.wasm /vendor/binjgb/%5Cbinjgb.js /vendor/binjgb/%252E%252E/binjgb.js; do
+    vendor_row "$p" 404
+  done
 fi
 
 if [ "$FAILS" -eq 0 ] && [ "$SKIPS" -gt 0 ]; then echo "RESULT PASS ($MODE, gate $GATE) WITH $SKIPS SKIP - NOT VALID FOR BINJGB_LOCAL_FILE_ENABLED"; exit 0; fi

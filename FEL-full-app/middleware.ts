@@ -67,10 +67,56 @@ function decodedPath(pathname: string): string {
   }
 }
 
-/** F6: raw OR percent-decoded spelling — /vendor%2Fbinjgb/… and /%76endor/binjgb/… count as the vendored folder too. */
+const collapseSlashes = (p: string) => p.replace(/\/{2,}/g, '/');
+
+/**
+ * F6: raw OR percent-decoded spelling — /vendor%2Fbinjgb/… and /%76endor/binjgb/… count as the vendored folder too.
+ * G1(b) (Cyber gate ruling, 2026-11-09): repeated slashes are collapsed before the prefix check (//vendor//binjgb/…).
+ */
 export function isShelfStaticPath(pathname: string): boolean {
-  const decoded = decodedPath(pathname);
-  return SHELF_STATIC_PREFIXES.some((p) => underPrefix(pathname, p) || underPrefix(decoded, p));
+  const views = [pathname, decodedPath(pathname)].map(collapseSlashes);
+  return SHELF_STATIC_PREFIXES.some((p) => views.some((v) => underPrefix(v, p)));
+}
+
+/**
+ * G1(b) (Cyber gate ruling on the 2026-11-09 real-build run): the static server percent-decodes a path before it looks
+ * the file up, but middleware's matcher sees the raw spelling, so /vendor%2Fbinjgb/binjgb.wasm and /%76endor/… were served
+ * with the flag OFF. Defence in depth for everything under /vendor, /play and /gb-shelf (raw or decoded, slashes
+ * collapsed): decode once, then refuse
+ *   'malformed'       an escape that does not decode;
+ *   'encoded-slash'   %2F / %2f anywhere in the raw path;
+ *   'encoded-backslash' %5C / %5c anywhere in the raw path;
+ *   'double-encoded'  a '%' still present after one decode (%252F, %252E%252E, …);
+ *   'dot-segment'     a '.' or '..' segment after decoding (%2E%2E traversal).
+ * Returns the reason, or null when the spelling is fine (or out of scope).
+ */
+export type RejectedSpelling = 'malformed' | 'encoded-slash' | 'encoded-backslash' | 'double-encoded' | 'dot-segment';
+const SPELLING_SCOPES = ['/vendor', '/play', '/gb-shelf'] as const;
+
+export function rejectedSpelling(pathname: string): RejectedSpelling | null {
+  let decoded: string | null = null;
+  try {
+    decoded = decodeURIComponent(pathname);
+  } catch {
+    decoded = null;
+  }
+  // Scope is judged on the raw, the once-decoded and the fully decoded spelling, so /vendor%252Fbinjgb/… is in scope.
+  let full = decoded ?? pathname;
+  for (let i = 0; i < 4 && full.includes('%'); i++) {
+    try {
+      full = decodeURIComponent(full);
+    } catch {
+      break;
+    }
+  }
+  const views = [pathname, ...(decoded === null ? [] : [decoded]), full].map(collapseSlashes);
+  if (!views.some((v) => SPELLING_SCOPES.some((s) => underPrefix(v, s)))) return null;
+  if (decoded === null) return 'malformed';
+  if (/%2f/i.test(pathname)) return 'encoded-slash';
+  if (/%5c/i.test(pathname)) return 'encoded-backslash';
+  if (decoded.includes('%')) return 'double-encoded';
+  if (decoded.split('/').some((seg) => seg === '.' || seg === '..')) return 'dot-segment';
+  return null;
 }
 
 /**
@@ -149,6 +195,15 @@ function requestCsp(nonce: string, policy: RoutePolicy): string {
 
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
+  // G1(b): odd spellings under /vendor, /play and /gb-shelf are refused before anything else.
+  // HELD (needs an existing-test change, not made): with the flag ON, an encoded slash inside the vendored folder's own
+  // spelling still passes through, because tests/binjgb/binjgb-f6-gate.test.ts:28 pins x-middleware-next for those
+  // spellings with the flag on. It reaches the same public file the canonical path serves (the flag is on); with the flag
+  // OFF every one of them is a 404 here.
+  const rejected = rejectedSpelling(pathname);
+  if (rejected && !(rejected === 'encoded-slash' && isShelfStaticPath(pathname) && isBinjgbShelfEnabled())) {
+    return new NextResponse(null, { status: 404 });
+  }
   if (isPublicRoute(pathname)) {
     return NextResponse.next();
   }
@@ -181,5 +236,10 @@ export const config = {
     '/links', '/books', '/elijah', '/screen', '/screen/:path*', '/play/mirror/assess', '/play/mirror/assess/:path*',
     // BINJGB-SHELF-1: the shelf routes (G2 policy) and its static files (G10 flag-off 404). No /play/gb-local (OQ-6).
     '/play/gb-shelf', '/play/gb-shelf/:path*', '/vendor/binjgb/:path*', '/gb-shelf/:path*',
+    // G1(b): any raw path holding a '%'. The matcher is tested against the RAW pathname (next-server resolve-routes:
+    // match(parsedUrl.pathname)), while the public-file lookup decodes it — so without this row /vendor%2Fbinjgb/… and
+    // /%76endor/… never reached middleware. rejectedSpelling() only acts under /vendor, /play and /gb-shelf; any other
+    // encoded path passes through as before (only a client-sent x-nonce is stripped, C3).
+    '/:encoded(.*%.*)',
   ],
 };
