@@ -432,6 +432,11 @@ change"). The owner has felt none of these yet; every default is flagged in the 
     is going while the chest stays on the man, so a diagonal slide or retreat steps along its travel. **NEW NUMBERS (flagged):**
     `hoops.hipSteerMaxDeg` 50° (the most the pelvis turns off the chest), `hoops.hipSteerSec` 0.14 s (the ease), `hoops.hipSteerFromMps`
     0.8 m/s and `hoops.hipSteerFullMps` 1.8 m/s (no turn under the first, all of it from the second). 0 = square hips, as before.
+- hoops-p05b, same group: `hoops.closeoutStepOn` 1 (`anim/basketballTree.ts`; the clip `bball_closeout_step`, authored in
+  `anim/authored/basketball.ts`) — the closeout fires only at 2.9 m/s and up, but the old closeout swung its legs in place (about 0.9 m/s at
+  its rate cap), so every closeout skated. The new clip is the same picture (chest up, hips low, one hand high) on chop steps paced to the
+  closeout's stride reference, 3.6 m/s at rate 1 (2.0–6.7 m/s across the stride matcher's range). Bench, the man 2 m ahead, 3–6 m/s:
+  slide p90 9–12 → 0.1–1.0 cm a frame. 0 = the old closeout clip exactly. No new feel number (the clip's own keys are pinned by a test).
 - hoops-p05, phase 5 (the ball lives in the hand), same group: `hoops.passFromHandOn` 1 (`hoops/ballHandoff.ts`) — a 3v3 teammate's
   pass (the swing, the ball back to me, the lob) starts its flight where the ball is in his hands; it started at his root + 1.2 m, so the
   ball jumped out of the hand on the release. The aim point and the pass speed are unchanged. 0 = the old start.

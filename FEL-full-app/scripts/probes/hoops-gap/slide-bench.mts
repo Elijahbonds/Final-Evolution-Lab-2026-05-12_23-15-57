@@ -165,13 +165,13 @@ async function run(over: string, dir: string, speed: number): Promise<Row> {
 // travel the tree plays it for and the stride reference it is paced against.
 if (process.argv.includes('--clips')) {
   const { rateFor, strideRef } = un(await import(APP + '/lib/babylon/core/StrideMatch.ts'));
-  const WANT: Record<string, number> = { defend_slide: -90, defend_slide_right: 90, defend_slide_hard: -90, defend_slide_hard_right: 90, defend_run: -90, defend_run_right: 90, defend_backpedal: 180, closeout: 0, run: 0, carry_slide: -90, carry_slide_right: 90, carry_back: 180, walk_dribble: 0, speed_dribble: 0, sprint_dribble: 0 };
+  const WANT: Record<string, number> = { defend_slide: -90, defend_slide_right: 90, defend_slide_hard: -90, defend_slide_hard_right: 90, defend_run: -90, defend_run_right: 90, defend_backpedal: 180, closeout: 0, closeout_step: 0, run: 0, carry_slide: -90, carry_slide_right: 90, carry_back: 180, walk_dribble: 0, speed_dribble: 0, sprint_dribble: 0 };
   const table = BT.basketballClipTable();
   console.log('state                     clip played                          stance implies: deg  m/s   |  the tree plays it for: deg   ref m/s  | off by');
   for (const [state, wantDeg] of Object.entries(WANT)) {
     const B = await build(false); const { scene, sk, animator, root } = B;
     const lf = boneNode(sk, 'LeftFoot')!, rf = boneNode(sk, 'RightFoot')!;
-    const g = animator.play(table[state as keyof typeof table].clip, { loop: true, fadeSec: 0, speedRatio: 1 });
+    const g = animator.play(state === 'closeout_step' ? 'bball_closeout_step' : table[state as keyof typeof table].clip, { loop: true, fadeSec: 0, speedRatio: 1 });   // (hoops-p05b: + the stepping closeout)
     const feet: number[][] = [];
     // …and where the pelvis and the chest point while it plays (deg from the root's front): the hip line and the shoulder line, turned 90
     const lu = boneNode(sk, 'LeftUpLeg')!, ru = boneNode(sk, 'RightUpLeg')!, la = boneNode(sk, 'LeftArm')!, ra = boneNode(sk, 'RightArm')!;
@@ -196,7 +196,7 @@ if (process.argv.includes('--clips')) {
     }
     const tx = -sx / Math.max(1, n), tz = -sz / Math.max(1, n);   // the travel = minus the stance foot's sweep
     const deg = Math.atan2(tx, tz) * 180 / Math.PI, sp = Math.hypot(tx, tz);
-    const ref = strideRef(true); const refMps = ref.byState?.[state] ?? null; const r1mps = (() => { for (let v = 0.5; v < 9; v += 0.01) { const r = rateFor(state, v, ref); if (r !== null && Math.abs(r - 1) < 0.004) return v; } return NaN; })();
+    const ref = strideRef(true); const st2 = state === 'closeout_step' ? 'closeout' : state; const refMps = ref.byState?.[st2] ?? null; const r1mps = (() => { for (let v = 0.5; v < 9; v += 0.01) { const r = rateFor(st2, v, ref); if (r !== null && Math.abs(r - 1) < 0.004) return v; } return NaN; })();
     let off = deg - wantDeg; off = ((off + 180) % 360 + 360) % 360 - 180;
     console.log(`${state.padEnd(25)} ${String(g?.name ?? '?').replace(/_c\d+$/, '').padEnd(36)} ${r1(deg).padStart(18)} ${sp.toFixed(2).padStart(5)}   | ${String(wantDeg).padStart(26)} ${(refMps ?? r1mps).toFixed(2).padStart(8)}  | ${r1(off).padStart(6)} deg | hips ${r1(hipYaw / nY)} chest ${r1(chestYaw / nY)} | best fit ${fit[0]} deg ${fit[1].toFixed(1)} m/s (slip ${r1(fit[2])} cm/f)`);
     void root; B.scene.dispose(); B.engine.dispose();

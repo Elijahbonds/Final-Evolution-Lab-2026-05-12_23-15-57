@@ -1326,6 +1326,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'The retreat capture is a forward run. 1 plays it in reverse, so the feet plant while you back off. 0 = it ran forward on the spot while the body went backward, as before.',
   },
   {
+    id: 'hoops.closeoutStepOn', label: 'Defense: the closeout steps at its pace (0 = off)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · transitions',
+    source: 'lib/babylon/anim/basketballTree.ts CLOSEOUT_STEP_ON',
+    hint: 'A closeout plays chop steps that cover the ground you are covering, the high hand up. 0 = the old closeout, whose feet swung in place while the body slid.',
+  },
+  {
     id: 'hoops.hipSteerOn', label: 'Defense: hips turn toward the travel (0 = off)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · transitions',
     source: 'lib/babylon/anim/hipSteer.ts HIP_STEER_ON',
     hint: 'On defense the pelvis and legs turn toward where you are going while the chest stays on your man, so a diagonal slide or retreat steps along its travel. 0 = square hips, as before.',

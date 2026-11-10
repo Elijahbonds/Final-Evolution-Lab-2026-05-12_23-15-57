@@ -194,7 +194,14 @@ export function chooseBasketballClip(i: AnimTreeInput): AnimChoice {
 }
 /** lane/h3-handler (#312 port, anim/RestDribble): a state's own clip — the protect's is RestDribble's (the idle dribble; the defender's
  *  stance with `hoops.protectDribbleOn` 0) — and whether it has a `_left` twin (a dribbling protect does, like every dribble loop). */
-const clipOf = (st: BasketballAnimState): string => (st === 'protect' ? protectClip(CLIP_FOR.idle_dribble.clip, CLIP_FOR.protect.clip) : CLIP_FOR[st].clip);
+const clipOf = (st: BasketballAnimState): string => (st === 'protect' ? protectClip(CLIP_FOR.idle_dribble.clip, CLIP_FOR.protect.clip) : st === 'closeout' && closeoutStepOn() ? CLOSEOUT_STEP_CLIP : CLIP_FOR[st].clip);
+/** hoops-p05b: THE CLOSEOUT STEPS. `bball_closeout` swings its legs in place (about 0.9 m/s at the rate cap) while the closeout fires only at
+ *  2.9 m/s and up: every closeout skated. `bball_closeout_step` (anim/authored/basketball buildCloseoutStep) is the same picture on chop
+ *  steps paced to the closeout's stride reference (3.6 m/s at rate 1). Knob `hoops.closeoutStepOn` (1); 0 = the old clip exactly. A rig
+ *  without it plays the old one (owned()). */
+export const CLOSEOUT_STEP_ON = 1;
+export const CLOSEOUT_STEP_CLIP = 'bball_closeout_step';
+function closeoutStepOn(): boolean { return feel('hoops.closeoutStepOn', CLOSEOUT_STEP_ON) >= 0.5; }
 const twinsLeft = (st: BasketballAnimState): boolean => LEFT_TWIN_STATES.has(st) || (st === 'protect' && protectDribbles());
 /** …and the two rest states share that loop: a change between them carries it on and only eases the tempo (RestDribble.restTempoFor). */
 const REST_LOOP_STATES: ReadonlySet<BasketballAnimState> = new Set<BasketballAnimState>(['idle_dribble', 'protect']);
@@ -388,7 +395,8 @@ export class BasketballAnimTree {
   /** A `_left` twin this rig does not have plays the loop it twins (never the resolver's fallback). */
   private owned(c: AnimChoice): AnimChoice {
     const names = (this.animator as { clipNames?: Set<string> }).clipNames;
-    const twinned = c.clip.endsWith('_left') && twinsLeft(c.state) && names && !names.has(c.clip) ? { ...c, clip: clipOf(c.state) } : c;
+    let twinned = c.clip.endsWith('_left') && twinsLeft(c.state) && names && !names.has(c.clip) ? { ...c, clip: clipOf(c.state) } : c;
+    if (twinned.clip === CLOSEOUT_STEP_CLIP && names && !names.has(CLOSEOUT_STEP_CLIP)) twinned = { ...twinned, clip: CLIP_FOR.closeout.clip };   // (hoops-p05b) a rig without the stepping closeout
     // H2d: a carrier state whose capture this rig does not have (its name resolves to `bball_mc_…`) plays what it always played
     const legacy = CARRY_LEGACY[twinned.state];
     if (legacy && names && !names.has(twinned.clip) && !names.has(twinned.clip.replace(/^bball_/, 'bball_mc_'))) return { ...twinned, clip: legacy };

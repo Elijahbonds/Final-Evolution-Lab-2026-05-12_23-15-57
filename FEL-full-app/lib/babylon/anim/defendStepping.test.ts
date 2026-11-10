@@ -64,3 +64,20 @@ describe('the tree picks them (chooseBasketballClip)', () => {
     }
   });
 });
+
+// hoops-p05b: THE CLOSEOUT STEPS — the closeout state plays bball_closeout_step (its chop steps cover its pace), behind hoops.closeoutStepOn
+describe('the stepping closeout (hoops-p05b)', () => {
+  it('the closeout state plays the stepping clip; knob 0 gives the old chop clip back exactly', async () => {
+    const { resetFeelForTests, setFeelOverride, setFeelSession, setFeelUser } = await import('../../feel-panel/feel');
+    const { CLOSEOUT_STEP_CLIP } = await import('./basketballTree');
+    expect(chooseBasketballClip(D({ closeout: true })).clip).toBe(CLOSEOUT_STEP_CLIP);
+    try { setFeelUser(true); setFeelSession(null); setFeelOverride('hoops.closeoutStepOn', 0); expect(chooseBasketballClip(D({ closeout: true })).clip).toBe('bball_closeout'); }
+    finally { resetFeelForTests(); }
+  });
+  it('its keys pace to the closeout\'s stride reference: a planted foot travels 2 × Z in half the loop, 3.6 m/s at rate 1, and the matcher covers 2.9 m/s up', async () => {
+    const { CLOSEOUT_STEP_SEC, CLOSEOUT_STEP_Z } = await import('./authored/basketball');
+    expect((2 * CLOSEOUT_STEP_Z) / (CLOSEOUT_STEP_SEC / 2)).toBeCloseTo(HOOPS_STRIDE.run, 6);
+    expect(rateFor('closeout', 2.9, HOOPS_STRIDE_CAPTURE)!).toBeGreaterThan(0.55);
+    expect(rateFor('closeout', 6.4, HOOPS_STRIDE_CAPTURE)!).toBeLessThan(1.85);
+  });
+});

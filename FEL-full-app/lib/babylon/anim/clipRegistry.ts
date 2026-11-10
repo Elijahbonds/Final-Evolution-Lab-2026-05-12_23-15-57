@@ -122,7 +122,7 @@ export const REAL_CLIPS = new Set<string>([
   'bball_ankle_stumble', 'bball_ankle_slip', 'bball_stepback_gather', 'bball_mikan', 'bball_mikan_left', 'bball_up_and_under',
   'bball_up_and_under_left', 'bball_finger_roll', 'bball_finger_roll_left', 'bball_layup_scoop', 'bball_layup_scoop_left', 'bball_layup_spin',
   'bball_layup_spin_left', 'bball_layup_hang', 'bball_layup_hang_left', 'bball_shimmy', 'bball_drop_step', 'bball_drop_step_left', 'bball_floater_left',
-  'bball_euro_step_left', 'bball_defend_backpedal', 'bball_closeout', 'bball_contact_react', 'bball_defend_slide_hard_left',
+  'bball_euro_step_left', 'bball_defend_backpedal', 'bball_closeout', 'bball_closeout_step', 'bball_contact_react', 'bball_defend_slide_hard_left',
   'bball_defend_slide_hard_right',
   'bball_catch',   // HOOPS-10PHASE-2 phase 6: authored/basketball.ts — hands out to meet a pass, in to secure it
   // the quiz podium (BRAINBRAWL-MAJOR, 2026-09-24): authored/party.ts
