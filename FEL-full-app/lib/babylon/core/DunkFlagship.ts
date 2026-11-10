@@ -18,6 +18,8 @@ export const RUNWAY_STRIDE_SCALE = 1.1;
 /** DUNK SWITCH-ON (owner 2026-11-10): the deep landing absorb (anim/authored/dunkLandAbsorb LAND_ABSORB_DEEP_CLIP) — 1 on (default),
  *  0 = the shipped `dunk_land_absorb` exactly. Presentation only (the clip's length and rise start are the old one's). */
 export const LAND_ABSORB_DEEP = 1;
+/** The least fall speed (m/s) the deep landing's leg absorb is asked for: a landing from the rim (measured: the hips fall ~5 m/s). */
+export const LAND_ABSORB_MIN_MPS = 4.4;
 
 // ── (b) THE ALLEY-OOP IS A LOB ──────────────────────────────────────────────────────────────────────────────────────────
 // Measured before (esbuild rig, the ALLEY-OOP prop): the passer threw after the take-off, at 0.9 × the rise beat, to arrive on

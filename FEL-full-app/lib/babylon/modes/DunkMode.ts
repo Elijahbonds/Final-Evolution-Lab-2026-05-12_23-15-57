@@ -89,7 +89,7 @@ import { applyOceanCourt } from '../visual/CourtSurface';
 import { applyVeniceDunkLookPass } from '../visual/veniceSurroundVisibility';
 import { DUNK_CONFIG as CFG } from './modeConfigs';
 import { readDisplaySetting } from '@/lib/controller-link/tvMode';   // TV MODE: the slam window widens on a mirrored display
-import { LAND_LEAD_SEC, LAND_ABSORB_DEEP, timeToFloor, OOP_LOB_FLIGHT_SEC, OOP_WINDUP_SEC, OOP_LATE_CATCH_CLIP_T, whiffWhy, GLASS_RUN_CATCH_CLIP_T, GLASS_RELEASE_MIN_M, SELF_LOB_RELEASE_Y, glassThrowDue, OOP_GLASS_PASSER_X, OOP_GLASS_PASSER_FROM_RIM_M, OOP_GLASS_HIT_OVER_RIM_M, OOP_BOUNCE_FLIGHT_SEC, LOB_FRAME_LIFT, REAL_JUMP_PERSONAL, SLAM_BIG_FROM, personalFullRiseM, riseToPower, LOB_FRAME_TAU, oopThrowDue, RUNWAY_STRIDE_MPS, RUNWAY_STRIDE_SCALE, RUNWAY_RATE_MIN, RUNWAY_RATE_MAX, slamImpact, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG } from '../core/DunkFlagship';   // DUNK-FLAGSHIP: the pass's numbers (feel-panel knobs)
+import { LAND_LEAD_SEC, LAND_ABSORB_DEEP, LAND_ABSORB_MIN_MPS, timeToFloor, OOP_LOB_FLIGHT_SEC, OOP_WINDUP_SEC, OOP_LATE_CATCH_CLIP_T, whiffWhy, GLASS_RUN_CATCH_CLIP_T, GLASS_RELEASE_MIN_M, SELF_LOB_RELEASE_Y, glassThrowDue, OOP_GLASS_PASSER_X, OOP_GLASS_PASSER_FROM_RIM_M, OOP_GLASS_HIT_OVER_RIM_M, OOP_BOUNCE_FLIGHT_SEC, LOB_FRAME_LIFT, REAL_JUMP_PERSONAL, SLAM_BIG_FROM, personalFullRiseM, riseToPower, LOB_FRAME_TAU, oopThrowDue, RUNWAY_STRIDE_MPS, RUNWAY_STRIDE_SCALE, RUNWAY_RATE_MIN, RUNWAY_RATE_MAX, slamImpact, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG } from '../core/DunkFlagship';   // DUNK-FLAGSHIP: the pass's numbers (feel-panel knobs)
 import { slamVariantOf, playSwitchBlocked, SLAM_VARIANTS, SLAM_VARIANTS_ON, SLAM_POWER_ON, REVERSE_TURN_RATE, REVERSE_CONTACT_FROM, REVERSE_JAM_LIFT, REVERSE_TURN_FROM, REVERSE_COMMIT_SEC, type SlamVariant } from '../core/DunkSlamVariant';   // DUNK-FLAGSHIP Phase 7: the finish called with the slam (knob, off)
 import { FINISH_OVER_RING, OVER_RING, overRingOn, overRingAim, overRingLeg, overRingHoldsBody, overRingFollows, overRingSideStep, overRingDeepStep, overRingDefers, type OverRingLeg } from '../core/DunkOverRing';   // DUNK-FLAGSHIP P11: the hand carries the ball over the ring (knob, off)
 import { feel } from '../../feel-panel/feel';
@@ -136,7 +136,8 @@ import { showCuts, cutsSec, POSTER_SEC, announcerCall, CELEBRATIONS, CELEB_BY_DP
 import {
   DUNK_LAND_ABSORB_CLIP, CELEB_BLEND_SEC, pickLiveCelebration, holdEndMs, celebStartMs, clipFor, type RotCelebId,
 } from '../core/DunkLandCelebrate';
-import { LAND_ABSORB_DEEP_CLIP } from '../anim/authored/dunkLandAbsorb';   // DUNK SWITCH-ON: the deep landing absorb
+import { LAND_ABSORB_DEEP_CLIP } from '../anim/authored/dunkLandAbsorb';
+import { mountLandingAbsorb, type LandingAbsorbHandle } from '../anim/LandingAbsorb';   // DUNK SWITCH-ON: the deep landing absorb
 import { PhoneFlashes } from '../visual/PhoneFlashes';
 import { mountRimFx, type RimFxHandle } from '../hoops/RimFx';   // vis-hoops-dunk: the rim's light on a make (visual only)
 import { tierFromAccuracy } from '../hoops/hoopsLook';
@@ -784,6 +785,7 @@ export const DunkMode: ModeDefinition = (() => {
   const JAM_FOLLOW_M = 0.3, JAM_FOLLOW_TAU = 0.07, JAM_Y = 1.15, JAM_LIFT_TAU = 0.08, JAM_DROP_TAU = 0.1, JAM_Y_LEFT_EXTRA = 0.15;
   const RIM_RADIUS = 0.225;
   let airHeld = false;                        // H5: an aerial clip (finish / trick) holds its last frame until feet-down
+  let landAbsorb: LandingAbsorbHandle | null = null;   // DUNK SWITCH-ON: the deep landing's leg absorb (mounted on the first deep landing)
   let landingClip: string = DUNK_LAND_ABSORB_CLIP;   // DUNK-LAND-CELEBRATE: feet-first absorb on every Flight Night landing
   let aerialClip: string = SPORT_CLIP.dunkScoreHang;     // the finish chosen at resolve (the replay re-plays it)
   let dropToFloor = false;                    // H5: the root falls to the floor (a miss from the release; a make after the replay)
@@ -2894,7 +2896,7 @@ export const DunkMode: ModeDefinition = (() => {
       dribble?.dispose(); dribble = null;
       if (ikScene && handIkObs) ikScene.onAfterAnimationsObservable.remove(handIkObs);   // A+ P8 H1
       if (ikScene && hingeObs) ikScene.onAfterAnimationsObservable.remove(hingeObs); hingeObs = null;
-      handIkObs = null; ikScene = null; handIkT = 0;
+      handIkObs = null; ikScene = null; handIkT = 0; landAbsorb?.dispose(); landAbsorb = null;
       ring?.dispose(); ring = null;
       takeoffMark?.dispose(); takeoffMark = null; takeoffMat?.dispose(); takeoffMat = null; takeoffSent = ''; takeoffZone = null;   // dunk-next phase 7
       player?.dispose(); rival?.dispose(); replay?.dispose(); ball?.dispose();
@@ -4117,7 +4119,11 @@ export const DunkMode: ModeDefinition = (() => {
     airHeld = false; setWin('land');
     console.info(`[HANDS] land ${landingClip}${fadeSec !== undefined ? ` (fading in ${Math.round(fadeSec * 1000)} ms before touchdown)` : ''}`);
     // DUNK SWITCH-ON: the deep absorb in its place (knob dunk.landAbsorbDeep, on; 0 = the shipped absorb exactly). Presentation only.
-    const clip = landingClip === DUNK_LAND_ABSORB_CLIP && feel('dunk.landAbsorbDeep', LAND_ABSORB_DEEP) >= 0.5 ? LAND_ABSORB_DEEP_CLIP : landingClip;
+    const deep = landingClip === DUNK_LAND_ABSORB_CLIP && feel('dunk.landAbsorbDeep', LAND_ABSORB_DEEP) >= 0.5;
+    const clip = deep ? LAND_ABSORB_DEEP_CLIP : landingClip;
+    // …and the legs take the rest of the fall: anim/LandingAbsorb re-solves them after the clip, the feet held where they are, deeper
+    // the harder the fall (dropVy, the drop's own speed; a landing at feet-down live has fallen at least that fast)
+    if (deep && ikScene && player) { landAbsorb ??= mountLandingAbsorb(ikScene, player.skeleton, player.root, { auto: false }); landAbsorb.impact(Math.max(dropVy, LAND_ABSORB_MIN_MPS)); }
     playClip(clip, { ...(fadeSec !== undefined ? { fadeSec } : {}), onEnd: () => { playClip(SPORT_CLIP.idle, { loop: true }); setWin('run'); } });
   }
 
