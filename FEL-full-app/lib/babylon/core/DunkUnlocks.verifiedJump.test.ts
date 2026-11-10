@@ -14,6 +14,10 @@ import { nightFormat, cardDunks, isStakedRun } from './DunkField';
 import { DUNK_CONTEST_ATTEMPTS } from '@/lib/arena-score-integrity';
 import { challengePlayHref } from '@/lib/social/challenge-routes';
 import { feelSessionBlock } from '@/lib/feel-panel/sessionGate';
+import { FEEL_STORAGE_KEY, feel, resetFeelForTests, setFeelSession, setFeelUser } from '@/lib/feel-panel/feel';
+import { FEEL_KNOBS } from '@/lib/feel-panel/knobs';
+import { FINISH_OVER_RING, overRingOn } from './DunkOverRing';
+import { playSwitchBlocked, SLAM_VARIANTS_ON } from './DunkSlamVariant';
 import { keepJump, loadJumps, historyId, type JumpHistoryEntry } from '@/lib/jump/historyStore';
 
 const DUNK = readFileSync(path.join(__dirname, '../modes/DunkMode.ts'), 'utf8');
@@ -102,5 +106,39 @@ describe('the friends battle: the ?c= link plays the classic staked night, the c
     expect(feelSessionBlock(p, q)).not.toBeNull();
     expect(feelSessionBlock(p, `${q}&playtest=1`)).not.toBeNull();
     expect(feelSessionBlock('/play/dunk', '?arena=1&playtest=1')).not.toBeNull();
+  });
+  // DUNK SWITCH-ON (extends the gate above; test changed from P11's, which held the over-the-ring knob OFF by default): the owner
+  // turned four switches ON by default on 2026-11-10. The two that change PLAY — the slam variants and the over-the-ring finish —
+  // are off in every staked, ranked and challenge run WHATEVER the default (playSwitchBlocked, read by DunkMode on both); the two
+  // that only change the look (the run-up's stride, the landing absorb) are not play and stay on. And no override reaches any of it.
+  it('the play-changing switches are off in ranked, staked and challenge play whatever the default; no override reaches those runs', () => {
+    const link = challengePlayHref('dunkContest', 'FRIEND42')!;
+    const q = link.slice(link.indexOf('?'));
+    const blocked = [q, `${q}&playtest=1`, '?arena=match_1', '?arena=match_1&playtest=1', '?mp=AB12CD', '?signature=1', '?ranked=1', '?ranked=1&playtest=1'];
+    for (const b of blocked) expect(playSwitchBlocked(b), b).toBe(true);
+    for (const open of ['', '?playtest=1', '?prop=alleyoop', '?arena=']) expect(playSwitchBlocked(open), open).toBe(false);   // an empty ?arena= stakes nothing (isStakedRun)
+    expect(SLAM_VARIANTS_ON).toBe(1); expect(FINISH_OVER_RING).toBe(1);   // ON by default…
+    expect(DUNK).toContain("const switchBlocked = (): boolean => typeof location !== 'undefined' && playSwitchBlocked(location.search);");
+    expect(DUNK).toContain("const finishOverRing = (): boolean => !switchBlocked() && finishVariant !== 'reverse' && overRingOn(feel('dunk.finishOverRing', FINISH_OVER_RING));");
+    expect(DUNK).toContain("const slamVariantsOn = (): boolean => !switchBlocked() && feel('dunk.slamVariants', SLAM_VARIANTS_ON) >= 0.5;");
+    expect(DUNK.split("feel('dunk.slamVariants'").length - 1).toBe(1);    // …read in one place each, behind the block
+    expect(DUNK.split("feel('dunk.finishOverRing'").length - 1).toBe(1);
+    // and the feel store: with every dunk knob moved off its default on the owner's device and the panel open, a blocked run reads
+    // the defaults (the switches' own block then turns the play ones off); only the unpaid playtest takes the override
+    const g = globalThis as { window?: unknown };
+    const dunkKnobs = FEEL_KNOBS.filter((k) => k.id.startsWith('dunk.'));
+    const held: Record<string, number> = Object.fromEntries(dunkKnobs.map((k) => [k.id, k.def === k.max ? k.min : k.max]));
+    resetFeelForTests();
+    g.window = { localStorage: { getItem: (k: string) => (k === FEEL_STORAGE_KEY ? JSON.stringify(held) : null), setItem: () => {}, removeItem: () => {} } };
+    try {
+      setFeelUser(true);
+      for (const [p, s] of [[link.slice(0, link.indexOf('?')), q], ['/play/dunk', `${q}&playtest=1`], ['/play/dunk', '?arena=match_1&playtest=1'], ['/play/dunk', '?ranked=1&playtest=1'], ['/play/dunk', '']] as const) {
+        setFeelSession(feelSessionBlock(p, s));
+        for (const k of dunkKnobs) expect(feel(k.id, k.def), `${k.id} on ${p}${s}`).toBe(k.def);
+      }
+      setFeelSession(feelSessionBlock('/play/dunk', '?playtest=1'));
+      expect(feel('dunk.finishOverRing', FINISH_OVER_RING)).toBe(0);   // the owner's playtest: the A/B back to the old finish works
+      expect(feel('dunk.slamVariants', SLAM_VARIANTS_ON)).toBe(0);
+    } finally { resetFeelForTests(); delete g.window; }
   });
 });

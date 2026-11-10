@@ -54,6 +54,7 @@ import { dressBall } from '../visual/meshyProps';
 import type { AbstractMesh, TransformNode, Mesh } from '@babylonjs/core';
 import { BasketballAnimTree, FootPlant } from '../anim/basketballTree';
 import { MoveLegs } from '../anim/moveLegs';   // H2: the legs keep running under a handle move
+import { HipSteer, travelOffOf } from '../anim/hipSteer';   // hoops-p05: on defence the hero's pelvis turns toward his travel
 import { MoveDip } from '../anim/moveDip';   // hoops-dip
 import { LocoAccent, accentState } from '../anim/locoAccent';   // hoops-dip movement pass
 import { HandlerRest } from './handlerRest';   // lane/h3-handler (#312 port): the eyes on the defender, the protect's turn / sink / guard
@@ -95,6 +96,7 @@ import { FreeThrowLine, ftBody, ftIdleInput, FT_STILL } from '../core/FreeThrowL
 import { BankLook, riseClipFor, gatherClipFor } from '../hoops/shotLooks';   // hoops-shot-content: the step-back's gather and release, the bank's look
 import type { GatherKind } from '../core/HoopsMoves';
 import { attachBallToHand, gatherBallToHand, releaseBall } from '../anim/ballRig';
+import { passStartFor } from '../hoops/ballHandoff';   // hoops-p05 (phase 5): a teammate's pass leaves from the ball, not from root + 1.2 m
 import { rightHandHoops, rightHandBall, hoopsHand, leftDribbleTwins } from '../anim/hoopsHand';   // HOOPS MOTION phase 3: right-handed on screen, every body
 import { sideAwayFrom, sideOfVector } from '../anim/athleteSide'; // HOOPS MOTION phase 3: the one visual-side helper (phase 4b: a crossing move's side is its end hand's; the bite's is still sideAwayFrom's)
 import { requestMove, sizeUpMoveOf, type HandleHost } from '../anim/handleMotion';   // HOOPS MOTION phase 4b: one renderer for the handle moves (1v1's too)
@@ -178,7 +180,7 @@ import { retreatFor, closeoutFor, defendRunFor, approachFor } from '../anim/bask
 import { TeamOffense3v3, teamOffenseOn, crossesHand } from '../hoops/teamOffense3v3';   // hoops-p03 (1v1/3v3 phase 3): their team offence on bodies
 import { KIT_RENDER, type KitMove } from '../hoops/rivalOffense';   // hoops-p03: the handler's kit moves
 import { jumperPace, finishPace, jumperFromRiseOn } from '../hoops/releaseTiming';   // hoops-p04: the rival's shot leaves on the clip's release; the hero's rise skips the load
-import { riseStartOf } from '../anim/opponentMotion';   // hoops-p04
+import { riseStartOf, variantFor } from '../anim/opponentMotion';   // hoops-p04; hoops-p05
 import { applyInertialBlend } from '../anim/inertialize';   // AF-1: inertial clip transitions, behind the anim.inertial knob (default off)
 import { Aware3v3 } from './threevthreeAware';   // lane/h3-aware (#313 H3c): the bodies off the ball watch it, their possession plays both ends, a real D stance
 import { MateBall, mateReadOn, RELEASE_ROLL_RIM_M, RELEASE_ROLL_PER_FRAME } from './threevthreeMate';   // lane/h3-aware (#315 H3e): my teammate with the ball reads and plays
@@ -839,6 +841,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     }
     if (busy) { console.info('[3V3-OFF] call for the ball — teammate busy, AI logic stands'); return; }
     SoundKit.play('uiTick', { pitch: 1.2, volume: 0.4 });
+    const passFrom = passStartFor(ball, body.char.root);   // hoops-p05: read before the release (the world transform is kept)
     releaseBall(ball);
     passTargetId = 'me';
     lastPasserWasMe = false;   // the mate threw this one, not me — no assist to credit on whatever I do next
@@ -848,7 +851,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     if (oopCut(me.char.root.position, me.drib.vel, RIM_FLOOR)) {
       passType = 'lob';
       const toOop = leadPoint(body.char.root.position, me.char.root.position, me.drib.vel, PASS_SPEED.lob).add(new Vector3(0, 2.4, 0));
-      passFlight.start(body.char.root.position.add(new Vector3(0, 1.2, 0)), toOop, 'lob', 1);
+      passFlight.start(passFrom, toOop, 'lob', 1);
       bannerFlash(ctx, 'LOB!', 500); mic?.expect({ moment: 'game.alleyoop' });
       console.info('[3V3-OFF] alley-oop lob to me on the cut');
       console.info('[3V3-OFF] call for the ball answered — mate passes it back');
@@ -858,7 +861,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     // HOOPS-10PHASE-2 phase 6: led the same way the live pass is — a call made mid-cut still arrives on me, not
     // behind me.
     const toMe = leadPoint(body.char.root.position, me.char.root.position, me.drib.vel, PASS_SPEED.chest).add(new Vector3(0, 1.2, 0));
-    passFlight.start(body.char.root.position.add(new Vector3(0, 1.2, 0)), toMe, 'chest', 1);
+    passFlight.start(passFrom, toMe, 'chest', 1);
     console.info('[3V3-OFF] call for the ball answered — mate passes it back');
   }
 
@@ -877,10 +880,11 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   /** lane/h3-aware (#315 H3e): my teammate moves the ball on — a chest pass led to the open man ('BALL BACK' when it comes to me). */
   function mateSwing(ctx: ModeContext, idx: number, to: 'me' | 'mate0' | 'mate1', heldSec: number): void {
     const body = mates[idx], target = to === 'me' ? me : mates[to === 'mate0' ? 0 : 1];
+    const passFrom = passStartFor(ball, body.char.root);   // hoops-p05: read before the release
     releaseBall(ball);
     passTargetId = to; lastPasserWasMe = false; slingPass = false; passType = 'chest';
     const toT = leadPoint(body.char.root.position, target.char.root.position, to === 'me' ? me.drib.vel : target.vel, PASS_SPEED.chest).add(new Vector3(0, 1.2, 0));
-    passFlight.start(body.char.root.position.add(new Vector3(0, 1.2, 0)), toT, 'chest', 1);
+    passFlight.start(passFrom, toT, 'chest', 1);
     if (to === 'me') ctx.juice.callout('BALL BACK', '#22d3ee', 380);
     console.info(`[3V3-OFF] mate${idx} reads: swing it to ${to} (${heldSec.toFixed(2)} s after the catch)`);
   }
@@ -1101,7 +1105,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       me = await spawnBody(new Vector3(0, 0, 6), undefined, false, 'teammate');
       MoveDip.for(ctx.scene, me.char.skeleton, me.char.root, (n) => me.char.animator.groupFor(n));   // hoops-dip (owner 10-20; BEFORE MoveLegs: both insert first, so the pass runs moveLegs → the dip → the foot planter): the body sinks into the crossover / momentum cross / behind-the-back (anim/moveDip)
       LocoAccent.for(ctx.scene, me.char.skeleton, me.char.root, () => accentState(me.tree)); meRest.mount(ctx.scene, me.char.skeleton, me.char.root);   // (+ h3-handler: the protect's sink, same slot)   // hoops-dip movement pass: the decel step and the push-off drawn on the body (anim/locoAccent; after the posture, before the carries)
-      me.tree.attachLegs(MoveLegs.for(ctx.scene, me.char.skeleton, (n) => me.char.animator.groupFor(n)));   // H2: the legs keep running under a handle move
+      me.tree.attachSteer(HipSteer.for(ctx.scene, me.char.skeleton, me.char.root));   // hoops-p05 (owner 2026-11-10, the hero's slide): built BEFORE MoveLegs (both insert first: the pass runs moveLegs → the steer → the dip)
+      me.tree.attachLegs(MoveLegs.for(ctx.scene, me.char.skeleton, (n) => me.char.animator.groupFor(n), (n) => variantFor(n, me.char.animator.clipNames)));   // H2: the legs keep running under a handle move (hoops-p05: + the name the animator really plays)
       ring?.dispose(); ring = mountPlayerRing(ctx.scene, me.char.root, { color: TEAM_JERSEY.mine, icon: readPlayerIcon() });   // PLAYER RING: the one you steer, in your team's colour
       // Each defender MARKS A MAN: allyPositions() is [me, mate0, mate1], so
       // 0/1/2 is a real matchup. Three defenders with no assignment all solved
@@ -2029,6 +2034,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         defending: carrierId === 'foeTeam', bracing: meBoxing, staggered: false, slideDir: slideDirFor(me.char.root.rotation.y, me.drib.vel),
         retreat: retreatFor(me.char.root.position, me.drib.vel, driver?.char.root.position ?? null), closeout: closeoutFor(me.char.root.position, me.drib.vel, driver?.char.root.position ?? null, me.speed01), intense: !!me.slot.intent.intense,   // DEFENSE-LOOK
         defendRun: carrierId === 'foeTeam' && defendRunFor(me.char.root.rotation.y, me.drib.vel, me.tree.state), approach: carrierId === 'foeTeam' && approachFor(me.char.root.position, me.drib.vel, driver?.char.root.position ?? null, me.tree.state),   // H2c
+        ...(carrierId === 'foeTeam' ? { travelOffRad: travelOffOf(me.char.root.rotation.y, me.drib.vel), airborne: myJumpAge !== Infinity } : {}),   // hoops-p05: on defence only (with the ball this tree is fed no travel, as before)
       });
       bioTick(me, dt, carrierId === 'foeTeam' ? 'defense' : 'offense', iAmCarrier && !passFlight.active, nearestFoeDist, me.tree.held === 'bball_block_reach' || meHandUp);
       Object.assign(me.bio, { posting, spinning: !!spin });   // HOOPS-MOVE-KIT-B: the seal turns the chest AWAY from the rim; the pivot owns it through the turn

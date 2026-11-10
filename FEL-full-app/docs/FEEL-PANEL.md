@@ -307,6 +307,15 @@ done), up a TWO-HAND POWER (`dunk_finish_two_hand`), each named on the card (+0.
 the live press inside the window; a called air trick keeps its own flush; the d-pad tricks are untouched (DunkSlamVariant.test).
 Like every knob, never in ranked, staked or paid play.
 
+lane/dunk-flagship P11 (group "Dunk · finishes"), new, OFF by default: `dunk.finishOverRing` 0 (`DunkOverRing.ts`
+`FINISH_OVER_RING`; owner call 1 of 2026-11-10: the shipped finish stays, this is the A/B to feel first). 0 = the shipped finish,
+line for line: the ball meets the front of the rim and the flush carries it in. 1 = the hand carries the ball over the ring —
+up in front of the rim, in over the lip, down through the middle — and lets it go inside the ring. Every dunk in the mode ends
+this way while it is on (the plain flush, the REVERSE, the TWO-HAND POWER, a called trick's flush). The numbers behind it are all
+new and read only with the knob on (`OVER_RING` in `DunkOverRing.ts`); the measured table is in `docs/DUNK-FLAGSHIP.md` §17.
+A ball the hand could not carry over in time is let go at the front of the rim as shipped: the knob never turns a make into a
+miss. Like every knob, never in ranked, staked or paid play (DunkUnlocks.verifiedJump.test proves it on this knob).
+
 lane/hoops-round2 (owner 2026-10-20, HOOPS DEFENSE / CONTACT; every number new, the owner has felt none of them yet):
 
 - Group "Hoops · AI reaction" (`hoops/reaction.ts`), **TUNED (new behaviour)**: `hoops.aiReactRookieMs` 420 ms, `hoops.aiReactProMs`
@@ -415,6 +424,26 @@ change"). The owner has felt none of these yet; every default is flagged in the 
 - hoops-p04b, same group (`anim/ballCarry.ts`, **TUNED (new)**): `hoops.carryArmSpeedSec` 0.12 s — the dribble's arm weights (the ball
   arm's pace reach, the off arm's swing in at 0.35–0.65 of speed) follow the body's speed eased over this; a gear change stepped them in
   a frame. 0 = the frame's speed, as before. The ball's push-ahead and the guard keep their own easing.
+- hoops-p05, same group (`anim/ballCarry.ts`): `hoops.carryLetGoToClipOn` 1 — when a shot, a pass or a pick-up takes the ball out of the
+  dribble, the ball arm (and the off arm) eases ALL the way back to the clip's pose over the let-go's own fade (0.14 s, unchanged). 0 = the
+  let-go as it was: the reach's target faded but the solved arm still sat about 44° off the clip on the fade's last frame and cut there in
+  one frame (the step-back gather, 1v1 seed 7: about 3 967 °/s, the hero's last severe pop in phase 4b). No new time, so no new number.
+- hoops-p05, the hero's slide (owner 2026-11-10: "fix it"), same group. Each is NEW BEHAVIOUR, on by default, with 0 = today's exactly:
+  - `hoops.backpedalReverseOn` 1 (`anim/basketballTree.ts`) — the captured backpedal (CMU 78_24) is a forward run on the hero rig, so a
+    retreat was a moonwalk (the feet ran forward on the spot while the body backed off). 1 plays it in reverse: the feet plant and the body
+    backs off over them. The stride reference is unchanged (3.31 m/s). 0 = forward, as before. Every body with the capture (hero, rival,
+    3v3) gets it: it is the clip's direction, not a hero rule.
+  - `hoops.defenseLegsOn` 1 (`anim/basketballTree.ts`, `anim/moveLegs.ts`) — the steal reach, the block reach and the held hand-up are
+    whole-body clips whose feet stand still. While one plays on a body moving on the floor, the legs keep the defensive loop they were in
+    (stride-matched, by speed: none under 1.0 m/s, all from 2.4 — the legs layer's own numbers), follow a change of direction after the
+    usual 0.22 s hold with the defence loops' own 0.2 s blend, and stand down in a block jump's flight. 0 = the clip's standing legs.
+  - `hoops.hipSteerOn` 1 (`anim/hipSteer.ts`, the hero in 1v1 and 3v3, on defence only) — the pelvis and legs turn toward where the body
+    is going while the chest stays on the man, so a diagonal slide or retreat steps along its travel. **NEW NUMBERS (flagged):**
+    `hoops.hipSteerMaxDeg` 50° (the most the pelvis turns off the chest), `hoops.hipSteerSec` 0.14 s (the ease), `hoops.hipSteerFromMps`
+    0.8 m/s and `hoops.hipSteerFullMps` 1.8 m/s (no turn under the first, all of it from the second). 0 = square hips, as before.
+- hoops-p05, phase 5 (the ball lives in the hand), same group: `hoops.passFromHandOn` 1 (`hoops/ballHandoff.ts`) — a 3v3 teammate's
+  pass (the swing, the ball back to me, the lob) starts its flight where the ball is in his hands; it started at his root + 1.2 m, so the
+  ball jumped out of the hand on the release. The aim point and the pass speed are unchanged. 0 = the old start.
 
 **assumption:** the bounds are safe, not tuned. A ranked, staked or head-to-head run reads every default above.
 
@@ -438,6 +467,28 @@ yet.
   the leg in one frame when the root or the clip jumped on that frame (Football Rush's hurdle and TD spike: thighs 41 to 70 degrees a
   frame). 0 = the old target fade exactly.
 
+- Same group (`anim/FootPlanting.ts`, lane/gameplay-clean-5), **NEW (on / off, no tuned number)**: `anim.plantReplantEase` 1. A foot
+  that plants again while its leg is still easing off the last plant keeps easing (the release carries on under the new plant). The
+  clean-4 release ended on the spot at a replant and the leg snapped the rest of the way in one frame: a body sliding in a stance let
+  each foot go at the drift limit and took it straight back, so a thigh jumped about 33 degrees at every replant (measured headless,
+  `FootPlanting.replant.test.ts`; 6 degrees with the clean-4 release off). 0 = a replant ends the release at once, exactly as before.
+  Feel-check: Showdown or Karate, walk and strafe in guard; watch the knees.
+
+- Same group (`anim/CharacterAnimator.ts`, lane/gameplay-clean-5), **NEW (on / off, no tuned number)**: `anim.fadeHoldEnded` 1. A
+  one-shot move (a strike, a hit react) that reaches its last frame while it is still blending out is held on that frame until the
+  blend ends. Before, it stopped mid-blend, the weight it still had was gone in one frame, and the body jumped toward a stale pose:
+  Showdown's hit react into guard moved the arms 21 to 30 degrees and the thighs 22 to 25 in one frame, every time (the rig); on the
+  hero headless 33 degrees, now 16, no worse than the blend around it (`CharacterAnimator.fadeHold.test.ts`). 0 = the old behaviour
+  exactly. No blend time changed. This is the shared animator: every mode's moves blend out through it, the hoops modes included.
+  Feel-check: Showdown, take a hit and watch the body come back to guard.
+
+- Same group (`anim/FootPlanting.ts` + one call in `modes/AeroAcesMode.ts`, lane/gameplay-clean-5), **NEW (on / off, no tuned
+  number)**: `anim.plantSeatedOff` 1. A body its mode seats in a vehicle holds no foot plant. Every spawned hero carries the foot
+  planter, and the Aero Aces pilot sits with his ankles at the root's height, so the planter pinned his feet to the ground while the
+  plane flew on and let them go a frame later: knees 51 to 63 degrees and thighs 22 to 40 in one frame, 2 to 3 hard pops a run (the
+  rig; none with the planter off). Aero now marks its pilot seated. 0 = the mark is ignored, exactly the old layer. Feel-check: Aero
+  Aces, watch the pilot's knees through a loop.
+
 **assumption:** the bounds (0 to 0.4 s) are safe, not tuned. A ranked, staked or head-to-head run reads the defaults.
 
 ## Owner calls, 2026-11-10 (delegated: "handle those 5 open calls"; lane/owner-calls-1110)
@@ -450,3 +501,32 @@ The owner has not felt this yet.
   read 26° in play), 15–17° at 0.12 s, 13–15° at 0.15 s; the knee 12–13° → 7.5–8.7°. The carry's own stride is about 6° a frame.
   0.06 = the old blend exactly. The juke, the spin and the stiff arm keep 0.06 s. Feel-check: football, hurdle a downed man at a
   sprint; do the legs tuck with the hop, or lag it?
+
+## Baseball bat, 2026-11-10 (lane/bat-grip-2)
+
+The owner has not felt this yet.
+
+- Group "Baseball · bat" (`modes/baseballBat.ts`), **NEW numbers (flagged)**: `baseball.batGripLostM` 0.4 m and
+  `baseball.batGripBackM` 0.3 m. The bat (Derby and the three-innings batter) is drawn only while both fists can be on it: it hides
+  once the fists are more than 0.4 m apart and comes back when they close to 0.3 m. Before, the bat was strung between the two
+  hands whatever the arms were doing, so the innings batter coming back to the stance (after a strikeout, a run, a celebration)
+  held it across hands 0.5 to 0.8 m apart for the first tenth of a second. Measured on the clips (`baseballBatHeld.test.ts`,
+  `scripts/probes/bat-grip-2/blend-headless.ts`): a held stance reads 0.07 m, the swing's follow-through 0.23 m, the swing back to
+  the stance 0.35 m at its widest (the bat stays drawn through it), a free hand 0.40 m and more. `batGripLostM` at its 2 m maximum
+  never hides the bat: the old behaviour exactly. Draw-only: no score, grade or timing reads the bat. Feel-check: baseball, strike
+  out or get a hit and watch the batter come back to the plate; does the bat appear in the hands cleanly, or pop in late?
+  **assumption:** the bounds (0.25 to 2 m, 0.1 to 0.4 m) are safe, not tuned.
+## gameplay-clean-5, 2026-11-10 (the hurdle's way out; the owner has not felt this yet)
+
+- Group "Anim · transitions" (`anim/footballTree.ts`), **TUNED (new, flagged)**: `football.hurdleExitFadeSec` 0.2 s (the hurdle used
+  the carry's own 0.1 s on the way out). How long the hurdle's jump blends back into the carry. The jump's clip runs out a few frames
+  before the landing and the arms came down from the jump's reach to the tuck in six frames: the rig read LeftArm 31, RightArm 23 and
+  RightForeArm 15 degrees a frame at every hurdle, football's last repeating hard pop. Measured headless on the hero over 6 carry
+  phases at 1× and 1.4× (`footballTree.hurdleExit.test.ts`): the off arm 30.9° a frame at 0.1 s, 19.6° at 0.16, 15.7° at 0.2, 12.6°
+  at 0.25. 0.1 = the old blend exactly. Every other way into the carry (the snap, a juke, a spin, the stiff arm) keeps 0.1 s.
+  Feel-check: football, hurdle at a sprint; do the arms come down with the landing, or hang in the air after it?
+
+lane/dunk-switch-on (owner 2026-11-10, "turn all 4 on"): `dunk.finishOverRing` and `dunk.slamVariants` default **1** (both off in
+staked, ranked and challenge runs whatever the default; 0 restores the old finish / slam exactly); new `dunk.slamPower` 1 (the
+TWO-HAND POWER on its own); `dunk.runwayStrideScale` **TUNED 1 → 1.1** (1 = the old pace); new `dunk.landAbsorbDeep` 1 (the deep
+landing; 0 = the old `dunk_land_absorb` alone). Measurements in docs/DUNK-FLAGSHIP.md §18.

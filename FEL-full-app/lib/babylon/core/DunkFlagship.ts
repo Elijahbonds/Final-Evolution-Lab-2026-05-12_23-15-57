@@ -11,8 +11,19 @@
 export const RUNWAY_STRIDE_MPS = 3.6 / 1.1;
 export const RUNWAY_RATE_MIN = 0.7 * 1.1;
 export const RUNWAY_RATE_MAX = 1.6 * 1.1;
-/** (new knob, default unchanged) The reference above × this: 1 = the shipped pace; above 1 slower steps, below 1 quicker. */
-export const RUNWAY_STRIDE_SCALE = 1;
+/** The reference above × this: 1 = the pace shipped until 2026-11-10; above 1 slower steps, below 1 quicker.
+ *  TUNED 1 → 1.1 (owner 2026-11-10, "turn all 4 on"): measured in Phase 4, matched pairs, 1.1 skated 17 % less (1.17 → 0.97 m/s)
+ *  and less in both bands (run 0.98 → 0.71, sprint 1.72 → 1.51). The knob at 1 restores the old pace exactly. */
+export const RUNWAY_STRIDE_SCALE = 1.1;
+/** DUNK SWITCH-ON (owner 2026-11-10): the deep landing absorb (anim/authored/dunkLandAbsorb LAND_ABSORB_DEEP_CLIP) — 1 on (default),
+ *  0 = the shipped `dunk_land_absorb` exactly. Presentation only (the clip's length and rise start are the old one's). */
+export const LAND_ABSORB_DEEP = 1;
+/** The least fall speed (m/s) the deep landing's leg absorb is asked for: a landing from the rim (measured: the hips fall ~5 m/s). */
+export const LAND_ABSORB_MIN_MPS = 4.4;
+/** …and its share of the shared absorb's sink (anim/LandingAbsorb `intensity`). Measured (rig, the 16 tricks): at 1 the absorb's
+ *  quick compress (0.07 s, a shared tuned number) added a hip pop 3 frames after touchdown (~49 m/s² against the probe's 40 floor)
+ *  and the landings averaged 3.1 hip pops against 2.1 with the old clip; 0.6 keeps the compress under the floor (NEW). */
+export const LAND_ABSORB_INTENSITY = 0.6;
 
 // ── (b) THE ALLEY-OOP IS A LOB ──────────────────────────────────────────────────────────────────────────────────────────
 // Measured before (esbuild rig, the ALLEY-OOP prop): the passer threw after the take-off, at 0.9 × the rise beat, to arrive on
