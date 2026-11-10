@@ -94,6 +94,15 @@ export function isCoachReviewUploadsEnabled(): boolean {
 }
 
 /**
+ * FOUNDERS-CAP-1 (Cyber COACH-STORE-CHECKOUT-SIGNOFF L2) — the server cap of FOUNDERS_SPOTS (10) on the Founders membership
+ * (lib/coach-store/foundersCap.ts). Default OFF: checkout and fulfilment behave as today. ON: the 11th Founders checkout is
+ * 409 sold_out before any Stripe call, and a paid Founders checkout that would make an 11th member is refund_due, not granted.
+ */
+export function isFoundersCapEnabled(): boolean {
+  return envOn('FOUNDERS_CAP_ENABLED');
+}
+
+/**
  * Real Stripe transfers. Default OFF. The payout route answers 503 and writes nothing
  * until this is on, and even then it does not mark a payout completed without a transfer.
  */

@@ -37,6 +37,11 @@ import { termsVersionStatus } from '@/lib/store-terms';
 import { verifyIdempotencyKey, isPaidSession } from '@/lib/stripe/verify-checkout';
 import { coachStoreSessionMeta, fulfilCoachStoreCheckout } from './webhook';
 import { invoiceChargeOrIntent, invoiceSubscriptionId, subscriptionPeriodEndUnix } from './stripeShapes';
+import { isFoundersCapEnabled } from '@/lib/flags';
+import {
+  FOUNDERS_BILLING_SUB_STATUSES, FOUNDERS_CLOSED_STATUSES, cancelFoundersSubscription, isFoundersListing, listFoundersRefundDue,
+  markFoundersRefundDue, withFoundersSpot,
+} from './foundersCap';
 
 export const RECONCILE_SECRET_HEADER = 'x-coach-store-reconcile-secret';
 const OPEN_DISPUTE_STATUSES = new Set(['warning_needs_response', 'warning_under_review', 'needs_response', 'under_review']);
@@ -65,6 +70,12 @@ export interface ReconcileCounts {
   renewed?: number;
   paused?: number;
   canceled?: number;
+  // FOUNDERS-CAP-1 (Cyber Q3): present only while FOUNDERS_CAP_ENABLED is on — Founders rows owed a refund, and how many
+  // are past the 48 h refund window (the list itself: lib/coach-store/foundersCap.ts listFoundersRefundDue).
+  foundersRefundDue?: number;
+  foundersRefundOverdue?: number;
+  // v3 (Cyber V2): still-billing subscriptions on closed Founders rows that this run cancelled.
+  foundersSubsCanceled?: number;
 }
 
 function zeroCounts(): ReconcileCounts {
@@ -93,7 +104,9 @@ async function reverseRow(input: {
   }
   if (access) {
     const moved = await prisma.programAccess.updateMany({
-      where: { id: access.id, status: { in: ['ACTIVE', 'PAST_DUE', 'PAUSED'] } },
+      // FOUNDERS-CAP-1 (Cyber Q3): a full refund also closes a REFUND_DUE row (only the cap writes one), taking it off the
+      // refund-due list; a dispute never turns it PAUSED (PAUSED holds a Founders spot).
+      where: { id: access.id, status: { in: dispute ? ['ACTIVE', 'PAST_DUE', 'PAUSED'] : ['ACTIVE', 'PAST_DUE', 'PAUSED', 'REFUND_DUE'] } },
       data: { status: dispute ? 'PAUSED' : 'REFUNDED', codeActive: false },
     });
     if (moved.count > 0) changed = true;
@@ -184,10 +197,10 @@ async function findRowForRefundOrDispute(
  * A row already CANCELED is not re-opened; a REFUNDED row (a refund already ran) is left to Passes 2-3.
  * Returns the bucket it moved to, or null when the row was already in sync / not found.
  */
-async function syncSubscriptionRow(sub: Stripe.Subscription): Promise<'renewed' | 'paused' | 'canceled' | null> {
+async function syncSubscriptionRow(sub: Stripe.Subscription, stripe: Stripe): Promise<'renewed' | 'paused' | 'canceled' | 'founders_canceled' | null> {
   const access = await prisma.programAccess.findFirst({
     where: { stripeSubscriptionId: sub.id },
-    select: { id: true, status: true },
+    select: { id: true, status: true, listingId: true },
   });
   if (!access) return null;
   const termsStatus = termsVersionStatus(sub.metadata);
@@ -195,7 +208,34 @@ async function syncSubscriptionRow(sub: Stripe.Subscription): Promise<'renewed' 
   const endUnix = subscriptionPeriodEndUnix(sub);
   const periodEnd = endUnix != null ? new Date(endUnix * 1000) : null;
   const status = sub.status;
+  // FOUNDERS-CAP-1 v3 (Cyber V2): self-healing cancel. A Founders row that is REFUND_DUE, REFUNDED or CANCELED whose
+  // subscription can still bill (active/trialing/past_due) gets it cancelled here, whether or not the cap is full — so a
+  // cancel that failed at fulfilment is retried every run. The row's status is not changed.
+  if (
+    isFoundersCapEnabled()
+    && FOUNDERS_CLOSED_STATUSES.includes(access.status as (typeof FOUNDERS_CLOSED_STATUSES)[number])
+    && FOUNDERS_BILLING_SUB_STATUSES.includes(status as (typeof FOUNDERS_BILLING_SUB_STATUSES)[number])
+    && (await isFoundersListing(prisma, access.listingId))
+  ) {
+    const done = await cancelFoundersSubscription(stripe, sub.id);
+    console.warn(`[coach-store] founders_closed_sub_cancel row=${access.id} outcome=${done}`);
+    return done === 'canceled' ? 'founders_canceled' : null;
+  }
   if (status === 'active' || status === 'trialing') {
+    // FOUNDERS-CAP-1 (Cyber H1, same hole as invoice.paid): under the cap a Founders row that is not ACTIVE/PAST_DUE
+    // (PENDING, EXPIRED) re-opens only through withFoundersSpot; over the cap it is REFUND_DUE and the subscription cancelled.
+    if (access.status !== 'ACTIVE' && access.status !== 'PAST_DUE' && isFoundersCapEnabled() && (await isFoundersListing(prisma, access.listingId))) {
+      const claim = await withFoundersSpot<{ count: number }>(prisma, { now: new Date(), exceptId: access.id, includePending: false }, (tx) =>
+        tx.programAccess.updateMany({
+          where: { id: access.id, status: { in: ['EXPIRED', 'PENDING'] } },
+          data: { status: 'ACTIVE', codeActive: true, cancelAtPeriodEnd: Boolean(sub.cancel_at_period_end), ...(periodEnd ? { accessUntil: periodEnd } : {}) },
+        }));
+      if (!claim.ok) {
+        await markFoundersRefundDue(prisma, stripe, { accessId: access.id, from: ['EXPIRED', 'PENDING'], subscriptionId: sub.id, source: 'reconcile' });
+        return null;
+      }
+      return claim.value.count > 0 ? 'renewed' : null;
+    }
     const moved = await prisma.programAccess.updateMany({
       // PAUSED is deliberately NOT here: Pass 4 never lifts a dispute hold (B9 fix 3). EXPIRED is: a row
       // whose unpaid subscription recovered re-opens (B9 fix 6).
@@ -228,7 +268,9 @@ async function syncSubscriptionRow(sub: Stripe.Subscription): Promise<'renewed' 
   if (status === 'canceled' || status === 'incomplete_expired') {
     const moved = await prisma.programAccess.updateMany({
       // PAUSED is deliberately excluded here too: a canceled subscription must not touch a dispute hold.
-      where: { id: access.id, status: { notIn: ['CANCELED', 'REFUNDED', 'PAUSED'] } },
+      // FOUNDERS-CAP-1 (Cyber Q3): REFUND_DUE too — the cap cancels that subscription itself, and the row must stay on
+      // the refund-due list until the refund lands.
+      where: { id: access.id, status: { notIn: ['CANCELED', 'REFUNDED', 'PAUSED', 'REFUND_DUE'] } },
       data: { status: 'CANCELED', codeActive: false, cancelAtPeriodEnd: true, ...(periodEnd ? { accessUntil: periodEnd } : {}) },
     });
     return moved.count > 0 ? 'canceled' : null;
@@ -356,11 +398,12 @@ export async function reconcileCoachStore(input: { now: Date; stripe: Stripe }):
   try {
     for await (const sub of stripe.subscriptions.list({ status: 'all', limit: 100 })) {
       try {
-        const moved = await syncSubscriptionRow(sub);
+        const moved = await syncSubscriptionRow(sub, stripe);
         counts.subscriptionsChecked = (counts.subscriptionsChecked ?? 0) + 1;
         if (moved === 'renewed') counts.renewed = (counts.renewed ?? 0) + 1;
         else if (moved === 'paused') counts.paused = (counts.paused ?? 0) + 1;
         else if (moved === 'canceled') counts.canceled = (counts.canceled ?? 0) + 1;
+        else if (moved === 'founders_canceled') counts.foundersSubsCanceled = (counts.foundersSubsCanceled ?? 0) + 1;
       } catch (err) {
         counts.errors++;
         console.warn('[coach-store] reconcile pass4 subscription row error');
@@ -371,6 +414,19 @@ export async function reconcileCoachStore(input: { now: Date; stripe: Stripe }):
     counts.errors++;
     console.warn('[coach-store] reconcile pass4 list failed');
     void err;
+  }
+
+  // FOUNDERS-CAP-1 (Cyber Q3): the run reports the Founders refund-due list's size, so a REFUND_DUE row is never only a log line.
+  if (isFoundersCapEnabled()) {
+    try {
+      const due = await listFoundersRefundDue(prisma, now);
+      counts.foundersRefundDue = due.length;
+      counts.foundersRefundOverdue = due.filter((r) => r.overdue).length;
+    } catch (err) {
+      counts.errors++;
+      console.warn('[coach-store] reconcile founders refund-due list failed');
+      void err;
+    }
   }
 
   return counts;

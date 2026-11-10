@@ -32,6 +32,7 @@ import { prisma } from '@/lib/db';
 import { getStripe } from '@/lib/stripe';
 import { fulfilCheckoutSession, type CheckoutFulfilment } from '@/lib/stripe/checkout-fulfil';
 import { coachStoreSessionMeta, fulfilCoachStoreCheckout } from '@/lib/coach-store/webhook';
+import { FoundersCapError } from '@/lib/coach-store/foundersCap';
 import { grantCoinPurchase, grantShardPurchase } from '@/lib/wallet/wallet-service';
 import { unlockProLane } from '@/lib/season/season-service';
 
@@ -96,7 +97,21 @@ export async function verifyCheckoutSession(userId: string, sessionId: string): 
   // coach-store webhook's own checkout handler.
   const coachMeta = coachStoreSessionMeta(session);
   if (coachMeta?.rowId) {
-    const outcome = await fulfilCoachStoreCheckout(session, coachMeta, idempotencyKey);
+    let outcome: Awaited<ReturnType<typeof fulfilCoachStoreCheckout>>;
+    try {
+      outcome = await fulfilCoachStoreCheckout(session, coachMeta, idempotencyKey);
+    } catch (err) {
+      // FOUNDERS-CAP-1 v3 (PM (c) / Cyber V3): a failure inside the Founders cap path never 500s the buyer; the webhook
+      // keeps throwing it so Stripe retries. A row already REFUND_DUE (the buyer lost the cap; e.g. only the subscription
+      // cancel failed) answers the sold-out / refund-coming state; anything else answers pending, which the success page
+      // polls past. Any other error is unchanged (re-thrown). Logged by FEL row id and stage only.
+      if (!(err instanceof FoundersCapError)) throw err;
+      const row = await prisma.programAccess.findUnique({ where: { id: coachMeta.rowId }, select: { status: true } }).catch(() => null);
+      const refundDue = row?.status === 'REFUND_DUE';
+      console.warn(`[verify-checkout] founders_cap_step_failed row=${coachMeta.rowId} stage=${err.stage} answered=${refundDue ? 'refund_due' : 'pending'}`);
+      if (refundDue) return { ok: true, status: 'refund_due', product, rowId: coachMeta.rowId };
+      return { ok: true, status: 'pending', product: meta.product ?? null };
+    }
     if (outcome === 'refund_due') {
       return { ok: true, status: 'refund_due', product, rowId: coachMeta.rowId };
     }
