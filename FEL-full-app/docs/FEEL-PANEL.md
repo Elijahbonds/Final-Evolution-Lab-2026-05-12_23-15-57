@@ -445,6 +445,11 @@ change"). The owner has felt none of these yet; every default is flagged in the 
 - hoops-p05, phase 5 (the ball lives in the hand), same group: `hoops.passFromHandOn` 1 (`hoops/ballHandoff.ts`) — a 3v3 teammate's
   pass (the swing, the ball back to me, the lob) starts its flight where the ball is in his hands; it started at his root + 1.2 m, so the
   ball jumped out of the hand on the release. The aim point and the pass speed are unchanged. 0 = the old start.
+- hoops-p05b, phase 5, same group: `hoops.passHomeOn` 1 (`hoops/ballHandoff.ts`, `core/BallHandling.ts` PassFlight.homeTo) — a 3v3 chest
+  or bounce pass in flight eases its landing point from where it was aimed (the receiver led at the ball's speed) onto where the receiver
+  really is, at the same chest height (smoothstep in the flight's progress: nothing at the throw, all of it at the catch). The flight time
+  is the throw's, so catch timing is unchanged. It landed on its aim wherever he was: 3v3 seed 7, the hero's pass to mate1 caught with his
+  palms 1.14 / 1.48 m off the ball and drawn into the hand in one frame (1.67 m). The lob keeps its own aim. 0 = as it was.
 
 **assumption:** the bounds are safe, not tuned. A ranked, staked or head-to-head run reads every default above.
 

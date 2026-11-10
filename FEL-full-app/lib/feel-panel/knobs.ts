@@ -1372,6 +1372,12 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/hoops/ballHandoff.ts PASS_FROM_HAND_ON',
     hint: 'A teammate pass starts its flight where the ball is in his hands. 0 = it started at his chest height over his feet, wherever the ball was: a jump out of the hand on the release.',
   },
+  // hoops-p05b (phase 5): the pass lands on the receiver
+  {
+    id: 'hoops.passHomeOn', label: '3v3: a pass lands on the receiver (0 = off)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · transitions',
+    source: 'lib/babylon/hoops/ballHandoff.ts PASS_HOME_ON',
+    hint: 'A chest or bounce pass in flight bends onto where the receiver really is, so it arrives at his chest. Same flight time. 0 = it landed on the point it was aimed at, wherever he was, and the ball was drawn into his hand from up to 1.5 m away.',
+  },
   // AF-1 (ANIM-FEEL-SPEC 2026-10-28): inertialized clip transitions, default OFF — off is the linear crossfade, unchanged.
   {
     id: 'anim.inertial', label: 'Inertial clip transitions on (1) / off (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',

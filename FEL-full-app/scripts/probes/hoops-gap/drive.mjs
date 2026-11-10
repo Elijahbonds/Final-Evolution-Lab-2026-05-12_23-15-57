@@ -315,7 +315,7 @@ if (SCEN === 'game') {
     await ev(() => window.__hg.stick(0, 0));
   }
   if (ON.has('flick')) await checkpoint('flick');
-  if (MODE === 'threevthree' && ON.has('pass')) { const N = Number(process.env.PASS_N ?? 3); for (let k = 0; k < N; k++) { await setOff(); await waitGame(Number(process.env.PASS_PRE_MS ?? 1200)); R.pass.push(await T('pass')); await waitGame(Number(process.env.PASS_WAIT_MS ?? 1500)); } }   // hoops-p05b: PASS_N, PASS_PRE_MS, PASS_WAIT_MS (the mate's read: he swings it back inside hoops.mateHoldMaxSec)
+  if (MODE === 'threevthree' && ON.has('pass')) { const N = Number(process.env.PASS_N ?? 3); for (let k = 0; k < N; k++) { await setOff(); await waitGame(Number(process.env.PASS_PRE_MS ?? 1200)); R.pass.push(await T('pass')); if (process.env.PASS_CALL_MS) { await waitGame(Number(process.env.PASS_CALL_MS)); R.pass.push(await T('call')); } await waitGame(Number(process.env.PASS_WAIT_MS ?? 1500)); } }   // hoops-p05b: PASS_CALL_MS — then call for it back (a teammate's pass)   // hoops-p05b: PASS_N, PASS_PRE_MS, PASS_WAIT_MS (the mate's read: he swings it back inside hoops.mateHoldMaxSec)
   if (MODE === 'threevthree' && ON.has('pass') && process.env.PASS_BALL) { const an = await ev((o) => window.__hg.analyse(o), {}); result.ball = an.ball; result.passLog = await ev(() => (window.__LOG || []).filter((l) => /3V3-OFF|pass|swing|catch/i.test(l.m)).map((l) => [l.f, l.m.slice(0, 120)])); await checkpoint('pass'); }
   if (ON.has('poke')) for (let k = 0; k < 3; k++) {
     await setDef(); await waitGame(1400 + k * 250);

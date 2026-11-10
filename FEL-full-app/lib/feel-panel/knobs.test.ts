@@ -56,7 +56,7 @@ import * as P4T from '@/lib/babylon/anim/hoopsTransitions';   // hoops-p04
 import * as P4R from '@/lib/babylon/hoops/releaseTiming';   // hoops-p04
 import { PLANT_RELEASE_FADE_SEC, DEFENSE_LEGS_ON, BACKPEDAL_REVERSE_ON, CLOSEOUT_STEP_ON } from '@/lib/babylon/anim/basketballTree';   // hoops-p04, hoops-p05
 import * as P5S from '@/lib/babylon/anim/hipSteer';   // hoops-p05
-import { PASS_FROM_HAND_ON } from '@/lib/babylon/hoops/ballHandoff';   // hoops-p05, phase 5
+import { PASS_FROM_HAND_ON, PASS_HOME_ON } from '@/lib/babylon/hoops/ballHandoff';   // hoops-p05, phase 5; hoops-p05b
 import * as P4B from '@/lib/babylon/anim/locoAccent';   // hoops-p04b
 import { CONTACT_ARM_SWAP_SEC } from '@/lib/babylon/hoops/contactPoses';   // hoops-p04b
 import { CARRY_ARM_SPEED_SEC, CARRY_LET_GO_TO_CLIP_ON, CARRY_START_HAND_ON } from '@/lib/babylon/anim/ballCarry';   // hoops-p04b, hoops-p05, hoops-p05b
@@ -253,6 +253,7 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.hipSteerFromMps')).toBe(P5S.HIP_STEER_FROM_MPS);
     expect(def('hoops.hipSteerFullMps')).toBe(P5S.HIP_STEER_FULL_MPS);
     expect(def('hoops.passFromHandOn')).toBe(PASS_FROM_HAND_ON);   // hoops-p05, phase 5
+    expect(def('hoops.passHomeOn')).toBe(PASS_HOME_ON);   // hoops-p05b, phase 5
     expect(def('hoops.rivalKitOn')).toBe(P3R.RIVAL_KIT_ON ? 1 : 0);
     expect(def('hoops.rivalTightM')).toBe(P3R.RIVAL_TIGHT_M);
     expect(def('hoops.rivalHesiSec')).toBe(P3R.RIVAL_HESI_SEC);
