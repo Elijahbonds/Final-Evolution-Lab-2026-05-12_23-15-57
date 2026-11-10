@@ -169,6 +169,22 @@ Token and shared-component fixes first; per-screen edits only for the live sweep
 `coach/business/thanks`, `press/receipt`). The fix in each is the same codemod line; run
 `npx tsx scripts/readable/codemod.mts --write` once the lane lands, then `source-baseline.mts --write`.
 
+**lane/readable-2 (2026-11-10) took the owner calls and the small misses below.** Each is re-read on the rig in
+section 3's readable-2 table.
+
+- The Play shelf: a family's mode list, a mode's name and its line wrap to two lines, then clamp.
+- Long-form copy at 16 px (`lib/legal/legalProse.ts` for every legal page, the lesson reader's "remember" list, the
+  playbook chapter theses, the credits notices); legal tables scroll inside themselves; long words and code break.
+- `prefers-reduced-transparency`: `.fel-glass` solid `#141a22`; the tab bar and the status rail (`.fel-bar`) solid.
+- The Quick Screen, Correctives and mirror-harness `h1`s keep their glyph tails; `/cards`, `/multiplayer`, `/live`,
+  `/party` and the stage's "3D isn't available" line clear AA; `/support`'s e-mail and `/multiplayer`'s tabs wrap.
+- `/profile`'s "No duels yet" and the empty tiles' "—" were the rig's, not the page's (half the run sat under the docked
+  primary at that scroll step); the rig now reads a run only when no fixed layer covers any part of it.
+- The floor reached every lane that landed since #532: the source has **0** sizes under 12 px and 7 sub-AA colour
+  classes, all `text-fel-violet`/`indigo` on icons (reviewed, non-text).
+
+The earlier list, for the record (all addressed above):
+
 **What the after-crawl still finds** (phone; each is per-screen, and most are other lanes' or the owner's):
 
 - `/play`: the Play shelf's one-line mode lists ("Breakaway · Twelve Yards · Basebal…") end in an ellipsis by design
