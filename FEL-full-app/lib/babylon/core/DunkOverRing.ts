@@ -45,11 +45,11 @@ export const OVER_RING = {
   bailUpM: 0.02,
   /** …and this far inside a ball's touch on the iron's outside (so it is within the contact's reach of the ring). */
   bailInM: 0.02,
-  /** Over the ring the jam's follow-through stops this far SHORT of the shipped one, and never takes the shipped late-press
-   *  extra: the jam lasts longer here, and the shipped carry-in would bring the head in under the ring (rig: 0.02 m from its axis). */
-  followBackM: 0.05,
-  /** The most the body slides sideways in one frame's worth of easing toward putting the ball over the centre. */
-  sideMaxM: 0.3,
+  /** Over the ring the jam's follow-through stops this far short of the shipped one (0 = the shipped carry-in, extra included:
+   *  0.05 left the ball 0.22–0.27 m in front of the ring, out of the arm's reach — rig, 2 of 5 plain slams). */
+  followBackM: 0,
+  /** The most the body slides sideways, from where the jam found it, to put the ball over the centre. */
+  sideMaxM: 0.25,
 };
 
 /** Is the knob on? (The mode passes `feel('dunk.finishOverRing', FINISH_OVER_RING)`.) */
@@ -130,12 +130,14 @@ export function overRingDefers(ball: V3, rim: V3, ringR: number, ballR: number, 
 /** THE BODY SLIDES UNDER THE BALL, sideways. Measured (rig, the over-the-ring cut of 2026-11-10): a slam carried in the off
  *  hand rides 0.26 m to the side of the ring's centre, and an arm reaching across the body cannot bring it over the middle —
  *  the jam timed out with the ball 0.30 m out to the side. Through the way in and the push, the body moves sideways by the
- *  ball's sideways offset from the ring (eased, at most `sideMaxM`), so the ball comes over the centre. Returns the root's x
- *  step for this frame. */
-export function overRingSideStep(leg: OverRingLeg | null, ballX: number, rimX: number, dt: number, tau: number): number {
+ *  ball's sideways offset from the ring (eased, at most `sideMaxM` from where the jam started), so the ball comes over the
+ *  centre. Returns the root's x step for this frame. */
+export function overRingSideStep(leg: OverRingLeg | null, ballX: number, rimX: number, rootX: number, rootX0: number, dt: number, tau: number): number {
   if (!overRingFollows(leg)) return 0;
-  const want = Math.max(-OVER_RING.sideMaxM, Math.min(OVER_RING.sideMaxM, rimX - ballX));
-  return want * Math.min(1, tau > 0 ? dt / tau : 1);
+  // the root eases toward where it puts the ball over the centre, never more than sideMaxM from where the jam found it (rig: an
+  // unbounded slide ran the root 0.6 m sideways while the arm, reaching for the centre, kept the ball where it was)
+  const goal = Math.max(rootX0 - OVER_RING.sideMaxM, Math.min(rootX0 + OVER_RING.sideMaxM, rootX + (rimX - ballX)));
+  return (goal - rootX) * Math.min(1, tau > 0 ? dt / tau : 1);
 }
 
 /** The jam's follow-through carries the body in only once the ball is over the ring or going down through it: while the hand

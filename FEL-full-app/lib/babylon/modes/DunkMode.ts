@@ -2561,7 +2561,8 @@ export const DunkMode: ModeDefinition = (() => {
               // over-the-ring path (null on the jam's first frame), then a follow-through that stops short of the shipped one
               const overRing = finishOverRing();
               if (overRing) overLeg = overRingLeg(jamSec <= dt ? null : overLeg, ball.getAbsolutePosition(), rim, RIM_RADIUS, ballSim.radius, overRingJamSec());
-              if (overRing) { if (overRingFollows(overLeg)) player.root.position.z += (rim.z + FLUSH_Z_AHEAD - JAM_FOLLOW_M + OVER_RING.followBackM - player.root.position.z) * Math.min(1, dt / JAM_FOLLOW_TAU); player.root.position.x += overRingSideStep(overLeg, ball.getAbsolutePosition().x, rim.x, dt, JAM_FOLLOW_TAU); }
+              if (overRing && jamSec <= dt) overRootX0 = player.root.position.x;   // where the jam found the body (the sideways slide's anchor)
+              if (overRing) { if (overRingFollows(overLeg)) player.root.position.z += (rim.z + FLUSH_Z_AHEAD - JAM_FOLLOW_M + OVER_RING.followBackM - jamExtra - player.root.position.z) * Math.min(1, dt / JAM_FOLLOW_TAU); player.root.position.x += overRingSideStep(overLeg, ball.getAbsolutePosition().x, rim.x, player.root.position.x, overRootX0, dt, JAM_FOLLOW_TAU); }
               else player.root.position.z += (rim.z + FLUSH_Z_AHEAD - JAM_FOLLOW_M - jamExtra - player.root.position.z) * Math.min(1, dt / JAM_FOLLOW_TAU);
               // the pull-up on the iron (never down); the LEFT-hand carry (the eastbay after its pass) pulls up further — the pass leaves
               // that palm facing down with the ball riding UNDER the wrist, 0.15 m lower than the right hand's palm-out carry
@@ -3610,7 +3611,7 @@ export const DunkMode: ModeDefinition = (() => {
   /** …and the jam's clock for its path: negative while the push is not allowed yet (the REVERSE still turning its back to the iron). */
   const overRingJamSec = (): number => (finishVariant === 'reverse' && reverseLeft() > Math.PI - REVERSE_CONTACT_FROM ? -1 : jamSec);
   /** …and the leg of the path the jam is on (core/DunkOverRing: lift → in → down, forward only), stepped once a frame in the jam. */
-  let overLeg: OverRingLeg | null = null;
+  let overLeg: OverRingLeg | null = null, overRootX0 = 0;
   const _aim = { x: 0, y: 0, z: 0 };
   function rimApproachAim(bw: Vector3 | null): { x: number; y: number; z: number } {
     const c = ballSim.radius + 0.01;
