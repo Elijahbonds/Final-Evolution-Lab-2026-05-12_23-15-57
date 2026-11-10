@@ -1335,6 +1335,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/anim/inertialize.ts ANIM_INERTIAL_MIN_HALF_LIFE_SEC',
     hint: 'A switch\'s old-pose offset never decays faster than this half-life (a 0.04 s fade gave 0.02 s: most of the offset went in one frame). 0 = the half-life × fade time alone. Read only while inertial transitions are on.',
   },
+  {
+    id: 'anim.inertialAllBones', label: 'Inertial: every bone keeps its history on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/inertialize.ts ANIM_INERTIAL_ALL_BONES_ON',
+    hint: 'On: a switch onto a clip that moves a bone the last clip did not (guard to run: the legs) starts that bone from where it was. Off: the first inertial version, where those bones jumped in one frame (knee 32 to 62 degrees). Read only while inertial transitions are on.',
+  },
   // CLIP-SMOOTH (2026-11-03, owner: "Yes, smooth them"): the karate captures' own single-frame snaps re-keyed, default ON.
   // GAMEPLAY-CLEAN P3 (2026-11-03): the foot planter's leg solve eases in and out instead of stepping (anim/FootPlanting)
   {

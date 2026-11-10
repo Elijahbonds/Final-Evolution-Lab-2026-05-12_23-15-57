@@ -126,4 +126,48 @@ describe('anim.inertialMatchVel', () => {
     expect(floored).toBeLessThan(18);
     expect(base).toBeGreaterThan(25);
   });
+
+  it('anim.inertialAllBones: a bone the last clip did not key starts from where it was (0 = AF-1: it jumped)', () => {
+    const run = (allBones: number) => {
+      resetFeelForTests();
+      ls.m.set(FEEL_STORAGE_KEY, JSON.stringify({ 'anim.inertialAllBones': allBones })); setFeelUser(true); setFeelSession(feelSessionBlock('/play/karate', '?playtest=1'));
+      const r = rig2(); r.animator.setBlendMode('inertial');
+      r.animator.play('upper', { loop: true, fadeSec: 0 }); r.frames(5);      // keys the hips only: the knee rests at identity
+      r.animator.play('full', { loop: true, fadeSec: 0.15 }); r.frames(1);      // keys the knee at 90°
+      const firstFrame = r.knee(); r.frames(60);
+      const settled = r.knee();
+      r.animator.play('upper', { loop: true, fadeSec: 0.15 }); r.frames(1);
+      const back1 = r.knee(); r.frames(60);
+      const back = r.knee();
+      r.engine.dispose();
+      return { firstFrame: angOf(firstFrame), settled: angOf(settled), back1: angOf(back1), back: angOf(back) };
+    };
+    const on = run(1), off = run(0);
+    expect(on.firstFrame).toBeLessThan(1e-3);                 // the switch frame shows the knee where it was
+    expect(off.firstFrame).toBeGreaterThan(89);               // AF-1: the whole 90° in one frame
+    expect(on.settled).toBeCloseTo(90, 2); expect(off.settled).toBeCloseTo(90, 2);
+    expect(on.back1).toBeGreaterThan(89);                     // the clip after it does not key the knee: it eases from 90°...
+    expect(on.back).toBeLessThan(0.1);                        // ...onto its rest (identity), where a linear fade-out leaves it
+    expect(off.back).toBeGreaterThan(89);                     // AF-1: frozen at 90°
+  });
 });
+
+const angOf = (q: Quaternion) => 2 * Math.acos(Math.min(1, Math.abs(q.w))) * 180 / Math.PI;
+/** A two-node body: 'upper' keys the hips only, 'full' keys the hips and the knee (90° about X). */
+function rig2() {
+  const engine = new NullEngine(); const scene = new Scene(engine);
+  scene.useConstantAnimationDeltaTime = true;
+  new FreeCamera('cam', new Vector3(0, 0, -5), scene);
+  const hips = new TransformNode('Hips', scene), leg = new TransformNode('LeftLeg', scene);
+  leg.parent = hips;
+  for (const n of [hips, leg]) n.rotationQuaternion = Quaternion.Identity();
+  const q = (name: string, node: TransformNode, v: Quaternion) => {
+    const a = new Animation(name, 'rotationQuaternion', 60, Animation.ANIMATIONTYPE_QUATERNION, Animation.ANIMATIONLOOPMODE_CYCLE);
+    a.setKeys([{ frame: 0, value: v.clone() }, { frame: 60, value: v.clone() }]); return a;
+  };
+  const upper = new AnimationGroup('upper', scene); upper.addTargetedAnimation(q('u_h', hips, Quaternion.Identity()), hips);
+  const full = new AnimationGroup('full', scene); full.addTargetedAnimation(q('f_h', hips, Quaternion.Identity()), hips); full.addTargetedAnimation(q('f_l', leg, Quaternion.RotationAxis(X, Math.PI / 2)), leg);
+  const animator = new CharacterAnimator(scene, [upper, full]);
+  (engine as unknown as { getDeltaTime: () => number }).getDeltaTime = () => 1000 / 60;
+  return { engine, animator, frames: (n: number) => { for (let i = 0; i < n; i++) scene.render(); }, knee: () => leg.rotationQuaternion!.clone() };
+}

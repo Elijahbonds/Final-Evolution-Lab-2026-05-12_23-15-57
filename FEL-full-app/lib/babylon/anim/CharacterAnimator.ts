@@ -18,7 +18,7 @@
 import type { AnimationGroup, Scene, Observer } from '@babylonjs/core';
 import { resolveClip } from './clipResolver';
 import { ledgerFor, requestAllowed, scopeFallback, suiteOfClip, type ClipScope } from './clipScope';
-import { inertialDt, inertialHalfLife, inertialMatchVelOn, inertialStep, quatFromAxisAngle, quatMul, quatMulConj, quatToAxisAngle, type Quat } from './inertialize';
+import { inertialAllBonesOn, inertialDt, inertialHalfLife, inertialMatchVelOn, inertialStep, quatFromAxisAngle, quatMul, quatMulConj, quatToAxisAngle, type Quat } from './inertialize';
 import { feel } from '../../feel-panel/feel';
 
 /**
@@ -56,6 +56,9 @@ interface InertialTrack {
   /** SWITCH-ON (anim.inertialMatchVel): the offset as a rotation vector (axis × angle) and its velocity, both 3-D, and the new clip's
    *  raw pose on the switch frame, read again one frame later to take the new clip's own motion out of the offset's start. */
   r3: [number, number, number]; w3: [number, number, number]; raw0: Quat | null; raw0P: [number, number, number] | null; dstDue: boolean;
+  /** SWITCH-ON (anim.inertialAllBones): the last clip keyed this node and the current one does not — it eases from the pose it showed
+   *  onto its rest (where a linear fade-out leaves it) instead of freezing there. */
+  toRest: boolean;
   halfLife: number; hips: boolean; bone: boolean;
   /** The inertial frame number the pose was last recorded on (history older than the frame before is stale). */
   stamp: number;
@@ -117,6 +120,7 @@ export class CharacterAnimator {
   private inertialTargets = new Map<AnimationGroup, InertialTarget[]>();
   private inertialHistDt = 0;
   private inertialFrameNo = 0;
+  private inertialRest = new Map<InertialNode, Quat>();
 
   constructor(private scene: Scene, groups: AnimationGroup[]) {
     for (const g of groups) this.register(g);
@@ -124,6 +128,13 @@ export class CharacterAnimator {
 
   register(g: AnimationGroup): void {
     g.stop();
+    // SWITCH-ON (anim.inertialAllBones): each keyed node's pose before any clip of this body moves it — the rest a linear fade-out
+    // settles a bone on when the clip after it does not key that bone (read only by the inertial blend)
+    for (const ta of g.targetedAnimations) {
+      const n = ta.target as InertialNode | null;
+      const q = n && ta.animation.targetProperty === 'rotationQuaternion' ? n.rotationQuaternion : null;
+      if (n && q && !this.inertialRest.has(n)) this.inertialRest.set(n, [q.x, q.y, q.z, q.w]);
+    }
     this.groups.set(g.name, g);
     this.names = null;
   }
@@ -522,7 +533,7 @@ export class CharacterAnimator {
   /** AF-1: drop the pending switch and every live offset (history stays: it is what the body showed). */
   private inertialCut(): void {
     this.inertialSwitch = null;
-    this.inertialTracks.forEach((t) => { t.rotOn = false; t.posOn = false; t.x = 0; t.v = 0; t.r3 = [0, 0, 0]; t.w3 = [0, 0, 0]; t.dstDue = false; });
+    this.inertialTracks.forEach((t) => { t.rotOn = false; t.posOn = false; t.x = 0; t.v = 0; t.r3 = [0, 0, 0]; t.w3 = [0, 0, 0]; t.dstDue = false; t.toRest = false; });
   }
 
   /** AF-1: the nodes a clip keys — rotation-quaternion tracks, plus the Hips' position track — once per group. Only KEYED channels
@@ -553,7 +564,7 @@ export class CharacterAnimator {
       t = {
         last: null, prior: null, lastP: null, priorP: null,
         axis: [1, 0, 0], x: 0, v: 0, rotOn: false, pOff: [0, 0, 0], pVel: [0, 0, 0], posOn: false,
-        r3: [0, 0, 0], w3: [0, 0, 0], raw0: null, raw0P: null, dstDue: false,
+        r3: [0, 0, 0], w3: [0, 0, 0], raw0: null, raw0P: null, dstDue: false, toRest: false,
         halfLife: 0, hips: INERTIAL_HIPS.test(n.name), bone: n.getClassName?.() === 'Bone', stamp: -1, scratchQ: null, scratchP: null,
       };
       this.inertialTracks.set(n, t);
@@ -573,8 +584,21 @@ export class CharacterAnimator {
     const mv = inertialMatchVelOn();
     if (sw) {
       this.inertialSwitch = null;
-      this.inertialTracks.forEach((t) => { t.rotOn = false; t.posOn = false; t.dstDue = false; });
+      this.inertialTracks.forEach((t) => { t.rotOn = false; t.posOn = false; t.dstDue = false; t.toRest = false; });
       const hd = this.inertialHistDt;
+      if (inertialAllBonesOn()) {
+        // the nodes the body showed last frame that the new clip does not key: ease each from that pose onto its rest
+        const keyed = new Set(targets.map((x) => x.n));
+        for (const { n, rot } of this.inertialAllTargets()) {
+          if (keyed.has(n) || !rot || !n.rotationQuaternion) continue;
+          const t = this.inertialTrack(n), rest = this.inertialRest.get(n);
+          if (!rest || t.stamp !== frame - 1 || !t.last) continue;
+          const { axis, angle } = quatToAxisAngle(quatMulConj(t.last, rest));
+          if (angle < 1e-6) continue;
+          t.halfLife = sw.halfLife; t.toRest = true; t.rotOn = true;
+          t.r3 = [axis[0] * angle, axis[1] * angle, axis[2] * angle]; t.w3 = [0, 0, 0]; t.dstDue = false;
+        }
+      }
       for (const { n, rot, pos } of targets) {
         const t = this.inertialTrack(n);
         t.halfLife = sw.halfLife;
@@ -663,7 +687,43 @@ export class CharacterAnimator {
       if (sp) { t.priorP = contiguous ? t.lastP : null; t.lastP = [sp.x, sp.y, sp.z]; }
       t.stamp = frame;
     }
+    // SWITCH-ON (anim.inertialAllBones): keep the pose history of EVERY node a clip of this body keys, not only the current clip's.
+    // A clip that keys a subset (the 'guard' capture keys 7 bones, not the legs) left the legs with no history, so the next clip that
+    // keys them (guard → guard step / run) had no offset there and the knee jumped 32–62° in one frame (headless, the hero).
+    if (inertialAllBonesOn()) {
+      const cur = new Set(targets.map((x) => x.n));
+      for (const { n, rot, pos } of this.inertialAllTargets()) {
+        if (cur.has(n)) continue;
+        const t = this.inertialTrack(n);
+        const rest = this.inertialRest.get(n), rq = rot ? n.rotationQuaternion : null;
+        if (t.toRest && rest && rq) {
+          if (!sw && dt > 0) this.inertialStepMatched(t, null, null, dt);
+          const a = Math.hypot(t.r3[0], t.r3[1], t.r3[2]);
+          const q = t.rotOn && a > 1e-12 ? quatMul(quatFromAxisAngle([t.r3[0] / a, t.r3[1] / a, t.r3[2] / a], a), rest) : rest;
+          if (t.bone) { const sq = (t.scratchQ ??= rq.clone()); sq.set(q[0], q[1], q[2], q[3]); n.rotationQuaternion = sq; }
+          else rq.set(q[0], q[1], q[2], q[3]);
+          if (!t.rotOn) t.toRest = false;
+        }
+        const contiguous = t.stamp === frame - 1;
+        const shown = rot ? n.rotationQuaternion : null;
+        if (shown) { t.prior = contiguous ? t.last : null; t.last = [shown.x, shown.y, shown.z, shown.w]; }
+        const sp = pos ? n.position : null;
+        if (sp) { t.priorP = contiguous ? t.lastP : null; t.lastP = [sp.x, sp.y, sp.z]; }
+        t.stamp = frame;
+      }
+    }
     this.inertialHistDt = dt;
+  }
+
+  /** SWITCH-ON: every node any of this body's clips keys (rotation, and the Hips position), rebuilt when a clip is added. */
+  private inertialAllCache: { size: number; list: InertialTarget[] } | null = null;
+  private inertialAllTargets(): InertialTarget[] {
+    if (this.inertialAllCache?.size === this.groups.size) return this.inertialAllCache.list;
+    const by = new Map<InertialNode, InertialTarget>();
+    this.groups.forEach((g) => { for (const x of this.inertialTargetsOf(g)) { const e = by.get(x.n) ?? { n: x.n, rot: false, pos: false }; e.rot ||= x.rot; e.pos ||= x.pos; by.set(x.n, e); } });
+    const list = [...by.values()];
+    this.inertialAllCache = { size: this.groups.size, list };
+    return list;
   }
 
   /**

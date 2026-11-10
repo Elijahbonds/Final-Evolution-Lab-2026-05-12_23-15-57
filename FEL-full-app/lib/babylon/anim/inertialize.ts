@@ -24,6 +24,16 @@ export function inertialMatchVelOn(): boolean {
   return feel('anim.inertialMatchVel', ANIM_INERTIAL_MATCH_VEL_ON) >= 0.5;
 }
 
+/**
+ * SWITCH-ON (2026-11-10): feel knob `anim.inertialAllBones` default. 1 = the blend keeps the pose history of every node any of the
+ * body's clips keys, so a switch onto a clip that keys a bone the last clip did not (guard → run: the legs) still starts from what
+ * the body showed. 0 = AF-1 exactly: history for the current clip's nodes only. Read only while `anim.inertial` is on.
+ */
+export const ANIM_INERTIAL_ALL_BONES_ON = 1;
+export function inertialAllBonesOn(): boolean {
+  return feel('anim.inertialAllBones', ANIM_INERTIAL_ALL_BONES_ON) >= 0.5;
+}
+
 /** Is the inertial blend on (feel knob `anim.inertial`, default off)? */
 export function inertialOn(): boolean {
   return feel('anim.inertial', ANIM_INERTIAL_ON) >= 0.5;
