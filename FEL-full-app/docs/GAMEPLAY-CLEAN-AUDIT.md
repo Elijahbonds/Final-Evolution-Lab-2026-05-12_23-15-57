@@ -493,7 +493,13 @@ throughout, so not a pop by the rule). A tuned rate on a clip, not changed.
 | skateboard | 6 (25.38) → **5** (21.28) | 6 · 0 → 5 · 0 | 47.1° · 24.5° · 13.2° · 39.9° → 22° · 18.8° · 7.9° · 39.9° |
 | mixedcombat | 5 (21.15) → **5** (21.1) | 5 · 0 → 5 · 0 | 42.8° · 38° · 17.1° · 47.2° → 42.8° · 37.8° · 17.1° · 47.2° |
 | football | 4 (17.1) → **1** (4.27) | 4 · 0 → 1 · 0 | 17.1° · 12.4° · 18.1° · 31.1° → 17.1° · 11.1° · 18.1° · 30.8° |
+| baseball | 3 (12.65) → **0** (0) | 3 · 0 → 0 · 0 | 16.1° · 4.6° · 9.4° · 54.9° → 9.2° · 3.4° · 8.8° · 38.8° |
+| aeroaces | 2 (8.51) → **0** (0) | 0 · 2 → 0 · 0 | 30.5° · 60.8° · 1.3° · 0.9° → 0.9° · 1.1° · 1.3° · 0.9° |
 | derby | 0 (0) → **0** (0) | 0 · 0 → 0 · 0 | 14° · 3.7° · 15.6° · 38.8° → 14° · 3.9° · 15.6° · 38.8° |
+
+Where a max-turn cell went UP, it is a different moment in a different run, not something these fixes add: showdown's thigh 58.7° is
+the orphan (list item 4: roundhouse at 0.75 → guard step), duel's arm 97.8° is knockdown → get-up (item 5, seen with the knobs off
+too), 1v1's thigh 179° is the hoops plant-and-cut lock (item 3).
 
 | Mode, same build | knobs off (`anim.fadeHoldEnded` 0, `anim.plantReplantEase` 0) | knobs on |
 |---|---|---|
@@ -501,7 +507,14 @@ throughout, so not a pop by the rule). A tuned rate on a clip, not changed.
 | karate | 10 | **8** |
 
 Aero Aces, the planter A/B on the before-build: 3 hard pops, knee 63.1° → **0**, every bone under 1.3° with `?noplant=1`. The
-fix (#4) marks the pilot seated; its after-run: see below.
+fix (#4), measured in play on the after-build: 2 → **0** hard pops, the worst knee 60.8° → **1.1°** a frame. Baseball (fix #1): 3 →
+**0**; what is left is the swing's own contact (arms 38.8°).
+
+**The posture layer A/B** (`?noposture=1`, the before-build): skateboard 6 → 6, duel 8 → 8, karate VS 11 → 11 hard pops — the
+posture layer is not behind them. Tiebreak 3 → 2: the one frame inside `tennis_swing.M` (a right thigh of 34°) is gone with posture
+off, so the posture layer is the suspect there (one frame in one run). What stays with posture off in duel and karate VS is the
+animator's weight bookkeeping: the orphan, strike onsets, and frames where ONE clip fades in alone at a weight under 1 (`guard 0.42`,
+`run 0.37`) and Babylon fills the rest with a pose captured earlier.
 
 ### What is left, ranked (hard pops a minute × how many modes), with its owner
 
@@ -517,9 +530,14 @@ fix (#4) marks the pilot seated; its after-run: see below.
 5. **Knockdown → get-up** (karate family): the right arm 98–153° in ONE frame at the end of the 0.1 s fade, in 3 runs, **with this
    lane's knobs off as well as on** (so not caused by them); not reproduced headless on the bare hero, so a layer is in it. *This
    lane, next pass, with the layer-off flags on a run that reaches it.*
+5b. **One clip fading in alone at a weight under 1** (duel, karate VS: `guard 0.42`, `run 0.37`, after a one-shot that was the
+   current clip ends): Babylon fills the gap with a stale pose. With the orphan (4) and the restart (6), the same family: the
+   animator letting the clip weights on a bone sum below 1. A structural fix is the inertial blend, or a snapshot pose to fade from.
+   *This lane, next pass.*
 6. **Surf's air restarted while playing** — the animator's same-clip restart drops the clip to weight 0 and fades it back in (0.81 →
    0.14 in one frame, right arm 78°). *This lane (CharacterAnimator), next pass.*
-7. **Clip content** — `tennis_swing.M` (a right-thigh frame of 34°), `board_push` (right thigh 47°), the dance stumble, the keeper's
+7. **Clip content** — `board_push` (right thigh 47°; stays with posture off), the tennis swing's one 34° right-thigh frame
+   (gone with posture off: the posture layer's, in tennis), the dance stumble, the keeper's
    mirrored dive, the baseball swing's contact (arms 27–35°, with the bat-grip lane's hold). *Animation lane / bat-grip.*
 8. **The dunk duel's** `dunk_mocap` → hang → land (arms 69°). *dunk-flagship.*
 
