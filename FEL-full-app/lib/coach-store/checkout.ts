@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type Stripe from 'stripe';
 import { prisma } from '@/lib/db';
 import { getStripe } from '@/lib/stripe';
+import { isFoundersCapEnabled } from '@/lib/flags';
 import { paymentMethodsFor } from '@/lib/stripe-payment-methods';
 import { isVerifiedAdult } from './adult';
 import { attachListingMatches, type PartListingMatch } from './bundleParts';
@@ -10,6 +11,8 @@ import { missingBundleParts, ownedBundleParts, productsGrantedBy } from './entit
 import { isMissingTable, isStoreCoach, logStoreUnavailable, reviewsCanBeSold, storeClosed } from './gate';
 import { itemKeyFor, parseManifest, priceOk, programComingSoon, type CoachManifest } from './manifest';
 import { checkoutExpiresAtUnix, holdExpiresAt } from './policy';
+import { foundersHeldCount, isFoundersItemKey, withFoundersSpot } from './foundersCap';
+import { FOUNDERS_SPOTS } from './storeOffers';
 import { shareWithCoachAllowed } from './rescreen';
 import { openSlots, type WeeklyWindow } from './slots';
 import { stripeTestGate } from './stripeMode';
@@ -99,6 +102,17 @@ export async function startCheckout(userId: string, body: CheckoutBody, origin: 
     const beneficiary = beneficiaryFor(manifest, body.beneficiary);
     if (!beneficiary) return NextResponse.json({ error: 'bad_beneficiary' }, { status: 400 });
 
+    // FOUNDERS-CAP-1: a full Founders listing (by its fixed itemKey, ./foundersCap M1) answers 409 sold_out before ANY
+    // Stripe call (no customer, no session). This early read is the cheap path; the locked count in buyAccess decides.
+    const founders = isFoundersCapEnabled() && manifest.kind === 'membership' && isFoundersItemKey(listing.itemKey);
+    let foundersCap: { customerIsNew: boolean } | null = null;
+    if (founders) {
+      const others = await foundersHeldCount(prisma, { now: new Date(), exceptUserId: userId });
+      if (others >= FOUNDERS_SPOTS) return foundersSoldOut(listing.id);
+      // Whether customerId() below creates the Stripe customer now: a race loser's new customer is logged as an orphan.
+      foundersCap = { customerIsNew: !(await prisma.stripeCustomer.findUnique({ where: { userId } })) };
+    }
+
     const now = new Date();
     const referrerUserId = await referrerFromCode(typeof body.referralCode === 'string' ? body.referralCode : '');
     const stripe = getStripe();
@@ -107,7 +121,7 @@ export async function startCheckout(userId: string, body: CheckoutBody, origin: 
     if (manifest.kind === 'live_1on1' || manifest.kind === 'video_review') {
       return bookTime(userId, listing, instructor, manifest, body, origin, customer, referrerUserId, now, stripe);
     }
-    return buyAccess(userId, listing, instructor.id, manifest, beneficiary, origin, customer, referrerUserId, now, stripe);
+    return buyAccess(userId, listing, instructor.id, manifest, beneficiary, origin, customer, referrerUserId, now, stripe, foundersCap);
   } catch (err) {
     if (isMissingTable(err)) {
       logStoreUnavailable();
@@ -115,6 +129,11 @@ export async function startCheckout(userId: string, body: CheckoutBody, origin: 
     }
     throw err;
   }
+}
+
+function foundersSoldOut(listingId: string): NextResponse {
+  console.warn(`[coach-store] founders_sold_out listing=${listingId}`);
+  return NextResponse.json({ error: 'sold_out' }, { status: 409 });
 }
 
 function beneficiaryFor(manifest: CoachManifest, raw: unknown): 'self' | 'teen' | null {
@@ -286,6 +305,8 @@ async function buyAccess(
   referrerUserId: string | null,
   now: Date,
   stripe: Stripe,
+  /** FOUNDERS-CAP-1: set (flag on, Founders itemKey) when this checkout claims a Founders spot; null otherwise. */
+  foundersCap: { customerIsNew: boolean } | null = null,
 ): Promise<NextResponse> {
   const instructor = await prisma.instructor.findUnique({ where: { id: instructorId }, select: { slug: true, userId: true } });
   const scope = manifest.kind === 'membership'
@@ -369,25 +390,41 @@ async function buyAccess(
       );
     }
   }
-  const row = existing
-    ? await prisma.programAccess.update({
+  const writeRow = async (db: typeof prisma) => existing
+    ? await db.programAccess.update({
       where: { id: existing.id },
       data: {
         status: 'PENDING', priceCents: listing.priceUsd, unlockCodeHash: unlock?.hash ?? existing.unlockCodeHash,
         codeActive: true, scope, lane, billing: manifest.kind === 'membership' ? 'month' : 'one_time',
       },
     })
-    : await prisma.programAccess.create({
+    : await db.programAccess.create({
       data: {
         userId, instructorId, listingId: listing.id, lane, billing: manifest.kind === 'membership' ? 'month' : 'one_time',
         scope, beneficiary, status: 'PENDING', priceCents: listing.priceUsd,
         unlockCodeHash: unlock?.hash ?? null, codeActive: beneficiary === 'teen',
       },
     });
+  // FOUNDERS-CAP-1 (L2): the Founders claim is the count and the PENDING write in ONE transaction under a per-listing
+  // advisory lock (./foundersCap), so concurrent checkouts cannot both take the 10th spot. Everything else is unchanged.
+  const founders = foundersCap !== null;
+  let row: Awaited<ReturnType<typeof writeRow>>;
+  if (founders) {
+    const claim = await withFoundersSpot(prisma, { now, exceptId: existing?.id ?? null }, (tx) => writeRow(tx));
+    if (!claim.ok) {
+      // Cyber Q2 (accepted, LOW): the race loser may keep a Stripe customer with no session. Log it for cleanup with the
+      // listing id and the Stripe customer id ONLY — never the buyer's email, name or FEL user id.
+      if (foundersCap?.customerIsNew) console.warn(`[coach-store] founders_orphan_customer listing=${listing.id} customer=${customer}`);
+      return foundersSoldOut(listing.id);
+    }
+    row = claim.value;
+  } else {
+    row = await writeRow(prisma);
+  }
 
   const methods = paymentMethodsFor(manifest.kind === 'membership' ? 'subscription' : 'payment');
   const metaData = meta(userId, row.id, manifest.kind, beneficiary, referrerUserId);
-  const session = await stripe.checkout.sessions.create({
+  const createSession = () => stripe.checkout.sessions.create({
     customer,
     client_reference_id: userId,
     mode: manifest.kind === 'membership' ? 'subscription' : 'payment',
@@ -413,6 +450,14 @@ async function buyAccess(
     // STORE-READY B5: a re-buy creates a NEW session, so the idempotency key must be new too — reusing the old
     // row's key is why a retry within 24 h 500'd (Stripe rejects a reused key with a different payload).
   }, { idempotencyKey: `coach-store:checkout:${row.id}:${now.getTime()}` });
+  let session: Awaited<ReturnType<typeof createSession>>;
+  try {
+    session = await createSession();
+  } catch (err) {
+    // FOUNDERS-CAP-1: a Founders claim whose session never opened gives its spot back at once (not after HOLD_MINUTES).
+    if (founders) await prisma.programAccess.updateMany({ where: { id: row.id, status: 'PENDING' }, data: { status: 'EXPIRED', codeActive: false } });
+    throw err;
+  }
   await prisma.programAccess.update({ where: { id: row.id }, data: { stripeCheckoutId: session.id } });
   await prisma.order.create({
     data: {
