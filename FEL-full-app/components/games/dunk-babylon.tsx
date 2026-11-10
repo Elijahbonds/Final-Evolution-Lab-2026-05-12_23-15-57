@@ -40,6 +40,9 @@ type Hud = Record<string, HudValue>;
 /** Venice DualShock pad: on phones (< 640 px) the hint and the beat strip sit above the pad column (the diamond stacks over the LOOK
  *  stick, about 264 px); the clamp is a media switch in pure CSS — this project's Tailwind emits no max-* variants. */
 const PAD_LIFT = 'clamp(2.5rem, calc((640px - 100vw) * 999), 17.5rem)';
+/** DUNK-FLAGSHIP P10: the hint row's reserved height — two lines of the HUD's body type (the clamp's limit) plus the plate's own
+ *  vertical padding (py-1.5), on the row's own type so `lh` is the hint's line. A browser without `lh` ignores it (the row hugs its text, as before). */
+const HINT_SLOT_STYLE = { minHeight: 'calc(2lh + 0.75rem)' } as const;
 
 /** A tappable chip (SKIP / RUN IT BACK / CHALLENGE): the plate, the label step and a tone, on a real button. */
 const chipButtonStyle = (tone: HudTone) => ({
@@ -409,7 +412,12 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
                         colour (the stripe gold, the elbow cyan, the paint white); the beat strip takes this spot in the air
             beat strip  RISE · HANG · PRE · SLAM, the tricks under their beats, PERFECT FLIGHT; stands aside for the triple cut and the judges
             MC          what the court's MC just said
-            call        the judges' call on the dunk ("FROM THE STRIPE!"), the top of the column */}
+            call        the judges' call on the dunk ("FROM THE STRIPE!"), the top of the column
+          DUNK-FLAGSHIP P10 (no layout shift at 390×844; measured with scripts/probes/_dunk-host-cls.mts): THE COLUMN'S BOX IS FIXED AND THE
+          HINT HAS A TWO-LINE SLOT. The column was anchored at its bottom only, so its box grew and shrank with what it held, and the hint
+          (one line or two, re-worded every few seconds on the runway) pushed the chip and the MC's caption up and down a line each time.
+          The box now spans from the top of the stage to the hint's slot (it never changes; the rows still stack up from the bottom), and
+          the hint's row is always two lines tall with its plate at the top of it — a one-line hint leaves the second line empty. */}
       {(() => {
         const t = decodeTakeoff(hud.takeoff);
         const beats = typeof hud.beats === 'string' && hud.beats ? hud.beats : '';
@@ -422,13 +430,13 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
         const call = !judging && hud.slamPulse !== true && typeof hud.call === 'string' && hud.call && phase === 'playing' ? hud.call : '';   // (the call yields to the SLAM! cue: the QTE window is the one thing on screen then)
         if (!hint && !takeoff && !strip && !mic && !call) return null;
         return (
-          <div data-dunk-bottom className="pointer-events-none absolute inset-x-0 flex flex-col-reverse items-center gap-[0.35rem] px-3" style={{ bottom: PAD_LIFT }}>
+          <div data-dunk-bottom className="pointer-events-none absolute inset-x-0 top-0 flex flex-col-reverse items-center gap-[0.35rem] px-3" style={{ bottom: PAD_LIFT }}>
             {hint && (
-              <div className="w-full text-center">
-                <HudPlate as="span" className="inline-block max-w-[min(92%,980px)] px-3 py-1.5">
+              <HudText as="div" size="body" className="w-full text-center" style={HINT_SLOT_STYLE}>
+                <HudPlate as="span" className="inline-block max-w-[min(92%,980px)] px-3 py-1.5 align-top">
                   <HudText as="div" size="body" alpha={0.8} style={LINE_CLAMP_STYLE}>{hint}</HudText>
                 </HudPlate>
-              </div>
+              </HudText>
             )}
             {takeoff && (
               <HudPlate as="span" className="inline-flex items-center px-3 py-1">

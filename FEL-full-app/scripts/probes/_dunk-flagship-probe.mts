@@ -76,7 +76,7 @@ const AIR: Record<string, [Dir, Btn]> = {
   lostfound: ['left', 'B'], hideseek: ['left', 'A'], behindback: ['left', 'Y'], fakeback: ['left', 'X'],
 };
 const BTN_I: Record<Btn, number> = { A: 0, B: 1, X: 2, Y: 3 }, DPAD_I: Record<Dir, number> = { up: 12, down: 13, left: 14, right: 15 };
-const JN = ['Hips', 'LeftFoot', 'RightFoot', 'LeftToeBase', 'RightToeBase', 'LeftHand', 'RightHand', 'Head'];
+const JN = ['Hips', 'LeftFoot', 'RightFoot', 'LeftToeBase', 'RightToeBase', 'LeftHand', 'RightHand', 'Head', 'RightArm', 'RightForeArm', 'LeftArm', 'LeftForeArm'];   // P11: the arms (appended: every earlier index holds)
 const QN = ['Hips', 'Spine', 'Spine1', 'Spine2', 'Neck', 'Head', 'LeftShoulder', 'RightShoulder', 'LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand', 'LeftUpLeg', 'RightUpLeg', 'LeftLeg', 'RightLeg', 'LeftFoot', 'RightFoot', 'LeftToeBase', 'RightToeBase'];
 
 interface Frame { sin?: number; occ?: string[] | null; lv?: number; inf?: number; t: number; f: number; rp: number[]; yaw: number; j: (number[] | null)[]; q: number[]; ball: number[] | null; bpar: string; cam: number[]; tgt: number[]; clips: [string, number][]; ts: number }

@@ -976,6 +976,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'dunk.slamVariants', label: 'Slam: stick back = REVERSE, stick up = TWO-HAND POWER', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Dunk · finishes',
     source: 'lib/babylon/core/DunkSlamVariant.ts SLAM_VARIANTS_ON',
     hint: 'Off (as shipped): the slam is the flush the flight carries. On: the left stick held at the A press inside the slam window calls the finish — back a REVERSE (the back to the iron), up a TWO-HAND POWER — named on the card. The air tricks (d-pad + button) are unchanged.',
+  },
+  {
+    id: 'dunk.finishOverRing', label: 'Finish: the hand carries the ball over the ring', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Dunk · finishes',
+    source: 'lib/babylon/core/DunkOverRing.ts FINISH_OVER_RING',
+    hint: 'Off (as shipped): the ball meets the front of the rim and the flush carries it in. On: the hand lifts the ball over the front of the rim and brings it down inside the ring, so it is let go over the hole. Every dunk ends this way while it is on.',
   },  // ── hoops-round2 (HOP-02, owner 2026-10-20): the AI defenders react late by difficulty (hoops/reaction; never in ranked / staked) ──
   {
     id: 'hoops.aiReactRookieMs', label: 'AI reaction: ROOKIE', def: 420, min: 0, max: 800, step: 10, unit: 'ms', group: 'Hoops · AI reaction',
