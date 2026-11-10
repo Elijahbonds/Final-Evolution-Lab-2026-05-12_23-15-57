@@ -177,9 +177,17 @@ export function measure(): Measure {
     for (let p = el.parentElement, i = 0; p && i < 2 && !said; p = p.parentElement, i++) {
       const pr = p.getBoundingClientRect();
       if (pr.height <= Math.max(72, r.height * 3)) said += words((p as HTMLElement).innerText || '');
-      // …or, in a taller container, a neighbour on the same line or within 48 px above or below it (a bar with its
-      // "Loading arena…" caption under it), overlapping it sideways
-      else for (const sib of Array.from(p.children)) { if (sib === el || sib.contains(el)) continue; const sr = sib.getBoundingClientRect(); if (sr.bottom > r.top - 48 && sr.top < r.bottom + 48 && sr.right > r.left && sr.left < r.right && shown(sib)) said += words((sib as HTMLElement).innerText || ''); }
+      // …or, in a taller container, a neighbour on the same line. A PROGRESS BAR may also be captioned just above or
+      // below it (a bar with "Loading arena…" under it), but only by a status line: words near a spinner are not its
+      // caption just for being near (the planted wordless spinner sits above unrelated text, and must still fail).
+      else for (const sib of Array.from(p.children)) {
+        if (sib === el || sib.contains(el) || !shown(sib)) continue;
+        const sr = sib.getBoundingClientRect(); const t = (sib as HTMLElement).innerText || '';
+        const sameLine = sr.bottom > r.top && sr.top < r.bottom;
+        const caption = el.matches('[role="progressbar"]') && sr.bottom > r.top - 48 && sr.top < r.bottom + 48 && sr.right > r.left && sr.left < r.right
+          && /loading|waiting|connecting|starting|preparing|getting|checking|saving|\u2026|\.\.\.|\d+\s?%/i.test(t);
+        if (sameLine || caption) said += words(t);
+      }
     }
     if (!said) spinnersNoWords++;
   }
