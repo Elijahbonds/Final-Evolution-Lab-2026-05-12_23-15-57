@@ -450,3 +450,18 @@ The owner has not felt this yet.
   read 26° in play), 15–17° at 0.12 s, 13–15° at 0.15 s; the knee 12–13° → 7.5–8.7°. The carry's own stride is about 6° a frame.
   0.06 = the old blend exactly. The juke, the spin and the stiff arm keep 0.06 s. Feel-check: football, hurdle a downed man at a
   sprint; do the legs tuck with the hop, or lag it?
+
+## Baseball bat, 2026-11-10 (lane/bat-grip-2)
+
+The owner has not felt this yet.
+
+- Group "Baseball · bat" (`modes/baseballBat.ts`), **NEW numbers (flagged)**: `baseball.batGripLostM` 0.4 m and
+  `baseball.batGripBackM` 0.3 m. The bat (Derby and the three-innings batter) is drawn only while both fists can be on it: it hides
+  once the fists are more than 0.4 m apart and comes back when they close to 0.3 m. Before, the bat was strung between the two
+  hands whatever the arms were doing, so the innings batter coming back to the stance (after a strikeout, a run, a celebration)
+  held it across hands 0.5 to 0.8 m apart for the first tenth of a second. Measured on the clips (`baseballBatHeld.test.ts`,
+  `scripts/probes/bat-grip-2/blend-headless.ts`): a held stance reads 0.07 m, the swing's follow-through 0.23 m, the swing back to
+  the stance 0.35 m at its widest (the bat stays drawn through it), a free hand 0.40 m and more. `batGripLostM` at its 2 m maximum
+  never hides the bat: the old behaviour exactly. Draw-only: no score, grade or timing reads the bat. Feel-check: baseball, strike
+  out or get a hit and watch the batter come back to the plate; does the bat appear in the hands cleanly, or pop in late?
+  **assumption:** the bounds (0.25 to 2 m, 0.1 to 0.4 m) are safe, not tuned.
