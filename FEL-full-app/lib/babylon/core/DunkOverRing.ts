@@ -55,6 +55,11 @@ export const OVER_RING = {
    *  past the shipped follow-through by the ball's remaining offset in front of the ring, at most this much (m). Measured before
    *  it: the ball sat 0.22–0.30 m in front of the ring with the body stopped at the follow-through, out of the arm's reach. */
   deepMaxM: 0.3,
+  /** On the push down the body comes down with the ball, but never faster than this (m/s): at 2.4 m/s (0.04 m a frame) the ball is
+   *  in the contact's 0.10 m height band for at least two frames. Measured both ways (rig): held at the top, the arm could not push
+   *  the ball down and the jam ran 530–550 ms; dropping at the jam's own pace (~0.09 m a frame), the windmill's ball skipped the
+   *  band between two frames — no contact, a miss. */
+  downDropMps: 2.4,
 };
 
 /** Is the knob on? (The mode passes `feel('dunk.finishOverRing', FINISH_OVER_RING)`.) */
@@ -102,7 +107,7 @@ export function overRingHoldsBody(leg: OverRingLeg | null, ballOverRingM: number
   // on the push down too: the hand alone takes the ball down through the ring. Measured (the windmill, knob on): with the body
   // dropping ~0.09 m a frame on the push as well, the ball went from over the ring to under its plane between two frames
   // without ever being seen in the contact's height band — no contact, SHORT OF THE IRON on a ball that went through the hole
-  if (leg === 'down') return true;
+  if (leg === 'down') return false;   // …it comes down, at most OVER_RING.downDropMps (DunkMode caps the drop on this leg)
   // at the give-up: down while the ball is still over the contact's height band, held once it is in it (lower would take it under the iron)
   if (leg === 'bail') return ballOverRingM <= ballR * 0.6;
   return true;

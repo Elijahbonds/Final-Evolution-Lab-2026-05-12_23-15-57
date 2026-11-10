@@ -55,7 +55,7 @@ function jamFrom(start: V3, over: boolean, opts: { reachCapDy?: number; sideReac
     // the body: in over the jam, and down onto the iron — over the ring, not down until the ball is over the hole
     if (over) leg = overRingLeg(leg, ball, rim, RING_R, BALL_R, jamSec);
     if (!over || overRingFollows(leg)) rootZ += (rim.z + FLUSH_Z_AHEAD - JAM_FOLLOW_M + (over ? OVER_RING.followBackM : 0) - jamFollowExtra(flatOf(ball, rim)) - rootZ) * Math.min(1, DT / JAM_FOLLOW_TAU);
-    if (!(over && rootY > JAM_Y && overRingHoldsBody(leg, ball.y - rim.y, BALL_R))) rootY = jamRootStep(rootY, JAM_Y, DT, JAM_LIFT_TAU, JAM_DROP_TAU);
+    if (!(over && rootY > JAM_Y && overRingHoldsBody(leg, ball.y - rim.y, BALL_R))) rootY = over && leg === 'down' ? Math.max(jamRootStep(rootY, JAM_Y, DT, JAM_LIFT_TAU, JAM_DROP_TAU), rootY - OVER_RING.downDropMps * DT) : jamRootStep(rootY, JAM_Y, DT, JAM_LIFT_TAU, JAM_DROP_TAU);
     if (over) { const dx = overRingSideStep(leg, ball.x, rim.x, rootX, start.x, DT, JAM_FOLLOW_TAU); rootX += dx; ball.x += dx; }
     if (over) { const dz = overRingDeepStep(leg, ball.z, rim.z, rootZ, rim.z + FLUSH_Z_AHEAD - JAM_FOLLOW_M + OVER_RING.followBackM - jamFollowExtra(flatOf(ball, rim)), DT, JAM_FOLLOW_TAU); rootZ += dz; if (!opts.ridesZ0) ball.z += dz; }
     ball.y += rootY - y0; if (!opts.ridesZ0) ball.z += rootZ - z0;   // the ball rides the body…
@@ -168,11 +168,11 @@ describe('the contact: let go INSIDE the ring (the shipped jam meets the front o
     expect(now.kind).toBe('contact'); expect(now.flat).toBeLessThanOrEqual(RING_R); expect(now.sec).toBeLessThan(OVER_RING.giveUpSec);
     expect(overRingSideStep('in', rim.x - 0.26, rim.x, rim.x, rim.x, DT, 0.07)).toBeGreaterThan(0);   // the slide is what does it (the reach moves it sideways by a tenth here)
   });
-  it('a ball pushed down through the middle is seen in the contact\'s height band on the way (never skips it between two frames)', () => {
-    // the windmill the rig measured: over the ring's centre, 0.2 m up, the body held at the top of its arc
+  it('a ball pushed down through the middle is seen in the contact\'s height band on the way, the body coming down at its capped rate', () => {
+    // the windmill the rig measured: over the ring's centre, 0.2 m up; the body drops at downDropMps under it
     let ball = at(0.05, 0.2), seen = false; const aim = { x: 0, y: 0, z: 0 };
     for (let i = 0; i < 40 && ball.y > rim.y - 0.1; i++) {
-      overRingAim('down', ball, rim, RING_R, BALL_R, aim); ball = lagToward(ball, aim, DT, WRIST_LAG_TAU);
+      overRingAim('down', ball, rim, RING_R, BALL_R, aim); ball = lagToward(ball, aim, DT, WRIST_LAG_TAU); ball.y -= OVER_RING.downDropMps * DT;
       if (jamIronStep({ ball, rim, rimRadius: RING_R, ballRadius: BALL_R, sincePress: 0.2, centred: true })?.kind === 'contact') { seen = true; break; }
     }
     expect(seen).toBe(true);
@@ -187,7 +187,8 @@ describe('the contact: let go INSIDE the ring (the shipped jam meets the front o
   });
   it('the body holds its height through the jam, and comes down at the give-up only while the ball is over the band', () => {
     expect(overRingHoldsBody('lift', 0.2, BALL_R)).toBe(true); expect(overRingHoldsBody('in', 0.2, BALL_R)).toBe(true); expect(overRingHoldsBody(null, 0.2, BALL_R)).toBe(true);
-    expect(overRingHoldsBody('down', 0.2, BALL_R)).toBe(true);   // the hand alone pushes it through (rig: a dropping body took the windmill's ball through the band between two frames, no contact)
+    expect(overRingHoldsBody('down', 0.2, BALL_R)).toBe(false);   // it comes down with the ball on the push, capped (rig: held, the arm could not push it down — 550 ms jams)
+    expect(OVER_RING.downDropMps / 60).toBeLessThanOrEqual(0.05);    // …at most half the contact's 0.10 m band a frame, so the ball is seen in it (the windmill's miss)
     expect(overRingHoldsBody('bail', 0.27, BALL_R)).toBe(false);   // at the give-up, a ball over the band: the body comes down (rig: held, the double clutch missed)
     expect(overRingHoldsBody('bail', 0.03, BALL_R)).toBe(true);    // …and stops once the ball is in the band (lower takes it under the iron)
   });
@@ -231,7 +232,7 @@ describe('DunkMode: knob off is the shipped finish, line for line', () => {
     // the jam: the leg is stepped, the follow-through shortened and the height held only with the knob on; the shipped steps are the else branches
     expect(DUNK).toContain("              const overRing = finishOverRing();\n              if (overRing) overLeg = overRingLeg(jamSec <= dt ? null : overLeg, ball.getAbsolutePosition(), rim, RIM_RADIUS, ballSim.radius, overRingJamSec());\n              if (overRing && jamSec <= dt) overRootX0 = player.root.position.x;   // where the jam found the body (the sideways slide's anchor)\n              if (overRing) { if (overRingFollows(overLeg)) player.root.position.z += (rim.z + FLUSH_Z_AHEAD - JAM_FOLLOW_M + OVER_RING.followBackM - jamExtra - player.root.position.z) * Math.min(1, dt / JAM_FOLLOW_TAU); player.root.position.x += overRingSideStep(overLeg, ball.getAbsolutePosition().x, rim.x, player.root.position.x, overRootX0, dt, JAM_FOLLOW_TAU); player.root.position.z += overRingDeepStep(overLeg, ball.getAbsolutePosition().z, rim.z, player.root.position.z, rim.z + FLUSH_Z_AHEAD - JAM_FOLLOW_M + OVER_RING.followBackM - jamExtra, dt, JAM_FOLLOW_TAU); }\n              else player.root.position.z += (rim.z + FLUSH_Z_AHEAD - JAM_FOLLOW_M - jamExtra - player.root.position.z) * Math.min(1, dt / JAM_FOLLOW_TAU);");
     expect(DUNK).toContain("const jamY = JAM_Y + (inOffHand() ? JAM_Y_LEFT_EXTRA : 0) + (finishVariant === 'reverse' ? REVERSE_JAM_LIFT : 0);");
-    expect(DUNK).toContain("              if (overRing && player.root.position.y > jamY && overRingHoldsBody(overLeg, ball.getAbsolutePosition().y - rim.y, ballSim.radius)) { /* held */ }\n              else player.root.position.y = jamRootStep(player.root.position.y, jamY, dt, JAM_LIFT_TAU, JAM_DROP_TAU);");
+    expect(DUNK).toContain("              if (overRing && player.root.position.y > jamY && overRingHoldsBody(overLeg, ball.getAbsolutePosition().y - rim.y, ballSim.radius)) { /* held */ }\n              else if (overRing && overLeg === 'down') player.root.position.y = Math.max(jamRootStep(player.root.position.y, jamY, dt, JAM_LIFT_TAU, JAM_DROP_TAU), player.root.position.y - OVER_RING.downDropMps * dt);\n              else player.root.position.y = jamRootStep(player.root.position.y, jamY, dt, JAM_LIFT_TAU, JAM_DROP_TAU);");
     // the contact: the geometric rule itself is untouched; only a contact the knob is holding is skipped
     expect(DUNK).toContain("const ironStep = finishVariant === 'reverse' && reverseLeft() > Math.PI - REVERSE_CONTACT_FROM ? null : jamIronStep({ ball: bp, rim, rimRadius: RIM_RADIUS, ballRadius: ballSim.radius, sincePress: jamSec, centred: true });");
     expect(DUNK).toContain("const overHolds = ironStep?.kind === 'contact' && finishOverRing() && overRingDefers(bp, rim, RIM_RADIUS, ballSim.radius, jamSec);");
@@ -239,7 +240,7 @@ describe('DunkMode: knob off is the shipped finish, line for line', () => {
     // three reads of the knob and its definition, no more; each of the path's functions is called once, on a line the knob gates
     expect(DUNK.split('finishOverRing()').length - 1).toBe(3);
     for (const f of ['overRingAim(', 'overRingLeg(', 'overRingHoldsBody(', 'overRingFollows(', 'overRingSideStep(', 'overRingDeepStep(', 'overRingDefers(']) expect(DUNK.split(f).length - 1, f).toBe(1);
-    for (const line of DUNK.split('\n').filter((l) => /overRing(Aim|Leg|HoldsBody|Follows|SideStep|DeepStep|Defers)\(|OVER_RING\.[a-zA-Z]|overLeg = /.test(l) && !/^\s*\/\//.test(l))) expect(line, line.trim().slice(0, 90)).toMatch(/finishOverRing\(\)|^\s*if \(overRing( |\))/);
+    for (const line of DUNK.split('\n').filter((l) => /overRing(Aim|Leg|HoldsBody|Follows|SideStep|DeepStep|Defers)\(|OVER_RING\.[a-zA-Z]|overLeg = /.test(l) && !/^\s*\/\//.test(l))) expect(line, line.trim().slice(0, 90)).toMatch(/finishOverRing\(\)|^\s*(else )?if \(overRing( |\)| &&)/);
   });
   it('the sixteen air tricks never see it: the trick path, the recognizer and the slam grading do not read the knob', () => {
     expect(DUNK_TRICKS).toHaveLength(16);
