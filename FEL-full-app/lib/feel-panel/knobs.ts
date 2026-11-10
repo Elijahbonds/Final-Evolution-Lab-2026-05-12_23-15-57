@@ -933,9 +933,9 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'Share of the frame width kept between the player and each side edge; the camera turns only when he would come closer. Wide screens never.',
   },  // ── dunk-flagship (owner playtest 2026-10-27: "smoother movement, better lobs") ──
   {
-    id: 'dunk.runwayStrideScale', label: 'Run-up: stride length', def: 1, min: 0.8, max: 1.4, step: 0.01, unit: '×', group: 'Dunk · run-up',
+    id: 'dunk.runwayStrideScale', label: 'Run-up: stride length', def: 1.1, min: 0.8, max: 1.4, step: 0.01, unit: '×', group: 'Dunk · run-up',
     source: 'lib/babylon/core/DunkFlagship.ts RUNWAY_STRIDE_SCALE',
-    hint: 'The run-up\'s legs are paced to the run at 1 (as shipped). Higher = slower, longer steps for the same speed (feet slide forward); lower = quicker steps (feet slide back).',
+    hint: 'The run-up\'s legs are paced to the run at 1.1 (default since 2026-11-10; it was 1, which still restores the old pace). Higher = slower, longer steps for the same speed (feet slide forward); lower = quicker steps (feet slide back).',
   },
   {
     id: 'dunk.oopLobFlightSec', label: 'Alley-oop: lob time in the air', def: 1.0, min: 0.5, max: 1.6, step: 0.05, unit: 's', group: 'Dunk · lobs',
@@ -973,14 +973,24 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'Off (as shipped): a 0.70 m jump fills the take-off. On: your own verified best jump (a saved Quick Screen, verified adult accounts only) fills it.',
   },
   {
-    id: 'dunk.slamVariants', label: 'Slam: stick back = REVERSE, stick up = TWO-HAND POWER', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Dunk · finishes',
+    id: 'dunk.slamVariants', label: 'Slam: stick back = REVERSE, stick up = TWO-HAND POWER', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Dunk · finishes',
     source: 'lib/babylon/core/DunkSlamVariant.ts SLAM_VARIANTS_ON',
-    hint: 'Off (as shipped): the slam is the flush the flight carries. On: the left stick held at the A press inside the slam window calls the finish — back a REVERSE (the back to the iron), up a TWO-HAND POWER — named on the card. The air tricks (d-pad + button) are unchanged.',
+    hint: 'On (default since 2026-11-10): the left stick held at the A press inside the slam window calls the finish — back a REVERSE (the back to the iron), up a TWO-HAND POWER — named on the card. Off: the slam is the flush the flight carries, as before. Never in staked, ranked or challenge play. The air tricks (d-pad + button) are unchanged.',
   },
   {
-    id: 'dunk.finishOverRing', label: 'Finish: the hand carries the ball over the ring', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Dunk · finishes',
+    id: 'dunk.finishOverRing', label: 'Finish: the hand carries the ball over the ring', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Dunk · finishes',
     source: 'lib/babylon/core/DunkOverRing.ts FINISH_OVER_RING',
-    hint: 'Off (as shipped): the ball meets the front of the rim and the flush carries it in. On: the hand lifts the ball over the front of the rim and brings it down inside the ring, so it is let go over the hole. Every dunk ends this way while it is on.',
+    hint: 'On (default since 2026-11-10): the body carries the ball over the ring and the hand brings it down inside, so it is let go over the hole. Off: the ball meets the front of the rim and the flush carries it in, as before. Never in staked, ranked or challenge play.',
+  },
+  {
+    id: 'dunk.slamPower', label: 'Slam: stick up = TWO-HAND POWER', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Dunk · finishes',
+    source: 'lib/babylon/core/DunkSlamVariant.ts SLAM_POWER_ON',
+    hint: 'The TWO-HAND POWER on its own (with the slam variants on). Off: the stick up calls nothing; the REVERSE is unchanged.',
+  },
+  {
+    id: 'dunk.landAbsorbDeep', label: 'Landing: deep absorb', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Dunk · landing',
+    source: 'lib/babylon/core/DunkFlagship.ts LAND_ABSORB_DEEP',
+    hint: 'On (default since 2026-11-10): the knees take about 25 cm of the landing in about 0.12 s. Off: the shallower landing as before.',
   },  // ── hoops-round2 (HOP-02, owner 2026-10-20): the AI defenders react late by difficulty (hoops/reaction; never in ranked / staked) ──
   {
     id: 'hoops.aiReactRookieMs', label: 'AI reaction: ROOKIE', def: 420, min: 0, max: 800, step: 10, unit: 'ms', group: 'Hoops · AI reaction',

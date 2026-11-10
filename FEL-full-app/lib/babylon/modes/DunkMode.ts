@@ -89,9 +89,9 @@ import { applyOceanCourt } from '../visual/CourtSurface';
 import { applyVeniceDunkLookPass } from '../visual/veniceSurroundVisibility';
 import { DUNK_CONFIG as CFG } from './modeConfigs';
 import { readDisplaySetting } from '@/lib/controller-link/tvMode';   // TV MODE: the slam window widens on a mirrored display
-import { LAND_LEAD_SEC, timeToFloor, OOP_LOB_FLIGHT_SEC, OOP_WINDUP_SEC, OOP_LATE_CATCH_CLIP_T, whiffWhy, GLASS_RUN_CATCH_CLIP_T, GLASS_RELEASE_MIN_M, SELF_LOB_RELEASE_Y, glassThrowDue, OOP_GLASS_PASSER_X, OOP_GLASS_PASSER_FROM_RIM_M, OOP_GLASS_HIT_OVER_RIM_M, OOP_BOUNCE_FLIGHT_SEC, LOB_FRAME_LIFT, REAL_JUMP_PERSONAL, SLAM_BIG_FROM, personalFullRiseM, riseToPower, LOB_FRAME_TAU, oopThrowDue, RUNWAY_STRIDE_MPS, RUNWAY_STRIDE_SCALE, RUNWAY_RATE_MIN, RUNWAY_RATE_MAX, slamImpact, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG } from '../core/DunkFlagship';   // DUNK-FLAGSHIP: the pass's numbers (feel-panel knobs)
-import { slamVariantOf, SLAM_VARIANTS, SLAM_VARIANTS_ON, REVERSE_TURN_RATE, REVERSE_CONTACT_FROM, REVERSE_JAM_LIFT, REVERSE_TURN_FROM, REVERSE_COMMIT_SEC, type SlamVariant } from '../core/DunkSlamVariant';   // DUNK-FLAGSHIP Phase 7: the finish called with the slam (knob, off)
-import { FINISH_OVER_RING, OVER_RING, overRingOn, overRingAim, overRingLeg, overRingHoldsBody, overRingFollows, overRingSideStep, overRingDefers, type OverRingLeg } from '../core/DunkOverRing';   // DUNK-FLAGSHIP P11: the hand carries the ball over the ring (knob, off)
+import { LAND_LEAD_SEC, LAND_ABSORB_DEEP, timeToFloor, OOP_LOB_FLIGHT_SEC, OOP_WINDUP_SEC, OOP_LATE_CATCH_CLIP_T, whiffWhy, GLASS_RUN_CATCH_CLIP_T, GLASS_RELEASE_MIN_M, SELF_LOB_RELEASE_Y, glassThrowDue, OOP_GLASS_PASSER_X, OOP_GLASS_PASSER_FROM_RIM_M, OOP_GLASS_HIT_OVER_RIM_M, OOP_BOUNCE_FLIGHT_SEC, LOB_FRAME_LIFT, REAL_JUMP_PERSONAL, SLAM_BIG_FROM, personalFullRiseM, riseToPower, LOB_FRAME_TAU, oopThrowDue, RUNWAY_STRIDE_MPS, RUNWAY_STRIDE_SCALE, RUNWAY_RATE_MIN, RUNWAY_RATE_MAX, slamImpact, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG } from '../core/DunkFlagship';   // DUNK-FLAGSHIP: the pass's numbers (feel-panel knobs)
+import { slamVariantOf, playSwitchBlocked, SLAM_VARIANTS, SLAM_VARIANTS_ON, SLAM_POWER_ON, REVERSE_TURN_RATE, REVERSE_CONTACT_FROM, REVERSE_JAM_LIFT, REVERSE_TURN_FROM, REVERSE_COMMIT_SEC, type SlamVariant } from '../core/DunkSlamVariant';   // DUNK-FLAGSHIP Phase 7: the finish called with the slam (knob, off)
+import { FINISH_OVER_RING, OVER_RING, overRingOn, overRingAim, overRingLeg, overRingHoldsBody, overRingFollows, overRingSideStep, overRingDeepStep, overRingDefers, type OverRingLeg } from '../core/DunkOverRing';   // DUNK-FLAGSHIP P11: the hand carries the ball over the ring (knob, off)
 import { feel } from '../../feel-panel/feel';
 import { rimCutSpot, clearOfHoop, runUpTune, tuneKey, dunkFramingOn } from '../core/dunkCamFraming';   // CAMERA TIP: cam.dunkFraming (default off)
 import { DUNK_BACKBOARD_Z } from '../visual/venuePropSets';
@@ -136,6 +136,7 @@ import { showCuts, cutsSec, POSTER_SEC, announcerCall, CELEBRATIONS, CELEB_BY_DP
 import {
   DUNK_LAND_ABSORB_CLIP, CELEB_BLEND_SEC, pickLiveCelebration, holdEndMs, celebStartMs, clipFor, type RotCelebId,
 } from '../core/DunkLandCelebrate';
+import { LAND_ABSORB_DEEP_CLIP } from '../anim/authored/dunkLandAbsorb';   // DUNK SWITCH-ON: the deep landing absorb
 import { PhoneFlashes } from '../visual/PhoneFlashes';
 import { mountRimFx, type RimFxHandle } from '../hoops/RimFx';   // vis-hoops-dunk: the rim's light on a make (visual only)
 import { tierFromAccuracy } from '../hoops/hoopsLook';
@@ -2562,7 +2563,7 @@ export const DunkMode: ModeDefinition = (() => {
               const overRing = finishOverRing();
               if (overRing) overLeg = overRingLeg(jamSec <= dt ? null : overLeg, ball.getAbsolutePosition(), rim, RIM_RADIUS, ballSim.radius, overRingJamSec());
               if (overRing && jamSec <= dt) overRootX0 = player.root.position.x;   // where the jam found the body (the sideways slide's anchor)
-              if (overRing) { if (overRingFollows(overLeg)) player.root.position.z += (rim.z + FLUSH_Z_AHEAD - JAM_FOLLOW_M + OVER_RING.followBackM - jamExtra - player.root.position.z) * Math.min(1, dt / JAM_FOLLOW_TAU); player.root.position.x += overRingSideStep(overLeg, ball.getAbsolutePosition().x, rim.x, player.root.position.x, overRootX0, dt, JAM_FOLLOW_TAU); }
+              if (overRing) { if (overRingFollows(overLeg)) player.root.position.z += (rim.z + FLUSH_Z_AHEAD - JAM_FOLLOW_M + OVER_RING.followBackM - jamExtra - player.root.position.z) * Math.min(1, dt / JAM_FOLLOW_TAU); player.root.position.x += overRingSideStep(overLeg, ball.getAbsolutePosition().x, rim.x, player.root.position.x, overRootX0, dt, JAM_FOLLOW_TAU); player.root.position.z += overRingDeepStep(overLeg, ball.getAbsolutePosition().z, rim.z, player.root.position.z, rim.z + FLUSH_Z_AHEAD - JAM_FOLLOW_M + OVER_RING.followBackM - jamExtra, dt, JAM_FOLLOW_TAU); }
               else player.root.position.z += (rim.z + FLUSH_Z_AHEAD - JAM_FOLLOW_M - jamExtra - player.root.position.z) * Math.min(1, dt / JAM_FOLLOW_TAU);
               // the pull-up on the iron (never down); the LEFT-hand carry (the eastbay after its pass) pulls up further — the pass leaves
               // that palm facing down with the ball riding UNDER the wrist, 0.15 m lower than the right hand's palm-out carry
@@ -3037,7 +3038,7 @@ export const DunkMode: ModeDefinition = (() => {
   function reverseOnTheWayUp(dt: number): boolean {
     if (reverseTurning) return true;
     const calling = turn === 'player' && !lob.live && !obstacle && !qteWindowOpen && clipTime >= REVERSE_TURN_FROM && !flight.attempt.tricks.length && !armedAir
-      && slamVariantOf(feel('dunk.slamVariants', SLAM_VARIANTS_ON) >= 0.5, stickX, stickY) === 'reverse';
+      && slamVariantOf(slamVariantsOn(), stickX, stickY) === 'reverse';
     reverseCommitSec = calling ? reverseCommitSec + dt : 0;
     if (reverseCommitSec >= REVERSE_COMMIT_SEC) { reverseTurning = true; console.info(`[DUNK-SLAM] reverse: the turn away from the iron starts @${clipTime.toFixed(2)}`); }
     return reverseTurning;
@@ -3052,7 +3053,7 @@ export const DunkMode: ModeDefinition = (() => {
    *  d-pad's, read only while the window is shut (airButton). */
   function readSlamVariant(): void {
     if (phase !== 'cinematic' || turn !== 'player' || slamVariant) return;
-    slamVariant = slamVariantOf(feel('dunk.slamVariants', SLAM_VARIANTS_ON) >= 0.5, stickX, stickY);
+    slamVariant = slamVariantOf(slamVariantsOn(), stickX, stickY, feel('dunk.slamPower', SLAM_POWER_ON) >= 0.5);
     if (slamVariant) console.info(`[DUNK-SLAM] variant ${SLAM_VARIANTS[slamVariant].label} (stick ${stickX.toFixed(2)}, ${stickY.toFixed(2)})`);
   }
   function slamNow(ctx: ModeContext, at: number): void {
@@ -3607,7 +3608,13 @@ export const DunkMode: ModeDefinition = (() => {
   /** DUNK-BALL-ARMS-RIM: where the reach sends the ball this frame — the centre over the ring once the ball is above the iron
    *  (or already inside the ring), otherwise a point in front of the front rim and over it, so the ball never climbs through it. */
   /** DUNK-FLAGSHIP P11: the over-the-ring finish is on (the knob; never in ranked, staked or paid play — lib/feel-panel's gate). Read here and nowhere else. */
-  const finishOverRing = (): boolean => overRingOn(feel('dunk.finishOverRing', FINISH_OVER_RING));
+  const finishOverRing = (): boolean => !switchBlocked() && overRingOn(feel('dunk.finishOverRing', FINISH_OVER_RING));
+  /** DUNK SWITCH-ON: a staked, ranked or challenge run — the play-changing switches are off there whatever their default. */
+  const switchBlocked = (): boolean => typeof location !== 'undefined' && playSwitchBlocked(location.search);
+  /** DUNK SWITCH-ON (owner 2026-11-10): the slam variants are ON by default — and OFF in a staked, ranked or challenge run whatever
+   *  the default (the card there is the integrity cap's: no new finish, no new difficulty). The feel panel's own gate already keeps
+   *  overrides out of those runs; this keeps the new DEFAULT out of them too. */
+  const slamVariantsOn = (): boolean => !switchBlocked() && feel('dunk.slamVariants', SLAM_VARIANTS_ON) >= 0.5;
   /** …and the jam's clock for its path: negative while the push is not allowed yet (the REVERSE still turning its back to the iron). */
   const overRingJamSec = (): number => (finishVariant === 'reverse' && reverseLeft() > Math.PI - REVERSE_CONTACT_FROM ? -1 : jamSec);
   /** …and the leg of the path the jam is on (core/DunkOverRing: lift → in → down, forward only), stepped once a frame in the jam. */
@@ -4109,7 +4116,9 @@ export const DunkMode: ModeDefinition = (() => {
     if (!airHeld) return;
     airHeld = false; setWin('land');
     console.info(`[HANDS] land ${landingClip}${fadeSec !== undefined ? ` (fading in ${Math.round(fadeSec * 1000)} ms before touchdown)` : ''}`);
-    playClip(landingClip, { ...(fadeSec !== undefined ? { fadeSec } : {}), onEnd: () => { playClip(SPORT_CLIP.idle, { loop: true }); setWin('run'); } });
+    // DUNK SWITCH-ON: the deep absorb in its place (knob dunk.landAbsorbDeep, on; 0 = the shipped absorb exactly). Presentation only.
+    const clip = landingClip === DUNK_LAND_ABSORB_CLIP && feel('dunk.landAbsorbDeep', LAND_ABSORB_DEEP) >= 0.5 ? LAND_ABSORB_DEEP_CLIP : landingClip;
+    playClip(clip, { ...(fadeSec !== undefined ? { fadeSec } : {}), onEnd: () => { playClip(SPORT_CLIP.idle, { loop: true }); setWin('run'); } });
   }
 
   // ── DUNK-CONTROL-JUICE (2026-09-08): runway tricks, the lob, the catch ──────────────────────────────────────────

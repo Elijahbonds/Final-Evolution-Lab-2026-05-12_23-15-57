@@ -10,7 +10,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { Vector3 } from '@babylonjs/core';
-import { FINISH_OVER_RING, OVER_RING, overRingOn, overRingLeg, overRingAim, overRingDefers, overRingHoldsBody, overRingFollows, overRingSideStep, flatOf, type V3, type OverRingLeg } from './DunkOverRing';
+import { FINISH_OVER_RING, OVER_RING, overRingOn, overRingLeg, overRingAim, overRingDefers, overRingHoldsBody, overRingFollows, overRingSideStep, overRingDeepStep, flatOf, type V3, type OverRingLeg } from './DunkOverRing';
 import { jamIronStep, JAM_SHORT_SEC } from './DunkContact';
 import { lagToward, jamRootStep, jamFollowExtra, WRIST_LAG_TAU } from './DunkHands';
 import { sweptTouch, clearOfIron } from './RimFlush';
@@ -57,6 +57,7 @@ function jamFrom(start: V3, over: boolean, opts: { reachCapDy?: number; sideReac
     if (!over || overRingFollows(leg)) rootZ += (rim.z + FLUSH_Z_AHEAD - JAM_FOLLOW_M + (over ? OVER_RING.followBackM : 0) - jamFollowExtra(flatOf(ball, rim)) - rootZ) * Math.min(1, DT / JAM_FOLLOW_TAU);
     if (!(over && rootY > JAM_Y && overRingHoldsBody(leg, ball.y - rim.y, BALL_R))) rootY = jamRootStep(rootY, JAM_Y, DT, JAM_LIFT_TAU, JAM_DROP_TAU);
     if (over) { const dx = overRingSideStep(leg, ball.x, rim.x, rootX, start.x, DT, JAM_FOLLOW_TAU); rootX += dx; ball.x += dx; }
+    if (over) { const dz = overRingDeepStep(leg, ball.z, rim.z, rootZ, rim.z + FLUSH_Z_AHEAD - JAM_FOLLOW_M + OVER_RING.followBackM - jamFollowExtra(flatOf(ball, rim)), DT, JAM_FOLLOW_TAU); rootZ += dz; if (!opts.ridesZ0) ball.z += dz; }
     ball.y += rootY - y0; if (!opts.ridesZ0) ball.z += rootZ - z0;   // the ball rides the body…
     yHand = ball.y;
     // …and the reach pulls it toward its aim behind the wrist's lag
@@ -76,9 +77,10 @@ function jamFrom(start: V3, over: boolean, opts: { reachCapDy?: number; sideReac
 }
 
 describe('the knob', () => {
-  it('is off by default, and 0 is off', () => {
-    expect(FINISH_OVER_RING).toBe(0);
-    expect(overRingOn(FINISH_OVER_RING)).toBe(false);
+  // test changed (owner 2026-11-10, "turn all 4 on"): the default is ON now; 0 is still off and restores the old finish line for line
+  it('is ON by default, and 0 is off', () => {
+    expect(FINISH_OVER_RING).toBe(1);
+    expect(overRingOn(FINISH_OVER_RING)).toBe(true);
     expect(overRingOn(0)).toBe(false);
     expect(overRingOn(1)).toBe(true);
   });
@@ -175,6 +177,14 @@ describe('the contact: let go INSIDE the ring (the shipped jam meets the front o
     }
     expect(seen).toBe(true);
   });
+  it('the deep carry: a ball left 0.25 m in front of the ring by an arm at full stretch is brought over it by the body, well inside the 400 ms aim', () => {
+    // the rig's failing plain slams (2026-11-10): the arm could not bring the ball in at all — only the body moves it here
+    const end = jamFrom(at(0.25, 0.22), true, { sideReach: 0, inReach: 0 });
+    expect(end.kind).toBe('contact'); expect(end.flat).toBeLessThanOrEqual(RING_R); expect(end.sec).toBeLessThanOrEqual(0.4);
+    expect(overRingDeepStep('lift', 0.25, 0, 0.3, 0.3, 1, 0.07)).toBe(0);                     // only on the way in
+    expect(overRingDeepStep('in', 0.25, 0, 0.3, 0.3, 1, 0.07)).toBeCloseTo(-0.25, 6);         // toward the ring by the ball's offset
+    expect(overRingDeepStep('in', 0.9, 0, 0.3, 0.3, 1, 0.07)).toBeCloseTo(-OVER_RING.deepMaxM, 6);   // never more than deepMaxM past the follow-through
+  });
   it('the body holds its height through the jam, and comes down at the give-up only while the ball is over the band', () => {
     expect(overRingHoldsBody('lift', 0.2, BALL_R)).toBe(true); expect(overRingHoldsBody('in', 0.2, BALL_R)).toBe(true); expect(overRingHoldsBody(null, 0.2, BALL_R)).toBe(true);
     expect(overRingHoldsBody('down', 0.2, BALL_R)).toBe(true);   // the hand alone pushes it through (rig: a dropping body took the windmill's ball through the band between two frames, no contact)
@@ -211,14 +221,15 @@ describe('the contact: let go INSIDE the ring (the shipped jam meets the front o
 describe('DunkMode: knob off is the shipped finish, line for line', () => {
   it('the knob is read in ONE place, through feel(), against the default', () => {
     expect(DUNK.split("feel('dunk.finishOverRing'").length - 1).toBe(1);
-    expect(DUNK).toContain("const finishOverRing = (): boolean => overRingOn(feel('dunk.finishOverRing', FINISH_OVER_RING));");
+    // test changed (owner 2026-11-10): …and never in a staked, ranked or challenge run, whatever the default
+    expect(DUNK).toContain("const finishOverRing = (): boolean => !switchBlocked() && overRingOn(feel('dunk.finishOverRing', FINISH_OVER_RING));");
   });
   it('every use sits behind the knob, and the shipped lines are still there, verbatim, on the other branch', () => {
     // the reach's aim: only through the jam (never before the slam, never in the replay); the shipped body of rimApproachAim follows untouched
     expect(DUNK).toContain("    if (finishOverRing() && !replaying && phase === 'resolve' && qteHit && jamSec >= 0 && !jamContact && overLeg) return overRingAim(overLeg, bw, rim, RIM_RADIUS, ballSim.radius, _aim);\n    const dx = bw.x - rim.x, dz = bw.z - rim.z, r = Math.hypot(dx, dz);");
     expect(DUNK).toContain("    if (r <= RIM_RADIUS - c + 0.02 && phase === 'resolve' && qteHit) { _aim.y = rim.y - 0.06; return _aim; }\n    if (bw.y >= rim.y + 0.02 || r <= RIM_RADIUS - c || r >= RIM_RADIUS + c + 0.25) return _aim;");
     // the jam: the leg is stepped, the follow-through shortened and the height held only with the knob on; the shipped steps are the else branches
-    expect(DUNK).toContain("              const overRing = finishOverRing();\n              if (overRing) overLeg = overRingLeg(jamSec <= dt ? null : overLeg, ball.getAbsolutePosition(), rim, RIM_RADIUS, ballSim.radius, overRingJamSec());\n              if (overRing && jamSec <= dt) overRootX0 = player.root.position.x;   // where the jam found the body (the sideways slide's anchor)\n              if (overRing) { if (overRingFollows(overLeg)) player.root.position.z += (rim.z + FLUSH_Z_AHEAD - JAM_FOLLOW_M + OVER_RING.followBackM - jamExtra - player.root.position.z) * Math.min(1, dt / JAM_FOLLOW_TAU); player.root.position.x += overRingSideStep(overLeg, ball.getAbsolutePosition().x, rim.x, player.root.position.x, overRootX0, dt, JAM_FOLLOW_TAU); }\n              else player.root.position.z += (rim.z + FLUSH_Z_AHEAD - JAM_FOLLOW_M - jamExtra - player.root.position.z) * Math.min(1, dt / JAM_FOLLOW_TAU);");
+    expect(DUNK).toContain("              const overRing = finishOverRing();\n              if (overRing) overLeg = overRingLeg(jamSec <= dt ? null : overLeg, ball.getAbsolutePosition(), rim, RIM_RADIUS, ballSim.radius, overRingJamSec());\n              if (overRing && jamSec <= dt) overRootX0 = player.root.position.x;   // where the jam found the body (the sideways slide's anchor)\n              if (overRing) { if (overRingFollows(overLeg)) player.root.position.z += (rim.z + FLUSH_Z_AHEAD - JAM_FOLLOW_M + OVER_RING.followBackM - jamExtra - player.root.position.z) * Math.min(1, dt / JAM_FOLLOW_TAU); player.root.position.x += overRingSideStep(overLeg, ball.getAbsolutePosition().x, rim.x, player.root.position.x, overRootX0, dt, JAM_FOLLOW_TAU); player.root.position.z += overRingDeepStep(overLeg, ball.getAbsolutePosition().z, rim.z, player.root.position.z, rim.z + FLUSH_Z_AHEAD - JAM_FOLLOW_M + OVER_RING.followBackM - jamExtra, dt, JAM_FOLLOW_TAU); }\n              else player.root.position.z += (rim.z + FLUSH_Z_AHEAD - JAM_FOLLOW_M - jamExtra - player.root.position.z) * Math.min(1, dt / JAM_FOLLOW_TAU);");
     expect(DUNK).toContain("const jamY = JAM_Y + (inOffHand() ? JAM_Y_LEFT_EXTRA : 0) + (finishVariant === 'reverse' ? REVERSE_JAM_LIFT : 0);");
     expect(DUNK).toContain("              if (overRing && player.root.position.y > jamY && overRingHoldsBody(overLeg, ball.getAbsolutePosition().y - rim.y, ballSim.radius)) { /* held */ }\n              else player.root.position.y = jamRootStep(player.root.position.y, jamY, dt, JAM_LIFT_TAU, JAM_DROP_TAU);");
     // the contact: the geometric rule itself is untouched; only a contact the knob is holding is skipped
@@ -227,8 +238,8 @@ describe('DunkMode: knob off is the shipped finish, line for line', () => {
     expect(DUNK).toContain("if (overHolds) { jamPrevBall.copyFrom(bp); jamPrevLive = true; }\n            else if (ironStep?.kind === 'contact') {");
     // three reads of the knob and its definition, no more; each of the path's functions is called once, on a line the knob gates
     expect(DUNK.split('finishOverRing()').length - 1).toBe(3);
-    for (const f of ['overRingAim(', 'overRingLeg(', 'overRingHoldsBody(', 'overRingFollows(', 'overRingSideStep(', 'overRingDefers(']) expect(DUNK.split(f).length - 1, f).toBe(1);
-    for (const line of DUNK.split('\n').filter((l) => /overRing(Aim|Leg|HoldsBody|Follows|SideStep|Defers)\(|OVER_RING\.[a-zA-Z]|overLeg = /.test(l) && !/^\s*\/\//.test(l))) expect(line, line.trim().slice(0, 90)).toMatch(/finishOverRing\(\)|^\s*if \(overRing( |\))/);
+    for (const f of ['overRingAim(', 'overRingLeg(', 'overRingHoldsBody(', 'overRingFollows(', 'overRingSideStep(', 'overRingDeepStep(', 'overRingDefers(']) expect(DUNK.split(f).length - 1, f).toBe(1);
+    for (const line of DUNK.split('\n').filter((l) => /overRing(Aim|Leg|HoldsBody|Follows|SideStep|DeepStep|Defers)\(|OVER_RING\.[a-zA-Z]|overLeg = /.test(l) && !/^\s*\/\//.test(l))) expect(line, line.trim().slice(0, 90)).toMatch(/finishOverRing\(\)|^\s*if \(overRing( |\))/);
   });
   it('the sixteen air tricks never see it: the trick path, the recognizer and the slam grading do not read the knob', () => {
     expect(DUNK_TRICKS).toHaveLength(16);

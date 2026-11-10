@@ -19,8 +19,9 @@
 // play (lib/feel-panel's session gate).
 export type V3 = { x: number; y: number; z: number };
 
-/** The knob's default: OFF (0) — the shipped finish, bit for bit. */
-export const FINISH_OVER_RING = 0;
+/** The knob's default: ON (1) since the owner's call of 2026-11-10 ("turn all 4 on"); 0 = the finish shipped until then, bit for
+ *  bit. A staked, ranked or challenge run reads 0 whatever the default (DunkMode). */
+export const FINISH_OVER_RING = 1;
 
 /** NEW numbers (no tuned value changed; every one is read only with the knob on). Metres and seconds. */
 export const OVER_RING = {
@@ -50,6 +51,10 @@ export const OVER_RING = {
   followBackM: 0,
   /** The most the body slides sideways, from where the jam found it, to put the ball over the centre. */
   sideMaxM: 0.25,
+  /** DUNK SWITCH-ON (owner 2026-11-10 approved changing the jump at the slam): on the way in, the body carries on toward the ring
+   *  past the shipped follow-through by the ball's remaining offset in front of the ring, at most this much (m). Measured before
+   *  it: the ball sat 0.22–0.30 m in front of the ring with the body stopped at the follow-through, out of the arm's reach. */
+  deepMaxM: 0.3,
 };
 
 /** Is the knob on? (The mode passes `feel('dunk.finishOverRing', FINISH_OVER_RING)`.) */
@@ -147,6 +152,14 @@ export function overRingSideStep(leg: OverRingLeg | null, ballX: number, rimX: n
 /** The jam's follow-through carries the body in only once the ball is over the ring or going down through it: while the hand
  *  is still lifting it in front of the rim (or lowering it onto the front of the rim at the give-up), the body would carry it
  *  INTO the iron from the side. */
+/** The deep carry, this frame's root z step (see OVER_RING.deepMaxM): on the way in only, toward putting the ball over the ring's
+ *  centre in z, never more than deepMaxM past `followZ` (the shipped follow-through's own target). */
+export function overRingDeepStep(leg: OverRingLeg | null, ballZ: number, rimZ: number, rootZ: number, followZ: number, dt: number, tau: number): number {
+  if (leg !== 'in') return 0;
+  const goal = Math.max(followZ - OVER_RING.deepMaxM, Math.min(followZ + OVER_RING.deepMaxM, rootZ + (rimZ - ballZ)));
+  return (goal - rootZ) * Math.min(1, tau > 0 ? dt / tau : 1);
+}
+
 export function overRingFollows(leg: OverRingLeg | null): boolean {
   return leg === 'in' || leg === 'down';
 }
