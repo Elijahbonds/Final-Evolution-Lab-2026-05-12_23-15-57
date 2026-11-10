@@ -431,7 +431,12 @@ export class BasketballAnimTree {
         if (r0 !== null && !carryOn) this.strideFilter.set(r0);
         // H2 (moveLegs): out of a handle move, the loop picks up at the stride phase the legs layer carried through it
         const phase01 = this.legs?.live ? this.legs.phaseFor(c.clip) : undefined;   // (the other hand's twin: half a stride on)
-        if (!carryOn) this.animator.play(c.clip, { loop: true, fadeSec: tr.fadeSec, speedRatio: (r0 ?? 1) * this.strideSign(c.state), ...(phase01 !== undefined ? { phase01 } : {}) });   // hoops-p04: the rule's fade   // hoops-p05: a reversed loop starts from its end
+        if (!carryOn) {
+          const sign = this.strideSign(c.state);
+          const g = this.animator.play(c.clip, { loop: true, fadeSec: tr.fadeSec, speedRatio: (r0 ?? 1) * sign, ...(phase01 !== undefined ? { phase01 } : {}) });   // hoops-p04: the rule's fade   // hoops-p05: a reversed loop starts from its end
+          // hoops-p05: …and a reversed loop picks up at the legs layer's phase too (the animator applies phase01 to a forward loop only)
+          if (g && sign < 0 && phase01 !== undefined && phase01 > 0 && g.to > g.from) g.goToFrame(g.from + Math.min(0.999, phase01) * (g.to - g.from));
+        }
         this.loopPlaying = c.clip;
       } else { this.strideClip = null; const isMove = c.state === 'crossover' || c.state === 'crossover_right'; this.playBeat(c.clip, { fadeSec: isMove && (input.moveRate ?? 1) > 1 ? moveFadeSec(true) : c.fadeSec, speedRatio: isMove ? input.moveRate ?? 1 : 1 }, c.state); }   // MOVE PACE   // (playBeat floors the fade: the rule)
     }

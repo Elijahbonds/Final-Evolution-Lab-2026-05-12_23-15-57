@@ -89,7 +89,7 @@ async function build(layers = true) {
 const pct = (a: number[], p: number) => { if (!a.length) return NaN; const s = [...a].sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(p * (s.length - 1)))]; };
 const r1 = (x: number) => (Number.isFinite(x) ? (Math.round(x * 10) / 10).toFixed(1) : '-');
 
-interface Row { over: string; dir: string; speed: number; state: string; planted: number; p50: number; p90: number; over3: number; footUp: number; frames: number; states: Record<string, number>; strictN: number; strictP90: number; noFoot: number }
+interface Row { over: string; dir: string; speed: number; state: string; planted: number; p50: number; p90: number; over3: number; footUp: number; frames: number; states: Record<string, number>; strictN: number; strictP90: number; noFoot: number; pops: number; severe: number; worst: string }
 async function run(over: string, dir: string, speed: number): Promise<Row> {
   const B = await build(); const { scene, root, sk, tree } = B;
   const lf = boneNode(sk, 'LeftFoot')!, rf = boneNode(sk, 'RightFoot')!;
@@ -97,6 +97,10 @@ async function run(over: string, dir: string, speed: number): Promise<Row> {
   const vel = new Vector3(bx * speed, 0, bz * speed);
   const man = () => new Vector3(root.position.x, 0, root.position.z + 3.0);   // 3 m ahead, always: the chest stays on him
   const feet: number[][] = []; const stateCount: Record<string, number> = {};
+  // the rig's POPS on the lower body and the spine (page.js analyse: a bone's local turn >= 600 deg/s, >= 3.5x the median of the 6 frames
+  // either side (floored at 60) and >= 3x the speed 3 frames away; severe >= 3000)
+  const POPB = ['Hips', 'Spine', 'Spine1', 'Spine2', 'LeftUpLeg', 'RightUpLeg', 'LeftLeg', 'RightLeg', 'LeftFoot', 'RightFoot'];
+  const popN = POPB.map((n) => boneNode(sk, n)); const prevQ: (InstanceType<typeof BJS.Quaternion> | null)[] = POPB.map(() => null); const angs: number[][] = POPB.map(() => []);
   const frame = (v: InstanceType<typeof Vector3>, rec: boolean, k: number) => {
     vt += DT * 1000;
     root.position.x += v.x * DT; root.position.z += v.z * DT;
@@ -120,6 +124,7 @@ async function run(over: string, dir: string, speed: number): Promise<Row> {
       const a = lf.getAbsolutePosition(), b = rf.getAbsolutePosition();
       feet.push([a.x, a.y, a.z, b.x, b.y, b.z, root.position.x, root.position.z]);
       const key = tree.held ? `${st}+${tree.held}` : String(st); stateCount[key] = (stateCount[key] || 0) + 1;
+      popN.forEach((n, j) => { if (!n || !n.rotationQuaternion) return; const q = n.rotationQuaternion; const pq = prevQ[j]; angs[j].push(pq ? 2 * Math.acos(Math.min(1, Math.abs(BJS.Quaternion.Dot(pq, q)))) * 180 / Math.PI * 60 : 0); prevQ[j] = q.clone(); });
     }
     return st;
   };
@@ -145,9 +150,11 @@ async function run(over: string, dir: string, speed: number): Promise<Row> {
     if (TRACE === `${dir}:${speed}:${over}`) trace.push(`${i} L y ${r1((f[1] - floorY) * 100)} step ${r1(Math.hypot(f[0] - p[0], f[2] - p[2]) * 100)} | R y ${r1((f[4] - floorY) * 100)} step ${r1(Math.hypot(f[3] - p[3], f[5] - p[5]) * 100)} | root ${r1(Math.hypot(f[6] - p[6], f[7] - p[7]) * 100)}`);
   }
   if (trace.length) console.log(trace.join('\n'));
+  let pops = 0, severe = 0; let worst = [0, '', 0] as [number, string, number];
+  angs.forEach((w, j) => { for (let i = 1; i < w.length; i++) { const nb: number[] = []; for (let k = Math.max(1, i - 6); k <= Math.min(w.length - 1, i + 6); k++) if (k !== i) nb.push(w[k]); nb.sort((a, b) => a - b); const med = nb[Math.floor(nb.length / 2)] || 0; const side = Math.max(w[i - 3] || 0, w[i + 3] || 0); if (w[i] >= 600 && w[i] >= 3.5 * Math.max(med, 60) && w[i] >= 3 * side) { pops++; if (w[i] >= 3000) severe++; if (w[i] > worst[0]) worst = [w[i], POPB[j], i]; } } });
   const top = Object.entries(stateCount).sort((a, b) => b[1] - a[1])[0]?.[0] ?? '-';
   B.scene.dispose(); B.engine.dispose();
-  return { over, dir, speed, state: top, planted: slides.length, p50: pct(slides, 0.5), p90: pct(slides, 0.9), over3: slides.length ? 100 * slides.filter((s) => s > 3).length / slides.length : NaN, footUp: pct(ups, 0.5), frames: feet.length, states: stateCount, strictN: strict.length, strictP90: pct(strict, 0.9), noFoot: 100 * noFoot / Math.max(1, feet.length - 1) };
+  return { over, dir, speed, state: top, planted: slides.length, p50: pct(slides, 0.5), p90: pct(slides, 0.9), over3: slides.length ? 100 * slides.filter((s) => s > 3).length / slides.length : NaN, footUp: pct(ups, 0.5), frames: feet.length, states: stateCount, strictN: strict.length, strictP90: pct(strict, 0.9), noFoot: 100 * noFoot / Math.max(1, feet.length - 1), pops, severe, worst: worst[0] ? `${worst[1]} ${Math.round(worst[0])} f${worst[2]}` : '-' };
 }
 
 // --clips: WHERE DOES EACH LOOP STEP? Each locomotion state's clip, played on the spot at rate 1 with no leg layer: a foot on the floor
@@ -195,10 +202,10 @@ if (process.argv.includes('--clips')) {
   process.exit(0);
 }
 const rows: Row[] = [];
-console.log('overlay   dir       m/s  cm/f  state (most frames)                      planted  p50   p90   >3cm%  footUp | strict: on-floor p90  no foot down %');
+console.log('overlay   dir       m/s  cm/f  state (most frames)                      planted  p50   p90   >3cm%  footUp | strict: on-floor p90  no foot down % | pops severe (worst)');
 for (const over of OVERS) for (const dir of DIRS) for (const speed of SPEEDS) {
   const r = await run(over, dir, speed); rows.push(r);
-  console.log(`${over.padEnd(9)} ${dir.padEnd(9)} ${String(speed).padEnd(4)} ${r1(speed * 100 / 60).padStart(4)}  ${r.state.slice(0, 40).padEnd(40)} ${String(r.planted).padStart(6)} ${r1(r.p50).padStart(5)} ${r1(r.p90).padStart(5)} ${r1(r.over3).padStart(6)} ${r1(r.footUp).padStart(6)} | ${String(r.strictN).padStart(12)} ${r1(r.strictP90).padStart(5)} ${r1(r.noFoot).padStart(8)}`);
+  console.log(`${over.padEnd(9)} ${dir.padEnd(9)} ${String(speed).padEnd(4)} ${r1(speed * 100 / 60).padStart(4)}  ${r.state.slice(0, 40).padEnd(40)} ${String(r.planted).padStart(6)} ${r1(r.p50).padStart(5)} ${r1(r.p90).padStart(5)} ${r1(r.over3).padStart(6)} ${r1(r.footUp).padStart(6)} | ${String(r.strictN).padStart(12)} ${r1(r.strictP90).padStart(5)} ${r1(r.noFoot).padStart(8)} | ${String(r.pops).padStart(3)} ${String(r.severe).padStart(3)} (${r.worst})`);
 }
 if (arg('--json', '')) fs.writeFileSync(arg('--json', ''), JSON.stringify(rows));
 process.exit(0);
