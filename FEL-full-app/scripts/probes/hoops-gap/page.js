@@ -352,6 +352,19 @@
     o.log = ((window.__LOG || []).filter((l) => l.f >= f0).map((l) => l.m.slice(0, 70)).slice(0, 6)).join(' | ');
     o.f0 = f0; return o;
   };
+  // T3c (hoops-p05): THE STEP-BACK JUMPER — the away flick (the step-back dribble), then Square inside its window, let go at the green.
+  // The carry lets the ball arm go as the gather takes the ball: the frames the let-go's pop was on (letgo.mjs reads the hero's arm
+  // bones from f0 to the release + 1 s).
+  HG.test.stepback = async () => {
+    const o = {}; const f0 = HG.frame;
+    flick('down');
+    const lg = await watch(() => logSince(f0, /stepback/i), 0.8); o.logF = lg.frames; o.log = lg.v ? lg.v.m.slice(0, 90) : '';
+    await waitSec(0.2);
+    press('X');
+    const g = await watch(() => logSince(f0, /gather/i), 1.0); o.gatherF = g.frames === null ? null : HG.frame - f0; o.gather = g.v ? g.v.m.slice(0, 90) : '';
+    await watch(() => { const mm = meterNow(); return mm.t >= mm.c; }, 2); release('X'); o.releaseF = HG.frame - f0;
+    await waitSec(1.0); o.endF = HG.frame - f0; o.f0 = f0; return o;
+  };
   // T4: a right-stick flick — did a move fire (a HANDLE / STICK / MOVE log line), and how long until the ball moved sideways
   HG.test.flick = async (dir) => {
     const o = { dir }; const f0 = HG.frame; const b0 = ballP(); const me0 = meP();

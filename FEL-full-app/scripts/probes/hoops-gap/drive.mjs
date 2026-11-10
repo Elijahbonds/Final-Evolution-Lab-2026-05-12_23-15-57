@@ -266,6 +266,10 @@ if (SCEN === 'game') {
   if (ON.has('stop')) for (let k = 0; k < 2; k++) { await setOff(); await waitGame(1200); R.stopSprint.push(await T('stopLine', { turbo: true, sec: 1.1, strip: k === 0 ? 'stop-sprint' : null })); if (k === 0) { await waitGame(300); await saveStrip('stop-sprint'); } }
   if (ON.has('shot')) for (let k = 0; k < 3; k++) { await setOff(); await waitGame(1200); if (k === 0) { ev(() => window.__hg.strip('jumper', 16, 3)); } R.shot.push(await T('shot')); if (k === 0) { await waitGame(300); await saveStrip('jumper'); } await waitGame(2500); }
   if (ON.has('stop') || ON.has('shot')) await checkpoint('stop+shot');
+  // hoops-p05: TESTS=stepback (not in the default list) — the step-back jumper, three times; the first takes a strip
+  R.stepback = [];
+  if (ON.has('stepback')) for (let k = 0; k < 3; k++) { await setOff(); await waitGame(1200); await noReplay(); if (k === 0) ev(() => window.__hg.strip('stepback', 20, 2)); R.stepback.push(await T('stepback')); if (k === 0) await saveStrip('stepback'); await waitGame(2000); }
+  if (ON.has('stepback')) { const an = await ev((o) => window.__hg.analyse(o), { popFrames: true, popList: !!process.env.POP_LIST }); result.heroMotion = an.perBody.me ? { ...an.perBody.me, popAt: undefined } : null; if (process.env.POP_LIST) { result.clips = await ev(() => window.__hg.clips || []); result.stageEv = await ev(() => window.__hg.stageEv || []); result.states = await ev(() => window.__hg.states || []); } await checkpoint('stepback'); }   // (a capped run keeps the step-backs' motion)
   // hoops-p01: the input buffer — Square tapped mid-spin and mid-crossover
   R.buffer = [];
   if (ON.has('buffer')) for (const kind of ['spin', 'spin', 'cross', 'cross']) { await setOff(); await waitGame(1200); R.buffer.push(await T('buffer', kind)); await waitGame(2500); }

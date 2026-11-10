@@ -2,7 +2,7 @@
 // reverse, and the tree drives the pelvis steer with the loop the legs are in. A fake animator, legs layer and steer: what the tree asks.
 import { afterEach, describe, expect, it } from 'vitest';
 import { BasketballAnimTree, DEFENSE_LEGS_BEAT, type AnimTreeInput } from './basketballTree';
-import { MOVE_LEGS_BEAT } from './moveLegs';
+import { MOVE_LEGS_BEAT, legsWeightFor } from './moveLegs';
 import { BACKPEDAL_REVERSED_TRAVEL_DEG } from './hipSteer';
 import { resetFeelForTests, setFeelOverride, setFeelSession, setFeelUser } from '../../feel-panel/feel';
 
@@ -13,7 +13,7 @@ interface Play { clip: string; opts: { speedRatio?: number; loop?: boolean } }
 const rigOf = (captured = true) => {
   const plays: Play[] = []; const scales: [string, number][] = [];
   const animator = { play: (clip: string, opts: Play['opts'] = {}) => { plays.push({ clip, opts }); return null; }, setPlaybackScale: (n: string, s: number) => { scales.push([n, s]); }, clipNames: new Set<string>(captured ? ['bball_mc_run', 'bball_mc_defend_backpedal'] : []) };
-  const drives: { loopClip: string | null; free?: boolean; reverse?: boolean; fadeSec?: number }[] = []; const begins: (string | null)[] = [];
+  const drives: { loopClip: string | null; speedMps: number; free?: boolean; reverse?: boolean; fadeSec?: number }[] = []; const begins: (string | null)[] = [];
   const legs = { live: false, begin: (c: string | null) => { begins.push(c); }, drive: (d: (typeof drives)[number]) => { drives.push(d); legs.live = !!d.loopClip; }, end: () => { legs.live = false; }, phaseFor: () => undefined };
   const steers: { state: string | null; loopDeg?: number; travelOffRad: number | undefined }[] = [];
   const steer = { drive: (d: (typeof steers)[number]) => { steers.push(d); } };
@@ -60,11 +60,12 @@ describe('a defensive beat on a moving body: the loop\'s legs under it', () => {
     expect(R.begins.length).toBe(1);
     expect(R.drives[R.drives.length - 1].loopClip).toBe('bball_defend_slide_left');
   });
-  it('standing still the beat keeps its own legs; in a block jump\'s flight too', () => {
+  it('standing still the beat keeps its own legs (the layer\'s weight is 0 under its own LEGS_ON_MPS); in a block jump\'s flight too', () => {
     const R = rigOf();
     R.tree.update(slide); R.tree.beat('bball_block_reach');
     R.tree.update({ ...slide, speed01: 0.05, speedMps: 0.3 });
-    expect(R.drives[R.drives.length - 1].loopClip).toBeNull();
+    expect(R.drives[R.drives.length - 1].speedMps).toBe(0.3);   // the layer is told the body's speed…
+    expect(legsWeightFor(0.3)).toBe(0);                          // …and draws none of the loop at it
     R.tree.update({ ...slide, airborne: true });
     expect(R.drives[R.drives.length - 1].loopClip).toBeNull();
     R.tree.update(slide);
@@ -78,7 +79,7 @@ describe('a defensive beat on a moving body: the loop\'s legs under it', () => {
   });
   it('a handle move\'s beat still drives the layer locked (not free), as before', () => {
     const R = rigOf();
-    const jog: AnimTreeInput = { ...slide, defending: false, hasBall: true, speed01: 0.6, speedMps: 3.8, nearestDefender: 3 };
+    const jog: AnimTreeInput = { ...slide, defending: false, hasBall: true, speed01: 0.6, speedMps: 3.8, nearestDefender: 3, travelOffRad: undefined };
     R.tree.update(jog); R.tree.beat('bball_crossover_left'); R.tree.update(jog);
     const d = R.drives[R.drives.length - 1];
     expect(d.loopClip).toBe('bball_dribble_jog'); expect(d.free).toBeUndefined();

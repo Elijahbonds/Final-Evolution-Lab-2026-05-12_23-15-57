@@ -31,7 +31,8 @@ export const HIP_STEER_MAX_DEG = 50;
 export const HIP_STEER_SEC = 0.14;
 /** No turn under this ground speed (m/s), all of it from HIP_STEER_FULL_MPS (a body shifting its weight is not travelling). Knobs
  *  `hoops.hipSteerFromMps`, `hoops.hipSteerFullMps`. */
-export const HIP_STEER_FROM_MPS = 0.8, HIP_STEER_FULL_MPS = 1.8;
+export const HIP_STEER_FROM_MPS = 0.8;
+export const HIP_STEER_FULL_MPS = 1.8;
 
 /**
  * The travel each stepping loop's feet are made for, in the BODY frame: degrees from the chest, + = body-right (the tree's own

@@ -104,7 +104,7 @@ describe('hipSteer — on the hero rig', () => {
       for (let i = 0; i < 60; i++) steer.drive({ state: 'defend_backpedal', travelOffRad: 140 * RAD, speedMps: 4, dtSec: 1 / 60 });
       expect(steer.turnDeg).toBe(0);
       R.scene.onAfterAnimationsObservable.notifyObservers(R.scene);
-      expect(Quaternion.Dot(hips.rotationQuaternion!, q0)).toBeCloseTo(1, 9);
+      expect(hips.rotationQuaternion!.equalsWithEpsilon(q0, 1e-9)).toBe(true);
     } finally { R.dispose(); }
   });
 });
