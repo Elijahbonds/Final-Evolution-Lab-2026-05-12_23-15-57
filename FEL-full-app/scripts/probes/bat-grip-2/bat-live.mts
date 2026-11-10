@@ -23,7 +23,7 @@
 // through the game's own InputBus (__FEL_DEV__.input), the same events a pad or a key produces.
 //
 // Usage: npx tsx scripts/probes/bat-grip-2/bat-live.mts <port> <outdir> <tag> [derby,baseball] [--devserver] [--faststart]
-//          [--noswing] [--budget=400] (seconds a mode)   --faststart: START on the first READY frame, a thumb already on
+//          [--noswing] [--sw=N] [--budget=400] (seconds a mode)   --faststart: START on the first READY frame, a thumb already on
 //          the button   --noswing: stop after the first two seconds of play
 import { chromium, type Page } from 'playwright-core';
 import fs from 'node:fs';
@@ -38,6 +38,9 @@ const MODES = (args[3] ?? 'derby,baseball').split(',');
 const DEVSERVER = flags.has('--devserver');
 const FASTSTART = flags.has('--faststart');
 const SWING = !flags.has('--noswing');
+/** --sw=N: also shoot the frame N frames after the swing's press (a matched frame for a before/after pair; the game is
+ *  frame-exact on the pinned clock, so two builds reach the same frame N). */
+const SW_AT = Number([...flags].find((f) => f.startsWith('--sw='))?.split('=')[1] ?? 0);
 const BUDGET_MS = 1000 * Number([...flags].find((f) => f.startsWith('--budget='))?.split('=')[1] ?? 400);
 /** Fists further apart than this are not one grip on a handle (the brief's line); FREE_M is a free hand (rig-grip-tests). */
 const APART_M = 0.15, FREE_M = 0.4;
@@ -282,6 +285,9 @@ for (const mode of MODES) {
       await shot(p, `${mode}-4-swing-f${String(n).padStart(2, '0')}`);
     }
     await p.evaluate(() => { const P = (window as any).__BATP; P.wantSwing = false; P.drawOn = false; P.restoreDraw = false; });
+    if (SW_AT > 0) {
+      if (await freezeOn(p, { kind: 'swing', n: SW_AT }, 200000)) { R.swAt = await last(p); await shot(p, `${mode}-7-sw${SW_AT}`); }
+    }
     // 4. after the swing: 10 s of play (the next pitches come, the batter goes back to the stance). Freeze on the first frame
     // a player can SEE a bat between hands a free hand's width apart; otherwise shoot the stance the batter is back in.
     R.freeCaught = await freezeOn(p, { kind: 'apartSeen', m: FREE_M, max: 600 }, 200000);
