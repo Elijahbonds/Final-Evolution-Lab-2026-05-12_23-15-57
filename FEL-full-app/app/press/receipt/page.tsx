@@ -93,7 +93,7 @@ export default async function ReceiptPage({ searchParams }: { searchParams: { se
       {lookupError ? <p className="mt-4 max-w-lg text-sm text-[#ffb4b4]">{lookupError}</p> : null}
       {!lookupError && paid ? (
         <div className="mt-4 max-w-xl rounded-2xl border border-white/10 bg-[#101010] p-5">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#F5C518]">Payment received</p>
+          <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-[#F5C518]">Payment received</p>
           <p className="mt-2 text-xl text-white">{book?.title ?? 'Book'}</p>
           <p className="text-sm text-white/55">{offer ? formatLabel(offer.format) : 'Purchase'}</p>
           {amount != null ? (

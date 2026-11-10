@@ -24,11 +24,11 @@ export default async function SupportPage() {
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[#00E5FF]/10 border border-[#00E5FF]/30">
               <Mail className="h-5 w-5 text-[#00E5FF]" />
             </div>
-            <div>
+            <div className="min-w-0">
               <h2 className="fel-heading text-lg font-bold text-white">Contact Us</h2>
               <a
                 href={`mailto:${BUSINESS_CONTACT_EMAIL}`}
-                className="font-mono text-sm text-[#00E5FF] hover:underline"
+                className="font-mono text-sm text-[#00E5FF] [overflow-wrap:anywhere] hover:underline"
               >
                 {BUSINESS_CONTACT_EMAIL}
               </a>

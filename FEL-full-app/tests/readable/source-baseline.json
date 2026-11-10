@@ -1,60 +1,17 @@
 {
  "note": "tests/readable/source-floor.test.ts: a file may not rise above its line; numbers only go down. docs/READABLE.md.",
  "totals": {
-  "size": 48,
-  "colour": 27
+  "size": 0,
+  "colour": 7
  },
  "files": {
   "app/coach/admin/_components/kb-admin.tsx": {
    "colour": 1,
    "why": "reviewed: text-fel-violet / text-fel-indigo on an ICON (lucide draws currentColor): non-text, 3:1 is its bar (1.4.11)"
   },
-  "app/play/adventure-br/stage.tsx": {
-   "size": 11,
-   "colour": 3,
-   "why": "routed: lane/public-polish holds it (coordinator, 2026-11-02)"
-  },
-  "app/play/adventure/stage.tsx": {
-   "size": 11,
-   "colour": 2,
-   "why": "routed: lane/public-polish holds it (coordinator, 2026-11-02)"
-  },
-  "app/play/drills/_components/drills-app.tsx": {
-   "size": 4,
-   "colour": 3,
-   "why": "routed: lanes plat-p09 / plat-p10 are editing it (trial merge, 2026-11-03)"
-  },
-  "app/play/drills/page.tsx": {
-   "size": 1,
-   "why": "routed: lanes plat-p09 / plat-p10 are editing it (trial merge, 2026-11-03)"
-  },
-  "app/press/receipt/page.tsx": {
-   "size": 1,
-   "why": "routed: lane/public-polish holds it (coordinator, 2026-11-02)"
-  },
   "components/education/chapter-list.tsx": {
    "colour": 1,
    "why": "reviewed: text-fel-violet / text-fel-indigo on an ICON (lucide draws currentColor): non-text, 3:1 is its bar (1.4.11)"
-  },
-  "components/games/dunk-game-3d.tsx": {
-   "size": 7,
-   "colour": 3,
-   "why": "routed: the dunk modes are lane/dunk-flagship-p6/p7's (coordinator, 2026-11-02)"
-  },
-  "components/games/onevone-win-by-2.tsx": {
-   "size": 3,
-   "colour": 2,
-   "why": "routed: the hoops modes are lane/hoops-p04's (coordinator, 2026-11-02)"
-  },
-  "components/games/three-point-3d.tsx": {
-   "size": 3,
-   "colour": 1,
-   "why": "routed: the hoops modes are lane/hoops-p04's (coordinator, 2026-11-02)"
-  },
-  "components/games/three-v-three-3d.tsx": {
-   "size": 3,
-   "colour": 1,
-   "why": "routed: the hoops modes are lane/hoops-p04's (coordinator, 2026-11-02)"
   },
   "components/groups/groups-home.tsx": {
    "colour": 1,
@@ -63,16 +20,6 @@
   "components/groups/teams-panel.tsx": {
    "colour": 1,
    "why": "reviewed: text-fel-violet / text-fel-indigo on an ICON (lucide draws currentColor): non-text, 3:1 is its bar (1.4.11)"
-  },
-  "components/hoops-cam/shot-chart.tsx": {
-   "size": 2,
-   "colour": 1,
-   "why": "routed: lane/plat-bbs04 is editing it (trial merge, 2026-11-03)"
-  },
-  "components/party/social/party-hub.tsx": {
-   "size": 2,
-   "colour": 4,
-   "why": "routed: lane/public-polish holds it (coordinator, 2026-11-02)"
   },
   "components/profile-v2/badges-section.tsx": {
    "colour": 2,

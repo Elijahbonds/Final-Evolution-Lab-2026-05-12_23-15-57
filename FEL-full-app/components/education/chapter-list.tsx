@@ -78,7 +78,7 @@ export function ChapterList() {
                 </div>
 
                 {/* The chapter's own opening line does the work of a blurb, and it is the author's sentence. */}
-                <p className="mt-3 line-clamp-2 text-[13px] italic leading-relaxed text-white/55">{c.thesis}</p>
+                <p className="mt-3 line-clamp-3 text-base italic leading-snug text-white/60">{c.thesis}</p>
 
                 <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-4">
                   {c.audience.map((a) => (

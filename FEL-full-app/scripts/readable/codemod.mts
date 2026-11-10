@@ -11,6 +11,10 @@
 // them), a solid accent that misses (text-fel-violet, text-fel-indigo: the palette is the owner's), disabled: variants.
 //
 //   npx tsx scripts/readable/codemod.mts [--skip=<file with one path per line>] [--write]
+//     --root=<dir>   read another tree's app/, components/ and lib/ (a `git archive` of a branch this lane may not edit),
+//                    never with --write here: it is for listing what the floor WOULD change there
+//     --only=<file>  judge only the paths in this file (one per line), e.g. the files that differ from the release
+//     --list         name each file and what would change in it
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import * as scanNs from '../../lib/readable/sourceScan.ts';
@@ -18,11 +22,15 @@ import * as filesNs from '../../tests/readable/files.ts';
 
 const scan = ((scanNs as { default?: unknown }).default ?? scanNs) as typeof scanNs;
 const { readableFiles } = ((filesNs as { default?: unknown }).default ?? filesNs) as typeof filesNs;
-const ROOT = resolve(import.meta.dirname, '../..');
 const args = process.argv.slice(2);
+const rootFlag = args.find((a) => a.startsWith('--root='))?.slice(7);
+const ROOT = rootFlag ? resolve(rootFlag) : resolve(import.meta.dirname, '../..');
 const skipFile = args.find((a) => a.startsWith('--skip='))?.slice(7);
 const skip = new Set(skipFile && existsSync(skipFile) ? readFileSync(skipFile, 'utf8').split('\n').map((s) => s.trim().replace(/^FEL-full-app\//, '')).filter(Boolean) : []);
-const WRITE = args.includes('--write');
+const onlyFile = args.find((a) => a.startsWith('--only='))?.slice(7);
+const only = onlyFile ? new Set(readFileSync(onlyFile, 'utf8').split('\n').map((s) => s.trim().replace(/^FEL-full-app\//, '')).filter(Boolean)) : null;
+const WRITE = args.includes('--write') && !rootFlag;
+const LIST = args.includes('--list');
 
 const GREY_UP: Record<string, string> = { 'neutral-500': 'neutral-400', 'neutral-600': 'neutral-400', 'slate-500': 'slate-400', 'slate-600': 'slate-400', 'zinc-500': 'zinc-400', 'zinc-600': 'zinc-400', 'gray-500': 'gray-400', 'gray-600': 'gray-400', 'stone-500': 'stone-400' };
 
@@ -57,15 +65,28 @@ export function fixSource(src: string): { out: string; size: number; colour: num
 let files = 0, sizeN = 0, colourN = 0;
 const left: Record<string, string[]> = {};
 const skipped: string[] = [];
+const listed: string[] = [];
 for (const f of readableFiles(ROOT)) {
+  if (only && !only.has(f)) continue;
   const abs = join(ROOT, f);
   const src = readFileSync(abs, 'utf8');
   const r = fixSource(src);
   if (r.out === src && !r.left.length) continue;
   if (skip.has(f)) { skipped.push(f); continue; }
   if (r.left.length) left[f] = r.left;
-  if (r.out !== src) { files++; sizeN += r.size; colourN += r.colour; if (WRITE) writeFileSync(abs, r.out); }
+  if (r.out !== src) {
+    files++; sizeN += r.size; colourN += r.colour;
+    if (WRITE) writeFileSync(abs, r.out);
+    if (LIST) {
+      const a = src.split('\n'), b = r.out.split('\n');
+      const tok = (l: string) => l.match(/(?:[a-z0-9-]+:)*!?(?:text|placeholder)-[^\s"'`]+|fontSize:\s*[^,}\n]+/g) ?? [];
+      const moves = new Set<string>();
+      a.forEach((l, i) => { if (l !== b[i]) { const x = tok(l), y = tok(b[i]); x.forEach((t, k) => { if (t !== y[k]) moves.add(`${t} → ${y[k]}`); }); } });
+      listed.push(`${f}: ${r.size} sizes, ${r.colour} colours (${[...moves].join('; ')})`);
+    }
+  }
 }
+if (LIST) console.log(listed.join('\n'));
 console.log(`${WRITE ? 'fixed' : 'would fix'}: ${files} files, ${sizeN} sizes, ${colourN} colours`);
 console.log(`skipped (another lane's file): ${skipped.length}\n  ${skipped.join('\n  ')}`);
 console.log(`left for the owner (a solid accent under AA): ${JSON.stringify(left, null, 1)}`);

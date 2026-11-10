@@ -223,7 +223,7 @@ function Remember({ items }: { items: string[] }) {
       {open && (
         <ul className="mt-3 space-y-2">
           {items.map((r, n) => (
-            <li key={n} data-remember className={`flex gap-2.5 ${TYPE.small} text-fel-soft`}>
+            <li key={n} data-remember className={`flex gap-2.5 ${TYPE.body} text-fel-soft`}>
               <span aria-hidden className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-fel-emerald" />
               {r}
             </li>
