@@ -30,13 +30,13 @@ const GATE_BADGE: Record<DrillAccess['gate'], string | null> = {
 
 function Badge({ gate }: { gate: DrillAccess['gate'] }) {
   const t = GATE_BADGE[gate];
-  return t ? <span className="rounded-full border border-amber-300/40 px-2 py-0.5 text-[11px] font-bold text-amber-200/90" data-drill-gate={gate}>{t}</span> : null;
+  return t ? <span className="rounded-full border border-amber-300/40 px-2 py-0.5 text-[12px] font-bold text-amber-200/90" data-drill-gate={gate}>{t}</span> : null;
 }
 
 function Note({ access }: { access: DrillsAccess }) {
   if (!access.note) return null;
   return (
-    <p className="rounded-xl border border-amber-300/25 bg-amber-300/[0.05] px-3 py-2 text-[13px] leading-snug text-amber-100/90" data-drill-note={access.impactHeld ?? ''}>
+    <p className="rounded-xl border border-amber-300/25 bg-amber-300/[0.05] px-3 py-2 text-[16px] leading-snug text-amber-100/90" data-drill-note={access.impactHeld ?? ''}>
       {access.note}{' '}
       {access.noteHref && <a href={access.noteHref} className="font-bold underline">See what&apos;s needed</a>}
     </p>
@@ -97,9 +97,9 @@ function Shelf({ access, unlockLive, shelf = 'playbook' }: { access: DrillsAcces
                   <span className="text-[16px] font-bold text-white">{d.name}</span>
                   <Badge gate={a.gate} />
                 </span>
-                <span className="text-[13px] leading-relaxed text-white/55">{d.blurb}</span>
+                <span className="text-[16px] leading-normal text-white/55">{d.blurb}</span>
                 {/* PLAT-P09: 60% white (was 40%: 3.8:1 at 10.5 px, under 4.5) */}
-                <span className="mt-auto flex items-center gap-3 font-mono text-[10.5px] uppercase tracking-[0.12em] text-white/60">
+                <span className="mt-auto flex items-center gap-3 font-mono text-[12px] uppercase tracking-[0.12em] text-white/60">
                   <span>{drillShortSource(d)}</span>
                   <span className="flex items-center gap-1"><Clock aria-hidden className="h-3 w-3" />{drillMinutes(d)} min</span>
                 </span>
@@ -108,7 +108,7 @@ function Shelf({ access, unlockLive, shelf = 'playbook' }: { access: DrillsAcces
           );
         })}
       </ul>
-      <p className="text-[12px] text-white/45">{CAMERA_LINE}</p>
+      <p className="text-[12px] text-white/50">{CAMERA_LINE}</p>
     </div>
   );
 }
@@ -117,18 +117,18 @@ function BookWords({ lessons, chapterHref }: { lessons: BookLesson[]; chapterHre
   if (!lessons.length) return null;
   return (
     <section className="space-y-3 rounded-2xl border border-white/8 bg-white/[0.02] p-4" data-drill-book>
-      <h3 className="flex items-center gap-2 font-mono text-[10.5px] font-bold uppercase tracking-[0.16em] text-[#A855F7]">
+      <h3 className="flex items-center gap-2 font-mono text-[12px] font-bold uppercase tracking-[0.16em] text-[#A855F7]">
         <BookOpen aria-hidden className="h-3.5 w-3.5" /> From the Playbook
       </h3>
       {lessons.map((l) => (
         <div key={l.id} className="space-y-1">
           <p className="text-[14px] font-bold text-white">{l.title}</p>
-          {l.purpose && <p className="text-[13px] text-white/65">Purpose: {l.purpose}</p>}
+          {l.purpose && <p className="text-[16px] text-white/65">Purpose: {l.purpose}</p>}
           {l.steps.length > 0 ? (
-            <ol className="list-decimal space-y-0.5 pl-5 text-[13px] leading-relaxed text-white/70">
+            <ol className="list-decimal space-y-0.5 pl-5 text-[16px] leading-normal text-white/70">
               {l.steps.map((s, i) => <li key={i}>{s}</li>)}
             </ol>
-          ) : l.firstProse ? <p className="text-[13px] leading-relaxed text-white/70">{l.firstProse}</p> : null}
+          ) : l.firstProse ? <p className="text-[16px] leading-normal text-white/70">{l.firstProse}</p> : null}
         </div>
       ))}
       {chapterHref && <Link href={chapterHref} className="inline-block text-[13px] font-bold text-[#A855F7] underline-offset-2 hover:underline" data-drill-chapter-link>Read the chapter</Link>}
@@ -149,8 +149,8 @@ function DrillPage({ id, access, lessons, unlockLive }: { id: string; access: Dr
       </Link>
       <header className="space-y-1">
         <div className="flex items-center gap-2"><h2 className="text-2xl font-black text-white">{drill.name}</h2><Badge gate={a.gate} /></div>
-        <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-white/45">{drillSourceLine(drill)} · {drillMinutes(run ?? drill)} min</p>
-        <p className="text-[14px] leading-relaxed text-white/70">{drill.blurb}</p>
+        <p className="font-mono text-[12px] uppercase tracking-[0.12em] text-white/50">{drillSourceLine(drill)} · {drillMinutes(run ?? drill)} min</p>
+        <p className="text-[16px] leading-normal text-white/70">{drill.blurb}</p>
         {drill.source.adapted && <p className="text-[13px] text-white/55">On camera: {drill.source.adapted}</p>}
       </header>
       {a.gate !== 'open' && <Note access={access} />}
@@ -170,7 +170,7 @@ function DrillPage({ id, access, lessons, unlockLive }: { id: string; access: Dr
           <Camera aria-hidden className="h-4 w-4" /> Start with the camera
         </button>
       ) : null}
-      <p className="text-[12px] text-white/45">{CAMERA_LINE}</p>
+      <p className="text-[12px] text-white/50">{CAMERA_LINE}</p>
       <DrillDemo drill={drill} />
       <BookWords lessons={lessons} chapterHref={drillChapterHref(drill)} />
     </article>
@@ -201,7 +201,7 @@ export function DrillsApp({ access, drillId, lessons, dobYear, unlockLive, shelf
   if (access.stopped) {
     return (
       <div className="space-y-3 rounded-xl border border-amber-300/25 p-6 text-center" data-drill-hard-stop>
-        <p className="text-[14px] text-white/75">{HARD_STOP_LINE}</p>
+        <p className="text-[16px] text-white/75">{HARD_STOP_LINE}</p>
         <Link href="/play/mirror" className="inline-block rounded-lg bg-white/10 px-4 py-2 text-xs font-semibold text-white/85">Go to the Mirror</Link>
       </div>
     );

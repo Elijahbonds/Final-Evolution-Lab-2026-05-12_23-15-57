@@ -63,7 +63,7 @@ export function StatusRail() {
   if (chromeHiddenFor(pathname) || status !== 'authenticated') return null;
 
   return (
-    <header className="sticky top-0 z-40 border-b border-[color:var(--fel-hairline)] bg-fel-bg/85 backdrop-blur-xl">
+    <header className="fel-bar sticky top-0 z-40 border-b border-[color:var(--fel-hairline)] bg-fel-bg/85 backdrop-blur-xl">
       {/* READABLE (2026-11-02): min-h + wrap, not a fixed h-14. With the root font at 150 % (iOS larger text) the wallet
           cluster is ~95 px wider than a 390 px phone, and a fixed one-row rail pushed it off the right edge: the whole page
           scrolled sideways. Now the cluster drops to a second row instead; at the default size it is still one 56 px row. */}

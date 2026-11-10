@@ -30,8 +30,8 @@ function Entry({ c }: { c: Credit }) {
         {c.link ? <ExternalLink href={c.link}>{c.title}</ExternalLink> : c.title}
       </h3>
       <p className="mt-0.5 text-xs text-white/50">{c.by}</p>
-      <p className="mt-2 text-sm text-white/70">{c.used}</p>
-      <p className="mt-2 text-xs text-white/50">
+      <p className="mt-2 text-base text-white/70">{c.used}</p>
+      <p className="mt-2 text-base text-white/50">
         Licence: <Licence c={c} />
         {c.notice ? <> · acknowledgement above</> : null}
       </p>
@@ -44,7 +44,7 @@ export function CreditsList({ credits = CREDITS }: { credits?: Credit[] }) {
   return (
     <div>
       <h1 className="fel-heading text-3xl font-bold text-white">CREDITS &amp; LICENCES</h1>
-      <p className="mt-2 text-sm text-white/50">
+      <p className="mt-2 text-base text-white/60">
         Final Evolution Lab is built on other people’s work as well as our own. These are the outside assets, models,
         motion, voices, typefaces and engines the app ships, what each is used for, and the licence it comes under.
         {/* HOTFIX (2026-09-24): not "every outside source", which would overclaim: the npm libraries the app is built
@@ -58,7 +58,7 @@ export function CreditsList({ credits = CREDITS }: { credits?: Credit[] }) {
             {notices.map((c) => (
               <li key={c.id}>
                 <p className="text-xs text-white/50">{c.title}</p>
-                <blockquote className="mt-1 border-l-2 border-[#A855F7]/40 pl-3 text-sm text-white/80">{c.notice}</blockquote>
+                <blockquote className="mt-1 border-l-2 border-[#A855F7]/40 pl-3 text-base text-white/80">{c.notice}</blockquote>
               </li>
             ))}
           </ul>

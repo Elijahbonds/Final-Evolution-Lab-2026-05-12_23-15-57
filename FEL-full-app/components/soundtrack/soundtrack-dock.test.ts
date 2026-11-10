@@ -37,7 +37,9 @@ describe('the strip', () => {
   it('has a slot in the tab bar\'s fixed glass, above the tabs\' nav', () => {
     // A11-06/A11-07 (2026-10-25): the glass's #050505 is the token class bg-fel-bg (same hex, lib/design/tokens.ts) and the
     // nav's name comes from t('shell.nav.main') ("Main", messages/en/shell.json); the structure pinned here is unchanged.
-    expect(bar).toMatch(/<div className="fixed inset-x-0 bottom-0 z-50 border-t border-white\/10 bg-fel-bg\/90 backdrop-blur-xl md:hidden">\s*<div data-tabbar-strip \/>\s*<nav aria-label=\{t\('shell\.nav\.main'\)\}>/);
+    // READABLE (lane/readable-2, 2026-11-10): the bar carries the `fel-bar` hook (solid under prefers-reduced-transparency,
+    // app/theme.css); the fixed glass, the strip slot and the nav are as they were.
+    expect(bar).toMatch(/<div className="fel-bar fixed inset-x-0 bottom-0 z-50 border-t border-white\/10 bg-fel-bg\/90 backdrop-blur-xl md:hidden">\s*<div data-tabbar-strip \/>\s*<nav aria-label=\{t\('shell\.nav\.main'\)\}>/);
   });
 
   it('fills that slot through a portal, right-aligned, with the panel opening upward', () => {

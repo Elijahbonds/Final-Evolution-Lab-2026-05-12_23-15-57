@@ -80,7 +80,7 @@ export function BoostShelf({ shards, owned }: { shards: number; owned: string[] 
                 <div className="min-w-0">
                   <p
                     className="font-mono text-[12px] font-bold uppercase tracking-[0.18em]"
-                    style={{ color: mine ? c.accent : 'rgba(255,255,255,0.35)' }}
+                    style={{ color: mine ? c.accent : 'rgba(255,255,255,0.55)' }}   /* READABLE: 0.35 was 3.1:1; 0.55 clears AA on the card */
                   >
                     {c.creator}
                   </p>

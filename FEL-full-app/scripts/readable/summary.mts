@@ -2,7 +2,8 @@
 // scripts/readable/audit.mts and writes summary.json — counts per rule per set-up, the worst screens, the most repeated
 // misses — and a contact sheet of the worst screens' first-screen shots (JPG, failing runs boxed in red).
 //
-//   npx tsx scripts/readable/summary.mts <outDir> <label> [--vs=<label>] [--sheet=15]
+//   npx tsx scripts/readable/summary.mts <outDir> <label> [--vs=<label>] [--sheet=15] [--pairs=/play,/terms]
+//     --pairs   with --vs: one more sheet, contact-pairs.jpg — each named route's phone shot before (top row) over after
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import sharp from 'sharp';
@@ -89,5 +90,17 @@ const sheetFor = async (routes: string[], label: string, name: string) => {
   await sharp({ create: { width: 5 * (W + 6), height: rows * (H + 28), channels: 3, background: '#222' } }).composite(tiles).jpeg({ quality: 70 }).toFile(join(OUT_ROOT, LABEL, name));
   console.log(`contact sheet → ${join(OUT_ROOT, LABEL, name)}`);
 };
+const pairs = flag('pairs')?.split(',').filter(Boolean);
+if (pairs && VS) {
+  const W = 390, H = 844, tiles: { input: Buffer; left: number; top: number }[] = [];
+  for (const [i, r] of pairs.entries()) for (const [j, label] of [VS, LABEL].entries()) {
+    const f = join(OUT_ROOT, label, 'shots', `${slug(r)}-phone.jpg`);
+    if (existsSync(f)) tiles.push({ input: await sharp(f).resize(W, H, { fit: 'cover', position: 'top' }).toBuffer(), left: i * (W + 8), top: j * (H + 8) });
+  }
+  if (tiles.length) {
+    await sharp({ create: { width: pairs.length * (W + 8), height: 2 * (H + 8), channels: 3, background: '#333' } }).composite(tiles).jpeg({ quality: 72 }).toFile(join(OUT_ROOT, LABEL, 'contact-pairs.jpg'));
+    console.log(`before over after → ${join(OUT_ROOT, LABEL, 'contact-pairs.jpg')}`);
+  }
+}
 const worstRoutes = (before ?? now).worst.slice(0, SHEET_N).map((w) => w.route);
 await sheetFor(worstRoutes, LABEL, before ? `contact-after.jpg` : `contact.jpg`);

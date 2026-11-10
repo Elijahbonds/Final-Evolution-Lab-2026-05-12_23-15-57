@@ -33,11 +33,11 @@ export default async function GuardianConsentPage() {
         <div className="flex min-h-[60vh] items-center justify-center p-6">
           <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/[0.04] p-5 text-center">
             <h2 className="text-[20px] font-black leading-tight text-white">You&apos;re all set</h2>
-            <p className="mt-2 text-[13.5px] leading-snug text-white/70">
+            <p className="mt-2 text-[16px] leading-snug text-white/70">
               Nothing more is needed here: you&apos;re 18 or over, or a parent or guardian has said it&apos;s OK. Their OK lets a
               camp plan your coach builds with you go live.
             </p>
-            <p className="mt-2 text-[12.5px] leading-snug text-white/55">
+            <p className="mt-2 text-[16px] leading-snug text-white/55">
               Pain check-ins and the daily check-in save only for players who are 18 or over, so under 18 they stay off, with or
               without a guardian&apos;s OK. The Mirror runs on your device either way; under 18 it keeps nothing.
             </p>

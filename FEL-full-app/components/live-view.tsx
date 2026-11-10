@@ -140,7 +140,7 @@ function ProgramCard({ p, live }: { p: StreamProgram; live?: boolean }) {
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
       <div className="relative h-28" style={{ background: `linear-gradient(135deg, ${accent}, transparent)` }}>
-        <span className="absolute left-3 top-3 rounded bg-black/40 px-2 py-0.5 text-[12px] font-bold uppercase tracking-wider text-white">{p.category}</span>
+        <span className="absolute left-3 top-3 rounded bg-black/65 px-2 py-0.5 text-[12px] font-bold uppercase tracking-wider text-white">{p.category}</span>
         {live && <span className="absolute right-3 top-3 rounded bg-black/50 px-2 py-0.5 text-[12px] font-bold text-red-300">LIVE CLASS · NOT ON AIR YET</span>}
         <button className="absolute inset-0 flex items-center justify-center" onClick={() => toast('Stream player activates when the studio provides a live URL.', { icon: '📺' })} aria-label={`Play ${p.title}`}>
           <span className="flex h-12 w-12 items-center justify-center rounded-full bg-black/50 backdrop-blur transition hover:scale-110"><Play className="h-5 w-5 text-white" /></span>
