@@ -23,8 +23,8 @@ comment at the line, `docs/`, `docs/OWNER-DECISIONS.md`, and the git log of the 
 
 | # | Switch | What it does | Why it is off | Status |
 |---|---|---|---|---|
-| A1 | `anim.inertial` (feel knob, `lib/babylon/anim/inertialize.ts ANIM_INERTIAL_ON`) | A clip change cuts to the new clip at once and the old pose's difference decays out (Holden inertialization), instead of a linear crossfade. Wired on karate, karate VS, showdown, mixed combat, football, skateboard, derby, dunk, 1v1, 3v3. | AF-1 (2026-10-28) landed it off to A/B it; gameplay-clean recommends it for the fighters' strike-onset pops (`docs/GAMEPLAY-CLEAN-AUDIT.md` §4g item 1, §6 item 6). Never measured on. | See §6 |
-| A2 | `anim.holdLast` (feel knob, `lib/babylon/anim/basketballTree.ts ANIM_HOLD_LAST_ON`) | The jumpshot holds its last frame while the shot state lasts, instead of wrapping (the wrap jumped 173°). | AF-11 (2026-10-29) landed it off to A/B it. | See §6 |
+| A1 | `anim.inertial` (feel knob, `lib/babylon/anim/inertialize.ts ANIM_INERTIAL_ON`) | A clip change cuts to the new clip at once and the old pose's difference decays out (Holden inertialization), instead of a linear crossfade. | AF-1 (2026-10-28) landed it off to A/B it; never measured on before. | **Owned by gameplay-clean** (`lane/gameplay-clean-6`, coordinator 2026-11-10). This lane measured it, found and fixed three faults, and handed the work over: §6. Nothing of it is on this branch's head. |
+| A2 | `anim.holdLast` (feel knob, `lib/babylon/anim/basketballTree.ts ANIM_HOLD_LAST_ON`) | The jumpshot holds its last frame while the shot state lasts, instead of wrapping (the wrap jumped 173°). | AF-11 (2026-10-29) landed it off to A/B it. | **Left off, routed to the hoops lane.** Its only effect is inside `basketballTree.ts`, which `lane/hoops-p05` is rewriting now. The hero's shot is a mode-owned hold in 1v1 and 3v3 (the tree's `shot_release` loop is overridden while the mode holds the jumpshot), and the rig's scripted player never shoots in a 14 s run (no shot clip in any 1v1 / 3v3 recording, knob on or off), so the rig cannot measure it. Not measured. |
 | A3 | `NEXT_PUBLIC_WEBGPU` (`lib/babylon/core/createEngine.ts`) | WebGPU engine instead of WebGL2. | `TintMaterialPlugin` injects GLSL only, so every tinted avatar breaks under WebGPU. | Not attempted: the fix is a WGSL port of the tint plugin, and this machine has no WebGPU adapter to measure it on (software GL only). It is also a build-time variable (the owner's). Floor: unmeasured. |
 | A4 | `NEXT_PUBLIC_IBL_SHADOWS` (`lib/babylon/scene/IblShadows.ts`) | Soft contact shadows from the sky light. | Cost: it voxelizes the scene and runs a pass every frame; a phone budget call. | Not attempted: a GPU cost cannot be measured on this machine's software renderer. Build-time variable (the owner's). |
 | A5 | Face options "coming soon" (`lib/babylon/core/faceMorphs.ts FEATURE_WEIGHTS`, empty) | Eye shape, mouth, nose and all brows but Arched in the character editor. | The kit bodies carry seven face morphs; these need new baked morphs (CREATOR-PLAN phase 5). | Not attempted: baking morphs into the body files is model work (GATE 0, not this lane's). |
@@ -47,6 +47,9 @@ comment at the line, `docs/`, `docs/OWNER-DECISIONS.md`, and the git log of the 
 | `STRONG_HAND_RETURNS` (`core/StrongHand.ts`) | hoops | The ball goes back to the strong hand on its own. Off by owner decision 2026-10-20. | B (owner decision) |
 | `OCCLUDER_FADE_OFF` (dunk, 1v1, 3v3) | dunk / hoops | Scenery between the camera and the player fades. Every other mode has it; these three wait for their lanes. | A (their lanes) |
 | `lib/babylon/modes/baseballBat.ts` | bat | — | bat lane |
+| `anim.inertial` and its sub-knobs | gameplay-clean (`lane/gameplay-clean-6`) | Inertial clip transitions. Measured and fixed here, handed over (§6). | A (gameplay-clean) |
+| Screens of home, party, profile edit, /account, /store, the Train label, the Play shelf, `boot-splash.tsx`, the 3D canvas label | screen-fixes | None of their switches were edited here. | — |
+| `lib/library/**`, authored clips | demos-fix | — | — |
 
 ## 3. Class B: not a quality question (the owner's, or another step's)
 
@@ -172,3 +175,44 @@ the Studio:
 **Recommendation for the owner:** set `NEXUS_STUDIO_ENABLED=1` when you want to use the Studio in production yourself. It opens
 the editor to founder and admin accounts only, opens no paid surface and no share links, and is undone by unsetting it.
 
+
+## 6. Handed over: `anim.inertial` (owned by gameplay-clean since 2026-11-10)
+
+The coordinator moved `anim.inertial` to `lane/gameplay-clean-6` while this lane was measuring it. The work is kept in this branch's
+history for that lane to take (`git diff d394b11b fe7b6868 -- FEL-full-app/lib FEL-full-app/docs/FEEL-PANEL.md`), and removed
+from the branch's head, so this lane's PR touches none of its files. Rig: `scripts/probes/gameplay-clean/` (one build, the knob set
+by `&playtest=1&feel=`), 14 s anim-only runs, two a side where shown, the reset-aware counter; `scripts/probes/switch-on/abtable.mjs`
+adds the control that the knob really took (an "on" run shows 0 % of frames mid-crossfade; an "off" run 5–27 %).
+
+**As shipped (AF-1), on is worse:** karate 42.4 → 50.6 hard pops a minute, karate VS 31.8 → 63.5, mixed combat 19.0 → 51.2,
+football 4.3 → 25.6, derby 0 → 16.9; showdown, duel, skateboard, 1v1, 3v3 and dunk about the same.
+
+**Three faults, found frame by frame and reproduced headless on the hero, each fixed behind its own knob (0 = AF-1 exactly):**
+1. `anim.inertialAllBones`: the 'guard' capture keys 7 bones and not the legs, so AF-1 kept no history for the legs while it played;
+   the next clip that keys them (guard → guard step / run) got no offset and the knee jumped 32–62° on the switch frame. The other way
+   (run → guard) the legs froze mid-stride, 55° off where a linear fade leaves them. Fix: history for every node any clip keys, and a
+   bone the new clip does not key eases onto its bind pose.
+2. `anim.inertialMinHalfLifeSec` 0.045 s: the half-life is 0.5 × the fade, 0.02–0.03 s on the fighters' 0.04–0.06 s switches, so two
+   thirds of an 80° offset went in one frame (karate VS jab → run, forearms 55–58°). Chosen from 0 / 0.045 / 0.07.
+3. `anim.inertialMatchVel`: the offset is a 3-D rotation vector starting at the old motion's velocity minus the new clip's (Holden).
+
+**With the three fixes, hard pops a minute (off → fixed, two runs a side; "default build" = the fixes as defaults, no knob set):**
+
+| Mode | Off (linear) | Fixed, knobs set | Fixed, default build |
+|---|---|---|---|
+| karate | 42.4 | 14.9 | 16.9 |
+| karate VS | 31.8 | 17.0 | 17.0 |
+| showdown | 23.3 | 14.9 | 14.9 |
+| mixed combat | 19.0 | 16.9 | 12.8 |
+| duel (wired by this lane) | 19.1 | 12.7 | 8.5 |
+| skateboard | 21.2 | 4.2 | 4.2 |
+| football | 4.3 | **17.0** (worse) | – |
+| derby | 0 | **17.0** (worse) | – |
+| 1v1 (one run) | 21.1 | **34.1** (worse) | – |
+| 3v3 (one run) | 59.1 | 59.4 | – |
+| dunk (one run) | 80.4 | 80.9 | – |
+
+The recommendation this lane would have shipped (commit `fe7b6868`, never on the head): on by default in the six modes that measured
+better (a new knob `anim.inertialModesOn` 1, 0 = linear there exactly), the global switch left at 0. Open for gameplay-clean: why
+football and derby get worse, and a hit react → guard frame in showdown (thighs 66° in one frame, once in two runs) that looks like a
+hard cut dropping a live offset.

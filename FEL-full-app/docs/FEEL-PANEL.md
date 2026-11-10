@@ -482,19 +482,3 @@ The owner has not felt this yet.
   phases at 1× and 1.4× (`footballTree.hurdleExit.test.ts`): the off arm 30.9° a frame at 0.1 s, 19.6° at 0.16, 15.7° at 0.2, 12.6°
   at 0.25. 0.1 = the old blend exactly. Every other way into the carry (the snap, a juke, a spin, the stiff arm) keeps 0.1 s.
   Feel-check: football, hurdle at a sprint; do the arms come down with the landing, or hang in the air after it?
-
-## switch-on, 2026-11-10 (the inertial blend's fixes; `anim.inertial` itself is unchanged, still 0)
-
-Group "Anim · transitions" (`anim/inertialize.ts`, read only while `anim.inertial` is on, so a player who has not turned that on
-sees no change). Each is a new number, and its off value restores AF-1's inertial blend exactly. Measured in the gameplay-clean rig
-and headless on the hero (`docs/SWITCH-ON.md` §6).
-
-- `anim.inertialAllBones` 1 (new). The blend keeps the pose history of every bone any of the body's clips keys; a bone the new clip
-  does not key eases from where it was onto its bind pose (where a linear fade-out leaves it). AF-1 kept history for the current
-  clip's bones only: the 'guard' capture keys 7 bones and not the legs, so a switch to a clip that keys them (guard to guard step or
-  run) jumped the knee 32 to 62 degrees on the switch frame, and run to guard froze the legs mid-stride (55 degrees off linear's).
-  0 = AF-1.
-- `anim.inertialMatchVel` 1 (new). The old pose's offset is a 3-D rotation vector whose starting velocity is the old motion's minus the
-  new clip's (Holden), so a clip that starts fast does not stack its speed on the old motion. 0 = AF-1 (one axis, the old speed only).
-- `anim.inertialMinHalfLifeSec` 0 (new). The shortest half-life an offset decays with. AF-1's half-life is 0.5 × the fade, 0.02 to 0.03 s
-  on the fighters' 0.04 to 0.06 s switches, so most of an offset went in one frame. 0 = AF-1's 0.5 × fade alone.
