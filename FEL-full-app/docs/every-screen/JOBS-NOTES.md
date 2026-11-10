@@ -1,3 +1,15 @@
+## What was fixed in phase 2 (phase 1's "after" → now, measured on the rig)
+
+| Job | Phase 1 after | Now | What changed |
+|---|---|---|---|
+| Finish a session (athlete alone, the program the AI built) | 65 taps | 18 taps: 17 sets + 1 (Back) | The player's bright button is shown only when the screen needs the person: a counted set ("Set done") or a pause. The ready count, rests and timed sets already run by themselves; their "Skip rest" / "Start now" is now a quiet button, so it no longer reads as the thing to press (`components/session-player/session-player.tsx`). The walker had pressed it 47 times. |
+| Finish a session (coached client) | 37 taps | 9 taps: 8 sets + 1 | The same change. |
+| Start today's workout (coached client) | 3 taps, 11 s | 2 taps, 1 s | Train's first card is Today's session; tapping it opens the session already started (`/coach?start=today`; `lib/coach/todayCard.ts`, `app/coach/_components/today-view.tsx`). |
+| Start today's workout (a program kept on this phone) | – (new walk) | 2 taps, 8.7 s | Train shows "Your program" under Today when the phone holds a program the AI built; it opens the next session already started (`components/every-screen/resume-program-card.tsx`, `/train/build?start=today`). |
+| Start today's workout (today's drill) | 3 taps | 3 taps for a first-timer (deliberate: the first time explains the camera); 2 for a returning athlete (covered by a test, not walked: the rig's athlete is a first-timer) | "Start" on the daily-drill card goes straight to the camera for someone who has done a drill before (`?start=1`). |
+
+Every phase-2 fix has a test that fails on the old code: `tests/every-screen/phase2.test.tsx`.
+
 ## What was fixed in phase 1 (before → after, measured on the rig)
 
 | Job | Before | After | What changed |
