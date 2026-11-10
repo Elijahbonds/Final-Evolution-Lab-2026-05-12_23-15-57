@@ -148,7 +148,7 @@ for (let i = 0; i < 900; i++) {
 }
 if (!ready) { say('no seam ' + JSON.stringify(await ev(() => [window.__phase, window.__err]))); say(pageErrs.join('\n')); await browser.close(); process.exit(2); }
 const loadWallS = (Date.now() - T0) / 1000;
-await ev((c) => { window.__HG_CFG = Object.assign(window.__HG_CFG || {}, c); }, { noPoke: process.env.BOT_NOPOKE === '1', clipLog: !!process.env.POP_LIST, stageLog: !!process.env.POP_LIST });   // hoops-p04: BOT_NOPOKE=1, the bot never reaches (a possession plays out to its shot)
+await ev((c) => { window.__HG_CFG = Object.assign(window.__HG_CFG || {}, c); }, { noPoke: process.env.BOT_NOPOKE === '1', clipLog: !!process.env.POP_LIST, stageLog: process.env.STAGE === '1' || (!!process.env.POP_LIST && process.env.STAGE !== '0') });   // hoops-p05: STAGE=0 keeps the clip / state log and the pop list but not the stage tracer (it snapshots 14 bones a body around every after-animations observer: the rig's most expensive recorder)   // hoops-p04: BOT_NOPOKE=1, the bot never reaches (a possession plays out to its shot)
 say('ready after ' + loadWallS.toFixed(0) + ' s wall; page.js: ' + await ev(fs.readFileSync(path.join(HERE, 'page.js'), 'utf8')));
 // hoops-p05: the load SETTLES before the clock starts — no pending loads, no request in flight and the mesh count unchanged for 3 s of
 // wall (a prop that landed after the start ran its callbacks on a wall-chosen frame: one run spawned 176 meshes, two 178, and that run's
@@ -178,6 +178,11 @@ const POSS = Number(process.env.POSS ?? 0);
 // hoops-p05: WALL_S — past this much wall time the possession loop stops where it is and the run still writes everything it recorded
 // (result.cutByWall): a hold of the shared lock is capped, and a run killed by `timeout` wrote nothing
 const WALL_S = Number(process.env.WALL_S ?? Infinity); const wallUp = () => (Date.now() - T0) / 1000 > WALL_S;
+// hoops-p05: MAX_FRAMES — the possession loop stops at this many frames since the go, exactly (a cut that is the same on every run, so
+// three runs compare frame for frame and their pops are counted over the same frames; WALL_S cuts on wall time, which differs). The rig
+// draws about one frame a second of wall on the shared box: size it to the hold.
+const MAX_FRAMES = Number(process.env.MAX_FRAMES ?? Infinity);
+const framesLeft = async () => MAX_FRAMES - (await ev(() => window.__frameNo || 0));
 async function possLoop() {
   const out = [];
   const tag = MODE === 'onevone' ? '1V1' : '3V3';
@@ -186,6 +191,7 @@ async function possLoop() {
   for (let k = 0; k < POSS * SIDES.length; k++) {
     const side = SIDES[k % SIDES.length];
     if (wallUp()) { result.cutByWall = true; say(`wall cap ${WALL_S} s: stopped before possession ${k}`); break; }
+    if ((await framesLeft()) <= 0) { result.cutAtFrame = MAX_FRAMES; break; }
     await ev(() => { window.__hg.bot.on = false; });
     // a trip to the line (an and-one, a shooting foul) is a dead ball the seams do not cancel, and the bot does not shoot free throws:
     // shoot them out (press, let go at the line meter's green) before the next possession, or every later possession is a statue
@@ -204,7 +210,7 @@ async function possLoop() {
     await ev(() => { window.__hg.bot.on = true; window.__hg.autoStrip = true; });
     let endAt = null;
     for (;;) {
-      await runFrames(90);   // hoops-p05: 1.5 s of game, not of wall
+      { const left = await framesLeft(); if (left <= 0) { result.cutAtFrame = MAX_FRAMES; break; } await runFrames(Math.min(30, left)); }   // hoops-p05: game frames, not wall; 30 at a time (the wall cap is checked between), never past MAX_FRAMES
       const st = await ev((a) => { const L = window.__LOG || []; const since = L.filter((l) => l.f >= a[0]); const pc = window.__hg.possCode(); return { pc, shot: since.some((l) => new RegExp(a[1] === 'def' ? 'rival release|rival dunk|swat at k|my block read' : 'my release|blocked at the release|drive contest|mate shot').test(l.m)), over: since.some((l) => /strip by the ai|ai reach resolve strip|STOLEN|resetPossession|charge|REF\]/.test(l.m)) }; }, [f0, side]);
       const g = (await gameNow()) - t0;
       if (endAt === null && (st.shot || st.over || (side === 'def' ? st.pc === 1 : st.pc === 2))) endAt = g + TAIL;
@@ -270,7 +276,7 @@ if (SCEN === 'game') {
   // diagonal, at a jog and with the turbo, then with the hand up and with a reach; the first two take a strip (STRIPS=1)
   R.defmove = [];
   if (ON.has('defmove')) {
-    const cases = [{ dir: 'back', turbo: false }, { dir: 'back', turbo: true }, { dir: 'side', turbo: false }, { dir: 'side', turbo: true }, { dir: 'diag', turbo: true }, { dir: 'back', turbo: true, hand: 'up' }, { dir: 'side', turbo: true, hand: 'up' }, { dir: 'back', turbo: true, hand: 'reach' }].slice(0, Number(process.env.DEFMOVE_N ?? 8));
+    const cases = [{ dir: 'back', turbo: true }, { dir: 'back', turbo: true, hand: 'up' }, { dir: 'diag', turbo: true }, { dir: 'side', turbo: true }, { dir: 'back', turbo: false }, { dir: 'side', turbo: false }, { dir: 'side', turbo: true, hand: 'up' }, { dir: 'back', turbo: true, hand: 'reach' }].slice(0, Number(process.env.DEFMOVE_N ?? 8));   // (the most telling first: DEFMOVE_N cuts the list)
     for (const [k, c] of cases.entries()) {
       await setDef(); await waitGame(500);
       const nm = `def-${c.dir}${c.turbo ? '-turbo' : ''}${c.hand ? '-' + c.hand : ''}`;
@@ -285,7 +291,7 @@ if (SCEN === 'game') {
   }
   // hoops-p05: TESTS=stepback (not in the default list) — the step-back jumper, three times; the first takes a strip
   R.stepback = [];
-  if (ON.has('stepback')) for (let k = 0; k < 3; k++) { await setOff(); await waitGame(1200); await noReplay(); if (k === 0) ev(() => window.__hg.strip('stepback', 20, 2)); R.stepback.push(await T('stepback')); if (k === 0) await saveStrip('stepback'); await waitGame(2000); }
+  { const N = Number(process.env.STEPBACK_N ?? 3); if (ON.has('stepback')) for (let k = 0; k < N; k++) { await setOff(); await waitGame(600); await noReplay(); if (k === 0 && process.env.STRIPS) ev(() => window.__hg.strip('stepback', 20, 2)); R.stepback.push(await T('stepback')); if (k === 0 && process.env.STRIPS) await saveStrip('stepback'); if (k < N - 1) await waitGame(1500); } }   // (STEPBACK_N, and strips only with STRIPS=1: the rig runs ~1 frame a second of wall)
   if (ON.has('stepback')) { const an = await ev((o) => window.__hg.analyse(o), { popFrames: true, popList: !!process.env.POP_LIST }); result.heroMotion = an.perBody.me ? { ...an.perBody.me, popAt: undefined } : null; if (process.env.POP_LIST) { result.clips = await ev(() => window.__hg.clips || []); result.stageEv = await ev(() => window.__hg.stageEv || []); result.states = await ev(() => window.__hg.states || []); } await checkpoint('stepback'); }   // (a capped run keeps the step-backs' motion)
   // hoops-p01: the input buffer — Square tapped mid-spin and mid-crossover
   R.buffer = [];
