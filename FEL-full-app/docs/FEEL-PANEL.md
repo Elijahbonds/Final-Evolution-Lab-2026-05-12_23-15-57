@@ -423,7 +423,9 @@ change"). The owner has felt none of these yet; every default is flagged in the 
   offset fades out over the first bounce (START_FADE_PHASE, unchanged). Only the ball took it: the hand went straight to the stroke's own
   point, so the palm sat the offset off the ball through the whole first bounce (1v1 seed 7, the gear stop into the sprint: the first top
   drawn 12.8 cm off; the hand tracer has the carry's own pass take the palm from on the ball to 13.5 cm off it). The hand now takes the
-  same faded offset, and the reach that takes the arm over from the hold keeps the elbow's swing limit (720 °/s, unchanged) from its
+  same faded offset — starting from where the hand held the ball (the held ball sits in the palm, not under the stroke's hand point),
+  so the wrist does not jump round the ball on the first frame — and the reach that takes the arm over from the hold keeps the elbow's
+  swing limit (720 °/s, unchanged) from its
   first frame (without that, aiming the hand at the real ball swung the upper arm 8 696 °/s on the rig's first dribble frame). 0 = as it
   was. No new number.
 - hoops-p05, the hero's slide (owner 2026-11-10: "fix it"), same group. Each is NEW BEHAVIOUR, on by default, with 0 = today's exactly:

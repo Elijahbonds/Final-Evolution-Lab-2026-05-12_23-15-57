@@ -668,9 +668,9 @@ describe('the let-go ends on the clip (hoops-p05)', () => {
 // offset: the hand went to the stroke's own point, and the palm sat the offset off the ball for the whole first bounce (1v1 seed 7, the
 // gear stop into the sprint: the first top drawn 12.8 cm off; the hand tracer has the carry's own pass take the palm off the ball).
 describe('the first bounce\'s palm rides the same fade as its ball (hoops-p05b)', () => {
-  /** The hand bone's distance off where the stroke puts it on the ball (the ball's centre + the stroke's own hand-over-ball), on each frame
-   *  of the first bounce's rise and top (where the stroke has the hand on the ball), for a dribble started from a held ball the clip carries well off the stroke. */
-  const firstBounce = (): number[] => {
+  /** The hand bone's place against the ball (hand − ball, world) as held on the last frame before the dribble, then on each frame of the
+   *  first bounce's rise and top, for a dribble started from a held ball the clip carries well off the stroke. */
+  const firstBounce = (): { held: Vector3; rel: Vector3[]; stroke: Vector3[] } => {
     const scene = new Scene(new NullEngine());
     const r = rig(scene);
     // the clip holds the ball arm out and up (the held ball well off the stroke's own point)
@@ -680,29 +680,31 @@ describe('the first bounce\'s palm rides the same fade as its ball (hoops-p05b)'
     attachBallToHand(r.ball, r.sk, 'LeftHand');
     const carry = mountBallCarry({ scene, ball: r.ball, root: r.root, skeleton: r.sk, hoops: true });
     const d = driver(scene, carry, r.ball);
+    const relNow = () => { r.nodes.LeftHand.computeWorldMatrix(true); return r.nodes.LeftHand.getAbsolutePosition().subtract(r.ball.getAbsolutePosition()); };
     clip(); d.frame(1 / 60, 0, false);
-    const off: number[] = [];
+    const held = relNow(), rel: Vector3[] = [], stroke: Vector3[] = [];
     for (let i = 0; i < 18; i++) {
       clip(); d.frame(1 / 60, 0.2, true);
-      r.nodes.LeftHand.computeWorldMatrix(true);
       const s = dribbleAtPushed(carry.phase, HOOPS_DRIBBLE);
       // the rise and the top (this test rig's straight arm bottoms out at ~1.03 m, so the follow down is out of its reach either way)
       if (!(s.phase > PUSHED_FLOOR_PHASE || s.phase < 0.1)) continue;
-      const want = r.ball.getAbsolutePosition().add(new Vector3(0, s.hand.y - s.ball.y, 0));
-      off.push(Vector3.Distance(r.nodes.LeftHand.getAbsolutePosition(), want));
+      rel.push(relNow()); stroke.push(new Vector3(0, s.hand.y - s.ball.y, 0));
     }
     carry.dispose();
-    return off;
+    return { held, rel, stroke };
   };
-  const mean = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length;
-  it('the hand is on the ball through the first bounce, as it is on every later one; knob hoops.carryStartHandOn 0 (the control) leaves it the offset off', () => {
+  it('the hand keeps the ball where it held it on the dribble\'s first frame and eases onto the stroke over the first bounce; knob hoops.carryStartHandOn 0 (the control) jumps the wrist round the ball', () => {
     resetFeelForTests(); setFeelUser(true); setFeelSession(null); setFeelOverride('hoops.carryStartHandOn', 0);
-    let was: number[];
+    let was: ReturnType<typeof firstBounce>;
     try { was = firstBounce(); } finally { resetFeelForTests(); }
     const now = firstBounce();
-    expect(mean(was)).toBeGreaterThan(0.05);            // the control: the miss this fix removes (0.08–0.13 m here)
-    expect(was.length).toBeGreaterThan(5);
-    expect(Math.max(...now)).toBeLessThan(0.01);        // on the ball, every frame the stroke has it there
+    expect(was.rel.length).toBeGreaterThan(5);
+    expect(Vector3.Distance(was.rel[0], was.held)).toBeGreaterThan(0.08);   // the control: the wrist round the ball in one frame (0.15 m here)
+    expect(Vector3.Distance(now.rel[0], now.held)).toBeLessThan(0.005);     // the hand as it held the ball
+    for (let k = 1; k < now.rel.length; k++) expect(Vector3.Distance(now.rel[k], now.rel[k - 1])).toBeLessThan(0.02);   // easing, never a jump
+    // …and it is on its way to the stroke's point (hand over the ball): closer at the top than at the start
+    const toStroke = (k: number) => Vector3.Distance(now.rel[k], now.stroke[k]);
+    expect(toStroke(now.rel.length - 1)).toBeLessThan(toStroke(0));
   });
   /** The ball arm's (rig LeftArm) turn per second on each of the dribble's first 6 frames, the clip resetting the arm every frame. */
   const armSpeeds = (): number[] => {

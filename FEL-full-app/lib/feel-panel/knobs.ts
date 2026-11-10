@@ -1318,7 +1318,7 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
   {
     id: 'hoops.carryStartHandOn', label: 'Ball carry: the first bounce palm follows the ball (0 = off)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · transitions',
     source: 'lib/babylon/anim/ballCarry.ts CARRY_START_HAND_ON',
-    hint: 'A dribble starts from where the palm had the ball, and that offset fades over the first bounce. The hand now takes the same offset, so the palm stays on the ball. 0 = only the ball took it (the palm sat up to 13 cm off it).',
+    hint: 'A dribble starts from where the hand held the ball, and that offset fades over the first bounce for the ball and the hand together, so the palm stays on the ball and the arm does not jump. 0 = only the ball took it (the palm sat up to 13 cm off it).',
   },
   // hoops-p05 (owner 2026-11-10: the hero's slide — fix it): stepping legs under the defensive beats
   {
