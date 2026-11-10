@@ -16,6 +16,7 @@ import { ChevronDown, Lock, Minus, Play, Plus, Sparkles } from 'lucide-react';
 import { PrimaryCta } from '@/components/ui/fel/primary-cta';
 import { warmAvatarDemo } from '@/components/library/avatar-demo';
 import type { FinishResult } from '@/components/session-player/session-player';
+import { Layer } from '@/components/session-player/layer';
 import { TYPE } from '@/lib/design/type';
 import { checkpointDecision, plannedWeeks, positionIn, type Decision } from '@/lib/program-ask/checkpoint';
 import {
@@ -275,7 +276,11 @@ export function ProgramBuilder({ initialQuestion = '' }: { initialQuestion?: str
         </section>
       )}
 
-      {playing && <SessionPlayer session={playing.session} mode="device" onFinish={finish} onClose={() => setPlaying(null)} />}
+      {/* EVERY-SCREEN P1 (2026-11-10): in a Layer (the end of <body>), as on Today and the signature page. Mounted here in
+          the page, the player sat inside the page's own stacking context, UNDER the tab bar and the status rail: its one
+          button (Start now / Set done) and its close and pause could not be tapped (measured on the rig: the tab bar's
+          icon was the element on top of the button). */}
+      {playing && <Layer><SessionPlayer session={playing.session} mode="device" onFinish={finish} onClose={() => setPlaying(null)} /></Layer>}
     </div>
   );
 }

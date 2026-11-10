@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { AthleteShots } from '@/lib/hoops-cam/coach';
 import { COACH_DARK_LINE, COACH_LINE, NOT_SHARED_LINE, pctText } from '@/lib/hoops-cam/copy';
+import { DarkInstead } from '@/components/every-screen/dark-instead';
 import { MakeTrend, ShotChart } from './shot-chart';
 import { HOOPS_LOOK as K } from './look';
 
@@ -99,7 +100,8 @@ export function CoachShots({ api = COACH_SHOTS_API }: { api?: string }) {
   useEffect(() => { void load(); }, [load]);
 
   if (!b) return <p className="text-sm text-white/50">Loading…</p>;
-  if (!b.available) return <p className={`${card} text-[14px] text-white/70`} data-coach-shots-dark>{COACH_DARK_LINE}</p>;
+  // EVERY-SCREEN P1: the notice, then a way on (it was the notice alone: only the tab bar led anywhere)
+  if (!b.available) return <div data-coach-shots-dark><p className={`${card} text-[14px] text-white/70`}>{COACH_DARK_LINE}</p><DarkInstead links={[{ href: '/coach', label: 'Back to Coach' }, { href: '/train/shots', label: 'Track shots yourself' }]} /></div>;
   const shared = (b.athletes ?? []).filter((a) => a.shares);
   const others = (b.athletes ?? []).filter((a) => !a.shares);
   const a = shared.find((x) => x.id === pick) ?? null;

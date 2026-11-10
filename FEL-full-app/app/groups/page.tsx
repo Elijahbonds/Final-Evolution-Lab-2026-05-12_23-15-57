@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { prisma } from '@/lib/db';
 import { groupsBoard, type GroupDb } from '@/lib/group-booking/server';
-import { GROUP_COPY as T } from '@/lib/group-booking/copy';
+import { GROUP_COPY as T, GROUP_DARK } from '@/lib/group-booking/copy';
 import { SHOP_LOOK as L } from '@/components/shop/look';
 import { OpensSoon } from '@/components/shop/opens-soon';
 import { GroupsBrowser, type GroupsBoardView } from '@/components/group-booking/groups-browser';
@@ -26,7 +26,7 @@ export default async function GroupsPage() {
       <p className={L.eyebrow}>Train in person</p>
       <h1 className={L.title}>{T.title}</h1>
       {board.available ? <p className={L.lede}>{T.lede(sizes.min, sizes.max, sizes.weeks)}</p> : null}
-      {board.available ? <GroupsBrowser board={board} /> : <OpensSoon />}
+      {board.available ? <GroupsBrowser board={board} /> : <OpensSoon why={GROUP_DARK.groups.why} instead={GROUP_DARK.groups.instead} />}
       <div className={L.section}>
         <Link href="/groups/one-on-one" className={L.buy} data-action="one-on-one">{T.bookOneOnOne}</Link>
       </div>

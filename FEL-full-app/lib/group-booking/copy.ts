@@ -42,6 +42,15 @@ export const GROUP_COPY = {
   addressSoon: 'Address coming soon',
 } as const;
 
+// EVERY-SCREEN P1 (2026-11-10): what a switched-off booking screen says besides "Opens soon": why, and what to do
+// instead (docs/PLAN-EVERY-SCREEN-10PHASE.md, phase 1's gate). DRAFT PRODUCT COPY for the owner, like the rest of this
+// file: no date is promised, no price is named, and nothing about how the app is built is said.
+export const GROUP_DARK = {
+  groups: { why: "Group training isn't open for booking yet.", instead: { href: '/train', label: 'Train on your own today' } },
+  oneOnOne: { why: "1:1 sessions aren't open for booking yet.", instead: { href: '/train', label: 'Train on your own today' } },
+  coach: { why: "Group classes aren't switched on yet. Your roster and programs work today.", instead: { href: '/coach', label: 'Back to your roster' } },
+} as const;
+
 export const MAKEUP_REFUSAL_COPY: Record<MakeupRefusal, string> = {
   not_package: 'Make-ups come with a package.',
   not_missed: 'Only a missed or cancelled session can be made up.',

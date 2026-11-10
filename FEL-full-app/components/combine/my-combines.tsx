@@ -8,8 +8,11 @@ import type { MyCombine, MyStation } from '@/lib/combine/server';
 import { previousStation, stationView } from '@/lib/results/combine';
 import { ResultCard, PROGRESS_HREF } from '@/components/result-card/result-card';
 import { LOOK } from '@/components/result-card/look';
+import { DarkInstead } from '@/components/every-screen/dark-instead';
 
 export const MINE_COMING_SOON = 'Combine results are coming soon.';
+/** EVERY-SCREEN P1: what to do instead while combine results are switched off (DRAFT product copy for the owner). */
+export const MINE_SOON_INSTEAD = [{ href: '/play/mirror/assess?run=vertical', label: 'Measure my vertical' }, { href: '/train/progress', label: 'My progress' }] as const;
 export const MINE_NONE = 'No combine results yet. When your coach runs one with you, your numbers show here.';
 /** PLAT-P03 DRAFT: the lead card's one button, to the re-test history. */
 export const MINE_PROGRESS = 'My progress';
@@ -39,7 +42,7 @@ function StationRow({ s, prev }: { s: MyStation; prev: MyStation | null }) {
  */
 export function MyCombines({ available, events }: { available: boolean; events: readonly MyCombine[] }) {
   const lead = say(ATHLETE_PAGE_LINE);
-  if (!available) return <p className="fel-card rounded-xl p-4 text-sm text-white/70" data-my-combines="soon">{MINE_COMING_SOON}</p>;
+  if (!available) return <div data-my-combines="soon"><p className="fel-card rounded-xl p-4 text-sm text-white/70">{MINE_COMING_SOON} Your own tests work today.</p><DarkInstead links={MINE_SOON_INSTEAD} /></div>;
   if (!events.length) return <p className="fel-card rounded-xl p-4 text-sm text-white/70" data-my-combines="none">{MINE_NONE}</p>;
   const newest = [...events].sort((a, b) => b.createdAt - a.createdAt);
   const top = newest[0];

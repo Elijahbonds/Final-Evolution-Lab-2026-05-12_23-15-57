@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { groupsBoard, type GroupDb } from '@/lib/group-booking/server';
 import { SHOP_LOOK as L } from '@/components/shop/look';
 import { OpensSoon } from '@/components/shop/opens-soon';
+import { GROUP_DARK } from '@/lib/group-booking/copy';
 import { GroupJoin, type GroupsBoardView } from '@/components/group-booking/groups-browser';
 import { ShareGroup } from '@/components/group-booking/share-group';
 
@@ -31,7 +32,7 @@ export default async function GroupPage({ params }: { params: { groupId: string 
           <div className="mt-6"><GroupJoin g={g} format={board.format ?? ''} cancelLine={board.cancelLine ?? ''} /></div>
           <ShareGroup path={`/groups/${g.id}`} />
         </>
-      ) : <OpensSoon />}
+      ) : <OpensSoon why={GROUP_DARK.groups.why} instead={GROUP_DARK.groups.instead} />}
       <div className={L.section}><Link href="/groups" className={L.buy}>All groups</Link></div>
     </main>
   );
