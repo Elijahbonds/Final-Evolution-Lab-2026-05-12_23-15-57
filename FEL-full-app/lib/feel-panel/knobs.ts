@@ -1350,6 +1350,12 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/anim/hipSteer.ts HIP_STEER_FULL_MPS',
     hint: 'All of the pelvis turn from this ground speed.',
   },
+  // hoops-p05 (phase 5, the ball lives in the hand)
+  {
+    id: 'hoops.passFromHandOn', label: '3v3: a teammate pass leaves from the ball (0 = off)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · transitions',
+    source: 'lib/babylon/hoops/ballHandoff.ts PASS_FROM_HAND_ON',
+    hint: 'A teammate pass starts its flight where the ball is in his hands. 0 = it started at his chest height over his feet, wherever the ball was: a jump out of the hand on the release.',
+  },
   // AF-1 (ANIM-FEEL-SPEC 2026-10-28): inertialized clip transitions, default OFF — off is the linear crossfade, unchanged.
   {
     id: 'anim.inertial', label: 'Inertial clip transitions on (1) / off (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',

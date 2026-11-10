@@ -96,6 +96,7 @@ import { FreeThrowLine, ftBody, ftIdleInput, FT_STILL } from '../core/FreeThrowL
 import { BankLook, riseClipFor, gatherClipFor } from '../hoops/shotLooks';   // hoops-shot-content: the step-back's gather and release, the bank's look
 import type { GatherKind } from '../core/HoopsMoves';
 import { attachBallToHand, gatherBallToHand, releaseBall } from '../anim/ballRig';
+import { passStartFor } from '../hoops/ballHandoff';   // hoops-p05 (phase 5): a teammate's pass leaves from the ball, not from root + 1.2 m
 import { rightHandHoops, rightHandBall, hoopsHand, leftDribbleTwins } from '../anim/hoopsHand';   // HOOPS MOTION phase 3: right-handed on screen, every body
 import { sideAwayFrom, sideOfVector } from '../anim/athleteSide'; // HOOPS MOTION phase 3: the one visual-side helper (phase 4b: a crossing move's side is its end hand's; the bite's is still sideAwayFrom's)
 import { requestMove, sizeUpMoveOf, type HandleHost } from '../anim/handleMotion';   // HOOPS MOTION phase 4b: one renderer for the handle moves (1v1's too)
@@ -840,6 +841,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     }
     if (busy) { console.info('[3V3-OFF] call for the ball — teammate busy, AI logic stands'); return; }
     SoundKit.play('uiTick', { pitch: 1.2, volume: 0.4 });
+    const passFrom = passStartFor(ball, body.char.root);   // hoops-p05: read before the release (the world transform is kept)
     releaseBall(ball);
     passTargetId = 'me';
     lastPasserWasMe = false;   // the mate threw this one, not me — no assist to credit on whatever I do next
@@ -849,7 +851,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     if (oopCut(me.char.root.position, me.drib.vel, RIM_FLOOR)) {
       passType = 'lob';
       const toOop = leadPoint(body.char.root.position, me.char.root.position, me.drib.vel, PASS_SPEED.lob).add(new Vector3(0, 2.4, 0));
-      passFlight.start(body.char.root.position.add(new Vector3(0, 1.2, 0)), toOop, 'lob', 1);
+      passFlight.start(passFrom, toOop, 'lob', 1);
       bannerFlash(ctx, 'LOB!', 500); mic?.expect({ moment: 'game.alleyoop' });
       console.info('[3V3-OFF] alley-oop lob to me on the cut');
       console.info('[3V3-OFF] call for the ball answered — mate passes it back');
@@ -859,7 +861,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     // HOOPS-10PHASE-2 phase 6: led the same way the live pass is — a call made mid-cut still arrives on me, not
     // behind me.
     const toMe = leadPoint(body.char.root.position, me.char.root.position, me.drib.vel, PASS_SPEED.chest).add(new Vector3(0, 1.2, 0));
-    passFlight.start(body.char.root.position.add(new Vector3(0, 1.2, 0)), toMe, 'chest', 1);
+    passFlight.start(passFrom, toMe, 'chest', 1);
     console.info('[3V3-OFF] call for the ball answered — mate passes it back');
   }
 
@@ -878,10 +880,11 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   /** lane/h3-aware (#315 H3e): my teammate moves the ball on — a chest pass led to the open man ('BALL BACK' when it comes to me). */
   function mateSwing(ctx: ModeContext, idx: number, to: 'me' | 'mate0' | 'mate1', heldSec: number): void {
     const body = mates[idx], target = to === 'me' ? me : mates[to === 'mate0' ? 0 : 1];
+    const passFrom = passStartFor(ball, body.char.root);   // hoops-p05: read before the release
     releaseBall(ball);
     passTargetId = to; lastPasserWasMe = false; slingPass = false; passType = 'chest';
     const toT = leadPoint(body.char.root.position, target.char.root.position, to === 'me' ? me.drib.vel : target.vel, PASS_SPEED.chest).add(new Vector3(0, 1.2, 0));
-    passFlight.start(body.char.root.position.add(new Vector3(0, 1.2, 0)), toT, 'chest', 1);
+    passFlight.start(passFrom, toT, 'chest', 1);
     if (to === 'me') ctx.juice.callout('BALL BACK', '#22d3ee', 380);
     console.info(`[3V3-OFF] mate${idx} reads: swing it to ${to} (${heldSec.toFixed(2)} s after the catch)`);
   }
