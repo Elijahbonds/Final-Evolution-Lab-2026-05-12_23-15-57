@@ -91,6 +91,7 @@ import { DUNK_CONFIG as CFG } from './modeConfigs';
 import { readDisplaySetting } from '@/lib/controller-link/tvMode';   // TV MODE: the slam window widens on a mirrored display
 import { LAND_LEAD_SEC, timeToFloor, OOP_LOB_FLIGHT_SEC, OOP_WINDUP_SEC, OOP_LATE_CATCH_CLIP_T, whiffWhy, GLASS_RUN_CATCH_CLIP_T, GLASS_RELEASE_MIN_M, SELF_LOB_RELEASE_Y, glassThrowDue, OOP_GLASS_PASSER_X, OOP_GLASS_PASSER_FROM_RIM_M, OOP_GLASS_HIT_OVER_RIM_M, OOP_BOUNCE_FLIGHT_SEC, LOB_FRAME_LIFT, REAL_JUMP_PERSONAL, SLAM_BIG_FROM, personalFullRiseM, riseToPower, LOB_FRAME_TAU, oopThrowDue, RUNWAY_STRIDE_MPS, RUNWAY_STRIDE_SCALE, RUNWAY_RATE_MIN, RUNWAY_RATE_MAX, slamImpact, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG } from '../core/DunkFlagship';   // DUNK-FLAGSHIP: the pass's numbers (feel-panel knobs)
 import { slamVariantOf, SLAM_VARIANTS, SLAM_VARIANTS_ON, REVERSE_TURN_RATE, REVERSE_CONTACT_FROM, REVERSE_JAM_LIFT, REVERSE_TURN_FROM, REVERSE_COMMIT_SEC, type SlamVariant } from '../core/DunkSlamVariant';   // DUNK-FLAGSHIP Phase 7: the finish called with the slam (knob, off)
+import { FINISH_OVER_RING, OVER_RING, overRingOn, overRingAim, overRingLeg, overRingHoldsBody, overRingFollows, overRingDefers, type OverRingLeg } from '../core/DunkOverRing';   // DUNK-FLAGSHIP P11: the hand carries the ball over the ring (knob, off)
 import { feel } from '../../feel-panel/feel';
 import { rimCutSpot, clearOfHoop, runUpTune, tuneKey, dunkFramingOn } from '../core/dunkCamFraming';   // CAMERA TIP: cam.dunkFraming (default off)
 import { DUNK_BACKBOARD_Z } from '../visual/venuePropSets';
@@ -2556,7 +2557,12 @@ export const DunkMode: ModeDefinition = (() => {
               // DUNK-CAR-CLIP R2: a ball still further out than an on-time carry (a late press's finish) carries the body that much further in
               ball.computeWorldMatrix(true);
               const jamExtra = finishVariant === 'reverse' ? 0 : jamFollowExtra(Math.hypot(ball.getAbsolutePosition().x - rim.x, ball.getAbsolutePosition().z - rim.z));   // DUNK-FLAGSHIP Phase 7: never on the REVERSE — its ball is BEHIND the head, so a ball far from the iron is not a body short of it (measured: the carry-in parked the hips under the ring, the ball 0.8 m off the iron)
-              player.root.position.z += (rim.z + FLUSH_Z_AHEAD - JAM_FOLLOW_M - jamExtra - player.root.position.z) * Math.min(1, dt / JAM_FOLLOW_TAU);
+              // DUNK-FLAGSHIP P11 (knob `dunk.finishOverRing`, off = the shipped lines, on the else branches): this frame's leg of the
+              // over-the-ring path (null on the jam's first frame), then a follow-through that stops short of the shipped one
+              const overRing = finishOverRing();
+              if (overRing) overLeg = overRingLeg(jamSec <= dt ? null : overLeg, ball.getAbsolutePosition(), rim, RIM_RADIUS, ballSim.radius, overRingJamSec());
+              if (overRing) { if (overRingFollows(overLeg)) player.root.position.z += (rim.z + FLUSH_Z_AHEAD - JAM_FOLLOW_M + OVER_RING.followBackM - player.root.position.z) * Math.min(1, dt / JAM_FOLLOW_TAU); }
+              else player.root.position.z += (rim.z + FLUSH_Z_AHEAD - JAM_FOLLOW_M - jamExtra - player.root.position.z) * Math.min(1, dt / JAM_FOLLOW_TAU);
               // the pull-up on the iron (never down); the LEFT-hand carry (the eastbay after its pass) pulls up further — the pass leaves
               // that palm facing down with the ball riding UNDER the wrist, 0.15 m lower than the right hand's palm-out carry
               const jamY = JAM_Y + (inOffHand() ? JAM_Y_LEFT_EXTRA : 0) + (finishVariant === 'reverse' ? REVERSE_JAM_LIFT : 0);   // DUNK-FLAGSHIP Phase 7: the turned body's reach over the head tops out lower
@@ -2565,7 +2571,10 @@ export const DunkMode: ModeDefinition = (() => {
               // held the ball 0.33 m over the ring until the 0.28 s timeout let it go 0.35 m off the iron and the flush floated it in
               // (the QA eye's "early windmill ≠ rim"). A slam comes down on the rim; the drop eases slower than the pull-up so it
               // reads as the body dropping onto the iron, not a snap.
-              player.root.position.y = jamRootStep(player.root.position.y, jamY, dt, JAM_LIFT_TAU, JAM_DROP_TAU);
+              // DUNK-FLAGSHIP P11 (knob, off = the shipped line below): over the ring the body does not come DOWN onto the iron until the ball
+              // is over the hole — it holds its height through the lift and the way in (it is still pulled UP to the jam height from under it)
+              if (overRing && player.root.position.y > jamY && overRingHoldsBody(overLeg)) { /* held */ }
+              else player.root.position.y = jamRootStep(player.root.position.y, jamY, dt, JAM_LIFT_TAU, JAM_DROP_TAU);
             }
             ball.computeWorldMatrix(true);
             const bp = ball.getAbsolutePosition();
@@ -2573,7 +2582,11 @@ export const DunkMode: ModeDefinition = (() => {
             // has not met the iron by JAM_SHORT_SEC is SHORT OF THE IRON (a miss, no contact, no punch)
             // DUNK-FLAGSHIP Phase 7: the reverse meets the iron once its back is to it (the turn is ~0.2 s; the short timeout is 0.6)
             const ironStep = finishVariant === 'reverse' && reverseLeft() > Math.PI - REVERSE_CONTACT_FROM ? null : jamIronStep({ ball: bp, rim, rimRadius: RIM_RADIUS, ballRadius: ballSim.radius, sincePress: jamSec, centred: true });
-            if (ironStep?.kind === 'contact') {
+            // DUNK-FLAGSHIP P11: with the knob on, a ball at the iron but still OUTSIDE the ring is not let go yet — the hand is carrying it
+            // over (core/DunkOverRing: up to OVER_RING.giveUpSec, then it is let go there as shipped). Off: never held.
+            const overHolds = ironStep?.kind === 'contact' && finishOverRing() && overRingDefers(bp, rim, RIM_RADIUS, ballSim.radius, jamSec);
+            if (overHolds) { jamPrevBall.copyFrom(bp); jamPrevLive = true; }
+            else if (ironStep?.kind === 'contact') {
               // DUNK-BALL-ARMS-RIM: let go where the ball TOUCHED the iron on this frame's travel, not where the frame left it (in the metal)
               // …and out of the metal when it was already in it a frame ago (a low catch under the front rim: no clear frame to rewind to)
               const touch = clearOfIron(jamPrevLive ? sweptTouch(jamPrevBall, bp, rim, RIM_RADIUS, ballSim.radius) : bp, rim, RIM_RADIUS, ballSim.radius);
@@ -3592,11 +3605,19 @@ export const DunkMode: ModeDefinition = (() => {
   // ── A+ P8 athlete hands (PM brief VENICE-DUNK-A-PLUS-P8, 2026-09-07) ─────────────────────────────────────────────
   /** DUNK-BALL-ARMS-RIM: where the reach sends the ball this frame — the centre over the ring once the ball is above the iron
    *  (or already inside the ring), otherwise a point in front of the front rim and over it, so the ball never climbs through it. */
+  /** DUNK-FLAGSHIP P11: the over-the-ring finish is on (the knob; never in ranked, staked or paid play — lib/feel-panel's gate). Read here and nowhere else. */
+  const finishOverRing = (): boolean => overRingOn(feel('dunk.finishOverRing', FINISH_OVER_RING));
+  /** …and the jam's clock for its path: negative while the push is not allowed yet (the REVERSE still turning its back to the iron). */
+  const overRingJamSec = (): number => (finishVariant === 'reverse' && reverseLeft() > Math.PI - REVERSE_CONTACT_FROM ? -1 : jamSec);
+  /** …and the leg of the path the jam is on (core/DunkOverRing: lift → in → down, forward only), stepped once a frame in the jam. */
+  let overLeg: OverRingLeg | null = null;
   const _aim = { x: 0, y: 0, z: 0 };
   function rimApproachAim(bw: Vector3 | null): { x: number; y: number; z: number } {
     const c = ballSim.radius + 0.01;
     _aim.x = rim.x; _aim.y = rim.y + ballSim.radius + 0.02; _aim.z = rim.z;
     if (!bw || RIM_AIM_OFF) return _aim;
+    // DUNK-FLAGSHIP P11 (knob `dunk.finishOverRing`, off = everything below, as shipped): through the jam, up in front of the rim, in over it, down through the middle
+    if (finishOverRing() && !replaying && phase === 'resolve' && qteHit && jamSec >= 0 && !jamContact && overLeg) return overRingAim(overLeg, bw, rim, RIM_RADIUS, ballSim.radius, _aim);
     const dx = bw.x - rim.x, dz = bw.z - rim.z, r = Math.hypot(dx, dz);
     // DUNK MOTION phase 9: over the MIDDLE of the ring the hand pushes the ball down THROUGH it (the flush), not onto it
     if (r <= RIM_RADIUS - c + 0.02 && phase === 'resolve' && qteHit) { _aim.y = rim.y - 0.06; return _aim; }

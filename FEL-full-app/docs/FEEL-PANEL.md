@@ -307,6 +307,15 @@ done), up a TWO-HAND POWER (`dunk_finish_two_hand`), each named on the card (+0.
 the live press inside the window; a called air trick keeps its own flush; the d-pad tricks are untouched (DunkSlamVariant.test).
 Like every knob, never in ranked, staked or paid play.
 
+lane/dunk-flagship P11 (group "Dunk · finishes"), new, OFF by default: `dunk.finishOverRing` 0 (`DunkOverRing.ts`
+`FINISH_OVER_RING`; owner call 1 of 2026-11-10: the shipped finish stays, this is the A/B to feel first). 0 = the shipped finish,
+line for line: the ball meets the front of the rim and the flush carries it in. 1 = the hand carries the ball over the ring —
+up in front of the rim, in over the lip, down through the middle — and lets it go inside the ring. Every dunk in the mode ends
+this way while it is on (the plain flush, the REVERSE, the TWO-HAND POWER, a called trick's flush). The numbers behind it are all
+new and read only with the knob on (`OVER_RING` in `DunkOverRing.ts`); the measured table is in `docs/DUNK-FLAGSHIP.md` §17.
+A ball the hand could not carry over in time is let go at the front of the rim as shipped: the knob never turns a make into a
+miss. Like every knob, never in ranked, staked or paid play (DunkUnlocks.verifiedJump.test proves it on this knob).
+
 lane/hoops-round2 (owner 2026-10-20, HOOPS DEFENSE / CONTACT; every number new, the owner has felt none of them yet):
 
 - Group "Hoops · AI reaction" (`hoops/reaction.ts`), **TUNED (new behaviour)**: `hoops.aiReactRookieMs` 420 ms, `hoops.aiReactProMs`
