@@ -67,11 +67,16 @@ const IN_PAGE = String.raw`
     // frames nobody looks at skip the GPU's draws (the gameplay-clean rig's fast mode); the render watchdog photographs the
     // canvas and would "rescue" a healthy game from the clear colour, so it is handed a grey frame while draws are off
     const de = eng.drawElementsType.bind(eng), da = eng.drawArraysType.bind(eng);
-    eng.drawElementsType = (...a) => { if (P.drawOn) de(...a); };
-    eng.drawArraysType = (...a) => { if (P.drawOn) da(...a); };
+    // Every frame is drawn until 20 frames past READY: the load's one-time passes (the environment's prefilter, the shadow
+    // maps) must run, or every later shot is dark (measured: the first run's frames were near-black). The gameplay-clean
+    // rig skips from READY on for the same reason.
+    eng.drawElementsType = (...a) => { if (P.drawOn || P.warm) de(...a); };
+    eng.drawArraysType = (...a) => { if (P.drawOn || P.warm) da(...a); };
+    P.warm = true; let warmLeft = -1;
+    scene.onBeforeRenderObservable.add(() => { const ph = phaseOf(); if (warmLeft < 0 && (ph === 'ready' || ph === 'playing')) warmLeft = 20; if (warmLeft > 0 && --warmLeft === 0) P.warm = false; });
     const T = window.__BABYLON_TOOLS;
     if (T) { const orig = T.CreateScreenshot; const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'); g.fillStyle = '#7a7a7a'; g.fillRect(0, 0, 64, 64); const gray = c.toDataURL();
-      T.CreateScreenshot = (e, cam, size, cb, ...rest) => (P.drawOn ? orig(e, cam, size, cb, ...rest) : (cb && setTimeout(() => cb(gray), 0))); }
+      T.CreateScreenshot = (e, cam, size, cb, ...rest) => (P.drawOn || P.warm ? orig(e, cam, size, cb, ...rest) : (cb && setTimeout(() => cb(gray), 0))); }
     else P.drawOn = true;   // no handle on the watchdog (the dev page): draw every frame
     let i = 0, sk = null, skRoot = null, nodes = null, pressedDown = false, lastZ = 99, swungThisPitch = false;
     const member = new WeakMap();
@@ -84,7 +89,9 @@ const IN_PAGE = String.raw`
       // Babylon does not start its animation clock while the scene still has files loading (Scene.animate returns early):
       // the clips are 'playing' and nobody moves. pend = files still loading, anim = the animation clock has started
       f.pend = (scene._pendingData || []).length; f.anim = !!scene._animationTimeLast;
-      const root = dev.hero();
+      // the batter, latched: Derby hands the hero handle to the ball on a hit (the follow camera)
+      if (!P.batter) { const h = dev.hero(); if (h && h.getDescendants(false).some((n) => /Hand/.test(n.name))) P.batter = h; }
+      const root = P.batter;
       const carrier = scene.getMeshByName('derby_bat') || scene.getMeshByName('baseball_bat');
       if (!root || !carrier || !carrier.rotationQuaternion) { f.none = !root ? 'hero' : 'bat'; P.frames.push(f); return arm(f); }
       if (skRoot !== root) {
@@ -126,7 +133,7 @@ const IN_PAGE = String.raw`
       lastZ = z; f.bz = +z.toFixed(2);
       if (pressedDown) { P.emit('A', false); pressedDown = false; }
       if (P.wantSwing && f.phase === 'playing' && incoming && !swungThisPitch && z < P.swingZ) {
-        P.emit('A', true); pressedDown = true; swungThisPitch = true; P.presses++; P.swingFrame = i; f.press = 1;
+        P.emit('A', true); pressedDown = true; swungThisPitch = true; P.presses++; P.swingFrame = i; f.press = 1; P.drawOn = P.wantSwing;
       }
       if (P.swingFrame > 0) f.sw = i - P.swingFrame;
       P.frames.push(f);
@@ -148,7 +155,7 @@ const IN_PAGE = String.raw`
       if (!hit && ((a.max !== undefined && --a.max <= 0) || (a.liveMax !== undefined && live && --a.liveMax <= 0))) { P.arm = null; P.gaveUp = true; P.freeze(); return; }
       if (!hit) return;
       // the frame that is shot is drawn in full: one more frame with the draws on, then the freeze
-      if (!P.drawOn) { P.drawOn = true; P.restoreDraw = true; P.arm = { kind: 'frames', n: 1 }; }
+      if (!P.drawOn && !P.warm) { P.drawOn = true; P.restoreDraw = true; P.arm = { kind: 'frames', n: 2 }; }
       else { P.arm = null; P.hitFrame = f.i; P.freeze(); }
     }
   }
@@ -184,10 +191,10 @@ const last = (p: Page) => p.evaluate(() => { const fr = (window as any).__BATP.f
 /** The GLB's thin end (handle) and thick end (barrel) from its own vertices, against the wrists. */
 async function glbEnds(p: Page): Promise<any> {
   return p.evaluate(() => {
-    const scene = (window as any).__FEL_DEV__.scene, root = (window as any).__FEL_DEV__.hero();
+    const scene = (window as any).__FEL_DEV__.scene, root = (window as any).__BATP.batter;
     const carrier = scene.getMeshByName('derby_bat') || scene.getMeshByName('baseball_bat');
     const wrap = carrier && scene.getTransformNodeByName(`${carrier.name}_glb`);
-    if (!wrap || !wrap.isEnabled()) return null;
+    if (!wrap || !wrap.isEnabled() || !root) return null;
     const V = carrier.position.constructor;
     const vs: any[] = [];
     for (const m of wrap.getChildMeshes()) { const pos = m.getVerticesData('position'); if (!pos) continue; m.computeWorldMatrix(true); const W = m.getWorldMatrix(); for (let i = 0; i < pos.length; i += 21) vs.push(V.TransformCoordinates(new V(pos[i], pos[i + 1], pos[i + 2]), W)); }
@@ -274,14 +281,12 @@ for (const mode of MODES) {
       R.swingShots.push({ n, frame: f, glb: await glbEnds(p) });
       await shot(p, `${mode}-4-swing-f${String(n).padStart(2, '0')}`);
     }
-    await p.evaluate(() => { (window as any).__BATP.wantSwing = false; });
-    // 4. after the swing: the batter comes back to the stance from another clip with the hands still free (8 s of game time)
-    R.freeCaught = await freezeOn(p, { kind: 'free', m: FREE_M, max: mode === 'derby' ? 150 : 480 }, 150000);
-    if (R.freeCaught) {
-      R.free = await last(p); await shot(p, `${mode}-5-back-to-stance-hands-free`);
-      // … and the stance once the fists have met again
-      if (await freezeOn(p, { kind: 'gripBack', m: 0.1, max: 60 }, 60000)) { R.gripBack = await last(p); await shot(p, `${mode}-6-stance-held-again`); }
-    }
+    await p.evaluate(() => { const P = (window as any).__BATP; P.wantSwing = false; P.drawOn = false; P.restoreDraw = false; });
+    // 4. after the swing: 10 s of play (the next pitches come, the batter goes back to the stance). Freeze on the first frame
+    // a player can SEE a bat between hands a free hand's width apart; otherwise shoot the stance the batter is back in.
+    R.freeCaught = await freezeOn(p, { kind: 'apartSeen', m: FREE_M, max: 600 }, 200000);
+    if (R.freeCaught) { R.free = await last(p); await shot(p, `${mode}-5-bat-seen-hands-free`); }
+    else { await freezeOn(p, { kind: 'gripBack', m: 0.1, max: 120 }, 60000); R.gripBack = await last(p); await shot(p, `${mode}-6-stance-after-10s`); }
     }
     const frames = await p.evaluate(() => (window as any).__BATP.frames);
     R.presses = await p.evaluate(() => (window as any).__BATP.presses);
