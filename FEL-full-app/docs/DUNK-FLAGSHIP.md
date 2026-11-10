@@ -619,3 +619,39 @@ motion and timing, not looks. Looks were judged on the drawn strips of each phas
 - **The READY card's layout shift while the arena loads** (0.2, the shared start screen of every mode): routed to its owner.
 - **The HUD's last shifts in play** (the caption and the beat strip, 0.074): a fixed slot per row is the HUD owners' change.
 - Not re-measured in Phase 10: the standing throws and the body dunk (their Phase 4 / 5 numbers stand).
+
+## 17. Follow-up (P11) — the finish carried over the ring, as a switched-off A/B (lane/dunk-flagship-p11)
+
+Owner call 1 of 2026-11-10: the shipped finish stays; the over-the-ring contact is built as its own off-by-default setting so it
+can be felt before any default moves. The setting is `dunk.finishOverRing` (feel panel, "Dunk · finishes"): **0, the default, is
+the shipped finish line for line** (every change in `DunkMode.ts` sits behind it with the shipped line on the other branch, and a
+test reads them); 1 changes only the stretch from the slam to the contact (`core/DunkOverRing.ts`):
+- the hand path goes forward only — up in front of the rim if the ball is low, in over the ring's centre, down through the middle;
+- the body holds its height through the jam and comes down after the contact (or, if the time runs out, straight down onto the
+  front of the rim); it carries in only once the ball is over the ring, and slides up to 0.25 m sideways to bring a ball carried
+  off the centre over it;
+- a contact met on the outside half of the iron is held while the hand can still carry it over; at 0.4 s the ball is let go at
+  the front of the rim as shipped, so the setting never turns a make into a miss.
+Every number is new and read only with the setting on. Like every setting, it never applies in ranked, staked or challenge play
+(`DunkUnlocks.verifiedJump.test`: with it held on the device and the panel open, it reads 0 on a challenge link with or without
+`?playtest=1`, an Arena duel, an async challenge, the ladder, a ranked or story run, online, and an ordinary paying run).
+
+**The 5-attempt table** (rig, the slam on the beat, `dunk.slamVariants` on so the stick calls the finish; "inside" = the ball's
+horizontal distance from the ring's centre at contact ≤ 0.225 m):
+
+| Build | Plain: made · inside | REVERSE | TWO-HAND POWER |
+|---|---|---|---|
+| Shipped finish (setting 0), this build | 5/5 · 2/5 (0.15–0.35 m) | 5/5 · 5/5 | 5/5 · 2/5 |
+| First cut (`c199e85a`) | 5/5 · 3/5 | 5/5 · 4/5 | 5/5 · 4/5 |
+| Body waits, slides under the ball (`4b22bb32`) | 5/5 · 3/5 | 5/5 · 5/5 | 5/5 · 4/5 |
+| Final (`7e7abb75`) | **5/5 · 4/5** | **5/5 · 5/5** | **5/5 · 3/5** |
+
+The 16 air tricks with the setting on (final build): 16/16 fire, 16/16 made, every slam on the same beat; 13/16 met inside the
+ring (8/16 with it off). Two earlier cuts each turned one trick into a miss (the double clutch, then the windmill) — both found on
+the rig, both fixed, each with a test that fails on the old code.
+
+**Verdict: not ready to flip.** The target was 5 of 5 inside for each finish; it is 4, 5 and 3. And the jam now runs long: on the
+final build the plain slams met the iron 83–567 ms after the press (the shipped finish: 17–67 ms), close to the 0.6 s at which a
+slam is SHORT OF THE IRON. What is left is the arm's reach: the ball sits 0.22–0.30 m in front of the ring with the body held at
+the top of its arc, and the hand cannot bring it further. The next step would be the body itself carrying the ball over the ring
+(a flight change at the slam), which is the owner's kind of decision; the setting stays off.
