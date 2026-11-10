@@ -10,6 +10,7 @@
 import { useEffect, useState } from 'react';
 import { Copy, Check, Gift, Users, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
+import { TYPE } from '@/lib/design/type';
 
 interface Stats {
   code: string | null;
@@ -54,7 +55,7 @@ export function ReferralCard() {
         <Gift className="h-5 w-5 text-[#A855F7]" />
         <h3 className="fel-heading text-lg font-bold text-white">Invite &amp; earn shards</h3>
       </div>
-      <p className="mt-1 text-sm text-white/60">
+      <p className={`mt-1 ${TYPE.body} text-white/60`}>
         Share your link. When a friend creates an athlete, you earn{' '}
         <span className="font-semibold text-[#C79BFF]">shards</span> — the currency you can’t buy.
       </p>

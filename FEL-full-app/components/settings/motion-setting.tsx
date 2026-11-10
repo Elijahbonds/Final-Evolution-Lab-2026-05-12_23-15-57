@@ -15,6 +15,7 @@ import {
   writeMotionPref, type MotionPref,
 } from '@/lib/a11y/reducedMotion';
 import { t } from '@/lib/i18n';
+import { lineSize } from '@/lib/design/type';
 
 // A11-07: the words live in messages/en/settings.json
 const LABEL: Record<MotionPref, string> = { system: t('settings.motion.label.system'), reduce: t('settings.motion.label.reduce'), full: t('settings.motion.label.full') };
@@ -89,7 +90,7 @@ export function MotionSetting({ compact = false, className = '' }: { compact?: b
   return (
     <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5" role="group" aria-labelledby="motion-setting-heading">
       <h3 id="motion-setting-heading" className="fel-heading mb-1 text-lg font-bold text-white">{t('settings.motion.heading')}</h3>
-      <p className="mb-4 text-xs text-fel-dim">{t('settings.motion.body')}</p>
+      <p className={`mb-4 ${lineSize(t('settings.motion.body'), 'text-xs')} text-fel-dim`}>{t('settings.motion.body')}</p>
       <div className="flex flex-wrap gap-2">
         {MOTION_PREFS.map((p) => (
           <button key={p} type="button" onClick={() => pick(p)} aria-pressed={p === pref}
@@ -98,7 +99,7 @@ export function MotionSetting({ compact = false, className = '' }: { compact?: b
           </button>
         ))}
       </div>
-      <p className="mt-3 text-[12px] text-white/50" aria-live="polite">{motionStatus(pref, os, url)}</p>
+      <p className={`mt-3 ${lineSize(motionStatus(pref, os, url), 'text-[12px]')} text-white/50`} aria-live="polite">{motionStatus(pref, os, url)}</p>
     </div>
   );
 }

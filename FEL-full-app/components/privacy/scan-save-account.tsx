@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { SCAN_SAVE_CONSENT_TEXT } from '@/lib/privacy/scanSaveConsent';
+import { lineSize } from '@/lib/design/type';
 
 type Item = { id: string; kind: string; at: string; numbers: Record<string, string | number | null> };
 
@@ -23,7 +24,7 @@ export function ScanSaveAccountPanel(props: {
   return (
     <section className="rounded-xl border border-white/10 bg-white/[0.02] p-5" data-testid="scan-save-account">
       <h2 className="fel-heading text-lg font-bold text-white">Jump numbers</h2>
-      <label className="mt-3 flex items-start gap-3 text-sm text-white/80">
+      <label className={`mt-3 flex items-start gap-3 ${lineSize(SCAN_SAVE_CONSENT_TEXT, 'text-sm')} text-white/80`}>
         <input
           data-testid="scan-save-toggle"
           type="checkbox"
@@ -44,7 +45,7 @@ export function ScanSaveAccountPanel(props: {
           Delete my saved history
         </button>
       ) : null}
-      {props.note ? <p className="mt-2 text-xs text-white/60">{props.note}</p> : null}
+      {props.note ? <p className={`mt-2 ${lineSize(props.note, 'text-xs')} text-white/60`}>{props.note}</p> : null}
       {props.visible && props.items.length > 0 ? (
         <ul className="mt-4 space-y-2 text-xs text-white/70">
           {props.items.map((item) => (

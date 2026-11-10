@@ -14,6 +14,7 @@ import { MP_MODES } from '@/lib/mp/match-core';
 import { CreatorCard, type CreatorCardData } from './creator-card';
 import { DEFAULT_VISIBILITY, MAX_HIGHLIGHTS, STAT_BLOCKS, normalizeVisibility, type Highlight, type HighlightCandidate, type Visibility } from '@/lib/creator/card-stats';
 import { mpModeLabel } from '@/lib/mp/match-core';
+import { TYPE } from '@/lib/design/type';
 
 export function CardEditor() {
   const [card, setCard] = useState<CreatorCardData | null>(null);
@@ -114,7 +115,7 @@ export function CardEditor() {
       {/* editor */}
       <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
         <h3 className="fel-heading text-lg font-bold text-white">Your Creator Card</h3>
-        <p className="mt-1 text-xs text-white/50">Customize the look. PRQ, top score and wins sync from your real sessions.</p>
+        <p className={`mt-1 ${TYPE.body} text-white/50`}>Customize the look. PRQ, top score and wins sync from your real sessions.</p>
 
         <Field label="Display name">
           <input value={displayName} maxLength={40} onChange={(e) => setDisplayName(e.target.value)} className="fel-input" placeholder="Your athlete name" />
@@ -151,7 +152,7 @@ export function CardEditor() {
             ))}
           </div>
           <div className="mt-3 font-mono text-[12px] uppercase tracking-widest text-white/50">Highlights · pin up to {MAX_HIGHLIGHTS}</div>
-          {candidates.length === 0 && <p className="mt-1 text-xs text-white/50">Play a mode — your personal bests, wins and signature attempts show up here to pin.</p>}
+          {candidates.length === 0 && <p className={`mt-1 ${TYPE.body} text-white/50`}>Play a mode — your personal bests, wins and signature attempts show up here to pin.</p>}
           <div className="mt-1.5 max-h-44 space-y-1 overflow-y-auto">
             {candidates.slice(0, 20).map((c) => {
               const key = `${c.kind}:${c.id}`; const pinned = pins.find((h) => `${h.kind}:${h.id}` === key);
@@ -167,7 +168,9 @@ export function CardEditor() {
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
-          <button onClick={save} disabled={busy} className="inline-flex items-center gap-2 rounded-xl bg-[#A855F7] px-5 py-3 font-bold text-white transition-transform hover:scale-[1.03] disabled:opacity-50">
+          {/* SCREEN-FIXES (2026-11-10): white on the violet accent #A855F7 is 3.96:1, under AA for this 16 px label; the fill is
+              the accent's next step down, #9333EA, 5.38:1 (lib/a11y/wcag.ts contrastRatio). The violet stays the colour. */}
+          <button data-save-card onClick={save} disabled={busy} className="inline-flex items-center gap-2 rounded-xl bg-[#9333EA] px-5 py-3 font-bold text-white transition-transform hover:scale-[1.03] disabled:opacity-50">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save card
           </button>
           {canPublish || published ? <button onClick={togglePublish} disabled={busy || !card} className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/[0.04] px-5 py-3 font-semibold text-white transition-colors hover:border-white/30 disabled:opacity-50">
