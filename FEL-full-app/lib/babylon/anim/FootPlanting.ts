@@ -133,6 +133,22 @@ export const PLANT_ENGAGE_SEC = 0.1;
  */
 export const PLANT_RELEASE_SEC = RELEASE_FADE_SEC;
 
+/**
+ * GAMEPLAY-CLEAN P5 (2026-11-10): A FOOT THAT PLANTS AGAIN CARRIES ITS RELEASE THROUGH, feel knob `anim.plantReplantEase` (1 on).
+ *
+ * P4's rotation release holds the leg the layer last wrote and slerps it onto the clip's over PLANT_RELEASE_SEC. A foot that planted
+ * AGAIN inside that time ENDED the release on the spot (`relLeft = 0`) — and the release had also zeroed the engage, so the new plant's
+ * first solve is the clip's own pose: the leg jumped the rest of the way from the held pose to the clip in ONE frame, then eased back
+ * out to the pole. It happens every time a pin is let go and taken straight back: a stance foot sliding to the drift limit (released
+ * there, low and still, so planted again on the next frame — "a clip that never steps slides smoothly at the drift limit", S7), a
+ * one-frame airborne read on a landing or a step down. Measured headless on a stance with its knees turned out 40°, the root sliding
+ * at 0.5–3 m/s: the thigh 33.5° in a frame at every release (6.4° with P4 off; 40° before P3) — P4 had put back most of the pop P3
+ * took out, on this path only. Now the release carries on under the new plant: the held hip and knee keep slerping onto whatever the
+ * layer solves this frame (the clip's pose at first, the pinned one as the engage comes back), for what is left of the release time.
+ * 0 = a replant ends the release at once, exactly as P4 shipped. The pin, its weight, the engage and the release time are unchanged.
+ */
+export const PLANT_REPLANT_EASE_ON = 1;
+
 /** The solve's engage weight one frame on (pure): toward 1 while the layer solves the leg, toward 0 when it stops, at 1/`sec` a second
  *  — a hard step at `sec` ≤ 0 (the old behaviour). */
 export function stepEngage(w: number, solving: boolean, dt: number, sec: number): number {
@@ -269,6 +285,7 @@ export function mountFootPlanting(scene: Scene, skinned: AbstractMesh, skeleton:
     const dt = Math.min(0.1, Math.max(1e-4, scene.getEngine().getDeltaTime() / 1000));
     const engageSec = feel('anim.plantEngageSec', PLANT_ENGAGE_SEC);
     const releaseSec = feel('anim.plantReleaseSec', PLANT_RELEASE_SEC);
+    const replantEase = feel('anim.plantReplantEase', PLANT_REPLANT_EASE_ON) >= 0.5;
     frameNo++;
     for (let li = 0; li < legs.length; li++) {
       const leg = legs[li];
@@ -327,7 +344,8 @@ export function mountFootPlanting(scene: Scene, skinned: AbstractMesh, skeleton:
         solveEngaged(leg, ankle, false, dt, engageSec);
         continue;
       }
-      leg.fadeLeft = 0; leg.relLeft = 0;   // (P4: a foot that plants again ends a release in flight)
+      leg.fadeLeft = 0;
+      if (!(replantEase && releaseSec > 0)) leg.relLeft = 0;   // (P4: a foot that plants again ends a release in flight; P5: it carries it through — carryRelease)
       if (!prev.planted && !handover) {
         // touchdown: remember where the foot is, in the root's frame
         leg.rootAtPlant.copyFrom(rootPos);
@@ -338,11 +356,23 @@ export function mountFootPlanting(scene: Scene, skinned: AbstractMesh, skeleton:
       const drift = Math.hypot(ankle.x - target.x, ankle.z - target.z);
       const w = pinWeight(drift, params.maxDrift) * intensity;
       leg.fadeW = w; leg.fadeTarget.copyFrom(target);   // what a release fades out from
-      if (w <= 0.001 || drift < 0.002) { solveEngaged(leg, ankle, false, dt, engageSec); continue; }
+      if (w <= 0.001 || drift < 0.002) { solveEngaged(leg, ankle, false, dt, engageSec); carryRelease(leg, dt, releaseSec); continue; }
       Vector3.LerpToRef(ankle, target, w, target);
       solveEngaged(leg, target, true, dt, engageSec);
+      carryRelease(leg, dt, releaseSec);
     }
   });
+  /** P5: a release still in flight when its foot planted again — the held hip and knee go on slerping onto what the layer wrote this
+   *  frame (the clip's pose, or the new plant's solve), over what is left of the release. Nothing when no release is in flight. */
+  function carryRelease(leg: Leg, dt: number, releaseSec: number): void {
+    if (!(leg.relLeft > 0)) return;
+    leg.relLeft = Math.max(0, leg.relLeft - dt);
+    const k = releaseSec > 0 ? 1 - leg.relLeft / releaseSec : 1;
+    Quaternion.SlerpToRef(leg.relHip, leg.hip.rotationQuaternion!, k, leg.hip.rotationQuaternion!);
+    Quaternion.SlerpToRef(leg.relKnee, leg.knee.rotationQuaternion!, k, leg.knee.rotationQuaternion!);
+    leg.hip.computeWorldMatrix(true); leg.knee.computeWorldMatrix(true); leg.ankle.computeWorldMatrix(true);
+    leg.outHip.copyFrom(leg.hip.rotationQuaternion!); leg.outKnee.copyFrom(leg.knee.rotationQuaternion!); leg.outFrame = frameNo;   // what a later release holds
+  }
   /** P3: solve the leg with its KNEE POLE eased by the engage. The pin's target is solved at full weight (the plant is as strong as
    *  ever); what blends is where the solve throws the knee: from the clip's own knee (engage 0 — a solve toward the clip's ankle
    *  with the clip's knee IS the clip's pose: nothing moves) to the root's forward (engage 1, the layer as it was). Not solving

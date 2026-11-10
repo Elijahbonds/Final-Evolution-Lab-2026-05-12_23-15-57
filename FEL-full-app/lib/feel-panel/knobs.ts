@@ -1332,6 +1332,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'How long a leg the foot planter lets go of takes to ease back onto the clip, in rotation. 0 = the old release, a target fade that rebuilt the leg in one frame when the body jumped or landed (football hurdle, 41 to 70 degrees a frame).',
   },
   {
+    id: 'anim.plantReplantEase', label: 'Foot plant: a replant keeps easing on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/FootPlanting.ts PLANT_REPLANT_EASE_ON',
+    hint: 'On: a foot that plants again while its leg is still easing off the last plant keeps easing. Off: the old behaviour, the leg snapped onto the new plant in one frame (a body sliding in a wide stance popped a thigh about 33 degrees at every re-plant).',
+  },
+  {
     id: 'anim.hipYawFold', label: 'Posture hip strip folds past 90 degrees on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
     source: 'lib/babylon/anim/PostureLayer.ts HIP_YAW_FOLD_ON',
     hint: 'On: a window that keeps part of the hips turn (football spin) reads a turn past 90 degrees folded back, so the hips never flip 180 degrees in a frame at the half-turn. Off: the old wrapped read.',
