@@ -310,6 +310,7 @@ To run one by hand: `npx prisma db execute --url "$PROD_DIRECT_URL" --stdin <<< 
   - The fix is the post-launch lane the runbook already names: add both models to `schema.prisma` and regenerate the
     client on Linux. The book shop's two tables do the same on the day it opens.
   - Until that lane lands, db-guard can still guard a release, but it cannot apply one.
+- **For the raw-SQL files there is `scripts/pending-sql/cli.ts` (2026-11-10, `docs/PENDING-SQL.md`):** the owner's one command, by hand.
 - **The raw-SQL pending files are never applied by db-guard.** They are not in the schema, so they never appear in the
   diff. `OWNER-RUNBOOK.md` §6 stays the way to apply them.
 - **Hand-written files must be in Prisma's form to auto-apply.** `2026-10-07-adventure-save.sql` is not (§2).

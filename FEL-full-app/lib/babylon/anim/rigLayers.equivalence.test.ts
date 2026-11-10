@@ -10,7 +10,8 @@ import { describe, expect, it, vi } from 'vitest';
 // (`anim.plantEngageSec`, 0 = the old one-frame engage) and the posture's folded hip strip (`anim.hipYawFold`, 0 = the old wrapped
 // read). This file proves the ALLOCATION pass, so it runs both at their pre-change values: the live layers must still be the legacy
 // ones bit for bit there. The new behaviour has its own tests (FootPlanting.engage.test, PostureLayer.fold.test).
-vi.mock('../../feel-panel/feel', () => ({ feel: (id: string, def: number) => (id === 'anim.plantEngageSec' || id === 'anim.hipYawFold' ? 0 : def) }));
+// (P4 adds the third: the rotation release, `anim.plantReleaseSec`, 0 = the old target fade.)
+vi.mock('../../feel-panel/feel', () => ({ feel: (id: string, def: number) => (id === 'anim.plantEngageSec' || id === 'anim.hipYawFold' || id === 'anim.plantReleaseSec' ? 0 : def) }));
 import { Quaternion, Vector3 } from '@babylonjs/core';
 import { firstDifference, runRigScenario, type RigImpl, type RigScenario, type RigTrace } from '@/tests/helpers/rigEquivalence';
 import * as LegacyPosture from '@/tests/helpers/rigLegacy/PostureLayer.legacy';
