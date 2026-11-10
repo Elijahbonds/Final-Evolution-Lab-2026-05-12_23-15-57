@@ -1025,7 +1025,13 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     if (arm && armW > 0) {
       handLocal.set((s.hand.x + out) * sx, s.hand.y, s.hand.z + push);
       toWorld(handLocal.x, handLocal.y, handLocal.z, handT);
-      if (feel('hoops.carryStartHandOn', CARRY_START_HAND_ON) >= 0.5) handT.addInPlace(startShift);   // hoops-p05b: the palm rides the same fade
+      if (feel('hoops.carryStartHandOn', CARRY_START_HAND_ON) >= 0.5) {
+        handT.addInPlace(startShift);   // hoops-p05b: the palm rides the same fade
+        // …and the reach that takes the arm over from the hold starts its elbow's swing limit from the arm as posed under it: with no
+        // reach last frame the limit had nothing to limit from, and the first solve swung the upper arm up to 145° in one frame (1v1
+        // seed 7, the gear stop into the sprint: LeftArm 8 696 °/s on the dribble's first frame, measured on the rig)
+        if (startOff && reachedAt !== stamp - 1) { forgetElbowSwing(arm); limitElbowSwing(arm, frameDt, stamp - 1, ELBOW_SWING_RATE_DEG); }
+      }
       toWorld(sx * BALL_ELBOW_POLE[0], BALL_ELBOW_POLE[1], BALL_ELBOW_POLE[2], pole).subtractInPlace(opts.root.getAbsolutePosition());
       const ks = switchLeft > 0 ? 1 - switchLeft / SWITCH_FADE_SEC : 1;
       // hoops-handle: never under the rising ball — the clip's hand (a stance with no ball arm) is lifted clear of the ball's top

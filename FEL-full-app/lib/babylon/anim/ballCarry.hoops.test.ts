@@ -704,5 +704,28 @@ describe('the first bounce\'s palm rides the same fade as its ball (hoops-p05b)'
     expect(was.length).toBeGreaterThan(5);
     expect(Math.max(...now)).toBeLessThan(0.01);        // on the ball, every frame the stroke has it there
   });
+  /** The ball arm's (rig LeftArm) turn per second on each of the dribble's first 6 frames, the clip resetting the arm every frame. */
+  const armSpeeds = (): number[] => {
+    const scene = new Scene(new NullEngine()); const r = rig(scene);
+    const armQ = Quaternion.RotationAxis(new Vector3(1, 0, 0), -0.9).multiply(r.nodes.LeftArm.rotationQuaternion!);
+    const clip = () => { r.nodes.LeftArm.rotationQuaternion!.copyFrom(armQ); r.nodes.LeftForeArm.rotationQuaternion = Quaternion.RotationAxis(Vector3.Right(), 0.4); };
+    clip(); r.nodes.LeftArm.computeWorldMatrix(true);
+    attachBallToHand(r.ball, r.sk, 'LeftHand');
+    const carry = mountBallCarry({ scene, ball: r.ball, root: r.root, skeleton: r.sk, hoops: true });
+    const d = driver(scene, carry, r.ball);
+    clip(); d.frame(1 / 60, 0, false);
+    let prev = r.nodes.LeftArm.rotationQuaternion!.clone(); const out: number[] = [];
+    for (let i = 0; i < 6; i++) { clip(); d.frame(1 / 60, 0.2, true); const q = r.nodes.LeftArm.rotationQuaternion!; out.push(2 * Math.acos(Math.min(1, Math.abs(Quaternion.Dot(q, prev)))) * 180 / Math.PI * 60); prev = q.clone(); }
+    carry.dispose();
+    return out;
+  };
+  it('the reach that takes the arm over from the hold keeps the elbow\'s swing limit from its first frame: no arm pop on the dribble\'s start', () => {
+    // (without the limit's seed the on-ball target swung the upper arm 7 700 °/s here, 8 696 on the rig; the old start 3 967 here)
+    resetFeelForTests(); setFeelUser(true); setFeelSession(null); setFeelOverride('hoops.carryStartHandOn', 0);
+    let was: number[];
+    try { was = armSpeeds(); } finally { resetFeelForTests(); }
+    const now = armSpeeds();
+    expect(Math.max(...was)).toBeGreaterThan(3000);      // the control: the old start's pop (the rig's SEVERE is 3 000 °/s)
+    expect(Math.max(...now)).toBeLessThan(1500);
+  });
 });
-
