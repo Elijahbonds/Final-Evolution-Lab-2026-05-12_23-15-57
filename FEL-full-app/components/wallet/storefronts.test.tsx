@@ -87,6 +87,8 @@ describe('/store draws the coin packs, or not, from the first render', () => {
     const { join } = await import('node:path');
     const root = join(__dirname, '..', '..');
     expect(readFileSync(join(root, 'app/store/page.tsx'), 'utf8')).toMatch(/<CoinStore initialPurchasesEnabled=\{coinPacksOnSale\(\)\} \/>/);
-    expect(readFileSync(join(root, 'app/api/v1/wallet/config/route.ts'), 'utf8')).toMatch(/purchasesEnabled: coinPacksOnSale\(\)/);
+    // the config route keeps its own two calls (lib/payments/allowlist.test.ts reads every real-money route's source for
+    // the allow list); lib/wallet/purchases.test.ts holds coinPacksOnSale to the same answer
+    expect(readFileSync(join(root, 'app/api/v1/wallet/config/route.ts'), 'utf8')).toMatch(/purchasesEnabled: purchasesEnabledFromEnv\(\) && allowlistPermits\('coins'\)/);
   });
 });

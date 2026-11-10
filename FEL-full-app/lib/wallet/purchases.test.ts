@@ -47,4 +47,9 @@ describe('coinPacksOnSale (SCREEN-FIXES 2026-11-10: the server answer /store dra
     expect(coinPacksOnSale({ STRIPE_SECRET_KEY: 'sk_test_x', VIRTUAL_PURCHASES_ENABLED: 'true', PURCHASES_ALLOWLIST: 'fel_pro' })).toBe(false);
     expect(coinPacksOnSale({ STRIPE_SECRET_KEY: 'sk_test_x', VIRTUAL_PURCHASES_ENABLED: 'true', PURCHASES_ALLOWLIST: 'coins' })).toBe(true);
   });
+  it('is the answer GET /api/v1/wallet/config gives (purchasesEnabledFromEnv && allowlistPermits(coins)), env by env', async () => {
+    const { allowlistPermits } = await import('@/lib/payments/allowlist');
+    const envs = [{}, { STRIPE_SECRET_KEY: 'k' }, { STRIPE_SECRET_KEY: 'k', VIRTUAL_PURCHASES_ENABLED: 'on' }, { STRIPE_SECRET_KEY: 'k', VIRTUAL_PURCHASES_ENABLED: 'yes', PURCHASES_ALLOWLIST: 'shards' }, { STRIPE_SECRET_KEY: 'k', VIRTUAL_PURCHASES_ENABLED: '1', PURCHASES_ALLOWLIST: 'coins,fel_pro' }];
+    for (const env of envs) expect(coinPacksOnSale(env), JSON.stringify(env)).toBe(purchasesEnabledFromEnv(env) && allowlistPermits('coins', env));
+  });
 });

@@ -21,8 +21,9 @@ export function purchasesEnabledFromEnv(env: Record<string, string | undefined> 
   return v === '1' || v === 'true' || v === 'on' || v === 'yes';
 }
 
-/** Coin packs on /store: real money on, and PURCHASES_ALLOWLIST lets coins through. The one answer GET /api/v1/wallet/config
- *  gives the client and app/store/page.tsx gives the first draw (SCREEN-FIXES 2026-11-10). */
+/** Coin packs on /store: real money on, and PURCHASES_ALLOWLIST lets coins through: the answer GET /api/v1/wallet/config gives
+ *  the client (that route keeps its own two calls; purchases.test.ts holds this to them), here for app/store/page.tsx's first
+ *  draw (SCREEN-FIXES 2026-11-10). */
 export function coinPacksOnSale(env: Record<string, string | undefined> = process.env): boolean {
   return purchasesEnabledFromEnv(env) && allowlistPermits('coins', env);
 }
