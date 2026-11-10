@@ -19,7 +19,7 @@ Each rule is a number in `lib/readable/rules.ts` (`READABLE`), so the rig, the s
 | **Never clipped** | No key information — a number, a score, a price, a time, an error, a heading or a control's label — is cut off at 390 px, at 200 % zoom (1280 × 800 at 200 %, a 640 × 400 CSS viewport), or with the root font at 150 % (iOS larger text). | These are the three ways a phone or a laptop shrinks the room text has. 150 % is the top of the brief's 125–150 % (the worst case). |
 | **Never overlapping** | No text is left under the tab bar, the status rail, the HUD or a toast once the page is scrolled as far as it goes; no two runs of text are drawn on each other. | A run under a bar at the end of the page can never be scrolled clear. |
 | **Up long enough to read** | A toast, banner, callout or lower third that goes away by itself stays up at least **words × 0.3 s + 1 s**, unless it persists or can be re-read. | 0.3 s a word is 200 words a minute, a slow reader's pace; the 1 s is noticing that something arrived and moving the eyes to it. |
-| **Themes** | Both themes, if the app has two; `prefers-contrast`; reduced transparency where a blur carries text. | The app has **one theme** (dark: `<html class="dark">`, ink `#050505`) and no `prefers-contrast` or `prefers-reduced-transparency` handling anywhere (searched 2026-11-02). Every contrast number here is on the dark theme. Blur-backed text (`fel-glass`, the toasts) is measured as drawn; see section 5 for the reduced-transparency call. |
+| **Themes** | Both themes, if the app has two; `prefers-contrast`; reduced transparency where a blur carries text. | The app has **one theme** (dark: `<html class="dark">`, ink `#050505`) and no `prefers-contrast` handling (searched 2026-11-02). Every contrast number here is on the dark theme. Blur-backed text is measured as drawn. Since readable-2 (2026-11-10), under `prefers-reduced-transparency: reduce` the glass (`.fel-glass`, the toasts), the HUD panels (`.fel-panel`), the tab bar and the status rail (`.fel-bar`) are solid with no blur (`app/theme.css`; measured by `scripts/probes/readable/reduced-transparency.mts`). |
 
 ## 2. How it is measured
 
@@ -50,11 +50,19 @@ own backdrops (`public/backdrops/*.jpg`) plus pure white and mid-grey.
 
 ```
 npx tsx scripts/readable/audit.mts <outDir> <label> --build-only                       # bundle (no browser)
-flock /home/user/wt/gate-queue.lock timeout 900 npx tsx scripts/readable/audit.mts <outDir> <label> --plant
-flock /home/user/wt/gate-queue.lock timeout 900 npx tsx scripts/readable/audit.mts <outDir> <label> --hud
-flock /home/user/wt/gate-queue.lock timeout 900 npx tsx scripts/readable/audit.mts <outDir> <label> [--budget=780]
-npx tsx scripts/readable/summary.mts <outDir> <label> [--vs=<before label>]             # totals, worst screens, contact sheet
+/home/user/wt/gate-run.sh 900 npx tsx scripts/readable/audit.mts <outDir> <label> --plant
+/home/user/wt/gate-run.sh 900 npx tsx scripts/readable/audit.mts <outDir> <label> --hud
+/home/user/wt/gate-run.sh 900 npx tsx scripts/readable/audit.mts <outDir> <label> [--budget=780]
+npx tsx scripts/readable/summary.mts <outDir> <label> [--vs=<before label>] [--pairs=/play,/terms]   # totals, worst screens, contact sheets
+npx tsx scripts/readable/regressions.mts <outDir> <before label> <after label> [--all] [--body]   # the gate: exits 1 on anything new
+/home/user/wt/gate-run.sh 900 npx tsx scripts/probes/readable/reduced-transparency.mts <outDir> <label>   # the glass and the bars, setting off / on
 ```
+
+`regressions.mts` is the gate between two crawls: per route and set-up, the clipping, overlap and sideways scroll that
+the after-crawl has and the before-crawl does not (counted, so a text clipped twice before and three times after is
+one new finding), and any route that rendered before and does not now. `--workers=3` reads three routes at a time in
+the one browser (a full crawl is then about two lock holds); `--trace=<text>` prints the measured ratio of a named run,
+pass or fail, and says so when a run was never read because a fixed layer covered it at every scroll step.
 
 The crawl resumes: each route is written to `<outDir>/<label>/routes/<route>.json` when it finishes, and a run stops
 starting new routes after `--budget` seconds, so a crawl is several ≤ 15-minute lock holds. Output is JSON plus a JPG of
@@ -85,6 +93,10 @@ scans) is read by `lib/readable/sourceScan.ts` for
 
 It is a ratchet: `tests/readable/source-baseline.json` holds what is left per file, a file may never rise above its line,
 and a new file is held to zero. Lower a line when you fix one: `npx tsx scripts/readable/source-baseline.mts --write`.
+
+The codemod also reads a tree this lane may not edit, to list what the floor would change there (never `--write`):
+`git archive origin/main app components lib | tar -x -C <dir>`, then
+`npx tsx scripts/readable/codemod.mts --root=<dir> --only=<file of paths> --list`.
 
 ### Timings (`scripts/readable/timings.mts`)
 
@@ -137,6 +149,75 @@ The 8 left under 12 px are the owner's `[OWNER: …]` placeholders on /press, /m
 Contact sheets (JPG): the worst screens before (`before/contact.jpg`) and after (`after/contact-after.jpg`), and the
 HUD before / after (`contact-hud.jpg`), in the lane's scratchpad; the route JSONs beside them.
 
+### readable-2 (2026-11-10): the owner calls, the small misses, the lanes that landed
+
+Phase 1's crawl data was lost with its scratch folder, so both crawls here are fresh, on one build of the rig: before is
+release `a5bb51e9`, after is `lane/readable-2`. 184 routes; 133 render on the stubbed server in both. The plant control
+passed on both bundles (exactly the five planted faults, phone and desktop).
+
+**The gate** (`scripts/readable/regressions.mts <outDir> before after`): **0** new clipped runs, **0** new overlaps, **0**
+pages that newly scroll sideways, **0** routes that stopped rendering, across phone, desktop, 200 % zoom and 150 % root
+font. Nothing is new under the size and contrast rules either.
+
+| Rule | phone | desktop | 200 % zoom | 150 % root font |
+|---|---|---|---|---|
+| under 12 px | 23 → **8** | 23 → **8** | – | – |
+| contrast under AA (from pixels) | 20 → **7** | 20 → **7** | – | – |
+| unreadable over a photo | 1 → 1 | 3 → 3 | – | – |
+| key information clipped | 13 → **7** | 17 → **2** | 17 → **2** | 17 → **12** |
+| overlapped (under a fixed bar / text on text) | 1 → 1 | 2 → 2 | 3 → 3 | 1 → 1 |
+| page scrolls sideways | 0 → 0 | 0 → 0 | 0 → 0 | 6 → **0** |
+| body copy under 16 px on a phone | 441 → **157** | – | – | – |
+
+The source (`tests/readable/source-floor.test.ts`): text under 12 px **48 → 0** uses; sub-AA text colours **26 → 7**
+(the 7 are `text-fel-violet` / `text-fel-indigo` on icons, reviewed as non-text). The baseline went from 17 files to 6.
+
+What each number is:
+
+- **Under 12 px, 8 left:** the owner's `[OWNER: …]` placeholders on /press, /media-kit, /team and /work-with-us.
+- **Contrast, 7 left on a phone:** 6 on `/play/party` (the four empty player slots "P 1"–"P 4" at 1.7–2.8:1 and two
+  "1–2 PLAYERS" badges at 3.67 and 4.42:1) and "Save card" on `/profile/edit` (3.96:1). Gone: /cards'
+  creator names, /multiplayer's active tab, /party's "PARTY", /live's category chips, /play/drills' camera line and the
+  athlete stage's "3D isn't available" line (3.18:1 → clear).
+- **Clipped, phone 13 → 7:** gone are the Quick Screen / Privacy / Correctives header `h1`s (2 px) and one Play shelf
+  list. Six of the Play shelf's seven lists still end in an ellipsis after two lines (see section 5); the seventh item
+  is "Your week · Nov 4 – Nov 10" on /train (32 px).
+- **Clipped, desktop and 200 % zoom 17 → 2:** the Play shelf's lists and the mode rows' lines fit in two lines on a desktop (what is left is two
+  lines of the hero's card strip, 3–5 px); at 200 % zoom the Sports list still clamps and one strip line is cut.
+- **Sideways scroll at 150 %, 6 → 0:** /store-terms (105 px), /multiplayer (88), /support (61), /purchase-terms (48),
+  /learn (34) and /modes (6).
+- **Body copy under 16 px, 441 → 157:** the five legal pages (244 runs), /credits (22), the guardian consent page (2),
+  the Playbook's chapter list (10 of 11) and /play/drills (6 of 7) are at 16 px. What is left is supporting copy on
+  59 screens (it was on 66), not long-form: section 5.
+- **`/profile`'s two 1.3:1 lines** ("No duels yet…", "Jump check, hands on hips →"): read by name with `--trace`, they
+  measure **5.3:1** and **12.1–12.5:1** on a phone and a desktop, before and after alike. The 1.3:1 was the rig's, not the
+  page's: it read them while the docked button covered half the run; since 60a01b76 a run any fixed layer covers is read
+  at another scroll step. The same trace has the athlete stage's "3D isn't available" line at 3.18:1 before and 6.51:1
+  after.
+
+**Reduced transparency**, measured with the browser reporting `prefers-reduced-transparency: reduce`
+(`scripts/probes/readable/reduced-transparency.mts`, computed styles on `/play` at 390 px):
+
+| Surface | setting off | setting on |
+|---|---|---|
+| tab bar | `rgba(5, 5, 5, 0.9)`, blur 24 px | `rgb(5, 5, 5)`, no blur |
+| status rail | `rgba(5, 5, 5, 0.85)`, blur 24 px | `rgb(5, 5, 5)`, no blur |
+| toast glass (`.fel-glass`) | `rgba(20, 26, 34, 0.86)`, blur 18 px | `rgb(20, 26, 34)`, no blur |
+| HUD panel (`.fel-panel`) | `rgba(13, 17, 23, 0.72)`, blur 14 px | `rgb(13, 17, 23)`, no blur |
+
+**Not measured on the rig:** the lesson reader (`/education/playbook/[chapter]`), a course lesson
+(`/education/course/[id]`) and the guardian's link page (`/consent/guardian/[token]`) need a record and do not render
+on the stubbed server; their 16 px is a class change read in the source, not a measured one. Nothing here was read on
+a real phone.
+
+**The HUD over real frames** was not touched by this lane; re-read on the after bundle it is as phase 1 left it: the
+shared TV HUD has one miss, the decorative "·" divider on pure white (3.48:1). The `juice-legacy` rows in `hud.json` are
+the pre-phase-1 JuiceKit styles kept as the rig's own control, and still fail as they should.
+
+Contact sheets (JPG, the lane's scratch folder `readable-2/`): `before/contact.jpg` and `after0/contact-after.jpg` (the
+same 15 worst screens), `after0/contact-pairs.jpg` (six changed screens, before over after), `after0/rt-off.jpg` and
+`after0/rt-on.jpg` (the bars with the setting off and on).
+
 ## 4. What was fixed
 
 Token and shared-component fixes first; per-screen edits only for the live sweep's named items.
@@ -169,23 +250,48 @@ Token and shared-component fixes first; per-screen edits only for the live sweep
 `coach/business/thanks`, `press/receipt`). The fix in each is the same codemod line; run
 `npx tsx scripts/readable/codemod.mts --write` once the lane lands, then `source-baseline.mts --write`.
 
-**lane/readable-2 (2026-11-10) took the owner calls and the small misses below.** Each is re-read on the rig in
-section 3's readable-2 table.
+**lane/readable-2 (2026-11-10) took the owner calls and the small misses.** Each is in section 3's readable-2 table.
 
-- The Play shelf: a family's mode list, a mode's name and its line wrap to two lines, then clamp.
-- Long-form copy at 16 px (`lib/legal/legalProse.ts` for every legal page, the lesson reader's "remember" list, the
-  playbook chapter theses, the credits notices); legal tables scroll inside themselves; long words and code break.
-- `prefers-reduced-transparency`: `.fel-glass` solid `#141a22`; the tab bar and the status rail (`.fel-bar`) solid.
-- The Quick Screen, Correctives and mirror-harness `h1`s keep their glyph tails; `/cards`, `/multiplayer`, `/live`,
-  `/party` and the stage's "3D isn't available" line clear AA; `/support`'s e-mail and `/multiplayer`'s tabs wrap.
-- `/profile`'s "No duels yet" and the empty tiles' "—" were the rig's, not the page's (half the run sat under the docked
-  primary at that scroll step); the rig now reads a run only when no fixed layer covers any part of it.
-- The floor reached every lane that landed since #532: the source has **0** sizes under 12 px and 7 sub-AA colour
-  classes, all `text-fel-violet`/`indigo` on icons (reviewed, non-text).
+- **The Play shelf** (`components/shell/play-shelf.tsx`): a family's mode list wraps to two lines, then clamps (it was
+  one line with an ellipsis). A mode's name and, from 640 px up, its line wrap to two lines as well.
+- **Long-form copy at 16 px**, size and wrapping only, no wording: `lib/legal/legalProse.ts` (every legal page, tables
+  included), the credits and their licence lines, the guardian consent pages, the lesson reader's "remember" list, the
+  Playbook chapter theses, the drills' Playbook text, and a course lesson's text (`TEACH_LOOK.lesson`).
+- **`prefers-reduced-transparency`** (`app/theme.css`): `.fel-glass`, `.fel-panel`, the tab bar and the status rail
+  (`.fel-bar`) are solid, with no blur.
+- **The small misses:** the Quick Screen, Privacy, Correctives and mirror-harness `h1`s keep their glyph tails; /cards,
+  /multiplayer, /party, /live and the athlete stage's "3D isn't available" line clear AA; the legal tables scroll inside
+  themselves and long words and code break; /support's e-mail, /multiplayer's tabs, /learn's Practice rows and /modes'
+  cards wrap, so no page scrolls sideways at 150 % root font.
+- **The floor over the lanes that landed since #532** (hoops P4/P4b, gameplay-clean 3 and 4, platform P9/P10, BBS-04,
+  dunk P7–P9, public-polish, bat-grip, #546): 11 files changed by the codemod, 48 sizes to 12 px and 19 colours to AA.
+  The teacher platform, the shot chart's page, gameplay-clean, bat-grip and #546 needed nothing.
+- **`main`-only files** (the arena age gate #543, the seller gate #544, the Venice court #542; the owner's workstream,
+  not edited): the codemod would change **nothing** in them (0 sizes, 0 colours; checked against a planted control).
 
-The earlier list, for the record (all addressed above):
+**What the after-crawl still finds** (each was there before this lane; none is new):
 
-**What the after-crawl still finds** (phone; each is per-screen, and most are other lanes' or the owner's):
+- **The Play shelf still ends six of its seven lists in an ellipsis on a 390 px phone**, after two lines. Five need one
+  more line (19 px); the Sports list ("Breakaway · Twelve Yards · Baseball · …") needs about seven. At 150 % root font
+  all seven clamp. The owner's call was two lines; **recommendation: three lines** shows five of the six in full.
+- `/play/party`: the empty player slots "P 1"–"P 4" (1.7–2.8:1) and the "1–2 PLAYERS" badges (3.67 and 4.42:1); the banner
+  "Scan the code to join — or press any button" is cut off on a phone (389 px). `/profile/edit`: "Save card" 3.96:1.
+- `/train`: "Your week · Nov 4 – Nov 10" loses 32 px on a phone. `/profile/edit`: "Generating your link…" 3 px.
+- `/play` on desktop: two lines of the hero's card strip are cut by 3–5 px.
+- `/`: the hero's two lines ("Dunk in Venice now…" and "Built by pro dunker Elijah Bonds.") are drawn on each other.
+  `/join` and `/coach/join` at 200 % zoom: the last lines sit under the docked button. `/learn/feed` on desktop: a topic
+  label over "Pick at least one topic"; at 150 % four topic blurbs clamp by one line.
+- `/education/playbook`: the eyebrow "The Playbook" over the hero photo, 2.24:1.
+- The `[OWNER: …]` placeholders at under 12 px on /press, /media-kit, /team, /work-with-us: owner copy.
+
+**Body copy under 16 px, what is left (157 runs on 59 screens).** None of it is long-form. It is the supporting line
+that runs past 12 words: the mode cards' descriptions on `/modes` (30, at 14 px), settings help on `/account` (7, at
+12 px) and `/profile/edit` (6), `/press` (6), `/workout` (6), `/profile` (7), `/cards` (8, at 12 px), and one to five
+on each of the rest. Owner call: move these to 16 px too (the standard's letter; cards get taller), or change the
+standard's line to "more than 20 words". **Recommendation: 16 px on `/account` and `/profile/edit` (they explain what
+happens to your data), leave the cards.** Not done here: it changes the look of 59 screens.
+
+The earlier list, for the record (phase 1's after-crawl; all addressed above or listed again):
 
 - `/play`: the Play shelf's one-line mode lists ("Breakaway · Twelve Yards · Basebal…") end in an ellipsis by design
   (premium-ui P4), and the hero clips its card strip. Recommendation: `line-clamp-2` on the list line.
@@ -201,14 +307,10 @@ The earlier list, for the record (all addressed above):
   sideways at 150 % root font.
 - The `[OWNER: …]` placeholders render at 9–11 px on `/press`, `/media-kit`, `/team`, `/work-with-us`: owner copy.
 
-**Body copy at 14 px.** The rig counts runs of more than 12 words drawn at `TYPE.small` (14 px) on a phone. That is
-the type scale used past its own "≤ 12 words" line; the fix is per screen (use `TYPE.body`), and most of it is the
-owner's long-form copy (terms, credits, lesson text), so it is reported here, not rewritten.
-
 **Coverage.** The rig renders a page module with the server stubbed. Pages that need a record (`notFound()` without
 one), pages that mount Babylon (`/play/*` hosts: no WebGL here), and pages whose client code needs a populated API
 shape do not render on it; the HUD is covered over recorded frames instead. Each route's JSON says why it did not render.
 
-**Themes.** One theme (dark). No `prefers-contrast` and no reduced-transparency handling exist. Recommendation: under
-`prefers-reduced-transparency`, make `.fel-glass` and the tab bar solid `--fel-bg` (one CSS rule in `app/globals.css`);
-not done here because no screen measured a blur-backed miss.
+**Themes.** One theme (dark). No `prefers-contrast` handling exists. Reduced transparency is handled since readable-2
+(section 1, Themes); the blurred overlays that use Tailwind's `backdrop-blur-*` directly (59 files: sheets, HUD chips)
+are not in that rule — each has its own tinted background under the blur, and none measured a miss.
