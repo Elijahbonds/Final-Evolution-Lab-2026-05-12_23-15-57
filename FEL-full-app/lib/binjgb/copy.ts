@@ -27,7 +27,7 @@ export const AGE_PROMPT_COPY = {
 } as const;
 
 /**
- * Player controls (APPROVED copy, Vibe review, Nov 9 2026): not part of the pending picker card.
+ * Player controls (APPROVED copy, Vibe review, Nov 9 2026).
  * Full screen is one-way: the button only calls requestFullscreen() on a tap; leaving is the browser's own Esc/back,
  * so there is no "Exit full screen" state to label.
  */
@@ -37,19 +37,19 @@ export const PLAYER_CONTROLS_COPY = {
 } as const;
 
 /**
- * Load-your-own picker (spec §3.5 "UI — picker copy"). PLACEHOLDER, NOT FINAL: the PM sends these strings to Elijah on a
- * card before they ship (BINJGB_LOCAL_FILE_ENABLED stays OFF until then and until G-FILE). The disclaimer renders
- * before the chooser opens (G-FILE item 8).
+ * Load-your-own picker (spec §3.5 "UI — picker copy" and "Player and reject copy"). FINAL, all seven strings approved by
+ * Elijah on Nov 9, 2026: button, helper, label and disclaimer (4:55 PM PT, PM card t4820s52532) and tooBig, wrongType,
+ * unreadable (4:49 PM PT, PM card t4817s52517). Word for word as the spec. BINJGB_LOCAL_FILE_ENABLED still stays OFF
+ * until G-FILE. The disclaimer renders before the chooser opens (G-FILE item 8).
  */
 export const PICKER_COPY = {
-  pendingElijahCard: true,
   button: 'Load a game file',
   helper: 'Choose a .gb or .gbc file from this device. It stays on your device. FEL never uploads it.',
   /** Shown after a pick, with the name cut to 40 characters on screen; the name is never stored or sent. */
   picked: 'Your file',
   disclaimer:
     'You are responsible for the files you open. Only open games you have the right to use. Final Evolution does not provide game files, does not link to places that share them, and does not upload your file. The file stays on this device.',
-  /** PLACEHOLDER rejects, pending Elijah's card t4785s52422. */
+  /** Reject messages (FINAL). The size cap allows exactly 8,388,608 bytes, so "8 MB or smaller". */
   tooBig: "That file is too big. Choose a file that's 8 MB or smaller.",
   wrongType: 'Choose a .gb or .gbc file.',
   unreadable: "That file couldn't be opened. Try a different file.",

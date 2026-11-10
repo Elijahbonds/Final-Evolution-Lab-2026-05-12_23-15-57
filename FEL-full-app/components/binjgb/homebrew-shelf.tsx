@@ -4,11 +4,14 @@
 //
 // v1 has zero titles (OQ-10), so the shelf says "No games on the shelf." — real copy, not "coming soon".
 // Credits are text only and one tap away (G5). No console names anywhere (OQ-11).
-import Link from 'next/link';
+//
+// F2 (Cyber build review dcbbec16): every link here is a plain <a href>, never next/link, so entering and leaving the
+// shelf are full page loads (its header policies are per document); ShelfNavGuard does the same for the app chrome.
 import type { ShelfTitle } from '@/lib/binjgb/manifest';
 import { AGE_PROMPT_COPY, SHELF_COPY } from '@/lib/binjgb/copy';
 import { DeleteSaves } from './delete-saves';
 import { LocalPlayerLazy } from './local-player-lazy';
+import { ShelfNavGuard } from './shelf-nav-guard';
 
 export interface HomebrewShelfProps {
   titles: readonly ShelfTitle[];
@@ -19,11 +22,12 @@ export interface HomebrewShelfProps {
 export function HomebrewShelf({ titles, agePrompt, picker }: HomebrewShelfProps) {
   return (
     <main className="mx-auto max-w-[700px] px-4 py-8" data-gb-shelf>
+      <ShelfNavGuard />
       <h1 className="fel-heading text-3xl font-bold text-white">{SHELF_COPY.title}</h1>
       {agePrompt ? (
         <div className="mt-4 fel-card rounded-xl p-5 text-sm text-white/75" data-gb-age-prompt>
           <p>{AGE_PROMPT_COPY.message}</p>
-          <Link href={AGE_PROMPT_COPY.href} className="mt-3 inline-block font-bold text-[#00E5FF] hover:underline">{AGE_PROMPT_COPY.action}</Link>
+          <a href={AGE_PROMPT_COPY.href} className="mt-3 inline-block font-bold text-[#00E5FF] hover:underline">{AGE_PROMPT_COPY.action}</a>
         </div>
       ) : (
         <>
@@ -34,7 +38,7 @@ export function HomebrewShelf({ titles, agePrompt, picker }: HomebrewShelfProps)
             <ul className="mt-6 space-y-2">
               {titles.map((t) => (
                 <li key={t.slug}>
-                  <Link href={`/play/gb-shelf/${t.slug}`} className="block rounded-xl border border-white/10 px-4 py-3 text-sm text-white/80 hover:bg-white/[0.04]">{t.title}</Link>
+                  <a href={`/play/gb-shelf/${t.slug}`} className="block rounded-xl border border-white/10 px-4 py-3 text-sm text-white/80 hover:bg-white/[0.04]">{t.title}</a>
                 </li>
               ))}
             </ul>
@@ -44,8 +48,8 @@ export function HomebrewShelf({ titles, agePrompt, picker }: HomebrewShelfProps)
         </>
       )}
       <nav className="mt-8 flex gap-4 text-sm">
-        <Link href="/credits" className="text-[#00E5FF] hover:underline">{SHELF_COPY.credits}</Link>
-        <Link href="/play" className="text-white/60 hover:text-white">{SHELF_COPY.back}</Link>
+        <a href="/credits" className="text-[#00E5FF] hover:underline">{SHELF_COPY.credits}</a>
+        <a href="/play" className="text-white/60 hover:text-white">{SHELF_COPY.back}</a>
       </nav>
     </main>
   );

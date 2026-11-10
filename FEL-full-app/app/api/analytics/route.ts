@@ -23,6 +23,7 @@ import { recordServerEvents } from '@/lib/analytics-server';
 import { isAnonymousEvent } from '@/lib/analyticsAnon';   // perf-lag: the fps / ttfp perf stats carry no user or guest id
 import { guestIdFrom } from '@/lib/guestSession';
 import { AGE_BLOCK_COOKIE } from '@/lib/privacy/ageScreen';
+import { normaliseHomebrewEvent } from '@/lib/binjgb/analyticsProps';   // BINJGB-SHELF-1 F5: allowlisted props for the anonymous homebrew events
 
 export const dynamic = 'force-dynamic';
 
@@ -51,8 +52,16 @@ export async function POST(req: Request) {
     if (!userId && jar.get(AGE_BLOCK_COOKIE)) return new NextResponse(null, { status: 204 });
     const guestId = userId ? null : guestIdFrom(jar);
 
+    // BINJGB-SHELF-1 F5 (Cyber build review dcbbec16): the two anonymous homebrew events get their props REBUILT from an
+    // allowlist ({ source: 'local' }; a shipped { slug } or the event is dropped), so a crafted POST can't store a file
+    // name or a hash under them. Every other event is unchanged.
+    const events = parsed.data.events.flatMap((e) => {
+      const n = normaliseHomebrewEvent(e.name, e.props);
+      return n.keep ? [{ ...e, props: n.props }] : [];
+    });
+
     await recordServerEvents(
-      parsed.data.events.map((e) => ({
+      events.map((e) => ({
         name: e.name,
         props: e.props ?? null,
         ts: e.ts,

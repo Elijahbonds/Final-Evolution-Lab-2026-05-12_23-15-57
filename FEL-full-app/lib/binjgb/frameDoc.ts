@@ -95,27 +95,48 @@ export const FRAME_RUNTIME = String.raw`function (w, cfg) {
     d.body.style.background = '#000';
   }
 
+  // F4 (Cyber build review dcbbec16): the engine has a fixed 16 MiB heap with an aborting malloc, so any step can throw.
+  // Every failure — a missing export, a 0 pointer, a throw anywhere in the body, a rejected factory — reports failed
+  // exactly once and leaves nothing running; the parent's 10 s watchdog (lib/binjgb/watchdog.ts) covers a silent hang.
+  var failedSent = false;
+  function fail() {
+    if (raf) { w.cancelAnimationFrame(raf); raf = 0; }
+    if (mod && emu && typeof mod._emulator_delete === 'function') { try { mod._emulator_delete(emu); } catch (e) { /* already failing */ } }
+    if (mod && romPtr && typeof mod._free === 'function') { try { mod._free(romPtr); } catch (e) { /* already failing */ } }
+    emu = 0; romPtr = 0;
+    if (!failedSent) { failedSent = true; send({ type: M.failed }); }
+  }
+
   function start(m) {
-    if (mod || typeof w.Binjgb !== 'function') { send({ type: M.failed }); return; }
+    if (mod || typeof w.Binjgb !== 'function') { fail(); return; }
     mod = {};
-    w.Binjgb({ wasmBinary: m.wasm, locateFile: function (p) { return cfg.appOrigin + cfg.vendorPath + p; } }).then(function (module) {
-      mod = module;
-      var cart = new Uint8Array(m.cart);
-      var size = (cart.byteLength + 0x7fff) & ~0x7fff;
-      romPtr = mod._malloc(size);
-      var heap = new Uint8Array(mod.HEAPU8.buffer, romPtr, size);
-      heap.fill(0);
-      heap.set(cart);
-      emu = mod._emulator_new_simple(romPtr, size, RATE, AUDIO_FRAMES, CURVE);
-      if (!emu) { send({ type: M.failed }); return; }
-      if (m.battery) loadBattery(m.battery);
-      ctx = canvas.getContext('2d');
-      img = ctx.createImageData(160, 144);
-      fit();
-      canvas.focus();
-      raf = w.requestAnimationFrame(tick);
-      send({ type: M.started });
-    }, function () { send({ type: M.failed }); });
+    var made;
+    try {
+      made = w.Binjgb({ wasmBinary: m.wasm, locateFile: function (p) { return cfg.appOrigin + cfg.vendorPath + p; } });
+    } catch (e) { fail(); return; }
+    if (!made || typeof made.then !== 'function') { fail(); return; }
+    made.then(function (module) {
+      try {
+        mod = module;
+        if (!mod || typeof mod._malloc !== 'function' || typeof mod._emulator_new_simple !== 'function' || !mod.HEAPU8) { fail(); return; }
+        var cart = new Uint8Array(m.cart);
+        var size = (cart.byteLength + 0x7fff) & ~0x7fff;
+        romPtr = mod._malloc(size);
+        if (!romPtr) { fail(); return; }
+        var heap = new Uint8Array(mod.HEAPU8.buffer, romPtr, size);
+        heap.fill(0);
+        heap.set(cart);
+        emu = mod._emulator_new_simple(romPtr, size, RATE, AUDIO_FRAMES, CURVE);
+        if (!emu) { fail(); return; }
+        if (m.battery) loadBattery(m.battery);
+        ctx = canvas.getContext('2d');
+        img = ctx.createImageData(160, 144);
+        fit();
+        canvas.focus();
+        raf = w.requestAnimationFrame(tick);
+        send({ type: M.started });
+      } catch (e) { fail(); }
+    }, function () { fail(); });
   }
 
   // G8: keys on the focused canvas only; preventDefault only for the player's own keys.

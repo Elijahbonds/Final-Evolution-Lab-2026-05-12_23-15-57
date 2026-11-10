@@ -18,6 +18,7 @@ import { BUTTON, gamepadBits, shouldPollGamepad, type ButtonName } from '@/lib/b
 import { acceptFromLocalFrame, LOCAL_FRAME_PATH, LOCAL_FRAME_SANDBOX, MSG, postToLocalFrame } from '@/lib/binjgb/messages';
 import { readBattery, writeBattery } from '@/lib/binjgb/savesDb';
 import { BINJGB_WASM_PATH, BINJGB_WASM_SHA256 } from '@/lib/binjgb/vendor';
+import { armStartWatchdog } from '@/lib/binjgb/watchdog';
 import { track } from '@/lib/analytics';
 
 type Phase = 'idle' | 'checking' | 'loading' | 'playing';
@@ -125,6 +126,15 @@ export function LocalPlayer() {
     return () => window.removeEventListener('message', onMessage);
   }, [stop]);
 
+  // F4: from mount to `started`, at most START_TIMEOUT_MS (10 s); then stop and say the player couldn't start.
+  useEffect(() => {
+    if (!mounted || phase !== 'loading') return;
+    return armStartWatchdog(() => {
+      setError(SHELF_COPY.wasmFail);
+      stop();
+    });
+  }, [mounted, phase, stop]);
+
   // G8: pads are read only while the page is visible and the player is on screen.
   useEffect(() => {
     if (phase !== 'playing' || !frameRef.current) return;
@@ -155,7 +165,13 @@ export function LocalPlayer() {
     if (!meta.ok) { setPicked(null); setError(rejectCopy(meta.reason)); return; }
     setPicked(file.name.slice(0, PICKED_NAME_MAX));
     setPhase('checking');
-    const checked = await validateInWorker(await file.arrayBuffer());
+    let bytes: ArrayBuffer;
+    try {
+      bytes = await file.arrayBuffer();   // F4: NotReadableError (file moved, permission gone) → "couldn't be opened"
+    } catch {
+      setPicked(null); setPhase('idle'); setError(PICKER_COPY.unreadable); return;
+    }
+    const checked = await validateInWorker(bytes);
     if (!checked.ok) { setPhase('idle'); setError(rejectCopy(checked.reason)); return; }
     const cart = checked.buf;
     const [key, wasm] = await Promise.all([sha256Hex(cart), loadPinnedWasm()]);

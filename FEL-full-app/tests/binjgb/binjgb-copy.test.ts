@@ -67,7 +67,7 @@ describe('T-NO-ROM-SITE-COPY (G5): no ROM-site link or the word "ROM" in UI copy
   it('the picker disclaimer says FEL provides no game files and links to none', () => {
     expect(PICKER_COPY.disclaimer).toContain('does not provide game files');
     expect(PICKER_COPY.disclaimer).toContain('does not link to places that share them');
-    expect(PICKER_COPY.pendingElijahCard).toBe(true);
+    expect('pendingElijahCard' in PICKER_COPY).toBe(false);   // all seven strings FINAL (Elijah, Nov 9 2026)
     expect(PICKED_NAME_MAX).toBe(40);
   });
 });
@@ -184,5 +184,27 @@ describe('analytics: the two homebrew events carry no user and are anonymous', (
   it('both are anonymous events; other events are unaffected', () => {
     expect(isAnonymousEvent('homebrew_shelf_play')).toBe(true);
     expect(isAnonymousEvent('homebrew_local_play')).toBe(true);
+  });
+});
+
+describe('picker copy is FINAL and word for word the spec (§3.5; Elijah, PM cards t4820s52532 + t4817s52517)', () => {
+  // The approved strings, copied from BINJGB-SHELF-1-SPEC.md §3.5 "UI — picker copy" and "Player and reject copy".
+  const FINAL = {
+    button: 'Load a game file',
+    helper: 'Choose a .gb or .gbc file from this device. It stays on your device. FEL never uploads it.',
+    picked: 'Your file',
+    disclaimer:
+      'You are responsible for the files you open. Only open games you have the right to use. Final Evolution does not provide game files, does not link to places that share them, and does not upload your file. The file stays on this device.',
+    tooBig: "That file is too big. Choose a file that's 8 MB or smaller.",
+    wrongType: 'Choose a .gb or .gbc file.',
+    unreadable: "That file couldn't be opened. Try a different file.",
+  };
+
+  it('exactly these seven strings, nothing else, no pending marker', () => {
+    expect({ ...PICKER_COPY }).toEqual(FINAL);
+  });
+
+  it('no placeholder / pending wording left in the copy module', () => {
+    expect(read('lib/binjgb/copy.ts')).not.toMatch(/PLACEHOLDER|pendingElijahCard|[Pp]ending Elijah|pending .*card/);
   });
 });

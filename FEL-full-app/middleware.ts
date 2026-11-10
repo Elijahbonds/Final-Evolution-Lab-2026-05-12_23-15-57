@@ -20,6 +20,8 @@ export const SHELF_REFERRER_POLICY = 'no-referrer';
  *   wasm         'wasm-unsafe-eval' in script-src
  *   permissions  the Permissions-Policy header
  *   enforce      true → Content-Security-Policy (enforced); false → Content-Security-Policy-Report-Only (legacy pose routes)
+ *   sandbox      F3 (Cyber build review dcbbec16): a CSP `sandbox` directive for the document itself, so the local frame is
+ *                an opaque origin even when it is opened top-level or framed without the attribute. Never allow-same-origin.
  */
 export interface RoutePolicy {
   prefix: string;
@@ -28,13 +30,14 @@ export interface RoutePolicy {
   enforce: boolean;
   frameAncestors: "'none'" | "'self'";
   referrer: string | null;
+  sandbox: 'allow-scripts' | null;
 }
 
 export const ROUTE_POLICIES: readonly RoutePolicy[] = [
-  { prefix: '/play/gb-shelf/local-frame', wasm: true, permissions: SHELF_PERMISSIONS_POLICY, enforce: true, frameAncestors: "'self'", referrer: SHELF_REFERRER_POLICY },
-  { prefix: '/play/gb-shelf', wasm: true, permissions: SHELF_PERMISSIONS_POLICY, enforce: true, frameAncestors: "'none'", referrer: SHELF_REFERRER_POLICY },
-  { prefix: '/screen', wasm: true, permissions: SCREEN_PERMISSIONS_POLICY, enforce: false, frameAncestors: "'none'", referrer: null },
-  { prefix: '/play/mirror/assess', wasm: true, permissions: SCREEN_PERMISSIONS_POLICY, enforce: false, frameAncestors: "'none'", referrer: null },
+  { prefix: '/play/gb-shelf/local-frame', wasm: true, permissions: SHELF_PERMISSIONS_POLICY, enforce: true, frameAncestors: "'self'", referrer: SHELF_REFERRER_POLICY, sandbox: 'allow-scripts' },
+  { prefix: '/play/gb-shelf', wasm: true, permissions: SHELF_PERMISSIONS_POLICY, enforce: true, frameAncestors: "'none'", referrer: SHELF_REFERRER_POLICY, sandbox: null },
+  { prefix: '/screen', wasm: true, permissions: SCREEN_PERMISSIONS_POLICY, enforce: false, frameAncestors: "'none'", referrer: null, sandbox: null },
+  { prefix: '/play/mirror/assess', wasm: true, permissions: SCREEN_PERMISSIONS_POLICY, enforce: false, frameAncestors: "'none'", referrer: null, sandbox: null },
 ];
 
 const underPrefix = (path: string, prefix: string) => path === prefix || path.startsWith(prefix + '/');
@@ -51,8 +54,19 @@ export function routePolicyFor(pathname: string): RoutePolicy | null {
  */
 export const SHELF_STATIC_PREFIXES = ['/vendor/binjgb', '/gb-shelf'] as const;
 
+/** The pathname once percent-decoded (the static server decodes before it looks up a file); the raw one if malformed. */
+function decodedPath(pathname: string): string {
+  try {
+    return decodeURIComponent(pathname);
+  } catch {
+    return pathname;
+  }
+}
+
+/** F6: raw OR percent-decoded spelling — /vendor%2Fbinjgb/… and /%76endor/binjgb/… count as the vendored folder too. */
 export function isShelfStaticPath(pathname: string): boolean {
-  return SHELF_STATIC_PREFIXES.some((p) => underPrefix(pathname, p));
+  const decoded = decodedPath(pathname);
+  return SHELF_STATIC_PREFIXES.some((p) => underPrefix(pathname, p) || underPrefix(decoded, p));
 }
 
 /**
@@ -120,6 +134,7 @@ export function cspEnforced(nonce: string, policy: RoutePolicy): string {
     "base-uri 'none'",
     `frame-ancestors ${policy.frameAncestors}`,
     "form-action 'self'",
+    ...(policy.sandbox ? [`sandbox ${policy.sandbox}`] : []),
   ].join('; ');
 }
 
