@@ -57,6 +57,9 @@ const MAKERS: Record<string, Maker> = {
   '/press/[slug]': async (p) => { const u = await firstLink(p, 'anon', '/press', /^\/press\/(?!library|receipt)[^/]+$/); return u ? { url: u } : { why: 'the press page links to no book' }; },
   '/team/[slug]': async (p) => { const u = await firstLink(p, 'anon', '/team', /^\/team\/[^/]+$/); return u ? { url: u } : { why: 'the team page links to no profile (no approved profile in the catalog)' }; },
   '/create/[discipline]': async (p) => { const u = await firstLink(p, 'solo', '/create', /^\/create\/[^/]+$/); return u ? { url: u } : { url: '/create/music' }; },
+  // EVERY-SCREEN P3: the builder is scored with a program on it (the page builds a ?q= ask on load): the empty page is
+  // one box and a button, and the program view is the screen phase 3 is about
+  '/train/build': async () => ({ url: `/train/build?q=${encodeURIComponent('All I have is a band. Full body, 3 days a week.')}`, note: 'scored with the sample ask built: the program view' }),
   // the programs list links none while its tables are off: the first signature program's own address (lib/signature)
   '/train/programs/[id]': async (p) => { const u = await firstLink(p, 'solo', '/train/programs', /^\/train\/programs\/[^/]+$/); return { url: u ?? '/train/programs/vertical-jump', note: u ? undefined : 'the list links no program while it is switched off: opened by its address' }; },
   // a coach's invite, made through the coach's own API; the client's join link

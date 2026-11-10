@@ -23,6 +23,11 @@ describe('the builder screen', () => {
     expect(src).not.toContain('h-11 w-9');
     expect(src.match(/className="grid h-11 w-11 place-items-center disabled:opacity-30"/g)).toHaveLength(2);
   });
+  it('the program view\'s long lines are body size (the rig: 52 paragraphs under 16 px), short ones keep 14 px; Build it shares the outline look', () => {
+    const src = read('components/program-ask/program-builder.tsx');
+    for (const s of ['className={lineSize(x)}', 'className={lineSize(t)}', 'className={lineSize(n)}', 'lineSize(p.why)', 'lineSize(WEEK_LINE)', 'className={lineSize(s)}']) expect(src, s).toContain(s);
+    expect(src).toContain('data-testid="program-ask-build" className={`min-h-11 rounded-full');
+  });
 });
 
 describe('the ask is read as typed', () => {
