@@ -29,7 +29,7 @@ const [VW, VH] = (process.env.VIEW ?? '480x270').split('x').map(Number);
 const SHOTS = process.env.SHOTS ?? path.join(OUT, 'shots');
 fs.mkdirSync(OUT, { recursive: true }); fs.mkdirSync(SHOTS, { recursive: true });
 const T0 = Date.now(); const say = (m) => console.log(`[${MODE} ${SCEN} ${TIER} ${((Date.now() - T0) / 1000).toFixed(0)}s] ${m}`);
-const exe = process.env.CHROMIUM_EXE ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const exe = process.env.CHROMIUM_EXE ?? ['/opt/pw-browsers/chromium-1243/chrome-linux64/chrome', '/opt/pw-browsers/chromium-1194/chrome-linux/chrome'].find((p) => fs.existsSync(p));   // (the container's install moves between versions)
 
 const INIT = `(() => {
   window.__name = window.__name || ((f) => f);
