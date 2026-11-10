@@ -18,8 +18,8 @@ import { JUMPER_HOP_ON, JUMPER_APEX_AFTER_RELEASE_SEC, JUMPER_MIN_LOAD_SEC, JUMP
 import { FT_SETUP_SEC, FT_ROUTINE_SEC, FT_SET_SEC, FT_RESULT_SEC, FT_DIST_NARROW_01 } from '@/lib/babylon/core/FreeThrows';
 import { BANK_SET_DEG, BANK_GLANCE_MS } from '@/lib/babylon/hoops/shotLooks';
 import { OVERTIME_3V3_SEC } from '@/lib/babylon/modes/threevthreeOvertime';
-import { OOP_LOB_FLIGHT_SEC, OOP_LATE_CATCH_CLIP_T, REAL_JUMP_PERSONAL, RUNWAY_STRIDE_SCALE, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG, LAND_LEAD_SEC } from '@/lib/babylon/core/DunkFlagship';   // dunk-flagship
-import { SLAM_VARIANTS_ON } from '@/lib/babylon/core/DunkSlamVariant';   // dunk-flagship Phase 7
+import { OOP_LOB_FLIGHT_SEC, OOP_LATE_CATCH_CLIP_T, REAL_JUMP_PERSONAL, RUNWAY_STRIDE_SCALE, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG, LAND_LEAD_SEC, LAND_ABSORB_DEEP } from '@/lib/babylon/core/DunkFlagship';   // dunk-flagship
+import { SLAM_VARIANTS_ON, SLAM_POWER_ON } from '@/lib/babylon/core/DunkSlamVariant';   // dunk-flagship Phase 7
 import { FINISH_OVER_RING } from '@/lib/babylon/core/DunkOverRing';   // dunk-flagship P11
 import { BALL_SIDE_SHADE_ON, SHADE_OFFSET_M, SHADE_REACT_SEC, SHADE_SHIFT_MPS, SHADE_FLIP_M, SHADE_RANGE_M, SHADE_RESEED_M } from '@/lib/babylon/core/BallSideShade';
 import { OFF_BALL_LOOK_ON, MAN_GLANCE_EVERY_SEC, MAN_GLANCE_SEC } from '@/lib/babylon/core/OffBallLook';   // lane/h3-aware
@@ -349,9 +349,12 @@ describe('the feel knob catalogue', () => {
     expect(def('dunk.realJumpPersonal')).toBe(REAL_JUMP_PERSONAL);     // dunk-flagship Phase 5 (new, off)
     expect(REAL_JUMP_PERSONAL).toBe(0);
     expect(def('dunk.slamVariants')).toBe(SLAM_VARIANTS_ON);          // dunk-flagship Phase 7 (new, off)
-    expect(SLAM_VARIANTS_ON).toBe(0);
+    expect(SLAM_VARIANTS_ON).toBe(1);   // test changed (owner 2026-11-10, "turn all 4 on"): the default is ON; 0 still restores the old slam (DunkSlamVariant.test)
+    expect(def('dunk.slamPower')).toBe(SLAM_POWER_ON); expect(SLAM_POWER_ON).toBe(1);
+    expect(def('dunk.landAbsorbDeep')).toBe(LAND_ABSORB_DEEP); expect(LAND_ABSORB_DEEP).toBe(1);
+    expect(RUNWAY_STRIDE_SCALE).toBe(1.1);   // TUNED 1 → 1.1 (owner 2026-11-10)
     expect(def('dunk.finishOverRing')).toBe(FINISH_OVER_RING);        // dunk-flagship P11 (new, off: 0 = the shipped finish)
-    expect(FINISH_OVER_RING).toBe(0);
+    expect(FINISH_OVER_RING).toBe(1);   // test changed (owner 2026-11-10): default ON; 0 restores the old finish (DunkOverRing.test)
     expect(def('dunk.runwayStrideScale')).toBe(RUNWAY_STRIDE_SCALE); // dunk-flagship (new, default = the shipped pace)
     expect(def('dunk.slamHitStopBigMs')).toBe(SLAM_HITSTOP_BIG_MS);  // dunk-flagship TUNED (new; every make was 70)
     expect(def('dunk.slamShakeBig')).toBe(SLAM_SHAKE_BIG);

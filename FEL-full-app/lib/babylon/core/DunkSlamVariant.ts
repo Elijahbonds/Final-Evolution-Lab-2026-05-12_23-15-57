@@ -15,11 +15,23 @@
 // OFF BY DEFAULT: `dunk.slamVariants` (lib/feel-panel/knobs.ts). Like every knob it never applies in ranked, staked or
 // paid play (lib/feel-panel's session gate).
 
+import { isStakedRun } from './DunkField';
+
 /** The finishes a slam can be called as. */
 export type SlamVariant = 'reverse' | 'power';
 
-/** The knob's default: OFF (0) — a slam is the flush the flight carries, as shipped. */
-export const SLAM_VARIANTS_ON = 0;
+/** The knob's default: ON (1) since the owner's call of 2026-11-10 ("turn all 4 on"); 0 = a slam is the flush the flight carries,
+ *  exactly as before. A staked, ranked or challenge run reads 0 whatever the default (DunkMode: the card there is the integrity cap's). */
+export const SLAM_VARIANTS_ON = 1;
+/** DUNK SWITCH-ON (owner 2026-11-10): the switches that change PLAY (the slam variants, the over-the-ring finish) are off in a
+ *  staked, ranked or challenge run whatever their default: an Arena duel, an async or link challenge, the Signature ladder
+ *  (DunkField.isStakedRun) and a `ranked` session (reserved: playFrame's felRanked). Pure. */
+export function playSwitchBlocked(search: string): boolean {
+  if (isStakedRun(search)) return true;
+  try { return new URLSearchParams(search).has('ranked'); } catch { return true; }
+}
+/** DUNK SWITCH-ON: the TWO-HAND POWER's own sub-switch (1 on, 0 = the stick up calls nothing, the REVERSE unchanged). */
+export const SLAM_POWER_ON = 1;
 
 /** How far the stick must be held (0..1) for the direction to count — a resting thumb does not call a reverse. */
 export const SLAM_VARIANT_STICK_MIN = 0.5;
@@ -58,8 +70,8 @@ export const REVERSE_CONTACT_FROM = Math.PI * 0.8;
  * Which finish the stick calls. `on` is the knob; `x`, `y` the left stick (up is −y on every source). The direction must be
  * held past SLAM_VARIANT_STICK_MIN and be more vertical than sideways — a diagonal is not a call. Pure.
  */
-export function slamVariantOf(on: boolean, x: number, y: number): SlamVariant | null {
+export function slamVariantOf(on: boolean, x: number, y: number, powerOn = true): SlamVariant | null {
   if (!on) return null;
   if (!(Math.abs(y) >= SLAM_VARIANT_STICK_MIN) || Math.abs(y) <= Math.abs(x)) return null;
-  return y > 0 ? 'reverse' : 'power';
+  return y > 0 ? 'reverse' : powerOn ? 'power' : null;
 }

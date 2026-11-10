@@ -655,3 +655,25 @@ final build the plain slams met the iron 83–567 ms after the press (the shippe
 slam is SHORT OF THE IRON. What is left is the arm's reach: the ball sits 0.22–0.30 m in front of the ring with the body held at
 the top of its arc, and the hand cannot bring it further. The next step would be the body itself carrying the ball over the ring
 (a flight change at the slam), which is the owner's kind of decision; the setting stays off.
+
+## 18. Switched on (owner, 2026-11-10: "Let's turn all 4 on … improve it and turn it on") — lane/dunk-switch-on
+
+The four calls from the pass's final report, each improved where it had to be and **ON by default**. Each switch's OFF value still
+restores the old behaviour exactly (tests kept). The two that change play — the finishes and the over-the-ring contact — are off
+in every staked, ranked and challenge run whatever the default (`core/DunkSlamVariant.playSwitchBlocked`: an Arena duel, an async
+or link challenge, the Signature ladder, a `ranked` session); the stride and the landing only change the look.
+
+| Switch | Default | What changed | Measured on the final build (rig, everything on) |
+|---|---|---|---|
+| `dunk.finishOverRing` | 0 → **1** | The jump changed at the slam (owner-approved): on the way in the body carries on toward the ring by the ball's offset (≤ 0.3 m past the shipped follow-through), slides sideways under it (≤ 0.25 m), and on the push comes down with the ball at ≤ 2.4 m/s so the ball is always seen in the contact band. The REVERSE keeps its own finish (it passed on it; over the ring it measured 4/5 once). | plain 5/5 made, **5/5 inside** (0.05–0.20 m), button to rim 83–317 ms; TWO-HAND POWER 5/5, **5/5 inside**, 67–333 ms; REVERSE 5/5, **5/5 inside**, 83–350 ms. The 16 tricks: 16/16 made on the same beat, 15/16 inside |
+| `dunk.slamVariants` | 0 → **1** | REVERSE and TWO-HAND POWER called with the stick at the slam. New sub-switch `dunk.slamPower` (1) so POWER could ship off alone — not needed: it passed. | as above |
+| `dunk.runwayStrideScale` | **TUNED 1 → 1.1** | the run-up's legs paced for a slightly longer step | foot slide (carrying foot, ≥ 2.5 m/s) 0.85 · 0.69 · 1.02 m/s against 0.96 · 1.39 · 1.02 at 1 (P10's runs): −24 % on the mean; bone pops 25 · 27 · 23 (≤ 31; one run of nine across the iterations read 33); largest speed step 0.53–0.60 m/s, 0 frames over 0.6 |
+| `dunk.landAbsorbDeep` | new, **1** | a new authored landing that bottoms out at 0.13 s (was 0.25 s), toes kept on the floor, plus the shared leg absorb (`anim/LandingAbsorb`, Free Run's) at 0.6 strength taking the rest of the fall with the feet held | hard cuts 0 in every landing; hip pops: the 16 tricks 1.88 a landing (the old landing 2.25), 2 of 16 at 3 (old: 5 of 16); the run-ups 2 · 1 · 3, press 3, release 3 (old: 2 · 3 · 1, 2, 2). Over all 21 landings: 2.0 against 2.19, and 5 of 21 over 2 against 7 of 21 — **better than the old landing, but the ≤ 2 gate is not met on every landing** (it never was) |
+
+Also changed and flagged: the button-to-feet-off time on a press and on a release is 83 ms (P10: 67 ms) — still under the
+150 ms gate; it moved with the stride change. Not re-run on this build: the lobs and the show (measured on this lane's earlier
+build: replay 188/188, no stray cut, sound on the contact frame), the standing throws and the body dunk.
+
+**Feel-checks on the phone, added for this round:** a plain slam, a REVERSE (stick back from the take-off) and a TWO-HAND POWER
+(stick up at the slam) — the ball should go over the rim and down through it, with the body rising into it; a landing from a
+big dunk — the knees should take it; the run-up from behind at a sprint — the feet should stay planted.
