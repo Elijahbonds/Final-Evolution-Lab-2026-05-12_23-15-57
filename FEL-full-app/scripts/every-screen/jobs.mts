@@ -31,6 +31,10 @@ export interface Step {
   fill?: [string, string];
   /** tap `css` until `until` shows, at most `max` times: each is a tap */
   loop?: [string, string, number];
+  /** the session player, as a person follows it (EVERY-SCREEN P2): tap the button when the screen asks for it
+   *  ([data-player-asks="1"], a tap counted); when it does not (a ready count, a rest, a timed set that runs by
+   *  itself), the rig taps the quiet skip to save the wall-clock wait, and counts it apart as a SKIP, not a tap */
+  play?: [string, number];
   /** the step succeeds only if this shows afterwards (a CSS selector, or /a pattern/ over the screen's words) */
   expect?: string;
   /** wait this long after the step (ms) */
@@ -56,6 +60,10 @@ export interface Job {
 export interface Walk {
   id: string; who: string; name: string; planBudget?: string;
   taps: number; typed: number; seconds: number;
+  /** waits the rig skipped instead of waiting (the session player's ready counts, rests and timed sets) */
+  skips?: number;
+  /** of `taps`, the ones that logged a counted set ("Set done" in a work phase): the plan's budget is the taps beyond these */
+  sets?: number;
   done: boolean;
   /** where it stopped, when it did not finish: the step, the address, what the screen said, what could be tapped */
   stop?: { step: number; say: string; why: string; path: string; screen: string; actions: string[] };
@@ -89,6 +97,19 @@ export async function walk(page: Page, job: Job, shotDir: string): Promise<Walk>
       if (s.tap) { ok = await tapLabel(page, s.tap); if (ok) w.taps++; else why = `nothing to tap called "${s.tap}"`; await settle(s.wait); }
       if (s.css) { ok = await page.locator(s.css).first().tap({ timeout: 5000 }).then(() => true).catch(() => false); if (ok) w.taps++; else why = `nothing to tap at ${s.css}`; await settle(s.wait); }
       if (s.fill) { ok = await page.locator(s.fill[0]).first().fill(s.fill[1], { timeout: 5000 }).then(() => true).catch(() => false); if (ok) w.typed++; else why = `no field at ${s.fill[0]}`; }
+      if (s.play) {
+        let n = 0; w.skips = w.skips ?? 0; w.sets = w.sets ?? 0;
+        while (n < s.play[1] && !(await page.locator(s.play[0]).count())) {
+          const asks = (await page.locator('[data-player-primary][data-player-asks="1"]').count()) > 0;
+          const isSet = asks && (await page.locator('[data-session-player][data-phase=work][data-paused="0"]').count()) > 0;
+          if (!(await page.locator('[data-player-primary] button').first().tap({ timeout: 5000 }).then(() => true).catch(() => false))) break;
+          n++; if (asks) w.taps++; else w.skips++;
+          if (isSet) w.sets = (w.sets ?? 0) + 1;
+          await page.waitForTimeout(300);
+        }
+        ok = (await page.locator(s.play[0]).count()) > 0;
+        if (!ok) why = `${n} presses never reached ${s.play[0]}`;
+      }
       if (s.loop) {
         let n = 0;
         while (n < s.loop[2] && !(await page.locator(s.loop[1]).count())) {

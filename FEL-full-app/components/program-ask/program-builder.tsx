@@ -178,6 +178,17 @@ export function ProgramBuilder({ initialQuestion = '' }: { initialQuestion?: str
   const currentWeek = pos.week?.n ?? null;
   useEffect(() => { if (currentWeek) setWeek(currentWeek); }, [currentWeek]);
 
+  // EVERY-SCREEN P2: from Train's "Your program" card (/train/build?start=today) the next session starts by itself, once,
+  // as soon as the saved plan is back on screen; the address is put back so closing the player does not start it again
+  const autoStart = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (autoStart.current === null) autoStart.current = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('start') === 'today';
+    if (!autoStart.current || !canStart) return;
+    autoStart.current = false;
+    window.history.replaceState(null, '', window.location.pathname);
+    start();
+  });   // eslint-disable-line react-hooks/exhaustive-deps
+
   const start = () => {
     if (!p || !nextDay || !canStart) return;
     setPlaying({ session: fromProgram(nextDay, { title: `${p.title} · ${nextDay.title}`, clips: answer?.clips }), id: nextDay.id });

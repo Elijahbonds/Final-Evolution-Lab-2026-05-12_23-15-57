@@ -15,7 +15,7 @@
 
 import type { ReactNode } from 'react';
 import { HeroHeader } from '@/components/ui/fel/hero-header';
-import { TYPE } from '@/lib/design/type';
+import { TYPE, lineSize } from '@/lib/design/type';
 
 export interface TabHero {
   /** a public/ image, credited in lib/credits/credits.ts */
@@ -58,7 +58,7 @@ export function TabPage({
             <div className="flex min-w-0 flex-col gap-2">
               <p className={`${TYPE.label} text-fel-cyan`}>{eyebrow}</p>
               <h1 className={`${TYPE.title} text-white`}>{title}</h1>
-              {lede && <p className={`${TYPE.small} max-w-lg text-fel-soft`}>{lede}</p>}
+              {lede && <p className={`${lineSize(lede)} max-w-lg text-fel-soft`}>{lede}</p>}
             </div>
             {aside}
           </header>

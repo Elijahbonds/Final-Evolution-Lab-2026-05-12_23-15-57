@@ -7,7 +7,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { ChevronRight, type LucideIcon } from 'lucide-react';
-import { TYPE } from '@/lib/design/type';
+import { TYPE, lineSize } from '@/lib/design/type';
 import { StatRing } from './stat-ring';
 
 const ASPECT = { wide: 'aspect-[16/9]', tall: 'aspect-[3/4]', square: 'aspect-square', banner: 'aspect-[21/9]' } as const;
@@ -74,7 +74,7 @@ export function ListRow({
       ) : null}
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className={`${TYPE.body} line-clamp-2 font-semibold text-white`}>{title}</span>
-        {line && <span className={`${TYPE.small} line-clamp-2 text-fel-dim`}>{line}</span>}
+        {line && <span className={`${typeof line === 'string' ? lineSize(line) : TYPE.small} line-clamp-2 text-fel-dim`}>{line}</span>}
       </span>
       {trailing ?? <ChevronRight aria-hidden className="h-5 w-5 shrink-0 text-fel-quiet transition-transform group-hover:translate-x-0.5" />}
     </Link>

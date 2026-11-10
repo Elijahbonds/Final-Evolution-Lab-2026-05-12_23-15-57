@@ -22,6 +22,13 @@ import { todayDay, type Availability } from './availability';
 
 /** Where the card opens: /coach, whose first tab is Today (app/coach/_components/coach-view.tsx). */
 export const TODAY_HREF = '/coach';
+/** EVERY-SCREEN P2 (2026-11-10): the card for a session to train STARTS it: Today opens with the player already on its
+ *  ready count (app/coach/_components/today-view.tsx reads ?start=today once). The plan's phase-2 gate: open the app →
+ *  first exercise in ≤ 2 taps (Train, then this card); it was 3 (Train, the card, Start on Today). An off day, or a
+ *  plan the card only points at, still opens Today itself. */
+export const TODAY_START_HREF = '/coach?start=today';
+/** Where the card goes. */
+export const todayCardHref = (v: TodayCardView): string => (v.kind === 'session' && !v.offDay && v.exercises > 0 ? TODAY_START_HREF : TODAY_HREF);
 
 export type TodayCardView =
   | {
@@ -36,7 +43,7 @@ export function todayCardLines(v: TodayCardView): { eyebrow: string; title: stri
   const eyebrow = `Today · ${v.programName} · coach ${v.coachName}`;
   if (v.kind === 'open') return { eyebrow, title: 'Your coaching', line: 'Your coach\'s plan for today is on Today.', cta: 'Open Today' };
   const what = v.offDay ? 'Off day' : `${v.exercises} ${v.exercises === 1 ? 'exercise' : 'exercises'}`;
-  return { eyebrow, title: `${v.blockLabel} · ${v.sessionLabel}`, line: `Session ${v.index + 1} of ${v.total} · ${what}`, cta: 'Open today\'s session' };
+  return { eyebrow, title: `${v.blockLabel} · ${v.sessionLabel}`, line: `Session ${v.index + 1} of ${v.total} · ${what}`, cta: v.offDay || v.exercises === 0 ? 'Open today\'s session' : 'Start today\'s session' };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

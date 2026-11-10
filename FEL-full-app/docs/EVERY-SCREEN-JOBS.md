@@ -2,44 +2,57 @@
 
 **Phase 1, part B of `docs/PLAN-EVERY-SCREEN-10PHASE.md`.** The fifteen jobs of the phase-1 brief, walked on the real app as three people: 18 walks, because starting, logging and finishing a session are walked both as an athlete alone (the program the AI built) and as a coached client (the coach's session). Written by `scripts/every-screen/jobs.mts --report`; the walks are `scripts/every-screen/jobs-list.mts`.
 
+**Taps and waits (phase 2).** In the session player a tap is counted only where the screen asks for one (the bright button: a counted set, or a pause). The ready count, every rest and every timed set run by themselves; the rig presses the quiet "skip" there instead of waiting out the clock, and counts those apart as waits, not taps.
+
 **How to read it.** Taps are counted from the signed-in home; the Train tab is one tap. Typing is counted apart. Seconds are the rig's own, with no reading time: a floor, not a person's time. A camera job is walked to the moment it needs a person in front of the camera. "Stops" means a person cannot go further on that path today, and says where.
 
-**Today: 18 of 18 jobs can be walked to their end** (or to the camera); 0 stop. Before this phase's fixes: 9 of 18.
+**Today: 19 of 19 jobs can be walked to their end** (or to the camera); 0 stop. Before this phase's fixes: 18 of 18.
 
 ## An athlete training alone
 
 | Job | Taps | Typing | Seconds | Before | What happens | The plan's budget |
 |---|---|---|---|---|---|---|
-| Start today's workout (today's drill) | 3 | – | 2.1 | 3 taps, 2.2 s | reaches it: the drill is on camera: it needs a person in the picture | open app → first exercise in ≤ 2 taps and ≤ 10 s (phase 2) |
-| Ask the AI builder for a program and start it | 5 | 1 | 4.7 | stopped at step 7 | finishes | ask → first rep in ≤ 4 taps (phase 3) |
-| Log a set (in the program the AI built) | 1 | – | 9.7 | stopped at step 6 | finishes | log a set in 1 tap (phase 2) |
-| Finish a session (in the program the AI built) | 65 | – | 72.8 | stopped at step 5 | finishes | a 5-exercise session in ≤ 12 taps beyond the sets (phase 2) |
-| Test a jump (measure my vertical) | 4 | – | 4.2 | 4 taps, 3.9 s | reaches it: the camera: three jumps in front of it (the reading itself is measured on recorded jumps, not on this rig) | vertical in ≤ 3 taps (phase 4) |
-| Run the movement screen | 4 | – | 3.9 | 4 taps, 4.1 s | reaches it: the camera: four moves in front of it | movement screen in 3 taps and under 3 minutes (phase 4) |
-| See progress | 2 | – | 1.2 | stopped at step 3 | finishes | progress number → its source in 1 tap (phase 4) |
-| Find and join a group | 0 | – | 0 | stopped at step 2 | reaches it: switched off until the group-booking tables are applied: the screen says so and offers what to do instead | join a group in ≤ 4 taps (phase 5) |
-| Book a 1:1 | 1 | – | 0.6 | stopped at step 3 | reaches it: switched off until the group-booking tables are applied: the screen says so and offers what to do instead | book a 1:1 in ≤ 5 taps (phase 5) |
-| Cancel a booking | 0 | – | 0.1 | stopped at step 2 | reaches it: switched off: nothing can be booked, so there is nothing to cancel; the notice says what to do instead | cancel in ≤ 3 taps with the rule shown first (phase 5) |
+| Start today's workout (today's drill) | 3 | – | 1.8 | 3 taps, 2.1 s | reaches it: the drill is on camera: it needs a person in the picture | open app → first exercise in ≤ 2 taps and ≤ 10 s (phase 2) |
+| Start today's workout (a program kept on this phone) | 2 | – | 8.7 | – | finishes | open app → first exercise in ≤ 2 taps and ≤ 10 s (phase 2) |
+| Ask the AI builder for a program and start it | 5 | 1 | 2.9 | 5 taps, 4.7 s | finishes | ask → first rep in ≤ 4 taps (phase 3) |
+| Log a set (in the program the AI built) | 1 | – | 8.7 | 1 taps, 9.7 s | finishes | log a set in 1 tap (phase 2) |
+| Finish a session (in the program the AI built) | 18 (17 sets + 1 other) (+ 47 waits the rig skipped) | – | 57.1 | 65 taps, 72.8 s | finishes | a 5-exercise session in ≤ 12 taps beyond the sets (phase 2) |
+| Test a jump (measure my vertical) | 4 | – | 3.7 | 4 taps, 4.2 s | reaches it: the camera: three jumps in front of it (the reading itself is measured on recorded jumps, not on this rig) | vertical in ≤ 3 taps (phase 4) |
+| Run the movement screen | 4 | – | 3.7 | 4 taps, 3.9 s | reaches it: the camera: four moves in front of it | movement screen in 3 taps and under 3 minutes (phase 4) |
+| See progress | 2 | – | 1.2 | 2 taps, 1.2 s | finishes | progress number → its source in 1 tap (phase 4) |
+| Find and join a group | 0 | – | 0 | 0 taps, 0 s | reaches it: switched off until the group-booking tables are applied: the screen says so and offers what to do instead | join a group in ≤ 4 taps (phase 5) |
+| Book a 1:1 | 1 | – | 0.6 | 1 taps, 0.6 s | reaches it: switched off until the group-booking tables are applied: the screen says so and offers what to do instead | book a 1:1 in ≤ 5 taps (phase 5) |
+| Cancel a booking | 0 | – | 0 | 0 taps, 0.1 s | reaches it: switched off: nothing can be booked, so there is nothing to cancel; the notice says what to do instead | cancel in ≤ 3 taps with the rule shown first (phase 5) |
 
 ## A coached client
 
 | Job | Taps | Typing | Seconds | Before | What happens | The plan's budget |
 |---|---|---|---|---|---|---|
-| Start today's workout (the coach's session) | 3 | – | 11 | 3 taps, 10.9 s | finishes | open app → first exercise in ≤ 2 taps and ≤ 10 s (phase 2) |
-| Log a set (the coach's session) | 1 | – | 10.4 | 1 taps, 9.9 s | finishes | log a set in 1 tap (phase 2) |
-| Finish a session (the coach's session) | 37 | – | 39.8 | 37 taps, 39.6 s | finishes | a 5-exercise session in ≤ 12 taps beyond the sets (phase 2) |
+| Start today's workout (the coach's session) | 2 | – | 1 | 3 taps, 11 s | finishes | open app → first exercise in ≤ 2 taps and ≤ 10 s (phase 2) |
+| Log a set (the coach's session) | 1 | – | 8.2 | 1 taps, 10.4 s | finishes | log a set in 1 tap (phase 2) |
+| Finish a session (the coach's session) | 9 (8 sets + 1 other) (+ 28 waits the rig skipped) | – | 29.1 | 37 taps, 39.8 s | finishes | a 5-exercise session in ≤ 12 taps beyond the sets (phase 2) |
 
 ## The coach
 
 | Job | Taps | Typing | Seconds | Before | What happens | The plan's budget |
 |---|---|---|---|---|---|---|
-| See who trained | 2 | – | 2.1 | 2 taps, 1.8 s | finishes | "Who needs me today" is the coach's first screen (phase 5) |
-| Adjust a program (change one exercise) | 7 | – | 4.7 | 7 taps, 4.7 s | finishes | adjust one exercise in ≤ 4 taps (phase 5) |
-| Review a form clip | 3 | – | 2.7 | 3 taps, 2.2 s | reaches it: switched off until the form-review table is applied: clients film a set and read their own flags; nothing reaches the coach yet, and the screen says so | – (phase 5) |
-| Take group attendance | 3 | – | 2 | stopped at step 5 | reaches it: switched off until the group-booking tables are applied: the screen says so and offers what to do instead | attendance in ≤ 1 tap per person (phase 5) |
-| Open shot charts | 4 | – | 2.7 | stopped at step 6 | reaches it: switched off until the shot-chart table is applied: the screen says so and offers a way back | – (phase 5) |
+| See who trained | 2 | – | 1.1 | 2 taps, 2.1 s | finishes | "Who needs me today" is the coach's first screen (phase 5) |
+| Adjust a program (change one exercise) | 8 | – | 5.2 | 7 taps, 4.7 s | finishes | adjust one exercise in ≤ 4 taps (phase 5) |
+| Review a form clip | 3 | – | 2.4 | 3 taps, 2.7 s | reaches it: switched off until the form-review table is applied: clients film a set and read their own flags; nothing reaches the coach yet, and the screen says so | – (phase 5) |
+| Take group attendance | 3 | – | 2.4 | 3 taps, 2 s | reaches it: switched off until the group-booking tables are applied: the screen says so and offers what to do instead | attendance in ≤ 1 tap per person (phase 5) |
+| Open shot charts | 4 | – | 2.9 | 4 taps, 2.7 s | reaches it: switched off until the shot-chart table is applied: the screen says so and offers a way back | – (phase 5) |
 
-*Adjust a program (change one exercise):* walked at 11:00 on the before build, opening the athlete from the 'Needs you' card; the coach screens are the same in both builds (this phase did not change them). A walk from the roster strip is queued.
+## What was fixed in phase 2 (phase 1's "after" → now, measured on the rig)
+
+| Job | Phase 1 after | Now | What changed |
+|---|---|---|---|
+| Finish a session (athlete alone, the program the AI built) | 65 taps | 18 taps: 17 sets + 1 (Back) | The player's bright button is shown only when the screen needs the person: a counted set ("Set done") or a pause. The ready count, rests and timed sets already run by themselves; their "Skip rest" / "Start now" is now a quiet button, so it no longer reads as the thing to press (`components/session-player/session-player.tsx`). The walker had pressed it 47 times. |
+| Finish a session (coached client) | 37 taps | 9 taps: 8 sets + 1 | The same change. |
+| Start today's workout (coached client) | 3 taps, 11 s | 2 taps, 1 s | Train's first card is Today's session; tapping it opens the session already started (`/coach?start=today`; `lib/coach/todayCard.ts`, `app/coach/_components/today-view.tsx`). |
+| Start today's workout (a program kept on this phone) | – (new walk) | 2 taps, 8.7 s | Train shows "Your program" under Today when the phone holds a program the AI built; it opens the next session already started (`components/every-screen/resume-program-card.tsx`, `/train/build?start=today`). |
+| Start today's workout (today's drill) | 3 taps | 3 taps for a first-timer (deliberate: the first time explains the camera); 2 for a returning athlete (covered by a test, not walked: the rig's athlete is a first-timer) | "Start" on the daily-drill card goes straight to the camera for someone who has done a drill before (`?start=1`). |
+
+Every phase-2 fix has a test that fails on the old code: `tests/every-screen/phase2.test.tsx`.
 
 ## What was fixed in phase 1 (before → after, measured on the rig)
 

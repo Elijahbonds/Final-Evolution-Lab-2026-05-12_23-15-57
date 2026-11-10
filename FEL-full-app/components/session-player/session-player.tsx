@@ -132,6 +132,8 @@ export function SessionPlayer({ session, mode, onFinish, onClose, initial, clock
   const label = state.phase === 'ready' ? T.getReady : state.phase === 'rest' ? T.rest : null;
   const small = timedWork ? (d.small ? `s · ${d.small}` : 's') : counting ? null : d.small;
   const button = state.paused ? T.resume : state.phase === 'work' ? T.setDone : state.phase === 'rest' ? T.skipRest : T.startNow;
+  /** Does the screen need the person now? A counted set, or a pause. Everything else runs by itself. */
+  const asks = state.paused || (state.phase === 'work' && !timedWork);
   const restUi = state.phase === 'rest' && restPanel ? restPanel(state) : null;
   const fill = (i: number) => (i < state.step ? 1 : i === state.step ? (state.set - 1) / Math.max(1, step.sets) : 0);
   const total = session.steps.length;
@@ -215,9 +217,16 @@ export function SessionPlayer({ session, mode, onFinish, onClose, initial, clock
         )}
       </div>
 
+      {/* EVERY-SCREEN P2 (2026-11-10): the bright button only when the screen needs the person: a counted set to mark
+          done, or a pause to resume. The ready count, a rest and a timed set run by themselves (machine.ts), so there
+          the button is the quiet outline: still one tap to skip, but no longer the screen's call to action. Before, the
+          bright "Skip rest" after every set read as the next step: following the screen, a coached client's 18-set
+          session took 37 taps and the AI builder's first band session 65 (docs/EVERY-SCREEN-JOBS.md). */}
       <div className={LOOK.bottom}>
-        <div className={LOOK.cta} data-player-primary>
-          <PrimaryCta onClick={() => { setAskEnd(false); p.primary(); }}>{button}</PrimaryCta>
+        <div className={LOOK.cta} data-player-primary data-player-asks={asks ? '1' : '0'}>
+          {asks
+            ? <PrimaryCta onClick={() => { setAskEnd(false); p.primary(); }}>{button}</PrimaryCta>
+            : <button type="button" data-fel-press className={LOOK.buttonQuiet} onClick={() => { setAskEnd(false); p.primary(); }}>{button}</button>}
         </div>
       </div>
     </div>

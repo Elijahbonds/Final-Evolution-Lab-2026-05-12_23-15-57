@@ -37,7 +37,7 @@ export function PauseButton({ className = '' }: { className?: string }) {
       data-fel-pause
       aria-label={paused ? 'Resume' : 'Pause'}
       onClick={(e) => { e.currentTarget.blur(); pressStart(); }}
-      className={`pointer-events-auto grid h-9 w-9 place-items-center rounded-lg border border-white/15 bg-black/50 text-white/80
+      className={`pointer-events-auto grid h-11 w-11 place-items-center rounded-lg border border-white/15 bg-black/50 text-white/80
                   backdrop-blur-md transition-colors hover:text-white fel-chrome-glass ${className}`}
     >
       {paused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}

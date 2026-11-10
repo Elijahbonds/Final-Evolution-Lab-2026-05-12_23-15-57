@@ -7,8 +7,10 @@ import { TYPE } from '@/lib/design/type';
 
 export const SIG_LOOK = {
   meta: `${TYPE.label} text-fel-soft`,
-  body: `${TYPE.small} text-fel-soft`,
-  note: `flex gap-2 ${TYPE.small}`,
+  // EVERY-SCREEN P2: the program's paragraphs (more than 12 words) are body copy: TYPE.body (READABLE.md)
+  body: `${TYPE.body} text-fel-soft`,
+  // EVERY-SCREEN P2: a note's size is its length's (lib/design/type.ts lineSize): a sentence is body, a short line small
+  note: 'flex gap-2',
   /** the kit's PrimaryCta, stretched to the card (it sizes itself to its words) */
   start: 'mt-4 [&>[data-fel-primary]]:w-full',
   today: 'fel-surface rounded-3xl border border-fel-cyan/25 bg-gradient-to-b from-fel-cyan/[0.07] to-transparent p-5',

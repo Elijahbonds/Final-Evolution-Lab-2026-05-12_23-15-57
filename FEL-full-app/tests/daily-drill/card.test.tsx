@@ -36,8 +36,16 @@ describe('the daily drill card', () => {
     expect(out).not.toContain('data-daily-explainer');
     // test changed: drill redesign (less text, owner 2026-10-27) — the reward as one short line, amounts unchanged
     expect(out).toContain('+10 Lab Credits · Day 4 streak');
-    expect(out).toContain('href="/train/today-drill"');
+    // test changed (EVERY-SCREEN P2, 2026-11-10, flagged): a returning athlete's Start opens the drill on camera at once
+    // (?start=1), one tap fewer to the first move; a first-timer still gets the drill's page (asserted next)
+    expect(out).toContain('href="/train/today-drill?start=1"');
     expect(out).not.toContain('data-daily-nudge');
+  });
+
+  it('a first-timer\'s Start opens the drill\'s page first (its steps and cues)', () => {
+    const v = viewFrom('u1', newAdult(), OPEN, NOW);
+    expect(v.newcomer).toBe(true);
+    expect(decode(html(v))).toContain('href="/train/today-drill"');
   });
 
   it('no number yet: the Wake-Up and the nudge to measure', () => {

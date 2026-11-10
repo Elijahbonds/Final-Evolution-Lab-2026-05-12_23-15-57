@@ -115,7 +115,7 @@ export function BodyControl({ compact = false }: { compact?: boolean }) {
         onClick={(e) => { e.currentTarget.blur(); toggle(); }}
         aria-pressed={on}
         aria-label={on ? 'Turn body play off' : 'Play with your body'}
-        className={`inline-flex items-center gap-2 rounded-lg border px-2.5 py-1.5 font-mono text-[12px]
+        className={`inline-flex min-h-11 items-center gap-2 rounded-lg border px-2.5 py-1.5 font-mono text-[12px]
                     font-bold uppercase tracking-[0.12em] transition-colors ${compact ? '' : 'sm:px-3'}`}
         style={{
           borderColor: on ? 'rgba(0,255,157,0.45)' : 'rgba(255,255,255,0.12)',

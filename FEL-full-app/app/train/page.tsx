@@ -14,6 +14,8 @@ import { loadWarmupContext } from '@/lib/coach/warmupServer';
 import { DoorsRow } from '@/components/shell/doors-row';
 // MIRROR-PROGRESS (2026-10-07): a coached athlete's door to today's session, first on the page (nothing for anyone else)
 import { TodayCard } from '@/components/coach/today-card';
+// EVERY-SCREEN P2: an athlete's own program (the AI builder's, kept on this phone), first, one tap to its next session
+import { ResumeProgramCard } from '@/components/every-screen/resume-program-card';
 import { todayCardFor } from '@/lib/coach/todayCard';
 // PROGRESS CARD (value round item 1): the weekly door to /profile/week; reads nothing
 import { WeekCardEntry } from '@/components/progress-card/week-entry';
@@ -194,8 +196,9 @@ export default async function TrainPage() {
       lede={t('train.lede')}
       hero={{ image: '/backdrops/training.jpg', imagePosition: '50% 60%' }}
     >
-      <DailyDrillCard view={dailyDrill} />
       <TodayCard view={todayCard} />
+      <ResumeProgramCard />
+      <DailyDrillCard view={dailyDrill} />
       <WeekCardEntry />
       {GROUPS.map((g) => (
         <section key={g} aria-labelledby={`train-${g}`} className="mt-8 first:mt-0">
