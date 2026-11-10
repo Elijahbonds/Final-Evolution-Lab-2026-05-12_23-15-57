@@ -109,7 +109,10 @@ export class CharacterAnimator {
   private blend: BlendMode = 'linear';
   private inertialObs: Observer<Scene> | null = null;
   /** AF-1: a clip switch waiting for the next evaluated frame, at this half-life (s). */
-  private inertialSwitch: { halfLife: number } | null = null;
+  private inertialSwitch: { halfLife: number; defer?: boolean } | null = null;
+  /** GAMEPLAY-CLEAN P6: inside this frame's animation pass (onBeforeAnimations → this body's inertialFrame) — see LATE SWITCH. */
+  private inAnimate = false;
+  private animBeginObs: Observer<Scene> | null = null;
   private inertialTracks = new Map<InertialNode, InertialTrack>();
   private inertialTargets = new Map<AnimationGroup, InertialTarget[]>();
   private inertialHistDt = 0;
@@ -251,7 +254,13 @@ export class CharacterAnimator {
       this.fadingOut = null;
       this.fadingOutWeight = 1;
       next.setWeightForAllAnimatables(1);
-      this.inertialSwitch = { halfLife: inertialHalfLife(fadeSec) };
+      // GAMEPLAY-CLEAN P6, LATE SWITCH: a play() made INSIDE the animation pass — from a clip's end callback (every tree's settle,
+      // neverBindPose's "back to the base loop"), or an after-animations observer that runs before inertialFrame — starts a clip that
+      // has NOT been evaluated this frame: the bones still hold the old clip's pose, so the offset captured now is ~0 and the whole
+      // switch lands on the NEXT frame with nothing to decay it. Measured on the hero: a hit react ending into the idle, the left
+      // forearm 0.0° then 55.3° in one frame; a knockdown ending, the right arm 0.0° then 56.6° (linear: 23.6° / 14.9°). Such a
+      // switch is captured one frame later, once the new clip has been evaluated; live offsets keep decaying meanwhile.
+      this.inertialSwitch = { halfLife: inertialHalfLife(fadeSec), defer: this.inAnimate };
       return;
     }
     this.fadingOut = prev && prev !== next ? prev : null;
@@ -492,6 +501,7 @@ export class CharacterAnimator {
     this.dropPendingFreezes();
     this.fadeObs?.remove();
     this.inertialObs?.remove(); this.inertialObs = null;   // AF-1
+    this.animBeginObs?.remove(); this.animBeginObs = null;   // P6
     this.endObs.forEach((o, g) => g.onAnimationGroupEndObservable.remove(o as never));
     this.groups.forEach((g) => g.stop());
   }
@@ -509,8 +519,10 @@ export class CharacterAnimator {
     this.blend = mode;
     if (mode === 'inertial') {
       this.inertialObs = this.scene.onAfterAnimationsObservable.add(() => this.inertialFrame(), undefined, true);
+      this.animBeginObs = this.scene.onBeforeAnimationsObservable.add(() => { this.inAnimate = true; });   // P6: LATE SWITCH
     } else {
       this.inertialObs?.remove(); this.inertialObs = null;
+      this.animBeginObs?.remove(); this.animBeginObs = null; this.inAnimate = false;
       this.inertialCut();
       this.inertialTracks.clear();
     }
@@ -559,13 +571,16 @@ export class CharacterAnimator {
 
   /** AF-1: one frame of the inertial blend — start a pending switch's offsets, decay the live ones, apply them, record the pose. */
   private inertialFrame(): void {
+    this.inAnimate = false;   // P6: the animation pass is over for this body; a play() from here on is evaluated before the next capture
     const cur = this.current;
     if (!cur) return;
     const dt = inertialDt(this.scene.getEngine().getDeltaTime() / 1000, this.scene.animationTimeScale);
     const targets = this.inertialTargetsOf(cur);
     const frame = ++this.inertialFrameNo;
     const sw = this.inertialSwitch;
-    if (sw) {
+    const late = !!sw?.defer;
+    if (sw && late) sw.defer = false;   // P6: LATE SWITCH — captured on the next frame; this frame decays and records as usual
+    if (sw && !late) {
       this.inertialSwitch = null;
       this.inertialTracks.forEach((t) => { t.rotOn = false; t.posOn = false; });
       const hd = this.inertialHistDt;
@@ -618,13 +633,23 @@ export class CharacterAnimator {
     for (const { n, rot, pos } of targets) {
       const t = this.inertialTrack(n);
       const rq = rot ? n.rotationQuaternion : null;
-      if (rq && t.rotOn) {
+      // P6, LATE SWITCH: this frame the bones show a pose that is neither clip's (the old one torn down mid-pass, the new one started
+      // in it) — 51.6° from the frame before and 60° from the new clip on the hero. Hold the pose the body showed last; the switch is
+      // captured against it next frame, from the new clip's real pose.
+      const hold = late && t.stamp === frame - 1;
+      if (hold && rq && t.last) {
+        if (t.bone) { const sq = (t.scratchQ ??= rq.clone()); sq.set(t.last[0], t.last[1], t.last[2], t.last[3]); n.rotationQuaternion = sq; }
+        else rq.set(t.last[0], t.last[1], t.last[2], t.last[3]);
+      } else if (rq && t.rotOn) {
         const q = quatMul(quatFromAxisAngle(t.axis, t.x), [rq.x, rq.y, rq.z, rq.w]);
         if (t.bone) { const sq = (t.scratchQ ??= rq.clone()); sq.set(q[0], q[1], q[2], q[3]); n.rotationQuaternion = sq; }
         else rq.set(q[0], q[1], q[2], q[3]);
       }
       const p = pos ? n.position : null;
-      if (p && t.posOn) {
+      if (hold && p && t.lastP) {
+        if (t.bone) { const sp = (t.scratchP ??= p.clone()); sp.set(t.lastP[0], t.lastP[1], t.lastP[2]); n.position = sp; }
+        else p.set(t.lastP[0], t.lastP[1], t.lastP[2]);
+      } else if (p && t.posOn) {
         const x = p.x + t.pOff[0], y = p.y + t.pOff[1], z = p.z + t.pOff[2];
         if (t.bone) { const sp = (t.scratchP ??= p.clone()); sp.set(x, y, z); n.position = sp; }
         else p.set(x, y, z);
@@ -636,6 +661,19 @@ export class CharacterAnimator {
       if (sp) { t.priorP = contiguous ? t.lastP : null; t.lastP = [sp.x, sp.y, sp.z]; }
       t.stamp = frame;
     }
+    // P6, PARTIAL CLIPS: a node the current clip does not key (the authored `guard` keys 7 bones; the jab before it keyed the legs)
+    // is still shown — frozen at its last value — and the next clip that keys it must blend FROM that. It used to go unrecorded while
+    // such a clip played, so the next switch found no fresh pose for it and applied no offset: the right leg 35.7° in one frame on the
+    // hero (jab → guard → guard step; linear 4.0°). Every node this body has tracked is recorded every frame.
+    this.inertialTracks.forEach((t, n) => {
+      if (t.stamp === frame) return;
+      const contiguous = t.stamp === frame - 1;
+      const shown = n.rotationQuaternion;
+      if (shown) { t.prior = contiguous ? t.last : null; t.last = [shown.x, shown.y, shown.z, shown.w]; }
+      const sp = t.hips ? n.position : null;
+      if (sp) { t.priorP = contiguous ? t.lastP : null; t.lastP = [sp.x, sp.y, sp.z]; }
+      t.stamp = frame;
+    });
     this.inertialHistDt = dt;
   }
 }

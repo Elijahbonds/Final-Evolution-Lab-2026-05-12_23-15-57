@@ -25,6 +25,7 @@ import { spawnProceduralAthlete } from '../characters/ProceduralAthlete';
 import { rosterUrlFor, normalizeHeroUrl, DEFAULT_HERO_URL, takeRivalRotation } from './athleteRoster';
 import { urlForHeroBody, KIT_BODY_URL, bodyUrlForTier } from './heroBody';
 import { installOpponentMotion, HERO_CAPTURE } from '../anim/opponentMotion';
+import { applyInertialBlend } from '../anim/inertialize';   // GAMEPLAY-CLEAN P6
 import { installStyleMotion } from '../anim/styleMotion';
 import { pickedVocab } from '../combat/styleVocab';
 /** The modes a picked fighting style's moves play in (The Hundred + the versus fights). */
@@ -325,6 +326,10 @@ export const CharacterLibrary = {
     else if (!rosterPicked && role === 'opponent' && heroRequest) applyTint(meshes, '#8b1e2d');
 
     const animator = new CharacterAnimator(scene, inst.animationGroups);
+    // GAMEPLAY-CLEAN P6: EVERY spawned body follows the inertial-blend knob (`anim.inertial`), not only the modes that opted their
+    // heroes in one by one (AF-1 / P2 #2) — the duel, the net sports, the boards and every rival switched with the linear crossfade,
+    // whose weight dips are most of what the rig still counts as pops (GAMEPLAY-CLEAN-AUDIT §4g/§4h). Off (the knob at 0): nothing.
+    applyInertialBlend(animator);
     registerAuthoredClips(animator, scene, skeleton);
     // M28 dance: build '<base>.M' mirrored groups so mirrored dance steps have a
     // real reflected clip (never a T-pose) — see mirrored-clips.ts. The keeper set rides along so the global
