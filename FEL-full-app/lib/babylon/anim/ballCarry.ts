@@ -287,6 +287,8 @@ function reachShaped(arm: ArmChain, target: Vector3, pole: Vector3, weight: numb
  * speed, this is a fade that already had a length; what was missing was where it ends).
  */
 export const CARRY_LET_GO_TO_CLIP_ON = 1;
+/** GAMEPLAY-CLEAN P6: feel knob `anim.carryPushedBounce` default — the non-hoops carry (the dunk runway) bounces the pushed shape (1). */
+export const CARRY_PUSHED_BOUNCE_ON = 1;
 function reachLettingGo(arm: ArmChain, target: Vector3, pole: Vector3, weight: number, dt: number, stamp: number): void {
   // knob `hoops.carryLetGoToClipOn` (1): 0 = the let-go as it was (the reach's target weight alone: the one-frame cut at the fade's end)
   if (feel('hoops.carryLetGoToClipOn', CARRY_LET_GO_TO_CLIP_ON) < 0.5) { reachShaped(arm, target, pole, weight, dt, stamp); return; }
@@ -425,7 +427,13 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     }
     if (!pending) return;
     pending = false;
-    const s = dribbleAt(phase, p);
+    // GAMEPLAY-CLEAN P6: THE RUNWAY BOUNCE IS PUSHED TOO, feel knob `anim.carryPushedBounce` (1 on; 0 = dribbleAt, the runway as it
+    // was tuned). dribbleAt's ball is fastest AT THE PALM and turns round there in one frame (a parabola with its vertex on the
+    // floor), and the hand riding on top of it turned with it: the dunk runway's ball arm 35–60° in ONE frame at every bounce's top
+    // (phase 0.96 → 0.04; headless on the hero, and the rig's dunk run-up: 14 hard pops in 14 s). Hoops phase 3 fixed exactly this
+    // for the hoops carry (dribbleAtPushed: the fastest frame is the floor, the hand meets a ball slowing into it); the runway now
+    // takes the same shape. Same palm, same depth, same rate: only where in the bounce the ball is fast.
+    const s = feel('anim.carryPushedBounce', CARRY_PUSHED_BOUNCE_ON) >= 0.5 ? dribbleAtPushed(phase, p) : dribbleAt(phase, p);
     const sx = armSign(arm, side === 'Right' ? 1 : -1);
     // DUNK MOTION (2026-09-23): at pace the ball is PUSHED out ahead of the body (a sprint dribble), not bounced beside the hip
     const push = PUSH_AHEAD_M * Math.min(1, Math.max(0, lastSpeed01));

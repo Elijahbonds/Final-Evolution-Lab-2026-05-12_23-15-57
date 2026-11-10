@@ -1378,6 +1378,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
   },
   // AF-1 (ANIM-FEEL-SPEC 2026-10-28): inertialized clip transitions, default OFF — off is the linear crossfade, unchanged.
   {
+    id: 'anim.carryPushedBounce', label: 'Dunk runway dribble: pushed bounce on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/ballCarry.ts CARRY_PUSHED_BOUNCE_ON',
+    hint: 'On: the dunk run-up dribble uses the pushed bounce the hoops modes use (the ball fastest at the floor, the hand meets it slowing). Off: the old bounce, fastest at the hand, which snapped the ball arm 35 to 60 degrees in a frame at every bounce.',
+  },
+  {
     id: 'anim.inertial', label: 'Inertial clip transitions on (1) / off (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
     source: 'lib/babylon/anim/inertialize.ts ANIM_INERTIAL_ON',
     hint: 'On: a clip switch cuts to the new clip at once and the old pose\'s difference decays out (no mid-blend pose). Takes effect on the next spawn.',
