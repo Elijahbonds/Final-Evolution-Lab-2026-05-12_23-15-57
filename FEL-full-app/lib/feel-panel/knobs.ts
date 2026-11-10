@@ -1336,6 +1336,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'On defense the pelvis and legs turn toward where you are going while the chest stays on your man, so a diagonal slide or retreat steps along its travel. 0 = square hips, as before.',
   },
   {
+    id: 'hoops.hipSteerAllLoopsOn', label: 'Defense: hips turn on every slide and run (0 = the retreat only)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · transitions',
+    source: 'lib/babylon/anim/hipSteer.ts HIP_STEER_ALL_LOOPS_ON',
+    hint: '0: the hips turn toward the travel only in the retreat, where it measured better. 1: on every slide, crossover run, run and closeout too (it made a 3v3 bump slide more).',
+  },
+  {
     id: 'hoops.hipSteerMaxDeg', label: 'Defense: most the hips turn off the chest', def: 50, min: 0, max: 80, step: 5, unit: '°', group: 'Hoops · transitions',
     source: 'lib/babylon/anim/hipSteer.ts HIP_STEER_MAX_DEG',
     hint: 'The cap on the pelvis turn. Higher follows a diagonal further and twists the waist more.',

@@ -47,6 +47,17 @@ export const LOOP_TRAVEL_DEG: Readonly<Record<string, number>> = {
 /** …and the captured backpedal's own travel once it is played in reverse (see above). */
 export const BACKPEDAL_REVERSED_TRAVEL_DEG = 147;
 
+/**
+ * hoops-p05b: WHERE THE STEER RUNS. On the rig (seed 7, the switch alone off against all three slide switches on) the steer was the only one
+ * acting in a real defensive possession, and it was not better everywhere: 3v3 the hero's slide p90 12.27 -> 12.65 cm (a bump landing on
+ * turned hips), 1v1 its two severe foot pops 4 735 / 3 262 -> 5 120 / 3 789 deg/s (pops 5 -> 3). Where it measured better is the retreat:
+ * the reversed backpedal capture steps 33 deg off straight back, and the steer lines its legs up with the retreat. So by default it runs on
+ * the backpedal only; knob `hoops.hipSteerAllLoopsOn` 1 = every stepping loop (the slides, the crossover run, the run, the closeout), as
+ * shipped in P5a. `hoops.hipSteerOn` 0 still turns it off everywhere.
+ */
+export const HIP_STEER_ALL_LOOPS_ON = 0;
+export const HIP_STEER_DEFAULT_STATES: ReadonlySet<string> = new Set(['defend_backpedal']);
+
 /** Where a body is travelling against where it faces (rad, 0 = straight ahead, + = body-right), or undefined under 0.6 m/s — OneVOneMode's
  *  `travelOff`, for a mode that has none of its own (the tree's `travelOffRad`). */
 export function travelOffOf(yaw: number, vel: { x: number; z: number }): number | undefined {
@@ -112,7 +123,8 @@ export class HipSteer {
   drive(d: SteerDrive): void {
     const on = feel('hoops.hipSteerOn', HIP_STEER_ON) >= 0.5;
     if (on && d.hold) { this.target = this.deg; return; }
-    const loopDeg = d.state === null ? null : d.loopDeg ?? LOOP_TRAVEL_DEG[d.state] ?? null;
+    const all = feel('hoops.hipSteerAllLoopsOn', HIP_STEER_ALL_LOOPS_ON) >= 0.5;
+    const loopDeg = d.state === null || (!all && !HIP_STEER_DEFAULT_STATES.has(d.state)) ? null : d.loopDeg ?? LOOP_TRAVEL_DEG[d.state] ?? null;
     this.target = on ? steerWantedDeg(loopDeg, d.travelOffRad, d.speedMps, feel('hoops.hipSteerMaxDeg', HIP_STEER_MAX_DEG), feel('hoops.hipSteerFromMps', HIP_STEER_FROM_MPS), feel('hoops.hipSteerFullMps', HIP_STEER_FULL_MPS)) : 0;
     this.deg = on ? stepSteer(this.deg, this.target, d.dtSec, feel('hoops.hipSteerSec', HIP_STEER_SEC)) : 0;
     if (Math.abs(this.deg) < 0.05 && this.target === 0) this.deg = 0;

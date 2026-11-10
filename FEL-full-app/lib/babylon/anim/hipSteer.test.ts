@@ -67,8 +67,20 @@ async function rig(): Promise<{ scene: Scene; sk: Skeleton; root: TransformNode;
 const lineYaw = (a: Vector3, b: Vector3): number => Math.atan2(-(a.z - b.z), a.x - b.x) / RAD;
 const wrap = (d: number): number => ((d + 180) % 360 + 360) % 360 - 180;
 
+describe('hipSteer — where it runs (hoops-p05b)', () => {
+  it('by default the retreat only; hoops.hipSteerAllLoopsOn 1 gives every stepping loop back (P5a)', () => {
+    const mk = () => new HipSteer({ onAfterAnimationsObservable: { add: () => null } } as never, { bones: [] } as never, {} as never);
+    const run = (st: HipSteer, state: string, off: number) => { for (let i = 0; i < 120; i++) st.drive({ state, travelOffRad: off * RAD, speedMps: 3, dtSec: 1 / 60 }); return st.turnDeg; };
+    expect(run(mk(), 'defend_slide', -130)).toBe(0);
+    expect(run(mk(), 'defend_backpedal', 150)).toBeCloseTo(-30, 1);
+    setFeelUser(true); setFeelSession(null); setFeelOverride('hoops.hipSteerAllLoopsOn', 1);
+    expect(run(mk(), 'defend_slide', -130)).toBeCloseTo(-40, 1);
+  });
+});
+
 describe('hipSteer — on the hero rig', () => {
   it('the legs turn about the vertical by the angle asked, toward the travel; the shoulders, the head and the hips\' height stay', async () => {
+    setFeelUser(true); setFeelSession(null); setFeelOverride('hoops.hipSteerAllLoopsOn', 1);   // (the slide: steered with every loop on)
     const R = await rig();
     try {
       const steer = HipSteer.for(R.scene, R.sk, R.root);
@@ -96,6 +108,7 @@ describe('hipSteer — on the hero rig', () => {
     } finally { R.dispose(); }
   });
   it('a hold keeps the turn where it is (a bump on defence), and steering resumes from there', () => {
+    setFeelUser(true); setFeelSession(null); setFeelOverride('hoops.hipSteerAllLoopsOn', 1);
     const st = new HipSteer({ onAfterAnimationsObservable: { add: () => null } } as never, { bones: [] } as never, {} as never);
     for (let i = 0; i < 120; i++) st.drive({ state: 'defend_slide', travelOffRad: -130 * RAD, speedMps: 3, dtSec: 1 / 60 });
     const t = st.turnDeg; expect(t).toBeCloseTo(-40, 1);

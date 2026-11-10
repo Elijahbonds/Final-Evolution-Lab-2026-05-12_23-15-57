@@ -246,6 +246,7 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.backpedalReverseOn')).toBe(BACKPEDAL_REVERSE_ON);
     expect(def('hoops.closeoutStepOn')).toBe(CLOSEOUT_STEP_ON);   // hoops-p05b
     expect(def('hoops.hipSteerOn')).toBe(P5S.HIP_STEER_ON);
+    expect(def('hoops.hipSteerAllLoopsOn')).toBe(P5S.HIP_STEER_ALL_LOOPS_ON);   // hoops-p05b
     expect(def('hoops.hipSteerMaxDeg')).toBe(P5S.HIP_STEER_MAX_DEG);
     expect(def('hoops.hipSteerSec')).toBe(P5S.HIP_STEER_SEC);
     expect(def('hoops.hipSteerFromMps')).toBe(P5S.HIP_STEER_FROM_MPS);
