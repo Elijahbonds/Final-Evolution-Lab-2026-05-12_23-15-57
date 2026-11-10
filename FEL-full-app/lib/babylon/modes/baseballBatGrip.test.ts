@@ -13,7 +13,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it, beforeAll } from 'vitest';
 import { NullEngine, Scene, SceneLoader, TransformNode, Vector3, VertexBuffer, Quaternion, MeshBuilder, FreeCamera, type AbstractMesh } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF/index.js';
-import { batGlbFit, batGlbInScene, batHandleEnd, fitBatModel, placeTwoHandBat, BAT_GLB_HANDLE, BAT_GLB_BARREL, BAT_LEN, BAT_KNOB_M, type BatBones } from './baseballBat';
+import { batGlbFit, batGlbInScene, batHandleEnd, batHeld, batGripHeld, dressBatGlb, fitBatModel, placeTwoHandBat, BAT_GLB_HANDLE, BAT_GLB_BARREL, BAT_GRIP_BACK_M, BAT_GRIP_LOST_M, BAT_LEN, BAT_KNOB_M, type BatBones } from './baseballBat';
 import { batLineAt } from '../anim/authored/baseball';
 
 type V3 = [number, number, number];
@@ -148,5 +148,59 @@ describe('placed in the hands: the handle at the fists, the barrel out along the
         carrier.dispose(); wrap.dispose();
       });
     }
+  }
+});
+
+// BAT-GRIP-2 (2026-11-10): the bat is drawn only while both fists can be on it. placeTwoHandBat strings the handle between
+// the two fists whatever the arms are doing, so a batter whose arms were not in a batting clip had a bat hanging between
+// two far-apart hands (the real clips, replayed: baseballBatHeld.test.ts).
+describe('the bat hides while the fists are apart', () => {
+  it('batGripHeld: lost past BAT_GRIP_LOST_M, back under BAT_GRIP_BACK_M, steady in the gap between', () => {
+    expect(BAT_GRIP_BACK_M).toBeLessThan(BAT_GRIP_LOST_M);
+    expect(batGripHeld(true, 0.07)).toBe(true);           // a held stance
+    expect(batGripHeld(true, 0.30)).toBe(true);           // the widest two-handed swing rig-grip-tests allows
+    expect(batGripHeld(true, 0.36)).toBe(true);           // the swing → stance blend at its widest (0.35 m): still drawn
+    expect(batGripHeld(true, 0.51)).toBe(false);          // the innings' idle → stance blend
+    expect(batGripHeld(true, 0.80)).toBe(false);          // the innings' run → stance blend
+    expect(batGripHeld(false, 0.35)).toBe(false);         // no flicker in the gap
+    expect(batGripHeld(false, 0.10)).toBe(true);          // the hands come together: the bat is back
+  });
+  it('the knobs: lost at its 2 m maximum never hides (the old behaviour), and back never sits above lost', () => {
+    for (const sep of [0.07, 0.5, 0.8, 1.2]) expect(batGripHeld(true, sep, 2, BAT_GRIP_BACK_M)).toBe(true);
+    expect(batGripHeld(false, 0.28, 0.25, 0.4)).toBe(false);   // back 0.4 over lost 0.25: back is held to lost
+    expect(batGripHeld(false, 0.24, 0.25, 0.4)).toBe(true);
+  });
+
+  for (const look of ['cylinder', 'glb'] as const) {
+    it(`placeTwoHandBat marks the grip, and the ${look} look follows it on the same frame`, () => {
+      const { root, bones } = body(1);
+      const carrier = MeshBuilder.CreateCylinder(`carrier_grip_${look}`, { height: BAT_LEN, diameter: 0.05 }, scene);
+      carrier.rotationQuaternion = new Quaternion();
+      // the modes' own order: the look first, then the placement
+      const lookH = dressBatGlb(scene, carrier, BAT_LEN, look);
+      const obs = placeTwoHandBat(scene, root, bones, carrier, () => null);
+      const shown = () => look === 'cylinder' ? carrier.isVisible : (carrier.isVisible || !!scene.getTransformNodeByName(`${carrier.name}_glb`)?.isEnabled());
+      scene.render();
+      expect(batHeld(carrier)).toBe(true);
+      expect(shown()).toBe(true);
+      // the hands come apart (0.72 m: free arms): hidden on that very frame, not one late
+      const lh = bones.lh as unknown as TransformNode, rh = bones.rh as unknown as TransformNode;
+      lh.position.x -= 0.35; rh.position.x += 0.35;
+      scene.render();
+      expect(batHeld(carrier)).toBe(false);
+      expect(shown()).toBe(false);
+      // the mode switching the bat on (the innings, on the first stance frame) does not draw a bat nobody holds
+      lookH.setVisible(false); lookH.setVisible(true);
+      expect(shown()).toBe(false);
+      // back together: drawn again, on that frame
+      lh.position.x += 0.35; rh.position.x -= 0.35;
+      scene.render();
+      expect(batHeld(carrier)).toBe(true);
+      expect(shown()).toBe(true);
+      // and the mode's own hide still wins over a held grip
+      lookH.setVisible(false); scene.render();
+      expect(shown()).toBe(false);
+      scene.onBeforeRenderObservable.remove(obs); lookH.dispose(); carrier.dispose();
+    });
   }
 });

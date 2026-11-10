@@ -31,7 +31,7 @@ const ok = (c: boolean, label: string): void => { checks++; if (!c) fail.push(la
   ok(/passTargetId = 'me'/.test(src), "the mate's pass targets 'me' (passTargetId's widened type)");
   ok(/lastPasserWasMe = false;\s*\/\/ the mate threw this one/.test(src), 'no stray assist credit from a call-for-ball catch');
   ok(/const toMe = leadPoint\(body\.char\.root\.position, me\.char\.root\.position, me\.drib\.vel, PASS_SPEED\.chest\)/.test(src) &&
-     /passFlight\.start\(body\.char\.root\.position\.add\(new Vector3\(0, 1\.2, 0\)\), toMe, 'chest', 1\);/.test(src),
+     /passFlight\.start\(passFrom, toMe, 'chest', 1\);/.test(src) && /const passFrom = passStartFor\(ball, body\.char\.root\);/.test(src),   // test changed (hoops-p05, phase 5): the flight starts from the ball (hoops/ballHandoff), not root + 1.2 m; the led target toMe is what this pins
     'the ball actually flies mate → hero (PassFlight, same system a human throw uses — now led toward "me" via leadPoint, HOOPS-10PHASE-2 phase 6)');
   ok(/if \(!\(carrierId === 'mate0' \|\| carrierId === 'mate1'\) \|\| passFlight\.active\) return;/.test(src),
     'a call with no mate carrying, or a pass already in flight, is a no-op (one pass at a time)');

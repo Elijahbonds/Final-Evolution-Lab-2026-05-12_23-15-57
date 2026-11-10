@@ -976,6 +976,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'dunk.slamVariants', label: 'Slam: stick back = REVERSE, stick up = TWO-HAND POWER', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Dunk · finishes',
     source: 'lib/babylon/core/DunkSlamVariant.ts SLAM_VARIANTS_ON',
     hint: 'Off (as shipped): the slam is the flush the flight carries. On: the left stick held at the A press inside the slam window calls the finish — back a REVERSE (the back to the iron), up a TWO-HAND POWER — named on the card. The air tricks (d-pad + button) are unchanged.',
+  },
+  {
+    id: 'dunk.finishOverRing', label: 'Finish: the hand carries the ball over the ring', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Dunk · finishes',
+    source: 'lib/babylon/core/DunkOverRing.ts FINISH_OVER_RING',
+    hint: 'Off (as shipped): the ball meets the front of the rim and the flush carries it in. On: the hand lifts the ball over the front of the rim and brings it down inside the ring, so it is let go over the hole. Every dunk ends this way while it is on.',
   },  // ── hoops-round2 (HOP-02, owner 2026-10-20): the AI defenders react late by difficulty (hoops/reaction; never in ranked / staked) ──
   {
     id: 'hoops.aiReactRookieMs', label: 'AI reaction: ROOKIE', def: 420, min: 0, max: 800, step: 10, unit: 'ms', group: 'Hoops · AI reaction',
@@ -1117,6 +1122,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'football.hurdleFadeSec', label: 'Football hurdle: blend-in time', def: 0.12, min: 0.04, max: 0.25, step: 0.01, unit: 's', group: 'Anim · transitions',
     source: 'lib/babylon/anim/footballTree.ts FOOTBALL_HURDLE_FADE_SEC',
     hint: 'How long the run blends into the hurdle jump. 0.06 = the old snap (thigh turns about 25 degrees in one frame); 0.12 = smoother (about 15); longer starts to lag behind the hop.',
+  },
+  {
+    id: 'football.hurdleExitFadeSec', label: 'Football hurdle: blend-out time', def: 0.2, min: 0.06, max: 0.4, step: 0.02, unit: 's', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/footballTree.ts FOOTBALL_HURDLE_EXIT_FADE_SEC',
+    hint: 'How long the hurdle jump blends back into the run. 0.1 = the old snap (the off arm turns about 31 degrees a frame for six frames); 0.2 = smoother (about 16); longer leaves the arms up after the landing.',
   },
   // hoops-p03 (1v1/3v3 phase 3 "rivals that play basketball"): the 1v1 rival's kit and reads (hoops/rivalOffense), the 3v3 team offence
   // (hoops/teamOffense3v3). Every default is this lane's; the owner has felt none of them.
@@ -1308,6 +1318,54 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/anim/ballCarry.ts CARRY_ARM_SPEED_SEC',
     hint: 'The dribble arm reach and the off arm swing follow the body speed eased over this, so a gear change does not move an arm in one frame. 0 = the frame speed, as before.',
   },
+  // hoops-p05: the carry's let-go ends on the clip (the hero's last severe pop in the step-back gather)
+  {
+    id: 'hoops.carryLetGoToClipOn', label: 'Ball carry: the let-go ends on the clip (0 = off)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · transitions',
+    source: 'lib/babylon/anim/ballCarry.ts CARRY_LET_GO_TO_CLIP_ON',
+    hint: 'When a shot or a pass takes the ball out of the dribble, the ball arm eases all the way back to the clip pose over the same fade. 0 = it eased part of the way and cut the rest in one frame.',
+  },
+  // hoops-p05 (owner 2026-11-10: the hero's slide — fix it): stepping legs under the defensive beats
+  {
+    id: 'hoops.defenseLegsOn', label: 'Defense: legs keep stepping under a reach, a block or a hand up (0 = off)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · transitions',
+    source: 'lib/babylon/anim/basketballTree.ts DEFENSE_LEGS_ON',
+    hint: 'While you reach, jump to block or hold a hand up on the move, your legs keep the slide or run they were in. 0 = the reach clip standing legs slid along the floor, as before.',
+  },
+  {
+    id: 'hoops.backpedalReverseOn', label: 'Defense: the backpedal steps backward (0 = off)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · transitions',
+    source: 'lib/babylon/anim/basketballTree.ts BACKPEDAL_REVERSE_ON',
+    hint: 'The retreat capture is a forward run. 1 plays it in reverse, so the feet plant while you back off. 0 = it ran forward on the spot while the body went backward, as before.',
+  },
+  {
+    id: 'hoops.hipSteerOn', label: 'Defense: hips turn toward the travel (0 = off)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · transitions',
+    source: 'lib/babylon/anim/hipSteer.ts HIP_STEER_ON',
+    hint: 'On defense the pelvis and legs turn toward where you are going while the chest stays on your man, so a diagonal slide or retreat steps along its travel. 0 = square hips, as before.',
+  },
+  {
+    id: 'hoops.hipSteerMaxDeg', label: 'Defense: most the hips turn off the chest', def: 50, min: 0, max: 80, step: 5, unit: '°', group: 'Hoops · transitions',
+    source: 'lib/babylon/anim/hipSteer.ts HIP_STEER_MAX_DEG',
+    hint: 'The cap on the pelvis turn. Higher follows a diagonal further and twists the waist more.',
+  },
+  {
+    id: 'hoops.hipSteerSec', label: 'Defense: hip turn ease', def: 0.14, min: 0, max: 0.5, step: 0.01, unit: 's', group: 'Hoops · transitions',
+    source: 'lib/babylon/anim/hipSteer.ts HIP_STEER_SEC',
+    hint: 'How fast the pelvis follows a change of direction. 0 = at once.',
+  },
+  {
+    id: 'hoops.hipSteerFromMps', label: 'Defense: hip turn starts at', def: 0.8, min: 0, max: 3, step: 0.1, unit: 'm/s', group: 'Hoops · transitions',
+    source: 'lib/babylon/anim/hipSteer.ts HIP_STEER_FROM_MPS',
+    hint: 'No pelvis turn under this ground speed.',
+  },
+  {
+    id: 'hoops.hipSteerFullMps', label: 'Defense: hip turn is full at', def: 1.8, min: 0.5, max: 5, step: 0.1, unit: 'm/s', group: 'Hoops · transitions',
+    source: 'lib/babylon/anim/hipSteer.ts HIP_STEER_FULL_MPS',
+    hint: 'All of the pelvis turn from this ground speed.',
+  },
+  // hoops-p05 (phase 5, the ball lives in the hand)
+  {
+    id: 'hoops.passFromHandOn', label: '3v3: a teammate pass leaves from the ball (0 = off)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · transitions',
+    source: 'lib/babylon/hoops/ballHandoff.ts PASS_FROM_HAND_ON',
+    hint: 'A teammate pass starts its flight where the ball is in his hands. 0 = it started at his chest height over his feet, wherever the ball was: a jump out of the hand on the release.',
+  },
   // AF-1 (ANIM-FEEL-SPEC 2026-10-28): inertialized clip transitions, default OFF — off is the linear crossfade, unchanged.
   {
     id: 'anim.inertial', label: 'Inertial clip transitions on (1) / off (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
@@ -1330,6 +1388,21 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'anim.plantReleaseSec', label: 'Foot plant: release blend time', def: 0.1, min: 0, max: 0.4, step: 0.02, unit: 's', group: 'Anim · transitions',
     source: 'lib/babylon/anim/FootPlanting.ts PLANT_RELEASE_SEC',
     hint: 'How long a leg the foot planter lets go of takes to ease back onto the clip, in rotation. 0 = the old release, a target fade that rebuilt the leg in one frame when the body jumped or landed (football hurdle, 41 to 70 degrees a frame).',
+  },
+  {
+    id: 'anim.plantReplantEase', label: 'Foot plant: a replant keeps easing on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/FootPlanting.ts PLANT_REPLANT_EASE_ON',
+    hint: 'On: a foot that plants again while its leg is still easing off the last plant keeps easing. Off: the old behaviour, the leg snapped onto the new plant in one frame (a body sliding in a wide stance popped a thigh about 33 degrees at every re-plant).',
+  },
+  {
+    id: 'anim.plantSeatedOff', label: 'Foot plant: off for a seated pilot on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/FootPlanting.ts PLANT_SEATED_OFF_ON',
+    hint: 'On: a body its mode seats in a vehicle (the Aero Aces pilot) holds no foot plant. Off: the old behaviour, the seated feet were pinned to the ground as the plane flew and the knees snapped 50 to 60 degrees in a frame.',
+  },
+  {
+    id: 'anim.fadeHoldEnded', label: 'Crossfade: hold a move that ends mid-blend on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/CharacterAnimator.ts FADE_HOLD_ENDED_ON',
+    hint: 'On: a strike or hit react that reaches its last frame while it is still blending out is held on that frame until the blend ends. Off: the old behaviour, it vanished mid-blend and the whole body jumped in one frame (Showdown hit react into guard, arms about 30 degrees).',
   },
   {
     id: 'anim.hipYawFold', label: 'Posture hip strip folds past 90 degrees on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
@@ -1357,6 +1430,17 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'crowd.forgeFront', label: 'Forge rivals in the crowd front row on (1) / off (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Crowd',
     source: 'lib/babylon/visual/crowd/crowdFront.ts CROWD_FORGE_FRONT_ON',
     hint: 'On: the front row of every stand is forge rivals (about 31k triangles each), the five Meshy fans sit behind. Off: the Meshy crowd in every row, no forge body loads. Read when the crowd bakes (next venue).',
+  },
+  // BAT-GRIP-2 (2026-11-10): the baseball bat is drawn only while both fists can be on it (modes/baseballBat.ts). NEW numbers.
+  {
+    id: 'baseball.batGripLostM', label: 'Bat hides when the fists are this far apart', def: 0.4, min: 0.25, max: 2, step: 0.05, unit: 'm', group: 'Baseball · bat',
+    source: 'lib/babylon/modes/baseballBat.ts BAT_GRIP_LOST_M',
+    hint: 'The bat is not drawn while the batter fists are further apart than this (the batter coming back to the stance from a run or a strikeout). 2 = never hides: the old behaviour, a bat strung between two far-apart hands.',
+  },
+  {
+    id: 'baseball.batGripBackM', label: 'Bat comes back when the fists are this close', def: 0.3, min: 0.1, max: 0.4, step: 0.05, unit: 'm', group: 'Baseball · bat',
+    source: 'lib/babylon/modes/baseballBat.ts BAT_GRIP_BACK_M',
+    hint: 'A hidden bat is drawn again once the fists close to this. Lower = it appears later in the blend into the stance, with the hands nearer together.',
   },
 ];
 

@@ -42,7 +42,7 @@
     const sk = skelOf(root); if (!sk) return null;
     const by = new Map(); for (const b of sk.bones) { const t = b.getTransformNode(); if (t) by.set(clean(t.name), t); }
     const set = new Set(by.values());
-    return { id, root, set, w: WATCH.map((n) => by.get(n) || null), lf: by.get('LeftFoot'), rf: by.get('RightFoot'), lh: by.get('LeftHand'), rh: by.get('RightHand'), head: by.get('Head'), hips: by.get('Hips'), prevQ: WATCH.map(() => null) };
+    return { id, root, set, w: WATCH.map((n) => by.get(n) || null), lf: by.get('LeftFoot'), rf: by.get('RightFoot'), lh: by.get('LeftHand'), rh: by.get('RightHand'), lfa: by.get('LeftForeArm'), rfa: by.get('RightForeArm'), head: by.get('Head'), hips: by.get('Hips'), prevQ: WATCH.map(() => null) };
   };
   const B = [];
   const bind = () => {
@@ -57,7 +57,7 @@
   bind();
   const NB = 6;
   const MAXF = CFG.maxFrames || 20000;
-  const K = 17;   // root xyz yaw | lf xyz | rf xyz | lh xyz | rh xyz | head y
+  const K = 23;   // root xyz yaw | lf xyz | rf xyz | lh xyz | rh xyz | head y | lfa xyz | rfa xyz (hoops-p05: the forearms, for the palm)
   const ang = new Float32Array(MAXF * NB * NW);
   const pos = new Float32Array(MAXF * NB * K);
   const ballA = new Float32Array(MAXF * 5);       // x y z holderBody(-1 none) heldByBone(0/1)
@@ -91,7 +91,7 @@
       const b = B[bi]; const o = (F * NB + bi) * K; const r = b.root.getAbsolutePosition(); const m = b.root.getWorldMatrix().m;
       pos[o] = r.x; pos[o + 1] = r.y; pos[o + 2] = r.z; pos[o + 3] = Math.atan2(m[8], m[10]);
       const put = (n, at) => { if (!n) { pos[o + at] = NaN; pos[o + at + 1] = NaN; pos[o + at + 2] = NaN; return; } const p = n.getAbsolutePosition(); pos[o + at] = p.x; pos[o + at + 1] = p.y; pos[o + at + 2] = p.z; };
-      put(b.lf, 4); put(b.rf, 7); put(b.lh, 10); put(b.rh, 13); pos[o + 16] = b.head ? b.head.getAbsolutePosition().y : NaN;
+      put(b.lf, 4); put(b.rf, 7); put(b.lh, 10); put(b.rh, 13); put(b.lfa, 17); put(b.rfa, 20); pos[o + 16] = b.head ? b.head.getAbsolutePosition().y : NaN;
       const ao = (F * NB + bi) * NW;
       for (let j = 0; j < NW; j++) {
         const t = b.w[j]; if (!t) { ang[ao + j] = NaN; continue; }
@@ -118,10 +118,12 @@
         if (bi >= 0 && bi < per.length) { const w = g.weight < 0 ? 1 : g.weight; if (w > 0.02) per[bi].push(g.name.replace(/_c\d+$/, '') + ':' + w.toFixed(1)); }
       }
       per.forEach((a, k) => { const sig = a.sort().join(' '); if (sig !== lastClips[k]) { lastClips[k] = sig; if (HG.clips.length < 6000) HG.clips.push([HG.frame, B[k].id, sig]); } });
+      // hoops-p05: the hero's tree state and the clip the mode holds over it (1v1's seam), logged on change — which STATE a slide frame is in
+      if (MODE === 'onevone') { try { const a = S().animState(); const sig = (a.me || '-') + '|' + (a.meHeld || ''); if (sig !== lastState) { lastState = sig; if (HG.states.length < 6000) HG.states.push([HG.frame, a.me || '-', a.meHeld || '']); } } catch (e) { /* no seam yet */ } }
     }
     F++;
   };
-  const clipBody = new WeakMap(); const lastClips = []; HG.clips = [];
+  const clipBody = new WeakMap(); const lastClips = []; HG.clips = []; let lastState = ''; HG.states = [];
   // hoops-p04b: THE STAGE TRACER (CFG.stageLog). Which layer moved a bone: the after-animations observers are wrapped, each one's change to
   // the traced bones (in → out, as a rotation) is kept per frame, and a frame where that change itself turns over 600 deg/s against the frame
   // before is logged against the layer — [frame, body, bone, stage, deg/s]. Stage 'clip' is the evaluated clips' own speed (what the
@@ -154,7 +156,27 @@
       }
     } catch (e) { if (HG.errors.length < 20) HG.errors.push('stage0 ' + String(e && e.message || e).slice(0, 120)); } }, undefined, true);   // first: the clips as evaluated
   }
-  scene.onAfterRenderObservable.add(() => { HG.frame++; window.__frameNo = HG.frame; try { record(); } catch (e) { if (HG.errors.length < 20) HG.errors.push('rec ' + String(e && e.message || e).slice(0, 160)); } }, undefined, true);   // hoops-p04b: FIRST after the render — the pose as DRAWN (hoops/contactPoses puts its arm bar, forearm and chest lean back on this observable; recorded after it, the rig never saw them)
+  // hoops-p05: THE TRACE — every frame since the go, a digest of what the game decided (every body's root and facing, the ball) and of what
+  // was drawn (every watched bone's local rotation), and how many random numbers had been drawn (inside a frame / outside one). Two runs
+  // of one build and seed must match on every frame; determinism.mjs names the first frame that does not, and which of the three moved first.
+  const TR = { n: 0, root: new Uint32Array(MAXF), bone: new Uint32Array(MAXF), rf: new Uint32Array(MAXF), rl: new Uint32Array(MAXF), v: new Float32Array(MAXF * 6) };   // v: me x z | foe x z | ball y | me yaw
+  const f32 = new Float32Array(1), u32 = new Uint32Array(f32.buffer);
+  const mix = (h, x) => { f32[0] = x; return Math.imul(h ^ u32[0], 16777619) >>> 0; };
+  const trace = () => {
+    if (TR.n >= MAXF) return; let h = 2166136261, g = 2166136261; const o = TR.n * 6;
+    for (let bi = 0; bi < B.length; bi++) {
+      const b = B[bi]; const r = b.root.getAbsolutePosition(); const m = b.root.getWorldMatrix().m;
+      h = mix(mix(mix(mix(mix(h, r.x), r.y), r.z), m[8]), m[10]);
+      if (bi < 2) { TR.v[o + bi * 2] = r.x; TR.v[o + bi * 2 + 1] = r.z; } if (bi === 0) TR.v[o + 5] = Math.atan2(m[8], m[10]);
+      for (const t of b.w) { if (!t) continue; const q = lqOf(t); if (q) g = mix(mix(mix(mix(g, q.x), q.y), q.z), q.w); }
+    }
+    const bl = ball(); if (bl) { const p = bl.getAbsolutePosition(); h = mix(mix(mix(h, p.x), p.y), p.z); TR.v[o + 4] = p.y; }
+    const R = window.__rand || { f: 0, l: 0 };
+    TR.root[TR.n] = h; TR.bone[TR.n] = g; TR.rf[TR.n] = R.f; TR.rl[TR.n] = R.l; TR.n++;
+  };
+  HG.zero = () => { HG.frame = 0; window.__frameNo = 0; TR.n = 0; };
+  HG.traceOut = () => { const a = (x) => Array.from(x.subarray(0, TR.n)); return { n: TR.n, root: a(TR.root), bone: a(TR.bone), rf: a(TR.rf), rl: a(TR.rl), v: Array.from(TR.v.subarray(0, TR.n * 6)).map((x) => Math.round(x * 1e5) / 1e5) }; };
+  scene.onAfterRenderObservable.add(() => { HG.frame++; window.__frameNo = HG.frame; try { trace(); } catch (e) { if (HG.errors.length < 20) HG.errors.push('trace ' + String(e && e.message || e).slice(0, 160)); } try { record(); } catch (e) { if (HG.errors.length < 20) HG.errors.push('rec ' + String(e && e.message || e).slice(0, 160)); } }, undefined, true);   // hoops-p04b: FIRST after the render — the pose as DRAWN (hoops/contactPoses puts its arm bar, forearm and chest lean back on this observable; recorded after it, the rig never saw them)
   HG.start = () => { HG.rec = true; HG.f0 = HG.frame; F = 0; for (const b of B) b.prevQ = WATCH.map(() => null); };
   HG.stop = () => { HG.rec = false; return F; };
 
@@ -330,6 +352,42 @@
     o.log = ((window.__LOG || []).filter((l) => l.f >= f0).map((l) => l.m.slice(0, 70)).slice(0, 6)).join(' | ');
     o.f0 = f0; return o;
   };
+  // T3c (hoops-p05): THE STEP-BACK JUMPER — the away flick (the step-back dribble), then Square inside its window, let go at the green.
+  // The carry lets the ball arm go as the gather takes the ball: the frames the let-go's pop was on (letgo.mjs reads the hero's arm
+  // bones from f0 to the release + 1 s).
+  HG.test.stepback = async (arg) => {
+    const o = {}; const f0 = HG.frame;
+    // (hoops-p05) arg.jog: drive at the rim for arg.jog s first, so the step-back is thrown on the move (the carry's reach at full weight)
+    if (arg && arg.jog) { const p0 = meP(); steer(RIM.x - p0.x, RIM.z - p0.z, 0.95); await waitSec(arg.jog); o.jogMps = +speedSampler()().toFixed(2); }
+    flick('down'); if (arg && arg.jog) stick(0, 0);
+    const lg = await watch(() => logSince(f0, /stepback/i), 0.8); o.logF = lg.frames; o.log = lg.v ? lg.v.m.slice(0, 90) : '';
+    await waitSec(0.2);
+    press('X');
+    const g = await watch(() => logSince(f0, /gather/i), 1.0); o.gatherF = g.frames === null ? null : HG.frame - f0; o.gather = g.v ? g.v.m.slice(0, 90) : '';
+    await watch(() => { const mm = meterNow(); return mm.t >= mm.c; }, 2); release('X'); o.releaseF = HG.frame - f0;
+    await waitSec(1.0); o.endF = HG.frame - f0; o.f0 = f0; return o;
+  };
+  // T3d (hoops-p05): THE RETREAT AND THE SLIDE ON DEFENCE — the stick held one way against the rival for `sec`: 'back' (straight away
+  // from him: the backpedal), 'side' (across his line: the slide, the crossover run with the turbo), 'diag' (back and across). Optionally
+  // the hand up (Square held) or a reach (a Square tap) on the way. The planted-foot slide over the window is read by slide-states.mjs
+  // from the run's motion; this returns the window and the tree's states seen in it.
+  HG.test.defmove = async (arg) => {
+    const o = { ...arg }; const s = S(); const f0 = HG.frame; const seen = {};
+    const foe = () => (MODE === 'onevone' ? s.foeRoot.getAbsolutePosition() : (s.driverRoot() || B[1].root).getAbsolutePosition());
+    if (arg.turbo) turbo(true);
+    if (arg.hand === 'up') press('X');
+    let k = 0;
+    await watch(() => {
+      const me = meP(), fp = foe(); let ax = me.x - fp.x, az = me.z - fp.z; const l = Math.hypot(ax, az) || 1; ax /= l; az /= l;   // away from him
+      const sx = -az, sz = ax;   // across his line
+      if (arg.dir === 'back') steer(ax, az, 1); else if (arg.dir === 'side') steer(sx, sz, 1); else steer(ax + sx, az + sz, 1);
+      if (arg.hand === 'reach' && k++ % 40 === 12) tap('X');
+      if (MODE === 'onevone') { try { const a = s.animState(); const key = (a.me || '-') + (a.meHeld ? '+' + a.meHeld : ''); seen[key] = (seen[key] || 0) + 1; } catch (e) { /* no seam */ } }
+      return false;
+    }, arg.sec || 1.2);
+    stick(0, 0); if (arg.turbo) turbo(false); if (arg.hand === 'up') release('X');
+    o.f0 = f0; o.f1 = HG.frame; o.states = seen; return o;
+  };
   // T4: a right-stick flick — did a move fire (a HANDLE / STICK / MOVE log line), and how long until the ball moved sideways
   HG.test.flick = async (dir) => {
     const o = { dir }; const f0 = HG.frame; const b0 = ballP(); const me0 = meP();
@@ -395,7 +453,7 @@
         const o = (i * NB + bi) * K, p = ((i - 1) * NB + bi) * K;
         for (const [fa, ob] of [[4, 7], [7, 4]]) {
           const y = pos[o + fa + 1], yWas = pos[p + fa + 1], yo = pos[o + ob + 1]; if (!isFinite(y) || !isFinite(yWas)) continue;
-          if (y < floorY + 0.05 && (!isFinite(yo) || y <= yo) && !(y - yWas > 0.002)) { const s = Math.hypot(pos[o + fa] - pos[p + fa], pos[o + fa + 2] - pos[p + fa + 2]); slides.push(s); if (opts.popList && s > 0.05 && (R.skateAt || (R.skateAt = [])).length < 400) R.skateAt.push([HG.f0 + i, fa === 4 ? 'L' : 'R', Math.round(s * 1000) / 10, Math.round((vel[i] || 0) * 100 / 60 * 10) / 10, Math.round((y - floorY) * 1000) / 10, Math.round((yo - floorY) * 1000) / 10]); /* … the root's cm a frame, this foot's and the other's height over the floor (cm) */ if (vel[i] > 0.5) { movingPlanted++; movingSlide += s; } }
+          if (y < floorY + 0.05 && (!isFinite(yo) || y <= yo) && !(y - yWas > 0.002)) { const s = Math.hypot(pos[o + fa] - pos[p + fa], pos[o + fa + 2] - pos[p + fa + 2]); slides.push(s); if (opts.popList && (R.slideAll || (R.slideAll = [])).length < 6000) R.slideAll.push([HG.f0 + i, fa === 4 ? 0 : 1, Math.round(s * 1000), Math.round((vel[i] || 0) * 1000 / 60), Math.round((y - floorY) * 1000), Math.round((yo - floorY) * 1000)]);   /* hoops-p05: EVERY planted frame — frame, foot (0 L / 1 R), its slide, the root's step, its height and the other foot's over the floor (mm) */ if (opts.popList && s > 0.05 && (R.skateAt || (R.skateAt = [])).length < 400) R.skateAt.push([HG.f0 + i, fa === 4 ? 'L' : 'R', Math.round(s * 1000) / 10, Math.round((vel[i] || 0) * 100 / 60 * 10) / 10, Math.round((y - floorY) * 1000) / 10, Math.round((yo - floorY) * 1000) / 10]); /* … the root's cm a frame, this foot's and the other's height over the floor (cm) */ if (vel[i] > 0.5) { movingPlanted++; movingSlide += s; } }
         }
       }
       R.plantedFrames = slides.length; R.slideP90Cm = r2(pctl(slides, 0.9) * 100); R.skates = slides.filter((s) => s > 0.05).length;
@@ -416,7 +474,21 @@
         if (by > yP && by >= yN && by > 0.5 && by < 1.4) { let bestD = Infinity; for (let bi = 0; bi < B.length; bi++) bestD = Math.min(bestD, near(bi)); if (bestD < 0.8) apex.push(bestD); }
       }
     }
-    out.ball = { heldFrames: held.length, heldMedCm: r2(pctl(held, 0.5) * 100), heldP90Cm: r2(pctl(held, 0.9) * 100), apexN: apex.length, apexMedCm: r2(pctl(apex, 0.5) * 100), apexP90Cm: r2(pctl(apex, 0.9) * 100), pathP99Cm: r2(pctl(path, 0.99) * 100), warpsOver15cm: warps };
+    // hoops-p05 (phase 5, "the ball lives in the hand"): the PALM — the hand bone, PALM_M on along forearm → hand (assumption: the rig has
+    // no finger bones; 8 cm is the hero's wrist-to-palm-centre) — and the ball's SURFACE (centre less BALL_R): the apex gate is the
+    // carrier's nearer palm within 5 cm of the ball at the top of each bounce; at each release the ball's height; at each catch the ball's
+    // one-frame jump and whether BOTH palms are on it (within TWO_HAND_CM of its surface: a board's two hands)
+    const PALM_M = 0.08, BALL_R = 0.12, TWO_HAND_CM = 8;
+    const palmD = (i, bi, side) => { const o = (i * NB + bi) * K, h = side ? 13 : 10, f = side ? 20 : 17; const hx = pos[o + h], hy = pos[o + h + 1], hz = pos[o + h + 2]; let dx = hx - pos[o + f], dy = hy - pos[o + f + 1], dz = hz - pos[o + f + 2]; const L = Math.hypot(dx, dy, dz) || 1; const px = hx + dx / L * PALM_M, py = hy + dy / L * PALM_M, pz = hz + dz / L * PALM_M; return Math.hypot(ballA[i * 5] - px, ballA[i * 5 + 1] - py, ballA[i * 5 + 2] - pz) - BALL_R; };
+    const apexPalm = [], releases = [], catches = [], apexList = [];
+    for (let i = 2; i < n - 1; i++) {
+      if (cuts.has(i) || !isFinite(ballA[i * 5])) continue;
+      const hb = ballA[i * 5 + 3], hbW = ballA[(i - 1) * 5 + 3], by = ballA[i * 5 + 1];
+      if (hb < 0) { const yP = ballA[(i - 1) * 5 + 1], yN = ballA[(i + 1) * 5 + 1]; if (by > yP && by >= yN && by > 0.5 && by < 1.4) { let best = Infinity, who = -1, hand = 0; for (let bi = 0; bi < B.length; bi++) for (const sd of [0, 1]) { const d = palmD(i, bi, sd); if (d < best) { best = d; who = bi; hand = sd; } } if (best < 0.7) { apexPalm.push(best); if (apexList.length < 200) apexList.push([HG.f0 + i, B[who] ? B[who].id : '?', hand ? 'R' : 'L', r2(best * 100), r2(by)]); } } }   /* hoops-p05: apexList — each top: frame, the body and rig hand nearest, the palm gap (cm), the ball's height (m) */
+      if (hbW >= 0 && hb < 0) { const j = Math.hypot(ballA[i * 5] - ballA[(i - 1) * 5], by - ballA[(i - 1) * 5 + 1], ballA[i * 5 + 2] - ballA[(i - 1) * 5 + 2]); const yN = isFinite(ballA[(i + 1) * 5]) && ballA[(i + 1) * 5 + 3] < 0 ? Math.hypot(ballA[(i + 1) * 5] - ballA[i * 5], ballA[(i + 1) * 5 + 1] - by, ballA[(i + 1) * 5 + 2] - ballA[i * 5 + 2]) : NaN; releases.push({ f: HG.f0 + i, body: B[hbW] ? B[hbW].id : '?', y: r2(ballA[(i - 1) * 5 + 1]), jumpCm: r2(j * 100), nextCm: r2(yN * 100) }); }   /* hoops-p05: the ball's step on the release frame and the one after (its flight's own pace): a release jump well over the flight's step is a warp out of the hand */
+      if (hbW < 0 && hb >= 0) { const j = Math.hypot(ballA[i * 5] - ballA[(i - 1) * 5], by - ballA[(i - 1) * 5 + 1], ballA[i * 5 + 2] - ballA[(i - 1) * 5 + 2]); const l = palmD(i, hb, 0), r = palmD(i, hb, 1); const pp = (i - 2) * 5; const dev = isFinite(ballA[pp]) ? Math.hypot(ballA[i * 5] - 2 * ballA[(i - 1) * 5] + ballA[pp], by - 2 * ballA[(i - 1) * 5 + 1] + ballA[pp + 1], ballA[i * 5 + 2] - 2 * ballA[(i - 1) * 5 + 2] + ballA[pp + 2]) : NaN; catches.push({ f: HG.f0 + i, body: B[hb] ? B[hb].id : '?', jumpCm: r2(j * 100), devCm: r2(dev * 100), twoHand: Math.max(l, r) * 100 <= TWO_HAND_CM, palmsCm: [r2(l * 100), r2(r * 100)] }); }   /* hoops-p05: devCm — how far the ball LEAVES ITS OWN PATH on the catch frame (this frame's step less the last one's): a pass flying 9 m/s steps 15 cm a frame and is no warp; a catch that snaps it to the palm is */
+    }
+    out.ball = { heldFrames: held.length, heldMedCm: r2(pctl(held, 0.5) * 100), heldP90Cm: r2(pctl(held, 0.9) * 100), apexN: apex.length, apexMedCm: r2(pctl(apex, 0.5) * 100), apexP90Cm: r2(pctl(apex, 0.9) * 100), pathP99Cm: r2(pctl(path, 0.99) * 100), warpsOver15cm: warps, apexPalmN: apexPalm.length, apexPalmMedCm: r2(pctl(apexPalm, 0.5) * 100), apexPalmWithin5Pct: apexPalm.length ? r2(100 * apexPalm.filter((d) => d <= 0.05).length / apexPalm.length) : null, releases, catches, catchJumpP90Cm: r2(pctl(catches.map((c) => c.jumpCm / 100), 0.9) * 100), apexList, releaseWarps: releases.filter((r) => r.jumpCm > 15 && !(r.nextCm >= 0.8 * r.jumpCm)).length, catchDevP90Cm: r2(pctl(catches.map((c) => c.devCm / 100).filter((x) => isFinite(x)), 0.9) * 100), catchTwoHandPct: catches.length ? r2(100 * catches.filter((c) => c.twoHand).length / catches.length) : null };
     // the camera: speed, turn rate, snaps, hero framing
     const cs = [], cw = [], cj = []; let snaps = 0, inFrame = 0, nF = 0, fovs = new Set();
     for (let i = 1; i < n; i++) {

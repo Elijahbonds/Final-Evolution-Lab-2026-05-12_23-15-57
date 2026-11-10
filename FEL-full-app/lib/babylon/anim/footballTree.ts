@@ -70,6 +70,15 @@ export const FOOTBALL_CARRY_RATE_MAX = 1.4;
  *  The juke, the spin and the stiff arm itself keep 0.06 s. */
 export const FOOTBALL_HURDLE_CLIP = 'jump_up';
 export const FOOTBALL_HURDLE_FADE_SEC = 0.12;
+/** GAMEPLAY-CLEAN P5 (2026-11-10): THE HURDLE'S WAY OUT. The hop's clip (0.5 s) runs out a few frames before the landing and the
+ *  tree settles on the carry over the carry's own 0.1 s: the arms come from the jump's reach down to the tuck — the off arm 150° — in
+ *  six frames. The rig read it in play as football's last repeating hard pop, the same numbers at every hurdle (LeftArm 31°, RightArm
+ *  23°, RightForeArm 15° a frame; GAMEPLAY-CLEAN-AUDIT §4g — §4e had put it down to the carry loop's own keys, which turn the arms
+ *  under 7° a frame). Measured headless on the hero over 6 carry phases at 1× and 1.4× (footballTree.hurdleExit.test): the off arm
+ *  30.9° a frame at 0.1 s, 19.6° at 0.16, 15.7° at 0.2, 12.6° at 0.25. 0.2 s halves it and is done 8 frames after the feet are down.
+ *  TUNED (new, flagged): the hurdle → carry blend 0.1 → 0.2 s. Feel knob `football.hurdleExitFadeSec`; 0.1 is the old blend exactly.
+ *  Every other way into the carry (the snap, a juke, a spin, the stiff arm itself) keeps the carry's 0.1 s. */
+export const FOOTBALL_HURDLE_EXIT_FADE_SEC = 0.2;
 const STRIDE_STATES: ReadonlySet<FootballAnimState> = new Set<FootballAnimState>(['route_run', 'carry', 'truck']);
 
 export interface FootballClipChoice { state: FootballAnimState; clip: string; loop: boolean; fadeSec: number }
@@ -143,6 +152,9 @@ export class FootballAnimTree {
   private token = 0;
   private lastInput: FootballAnimInput | null = null;
   private strideFilter = new StrideRateFilter();
+  /** P5: what the tree last PLAYED (clearBeat forgets `current`, not this): the hurdle's way out is read off it. */
+  private playedState: FootballAnimState | null = null;
+  private playedClip = '';
   /** Fires when a one-shot ENDS on its own (never when the tree cut it) — the mode clears its move / beat here. */
   onSettle: ((state: FootballAnimState) => void) | null = null;
   constructor(private animator: CharacterAnimator) {}
@@ -172,15 +184,18 @@ export class FootballAnimTree {
       const after = settleAfter(st, this.lastInput ?? EMPTY_INPUT);
       if (after.state !== st) this.enter(after);
     } : undefined;
-    this.animator.play(c.clip, onEnd ? { loop: c.loop, fadeSec: c.fadeSec, onEnd } : { loop: c.loop, fadeSec: c.fadeSec });
-    this.current = st;
+    // P5: out of the hurdle onto the carry — its own, longer blend (FOOTBALL_HURDLE_EXIT_FADE_SEC)
+    const fadeSec = st === 'carry' && this.playedState === 'stiff_arm' && this.playedClip === FOOTBALL_HURDLE_CLIP
+      ? feel('football.hurdleExitFadeSec', FOOTBALL_HURDLE_EXIT_FADE_SEC) : c.fadeSec;
+    this.animator.play(c.clip, onEnd ? { loop: c.loop, fadeSec, onEnd } : { loop: c.loop, fadeSec });
+    this.current = st; this.playedState = st; this.playedClip = c.clip;
   }
   /** The mode's beat window closed (or a NEW beat of the same kind landed): forget it so the next update re-chooses. */
   clearBeat(...states: FootballAnimState[]): void {
     if (this.current && states.includes(this.current)) this.current = null;
     if (this.spent && states.includes(this.spent)) this.spent = null;
   }
-  reset(): void { this.current = null; this.spent = null; this.lastInput = null; }
+  reset(): void { this.current = null; this.spent = null; this.lastInput = null; this.playedState = null; this.playedClip = ''; }
 }
 
 const EMPTY_INPUT: FootballAnimInput = {
