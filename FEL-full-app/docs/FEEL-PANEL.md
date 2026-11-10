@@ -525,3 +525,8 @@ The owner has not felt this yet.
   phases at 1× and 1.4× (`footballTree.hurdleExit.test.ts`): the off arm 30.9° a frame at 0.1 s, 19.6° at 0.16, 15.7° at 0.2, 12.6°
   at 0.25. 0.1 = the old blend exactly. Every other way into the carry (the snap, a juke, a spin, the stiff arm) keeps 0.1 s.
   Feel-check: football, hurdle at a sprint; do the arms come down with the landing, or hang in the air after it?
+
+lane/dunk-switch-on (owner 2026-11-10, "turn all 4 on"): `dunk.finishOverRing` and `dunk.slamVariants` default **1** (both off in
+staked, ranked and challenge runs whatever the default; 0 restores the old finish / slam exactly); new `dunk.slamPower` 1 (the
+TWO-HAND POWER on its own); `dunk.runwayStrideScale` **TUNED 1 → 1.1** (1 = the old pace); new `dunk.landAbsorbDeep` 1 (the deep
+landing; 0 = the old `dunk_land_absorb` alone). Measurements in docs/DUNK-FLAGSHIP.md §18.
