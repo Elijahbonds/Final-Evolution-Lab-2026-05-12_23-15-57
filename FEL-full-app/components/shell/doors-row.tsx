@@ -11,14 +11,14 @@ import { t } from '@/lib/i18n';
 export function DoorsRow({ tab, hide = [] }: { tab: Door['tab']; hide?: readonly string[] }) {
   return (
     <nav aria-label={t('shell.nav.more')} className="mt-10 border-t border-white/[0.06] pt-5">
-      {/* EVERY-SCREEN P2: each door is a 44 px target (the words were the target: 15 px tall, the bars fault left on the
+      {/* EVERY-SCREEN P2: each door is at least 44 × 44 px (the words were the target: 15 px tall, "CAMP" 39 px wide, the bars fault left on the
           Train, Play and Profile tabs); the row's rhythm is the targets' own height now, so the gap between rows is 0 */}
       <ul className="flex flex-wrap gap-x-5">
         {doorsFor(tab).filter((d) => !hide.includes(d.href)).map((d) => (
           <li key={d.href}>
             <Link
               href={d.href}
-              className="inline-flex min-h-11 items-center font-sans text-[12px] uppercase tracking-[0.14em] text-fel-quiet transition-colors hover:text-white/70"
+              className="inline-flex min-h-11 min-w-11 items-center justify-center font-sans text-[12px] uppercase tracking-[0.14em] text-fel-quiet transition-colors hover:text-white/70"
             >
               {d.label}
             </Link>

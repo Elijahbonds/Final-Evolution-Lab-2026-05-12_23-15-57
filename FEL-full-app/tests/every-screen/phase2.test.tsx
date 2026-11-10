@@ -16,6 +16,7 @@ import { RESUME_PROGRAM_HREF, ResumeProgramView, resumeView } from '@/components
 import { TYPE, lineSize } from '@/lib/design/type';
 import { isSignedInOnly } from '@/lib/screen/config';
 import { reservesRail } from '@/components/shell/status-rail';
+import { chromeHiddenFor } from '@/components/shell/tab-bar';
 
 const ROOT = join(__dirname, '..', '..');
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
@@ -82,9 +83,10 @@ describe('3. the bars: 44 px targets, and the rail does not arrive late', () => 
     for (const p of ['/train', '/coach', '/coach/admin', '/play', '/profile', '/train/build']) expect(reservesRail(p), p).toBe(true);
     expect(reservesRail('/')).toBe(false);
   });
-  it('but not where a signed-out visitor stays (the rail would vanish under them): sign-in, an invite, the free games', () => {
-    for (const p of ['/login', '/signup', '/coach/join', '/coach/join/abc', '/play/adventure', '/play/adventure-br', '/play/mirror/assess/results', '/squads/join/x', '/SIGNUP/'])
-      expect(reservesRail(p), p).toBe(false);
+  it('but not where a signed-out visitor stays (the rail would vanish under them): sign-in and the invites', () => {
+    for (const p of ['/login', '/signup', '/coach/join', '/coach/join/abc', '/squads/join/x', '/SIGNUP/']) expect(reservesRail(p), p).toBe(false);
+    // the free games a visitor plays sit under /play/, where the rail is never drawn at all
+    for (const p of ['/play/mirror/assess', '/play/mirror/assess/results']) expect(chromeHiddenFor(p), p).toBe(true);
   });
   it('on a phone the wallet cluster is its own row from the first frame, so its count-up cannot wrap it mid-load', () => {
     expect(rail).toContain('ml-auto flex min-w-0 basis-full flex-wrap items-center justify-end gap-2 sm:basis-auto');
@@ -94,11 +96,11 @@ describe('3. the bars: 44 px targets, and the rail does not arrive late', () => 
     const html = renderToStaticMarkup(h(DoorsRow, { tab: 'train' }));
     const links = html.match(/<a [^>]*>/g) ?? [];
     expect(links.length).toBeGreaterThan(0);
-    for (const l of links) expect(l).toContain('inline-flex min-h-11 items-center');
+    for (const l of links) expect(l).toContain('inline-flex min-h-11 min-w-11 items-center justify-center');
   });
   it('the game header: Home, body play, the graphics menu, pause and full screen are 44 px; the late parts hold their place', () => {
     const shell = read('components/games/game-shell.tsx');
-    expect(shell).toContain('flex min-h-11 shrink-0 items-center gap-1.5');
+    expect(shell).toContain('hover:text-[#00E5FF] min-h-11"');
     expect(shell).toContain('grid h-11 w-11 place-items-center rounded-md');
     expect(shell).toContain('invisible whitespace-nowrap');
     expect(read('components/games/graphics-toggle.tsx')).toContain('h-11 rounded-md');

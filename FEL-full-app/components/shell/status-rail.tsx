@@ -34,13 +34,14 @@ interface RailData { prq: PrqDisplay; isAdmin: boolean }
 
 /**
  * EVERY-SCREEN P2: signed-in-only paths (lib/screen/config.ts) that a signed-out visitor still stays on — the sign-in
- * pages, an invite, the free games. The rail must not be drawn there while the session loads: for a visitor it would
- * vanish as the answer arrives and push the page up (the rig measured /coach/join go from 0 to 0.072). The list is the
- * crawl's: every screen it scored signed out on a signed-in-only path (docs/every-screen/scorecard.json).
+ * pages and the invites. The rail must not be drawn there while the session loads: for a visitor it would vanish as the
+ * answer arrives and push the page up (the rig measured /coach/join go from 0 to 0.072). The list is the crawl's: every
+ * screen it scored signed out on a signed-in-only path (docs/every-screen/scorecard.json), less those under /play/,
+ * where the rail is never drawn (chromeHiddenFor).
  * assumption: a coach's public page (/coach/<name>, off while the coach store is) is not handled; it would jump for a
  * visitor once the store opens.
  */
-export const RAIL_OPEN_TO_VISITORS: readonly string[] = ['/login', '/signup', '/coach/join', '/play/adventure', '/play/adventure-br', '/play/mirror/assess', '/squads/join'];
+export const RAIL_OPEN_TO_VISITORS: readonly string[] = ['/login', '/signup', '/coach/join', '/squads/join'];
 export const reservesRail = (pathname: string): boolean => {
   const p = pathname.toLowerCase().replace(/\/+$/, '') || '/';
   return isSignedInOnly(p) && !RAIL_OPEN_TO_VISITORS.some((r) => p === r || p.startsWith(`${r}/`));
