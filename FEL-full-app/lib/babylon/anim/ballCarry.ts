@@ -200,6 +200,15 @@ export const SNAP_TURN_RAD = Math.PI / 2;
 /** A dribble started with the ball below this share of the stroke starts on the way UP at the ball's height (risingPhaseAt); above it,
  *  at the top. Whatever is left of where the palm had the ball fades out over this much of the bounce. */
 export const START_FROM_TOP_ABOVE = 0.85, START_FADE_PHASE = 0.6;
+/**
+ * hoops-p05b: THE FIRST BOUNCE'S PALM RIDES THE SAME FADE AS ITS BALL. The dribble starts from where the palm had the ball (startOff,
+ * faded out over START_FADE_PHASE) — but only the BALL carried that offset: the hand went straight to the stroke's own hand point, so for
+ * the whole first bounce the palm sat the offset away from the ball (1v1 seed 7, the gear stop into the sprint: the hand tracer has the
+ * carry's own pass take the palm from ON the ball, −1.5 cm, to 13.5 cm off it on the activation frame, and the first top drawn 12.8 cm
+ * off — every layer after the carry moved palm and ball together). The hand target now takes the same faded offset.
+ * Knob `hoops.carryStartHandOn` (1): 0 = as it was (the ball alone carries the offset).
+ */
+export const CARRY_START_HAND_ON = 1;
 /** The phase on the pushed bounce's rising leg (floor → palm) whose height is `h01` of the stroke. */
 export function risingPhaseAt(h01: number): number {
   const want = Math.min(1, Math.max(0, h01));
@@ -473,6 +482,10 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   const foreNodes = { Left: findBone(opts.skeleton, 'LeftForeArm')?.getTransformNode() ?? null, Right: findBone(opts.skeleton, 'RightForeArm')?.getTransformNode() ?? null };
   const footNodes = [findBone(opts.skeleton, 'LeftFoot')?.getTransformNode() ?? null, findBone(opts.skeleton, 'RightFoot')?.getTransformNode() ?? null];
   let startOff: Vector3 | null = null;          // an activation's offset from the palm to the bounce's point it starts at, faded out
+  const startShift = new Vector3();              // (hoops-p05b) this frame's share of startOff, added to the ball AND the hand
+  let startK = 0;                                // (hoops-p05b) the share of the start's offsets left this frame (1 → 0 over the fade)
+  let startHand: Vector3 | null = null, startHandPending = false;   // (hoops-p05b) the hand as held, off the stroke's hand point (full share)
+  const drawnHeldHand = new Vector3(); let drawnHeldAt = -1, drawnHeldSide: 'Left' | 'Right' | null = null;   // (hoops-p05b) the held ball's hand, as drawn
   let startAcc = 0;                              // the phase run since the activation (the fade's clock)
   let clock = 0, pendingDt = 0, rootSpeed = 0;  // the carry's own clock (s), the dt recorded since the last pass, planar root speed
   const lastRoot = new Vector3(); let rootSeen = false;
@@ -727,6 +740,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     if (active && !mv && handRootLocal(side, drawnHand)) { drawnHandAt = stamp; drawnHandSide = side; }   // (the clip clock's held-pose read)
     const held = ballHandNow();
     if (held) {
+      { const hn = handNodes[held]; if (hn) { hn.computeWorldMatrix(true); drawnHeldHand.copyFrom(hn.getAbsolutePosition()); drawnHeldAt = stamp; drawnHeldSide = held; } }   // (hoops-p05b)
       const bones = armOf[held];
       bones.forEach((n, i) => { (drawnLocals[i] ??= new Quaternion()).copyFrom(n.rotationQuaternion ?? Quaternion.Identity()); });
       drawnLocals.length = bones.length; drawnLocalsHand = held;
@@ -984,6 +998,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
         const s0 = dribbleAtPushed(phase, p);
         ballToWorld(s0.ball.x * sideSign(side), s0.ball.y, s0.ball.z + PUSH_AHEAD_M * pushK, world);
         startOff = was.subtract(world); startAcc = 0;
+        startHand = null; startHandPending = true;   // (hoops-p05b) read on the reach below, where the stroke's hand point is known
         if (startOff.length() > 1.3) startOff = null;   // a ball that was nowhere near (a reset) just starts
       }
     }
@@ -1002,9 +1017,10 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     // THE BALL BOUNCES ON THE FLOOR, NOT ON THE ROOT (ballToWorld): a hop mid-dribble (the step-back) carried the ball up with the body and
     // gave it a second top at knee height, 0.33 m under the hand (measured)
     ballToWorld(bx, s.ball.y, bz + push, world);
+    startShift.setAll(0); startK = 0;
     if (startOff) {   // what is left of where the palm really had the ball, faded out over START_FADE_PHASE of the bounce (never a jump)
       const f = Math.min(1, startAcc / START_FADE_PHASE);
-      if (f >= 1) startOff = null; else world.addInPlace(startOff.scale(1 - f * f * (3 - 2 * f)));
+      if (f >= 1) startOff = null; else { startK = 1 - f * f * (3 - 2 * f); startOff.scaleToRef(startK, startShift); world.addInPlace(startShift); }
     }
     opts.ball.position.copyFrom(world);
     placedRoot.copyFrom(opts.root.getAbsolutePosition()); placedYaw = rootYaw(); placedAt = stamp;
@@ -1014,6 +1030,22 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     if (arm && armW > 0) {
       handLocal.set((s.hand.x + out) * sx, s.hand.y, s.hand.z + push);
       toWorld(handLocal.x, handLocal.y, handLocal.z, handT);
+      if (feel('hoops.carryStartHandOn', CARRY_START_HAND_ON) >= 0.5) {
+        handT.addInPlace(startShift);   // hoops-p05b: the palm rides the same fade
+        // …from where the HAND was: the held ball sits in the palm, not under the stroke's hand point (the hand bone 12 cm over the ball's
+        // centre), so the first frame still moved the wrist round the ball (14 cm on the rig) and bent the elbow in one frame (LeftForeArm
+        // 3 432 °/s). The hand as drawn holding it, off the stroke's point, fades out with the same share.
+        if (startHandPending) {
+          startHandPending = false;
+          startHand = startK > 0 && drawnHeldAt === stamp - 1 && drawnHeldSide === side ? drawnHeldHand.subtract(handT).scaleInPlace(1 / startK) : null;
+          if (startHand && startHand.length() > 0.5) startHand = null;   // (not the hand that had it: a reset)
+        }
+        if (startHand && startK > 0) handT.addInPlace(startHand.scale(startK)); else startHand = null;
+        // …and the reach that takes the arm over from the hold starts its elbow's swing limit from the arm as posed under it: with no
+        // reach last frame the limit had nothing to limit from, and the first solve swung the upper arm up to 145° in one frame (1v1
+        // seed 7, the gear stop into the sprint: LeftArm 8 696 °/s on the dribble's first frame, measured on the rig)
+        if (startOff && reachedAt !== stamp - 1) { forgetElbowSwing(arm); limitElbowSwing(arm, frameDt, stamp - 1, ELBOW_SWING_RATE_DEG); }
+      }
       toWorld(sx * BALL_ELBOW_POLE[0], BALL_ELBOW_POLE[1], BALL_ELBOW_POLE[2], pole).subtractInPlace(opts.root.getAbsolutePosition());
       const ks = switchLeft > 0 ? 1 - switchLeft / SWITCH_FADE_SEC : 1;
       // hoops-handle: never under the rising ball — the clip's hand (a stance with no ball arm) is lifted clear of the ball's top

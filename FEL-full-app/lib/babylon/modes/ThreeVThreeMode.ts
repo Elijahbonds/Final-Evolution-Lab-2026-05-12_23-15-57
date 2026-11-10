@@ -96,7 +96,7 @@ import { FreeThrowLine, ftBody, ftIdleInput, FT_STILL } from '../core/FreeThrowL
 import { BankLook, riseClipFor, gatherClipFor } from '../hoops/shotLooks';   // hoops-shot-content: the step-back's gather and release, the bank's look
 import type { GatherKind } from '../core/HoopsMoves';
 import { attachBallToHand, gatherBallToHand, releaseBall } from '../anim/ballRig';
-import { passStartFor } from '../hoops/ballHandoff';   // hoops-p05 (phase 5): a teammate's pass leaves from the ball, not from root + 1.2 m
+import { passStartFor, passCatchPoint } from '../hoops/ballHandoff';   // hoops-p05 (phase 5): a teammate's pass leaves from the ball, not from root + 1.2 m
 import { rightHandHoops, rightHandBall, hoopsHand, leftDribbleTwins } from '../anim/hoopsHand';   // HOOPS MOTION phase 3: right-handed on screen, every body
 import { sideAwayFrom, sideOfVector } from '../anim/athleteSide'; // HOOPS MOTION phase 3: the one visual-side helper (phase 4b: a crossing move's side is its end hand's; the bite's is still sideAwayFrom's)
 import { requestMove, sizeUpMoveOf, type HandleHost } from '../anim/handleMotion';   // HOOPS MOTION phase 4b: one renderer for the handle moves (1v1's too)
@@ -2296,6 +2296,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
             void opponentPossession(ctx);
           }
         }
+        if (passFlight.active && passType !== 'lob') passFlight.homeTo(passCatchPoint((passTargetId === 'me' ? me : mates[passTargetId === 'mate0' ? 0 : 1]).char.root.position));   // hoops-p05b: the pass lands on the receiver (knob hoops.passHomeOn)
         if (!passFlight.active) { /* picked */ }
         else if (passFlight.step(dt, ball.position)) {
           if (passType === 'lob' && passTargetId === 'me') {

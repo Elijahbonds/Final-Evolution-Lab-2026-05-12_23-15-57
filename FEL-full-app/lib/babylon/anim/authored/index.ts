@@ -15,7 +15,7 @@ import { buildMocapDunk } from './mocapDunk';
 import { buildCarryUpOne, buildCarryUpLeft, buildCarryUpTwo, buildFlushOne, buildFlushLeft, buildFlushTwo } from './dunkFlush';   // DUNK MOTION phase 4
 import { buildGatherOne, buildGatherTwo, buildTakeOffOne } from './dunkTakeoff';   // DUNK MOTION phase 7: push 1-2 and the one-foot take-off
 import { buildFinishWindmill, buildFinishTomahawk, buildFinishBlown, buildCelebrateBig, buildFinishReverse, buildFinishPower, buildFinishTwoHand } from './dunkFinishes';
-import { buildDefendBackpedal, buildCloseout, buildDefendSlideHard, buildContactReact, buildCatchBall } from './basketball';   // DEFENSE-LOOK (2026-09-17) + HOOPS-10PHASE-2 phase 6 (the catch)
+import { buildDefendBackpedal, buildCloseout, buildCloseoutStep, buildDefendSlideHard, buildContactReact, buildCatchBall } from './basketball';   // DEFENSE-LOOK (2026-09-17) + HOOPS-10PHASE-2 phase 6 (the catch)
 import { buildScoopLayup, buildSpinLayup, buildHangLayup, buildShimmy, buildDropStep } from './basketball';   // ACROBATIC LAYUPS + THE POST GAME (2026-09-18)
 import { buildStackBase, buildStackRider, buildRowStand, buildRowCrouch, buildDubbleHold, buildDubbleKneel, buildBikeRider, buildSkateRider } from './stackProp';
 import { buildCelebSpidermanSplits, buildCelebItsOver, buildCelebRoar, buildCelebTooSmall } from './dunkCelebrations';
@@ -256,6 +256,7 @@ function authoredBuilders(scene: Scene, skeleton: Skeleton): [string, () => Anim
     ['bball_defend_slide_right', () => buildDefendSlide(scene, skeleton, 'right')],
     ['bball_defend_backpedal', () => buildDefendBackpedal(scene, skeleton)],                 // DEFENSE-LOOK (2026-09-17): the retreat
     ['bball_closeout', () => buildCloseout(scene, skeleton)],                                 // …the closeout
+    ['bball_closeout_step', () => buildCloseoutStep(scene, skeleton)],                       // hoops-p05b: …and the closeout that steps at its pace
     ['bball_contact_react', () => buildContactReact(scene, skeleton)],                      // the bump (2026-09-17): hands in FRONT, never the fighter's flinch
     ['bball_catch', () => buildCatchBall(scene, skeleton)],                                 // HOOPS-10PHASE-2 phase 6: hands out to meet the pass, then in to secure it
     ['bball_defend_slide_hard_left', () => buildDefendSlideHard(scene, skeleton, 'left')],   // …and the sat-down slide (intense D)

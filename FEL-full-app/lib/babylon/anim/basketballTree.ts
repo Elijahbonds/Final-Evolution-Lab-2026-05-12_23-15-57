@@ -194,7 +194,30 @@ export function chooseBasketballClip(i: AnimTreeInput): AnimChoice {
 }
 /** lane/h3-handler (#312 port, anim/RestDribble): a state's own clip — the protect's is RestDribble's (the idle dribble; the defender's
  *  stance with `hoops.protectDribbleOn` 0) — and whether it has a `_left` twin (a dribbling protect does, like every dribble loop). */
-const clipOf = (st: BasketballAnimState): string => (st === 'protect' ? protectClip(CLIP_FOR.idle_dribble.clip, CLIP_FOR.protect.clip) : CLIP_FOR[st].clip);
+const clipOf = (st: BasketballAnimState): string => (st === 'protect' ? protectClip(CLIP_FOR.idle_dribble.clip, CLIP_FOR.protect.clip) : st === 'closeout' && closeoutStepOn() ? CLOSEOUT_STEP_CLIP : CLIP_FOR[st].clip);
+/** hoops-p05b: THE CLOSEOUT STEPS. `bball_closeout` swings its legs in place (about 0.9 m/s at the rate cap) while the closeout fires only at
+ *  2.9 m/s and up: every closeout skated. `bball_closeout_step` (anim/authored/basketball buildCloseoutStep) is the same picture on chop
+ *  steps paced to the closeout's stride reference (3.6 m/s at rate 1). Knob `hoops.closeoutStepOn` (1); 0 = the old clip exactly. A rig
+ *  without it plays the old one (owned()). */
+export const CLOSEOUT_STEP_ON = 1;
+export const CLOSEOUT_STEP_CLIP = 'bball_closeout_step';
+function closeoutStepOn(): boolean { return feel('hoops.closeoutStepOn', CLOSEOUT_STEP_ON) >= 0.5; }
+/** hoops-p05b: A RUN AND THE STEPPING CLOSEOUT CROSSFADE IN STEP. The closeout started at its first frame (the right foot touching down)
+ *  wherever the run it cut was in its stride: through the fade the two clips had the legs in opposite stances, and the blend swept the
+ *  legs (3v3 seed 7, the hero's run into the closeout: leg pops at 741–809 °/s on frames 80 and 85, the two pops the switches added).
+ *  Each loop listed here says where in it the RIGHT foot touches down (a phase of the clip; measured on the hero rig with the slide bench,
+ *  `--clips --dump run`: bball_mc_run's right foot lands at 0.87–0.90 and is planted to 0.24); a loop change between two listed loops
+ *  starts the new one at the same point of the stride. Knob `hoops.loopInStepOn` (1); 0 = the new loop starts at its first frame. */
+export const LOOP_IN_STEP_ON = 1;
+export const RIGHT_STRIKE_PHASE: Readonly<Record<string, number>> = { bball_mc_run: 0.88, [CLOSEOUT_STEP_CLIP]: 0 };
+/** The phase the loop `toClip` starts at so its stride carries on from `fromClip` at `fromPhase` (pure); undefined = not listed. */
+export function inStepPhase(fromClip: string | null | undefined, fromPhase: number | null | undefined, toClip: string): number | undefined {
+  if (!fromClip || fromClip === toClip || fromPhase == null || !Number.isFinite(fromPhase)) return undefined;
+  const a = RIGHT_STRIKE_PHASE[fromClip], b = RIGHT_STRIKE_PHASE[toClip];
+  if (a === undefined || b === undefined) return undefined;
+  return (((fromPhase - a + b) % 1) + 1) % 1;
+}
+function loopInStepOn(): boolean { return feel('hoops.loopInStepOn', LOOP_IN_STEP_ON) >= 0.5; }
 const twinsLeft = (st: BasketballAnimState): boolean => LEFT_TWIN_STATES.has(st) || (st === 'protect' && protectDribbles());
 /** …and the two rest states share that loop: a change between them carries it on and only eases the tempo (RestDribble.restTempoFor). */
 const REST_LOOP_STATES: ReadonlySet<BasketballAnimState> = new Set<BasketballAnimState>(['idle_dribble', 'protect']);
@@ -306,7 +329,7 @@ export class BasketballAnimTree {
   private strideClip: string | null = null;
   /** lane/h3-handler (#312 port): the loop the tree itself last played, while it is still the one playing (a beat / hold / reset clears it). */
   private loopPlaying: string | null = null;
-  constructor(private animator: Pick<CharacterAnimator, 'play' | 'setPlaybackScale'> & Partial<Pick<CharacterAnimator, 'freezeAtEnd'>>) {}
+  constructor(private animator: Pick<CharacterAnimator, 'play' | 'setPlaybackScale'> & Partial<Pick<CharacterAnimator, 'freezeAtEnd' | 'currentGroup'>>) {}
   /** H2 (moveLegs): the body's legs layer, and whether the beat in flight runs it (a handle move's beat, MOVE_LEGS_BEAT). */
   private legs: MoveLegs | null = null;
   private legsBeat = false;
@@ -388,7 +411,8 @@ export class BasketballAnimTree {
   /** A `_left` twin this rig does not have plays the loop it twins (never the resolver's fallback). */
   private owned(c: AnimChoice): AnimChoice {
     const names = (this.animator as { clipNames?: Set<string> }).clipNames;
-    const twinned = c.clip.endsWith('_left') && twinsLeft(c.state) && names && !names.has(c.clip) ? { ...c, clip: clipOf(c.state) } : c;
+    let twinned = c.clip.endsWith('_left') && twinsLeft(c.state) && names && !names.has(c.clip) ? { ...c, clip: clipOf(c.state) } : c;
+    if (twinned.clip === CLOSEOUT_STEP_CLIP && names && !names.has(CLOSEOUT_STEP_CLIP)) twinned = { ...twinned, clip: CLIP_FOR.closeout.clip };   // (hoops-p05b) a rig without the stepping closeout
     // H2d: a carrier state whose capture this rig does not have (its name resolves to `bball_mc_…`) plays what it always played
     const legacy = CARRY_LEGACY[twinned.state];
     if (legacy && names && !names.has(twinned.clip) && !names.has(twinned.clip.replace(/^bball_/, 'bball_mc_'))) return { ...twinned, clip: legacy };
@@ -432,7 +456,12 @@ export class BasketballAnimTree {
         this.strideClip = c.loop ? c.clip : null;
         if (r0 !== null && !carryOn) this.strideFilter.set(r0);
         // H2 (moveLegs): out of a handle move, the loop picks up at the stride phase the legs layer carried through it
-        const phase01 = this.legs?.live ? this.legs.phaseFor(c.clip) : undefined;   // (the other hand's twin: half a stride on)
+        let phase01 = this.legs?.live ? this.legs.phaseFor(c.clip) : undefined;   // (the other hand's twin: half a stride on)
+        // hoops-p05b: …and a run into the stepping closeout (and back) picks up in step (RIGHT_STRIKE_PHASE)
+        if (phase01 === undefined && !carryOn && loopInStepOn()) {
+          const og = this.animator.currentGroup ?? null; const f = (og as unknown as { animatables?: { masterFrame?: number }[] } | null)?.animatables?.[0]?.masterFrame;
+          if (og && og.isPlaying && Number.isFinite(f) && og.to > og.from) phase01 = inStepPhase(og.name, ((f as number) - og.from) / (og.to - og.from), c.clip);
+        }
         if (!carryOn) {
           const sign = this.strideSign(c.state);
           const g = this.animator.play(c.clip, { loop: true, fadeSec: tr.fadeSec, speedRatio: (r0 ?? 1) * sign, ...(phase01 !== undefined ? { phase01 } : {}) });   // hoops-p04: the rule's fade   // hoops-p05: a reversed loop starts from its end
