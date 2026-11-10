@@ -135,7 +135,7 @@ export function CardEditor() {
           <Field label="Accent color">
             <div className="flex items-center gap-2">
               <input type="color" value={/^#[0-9a-fA-F]{6}$/.test(accent) ? accent : '#00E5FF'} onChange={(e) => setAccent(e.target.value)} className="h-10 w-12 cursor-pointer rounded-lg border border-white/10 bg-transparent" />
-              <input value={accent} maxLength={7} onChange={(e) => setAccent(e.target.value)} className="fel-input" placeholder="#00E5FF" />
+              <input value={accent} maxLength={7} onChange={(e) => setAccent(e.target.value)} className="fel-input" placeholder="#00E5FF" aria-label="Accent color, as a hex code" />
             </div>
           </Field>
         </div>
@@ -200,11 +200,13 @@ export function CardEditor() {
   );
 }
 
+// SCREEN-FIXES (2026-11-10): the label wraps its field, so the field is named by it (the every-screen scan found six of these
+// fields named by their placeholder only, a critical finding each). Same look: the label text, then the field under it.
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="mt-3">
-      <label className="font-mono text-[12px] uppercase tracking-wider text-white/50">{label}</label>
-      <div className="mt-1">{children}</div>
-    </div>
+    <label className="mt-3 block">
+      <span className="font-mono text-[12px] uppercase tracking-wider text-white/50">{label}</span>
+      <span className="mt-1 block">{children}</span>
+    </label>
   );
 }

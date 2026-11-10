@@ -18,3 +18,20 @@ describe('"Save card"', () => {
     expect(contrastRatio(parseColor('#ffffff')!, parseColor(fill!)!)).toBeGreaterThanOrEqual(4.5);
   });
 });
+
+// SCREEN-FIXES (2026-11-10, beyond the brief, flagged): the every-screen scan's 7 critical findings on /profile/edit were the
+// card editor's fields named by their placeholder only. Field's label now wraps its field; the hex box has its own name.
+describe('the card editor\'s fields are named', () => {
+  it('Field wraps its field in the label (an implicit label)', () => {
+    const field = src.slice(src.indexOf('function Field('));
+    expect(field).toMatch(/<label className="mt-3 block">\s*<span[^>]*>\{label\}<\/span>\s*<span className="mt-1 block">\{children\}<\/span>\s*<\/label>/);
+  });
+  it('the accent\'s hex box, the second field in its label, has a name of its own', () => {
+    expect(src).toMatch(/placeholder="#00E5FF" aria-label="Accent color, as a hex code"/);
+  });
+  it('"Copy" on the invite card is on the same AA fill as "Save card"', () => {
+    const ref = readFileSync(join(__dirname, '../marketing/referral-card.tsx'), 'utf8');
+    expect(ref).not.toMatch(/bg-\[#A855F7\] px-4 py-3 font-semibold text-white/);
+    expect(ref).toMatch(/bg-\[#9333EA\] px-4 py-3 font-semibold text-white/);
+  });
+});

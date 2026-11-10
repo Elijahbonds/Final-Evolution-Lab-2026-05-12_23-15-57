@@ -67,7 +67,8 @@ export function ReferralCard() {
         <button
           onClick={copy}
           disabled={!link}
-          className="inline-flex items-center gap-2 rounded-xl bg-[#A855F7] px-4 py-3 font-semibold text-white transition-transform hover:scale-[1.03] disabled:opacity-40"
+          // SCREEN-FIXES (2026-11-10): the same fill as "Save card" (white on #A855F7 was 3.96:1; on #9333EA, 5.38:1)
+          className="inline-flex items-center gap-2 rounded-xl bg-[#9333EA] px-4 py-3 font-semibold text-white transition-transform hover:scale-[1.03] disabled:opacity-40"
         >
           {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
           {copied ? 'Copied' : 'Copy'}
