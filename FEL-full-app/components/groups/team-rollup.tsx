@@ -64,11 +64,14 @@ export function TeamRollup({ groupId, rollup, onChanged }: { groupId: string; ro
         {rollup.rows.length === 0 && <li className="py-2 text-[13px] text-fel-dim">No athletes yet. Share the team code below.</li>}
       </ul>
       <label className="mt-3 flex min-h-[44px] items-center gap-3 text-[13px] text-white/80">
-        {/* PLAT-BBS04-2 (coordinator 2026-11-03): the box itself is the 44 px target (it was 20 x 20: rig a11y, 2.5.8
-            serious); the tick is drawn over it and never takes the tap */}
-        <span className="relative grid h-11 w-11 shrink-0 place-items-center">
-          <input type="checkbox" className="peer h-11 w-11 cursor-pointer appearance-none rounded-lg border border-white/40 bg-black/40 checked:border-fel-emerald checked:bg-fel-emerald focus-visible:outline focus-visible:outline-2 focus-visible:outline-fel-cyan disabled:opacity-50" checked={rollup.drillAssigned} disabled={busy} onChange={(e) => setDrill(e.target.checked)} data-rollup-drill />
-          <Check aria-hidden className="pointer-events-none absolute h-5 w-5 text-fel-bg opacity-0 peer-checked:opacity-100" />
+        {/* PLAT-BBS04-2 (coordinator 2026-11-10): the checkbox itself is a 44 x 44 tap target (it was 20 x 20: the rig's
+            a11y scan, 2.5.8 serious), and the row is laid out as it always was. The slot is the 20 px the box always took;
+            the real input is centred on it and reaches 12 px past each edge (inside the label's own 44 px row, the gap
+            and the card's padding); the box and tick the eye sees are drawn in the slot and never take the tap. */}
+        <span className="relative h-5 w-5 shrink-0" data-rollup-drill-slot>
+          <input type="checkbox" className="peer absolute -inset-3 m-0 h-11 w-11 cursor-pointer appearance-none rounded-lg bg-transparent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-9px] focus-visible:outline-fel-cyan disabled:cursor-default" checked={rollup.drillAssigned} disabled={busy} onChange={(e) => setDrill(e.target.checked)} data-rollup-drill />
+          <span aria-hidden className="pointer-events-none absolute inset-0 rounded border border-white/60 bg-black/40 peer-checked:border-fel-emerald peer-checked:bg-fel-emerald peer-disabled:opacity-50" />
+          <Check aria-hidden className="pointer-events-none absolute left-0.5 top-0.5 h-4 w-4 text-fel-bg opacity-0 peer-checked:opacity-100" strokeWidth={3} />
         </span>
         Assign the daily drill to the whole team
       </label>
