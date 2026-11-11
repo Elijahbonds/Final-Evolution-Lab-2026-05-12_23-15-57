@@ -34,7 +34,7 @@ export default async function SupportPage() {
               </a>
             </div>
           </div>
-          <p className="mt-3 text-xs text-white/50">
+          <p className="mt-3 text-base text-white/50">
             For account issues, billing questions, bug reports, or feature requests.
             Include your account email and a description of the issue.
           </p>

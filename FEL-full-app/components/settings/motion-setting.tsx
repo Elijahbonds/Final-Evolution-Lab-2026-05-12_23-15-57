@@ -94,7 +94,7 @@ export function MotionSetting({ compact = false, className = '' }: { compact?: b
       <div className="flex flex-wrap gap-2">
         {MOTION_PREFS.map((p) => (
           <button key={p} type="button" onClick={() => pick(p)} aria-pressed={p === pref}
-            className={`rounded-md border px-4 py-2 text-xs font-bold transition-colors ${p === pref ? 'border-fel-cyan bg-fel-cyan/15 text-fel-cyan' : 'border-white/15 text-white/60 hover:bg-white/[0.05] hover:text-white'}`}>
+            className={`min-h-11 rounded-md border px-4 py-2 text-xs font-bold transition-colors ${p === pref ? 'border-fel-cyan bg-fel-cyan/15 text-fel-cyan' : 'border-white/15 text-white/60 hover:bg-white/[0.05] hover:text-white'}`}>
             {LABEL[p]}
           </button>
         ))}

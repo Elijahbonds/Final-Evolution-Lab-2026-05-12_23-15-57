@@ -68,7 +68,7 @@ export function ProgressCardView({ card }: { card: ProgressCard }) {
         <p className="font-mono text-[12px] uppercase tracking-[0.14em] text-[#00E5FF]">{weekLabel(card)}</p>
       </div>
       <h2 id="week-card-h" className="fel-heading mt-2 text-[21px] font-black leading-tight text-white">{card.headline}</h2>
-      <p className="mt-1 text-[12px] text-fel-dim">Last 7 days against the 7 before. A dash is something nobody measured.</p>
+      <p className="mt-1 text-base text-fel-dim">Last 7 days against the 7 before. A dash is something nobody measured.</p>
       <div className="mt-4 grid grid-cols-2 gap-2.5 md:grid-cols-4">
         {card.metrics.map((t) => <TileView key={t.key} tile={t} accent={ACCENT[t.key] ?? '#fff'} />)}
       </div>

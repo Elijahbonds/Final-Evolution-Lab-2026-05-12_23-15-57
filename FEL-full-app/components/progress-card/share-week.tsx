@@ -71,7 +71,7 @@ export function ShareWeek({ minor, phoneOnly }: { minor: boolean; phoneOnly: boo
   return (
     <section aria-labelledby="share-week-h" className="mt-6 rounded-2xl border border-white/[0.07] bg-[#0c0c11] p-4">
       <h2 id="share-week-h" className="fel-heading text-[16px] font-bold text-white">Share your week</h2>
-      <p className="mt-1 text-[12px] leading-snug text-white/50">
+      <p className="mt-1 text-base leading-snug text-white/50">
         An image of this card. You see it first; nothing is posted unless you share it.
         {phoneOnly && ' Numbers kept only on this phone aren’t on it.'}
       </p>

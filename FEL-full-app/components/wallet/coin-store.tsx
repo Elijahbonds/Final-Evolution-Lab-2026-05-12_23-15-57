@@ -187,7 +187,7 @@ export function CoinStore({ initialPurchasesEnabled = null }: { initialPurchases
           <Sparkles className="h-4 w-4 text-[#00FF9D]" />
           <h2 className="text-lg font-semibold text-white">Spend Your Balance</h2>
         </div>
-        <p className="mb-3 text-xs text-white/50">Coins and shards are spent on the page that uses what you buy.</p>
+        <p className="mb-3 text-base text-white/50">Coins and shards are spent on the page that uses what you buy.</p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {WHERE_TO_SPEND.map((w) => {
             const isShard = w.currency === 'shards';

@@ -142,7 +142,7 @@ export function PrqDataRights() {
       <div className="flex flex-wrap gap-3">
         <button
           onClick={handleExport}
-          className="inline-flex items-center gap-2 rounded-md border border-[#00E5FF]/30 bg-[#00E5FF]/10 px-4 py-2 text-xs font-bold text-[#00E5FF] transition-colors hover:bg-[#00E5FF]/20"
+          className="inline-flex min-h-11 items-center gap-2 rounded-md border border-[#00E5FF]/30 bg-[#00E5FF]/10 px-4 py-2 text-xs font-bold text-[#00E5FF] transition-colors hover:bg-[#00E5FF]/20"
         >
           <Download className="h-3.5 w-3.5" /> EXPORT DATA (JSON)
         </button>
@@ -150,7 +150,7 @@ export function PrqDataRights() {
           <button
             data-test-ignore="opens-confirm-dialog"
             onClick={() => setShowConfirm(true)}
-            className="inline-flex items-center gap-2 rounded-md border border-[#FF3366]/30 bg-[#FF3366]/10 px-4 py-2 text-xs font-bold text-[#FF3366] transition-colors hover:bg-[#FF3366]/20"
+            className="inline-flex min-h-11 items-center gap-2 rounded-md border border-[#FF3366]/30 bg-[#FF3366]/10 px-4 py-2 text-xs font-bold text-[#FF3366] transition-colors hover:bg-[#FF3366]/20"
           >
             <Trash2 className="h-3.5 w-3.5" /> DELETE PRQ + MOVEMENT HISTORY
           </button>
@@ -312,7 +312,7 @@ export function HealthDataSection() {
           <button
             data-test-ignore="opens-confirm-dialog"
             onClick={() => setShowErase(true)}
-            className="inline-flex items-center gap-2 rounded-md border border-[#FF3366]/30 bg-[#FF3366]/10 px-4 py-2 text-xs font-bold text-[#FF3366] transition-colors hover:bg-[#FF3366]/20"
+            className="inline-flex min-h-11 items-center gap-2 rounded-md border border-[#FF3366]/30 bg-[#FF3366]/10 px-4 py-2 text-xs font-bold text-[#FF3366] transition-colors hover:bg-[#FF3366]/20"
           >
             <Trash2 className="h-3.5 w-3.5" /> ERASE HEALTH DATA
           </button>

@@ -1,7 +1,7 @@
 // One block of the profile: a heading that says what the block is for, then its body. Every block is the same frame,
 // so the page reads top to bottom with one rhythm (PROFILE V2 design: one hierarchy, every block has an obvious purpose).
 import type { ReactNode } from 'react';
-import { TYPE } from '@/lib/design/type';
+import { TYPE, lineSize } from '@/lib/design/type';
 
 export function Section({ id, title, purpose, accent, children, aside }: { id: string; title: string; purpose: string; accent: string; children: ReactNode; aside?: ReactNode }) {
   return (
@@ -12,7 +12,7 @@ export function Section({ id, title, purpose, accent, children, aside }: { id: s
             <span aria-hidden className="mr-2 inline-block h-2 w-2 rounded-full align-middle" style={{ background: accent }} />
             {title}
           </h2>
-          <p className={`${TYPE.small} mt-1 text-fel-dim`}>{purpose}</p>
+          <p className={`${lineSize(purpose)} mt-1 text-fel-dim`}>{purpose}</p>
         </div>
         {aside}
       </div>
@@ -33,8 +33,8 @@ export function Coming({ title, text, href, cta }: { title: string; text: string
         {title}
         <span className="rounded-full bg-white/[0.06] px-2 py-0.5 font-sans text-[12px] font-semibold uppercase tracking-[0.14em] text-fel-dim">Coming</span>
       </p>
-      <p className="mt-1 text-[12px] leading-snug text-fel-dim">{text}</p>
-      {href && cta && <a href={href} className="mt-2 inline-block text-[12px] font-bold text-fel-cyan underline-offset-2 hover:underline">{cta} →</a>}
+      <p className={`mt-1 ${lineSize(text, 'text-[12px]')} leading-snug text-fel-dim`}>{text}</p>
+      {href && cta && <a href={href} className="mt-2 inline-flex min-h-11 items-center text-[12px] font-bold text-fel-cyan underline-offset-2 hover:underline">{cta} →</a>}
     </div>
   );
 }

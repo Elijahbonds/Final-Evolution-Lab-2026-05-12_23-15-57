@@ -118,7 +118,7 @@ export function PartsTab({ parts, onChange, accent, canUndo, canRedo, onUndo, on
       <section>
         <h3 className="mb-2 text-sm font-semibold text-white/80">Placed parts</h3>
         {parts.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-white/10 p-4 text-center text-xs text-white/50">No parts yet. Add one above — spikes, plates, fins, a visor — and place it anywhere on the body.</p>
+          <p className="rounded-lg border border-dashed border-white/10 p-4 text-center text-base text-white/50">No parts yet. Add one above — spikes, plates, fins, a visor — and place it anywhere on the body.</p>
         ) : (
           <ul className="max-h-56 space-y-1 overflow-y-auto pr-1" aria-label="Placed parts">
             {parts.map((p) => {

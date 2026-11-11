@@ -63,7 +63,7 @@ export function ExchangeWidget() {
           <Gem className="h-5 w-5 text-[#C79BFF]" />
           <h2 className="fel-heading text-lg font-bold text-white">Get Shards</h2>
         </div>
-        <p className="mb-4 text-xs text-white/50">Shards unlock group workouts and 1-on-1 sessions. Convert coins to shards at {rate} coins = 1 shard.</p>
+        <p className="mb-4 text-base text-white/50">Shards unlock group workouts and 1-on-1 sessions. Convert coins to shards at {rate} coins = 1 shard.</p>
 
         {bal && (
           <div className="mb-4 flex items-center gap-4 text-sm">

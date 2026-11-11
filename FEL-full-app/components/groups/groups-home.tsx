@@ -30,7 +30,7 @@ export function GroupsHome({ initial, initialNames }: { initial: GroupsHomeData;
 
   if (!initial.available) {
     // EVERY-SCREEN P1: the notice names the drills and the streak; they are links now (the screen had no way on)
-    return <section className={card} data-groups-coming-soon><p className="text-[14px] leading-relaxed text-white/70">{COMING_SOON}</p><DarkInstead links={[{ href: '/train/today-drill', label: "Today's drill" }, { href: '/play', label: 'Play a game' }]} /></section>;
+    return <section className={card} data-groups-coming-soon><p className="text-base leading-relaxed text-white/70">{COMING_SOON}</p><DarkInstead links={[{ href: '/train/today-drill', label: "Today's drill" }, { href: '/play', label: 'Play a game' }]} /></section>;
   }
 
   const post = async (url: string, body: Record<string, unknown>) => {

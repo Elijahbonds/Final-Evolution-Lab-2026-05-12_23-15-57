@@ -48,7 +48,7 @@ export function BoostShelf({ shards, owned }: { shards: number; owned: string[] 
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
         <div>
           <h2 className="fel-heading text-[19px] font-bold text-white">Creator cards</h2>
-          <p className="mt-1 text-[12.5px] text-white/50">
+          <p className="mt-1 text-base text-white/50">
             Cosmetic cards: a card frame and links to the creator&apos;s own work. They never change a rating, PRQ,
             vertical or any game stat.
           </p>

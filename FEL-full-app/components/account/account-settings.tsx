@@ -32,7 +32,7 @@ export function AccountDataPanel({
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <a
           href="/api/account/export"
-          className="inline-flex items-center gap-2 rounded-md border border-fel-cyan/30 bg-fel-cyan/10 px-4 py-2 text-xs font-bold text-fel-cyan transition-colors hover:bg-fel-cyan/20"
+          className="inline-flex min-h-11 items-center gap-2 rounded-md border border-fel-cyan/30 bg-fel-cyan/10 px-4 py-2 text-xs font-bold text-fel-cyan transition-colors hover:bg-fel-cyan/20"
         >
           <Download className="h-3.5 w-3.5" /> Download my data
         </a>
@@ -47,7 +47,7 @@ export function AccountDataPanel({
           <button
             type="button"
             onClick={onAskErase}
-            className="inline-flex items-center gap-2 rounded-md border border-fel-crimson/30 bg-fel-crimson/10 px-4 py-2 text-xs font-bold text-fel-crimson transition-colors hover:bg-fel-crimson/20"
+            className="inline-flex min-h-11 items-center gap-2 rounded-md border border-fel-crimson/30 bg-fel-crimson/10 px-4 py-2 text-xs font-bold text-fel-crimson transition-colors hover:bg-fel-crimson/20"
           >
             <Trash2 className="h-3.5 w-3.5" /> Erase my health data
           </button>

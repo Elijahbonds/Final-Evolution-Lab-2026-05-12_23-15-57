@@ -53,7 +53,7 @@ export function BadgesSection({ data, viewer = false }: { data: ProfileV2Data; v
               ))}
             </ul>
           ) : (
-            <p className="mt-2 text-[14px] text-white/50">No tiers yet. Play any mode a few times to climb from Bronze.</p>
+            <p className="mt-2 text-base text-white/50">No tiers yet. Play any mode a few times to climb from Bronze.</p>
           )}
         </Card>
       </div>
