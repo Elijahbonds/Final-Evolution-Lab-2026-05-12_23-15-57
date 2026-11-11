@@ -18,7 +18,7 @@
 import type { AnimationGroup, Scene, Observer } from '@babylonjs/core';
 import { resolveClip } from './clipResolver';
 import { ledgerFor, requestAllowed, scopeFallback, suiteOfClip, type ClipScope } from './clipScope';
-import { inertialAllBonesOn, inertialDt, inertialEndedHoldOn, inertialTwinLinearOn, inertialHalfLife, inertialMatchVelOn, inertialStep, quatFromAxisAngle, quatMul, quatMulConj, quatToAxisAngle, type Quat } from './inertialize';
+import { inertialAllBonesOn, inertialDt, inertialEndedHoldOn, inertialHipsPosOn, inertialTwinLinearOn, inertialHalfLife, inertialMatchVelOn, inertialStep, quatFromAxisAngle, quatMul, quatMulConj, quatToAxisAngle, type Quat } from './inertialize';
 import { feel } from '../../feel-panel/feel';
 
 /**
@@ -67,6 +67,9 @@ interface InertialTrack {
 /** AF-1: a switch's starting velocity is capped (a teleported or re-spawned pose must not fling the offset). */
 const INERTIAL_MAX_ANG_VEL = 30, INERTIAL_MAX_LIN_VEL = 10;
 const INERTIAL_HIPS = /(^|[:_|])hips$/i;
+/** GAMEPLAY-CLEAN-7 (anim.inertialHipsPos): a spawned body's nodes are clones, `Hips_c240` — the Hips by name on those too. */
+const INERTIAL_HIPS_CLONE = /(^|[:_|])hips_c\d+$/i;
+const isHips = (name: string): boolean => INERTIAL_HIPS.test(name) || (INERTIAL_HIPS_CLONE.test(name) && inertialHipsPosOn());
 /** AF-1: a node a clip keys — its rotation (rotationQuaternion track) and/or, on the Hips, its position (position track). */
 interface InertialTarget { n: InertialNode; rot: boolean; pos: boolean }
 
@@ -570,7 +573,7 @@ export class CharacterAnimator {
       if (!n || typeof n.name !== 'string') continue;
       const prop = ta.animation.targetProperty;
       const rot = prop === 'rotationQuaternion' && !!n.rotationQuaternion;
-      const pos = (prop === 'position' || prop.startsWith('position.')) && INERTIAL_HIPS.test(n.name) && !!n.position;
+      const pos = (prop === 'position' || prop.startsWith('position.')) && isHips(n.name) && !!n.position;
       if (!rot && !pos) continue;
       const e = by.get(n) ?? { n, rot: false, pos: false };
       e.rot ||= rot; e.pos ||= pos;
@@ -588,7 +591,7 @@ export class CharacterAnimator {
         last: null, prior: null, lastP: null, priorP: null,
         axis: [1, 0, 0], x: 0, v: 0, rotOn: false, pOff: [0, 0, 0], pVel: [0, 0, 0], posOn: false,
         r3: [0, 0, 0], w3: [0, 0, 0], raw0: null, raw0P: null, dstDue: false, toRest: false,
-        halfLife: 0, hips: INERTIAL_HIPS.test(n.name), bone: n.getClassName?.() === 'Bone', stamp: -1, scratchQ: null, scratchP: null,
+        halfLife: 0, hips: isHips(n.name), bone: n.getClassName?.() === 'Bone', stamp: -1, scratchQ: null, scratchP: null,
       };
       this.inertialTracks.set(n, t);
     }

@@ -60,6 +60,18 @@ export function inertialTwinLinearOn(): boolean {
   return feel('anim.inertialTwinLinear', ANIM_INERTIAL_TWIN_LINEAR_ON) >= 0.5;
 }
 
+/**
+ * GAMEPLAY-CLEAN-7 (2026-11-11): feel knob `anim.inertialHipsPos` default. AF-1 carries the Hips' POSITION across a switch as well as the
+ * rotations, finding the Hips by name (/hips$/). Every body a mode spawns is a clone whose nodes are named `<bone>_c<n>` (CharacterLibrary:
+ * `Hips_c240`), so on no in-game body did the name match: the hips' height and sway switched at once on every inertial switch (a crouch
+ * → stand: the whole body jumping by the clips' hip-height difference in one frame). 1 = the clone's Hips is found too. 0 = as before.
+ * Read when a clip's targets are first read (at the body's first switch); only while the inertial blend is on.
+ */
+export const ANIM_INERTIAL_HIPS_POS_ON = 1;
+export function inertialHipsPosOn(): boolean {
+  return feel('anim.inertialHipsPos', ANIM_INERTIAL_HIPS_POS_ON) >= 0.5;
+}
+
 /** Is the inertial blend on (feel knob `anim.inertial`, default off)? */
 export function inertialOn(): boolean {
   return feel('anim.inertial', ANIM_INERTIAL_ON) >= 0.5;

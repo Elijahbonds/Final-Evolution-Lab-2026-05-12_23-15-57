@@ -1463,6 +1463,12 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/anim/inertialize.ts ANIM_INERTIAL_TWIN_LINEAR_ON',
     hint: 'On: when a basketball body switches the ball to the other hand, that one switch uses the plain crossfade even with inertial transitions on (the inertial one flipped both upper arms about 128 degrees in a frame). Off: the inertial switch there too. Only matters while inertial transitions are on for that body.',
   },
+  // GAMEPLAY-CLEAN-7 (2026-11-11): the inertial blend finds a spawned body's hips (named Hips_c<n>) and carries their position too
+  {
+    id: 'anim.inertialHipsPos', label: 'Inertial: hip height carried across a switch on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/inertialize.ts ANIM_INERTIAL_HIPS_POS_ON',
+    hint: 'On: with inertial transitions, the hips height and sway ease into the new move like the rotations do. Off: the old behaviour, on every in-game body the hips jumped to the new move height in one frame (the blend looked for the hips by a name the spawned bodies do not have). Read only while inertial transitions are on.',
+  },
   // GAMEPLAY-CLEAN-7 (2026-11-11): after a move that ran to its end, the bones the next clip does not move hold still (linear's behaviour)
   {
     id: 'anim.inertialEndedHold', label: 'Inertial: bones hold after a finished move on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',

@@ -12,7 +12,9 @@ async function main() {
   const name = process.argv[2] ?? 'dunk_mc_celebrate_big';
   const def = MOCAP_OPPONENT_CLIPS.find((c: any) => c.name === name);
   const { buildAuthoredClip } = await import(APP + '/lib/babylon/anim/authored/index.ts');
-  const g = def ? buildMocapOpponentClip(scene, r.skeletons[0], def) : buildAuthoredClip(scene, r.skeletons[0], name);
+  const { CharacterAnimator } = await import(APP + '/lib/babylon/anim/CharacterAnimator.ts');
+  let g = def ? buildMocapOpponentClip(scene, r.skeletons[0], def) : null;
+  if (!g) { const A = new CharacterAnimator(scene, []); buildAuthoredClip(A, scene, r.skeletons[0], name, null); g = (A as any).groups.get(name); }
   const only = process.argv[3] ? new RegExp(process.argv[3]) : /Arm|ForeArm|UpLeg/;
   for (const ta of g.targetedAnimations) {
     const n = ta.target.name; if (!only.test(n) || ta.animation.targetProperty !== 'rotationQuaternion') continue;
