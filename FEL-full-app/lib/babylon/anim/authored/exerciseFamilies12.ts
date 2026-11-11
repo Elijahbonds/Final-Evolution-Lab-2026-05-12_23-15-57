@@ -512,7 +512,7 @@ const pallofWalkout: Builder = (scene, sk) => {
     at(p(0, 0), 0, true), at(p(0, -1), 0.3), at({ ...p(-W, 0), feet: { Left: [-W - 0.14, ANKLE, 0.06], Right: [0.14, ANKLE, 0.06] }, hipsX: -W / 2 }, 0.5), at(p(-W, 0), 0.75, true),
     at(p(-W, -1), 1.05), at({ ...p(-2 * W, 0), feet: { Left: [-2 * W - 0.14, ANKLE, 0.06], Right: [-W + 0.14, ANKLE, 0.06] }, hipsX: -1.5 * W }, 1.25), at(p(-2 * W, 0), 1.5, true), at(p(-2 * W, 0), 2.0, true),
     at(p(-2 * W, 1), 2.3), at({ ...p(-W, 0), feet: { Left: [-2 * W - 0.14, ANKLE, 0.06], Right: [-W + 0.14, ANKLE, 0.06] }, hipsX: -1.5 * W }, 2.5), at(p(-W, 0), 2.75, true),
-    at(p(-W, 1), 3.05), at({ ...p(0, 0), feet: { Left: [-W - 0.14, ANKLE, 0.06], Right: [0.14, ANKLE, 0.06] }, hipsX: -W / 2 }, 3.25), at(p(0, 0), 3.5, true),
+    at(p(-W, 1), 3.0), at({ ...p(0, 0), feet: { Left: [-W - 0.14, ANKLE, 0.06], Right: [0.14, ANKLE, 0.06] }, hipsX: -W / 2 }, 3.25), at(p(0, 0), 3.5, true),
   ]);
 };
 
@@ -563,8 +563,8 @@ const birdDogBandRow: Builder = (scene, sk) => {
 /** ex_guillotine_press (the barbell guillotine bench press) — lying on the bench, the bar held straight over the NECK, arms
  *  locked: lowered slow until it is an inch from the neck, the elbows out wide, a beat, and pressed back up. */
 const guillotinePress: Builder = (scene, sk) => {
-  const a = lie({ hands: both(0.26, 1.10, -0.60), poles: bothDir(0.9, -0.3, 0) });
-  const b = lie({ hands: both(0.30, 0.68, -0.60), poles: bothDir(1, -0.4, 0.1) });
+  const a = lie({ hands: both(0.25, 1.10, -0.50), poles: bothDir(0.8, -0.5, 0) });
+  const b = lie({ hands: both(0.30, 0.70, -0.52), poles: bothDir(1, -0.5, 0.1) });
   return rep(scene, sk, 'ex_guillotine_press', a, b, 1.6, 0.4, 0.8, 0.35);
 };
 
@@ -574,7 +574,8 @@ const guillotinePress: Builder = (scene, sk) => {
 const PRONE_PAD: Pose = { bones: { Hips: [52, 0, 0], Spine: [0, 0, 0], Neck: [-30, 0, 0], LeftFoot: [-44, 0, 0], RightFoot: [-44, 0, 0] }, feet: both(0.14, ANKLE + 0.02, -0.80), kneePoles: bothDir(0.1, 0, 1), hipsY: -0.33, hipsZ: -0.42 };
 const antiGravityPress: Builder = (scene, sk) => {
   const a: Pose = { ...PRONE_PAD, rel: both(0.20, -0.16, 0.20), poles: bothDir(0.8, -0.2, -0.6) };
-  const b: Pose = { ...PRONE_PAD, bones: { ...PRONE_PAD.bones, Neck: [-36, 0, 0] }, rel: both(0.22, 0.42, 0.34), poles: bothDir(0.6, -0.4, -0.6) };
+  // (`rel` is the hand from the shoulder in the stage's own axes, not the trunk's: (0.42 up, 0.34 out) pressed up at 50°, the sheet)
+  const b: Pose = { ...PRONE_PAD, bones: { ...PRONE_PAD.bones, Neck: [-36, 0, 0] }, rel: both(0.20, -0.02, 0.54), poles: bothDir(0.6, -0.4, -0.6) };
   return rep(scene, sk, 'ex_anti_gravity_press', a, b, 0.9, 0.3, 1.0, 0.35);
 };
 
@@ -673,8 +674,8 @@ const kneelCableTriceps: Builder = (scene, sk) => {
 };
 
 /** ex_clock_pushup (the clock push-up) — a push-up driven up hard enough that the hands leave the floor, the body turning about
- *  the feet so the hands land a step round to the left (about 30°); another push-up and round to the left again; then two
- *  back to the start. (flag in demo.ts: the source goes all the way round the clock; the loop goes two round and two back.) */
+ *  the feet so the hands land a step round (about 30°); then back, then round the other way and back. (flag in demo.ts: the
+ *  source goes all the way round the clock; the loop goes a step each way and back.) */
 const clockPushup: Builder = (scene, sk) => {
   const feet = both(0.11, TOE_ANKLE, -0.90);
   const top: Pose = { bones: { Hips: [70, 0, 0], Spine: [0, 0, 0], Neck: [-30, 0, 0], LeftFoot: [8, 0, 0], RightFoot: [8, 0, 0] }, feet, kneePoles: bothDir(0, -1, 0.1), hands: both(0.24, 0.05, 0.44), poles: bothDir(0.6, 0.2, -0.7), hipsY: -0.58 };
@@ -684,9 +685,11 @@ const clockPushup: Builder = (scene, sk) => {
   const about = (p: Pose, deg: number): Pose => movePose(yawPose(movePose(p, 0, 0.90), deg), 0, -0.90);
   const keys: ExKey[] = [];
   let t = 0;
-  // the four reps: 0° → −30° → −60°, then back −60° → −30° → 0° (−: round to the body's left)
+  // the four reps: 0° → −30° (round to the body's left) → 0° → +30° → 0° (two round toward the stage's floor camera put the
+  // head in its lens: the sheet)
+  const at4 = [0, -30, 0, 30, 0];
   for (let i = 0; i < 4; i++) {
-    const d0 = i < 2 ? -30 * i : -30 * (4 - i), d1 = i < 2 ? -30 * (i + 1) : -30 * (3 - i);
+    const d0 = at4[i], d1 = at4[i + 1];
     keys.push(at(about(top, d0), t, true), at(about(low, d0), t + 0.6, true), at(about(air, (d0 + d1) / 2), t + 0.95));
     t += 1.25;
   }

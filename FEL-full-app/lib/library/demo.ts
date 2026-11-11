@@ -1075,7 +1075,7 @@ export const DEMO_RULES: readonly DemoRule[] = [
   { clip: 'ex_anti_gravity_press', families: ['overhead-press'], bases: /^anti-gravity-press$/ },
   { clip: 'ex_handstand_pushup', families: ['push-up'], bases: /^handstand-push-ups$/ },
   // the clock push-up: its entry's words are the push-up family's, its name and source the plyometric push-up that hops round the
-  // feet (flag: the source goes all the way round the clock; the loop goes two hops round and two back)
+  // feet (flag: the source goes all the way round the clock; the loop hops a step round each way and back)
   { clip: 'ex_clock_pushup', families: ['push-up'], bases: /^clock-push-up$/ },
   { clip: (b) => ({ 'muscl-up': 'ex_muscle_up', 'kip-muscl-up': 'ex_muscle_up_kip' } as Record<string, string>)[b] ?? null, families: ['pull-up'], bases: /^(muscl-up|kip-muscl-up)$/, emits: ['ex_muscle_up', 'ex_muscle_up_kip'] },
   { clip: 'ex_db_vertical_swing', families: ['kb-swing'], bases: /^vertical-swing$/ },
@@ -1225,7 +1225,8 @@ export const TRAVEL_CLIPS: Readonly<Record<string, 'forward' | 'lateral' | 'both
   ex_lateral_skip: 'lateral', ex_lateral_walk: 'lateral', ex_lateral_hop_stick: 'lateral', ex_t_drill: 'both',
   ex_stride_jump_cross: 'lateral',
   // DEMOS-FIX-2: the double broad jump and the walk back; the Spiderman lunge walk; the step and stick to each side
-  ex_broad_jump_double: 'forward', ex_spiderman_lunge_walk: 'forward', ex_lateral_step_stick: 'lateral', ex_slide_run_slide: 'lateral', ex_shuttle_5105: 'lateral',
+  // (the handstand push-up is framed as forward travel for its height: upside down against the wall the feet are 2 m up)
+  ex_handstand_pushup: 'forward', ex_broad_jump_double: 'forward', ex_spiderman_lunge_walk: 'forward', ex_lateral_step_stick: 'lateral', ex_slide_run_slide: 'lateral', ex_shuttle_5105: 'lateral',
   // DEMO-LOOPS-8: the ankle lesson gets up from its chair and walks to the wall, 1.2 m in front
   ex_ankle_unlock: 'forward',
   // DEMO-LOOPS-9: three hurdle hops forward and the walk back; the long jump to the side and back
@@ -1253,7 +1254,7 @@ export const SIDE_CLIPS: ReadonlySet<string> = new Set(['ex_jefferson_curl', 'ex
   'ex_bb_snatch', 'ex_bb_power_snatch', 'ex_bb_hang_snatch', 'ex_bb_hang_snatch_low', 'ex_bb_snatch_pull', 'ex_bb_snatch_shrug', 'ex_bb_muscle_snatch', 'ex_bb_snatch_balance',
   'ex_rope_crunch_kneel', 'ex_rope_crunch_stand', 'ex_arm_swing_up', 'ex_pelvic_tilt_stand',
   // DEMOS-FIX-2: the machine chair squat's depth and the elevated back lunge read from the side
-  'ex_chair_squat', 'ex_back_lunge_elevated', 'ex_box_out', 'ex_hill_sprint', 'ex_db_vertical_swing', 'ex_handstand_pushup', 'ex_hk_hip_shift', 'ex_band_shoulder_sink']);
+  'ex_chair_squat', 'ex_back_lunge_elevated', 'ex_box_out', 'ex_hill_sprint', 'ex_db_vertical_swing', 'ex_hk_hip_shift', 'ex_band_shoulder_sink']);
 /** What the stage draws under a loop that needs it: a bench seat, a flat bench to lie on, or an incline bench. Bench loops
  *  lying down are framed from the side, like the floor loops. LIBRARY-ANATOMY-2: and the rest of a gym's furniture a loop
  *  stands, sits, lies or hangs on — a box, benches in front and behind, a pull-up bar, a low bar, dip bars, pads, a wall. */
