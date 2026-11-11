@@ -119,6 +119,7 @@ export function ProgramBuilder({ initialQuestion = '' }: { initialQuestion?: str
   // budget, and the docked Start covered the chips under it); "Change the ask" opens it again
   // an ask that arrives with the address (?q=) is built on arrival: it starts folded, so nothing moves when the program lands
   const [askOpen, setAskOpen] = useState(!initialQuestion);
+  const [assumedOpen, setAssumedOpen] = useState(false);
   // PROGRAM-ASK-2: the account copy (adults, once the pending table exists); 'device' = the phone only (youth, or not ready)
   const keep = useRef<'account' | 'device' | null>(null);
   const [onAccount, setOnAccount] = useState(false);
@@ -237,10 +238,14 @@ export function ProgramBuilder({ initialQuestion = '' }: { initialQuestion?: str
           <p className={`${TYPE.label} text-fel-soft`}>{READ_BACK} · {EDIT_HINT}</p>
           <div className="flex flex-wrap gap-2">{answer.read.chips.map((c) => <ChipControl key={c.field} c={c} onEdit={edit} busy={busy} />)}</div>
           {answer.read.assumptions.length > 0 && (
-            <details className="text-fel-soft">
-              <summary className={`min-h-11 cursor-pointer py-2 ${TYPE.small}`}>FEL assumed {answer.read.assumptions.length} thing{answer.read.assumptions.length === 1 ? '' : 's'}</summary>
-              <ul className="list-disc space-y-1 pl-5">{answer.read.assumptions.map((a) => { const t = a.replace(/^assumption: /, ''); return <li key={a} className={lineSize(t)}>{t}</li>; })}</ul>
-            </details>
+            // EVERY-SCREEN P4: a disclosure, not <details>: a closed <details> still lays its text out, so the phone's first
+            // screen measured every hidden assumption (the result card's own finding, components/result-card)
+            <div className="text-fel-soft">
+              <button type="button" aria-expanded={assumedOpen} onClick={() => setAssumedOpen((o) => !o)} data-testid="program-assumed" className={`min-h-11 py-2 text-left ${TYPE.small}`}>
+                {assumedOpen ? '▾' : '▸'} FEL assumed {answer.read.assumptions.length} thing{answer.read.assumptions.length === 1 ? '' : 's'}
+              </button>
+              <ul hidden={!assumedOpen} className="list-disc space-y-1 pl-5">{answer.read.assumptions.map((a) => { const t = a.replace(/^assumption: /, ''); return <li key={a} className={lineSize(t)}>{t}</li>; })}</ul>
+            </div>
           )}
         </section>
       )}
