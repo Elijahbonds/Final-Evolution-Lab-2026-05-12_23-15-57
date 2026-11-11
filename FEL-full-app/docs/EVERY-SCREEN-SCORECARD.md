@@ -6,7 +6,7 @@ This is phase 1 of `docs/PLAN-EVERY-SCREEN-10PHASE.md`: every screen a person ca
 
 ## The number
 
-**20 of 185 screens pass all four checks.**
+**25 of 185 screens pass all four checks.**
 
 | | Screens |
 |---|---|
@@ -15,15 +15,15 @@ This is phase 1 of `docs/PLAN-EVERY-SCREEN-10PHASE.md`: every screen a person ca
 | Not a screen of its own: it only sends you on to another | 7 |
 | Switched off: a 404 for everyone today | 20 |
 | Not scored, with the reason (section 5) | 5 |
-| **Pass all four** | **20** |
-| Training and coaching (phases 2–5): pass all four | 13 of 61 (44 scored) |
+| **Pass all four** | **25** |
+| Training and coaching (phases 2–5): pass all four | 15 of 61 (44 scored) |
 
 | Check | Pass | Fail | Not measured |
 |---|---|---|---|
-| 1. Clear and quick | 70 | **83** | 0 |
-| 2. Looks finished | 45 | **108** | 0 |
-| 3. Fast and smooth | 121 | **9** | 23 |
-| 4. Right and trustworthy | 137 | **16** | 0 |
+| 1. Clear and quick | 74 | **79** | 0 |
+| 2. Looks finished | 47 | **106** | 0 |
+| 3. Fast and smooth | 122 | **9** | 22 |
+| 4. Right and trustworthy | 140 | **13** | 0 |
 
 Of the 153 scored screens. "Not measured" is a 3D screen's tap time: the rig has no real GPU, so that one number is left open and the screen is not counted as passing.
 
@@ -42,7 +42,7 @@ The real app (a production build) runs against a throwaway local database, and a
 
 **Sorting screens into do-this, menu and reading pages** ("Kind" in the table) is a first sorting by address (`kindOf`), an `assumption:`; only a do-this screen takes the 40-word rule. Each phase corrects its own screens.
 
-**Controls: passed** on 2026-11-11 07:11 UTC (scorer version 4).
+**Controls: passed** on 2026-11-11 09:08 UTC (scorer version 5).
 
 **The scorer was checked before it was believed** (`score.mts --plant`, and again at the start of every crawl): a clean control page must pass all four, and each planted fault (three bright buttons, 120 words, a 30 px target, a dead end, "Coming soon", an owner placeholder, an empty state, a wordless spinner, sideways scroll, 10 px text, six text sizes, five button looks, slow first content, a jumping banner, a blocking tap handler, a link to a missing page, a link to nowhere, a button that does nothing, an unnamed button, a bare measured number) must be flagged on its own page and fail only its own check.
 
@@ -52,14 +52,14 @@ The plan's rule: fix the shared thing first. "Alone" is how many screens would p
 
 | # | Fault | Screens | Alone | Check |
 |---|---|---|---|---|
-| 1 | Body copy under 16 px | 58 | 1 | 2 |
-| 2 | More than 40 words before scrolling on a do-this screen | 46 | 17 | 1 |
-| 3 | Tap targets under 44 px in the screen itself | 45 | 0 | 1 |
-| 4 | More than 4 text sizes on one screen | 39 | 0 | 2 |
+| 1 | Body copy under 16 px | 57 | 1 | 2 |
+| 2 | Tap targets under 44 px in the screen itself | 42 | 0 | 1 |
+| 3 | More than 40 words before scrolling on a do-this screen | 42 | 15 | 1 |
+| 4 | More than 4 text sizes on one screen | 36 | 0 | 2 |
 | 5 | A spinner with no words | 26 | 1 | 2 |
 | 6 | Text under 12 px | 22 | 0 | 2 |
-| 7 | More than 3 button looks on one screen | 19 | 0 | 2 |
-| 8 | Tap targets under 44 px in the app's own bars | 19 | 4 | 1 |
+| 7 | Tap targets under 44 px in the app's own bars | 18 | 3 | 1 |
+| 8 | More than 3 button looks on one screen | 17 | 0 | 2 |
 | 9 | An empty state with no next step | 12 | 0 | 2 |
 | 10 | Unfinished mark: "opens soon" | 9 | 5 | 2 |
 
@@ -85,7 +85,7 @@ at 4, a screen that uses only the approved sizes still fails. Recommend: 5, the 
 scale is a fault. Until the owner answers, the scorer keeps the plan's 4 (it is the approved number) and this page says
 how many screens fail at exactly 5.
 
-Measured for that call: 57 scored screens use exactly 5 text sizes; with 5 allowed, 0 more screens would pass all four today (the other faults on them stay).
+Measured for that call: 54 scored screens use exactly 5 text sizes; with 5 allowed, 0 more screens would pass all four today (the other faults on them stay).
 
 <details><summary>The elements behind them (the rig's own list)</summary>
 
@@ -127,38 +127,38 @@ Measured for that call: 57 scored screens use exactly 5 text sizes; with 5 allow
 - 2 × `"GUARD" 107×40 button.pointer-events-auto.relative.flex.select-none`
 - 1 × `"on" 13×13 input in [data-testid]`
 
-**Text sizes per screen:** 1 sizes: 2 screens; 2 sizes: 3 screens; 3 sizes: 47 screens; 4 sizes: 23 screens; 5 sizes: 57 screens; 6 sizes: 10 screens; 7 sizes: 7 screens; 8 sizes: 2 screens; 9 sizes: 1 screens; 10 sizes: 1 screens
+**Text sizes per screen:** 0 sizes: 1 screens; 1 sizes: 2 screens; 2 sizes: 2 screens; 3 sizes: 47 screens; 4 sizes: 26 screens; 5 sizes: 54 screens; 6 sizes: 10 screens; 7 sizes: 7 screens; 8 sizes: 2 screens; 9 sizes: 1 screens; 10 sizes: 1 screens
 
 **The sizes themselves (screens that use each)**
 
-- 144 × `12px`
-- 112 × `20px`
-- 105 × `16px`
-- 103 × `14px`
-- 57 × `30px`
-- 32 × `18px`
+- 143 × `12px`
+- 113 × `20px`
+- 106 × `16px`
+- 102 × `14px`
+- 59 × `30px`
+- 31 × `18px`
 - 31 × `24px`
 - 16 × `36px`
-- 15 × `13px`
+- 13 × `13px`
 - 7 × `44px`
 - 7 × `22px`
 - 6 × `12.5px`
-- 5 × `15px`
+- 4 × `15px`
 - 4 × `11.9px`
 - 4 × `21px`
-- 3 × `13.5px`
-- 3 × `26px`
 - 2 × `19px`
 - 2 × `17px`
 - 2 × `28px`
+- 2 × `13.5px`
 - 2 × `40px`
 - 2 × `48px`
 - 2 × `10.8108px`
 - 2 × `14.4144px`
 - 1 × `15.5px`
+- 1 × `26px`
 - 1 × `60px`
 
-**Button looks per screen:** 0: 31; 1: 66; 2: 23; 3: 14; 4: 8; 5: 3; 6: 4; 7: 2; 8: 1; 12: 1
+**Button looks per screen:** 0: 32; 1: 66; 2: 23; 3: 15; 4: 7; 5: 2; 6: 4; 7: 2; 8: 1; 12: 1
 
 **Text under the READABLE floor**
 
@@ -191,12 +191,10 @@ Measured for that call: 57 scored screens use exactly 5 text sizes; with 5 allow
 - 1 × `serious contrast: span[data-testid=rx-leak] "LEAK · MID-BACK"`
 - 1 × `critical label: select "Flight NightAero AcesVelocity KartDowntownStompG"`
 - 1 × `critical contrast: div "NONE"`
-- 1 × `serious contrast: button "Neuro Arena — THE QUIZ IN THE DARK"`
-- 1 × `serious contrast: button "Global Pitch — THE STADIUM AT DUSK · GLASS DOWN "`
-- 1 × `serious contrast: button "Stadium Straight — THE TARTAN UNDER A CLEAR SKY"`
-- 1 × `serious contrast: button "Center Court — HARDCOURT UNDER A DUSK SKY"`
+- 1 × `serious contrast: span[data-hud-call=true] "ON YOUR MARKS"`
 - 1 × `critical contrast: div "NO ITEM"`
 - 1 × `critical label: input ""`
+- 1 × `serious contrast: button "10 ◆"`
 
 **What moves as a screen loads**
 
@@ -205,13 +203,13 @@ Measured for that call: 57 scored screens use exactly 5 text sizes; with 5 allow
 - 4 × `#text`
 - 2 × `h1.text-4xl.font-black.tracking-wide`
 - 2 × `div.fel-boot-bar.h-full.rounded-full`
-- 1 × `div.mt-8.overflow-x-auto`
-- 1 × `button.inline-flex.items-center.gap-2`
-- 1 × `div.mt-6.space-y-8`
 - 1 × `div.flex.gap-1`
 - 1 × `section.mt-6`
 - 1 × `p.font-sans.text-[14px].font-medium`
 - 1 × `div.pointer-events-auto.flex.items-center`
+- 1 × `p.max-w-[24rem].text-[12px].leading-tight`
+- 1 × `button.rounded-full.border.px-3`
+- 1 × `button.rounded-full.border.px-2`
 
 **What sticks out sideways**
 
@@ -275,9 +273,9 @@ Phase 1 fixed only what stops a person (`docs/EVERY-SCREEN-JOBS.md`). Everything
 
 1. More than 40 words before scrolling on a do-this screen: 1 screen (`/train/build`)
 
-**Phase 4** (14 scored screens, 2 pass all four):
+**Phase 4** (14 scored screens, 4 pass all four):
 
-1. More than 40 words before scrolling on a do-this screen: 11 screens (`/play/mirror`, `/play/mirror/assess`, `/play/mirror/assess/results`, `/play/mirror/correctives`, `/screen`, `/screen/program/[lane]`, …)
+1. More than 40 words before scrolling on a do-this screen: 9 screens (`/play/mirror`, `/play/mirror/assess`, `/play/mirror/correctives`, `/screen`, `/train/jumps`, `/train/readiness`, …)
 2. Tap targets under 44 px in the screen itself: 2 screens (`/train/shots`, `/train/velocity`)
 3. More than 3 button looks on one screen: 2 screens (`/train/speed`, `/train/velocity`)
 4. Unfinished mark: "coming soon": 1 screen (`/train/combine`)
@@ -289,9 +287,10 @@ Phase 1 fixed only what stops a person (`docs/EVERY-SCREEN-JOBS.md`). Everything
 2. Unfinished mark: "opens soon": 4 screens (`/coach/groups`, `/groups`, `/groups/[groupId]`, `/groups/one-on-one`)
 3. Body copy under 16 px: 3 screens (`/coach/admin/library`, `/coach/admin/programs`, `/coach/business`)
 4. More than 4 text sizes on one screen: 3 screens (`/coach/admin/programs`, `/coach/business`, `/coach/combine`)
-5. An empty state with no next step: 1 screen (`/coach/business`)
-6. Tap targets under 44 px in the screen itself: 1 screen (`/coach/business`)
-7. Unfinished mark: "coming soon": 1 screen (`/coach/combine`)
+5. The main action answers a tap in more than 200 ms: 1 screen (`/coach/admin/programs`)
+6. An empty state with no next step: 1 screen (`/coach/business`)
+7. Tap targets under 44 px in the screen itself: 1 screen (`/coach/business`)
+8. Unfinished mark: "coming soon": 1 screen (`/coach/combine`)
 
 ## 3. What is switched off today
 
@@ -385,7 +384,7 @@ Not measured yet: run `scripts/every-screen/dark.mts`.
 | `/train/library` | signed-in | hub | ✓ | ✓ | ✓ | ✓ | **passes all four** |
 | `/train/programs` | signed-in | hub | ✓ | ✗ | ✓ | ✓ | Unfinished mark on screen: "Signature programs are coming soon. The daily drill and the exercise library are". |
 | `/train/programs/[id]` | admin | do | ✗ | ✗ | ✓ | ✓ | 238 words before scrolling (the budget is 40). review: a number with no method line (the list links no program while it is switched off: opened by its address) |
-| `/train/today-drill` | signed-in | do | ✗ | ✓ | ✗ | ✓ | "Start" answers a tap in 288 ms (the budget is 200 ms). |
+| `/train/today-drill` | signed-in | do | ✗ | ✓ | ✗ | ✓ | "Start" answers a tap in 256 ms (the budget is 200 ms). |
 | `/training` | nobody (redirects away) | do | – | – | – | – | *not its own screen: redirects to /coach for everyone who is signed in* |
 | `/workout` | signed-in | do | ✗ | ✗ | ✓ | ✓ | 183 words before scrolling (the budget is 40). |
 
@@ -395,22 +394,22 @@ Not measured yet: run `scripts/every-screen/dark.mts`.
 |---|---|---|---|---|---|---|---|
 | `/train/build` | signed-in | do | ✗ | ✓ | ✓ | ✓ | 168 words before scrolling (the budget is 40). review: a number with no method line (scored with the sample ask built: the program view) |
 
-### Phase 4 — numbers you can trust (14 screens; 2 of 14 scored pass all four)
+### Phase 4 — numbers you can trust (14 screens; 4 of 14 scored pass all four)
 
 | Screen | Who | Kind | 1 | 2 | 3 | 4 | The single worst problem |
 |---|---|---|---|---|---|---|---|
 | `/play/mirror` | signed-in | do | ✗ | ✓ | ✓ | ✓ | 118 words before scrolling (the budget is 40). |
-| `/play/mirror/assess` | anyone | do | ✗ | ✓ | ✓ | ✓ | 73 words before scrolling (the budget is 40). |
-| `/play/mirror/assess/results` | anyone | do | ✗ | ✓ | ✓ | ✓ | 47 words before scrolling (the budget is 40). |
+| `/play/mirror/assess` | anyone | do | ✗ | ✓ | ✓ | ✓ | 42 words before scrolling (the budget is 40; 31 words of approved notices not counted). |
+| `/play/mirror/assess/results` | anyone | do | ✓ | ✓ | ✓ | ✓ | **passes all four** |
 | `/play/mirror/correctives` | signed-in | do | ✗ | ✓ | ✓ | ✓ | 63 words before scrolling (the budget is 40). |
-| `/screen` | anyone | do | ✗ | ✓ | ✓ | ✓ | 73 words before scrolling (the budget is 40). |
+| `/screen` | anyone | do | ✗ | ✓ | ✓ | ✓ | 42 words before scrolling (the budget is 40; 31 words of approved notices not counted). |
 | `/screen/privacy` | anyone | read | ✓ | ✓ | ✓ | ✓ | **passes all four** |
-| `/screen/program/[lane]` | anyone | do | ✗ | ✓ | ✓ | ✓ | 48 words before scrolling (the budget is 40). |
+| `/screen/program/[lane]` | anyone | do | ✓ | ✓ | ✓ | ✓ | **passes all four** |
 | `/train/combine` | signed-in | do | ✓ | ✗ | ✓ | ✓ | Unfinished mark on screen: "Combine results are coming soon.". |
 | `/train/jumps` | signed-in | do | ✗ | ✓ | ✓ | ✓ | 77 words before scrolling (the budget is 40). |
 | `/train/progress` | signed-in | hub | ✓ | ✓ | ✓ | ✓ | **passes all four** |
-| `/train/readiness` | signed-in | do | ✗ | ✓ | ✓ | ✓ | 72 words before scrolling (the budget is 40). |
-| `/train/shots` | signed-in | do | ✗ | ✓ | ✓ | ✓ | 92 words before scrolling (the budget is 40). review: a number with no method line |
+| `/train/readiness` | signed-in | do | ✗ | ✓ | ✓ | ✓ | 57 words before scrolling (the budget is 40; 15 words of approved notices not counted). |
+| `/train/shots` | signed-in | do | ✗ | ✓ | ✓ | ✓ | 75 words before scrolling (the budget is 40; 17 words of approved notices not counted). review: a number with no method line |
 | `/train/speed` | signed-in | do | ✗ | ✗ | ✓ | ✓ | 66 words before scrolling (the budget is 40). |
 | `/train/velocity` | signed-in | do | ✗ | ✗ | ✓ | ✓ | 88 words before scrolling (the budget is 40). |
 
@@ -427,7 +426,7 @@ Not measured yet: run `scripts/every-screen/dark.mts`.
 | `/coach/[slug]/programs/[lane]` | nobody (a 404 for everyone) | do | – | – | – | – | *switched off: a 404 (COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL))* |
 | `/coach/admin` | admin | hub | ✓ | ✓ | ✓ | ✓ | **passes all four** |
 | `/coach/admin/library` | admin | do | ✗ | ✗ | ✓ | ✓ | 114 paragraphs of body copy under 16 px. |
-| `/coach/admin/programs` | admin | do | ✗ | ✗ | ✓ | ✓ | 343 words before scrolling (the budget is 40). |
+| `/coach/admin/programs` | admin | do | ✗ | ✗ | ✗ | ✓ | 343 words before scrolling (the budget is 40). |
 | `/coach/business` | signed-in; scored as coach | hub | ✗ | ✗ | ✓ | ✓ | An empty state with no next step: "Coach Pro is not on sale yet. Nothing is limited until it is.". |
 | `/coach/business/thanks` | anyone; scored as coach | do | ✗ | ✓ | ✓ | ✓ | 41 words before scrolling (the budget is 40). |
 | `/coach/combine` | signed-in; scored as coach | do | ✗ | ✗ | ✓ | ✓ | Unfinished mark on screen: "Saving combines to your account is coming soon. This combine is kept on this pho". |
@@ -435,7 +434,7 @@ Not measured yet: run `scripts/every-screen/dark.mts`.
 | `/coach/dashboard/settings` | nobody (a 404 for everyone) | do | – | – | – | – | *switched off: a 404 (COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL))* |
 | `/coach/form-review` | signed-in (coached client) | do | ✗ | ✓ | ✓ | ✓ | 56 words before scrolling (the budget is 40). (opened from the first exercise of the client's session, as the app links it) |
 | `/coach/groups` | signed-in; scored as coach | do | ✓ | ✗ | ✓ | ✓ | Unfinished mark on screen: "Opens soon". |
-| `/coach/highlight/[id]` | signed-in | do | ✗ | ✓ | ✓ | ✓ | 53 words before scrolling (the budget is 40). (no highlight row exists on a new account: the screen for a link that names none) |
+| `/coach/highlight/[id]` | signed-in | do | ✗ | ✓ | ✓ | ✓ | 55 words before scrolling (the budget is 40). (no highlight row exists on a new account: the screen for a link that names none) |
 | `/coach/join` | anyone | do | ✓ | ✓ | ✓ | ✓ | **passes all four** |
 | `/coach/join/[token]` | anyone; scored as solo | do | ✗ | ✓ | ✓ | ✓ | 44 words before scrolling (the budget is 40). (a real invite made by the rig's coach, opened by an athlete who has not joined) |
 | `/coach/live/[room]` | nobody (a 404 for everyone) | do | – | – | – | – | *switched off: a 404 (NEXT_PUBLIC_COACH_LIVE_ENABLED (live coach sessions))* |
@@ -453,19 +452,19 @@ Not measured yet: run `scripts/every-screen/dark.mts`.
 | `/session/[bookingId]` | nobody (a 404 for everyone) | do | – | – | – | – | *switched off: a 404 (COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL))* |
 | `/sessions` | signed-in | hub | ✓ | ✓ | ✓ | ✓ | **passes all four** |
 
-### Phase 6 — the first five minutes (9 screens; 2 of 7 scored pass all four)
+### Phase 6 — the first five minutes (9 screens; 5 of 7 scored pass all four)
 
 | Screen | Who | Kind | 1 | 2 | 3 | 4 | The single worst problem |
 |---|---|---|---|---|---|---|---|
 | `/` | anyone | hub | ✓ | ✓ | ✓ | ✓ | **passes all four** |
 | `/age` | nobody (redirects away) | do | – | – | – | – | *not its own screen: redirects to / for everyone who is signed in* |
-| `/consent/guardian` | signed-in | do | ✗ | ✓ | ✓ | ✓ | 90 words before scrolling (the budget is 40). |
+| `/consent/guardian` | signed-in | do | ✓ | ✓ | ✓ | ✓ | **passes all four** |
 | `/consent/guardian/[token]` | unknown (no fixture) | do | – | – | – | – | *not scored: needs a guardian-consent row with its emailed token* |
 | `/join` | anyone | do | ✓ | ✓ | ✓ | ✓ | **passes all four** |
-| `/login` | anyone | do | ✗ | ✗ | ✓ | ✓ | 166 words before scrolling (the budget is 40). |
-| `/signup` | anyone | do | ✗ | ✗ | ✗ | ✓ | "CONTINUE" answers a tap in 288 ms (the budget is 200 ms). |
-| `/try` | anyone | do | ✗ | ✓ | ✓ | ✓ | 1 tap target under 44 px in the app's own bars. |
-| `/welcome` | signed-in | hub | ✓ | ✗ | ✓ | ✓ | 1 paragraph of body copy under 16 px. |
+| `/login` | anyone | do | ✗ | ✓ | ✓ | ✓ | 41 words before scrolling (the budget is 40). |
+| `/signup` | anyone | do | ✗ | ✗ | ✗ | ✓ | "CONTINUE" answers a tap in 280 ms (the budget is 200 ms). |
+| `/try` | anyone | do | ✓ | ✓ | ✓ | ✓ | **passes all four** |
+| `/welcome` | signed-in | hub | ✓ | ✓ | ✓ | ✓ | **passes all four** |
 
 ### Phase 7 — around the games (55 screens; 2 of 49 scored pass all four)
 
@@ -485,45 +484,45 @@ Not measured yet: run `scripts/every-screen/dark.mts`.
 | `/party/[code]` | anyone | do | ✗ | ✗ | ✓ | ✓ | 108 words before scrolling (the budget is 40). (a made-up party code) |
 | `/play` | signed-in | hub | ✓ | ✗ | ✓ | ✓ | Text cut off at 390 px: "Breakaway · Twelve Yards · Baseball · Moonsh". |
 | `/play/acting` | signed-in | do | ✗ | ✗ | ✓ | ✓ | 45 words before scrolling (the budget is 40). |
-| `/play/adventure` | anyone | do | ✗ | ✗ | ? | ✓ | 1 paragraph of body copy under 16 px. |
+| `/play/adventure` | anyone | do | ✗ | ✗ | ? | ✓ | Dead end: nothing on the screen leads on or back. |
 | `/play/adventure-br` | anyone | do | ✗ | ✗ | ? | ✓ | Dead end: nothing on the screen leads on or back. |
 | `/play/aero-aces` | signed-in | do | ✓ | ✗ | ✓ | ✗ | 1 critical accessibility finding (contrast). |
-| `/play/baseball` | signed-in | do | ✗ | ✗ | ? | ✓ | 64 words before scrolling (the budget is 40). |
+| `/play/baseball` | signed-in | do | ✗ | ✗ | ? | ✓ | 65 words before scrolling (the budget is 40). |
 | `/play/big-air` | signed-in | do | ✓ | ✗ | ? | ✓ | A spinner with no words: it never says what it is waiting for. |
-| `/play/brain-brawl` | signed-in | do | ✓ | ✗ | ? | ✗ | A spinner with no words: it never says what it is waiting for. |
+| `/play/brain-brawl` | signed-in | do | ✓ | ✗ | ? | ✓ | A spinner with no words: it never says what it is waiting for. |
 | `/play/calibrate` | signed-in | do | ✗ | ✗ | ✓ | ✓ | 98 words before scrolling (the budget is 40). |
 | `/play/carnival` | signed-in | do | ✓ | ✓ | ✓ | ✓ | **passes all four** |
 | `/play/carnival/recap` | signed-in | do | ✓ | ✓ | ✓ | ✓ | **passes all four** |
-| `/play/dance` | signed-in | do | ✓ | ✗ | ✓ | ✓ | A spinner with no words: it never says what it is waiting for. |
+| `/play/dance` | signed-in | do | ✓ | ✗ | ? | ✓ | A spinner with no words: it never says what it is waiting for. |
 | `/play/derby` | signed-in | do | ✓ | ✗ | ? | ✓ | A spinner with no words: it never says what it is waiting for. |
 | `/play/duel` | signed-in | do | ✓ | ✗ | ? | ✓ | A spinner with no words: it never says what it is waiting for. |
-| `/play/dunk` | signed-in | do | ✓ | ✗ | ? | ✓ | A spinner with no words: it never says what it is waiting for. |
+| `/play/dunk` | signed-in | do | ✓ | ✗ | ✓ | ✓ | A spinner with no words: it never says what it is waiting for. |
 | `/play/dunkduel` | signed-in | do | ✗ | ✓ | ✓ | ✓ | 88 words before scrolling (the budget is 40). |
 | `/play/football` | signed-in | do | ✓ | ✗ | ✓ | ✓ | A spinner with no words: it never says what it is waiting for. |
-| `/play/freerun` | signed-in | do | ✓ | ✗ | ✗ | ✓ | "TAP TO START" answers a tap in 1272 ms (the budget is 200 ms). |
+| `/play/freerun` | signed-in | do | ✓ | ✗ | ✓ | ✓ | A spinner with no words: it never says what it is waiting for. |
 | `/play/golf` | signed-in | do | ✓ | ✗ | ? | ✓ | A spinner with no words: it never says what it is waiting for. |
 | `/play/irl` | signed-in | do | ✗ | ✗ | ✓ | ✓ | 1 paragraph of body copy under 16 px. |
 | `/play/karate` | signed-in | do | ✓ | ✗ | ? | ✓ | A spinner with no words: it never says what it is waiting for. |
 | `/play/karate-vs` | signed-in | do | ✓ | ✗ | ? | ✓ | A spinner with no words: it never says what it is waiting for. |
 | `/play/map-preview` | signed-in | do | ✗ | ✗ | ✗ | ✓ | The screen jumps as it loads (layout shift 0.062; the budget is 0.02). |
 | `/play/mixedcombat` | signed-in | do | ✓ | ✗ | ? | ✓ | A spinner with no words: it never says what it is waiting for. |
-| `/play/music` | signed-in | do | ✗ | ✗ | ✗ | ✓ | "TAP TO START" answers a tap in 288 ms (the budget is 200 ms). review: a number with no method line |
-| `/play/onevone` | signed-in | do | ✓ | ✗ | ✓ | ✓ | A spinner with no words: it never says what it is waiting for. |
+| `/play/music` | signed-in | do | ✗ | ✗ | ✓ | ✓ | 74 words before scrolling (the budget is 40). review: a number with no method line |
+| `/play/onevone` | signed-in | do | ✓ | ✗ | ? | ✓ | A spinner with no words: it never says what it is waiting for. |
 | `/play/party` | signed-in | do | ✗ | ✗ | ✓ | ✓ | 91 words before scrolling (the budget is 40). |
 | `/play/shared` | nobody (a 404 for everyone) | do | – | – | – | – | *switched off: a 404 (a 404 by design: only its share links are pages (lib/nav/reachability.test.ts))* |
 | `/play/shared/[token]` | nobody (a 404 for everyone) | do | – | – | – | – | *switched off: a 404 (STUDIO_SHARE_ENABLED (Studio share links))* |
 | `/play/showdown` | signed-in | do | ✓ | ✗ | ? | ✓ | A spinner with no words: it never says what it is waiting for. |
 | `/play/skateboard` | signed-in | do | ✓ | ✗ | ? | ✓ | A spinner with no words: it never says what it is waiting for. |
 | `/play/snowboard` | signed-in | do | ✓ | ✗ | ? | ✓ | A spinner with no words: it never says what it is waiting for. |
-| `/play/soccer` | signed-in | do | ✓ | ✗ | ✓ | ✗ | A spinner with no words: it never says what it is waiting for. |
+| `/play/soccer` | signed-in | do | ✓ | ✗ | ✓ | ✓ | A spinner with no words: it never says what it is waiting for. |
 | `/play/sprint` | signed-in | do | ✓ | ✗ | ? | ✗ | A spinner with no words: it never says what it is waiting for. |
 | `/play/surf` | signed-in | do | ✓ | ✗ | ? | ✓ | A spinner with no words: it never says what it is waiting for. |
-| `/play/tennis` | signed-in | do | ✓ | ✗ | ? | ✗ | A spinner with no words: it never says what it is waiting for. |
+| `/play/tennis` | signed-in | do | ✓ | ✗ | ✗ | ✓ | "TAP TO START" answers a tap in 1240 ms (the budget is 200 ms). |
 | `/play/threepoint` | signed-in | do | ✓ | ✗ | ? | ✓ | A spinner with no words: it never says what it is waiting for. |
 | `/play/threevthree` | signed-in | do | ✓ | ✗ | ✓ | ✓ | A spinner with no words: it never says what it is waiting for. |
 | `/play/tiebreak` | nobody (redirects away) | do | – | – | – | – | *not its own screen: redirects to /play/tennis for everyone who is signed in* |
 | `/play/velocity-kart` | signed-in | do | ✓ | ✗ | ? | ✗ | 1 critical accessibility finding (contrast). |
-| `/play/volleyball` | signed-in | do | ✓ | ✗ | ? | ✓ | A spinner with no words: it never says what it is waiting for. |
+| `/play/volleyball` | signed-in | do | ✓ | ✗ | ✓ | ✓ | A spinner with no words: it never says what it is waiting for. |
 | `/play/who-scene-it` | signed-in | do | ✓ | ✗ | ? | ✓ | A spinner with no words: it never says what it is waiting for. |
 | `/venues` | signed-in | hub | ✗ | ✗ | ✓ | ✓ | 1 paragraph of body copy under 16 px. |
 
@@ -587,7 +586,7 @@ Not measured yet: run `scripts/every-screen/dark.mts`.
 | `/purchase-terms` | anyone | read | ✗ | ✓ | ✓ | ✓ | 3 tap targets under 44 px in the app's own bars. |
 | `/store-terms` | anyone | read | ✗ | ✗ | ✓ | ✓ | An empty state with no next step: "Nothing here stops you from contacting a government consumer-protection agency.". |
 | `/story` | signed-in | read | ✓ | ✗ | ✓ | ✓ | Text cut off with 150 % text: "The Snow Slope". |
-| `/story/boss` | signed-in | read | ✗ | ✗ | ✗ | ✓ | "FACE THE GLITCH" answers a tap in 432 ms (the budget is 200 ms). |
+| `/story/boss` | signed-in | read | ✗ | ✗ | ✗ | ✓ | "FACE THE GLITCH" answers a tap in 288 ms (the budget is 200 ms). |
 | `/story/rail` | signed-in | read | ✗ | ✗ | ✓ | ✓ | 2 pieces of text under 12 px. |
 | `/studio` | nobody (a 404 for everyone) | hub | – | – | – | – | *switched off: a 404 (NEXUS_STUDIO_ENABLED (Nexus Studio))* |
 | `/teach` | signed-in | hub | ✓ | ✗ | ✓ | ✓ | Unfinished mark on screen: "Teaching on FEL opens soon.". |

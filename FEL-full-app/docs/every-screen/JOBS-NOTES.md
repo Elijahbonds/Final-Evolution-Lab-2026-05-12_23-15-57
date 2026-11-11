@@ -1,3 +1,56 @@
+## What changed in phase 6 (the first five minutes, measured on the rig)
+
+The plan's gate: a new person goes from the home page to doing something real (a game or a first workout) in ≤ 4 taps and
+under 60 s on the throttled phone; sign-up asks for nothing twice; every screen in this group passes all four checks. The
+walks below are a new person, signed out, on the throttled phone (CPU 4×, as the crawl reads every screen).
+
+| Job | Now | The plan |
+|---|---|---|
+| From the home page to playing a game | 3 taps, 30 s: Play now, Play without saving (the arena loads), Tap to start | ≤ 4 taps, under 60 s |
+| From the home page to a first workout (the vertical test) | 3 taps, 4 s to the camera: Measure my vertical, 18 or older, No, nothing hurts | ≤ 4 taps, under 60 s |
+| Sign up | birth date (year, month, day), then the name, email and password, the terms tick: each asked once; it lands in the first game picked | asks for nothing twice |
+
+**Asked again after sign-up (not changed: an age rule, the owner's call).** Sign-up records the birth date; the Quick Screen
+and the vertical test then ask "How old are you?" again (the walk "New: sign up, then the vertical test"). Proposal for the
+owner: for a signed-in person whose birth date is on file, take the screen's age band from the account and skip the
+question. The question, its bands and what each band does would stay exactly as they are for everyone else.
+
+### The phase's screens
+
+| Screen | Result | Why |
+|---|---|---|
+| `/` | passes all four | The home headline (PR #540) is unchanged. |
+| `/age` | redirects to `/` | |
+| `/consent/guardian` | passes all four (was: 90 words) | Its two lines are approved consent and privacy notices (71 words), now marked and not counted; the wording is unchanged (`lib/consent/guardian-copy.ts`). |
+| `/consent/guardian/[token]` | not read | Needs a guardian-consent row with its emailed token; the rig has none. |
+| `/join` | passes all four | |
+| `/login` | listed: 41 words (the budget is 40) | Was 166: the scorer counted the venue strip's cards past the right edge. One word over. Proposal (owner's wording): the tagline "Real sports, real training — your on-court reps become real stats." as "Real sports. Real training. Real stats." |
+| `/signup` | listed: 51 words; 4 button looks; Continue answers in 280 ms | The age step comes first (an age rule) and its Continue is the age step's own (`components/age-step.tsx`, read only); under it, "What did you come for?" and its five choices. Proposal: show the five choices once the birth date is confirmed (a change of the flow: the owner's call). |
+| `/try` | passes all four (was: QUIT 40 px tall) | |
+| `/welcome` | passes all four (was: 13.5 px steps, five sizes) | |
+
+### Approved notices: what the owner's rule changed (2026-11-11)
+
+Medical, privacy and consent notices are marked in the code (`{...notice(kind)}`, only on a constant listed in
+`lib/every-screen/notices.ts`) and left out of the 40 words; everything else counts. On the do-this screens that carry one:
+
+| Screen | Phase | Phase 5 (old rule) | Now, all words | Approved notices | Counted | The 40-word rule |
+|---|---|---|---|---|---|---|
+| `/consent/guardian` | 6 | 90 | 90 | 71 | 19 | fails → passes |
+| `/play/mirror/assess` | 4 | 73 | 73 | 31 | 42 | still over |
+| `/play/mirror/assess/results` | 4 | 47 | 47 | 14 | 33 | fails → passes |
+| `/screen` | 4 | 73 | 73 | 31 | 42 | still over |
+| `/screen/program/[lane]` | 4 | 48 | 48 | 14 | 34 | fails → passes |
+| `/train/readiness` | 4 | 72 | 72 | 15 | 57 | still over |
+| `/train/shots` | 4 | 92 | 92 | 17 | 75 | still over |
+
+**For phase 7 (around the games), not this phase's:** the tennis start card shifts 0.138 when its weather buttons re-wrap;
+the game HUD's "…" menu button overlaps the TIEBREAK title at the top left; \`/play/freerun\` and \`/play/tennis\` answer a tap
+slowly; \`/play/adventure-br\`'s word count; \`/play/adventure\` read blank in this crawl (a dead end).
+
+Also in this re-score: words past the right edge (a carousel) are no longer "before scrolling": `/login` 166 → 41,
+`/play/map-preview` 71 → 47.
+
 ## What changed in phase 5 (phase 4's "after" → now, measured on the rig)
 
 Booking is switched off in production until the owner applies `prisma/pending/2026-11-02-group-booking.sql` and sets
