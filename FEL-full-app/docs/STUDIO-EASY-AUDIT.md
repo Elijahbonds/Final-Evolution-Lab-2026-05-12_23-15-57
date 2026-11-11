@@ -220,7 +220,7 @@ development build; the production path is held by `lib/nexus-studio/playtestLive
 |---|---|---|
 | Start a new project | **Dead end → 2 taps** (Projects, New project), est. 5.3 s. The old project moves to the list | **Dead end → 2 taps**, est. 5.3 s |
 | A first court that looks like something | **7 taps + 1 key, est. 21.1 s, from 4 places, hidden Esc → 2 taps, est. 5.3 s** ("Make it for me" (1), "Play it" (2)) | **7 + 1, est. 20.2 s, sideways scroll → 2 taps, est. 6.3 s** |
-| Place and edit an element | 3 + 1, est. 11.6 s → 3 + 1, est. 11.2 s; undo exact | 3 + 1 with the inspector **off screen** → the inspector is a sheet tab. **Open:** the probe's colour fill timed out on the phone after the merge (not diagnosed: no extra rig runs); the owner's phone check covers it |
+| Place and edit an element | 3 + 1, est. 11.6 s → 3 + 1, est. 11.2 s; undo exact | 3 + 1 with the inspector **off screen** → the inspector is a sheet tab. ~~Open: the colour fill timed out on the phone~~ **Closed by studio-22 (§8):** the rig never pressed Inspect; with the Inspect tap it is **4 taps + 1 key**, and the light's colour is now on the first screen when Inspect opens (it was 192 px below) |
 | Arrow keys after placing | **Nudge + focus jumped** to the next control → **nudge only, focus stays on the 3D view** | Same fix, measured |
 | AI builder, switch off (default) | "Coming soon" over a greyed form, **dead end** → an honest line (it runs on a paid AI service) and **Build by hand / Make your first court** | Same |
 | AI builder, switch on | 4 + 1, est. 14.9 s → 4 + 1, est. 14.6 s; one Ctrl+Z takes it back | 4 + 1, est. 14.3 → 14.5 s |
@@ -302,3 +302,44 @@ The 4 vitest failures:
 3. **`lib/sessions/modeScoreRules.test.ts`** (environmental). Same cause as 2.
 4. **`tests/signature-programs/server.test.ts`**, "a checkpoint week decides from the retests". The release's own test,
    pinned to `NOW = 2026-10-25`. No file it reads differs from `82e88b7c`, so it fails on the release as well.
+
+## 8. studio-22: the last four, and 22 of 22 (2026-11-11)
+
+Owner, 2026-11-11, on `docs/SWITCH-ON.md` §5's 18 of 22: "Fix the last 4 first", then the Studio goes on. Lane `lane/studio-22`,
+cut from `lane/finish-release` at `bd030d9d`. SWITCH-ON's diagnosis ("the rig, not the Studio") was a claim; it was checked, and it
+was half right.
+
+**What was wrong, measured:**
+
+| Run that did not finish | What it really was | Fix |
+|---|---|---|
+| Play-test, desktop and phone; first court, phone ("Invalid URL") | The rig. Reproduced on `bd030d9d`, 4 of 4 (desktop first court too): the rig read the new tab's address the moment the tab existed, when Playwright still reports an empty one. And the rig never followed the tab: on its static server `/dev/mode/tiebreak` was a 404, so "done" had only ever meant "a tab opened". | The rig waits for the tab's own address, and serves the real game page (`scripts/probes/studio-22/game-entry.tsx`, built by `game-build.mjs`) on the same origin, so a press is followed into the game: the engine drawing, the runtime's answer for which Studio venue the mode loads (it must be the one the Studio handed over), the run started as practice, a picture. `--prod` builds the Studio as production runs it, where Play-test hands the court over in the same tab to `/play/tennis?variant=tiebreak&share=…`. |
+| The light's colour, phone | **Both.** The rig: it asked Playwright whether a colour field was visible to decide whether to press Inspect, and Playwright counted the colour inside the hidden sheet (no box, no client rects, its panel `display:none`) as visible, so the rig never pressed Inspect and the fill timed out, 9 of 9. The Studio: once a person does press Inspect, the phone's sheet is 108 px tall and the light's colour sat **192 px below the screen** inside it, under the Name / Position / Turn / Scale rows every object shares (`scripts/probes/studio-22/inspect-phone.mts`). | The rig presses the Inspect tab, as a person does. The Studio: opening Inspect on a phone (or picking another object while it is open) scrolls the sheet to the object's own fields (`lib/nexus-studio/phoneInspect.ts`; `inspector.tsx` marks where they start; `venue-editor.tsx` runs it). The light's role and colour are on the first screen: **192 px below → 0**. Desktop unchanged. Tests: `lib/nexus-studio/phoneInspect.test.ts`, `components/nexus-studio/phone-inspect.test.tsx`. |
+
+Two more rig faults found on the way, both fixed: the rig's waits polled once per animation frame, and the game page draws
+0.2 to 0.5 frames a second at 1280 × 800 on this shared machine's software renderer, so a 6 s check ran once or not at all (it
+failed desktop first court once); they poll on a 100 ms timer now. And the game page's stylesheet was served without its type.
+
+**The series: production build, 3 runs, both widths (`scripts/probes/studio-22/series.sh`, `summary.mjs`): 66 of 66 task runs
+done, 22 of 22 in every run.** Tap counts, the same in all three runs:
+
+| Task | Desktop | Phone | Against §5 |
+|---|---|---|---|
+| New project | 2 taps, 3 of 3 | 2 taps, 3 of 3 | Holds |
+| First court ("Make it for me", "Play it") | 2 taps, 3 of 3; the game loads the Studio's court: night light, 4 Studio floodlights in the scene | 2 taps, 3 of 3; same | Holds, and now followed into the game |
+| Place a light, change its colour, undo | 3 taps + 1 key, 3 of 3; colour on the first screen | **4 taps + 1 key** (Floodlight, Inspect, the colour picker's open and pick; Ctrl+Z), 3 of 3; colour on the first screen | Phone: first measured result (§5 had it open) |
+| Arrow keys after placing | 1 tap + 1 key, nudge 0 → 0.5, focus stays on the 3D view, 3 of 3 | Same | Holds |
+| AI builder (switch on) | 4 taps + 1 key, 3 of 3 | 4 + 1, 3 of 3 | Holds |
+| Character | 4 taps, 3 of 3 | 4 taps, 3 of 3 | Holds |
+| Script | 2 taps, 5 graph nodes take focus, 3 of 3 | Same | Holds |
+| Play-test | 1 tap, 3 of 3: same tab to `/play/tennis?variant=tiebreak&share=…`, the mode loads the Studio's venue (source "shared", not competitive), the run starts with `playtest: true` | Same, 3 of 3 | Holds, and now followed into the game |
+| Save | 0 taps to save (1 tap is the edit itself), autosave 1.6 to 2.0 s, 3 of 3 | 0 (+1 edit), 1.5 to 1.6 s, 3 of 3 | Holds |
+| Reopen | Restored (1 tap is the edit), 3 of 3 | Same | Holds |
+| Publish | 2 taps; the publish gate passed and downloaded the venue file, 3 of 3 | 2 taps (the phone measure first), 3 of 3 | Holds |
+
+The development build (the configuration §5 measured, Play-test opening `/dev/mode/tiebreak?venue=` in a new tab): see
+`docs/SWITCH-ON.md` §5 for its run.
+
+Pictures (scratch, not committed): the game running from the Studio, `prod/{desktop,phone}-{playtest,firstcourt}-game-run{1,2,3}.jpg`;
+the phone's Inspect before and after, `inspect-390-before.jpg` and `inspect-390-prod.jpg`.
+

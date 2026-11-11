@@ -68,6 +68,9 @@ export interface RigOptions {
   /** STUDIO-EASY (2026-10-28): the packages left out of the bundle (default: MediaPipe and Babylon). The Studio's rig bundles
    *  Babylon, because its viewport is the mode's own engine path and the tasks it measures click into it. */
   external?: string[];
+  /** studio-22 (2026-11-11): the build's NODE_ENV (default 'development', as every rig has been measured). 'production' is the
+   *  code path a production deploy runs — the Studio's Play-test, for one, hands off in the same tab only in a production build. */
+  nodeEnv?: 'development' | 'production';
 }
 
 // next/font/local's generated fallbacks, as served by final-evolution-lab.web.app on 2026-10-27 (deterministic per font file)
@@ -80,10 +83,11 @@ const PROD_FALLBACK: Record<string, string> = {
 
 export async function buildRig(BUILD: string, opts: RigOptions = {}): Promise<{ html: string }> {
 mkdirSync(BUILD, { recursive: true });
+const env = JSON.stringify(opts.nodeEnv ?? 'development');
 const common = {
   bundle: true, format: 'iife' as const, platform: 'browser' as const, jsx: 'automatic' as const, logLevel: 'error' as const,
-  define: { 'process.env.NODE_ENV': '"development"' }, tsconfig: join(ROOT, 'tsconfig.json'), plugins: [stubs],
-  banner: { js: 'var process = globalThis.process || { env: { NODE_ENV: "development" } }; var __dirname = "/";' },
+  define: { 'process.env.NODE_ENV': env }, tsconfig: join(ROOT, 'tsconfig.json'), plugins: [stubs],
+  banner: { js: `var process = globalThis.process || { env: { NODE_ENV: ${env} } }; var __dirname = "/";` },
   loader: { '.png': 'empty', '.jpg': 'empty', '.svg': 'empty', '.woff2': 'empty', '.wasm': 'empty', '.glb': 'empty' } as Record<string, 'empty'>,
   external: opts.external ?? ['@mediapipe/tasks-vision', '@babylonjs/*'],
 };

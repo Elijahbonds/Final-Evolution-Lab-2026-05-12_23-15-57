@@ -131,7 +131,8 @@ function ObjectFields({ venue, object: o, run, seal, onDelete, onDuplicate }: In
       {o.type !== 'crowdStand' && (
         <Row label="Scale"><NumberField label="Scale" value={t.s} step={0.1} min={LIMITS.scaleMin} max={LIMITS.scaleMax} disabled={lock} onChange={(s) => set({ t: { ...t, s: Math.min(LIMITS.scaleMax, Math.max(LIMITS.scaleMin, s)) } }, 'scale')} onDone={seal} /></Row>
       )}
-      <div className="mx-3 my-2 border-t" style={{ borderColor: C.line }} />
+      {/* studio-22: the object's own fields start here; on a phone, opening Inspect scrolls the sheet to them (lib/nexus-studio/phoneInspect.ts) */}
+      <div className="mx-3 my-2 border-t" style={{ borderColor: C.line }} data-own-fields="" />
       {o.type === 'specProp' && (
         <Row label="Colour" hint="Leave off for the prop's own colour">
           <span className="flex items-center gap-2">

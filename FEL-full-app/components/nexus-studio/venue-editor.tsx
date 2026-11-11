@@ -32,6 +32,7 @@ import { BudgetMeter } from './budget-meter';
 import { PublishPanel } from './publish-panel';
 import { PhoneBar } from './phone-bar';
 import { worstPhone, type PhoneSample } from '@/lib/nexus-studio/publishGate';
+import { isPhoneWidth, revealOwnFields } from '@/lib/nexus-studio/phoneInspect';
 import { C, ToolButton } from './ui';
 
 /** Pure: is this key event aimed at a text field (where the editor's shortcuts must not fire)? */
@@ -67,6 +68,12 @@ export function VenueEditor({ studio, onHandle, overlay }: { studio: StudioApi; 
   const [sheet, setSheet] = useState<'left' | 'inspect' | null>('left');
   const [multi, setMulti] = useState(false);
   const onStats = useCallback((s: BudgetSample) => { setStats(s); setPhoneSample((p) => worstPhone(p, s)); }, []);
+  // studio-22: on a phone the Inspect sheet is a short strip under the 3D view; opening it on an object (or picking another while it
+  // is open) brings that object's own fields — a light's colour — into the strip, instead of the rows every object shares
+  const inspRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (sheet === 'inspect' && selected && isPhoneWidth(typeof window === 'undefined' ? undefined : window)) revealOwnFields(inspRef.current);
+  }, [sheet, selected]);
   useEffect(() => { setPhoneSample(null); }, [venue]);   // an edit asks for a fresh measurement
   const [note, setNote] = useState<string | null>(null);
 
@@ -257,7 +264,7 @@ export function VenueEditor({ studio, onHandle, overlay }: { studio: StudioApi; 
           );
         })}
       </nav>
-      <aside className={`${sheet === 'inspect' ? 'flex' : 'hidden'} order-3 min-h-0 flex-1 flex-col overflow-y-auto border-l md:order-none md:flex md:flex-none md:overflow-visible`} style={{ borderColor: C.line, background: C.surface }} aria-label="Inspector" id="studio-inspector" tabIndex={-1}>
+      <aside className={`${sheet === 'inspect' ? 'flex' : 'hidden'} order-3 min-h-0 flex-1 flex-col overflow-y-auto border-l md:order-none md:flex md:flex-none md:overflow-visible`} style={{ borderColor: C.line, background: C.surface }} aria-label="Inspector" id="studio-inspector" tabIndex={-1} ref={inspRef}>
         <Inspector venue={venue} project={doc} object={object} run={run} seal={seal} onDelete={(id) => del([id])} onDuplicate={(id) => dup([id])}
           group={group} groupActions={{ duplicate: () => dup(), copy, remove: () => del(), flag: (k) => flag(k), turn, saveStamp: () => saveStamp() }}
           onPreviewIntro={(k) => { const ok = vp.current?.previewIntro(k); setNote(ok ? 'Previewing the intro — Esc to stop' : 'Reduced motion is on: the intro is skipped, as in the mode'); }}
