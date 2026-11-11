@@ -1405,6 +1405,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
   },
   // AF-1 (ANIM-FEEL-SPEC 2026-10-28): inertialized clip transitions, default OFF — off is the linear crossfade, unchanged.
   {
+    id: 'anim.carryPushedBounce', label: 'Dunk runway dribble: pushed bounce on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/ballCarry.ts CARRY_PUSHED_BOUNCE_ON',
+    hint: 'On: the dunk run-up dribble uses the pushed bounce the hoops modes use (the ball fastest at the floor, the hand meets it slowing). Off: the old bounce, fastest at the hand, which snapped the ball arm 35 to 60 degrees in a frame at every bounce.',
+  },
+  {
     id: 'anim.inertial', label: 'Inertial clip transitions on (1) / off (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
     source: 'lib/babylon/anim/inertialize.ts ANIM_INERTIAL_ON',
     hint: 'On: a clip switch cuts to the new clip at once and the old pose\'s difference decays out (no mid-blend pose). Takes effect on the next spawn.',
@@ -1413,6 +1418,27 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'anim.inertialHalfLifeK', label: 'Inertial offset half-life × fade time', def: 0.5, min: 0.1, max: 1.5, step: 0.05, unit: '×', group: 'Anim · transitions',
     source: 'lib/babylon/anim/inertialize.ts ANIM_INERTIAL_HALF_LIFE_K',
     hint: 'How long the old pose takes to wash out, as a fraction of each clip switch\'s fade time. Only read when inertial transitions are on.',
+  },
+  // SWITCH-ON (2026-11-10): the inertial offset keeps the body's speed across a switch (Holden's v0 = v_old - v_new). Read only while anim.inertial is on.
+  {
+    id: 'anim.inertialMatchVel', label: 'Inertial: keep the speed across a switch on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/inertialize.ts ANIM_INERTIAL_MATCH_VEL_ON',
+    hint: 'On: the old pose\'s difference decays out starting at the speed the body had, minus the new clip\'s own speed, so a clip that starts fast (a strike) does not stack its speed on the old motion. Off: the first inertial version (one axis, the old speed only).',
+  },
+  {
+    id: 'anim.inertialMinHalfLifeSec', label: 'Inertial: shortest half-life', def: 0.045, min: 0, max: 0.15, step: 0.005, unit: 's', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/inertialize.ts ANIM_INERTIAL_MIN_HALF_LIFE_SEC',
+    hint: 'A switch\'s old-pose offset never decays faster than this half-life (a 0.04 s fade gave 0.02 s: most of the offset went in one frame). 0 = the half-life × fade time alone. Read only while inertial transitions are on.',
+  },
+  {
+    id: 'anim.inertialModesOn', label: 'Inertial transitions in karate, karate VS, showdown, mixed combat, duel, skateboard on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/inertialize.ts ANIM_INERTIAL_MODES_ON',
+    hint: 'On: those six modes use the inertial blend on the hero (the rig measured fewer hard pops in each). Off: the linear crossfade there, exactly as before. Every other mode follows the knob above. Takes effect on the next spawn.',
+  },
+  {
+    id: 'anim.inertialAllBones', label: 'Inertial: every bone keeps its history on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/inertialize.ts ANIM_INERTIAL_ALL_BONES_ON',
+    hint: 'On: a switch onto a clip that moves a bone the last clip did not (guard to run: the legs) starts that bone from where it was. Off: the first inertial version, where those bones jumped in one frame (knee 32 to 62 degrees). Read only while inertial transitions are on.',
   },
   // CLIP-SMOOTH (2026-11-03, owner: "Yes, smooth them"): the karate captures' own single-frame snaps re-keyed, default ON.
   // GAMEPLAY-CLEAN P3 (2026-11-03): the foot planter's leg solve eases in and out instead of stepping (anim/FootPlanting)
