@@ -1,6 +1,6 @@
 {
  "summary": {
-  "generated": "2026-11-10",
+  "generated": "2026-11-11",
   "signature": {
    "programs": [
     "vertical-jump",
@@ -9,8 +9,8 @@
     "pain-free"
    ],
    "exercises": 136,
-   "demo": 126,
-   "still": 10,
+   "demo": 127,
+   "still": 9,
    "servedIdsMissingFromClipMap": 0
   },
   "templates": {
@@ -24,18 +24,18 @@
     "camp-session"
    ],
    "exercises": 104,
-   "demo": 17,
-   "still": 87
+   "demo": 100,
+   "still": 4
   },
   "builder": {
    "builds": 1680,
    "buildFails": 0,
    "exercises": 496,
-   "demo": 378,
-   "still": 118
+   "demo": 447,
+   "still": 49
   },
-  "suspects": 16,
-  "judged": 16,
+  "suspects": 17,
+  "judged": 17,
   "wrong": 0
  },
  "wrong": [],
@@ -143,50 +143,6 @@
     "muscle",
     "conditioning",
     "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "hand-release-push-up",
-   "name": "Hand-Release Push-Up",
-   "pattern": "push",
-   "family": "push-up",
-   "variation": "hand-release",
-   "clip": "ex_hand_release",
-   "via": "library",
-   "read": "pattern push, loop reads as other",
-   "verdict": {
-    "v": "ok",
-    "why": "the hand-release push-up loop"
-   }
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "conditioning",
-    "sport"
-   ],
-   "id": "hand-release-push-up-with-4-second-lower",
-   "name": "Hand-Release Push-Up with 4-Second Lower",
-   "pattern": "push",
-   "family": "push-up",
-   "variation": "hand-release+tempo",
-   "clip": "ex_hand_release",
-   "via": "library",
-   "read": "pattern push, loop reads as other",
-   "verdict": {
-    "v": "ok",
-    "why": "the hand-release push-up loop (the tempo is the dose)"
-   }
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
     "mobility"
    ],
    "id": "kettlebell-arnold-press",
@@ -200,6 +156,25 @@
    "verdict": {
     "v": "ok",
     "why": "the one-arm Arnold press loop"
+   }
+  },
+  {
+   "source": "builder",
+   "in": [
+    "athletic",
+    "sport"
+   ],
+   "id": "kettlebell-hike-pass",
+   "name": "Kettlebell Hike Pass",
+   "pattern": "hinge",
+   "family": "kb-swing",
+   "variation": "hike",
+   "clip": "ex_kb_hike_pass",
+   "via": "library",
+   "read": "pattern hinge, loop reads as other",
+   "verdict": {
+    "v": "ok",
+    "why": "the kettlebell hike pass loop"
    }
   },
   {
@@ -261,6 +236,30 @@
     "mobility",
     "sport"
    ],
+   "id": "prone-dumbbell-rear-fly",
+   "name": "Prone Dumbbell Rear Fly",
+   "pattern": "pull",
+   "family": "upper-back",
+   "variation": "rear-fly-prone",
+   "clip": "ex_incline_t",
+   "via": "library",
+   "read": "pattern pull, loop reads as other",
+   "verdict": {
+    "v": "ok",
+    "why": "lying face down on the incline pad, arms out to a T: the prone rear fly (demo.ts already plays it for the lying rear lateral raise)"
+   }
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
    "id": "shotgun-row",
    "name": "Shotgun Row",
    "pattern": "pull",
@@ -309,17 +308,17 @@
     "mobility",
     "sport"
    ],
-   "id": "zottman-curl",
-   "name": "Zottman Curl",
-   "pattern": "pull",
-   "family": "curl",
-   "variation": "zottman-curl",
-   "clip": "ex_zottman",
+   "id": "single-leg-hip-airplane",
+   "name": "Single-Leg Hip Airplane",
+   "pattern": "hinge",
+   "family": "single-leg-hinge",
+   "variation": "airplane",
+   "clip": "ex_hip_airplane_free",
    "via": "library",
-   "read": "pattern pull, loop reads as other",
+   "read": "pattern hinge, loop reads as mobility",
    "verdict": {
     "v": "ok",
-    "why": "the Zottman curl loop"
+    "why": "the single-leg hip airplane with no support (exerciseFamilies11.ts)"
    }
   },
   {
@@ -377,68 +376,49 @@
    }
   },
   {
-   "source": "signature",
+   "source": "template",
    "in": [
-    "vertical-jump",
-    "basketball-skills"
+    "adult-bw-3",
+    "adult-bw-4",
+    "youth-bw-3",
+    "youth-bw-2"
    ],
-   "id": "standing-arm-swing-drill",
-   "name": "Standing Arm Swing Drill",
-   "pattern": "locomotion",
-   "family": "sprint-development",
-   "variation": "arm-standing",
-   "clip": "ex_arm_swing",
-   "via": "library",
-   "read": "pattern locomotion, loop reads as hinge",
+   "id": "catalogue:prone-yt",
+   "name": "Prone Y-T Raise",
+   "pattern": "pull",
+   "family": "",
+   "variation": "",
+   "clip": "ex_prone_yt",
+   "via": "catalogue",
+   "read": "pattern pull, loop reads as mobility",
    "verdict": {
     "v": "ok",
-    "why": "the sprint arm-swing loop"
+    "why": "the prone Y-T raise loop"
+   }
+  },
+  {
+   "source": "template",
+   "in": [
+    "adult-bw-3",
+    "adult-bw-4",
+    "youth-bw-3",
+    "youth-bw-2"
+   ],
+   "id": "catalogue:prone-yt-hold",
+   "name": "Prone Y-T Raise, 3-Second Holds",
+   "pattern": "pull",
+   "family": "",
+   "variation": "",
+   "clip": "ex_prone_yt",
+   "via": "catalogue",
+   "read": "pattern pull, loop reads as mobility",
+   "verdict": {
+    "v": "ok",
+    "why": "the prone Y-T raise loop (the holds are the dose)"
    }
   }
  ],
  "missing": [
-  {
-   "source": "builder",
-   "in": [
-    "sport"
-   ],
-   "id": "45-degree-back-extension",
-   "name": "45-Degree Back Extension",
-   "pattern": "hinge",
-   "family": "hinge-accessory",
-   "variation": "45-ext",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "sport"
-   ],
-   "id": "45-degree-back-extension-with-4-second-lower",
-   "name": "45-Degree Back Extension with 4-Second Lower",
-   "pattern": "hinge",
-   "family": "hinge-accessory",
-   "variation": "45-ext+tempo",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "sport"
-   ],
-   "id": "90-90-back-leg-lift-off",
-   "name": "90/90 Back-Leg Lift-Off",
-   "pattern": "mobility",
-   "family": "active-mobility",
-   "variation": "ninety-liftoff",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
   {
    "source": "builder",
    "in": [
@@ -454,21 +434,6 @@
    "pattern": "mobility",
    "family": "stretch-hip",
    "variation": "adductor-groin",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "athletic",
-    "sport"
-   ],
-   "id": "ankling",
-   "name": "Ankling",
-   "pattern": "locomotion",
-   "family": "sprint-mechanics",
-   "variation": "ankling",
    "clip": null,
    "via": "none",
    "still": "no loop"
@@ -626,46 +591,6 @@
     "full-body",
     "strength",
     "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "barbell-ab-rollout-on-knees",
-   "name": "Barbell Ab Rollout - On Knees",
-   "pattern": "other",
-   "family": "rollout",
-   "variation": "ab-rollout-kne",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "barbell-box-step-up",
-   "name": "Barbell Box Step-Up",
-   "pattern": "lunge",
-   "family": "step-up",
-   "variation": "bb",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
     "conditioning"
    ],
    "id": "barbell-guillotine-bench-press",
@@ -673,21 +598,6 @@
    "pattern": "push",
    "family": "bench-press",
    "variation": "guillotin-bench-press",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "conditioning"
-   ],
-   "id": "barbell-hack-squat",
-   "name": "Barbell Hack Squat",
-   "pattern": "squat",
-   "family": "leg-press-hack",
-   "variation": "hack-squat",
    "clip": null,
    "via": "none",
    "still": "no loop"
@@ -720,79 +630,6 @@
     "muscle",
     "conditioning",
     "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "barbell-side-split-squat",
-   "name": "Barbell Side Split Squat",
-   "pattern": "lunge",
-   "family": "lunge",
-   "variation": "sid-split-squat",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "athletic"
-   ],
-   "id": "barbell-side-split-squat-with-4-second-lower",
-   "name": "Barbell Side Split Squat with 4-Second Lower",
-   "pattern": "lunge",
-   "family": "lunge",
-   "variation": "sid-split-squat+tempo",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility"
-   ],
-   "id": "barbell-step-ups",
-   "name": "Barbell Step Ups",
-   "pattern": "lunge",
-   "family": "step-up",
-   "variation": "step-ups",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "barbell-walking-lunge",
-   "name": "Barbell Walking Lunge",
-   "pattern": "lunge",
-   "family": "lunge",
-   "variation": "walk-lung",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
     "mobility"
    ],
    "id": "bear-plank-with-band-row",
@@ -800,26 +637,6 @@
    "pattern": "other",
    "family": "plank-matrix",
    "variation": "bear-band-row",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "bird-dog-hold-knee-hover",
-   "name": "Bird Dog Hold, Knee Hover",
-   "pattern": "other",
-   "family": "dead-bug-bird-dog",
-   "variation": "bird-hover",
    "clip": null,
    "via": "none",
    "still": "no loop"
@@ -860,46 +677,6 @@
    "pattern": "other",
    "family": "dead-bug-bird-dog",
    "variation": "bird-band",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "bodyweight-walking-lunge",
-   "name": "Bodyweight Walking Lunge",
-   "pattern": "lunge",
-   "family": "lunge",
-   "variation": "bodyweight-walk-lung",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "butt-lift-bridge",
-   "name": "Butt Lift (Bridge)",
-   "pattern": "hinge",
-   "family": "bridge-thrust",
-   "variation": "glut-lift-bridg",
    "clip": null,
    "via": "none",
    "still": "no loop"
@@ -973,214 +750,11 @@
     "mobility",
     "sport"
    ],
-   "id": "copenhagen-plank",
-   "name": "Copenhagen Plank",
-   "pattern": "other",
-   "family": "side-plank",
-   "variation": "copenhagen-long",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "couch-stretch-knee-lift-off",
-   "name": "Couch Stretch Knee Lift-Off",
-   "pattern": "mobility",
-   "family": "active-mobility",
-   "variation": "couch-liftoff",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "dead-bug-with-kettlebell-press",
-   "name": "Dead Bug with Kettlebell Press",
-   "pattern": "other",
-   "family": "dead-bug-bird-dog",
-   "variation": "kb",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "strength",
-    "muscle"
-   ],
-   "id": "dead-bug-legs-only",
-   "name": "Dead Bug, Legs Only",
-   "pattern": "other",
-   "family": "dead-bug-bird-dog",
-   "variation": "legs",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "strength",
-    "muscle"
-   ],
-   "id": "dead-bug-wall-press",
-   "name": "Dead Bug, Wall Press",
-   "pattern": "other",
-   "family": "dead-bug-bird-dog",
-   "variation": "wall",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
    "id": "diagonal-band-pull-apart",
    "name": "Diagonal Band Pull-Apart",
    "pattern": "pull",
    "family": "scap-work",
    "variation": "pull-apart-diag",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "athletic",
-    "sport"
-   ],
-   "id": "dot-drill",
-   "name": "Dot Drill",
-   "pattern": "locomotion",
-   "family": "quick-feet",
-   "variation": "dot",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "dumbbell-push-press",
-   "name": "Dumbbell Push Press",
-   "pattern": "push",
-   "family": "push-extra",
-   "variation": "db-push-press",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "dumbbell-renegade-row",
-   "name": "Dumbbell Renegade Row",
-   "pattern": "pull",
-   "family": "db-upper",
-   "variation": "renegade",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "dumbbell-walking-lunge",
-   "name": "Dumbbell Walking Lunge",
-   "pattern": "lunge",
-   "family": "lunge",
-   "variation": "walking-db",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "eccentric-pull-up",
-   "name": "Eccentric Pull-Up",
-   "pattern": "pull",
-   "family": "vertical-pull",
-   "variation": "eccentric",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "sport"
-   ],
-   "id": "eccentric-push-up",
-   "name": "Eccentric Push-Up",
-   "pattern": "push",
-   "family": "push-up",
-   "variation": "eccentric",
    "clip": null,
    "via": "none",
    "still": "no loop"
@@ -1195,154 +769,6 @@
    "pattern": "lunge",
    "family": "lunge",
    "variation": "elevat-back-lung",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "athletic",
-    "sport"
-   ],
-   "id": "fast-leg-drill",
-   "name": "Fast-Leg Drill",
-   "pattern": "locomotion",
-   "family": "sprint-development",
-   "variation": "fast-leg",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "feet-elevated-inverted-row",
-   "name": "Feet-Elevated Inverted Row",
-   "pattern": "pull",
-   "family": "row",
-   "variation": "inverted-feet-up",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "feet-elevated-inverted-row-with-4-second-lower",
-   "name": "Feet-Elevated Inverted Row with 4-Second Lower",
-   "pattern": "pull",
-   "family": "row",
-   "variation": "inverted-feet-up+tempo",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "sport"
-   ],
-   "id": "floor-snow-angel",
-   "name": "Floor Snow Angel",
-   "pattern": "mobility",
-   "family": "stretch-matrix",
-   "variation": "chest-angel",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "frog-pump",
-   "name": "Frog Pump",
-   "pattern": "hinge",
-   "family": "hinge-accessory",
-   "variation": "frog-pump",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "frog-pump-with-4-second-lower",
-   "name": "Frog Pump with 4-Second Lower",
-   "pattern": "hinge",
-   "family": "hinge-accessory",
-   "variation": "frog-pump+tempo",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "goblet-deep-squat-hold-with-reach",
-   "name": "Goblet Deep Squat Hold with Reach",
-   "pattern": "mobility",
-   "family": "loaded-mobility",
-   "variation": "goblet-reach",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility"
-   ],
-   "id": "hack-squat",
-   "name": "Hack Squat",
-   "pattern": "squat",
-   "family": "leg-press-hack",
-   "variation": "hack-squat",
    "clip": null,
    "via": "none",
    "still": "no loop"
@@ -1411,94 +837,11 @@
     "mobility",
     "sport"
    ],
-   "id": "incline-plank",
-   "name": "Incline Plank",
-   "pattern": "other",
-   "family": "plank",
-   "variation": "incline",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
    "id": "kettlebell-arm-bar",
    "name": "Kettlebell Arm Bar",
    "pattern": "mobility",
    "family": "loaded-mobility",
    "variation": "arm-bar",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "conditioning",
-    "athletic",
-    "sport"
-   ],
-   "id": "kettlebell-gorilla-row",
-   "name": "Kettlebell Gorilla Row",
-   "pattern": "pull",
-   "family": "row",
-   "variation": "kb-gorilla",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "conditioning",
-    "athletic",
-    "sport"
-   ],
-   "id": "kettlebell-gorilla-row-with-4-second-lower",
-   "name": "Kettlebell Gorilla Row with 4-Second Lower",
-   "pattern": "pull",
-   "family": "row",
-   "variation": "kb-gorilla+tempo",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "sport"
-   ],
-   "id": "kettlebell-high-pull-light",
-   "name": "Kettlebell High Pull, Light",
-   "pattern": "pull",
-   "family": "pull-extra",
-   "variation": "kb-high-pull",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "athletic",
-    "sport"
-   ],
-   "id": "kettlebell-hike-pass",
-   "name": "Kettlebell Hike Pass",
-   "pattern": "hinge",
-   "family": "kb-swing",
-   "variation": "hike",
    "clip": null,
    "via": "none",
    "still": "no loop"
@@ -1553,200 +896,11 @@
     "mobility",
     "sport"
    ],
-   "id": "lateral-bear-crawl",
-   "name": "Lateral Bear Crawl",
-   "pattern": "other",
-   "family": "plank",
-   "variation": "bear-lateral",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility"
-   ],
-   "id": "leg-press",
-   "name": "Leg Press",
-   "pattern": "squat",
-   "family": "leg-press-hack",
-   "variation": "leg-press",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
    "id": "leg-over-floor-press",
    "name": "Leg-Over Floor Press",
    "pattern": "push",
    "family": "bench-press",
    "variation": "leg-over-floor-press",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "athletic",
-    "sport"
-   ],
-   "id": "line-quick-steps",
-   "name": "Line Quick Steps",
-   "pattern": "locomotion",
-   "family": "quick-feet",
-   "variation": "line-steps",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "loaded-ankle-rock",
-   "name": "Loaded Ankle Rock",
-   "pattern": "mobility",
-   "family": "ankle-mobility",
-   "variation": "loaded",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "loaded-jefferson-curl",
-   "name": "Loaded Jefferson Curl",
-   "pattern": "mobility",
-   "family": "posterior-chain-mobility",
-   "variation": "jefferson",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "mobility"
-   ],
-   "id": "long-lever-forearm-plank-with-arm-reach",
-   "name": "Long-Lever Forearm Plank with Arm Reach",
-   "pattern": "other",
-   "family": "plank-matrix",
-   "variation": "long-lever-arm-reach",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "mobility"
-   ],
-   "id": "long-lever-forearm-plank-with-knee-to-elbow",
-   "name": "Long-Lever Forearm Plank with Knee-to-Elbow",
-   "pattern": "other",
-   "family": "plank-matrix",
-   "variation": "long-lever-knee-elbow",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "long-lever-forearm-plank-with-leg-lift",
-   "name": "Long-Lever Forearm Plank with Leg Lift",
-   "pattern": "other",
-   "family": "plank-matrix",
-   "variation": "long-lever-leg-lift",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "long-lever-plank",
-   "name": "Long-Lever Plank",
-   "pattern": "other",
-   "family": "plank",
-   "variation": "long-lever",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility"
-   ],
-   "id": "lunge-pass-through",
-   "name": "Lunge Pass Through",
-   "pattern": "lunge",
-   "family": "lunge",
-   "variation": "lung-pass-through",
    "clip": null,
    "via": "none",
    "still": "no loop"
@@ -1928,121 +1082,6 @@
    "source": "builder",
    "in": [
     "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "pigeon-back-knee-lift-off",
-   "name": "Pigeon Back-Knee Lift-Off",
-   "pattern": "mobility",
-   "family": "active-mobility",
-   "variation": "pigeon-liftoff",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "plank-bird-dog",
-   "name": "Plank Bird Dog",
-   "pattern": "other",
-   "family": "dead-bug-bird-dog",
-   "variation": "bird-plank",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "prone-dumbbell-rear-fly",
-   "name": "Prone Dumbbell Rear Fly",
-   "pattern": "pull",
-   "family": "upper-back",
-   "variation": "rear-fly-prone",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "mobility",
-    "sport"
-   ],
-   "id": "prone-scorpion-reach",
-   "name": "Prone Scorpion Reach",
-   "pattern": "mobility",
-   "family": "shoulder-mobility",
-   "variation": "scorpion",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "prone-w-raise",
-   "name": "Prone W Raise",
-   "pattern": "pull",
-   "family": "shoulder-care",
-   "variation": "prone-w",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "prone-y-raise",
-   "name": "Prone Y Raise",
-   "pattern": "pull",
-   "family": "shoulder-care",
-   "variation": "prone-y",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
     "conditioning"
    ],
    "id": "push-up-to-side-plank",
@@ -2050,21 +1089,6 @@
    "pattern": "push",
    "family": "push-up",
    "variation": "push-up-sid-plank",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "athletic",
-    "sport"
-   ],
-   "id": "quick-feet-in-place",
-   "name": "Quick Feet in Place",
-   "pattern": "locomotion",
-   "family": "quick-feet",
-   "variation": "in-place",
    "clip": null,
    "via": "none",
    "still": "no loop"
@@ -2105,26 +1129,6 @@
    "pattern": "pull",
    "family": "rear-delt-face-pull",
    "variation": "revers-fly-external-rotation",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "reverse-plank-with-leg-lift",
-   "name": "Reverse Plank with Leg Lift",
-   "pattern": "other",
-   "family": "plank-matrix",
-   "variation": "reverse-leg-lift",
    "clip": null,
    "via": "none",
    "still": "no loop"
@@ -2191,100 +1195,6 @@
   {
    "source": "builder",
    "in": [
-    "mobility"
-   ],
-   "id": "seated-hip-rotation-lift-off",
-   "name": "Seated Hip Rotation Lift-Off",
-   "pattern": "mobility",
-   "family": "active-mobility",
-   "variation": "hip-rot-liftoff",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "short-side-plank",
-   "name": "Short Side Plank",
-   "pattern": "other",
-   "family": "side-plank",
-   "variation": "short",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "side-plank-hip-dip",
-   "name": "Side Plank Hip Dip",
-   "pattern": "other",
-   "family": "rollout-matrix",
-   "variation": "side-dip",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "side-plank-reach-through",
-   "name": "Side Plank Reach-Through",
-   "pattern": "other",
-   "family": "rollout-matrix",
-   "variation": "side-reach",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "side-plank-with-arm-reach",
-   "name": "Side Plank with Arm Reach",
-   "pattern": "other",
-   "family": "plank-matrix",
-   "variation": "side-arm-reach",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
     "full-body",
     "strength",
     "muscle",
@@ -2298,46 +1208,6 @@
    "pattern": "other",
    "family": "side-plank",
    "variation": "row",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "single-arm-push-up",
-   "name": "Single-Arm Push-Up",
-   "pattern": "push",
-   "family": "push-up",
-   "variation": "singl-arm-push-up",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "single-leg-hip-airplane",
-   "name": "Single-Leg Hip Airplane",
-   "pattern": "hinge",
-   "family": "single-leg-hinge",
-   "variation": "airplane",
    "clip": null,
    "via": "none",
    "still": "no loop"
@@ -2379,26 +1249,6 @@
     "muscle",
     "conditioning",
     "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "spinal-wave",
-   "name": "Spinal Wave",
-   "pattern": "mobility",
-   "family": "shoulder-mobility",
-   "variation": "spinal-wave",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
     "mobility"
    ],
    "id": "split-squat-stretch",
@@ -2406,41 +1256,6 @@
    "pattern": "mobility",
    "family": "stretch-hamstring",
    "variation": "split-squat-stretch",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "staggered-hand-push-up",
-   "name": "Staggered-Hand Push-Up",
-   "pattern": "push",
-   "family": "push-extra",
-   "variation": "staggered",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "athletic",
-    "sport"
-   ],
-   "id": "straight-leg-run",
-   "name": "Straight-Leg Run",
-   "pattern": "locomotion",
-   "family": "sprint-development",
-   "variation": "straight-leg-run",
    "clip": null,
    "via": "none",
    "still": "no loop"
@@ -2488,20 +1303,6 @@
   {
    "source": "builder",
    "in": [
-    "mobility"
-   ],
-   "id": "tall-kneeling-hip-rotation",
-   "name": "Tall-Kneeling Hip Rotation",
-   "pattern": "mobility",
-   "family": "shoulder-mobility",
-   "variation": "tall-kneel-rotation",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
     "athletic",
     "sport"
    ],
@@ -2510,40 +1311,6 @@
    "pattern": "hinge",
    "family": "kb-swing",
    "variation": "vertical-swing",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "sport"
-   ],
-   "id": "walking-knee-hug",
-   "name": "Walking Knee Hug",
-   "pattern": "mobility",
-   "family": "dynamic-flow",
-   "variation": "knee-hug",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "wall-hip-hinge",
-   "name": "Wall Hip Hinge",
-   "pattern": "hinge",
-   "family": "hinge-pattern",
-   "variation": "wall-tap",
    "clip": null,
    "via": "none",
    "still": "no loop"
@@ -2684,20 +1451,6 @@
   {
    "source": "signature",
    "in": [
-    "pain-free"
-   ],
-   "id": "latissimus-dorsi-smr",
-   "name": "Latissimus Dorsi-SMR",
-   "pattern": "mobility",
-   "family": "roll",
-   "variation": "latissimus-dorsi-smr",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "signature",
-   "in": [
     "basketball-skills"
    ],
    "id": "slide-run-slide",
@@ -2708,449 +1461,6 @@
    "clip": null,
    "via": "none",
    "still": "no loop"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "youth-bw-3",
-    "youth-bw-2"
-   ],
-   "id": "catalogue:backpack-hug-carry",
-   "name": "Backpack Hug Carry",
-   "pattern": "carry",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "youth-bw-3",
-    "youth-bw-2"
-   ],
-   "id": "catalogue:backpack-hug-hold",
-   "name": "Backpack Hug Hold",
-   "pattern": "carry",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "youth-bw-3",
-    "youth-bw-2"
-   ],
-   "id": "catalogue:backpack-hug-march",
-   "name": "Backpack Hug March",
-   "pattern": "carry",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "youth-bw-3",
-    "youth-bw-2",
-    "camp-session"
-   ],
-   "id": "catalogue:backpack-hug-squat",
-   "name": "Backpack Hug Squat",
-   "pattern": "squat",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "youth-bw-3",
-    "youth-bw-2",
-    "camp-session"
-   ],
-   "id": "catalogue:backpack-hug-squat-pause",
-   "name": "Backpack Hug Squat, 3-Second Pause",
-   "pattern": "squat",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "youth-bw-3",
-    "youth-bw-2",
-    "camp-session"
-   ],
-   "id": "catalogue:backpack-rdl",
-   "name": "Backpack RDL",
-   "pattern": "hinge",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4"
-   ],
-   "id": "catalogue:backpack-reverse-lunge",
-   "name": "Backpack Reverse Lunge",
-   "pattern": "lunge",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-gym-3",
-    "adult-gym-4"
-   ],
-   "id": "barbell-back-squat",
-   "name": "Barbell Back Squat",
-   "pattern": "squat",
-   "family": "squat",
-   "variation": "back-bb",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_squat_bar"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-gym-3",
-    "adult-gym-4"
-   ],
-   "id": "catalogue:bb-bench",
-   "name": "Barbell Bench Press",
-   "pattern": "push",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-gym-3",
-    "adult-gym-4"
-   ],
-   "id": "catalogue:bb-row-squeeze",
-   "name": "Barbell Bent-Over Row, 2-Second Squeeze",
-   "pattern": "pull",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-gym-3",
-    "adult-gym-4"
-   ],
-   "id": "barbell-overhead-press",
-   "name": "Barbell Overhead Press",
-   "pattern": "push",
-   "family": "overhead-press",
-   "variation": "bb",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_press"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-gym-3",
-    "adult-gym-4"
-   ],
-   "id": "catalogue:barbell-rdl",
-   "name": "Barbell RDL",
-   "pattern": "hinge",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-gym-3",
-    "adult-gym-4"
-   ],
-   "id": "catalogue:barbell-rdl-slow",
-   "name": "Barbell RDL, 3-Second Lower",
-   "pattern": "hinge",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-gym-3",
-    "adult-gym-4"
-   ],
-   "id": "barbell-rear-foot-elevated-split-squat",
-   "name": "Barbell Rear-Foot Elevated Split Squat",
-   "pattern": "lunge",
-   "family": "split-squat",
-   "variation": "rfe-bb",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_bulgarian_bar"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "camp-session"
-   ],
-   "id": "catalogue:backpack-row",
-   "name": "Bent-Over Backpack Row",
-   "pattern": "pull",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "camp-session"
-   ],
-   "id": "catalogue:backpack-row-squeeze",
-   "name": "Bent-Over Backpack Row, 3-Second Squeeze",
-   "pattern": "pull",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "youth-bw-3",
-    "youth-bw-2",
-    "camp-session"
-   ],
-   "id": "catalogue:bw-rdl-hold",
-   "name": "Bodyweight RDL, 3-Second Hold",
-   "pattern": "hinge",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "adult-gym-4"
-   ],
-   "id": "catalogue:box-jump-stick",
-   "name": "Box Jump and Stick",
-   "pattern": "squat",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "youth-bw-3",
-    "youth-bw-2",
-    "camp-session"
-   ],
-   "id": "catalogue:breathing-plank",
-   "name": "Breathing Plank",
-   "pattern": "other",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "youth-bw-3",
-    "youth-bw-2",
-    "camp-session"
-   ],
-   "id": "catalogue:breathing-plank-taps",
-   "name": "Breathing Plank with Shoulder Taps",
-   "pattern": "other",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-gym-3"
-   ],
-   "id": "broad-jump-to-stick",
-   "name": "Broad Jump and Stick",
-   "pattern": "locomotion",
-   "family": "broad-jump",
-   "variation": "stick",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_broad_jump_stick"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-gym-3",
-    "adult-gym-4"
-   ],
-   "id": "catalogue:face-pull",
-   "name": "Cable Face Pull",
-   "pattern": "pull",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-gym-3",
-    "adult-gym-4"
-   ],
-   "id": "catalogue:face-pull-hold",
-   "name": "Cable Face Pull, 2-Second Hold",
-   "pattern": "pull",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "youth-bw-3",
-    "youth-bw-2",
-    "camp-session"
-   ],
-   "id": "catalogue:chair-box-squat",
-   "name": "Chair Box Squat",
-   "pattern": "squat",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-gym-3",
-    "adult-gym-4"
-   ],
-   "id": "chest-supported-dumbbell-row",
-   "name": "Chest-Supported Dumbbell Row",
-   "pattern": "pull",
-   "family": "row",
-   "variation": "db-chest",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_chest_row"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-gym-3"
-   ],
-   "id": "continuous-lateral-bound",
-   "name": "Continuous Lateral Bounds",
-   "pattern": "locomotion",
-   "family": "lateral-bound",
-   "variation": "continuous",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_lateral_bound"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "adult-gym-4"
-   ],
-   "id": "countermovement-jump-to-stick",
-   "name": "Countermovement Jump and Stick",
-   "pattern": "locomotion",
-   "family": "vertical-jump",
-   "variation": "cmj-stick",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_jump"
   },
   {
    "source": "template",
@@ -3170,312 +1480,12 @@
   {
    "source": "template",
    "in": [
-    "adult-gym-3",
-    "adult-gym-4"
-   ],
-   "id": "dumbbell-farmer-carry",
-   "name": "Dumbbell Farmer Carry",
-   "pattern": "carry",
-   "family": "carry",
-   "variation": "farmer-db",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_carry"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-gym-3",
-    "adult-gym-4"
-   ],
-   "id": "catalogue:db-farmer-hold",
-   "name": "Dumbbell Farmer Hold",
-   "pattern": "carry",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-gym-3",
-    "adult-gym-4"
-   ],
-   "id": "dumbbell-romanian-deadlift",
-   "name": "Dumbbell RDL",
-   "pattern": "hinge",
-   "family": "hinge-pattern",
-   "variation": "db-rdl",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_hinge"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-gym-3",
-    "adult-gym-4"
-   ],
-   "id": "dumbbell-rear-foot-elevated-split-squat",
-   "name": "Dumbbell Rear-Foot Elevated Split Squat",
-   "pattern": "lunge",
-   "family": "split-squat",
-   "variation": "rfe-db",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_bulgarian"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-gym-3",
-    "adult-gym-4"
-   ],
-   "id": "catalogue:db-step-up",
-   "name": "Dumbbell Step-Up",
-   "pattern": "lunge",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-gym-3",
-    "adult-gym-4"
-   ],
-   "id": "catalogue:db-step-up-slow",
-   "name": "Dumbbell Step-Up, 3-Second Lower",
-   "pattern": "lunge",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-gym-3",
-    "adult-gym-4"
-   ],
-   "id": "catalogue:db-step-up-low",
-   "name": "Dumbbell Step-Up, Low Box",
-   "pattern": "lunge",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-gym-3",
-    "adult-gym-4"
-   ],
-   "id": "catalogue:db-suitcase-carry",
-   "name": "Dumbbell Suitcase Carry",
-   "pattern": "carry",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-gym-3",
-    "adult-gym-4"
-   ],
-   "id": "catalogue:db-suitcase-march",
-   "name": "Dumbbell Suitcase March",
-   "pattern": "carry",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "adult-gym-4"
-   ],
-   "id": "catalogue:fast-bw-squat",
-   "name": "Fast Bodyweight Squat",
-   "pattern": "squat",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-4",
-    "adult-gym-3",
-    "adult-gym-4"
-   ],
-   "id": "catalogue:fast-heel-raise",
-   "name": "Fast Heel Raise",
-   "pattern": "locomotion",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
     "adult-bw-3",
     "adult-bw-4"
    ],
    "id": "catalogue:feet-elevated-pike",
    "name": "Feet-Elevated Pike Push-Up",
    "pattern": "push",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "youth-bw-3",
-    "youth-bw-2",
-    "camp-session"
-   ],
-   "id": "feet-elevated-push-up",
-   "name": "Feet-Elevated Push-Up",
-   "pattern": "push",
-   "family": "push-up",
-   "variation": "feet-up",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_decline_pushup"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-gym-3",
-    "adult-gym-4"
-   ],
-   "id": "front-rack-kettlebell-carry",
-   "name": "Front-Rack Kettlebell Carry",
-   "pattern": "carry",
-   "family": "carry",
-   "variation": "rack",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_carry_rack"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "youth-bw-3",
-    "youth-bw-2"
-   ],
-   "id": "catalogue:glute-bridge-squeeze",
-   "name": "Glute Bridge, 5-Second Squeeze",
-   "pattern": "hinge",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "youth-bw-3",
-    "youth-bw-2"
-   ],
-   "id": "catalogue:glute-bridge-close",
-   "name": "Glute Bridge, Feet Close",
-   "pattern": "hinge",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-gym-3",
-    "adult-gym-4"
-   ],
-   "id": "catalogue:goblet-carry",
-   "name": "Goblet Carry",
-   "pattern": "carry",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-gym-3",
-    "adult-gym-4"
-   ],
-   "id": "catalogue:goblet-hold",
-   "name": "Goblet Hold",
-   "pattern": "carry",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-gym-3",
-    "adult-gym-4"
-   ],
-   "id": "half-kneeling-landmine-press",
-   "name": "Half-Kneeling Landmine Press",
-   "pattern": "push",
-   "family": "overhead-press",
-   "variation": "landmine-hk",
-   "clip": null,
-   "via": "none",
-   "still": "no loop",
-   "heldLoop": null
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-gym-3",
-    "adult-gym-4"
-   ],
-   "id": "catalogue:hk-single-pulldown",
-   "name": "Half-Kneeling Single-Arm Pulldown",
-   "pattern": "pull",
    "family": "",
    "variation": "",
    "clip": null,
@@ -3503,87 +1513,6 @@
     "adult-bw-3",
     "adult-gym-3"
    ],
-   "id": "catalogue:hip-snap",
-   "name": "Hip Snap",
-   "pattern": "hinge",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "youth-bw-3",
-    "youth-bw-2",
-    "camp-session"
-   ],
-   "id": "catalogue:incline-breathing-plank",
-   "name": "Incline Breathing Plank",
-   "pattern": "other",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-gym-3",
-    "adult-gym-4"
-   ],
-   "id": "kettlebell-deadlift",
-   "name": "Kettlebell Deadlift",
-   "pattern": "hinge",
-   "family": "hinge-pattern",
-   "variation": "kb-deadlift",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_hinge"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-gym-3",
-    "adult-gym-4"
-   ],
-   "id": "lat-pulldown",
-   "name": "Lat Pulldown",
-   "pattern": "pull",
-   "family": "vertical-pull",
-   "variation": "pulldown",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_pulldown"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-gym-3"
-   ],
-   "id": "lateral-bound-to-stick",
-   "name": "Lateral Bound and Stick",
-   "pattern": "locomotion",
-   "family": "lateral-bound",
-   "variation": "bound-stick",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_lateral_bound"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-gym-3"
-   ],
    "id": "catalogue:lateral-step-stick",
    "name": "Lateral Step and Stick",
    "pattern": "lunge",
@@ -3592,555 +1521,6 @@
    "clip": null,
    "via": "none",
    "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "adult-gym-4"
-   ],
-   "id": "catalogue:low-box-depth-drop",
-   "name": "Low Box Depth Drop and Stick",
-   "pattern": "squat",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-gym-3",
-    "adult-gym-4"
-   ],
-   "id": "catalogue:back-squat-pause",
-   "name": "Paused Barbell Back Squat",
-   "pattern": "squat",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-gym-3",
-    "adult-gym-4"
-   ],
-   "id": "catalogue:bb-bench-pause",
-   "name": "Paused Barbell Bench Press",
-   "pattern": "push",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4"
-   ],
-   "id": "pike-push-up",
-   "name": "Pike Push-Up",
-   "pattern": "push",
-   "family": "push-up",
-   "variation": "pike",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_pike_pushup"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-4",
-    "adult-gym-3",
-    "adult-gym-4"
-   ],
-   "id": "pogo-hop",
-   "name": "Pogo Hops",
-   "pattern": "locomotion",
-   "family": "pogo",
-   "variation": "pogo",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_pogo"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "youth-bw-3",
-    "youth-bw-2"
-   ],
-   "id": "prone-t-raise",
-   "name": "Prone T Raise",
-   "pattern": "pull",
-   "family": "shoulder-care",
-   "variation": "prone-t",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_prone_t"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "youth-bw-3",
-    "youth-bw-2"
-   ],
-   "id": "catalogue:prone-yt",
-   "name": "Prone Y-T Raise",
-   "pattern": "pull",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "youth-bw-3",
-    "youth-bw-2"
-   ],
-   "id": "catalogue:prone-yt-hold",
-   "name": "Prone Y-T Raise, 3-Second Holds",
-   "pattern": "pull",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "youth-bw-3",
-    "youth-bw-2",
-    "camp-session"
-   ],
-   "id": "rear-foot-elevated-split-squat",
-   "name": "Rear-Foot Elevated Split Squat",
-   "pattern": "lunge",
-   "family": "split-squat",
-   "variation": "rfe-bw",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_bulgarian"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "youth-bw-3",
-    "youth-bw-2",
-    "camp-session"
-   ],
-   "id": "rear-foot-elevated-split-squat-with-4-second-lower",
-   "name": "Rear-Foot Elevated Split Squat, 4-Second Lower",
-   "pattern": "lunge",
-   "family": "split-squat",
-   "variation": "rfe-bw+tempo",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_bulgarian"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4"
-   ],
-   "id": "reverse-lunge",
-   "name": "Reverse Lunge",
-   "pattern": "lunge",
-   "family": "lunge",
-   "variation": "reverse-bw",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_reverse_lunge"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "youth-bw-3",
-    "youth-bw-2"
-   ],
-   "id": "catalogue:door-row-single",
-   "name": "Single-Arm Door Frame Row",
-   "pattern": "pull",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "youth-bw-3",
-    "youth-bw-2"
-   ],
-   "id": "catalogue:door-row-single-slow",
-   "name": "Single-Arm Door Frame Row, 3-Second Lower",
-   "pattern": "pull",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "youth-bw-3",
-    "youth-bw-2"
-   ],
-   "id": "catalogue:sl-bridge-backpack",
-   "name": "Single-Leg Bridge with a Backpack",
-   "pattern": "hinge",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "youth-bw-3",
-    "youth-bw-2"
-   ],
-   "id": "catalogue:sl-bridge-squeeze",
-   "name": "Single-Leg Bridge, 5-Second Squeeze",
-   "pattern": "hinge",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-4",
-    "adult-gym-3",
-    "adult-gym-4"
-   ],
-   "id": "catalogue:single-leg-pogo",
-   "name": "Single-Leg Pogo Hops",
-   "pattern": "locomotion",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "youth-bw-3",
-    "youth-bw-2",
-    "camp-session"
-   ],
-   "id": "catalogue:sl-rdl-supported",
-   "name": "Single-Leg RDL Toe Touch, Supported",
-   "pattern": "hinge",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "youth-bw-3",
-    "youth-bw-2",
-    "camp-session"
-   ],
-   "id": "catalogue:sl-rdl-free",
-   "name": "Single-Leg RDL, Free Stand",
-   "pattern": "hinge",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "youth-bw-3",
-    "youth-bw-2",
-    "camp-session"
-   ],
-   "id": "catalogue:split-squat-hold",
-   "name": "Split Squat, 3-Second Hold",
-   "pattern": "lunge",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-gym-3",
-    "adult-gym-4"
-   ],
-   "id": "catalogue:split-pallof-hold",
-   "name": "Split-Stance Pallof Press with a Hold",
-   "pattern": "rotation",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-gym-3",
-    "adult-gym-4"
-   ],
-   "id": "catalogue:pallof-press",
-   "name": "Standing Pallof Press",
-   "pattern": "rotation",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "youth-bw-3",
-    "youth-bw-2",
-    "camp-session"
-   ],
-   "id": "suitcase-carry",
-   "name": "Suitcase Carry",
-   "pattern": "carry",
-   "family": "carry",
-   "variation": "suitcase",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_carry_suitcase"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "youth-bw-3",
-    "youth-bw-2",
-    "camp-session"
-   ],
-   "id": "suitcase-march",
-   "name": "Suitcase March",
-   "pattern": "carry",
-   "family": "march",
-   "variation": "suitcase",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_march_carry"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "camp-session"
-   ],
-   "id": "catalogue:supported-backpack-row",
-   "name": "Supported One-Arm Backpack Row",
-   "pattern": "pull",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4"
-   ],
-   "id": "catalogue:supported-reverse-lunge",
-   "name": "Supported Reverse Lunge",
-   "pattern": "lunge",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "youth-bw-3",
-    "youth-bw-2",
-    "camp-session"
-   ],
-   "id": "supported-split-squat",
-   "name": "Supported Split Squat",
-   "pattern": "lunge",
-   "family": "split-squat",
-   "variation": "supported",
-   "clip": null,
-   "via": "none",
-   "still": "no loop",
-   "heldLoop": null
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-gym-3",
-    "adult-gym-4"
-   ],
-   "id": "tall-kneeling-pallof-press",
-   "name": "Tall-Kneeling Pallof Press",
-   "pattern": "rotation",
-   "family": "anti-rotation",
-   "variation": "tall-kneel",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_pallofpress_tk"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "youth-bw-3",
-    "youth-bw-2",
-    "camp-session"
-   ],
-   "id": "catalogue:tempo-bw-squat",
-   "name": "Tempo Bodyweight Squat",
-   "pattern": "squat",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "youth-bw-3",
-    "youth-bw-2",
-    "camp-session"
-   ],
-   "id": "catalogue:farmer-carry-bags",
-   "name": "Two-Bag Farmer Carry",
-   "pattern": "carry",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "youth-bw-3",
-    "youth-bw-2",
-    "camp-session"
-   ],
-   "id": "catalogue:farmer-hold-bags",
-   "name": "Two-Bag Farmer Hold",
-   "pattern": "carry",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "youth-bw-3",
-    "youth-bw-2",
-    "camp-session"
-   ],
-   "id": "wall-hip-hinge",
-   "name": "Wall Hip Hinge",
-   "pattern": "hinge",
-   "family": "hinge-pattern",
-   "variation": "wall-tap",
-   "clip": null,
-   "via": "none",
-   "still": "no loop",
-   "heldLoop": null
-  },
-  {
-   "source": "template",
-   "in": [
-    "adult-bw-3",
-    "adult-bw-4",
-    "youth-bw-3",
-    "youth-bw-2",
-    "camp-session"
-   ],
-   "id": "wall-push-up",
-   "name": "Wall Push-Up",
-   "pattern": "push",
-   "family": "push-up",
-   "variation": "wall",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_wall_pushup"
   }
  ],
  "all": [
@@ -4278,9 +1658,8 @@
    "pattern": "hinge",
    "family": "hinge-accessory",
    "variation": "45-ext",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_back_ext_45",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -4292,9 +1671,8 @@
    "pattern": "hinge",
    "family": "hinge-accessory",
    "variation": "45-ext+tempo",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_back_ext_45",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -4306,9 +1684,8 @@
    "pattern": "mobility",
    "family": "active-mobility",
    "variation": "ninety-liftoff",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_ninety_liftoff",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -4492,9 +1869,8 @@
    "pattern": "locomotion",
    "family": "sprint-mechanics",
    "variation": "ankling",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_ankling",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -5454,9 +2830,8 @@
    "pattern": "other",
    "family": "rollout",
    "variation": "ab-rollout-kne",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_rollout_knees",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -5512,9 +2887,8 @@
    "pattern": "lunge",
    "family": "step-up",
    "variation": "bb",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_step_up_bar",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -5599,9 +2973,8 @@
    "pattern": "squat",
    "family": "leg-press-hack",
    "variation": "hack-squat",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_hack_squat",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -5852,9 +3225,8 @@
    "pattern": "lunge",
    "family": "lunge",
    "variation": "sid-split-squat",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_side_split_squat_bar",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -5866,9 +3238,8 @@
    "pattern": "lunge",
    "family": "lunge",
    "variation": "sid-split-squat+tempo",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_side_split_squat_bar",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -5921,9 +3292,8 @@
    "pattern": "lunge",
    "family": "step-up",
    "variation": "step-ups",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_step_up_bar",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -5941,9 +3311,8 @@
    "pattern": "lunge",
    "family": "lunge",
    "variation": "walk-lung",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_walking_lunge_bar",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -6161,9 +3530,8 @@
    "pattern": "other",
    "family": "dead-bug-bird-dog",
    "variation": "bird-hover",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_bird_dog_hover",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -6259,9 +3627,8 @@
    "pattern": "lunge",
    "family": "lunge",
    "variation": "bodyweight-walk-lung",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_walking_lunge_bw",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -6343,9 +3710,8 @@
    "pattern": "hinge",
    "family": "bridge-thrust",
    "variation": "glut-lift-bridg",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_bridge",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -6699,9 +4065,8 @@
    "pattern": "other",
    "family": "side-plank",
    "variation": "copenhagen-long",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_copenhagen_long",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -6795,9 +4160,8 @@
    "pattern": "mobility",
    "family": "active-mobility",
    "variation": "couch-liftoff",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_couch_liftoff",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -6885,9 +4249,8 @@
    "pattern": "other",
    "family": "dead-bug-bird-dog",
    "variation": "kb",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_dead_bug_press",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -6900,9 +4263,8 @@
    "pattern": "other",
    "family": "dead-bug-bird-dog",
    "variation": "legs",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_dead_bug_legs",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -6915,9 +4277,8 @@
    "pattern": "other",
    "family": "dead-bug-bird-dog",
    "variation": "wall",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_dead_bug_wall",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -7025,9 +4386,8 @@
    "pattern": "locomotion",
    "family": "quick-feet",
    "variation": "dot",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_dot_drill",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -7517,9 +4877,8 @@
    "pattern": "push",
    "family": "push-extra",
    "variation": "db-push-press",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_kb_push_press_two",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -7574,9 +4933,8 @@
    "pattern": "pull",
    "family": "db-upper",
    "variation": "renegade",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_renegade_row",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -7941,9 +5299,8 @@
    "pattern": "lunge",
    "family": "lunge",
    "variation": "walking-db",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_walking_lunge",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -7961,9 +5318,8 @@
    "pattern": "pull",
    "family": "vertical-pull",
    "variation": "eccentric",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_pullup_eccentric",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -7979,9 +5335,8 @@
    "pattern": "push",
    "family": "push-up",
    "variation": "eccentric",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_pushup_eccentric",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -8096,9 +5451,8 @@
    "pattern": "locomotion",
    "family": "sprint-development",
    "variation": "fast-leg",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_fast_leg",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -8129,9 +5483,8 @@
    "pattern": "pull",
    "family": "row",
    "variation": "inverted-feet-up",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_inverted_row_feet_up",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -8149,9 +5502,8 @@
    "pattern": "pull",
    "family": "row",
    "variation": "inverted-feet-up+tempo",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_inverted_row_feet_up",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -8163,9 +5515,8 @@
    "pattern": "mobility",
    "family": "stretch-matrix",
    "variation": "chest-angel",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_snow_angel_floor",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -8237,9 +5588,8 @@
    "pattern": "hinge",
    "family": "hinge-accessory",
    "variation": "frog-pump",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_frog_pump",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -8257,9 +5607,8 @@
    "pattern": "hinge",
    "family": "hinge-accessory",
    "variation": "frog-pump+tempo",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_frog_pump",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -8389,9 +5738,8 @@
    "pattern": "mobility",
    "family": "loaded-mobility",
    "variation": "goblet-reach",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_goblet_reach",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -8552,9 +5900,8 @@
    "pattern": "squat",
    "family": "leg-press-hack",
    "variation": "hack-squat",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_hack_squat",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -8928,9 +6275,8 @@
    "pattern": "other",
    "family": "plank",
    "variation": "incline",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_plank_incline",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -9148,9 +6494,8 @@
    "pattern": "pull",
    "family": "row",
    "variation": "kb-gorilla",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_gorilla_row",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -9165,9 +6510,8 @@
    "pattern": "pull",
    "family": "row",
    "variation": "kb-gorilla+tempo",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_gorilla_row",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -9179,9 +6523,8 @@
    "pattern": "pull",
    "family": "pull-extra",
    "variation": "kb-high-pull",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_kb_high_pull",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -9194,9 +6537,8 @@
    "pattern": "hinge",
    "family": "kb-swing",
    "variation": "hike",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_kb_hike_pass",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -9428,9 +6770,8 @@
    "pattern": "other",
    "family": "plank",
    "variation": "bear-lateral",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_bear_lateral",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -9485,9 +6826,8 @@
    "pattern": "squat",
    "family": "leg-press-hack",
    "variation": "leg-press",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_leg_press",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -9590,9 +6930,8 @@
    "pattern": "locomotion",
    "family": "quick-feet",
    "variation": "line-steps",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_line_steps",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -9610,9 +6949,8 @@
    "pattern": "mobility",
    "family": "ankle-mobility",
    "variation": "loaded",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_ankle_rock",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -9630,9 +6968,8 @@
    "pattern": "mobility",
    "family": "posterior-chain-mobility",
    "variation": "jefferson",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_jefferson_curl",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -9648,9 +6985,8 @@
    "pattern": "other",
    "family": "plank-matrix",
    "variation": "long-lever-arm-reach",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_plank_long_reach",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -9666,9 +7002,8 @@
    "pattern": "other",
    "family": "plank-matrix",
    "variation": "long-lever-knee-elbow",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_plank_long_knee",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -9686,9 +7021,8 @@
    "pattern": "other",
    "family": "plank-matrix",
    "variation": "long-lever-leg-lift",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_plank_long_leg",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -9706,9 +7040,8 @@
    "pattern": "other",
    "family": "plank",
    "variation": "long-lever",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_plank_long",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -9725,9 +7058,8 @@
    "pattern": "lunge",
    "family": "lunge",
    "variation": "lung-pass-through",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_lunge_pass",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -10363,9 +7695,8 @@
    "pattern": "mobility",
    "family": "active-mobility",
    "variation": "pigeon-liftoff",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_pigeon_liftoff",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -10477,9 +7808,8 @@
    "pattern": "other",
    "family": "dead-bug-bird-dog",
    "variation": "bird-plank",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_plank_bird_dog",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -10605,9 +7935,8 @@
    "pattern": "pull",
    "family": "upper-back",
    "variation": "rear-fly-prone",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_incline_t",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -10620,9 +7949,8 @@
    "pattern": "mobility",
    "family": "shoulder-mobility",
    "variation": "scorpion",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_iron_cross_stretch",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -10659,9 +7987,8 @@
    "pattern": "pull",
    "family": "shoulder-care",
    "variation": "prone-w",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_prone_w",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -10679,9 +8006,8 @@
    "pattern": "pull",
    "family": "shoulder-care",
    "variation": "prone-y",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_prone_y",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -10839,9 +8165,8 @@
    "pattern": "locomotion",
    "family": "quick-feet",
    "variation": "in-place",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_quick_feet",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -10972,9 +8297,8 @@
    "pattern": "other",
    "family": "plank-matrix",
    "variation": "reverse-leg-lift",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_reverse_plank_leg",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -11235,9 +8559,8 @@
    "pattern": "mobility",
    "family": "active-mobility",
    "variation": "hip-rot-liftoff",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_hip_rot_liftoff_seat",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -11293,9 +8616,8 @@
    "pattern": "other",
    "family": "side-plank",
    "variation": "short",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_side_plank_short",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -11408,9 +8730,8 @@
    "pattern": "other",
    "family": "rollout-matrix",
    "variation": "side-dip",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_side_plank_dip",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -11428,9 +8749,8 @@
    "pattern": "other",
    "family": "rollout-matrix",
    "variation": "side-reach",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_side_plank_reach_through",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -11467,9 +8787,8 @@
    "pattern": "other",
    "family": "plank-matrix",
    "variation": "side-arm-reach",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_side_plank_arm_reach",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -11553,9 +8872,8 @@
    "pattern": "push",
    "family": "push-up",
    "variation": "singl-arm-push-up",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_pushup_one_arm",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -11573,9 +8891,8 @@
    "pattern": "hinge",
    "family": "single-leg-hinge",
    "variation": "airplane",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_hip_airplane_free",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -11851,9 +9168,8 @@
    "pattern": "mobility",
    "family": "shoulder-mobility",
    "variation": "spinal-wave",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_spinal_wave",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -12017,9 +9333,8 @@
    "pattern": "push",
    "family": "push-extra",
    "variation": "staggered",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_pushup_staggered",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -12336,9 +9651,8 @@
    "pattern": "locomotion",
    "family": "sprint-development",
    "variation": "straight-leg-run",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_straight_leg_run",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -12408,9 +9722,8 @@
    "pattern": "mobility",
    "family": "shoulder-mobility",
    "variation": "tall-kneel-rotation",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_tk_hip_rotation",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -12634,9 +9947,8 @@
    "pattern": "mobility",
    "family": "dynamic-flow",
    "variation": "knee-hug",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_knee_hug_walk",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -12686,9 +9998,8 @@
    "pattern": "hinge",
    "family": "hinge-pattern",
    "variation": "wall-tap",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_wall_hinge",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -13970,9 +11281,8 @@
    "pattern": "mobility",
    "family": "roll",
    "variation": "latissimus-dorsi-smr",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
+   "clip": "ex_lat_smr",
+   "via": "library"
   },
   {
    "source": "signature",
@@ -14788,14 +12098,13 @@
     "youth-bw-3",
     "youth-bw-2"
    ],
-   "id": "catalogue:backpack-hug-carry",
+   "id": "sandbag-bear-hug-carry",
    "name": "Backpack Hug Carry",
    "pattern": "carry",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "family": "carry",
+   "variation": "sandbag",
+   "clip": "ex_carry_hug",
+   "via": "library"
   },
   {
    "source": "template",
@@ -14810,9 +12119,8 @@
    "pattern": "carry",
    "family": "",
    "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "clip": "ex_hold_hug",
+   "via": "catalogue"
   },
   {
    "source": "template",
@@ -14827,9 +12135,8 @@
    "pattern": "carry",
    "family": "",
    "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "clip": "ex_march_hug",
+   "via": "catalogue"
   },
   {
    "source": "template",
@@ -14840,14 +12147,13 @@
     "youth-bw-2",
     "camp-session"
    ],
-   "id": "catalogue:backpack-hug-squat",
+   "id": "sandbag-bear-hug-squat",
    "name": "Backpack Hug Squat",
    "pattern": "squat",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "family": "sandbag",
+   "variation": "bear-hug-squat",
+   "clip": "ex_squat",
+   "via": "library"
   },
   {
    "source": "template",
@@ -14858,14 +12164,13 @@
     "youth-bw-2",
     "camp-session"
    ],
-   "id": "catalogue:backpack-hug-squat-pause",
+   "id": "paused-sandbag-bear-hug-squat",
    "name": "Backpack Hug Squat, 3-Second Pause",
    "pattern": "squat",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "family": "sandbag",
+   "variation": "bear-hug-squat+paused",
+   "clip": "ex_squat",
+   "via": "library"
   },
   {
    "source": "template",
@@ -14876,14 +12181,13 @@
     "youth-bw-2",
     "camp-session"
    ],
-   "id": "catalogue:backpack-rdl",
+   "id": "dumbbell-romanian-deadlift",
    "name": "Backpack RDL",
    "pattern": "hinge",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "family": "hinge-pattern",
+   "variation": "db-rdl",
+   "clip": "ex_hinge",
+   "via": "library"
   },
   {
    "source": "template",
@@ -14891,14 +12195,13 @@
     "adult-bw-3",
     "adult-bw-4"
    ],
-   "id": "catalogue:backpack-reverse-lunge",
+   "id": "reverse-lunge",
    "name": "Backpack Reverse Lunge",
    "pattern": "lunge",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "family": "lunge",
+   "variation": "reverse-bw",
+   "clip": "ex_reverse_lunge",
+   "via": "library"
   },
   {
    "source": "template",
@@ -14939,10 +12242,8 @@
    "pattern": "squat",
    "family": "squat",
    "variation": "back-bb",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_squat_bar"
+   "clip": "ex_squat_bar",
+   "via": "library"
   },
   {
    "source": "template",
@@ -14950,14 +12251,13 @@
     "adult-gym-3",
     "adult-gym-4"
    ],
-   "id": "catalogue:bb-bench",
+   "id": "barbell-bench-press-medium-grip",
    "name": "Barbell Bench Press",
    "pattern": "push",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "family": "bench-press",
+   "variation": "bench-press-medium-grip",
+   "clip": "ex_bench_press",
+   "via": "library"
   },
   {
    "source": "template",
@@ -14979,14 +12279,13 @@
     "adult-gym-3",
     "adult-gym-4"
    ],
-   "id": "catalogue:bb-row-squeeze",
+   "id": "bent-over-barbell-row",
    "name": "Barbell Bent-Over Row, 2-Second Squeeze",
    "pattern": "pull",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "family": "row",
+   "variation": "bent-over-row",
+   "clip": "ex_row",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15013,10 +12312,8 @@
    "pattern": "push",
    "family": "overhead-press",
    "variation": "bb",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_press"
+   "clip": "ex_press",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15024,14 +12321,13 @@
     "adult-gym-3",
     "adult-gym-4"
    ],
-   "id": "catalogue:barbell-rdl",
+   "id": "romanian-deadlift",
    "name": "Barbell RDL",
    "pattern": "hinge",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "family": "rdl",
+   "variation": "romanian-deadlift",
+   "clip": "ex_hinge",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15039,14 +12335,13 @@
     "adult-gym-3",
     "adult-gym-4"
    ],
-   "id": "catalogue:barbell-rdl-slow",
+   "id": "romanian-deadlift",
    "name": "Barbell RDL, 3-Second Lower",
    "pattern": "hinge",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "family": "rdl",
+   "variation": "romanian-deadlift",
+   "clip": "ex_hinge",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15059,10 +12354,8 @@
    "pattern": "lunge",
    "family": "split-squat",
    "variation": "rfe-bb",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_bulgarian_bar"
+   "clip": "ex_bulgarian_bar",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15071,14 +12364,13 @@
     "adult-bw-4",
     "camp-session"
    ],
-   "id": "catalogue:backpack-row",
+   "id": "bent-over-dumbbell-row",
    "name": "Bent-Over Backpack Row",
    "pattern": "pull",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "family": "row",
+   "variation": "db-bent",
+   "clip": "ex_row",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15087,14 +12379,13 @@
     "adult-bw-4",
     "camp-session"
    ],
-   "id": "catalogue:backpack-row-squeeze",
+   "id": "bent-over-dumbbell-row",
    "name": "Bent-Over Backpack Row, 3-Second Squeeze",
    "pattern": "pull",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "family": "row",
+   "variation": "db-bent",
+   "clip": "ex_row",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15110,9 +12401,8 @@
    "pattern": "hinge",
    "family": "",
    "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "clip": "ex_bw_hinge",
+   "via": "catalogue"
   },
   {
    "source": "template",
@@ -15121,14 +12411,13 @@
     "adult-bw-4",
     "adult-gym-4"
    ],
-   "id": "catalogue:box-jump-stick",
+   "id": "box-jump",
    "name": "Box Jump and Stick",
-   "pattern": "squat",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "pattern": "locomotion",
+   "family": "box-jump",
+   "variation": "mid",
+   "clip": "ex_box_jump",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15153,14 +12442,13 @@
     "youth-bw-2",
     "camp-session"
    ],
-   "id": "catalogue:breathing-plank",
+   "id": "forearm-plank",
    "name": "Breathing Plank",
    "pattern": "other",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "family": "plank",
+   "variation": "forearm",
+   "clip": "ex_plank",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15171,14 +12459,13 @@
     "youth-bw-2",
     "camp-session"
    ],
-   "id": "catalogue:breathing-plank-taps",
+   "id": "plank-shoulder-tap",
    "name": "Breathing Plank with Shoulder Taps",
    "pattern": "other",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "family": "plank",
+   "variation": "shoulder-tap",
+   "clip": "ex_shoulder_tap",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15191,10 +12478,8 @@
    "pattern": "locomotion",
    "family": "broad-jump",
    "variation": "stick",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_broad_jump_stick"
+   "clip": "ex_broad_jump_stick",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15202,14 +12487,13 @@
     "adult-gym-3",
     "adult-gym-4"
    ],
-   "id": "catalogue:face-pull",
+   "id": "face-pull",
    "name": "Cable Face Pull",
    "pattern": "pull",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "family": "rear-delt-face-pull",
+   "variation": "fac-pull",
+   "clip": "ex_face_pull",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15217,14 +12501,13 @@
     "adult-gym-3",
     "adult-gym-4"
    ],
-   "id": "catalogue:face-pull-hold",
+   "id": "face-pull",
    "name": "Cable Face Pull, 2-Second Hold",
    "pattern": "pull",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "family": "rear-delt-face-pull",
+   "variation": "fac-pull",
+   "clip": "ex_face_pull",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15235,14 +12518,13 @@
     "youth-bw-2",
     "camp-session"
    ],
-   "id": "catalogue:chair-box-squat",
+   "id": "bodyweight-box-squat",
    "name": "Chair Box Squat",
    "pattern": "squat",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "family": "squat",
+   "variation": "box-bw",
+   "clip": "ex_squat",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15255,10 +12537,8 @@
    "pattern": "pull",
    "family": "row",
    "variation": "db-chest",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_chest_row"
+   "clip": "ex_chest_row",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15271,10 +12551,8 @@
    "pattern": "locomotion",
    "family": "lateral-bound",
    "variation": "continuous",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_lateral_bound"
+   "clip": "ex_lateral_bound",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15288,10 +12566,8 @@
    "pattern": "locomotion",
    "family": "vertical-jump",
    "variation": "cmj-stick",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_jump"
+   "clip": "ex_jump",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15365,10 +12641,8 @@
    "pattern": "carry",
    "family": "carry",
    "variation": "farmer-db",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_carry"
+   "clip": "ex_carry",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15381,9 +12655,8 @@
    "pattern": "carry",
    "family": "",
    "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "clip": "ex_hold_farmer",
+   "via": "catalogue"
   },
   {
    "source": "template",
@@ -15410,10 +12683,8 @@
    "pattern": "hinge",
    "family": "hinge-pattern",
    "variation": "db-rdl",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_hinge"
+   "clip": "ex_hinge",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15426,10 +12697,8 @@
    "pattern": "lunge",
    "family": "split-squat",
    "variation": "rfe-db",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_bulgarian"
+   "clip": "ex_bulgarian",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15451,14 +12720,13 @@
     "adult-gym-3",
     "adult-gym-4"
    ],
-   "id": "catalogue:db-step-up",
+   "id": "dumbbell-step-ups",
    "name": "Dumbbell Step-Up",
    "pattern": "lunge",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "family": "step-up",
+   "variation": "step-ups",
+   "clip": "ex_step_up",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15466,14 +12734,13 @@
     "adult-gym-3",
     "adult-gym-4"
    ],
-   "id": "catalogue:db-step-up-slow",
+   "id": "dumbbell-step-ups",
    "name": "Dumbbell Step-Up, 3-Second Lower",
    "pattern": "lunge",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "family": "step-up",
+   "variation": "step-ups",
+   "clip": "ex_step_up",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15481,14 +12748,13 @@
     "adult-gym-3",
     "adult-gym-4"
    ],
-   "id": "catalogue:db-step-up-low",
+   "id": "dumbbell-step-ups",
    "name": "Dumbbell Step-Up, Low Box",
    "pattern": "lunge",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "family": "step-up",
+   "variation": "step-ups",
+   "clip": "ex_step_up",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15496,14 +12762,13 @@
     "adult-gym-3",
     "adult-gym-4"
    ],
-   "id": "catalogue:db-suitcase-carry",
+   "id": "suitcase-carry",
    "name": "Dumbbell Suitcase Carry",
    "pattern": "carry",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "family": "carry",
+   "variation": "suitcase",
+   "clip": "ex_carry_suitcase",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15511,14 +12776,13 @@
     "adult-gym-3",
     "adult-gym-4"
    ],
-   "id": "catalogue:db-suitcase-march",
+   "id": "suitcase-march",
    "name": "Dumbbell Suitcase March",
    "pattern": "carry",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "family": "march",
+   "variation": "suitcase",
+   "clip": "ex_march_carry",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15532,9 +12796,8 @@
    "pattern": "squat",
    "family": "",
    "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "clip": "ex_fast_squat",
+   "via": "catalogue"
   },
   {
    "source": "template",
@@ -15543,14 +12806,13 @@
     "adult-gym-3",
     "adult-gym-4"
    ],
-   "id": "catalogue:fast-heel-raise",
+   "id": "standing-calf-raises",
    "name": "Fast Heel Raise",
-   "pattern": "locomotion",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "pattern": "other",
+   "family": "calf-raise",
+   "variation": "stand-calf-rais",
+   "clip": "ex_calf_raise",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15581,10 +12843,8 @@
    "pattern": "push",
    "family": "push-up",
    "variation": "feet-up",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_decline_pushup"
+   "clip": "ex_decline_pushup",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15597,10 +12857,8 @@
    "pattern": "carry",
    "family": "carry",
    "variation": "rack",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_carry_rack"
+   "clip": "ex_carry_rack",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15610,14 +12868,13 @@
     "youth-bw-3",
     "youth-bw-2"
    ],
-   "id": "catalogue:glute-bridge-squeeze",
+   "id": "glute-bridge",
    "name": "Glute Bridge, 5-Second Squeeze",
    "pattern": "hinge",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "family": "bridge",
+   "variation": "bw",
+   "clip": "ex_bridge",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15627,14 +12884,13 @@
     "youth-bw-3",
     "youth-bw-2"
    ],
-   "id": "catalogue:glute-bridge-close",
+   "id": "glute-bridge",
    "name": "Glute Bridge, Feet Close",
    "pattern": "hinge",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "family": "bridge",
+   "variation": "bw",
+   "clip": "ex_bridge",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15647,9 +12903,8 @@
    "pattern": "carry",
    "family": "",
    "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "clip": "ex_carry_goblet",
+   "via": "catalogue"
   },
   {
    "source": "template",
@@ -15662,9 +12917,8 @@
    "pattern": "carry",
    "family": "",
    "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "clip": "ex_hold_goblet",
+   "via": "catalogue"
   },
   {
    "source": "template",
@@ -15691,10 +12945,8 @@
    "pattern": "push",
    "family": "overhead-press",
    "variation": "landmine-hk",
-   "clip": null,
-   "via": "none",
-   "still": "no loop",
-   "heldLoop": null
+   "clip": "ex_landmine_press_hk",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15702,14 +12954,13 @@
     "adult-gym-3",
     "adult-gym-4"
    ],
-   "id": "catalogue:hk-single-pulldown",
+   "id": "half-kneeling-single-arm-cable-pulldown",
    "name": "Half-Kneeling Single-Arm Pulldown",
    "pattern": "pull",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "family": "vertical-pull",
+   "variation": "pulldown-hk",
+   "clip": "ex_pulldown_hk_one",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15737,9 +12988,8 @@
    "pattern": "hinge",
    "family": "",
    "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "clip": "ex_hip_snap",
+   "via": "catalogue"
   },
   {
    "source": "template",
@@ -15750,14 +13000,13 @@
     "youth-bw-2",
     "camp-session"
    ],
-   "id": "catalogue:incline-breathing-plank",
+   "id": "incline-plank",
    "name": "Incline Breathing Plank",
    "pattern": "other",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "family": "plank",
+   "variation": "incline",
+   "clip": "ex_plank_incline",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15787,10 +13036,8 @@
    "pattern": "hinge",
    "family": "hinge-pattern",
    "variation": "kb-deadlift",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_hinge"
+   "clip": "ex_hinge",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15803,10 +13050,8 @@
    "pattern": "pull",
    "family": "vertical-pull",
    "variation": "pulldown",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_pulldown"
+   "clip": "ex_pulldown",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15819,10 +13064,8 @@
    "pattern": "locomotion",
    "family": "lateral-bound",
    "variation": "bound-stick",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_lateral_bound"
+   "clip": "ex_lateral_bound",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15846,14 +13089,13 @@
     "adult-bw-4",
     "adult-gym-4"
    ],
-   "id": "catalogue:low-box-depth-drop",
+   "id": "drop-landing-from-low-box",
    "name": "Low Box Depth Drop and Stick",
-   "pattern": "squat",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "pattern": "locomotion",
+   "family": "landing",
+   "variation": "drop-low",
+   "clip": "ex_drop_landing",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15875,14 +13117,13 @@
     "adult-gym-3",
     "adult-gym-4"
    ],
-   "id": "catalogue:back-squat-pause",
+   "id": "barbell-back-squat",
    "name": "Paused Barbell Back Squat",
    "pattern": "squat",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "family": "squat",
+   "variation": "back-bb",
+   "clip": "ex_squat_bar",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15890,14 +13131,13 @@
     "adult-gym-3",
     "adult-gym-4"
    ],
-   "id": "catalogue:bb-bench-pause",
+   "id": "barbell-bench-press-medium-grip",
    "name": "Paused Barbell Bench Press",
    "pattern": "push",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "family": "bench-press",
+   "variation": "bench-press-medium-grip",
+   "clip": "ex_bench_press",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15910,10 +13150,8 @@
    "pattern": "push",
    "family": "push-up",
    "variation": "pike",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_pike_pushup"
+   "clip": "ex_pike_pushup",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15927,10 +13165,8 @@
    "pattern": "locomotion",
    "family": "pogo",
    "variation": "pogo",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_pogo"
+   "clip": "ex_pogo",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15945,10 +13181,8 @@
    "pattern": "pull",
    "family": "shoulder-care",
    "variation": "prone-t",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_prone_t"
+   "clip": "ex_prone_t",
+   "via": "library"
   },
   {
    "source": "template",
@@ -15963,9 +13197,8 @@
    "pattern": "pull",
    "family": "",
    "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "clip": "ex_prone_yt",
+   "via": "catalogue"
   },
   {
    "source": "template",
@@ -15980,9 +13213,8 @@
    "pattern": "pull",
    "family": "",
    "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "clip": "ex_prone_yt",
+   "via": "catalogue"
   },
   {
    "source": "template",
@@ -16029,10 +13261,8 @@
    "pattern": "lunge",
    "family": "split-squat",
    "variation": "rfe-bw",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_bulgarian"
+   "clip": "ex_bulgarian",
+   "via": "library"
   },
   {
    "source": "template",
@@ -16048,10 +13278,8 @@
    "pattern": "lunge",
    "family": "split-squat",
    "variation": "rfe-bw+tempo",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_bulgarian"
+   "clip": "ex_bulgarian",
+   "via": "library"
   },
   {
    "source": "template",
@@ -16064,10 +13292,8 @@
    "pattern": "lunge",
    "family": "lunge",
    "variation": "reverse-bw",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_reverse_lunge"
+   "clip": "ex_reverse_lunge",
+   "via": "library"
   },
   {
    "source": "template",
@@ -16082,9 +13308,8 @@
    "pattern": "pull",
    "family": "",
    "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "clip": "ex_door_row_one",
+   "via": "catalogue"
   },
   {
    "source": "template",
@@ -16099,9 +13324,8 @@
    "pattern": "pull",
    "family": "",
    "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "clip": "ex_door_row_one",
+   "via": "catalogue"
   },
   {
    "source": "template",
@@ -16116,9 +13340,8 @@
    "pattern": "hinge",
    "family": "",
    "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "clip": "ex_bridge_sl_load",
+   "via": "catalogue"
   },
   {
    "source": "template",
@@ -16133,9 +13356,8 @@
    "pattern": "hinge",
    "family": "",
    "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "clip": "ex_bridge_sl_hug",
+   "via": "catalogue"
   },
   {
    "source": "template",
@@ -16144,14 +13366,13 @@
     "adult-gym-3",
     "adult-gym-4"
    ],
-   "id": "catalogue:single-leg-pogo",
+   "id": "single-leg-pogo",
    "name": "Single-Leg Pogo Hops",
    "pattern": "locomotion",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "family": "pogo",
+   "variation": "single-leg",
+   "clip": "ex_pogo_sl",
+   "via": "library"
   },
   {
    "source": "template",
@@ -16162,14 +13383,13 @@
     "youth-bw-2",
     "camp-session"
    ],
-   "id": "catalogue:sl-rdl-supported",
+   "id": "supported-single-leg-romanian-deadlift",
    "name": "Single-Leg RDL Toe Touch, Supported",
    "pattern": "hinge",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "family": "single-leg-hinge",
+   "variation": "supported",
+   "clip": "ex_supported_sl_rdl",
+   "via": "library"
   },
   {
    "source": "template",
@@ -16180,14 +13400,13 @@
     "youth-bw-2",
     "camp-session"
    ],
-   "id": "catalogue:sl-rdl-free",
+   "id": "single-leg-romanian-deadlift",
    "name": "Single-Leg RDL, Free Stand",
    "pattern": "hinge",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "family": "single-leg-hinge",
+   "variation": "bw",
+   "clip": "ex_sl_rdl",
+   "via": "library"
   },
   {
    "source": "template",
@@ -16198,14 +13417,13 @@
     "youth-bw-2",
     "camp-session"
    ],
-   "id": "catalogue:split-squat-hold",
+   "id": "split-squat",
    "name": "Split Squat, 3-Second Hold",
    "pattern": "lunge",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "family": "split-squat",
+   "variation": "bw",
+   "clip": "ex_split_squat",
+   "via": "library"
   },
   {
    "source": "template",
@@ -16213,14 +13431,13 @@
     "adult-gym-3",
     "adult-gym-4"
    ],
-   "id": "catalogue:split-pallof-hold",
+   "id": "cable-pallof-press-and-hold-split-stance",
    "name": "Split-Stance Pallof Press with a Hold",
    "pattern": "rotation",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "family": "pallof-matrix",
+   "variation": "cable-hold-split",
+   "clip": "ex_pallofhold_split",
+   "via": "library"
   },
   {
    "source": "template",
@@ -16242,14 +13459,13 @@
     "adult-gym-3",
     "adult-gym-4"
    ],
-   "id": "catalogue:pallof-press",
+   "id": "cable-pallof-press-standing",
    "name": "Standing Pallof Press",
    "pattern": "rotation",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "family": "pallof-matrix",
+   "variation": "cable-press-standing",
+   "clip": "ex_pallofpress_standing",
+   "via": "library"
   },
   {
    "source": "template",
@@ -16265,10 +13481,8 @@
    "pattern": "carry",
    "family": "carry",
    "variation": "suitcase",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_carry_suitcase"
+   "clip": "ex_carry_suitcase",
+   "via": "library"
   },
   {
    "source": "template",
@@ -16284,10 +13498,8 @@
    "pattern": "carry",
    "family": "march",
    "variation": "suitcase",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_march_carry"
+   "clip": "ex_march_carry",
+   "via": "library"
   },
   {
    "source": "template",
@@ -16296,14 +13508,13 @@
     "adult-bw-4",
     "camp-session"
    ],
-   "id": "catalogue:supported-backpack-row",
+   "id": "one-arm-dumbbell-row",
    "name": "Supported One-Arm Backpack Row",
    "pattern": "pull",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "family": "row",
+   "variation": "singl-arm-row",
+   "clip": "ex_row_one",
+   "via": "library"
   },
   {
    "source": "template",
@@ -16311,14 +13522,13 @@
     "adult-bw-3",
     "adult-bw-4"
    ],
-   "id": "catalogue:supported-reverse-lunge",
+   "id": "reverse-lunge",
    "name": "Supported Reverse Lunge",
    "pattern": "lunge",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "family": "lunge",
+   "variation": "reverse-bw",
+   "clip": "ex_reverse_lunge",
+   "via": "library"
   },
   {
    "source": "template",
@@ -16334,10 +13544,8 @@
    "pattern": "lunge",
    "family": "split-squat",
    "variation": "supported",
-   "clip": null,
-   "via": "none",
-   "still": "no loop",
-   "heldLoop": null
+   "clip": "ex_split_squat_supported",
+   "via": "library"
   },
   {
    "source": "template",
@@ -16350,10 +13558,8 @@
    "pattern": "rotation",
    "family": "anti-rotation",
    "variation": "tall-kneel",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_pallofpress_tk"
+   "clip": "ex_pallofpress_tk",
+   "via": "library"
   },
   {
    "source": "template",
@@ -16364,14 +13570,13 @@
     "youth-bw-2",
     "camp-session"
    ],
-   "id": "catalogue:tempo-bw-squat",
+   "id": "bodyweight-squat",
    "name": "Tempo Bodyweight Squat",
    "pattern": "squat",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "family": "squat",
+   "variation": "bodyweight-squat",
+   "clip": "ex_squat",
+   "via": "library"
   },
   {
    "source": "template",
@@ -16396,14 +13601,13 @@
     "youth-bw-2",
     "camp-session"
    ],
-   "id": "catalogue:farmer-carry-bags",
+   "id": "dumbbell-farmer-carry",
    "name": "Two-Bag Farmer Carry",
    "pattern": "carry",
-   "family": "",
-   "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "family": "carry",
+   "variation": "farmer-db",
+   "clip": "ex_carry",
+   "via": "library"
   },
   {
    "source": "template",
@@ -16419,9 +13623,8 @@
    "pattern": "carry",
    "family": "",
    "variation": "",
-   "clip": null,
-   "via": "none",
-   "still": "no library entry by name"
+   "clip": "ex_hold_farmer",
+   "via": "catalogue"
   },
   {
    "source": "template",
@@ -16437,10 +13640,8 @@
    "pattern": "hinge",
    "family": "hinge-pattern",
    "variation": "wall-tap",
-   "clip": null,
-   "via": "none",
-   "still": "no loop",
-   "heldLoop": null
+   "clip": "ex_wall_hinge",
+   "via": "library"
   },
   {
    "source": "template",
@@ -16456,10 +13657,8 @@
    "pattern": "push",
    "family": "push-up",
    "variation": "wall",
-   "clip": null,
-   "via": "none",
-   "still": "not approved",
-   "heldLoop": "ex_wall_pushup"
+   "clip": "ex_wall_pushup",
+   "via": "library"
   }
  ]
 }
