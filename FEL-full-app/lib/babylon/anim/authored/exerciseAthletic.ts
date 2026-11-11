@@ -129,7 +129,7 @@ export function carry(scene: Scene, sk: Skeleton, name: string, arms: Pose): Ani
   return loop(scene, sk, name, 1.4, [step(1, 0), pass(0.35, 1), step(-1, 0.7), pass(1.05, -1)]);
 }
 /** A slow loaded march in place: one knee driven to hip height and set down, then the other, the arms holding `arms`. */
-function march(scene: Scene, sk: Skeleton, name: string, arms: Pose): AnimationGroup | null {
+export function march(scene: Scene, sk: Skeleton, name: string, arms: Pose): AnimationGroup | null {
   const up = (s: Side): ExKey => {
     const down: Side = s === 'Left' ? 'Right' : 'Left';
     return { t: 0, bones: { Hips: [0, 0, 0], Spine: [0, 0, 0], Neck: [0, 0, 0], [`${s}UpLeg`]: [-84, 0, 0], [`${s}Leg`]: [92, 0, 0], [`${s}Foot`]: [-6, 0, 0] } as Record<string, Deg3>, feet: { [down]: [down === 'Left' ? -0.11 : 0.11, ANKLE, 0.04] } as Pair, kneePoles: bothDir(0, 0, 1), ...arms, hipsY: 0 };
