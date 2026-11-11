@@ -32,7 +32,7 @@ export default async function AccountPage() {
       {/* HOTFIX (2026-09-24): reduced motion — the device decides by default; this is the override, both ways.
           A11-03 / A11-05 (2026-10-25): with it, colour vision for the game HUD and the big-screen menus. */}
       <div className="mt-8"><AccessibilitySettings /></div>
-      <p className="mt-4 text-sm"><Link href="/account/coaching">Coaching</Link></p>
+      <p className="mt-4 text-sm"><Link href="/account/coaching" className="inline-flex min-h-11 items-center">Coaching</Link></p>
     </TabPage>
   );
 }

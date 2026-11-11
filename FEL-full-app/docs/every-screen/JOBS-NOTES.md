@@ -1,3 +1,51 @@
+## What changed in phase 8, part 2 (your things, measured on the rig)
+
+**Of the phase's 20 screens, 5 now pass all four (part 1: 0):** `/shop`, `/store`, `/wallet`, `/market`, `/support`.
+App-wide 31 → 36 of 187. No screen lost a pass.
+
+**Tap budgets, set from this build's walks** (the plan: "never more than before"; a later change may not add a tap):
+
+| Area | The walk | Taps (the budget) |
+|---|---|---|
+| Wallet | Play → the Profile tab → Wallet | 2 |
+| Store | Play → the coins in the top bar | 1 |
+| Closet | Play → the Profile tab → Closet | 2 |
+| Edit the profile | Play → the Profile tab → Edit | 2 |
+| Support | Play → the Profile tab → Support (the tab's row of doors) | 2 |
+
+**A purchase shows where it came from (the free/coin path):** walked. Wallet → "5 shards" → Exchange: 2 taps; back on the
+wallet, the history names the exchange, and the ledger holds the pair (−100 coins and +5 shards, both
+`exchange_coins_to_shards`). No money purchase exists on the rig (real-money packs are off), so the coin path is the one
+walked.
+
+**The text cut off on three game screens (dunk, snowboard, Spot the Scene): measured against release 51cce66f.** The
+same scorer read release 51cce66f's build and this branch's, more than once:
+
+| Screen | What was cut | Release 51cce66f | This branch (readings) | Verdict |
+|---|---|---|---|---|
+| `/play/dunk` | the HUD's "0", "vs", "RD 1/2" at 200 % (part 1's reading) | not cut | cut in 1 of 5 (part 1), not cut in the 4 since | noise: the HUD was drawing in as it was read |
+| `/play/snowboard` | "· PAR 60" at 200 % | **cut** | cut in 3 of 4 | there before phase 7; not caused here |
+| `/play/who-scene-it` | CONTROLS, TOUCH, TAP, ANSWER A/C at 200 % | **cut** | cut in 2 of 4 | there before phase 7; comes and goes |
+| `/play/who-scene-it` | "❚❚ PAUSE" with 150 % text (8.4 px) | not cut | cut in 2 of 2, then **0 of 2 after the fix** | **phase 7 caused it** (the controls went 12 → 14 px) |
+
+The fix: when the controls panel has stepped down as far as it may, its rows scroll in their own box (as its lines
+already did) instead of being cut. Nothing is hidden, nothing is smaller.
+
+**Owner-gated, left as they are:** `/squads`, `/squads/[id]`, `/squads/join/[token]` (switched off until the groups
+tables are applied), `/pro` (Coach Pro is not on sale), `/admin/*` (the owner's tools).
+
+**What the other 15 still need:**
+
+| Screen | Still fails | Needs |
+|---|---|---|
+| `/account` | the health-data switch (24 px tall), 5 text sizes, 4 button looks | the switch is the app's shared one: sizing it changes every switch |
+| `/cards` | 9 text sizes, 7 small paragraphs | the card art's own sizes: a design pass on the card |
+| `/closet` | 10 button looks, 4 small paragraphs | one button look for the studio (a design call) |
+| `/profile` | the new "Jump check →" link answers in 0.4–0.5 s with the CPU slowed 4× (two readings) | before, nothing on /profile was timed; the jump-check page is heavy to open |
+| `/profile/edit`, `/profile/week`, `/profile/challenges` | 69–114 words before scrolling, 5–7 text sizes, 8 button looks | shorter lines: wording, so the owner's |
+| `/shop/shards` | words, a load shift, only the bars lead on | payment wording and layout are the owner's |
+| `/play/snowboard`, `/play/who-scene-it`, `/play/dunk` | the 200 % cuts above (there before), one HUD line under 12 px | the games' HUD: game lanes |
+
 ## What changed in phase 8 (your things, measured on the rig) — partly done
 
 The plan's gate: each area's main job within its tap budget (from the phase-1 baseline, never more than before); a

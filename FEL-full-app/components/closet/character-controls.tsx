@@ -57,7 +57,7 @@ export function BodyControls({ body, frame, scanOwned, numbersSaved, onBody, onF
       <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Body">
         {bodies.map((b) => (
           <button key={b} type="button" role="radio" aria-checked={body === b} onClick={() => onBody(b)}
-            className="rounded-full px-3 py-1.5 text-xs font-medium transition"
+            className="min-h-11 rounded-full px-3 py-1.5 text-xs font-medium transition"
             style={{ backgroundColor: body === b ? '#00E5FF' : 'rgba(255,255,255,0.05)', color: body === b ? '#050505' : 'rgba(255,255,255,0.75)', border: `1px solid ${body === b ? '#00E5FF' : 'rgba(255,255,255,0.12)'}` }}>
             {BODY_LABEL[b]}
           </button>
@@ -119,7 +119,7 @@ export function HideControls({ hide, onChange }: { hide: Partial<Record<HideKey,
           return (
             <button key={k} type="button" aria-pressed={on}
               onClick={() => { const next = { ...h }; if (on) delete next[k]; else next[k] = true; onChange(next); }}
-              className="rounded-full px-3 py-1.5 text-xs font-medium transition"
+              className="min-h-11 rounded-full px-3 py-1.5 text-xs font-medium transition"
               style={{ backgroundColor: on ? '#FF3366' : 'rgba(255,255,255,0.05)', color: on ? '#050505' : 'rgba(255,255,255,0.75)', border: `1px solid ${on ? '#FF3366' : 'rgba(255,255,255,0.12)'}` }}>
               {on ? 'Hidden: ' : 'Hide '}{HIDE_LABEL[k]}
             </button>

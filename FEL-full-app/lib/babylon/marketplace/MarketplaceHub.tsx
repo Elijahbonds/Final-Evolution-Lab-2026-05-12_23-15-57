@@ -156,7 +156,7 @@ export default function MarketplaceHub({
     root: { color: '#f2ecdf', background: 'linear-gradient(160deg,#231a2e 0%,#2e2417 60%,#1c2430 100%)', padding: 16, borderRadius: 12 },
     h1: { fontSize: 20, fontWeight: 800, color: '#e8b84a' },
     tabs: { display: 'flex', gap: 8, margin: '10px 0', flexWrap: 'wrap' },
-    tab: { padding: '6px 14px', borderRadius: 20, border: '1px solid #8a6d3a', background: 'transparent', color: '#e8dcc2', cursor: 'pointer' },
+    tab: { padding: '6px 14px', minHeight: 44, borderRadius: 20, border: '1px solid #8a6d3a', background: 'transparent', color: '#e8dcc2', cursor: 'pointer' },
     tabOn: { background: '#8a6d3a', color: '#fff' },
     row: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 10 },
     input: { padding: 8, borderRadius: 8, border: '1px solid #8a6d3a', background: '#1c1526', color: '#f2ecdf' },
@@ -166,7 +166,7 @@ export default function MarketplaceHub({
     reader: { marginTop: 10, padding: 14, borderRadius: 10, background: '#171220', maxHeight: 380, overflowY: 'auto', whiteSpace: 'pre-wrap', fontSize: 14, width: '100%' },
     area: { width: '100%', minHeight: 160, padding: 10, borderRadius: 8, border: '1px solid #8a6d3a', background: '#1c1526', color: '#f2ecdf', fontFamily: 'inherit' },
     note: { marginTop: 10, padding: '8px 12px', borderRadius: 8, background: '#8a6d3a', color: '#fff', width: 'fit-content' },
-    preview: { marginTop: 8, padding: '6px 10px', borderRadius: 8, border: '1px solid #e8b84a', fontSize: 12, color: '#f5d88e' },
+    preview: { marginTop: 8, padding: '6px 10px', borderRadius: 8, border: '1px solid #e8b84a', fontSize: 16, color: '#f5d88e' },
   };
 
   const listings = Marketplace.list(floor === 'shop' ? kind : undefined);
@@ -196,7 +196,7 @@ export default function MarketplaceHub({
               <button key={k.id} style={{ ...S.tab, ...(kind === k.id ? S.tabOn : {}) }} onClick={() => setKind(k.id)}>{k.label}</button>
             ))}
           </div>
-          {listings.length === 0 && <div style={{ opacity: 0.6, fontSize: 13 }}>nothing listed yet — the SELL floor awaits</div>}
+          {listings.length === 0 && <div style={{ opacity: 0.6, fontSize: 14 }}>nothing listed yet — the SELL floor awaits</div>}
           {listings.map((l) => (
             <div key={l.id} style={S.card}>
               {l.payload.imageDataUrl && <img src={l.payload.imageDataUrl} alt={l.title} style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 8 }} />}
@@ -307,7 +307,7 @@ export default function MarketplaceHub({
 
       {floor === 'shelf' && (
         <>
-          {Marketplace.myPurchases().length === 0 && <div style={{ opacity: 0.6, fontSize: 13 }}>nothing yet — the SHOP floor awaits</div>}
+          {Marketplace.myPurchases().length === 0 && <div style={{ opacity: 0.6, fontSize: 14 }}>nothing yet — the SHOP floor awaits</div>}
           {Marketplace.myPurchases().map((p) => {
             const l = Marketplace.get(p.listingId);
             if (!l) return null;

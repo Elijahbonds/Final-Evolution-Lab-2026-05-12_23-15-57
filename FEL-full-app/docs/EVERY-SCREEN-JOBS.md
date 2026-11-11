@@ -6,39 +6,45 @@
 
 **How to read it.** Taps are counted from the signed-in home; the Train tab is one tap. Typing is counted apart. Seconds are the rig's own, with no reading time: a floor, not a person's time. A camera job is walked to the moment it needs a person in front of the camera. "Stops" means a person cannot go further on that path today, and says where.
 
-**Today: 32 of 32 jobs can be walked to their end** (or to the camera); 0 stop.
+**Today: 38 of 38 jobs can be walked to their end** (or to the camera); 0 stop.
 
 ## An athlete training alone
 
 | Job | Taps | Typing | Seconds | What happens | The plan's budget |
 |---|---|---|---|---|---|
 | The wallet: each coin says where it came from | 0 | – | 0 | finishes | a balance always shows where it came from (phase 8) |
-| Pick a game on Play and start playing | 2 | – | 34.6 | finishes | pick a game → playing in ≤ 2 taps (phase 7) |
+| Pick a game on Play and start playing | 2 | – | 32.8 | finishes | pick a game → playing in ≤ 2 taps (phase 7) |
 | The party room: what each empty seat waits for | 0 | – | 0 | reaches it: the lobby: it waits for phones or controllers to join | a lobby always says what it is waiting for (phase 7) |
-| Start today's workout (today's drill) | 3 | – | 1.6 | reaches it: the drill is on camera: it needs a person in the picture | open app → first exercise in ≤ 2 taps and ≤ 10 s (phase 2) |
-| Start today's workout (a program kept on this phone) | 2 | – | 8.2 | finishes | open app → first exercise in ≤ 2 taps and ≤ 10 s (phase 2) |
-| Ask the AI builder for a program and start it | 4 | 1 | 10 | finishes | ask → first rep in ≤ 4 taps (phase 3) |
-| Change one thing in the program the AI built, and start it | 3 | – | 1.4 | finishes | change one thing without starting over; save, and start (phase 3) |
-| Log a set (in the program the AI built) | 1 | – | 8.3 | finishes | log a set in 1 tap (phase 2) |
-| Finish a session (in the program the AI built) | 15 (14 sets + 1 other) (+ 44 waits the rig skipped) | – | 38.9 | finishes | a 5-exercise session in ≤ 12 taps beyond the sets (phase 2) |
-| Test a jump (measure my vertical) | 3 | – | 2.7 | reaches it: the camera: three jumps in front of it (the reading itself is measured on recorded jumps, not on this rig) | vertical in ≤ 3 taps (phase 4) |
-| Run the movement screen | 3 | – | 2.6 | reaches it: the camera: four moves in front of it | movement screen in 3 taps and under 3 minutes (phase 4) |
+| Start today's workout (today's drill) | 3 | – | 2 | reaches it: the drill is on camera: it needs a person in the picture | open app → first exercise in ≤ 2 taps and ≤ 10 s (phase 2) |
+| Start today's workout (a program kept on this phone) | 2 | – | 8.4 | finishes | open app → first exercise in ≤ 2 taps and ≤ 10 s (phase 2) |
+| Ask the AI builder for a program and start it | 4 | 1 | 10.5 | finishes | ask → first rep in ≤ 4 taps (phase 3) |
+| Change one thing in the program the AI built, and start it | 3 | – | 1.5 | finishes | change one thing without starting over; save, and start (phase 3) |
+| Log a set (in the program the AI built) | 1 | – | 7.7 | finishes | log a set in 1 tap (phase 2) |
+| Finish a session (in the program the AI built) | 15 (14 sets + 1 other) (+ 44 waits the rig skipped) | – | 39 | finishes | a 5-exercise session in ≤ 12 taps beyond the sets (phase 2) |
+| Test a jump (measure my vertical) | 3 | – | 2.6 | reaches it: the camera: three jumps in front of it (the reading itself is measured on recorded jumps, not on this rig) | vertical in ≤ 3 taps (phase 4) |
+| Run the movement screen | 3 | – | 2 | reaches it: the camera: four moves in front of it | movement screen in 3 taps and under 3 minutes (phase 4) |
 | See progress | 2 | – | 2 | finishes | progress number → its source in 1 tap (phase 4) |
-| See where a progress number came from | 2 | – | 10.9 | finishes | progress number → its source in 1 tap (phase 4) |
+| See where a progress number came from | 2 | – | 11 | finishes | progress number → its source in 1 tap (phase 4) |
 | Find and join a group | 0 | – | 0 | reaches it: switched off until the group-booking tables are applied: the screen says so and offers what to do instead | join a group in ≤ 4 taps (phase 5) |
 | Book a 1:1 | 1 | – | 0.6 | reaches it: switched off until the group-booking tables are applied: the screen says so and offers what to do instead | book a 1:1 in ≤ 5 taps (phase 5) |
 | Cancel a booking | 0 | – | 0 | reaches it: switched off: nothing can be booked, so there is nothing to cancel; the notice says what to do instead | cancel in ≤ 3 taps with the rule shown first (phase 5) |
 | Find and join a group (booking open) | 4 | – | 1.9 | finishes | join a group in ≤ 4 taps (phase 5) |
 | Book a 1:1 (booking open) | 5 | – | 2.5 | finishes | book a 1:1 in ≤ 5 taps (phase 5) |
 | Cancel a booking (booking open) | 3 | – | 1.4 | finishes | cancel in ≤ 3 taps with the rule shown first (phase 5) |
+| Open the wallet | 2 | – | 1.3 | finishes | budget: this walk (phase 8) |
+| Open the store | 1 | – | 0.5 | finishes | budget: this walk (phase 8) |
+| Open the closet | 2 | – | 1.9 | finishes | budget: this walk (phase 8) |
+| Edit the profile | 2 | – | 1.1 | finishes | budget: this walk (phase 8) |
+| Find support | 2 | – | 1 | finishes | budget: this walk (phase 8) |
+| Spend coins (exchange for shards): the history says where it went | 2 | – | 6.5 | finishes | a purchase always shows where it came from (phase 8) |
 
 ## A coached client
 
 | Job | Taps | Typing | Seconds | What happens | The plan's budget |
 |---|---|---|---|---|---|
-| Start today's workout (the coach's session) | 2 | – | 1 | finishes | open app → first exercise in ≤ 2 taps and ≤ 10 s (phase 2) |
+| Start today's workout (the coach's session) | 2 | – | 0.9 | finishes | open app → first exercise in ≤ 2 taps and ≤ 10 s (phase 2) |
 | Log a set (the coach's session) | 1 | – | 8.1 | finishes | log a set in 1 tap (phase 2) |
-| Finish a session (the coach's session) | 9 (8 sets + 1 other) (+ 28 waits the rig skipped) | – | 25.6 | finishes | a 5-exercise session in ≤ 12 taps beyond the sets (phase 2) |
+| Finish a session (the coach's session) | 9 (8 sets + 1 other) (+ 28 waits the rig skipped) | – | 24.2 | finishes | a 5-exercise session in ≤ 12 taps beyond the sets (phase 2) |
 
 ## The coach
 
@@ -46,10 +52,86 @@
 |---|---|---|---|---|---|
 | See who trained | 2 | – | 2 | finishes | "Who needs me today" is the coach's first screen (phase 5) |
 | Adjust a program (change one exercise) | 6 | – | 3.9 | finishes | adjust one exercise in ≤ 4 taps (phase 5) |
-| Review a form clip | 3 | – | 2.5 | reaches it: switched off until the form-review table is applied: clients film a set and read their own flags; nothing reaches the coach yet, and the screen says so | – (phase 5) |
+| Review a form clip | 3 | – | 2.4 | reaches it: switched off until the form-review table is applied: clients film a set and read their own flags; nothing reaches the coach yet, and the screen says so | – (phase 5) |
 | Take group attendance | 3 | – | 2.4 | reaches it: switched off until the group-booking tables are applied: the screen says so and offers what to do instead | attendance in ≤ 1 tap per person (phase 5) |
-| Open shot charts | 4 | – | 3 | reaches it: switched off until the shot-chart table is applied: the screen says so and offers a way back | – (phase 5) |
+| Open shot charts | 4 | – | 2.9 | reaches it: switched off until the shot-chart table is applied: the screen says so and offers a way back | – (phase 5) |
 | Take group attendance (booking open) | 4 | – | 2.9 | finishes | attendance in ≤ 1 tap per person (phase 5) |
+
+## What changed in phase 8, part 2 (your things, measured on the rig)
+
+**Of the phase's 20 screens, 5 now pass all four (part 1: 0):** `/shop`, `/store`, `/wallet`, `/market`, `/support`.
+App-wide 31 → 36 of 187. No screen lost a pass.
+
+**Tap budgets, set from this build's walks** (the plan: "never more than before"; a later change may not add a tap):
+
+| Area | The walk | Taps (the budget) |
+|---|---|---|
+| Wallet | Play → the Profile tab → Wallet | 2 |
+| Store | Play → the coins in the top bar | 1 |
+| Closet | Play → the Profile tab → Closet | 2 |
+| Edit the profile | Play → the Profile tab → Edit | 2 |
+| Support | Play → the Profile tab → Support (the tab's row of doors) | 2 |
+
+**A purchase shows where it came from (the free/coin path):** walked. Wallet → "5 shards" → Exchange: 2 taps; back on the
+wallet, the history names the exchange, and the ledger holds the pair (−100 coins and +5 shards, both
+`exchange_coins_to_shards`). No money purchase exists on the rig (real-money packs are off), so the coin path is the one
+walked.
+
+**The text cut off on three game screens (dunk, snowboard, Spot the Scene): measured against release 51cce66f.** The
+same scorer read release 51cce66f's build and this branch's, more than once:
+
+| Screen | What was cut | Release 51cce66f | This branch (readings) | Verdict |
+|---|---|---|---|---|
+| `/play/dunk` | the HUD's "0", "vs", "RD 1/2" at 200 % (part 1's reading) | not cut | cut in 1 of 5 (part 1), not cut in the 4 since | noise: the HUD was drawing in as it was read |
+| `/play/snowboard` | "· PAR 60" at 200 % | **cut** | cut in 3 of 4 | there before phase 7; not caused here |
+| `/play/who-scene-it` | CONTROLS, TOUCH, TAP, ANSWER A/C at 200 % | **cut** | cut in 2 of 4 | there before phase 7; comes and goes |
+| `/play/who-scene-it` | "❚❚ PAUSE" with 150 % text (8.4 px) | not cut | cut in 2 of 2, then **0 of 2 after the fix** | **phase 7 caused it** (the controls went 12 → 14 px) |
+
+The fix: when the controls panel has stepped down as far as it may, its rows scroll in their own box (as its lines
+already did) instead of being cut. Nothing is hidden, nothing is smaller.
+
+**Owner-gated, left as they are:** `/squads`, `/squads/[id]`, `/squads/join/[token]` (switched off until the groups
+tables are applied), `/pro` (Coach Pro is not on sale), `/admin/*` (the owner's tools).
+
+**What the other 15 still need:**
+
+| Screen | Still fails | Needs |
+|---|---|---|
+| `/account` | the health-data switch (24 px tall), 5 text sizes, 4 button looks | the switch is the app's shared one: sizing it changes every switch |
+| `/cards` | 9 text sizes, 7 small paragraphs | the card art's own sizes: a design pass on the card |
+| `/closet` | 10 button looks, 4 small paragraphs | one button look for the studio (a design call) |
+| `/profile` | the new "Jump check →" link answers in 0.4–0.5 s with the CPU slowed 4× (two readings) | before, nothing on /profile was timed; the jump-check page is heavy to open |
+| `/profile/edit`, `/profile/week`, `/profile/challenges` | 69–114 words before scrolling, 5–7 text sizes, 8 button looks | shorter lines: wording, so the owner's |
+| `/shop/shards` | words, a load shift, only the bars lead on | payment wording and layout are the owner's |
+| `/play/snowboard`, `/play/who-scene-it`, `/play/dunk` | the 200 % cuts above (there before), one HUD line under 12 px | the games' HUD: game lanes |
+
+## What changed in phase 8 (your things, measured on the rig) — partly done
+
+The plan's gate: each area's main job within its tap budget (from the phase-1 baseline, never more than before); a
+balance or a purchase always shows where it came from; every screen in this group passes all four checks.
+
+- **Where a balance came from:** walked. The wallet's history names each entry (today's first-session coins: "daily").
+- **Tap budgets:** no phase-1 walk exists for these areas (phase 1 walked training, coaching and booking). Phase 8 changed
+  sizes only, so no tap count can have gone up; the budgets are not yet set from a walk (owner/coordinator call below).
+- **Changed (size only, never wording; payments, prices, policy and the delete flow untouched):** long lines to 16 px on
+  the profile, shop, store, the wallet's exchange, support, the closet's parts, the week card and the squads notices;
+  the profile's section lines by the 12-word rule; the account and settings buttons at 44 px (Download my data, Export,
+  the erase and delete buttons, the motion choices) with every confirmation step as it was.
+
+**The 20 read screens: none passes all four yet.** What each still needs:
+
+| Screen | Still fails | Needs |
+|---|---|---|
+| `/account` | targets, text sizes, button looks | the data-consent tick (13 px), one type scale for the page |
+| `/wallet` | critical accessibility, targets, text sizes | the shard amount chips at 44 px and named; sizes onto the scale |
+| `/shop`, `/store`, `/cards` | text sizes (6–10 on a screen), small lines | one type scale for the product cards (prices untouched) |
+| `/shop/shards` | words, small lines, a shift, only the bars lead on | payment wording is the owner's: layout only |
+| `/closet` | targets (SAVE LOOK, FULL 28 px), 150 % text clipped, contrast | the editor's top bar at 44 px |
+| `/profile`, `/profile/edit`, `/profile/week`, `/profile/challenges` | targets, text sizes, words, empty states | the back links and tabs at 44 px; empty states with a next step |
+| `/support`, `/market` | targets (the email link 18 px; SHOP/SELL 38 px) | 44 px links |
+| `/squads`, `/squads/[id]`, `/squads/join/[token]` | "coming soon" | switched off until the groups tables are applied (owner) |
+| `/pro` | "opens soon" | switched off (Coach Pro is not on sale: owner) |
+| `/admin/*` | the owner's tools | dense by design; small fixes only |
 
 ## What changed in phase 7 (around the games, measured on the rig)
 

@@ -61,7 +61,7 @@ export function ExchangeWidget() {
       <div className="rounded-2xl border border-[#A855F7]/30 bg-gradient-to-br from-[#A855F7]/10 to-transparent p-5">
         <div className="mb-1 flex items-center gap-2">
           <Gem className="h-5 w-5 text-[#C79BFF]" />
-          <h2 className="fel-heading text-lg font-bold text-white">Get Shards</h2>
+          <h2 className="fel-heading text-[20px] font-bold text-white">Get Shards</h2>
         </div>
         <p className="mb-4 text-base text-white/50">Shards unlock group workouts and 1-on-1 sessions. Convert coins to shards at {rate} coins = 1 shard.</p>
 
@@ -74,12 +74,13 @@ export function ExchangeWidget() {
 
         <div className="mb-3 flex flex-wrap gap-2">
           {PRESETS.map((n) => (
-            <button key={n} onClick={() => setShards(n)} className="rounded-full px-3 py-1.5 text-xs font-bold transition" style={{ backgroundColor: shards === n ? '#A855F7' : 'rgba(255,255,255,0.06)', color: shards === n ? '#fff' : 'rgba(255,255,255,0.7)' }}>{n} ◆</button>
+            <button key={n} type="button" aria-label={`${n} shards`} aria-pressed={shards === n} onClick={() => setShards(n)} className="min-h-11 min-w-11 rounded-full px-3 py-1.5 text-xs font-bold transition" style={{ backgroundColor: shards === n ? '#9333EA' : 'rgba(255,255,255,0.06)', color: shards === n ? '#fff' : 'rgba(255,255,255,0.7)' }}>{n} ◆</button>
           ))}
           <input
             type="number" min={5} max={1000} value={shards}
             onChange={(e) => setShards(Math.max(5, Math.min(1000, Math.floor(Number(e.target.value) || 0))))}
-            className="w-20 rounded-lg border border-white/15 bg-black/40 px-2 py-1.5 text-xs text-white"
+            aria-label="Shards"
+            className="min-h-11 w-20 rounded-lg border border-white/15 bg-black/40 px-2 py-1.5 text-xs text-white"
           />
         </div>
 
@@ -89,7 +90,7 @@ export function ExchangeWidget() {
             <ArrowRight className="h-4 w-4 text-white/50" />
             <Gem className="h-4 w-4 text-[#C79BFF]" /> {shards.toLocaleString()}
           </div>
-          <button onClick={doExchange} disabled={busy || !affordable} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#A855F7] py-3 text-sm font-bold text-white transition hover:bg-[#9333EA] disabled:opacity-50">
+          <button onClick={doExchange} disabled={busy || !affordable} data-exchange className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#A855F7] py-3 text-sm font-bold text-white transition hover:bg-[#9333EA] disabled:opacity-50">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Gem className="h-4 w-4" />} {affordable ? 'Exchange' : 'Not enough coins'}
           </button>
         </div>

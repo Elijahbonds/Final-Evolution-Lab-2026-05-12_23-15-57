@@ -6,7 +6,7 @@ This is phase 1 of `docs/PLAN-EVERY-SCREEN-10PHASE.md`: every screen a person ca
 
 ## The number
 
-**31 of 187 screens pass all four checks.**
+**36 of 187 screens pass all four checks.**
 
 | | Screens |
 |---|---|
@@ -15,15 +15,15 @@ This is phase 1 of `docs/PLAN-EVERY-SCREEN-10PHASE.md`: every screen a person ca
 | Not a screen of its own: it only sends you on to another | 7 |
 | Switched off: a 404 for everyone today | 21 |
 | Not scored, with the reason (section 5) | 6 |
-| **Pass all four** | **31** |
+| **Pass all four** | **36** |
 | Training and coaching (phases 2–5): pass all four | 15 of 61 (44 scored) |
 
 | Check | Pass | Fail | Not measured |
 |---|---|---|---|
-| 1. Clear and quick | 78 | **75** | 0 |
-| 2. Looks finished | 63 | **90** | 0 |
-| 3. Fast and smooth | 126 | **9** | 18 |
-| 4. Right and trustworthy | 141 | **12** | 0 |
+| 1. Clear and quick | 83 | **70** | 0 |
+| 2. Looks finished | 69 | **84** | 0 |
+| 3. Fast and smooth | 125 | **10** | 18 |
+| 4. Right and trustworthy | 143 | **10** | 0 |
 
 Of the 153 scored screens. "Not measured" is a 3D screen's tap time: the rig has no real GPU, so that one number is left open and the screen is not counted as passing.
 
@@ -52,16 +52,16 @@ The plan's rule: fix the shared thing first. "Alone" is how many screens would p
 
 | # | Fault | Screens | Alone | Check |
 |---|---|---|---|---|
-| 1 | Body copy under 16 px | 50 | 5 | 2 |
+| 1 | Body copy under 16 px | 48 | 5 | 2 |
 | 2 | More than 40 words before scrolling on a do-this screen | 40 | 14 | 1 |
-| 3 | More than 4 text sizes on one screen | 35 | 1 | 2 |
-| 4 | Tap targets under 44 px in the screen itself | 33 | 0 | 1 |
-| 5 | Tap targets under 44 px in the app's own bars | 18 | 3 | 1 |
-| 6 | More than 3 button looks on one screen | 16 | 0 | 2 |
-| 7 | Text under 12 px | 13 | 2 | 2 |
-| 8 | An empty state with no next step | 12 | 0 | 2 |
+| 3 | More than 4 text sizes on one screen | 29 | 0 | 2 |
+| 4 | Tap targets under 44 px in the screen itself | 27 | 0 | 1 |
+| 5 | More than 3 button looks on one screen | 16 | 0 | 2 |
+| 6 | Tap targets under 44 px in the app's own bars | 16 | 3 | 1 |
+| 7 | Text under 12 px | 13 | 3 | 2 |
+| 8 | An empty state with no next step | 10 | 0 | 2 |
 | 9 | Unfinished mark: "opens soon" | 9 | 5 | 2 |
-| 10 | Text cut off (150 % text) | 7 | 2 | 2 |
+| 10 | Unfinished mark: "coming soon" | 6 | 5 | 2 |
 
 **Where the common faults come from (read from the rig's element lists below, 2026-11-10).** The plan's rule is
 "fix the shared thing first". Most of the top ten come from a handful of shared parts:
@@ -85,15 +85,15 @@ at 4, a screen that uses only the approved sizes still fails. Recommend: 5, the 
 scale is a fault. Until the owner answers, the scorer keeps the plan's 4 (it is the approved number) and this page says
 how many screens fail at exactly 5.
 
-Measured for that call: 51 scored screens use exactly 5 text sizes; with 5 allowed, 0 more screens would pass all four today (the other faults on them stay).
+Measured for that call: 54 scored screens use exactly 5 text sizes; with 5 allowed, 0 more screens would pass all four today (the other faults on them stay).
 
 <details><summary>The elements behind them (the rig's own list)</summary>
 
 **Small tap targets in the app's own bars (screens)**
 
-- 15 × `"FINAL EVOLUTION LAB" 206×32 a.fel-heading.text-2xl.font-bold.text-white`
-- 7 × `"Terms" 39×44 a.hover:text-white/70`
-- 7 × `"Log in" 37×44 a.hover:text-white/70`
+- 14 × `"FINAL EVOLUTION LAB" 206×32 a.fel-heading.text-2xl.font-bold.text-white`
+- 6 × `"Terms" 39×44 a.hover:text-white/70`
+- 6 × `"Log in" 37×44 a.hover:text-white/70`
 - 4 × `"TEAM" 60×30 a.rounded-md.border.border-white/15.px-3`
 - 4 × `"MEDIA KIT" 93×30 a.rounded-md.border.border-white/15.px-3`
 - 4 × `"WORK WITH US" 120×30 a.rounded-md.bg-[#F5C518].px-3.py-1.5`
@@ -112,36 +112,36 @@ Measured for that call: 51 scored screens use exactly 5 text sizes; with 5 allow
 - 4 × `"Support" 43×18 a.hover:text-white/70`
 - 4 × `"MY LIBRARY" 103×30 a.rounded-md.border.border-white/15.px-3`
 - 4 × `"Support" 44×18 a.hover:text-white/70`
-- 3 × `"on" 13×13 input.mt-0.5`
-- 2 × `"← Back to profile" 122×36 a.rounded-xl.border.border-white/10.px-3 in [data-couch-scale]`
+- 2 × `"on" 13×13 input.mt-0.5`
 - 2 × `"Controls help" 111×28 button.pointer-events-auto.flex.items-center.gap-1.5`
 - 2 × `"Hide controller" 28×28 button.pointer-events-auto.flex.h-7.w-7`
 - 2 × `"GUARD" 107×40 button.pointer-events-auto.relative.flex.select-none`
-- 1 × `"on" 13×13 input in [data-testid]`
 - 1 × `"Health data collection" 44×24 button.peer.inline-flex.h-6.w-11 in [data-couch-scale]`
-- 1 × `"Coaching" 58×18 a in [data-couch-scale]`
 - 1 × `"Run re-engagement sweep" 232×38 button.inline-flex.items-center.gap-2.rounded-xl`
 - 1 × `"WAITING" 79×28 button.rounded-lg.px-3.py-1.5.font-mono`
 - 1 × `"FLAGGED" 79×28 button.rounded-lg.px-3.py-1.5.font-mono`
 - 1 × `"IN ROTATION" 110×28 button.rounded-lg.px-3.py-1.5.font-mono`
 - 1 × `"APPROVED" 86×28 button.rounded-lg.px-3.py-1.5.font-mono`
 - 1 × `"REJECTED" 86×28 button.rounded-lg.px-3.py-1.5.font-mono`
+- 1 × `"Discipline" 145×30 select.ml-auto.rounded-lg.bg-white/5.px-2`
+- 1 × `"25 LC" 76×38 button.rounded-lg.border.px-4.py-2`
+- 1 × `"50 LC" 76×38 button.rounded-lg.border.px-4.py-2`
 
-**Text sizes per screen:** 0 sizes: 1 screens; 1 sizes: 2 screens; 2 sizes: 2 screens; 3 sizes: 48 screens; 4 sizes: 25 screens; 5 sizes: 51 screens; 6 sizes: 13 screens; 7 sizes: 7 screens; 8 sizes: 2 screens; 9 sizes: 1 screens; 10 sizes: 1 screens
+**Text sizes per screen:** 0 sizes: 1 screens; 1 sizes: 2 screens; 2 sizes: 2 screens; 3 sizes: 48 screens; 4 sizes: 26 screens; 5 sizes: 54 screens; 6 sizes: 9 screens; 7 sizes: 7 screens; 8 sizes: 2 screens; 9 sizes: 1 screens; 10 sizes: 1 screens
 
 **The sizes themselves (screens that use each)**
 
 - 142 × `12px`
-- 113 × `20px`
-- 112 × `16px`
-- 100 × `14px`
+- 114 × `20px`
+- 113 × `16px`
+- 101 × `14px`
 - 59 × `30px`
-- 31 × `18px`
-- 31 × `24px`
+- 30 × `24px`
+- 26 × `18px`
 - 16 × `36px`
-- 13 × `13px`
+- 12 × `13px`
 - 7 × `44px`
-- 7 × `22px`
+- 6 × `22px`
 - 5 × `12.5px`
 - 4 × `15px`
 - 4 × `11.9px`
@@ -158,11 +158,11 @@ Measured for that call: 51 scored screens use exactly 5 text sizes; with 5 allow
 - 1 × `26px`
 - 1 × `60px`
 
-**Button looks per screen:** 0: 32; 1: 67; 2: 23; 3: 15; 4: 7; 5: 2; 6: 3; 7: 2; 8: 1; 12: 1
+**Button looks per screen:** 0: 32; 1: 67; 2: 23; 3: 15; 4: 7; 5: 2; 6: 3; 7: 2; 8: 1; 10: 1
 
 **Text under the READABLE floor**
 
-- 8 × `body-small 14px div>div>div>p`
+- 7 × `body-small 14px div>div>div>p`
 - 5 × `body-small 12px div>div>div>p`
 - 5 × `body-small 14px main>header>div>p`
 - 4 × `body-small 12px div>p`
@@ -171,18 +171,17 @@ Measured for that call: 51 scored screens use exactly 5 text sizes; with 5 allow
 - 3 × `hud-small 12px div>div>span[data-hud-plate=true]>span`
 - 2 × `body-small 12px div>div>label>span`
 - 2 × `body-small 14px main>div>div>p`
-- 2 × `body-small 12px div>div>div`
 - 2 × `body-small 12px div>div>p`
 - 2 × `tiny 11.9px div>main>p[data-public-copy=true]>mark[data-owner-blank]`
 - 2 × `body-small 14px main[data-live=1]>div>p`
 - 2 × `body-small 14px main[data-live=1]>section[data-testid]>p[data-testid]`
 - 2 × `hud-small 12px div[data-hud-frame=true]>div>div[data-hud-plate=true]>div`
 - 2 × `hud-small 12px div[data-hud-frame=true]>div>span[data-hud-plate=true]>span`
+- 2 × `body-small 12.04px div[data-splash-main=true]>span[data-controls-panel=touch]>span[data-controls-lines=true]>span`
 
 **Accessibility findings**
 
 - 1 × `serious contrast: button "STAKE & POST DUEL"`
-- 1 × `serious target-size: button "Rename LOOK 1"`
 - 1 × `critical label: input[data-testid=controller-name] "Your name"`
 - 1 × `critical label: input "Filter…"`
 - 1 × `serious contrast: p "Goes fullscreen and keeps the screen awake."`
@@ -192,23 +191,21 @@ Measured for that call: 51 scored screens use exactly 5 text sizes; with 5 allow
 - 1 × `critical label: select "Flight NightAero AcesVelocity KartDowntownStompG"`
 - 1 × `critical contrast: div "NONE"`
 - 1 × `critical contrast: div "NO ITEM"`
-- 1 × `critical label: input ""`
-- 1 × `serious contrast: button "10 ◆"`
 
 **What moves as a screen loads**
 
-- 72 × `a.inline-flex.min-h-11.items-center`
-- 72 × `a.fel-press.inline-flex.min-h-11`
-- 4 × `#text`
+- 71 × `a.inline-flex.min-h-11.items-center`
+- 71 × `a.fel-press.inline-flex.min-h-11`
+- 3 × `#text`
 - 2 × `h1.text-4xl.font-black.tracking-wide`
 - 2 × `div.fel-boot-bar.h-full.rounded-full`
 - 2 × `svg`
 - 1 × `div.mt-8.overflow-x-auto`
 - 1 × `button.inline-flex.items-center.gap-2`
 - 1 × `div.mt-6.space-y-8`
-- 1 × `div.flex.gap-1`
+- 1 × `div.flex.min-w-0.shrink`
+- 1 × `div.flex.gap-2`
 - 1 × `section.mt-6`
-- 1 × `p.font-sans.text-[14px].font-medium`
 
 **What sticks out sideways**
 
@@ -230,9 +227,7 @@ Measured for that call: 51 scored screens use exactly 5 text sizes; with 5 allow
 - 1 × `No songs of yours on this device yet. Make one in the Academ`
 - 1 × `No season has finalized yet.`
 - 1 × `No matches yet. Create a challenge above to get started.`
-- 1 × `Nothing measured yet`
-- 1 × `No tiers yet. Play any mode a few times to climb from Bronze`
-- 1 × `No duels yet. Send a challenge and your record starts here.`
+- 1 × `Nothing here stops you from contacting a government consumer`
 
 **Unfinished marks**
 
@@ -497,7 +492,7 @@ Not measured yet: run `scripts/every-screen/dark.mts`.
 | `/play/dance` | signed-in | do | ✓ | ✓ | ? | ✓ | not measured: tap response; Fast and smooth: a 3D screen: the rig has no real GPU, so the tap response is not timed |
 | `/play/derby` | signed-in | do | ✓ | ✓ | ? | ✓ | not measured: tap response; Fast and smooth: a 3D screen: the rig has no real GPU, so the tap response is not timed |
 | `/play/duel` | signed-in | do | ✓ | ✓ | ? | ✓ | not measured: tap response; Fast and smooth: a 3D screen: the rig has no real GPU, so the tap response is not timed |
-| `/play/dunk` | signed-in | do | ✓ | ✗ | ✓ | ✓ | Text cut off at 200 % zoom: "0" and 5 more. |
+| `/play/dunk` | signed-in | do | ✓ | ✗ | ✓ | ✓ | 1 piece of text under 12 px. |
 | `/play/dunkduel` | signed-in | do | ✗ | ✓ | ✓ | ✓ | 88 words before scrolling (the budget is 40). |
 | `/play/football` | signed-in | do | ✓ | ✗ | ✓ | ✓ | 3 pieces of text under 12 px. |
 | `/play/freerun` | signed-in | do | ✓ | ✗ | ✓ | ✓ | 1 piece of text under 12 px. |
@@ -526,37 +521,37 @@ Not measured yet: run `scripts/every-screen/dark.mts`.
 | `/play/tiebreak` | nobody (redirects away) | do | – | – | – | – | *not its own screen: redirects to /play/tennis for everyone who is signed in* |
 | `/play/velocity-kart` | signed-in | do | ✓ | ✗ | ✓ | ✗ | 1 critical accessibility finding (contrast). |
 | `/play/volleyball` | signed-in | do | ✓ | ✓ | ? | ✓ | not measured: tap response; Fast and smooth: a 3D screen: the rig has no real GPU, so the tap response is not timed |
-| `/play/who-scene-it` | signed-in | do | ✓ | ✗ | ? | ✓ | Text cut off at 200 % zoom: "CONTROLS" and 5 more. |
+| `/play/who-scene-it` | signed-in | do | ✓ | ✗ | ? | ✓ | 1 piece of text under 12 px. |
 | `/venues` | signed-in | hub | ✓ | ✗ | ✓ | ✓ | 1 paragraph of body copy under 16 px. |
 
-### Phase 8 — your things (24 screens; 0 of 20 scored pass all four)
+### Phase 8 — your things (24 screens; 5 of 20 scored pass all four)
 
 | Screen | Who | Kind | 1 | 2 | 3 | 4 | The single worst problem |
 |---|---|---|---|---|---|---|---|
-| `/account` | signed-in | hub | ✗ | ✗ | ✓ | ✓ | 3 tap targets under 44 px (smallest: "on"). |
+| `/account` | signed-in | hub | ✗ | ✗ | ✓ | ✓ | 1 tap target under 44 px (smallest: "Health data collection"). |
 | `/admin/funnel` | admin | hub | ✗ | ✗ | ✓ | ✓ | An empty state with no next step: "No wins yet". |
 | `/admin/metrics` | admin | hub | ✓ | ✗ | ✗ | ✓ | An empty state with no next step: "No stored rollups yet. Click “Recompute” to generate them from traffic.". |
 | `/admin/review` | admin | hub | ✗ | ✗ | ✓ | ✗ | "WAITING" does nothing when tapped. |
 | `/card/[slug]` | unknown (no fixture) | do | – | – | – | – | *not scored: needs a published creator card row; a new account has none* |
 | `/cards` | signed-in | hub | ✓ | ✗ | ✓ | ✓ | 7 paragraphs of body copy under 16 px. |
-| `/closet` | signed-in | hub | ✗ | ✗ | ? | ✗ | 40 tap targets under 44 px (smallest: "Rename LOOK 1"). |
-| `/market` | signed-in | hub | ✗ | ✗ | ✓ | ✓ | 8 tap targets under 44 px (smallest: "SHOP"). |
+| `/closet` | signed-in | hub | ✓ | ✗ | ? | ✓ | 4 paragraphs of body copy under 16 px. |
+| `/market` | signed-in | hub | ✓ | ✓ | ✓ | ✓ | **passes all four** |
 | `/p/[token]` | unknown (no fixture) | do | – | – | – | – | *not scored: needs a coach share-link row (a coach sharing a client's progress); none exists on a new account* |
 | `/pro` | signed-in | do | ✗ | ✗ | ✓ | ✓ | Unfinished mark on screen: "Opens soon". |
-| `/profile` | signed-in | hub | ✗ | ✗ | ✓ | ✓ | An empty state with no next step: "Nothing measured yet". |
-| `/profile/challenges` | signed-in | do | ✗ | ✗ | ✓ | ✓ | Nothing in the screen itself leads on: only the app's own bars do. |
-| `/profile/edit` | signed-in | do | ✗ | ✗ | ✓ | ✓ | 24 tap targets under 44 px (smallest: "+ Log measurement"). |
+| `/profile` | signed-in | hub | ✓ | ✓ | ✗ | ✓ | "Jump check, hands on hips →" answers a tap in 408 ms (the budget is 200 ms). |
+| `/profile/challenges` | signed-in | do | ✗ | ✗ | ✓ | ✓ | 69 words before scrolling (the budget is 40). |
+| `/profile/edit` | signed-in | do | ✗ | ✗ | ✓ | ✓ | 79 words before scrolling (the budget is 40). |
 | `/profile/week` | signed-in | do | ✗ | ✗ | ✓ | ✓ | 114 words before scrolling (the budget is 40). |
 | `/settings` | nobody (redirects away) | do | – | – | – | – | *not its own screen: redirects to /account for everyone who is signed in* |
-| `/shop` | signed-in | hub | ✓ | ✗ | ✓ | ✓ | 5 text sizes on one screen besides 16 px body text (at most 4). |
+| `/shop` | signed-in | hub | ✓ | ✓ | ✓ | ✓ | **passes all four** |
 | `/shop/shards` | signed-in | do | ✗ | ✗ | ✗ | ✓ | Nothing in the screen itself leads on: only the app's own bars do. review: a number with no method line |
 | `/squads` | signed-in | hub | ✓ | ✗ | ✓ | ✓ | Unfinished mark on screen: "Squads and teams are coming soon. Your drills, games and streak keep counting in". |
 | `/squads/[id]` | signed-in | do | ✓ | ✗ | ✓ | ✓ | Unfinished mark on screen: "Squads and teams are coming soon. Your drills, games and streak keep counting in". (the teams-and-squads tables are not applied) |
 | `/squads/join/[token]` | anyone | do | ✓ | ✗ | ✓ | ✓ | Unfinished mark on screen: "Squads and teams are coming soon. Your drills, games and streak keep counting in". (the teams-and-squads tables are not applied) |
-| `/store` | signed-in | hub | ✓ | ✗ | ✓ | ✓ | 1 paragraph of body copy under 16 px. |
-| `/support` | anyone | read | ✗ | ✗ | ✓ | ✓ | 1 tap target under 44 px (smallest: "FinalEvolution.us@gmail.com"). |
+| `/store` | signed-in | hub | ✓ | ✓ | ✓ | ✓ | **passes all four** |
+| `/support` | anyone | read | ✓ | ✓ | ✓ | ✓ | **passes all four** |
 | `/u/[slug]` | unknown (no fixture) | do | – | – | – | – | *not scored: needs a published creator card row; a new account has none* |
-| `/wallet` | signed-in | hub | ✗ | ✗ | ✓ | ✗ | 1 critical accessibility finding (label, contrast). |
+| `/wallet` | signed-in | hub | ✓ | ✓ | ✓ | ✓ | **passes all four** |
 
 ### Phase 9 — learn, create and the public pages (36 screens; 3 of 33 scored pass all four)
 

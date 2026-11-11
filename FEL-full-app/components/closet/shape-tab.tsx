@@ -77,7 +77,7 @@ export function ShapeTab(p: ShapeTabProps) {
         <button type="button" onClick={p.onRedo} disabled={!p.canRedo} aria-label="Redo" title="Redo (Shift+Ctrl+Z)"
           className="flex items-center gap-1 rounded-lg bg-white/5 px-2.5 py-1.5 text-xs text-white/80 transition hover:bg-white/10 disabled:opacity-30"><Redo2 className="h-3.5 w-3.5" /> Redo</button>
         <button type="button" onClick={p.onRoll} disabled={p.locks.length === SHAPE_RANDOM_SECTIONS.length} aria-label="Randomise shape"
-          className="flex items-center gap-1 rounded-lg bg-cyan-400/15 px-2.5 py-1.5 text-xs font-semibold text-cyan-200 transition hover:bg-cyan-400/25 disabled:opacity-30"><Shuffle className="h-3.5 w-3.5" /> Randomise shape</button>
+          className="flex min-h-11 items-center gap-1 rounded-lg bg-cyan-400/15 px-2.5 py-1.5 text-xs font-semibold text-cyan-200 transition hover:bg-cyan-400/25 disabled:opacity-30"><Shuffle className="h-3.5 w-3.5" /> Randomise shape</button>
         <div className="flex flex-wrap gap-1.5">
           {SHAPE_RANDOM_SECTIONS.map((sec) => {
             const on = p.locks.includes(sec);

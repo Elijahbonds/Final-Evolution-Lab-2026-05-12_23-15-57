@@ -46,7 +46,7 @@ export function AthletePicker({ initialKey }: { initialKey: string | null }) {
         </div>
         <a
           href="/closet"
-          className="inline-flex items-center gap-1.5 rounded-md border border-[#C79BFF]/40 bg-[#C79BFF]/10 px-3 py-1.5 text-xs font-bold text-[#C79BFF] transition-colors hover:bg-[#C79BFF]/20"
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-[#C79BFF]/40 bg-[#C79BFF]/10 px-3 py-1.5 text-xs font-bold text-[#C79BFF] transition-colors hover:bg-[#C79BFF]/20"
         >
           <Sparkles className="h-3.5 w-3.5" /> CUSTOMIZE YOUR LOOK
         </a>
@@ -133,7 +133,7 @@ export function PrqDataRights() {
 
   return (
     <div className="mt-8 rounded-xl border border-white/10 bg-white/[0.02] p-5">
-      <h3 className="fel-heading text-lg font-bold text-white mb-1">YOUR DATA RIGHTS</h3>
+      <h3 className="fel-heading text-[20px] font-bold text-white mb-1">YOUR DATA RIGHTS</h3>
       {/* REVIEW (2026-09-24, D5): both buttons cover the movement history too (lib/prq-data-rights.ts), the numbers
           worked out from the camera that the privacy policy sends people here to export or delete */}
       <p className={`${TYPE.body} text-fel-dim mb-4`}>
@@ -259,7 +259,7 @@ export function HealthDataSection() {
 
   return (
     <div className="mt-8 rounded-xl border border-white/10 bg-white/[0.02] p-5">
-      <h3 className="fel-heading flex items-center gap-2 text-lg font-bold text-white mb-1">
+      <h3 className="fel-heading flex items-center gap-2 text-[20px] font-bold text-white mb-1">
         <ShieldCheck className="h-4 w-4 text-[#00E5FF]" /> HEALTH DATA
       </h3>
       <p className={`${TYPE.body} text-fel-dim mb-4`}>
@@ -408,7 +408,7 @@ export function PrqFoundation() {
         <button
           data-test-ignore="opens-log-form"
           onClick={() => openForm()}
-          className="inline-flex items-center gap-1.5 rounded-md border border-[#00E5FF]/40 bg-[#00E5FF]/10 px-3 py-1.5 text-xs font-bold text-[#00E5FF] transition-colors hover:bg-[#00E5FF]/20"
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-[#00E5FF]/40 bg-[#00E5FF]/10 px-3 py-1.5 text-xs font-bold text-[#00E5FF] transition-colors hover:bg-[#00E5FF]/20"
         >
           <Plus className="h-3.5 w-3.5" /> LOG ENTRY
         </button>
@@ -418,7 +418,7 @@ export function PrqFoundation() {
         // the same badge every surface prints (lib/prq-display): "PRQ —" until something is measured
         const d = prqDisplay(prq);
         return (
-          <div className="mt-3 inline-flex items-center gap-2 rounded-lg border px-4 py-2 font-mono text-lg font-bold" style={{ color: d.color, borderColor: `${d.color}4d`, background: `${d.color}1a` }}>
+          <div className="mt-3 inline-flex items-center gap-2 rounded-lg border px-4 py-2 font-mono text-[20px] font-bold" style={{ color: d.color, borderColor: `${d.color}4d`, background: `${d.color}1a` }}>
             {d.label}
             <span className="text-xs font-normal text-white/50">({d.coverage} measured)</span>
           </div>
@@ -463,7 +463,7 @@ export function PrqFoundation() {
               {val === null && (
                 <button
                   onClick={() => openForm(attr.key)}
-                  className="mt-2 text-[12px] font-bold text-[#00E5FF]/70 hover:text-[#00E5FF]"
+                  className="mt-1 inline-flex min-h-11 items-center text-[12px] font-bold text-[#00E5FF]/70 hover:text-[#00E5FF]"
                 >
                   + Log measurement
                 </button>
@@ -477,7 +477,7 @@ export function PrqFoundation() {
       {showForm && (
         <div className="fel-panel mt-6 rounded-xl p-5">
           <div className="flex items-center justify-between">
-            <h3 className="fel-heading text-lg font-bold text-white">LOG PRQ ENTRY</h3>
+            <h3 className="fel-heading text-[20px] font-bold text-white">LOG PRQ ENTRY</h3>
             <button onClick={() => setShowForm(false)} className="text-white/50 hover:text-white">
               <X className="h-4 w-4" />
             </button>

@@ -99,7 +99,7 @@ export function PartsTab({ parts, onChange, accent, canUndo, canRedo, onUndo, on
             const ok = fitsBudget(parts, 1);
             return (
               <button key={shape} type="button" disabled={!ok} onClick={() => add(shape)} title={`Add a ${SHAPE_LABELS[shape].toLowerCase()} (starts on the ${BONE_LABELS[PART_START[shape].bone].toLowerCase()})`}
-                className="flex items-center justify-center gap-1 rounded-lg border border-white/10 bg-white/[0.03] px-2 py-1.5 text-[12px] text-white/80 transition hover:border-cyan-400/50 hover:bg-cyan-400/10 disabled:opacity-30">
+                className="flex min-h-11 items-center justify-center gap-1 rounded-lg border border-white/10 bg-white/[0.03] px-2 py-1.5 text-[12px] text-white/80 transition hover:border-cyan-400/50 hover:bg-cyan-400/10 disabled:opacity-30">
                 <Plus className="h-3 w-3 text-cyan-300/80" /> {SHAPE_LABELS[shape]}
               </button>
             );
@@ -107,10 +107,10 @@ export function PartsTab({ parts, onChange, accent, canUndo, canRedo, onUndo, on
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-[12px] text-white/60">
           <span>Spike cluster</span>
-          <input type="range" min={3} max={16} value={cluster} onChange={(e) => setCluster(Number(e.target.value))} className="w-28 accent-cyan-400" aria-label="Spikes in the cluster" />
+          <input type="range" min={3} max={16} value={cluster} onChange={(e) => setCluster(Number(e.target.value))} className="min-h-11 w-28 accent-cyan-400" aria-label="Spikes in the cluster" />
           <span className="w-5 tabular-nums text-white/50">{cluster}</span>
           <button type="button" onClick={addCluster} disabled={!fitsBudget(parts, 1)}
-            className="rounded-md bg-cyan-400/15 px-2 py-1 font-semibold text-cyan-200 transition hover:bg-cyan-400/25 disabled:opacity-30">Add spikes to the head</button>
+            className="min-h-11 rounded-md bg-cyan-400/15 px-2 py-1 font-semibold text-cyan-200 transition hover:bg-cyan-400/25 disabled:opacity-30">Add spikes to the head</button>
           <span className="text-[12px] text-white/50">Each spike is its own part — edit or delete any of them.</span>
         </div>
       </section>

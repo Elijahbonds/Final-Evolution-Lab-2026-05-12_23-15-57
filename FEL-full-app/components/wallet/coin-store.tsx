@@ -118,7 +118,7 @@ export function CoinStore({ initialPurchasesEnabled = null }: { initialPurchases
           <h1 className="text-2xl font-bold text-white">Coin Store</h1>
           {/* ARENA-10PHASE P10 said "sold separately" unconditionally; FEATURES-UX-SHOP: the line is the purchases flag's own words,
               and "Shard Store" is the link in every state. */}
-          <p className="text-sm text-white/50">
+          <p className="text-base text-white/50">
             {copy.coinStoreShards.split('Shard Store')[0]}
             <Link href="/shop/shards" className="text-[#C79BFF] hover:underline">Shard Store</Link>
             {copy.coinStoreShards.split('Shard Store')[1]}
@@ -142,7 +142,7 @@ export function CoinStore({ initialPurchasesEnabled = null }: { initialPurchases
       <section>
         <div className="mb-3 flex items-center gap-2">
           <ShoppingCart className="h-4 w-4 text-[#00E5FF]" />
-          <h2 className="text-lg font-semibold text-white">Coin Packs</h2>
+          <h2 className="text-[20px] font-semibold text-white">Coin Packs</h2>
           {copy.badge && (
             <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[12px] uppercase tracking-wide text-white/50">{copy.badge}</span>
           )}
@@ -185,7 +185,7 @@ export function CoinStore({ initialPurchasesEnabled = null }: { initialPurchases
       <section>
         <div className="mb-1 flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-[#00FF9D]" />
-          <h2 className="text-lg font-semibold text-white">Spend Your Balance</h2>
+          <h2 className="text-[20px] font-semibold text-white">Spend Your Balance</h2>
         </div>
         <p className="mb-3 text-base text-white/50">Coins and shards are spent on the page that uses what you buy.</p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

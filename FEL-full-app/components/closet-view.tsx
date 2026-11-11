@@ -89,7 +89,7 @@ function Chip({ label, active, onClick, accent = '#00E5FF' }: { label: string; a
   return (
     <button
       onClick={onClick}
-      className="rounded-full px-3 py-1.5 text-xs font-medium transition"
+      className="min-h-11 rounded-full px-3 py-1.5 text-xs font-medium transition"
       style={{
         backgroundColor: active ? accent : 'rgba(255,255,255,0.05)',
         color: active ? '#050505' : 'rgba(255,255,255,0.75)',
@@ -666,7 +666,7 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan: faceSca
 
   const dirty = !!savedSig && sigNow !== savedSig;
   const stageH = fullBleed ? 'h-[100dvh]' : 'h-[calc(100dvh-3.5rem)] max-md:h-[calc(100dvh-3.5rem-4.5rem)]';
-  const hudBtn = 'pointer-events-auto flex items-center gap-1 rounded-lg border border-white/10 bg-black/55 px-2.5 py-1.5 max-md:px-2 max-md:py-1 font-display text-[12px] font-semibold uppercase tracking-wider text-white/80 backdrop-blur transition hover:border-cyan-400/50';
+  const hudBtn = 'pointer-events-auto flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-lg border border-white/10 bg-black/55 px-2.5 py-1.5 max-md:px-2 max-md:py-1 font-display text-[12px] font-semibold uppercase tracking-wider text-white/80 backdrop-blur transition hover:border-cyan-400/50';
   const on = (v: boolean) => (v ? { borderColor: 'var(--fel-cyan)', color: 'var(--fel-cyan)', background: 'rgba(0,229,255,0.12)' } : undefined);
   const selLabel = tab === 'parts' && selectedPart ? `Part · ${selectedPart.shape}` : tab === 'paint' && selectedLayer ? `Layer · ${REGION_LABELS[selectedLayer.region]}`
     : selectedCloth ? `Wearing · ${clothLabel(selectedCloth)}` : null;
@@ -686,7 +686,7 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan: faceSca
           studio={{ tab, focus, selectedPart, sticker, region: selectedLayer?.region ?? tapped?.region ?? null, knobs: !compare && !photoOpen, events, apiRef: studioApi }} />
 
         {/* top: the title and the character, the shots and the tools */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-3">
+        <div className="pointer-events-none absolute inset-x-0 top-0 flex flex-wrap items-start justify-between gap-2 p-3">
           <div className="min-w-[7rem]">
             <h1 className="flex items-center gap-2 font-display text-lg font-bold uppercase tracking-[0.22em] text-white max-md:text-base max-md:tracking-[0.15em]"><Shirt className="h-5 w-5 text-cyan-400" /> Studio</h1>
             <p className="truncate font-display text-[12px] uppercase tracking-[0.18em] text-white/55">{slot.label || 'This character'}{dirty ? ' · unsaved' : ''}</p>
@@ -702,24 +702,26 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan: faceSca
                 <button type="button" className={hudBtn} onClick={() => addAt('fill')}>+ Fill</button>
                 <button type="button" className={hudBtn} onClick={() => addAt('pattern')}>+ Pattern</button>
                 <button type="button" className={hudBtn} onClick={() => addAt('stamp')}>+ Stamp here</button>
-                <button type="button" className="pointer-events-auto rounded p-1 text-white/50 hover:text-white" onClick={() => setTapped(null)} aria-label="Clear"><X className="h-3.5 w-3.5" /></button>
+                <button type="button" className="pointer-events-auto grid h-11 w-11 place-items-center rounded text-white/50 hover:text-white" onClick={() => setTapped(null)} aria-label="Clear"><X className="h-3.5 w-3.5" /></button>
               </div>
             )}
           </div>
-          <div className="flex shrink-0 flex-col items-end gap-1.5">
+          <div className="flex min-w-0 shrink flex-col items-end gap-1.5">
             {studioEdit ? (
-              <button onClick={() => { void backToStudio(); }} className="pointer-events-auto flex items-center gap-2 rounded-xl bg-cyan-400 px-4 py-2 max-md:px-3 max-md:py-1.5 font-display text-xs font-bold uppercase tracking-wider text-black shadow-[0_0_18px_rgba(0,229,255,0.35)] transition hover:bg-cyan-300">
+              <button onClick={() => { void backToStudio(); }} className="pointer-events-auto flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-xl bg-cyan-400 px-4 py-2 max-md:px-3 max-md:py-1.5 font-display text-xs font-bold uppercase tracking-wider text-black shadow-[0_0_18px_rgba(0,229,255,0.35)] transition hover:bg-cyan-300">
                 <Check className="h-4 w-4" /> Back to Nexus Studio
               </button>
             ) : (
-            <button onClick={() => save()} disabled={saving} className="pointer-events-auto flex items-center gap-2 rounded-xl bg-cyan-400 px-4 py-2 max-md:px-3 max-md:py-1.5 font-display text-xs font-bold uppercase tracking-wider text-black shadow-[0_0_18px_rgba(0,229,255,0.35)] transition hover:bg-cyan-300 disabled:opacity-60">
+            <button onClick={() => save()} disabled={saving} className="pointer-events-auto flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-xl bg-cyan-400 px-4 py-2 max-md:px-3 max-md:py-1.5 font-display text-xs font-bold uppercase tracking-wider text-black shadow-[0_0_18px_rgba(0,229,255,0.35)] transition hover:bg-cyan-300 disabled:opacity-60">
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Save Look
             </button>
             )}
-            <div className="flex gap-1" role="group" aria-label="Camera">
+            <div className="flex flex-wrap justify-end gap-1" role="group" aria-label="Camera">
               {STUDIO_SHOTS.map((sh, i) => <button key={sh} type="button" className={hudBtn} onClick={() => act({ shot: sh })} title={`${sh} (${i + 1})`}>{sh}</button>)}
             </div>
-            <div className="flex flex-wrap justify-end gap-1">
+            {/* EVERY-SCREEN P8b: at 44 px a phone's row of five ran across the character's face; two columns down the
+                stage's right edge keep him clear */}
+            <div className="flex flex-wrap justify-end gap-1 max-md:grid max-md:grid-cols-2">
               <button type="button" className={hudBtn} style={on(autoSpin)} onClick={() => setAutoSpin(!autoSpin)} aria-pressed={autoSpin} title="Turntable (T, pad L3) — or drag the stage to spin"><RotateCw className="h-3.5 w-3.5" /> <span className="max-md:hidden">Spin</span></button>
               <button type="button" className={hudBtn} style={on(compare)} onClick={() => setCompare((c) => !c)} aria-pressed={compare} title="Before / after (B, pad Select)"><SplitSquareHorizontal className="h-3.5 w-3.5" /> <span className="max-md:hidden">Before</span></button>
               <button type="button" className={hudBtn} style={on(showPose)} onClick={() => setShowPose((v) => !v)} aria-pressed={showPose} title="Poses and venue light"><Sun className="h-3.5 w-3.5" /> <span className="max-md:hidden">Pose</span></button>
@@ -831,7 +833,7 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan: faceSca
                 <button type="button" onClick={() => setHist(redo)} disabled={!canRedo(hist)} aria-label="Redo" title="Redo (Shift+Ctrl+Z)"
                   className="flex items-center gap-1 rounded-lg bg-white/5 px-2.5 py-1.5 text-xs text-white/80 transition hover:bg-white/10 disabled:opacity-30"><Redo2 className="h-3.5 w-3.5" /> Redo</button>
                 <button type="button" onClick={roll} disabled={locks.length === RANDOM_SECTIONS.length}
-                  className="flex items-center gap-1 rounded-lg bg-cyan-400/15 px-2.5 py-1.5 text-xs font-semibold text-cyan-200 transition hover:bg-cyan-400/25 disabled:opacity-30"><Shuffle className="h-3.5 w-3.5" /> Randomise</button>
+                  className="flex min-h-11 items-center gap-1 rounded-lg bg-cyan-400/15 px-2.5 py-1.5 text-xs font-semibold text-cyan-200 transition hover:bg-cyan-400/25 disabled:opacity-30"><Shuffle className="h-3.5 w-3.5" /> Randomise</button>
                 <div className="flex flex-wrap gap-1.5">
                   {RANDOM_SECTIONS.map((sec) => {
                     const on = locks.includes(sec);

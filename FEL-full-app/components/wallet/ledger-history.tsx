@@ -105,7 +105,7 @@ export function LedgerHistory() {
         })}
       </ul>
 
-      {err && <div className="mt-4 text-center text-sm text-[#FF3366]">Could not load history. <button onClick={() => loadMore(true)} className="underline">Retry</button></div>}
+      {err && <div className="mt-4 text-center text-sm text-[#FF3366]">Could not load history. <button onClick={() => loadMore(true)} className="inline-flex min-h-11 items-center px-1 underline">Retry</button></div>}
 
       {!done && !err && (
         <div className="mt-4 flex justify-center">

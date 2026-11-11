@@ -109,8 +109,9 @@ export function PaintTab({ layers, suit, onChange, onSuit, accent, marks, onMark
 
       <label className="flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-2.5 text-xs transition"
         style={{ borderColor: suit ? '#00E5FF' : 'rgba(255,255,255,0.1)', backgroundColor: suit ? 'rgba(0,229,255,0.07)' : 'rgba(255,255,255,0.02)' }}>
-        <input type="checkbox" checked={suit} aria-label="Suit mode" className="mt-0.5 accent-cyan-400"
+        <input type="checkbox" checked={suit} aria-label="Suit mode" className="peer sr-only"
           onChange={(e) => onSuit(e.target.checked, e.target.checked ? suitBase(layers, colour) : [...layers])} />
+        <span aria-hidden className="mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded border border-white/40 text-[12px] leading-none text-transparent peer-checked:border-cyan-400 peer-checked:bg-cyan-400 peer-checked:text-black peer-focus-visible:ring-2 peer-focus-visible:ring-cyan-300">✓</span>
         <span>
           <span className="flex items-center gap-1 font-semibold text-white/85"><Shirt className="h-3.5 w-3.5" /> Suit mode</span>
           <span className="text-white/50">Hides your clothes and paints the whole body — a skin-tight suit, a full-head mask and a chest emblem are all paint. Parts stay on.</span>
@@ -122,7 +123,7 @@ export function PaintTab({ layers, suit, onChange, onSuit, accent, marks, onMark
         <div className="grid grid-cols-5 gap-1.5">
           {TYPES.map((t) => (
             <button key={t} type="button" disabled={full || (t === 'mark' && (!onMarks || !fitsMarkBudget(marks)))} onClick={() => add(t)} title={t === 'mark' ? `Draw your own stamp (up to ${MAX_MARKS})` : `Add a ${TYPE_LABELS[t].toLowerCase()} layer`}
-              className="flex items-center justify-center gap-1 rounded-lg border border-white/10 bg-white/[0.03] px-2 py-1.5 text-[12px] text-white/80 transition hover:border-cyan-400/50 hover:bg-cyan-400/10 disabled:opacity-30">
+              className="flex min-h-11 items-center justify-center gap-1 rounded-lg border border-white/10 bg-white/[0.03] px-2 py-1.5 text-[12px] text-white/80 transition hover:border-cyan-400/50 hover:bg-cyan-400/10 disabled:opacity-30">
               <Plus className="h-3 w-3 text-cyan-300/80" /> {TYPE_LABELS[t]}
             </button>
           ))}

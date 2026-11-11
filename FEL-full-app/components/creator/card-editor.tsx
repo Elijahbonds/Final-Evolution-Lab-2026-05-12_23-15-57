@@ -134,7 +134,7 @@ export function CardEditor() {
           </Field>
           <Field label="Accent color">
             <div className="flex items-center gap-2">
-              <input type="color" value={/^#[0-9a-fA-F]{6}$/.test(accent) ? accent : '#00E5FF'} onChange={(e) => setAccent(e.target.value)} className="h-10 w-12 cursor-pointer rounded-lg border border-white/10 bg-transparent" />
+              <input type="color" value={/^#[0-9a-fA-F]{6}$/.test(accent) ? accent : '#00E5FF'} onChange={(e) => setAccent(e.target.value)} className="h-11 w-12 cursor-pointer rounded-lg border border-white/10 bg-transparent" />
               <input value={accent} maxLength={7} onChange={(e) => setAccent(e.target.value)} className="fel-input" placeholder="#00E5FF" aria-label="Accent color, as a hex code" />
             </div>
           </Field>
@@ -148,7 +148,7 @@ export function CardEditor() {
           <div className="font-mono text-[12px] uppercase tracking-widest text-white/50">What your card shows</div>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {STAT_BLOCKS.map((k) => (
-              <button key={k} type="button" onClick={() => setShowStats((s) => ({ ...s, [k]: !s[k] }))} className={`rounded-lg border px-2.5 py-1 text-xs capitalize ${showStats[k] ? 'border-[#00E5FF]/50 bg-[#00E5FF]/10 text-[#00E5FF]' : 'border-white/10 text-white/50'}`}>{k === 'prq' ? 'PRQ profile' : k}</button>
+              <button key={k} type="button" onClick={() => setShowStats((s) => ({ ...s, [k]: !s[k] }))} className={`min-h-11 rounded-lg border px-2.5 py-1 text-xs capitalize ${showStats[k] ? 'border-[#00E5FF]/50 bg-[#00E5FF]/10 text-[#00E5FF]' : 'border-white/10 text-white/50'}`}>{k === 'prq' ? 'PRQ profile' : k}</button>
             ))}
           </div>
           <div className="mt-3 font-mono text-[12px] uppercase tracking-widest text-white/50">Highlights · pin up to {MAX_HIGHLIGHTS}</div>

@@ -115,7 +115,7 @@ export function ShardStore() {
         </div>
         <div className="shrink-0 rounded-xl border border-[#C79BFF]/30 bg-[#C79BFF]/5 px-3 py-2 text-right">
           <div className="text-[12px] uppercase tracking-wide text-white/50">Balance</div>
-          <div className="flex items-center justify-end gap-1 text-lg font-bold text-[#C79BFF]">
+          <div className="flex items-center justify-end gap-1 text-[20px] font-bold text-[#C79BFF]">
             <Gem className="h-4 w-4" /> {balance === null ? '—' : balance.toLocaleString()}
           </div>
         </div>
@@ -149,7 +149,7 @@ export function ShardStore() {
                 </div>
               )}
               <div className="mt-4 flex items-center justify-between">
-                <span className="text-lg font-bold text-white">{usd(pack.usdCents)}</span>
+                <span className="text-[20px] font-bold text-white">{usd(pack.usdCents)}</span>
                 <button
                   onClick={() => buy(pack)}
                   disabled={busy}

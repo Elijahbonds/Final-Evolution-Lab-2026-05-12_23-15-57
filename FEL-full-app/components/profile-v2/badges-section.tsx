@@ -1,6 +1,7 @@
 // BADGES AND MILESTONES (PROFILE V2): what you have earned — the streak and its next goal, your level, mode mastery,
 // Academy modules, ghost beats. Coach-verified milestones (the skill passport's seed) do not exist yet: a labelled
 // "Coming" block says so instead of a sample badge.
+import Link from 'next/link';
 import { Flame, Ghost, GraduationCap, Sparkles } from 'lucide-react';
 import { MasteryBadge } from '@/components/mastery-badge';
 import type { ProfileV2Data } from '@/lib/profile-v2/assemble';
@@ -53,7 +54,11 @@ export function BadgesSection({ data, viewer = false }: { data: ProfileV2Data; v
               ))}
             </ul>
           ) : (
-            <p className="mt-2 text-base text-white/50">No tiers yet. Play any mode a few times to climb from Bronze.</p>
+            <>
+              <p className="mt-2 text-base text-white/50">No tiers yet. Play any mode a few times to climb from Bronze.</p>
+              {/* EVERY-SCREEN P8: the empty state leads on (the label is the Play tab's own) */}
+              {!viewer && <Link href="/play" className="mt-2 inline-flex min-h-11 items-center text-[14px] font-bold text-fel-cyan">Play →</Link>}
+            </>
           )}
         </Card>
       </div>
