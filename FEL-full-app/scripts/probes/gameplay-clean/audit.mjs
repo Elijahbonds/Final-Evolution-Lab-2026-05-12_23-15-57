@@ -603,7 +603,7 @@ for (const mode of MODES) {
       await sleep(250);
     }
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 }).catch(() => {});
-    const rec = await ev(() => { const R = window.__rec; const thrFrom = R.frames.findIndex((f) => f.t >= (window.__thrT ?? 1e9)); return { frames: R.frames, clips: R.clips, gNames: R.gNames, cwv: 2, occNames: R.occNames, presses: R.presses, bus: R.bus.slice(0, 50), skel: R.skel }; });
+    const rec = await ev(() => { const R = window.__rec; const thrFrom = R.frames.findIndex((f) => f.t >= (window.__thrT ?? 1e9)); return { frames: R.frames, clips: R.clips, gNames: R.gNames, cwv: 2, occNames: R.occNames, presses: R.presses, bus: R.bus.slice(0, 50), skel: R.skel, sw: (window.__felSw || []).slice(0, 4000) }; });   // clean-7: `sw`, the hero's clip switches, when a build records them (a diagnostic build only)
     // frames the throttle covered: the last PERF_S seconds of the script
     const S = await ev(() => ({ ...window.__S, tapUntil: undefined }));
     const tEnd = rec.frames.length ? rec.frames[rec.frames.length - 1].t : 0;
