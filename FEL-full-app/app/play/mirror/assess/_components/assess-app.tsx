@@ -107,7 +107,9 @@ declare global {
   interface Window { __FEL_ASSESS__?: AssessProbe }
 }
 
-export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | null }) {
+/** accountAge (EVERY-SCREEN P7, owner 2026-11-11): the band from the signed-in account's full birth date
+ *  (lib/screen/accountAge.ts), or null: the question is asked. A band is answered through pre() exactly as a tap is. */
+export function AssessApp({ initialRun = null, accountAge = null }: { initialRun?: ScreenKind | null; accountAge?: AgeBand | null }) {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>(initialRun ? 'age' : 'intro');
   const preRef = useRef<PreState>(PRE_START);
@@ -369,6 +371,8 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
     preRef.current = next;
     gateRef.current = next.gate;
     if (e.type === 'start' && e.kind) modeRef.current = e.kind;
+    // EVERY-SCREEN P7: the account's band answers the age question, through this same function (every lock and rule above)
+    if (next.step === 'age' && accountAge) { pre({ type: 'age', age: accountAge }); return; }
     // SCREEN-MINOR-LOCK: past the age question, a run that is not 18 or older ends on the camera-free card
     if (next.step !== 'intro' && next.step !== 'age' && !cameraAllowed(next.age, readSessionAge(tabStorage()))) { setPhase('noCamera'); return; }
     if (next.step === 'camera') { void startCamera(); return; }
@@ -466,7 +470,7 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
       </div>
     ) : undefined}>
       {phase === 'intro' ? <StartStep onJump={() => startNew('vertical')} onFull={() => startNew('full')} /> : null}
-      {phase === 'age' ? <AgeStep onAnswer={answerAge} /> : null}
+      {phase === 'age' && !accountAge ? <AgeStep onAnswer={answerAge} /> : null}
       {phase === 'grownUp' ? <GrownUpStep onContinue={grownUp} /> : null}
       {phase === 'noCamera' ? <KidNoCamera onRestart={restart} /> : null}
       {phase === 'pain' ? <PainStep onAnswer={answerPainFirst} /> : null}

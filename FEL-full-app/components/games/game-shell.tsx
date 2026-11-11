@@ -115,6 +115,9 @@ interface RecapData {
   sessionId?: string | null;
 }
 
+/** EVERY-SCREEN P7: what the game's loading spinner waits for (a spinner with no words was the rig's commonest fault on the game screens). */
+const GAME_LOADING = 'Loading the game…';
+
 export function GameShell(props: {
   mode: string;
   title: string;
@@ -127,7 +130,7 @@ export function GameShell(props: {
   gameProps?: Record<string, unknown>;
 }) {
   return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-[#050505]"><Loader2 className="h-8 w-8 animate-spin text-[#00E5FF]" /></div>}>
+    <Suspense fallback={<div role="status" className="flex min-h-screen flex-col items-center justify-center gap-3 bg-[#050505]"><Loader2 aria-hidden className="h-8 w-8 animate-spin text-[#00E5FF]" /><p className="text-[16px] text-white/60">{GAME_LOADING}</p></div>}>
       <GameShellInner {...props} />
     </Suspense>
   );
@@ -801,8 +804,9 @@ function GameShellInner({
             </ThreeDErrorBoundary>
           </ReplayInPlaceContext.Provider>
         ) : !unreachable ? (
-          <div className="flex h-[60vh] items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-[#00E5FF]" />
+          <div role="status" className="flex h-[60vh] flex-col items-center justify-center gap-3">
+            <Loader2 aria-hidden className="h-8 w-8 animate-spin text-[#00E5FF]" />
+            <p className="text-[16px] text-white/60">{GAME_LOADING}</p>
           </div>
         ) : null}
 

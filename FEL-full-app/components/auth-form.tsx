@@ -213,6 +213,9 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
   if (turnedAway) return <AgeTurnAway />;
 
   const credentialsOpen = mode === 'login' || birthYear !== null;
+  // EVERY-SCREEN P7 (owner, 2026-11-11): the birth date first; "What did you come for?" and the first game come after it is
+  // confirmed. Same questions, same words, in that order.
+  const choicesOpen = mode === 'signup' && birthYear !== null;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#050505] px-3 py-6 sm:px-4">
@@ -247,7 +250,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
           </h1>
           <p className="mx-auto mt-2 max-w-xs text-[14px] text-white/55 sm:max-w-none sm:text-sm">
             {mode === 'login'
-              ? 'Real sports, real training — your on-court reps become real stats.'
+              ? 'Real sports. Real training. Real stats.'
               : 'Pick your arena, then create your athlete profile.'}
           </p>
         </div>
@@ -287,20 +290,20 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
         {/* THE WAYS IN (ONB-01). This used to be six hardcoded sports that saved your answer to localStorage and then
             sent you to the home page regardless; then two (play or body). Asking is only worth doing if the answer
             changes where you land, and each of the five lands on its own first win. */}
-        {mode === 'signup' && (
+        {choicesOpen && (
           <div className="mb-5">
             <PathPicker value={path} onChange={setPath} adult={isAdult} />
           </div>
         )}
 
         {/* The games, as a rail you swipe. The focused card preloads its mode so entry is instant. */}
-        {mode === 'signup' && path === 'play' && (
+        {choicesOpen && path === 'play' && (
           <div className="mb-6">
             <ModeCarousel lead={host?.mode ?? null} value={firstGame} onChange={rememberGame} accent={host?.accent} />
           </div>
         )}
 
-        {mode === 'signup' && path !== 'play' && (
+        {choicesOpen && path !== 'play' && (
           <div className="mb-6 rounded-2xl border p-4" data-first-win-preview={path}
             style={{ borderColor: `${FIRST_WINS[path].accent}40`, background: `${FIRST_WINS[path].accent}0A` }}>
             <p className="font-mono text-[12px] font-bold uppercase tracking-[0.16em]" style={{ color: FIRST_WINS[path].accent }}>Your first win</p>
@@ -348,10 +351,13 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
             className="w-full rounded-md border border-white/10 bg-[#16161A] px-4 py-3 text-sm text-white placeholder-white/50 outline-none transition-colors focus:border-[#00E5FF]/60"
           />
           {mode === 'signup' && (
-            <label className="flex items-start gap-3 cursor-pointer select-none">
+            // EVERY-SCREEN P7 (owner, 2026-11-11): a real checkbox, named by its label's words, usable from the keyboard and by a
+            // screen reader; the box beside it is its picture. Same words, same rule: it must be ticked to continue.
+            <label className="flex min-h-11 items-start gap-3 cursor-pointer select-none">
+              <input type="checkbox" checked={policyAccepted} onChange={(e) => setPolicyAccepted(e.target.checked)} className="peer sr-only" data-terms-tick />
               <span
-                onClick={() => setPolicyAccepted(!policyAccepted)}
-                className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors ${
+                aria-hidden
+                className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-[#00E5FF] ${
                   policyAccepted ? 'border-[#00E5FF] bg-[#00E5FF]/20' : 'border-white/20 bg-[#16161A]'
                 }`}
               >

@@ -368,3 +368,21 @@ The owner answered three questions (relayed by the coordinator).
    approved copy in `lib/every-screen/notices.ts`), never by guessing from the words.
 3. **Text size: keep it.** A line of more than about 12 words goes to 16 px (`lineSize`, READABLE.md): size only, never
    the wording. Apply it across the rest of the app's screens as each phase reaches them.
+
+## 2026-11-11 (evening) — the second age question, sign-up order, the login tagline, the terms tick
+
+The owner answered four proposals from phase 6 (relayed by the coordinator). Each is held by a test
+(`tests/every-screen/phase7-owner.test.tsx`).
+
+1. **Skip the second age question.** A signed-in person with a birth date on file is not asked "How old are you?" in the
+   vertical test and the movement check (Quick Screen): the age band comes from the account. Signed-out people, and
+   accounts without a birth date, keep the question exactly as it is. The age rules do not change: the band is
+   `tryAgeBand` of the full birth date (the 13th and 18th birthdays, exact), and it is answered through the screen's own
+   age path. A birth year alone does not skip it. Until `prisma/pending/2026-10-19-user-dob.sql` is applied, production
+   keeps only the year, so everyone is still asked.
+2. **Sign-up order.** The birth date first; the five "What did you come for?" choices come after it is confirmed. Same
+   questions, same words.
+3. **/login tagline:** exactly "Real sports. Real training. Real stats." (it replaces "Real sports, real training — your
+   on-court reps become real stats.").
+4. **Terms tick:** a real `<input type="checkbox">` inside its label. Same words, same rule (it must be ticked to
+   continue), now usable from the keyboard and with a screen reader.

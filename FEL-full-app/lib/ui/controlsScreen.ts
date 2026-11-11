@@ -208,8 +208,10 @@ export function controlsSheet(modeId: string, device: ControlsDevice, opts: { bo
   return { device, rows: controlRows(modeId, device, family), lines: named.flatMap((g) => g.lines), groups: named };
 }
 
-/** The smallest the panel's rows and lines may step down to so a list fits its box (ControlsPanel's fit): 10 px → 8.5 px. */
-export const FIT_MIN = 0.85;
+/** The smallest the panel's rows and lines may step down to so a list fits its box (ControlsPanel's fit). EVERY-SCREEN P7: the
+ *  rows and lines are 14 px and the floor 0.86, so the fit never takes them under the 12 px floor (14 → 12.04 px); it was 12 px
+ *  and 0.85 (10.2 px: the rig's "text under 12 px" on 16 game screens). */
+export const FIT_MIN = 0.86;
 const FIT_STEP = 0.05;
 
 /**
