@@ -9,11 +9,14 @@ import { readProgramAsk } from '@/lib/program-ask/request';
 
 const read = (p: string) => readFileSync(join(process.cwd(), p), 'utf8');
 
-describe('the two wrong demos show the labelled still (owner, 2026-11-10)', () => {
+// The two wrong demos first became the labelled still (every-screen p3, 2026-11-10); demos-fix-2 (coordinator call
+// 2026-11-11: follow the card, not the source) gave each its own honest loop. Held exactly, so neither can slide back to
+// the jumping split or the push-up, nor back to a still.
+describe('the two formerly wrong demos play the movement their card describes (owner, 2026-11-10; coordinator, 2026-11-11)', () => {
   const lib = new Map(loadLibraryFiles().map((e) => [e.id, e]));
-  it('Split Squat Stretch no longer plays the jumping split; Spider Crawl no longer plays a push-up', () => {
-    expect(demoClipFor(lib.get('split-squat-stretch')!)).toBeNull();
-    expect(demoClipFor(lib.get('spider-crawl')!)).toBeNull();
+  it('Split Squat Stretch plays the hamstring fold; Spider Crawl plays the travelling crawl', () => {
+    expect(demoClipFor(lib.get('split-squat-stretch')!)).toBe('ex_split_ham_fold');
+    expect(demoClipFor(lib.get('spider-crawl')!)).toBe('ex_spider_crawl');
   });
 });
 

@@ -218,6 +218,8 @@ async function buildStage(first: ExerciseStageProps, gone: () => boolean): Promi
     if (travel === 'lateral') return { alpha: FRONT_ALPHA - 0.35, beta: 1.38, radius: 3.6, y: 0.9 };
     if (travel === 'both') return { alpha: FRONT_ALPHA - 0.8, beta: 1.2, radius: 4.2, y: 0.8 };
     if (p.clip && SIDE_CLIPS.has(p.clip)) return { alpha: 0.4, beta: 1.42, radius: 2.6, y: 0.85 };
+    // DEMOS-FIX-2: the muscle-up ends ON the bar (the head near 2.8 m): framed higher and wider than a hang, from three-quarters
+    if (p.clip?.startsWith('ex_muscle_up')) return { alpha: FRONT_ALPHA - 0.9, beta: 1.45, radius: 4.4, y: 1.85 };
     const prop = p.clip ? DEMO_PROPS[p.clip] : undefined;
     if (prop === 'bench' || prop === 'incline') return { alpha: 0.45, beta: 1.2, radius: 2.4, y: 0.62 };
     if (prop === 'seat' || prop === 'preacher') return { alpha: FRONT_ALPHA - 0.55, beta: 1.36, radius: 2.35, y: 0.7 };

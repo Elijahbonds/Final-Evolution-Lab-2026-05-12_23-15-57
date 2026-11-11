@@ -125,6 +125,14 @@ export const CATALOGUE_DEMO_LOOPS: Readonly<Record<string, string>> = {
   // the holds stand still and breathe; the carries walk (in place); the march lifts each knee toward the bag
   'Two-Bag Farmer Hold': 'ex_hold_farmer', 'Dumbbell Farmer Hold': 'ex_hold_farmer', 'Goblet Hold': 'ex_hold_goblet', 'Goblet Carry': 'ex_carry_goblet',
   'Backpack Hug Hold': 'ex_hold_hug', 'Backpack Hug March': 'ex_march_hug',
+  // DEMOS-FIX-2 (2026-11-11): the four rows DEMOS-FIX left as stills, each with its own loop now (anim/authored/
+  // exerciseFamilies12.ts). "Hands on a bench, hips high so the body makes an upside-down V. Lower the top of your head toward
+  // the bench, then press back up"; "Feet on a step or chair, hips stacked high over the hands. Lower slow, then press up"
+  'Hands-Elevated Pike Push-Up': 'ex_pike_pushup_hands_up', 'Feet-Elevated Pike Push-Up': 'ex_pike_pushup_feet_up',
+  // "Two short broad jumps in a row, the second straight off the first landing. Stick the last landing for a two-count"
+  'Double Broad Jump and Stick': 'ex_broad_jump_double',
+  // "A big step to the side; land on that foot and hold still for a two-count. Knee over the laces, hips back a little"
+  'Lateral Step and Stick': 'ex_lateral_step_stick',
 };
 const CATALOGUE_BY_KEY: ReadonlyMap<string, string> = new Map(Object.entries(CATALOGUE_DEMO_LOOPS).map(([n, c]) => [nameKey(n), c]));
 /** A catalogue row's loop by its name, for a row the library has no entry for; null otherwise. */

@@ -1012,6 +1012,95 @@ export const DEMO_RULES: readonly DemoRule[] = [
   { clip: (b) => ({ 'in-place': 'ex_quick_feet', dot: 'ex_dot_drill', 'line-steps': 'ex_line_steps' } as Record<string, string>)[b] ?? null, families: ['quick-feet'], bases: /^(in-place|dot|line-steps)$/, emits: ['ex_quick_feet', 'ex_dot_drill', 'ex_line_steps'] },
   // the sandbag bear-hug carry: the bag hugged high on the chest, walked
   { clip: 'ex_carry_hug', families: ['carry'], bases: /^sandbag$/ },
+  // ── DEMOS-FIX-2 (2026-11-11, anim/authored/exerciseFamilies12.ts): what the session player still showed a still for ──
+  // the whole body turning over: the T push-up — one push-up, then the turn on one hand into a side plank, the other arm to the
+  // ceiling, each side — and the push-up to side plank (its source's words are the same movement; its entry's are the plain
+  // push-up's, which the loop's push-up is); the kettlebell arm bar (flag: shown on the right side with the bell in the left
+  // hand, so the chest faces the camera; the entry names neither side)
+  { clip: 'ex_pushup_t', families: ['push-extra'], bases: /^t-push-up$/ },
+  { clip: 'ex_pushup_t', families: ['push-up'], bases: /^push-up-sid-plank$/ },
+  { clip: 'ex_kb_arm_bar', families: ['loaded-mobility'], bases: /^arm-bar$/ },
+  // the machines: the calf press and the calf press on the leg press are the leg press's calf press (their entries' words are
+  // the calf-raise family's shared set-up — "on a step or plate … holding a rail or the machine handles" — which the seated
+  // and standing calf raises share too; the name, the kit and the source are the leg press's: the loop follows them, as the
+  // seated calf raise's does; flag: the sled is not drawn); the machine chair squat (the uprights drawn, the bar not); the
+  // lying machine squat (the pad drawn, the sled not)
+  { clip: 'ex_calf_press', families: ['calf-raise'], bases: /^(calf-press|calf-press-leg-press)$/ },
+  { clip: 'ex_chair_squat', families: ['squat'], bases: /^chair-squat$/ },
+  { clip: 'ex_lying_machine_squat', families: ['leg-press-hack'], bases: /^lying-squat$/ },
+  // lunges: the elevated back lunge off a short platform, the bar on the back; the Spiderman lunge walk (two lunges forward
+  // and the walk back)
+  { clip: 'ex_back_lunge_elevated', families: ['lunge'], bases: /^elevat-back-lung$/ },
+  { clip: 'ex_spiderman_lunge_walk', families: ['dynamic-flow'], bases: /^spiderman$/ },
+  // on a bench: the bird dog row (the hand and knee on the bench, the free leg long behind); the rollout kneeling on a bench
+  // (flag: the bar on the floor is not drawn)
+  { clip: 'ex_bird_dog_row', families: ['dead-bug'], bases: /^bird-dog-row$/ },
+  { clip: 'ex_rollout_bench', families: ['rollout'], bases: /^rollout-bench$/ },
+  // speed: the hill sprint, in place on a drawn slope (flag: the run up the hill is shown in place, as the sprint drills are;
+  // the 20 m and 40 m hill sprints are the same run); the 5-10-5 shuttle (flag: shown short — 1, 2 and 1 metres for 5, 10 and 5
+  // — and the cones and lines are not drawn)
+  { clip: 'ex_hill_sprint', families: ['acceleration'], bases: /^hill$/ },
+  { clip: 'ex_hill_sprint', families: ['sprint-development'], bases: /^(hill-20|hill-40)$/ },
+  { clip: 'ex_shuttle_5105', families: ['change-of-direction'], bases: /^5-10-5$/ },
+  // the basketball program's drills (the ball is not drawn: isBallClip). The two handle combos are the court's own handle moves
+  // (anim/authored/basketball.ts), the second off the hand the first ended in. Shown IN PLACE (flag, each): the full-court speed
+  // dribble, the change-of-pace dribble (also its full-court version), the crossover into a layup and the full-court layup
+  // lines — the travel, the cones and the basket are not drawn, so the loop is the hands' and the legs' work on the spot. The
+  // box-out turns and pushes back; Slide-Run-Slide travels (the cones are not drawn).
+  { clip: (b) => ({ 'between-behind': 'ex_combo_between_behind', 'cross-between': 'ex_combo_cross_between' } as Record<string, string>)[b] ?? null, families: ['handle-combos'], bases: /^(between-behind|cross-between)$/, emits: ['ex_combo_between_behind', 'ex_combo_cross_between'] },
+  { clip: (b) => ({ 'box-out': 'ex_box_out', 'slide-run': 'ex_slide_run_slide' } as Record<string, string>)[b] ?? null, families: ['defense'], bases: /^(box-out|slide-run)$/, emits: ['ex_box_out', 'ex_slide_run_slide'] },
+  { clip: 'ex_change_pace_dribble', families: ['ball-handling'], bases: /^change-of-pace$/ },
+  { clip: 'ex_change_pace_dribble', families: ['full-court-handles'], bases: /^change-pace$/ },
+  { clip: (b) => ({ speed: 'ex_speed_dribble', 'cross-layup': 'ex_cross_layup' } as Record<string, string>)[b] ?? null, families: ['moving-handles'], bases: /^(speed|cross-layup)$/, emits: ['ex_speed_dribble', 'ex_cross_layup'] },
+  { clip: 'ex_speed_layup', families: ['finishing-touch'], bases: /^full-court$/ },
+  // DEMOS-FIX-2, second pass: what the program builder reaches with the band kit (the band is never drawn) and the rest. Where an
+  // entry's words are its family's shared set-up and its name, kit and source agree on another movement, the loop follows the
+  // name and the source (as the seated calf raise's always has): the anti-gravity press (face down on an incline bench, the bar
+  // pressed out in front of the head), the handstand push-up (the heels on a wall), the guillotine bench press (the bar to the
+  // neck), the leg-over floor press, the muscle-ups (flag: the source's rings are the entry's bar here), the dumbbell vertical
+  // swing (flag: the kettlebell swings' shared set-up says the bell floats to chest height; the name and the source jump and
+  // swing it overhead), the kneeling cable triceps extension (the cable is not drawn) and the Pallof press with rotation (an
+  // entry tagged plank whose name and source are the standing cable press that turns; flag: the loop starts with the arms
+  // already pressed out — the press out from the chest at each end is not shown)
+  { clip: (b) => ({ march: 'ex_pallof_march', walkout: 'ex_pallof_walkout' } as Record<string, string>)[b] ?? null, families: ['anti-rotation'], bases: /^(march|walkout)$/, emits: ['ex_pallof_march', 'ex_pallof_walkout'] },
+  { clip: 'ex_pallofrotate_standing', families: ['plank'], bases: /^pallof-press-rotation$/ },
+  { clip: 'ex_pull_apart_diag', families: ['scap-work'], bases: /^pull-apart-diag$/ },
+  { clip: 'ex_pull_apart_overhead', families: ['upper-back'], bases: /^pull-apart-overhead$/ },
+  // the banded knee squat (the Spanish squat for reps) plays the Spanish squat's own loop (exerciseVariants.ts)
+  { clip: 'ex_spanish_squat', families: ['spanish-squat'], bases: /^reps$/ },
+  { clip: 'ex_side_plank_row', families: ['side-plank'], bases: /^row$/ },
+  { clip: (b) => ({ 'bear-band-row': 'ex_bear_plank_row', 'high-band-row': 'ex_high_plank_row' } as Record<string, string>)[b] ?? null, families: ['plank-matrix'], bases: /^(bear-band-row|high-band-row)$/, emits: ['ex_bear_plank_row', 'ex_high_plank_row'] },
+  { clip: 'ex_bird_dog_band_row', families: ['dead-bug-bird-dog'], bases: /^bird-band$/ },
+  { clip: (b) => ({ 'guillotin-bench-press': 'ex_guillotine_press', 'leg-over-floor-press': 'ex_leg_over_floor_press' } as Record<string, string>)[b] ?? null, families: ['bench-press'], bases: /^(guillotin-bench-press|leg-over-floor-press)$/, emits: ['ex_guillotine_press', 'ex_leg_over_floor_press'] },
+  { clip: 'ex_anti_gravity_press', families: ['overhead-press'], bases: /^anti-gravity-press$/ },
+  { clip: 'ex_handstand_pushup', families: ['push-up'], bases: /^handstand-push-ups$/ },
+  // the clock push-up: its entry's words are the push-up family's, its name and source the plyometric push-up that hops round the
+  // feet (flag: the source goes all the way round the clock; the loop hops a step round each way and back)
+  { clip: 'ex_clock_pushup', families: ['push-up'], bases: /^clock-push-up$/ },
+  { clip: (b) => ({ 'muscl-up': 'ex_muscle_up', 'kip-muscl-up': 'ex_muscle_up_kip' } as Record<string, string>)[b] ?? null, families: ['pull-up'], bases: /^(muscl-up|kip-muscl-up)$/, emits: ['ex_muscle_up', 'ex_muscle_up_kip'] },
+  { clip: 'ex_db_vertical_swing', families: ['kb-swing'], bases: /^vertical-swing$/ },
+  { clip: 'ex_kneel_cable_triceps', families: ['triceps'], bases: /^kneel-tricep-extension$/ },
+  // the loaded-mobility band stretches: the half-kneeling hip shift into the band; the arm in the band overhead, the chest sunk
+  { clip: (b) => ({ 'band-hip': 'ex_hk_hip_shift', 'band-shoulder': 'ex_band_shoulder_sink' } as Record<string, string>)[b] ?? null, families: ['loaded-mobility'], bases: /^(band-hip|band-shoulder)$/, emits: ['ex_hk_hip_shift', 'ex_band_shoulder_sink'] },
+  // existing loops that are the movement, each flagged for what they do not draw: the banded ankle rock plays the half-kneeling
+  // ankle rock (flag: the band and the wall are not drawn); the band good morning plays the good morning (flag: the band round the
+  // neck is not drawn: the hands hold it where the bar sits); the reverse-band sumo deadlift plays the sumo deadlift (flag: the
+  // bands from the rack are not drawn); the reverse fly with external rotation plays the incline T, face down on the pad (flag:
+  // the wrists' quarter turn is not drawn, and the pad is a little steeper than the source's 30°)
+  { clip: 'ex_ankle_rock', families: ['ankle-mobility'], bases: /^banded$/ },
+  { clip: 'ex_good_morning', families: ['good-morning'], bases: /^morn-pull-through$/ },
+  { clip: 'ex_sumo_deadlift', families: ['deadlift'], bases: /^revers-sumo-deadlift$/ },
+  { clip: 'ex_incline_t', families: ['rear-delt-face-pull'], bases: /^revers-fly-external-rotation$/ },
+  // FOLLOWS THE CARD, NOT THE SOURCE (coordinator call 2026-11-11): four entries whose own words contradict their
+  // free-exercise-db source play what the card the person reads says (flag, each). The barbell ab rollout kneels and rolls out
+  // (its source starts in a push-up and rolls the bar in toward the feet): the rollout from the knees. The split squat stretch
+  // is the hamstring stretch its card describes (its source is a jumping split). The lunge sprint is a sprint from the
+  // two-point stance, shown on the spot (its source is a split jump in a Smith machine). The spider crawl travels (its source
+  // is knee-to-elbow in place); it crawls two steps forward and two back.
+  { clip: 'ex_rollout_knees', families: ['rollout'], bases: /^ab-rollout$/ },
+  { clip: 'ex_split_ham_fold', families: ['stretch-hamstring'], bases: /^split-squat-stretch$/ },
+  { clip: 'ex_sprint_spot', families: ['sprint-drill'], bases: /^lung-sprint$/ },
+  { clip: 'ex_spider_crawl', families: ['dynamic-warmup'], bases: /^spider-crawl$/ },
 ];
 
 const RULES_BY_FAMILY: ReadonlyMap<string, readonly DemoRule[]> = (() => {
@@ -1132,6 +1221,8 @@ export const FLOOR_CLIPS: ReadonlySet<string> = new Set(['ex_rollout_knees', 'ex
   // DEMO-LOOPS-4: the warm-up's and cool-down's floor steps (anim/authored/exerciseWarmup.ts)
   ['ex_ankle_rock', 'ex_ninety_rock', 'ex_open_book_rock', 'ex_kneeling_reach_rock', 'ex_breathe_supine', 'ex_fast_pushup'],
   FLOW_CLIPS,
+  // DEMOS-FIX-2: the T push-up (exerciseFamilies12.ts)
+  ['ex_pushup_t', 'ex_kb_arm_bar', 'ex_side_plank_row', 'ex_bear_plank_row', 'ex_high_plank_row', 'ex_bird_dog_band_row', 'ex_leg_over_floor_press', 'ex_clock_pushup', 'ex_spider_crawl'],
 ));
 /** Hinges and rows read from the side (the angle at the hips is the movement). */
 /** DEMO-LOOPS: loops that travel a metre or more — framed wide: forward travel from the side, sideways travel from the
@@ -1143,6 +1234,9 @@ export const TRAVEL_CLIPS: Readonly<Record<string, 'forward' | 'lateral' | 'both
   ex_decel_stick: 'forward', ex_jump_stop: 'forward', ex_broad_jump_stick: 'forward', ex_two_point_start: 'forward', ex_power_layup: 'forward', ex_catch_shoot_hop: 'forward',
   ex_lateral_skip: 'lateral', ex_lateral_walk: 'lateral', ex_lateral_hop_stick: 'lateral', ex_t_drill: 'both',
   ex_stride_jump_cross: 'lateral',
+  // DEMOS-FIX-2: the double broad jump and the walk back; the Spiderman lunge walk; the step and stick to each side
+  // (the handstand push-up is framed as forward travel for its height: upside down against the wall the feet are 2 m up)
+  ex_handstand_pushup: 'forward', ex_broad_jump_double: 'forward', ex_spiderman_lunge_walk: 'forward', ex_lateral_step_stick: 'lateral', ex_slide_run_slide: 'lateral', ex_shuttle_5105: 'lateral',
   // DEMO-LOOPS-8: the ankle lesson gets up from its chair and walks to the wall, 1.2 m in front
   ex_ankle_unlock: 'forward',
   // DEMO-LOOPS-9: three hurdle hops forward and the walk back; the long jump to the side and back
@@ -1168,13 +1262,16 @@ export const SIDE_CLIPS: ReadonlySet<string> = new Set(['ex_jefferson_curl', 'ex
   // DEMO-LOOPS-5: the barbell's pulls and catches, the rope crunches, the arm swing up and the pelvic tilt read from the side
   'ex_bb_clean', 'ex_bb_power_clean', 'ex_bb_hang_clean', 'ex_bb_hang_clean_low', 'ex_bb_clean_pull', 'ex_bb_clean_shrug', 'ex_bb_clean_press',
   'ex_bb_snatch', 'ex_bb_power_snatch', 'ex_bb_hang_snatch', 'ex_bb_hang_snatch_low', 'ex_bb_snatch_pull', 'ex_bb_snatch_shrug', 'ex_bb_muscle_snatch', 'ex_bb_snatch_balance',
-  'ex_rope_crunch_kneel', 'ex_rope_crunch_stand', 'ex_arm_swing_up', 'ex_pelvic_tilt_stand']);
+  'ex_rope_crunch_kneel', 'ex_rope_crunch_stand', 'ex_arm_swing_up', 'ex_pelvic_tilt_stand',
+  // DEMOS-FIX-2: the machine chair squat's depth and the elevated back lunge read from the side
+  'ex_chair_squat', 'ex_back_lunge_elevated', 'ex_box_out', 'ex_hill_sprint', 'ex_db_vertical_swing', 'ex_split_ham_fold', 'ex_sprint_spot', 'ex_hk_hip_shift', 'ex_band_shoulder_sink']);
 /** What the stage draws under a loop that needs it: a bench seat, a flat bench to lie on, or an incline bench. Bench loops
  *  lying down are framed from the side, like the floor loops. LIBRARY-ANATOMY-2: and the rest of a gym's furniture a loop
  *  stands, sits, lies or hangs on — a box, benches in front and behind, a pull-up bar, a low bar, dip bars, pads, a wall. */
 export type DemoProp = 'seat' | 'bench' | 'incline' | 'box' | 'boxside' | 'stepbox' | 'boxback' | 'rearbench' | 'handbench' | 'feetbench' | 'feetbenchfront' | 'thrust'
   | 'pullbar' | 'lowbar' | 'dipbars' | 'dipbench' | 'legcurl' | 'proneincline' | 'decline' | 'preacher' | 'wall' | 'calfstep' | 'wallback' | 'rowseat' | 'dowel' | 'cphbench' | 'roller' | 'rollerseat'
-  | 'doorpost' | 'doorway' | 'seatwall' | 'rollerthigh' | 'rollerquad' | 'rollerback' | 'rollerlow' | 'rollerit' | 'rollershin' | 'wallhinge' | 'wallhead' | 'lowbarfeet' | 'hyper45' | 'legpress' | 'hackpad' | 'rollerlat' | 'cphlong';
+  | 'doorpost' | 'doorway' | 'seatwall' | 'rollerthigh' | 'rollerquad' | 'rollerback' | 'rollerlow' | 'rollerit' | 'rollershin' | 'wallhinge' | 'wallhead' | 'lowbarfeet' | 'hyper45' | 'legpress' | 'hackpad' | 'rollerlat' | 'cphlong'
+  | 'feetbox' | 'lowstep' | 'rowbench' | 'kneelbench' | 'rails' | 'ramp' | 'lyingpad';
 /** A plain box (metres, the body's frame: +x its right, +y up, +z its front; rx tips it about x — negative raises its −z end).
  *  (The stage puts the body's +x at its own −x: the spawned root carries the importer's mirror.) */
 export interface PropBox { w: number; h: number; d: number; x?: number; y: number; z: number; rx?: number; /** DEMO-LOOPS: a roller — a cylinder across the body, `w` long, `h` across */ cyl?: true }
@@ -1197,7 +1294,9 @@ export const PROP_SHAPES: Readonly<Record<DemoProp, readonly PropBox[]>> = {
   dipbars: [{ w: 0.04, h: 0.04, d: 0.80, x: -0.27, y: 1.12, z: 0.02 }, { w: 0.04, h: 0.04, d: 0.80, x: 0.27, y: 1.12, z: 0.02 }],
   dipbench: [{ w: 0.90, h: 0.44, d: 0.34, y: 0.22, z: -0.42 }],
   legcurl: [{ w: 0.30, h: 0.44, d: 1.35, y: 0.22, z: 0.30 }],
-  proneincline: [{ w: 0.34, h: 0.50, d: 0.30, y: 0.25, z: -0.28 }, { w: 0.34, h: 0.07, d: 0.90, y: 0.80, z: 0.02, rx: 0.66 }],
+  // DEMOS-FIX-2 (flag): the pad's tilt was the wrong way round — it crossed the chest of every loop lying on it (ex_incline_t,
+  // the anti-gravity press; the coordinator's sheet review): now its high end is under the head
+  proneincline: [{ w: 0.34, h: 0.50, d: 0.30, y: 0.25, z: -0.28 }, { w: 0.34, h: 0.07, d: 0.90, y: 0.80, z: 0.02, rx: -0.66 }],
   // LIBRARY-ANATOMY-2: the decline bench as exerciseVariants.ts lies on it (the pad 14° head-down, its top 0.60 at the hips;
   // the roller in front of the ankles at its high end)
   decline: [{ w: 0.30, h: 0.07, d: 1.20, y: 0.458, z: -0.42, rx: 0.25 }, { w: 0.24, h: 0.40, d: 0.24, y: 0.20, z: -0.40 }, { w: 0.06, h: 0.30, d: 0.06, y: 0.15, z: 0.52 }, { w: 0.40, h: 0.08, d: 0.08, y: 0.30, z: 0.51 }],
@@ -1239,11 +1338,27 @@ export const PROP_SHAPES: Readonly<Record<DemoProp, readonly PropBox[]>> = {
   // foot plate behind
   // the 45-degree leg press's seat and back pad; the hack squat's inclined back pad; the roller under the armpit (the body on
   // its side, turned to the camera); the bench under the long-lever Copenhagen's top foot
-  legpress: [{ w: 0.44, h: 0.30, d: 0.44, y: 0.15, z: 0.02 }, { w: 0.44, h: 0.06, d: 0.70, y: 0.60, z: -0.24, rx: -0.78 }],
+  // DEMOS-FIX-2 (flag): the back pad's tilt was the wrong way round — drawn through the chest of the leg press and the calf
+  // press (the sheets): now its high end is behind the head
+  legpress: [{ w: 0.44, h: 0.30, d: 0.44, y: 0.15, z: 0.02 }, { w: 0.44, h: 0.06, d: 0.70, y: 0.60, z: -0.24, rx: 0.78 }],
   hackpad: [{ w: 0.44, h: 0.06, d: 1.10, y: 0.95, z: -0.24, rx: 1.32 }],
   rollerlat: [{ w: 0.55, h: 0.14, d: 0.14, y: 0.07, z: 0.46, cyl: true }],
   cphlong: [{ w: 0.50, h: 0.46, d: 0.30, y: 0.23, z: -0.88 }],
   hyper45: [{ w: 0.40, h: 0.07, d: 0.42, y: 0.66, z: -0.10, rx: 0.78 }, { w: 0.08, h: 0.60, d: 0.08, y: 0.30, z: -0.20 }, { w: 0.40, h: 0.05, d: 0.26, y: 0.12, z: -0.60 }],
+  // DEMOS-FIX-2 (exerciseFamilies12.ts): the box under the toes of the feet-elevated pike (close enough behind the hands for
+  // the hips to stack over them); the short platform the elevated back lunge stands on; the flat bench under the left hand and
+  // knee of the bird dog row; the bench the rollout kneels on (the bar on the floor in front is not drawn: it rolls)
+  feetbox: [{ w: 0.60, h: 0.44, d: 0.34, y: 0.22, z: -0.62 }],
+  lowstep: [{ w: 0.60, h: 0.15, d: 0.40, y: 0.075, z: 0.04 }],
+  rowbench: [{ w: 0.30, h: 0.44, d: 1.30, x: -0.16, y: 0.22, z: -0.24 }],
+  kneelbench: [{ w: 0.40, h: 0.44, d: 0.80, y: 0.22, z: -0.50 }],
+  // the machine chair squat's two uprights (the bar it rides on moves with the body and is not drawn); the slope a hill sprint
+  // runs up (exerciseFamilies12.ts RAMP_Y: its top 0.12 under the feet, 8° up toward the front; the stage draws a negative rx
+  // with the front end high — the contact sheet showed a positive one sloping down the way the body faced)
+  rails: [{ w: 0.05, h: 2.0, d: 0.05, x: -0.62, y: 1.0, z: -0.12 }, { w: 0.05, h: 2.0, d: 0.05, x: 0.62, y: 1.0, z: -0.12 }],
+  ramp: [{ w: 0.90, h: 0.04, d: 2.4, y: 0.10, z: 0.0, rx: -0.14 }],
+  // the lying machine squat's pad, reclined 34° from upright behind the back
+  lyingpad: [{ w: 0.44, h: 0.06, d: 1.20, y: 0.86, z: -0.58, rx: 0.98 }],
 };
 export const DEMO_PROPS: Readonly<Record<string, DemoProp>> = {
   ex_seated_press: 'seat', ex_seated_curl: 'seat', ex_seated_lateral_raise: 'seat', ex_seated_triceps: 'seat',
@@ -1256,7 +1371,9 @@ export const DEMO_PROPS: Readonly<Record<string, DemoProp>> = {
 /** DEMO-LOOPS: the authored shooting and finishing loops carry a ball too (exerciseSignature.ts) */
 const BALL_LOOPS: ReadonlySet<string> = new Set(['ex_set_shot', 'ex_form_shot_one', 'ex_catch_shoot_hop', 'ex_pullup_jumper', 'ex_power_layup', 'ex_jab_crossover',
   // DEMO-LOOPS-6: the ball-skill drills' own loops (exerciseHoops.ts)
-  'ex_catch_shoot_12', 'ex_layup_steps', 'ex_rip_through', 'ex_rebound_chin']);
+  'ex_catch_shoot_12', 'ex_layup_steps', 'ex_rip_through', 'ex_rebound_chin',
+  // DEMOS-FIX-2: the dribble combos and the in-place dribbling and finishing drills (exerciseFamilies12.ts)
+  'ex_combo_between_behind', 'ex_combo_cross_between', 'ex_speed_dribble', 'ex_change_pace_dribble', 'ex_cross_layup', 'ex_speed_layup']);
 export const isBallClip = (clip: string | null | undefined): boolean => !!clip && (clip.startsWith('bball_') || clip === 'jumpshot' || BALL_LOOPS.has(clip));
 
 const ANATOMY: ReadonlyMap<string, string> = new Map(MUSCLES.map((m) => [m.id, m.anatomyKey]));
