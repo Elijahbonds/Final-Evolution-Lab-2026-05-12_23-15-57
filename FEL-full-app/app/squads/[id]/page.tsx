@@ -23,7 +23,7 @@ export default async function GroupPage({ params }: { params: { id: string } }) 
   return (
     <TabPage eyebrow="Train together" title={group ? (group.kind === 'team' ? 'Your team' : 'Your squad') : 'Squads and teams'} accent="#00E5FF">
       <Link href={SQUADS_PATH} className="-mt-4 mb-3 inline-flex min-h-[44px] items-center text-[13px] text-white/55">‹ All squads and teams</Link>
-      {group ? <GroupScreen initial={group} /> : <p className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-[14px] text-white/70">{COMING_SOON}</p>}
+      {group ? <GroupScreen initial={group} /> : <p className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-base text-white/70">{COMING_SOON}</p>}
     </TabPage>
   );
 }

@@ -99,7 +99,7 @@ export function ShopView({
 
       {/* HOTFIX (2026-09-24): these cards unlock nothing yet, so they are shown but not sold. See shopCardOnSale. */}
       {SHOP_CARDS.some((c) => !shopCardOnSale(c.key)) && (
-        <p className="mt-3 text-xs text-white/55">
+        <p className="mt-3 text-base text-white/55">
           Cards marked NOT ON SALE YET don&apos;t unlock anything in the game yet, so this shop won&apos;t take Lab Credits for
           them. The cards on sale today are in{' '}
           <Link href="/cards" className="text-[#00E5FF] hover:underline">Creator Cards</Link>.

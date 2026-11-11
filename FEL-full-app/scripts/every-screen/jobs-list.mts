@@ -35,6 +35,15 @@ const PRIMARY = '[data-player-primary] button';
 const CAMERA = '/CAMERA CHECK|CAMERA SETUP|Step into|TAP TO START/';
 
 export const JOBS: Job[] = [
+  // ── EVERY-SCREEN P8: your things. The plan: "a balance or a purchase always shows where it came from" ──
+  {
+    id: 'wallet-source', who: 'solo', name: 'The wallet: each coin says where it came from', planBudget: 'a balance always shows where it came from (phase 8)',
+    steps: [
+      { goto: '/wallet', say: 'Wallet' },
+      { expect: '/Wallet History/', within: 20, say: 'the history under the balance' },
+      { expect: '/daily|first session/i', within: 20, say: "today's first-session coins, named" },
+    ],
+  },
   // ── EVERY-SCREEN P7: around the games. The plan: "pick a game → playing in ≤ 2 taps; results → play again in 1; a lobby
   //    always says what it is waiting for" ──
   {
