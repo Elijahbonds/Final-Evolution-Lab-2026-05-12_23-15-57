@@ -46,7 +46,8 @@ import { PLANT_ENGAGE_SEC, PLANT_RELEASE_SEC, PLANT_REPLANT_EASE_ON, PLANT_SEATE
 import { FADE_HOLD_ENDED_ON } from '@/lib/babylon/anim/CharacterAnimator';   // gameplay-clean P5
 import { CARRY_PUSHED_BOUNCE_ON } from '@/lib/babylon/anim/ballCarry';   // gameplay-clean P6
 import { HIP_YAW_FOLD_ON } from '@/lib/babylon/anim/PostureLayer';   // gameplay-clean P3
-import { ANIM_INERTIAL_ON, ANIM_INERTIAL_MATCH_VEL_ON, ANIM_INERTIAL_MIN_HALF_LIFE_SEC, ANIM_INERTIAL_ALL_BONES_ON, ANIM_INERTIAL_MODES_ON } from '@/lib/babylon/anim/inertialize';   // switch-on
+import { ANIM_INERTIAL_ON, ANIM_INERTIAL_MATCH_VEL_ON, ANIM_INERTIAL_MIN_HALF_LIFE_SEC, ANIM_INERTIAL_ALL_BONES_ON, ANIM_INERTIAL_MODES_ON, ANIM_INERTIAL_ENDED_HOLD_ON, ANIM_INERTIAL_FOOTBALL_ON, ANIM_INERTIAL_SURF_ON, ANIM_INERTIAL_TWIN_LINEAR_ON, ANIM_INERTIAL_HIPS_POS_ON } from '@/lib/babylon/anim/inertialize';   // switch-on; gameplay-clean-7
+import { CELEBRATE_EASE_ON } from '@/lib/babylon/anim/clipDesnap';   // gameplay-clean-7
 import { AI_REACT_ROOKIE_MS, AI_REACT_PRO_MS, AI_REACT_ELITE_MS } from '@/lib/babylon/hoops/reaction';   // lane/hoops-round2
 import { DOUBLE_TEAM_ON, DOUBLE_PAINT_M, DOUBLE_AFTER_SEC, DOUBLE_MAX_SEC, DOUBLE_COOLDOWN_SEC, SWITCH_ON_SCREEN_ON, SWITCH_HELP_M, SWITCH_COOLDOWN_SEC } from '@/lib/babylon/hoops/teamDefense';
 import { HAND_CHECK_ON, HAND_CHECK_REACH_OVER_M, HAND_CHECK_GAP_SEC, HAND_CHECK_FOUL_COUNT, HAND_CHECK_WINDOW_SEC, CONTACT_POSE_ON, CONTACT_EASE_IN_SEC, CONTACT_EASE_OUT_SEC } from '@/lib/babylon/hoops/handCheck';
@@ -125,6 +126,12 @@ describe('the feel knob catalogue', () => {
     expect(def('anim.inertialMinHalfLifeSec')).toBe(ANIM_INERTIAL_MIN_HALF_LIFE_SEC);
     expect(def('anim.inertialAllBones')).toBe(ANIM_INERTIAL_ALL_BONES_ON);
     expect(def('anim.inertialModesOn')).toBe(ANIM_INERTIAL_MODES_ON);
+    expect(def('anim.inertialEndedHold')).toBe(ANIM_INERTIAL_ENDED_HOLD_ON);   // gameplay-clean-7
+    expect(def('anim.inertialFootballOn')).toBe(ANIM_INERTIAL_FOOTBALL_ON);
+    expect(def('anim.inertialSurfOn')).toBe(ANIM_INERTIAL_SURF_ON);
+    expect(def('anim.celebrateEase')).toBe(CELEBRATE_EASE_ON);
+    expect(def('anim.inertialTwinLinear')).toBe(ANIM_INERTIAL_TWIN_LINEAR_ON);
+    expect(def('anim.inertialHipsPos')).toBe(ANIM_INERTIAL_HIPS_POS_ON);
     // hoops-round2 (HOP-02 "Hoops · AI reaction", HOP-03 "Hoops · team defense", HOP-04 "Hoops · contact"): the owner's 420 / 220 / 120
     expect(def('hoops.aiReactRookieMs')).toBe(AI_REACT_ROOKIE_MS);
     expect(def('hoops.aiReactProMs')).toBe(AI_REACT_PRO_MS);

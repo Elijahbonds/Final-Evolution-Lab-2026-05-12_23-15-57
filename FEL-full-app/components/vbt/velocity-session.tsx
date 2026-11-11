@@ -231,13 +231,13 @@ export function VelocitySession({ api = VBT_API, grab, decoder }: { api?: string
             {families.map((f) => (
               <button key={f.id} type="button" role="tab" aria-selected={family === f.id} data-vbt-family={f.id}
                 onClick={() => { setFamily(f.id); setLiftId(LIFT_IDS.find((id) => LIFTS[id].family === f.id)!); }}
-                className={`min-h-10 shrink-0 rounded-lg border px-3 text-sm font-bold ${family === f.id ? 'border-[#00E5FF] bg-[#00E5FF]/15 text-[#00E5FF]' : 'border-white/15 text-white/70'}`}>{f.label}</button>
+                className={`min-h-11 shrink-0 rounded-lg border px-3 text-sm font-bold ${family === f.id ? 'border-[#00E5FF] bg-[#00E5FF]/15 text-[#00E5FF]' : 'border-white/15 text-white/70'}`}>{f.label}</button>
             ))}
           </div>
           <div className="flex flex-wrap gap-1.5">
             {LIFT_IDS.filter((id) => LIFTS[id].family === family).map((id) => (
               <button key={id} type="button" data-vbt-lift={id} aria-pressed={liftId === id} onClick={() => setLiftId(id)}
-                className={`min-h-9 rounded-full border px-3 text-[13px] ${liftId === id ? 'border-white bg-white text-black' : 'border-white/15 text-white/75'}`}>{LIFTS[id].name}</button>
+                className={`min-h-11 rounded-full border px-3 text-[13px] ${liftId === id ? 'border-white bg-white text-black' : 'border-white/15 text-white/75'}`}>{LIFTS[id].name}</button>
             ))}
           </div>
           <div className="grid grid-cols-2 gap-2">

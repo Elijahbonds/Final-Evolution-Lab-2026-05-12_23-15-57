@@ -6,8 +6,8 @@
 //   · SIGNATURE   app/train/programs/[id]/page.tsx: clipsFor(signatureExerciseIds(program), library entry by id), and
 //                 every session the plan can serve under every day gate (a swap or an easier version is a different id);
 //   · TEMPLATES   FEL's seven coach templates (lib/coach/templates), every rung of every ladder a wave can reach, through
-//                 the reader GET /api/coach/me/today uses (lib/coach/todayExtras.ts libraryClips: the library entry by
-//                 name, approved and youth-safe, else the catalogue loop). libraryClips imports 'server-only', so its
+//                 the reader GET /api/coach/me/today uses (lib/coach/todayExtras.ts libraryClips, since demos-fix #564:
+//                 the entry by name or the template-name map, drafts play, youth-safe, else the catalogue loop). libraryClips imports 'server-only', so its
 //                 five lines are mirrored here — assumption, flagged: if it changes, this mirror must follow;
 //   · BUILDER     /train/build (lib/program-ask/server.ts): clipsFor(program.exerciseIds) over a grid of requests (every
 //                 goal × level × age × four kits × 2–6 days × jumps open or closed), plus every option a choice offers.
@@ -32,7 +32,7 @@ const load = async (p: string): Promise<any> => { const m = await import(p); ret
 const { loadLibraryFiles } = await load('@/lib/library/files');
 const { clipsFor } = await load('@/lib/session-player/clips');
 const { demoClipFor } = await load('@/lib/library/demo');
-const { matchLibraryByName } = await load('@/lib/library/match');
+const { templateLibraryEntry } = await load('@/lib/library/templateNames');   // DEMOS-FIX's reader (#564)
 const { catalogueDemoLoop } = await load('@/lib/library/surfaceDemo');
 const { SIGNATURE_PROGRAMS } = await load('@/lib/signature/content');
 const { expandPlan } = await load('@/lib/signature/plan');
@@ -95,17 +95,20 @@ for (const p of SIGNATURE_PROGRAMS) {
 // ── templates ────────────────────────────────────────────────────────────────────────────────────────────────────
 /** lib/coach/todayExtras.ts libraryClips, mirrored (it imports 'server-only'). */
 function templateClip(name: string, youth: boolean): { clip: string | null; e: LibraryExercise | null; via: Row['via']; still?: Row['still']; heldLoop?: string | null } {
-  const e = matchLibraryByName(LIB, [name]);
+  // as lib/coach/todayExtras.ts libraryClips reads it since demos-fix (#564): the entry by its name or the template-name
+  // map, a draft entry plays its loop too, an adults-only entry not for a youth reader
+  const e = templateLibraryEntry(LIB, name);
   if (e) {
-    const clip = e.review.status === 'approved' && (!youth || e.youthOk) ? demoClipFor(e) : null;
+    const clip = !youth || e.youthOk ? demoClipFor(e) : null;
     if (clip) return { clip, e, via: 'library' };
     const own: string | null = demoClipFor(e);
-    const still: Row['still'] = !own ? 'no loop' : e.review.status !== 'approved' ? 'not approved' : 'not youth-safe';
+    const still: Row['still'] = !own ? 'no loop' : 'not youth-safe';
     return { clip: null, e, via: 'none', still, heldLoop: own };
   }
   const clip = catalogueDemoLoop(name);
   return { clip, e: null, via: clip ? 'catalogue' : 'none', ...(clip ? {} : { still: 'no library entry by name' as const }) };
 }
+
 const templateNames = new Map<string, string>();   // key → name
 for (const t of TEMPLATES) {
   const keys = new Set<string>();
@@ -183,8 +186,16 @@ const COMPAT: readonly (readonly Move[])[] = [['squat', 'lunge', 'jump', 'throw'
   ['jump', 'run', 'ball', 'lunge'], ['carry', 'run'], ['rotation', 'core', 'throw'], ['calf', 'jump'], ['mobility', 'core', 'lunge', 'squat', 'hinge', 'rotation', 'pull', 'push', 'run', 'calf']];
 const nameMove = (name: string): Move => moveOf(name.toLowerCase().replace(/[^a-z0-9]+/g, '_'));
 const compatible = (a: Move, b: Move) => a === b || a === 'other' || b === 'other' || COMPAT.some((g) => g.includes(a) && g.includes(b));
+/** The loop is named for the exercise itself: every word of the loop's name is in the exercise's (ex_frog_pump for
+ *  "Frog Pump"). Demos-fix (#564) named its 70 new loops this way; such a pair is the exercise's own loop. */
+const namedFor = (r: Row): boolean => {
+  const words = new Set(r.name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(' '));
+  const loop = r.clip!.replace(/^ex_/, '').split('_').filter(Boolean);
+  return loop.length > 0 && loop.every((w) => words.has(w) || words.has(`${w}s`) || [...words].some((x) => x.startsWith(w) && w.length >= 4));
+};
 const why = (r: Row): string | null => {
   if (!r.clip) return null;
+  if (namedFor(r)) return null;
   const m = moveOf(r.clip);
   if (!(ALLOWS[r.pattern] ?? ALLOWS.other).includes(m)) return `pattern ${r.pattern}, loop reads as ${m}`;
   const n = nameMove(r.name);
@@ -214,6 +225,12 @@ const VERDICTS: Record<string, { v: 'ok' | 'wrong'; why: string }> = {
   'band-terminal-knee-extension → ex_tke': { v: 'ok', why: 'the terminal knee extension loop' },
   'recover-and-contest → bball_closeout': { v: 'ok', why: 'recover and contest is the closeout' },
   'standing-arm-swing-drill → ex_arm_swing': { v: 'ok', why: 'the sprint arm-swing loop' },
+  // demos-fix's loops (#564), looked at in their authored source
+  'kettlebell-hike-pass → ex_kb_hike_pass': { v: 'ok', why: 'the kettlebell hike pass loop' },
+  'prone-dumbbell-rear-fly → ex_incline_t': { v: 'ok', why: 'lying face down on the incline pad, arms out to a T: the prone rear fly (demo.ts already plays it for the lying rear lateral raise)' },
+  'single-leg-hip-airplane → ex_hip_airplane_free': { v: 'ok', why: 'the single-leg hip airplane with no support (exerciseFamilies11.ts)' },
+  'catalogue:prone-yt → ex_prone_yt': { v: 'ok', why: 'the prone Y-T raise loop' },
+  'catalogue:prone-yt-hold → ex_prone_yt': { v: 'ok', why: 'the prone Y-T raise loop (the holds are the dose)' },
   // wrong: another movement
   'split-squat-stretch → ex_split_jump': { v: 'wrong', why: 'a hamstring stretch (front leg long, fold forward, "no bouncing") plays a jumping split-switch plyometric. lib/library/demo.ts line 890 (demo-loops)' },
   'spider-crawl → ex_spiderman_pushup': { v: 'wrong', why: 'a travelling crawl warm-up plays a push-up in place: the chest drops to the floor and nothing travels. lib/library/demo.ts line 752 (demo-loops); assumption: the crawl is not done as a push-up' },
@@ -280,7 +297,7 @@ const md = [
   '',
   '## Not the animation lane\'s: a coach-template exercise that shows the still although a loop could play',
   '',
-  'The coached athlete\'s Today reads each catalogue row\'s loop by its exact name in the library, approved entries only (lib/coach/todayExtras.ts libraryClips). The signature programs play draft entries\' loops; this path does not.',
+  'The coached athlete\'s Today reads each catalogue row\'s loop through the library\'s template-name map (lib/library/templateNames.ts, demos-fix #564); draft entries play.',
   '',
   '| Exercise (coach catalogue name) | Why the still | Loop the library would play | Templates |',
   '|---|---|---|---|',

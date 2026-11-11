@@ -10,6 +10,10 @@
 import type { Job, Step } from './jobs.mts';
 
 /** Home, then the Train tab: one tap. */
+/** EVERY-SCREEN P4: two jump checks as the jump check keeps them on a phone (lib/jump/historyStore.ts HISTORY_KEY and its entry). */
+const JUMP_HISTORY_KEY = 'fel.jump.history.v1';
+const kept = (id: string, at: string, bestCm: number) => ({ id, at, test: 'check', bestCm, plusMinusCm: 3, jumps: 3, verified: false, manualFrames: false, source: 'live', fps: 30, rsi: null, contactMs: null, v0Mps: null, rsiMod: null });
+const JUMP_KEPT = JSON.stringify([kept('rig-jump-2', '2026-11-10T17:00:00.000Z', 44), kept('rig-jump-1', '2026-11-03T17:00:00.000Z', 41)]);
 const TRAIN: Step[] = [{ goto: '/play', say: 'home' }, { css: 'nav a[href="/train"]:visible', say: 'the Train tab' }];
 /** The coach's own home: Train, then "Your roster". */
 const COACH: Step[] = [...TRAIN, { tap: 'Your roster', expect: '[data-coach-clients]', say: 'Your roster' }];
@@ -17,6 +21,7 @@ const ASK = 'All I have is a band. Full body, 3 days a week.';
 /** An athlete alone, already inside a session of the program the AI built (not counted: it is another job's ground). */
 const IN_BUILT_SESSION: Step[] = [
   { goto: '/train/build', pre: true },
+  { css: '[data-testid=program-ask-open]', ifPresent: true, pre: true },
   { fill: ['[data-testid=program-ask-input]', ASK], pre: true },
   { css: '[data-testid=program-ask-build]', expect: '[data-testid=program-view]', pre: true },
   { css: '[data-testid=program-start]', expect: '[data-session-player]', pre: true, say: 'Start today' },
@@ -45,7 +50,9 @@ export const JOBS: Job[] = [
   {
     id: 'solo-ask-builder', who: 'solo', name: 'Ask the AI builder for a program and start it', planBudget: 'ask → first rep in ≤ 4 taps (phase 3)',
     steps: [
-      ...TRAIN, { tap: 'Build my program', expect: '[data-testid=program-ask-input]', say: 'Build my program' },
+      ...TRAIN, { tap: 'Build my program', expect: '[data-testid=program-builder]', say: 'Build my program' },
+      // a program saved on the account opens folded (EVERY-SCREEN P4): "Change the ask" is then one more tap, counted
+      { css: '[data-testid=program-ask-open]', ifPresent: true, say: 'Change the ask (only when a program is already saved)' },
       { fill: ['[data-testid=program-ask-input]', ASK], say: 'type the ask' },
       { css: '[data-testid=program-ask-build]', expect: '[data-testid=program-view]', say: 'Build it' },
       { css: '[data-testid=program-start]', expect: '[data-session-player]', say: 'Start today' },
@@ -57,7 +64,8 @@ export const JOBS: Job[] = [
     id: 'solo-change-one-thing', who: 'solo', name: 'Change one thing in the program the AI built, and start it', planBudget: 'change one thing without starting over; save, and start (phase 3)',
     steps: [
       { goto: '/train/build', pre: true },
-      { fill: ['[data-testid=program-ask-input]', ASK], pre: true },
+      { css: '[data-testid=program-ask-open]', ifPresent: true, pre: true },
+  { fill: ['[data-testid=program-ask-input]', ASK], pre: true },
       { css: '[data-testid=program-ask-build]', expect: '[data-testid=program-view]', pre: true },
       { css: '[data-chip=days] button[aria-label^="More"]', expect: '/4 days/', say: 'one more day a week (the days chip\'s +)' },
       { css: '[data-testid=program-start]', expect: '[data-session-player]', say: 'Start today' },
@@ -73,17 +81,31 @@ export const JOBS: Job[] = [
   },
   {
     id: 'solo-test-jump', who: 'solo', name: 'Test a jump (measure my vertical)', planBudget: 'vertical in ≤ 3 taps (phase 4)',
-    steps: [...TRAIN, { tap: 'Measure my vertical', expect: '/How old are you/', say: 'Measure my vertical' }, { tap: '18 or older', expect: '/Does anything hurt/', say: '18 or older' }, { tap: 'No, nothing hurts', expect: CAMERA, say: 'No, nothing hurts' }],
+    // EVERY-SCREEN P4: from the signed-in home, as the VERTICAL-EASY gate counts it (its "Measure my vertical" chip is on
+    // Play and on Train): 3 taps. Through Train it is 4.
+    steps: [{ goto: '/play', say: 'home' }, { css: '[data-testid=play-vertical-entry]', expect: '/How old are you/', say: 'Measure my vertical (on Play)' }, { tap: '18 or older', expect: '/Does anything hurt/', say: '18 or older' }, { tap: 'No, nothing hurts', expect: CAMERA, say: 'No, nothing hurts' }],
     endsAt: 'the camera: three jumps in front of it (the reading itself is measured on recorded jumps, not on this rig)',
   },
   {
     id: 'solo-movement-screen', who: 'solo', name: 'Run the movement screen', planBudget: 'movement screen in 3 taps and under 3 minutes (phase 4)',
-    steps: [...TRAIN, { tap: 'Screen my movement', expect: '/How old are you/', say: 'Screen my movement' }, { tap: '18 or older', expect: '/Does anything hurt/', say: '18 or older' }, { tap: 'No, nothing hurts', expect: CAMERA, say: 'No, nothing hurts' }],
+    steps: [{ goto: '/play', say: 'home' }, { css: '[data-testid=play-screen-entry]', expect: '/How old are you/', say: 'Screen my movement (on Play)' }, { tap: '18 or older', expect: '/Does anything hurt/', say: '18 or older' }, { tap: 'No, nothing hurts', expect: CAMERA, say: 'No, nothing hurts' }],
     endsAt: 'the camera: four moves in front of it',
   },
   {
     id: 'solo-see-progress', who: 'solo', name: 'See progress', planBudget: 'progress number → its source in 1 tap (phase 4)',
     steps: [...TRAIN, { tap: 'My progress', expect: '/Your numbers over time/', say: 'My progress' }],
+  },
+  {
+    id: 'solo-progress-source', who: 'solo', name: 'See where a progress number came from', planBudget: 'progress number → its source in 1 tap (phase 4)',
+    // EVERY-SCREEN P4: the rig cannot jump in front of a camera, so the jump is put on the phone as the jump check keeps
+    // it (lib/jump/historyStore.ts); then one tap on the row shows the tool, how it measures and how sure, and each
+    // number's own test and time. The second tap opens that tool.
+    steps: [
+      { goto: '/train/progress', pre: true, say: 'My progress' },
+      { seed: [JUMP_HISTORY_KEY, JUMP_KEPT], pre: true, expect: '[data-progress-row]', say: 'a jump kept on this phone (put there by the rig)' },
+      { css: '[data-progress-row] button[aria-expanded]', expect: '[data-progress-trace] [data-progress-source]', say: 'the jump row: its source' },
+      { css: '[data-progress-source]', expect: '/Jump tests/', say: 'Open the tool (Jump tests)' },
+    ],
   },
   {
     id: 'solo-join-group', who: 'solo', name: 'Find and join a group', planBudget: 'join a group in ≤ 4 taps (phase 5)',

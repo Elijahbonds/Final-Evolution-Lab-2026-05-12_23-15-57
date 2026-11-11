@@ -25,7 +25,7 @@ export default async function ProgressPage() {
   const saved = await loadSavedProgress(prisma as unknown as ProgressDb, userId).catch(() => NOTHING_SAVED);
   return (
     <TabPage eyebrow={PROGRESS_COPY.eyebrow} title={PROGRESS_COPY.title} lede={PROGRESS_COPY.lede}
-      aside={<Link href="/train" className="rounded-xl border border-white/10 px-3 py-2 text-[12px] font-bold text-white/75 hover:bg-white/[0.05] hover:text-white">← Train</Link>}>
+      aside={<Link href="/train" className="inline-flex min-h-11 items-center rounded-xl border border-white/10 px-3 py-2 text-[12px] font-bold text-white/75 hover:bg-white/[0.05] hover:text-white">← Train</Link>}>
       <div className="mx-auto max-w-md">
         <ProgressView saved={saved} />
       </div>

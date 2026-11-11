@@ -12,6 +12,7 @@
 import type { ReadinessView } from '@/lib/coach/readiness/view';
 import { vsLineOf, type ResultNextStep, type ResultView, type VsLast } from './view';
 import { RESULT_COPY } from './copy';
+import { readinessSure } from './trust';
 
 const IN = 2.54;
 
@@ -31,6 +32,6 @@ export function readinessView(v: ReadinessView, next: ResultNextStep): ResultVie
     value: (v.bestCm / IN).toFixed(1), unit: 'in', estimate: true, pm: null,
     vsLast, better: 'up',
     vsLine: vsLineOf({ vsLast, delta }, { against: RESULT_COPY.yourNormal, up: 'higher', down: 'lower', fmt: (x) => `${(x / IN).toFixed(1)} in` }),
-    line: v.next ?? v.line, next,
+    line: v.next ?? v.line, next, howSure: readinessSure(),
   };
 }

@@ -21,6 +21,8 @@ export const LOOK = {
     same: 'border-white/15 bg-white/[0.06] text-fel-soft',
   },
   line: 'mx-auto mt-3 max-w-sm font-sans text-[20px] font-medium leading-snug text-white',
+  /** EVERY-SCREEN P4: how it was measured and how sure, under the number (body size: the approved 16 px). */
+  sure: `${TYPE.body} mx-auto mt-2 max-w-sm text-fel-soft`,
   actions: 'mt-5 flex flex-col items-center gap-1',
   quiet: 'fel-press inline-flex min-h-12 items-center justify-center px-3 font-sans text-[14px] font-bold text-fel-soft underline underline-offset-4',
   details: 'mt-2 text-left [&_summary::-webkit-details-marker]:hidden',

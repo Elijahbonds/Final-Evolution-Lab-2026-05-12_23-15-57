@@ -236,7 +236,7 @@ export function ReadinessCheck({ api = READINESS_API }: { api?: string }) {
       )}
 
       {trend.length > 1 && phase !== 'live' && <ReadinessTrend points={trend} />}
-      <p className="text-center text-xs text-fel-dim"><Link href="/train" className="underline">Back to Train</Link></p>
+      <p className="text-center text-xs text-fel-dim"><Link href="/train" className="inline-flex min-h-11 items-center underline">Back to Train</Link></p>
     </div>
   );
 }

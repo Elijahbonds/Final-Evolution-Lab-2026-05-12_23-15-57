@@ -57,7 +57,7 @@ function Fold({ on, label, children }: { on: boolean; label: string; children: R
 function Chip({ on, onClick, children, data }: { on: boolean; onClick: () => void; children: React.ReactNode; data?: string }) {
   return (
     <button type="button" onClick={onClick} aria-pressed={on} data-sprint-chip={data}
-      className={`min-h-10 rounded-lg border px-3 text-sm font-bold ${on ? 'border-[#00E5FF] bg-[#00E5FF]/15 text-[#00E5FF]' : 'border-white/15 text-white/70'}`}>{children}</button>
+      className={`min-h-11 rounded-lg border px-3 text-sm font-bold ${on ? 'border-[#00E5FF] bg-[#00E5FF]/15 text-[#00E5FF]' : 'border-white/15 text-white/70'}`}>{children}</button>
   );
 }
 
@@ -207,7 +207,7 @@ export function SpeedApp({ adult = true }: { adult?: boolean }) {
         )}
       </section>
       </div>
-      <p className="text-center text-xs text-white/50"><Link href="/train" className="underline">Back to Train</Link></p>
+      <p className="text-center text-xs text-white/50"><Link href="/train" className="inline-flex min-h-11 items-center underline">Back to Train</Link></p>
     </div>
   );
 }

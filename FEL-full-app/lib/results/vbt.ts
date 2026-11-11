@@ -14,6 +14,7 @@ import type { KeptSet } from '@/lib/vbt/sets';
 import type { LiftId } from '@/lib/vbt/lifts';
 import { vsLineOf, type Comparison, type ResultNextStep, type ResultView } from './view';
 import { RESULT_COPY } from './copy';
+import { vbtSure } from './trust';
 
 /** A set's first reps as the warm-up read takes them: best, mean and SD (m/s). Null under two reps. */
 export function setSpeedOf(repMcvs: readonly number[]): { bestMcv: number; meanMcv: number; sdMcv: number; reps: number } | null {
@@ -57,6 +58,6 @@ export function vbtView(o: {
     value: o.bestMcv == null ? null : o.bestMcv.toFixed(2), unit: 'm/s', estimate: true, pm: o.pm == null ? null : o.pm.toFixed(2),
     vsLast: o.bestMcv == null ? null : c.vsLast, better: 'up',
     vsLine: o.bestMcv == null ? null : vsLineOf(c, { against: RESULT_COPY.lastTime, up: 'faster', down: 'slower', fmt: (x) => `${x.toFixed(2)} m/s` }),
-    line: o.line, next: o.next,
+    line: o.line, next: o.next, howSure: o.bestMcv == null ? null : vbtSure(),
   };
 }

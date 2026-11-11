@@ -1,3 +1,14 @@
+## What changed in phase 4 (phase 3's "after" → now, measured on the rig)
+
+| Job | Phase 3 | Now | What changed |
+|---|---|---|---|
+| Test a jump (measure my vertical) | 4 taps (through Train) | 3 taps (the plan's budget: ≤ 3) | Walked from the home's "Measure my vertical" chip, as the VERTICAL-EASY gate counts it; the door through Train is one more. |
+| Run the movement screen | 4 taps (through Train) | 3 taps, and 143 s from the camera to the result on the computer-made mover (the plan: 3 taps, under 3 minutes) | From the home's "Screen my movement" chip; the time is `scripts/every-screen/trust.mts` (lib/screen-easy/sim.ts, 8 seeds). |
+| See progress → a number's source | – | 1 tap on the row; 1 more opens the tool (walked on the rig with two jump checks put on the phone as the jump check keeps them: the rig cannot jump in front of a camera) | Each row opens on the tool, how it measures and how sure, a link to the tool, and each number's own test and time (`components/progress/progress-view.tsx`). |
+| Build a program: the first screen after it is built | The ask box and BUILD IT on top; the last two chip rows and "FEL assumed" sat under START TODAY | The ask folds to one line with "Change the ask"; every chip and "FEL assumed 5 things" sit above START TODAY | Words before scrolling went 92 → 117, not down to 40: the fold brings the chips and the program's summary into the first screen, and the budget counts every visible word. Reaching 40 means hiding the chips or the summary (an owner or layout call; not done). |
+
+Every measured number now carries a line under it: how it was measured, and its ± from a measurement on the repository's fixtures (`docs/every-screen/TRUST.md`).
+
 ## What changed in phase 3 (phase 2's "after" → now, measured on the rig)
 
 | Job | Phase 2 | Now | What changed |

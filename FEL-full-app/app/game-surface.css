@@ -300,6 +300,9 @@
 /* SCREEN-FIXES (2026-11-10): the start card's middle slot (boot-splash.tsx) holds its height in portrait only; sideways it
  * steps aside, so the left column is exactly what it was */
 [data-fel-console] [data-splash-slot] { display: contents !important; }
+/* SCREEN-FIXES-2 (2026-11-11): upright, the learn card scrolls inside the slot rather than grow it; sideways it is the card
+ * it was (it does not give up height in the left column: the CONTROLS panel does) */
+[data-fel-console] [data-splash-slot] > [data-learn-idle] { min-height: auto !important; overflow: visible !important; }
 [data-fel-console] [data-splash-main] > [data-controls-panel] {
   max-height: none !important;
   flex: 0 1 auto;
@@ -375,6 +378,16 @@ div:has(> [data-capture-ui]) > div:has(> canvas) > [data-fel-fullbleed] > [data-
   zoom: calc(var(--fel-splash-corner-zoom) / var(--fel-hud-zoom, 1));
   left: calc(4.75rem / var(--fel-splash-corner-zoom));
   top: calc(0.5rem / var(--fel-splash-corner-zoom));
+}
+/*    - SCREEN-FIXES-2 (2026-11-11): and on a card with the MOTION chip but no
+ *      ⋯ (a host without the capture menu, /try), the column still starts
+ *      below the chip (12-40 px down), not 16 px down under it. A card taller
+ *      than the phone starts at the top, so the chip was drawn over the venue
+ *      line (skateboard's "VENICE SKATEPARK"; every game's start screen measured
+ *      with scripts/probes/screen-fixes/corner-overlap.mts). Only while the
+ *      chip is there (loading and READY); sideways the console padding wins. */
+[data-fel-fullbleed]:has(> [data-splash-corner]) > [data-splash-column] {
+  padding-top: 3.5rem;
 }
 /*    - Upright, the column starts below that row (the ⋯ ends 43 px down the
  *      card) rather than under it. Sideways the console padding wins. */
