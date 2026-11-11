@@ -34,6 +34,32 @@ export function inertialAllBonesOn(): boolean {
   return feel('anim.inertialAllBones', ANIM_INERTIAL_ALL_BONES_ON) >= 0.5;
 }
 
+/**
+ * GAMEPLAY-CLEAN-7 (2026-11-11): feel knob `anim.inertialEndedHold` default. 1 = when the outgoing clip had already RUN TO ITS END (a
+ * hit react or a knockdown whose end callback plays the idle), a bone the new clip does not key HOLDS the pose it shows — what the
+ * linear crossfade does there (Babylon has stopped the ended clip, so nothing pulls the bone anywhere). 0 = it eases onto its bind
+ * pose (anim.inertialAllBones' ease), exactly as before: the hero's thighs turned 21, 18, 14, 11… degrees a frame for ~20 frames
+ * after a hit react into `idle_stand` (GAMEPLAY-CLEAN-AUDIT §4h). A clip CUT mid-play still eases its unkeyed bones onto the rest
+ * (where a linear fade-out leaves them). Read only while the inertial blend is on.
+ */
+export const ANIM_INERTIAL_ENDED_HOLD_ON = 1;
+export function inertialEndedHoldOn(): boolean {
+  return feel('anim.inertialEndedHold', ANIM_INERTIAL_ENDED_HOLD_ON) >= 0.5;
+}
+
+/**
+ * GAMEPLAY-CLEAN-7 (2026-11-11): feel knob `anim.inertialTwinLinear` default. 1 = on an inertial body, a switch between a dribble loop and
+ * its LEFT-HAND TWIN (hoopsHand.leftDribbleTwins: the same loop mirrored across the body, `felLeftTwinOf`) — a hand change — uses the
+ * linear crossfade. The twin swaps the arms' roles, so the inertial offset on each arm starts at 120–180° and is still ~45 % of that 8
+ * frames on (fade 0.2 s, half-life 0.1 s), under the carry's arm solve: both upper arms flipped 127–131° in ONE frame 7–8 frames after
+ * every hand change in 3v3 (the rig, `anim.inertial` 1; GAMEPLAY-CLEAN-AUDIT §4i). 0 = the inertial switch there too, exactly as before.
+ * Read only while the inertial blend is on (the hoops bodies are linear unless `anim.inertial` is 1).
+ */
+export const ANIM_INERTIAL_TWIN_LINEAR_ON = 1;
+export function inertialTwinLinearOn(): boolean {
+  return feel('anim.inertialTwinLinear', ANIM_INERTIAL_TWIN_LINEAR_ON) >= 0.5;
+}
+
 /** Is the inertial blend on (feel knob `anim.inertial`, default off)? */
 export function inertialOn(): boolean {
   return feel('anim.inertial', ANIM_INERTIAL_ON) >= 0.5;
@@ -60,12 +86,26 @@ export function inertialHalfLife(fadeSec: number): number {
  * applyInertialBlend(animator, 'measured'); every other mode stays linear unless `anim.inertial` is on.
  */
 export const ANIM_INERTIAL_MODES_ON = 1;
-export type InertialScope = 'measured';
+/**
+ * GAMEPLAY-CLEAN-7 (2026-11-11): the hero-only opt-ins measured after the six, one knob each so each can be taken back alone.
+ * `anim.inertialFootballOn` / `anim.inertialSurfOn`: 1 = the inertial blend on the football runner / the surfer by default, 0 = linear
+ * there exactly as before (every other body in those modes follows `anim.inertial`). The defaults are the rig's verdict
+ * (GAMEPLAY-CLEAN-AUDIT §4i: hero-only, two runs a side on one build).
+ */
+export const ANIM_INERTIAL_FOOTBALL_ON = 1;
+export const ANIM_INERTIAL_SURF_ON = 1;
+export type InertialScope = 'measured' | 'football' | 'surf';
+/** Is a scope's own default-on switch on? (Each knob read by name: knobs.test finds every read.) */
+function scopeOn(scope: InertialScope): boolean {
+  if (scope === 'football') return feel('anim.inertialFootballOn', ANIM_INERTIAL_FOOTBALL_ON) >= 0.5;
+  if (scope === 'surf') return feel('anim.inertialSurfOn', ANIM_INERTIAL_SURF_ON) >= 0.5;
+  return feel('anim.inertialModesOn', ANIM_INERTIAL_MODES_ON) >= 0.5;
+}
 
-/** Opt a body in: inertial when the knob is on (or, for a measured mode, unless anim.inertialModesOn is 0), otherwise untouched
+/** Opt a body in: inertial when the knob is on (or, for a measured mode, unless its scope's knob is 0), otherwise untouched
  *  (returns whether it switched). */
 export function applyInertialBlend(animator: { setBlendMode(mode: 'linear' | 'inertial'): void }, scope?: InertialScope): boolean {
-  const on = inertialOn() || (scope === 'measured' && feel('anim.inertialModesOn', ANIM_INERTIAL_MODES_ON) >= 0.5);
+  const on = inertialOn() || (scope !== undefined && scopeOn(scope));
   if (!on) return false;
   animator.setBlendMode('inertial');
   return true;

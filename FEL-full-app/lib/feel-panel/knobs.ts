@@ -1440,6 +1440,35 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/anim/inertialize.ts ANIM_INERTIAL_ALL_BONES_ON',
     hint: 'On: a switch onto a clip that moves a bone the last clip did not (guard to run: the legs) starts that bone from where it was. Off: the first inertial version, where those bones jumped in one frame (knee 32 to 62 degrees). Read only while inertial transitions are on.',
   },
+  // GAMEPLAY-CLEAN-7 (2026-11-11): two more hero-only opt-ins, measured on the rig (GAMEPLAY-CLEAN-AUDIT section 4i), one knob each
+  {
+    id: 'anim.inertialFootballOn', label: 'Inertial transitions on the football runner on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/inertialize.ts ANIM_INERTIAL_FOOTBALL_ON',
+    hint: 'On: the football runner uses the inertial blend by default (the rig measured fewer hard pops). Off: the linear crossfade on the runner, exactly as before. Takes effect on the next spawn.',
+  },
+  {
+    id: 'anim.inertialSurfOn', label: 'Inertial transitions on the surfer on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/inertialize.ts ANIM_INERTIAL_SURF_ON',
+    hint: 'On: the surfer uses the inertial blend by default (the rig measured fewer hard pops). Off: the linear crossfade on the surfer, exactly as before. Takes effect on the next spawn.',
+  },
+  // GAMEPLAY-CLEAN-7 (2026-11-11): the made-shot celebration's elbow swing re-keyed under a speed cap when the clip is built (the file untouched)
+  {
+    id: 'anim.celebrateEase', label: 'Made-shot celebration: arm swing eased on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/clipDesnap.ts CELEBRATE_EASE_ON',
+    hint: 'On: the arms-up celebration after a made shot or a dunk turns the upper arms at most about 20 degrees a frame (its own capture swung them 28 to 32 degrees a frame as the elbows came out). Off: the clip exactly as captured. Takes effect on the next spawn.',
+  },
+  // GAMEPLAY-CLEAN-7 (2026-11-11): a dribble hand change crossfades linearly even on an inertial body
+  {
+    id: 'anim.inertialTwinLinear', label: 'Inertial: hand changes in the dribble crossfade on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/inertialize.ts ANIM_INERTIAL_TWIN_LINEAR_ON',
+    hint: 'On: when a basketball body switches the ball to the other hand, that one switch uses the plain crossfade even with inertial transitions on (the inertial one flipped both upper arms about 128 degrees in a frame). Off: the inertial switch there too. Only matters while inertial transitions are on for that body.',
+  },
+  // GAMEPLAY-CLEAN-7 (2026-11-11): after a move that ran to its end, the bones the next clip does not move hold still (linear's behaviour)
+  {
+    id: 'anim.inertialEndedHold', label: 'Inertial: bones hold after a finished move on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/inertialize.ts ANIM_INERTIAL_ENDED_HOLD_ON',
+    hint: 'On: when a hit react or knockdown has finished and the idle takes over, the legs the idle does not move stay where they are, as with the plain crossfade. Off: the old behaviour, they swung back to the rest pose (thighs up to 25 degrees a frame for about 20 frames). Read only while inertial transitions are on.',
+  },
   // CLIP-SMOOTH (2026-11-03, owner: "Yes, smooth them"): the karate captures' own single-frame snaps re-keyed, default ON.
   // GAMEPLAY-CLEAN P3 (2026-11-03): the foot planter's leg solve eases in and out instead of stepping (anim/FootPlanting)
   {
