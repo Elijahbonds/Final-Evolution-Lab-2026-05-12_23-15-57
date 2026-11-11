@@ -652,6 +652,123 @@ inertial by default now (§1), so it is fixed there. None of the 100-odd rig run
 `karate_mc_jab` (forearms 32–33° a frame), `dunk_score_hang` (left forearm 43–69°), `baseball_swing` (LeftArm 35° at contact, the
 one hard pop baseball shows inertial), the board push (skate), the dance stumble.
 
+## 4i. Clean-7: the inertial blend's last holes, two more modes on it, the celebration eased (lane/gameplay-clean-7)
+
+Owner, 2026-11-10: "Fix the demos, fix the screens, address what you found above" — §4h's open items. Same rig and counter as §4g/§4h
+(14 s anim-only runs, the reset-aware counter, prod build). **One build** for every rig number below unless it says otherwise (`site-final`, the lane's head at
+`9c1e60bf`); "before" is the same build with the new knob at 0, so before and after differ by that knob alone. Runs of one build differ
+by the AI's choices (the hoops and fight modes most), so a single run is a sample. New probes: `legHold.ts`, `celebrate.ts`,
+`runupFill.ts`, `keySteps.ts` (headless, the hero); `audit.mjs` now saves the hero's clip switches when a diagnostic build logs them
+(`sw`) — how items 1 and 7 were found.
+
+### What changed (each behind its own knob; 0 restores the old behaviour exactly; tests pin both)
+
+| # | Knob (default) | What it fixes | Measured |
+|---|---|---|---|
+| 1 | `anim.inertialHipsPos` (1) | AF-1 carries the Hips' **position** across an inertial switch, finding the Hips by name (`/hips$/`). Every body a mode spawns is a clone named `<bone>_c<n>` — the switch log read `Hips_c240` — so on **no in-game body** did it match: the hips' height switched at once, and the foot planter and the carry bent the legs and arms to follow in the same frame. | Headless (hero's Hips renamed as a clone's, crouch → idle): **0.254 m → 0.028 m** in one frame (the matching name 0.028, linear 0.036). In play: the hoops first-dribble pop (knees 56–58°, forearm 89° on the switch frame, in all four 1v1 inertial runs on the diagnostic builds, which had the code before this knob) is gone on this build: 1v1's largest knee turn inertial 58.1° / 56.0° → **15.0° / 15.1°**. (The rig's knob A/B of this one is not separate: it ran inside the six modes' old/new pair below.) Reaches the six modes already inertial (flag). |
+| 2 | `anim.inertialTwinLinear` (1) | A dribble **hand change** (a loop ↔ its left-hand twin, `hoopsHand.leftDribbleTwins`) swaps the arms' roles: inertial, each arm's offset starts at 120–180° and is ~45 % of that 8 frames on, under the carry's arm solve — both upper arms flipped 127–131° in one frame 7–8 frames after every hand change (3v3, switch log). That one switch now crossfades linearly. Only matters on an inertial hoops body (none by default). | 3v3 with `anim.inertial` 1, knob 0 → 1: **14 → 10** and **14 → 11** hard pops (two runs). |
+| 3 | `anim.inertialEndedHold` (1) | §4h's leg ease: after a clip that **ran to its end** (a hit react or knockdown into `idle_stand`, which keys 7 bones), the bones the idle does not key eased onto the bind pose — 170–178° away on the hero's thighs (the captures' bone frames are not the bind pose's). Linear leaves them still (Babylon has stopped the ended clip). Now they hold. A clip CUT mid-play still eases the old way: linear does the same there (measured: the cut hit react into the guard, thighs 14.3° linear, 14.6° inertial, both knob values). | Headless, the hero, largest thigh turn a frame over the 40 frames after the settle: hit react **25.1° → 4.9°** (linear 5.0°), knockdown **24.5° → 1.3°** (linear 1.3°); frames with a thigh ≥ 5°: 10 → 0. Not visible in the rig's counts (§4h said so too). |
+| 4 | `anim.celebrateEase` (1) | The made-shot celebration: `bball_score_celebrate` → `dunk_celebrate_big` → the capture `dunk_mc_celebrate_big` on every hoops and dunk body. Its upper arms turn 28–32° a frame at 0.43–0.57 s as the elbows swing out (key steps 41–66° on 30 fps keys) — not a one-step snap, so clip-smooth's desnap left it. The four arm tracks are re-keyed under 1200°/s when the clip is built (`clipDesnap.capTrackSpeed`: a fast step spread over the keys either side until the window is under the cap; its end poses and holds kept). **The clip file is not edited** (GATE 0). | Headless, from the dribble, fade 0.26 (the tree's): upper arms **29.5° / 31.5° → 15.9° / 16.2°** a frame; forearms unchanged (9.4° / 9.0°). No rig run reached a made shot in 14 s, so not measured in play. |
+| 5 | `anim.inertialFootballOn` (1), `anim.inertialSurfOn` (1) | Hero-only opt-ins, as the six have (`applyInertialBlend(animator, 'football' \| 'surf')`, a knob each). | Below. |
+
+### Football and surf, hero-only, knob 0 → 1 (two runs a side, this build)
+
+| Mode | Hard pops, linear (run 1 / run 2) | Inertial (run 1 / run 2) | All events, linear → inertial | Largest arm turn a frame, linear → inertial (run 1) |
+|---|---|---|---|---|
+| football | 1 / 1 | **0 / 0** | 17 → 12, 18 → 12 | 30.8° → 18.1° |
+| surf | 1 / 1 | **0 / 0** | 9 → 0, 9 → 0 | 80.0° → 17.2° |
+
+The diagnostic build before the hips fix gave the same verdict (football 1 → 0 twice, surf 1 → 0 twice). **Decision: both ON** (the
+knobs' defaults); 0 puts either back on the linear crossfade exactly. Surf's one linear pop is §4g's `board_air` restart (right arm
+78–80°); football's is the tackle onset. Surf's events fall 9 → 0 here where they fell 9 → 4 before the hips fix.
+
+### 1v1 and 3v3 under the inertial blend (`anim.inertial` 1 on every body, against linear; two runs a side, this build)
+
+| Mode | Linear (run 1 / run 2) | Inertial, clean-6 (§4h, one build) | Inertial now (run 1 / run 2) |
+|---|---|---|---|
+| 1v1 | 5 / 5 | 7 (4 → 7 on that build's linear) | 6 / 5 |
+| 3v3 | 9 / 9 | 11–17 (6 → 11 on that build's linear) | 10 / 11 |
+
+**Why they were worse, found:** (a) the hips' position (item 1): every switch dropped or raised the hips in one frame and the
+planter bent the knees 56–58° to keep the feet down, the carry the forearm 89° — on the first dribble of every possession; (b) the
+hand change (item 2); (c) the 169° arm in §4h is (b). **Now** they are within a pop of linear, not better: what is left is the same in
+both blends — the hand change still pops in LINEAR (the two loops hold the arms 120–180° apart, and the slerp between near-opposite
+rotations flips mid-fade: arms 104–136° at the half-way frame, §4h item 3's mechanism), the contact react's arms, and the defend
+stance's and block reach's feet (the defend legs layer; 75–152° a frame in both blends). **Decision: they stay linear** (the brief:
+only if they beat linear). The hoops and dunk modes are unchanged by default. For the hoops lane: a hand change that does not swap
+the arms through each other (the carry crossing the ball first, or a clip of the change itself) is what would take both blends' pop
+away; the feet are `defendStepping` / `footGlide`'s.
+
+### The six modes already inertial: the new knobs on (default) against off (`anim.inertialEndedHold` 0, `anim.inertialHipsPos` 0)
+
+| Mode | Off (run 1 / run 2) | On (run 1 / run 2) |
+|---|---|---|
+| karate | 2 / 3 | 3 / 2 |
+| karate VS | 3 / 3 | 4 / 4 |
+| showdown | 6 / 5 | 7 / 4 |
+| duel | 3 | 1 |
+| skateboard | 1 / 1 (`anim.inertialHipsPos` 0 alone: 1 / 1) | 2 / 2 / 2 (three runs) |
+| mixed combat | 2 | 5 |
+
+Every hard pop in the fight modes' runs, on and off alike, is read frame by frame: all but one or two a run are INSIDE
+`karate_mc_hit_react` (the left thigh 33–38° a frame, 8–39 frames into the clip — the capture's own snap, §4h's clip-content list), and
+their count follows how often the AI landed a hit in the run (karate VS: one more hit react at 6.3 s in both "on" runs and in neither
+"off" run — the pose changed whether that blow landed; mixed combat run 1: two more hit reacts). None sits on a frame the new knobs
+act on. Summed over the two-run modes: karate 5 → 5, karate VS 6 → 8, showdown 11 → 11.
+
+**Skateboard (flag):** with `anim.inertialHipsPos` on, the first push (`board_stand_idle` → `board_push`, 3–8 frames in) bends the right
+leg 36° / 29° (thigh / knee) in one frame and back the next, in all three runs; with that knob alone at 0, in neither of two runs. The
+hips now ease to the push's height instead of dropping at once, and the planter's leg solve flips for one frame on the way. The rest of
+skateboard's pops are the ollie's arm (26°), on and off alike.
+
+**What the rotation counter does not see — the hips' height, a frame** (`hipStep.mjs`: the Hips' height above the root, the largest
+one-frame step and the frames stepping ≥ 4 cm; the same runs, knobs off → on):
+
+| Mode | Largest step (run 1, run 2) | Frames ≥ 4 cm (run 1, run 2) |
+|---|---|---|
+| karate VS | 43 → **7.1** cm, 43 → **7.0** | 17 → 31, 17 → 31 |
+| showdown | 33 → **13.1** cm, 33 → **6.9** | 12 → 34, 8 → 33 |
+| mixed combat | 30.4 → **7.9** cm | 19 → 22 |
+| skateboard | 30.3 → **5.2** cm, 30.2 → **5.1** | 54 → 9, 54 → 9 |
+| karate | 26.7 → **8.2** cm, 23.7 → **8.2** | 12 → 11, 14 → 11 |
+| duel | 22 → **3.7** cm | 3 → 0 |
+| 1v1 (inertial, linear → inertial now) | 5.8 → 3.0 cm | 6 → 0 |
+
+The hips no longer teleport 22–43 cm in a frame in the six inertial modes; the fighters' frames that move 4–7 cm are those jumps spread
+over several frames. **Decision: `anim.inertialHipsPos` stays 1** for this, and skateboard's first-push leg frame is the trade, named
+here for the owner's eye (0 takes it back, and the hip jumps with it). **Showdown's setting is not
+changed** (it waits on the owner's feel check).
+
+### 5. The weight-below-1 family in linear modes: the dunk run-up's first frame
+
+Measured on the BARE hero (no carry, no layer; `runupFill.ts`): `idle_stand` → the run-up dribble (`bball_mc_dribble_run`, fade 0.15)
+after three different lead-ins, frame by frame — the first fade frame moves no bone at all, and no bone turns more than 15.4° a frame
+over the fade. Babylon's fill for a clip fading in alone is the pose the bone had when that clip started (`InheritOriginalValueFrom
+ActiveAnimations` is off), i.e. the pose last shown — not a stale one. So the 100–123° forearm on the run-up's first frame in play is
+**not the blend**: it is a layer acting on that frame (the dunk carry engaging the ball arm — the inertial run showed it too, 137–141°,
+§4h). Not fixable in blending code; routed to the dunk lane (`DunkMode.ts` / the non-hoops `ballCarry` path).
+
+### 6. Clip-content pops (GATE 0: listed, not edited)
+
+None of these is removed by a fade, a mask or an entry time without changing the move itself; each was read on the clip's own keys
+(`keySteps.ts`) or frame by frame in play:
+- `karate_mc_hit_react`: the left thigh 33–38° a frame at full weight, 8–39 frames in; the capture's key steps are 58–70° on 0.05 s keys
+  across the whole reaction (fast throughout, not a one-key snap). A cap like item 4's would slow the whole reaction — the owner's call.
+- `karate_mc_jab`: the forearms 32–33° a frame — the strike itself.
+- `dunk_score_hang`: the left forearm 43–69° at full weight (dunk lane).
+- `baseball_swing`: the arms 113–135° per 0.15 s key through contact (35° a frame) — the swing itself (bat-grip lane's hold).
+- `board_push`: key steps of 77° on 0.1–0.15 s keys (13–15° a frame on the keys); §4g's 47° thigh frame in play stays with posture off,
+  so a layer (the planter) is the suspect, not the keys.
+- The dance stumble: not reached by a run here; unchanged from §4h.
+
+### Left open (with a recommendation)
+
+1. **The hoops hand change** pops in both blends (above): hoops lane. With it fixed, 1v1 and 3v3 would be worth measuring inertial again.
+2. **The hoops celebration's 5 929°/s ball arm** (HOOPS-GOAL-GAP §3f) is the carry layer's during the celebration, not the clip; item 4
+   eases the clip's own swing. Not reproduced here (no run reached a made shot). Hoops lane.
+3. **A cap for `karate_mc_hit_react`'s thigh** (the most common fight-mode hard pop, on and off alike): the tool exists (item 4); slowing
+   a reaction is a feel call. *Recommend:* try it on the left thigh only, behind its own knob, with the owner's eye on a strip.
+
 ## 5. For the dunk and hoops lanes (routed, not changed here)
 
 Measured by the same rig on `/play/dunk`, `/play/onevone` and `/play/threevthree`. The occluder fade is off for these

@@ -578,3 +578,26 @@ landing; 0 = the old `dunk_land_absorb` alone). Measurements in docs/DUNK-FLAGSH
     combat, duel and skateboard, the modes measured better; 0 = those modes linear exactly as before. Every other mode stays linear
     unless `anim.inertial` is 1. Measurements and the per-mode decision: GAMEPLAY-CLEAN-AUDIT section 4h. Feel-check: karate, throw
     jabs out of a run; showdown, take a hit; skateboard, push and ollie.
+
+## gameplay-clean-7, 2026-11-11 (owner: "address what you found above"; the owner has not felt these yet)
+
+All in group "Anim · transitions", all **NEW (on / off, no tuned number)**; each 0 restores the old behaviour exactly. Measurements:
+GAMEPLAY-CLEAN-AUDIT section 4i.
+- `anim.inertialEndedHold` 1: with inertial transitions, after a hit react or a knockdown has FINISHED and the idle takes over, the legs
+  the idle does not move stay where they are, as with the plain crossfade. Before, they swung back to the rest pose: the hero's thighs
+  up to 25 degrees a frame for about 10 frames (headless: 25.1 to 4.9 degrees; the plain crossfade 5.0). A move cut before its end
+  still eases those bones the old way (it matches the plain crossfade there). Feel-check: karate or showdown, get hit and stand still.
+- `anim.inertialHipsPos` 1: with inertial transitions, the hip height eases into the new move like the rotations do. The blend looked
+  for the hips by a name the bodies a mode spawns do not have (`Hips_c240`), so on every in-game body the hips jumped to the new move's
+  height in one frame (headless, crouch to idle: 25 cm in a frame to 3 cm; in play, the six inertial modes' largest hip step a frame
+  22-43 cm to 4-13 cm). The trade: skateboard's first push bends the right leg about 36 degrees for one frame (all three runs). Feel-check:
+  karate, a knockdown and the get-up; skateboard, the first push.
+- `anim.inertialFootballOn` 1 and `anim.inertialSurfOn` 1 (new switches, ON): the inertial blend by default on the football runner and
+  on the surfer (the rig measured fewer hard pops on each, two runs a side). 0 = the plain crossfade there, exactly as before.
+  Feel-check: football, juke and hurdle; surf, air and land.
+- `anim.inertialTwinLinear` 1: when a basketball body switches the ball to the other hand, that one switch uses the plain crossfade
+  even with inertial transitions on (inertial, both upper arms flipped about 128 degrees in one frame after every hand change in
+  3v3). Only matters where a basketball body is inertial, which none is by default.
+- `anim.celebrateEase` 1: the arms-up celebration after a made shot or a dunk (`dunk_mc_celebrate_big`) turns the upper arms at most
+  about 20 degrees a frame; its capture swung them 28 to 32 degrees a frame as the elbows came out (headless: 29.5 / 31.5 to 15.9 /
+  16.2 degrees). The clip is re-keyed when it is built; the file is not edited. Feel-check: 1v1, make a shot.
