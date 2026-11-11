@@ -30,47 +30,15 @@
   "builder": {
    "builds": 1680,
    "buildFails": 0,
-   "exercises": 443,
-   "demo": 338,
-   "still": 105
+   "exercises": 496,
+   "demo": 378,
+   "still": 118
   },
-  "suspects": 22,
-  "judged": 22,
-  "wrong": 2
+  "suspects": 16,
+  "judged": 16,
+  "wrong": 0
  },
- "wrong": [
-  {
-   "source": "builder",
-   "in": [
-    "mobility"
-   ],
-   "id": "spider-crawl",
-   "name": "Spider Crawl",
-   "pattern": "mobility",
-   "family": "dynamic-warmup",
-   "variation": "spider-crawl",
-   "clip": "ex_spiderman_pushup",
-   "via": "library"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility"
-   ],
-   "id": "split-squat-stretch",
-   "name": "Split Squat Stretch",
-   "pattern": "mobility",
-   "family": "stretch-hamstring",
-   "variation": "split-squat-stretch",
-   "clip": "ex_split_jump",
-   "via": "library"
-  }
- ],
+ "wrong": [],
  "suspects": [
   {
    "source": "builder",
@@ -245,30 +213,6 @@
     "mobility",
     "sport"
    ],
-   "id": "machine-triceps-extension",
-   "name": "Machine Triceps Extension",
-   "pattern": "push",
-   "family": "triceps",
-   "variation": "tricep-extension",
-   "clip": "ex_machine_triceps",
-   "via": "library",
-   "read": "pattern push, loop reads as pull",
-   "verdict": {
-    "v": "ok",
-    "why": "the machine triceps loop"
-   }
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
    "id": "one-arm-pronated-dumbbell-triceps-extension",
    "name": "One Arm Pronated Dumbbell Triceps Extension",
    "pattern": "push",
@@ -317,30 +261,6 @@
     "mobility",
     "sport"
    ],
-   "id": "pallof-press",
-   "name": "Pallof Press",
-   "pattern": "rotation",
-   "family": "plank",
-   "variation": "pallof-press",
-   "clip": "ex_pallofpress_standing",
-   "via": "library",
-   "read": "pattern rotation, loop reads as push",
-   "verdict": {
-    "v": "ok",
-    "why": "the standing Pallof press: a press away that resists the turn"
-   }
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
    "id": "shotgun-row",
    "name": "Shotgun Row",
    "pattern": "pull",
@@ -376,47 +296,6 @@
    "verdict": {
     "v": "ok",
     "why": "a shotgun row is a one-arm cable row"
-   }
-  },
-  {
-   "source": "builder",
-   "in": [
-    "mobility"
-   ],
-   "id": "spider-crawl",
-   "name": "Spider Crawl",
-   "pattern": "mobility",
-   "family": "dynamic-warmup",
-   "variation": "spider-crawl",
-   "clip": "ex_spiderman_pushup",
-   "via": "library",
-   "read": "pattern mobility, loop reads as push",
-   "verdict": {
-    "v": "wrong",
-    "why": "a travelling crawl warm-up plays a push-up in place: the chest drops to the floor and nothing travels. lib/library/demo.ts line 752 (demo-loops); assumption: the crawl is not done as a push-up"
-   }
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility"
-   ],
-   "id": "split-squat-stretch",
-   "name": "Split Squat Stretch",
-   "pattern": "mobility",
-   "family": "stretch-hamstring",
-   "variation": "split-squat-stretch",
-   "clip": "ex_split_jump",
-   "via": "library",
-   "read": "pattern mobility, loop reads as jump",
-   "verdict": {
-    "v": "wrong",
-    "why": "a hamstring stretch (front leg long, fold forward, \"no bouncing\") plays a jumping split-switch plyometric. lib/library/demo.ts line 890 (demo-loops)"
    }
   },
   {
@@ -482,24 +361,6 @@
   {
    "source": "signature",
    "in": [
-    "athletic-foundation"
-   ],
-   "id": "pallof-press",
-   "name": "Pallof Press",
-   "pattern": "rotation",
-   "family": "plank",
-   "variation": "pallof-press",
-   "clip": "ex_pallofpress_standing",
-   "via": "library",
-   "read": "pattern rotation, loop reads as push",
-   "verdict": {
-    "v": "ok",
-    "why": "the standing Pallof press: a press away that resists the turn"
-   }
-  },
-  {
-   "source": "signature",
-   "in": [
     "basketball-skills"
    ],
    "id": "recover-and-contest",
@@ -513,24 +374,6 @@
    "verdict": {
     "v": "ok",
     "why": "recover and contest is the closeout"
-   }
-  },
-  {
-   "source": "signature",
-   "in": [
-    "pain-free"
-   ],
-   "id": "split-stance-pallof-press",
-   "name": "Split-Stance Pallof Press",
-   "pattern": "rotation",
-   "family": "anti-rotation",
-   "variation": "split",
-   "clip": "ex_pallofpress_split",
-   "via": "library",
-   "read": "pattern rotation, loop reads as lunge",
-   "verdict": {
-    "v": "ok",
-    "why": "the Pallof press in a split stance"
    }
   },
   {
@@ -661,6 +504,113 @@
     "mobility",
     "sport"
    ],
+   "id": "band-anti-rotation-march",
+   "name": "Band Anti-Rotation March",
+   "pattern": "rotation",
+   "family": "anti-rotation",
+   "variation": "march",
+   "clip": null,
+   "via": "none",
+   "still": "no loop"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "sport"
+   ],
+   "id": "band-good-morning-pull-through",
+   "name": "Band Good Morning (Pull Through)",
+   "pattern": "hinge",
+   "family": "good-morning",
+   "variation": "morn-pull-through",
+   "clip": null,
+   "via": "none",
+   "still": "no loop"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "banded-ankle-rock",
+   "name": "Banded Ankle Rock",
+   "pattern": "mobility",
+   "family": "ankle-mobility",
+   "variation": "banded",
+   "clip": null,
+   "via": "none",
+   "still": "no loop"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "mobility"
+   ],
+   "id": "banded-hip-distraction-stretch",
+   "name": "Banded Hip Distraction Stretch",
+   "pattern": "mobility",
+   "family": "loaded-mobility",
+   "variation": "band-hip",
+   "clip": null,
+   "via": "none",
+   "still": "no loop"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "banded-knee-squat",
+   "name": "Banded Knee Squat",
+   "pattern": "squat",
+   "family": "spanish-squat",
+   "variation": "reps",
+   "clip": null,
+   "via": "none",
+   "still": "no loop"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "mobility"
+   ],
+   "id": "banded-shoulder-distraction-stretch",
+   "name": "Banded Shoulder Distraction Stretch",
+   "pattern": "mobility",
+   "family": "loaded-mobility",
+   "variation": "band-shoulder",
+   "clip": null,
+   "via": "none",
+   "still": "no loop"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
    "id": "barbell-ab-rollout",
    "name": "Barbell Ab Rollout",
    "pattern": "other",
@@ -731,8 +681,6 @@
    "source": "builder",
    "in": [
     "full-body",
-    "strength",
-    "muscle",
     "conditioning"
    ],
    "id": "barbell-hack-squat",
@@ -740,26 +688,6 @@
    "pattern": "squat",
    "family": "leg-press-hack",
    "variation": "hack-squat",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "barbell-rear-delt-row",
-   "name": "Barbell Rear Delt Row",
-   "pattern": "pull",
-   "family": "rear-delt-face-pull",
-   "variation": "rear-shoulder-row",
    "clip": null,
    "via": "none",
    "still": "no loop"
@@ -865,6 +793,25 @@
     "muscle",
     "conditioning",
     "athletic",
+    "mobility"
+   ],
+   "id": "bear-plank-with-band-row",
+   "name": "Bear Plank with Band Row",
+   "pattern": "other",
+   "family": "plank-matrix",
+   "variation": "bear-band-row",
+   "clip": null,
+   "via": "none",
+   "still": "no loop"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
     "mobility",
     "sport"
    ],
@@ -893,6 +840,26 @@
    "pattern": "other",
    "family": "dead-bug",
    "variation": "bird-dog-row",
+   "clip": null,
+   "via": "none",
+   "still": "no loop"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "bird-dog-with-band-row",
+   "name": "Bird Dog with Band Row",
+   "pattern": "other",
+   "family": "dead-bug-bird-dog",
+   "variation": "bird-band",
    "clip": null,
    "via": "none",
    "still": "no loop"
@@ -998,20 +965,6 @@
   {
    "source": "builder",
    "in": [
-    "mobility"
-   ],
-   "id": "controlled-thoracic-circle-seated",
-   "name": "Controlled Thoracic Circle, Seated",
-   "pattern": "mobility",
-   "family": "joint-circles",
-   "variation": "thoracic-seated",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
     "full-body",
     "strength",
     "muscle",
@@ -1095,6 +1048,26 @@
    "pattern": "other",
    "family": "dead-bug-bird-dog",
    "variation": "wall",
+   "clip": null,
+   "via": "none",
+   "still": "no loop"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "diagonal-band-pull-apart",
+   "name": "Diagonal Band Pull-Apart",
+   "pattern": "pull",
+   "family": "scap-work",
+   "variation": "pull-apart-diag",
    "clip": null,
    "via": "none",
    "still": "no loop"
@@ -1390,6 +1363,24 @@
    "pattern": "push",
    "family": "push-up",
    "variation": "handstand-push-ups",
+   "clip": null,
+   "via": "none",
+   "still": "no loop"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "mobility"
+   ],
+   "id": "high-plank-with-band-row",
+   "name": "High Plank with Band Row",
+   "pattern": "other",
+   "family": "plank-matrix",
+   "variation": "high-band-row",
    "clip": null,
    "via": "none",
    "still": "no loop"
@@ -1819,21 +1810,6 @@
    "source": "builder",
    "in": [
     "full-body",
-    "conditioning"
-   ],
-   "id": "lying-machine-squat",
-   "name": "Lying Machine Squat",
-   "pattern": "squat",
-   "family": "leg-press-hack",
-   "variation": "lying-squat",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
     "strength",
     "muscle",
     "conditioning",
@@ -1884,6 +1860,46 @@
    "pattern": "pull",
    "family": "pull-up",
    "variation": "muscl-up+tempo",
+   "clip": null,
+   "via": "none",
+   "still": "no loop"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "overhead-band-pull-apart",
+   "name": "Overhead Band Pull-Apart",
+   "pattern": "pull",
+   "family": "upper-back",
+   "variation": "pull-apart-overhead",
+   "clip": null,
+   "via": "none",
+   "still": "no loop"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "pallof-press-walkout",
+   "name": "Pallof Press Walkout",
+   "pattern": "rotation",
+   "family": "anti-rotation",
+   "variation": "walkout",
    "clip": null,
    "via": "none",
    "still": "no loop"
@@ -2049,6 +2065,26 @@
    "pattern": "locomotion",
    "family": "quick-feet",
    "variation": "in-place",
+   "clip": null,
+   "via": "none",
+   "still": "no loop"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "reverse-band-sumo-deadlift",
+   "name": "Reverse Band Sumo Deadlift",
+   "pattern": "hinge",
+   "family": "deadlift",
+   "variation": "revers-sumo-deadlift",
    "clip": null,
    "via": "none",
    "still": "no loop"
@@ -2257,6 +2293,26 @@
     "mobility",
     "sport"
    ],
+   "id": "side-plank-with-row",
+   "name": "Side Plank with Row",
+   "pattern": "other",
+   "family": "side-plank",
+   "variation": "row",
+   "clip": null,
+   "via": "none",
+   "still": "no loop"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
    "id": "single-arm-push-up",
    "name": "Single-Arm Push-Up",
    "pattern": "push",
@@ -2282,6 +2338,20 @@
    "pattern": "hinge",
    "family": "single-leg-hinge",
    "variation": "airplane",
+   "clip": null,
+   "via": "none",
+   "still": "no loop"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "mobility"
+   ],
+   "id": "spider-crawl",
+   "name": "Spider Crawl",
+   "pattern": "mobility",
+   "family": "dynamic-warmup",
+   "variation": "spider-crawl",
    "clip": null,
    "via": "none",
    "still": "no loop"
@@ -2317,6 +2387,25 @@
    "pattern": "mobility",
    "family": "shoulder-mobility",
    "variation": "spinal-wave",
+   "clip": null,
+   "via": "none",
+   "still": "no loop"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility"
+   ],
+   "id": "split-squat-stretch",
+   "name": "Split Squat Stretch",
+   "pattern": "mobility",
+   "family": "stretch-hamstring",
+   "variation": "split-squat-stretch",
    "clip": null,
    "via": "none",
    "still": "no loop"
@@ -4513,6 +4602,25 @@
     "mobility",
     "sport"
    ],
+   "id": "back-flyes-with-bands",
+   "name": "Back Flyes - With Bands",
+   "pattern": "pull",
+   "family": "rear-delt-face-pull",
+   "variation": "back-fly",
+   "clip": "ex_reverse_fly",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
    "id": "back-to-wall-arm-raise",
    "name": "Back-to-Wall Arm Raise",
    "pattern": "pull",
@@ -4520,6 +4628,795 @@
    "variation": "wall-raise",
    "clip": "ex_back_wall_arm_raise",
    "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "band-anti-rotation-march",
+   "name": "Band Anti-Rotation March",
+   "pattern": "rotation",
+   "family": "anti-rotation",
+   "variation": "march",
+   "clip": null,
+   "via": "none",
+   "still": "no loop"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "band-biceps-curl",
+   "name": "Band Biceps Curl",
+   "pattern": "pull",
+   "family": "arm-accessory",
+   "variation": "band-curl",
+   "clip": "ex_curl",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "band-face-pull",
+   "name": "Band Face Pull",
+   "pattern": "pull",
+   "family": "upper-back",
+   "variation": "face-pull-band",
+   "clip": "ex_face_pull",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "band-front-squat",
+   "name": "Band Front Squat",
+   "pattern": "squat",
+   "family": "squat",
+   "variation": "front-squat",
+   "clip": "ex_squat",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "band-good-morning",
+   "name": "Band Good Morning",
+   "pattern": "hinge",
+   "family": "good-morning",
+   "variation": "morn",
+   "clip": "ex_good_morning",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "sport"
+   ],
+   "id": "band-good-morning-pull-through",
+   "name": "Band Good Morning (Pull Through)",
+   "pattern": "hinge",
+   "family": "good-morning",
+   "variation": "morn-pull-through",
+   "clip": null,
+   "via": "none",
+   "still": "no loop"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "band-pallof-overhead-press-half-kneeling",
+   "name": "Band Pallof Overhead Press, Half-Kneeling",
+   "pattern": "rotation",
+   "family": "pallof-matrix",
+   "variation": "band-overhead-half-kneeling",
+   "clip": "ex_pallofoverhead_hk",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "band-pallof-overhead-press-lateral-lunge",
+   "name": "Band Pallof Overhead Press, Lateral Lunge",
+   "pattern": "rotation",
+   "family": "pallof-matrix",
+   "variation": "band-overhead-lateral-lunge",
+   "clip": "ex_pallofoverhead_lateral",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "band-pallof-overhead-press-single-leg",
+   "name": "Band Pallof Overhead Press, Single-Leg",
+   "pattern": "rotation",
+   "family": "pallof-matrix",
+   "variation": "band-overhead-single-leg",
+   "clip": "ex_pallofoverhead_single",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "band-pallof-overhead-press-split-stance",
+   "name": "Band Pallof Overhead Press, Split-Stance",
+   "pattern": "rotation",
+   "family": "pallof-matrix",
+   "variation": "band-overhead-split",
+   "clip": "ex_pallofoverhead_split",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "band-pallof-overhead-press-standing",
+   "name": "Band Pallof Overhead Press, Standing",
+   "pattern": "rotation",
+   "family": "pallof-matrix",
+   "variation": "band-overhead-standing",
+   "clip": "ex_pallofoverhead_standing",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "strength",
+    "muscle",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "band-pallof-overhead-press-tall-kneeling",
+   "name": "Band Pallof Overhead Press, Tall-Kneeling",
+   "pattern": "rotation",
+   "family": "pallof-matrix",
+   "variation": "band-overhead-tall-kneeling",
+   "clip": "ex_pallofoverhead_tk",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "band-pallof-press",
+   "name": "Band Pallof Press",
+   "pattern": "rotation",
+   "family": "anti-rotation",
+   "variation": "standing",
+   "clip": "ex_pallofpress_standing",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "strength",
+    "muscle",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "band-pallof-press-and-hold-lateral-lunge",
+   "name": "Band Pallof Press and Hold, Lateral Lunge",
+   "pattern": "rotation",
+   "family": "pallof-matrix",
+   "variation": "band-hold-lateral-lunge",
+   "clip": "ex_pallofhold_lateral",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "band-pallof-press-and-hold-single-leg",
+   "name": "Band Pallof Press and Hold, Single-Leg",
+   "pattern": "rotation",
+   "family": "pallof-matrix",
+   "variation": "band-hold-single-leg",
+   "clip": "ex_pallofhold_single",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "strength",
+    "muscle",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "band-pallof-press-and-hold-split-stance",
+   "name": "Band Pallof Press and Hold, Split-Stance",
+   "pattern": "rotation",
+   "family": "pallof-matrix",
+   "variation": "band-hold-split",
+   "clip": "ex_pallofhold_split",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "band-pallof-press-and-hold-standing",
+   "name": "Band Pallof Press and Hold, Standing",
+   "pattern": "rotation",
+   "family": "pallof-matrix",
+   "variation": "band-hold-standing",
+   "clip": "ex_pallofhold_standing",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "band-pallof-press-half-kneeling",
+   "name": "Band Pallof Press, Half-Kneeling",
+   "pattern": "rotation",
+   "family": "pallof-matrix",
+   "variation": "band-press-half-kneeling",
+   "clip": "ex_pallofpress_hk",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "band-pallof-press-lateral-lunge",
+   "name": "Band Pallof Press, Lateral Lunge",
+   "pattern": "rotation",
+   "family": "pallof-matrix",
+   "variation": "band-press-lateral-lunge",
+   "clip": "ex_pallofpress_lateral",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "band-pallof-press-single-leg",
+   "name": "Band Pallof Press, Single-Leg",
+   "pattern": "rotation",
+   "family": "pallof-matrix",
+   "variation": "band-press-single-leg",
+   "clip": "ex_pallofpress_single",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "band-pallof-press-standing",
+   "name": "Band Pallof Press, Standing",
+   "pattern": "rotation",
+   "family": "pallof-matrix",
+   "variation": "band-press-standing",
+   "clip": "ex_pallofpress_standing",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "band-pallof-press-tall-kneeling",
+   "name": "Band Pallof Press, Tall-Kneeling",
+   "pattern": "rotation",
+   "family": "pallof-matrix",
+   "variation": "band-press-tall-kneeling",
+   "clip": "ex_pallofpress_tk",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "band-pull-apart",
+   "name": "Band Pull Apart",
+   "pattern": "pull",
+   "family": "rear-delt-face-pull",
+   "variation": "pull-apart",
+   "clip": "ex_pull_apart",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "band-pull-through",
+   "name": "Band Pull-Through",
+   "pattern": "hinge",
+   "family": "hinge-accessory",
+   "variation": "band-pull-through",
+   "clip": "ex_pull_through",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "band-pulldown",
+   "name": "Band Pulldown",
+   "pattern": "pull",
+   "family": "vertical-pull",
+   "variation": "band-pulldown",
+   "clip": "ex_band_pulldown",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "athletic"
+   ],
+   "id": "band-rear-foot-elevated-split-squat",
+   "name": "Band Rear-Foot-Elevated Split Squat",
+   "pattern": "lunge",
+   "family": "split-squat",
+   "variation": "rfe-band",
+   "clip": "ex_bulgarian",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "band-romanian-deadlift",
+   "name": "Band Romanian Deadlift",
+   "pattern": "hinge",
+   "family": "hinge-pattern",
+   "variation": "band-rdl",
+   "clip": "ex_hinge",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "conditioning",
+    "athletic",
+    "sport"
+   ],
+   "id": "band-romanian-deadlift-with-4-second-lower",
+   "name": "Band Romanian Deadlift with 4-Second Lower",
+   "pattern": "hinge",
+   "family": "hinge-pattern",
+   "variation": "band-rdl+tempo",
+   "clip": "ex_hinge",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "band-row",
+   "name": "Band Row",
+   "pattern": "pull",
+   "family": "row",
+   "variation": "band",
+   "clip": "ex_band_row",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "band-row-with-4-second-lower",
+   "name": "Band Row with 4-Second Lower",
+   "pattern": "pull",
+   "family": "row",
+   "variation": "band+tempo",
+   "clip": "ex_band_row",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "band-single-arm-row",
+   "name": "Band Single-Arm Row",
+   "pattern": "pull",
+   "family": "standing-cable",
+   "variation": "band-row",
+   "clip": "ex_cable_row_one",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "band-skull-crusher",
+   "name": "Band Skull Crusher",
+   "pattern": "push",
+   "family": "triceps",
+   "variation": "skull-crusher",
+   "clip": "ex_skull_crusher",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "athletic"
+   ],
+   "id": "band-split-squat",
+   "name": "Band Split Squat",
+   "pattern": "lunge",
+   "family": "split-squat",
+   "variation": "band",
+   "clip": "ex_split_squat",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "band-straight-arm-pulldown",
+   "name": "Band Straight-Arm Pulldown",
+   "pattern": "pull",
+   "family": "pull-extra",
+   "variation": "band-straight-arm",
+   "clip": "ex_straight_arm_pulldown",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "band-straight-arm-pulldown-with-4-second-lower",
+   "name": "Band Straight-Arm Pulldown with 4-Second Lower",
+   "pattern": "pull",
+   "family": "pull-extra",
+   "variation": "band-straight-arm+tempo",
+   "clip": "ex_straight_arm_pulldown",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "band-triceps-pushdown",
+   "name": "Band Triceps Pushdown",
+   "pattern": "push",
+   "family": "triceps-accessory",
+   "variation": "band-pushdown",
+   "clip": "ex_pushdown",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "band-under-feet-squat",
+   "name": "Band Under-Feet Squat",
+   "pattern": "squat",
+   "family": "squat",
+   "variation": "squat",
+   "clip": "ex_squat",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "band-resisted-bodyweight-squat",
+   "name": "Band-Resisted Bodyweight Squat",
+   "pattern": "squat",
+   "family": "squat",
+   "variation": "bodyweight-squat+band-resisted",
+   "clip": "ex_squat",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "band-resisted-dead-bug",
+   "name": "Band-Resisted Dead Bug",
+   "pattern": "other",
+   "family": "dead-bug",
+   "variation": "band",
+   "clip": "ex_dead_bug",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "banded-ankle-rock",
+   "name": "Banded Ankle Rock",
+   "pattern": "mobility",
+   "family": "ankle-mobility",
+   "variation": "banded",
+   "clip": null,
+   "via": "none",
+   "still": "no loop"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "mobility"
+   ],
+   "id": "banded-hip-distraction-stretch",
+   "name": "Banded Hip Distraction Stretch",
+   "pattern": "mobility",
+   "family": "loaded-mobility",
+   "variation": "band-hip",
+   "clip": null,
+   "via": "none",
+   "still": "no loop"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "banded-knee-squat",
+   "name": "Banded Knee Squat",
+   "pattern": "squat",
+   "family": "spanish-squat",
+   "variation": "reps",
+   "clip": null,
+   "via": "none",
+   "still": "no loop"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "mobility"
+   ],
+   "id": "banded-shoulder-distraction-stretch",
+   "name": "Banded Shoulder Distraction Stretch",
+   "pattern": "mobility",
+   "family": "loaded-mobility",
+   "variation": "band-shoulder",
+   "clip": null,
+   "via": "none",
+   "still": "no loop"
   },
   {
    "source": "builder",
@@ -4695,8 +5592,6 @@
    "source": "builder",
    "in": [
     "full-body",
-    "strength",
-    "muscle",
     "conditioning"
    ],
    "id": "barbell-hack-squat",
@@ -4798,26 +5693,6 @@
    "variation": "bb+tempo",
    "clip": "ex_press",
    "via": "library"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "barbell-rear-delt-row",
-   "name": "Barbell Rear Delt Row",
-   "pattern": "pull",
-   "family": "rear-delt-face-pull",
-   "variation": "rear-shoulder-row",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
   },
   {
    "source": "builder",
@@ -5128,6 +6003,25 @@
     "strength",
     "muscle",
     "conditioning",
+    "athletic",
+    "mobility"
+   ],
+   "id": "bear-plank-with-band-row",
+   "name": "Bear Plank with Band Row",
+   "pattern": "other",
+   "family": "plank-matrix",
+   "variation": "bear-band-row",
+   "clip": null,
+   "via": "none",
+   "still": "no loop"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
     "mobility"
    ],
    "id": "bear-plank-with-leg-lift",
@@ -5302,6 +6196,26 @@
     "mobility",
     "sport"
    ],
+   "id": "bird-dog-with-band-row",
+   "name": "Bird Dog with Band Row",
+   "pattern": "other",
+   "family": "dead-bug-bird-dog",
+   "variation": "bird-band",
+   "clip": null,
+   "via": "none",
+   "still": "no loop"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
    "id": "bodyweight-squat",
    "name": "Bodyweight Squat",
    "pattern": "squat",
@@ -5373,12 +6287,12 @@
     "full-body",
     "conditioning"
    ],
-   "id": "box-squat-with-chains",
-   "name": "Box Squat with Chains",
+   "id": "box-squat-with-bands",
+   "name": "Box Squat with Bands",
    "pattern": "squat",
    "family": "squat",
-   "variation": "box-squat-chain",
-   "clip": "ex_box_squat_bar",
+   "variation": "box-squat",
+   "clip": "ex_squat_bar",
    "via": "library"
   },
   {
@@ -5555,6 +6469,25 @@
     "muscle",
     "conditioning",
     "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "calf-raises-with-bands",
+   "name": "Calf Raises - With Bands",
+   "pattern": "other",
+   "family": "calf-raise",
+   "variation": "calf-rais",
+   "clip": "ex_calf_raise",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
     "mobility"
    ],
    "id": "cat-stretch",
@@ -5637,8 +6570,7 @@
     "muscle",
     "conditioning",
     "athletic",
-    "mobility",
-    "sport"
+    "mobility"
    ],
    "id": "chin-up",
    "name": "Chin-Up",
@@ -5731,20 +6663,6 @@
    "variation": "concentration-curl",
    "clip": "ex_concentration_curl",
    "via": "library"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "mobility"
-   ],
-   "id": "controlled-thoracic-circle-seated",
-   "name": "Controlled Thoracic Circle, Seated",
-   "pattern": "mobility",
-   "family": "joint-circles",
-   "variation": "thoracic-seated",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
   },
   {
    "source": "builder",
@@ -6075,6 +6993,26 @@
    "variation": "declin-smith-press",
    "clip": "ex_decline_press",
    "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "diagonal-band-pull-apart",
+   "name": "Diagonal Band Pull-Apart",
+   "pattern": "pull",
+   "family": "scap-work",
+   "variation": "pull-apart-diag",
+   "clip": null,
+   "via": "none",
+   "still": "no loop"
   },
   {
    "source": "builder",
@@ -7661,6 +8599,25 @@
     "mobility",
     "sport"
    ],
+   "id": "half-kneeling-pallof-press",
+   "name": "Half-Kneeling Pallof Press",
+   "pattern": "rotation",
+   "family": "anti-rotation",
+   "variation": "half-kneel",
+   "clip": "ex_pallofpress_hk",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
    "id": "hammer-curls",
    "name": "Hammer Curls",
    "pattern": "pull",
@@ -7770,6 +8727,24 @@
     "conditioning",
     "mobility"
    ],
+   "id": "high-plank-with-band-row",
+   "name": "High Plank with Band Row",
+   "pattern": "other",
+   "family": "plank-matrix",
+   "variation": "high-band-row",
+   "clip": null,
+   "via": "none",
+   "still": "no loop"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "mobility"
+   ],
    "id": "high-plank-with-leg-lift",
    "name": "High Plank with Leg Lift",
    "pattern": "other",
@@ -7792,6 +8767,25 @@
    "clip": null,
    "via": "none",
    "still": "no loop"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "hip-lift-with-band",
+   "name": "Hip Lift with Band",
+   "pattern": "hinge",
+   "family": "bridge-thrust",
+   "variation": "hip-lift",
+   "clip": "ex_bridge",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -7888,11 +8882,8 @@
    "source": "builder",
    "in": [
     "full-body",
-    "strength",
-    "muscle",
     "conditioning",
-    "athletic",
-    "sport"
+    "athletic"
    ],
    "id": "incline-bench-pull",
    "name": "Incline Bench Pull",
@@ -7992,6 +8983,19 @@
   {
    "source": "builder",
    "in": [
+    "mobility"
+   ],
+   "id": "it-band-and-glute-stretch",
+   "name": "IT Band and Glute Stretch",
+   "pattern": "mobility",
+   "family": "stretch-hip",
+   "variation": "glut-stretch",
+   "clip": "ex_lying_leg_across",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
     "full-body",
     "strength",
     "muscle",
@@ -8067,7 +9071,6 @@
     "muscle",
     "conditioning",
     "athletic",
-    "mobility",
     "sport"
    ],
    "id": "kettlebell-deadlift",
@@ -8081,12 +9084,6 @@
   {
    "source": "builder",
    "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
     "sport"
    ],
    "id": "kettlebell-deadlift-with-4-second-lower",
@@ -8275,28 +9272,6 @@
   {
    "source": "builder",
    "in": [
-    "full-body",
-    "conditioning",
-    "athletic",
-    "sport"
-   ],
-   "id": "kettlebell-romanian-deadlift",
-   "name": "Kettlebell Romanian Deadlift",
-   "pattern": "hinge",
-   "family": "hinge-pattern",
-   "variation": "kb-rdl",
-   "clip": "ex_hinge",
-   "via": "library"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
     "sport"
    ],
    "id": "kettlebell-sumo-deadlift",
@@ -8851,21 +9826,6 @@
    "source": "builder",
    "in": [
     "full-body",
-    "conditioning"
-   ],
-   "id": "lying-machine-squat",
-   "name": "Lying Machine Squat",
-   "pattern": "squat",
-   "family": "leg-press-hack",
-   "variation": "lying-squat",
-   "clip": null,
-   "via": "none",
-   "still": "no loop"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
     "strength",
     "muscle",
     "conditioning",
@@ -8936,44 +9896,6 @@
    "family": "bench-press",
    "variation": "bench-press",
    "clip": "ex_bench_press",
-   "via": "library"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "machine-bicep-curl",
-   "name": "Machine Bicep Curl",
-   "pattern": "pull",
-   "family": "curl",
-   "variation": "bicep-curl",
-   "clip": "ex_curl",
-   "via": "library"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
-   "id": "machine-triceps-extension",
-   "name": "Machine Triceps Extension",
-   "pattern": "push",
-   "family": "triceps",
-   "variation": "tricep-extension",
-   "clip": "ex_machine_triceps",
    "via": "library"
   },
   {
@@ -9209,12 +10131,7 @@
   {
    "source": "builder",
    "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility"
+    "sport"
    ],
    "id": "one-arm-long-bar-row",
    "name": "One-Arm Long Bar Row",
@@ -9255,6 +10172,26 @@
    "variation": "open-book",
    "clip": "ex_pos_openbook",
    "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "overhead-band-pull-apart",
+   "name": "Overhead Band Pull-Apart",
+   "pattern": "pull",
+   "family": "upper-back",
+   "variation": "pull-apart-overhead",
+   "clip": null,
+   "via": "none",
+   "still": "no loop"
   },
   {
    "source": "builder",
@@ -9324,6 +10261,26 @@
     "mobility",
     "sport"
    ],
+   "id": "pallof-press-walkout",
+   "name": "Pallof Press Walkout",
+   "pattern": "rotation",
+   "family": "anti-rotation",
+   "variation": "walkout",
+   "clip": null,
+   "via": "none",
+   "still": "no loop"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
    "id": "pallof-press-with-rotation",
    "name": "Pallof Press With Rotation",
    "pattern": "rotation",
@@ -9332,6 +10289,25 @@
    "clip": null,
    "via": "none",
    "still": "no loop"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "palms-up-band-pull-apart",
+   "name": "Palms-Up Band Pull-Apart",
+   "pattern": "pull",
+   "family": "scap-work",
+   "variation": "pull-apart-up",
+   "clip": "ex_pull_apart",
+   "via": "library"
   },
   {
    "source": "builder",
@@ -9733,8 +10709,7 @@
     "muscle",
     "conditioning",
     "athletic",
-    "mobility",
-    "sport"
+    "mobility"
    ],
    "id": "pullups",
    "name": "Pullups",
@@ -9879,6 +10854,26 @@
     "mobility",
     "sport"
    ],
+   "id": "reverse-band-sumo-deadlift",
+   "name": "Reverse Band Sumo Deadlift",
+   "pattern": "hinge",
+   "family": "deadlift",
+   "variation": "revers-sumo-deadlift",
+   "clip": null,
+   "via": "none",
+   "still": "no loop"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
    "id": "reverse-flyes",
    "name": "Reverse Flyes",
    "pattern": "pull",
@@ -9972,25 +10967,6 @@
     "mobility",
     "sport"
    ],
-   "id": "reverse-machine-flyes",
-   "name": "Reverse Machine Flyes",
-   "pattern": "pull",
-   "family": "rear-delt-face-pull",
-   "variation": "revers-fly",
-   "clip": "ex_reverse_fly",
-   "via": "library"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
-   ],
    "id": "reverse-plank-with-leg-lift",
    "name": "Reverse Plank with Leg Lift",
    "pattern": "other",
@@ -10017,20 +10993,6 @@
    "family": "triceps",
    "variation": "revers-tricep-bench-press",
    "clip": "ex_bench_press",
-   "via": "library"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "strength",
-    "muscle"
-   ],
-   "id": "rocking-standing-calf-raise",
-   "name": "Rocking Standing Calf Raise",
-   "pattern": "other",
-   "family": "calf-raise",
-   "variation": "rock-stand-calf-rais",
-   "clip": "ex_calf_raise",
    "via": "library"
   },
   {
@@ -10112,30 +11074,13 @@
     "strength",
     "muscle",
     "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
+    "athletic"
    ],
    "id": "seated-cable-rows",
    "name": "Seated Cable Rows",
    "pattern": "pull",
    "family": "row",
    "variation": "seat-row",
-   "clip": "ex_seated_row",
-   "via": "library"
-  },
-  {
-   "source": "builder",
-   "in": [
-    "full-body",
-    "conditioning",
-    "athletic"
-   ],
-   "id": "seated-cable-rows-with-4-second-lower",
-   "name": "Seated Cable Rows with 4-Second Lower",
-   "pattern": "pull",
-   "family": "row",
-   "variation": "seat-row+tempo",
    "clip": "ex_seated_row",
    "via": "library"
   },
@@ -10401,6 +11346,25 @@
     "mobility",
     "sport"
    ],
+   "id": "shoulder-press-with-bands",
+   "name": "Shoulder Press - With Bands",
+   "pattern": "push",
+   "family": "overhead-press",
+   "variation": "shoulder-press",
+   "clip": "ex_press",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
    "id": "side-bridge",
    "name": "Side Bridge",
    "pattern": "rotation",
@@ -10525,6 +11489,26 @@
    "variation": "side-leg-lift",
    "clip": "ex_side_plank_leg",
    "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "side-plank-with-row",
+   "name": "Side Plank with Row",
+   "pattern": "other",
+   "family": "side-plank",
+   "variation": "row",
+   "clip": null,
+   "via": "none",
+   "still": "no loop"
   },
   {
    "source": "builder",
@@ -10704,13 +11688,8 @@
   {
    "source": "builder",
    "in": [
-    "full-body",
     "strength",
-    "muscle",
-    "conditioning",
-    "athletic",
-    "mobility",
-    "sport"
+    "muscle"
    ],
    "id": "smith-machine-calf-raise",
    "name": "Smith Machine Calf Raise",
@@ -10732,6 +11711,25 @@
    "family": "landing",
    "variation": "snap-down",
    "clip": "ex_snap_down",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "speed-band-overhead-triceps",
+   "name": "Speed Band Overhead Triceps",
+   "pattern": "push",
+   "family": "triceps",
+   "variation": "spe-overhead-tricep",
+   "clip": "ex_triceps_overhead",
    "via": "library"
   },
   {
@@ -10780,8 +11778,9 @@
    "pattern": "mobility",
    "family": "dynamic-warmup",
    "variation": "spider-crawl",
-   "clip": "ex_spiderman_pushup",
-   "via": "library"
+   "clip": null,
+   "via": "none",
+   "still": "no loop"
   },
   {
    "source": "builder",
@@ -10909,8 +11908,9 @@
    "pattern": "mobility",
    "family": "stretch-hamstring",
    "variation": "split-squat-stretch",
-   "clip": "ex_split_jump",
-   "via": "library"
+   "clip": null,
+   "via": "none",
+   "still": "no loop"
   },
   {
    "source": "builder",
@@ -10953,6 +11953,25 @@
   {
    "source": "builder",
    "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "split-stance-pallof-press",
+   "name": "Split-Stance Pallof Press",
+   "pattern": "rotation",
+   "family": "anti-rotation",
+   "variation": "split",
+   "clip": "ex_pallofpress_split",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
     "athletic",
     "sport"
    ],
@@ -10962,6 +11981,24 @@
    "family": "vertical-jump",
    "variation": "squat-jump",
    "clip": "ex_jump",
+   "via": "library"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility"
+   ],
+   "id": "squat-with-bands",
+   "name": "Squat with Bands",
+   "pattern": "squat",
+   "family": "squat",
+   "variation": "squat",
+   "clip": "ex_squat_bar",
    "via": "library"
   },
   {
@@ -11374,6 +12411,25 @@
    "clip": null,
    "via": "none",
    "still": "no loop"
+  },
+  {
+   "source": "builder",
+   "in": [
+    "full-body",
+    "strength",
+    "muscle",
+    "conditioning",
+    "athletic",
+    "mobility",
+    "sport"
+   ],
+   "id": "tall-kneeling-pallof-press",
+   "name": "Tall-Kneeling Pallof Press",
+   "pattern": "rotation",
+   "family": "anti-rotation",
+   "variation": "tall-kneel",
+   "clip": "ex_pallofpress_tk",
+   "via": "library"
   },
   {
    "source": "builder",

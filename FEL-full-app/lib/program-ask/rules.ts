@@ -243,6 +243,14 @@ export function dayTemplate(focus: DayFocus, key: string, goal: ProgramGoal, min
   const core: SlotId[] = ['antiExt', 'antiRot'];
   switch (focus) {
     case 'full': {
+      // EVERY-SCREEN P3: a session of 25 minutes or less runs its six jobs as one circuit (one rest a round, the
+      // conditioning day's shape): as pairs, with the 6-minute warm-up, every 20-minute full-body plan above beginner ran
+      // 22–24 minutes and the server refused it (the grid: 436 of 1,680 twenty-minute requests)
+      if (minutes <= SHORT_SESSION && goal !== 'mobility') {
+        const circuit: SlotId[][] = [second ? ['hinge', 'hpush', 'knee', 'hpull', 'single', 'vpush'] : ['knee', 'hpull', 'hinge', 'hpush', 'single', 'vpull'], core];
+        if (goal === 'athletic' || goal === 'sport') circuit.unshift(['speed']);
+        return circuit;
+      }
       const blocks: SlotId[][] = second
         ? [['hinge', 'hpush'], ['knee', 'hpull'], ['single', 'vpush'], core]
         : [['knee', 'hpull'], ['hinge', 'hpush'], ['single', 'vpull'], core];
@@ -264,9 +272,11 @@ export function dayTemplate(focus: DayFocus, key: string, goal: ProgramGoal, min
     case 'athletic': return [['speed'], ['single', 'antiRot'], ['hinge', 'hpull']];
     case 'mobility': return [['mobility', 'mobility'], ['mobility', 'mobility'], core];
   }
-  void minutes;
   return [];
 }
+
+/** EVERY-SCREEN P3: at or under this many minutes a full-body day is one circuit (see dayTemplate). */
+export const SHORT_SESSION = 25;
 
 /** The slots a full-body day must cover (owner brief): knee, hinge, both pushes or pulls once, single leg, two trunk patterns. */
 export const FULL_DAY_REQUIRED: readonly (SlotId | readonly SlotId[])[] = [

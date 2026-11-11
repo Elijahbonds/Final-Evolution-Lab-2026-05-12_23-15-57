@@ -24,7 +24,10 @@ import { clipsFor } from '@/lib/session-player/clips';
 import { programWeekAccess } from './access';
 import { aiSystemPrompt, aiUserMessage, cleanWhy, parsePolish } from './ai';
 import { buildProgram } from './build';
-import { programProblems } from './check';
+// EVERY-SCREEN P3: every program the server sends keeps the plan's five written rules (./rules24.ts), which include the
+// builder's own check (./check.ts programProblems)
+import { builderRuleFailures } from './rules24';
+import { buildKept } from './kept';
 import { applyEdits, readProgramAsk, type RequestEdits } from './request';
 import type { BuiltProgram, ProgramAskRead } from './types';
 
@@ -52,8 +55,9 @@ export async function askProgram(user: { id: string; role?: string }, q: string,
   const { index } = await libraryState();
   const jumpsOpen = !youth && !!ctx && !ctx.isYouth && !ctx.jumpGate.closed;
   const jumpsWhy = ctx?.jumpGate.why || null;
-  let program = buildProgram({ request: read.request, library: index.docs, jumpsOpen, jumpsWhy });
-  const problems = programProblems(program, index.docs, { jumpsOpen });
+  const kept = buildKept({ request: read.request, library: index.docs, jumpsOpen, jumpsWhy });
+  let program = kept.program;
+  const problems = kept.failures;
   if (problems.length) {
     console.error('[program-ask] a built program failed its own check; nothing served', problems.slice(0, 10));
     throw new Error('program_check_failed');
@@ -63,8 +67,9 @@ export async function askProgram(user: { id: string; role?: string }, q: string,
     try {
       const polish = parsePolish(await ai(aiSystemPrompt(youth), aiUserMessage(program)), program);
       if (polish) {
-        const again = Object.keys(polish.picks).length ? buildProgram({ request: read.request, library: index.docs, jumpsOpen, jumpsWhy, picks: polish.picks }) : program;
-        if (!programProblems(again, index.docs, { jumpsOpen }).length) {
+        const again = Object.keys(polish.picks).length ? buildProgram({ request: program.request, library: index.docs, jumpsOpen, jumpsWhy, picks: polish.picks }) : program;
+        if (again !== program && kept.longer) again.notes.unshift(program.notes[0]);   // the longer-sessions line stays
+        if (!builderRuleFailures(again, index.docs, { jumpsOpen }).length) {
           const why = cleanWhy(polish.why, again);
           program = why ? { ...again, why, whyBy: 'ai' } : again;
           used = true;

@@ -65,12 +65,17 @@ describe('the four checks (docs/PLAN-EVERY-SCREEN-10PHASE.md)', () => {
       ['text cut off', { clipped: { phone: ['Score 12,345'], zoom200: [], font150: [] } }, 'clipped:phone'],
       ['text under 12 px', { tiny: 3 }, 'tiny-text'],
       ['body copy under 16 px', { bodySmall: 1 }, 'body-small'],
-      ['five text sizes', { textSizes: ['12px', '14px', '16px', '20px', '28px'] }, 'text-sizes'],
+      // test changed (owner decision 2026-11-10): 16 px body text no longer counts, so the five planted sizes are all others
+      ['five text sizes besides 16 px body', { textSizes: ['12px', '13px', '14px', '20px', '28px'] }, 'text-sizes'],
       ['four button looks', { buttonLooks: 4 }, 'button-looks'],
     ] as [string, Partial<ScreenFacts>, string][])('%s fails the check', (_name, over, id) => {
       const v = judge(clean(over));
       expect(v.faults.map((x) => x.id)).toEqual([id]);
       expect(v.checks).toEqual({ clear: 'pass', finished: 'fail', fast: 'pass', right: 'pass' });
+    });
+    it('owner decision 2026-11-10: 16 px body text does not count against the four sizes; an off-scale size still does', () => {
+      expect(ids(clean({ textSizes: ['12px', '14px', '16px', '20px', '30px'] }))).toEqual([]);
+      expect(ids(clean({ textSizes: ['12px', '13px', '14px', '16px', '20px', '30px'] }))).toEqual(['text-sizes']);
     });
     it('2 px of sideways scroll is rounding, not a fault; four text sizes and three button looks are allowed', () => {
       expect(ids(clean({ hscroll: { phone: 2, zoom200: 2, font150: 2 }, textSizes: ['12px', '14px', '16px', '28px'], buttonLooks: 3 }))).toEqual([]);

@@ -168,6 +168,16 @@ export function readProgramAsk(question: string, opts: ReadOptions = {}): Progra
   if (am) { const n = Number(am[1]); age = n < 13 ? 'child' : n < 18 ? 'teen' : 'adult'; said.age = true; }
   else if (/\b(kid|kids|child|children|my son|my daughter|middle school|elementary)\b/.test(f)) { age = 'teen'; said.age = true; assumptions.push('assumption: no age given for a young athlete, so under-18 rules apply. Say the age if they are under 13.'); }
   else if (/\b(teen|teenager|high school|youth)\b/.test(f)) { age = 'teen'; said.age = true; }
+  // EVERY-SCREEN P3: a bare 10–17 standing as its own clause ("Soccer player, 17, no equipment") is an age. It read as an
+  // adult. Only the under-18 direction is read this way: a bare number never makes anyone an adult.
+  else {
+    const bare = /(?:^|[,.;:(])\s*(1[0-7])\s*(?=[,.;:)]|$)/.exec(q.trim());
+    if (bare) {
+      const n = Number(bare[1]);
+      age = n < 13 ? 'child' : 'teen'; said.age = true;
+      assumptions.push(`assumption: the ${n} on its own is read as the athlete's age, so under-${n < 13 ? '13' : '18'} rules apply.`);
+    }
+  }
   if (opts.youth && age === 'adult') {
     age = 'teen';
     assumptions.push("assumption: this account's age rules are under-18 rules, so the plan follows them.");

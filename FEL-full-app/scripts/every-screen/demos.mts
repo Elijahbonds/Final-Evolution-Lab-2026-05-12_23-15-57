@@ -127,7 +127,7 @@ for (const t of TEMPLATES) {
 
 // ── builder ──────────────────────────────────────────────────────────────────────────────────────────────────────
 const GOALS: ProgramGoal[] = ['full-body', 'strength', 'muscle', 'conditioning', 'athletic', 'mobility', 'sport'];
-const KITS: string[][] = [[], ['resistance-band'], ['dumbbell'], ['barbell', 'dumbbell', 'kettlebell', 'cable', 'machine', 'pull-up-bar', 'bench', 'box', 'resistance-band', 'trap-bar']];
+const KITS: string[][] = [[], ['band'], ['dumbbell'], ['barbell', 'dumbbell', 'kettlebell', 'cable', 'machine', 'pull-up-bar', 'bench', 'box', 'band', 'trap-bar']];
 let builds = 0, buildFails = 0;
 for (const goal of GOALS) for (const level of ['beginner', 'intermediate', 'advanced'] as const) for (const age of ['adult', 'teen', 'child'] as AgeBand[])
   for (const equipment of KITS) for (const days of [2, 3, 4, 5, 6]) for (const jumpsOpen of age === 'adult' ? [false, true] : [false]) {
@@ -150,6 +150,7 @@ const MOVE_WORDS: [Move, RegExp][] = [
   ['ball', /^bball_|jumpshot|jumper|shot|shoot|layup|dribble|free_throw/],
   ['calf', /calf|tibialis|toe_raise|heel_raise/],
   ['throw', /throw|toss|scoop|shotput|slam|underhand|chest_pass|jammer|_chest_|overhead_(standing|hk|tk|split|lateral|single|stepin)|sidetoss|singlepush|rotoverhead/],
+  ['rotation', /pallof/],   // a Pallof press resists the turn, in any stance (P3: the band kit brought its variants in)
   ['hinge', /hinge|rdl|deadlift|good_morning|swing|kickstand|hip_thrust|thrust|bridge|glute|nordic|ham_?string_curl|ham_curl|slider|clean|snatch|back_ext|hyper|pull_through/],
   ['jump', /jump|hop|bound|pogo|skip|burpee|depth|leap|broad|snap_down|landing/],
   ['carry', /carry|farmer|waiter|suitcase_walk/],
@@ -160,7 +161,7 @@ const MOVE_WORDS: [Move, RegExp][] = [
   ['rotation', /rot|twist|chop|lift|pallof|windmill|woodchop/],
   ['run', /sprint|run|shuffle|carioca|backpedal|a_march|high_knee|butt_kick|accel|decel|cut|agility|ladder|march|start|arm_swing|crawl|stance|walk|climber/],
   ['core', /plank|crunch|dead_bug|bird_dog|hollow|sit_?up|leg_raise|bear|ab_|rollout|copenhagen|v_up|jackknife|flutter|mountain|superman|side_bend|tap|balance|tripod|clamshell|adductor|tke|chin_tuck/],
-  ['mobility', /stretch|smr|roll|9090|ninety|cat|cow|thread|open|circle|opener|rock|breath|legsup|prone|child|cobra|pigeon|frog|spider|groiner|world|ankle|knee_to_wall|hip_|t_spine|thoracic|quad|reach|sweep|halo|couch|pike|shinbox|switch|inchworm|elbows|sit_squat/],
+  ['mobility', /stretch|smr|roll|9090|ninety|cat|cow|thread|open|circle|opener|rock|breath|legsup|prone|child|cobra|pigeon|frog|spider|groiner|world|ankle|knee_to_wall|hip_|t_spine|thoracic|quad|reach|sweep|halo|couch|pike|shinbox|switch|inchworm|elbows|sit_squat|leg_across|leg_out/],
 ];
 function moveOf(clip: string): Move {
   const c = clip.replace(/^ex_/, '');

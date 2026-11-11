@@ -49,7 +49,18 @@ export const JOBS: Job[] = [
       { fill: ['[data-testid=program-ask-input]', ASK], say: 'type the ask' },
       { css: '[data-testid=program-ask-build]', expect: '[data-testid=program-view]', say: 'Build it' },
       { css: '[data-testid=program-start]', expect: '[data-session-player]', say: 'Start today' },
-      { css: PRIMARY, expect: '[data-session-player][data-phase=work]', say: 'Start now (the first exercise)' },
+      // EVERY-SCREEN P3: the ready count runs by itself (phase 2); the walk had pressed its quiet "Start now" as a fifth tap
+      { expect: '[data-session-player][data-phase=work]', say: 'the ready count ends by itself: the first rep' },
+    ],
+  },
+  {
+    id: 'solo-change-one-thing', who: 'solo', name: 'Change one thing in the program the AI built, and start it', planBudget: 'change one thing without starting over; save, and start (phase 3)',
+    steps: [
+      { goto: '/train/build', pre: true },
+      { fill: ['[data-testid=program-ask-input]', ASK], pre: true },
+      { css: '[data-testid=program-ask-build]', expect: '[data-testid=program-view]', pre: true },
+      { css: '[data-chip=days] button[aria-label^="More"]', expect: '/4 days/', say: 'one more day a week (the days chip\'s +)' },
+      { css: '[data-testid=program-start]', expect: '[data-session-player]', say: 'Start today' },
     ],
   },
   {

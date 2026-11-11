@@ -17,7 +17,7 @@ import { PrimaryCta } from '@/components/ui/fel/primary-cta';
 import { warmAvatarDemo } from '@/components/library/avatar-demo';
 import type { FinishResult } from '@/components/session-player/session-player';
 import { Layer } from '@/components/session-player/layer';
-import { TYPE } from '@/lib/design/type';
+import { TYPE, lineSize } from '@/lib/design/type';
 import { checkpointDecision, plannedWeeks, positionIn, type Decision } from '@/lib/program-ask/checkpoint';
 import {
   ASK_BUTTON, ASK_PLACEHOLDER, CHECKPOINT_LINES, CHECKPOINT_TITLE, EDIT_HINT, LIGHTER_TAG, READ_BACK, SAVED_ACCOUNT_LINE, SAVED_LINE, START_TODAY, WEEK_LINE, WEEK_VIEW,
@@ -44,6 +44,7 @@ interface Answer {
 
 const CHIP = 'inline-flex min-h-11 items-center gap-1 rounded-full border px-3';
 
+// EVERY-SCREEN P3: the − and + are 44 px wide (they were 36: under the tap-target floor)
 function ChipControl({ c, onEdit, busy }: { c: ProgramChip; onEdit: (f: RequestField, v: string | number) => void; busy: boolean }) {
   const [open, setOpen] = useState(false);
   const tone = c.assumed ? 'border-white/15 bg-white/[0.04] text-fel-soft' : 'border-fel-cyan/40 bg-fel-cyan/[0.12] text-fel-cyan';
@@ -51,9 +52,9 @@ function ChipControl({ c, onEdit, busy }: { c: ProgramChip; onEdit: (f: RequestF
     const s = c.step;
     return (
       <span data-chip={c.field} className={`${CHIP} ${TYPE.label} ${tone} gap-0 px-1`}>
-        <button type="button" aria-label={`Fewer: ${c.label}`} disabled={busy || s.value <= s.min} onClick={() => onEdit(c.field, s.value - s.by)} className="grid h-11 w-9 place-items-center disabled:opacity-30"><Minus className="h-4 w-4" /></button>
+        <button type="button" aria-label={`Fewer: ${c.label}`} disabled={busy || s.value <= s.min} onClick={() => onEdit(c.field, s.value - s.by)} className="grid h-11 w-11 place-items-center disabled:opacity-30"><Minus className="h-4 w-4" /></button>
         <span className="px-1">{c.label}</span>
-        <button type="button" aria-label={`More: ${c.label}`} disabled={busy || s.value >= s.max} onClick={() => onEdit(c.field, s.value + s.by)} className="grid h-11 w-9 place-items-center disabled:opacity-30"><Plus className="h-4 w-4" /></button>
+        <button type="button" aria-label={`More: ${c.label}`} disabled={busy || s.value >= s.max} onClick={() => onEdit(c.field, s.value + s.by)} className="grid h-11 w-11 place-items-center disabled:opacity-30"><Plus className="h-4 w-4" /></button>
       </span>
     );
   }
@@ -90,13 +91,11 @@ function DayCard({ d, locked, next }: { d: ProgramDay; locked: boolean; next: bo
         {d.blocks.map((b) => b.items.map((i) => (
           <li key={i.key} data-ex={i.exId} className="border-t border-white/6 pt-2">
             <p className={`${TYPE.body} text-white`}><span className="mr-2 text-fel-cyan">{i.label}</span>{i.name}</p>
-            <p className={`${TYPE.small} text-fel-soft`}>{doseText(i)} · {i.effortWords}</p>
+            <p className={`${lineSize(`${doseText(i)} · ${i.effortWords}`)} text-fel-soft`}>{doseText(i)} · {i.effortWords}</p>
+            {/* EVERY-SCREEN P3: a line of more than 12 words is body size (READABLE.md); a short one keeps 14 px */}
             {(i.note || i.bandSetup || i.harder || i.easier) && (
-              <div className={`mt-1 space-y-0.5 ${TYPE.small} text-white/75`}>
-                {i.note && <p>{i.note}</p>}
-                {i.bandSetup && <p>{i.bandSetup}</p>}
-                {i.harder && <p>{i.harder}</p>}
-                {i.easier && <p>{i.easier}</p>}
+              <div className="mt-1 space-y-0.5 text-white/75">
+                {[i.note, i.bandSetup, i.harder, i.easier].filter((x): x is string => !!x).map((x) => <p key={x} className={lineSize(x)}>{x}</p>)}
               </div>
             )}
           </li>
@@ -216,7 +215,7 @@ export function ProgramBuilder({ initialQuestion = '' }: { initialQuestion?: str
         <label htmlFor="program-ask" className={`${TYPE.label} text-fel-soft`}>What do you have, and what do you want?</label>
         <textarea id="program-ask" data-testid="program-ask-input" value={q} onChange={(e) => setQ(e.target.value)} rows={3} maxLength={400} placeholder={ASK_PLACEHOLDER}
           className={`w-full rounded-2xl border border-white/10 bg-[#0c0c11] p-4 ${TYPE.body} text-white placeholder:text-white/50 focus:border-fel-cyan/60 focus:outline-none`} />
-        <button type="submit" disabled={busy || !q.trim()} data-testid="program-ask-build" className={`min-h-12 rounded-full border border-fel-cyan/50 px-6 ${TYPE.label} text-fel-cyan disabled:opacity-40`}>{busy ? 'Building…' : ASK_BUTTON}</button>
+        <button type="submit" disabled={busy || !q.trim()} data-testid="program-ask-build" className={`min-h-11 rounded-full border border-fel-cyan/50 px-6 ${TYPE.label} text-fel-cyan disabled:opacity-40`}>{busy ? 'Building…' : ASK_BUTTON}</button>
         {error && <p role="alert" className={`${TYPE.small} text-[#ff6b8b]`}>{error}</p>}
       </form>
 
@@ -225,9 +224,9 @@ export function ProgramBuilder({ initialQuestion = '' }: { initialQuestion?: str
           <p className={`${TYPE.label} text-fel-soft`}>{READ_BACK} · {EDIT_HINT}</p>
           <div className="flex flex-wrap gap-2">{answer.read.chips.map((c) => <ChipControl key={c.field} c={c} onEdit={edit} busy={busy} />)}</div>
           {answer.read.assumptions.length > 0 && (
-            <details className={`${TYPE.small} text-fel-soft`}>
-              <summary className="min-h-11 cursor-pointer py-2">FEL assumed {answer.read.assumptions.length} thing{answer.read.assumptions.length === 1 ? '' : 's'}</summary>
-              <ul className="list-disc space-y-1 pl-5">{answer.read.assumptions.map((a) => <li key={a}>{a.replace(/^assumption: /, '')}</li>)}</ul>
+            <details className="text-fel-soft">
+              <summary className={`min-h-11 cursor-pointer py-2 ${TYPE.small}`}>FEL assumed {answer.read.assumptions.length} thing{answer.read.assumptions.length === 1 ? '' : 's'}</summary>
+              <ul className="list-disc space-y-1 pl-5">{answer.read.assumptions.map((a) => { const t = a.replace(/^assumption: /, ''); return <li key={a} className={lineSize(t)}>{t}</li>; })}</ul>
             </details>
           )}
         </section>
@@ -235,7 +234,7 @@ export function ProgramBuilder({ initialQuestion = '' }: { initialQuestion?: str
 
       {answer?.safety && (
         <div role="note" data-testid="program-safety" className={`space-y-1 rounded-2xl border border-fel-gold/30 bg-fel-gold/[0.06] p-4 ${TYPE.small} text-white/85`}>
-          {answer.safety.map((s) => <p key={s}>{s}</p>)}
+          {answer.safety.map((s) => <p key={s} className={lineSize(s)}>{s}</p>)}
         </div>
       )}
 
@@ -247,7 +246,7 @@ export function ProgramBuilder({ initialQuestion = '' }: { initialQuestion?: str
             <p className={`${TYPE.small} text-fel-soft`}>{saved?.programId === p.id ? (onAccount ? SAVED_ACCOUNT_LINE : SAVED_LINE) : ''}{pos.total ? ` ${pos.done} of ${pos.total} sessions done.` : ''}</p>
           </div>
           {canStart && <PrimaryCta docked onClick={start} icon={<Play className="h-5 w-5" />} testId="program-start">{START_TODAY}</PrimaryCta>}
-          {nextLocked && <p className={`${TYPE.small} text-fel-gold`}>{FREE_WEEK_LINE}</p>}
+          {nextLocked && <p className={`${lineSize(FREE_WEEK_LINE)} text-fel-gold`}>{FREE_WEEK_LINE}</p>}
 
           {pos.pendingCheckpoint && (
             <div data-testid="program-checkpoint" className="space-y-3 rounded-2xl border border-fel-cyan/40 bg-fel-cyan/[0.06] p-4">
@@ -275,14 +274,14 @@ export function ProgramBuilder({ initialQuestion = '' }: { initialQuestion?: str
             <div className="space-y-2">
               {shown.days.map((d) => <DayCard key={d.id} d={d} locked={accessOf(shown.n) === 'locked'} next={d.id === nextDay?.id} />)}
             </div>
-            <p className={`${TYPE.small} text-fel-soft`}>{WEEK_LINE}</p>
+            <p className={`${lineSize(WEEK_LINE)} text-fel-soft`}>{WEEK_LINE}</p>
           </div>
 
           <details className="rounded-2xl border border-white/8 bg-[#0c0c11] px-4">
             <summary className={`min-h-12 cursor-pointer py-3 ${TYPE.label} text-white`}>Why this plan</summary>
-            <p className={`pb-3 ${TYPE.small} text-white/85`}>{answer?.ai.used && p.whyBy === 'ai' && <Sparkles aria-hidden className="mr-1 inline h-3.5 w-3.5 text-fel-violet" />}{p.why}</p>
-            {p.jumps.line && <p className={`pb-3 ${TYPE.small} text-white/75`}>{p.jumps.line}</p>}
-            <ul className={`list-disc space-y-1 pb-4 pl-5 ${TYPE.small} text-white/75`}>{p.notes.map((n) => <li key={n}>{n}</li>)}</ul>
+            <p className={`pb-3 ${lineSize(p.why)} text-white/85`}>{answer?.ai.used && p.whyBy === 'ai' && <Sparkles aria-hidden className="mr-1 inline h-3.5 w-3.5 text-fel-violet" />}{p.why}</p>
+            {p.jumps.line && <p className={`pb-3 ${lineSize(p.jumps.line)} text-white/75`}>{p.jumps.line}</p>}
+            <ul className="list-disc space-y-1 pb-4 pl-5 text-white/75">{p.notes.map((n) => <li key={n} className={lineSize(n)}>{n}</li>)}</ul>
           </details>
         </section>
       )}

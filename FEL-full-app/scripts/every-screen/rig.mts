@@ -166,7 +166,9 @@ export async function people(fresh = false, lit: Lit = false): Promise<People> {
   for (const [who, p] of Object.entries(SIGNUP) as [Exclude<Person, 'anon'>, typeof SIGNUP['solo']][]) {
     if (sql(`select count(*) from "User" where email = '${p.email}'`, lit) === '0') {
       const r = await fetch(`${origin}/api/signup`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: p.email, password: PASSWORD, name: p.name, birthYear: p.birthYear }) });
-      if (!r.ok) throw new Error(`sign-up failed for ${who}: ${r.status} ${await r.text()}`);
+      // EVERY-SCREEN P3: two rigs (this lane's and screen-fixes') share this database and seed the same five people, so
+      // the seed is idempotent: an account another rig made between the check and the sign-up is used, not an error
+      if (!r.ok && sql(`select count(*) from "User" where email = '${p.email}'`, lit) === '0') throw new Error(`sign-up failed for ${who}: ${r.status} ${await r.text()}`);
     }
     ids[who] = sql(`select id from "User" where email = '${p.email}'`, lit);
   }
@@ -223,7 +225,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const cmd = process.argv[2];
   if (cmd === 'db-up') { dbUp(); console.log(`database up: ${DB_URL}`); }
   else if (cmd === 'db-down') { dbDown(); console.log('database stopped'); }
-  else if (cmd === 'db-reset') { dbReset(); console.log('database reset to prisma db push'); }
+  // EVERY-SCREEN P3: the database is shared with the screen-fixes lane's rig; a reset drops its people too
+  else if (cmd === 'db-reset') { if (!process.argv.includes('--shared-ok')) { console.error('db-reset drops the shared rig database (screen-fixes uses it too): add --shared-ok once both lanes agree'); process.exit(2); } dbReset(); console.log('database reset to prisma db push'); }
   else if (cmd === 'build') { dbUp(); const r = spawnSync(process.execPath, [join(ROOT, 'node_modules/next/dist/bin/next'), 'build'], { cwd: ROOT, env: rigEnv(), stdio: 'inherit' }); process.exit(r.status ?? 1); }
   else if (cmd === 'serve') { dbUp(); await serve(); console.log(`serving ${ORIGIN} (Ctrl-C stops it)`); await new Promise(() => {}); }
   else if (cmd === 'people') { dbUp(); const stop = await serve(); const p = await people(process.argv.includes('--fresh')); console.log(Object.keys(p.ids).join(', ')); stop(); }

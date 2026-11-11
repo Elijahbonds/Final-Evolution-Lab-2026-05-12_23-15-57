@@ -290,32 +290,64 @@ export function buildProgram(input: BuildInput): BuiltProgram {
   // a main lift keeps two sets (one for a child, or when the goal is mobility or conditioning, where it is not the point)
   const mainFloor = r.age === 'child' || r.goal === 'mobility' || r.goal === 'conditioning' ? 1 : 2;
   const minSetsFor = (i: TItem) => (MAIN.has(i.wanted) ? mainFloor : 1);
+  // EVERY-SCREEN P3 (2026-11-10): THE VOLUME GOVERNOR. With many days (5–6) every day template brings its own pull, push
+  // and trunk items, and with every item at its floor a group could still sit over the top of its range (the rig's grid:
+  // 1,584 of 5,040 requests had pulling over its range and the server refused them: program_check_failed). One set comes
+  // off at a time, in three steps, until the group fits: (1) an item above its floor; (2) a main lift that is not the
+  // day's key lift, down to one set; (3) an item leaves its day — an accessory first (rear delts, arms, calves), then a
+  // repeat of a job the week already does elsewhere. A full-body day keeps every job it must cover, and the key lift stays.
+  const templateOf = (i: TItem) => [...templates.values()].find((t) => t.blocks.some((b) => b.items.includes(i)))!;
+  const removable = (i: TItem): boolean => {
+    if (i.key) return false;
+    if (ACCESSORY.has(i.wanted)) return true;
+    if (templateOf(i).focus === 'full') return false;
+    return weekItems().some((o) => o !== i && o.wanted === i.wanted);
+  };
+  const removeItem = (i: TItem) => {
+    for (const t of templates.values()) {
+      for (const b of t.blocks) b.items = b.items.filter((x) => x !== i);
+      t.blocks = t.blocks.filter((b) => b.items.length);
+    }
+  };
+  /** One set (or one item) less for group g; false when nothing can give. */
+  const giveOne = (g: VolumeGroup): boolean => {
+    const items = groupItems(g);
+    const byMain = (a: TItem, b: TItem) => Number(MAIN.has(a.wanted)) - Number(MAIN.has(b.wanted)) || Number(a.key) - Number(b.key) || b.sets - a.sets;
+    const c1 = items.filter((i) => i.sets > minSetsFor(i)).sort(byMain)[0];
+    if (c1) { c1.sets--; return true; }
+    const c2 = items.filter((i) => !i.key && i.sets > 1).sort(byMain)[0];
+    if (c2) { c2.sets--; return true; }
+    const c3 = items.filter(removable).sort((a, b) => Number(!ACCESSORY.has(a.wanted)) - Number(!ACCESSORY.has(b.wanted)) || slotWeight(b.slot, g) - slotWeight(a.slot, g) || a.sets - b.sets)[0];
+    if (c3) { removeItem(c3); return true; }
+    return false;
+  };
   for (const g of groups) {
     const [lo, hi] = volumeRange(r.goal, r.level, r.age, g);
-    const items = groupItems(g);
-    if (!items.length) continue;
+    if (!groupItems(g).length) continue;
     // a template item appears once per day it runs; changing its sets changes the week by that many
-    for (let guard = 0; guard < 40 && volumeOf(g, true) > hi; guard++) {
-      const cand = [...items].filter((i) => i.sets > minSetsFor(i)).sort((a, b) => Number(MAIN.has(a.wanted)) - Number(MAIN.has(b.wanted)) || Number(a.key) - Number(b.key) || b.sets - a.sets)[0];
-      if (!cand) break;
-      cand.sets--;
-    }
+    for (let guard = 0; guard < 60 && volumeOf(g, true) > hi; guard++) if (!giveOne(g)) break;
     for (let guard = 0; guard < 40 && volumeOf(g, false) < lo; guard++) {
-      const cand = [...items].filter((i) => i.sets < maxSets).sort((a, b) => Number(MAIN.has(b.slot)) - Number(MAIN.has(a.slot)) || a.sets - b.sets)[0];
+      const cand = groupItems(g).filter((i) => i.sets < maxSets).sort((a, b) => Number(MAIN.has(b.slot)) - Number(MAIN.has(a.slot)) || a.sets - b.sets)[0];
       if (!cand) break;
       cand.sets++;
       if (volumeOf(g, true) > hi) { cand.sets--; break; }
     }
   }
-  // pulling at least equal to pushing (rows and upper-back work carry the extra)
+  // pulling at least equal to pushing (rows and upper-back work carry the extra), and at most PULL_PUSH_RATIO[1] of it
   const balance = () => {
     const pullHi = volumeRange(r.goal, r.level, r.age, 'pull')[1];
+    const pushHi = volumeRange(r.goal, r.level, r.age, 'push')[1];
     for (let guard = 0; guard < 30 && volumeOf('pull', false) < volumeOf('push', false); guard++) {
       const pull = groupItems('pull').filter((i) => i.sets < maxSets).sort((a, b) => a.sets - b.sets)[0];
       if (pull) { pull.sets++; if (volumeOf('pull', true) <= pullHi) continue; pull.sets--; }
-      const push = groupItems('push').filter((i) => i.sets > minSetsFor(i)).sort((a, b) => Number(a.key) - Number(b.key) || b.sets - a.sets)[0];
-      if (!push) break;
-      push.sets--;
+      if (!giveOne('push')) break;
+    }
+    // EVERY-SCREEN P3: …and not lopsided the other way (1,115 of the grid's requests pulled 1.6–2× what they pushed): a
+    // push set where the range has room, else a pull set off
+    for (let guard = 0; guard < 30 && volumeOf('pull', false) > PULL_PUSH_RATIO[1] * volumeOf('push', false) + 1e-9; guard++) {
+      const push = groupItems('push').filter((i) => i.sets < maxSets).sort((a, b) => Number(MAIN.has(b.wanted)) - Number(MAIN.has(a.wanted)) || a.sets - b.sets)[0];
+      if (push) { push.sets++; if (volumeOf('push', true) <= pushHi && volumeOf('pull', false) >= volumeOf('push', false)) continue; push.sets--; }
+      if (!giveOne('pull') || volumeOf('pull', false) < volumeOf('push', false)) break;
     }
   };
   balance();
@@ -375,8 +407,14 @@ export function buildProgram(input: BuildInput): BuiltProgram {
     const side = perSideEntry(e);
     const timed = isTimedEntry(e) || t.timed;
     const minReps = YOUTH_MIN_REPS[r.age];
-    const reps = Math.max(minReps, t.dose.reps[step.reps]);
-    const secs = t.dose.secs[step.reps];
+    // EVERY-SCREEN P3: a slow-lowering week this day has no time for builds by reps instead (the top of the dose), so it
+    // still differs from the week before. And when the youth floor lifts the dose's bottom step, the whole ladder moves up
+    // with it (a child's 8-10-12 is 10-12-14), so the build weeks still climb and the lighter week is lighter: at the floor
+    // every step had read 10, and a child's weeks 2 and 3 were the same week (the grid: 336 youth requests refused).
+    const repStep = step.tempo && noTempo.has(dayKey) && MAIN.has(t.slot) ? 2 : step.reps;
+    const lift = Math.max(0, minReps - t.dose.reps[0]);
+    const reps = Math.max(minReps, t.dose.reps[repStep] + lift);
+    const secs = t.dose.secs[repStep];
     const band = (r.age === 'adult' ? step.bands : step.youthBands)[t.key ? 'key' : MAIN.has(t.wanted) ? 'main' : 'rest'];
     const effort = t.slot === 'mobility' || t.slot === 'speed' ? 'cruise' : bandFor(band, r.age);
     const cues = r.age === 'adult' ? e.cues : e.cues.filter((c) => !MAX_EFFORT_CUE.test(c));
@@ -454,21 +492,44 @@ export function buildProgram(input: BuildInput): BuiltProgram {
   // cut map for the week, so a cut never leaves pulling below pushing across the week.
   const fit = new Map<string, { restScale: number; cut: Map<TItem, number> }>();
   const noTempo = new Set<string>();
+  const noBump = new Set<string>();
   const cut = new Map<TItem, number>();
   const weekVol = (g: VolumeGroup) => weekItems().reduce((a, i) => a + slotWeight(i.slot, g) * Math.max(1, i.sets - (cut.get(i) ?? 0)), 0);
+  /** A template's longest week at its rest scale (1 until its own fit has run). */
+  const peakOf = (t: TDay) => Math.max(...steps.map((st, i) => daySeconds({ warmup: warmFor(t), cooldown: coolFor(t), blocks: sessionFor(t, st, blockOf[i], fit.get(t.key)?.restScale ?? 1, cut, !noBump.has(t.key)) })));
+  /** One pulling set off an item of `t` and onto a pulling item of another day that has the minutes and the range for it. */
+  const movePull = (t: TDay, from: TItem[]): boolean => {
+    for (const c of from) for (const t2 of templates.values()) {
+      if (t2 === t) continue;
+      for (const d of t2.blocks.flatMap((b) => b.items).filter((i) => slotWeight(i.slot, 'pull') >= slotWeight(c.slot, 'pull') && i.sets - (cut.get(i) ?? 0) < maxSets)) {
+        const undo = cut.get(d) ?? 0;
+        cut.set(c, (cut.get(c) ?? 0) + 1);
+        if (undo > 0) cut.set(d, undo - 1); else d.sets++;
+        const ok = peakOf(t2) <= window[1] && groups.every((g) => volumeOf(g, true) <= volumeRange(r.goal, r.level, r.age, g)[1]) && weekVol('pull') >= weekVol('push');
+        if (ok) return true;
+        cut.set(c, (cut.get(c) ?? 0) - 1);
+        if (undo > 0) cut.set(d, undo); else d.sets--;
+      }
+    }
+    return false;
+  };
   for (const t of templates.values()) {
     let restScale = 1;
-    const measure = (step: WeekStep, block: number) => daySeconds({ warmup: warmFor(t), cooldown: coolFor(t), blocks: sessionFor(t, step, block, restScale, cut) });
+    const measure = (step: WeekStep, block: number) => daySeconds({ warmup: warmFor(t), cooldown: coolFor(t), blocks: sessionFor(t, step, block, restScale, cut, !noBump.has(t.key)) });
     const peak = () => Math.max(...steps.map((s, i) => measure(s, blockOf[i])));
     const rests = t.blocks.map((b) => b.items[0].dose.rest);
     const minScale = Math.min(...rests.map((rr, i) => rr[0] / Math.max(1, t.blocks[i].rest)));
     const maxScale = Math.min(...rests.map((rr, i) => rr[1] / Math.max(1, t.blocks[i].rest)));
     const order = (i: TItem) => (ACCESSORY.has(i.wanted) ? 0 : TRUNK.has(i.slot) ? 1 : i.slot === 'speed' || i.slot === 'power' || i.slot === 'mobility' ? 2 : i.key ? 4 : 3);
     const left = (i: TItem) => i.sets - (cut.get(i) ?? 0);
+    // a cut keeps pulling at or above pushing, and (EVERY-SCREEN P3) never leaves pulling further over 1.5× pushing than it
+    // already is: cutting the presses first had left a child's week at 1.75×
     const keepsBalance = (i: TItem) => {
-      if (slotWeight(i.slot, 'pull') === 0) return true;
       const occ = occurrences.filter((o) => o === t).length;
-      return weekVol('pull') - slotWeight(i.slot, 'pull') * occ >= weekVol('push');
+      const pull = weekVol('pull') - slotWeight(i.slot, 'pull') * occ, push = weekVol('push') - slotWeight(i.slot, 'push') * occ;
+      if (slotWeight(i.slot, 'pull') > 0 && pull < push) return false;
+      const now = weekVol('push') > 0 ? weekVol('pull') / weekVol('push') : 0;
+      return push <= 0 || pull / push <= Math.max(PULL_PUSH_RATIO[1], now) + 1e-9;
     };
     // too long: shorter rests first, then sets off the smallest jobs, never below the item's floor (and, only when the
     // time allows nothing else, a non-key main lift down to one set: the program then says the volume is short)
@@ -477,23 +538,41 @@ export function buildProgram(input: BuildInput): BuiltProgram {
       const all = t.blocks.flatMap((b) => b.items);
       const pick = (floor: (i: TItem) => number) => all.filter((i) => left(i) > floor(i) && keepsBalance(i)).sort((a, b) => order(a) - order(b) || left(b) - left(a))[0];
       const cand = pick(minSetsFor) ?? pick((i) => (i.key ? minSetsFor(i) : 1));
-      if (!cand) break;
-      cut.set(cand, (cut.get(cand) ?? 0) + 1);
+      if (cand) { cut.set(cand, (cut.get(cand) ?? 0) + 1); continue; }
+      // EVERY-SCREEN P3 (the grid: 20-minute plans ran 22–23 minutes in their build weeks and the server refused them).
+      // Nothing left to cut: the slow-lowering week costs time this session does not have, so it builds by reps instead
+      // (as before); then the build weeks' extra key set leaves this day; then a pulling set moves to a day with room
+      // (pulling stays at or above pushing across the week, so a pull here could not simply go)
+      if (!noTempo.has(t.key) && steps.some((x) => x.tempo)) { noTempo.add(t.key); continue; }
+      if (!noBump.has(t.key) && t.blocks.some((b) => b.items.some((i) => i.key))) { noBump.add(t.key); continue; }
+      if (movePull(t, all.filter((i) => slotWeight(i.slot, 'pull') > 0 && !i.key && left(i) > 1).sort((a, b) => order(a) - order(b) || left(b) - left(a)))) continue;
+      // and last, an accessory (arms, rear delts, calves) leaves this day, while pulling stays at or above pushing
+      const extra = all.filter((i) => ACCESSORY.has(i.wanted) && !i.key).find((i) => {
+        const occ = occurrences.filter((o) => o === t).length;
+        return weekVol('pull') - slotWeight(i.slot, 'pull') * left(i) * occ >= weekVol('push') - slotWeight(i.slot, 'push') * left(i) * occ;
+      });
+      if (extra) { removeItem(extra); continue; }
+      break;
     }
     // room to spare: more work first — a set at a time on the main lifts, while every group stays inside its range
     // (the build weeks' extra key set counted) and pulling stays at or above pushing — then longer rests, then filler
     const shortest = () => Math.min(...steps.map((s, i) => measure(s, blockOf[i])));
     for (let guard = 0; guard < 30 && shortest() < r.minutes * 60 - 150; guard++) {
-      const all = t.blocks.flatMap((b) => b.items).filter((i) => MAIN.has(i.wanted) && left(i) < maxSets && !cut.get(i));
-      // the day's key lift first, then the lightest main lift: a key lift never has fewer sets than the rest of its day
-      all.sort((a, b) => Number(b.key) - Number(a.key) || left(a) - left(b));
+      // EVERY-SCREEN P3: the lightest main lift first (a set cut earlier comes back first), the key lift on a tie, and a key
+      // lift never with fewer sets than the rest of its day. It was the key lift first, so a short day whose other lifts
+      // had been cut to one set grew its key lift alone, to five sets.
+      const keyLeft = Math.max(0, ...t.blocks.flatMap((b) => b.items).filter((i) => i.key).map(left));
+      const all = t.blocks.flatMap((b) => b.items).filter((i) => MAIN.has(i.wanted) && left(i) < maxSets && (i.key || !keyLeft || left(i) + 1 <= keyLeft));
+      all.sort((a, b) => left(a) - left(b) || Number(b.key) - Number(a.key));
       let grew = false;
       for (const i of all) {
-        i.sets++;
+        const wasCut = cut.get(i) ?? 0;
+        if (wasCut) cut.set(i, wasCut - 1); else i.sets++;
         const fits = groups.every((g) => volumeOf(g, true) <= volumeRange(r.goal, r.level, r.age, g)[1])
-          && volumeOf('pull', false) >= volumeOf('push', false) && volumeOf('pull', true) <= PULL_PUSH_RATIO[1] * volumeOf('push', false) && peak() <= window[1];
+          && volumeOf('pull', false) >= volumeOf('push', false) && volumeOf('pull', true) <= PULL_PUSH_RATIO[1] * volumeOf('push', false)
+          && weekVol('pull') >= weekVol('push') && peak() <= window[1];
         if (fits) { grew = true; break; }
-        i.sets--;
+        if (wasCut) cut.set(i, wasCut); else i.sets--;
       }
       if (!grew) break;
     }
@@ -503,8 +582,6 @@ export function buildProgram(input: BuildInput): BuiltProgram {
       restScale = Math.min(maxScale, restScale + 0.1);
       if (peak() > window[1] || Math.min(...steps.map((s, i) => measure(s, blockOf[i]))) > r.minutes * 60) { restScale = before; break; }
     }
-    // still long: the slow-lowering week costs time this session does not have; it builds by reps instead
-    if (peak() > window[1]) noTempo.add(t.key);
     fit.set(t.key, { restScale, cut });
   }
 
@@ -549,7 +626,7 @@ export function buildProgram(input: BuildInput): BuiltProgram {
     split.forEach((d, di) => {
       if (bumpDays.size >= bumps) return;
       const key = templates.get(d.key)!.blocks.flatMap((b) => b.items).find((i) => i.key);
-      if (!key || key.sets - (cut.get(key) ?? 0) + 1 > maxSets) return;
+      if (!key || key.sets - (cut.get(key) ?? 0) + 1 > maxSets || noBump.has(d.key)) return;
       const next = { ...added };
       for (const g of groups) next[g] += slotWeight(key.slot, g);
       if (groups.some((g) => base(g) + next[g] > volumeRange(r.goal, r.level, r.age, g)[1])) return;
@@ -578,7 +655,9 @@ export function buildProgram(input: BuildInput): BuiltProgram {
         const f1 = fillerBlock('cond', d.key, di, next(), r.minutes * 60 - daySeconds(day), 4, step);
         if (f1) blocks.push(f1);
       }
-      for (const cap of [6, 12, 20]) {
+      // EVERY-SCREEN P3: a lighter week has less work in it, so its easy range work may run a few rounds longer than a build
+      // week's to keep the session the length asked (a 90-minute lighter week ran 79 minutes and the server refused it)
+      for (const cap of step.lighter ? [6, 12, 20, 26] : [6, 12, 20]) {
         if (daySeconds(day) >= window[0]) break;
         const prev = blocks[blocks.length - 1];
         if (prev?.kind === 'filler' && prev.items[0].slot === 'mobility') blocks.pop();

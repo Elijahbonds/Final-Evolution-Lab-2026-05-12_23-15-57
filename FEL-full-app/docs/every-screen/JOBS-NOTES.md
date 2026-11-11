@@ -1,3 +1,13 @@
+## What changed in phase 3 (phase 2's "after" → now, measured on the rig)
+
+| Job | Phase 2 | Now | What changed |
+|---|---|---|---|
+| Ask the AI builder for a program and start it | 5 taps, 2.9 s | 4 taps, 10.9 s (the plan's budget: ask → first rep in ≤ 4) | The walk no longer presses the ready count's quiet "Start now": the count runs by itself (phase 2). The seconds now include that 5-second count and the build. |
+| Change one thing in the program the AI built, and start it | – (new walk) | 2 taps, 1 s | The days chip's + rebuilds the plan in place; Start today. |
+| Any request at all | 1 in 3 refused | every one of 10,080 grid requests gets a plan | The builder's own checks refused 1,489 of 5,040 requests with an error (no plan). The fixes are in `lib/program-ask/build.ts`; when a request cannot be met exactly, the nearest one that keeps every rule is built and the plan says so (`lib/program-ask/kept.ts`). |
+
+The builder's written rules and the 24 fixed asks: `lib/program-ask/asks24.test.ts`; the grid: `scripts/every-screen/builder-rules.mts`.
+
 ## What was fixed in phase 2 (phase 1's "after" → now, measured on the rig)
 
 | Job | Phase 1 after | Now | What changed |
