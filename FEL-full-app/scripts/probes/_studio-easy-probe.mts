@@ -137,7 +137,9 @@ class Driver {
   }
   async waitFor(fn: string, ms: number, what: string): Promise<boolean> {
     const t0 = Date.now();
-    const ok = await this.page.waitForFunction(fn, null, { timeout: ms }).then(() => true, () => false);
+    // studio-22: timer polling, not Playwright's default (once per animation frame): after a production Play-test the page is the
+    // game, drawing 0.2 frames a second on the shared machine, and a frame-polled 6 s wait ran its check once or not at all
+    const ok = await this.page.waitForFunction(fn, null, { timeout: ms, polling: 100 }).then(() => true, () => false);
     this.c.waitMs += Date.now() - t0; this.c.steps.push(`${ok ? 'wait' : '✗ wait'} ${what} ${Date.now() - t0} ms`);
     return ok;
   }
