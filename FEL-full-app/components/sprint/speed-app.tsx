@@ -207,7 +207,7 @@ export function SpeedApp({ adult = true }: { adult?: boolean }) {
         )}
       </section>
       </div>
-      <p className="text-center text-xs text-white/50"><Link href="/train" className="underline">Back to Train</Link></p>
+      <p className="text-center text-xs text-white/50"><Link href="/train" className="inline-flex min-h-11 items-center underline">Back to Train</Link></p>
     </div>
   );
 }
