@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { analyzeMovement, defaultMetrics } from '@/lib/workout/movement-screen';
@@ -325,5 +326,17 @@ describe('WorkoutView, the offer states', () => {
     expect(text).toContain(WORKOUT_FREE_LINE);
     expect(text).toContain('Get the 4-week plan free');
     expect(text).not.toMatch(/Buy for/);
+  });
+});
+
+// SCREEN-FIXES (2026-11-10): /workout jumped as it loaded (layout shift 0.324 on the every-screen rig; the budget is 0.02).
+// The view fetched the plan route after the first paint, and the offer's lines, the template and the products then pushed
+// the picker down. The page now reads the same answer on the server and hands it over.
+describe('/workout draws the plan picker whole on the first render', () => {
+  const pageSrc = readFileSync(join(__dirname, '..', 'app/workout/page.tsx'), 'utf8');
+  it('the page reads what the plan route answers and passes it as initialData', () => {
+    expect(pageSrc).toMatch(/loadWorkoutPage\(prisma, userId\)/);
+    expect(pageSrc).toMatch(/<WorkoutView initialData=\{initialData\} \/>/);
+    expect(readFileSync(join(__dirname, '..', 'app/api/v1/workout/plan/route.ts'), 'utf8')).toMatch(/NextResponse\.json\(await loadWorkoutPage\(prisma, userId\)\)/);
   });
 });

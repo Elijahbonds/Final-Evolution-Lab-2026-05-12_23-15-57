@@ -8,6 +8,7 @@ import { TabPage } from '@/components/shell/tab-page';
 import { AthletePicker, PrqFoundation } from '@/components/profile-view';
 import { CardEditor } from '@/components/creator/card-editor';
 import { ReferralCard } from '@/components/marketing/referral-card';
+import { TYPE } from '@/lib/design/type';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,7 +35,7 @@ export default async function EditProfilePage() {
       <section id="athlete" className="scroll-mt-20"><AthletePicker initialKey={profile?.avatarKey ?? null} /></section>
       <section id="card" className="mt-10 scroll-mt-20">
         <h2 className="fel-heading text-[19px] font-bold text-white">Your creator card</h2>
-        <p className="mt-1 text-[12.5px] text-white/50">Scanned by somebody new, it pays you both in shards. Publishing it is your public profile switch.</p>
+        <p className={`mt-1 ${TYPE.body} text-white/50`}>Scanned by somebody new, it pays you both in shards. Publishing it is your public profile switch.</p>
         <div className="mt-3"><CardEditor /></div>
       </section>
       <section id="invite" className="mt-10 scroll-mt-20"><ReferralCard /></section>

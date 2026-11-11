@@ -25,8 +25,13 @@ export function fetchPurchasesEnabled(): Promise<boolean> {
 /** Test seam: forget the shared answer (a new page load does this naturally). */
 export function resetPurchasesEnabledCache(): void { shared = null; }
 
-export function usePurchasesEnabled(): PurchasesState {
-  const [state, setState] = useState<PurchasesState>(null);
+/**
+ * `initial`: the server's answer when the page had it (SCREEN-FIXES 2026-11-10: /store passes it). Then the first draw is
+ * already right, and the coin packs no longer vanish after the page is up — measured as a layout shift of 0.42 on /store
+ * (the budget is 0.02). The fetch still runs and gives the same answer; without `initial` nothing changes.
+ */
+export function usePurchasesEnabled(initial: PurchasesState = null): PurchasesState {
+  const [state, setState] = useState<PurchasesState>(initial);
   useEffect(() => {
     let live = true;
     fetchPurchasesEnabled().then((v) => { if (live) setState(v); });

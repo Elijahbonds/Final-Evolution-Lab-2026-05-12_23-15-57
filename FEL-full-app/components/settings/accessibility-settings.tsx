@@ -8,6 +8,7 @@ import { MotionSetting } from './motion-setting';
 import { COLOR_VISIONS, onColorVisionChange, readColorVision, writeColorVision, type ColorVision } from '@/lib/a11y/colorVision';
 import { COUCH_PREFS, onCouchChange, readCouchPref, writeCouchPref, type CouchPref } from '@/lib/design/couch';
 import { t } from '@/lib/i18n';
+import { lineSize } from '@/lib/design/type';
 
 const VISION_LABEL: Record<ColorVision, string> = {
   off: t('settings.colorVision.off'),
@@ -41,7 +42,7 @@ export function ColorVisionSetting() {
   return (
     <section className="rounded-xl border border-white/10 bg-white/[0.02] p-5" aria-labelledby="color-vision-heading" data-setting="color-vision">
       <h3 id="color-vision-heading" className="fel-heading mb-1 text-lg font-bold text-white">{t('settings.colorVision.title')}</h3>
-      <p className="mb-4 text-xs text-fel-dim">{t('settings.colorVision.body')}</p>
+      <p className={`mb-4 ${lineSize(t('settings.colorVision.body'), 'text-xs')} text-fel-dim`}>{t('settings.colorVision.body')}</p>
       <Choice value={v} options={COLOR_VISIONS} label={VISION_LABEL} onPick={(n) => { if (n !== v) { writeColorVision(n); setV(n); } }} />
     </section>
   );
@@ -53,7 +54,7 @@ export function CouchSetting() {
   return (
     <section className="rounded-xl border border-white/10 bg-white/[0.02] p-5" aria-labelledby="couch-heading" data-setting="couch">
       <h3 id="couch-heading" className="fel-heading mb-1 text-lg font-bold text-white">{t('settings.couch.title')}</h3>
-      <p className="mb-4 text-xs text-fel-dim">{t('settings.couch.body')}</p>
+      <p className={`mb-4 ${lineSize(t('settings.couch.body'), 'text-xs')} text-fel-dim`}>{t('settings.couch.body')}</p>
       <Choice value={p} options={COUCH_PREFS} label={COUCH_LABEL} onPick={(n) => { if (n !== p) { writeCouchPref(n); setP(n); } }} />
     </section>
   );

@@ -17,7 +17,9 @@ export function WeekCardEntry({ now = new Date() }: { now?: Date }) {
         <TrendingUp className="h-5 w-5 text-fel-cyan" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate font-sans text-[12px] uppercase tracking-[0.14em] text-fel-dim">Your week · {weekLabel({ window: windowAt(now) })}</span>
+        {/* SCREEN-FIXES (2026-11-10): wraps instead of truncating. "YOUR WEEK · NOV 4 – NOV 10" is wider than the card's text
+            column on a 390 px phone, and the truncate cut 32 px of it (the dates: the part the label is for) */}
+        <span data-week-label className="block font-sans text-[12px] uppercase tracking-[0.14em] text-fel-dim">Your week · {weekLabel({ window: windowAt(now) })}</span>
         <span className="fel-heading mt-1 block text-[16px] font-bold leading-tight text-white">What moved this week</span>
         <span className="mt-1 block text-[13px] text-white/55">Your numbers against last week, and a card to share.</span>
       </span>

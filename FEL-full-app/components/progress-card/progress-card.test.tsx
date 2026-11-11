@@ -84,6 +84,14 @@ describe('the weekly door', () => {
     expect(readFileSync(join(__dirname, 'week-entry.tsx'), 'utf8')).not.toMatch(/prisma|fetch\(/);
   });
 
+  // SCREEN-FIXES (2026-11-10): the readable audit measured "Your week · Nov 4 – Nov 10" losing 32 px on a 390 px phone
+  it('wraps the week label rather than cutting its dates off', () => {
+    const h = renderToStaticMarkup(createElement(WeekCardEntry, { now: NOW }));
+    const label = h.match(/<span[^>]*>Your week · /)?.[0] ?? '';
+    expect(label).not.toBe('');
+    expect(label).not.toMatch(/truncate|line-clamp|text-ellipsis|whitespace-nowrap/);
+  });
+
   // TEST CHANGED (premium-ui P4, 2026-10-27): the Profile tab's door moved from a text link in the progress header to the
   // tab's ONE docked primary (app/profile/page.tsx), same href and the same data-testid; the intent — the weekly door is on
   // the Profile tab — is what this still holds.
