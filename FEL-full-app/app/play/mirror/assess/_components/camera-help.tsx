@@ -6,6 +6,7 @@
 // The words PoseService gives (lib/pose/PoseService.ts explain()) are matched to a kind; anything else gets the general
 // steps.
 import { CameraOff } from 'lucide-react';
+import { notice } from '@/lib/every-screen/notices';
 import { SYSTEM_FONT_STACK } from '@/lib/screen/ui';
 import { DISCLAIMER } from '@/lib/screen/copy';
 
@@ -83,7 +84,7 @@ export function CameraHelp({ why, onRetry, onBack }: { why: string | null; onRet
           Try again
         </button>
         {onBack ? <button type="button" onClick={onBack} className="mt-2 inline-flex min-h-12 w-full items-center justify-center text-[16px] text-white/60">Back to the start</button> : null}
-        <p className="mt-6 text-[16px] text-white/50">{DISCLAIMER}</p>
+        <p {...notice('medical')} className="mt-6 text-[16px] text-white/50">{DISCLAIMER}</p>
       </div>
     </div>
   );

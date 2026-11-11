@@ -49,10 +49,19 @@ export interface Step {
   /** EVERY-SCREEN P4: put [key, value] in this phone's storage and reload, as the tool would have kept it (a jump kept
    *  on this phone, say): the rig cannot jump in front of a camera. Never a tap. */
   seed?: [string, string];
+  /** EVERY-SCREEN P6: pick an option in a <select> [css, value]: counted as typing (a field filled), not a tap */
+  select?: [string, string];
+  /** EVERY-SCREEN P6: the step succeeds only once this selector is gone (a start card, a loading screen) */
+  gone?: string;
+  /** EVERY-SCREEN P6: how long `expect` and `gone` may wait, in seconds (default 8): a game's first load on the throttled phone */
+  within?: number;
 }
 export interface Job {
   id: string;
-  who: Exclude<Person, 'anon' | 'admin' | 'teen'>;
+  /** EVERY-SCREEN P6: 'anon' is a new person, signed out (the first five minutes) */
+  who: Exclude<Person, 'admin' | 'teen'>;
+  /** EVERY-SCREEN P6: walked on the throttled phone (CPU 4×, as the crawl reads every screen): the plan's phase-6 gate */
+  throttle?: boolean;
   name: string;
   /** the plan's own budget for this job, when it names one (a later phase's gate; reported, not judged here) */
   planBudget?: string;
@@ -86,8 +95,11 @@ export interface Walk {
 
 async function see(page: Page, expect: string): Promise<boolean> {
   const m = /^\/(.*)\/([a-z]*)$/.exec(expect);
-  if (m) return new RegExp(m[1], m[2] || 'i').test(await page.evaluate('document.body.innerText') as string);
-  return (await page.locator(expect).count()) > 0;
+  // EVERY-SCREEN P6: a page mid-navigation (sign-up's redirect into the first game) is "not yet", not a stop
+  try {
+    if (m) return new RegExp(m[1], m[2] || 'i').test(await page.evaluate('document.body.innerText') as string);
+    return (await page.locator(expect).count()) > 0;
+  } catch { return false; }
 }
 
 export async function walk(page: Page, job: Job, shotDir: string): Promise<Walk> {
@@ -107,7 +119,8 @@ export async function walk(page: Page, job: Job, shotDir: string): Promise<Walk>
       if (s.tap) { ok = await tapLabel(page, s.tap); if (ok) w.taps++; else why = `nothing to tap called "${s.tap}"`; await settle(s.wait); }
       if (s.css && s.ifPresent && !(await page.locator(s.css).first().isVisible().catch(() => false))) { /* not here: nothing to do */ }
       else if (s.css) { ok = await page.locator(s.css).first().tap({ timeout: 5000 }).then(() => true).catch(() => false); if (ok) w.taps++; else why = `nothing to tap at ${s.css}`; await settle(s.wait); }
-      if (s.fill) { ok = await page.locator(s.fill[0]).first().fill(s.fill[1], { timeout: 5000 }).then(() => true).catch(() => false); if (ok) w.typed++; else why = `no field at ${s.fill[0]}`; }
+      if (s.select) { ok = await page.locator(s.select[0]).first().selectOption(s.select[1], { timeout: 5000 }).then(() => true).catch(() => false); if (ok) w.typed++; else why = `no option ${s.select[1]} at ${s.select[0]}`; }
+      if (s.fill) { ok = await page.locator(s.fill[0]).first().fill(s.fill[1].replace('{ts}', String(Date.now())), { timeout: 5000 }).then(() => true).catch(() => false); if (ok) w.typed++; else why = `no field at ${s.fill[0]}`; }
       if (s.play) {
         let n = 0; w.skips = w.skips ?? 0; w.sets = w.sets ?? 0;
         while (n < s.play[1] && !(await page.locator(s.play[0]).count())) {
@@ -131,10 +144,16 @@ export async function walk(page: Page, job: Job, shotDir: string): Promise<Walk>
         ok = (await page.locator(s.loop[1]).count()) > 0;
         if (!ok) why = `${n} taps on ${s.loop[0]} never reached ${s.loop[1]}`;
       }
+      const tries = Math.max(1, Math.round((s.within ?? 8) * 2));
       if (ok && s.expect) {
         ok = false;
-        for (let k = 0; k < 16 && !ok; k++) { ok = await see(page, s.expect); if (!ok) await page.waitForTimeout(500); }
+        for (let k = 0; k < tries && !ok; k++) { ok = await see(page, s.expect); if (!ok) await page.waitForTimeout(500); }
         if (!ok) why = `the screen never showed ${s.expect}`;
+      }
+      if (ok && s.gone) {
+        ok = false;
+        for (let k = 0; k < tries && !ok; k++) { ok = (await page.locator(s.gone).count()) === 0; if (!ok) await page.waitForTimeout(500); }
+        if (!ok) why = `${s.gone} never went away`;
       }
     } catch (e) { ok = false; why = String(e).slice(0, 160); }
     if (s.pre) { w.taps = tapsBefore; w.typed = typedBefore; }
@@ -194,6 +213,7 @@ export async function runJobs(): Promise<void> {
       if (!!job.lit !== lit) continue;
       const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true, storageState: storageState(ppl, job.who), permissions: ['camera', 'microphone'] });
       const page = await ctx.newPage();
+      if (job.throttle) { const cdp = await ctx.newCDPSession(page); await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 }); }
       const w = await walk(page, job, dir);
       await ctx.close();
       const at = walks.findIndex((x) => x.id === w.id);

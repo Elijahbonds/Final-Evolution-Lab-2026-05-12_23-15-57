@@ -17,6 +17,7 @@
 // UNDER 18, OR "RATHER NOT SAY": never these cards. Their results never reach this address (nothing is kept for them:
 // lib/screen/store.ts), so this is only a guard: a kid's age gets the kid view, their number and nothing else.
 import { jumpSure, quickScreenSure } from '@/lib/results/trust';
+import { notice } from '@/lib/every-screen/notices';
 import Link from 'next/link';
 import { priorities, type CheckBand, type ScreenSummary } from '@/lib/screen/checks';
 import { BAND_WORDS, cueOf, checkById, GRADED_CHECKS, type BandWord, type CheckId } from '@/lib/screen/PROPOSED-thresholds';
@@ -130,7 +131,7 @@ export function ResultsView({ summary, age, onClear, onRunAgain, trainWithElijah
   return (
     <div data-screen-results className="space-y-3">
       <div className="space-y-1">
-        <p data-disclaimer className="text-[16px] font-bold leading-snug text-white">{DISCLAIMER}</p>
+        <p {...notice('medical')} data-disclaimer className="text-[16px] font-bold leading-snug text-white">{DISCLAIMER}</p>
         <StopLine />
         <PreviewLabel line={false} />
       </div>

@@ -3,6 +3,7 @@
 // alone: Squad gate 3), the stop line and the "Have a parent open this" card. No hooks, no client state: the results
 // view, the lane page, the privacy page and the tests all render these.
 import Link from 'next/link';
+import { notice } from '@/lib/every-screen/notices';
 import type { ReactNode } from 'react';
 import { AlertOctagon, AlertTriangle, ArrowLeft, CheckCircle2, CircleDashed, Eye, EyeOff, Users } from 'lucide-react';
 import { BAND_WORDS, type BandWord } from '@/lib/screen/PROPOSED-thresholds';
@@ -77,7 +78,7 @@ export const EarlyTag = () => (
 
 /** "If anything hurts, stop." Under DISCLAIMER on the results and the program page (owner, 2026-09-29; S-13). */
 export const StopLine = ({ className = 'text-[16px] text-white/70' }: { className?: string }) => (
-  <p data-stop-line className={className}>{STOP_LINE}</p>
+  <p {...notice('medical')} data-stop-line className={className}>{STOP_LINE}</p>
 );
 
 /**

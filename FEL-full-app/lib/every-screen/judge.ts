@@ -51,6 +51,9 @@ export interface Fault {
 export interface ScreenFacts {
   kind: ScreenKind;
   wordsFold: number;
+  /** EVERY-SCREEN P6 (owner, 2026-11-11): of wordsFold, the words of owner-approved notices (medical, privacy, consent),
+   *  marked in the code with data-notice (lib/every-screen/notices.ts). They do not count toward the 40-word budget. */
+  noticeWordsFold?: number;
   wordsAll: number;
   primaryFold: string[];
   /** enabled links, buttons and fields: on the whole screen, and outside the app's own bars */
@@ -102,7 +105,10 @@ export function faultsOf(f: ScreenFacts): Fault[] {
   if (f.actionsAll === 0) add('clear', 'dead-end', 100, 'Dead end: nothing on the screen leads on or back.');
   else if (f.actionsMain === 0) add('clear', 'only-chrome', 70, 'Nothing in the screen itself leads on: only the app\'s own bars do.');
   if (f.primaryFold.length > BUDGET.primaryMax) add('clear', 'many-primary', 45, `${f.primaryFold.length} bright buttons compete on the first screen (${f.primaryFold.slice(0, 3).join(', ')}).`);
-  if (f.kind === 'do' && f.wordsFold > BUDGET.wordsFoldDo) add('clear', 'too-many-words', Math.min(60, 30 + Math.round((f.wordsFold - BUDGET.wordsFoldDo) / 6)), `${f.wordsFold} words before scrolling (the budget is ${BUDGET.wordsFoldDo}).`);
+  // the owner (2026-11-11): approved notices stay word for word and do not count; everything else still does
+  const notice = Math.max(0, Math.min(f.noticeWordsFold ?? 0, f.wordsFold));
+  const counted = f.wordsFold - notice;
+  if (f.kind === 'do' && counted > BUDGET.wordsFoldDo) add('clear', 'too-many-words', Math.min(60, 30 + Math.round((counted - BUDGET.wordsFoldDo) / 6)), `${counted} words before scrolling (the budget is ${BUDGET.wordsFoldDo}${notice ? `; ${notice} words of approved notices not counted` : ''}).`);
   const ownSmall = f.smallTargets.filter((t) => !t.chrome);
   const barSmall = f.smallTargets.filter((t) => t.chrome);
   if (ownSmall.length) add('clear', 'small-targets', Math.min(55, 25 + ownSmall.length), `${plural(ownSmall.length, 'tap target')} under ${BUDGET.tapPx} px (smallest: "${[...ownSmall].sort((a, b) => Math.min(a.w, a.h) - Math.min(b.w, b.h))[0].label}").`);

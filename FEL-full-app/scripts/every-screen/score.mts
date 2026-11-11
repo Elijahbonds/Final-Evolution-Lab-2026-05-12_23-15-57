@@ -210,7 +210,7 @@ async function scoreUrl(browser: Browser, state: ReturnType<typeof storageState>
 
   const crit = a11y.violations.filter((v) => v.severity === 'critical'), ser = a11y.violations.filter((v) => v.severity === 'serious');
   const facts: ScreenFacts = {
-    kind, wordsFold: m.wordsFold, wordsAll: m.wordsAll, primaryFold: m.primaryFold, actionsAll: m.actionsAll, actionsMain: m.actionsMain,
+    kind, wordsFold: m.wordsFold, noticeWordsFold: m.noticeFold ?? 0, wordsAll: m.wordsAll, primaryFold: m.primaryFold, actionsAll: m.actionsAll, actionsMain: m.actionsMain,
     smallTargets: m.smallTargets, unfinished: m.unfinished, emptyNoNext: m.emptyNoNext, spinnersNoWords: m.spinnersNoWords, blank: m.blank,
     textSizes: m.textSizes, buttonLooks: m.buttonLooks,
     hscroll: { phone: sq.phone?.hs ?? null, zoom200: sq.zoom200?.hs ?? null, font150: sq.font150?.hs ?? null },

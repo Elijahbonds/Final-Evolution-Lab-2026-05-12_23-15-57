@@ -15,6 +15,7 @@
 // The camera picture is shown ONLY through SelfView and never leaves the phone; the colour copy the ball detector reads
 // (frame-grab.ts) is never shown or sent; the only thing ever sent is a finished session's numbers (serverKeep above).
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { notice } from '@/lib/every-screen/notices';
 import { lineSize } from '@/lib/design/type';
 import { Fold } from '@/components/every-screen/fold';
 import Link from 'next/link';
@@ -221,7 +222,7 @@ export function ShotSession({ tier, grab, startMode = 'shots', serverKeep = fals
             </ul>
           </Fold>
           <p className={`${lineSize(BETA_LINE)} text-[#FFB020]/90`} data-hoops-beta>{BETA_LINE}</p>
-          <p className={`${lineSize(PRIVACY_LINE)} text-white/60`}>{PRIVACY_LINE}</p>
+          <p {...notice('privacy')} className={`${lineSize(PRIVACY_LINE)} text-white/60`}>{PRIVACY_LINE}</p>
         </div>
       )}
 
