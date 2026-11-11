@@ -22,14 +22,6 @@ import { COLOR } from '@/lib/design/tokens';
 import { TYPE } from '@/lib/design/type';
 import { enterDelay } from '@/components/ui/fel/page-enter';
 
-/** SCREEN-FIXES-2 (owner, 2026-11-10: "Fix the screens, address what you found above"): every family row is one height, the
- *  height of a row whose list wraps to the owner's three lines (the list's 14 px at its line height 1.4, three lines, plus
- *  the row's 12 px top and bottom padding and its 1 px borders: 85 px at the default text size; it follows the text size).
- *  With three-line lists the closed rows grew taller than the open one, whose one-line blurb kept it at 64 px, so the same
- *  row read as two different buttons, and the every-screen scorer counted a fourth button look on /play. A row whose list is
- *  shorter keeps its words centred in the same height. The three-line clamp is unchanged. Layout only. */
-export const SHELF_ROW_MIN_HEIGHT = 'calc(1.5rem + 2px + 3 * 1.4 * 0.875rem)';
-
 type ModeRow = { key: string; name: string; venue: string; href: string; desc: string; color: string; Icon: LucideIcon };
 
 function modesOf(f: Family): ModeRow[] {
@@ -63,9 +55,8 @@ export function PlayShelf({ initialFamily }: { initialFamily?: string }) {
             <button
               onClick={() => setOpen(isOpen ? null : f.id)}
               aria-expanded={isOpen}
-              className="fel-press group flex w-full items-center gap-3.5 rounded-[20px] border px-4 py-3 text-left"
+              className="fel-press group flex min-h-[64px] w-full items-center gap-3.5 rounded-[20px] border px-4 py-3 text-left"
               style={{
-                minHeight: SHELF_ROW_MIN_HEIGHT,
                 borderColor: isOpen ? `${f.accent}55` : 'rgba(255,255,255,0.08)',
                 background: isOpen
                   ? `linear-gradient(90deg, ${f.accent}16 0%, rgba(255,255,255,0.02) 55%)`
@@ -94,8 +85,14 @@ export function PlayShelf({ initialFamily }: { initialFamily?: string }) {
                     family's own line takes over once it is open and the modes are on screen underneath anyway. */}
                 {/* READABLE (lane/readable-2): two lines, then the clamp — the one-line list cut most of each family's modes at 390 px.
                     SCREEN-FIXES (owner, 2026-11-10): three lines. readable-2 measured six of the seven lists cut at two lines on a
-                    390 px phone; five of them need one more line (19 px), so three shows them in full (the Sports list still clamps). */}
-                <span data-shelf-list className={`${TYPE.small} min-w-0 line-clamp-3 leading-snug text-fel-dim`}>
+                    390 px phone; five of them need one more line (19 px), so three shows them in full (the Sports list still clamps).
+                    SCREEN-FIXES-2 (owner, 2026-11-10: "Fix the screens, address what you found above"): and every row holds the room
+                    of three lines (min-h-[3lh]: three of the list's own lines, at any text size), open or closed. With three-line
+                    lists the closed rows grew to 88 px while the open row, its one-line blurb, stayed at 68: one row in two sizes,
+                    which the every-screen scorer counted as a fourth button look on /play. Now every row lays out the same, so
+                    they are one height. A shorter list or blurb starts on the first line, beside the family's name, as a three-line
+                    list always has. The three-line clamp is unchanged. Layout only. */}
+                <span data-shelf-list className={`${TYPE.small} min-h-[3lh] min-w-0 line-clamp-3 leading-snug text-fel-dim`}>
                   {isOpen ? f.blurb : modes.map((m) => m.name).join('  ·  ')}
                 </span>
               </span>
