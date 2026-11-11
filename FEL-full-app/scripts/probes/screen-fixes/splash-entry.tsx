@@ -24,6 +24,10 @@ try {
 } catch { /* no layout-shift entries in this browser */ }
 
 const q = new URLSearchParams(location.search);
+// SCREEN-FIXES-2 (2026-11-11): `?seed=N` pins the clock the learn card draws with (LearnWhileYouWait seeds its pick from
+// Date.now), so a run shows the same card every time and a tall card can be measured on purpose, before and after.
+const SEED = q.get('seed');
+if (SEED) { const t0 = 1_762_000_000_000 + Number(SEED) * 7919; Date.now = () => t0; }
 const MODE = q.get('mode') ?? 'dunkContest';
 const READY_AT = Number(q.get('readyAt') ?? 3000);
 w.__READY_AT = READY_AT;
