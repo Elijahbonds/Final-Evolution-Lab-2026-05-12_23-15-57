@@ -258,6 +258,10 @@ const VERDICTS: Record<string, { v: 'ok' | 'wrong'; why: string }> = {
   'muscle-up-with-4-second-lower → ex_muscle_up': { v: 'ok', why: 'the muscle-up loop (the tempo is the dose)' },
   'leg-over-floor-press → ex_leg_over_floor_press': { v: 'ok', why: 'the leg-over floor press loop: on the floor, the right leg over the left, one bell pressed up (the read takes "leg_over" for a pull)' },
   'reverse-flyes-with-external-rotation → ex_incline_t': { v: 'ok', why: "face down on the incline pad, the arms opening out to a T: the reverse fly (flag in demo.ts: the wrists' turn is not drawn)" },
+  'barbell-ab-rollout → ex_rollout_knees': { v: 'ok', why: 'the card: kneel and roll out (coordinator call 2026-11-11: follows the card, not the source)' },
+  'split-squat-stretch → ex_split_ham_fold': { v: 'ok', why: 'the card: a split-stance hamstring fold, the front toes up (coordinator call 2026-11-11: follows the card, not the source)' },
+  'lunge-sprint → ex_sprint_spot': { v: 'ok', why: 'the card: a sprint from the two-point stance, on the spot (coordinator call 2026-11-11: follows the card, not the source)' },
+  'spider-crawl → ex_spider_crawl': { v: 'ok', why: 'the card: a low crawl that travels (coordinator call 2026-11-11: follows the card, not the source)' },
   // wrong: another movement
   'split-squat-stretch → ex_split_jump': { v: 'wrong', why: 'a hamstring stretch (front leg long, fold forward, "no bouncing") plays a jumping split-switch plyometric. lib/library/demo.ts line 890 (demo-loops)' },
   'spider-crawl → ex_spiderman_pushup': { v: 'wrong', why: 'a travelling crawl warm-up plays a push-up in place: the chest drops to the floor and nothing travels. lib/library/demo.ts line 752 (demo-loops); assumption: the crawl is not done as a push-up' },

@@ -1091,6 +1091,16 @@ export const DEMO_RULES: readonly DemoRule[] = [
   { clip: 'ex_good_morning', families: ['good-morning'], bases: /^morn-pull-through$/ },
   { clip: 'ex_sumo_deadlift', families: ['deadlift'], bases: /^revers-sumo-deadlift$/ },
   { clip: 'ex_incline_t', families: ['rear-delt-face-pull'], bases: /^revers-fly-external-rotation$/ },
+  // FOLLOWS THE CARD, NOT THE SOURCE (coordinator call 2026-11-11): four entries whose own words contradict their
+  // free-exercise-db source play what the card the person reads says (flag, each). The barbell ab rollout kneels and rolls out
+  // (its source starts in a push-up and rolls the bar in toward the feet): the rollout from the knees. The split squat stretch
+  // is the hamstring stretch its card describes (its source is a jumping split). The lunge sprint is a sprint from the
+  // two-point stance, shown on the spot (its source is a split jump in a Smith machine). The spider crawl travels (its source
+  // is knee-to-elbow in place); it crawls two steps forward and two back.
+  { clip: 'ex_rollout_knees', families: ['rollout'], bases: /^ab-rollout$/ },
+  { clip: 'ex_split_ham_fold', families: ['stretch-hamstring'], bases: /^split-squat-stretch$/ },
+  { clip: 'ex_sprint_spot', families: ['sprint-drill'], bases: /^lung-sprint$/ },
+  { clip: 'ex_spider_crawl', families: ['dynamic-warmup'], bases: /^spider-crawl$/ },
 ];
 
 const RULES_BY_FAMILY: ReadonlyMap<string, readonly DemoRule[]> = (() => {
@@ -1212,7 +1222,7 @@ export const FLOOR_CLIPS: ReadonlySet<string> = new Set(['ex_rollout_knees', 'ex
   ['ex_ankle_rock', 'ex_ninety_rock', 'ex_open_book_rock', 'ex_kneeling_reach_rock', 'ex_breathe_supine', 'ex_fast_pushup'],
   FLOW_CLIPS,
   // DEMOS-FIX-2: the T push-up (exerciseFamilies12.ts)
-  ['ex_pushup_t', 'ex_kb_arm_bar', 'ex_side_plank_row', 'ex_bear_plank_row', 'ex_high_plank_row', 'ex_bird_dog_band_row', 'ex_leg_over_floor_press', 'ex_clock_pushup'],
+  ['ex_pushup_t', 'ex_kb_arm_bar', 'ex_side_plank_row', 'ex_bear_plank_row', 'ex_high_plank_row', 'ex_bird_dog_band_row', 'ex_leg_over_floor_press', 'ex_clock_pushup', 'ex_spider_crawl'],
 ));
 /** Hinges and rows read from the side (the angle at the hips is the movement). */
 /** DEMO-LOOPS: loops that travel a metre or more — framed wide: forward travel from the side, sideways travel from the
@@ -1254,7 +1264,7 @@ export const SIDE_CLIPS: ReadonlySet<string> = new Set(['ex_jefferson_curl', 'ex
   'ex_bb_snatch', 'ex_bb_power_snatch', 'ex_bb_hang_snatch', 'ex_bb_hang_snatch_low', 'ex_bb_snatch_pull', 'ex_bb_snatch_shrug', 'ex_bb_muscle_snatch', 'ex_bb_snatch_balance',
   'ex_rope_crunch_kneel', 'ex_rope_crunch_stand', 'ex_arm_swing_up', 'ex_pelvic_tilt_stand',
   // DEMOS-FIX-2: the machine chair squat's depth and the elevated back lunge read from the side
-  'ex_chair_squat', 'ex_back_lunge_elevated', 'ex_box_out', 'ex_hill_sprint', 'ex_db_vertical_swing', 'ex_hk_hip_shift', 'ex_band_shoulder_sink']);
+  'ex_chair_squat', 'ex_back_lunge_elevated', 'ex_box_out', 'ex_hill_sprint', 'ex_db_vertical_swing', 'ex_split_ham_fold', 'ex_sprint_spot', 'ex_hk_hip_shift', 'ex_band_shoulder_sink']);
 /** What the stage draws under a loop that needs it: a bench seat, a flat bench to lie on, or an incline bench. Bench loops
  *  lying down are framed from the side, like the floor loops. LIBRARY-ANATOMY-2: and the rest of a gym's furniture a loop
  *  stands, sits, lies or hangs on — a box, benches in front and behind, a pull-up bar, a low bar, dip bars, pads, a wall. */
@@ -1284,7 +1294,9 @@ export const PROP_SHAPES: Readonly<Record<DemoProp, readonly PropBox[]>> = {
   dipbars: [{ w: 0.04, h: 0.04, d: 0.80, x: -0.27, y: 1.12, z: 0.02 }, { w: 0.04, h: 0.04, d: 0.80, x: 0.27, y: 1.12, z: 0.02 }],
   dipbench: [{ w: 0.90, h: 0.44, d: 0.34, y: 0.22, z: -0.42 }],
   legcurl: [{ w: 0.30, h: 0.44, d: 1.35, y: 0.22, z: 0.30 }],
-  proneincline: [{ w: 0.34, h: 0.50, d: 0.30, y: 0.25, z: -0.28 }, { w: 0.34, h: 0.07, d: 0.90, y: 0.80, z: 0.02, rx: 0.66 }],
+  // DEMOS-FIX-2 (flag): the pad's tilt was the wrong way round — it crossed the chest of every loop lying on it (ex_incline_t,
+  // the anti-gravity press; the coordinator's sheet review): now its high end is under the head
+  proneincline: [{ w: 0.34, h: 0.50, d: 0.30, y: 0.25, z: -0.28 }, { w: 0.34, h: 0.07, d: 0.90, y: 0.80, z: 0.02, rx: -0.66 }],
   // LIBRARY-ANATOMY-2: the decline bench as exerciseVariants.ts lies on it (the pad 14° head-down, its top 0.60 at the hips;
   // the roller in front of the ankles at its high end)
   decline: [{ w: 0.30, h: 0.07, d: 1.20, y: 0.458, z: -0.42, rx: 0.25 }, { w: 0.24, h: 0.40, d: 0.24, y: 0.20, z: -0.40 }, { w: 0.06, h: 0.30, d: 0.06, y: 0.15, z: 0.52 }, { w: 0.40, h: 0.08, d: 0.08, y: 0.30, z: 0.51 }],
@@ -1326,7 +1338,9 @@ export const PROP_SHAPES: Readonly<Record<DemoProp, readonly PropBox[]>> = {
   // foot plate behind
   // the 45-degree leg press's seat and back pad; the hack squat's inclined back pad; the roller under the armpit (the body on
   // its side, turned to the camera); the bench under the long-lever Copenhagen's top foot
-  legpress: [{ w: 0.44, h: 0.30, d: 0.44, y: 0.15, z: 0.02 }, { w: 0.44, h: 0.06, d: 0.70, y: 0.60, z: -0.24, rx: -0.78 }],
+  // DEMOS-FIX-2 (flag): the back pad's tilt was the wrong way round — drawn through the chest of the leg press and the calf
+  // press (the sheets): now its high end is behind the head
+  legpress: [{ w: 0.44, h: 0.30, d: 0.44, y: 0.15, z: 0.02 }, { w: 0.44, h: 0.06, d: 0.70, y: 0.60, z: -0.24, rx: 0.78 }],
   hackpad: [{ w: 0.44, h: 0.06, d: 1.10, y: 0.95, z: -0.24, rx: 1.32 }],
   rollerlat: [{ w: 0.55, h: 0.14, d: 0.14, y: 0.07, z: 0.46, cyl: true }],
   cphlong: [{ w: 0.50, h: 0.46, d: 0.30, y: 0.23, z: -0.88 }],

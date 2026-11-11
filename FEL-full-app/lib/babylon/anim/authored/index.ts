@@ -1257,6 +1257,9 @@ function authoredBuilders(scene: Scene, skeleton: Skeleton): [string, () => Anim
     ['ex_db_vertical_swing', () => buildExerciseClip('ex_db_vertical_swing', scene, skeleton)],
     ['ex_hk_hip_shift', () => buildExerciseClip('ex_hk_hip_shift', scene, skeleton)],
     ['ex_band_shoulder_sink', () => buildExerciseClip('ex_band_shoulder_sink', scene, skeleton)],
+    ['ex_split_ham_fold', () => buildExerciseClip('ex_split_ham_fold', scene, skeleton)],
+    ['ex_sprint_spot', () => buildExerciseClip('ex_sprint_spot', scene, skeleton)],
+    ['ex_spider_crawl', () => buildExerciseClip('ex_spider_crawl', scene, skeleton)],
     ['ex_combo_cross_between', () => buildExerciseClip('ex_combo_cross_between', scene, skeleton)],
   ];
 }

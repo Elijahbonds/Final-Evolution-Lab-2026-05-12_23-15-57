@@ -674,26 +674,81 @@ const kneelCableTriceps: Builder = (scene, sk) => {
 };
 
 /** ex_clock_pushup (the clock push-up) — a push-up driven up hard enough that the hands leave the floor, the body turning about
- *  the feet so the hands land a step round (about 30°); then back, then round the other way and back. (flag in demo.ts: the
+ *  its middle so the hands land a step round (about 25°) and the feet hop a little the other way; then back, then round the other way and back. (flag in demo.ts: the
  *  source goes all the way round the clock; the loop goes a step each way and back.) */
 const clockPushup: Builder = (scene, sk) => {
   const feet = both(0.11, TOE_ANKLE, -0.90);
   const top: Pose = { bones: { Hips: [70, 0, 0], Spine: [0, 0, 0], Neck: [-30, 0, 0], LeftFoot: [8, 0, 0], RightFoot: [8, 0, 0] }, feet, kneePoles: bothDir(0, -1, 0.1), hands: both(0.24, 0.05, 0.44), poles: bothDir(0.6, 0.2, -0.7), hipsY: -0.58 };
   const low: Pose = { ...top, bones: { ...top.bones, Hips: [84, 0, 0], Neck: [-40, 0, 0] }, hands: both(0.26, 0.05, 0.44), poles: bothDir(0.7, 0.4, -0.5), hipsY: -0.80 };
   const air: Pose = { ...top, bones: { ...top.bones, Hips: [66, 0, 0] }, hands: both(0.24, 0.20, 0.50), poles: bothDir(0.6, 0, -0.8), hipsY: -0.50 };
-  // turned `deg` about the feet (+ round to the body's right): the pose turned about the vertical through the feet
-  const about = (p: Pose, deg: number): Pose => movePose(yawPose(movePose(p, 0, 0.90), deg), 0, -0.90);
+  // turned `deg` (+ round to the body's right) about the vertical through the middle of the body: the hands land a step round
+  // and the feet hop a little the other way, as the source's outside foot does. (Turned about the feet, the hands and head went
+  // past the edge of the stage's floor, toward its camera: the coordinator's sheet review.)
+  const about = (p: Pose, deg: number): Pose => movePose(yawPose(movePose(p, 0, 0.25), deg), 0, -0.25);
   const keys: ExKey[] = [];
   let t = 0;
-  // the four reps: 0° → −30° (round to the body's left) → 0° → +30° → 0° (two round toward the stage's floor camera put the
-  // head in its lens: the sheet)
-  const at4 = [0, -30, 0, 30, 0];
+  // the four reps: 0° → −25° (round to the body's left) → 0° → +25° → 0°
+  const at4 = [0, -25, 0, 25, 0];
   for (let i = 0; i < 4; i++) {
     const d0 = at4[i], d1 = at4[i + 1];
     keys.push(at(about(top, d0), t, true), at(about(low, d0), t + 0.6, true), at(about(air, (d0 + d1) / 2), t + 0.95));
     t += 1.25;
   }
   return run(scene, sk, 'ex_clock_pushup', t, keys, true);
+};
+
+// ── the card, not the source (coordinator call 2026-11-11): four entries whose own words and their source disagree play what
+//    the card the person reads says ──────────────────────────────────────────────────────────────────────────────────────
+
+/** ex_split_ham_fold (the split squat stretch, as its card reads) — a short split stance, the front (left) leg long with the
+ *  knee soft and the toes up to the ceiling, the back knee bent, the hands on the front thigh: fold from the belt line toward
+ *  the floor to the first firm pull, breathe out long, a little further, and ease up slow — no bouncing. */
+const splitHamFold: Builder = (scene, sk) => {
+  const feet: Pair = { Left: [-0.11, ANKLE + 0.015, 0.36], Right: [0.11, ANKLE, 0.0] };
+  const up: Pose = { bones: { ...STAND, LeftFoot: [-24, 0, 0], LeftLeg: [4, 0, 0] }, feet, kneePoles: bothDir(0.1, 0, 1), hands: { Left: [-0.14, 0.78, 0.22], Right: [0.02, 0.80, 0.22] }, poles: bothDir(0.6, -0.4, -0.6), hipsY: -0.06, hipsZ: 0.04 };
+  const fold = (d: number): Pose => ({ bones: { Hips: [44 + d, 0, 0], Spine: [8, 0, 0], Neck: [-20, 0, 0], LeftFoot: [-24, 0, 0], LeftLeg: [4, 0, 0], RightFoot: [-14, 0, 0] }, feet, kneePoles: bothDir(0.1, 0, 1), hands: { Left: [-0.15, 0.50, 0.40], Right: [-0.03, 0.54, 0.38] }, poles: bothDir(0.6, 0, -0.6), hipsY: -0.16, hipsZ: -0.10 });
+  return run(scene, sk, 'ex_split_ham_fold', 6.0, [at(up, 0, true), at(fold(0), 1.5, true), at(fold(7), 3.0, true), at(fold(7), 4.0, true), at(up, 5.5, true)], true);
+};
+
+/** ex_sprint_spot (the lunge sprint, as its card reads) — from the two-point stance (the left foot forward, the trunk leaning),
+ *  the drive: hard sprint steps, shown on the spot, the lean easing as the steps come up to speed; back to the stance. (The
+ *  cones and the distance are not drawn.) */
+const sprintSpot: Builder = (scene, sk) => {
+  const set: Pose = { bones: { Hips: [36, 0, 0], Spine: [6, 0, 0], Neck: [-20, 0, 0], RightFoot: [26, 0, 0], LeftFoot: [-14, 0, 0] }, feet: { Left: [-0.12, ANKLE, 0.20], Right: [0.12, ANKLE + 0.10, -0.24] }, kneePoles: bothDir(0.1, 0, 1), rel: { Left: [0.02, -0.40, -0.18], Right: [-0.02, -0.18, 0.26] }, poles: bothDir(0.2, -0.6, -0.6), hipsY: -0.18, hipsZ: -0.02 };
+  const step = (sd: Side, lean: number): Pose => {
+    const p = stride(sd, { [`${sd}UpLeg`]: [-70, 0, 0], [`${sd}Leg`]: [100, 0, 0], [`${sd}Foot`]: [10, 0, 0] }, 0.02);
+    return { ...p, bones: { ...p.bones, Hips: [lean, 0, 0], Spine: [4, 0, 0], Neck: [-8 - lean / 3, 0, 0] } as Record<string, Deg3> };
+  };
+  return run(scene, sk, 'ex_sprint_spot', 3.6, [
+    at(set, 0, true), at(set, 0.5, true), at(step('Right', 26), 0.75), at(step('Left', 22), 1.0), at(step('Right', 18), 1.25), at(step('Left', 14), 1.5),
+    at(step('Right', 12), 1.75), at(step('Left', 10), 2.0), at(STANDING(0.04), 2.5, true), at(set, 3.2, true),
+  ]);
+};
+
+/** ex_spider_crawl (the spider crawl, as its card reads: it travels) — low on the hands and feet, the hips low and level: the
+ *  opposite hand and foot step forward together, the foot landing wide outside its own hand, the knee up toward the elbow;
+ *  then the other pair; two steps forward and two back the same way. */
+const spiderCrawl: Builder = (scene, sk) => {
+  const S = 0.30;
+  // the hips at zb; `s`'s foot leads (wide, up by its hand), the other hand leads; each step the trailing hand and foot travel
+  // 2S and the leading ones stay planted while the body passes them
+  const pose = (lead: Side, zb: number): Pose => {
+    const o = other(lead);
+    return {
+      bones: { Hips: [80, 0, 0], Spine: [0, 0, 0], Neck: [-38, 0, 0], [`${lead}Foot`]: [-10, 0, 0], [`${o}Foot`]: [20, 0, 0] } as Record<string, Deg3>,
+      feet: { [lead]: [sx(lead, 0.40), ANKLE + 0.02, zb - 0.10], [o]: [sx(o, 0.16), TOE_ANKLE + 0.02, zb - 0.40] } as Pair,
+      kneePoles: { [lead]: [sx(lead, 1), 0.3, 0.3], [o]: [0, -1, 0.2] } as Pair,
+      hands: { [o]: [sx(o, 0.28), 0.05, zb + 0.62], [lead]: [sx(lead, 0.28), 0.05, zb + 0.62 - S] } as Pair,
+      poles: { [o]: [sx(o, 0.7), 0.2, -0.6], [lead]: [sx(lead, 0.7), 0.2, -0.6] } as Pair,
+      hipsY: -0.52, hipsZ: zb,
+    };
+  };
+  // (four steps each way ran out of the floor camera's frame at both ends: the sheet. Three positions, centred.)
+  const sides: Side[] = ['Left', 'Right', 'Left'];
+  const z0 = -S;
+  const fwd = sides.map((sd, k) => pose(sd, z0 + k * S));
+  const keys = [...fwd, ...fwd.slice(1, -1).reverse()].map((p, i) => at(p, i * 0.6, true));
+  return run(scene, sk, 'ex_spider_crawl', keys.length * 0.6, keys, true);
 };
 
 export const FAMILY12_BUILDERS: readonly [string, Builder][] = [
@@ -708,5 +763,6 @@ export const FAMILY12_BUILDERS: readonly [string, Builder][] = [
   ['ex_side_plank_row', sidePlankRow], ['ex_bear_plank_row', bearPlankRow], ['ex_bird_dog_band_row', birdDogBandRow], ['ex_guillotine_press', guillotinePress], ['ex_anti_gravity_press', antiGravityPress],
   ['ex_handstand_pushup', handstandPushup], ['ex_muscle_up', muscleUp('ex_muscle_up', false)], ['ex_muscle_up_kip', muscleUp('ex_muscle_up_kip', true)], ['ex_leg_over_floor_press', legOverFloorPress],
   ['ex_clock_pushup', clockPushup], ['ex_high_plank_row', highPlankRow], ['ex_kneel_cable_triceps', kneelCableTriceps], ['ex_db_vertical_swing', dbVerticalSwing], ['ex_hk_hip_shift', hkHipShift], ['ex_band_shoulder_sink', bandShoulderSink],
+  ['ex_split_ham_fold', splitHamFold], ['ex_sprint_spot', sprintSpot], ['ex_spider_crawl', spiderCrawl],
   ['ex_combo_cross_between', handleCombo('ex_combo_cross_between', { move: 'crossover', keys: CROSSOVER_V2, mirror: false }, { move: 'between_legs', keys: BETWEEN_V2, mirror: true })],
 ];
