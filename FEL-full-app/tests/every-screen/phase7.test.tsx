@@ -31,7 +31,8 @@ describe('the start card: readable controls, 44 px buttons', () => {
     expect(14 * fitScale(() => true)).toBeGreaterThanOrEqual(12);
     const p = src('components/games/controls-panel.tsx');
     expect(p).toContain('font-mono text-[14px] font-black text-[#22d3ee]">{r.input}');
-    expect(p).toContain('<span data-controls-lines className="block min-h-0 overflow-y-auto');   // the how-to lines scroll, unzoomed
+    expect(p).toContain('<span data-controls-lines className="[zoom:var(--fel-controls-fit,1)] block min-h-0 overflow-y-auto');   // lines fit with the rows (14 px, never under 12)
+    expect(p).toContain('font-mono text-[14px] leading-snug text-white/75">· {l}');
   });
   it('the device tabs, the motion chip and "Next card" are 44 px', () => {
     expect(src('components/games/controls-panel.tsx')).toContain('inline-flex min-h-11 items-center rounded-full border px-3 text-[12px] font-black');

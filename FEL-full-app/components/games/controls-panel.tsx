@@ -30,7 +30,6 @@ import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyn
 import { sessionStore } from '@/lib/babylon/core/sessionStore';
 import { CONTROLS_DEVICES, DEVICE_LABEL, controlsSheet, detectDevice, fitScale, type ControlsDevice } from '@/lib/ui/controlsScreen';
 import { detectPadFamily, type PadFamily } from '@/lib/input/padLabels';
-import { MAX_SMALL_WORDS } from '@/lib/design/type';
 
 /** How much of the panel's content its box cuts off: the panel's own overflow and its lines' scroll box. */
 function cutPx(panel: HTMLElement): number {
@@ -40,10 +39,6 @@ function cutPx(panel: HTMLElement): number {
 
 // useLayoutEffect warns on the server (the splash renders there): the fit is a browser-only measure anyway
 const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
-
-// EVERY-SCREEN P7: the how-to lines scroll in their own box at their own size (they were zoomed to fit with the rows, down to
-// 10.2 px); a line of more than 12 words is body size (READABLE.md, lib/design/type.ts lineSize's rule)
-const lineWords = (l: string): number => l.split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
 
 export function ControlsPanel({ modeId, hint, chooser = true, className = '' }: {
   modeId: string;
@@ -119,7 +114,7 @@ export function ControlsPanel({ modeId, hint, chooser = true, className = '' }: 
         </span>
       )}
       {sheet.lines.length > 0 && (
-        <span data-controls-lines className="block min-h-0 overflow-y-auto border-t border-white/10 pt-1.5 [scrollbar-width:thin]">
+        <span data-controls-lines className="[zoom:var(--fel-controls-fit,1)] block min-h-0 overflow-y-auto border-t border-white/10 pt-1.5 [scrollbar-width:thin]">
           {sheet.groups.map((g, gi) => (
             <Fragment key={g.title ?? `group-${gi}`}>
               {g.title && (
@@ -127,7 +122,7 @@ export function ControlsPanel({ modeId, hint, chooser = true, className = '' }: 
                   className={`block text-[14px] font-black tracking-[0.3em]${gi > 0 ? ' pt-1.5' : ''}`}>{g.title}</span>
               )}
               {g.lines.map((l) => (
-                <span key={l} className={`block pl-3 -indent-3 font-mono ${lineWords(l) > MAX_SMALL_WORDS ? 'text-[16px]' : 'text-[14px]'} leading-snug text-white/75`}>· {l}</span>
+                <span key={l} className="block pl-3 -indent-3 font-mono text-[14px] leading-snug text-white/75">· {l}</span>
               ))}
             </Fragment>
           ))}

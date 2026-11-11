@@ -70,7 +70,12 @@ const PAGES: Record<string, () => Promise<{ default: unknown }>> = {
 async function pageElement(file: string, route: string): Promise<ReactNode> {
   const mod = await PAGES[file]();
   const lane = /\/screen\/program\/([^/]+)$/.exec(route)?.[1];
-  return createElement(mod.default as never, (lane ? { params: { lane } } : {}) as never);
+  const props = (lane ? { params: { lane } } : {}) as never;
+  // EVERY-SCREEN P7: /play/mirror/assess is an async server page now (it reads the signed-in account's birth date, owner
+  // 2026-11-11): await it to its element, as Next does
+  const Page = mod.default as unknown as (p: never) => unknown;
+  if (Page.constructor.name === 'AsyncFunction') return (await Page(props)) as ReactNode;
+  return createElement(mod.default as never, props);
 }
 
 afterEach(() => { vi.unstubAllGlobals(); });
