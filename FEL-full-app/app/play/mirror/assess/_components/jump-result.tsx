@@ -11,6 +11,7 @@
 //
 // Under 18 and "rather not say": the number from page memory, the change since their last screen here, the save-your-number
 // line, no program or game link (unchanged rules). The disclaimer and the stop line stay on the page, at the foot.
+import { jumpSure } from '@/lib/results/trust';
 import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { Check } from 'lucide-react';
@@ -87,6 +88,12 @@ export function JumpResult({ heightCm, plusMinusCm = null, attempts, counted, ki
         ) : (
           <p data-jump-missing className="mt-2 text-[28px] font-black leading-tight">{KID_NO_JUMP}</p>
         )}
+        {v !== null && !hidden ? (
+          // EVERY-SCREEN P4: how it was measured and how sure, measured on recorded jumps (lib/results/trust.ts)
+          <p data-jump-sure className="mx-auto mt-2 max-w-sm text-[16px] leading-snug text-white/70">
+            <span className="text-white/85">{jumpSure(unit).method}.</span> {jumpSure(unit).sure}
+          </p>
+        ) : null}
         {v !== null && t && !hidden ? (
           <div data-trust-row className="mt-1">
             <TrustChip level={t.level} reasons={t.reasons} />

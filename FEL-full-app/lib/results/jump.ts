@@ -15,8 +15,12 @@ import type { JumpHistoryEntry } from '@/lib/jump/historyStore';
 import { HISTORY_TEST_NAMES, type HistoryTest } from '@/lib/jump/historyStore';
 import { compareLast, vsLineOf, type ResultNextStep, type ResultView } from './view';
 import { RESULT_COPY } from './copy';
+import { jumpSure, type HowSure } from './trust';
 
 const IN = 2.54;
+/** The bounce score (RSI): the 10-5 and the drop jump. Not yet measured on recorded takes: said so. */
+const APPROACH_SURE: HowSure = { method: 'Side-on video of the run-up and jump', sure: 'Not yet measured on recorded approach jumps: treat it as a camera estimate.' };
+const RSI_SURE: HowSure = { method: 'Phone camera: time in the air over time on the ground', sure: 'Not yet measured on recorded bounces: treat it as a camera estimate.' };
 const in1 = (cm: number) => Math.round((cm / IN) * 10) / 10;
 /** The band in centimetres (the stores keep cm). */
 export const JUMP_BAND_CM = JUMP_SAME_BAND_IN * IN;
@@ -42,6 +46,8 @@ export function jumpCompare(nowCm: number | null, lastCm: number | null | undefi
 export function jumpHeightView(o: {
   measure: string; bestCm: number | null; plusMinusCm: number | null; lastCm: number | null | undefined;
   unit?: JumpUnit; line: string; next: ResultNextStep;
+  /** The method and how sure, when it is not the live jump check's (the approach jump's side-on video). */
+  howSure?: HowSure;
 }): ResultView {
   const unit = o.unit ?? 'in';
   const c = jumpCompare(o.bestCm, o.lastCm);
@@ -50,6 +56,7 @@ export function jumpHeightView(o: {
   return {
     measure: o.measure, value: o.bestCm === null ? null : jumpValue(o.bestCm, unit), unit, estimate: true, pm,
     vsLast: c.vsLast, better: 'up', vsLine: vsLineOf(c, words(unit)), line: o.line, next: o.next,
+    howSure: o.bestCm === null ? null : o.howSure ?? jumpSure(unit),
   };
 }
 
@@ -69,6 +76,7 @@ export function jumpTestView(o: {
     return {
       measure, value: o.rsi == null ? null : o.rsi.toFixed(2), unit: 'RSI', estimate: true, pm: null,
       vsLast: null, better: 'up', vsLine: null, line: o.line, next: o.next,
+      howSure: o.rsi == null ? null : RSI_SURE,
     };
   }
   return jumpHeightView({ measure, bestCm: o.bestCm, plusMinusCm: o.plusMinusCm, lastCm: o.last?.bestCm ?? null, line: o.line, next: o.next });
@@ -76,13 +84,13 @@ export function jumpTestView(o: {
 
 /** The approach jump (side-on video): the jump height, its own band; the touch height stays in the detail. */
 export function approachView(o: { heightCm: number | null; plusMinusCm: number | null; lastCm?: number | null; line: string; next: ResultNextStep }): ResultView {
-  return jumpHeightView({ measure: 'Approach jump', bestCm: o.heightCm, plusMinusCm: o.plusMinusCm, lastCm: o.lastCm ?? null, line: o.line, next: o.next });
+  return jumpHeightView({ measure: 'Approach jump', bestCm: o.heightCm, plusMinusCm: o.plusMinusCm, lastCm: o.lastCm ?? null, line: o.line, next: o.next, howSure: APPROACH_SURE });
 }
 
 /** The drop jump: RSI. No band of its own in the tool, so no arrow (assumption: flagged in the report). */
 export function dropView(o: { rsi: number | null; line: string; next: ResultNextStep }): ResultView {
   return {
     measure: 'Drop jump', value: o.rsi == null ? null : o.rsi.toFixed(2), unit: 'RSI', estimate: true, pm: null,
-    vsLast: null, better: 'up', vsLine: null, line: o.line, next: o.next,
+    vsLast: null, better: 'up', vsLine: null, line: o.line, next: o.next, howSure: o.rsi == null ? null : RSI_SURE,
   };
 }

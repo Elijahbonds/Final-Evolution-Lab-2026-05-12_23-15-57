@@ -26,6 +26,11 @@ import { sprintBand, speedPm, timePm } from './sprint';
 import { vbtCompare } from './vbt';
 import { stationBand, stationSeries, stationValue } from './combine';
 import { STATIONS } from '@/lib/combine/catalogue';
+import { jumpSure, readinessSure, sprintSure, stationSure, vbtSure, type HowSure } from './trust';
+
+/** EVERY-SCREEN P4 (the plan: "every number on the progress page traces to the session or test it came from"): where a row's
+ *  numbers came from — the tool, how it measures and how sure, and the page to open it. */
+export interface RowTrace { tool: string; how: HowSure; href: string }
 
 export type RowSource = 'account' | 'device' | 'combine';
 
@@ -50,8 +55,10 @@ export interface ProgressRow {
   vsLine: string | null;
   /** The last SPARK_POINTS values (display unit), oldest first. */
   spark: number[];
-  /** Newest first: when, the number, and its arrow against the one before it. */
-  history: { at: number; value: string; vs: VsLast }[];
+  /** Newest first: when, the number, its arrow against the one before it, and (EVERY-SCREEN P4) the test it came from. */
+  history: { at: number; value: string; vs: VsLast; from: string | null }[];
+  /** EVERY-SCREEN P4: the tool, its method and how sure, and its page. */
+  trace: RowTrace;
 }
 
 interface RowSpec<T> {
@@ -64,6 +71,9 @@ interface RowSpec<T> {
   compare: (now: T, before: T) => Comparison;
   words: VsWords;
   limit?: number;
+  /** EVERY-SCREEN P4: the row's tool, method and page, and each number's own test ("best of 3 jumps"). */
+  trace: RowTrace;
+  from?: (t: T) => string | null;
 }
 
 /** One row from a tool's records (any order). Null when there are none. */
@@ -73,12 +83,12 @@ export function rowOf<T>(s: RowSpec<T>): ProgressRow | null {
   const newest = items[items.length - 1];
   const prev = items.length > 1 ? items[items.length - 2] : null;
   const c = prev ? s.compare(newest, prev) : { vsLast: null, delta: null };
-  const all = items.map((t, i) => ({ at: s.at(t), value: s.fmt(s.value(t)), vs: i > 0 ? s.compare(t, items[i - 1]).vsLast : null }));
+  const all = items.map((t, i) => ({ at: s.at(t), value: s.fmt(s.value(t)), vs: i > 0 ? s.compare(t, items[i - 1]).vsLast : null, from: s.from?.(t) ?? null }));
   const history = all.slice(-(s.limit ?? HISTORY_ROWS)).reverse();
   return {
     key: s.key, measure: s.measure, unit: s.unit, source: s.source, estimate: s.estimate, better: s.better,
     latest: s.fmt(s.value(newest)), latestAt: s.at(newest), vsLast: c.vsLast, vsLine: vsLineOf(c, s.words),
-    spark: items.slice(-SPARK_POINTS).map(s.value), history,
+    spark: items.slice(-SPARK_POINTS).map(s.value), history, trace: s.trace,
   };
 }
 
@@ -86,6 +96,10 @@ const IN = 2.54;
 const in1 = (cm: number) => Math.round((cm / IN) * 10) / 10;
 const jumpWords: VsWords = { against: RESULT_COPY.lastTime, up: 'higher', down: 'lower', fmt: (x) => `${x.toFixed(1)} in` };
 const at = (iso: string) => Date.parse(iso);
+/** The jump tools' page (the jump check and the jump tests). */
+const JUMP_TRACE_HREF = '/train/jumps';
+const RSI_HOW: HowSure = { method: 'Phone camera: time in the air over time on the ground', sure: 'Not yet measured on recorded bounces: treat it as a camera estimate.' };
+const VIDEO_HOW: HowSure = { method: 'Video of the jump, read frame by frame', sure: 'Not yet measured on recorded videos: treat it as a camera estimate.' };
 
 // ── jump ────────────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -102,6 +116,8 @@ export function deviceJumpRows(entries: readonly JumpHistoryEntry[]): ProgressRo
       // the 10-5's bounce score has no band in the jump tool: the change, no arrow
       compare: (a, b) => (rsi ? compareLast(a.rsi, b.rsi, null) : jumpCompare(a.bestCm, b.bestCm)),
       words: rsi ? { ...jumpWords, fmt: (x) => x.toFixed(2) } : jumpWords, limit: DEVICE_JUMPS,
+      trace: { tool: HISTORY_TEST_NAMES[test] ?? 'Jump', how: rsi ? RSI_HOW : mine.some((e) => e.source === 'video') ? VIDEO_HOW : jumpSure('in'), href: JUMP_TRACE_HREF },
+      from: (e) => `${HISTORY_TEST_NAMES[e.test] ?? 'Jump'}: best of ${e.jumps} ${e.jumps === 1 ? 'jump' : 'jumps'}${e.source === 'video' ? ', from a video' : ''}${e.manualFrames ? ', frames picked by hand' : ''}`,
     });
     return r ? [r] : [];
   });
@@ -112,6 +128,7 @@ export function savedJumpRow(points: readonly { at: number; cm: number }[]): Pro
   return rowOf({
     key: 'account:jump', measure: 'Jump check', unit: 'in', source: 'account', estimate: true, better: 'up',
     items: points, at: (p) => p.at, value: (p) => in1(p.cm), fmt: (v) => v.toFixed(1), compare: (a, b) => jumpCompare(a.cm, b.cm), words: jumpWords,
+    trace: { tool: 'Jump check', how: jumpSure('in'), href: JUMP_TRACE_HREF }, from: () => 'Jump check, saved to your account',
   });
 }
 
@@ -132,6 +149,8 @@ export function sprintRows(runs: readonly SprintRecord[]): ProgressRow[] {
         ? compareLast(a.topSpeed, b.topSpeed, sprintBand(speedPm(a.topSpeedSd), speedPm(b.topSpeedSd)))
         : compareLast(a.timeS, b.timeS, sprintBand(timePm(a.sdS), timePm(b.sdS)))),
       words: { against: RESULT_COPY.lastTime, up: speed ? 'faster' : 'slower', down: speed ? 'slower' : 'faster', fmt: (x) => (speed ? `${x.toFixed(1)} m/s` : `${x.toFixed(2)} s`) },
+      trace: { tool: 'Sprint', how: sprintSure(), href: '/train/speed' },
+      from: (x) => `${x.label}${x.startKind ? `, start on ${x.startKind === 'go' ? '"Go"' : x.startKind === 'movement' ? 'your first move' : 'the phone'}` : ''}${x.reactionIncluded ? ', reaction included' : ''}`,
     });
     return r ? [r] : [];
   });
@@ -151,6 +170,8 @@ export function vbtRows(sets: readonly KeptSet[], source: RowSource): ProgressRo
       source, estimate: true, better: 'up', items: mine, at: (s) => s.at, value: (s) => s.bestMcv!, fmt: (v) => v.toFixed(2),
       compare: (a, b) => vbtCompare(a.repMcvs, b.repMcvs, a.fps),
       words: { against: RESULT_COPY.lastTime, up: 'faster', down: 'slower', fmt: (x) => `${x.toFixed(2)} m/s` },
+      trace: { tool: 'Bar speed', how: vbtSure(), href: '/train/velocity' },
+      from: (x) => `Best of ${x.reps} ${x.reps === 1 ? 'rep' : 'reps'}, read from ${x.source === 'plate' ? 'the plate' : 'your body'} at ${x.fps} fps`,
     });
     return r ? [r] : [];
   });
@@ -168,6 +189,7 @@ export function readinessRow(days: readonly ReadinessDay[], source: RowSource): 
     items: days, at: (d) => Date.parse(`${d.day}T12:00:00`), value: (d) => in1(d.bestCm), fmt: (v) => v.toFixed(1),
     compare: (a) => ({ vsLast: vs(a), delta: null }),
     words: { against: RESULT_COPY.yourNormal, up: 'above', down: 'below', fmt: () => '' },
+    trace: { tool: 'Readiness check', how: readinessSure(), href: '/train/readiness' }, from: () => 'Readiness check: your best jump that day',
   });
   return r ? { ...r, vsLine: readinessVsLine(r.vsLast) } : null;
 }
@@ -191,6 +213,7 @@ export function combineRows(events: readonly MyCombine[]): ProgressRow[] {
       items: s.points, at: (p) => p.at, value: (p) => Number(stationValue(s.kind, p.value).value), fmt: (v) => (unit === 's' ? v.toFixed(2) : unit === 'in' ? v.toFixed(1) : String(Math.round(v))),
       compare: (a, b) => compareLast(a.value, b.value, stationBand(s.kind)),
       words: { against: RESULT_COPY.lastCombine, up: lower ? 'slower' : 'higher', down: lower ? 'faster' : 'lower', fmt: (x) => { const p = stationValue(s.kind, x); return `${p.value} ${p.unit}`; } },
+      trace: { tool: s.name, how: stationSure(s.kind), href: '/train/combine' }, from: () => `${s.name}, at a combine`,
     });
     return r ? [r] : [];
   });

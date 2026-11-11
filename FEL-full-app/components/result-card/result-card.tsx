@@ -123,6 +123,10 @@ export function ResultCard({ view, onNext, primary = true, details, seeAll = tru
           <span aria-hidden className={LOOK.unit}>{view.unit}{view.pm ? ` ±${view.pm}` : ''}</span>
         </p>
       ) : null}
+      {view.value !== null && view.howSure ? (
+        // EVERY-SCREEN P4: the plan's gate, no measured number without its method and how sure (lib/results/trust.ts)
+        <p data-result-sure className={LOOK.sure}><span className="text-white/80">{view.howSure.method}.</span> {view.howSure.sure}</p>
+      ) : null}
       {view.vsLine ? (
         <p data-result-vs={view.vsLast ?? ''} className={`${LOOK.chip} ${tone}`}>
           <Arrow aria-hidden className="h-4 w-4 shrink-0" strokeWidth={2.5} />

@@ -43,6 +43,8 @@ export interface Step {
   say?: string;
   /** getting to the job's starting point (a session already open, say): done, but not counted in the job's taps or time */
   pre?: boolean;
+  /** EVERY-SCREEN P4: tap `css` only if it is on screen (a folded ask box, say): absent is not a stop, and not a tap */
+  ifPresent?: boolean;
 }
 export interface Job {
   id: string;
@@ -95,7 +97,8 @@ export async function walk(page: Page, job: Job, shotDir: string): Promise<Walk>
     try {
       if (s.goto) { await page.goto(ORIGIN + s.goto, { waitUntil: 'load', timeout: 45000 }); await settle(); if (!t0 && !s.pre) t0 = Date.now(); }
       if (s.tap) { ok = await tapLabel(page, s.tap); if (ok) w.taps++; else why = `nothing to tap called "${s.tap}"`; await settle(s.wait); }
-      if (s.css) { ok = await page.locator(s.css).first().tap({ timeout: 5000 }).then(() => true).catch(() => false); if (ok) w.taps++; else why = `nothing to tap at ${s.css}`; await settle(s.wait); }
+      if (s.css && s.ifPresent && !(await page.locator(s.css).first().isVisible().catch(() => false))) { /* not here: nothing to do */ }
+      else if (s.css) { ok = await page.locator(s.css).first().tap({ timeout: 5000 }).then(() => true).catch(() => false); if (ok) w.taps++; else why = `nothing to tap at ${s.css}`; await settle(s.wait); }
       if (s.fill) { ok = await page.locator(s.fill[0]).first().fill(s.fill[1], { timeout: 5000 }).then(() => true).catch(() => false); if (ok) w.typed++; else why = `no field at ${s.fill[0]}`; }
       if (s.play) {
         let n = 0; w.skips = w.skips ?? 0; w.sets = w.sets ?? 0;

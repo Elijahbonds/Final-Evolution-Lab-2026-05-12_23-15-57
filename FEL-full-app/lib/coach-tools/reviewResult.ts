@@ -15,7 +15,7 @@ export function formReviewView(exercise: string, reps: number, headline: string,
   return {
     measure: `${exercise} · ${repsWord(reps)}`, value: null, unit: '', estimate: true, pm: null,
     vsLast: null, better: 'up', vsLine: null, line: headline,
-    next: { label: canSend ? REVIEW_RESULT_COPY.send : REVIEW_RESULT_COPY.again, href: null },
+    next: { label: canSend ? REVIEW_RESULT_COPY.send : REVIEW_RESULT_COPY.again, href: null }, howSure: null,
   };
 }
 
@@ -24,7 +24,7 @@ export function mirrorReviewView(movement: string, reps: number, headline: strin
   return {
     measure: `${movement} · ${repsWord(reps)}`, value: null, unit: '', estimate: true, pm: null,
     vsLast: null, better: 'up', vsLine: null, line: headline,
-    next: { label: REVIEW_RESULT_COPY.next, href: null },
+    next: { label: REVIEW_RESULT_COPY.next, href: null }, howSure: null,
   };
 }
 

@@ -17,6 +17,7 @@ const ASK = 'All I have is a band. Full body, 3 days a week.';
 /** An athlete alone, already inside a session of the program the AI built (not counted: it is another job's ground). */
 const IN_BUILT_SESSION: Step[] = [
   { goto: '/train/build', pre: true },
+  { css: '[data-testid=program-ask-open]', ifPresent: true, pre: true },
   { fill: ['[data-testid=program-ask-input]', ASK], pre: true },
   { css: '[data-testid=program-ask-build]', expect: '[data-testid=program-view]', pre: true },
   { css: '[data-testid=program-start]', expect: '[data-session-player]', pre: true, say: 'Start today' },
@@ -45,7 +46,9 @@ export const JOBS: Job[] = [
   {
     id: 'solo-ask-builder', who: 'solo', name: 'Ask the AI builder for a program and start it', planBudget: 'ask → first rep in ≤ 4 taps (phase 3)',
     steps: [
-      ...TRAIN, { tap: 'Build my program', expect: '[data-testid=program-ask-input]', say: 'Build my program' },
+      ...TRAIN, { tap: 'Build my program', expect: '[data-testid=program-builder]', say: 'Build my program' },
+      // a program saved on the account opens folded (EVERY-SCREEN P4): "Change the ask" is then one more tap, counted
+      { css: '[data-testid=program-ask-open]', ifPresent: true, say: 'Change the ask (only when a program is already saved)' },
       { fill: ['[data-testid=program-ask-input]', ASK], say: 'type the ask' },
       { css: '[data-testid=program-ask-build]', expect: '[data-testid=program-view]', say: 'Build it' },
       { css: '[data-testid=program-start]', expect: '[data-session-player]', say: 'Start today' },
@@ -57,7 +60,8 @@ export const JOBS: Job[] = [
     id: 'solo-change-one-thing', who: 'solo', name: 'Change one thing in the program the AI built, and start it', planBudget: 'change one thing without starting over; save, and start (phase 3)',
     steps: [
       { goto: '/train/build', pre: true },
-      { fill: ['[data-testid=program-ask-input]', ASK], pre: true },
+      { css: '[data-testid=program-ask-open]', ifPresent: true, pre: true },
+  { fill: ['[data-testid=program-ask-input]', ASK], pre: true },
       { css: '[data-testid=program-ask-build]', expect: '[data-testid=program-view]', pre: true },
       { css: '[data-chip=days] button[aria-label^="More"]', expect: '/4 days/', say: 'one more day a week (the days chip\'s +)' },
       { css: '[data-testid=program-start]', expect: '[data-session-player]', say: 'Start today' },
@@ -73,12 +77,14 @@ export const JOBS: Job[] = [
   },
   {
     id: 'solo-test-jump', who: 'solo', name: 'Test a jump (measure my vertical)', planBudget: 'vertical in ≤ 3 taps (phase 4)',
-    steps: [...TRAIN, { tap: 'Measure my vertical', expect: '/How old are you/', say: 'Measure my vertical' }, { tap: '18 or older', expect: '/Does anything hurt/', say: '18 or older' }, { tap: 'No, nothing hurts', expect: CAMERA, say: 'No, nothing hurts' }],
+    // EVERY-SCREEN P4: from the signed-in home, as the VERTICAL-EASY gate counts it (its "Measure my vertical" chip is on
+    // Play and on Train): 3 taps. Through Train it is 4.
+    steps: [{ goto: '/play', say: 'home' }, { css: '[data-testid=play-vertical-entry]', expect: '/How old are you/', say: 'Measure my vertical (on Play)' }, { tap: '18 or older', expect: '/Does anything hurt/', say: '18 or older' }, { tap: 'No, nothing hurts', expect: CAMERA, say: 'No, nothing hurts' }],
     endsAt: 'the camera: three jumps in front of it (the reading itself is measured on recorded jumps, not on this rig)',
   },
   {
     id: 'solo-movement-screen', who: 'solo', name: 'Run the movement screen', planBudget: 'movement screen in 3 taps and under 3 minutes (phase 4)',
-    steps: [...TRAIN, { tap: 'Screen my movement', expect: '/How old are you/', say: 'Screen my movement' }, { tap: '18 or older', expect: '/Does anything hurt/', say: '18 or older' }, { tap: 'No, nothing hurts', expect: CAMERA, say: 'No, nothing hurts' }],
+    steps: [{ goto: '/play', say: 'home' }, { css: '[data-testid=play-screen-entry]', expect: '/How old are you/', say: 'Screen my movement (on Play)' }, { tap: '18 or older', expect: '/Does anything hurt/', say: '18 or older' }, { tap: 'No, nothing hurts', expect: CAMERA, say: 'No, nothing hurts' }],
     endsAt: 'the camera: four moves in front of it',
   },
   {

@@ -16,6 +16,7 @@
 //
 // UNDER 18, OR "RATHER NOT SAY": never these cards. Their results never reach this address (nothing is kept for them:
 // lib/screen/store.ts), so this is only a guard: a kid's age gets the kid view, their number and nothing else.
+import { jumpSure, quickScreenSure } from '@/lib/results/trust';
 import Link from 'next/link';
 import { priorities, type CheckBand, type ScreenSummary } from '@/lib/screen/checks';
 import { BAND_WORDS, cueOf, checkById, GRADED_CHECKS, type BandWord, type CheckId } from '@/lib/screen/PROPOSED-thresholds';
@@ -139,6 +140,8 @@ export function ResultsView({ summary, age, onClear, onRunAgain, trainWithElijah
         className="rounded-3xl border p-4" style={{ borderColor: `${BAND_COLOUR[read.colour]}66`, background: `${BAND_COLOUR[read.colour]}0f` }}>
         <p data-overall-word className="text-[clamp(30px,9vw,40px)] font-black leading-none" style={{ color: BAND_COLOUR[read.colour] }}>{read.word}</p>
         <p className="mt-2 text-[16px] font-bold leading-snug text-white/85">{read.line}</p>
+        {/* EVERY-SCREEN P4: how the checks were read, and how sure (lib/results/trust.ts) */}
+        <p data-screen-sure className="mt-2 text-[16px] leading-snug text-white/70"><span className="text-white/85">{quickScreenSure().method}.</span> {quickScreenSure().sure}</p>
       </section>
 
       {/* MIRROR-TRUST-RATING: the one info line, above the cards and "Your checks" */}
@@ -176,6 +179,7 @@ export function ResultsView({ summary, age, onClear, onRunAgain, trainWithElijah
                   ) : null}
                   <p data-means className="text-[16px] text-white/70">{JUMP_BEST_MEANS}</p>
                   <p data-next className="text-[16px] text-white/55">{JUMP_BEST_NEXT}</p>
+                  <p data-jump-sure className="text-[16px] text-white/70"><span className="text-white/85">{jumpSure('in').method}.</span> {jumpSure('in').sure}</p>
                 </>
               )}
             </section>
