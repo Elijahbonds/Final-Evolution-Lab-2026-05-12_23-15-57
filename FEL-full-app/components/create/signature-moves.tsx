@@ -28,7 +28,7 @@ export async function SignatureMoves({ ownerId, accent = '#00E5FF' }: { ownerId:
   if (!items.length) return null;
   return (
     <section className="mt-8 w-full max-w-[520px]" aria-labelledby="signature-moves">
-      <h2 id="signature-moves" className="fel-heading text-lg font-bold text-white">Signature moves</h2>
+      <h2 id="signature-moves" className="fel-heading text-[20px] font-bold text-white">Signature moves</h2>
       <ul className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
         {items.map((m) => (
           <li key={m.id} className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">

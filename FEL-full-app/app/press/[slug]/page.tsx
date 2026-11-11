@@ -73,7 +73,7 @@ export default async function BookPage({
         <div>
           {book.eyebrow ? <p className="text-[12px] uppercase tracking-[0.16em] text-white/50">{book.eyebrow}</p> : null}
           {book.track ? <p className="text-[12px] uppercase tracking-[0.16em] text-white/50">{book.track}</p> : null}
-          <h2 className="fel-heading text-4xl text-white">{book.title}</h2>
+          <h2 className="fel-heading text-[30px] text-white">{book.title}</h2>
           <p className="mt-2 text-sm text-white/60">{publicBookDescription(book)}</p>
           {chapterNotice ? (
             <p className="mt-2 text-[12px] text-white/50">{chapterNotice}</p>

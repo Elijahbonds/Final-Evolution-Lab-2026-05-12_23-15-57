@@ -58,6 +58,29 @@ export const JOBS: Job[] = [
     steps: [{ goto: '/play', say: 'home' }, { css: 'nav a[href="/profile"]:visible', say: 'the Profile tab' }, { css: 'a[href="/support"]', expect: '/support/i', within: 20, say: 'Support (the Profile tab\'s doors row)' }] },
   { id: 'coin-exchange', who: 'solo', name: 'Spend coins (exchange for shards): the history says where it went', planBudget: 'a purchase always shows where it came from (phase 8)',
     steps: [{ goto: '/wallet', say: 'Wallet' }, { css: '[aria-label="5 shards"]', say: '5 shards' }, { css: '[data-exchange]', expect: '/exchang/i', within: 20, say: 'Exchange' }, { goto: '/wallet', say: 'Wallet again' }, { expect: '/exchang/i', within: 20, say: 'the history names the exchange' }] },
+  // ── EVERY-SCREEN P9: learn, create and the public pages. The plan: "open a lesson → reading or doing in ≤ 2 taps;
+  //    Studio's first screen says what you can make and starts it in 1 tap". Each area's main job, walked once on the
+  //    phase's first build: these counts are its budget from now on ──
+  { id: 'p9-lesson', who: 'solo', name: 'Open a lesson (Train → Learn → Continue)', planBudget: 'a lesson: reading in ≤ 2 taps from Learn (phase 9)',
+    steps: [{ goto: '/play', say: 'home' }, { css: 'nav a[href="/train"]:visible', say: 'the Train tab' }, { css: 'a[href="/learn"]', expect: '[data-testid=learn-continue]', within: 20, say: 'Learn' },
+      { css: '[data-testid=learn-continue]', expect: '[data-lesson]', within: 20, say: 'Continue: the lesson, reading' }] },
+  { id: 'p9-chapter', who: 'solo', name: 'Open a lesson from the chapter list', planBudget: 'a lesson: reading in ≤ 2 taps (phase 9)',
+    steps: [{ goto: '/education/playbook', say: 'the Playbook' }, { css: '[data-learn-chapter], a[href^="/education/playbook/"]', expect: '[data-lesson]', within: 20, say: 'a chapter: its first lesson' }] },
+  { id: 'p9-studio', who: 'admin', name: 'Studio: make something in one tap', planBudget: 'Studio says what you can make, starts it in 1 tap (phase 9)',
+    steps: [{ goto: '/studio', say: 'Nexus Studio (its switch on in the rig)' }, { expect: '[data-testid=guide-quick]', within: 30, say: '"Make your first court"' },
+      { css: '[data-testid=guide-quick]', expect: '[data-testid=first-court][data-step="3"]', within: 20, say: 'Make it for me: the court is built' }] },
+  { id: 'p9-story', who: 'solo', name: 'Open Story', planBudget: 'budget: this walk (phase 9)',
+    steps: [{ goto: '/play', say: 'home' }, { tap: 'Story', expect: '/Snow Slope/i', within: 20, say: 'Story (the Play tab\'s doors row)' }] },
+  { id: 'p9-kitchens', who: 'solo', name: 'Open Kitchens', planBudget: 'budget: this walk (phase 9)',
+    steps: [{ goto: '/play', say: 'home' }, { css: 'nav a[href="/train"]:visible', say: 'the Train tab' }, { css: 'a[href="/kitchens"]', expect: '/LIST A KITCHEN/', within: 20, say: 'Kitchens' }] },
+  { id: 'p9-create', who: 'solo', name: 'Open Create', planBudget: 'budget: this walk (phase 9)',
+    steps: [{ goto: '/play', say: 'home' }, { css: 'nav a[href="/profile"]:visible', say: 'the Profile tab' }, { css: 'a[href="/create"]', expect: '/My Creations/', within: 20, say: 'Create' }] },
+  { id: 'p9-press', who: 'solo', name: 'Open the books (Press)', planBudget: 'budget: this walk (phase 9)',
+    steps: [{ goto: '/play', say: 'home' }, { css: 'nav a[href="/profile"]:visible', say: 'the Profile tab' }, { css: 'a[href="/press"]', expect: '/My Library/i', within: 20, say: 'Books' }] },
+  { id: 'p9-teach', who: 'solo', name: 'Find Teach on FEL', planBudget: 'budget: this walk (phase 9)',
+    steps: [{ goto: '/play', say: 'home' }, { css: 'nav a[href="/train"]:visible', say: 'the Train tab' }, { css: 'a[href="/learn"]', say: 'Learn' }, { css: '[data-testid=learn-teach-door]', expect: '/Teach/i', within: 20, say: 'Teach on FEL' }] },
+  { id: 'p9-terms', who: 'anon', name: 'Read the terms (signed out)', planBudget: 'budget: this walk (phase 9)',
+    steps: [{ goto: '/support', say: 'Support' }, { css: 'a[href="/terms"]', expect: '/terms/i', within: 20, say: 'Terms' }] },
   // ── EVERY-SCREEN P7: around the games. The plan: "pick a game → playing in ≤ 2 taps; results → play again in 1; a lobby
   //    always says what it is waiting for" ──
   {

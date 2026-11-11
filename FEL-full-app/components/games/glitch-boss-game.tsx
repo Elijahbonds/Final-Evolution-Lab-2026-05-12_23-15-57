@@ -354,7 +354,7 @@ export default function GlitchBossGame({ grade, prq, onEnd, gamepad }: GameProps
           <div className="absolute inset-0 flex flex-col items-center justify-center rounded-lg bg-black/80 backdrop-blur-sm">
             <h2 className="fel-heading text-4xl font-bold text-[#FF3366]">THE VERTIGO</h2>
             <p className="mt-1 font-mono text-xs text-[#A855F7]">GLITCH BOSS · CHAPTER 1</p>
-            <p className="mt-3 max-w-md text-center text-sm text-white/60">
+            <p className="mt-3 max-w-md text-center text-base text-white/60">
               A manifestation of your weakest stat. Three phases: dodge projectiles, land combo strikes in timing windows, then execute the aerial QTE finisher. The boss is stronger when your PRQ is lower.
             </p>
             <div className="mt-4 grid grid-cols-2 gap-x-8 gap-y-1 font-mono text-xs text-white/55">

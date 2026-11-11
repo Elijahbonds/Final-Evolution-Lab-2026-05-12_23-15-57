@@ -10,7 +10,15 @@
 
 import { useEffect, useState } from 'react';
 import { Compass, ArrowUpRight, Sparkles } from 'lucide-react';
-import { DISCIPLINE_META } from '@/lib/creator/creative-card-types';
+import Link from 'next/link';
+import { DISCIPLINE_META, isDiscipline } from '@/lib/creator/creative-card-types';
+import { lineSize } from '@/lib/design/type';
+
+/** EVERY-SCREEN P9: where a suggestion's one next step starts — the discipline's own create flow (sport: Train). */
+export function startHref(discipline: string): string {
+  if (discipline === 'sport') return '/train';
+  return isDiscipline(discipline) ? `/create/${discipline}` : '/create';
+}
 
 interface Suggestion {
   id: string; title: string; discipline: string; looksLike: string; firstStep: string;
@@ -31,13 +39,13 @@ export function PathwayPanelError({ onRetry }: { onRetry?: () => void }) {
       <h2 className="fel-heading mt-2 text-[20px] font-bold text-white">
         We could not load your next-step ideas.
       </h2>
-      <p className="mt-2 text-[13.5px] leading-relaxed text-white/60">
+      <p className="mt-2 text-base leading-relaxed text-white/60">
         The counsellor still has a home here. Try again in a moment, or keep playing and come back when the signal clears.
       </p>
       <button
         type="button"
         onClick={onRetry}
-        className="mt-4 rounded-full border border-white/12 bg-white/[0.06] px-4 py-2 text-[12px] font-bold uppercase tracking-[0.14em] text-white/75 transition hover:border-white/25 hover:text-white"
+        className="mt-4 min-h-11 rounded-full border border-white/12 bg-white/[0.06] px-4 py-2 text-[12px] font-bold uppercase tracking-[0.14em] text-white/75 transition hover:border-white/25 hover:text-white"
       >
         Try again
       </button>
@@ -63,7 +71,7 @@ export function PathwayPanel() {
 
   return (
     <>
-      <p className="mb-5 text-[14px] leading-relaxed text-white/60">{data.note}</p>
+      <p className={`mb-5 ${lineSize(data.note, 'text-[14px]')} leading-relaxed text-white/60`}>{data.note}</p>
 
       <ul className="grid gap-3 lg:grid-cols-2">
         {data.suggestions.map((s, i) => {
@@ -79,7 +87,7 @@ export function PathwayPanel() {
                     <p className="font-mono text-[12px] font-bold uppercase tracking-[0.18em]" style={{ color: accent }}>
                       {s.discipline}
                     </p>
-                    <h3 className="fel-heading mt-1 text-[18px] font-bold leading-tight text-white">{s.title}</h3>
+                    <h3 className="fel-heading mt-1 text-[20px] font-bold leading-tight text-white">{s.title}</h3>
                   </div>
                   {s.exploratory && (
                     <span className="shrink-0 rounded-md bg-white/[0.06] px-2 py-0.5 font-mono text-[12px] uppercase tracking-[0.12em] text-white/50">
@@ -88,13 +96,15 @@ export function PathwayPanel() {
                   )}
                 </div>
 
-                <p className="mt-2.5 text-[13.5px] leading-relaxed text-white/60">{s.looksLike}</p>
+                <p className="mt-2.5 text-base leading-relaxed text-white/60">{s.looksLike}</p>
 
                 <div className="mt-4 rounded-xl border border-white/[0.07] bg-black/20 p-3.5">
                   <p className="font-mono text-[12px] font-bold uppercase tracking-[0.16em] text-white/50">
                     One next step
                   </p>
-                  <p className="mt-1.5 text-[13.5px] leading-relaxed text-white/80">{s.firstStep}</p>
+                  <p className="mt-1.5 text-base leading-relaxed text-white/80">{s.firstStep}</p>
+                  {/* EVERY-SCREEN P9: the next step is a tap away */}
+                  <Link href={startHref(s.discipline)} className="mt-2 inline-flex min-h-11 items-center text-[14px] font-bold hover:underline" style={{ color: accent }}>Start →</Link>
                 </div>
 
                 {/* What it read. Somebody can disagree with a fact; nobody can argue with a black box. */}
@@ -116,27 +126,27 @@ export function PathwayPanel() {
 
       {data.adjacent.length > 0 && (
         <section className="mt-8">
-          <h2 className="fel-heading flex items-center gap-2 text-[15px] font-bold text-white/80">
+          <h2 className="fel-heading flex items-center gap-2 text-[16px] font-bold text-white/80">
             <Compass className="h-4 w-4 text-white/50" /> Next door to these
           </h2>
-          <p className="mt-1 text-[12.5px] text-white/50">
+          <p className="mt-1 text-[12px] text-white/50">
             Interests move. These sit beside what you are already doing.
           </p>
           <ul className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {data.adjacent.map((p) => (
               <li key={p.id} className="rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3">
-                <p className="flex items-center gap-1.5 text-[13.5px] font-semibold text-white/85">
+                <p className="flex items-center gap-1.5 text-[14px] font-semibold text-white/85">
                   <ArrowUpRight className="h-3.5 w-3.5" style={{ color: accentFor(p.discipline) }} />
                   {p.title}
                 </p>
-                <p className="mt-1 text-[12px] leading-snug text-white/50">{p.looksLike}</p>
+                <p className={`mt-1 ${lineSize(p.looksLike, 'text-[12px]')} leading-snug text-white/50`}>{p.looksLike}</p>
               </li>
             ))}
           </ul>
         </section>
       )}
 
-      <p className="mt-8 flex items-start gap-2 text-[12px] leading-relaxed text-white/50">
+      <p className="mt-8 flex items-start gap-2 text-base leading-relaxed text-white/50">
         <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0" />
         This reads what you actually do, not a quiz you filled in. It is a suggestion, never a verdict — every
         one of these stays open to you whatever it says.

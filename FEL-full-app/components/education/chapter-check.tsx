@@ -123,11 +123,11 @@ export function ChapterCheckView({ info, picked, result, busy, error, onPick, on
         <ClipboardCheck aria-hidden className="h-4 w-4 text-[#A855F7]" /> {CHECK_COPY.title}
       </h3>
       {info.draft && (
-        <p data-check-draft className="mt-2 rounded-lg border border-amber-300/30 bg-amber-300/[0.07] px-3 py-2 text-[12.5px] font-bold text-amber-200">
+        <p data-check-draft className="mt-2 rounded-lg border border-amber-300/30 bg-amber-300/[0.07] px-3 py-2 text-[12px] font-bold text-amber-200">
           {CHECK_COPY.draft}
         </p>
       )}
-      {!result && <p className="mt-2 text-[13px] text-white/60">
+      {!result && <p className="mt-2 text-[14px] text-white/60">
         {CHECK_COPY.rule(mark)}{' '}
         {info.saves === false ? CHECK_COPY.device
           : info.passedBefore ? CHECK_COPY.passedBefore
@@ -168,7 +168,7 @@ export function ChapterCheckView({ info, picked, result, busy, error, onPick, on
         })}
       </ol>
 
-      {error && <p data-check-error role="alert" className="mt-4 text-[13px] font-bold text-[#FF3366]">{CHECK_COPY.error}</p>}
+      {error && <p data-check-error role="alert" className="mt-4 text-[14px] font-bold text-[#FF3366]">{CHECK_COPY.error}</p>}
 
       {/* PLAT-P03 (2026-10-28): the score is ONE result card, where the submit button was (it scrolls itself into view) — the %, the arrow against this device's best for
           the chapter (a score has no noise: the same score is "the same"), and the check's own pass / fail line. The

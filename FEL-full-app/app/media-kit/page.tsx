@@ -28,14 +28,14 @@ export default async function MediaKitPage() {
       lede={PUBLIC_PAGE_COPY.mediaKit.lede}
     >
       {/* ONB-05: Appendix B as approved (2026-10-20); [OWNER: …] marks a blank the owner still fills. */}
-      <OwnerCopy parts={PUBLIC_PAGE_COPY.mediaKit.body} className="mt-6 max-w-2xl text-sm leading-relaxed text-white/75" />
+      <OwnerCopy parts={PUBLIC_PAGE_COPY.mediaKit.body} className="mt-6 max-w-2xl text-base leading-relaxed text-white/75" />
       <section className="mt-8 grid gap-6 md:grid-cols-[180px_1fr]">
         {profile ? <ProfilePhoto name={profile.name} photoUrl={profile.photoUrl} size="lg" /> : null}
         <div>
           <SectionTitle>Bio</SectionTitle>
           <p className="fel-heading mt-1 text-3xl text-white">{profile?.name ?? 'Final Evolution Lab'}</p>
           <p className="mt-2 text-sm text-white/70">{publicProfileBio(profile)}</p>
-          <Link href="/work-with-us?source=media-kit" className="mt-4 inline-block rounded-md bg-[#F5C518] px-4 py-2 text-sm font-semibold text-black hover:bg-[#ffd84a]">
+          <Link href="/work-with-us?source=media-kit" className="mt-4 inline-flex min-h-11 items-center rounded-md bg-[#F5C518] px-4 py-2 text-sm font-semibold text-black hover:bg-[#ffd84a]">
             Inquire
           </Link>
         </div>
@@ -96,7 +96,7 @@ export default async function MediaKitPage() {
             </div>
           ))}
         </div>
-        <Link href="/work-with-us?source=media-kit" className="mt-4 inline-block rounded-md bg-[#F5C518] px-4 py-2 text-sm font-semibold text-black hover:bg-[#ffd84a]">
+        <Link href="/work-with-us?source=media-kit" className="mt-4 inline-flex min-h-11 items-center rounded-md bg-[#F5C518] px-4 py-2 text-sm font-semibold text-black hover:bg-[#ffd84a]">
           Inquire
         </Link>
       </section>

@@ -44,7 +44,7 @@ function DraftNowPlaying({ title, creator, cover, playing, onToggle }: { title: 
         <div className="truncate text-sm font-bold text-white">{title || 'Untitled'}</div>
         <div className="truncate text-xs text-white/60">by {creator}</div>
       </div>
-      <button onClick={onToggle} aria-label={playing ? 'Pause' : 'Play'} className="h-10 w-10 rounded-full bg-white text-lg font-black text-black">{playing ? '❚❚' : '▶'}</button>
+      <button onClick={onToggle} aria-label={playing ? 'Pause' : 'Play'} className="h-10 w-10 rounded-full bg-white text-[20px] font-black text-black">{playing ? '❚❚' : '▶'}</button>
     </div>
   );
 }
@@ -213,7 +213,7 @@ function WritingPreview({ art, title, creator }: { art: Extract<ArtPayloadBody, 
       <Frame label="Story: Community reads">
         <article className="rounded-2xl border border-lime-400/20 bg-neutral-900 p-4">
           <div className="text-[12px] uppercase tracking-widest text-lime-300">Community read</div>
-          <h3 className="mt-1 text-lg font-black text-white">{title || 'Untitled'}</h3>
+          <h3 className="mt-1 text-[20px] font-black text-white">{title || 'Untitled'}</h3>
           <p className="mt-2 line-clamp-5 whitespace-pre-line text-sm text-neutral-300">{art.text}</p>
           <p className="mt-2 text-xs text-neutral-400">by {creator}</p>
         </article>
@@ -232,7 +232,7 @@ function CookingPreview({ art, title, creator }: { art: Extract<ArtPayloadBody, 
   return (
     <Frame label="Fuel floor: Community recipes (routed)">
       <div className="max-w-sm rounded-2xl bg-gradient-to-br from-rose-950 to-neutral-900 p-4">
-        <h3 className="text-lg font-black text-white">{title || 'Recipe'}</h3>
+        <h3 className="text-[20px] font-black text-white">{title || 'Recipe'}</h3>
         <p className="text-xs text-neutral-400">by {creator} · {art.ingredients.length} ingredients · {art.steps.length} steps</p>
         <div className="mt-2 flex flex-wrap gap-1">{art.fuelTags.map((t) => <span key={t} className="rounded-full bg-rose-500/20 px-2 py-0.5 text-[12px] text-rose-200">{t}</span>)}</div>
         <p className="mt-2 text-xs text-neutral-300">{art.allergens?.length ? <>Contains: <b>{art.allergens.join(', ')}</b></> : 'No allergens declared.'}</p>
@@ -259,7 +259,7 @@ function SportPreview({ art, title, creator }: { art: Extract<ArtPayloadBody, { 
     <Frame label="Your athlete card: Signature moves">
       <div className="max-w-sm rounded-2xl border border-orange-400/30 bg-neutral-950 p-4">
         <div className="text-[12px] uppercase tracking-widest text-orange-300">Signature move</div>
-        <div className="mt-1 text-lg font-black text-white">{art.signatureMoveId || title || 'Your move'}</div>
+        <div className="mt-1 text-[20px] font-black text-white">{art.signatureMoveId || title || 'Your move'}</div>
         <div className="text-xs text-neutral-400">{title} · {creator}</div>
       </div>
     </Frame>

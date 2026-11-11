@@ -33,17 +33,17 @@ export default async function LibraryPage() {
         <section className="mt-8">
           <h2 className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#F5C518]">My Library</h2>
           <div className="mt-3 rounded-2xl border border-white/10 bg-[#101010] p-6">
-            <p className="text-lg text-white">Log in to listen to your books.</p>
-            <p className="mt-2 max-w-lg text-sm text-white/55">
+            <p className="text-[20px] text-white">Log in to listen to your books.</p>
+            <p className="mt-2 max-w-lg text-base text-white/55">
               Audiobooks are for signed-in, verified adults (18+). Sign in with the account you bought with.
             </p>
             {/* PUBLIC-POLISH (2026-11-02, live sweep D3): sign-in comes back here (it went to /login with no next and left
                 the reader on the home screen), and a visitor with no books yet has a way to the shop */}
             <div className="mt-4 flex flex-wrap gap-3">
-              <Link href={loginPath('/press/library')} className="inline-block rounded-md bg-[#F5C518] px-4 py-2 text-sm font-semibold text-black">
+              <Link href={loginPath('/press/library')} className="inline-flex min-h-11 items-center rounded-md bg-[#F5C518] px-4 py-2 text-sm font-semibold text-black">
                 Log in
               </Link>
-              <Link href="/press" className="inline-block rounded-md border border-white/15 px-4 py-2 text-sm font-semibold text-white/80">
+              <Link href="/press" className="inline-flex min-h-11 items-center rounded-md border border-white/15 px-4 py-2 text-sm font-semibold text-white/80">
                 Browse the books
               </Link>
             </div>
@@ -119,7 +119,7 @@ export default async function LibraryPage() {
             }));
             return (
               <article key={slug} className="rounded-2xl border border-white/10 bg-[#101010] p-4">
-                <h3 className="text-lg font-semibold text-white">
+                <h3 className="text-[20px] font-semibold text-white">
                   <Link href={`/press/${book.slug}`} className="hover:underline">{book.title}</Link>
                 </h3>
                 <p className="mt-1 text-[12px] uppercase tracking-wider text-white/50">Audiobook · stream only</p>

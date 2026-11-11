@@ -40,12 +40,12 @@ export default function MyCreations({ cards, loading, publicCreator }: { cards: 
   return (
     <section className="px-5 pb-10" aria-labelledby="my-creations">
       <div className="mb-3 flex items-baseline justify-between">
-        <h2 id="my-creations" className="text-lg font-black text-neutral-100">My Creations</h2>
+        <h2 id="my-creations" className="text-[20px] font-black text-neutral-100">My Creations</h2>
         {!loading && cards.length > 0 && <span className="text-xs text-neutral-400">{cards.length} card{cards.length === 1 ? '' : 's'}</span>}
       </div>
       {loading && <p className="text-sm text-neutral-400">Loading your creations…</p>}
       {!loading && cards.length === 0 && (
-        <p className="rounded-xl bg-neutral-900 p-4 text-sm text-neutral-400">Nothing yet. Pick a tile above: three steps and it is a card.</p>
+        <p className="rounded-xl bg-neutral-900 p-4 text-base text-neutral-400">Nothing yet. Pick a tile above: three steps and it is a card.</p>
       )}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {cards.map((c) => {

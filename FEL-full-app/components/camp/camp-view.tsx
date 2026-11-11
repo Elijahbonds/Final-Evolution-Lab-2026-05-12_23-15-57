@@ -87,7 +87,7 @@ export function CampPaywall({ body }: { body: CampPaywallBody }) {
     <section data-testid="camp-paywall" className="rounded-xl border border-amber-300/30 bg-amber-300/[0.06] p-5">
       <p className="flex items-center gap-2 text-sm font-bold text-amber-200"><Lock className="h-4 w-4" /> {body.feature ?? 'Camp'} is part of FEL Coach</p>
       {body.message && <p className="mt-2 text-sm text-white/80">{body.message}</p>}
-      {body.free && <p className="mt-2 text-xs text-white/60">{body.free}</p>}
+      {body.free && <p className="mt-2 text-base text-white/60">{body.free}</p>}
     </section>
   );
 }
@@ -136,12 +136,12 @@ export function CampView() {
   return (
     <main className="mx-auto max-w-3xl px-4 pt-6 text-white">
       <div className="mb-5">
-        <h1 className="text-2xl font-black tracking-tight">Camp Blueprint</h1>
+        <h1 className="text-[30px] font-black tracking-tight">Camp Blueprint</h1>
         <p className="text-sm text-white/50">Mentorship, on the Neuro-Mechanic&apos;s Blueprint. {assess ? <span className={certified ? 'text-emerald-300' : 'text-white/70'}>{STATUS_LABEL[assess.status] ?? assess.status}</span> : null}</p>
       </div>
       <div className="mb-6 grid grid-cols-5 gap-1 rounded-xl border border-white/10 bg-white/[0.03] p-1">
         {tabs.map(({ key, label, icon: Icon }) => (
-          <button key={key} onClick={() => setTab(key)} className={`flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-semibold transition ${tab === key ? 'bg-cyan-400/15 text-cyan-300' : 'text-white/60 hover:text-white'}`}>
+          <button key={key} onClick={() => setTab(key)} className={`flex min-h-11 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-semibold transition ${tab === key ? 'bg-cyan-400/15 text-cyan-300' : 'text-white/60 hover:text-white'}`}>
             <Icon className="h-3.5 w-3.5" /> {label}
           </button>
         ))}

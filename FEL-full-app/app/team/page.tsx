@@ -26,7 +26,7 @@ export default async function TeamPage() {
       {/* ONB-05: Appendix B as approved (2026-10-20). Its booking sentence is said only while the coach store is open
           (the lede above already says what to do while it is closed). */}
       <OwnerCopy parts={[PUBLIC_PAGE_COPY.team.lede, ' ', ...PUBLIC_PAGE_COPY.team.body, ...(coachStoreOpen ? [' ', TEAM_BOOK_OPEN] : [])]}
-        className="mt-6 max-w-2xl text-sm leading-relaxed text-white/75" />
+        className="mt-6 max-w-2xl text-base leading-relaxed text-white/75" />
       <section className="mt-8">
         <SectionTitle>Profiles</SectionTitle>
         <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -40,7 +40,7 @@ export default async function TeamPage() {
                 <Link href={`/team/${profile.slug}`} className="flex gap-4">
                   <ProfilePhoto name={profile.name} photoUrl={profile.photoUrl} />
                   <div className="min-w-0">
-                    <p className="fel-heading text-2xl text-white">{profile.name}</p>
+                    <p className="fel-heading text-[20px] text-white">{profile.name}</p>
                     <p className="text-xs text-white/50">{publicProfileSpecialty(profile)}</p>
                   </div>
                 </Link>

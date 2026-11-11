@@ -91,12 +91,12 @@ export default function CreatorEditor({ table, values, onChange, axes, issues = 
       {/* tab strip: bumper paging, dot indicator, filter (§1) */}
       <div className="flex items-center gap-2">
         <button onClick={() => page(-1)} disabled={tabIdx === 0}
-          className="fel-panel px-2 py-1 font-mono text-xs disabled:opacity-30" aria-label="Previous tab">L</button>
+          className="fel-panel min-h-11 min-w-11 px-2 py-1 font-mono text-xs disabled:opacity-30" aria-label="Previous tab">L</button>
         <div className="flex-1 overflow-x-auto">
           <div className="flex gap-1">
             {tabs.map((t, i) => (
               <button key={t} onClick={() => { setTabIdx(i); setFocusId(null); }}
-                className={`whitespace-nowrap rounded-lg px-3 py-1 font-mono text-[12px] uppercase tracking-wide transition-colors ${
+                className={`min-h-11 whitespace-nowrap rounded-lg px-3 py-1 font-mono text-[12px] uppercase tracking-wide transition-colors ${
                   i === tabIdx ? 'bg-[var(--fel-cyan)] text-black' : 'fel-panel text-white/70'}`}>
                 {t}
               </button>
@@ -104,12 +104,12 @@ export default function CreatorEditor({ table, values, onChange, axes, issues = 
           </div>
         </div>
         <button onClick={() => page(1)} disabled={tabIdx >= tabs.length - 1}
-          className="fel-panel px-2 py-1 font-mono text-xs disabled:opacity-30" aria-label="Next tab">R</button>
+          className="fel-panel min-h-11 min-w-11 px-2 py-1 font-mono text-xs disabled:opacity-30" aria-label="Next tab">R</button>
         <span className="font-mono text-[12px] text-white/50">{tabIdx + 1}/{tabs.length}</span>
       </div>
 
-      <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter…"
-        className="fel-panel w-full rounded-lg px-3 py-1.5 font-mono text-xs text-white placeholder:text-white/50" />
+      <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter…" aria-label="Filter"
+        className="fel-panel min-h-11 w-full rounded-lg px-3 py-1.5 font-mono text-xs text-white placeholder:text-white/50" />
 
       <div className="flex min-h-0 flex-1 gap-3">
         {/* the row list — one renderer, three row kinds */}
@@ -193,7 +193,7 @@ export default function CreatorEditor({ table, values, onChange, axes, issues = 
         <span>Rotate</span><span>·</span><span>Select</span>
         {focusId && <><span>·</span><span>Glossary</span></>}
         <span>·</span>
-        <button onClick={onBack} className="underline">Back</button>
+        <button onClick={onBack} className="inline-flex min-h-11 min-w-11 items-center underline">Back</button>
       </div>
 
       {/* glossary modal — every row carries its text (§6), tiers included where there are tiers */}

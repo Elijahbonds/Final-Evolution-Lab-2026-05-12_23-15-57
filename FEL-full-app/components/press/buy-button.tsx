@@ -73,13 +73,15 @@ export function BuyButton({
 
   return (
     <div>
-      <label className="mb-2 flex max-w-xs items-start gap-2 text-[12px] leading-snug text-white/60">
+      {/* EVERY-SCREEN P9: the phase-7 terms-tick pattern (a real checkbox in a 44 px label, a drawn box); wording unchanged */}
+      <label className="mb-2 flex min-h-11 max-w-xs cursor-pointer items-start gap-2 py-1 text-base leading-snug text-white/60">
         <input
           type="checkbox"
           checked={termsAgreed}
           onChange={(e) => setTermsAgreed(e.target.checked)}
-          className="mt-0.5"
+          className="peer sr-only"
         />
+        <span aria-hidden className="mt-1 grid h-4 w-4 shrink-0 place-items-center rounded border border-white/40 text-[12px] leading-none text-transparent peer-checked:border-[#F5C518] peer-checked:bg-[#F5C518] peer-checked:text-black peer-focus-visible:ring-2 peer-focus-visible:ring-[#F5C518]/60">✓</span>
         <span>
           I agree to the{' '}
           <a className="font-semibold text-[#F5C518] underline" href="/store-terms" target="_blank" rel="noopener noreferrer">Store Terms of Service and Refund &amp; Cancellation Policy</a>.
@@ -92,8 +94,8 @@ export function BuyButton({
         aria-busy={busy}
         className={
           prominent
-            ? 'rounded-md bg-[#F5C518] px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-[#ffd84a] disabled:opacity-60'
-            : 'rounded-md border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:border-[#F5C518]/60 disabled:opacity-60'
+            ? 'min-h-11 rounded-md bg-[#F5C518] px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-[#ffd84a] disabled:opacity-60'
+            : 'min-h-11 rounded-md border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:border-[#F5C518]/60 disabled:opacity-60'
         }
       >
         {busy ? 'Opening checkout…' : label}

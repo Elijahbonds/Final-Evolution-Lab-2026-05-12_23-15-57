@@ -57,7 +57,7 @@ export function TopicPicker({
                 >
                   <Motif motif={t.motif} accent={t.accent} size={36} />
                   <span className={`${TYPE.body} font-semibold leading-tight text-white`}>{t.label}</span>
-                  <span className={`${TYPE.small} line-clamp-3 text-fel-dim`}>{t.blurb}</span>
+                  <span className={`${TYPE.small} text-fel-dim`}>{t.blurb}</span>{/* EVERY-SCREEN P9: no clamp: at 150 % text the clamp cut a third of each blurb; the tile grows instead */}
                   {on && (
                     <span className="absolute right-2.5 top-2.5 grid h-6 w-6 place-items-center rounded-full text-black" style={{ background: t.accent }}>
                       <Check className="h-4 w-4" />

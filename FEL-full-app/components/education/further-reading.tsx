@@ -12,7 +12,7 @@ export function FurtherReading() {
       <h2 id="further-reading-h" className="font-mono text-[12px] font-bold uppercase tracking-[0.18em] text-fel-dim">
         {FURTHER_READING_HEADING}
       </h2>
-      <ul className="mt-2 space-y-1 text-[13px] leading-relaxed text-white/60">
+      <ul className="mt-2 space-y-1 text-[14px] leading-relaxed text-white/60">
         {FURTHER_READING.map((c) => <li key={c.title}>{citationLine(c)}</li>)}
       </ul>
       <p className="mt-1.5 text-[12px] leading-relaxed text-fel-quiet">{FURTHER_READING_NOTE}</p>

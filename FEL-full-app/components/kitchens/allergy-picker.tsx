@@ -11,19 +11,19 @@ export function AllergyPicker({ avoid, onChange }: { avoid: readonly Allergen[];
   return (
     <section className="fel-panel mt-4 rounded-2xl p-4" data-testid="allergy-picker">
       <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-white/50">Allergies · this device only</p>
-      <p className="mt-1 text-xs text-white/60">Pick anything you avoid. Recipes that contain it are left out of your plan.</p>
+      <p className="mt-1 text-base text-white/60">Pick anything you avoid. Recipes that contain it are left out of your plan.</p>
       <div className="mt-3 flex flex-wrap gap-1.5">
         {ALLERGENS.map((a) => {
           const on = avoid.includes(a);
           return (
             <button key={a} type="button" role="checkbox" aria-checked={on} onClick={() => flip(a)}
-              className={`rounded-full border px-2.5 py-1 text-[12px] font-bold ${on ? 'border-[#FF3D5E] bg-[#FF3D5E]/15 text-[#FF8FA3]' : 'border-white/15 text-white/70 hover:bg-white/10'}`}>
+              className={`min-h-11 rounded-full border px-2.5 py-1 text-[12px] font-bold ${on ? 'border-[#FF3D5E] bg-[#FF3D5E]/15 text-[#FF8FA3]' : 'border-white/15 text-white/70 hover:bg-white/10'}`}>
               {on ? 'NO ' : ''}{ALLERGEN_LABEL[a].toUpperCase()}
             </button>
           );
         })}
       </div>
-      <p className="mt-3 text-[12px] leading-snug text-white/50" data-testid="allergen-note">{ALLERGEN_NOTE}</p>
+      <p className="mt-3 text-base leading-snug text-white/50" data-testid="allergen-note">{ALLERGEN_NOTE}</p>
     </section>
   );
 }

@@ -58,7 +58,7 @@ export function AssetBrowser({ onPlace }: { onPlace(item: CatalogItem): void }) 
         <label className="flex items-center gap-2 rounded-md border px-2 py-1" style={{ borderColor: C.line }}>
           <Search className="h-3.5 w-3.5" style={{ color: C.dim }} aria-hidden />
           <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Palm, flood, bleacher…" aria-label="Search assets"
-            className="w-full bg-transparent text-[12px] outline-none" style={{ color: C.text }} />
+            className="w-full bg-transparent text-[12px] outline-none max-md:min-h-11" style={{ color: C.text }} />
         </label>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto pb-3" data-testid="asset-list" onKeyDown={onGridKey} aria-label="Things to add: arrow keys move, Enter adds" role="group">
@@ -71,7 +71,7 @@ export function AssetBrowser({ onPlace }: { onPlace(item: CatalogItem): void }) 
                   <button type="button" draggable ref={(el) => { if (el) refs.current.set(c.id, el); else refs.current.delete(c.id); }}
                     tabIndex={flat[cur]?.id === c.id ? 0 : -1} onFocus={() => setCurrent(flat.indexOf(c))} onDragStart={(e) => { e.dataTransfer.setData(DRAG_MIME, c.id); e.dataTransfer.effectAllowed = 'copy'; }}
                     onClick={() => { onPlace(c); afterPlace(); }} title={`${c.label}: tap to place it in the middle of the view, or drag it into the view (${c.source})`} aria-label={`Add ${c.label}`}
-                    className="flex min-h-10 w-full items-center rounded-md border px-2 py-1.5 text-left transition-colors hover:border-[color:var(--fel-cyan)]" style={{ borderColor: C.line, background: C.surface }}>
+                    className="flex min-h-10 w-full items-center rounded-md border px-2 py-1.5 text-left max-md:min-h-11 transition-colors hover:border-[color:var(--fel-cyan)]" style={{ borderColor: C.line, background: C.surface }}>
                     {/* STUDIO-EASY: the engine source ("FixtureLights · flood") moved to the tooltip and the search; the card says what it is */}
                     <span className="block truncate text-[13px]" style={{ color: C.text }}>{c.label}</span>
                   </button>

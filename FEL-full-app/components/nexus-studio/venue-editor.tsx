@@ -224,7 +224,7 @@ export function VenueEditor({ studio, onHandle, overlay }: { studio: StudioApi; 
           <span className="mx-1 h-5 w-px" style={{ background: C.line }} />
           <ToolButton title="Grid" shortcut="G" active={grid} onClick={() => setGrid((g) => !g)}><Grid3x3 className="h-4 w-4" /></ToolButton>
           <ToolButton title="Snap" shortcut="N" active={snap.on} onClick={() => setSnap((s) => ({ ...s, on: !s.on }))}><Magnet className="h-4 w-4" /></ToolButton>
-          <select aria-label="Snap step" value={snap.move} onChange={(e) => setSnap((s) => ({ ...s, move: Number(e.target.value) }))} className="rounded border bg-transparent px-1 py-0.5 text-[12px]" style={{ borderColor: C.line, color: C.text, background: C.surface }}>
+          <select aria-label="Snap step" value={snap.move} onChange={(e) => setSnap((s) => ({ ...s, move: Number(e.target.value) }))} className="max-md:min-h-11 rounded border bg-transparent px-1 py-0.5 text-[12px]" style={{ borderColor: C.line, color: C.text, background: C.surface }}>
             {SNAP_MOVES.map((m) => <option key={m} value={m}>{m} m · {snap.turn}°</option>)}
           </select>
           <ToolButton title={clip ? `Paste ${clip.objects.length === 1 ? clip.objects[0].name : `${clip.objects.length} objects`} at the view's centre` : 'Paste (copy something first)'} shortcut="Ctrl+V" disabled={!clip} onClick={paste}><ClipboardPaste className="h-4 w-4" /></ToolButton>
