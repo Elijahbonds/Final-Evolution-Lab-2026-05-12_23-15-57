@@ -27,6 +27,10 @@ if (cmd === 'build') {
   fs.mkdirSync(path.join(SITE, 'fonts'), { recursive: true });
   for (const f of fs.readdirSync(path.join(ROOT, 'app/fonts'))) if (f.endsWith('.woff2')) fs.copyFileSync(path.join(ROOT, 'app/fonts', f), path.join(SITE, 'fonts', f));
   await buildRig(SITE, { entry: path.join(ROOT, 'scripts/probes/screen-fixes/splash-entry.tsx'), fontBase: '/fonts', prodFonts: true, external: ['@mediapipe/tasks-vision'] });
+  // SCREEN-FIXES-2 (2026-11-11): the app loads app/game-surface.css on every page (app/layout.tsx); the rig compiles only
+  // globals.css, so without this the card was measured without the start card's own rules (4b, 4d). Plain CSS, appended last.
+  const html = path.join(SITE, 'index.html');
+  fs.writeFileSync(html, fs.readFileSync(html, 'utf8').replace('</head>', `<style>${fs.readFileSync(path.join(ROOT, 'app/game-surface.css'), 'utf8')}</style></head>`));
   console.log('[splash] built', SITE);
   process.exit(0);
 }
@@ -66,6 +70,14 @@ try {
     await p.waitForTimeout(4000);
     await p.screenshot({ path: path.join(SITE, `splash-${mode}-ready.jpg`), type: 'jpeg', quality: 70 });
     const hReady = await p.evaluate(() => Math.round(document.querySelector('[data-splash-slot]')?.getBoundingClientRect().height ?? 0));
+    // SCREEN-FIXES-2: the corner chip (MOTION) over the card's own words, in px² (text runs by Range rects), on READY
+    const overlap = await p.evaluate(`(() => { const c = document.querySelector('[data-splash-corner]'), col = document.querySelector('[data-splash-column]');
+      if (!c || !col) return { px2: -1, text: '' }; const k = c.getBoundingClientRect(); let px2 = 0, text = '';
+      const w = document.createTreeWalker(col, NodeFilter.SHOW_TEXT);
+      for (let n = w.nextNode(); n; n = w.nextNode()) { if (!(n.textContent || '').trim()) continue; const r0 = document.createRange(); r0.selectNodeContents(n);
+        for (const r of Array.from(r0.getClientRects())) { const x = Math.min(r.right, k.right) - Math.max(r.left, k.left), y = Math.min(r.bottom, k.bottom) - Math.max(r.top, k.top);
+          if (x > 0.5 && y > 0.5) { px2 += x * y; text = text || n.textContent.trim().slice(0, 30); } } }
+      return { px2: Math.round(px2), text }; })()`) as { px2: number; text: string };
     const r = await p.evaluate(() => {
       const w = window as unknown as { __CLS: Shift[]; __readyT?: number };
       return { shifts: w.__CLS, tReady: w.__readyT ?? null };
@@ -74,9 +86,9 @@ try {
     const sum = (xs: Shift[]) => Math.round(xs.reduce((a, s) => a + s.v, 0) * 1000) / 1000;
     const tr = r.tReady ?? Infinity;
     const loading = shifts.filter((s) => s.t < tr), swap = shifts.filter((s) => s.t >= tr && s.t < tr + 250), after = shifts.filter((s) => s.t >= tr + 250);
-    out[mode] = { learnCardPx: hLoad.card, learnCardOwnPx: hLoad.cardOwn, slotLoadingPx: hLoad.slot, slotReadyPx: hReady, cls: sum(shifts), loading: sum(loading), swap: sum(swap), after: sum(after), count: shifts.length, tReady: r.tReady, errors,
+    out[mode] = { cornerOverlapPx2: overlap.px2, cornerOverlapText: overlap.text, learnCardPx: hLoad.card, learnCardOwnPx: hLoad.cardOwn, slotLoadingPx: hLoad.slot, slotReadyPx: hReady, cls: sum(shifts), loading: sum(loading), swap: sum(swap), after: sum(after), count: shifts.length, tReady: r.tReady, errors,
       shifts: shifts.map((s) => ({ v: Math.round(s.v * 1000) / 1000, t: s.t, src: s.src.slice(0, 4), rects: s.rects.slice(0, 4) })) };
-    console.log(`${mode.padEnd(14)} cls ${sum(shifts)} = loading ${sum(loading)} + READY swap ${sum(swap)} + after ${sum(after)} (${shifts.length} shifts, ready at ${r.tReady} ms; learn card ${hLoad.card} px (own ${hLoad.cardOwn}), slot ${hLoad.slot} -> ${hReady} px)${errors.length ? `  errors: ${errors[0]}` : ''}`);
+    console.log(`${mode.padEnd(14)} cls ${sum(shifts)} = loading ${sum(loading)} + READY swap ${sum(swap)} + after ${sum(after)} (${shifts.length} shifts, ready at ${r.tReady} ms; learn card ${hLoad.card} px (own ${hLoad.cardOwn}), slot ${hLoad.slot} -> ${hReady} px; MOTION chip over the words ${overlap.px2} px²${overlap.text ? ` ("${overlap.text}")` : ''})${errors.length ? `  errors: ${errors[0]}` : ''}`);
     for (const s of shifts.filter((x) => x.v >= 0.001)) console.log(`   ${s.t}ms  ${s.v.toFixed(3)}  ${s.src[0] ?? ''}  ${s.rects[0] ?? ''}`);
     await ctx.close();
   }
