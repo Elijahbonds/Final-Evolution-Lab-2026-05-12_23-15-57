@@ -28,6 +28,9 @@ describe('booking: the doors, the rule first, and fewer taps', () => {
     const m = src('components/group-booking/my-group-sessions.tsx');
     expect(m).toContain("if (compact && !seats.some((x) => x.status === 'booked') && !ones.some((x) => x.status === 'booked')) return null;");
     expect(m.indexOf('{compact && mine.cancelLine ?')).toBeLessThan(m.indexOf('<ul className={L.rows}>'));
+    // the next two only (a package is eight seats: the walk's Train showed all eight), the heading opens the rest
+    expect(m).toContain("const seatsShown = compact ? seats.filter((x) => x.status === 'booked').slice(0, 2) : seats;");
+    expect(m).toContain('data-my-sessions-all');
   });
   it('a 1:1 with one way to book open (in person while the coach store is off) has it picked already', () => {
     const b = src('components/group-booking/one-on-one-booker.tsx');

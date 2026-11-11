@@ -50,7 +50,7 @@ export function QuickAdjust({ tree, done, onTree }: { tree: ProgramTree; done: r
           <li key={e.id} className="rounded-xl bg-white/[0.04]">
             <button type="button" className={row} aria-expanded={open === e.id} onClick={() => setOpen(open === e.id ? null : e.id)} data-quick-exercise={e.name}>
               <span className="min-w-0 text-white">{e.name}</span>
-              <span className={`shrink-0 ${TYPE.small} text-fel-soft`}>{doseLine(e)}{e.effortBand ? ` · ${effortBand(e.effortBand)?.label ?? ''}` : ''}</span>
+              <span className={`shrink-0 ${TYPE.small} text-fel-soft`}>{doseLine(e)}</span>
             </button>
             {open === e.id && (
               <div className="flex flex-wrap gap-1.5 px-3 pb-3" role="radiogroup" aria-label={`Effort for ${e.name}`}>

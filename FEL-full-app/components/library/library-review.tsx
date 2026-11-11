@@ -52,27 +52,27 @@ export function LibraryReview() {
     <main className="mx-auto max-w-[960px] space-y-4 px-4 py-6" data-testid="library-review">
       <header className="space-y-1">
         <h1 className="fel-heading text-xl text-white">Exercise library review</h1>
-        <p className="text-xs text-white/50">Drafts are seed facts in FEL&apos;s words and FEL-authored entries. Nothing reaches a coach by default, or any athlete, until it is approved here.</p>
+        <p className="text-base text-white/50">Drafts are seed facts in FEL&apos;s words and FEL-authored entries. Nothing reaches a coach by default, or any athlete, until it is approved here.</p>
         {!data.ready && <p className="rounded-lg border border-[#FFD700]/30 bg-[#FFD700]/[0.06] px-3 py-2 text-xs text-[#FFD700]/90">{NOT_READY}</p>}
       </header>
 
       <section className="space-y-2">
         <h2 className="text-[12px] uppercase tracking-wider text-white/50">Batches</h2>
         <div className="flex flex-wrap gap-1.5">
-          <button onClick={() => { setBatch(null); setOffset(0); }} className={`rounded-lg border px-2 py-1 text-[12px] ${!batch ? 'border-[#00E5FF]/40 text-[#00E5FF]' : 'border-white/10 text-white/60'}`}>All</button>
+          <button onClick={() => { setBatch(null); setOffset(0); }} className={`min-h-11 rounded-lg border px-2 py-1 text-[12px] ${!batch ? 'border-[#00E5FF]/40 text-[#00E5FF]' : 'border-white/10 text-white/60'}`}>All</button>
           {data.batches.map((b) => (
-            <button key={b.batch} onClick={() => { setBatch(b.batch); setOffset(0); }} className={`rounded-lg border px-2 py-1 text-[12px] ${batch === b.batch ? 'border-[#00E5FF]/40 text-[#00E5FF]' : 'border-white/10 text-white/60'}`}>
+            <button key={b.batch} onClick={() => { setBatch(b.batch); setOffset(0); }} className={`min-h-11 rounded-lg border px-2 py-1 text-[12px] ${batch === b.batch ? 'border-[#00E5FF]/40 text-[#00E5FF]' : 'border-white/10 text-white/60'}`}>
               {b.batch} <span className="text-white/50">{b.draft}/{b.total}</span>
             </button>
           ))}
         </div>
         <div className="flex flex-wrap items-center gap-2 text-[12px]">
           {(['draft', 'approved', 'rejected', 'all'] as const).map((s) => (
-            <button key={s} onClick={() => { setStatus(s); setOffset(0); }} className={`rounded-md px-2 py-0.5 ${status === s ? 'bg-white/10 text-white' : 'text-white/50'}`}>{s}</button>
+            <button key={s} onClick={() => { setStatus(s); setOffset(0); }} className={`min-h-11 rounded-md px-2 py-0.5 ${status === s ? 'bg-white/10 text-white' : 'text-white/50'}`}>{s}</button>
           ))}
           {current && current.draft > 0 && (
             <button disabled={busy} onClick={() => { if (confirm(`Approve all ${current.draft} drafts in ${current.batch}?`)) void act({ action: 'approve-batch', batch: current.batch }, `${current.batch} approved`); }}
-              className="ml-auto inline-flex items-center gap-1 rounded-lg border border-[#7BD389]/40 px-2.5 py-1 text-[#7BD389] disabled:opacity-40" data-testid="approve-batch">
+              className="ml-auto inline-flex min-h-11 items-center gap-1 rounded-lg border border-[#7BD389]/40 px-2.5 py-1 text-[#7BD389] disabled:opacity-40" data-testid="approve-batch">
               <Check className="h-3.5 w-3.5" /> Approve batch ({current.draft})
             </button>
           )}
@@ -91,9 +91,9 @@ export function LibraryReview() {
                 <div className="text-[12px] text-white/50">{e.setup}</div>
               </div>
               <div className="flex shrink-0 gap-1">
-                <button disabled={busy} onClick={() => void act({ action: 'approve', ids: [e.id] }, `${e.name} approved`)} aria-label={`Approve ${e.name}`} className="rounded-lg p-1.5 text-[#7BD389]/80 hover:text-[#7BD389]"><Check className="h-4 w-4" /></button>
-                <button disabled={busy} onClick={() => setEditing(e)} aria-label={`Edit ${e.name}`} className="rounded-lg p-1.5 text-white/50 hover:text-white"><Pencil className="h-4 w-4" /></button>
-                <button disabled={busy} onClick={() => void act({ action: 'reject', ids: [e.id] }, `${e.name} rejected`)} aria-label={`Reject ${e.name}`} className="rounded-lg p-1.5 text-white/50 hover:text-[#FF3366]"><X className="h-4 w-4" /></button>
+                <button disabled={busy} onClick={() => void act({ action: 'approve', ids: [e.id] }, `${e.name} approved`)} aria-label={`Approve ${e.name}`} className="grid h-11 w-11 place-items-center rounded-lg text-[#7BD389]/80 hover:text-[#7BD389]"><Check className="h-4 w-4" /></button>
+                <button disabled={busy} onClick={() => setEditing(e)} aria-label={`Edit ${e.name}`} className="grid h-11 w-11 place-items-center rounded-lg text-white/50 hover:text-white"><Pencil className="h-4 w-4" /></button>
+                <button disabled={busy} onClick={() => void act({ action: 'reject', ids: [e.id] }, `${e.name} rejected`)} aria-label={`Reject ${e.name}`} className="grid h-11 w-11 place-items-center rounded-lg text-white/50 hover:text-[#FF3366]"><X className="h-4 w-4" /></button>
               </div>
             </div>
             <ul className="list-disc pl-4 text-[12px] text-white/65">{e.cues.map((c) => <li key={c}>{c}</li>)}</ul>
@@ -101,8 +101,8 @@ export function LibraryReview() {
           </div>
         ))}
         <div className="flex justify-between text-xs">
-          <button disabled={offset === 0} onClick={() => setOffset((o) => Math.max(0, o - 50))} className="text-white/60 disabled:opacity-30">Previous</button>
-          <button disabled={offset + 50 >= data.total} onClick={() => setOffset((o) => o + 50)} className="text-white/60 disabled:opacity-30">Next</button>
+          <button disabled={offset === 0} onClick={() => setOffset((o) => Math.max(0, o - 50))} className="min-h-11 text-white/60 disabled:opacity-30">Previous</button>
+          <button disabled={offset + 50 >= data.total} onClick={() => setOffset((o) => o + 50)} className="min-h-11 text-white/60 disabled:opacity-30">Next</button>
         </div>
       </section>
 

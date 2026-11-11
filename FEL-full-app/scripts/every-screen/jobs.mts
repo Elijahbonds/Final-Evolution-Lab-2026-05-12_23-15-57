@@ -188,7 +188,7 @@ export async function runJobs(): Promise<void> {
   try {
     if (!lit) console.log(await seedCoaching(ppl).catch((e) => `coached pair: failed (${String(e).slice(0, 160)})`));
     const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_EXE ?? chromiumExe(), headless: true, args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
-    const walks: Walk[] = existsSync(join(dir, 'walks.json')) && only ? JSON.parse(readFileSync(join(dir, 'walks.json'), 'utf8')) : [];
+    const walks: Walk[] = existsSync(join(dir, 'walks.json')) && (only || lit) ? JSON.parse(readFileSync(join(dir, 'walks.json'), 'utf8')) : [];
     for (const job of JOBS) {
       if (only && !only.includes(job.id)) continue;
       if (!!job.lit !== lit) continue;

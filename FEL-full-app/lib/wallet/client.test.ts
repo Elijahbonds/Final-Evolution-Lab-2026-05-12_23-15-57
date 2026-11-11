@@ -41,19 +41,20 @@ describe('wallet client — the grant a report was paid', () => {
     const replay = { ...earned({ coins: 100 }), replayed: true };
     vi.stubGlobal('fetch', respond(200, replay));
     expect(await reportEarnGrant({ idempotency_key: 'daily_first_session:2026-09-28:u1', event_type: 'daily_first_session', payload: { day: '2026-09-28' } })).toEqual({ coins: 0, shards: 0, capped: false });
-    expect(seen).toEqual([{ granted: { coins: 0, shards: 0 }, balances, capped: false }]);
+    expect(seen).toEqual([{ granted: { coins: 0, shards: 0 }, balances, capped: false, event: 'daily_first_session' }]);
     vi.stubGlobal('fetch', respond(200, replay));
     expect(await reportEarn({ idempotency_key: 'daily_first_session:2026-09-28:u1', event_type: 'daily_first_session', payload: {} })).toBe(true);   // the chip marks the day done
     // PM note (QA acceptance #5): the server now answers an already-claimed daily with granted 0 — nothing to show either way
     seen.length = 0;
     vi.stubGlobal('fetch', respond(200, { ...earned({ coins: 0 }), replayed: true, already_claimed: true }));
     expect(await reportEarnGrant({ idempotency_key: 'daily_first_session:2026-09-28:u1', event_type: 'daily_first_session', payload: {} })).toEqual({ coins: 0, shards: 0, capped: false });
-    expect(seen).toEqual([{ granted: { coins: 0, shards: 0 }, balances, capped: false }]);
+    expect(seen).toEqual([{ granted: { coins: 0, shards: 0 }, balances, capped: false, event: 'daily_first_session' }]);
     // the first, real grant still shows
     seen.length = 0;
     vi.stubGlobal('fetch', respond(200, { ...earned({ coins: 100 }), replayed: false }));
     expect(await reportEarnGrant({ idempotency_key: 'daily_first_session:2026-09-29:u1', event_type: 'daily_first_session', payload: {} })).toEqual({ coins: 100, shards: 0, capped: false });
-    expect(seen).toEqual([{ granted: { coins: 100, shards: 0 }, balances, capped: false }]);
+    // EVERY-SCREEN P5: the event also names the report's event_type (a HUD shows the daily bonus by the chip, not a toast)
+    expect(seen).toEqual([{ granted: { coins: 100, shards: 0 }, balances, capped: false, event: 'daily_first_session' }]);
   });
 
   it('a cap is not a refusal: it says so, with the coins the cap left (MODE_SESSION_COMPLETED is 2 a minute)', async () => {

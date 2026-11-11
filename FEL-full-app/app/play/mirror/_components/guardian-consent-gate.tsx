@@ -57,8 +57,10 @@ const REQUEST_ERROR_COPY: Record<string, string> = {
 };
 
 function GateShell({ children }: { children: ReactNode }) {
+  // EVERY-SCREEN P5: top-aligned, so the card grows downward when "Checking in…" becomes the form (centred, its top
+  // moved up: the rig measured a layout shift of 0.154 on /play/mirror)
   return (
-    <div className="flex min-h-[60vh] items-center justify-center p-6">
+    <div className="flex min-h-[60vh] items-start justify-center p-6 pt-10">
       <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/[0.04] p-5">{children}</div>
     </div>
   );
