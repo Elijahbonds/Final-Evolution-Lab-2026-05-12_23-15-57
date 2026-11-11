@@ -15,6 +15,8 @@
 // The camera picture is shown ONLY through SelfView and never leaves the phone; the colour copy the ball detector reads
 // (frame-grab.ts) is never shown or sent; the only thing ever sent is a finished session's numbers (serverKeep above).
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lineSize } from '@/lib/design/type';
+import { Fold } from '@/components/every-screen/fold';
 import Link from 'next/link';
 import { Check, CheckCircle2, Crosshair, Loader2, RotateCcw, Square, Trash2, X, XCircle } from 'lucide-react';
 import { Layer } from '@/components/session-player/layer';
@@ -213,14 +215,13 @@ export function ShotSession({ tier, grab, startMode = 'shots', serverKeep = fals
             Use the front camera (the screen faces you)
           </label>
           {/* PLAT-P09: the set-up guide folds away (fewer words before the camera; one tap to read it) */}
-          <details className="text-xs text-white/60" data-hoops-guide-box>
-            <summary className="min-h-10 cursor-pointer py-2 text-sm font-semibold text-white/80">How to set the phone up</summary>
-            <ul className="list-disc space-y-0.5 pl-4" data-hoops-guide>
-              {(mode === 'shots' ? SHOT_GUIDE : DRIBBLE_GUIDE).map((l) => <li key={l}>{l}</li>)}
+          <Fold summary="How to set the phone up" className="text-white/60" testId="hoops-guide">
+            <ul className="list-disc space-y-1 pl-4" data-hoops-guide>
+              {(mode === 'shots' ? SHOT_GUIDE : DRIBBLE_GUIDE).map((l) => <li key={l} className={lineSize(l)}>{l}</li>)}
             </ul>
-          </details>
-          <p className="text-xs text-[#FFB020]/90" data-hoops-beta>{BETA_LINE}</p>
-          <p className="text-xs text-white/60">{PRIVACY_LINE}</p>
+          </Fold>
+          <p className={`${lineSize(BETA_LINE)} text-[#FFB020]/90`} data-hoops-beta>{BETA_LINE}</p>
+          <p className={`${lineSize(PRIVACY_LINE)} text-white/60`}>{PRIVACY_LINE}</p>
         </div>
       )}
 

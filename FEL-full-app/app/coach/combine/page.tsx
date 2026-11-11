@@ -25,11 +25,11 @@ export default async function CombineDayPage() {
   const dobYear = await readDobYear(prisma, userId, 'combine_page');
   return (
     <main className="mx-auto min-h-screen max-w-2xl bg-fel-bg px-4 py-6 pb-24">
-      <Link href="/coach" className="text-[13px] text-white/50 hover:text-white">← Coach</Link>
+      <Link href="/coach" className="inline-flex min-h-11 items-center text-[14px] text-white/50 hover:text-white">← Coach</Link>
       <header className="mb-5 mt-2 space-y-1">
         <p className="font-mono text-[12px] font-bold uppercase tracking-[0.18em] text-fel-cyan">Combine day</p>
         <h1 className="text-3xl font-black text-white">Tryouts and testing days</h1>
-        <p className="text-[14px] text-white/55">Jump, agility, sprint and a skill drill, station by station on this device, then a ranked report.</p>
+        <p className="text-base text-white/55">Jump, agility, sprint and a skill drill, station by station on this device, then a ranked report.</p>
       </header>
       <CombineApp dobYear={dobYear} />
     </main>

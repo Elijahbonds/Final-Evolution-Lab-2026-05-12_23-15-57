@@ -9,6 +9,7 @@
 //     /train/velocity reads it ("Your coach's target …") and the live cue uses the stop line.
 // Every number is an estimate from a phone camera; the line says so.
 import { useCallback, useEffect, useState } from 'react';
+import { TYPE } from '@/lib/design/type';
 import { DarkInstead } from '@/components/every-screen/dark-instead';
 import { ZONES, ZONE_IDS, zoneOf, type ZoneId } from '@/lib/vbt/lifts';
 import { LOSS_STOP_PCT } from '@/lib/vbt/thresholds';
@@ -64,7 +65,7 @@ export function CoachVelocity({ api = COACH_VBT_API }: { api?: string }) {
 
   if (!board) return <p className="text-sm text-white/50">Loading…</p>;
   // EVERY-SCREEN P1: the notice, then a way on (it was the notice alone: only the tab bar led anywhere)
-  if (!board.available) return <div data-vbt-coach-unavailable><div className="fel-card rounded-xl p-4 text-sm text-white/70">Bar speed for coaches opens when its tables are applied. Your athletes can already track sets on their phones.</div><DarkInstead links={[{ href: '/coach', label: 'Back to Coach' }, { href: '/train/velocity', label: 'Track a set yourself' }]} /></div>;
+  if (!board.available) return <div data-vbt-coach-unavailable><div className={`fel-card rounded-xl p-4 ${TYPE.body} text-white/70`}>Bar speed for coaches opens when its tables are applied. Your athletes can already track sets on their phones.</div><DarkInstead links={[{ href: '/coach', label: 'Back to Coach' }, { href: '/train/velocity', label: 'Track a set yourself' }]} /></div>;
 
   return (
     <div className="space-y-4" data-vbt-coach>

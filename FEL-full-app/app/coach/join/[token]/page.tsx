@@ -70,7 +70,7 @@ export default async function JoinPage({ params }: { params: { token: string } }
       <h1 className="fel-heading mt-3 text-3xl font-bold text-white">
         {invite.coachName} <span className="text-white/50">wants to coach you</span>
       </h1>
-      <p className="mt-4 max-w-sm text-sm leading-relaxed text-white/60">
+      <p className="mt-4 max-w-sm text-base leading-relaxed text-white/60">
         Accept and {invite.coachName} can build your programming, watch your movement screens and send you work.
         You can leave at any time.
       </p>
@@ -96,7 +96,7 @@ export default async function JoinPage({ params }: { params: { token: string } }
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-fel-bg px-6 text-center">
-      <Link href="/" className="fel-heading mb-10 text-lg font-bold text-white">
+      <Link href="/" className="fel-heading mb-10 inline-flex min-h-11 items-center text-lg font-bold text-white">
         FINAL <span className="text-fel-cyan">EVOLUTION</span> LAB
       </Link>
       {children}

@@ -43,7 +43,7 @@ export function BookButton({ price, balance, isBooked, busy, color, textColor, o
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : isBooked ? <><Check className="h-4 w-4" /> Booked</> : short > 0 ? <>Need {short} more shard{short === 1 ? '' : 's'}</> : <><Sparkles className="h-4 w-4" /> Book · {price} shards</>}
       </button>
       {!isBooked && short > 0 && (
-        <a href="/wallet" className="mt-1.5 block text-center text-[12px] text-cyan-300 underline">How to earn shards</a>
+        <a href="/wallet" className="mt-1 flex min-h-11 items-center justify-center text-[12px] text-cyan-300 underline">How to earn shards</a>
       )}
     </>
   );

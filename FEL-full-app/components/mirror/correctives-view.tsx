@@ -46,7 +46,7 @@ export function CorrectivesView({ youth, program, hold = null }: CorrectivesView
         <Link
           href="/play/mirror"
           aria-label="Back to the Mirror"
-          className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.03]
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.03]
                      text-white/55 transition-colors hover:border-white/25 hover:text-white"
         >
           <ArrowLeft className="h-[18px] w-[18px]" />
@@ -57,17 +57,17 @@ export function CorrectivesView({ youth, program, hold = null }: CorrectivesView
         </div>
       </header>
 
-      <p className="text-[13.5px] leading-relaxed text-white/60">
+      <p className="text-[16px] leading-relaxed text-white/60">
         Written work for what the Mirror reads: a band drill for each drift, a release to run first, and a program that
         builds across your sets. Every number behind them is estimated.
       </p>
 
       {youth !== null ? (
-        <p data-correctives-off className="mt-5 rounded-2xl border border-white/8 bg-white/[0.02] p-5 text-[13.5px] leading-relaxed text-white/65">
+        <p data-correctives-off className="mt-5 rounded-2xl border border-white/8 bg-white/[0.02] p-5 text-[16px] leading-relaxed text-white/65">
           {CORRECTIVES_YOUTH_OFF[youth]}
         </p>
       ) : hold ? (
-        <p data-correctives-hold className="mt-5 rounded-2xl border border-white/8 bg-white/[0.02] p-5 text-[13.5px] leading-relaxed text-white/65">
+        <p data-correctives-hold className="mt-5 rounded-2xl border border-white/8 bg-white/[0.02] p-5 text-[16px] leading-relaxed text-white/65">
           {hold}{' '}
           <Link href="/play/mirror" className="font-semibold text-[#00E5FF] hover:underline">Open the Mirror</Link>
         </p>
@@ -95,7 +95,7 @@ export function CorrectivesView({ youth, program, hold = null }: CorrectivesView
                 const b = breathFor(sig, 4);
                 return (
                   <li key={sig} data-band={sig} className="rounded-xl border border-[#00E5FF]/20 bg-black/20 px-4 py-3 text-[12.5px] leading-relaxed">
-                    <p className="text-[13.5px] font-semibold text-white/85">{d.title}</p>
+                    <p className="text-[14px] font-semibold text-white/85">{d.title}</p>
                     <p className="mt-0.5 text-white/50">For a set where the camera read {MIRROR_SIGNAL_READ[sig]}.</p>
                     <p className="mt-1 text-white/65">{d.setup}</p>
                     <p className="mt-0.5 text-white/60">The band: {sentence(d.rnt.feed)} {sentence(d.rnt.direction)} {sentence(d.rnt.load)}</p>
@@ -116,7 +116,7 @@ export function CorrectivesView({ youth, program, hold = null }: CorrectivesView
                 const r = releaseProtocol(z)!;
                 return (
                   <li key={z} data-release-zone={z} className="rounded-xl border border-white/8 bg-black/20 px-4 py-3 text-[12.5px] leading-relaxed">
-                    <p className="text-[13.5px] font-semibold text-white/85">{r.tissue} · {r.holdSec}s per side, {r.reps} slow passes</p>
+                    <p className="text-[14px] font-semibold text-white/85">{r.tissue} · {r.holdSec}s per side, {r.reps} slow passes</p>
                     <p className="mt-0.5 text-white/60">{sentence(r.tool)} {sentence(r.pin)}</p>
                     <p className="mt-0.5 text-white/60">{sentence(r.stretch)}</p>
                     <p className="mt-0.5 text-white/55">Breath: {sentence(r.breath)}</p>
@@ -138,7 +138,7 @@ export function CorrectivesView({ youth, program, hold = null }: CorrectivesView
               <p data-program-note className="mt-3 text-[13px] leading-relaxed text-white/65">{program.note}</p>
             ) : program.cycle ? (
               <>
-                <p className="mt-3 text-[13.5px] font-semibold text-white/80">{program.cycle.program.headline}</p>
+                <p className="mt-3 text-[14px] font-semibold text-white/80">{program.cycle.program.headline}</p>
                 {program.cycle.program.blocks.length > 0 && (
                   <ol className="mt-2 grid gap-2">
                     {program.cycle.program.blocks.map((b) => (

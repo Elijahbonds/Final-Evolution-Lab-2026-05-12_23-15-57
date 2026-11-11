@@ -15,6 +15,8 @@
 //   OR: a slow-motion video, read on this phone through the jump check's decoder (lib/jump/slowmoDecode.ts).
 // The video never leaves the device. Every number on screen is labelled an estimate.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { TYPE, lineSize } from '@/lib/design/type';
+import { Fold } from '@/components/every-screen/fold';
 import Link from 'next/link';
 import { Camera, CheckCircle2, Film, Loader2, Square } from 'lucide-react';
 import { poseService } from '@/lib/pose/PoseService';
@@ -253,12 +255,12 @@ export function VelocitySession({ api = VBT_API, grab, decoder }: { api?: string
             </label>
           </div>
           {features?.readiness && lift.loaded && (
-            <label className="flex items-center gap-2 text-sm text-white/75">
+            <label className="flex min-h-11 items-center gap-2 text-sm text-white/75">
               <input type="checkbox" checked={warmup} onChange={(e) => setWarmup(e.target.checked)} data-vbt-warmup className="h-5 w-5" />
               Warm-up readiness read (same lift, a load you use often)
             </label>
           )}
-          <p className="text-xs text-white/55" data-vbt-stopline>
+          <p className={`${TYPE.body} text-white/55`} data-vbt-stopline>
             {target ? `Your coach's target: ${ZONES[target.zone].name}. End the set when the bar is ${stopPct}% slower than your best rep.` : `End the set when the bar is ${stopPct}% slower than your best rep.`}
           </p>
           {/* TOOLS-EASY (2026-10-28): where the phone goes, as a picture and one line; the rest of the tips one tap away */}
@@ -266,14 +268,13 @@ export function VelocitySession({ api = VBT_API, grab, decoder }: { api?: string
             <SideSetup className="h-14 w-auto shrink-0" />
             <p className="text-sm text-white/80">{setupLines(lift.family)[0]}</p>
           </div>
-          <details className="text-xs text-white/60" data-vbt-guide>
-            <summary className="flex min-h-11 cursor-pointer items-center font-bold text-white/80">{TIPS_LABEL}</summary>
-            <ul className="list-disc space-y-0.5 pl-4">
-              {setupLines(lift.family).slice(1).map((l) => <li key={l}>{l}</li>)}
-              <li>The camera asks for 60 frames a second where your phone can hold it.</li>
+          <Fold summary={TIPS_LABEL} className="text-white/60" testId="vbt-guide">
+            <ul className="list-disc space-y-1 pl-4" data-vbt-guide>
+              {setupLines(lift.family).slice(1).map((l) => <li key={l} className={lineSize(l)}>{l}</li>)}
+              <li className={TYPE.small}>The camera asks for 60 frames a second where your phone can hold it.</li>
             </ul>
-          </details>
-          <p className="text-[12px] text-fel-dim">{PRIVACY_LINE}</p>
+          </Fold>
+          <p className={`${lineSize(PRIVACY_LINE)} text-fel-dim`}>{PRIVACY_LINE}</p>
         </div>
       )}
 
@@ -323,14 +324,14 @@ export function VelocitySession({ api = VBT_API, grab, decoder }: { api?: string
               {phase === 'reading' ? 'Reading the video…' : START_CAMERA}
             </button>
             {phase === 'setup' && (
-              <details className="fel-card space-y-2 rounded-xl p-3" data-vbt-slowmo>
-                <summary className="flex min-h-11 cursor-pointer items-center text-sm font-bold text-white/80">{SLOWMO_LABEL}</summary>
-                <p className="text-xs text-white/60">{SLOWMO_LINE}</p>
-                <div className="flex items-center gap-2 text-xs text-white/60">
+              <Fold summary={SLOWMO_LABEL} className="fel-card rounded-xl p-3" testId="vbt-slowmo">
+                <div className="space-y-2" data-vbt-slowmo>
+                <p className={`${lineSize(SLOWMO_LINE)} text-white/60`}>{SLOWMO_LINE}</p>
+                <div className="flex flex-wrap items-center gap-2 text-sm text-white/60">
                   Filmed at
                   {[30, 60, 120, 240].map((f) => (
                     <button key={f} type="button" onClick={() => setFilmedAt(f)} aria-pressed={filmedAt === f} data-vbt-filmed={f}
-                      className={`min-h-8 rounded-md border px-2 ${filmedAt === f ? 'border-[#00E5FF] text-[#00E5FF]' : 'border-white/15'}`}>{f}</button>
+                      className={`min-h-11 min-w-11 rounded-md border px-2 ${filmedAt === f ? 'border-[#00E5FF] text-[#00E5FF]' : 'border-white/15'}`}>{f}</button>
                   ))}
                   fps
                 </div>
@@ -338,7 +339,8 @@ export function VelocitySession({ api = VBT_API, grab, decoder }: { api?: string
                   <Film className="h-4 w-4" /> Pick a slow-mo video
                   <input type="file" accept="video/*" className="sr-only" data-vbt-file onChange={(e) => { const f = e.target.files?.[0]; if (f) void importClip(f); e.target.value = ''; }} />
                 </label>
-              </details>
+                </div>
+              </Fold>
             )}
           </div>
         )

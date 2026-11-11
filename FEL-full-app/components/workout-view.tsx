@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { lineSize } from '@/lib/design/type';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
@@ -174,8 +175,8 @@ export function WorkoutView({ initialData = null }: { initialData?: PageData | n
         <Activity className="h-6 w-6 text-[#00E5FF]" />
         <h1 className="text-2xl font-bold text-white">Training plans</h1>
       </div>
-      <p className="text-white/60 text-sm mb-2">{WORKOUT_INTRO}</p>
-      <p className="text-white/50 text-xs mb-5">{WAVE_LINE}</p>
+      <p className={`text-white/60 ${lineSize(WORKOUT_INTRO)} mb-2`}>{WORKOUT_INTRO}</p>
+      <p className={`text-white/50 ${lineSize(WAVE_LINE, 'text-xs')} mb-5`}>{WAVE_LINE}</p>
 
       {/* MIRROR-COACH P8: the relaunch. The answers pick a FEL template; the server picks again with the account's age. */}
       <section aria-label="Pick your plan" className="rounded-xl border border-white/10 bg-white/[0.03] p-4 mb-4 space-y-3">
@@ -185,14 +186,14 @@ export function WorkoutView({ initialData = null }: { initialData?: PageData | n
             {offer?.ageHref && <Link href={offer.ageHref} className="text-[#00E5FF] underline-offset-2 hover:underline">Open your health answers</Link>}
           </p>
         )}
-        {offer && !ageNeeded && youth && <p className="text-xs text-[#FFD700]/90">{WORKOUT_YOUTH_LINE}</p>}
-        {offer && !ageNeeded && !youth && <p className="text-xs text-white/50">{WORKOUT_JUMP_LINE}</p>}
+        {offer && !ageNeeded && youth && <p className={`${lineSize(WORKOUT_YOUTH_LINE, 'text-xs')} text-[#FFD700]/90`}>{WORKOUT_YOUTH_LINE}</p>}
+        {offer && !ageNeeded && !youth && <p className={`${lineSize(WORKOUT_JUMP_LINE, 'text-xs')} text-white/50`}>{WORKOUT_JUMP_LINE}</p>}
         {!ageNeeded && <>
         <fieldset className="flex flex-wrap items-center gap-2">
           <legend className="mb-1 text-xs font-semibold text-white/70">Days a week you train</legend>
           {dayChoices.map((d) => (
             <button key={d} type="button" aria-pressed={days === d} onClick={() => setAnswers((a) => ({ ...a, daysPerWeek: d as WorkoutAnswers['daysPerWeek'] }))}
-              className={`rounded-lg border px-3 py-1.5 text-sm ${days === d ? 'border-[#00E5FF] text-[#00E5FF]' : 'border-white/15 text-white/70'}`}>{d} days</button>
+              className={`min-h-11 rounded-lg border px-3 py-1.5 text-sm ${days === d ? 'border-[#00E5FF] text-[#00E5FF]' : 'border-white/15 text-white/70'}`}>{d} days</button>
           ))}
         </fieldset>
         {!youth && (
@@ -200,7 +201,7 @@ export function WorkoutView({ initialData = null }: { initialData?: PageData | n
             <legend className="mb-1 text-xs font-semibold text-white/70">Equipment</legend>
             {(['bodyweight', 'gym'] as const).map((e) => (
               <button key={e} type="button" aria-pressed={answers.equipment === e} onClick={() => setAnswers((a) => ({ ...a, equipment: e }))}
-                className={`rounded-lg border px-3 py-1.5 text-sm ${answers.equipment === e ? 'border-[#00E5FF] text-[#00E5FF]' : 'border-white/15 text-white/70'}`}>{e === 'gym' ? 'Full gym' : 'Bodyweight (home)'}</button>
+                className={`min-h-11 rounded-lg border px-3 py-1.5 text-sm ${answers.equipment === e ? 'border-[#00E5FF] text-[#00E5FF]' : 'border-white/15 text-white/70'}`}>{e === 'gym' ? 'Full gym' : 'Bodyweight (home)'}</button>
             ))}
           </fieldset>
         )}
@@ -208,7 +209,7 @@ export function WorkoutView({ initialData = null }: { initialData?: PageData | n
         {preview && (
           <div className="rounded-lg border border-white/10 p-3" data-template={preview.id}>
             <p className="text-sm font-semibold text-white">Your template: {preview.name}</p>
-            <p className="text-xs text-white/60">{preview.summary}</p>
+            <p className={`${lineSize(preview.summary, 'text-xs')} text-white/60`}>{preview.summary}</p>
             <p className="mt-1 text-[12px] text-white/50">{templateShapeLine(preview)} · You need: {preview.equipmentLine}</p>
             {preview.dailyTargetMinutes ? <p className="mt-1 text-[12px] text-white/50">{dailyTargetLine(preview.dailyTargetMinutes)}</p> : null}
           </div>
@@ -229,7 +230,7 @@ export function WorkoutView({ initialData = null }: { initialData?: PageData | n
                     ? <p className="text-[12px] text-[#00FF9D] flex items-center gap-1"><Gift className="h-3 w-3" />{WORKOUT_FREE_LINE}</p>
                     : <p className="text-[12px] text-white/70">{p.price} shards</p>}
                 <button type="button" onClick={() => void buy(p)} disabled={busy !== null}
-                  className="mt-1 rounded-lg bg-[#00E5FF] py-2 text-sm font-semibold text-black disabled:opacity-50">
+                  className="mt-1 min-h-11 rounded-lg bg-[#00E5FF] py-2 text-sm font-semibold text-black disabled:opacity-50">
                   {busy === p.tier ? 'Working…' : p.unfinished ? `Get your ${p.name}` : p.free ? `Get the ${p.name} free` : `Buy for ${p.price} shards`}
                 </button>
               </div>

@@ -12,6 +12,7 @@
 //      athlete gets a suggestion and nothing is changed.
 // The page (app/train/readiness/page.tsx) only mounts this for a verified adult; the server refuses everyone else anyway.
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { lineSize } from '@/lib/design/type';
 import Link from 'next/link';
 import { Camera, CheckCircle2, Loader2, Square } from 'lucide-react';
 import { poseService } from '@/lib/pose/PoseService';
@@ -151,11 +152,11 @@ export function ReadinessCheck({ api = READINESS_API }: { api?: string }) {
       <div className={`fel-card space-y-2 rounded-xl p-4 ${phase === 'live' || phase === 'starting' || phase === 'result' ? 'hidden' : ''}`}>
         <div className="text-[12px] uppercase tracking-wider text-fel-dim">Daily readiness · 30 seconds</div>
         {/* TOOLS-EASY: where the phone goes, as a picture, and one short line (was HOW_LINE, 25 words) */}
-        <div className="flex items-center gap-3" data-readiness-how><SetupPicture className="h-14 w-auto shrink-0" /><p className="text-sm text-white/75">{READINESS_HOW}</p></div>
-        <p className="text-xs text-fel-dim">{NOT_A_DIAGNOSIS}</p>
+        <div className="flex items-center gap-3" data-readiness-how><SetupPicture className="h-14 w-auto shrink-0" /><p className={`${lineSize(READINESS_HOW)} text-white/75`}>{READINESS_HOW}</p></div>
+        <p className={`${lineSize(NOT_A_DIAGNOSIS, 'text-xs')} text-fel-dim`}>{NOT_A_DIAGNOSIS}</p>
         {ctx && ctx.coaches.length > 0 && (
-          <ul className="space-y-0.5 text-xs text-white/55" data-readiness-rules>
-            {ctx.coaches.map((c) => <li key={c.coachId}>{c.ruleLine}</li>)}
+          <ul className="space-y-0.5 text-white/55" data-readiness-rules>
+            {ctx.coaches.map((c) => <li key={c.coachId} className={lineSize(c.ruleLine, 'text-xs')}>{c.ruleLine}</li>)}
           </ul>
         )}
       </div>
@@ -163,7 +164,7 @@ export function ReadinessCheck({ api = READINESS_API }: { api?: string }) {
       {doneToday && ctx?.today && (
         <div className="fel-card space-y-2 rounded-xl p-4" data-readiness-today>
           <span className={`inline-block rounded-lg border px-2.5 py-1 text-sm font-bold ${BAND_STYLE[ctx.today.band]}`}>{BAND_LABEL[ctx.today.band]}</span>
-          <p className="text-sm text-white/75">{ONE_A_DAY_LINE}</p>
+          <p className={`${lineSize(ONE_A_DAY_LINE)} text-white/75`}>{ONE_A_DAY_LINE}</p>
         </div>
       )}
 

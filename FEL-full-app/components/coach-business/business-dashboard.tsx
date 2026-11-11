@@ -118,7 +118,7 @@ function CoachTermsTick({ d, agreed, onChange }: { d: Dashboard; agreed: boolean
   const t = d.coachTerms;
   return (
     <label className="mt-3 flex items-start gap-2 text-sm text-white/80" data-coach-terms>
-      <input type="checkbox" className="mt-1" checked={agreed} onChange={(e) => onChange(e.target.checked)} />
+      <input type="checkbox" className="mt-0.5 h-5 w-5 shrink-0" checked={agreed} onChange={(e) => onChange(e.target.checked)} />
       <span>
         I agree to the{' '}
         {t?.href ? <a className="font-bold text-cyan-300 underline" href={t.href} target="_blank" rel="noopener noreferrer">coach terms and payout terms</a> : 'coach terms and payout terms'}
@@ -147,7 +147,7 @@ function PaymentsCard({ d, api, onNote }: CardProps) {
     <section className={card} aria-labelledby="pay-h" data-payments={d.paymentsLive ? 'live' : 'off'}>
       <h2 id="pay-h" className={h2}>Payments</h2>
       {!d.paymentsLive ? (
-        <p className="mt-1 text-sm text-white/70" data-payments-not-live>{PAYMENTS_NOT_LIVE} Clients apply from your page and you reply. When payments open, clients pay you directly and FEL keeps {fee}.</p>
+        <p className="mt-1 text-base text-white/70" data-payments-not-live>{PAYMENTS_NOT_LIVE} Clients apply from your page and you reply. When payments open, clients pay you directly and FEL keeps {fee}.</p>
       ) : setupUnfinished ? (
         <>
           {c ? <p className="mt-1 text-sm font-bold text-amber-200" data-finish-stripe>Finish your Stripe setup to take payments.</p> : null}

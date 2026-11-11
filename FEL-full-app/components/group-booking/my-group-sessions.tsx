@@ -14,7 +14,9 @@ interface Mine { available: boolean; seats?: Seat[]; makeups?: Credit[]; oneOnOn
 
 const when = (iso: string) => new Date(iso).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' });
 
-export function MyGroupSessions() {
+/** compact (EVERY-SCREEN P5, on Train): only when something is booked, so cancelling is Train → Cancel → confirm, with the
+ *  rule on screen before the first tap; the full list (and "none booked yet") stays on /groups. */
+export function MyGroupSessions({ compact = false }: { compact?: boolean } = {}) {
   const [mine, setMine] = useState<Mine | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<string | null>(null);
@@ -31,9 +33,12 @@ export function MyGroupSessions() {
     load();
   };
   const seats = mine.seats ?? [], credits = (mine.makeups ?? []).filter((c) => c.options.length), ones = mine.oneOnOne ?? [];
+  if (compact && !seats.some((x) => x.status === 'booked') && !ones.some((x) => x.status === 'booked')) return null;
   return (
     <section className={L.section} data-my-group-sessions>
       <h2 className={L.sectionTitle}>{T.mine}</h2>
+      {/* EVERY-SCREEN P5: on Train the owner's cancel rule comes first, above the Cancel buttons */}
+      {compact && mine.cancelLine ? <p className={L.lede} data-cancel-rule>{mine.cancelLine}</p> : null}
       {!seats.length && !ones.length ? <p className={L.lede}>{T.noneMine}</p> : null}
       <ul className={L.rows}>
         {seats.map((s) => (
@@ -77,7 +82,7 @@ export function MyGroupSessions() {
           ))}
         </div>
       ) : null}
-      {mine.cancelLine ? <p className={`${L.lede} mt-4`}>{mine.cancelLine}</p> : null}
+      {!compact && mine.cancelLine ? <p className={`${L.lede} mt-4`} data-cancel-rule>{mine.cancelLine}</p> : null}
       {msg ? <p role="status" className={L.alert}>{msg}</p> : null}
     </section>
   );

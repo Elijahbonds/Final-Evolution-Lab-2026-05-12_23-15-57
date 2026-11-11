@@ -1060,7 +1060,7 @@ export function MirrorHarness({
           <Link
             href="/train"
             aria-label="Back to Train"
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.03]
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.03]
                        text-white/55 transition-colors hover:border-white/25 hover:text-white"
           >
             <ArrowLeft className="h-[18px] w-[18px]" />

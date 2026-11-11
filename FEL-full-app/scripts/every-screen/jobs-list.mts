@@ -67,6 +67,8 @@ export const JOBS: Job[] = [
       { css: '[data-testid=program-ask-open]', ifPresent: true, pre: true },
   { fill: ['[data-testid=program-ask-input]', ASK], pre: true },
       { css: '[data-testid=program-ask-build]', expect: '[data-testid=program-view]', pre: true },
+      // EVERY-SCREEN P5: once a program is built, what FEL read is one line; "Change" opens the chips (a tap, counted)
+      { css: '[data-testid=program-ask-open]', ifPresent: true, expect: '[data-chip=days]', say: 'Change (what FEL read, folded to one line)' },
       { css: '[data-chip=days] button[aria-label^="More"]', expect: '/4 days/', say: 'one more day a week (the days chip\'s +)' },
       { css: '[data-testid=program-start]', expect: '[data-session-player]', say: 'Start today' },
     ],
@@ -122,6 +124,41 @@ export const JOBS: Job[] = [
     steps: [{ goto: '/groups', say: 'the groups page ("Your sessions" lives here once booking is on)' }, { expect: '[data-opens-soon-instead]', say: 'the switched-off notice offers a way on' }],
     endsAt: 'switched off: nothing can be booked, so there is nothing to cancel; the notice says what to do instead',
   },
+  // ── EVERY-SCREEN P5: the booking jobs as they will be once the owner applies the group-booking SQL (the LIT rig,
+  //    `jobs.mts --lit`: every pending file applied, the rig's coach as the business owner, one group seeded). The four
+  //    walks above stay: they are the screens as production has them today ("Opens soon", and what to do instead). ──
+  {
+    id: 'open-join-group', who: 'solo', lit: true, name: 'Find and join a group (booking open)', planBudget: 'join a group in ≤ 4 taps (phase 5)',
+    steps: [
+      ...TRAIN, { css: 'a[href="/groups"]', expect: '[data-groups-browser]', say: 'Groups (on Train once booking is open)' },
+      { css: '[data-action=join]', expect: '[data-buy-sheet]', say: 'Join (the 4-week package is picked)' },
+      { css: '[data-buy-pay] [data-fel-primary], [data-buy-pay] button', expect: '[data-buy-done]', say: 'Reserve, pay at the gym' },
+    ],
+  },
+  {
+    id: 'open-book-1on1', who: 'solo', lit: true, name: 'Book a 1:1 (booking open)', planBudget: 'book a 1:1 in ≤ 5 taps (phase 5)',
+    steps: [
+      ...TRAIN, { css: 'a[href="/groups/one-on-one"]', expect: '[data-one-on-one]', say: 'Book a 1:1 session (on Train; in person is already picked)' },
+      { css: '[data-gym]', expect: '[data-slot]', say: 'the gym' },
+      { css: '[data-slot]', expect: '/Reserve, pay at the gym/', say: 'a time' },
+      { tap: 'Reserve, pay at the gym', expect: '[data-booked]', say: 'Reserve, pay at the gym' },
+    ],
+  },
+  {
+    id: 'open-cancel-booking', who: 'solo', lit: true, name: 'Cancel a booking (booking open)', planBudget: 'cancel in ≤ 3 taps with the rule shown first (phase 5)',
+    steps: [
+      { goto: '/play', say: 'home' }, { css: 'nav a[href="/train"]:visible', expect: '[data-my-group-sessions] [data-cancel-rule]', say: 'the Train tab: your sessions, the cancel rule above them' },
+      { css: '[data-my-group-sessions] [data-action=cancel]', expect: '[data-action=confirm-cancel]', say: 'Cancel (the button now says what it costs)' },
+      { css: '[data-action=confirm-cancel]', expect: '/Cancelled/', say: 'Cancel free (or: counts as used)' },
+    ],
+  },
+  {
+    id: 'open-attendance', who: 'coach', lit: true, name: 'Take group attendance (booking open)', planBudget: 'attendance in ≤ 1 tap per person (phase 5)',
+    steps: [
+      ...COACH, { css: '[data-coach-tool=groups]', expect: '[data-roster] [data-mark=present]', say: "Groups: today's session opens on its roster" },
+      { css: '[data-roster] [data-mark=present]', expect: '[data-roster] [data-mark=present][aria-pressed=true]', say: 'Present (one tap for Casey)' },
+    ],
+  },
   // ── a coached client ──
   {
     id: 'client-start-today', who: 'client', name: "Start today's workout (the coach's session)", planBudget: 'open app → first exercise in ≤ 2 taps and ≤ 10 s (phase 2)',
@@ -144,8 +181,10 @@ export const JOBS: Job[] = [
     id: 'coach-adjust-program', who: 'coach', name: 'Adjust a program (change one exercise)', planBudget: 'adjust one exercise in ≤ 4 taps (phase 5)',
     steps: [
       // the athlete from the roster strip (always there); the "Needs you" card that also opens them goes once it is acted on
-      ...COACH, { css: 'button[aria-label^="Casey Client:"]', expect: '/PROGRAM/', say: 'open the athlete' }, { tap: 'PROGRAM', expect: '[data-open-builder]', say: 'the Program tab' }, { css: '[data-open-builder]', expect: '/Edit Rig goblet squat|Rig goblet squat —/', say: 'Open the builder' },
-      { tap: 'Edit Rig goblet squat', expect: '/NOTE TO YOUR ATHLETE/', say: 'Edit the exercise' }, { tap: 'Cruise RPE 4–5', say: 'pick an easier effort' }, { tap: 'Save', expect: '/^(?![\\s\\S]*NOTE TO YOUR ATHLETE)[\\s\\S]*Rig goblet squat/', say: 'Save' },
+      // EVERY-SCREEN P5: the Program tab lists the next session; an exercise, then a band, and it is saved (quick-adjust.tsx)
+      ...COACH, { css: 'button[aria-label^="Casey Client:"]', expect: '/PROGRAM/', say: 'open the athlete' }, { tap: 'PROGRAM', expect: '[data-quick-adjust]', say: 'the Program tab' },
+      { css: '[data-quick-exercise="Rig goblet squat"]', expect: '[data-quick-band=cruise]', say: 'Rig goblet squat' },
+      { css: '[data-quick-band=cruise]', expect: '[data-quick-saved]', say: 'Cruise (saved on the tap)' },
     ],
   },
   {

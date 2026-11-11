@@ -117,7 +117,9 @@ export function TodayDrillRun({ view, dobYear }: { view: DailyDrillView; dobYear
       <header className="space-y-2">
         <p className="font-sans text-[12px] font-semibold uppercase tracking-[0.14em] text-fel-dim" data-daily-book>{plan.name}</p>
         <h1 className="font-display text-[30px] font-bold leading-[1] tracking-[0.005em] text-white">{guide.title}</h1>
-        <p className="text-[16px] font-semibold leading-snug text-white/90" data-daily-why>{whyNumber(view.focus, view.skill)}</p>
+        {/* EVERY-SCREEN P5: with no score yet the why line said only "No scores yet." (an empty state on a page whose Start is
+            right below it): it shows once there is a number to say */}
+        {view.skill && view.focus !== 'starter' ? <p className="text-[16px] font-semibold leading-snug text-white/90" data-daily-why>{whyNumber(view.focus, view.skill)}</p> : null}
         {newcomer && (
           <p className="flex items-center gap-2 text-[16px] text-fel-soft" data-daily-improves>
             <Sparkles aria-hidden className="h-4 w-4 shrink-0 text-[#00FF9D]" />{guide.improves}

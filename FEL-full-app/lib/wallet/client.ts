@@ -56,6 +56,8 @@ export interface WalletEarnDetail {
   granted: { coins: number; shards: number; lc?: number };
   balances: { coins: number; shards: number; lc?: number };
   capped?: boolean;
+  /** EVERY-SCREEN P5: the report's event_type, so a HUD can show a quiet gain (the daily first-session bonus) without a toast. */
+  event?: string;
 }
 
 /**
@@ -132,7 +134,7 @@ async function postEarn(report: EarnReport): Promise<{ granted: { coins: number;
       if (typeof window !== 'undefined') {
         window.dispatchEvent(
           new CustomEvent<WalletEarnDetail>(WALLET_EARN_EVENT, {
-            detail: { granted: out.granted, balances, capped: out.capped },
+            detail: { granted: out.granted, balances, capped: out.capped, event: report.event_type },
           }),
         );
       }
