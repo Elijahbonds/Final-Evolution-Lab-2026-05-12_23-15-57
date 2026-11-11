@@ -17,12 +17,23 @@
 //
 // No Babylon in this file or anything it imports (lib/assess/replay.test.ts walks the drill surfaces' imports).
 import { readHeroBodyEarly } from '@/lib/babylon/core/heroBodyRead';
-import { KIT_BODY_MOBILE_URL, KIT_BODY_URL, SCAN_BODY_MOBILE_URL, SCAN_BODY_URL, bodyUrlForTier, urlForHeroBody, type HeroBodyKind } from '@/lib/babylon/core/heroBody';
+import { COACH_BODY_MOBILE_URL, COACH_BODY_URL, KIT_BODY_MOBILE_URL, KIT_BODY_URL, SCAN_BODY_MOBILE_URL, SCAN_BODY_URL, bodyUrlForTier, urlForHeroBody, type HeroBodyKind } from '@/lib/babylon/core/heroBody';
 import { deviceTierDecision } from '@/lib/babylon/scene/tierRule';
+import { demoModelFlagsFrom, planPlayerBody } from '@/lib/babylon/core/demoModels';
+import type { HeroBodyAnswer } from '@/lib/babylon/core/playerIdentity';
 
 /** The body file a stage on this device spawns, for a body kind and a tier (the rule CharacterLibrary loads by). */
 export function demoBodyUrl(kind: HeroBodyKind | null | undefined, tier: string): string {
   return bodyUrlForTier(urlForHeroBody(kind ?? 'kit-male'), tier);
+}
+
+/** DEMO-MODELS-1 (2026-11-09; v2): the file a DEMO stage spawns for this hero-body answer, by the rule CharacterLibrary spawns by
+ *  (demoModels.planPlayerBody, context 'other': a stage is never the /try dunk demo). The stage shows the viewer's OWN body; the
+ *  only setting that changes it is 1, and only for the scan owner's own view (his own body is the coach body then). With no
+ *  `demo` on the answer (every setting off) it is exactly demoBodyUrl(answer.body, tier). */
+export function demoStageBodyUrl(answer: HeroBodyAnswer | null | undefined, tier: string): string {
+  const plan = planPlayerBody({ kind: answer?.body ?? 'kit-male', context: 'other', flags: demoModelFlagsFrom(answer?.demo) });
+  return bodyUrlForTier(plan.url, tier);
 }
 
 /** The visitor's data-saver setting (Chrome / Android: navigator.connection.saveData). */
@@ -77,7 +88,7 @@ export function warmDemoBody(): Promise<void> {
     userMark('start');
     const answer = await readHeroBodyEarly();
     userMark('answer');
-    const url = demoBodyUrl(answer?.body, deviceTierDecision().tier);
+    const url = demoStageBodyUrl(answer, deviceTierDecision().tier);
     w.url = url;
     if (remembered(url)) { userMark('cached'); return; }
     const off = fetchOffThread(url);
@@ -96,6 +107,7 @@ export function unscaledBodyUrl(url: string): string {
   if (url === SCAN_BODY_MOBILE_URL) return SCAN_BODY_URL;
   if (url === KIT_BODY_MOBILE_URL.male) return KIT_BODY_URL.male;
   if (url === KIT_BODY_MOBILE_URL.female) return KIT_BODY_URL.female;
+  if (url === COACH_BODY_MOBILE_URL) return COACH_BODY_URL;   // DEMO-MODELS-1
   return url;
 }
 

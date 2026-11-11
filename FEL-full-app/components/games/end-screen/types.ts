@@ -89,6 +89,8 @@ export interface EndChallengeResult { beat: boolean; targetScore: number; margin
 export interface EndArenaResult {
   settled: boolean; status: string; result?: string; iWon?: boolean; payout?: number; feeLc?: number;
   myScore?: number; oppScore?: number; refused?: Refusal;
+  /** ARENA-AGE-1: a teen practice duel — no entry, a fixed prize (`prize`, 0 when the daily limit was reached). */
+  teenPractice?: boolean; prize?: number; prizeCapped?: boolean;
 }
 
 /**

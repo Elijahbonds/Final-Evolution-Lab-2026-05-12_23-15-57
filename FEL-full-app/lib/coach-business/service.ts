@@ -9,6 +9,7 @@ import { featureGate, type CoachPlan } from './plan';
 import { cleanGoals } from './market';
 import { attachCheckout, businessReady, coachFeesThisMonth, connectFor, holdSpot, markExpired, packageById, saleById, saveApplication, type TxDb } from './store';
 import { recordConnectRefund, type ConnectDeps } from './webhook';
+import { isSellerAdultGateEnabled } from '@/lib/flags';
 
 export type Refusal = { ok: false; status: number; error: string; reason?: string; message?: string; version?: string | null };
 
@@ -23,6 +24,8 @@ export interface CheckoutDeps {
   coachSlug(coachId: string): Promise<string | null>;
   /** PAYMENTS-READY: FEL's fees from a coach so far this month, asked only under a monthly cap (default: the ledger). */
   feesThisMonth?(coachId: string, now: Date): Promise<number>;
+  /** SELLER-18-1 (S-2): may this coach sell (lib/seller/server.ts canSell)? Default: the same verified-adult check. */
+  sellerOk?(coachId: string): Promise<boolean>;
 }
 
 export type CheckoutResult = { ok: true; url: string | null; saleId: string } | Refusal;
@@ -32,7 +35,8 @@ const closed = (g: Extract<ConnectGate, { ok: false }>): Refusal => ({ ok: false
 /**
  * A buyer starts a package checkout. In order: the payments fence (switch, key, live fence, site URL) → the tables → the
  * package (active, not the coach's own) → the coach can charge (Connect ready; Pro, when the gates are on) → the buyer is
- * a verified adult → the buyer's terms tick (PAYMENTS-READY: 409 terms_required, the store terms' answer) → FEL's share
+ * a verified adult → the coach is a verified adult (SELLER-18-1) → the buyer's terms tick (PAYMENTS-READY: 409
+ * terms_required, the store terms' answer) → FEL's share
  * (by the coach's plan, under the monthly cap) → a capacity spot is held → Stripe. A Stripe failure releases the spot.
  */
 export async function startPackageCheckout(deps: CheckoutDeps, buyerId: string, packageId: string, terms?: TermsBody | null): Promise<CheckoutResult> {
@@ -52,6 +56,12 @@ export async function startPackageCheckout(deps: CheckoutDeps, buyerId: string, 
   if (!(await deps.isAdult(buyerId))) {
     return { ok: false, status: 403, error: 'adults_only', message: 'Purchases are for verified adults (18+). Under 18? A parent or guardian contacts the coach.' };
   }
+  // SELLER-18-1 (S-2): the coach must be a verified adult too. Checked after the buyer, so a refused buyer hears their
+  // own reason first; a coach who is not (or no longer known to be) 18+ is simply not taking payments.
+  // v2: only with SELLER_ADULT_GATE_ENABLED on (read from deps.env); off, the checkout is exactly as before.
+  const sellerOk = !isSellerAdultGateEnabled(deps.env) ? true
+    : deps.sellerOk ? await deps.sellerOk(pkg.coachId).catch(() => false) : await deps.isAdult(pkg.coachId);
+  if (!sellerOk) return { ok: false, status: 409, error: 'coach_not_ready', message: 'This coach is not taking payments yet. Apply instead.' };
   const slug = await deps.coachSlug(pkg.coachId);
   if (!slug) return { ok: false, status: 404, error: 'package_not_found' };
   // PAYMENTS-READY: the buyer's terms tick, before any spot is held or Stripe is called (the store terms' 409).
