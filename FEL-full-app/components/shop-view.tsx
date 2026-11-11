@@ -91,7 +91,7 @@ export function ShopView({
           <h1 className="fel-heading text-3xl font-bold text-white">CREATOR CARD SHOP</h1>
           <p className="text-sm text-white/50">First-party cards. Server-authoritative wallet.</p>
         </div>
-        <span className="inline-flex items-center gap-2 rounded-lg border border-[#FFD700]/40 bg-[#FFD700]/10 px-4 py-2 font-mono text-lg font-bold text-[#FFD700]">
+        <span className="inline-flex items-center gap-2 rounded-lg border border-[#FFD700]/40 bg-[#FFD700]/10 px-4 py-2 font-mono text-[20px] font-bold text-[#FFD700]">
           <Coins className="h-5 w-5" />
           {credits ?? '–'} LC
         </span>
@@ -138,7 +138,7 @@ export function ShopView({
                   <Icon className="h-5 w-5" style={{ color: card.accent }} />
                 </div>
                 <div>
-                  <h3 className="fel-heading text-lg font-bold leading-tight text-white">{card.name}</h3>
+                  <h3 className="fel-heading text-[20px] font-bold leading-tight text-white">{card.name}</h3>
                   <span className="font-mono text-[12px] uppercase tracking-wider text-white/50">{meta?.label}</span>
                 </div>
               </div>

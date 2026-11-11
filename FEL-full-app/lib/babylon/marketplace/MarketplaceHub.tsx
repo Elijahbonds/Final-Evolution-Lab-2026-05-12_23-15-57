@@ -156,7 +156,7 @@ export default function MarketplaceHub({
     root: { color: '#f2ecdf', background: 'linear-gradient(160deg,#231a2e 0%,#2e2417 60%,#1c2430 100%)', padding: 16, borderRadius: 12 },
     h1: { fontSize: 20, fontWeight: 800, color: '#e8b84a' },
     tabs: { display: 'flex', gap: 8, margin: '10px 0', flexWrap: 'wrap' },
-    tab: { padding: '6px 14px', borderRadius: 20, border: '1px solid #8a6d3a', background: 'transparent', color: '#e8dcc2', cursor: 'pointer' },
+    tab: { padding: '6px 14px', minHeight: 44, borderRadius: 20, border: '1px solid #8a6d3a', background: 'transparent', color: '#e8dcc2', cursor: 'pointer' },
     tabOn: { background: '#8a6d3a', color: '#fff' },
     row: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 10 },
     input: { padding: 8, borderRadius: 8, border: '1px solid #8a6d3a', background: '#1c1526', color: '#f2ecdf' },

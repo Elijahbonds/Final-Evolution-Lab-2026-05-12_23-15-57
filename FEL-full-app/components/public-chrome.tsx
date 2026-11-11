@@ -10,7 +10,7 @@ export function PublicTopBar() {
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-[#050505]/85 backdrop-blur-md">
       <div className="mx-auto flex max-w-[1200px] items-center justify-between px-4 py-3">
-        <Link href="/" className="fel-heading text-2xl font-bold text-white">
+        <Link href="/" className="fel-heading inline-flex min-h-11 items-center text-2xl font-bold text-white">
           <span className="text-[#00E5FF] fel-glow-cyan">FINAL EVOLUTION</span> LAB
         </Link>
         <Link
@@ -27,7 +27,7 @@ export function PublicTopBar() {
 export function PublicLegalFooter() {
   return (
     <footer className="mt-10 border-t border-white/10 py-6">
-      <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-[14px] text-white/60 [&>a]:inline-flex [&>a]:min-h-[44px] [&>a]:items-center">
+      <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-[14px] text-white/60 [&>a]:inline-flex [&>a]:min-h-[44px] [&>a]:min-w-[44px] [&>a]:items-center [&>a]:justify-center">
         <Link href="/terms" className="hover:text-white/70">Terms</Link>
         <Link href="/privacy" className="hover:text-white/70">Privacy</Link>
         {/* OWNER-APPROVALS (2026-10-27, cards C28/C12): the two new legal texts, beside the other legal pages; the buy and

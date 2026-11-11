@@ -44,6 +44,20 @@ export const JOBS: Job[] = [
       { expect: '/daily|first session/i', within: 20, say: "today's first-session coins, named" },
     ],
   },
+  // EVERY-SCREEN P8 (part 2): each area's main job, walked once on this build; these counts are the budget from now on
+  // ("never more taps than before", the coordinator's call, 2026-11-11)
+  { id: 'budget-wallet', who: 'solo', name: 'Open the wallet', planBudget: 'budget: this walk (phase 8)',
+    steps: [{ goto: '/play', say: 'home' }, { css: 'nav a[href="/profile"]:visible', say: 'the Profile tab' }, { css: 'a[href="/wallet"]', expect: '/Wallet History/', within: 20, say: 'Wallet' }] },
+  { id: 'budget-store', who: 'solo', name: 'Open the store', planBudget: 'budget: this walk (phase 8)',
+    steps: [{ goto: '/play', say: 'home' }, { css: 'a[href="/store"]', expect: 'a[href="/wallet"]', within: 20, say: 'the coins in the top bar: the store' }] },
+  { id: 'budget-closet', who: 'solo', name: 'Open the closet', planBudget: 'budget: this walk (phase 8)',
+    steps: [{ goto: '/play', say: 'home' }, { css: 'nav a[href="/profile"]:visible', say: 'the Profile tab' }, { css: 'a[href^="/closet"]', expect: '/save look/i', within: 30, say: 'Closet' }] },
+  { id: 'budget-profile-edit', who: 'solo', name: 'Edit the profile', planBudget: 'budget: this walk (phase 8)',
+    steps: [{ goto: '/play', say: 'home' }, { css: 'nav a[href="/profile"]:visible', say: 'the Profile tab' }, { css: 'a[href^="/profile/edit"]', expect: '/Back to profile/', within: 20, say: 'Edit' }] },
+  { id: 'budget-support', who: 'solo', name: 'Find support', planBudget: 'budget: this walk (phase 8)',
+    steps: [{ goto: '/play', say: 'home' }, { css: 'nav a[href="/profile"]:visible', say: 'the Profile tab' }, { css: 'a[href="/account"]', ifPresent: true, say: 'Account (when Profile links it)' }, { css: 'a[href="/support"]', expect: '/support/i', within: 20, say: 'Support' }] },
+  { id: 'coin-exchange', who: 'solo', name: 'Spend coins (exchange for shards): the history says where it went', planBudget: 'a purchase always shows where it came from (phase 8)',
+    steps: [{ goto: '/wallet', say: 'Wallet' }, { css: '[aria-label="5 shards"]', say: '5 shards' }, { css: '[data-exchange]', expect: '/exchang/i', within: 20, say: 'Exchange' }, { goto: '/wallet', say: 'Wallet again' }, { expect: '/exchang/i', within: 20, say: 'the history names the exchange' }] },
   // ── EVERY-SCREEN P7: around the games. The plan: "pick a game → playing in ≤ 2 taps; results → play again in 1; a lobby
   //    always says what it is waiting for" ──
   {

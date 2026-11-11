@@ -103,9 +103,9 @@ export function SlotBar(p: SlotBarProps) {
                   ? <span className="flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[12px] font-black tracking-wider text-black" style={{ background: accent }}><Play className="h-2.5 w-2.5" /> PLAYING</span>
                   : <button type="button" onClick={() => p.onPlayAs(s.id)} className="rounded-full border border-white/15 px-1.5 py-0.5 text-[12px] font-bold tracking-wider text-white/75 hover:bg-white/10" title="Play as this character in every mode">PLAY AS</button>}
                 <span className="flex-1" />
-                <button type="button" aria-label={`Rename ${s.label}`} title="Rename" onClick={() => { setRenaming(s.id); setDraft(s.label); }} className="text-white/50 hover:text-white"><Pencil className="h-3 w-3" /></button>
+                <button type="button" aria-label={`Rename ${s.label}`} title="Rename" onClick={() => { setRenaming(s.id); setDraft(s.label); }} className="grid h-11 w-11 place-items-center text-white/50 hover:text-white"><Pencil className="h-3 w-3" /></button>
                 <button type="button" aria-label={`Delete ${s.label}`} title={p.slots.length <= 1 ? 'Your only character' : 'Delete'} disabled={p.slots.length <= 1}
-                  onClick={() => setConfirmDelete(s.id)} className="text-white/50 hover:text-red-300 disabled:opacity-20"><Trash2 className="h-3 w-3" /></button>
+                  onClick={() => setConfirmDelete(s.id)} className="grid h-11 w-11 place-items-center text-white/50 hover:text-red-300 disabled:opacity-20"><Trash2 className="h-3 w-3" /></button>
               </div>
             </div>
           );

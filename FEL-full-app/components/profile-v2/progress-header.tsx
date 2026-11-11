@@ -8,6 +8,9 @@ import { DeviceFormTile } from './device-form-tile';
 import { TileView } from './tile';
 import { StatRing } from '@/components/ui/fel/stat-ring';
 import { TYPE } from '@/lib/design/type';
+import Link from 'next/link';
+import { JUMP_CHECK_HREF } from '@/lib/profile-v2/tiles';
+import { JUMP_CHECK } from '@/lib/vertical/copy';
 
 const ACCENT: Record<string, string> = { jump: '#00E5FF', form: '#00FF9D', reaction: '#FFD700', streak: '#FF7A2F' };
 
@@ -26,6 +29,8 @@ export function ProgressHeader({ data, viewer = false, poster = null }: { data: 
           <div className="flex flex-col gap-1">
             <p className={`${TYPE.label} hidden text-fel-dim lg:block`}>PRQ grade</p>
             <p className={`${TYPE.small} text-fel-dim`}>{prq.measured === 0 ? 'Nothing measured yet' : `${prq.measured} of ${prq.total} skills measured`}</p>
+            {/* EVERY-SCREEN P8: the empty state leads on, to the place that fills it (the label is the app's own, JUMP_CHECK) */}
+            {prq.measured === 0 && !viewer && <Link href={JUMP_CHECK_HREF} className={`inline-flex min-h-11 items-center ${TYPE.small} font-bold text-fel-cyan`}>{JUMP_CHECK} →</Link>}
             {identity.level && <p className={`${TYPE.label} text-fel-emerald`}>Level {identity.level.level}</p>}
           </div>
         </div>

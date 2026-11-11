@@ -25,7 +25,7 @@ export function AccountDataPanel({
 }) {
   return (
     <section className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
-      <h2 className="fel-heading text-lg font-bold text-white">Your data</h2>
+      <h2 className="fel-heading text-[20px] font-bold text-white">Your data</h2>
       <p className={`mt-1 ${TYPE.body} text-fel-dim`}>
         Signed in as {email || 'this account'}. Download a JSON file of your profile, Mirror sessions, assessments, and the health data stored here.
       </p>

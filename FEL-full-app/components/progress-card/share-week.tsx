@@ -81,7 +81,8 @@ export function ShareWeek({ minor, phoneOnly }: { minor: boolean; phoneOnly: boo
         <label className="mt-3 flex min-h-11 items-center gap-2.5 text-[13px] text-white/75">
           <input type="checkbox" checked={withName} data-share-name="choice"
             onChange={(e) => { setWithName(e.target.checked); setPhase({ kind: 'idle' }); setSaid(null); }}
-            className="h-4 w-4 accent-[#00E5FF]" />
+            className="peer sr-only" />
+          <span aria-hidden className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border text-[12px] peer-focus-visible:ring-2 peer-focus-visible:ring-[#00E5FF] ${withName ? 'border-[#00E5FF] bg-[#00E5FF]/20 text-[#00E5FF]' : 'border-white/30'}`}>{withName ? '✓' : ''}</span>
           Put my name on it
         </label>
       )}

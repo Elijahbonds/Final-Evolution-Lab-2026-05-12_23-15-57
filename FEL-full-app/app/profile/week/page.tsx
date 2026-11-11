@@ -46,7 +46,7 @@ export default async function WeekPage() {
 
   return (
     <TabPage eyebrow="Profile" title="Your week" lede="Proof of progress: what you measured and played, against the week before." accent="#00E5FF"
-      aside={<Link href="/profile" className="rounded-xl border border-white/10 px-3 py-2 text-[12px] font-bold text-white/75 hover:bg-white/[0.05] hover:text-white">← Back to profile</Link>}>
+      aside={<Link href="/profile" className="inline-flex min-h-11 items-center rounded-xl border border-white/10 px-3 py-2 text-[12px] font-bold text-white/75 hover:bg-white/[0.05] hover:text-white">← Back to profile</Link>}>
       {phoneForm ? <DeviceCard card={card} /> : <ProgressCardView card={card} />}
       <DrillWeekLine days={drillDays} />
       <ProgramWeekLine card={program} />

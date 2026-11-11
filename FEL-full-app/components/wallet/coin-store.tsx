@@ -142,7 +142,7 @@ export function CoinStore({ initialPurchasesEnabled = null }: { initialPurchases
       <section>
         <div className="mb-3 flex items-center gap-2">
           <ShoppingCart className="h-4 w-4 text-[#00E5FF]" />
-          <h2 className="text-lg font-semibold text-white">Coin Packs</h2>
+          <h2 className="text-[20px] font-semibold text-white">Coin Packs</h2>
           {copy.badge && (
             <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[12px] uppercase tracking-wide text-white/50">{copy.badge}</span>
           )}
@@ -185,7 +185,7 @@ export function CoinStore({ initialPurchasesEnabled = null }: { initialPurchases
       <section>
         <div className="mb-1 flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-[#00FF9D]" />
-          <h2 className="text-lg font-semibold text-white">Spend Your Balance</h2>
+          <h2 className="text-[20px] font-semibold text-white">Spend Your Balance</h2>
         </div>
         <p className="mb-3 text-base text-white/50">Coins and shards are spent on the page that uses what you buy.</p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

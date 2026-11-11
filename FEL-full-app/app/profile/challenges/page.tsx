@@ -83,7 +83,11 @@ export default async function ChallengesPage() {
       <section className="fel-panel rounded-2xl p-5" aria-labelledby="sent-h">
         <h2 id="sent-h" className="fel-heading text-lg font-bold text-white">You sent</h2>
         {sent.length === 0 ? (
-          <p className="mt-2 text-sm text-white/55">Nothing yet. Finish a run and tap Challenge on the result.</p>
+          <>
+            <p className="mt-2 text-base text-white/55">Nothing yet. Finish a run and tap Challenge on the result.</p>
+            {/* EVERY-SCREEN P8: the empty state leads on (the label is the Play tab's own) */}
+            <Link href="/play" className="mt-2 inline-flex min-h-11 items-center text-[14px] font-bold text-fel-cyan">Play →</Link>
+          </>
         ) : (
           <ul className="mt-3 divide-y divide-white/10">
             {sent.map((l) => {

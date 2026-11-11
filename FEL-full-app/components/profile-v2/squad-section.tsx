@@ -10,7 +10,7 @@ export function SquadSection({ data }: { data: ProfileV2Data }) {
   const { opponents, rival, matchesPlayed, links } = data.squad;
   return (
     <Section id="squad" title="Squad & friends" purpose="Your head-to-head record against the people you’ve played." accent="#A855F7"
-      aside={<Link href="/multiplayer" className="shrink-0 rounded-full border border-fel-violet/40 px-3 py-1.5 text-[12px] font-bold text-[#C79BFF] hover:bg-fel-violet/10">Challenge someone</Link>}>
+      aside={<Link href="/multiplayer" className="inline-flex min-h-11 shrink-0 items-center rounded-full border border-fel-violet/40 px-3 py-1.5 text-[12px] font-bold text-[#C79BFF] hover:bg-fel-violet/10">Challenge someone</Link>}>
       <div className="grid gap-3 md:grid-cols-2">
         <Card>
           {rival ? (
