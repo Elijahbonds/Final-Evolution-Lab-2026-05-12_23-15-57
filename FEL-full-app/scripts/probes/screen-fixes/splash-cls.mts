@@ -3,7 +3,10 @@
 // ball rows load"; this mounts the card alone (splash-entry.tsx) so the number is the card's and nothing else's.
 //
 //   npx tsx scripts/probes/screen-fixes/splash-cls.mts build <outDir> <label>          bundle the card (no browser)
-//   /home/user/wt/gate-run.sh 600 npx tsx scripts/probes/screen-fixes/splash-cls.mts measure <outDir> <label> [modes]
+//   /home/user/wt/gate-run.sh 600 npx tsx scripts/probes/screen-fixes/splash-cls.mts measure <outDir> <label> [modes] [seeds]
+//
+// SCREEN-FIXES-2 (2026-11-11): [seeds] (comma list) pins which learn card is drawn (splash-entry `?seed=`): each mode is
+// run once per seed, and the learn card's own height (its scrollHeight, what it would take unclamped) is reported.
 //
 // A 390 × 844 phone, CPU slowed 4× (the every-screen scorer's phone). Per mode: the sum of the shifts while loading, at the
 // READY swap, and after it, each shift with what moved; and two JPGs (loading, ready). Writes <outDir>/<label>/splash.json.
@@ -15,7 +18,7 @@ import { chromium } from 'playwright-core';
 import { chromiumExe } from '../_chromium.mts';
 
 const ROOT = path.resolve(import.meta.dirname, '../../..');
-const [cmd, outDir, label = 'now', modesArg] = process.argv.slice(2);
+const [cmd, outDir, label = 'now', modesArg, seedsArg] = process.argv.slice(2);
 if (!cmd || !outDir) { console.error('usage: splash-cls.mts build|measure <outDir> <label> [modes]'); process.exit(2); }
 const SITE = path.resolve(outDir, label);
 
@@ -44,18 +47,20 @@ const b = await chromium.launch({ executablePath: process.env.CHROMIUM_EXE ?? ch
 type Shift = { v: number; t: number; input: boolean; src: string[]; rects: string[] };
 const out: Record<string, unknown> = {};
 try {
-  for (const mode of MODES) {
+  const SEEDS = seedsArg ? seedsArg.split(',') : [''];
+  for (const mode0 of MODES) for (const seed of SEEDS) {
+    const mode = seed ? `${mode0}@${seed}` : mode0;
     const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
     const p = await ctx.newPage();
     const cdp = await ctx.newCDPSession(p);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
     const errors: string[] = [];
     p.on('pageerror', (e) => errors.push(e.message.slice(0, 160)));
-    await p.goto(`${BASE}/index.html?mode=${mode}&readyAt=${READY_AT}`, { waitUntil: 'load', timeout: 120000 });
+    await p.goto(`${BASE}/index.html?mode=${mode0}&readyAt=${READY_AT}${seed ? `&seed=${seed}` : ''}`, { waitUntil: 'load', timeout: 120000 });
     await p.waitForTimeout(1500);
     await p.waitForFunction(() => document.querySelector('[data-learn-idle]'), null, { timeout: 8000 }).catch(() => {});
     await p.waitForTimeout(300);
-    const hLoad = await p.evaluate(() => ({ card: Math.round(document.querySelector('[data-learn-idle]')?.getBoundingClientRect().height ?? 0), slot: Math.round(document.querySelector('[data-splash-slot]')?.getBoundingClientRect().height ?? 0) }));
+    const hLoad = await p.evaluate(() => ({ card: Math.round(document.querySelector('[data-learn-idle]')?.getBoundingClientRect().height ?? 0), cardOwn: document.querySelector('[data-learn-idle]')?.scrollHeight ?? 0, slot: Math.round(document.querySelector('[data-splash-slot]')?.getBoundingClientRect().height ?? 0) }));
     await p.screenshot({ path: path.join(SITE, `splash-${mode}-loading.jpg`), type: 'jpeg', quality: 70 });
     await p.waitForFunction(() => document.querySelector('[data-phase="ready"]'), null, { timeout: 60000 });
     await p.waitForTimeout(4000);
@@ -69,9 +74,9 @@ try {
     const sum = (xs: Shift[]) => Math.round(xs.reduce((a, s) => a + s.v, 0) * 1000) / 1000;
     const tr = r.tReady ?? Infinity;
     const loading = shifts.filter((s) => s.t < tr), swap = shifts.filter((s) => s.t >= tr && s.t < tr + 250), after = shifts.filter((s) => s.t >= tr + 250);
-    out[mode] = { learnCardPx: hLoad.card, slotLoadingPx: hLoad.slot, slotReadyPx: hReady, cls: sum(shifts), loading: sum(loading), swap: sum(swap), after: sum(after), count: shifts.length, tReady: r.tReady, errors,
+    out[mode] = { learnCardPx: hLoad.card, learnCardOwnPx: hLoad.cardOwn, slotLoadingPx: hLoad.slot, slotReadyPx: hReady, cls: sum(shifts), loading: sum(loading), swap: sum(swap), after: sum(after), count: shifts.length, tReady: r.tReady, errors,
       shifts: shifts.map((s) => ({ v: Math.round(s.v * 1000) / 1000, t: s.t, src: s.src.slice(0, 4), rects: s.rects.slice(0, 4) })) };
-    console.log(`${mode.padEnd(14)} cls ${sum(shifts)} = loading ${sum(loading)} + READY swap ${sum(swap)} + after ${sum(after)} (${shifts.length} shifts, ready at ${r.tReady} ms; learn card ${hLoad.card} px, slot ${hLoad.slot} -> ${hReady} px)${errors.length ? `  errors: ${errors[0]}` : ''}`);
+    console.log(`${mode.padEnd(14)} cls ${sum(shifts)} = loading ${sum(loading)} + READY swap ${sum(swap)} + after ${sum(after)} (${shifts.length} shifts, ready at ${r.tReady} ms; learn card ${hLoad.card} px (own ${hLoad.cardOwn}), slot ${hLoad.slot} -> ${hReady} px)${errors.length ? `  errors: ${errors[0]}` : ''}`);
     for (const s of shifts.filter((x) => x.v >= 0.001)) console.log(`   ${s.t}ms  ${s.v.toFixed(3)}  ${s.src[0] ?? ''}  ${s.rects[0] ?? ''}`);
     await ctx.close();
   }

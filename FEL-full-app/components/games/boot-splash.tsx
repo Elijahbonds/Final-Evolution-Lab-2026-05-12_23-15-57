@@ -12,6 +12,7 @@ import React, { useEffect, useState } from 'react';
 import type { ModePhase } from '@/lib/babylon';
 import { venueThumb } from '@/lib/babylon/ui/venueThumbs';
 import { CardSlot } from './card-slot';
+import { chipInk, pickedChip } from './chip-ink';   // SCREEN-FIXES-2: a picked chip's letters at AA on its own colour
 import { MotionSetting } from '@/components/settings/motion-setting';
 import { PausedLayer } from './paused-layer';
 import { LearnWhileYouWait } from '@/components/learn/learn-while-you-wait';   // KNOWLEDGE-FEED v1: one card while the arena loads
@@ -50,8 +51,11 @@ import {
 /** SCREEN-FIXES (2026-11-10): the start card's middle slot (the loading bar and the learn card, or START and its lines),
  *  held at one height from the first frame so nothing under it moves when the learn card arrives or START replaces it.
  *  NEW number, measured (splash-cls.mts): the loading bar (26 px) + the gap (16) + the compact learn card (175-185 px for a
- *  lesson or fact card at the 2026-11-10 sizes). A taller card (a quiz) still grows the slot. Not a feel number. */
-export const SPLASH_SLOT_MIN_PX = 230;
+ *  lesson or fact card at the 2026-11-10 sizes). Not a feel number.
+ *  SCREEN-FIXES-2 (2026-11-11): 230 -> 237. Measured with the card pinned (splash-cls.mts [seeds]): the bar, its line and the
+ *  gaps above the card take 52 px, and the lesson and fact cards are 150-185 px, so 230 still grew by 7 px for a 185 px card.
+ *  237 holds every lesson and fact card whole; a taller one (a quiz, 225 px) scrolls inside the slot while loading. */
+export const SPLASH_SLOT_MIN_PX = 237;
 
 // M37 E12 FIX: venue slugs resolve to PROCEDURAL canvas thumbnails (venueThumbs)
 // instead of /img/venues/*.jpg files that 404 on every mode route.
@@ -387,7 +391,8 @@ export function SplashCard(props: BootSplashProps) {
       )}
       {/* CONTROLS SCREEN (2026-10-06): the column scrolls (safe-centred) rather than clip when a portrait card holds the
           controls and three pickers: START stays at the top of what shows, and no picker is cut off out of reach.
-          Where the corner row (MOTION, the shell's ⋯, the controller pills) needs it to start lower: game-surface.css 4d. */}
+          Where the corner row (MOTION, the shell's ⋯, the controller pills) needs it to start lower: game-surface.css 4d
+          (SCREEN-FIXES-2: below the MOTION chip on every screen that shows it, not only where a shell put its ⋯). */}
       <div data-splash-column className="absolute inset-0 flex flex-col items-center justify-center gap-4 overflow-y-auto px-6 py-4 text-center [justify-content:safe_center] [scrollbar-width:none]">
         {/* data-splash-main: display: contents everywhere but a sideways screen, where it is the left column — title,
             START and the CONTROLS panel, which gives up its height (its lines scroll) before START leaves the screen */}
@@ -405,18 +410,23 @@ export function SplashCard(props: BootSplashProps) {
             lines, centred. Before, the card's arrival pushed the CONTROLS panel and every picker down, and the swap to START
             pulled them back up: a layout shift of 0.06-0.29 on the card alone (scripts/probes/screen-fixes/splash-cls.mts),
             0.21-0.24 on the dunk host (DUNK-FLAGSHIP §15). Layout only: what loads, and when, is unchanged. */}
+        {/* SCREEN-FIXES-2 (2026-11-11): and while loading the slot is that height at most, too. A learn card taller than the
+            room left under the bar (a quiz, a long lesson: 227 px measured on skateboard) used to grow the slot and push
+            the CONTROLS panel down 49 px, then let it back up at READY (0.081 on the card alone). It now scrolls inside
+            the slot instead: nothing is cut off, every line and button stays reachable. Sideways the slot is display:
+            contents and the card is as it was (game-surface.css 4b). Layout only. */}
         {(props.phase === 'ready' || props.phase === 'loading') && (
         <div data-splash-slot={props.phase} className={`flex w-full shrink-0 flex-col items-center gap-4 ${props.phase === 'ready' ? 'justify-center' : 'justify-start'}`}
-          style={{ minHeight: SPLASH_SLOT_MIN_PX }}>
+          style={props.phase === 'loading' ? { minHeight: SPLASH_SLOT_MIN_PX, maxHeight: SPLASH_SLOT_MIN_PX } : { minHeight: SPLASH_SLOT_MIN_PX }}>
         {props.phase === 'loading' && (
-          <div className="w-56">
+          <div className="w-56 shrink-0">
             <div className="h-1.5 overflow-hidden rounded-full bg-white/15">
               <div className="fel-boot-bar h-full rounded-full" style={{ background: v.tint }} />
             </div>
             <p className="mt-2 text-[12px] tracking-widest text-white/60">LOADING ARENA…</p>
           </div>
         )}
-        {props.phase === 'loading' && <LearnWhileYouWait compact className="mt-1" />}
+        {props.phase === 'loading' && <LearnWhileYouWait compact className="mt-1 min-h-0 shrink overflow-y-auto overscroll-contain" />}
 
         {props.phase === 'ready' && (
           <button
@@ -465,8 +475,8 @@ export function SplashCard(props: BootSplashProps) {
             <div className="flex flex-wrap items-center justify-center gap-2">
               {readyCourtLocations().map((l) => (
                 <button key={l.id} type="button" onClick={() => pickLocation(l.id)}
-                  className={`rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${l.id === loc ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
-                  style={l.id === loc ? { background: l.tint, borderColor: l.tint } : { borderColor: `${l.tint}88` }}>
+                  className={`rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${l.id === loc ? '' : 'text-white/80 hover:bg-white/10'}`}
+                  style={l.id === loc ? pickedChip(l.tint) : { borderColor: `${l.tint}88` }}>
                   {l.name.toUpperCase()}
                 </button>
               ))}
@@ -481,8 +491,8 @@ export function SplashCard(props: BootSplashProps) {
               {readyBallSkins().map((b) => (
                 <button key={b.id} type="button" onClick={() => pickBall(b.id)} title={b.sub}
                   aria-label={`${b.label} — ${b.sub}`} aria-pressed={b.id === ball}
-                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${b.id === ball ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
-                  style={b.id === ball ? { background: b.tint, borderColor: b.tint } : { borderColor: `${b.tint}88` }}>
+                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${b.id === ball ? '' : 'text-white/80 hover:bg-white/10'}`}
+                  style={b.id === ball ? pickedChip(b.tint) : { borderColor: `${b.tint}88` }}>
                   <span aria-hidden className="inline-block h-2.5 w-2.5 rounded-full"
                     style={{ background: b.tint2 ? `linear-gradient(135deg, ${b.tint}, ${b.tint2})` : b.tint, boxShadow: `0 0 6px ${b.tint}aa` }} />
                   {b.label}
@@ -499,8 +509,8 @@ export function SplashCard(props: BootSplashProps) {
             <div className="flex flex-wrap items-center justify-center gap-2">
               {readyWeathers(wxFamily).map((w) => (
                 <button key={w.id} type="button" onClick={() => pickWeather(w.id)} aria-pressed={w.id === wx}
-                  className={`rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${w.id === wx ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
-                  style={w.id === wx ? { background: w.tint, borderColor: w.tint } : { borderColor: `${w.tint}88` }}>
+                  className={`rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${w.id === wx ? '' : 'text-white/80 hover:bg-white/10'}`}
+                  style={w.id === wx ? pickedChip(w.tint) : { borderColor: `${w.tint}88` }}>
                   {w.name}
                 </button>
               ))}
@@ -515,8 +525,8 @@ export function SplashCard(props: BootSplashProps) {
               {readyVenues(disc).map((v) => (
                 <button key={v.id} type="button" onClick={() => pickVenue(v.id)} title={v.sub}
                   aria-label={`${v.name} — ${v.sub}`} aria-pressed={v.id === venue}
-                  className={`rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${v.id === venue ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
-                  style={v.id === venue ? { background: v.palette.accent, borderColor: v.palette.accent } : { borderColor: `${v.palette.accent}88` }}>
+                  className={`rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${v.id === venue ? '' : 'text-white/80 hover:bg-white/10'}`}
+                  style={v.id === venue ? pickedChip(v.palette.accent) : { borderColor: `${v.palette.accent}88` }}>
                   {v.name}
                 </button>
               ))}
@@ -534,8 +544,8 @@ export function SplashCard(props: BootSplashProps) {
               {arenasFor(arenaMode).map((a) => (
                 <button key={a.id} type="button" onClick={() => pickArena(a.id)} title={a.sub}
                   aria-label={`${a.name} — ${a.sub}`} aria-pressed={a.id === arenaId}
-                  className={`rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${a.id === arenaId ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
-                  style={a.id === arenaId ? { background: a.tint, borderColor: a.tint } : { borderColor: `${a.tint}88` }}>
+                  className={`rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${a.id === arenaId ? '' : 'text-white/80 hover:bg-white/10'}`}
+                  style={a.id === arenaId ? pickedChip(a.tint) : { borderColor: `${a.tint}88` }}>
                   {a.name.toUpperCase()}
                 </button>
               ))}
@@ -553,8 +563,8 @@ export function SplashCard(props: BootSplashProps) {
               {placeList.map((l) => (
                 <button key={l.id} type="button" onClick={() => pickPlace(l.id)} title={l.sub}
                   aria-label={`${l.name} — ${l.sub}`} aria-pressed={l.id === placeId}
-                  className={`rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${l.id === placeId ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
-                  style={l.id === placeId ? { background: l.tint, borderColor: l.tint } : { borderColor: `${l.tint}88` }}>
+                  className={`rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${l.id === placeId ? '' : 'text-white/80 hover:bg-white/10'}`}
+                  style={l.id === placeId ? pickedChip(l.tint) : { borderColor: `${l.tint}88` }}>
                   {l.name.toUpperCase()}
                 </button>
               ))}
@@ -577,8 +587,8 @@ export function SplashCard(props: BootSplashProps) {
               {COURT_LAYOUTS.map((l) => (
                 <button key={l.id} type="button" onClick={() => pickCourt(l.id)} title={l.sub}
                   aria-label={`${l.name} — ${l.sub}`} aria-pressed={l.id === courtId}
-                  className={`rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${l.id === courtId ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
-                  style={l.id === courtId ? { background: l.tint, borderColor: l.tint } : { borderColor: `${l.tint}88` }}>
+                  className={`rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${l.id === courtId ? '' : 'text-white/80 hover:bg-white/10'}`}
+                  style={l.id === courtId ? pickedChip(l.tint) : { borderColor: `${l.tint}88` }}>
                   {l.name.toUpperCase()}
                 </button>
               ))}
@@ -593,8 +603,8 @@ export function SplashCard(props: BootSplashProps) {
               {setLengthsFor(props.modeId).map((l) => (
                 <button key={l.id} type="button" onClick={() => pickSetLen(l.id)} title={l.sub}
                   aria-label={`${l.name} — ${l.sub}`} aria-pressed={l.id === setLenId}
-                  className={`rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${l.id === setLenId ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
-                  style={l.id === setLenId ? { background: l.tint, borderColor: l.tint } : { borderColor: `${l.tint}88` }}>
+                  className={`rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${l.id === setLenId ? '' : 'text-white/80 hover:bg-white/10'}`}
+                  style={l.id === setLenId ? pickedChip(l.tint) : { borderColor: `${l.tint}88` }}>
                   {l.name.toUpperCase()}
                 </button>
               ))}
@@ -609,8 +619,8 @@ export function SplashCard(props: BootSplashProps) {
               {skinsFor(disc).map((d) => (
                 <button key={d.id} type="button" onClick={() => pickDeck(d.id)} title={d.sub}
                   aria-label={`${d.label} — ${d.sub}`} aria-pressed={d.id === deck}
-                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${d.id === deck ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
-                  style={d.id === deck ? { background: d.tint, borderColor: d.tint } : { borderColor: `${d.tint}88` }}>
+                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${d.id === deck ? '' : 'text-white/80 hover:bg-white/10'}`}
+                  style={d.id === deck ? pickedChip(d.tint) : { borderColor: `${d.tint}88` }}>
                   <span aria-hidden className="inline-block h-2.5 w-2.5 rounded-full"
                     style={{ background: d.tint2 ? `linear-gradient(135deg, ${d.tint}, ${d.tint2})` : d.tint, boxShadow: `0 0 6px ${d.tint}aa` }} />
                   {d.label}
@@ -627,8 +637,8 @@ export function SplashCard(props: BootSplashProps) {
               {readyMusicStages().map((m) => (
                 <button key={m.id} type="button" onClick={() => pickStage(m.id)} title={m.sub}
                   aria-label={`${m.label} — ${m.sub}`} aria-pressed={m.id === stage}
-                  className={`rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${m.id === stage ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
-                  style={m.id === stage ? { background: m.tint, borderColor: m.tint } : { borderColor: `${m.tint}88` }}>
+                  className={`rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${m.id === stage ? '' : 'text-white/80 hover:bg-white/10'}`}
+                  style={m.id === stage ? pickedChip(m.tint) : { borderColor: `${m.tint}88` }}>
                   {m.label}
                 </button>
               ))}
@@ -646,8 +656,8 @@ export function SplashCard(props: BootSplashProps) {
               {readyCourses(race).map((c) => (
                 <button key={c.id} type="button" onClick={() => pickMap(c.id)} title={c.sub}
                   aria-label={`${c.name} — ${c.sub}`} aria-pressed={c.id === map}
-                  className={`rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${c.id === map ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
-                  style={c.id === map ? { background: c.tint, borderColor: c.tint } : { borderColor: `${c.tint}88` }}>
+                  className={`rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${c.id === map ? '' : 'text-white/80 hover:bg-white/10'}`}
+                  style={c.id === map ? pickedChip(c.tint) : { borderColor: `${c.tint}88` }}>
                   {c.name}
                 </button>
               ))}
@@ -697,9 +707,9 @@ export function SplashCard(props: BootSplashProps) {
               {readyVehicles(race).map((r) => (
                 <button key={r.id} type="button" onClick={() => pickRide(r.id)} title={r.sub}
                   aria-label={`${r.name} — ${r.sub}`} aria-pressed={r.id === ride}
-                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${r.id === ride ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
-                  style={r.id === ride ? { background: r.tint, borderColor: r.tint } : { borderColor: `${r.tint}88` }}>
-                  <Bars bars={r.bars} tint={r.id === ride ? '#000' : r.tint} />
+                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${r.id === ride ? '' : 'text-white/80 hover:bg-white/10'}`}
+                  style={r.id === ride ? pickedChip(r.tint) : { borderColor: `${r.tint}88` }}>
+                  <Bars bars={r.bars} tint={r.id === ride ? chipInk(r.tint) : r.tint} />
                   {r.name}
                 </button>
               ))}
@@ -719,9 +729,9 @@ export function SplashCard(props: BootSplashProps) {
               {readyWeapons().map((w) => (
                 <button key={w.id} type="button" onClick={() => pickWeapon(w.id)} title={w.sub}
                   aria-label={`${w.name} — ${w.sub}`} aria-pressed={w.id === weapon}
-                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${w.id === weapon ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
-                  style={w.id === weapon ? { background: w.tint, borderColor: w.tint } : { borderColor: `${w.tint}88` }}>
-                  <Bars bars={{ speed: w.bars.reach, hold: w.bars.speed, edge: w.bars.power }} tint={w.id === weapon ? '#000' : w.tint} />
+                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${w.id === weapon ? '' : 'text-white/80 hover:bg-white/10'}`}
+                  style={w.id === weapon ? pickedChip(w.tint) : { borderColor: `${w.tint}88` }}>
+                  <Bars bars={{ speed: w.bars.reach, hold: w.bars.speed, edge: w.bars.power }} tint={w.id === weapon ? chipInk(w.tint) : w.tint} />
                   {w.name}
                 </button>
               ))}
@@ -739,8 +749,8 @@ export function SplashCard(props: BootSplashProps) {
               {readySchools().map((sc) => (
                 <button key={sc.id} type="button" onClick={() => pickSchool(sc.id)} title={sc.sub}
                   aria-label={`${sc.name} — ${sc.sub}`} aria-pressed={sc.id === style.primary}
-                  className={`rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${sc.id === style.primary ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
-                  style={sc.id === style.primary ? { background: sc.tint, borderColor: sc.tint } : { borderColor: `${sc.tint}88` }}>
+                  className={`rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${sc.id === style.primary ? '' : 'text-white/80 hover:bg-white/10'}`}
+                  style={sc.id === style.primary ? pickedChip(sc.tint) : { borderColor: `${sc.tint}88` }}>
                   {sc.name}
                 </button>
               ))}
@@ -757,8 +767,8 @@ export function SplashCard(props: BootSplashProps) {
               {readySchools().filter((sc) => sc.id !== style.primary).map((sc) => (
                 <button key={sc.id} type="button" aria-pressed={sc.id === style.secondary}
                   onClick={() => setBlend({ primary: style.primary, secondary: sc.id, mix: style.mix > 0 ? style.mix : 0.3 })}
-                  className={`rounded-full border px-2 py-0.5 text-[12px] font-bold tracking-wider transition ${sc.id === style.secondary ? 'text-black' : 'text-white/60 hover:bg-white/10'}`}
-                  style={sc.id === style.secondary ? { background: sc.tint, borderColor: sc.tint } : { borderColor: 'rgba(255,255,255,0.18)' }}>
+                  className={`rounded-full border px-2 py-0.5 text-[12px] font-bold tracking-wider transition ${sc.id === style.secondary ? '' : 'text-white/60 hover:bg-white/10'}`}
+                  style={sc.id === style.secondary ? pickedChip(sc.tint) : { borderColor: 'rgba(255,255,255,0.18)' }}>
                   {sc.name}
                 </button>
               ))}
@@ -799,8 +809,8 @@ export function SplashCard(props: BootSplashProps) {
               {tierList().map((t) => (
                 <button key={t.id} type="button" onClick={() => pickTier(t.id)} title={t.sub}
                   aria-label={`${t.name} — ${t.sub}`} aria-pressed={t.id === tier}
-                  className={`rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${t.id === tier ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
-                  style={t.id === tier ? { background: t.tint, borderColor: t.tint } : { borderColor: `${t.tint}88` }}>
+                  className={`rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${t.id === tier ? '' : 'text-white/80 hover:bg-white/10'}`}
+                  style={t.id === tier ? pickedChip(t.tint) : { borderColor: `${t.tint}88` }}>
                   {t.name}
                 </button>
               ))}
