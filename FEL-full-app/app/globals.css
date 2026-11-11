@@ -126,6 +126,7 @@ body {
 
 .fel-input {
   width: 100%;
+  min-height: 2.75rem; /* EVERY-SCREEN P8b: 44 px, the app's tap-target floor (was 42.8 px from its padding) */
   border-radius: 0.75rem;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(0, 0, 0, 0.5);

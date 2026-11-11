@@ -10,8 +10,9 @@ export function PublicTopBar() {
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-[#050505]/85 backdrop-blur-md">
       <div className="mx-auto flex max-w-[1200px] items-center justify-between px-4 py-3">
-        <Link href="/" className="fel-heading inline-flex min-h-11 items-center text-2xl font-bold text-white">
-          <span className="text-[#00E5FF] fel-glow-cyan">FINAL EVOLUTION</span> LAB
+        <Link href="/" className="fel-heading inline-flex min-h-11 items-center text-[20px] font-bold text-white">
+          {/* one inline box inside the flex link: a flex link drops the space before " LAB" (EVERY-SCREEN P8b) */}
+          <span><span className="text-[#00E5FF] fel-glow-cyan">FINAL EVOLUTION</span> LAB</span>
         </Link>
         <Link
           href="/login"

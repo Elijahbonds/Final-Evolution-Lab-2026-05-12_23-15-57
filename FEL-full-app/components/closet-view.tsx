@@ -89,7 +89,7 @@ function Chip({ label, active, onClick, accent = '#00E5FF' }: { label: string; a
   return (
     <button
       onClick={onClick}
-      className="rounded-full px-3 py-1.5 text-xs font-medium transition"
+      className="min-h-11 rounded-full px-3 py-1.5 text-xs font-medium transition"
       style={{
         backgroundColor: active ? accent : 'rgba(255,255,255,0.05)',
         color: active ? '#050505' : 'rgba(255,255,255,0.75)',
@@ -666,7 +666,7 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan: faceSca
 
   const dirty = !!savedSig && sigNow !== savedSig;
   const stageH = fullBleed ? 'h-[100dvh]' : 'h-[calc(100dvh-3.5rem)] max-md:h-[calc(100dvh-3.5rem-4.5rem)]';
-  const hudBtn = 'pointer-events-auto flex items-center gap-1 rounded-lg border border-white/10 bg-black/55 px-2.5 py-1.5 max-md:px-2 max-md:py-1 font-display text-[12px] font-semibold uppercase tracking-wider text-white/80 backdrop-blur transition hover:border-cyan-400/50';
+  const hudBtn = 'pointer-events-auto flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-lg border border-white/10 bg-black/55 px-2.5 py-1.5 max-md:px-2 max-md:py-1 font-display text-[12px] font-semibold uppercase tracking-wider text-white/80 backdrop-blur transition hover:border-cyan-400/50';
   const on = (v: boolean) => (v ? { borderColor: 'var(--fel-cyan)', color: 'var(--fel-cyan)', background: 'rgba(0,229,255,0.12)' } : undefined);
   const selLabel = tab === 'parts' && selectedPart ? `Part · ${selectedPart.shape}` : tab === 'paint' && selectedLayer ? `Layer · ${REGION_LABELS[selectedLayer.region]}`
     : selectedCloth ? `Wearing · ${clothLabel(selectedCloth)}` : null;
@@ -702,7 +702,7 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan: faceSca
                 <button type="button" className={hudBtn} onClick={() => addAt('fill')}>+ Fill</button>
                 <button type="button" className={hudBtn} onClick={() => addAt('pattern')}>+ Pattern</button>
                 <button type="button" className={hudBtn} onClick={() => addAt('stamp')}>+ Stamp here</button>
-                <button type="button" className="pointer-events-auto rounded p-1 text-white/50 hover:text-white" onClick={() => setTapped(null)} aria-label="Clear"><X className="h-3.5 w-3.5" /></button>
+                <button type="button" className="pointer-events-auto grid h-11 w-11 place-items-center rounded text-white/50 hover:text-white" onClick={() => setTapped(null)} aria-label="Clear"><X className="h-3.5 w-3.5" /></button>
               </div>
             )}
           </div>
@@ -719,7 +719,9 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan: faceSca
             <div className="flex flex-wrap justify-end gap-1" role="group" aria-label="Camera">
               {STUDIO_SHOTS.map((sh, i) => <button key={sh} type="button" className={hudBtn} onClick={() => act({ shot: sh })} title={`${sh} (${i + 1})`}>{sh}</button>)}
             </div>
-            <div className="flex flex-wrap justify-end gap-1">
+            {/* EVERY-SCREEN P8b: at 44 px a phone's row of five ran across the character's face; two columns down the
+                stage's right edge keep him clear */}
+            <div className="flex flex-wrap justify-end gap-1 max-md:grid max-md:grid-cols-2">
               <button type="button" className={hudBtn} style={on(autoSpin)} onClick={() => setAutoSpin(!autoSpin)} aria-pressed={autoSpin} title="Turntable (T, pad L3) — or drag the stage to spin"><RotateCw className="h-3.5 w-3.5" /> <span className="max-md:hidden">Spin</span></button>
               <button type="button" className={hudBtn} style={on(compare)} onClick={() => setCompare((c) => !c)} aria-pressed={compare} title="Before / after (B, pad Select)"><SplitSquareHorizontal className="h-3.5 w-3.5" /> <span className="max-md:hidden">Before</span></button>
               <button type="button" className={hudBtn} style={on(showPose)} onClick={() => setShowPose((v) => !v)} aria-pressed={showPose} title="Poses and venue light"><Sun className="h-3.5 w-3.5" /> <span className="max-md:hidden">Pose</span></button>
@@ -831,7 +833,7 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan: faceSca
                 <button type="button" onClick={() => setHist(redo)} disabled={!canRedo(hist)} aria-label="Redo" title="Redo (Shift+Ctrl+Z)"
                   className="flex items-center gap-1 rounded-lg bg-white/5 px-2.5 py-1.5 text-xs text-white/80 transition hover:bg-white/10 disabled:opacity-30"><Redo2 className="h-3.5 w-3.5" /> Redo</button>
                 <button type="button" onClick={roll} disabled={locks.length === RANDOM_SECTIONS.length}
-                  className="flex items-center gap-1 rounded-lg bg-cyan-400/15 px-2.5 py-1.5 text-xs font-semibold text-cyan-200 transition hover:bg-cyan-400/25 disabled:opacity-30"><Shuffle className="h-3.5 w-3.5" /> Randomise</button>
+                  className="flex min-h-11 items-center gap-1 rounded-lg bg-cyan-400/15 px-2.5 py-1.5 text-xs font-semibold text-cyan-200 transition hover:bg-cyan-400/25 disabled:opacity-30"><Shuffle className="h-3.5 w-3.5" /> Randomise</button>
                 <div className="flex flex-wrap gap-1.5">
                   {RANDOM_SECTIONS.map((sec) => {
                     const on = locks.includes(sec);

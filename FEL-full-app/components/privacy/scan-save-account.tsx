@@ -23,7 +23,7 @@ export function ScanSaveAccountPanel(props: {
 }) {
   return (
     <section className="rounded-xl border border-white/10 bg-white/[0.02] p-5" data-testid="scan-save-account">
-      <h2 className="fel-heading text-lg font-bold text-white">Jump numbers</h2>
+      <h2 className="fel-heading text-[20px] font-bold text-white">Jump numbers</h2>
       <label className={`mt-3 flex min-h-11 cursor-pointer items-start gap-3 ${lineSize(SCAN_SAVE_CONSENT_TEXT, 'text-sm')} text-white/80`}>
         <input
           data-testid="scan-save-toggle"

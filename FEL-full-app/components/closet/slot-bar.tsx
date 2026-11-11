@@ -62,7 +62,7 @@ export function SlotBar(p: SlotBarProps) {
   const sel = p.slots.find((s) => s.id === p.selected);
   useEffect(() => { if (p.openPaste) { setPasting(true); setPasteError(null); } }, [p.openPaste]);
 
-  const btn = 'flex items-center gap-1 rounded-lg bg-white/5 px-2 py-1 text-[12px] text-white/80 transition hover:bg-white/10 disabled:opacity-30';
+  const btn = 'flex min-h-11 items-center gap-1 rounded-lg bg-white/5 px-2 py-1 text-[12px] text-white/80 transition hover:bg-white/10 disabled:opacity-30';
   return (
     <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3" aria-label="Saved characters">
       <div className="mb-2 flex items-center justify-between">
@@ -82,7 +82,7 @@ export function SlotBar(p: SlotBarProps) {
             <div key={s.id} role="option" aria-selected={on}
               className="flex flex-col gap-1 rounded-xl border p-2 transition"
               style={{ borderColor: on ? accent : 'rgba(255,255,255,0.1)', backgroundColor: on ? `${accent}14` : 'rgba(255,255,255,0.02)' }}>
-              <button type="button" onClick={() => p.onSelect(s.id)} className="flex items-center gap-2 text-left" aria-label={`Edit ${s.label || 'character'}`}>
+              <button type="button" onClick={() => p.onSelect(s.id)} className="flex min-h-11 items-center gap-2 text-left" aria-label={`Edit ${s.label || 'character'}`}>
                 <SlotThumb slot={s} />
                 <span className="min-w-0">
                   {renaming === s.id ? null : <span className="block truncate font-mono text-[12px] font-bold tracking-wider text-white">{s.label || '—'}</span>}
@@ -103,9 +103,9 @@ export function SlotBar(p: SlotBarProps) {
                   ? <span className="flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[12px] font-black tracking-wider text-black" style={{ background: accent }}><Play className="h-2.5 w-2.5" /> PLAYING</span>
                   : <button type="button" onClick={() => p.onPlayAs(s.id)} className="rounded-full border border-white/15 px-1.5 py-0.5 text-[12px] font-bold tracking-wider text-white/75 hover:bg-white/10" title="Play as this character in every mode">PLAY AS</button>}
                 <span className="flex-1" />
-                <button type="button" aria-label={`Rename ${s.label}`} title="Rename" onClick={() => { setRenaming(s.id); setDraft(s.label); }} className="grid h-11 w-11 place-items-center text-white/50 hover:text-white"><Pencil className="h-3 w-3" /></button>
+                <button type="button" aria-label={`Rename ${s.label}`} title="Rename" onClick={() => { setRenaming(s.id); setDraft(s.label); }} className="grid h-11 w-11 shrink-0 place-items-center text-white/50 hover:text-white"><Pencil className="h-3 w-3" /></button>
                 <button type="button" aria-label={`Delete ${s.label}`} title={p.slots.length <= 1 ? 'Your only character' : 'Delete'} disabled={p.slots.length <= 1}
-                  onClick={() => setConfirmDelete(s.id)} className="grid h-11 w-11 place-items-center text-white/50 hover:text-red-300 disabled:opacity-20"><Trash2 className="h-3 w-3" /></button>
+                  onClick={() => setConfirmDelete(s.id)} className="grid h-11 w-11 shrink-0 place-items-center text-white/50 hover:text-red-300 disabled:opacity-20"><Trash2 className="h-3 w-3" /></button>
               </div>
             </div>
           );
@@ -140,8 +140,10 @@ export function SlotBar(p: SlotBarProps) {
       {sel && (
         <div className="mt-2 flex flex-wrap items-center gap-2 text-[12px] text-white/60">
           <button type="button" className={btn} onClick={async () => setShare(await p.onShare(shareNumbers))}><Copy className="h-3 w-3" /> Share code for {sel.label || 'this character'}</button>
-          <label className="flex items-center gap-1" title="The face sculpt numbers (a face scan writes these). Off unless you choose.">
-            <input type="checkbox" checked={shareNumbers} onChange={(e) => { setShareNumbers(e.target.checked); setShare(null); }} /> include face sculpt
+          <label className="flex min-h-11 cursor-pointer items-center gap-1.5" title="The face sculpt numbers (a face scan writes these). Off unless you choose.">
+            <input type="checkbox" className="peer sr-only" checked={shareNumbers} onChange={(e) => { setShareNumbers(e.target.checked); setShare(null); }} />
+            <span aria-hidden className="grid h-4 w-4 place-items-center rounded border border-white/40 text-[12px] leading-none text-transparent peer-checked:border-cyan-400 peer-checked:bg-cyan-400 peer-checked:text-black peer-focus-visible:ring-2 peer-focus-visible:ring-cyan-300">✓</span>
+            include face sculpt
           </label>
           {p.dirty && <span className="text-yellow-300/80">unsaved changes</span>}
         </div>

@@ -118,7 +118,7 @@ export function CoinStore({ initialPurchasesEnabled = null }: { initialPurchases
           <h1 className="text-2xl font-bold text-white">Coin Store</h1>
           {/* ARENA-10PHASE P10 said "sold separately" unconditionally; FEATURES-UX-SHOP: the line is the purchases flag's own words,
               and "Shard Store" is the link in every state. */}
-          <p className="text-sm text-white/50">
+          <p className="text-base text-white/50">
             {copy.coinStoreShards.split('Shard Store')[0]}
             <Link href="/shop/shards" className="text-[#C79BFF] hover:underline">Shard Store</Link>
             {copy.coinStoreShards.split('Shard Store')[1]}

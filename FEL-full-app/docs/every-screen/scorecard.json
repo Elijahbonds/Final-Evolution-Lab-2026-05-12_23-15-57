@@ -1,7 +1,7 @@
 {
  "what": "The every-screen scorecard: docs/PLAN-EVERY-SCREEN-10PHASE.md, phase 1. Written by scripts/every-screen/score.mts --report.",
- "measuredAt": "2026-11-11T18:42:58.964Z",
- "commit": "39904c9d",
+ "measuredAt": "2026-11-11T20:43:32.136Z",
+ "commit": "30bb4553",
  "budgets": {
   "wordsFoldDo": 40,
   "tapPx": 44,
@@ -15,29 +15,29 @@
  "totals": {
   "screens": 187,
   "scored": 153,
-  "passAll": 31,
+  "passAll": 36,
   "alias": 7,
   "off": 21,
   "notScored": 6,
   "byCheck": {
    "clear": {
-    "pass": 78,
-    "fail": 75,
+    "pass": 83,
+    "fail": 70,
     "nm": 0
    },
    "finished": {
-    "pass": 63,
-    "fail": 90,
+    "pass": 69,
+    "fail": 84,
     "nm": 0
    },
    "fast": {
-    "pass": 126,
-    "fail": 9,
+    "pass": 125,
+    "fail": 10,
     "nm": 18
    },
    "right": {
-    "pass": 141,
-    "fail": 12,
+    "pass": 143,
+    "fail": 10,
     "nm": 0
    }
   },
@@ -51,7 +51,7 @@
   {
    "id": "body-small",
    "name": "Body copy under 16 px",
-   "screens": 50,
+   "screens": 48,
    "wouldPassIfFixed": 5
   },
   {
@@ -63,20 +63,14 @@
   {
    "id": "text-sizes",
    "name": "More than 4 text sizes on one screen",
-   "screens": 35,
-   "wouldPassIfFixed": 1
+   "screens": 29,
+   "wouldPassIfFixed": 0
   },
   {
    "id": "small-targets",
    "name": "Tap targets under 44 px in the screen itself",
-   "screens": 33,
+   "screens": 27,
    "wouldPassIfFixed": 0
-  },
-  {
-   "id": "small-targets-bars",
-   "name": "Tap targets under 44 px in the app's own bars",
-   "screens": 18,
-   "wouldPassIfFixed": 3
   },
   {
    "id": "button-looks",
@@ -85,15 +79,21 @@
    "wouldPassIfFixed": 0
   },
   {
+   "id": "small-targets-bars",
+   "name": "Tap targets under 44 px in the app's own bars",
+   "screens": 16,
+   "wouldPassIfFixed": 3
+  },
+  {
    "id": "tiny-text",
    "name": "Text under 12 px",
    "screens": 13,
-   "wouldPassIfFixed": 2
+   "wouldPassIfFixed": 3
   },
   {
    "id": "empty-no-next",
    "name": "An empty state with no next step",
-   "screens": 12,
+   "screens": 10,
    "wouldPassIfFixed": 0
   },
   {
@@ -103,28 +103,16 @@
    "wouldPassIfFixed": 5
   },
   {
-   "id": "clipped:font150",
-   "name": "Text cut off (150 % text)",
-   "screens": 7,
-   "wouldPassIfFixed": 2
-  },
-  {
-   "id": "only-chrome",
-   "name": "Only the app's bars lead on",
-   "screens": 7,
-   "wouldPassIfFixed": 0
-  },
-  {
    "id": "unfinished:coming soon",
    "name": "Unfinished mark: \"coming soon\"",
    "screens": 6,
    "wouldPassIfFixed": 5
   },
   {
-   "id": "a11y-critical",
-   "name": "Critical accessibility findings",
+   "id": "only-chrome",
+   "name": "Only the app's bars lead on",
    "screens": 6,
-   "wouldPassIfFixed": 1
+   "wouldPassIfFixed": 0
   },
   {
    "id": "layout-shift",
@@ -133,16 +121,22 @@
    "wouldPassIfFixed": 0
   },
   {
-   "id": "a11y-serious",
-   "name": "Serious accessibility findings",
-   "screens": 4,
-   "wouldPassIfFixed": 0
-  },
-  {
    "id": "slow-tap",
    "name": "The main action answers a tap in more than 200 ms",
-   "screens": 4,
-   "wouldPassIfFixed": 0
+   "screens": 5,
+   "wouldPassIfFixed": 1
+  },
+  {
+   "id": "a11y-critical",
+   "name": "Critical accessibility findings",
+   "screens": 5,
+   "wouldPassIfFixed": 1
+  },
+  {
+   "id": "clipped:font150",
+   "name": "Text cut off (150 % text)",
+   "screens": 5,
+   "wouldPassIfFixed": 2
   },
   {
    "id": "unfinished:placeholder text",
@@ -151,9 +145,9 @@
    "wouldPassIfFixed": 0
   },
   {
-   "id": "clipped:zoom200",
-   "name": "Text cut off (200 % zoom)",
-   "screens": 4,
+   "id": "a11y-serious",
+   "name": "Serious accessibility findings",
+   "screens": 3,
    "wouldPassIfFixed": 0
   },
   {
@@ -165,6 +159,12 @@
   {
    "id": "many-primary",
    "name": "More than one bright button on the first screen",
+   "screens": 2,
+   "wouldPassIfFixed": 0
+  },
+  {
+   "id": "clipped:zoom200",
+   "name": "Text cut off (200 % zoom)",
    "screens": 2,
    "wouldPassIfFixed": 0
   },
@@ -254,7 +254,7 @@
     "right": "pass"
    },
    "passAll": false,
-   "worst": "3 tap targets under 44 px (smallest: \"on\").",
+   "worst": "1 tap target under 44 px (smallest: \"Health data collection\").",
    "faults": [
     "small-targets",
     "text-sizes",
@@ -265,12 +265,12 @@
    "numbers": {
     "wordsBeforeScroll": 81,
     "brightButtons": 0,
-    "smallTargets": 3,
+    "smallTargets": 1,
     "textSizes": 6,
     "buttonLooks": 4,
-    "firstContentMs": 368,
+    "firstContentMs": 384,
     "layoutShift": 0.001,
-    "tapMs": 104,
+    "tapMs": 88,
     "tapped": "Download my data",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -318,14 +318,14 @@
    "review": [],
    "unmeasured": [],
    "numbers": {
-    "wordsBeforeScroll": 16,
+    "wordsBeforeScroll": 14,
     "brightButtons": 0,
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 0,
-    "firstContentMs": 280,
+    "firstContentMs": 356,
     "layoutShift": 0.001,
-    "tapMs": 152,
+    "tapMs": 96,
     "tapped": "Account",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -364,9 +364,9 @@
     "smallTargets": 1,
     "textSizes": 4,
     "buttonLooks": 1,
-    "firstContentMs": 316,
+    "firstContentMs": 400,
     "layoutShift": 0.001,
-    "tapMs": 104,
+    "tapMs": 152,
     "tapped": "Run re-engagement sweep",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -405,9 +405,9 @@
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 1,
-    "firstContentMs": 272,
+    "firstContentMs": 288,
     "layoutShift": 0.132,
-    "tapMs": 120,
+    "tapMs": 128,
     "tapped": "Recompute (14d)",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -447,9 +447,9 @@
     "smallTargets": 6,
     "textSizes": 5,
     "buttonLooks": 2,
-    "firstContentMs": 268,
+    "firstContentMs": 420,
     "layoutShift": 0.001,
-    "tapMs": 40,
+    "tapMs": 56,
     "tapped": "WAITING",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -641,9 +641,9 @@
     "smallTargets": 0,
     "textSizes": 10,
     "buttonLooks": 1,
-    "firstContentMs": 380,
+    "firstContentMs": 436,
     "layoutShift": 0.001,
-    "tapMs": 104,
+    "tapMs": 152,
     "tapped": "80 LC",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -662,19 +662,16 @@
    "state": "scored",
    "reason": null,
    "checks": {
-    "clear": "fail",
+    "clear": "pass",
     "finished": "fail",
     "fast": "n/m",
-    "right": "fail"
+    "right": "pass"
    },
    "passAll": false,
-   "worst": "40 tap targets under 44 px (smallest: \"Rename LOOK 1\").",
+   "worst": "4 paragraphs of body copy under 16 px.",
    "faults": [
-    "small-targets",
-    "clipped:font150",
-    "a11y-serious",
-    "button-looks",
-    "body-small"
+    "body-small",
+    "button-looks"
    ],
    "review": [],
    "unmeasured": [
@@ -682,19 +679,19 @@
     "Fast and smooth: a 3D screen: the rig has no real GPU, so the tap response is not timed"
    ],
    "numbers": {
-    "wordsBeforeScroll": 115,
-    "brightButtons": 0,
-    "smallTargets": 40,
+    "wordsBeforeScroll": 98,
+    "brightButtons": 1,
+    "smallTargets": 0,
     "textSizes": 4,
-    "buttonLooks": 12,
-    "firstContentMs": 380,
-    "layoutShift": 0.002,
+    "buttonLooks": 10,
+    "firstContentMs": 368,
+    "layoutShift": 0.007,
     "tapMs": null,
     "tapped": null,
     "brokenLinks": 0,
     "a11yCritical": 0,
-    "a11ySerious": 1,
-    "jsKb": 2484
+    "a11ySerious": 0,
+    "jsKb": 2492
    }
   },
   {
@@ -2620,28 +2617,25 @@
    "state": "scored",
    "reason": null,
    "checks": {
-    "clear": "fail",
-    "finished": "fail",
+    "clear": "pass",
+    "finished": "pass",
     "fast": "pass",
     "right": "pass"
    },
-   "passAll": false,
-   "worst": "8 tap targets under 44 px (smallest: \"SHOP\").",
-   "faults": [
-    "small-targets",
-    "body-small"
-   ],
+   "passAll": true,
+   "worst": null,
+   "faults": [],
    "review": [],
    "unmeasured": [],
    "numbers": {
     "wordsBeforeScroll": 65,
     "brightButtons": 0,
-    "smallTargets": 8,
+    "smallTargets": 0,
     "textSizes": 4,
     "buttonLooks": 2,
-    "firstContentMs": 252,
+    "firstContentMs": 320,
     "layoutShift": 0.001,
-    "tapMs": 64,
+    "tapMs": 72,
     "tapped": "SHOP",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -3494,9 +3488,8 @@
     "right": "pass"
    },
    "passAll": false,
-   "worst": "Text cut off at 200 % zoom: \"0\" and 5 more.",
+   "worst": "1 piece of text under 12 px.",
    "faults": [
-    "clipped:zoom200",
     "tiny-text"
    ],
    "review": [],
@@ -3507,7 +3500,7 @@
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 1,
-    "firstContentMs": 440,
+    "firstContentMs": 484,
     "layoutShift": 0,
     "tapMs": 16,
     "tapped": "TAP TO START",
@@ -4341,7 +4334,7 @@
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 1,
-    "firstContentMs": 540,
+    "firstContentMs": 504,
     "layoutShift": 0,
     "tapMs": null,
     "tapped": null,
@@ -4717,10 +4710,8 @@
     "right": "pass"
    },
    "passAll": false,
-   "worst": "Text cut off at 200 % zoom: \"CONTROLS\" and 5 more.",
+   "worst": "1 piece of text under 12 px.",
    "faults": [
-    "clipped:zoom200",
-    "clipped:font150",
     "tiny-text"
    ],
    "review": [],
@@ -4734,7 +4725,7 @@
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 1,
-    "firstContentMs": 408,
+    "firstContentMs": 488,
     "layoutShift": 0,
     "tapMs": null,
     "tapped": null,
@@ -4991,8 +4982,8 @@
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 0,
-    "firstContentMs": 288,
-    "layoutShift": 0.001,
+    "firstContentMs": 1024,
+    "layoutShift": 0,
     "tapMs": null,
     "tapped": null,
     "brokenLinks": 0,
@@ -5012,32 +5003,28 @@
    "state": "scored",
    "reason": null,
    "checks": {
-    "clear": "fail",
-    "finished": "fail",
-    "fast": "pass",
+    "clear": "pass",
+    "finished": "pass",
+    "fast": "fail",
     "right": "pass"
    },
    "passAll": false,
-   "worst": "An empty state with no next step: \"Nothing measured yet\".",
+   "worst": "\"Jump check, hands on hips →\" answers a tap in 408 ms (the budget is 200 ms).",
    "faults": [
-    "empty-no-next",
-    "small-targets",
-    "text-sizes"
+    "slow-tap"
    ],
    "review": [],
-   "unmeasured": [
-    "tap response"
-   ],
+   "unmeasured": [],
    "numbers": {
-    "wordsBeforeScroll": 41,
+    "wordsBeforeScroll": 46,
     "brightButtons": 0,
-    "smallTargets": 1,
-    "textSizes": 6,
+    "smallTargets": 0,
+    "textSizes": 5,
     "buttonLooks": 2,
-    "firstContentMs": 832,
+    "firstContentMs": 904,
     "layoutShift": 0.001,
-    "tapMs": null,
-    "tapped": null,
+    "tapMs": 408,
+    "tapped": "Jump check, hands on hips →",
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
@@ -5061,28 +5048,24 @@
     "right": "pass"
    },
    "passAll": false,
-   "worst": "Nothing in the screen itself leads on: only the app's own bars do.",
+   "worst": "69 words before scrolling (the budget is 40).",
    "faults": [
-    "only-chrome",
-    "empty-no-next",
     "too-many-words",
     "body-small",
     "text-sizes"
    ],
    "review": [],
-   "unmeasured": [
-    "tap response"
-   ],
+   "unmeasured": [],
    "numbers": {
-    "wordsBeforeScroll": 68,
+    "wordsBeforeScroll": 69,
     "brightButtons": 0,
     "smallTargets": 0,
-    "textSizes": 5,
+    "textSizes": 6,
     "buttonLooks": 0,
-    "firstContentMs": 412,
+    "firstContentMs": 300,
     "layoutShift": 0.001,
-    "tapMs": null,
-    "tapped": null,
+    "tapMs": 104,
+    "tapped": "Play →",
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
@@ -5106,25 +5089,24 @@
     "right": "pass"
    },
    "passAll": false,
-   "worst": "24 tap targets under 44 px (smallest: \"+ Log measurement\").",
+   "worst": "79 words before scrolling (the budget is 40).",
    "faults": [
-    "small-targets",
     "too-many-words",
     "button-looks",
-    "text-sizes",
-    "small-targets-bars"
+    "small-targets",
+    "text-sizes"
    ],
    "review": [],
    "unmeasured": [],
    "numbers": {
     "wordsBeforeScroll": 79,
     "brightButtons": 0,
-    "smallTargets": 28,
+    "smallTargets": 1,
     "textSizes": 8,
     "buttonLooks": 8,
-    "firstContentMs": 632,
+    "firstContentMs": 376,
     "layoutShift": 0.001,
-    "tapMs": 80,
+    "tapMs": 88,
     "tapped": "← Back to profile",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -5152,7 +5134,6 @@
    "worst": "114 words before scrolling (the budget is 40).",
    "faults": [
     "too-many-words",
-    "small-targets",
     "text-sizes"
    ],
    "review": [],
@@ -5160,12 +5141,12 @@
    "numbers": {
     "wordsBeforeScroll": 114,
     "brightButtons": 0,
-    "smallTargets": 2,
+    "smallTargets": 0,
     "textSizes": 7,
     "buttonLooks": 3,
-    "firstContentMs": 484,
+    "firstContentMs": 440,
     "layoutShift": 0.001,
-    "tapMs": 80,
+    "tapMs": 96,
     "tapped": "← Back to profile",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -5450,26 +5431,24 @@
    "reason": null,
    "checks": {
     "clear": "pass",
-    "finished": "fail",
+    "finished": "pass",
     "fast": "pass",
     "right": "pass"
    },
-   "passAll": false,
-   "worst": "5 text sizes on one screen besides 16 px body text (at most 4).",
-   "faults": [
-    "text-sizes"
-   ],
+   "passAll": true,
+   "worst": null,
+   "faults": [],
    "review": [],
    "unmeasured": [],
    "numbers": {
-    "wordsBeforeScroll": 89,
+    "wordsBeforeScroll": 86,
     "brightButtons": 0,
     "smallTargets": 0,
-    "textSizes": 6,
+    "textSizes": 5,
     "buttonLooks": 0,
-    "firstContentMs": 472,
+    "firstContentMs": 324,
     "layoutShift": 0.001,
-    "tapMs": 72,
+    "tapMs": 64,
     "tapped": "Creator Cards",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -5499,8 +5478,7 @@
     "only-chrome",
     "layout-shift",
     "too-many-words",
-    "body-small",
-    "text-sizes"
+    "body-small"
    ],
    "review": [
     "A measured number (\"Shards are the premium currency for group workouts & 1-on-1s\") with no line saying how it was measured or how sure it is."
@@ -5512,10 +5490,10 @@
     "wordsBeforeScroll": 103,
     "brightButtons": 0,
     "smallTargets": 0,
-    "textSizes": 5,
+    "textSizes": 4,
     "buttonLooks": 0,
-    "firstContentMs": 416,
-    "layoutShift": 0.273,
+    "firstContentMs": 476,
+    "layoutShift": 0.272,
     "tapMs": null,
     "tapped": null,
     "brokenLinks": 0,
@@ -5627,9 +5605,9 @@
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 0,
-    "firstContentMs": 356,
+    "firstContentMs": 332,
     "layoutShift": 0.001,
-    "tapMs": 72,
+    "tapMs": 88,
     "tapped": "Today's drill →",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -5666,9 +5644,9 @@
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 0,
-    "firstContentMs": 372,
+    "firstContentMs": 348,
     "layoutShift": 0.001,
-    "tapMs": 64,
+    "tapMs": 72,
     "tapped": "‹ All squads and teams",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -5709,7 +5687,7 @@
     "buttonLooks": 0,
     "firstContentMs": null,
     "layoutShift": 0,
-    "tapMs": 80,
+    "tapMs": 72,
     "tapped": "Squads and teams →",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -5729,27 +5707,24 @@
    "reason": null,
    "checks": {
     "clear": "pass",
-    "finished": "fail",
+    "finished": "pass",
     "fast": "pass",
     "right": "pass"
    },
-   "passAll": false,
-   "worst": "1 paragraph of body copy under 16 px.",
-   "faults": [
-    "body-small",
-    "text-sizes"
-   ],
+   "passAll": true,
+   "worst": null,
+   "faults": [],
    "review": [],
    "unmeasured": [],
    "numbers": {
     "wordsBeforeScroll": 72,
     "brightButtons": 0,
     "smallTargets": 0,
-    "textSizes": 6,
+    "textSizes": 5,
     "buttonLooks": 1,
-    "firstContentMs": 328,
-    "layoutShift": 0.002,
-    "tapMs": 72,
+    "firstContentMs": 320,
+    "layoutShift": 0.001,
+    "tapMs": 112,
     "tapped": "Shard Store",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -5954,29 +5929,25 @@
    "state": "scored",
    "reason": null,
    "checks": {
-    "clear": "fail",
-    "finished": "fail",
+    "clear": "pass",
+    "finished": "pass",
     "fast": "pass",
     "right": "pass"
    },
-   "passAll": false,
-   "worst": "1 tap target under 44 px (smallest: \"FinalEvolution.us@gmail.com\").",
-   "faults": [
-    "small-targets",
-    "small-targets-bars",
-    "text-sizes"
-   ],
+   "passAll": true,
+   "worst": null,
+   "faults": [],
    "review": [],
    "unmeasured": [],
    "numbers": {
-    "wordsBeforeScroll": 67,
+    "wordsBeforeScroll": 61,
     "brightButtons": 0,
-    "smallTargets": 4,
-    "textSizes": 6,
+    "smallTargets": 0,
+    "textSizes": 5,
     "buttonLooks": 1,
-    "firstContentMs": 408,
+    "firstContentMs": 364,
     "layoutShift": 0,
-    "tapMs": 104,
+    "tapMs": 88,
     "tapped": "TERMS OF SERVICE Usage terms & conditions",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -6830,33 +6801,29 @@
    "state": "scored",
    "reason": null,
    "checks": {
-    "clear": "fail",
-    "finished": "fail",
+    "clear": "pass",
+    "finished": "pass",
     "fast": "pass",
-    "right": "fail"
+    "right": "pass"
    },
-   "passAll": false,
-   "worst": "1 critical accessibility finding (label, contrast).",
-   "faults": [
-    "a11y-critical",
-    "small-targets",
-    "text-sizes"
-   ],
+   "passAll": true,
+   "worst": null,
+   "faults": [],
    "review": [],
    "unmeasured": [],
    "numbers": {
     "wordsBeforeScroll": 50,
     "brightButtons": 0,
-    "smallTargets": 6,
-    "textSizes": 6,
+    "smallTargets": 0,
+    "textSizes": 5,
     "buttonLooks": 2,
-    "firstContentMs": 328,
+    "firstContentMs": 464,
     "layoutShift": 0.001,
-    "tapMs": 64,
+    "tapMs": 96,
     "tapped": "Today's drill +10 LC",
     "brokenLinks": 0,
-    "a11yCritical": 1,
-    "a11ySerious": 1,
+    "a11yCritical": 0,
+    "a11ySerious": 0,
     "jsKb": 248
    }
   },

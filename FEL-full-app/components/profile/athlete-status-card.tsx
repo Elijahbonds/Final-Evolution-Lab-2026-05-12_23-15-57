@@ -33,7 +33,7 @@ export function AthleteStatusCard({ status }: { status: AthleteStatus }) {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="font-mono text-[12px] font-bold uppercase tracking-[0.18em] text-fel-cyan/70">Athlete status</p>
-          <h2 className="fel-heading mt-1 text-[22px] font-black text-white">What to do next</h2>
+          <h2 className="fel-heading mt-1 text-[20px] font-black text-white">What to do next</h2>
           <p className="mt-1 text-sm text-white/55">A live read of your scan history, Academy progress, and open protocols.</p>
         </div>
         <div className="grid min-w-[220px] grid-cols-2 gap-2 text-right">

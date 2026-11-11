@@ -74,7 +74,7 @@ export function ExchangeWidget() {
 
         <div className="mb-3 flex flex-wrap gap-2">
           {PRESETS.map((n) => (
-            <button key={n} type="button" aria-label={`${n} shards`} aria-pressed={shards === n} onClick={() => setShards(n)} className="min-h-11 min-w-11 rounded-full px-3 py-1.5 text-xs font-bold transition" style={{ backgroundColor: shards === n ? '#A855F7' : 'rgba(255,255,255,0.06)', color: shards === n ? '#fff' : 'rgba(255,255,255,0.7)' }}>{n} ◆</button>
+            <button key={n} type="button" aria-label={`${n} shards`} aria-pressed={shards === n} onClick={() => setShards(n)} className="min-h-11 min-w-11 rounded-full px-3 py-1.5 text-xs font-bold transition" style={{ backgroundColor: shards === n ? '#9333EA' : 'rgba(255,255,255,0.06)', color: shards === n ? '#fff' : 'rgba(255,255,255,0.7)' }}>{n} ◆</button>
           ))}
           <input
             type="number" min={5} max={1000} value={shards}

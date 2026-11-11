@@ -23,7 +23,11 @@ export function SquadSection({ data }: { data: ProfileV2Data }) {
               <p className="text-[12px] text-fel-dim">Most played · last in {rival.mode}</p>
             </>
           ) : (
-            <p className="flex items-start gap-2 text-[14px] text-white/50"><Swords className="mt-0.5 h-4 w-4 shrink-0 text-[#C79BFF]" aria-hidden />No duels yet. Send a challenge and your record starts here.</p>
+            <>
+              <p className="flex items-start gap-2 text-[14px] text-white/50"><Swords className="mt-0.5 h-4 w-4 shrink-0 text-[#C79BFF]" aria-hidden />No duels yet. Send a challenge and your record starts here.</p>
+              {/* EVERY-SCREEN P8b: the empty state leads on, with the section's own label */}
+              <Link href="/multiplayer" className="mt-1 inline-flex min-h-11 items-center text-[14px] font-bold text-[#C79BFF] hover:underline">Challenge someone →</Link>
+            </>
           )}
           {opponents.length > 1 && (
             <ul className="mt-3 divide-y divide-white/[0.06]">

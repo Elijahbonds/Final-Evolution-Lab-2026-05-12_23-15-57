@@ -34,7 +34,9 @@ import { detectPadFamily, type PadFamily } from '@/lib/input/padLabels';
 /** How much of the panel's content its box cuts off: the panel's own overflow and its lines' scroll box. */
 function cutPx(panel: HTMLElement): number {
   const lines = panel.querySelector<HTMLElement>('[data-controls-lines]');
-  return Math.max(panel.scrollHeight - panel.clientHeight, lines ? lines.scrollHeight - lines.clientHeight : 0);
+  const rows = panel.querySelector<HTMLElement>('[data-controls-rows]');
+  return Math.max(panel.scrollHeight - panel.clientHeight, lines ? lines.scrollHeight - lines.clientHeight : 0,
+    rows ? rows.scrollHeight - rows.clientHeight : 0);
 }
 
 // useLayoutEffect warns on the server (the splash renders there): the fit is a browser-only measure anyway
@@ -103,8 +105,11 @@ export function ControlsPanel({ modeId, hint, chooser = true, className = '' }: 
           <span className="text-[12px] font-black tracking-wider text-white/50">{DEVICE_LABEL[device]}</span>
         )}
       </span>
+      {/* EVERY-SCREEN P8b: at 150 % text a short box still cut the last row (8.4 px of "❚❚ PAUSE" on Spot the Scene) once the
+          fit reached its floor. The rows now scroll in their own box past it, as the lines do: nothing is hidden. The fit
+          still steps them down first (cutPx reads this box too), and they give up height far more slowly than the lines. */}
       {sheet.rows.length > 0 && (
-        <span data-controls-rows className="[zoom:var(--fel-controls-fit,1)] grid grid-cols-[auto_1fr_auto_1fr] gap-x-3 gap-y-0.5">
+        <span data-controls-rows className="[zoom:var(--fel-controls-fit,1)] grid min-h-0 shrink-[0.2] grid-cols-[auto_1fr_auto_1fr] gap-x-3 gap-y-0.5 overflow-y-auto [scrollbar-width:thin]">
           {sheet.rows.map((r) => (
             <span key={`${r.input}-${r.action}`} className="contents">
               <span className="whitespace-nowrap font-mono text-[14px] font-black text-[#22d3ee]">{r.input}</span>

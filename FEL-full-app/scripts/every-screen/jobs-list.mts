@@ -55,7 +55,7 @@ export const JOBS: Job[] = [
   { id: 'budget-profile-edit', who: 'solo', name: 'Edit the profile', planBudget: 'budget: this walk (phase 8)',
     steps: [{ goto: '/play', say: 'home' }, { css: 'nav a[href="/profile"]:visible', say: 'the Profile tab' }, { css: 'a[href^="/profile/edit"]', expect: '/Back to profile/', within: 20, say: 'Edit' }] },
   { id: 'budget-support', who: 'solo', name: 'Find support', planBudget: 'budget: this walk (phase 8)',
-    steps: [{ goto: '/play', say: 'home' }, { css: 'nav a[href="/profile"]:visible', say: 'the Profile tab' }, { css: 'a[href="/account"]', ifPresent: true, say: 'Account (when Profile links it)' }, { css: 'a[href="/support"]', expect: '/support/i', within: 20, say: 'Support' }] },
+    steps: [{ goto: '/play', say: 'home' }, { css: 'nav a[href="/profile"]:visible', say: 'the Profile tab' }, { css: 'a[href="/support"]', expect: '/support/i', within: 20, say: 'Support (the Profile tab\'s doors row)' }] },
   { id: 'coin-exchange', who: 'solo', name: 'Spend coins (exchange for shards): the history says where it went', planBudget: 'a purchase always shows where it came from (phase 8)',
     steps: [{ goto: '/wallet', say: 'Wallet' }, { css: '[aria-label="5 shards"]', say: '5 shards' }, { css: '[data-exchange]', expect: '/exchang/i', within: 20, say: 'Exchange' }, { goto: '/wallet', say: 'Wallet again' }, { expect: '/exchang/i', within: 20, say: 'the history names the exchange' }] },
   // ── EVERY-SCREEN P7: around the games. The plan: "pick a game → playing in ≤ 2 taps; results → play again in 1; a lobby
