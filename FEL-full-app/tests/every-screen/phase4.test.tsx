@@ -150,3 +150,22 @@ describe('4. a bad set-up is caught before the test, not after', () => {
     expect(feed((f) => f).v.step).not.toBe('framing');
   });
 });
+
+describe('carried from phase 3: the builder\'s first screen once a program is on it', () => {
+  it('the ask folds to one line (all of it, never clamped) with "Change the ask"; an ask that arrives with the address starts folded', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync('components/program-ask/program-builder.tsx', 'utf8');
+    expect(src).toContain('data-testid="program-ask-folded"');
+    expect(src).toContain('data-testid="program-ask-open"');
+    expect(src).toContain('useState(!initialQuestion)');
+    expect(src).not.toContain('line-clamp-2">{q}');
+    expect(src).toContain('<form hidden={!askOpen}');
+  });
+  it('the lede is the builder\'s and steps aside once a program is shown; room is left under the docked Start', async () => {
+    const { readFileSync } = await import('node:fs');
+    expect(readFileSync('app/train/build/page.tsx', 'utf8')).not.toContain('lede={PAGE_LEDE}');
+    const src = readFileSync('components/program-ask/program-builder.tsx', 'utf8');
+    expect(src).toContain('data-testid="program-lede"');
+    expect(src).toContain('data-dock-spacer');
+  });
+});

@@ -20,7 +20,7 @@ import { Layer } from '@/components/session-player/layer';
 import { TYPE, lineSize } from '@/lib/design/type';
 import { checkpointDecision, plannedWeeks, positionIn, type Decision } from '@/lib/program-ask/checkpoint';
 import {
-  ASK_BUTTON, ASK_PLACEHOLDER, CHECKPOINT_LINES, CHECKPOINT_TITLE, EDIT_HINT, LIGHTER_TAG, READ_BACK, SAVED_ACCOUNT_LINE, SAVED_LINE, START_TODAY, WEEK_LINE, WEEK_VIEW,
+  ASK_BUTTON, ASK_PLACEHOLDER, CHECKPOINT_LINES, CHECKPOINT_TITLE, EDIT_HINT, LIGHTER_TAG, PAGE_LEDE, READ_BACK, SAVED_ACCOUNT_LINE, SAVED_LINE, START_TODAY, WEEK_LINE, WEEK_VIEW,
 } from '@/lib/program-ask/copy';
 import { accountBody, addDecision, markDone, mergeAccount, readSaved, saveProgram, type SavedProgram } from '@/lib/program-ask/device';
 import type { RequestEdits } from '@/lib/program-ask/request';
@@ -117,7 +117,8 @@ export function ProgramBuilder({ initialQuestion = '' }: { initialQuestion?: str
   const [playing, setPlaying] = useState<{ session: Session; id: string } | null>(null);
   // EVERY-SCREEN P4: once a program is on screen the ask folds to one line (its words were over the first screen's 40-word
   // budget, and the docked Start covered the chips under it); "Change the ask" opens it again
-  const [askOpen, setAskOpen] = useState(true);
+  // an ask that arrives with the address (?q=) is built on arrival: it starts folded, so nothing moves when the program lands
+  const [askOpen, setAskOpen] = useState(!initialQuestion);
   // PROGRAM-ASK-2: the account copy (adults, once the pending table exists); 'device' = the phone only (youth, or not ready)
   const keep = useRef<'account' | 'device' | null>(null);
   const [onAccount, setOnAccount] = useState(false);
@@ -216,13 +217,14 @@ export function ProgramBuilder({ initialQuestion = '' }: { initialQuestion?: str
 
   return (
     <div data-testid="program-builder" className="mx-auto max-w-[720px] space-y-5">
-      {p && !askOpen && (
+      {!p && !(initialQuestion && !askOpen) && <p data-testid="program-lede" className={`${lineSize(PAGE_LEDE)} max-w-lg text-fel-soft`}>{PAGE_LEDE}</p>}
+      {!askOpen && (
         <div data-testid="program-ask-folded" className="flex items-start justify-between gap-3">
-          <p className={`min-w-0 ${TYPE.small} text-fel-soft`}><span className="text-white">Your ask:</span> <span className="line-clamp-2">{q}</span></p>
+          <p className={`min-w-0 ${TYPE.small} text-fel-soft`}><span className="text-white">Your ask:</span> {q}</p>
           <button type="button" onClick={() => setAskOpen(true)} data-testid="program-ask-open" className={`min-h-11 shrink-0 rounded-full border border-fel-cyan/50 px-4 ${TYPE.label} text-fel-cyan`}>Change the ask</button>
         </div>
       )}
-      <form hidden={!!p && !askOpen} onSubmit={(e) => { e.preventDefault(); setEdits({}); void ask(q, {}); }} className="space-y-3">
+      <form hidden={!askOpen} onSubmit={(e) => { e.preventDefault(); setEdits({}); void ask(q, {}); }} className="space-y-3">
         <label htmlFor="program-ask" className={`${TYPE.label} text-fel-soft`}>What do you have, and what do you want?</label>
         <textarea id="program-ask" data-testid="program-ask-input" value={q} onChange={(e) => setQ(e.target.value)} rows={3} maxLength={400} placeholder={ASK_PLACEHOLDER}
           className={`w-full rounded-2xl border border-white/10 bg-[#0c0c11] p-4 ${TYPE.body} text-white placeholder:text-white/50 focus:border-fel-cyan/60 focus:outline-none`} />

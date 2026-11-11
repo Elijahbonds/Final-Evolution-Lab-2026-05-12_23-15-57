@@ -217,6 +217,23 @@ if (process.argv.includes('--check')) {
   console.log('trust.json matches a fresh measurement');
 } else {
   writeFileSync(OUT, text);
+  writeFileSync(join(ROOT, 'docs/every-screen/TRUST.md'), [
+    '# Numbers you can trust: what each measured number was checked on',
+    '',
+    'Written by `scripts/every-screen/trust.mts` (it runs the code a phone runs; re-run it when a reader changes). Every result card, the jump check, the two screens and My progress show these as one line under the number (`lib/results/trust.ts`).',
+    '',
+    '| Tool | Checked on | What it found | What the screen says |',
+    '|---|---|---|---|',
+    `| Jump (the jump check, the jump tests, readiness) | RECORDED: ${jump.jumpsRead} of ${jump.jumpsInTakes} motion-captured jumps (${JUMP_TAKES.join(', ')}), each read ${REPEATS.length} times | mean miss ${jump.meanMiss} cm, bias ${jump.bias} cm; the same jump read again moves ${jump.repeatSpread} cm | ± (mean miss) on recorded jumps; ± (repeat spread) |`,
+    `| The Mirror's movement screen | RECORDED: its landmark fixtures, ${mirrorScreen.runs} reads with the camera's noise | score ${mirrorScreen.scoreMean} every time (± ${mirrorScreen.repeatSpread}), ${mirrorScreen.flagsNotInTheKey} flags the key does not hold | ± points; no flag the recording lacks |`,
+    `| The Quick Screen (Screen my movement) | SYNTHETIC: a clean computer-made mover, ${quickScreen.runs} screens | same colour ${quickScreen.sameColourPct} % of the time; angles ± ${quickScreen.angleSpreadDeg}°; the clean mover failed ${quickScreen.cleanMoverFailed} of ${quickScreen.checks} checks; camera to result ${quickScreen.cameraToResultMeanS} s | same colour %; computer-made, no recorded screen yet |`,
+    `| Sprint | SYNTHETIC: ${sprint.runs} computer-made runs at 60 fps | mean miss ${sprint.meanMiss} s, 95 % within ${sprint.p95Miss} s; the truth inside the run's own ± ${sprint.insideItsOwnPm} % of the time | ± s; no recorded run yet |`,
+    `| Bar speed | SYNTHETIC: ${vbt.reps} computer-made reps | mean miss ${vbt.meanMiss} m/s (bias ${vbt.bias}); the same set read again moves ${vbt.repeatSpread} m/s | ± m/s; no recorded set yet |`,
+    '| Approach jump, bounce score (RSI), drop jump | not measured here | — | "Not yet measured on recorded ...: treat it as a camera estimate." |',
+    '',
+    'Gaps for the owner: there is no recorded sprint, bar-speed set, approach jump or Quick Screen take with a known answer in the repository, so those lines say "computer-made" or "not yet measured". A recorded fixture for each (a phone video plus its timing gates, plate or force plate) would turn them into recorded measurements with no change to the screens.',
+    '',
+  ].join('\n'));
   console.log(text);
 }
 void r2;
