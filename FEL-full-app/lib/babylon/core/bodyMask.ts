@@ -28,6 +28,7 @@ import { BoundingInfo, Matrix, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, IndicesArray, Mesh, Scene, TransformNode } from '@babylonjs/core';
 import { boneNode } from '../anim/boneLookup';
 import { tubeCoverage, trimSpan, type TubeSpan } from './accessoryFit';
+import { coachGarmentSlotOf, demoModelFlags } from './demoModels';
 
 /** How far under a garment (from its open edge, metres) the skin must be before it is hidden. Tops and shorts leave a
  *  band at the hem so a garment that rides up never opens a hole into the body. */
@@ -586,10 +587,15 @@ export function skinnedWorld(mesh: Mesh, positions?: ArrayLike<number>): { P: Fl
 }
 
 const SLOT_RE = /^Kit_(tops|shorts|shoes)_/;
-/** The garment slot of a mesh name — the split-off sole (`KitSole_*`) belongs to its shoe. */
+/** The garment slot of a mesh name — the split-off sole (`KitSole_*`) belongs to its shoe.
+ *  DEMO-MODELS-1 (2026-11-09): the coach body's garments are named `Top_*`, `Bottom_*`, `Shoe_*`, `Sock_*` (QC-coach-prep2), which
+ *  SLOT_RE never matched, so nothing masked the skin under them and it poked through the tee. With COACH_BODY_MASK_ENABLED on they
+ *  take their slots (demoModels.coachGarmentSlotOf); off, the answer is exactly the Kit_-only one it was. */
 export function maskSlotOf(name: string): string | null {
   if (/^KitSole_/.test(name)) return 'shoes';
-  return SLOT_RE.exec(name)?.[1] ?? null;
+  const kit = SLOT_RE.exec(name)?.[1];
+  if (kit) return kit;
+  return demoModelFlags().coachBodyMask ? coachGarmentSlotOf(name) : null;
 }
 /** The kit body's skin mesh: `Body` (loader clones append `_c<n>`). */
 export function isBodyMesh(name: string): boolean { return /^Body(_c\d+)?$/.test(name); }

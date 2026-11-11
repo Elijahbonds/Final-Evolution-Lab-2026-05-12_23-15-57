@@ -9,6 +9,8 @@ import { recordServerEvent } from '@/lib/analytics-server';
 import { isStakingPaused, stakingPausedDetail, STAKING_PAUSED_CODE, STAKING_PAUSED_STATUS } from '@/lib/stakingPause';
 import { isExpired } from '@/lib/arena-reclaim';
 import { isUnlistedMode } from '@/lib/unlisted-modes';
+import { buyerAgeRefusal } from '@/lib/stripe/adult-gate';
+import { ArenaAgeRefusal, refuseArenaEntry } from '@/lib/age/arenaAgeBand';
 
 /**
  * POST /api/arena/join
@@ -44,6 +46,11 @@ export async function POST(req: NextRequest) {
       // the next sweep with no time left to play. Refused before the lock; the lobby no longer lists it as open.
       if (isExpired(match.expiresAt, new Date())) throw new ArenaError('EXPIRED', 'This duel has expired and can no longer be accepted.', 409);
 
+      // ARENA-AGE-1 (Cyber F1 fix 1, T4, T5): accepting puts up an entry, so only a verified adult (DB birth year) may.
+      // Checked after the duel's own refusals and before the lock: a teen or unknown-age joiner writes nothing.
+      const ageReason = await buyerAgeRefusal(prisma as any, userId);
+      if (ageReason) throw new ArenaAgeRefusal(ageReason);
+
       const feeLc = match.entryFeeCents;
       await arenaLockEntry(tx, { userId, matchId: match.id, feeLc });
       // MUSIC-SUITE P6 FIX PASS (2026-09-26): THE DEADLINE STARTS AGAIN AT THE JOIN. It was left at create + 48 h, and the
@@ -69,6 +76,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, matchId: result.id, mode, seed: result.seed, status: result.status });
   } catch (err: any) {
+    if (err instanceof ArenaAgeRefusal) return refuseArenaEntry(err.reason);
     if (err instanceof ArenaError) {
       return NextResponse.json({ error: err.code, detail: err.message }, { status: err.httpStatus });
     }

@@ -156,6 +156,8 @@ import { createContestDefer, isQuietDunkPhase, whenQuietBeat, DUNK_PRELOAD_SET_O
 import { Onlookers } from '../visual/Onlookers';   // RUNUP-STALL-2 (a): the preload waits for the rail's bodies
 import { warmSceneShaders } from '../core/warmShaders';   // RUNUP-STALL-2 (a)
 import { setMaskOnePerFrame } from '../core/bodyMask';   // RUNUP-STALL-4 (knob dunk.preloadSet)
+import { prefetchRivalBody } from './dunkRivalPrefetch';   // DEMO-MODELS-1 item 3
+import { demoModelFlags } from '../core/demoModels';   // DEMO-MODELS-1
 
 type Phase = 'approach' | 'charge' | 'cinematic' | 'resolve' | 'judging' | 'rivalTurn' | 'fieldCut' | 'contestOver';   // fieldCut: dunk-next phase 5 (the highlights, the cut)
 /** Venice DualShock pad (2026-09-05): a miss is one beat, not the full judged reveal — the next run-up follows at once. */
@@ -1304,6 +1306,9 @@ export const DunkMode: ModeDefinition = (() => {
   let contestHisTurn = false;   // RUNUP-STALL-1 v3: his turn is up (rivalRound) and needs his body: the set starts now, between dunks
   function startContestSet(ctx: ModeContext): void {
     if (contestSetStarted || ctx.scene.isDisposed) return;
+    // DEMO-MODELS-1 item 3: the set is about to queue (not a quiet beat), so with DUNK_RIVAL_PREFETCH_ENABLED on his body FILE is
+    // fetched now, network only (dunkRivalPrefetch.ts has the root cause); off, nothing is fetched, as before
+    if (!contestHisTurn && !dunkQuiet()) void prefetchRivalBody(rosterBodyUrl(foe.body), demoModelFlags().rivalPrefetch);
     if (!contestHisTurn && !contestDefer.ask(dunkQuiet())) { console.info('[DUNK-BUDGET] not a quiet beat — the contest set waits for one'); return; }
     contestSetStarted = true;
     console.info('[DUNK-BUDGET] dunk 1 is in — the contest set loads now (his body first)');

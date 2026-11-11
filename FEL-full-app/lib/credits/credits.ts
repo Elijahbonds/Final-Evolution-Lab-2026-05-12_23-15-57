@@ -16,6 +16,8 @@
 // an exact list: a new unlabeled entry fails the test, and so does a pending entry whose licence has been recorded.
 
 import { signedPdEntries, type PdEntry } from '../babylon/music/pdShelf';
+// G1(a) (Cyber A6): binjgb's upstream LICENSE, bundled as a string from the file itself (never retyped, never served).
+import BINJGB_LICENSE_TEXT from '../../third_party/binjgb/LICENSE?raw';
 
 /** CMU's required acknowledgement, word for word. The test fails if a character of it changes. */
 export const CMU_ACKNOWLEDGEMENT =
@@ -233,6 +235,23 @@ export const CREDITS: Credit[] = [
     covers: ['models/skins/', 'models/fel-hero.glb', 'models/fel-hero.json', 'models/fel-hero.mobile.glb', 'models/candidates/', 'models/rivals/'],
     manifestLicences: ['CC0 (MakeHuman community assets)'],
   },
+  // DEMO-MODELS-1 (2026-11-09; owner "Yes full swap"): the coach body that replaces the Meshy scan behind DEMO_COACH_BODY_ENABLED
+  // and friends. Built on the MPFB2 builder body (the same topology and 22-bone rig as the kit bodies) with the owner's approved
+  // likeness (v7.2) and outfit C; files copied byte-for-byte from QC-coach-prep2 (sha256 051adcc0…7643 / e05d1822…9244).
+  {
+    id: 'coach-body',
+    section: 'models',
+    title: 'The coach body (MPFB2 builder body with the owner’s likeness)',
+    by: 'MakeHuman Community (MPFB2 builder body); likeness and outfit by the owner',
+    used: 'The coach and demo body: the owner’s own likeness on the MakeHuman builder body, with its hair, tee, shorts, socks and shoes.',
+    licence: 'CC0',
+    licenceUrl: OPEN_LICENCES.CC0,
+    status: 'open',
+    link: 'https://github.com/makehumancommunity/mpfb2',
+    recordedIn: ['lib/babylon/core/heroBody.ts', 'lib/babylon/core/demoModels.ts'],
+    covers: ['models/coach/'],
+    manifestLicences: ['CC0 (MakeHuman community assets)'],
+  },
   {
     id: 'openai-image',
     section: 'models',
@@ -376,6 +395,24 @@ export const CREDITS: Credit[] = [
     link: 'https://github.com/BinomialLLC/basis_universal',
     recordedIn: ['public/loaders/basis/README.md'],
     covers: ['loaders/basis/'],
+    manifestLicences: [],
+  },
+  {
+    // BINJGB-SHELF-1 (spec §3.2, Cyber G3/G5): the Homebrew Shelf's player, vendored at a pinned commit. Text only: no
+    // outbound link (G5). Served only while BINJGB_SHELF_ENABLED is on, by app/vendor/binjgb/[file]/route.ts (middleware
+    // 404s /vendor/binjgb/* otherwise). G1(a) (Cyber A6): the records live in third_party/binjgb/, outside public/, and the
+    // MIT notice is shown on /credits verbatim from that LICENSE file.
+    id: 'binjgb',
+    section: 'software',
+    title: 'binjgb',
+    by: 'Ben Smith (binji)',
+    used: 'Homebrew player: binjgb by Ben Smith (binji), MIT License.',
+    licence: 'MIT',
+    licenceUrl: OPEN_LICENCES.MIT,
+    status: 'open',
+    notice: BINJGB_LICENSE_TEXT,
+    recordedIn: ['third_party/binjgb/LICENSE', 'third_party/binjgb/VENDOR.md'],
+    covers: ['vendor/binjgb/'],
     manifestLicences: [],
   },
   {
