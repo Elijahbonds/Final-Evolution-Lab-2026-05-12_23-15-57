@@ -254,6 +254,33 @@ The plan's "catch jump ≤ 0.12 m" cannot be read raw at the shipped pass speed:
 First change (`hoops.passFromHandOn`, hoops/ballHandoff): a 3v3 teammate's pass starts its flight from the ball, not his root + 1.2 m.
 Unit-tested; not yet seen on the rig (no teammate passed in the recorded windows).
 
+### 3h. hoops-p05b — the 3v3 slide switches on one bundle, the first-bounce palm, the pass that lands on the receiver
+
+All on the deterministic rig, seed 7 PRO, each before → after on ONE bundle (the same play: the roots identical frame for frame).
+
+**3v3 defence, the hero (130 frames).** Every slide switch off → the defaults: slide p90 12.27 → 10.95 cm, pops 4 → 4, severe 0 → 0;
+the other five bodies unchanged (one rival 7 → 6 pops). On p5e the defaults had 6 pops: the run → stepping-closeout crossfade (frames
+80 and 85, 741–809 °/s), fixed by starting the closeout at the run's point of the stride (`hoops.loopInStepOn`; off it is p5e exactly).
+The frame-119 pops stay (both sides) and run a little faster with the switches on (1 809 → 1 967 °/s; not severe). The p5e "foe1
+regression" (7.26 → 12.19 cm) was one outlier run: that run differs from every other run of its bundle and config from frame 1
+(bones) and frame 9 (the ball); the p5i defaults run twice is identical over all 130 frames.
+
+**The first-bounce palm miss (1v1, the gear stop into the sprint).** The hand tracer (`handtrace.mjs`): the ball carry's own pass took
+the palm from on the held ball (−1.5 cm) to 13.5 cm off it on the dribble's first frame — the dribble starts from where the palm had the
+ball, but only the ball carried that offset. With the hand taking it too, from where it held the ball (`hoops.carryStartHandOn`): the
+first top 11.0 → 0.4 cm, frames 67–79 all within 1.6 cm, tops within 5 cm 1 of 3 → 2 of 3, and the hero's pops 11 / 1 severe → 10 / 1
+(the dribble start's arm pop, LeftArm 1 676 °/s, gone). Two rig rounds got there: aiming the hand straight at the stroke's point over
+the real ball swung the arm 8 696 °/s on the first frame (no elbow swing limit on a reach's first frame; it now starts from the arm as
+posed), then bent the elbow 3 432 °/s (the wrist moved 14 cm round the ball: the held ball sits in the palm, not under that point).
+
+**1v1 defence (180 frames, p5i):** every slide switch off → the defaults: the hero's slide p90 2.57 → 2.34 cm (gate ≤ 3), pops 5 → 5,
+severe 2 → 2 (the frame-130 landing: left foot 4 735 → 4 395 °/s, right foot 2 200 → 3 651, frame-131 left 3 262 → 2 722).
+
+**3v3 pass and catch (the hero's pass to mate1, then the call for it back).** The flight now eases its landing onto the receiver
+(`hoops.passHomeOn`): mate1's palms on the catch frame 1.14 / 1.48 m → 0.28 / 0.36 m off the ball, the 1.67 m draw into the hand gone
+(release warps 1 → 0). The catch read sideways (the gate as now written): 4.8 and 2.0 cm (bar 12). The teammate's throw
+(`hoops.passFromHandOn`, measured on the call-back): the ball's step on the throw frame 45.6 → 23.9 cm (the flight's own pace).
+
 ## 4. Ranked gaps
 
 Ranked by what the owner feels first × how far from the bar. "Shared" = touches one of the shared hoops files.

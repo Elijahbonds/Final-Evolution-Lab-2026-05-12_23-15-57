@@ -1,6 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Bone, Matrix, MeshBuilder, NullEngine, Quaternion, Scene, Skeleton, TransformNode, Vector3 } from '@babylonjs/core';
-import { DEFAULT_DRIBBLE as P } from './Dribble';
+import { DEFAULT_DRIBBLE as P, PUSHED_FLOOR_PHASE } from './Dribble';
+// GAMEPLAY-CLEAN P6: the non-hoops carry bounces the PUSHED shape by default (`anim.carryPushedBounce`), whose floor is at
+// PUSHED_FLOOR_PHASE, not 0.5. The first test below is the original, pinned to the old shape (the knob at 0, which must keep working);
+// its twin after it checks the same things on the default shape at its own floor phase.
+const knob = vi.hoisted(() => ({ v: new Map<string, number>() }));
+vi.mock('../../feel-panel/feel', () => ({ feel: (id: string, def: number) => knob.v.get(id) ?? def }));
+afterEach(() => knob.v.clear());
 import { mountBallCarry } from './ballCarry';
 import { attachBallToHand, releaseBall } from './ballRig';
 
@@ -30,7 +36,8 @@ function rig(scene: Scene, mirror = false) {
 }
 
 describe('ballCarry', () => {
-  it('detaches the ball while dribbling, puts it on the floor mid-bounce, and hands it back', () => {
+  it('detaches the ball while dribbling, puts it on the floor mid-bounce, and hands it back (the old bounce: anim.carryPushedBounce 0)', () => {
+    knob.v.set('anim.carryPushedBounce', 0);
     const scene = new Scene(new NullEngine());
     const r = rig(scene);
     attachBallToHand(r.ball, r.sk, 'RightHand');             // the mode owns possession
@@ -46,6 +53,38 @@ describe('ballCarry', () => {
     // step to phase 0.5 — the floor
     let steps = 0;
     while (Math.abs(carry.phase - 0.5) > 0.01 && steps++ < 400) frame(1 / 240, 0, true);
+    r.ball.computeWorldMatrix(true);
+    expect(r.ball.getAbsolutePosition().y).toBeCloseTo(P.ballR, 2);
+    // the ball dribbles on the right of a body facing -z: world x is negative
+    expect(r.ball.getAbsolutePosition().x).toBeLessThan(-0.2);
+    // the hand reaches down and out toward the ball (the wait height is at the
+    // edge of the arm's reach, so the solver may clamp to full extension)
+    r.hand.computeWorldMatrix(true);
+    // (straightening a bent arm toward a point off to the side can lift the
+    // wrist a little; closing on the ball horizontally is the visible part)
+    const hand = r.hand.getAbsolutePosition();
+    const ballPos = r.ball.getAbsolutePosition();
+    expect(Math.hypot(hand.x - ballPos.x, hand.z - ballPos.z)).toBeLessThan(Math.hypot(restHand.x - ballPos.x, restHand.z - ballPos.z));
+    frame(0.016, 0, false);
+    expect(r.ball.parent).toBe(r.hand);                      // shot starts: back in the palm
+    carry.dispose();
+  });
+  it('…and the same on the pushed bounce (the default): the floor at PUSHED_FLOOR_PHASE', () => {
+    const scene = new Scene(new NullEngine());
+    const r = rig(scene);
+    attachBallToHand(r.ball, r.sk, 'RightHand');             // the mode owns possession
+    const carry = mountBallCarry({ scene, ball: r.ball, root: r.root, skeleton: r.sk });
+    // a frame = the mode's update, then Babylon's after-animations pass
+    const frame = (dt: number, speed: number, active: boolean) => { carry.update(dt, speed, active); scene.onAfterAnimationsObservable.notifyObservers(scene); };
+    frame(0, 0, false);
+    expect(r.ball.parent).toBe(r.hand);                      // inactive: left alone in the palm
+    r.hand.computeWorldMatrix(true);
+    const restHand = r.hand.getAbsolutePosition().clone();
+    frame(0.016, 0.5, true);
+    expect(r.ball.parent).toBeNull();
+    // step to the pushed bounce's floor (in finer steps: the pushed ball is FASTEST at the floor, ~2.7 cm per 0.01 of phase there)
+    let steps = 0;
+    while (Math.abs(carry.phase - PUSHED_FLOOR_PHASE) > 0.001 && steps++ < 8000) frame(1 / 4800, 0, true);
     r.ball.computeWorldMatrix(true);
     expect(r.ball.getAbsolutePosition().y).toBeCloseTo(P.ballR, 2);
     // the ball dribbles on the right of a body facing -z: world x is negative

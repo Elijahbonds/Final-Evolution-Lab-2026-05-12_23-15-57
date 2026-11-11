@@ -29,3 +29,16 @@ export function passStartFor(ball: AbstractMesh, passerRoot: TransformNode): Vec
   ball.computeWorldMatrix(true);
   return passStart(ball.getAbsolutePosition(), passerRoot.position);
 }
+
+/**
+ * hoops-p05b: THE PASS ARRIVES IN THE HANDS (PassFlight.homeTo). Where a pass in flight lands: the receiver's catch point, live — his root
+ * + PASS_ROOT_HEIGHT_M, the height the throw already aims at — or null (knob 0: the flight lands on its thrown aim, as it did). The lob
+ * keeps its own aim (the alley-oop's timing is its read); the mode does not ask for it.
+ * Knob `hoops.passHomeOn` (1); 0 = as it was.
+ */
+export const PASS_HOME_ON = 1;
+export function passCatchPoint(receiverRoot: { x: number; y: number; z: number }, on = feel('hoops.passHomeOn', PASS_HOME_ON) >= 0.5): Vector3 | null {
+  if (!on || ![receiverRoot.x, receiverRoot.y, receiverRoot.z].every(Number.isFinite)) return null;
+  return new Vector3(receiverRoot.x, receiverRoot.y + PASS_ROOT_HEIGHT_M, receiverRoot.z);
+}
+

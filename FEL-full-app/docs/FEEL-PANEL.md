@@ -428,6 +428,15 @@ change"). The owner has felt none of these yet; every default is flagged in the 
   dribble, the ball arm (and the off arm) eases ALL the way back to the clip's pose over the let-go's own fade (0.14 s, unchanged). 0 = the
   let-go as it was: the reach's target faded but the solved arm still sat about 44° off the clip on the fade's last frame and cut there in
   one frame (the step-back gather, 1v1 seed 7: about 3 967 °/s, the hero's last severe pop in phase 4b). No new time, so no new number.
+- hoops-p05b, same group (`anim/ballCarry.ts`): `hoops.carryStartHandOn` 1 — a dribble starts from where the palm had the ball, and that
+  offset fades out over the first bounce (START_FADE_PHASE, unchanged). Only the ball took it: the hand went straight to the stroke's own
+  point, so the palm sat the offset off the ball through the whole first bounce (1v1 seed 7, the gear stop into the sprint: the first top
+  drawn 12.8 cm off; the hand tracer has the carry's own pass take the palm from on the ball to 13.5 cm off it). The hand now takes the
+  same faded offset — starting from where the hand held the ball (the held ball sits in the palm, not under the stroke's hand point),
+  so the wrist does not jump round the ball on the first frame — and the reach that takes the arm over from the hold keeps the elbow's
+  swing limit (720 °/s, unchanged) from its
+  first frame (without that, aiming the hand at the real ball swung the upper arm 8 696 °/s on the rig's first dribble frame). 0 = as it
+  was. No new number.
 - hoops-p05, the hero's slide (owner 2026-11-10: "fix it"), same group. Each is NEW BEHAVIOUR, on by default, with 0 = today's exactly:
   - `hoops.backpedalReverseOn` 1 (`anim/basketballTree.ts`) — the captured backpedal (CMU 78_24) is a forward run on the hero rig, so a
     retreat was a moonwalk (the feet ran forward on the spot while the body backed off). 1 plays it in reverse: the feet plant and the body
@@ -441,9 +450,24 @@ change"). The owner has felt none of these yet; every default is flagged in the 
     is going while the chest stays on the man, so a diagonal slide or retreat steps along its travel. **NEW NUMBERS (flagged):**
     `hoops.hipSteerMaxDeg` 50° (the most the pelvis turns off the chest), `hoops.hipSteerSec` 0.14 s (the ease), `hoops.hipSteerFromMps`
     0.8 m/s and `hoops.hipSteerFullMps` 1.8 m/s (no turn under the first, all of it from the second). 0 = square hips, as before.
+- hoops-p05b, same group: `hoops.closeoutStepOn` 1 (`anim/basketballTree.ts`; the clip `bball_closeout_step`, authored in
+  `anim/authored/basketball.ts`) — the closeout fires only at 2.9 m/s and up, but the old closeout swung its legs in place (about 0.9 m/s at
+  its rate cap), so every closeout skated. The new clip is the same picture (chest up, hips low, one hand high) on chop steps paced to the
+  closeout's stride reference, 3.6 m/s at rate 1 (2.0–6.7 m/s across the stride matcher's range). Bench, the man 2 m ahead, 3–6 m/s:
+  slide p90 9–12 → 0.1–1.0 cm a frame. 0 = the old closeout clip exactly. No new feel number (the clip's own keys are pinned by a test).
+- hoops-p05b, same group: `hoops.loopInStepOn` 1 (`anim/basketballTree.ts` RIGHT_STRIKE_PHASE) — the stepping closeout started on its
+  first frame (the right foot landing) wherever the run it cut was in its stride, so through the crossfade the two clips had the legs in
+  opposite stances (3v3 seed 7: the two leg pops the switches added, 741–809 °/s). A run into it now starts it at the same point of the
+  stride. The table's numbers are where each clip's right foot lands (bball_mc_run 0.88, measured with the slide bench), not feel
+  numbers. 0 = as it was.
 - hoops-p05, phase 5 (the ball lives in the hand), same group: `hoops.passFromHandOn` 1 (`hoops/ballHandoff.ts`) — a 3v3 teammate's
   pass (the swing, the ball back to me, the lob) starts its flight where the ball is in his hands; it started at his root + 1.2 m, so the
   ball jumped out of the hand on the release. The aim point and the pass speed are unchanged. 0 = the old start.
+- hoops-p05b, phase 5, same group: `hoops.passHomeOn` 1 (`hoops/ballHandoff.ts`, `core/BallHandling.ts` PassFlight.homeTo) — a 3v3 chest
+  or bounce pass in flight eases its landing point from where it was aimed (the receiver led at the ball's speed) onto where the receiver
+  really is, at the same chest height (smoothstep in the flight's progress: nothing at the throw, all of it at the catch). The flight time
+  is the throw's, so catch timing is unchanged. It landed on its aim wherever he was: 3v3 seed 7, the hero's pass to mate1 caught with his
+  palms 1.14 / 1.48 m off the ball and drawn into the hand in one frame (1.67 m). The lob keeps its own aim. 0 = as it was.
 
 **assumption:** the bounds are safe, not tuned. A ranked, staked or head-to-head run reads every default above.
 
@@ -530,3 +554,27 @@ lane/dunk-switch-on (owner 2026-11-10, "turn all 4 on"): `dunk.finishOverRing` a
 staked, ranked and challenge runs whatever the default; 0 restores the old finish / slam exactly); new `dunk.slamPower` 1 (the
 TWO-HAND POWER on its own); `dunk.runwayStrideScale` **TUNED 1 → 1.1** (1 = the old pace); new `dunk.landAbsorbDeep` 1 (the deep
 landing; 0 = the old `dunk_land_absorb` alone). Measurements in docs/DUNK-FLAGSHIP.md §18.
+
+## gameplay-clean-6, 2026-11-10 (owner: "address what you found"; the owner has not felt these yet)
+
+- Group "Anim · transitions" (`anim/ballCarry.ts`), **NEW (on / off, no tuned number)**: `anim.carryPushedBounce` 1. The dunk run-up's
+  dribble uses the pushed bounce the hoops modes already use: the ball is fastest at the floor and the hand meets it slowing at the
+  top. The old bounce was fastest at the hand and turned round there in one frame, and the ball arm turned with it: 35 to 60 degrees
+  in one frame at every bounce (the rig's dunk run-up: 14 hard pops in 14 s). Headless on the hero: 56.8 → 26.2 degrees. Only the dunk
+  runway uses this carry. 0 = the old bounce exactly. Feel-check: dunk, run up with the ball; watch the dribbling arm.
+- `anim.inertial` (AF-1's inertial clip transitions, existing knob, still **0**): when on it now reaches every spawned body (it was
+  the heroes of the modes that opted in), and three of its holes are fixed with no knob of their own (they only run while a body is
+  inertial): a switch made from a clip's end callback (the late switch: a hit react or knockdown running out into the idle threw the
+  arms 55 to 57 degrees in one frame), clips that key only some bones (a leg the guard does not key: 35.7 degrees), and a node no
+  clip shown so far had keyed (guard to the high kick: the knee 68.4 degrees; now held by `anim.inertialAllBones`).
+- The switch-on lane's inertial work, taken over by this lane (coordinator 2026-11-10; `docs/SWITCH-ON.md` section 6 on
+  lane/switch-on), merged on top of the three fixes above. All read only while a body is inertial; each off value restores AF-1:
+  - `anim.inertialAllBones` 1 (new): every bone any of the body's clips keys keeps its pose history; a bone the new clip does not key
+    eases onto its bind pose. 0 = AF-1.
+  - `anim.inertialMatchVel` 1 (new): the offset is a 3-D rotation vector starting at the old motion's speed minus the new clip's. 0 = AF-1.
+  - `anim.inertialMinHalfLifeSec` **0.045 s** (new number): the shortest half-life an offset decays with (AF-1's 0.5 x the fade is
+    0.02 to 0.03 s on the fighters' switches). 0 = AF-1.
+  - `anim.inertialModesOn` **1** (new switch, ON): the inertial blend on by default on the hero in karate, karate VS, showdown, mixed
+    combat, duel and skateboard, the modes measured better; 0 = those modes linear exactly as before. Every other mode stays linear
+    unless `anim.inertial` is 1. Measurements and the per-mode decision: GAMEPLAY-CLEAN-AUDIT section 4h. Feel-check: karate, throw
+    jabs out of a run; showdown, take a hit; skateboard, push and ollie.

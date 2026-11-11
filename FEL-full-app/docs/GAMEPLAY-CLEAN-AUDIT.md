@@ -549,6 +549,109 @@ Not touched, as asked: the hoops plant-and-cut lock, `legSink`, `FootGlide`, `ba
 vault's 1.7× rate.
 
 
+## 4h. Clean-6: the inertial blend measured and switched on where it wins; the dunk run-up's bounce (lane/gameplay-clean-6)
+
+Owner, 2026-11-10: "Fix the demos, fix the screens, address what you found above." Same rig and counter as §4g (14 s anim-only runs,
+the reset-aware counter, `cwv: 2` weights). `abcompare.mjs` (new) puts two tags side by side per mode and proves the knob took: an
+inertial run shows **0 %** of frames mid-crossfade, a linear one 2–34 %.
+
+### 1. `anim.inertial` — taken over from lane/switch-on, merged with this lane's fixes, ON in six modes
+
+The coordinator moved `anim.inertial` here from lane/switch-on, whose work (`docs/SWITCH-ON.md` §6 on that branch; commit `fe7b6868`)
+is merged, not redone. What each lane found, and where the numbers agree:
+
+| Fault | Found by | Fix (knob; its 0 = AF-1) | Hero, headless |
+|---|---|---|---|
+| A clip switched from a clip's END CALLBACK (every tree's settle, neverBindPose) was captured against a pose that is neither clip's | this lane (P6) | hold the last shown pose one frame, capture next frame (no knob: runs only while inertial) | hit react → idle forearm 55.3° → 15.7°; knockdown → idle arm 56.6° → 15.1° |
+| A bone the current clip does not key went unrecorded | this lane (P6) | record every tracked node every frame (no knob) | jab → guard → guard step, leg 35.7° → under 5° |
+| A bone no clip shown so far had keyed had no history at all | both (switch-on: guard → run, knee 32–62°; here: guard → high kick, knee 68.4°) | `anim.inertialAllBones` 1 (switch-on's; this lane's own version, 63bae0dc, is folded into it) | 68.4° → 17.7° (linear 17.3°) |
+| Half-life 0.5 × the fade = 0.02–0.03 s on the fighters' switches: most of an offset in one frame | switch-on | `anim.inertialMinHalfLifeSec` **0.045 s** (new number) | — |
+| The offset's speed ignored the new clip's own speed | switch-on | `anim.inertialMatchVel` 1 | — |
+
+**On the rig, one build (`2358a54a`, two runs a side), the six modes the switch-on lane recommended, the hero inertial by default
+(`anim.inertialModesOn` 1) against `anim.inertialModesOn` 0 (linear, exactly as before):**
+
+| Mode | Hard pops, linear (run 1 / run 2) | Inertial (run 1 / run 2) | All events, linear → inertial (run 1) | Largest arm turn a frame, linear → inertial (run 1) |
+|---|---|---|---|---|
+| karate | 8 / 8 | 2 / 2 | 22 → 25 | 40.9° → 37.5° |
+| karate VS | 6 / 6 | 3 / 3 | 31 → 20 | 47.2° → 24.0° |
+| showdown | 4 / 3 | 5 / 3 | 26 → 15 | 32.5° → 26.9° |
+| mixed combat | 5 / 5 | 2 / 2 | 29 → 29 | 47.2° → 46.4° |
+| duel | 5 / 4 | 1 / 1 | 20 → 13 | 97.8° → 16.5° |
+| skateboard | 5 / 5 | 1 / 1 | 12 → 15 | 39.9° → 26.0° |
+| **total** | **33 / 31** | **14 / 12** | | |
+
+Five modes are better in both runs. **Showdown is the judgment call (flagged):** hard pops 4 / 3 linear against 5 / 3 inertial,
+while its events in all fall 26 → 15 in both runs and its largest arm turn falls. Each extra hard pop is the hit react's own thigh
+snap shown at full weight (LeftUpLeg 33.7–35.6° a frame, 10 frames into the clip, every hit) where the linear fade-in diluted it
+(27.1°): clip content (`karate_mc_hit_react`, the animation lane's), listed below. **Decision: `anim.inertialModesOn` stays 1 (the
+switch-on lane's recommendation, confirmed on this build); `anim.inertial` stays 0.** To take showdown back to linear alone, drop
+`'measured'` from its one `applyInertialBlend` line (ShowdownMode.ts).
+
+**Reconciled with the switch-on lane's numbers.** Its "AF-1 as shipped is worse" stands: this lane's first pass (AF-1 plus the two P6
+holds only) was 48 → 45 hard pops over 20 modes but karate 8 → 9 and karate VS 6 → 7 — the P6 holds alone do not make the fighters
+better; the switch-on fixes do. Its three open items:
+- **Football and derby worse (17 a minute):** not on this build. Inertial on every body (`anim.inertial` 1), two runs each: football
+  1 → 0 and 1 → 0 hard pops (events 18 → 12), derby 0 → 0 and 0 → 0 (soft events 4 → 8 and 11 → 12: the derby swing clip at full
+  weight). The difference from the switch-on runs is this lane's late-switch hold, which their base did not have. Neither mode is
+  switched on here (`anim.inertialModesOn` covers six modes; football's opt-in is a one-line change once its hero alone is measured).
+- **Showdown's 66° thigh, hit react → guard:** that is the late switch (a hit react's end callback plays the guard inside the
+  animation pass); fixed by the P6 hold. Not seen in two showdown runs (largest thigh 34.2°, the clip's own snap).
+- **1v1 worse:** confirmed, and 3v3 and 3PT too (AF-1 + P6 build, one run each: 1v1 4 → 7, 3v3 6 → 12, 3PT 8 → 10). With the switch-on fixes and inertial on every body (this build, one run
+  each): 1v1 4 → 7, 3v3 6 → 11 (an arm 169° in a frame), 3PT 8 → 7, the dunk 9–10 → 10 (forearm 142°). They stay linear. The hoops bodies' layers (the dribble hand-switch, the defend stance's feet) turn the arms 120–170° and the feet up to
+  126° in one frame with the offset under them: the hoops lane's files.
+
+**Found, not fixed (flagged):** `anim.inertialAllBones` eases a bone the new clip does not key onto its BIND pose. When a one-shot
+runs out into a clip that keys 7 bones (hit react or knockdown → `idle_stand`), the hero's thighs swing 21, 18, 14, 11… degrees a frame
+for 20 frames; linear leaves them where the one-shot left them (0°). Not visible in the rig's counts (showdown's largest thigh 34.2°
+inertial against 34.1° linear, the clip's own snap), and aiming at the pose the bone had when the outgoing clip took it (where a
+linear fade-out leaves a bone it alone keys) measured the same (25.2° against 25.1°). A candidate for the animation lane's eye.
+
+### 2. The weight-below-1 family
+
+- **In the six inertial modes it cannot happen:** no frame is mid-crossfade (0 % in every run), so there is no third clip cutting into
+  a blend and no clip fading in alone over a stale fill.
+- **Elsewhere (linear), the clearest case:** the dunk run-up's first frames. `idle_stand` keys 7 rotations, so the dribble fading in
+  over it is the ONLY clip on the forearm: Babylon fills the other 0.89 with a stale captured pose, and the left forearm turns
+  100–123° on the first fade frame (four runs). Inertial removes the fill but the ball carry's arm engage still turns it 137–141°, so
+  the dunk stays linear. Open, for the dunk (now free) or animation work: the carry engaging on the run-up's first frame.
+- **Surf's mid-air restart:** inertial on every body, three runs on three builds, surf 1 → 0 hard pops each time, events 9 → 3–4. Surf
+  is not in the six (its body is spawned by BoardRunMode, which has no opt-in); a candidate, like football.
+- **A linear-only fix** was not attempted again: clean-5's orphan rule (keep the faded-out clip) made three-clip blends, which Babylon
+  chains by slerp and can flip (karate's thigh 117.9°).
+
+### 3. Knockdown → get-up (the 98–153° arm frame)
+
+**Cause:** the knockdown's last frame and the get-up's first hold the right arm 156–177° apart. A linear crossfade slerps the short way
+round, which for near-opposite rotations flips sides mid-fade: one frame turns the arm the long way. Headless on the hero: linear
+95–98°, inertial 25–32° (the offset is applied as one rotation, decaying, with no slerp between the two clips). The karate family is
+inertial by default now (§1), so it is fixed there. None of the 100-odd rig runs in this lane caught a knockdown inside its 14 s.
+
+### 4. Dunk
+
+- **The run-up dribble (14 pops in 14 s): fixed.** The non-hoops carry (only the dunk mounts it) used `dribbleAt`, fastest at the palm
+  and reversing there in one frame; the arm reversed with it. Now the pushed bounce the hoops modes use (`dribbleAtPushed`, fastest at
+  the floor). Knob `anim.carryPushedBounce` 1 (0 = the old bounce). Headless 56.8° → 26.2° (the clip alone 41.0°). Rig, same build,
+  knob 0 → 1, two runs: hard pops **17 → 9** and **17 → 10**; the dribble's own pops 13 → 5 and 13 → 6. The five left are identical in all
+  four runs (LeftArm 48.4° a frame every 0.57 s while strafing): the capture's own arm swing, clip content.
+- **Dunk duel, dunk → hang → land:** linear: the hang's left forearm 69° a frame, the hang → land blend 47–54°. Inertial (every body,
+  one run): 43.6° and 64.7° — not better, so the duel stays linear. The 69° is `dunk_score_hang` at full weight: clip content.
+
+### 5. Tiebreak's thigh and the made-shot celebration
+
+- **Tiebreak's 34° thigh:** not reproduced in seven runs (four linear: base2, noposture, noplant, lin, largest thigh 3.8–12.3°;
+  three inertial, 16.6–16.7°). Its hard
+  pops are the swing onsets (arms 41–43° in a 0.05 s blend). Not changed.
+- **The hoops made-shot celebration forearm (5 929°/s): for the hoops lane.** Not reproduced headless; the celebrate clip
+  (`bball_score_celebrate` → `dunk_celebrate_big`, fade 0.26, `basketballTree.ts`) turns the arms 28–32° a frame by itself, identically
+  with and without the ball carry. The cause sits in the hoops tree's celebrate path or the clip, both inside the hoops lane's files.
+
+### Clip content for the animation lane (listed, not edited)
+
+`bball_mc_dribble_run` (LeftArm 41–48° a frame, three frames, every stride), `karate_mc_hit_react` (LeftUpLeg 33–36° at full weight),
+`karate_mc_jab` (forearms 32–33° a frame), `dunk_score_hang` (left forearm 43–69°), `baseball_swing` (LeftArm 35° at contact, the
+one hard pop baseball shows inertial), the board push (skate), the dance stumble.
+
 ## 5. For the dunk and hoops lanes (routed, not changed here)
 
 Measured by the same rig on `/play/dunk`, `/play/onevone` and `/play/threevthree`. The occluder fade is off for these
