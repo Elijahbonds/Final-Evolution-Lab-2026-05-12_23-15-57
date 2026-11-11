@@ -20,7 +20,7 @@ import { Layer } from '@/components/session-player/layer';
 import { TYPE, lineSize } from '@/lib/design/type';
 import { checkpointDecision, plannedWeeks, positionIn, type Decision } from '@/lib/program-ask/checkpoint';
 import {
-  ASK_BUTTON, ASK_PLACEHOLDER, CHECKPOINT_LINES, CHECKPOINT_TITLE, EDIT_HINT, LIGHTER_TAG, READ_BACK, SAVED_ACCOUNT_LINE, SAVED_LINE, START_TODAY, WEEK_LINE, WEEK_VIEW,
+  ASK_BUTTON, ASK_PLACEHOLDER, CHECKPOINT_LINES, CHECKPOINT_TITLE, EDIT_HINT, LIGHTER_TAG, PAGE_LEDE, READ_BACK, SAVED_ACCOUNT_LINE, SAVED_LINE, START_TODAY, WEEK_LINE, WEEK_VIEW,
 } from '@/lib/program-ask/copy';
 import { accountBody, addDecision, markDone, mergeAccount, readSaved, saveProgram, type SavedProgram } from '@/lib/program-ask/device';
 import type { RequestEdits } from '@/lib/program-ask/request';
@@ -115,6 +115,11 @@ export function ProgramBuilder({ initialQuestion = '' }: { initialQuestion?: str
   const [saved, setSaved] = useState<SavedProgram | null>(null);
   const [week, setWeek] = useState(1);
   const [playing, setPlaying] = useState<{ session: Session; id: string } | null>(null);
+  // EVERY-SCREEN P4: once a program is on screen the ask folds to one line (its words were over the first screen's 40-word
+  // budget, and the docked Start covered the chips under it); "Change the ask" opens it again
+  // an ask that arrives with the address (?q=) is built on arrival: it starts folded, so nothing moves when the program lands
+  const [askOpen, setAskOpen] = useState(!initialQuestion);
+  const [assumedOpen, setAssumedOpen] = useState(false);
   // PROGRAM-ASK-2: the account copy (adults, once the pending table exists); 'device' = the phone only (youth, or not ready)
   const keep = useRef<'account' | 'device' | null>(null);
   const [onAccount, setOnAccount] = useState(false);
@@ -164,6 +169,8 @@ export function ProgramBuilder({ initialQuestion = '' }: { initialQuestion?: str
   const edit = (f: RequestField, v: string | number) => { const e = { ...edits, [f]: v }; setEdits(e); void ask(q, e); };
 
   const p = answer?.program ?? null;
+  const programId = p?.id ?? null;
+  useEffect(() => { if (programId) setAskOpen(false); }, [programId]);
   const decisions: Decision[] = useMemo(() => (saved && p && saved.programId === p.id ? saved.decisions : []), [saved, p]);
   const done = useMemo(() => (saved && p && saved.programId === p.id ? saved.done : {}), [saved, p]);
   const weeks = useMemo(() => (p ? plannedWeeks(p, decisions) : []), [p, decisions]);
@@ -211,7 +218,14 @@ export function ProgramBuilder({ initialQuestion = '' }: { initialQuestion?: str
 
   return (
     <div data-testid="program-builder" className="mx-auto max-w-[720px] space-y-5">
-      <form onSubmit={(e) => { e.preventDefault(); setEdits({}); void ask(q, {}); }} className="space-y-3">
+      {!p && !(initialQuestion && !askOpen) && <p data-testid="program-lede" className={`${lineSize(PAGE_LEDE)} max-w-lg text-fel-soft`}>{PAGE_LEDE}</p>}
+      {!askOpen && (
+        <div data-testid="program-ask-folded" className="flex items-start justify-between gap-3">
+          <p className={`min-w-0 ${TYPE.small} text-fel-soft`}><span className="text-white">Your ask:</span> {q}</p>
+          <button type="button" onClick={() => setAskOpen(true)} data-testid="program-ask-open" className={`min-h-11 shrink-0 rounded-full border border-fel-cyan/50 px-4 ${TYPE.label} text-fel-cyan`}>Change the ask</button>
+        </div>
+      )}
+      <form hidden={!askOpen} onSubmit={(e) => { e.preventDefault(); setEdits({}); void ask(q, {}); }} className="space-y-3">
         <label htmlFor="program-ask" className={`${TYPE.label} text-fel-soft`}>What do you have, and what do you want?</label>
         <textarea id="program-ask" data-testid="program-ask-input" value={q} onChange={(e) => setQ(e.target.value)} rows={3} maxLength={400} placeholder={ASK_PLACEHOLDER}
           className={`w-full rounded-2xl border border-white/10 bg-[#0c0c11] p-4 ${TYPE.body} text-white placeholder:text-white/50 focus:border-fel-cyan/60 focus:outline-none`} />
@@ -224,10 +238,14 @@ export function ProgramBuilder({ initialQuestion = '' }: { initialQuestion?: str
           <p className={`${TYPE.label} text-fel-soft`}>{READ_BACK} · {EDIT_HINT}</p>
           <div className="flex flex-wrap gap-2">{answer.read.chips.map((c) => <ChipControl key={c.field} c={c} onEdit={edit} busy={busy} />)}</div>
           {answer.read.assumptions.length > 0 && (
-            <details className="text-fel-soft">
-              <summary className={`min-h-11 cursor-pointer py-2 ${TYPE.small}`}>FEL assumed {answer.read.assumptions.length} thing{answer.read.assumptions.length === 1 ? '' : 's'}</summary>
-              <ul className="list-disc space-y-1 pl-5">{answer.read.assumptions.map((a) => { const t = a.replace(/^assumption: /, ''); return <li key={a} className={lineSize(t)}>{t}</li>; })}</ul>
-            </details>
+            // EVERY-SCREEN P4: a disclosure, not <details>: a closed <details> still lays its text out, so the phone's first
+            // screen measured every hidden assumption (the result card's own finding, components/result-card)
+            <div className="text-fel-soft">
+              <button type="button" aria-expanded={assumedOpen} onClick={() => setAssumedOpen((o) => !o)} data-testid="program-assumed" className={`min-h-11 py-2 text-left ${TYPE.small}`}>
+                {assumedOpen ? '▾' : '▸'} FEL assumed {answer.read.assumptions.length} thing{answer.read.assumptions.length === 1 ? '' : 's'}
+              </button>
+              <ul hidden={!assumedOpen} className="list-disc space-y-1 pl-5">{answer.read.assumptions.map((a) => { const t = a.replace(/^assumption: /, ''); return <li key={a} className={lineSize(t)}>{t}</li>; })}</ul>
+            </div>
           )}
         </section>
       )}
@@ -290,6 +308,8 @@ export function ProgramBuilder({ initialQuestion = '' }: { initialQuestion?: str
           the page, the player sat inside the page's own stacking context, UNDER the tab bar and the status rail: its one
           button (Start now / Set done) and its close and pause could not be tapped (measured on the rig: the tab bar's
           icon was the element on top of the button). */}
+      {/* EVERY-SCREEN P4: room under the last line for the docked Start (fixed on a phone), so nothing ends under it */}
+      {canStart && <div aria-hidden data-dock-spacer className="h-24 md:hidden" />}
       {playing && <Layer><SessionPlayer session={playing.session} mode="device" onFinish={finish} onClose={() => setPlaying(null)} /></Layer>}
     </div>
   );

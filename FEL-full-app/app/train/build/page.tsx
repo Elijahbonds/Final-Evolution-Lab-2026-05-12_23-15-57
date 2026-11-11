@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { loginPath } from '@/lib/auth/safeNext';
 import { TabPage } from '@/components/shell/tab-page';
 import { ProgramBuilder } from '@/components/program-ask/program-builder';
-import { PAGE_LEDE, PAGE_TITLE } from '@/lib/program-ask/copy';
+import { PAGE_TITLE } from '@/lib/program-ask/copy';
 import { MAX_ASK_CHARS } from '@/lib/program-ask/request';
 
 export const dynamic = 'force-dynamic';
@@ -19,7 +19,9 @@ export default async function BuildProgramPage({ searchParams }: { searchParams?
   if (!session?.user) redirect(loginPath('/train/build'));
   const q = typeof searchParams?.q === 'string' ? searchParams.q.slice(0, MAX_ASK_CHARS) : '';
   return (
-    <TabPage eyebrow="Train" title={PAGE_TITLE} lede={PAGE_LEDE}>
+    // EVERY-SCREEN P4: the lede is the builder's own (components/program-ask/program-builder.tsx): it steps aside once a
+    // program is on screen, so the program's first screen is the program
+    <TabPage eyebrow="Train" title={PAGE_TITLE}>
       <ProgramBuilder initialQuestion={q} />
     </TabPage>
   );

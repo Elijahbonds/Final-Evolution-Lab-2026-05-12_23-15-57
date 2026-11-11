@@ -344,3 +344,14 @@ reversible). Work is on `lane/screen-fixes` (the screens) and the demos lane (th
    and the shared start screen (`boot-splash.tsx`: the layout only, never what it loads or when); the React hydration
    mismatch on every game screen (its cause, not the warning); the 3D canvas's name and Tab order wherever a 3D stage is
    mounted; and the start screens' "learn" card text, moved onto the type scale (size only).
+
+## 2026-11-11 — deploy cadence, short plans, Nexus Studio, pace
+
+The owner answered four questions (relayed by the coordinator).
+
+1. **Deploy cadence:** no deploy until all the training phases (1–5 of `docs/PLAN-EVERY-SCREEN-10PHASE.md`) are done;
+   then one deploy.
+2. **Short builder plans: "slightly longer, told".** A 20–30 minute request that is built 5–10 minutes longer, with the
+   plain line that says so (`lib/program-ask/kept.ts`, `copy.ts`), stays as it is.
+3. **Nexus Studio: "fix the last 4 first".** A separate lane, `studio-22`, takes it.
+4. **Pace:** phases 5–10 run back to back; each phase starts as soon as the one before it merges.

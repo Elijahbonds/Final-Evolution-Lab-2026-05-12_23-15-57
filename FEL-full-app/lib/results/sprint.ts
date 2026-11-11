@@ -15,6 +15,7 @@ import type { RunResult } from '@/lib/sprint/session';
 import type { SprintRecord } from '@/lib/sprint/store';
 import { compareLast, vsLineOf, type ResultNextStep, type ResultView } from './view';
 import { RESULT_COPY } from './copy';
+import { sprintSure } from './trust';
 
 type Ok = Extract<RunResult, { ok: true }>;
 
@@ -55,6 +56,6 @@ export function sprintView(r: Ok, last: SprintRecord | null, line: string, next:
     estimate: true, pm: pmNow === null ? null : speed ? pmNow.toFixed(1) : pmNow.toFixed(2),
     vsLast: c.vsLast, better: speed ? 'up' : 'down',
     vsLine: vsLineOf(c, { against: RESULT_COPY.lastTime, up: speed ? 'faster' : 'slower', down: speed ? 'slower' : 'faster', fmt }),
-    line, next,
+    line, next, howSure: now === null ? null : sprintSure(),
   };
 }

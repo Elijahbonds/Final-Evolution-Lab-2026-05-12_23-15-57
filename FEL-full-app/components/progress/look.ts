@@ -13,6 +13,9 @@ export const LOOK = {
   better: 'text-fel-emerald',
   worse: 'text-[#FFB020]',
   same: 'text-fel-soft',
+  /** EVERY-SCREEN P4: a row's source — how it measures and how sure (body size, a sentence), and the tool's page */
+  trace: `${TYPE.body} space-y-1 border-t border-white/10 px-4 pt-3 text-fel-soft`,
+  traceLink: `${TYPE.small} inline-flex min-h-11 items-center font-semibold text-fel-cyan underline underline-offset-4`,
   history: 'space-y-1 border-t border-white/10 px-4 py-3',
   historyRow: `${TYPE.small} flex items-center justify-between gap-3 py-1`,
   emptyLine: `${TYPE.body} max-w-xs text-fel-soft`,
