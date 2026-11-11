@@ -1,10 +1,10 @@
 // studio-22 (2026-11-11): the series' table. node scripts/probes/studio-22/summary.mjs <outDir>/<label>
-// Reads tasks-<width>-run<n>.json and prints, per task and width: done in how many runs, the taps + keys of each run, and the
+// Reads tasks-<width>[-<tasks>]-run<n>.json and prints, per task and width: done in how many runs, the taps + keys of each run, and the
 // notes that differ (Play-test's path, the colour field on screen or not).
 import fs from 'node:fs';
 import path from 'node:path';
 const dir = process.argv[2];
-const files = fs.readdirSync(dir).filter((f) => /^tasks-(desktop|phone)-run\d+\.json$/.test(f)).sort();
+const files = fs.readdirSync(dir).filter((f) => /^tasks-(desktop|phone)(-[a-z_]+)?-run\d+\.json$/.test(f)).sort();
 const rows = new Map();
 let total = 0, done = 0;
 for (const f of files) {

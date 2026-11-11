@@ -42,6 +42,13 @@ async function measure(page: Page, width: number, height: number) {
   if (await sheet.count() && (await sheet.first().getAttribute('aria-selected')) !== 'true') await press(page, btn('^(assets|add)$'));
   await press(page, '[data-testid=asset-list] button:has-text("Floodlight")');
   await page.waitForTimeout(400);
+  // before Inspect: what the studio-easy probe's "is the inspector already showing?" check sees (it skipped the Inspect tap on a phone)
+  const pre = page.locator('[data-testid=inspector] input[type=color]');
+  const preSeen = { count: await pre.count(), visibleFilter: await pre.filter({ visible: true }).count(),
+    // a real function with no named inner function (tsx would wrap a named one in a helper the page does not have)
+    each: await pre.evaluateAll((els) => els.map((e) => ({ box: [e.getBoundingClientRect().left, e.getBoundingClientRect().top, e.getBoundingClientRect().width, e.getBoundingClientRect().height].map(Math.round),
+      rects: e.getClientRects().length, label: e.getAttribute('aria-label'), aside: e.closest('aside') ? getComputedStyle(e.closest('aside')!).display : 'no aside',
+      sheet: document.querySelector('[data-testid=sheet-inspect]')?.getAttribute('aria-selected') ?? 'no tab' }))) };
   if (await page.locator('[data-testid=sheet-inspect]').filter({ visible: true }).count()) await press(page, '[data-testid=sheet-inspect]');
   await page.waitForTimeout(700);
   // a string, not a function: tsx names arrow functions with a helper the page does not have
@@ -70,7 +77,7 @@ async function measure(page: Page, width: number, height: number) {
     };
   })()`) as Record<string, unknown>;
   await page.screenshot({ path: join(resolve(outDir), `inspect-${width}-${label}.jpg`), type: 'jpeg', quality: 72 });
-  return { width, height, ...r };
+  return { width, height, preInspect: preSeen, ...r };
 }
 
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_EXE ?? chromiumExe(), headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });

@@ -215,7 +215,9 @@ async function followPlay(page: Page, d: Driver, sel: string, what: string, widt
   if (!r.ok) { r.why = `the tab went to ${u.pathname}`; return r; }
   if (!GAME) return r;   // the address is all a rig without the game page can check
   const t0 = Date.now();
-  r.gameLoaded = await g.waitForFunction(`(() => { const s = ${GAME_STATE}; return s.engines > 0 && s.meshes > 20 && s.frame > 30; })()`, null, { timeout: 150000, polling: 500 }).then(() => true, () => false);
+  // loaded: an engine, a scene with the court in it, a few frames drawn. Up to 5 minutes: the desktop game with four Studio
+  // floodlights compiling on software GL took 148 s to its 30th frame on the shared machine (2026-11-11, load 13 to 15)
+  r.gameLoaded = await g.waitForFunction(`(() => { const s = ${GAME_STATE}; return s.engines > 0 && s.meshes > 20 && s.frame > 5; })()`, null, { timeout: 300000, polling: 500 }).then(() => true, () => false);
   d.c.waitMs += Date.now() - t0; d.c.steps.push(`${r.gameLoaded ? 'wait' : '✗ wait'} the game to load and draw ${Date.now() - t0} ms`);
   // the game's READY card covers the court: press its start as a player would (in the game, not a Studio tap: not counted)
   const start = g.locator('button:text-matches("tap to start", "i")').filter({ visible: true }).first();
@@ -225,9 +227,12 @@ async function followPlay(page: Page, d: Driver, sel: string, what: string, widt
     await g.waitForTimeout(4000);
   }
   const a = await g.evaluate(GAME_STATE) as { frame: number; fixtures: number; pick: unknown; starts: unknown[] };
-  await g.waitForTimeout(2000);
+  // drawing: the engine's frame counter moves on. Software GL at 1280 × 800 on a shared 4-core machine has drawn under one frame a
+  // second (2026-11-11, load 13), so the window is up to 30 s, not a fixed 2 s; the rate is reported as measured
+  const ta = Date.now();
+  await g.waitForFunction(`(() => { const e = (window.__ENGINES || [])[0]; return !!e && e.frameId >= ${a.frame} + 3; })()`, null, { timeout: 30000, polling: 250 }).catch(() => {});
   const b = await g.evaluate(GAME_STATE) as { frame: number; fixtures: number; pick: unknown; starts: unknown[]; handed: string | null };
-  r.framesPerSec = Math.round((b.frame - a.frame) / 2 * 10) / 10;
+  r.framesPerSec = Math.round((b.frame - a.frame) / ((Date.now() - ta) / 1000) * 10) / 10;
   r.pick = b.pick; r.starts = b.starts; r.studioFixtureNodes = b.fixtures; r.handed = b.handed;
   if (!(await shot(g, `${width}-${tag}-game`))) d.c.steps.push('(the game’s picture timed out on the rig)');
   const pick = b.pick as { venueId?: string; competitive?: boolean } | null;
@@ -328,11 +333,12 @@ async function runTask(browser: Browser, width: Width, task: Task): Promise<Task
       const placed = await d.tap('[data-testid=asset-list] button:has-text("Floodlight")', 'Floodlight');
       if (!placed) { deadEnd = 'the asset list is not reachable'; break; }
       await page.waitForTimeout(300);
-      const insp = page.locator('[data-testid=inspector] input[type=color]').filter({ visible: true }).first();
-      if (!(await insp.count())) {
-        const tab = page.locator(btn('^inspect')).filter({ visible: true });
-        if (await tab.count()) await d.tap(btn('^inspect'), 'Inspect');
-      }
+      // studio-22: on a phone the inspector is a sheet behind its "Inspect" tab. The old check ("is a colour field visible?") was
+      // fooled: Playwright's visible filter counted the light's colour inside the hidden sheet (measured 2026-11-11: no box, no
+      // client rects, its aside display:none), so the rig never pressed Inspect and the fill then timed out — the audit's open
+      // phone item. Press the tab whenever it is shown and not already open, as a person does.
+      const sheetTab = page.locator('[data-testid=sheet-inspect]').filter({ visible: true });
+      if (await sheetTab.count() && (await sheetTab.first().getAttribute('aria-selected')) !== 'true') await d.tap('[data-testid=sheet-inspect]', 'Inspect');
       const colour = page.locator('[data-testid=inspector] input[type=color]').filter({ visible: true }).first();
       if (await colour.count()) {
         const box = await colour.boundingBox();
@@ -346,8 +352,11 @@ async function runTask(browser: Browser, width: Width, task: Task): Promise<Task
           for (; c; c = c.parentElement) { const s = getComputedStyle(c); if (/(auto|scroll|hidden)/.test(s.overflowY)) { const b = c.getBoundingClientRect(); top = Math.max(top, b.top); bottom = Math.min(bottom, b.bottom); } }
           return { on: r.top >= top && r.bottom <= bottom, below: Math.round(Math.max(0, r.bottom - bottom)) }; })()`) as { on: boolean; below: number };
         notes.push(seen.on ? 'the colour field is on the first screen' : `the colour field is ${seen.below} px below the first screen: a person scrolls the sheet to find it`);
-        await colour.fill('#ff3366', { timeout: 15000 }); d.c.taps += 2; d.c.steps.push('colour picker: open + pick');
-        done = true;
+        // studio-22: a failed fill is the task's dead end, with Playwright's own account of what it waited for (it threw out of the
+        // task before, so the run kept no notes: "the colour fill timed out on the phone" was all anyone ever saw)
+        const err = await colour.fill('#ff3366', { timeout: 15000 }).then(() => null, (e) => String(e).split('\n').filter((l) => /waiting|element|intercept|retrying|scroll|not |Timeout|attempt/.test(l)).slice(0, 12).join(' | '));
+        if (err) deadEnd = `the colour fill failed: ${err}`;
+        else { d.c.taps += 2; d.c.steps.push('colour picker: open + pick'); done = true; }
       } else { deadEnd = 'the inspector (colour) is not reachable'; }
       await d.waitFor(`${objects} >= ${Math.max(0, before as number) + 1}`, 5000, 'autosave of the new light');
       await d.key('Control+z', 'undo the colour');
