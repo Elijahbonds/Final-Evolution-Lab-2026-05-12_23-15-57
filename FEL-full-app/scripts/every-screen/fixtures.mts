@@ -28,6 +28,7 @@ const SWITCHES: [RegExp, string][] = [
   [/isStudioShareEnabled\(\)/, 'STUDIO_SHARE_ENABLED (Studio share links)'],
   [/isLiveStreamScheduleEnabled\(\)/, 'LIVE_STREAM_SCHEDULE_ENABLED (the live schedule)'],
   [/isNexusStudioEnabled\(\)/, 'NEXUS_STUDIO_ENABLED (Nexus Studio)'],
+  [/isBinjgbShelfEnabled\(\)/, 'BINJGB_SHELF_ENABLED (the Game Boy homebrew shelf)'],
 ];
 export function switchesOf(s: Screen): string[] {
   const src = [s.file, ...layoutsOf(s.file)].map((f) => readFileSync(join(ROOT, f), 'utf8')).join('\n');
@@ -95,6 +96,7 @@ const MAKERS: Record<string, Maker> = {
   '/program/[accessId]': async () => ({ url: '/program/none' }),
   '/session/[bookingId]': async () => ({ url: '/session/none' }),
   '/play/shared/[token]': async () => ({ url: '/play/shared/none' }),
+  '/play/gb-shelf/[slug]': async () => ({ why: 'v1 of the homebrew shelf ships no titles (BINJGB-SHELF-1, OQ-10), so every slug is a 404 by design' }),
 };
 
 export async function fixtureFor(s: Screen, p: People): Promise<Fixture> {
