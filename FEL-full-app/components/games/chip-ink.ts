@@ -6,9 +6,7 @@
 // (#2E7D46) and 4.15 on Brain Brawl (#5E5CE6), at 12 px / 900, where AA is 4.5. The fix keeps every colour exactly as it
 // is (the fill and the border) and changes only the letters: black where black clears AA, white where it does not. The
 // better of the two always clears it (the two ratios cross at 4.58:1), so no colour needs changing.
-import * as wcagNs from '@/lib/a11y/wcag';
-
-const { contrastRatio, parseColor } = ((wcagNs as { default?: unknown }).default ?? wcagNs) as typeof wcagNs;
+import { contrastRatio, parseColor } from '@/lib/a11y/wcag';
 
 /** WCAG AA for the chips' 12 px text (under 18.66 px bold, so not "large"). The scorer reads computed colours. */
 export const CHIP_AA = 4.5;

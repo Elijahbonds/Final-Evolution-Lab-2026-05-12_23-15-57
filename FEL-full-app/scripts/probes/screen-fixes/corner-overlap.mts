@@ -25,32 +25,31 @@ const GAMES = ['skateboard', 'snowboard', 'big-air', 'surf', 'dunk', 'onevone', 
 const ROUTES = routesArg ? routesArg.split(',') : GAMES.map((g) => `/play/${g}`);
 
 type Hit = { text: string; area: number; rect: string };
-async function measure(page: Page): Promise<{ corner: string | null; chip: string; hits: Hit[] }> {
-  return page.evaluate(() => {
-    const corner = document.querySelector('[data-splash-corner]');
-    const col = document.querySelector('[data-splash-column]');
-    if (!corner || !col) return { corner: null, chip: '', hits: [] };
-    const c = corner.getBoundingClientRect();
-    const rc = (r: DOMRect) => `${Math.round(r.x)},${Math.round(r.y)} ${Math.round(r.width)}x${Math.round(r.height)}`;
-    const hits: { text: string; area: number; rect: string }[] = [];
-    const walk = document.createTreeWalker(col, NodeFilter.SHOW_TEXT);
-    for (let n = walk.nextNode(); n; n = walk.nextNode()) {
-      const t = (n.textContent ?? '').trim();
-      if (!t) continue;
-      const el = n.parentElement!;
-      const cs = getComputedStyle(el);
-      if (cs.visibility === 'hidden' || Number(cs.opacity) === 0) continue;
-      const range = document.createRange(); range.selectNodeContents(n);
-      let area = 0; let at: DOMRect | null = null;
-      for (const r of Array.from(range.getClientRects())) {
-        const w = Math.min(r.right, c.right) - Math.max(r.left, c.left), h = Math.min(r.bottom, c.bottom) - Math.max(r.top, c.top);
-        if (w > 0.5 && h > 0.5) { area += w * h; at ??= r; }
-      }
-      if (area > 0) hits.push({ text: t.slice(0, 40), area: Math.round(area), rect: rc(at!) });
+// a string, not a function: tsx (esbuild) wraps named functions in a `__name` helper the page does not have
+const MEASURE = `(() => {
+  const corner = document.querySelector('[data-splash-corner]');
+  const col = document.querySelector('[data-splash-column]');
+  if (!corner || !col) return { corner: null, chip: '', hits: [] };
+  const c = corner.getBoundingClientRect();
+  const rc = (r) => Math.round(r.x) + ',' + Math.round(r.y) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height);
+  const hits = [];
+  const walk = document.createTreeWalker(col, NodeFilter.SHOW_TEXT);
+  for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+    const t = (n.textContent || '').trim();
+    if (!t) continue;
+    const cs = getComputedStyle(n.parentElement);
+    if (cs.visibility === 'hidden' || Number(cs.opacity) === 0) continue;
+    const range = document.createRange(); range.selectNodeContents(n);
+    let area = 0, at = null;
+    for (const r of Array.from(range.getClientRects())) {
+      const w = Math.min(r.right, c.right) - Math.max(r.left, c.left), h = Math.min(r.bottom, c.bottom) - Math.max(r.top, c.top);
+      if (w > 0.5 && h > 0.5) { area += w * h; at = at || r; }
     }
-    return { corner: rc(c), chip: (corner.textContent ?? '').trim().slice(0, 40), hits };
-  });
-}
+    if (area > 0) hits.push({ text: t.slice(0, 40), area: Math.round(area), rect: rc(at) });
+  }
+  return { corner: rc(c), chip: (corner.textContent || '').trim().slice(0, 40), hits };
+})()`;
+const measure = (page: Page) => page.evaluate(MEASURE) as Promise<{ corner: string | null; chip: string; hits: Hit[] }>;
 
 dbUp();
 const stop = await serve(path.join(OUT, 'server.log'));
