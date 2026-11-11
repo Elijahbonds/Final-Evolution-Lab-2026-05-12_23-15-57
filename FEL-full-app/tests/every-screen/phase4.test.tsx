@@ -169,3 +169,16 @@ describe('carried from phase 3: the builder\'s first screen once a program is on
     expect(src).toContain('data-dock-spacer');
   });
 });
+
+describe('the measurement screens\' own small targets are 44 px (the rig: "← Train" 36 px tall on all six)', () => {
+  it('"← Train", the sprint chips, the bar-speed families and lifts, and readiness\'s "Back to Train"', async () => {
+    const { readFileSync } = await import('node:fs');
+    for (const p of ['readiness', 'progress', 'jumps', 'velocity', 'speed']) expect(readFileSync(`app/train/${p}/page.tsx`, 'utf8'), p).toContain('inline-flex min-h-11 items-center rounded-xl border border-white/10 px-3 py-2 text-[12px]');
+    expect(readFileSync('app/train/combine/page.tsx', 'utf8')).toContain('inline-flex min-h-11 items-center text-[14px] text-fel-soft hover:text-white">← Train');
+    expect(readFileSync('components/sprint/speed-app.tsx', 'utf8')).toContain('min-h-11 rounded-lg border px-3 text-sm font-bold ${on');
+    const v = readFileSync('components/vbt/velocity-session.tsx', 'utf8');
+    expect(v).toContain('min-h-11 shrink-0 rounded-lg border px-3 text-sm font-bold ${family');
+    expect(v).toContain('min-h-11 rounded-full border px-3 text-[13px] ${liftId');
+    expect(readFileSync('components/readiness/readiness-check.tsx', 'utf8')).toContain('inline-flex min-h-11 items-center underline">Back to Train');
+  });
+});

@@ -24,7 +24,7 @@ export default async function MyCombinesPage() {
   const body = r.body as { available?: boolean; events?: MyCombine[] };
   return (
     <main className="mx-auto min-h-screen max-w-xl bg-fel-bg px-4 py-6 pb-24">
-      <Link href="/train" className="text-[14px] text-fel-soft hover:text-white">← Train</Link>
+      <Link href="/train" className="inline-flex min-h-11 items-center text-[14px] text-fel-soft hover:text-white">← Train</Link>
       <h1 className="mb-4 mt-2 font-display text-[20px] font-bold uppercase tracking-[0.03em] text-white">Your combines</h1>
       <MyCombines available={body.available === true} events={body.events ?? []} />
     </main>

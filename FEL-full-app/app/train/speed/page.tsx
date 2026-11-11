@@ -24,7 +24,7 @@ export default async function SpeedPage() {
   const adult = verifiedAdult(await readDobYear(prisma, me, 'sprint_speed_page'));
   return (
     <TabPage eyebrow="Train" title="Sprint speed" lede="Time a sprint with your phone's camera. Every number is an estimate." accent="#00FF9D"
-      aside={<Link href="/train" className="rounded-xl border border-white/10 px-3 py-2 text-[12px] font-bold text-white/75 hover:bg-white/[0.05] hover:text-white">← Train</Link>}>
+      aside={<Link href="/train" className="inline-flex min-h-11 items-center rounded-xl border border-white/10 px-3 py-2 text-[12px] font-bold text-white/75 hover:bg-white/[0.05] hover:text-white">← Train</Link>}>
       <div className="mx-auto max-w-md">
         {adult ? <SpeedApp /> : (
           <div className="fel-card rounded-xl p-5 text-sm text-white/75" data-sprint-adults-only>{ADULTS_ONLY_LINE}</div>
