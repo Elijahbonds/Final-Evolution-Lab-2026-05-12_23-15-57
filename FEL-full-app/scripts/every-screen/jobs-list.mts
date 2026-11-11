@@ -10,6 +10,10 @@
 import type { Job, Step } from './jobs.mts';
 
 /** Home, then the Train tab: one tap. */
+/** EVERY-SCREEN P4: two jump checks as the jump check keeps them on a phone (lib/jump/historyStore.ts HISTORY_KEY and its entry). */
+const JUMP_HISTORY_KEY = 'fel.jump.history.v1';
+const kept = (id: string, at: string, bestCm: number) => ({ id, at, test: 'check', bestCm, plusMinusCm: 3, jumps: 3, verified: false, manualFrames: false, source: 'live', fps: 30, rsi: null, contactMs: null, v0Mps: null, rsiMod: null });
+const JUMP_KEPT = JSON.stringify([kept('rig-jump-2', '2026-11-10T17:00:00.000Z', 44), kept('rig-jump-1', '2026-11-03T17:00:00.000Z', 41)]);
 const TRAIN: Step[] = [{ goto: '/play', say: 'home' }, { css: 'nav a[href="/train"]:visible', say: 'the Train tab' }];
 /** The coach's own home: Train, then "Your roster". */
 const COACH: Step[] = [...TRAIN, { tap: 'Your roster', expect: '[data-coach-clients]', say: 'Your roster' }];
@@ -90,6 +94,18 @@ export const JOBS: Job[] = [
   {
     id: 'solo-see-progress', who: 'solo', name: 'See progress', planBudget: 'progress number → its source in 1 tap (phase 4)',
     steps: [...TRAIN, { tap: 'My progress', expect: '/Your numbers over time/', say: 'My progress' }],
+  },
+  {
+    id: 'solo-progress-source', who: 'solo', name: 'See where a progress number came from', planBudget: 'progress number → its source in 1 tap (phase 4)',
+    // EVERY-SCREEN P4: the rig cannot jump in front of a camera, so the jump is put on the phone as the jump check keeps
+    // it (lib/jump/historyStore.ts); then one tap on the row shows the tool, how it measures and how sure, and each
+    // number's own test and time. The second tap opens that tool.
+    steps: [
+      { goto: '/train/progress', pre: true, say: 'My progress' },
+      { seed: [JUMP_HISTORY_KEY, JUMP_KEPT], pre: true, expect: '[data-progress-row]', say: 'a jump kept on this phone (put there by the rig)' },
+      { css: '[data-progress-row] button[aria-expanded]', expect: '[data-progress-trace] [data-progress-source]', say: 'the jump row: its source' },
+      { css: '[data-progress-source]', expect: '/Jump tests/', say: 'Open the tool (Jump tests)' },
+    ],
   },
   {
     id: 'solo-join-group', who: 'solo', name: 'Find and join a group', planBudget: 'join a group in ≤ 4 taps (phase 5)',

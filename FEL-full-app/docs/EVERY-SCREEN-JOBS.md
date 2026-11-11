@@ -6,7 +6,7 @@
 
 **How to read it.** Taps are counted from the signed-in home; the Train tab is one tap. Typing is counted apart. Seconds are the rig's own, with no reading time: a floor, not a person's time. A camera job is walked to the moment it needs a person in front of the camera. "Stops" means a person cannot go further on that path today, and says where.
 
-**Today: 20 of 20 jobs can be walked to their end** (or to the camera); 0 stop. Before this phase's fixes: 20 of 20.
+**Today: 21 of 21 jobs can be walked to their end** (or to the camera); 0 stop. Before this phase's fixes: 20 of 20.
 
 ## An athlete training alone
 
@@ -24,6 +24,7 @@
 | Find and join a group | 0 | – | 0 | 0 taps, 0.1 s | reaches it: switched off until the group-booking tables are applied: the screen says so and offers what to do instead | join a group in ≤ 4 taps (phase 5) |
 | Book a 1:1 | 1 | – | 0.5 | 1 taps, 0.6 s | reaches it: switched off until the group-booking tables are applied: the screen says so and offers what to do instead | book a 1:1 in ≤ 5 taps (phase 5) |
 | Cancel a booking | 0 | – | 0 | 0 taps, 0 s | reaches it: switched off: nothing can be booked, so there is nothing to cancel; the notice says what to do instead | cancel in ≤ 3 taps with the rule shown first (phase 5) |
+| See where a progress number came from | 2 | – | 11 | – | finishes | progress number → its source in 1 tap (phase 4) |
 
 ## A coached client
 
@@ -50,6 +51,7 @@
 | Test a jump (measure my vertical) | 4 taps (through Train) | 3 taps (the plan's budget: ≤ 3) | Walked from the home's "Measure my vertical" chip, as the VERTICAL-EASY gate counts it; the door through Train is one more. |
 | Run the movement screen | 4 taps (through Train) | 3 taps, and 143 s from the camera to the result on the computer-made mover (the plan: 3 taps, under 3 minutes) | From the home's "Screen my movement" chip; the time is `scripts/every-screen/trust.mts` (lib/screen-easy/sim.ts, 8 seeds). |
 | See progress → a number's source | – | 1 tap on the row | Each row opens on the tool, how it measures and how sure, a link to the tool, and each number's own test and time (`components/progress/progress-view.tsx`). |
+| Build a program: the first screen after it is built | The ask box and BUILD IT on top; the last two chip rows and "FEL assumed" sat under START TODAY | The ask folds to one line with "Change the ask"; every chip and "FEL assumed 5 things" sit above START TODAY | Words before scrolling went 92 → 117, not down to 40: the fold brings the chips and the program's summary into the first screen, and the budget counts every visible word. Reaching 40 means hiding the chips or the summary (an owner or layout call; not done). |
 
 Every measured number now carries a line under it: how it was measured, and its ± from a measurement on the repository's fixtures (`docs/every-screen/TRUST.md`).
 

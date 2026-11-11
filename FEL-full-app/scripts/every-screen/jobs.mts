@@ -45,6 +45,9 @@ export interface Step {
   pre?: boolean;
   /** EVERY-SCREEN P4: tap `css` only if it is on screen (a folded ask box, say): absent is not a stop, and not a tap */
   ifPresent?: boolean;
+  /** EVERY-SCREEN P4: put [key, value] in this phone's storage and reload, as the tool would have kept it (a jump kept
+   *  on this phone, say): the rig cannot jump in front of a camera. Never a tap. */
+  seed?: [string, string];
 }
 export interface Job {
   id: string;
@@ -96,6 +99,7 @@ export async function walk(page: Page, job: Job, shotDir: string): Promise<Walk>
     if (!s.pre && !t0 && !s.goto) t0 = Date.now();
     try {
       if (s.goto) { await page.goto(ORIGIN + s.goto, { waitUntil: 'load', timeout: 45000 }); await settle(); if (!t0 && !s.pre) t0 = Date.now(); }
+      if (s.seed) { const [k, v] = s.seed; await page.evaluate(([k, v]) => localStorage.setItem(k, v), [k, v]); await page.reload({ waitUntil: 'load' }); await settle(); }
       if (s.tap) { ok = await tapLabel(page, s.tap); if (ok) w.taps++; else why = `nothing to tap called "${s.tap}"`; await settle(s.wait); }
       if (s.css && s.ifPresent && !(await page.locator(s.css).first().isVisible().catch(() => false))) { /* not here: nothing to do */ }
       else if (s.css) { ok = await page.locator(s.css).first().tap({ timeout: 5000 }).then(() => true).catch(() => false); if (ok) w.taps++; else why = `nothing to tap at ${s.css}`; await settle(s.wait); }
