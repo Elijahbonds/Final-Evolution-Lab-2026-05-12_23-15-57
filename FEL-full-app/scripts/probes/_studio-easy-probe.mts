@@ -11,8 +11,19 @@
 // track, a Tab pass, 200 % zoom, reduced motion.
 //
 //   npx tsx scripts/probes/_studio-easy-probe.mts <outDir> <label> --build-only
-//   flock /home/user/wt/gate-queue.lock timeout 900 npx tsx scripts/probes/_studio-easy-probe.mts <outDir> <label> [--widths=phone,desktop] [--tasks=new,place,…] [--a11y]
+//   /home/user/wt/gate-run.sh 900 npx tsx scripts/probes/_studio-easy-probe.mts <outDir> <label> [--widths=phone,desktop] [--tasks=new,place,…] [--a11y]
 // Reads/writes <outDir>/.build-<label>; writes <outDir>/<label>/{tasks-<width>.json,a11y.json} and the jpgs.
+//
+// studio-22 (2026-11-11), the four runs that never finished ("Invalid URL"):
+//   --prod          build the Studio as a production deploy runs it (NODE_ENV production): Play-test then hands the court over
+//                   in the SAME tab, to the game's own page as practice (shareHandoff.ts), as it will for the owner. Default: the
+//                   development build every earlier measurement used (Play-test opens /dev/mode/<key>?venue= in a new tab).
+//   --game=<site>   serve the game page (scripts/probes/studio-22/game-build.mjs, built --dev for a development Studio) at
+//                   /play/* and /dev/mode/*, so Play-test is followed INTO the game: the tab's own address (waited for, not
+//                   read before the tab has one), the game's engine drawing frames, the runtime's answer for which Studio
+//                   venue the mode loads, the run asked as practice, and a jpg of the game.
+//   --port=<n>      the server's port (the lane's, from docs/LANES.md); default any free port.
+//   --run=<n>       a repeat's number, in the output file names (three runs a width show it is stable).
 import { createServer } from 'node:http';
 import { createReadStream, existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
@@ -37,22 +48,27 @@ const BUILD = join(OUT_ROOT, `.build-${LABEL}`);
 const OUT = join(OUT_ROOT, LABEL);
 mkdirSync(OUT, { recursive: true });
 
+const PROD = args.includes('--prod');
+const GAME = flag('game') ? resolve(flag('game')!) : null;
+const RUN = flag('run');
 if (args.includes('--build-only') || !existsSync(join(BUILD, 'index.html'))) {
-  await buildRig(BUILD, { entry: join(ROOT, 'scripts/probes/_studio-easy-entry.tsx'), fontBase: '/__fonts', external: ['@mediapipe/tasks-vision'] });
+  await buildRig(BUILD, { entry: join(ROOT, 'scripts/probes/_studio-easy-entry.tsx'), fontBase: '/__fonts', external: ['@mediapipe/tasks-vision'], nodeEnv: PROD ? 'production' : 'development' });
   console.log(`built → ${BUILD}`);
   if (args.includes('--build-only')) process.exit(0);
 }
 
-const TYPES: Record<string, string> = { '.html': 'text/html', '.js': 'text/javascript', '.woff2': 'font/woff2', '.jpg': 'image/jpeg', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.glb': 'model/gltf-binary', '.gltf': 'model/gltf+json', '.bin': 'application/octet-stream', '.ktx2': 'image/ktx2', '.env': 'application/octet-stream', '.hdr': 'application/octet-stream', '.webp': 'image/webp' };
+const TYPES: Record<string, string> = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.woff2': 'font/woff2', '.jpg': 'image/jpeg', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.glb': 'model/gltf-binary', '.gltf': 'model/gltf+json', '.bin': 'application/octet-stream', '.ktx2': 'image/ktx2', '.env': 'application/octet-stream', '.hdr': 'application/octet-stream', '.webp': 'image/webp' };
 const server = createServer((req, res) => {
   const p = decodeURIComponent((req.url ?? '/').split('?')[0]);
   if (p.startsWith('/api/')) { res.writeHead(404, { 'content-type': 'application/json' }).end('{"error":"not_found"}'); return; }
-  const file = p.startsWith('/__fonts/') ? join(ROOT, 'app/fonts', p.slice(9)) : existsSync(join(BUILD, p)) && p !== '/' ? join(BUILD, p) : join(ROOT, 'public', p);
+  // studio-22: the game page Play-test opens (production /play/<mode>, development /dev/mode/<key>), and its files
+  const game = GAME && (p.startsWith('/play/') || p.startsWith('/dev/mode/')) ? join(GAME, 'index.html') : GAME && p.startsWith('/__game/') ? join(GAME, p.slice(8)) : null;
+  const file = game ? game : p.startsWith('/__fonts/') ? join(ROOT, 'app/fonts', p.slice(9)) : existsSync(join(BUILD, p)) && p !== '/' ? join(BUILD, p) : join(ROOT, 'public', p);
   if (!existsSync(file) || !statSync(file).isFile()) { res.writeHead(404).end(); return; }
   res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream' });
   createReadStream(file).pipe(res);
 });
-await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+await new Promise<void>((r) => server.listen(Number(flag('port') ?? 0), '127.0.0.1', r));
 const ORIGIN = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 
 const WIDTHS = { phone: { width: 390, height: 844 }, desktop: { width: 1280, height: 800 } } as const;
@@ -162,9 +178,68 @@ async function open(page: Page, fresh: boolean) {
   await page.waitForTimeout(500);
 }
 
-async function shot(page: Page, name: string) { await page.screenshot({ path: join(OUT, `${name}.jpg`), type: 'jpeg', quality: 72 }); }
+// studio-22: a game drawn at 1280 × 800 on the software renderer can take longer than Playwright's 30 s for one frame; a picture
+// that cannot be taken is said in the notes, it does not fail the task
+async function shot(page: Page, name: string): Promise<boolean> {
+  return page.screenshot({ path: join(OUT, `${name}${RUN ? `-run${RUN}` : ''}.jpg`), type: 'jpeg', quality: 72, timeout: 120000 }).then(() => true, () => false);
+}
 
-interface TaskResult { task: Task; width: Width; done: boolean; deadEnd?: string; taps: number; keys: number; chars: number; rigS: number; klmS: number; steps: string[]; screen: unknown; undo?: string; notes: string[] }
+// ── studio-22: following Play-test into the game ─────────────────────────────────────────────────────────────────────
+/** What a Play-test press reached: where (the tab's own address, once it has one), and — with --game — whether the game runs the
+ *  Studio's court: the runtime's pick, the engine's frames, the run's start, the Studio's lights in the scene. */
+interface PlayResult { how: 'new tab' | 'same tab' | 'nothing'; path: string; gameLoaded?: boolean; framesPerSec?: number; pick?: unknown; handed?: string | null; starts?: unknown[]; studioFixtureNodes?: number; ok: boolean; why?: string }
+const GAME_STATE = `(() => {
+  const e = (window.__ENGINES || [])[0]; const sc = e && e.scenes && e.scenes[0];
+  return { engines: (window.__ENGINES || []).length, frame: e ? e.frameId : -1, meshes: sc ? sc.meshes.length : 0,
+    fixtures: sc ? sc.transformNodes.filter((n) => /^studio_fixture_/.test(n.name)).length : 0,
+    pick: typeof window.__studioPick === 'function' ? window.__studioPick() : 'no game page', starts: window.__starts || null,
+    // the venue the Studio handed over: a development build's ?venue=<id>, a production build's hand-off under ?share=<key>
+    handed: (() => { const q = new URLSearchParams(location.search); const v = q.get('venue'); if (v && !v.startsWith('b64:')) return v;
+      try { const k = q.get('share'); return k ? JSON.parse(sessionStorage.getItem('fel.nexusStudio.share.' + k) || 'null').venueId : null; } catch { return null; } })() };
+})()`;
+async function followPlay(page: Page, d: Driver, sel: string, what: string, width: Width, tag: string): Promise<PlayResult> {
+  const venueId = await page.evaluate(`(JSON.parse(localStorage.getItem('fel.nexusStudio.v1') || 'null') || {}).activeVenueId || null`) as string | null;
+  // a development build opens a new tab; a production build moves this tab. Listen for both BEFORE the press.
+  const tab = page.waitForEvent('popup', { timeout: 10000 }).then((p) => ({ how: 'new tab' as const, p }));
+  const same = page.waitForURL((u) => /^\/(play|dev\/mode)\//.test(u.pathname), { timeout: 10000, waitUntil: 'commit' }).then(() => ({ how: 'same tab' as const, p: page }));
+  if (!(await d.tap(sel, what))) { tab.catch(() => {}); same.catch(() => {}); return { how: 'nothing', path: '', ok: false, why: `${what} is not on screen` }; }
+  const hit = await Promise.any([tab, same]).catch(() => null);
+  if (!hit) return { how: 'nothing', path: '', ok: false, why: 'no tab opened and this tab did not move' };
+  const g = hit.p;
+  // THE FIX: a new tab has no address the moment it exists (Playwright reports '' until it commits its first navigation), which is
+  // what "Invalid URL" was. Wait for the tab's own http(s) address before reading it.
+  const committed = await g.waitForURL((u) => u.protocol === 'http:' || u.protocol === 'https:', { timeout: 20000, waitUntil: 'commit' }).then(() => true, () => false);
+  if (!committed) return { how: hit.how, path: g.url(), ok: false, why: 'the tab never got an address' };
+  const u = new URL(g.url());
+  const r: PlayResult = { how: hit.how, path: `${u.pathname}${u.search.replace(/(venue|share)=[^&]+/, '$1=…')}`, ok: /^\/(play|dev\/mode)\//.test(u.pathname) };
+  if (!r.ok) { r.why = `the tab went to ${u.pathname}`; return r; }
+  if (!GAME) return r;   // the address is all a rig without the game page can check
+  const t0 = Date.now();
+  r.gameLoaded = await g.waitForFunction(`(() => { const s = ${GAME_STATE}; return s.engines > 0 && s.meshes > 20 && s.frame > 30; })()`, null, { timeout: 150000, polling: 500 }).then(() => true, () => false);
+  d.c.waitMs += Date.now() - t0; d.c.steps.push(`${r.gameLoaded ? 'wait' : '✗ wait'} the game to load and draw ${Date.now() - t0} ms`);
+  // the game's READY card covers the court: press its start as a player would (in the game, not a Studio tap: not counted)
+  const start = g.locator('button:text-matches("tap to start", "i")').filter({ visible: true }).first();
+  if (r.gameLoaded && await start.count()) {
+    await start.click({ timeout: 30000 }).catch(() => start.dispatchEvent('click'));
+    d.c.steps.push('(in the game: Tap to start, not counted as a Studio tap)');
+    await g.waitForTimeout(4000);
+  }
+  const a = await g.evaluate(GAME_STATE) as { frame: number; fixtures: number; pick: unknown; starts: unknown[] };
+  await g.waitForTimeout(2000);
+  const b = await g.evaluate(GAME_STATE) as { frame: number; fixtures: number; pick: unknown; starts: unknown[]; handed: string | null };
+  r.framesPerSec = Math.round((b.frame - a.frame) / 2 * 10) / 10;
+  r.pick = b.pick; r.starts = b.starts; r.studioFixtureNodes = b.fixtures; r.handed = b.handed;
+  if (!(await shot(g, `${width}-${tag}-game`))) d.c.steps.push('(the game’s picture timed out on the rig)');
+  const pick = b.pick as { venueId?: string; competitive?: boolean } | null;
+  // the Studio's venue: the one it handed over, and (once autosave has written the project) the active one in its storage
+  const want = b.handed ?? venueId;
+  const sameVenue = !!pick && typeof pick === 'object' && !!want && pick.venueId === want && (!venueId || venueId === want);
+  r.ok = !!r.gameLoaded && r.framesPerSec > 0 && sameVenue && (pick as { competitive?: boolean }).competitive === false;
+  if (!r.ok) r.why = !r.gameLoaded ? 'the game did not load on the rig' : !(r.framesPerSec > 0) ? 'the game is not drawing frames' : !pick || typeof pick !== 'object' ? 'the game did not load the Studio venue' : !sameVenue ? `the game loaded venue ${pick.venueId}; the Studio handed over ${b.handed}, its project's active venue is ${venueId}` : 'the run would be competitive';
+  return r;
+}
+
+interface TaskResult { task: Task; width: Width; done: boolean; deadEnd?: string; taps: number; keys: number; chars: number; rigS: number; klmS: number; steps: string[]; screen: unknown; undo?: string; notes: string[]; play?: PlayResult }
 
 async function runTask(browser: Browser, width: Width, task: Task): Promise<TaskResult> {
   const ctx = await browser.newContext({ viewport: WIDTHS[width], deviceScaleFactor: 1 });
@@ -175,7 +250,7 @@ async function runTask(browser: Browser, width: Width, task: Task): Promise<Task
   await open(page, true);
   const d = new Driver(page, width);
   const notes: string[] = [];
-  let done = false; let deadEnd: string | undefined; let undo: string | undefined;
+  let done = false; let deadEnd: string | undefined; let undo: string | undefined; let play: PlayResult | undefined;
   const tLoad = Date.now();
   const ready = await d.waitFor(viewportReady, 150000, 'the viewport');
   notes.push(ready ? `viewport ready in ${((Date.now() - tLoad) / 1000).toFixed(1)} s` : 'the viewport did not finish loading on the rig');
@@ -217,9 +292,9 @@ async function runTask(browser: Browser, width: Width, task: Task): Promise<Task
         await d.tap('[data-testid=guide-quick]', 'Make it for me');
         await page.waitForTimeout(800);
         await shot(page, `${width}-firstcourt-made`);
-        const popup = page.waitForEvent('popup', { timeout: 4000 }).catch(() => null);
-        await d.tap('[data-testid=guide-play]', 'Play it');
-        const pop = await popup; if (pop) { notes.push(`Play it opens ${new URL(pop.url()).pathname} (dev build; a production build opens the game's own page with ?share=)`); await pop.close(); }
+        play = await followPlay(page, d, '[data-testid=guide-play]', 'Play it', width, 'firstcourt');
+        notes.push(`Play it: ${play.how} → ${play.path}${play.ok ? '' : ` ✗ ${play.why}`}`);
+        if (play.how === 'new tab') { for (const p of ctx.pages()) if (p !== page) await p.close(); }
       } else if (await guide.count()) {
         notes.push('the guide is open on arrival');
         await d.tap('[data-testid=guide-light-nightGame]', 'Night game');
@@ -243,7 +318,7 @@ async function runTask(browser: Browser, width: Width, task: Task): Promise<Task
         await page.waitForTimeout(1500);
       }
       await d.waitFor(`(() => { const p = JSON.parse(localStorage.getItem('fel.nexusStudio.v1') || 'null'); const v = p && p.venues.find((x) => x.id === p.activeVenueId); return !!v && v.mood === 'nightGame' && v.objects.filter((o) => o.type === 'fixture').length >= 4; })()`, 6000, 'the court saved: night light, four floods');
-      done = d.c.steps[d.c.steps.length - 1].startsWith('wait');
+      done = d.c.steps[d.c.steps.length - 1].startsWith('wait') && (!play || play.ok);
       break;
     }
     case 'place': {
@@ -262,6 +337,15 @@ async function runTask(browser: Browser, width: Width, task: Task): Promise<Task
       if (await colour.count()) {
         const box = await colour.boundingBox();
         if (!box || box.x > WIDTHS[width].width) notes.push('the inspector is off screen to the right');
+        // studio-22: is the colour field on the FIRST screen once Inspect is open (in the window and inside its scrolling sheet)?
+        // A rig's fill scrolls to it on its own; a person has to find it first.
+        await page.waitForTimeout(300);
+        const seen = await page.evaluate(`(() => { const e = [...document.querySelectorAll('[data-testid=inspector] input[type=color]')].find((x) => x.getClientRects().length);
+          if (!e) return { on: false, below: -1 };
+          const r = e.getBoundingClientRect(); let c = e.parentElement, top = 0, bottom = innerHeight;
+          for (; c; c = c.parentElement) { const s = getComputedStyle(c); if (/(auto|scroll|hidden)/.test(s.overflowY)) { const b = c.getBoundingClientRect(); top = Math.max(top, b.top); bottom = Math.min(bottom, b.bottom); } }
+          return { on: r.top >= top && r.bottom <= bottom, below: Math.round(Math.max(0, r.bottom - bottom)) }; })()`) as { on: boolean; below: number };
+        notes.push(seen.on ? 'the colour field is on the first screen' : `the colour field is ${seen.below} px below the first screen: a person scrolls the sheet to find it`);
         await colour.fill('#ff3366', { timeout: 15000 }); d.c.taps += 2; d.c.steps.push('colour picker: open + pick');
         done = true;
       } else { deadEnd = 'the inspector (colour) is not reachable'; }
@@ -328,11 +412,11 @@ async function runTask(browser: Browser, width: Width, task: Task): Promise<Task
       break;
     }
     case 'playtest': {
-      const popup = page.waitForEvent('popup', { timeout: 4000 }).catch(() => null);
-      if (!(await d.tap(btn('play-test|play test|^play'), 'Play-test'))) { deadEnd = 'no Play-test button on screen'; break; }
-      const pop = await popup;
-      if (pop) { await pop.waitForLoadState('domcontentloaded').catch(() => {}); notes.push(`opens a new tab: ${new URL(pop.url()).pathname} (this rig is a development build; production: ${await page.evaluate(`(document.body.innerText.match(/test build[^\\n]*/) || [''])[0]`) || 'the game’s own page with ?share=, practice'})`); await pop.close(); done = true; }
-      else { const msg = await page.locator('[role=status]').first().textContent().catch(() => ''); deadEnd = `no tab opened: ${msg}`; }
+      play = await followPlay(page, d, btn('play-test|play test|^play'), 'Play-test', width, 'playtest');
+      notes.push(`Play-test: ${play.how} → ${play.path}${PROD ? ' (production build)' : ' (development build)'}`);
+      if (play.ok) done = true;
+      else { const msg = await page.locator('[role=status]').first().textContent().catch(() => ''); deadEnd = `${play.why}${msg ? ` · ${msg}` : ''}`; }
+      if (play.how === 'new tab') { for (const p of ctx.pages()) if (p !== page) await p.close(); }
       break;
     }
     case 'save': {
@@ -388,11 +472,13 @@ async function runTask(browser: Browser, width: Width, task: Task): Promise<Task
   }
   const rigS = Math.round((Date.now() - t0) / 100) / 10;
   await page.waitForTimeout(250);
-  const screen = await page.evaluate(SCREEN);
-  await shot(page, `${width}-${task}`);
+  // a production Play-test has moved this tab into the game: the Studio's screen numbers and picture are not taken from it
+  const inStudio = new URL(page.url()).pathname.endsWith('/index.html');
+  const screen = inStudio ? await page.evaluate(SCREEN) : null;
+  if (inStudio) await shot(page, `${width}-${task}`);
   if (errors.length) notes.push(`page errors: ${errors.slice(0, 2).join(' | ')}`);
   await ctx.close();
-  return { task, width, done, deadEnd, taps: d.c.taps, keys: d.c.keys, chars: d.c.chars, rigS, klmS: klm(d.c), steps: d.c.steps, screen, undo, notes };
+  return { task, width, done, deadEnd, taps: d.c.taps, keys: d.c.keys, chars: d.c.chars, rigS, klmS: klm(d.c), steps: d.c.steps, screen, undo, notes, play };
 }
 
 // ── the accessibility pass ───────────────────────────────────────────────────────────────────────────────────────────
@@ -467,8 +553,8 @@ try {
         rows.push(r);
         console.log(`${width.padEnd(7)} ${t.padEnd(9)} ${r.done ? 'done' : 'DEAD END'} taps ${r.taps} keys ${r.keys} rig ${r.rigS}s klm ${r.klmS}s ${r.deadEnd ? `· ${r.deadEnd}` : ''} ${r.notes.join(' · ')}`);
       }
-      const file = join(OUT, `tasks-${width}${flag('tasks') ? `-${tasks.join('_')}` : ''}.json`);
-      writeFileSync(file, JSON.stringify({ label: LABEL, width, when: new Date().toISOString(), rows }, null, 1));
+      const file = join(OUT, `tasks-${width}${flag('tasks') ? `-${tasks.join('_')}` : ''}${RUN ? `-run${RUN}` : ''}.json`);
+      writeFileSync(file, JSON.stringify({ label: LABEL, width, build: PROD ? 'production' : 'development', game: !!GAME, run: RUN ?? null, when: new Date().toISOString(), rows }, null, 1));
     }
   }
 } finally {
