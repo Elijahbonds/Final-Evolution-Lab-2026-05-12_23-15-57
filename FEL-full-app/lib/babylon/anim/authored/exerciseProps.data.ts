@@ -44,4 +44,9 @@ export const PROPPED_LOOPS = {
   // exerciseFamilies10.ts (DEMO-LOOPS-10): the chair, the thigh machines' seat, the rollers under the side of the leg, the bar
   ex_chair_leg_out: 'seat', ex_seat_abduction: 'seat', ex_seat_adduction: 'seat', ex_it_band_smr: 'rollerit', ex_peroneal_smr: 'rollershin',
   ex_pullup_rear: 'pullbar', ex_pullup_side: 'pullbar', ex_sternum_chin: 'pullbar',
+  // exerciseFamilies11.ts (DEMOS-FIX): the wall behind, the dowel, the box, the bench under the forearms, the wall behind the
+  // head, the low bar and the bench, the pull-up bar, the doorway
+  ex_wall_hinge: 'wallhinge', ex_split_squat_supported: 'dowel', ex_step_up_bar: 'box', ex_plank_incline: 'handbench', ex_dead_bug_wall: 'wallhead',
+  ex_inverted_row_feet_up: 'lowbarfeet', ex_pullup_eccentric: 'pullbar', ex_door_row_one: 'doorway', ex_thoracic_circle_seat: 'seat', ex_back_ext_45: 'hyper45',
+  ex_leg_press: 'legpress', ex_hack_squat: 'hackpad', ex_lat_smr: 'rollerlat', ex_copenhagen_long: 'cphlong', ex_hip_rot_liftoff_seat: 'seat', ex_jefferson_curl: 'stepbox',
 } as const satisfies Record<string, string>;

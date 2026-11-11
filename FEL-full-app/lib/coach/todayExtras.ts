@@ -5,7 +5,8 @@
 //            and the first card of the session player;
 //   clips    each of today's exercises → the loop that IS its movement, so the player's demo plays with no further
 //            request. The coach's catalogue row is matched to the library by name (lib/library/match.ts: exactly one
-//            entry by its name or an alias, approved, youth-safe for a youth reader) and the loop is the library's own
+//            entry by its name or an alias; DEMOS-FIX: or lib/library/templateNames.ts; draft or approved, youth-safe for a
+//            youth reader) and the loop is the library's own
 //            choice (lib/library/demo.ts demoClipFor: structured tags, a whitelist). No match is no loop: the player shows
 //            the still start pose, "Demo coming" — never another movement;
 //   coached  with no program: whether a coach link is live, so Today says "No coach yet" only to someone with no coach.
@@ -20,15 +21,18 @@ export type ClipReader = (rows: readonly { id: string; name: string; youth: bool
 /** The real clip reader: the server's library index (never shipped to a browser). */
 export const libraryClips: ClipReader = async (rows) => {
   if (!rows.length) return {};
-  const [{ libraryState }, { matchLibraryByName }, { demoClipFor }, { catalogueDemoLoop }] = await Promise.all([
-    import('@/lib/library/server'), import('@/lib/library/match'), import('@/lib/library/demo'), import('@/lib/library/surfaceDemo'),
+  const [{ libraryState }, { templateLibraryEntry }, { demoClipFor }, { catalogueDemoLoop }] = await Promise.all([
+    import('@/lib/library/server'), import('@/lib/library/templateNames'), import('@/lib/library/demo'), import('@/lib/library/surfaceDemo'),
   ]);
   const { index } = await libraryState();
   const out: Record<string, string | null> = {};
   for (const r of rows) {
-    const e = matchLibraryByName(index.docs, [r.name]);
+    // DEMOS-FIX (owner 2026-11-10): the entry by its name, or by the template-name map (lib/library/templateNames.ts); a DRAFT
+    // entry plays its loop too, as the signature programs' do (only the animation shows: no draft wording reaches the
+    // athlete); an adults-only entry still does not play for a youth reader
+    const e = templateLibraryEntry(index.docs, r.name);
     // DEMO-LOOPS-4: a row the library has no entry for plays its catalogue loop (surfaceDemo CATALOGUE_DEMO_LOOPS), if any
-    out[r.id] = e ? (e.review.status === 'approved' && (!r.youth || e.youthOk) ? demoClipFor(e) : null) : catalogueDemoLoop(r.name);
+    out[r.id] = e ? (!r.youth || e.youthOk ? demoClipFor(e) : null) : catalogueDemoLoop(r.name);
   }
   return out;
 };

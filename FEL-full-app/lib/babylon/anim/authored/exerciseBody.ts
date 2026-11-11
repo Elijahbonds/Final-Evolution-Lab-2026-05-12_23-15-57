@@ -168,9 +168,9 @@ function deadBugHeel(scene: Scene, sk: Skeleton): AnimationGroup | null {
 }
 
 // ── planks with a limb moving; side planks ──────────────────────────────────────────────────────────────────────────
-const FOREARM: Pose = { bones: { Hips: [78, 0, 0], Spine: [0, 0, 0], Neck: [-36, 0, 0], LeftFoot: [8, 0, 0], RightFoot: [8, 0, 0] }, feet: both(0.13, TOE_ANKLE, -0.95), kneePoles: bothDir(0, -1, 0.1), hands: both(0.10, 0.06, 0.52), poles: bothDir(0.3, 0.2, -1), hipsY: -0.66 };
+export const FOREARM: Pose = { bones: { Hips: [78, 0, 0], Spine: [0, 0, 0], Neck: [-36, 0, 0], LeftFoot: [8, 0, 0], RightFoot: [8, 0, 0] }, feet: both(0.13, TOE_ANKLE, -0.95), kneePoles: bothDir(0, -1, 0.1), hands: both(0.10, 0.06, 0.52), poles: bothDir(0.3, 0.2, -1), hipsY: -0.66 };
 const HIGH: Pose = { ...HIGH_PLANK, feet: both(0.14, TOE_ANKLE, -0.90) };
-const BEAR: Pose = { bones: { Hips: [88, 0, 0], Spine: [0, 0, 0], Neck: [-46, 0, 0], LeftFoot: [0, 0, 0], RightFoot: [0, 0, 0] }, feet: both(0.14, TOE_ANKLE + 0.04, -0.36), kneePoles: bothDir(0, -1, 0.3), hands: both(0.18, 0.05, 0.52), poles: bothDir(0.6, 0.2, -0.5), hipsY: -0.36 };
+export const BEAR: Pose = { bones: { Hips: [88, 0, 0], Spine: [0, 0, 0], Neck: [-46, 0, 0], LeftFoot: [0, 0, 0], RightFoot: [0, 0, 0] }, feet: both(0.14, TOE_ANKLE + 0.04, -0.36), kneePoles: bothDir(0, -1, 0.3), hands: both(0.18, 0.05, 0.52), poles: bothDir(0.6, 0.2, -0.5), hipsY: -0.36 };
 type PlankAct = 'leg' | 'reach' | 'knee' | 'tap';
 /** A plank (`base`) holding still while one limb moves and returns, then the other side's. */
 function plankAct(scene: Scene, sk: Skeleton, name: string, base: Pose, act: PlankAct): AnimationGroup | null {
@@ -191,7 +191,7 @@ function plankAct(scene: Scene, sk: Skeleton, name: string, base: Pose, act: Pla
 
 /** The side plank: on the right forearm, the body one straight line tilted up from the feet, the top arm up (authored
  *  head toward −z like exerciseFloor's side-lying, and turned the same way to face the floor camera). */
-const SIDE_PLANK: Pose = {
+export const SIDE_PLANK: Pose = {
   bones: { Hips: [0, -90, 90], Spine: [0, 0, -14], Spine1: [0, 0, -10], Neck: [0, 0, -4], LeftUpLeg: [0, 0, 0], RightUpLeg: [0, 0, 0], LeftLeg: [2, 0, 0], RightLeg: [2, 0, 0], LeftFoot: [-10, 0, 0], RightFoot: [-10, 0, 0] },
   feet: { Right: [0.02, 0.07, 0.84], Left: [-0.02, 0.17, 0.84] }, kneePoles: { Right: [1, 0, 0], Left: [1, 0, 0] },
   hands: { Right: [0.24, 0.07, -0.50], Left: [0.02, 0.98, -0.30] }, poles: { Right: [0, -1, 0.1], Left: [1, 0, 0] }, hipsY: -0.52,
@@ -289,7 +289,7 @@ function slJump(scene: Scene, sk: Skeleton): AnimationGroup | null {
 }
 
 /** Hops: two feet (or one) leaving and landing, `places` the spots they land on in turn (x, z offsets of the hips). */
-function hops(scene: Scene, sk: Skeleton, name: string, places: [number, number][], oneLeg: boolean, height: number, period: number): AnimationGroup | null {
+export function hops(scene: Scene, sk: Skeleton, name: string, places: [number, number][], oneLeg: boolean, height: number, period: number): AnimationGroup | null {
   const keys: ExKey[] = [];
   const n = places.length;
   places.forEach(([x, z], i) => {

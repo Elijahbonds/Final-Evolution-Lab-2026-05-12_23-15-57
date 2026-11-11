@@ -239,7 +239,7 @@ const fastPushup: Builder = (scene, sk) => {
 };
 
 /** The two posts of a doorway in front (demo.ts PROP_SHAPES doorway). */
-const DOOR_GRIP: Pair = { Left: [-0.30, 1.12, 0.50], Right: [0.30, 1.12, 0.50] };
+export const DOOR_GRIP: Pair = { Left: [-0.30, 1.12, 0.50], Right: [0.30, 1.12, 0.50] };
 /** ex_door_row (Fast Row Primer) — holding a sturdy door frame, leaning back on straight arms: pull the chest in to the
  *  hands fast, lower slowly. */
 const doorRow: Builder = (scene, sk) => {
