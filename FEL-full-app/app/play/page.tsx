@@ -19,6 +19,9 @@ import { prisma } from '@/lib/db';
 import { t } from '@/lib/i18n';
 import { MEASURE_VERTICAL_HREF } from '@/lib/vertical/door';
 import { FULL_SCREEN_HREF } from '@/lib/screen-easy/door';
+// BINJGB-SHELF-1 (OQ-8): the quiet Homebrew Shelf row — server-gated (flag AND titles > 0 AND 13+); v1 has no titles, so never
+import { homebrewRowFor } from '@/lib/binjgb/hubRow';
+import { HomebrewShelfRow } from '@/components/binjgb/homebrew-row';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +31,7 @@ export default async function PlayPage() {
   if (!session) redirect(loginPath('/play'));
   const me = (session.user as { id?: string } | undefined)?.id;
   const todayCard = me ? await todayCardFor(prisma, me) : null;
+  const homebrewRow = await homebrewRowFor(me);
   // The week card is not on Play any more: it is Profile's one primary and sits on Train (P4 follow-up, 2026-10-27).
   // PREMIUM-UI P4 (2026-10-27): the Venice court at golden hour full-bleed, the shelf's promise in one line, and ONE
   // primary — the Prove It dunk duel, the flagship, docked where a thumb is. Couch and Versus are two quiet doors beside it.
@@ -60,6 +64,7 @@ export default async function PlayPage() {
     >
       <TodayCard view={todayCard} />
       <PlayShelf />
+      <HomebrewShelfRow show={homebrewRow} />
       <VenueStrip />
       <div className="mt-10 empty:mt-0"><SeasonPassTrack /></div>
       <DoorsRow tab="play" />

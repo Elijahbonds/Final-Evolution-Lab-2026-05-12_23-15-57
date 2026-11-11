@@ -9,6 +9,8 @@
  * (case-insensitive). Anything else — unset, "0", "false", "" — is OFF.
  */
 
+import { DEMO_MODEL_FLAG_ENV, type DemoModelFlags } from './babylon/core/demoModels';
+
 function envOn(name: string): boolean {
   const v = (process.env[name] ?? '').trim().toLowerCase();
   return v === '1' || v === 'true' || v === 'on' || v === 'yes';
@@ -158,4 +160,57 @@ export function feelPanelUserIds(env: NodeJS.ProcessEnv = process.env): Set<stri
 
 export function isFeelPanelUser(userId: string | null | undefined, env: NodeJS.ProcessEnv = process.env): boolean {
   return !!userId && feelPanelUserIds(env).has(userId);
+}
+
+// ── DEMO-MODELS-1 (owner, 2026-11-09: "Yes full swap") ─────────────────────────────────────────────────────────────────────
+// Five server settings, each OFF by default, each its own switch (lib/babylon/core/demoModels.ts names what each does; v2 removed
+// setting 5, the library-demo coach body: owner 10:09 AM, "Each viewer sees their own body in workouts and anatomy"). With all
+// five off the app is exactly as live: /api/v1/hero-body sends no `demo` and the client keeps every body and request as before.
+// AM turns each on only after Elijah's yes on its before/after shots.
+
+/** 1. DEMO_COACH_BODY_ENABLED: the scan owner plays the prep2 coach body (the Meshy scan is the fallback). */
+export function isDemoCoachBodyEnabled(): boolean { return envOn(DEMO_MODEL_FLAG_ENV.coachBody); }
+/** 2. COACH_BODY_MASK_ENABLED: the skin under the coach body's tee, shorts and shoes is masked (no skin through the tee). */
+export function isCoachBodyMaskEnabled(): boolean { return envOn(DEMO_MODEL_FLAG_ENV.coachBodyMask); }
+/** 3. DUNK_RIVAL_PREFETCH_ENABLED: Flight Night fetches the rival's body file once the first dunk is in. */
+export function isDunkRivalPrefetchEnabled(): boolean { return envOn(DEMO_MODEL_FLAG_ENV.rivalPrefetch); }
+/** 4. TRY_GUEST_COACH_BODY_ENABLED: a signed-out guest in /try's dunk demo (only there) plays the coach body (reverses the
+ *  2026-09-14 rule while on, for that demo; workouts and anatomy keep the viewer's own body). */
+export function isTryGuestCoachBodyEnabled(): boolean { return envOn(DEMO_MODEL_FLAG_ENV.tryGuestCoach); }
+/** 6. CROWD_FORGE_FRONT_ENABLED: the crowd's forge front row defaults on (the feel knob crowd.forgeFront still overrides). */
+export function isCrowdForgeFrontEnabled(): boolean { return envOn(DEMO_MODEL_FLAG_ENV.crowdForgeFront); }
+
+/** All five, as the hero-body answer carries them. */
+export function demoModelFlagsFromEnv(): DemoModelFlags {
+  return {
+    coachBody: isDemoCoachBodyEnabled(),
+    coachBodyMask: isCoachBodyMaskEnabled(),
+    rivalPrefetch: isDunkRivalPrefetchEnabled(),
+    tryGuestCoach: isTryGuestCoachBodyEnabled(),
+    crowdForgeFront: isCrowdForgeFrontEnabled(),
+  };
+}
+
+/** BINJGB-SHELF-1. Default OFF. /play/gb-shelf* 404 while unset. */
+export function isBinjgbShelfEnabled(): boolean {
+  return envOn('BINJGB_SHELF_ENABLED');
+}
+
+/**
+ * BINJGB-SHELF-1 load-your-own. Default OFF. OQ-1 ANSWERED — build switched off.
+ * Requires BINJGB_SHELF_ENABLED (OQ-6). Cyber reviews local-file path in PR; G-FILE before ON.
+ */
+export function isBinjgbLocalFileEnabled(): boolean {
+  return envOn('BINJGB_LOCAL_FILE_ENABLED');
+}
+
+/**
+ * SELLER-18-1 (Cyber BOOK-SIGNOFF S-2; PM 2026-11-09) — the seller-side 18+ gate (lib/seller/canSell.ts). Default OFF:
+ * every seller surface behaves as it does today and nothing is taken down; sellers with no birth year only see a prompt to
+ * add one. ON: selling needs the role AND a verified adult by the database birth year (unknown age refused), and a seller
+ * found to be under 18 is taken down with payouts frozen. Switching it on needs Elijah's own words.
+ */
+export function isSellerAdultGateEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  const v = (env.SELLER_ADULT_GATE_ENABLED ?? '').trim().toLowerCase();
+  return v === '1' || v === 'true' || v === 'on' || v === 'yes';
 }

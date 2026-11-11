@@ -359,6 +359,11 @@ async function roleOf(db: GroupDb, userId: string, cfg: GroupConfig, nowMs: numb
   return t && t.ownerId === cfg.ownerId ? { role: 'trainer', ownerId: cfg.ownerId, trainer: t } : null;
 }
 
+/** SELLER-18-1 (S-2): the group owner or one of their active trainers — the people who take money here. A failed read is no. */
+export async function isGroupCoach(db: GroupDb, userId: string, now: Date = new Date(), env: NodeJS.ProcessEnv = process.env): Promise<boolean> {
+  return (await roleOf(db, userId, groupConfig(env), now.getTime()).catch(() => null)) !== null;
+}
+
 const mayRun = (r: Role, g: GroupClass) => g.ownerId === r.ownerId && (r.role === 'owner' || g.trainerUserId === r.trainer.trainerUserId);
 
 export async function coachBoard(db: GroupDb, userId: string, now: Date = new Date(), env: NodeJS.ProcessEnv = process.env): Promise<Res> {

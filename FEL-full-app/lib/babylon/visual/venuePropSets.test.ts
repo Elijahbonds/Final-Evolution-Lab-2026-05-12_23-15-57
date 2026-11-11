@@ -143,10 +143,10 @@ describe('THE SURROUND — every prop stands on something', () => {
 describe('DUNK-VENICE-ENV-RENDER — the Venice dunk dresses as Venice', () => {
   const set = VENUE_PROP_SETS['venice-dunk'];
 
-  it('is the dunk\'s set (and the duel\'s — same venue), while the other Venice courts keep theirs', () => {
+  it('is the dunk\'s set, and 1v1 and 3v3 now use venice-dunk too, while the other Venice courts keep theirs', () => {
     expect(propSetFor('basketball_dunk')).toBe('venice-dunk');
-    expect(propSetFor('basketball_h2h')).toBe('venice-court-meshy');
-    expect(propSetFor('basketball_3v3')).toBe('venice-court-meshy');
+    expect(propSetFor('basketball_h2h')).toBe('venice-dunk');
+    expect(propSetFor('basketball_3v3')).toBe('venice-dunk');
   });
 
   it('has none of the chunky low-poly palms, and no hedge or grass-tuft planting', () => {
