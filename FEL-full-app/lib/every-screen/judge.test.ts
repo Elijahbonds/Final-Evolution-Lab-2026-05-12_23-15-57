@@ -139,3 +139,20 @@ describe('the four checks (docs/PLAN-EVERY-SCREEN-10PHASE.md)', () => {
     expect(kindOf('/coach/join/[token]')).toBe('do');
   });
 });
+
+describe('approved notices (owner, 2026-11-11): marked notices do not count; everything else still does', () => {
+  it('a marked notice is left out of the 40 words', () => {
+    expect(ids(clean({ wordsFold: 90, noticeWordsFold: 60 }))).not.toContain('too-many-words');     // 30 counted
+    expect(faultsOf(clean({ wordsFold: 110, noticeWordsFold: 60 })).find((f) => f.id === 'too-many-words')?.say)
+      .toBe('50 words before scrolling (the budget is 40; 60 words of approved notices not counted).');
+  });
+  it('an unmarked paragraph still counts, word for word', () => {
+    expect(ids(clean({ wordsFold: 90 }))).toContain('too-many-words');
+    expect(ids(clean({ wordsFold: 90, noticeWordsFold: 0 }))).toContain('too-many-words');
+    expect(faultsOf(clean({ wordsFold: 90 })).find((f) => f.id === 'too-many-words')?.say).toBe('90 words before scrolling (the budget is 40).');
+  });
+  it('a notice count can never take more than the words on screen', () => {
+    expect(ids(clean({ wordsFold: 30, noticeWordsFold: 500 }))).not.toContain('too-many-words');
+    expect(ids(clean({ wordsFold: 90, noticeWordsFold: -50 }))).toContain('too-many-words');
+  });
+});

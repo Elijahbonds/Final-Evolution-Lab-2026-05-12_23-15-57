@@ -35,6 +35,46 @@ const PRIMARY = '[data-player-primary] button';
 const CAMERA = '/CAMERA CHECK|CAMERA SETUP|Step into|TAP TO START/';
 
 export const JOBS: Job[] = [
+  // ── EVERY-SCREEN P6: a new person, signed out, on the throttled phone (CPU 4×, as the crawl): the plan's gate is "from
+  //    the home page to doing something real (a game or a first workout) in ≤ 4 taps and under 60 s" ──
+  {
+    id: 'new-first-game', who: 'anon', throttle: true, name: 'New: from the home page to playing a game', planBudget: 'home → something real in ≤ 4 taps and under 60 s (phase 6)',
+    steps: [
+      { goto: '/', say: 'the home page' },
+      { tap: 'Play now', expect: '[data-testid=guest-age-step]', within: 30, say: 'Play now' },
+      { tap: 'Play without saving', expect: '/TAP TO START/', within: 90, say: 'Play without saving (the arena loads)' },
+      { tap: 'TAP TO START', gone: '[data-splash-column]', within: 20, say: 'Tap to start: playing' },
+    ],
+  },
+  {
+    // the plan: "sign-up asks for nothing twice". The walk signs up, then opens the vertical test: what it is asked there
+    // is in the phase-6 notes (docs/every-screen/JOBS-NOTES.md)
+    id: 'new-signup', who: 'anon', throttle: true, name: 'New: sign up, then the vertical test', planBudget: 'sign-up asks for nothing twice (phase 6)',
+    steps: [
+      { goto: '/signup', say: 'Create account' },
+      { select: ['select[aria-label="Birth year"]', '1995'], say: 'birth year' },
+      { fill: ['input[aria-label="Month"]', '6'], say: 'month' },
+      { fill: ['input[aria-label="Day"]', '15'], say: 'day' },
+      { tap: 'Continue', expect: 'input[type=email]', within: 20, say: 'Continue' },
+      { fill: ['input[placeholder="Athlete name"]', 'Rig Newcomer'], say: 'athlete name' },
+      { fill: ['input[type=email]', 'rig-new-{ts}@example.test'], say: 'email' },
+      { fill: ['input[type=password]', 'rig-password-1'], say: 'password' },
+      { css: 'label:has(a[href="/terms"]) > span:first-child', say: 'I agree to the Terms of Service and Privacy Policy' },
+      { tap: 'BEGIN EVOLUTION', expect: 'canvas', within: 60, say: 'Begin evolution: into the first game picked (Flight Night)' },
+      { goto: '/train', say: 'later: Train' },
+      { css: 'a[href^="/play/mirror/assess"], a[href^="/screen"]', expect: '/How old are you|Does anything hurt|CAMERA/i', within: 30, say: 'Measure my vertical (Train): what it asks' },
+    ],
+  },
+  {
+    id: 'new-first-workout', who: 'anon', throttle: true, name: 'New: from the home page to a first workout (the vertical test)', planBudget: 'home → something real in ≤ 4 taps and under 60 s (phase 6)',
+    steps: [
+      { goto: '/', say: 'the home page' },
+      { tap: 'Measure my vertical', expect: '/How old are you/', within: 30, say: 'Measure my vertical' },
+      { tap: '18 or older', expect: '/Does anything hurt/', say: '18 or older' },
+      { tap: 'No, nothing hurts', expect: CAMERA, within: 30, say: 'No, nothing hurts' },
+    ],
+    endsAt: 'the camera: the jumps need a person in front of it',
+  },
   // ── an athlete training alone ──
   {
     id: 'solo-start-today', who: 'solo', name: "Start today's workout (today's drill)", planBudget: 'open app → first exercise in ≤ 2 taps and ≤ 10 s (phase 2)',

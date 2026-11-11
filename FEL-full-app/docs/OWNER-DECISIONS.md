@@ -355,3 +355,16 @@ The owner answered four questions (relayed by the coordinator).
    plain line that says so (`lib/program-ask/kept.ts`, `copy.ts`), stays as it is.
 3. **Nexus Studio: "fix the last 4 first".** A separate lane, `studio-22`, takes it.
 4. **Pace:** phases 5–10 run back to back; each phase starts as soon as the one before it merges.
+
+## 2026-11-11 (later) — booking, notices and the word budget, text size
+
+The owner answered three questions (relayed by the coordinator).
+
+1. **Booking opens with the training deploy.** The owner applies `prisma/pending/2026-11-02-group-booking.sql` and sets
+   the business owner. It stays "reserve, pay at the gym": no online payment.
+2. **Approved notices do not count toward the 40-word budget.** Medical, privacy and consent text is the owner's approved
+   wording: it stays word for word and no longer counts against the first screen's words. Everything else still counts.
+   The judge excludes only notices marked as such in the code (`data-notice` on an owner-approved notice block, tied to the
+   approved copy in `lib/every-screen/notices.ts`), never by guessing from the words.
+3. **Text size: keep it.** A line of more than about 12 words goes to 16 px (`lineSize`, READABLE.md): size only, never
+   the wording. Apply it across the rest of the app's screens as each phase reaches them.

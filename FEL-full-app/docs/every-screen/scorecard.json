@@ -1,7 +1,7 @@
 {
  "what": "The every-screen scorecard: docs/PLAN-EVERY-SCREEN-10PHASE.md, phase 1. Written by scripts/every-screen/score.mts --report.",
- "measuredAt": "2026-11-11T07:11:41.398Z",
- "commit": "94732e42",
+ "measuredAt": "2026-11-11T09:09:01.127Z",
+ "commit": "a5c51576",
  "budgets": {
   "wordsFoldDo": 40,
   "tapPx": 44,
@@ -15,61 +15,61 @@
  "totals": {
   "screens": 185,
   "scored": 153,
-  "passAll": 20,
+  "passAll": 25,
   "alias": 7,
   "off": 20,
   "notScored": 5,
   "byCheck": {
    "clear": {
-    "pass": 70,
-    "fail": 83,
+    "pass": 74,
+    "fail": 79,
     "nm": 0
    },
    "finished": {
-    "pass": 45,
-    "fail": 108,
+    "pass": 47,
+    "fail": 106,
     "nm": 0
    },
    "fast": {
-    "pass": 121,
+    "pass": 122,
     "fail": 9,
-    "nm": 23
+    "nm": 22
    },
    "right": {
-    "pass": 137,
-    "fail": 16,
+    "pass": 140,
+    "fail": 13,
     "nm": 0
    }
   },
   "trainingAndCoaching": {
    "screens": 61,
    "scored": 44,
-   "passAll": 13
+   "passAll": 15
   }
  },
  "faults": [
   {
    "id": "body-small",
    "name": "Body copy under 16 px",
-   "screens": 58,
+   "screens": 57,
    "wouldPassIfFixed": 1
-  },
-  {
-   "id": "too-many-words",
-   "name": "More than 40 words before scrolling on a do-this screen",
-   "screens": 46,
-   "wouldPassIfFixed": 17
   },
   {
    "id": "small-targets",
    "name": "Tap targets under 44 px in the screen itself",
-   "screens": 45,
+   "screens": 42,
    "wouldPassIfFixed": 0
+  },
+  {
+   "id": "too-many-words",
+   "name": "More than 40 words before scrolling on a do-this screen",
+   "screens": 42,
+   "wouldPassIfFixed": 15
   },
   {
    "id": "text-sizes",
    "name": "More than 4 text sizes on one screen",
-   "screens": 39,
+   "screens": 36,
    "wouldPassIfFixed": 0
   },
   {
@@ -85,16 +85,16 @@
    "wouldPassIfFixed": 0
   },
   {
-   "id": "button-looks",
-   "name": "More than 3 button looks on one screen",
-   "screens": 19,
-   "wouldPassIfFixed": 0
-  },
-  {
    "id": "small-targets-bars",
    "name": "Tap targets under 44 px in the app's own bars",
-   "screens": 19,
-   "wouldPassIfFixed": 4
+   "screens": 18,
+   "wouldPassIfFixed": 3
+  },
+  {
+   "id": "button-looks",
+   "name": "More than 3 button looks on one screen",
+   "screens": 17,
+   "wouldPassIfFixed": 0
   },
   {
    "id": "empty-no-next",
@@ -107,12 +107,6 @@
    "name": "Unfinished mark: \"opens soon\"",
    "screens": 9,
    "wouldPassIfFixed": 5
-  },
-  {
-   "id": "a11y-serious",
-   "name": "Serious accessibility findings",
-   "screens": 8,
-   "wouldPassIfFixed": 0
   },
   {
    "id": "only-chrome",
@@ -137,6 +131,12 @@
    "name": "Critical accessibility findings",
    "screens": 6,
    "wouldPassIfFixed": 1
+  },
+  {
+   "id": "a11y-serious",
+   "name": "Serious accessibility findings",
+   "screens": 5,
+   "wouldPassIfFixed": 0
   },
   {
    "id": "slow-tap",
@@ -175,6 +175,12 @@
    "wouldPassIfFixed": 0
   },
   {
+   "id": "dead-end",
+   "name": "Dead end: nothing leads on or back",
+   "screens": 2,
+   "wouldPassIfFixed": 0
+  },
+  {
    "id": "hscroll:phone",
    "name": "Sideways scroll (390 px)",
    "screens": 1,
@@ -193,8 +199,8 @@
    "wouldPassIfFixed": 0
   },
   {
-   "id": "dead-end",
-   "name": "Dead end: nothing leads on or back",
+   "id": "blank",
+   "name": "A blank screen",
    "screens": 1,
    "wouldPassIfFixed": 0
   }
@@ -227,9 +233,9 @@
     "smallTargets": 0,
     "textSizes": 4,
     "buttonLooks": 2,
-    "firstContentMs": 300,
+    "firstContentMs": 320,
     "layoutShift": 0,
-    "tapMs": 88,
+    "tapMs": 96,
     "tapped": "PLAY NOW",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -268,7 +274,7 @@
     "smallTargets": 11,
     "textSizes": 6,
     "buttonLooks": 6,
-    "firstContentMs": 320,
+    "firstContentMs": 392,
     "layoutShift": 0.001,
     "tapMs": 64,
     "tapped": "Download my data",
@@ -318,14 +324,14 @@
    "review": [],
    "unmeasured": [],
    "numbers": {
-    "wordsBeforeScroll": 14,
+    "wordsBeforeScroll": 16,
     "brightButtons": 0,
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 0,
-    "firstContentMs": 240,
+    "firstContentMs": 332,
     "layoutShift": 0.001,
-    "tapMs": 136,
+    "tapMs": 96,
     "tapped": "Account",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -359,14 +365,14 @@
    "review": [],
    "unmeasured": [],
    "numbers": {
-    "wordsBeforeScroll": 84,
+    "wordsBeforeScroll": 81,
     "brightButtons": 0,
     "smallTargets": 1,
     "textSizes": 4,
     "buttonLooks": 1,
-    "firstContentMs": 352,
+    "firstContentMs": 320,
     "layoutShift": 0.001,
-    "tapMs": 104,
+    "tapMs": 96,
     "tapped": "Run re-engagement sweep",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -405,9 +411,9 @@
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 1,
-    "firstContentMs": 276,
+    "firstContentMs": 264,
     "layoutShift": 0.111,
-    "tapMs": 104,
+    "tapMs": 136,
     "tapped": "Recompute (14d)",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -448,9 +454,9 @@
     "smallTargets": 6,
     "textSizes": 4,
     "buttonLooks": 2,
-    "firstContentMs": 240,
+    "firstContentMs": 352,
     "layoutShift": 0.001,
-    "tapMs": 64,
+    "tapMs": 40,
     "tapped": "WAITING",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -508,7 +514,7 @@
     "smallTargets": 8,
     "textSizes": 5,
     "buttonLooks": 4,
-    "firstContentMs": 308,
+    "firstContentMs": 300,
     "layoutShift": 0.013,
     "tapMs": 56,
     "tapped": "Flight Night Venice Beach Court",
@@ -584,9 +590,9 @@
     "smallTargets": 5,
     "textSizes": 4,
     "buttonLooks": 1,
-    "firstContentMs": 376,
+    "firstContentMs": 312,
     "layoutShift": 0.001,
-    "tapMs": 48,
+    "tapMs": 56,
     "tapped": "Certify",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -642,9 +648,9 @@
     "smallTargets": 0,
     "textSizes": 10,
     "buttonLooks": 1,
-    "firstContentMs": 268,
+    "firstContentMs": 372,
     "layoutShift": 0.001,
-    "tapMs": 112,
+    "tapMs": 104,
     "tapped": "80 LC",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -695,7 +701,7 @@
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 1,
-    "jsKb": 2476
+    "jsKb": 2483
    }
   },
   {
@@ -720,19 +726,19 @@
    "review": [],
    "unmeasured": [],
    "numbers": {
-    "wordsBeforeScroll": 47,
+    "wordsBeforeScroll": 49,
     "brightButtons": 1,
     "smallTargets": 0,
     "textSizes": 4,
     "buttonLooks": 1,
-    "firstContentMs": 376,
+    "firstContentMs": 328,
     "layoutShift": 0.001,
     "tapMs": 96,
     "tapped": "Nudge",
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
-    "jsKb": 492
+    "jsKb": 493
    }
   },
   {
@@ -766,7 +772,7 @@
     "smallTargets": 3,
     "textSizes": 5,
     "buttonLooks": 0,
-    "firstContentMs": 412,
+    "firstContentMs": 292,
     "layoutShift": 0,
     "tapMs": null,
     "tapped": null,
@@ -870,19 +876,19 @@
    "review": [],
    "unmeasured": [],
    "numbers": {
-    "wordsBeforeScroll": 42,
+    "wordsBeforeScroll": 44,
     "brightButtons": 1,
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 1,
-    "firstContentMs": 336,
+    "firstContentMs": 296,
     "layoutShift": 0.001,
-    "tapMs": 56,
+    "tapMs": 48,
     "tapped": "Add Category",
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
-    "jsKb": 497
+    "jsKb": 498
    }
   },
   {
@@ -915,14 +921,14 @@
     "smallTargets": 0,
     "textSizes": 4,
     "buttonLooks": 2,
-    "firstContentMs": 420,
+    "firstContentMs": 296,
     "layoutShift": 0.001,
-    "tapMs": 144,
+    "tapMs": 56,
     "tapped": "All",
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
-    "jsKb": 496
+    "jsKb": 497
    }
   },
   {
@@ -938,7 +944,7 @@
    "checks": {
     "clear": "fail",
     "finished": "fail",
-    "fast": "pass",
+    "fast": "fail",
     "right": "pass"
    },
    "passAll": false,
@@ -946,6 +952,7 @@
    "faults": [
     "too-many-words",
     "body-small",
+    "slow-tap",
     "text-sizes"
    ],
    "review": [],
@@ -956,14 +963,14 @@
     "smallTargets": 0,
     "textSizes": 6,
     "buttonLooks": 2,
-    "firstContentMs": 744,
+    "firstContentMs": 748,
     "layoutShift": 0.001,
-    "tapMs": 200,
+    "tapMs": 208,
     "tapped": "Edit the sessions",
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
-    "jsKb": 496
+    "jsKb": 497
    }
   },
   {
@@ -998,14 +1005,14 @@
     "smallTargets": 1,
     "textSizes": 6,
     "buttonLooks": 1,
-    "firstContentMs": 320,
+    "firstContentMs": 312,
     "layoutShift": 0.001,
-    "tapMs": 72,
+    "tapMs": 120,
     "tapped": "Publish your page",
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
-    "jsKb": 501
+    "jsKb": 502
    }
   },
   {
@@ -1037,7 +1044,7 @@
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 2,
-    "firstContentMs": 240,
+    "firstContentMs": 272,
     "layoutShift": 0.001,
     "tapMs": 64,
     "tapped": "Go to Coach",
@@ -1078,9 +1085,9 @@
     "smallTargets": 0,
     "textSizes": 6,
     "buttonLooks": 1,
-    "firstContentMs": 348,
+    "firstContentMs": 352,
     "layoutShift": 0.001,
-    "tapMs": 128,
+    "tapMs": 120,
     "tapped": "New combine",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -1126,7 +1133,7 @@
   },
   {
    "route": "/coach/form-review",
-   "url": "/coach/form-review?slot=cmwbpq0bm002r7dnisfaahk46",
+   "url": "/coach/form-review?slot=cmwbv4i6i002r7du1bw1pd6yx",
    "phase": 5,
    "area": "coaching",
    "kind": "do",
@@ -1155,14 +1162,14 @@
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 1,
-    "firstContentMs": 328,
+    "firstContentMs": 476,
     "layoutShift": 0.001,
     "tapMs": null,
     "tapped": null,
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
-    "jsKb": 612
+    "jsKb": 613
    }
   },
   {
@@ -1194,9 +1201,9 @@
     "smallTargets": 0,
     "textSizes": 4,
     "buttonLooks": 1,
-    "firstContentMs": 232,
+    "firstContentMs": 284,
     "layoutShift": 0.001,
-    "tapMs": 72,
+    "tapMs": 104,
     "tapped": "BACK TO YOUR ROSTER",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -1221,26 +1228,26 @@
     "right": "pass"
    },
    "passAll": false,
-   "worst": "53 words before scrolling (the budget is 40).",
+   "worst": "55 words before scrolling (the budget is 40).",
    "faults": [
     "too-many-words"
    ],
    "review": [],
    "unmeasured": [],
    "numbers": {
-    "wordsBeforeScroll": 53,
+    "wordsBeforeScroll": 55,
     "brightButtons": 0,
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 0,
-    "firstContentMs": 292,
+    "firstContentMs": 356,
     "layoutShift": 0.001,
-    "tapMs": 64,
+    "tapMs": 80,
     "tapped": "Your coaching →",
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
-    "jsKb": 494
+    "jsKb": 495
    }
   },
   {
@@ -1270,7 +1277,7 @@
     "smallTargets": 0,
     "textSizes": 4,
     "buttonLooks": 1,
-    "firstContentMs": 224,
+    "firstContentMs": 208,
     "layoutShift": 0,
     "tapMs": 64,
     "tapped": "Find my coach",
@@ -1282,7 +1289,7 @@
   },
   {
    "route": "/coach/join/[token]",
-   "url": "/coach/join/A4AJ4GPZ~Z0EG4J4RDH-v_1FubuSp33fp_ug8vTWV",
+   "url": "/coach/join/XBM1YRVQ~ssqLp-RxboSfe6v-e1Pm_24FFPqkU669",
    "phase": 5,
    "area": "coaching",
    "kind": "do",
@@ -1309,9 +1316,9 @@
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 1,
-    "firstContentMs": 248,
+    "firstContentMs": 256,
     "layoutShift": 0.001,
-    "tapMs": 72,
+    "tapMs": 96,
     "tapped": "Join Coach Riley",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -1402,14 +1409,14 @@
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 1,
-    "firstContentMs": 316,
+    "firstContentMs": 292,
     "layoutShift": 0.001,
-    "tapMs": 88,
+    "tapMs": 80,
     "tapped": "Dunk session",
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
-    "jsKb": 504
+    "jsKb": 505
    }
   },
   {
@@ -1439,14 +1446,14 @@
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 0,
-    "firstContentMs": 300,
+    "firstContentMs": 324,
     "layoutShift": 0.001,
     "tapMs": 64,
     "tapped": "Back to Coach →",
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
-    "jsKb": 503
+    "jsKb": 505
    }
   },
   {
@@ -1494,14 +1501,14 @@
     "smallTargets": 0,
     "textSizes": 4,
     "buttonLooks": 0,
-    "firstContentMs": 272,
+    "firstContentMs": 304,
     "layoutShift": 0.001,
     "tapMs": 56,
     "tapped": "Back to Coach →",
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
-    "jsKb": 497
+    "jsKb": 499
    }
   },
   {
@@ -1533,25 +1540,23 @@
    "state": "scored",
    "reason": null,
    "checks": {
-    "clear": "fail",
+    "clear": "pass",
     "finished": "pass",
     "fast": "pass",
     "right": "pass"
    },
-   "passAll": false,
-   "worst": "90 words before scrolling (the budget is 40).",
-   "faults": [
-    "too-many-words"
-   ],
+   "passAll": true,
+   "worst": null,
+   "faults": [],
    "review": [],
    "unmeasured": [],
    "numbers": {
     "wordsBeforeScroll": 90,
     "brightButtons": 1,
     "smallTargets": 0,
-    "textSizes": 5,
+    "textSizes": 4,
     "buttonLooks": 2,
-    "firstContentMs": 256,
+    "firstContentMs": 224,
     "layoutShift": 0.001,
     "tapMs": 64,
     "tapped": "Go to the Mirror",
@@ -1608,9 +1613,9 @@
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 1,
-    "firstContentMs": 168,
+    "firstContentMs": 240,
     "layoutShift": 0,
-    "tapMs": 80,
+    "tapMs": 96,
     "tapped": "JOIN",
     "brokenLinks": 0,
     "a11yCritical": 1,
@@ -1650,9 +1655,9 @@
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 4,
-    "firstContentMs": 312,
+    "firstContentMs": 336,
     "layoutShift": 0.001,
-    "tapMs": 64,
+    "tapMs": 96,
     "tapped": "Music Build a beat, flip a sample, perform it live SHOWS UP ",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -1694,7 +1699,7 @@
     "smallTargets": 6,
     "textSizes": 4,
     "buttonLooks": 1,
-    "firstContentMs": 280,
+    "firstContentMs": 344,
     "layoutShift": 0.001,
     "tapMs": 48,
     "tapped": "From my Academy library",
@@ -1734,9 +1739,9 @@
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 1,
-    "firstContentMs": 424,
+    "firstContentMs": 372,
     "layoutShift": 0.001,
-    "tapMs": 104,
+    "tapMs": 112,
     "tapped": "CHARACTER CREATOR Build your athlete Shape the hero every sh",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -1772,23 +1777,21 @@
     "body-small"
    ],
    "review": [],
-   "unmeasured": [
-    "tap response"
-   ],
+   "unmeasured": [],
    "numbers": {
-    "wordsBeforeScroll": 104,
+    "wordsBeforeScroll": 102,
     "brightButtons": 0,
     "smallTargets": 26,
     "textSizes": 4,
     "buttonLooks": 3,
-    "firstContentMs": 388,
+    "firstContentMs": 444,
     "layoutShift": 0.001,
-    "tapMs": null,
+    "tapMs": 168,
     "tapped": "MISC",
     "brokenLinks": 0,
     "a11yCritical": 1,
     "a11ySerious": 0,
-    "jsKb": 2422
+    "jsKb": 2429
    }
   },
   {
@@ -1824,7 +1827,7 @@
     "smallTargets": 36,
     "textSizes": 6,
     "buttonLooks": 0,
-    "firstContentMs": 304,
+    "firstContentMs": 332,
     "layoutShift": 0,
     "tapMs": null,
     "tapped": null,
@@ -1876,12 +1879,12 @@
     "tap response"
    ],
    "numbers": {
-    "wordsBeforeScroll": 21,
+    "wordsBeforeScroll": 20,
     "brightButtons": 0,
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 0,
-    "firstContentMs": 260,
+    "firstContentMs": 336,
     "layoutShift": 0.001,
     "tapMs": null,
     "tapped": null,
@@ -1923,7 +1926,7 @@
     "smallTargets": 0,
     "textSizes": 7,
     "buttonLooks": 3,
-    "firstContentMs": 484,
+    "firstContentMs": 388,
     "layoutShift": 0.001,
     "tapMs": null,
     "tapped": null,
@@ -1960,9 +1963,9 @@
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 2,
-    "firstContentMs": 352,
+    "firstContentMs": 368,
     "layoutShift": 0.001,
-    "tapMs": 80,
+    "tapMs": 88,
     "tapped": "MARK DONE",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -1999,9 +2002,9 @@
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 1,
-    "firstContentMs": 232,
+    "firstContentMs": 224,
     "layoutShift": 0,
-    "tapMs": 112,
+    "tapMs": 72,
     "tapped": "TRAIN ON YOUR OWN TODAY",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -2038,7 +2041,7 @@
     "smallTargets": 0,
     "textSizes": 2,
     "buttonLooks": 1,
-    "firstContentMs": 208,
+    "firstContentMs": 212,
     "layoutShift": 0,
     "tapMs": 72,
     "tapped": "TRAIN ON YOUR OWN TODAY",
@@ -2077,9 +2080,9 @@
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 1,
-    "firstContentMs": 232,
+    "firstContentMs": 244,
     "layoutShift": 0,
-    "tapMs": 56,
+    "tapMs": 72,
     "tapped": "TRAIN ON YOUR OWN TODAY",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -2114,9 +2117,9 @@
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 1,
-    "firstContentMs": 284,
+    "firstContentMs": 356,
     "layoutShift": 0.001,
-    "tapMs": 72,
+    "tapMs": 88,
     "tapped": "ACCEPT",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -2176,7 +2179,7 @@
     "smallTargets": 0,
     "textSizes": 9,
     "buttonLooks": 0,
-    "firstContentMs": 328,
+    "firstContentMs": 304,
     "layoutShift": 0.001,
     "tapMs": null,
     "tapped": null,
@@ -2220,14 +2223,14 @@
     "smallTargets": 30,
     "textSizes": 5,
     "buttonLooks": 3,
-    "firstContentMs": 280,
+    "firstContentMs": 428,
     "layoutShift": 0,
     "tapMs": null,
     "tapped": "START THE SCREEN",
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 1,
-    "jsKb": 3686
+    "jsKb": 3693
    }
   },
   {
@@ -2259,7 +2262,7 @@
     "smallTargets": 0,
     "textSizes": 4,
     "buttonLooks": 0,
-    "firstContentMs": 300,
+    "firstContentMs": 296,
     "layoutShift": 0,
     "tapMs": null,
     "tapped": null,
@@ -2301,7 +2304,7 @@
     "smallTargets": 3,
     "textSizes": 5,
     "buttonLooks": 3,
-    "firstContentMs": 252,
+    "firstContentMs": 248,
     "layoutShift": 0.001,
     "tapMs": null,
     "tapped": "Today's fuel — your Build, as a plate →",
@@ -2343,9 +2346,9 @@
     "smallTargets": 34,
     "textSizes": 4,
     "buttonLooks": 4,
-    "firstContentMs": 360,
+    "firstContentMs": 304,
     "layoutShift": 0.001,
-    "tapMs": 104,
+    "tapMs": 88,
     "tapped": "Rebuild",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -2385,7 +2388,7 @@
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 0,
-    "firstContentMs": 292,
+    "firstContentMs": 252,
     "layoutShift": 0.001,
     "tapMs": null,
     "tapped": null,
@@ -2419,12 +2422,12 @@
     "tap response"
    ],
    "numbers": {
-    "wordsBeforeScroll": 44,
+    "wordsBeforeScroll": 37,
     "brightButtons": 0,
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 0,
-    "firstContentMs": 596,
+    "firstContentMs": 600,
     "layoutShift": 0,
     "tapMs": null,
     "tapped": "Chapter 1: The Body's Control Panel",
@@ -2467,7 +2470,7 @@
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 4,
-    "firstContentMs": 976,
+    "firstContentMs": 940,
     "layoutShift": 0.035,
     "tapMs": null,
     "tapped": "Close the feed",
@@ -2508,9 +2511,9 @@
     "smallTargets": 0,
     "textSizes": 6,
     "buttonLooks": 5,
-    "firstContentMs": 348,
+    "firstContentMs": 292,
     "layoutShift": 0,
-    "tapMs": 88,
+    "tapMs": 72,
     "tapped": "Take the free movement screen",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -2547,9 +2550,9 @@
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 1,
-    "firstContentMs": 352,
+    "firstContentMs": 316,
     "layoutShift": 0.001,
-    "tapMs": 104,
+    "tapMs": 88,
     "tapped": "FEL Run your System Scan Scan now",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -2587,28 +2590,26 @@
    "reason": null,
    "checks": {
     "clear": "fail",
-    "finished": "fail",
+    "finished": "pass",
     "fast": "pass",
     "right": "pass"
    },
    "passAll": false,
-   "worst": "166 words before scrolling (the budget is 40).",
+   "worst": "41 words before scrolling (the budget is 40).",
    "faults": [
-    "too-many-words",
-    "small-targets",
-    "text-sizes"
+    "too-many-words"
    ],
    "review": [],
    "unmeasured": [],
    "numbers": {
-    "wordsBeforeScroll": 166,
+    "wordsBeforeScroll": 41,
     "brightButtons": 1,
-    "smallTargets": 5,
-    "textSizes": 5,
+    "smallTargets": 0,
+    "textSizes": 4,
     "buttonLooks": 2,
-    "firstContentMs": 376,
+    "firstContentMs": 640,
     "layoutShift": 0,
-    "tapMs": 168,
+    "tapMs": 128,
     "tapped": "ENTER THE LAB",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -2646,9 +2647,9 @@
     "smallTargets": 8,
     "textSizes": 4,
     "buttonLooks": 2,
-    "firstContentMs": 260,
+    "firstContentMs": 256,
     "layoutShift": 0.001,
-    "tapMs": 48,
+    "tapMs": 64,
     "tapped": "SHOP",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -2690,9 +2691,9 @@
     "smallTargets": 8,
     "textSizes": 7,
     "buttonLooks": 1,
-    "firstContentMs": 476,
+    "firstContentMs": 448,
     "layoutShift": 0,
-    "tapMs": 56,
+    "tapMs": 72,
     "tapped": "Inquire",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -2724,18 +2725,16 @@
     "text-sizes"
    ],
    "review": [],
-   "unmeasured": [
-    "first content time"
-   ],
+   "unmeasured": [],
    "numbers": {
     "wordsBeforeScroll": 141,
     "brightButtons": 0,
     "smallTargets": 0,
     "textSizes": 6,
     "buttonLooks": 5,
-    "firstContentMs": null,
+    "firstContentMs": 536,
     "layoutShift": 0,
-    "tapMs": 88,
+    "tapMs": 64,
     "tapped": "Sign in",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -2776,9 +2775,9 @@
     "smallTargets": 3,
     "textSizes": 5,
     "buttonLooks": 3,
-    "firstContentMs": 340,
+    "firstContentMs": 304,
     "layoutShift": 0.001,
-    "tapMs": 40,
+    "tapMs": 64,
     "tapped": "Challenge online",
     "brokenLinks": 0,
     "a11yCritical": 1,
@@ -2836,7 +2835,7 @@
     "buttonLooks": 1,
     "firstContentMs": 280,
     "layoutShift": 0,
-    "tapMs": 96,
+    "tapMs": 48,
     "tapped": "Open local party room",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -2875,9 +2874,9 @@
     "smallTargets": 2,
     "textSizes": 3,
     "buttonLooks": 1,
-    "firstContentMs": 320,
+    "firstContentMs": 264,
     "layoutShift": 0,
-    "tapMs": 64,
+    "tapMs": 72,
     "tapped": "Open local party room",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -2907,8 +2906,7 @@
     "clipped:phone",
     "clipped:zoom200",
     "clipped:font150",
-    "body-small",
-    "button-looks"
+    "body-small"
    ],
    "review": [],
    "unmeasured": [],
@@ -2917,10 +2915,10 @@
     "brightButtons": 0,
     "smallTargets": 0,
     "textSizes": 5,
-    "buttonLooks": 4,
-    "firstContentMs": 592,
+    "buttonLooks": 3,
+    "firstContentMs": 504,
     "layoutShift": 0.001,
-    "tapMs": 152,
+    "tapMs": 136,
     "tapped": "HOOPS Dunk contests, ones, threes, the arc. 5",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -2959,9 +2957,9 @@
     "smallTargets": 1,
     "textSizes": 5,
     "buttonLooks": 3,
-    "firstContentMs": 440,
+    "firstContentMs": 428,
     "layoutShift": 0,
-    "tapMs": 80,
+    "tapMs": 96,
     "tapped": "Rehearse Last Possession",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -2986,12 +2984,11 @@
     "right": "pass"
    },
    "passAll": false,
-   "worst": "1 paragraph of body copy under 16 px.",
+   "worst": "Dead end: nothing on the screen leads on or back.",
    "faults": [
-    "body-small",
-    "too-many-words",
-    "small-targets",
-    "button-looks"
+    "dead-end",
+    "blank",
+    "body-small"
    ],
    "review": [],
    "unmeasured": [
@@ -3000,11 +2997,11 @@
     "Fast and smooth: a 3D screen: the rig has no real GPU, so the tap response is not timed"
    ],
    "numbers": {
-    "wordsBeforeScroll": 42,
-    "brightButtons": 1,
-    "smallTargets": 4,
-    "textSizes": 2,
-    "buttonLooks": 5,
+    "wordsBeforeScroll": 0,
+    "brightButtons": 0,
+    "smallTargets": 0,
+    "textSizes": 0,
+    "buttonLooks": 0,
     "firstContentMs": null,
     "layoutShift": 0,
     "tapMs": null,
@@ -3012,7 +3009,7 @@
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
-    "jsKb": 3651
+    "jsKb": 3658
    }
   },
   {
@@ -3057,7 +3054,7 @@
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
-    "jsKb": 3649
+    "jsKb": 3656
    }
   },
   {
@@ -3091,14 +3088,14 @@
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 1,
-    "firstContentMs": 332,
+    "firstContentMs": 380,
     "layoutShift": 0,
     "tapMs": 16,
     "tapped": "TAP TO START",
     "brokenLinks": 0,
     "a11yCritical": 1,
     "a11ySerious": 0,
-    "jsKb": 3744
+    "jsKb": 3751
    }
   },
   {
@@ -3118,7 +3115,7 @@
     "right": "pass"
    },
    "passAll": false,
-   "worst": "64 words before scrolling (the budget is 40).",
+   "worst": "65 words before scrolling (the budget is 40).",
    "faults": [
     "too-many-words",
     "small-targets",
@@ -3130,19 +3127,19 @@
     "Fast and smooth: a 3D screen: the rig has no real GPU, so the tap response is not timed"
    ],
    "numbers": {
-    "wordsBeforeScroll": 64,
+    "wordsBeforeScroll": 65,
     "brightButtons": 0,
     "smallTargets": 8,
     "textSizes": 5,
     "buttonLooks": 6,
-    "firstContentMs": 360,
-    "layoutShift": 0.001,
+    "firstContentMs": 304,
+    "layoutShift": 0.002,
     "tapMs": null,
     "tapped": null,
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
-    "jsKb": 3859
+    "jsKb": 3867
    }
   },
   {
@@ -3177,14 +3174,14 @@
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 1,
-    "firstContentMs": 400,
+    "firstContentMs": 408,
     "layoutShift": 0,
     "tapMs": null,
     "tapped": null,
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
-    "jsKb": 3762
+    "jsKb": 3769
    }
   },
   {
@@ -3201,13 +3198,12 @@
     "clear": "pass",
     "finished": "fail",
     "fast": "n/m",
-    "right": "fail"
+    "right": "pass"
    },
    "passAll": false,
    "worst": "A spinner with no words: it never says what it is waiting for.",
    "faults": [
-    "spinner-no-words",
-    "a11y-serious"
+    "spinner-no-words"
    ],
    "review": [],
    "unmeasured": [
@@ -3220,14 +3216,14 @@
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 1,
-    "firstContentMs": 432,
+    "firstContentMs": 308,
     "layoutShift": 0,
     "tapMs": null,
     "tapped": null,
     "brokenLinks": 0,
     "a11yCritical": 0,
-    "a11ySerious": 1,
-    "jsKb": 3765
+    "a11ySerious": 0,
+    "jsKb": 3772
    }
   },
   {
@@ -3261,7 +3257,7 @@
     "smallTargets": 1,
     "textSizes": 3,
     "buttonLooks": 1,
-    "firstContentMs": 280,
+    "firstContentMs": 264,
     "layoutShift": 0,
     "tapMs": 96,
     "tapped": "START CALIBRATION",
@@ -3298,9 +3294,9 @@
     "smallTargets": 0,
     "textSizes": 4,
     "buttonLooks": 1,
-    "firstContentMs": 280,
-    "layoutShift": 0.002,
-    "tapMs": 144,
+    "firstContentMs": 220,
+    "layoutShift": 0.003,
+    "tapMs": 120,
     "tapped": "START THE NIGHT",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -3335,9 +3331,9 @@
     "smallTargets": 0,
     "textSizes": 2,
     "buttonLooks": 1,
-    "firstContentMs": 276,
+    "firstContentMs": 240,
     "layoutShift": 0,
-    "tapMs": 72,
+    "tapMs": 48,
     "tapped": "START A NEW NIGHT",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -3358,7 +3354,7 @@
    "checks": {
     "clear": "pass",
     "finished": "fail",
-    "fast": "pass",
+    "fast": "n/m",
     "right": "pass"
    },
    "passAll": false,
@@ -3367,21 +3363,24 @@
     "spinner-no-words"
    ],
    "review": [],
-   "unmeasured": [],
+   "unmeasured": [
+    "tap response",
+    "Fast and smooth: a 3D screen: the rig has no real GPU, so the tap response is not timed"
+   ],
    "numbers": {
     "wordsBeforeScroll": 10,
     "brightButtons": 0,
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 1,
-    "firstContentMs": 448,
+    "firstContentMs": 300,
     "layoutShift": 0,
-    "tapMs": 16,
-    "tapped": "TAP TO START",
+    "tapMs": null,
+    "tapped": null,
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
-    "jsKb": 3767
+    "jsKb": 3774
    }
   },
   {
@@ -3416,14 +3415,14 @@
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 1,
-    "firstContentMs": 544,
+    "firstContentMs": 500,
     "layoutShift": 0,
     "tapMs": null,
     "tapped": null,
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
-    "jsKb": 3767
+    "jsKb": 3774
    }
   },
   {
@@ -3455,9 +3454,9 @@
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 1,
-    "firstContentMs": 300,
+    "firstContentMs": 324,
     "layoutShift": 0,
-    "tapMs": 64,
+    "tapMs": 72,
     "tapped": "Train",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -3498,14 +3497,14 @@
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 1,
-    "firstContentMs": 472,
+    "firstContentMs": 396,
     "layoutShift": 0,
     "tapMs": null,
     "tapped": null,
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
-    "jsKb": 3762
+    "jsKb": 3769
    }
   },
   {
@@ -3521,7 +3520,7 @@
    "checks": {
     "clear": "pass",
     "finished": "fail",
-    "fast": "n/m",
+    "fast": "pass",
     "right": "pass"
    },
    "passAll": false,
@@ -3531,24 +3530,21 @@
     "tiny-text"
    ],
    "review": [],
-   "unmeasured": [
-    "tap response",
-    "Fast and smooth: a 3D screen: the rig has no real GPU, so the tap response is not timed"
-   ],
+   "unmeasured": [],
    "numbers": {
     "wordsBeforeScroll": 11,
     "brightButtons": 0,
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 1,
-    "firstContentMs": 512,
+    "firstContentMs": 356,
     "layoutShift": 0,
-    "tapMs": null,
-    "tapped": null,
+    "tapMs": 16,
+    "tapped": "TAP TO START",
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
-    "jsKb": 3025
+    "jsKb": 3032
    }
   },
   {
@@ -3580,9 +3576,9 @@
     "smallTargets": 0,
     "textSizes": 4,
     "buttonLooks": 2,
-    "firstContentMs": 316,
+    "firstContentMs": 312,
     "layoutShift": 0,
-    "tapMs": 128,
+    "tapMs": 104,
     "tapped": "START",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -3613,21 +3609,23 @@
     "tiny-text"
    ],
    "review": [],
-   "unmeasured": [],
+   "unmeasured": [
+    "tap response"
+   ],
    "numbers": {
     "wordsBeforeScroll": 9,
     "brightButtons": 0,
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 1,
-    "firstContentMs": 328,
+    "firstContentMs": 496,
     "layoutShift": 0,
-    "tapMs": 16,
+    "tapMs": null,
     "tapped": "TAP TO START",
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
-    "jsKb": 3762
+    "jsKb": 3769
    }
   },
   {
@@ -3643,13 +3641,12 @@
    "checks": {
     "clear": "pass",
     "finished": "fail",
-    "fast": "fail",
+    "fast": "pass",
     "right": "pass"
    },
    "passAll": false,
-   "worst": "\"TAP TO START\" answers a tap in 1272 ms (the budget is 200 ms).",
+   "worst": "A spinner with no words: it never says what it is waiting for.",
    "faults": [
-    "slow-tap",
     "spinner-no-words",
     "tiny-text"
    ],
@@ -3661,14 +3658,14 @@
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 1,
-    "firstContentMs": 456,
+    "firstContentMs": 360,
     "layoutShift": 0,
-    "tapMs": 1272,
+    "tapMs": 16,
     "tapped": "TAP TO START",
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
-    "jsKb": 3761
+    "jsKb": 3769
    }
   },
   {
@@ -3704,14 +3701,14 @@
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 1,
-    "firstContentMs": 488,
+    "firstContentMs": 548,
     "layoutShift": 0,
     "tapMs": null,
     "tapped": null,
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
-    "jsKb": 3768
+    "jsKb": 3775
    }
   },
   {
@@ -3745,9 +3742,9 @@
     "smallTargets": 1,
     "textSizes": 5,
     "buttonLooks": 2,
-    "firstContentMs": 324,
+    "firstContentMs": 492,
     "layoutShift": 0,
-    "tapMs": 64,
+    "tapMs": 104,
     "tapped": "Allow Motion & Start",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -3788,14 +3785,14 @@
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 1,
-    "firstContentMs": 424,
+    "firstContentMs": 496,
     "layoutShift": 0,
     "tapMs": null,
     "tapped": null,
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
-    "jsKb": 3762
+    "jsKb": 3769
    }
   },
   {
@@ -3831,14 +3828,14 @@
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 1,
-    "firstContentMs": 444,
+    "firstContentMs": 404,
     "layoutShift": 0,
     "tapMs": null,
     "tapped": null,
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
-    "jsKb": 3762
+    "jsKb": 3770
    }
   },
   {
@@ -3870,12 +3867,12 @@
     "Fast and smooth: a 3D screen: the rig has no real GPU, so the tap response is not timed"
    ],
    "numbers": {
-    "wordsBeforeScroll": 71,
+    "wordsBeforeScroll": 47,
     "brightButtons": 0,
     "smallTargets": 0,
     "textSizes": 1,
     "buttonLooks": 1,
-    "firstContentMs": 364,
+    "firstContentMs": 328,
     "layoutShift": 0.062,
     "tapMs": null,
     "tapped": null,
@@ -3914,7 +3911,7 @@
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 2,
-    "firstContentMs": 220,
+    "firstContentMs": 308,
     "layoutShift": 0,
     "tapMs": 72,
     "tapped": "I agree — continue",
@@ -3941,7 +3938,7 @@
     "right": "pass"
    },
    "passAll": false,
-   "worst": "73 words before scrolling (the budget is 40).",
+   "worst": "42 words before scrolling (the budget is 40; 31 words of approved notices not counted).",
    "faults": [
     "too-many-words"
    ],
@@ -3953,9 +3950,9 @@
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 2,
-    "firstContentMs": 380,
+    "firstContentMs": 316,
     "layoutShift": 0,
-    "tapMs": 80,
+    "tapMs": 72,
     "tapped": "Measure my vertical (about 1 min)",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -3974,16 +3971,14 @@
    "state": "scored",
    "reason": null,
    "checks": {
-    "clear": "fail",
+    "clear": "pass",
     "finished": "pass",
     "fast": "pass",
     "right": "pass"
    },
-   "passAll": false,
-   "worst": "47 words before scrolling (the budget is 40).",
-   "faults": [
-    "too-many-words"
-   ],
+   "passAll": true,
+   "worst": null,
+   "faults": [],
    "review": [],
    "unmeasured": [],
    "numbers": {
@@ -3992,9 +3987,9 @@
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 1,
-    "firstContentMs": 228,
+    "firstContentMs": 300,
     "layoutShift": 0,
-    "tapMs": 64,
+    "tapMs": 88,
     "tapped": "Run the screen again",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -4031,9 +4026,9 @@
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 0,
-    "firstContentMs": 280,
+    "firstContentMs": 260,
     "layoutShift": 0,
-    "tapMs": 80,
+    "tapMs": 56,
     "tapped": "Open the Mirror",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -4074,14 +4069,14 @@
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 1,
-    "firstContentMs": 448,
+    "firstContentMs": 404,
     "layoutShift": 0,
     "tapMs": null,
     "tapped": null,
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
-    "jsKb": 3762
+    "jsKb": 3769
    }
   },
   {
@@ -4097,13 +4092,12 @@
    "checks": {
     "clear": "fail",
     "finished": "fail",
-    "fast": "fail",
+    "fast": "pass",
     "right": "pass"
    },
    "passAll": false,
-   "worst": "\"TAP TO START\" answers a tap in 288 ms (the budget is 200 ms).",
+   "worst": "74 words before scrolling (the budget is 40).",
    "faults": [
-    "slow-tap",
     "too-many-words",
     "small-targets",
     "button-looks"
@@ -4118,9 +4112,9 @@
     "smallTargets": 7,
     "textSizes": 5,
     "buttonLooks": 6,
-    "firstContentMs": 412,
+    "firstContentMs": 296,
     "layoutShift": 0.011,
-    "tapMs": 288,
+    "tapMs": 200,
     "tapped": "TAP TO START",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -4141,7 +4135,7 @@
    "checks": {
     "clear": "pass",
     "finished": "fail",
-    "fast": "pass",
+    "fast": "n/m",
     "right": "pass"
    },
    "passAll": false,
@@ -4151,21 +4145,24 @@
     "tiny-text"
    ],
    "review": [],
-   "unmeasured": [],
+   "unmeasured": [
+    "tap response",
+    "Fast and smooth: a 3D screen: the rig has no real GPU, so the tap response is not timed"
+   ],
    "numbers": {
     "wordsBeforeScroll": 10,
     "brightButtons": 0,
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 1,
-    "firstContentMs": 412,
+    "firstContentMs": 448,
     "layoutShift": 0,
-    "tapMs": 16,
-    "tapped": "TAP TO START",
+    "tapMs": null,
+    "tapped": null,
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
-    "jsKb": 3762
+    "jsKb": 3770
    }
   },
   {
@@ -4200,9 +4197,9 @@
     "smallTargets": 2,
     "textSizes": 7,
     "buttonLooks": 3,
-    "firstContentMs": 268,
+    "firstContentMs": 276,
     "layoutShift": 0.004,
-    "tapMs": 104,
+    "tapMs": 72,
     "tapped": "Back to Play",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -4279,14 +4276,14 @@
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 1,
-    "firstContentMs": 484,
+    "firstContentMs": 288,
     "layoutShift": 0,
     "tapMs": null,
     "tapped": null,
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
-    "jsKb": 3761
+    "jsKb": 3768
    }
   },
   {
@@ -4321,14 +4318,14 @@
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 1,
-    "firstContentMs": 396,
+    "firstContentMs": 500,
     "layoutShift": 0,
     "tapMs": null,
     "tapped": null,
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
-    "jsKb": 3764
+    "jsKb": 3771
    }
   },
   {
@@ -4366,14 +4363,14 @@
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 1,
-    "firstContentMs": 520,
+    "firstContentMs": 428,
     "layoutShift": 0,
     "tapMs": null,
     "tapped": null,
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
-    "jsKb": 3763
+    "jsKb": 3770
    }
   },
   {
@@ -4390,14 +4387,13 @@
     "clear": "pass",
     "finished": "fail",
     "fast": "pass",
-    "right": "fail"
+    "right": "pass"
    },
    "passAll": false,
    "worst": "A spinner with no words: it never says what it is waiting for.",
    "faults": [
     "spinner-no-words",
-    "clipped:font150",
-    "a11y-serious"
+    "clipped:font150"
    ],
    "review": [],
    "unmeasured": [],
@@ -4407,14 +4403,14 @@
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 1,
-    "firstContentMs": 484,
+    "firstContentMs": 388,
     "layoutShift": 0,
     "tapMs": 16,
     "tapped": "TAP TO START",
     "brokenLinks": 0,
     "a11yCritical": 0,
-    "a11ySerious": 1,
-    "jsKb": 3767
+    "a11ySerious": 0,
+    "jsKb": 3774
    }
   },
   {
@@ -4450,14 +4446,14 @@
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 1,
-    "firstContentMs": 672,
+    "firstContentMs": 388,
     "layoutShift": 0,
     "tapMs": null,
     "tapped": null,
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 1,
-    "jsKb": 3761
+    "jsKb": 3769
    }
   },
   {
@@ -4493,14 +4489,14 @@
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 1,
-    "firstContentMs": 548,
+    "firstContentMs": 460,
     "layoutShift": 0,
     "tapMs": null,
     "tapped": null,
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
-    "jsKb": 3763
+    "jsKb": 3770
    }
   },
   {
@@ -4516,34 +4512,31 @@
    "checks": {
     "clear": "pass",
     "finished": "fail",
-    "fast": "n/m",
-    "right": "fail"
+    "fast": "fail",
+    "right": "pass"
    },
    "passAll": false,
-   "worst": "A spinner with no words: it never says what it is waiting for.",
+   "worst": "\"TAP TO START\" answers a tap in 1240 ms (the budget is 200 ms).",
    "faults": [
-    "spinner-no-words",
-    "a11y-serious"
+    "slow-tap",
+    "spinner-no-words"
    ],
    "review": [],
-   "unmeasured": [
-    "tap response",
-    "Fast and smooth: a 3D screen: the rig has no real GPU, so the tap response is not timed"
-   ],
+   "unmeasured": [],
    "numbers": {
     "wordsBeforeScroll": 11,
     "brightButtons": 0,
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 1,
-    "firstContentMs": 564,
+    "firstContentMs": 348,
     "layoutShift": 0,
-    "tapMs": null,
-    "tapped": null,
+    "tapMs": 1240,
+    "tapped": "TAP TO START",
     "brokenLinks": 0,
     "a11yCritical": 0,
-    "a11ySerious": 1,
-    "jsKb": 3768
+    "a11ySerious": 0,
+    "jsKb": 3775
    }
   },
   {
@@ -4578,14 +4571,14 @@
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 1,
-    "firstContentMs": 428,
+    "firstContentMs": 424,
     "layoutShift": 0,
     "tapMs": null,
     "tapped": null,
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
-    "jsKb": 3777
+    "jsKb": 3784
    }
   },
   {
@@ -4618,14 +4611,14 @@
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 1,
-    "firstContentMs": 452,
+    "firstContentMs": 368,
     "layoutShift": 0,
     "tapMs": 16,
     "tapped": "TAP TO START",
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
-    "jsKb": 3762
+    "jsKb": 3770
    }
   },
   {
@@ -4699,14 +4692,14 @@
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 1,
-    "firstContentMs": 712,
+    "firstContentMs": 444,
     "layoutShift": 0,
     "tapMs": null,
     "tapped": null,
     "brokenLinks": 0,
     "a11yCritical": 1,
     "a11ySerious": 0,
-    "jsKb": 3744
+    "jsKb": 3751
    }
   },
   {
@@ -4722,7 +4715,7 @@
    "checks": {
     "clear": "pass",
     "finished": "fail",
-    "fast": "n/m",
+    "fast": "pass",
     "right": "pass"
    },
    "passAll": false,
@@ -4731,24 +4724,21 @@
     "spinner-no-words"
    ],
    "review": [],
-   "unmeasured": [
-    "tap response",
-    "Fast and smooth: a 3D screen: the rig has no real GPU, so the tap response is not timed"
-   ],
+   "unmeasured": [],
    "numbers": {
     "wordsBeforeScroll": 11,
     "brightButtons": 0,
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 1,
-    "firstContentMs": 772,
+    "firstContentMs": 372,
     "layoutShift": 0,
-    "tapMs": null,
-    "tapped": null,
+    "tapMs": 16,
+    "tapped": "TAP TO START",
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
-    "jsKb": 3768
+    "jsKb": 3775
    }
   },
   {
@@ -4784,14 +4774,14 @@
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 1,
-    "firstContentMs": 724,
+    "firstContentMs": 464,
     "layoutShift": 0,
     "tapMs": null,
     "tapped": null,
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
-    "jsKb": 3742
+    "jsKb": 3749
    }
   },
   {
@@ -4830,9 +4820,9 @@
     "smallTargets": 13,
     "textSizes": 7,
     "buttonLooks": 4,
-    "firstContentMs": 572,
+    "firstContentMs": 292,
     "layoutShift": 0,
-    "tapMs": 80,
+    "tapMs": 72,
     "tapped": "FINAL EVOLUTION LAB",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -4872,7 +4862,7 @@
     "smallTargets": 12,
     "textSizes": 5,
     "buttonLooks": 2,
-    "firstContentMs": 500,
+    "firstContentMs": 336,
     "layoutShift": 0,
     "tapMs": 80,
     "tapped": "FINAL EVOLUTION LAB",
@@ -4914,9 +4904,9 @@
     "smallTargets": 8,
     "textSizes": 5,
     "buttonLooks": 3,
-    "firstContentMs": 516,
+    "firstContentMs": 284,
     "layoutShift": 0,
-    "tapMs": 72,
+    "tapMs": 56,
     "tapped": "Log in",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -4956,9 +4946,9 @@
     "smallTargets": 8,
     "textSizes": 5,
     "buttonLooks": 3,
-    "firstContentMs": 388,
+    "firstContentMs": 292,
     "layoutShift": 0,
-    "tapMs": 72,
+    "tapMs": 80,
     "tapped": "Go to the shop",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -4998,7 +4988,7 @@
     "smallTargets": 3,
     "textSizes": 5,
     "buttonLooks": 0,
-    "firstContentMs": 524,
+    "firstContentMs": 376,
     "layoutShift": 0,
     "tapMs": null,
     "tapped": null,
@@ -5041,7 +5031,7 @@
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 0,
-    "firstContentMs": 456,
+    "firstContentMs": 308,
     "layoutShift": 0.001,
     "tapMs": null,
     "tapped": null,
@@ -5085,14 +5075,14 @@
     "smallTargets": 1,
     "textSizes": 6,
     "buttonLooks": 2,
-    "firstContentMs": 920,
+    "firstContentMs": 720,
     "layoutShift": 0.001,
     "tapMs": null,
     "tapped": null,
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
-    "jsKb": 2344
+    "jsKb": 2035
    }
   },
   {
@@ -5130,7 +5120,7 @@
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 0,
-    "firstContentMs": 456,
+    "firstContentMs": 252,
     "layoutShift": 0.001,
     "tapMs": null,
     "tapped": null,
@@ -5173,9 +5163,9 @@
     "smallTargets": 28,
     "textSizes": 8,
     "buttonLooks": 8,
-    "firstContentMs": 784,
+    "firstContentMs": 520,
     "layoutShift": 0.001,
-    "tapMs": 88,
+    "tapMs": 72,
     "tapped": "← Back to profile",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -5215,14 +5205,14 @@
     "smallTargets": 2,
     "textSizes": 7,
     "buttonLooks": 3,
-    "firstContentMs": 492,
+    "firstContentMs": 448,
     "layoutShift": 0.001,
-    "tapMs": 104,
+    "tapMs": 72,
     "tapped": "← Back to profile",
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
-    "jsKb": 280
+    "jsKb": 279
    }
   },
   {
@@ -5292,7 +5282,7 @@
     "smallTargets": 3,
     "textSizes": 5,
     "buttonLooks": 0,
-    "firstContentMs": 560,
+    "firstContentMs": 280,
     "layoutShift": 0,
     "tapMs": null,
     "tapped": null,
@@ -5319,7 +5309,7 @@
     "right": "pass"
    },
    "passAll": false,
-   "worst": "73 words before scrolling (the budget is 40).",
+   "worst": "42 words before scrolling (the budget is 40; 31 words of approved notices not counted).",
    "faults": [
     "too-many-words"
    ],
@@ -5331,7 +5321,7 @@
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 2,
-    "firstContentMs": 236,
+    "firstContentMs": 316,
     "layoutShift": 0,
     "tapMs": 96,
     "tapped": "Measure my vertical (about 1 min)",
@@ -5368,7 +5358,7 @@
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 1,
-    "firstContentMs": 248,
+    "firstContentMs": 264,
     "layoutShift": 0,
     "tapMs": 64,
     "tapped": "Done, clear my results",
@@ -5389,16 +5379,14 @@
    "state": "scored",
    "reason": null,
    "checks": {
-    "clear": "fail",
+    "clear": "pass",
     "finished": "pass",
     "fast": "pass",
     "right": "pass"
    },
-   "passAll": false,
-   "worst": "48 words before scrolling (the budget is 40).",
-   "faults": [
-    "too-many-words"
-   ],
+   "passAll": true,
+   "worst": null,
+   "faults": [],
    "review": [],
    "unmeasured": [],
    "numbers": {
@@ -5407,9 +5395,9 @@
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 1,
-    "firstContentMs": 232,
+    "firstContentMs": 216,
     "layoutShift": 0,
-    "tapMs": 64,
+    "tapMs": 56,
     "tapped": "Run the screen again",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -5464,7 +5452,7 @@
     "smallTargets": 0,
     "textSizes": 4,
     "buttonLooks": 0,
-    "firstContentMs": 324,
+    "firstContentMs": 252,
     "layoutShift": 0.001,
     "tapMs": null,
     "tapped": "How to earn shards",
@@ -5522,9 +5510,9 @@
     "smallTargets": 0,
     "textSizes": 6,
     "buttonLooks": 0,
-    "firstContentMs": 772,
+    "firstContentMs": 428,
     "layoutShift": 0.001,
-    "tapMs": 120,
+    "tapMs": 88,
     "tapped": "Creator Cards",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -5569,7 +5557,7 @@
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 0,
-    "firstContentMs": 476,
+    "firstContentMs": 336,
     "layoutShift": 0.272,
     "tapMs": null,
     "tapped": null,
@@ -5606,9 +5594,9 @@
     "smallTargets": 0,
     "textSizes": 4,
     "buttonLooks": 1,
-    "firstContentMs": 240,
+    "firstContentMs": 224,
     "layoutShift": 0.001,
-    "tapMs": 96,
+    "tapMs": 112,
     "tapped": "PLAY TODAY'S ATTEMPT",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -5633,12 +5621,10 @@
     "right": "pass"
    },
    "passAll": false,
-   "worst": "\"CONTINUE\" answers a tap in 288 ms (the budget is 200 ms).",
+   "worst": "\"CONTINUE\" answers a tap in 280 ms (the budget is 200 ms).",
    "faults": [
     "slow-tap",
     "too-many-words",
-    "small-targets",
-    "text-sizes",
     "button-looks"
    ],
    "review": [],
@@ -5646,12 +5632,12 @@
    "numbers": {
     "wordsBeforeScroll": 51,
     "brightButtons": 1,
-    "smallTargets": 1,
-    "textSizes": 5,
+    "smallTargets": 0,
+    "textSizes": 4,
     "buttonLooks": 4,
-    "firstContentMs": 544,
+    "firstContentMs": 472,
     "layoutShift": 0,
-    "tapMs": 288,
+    "tapMs": 280,
     "tapped": "CONTINUE",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -5689,9 +5675,9 @@
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 0,
-    "firstContentMs": 528,
+    "firstContentMs": 336,
     "layoutShift": 0.001,
-    "tapMs": 80,
+    "tapMs": 64,
     "tapped": "Today's drill →",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -5730,9 +5716,9 @@
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 0,
-    "firstContentMs": 476,
+    "firstContentMs": 300,
     "layoutShift": 0.001,
-    "tapMs": 56,
+    "tapMs": 48,
     "tapped": "‹ All squads and teams",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -5763,16 +5749,18 @@
     "body-small"
    ],
    "review": [],
-   "unmeasured": [],
+   "unmeasured": [
+    "first content time"
+   ],
    "numbers": {
     "wordsBeforeScroll": 23,
     "brightButtons": 0,
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 0,
-    "firstContentMs": 548,
+    "firstContentMs": null,
     "layoutShift": 0,
-    "tapMs": 88,
+    "tapMs": 56,
     "tapped": "Squads and teams →",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -5810,9 +5798,9 @@
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 1,
-    "firstContentMs": 508,
+    "firstContentMs": 356,
     "layoutShift": 0.002,
-    "tapMs": 72,
+    "tapMs": 80,
     "tapped": "Shard Store",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -5852,7 +5840,7 @@
     "smallTargets": 3,
     "textSizes": 5,
     "buttonLooks": 0,
-    "firstContentMs": 600,
+    "firstContentMs": 424,
     "layoutShift": 0,
     "tapMs": null,
     "tapped": null,
@@ -5891,9 +5879,9 @@
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 0,
-    "firstContentMs": 344,
+    "firstContentMs": 256,
     "layoutShift": 0.001,
-    "tapMs": 176,
+    "tapMs": 144,
     "tapped": "The Snow Slope — locked: Clear The Surf Pier · PRQ 55+",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -5918,7 +5906,7 @@
     "right": "pass"
    },
    "passAll": false,
-   "worst": "\"FACE THE GLITCH\" answers a tap in 432 ms (the budget is 200 ms).",
+   "worst": "\"FACE THE GLITCH\" answers a tap in 288 ms (the budget is 200 ms).",
    "faults": [
     "slow-tap",
     "tiny-text",
@@ -5935,9 +5923,9 @@
     "smallTargets": 3,
     "textSizes": 7,
     "buttonLooks": 7,
-    "firstContentMs": 524,
+    "firstContentMs": 380,
     "layoutShift": 0,
-    "tapMs": 432,
+    "tapMs": 288,
     "tapped": "FACE THE GLITCH",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -5978,9 +5966,9 @@
     "smallTargets": 3,
     "textSizes": 7,
     "buttonLooks": 7,
-    "firstContentMs": 448,
+    "firstContentMs": 336,
     "layoutShift": 0,
-    "tapMs": 144,
+    "tapMs": 120,
     "tapped": "GRIND",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -6038,9 +6026,9 @@
     "smallTargets": 4,
     "textSizes": 5,
     "buttonLooks": 1,
-    "firstContentMs": 452,
+    "firstContentMs": 284,
     "layoutShift": 0,
-    "tapMs": 112,
+    "tapMs": 136,
     "tapped": "TERMS OF SERVICE Usage terms & conditions",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -6077,9 +6065,9 @@
     "smallTargets": 0,
     "textSizes": 4,
     "buttonLooks": 1,
-    "firstContentMs": 536,
+    "firstContentMs": 288,
     "layoutShift": 0.001,
-    "tapMs": 112,
+    "tapMs": 64,
     "tapped": "See a course: the Playbook →",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -6119,7 +6107,7 @@
     "smallTargets": 0,
     "textSizes": 4,
     "buttonLooks": 0,
-    "firstContentMs": 464,
+    "firstContentMs": 328,
     "layoutShift": 0.001,
     "tapMs": null,
     "tapped": null,
@@ -6163,9 +6151,9 @@
     "smallTargets": 8,
     "textSizes": 5,
     "buttonLooks": 0,
-    "firstContentMs": 548,
+    "firstContentMs": 432,
     "layoutShift": 0,
-    "tapMs": 72,
+    "tapMs": 64,
     "tapped": "FINAL EVOLUTION LAB",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -6205,9 +6193,9 @@
     "smallTargets": 15,
     "textSizes": 5,
     "buttonLooks": 2,
-    "firstContentMs": 504,
+    "firstContentMs": 300,
     "layoutShift": 0,
-    "tapMs": 72,
+    "tapMs": 56,
     "tapped": "FINAL EVOLUTION LAB",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -6246,7 +6234,7 @@
     "smallTargets": 3,
     "textSizes": 5,
     "buttonLooks": 0,
-    "firstContentMs": 416,
+    "firstContentMs": 352,
     "layoutShift": 0,
     "tapMs": null,
     "tapped": "/coach-terms",
@@ -6283,9 +6271,9 @@
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 2,
-    "firstContentMs": 448,
+    "firstContentMs": 428,
     "layoutShift": 0.001,
-    "tapMs": 120,
+    "tapMs": 104,
     "tapped": "Account settings →",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -6324,7 +6312,7 @@
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 3,
-    "firstContentMs": 288,
+    "firstContentMs": 280,
     "layoutShift": 0.001,
     "tapMs": 80,
     "tapped": "START TODAY",
@@ -6363,9 +6351,9 @@
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 0,
-    "firstContentMs": 260,
+    "firstContentMs": 316,
     "layoutShift": 0.001,
-    "tapMs": 88,
+    "tapMs": 72,
     "tapped": "← Train",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -6402,7 +6390,7 @@
     "smallTargets": 0,
     "textSizes": 4,
     "buttonLooks": 3,
-    "firstContentMs": 296,
+    "firstContentMs": 320,
     "layoutShift": 0.001,
     "tapMs": 64,
     "tapped": "← Train",
@@ -6434,19 +6422,19 @@
    "review": [],
    "unmeasured": [],
    "numbers": {
-    "wordsBeforeScroll": 53,
+    "wordsBeforeScroll": 44,
     "brightButtons": 0,
     "smallTargets": 0,
     "textSizes": 4,
     "buttonLooks": 2,
-    "firstContentMs": 284,
+    "firstContentMs": 324,
     "layoutShift": 0.001,
-    "tapMs": 72,
+    "tapMs": 96,
     "tapped": "SEARCH",
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
-    "jsKb": 312
+    "jsKb": 313
    }
   },
   {
@@ -6478,9 +6466,9 @@
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 0,
-    "firstContentMs": 288,
+    "firstContentMs": 308,
     "layoutShift": 0.001,
-    "tapMs": 72,
+    "tapMs": 80,
     "tapped": "Today's drill →",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -6521,9 +6509,9 @@
     "smallTargets": 0,
     "textSizes": 8,
     "buttonLooks": 1,
-    "firstContentMs": 252,
+    "firstContentMs": 376,
     "layoutShift": 0.001,
-    "tapMs": 88,
+    "tapMs": 104,
     "tapped": "START TODAY'S SESSION",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -6558,9 +6546,9 @@
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 2,
-    "firstContentMs": 284,
+    "firstContentMs": 308,
     "layoutShift": 0.006,
-    "tapMs": 112,
+    "tapMs": 120,
     "tapped": "DO A JUMP CHECK",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -6585,7 +6573,7 @@
     "right": "pass"
    },
    "passAll": false,
-   "worst": "72 words before scrolling (the budget is 40).",
+   "worst": "57 words before scrolling (the budget is 40; 15 words of approved notices not counted).",
    "faults": [
     "too-many-words"
    ],
@@ -6597,9 +6585,9 @@
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 3,
-    "firstContentMs": 312,
+    "firstContentMs": 416,
     "layoutShift": 0.001,
-    "tapMs": 120,
+    "tapMs": 160,
     "tapped": "Start the camera",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -6624,7 +6612,7 @@
     "right": "pass"
    },
    "passAll": false,
-   "worst": "92 words before scrolling (the budget is 40).",
+   "worst": "75 words before scrolling (the budget is 40; 17 words of approved notices not counted).",
    "faults": [
     "too-many-words",
     "small-targets"
@@ -6639,9 +6627,9 @@
     "smallTargets": 1,
     "textSizes": 5,
     "buttonLooks": 2,
-    "firstContentMs": 496,
+    "firstContentMs": 448,
     "layoutShift": 0.001,
-    "tapMs": 80,
+    "tapMs": 128,
     "tapped": "Shots",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -6679,7 +6667,7 @@
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 4,
-    "firstContentMs": 328,
+    "firstContentMs": 392,
     "layoutShift": 0.001,
     "tapMs": 72,
     "tapped": "← Train",
@@ -6706,7 +6694,7 @@
     "right": "pass"
    },
    "passAll": false,
-   "worst": "\"Start\" answers a tap in 288 ms (the budget is 200 ms).",
+   "worst": "\"Start\" answers a tap in 256 ms (the budget is 200 ms).",
    "faults": [
     "slow-tap",
     "too-many-words"
@@ -6719,14 +6707,14 @@
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 1,
-    "firstContentMs": 364,
+    "firstContentMs": 376,
     "layoutShift": 0.001,
-    "tapMs": 288,
+    "tapMs": 256,
     "tapped": "Start",
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
-    "jsKb": 2622
+    "jsKb": 2623
    }
   },
   {
@@ -6761,9 +6749,9 @@
     "smallTargets": 1,
     "textSizes": 6,
     "buttonLooks": 6,
-    "firstContentMs": 328,
+    "firstContentMs": 388,
     "layoutShift": 0.001,
-    "tapMs": 80,
+    "tapMs": 56,
     "tapped": "← Train",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -6800,27 +6788,25 @@
    "state": "scored",
    "reason": null,
    "checks": {
-    "clear": "fail",
+    "clear": "pass",
     "finished": "pass",
     "fast": "pass",
     "right": "pass"
    },
-   "passAll": false,
-   "worst": "1 tap target under 44 px in the app's own bars.",
-   "faults": [
-    "small-targets-bars"
-   ],
+   "passAll": true,
+   "worst": null,
+   "faults": [],
    "review": [],
    "unmeasured": [],
    "numbers": {
     "wordsBeforeScroll": 16,
     "brightButtons": 1,
-    "smallTargets": 1,
+    "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 1,
-    "firstContentMs": 420,
+    "firstContentMs": 280,
     "layoutShift": 0,
-    "tapMs": 96,
+    "tapMs": 72,
     "tapped": "CONTINUE",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -6876,9 +6862,9 @@
     "smallTargets": 1,
     "textSizes": 5,
     "buttonLooks": 1,
-    "firstContentMs": 432,
+    "firstContentMs": 356,
     "layoutShift": 0.001,
-    "tapMs": 88,
+    "tapMs": 64,
     "tapped": "All modes",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -6918,14 +6904,14 @@
     "smallTargets": 6,
     "textSizes": 5,
     "buttonLooks": 2,
-    "firstContentMs": 752,
+    "firstContentMs": 384,
     "layoutShift": 0.001,
-    "tapMs": 72,
+    "tapMs": 104,
     "tapped": "Today's drill +10 LC",
     "brokenLinks": 0,
     "a11yCritical": 1,
     "a11ySerious": 1,
-    "jsKb": 248
+    "jsKb": 247
    }
   },
   {
@@ -6940,16 +6926,13 @@
    "reason": null,
    "checks": {
     "clear": "pass",
-    "finished": "fail",
+    "finished": "pass",
     "fast": "pass",
     "right": "pass"
    },
-   "passAll": false,
-   "worst": "1 paragraph of body copy under 16 px.",
-   "faults": [
-    "body-small",
-    "text-sizes"
-   ],
+   "passAll": true,
+   "worst": null,
+   "faults": [],
    "review": [],
    "unmeasured": [],
    "numbers": {
@@ -6958,9 +6941,9 @@
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 3,
-    "firstContentMs": 620,
+    "firstContentMs": 344,
     "layoutShift": 0.001,
-    "tapMs": 80,
+    "tapMs": 48,
     "tapped": "Play Flight Night",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -7002,9 +6985,9 @@
     "smallTargets": 8,
     "textSizes": 5,
     "buttonLooks": 0,
-    "firstContentMs": 388,
+    "firstContentMs": 316,
     "layoutShift": 0,
-    "tapMs": 120,
+    "tapMs": 80,
     "tapped": "FINAL EVOLUTION LAB",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -7043,9 +7026,9 @@
     "smallTargets": 2,
     "textSizes": 5,
     "buttonLooks": 2,
-    "firstContentMs": 496,
+    "firstContentMs": 344,
     "layoutShift": 0.001,
-    "tapMs": 80,
+    "tapMs": 48,
     "tapped": "3 days",
     "brokenLinks": 0,
     "a11yCritical": 0,

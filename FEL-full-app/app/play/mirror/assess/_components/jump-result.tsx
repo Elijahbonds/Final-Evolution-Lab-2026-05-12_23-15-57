@@ -12,6 +12,7 @@
 // Under 18 and "rather not say": the number from page memory, the change since their last screen here, the save-your-number
 // line, no program or game link (unchanged rules). The disclaimer and the stop line stay on the page, at the foot.
 import { jumpSure } from '@/lib/results/trust';
+import { notice } from '@/lib/every-screen/notices';
 import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { Check } from 'lucide-react';
@@ -146,8 +147,8 @@ export function JumpResult({ heightCm, plusMinusCm = null, attempts, counted, ki
       </details>
 
       <div className="space-y-1 text-center text-[16px] text-white/60">
-        <p data-disclaimer>{DISCLAIMER}</p>
-        <p data-stop-line>{STOP_LINE}</p>
+        <p {...notice('medical')} data-disclaimer>{DISCLAIMER}</p>
+        <p {...notice('medical')} data-stop-line>{STOP_LINE}</p>
         <p><Link href={PRIVACY_PATH} prefetch={false} data-privacy-link className={LINK}>{PRIVACY_LINK}</Link></p>
       </div>
     </div>

@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { lineSize } from '@/lib/design/type';
 import { Check, Copy, Link2, Loader2, Share2 } from 'lucide-react';
 import { track } from '@/lib/analytics';
 import type { Card } from '@/lib/knowledge/types';
@@ -70,7 +71,7 @@ export function FirstWin(props: FirstWinProps) {
           <>
             <ol className="space-y-1.5">
               {w.steps.map((s, i) => (
-                <li key={s.text} className="flex gap-2 text-[13.5px] leading-snug text-white/75">
+                <li key={s.text} className={`flex gap-2 ${lineSize(s.text)} leading-snug text-white/75`}>
                   <span className="font-mono text-[12px] font-bold" style={{ color: w.accent }}>{i + 1}</span>
                   <span>{s.text}</span>
                 </li>

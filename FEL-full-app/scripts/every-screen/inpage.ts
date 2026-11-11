@@ -86,6 +86,9 @@ const METHOD = /\b(estimate[ds]?|estimated|measured (from|by|with|on)|from (your
 export interface Measure {
   title: string; h1: string | null; url: string;
   wordsFold: number; wordsAll: number;
+  /** EVERY-SCREEN P6 (owner, 2026-11-11): of wordsFold, the words inside an owner-approved notice ([data-notice], only ever
+   *  set by lib/every-screen/notices.ts notice()): medical, privacy and consent wording, kept word for word, not counted */
+  noticeFold: number;
   primaryFold: string[]; actionsFold: number; actionsAll: number; actionsMain: number;
   smallTargets: { label: string; w: number; h: number; chrome: boolean; sel?: string }[]; targets: number;
   unfinished: { mark: string; text: string }[];
@@ -99,7 +102,7 @@ export interface Measure {
 
 export function measure(): Measure {
   const vh = innerHeight;
-  let wordsFold = 0, wordsAll = 0; const sizes = new Set<string>();
+  let wordsFold = 0, wordsAll = 0, noticeFold = 0; const sizes = new Set<string>();
   const texts: { t: string; el: Element; px: number; top: number }[] = [];
   const tw = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   for (let n = tw.nextNode(); n; n = tw.nextNode()) {
@@ -109,7 +112,9 @@ export function measure(): Measure {
     const cs = getComputedStyle(el); const c = words(t);
     if (cs.position === 'absolute' && r.width <= 1 && r.height <= 1) continue;            // sr-only
     wordsAll += c; if (c) sizes.add(cs.fontSize);
-    if (r.top < vh && r.bottom > 0) wordsFold += c;
+    // EVERY-SCREEN P6: "before scrolling" either way: a carousel's cards past the right edge are not on the first screen
+    // (the rig counted /login's venue strip, five cards wide, as 166 words on a 390 px phone)
+    if (r.top < vh && r.bottom > 0 && r.left < innerWidth && r.right > 0) { wordsFold += c; if (el.closest('[data-notice]')) noticeFold += c; }
     texts.push({ t, el, px: parseFloat(cs.fontSize), top: r.top });
   }
 
@@ -197,7 +202,7 @@ export function measure(): Measure {
   const h1 = document.querySelector('h1');
   return {
     title: document.title, h1: h1 ? ((h1 as HTMLElement).innerText || '').trim().slice(0, 80) : null, url: location.pathname + location.search,
-    wordsFold, wordsAll, primaryFold, actionsFold, actionsAll, actionsMain, smallTargets: smallTargets.slice(0, 40), targets,
+    wordsFold, wordsAll, noticeFold, primaryFold, actionsFold, actionsAll, actionsMain, smallTargets: smallTargets.slice(0, 40), targets,
     unfinished, emptyNoNext, spinnersNoWords, blank: wordsAll < 3,
     textSizes: [...sizes].sort((a, b) => parseFloat(a) - parseFloat(b)), buttonLooks: looks.size, buttonLookList: [...looks].map(([s, l]) => `${s} (${l})`).slice(0, 12),
     links, nowhere, numbers, methodLine: METHOD.test(bodyText),

@@ -29,7 +29,10 @@ export const CONTROLS: Control[] = [
     kind: 'do',
     expectFail: [],
     expectFaults: [],
+    // EVERY-SCREEN P6 (owner, 2026-11-11): a 60-word approved notice, marked, must not count toward the 40 words: this page
+    // stays clean only if it is left out. fault-clear's 120 unmarked words must still fail (the other direction).
     html: SHELL(`<h1>Test your jump</h1><p>Stand side-on, hands on hips. Three jumps.</p>
+      <p data-notice="medical">${words(60)}</p>
       <p><a class="btn" href="/">Start the test</a></p><p><a class="link" href="/">Back to home</a></p>
       <section><p>No jumps saved yet.</p><a class="link" href="/">Do your first jump</a></section>
       <p style="display:flex;align-items:center;gap:8px"><span class="animate-spin" style="display:inline-block;width:16px;height:16px;border:2px solid #22d3ee;border-top-color:transparent;border-radius:50%"></span>Checking the camera…</p>

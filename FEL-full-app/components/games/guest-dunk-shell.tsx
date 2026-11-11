@@ -311,7 +311,7 @@ export function GuestDunkShell({ challengeCode, reviewHref = null, ageBands = fa
           {!result && (
             <Link
               href="/"
-              className="inline-flex min-h-[40px] min-w-[44px] items-center justify-center rounded-md border border-white/25 px-3 font-mono text-[12px] text-white/75 transition-colors hover:border-white/40 hover:text-white"
+              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md border border-white/25 px-3 font-mono text-[12px] text-white/75 transition-colors hover:border-white/40 hover:text-white"
             >
               QUIT
             </Link>

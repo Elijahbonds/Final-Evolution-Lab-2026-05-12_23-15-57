@@ -242,10 +242,10 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
             priority
             className="mx-auto mb-2 h-[72px] w-auto opacity-90 sm:h-[92px]"
           />
-          <h1 className="fel-heading text-[26px] font-bold leading-none sm:text-4xl">
+          <h1 className="fel-heading text-[30px] font-bold leading-none sm:text-4xl">
             <span className="text-[#00E5FF] fel-glow-cyan">FINAL EVOLUTION</span> LAB
           </h1>
-          <p className="mx-auto mt-2 max-w-xs text-[13px] text-white/55 sm:max-w-none sm:text-sm">
+          <p className="mx-auto mt-2 max-w-xs text-[14px] text-white/55 sm:max-w-none sm:text-sm">
             {mode === 'login'
               ? 'Real sports, real training — your on-court reps become real stats.'
               : 'Pick your arena, then create your athlete profile.'}
@@ -270,12 +270,12 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
           >
             <span
               aria-hidden
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-full font-mono text-[13px] font-black text-black"
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-full font-mono text-[14px] font-black text-black"
               style={{ background: host.accent ?? '#00E5FF' }}
             >
               {host.name.slice(0, 1).toUpperCase()}
             </span>
-            <p className="min-w-0 text-[13px] leading-snug text-white/70">
+            <p className="min-w-0 text-[14px] leading-snug text-white/70">
               <span className="font-bold text-white">{host.name}</span> sent you
               {host.mode && MODE_INFO[host.mode] && path === 'play' && (
                 <> — you are starting in <span className="font-bold text-white">{MODE_INFO[host.mode].name}</span>.</>
@@ -305,7 +305,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
             style={{ borderColor: `${FIRST_WINS[path].accent}40`, background: `${FIRST_WINS[path].accent}0A` }}>
             <p className="font-mono text-[12px] font-bold uppercase tracking-[0.16em]" style={{ color: FIRST_WINS[path].accent }}>Your first win</p>
             <p className="fel-heading mt-1 text-[14px] font-bold text-white">{FIRST_WINS[path].title}</p>
-            <p className="mt-1.5 text-[12.5px] leading-relaxed text-white/60">
+            <p className="mt-1.5 text-[16px] leading-relaxed text-white/60">
               {FIRST_WINS[path].steps[0].text} About {FIRST_WINS[path].aboutSec} seconds, right after you join.
             </p>
           </div>
@@ -368,7 +368,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
           <button
             type="submit"
             disabled={loading || (mode === 'signup' && !policyAccepted)}
-            className="fel-heading flex w-full items-center justify-center gap-2 rounded-md bg-[#00E5FF] py-3 text-lg font-bold text-black transition-all hover:bg-[#00E5FF]/85 hover:shadow-[0_0_24px_rgba(0,229,255,0.45)] disabled:opacity-50"
+            className="fel-heading flex w-full items-center justify-center gap-2 rounded-md bg-[#00E5FF] py-3 text-[20px] font-bold text-black transition-all hover:bg-[#00E5FF]/85 hover:shadow-[0_0_24px_rgba(0,229,255,0.45)] disabled:opacity-50"
           >
             {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : mode === 'login' ? 'ENTER THE LAB' : 'BEGIN EVOLUTION'}
           </button>
@@ -377,14 +377,14 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
           {mode === 'login' ? (
             <>
               New athlete?{' '}
-              <Link href={challengeCode ? challengeSignupHref(challengeCode) : returnPath ? `/signup?next=${encodeURIComponent(returnPath)}` : '/signup'} className="font-semibold text-[#00E5FF] hover:underline">
+              <Link href={challengeCode ? challengeSignupHref(challengeCode) : returnPath ? `/signup?next=${encodeURIComponent(returnPath)}` : '/signup'} className="inline-flex min-h-11 items-center font-semibold text-[#00E5FF] hover:underline">
                 Create account
               </Link>
             </>
           ) : (
             <>
               Already registered?{' '}
-              <Link href={challengeCode ? challengeLoginHref(challengeCode) : returnPath ? loginPath(returnPath) : '/login'} className="font-semibold text-[#00E5FF] hover:underline">
+              <Link href={challengeCode ? challengeLoginHref(challengeCode) : returnPath ? loginPath(returnPath) : '/login'} className="inline-flex min-h-11 items-center font-semibold text-[#00E5FF] hover:underline">
                 Sign in
               </Link>
             </>
@@ -393,15 +393,15 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
         {/* M12.7 — legal links reachable from the login view, mirroring signup. */}
         {mode === 'login' && (
           <p className="mt-4 text-center text-xs text-fel-quiet">
-            <a href="/terms" target="_blank" className="hover:text-[#00E5FF] hover:underline">Terms</a>
+            <a href="/terms" target="_blank" className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-[#00E5FF] hover:underline">Terms</a>
             <span className="mx-2">·</span>
-            <a href="/privacy" target="_blank" className="hover:text-[#00E5FF] hover:underline">Privacy</a>
+            <a href="/privacy" target="_blank" className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-[#00E5FF] hover:underline">Privacy</a>
             <span className="mx-2">·</span>
-            <a href="/support" target="_blank" className="hover:text-[#00E5FF] hover:underline">Support</a>
+            <a href="/support" target="_blank" className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-[#00E5FF] hover:underline">Support</a>
             {/* HOTFIX (2026-09-24): the licence notices sit with the other legal links, named so they do not read as
                 the Lab Credits wallet. */}
             <span className="mx-2">·</span>
-            <a href="/credits" target="_blank" className="hover:text-[#00E5FF] hover:underline">Credits &amp; licences</a>
+            <a href="/credits" target="_blank" className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-[#00E5FF] hover:underline">Credits &amp; licences</a>
           </p>
         )}
       </motion.div>

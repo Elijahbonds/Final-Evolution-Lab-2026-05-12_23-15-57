@@ -16,6 +16,8 @@ export const DISCLAIMER = 'This is a free movement check, not a medical exam.';
  * page says that once (DISCLAIMER); this line keeps the stop.
  */
 export const STOP_LINE = 'If anything hurts, stop.';
+/** EVERY-SCREEN P6: the start screen's privacy line, moved here word for word so it can be an approved notice (lib/every-screen/notices.ts). */
+export const DEVICE_ONLY_LINE = 'Everything runs on this device. The picture never leaves it, and nothing is sent anywhere.';
 
 /** The pain gate, before the camera. */
 export const PAIN_QUESTION = 'Does anything hurt right now?';

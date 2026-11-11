@@ -15,6 +15,7 @@
 //   OR: a slow-motion video, read on this phone through the jump check's decoder (lib/jump/slowmoDecode.ts).
 // The video never leaves the device. Every number on screen is labelled an estimate.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { notice } from '@/lib/every-screen/notices';
 import { TYPE, lineSize } from '@/lib/design/type';
 import { Fold } from '@/components/every-screen/fold';
 import Link from 'next/link';
@@ -274,7 +275,7 @@ export function VelocitySession({ api = VBT_API, grab, decoder }: { api?: string
               <li className={TYPE.small}>The camera asks for 60 frames a second where your phone can hold it.</li>
             </ul>
           </Fold>
-          <p className={`${lineSize(PRIVACY_LINE)} text-fel-dim`}>{PRIVACY_LINE}</p>
+          <p {...notice('privacy')} className={`${lineSize(PRIVACY_LINE)} text-fel-dim`}>{PRIVACY_LINE}</p>
         </div>
       )}
 

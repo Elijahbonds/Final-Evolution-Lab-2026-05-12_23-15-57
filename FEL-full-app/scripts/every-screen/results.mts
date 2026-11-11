@@ -12,7 +12,7 @@ export type Got = 'page' | 'sign-in' | 'not-found' | 'error' | `to:${string}`;
 
 /** The scorer's version. A screen read by an older version is read again (after the screens never read), so a change to
  *  what the page side measures never leaves old and new numbers mixed in one scorecard. */
-export const SCORER = 4;
+export const SCORER = 5;
 export const slug = (route: string) => (route === '/' ? 'root' : route.slice(1).replace(/[\/\[\]]+/g, '_').replace(/_+$/, ''));
 
 
