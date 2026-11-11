@@ -145,7 +145,7 @@ function broadJumpStick(scene: Scene, sk: Skeleton): AnimationGroup | null {
 }
 
 /** A one-leg hop and stick: on the right leg, a dip, a hop of (dx, dz) landing on the same leg, held, then back. */
-function oneLegLand(s: Side, x: number, z: number, deep: number): Pose {
+export function oneLegLand(s: Side, x: number, z: number, deep: number): Pose {
   const o = other(s);
   return { bones: { Hips: [22 + deep * 8, 0, 0], Spine: [8, 0, 0], Neck: [-12, 0, 0], [`${o}UpLeg`]: [-40 - deep * 12, 0, 0], [`${o}Leg`]: [92, 0, 0], [`${o}Foot`]: [20, 0, 0], [`${s}Foot`]: [-20, 0, 0] } as Record<string, Deg3>, feet: { [s]: [x + sx(s, 0.09), ANKLE, z] } as Pair, kneePoles: { [s]: [sx(s, 0.1), 0, 1] } as Pair, rel: { Left: [0.04, -0.22, 0.30], Right: [-0.04, -0.22, 0.30] }, poles: bothDir(0.3, -1, 0), hipsY: -0.20 - deep * 0.06, hipsX: x, hipsZ: z - 0.10 };
 }
@@ -255,12 +255,12 @@ function inclineScapPushup(scene: Scene, sk: Skeleton): AnimationGroup | null {
 
 // ── running a few steps, and stopping ─────────────────────────────────────────────────────────────────────────────
 /** A running step forward: `s` foot landing at z, the other pushing off behind on its ball, the arms driving. */
-function runStep(s: Side, z: number, oz: number): Pose {
+export function runStep(s: Side, z: number, oz: number): Pose {
   const o = other(s);
   return { bones: { Hips: [20, 0, 0], Spine: [4, 0, 0], Neck: [-14, 0, 0], [`${s}Foot`]: [-6, 0, 0], [`${o}Foot`]: [26, 0, 0] } as Record<string, Deg3>, feet: { [s]: [sx(s, 0.11), ANKLE, z], [o]: [sx(o, 0.11), ANKLE + 0.09, oz] } as Pair, kneePoles: bothDir(0.1, 0, 1), rel: { [o]: [sx(o, -0.02), -0.16, 0.26], [s]: [sx(s, 0.0), -0.40, -0.18] } as Pair, poles: { [o]: [sx(o, 0.2), -1, 0.2], [s]: [sx(s, 0.2), -0.4, -1] } as Pair, hipsY: -0.06, hipsZ: (z + oz) / 2 + 0.06 };
 }
 /** The stick: a wide two-foot athletic stance, hips back and low, the chest over the knees, held. */
-const STICK = (z: number): Pose => ({ bones: { Hips: [30, 0, 0], Spine: [8, 0, 0], Neck: [-16, 0, 0], LeftFoot: [-22, 0, 0], RightFoot: [-22, 0, 0] }, feet: both(0.24, ANKLE, z), kneePoles: bothDir(0.25, 0, 1), rel: { Left: [-0.06, -0.24, 0.30], Right: [0.06, -0.24, 0.30] }, poles: bothDir(0.3, -1, 0), hipsY: -0.30, hipsZ: z - 0.14 });
+export const STICK = (z: number): Pose => ({ bones: { Hips: [30, 0, 0], Spine: [8, 0, 0], Neck: [-16, 0, 0], LeftFoot: [-22, 0, 0], RightFoot: [-22, 0, 0] }, feet: both(0.24, ANKLE, z), kneePoles: bothDir(0.25, 0, 1), rel: { Left: [-0.06, -0.24, 0.30], Right: [0.06, -0.24, 0.30] }, poles: bothDir(0.3, -1, 0), hipsY: -0.30, hipsZ: z - 0.14 });
 /** ex_decel_stick (decel to stick) — three quick running steps, then the brake: the feet land wide, the hips drop back and
  *  the stick is held; walk back. */
 function decelStick(scene: Scene, sk: Skeleton): AnimationGroup | null {

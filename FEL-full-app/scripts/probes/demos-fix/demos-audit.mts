@@ -134,7 +134,8 @@ for (const t of TEMPLATES) {
 
 // ── builder ──────────────────────────────────────────────────────────────────────────────────────────────────────
 const GOALS: ProgramGoal[] = ['full-body', 'strength', 'muscle', 'conditioning', 'athletic', 'mobility', 'sport'];
-const KITS: string[][] = [[], ['resistance-band'], ['dumbbell'], ['barbell', 'dumbbell', 'kettlebell', 'cable', 'machine', 'pull-up-bar', 'bench', 'box', 'resistance-band', 'trap-bar']];
+// DEMOS-FIX-2: every-screen p3's fix — the band kit is 'band' ('resistance-band' is no equipment id, so it built for no kit)
+const KITS: string[][] = [[], ['band'], ['dumbbell'], ['barbell', 'dumbbell', 'kettlebell', 'cable', 'machine', 'pull-up-bar', 'bench', 'box', 'band', 'trap-bar']];
 let builds = 0, buildFails = 0;
 for (const goal of GOALS) for (const level of ['beginner', 'intermediate', 'advanced'] as const) for (const age of ['adult', 'teen', 'child'] as AgeBand[])
   for (const equipment of KITS) for (const days of [2, 3, 4, 5, 6]) for (const jumpsOpen of age === 'adult' ? [false, true] : [false]) {
@@ -157,6 +158,7 @@ const MOVE_WORDS: [Move, RegExp][] = [
   ['ball', /^bball_|jumpshot|jumper|shot|shoot|layup|dribble|free_throw/],
   ['calf', /calf|tibialis|toe_raise|heel_raise/],
   ['throw', /throw|toss|scoop|shotput|slam|underhand|chest_pass|jammer|_chest_|overhead_(standing|hk|tk|split|lateral|single|stepin)|sidetoss|singlepush|rotoverhead/],
+  ['rotation', /pallof/],   // DEMOS-FIX-2 (from every-screen p3): a Pallof press resists the turn, in any stance
   ['hinge', /hinge|rdl|deadlift|good_morning|swing|kickstand|hip_thrust|thrust|bridge|glute|nordic|ham_?string_curl|ham_curl|slider|clean|snatch|back_ext|hyper|pull_through/],
   ['jump', /jump|hop|bound|pogo|skip|burpee|depth|leap|broad|snap_down|landing/],
   ['carry', /carry|farmer|waiter|suitcase_walk/],
@@ -167,7 +169,7 @@ const MOVE_WORDS: [Move, RegExp][] = [
   ['rotation', /rot|twist|chop|lift|pallof|windmill|woodchop/],
   ['run', /sprint|run|shuffle|carioca|backpedal|a_march|high_knee|butt_kick|accel|decel|cut|agility|ladder|march|start|arm_swing|crawl|stance|walk|climber/],
   ['core', /plank|crunch|dead_bug|bird_dog|hollow|sit_?up|leg_raise|bear|ab_|rollout|copenhagen|v_up|jackknife|flutter|mountain|superman|side_bend|tap|balance|tripod|clamshell|adductor|tke|chin_tuck/],
-  ['mobility', /stretch|smr|roll|9090|ninety|cat|cow|thread|open|circle|opener|rock|breath|legsup|prone|child|cobra|pigeon|frog|spider|groiner|world|ankle|knee_to_wall|hip_|t_spine|thoracic|quad|reach|sweep|halo|couch|pike|shinbox|switch|inchworm|elbows|sit_squat/],
+  ['mobility', /stretch|smr|roll|9090|ninety|cat|cow|thread|open|circle|opener|rock|breath|legsup|prone|child|cobra|pigeon|frog|spider|groiner|world|ankle|knee_to_wall|hip_|t_spine|thoracic|quad|reach|sweep|halo|couch|pike|shinbox|switch|inchworm|elbows|sit_squat|leg_across|leg_out/],
 ];
 function moveOf(clip: string): Move {
   const c = clip.replace(/^ex_/, '');
@@ -244,6 +246,18 @@ const VERDICTS: Record<string, { v: 'ok' | 'wrong'; why: string }> = {
   'kettlebell-hike-pass → ex_kb_hike_pass': { v: 'ok', why: 'the hike pass loop: the bell hiked back between the legs and set down in front' },
   'spinal-wave → ex_spinal_wave': { v: 'ok', why: 'the spinal wave loop: a slow wave down the spine and back up, the hands on the thighs' },
   'leg-press → ex_leg_press': { v: 'ok', why: 'the leg press loop: the read takes "press" for a push' },
+  // DEMOS-FIX-2: the read's misses on this lane's new pairs, each looked at against the entry's text and the contact sheet
+  'kettlebell-arm-bar → ex_kb_arm_bar': { v: 'ok', why: 'the arm bar loop: on the side, the bell pressed up, the chest rolling toward the floor with the arm vertical' },
+  '5-10-5-shuttle → ex_shuttle_5105': { v: 'ok', why: 'the 5-10-5 loop: sprint right, plant and touch, sprint across, plant and touch, back through the middle (flag: shown short)' },
+  'between-behind-combo → ex_combo_between_behind': { v: 'ok', why: "the court's between-the-legs then behind-the-back, back into the first hand (the ball not drawn)" },
+  'crossover-between-combo → ex_combo_cross_between': { v: 'ok', why: "the court's crossover then between-the-legs, back into the first hand (the ball not drawn)" },
+  'box-out → ex_box_out': { v: 'ok', why: 'the box-out loop: the turn on one foot, sat low and wide, the elbows out, two pushes back' },
+  'catalogue:lateral-step-stick → ex_lateral_step_stick': { v: 'ok', why: 'a big step to the side, stuck on that foot for a two-count; then back the other way' },
+  'kipping-muscle-up → ex_muscle_up_kip': { v: 'ok', why: 'the kipping muscle-up loop: the swing back and forward, the pull, over the bar to straight arms (flag: the source uses rings)' },
+  'muscle-up → ex_muscle_up': { v: 'ok', why: 'the muscle-up loop: the pull, the chest to the bar, the turn over it, the dip to straight arms (flag: the source uses rings)' },
+  'muscle-up-with-4-second-lower → ex_muscle_up': { v: 'ok', why: 'the muscle-up loop (the tempo is the dose)' },
+  'leg-over-floor-press → ex_leg_over_floor_press': { v: 'ok', why: 'the leg-over floor press loop: on the floor, the right leg over the left, one bell pressed up (the read takes "leg_over" for a pull)' },
+  'reverse-flyes-with-external-rotation → ex_incline_t': { v: 'ok', why: "face down on the incline pad, the arms opening out to a T: the reverse fly (flag in demo.ts: the wrists' turn is not drawn)" },
   // wrong: another movement
   'split-squat-stretch → ex_split_jump': { v: 'wrong', why: 'a hamstring stretch (front leg long, fold forward, "no bouncing") plays a jumping split-switch plyometric. lib/library/demo.ts line 890 (demo-loops)' },
   'spider-crawl → ex_spiderman_pushup': { v: 'wrong', why: 'a travelling crawl warm-up plays a push-up in place: the chest drops to the floor and nothing travels. lib/library/demo.ts line 752 (demo-loops); assumption: the crawl is not done as a push-up' },

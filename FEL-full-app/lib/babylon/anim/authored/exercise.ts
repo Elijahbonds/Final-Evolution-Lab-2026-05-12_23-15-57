@@ -46,6 +46,7 @@ import { FAMILY8_BUILDERS } from './exerciseFamilies8';
 import { FAMILY9_BUILDERS } from './exerciseFamilies9';
 import { FAMILY10_BUILDERS } from './exerciseFamilies10';
 import { FAMILY11_BUILDERS } from './exerciseFamilies11';
+import { FAMILY12_BUILDERS } from './exerciseFamilies12';
 
 
 // ── lower body ───────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -451,6 +452,7 @@ export const EXERCISE_BUILDERS: readonly [string, (scene: Scene, sk: Skeleton) =
   ...FAMILY9_BUILDERS,
   ...FAMILY10_BUILDERS,
   ...FAMILY11_BUILDERS,
+  ...FAMILY12_BUILDERS,
 ];
 /** Build one exercise loop by name (authored/index.ts registers each name through this). */
 export function buildExerciseClip(name: string, scene: Scene, sk: Skeleton): AnimationGroup | null {

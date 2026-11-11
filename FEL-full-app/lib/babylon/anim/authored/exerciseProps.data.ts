@@ -49,4 +49,9 @@ export const PROPPED_LOOPS = {
   ex_wall_hinge: 'wallhinge', ex_split_squat_supported: 'dowel', ex_step_up_bar: 'box', ex_plank_incline: 'handbench', ex_dead_bug_wall: 'wallhead',
   ex_inverted_row_feet_up: 'lowbarfeet', ex_pullup_eccentric: 'pullbar', ex_door_row_one: 'doorway', ex_thoracic_circle_seat: 'seat', ex_back_ext_45: 'hyper45',
   ex_leg_press: 'legpress', ex_hack_squat: 'hackpad', ex_lat_smr: 'rollerlat', ex_copenhagen_long: 'cphlong', ex_hip_rot_liftoff_seat: 'seat', ex_jefferson_curl: 'stepbox',
+  // exerciseFamilies12.ts (DEMOS-FIX-2): the bench under the hands, the box under the toes, the leg press's seat, the short
+  // platform, the bench under the hand and knee, the bench the rollout kneels on
+  ex_pike_pushup_hands_up: 'handbench', ex_pike_pushup_feet_up: 'feetbox', ex_calf_press: 'legpress', ex_back_lunge_elevated: 'lowstep', ex_bird_dog_row: 'rowbench', ex_rollout_bench: 'kneelbench',
+  ex_chair_squat: 'rails', ex_hill_sprint: 'ramp', ex_lying_machine_squat: 'lyingpad',
+  ex_guillotine_press: 'bench', ex_anti_gravity_press: 'proneincline', ex_handstand_pushup: 'wall', ex_muscle_up: 'pullbar', ex_muscle_up_kip: 'pullbar', ex_kneel_cable_triceps: 'handbench',
 } as const satisfies Record<string, string>;

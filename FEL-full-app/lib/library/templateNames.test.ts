@@ -31,8 +31,15 @@ describe('the template-name map', () => {
     expect(templateLibraryEntry(ALL, 'Hands-Elevated Pike Push-Up')).toBeNull();   // no honest match: the still
     expect(templateLibraryEntry(ALL, null)).toBeNull();
   });
-  it('every FEL template exercise now plays a loop, by the library, the map or its catalogue row, except the four with no honest match', () => {
+  // DEMOS-FIX-2 (2026-11-11), test changed: this held the four rows with no honest match (the hands- and feet-elevated pike
+  // push-ups, the double broad jump, the lateral step and stick) to the still. Each has its own loop now (exerciseFamilies12.ts),
+  // so the list is empty, and the four are held to THEIR loops by name — stricter than the old list, which any still passed.
+  it('every FEL template exercise plays a loop, by the library, the map or its catalogue row — the last four by their own loops', () => {
     const still = [...TEMPLATE_NAMES].filter((n) => { const e = templateLibraryEntry(ALL, n); return !(e ? demoClipFor(e) : CATALOGUE_DEMO_LOOPS[n]); }).sort();
-    expect(still).toEqual(['Double Broad Jump and Stick', 'Feet-Elevated Pike Push-Up', 'Hands-Elevated Pike Push-Up', 'Lateral Step and Stick']);
+    expect(still).toEqual([]);
+    expect(CATALOGUE_DEMO_LOOPS['Hands-Elevated Pike Push-Up']).toBe('ex_pike_pushup_hands_up');
+    expect(CATALOGUE_DEMO_LOOPS['Feet-Elevated Pike Push-Up']).toBe('ex_pike_pushup_feet_up');
+    expect(CATALOGUE_DEMO_LOOPS['Double Broad Jump and Stick']).toBe('ex_broad_jump_double');
+    expect(CATALOGUE_DEMO_LOOPS['Lateral Step and Stick']).toBe('ex_lateral_step_stick');
   });
 });
