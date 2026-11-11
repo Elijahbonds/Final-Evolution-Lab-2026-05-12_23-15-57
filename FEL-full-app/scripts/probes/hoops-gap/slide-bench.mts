@@ -165,20 +165,20 @@ async function run(over: string, dir: string, speed: number): Promise<Row> {
 // travel the tree plays it for and the stride reference it is paced against.
 if (process.argv.includes('--clips')) {
   const { rateFor, strideRef } = un(await import(APP + '/lib/babylon/core/StrideMatch.ts'));
-  const WANT: Record<string, number> = { defend_slide: -90, defend_slide_right: 90, defend_slide_hard: -90, defend_slide_hard_right: 90, defend_run: -90, defend_run_right: 90, defend_backpedal: 180, closeout: 0, run: 0, carry_slide: -90, carry_slide_right: 90, carry_back: 180, walk_dribble: 0, speed_dribble: 0, sprint_dribble: 0 };
+  const WANT: Record<string, number> = { defend_slide: -90, defend_slide_right: 90, defend_slide_hard: -90, defend_slide_hard_right: 90, defend_run: -90, defend_run_right: 90, defend_backpedal: 180, closeout: 0, closeout_step: 0, run: 0, carry_slide: -90, carry_slide_right: 90, carry_back: 180, walk_dribble: 0, speed_dribble: 0, sprint_dribble: 0 };
   const table = BT.basketballClipTable();
   console.log('state                     clip played                          stance implies: deg  m/s   |  the tree plays it for: deg   ref m/s  | off by');
   for (const [state, wantDeg] of Object.entries(WANT)) {
     const B = await build(false); const { scene, sk, animator, root } = B;
     const lf = boneNode(sk, 'LeftFoot')!, rf = boneNode(sk, 'RightFoot')!;
-    const g = animator.play(table[state as keyof typeof table].clip, { loop: true, fadeSec: 0, speedRatio: 1 });
+    const g = animator.play(state === 'closeout_step' ? 'bball_closeout_step' : table[state as keyof typeof table].clip, { loop: true, fadeSec: 0, speedRatio: 1 });   // (hoops-p05b: + the stepping closeout)
     const feet: number[][] = [];
     // …and where the pelvis and the chest point while it plays (deg from the root's front): the hip line and the shoulder line, turned 90
     const lu = boneNode(sk, 'LeftUpLeg')!, ru = boneNode(sk, 'RightUpLeg')!, la = boneNode(sk, 'LeftArm')!, ra = boneNode(sk, 'RightArm')!;
     let hipYaw = 0, chestYaw = 0, nY = 0;
     const lineYaw = (l: typeof lu, r: typeof lu) => { l.computeWorldMatrix(true); r.computeWorldMatrix(true); const a = l.getAbsolutePosition(), b = r.getAbsolutePosition(); const dx = a.x - b.x, dz = a.z - b.z; return Math.atan2(-dz, dx) * 180 / Math.PI; };   // the rig's Left* is on the root's +x: a square body reads 0
-    for (let i = 0; i < 150; i++) { vt += DT * 1000; scene.render(); if (i < 30) continue; for (const n of [lf, rf]) n.computeWorldMatrix(true); const a = lf.getAbsolutePosition(), b = rf.getAbsolutePosition(); feet.push([a.x, a.y, a.z, b.x, b.y, b.z]); hipYaw += lineYaw(lu, ru); chestYaw += lineYaw(la, ra); nY++; }
-    if (arg('--dump', '') === state) { console.log(`${state}: frame | L x y z | R x y z (m, the root's frame; +z = the chest's way, +x = body-right)`); feet.slice(0, 80).forEach((f, i) => console.log(`  ${String(i).padStart(2)} | ${f.slice(0, 3).map((v) => v.toFixed(3).padStart(7)).join(' ')} | ${f.slice(3, 6).map((v) => v.toFixed(3).padStart(7)).join(' ')}`)); }
+    for (let i = 0; i < 150; i++) { vt += DT * 1000; scene.render(); if (i < 30) continue; for (const n of [lf, rf]) n.computeWorldMatrix(true); const a = lf.getAbsolutePosition(), b = rf.getAbsolutePosition(); feet.push([a.x, a.y, a.z, b.x, b.y, b.z, g && g.to > g.from ? (((g as unknown as { animatables: { masterFrame: number }[] }).animatables[0]?.masterFrame ?? g.from) - g.from) / (g.to - g.from) : NaN]);   /* hoops-p05b: + the clip's phase */ hipYaw += lineYaw(lu, ru); chestYaw += lineYaw(la, ra); nY++; }
+    if (arg('--dump', '') === state) { console.log(`${state}: frame | L x y z | R x y z (m, the root's frame; +z = the chest's way, +x = body-right)`); feet.slice(0, 80).forEach((f, i) => console.log(`  ${String(i).padStart(2)} | ${f.slice(0, 3).map((v) => v.toFixed(3).padStart(7)).join(' ')} | ${f.slice(3, 6).map((v) => v.toFixed(3).padStart(7)).join(' ')} | phase ${f[6].toFixed(3)}`)); }
     let sx = 0, sz = 0, n = 0;
     for (const o of [0, 3]) {
       const ys = feet.map((f) => f[o + 1]); const cut = pct(ys, 0.33);
@@ -196,7 +196,7 @@ if (process.argv.includes('--clips')) {
     }
     const tx = -sx / Math.max(1, n), tz = -sz / Math.max(1, n);   // the travel = minus the stance foot's sweep
     const deg = Math.atan2(tx, tz) * 180 / Math.PI, sp = Math.hypot(tx, tz);
-    const ref = strideRef(true); const refMps = ref.byState?.[state] ?? null; const r1mps = (() => { for (let v = 0.5; v < 9; v += 0.01) { const r = rateFor(state, v, ref); if (r !== null && Math.abs(r - 1) < 0.004) return v; } return NaN; })();
+    const ref = strideRef(true); const st2 = state === 'closeout_step' ? 'closeout' : state; const refMps = ref.byState?.[st2] ?? null; const r1mps = (() => { for (let v = 0.5; v < 9; v += 0.01) { const r = rateFor(st2, v, ref); if (r !== null && Math.abs(r - 1) < 0.004) return v; } return NaN; })();
     let off = deg - wantDeg; off = ((off + 180) % 360 + 360) % 360 - 180;
     console.log(`${state.padEnd(25)} ${String(g?.name ?? '?').replace(/_c\d+$/, '').padEnd(36)} ${r1(deg).padStart(18)} ${sp.toFixed(2).padStart(5)}   | ${String(wantDeg).padStart(26)} ${(refMps ?? r1mps).toFixed(2).padStart(8)}  | ${r1(off).padStart(6)} deg | hips ${r1(hipYaw / nY)} chest ${r1(chestYaw / nY)} | best fit ${fit[0]} deg ${fit[1].toFixed(1)} m/s (slip ${r1(fit[2])} cm/f)`);
     void root; B.scene.dispose(); B.engine.dispose();

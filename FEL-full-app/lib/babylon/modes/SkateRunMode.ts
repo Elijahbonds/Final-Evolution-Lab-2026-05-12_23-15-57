@@ -684,7 +684,7 @@ export const SkateRunMode: ModeDefinition = (() => {
       rig = await buildRig(ctx, CFG.heroUrl, VENICE_PATROL_RAIL.spawn.clone(), 0, world.ground, '#22d3ee', 'skateboard', { carveAccel: 0, grindSpeed: 6.5, maxSpeed: SKATE_TUNING.maxSpeed * 1.4, stepUp: STEP_UP_M });   // BOARD-SPEED: the Rider's flat 16 clipped the boost (ceiling × 1.4) — the momentum model owns the cap
       rig.char.animator.play(SPORT_CLIP.boardIdle, { loop: true });
       animTree = new BoardAnimTree(rig.char.animator);
-      applyInertialBlend(rig.char.animator);   // GAMEPLAY-CLEAN P2 #2: AF-1 inertial transitions behind anim.inertial (default off: linear, unchanged)
+      applyInertialBlend(rig.char.animator, 'measured');   // SWITCH-ON: on by default here (anim.inertialModesOn; 0 = linear, as before)   // GAMEPLAY-CLEAN P2 #2: AF-1 inertial transitions behind anim.inertial (default off: linear, unchanged)
       posture?.dispose();
       posture = mountPostureLayer(ctx.scene, rig.char.skeleton, rig.char.root, () => {
         const { window, pose, legs } = boardPose(bio);

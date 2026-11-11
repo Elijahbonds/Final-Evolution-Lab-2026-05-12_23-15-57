@@ -1334,6 +1334,12 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/anim/ballCarry.ts CARRY_LET_GO_TO_CLIP_ON',
     hint: 'When a shot or a pass takes the ball out of the dribble, the ball arm eases all the way back to the clip pose over the same fade. 0 = it eased part of the way and cut the rest in one frame.',
   },
+  // hoops-p05b: the first bounce's palm rides the same fade as its ball (the gear stop into the sprint: the first top 12.8 cm off the palm)
+  {
+    id: 'hoops.carryStartHandOn', label: 'Ball carry: the first bounce palm follows the ball (0 = off)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · transitions',
+    source: 'lib/babylon/anim/ballCarry.ts CARRY_START_HAND_ON',
+    hint: 'A dribble starts from where the hand held the ball, and that offset fades over the first bounce for the ball and the hand together, so the palm stays on the ball and the arm does not jump. 0 = only the ball took it (the palm sat up to 13 cm off it).',
+  },
   // hoops-p05 (owner 2026-11-10: the hero's slide — fix it): stepping legs under the defensive beats
   {
     id: 'hoops.defenseLegsOn', label: 'Defense: legs keep stepping under a reach, a block or a hand up (0 = off)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · transitions',
@@ -1346,9 +1352,24 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'The retreat capture is a forward run. 1 plays it in reverse, so the feet plant while you back off. 0 = it ran forward on the spot while the body went backward, as before.',
   },
   {
+    id: 'hoops.closeoutStepOn', label: 'Defense: the closeout steps at its pace (0 = off)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · transitions',
+    source: 'lib/babylon/anim/basketballTree.ts CLOSEOUT_STEP_ON',
+    hint: 'A closeout plays chop steps that cover the ground you are covering, the high hand up. 0 = the old closeout, whose feet swung in place while the body slid.',
+  },
+  {
+    id: 'hoops.loopInStepOn', label: 'Defense: a run into the stepping closeout stays in step (0 = off)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · transitions',
+    source: 'lib/babylon/anim/basketballTree.ts LOOP_IN_STEP_ON',
+    hint: 'The stepping closeout starts on the same foot the run was on, so the crossfade does not sweep the legs. 0 = it started on its first frame wherever the run was.',
+  },
+  {
     id: 'hoops.hipSteerOn', label: 'Defense: hips turn toward the travel (0 = off)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · transitions',
     source: 'lib/babylon/anim/hipSteer.ts HIP_STEER_ON',
     hint: 'On defense the pelvis and legs turn toward where you are going while the chest stays on your man, so a diagonal slide or retreat steps along its travel. 0 = square hips, as before.',
+  },
+  {
+    id: 'hoops.hipSteerAllLoopsOn', label: 'Defense: hips turn on every slide and run (0 = retreat and closeout only)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · transitions',
+    source: 'lib/babylon/anim/hipSteer.ts HIP_STEER_ALL_LOOPS_ON',
+    hint: '0: the hips turn toward the travel only in the retreat and the closeout, where it measured better. 1: on every slide, crossover run and run too (it made a 3v3 bump slide more).',
   },
   {
     id: 'hoops.hipSteerMaxDeg', label: 'Defense: most the hips turn off the chest', def: 50, min: 0, max: 80, step: 5, unit: '°', group: 'Hoops · transitions',
@@ -1376,7 +1397,18 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/hoops/ballHandoff.ts PASS_FROM_HAND_ON',
     hint: 'A teammate pass starts its flight where the ball is in his hands. 0 = it started at his chest height over his feet, wherever the ball was: a jump out of the hand on the release.',
   },
+  // hoops-p05b (phase 5): the pass lands on the receiver
+  {
+    id: 'hoops.passHomeOn', label: '3v3: a pass lands on the receiver (0 = off)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · transitions',
+    source: 'lib/babylon/hoops/ballHandoff.ts PASS_HOME_ON',
+    hint: 'A chest or bounce pass in flight bends onto where the receiver really is, so it arrives at his chest. Same flight time. 0 = it landed on the point it was aimed at, wherever he was, and the ball was drawn into his hand from up to 1.5 m away.',
+  },
   // AF-1 (ANIM-FEEL-SPEC 2026-10-28): inertialized clip transitions, default OFF — off is the linear crossfade, unchanged.
+  {
+    id: 'anim.carryPushedBounce', label: 'Dunk runway dribble: pushed bounce on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/ballCarry.ts CARRY_PUSHED_BOUNCE_ON',
+    hint: 'On: the dunk run-up dribble uses the pushed bounce the hoops modes use (the ball fastest at the floor, the hand meets it slowing). Off: the old bounce, fastest at the hand, which snapped the ball arm 35 to 60 degrees in a frame at every bounce.',
+  },
   {
     id: 'anim.inertial', label: 'Inertial clip transitions on (1) / off (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
     source: 'lib/babylon/anim/inertialize.ts ANIM_INERTIAL_ON',
@@ -1386,6 +1418,27 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'anim.inertialHalfLifeK', label: 'Inertial offset half-life × fade time', def: 0.5, min: 0.1, max: 1.5, step: 0.05, unit: '×', group: 'Anim · transitions',
     source: 'lib/babylon/anim/inertialize.ts ANIM_INERTIAL_HALF_LIFE_K',
     hint: 'How long the old pose takes to wash out, as a fraction of each clip switch\'s fade time. Only read when inertial transitions are on.',
+  },
+  // SWITCH-ON (2026-11-10): the inertial offset keeps the body's speed across a switch (Holden's v0 = v_old - v_new). Read only while anim.inertial is on.
+  {
+    id: 'anim.inertialMatchVel', label: 'Inertial: keep the speed across a switch on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/inertialize.ts ANIM_INERTIAL_MATCH_VEL_ON',
+    hint: 'On: the old pose\'s difference decays out starting at the speed the body had, minus the new clip\'s own speed, so a clip that starts fast (a strike) does not stack its speed on the old motion. Off: the first inertial version (one axis, the old speed only).',
+  },
+  {
+    id: 'anim.inertialMinHalfLifeSec', label: 'Inertial: shortest half-life', def: 0.045, min: 0, max: 0.15, step: 0.005, unit: 's', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/inertialize.ts ANIM_INERTIAL_MIN_HALF_LIFE_SEC',
+    hint: 'A switch\'s old-pose offset never decays faster than this half-life (a 0.04 s fade gave 0.02 s: most of the offset went in one frame). 0 = the half-life × fade time alone. Read only while inertial transitions are on.',
+  },
+  {
+    id: 'anim.inertialModesOn', label: 'Inertial transitions in karate, karate VS, showdown, mixed combat, duel, skateboard on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/inertialize.ts ANIM_INERTIAL_MODES_ON',
+    hint: 'On: those six modes use the inertial blend on the hero (the rig measured fewer hard pops in each). Off: the linear crossfade there, exactly as before. Every other mode follows the knob above. Takes effect on the next spawn.',
+  },
+  {
+    id: 'anim.inertialAllBones', label: 'Inertial: every bone keeps its history on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/inertialize.ts ANIM_INERTIAL_ALL_BONES_ON',
+    hint: 'On: a switch onto a clip that moves a bone the last clip did not (guard to run: the legs) starts that bone from where it was. Off: the first inertial version, where those bones jumped in one frame (knee 32 to 62 degrees). Read only while inertial transitions are on.',
   },
   // CLIP-SMOOTH (2026-11-03, owner: "Yes, smooth them"): the karate captures' own single-frame snaps re-keyed, default ON.
   // GAMEPLAY-CLEAN P3 (2026-11-03): the foot planter's leg solve eases in and out instead of stepping (anim/FootPlanting)

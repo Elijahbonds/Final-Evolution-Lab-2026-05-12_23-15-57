@@ -314,6 +314,18 @@ standing rule above), is reversible, and is flagged here so it can be overturned
   content ≤ 2.5 s, layout shift ≤ 0.02, tap response ≤ 200 ms on the throttled phone).
 - The seven stopped lanes were restarted the same day at the owner's word ("restart those lanes and finish those").
 
+## 2026-11-10 — switch it on
+
+- The owner: **"anything that's turned off because it needs to be improved, let's improve it and turn it on."**
+- Lane `lane/switch-on` (cut from `lane/finish-release` at `d394b11b`). The inventory of every switch that is off, why, and
+  which class it is in, is `docs/SWITCH-ON.md`. Class A (off because it is not good enough yet) is improved to a written,
+  measured gate and then turned on, each flip flagged from → to; every off value still restores the old behaviour exactly,
+  with a test. Class B (money, legal or policy text, age or consent rules, owner accounts or keys, a pending SQL table,
+  production environment variables, or an explicit owner decision to keep it off) is listed with exactly what turns it on and
+  who does it, and is not flipped. Class C (not really off: an A/B, a developer tool, or 0 is the newer behaviour) is listed.
+- Not this lane's while their lanes run: the dunk switches, the hoops switches, `baseballBat.ts`, the every-screen lane's
+  screens, the owner's age-gate work on `main` (#543, #544).
+
 ## 2026-11-10 — fix the demos, fix the screens
 
 The owner: **"Fix the demos, fix the screens, address what you found above."** Taken on the owner's word (each is

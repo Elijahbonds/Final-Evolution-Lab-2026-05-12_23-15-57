@@ -664,3 +664,70 @@ describe('the let-go ends on the clip (hoops-p05)', () => {
   });
 });
 
+// hoops-p05b: the dribble starts from where the palm had the ball (startOff, faded over START_FADE_PHASE) — but only the BALL carried the
+// offset: the hand went to the stroke's own point, and the palm sat the offset off the ball for the whole first bounce (1v1 seed 7, the
+// gear stop into the sprint: the first top drawn 12.8 cm off; the hand tracer has the carry's own pass take the palm off the ball).
+describe('the first bounce\'s palm rides the same fade as its ball (hoops-p05b)', () => {
+  /** The hand bone's place against the ball (hand − ball, world) as held on the last frame before the dribble, then on each frame of the
+   *  first bounce's rise and top, for a dribble started from a held ball the clip carries well off the stroke. */
+  const firstBounce = (): { held: Vector3; rel: Vector3[]; stroke: Vector3[] } => {
+    const scene = new Scene(new NullEngine());
+    const r = rig(scene);
+    // the clip holds the ball arm out and up (the held ball well off the stroke's own point)
+    const armQ = Quaternion.RotationAxis(new Vector3(1, 0, 0), -0.9).multiply(r.nodes.LeftArm.rotationQuaternion!);
+    const clip = () => { r.nodes.LeftArm.rotationQuaternion!.copyFrom(armQ); r.nodes.LeftForeArm.rotationQuaternion = Quaternion.RotationAxis(Vector3.Right(), 0.4); };
+    clip(); r.nodes.LeftArm.computeWorldMatrix(true);
+    attachBallToHand(r.ball, r.sk, 'LeftHand');
+    const carry = mountBallCarry({ scene, ball: r.ball, root: r.root, skeleton: r.sk, hoops: true });
+    const d = driver(scene, carry, r.ball);
+    const relNow = () => { r.nodes.LeftHand.computeWorldMatrix(true); return r.nodes.LeftHand.getAbsolutePosition().subtract(r.ball.getAbsolutePosition()); };
+    clip(); d.frame(1 / 60, 0, false);
+    const held = relNow(), rel: Vector3[] = [], stroke: Vector3[] = [];
+    for (let i = 0; i < 18; i++) {
+      clip(); d.frame(1 / 60, 0.2, true);
+      const s = dribbleAtPushed(carry.phase, HOOPS_DRIBBLE);
+      // the rise and the top (this test rig's straight arm bottoms out at ~1.03 m, so the follow down is out of its reach either way)
+      if (!(s.phase > PUSHED_FLOOR_PHASE || s.phase < 0.1)) continue;
+      rel.push(relNow()); stroke.push(new Vector3(0, s.hand.y - s.ball.y, 0));
+    }
+    carry.dispose();
+    return { held, rel, stroke };
+  };
+  it('the hand keeps the ball where it held it on the dribble\'s first frame and eases onto the stroke over the first bounce; knob hoops.carryStartHandOn 0 (the control) jumps the wrist round the ball', () => {
+    resetFeelForTests(); setFeelUser(true); setFeelSession(null); setFeelOverride('hoops.carryStartHandOn', 0);
+    let was: ReturnType<typeof firstBounce>;
+    try { was = firstBounce(); } finally { resetFeelForTests(); }
+    const now = firstBounce();
+    expect(was.rel.length).toBeGreaterThan(5);
+    expect(Vector3.Distance(was.rel[0], was.held)).toBeGreaterThan(0.08);   // the control: the wrist round the ball in one frame (0.15 m here)
+    expect(Vector3.Distance(now.rel[0], now.held)).toBeLessThan(0.005);     // the hand as it held the ball
+    for (let k = 1; k < now.rel.length; k++) expect(Vector3.Distance(now.rel[k], now.rel[k - 1])).toBeLessThan(0.02);   // easing, never a jump
+    // …and it is on its way to the stroke's point (hand over the ball): closer at the top than at the start
+    const toStroke = (k: number) => Vector3.Distance(now.rel[k], now.stroke[k]);
+    expect(toStroke(now.rel.length - 1)).toBeLessThan(toStroke(0));
+  });
+  /** The ball arm's (rig LeftArm) turn per second on each of the dribble's first 6 frames, the clip resetting the arm every frame. */
+  const armSpeeds = (): number[] => {
+    const scene = new Scene(new NullEngine()); const r = rig(scene);
+    const armQ = Quaternion.RotationAxis(new Vector3(1, 0, 0), -0.9).multiply(r.nodes.LeftArm.rotationQuaternion!);
+    const clip = () => { r.nodes.LeftArm.rotationQuaternion!.copyFrom(armQ); r.nodes.LeftForeArm.rotationQuaternion = Quaternion.RotationAxis(Vector3.Right(), 0.4); };
+    clip(); r.nodes.LeftArm.computeWorldMatrix(true);
+    attachBallToHand(r.ball, r.sk, 'LeftHand');
+    const carry = mountBallCarry({ scene, ball: r.ball, root: r.root, skeleton: r.sk, hoops: true });
+    const d = driver(scene, carry, r.ball);
+    clip(); d.frame(1 / 60, 0, false);
+    let prev = r.nodes.LeftArm.rotationQuaternion!.clone(); const out: number[] = [];
+    for (let i = 0; i < 6; i++) { clip(); d.frame(1 / 60, 0.2, true); const q = r.nodes.LeftArm.rotationQuaternion!; out.push(2 * Math.acos(Math.min(1, Math.abs(Quaternion.Dot(q, prev)))) * 180 / Math.PI * 60); prev = q.clone(); }
+    carry.dispose();
+    return out;
+  };
+  it('the reach that takes the arm over from the hold keeps the elbow\'s swing limit from its first frame: no arm pop on the dribble\'s start', () => {
+    // (without the limit's seed the on-ball target swung the upper arm 7 700 °/s here, 8 696 on the rig; the old start 3 967 here)
+    resetFeelForTests(); setFeelUser(true); setFeelSession(null); setFeelOverride('hoops.carryStartHandOn', 0);
+    let was: number[];
+    try { was = armSpeeds(); } finally { resetFeelForTests(); }
+    const now = armSpeeds();
+    expect(Math.max(...was)).toBeGreaterThan(3000);      // the control: the old start's pop (the rig's SEVERE is 3 000 °/s)
+    expect(Math.max(...now)).toBeLessThan(1500);
+  });
+});
