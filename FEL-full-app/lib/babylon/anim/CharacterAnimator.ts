@@ -18,7 +18,7 @@
 import type { AnimationGroup, Scene, Observer } from '@babylonjs/core';
 import { resolveClip } from './clipResolver';
 import { ledgerFor, requestAllowed, scopeFallback, suiteOfClip, type ClipScope } from './clipScope';
-import { inertialAllBonesOn, inertialDt, inertialHalfLife, inertialMatchVelOn, inertialStep, quatFromAxisAngle, quatMul, quatMulConj, quatToAxisAngle, type Quat } from './inertialize';
+import { inertialAllBonesOn, inertialDt, inertialEndedHoldOn, inertialHipsPosOn, inertialTwinLinearOn, inertialHalfLife, inertialMatchVelOn, inertialStep, quatFromAxisAngle, quatMul, quatMulConj, quatToAxisAngle, type Quat } from './inertialize';
 import { feel } from '../../feel-panel/feel';
 
 /**
@@ -67,6 +67,9 @@ interface InertialTrack {
 /** AF-1: a switch's starting velocity is capped (a teleported or re-spawned pose must not fling the offset). */
 const INERTIAL_MAX_ANG_VEL = 30, INERTIAL_MAX_LIN_VEL = 10;
 const INERTIAL_HIPS = /(^|[:_|])hips$/i;
+/** GAMEPLAY-CLEAN-7 (anim.inertialHipsPos): a spawned body's nodes are clones, `Hips_c240` — the Hips by name on those too. */
+const INERTIAL_HIPS_CLONE = /(^|[:_|])hips_c\d+$/i;
+const isHips = (name: string): boolean => INERTIAL_HIPS.test(name) || (INERTIAL_HIPS_CLONE.test(name) && inertialHipsPosOn());
 /** AF-1: a node a clip keys — its rotation (rotationQuaternion track) and/or, on the Hips, its position (position track). */
 interface InertialTarget { n: InertialNode; rot: boolean; pos: boolean }
 
@@ -115,7 +118,7 @@ export class CharacterAnimator {
   private blend: BlendMode = 'linear';
   private inertialObs: Observer<Scene> | null = null;
   /** AF-1: a clip switch waiting for the next evaluated frame, at this half-life (s). */
-  private inertialSwitch: { halfLife: number; defer?: boolean } | null = null;
+  private inertialSwitch: { halfLife: number; defer?: boolean; ended?: boolean } | null = null;
   /** GAMEPLAY-CLEAN P6: inside this frame's animation pass (onBeforeAnimations → this body's inertialFrame) — see LATE SWITCH. */
   private inAnimate = false;
   private animBeginObs: Observer<Scene> | null = null;
@@ -260,10 +263,16 @@ export class CharacterAnimator {
       if (this.blend === 'inertial') this.inertialCut();   // AF-1: a hard cut stays a hard cut — no offset carries across it
       return;
     }
-    if (this.blend === 'inertial') {
+    // GAMEPLAY-CLEAN-7 (anim.inertialTwinLinear): a hand change (a dribble loop ↔ its left-hand twin) crossfades linearly on an inertial body
+    const twinLinear = this.blend === 'inertial' && !!prev && prev !== next && CharacterAnimator.isLeftTwin(prev) !== CharacterAnimator.isLeftTwin(next) && inertialTwinLinearOn();
+    if (twinLinear) this.inertialSwitch = null;   // no offset is started for it; live ones keep decaying
+    if (this.blend === 'inertial' && !twinLinear) {
       // AF-1: INERTIAL SWITCH — the new clip takes the body at full weight NOW and the outgoing clip is retired on this frame; the
       // difference from the pose the body last showed decays out over the next frames (inertialFrame). fadingOut stays null, so a
       // freeze started under this switch joins the current clip at weight 1.
+      // GAMEPLAY-CLEAN-7 (anim.inertialEndedHold): did the outgoing clip run to its END before this switch (a one-shot's end callback)?
+      // Babylon has stopped it, so under the linear crossfade a bone only it keyed holds where it ended; read before it is retired.
+      const ended = !!prev && prev !== next && !prev.isPlaying;
       if (prev && prev !== next) this.retire(prev);
       this.fadingOut = null;
       this.fadingOutWeight = 1;
@@ -274,7 +283,7 @@ export class CharacterAnimator {
       // switch lands on the NEXT frame with nothing to decay it. Measured on the hero: a hit react ending into the idle, the left
       // forearm 0.0° then 55.3° in one frame; a knockdown ending, the right arm 0.0° then 56.6° (linear: 23.6° / 14.9°). Such a
       // switch is captured one frame later, once the new clip has been evaluated; live offsets keep decaying meanwhile.
-      this.inertialSwitch = { halfLife: inertialHalfLife(fadeSec), defer: this.inAnimate };
+      this.inertialSwitch = { halfLife: inertialHalfLife(fadeSec), defer: this.inAnimate, ended };
       return;
     }
     this.fadingOut = prev && prev !== next ? prev : null;
@@ -520,6 +529,11 @@ export class CharacterAnimator {
     this.groups.forEach((g) => g.stop());
   }
 
+  /** GAMEPLAY-CLEAN-7: a left-hand dribble twin (hoopsHand.leftDribbleTwins marks each with `felLeftTwinOf`). */
+  private static isLeftTwin(g: AnimationGroup): boolean {
+    return !!(g.metadata as { felLeftTwinOf?: string } | null | undefined)?.felLeftTwinOf;
+  }
+
   /** AF-1: the blend mode this body's clip switches use. */
   get blendMode(): BlendMode { return this.blend; }
 
@@ -559,7 +573,7 @@ export class CharacterAnimator {
       if (!n || typeof n.name !== 'string') continue;
       const prop = ta.animation.targetProperty;
       const rot = prop === 'rotationQuaternion' && !!n.rotationQuaternion;
-      const pos = (prop === 'position' || prop.startsWith('position.')) && INERTIAL_HIPS.test(n.name) && !!n.position;
+      const pos = (prop === 'position' || prop.startsWith('position.')) && isHips(n.name) && !!n.position;
       if (!rot && !pos) continue;
       const e = by.get(n) ?? { n, rot: false, pos: false };
       e.rot ||= rot; e.pos ||= pos;
@@ -577,7 +591,7 @@ export class CharacterAnimator {
         last: null, prior: null, lastP: null, priorP: null,
         axis: [1, 0, 0], x: 0, v: 0, rotOn: false, pOff: [0, 0, 0], pVel: [0, 0, 0], posOn: false,
         r3: [0, 0, 0], w3: [0, 0, 0], raw0: null, raw0P: null, dstDue: false, toRest: false,
-        halfLife: 0, hips: INERTIAL_HIPS.test(n.name), bone: n.getClassName?.() === 'Bone', stamp: -1, scratchQ: null, scratchP: null,
+        halfLife: 0, hips: isHips(n.name), bone: n.getClassName?.() === 'Bone', stamp: -1, scratchQ: null, scratchP: null,
       };
       this.inertialTracks.set(n, t);
     }
@@ -602,7 +616,8 @@ export class CharacterAnimator {
       this.inertialSwitch = null;
       this.inertialTracks.forEach((t) => { t.rotOn = false; t.posOn = false; t.dstDue = false; t.toRest = false; });
       const hd = this.inertialHistDt;
-      if (inertialAllBonesOn()) {
+      // GAMEPLAY-CLEAN-7 (anim.inertialEndedHold, 1): after a clip that ran to its end they HOLD instead (linear's behaviour there)
+      if (inertialAllBonesOn() && !(sw.ended && inertialEndedHoldOn())) {
         // the nodes the body showed last frame that the new clip does not key: ease each from that pose onto its rest
         const keyed = new Set(targets.map((x) => x.n));
         for (const { n, rot } of this.inertialAllTargets()) {

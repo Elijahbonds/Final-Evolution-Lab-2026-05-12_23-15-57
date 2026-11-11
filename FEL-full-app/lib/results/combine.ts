@@ -15,6 +15,7 @@ import type { MyCombine, MyStation } from '@/lib/combine/server';
 import { JUMP_BAND_CM } from './jump';
 import { compareLast, vsLineOf, type ResultNextStep, type ResultView } from './view';
 import { RESULT_COPY } from './copy';
+import { stationSure } from './trust';
 
 const IN = 2.54;
 
@@ -56,6 +57,7 @@ export function stationView(s: MyStation, prev: MyStation | null, next: ResultNe
     estimate: def.method !== 'hand', pm: null, vsLast: c.vsLast, better: lower ? 'down' : 'up',
     vsLine: vsLineOf(c, { against: RESULT_COPY.lastCombine, up: lower ? 'slower' : 'higher', down: lower ? 'faster' : 'lower', fmt }),
     line: s.rank ? placedLine(s.rank, s.of) : '', next,
+    howSure: s.best === null ? null : stationSure(s.kind, (s as { timing?: string | null }).timing ?? null),
   };
 }
 

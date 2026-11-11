@@ -15,6 +15,8 @@
 //
 // Pure.
 import { RESULT_COPY } from './copy';
+import type { HowSure } from './trust';
+export type { HowSure } from './trust';
 
 export type VsLast = 'up' | 'down' | 'same' | null;
 
@@ -43,6 +45,9 @@ export interface ResultView {
   /** What it means: the tool's own line. */
   line: string;
   next: ResultNextStep;
+  /** EVERY-SCREEN P4 (the plan's gate: no measured number without its method and how sure): how it was measured and
+   *  its measured ± (lib/results/trust.ts). Required wherever `value` is a number; null only with no number. */
+  howSure: HowSure | null;
 }
 
 export interface Comparison {

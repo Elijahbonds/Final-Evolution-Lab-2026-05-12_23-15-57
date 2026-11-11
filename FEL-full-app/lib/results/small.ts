@@ -7,6 +7,7 @@
 // Pure.
 import { compareLast, vsLineOf, type ResultNextStep, type ResultView } from './view';
 import { RESULT_COPY } from './copy';
+import { countSure } from './trust';
 
 /** A chapter check's score against the best this device kept for the chapter (lib/education/checkDevice.ts), if any. */
 export function chapterView(o: { score: number; bestBefore: number | null; line: string; next: ResultNextStep }): ResultView {
@@ -15,7 +16,7 @@ export function chapterView(o: { score: number; bestBefore: number | null; line:
     measure: 'Chapter check', value: String(Math.round(o.score)), unit: '%', estimate: false, pm: null,
     vsLast: c.vsLast, better: 'up',
     vsLine: vsLineOf(c, { against: RESULT_COPY.yourBest, up: 'higher', down: 'lower', fmt: (x) => `${Math.round(x)} points` }),
-    line: o.line, next: o.next,
+    line: o.line, next: o.next, howSure: countSure('your answers'),
   };
 }
 
@@ -23,6 +24,6 @@ export function chapterView(o: { score: number; bestBefore: number | null; line:
 export function sessionFinishView(o: { setsDone: number; line: string; next: ResultNextStep }): ResultView {
   return {
     measure: 'Session done', value: String(o.setsDone), unit: o.setsDone === 1 ? 'set' : 'sets', estimate: false, pm: null,
-    vsLast: null, better: 'up', vsLine: null, line: o.line, next: o.next,
+    vsLast: null, better: 'up', vsLine: null, line: o.line, next: o.next, howSure: countSure('the sets you marked done'),
   };
 }

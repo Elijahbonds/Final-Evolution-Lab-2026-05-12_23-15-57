@@ -11,6 +11,7 @@
 // claims. No biomechanical statistics are fabricated — the only numbers shown
 // are the ones the engine actually computes for this session.
 
+import { mirrorScreenSure } from '@/lib/results/trust';
 import { REVIEW_COPY, levelWord, repsLine } from '@/lib/cue-style/review';
 import { MOVEMENT_NAMES } from '@/lib/cue-style/names';   // CUE-REWRITE: the review cards' words
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -1550,6 +1551,10 @@ export function MirrorHarness({
                     is listed as not read ("Score 78 · from 5 of 6 checks read" · "Head float · not read") */}
                 {scoreLine(screenSummary) && (
                   <p className="mt-4 text-[13px] font-semibold leading-relaxed text-white/80" data-score-line>{scoreLine(screenSummary)}</p>
+                )}
+                {scoreLine(screenSummary) && (
+                  // EVERY-SCREEN P4: how the score was read, and how sure (lib/results/trust.ts, recorded fixtures)
+                  <p className="mt-1 text-[16px] leading-snug text-white/70" data-score-sure><span className="text-white/85">{mirrorScreenSure().method}.</span> {mirrorScreenSure().sure}</p>
                 )}
                 {notReadLines(screenSummary).length > 0 && (
                   <ul className="mt-1 text-[12.5px] leading-relaxed text-white/55" data-not-read>

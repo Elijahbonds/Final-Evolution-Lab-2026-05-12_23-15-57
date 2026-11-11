@@ -48,6 +48,8 @@ export function savedRows(saved: SavedProgress): ProgressRow[] {
 
 const SOURCE_WORDS: Record<ProgressRow['source'], string> = { account: PROGRESS_COPY.saved, device: PROGRESS_COPY.device, combine: PROGRESS_COPY.combine };
 const day = (at: number) => new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+/** A number's own moment: the day and the time it was taken. */
+const when = (at: number) => new Date(at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
 function VsIcon({ vs }: { vs: ProgressRow['vsLast'] }) {
   const I = vs === 'up' ? ArrowUpRight : vs === 'down' ? ArrowDownRight : Minus;
@@ -77,17 +79,28 @@ function Row({ row, open, onToggle }: { row: ProgressRow; open: boolean; onToggl
         <ChevronDown aria-hidden className={`h-5 w-5 shrink-0 text-fel-dim transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open ? (
-        <ol data-progress-history className={LOOK.history}>
-          {row.history.map((h, i) => (
-            <li key={`${h.at}-${i}`} className={LOOK.historyRow}>
-              <span className="text-fel-dim">{day(h.at)}</span>
-              <span className="flex items-center gap-1.5 font-bold text-white">
-                <span className={tone({ vsLast: h.vs, better: row.better })}><VsIcon vs={h.vs} /></span>
-                {h.value} {row.unit}
-              </span>
-            </li>
-          ))}
-        </ol>
+        <>
+          {/* EVERY-SCREEN P4: where these numbers came from, one tap from the row: the tool, how it measures and how
+              sure, each number's own test and time, and the page to open the tool */}
+          <div data-progress-trace className={LOOK.trace}>
+            <p><span className="text-white/85">{row.trace.how.method}.</span> {row.trace.how.sure}</p>
+            <Link href={row.trace.href} prefetch={false} data-progress-source className={LOOK.traceLink}>Open {row.trace.tool}</Link>
+          </div>
+          <ol data-progress-history className={LOOK.history}>
+            {row.history.map((h, i) => (
+              <li key={`${h.at}-${i}`} data-progress-from className={LOOK.historyRow}>
+                <span className="min-w-0 text-fel-dim">
+                  <span className="block">{when(h.at)}</span>
+                  {h.from ? <span className="block">{h.from}</span> : null}
+                </span>
+                <span className="flex shrink-0 items-center gap-1.5 font-bold text-white">
+                  <span className={tone({ vsLast: h.vs, better: row.better })}><VsIcon vs={h.vs} /></span>
+                  {h.value} {row.unit}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </>
       ) : null}
     </li>
   );
