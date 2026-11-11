@@ -1,3 +1,31 @@
+## What changed in phase 8 (your things, measured on the rig) — partly done
+
+The plan's gate: each area's main job within its tap budget (from the phase-1 baseline, never more than before); a
+balance or a purchase always shows where it came from; every screen in this group passes all four checks.
+
+- **Where a balance came from:** walked. The wallet's history names each entry (today's first-session coins: "daily").
+- **Tap budgets:** no phase-1 walk exists for these areas (phase 1 walked training, coaching and booking). Phase 8 changed
+  sizes only, so no tap count can have gone up; the budgets are not yet set from a walk (owner/coordinator call below).
+- **Changed (size only, never wording; payments, prices, policy and the delete flow untouched):** long lines to 16 px on
+  the profile, shop, store, the wallet's exchange, support, the closet's parts, the week card and the squads notices;
+  the profile's section lines by the 12-word rule; the account and settings buttons at 44 px (Download my data, Export,
+  the erase and delete buttons, the motion choices) with every confirmation step as it was.
+
+**The 20 read screens: none passes all four yet.** What each still needs:
+
+| Screen | Still fails | Needs |
+|---|---|---|
+| `/account` | targets, text sizes, button looks | the data-consent tick (13 px), one type scale for the page |
+| `/wallet` | critical accessibility, targets, text sizes | the shard amount chips at 44 px and named; sizes onto the scale |
+| `/shop`, `/store`, `/cards` | text sizes (6–10 on a screen), small lines | one type scale for the product cards (prices untouched) |
+| `/shop/shards` | words, small lines, a shift, only the bars lead on | payment wording is the owner's: layout only |
+| `/closet` | targets (SAVE LOOK, FULL 28 px), 150 % text clipped, contrast | the editor's top bar at 44 px |
+| `/profile`, `/profile/edit`, `/profile/week`, `/profile/challenges` | targets, text sizes, words, empty states | the back links and tabs at 44 px; empty states with a next step |
+| `/support`, `/market` | targets (the email link 18 px; SHOP/SELL 38 px) | 44 px links |
+| `/squads`, `/squads/[id]`, `/squads/join/[token]` | "coming soon" | switched off until the groups tables are applied (owner) |
+| `/pro` | "opens soon" | switched off (Coach Pro is not on sale: owner) |
+| `/admin/*` | the owner's tools | dense by design; small fixes only |
+
 ## What changed in phase 7 (around the games, measured on the rig)
 
 The plan's gate: pick a game → playing in ≤ 2 taps; results → play again in 1; a lobby always says what it is waiting

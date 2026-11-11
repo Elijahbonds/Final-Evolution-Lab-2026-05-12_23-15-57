@@ -6,21 +6,22 @@
 
 **How to read it.** Taps are counted from the signed-in home; the Train tab is one tap. Typing is counted apart. Seconds are the rig's own, with no reading time: a floor, not a person's time. A camera job is walked to the moment it needs a person in front of the camera. "Stops" means a person cannot go further on that path today, and says where.
 
-**Today: 31 of 31 jobs can be walked to their end** (or to the camera); 0 stop.
+**Today: 32 of 32 jobs can be walked to their end** (or to the camera); 0 stop.
 
 ## An athlete training alone
 
 | Job | Taps | Typing | Seconds | What happens | The plan's budget |
 |---|---|---|---|---|---|
-| Pick a game on Play and start playing | 2 | – | 31 | finishes | pick a game → playing in ≤ 2 taps (phase 7) |
+| The wallet: each coin says where it came from | 0 | – | 0 | finishes | a balance always shows where it came from (phase 8) |
+| Pick a game on Play and start playing | 2 | – | 34.6 | finishes | pick a game → playing in ≤ 2 taps (phase 7) |
 | The party room: what each empty seat waits for | 0 | – | 0 | reaches it: the lobby: it waits for phones or controllers to join | a lobby always says what it is waiting for (phase 7) |
-| Start today's workout (today's drill) | 3 | – | 2 | reaches it: the drill is on camera: it needs a person in the picture | open app → first exercise in ≤ 2 taps and ≤ 10 s (phase 2) |
+| Start today's workout (today's drill) | 3 | – | 1.6 | reaches it: the drill is on camera: it needs a person in the picture | open app → first exercise in ≤ 2 taps and ≤ 10 s (phase 2) |
 | Start today's workout (a program kept on this phone) | 2 | – | 8.2 | finishes | open app → first exercise in ≤ 2 taps and ≤ 10 s (phase 2) |
-| Ask the AI builder for a program and start it | 4 | 1 | 10.4 | finishes | ask → first rep in ≤ 4 taps (phase 3) |
+| Ask the AI builder for a program and start it | 4 | 1 | 10 | finishes | ask → first rep in ≤ 4 taps (phase 3) |
 | Change one thing in the program the AI built, and start it | 3 | – | 1.4 | finishes | change one thing without starting over; save, and start (phase 3) |
-| Log a set (in the program the AI built) | 1 | – | 8.4 | finishes | log a set in 1 tap (phase 2) |
-| Finish a session (in the program the AI built) | 15 (14 sets + 1 other) (+ 44 waits the rig skipped) | – | 40.1 | finishes | a 5-exercise session in ≤ 12 taps beyond the sets (phase 2) |
-| Test a jump (measure my vertical) | 3 | – | 2.6 | reaches it: the camera: three jumps in front of it (the reading itself is measured on recorded jumps, not on this rig) | vertical in ≤ 3 taps (phase 4) |
+| Log a set (in the program the AI built) | 1 | – | 8.3 | finishes | log a set in 1 tap (phase 2) |
+| Finish a session (in the program the AI built) | 15 (14 sets + 1 other) (+ 44 waits the rig skipped) | – | 38.9 | finishes | a 5-exercise session in ≤ 12 taps beyond the sets (phase 2) |
+| Test a jump (measure my vertical) | 3 | – | 2.7 | reaches it: the camera: three jumps in front of it (the reading itself is measured on recorded jumps, not on this rig) | vertical in ≤ 3 taps (phase 4) |
 | Run the movement screen | 3 | – | 2.6 | reaches it: the camera: four moves in front of it | movement screen in 3 taps and under 3 minutes (phase 4) |
 | See progress | 2 | – | 2 | finishes | progress number → its source in 1 tap (phase 4) |
 | See where a progress number came from | 2 | – | 10.9 | finishes | progress number → its source in 1 tap (phase 4) |
@@ -28,7 +29,7 @@
 | Book a 1:1 | 1 | – | 0.6 | reaches it: switched off until the group-booking tables are applied: the screen says so and offers what to do instead | book a 1:1 in ≤ 5 taps (phase 5) |
 | Cancel a booking | 0 | – | 0 | reaches it: switched off: nothing can be booked, so there is nothing to cancel; the notice says what to do instead | cancel in ≤ 3 taps with the rule shown first (phase 5) |
 | Find and join a group (booking open) | 4 | – | 1.9 | finishes | join a group in ≤ 4 taps (phase 5) |
-| Book a 1:1 (booking open) | 5 | – | 2.4 | finishes | book a 1:1 in ≤ 5 taps (phase 5) |
+| Book a 1:1 (booking open) | 5 | – | 2.5 | finishes | book a 1:1 in ≤ 5 taps (phase 5) |
 | Cancel a booking (booking open) | 3 | – | 1.4 | finishes | cancel in ≤ 3 taps with the rule shown first (phase 5) |
 
 ## A coached client
@@ -36,19 +37,19 @@
 | Job | Taps | Typing | Seconds | What happens | The plan's budget |
 |---|---|---|---|---|---|
 | Start today's workout (the coach's session) | 2 | – | 1 | finishes | open app → first exercise in ≤ 2 taps and ≤ 10 s (phase 2) |
-| Log a set (the coach's session) | 1 | – | 8.2 | finishes | log a set in 1 tap (phase 2) |
-| Finish a session (the coach's session) | 9 (8 sets + 1 other) (+ 28 waits the rig skipped) | – | 25.1 | finishes | a 5-exercise session in ≤ 12 taps beyond the sets (phase 2) |
+| Log a set (the coach's session) | 1 | – | 8.1 | finishes | log a set in 1 tap (phase 2) |
+| Finish a session (the coach's session) | 9 (8 sets + 1 other) (+ 28 waits the rig skipped) | – | 25.6 | finishes | a 5-exercise session in ≤ 12 taps beyond the sets (phase 2) |
 
 ## The coach
 
 | Job | Taps | Typing | Seconds | What happens | The plan's budget |
 |---|---|---|---|---|---|
 | See who trained | 2 | – | 2 | finishes | "Who needs me today" is the coach's first screen (phase 5) |
-| Adjust a program (change one exercise) | 6 | – | 3.4 | finishes | adjust one exercise in ≤ 4 taps (phase 5) |
-| Review a form clip | 3 | – | 1.6 | reaches it: switched off until the form-review table is applied: clients film a set and read their own flags; nothing reaches the coach yet, and the screen says so | – (phase 5) |
+| Adjust a program (change one exercise) | 6 | – | 3.9 | finishes | adjust one exercise in ≤ 4 taps (phase 5) |
+| Review a form clip | 3 | – | 2.5 | reaches it: switched off until the form-review table is applied: clients film a set and read their own flags; nothing reaches the coach yet, and the screen says so | – (phase 5) |
 | Take group attendance | 3 | – | 2.4 | reaches it: switched off until the group-booking tables are applied: the screen says so and offers what to do instead | attendance in ≤ 1 tap per person (phase 5) |
 | Open shot charts | 4 | – | 3 | reaches it: switched off until the shot-chart table is applied: the screen says so and offers a way back | – (phase 5) |
-| Take group attendance (booking open) | 4 | – | 2.4 | finishes | attendance in ≤ 1 tap per person (phase 5) |
+| Take group attendance (booking open) | 4 | – | 2.9 | finishes | attendance in ≤ 1 tap per person (phase 5) |
 
 ## What changed in phase 7 (around the games, measured on the rig)
 
