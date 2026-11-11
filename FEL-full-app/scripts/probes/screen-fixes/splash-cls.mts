@@ -3,7 +3,10 @@
 // ball rows load"; this mounts the card alone (splash-entry.tsx) so the number is the card's and nothing else's.
 //
 //   npx tsx scripts/probes/screen-fixes/splash-cls.mts build <outDir> <label>          bundle the card (no browser)
-//   /home/user/wt/gate-run.sh 600 npx tsx scripts/probes/screen-fixes/splash-cls.mts measure <outDir> <label> [modes]
+//   /home/user/wt/gate-run.sh 600 npx tsx scripts/probes/screen-fixes/splash-cls.mts measure <outDir> <label> [modes] [seeds]
+//
+// SCREEN-FIXES-2 (2026-11-11): [seeds] (comma list) pins which learn card is drawn (splash-entry `?seed=`): each mode is
+// run once per seed, and the learn card's own height (its scrollHeight, what it would take unclamped) is reported.
 //
 // A 390 × 844 phone, CPU slowed 4× (the every-screen scorer's phone). Per mode: the sum of the shifts while loading, at the
 // READY swap, and after it, each shift with what moved; and two JPGs (loading, ready). Writes <outDir>/<label>/splash.json.
@@ -15,7 +18,7 @@ import { chromium } from 'playwright-core';
 import { chromiumExe } from '../_chromium.mts';
 
 const ROOT = path.resolve(import.meta.dirname, '../../..');
-const [cmd, outDir, label = 'now', modesArg] = process.argv.slice(2);
+const [cmd, outDir, label = 'now', modesArg, seedsArg] = process.argv.slice(2);
 if (!cmd || !outDir) { console.error('usage: splash-cls.mts build|measure <outDir> <label> [modes]'); process.exit(2); }
 const SITE = path.resolve(outDir, label);
 
@@ -24,6 +27,10 @@ if (cmd === 'build') {
   fs.mkdirSync(path.join(SITE, 'fonts'), { recursive: true });
   for (const f of fs.readdirSync(path.join(ROOT, 'app/fonts'))) if (f.endsWith('.woff2')) fs.copyFileSync(path.join(ROOT, 'app/fonts', f), path.join(SITE, 'fonts', f));
   await buildRig(SITE, { entry: path.join(ROOT, 'scripts/probes/screen-fixes/splash-entry.tsx'), fontBase: '/fonts', prodFonts: true, external: ['@mediapipe/tasks-vision'] });
+  // SCREEN-FIXES-2 (2026-11-11): the app loads app/game-surface.css on every page (app/layout.tsx); the rig compiles only
+  // globals.css, so without this the card was measured without the start card's own rules (4b, 4d). Plain CSS, appended last.
+  const html = path.join(SITE, 'index.html');
+  fs.writeFileSync(html, fs.readFileSync(html, 'utf8').replace('</head>', `<style>${fs.readFileSync(path.join(ROOT, 'app/game-surface.css'), 'utf8')}</style></head>`));
   console.log('[splash] built', SITE);
   process.exit(0);
 }
@@ -44,23 +51,33 @@ const b = await chromium.launch({ executablePath: process.env.CHROMIUM_EXE ?? ch
 type Shift = { v: number; t: number; input: boolean; src: string[]; rects: string[] };
 const out: Record<string, unknown> = {};
 try {
-  for (const mode of MODES) {
+  const SEEDS = seedsArg ? seedsArg.split(',') : [''];
+  for (const mode0 of MODES) for (const seed of SEEDS) {
+    const mode = seed ? `${mode0}@${seed}` : mode0;
     const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
     const p = await ctx.newPage();
     const cdp = await ctx.newCDPSession(p);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
     const errors: string[] = [];
     p.on('pageerror', (e) => errors.push(e.message.slice(0, 160)));
-    await p.goto(`${BASE}/index.html?mode=${mode}&readyAt=${READY_AT}`, { waitUntil: 'load', timeout: 120000 });
+    await p.goto(`${BASE}/index.html?mode=${mode0}&readyAt=${READY_AT}${seed ? `&seed=${seed}` : ''}`, { waitUntil: 'load', timeout: 120000 });
     await p.waitForTimeout(1500);
     await p.waitForFunction(() => document.querySelector('[data-learn-idle]'), null, { timeout: 8000 }).catch(() => {});
     await p.waitForTimeout(300);
-    const hLoad = await p.evaluate(() => ({ card: Math.round(document.querySelector('[data-learn-idle]')?.getBoundingClientRect().height ?? 0), slot: Math.round(document.querySelector('[data-splash-slot]')?.getBoundingClientRect().height ?? 0) }));
+    const hLoad = await p.evaluate(() => ({ card: Math.round(document.querySelector('[data-learn-idle]')?.getBoundingClientRect().height ?? 0), cardOwn: document.querySelector('[data-learn-idle]')?.scrollHeight ?? 0, slot: Math.round(document.querySelector('[data-splash-slot]')?.getBoundingClientRect().height ?? 0) }));
     await p.screenshot({ path: path.join(SITE, `splash-${mode}-loading.jpg`), type: 'jpeg', quality: 70 });
     await p.waitForFunction(() => document.querySelector('[data-phase="ready"]'), null, { timeout: 60000 });
     await p.waitForTimeout(4000);
     await p.screenshot({ path: path.join(SITE, `splash-${mode}-ready.jpg`), type: 'jpeg', quality: 70 });
     const hReady = await p.evaluate(() => Math.round(document.querySelector('[data-splash-slot]')?.getBoundingClientRect().height ?? 0));
+    // SCREEN-FIXES-2: the corner chip (MOTION) over the card's own words, in px² (text runs by Range rects), on READY
+    const overlap = await p.evaluate(`(() => { const c = document.querySelector('[data-splash-corner]'), col = document.querySelector('[data-splash-column]');
+      if (!c || !col) return { px2: -1, text: '' }; const k = c.getBoundingClientRect(); let px2 = 0, text = '';
+      const w = document.createTreeWalker(col, NodeFilter.SHOW_TEXT);
+      for (let n = w.nextNode(); n; n = w.nextNode()) { if (!(n.textContent || '').trim()) continue; const r0 = document.createRange(); r0.selectNodeContents(n);
+        for (const r of Array.from(r0.getClientRects())) { const x = Math.min(r.right, k.right) - Math.max(r.left, k.left), y = Math.min(r.bottom, k.bottom) - Math.max(r.top, k.top);
+          if (x > 0.5 && y > 0.5) { px2 += x * y; text = text || n.textContent.trim().slice(0, 30); } } }
+      return { px2: Math.round(px2), text }; })()`) as { px2: number; text: string };
     const r = await p.evaluate(() => {
       const w = window as unknown as { __CLS: Shift[]; __readyT?: number };
       return { shifts: w.__CLS, tReady: w.__readyT ?? null };
@@ -69,9 +86,9 @@ try {
     const sum = (xs: Shift[]) => Math.round(xs.reduce((a, s) => a + s.v, 0) * 1000) / 1000;
     const tr = r.tReady ?? Infinity;
     const loading = shifts.filter((s) => s.t < tr), swap = shifts.filter((s) => s.t >= tr && s.t < tr + 250), after = shifts.filter((s) => s.t >= tr + 250);
-    out[mode] = { learnCardPx: hLoad.card, slotLoadingPx: hLoad.slot, slotReadyPx: hReady, cls: sum(shifts), loading: sum(loading), swap: sum(swap), after: sum(after), count: shifts.length, tReady: r.tReady, errors,
+    out[mode] = { cornerOverlapPx2: overlap.px2, cornerOverlapText: overlap.text, learnCardPx: hLoad.card, learnCardOwnPx: hLoad.cardOwn, slotLoadingPx: hLoad.slot, slotReadyPx: hReady, cls: sum(shifts), loading: sum(loading), swap: sum(swap), after: sum(after), count: shifts.length, tReady: r.tReady, errors,
       shifts: shifts.map((s) => ({ v: Math.round(s.v * 1000) / 1000, t: s.t, src: s.src.slice(0, 4), rects: s.rects.slice(0, 4) })) };
-    console.log(`${mode.padEnd(14)} cls ${sum(shifts)} = loading ${sum(loading)} + READY swap ${sum(swap)} + after ${sum(after)} (${shifts.length} shifts, ready at ${r.tReady} ms; learn card ${hLoad.card} px, slot ${hLoad.slot} -> ${hReady} px)${errors.length ? `  errors: ${errors[0]}` : ''}`);
+    console.log(`${mode.padEnd(14)} cls ${sum(shifts)} = loading ${sum(loading)} + READY swap ${sum(swap)} + after ${sum(after)} (${shifts.length} shifts, ready at ${r.tReady} ms; learn card ${hLoad.card} px (own ${hLoad.cardOwn}), slot ${hLoad.slot} -> ${hReady} px; MOTION chip over the words ${overlap.px2} px²${overlap.text ? ` ("${overlap.text}")` : ''})${errors.length ? `  errors: ${errors[0]}` : ''}`);
     for (const s of shifts.filter((x) => x.v >= 0.001)) console.log(`   ${s.t}ms  ${s.v.toFixed(3)}  ${s.src[0] ?? ''}  ${s.rects[0] ?? ''}`);
     await ctx.close();
   }

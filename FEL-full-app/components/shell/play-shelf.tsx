@@ -85,8 +85,14 @@ export function PlayShelf({ initialFamily }: { initialFamily?: string }) {
                     family's own line takes over once it is open and the modes are on screen underneath anyway. */}
                 {/* READABLE (lane/readable-2): two lines, then the clamp — the one-line list cut most of each family's modes at 390 px.
                     SCREEN-FIXES (owner, 2026-11-10): three lines. readable-2 measured six of the seven lists cut at two lines on a
-                    390 px phone; five of them need one more line (19 px), so three shows them in full (the Sports list still clamps). */}
-                <span data-shelf-list className={`${TYPE.small} min-w-0 line-clamp-3 leading-snug text-fel-dim`}>
+                    390 px phone; five of them need one more line (19 px), so three shows them in full (the Sports list still clamps).
+                    SCREEN-FIXES-2 (owner, 2026-11-10: "Fix the screens, address what you found above"): and every row holds the room
+                    of three lines (min-h-[3lh]: three of the list's own lines, at any text size), open or closed. With three-line
+                    lists the closed rows grew to 88 px while the open row, its one-line blurb, stayed at 68: one row in two sizes,
+                    which the every-screen scorer counted as a fourth button look on /play. Now every row lays out the same, so
+                    they are one height. A shorter list or blurb starts on the first line, beside the family's name, as a three-line
+                    list always has. The three-line clamp is unchanged. Layout only. */}
+                <span data-shelf-list className={`${TYPE.small} min-h-[3lh] min-w-0 line-clamp-3 leading-snug text-fel-dim`}>
                   {isOpen ? f.blurb : modes.map((m) => m.name).join('  ·  ')}
                 </span>
               </span>
