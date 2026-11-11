@@ -6,6 +6,7 @@
 //
 //   (in the tree whose build you want, ES_* set as scripts/probes/screen-fixes/ab.sh sets them)
 //   /home/user/wt/gate-run.sh 900 env -u DATABASE_URL -u DIRECT_URL npx tsx scripts/probes/screen-fixes/corner-overlap.mts <outDir> <label> [routes,comma]
+//   A route written `anon:/try` is loaded signed out (the guest trial, which has no capture menu ⋯ over the card).
 //
 // Writes <outDir>/<label>/corner.json and corner-<route>.jpg. Exit 0 always: the numbers are the result.
 import fs from 'node:fs';
@@ -57,10 +58,12 @@ const p = await people();
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_EXE ?? chromiumExe(), headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 const out: Record<string, unknown> = {};
 try {
-  for (const route of ROUTES) {
-    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true, storageState: storageState(p, 'solo') });
+  for (const entry of ROUTES) {
+    const anon = entry.startsWith('anon:');
+    const route = anon ? entry.slice(5) : entry;
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true, storageState: storageState(p, anon ? 'anon' : 'solo') });
     const page = await ctx.newPage();
-    const name = route.replace(/^\//, '').replace(/\//g, '_');
+    const name = (anon ? 'anon_' : '') + route.replace(/^\//, '').replace(/[/?=&]/g, '_');
     try {
       await page.goto(ORIGIN + route, { waitUntil: 'load', timeout: 60000 });
       const seen = await page.waitForSelector('[data-splash-corner]', { timeout: 45000 }).then(() => true).catch(() => false);
