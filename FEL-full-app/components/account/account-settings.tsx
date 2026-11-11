@@ -5,6 +5,7 @@ import { Download, Loader2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { healthEraseToast } from '@/lib/health/healthDataCopy';
 import { forgetIntakeMemory } from '@/lib/health/intakeForget';
+import { TYPE, lineSize } from '@/lib/design/type';
 
 const ERASE_WARNING =
   'This permanently deletes your health intake, pain check-ins, daily check-ins, and Dial-Up Breath uses. '
@@ -25,7 +26,7 @@ export function AccountDataPanel({
   return (
     <section className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
       <h2 className="fel-heading text-lg font-bold text-white">Your data</h2>
-      <p className="mt-1 text-xs text-fel-dim">
+      <p className={`mt-1 ${TYPE.body} text-fel-dim`}>
         Signed in as {email || 'this account'}. Download a JSON file of your profile, Mirror sessions, assessments, and the health data stored here.
       </p>
       <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -52,7 +53,7 @@ export function AccountDataPanel({
           </button>
         ) : (
           <div className="flex flex-wrap items-center gap-2">
-            <p className="max-w-xl text-xs text-fel-crimson">{ERASE_WARNING}</p>
+            <p className={`max-w-xl ${lineSize(ERASE_WARNING, 'text-xs')} text-fel-crimson`}>{ERASE_WARNING}</p>
             <button
               type="button"
               onClick={onConfirmErase}

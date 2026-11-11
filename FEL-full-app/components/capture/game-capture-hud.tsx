@@ -153,7 +153,12 @@ export function GameCaptureHud(props: {
 
   return (
     <>
-      <style>{STREAM_FRAME_CSS}</style>
+      {/* SCREEN-FIXES (2026-11-10): the CSS goes in as raw HTML, not as a text child. React 18's server renderer escapes a
+          text child, so `[data-fel-stream="1"]` reached the page as `[data-fel-stream=&quot;1&quot;]`; a browser reads a
+          <style> as raw text, so the phone's first draw held the entity and React's did not: error #425 (a hydration
+          mismatch) on every game screen, since this HUD is in every GameShell, and the stream frame's CSS was broken
+          until React drew it again. stream-frame-ssr.test.tsx holds the server's bytes to the CSS. */}
+      <style dangerouslySetInnerHTML={{ __html: STREAM_FRAME_CSS }} />
       <div
         data-capture-ui="1"
         style={{

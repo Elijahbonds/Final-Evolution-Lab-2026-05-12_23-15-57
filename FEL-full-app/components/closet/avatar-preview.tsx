@@ -33,6 +33,7 @@ import type { PhotoShot } from '@/components/closet/studio/photo-mode';
 import { useEffect, useRef, useState } from 'react';
 import type { MutableRefObject } from 'react';
 import type { FaceConfig, JerseyConfig } from '@/lib/closet/wearable-catalog';
+import { quietCanvas } from '@/lib/babylon/core/canvasA11y';
 
 export interface StudioEvents {
   /** a tap on the body: the region it selects (a second tap on the same spot widens it), the finest region there and
@@ -161,6 +162,8 @@ export default function AvatarPreview(props: AvatarPreviewProps) {
       const screenTier = deviceTierDecision().tier;
       const tier: 'mobile' | 'desktop' = screenTier === 'mobile' ? 'mobile' : 'desktop';
       const engine = new Engine(box, tier === 'desktop', { alpha: true, adaptToDeviceRatio: false, stencil: false });
+      // SCREEN-FIXES (2026-11-10): named, and out of the Tab order (Babylon makes it 1): lib/babylon/core/canvasA11y.ts
+      quietCanvas(engine, box);
       applyCanvasFit(engine, box);
       const scene = new Scene(engine);
       // phase 4d: the tier the paint, the bendable parts and the identity layer read (a phone gets the phone sizes)

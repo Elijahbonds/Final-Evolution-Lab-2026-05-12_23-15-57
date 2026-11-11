@@ -34,9 +34,15 @@ describe('who is looking', () => {
   });
 });
 
+// TEST CHANGED (screen-fixes, 2026-11-10): ModesPage is async now (it reads the session on the server, so a signed-out
+// visitor's hints are in the first draw instead of arriving after it and moving every card: a layout shift). The page is
+// awaited and its tree rendered; what each case asserts is unchanged, except "nothing while the session is loading",
+// which is now "while it loads, the SERVER's answer decides" — the old line pinned the late arrival that caused the
+// shift, and its intent (a signed-in player never sees a hint flash past) is asserted below for both server answers.
 describe('/modes (D2, J7)', () => {
-  it('tells a signed-out visitor, above the list and on each card, that playing needs a free sign-in', () => {
-    const page = as('unauthenticated', createElement(ModesPage));
+  it('tells a signed-out visitor, above the list and on each card, that playing needs a free sign-in', async () => {
+    h.session = null;
+    const page = as('unauthenticated', await ModesPage());
     expect(page).toContain('data-testid="modes-signin-note"');
     expect(page).toContain('href="/login?next=%2Fmodes"');
     expect(page).toContain('href="/try"');
@@ -47,18 +53,36 @@ describe('/modes (D2, J7)', () => {
     expect(page).toContain(SIGN_IN_TO_PLAY);
   });
 
-  it('shows no sign-in hint to a signed-in player, nor while the session is still loading', () => {
+  it('shows no sign-in hint to a signed-in player, nor while the session is still loading for one', async () => {
+    h.session = { user: { id: 'u1' } };
     for (const s of ['authenticated', 'loading'] as const) {
-      const page = as(s, createElement(ModesPage));
+      const page = as(s, await ModesPage());
       expect(page).not.toContain('modes-signin-note');
       expect(page).not.toContain('mode-signin-chip');
     }
+    h.session = null;
     expect(renderToStaticMarkup(createElement(SignInChip))).toBe('');
     expect(renderToStaticMarkup(createElement(ModesSignInNote))).toBe('');
   });
 
-  it('opens in plain words, not the shelf vocabulary', () => {
-    const page = renderToStaticMarkup(createElement(ModesPage));
+  // SCREEN-FIXES (2026-11-10): the first draw (the browser's session read still loading) is already the final one
+  it('a signed-out visitor gets the note and every chip in the first draw, before the browser has read the session', async () => {
+    h.session = null;
+    const first = as('loading', await ModesPage());
+    const final = as('unauthenticated', await ModesPage());
+    expect(first).toContain('data-testid="modes-signin-note"');
+    expect((first.match(/data-testid="mode-signin-chip"/g) ?? []).length).toBe((final.match(/data-testid="mode-signin-chip"/g) ?? []).length);
+    expect(first).toBe(final);
+  });
+
+  it('the browser\'s own answer wins once it has one', () => {
+    const signedIn = as('authenticated', createElement(ModesSignInNote, { serverGuest: true }));
+    expect(signedIn).toBe('');
+    expect(as('unauthenticated', createElement(ModesSignInNote, { serverGuest: false }))).toContain('modes-signin-note');
+  });
+
+  it('opens in plain words, not the shelf vocabulary', async () => {
+    const page = renderToStaticMarkup(await ModesPage());
     expect(page).toContain('All live modes');
     expect(page).toMatch(/\d+ games, grouped by sport/);
     expect(page).not.toMatch(/shelf modes|training-floor entr|play contract/);

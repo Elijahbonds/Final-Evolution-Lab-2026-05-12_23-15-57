@@ -8,6 +8,7 @@ import { AvatarFigure } from '@/components/avatar-figure';
 import { Sparkles, Check, Plus, X, Loader2, Download, Trash2, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
+import { TYPE, lineSize } from '@/lib/design/type';
 
 // PROFILE V2 (owner 2026-10-24): this file used to BE the profile — a header, the athlete roster, mode mastery, the PRQ
 // attributes, data rights and health data, one long page that fetched four things after it hydrated. The profile is now
@@ -41,7 +42,7 @@ export function AthletePicker({ initialKey }: { initialKey: string | null }) {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="fel-heading text-[19px] font-bold text-white">YOUR ATHLETE</h2>
-          <p className="text-xs text-white/50">Pick the body type you're building toward. Your athlete shows up across the Lab.</p>
+          <p className={`${TYPE.body} text-white/50`}>Pick the body type you're building toward. Your athlete shows up across the Lab.</p>
         </div>
         <a
           href="/closet"
@@ -50,7 +51,7 @@ export function AthletePicker({ initialKey }: { initialKey: string | null }) {
           <Sparkles className="h-3.5 w-3.5" /> CUSTOMIZE YOUR LOOK
         </a>
       </div>
-      <p className="mt-1 text-[12px] text-white/50">
+      <p className={`mt-1 ${TYPE.body} text-white/50`}>
         Face, gear, and card skin live in the <a href="/closet" className="text-[#C79BFF]/80 underline underline-offset-2 hover:text-[#C79BFF]">Closet</a> — or scan your face there and let it build you.
       </p>
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -135,7 +136,7 @@ export function PrqDataRights() {
       <h3 className="fel-heading text-lg font-bold text-white mb-1">YOUR DATA RIGHTS</h3>
       {/* REVIEW (2026-09-24, D5): both buttons cover the movement history too (lib/prq-data-rights.ts), the numbers
           worked out from the camera that the privacy policy sends people here to export or delete */}
-      <p className="text-xs text-fel-dim mb-4">
+      <p className={`${TYPE.body} text-fel-dim mb-4`}>
         Export or delete your PRQ measurements and your movement history (jumps, dunks, form reads and screens worked out from the camera) at any time.
       </p>
       <div className="flex flex-wrap gap-3">
@@ -155,7 +156,7 @@ export function PrqDataRights() {
           </button>
         ) : (
           <div className="flex items-center gap-2">
-            <span className="text-xs text-[#FF3366]">Deletes every PRQ entry and all movement history (Mirror dunks, screens, form reads). Bought plans stay. This is permanent.</span>
+            <span className={`${TYPE.body} text-[#FF3366]`}>Deletes every PRQ entry and all movement history (Mirror dunks, screens, form reads). Bought plans stay. This is permanent.</span>
             <button
               onClick={handleDelete}
               disabled={deleting}
@@ -261,7 +262,7 @@ export function HealthDataSection() {
       <h3 className="fel-heading flex items-center gap-2 text-lg font-bold text-white mb-1">
         <ShieldCheck className="h-4 w-4 text-[#00E5FF]" /> HEALTH DATA
       </h3>
-      <p className="text-xs text-fel-dim mb-4">
+      <p className={`${TYPE.body} text-fel-dim mb-4`}>
         Your health intake, pain check-ins, daily check-ins and Dial-Up Breath uses, kept separately from the rest of your account: opt-in only, stored on FEL
         only, never sold, never used for ads, never in a share link, and never scored or paid. See Privacy §5.
       </p>
@@ -269,11 +270,12 @@ export function HealthDataSection() {
       <div className="flex items-center justify-between rounded-lg border border-white/10 p-3">
         <div>
           <div className="text-sm font-bold text-white">Health data collection</div>
-          <div className="text-xs text-fel-dim">
-            {granted
+          {(() => {
+            const line = granted
               ? `On${view?.healthData.grantedAt ? ` since ${new Date(view.healthData.grantedAt).toLocaleDateString()}` : ''} — ${healthStoredLine(view?.counts)}`
-              : 'Off — nothing is being collected.'}
-          </div>
+              : 'Off — nothing is being collected.';
+            return <div className={`${lineSize(line, 'text-xs')} text-fel-dim`}>{line}</div>;
+          })()}
         </div>
         <Switch
           checked={granted}
@@ -316,7 +318,7 @@ export function HealthDataSection() {
           </button>
         ) : (
           <div className="flex items-center gap-2">
-            <span className="text-xs text-[#FF3366]">Deletes your intake, every pain check-in, every daily check-in and your Dial-Up Breath uses. Your consent records are kept as proof of agreement and withdrawal. Never touches a workout plan or your PRQ history. This is permanent.</span>
+            <span className={`${TYPE.body} text-[#FF3366]`}>Deletes your intake, every pain check-in, every daily check-in and your Dial-Up Breath uses. Your consent records are kept as proof of agreement and withdrawal. Never touches a workout plan or your PRQ history. This is permanent.</span>
             <button
               onClick={handleErase}
               disabled={erasing}
