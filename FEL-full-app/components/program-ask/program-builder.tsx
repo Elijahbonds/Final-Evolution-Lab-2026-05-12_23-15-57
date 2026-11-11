@@ -76,6 +76,13 @@ function ChipControl({ c, onEdit, busy }: { c: ProgramChip; onEdit: (f: RequestF
   );
 }
 
+/** EVERY-SCREEN P5: the folded read line's words: the first four things FEL read, then "…" when there are more. */
+export const READ_LINE = 'What FEL read:';
+export function readLine(labels: string[], max = 4): string {
+  const shown = labels.slice(0, max).map((l) => l.toLowerCase()).join(' · ');
+  return labels.length > max ? `${shown} …` : shown;
+}
+
 function DayCard({ d, locked, next }: { d: ProgramDay; locked: boolean; next: boolean }) {
   return (
     <details data-day={d.id} className={`group rounded-2xl border ${next ? 'border-fel-cyan/50' : 'border-white/8'} bg-[#0c0c11] ${locked ? 'opacity-50' : ''}`}>
@@ -120,6 +127,10 @@ export function ProgramBuilder({ initialQuestion = '' }: { initialQuestion?: str
   // an ask that arrives with the address (?q=) is built on arrival: it starts folded, so nothing moves when the program lands
   const [askOpen, setAskOpen] = useState(!initialQuestion);
   const [assumedOpen, setAssumedOpen] = useState(false);
+  // EVERY-SCREEN P5 (carried from phase 4): once a program is on screen, what FEL read folds into the ask's one line too
+  // ("What FEL read: band · full body · 3 days · 40 min… Change"); Change opens the ask and the chips, which then stay open
+  // while the person edits
+  const [readOpen, setReadOpen] = useState(false);
   // PROGRAM-ASK-2: the account copy (adults, once the pending table exists); 'device' = the phone only (youth, or not ready)
   const keep = useRef<'account' | 'device' | null>(null);
   const [onAccount, setOnAccount] = useState(false);
@@ -215,14 +226,17 @@ export function ProgramBuilder({ initialQuestion = '' }: { initialQuestion?: str
   };
 
   const shown = weeks.find((w) => w.n === week) ?? weeks[0];
+  const readFolded = !!p && !askOpen && !readOpen;
 
   return (
     <div data-testid="program-builder" className="mx-auto max-w-[720px] space-y-5">
       {!p && !(initialQuestion && !askOpen) && <p data-testid="program-lede" className={`${lineSize(PAGE_LEDE)} max-w-lg text-fel-soft`}>{PAGE_LEDE}</p>}
       {!askOpen && (
         <div data-testid="program-ask-folded" className="flex items-start justify-between gap-3">
-          <p className={`min-w-0 ${TYPE.small} text-fel-soft`}><span className="text-white">Your ask:</span> {q}</p>
-          <button type="button" onClick={() => setAskOpen(true)} data-testid="program-ask-open" className={`min-h-11 shrink-0 rounded-full border border-fel-cyan/50 px-4 ${TYPE.label} text-fel-cyan`}>Change the ask</button>
+          {readFolded && answer
+            ? <p data-testid="program-read-line" className={`min-w-0 ${TYPE.small} text-fel-soft`}><span className="text-white">{READ_LINE}</span> {readLine(answer.read.chips.map((c) => c.label))}</p>
+            : <p className={`min-w-0 ${TYPE.small} text-fel-soft`}><span className="text-white">Your ask:</span> {q}</p>}
+          <button type="button" onClick={() => { setAskOpen(true); setReadOpen(true); }} data-testid="program-ask-open" className={`min-h-11 shrink-0 rounded-full border border-fel-cyan/50 px-4 ${TYPE.label} text-fel-cyan`}>{readFolded && answer ? 'Change' : 'Change the ask'}</button>
         </div>
       )}
       <form hidden={!askOpen} onSubmit={(e) => { e.preventDefault(); setEdits({}); void ask(q, {}); }} className="space-y-3">
@@ -234,7 +248,7 @@ export function ProgramBuilder({ initialQuestion = '' }: { initialQuestion?: str
       </form>
 
       {answer && (
-        <section data-testid="program-chips" className="space-y-2">
+        <section data-testid="program-chips" hidden={readFolded} className="space-y-2">
           <p className={`${TYPE.label} text-fel-soft`}>{READ_BACK} · {EDIT_HINT}</p>
           <div className="flex flex-wrap gap-2">{answer.read.chips.map((c) => <ChipControl key={c.field} c={c} onEdit={edit} busy={busy} />)}</div>
           {answer.read.assumptions.length > 0 && (

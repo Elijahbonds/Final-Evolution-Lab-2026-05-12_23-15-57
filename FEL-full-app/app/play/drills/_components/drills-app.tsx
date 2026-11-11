@@ -73,7 +73,7 @@ function Shelf({ access, unlockLive, shelf = 'playbook' }: { access: DrillsAcces
       <nav className="flex gap-2" aria-label="Drill shelves" data-drill-shelves>
         {(['playbook', 'hoops'] as const).map((s) => (
           <Link key={s} href={shelfHref(s)} aria-current={s === shelf ? 'page' : undefined} data-drill-shelf={s}
-            className={`inline-flex min-h-10 items-center rounded-full border px-4 text-[13px] font-bold ${s === shelf ? 'border-[#00FF9D]/60 text-[#00FF9D]' : 'border-white/15 text-white/70'}`}>
+            className={`inline-flex min-h-11 items-center rounded-full border px-4 text-[14px] font-bold ${s === shelf ? 'border-[#00FF9D]/60 text-[#00FF9D]' : 'border-white/15 text-white/70'}`}>
             {SHELF_LABEL[s]}
           </Link>
         ))}
@@ -108,7 +108,7 @@ function Shelf({ access, unlockLive, shelf = 'playbook' }: { access: DrillsAcces
           );
         })}
       </ul>
-      <p className="text-[12px] text-white/50">{CAMERA_LINE}</p>
+      <p className="text-[16px] text-white/50">{CAMERA_LINE}</p>
     </div>
   );
 }
@@ -170,7 +170,7 @@ function DrillPage({ id, access, lessons, unlockLive }: { id: string; access: Dr
           <Camera aria-hidden className="h-4 w-4" /> Start with the camera
         </button>
       ) : null}
-      <p className="text-[12px] text-white/50">{CAMERA_LINE}</p>
+      <p className="text-[16px] text-white/50">{CAMERA_LINE}</p>
       <DrillDemo drill={drill} />
       <BookWords lessons={lessons} chapterHref={drillChapterHref(drill)} />
     </article>

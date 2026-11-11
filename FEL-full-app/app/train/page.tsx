@@ -30,6 +30,9 @@ import { enterDelay } from '@/components/ui/fel/page-enter';
 import { t } from '@/lib/i18n';
 import { MEASURE_VERTICAL_HREF } from '@/lib/vertical/door';
 import { JUMP_TESTS_HREF, MIRROR_HREF } from '@/lib/tools-easy/door';
+import { groupBookingOpen, type GroupDb } from '@/lib/group-booking/server';
+import { GROUP_COPY } from '@/lib/group-booking/copy';
+import { MyGroupSessions } from '@/components/group-booking/my-group-sessions';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,12 +51,14 @@ export default async function TrainPage() {
   const me = (session?.user as { id?: string } | undefined)?.id;
   if (!me) redirect(loginPath('/train'));
 
-  const [coachLink, coachesAnyone, programCount, todayCard, dailyDrill] = await Promise.all([
+  const [coachLink, coachesAnyone, programCount, todayCard, dailyDrill, groupsOpen] = await Promise.all([
     prisma.coachClient.findFirst({ where: { clientId: me, endedAt: null }, select: { coach: { select: { name: true } } } }).catch(() => null),
     prisma.coachClient.findFirst({ where: { coachId: me, endedAt: null }, select: { id: true } }).catch(() => null),
     prisma.coachingProgram.count({ where: { clientId: me } }).catch(() => 0),
     todayCardFor(prisma, me),
     loadDailyDrill(prisma, me, { warmupContext: (id, now) => loadWarmupContext(prisma, id, now) }).catch(() => null),
+    // EVERY-SCREEN P5: the doors to group training and 1:1s, only once booking is open (the owner set, the tables applied)
+    groupBookingOpen(prisma as unknown as GroupDb),
   ]);
 
   const cards = [
@@ -147,6 +152,13 @@ export default async function TrainPage() {
       // screen, and "prescription" is a treatment word (lib/share/screen.ts). Said as what it is.
       line: t('train.cards.fuel.line'),
     },
+    ...(groupsOpen ? [{
+      href: '/groups', group: 'program' as Group, icon: Users, accent: PALETTE.emerald, title: GROUP_COPY.title,
+      line: GROUP_COPY.inPerson,
+    }, {
+      href: '/groups/one-on-one', group: 'program' as Group, icon: Users, accent: PALETTE.emerald, title: GROUP_COPY.bookOneOnOne,
+      line: GROUP_COPY.inPerson,
+    }] : []),
     {
       // TEAMS-SQUADS (2026-10-25): squads (friends) and teams (a coach's) — daily drills together, a weekly league
       href: '/squads', group: 'program' as Group, icon: Users, accent: PALETTE.cyan, title: t('train.cards.squads.title'),
@@ -197,6 +209,7 @@ export default async function TrainPage() {
       hero={{ image: '/backdrops/training.jpg', imagePosition: '50% 60%' }}
     >
       <TodayCard view={todayCard} />
+      {groupsOpen ? <MyGroupSessions compact /> : null}
       <ResumeProgramCard />
       <DailyDrillCard view={dailyDrill} />
       <WeekCardEntry />

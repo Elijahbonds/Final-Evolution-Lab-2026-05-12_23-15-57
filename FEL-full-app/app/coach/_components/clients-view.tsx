@@ -45,6 +45,7 @@ import { CoachQueue } from '@/components/coach/coach-queue/coach-queue';
 import { RosterStrip } from '@/components/coach/coach-queue/roster-strip';
 import { LOOK } from '@/components/coach/coach-queue/look';
 import { AthleteSheet, FullScreen, type SheetTab } from '@/components/coach/athlete-sheet/athlete-sheet';
+import { QuickAdjust } from '@/components/coach/quick-adjust';
 import { SetupScreen } from '@/components/coach/setup/setup-screen';
 import type { QueueCard, QueueSourceKey } from '@/lib/coach/queue';
 import type { RosterStripRow } from '@/lib/coach/queueServer';
@@ -284,6 +285,8 @@ export function ClientsView({ me = null, chatOn = false }: { me?: SharedBy | nul
               {tab === 'program' && (
                 <div className="space-y-4" data-sheet-program>
                   {!prog && <p className={LOOK.quiet}>No program yet. Assign one from another athlete, or draft one in Camp.</p>}
+                  {/* EVERY-SCREEN P5: one exercise's effort in two taps, here (components/coach/quick-adjust.tsx) */}
+                  {prog && <QuickAdjust tree={prog.tree} done={prog.completedSessionIds} onTree={setTree} />}
                   {prog && <button type="button" className={`${LOOK.solid} w-full`} onClick={() => setScreen('builder')} data-open-builder>Open the builder</button>}
                   {prog?.clientId && <AssignProgram program={{ id: prog.tree.id, name: prog.tree.name, clientId: prog.clientId }} roster={roster} onDone={() => void load()} />}
                   {/* COACH-DELIVERY COA-02: draft the first block from their goal, the coach's answers and their Mirror screen */}

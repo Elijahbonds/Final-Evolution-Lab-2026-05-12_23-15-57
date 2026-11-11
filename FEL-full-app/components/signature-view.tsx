@@ -31,7 +31,7 @@ function SignatureCard({ sig }: { sig: Sig }) {
     <div className="fel-panel rounded-xl p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="fel-heading text-lg font-bold text-white">{sig.modeLabel}</div>
+          <div className="fel-heading text-[20px] font-bold text-white">{sig.modeLabel}</div>
           <div className="mt-0.5 inline-flex items-center gap-1.5 rounded-full border border-[#FFD700]/30 bg-[#FFD700]/10 px-2.5 py-0.5 font-mono text-[12px] text-[#FFD700]">
             {sig.modifier.name}
           </div>
@@ -40,7 +40,7 @@ function SignatureCard({ sig }: { sig: Sig }) {
           <div className="flex items-center gap-1 font-mono text-xs text-white/50">
             <Target className="h-3.5 w-3.5" /> TARGET
           </div>
-          <div className="fel-heading text-2xl font-bold text-[#00E5FF]">{sig.targetScore}</div>
+          <div className="fel-heading text-[30px] font-bold text-[#00E5FF]">{sig.targetScore}</div>
         </div>
       </div>
 
@@ -112,13 +112,15 @@ export function SignatureView() {
   }
   if (!sigs) {
     return (
-      <div className="mt-16 flex justify-center">
+      // EVERY-SCREEN P5: its own key, so the cards' grid is a new node and not this one moved up (the rig: a layout shift of
+      // 0.031 — React reused the spinner's div for the grid and its top margin went from 64 to 24 px)
+      <div key="loading" className="mt-16 flex justify-center">
         <Loader2 className="h-7 w-7 animate-spin text-[#00E5FF]" />
       </div>
     );
   }
   return (
-    <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    <div key="cards" className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       {sigs.map((s) => (
         <SignatureCard key={s.challengeKey} sig={s} />
       ))}

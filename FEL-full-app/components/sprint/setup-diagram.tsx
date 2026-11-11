@@ -43,6 +43,7 @@ export const SETUP_STEPS: Record<SprintTest, string[]> = {
   ],
 };
 
+// EVERY-SCREEN P5: every label is 12 (it was 10, under the 12 px floor); the long ones end at the right edge so they fit
 export function SetupDiagram({ test }: { test: SprintTest }) {
   return (
     <svg viewBox="0 0 320 150" className="h-auto w-full" role="img" aria-label="Where to put the phone, seen from above" data-sprint-diagram={test}>
@@ -50,40 +51,40 @@ export function SetupDiagram({ test }: { test: SprintTest }) {
       {test !== 'agility' && <rect x={10} y={40} width={300} height={34} fill={LANE} />}
       {test === 'gate' && (
         <g>
-          <text x={14} y={34} fill={TXT} fontSize={10}>start</text>
+          <text x={14} y={34} fill={TXT} fontSize={12}>start</text>
           <line x1={250} y1={30} x2={250} y2={120} stroke={LINE} strokeWidth={3} />
-          <text x={256} y={34} fill={LINE} fontSize={10}>finish line</text>
+          <text x={250} y={24} textAnchor="middle" fill={LINE} fontSize={12}>finish line</text>
           <path d="M20 57 H232" stroke={RUN} strokeWidth={2} markerEnd="url(#arr)" />
           <Phone x={250} y={128} rot={0} />
-          <text x={176} y={146} fill={TXT} fontSize={10}>phone on the line, 3–5 m out</text>
+          <text x={316} y={146} textAnchor="end" fill={TXT} fontSize={12}>phone on the line, 3–5 m out</text>
         </g>
       )}
       {test === 'flying' && (
         <g>
           <line x1={120} y1={36} x2={120} y2={78} stroke={LINE} strokeWidth={3} />
           <line x1={220} y1={36} x2={220} y2={78} stroke={LINE} strokeWidth={3} />
-          <text x={104} y={30} fill={LINE} fontSize={10}>line 1</text><text x={204} y={30} fill={LINE} fontSize={10}>line 2</text>
+          <text x={104} y={30} fill={LINE} fontSize={12}>line 1</text><text x={204} y={30} fill={LINE} fontSize={12}>line 2</text>
           <path d="M20 57 H300" stroke={RUN} strokeWidth={2} markerEnd="url(#arr)" />
           <Phone x={170} y={130} />
-          <text x={186} y={140} fill={TXT} fontSize={10}>≥ 12 m back, centred</text>
+          <text x={316} y={140} textAnchor="end" fill={TXT} fontSize={12}>≥ 12 m back, centred</text>
         </g>
       )}
       {test === 'trace' && (
         <g>
           <circle cx={30} cy={74} r={4} fill={LINE} /><circle cx={250} cy={74} r={4} fill={LINE} />
-          <text x={12} y={90} fill={LINE} fontSize={10}>start marker</text><text x={226} y={90} fill={LINE} fontSize={10}>marker</text>
+          <text x={12} y={90} fill={LINE} fontSize={12}>start marker</text><text x={226} y={90} fill={LINE} fontSize={12}>marker</text>
           <path d="M30 57 H300" stroke={RUN} strokeWidth={2} markerEnd="url(#arr)" />
           <Phone x={160} y={132} />
-          <text x={176} y={140} fill={TXT} fontSize={10}>far back, side-on</text>
+          <text x={316} y={140} textAnchor="end" fill={TXT} fontSize={12}>far back, side-on</text>
         </g>
       )}
       {test === 'agility' && (
         <g>
-          {[70, 160, 250].map((x, i) => <g key={x}><line x1={x} y1={30} x2={x} y2={80} stroke={LINE} strokeWidth={3} /><text x={x - 10} y={24} fill={LINE} fontSize={10}>{['left', 'middle', 'right'][i]}</text></g>)}
+          {[70, 160, 250].map((x, i) => <g key={x}><line x1={x} y1={30} x2={x} y2={80} stroke={LINE} strokeWidth={3} /><text x={x} y={24} textAnchor="middle" fill={LINE} fontSize={12}>{['left', 'middle', 'right'][i]}</text></g>)}
           <path d="M160 62 H250 M250 50 H70 M70 38 H190" stroke={RUN} strokeWidth={2} fill="none" />
-          <text x={120} y={98} fill={TXT} fontSize={10}>5 yd · 5 yd</text>
+          <text x={120} y={98} fill={TXT} fontSize={12}>5 yd · 5 yd</text>
           <Phone x={160} y={132} />
-          <text x={176} y={140} fill={TXT} fontSize={10}>≈ 9 m back, square on</text>
+          <text x={316} y={140} textAnchor="end" fill={TXT} fontSize={12}>≈ 9 m back, square on</text>
         </g>
       )}
       <defs>

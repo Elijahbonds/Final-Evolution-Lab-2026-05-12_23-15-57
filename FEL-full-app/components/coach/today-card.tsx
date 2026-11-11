@@ -22,7 +22,7 @@ export function TodayCard({ view }: { view: TodayCardView | null }) {
       <span className="min-w-0 flex-1">
         <span className="block truncate font-sans text-[12px] uppercase tracking-[0.14em] text-fel-dim">{l.eyebrow}</span>
         <span className="fel-heading mt-1 block text-[16px] font-bold leading-tight text-white">{l.title}</span>
-        <span className="mt-1 block text-[13px] text-white/55">{l.line}</span>
+        <span className="mt-1 block text-[14px] text-white/55">{l.line}</span>
       </span>
       <span className="shrink-0 font-sans text-[12px] font-semibold uppercase tracking-[0.14em] text-fel-cyan">{l.cta} →</span>
     </Link>

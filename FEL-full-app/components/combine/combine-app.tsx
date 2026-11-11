@@ -8,6 +8,7 @@
 // only, as PUT /api/coach/combine/[id] takes them; the server keeps what the gates allow and names what it left on the
 // phone. A name the coach typed (held: age unknown) never leaves the phone.
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { lineSize } from '@/lib/design/type';
 import { ClipboardList, Loader2, Plus, Trash2 } from 'lucide-react';
 import { setBodyPlayDobYear } from '@/lib/move/bodyPlayGrownUp';
 import { parseStations } from '@/lib/combine/catalogue';
@@ -149,7 +150,7 @@ export function CombineApp({ api = COMBINE_API, dobYear = null }: { api?: string
       <button type="button" onClick={() => setView({ kind: 'setup' })} data-combine-new className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-fel-cyan text-lg font-black text-black">
         <Plus className="h-5 w-5" /> New combine
       </button>
-      {!ctx.available && <p className="text-xs text-white/50" data-combine-coming-soon>{COMING_SOON_LINE}</p>}
+      {!ctx.available && <p className={`${lineSize(COMING_SOON_LINE)} text-white/50`} data-combine-coming-soon>{COMING_SOON_LINE}</p>}
       {numbersOnly && <p className="text-xs text-fel-dim">{numbersOnly}</p>}
       {drafts.length > 0 && (
         <section className="space-y-2">
@@ -192,7 +193,7 @@ export function CombineApp({ api = COMBINE_API, dobYear = null }: { api?: string
         </section>
       )}
       {drafts.length === 0 && savedOnly.length === 0 && (
-        <p className="text-sm text-white/55">Run a tryout or testing day: pick who is testing and the stations, then take each athlete through them on this device. You get a ranked report at the end.</p>
+        <p className="text-base text-white/55">Run a tryout or testing day: pick who is testing and the stations, then take each athlete through them on this device. You get a ranked report at the end.</p>
       )}
     </div>
   );

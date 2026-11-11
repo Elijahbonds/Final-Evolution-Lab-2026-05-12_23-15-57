@@ -40,6 +40,8 @@ export const GROUP_COPY = {
   noneMine: 'No sessions booked yet.',
   bookOneOnOne: 'Book a 1:1 session',
   addressSoon: 'Address coming soon',
+  /** EVERY-SCREEN P5: the Train rows' line: the groups page's own eyebrow (app/groups/page.tsx), not new words */
+  inPerson: 'Train in person',
 } as const;
 
 // EVERY-SCREEN P1 (2026-11-10): what a switched-off booking screen says besides "Opens soon": why, and what to do

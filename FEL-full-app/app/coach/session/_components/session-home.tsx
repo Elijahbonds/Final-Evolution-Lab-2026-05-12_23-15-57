@@ -80,10 +80,10 @@ export function SessionHome({ serverVerified, optedIn }: { serverVerified: boole
 
       {mode === 'home' && (
         <div className="mt-6 grid gap-3">
-          <button type="button" onClick={() => setMode('roster')} className="min-h-16 rounded-2xl bg-[#FF2D95] px-4 text-2xl font-black text-black">
+          <button type="button" onClick={() => setMode('roster')} className="min-h-16 rounded-2xl border-2 border-[#FF2D95] px-4 text-2xl font-black text-[#FF2D95]">
             Dunk session
           </button>
-          <button type="button" onClick={() => setMode('roster')} className="min-h-16 rounded-2xl bg-fel-cyan px-4 text-2xl font-black text-black">
+          <button type="button" onClick={() => setMode('roster')} className="min-h-16 rounded-2xl border-2 border-fel-cyan px-4 text-2xl font-black text-fel-cyan">
             Training session
           </button>
         </div>

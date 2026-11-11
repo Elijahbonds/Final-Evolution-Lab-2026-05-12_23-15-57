@@ -113,15 +113,16 @@ export function KBAdmin() {
       </div>
 
       {/* Add Category */}
-      <div className="mt-6 flex gap-2">
+      <div className="mt-6 flex flex-wrap gap-2">
         <input
+          aria-label="New category name"
           value={newCatName}
           onChange={e => setNewCatName(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && addCategory()}
           placeholder="New category name…"
-          className="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/50 focus:border-fel-violet/50 focus:outline-none"
+          className="min-h-11 min-w-0 flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/50 focus:border-fel-violet/50 focus:outline-none"
         />
-        <button onClick={addCategory} className="flex items-center gap-1.5 rounded-lg bg-fel-violet px-4 py-2 text-sm font-bold text-white transition hover:bg-fel-violet/80">
+        <button onClick={addCategory} className="flex min-h-11 items-center gap-1.5 rounded-lg bg-fel-violet px-4 py-2 text-sm font-bold text-black transition hover:bg-fel-violet/80">
           <FolderPlus className="h-4 w-4" /> Add Category
         </button>
       </div>

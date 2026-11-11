@@ -139,6 +139,8 @@ check(JSON.stringify(bb.families) === JSON.stringify(['barbell', 'dbkb', 'body',
   await page.waitForSelector('[data-vbt-setup]');
   await page.fill('[data-vbt-load]', '100');
   await page.fill('[data-vbt-height]', '178');
+  // EVERY-SCREEN P5: the slow-motion picker is a fold (components/every-screen/fold.tsx): open it first
+  await page.click('[data-fold="vbt-slowmo"] > button');
   await page.click('[data-vbt-filmed="240"]');
   await page.setInputFiles('[data-vbt-file]', { name: 'squat-slowmo.mov', mimeType: 'video/quicktime', buffer: Buffer.from('not a real video: the rig decodes through the seam') });
   await page.waitForSelector('[data-vbt-summary]');

@@ -3,6 +3,7 @@
 // line says free or "counts as used" before the tap), and their make-up credits: a missed or cancelled package session
 // with the open Friday/Saturday slots at the group's gym this week or next (one tap books it).
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { SHOP_LOOK as L } from '@/components/shop/look';
 import { GROUP_COPY as T, errorLine, MAKEUP_REFUSAL_COPY } from '@/lib/group-booking/copy';
 import { ME_API, postJson } from '@/lib/group-booking/client';
@@ -14,7 +15,9 @@ interface Mine { available: boolean; seats?: Seat[]; makeups?: Credit[]; oneOnOn
 
 const when = (iso: string) => new Date(iso).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' });
 
-export function MyGroupSessions() {
+/** compact (EVERY-SCREEN P5, on Train): only when something is booked, so cancelling is Train → Cancel → confirm, with the
+ *  rule on screen before the first tap; the full list (and "none booked yet") stays on /groups. */
+export function MyGroupSessions({ compact = false }: { compact?: boolean } = {}) {
   const [mine, setMine] = useState<Mine | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<string | null>(null);
@@ -31,12 +34,18 @@ export function MyGroupSessions() {
     load();
   };
   const seats = mine.seats ?? [], credits = (mine.makeups ?? []).filter((c) => c.options.length), ones = mine.oneOnOne ?? [];
+  if (compact && !seats.some((x) => x.status === 'booked') && !ones.some((x) => x.status === 'booked')) return null;
+  // on Train, the next two (a package is eight seats); the heading opens the whole list on /groups
+  const seatsShown = compact ? seats.filter((x) => x.status === 'booked').slice(0, 2) : seats;
+  const onesShown = compact ? ones.filter((x) => x.status === 'booked').slice(0, Math.max(0, 2 - seatsShown.length)) : ones;
   return (
     <section className={L.section} data-my-group-sessions>
-      <h2 className={L.sectionTitle}>{T.mine}</h2>
+      <h2 className={L.sectionTitle}>{compact ? <Link href="/groups" className="inline-flex min-h-11 items-center" data-my-sessions-all>{T.mine} →</Link> : T.mine}</h2>
+      {/* EVERY-SCREEN P5: on Train the owner's cancel rule comes first, above the Cancel buttons */}
+      {compact && mine.cancelLine ? <p className={L.lede} data-cancel-rule>{mine.cancelLine}</p> : null}
       {!seats.length && !ones.length ? <p className={L.lede}>{T.noneMine}</p> : null}
       <ul className={L.rows}>
-        {seats.map((s) => (
+        {seatsShown.map((s) => (
           <li key={s.id}>
             <div className={L.row}>
               <span>{s.title}{s.kind === 'makeup' ? ` · ${T.makeup}` : ''}<span className="block text-xs text-fel-soft">{s.dayLabel} · {s.time} · {s.gymName}{s.status !== 'booked' ? ` · ${s.status}` : ''}</span></span>
@@ -48,7 +57,7 @@ export function MyGroupSessions() {
             </div>
           </li>
         ))}
-        {ones.map((s) => (
+        {onesShown.map((s) => (
           <li key={s.id}>
             <div className={L.row}>
               <span>1:1 with {s.trainerName}<span className="block text-xs text-fel-soft">{when(s.startsAt)} · {s.gymName} · {s.priceLabel}</span></span>
@@ -61,7 +70,7 @@ export function MyGroupSessions() {
           </li>
         ))}
       </ul>
-      {credits.length ? (
+      {!compact && credits.length ? (
         <div className="mt-6" data-makeups>
           <h3 className={L.sectionTitle}>Make up a session</h3>
           {credits.map((c) => (
@@ -77,7 +86,7 @@ export function MyGroupSessions() {
           ))}
         </div>
       ) : null}
-      {mine.cancelLine ? <p className={`${L.lede} mt-4`}>{mine.cancelLine}</p> : null}
+      {!compact && mine.cancelLine ? <p className={`${L.lede} mt-4`} data-cancel-rule>{mine.cancelLine}</p> : null}
       {msg ? <p role="status" className={L.alert}>{msg}</p> : null}
     </section>
   );
