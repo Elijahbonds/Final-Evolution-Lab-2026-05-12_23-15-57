@@ -172,6 +172,24 @@ the Studio:
   170 px below the first screen once Inspect is open, and filling it worked (`#ff3366`) on the phone and the desktop. Not reproduced.
   JPG: `colour-390.jpg` in the lane's scratch folder.
 
+**Re-measured by `lane/studio-22` (2026-11-11, owner: "Fix the last 4 first"): 22 of 22.** The claim above was checked, not
+trusted (`docs/STUDIO-EASY-AUDIT.md` §8). Play-test and first court were the rig, as said: reproduced 4 of 4 on `bd030d9d`, and the
+rig had never followed the tab into the game at all. The phone colour was **both**: the rig never pressed Inspect (Playwright counted
+the colour inside the hidden sheet as visible), and once Inspect is pressed the light's colour sat 192 px below the screen in a
+108 px sheet. The rig is fixed and now follows Play-test into the real game page; the Studio's phone Inspect now opens on the
+object's own fields (192 px below → on the first screen). Results, the 11 tasks at 390 × 844 and 1280 × 800:
+
+- **Production build (what `NEXUS_STUDIO_ENABLED=1` serves), three runs: 66 of 66, 22 of 22 in each run.** Play-test moves the tab
+  to `/play/tennis?variant=tiebreak&share=…`; the game loads the Studio's venue (the one handed over, not competitive), the run
+  starts as practice (`playtest: true`), and after "Make it for me" the scene holds the Studio's four floodlights under its night light.
+- **Development build (the audit's configuration), one run: 22 of 22.** Play-test opens `/dev/mode/tiebreak?venue=…` in a new tab
+  and the game loads the same venue.
+- Tap counts held against the audit's §5 in every run; the phone's "place" is now measured at 4 taps + 1 key (Floodlight, Inspect,
+  the colour picker, Ctrl+Z), where §5 had it open.
+
+JPGs (studio-22 scratch): the game running from the Studio, `prod/phone-playtest-game-run3.jpg`, `prod/desktop-firstcourt-game-run2.jpg`;
+the phone's Inspect before and after, `inspect-390-before.jpg`, `inspect-390-prod.jpg`.
+
 **Recommendation for the owner:** set `NEXUS_STUDIO_ENABLED=1` when you want to use the Studio in production yourself. It opens
 the editor to founder and admin accounts only, opens no paid surface and no share links, and is undone by unsetting it.
 
