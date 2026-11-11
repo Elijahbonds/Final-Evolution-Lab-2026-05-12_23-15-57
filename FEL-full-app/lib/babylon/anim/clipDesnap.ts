@@ -103,3 +103,58 @@ export function desnapTracks(tracks: Record<string, QuatTrack>, protect: readonl
   for (const bone of Object.keys(tracks)) moved += desnapTrack(tracks[bone], protect);
   return moved;
 }
+
+/**
+ * GAMEPLAY-CLEAN-7 (2026-11-11): A FAST STRETCH, NOT A SNAP — re-keyed under a speed cap, for the listed clips and bones only.
+ *
+ * The hoops made-shot celebration (`bball_score_celebrate` → `dunk_celebrate_big`, which the hero and the rivals play as the capture
+ * `dunk_mc_celebrate_big`) turns the upper arms 28–32° a 60 fps frame by itself at 0.43–0.57 s, the elbows swinging out as the fists
+ * come up (key steps 41–66° on 30 fps keys). The audit's hard pop is 25° a frame. It is not a one-step snap (its neighbours are fast
+ * too), so the desnap rule above leaves it. Here each step over the cap is spread over the keys either side, widened one key at a
+ * time until the constant-speed path across the window is under the cap (at most CAP_MAX_SPREAD keys a side); the window's end poses,
+ * and any hold, are kept. Feel knob `anim.celebrateEase` (default ON): 0 builds the clip exactly as before. The clip file is untouched.
+ */
+export const SPEED_CAP_CLIPS: ReadonlyMap<string, readonly string[]> = new Map([
+  ['dunk_mc_celebrate_big', ['LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm']],
+]);
+/** The cap (°/s): 20° a 60 fps frame, under the audit's 25° hard pop. */
+export const SPEED_CAP_DEG_PER_SEC = 1200;
+const CAP_MAX_SPREAD = 6;
+/** Feel knob `anim.celebrateEase` default: 1 = the listed clips' fast stretches re-keyed under the cap, 0 = as captured. */
+export const CELEBRATE_EASE_ON = 1;
+export function celebrateEaseOn(): boolean {
+  return feel('anim.celebrateEase', CELEBRATE_EASE_ON) >= 0.5;
+}
+
+/** Re-key one track so no key step is faster than `capDegPerSec` where a window of ≤ CAP_MAX_SPREAD keys a side allows it. Returns
+ *  the keys moved. */
+export function capTrackSpeed(track: QuatTrack, capDegPerSec = SPEED_CAP_DEG_PER_SEC, protect: readonly number[] = []): number {
+  const isProtected = (t: number) => protect.some((p) => Math.abs(p - t) < 1e-4);
+  let moved = 0;
+  for (let pass = 0; pass < 24; pass++) {
+    const sp = stepSpeeds(track);
+    let i = -1;
+    for (let k = 0; k < sp.length; k++) if (sp[k] > capDegPerSec + 1e-6 && (i < 0 || sp[k] > sp[i])) i = k;
+    if (i < 0) break;
+    let done = false;
+    for (let r = 1; r <= CAP_MAX_SPREAD && !done; r++) {
+      let a = Math.max(0, i - r), b = Math.min(track.length - 1, i + 1 + r);
+      for (let k = i; k > a; k--) if (isProtected(track[k][0])) { a = k; break; }
+      for (let k = i + 1; k < b; k++) if (isProtected(track[k][0])) { b = k; break; }
+      if (b - a < 2) continue;
+      const [ta, qa] = track[a], [tb, qb] = track[b];
+      if (angleDeg(qa, qb) / (tb - ta) > capDegPerSec && r < CAP_MAX_SPREAD) continue;
+      for (let k = a + 1; k < b; k++) { track[k] = [track[k][0], Quaternion.Slerp(qa, qb, (track[k][0] - ta) / (tb - ta))]; moved++; }
+      done = true;
+    }
+    if (!done) break;
+  }
+  return moved;
+}
+
+/** Re-key the listed bones of a clip being built (poseClip's bone → keys map) under the cap. Returns the keys moved. */
+export function capTracks(tracks: Record<string, QuatTrack>, bones: readonly string[], protect: readonly number[] = []): number {
+  let moved = 0;
+  for (const bone of bones) if (tracks[bone]) moved += capTrackSpeed(tracks[bone], SPEED_CAP_DEG_PER_SEC, protect);
+  return moved;
+}

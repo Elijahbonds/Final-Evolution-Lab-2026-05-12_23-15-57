@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { ANIM_INERTIAL_MODES_ON, ANIM_INERTIAL_MIN_HALF_LIFE_SEC, applyInertialBlend, inertialHalfLife, inertialOn } from './inertialize';
+import { ANIM_INERTIAL_FOOTBALL_ON, ANIM_INERTIAL_SURF_ON, ANIM_INERTIAL_MODES_ON, ANIM_INERTIAL_MIN_HALF_LIFE_SEC, applyInertialBlend, inertialHalfLife, inertialOn } from './inertialize';
 import { FEEL_STORAGE_KEY, resetFeelForTests, setFeelSession, setFeelUser } from '../../feel-panel/feel';
 import { feelSessionBlock } from '../../feel-panel/sessionGate';
 
@@ -47,4 +47,29 @@ describe('anim.inertialModesOn', () => {
       .filter((f) => /applyInertialBlend\([^)]*'measured'\)/.test(readFileSync(join(dir, f), 'utf8'))).sort();
     expect(opted).toEqual(['DuelMode.ts', 'KarateEndlessMode.ts', 'KarateVSMode.ts', 'MixedCombatMode.ts', 'ShowdownMode.ts', 'SkateRunMode.ts']);
   });
+});
+
+// GAMEPLAY-CLEAN-7 (2026-11-11): the football runner and the surfer, one knob each (their defaults are the rig's verdict, audit §4i)
+/** A fresh page with these overrides (the feel store reads the device's storage once a page). */
+const fresh = (o: Record<string, number>) => { resetFeelForTests(); knobs(o); };
+describe('anim.inertialFootballOn / anim.inertialSurfOn', () => {
+  for (const [scope, id, def, file] of [['football', 'anim.inertialFootballOn', ANIM_INERTIAL_FOOTBALL_ON, 'FootballRushMode.ts'], ['surf', 'anim.inertialSurfOn', ANIM_INERTIAL_SURF_ON, 'SurfBreakMode.ts']] as const) {
+    it(`${scope}: the default (${def}) decides the hero; 0 leaves the animator untouched (linear exactly); 1 switches it`, () => {
+      const d = spy(); expect(applyInertialBlend(d.a, scope)).toBe(def >= 0.5); expect(d.calls).toEqual(def >= 0.5 ? ['inertial'] : []);
+      fresh({ [id]: 0 });
+      const off = spy(); expect(applyInertialBlend(off.a, scope)).toBe(false); expect(off.calls).toEqual([]);
+      fresh({ [id]: 1 });
+      const on = spy(); expect(applyInertialBlend(on.a, scope)).toBe(true); expect(on.calls).toEqual(['inertial']);
+    });
+    it(`${scope}: its knob does not reach the six measured modes, nor theirs it`, () => {
+      fresh({ [id]: 0 });
+      const m = spy(); expect(applyInertialBlend(m.a, 'measured')).toBe(true);
+      fresh({ 'anim.inertialModesOn': 0, [id]: 1 });
+      const o = spy(); expect(applyInertialBlend(o.a, scope)).toBe(true);
+    });
+    it(`${scope}: the hero opts in from ${file}, once`, () => {
+      const src = readFileSync(join(__dirname, '../modes', file), 'utf8');
+      expect(src.match(new RegExp(`applyInertialBlend\\([^)]*'${scope}'\\)`, 'g'))?.length).toBe(1);
+    });
+  }
 });

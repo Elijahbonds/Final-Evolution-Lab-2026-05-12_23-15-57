@@ -801,7 +801,7 @@ export const FootballRushMode: ModeDefinition = (() => {
       ctx.groundLock?.track(runner.root, runner.skeleton);
       ctx.heroRef.current = runner.root;
       animTree = new FootballAnimTree(runner.animator);
-      applyInertialBlend(runner.animator);   // GAMEPLAY-CLEAN P2 #2: AF-1 inertial transitions behind anim.inertial (default off: linear, unchanged)
+      applyInertialBlend(runner.animator, 'football');   // GAMEPLAY-CLEAN-7: on by default on the runner (anim.inertialFootballOn; 0 = linear, as before)   // GAMEPLAY-CLEAN P2 #2: AF-1 inertial transitions behind anim.inertial (default off: linear, unchanged)
       animTree.onSettle = (st) => { if (st === 'juke' || st === 'spin' || st === 'stiff_arm') { move = null; dodging = false; } };
       posture?.dispose();
       posture = mountPostureLayer(ctx.scene, runner.skeleton, runner.root, () => {
