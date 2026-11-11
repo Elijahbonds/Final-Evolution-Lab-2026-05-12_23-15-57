@@ -6,27 +6,29 @@
 
 **How to read it.** Taps are counted from the signed-in home; the Train tab is one tap. Typing is counted apart. Seconds are the rig's own, with no reading time: a floor, not a person's time. A camera job is walked to the moment it needs a person in front of the camera. "Stops" means a person cannot go further on that path today, and says where.
 
-**Today: 28 of 28 jobs can be walked to their end** (or to the camera); 0 stop.
+**Today: 31 of 31 jobs can be walked to their end** (or to the camera); 0 stop.
 
 ## An athlete training alone
 
 | Job | Taps | Typing | Seconds | What happens | The plan's budget |
 |---|---|---|---|---|---|
+| Pick a game on Play and start playing | 2 | – | 31 | finishes | pick a game → playing in ≤ 2 taps (phase 7) |
+| The party room: what each empty seat waits for | 0 | – | 0 | reaches it: the lobby: it waits for phones or controllers to join | a lobby always says what it is waiting for (phase 7) |
 | Start today's workout (today's drill) | 3 | – | 2 | reaches it: the drill is on camera: it needs a person in the picture | open app → first exercise in ≤ 2 taps and ≤ 10 s (phase 2) |
-| Start today's workout (a program kept on this phone) | 2 | – | 8.1 | finishes | open app → first exercise in ≤ 2 taps and ≤ 10 s (phase 2) |
-| Ask the AI builder for a program and start it | 4 | 1 | 9.8 | finishes | ask → first rep in ≤ 4 taps (phase 3) |
+| Start today's workout (a program kept on this phone) | 2 | – | 8.2 | finishes | open app → first exercise in ≤ 2 taps and ≤ 10 s (phase 2) |
+| Ask the AI builder for a program and start it | 4 | 1 | 10.4 | finishes | ask → first rep in ≤ 4 taps (phase 3) |
 | Change one thing in the program the AI built, and start it | 3 | – | 1.4 | finishes | change one thing without starting over; save, and start (phase 3) |
-| Log a set (in the program the AI built) | 1 | – | 8.1 | finishes | log a set in 1 tap (phase 2) |
-| Finish a session (in the program the AI built) | 15 (14 sets + 1 other) (+ 44 waits the rig skipped) | – | 36.5 | finishes | a 5-exercise session in ≤ 12 taps beyond the sets (phase 2) |
-| Test a jump (measure my vertical) | 3 | – | 2.2 | reaches it: the camera: three jumps in front of it (the reading itself is measured on recorded jumps, not on this rig) | vertical in ≤ 3 taps (phase 4) |
-| Run the movement screen | 3 | – | 2.2 | reaches it: the camera: four moves in front of it | movement screen in 3 taps and under 3 minutes (phase 4) |
-| See progress | 2 | – | 1.9 | finishes | progress number → its source in 1 tap (phase 4) |
+| Log a set (in the program the AI built) | 1 | – | 8.4 | finishes | log a set in 1 tap (phase 2) |
+| Finish a session (in the program the AI built) | 15 (14 sets + 1 other) (+ 44 waits the rig skipped) | – | 40.1 | finishes | a 5-exercise session in ≤ 12 taps beyond the sets (phase 2) |
+| Test a jump (measure my vertical) | 3 | – | 2.6 | reaches it: the camera: three jumps in front of it (the reading itself is measured on recorded jumps, not on this rig) | vertical in ≤ 3 taps (phase 4) |
+| Run the movement screen | 3 | – | 2.6 | reaches it: the camera: four moves in front of it | movement screen in 3 taps and under 3 minutes (phase 4) |
+| See progress | 2 | – | 2 | finishes | progress number → its source in 1 tap (phase 4) |
 | See where a progress number came from | 2 | – | 10.9 | finishes | progress number → its source in 1 tap (phase 4) |
 | Find and join a group | 0 | – | 0 | reaches it: switched off until the group-booking tables are applied: the screen says so and offers what to do instead | join a group in ≤ 4 taps (phase 5) |
-| Book a 1:1 | 1 | – | 0.5 | reaches it: switched off until the group-booking tables are applied: the screen says so and offers what to do instead | book a 1:1 in ≤ 5 taps (phase 5) |
+| Book a 1:1 | 1 | – | 0.6 | reaches it: switched off until the group-booking tables are applied: the screen says so and offers what to do instead | book a 1:1 in ≤ 5 taps (phase 5) |
 | Cancel a booking | 0 | – | 0 | reaches it: switched off: nothing can be booked, so there is nothing to cancel; the notice says what to do instead | cancel in ≤ 3 taps with the rule shown first (phase 5) |
-| Find and join a group (booking open) | 4 | – | 2 | finishes | join a group in ≤ 4 taps (phase 5) |
-| Book a 1:1 (booking open) | 5 | – | 2.5 | finishes | book a 1:1 in ≤ 5 taps (phase 5) |
+| Find and join a group (booking open) | 4 | – | 1.9 | finishes | join a group in ≤ 4 taps (phase 5) |
+| Book a 1:1 (booking open) | 5 | – | 2.4 | finishes | book a 1:1 in ≤ 5 taps (phase 5) |
 | Cancel a booking (booking open) | 3 | – | 1.4 | finishes | cancel in ≤ 3 taps with the rule shown first (phase 5) |
 
 ## A coached client
@@ -34,19 +36,104 @@
 | Job | Taps | Typing | Seconds | What happens | The plan's budget |
 |---|---|---|---|---|---|
 | Start today's workout (the coach's session) | 2 | – | 1 | finishes | open app → first exercise in ≤ 2 taps and ≤ 10 s (phase 2) |
-| Log a set (the coach's session) | 1 | – | 7.8 | finishes | log a set in 1 tap (phase 2) |
-| Finish a session (the coach's session) | 9 (8 sets + 1 other) (+ 28 waits the rig skipped) | – | 22.7 | finishes | a 5-exercise session in ≤ 12 taps beyond the sets (phase 2) |
+| Log a set (the coach's session) | 1 | – | 8.2 | finishes | log a set in 1 tap (phase 2) |
+| Finish a session (the coach's session) | 9 (8 sets + 1 other) (+ 28 waits the rig skipped) | – | 25.1 | finishes | a 5-exercise session in ≤ 12 taps beyond the sets (phase 2) |
 
 ## The coach
 
 | Job | Taps | Typing | Seconds | What happens | The plan's budget |
 |---|---|---|---|---|---|
 | See who trained | 2 | – | 2 | finishes | "Who needs me today" is the coach's first screen (phase 5) |
-| Adjust a program (change one exercise) | 6 | – | 3.9 | finishes | adjust one exercise in ≤ 4 taps (phase 5) |
-| Review a form clip | 3 | – | 2.4 | reaches it: switched off until the form-review table is applied: clients film a set and read their own flags; nothing reaches the coach yet, and the screen says so | – (phase 5) |
+| Adjust a program (change one exercise) | 6 | – | 3.4 | finishes | adjust one exercise in ≤ 4 taps (phase 5) |
+| Review a form clip | 3 | – | 1.6 | reaches it: switched off until the form-review table is applied: clients film a set and read their own flags; nothing reaches the coach yet, and the screen says so | – (phase 5) |
 | Take group attendance | 3 | – | 2.4 | reaches it: switched off until the group-booking tables are applied: the screen says so and offers what to do instead | attendance in ≤ 1 tap per person (phase 5) |
-| Open shot charts | 4 | – | 2.9 | reaches it: switched off until the shot-chart table is applied: the screen says so and offers a way back | – (phase 5) |
-| Take group attendance (booking open) | 4 | – | 2.9 | finishes | attendance in ≤ 1 tap per person (phase 5) |
+| Open shot charts | 4 | – | 3 | reaches it: switched off until the shot-chart table is applied: the screen says so and offers a way back | – (phase 5) |
+| Take group attendance (booking open) | 4 | – | 2.4 | finishes | attendance in ≤ 1 tap per person (phase 5) |
+
+## What changed in phase 7 (around the games, measured on the rig)
+
+The plan's gate: pick a game → playing in ≤ 2 taps; results → play again in 1; a lobby always says what it is waiting
+for; every screen in this group passes all four checks. Not the play itself, and no feel number changed.
+
+| Job | Now | The plan |
+|---|---|---|
+| Pick a game on Play and start playing (throttled phone) | 2 taps (the game, Tap to start), 35 s with the arena's load | ≤ 2 taps |
+| Results → play again | 1 tap: the end screen's first, focused button is Play again (its own tests: `components/games/end-screen/end-screen.test.tsx`). Not walked: a whole game cannot be driven to its results in a production build on the rig. | 1 tap |
+| A lobby says what it waits for | The party room: every empty seat says "Scan the code · or press A on a controller". Online parties are switched off; versus challenges are asynchronous (no waiting room); `/host` opens the game's own start card. | always |
+| Owner (2026-11-11): sign up with a birth date, then the vertical test | No "How old are you?": straight to the pain question (the LIT rig, where the birth date is kept). On the main rig, as in production today, only the year is kept, and the question is asked. | asked once |
+
+**The phase's 49 read screens:** 5 pass all four checks (2 before the phase); 11 more have no fault but "fast" not
+measured (a 3D screen's tap time on a rig with no GPU). The wordless loading spinner is gone from all 26 game screens.
+What still fails, and why it stays:
+
+- the start card's how-to lines are 14 px and zoom with the rows to fit (never under 12 px), so a line of more than 12
+  words reads as small body text on several modes. Tried in this phase: unzoomed lines that scroll at 14/16 px pass six
+  more screens, but the panel then cut its own words off at 150 % and 200 % text (who-scene-it). Kept the version that
+  hides nothing; a panel that scrolls as a whole is the fix (phase 10);
+
+- the in-game HUD's 12 px plates (`data-hud-plate`, the score, RD 1/2) on several modes: the play itself, not this phase's;
+- `/play`: the shelf's mode lists clip at three lines (the owner's line-clamp-3, 2026-11-10);
+- `/play/party` jumped as it loaded in the last reading (0.052): not found in this phase;
+- the tiebreak HUD's title under the shell's "⋯" capture menu: the HUD is the play itself, and the menu owns the stage's
+  corner in every mode (a gameplay-lane or owner call);
+- `/arena`: the owner's arena age-gate screen (#543), read only;
+- words over 40 on the setup screens of acting, irl, calibrate, music, baseball, dunkduel, the party pages and the map
+  preview (their own explanations; cutting them is new copy);
+- the tennis start card's 0.138 shift did not reproduce (layout shift 0 in this crawl); `/coach/join/[token]`'s top bar
+  arriving late reproduced once (0.135, phase 5's finding).
+
+## What changed in phase 6 (the first five minutes, measured on the rig)
+
+The plan's gate: a new person goes from the home page to doing something real (a game or a first workout) in ≤ 4 taps and
+under 60 s on the throttled phone; sign-up asks for nothing twice; every screen in this group passes all four checks. The
+walks below are a new person, signed out, on the throttled phone (CPU 4×, as the crawl reads every screen).
+
+| Job | Now | The plan |
+|---|---|---|
+| From the home page to playing a game | 3 taps, 30 s: Play now, Play without saving (the arena loads), Tap to start | ≤ 4 taps, under 60 s |
+| From the home page to a first workout (the vertical test) | 3 taps, 4 s to the camera: Measure my vertical, 18 or older, No, nothing hurts | ≤ 4 taps, under 60 s |
+| Sign up | birth date (year, month, day), then the name, email and password, the terms tick: each asked once; it lands in the first game picked | asks for nothing twice |
+
+**Asked again after sign-up (not changed: an age rule, the owner's call).** Sign-up records the birth date; the Quick Screen
+and the vertical test then ask "How old are you?" again (the walk "New: sign up, then the vertical test"). Proposal for the
+owner: for a signed-in person whose birth date is on file, take the screen's age band from the account and skip the
+question. The question, its bands and what each band does would stay exactly as they are for everyone else.
+
+### The phase's screens
+
+| Screen | Result | Why |
+|---|---|---|
+| `/` | passes all four | The home headline (PR #540) is unchanged. |
+| `/age` | redirects to `/` | |
+| `/consent/guardian` | passes all four (was: 90 words) | Its two lines are approved consent and privacy notices (71 words), now marked and not counted; the wording is unchanged (`lib/consent/guardian-copy.ts`). |
+| `/consent/guardian/[token]` | not read | Needs a guardian-consent row with its emailed token; the rig has none. |
+| `/join` | passes all four | |
+| `/login` | listed: 41 words (the budget is 40) | Was 166: the scorer counted the venue strip's cards past the right edge. One word over. Proposal (owner's wording): the tagline "Real sports, real training — your on-court reps become real stats." as "Real sports. Real training. Real stats." |
+| `/signup` | listed: 51 words; 4 button looks; Continue answers in 280 ms | The age step comes first (an age rule) and its Continue is the age step's own (`components/age-step.tsx`, read only); under it, "What did you come for?" and its five choices. Proposal: show the five choices once the birth date is confirmed (a change of the flow: the owner's call). |
+| `/try` | passes all four (was: QUIT 40 px tall) | |
+| `/welcome` | passes all four (was: 13.5 px steps, five sizes) | |
+
+### Approved notices: what the owner's rule changed (2026-11-11)
+
+Medical, privacy and consent notices are marked in the code (`{...notice(kind)}`, only on a constant listed in
+`lib/every-screen/notices.ts`) and left out of the 40 words; everything else counts. On the do-this screens that carry one:
+
+| Screen | Phase | Phase 5 (old rule) | Now, all words | Approved notices | Counted | The 40-word rule |
+|---|---|---|---|---|---|---|
+| `/consent/guardian` | 6 | 90 | 90 | 71 | 19 | fails → passes |
+| `/play/mirror/assess` | 4 | 73 | 73 | 31 | 42 | still over |
+| `/play/mirror/assess/results` | 4 | 47 | 47 | 14 | 33 | fails → passes |
+| `/screen` | 4 | 73 | 73 | 31 | 42 | still over |
+| `/screen/program/[lane]` | 4 | 48 | 48 | 14 | 34 | fails → passes |
+| `/train/readiness` | 4 | 72 | 72 | 15 | 57 | still over |
+| `/train/shots` | 4 | 92 | 92 | 17 | 75 | still over |
+
+**For phase 7 (around the games), not this phase's:** the tennis start card shifts 0.138 when its weather buttons re-wrap;
+the game HUD's "…" menu button overlaps the TIEBREAK title at the top left; `/play/freerun` and `/play/tennis` answer a tap
+slowly; `/play/adventure-br`'s word count; `/play/adventure` read blank in this crawl (a dead end).
+
+Also in this re-score: words past the right edge (a carousel) are no longer "before scrolling": `/login` 166 → 41,
+`/play/map-preview` 71 → 47.
 
 ## What changed in phase 5 (phase 4's "after" → now, measured on the rig)
 

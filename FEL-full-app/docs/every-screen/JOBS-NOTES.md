@@ -1,3 +1,35 @@
+## What changed in phase 7 (around the games, measured on the rig)
+
+The plan's gate: pick a game → playing in ≤ 2 taps; results → play again in 1; a lobby always says what it is waiting
+for; every screen in this group passes all four checks. Not the play itself, and no feel number changed.
+
+| Job | Now | The plan |
+|---|---|---|
+| Pick a game on Play and start playing (throttled phone) | 2 taps (the game, Tap to start), 35 s with the arena's load | ≤ 2 taps |
+| Results → play again | 1 tap: the end screen's first, focused button is Play again (its own tests: `components/games/end-screen/end-screen.test.tsx`). Not walked: a whole game cannot be driven to its results in a production build on the rig. | 1 tap |
+| A lobby says what it waits for | The party room: every empty seat says "Scan the code · or press A on a controller". Online parties are switched off; versus challenges are asynchronous (no waiting room); `/host` opens the game's own start card. | always |
+| Owner (2026-11-11): sign up with a birth date, then the vertical test | No "How old are you?": straight to the pain question (the LIT rig, where the birth date is kept). On the main rig, as in production today, only the year is kept, and the question is asked. | asked once |
+
+**The phase's 49 read screens:** 5 pass all four checks (2 before the phase); 11 more have no fault but "fast" not
+measured (a 3D screen's tap time on a rig with no GPU). The wordless loading spinner is gone from all 26 game screens.
+What still fails, and why it stays:
+
+- the start card's how-to lines are 14 px and zoom with the rows to fit (never under 12 px), so a line of more than 12
+  words reads as small body text on several modes. Tried in this phase: unzoomed lines that scroll at 14/16 px pass six
+  more screens, but the panel then cut its own words off at 150 % and 200 % text (who-scene-it). Kept the version that
+  hides nothing; a panel that scrolls as a whole is the fix (phase 10);
+
+- the in-game HUD's 12 px plates (`data-hud-plate`, the score, RD 1/2) on several modes: the play itself, not this phase's;
+- `/play`: the shelf's mode lists clip at three lines (the owner's line-clamp-3, 2026-11-10);
+- `/play/party` jumped as it loaded in the last reading (0.052): not found in this phase;
+- the tiebreak HUD's title under the shell's "⋯" capture menu: the HUD is the play itself, and the menu owns the stage's
+  corner in every mode (a gameplay-lane or owner call);
+- `/arena`: the owner's arena age-gate screen (#543), read only;
+- words over 40 on the setup screens of acting, irl, calibrate, music, baseball, dunkduel, the party pages and the map
+  preview (their own explanations; cutting them is new copy);
+- the tennis start card's 0.138 shift did not reproduce (layout shift 0 in this crawl); `/coach/join/[token]`'s top bar
+  arriving late reproduced once (0.135, phase 5's finding).
+
 ## What changed in phase 6 (the first five minutes, measured on the rig)
 
 The plan's gate: a new person goes from the home page to doing something real (a game or a first workout) in ≤ 4 taps and
@@ -45,8 +77,8 @@ Medical, privacy and consent notices are marked in the code (`{...notice(kind)}`
 | `/train/shots` | 4 | 92 | 92 | 17 | 75 | still over |
 
 **For phase 7 (around the games), not this phase's:** the tennis start card shifts 0.138 when its weather buttons re-wrap;
-the game HUD's "…" menu button overlaps the TIEBREAK title at the top left; \`/play/freerun\` and \`/play/tennis\` answer a tap
-slowly; \`/play/adventure-br\`'s word count; \`/play/adventure\` read blank in this crawl (a dead end).
+the game HUD's "…" menu button overlaps the TIEBREAK title at the top left; `/play/freerun` and `/play/tennis` answer a tap
+slowly; `/play/adventure-br`'s word count; `/play/adventure` read blank in this crawl (a dead end).
 
 Also in this re-score: words past the right edge (a carousel) are no longer "before scrolling": `/login` 166 → 41,
 `/play/map-preview` 71 → 47.
