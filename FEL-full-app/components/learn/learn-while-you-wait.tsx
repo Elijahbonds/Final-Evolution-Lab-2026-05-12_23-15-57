@@ -140,7 +140,7 @@ export function LearnWhileYouWait({ compact = false, className = '' }: { compact
       {topic.notAdvice && <p className="mt-1.5 text-[12px] text-amber-200/60">{mods.topics.NOT_ADVICE_LINE[topic.notAdvice]}</p>}
 
       <div className="mt-2.5 flex items-center justify-between gap-2">
-        <button type="button" onClick={next} className="rounded-full bg-white/10 px-3 py-1 text-[12px] font-bold text-white hover:bg-white/20">
+        <button type="button" onClick={next} className="inline-flex min-h-11 items-center rounded-full bg-white/10 px-3 text-[12px] font-bold text-white hover:bg-white/20">
           {card.type === 'quiz' && picked === null ? 'Skip' : 'Next card'}
         </button>
         {!compact && (

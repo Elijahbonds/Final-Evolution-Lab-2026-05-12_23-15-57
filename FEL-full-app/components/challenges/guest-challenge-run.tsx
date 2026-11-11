@@ -10,18 +10,16 @@
 
 import dynamicImport from 'next/dynamic';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Loader2 } from 'lucide-react';
 import { prqGrade } from '@/lib/prq';
 import { AgeStep, ageBlockPresent, writeAgeBlockFlag } from '@/components/age-step';
 import { ageScreenOutcome } from '@/lib/privacy/ageScreen';
 import type { GameProps, GameResult } from '@/components/games/game-shell';
 import { formatChallengeScore, outcomeOf, type ChallengeOutcome } from '@/lib/social/challenge-terms';
 import { ChallengeResultCard, type ResultViewer } from './challenge-result-card';
+import { GameLoading } from '@/components/games/game-loading';
 
 const spinner = () => (
-  <div className="flex h-[60vh] items-center justify-center">
-    <Loader2 className="h-8 w-8 animate-spin text-[#00E5FF]" />
-  </div>
+  <GameLoading />
 );
 
 /** The guest hosts (lib/social/challenge-guest-play.ts GUEST_HOST_MODES). */

@@ -1,14 +1,12 @@
 'use client';
 
 import dynamicImport from 'next/dynamic';
-import { Loader2 } from 'lucide-react';
 import { GameShell } from '@/components/games/game-shell';
 import { is3D, isBabylon } from '@/components/three/flags';
+import { GameLoading } from '@/components/games/game-loading';
 
 const spinner = () => (
-  <div className="flex h-[60vh] items-center justify-center">
-    <Loader2 className="h-8 w-8 animate-spin text-[#00E5FF]" />
-  </div>
+  <GameLoading />
 );
 
 const GolfGame2D = dynamicImport(() => import('@/components/games/golf-game'), { ssr: false, loading: spinner });

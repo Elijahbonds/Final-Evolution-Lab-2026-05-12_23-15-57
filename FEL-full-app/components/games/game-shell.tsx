@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AnimatePresence } from 'framer-motion';
 import { Maximize2, Minimize2, ArrowLeft, Loader2 } from 'lucide-react';
+import { GAME_LOADING } from '@/components/games/game-loading';
 import type { PrqGrade } from '@/lib/prq';
 import { readPrqDisplay, type PrqDisplay } from '@/lib/prq-display';
 import { PhysicalGamepadPoller } from '@/lib/gamepad-bridge';
@@ -114,9 +115,6 @@ interface RecapData {
   goals?: EndGoals | null;
   sessionId?: string | null;
 }
-
-/** EVERY-SCREEN P7: what the game's loading spinner waits for (a spinner with no words was the rig's commonest fault on the game screens). */
-const GAME_LOADING = 'Loading the game…';
 
 export function GameShell(props: {
   mode: string;

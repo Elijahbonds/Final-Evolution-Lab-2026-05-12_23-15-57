@@ -73,7 +73,7 @@ export function HostStage({ modeId: initialModeId, couch = false, exitHref }: Ho
     <div data-host-modes style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', margin: '0 0 18px' }}>
       {modes.map((m) => (
         <button key={m.modeId} type="button" data-mode={m.modeId} aria-pressed={m.modeId === modeId} onClick={() => choose(m.modeId)}
-          style={{ padding: '8px 12px', borderRadius: 10, border: `1px solid ${m.modeId === modeId ? '#00E5FF' : '#26304a'}`, background: m.modeId === modeId ? '#00E5FF22' : 'transparent', color: m.modeId === modeId ? '#00E5FF' : '#cfd6e4', cursor: 'pointer', font: '600 13px system-ui' }}>
+          style={{ padding: '8px 12px', minHeight: 44, borderRadius: 10, border: `1px solid ${m.modeId === modeId ? '#00E5FF' : '#26304a'}`, background: m.modeId === modeId ? '#00E5FF22' : 'transparent', color: m.modeId === modeId ? '#00E5FF' : '#cfd6e4', cursor: 'pointer', font: '600 13px system-ui' }}>
           {m.title}
         </button>
       ))}

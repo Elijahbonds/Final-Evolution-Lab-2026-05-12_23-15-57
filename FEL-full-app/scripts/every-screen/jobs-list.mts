@@ -46,12 +46,14 @@ export const JOBS: Job[] = [
     ],
   },
   {
-    id: 'host-lobby', who: 'solo', name: 'Host a game on a big screen: what the lobby says', planBudget: 'a lobby always says what it is waiting for (phase 7)',
+    // /host is not a lobby (it opens the game's own start card on the big screen); the party room is: each empty seat says
+    // what it waits for. Online parties (/party/[code]) are switched off.
+    id: 'party-lobby', who: 'solo', name: 'The party room: what each empty seat waits for', planBudget: 'a lobby always says what it is waiting for (phase 7)',
     steps: [
-      { goto: '/host', say: 'Host' },
-      { tap: 'Start the screen', expect: '/waiting|join|code/i', within: 30, say: 'Start the screen: the lobby' },
+      { goto: '/play/party', say: 'Party room' },
+      { expect: '/Scan the code · or press A on a controller/', within: 30, say: 'each empty seat: scan the code, or press A on a controller' },
     ],
-    endsAt: 'the lobby: it waits for phones to join with its code',
+    endsAt: 'the lobby: it waits for phones or controllers to join',
   },
   {
     // the owner (2026-11-11): signed in with a birth date on file, the vertical test does not ask the age again. On the LIT

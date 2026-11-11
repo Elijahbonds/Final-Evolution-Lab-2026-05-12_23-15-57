@@ -41,10 +41,10 @@ export function LocalPartyFallback({ outdated = false }: { outdated?: boolean })
         </p>
       )}
       <div className="flex flex-wrap items-center gap-3">
-        <Link href={href} className="inline-flex rounded-xl bg-[#00E5FF] px-4 py-2 font-bold text-black">
+        <Link href={href} className="inline-flex min-h-11 items-center rounded-xl bg-[#00E5FF] px-4 py-2 font-bold text-black">
           Open local party room
         </Link>
-        <Link href="/join" className="font-semibold text-[#00E5FF] underline underline-offset-2">Got a code? Join a game</Link>
+        <Link href="/join" className="inline-flex min-h-11 items-center font-semibold text-[#00E5FF] underline underline-offset-2">Got a code? Join a game</Link>
       </div>
       {signedIn ? null : <p className="text-white/55">Hosting signs you in first. Making an account is free.</p>}
     </section>

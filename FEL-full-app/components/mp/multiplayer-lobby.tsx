@@ -92,7 +92,7 @@ function TabBtn({ active, onClick, icon, label }: { active: boolean; onClick: ()
   return (
     <button
       onClick={onClick}
-      className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${
+      className={`inline-flex min-h-11 items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${
         active ? 'bg-[#FF3366] text-[#050505]' : 'border border-white/10 bg-white/[0.03] text-white/60 hover:text-white'
       }`}
     >
