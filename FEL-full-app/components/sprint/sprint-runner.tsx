@@ -14,6 +14,7 @@
 //
 // Nothing here sends anything: no fetch, no upload; the picture never leaves the phone.
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { lineSize } from '@/lib/design/type';
 import { Camera, Crosshair, Loader2, Play, RotateCcw, Square } from 'lucide-react';
 import { poseService } from '@/lib/pose/PoseService';
 import type { PoseFrame } from '@/lib/pose/landmarks';
@@ -253,7 +254,7 @@ export function SprintRunner({ base, onResult, facingMode = 'environment', onLiv
           {phase === 'reading' ? <><Loader2 className="h-4 w-4 animate-spin" /> Reading…</> : <><Square className="h-4 w-4" /> Stop and read the run</>}
         </button>
       )}
-      <p className="text-[12px] text-white/50">{PRIVACY_LINE}</p>
+      <p className={`${lineSize(PRIVACY_LINE)} text-white/50`}>{PRIVACY_LINE}</p>
     </div>
   );
 }

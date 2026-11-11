@@ -2,6 +2,7 @@ import localFont from 'next/font/local'
 import type { Viewport } from 'next'
 import { TabBar } from '@/components/shell/tab-bar'
 import { StatusRail } from '@/components/shell/status-rail'
+import { NavScrollTop } from '@/components/shell/nav-scroll-top'
 import './globals.css'
 import './theme.css'
 // M95 (Pass 2): mobile canvas fix — on portrait phones the shared 16:10 game
@@ -140,6 +141,8 @@ export default function RootLayout({
           {/* ONB-04: utm_* / ?ref on the first page view, kept first-party on this browser for the sign-up (renders nothing) */}
           <AttributionCapture />
           {children}
+          {/* EVERY-SCREEN P5: a page opened by a tap starts at its top, never under the sticky rail (components/shell/nav-scroll-top.tsx) */}
+          <NavScrollTop />
           {/* The same three tabs, at the bottom of a phone where a thumb is. On a desktop this renders nothing and
               the rail above carries them instead. */}
           <TabBar />

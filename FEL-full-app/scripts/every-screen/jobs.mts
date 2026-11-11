@@ -19,7 +19,8 @@ import { chromium, type Page } from 'playwright-core';
 import sharp from 'sharp';
 import { chromiumExe } from '../probes/_chromium.mts';
 import { LOOK, tapLabel } from './explore.mts';
-import { ORIGIN, ROOT, STATE, dbUp, people as makePeople, seedCoaching, serve, storageState, type Person } from './rig.mts';
+import { LIT_ORIGIN, ORIGIN, ROOT, STATE, dbUp, litDbUp, people as makePeople, seedCoaching, serve, serverUp, storageState, type Person } from './rig.mts';
+import { seedBooking } from './booking-seed.mts';
 
 export interface Step {
   /** open an address directly (not a tap: a link from outside, or the job's stated starting point) */
@@ -58,6 +59,9 @@ export interface Job {
   steps: Step[];
   /** the walk ends here by design: the reason (a camera needs a person; a switched-off feature) */
   endsAt?: string;
+  /** EVERY-SCREEN P5: walked on the LIT rig only (`--lit`: every pending SQL file applied, group booking open), as the
+   *  screen will be once the owner applies its SQL; the main rig walks the screen as production has it today */
+  lit?: boolean;
 }
 
 
@@ -98,7 +102,7 @@ export async function walk(page: Page, job: Job, shotDir: string): Promise<Walk>
     const tapsBefore = w.taps, typedBefore = w.typed;
     if (!s.pre && !t0 && !s.goto) t0 = Date.now();
     try {
-      if (s.goto) { await page.goto(ORIGIN + s.goto, { waitUntil: 'load', timeout: 45000 }); await settle(); if (!t0 && !s.pre) t0 = Date.now(); }
+      if (s.goto) { await page.goto(BASE + s.goto, { waitUntil: 'load', timeout: 45000 }); await settle(); if (!t0 && !s.pre) t0 = Date.now(); }
       if (s.seed) { const [k, v] = s.seed; await page.evaluate(([k, v]) => localStorage.setItem(k, v), [k, v]); await page.reload({ waitUntil: 'load' }); await settle(); }
       if (s.tap) { ok = await tapLabel(page, s.tap); if (ok) w.taps++; else why = `nothing to tap called "${s.tap}"`; await settle(s.wait); }
       if (s.css && s.ifPresent && !(await page.locator(s.css).first().isVisible().catch(() => false))) { /* not here: nothing to do */ }
@@ -152,21 +156,42 @@ export async function walk(page: Page, job: Job, shotDir: string): Promise<Walk>
 const args = process.argv.slice(2);
 const flag = (n: string) => args.find((a) => a.startsWith(`--${n}=`))?.slice(n.length + 3);
 
+/** where a walk's addresses go: the main rig, or the LIT rig with --lit */
+let BASE = ORIGIN;
+
+/** EVERY-SCREEN P5: the LIT rig for the booking walks: a fresh LIT database, its people, then the server again with the
+ *  rig's coach as the group business owner (GROUP_BOOKING_OWNER_ID is read per request, so the id must exist first). */
+async function litUp(): Promise<{ stop: () => void; ppl: Awaited<ReturnType<typeof makePeople>> }> {
+  litDbUp(true);
+  const log = join(STATE, 'server-lit.log');
+  let stop = await serve(log, true);
+  const ppl = await makePeople(true, true);
+  stop();
+  for (let i = 0; i < 60 && (await serverUp(LIT_ORIGIN)); i++) await new Promise((r) => setTimeout(r, 500));
+  process.env.GROUP_BOOKING_OWNER_ID = ppl.ids.coach;
+  stop = await serve(log, true);
+  console.log(await seedCoaching(ppl, true).catch((e) => `coached pair: failed (${String(e).slice(0, 160)})`));
+  console.log(await seedBooking(ppl).catch((e) => `booking: failed (${String(e).slice(0, 160)})`));
+  return { stop, ppl };
+}
+
 export async function runJobs(): Promise<void> {
   const { JOBS } = await import('./jobs-list.mts');
   const label = flag('label') ?? 'walk';
   const only = flag('only')?.split(',');
+  const lit = args.includes('--lit');
   const dir = join(STATE, `jobs-${label}`);
   mkdirSync(dir, { recursive: true });
-  dbUp();
-  const stop = await serve(join(STATE, 'server.log'));
+  let stop: () => void, ppl: Awaited<ReturnType<typeof makePeople>>;
+  if (lit) { ({ stop, ppl } = await litUp()); BASE = LIT_ORIGIN; }
+  else { dbUp(); stop = await serve(join(STATE, 'server.log')); ppl = await makePeople(); }
   try {
-    const ppl = await makePeople();
-    console.log(await seedCoaching(ppl).catch((e) => `coached pair: failed (${String(e).slice(0, 160)})`));
+    if (!lit) console.log(await seedCoaching(ppl).catch((e) => `coached pair: failed (${String(e).slice(0, 160)})`));
     const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_EXE ?? chromiumExe(), headless: true, args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
-    const walks: Walk[] = existsSync(join(dir, 'walks.json')) && only ? JSON.parse(readFileSync(join(dir, 'walks.json'), 'utf8')) : [];
+    const walks: Walk[] = existsSync(join(dir, 'walks.json')) && (only || lit) ? JSON.parse(readFileSync(join(dir, 'walks.json'), 'utf8')) : [];
     for (const job of JOBS) {
       if (only && !only.includes(job.id)) continue;
+      if (!!job.lit !== lit) continue;
       const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true, storageState: storageState(ppl, job.who), permissions: ['camera', 'microphone'] });
       const page = await ctx.newPage();
       const w = await walk(page, job, dir);

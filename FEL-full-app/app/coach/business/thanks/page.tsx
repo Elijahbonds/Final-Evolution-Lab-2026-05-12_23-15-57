@@ -21,12 +21,12 @@ export default async function CoachBusinessThanksPage({ searchParams }: { search
         {signedIn ? null : <PublicTopBar />}
         <main className="mx-auto max-w-xl px-4 py-16 text-white" data-thanks="none">
           <h1 className="text-2xl font-black">Nothing to show here</h1>
-          <p className="mt-3 text-sm text-white/70">
+          <p className="mt-3 text-base text-white/70">
             This page opens after you pay for a coach&apos;s package, to confirm the booking. There is no payment to look up from here.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
-            <Link href="/coach" className="inline-block rounded-xl bg-cyan-300 px-4 py-2 text-sm font-bold text-black">Go to Coach</Link>
-            <Link href="/" className="inline-block rounded-xl border border-white/20 px-4 py-2 text-sm font-bold text-white">Back to home</Link>
+            <Link href="/coach" className="inline-flex min-h-11 items-center rounded-xl bg-cyan-300 px-4 py-2 text-sm font-bold text-black">Go to Coach</Link>
+            <Link href="/" className="inline-flex min-h-11 items-center rounded-xl border border-white/20 px-4 py-2 text-sm font-bold text-white">Back to home</Link>
           </div>
         </main>
       </div>

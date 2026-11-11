@@ -27,7 +27,7 @@ interface Board {
 interface RosterRow { seatId: string; name: string; status: string; kind: string; group: string; passId: string; passKind: string | null; paid: boolean; priceLabel: string | null }
 
 const input = 'min-h-11 w-full min-w-0 rounded-xl border border-white/10 bg-[#0b0d12] px-3 text-sm text-white';
-const small = 'fel-press inline-flex min-h-10 items-center rounded-full border border-white/20 px-3 text-xs font-semibold text-white';
+const small = 'fel-press inline-flex min-h-11 items-center rounded-full border border-white/20 px-3 text-xs font-semibold text-white';
 const on = 'bg-white/[0.16]';
 const when = (iso: string) => new Date(iso).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' });
 
@@ -62,9 +62,19 @@ function Roster({ slotKey, onChange }: { slotKey: string; onChange: (line: strin
   );
 }
 
+/** The Los Angeles calendar day of an instant ("2026-11-11"). */
+const laDay = (ms: number) => new Date(ms).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+/** EVERY-SCREEN P5 (the plan: "attendance in ≤ 1 tap per person"): today's session, if the group meets today. */
+export function todaySlot(sessions: readonly SessionRow[], nowMs: number): string | null {
+  const today = laDay(nowMs);
+  return sessions.find((x) => laDay(Date.parse(x.startsAt)) === today)?.slotKey ?? null;
+}
+
 function GroupPanel({ g, gyms, owner, act }: { g: GroupRow; gyms: Board['gyms']; owner: boolean; act: (b: Record<string, unknown>, ok: string) => Promise<void> }) {
-  const [open, setOpen] = useState(false);
-  const [slot, setSlot] = useState<string | null>(null);
+  // a group that meets today opens on today's roster: at the gym, each person is then one tap (Present)
+  const [today] = useState(() => todaySlot(g.sessions, Date.now()));
+  const [open, setOpen] = useState(!!today);
+  const [slot, setSlot] = useState<string | null>(today);
   const [text, setText] = useState('');
   const [note, setNote] = useState<string | null>(null);
   return (

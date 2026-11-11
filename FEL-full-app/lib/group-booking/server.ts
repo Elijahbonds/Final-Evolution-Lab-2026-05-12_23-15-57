@@ -77,6 +77,12 @@ const visible = (g: GroupClass, now: Date) => g.status === 'open' && groupSessio
 
 // ── joining ───────────────────────────────────────────────────────────────────────────────────────────────────────────
 
+/** EVERY-SCREEN P5: whether booking is open (the owner is set and the tables are applied). Train shows its doors (join a
+ *  group, book a 1:1, your sessions) only then; while it is off they stay off Train, as nothing there could be booked. */
+export async function groupBookingOpen(db: GroupDb, now: Date = new Date(), env: NodeJS.ProcessEnv = process.env): Promise<boolean> {
+  return ready(db, groupConfig(env), now.getTime()).catch(() => false);
+}
+
 export async function groupsBoard(db: GroupDb, now: Date = new Date(), env: NodeJS.ProcessEnv = process.env, onlyId?: string): Promise<Res> {
   const cfg = groupConfig(env), nowMs = now.getTime();
   if (!(await ready(db, cfg, nowMs))) return res(200, { available: false });

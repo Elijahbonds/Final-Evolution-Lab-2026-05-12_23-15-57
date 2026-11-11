@@ -20,6 +20,6 @@ export const HOOPS_LOOK = {
   yes: `${TYPE.label} fel-press min-h-12 rounded-full bg-[#00FF9D] px-5 text-black`,
   no: `${TYPE.label} fel-press min-h-12 rounded-full bg-[#FF6B8A] px-5 text-black`,
   // the set-up: one chip look for the mode tabs and the phone's spot (on = the accent's ring and text, no fill)
-  chip: `${TYPE.small} fel-press min-h-10 rounded-full border border-white/15 px-3 text-white/75`,
+  chip: `${TYPE.small} fel-press min-h-11 rounded-full border border-white/15 px-3 text-white/75`,
   chipOn: 'border-[#FF8A3D] text-[#FF8A3D]',
 } as const;

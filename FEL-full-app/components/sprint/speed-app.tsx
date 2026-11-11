@@ -11,6 +11,8 @@
 //
 // The page (app/train/speed/page.tsx) mounts this only for a verified adult.
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { lineSize } from '@/lib/design/type';
+import { Fold as GuideFold } from '@/components/every-screen/fold';
 import Link from 'next/link';
 import { Download, Trash2 } from 'lucide-react';
 import { BODY_POINTS, BODY_POINT_LABEL, type BodyPointKind } from '@/lib/sprint/geometry';
@@ -127,7 +129,10 @@ export function SpeedApp({ adult = true }: { adult?: boolean }) {
 
       <section className="fel-card space-y-3 rounded-xl p-4" data-sprint-setup>
         <SetupDiagram test={test} />
-        <ol className="list-decimal space-y-1 pl-5 text-sm text-white/75">{SETUP_STEPS[test].map((s) => <li key={s}>{s}</li>)}</ol>
+        {/* EVERY-SCREEN P5: the picture stays; its four steps are one tap away (114 words were on the first screen) */}
+        <GuideFold summary="How to set the phone up" className="text-white/75" testId="sprint-steps">
+          <ol className="list-decimal space-y-1 pl-5">{SETUP_STEPS[test].map((s) => <li key={s} className={lineSize(s)}>{s}</li>)}</ol>
+        </GuideFold>
       </section>
 
       {/* TOOLS-EASY: the settings sit behind one line that says what is set (the defaults run a test as they are) */}
@@ -187,12 +192,12 @@ export function SpeedApp({ adult = true }: { adult?: boolean }) {
 
       <SprintRunner base={base} onResult={onResult} onLive={setCameraOn} />
 
-      <section className={`fel-card space-y-2 rounded-xl p-4 ${cameraOn ? 'hidden' : ''}`} data-sprint-history>
+      <section className={`fel-card space-y-2 rounded-xl p-4 ${cameraOn || !runs.length ? 'hidden' : ''}`} data-sprint-history>
         <div className="flex items-center justify-between">
           <div className="text-sm font-semibold text-white">History <span className="font-normal text-white/50">(this phone)</span></div>
           <div className="flex gap-2">
-            <button type="button" onClick={exportCsv} disabled={!runs.length} data-sprint-csv className="flex min-h-10 items-center gap-1.5 rounded-lg border border-white/20 px-3 text-xs font-bold text-white disabled:opacity-40"><Download className="h-3.5 w-3.5" /> CSV</button>
-            <button type="button" onClick={() => { if (window.confirm('Clear every run kept on this phone?')) { clearRuns(runStorage()); setRuns([]); } }} disabled={!runs.length} aria-label="Clear history" className="flex min-h-10 items-center rounded-lg border border-white/20 px-3 text-white/70 disabled:opacity-40"><Trash2 className="h-3.5 w-3.5" /></button>
+            <button type="button" onClick={exportCsv} disabled={!runs.length} data-sprint-csv className="flex min-h-11 items-center gap-1.5 rounded-lg border border-white/20 px-3 text-xs font-bold text-white disabled:opacity-40"><Download className="h-3.5 w-3.5" /> CSV</button>
+            <button type="button" onClick={() => { if (window.confirm('Clear every run kept on this phone?')) { clearRuns(runStorage()); setRuns([]); } }} disabled={!runs.length} aria-label="Clear history" className="flex min-h-11 items-center rounded-lg border border-white/20 px-3 text-white/70 disabled:opacity-40"><Trash2 className="h-3.5 w-3.5" /></button>
           </div>
         </div>
         {runs.length === 0 ? <p className="text-sm text-white/50">No runs yet.</p> : (

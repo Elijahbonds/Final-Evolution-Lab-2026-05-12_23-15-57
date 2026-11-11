@@ -14,6 +14,7 @@
 //      (lib/coach/formReview/gate.ts). Video never: there is no clip option while lib/coach/formReview/clipPolicy.ts says
 //      so, and a minor never gets one.
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { lineSize } from '@/lib/design/type';
 import Link from 'next/link';
 import { Camera, CheckCircle2, Loader2, Square, Trash2 } from 'lucide-react';
 import { poseService } from '@/lib/pose/PoseService';
@@ -188,8 +189,8 @@ export function RecordSet({ ctx, api = FORM_REVIEWS_API }: { ctx: RecordContext;
       <div className="fel-card space-y-2 rounded-xl p-4">
         <div className="text-[12px] uppercase tracking-wider text-fel-dim">Film a set for your coach</div>
         <h1 className="text-lg font-bold text-white">{ctx.exerciseName}</h1>
-        <p className="text-sm text-white/65">{spec.setup}</p>
-        <p className="text-xs text-fel-dim">The camera counts your reps and reads each one. Every number is an estimate.</p>
+        <p className={`${lineSize(spec.setup)} text-white/65`}>{spec.setup}</p>
+        <p className="text-base text-fel-dim">The camera counts your reps and reads each one. Every number is an estimate.</p>
       </div>
 
       {/* collapsed (not unmounted: the camera attaches to it on "Film it again") once a set has been read */}

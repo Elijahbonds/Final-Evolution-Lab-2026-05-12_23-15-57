@@ -33,7 +33,9 @@ function Step({ label, children }: { label: string; children: React.ReactNode })
 export function OneOnOneBooker({ view }: { view: OneOnOneView }) {
   const trainers = view.trainers ?? [];
   const [who, setWho] = useState<string | null>(trainers.length === 1 ? trainers[0].id : null);
-  const [mode, setMode] = useState<'online' | 'in_person' | null>(null);
+  // EVERY-SCREEN P5: with one way to book open (in person while the coach store is off), it is already picked: a tap saved
+  const only = (x: Trainer | undefined) => { const open = (x?.choices ?? []).filter((c) => c.available); return open.length === 1 ? open[0].mode : null; };
+  const [mode, setMode] = useState<'online' | 'in_person' | null>(trainers.length === 1 ? only(trainers[0]) : null);
   const [gym, setGym] = useState<string | null>(null);
   const [slots, setSlots] = useState<Slot[] | null>(null);
   const [slot, setSlot] = useState<string | null>(null);
@@ -69,7 +71,7 @@ export function OneOnOneBooker({ view }: { view: OneOnOneView }) {
     <section data-one-on-one>
       {trainers.length > 1 ? (
         <Step label="Who">
-          {trainers.map((x) => <button key={x.id} type="button" className={`${L.chip} ${who === x.id ? L.chipOn : ''}`} onClick={() => { setWho(x.id); setMode(null); setGym(null); }}>{x.name}</button>)}
+          {trainers.map((x) => <button key={x.id} type="button" className={`${L.chip} ${who === x.id ? L.chipOn : ''}`} onClick={() => { setWho(x.id); setMode(only(x)); setGym(null); }}>{x.name}</button>)}
         </Step>
       ) : <p className={`${L.cardTitle} mt-4`}>{t?.name}</p>}
       {t ? (
