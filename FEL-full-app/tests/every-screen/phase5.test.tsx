@@ -129,6 +129,10 @@ describe('the screens: sizes, targets and folds', () => {
   it('today\'s drill says nothing rather than "No scores yet." (its Start is right there)', () => {
     expect(src('app/train/today-drill/_components/today-drill-run.tsx')).toContain("view.skill && view.focus !== 'starter' ?");
   });
+  it('the sessions page says what it is loading; the shots page\'s links are 44 px', () => {
+    expect(src('components/sessions-view.tsx')).toContain('Loading sessions…</div>');
+    expect(src('components/hoops-cam/shot-session.tsx')).toContain('<Link href="/train" className="inline-flex min-h-11 items-center underline">Back to Train</Link>');
+  });
   it('the admin category box is named (it was named by its placeholder only)', () => {
     expect(src('app/coach/admin/_components/kb-admin.tsx')).toContain('aria-label="New category name"');
   });

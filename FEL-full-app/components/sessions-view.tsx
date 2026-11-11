@@ -133,7 +133,8 @@ export function SessionsView() {
   );
 
   if (loading) {
-    return <div className="flex min-h-[60vh] items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-cyan-400" /></div>;
+    // EVERY-SCREEN P5: the spinner says what it waits for (the rig, under load: "a spinner with no words")
+    return <div role="status" className="flex min-h-[60vh] items-center justify-center gap-2 text-[16px] text-white/60"><Loader2 className="h-6 w-6 animate-spin text-cyan-400" aria-hidden />Loading sessions…</div>;
   }
 
   return (

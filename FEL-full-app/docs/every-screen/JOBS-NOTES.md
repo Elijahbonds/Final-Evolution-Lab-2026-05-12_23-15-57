@@ -1,3 +1,24 @@
+## What changed in phase 5 (phase 4's "after" → now, measured on the rig)
+
+Booking is switched off in production until the owner applies `prisma/pending/2026-11-02-group-booking.sql` and sets
+the business owner: there the four booking walks still end at "Opens soon" with what to do instead. The rows marked
+**(booking open)** are walked on the LIT rig (`scripts/every-screen/jobs.mts --lit`: every pending file applied, the
+rig's coach as the business owner, one group seeded by `scripts/every-screen/booking-seed.mts`), as the screens will be
+once the SQL is applied. Taps are counted from the home, as in every phase.
+
+| Job | Phase 4 | Now | What changed |
+|---|---|---|---|
+| Find and join a group (booking open) | the switched-off notice, by its address | 4 taps (the plan: ≤ 4): Train, Groups, Join, Reserve | Train shows Groups and Book a 1:1 once booking is open (`app/train/page.tsx`, `groupBookingOpen`); nothing leads to "Opens soon" while it is off. |
+| Book a 1:1 (booking open) | the notice | 5 taps (the plan: ≤ 5): Train, Book a 1:1, the gym, a time, Reserve | With one way to book open (in person while the coach store is off) it is already picked (`one-on-one-booker.tsx`). |
+| Cancel a booking (booking open) | the notice | 3 taps (the plan: ≤ 3), the owner's cancel rule on screen before the first: Train, Cancel, "Cancel free" | Train shows your next two sessions with the rule above them (`my-group-sessions.tsx`, compact); the confirm button says what it costs. |
+| Take group attendance (booking open) | the notice | 3 taps to today's roster, then 1 tap a person (the plan: ≤ 1 a person) | A group that meets today opens on today's roster (`coach-groups.tsx` todaySlot); its buttons are 44 px. |
+| Adjust a program (change one exercise) | 8 taps (6 from the coach's first screen) | 6 taps (4 from the coach's first screen; the plan: ≤ 4) | The athlete's Program tab lists the next session; an exercise, then an effort band, and it is saved (`components/coach/quick-adjust.tsx`). The full builder is one tap away. |
+| See who trained | 2 taps | 2 taps | Unchanged: "Needs you" and the week are the coach's first screen. |
+| Change one thing in the program the AI built | 2 taps | 3 taps | Carried from phase 4: once a program is built, what FEL read folds into one line ("What FEL read: … Change"), so changing a chip is one more tap. The first screen after a build is the program. |
+
+Every phase-5 change has a test that fails on the old code: `tests/every-screen/phase5.test.tsx`. The 61 training and
+coaching entries, each passing all four checks or listed with the reason: `docs/every-screen/TRAINING-SCREENS.md`.
+
 ## What changed in phase 4 (phase 3's "after" → now, measured on the rig)
 
 | Job | Phase 3 | Now | What changed |

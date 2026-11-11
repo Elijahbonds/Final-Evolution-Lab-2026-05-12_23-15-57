@@ -59,16 +59,16 @@ export function LibraryReview() {
       <section className="space-y-2">
         <h2 className="text-[12px] uppercase tracking-wider text-white/50">Batches</h2>
         <div className="flex flex-wrap gap-1.5">
-          <button onClick={() => { setBatch(null); setOffset(0); }} className={`min-h-11 rounded-lg border px-2 py-1 text-[12px] ${!batch ? 'border-[#00E5FF]/40 text-[#00E5FF]' : 'border-white/10 text-white/60'}`}>All</button>
+          <button onClick={() => { setBatch(null); setOffset(0); }} className={`min-h-11 min-w-11 rounded-lg border px-2 py-1 text-[12px] ${!batch ? 'border-[#00E5FF]/40 text-[#00E5FF]' : 'border-white/10 text-white/60'}`}>All</button>
           {data.batches.map((b) => (
-            <button key={b.batch} onClick={() => { setBatch(b.batch); setOffset(0); }} className={`min-h-11 rounded-lg border px-2 py-1 text-[12px] ${batch === b.batch ? 'border-[#00E5FF]/40 text-[#00E5FF]' : 'border-white/10 text-white/60'}`}>
+            <button key={b.batch} onClick={() => { setBatch(b.batch); setOffset(0); }} className={`min-h-11 min-w-11 rounded-lg border px-2 py-1 text-[12px] ${batch === b.batch ? 'border-[#00E5FF]/40 text-[#00E5FF]' : 'border-white/10 text-white/60'}`}>
               {b.batch} <span className="text-white/50">{b.draft}/{b.total}</span>
             </button>
           ))}
         </div>
         <div className="flex flex-wrap items-center gap-2 text-[12px]">
           {(['draft', 'approved', 'rejected', 'all'] as const).map((s) => (
-            <button key={s} onClick={() => { setStatus(s); setOffset(0); }} className={`min-h-11 rounded-md px-2 py-0.5 ${status === s ? 'bg-white/10 text-white' : 'text-white/50'}`}>{s}</button>
+            <button key={s} onClick={() => { setStatus(s); setOffset(0); }} className={`min-h-11 min-w-11 rounded-md px-2 py-0.5 ${status === s ? 'bg-white/10 text-white' : 'text-white/50'}`}>{s}</button>
           ))}
           {current && current.draft > 0 && (
             <button disabled={busy} onClick={() => { if (confirm(`Approve all ${current.draft} drafts in ${current.batch}?`)) void act({ action: 'approve-batch', batch: current.batch }, `${current.batch} approved`); }}
@@ -101,8 +101,8 @@ export function LibraryReview() {
           </div>
         ))}
         <div className="flex justify-between text-xs">
-          <button disabled={offset === 0} onClick={() => setOffset((o) => Math.max(0, o - 50))} className="min-h-11 text-white/60 disabled:opacity-30">Previous</button>
-          <button disabled={offset + 50 >= data.total} onClick={() => setOffset((o) => o + 50)} className="min-h-11 text-white/60 disabled:opacity-30">Next</button>
+          <button disabled={offset === 0} onClick={() => setOffset((o) => Math.max(0, o - 50))} className="min-h-11 min-w-11 text-white/60 disabled:opacity-30">Previous</button>
+          <button disabled={offset + 50 >= data.total} onClick={() => setOffset((o) => o + 50)} className="min-h-11 min-w-11 text-white/60 disabled:opacity-30">Next</button>
         </div>
       </section>
 

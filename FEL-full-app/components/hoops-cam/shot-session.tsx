@@ -333,7 +333,7 @@ export function ShotSession({ tier, grab, startMode = 'shots', serverKeep = fals
         </div>
       )}
       <p className="text-center text-xs text-white/60">
-        <Link href="/train" className="underline">Back to Train</Link> · <Link href="/play/drills?shelf=hoops" className="underline" data-hoops-drills-door>Ball-skill drills</Link>
+        <Link href="/train" className="inline-flex min-h-11 items-center underline">Back to Train</Link> · <Link href="/play/drills?shelf=hoops" className="inline-flex min-h-11 items-center underline" data-hoops-drills-door>Ball-skill drills</Link>
       </p>
     </div>
   );

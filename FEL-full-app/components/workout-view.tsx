@@ -52,6 +52,9 @@ export const DEMO_CONSENT =
 // to /api/v1/workout/scan, which stored them as a real WorkoutScan, and playerIdentity reads the newest scan's
 // avatarSpec as a measured body. A real movement screen is the Mirror's, which measures with the camera.
 // MIRROR-COACH P8 (2026-09-29): and it has nothing to do with a plan — a plan is picked by the answers above it.
+/** The equipment line's lead (EVERY-SCREEN P5: kept out of className, where the Tailwind scan read "need:" as a class). */
+const NEED = 'You need:';
+
 export function demoScan(): { analysis: Analysis; avatarSpec: AvatarSpec } {
   const m = defaultMetrics();
   return { analysis: analyzeMovement(m), avatarSpec: buildAvatarSpec(m) };
@@ -210,7 +213,7 @@ export function WorkoutView({ initialData = null }: { initialData?: PageData | n
           <div className="rounded-lg border border-white/10 p-3" data-template={preview.id}>
             <p className="text-sm font-semibold text-white">Your template: {preview.name}</p>
             <p className={`${lineSize(preview.summary, 'text-xs')} text-white/60`}>{preview.summary}</p>
-            <p className="mt-1 text-[12px] text-white/50">{templateShapeLine(preview)} · You need: {preview.equipmentLine}</p>
+            <p className={`mt-1 ${lineSize([templateShapeLine(preview), NEED, preview.equipmentLine].join(' '), 'text-[12px]')} text-white/50`}>{templateShapeLine(preview)} · {NEED} {preview.equipmentLine}</p>
             {preview.dailyTargetMinutes ? <p className="mt-1 text-[12px] text-white/50">{dailyTargetLine(preview.dailyTargetMinutes)}</p> : null}
           </div>
         )}
@@ -223,7 +226,7 @@ export function WorkoutView({ initialData = null }: { initialData?: PageData | n
             {offer.products.filter((p) => p.onSale).map((p) => (
               <div key={p.tier} className="rounded-lg border border-white/10 p-3 flex flex-col gap-1" data-product={p.tier}>
                 <p className="text-sm font-semibold text-white">{p.name}</p>
-                <p className="text-[12px] text-white/50">{p.line}</p>
+                <p className={`${lineSize(p.line, 'text-[12px]')} text-white/50`}>{p.line}</p>
                 {p.unfinished
                   ? <p className="text-[12px] text-[#FFD700]" data-unfinished>{unfinishedLine(p.name)}</p>
                   : p.free
@@ -237,12 +240,12 @@ export function WorkoutView({ initialData = null }: { initialData?: PageData | n
             ))}
           </div>
         )}
-        <p className="text-[12px] text-white/50">A plan is a list of sessions to follow at your own pace. Not medical advice.</p>
+        <p className="text-[16px] text-white/50">A plan is a list of sessions to follow at your own pace. Not medical advice.</p>
       </section>
 
       <SavedPlans saved={data === null ? null : data === 'error' ? 'error' : data.plans} />
 
-      <p className="text-white/50 text-xs mb-2">A real movement screen is measured in <Link href="/play/mirror" className="text-[#00E5FF] hover:underline">the Mirror</Link>. The demo below uses sample numbers and does not change your plan.</p>
+      <p className="text-white/50 text-[16px] mb-2">A real movement screen is measured in <Link href="/play/mirror" className="text-[#00E5FF] hover:underline">the Mirror</Link>. The demo below uses sample numbers and does not change your plan.</p>
 
       {/* The demo scan: sample numbers, worked out on this page */}
       <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 mb-4 space-y-2">
