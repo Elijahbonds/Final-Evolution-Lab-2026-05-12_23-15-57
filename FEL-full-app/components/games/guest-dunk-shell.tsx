@@ -4,7 +4,7 @@ import dynamicImport from 'next/dynamic';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Loader2, Trophy, Flame, ArrowRight, ExternalLink, X } from 'lucide-react';
+import { Trophy, Flame, ArrowRight, ExternalLink, X } from 'lucide-react';
 import { prqGrade } from '@/lib/prq';
 import { is3D, isBabylon } from '@/components/three/flags';
 import { track, flush } from '@/lib/analytics';
@@ -12,12 +12,11 @@ import { AgeStep, ageBlockPresent, writeAgeBlockFlag } from '@/components/age-st
 import { ageScreenOutcome } from '@/lib/privacy/ageScreen';
 import { lockTryAge, tabStorage, tryAgeBand } from '@/lib/privacy/tryAgeGate';   // TRY-AGE-PLACEHOLDER-1 (flag ageBands)
 import type { GameProps, GameResult } from '@/components/games/game-shell';
+import { GameLoading } from '@/components/games/game-loading';
 import { REVIEW_BUTTON_LABEL } from '@/lib/coach-store/storeOffers';   // STORE-OFFER-1 (a constant: no flag read on the client)
 
 const spinner = () => (
-  <div className="flex h-[60vh] items-center justify-center">
-    <Loader2 className="h-8 w-8 animate-spin text-[#00E5FF]" />
-  </div>
+  <GameLoading />
 );
 
 const DunkGame2D = dynamicImport(() => import('@/components/games/dunk-game'), { ssr: false, loading: spinner });

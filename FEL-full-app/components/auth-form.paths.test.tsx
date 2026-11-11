@@ -42,7 +42,8 @@ const pick = (path: string): Step => (tree) => {
 const fill: Step[] = [
   (tree) => typeInto(field(tree, /^Email$/), 'new@example.com'),
   (tree) => typeInto(field(tree, /Password/), 'correct-horse-battery'),
-  (tree) => { const [box] = findAll(tree, (el) => el.type === 'span' && typeof el.props.onClick === 'function'); box.props.onClick(); },
+  // EVERY-SCREEN P7 (owner, 2026-11-11): the terms tick is a real checkbox now (it was a span with an onClick)
+  (tree) => { const [box] = findAll(tree, (el) => el.type === 'input' && el.props.type === 'checkbox'); box.props.onChange({ target: { checked: true } }); },
 ];
 
 async function signUp(steps: Step[]) {
@@ -64,10 +65,11 @@ afterEach(() => { vi.unstubAllGlobals(); });
 describe('ONB-01: five ways in', () => {
   it('offers play, train, learn, teach and create, and holds teach until the age step says verified adult', () => {
     stubWindow();
+    // EVERY-SCREEN P7 (owner, 2026-11-11): the birth date first; the five ways in show once it is confirmed
     const before = drive(() => AuthForm({ mode: 'signup' })).html;
-    for (const p of ['play', 'train', 'learn', 'teach', 'create']) expect(before).toContain(`data-path="${p}"`);
-    expect(before).toMatch(/data-path="teach" data-held="true"/);
+    expect(before).not.toContain('data-path=');
     const teen = drive(() => AuthForm({ mode: 'signup' }), [lockAge(TEEN)]).html;
+    for (const p of ['play', 'train', 'learn', 'teach', 'create']) expect(teen).toContain(`data-path="${p}"`);
     expect(teen).toMatch(/data-path="teach" data-held="true"/);
     expect(teen).toContain('For adults (18+).');
     const adult = drive(() => AuthForm({ mode: 'signup' }), [lockAge(ADULT)]).html;

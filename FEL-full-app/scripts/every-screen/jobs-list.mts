@@ -35,6 +35,46 @@ const PRIMARY = '[data-player-primary] button';
 const CAMERA = '/CAMERA CHECK|CAMERA SETUP|Step into|TAP TO START/';
 
 export const JOBS: Job[] = [
+  // ── EVERY-SCREEN P7: around the games. The plan: "pick a game → playing in ≤ 2 taps; results → play again in 1; a lobby
+  //    always says what it is waiting for" ──
+  {
+    id: 'pick-game', who: 'solo', throttle: true, name: 'Pick a game on Play and start playing', planBudget: 'pick a game → playing in ≤ 2 taps (phase 7)',
+    steps: [
+      { goto: '/play', say: 'Play' },
+      { tap: 'Flight Night', expect: '/TAP TO START/', within: 90, say: 'Flight Night (the arena loads)' },
+      { tap: 'TAP TO START', gone: '[data-splash-column]', within: 20, say: 'Tap to start: playing' },
+    ],
+  },
+  {
+    // /host is not a lobby (it opens the game's own start card on the big screen); the party room is: each empty seat says
+    // what it waits for. Online parties (/party/[code]) are switched off.
+    id: 'party-lobby', who: 'solo', name: 'The party room: what each empty seat waits for', planBudget: 'a lobby always says what it is waiting for (phase 7)',
+    steps: [
+      { goto: '/play/party', say: 'Party room' },
+      { expect: '/Scan the code · or press A on a controller/', within: 30, say: 'each empty seat: scan the code, or press A on a controller' },
+    ],
+    endsAt: 'the lobby: it waits for phones or controllers to join',
+  },
+  {
+    // the owner (2026-11-11): signed in with a birth date on file, the vertical test does not ask the age again. On the LIT
+    // rig the birth date is kept (prisma/pending/2026-10-19-user-dob.sql applied); on the main rig, as in production today,
+    // only the year is, and the question is asked
+    id: 'open-signup-no-second-age', who: 'anon', lit: true, name: 'Sign up, then the vertical test (birth date on file)', planBudget: 'sign-up asks for nothing twice (phase 6; owner 2026-11-11)',
+    steps: [
+      { goto: '/signup', say: 'Create account' },
+      { select: ['select[aria-label="Birth year"]', '1995'], say: 'birth year' },
+      { fill: ['input[aria-label="Month"]', '6'], say: 'month' },
+      { fill: ['input[aria-label="Day"]', '15'], say: 'day' },
+      { tap: 'Continue', expect: 'input[type=email]', within: 20, say: 'Continue (then: what did you come for?)' },
+      { fill: ['input[placeholder="Athlete name"]', 'Rig Newcomer'], say: 'athlete name' },
+      { fill: ['input[type=email]', 'rig-new-{ts}@example.test'], say: 'email' },
+      { fill: ['input[type=password]', 'rig-password-1'], say: 'password' },
+      { css: 'label:has([data-terms-tick]) > span[aria-hidden]', say: 'I agree to the Terms of Service and Privacy Policy' },
+      { tap: 'BEGIN EVOLUTION', expect: 'canvas', within: 60, say: 'Begin evolution' },
+      { goto: '/play/mirror/assess?run=vertical', say: 'later: Measure my vertical' },
+      { expect: '/Does anything hurt/', within: 30, say: 'no "How old are you?": straight to the pain question' },
+    ],
+  },
   // ── EVERY-SCREEN P6: a new person, signed out, on the throttled phone (CPU 4×, as the crawl): the plan's gate is "from
   //    the home page to doing something real (a game or a first workout) in ≤ 4 taps and under 60 s" ──
   {
@@ -59,7 +99,7 @@ export const JOBS: Job[] = [
       { fill: ['input[placeholder="Athlete name"]', 'Rig Newcomer'], say: 'athlete name' },
       { fill: ['input[type=email]', 'rig-new-{ts}@example.test'], say: 'email' },
       { fill: ['input[type=password]', 'rig-password-1'], say: 'password' },
-      { css: 'label:has(a[href="/terms"]) > span:first-child', say: 'I agree to the Terms of Service and Privacy Policy' },
+      { css: 'label:has([data-terms-tick]) > span[aria-hidden]', say: 'I agree to the Terms of Service and Privacy Policy (a real checkbox since phase 7)' },
       { tap: 'BEGIN EVOLUTION', expect: 'canvas', within: 60, say: 'Begin evolution: into the first game picked (Flight Night)' },
       { goto: '/train', say: 'later: Train' },
       { css: 'a[href^="/play/mirror/assess"], a[href^="/screen"]', expect: '/How old are you|Does anything hurt|CAMERA/i', within: 30, say: 'Measure my vertical (Train): what it asks' },

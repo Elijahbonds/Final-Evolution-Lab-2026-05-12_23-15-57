@@ -153,7 +153,7 @@ function Lobby({ room, qr, origin, share, shared }: { room: Room; qr: string | n
     <div className="flex min-h-full flex-col gap-[2vh] p-[2.5vh] sm:p-5 md:absolute md:inset-0">
       <header className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/play" aria-label="Back to Play" className="rounded-full border border-white/10 p-1.5 text-white/60 hover:text-white"><ArrowLeft className="h-4 w-4" /></Link>
+          <Link href="/play" aria-label="Back to Play" className="grid h-11 w-11 place-items-center rounded-full border border-white/10 text-white/60 hover:text-white"><ArrowLeft className="h-4 w-4" /></Link>
           <div>
             <p className="font-mono text-[12px] tracking-[0.35em] text-white/50">PARTY ROOM</p>
             <h1 className="fel-heading text-[min(5vh,28px)] font-black leading-none">PLAY WITH FRIENDS</h1>
@@ -183,7 +183,7 @@ function Lobby({ room, qr, origin, share, shared }: { room: Room; qr: string | n
               <p data-testid="party-code" className="font-mono text-[min(7vh,40px)] font-black leading-tight tracking-[0.18em] text-[#00E5FF]">{code || '······'}</p>
               <p className="text-center font-mono text-[12px] text-white/50">or open <span className="text-white/80">{host}{JOIN_PATH}</span></p>
               <button type="button" data-testid="party-share" onClick={share} disabled={!code}
-                className="mt-[1.2vh] flex items-center gap-1.5 rounded-full border border-[#A855F7]/50 bg-[#A855F7]/10 px-3 py-1 text-[12px] font-bold text-[#c4a1ff] disabled:opacity-40">
+                className="mt-[1.2vh] flex min-h-11 items-center gap-1.5 rounded-full border border-[#A855F7]/50 bg-[#A855F7]/10 px-3 text-[12px] font-bold text-[#c4a1ff] disabled:opacity-40">
                 {shared === 'copied' ? <><Check className="h-3.5 w-3.5" /> INVITE COPIED</> : <><Share2 className="h-3.5 w-3.5" /> SEND INVITE</>}
               </button>
               {loopbackHost() && (

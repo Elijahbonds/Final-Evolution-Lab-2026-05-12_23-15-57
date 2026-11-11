@@ -107,7 +107,9 @@ export function ScreenFrame({ children, right, back = SCREEN_HOME, title = 'Quic
     // PREMIUM-UI P6 (2026-10-27): the frame on the design system's ink and glow; the system font stays (gate 1)
     <div data-screen-frame className="relative min-h-screen bg-fel-bg text-white [background-image:var(--fel-page-glow)]" style={{ fontFamily: SYSTEM_FONT_STACK }}>
       <div className="relative mx-auto max-w-[560px] px-4 pb-10 pt-3">
-        <header className="mb-3 flex items-center gap-3">
+        {/* EVERY-SCREEN P7: the title keeps 12rem; on a phone, Flip camera and Voice drop to their own row instead of squeezing
+            "FREE MOVEMENT CHECK / Quick Screen" to "Quick…" (the rig's phase-6 picture) */}
+        <header className="mb-3 flex flex-wrap items-center gap-3">
           {typeof back === 'function' ? (
             <button type="button" onClick={back} data-back aria-label="Back one step" className={arrow}>
               <ArrowLeft className="h-[18px] w-[18px]" />
@@ -117,7 +119,7 @@ export function ScreenFrame({ children, right, back = SCREEN_HOME, title = 'Quic
               <ArrowLeft className="h-[18px] w-[18px]" />
             </Link>
           )}
-          <div className="min-w-0">
+          <div className="min-w-[12rem] flex-1">
             <p className="text-[16px] font-bold uppercase tracking-[0.18em] text-[#00E5FF]">Free movement check</p>
             <h1 className="truncate pb-[2px] text-[22px] font-black leading-tight tracking-tight">{title}</h1>
           </div>

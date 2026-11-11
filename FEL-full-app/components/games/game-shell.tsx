@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AnimatePresence } from 'framer-motion';
 import { Maximize2, Minimize2, ArrowLeft, Loader2 } from 'lucide-react';
+import { GAME_LOADING } from '@/components/games/game-loading';
 import type { PrqGrade } from '@/lib/prq';
 import { readPrqDisplay, type PrqDisplay } from '@/lib/prq-display';
 import { PhysicalGamepadPoller } from '@/lib/gamepad-bridge';
@@ -127,7 +128,7 @@ export function GameShell(props: {
   gameProps?: Record<string, unknown>;
 }) {
   return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-[#050505]"><Loader2 className="h-8 w-8 animate-spin text-[#00E5FF]" /></div>}>
+    <Suspense fallback={<div role="status" className="flex min-h-screen flex-col items-center justify-center gap-3 bg-[#050505]"><Loader2 aria-hidden className="h-8 w-8 animate-spin text-[#00E5FF]" /><p className="text-[16px] text-white/60">{GAME_LOADING}</p></div>}>
       <GameShellInner {...props} />
     </Suspense>
   );
@@ -801,8 +802,9 @@ function GameShellInner({
             </ThreeDErrorBoundary>
           </ReplayInPlaceContext.Provider>
         ) : !unreachable ? (
-          <div className="flex h-[60vh] items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-[#00E5FF]" />
+          <div role="status" className="flex h-[60vh] flex-col items-center justify-center gap-3">
+            <Loader2 aria-hidden className="h-8 w-8 animate-spin text-[#00E5FF]" />
+            <p className="text-[16px] text-white/60">{GAME_LOADING}</p>
           </div>
         ) : null}
 

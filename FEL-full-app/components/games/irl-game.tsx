@@ -167,7 +167,7 @@ export default function IrlGame({ onEnd }: GameProps) {
     <div className="min-h-screen w-full" style={{ background: BG, color: '#fff' }}>
       <div className="mx-auto max-w-xl px-5 py-6">
         <div className="mb-6 flex items-center justify-between">
-          <Link href="/creator" className="inline-flex items-center gap-2 text-sm text-white/60 transition hover:text-white">
+          <Link href="/creator" className="inline-flex min-h-11 items-center gap-2 text-sm text-white/60 transition hover:text-white">
             <ArrowLeft className="h-4 w-4" /> Creator Hub
           </Link>
           <span className="text-xs font-semibold tracking-[0.3em]" style={{ color: GREEN }}>FEL · IRL</span>
