@@ -2,16 +2,29 @@
 // THE MIC on screen (2026-09-24): the lower third for what the court's MC (or the sidekick, or a player) just said, and the
 // switch for the voice. The mode sets `mic` / `micWho` through ModeMic; the words show whether or not the voice plays (muted,
 // no audio, a bank that never arrived), and the harness's caption bus reads `mic` out to screen readers.
-import { useState } from 'react';
-import { Mic, MicOff, SlidersHorizontal } from 'lucide-react';
+import { useState, useSyncExternalStore } from 'react';
+import { Captions, Mic, MicOff, SlidersHorizontal } from 'lucide-react';
 import { SoundKit } from '@/lib/babylon/audio/SoundKit';
 import { VoiceKit } from '@/lib/babylon/audio/mic/VoiceKit';
 import { VolumeMixer } from '@/lib/audio/ui/VolumeMixer';
 import { HUD_FONT_CLASS, HUD_PLATE, HudText, hudColor, hudType } from './tv-hud';
+import { readCcPref, showMicCaption, writeCcPref } from '@/lib/babylon/ui/hudHints';
 
-export function MicCaption({ text, who, className = 'bottom-[14%]', flow = false }: { text: unknown; who: unknown; className?: string; /** In the flow of a parent column (the dunk host's bottom stack) instead of a layer of its own at `className`. */ flow?: boolean }) {
+// hoops-p08 (2026-11-12): THE PLAYER'S SUBTITLE SWITCH (the CC chip beside MC), one store so the chip and the caption agree.
+const ccListeners = new Set<() => void>();
+let ccOn: boolean | null = null;
+const ccGet = (): boolean => (ccOn ??= readCcPref());
+const ccSet = (on: boolean): void => { ccOn = on; writeCcPref(on); for (const l of ccListeners) l(); };
+const ccSub = (l: () => void): (() => void) => { ccListeners.add(l); return () => { ccListeners.delete(l); }; };
+export function useCaptionsOn(): boolean { return useSyncExternalStore(ccSub, ccGet, () => false); }
+
+/** `voiced` (hoops-p08): the host's `hud.micVoiced` — the line's audio started. A voiced line shows no subtitle unless the player turned
+ *  subtitles on (CC) or the `hud.mcSubsWithVoice` knob is 1 (as before); a line with no audio always shows. Hosts that do not pass it
+ *  (the dance room) draw every line, as before. */
+export function MicCaption({ text, who, className = 'bottom-[14%]', flow = false, voiced = false }: { text: unknown; who: unknown; className?: string; /** In the flow of a parent column (the dunk host's bottom stack) instead of a layer of its own at `className`. */ flow?: boolean; voiced?: unknown }) {
+  const cc = useCaptionsOn();
   const line = typeof text === 'string' ? text : '';
-  if (!line) return null;
+  if (!line || !showMicCaption(voiced === true, cc)) return null;
   const name = typeof who === 'string' ? who : '';
   return (
     <div data-mic-caption className={`pointer-events-none ${flow ? 'relative flex w-full' : `absolute inset-x-0 ${className}`} z-10 flex justify-center px-4 ${HUD_FONT_CLASS}`} aria-hidden>
@@ -32,6 +45,7 @@ export function MicCaption({ text, who, className = 'bottom-[14%]', flow = false
 export function MicToggle({ className = 'right-3 top-[18%]', flow = false }: { className?: string; flow?: boolean }) {
   const [on, setOn] = useState(() => SoundKit.voiceOn);
   const [mix, setMix] = useState(false);
+  const cc = useCaptionsOn();
   const flip = () => {
     const next = !on;
     SoundKit.setVoice(next); setOn(next);
@@ -55,6 +69,14 @@ export function MicToggle({ className = 'right-3 top-[18%]', flow = false }: { c
           className={chip} style={chipStyle(on ? 0.8 : 0.4)}>
           {on ? <Mic className="h-3 w-3" /> : <MicOff className="h-3 w-3" />}
           MC
+        </button>
+        {/* hoops-p08: subtitles for the MC while his voice is on (off by default: the voice carries the line; with the voice off the
+            words always show) */}
+        <button type="button" onClick={(e) => { ccSet(!cc); e.currentTarget.blur(); }} onMouseDown={(e) => e.preventDefault()} onPointerDown={(e) => e.stopPropagation()}
+          aria-label={cc ? 'Turn the announcer subtitles off' : 'Turn the announcer subtitles on'} aria-pressed={cc} data-qa="mic-cc"
+          className={chip} style={chipStyle(cc ? 0.8 : 0.4)}>
+          <Captions className="h-3 w-3" />
+          CC
         </button>
       </div>
       {mix && (

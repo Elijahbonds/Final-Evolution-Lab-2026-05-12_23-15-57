@@ -17,7 +17,7 @@
 // vendors and crowd behind the hoop (mountVeniceDunkDressing — placements in venuePropSets.ts), the sea as water, a sand with
 // no streaks, and the FLIGHT NIGHT sign up on the row's roof.
 import { phoneHalf } from '../scene/phoneTrim';   // lane/owner-1016: a phone keeps half the gulls
-import { Color3, DynamicTexture, InstancedMesh, Mesh, MeshBuilder, PBRMaterial, SceneLoader, StandardMaterial, Texture, TransformNode, Vector3, VertexData } from '@babylonjs/core';
+import { Color3, DynamicTexture, InstancedMesh, Mesh, MeshBuilder, PBRMaterial, SceneLoader, StandardMaterial, Texture, TransformNode, Vector3, Vector4, VertexData } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { mountStreetCourt, STREET_COURT_PALETTE, VENICE_DUNK_COURT_PALETTE } from '../visual/CourtSurface';
 import { courtLogoTexture, groundTextureFor, signTexture, TILE_M, type GroundKind } from '../visual/groundTextures';
@@ -30,6 +30,15 @@ import type { AbstractMesh, Material, Scene } from '@babylonjs/core';
 import { setPbrRoughnessUniform } from '../scene/pbrUniform';   // perf-lag: the sea's shimmer without a shader re-prepare a frame
 
 const COURT = { hx: 8, hz: 14 };                 // 16 × 28 court slab (venueSpecs basketball_*)
+/** hoops-p08: a sign's two faces — the front as Babylon lays it, the back with u reversed so its text is not mirrored. */
+export const SIGN_FRONT_UVS = new Vector4(0, 0, 1, 1), SIGN_BACK_UVS = new Vector4(1, 0, 0, 1);
+
+/** hoops-p08: what the Venice dressing mounts. `crowdCards` — the boardwalk row's 12 flat cut-out figures (venice_crowd_cards.glb). */
+export interface VeniceDressingOpts { crowdCards?: boolean }
+/** venue.halfCourtCrowdCards: 0 = the cut-out figures only behind the dunk's rim (new: 1v1, 3v3 and 3-Point stand on the same Venice and
+ *  the cards stood right behind their rim, "black cardboard people", docs/HOOPS-AAA-GAP-SHOW.md sinker 4); 1 = on every Venice court
+ *  that mounts the dunk dressing, as before. */
+export const HALF_COURT_CROWD_CARDS = 0;
 export const BOARDWALK = { apron: 3, grass: 5, walkW: 9, sandW: 34 };
 
 /**
@@ -70,7 +79,7 @@ function flat(scene: Scene, name: string, w: number, d: number, x: number, z: nu
  * aprons, far hoop, centre logo and gate sign slide with it — the owner's Luma reference (2026-09-06) shows both hoops on
  * the concrete right behind each baseline.
  */
-export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode, scanShiftZ = 0, env: BoardwalkEnv = 'lawn', dressing?: DressingHooks): TransformNode {
+export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode, scanShiftZ = 0, env: BoardwalkEnv = 'lawn', dressing?: DressingHooks, opts: VeniceDressingOpts = {}): TransformNode {
   const holder = new TransformNode('venice_boardwalk', scene); holder.parent = root;
   const { apron, grass, walkW, sandW } = BOARDWALK;
   // concrete apron around the slab (a hair above the scan's painted ground), then the boardwalk strip to the east
@@ -185,10 +194,13 @@ export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode, scanS
   });
   // Pass 7 phase 4 — signage with real names: an entrance sign at the south gate, a scoreboard plate behind the far hoop,
   // flags on the boardwalk lamp posts (unlit boards so the paint reads under the grade; ~10 draws)
+  // hoops-p08 (docs/HOOPS-AAA-GAP-SHOW.md 3.10): the gate sign read "VENICE BEACH COURTS" mirrored from the court — one plane drawn
+  // from both sides (backFaceCulling off) shows its back face with the text reversed. A sign is now double-sided GEOMETRY whose back
+  // face has its u flipped (SIGN_BACK_UVS), so it reads the right way round from either side; still one mesh, one draw.
   const sign = (name: string, w: number, h: number, pos: [number, number, number], yaw: number, tex: ReturnType<typeof signTexture>) => {
-    const plane = MeshBuilder.CreatePlane(name, { width: w, height: h }, scene);
+    const plane = MeshBuilder.CreatePlane(name, { width: w, height: h, sideOrientation: Mesh.DOUBLESIDE, frontUVs: SIGN_FRONT_UVS, backUVs: SIGN_BACK_UVS }, scene);
     plane.position.set(pos[0], pos[1], pos[2]); plane.rotation.y = yaw; plane.parent = holder; plane.isPickable = false;
-    const m = new StandardMaterial(`${name}_mat`, scene); m.emissiveTexture = tex; m.emissiveColor = Color3.Black(); m.disableLighting = true; m.backFaceCulling = false;
+    const m = new StandardMaterial(`${name}_mat`, scene); m.emissiveTexture = tex; m.emissiveColor = Color3.Black(); m.disableLighting = true; m.backFaceCulling = true;
     plane.material = m; return plane;
   };
   const post = (name: string, x: number, z: number, hgt: number) => { const c = MeshBuilder.CreateCylinder(name, { height: hgt, diameter: 0.14 }, scene); c.position.set(x, hgt / 2, z); c.parent = holder; c.isPickable = false; const pm = new PBRMaterial(`${name}_mat`, scene); pm.albedoColor = Color3.FromHexString('#2A2E37'); pm.roughness = 0.6; pm.metallic = 0.4; c.material = pm; return c; };
@@ -260,7 +272,7 @@ export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode, scanS
   logo.material = lm;
   console.info(dunkEnv ? '[FEL-VENICE] dunk boardwalk built (apron, beach, bike path, promenade, plaza, ocean) — props from venice-dunk'
     : '[FEL-VENICE] boardwalk scenery built (apron, grass, boardwalk, sand, ocean, sun) — props from venice-court-meshy');
-  if (dunkEnv) void mountVeniceDunkDressing(scene, holder).catch((e) => console.warn('[FEL-VENICE] dunk dressing failed to load:', (e as Error)?.message ?? e));
+  if (dunkEnv) void mountVeniceDunkDressing(scene, holder, opts).catch((e) => console.warn('[FEL-VENICE] dunk dressing failed to load:', (e as Error)?.message ?? e));
   return holder;
 }
 
@@ -503,8 +515,10 @@ export function shareFarFrondMaterial(lod1Frond: Mesh, lod2Frond: Mesh): void {
  *    material — two draws for four shops and three stalls. It does not cast.
  *  · THE CROWD: the file's 12-card strip, baked to one mesh (one draw); the card library is dropped. It does not cast.
  */
-export async function mountVeniceDunkDressing(scene: Scene, holder: TransformNode): Promise<VeniceDressingHandle | null> {
-  const files = [...VENICE_PALM_LODS.files, 'venice_boardwalk_kit.glb', 'venice_crowd_cards.glb'];
+export async function mountVeniceDunkDressing(scene: Scene, holder: TransformNode, opts: VeniceDressingOpts = {}): Promise<VeniceDressingHandle | null> {
+  // hoops-p08: the cut-out crowd strip only where it is asked for (the dunk and the duel); the half-court modes do not load the file
+  const withCrowd = opts.crowdCards !== false;
+  const files = [...VENICE_PALM_LODS.files, 'venice_boardwalk_kit.glb', ...(withCrowd ? ['venice_crowd_cards.glb'] : [])];
   // DUNK-FLAGSHIP (2026-10-27): each file is HIDDEN the moment it lands. An import goes into the scene at the world origin, and the
   // dressing waits for all five files before it places anything — so the files that arrived first stood at the origin, the
   // boardwalk's single-sided fronts facing +Z, between the run-up camera (z 8) and the dunker at the start of the runway (z −1.2):
@@ -558,12 +572,15 @@ export async function mountVeniceDunkDressing(scene: Scene, holder: TransformNod
   kit.meshes[0].dispose(false, false);   // the materials and the atlas stay: the baked meshes use them
 
   // the crowd strip, baked (the library row is the strip's source geometry and goes with the file)
-  const crowdAt = new TransformNode('vb_boardwalk_crowd', scene);
-  crowdAt.parent = holder; crowdAt.position.set(...VENICE_BOARDWALK_ROW.crowdAt);
-  crowd.meshes[0].parent = crowdAt;
-  const strip = crowd.meshes.filter((m) => /^crowd_strip_/.test(m.name));
-  const crowdMeshes = bakeByMaterial(scene, strip, crowdAt, 'vb_crowd', false);
-  crowd.meshes[0].dispose(false, false);
+  let strip: AbstractMesh[] = [], crowdMeshes: Mesh[] = [];
+  if (crowd) {
+    const crowdAt = new TransformNode('vb_boardwalk_crowd', scene);
+    crowdAt.parent = holder; crowdAt.position.set(...VENICE_BOARDWALK_ROW.crowdAt);
+    crowd.meshes[0].parent = crowdAt;
+    strip = crowd.meshes.filter((m) => /^crowd_strip_/.test(m.name));
+    crowdMeshes = bakeByMaterial(scene, strip, crowdAt, 'vb_crowd', false);
+    crowd.meshes[0].dispose(false, false);
+  }
 
   console.info(`[FEL-VENICE] dunk dressing: ${palms.length} baked palms (${palms.filter((p) => p.casts === 'whole').length} cast whole, ${palms.filter((p) => p.casts === 'trunk').length} their trunks; LOD ${VENICE_PALM_LODS.switchM.join('/')} m), boardwalk row in ${kitMeshes.length} draws, crowd of ${strip.length} cards in ${crowdMeshes.length}`);
   return { palms: palms.length, kit: kitMeshes, crowd: crowdMeshes };

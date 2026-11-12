@@ -16,11 +16,14 @@ import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } 
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
-import { HUD_TEXT_ALPHA, HudBanner, HudChip, HudFrame, HudLine, HudMeter, HudPlate, HudText, ScoreValue, Scorebug } from './tv-hud';
+import { HUD_TEXT_ALPHA, HudBanner, HudChip, HudFrame, HudMeter, HudPlate, HudText, ScoreValue, Scorebug } from './tv-hud';
 import { HoopsShotMeter } from './hoops-shot-meter';
 import { HoopsShotClock } from './hoops-shot-clock';   // lane/hoops-shot-core: ELITE's shot clock on the scorebug
 import { overtimeHeadline } from '@/lib/babylon/modes/threevthreeOvertime';   // lane/hoops-overtime (NB-3): a tie at the horn is sudden death
 import { MicCaption, MicToggle } from './mic-caption';   // THE MIC (2026-09-24): what the court's MC just said, and the voice switch
+import { HoopsBottomStack, StackLine } from './hoops-bottom-stack';   // hoops-p08: one column for the bottom layers
+import { useHintDevice, useHoopsHint } from './use-hoops-hint';   // hoops-p08: the hint for the first plays, in the device's words
+import { passKey } from '@/lib/babylon/ui/hudHints';
 
 type Hud = Record<string, HudValue>;
 
@@ -111,6 +114,12 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
   }, [emit]);
 
   const meter = typeof hud.shotMeterT === 'number' ? Math.max(0, Math.min(1, hud.shotMeterT)) : null;
+  // hoops-p08: the control hint for the first plays only, never in pad or key words on a touch screen; the pass chip names the
+  // device's own button ('J' on the keys, the pad's word for A, none on the touch deck, whose button already says PASS)
+  const { device, family } = useHintDevice();
+  const hint = useHoopsHint('threevthree', typeof hud.hint === 'string' && hud.hint && phase === 'playing' ? hud.hint : '', hud, phase === 'playing', device);
+  const passBtn = passKey(device, family);
+  const pass = typeof hud.passPreview === 'string' && hud.passPreview ? hud.passPreview : '';
 
   return (
     <div className="relative h-[calc(100dvh-3.25rem)] w-full overflow-hidden rounded-none border-0 bg-transparent">
@@ -147,28 +156,21 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
         <HudChip tone="score" size="body">{typeof hud.time === 'number' ? `${typeof hud.period === 'string' && hud.period ? `${hud.period} ` : ''}${hud.time}s` : 'TO 21'}</HudChip>
       </div>
 
-      {/* shot meter */}
-      {meter !== null && phase === 'playing' && (
-        <div className="absolute inset-x-0 bottom-24 flex justify-center">
-          <HoopsShotMeter t={meter} green={hud.shotMeterGreen} perfect={hud.shotMeterPerfect} />
-        </div>
-      )}
-
       {phase === 'playing' && <HudBanner text={typeof hud.banner === 'string' ? hud.banner : ''} tone="you" plate={false} className="top-1/3" />}
 
-      {/* IMPROVE (2026-10-06) #5: what the PASS button would throw right now — the ring under the mate is its colour */}
-      {typeof hud.passPreview === 'string' && hud.passPreview && phase === 'playing' && (
-        <div className="absolute inset-x-0 bottom-[4.25rem] flex justify-center">
-          <HudChip size="caption" tone={hud.passPreview === 'NO LANE' ? 'text' : 'you'} alpha={hud.passPreview === 'NO LANE' ? 0.5 : 1}>J · {hud.passPreview}</HudChip>
-        </div>
-      )}
-      {/* IMPROVE (2026-10-06) #7: ONE line for the state you are in (it used to be every control at once) */}
-      {typeof hud.hint === 'string' && hud.hint && phase === 'playing' && (
-        <HudLine text={hud.hint} size="caption" alpha={0.8} className="bottom-10" />
+      {/* hoops-p08: THE BOTTOM STACK, lowest first — IMPROVE (2026-10-06) #7's ONE line for the state you are in (for the first plays),
+          #5's chip for what the PASS button would throw right now (the ring under the mate is its colour), the shot meter, the MC's
+          line (heard: no subtitle unless CC) — one column, so no layer can sit on another */}
+      {phase === 'playing' && (
+        <HoopsBottomStack rows={[
+          ['hint', hint ? <StackLine text={hint} alpha={0.8} /> : null],
+          ['pass', pass ? <HudChip size="caption" tone={pass === 'NO LANE' ? 'text' : 'you'} alpha={pass === 'NO LANE' ? 0.5 : 1}>{passBtn ? `${passBtn} · ${pass}` : pass}</HudChip> : null],
+          ['meter', meter !== null ? <HoopsShotMeter t={meter} green={hud.shotMeterGreen} perfect={hud.shotMeterPerfect} /> : null],
+          ['mic', typeof hud.mic === 'string' && hud.mic ? <MicCaption flow text={hud.mic} who={hud.micWho} voiced={hud.micVoiced} /> : null],
+        ]} />
       )}
       </HudFrame>
 
-      {phase === 'playing' && <MicCaption text={hud.mic} who={hud.micWho} />}
       {phase === 'playing' && <MicToggle />}
 
       <BootSplash

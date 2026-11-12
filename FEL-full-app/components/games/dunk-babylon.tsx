@@ -446,7 +446,7 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
               </HudPlate>
             )}
             {strip && <DunkBeatStrip value={strip} />}
-            {mic && <MicCaption flow text={hud.mic} who={hud.micWho} />}
+            {mic && <MicCaption flow text={hud.mic} who={hud.micWho} voiced={hud.micVoiced} />}
             {/* the call ("FROM THE STRIPE!") was a layer of its own at 58 % of the stage, and the caption now stands where it was */}
             {call && (
               <div className="w-full px-4 text-center">

@@ -1601,6 +1601,21 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'hoops.guardHandRestGapSec', label: 'Outside hand at rest: at most one cross per', def: 1.5, min: 0, max: 4, step: 0.1, unit: 's', group: 'Hoops · flow and pace',
     source: 'lib/babylon/modes/hoopsFlow.ts GUARD_HAND_REST_GAP_SEC',
     hint: 'Standing guarded, the automatic outside hand crosses the ball no more than once in this long (it crossed about once a second). On the move it is the rule as before. 0 = as before.',
+  },  // ── hoops-p08 (clean screen and phone budget, docs/HOOPS-AAA-GAP-SHOW.md) ──
+  {
+    id: 'hud.mcSubsWithVoice', label: 'MC subtitles while his voice plays: on (1) / off (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · screen',
+    source: 'lib/babylon/ui/hudHints.ts MC_SUBS_WITH_VOICE',
+    hint: 'Off: a line the MC is saying out loud shows no subtitle (the player can still turn subtitles on with CC; with the voice off the words always show). 1 = every line subtitled, as before.',
+  },
+  {
+    id: 'hud.hintPlays', label: 'Control hint: shown for the first plays', def: 3, min: 0, max: 20, step: 1, unit: 'plays', group: 'Hoops · screen',
+    source: 'lib/babylon/ui/hudHints.ts HINT_PLAYS',
+    hint: 'The one-line control hint shows for this many plays of a mode in a session (a score, a shot or the next ball ends a play), then stops. 0 = always, as before.',
+  },
+  {
+    id: 'venue.halfCourtCrowdCards', label: 'Flat cut-out crowd behind the 1v1 / 3v3 / 3-Point rim: on (1) / off (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · screen',
+    source: 'lib/babylon/nexus/veniceBoardwalk.ts HALF_COURT_CROWD_CARDS',
+    hint: 'Off: the twelve flat crowd cards stand only behind the dunk rim. 1 = also behind the half-court rim at Venice, as before.',
   },
 ];
 

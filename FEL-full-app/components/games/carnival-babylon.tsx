@@ -184,7 +184,7 @@ export default function CarnivalBabylon({ onEnd }: GameProps) {
 
       {/* THE MIC: under the reveal / hand-off card, and at the bottom while the scoreboard is up (it would cover the scores) */}
       {phase === 'playing' && (
-        <MicCaption text={hud.mic} who={hud.micWho}
+        <MicCaption text={hud.mic} who={hud.micWho} voiced={hud.micVoiced}
           className={isBoard(hud.board) && typeof hud.boardTitle === 'string' && hud.boardTitle ? 'bottom-3' : 'top-[62%]'} />
       )}
       {phase === 'playing' && <MicToggle />}
