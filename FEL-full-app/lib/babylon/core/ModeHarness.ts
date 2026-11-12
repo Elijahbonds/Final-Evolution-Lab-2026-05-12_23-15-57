@@ -1055,8 +1055,8 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     unsub?.();
     input.stop();
     SoundKit.stopAmbient();   // M43: silence the ambient bed on teardown
-    try { void SoundKit.useSampleBank(null); } catch { /* nothing to release */ }   // HOOPS-SOUND: the next mode hears its own synths
     exitBed();                // PIPELINES: the page gets its soundtrack stage back
+    try { void SoundKit.useSampleBank(null); } catch { /* nothing to release */ }   // HOOPS-SOUND: the next mode hears its own synths
     VoiceKit.stopAll(0.1);    // THE MIC: whatever a mode left on the mic goes with it
     juice.dispose();
     qaRestore?.();

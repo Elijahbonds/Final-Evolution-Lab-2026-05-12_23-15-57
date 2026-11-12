@@ -337,6 +337,23 @@ export const CREDITS: Credit[] = [
     covers: ['audio/flip/', 'audio/songs/'],
     manifestLicences: ['FEL original, generated'],
   },
+  // HOOPS-SOUND (phase 11a, 2026-11-12; owner: basketball sounds from free CC0 recordings): the hoops foley set. Every file is made
+  // from a BigSoundBank recording whose page states CC0; public/audio/hoops/CREDITS.md and sources.json (each source's URL and sha256,
+  // each output's sha256) are its record and sit in the folder this entry covers, as Kenney's manifest sits under models/props/.
+  {
+    id: 'bigsoundbank',
+    section: 'sound',
+    title: 'BigSoundBank recordings (the hoops sounds)',
+    by: 'Joseph Sardin (BigSoundBank, bigsoundbank.com)',
+    used: 'The basketball court’s recorded sounds in 1v1, 3v3 and the 3-point contest: the ball bouncing, sneaker squeaks, the rim, the net, a pass caught, the crowd’s cheer and its murmur. Cut, faded, levelled and converted by our own script; nothing else in the audio is changed.',
+    licence: 'CC0 1.0',
+    licenceUrl: OPEN_LICENCES['CC0 1.0'],
+    status: 'open',
+    link: 'https://bigsoundbank.com/',
+    recordedIn: ['public/audio/hoops/CREDITS.md', 'public/audio/hoops/sources.json', 'scripts/audio/hoops-foley/build.mjs'],
+    covers: ['audio/hoops/'],
+    manifestLicences: ['CC0 1.0 (public domain)'],
+  },
 
   // ── software the browser runs ───────────────────────────────────────────────────────────────────────────────────
   {
