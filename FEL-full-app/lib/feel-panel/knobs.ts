@@ -1787,9 +1787,9 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
   },
   // ── lane/kit-fit (owner 2026-11-12: "fix how the clothes fit, how they look") ──
   {
-    id: 'kit.garmentFollowBody', label: 'Clothes follow the body shape on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Kit · fit',
+    id: 'kit.garmentFollowBody', label: 'Clothes follow the body shape on (1) / off (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Kit · fit',
     source: 'lib/babylon/creator/shape/renderShape.ts GARMENT_FOLLOW_BODY',
-    hint: 'On: a worn top or short takes the bulk of the skin under it on a Creator build, so layers keep their gap. Off: each garment bulks by its own weights.',
+    hint: 'Ships off (measured worse on heavy builds). On: a worn top or short takes the bulk of the nearest skin on a Creator build. Off: each garment bulks by its own weights, as before.',
   },
 ];
 

@@ -139,10 +139,13 @@ const NECK_FALLBACK_M = 0.08;
 const EYE_REACH_M = 0.04;
 /**
  * kit.garmentFollowBody (lane/kit-fit): 1 = a worn top or short (the kit's, a kit pack's) takes the bulk of the skin under it
- * (inflate.followDelta), so the layers keep their offsets on any build — the girth-max body's waistband no longer outgrows the
- * tee's hem; 0 = each garment bulks through its own weights, as before.
+ * (inflate.followDelta); 0 = each garment bulks through its own weights, as before. SHIPS OFF: measured on the browser rig
+ * (docs/KIT-FIT-PLAN.md §3.3) it made the girth-max bodies WORSE — female 13,773 → 34,875 px of skin through cloth over
+ * 50 shots, the bust and shoulders through the tee — because the NEAREST skin under a garment that bridges a hollow (under the
+ * bust) barely moves while the skin it covers swells. Phase 2 redoes it by projection along the garment's normal, measured on
+ * a layer-order metric (the short drawn over the tee), which the skin metric does not see.
  */
-export const GARMENT_FOLLOW_BODY = 1;
+export const GARMENT_FOLLOW_BODY = 0;
 /** How far (m, at rest) a garment vertex looks for the skin it follows; beyond it keeps its own bulk (a loose hem's tip). */
 const FOLLOW_REACH_M = 0.08;
 const followMaps = new Map<string, FollowMap>();

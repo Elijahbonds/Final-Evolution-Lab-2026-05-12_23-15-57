@@ -737,7 +737,7 @@ party run plays today's numbers (and so does an agent / probe run). **Phase B (2
 
 Group **Kit · fit**. A look switch, not a feel number: it moves no body, no bone and no timing.
 
-- `kit.garmentFollowBody` 1: on a Creator build (the girth sliders), a worn top or short (the kit's own, a kit pack's) takes the
-  bulk of the skin under it, so the tee stays over the short and both stay over the skin on any build (the kit-glitch lane's
-  open item: on the girth-max body the waistband showed through the tee's hem). 0 = each garment bulks through its own skin
-  weights, as before. Applied the next time the shape changes. `lib/babylon/creator/shape/renderShape.ts` `GARMENT_FOLLOW_BODY`.
+- `kit.garmentFollowBody` **0 (ships off)**: 1 = on a Creator build (the girth sliders), a worn top or short takes the bulk of the
+  nearest skin instead of its own. Measured WORSE on the browser rig on the girth-max bodies (the bust through the tee), so it
+  is off; 0 = each garment bulks through its own skin weights, as before. Kept for phase 2 (docs/KIT-FIT-PLAN.md).
+  `lib/babylon/creator/shape/renderShape.ts` `GARMENT_FOLLOW_BODY`.

@@ -12,8 +12,9 @@ skin under it and move it with the skin.** Concretely: a garment's own shape is 
 cross into another limb or sink under the skin), it takes the skin weights of the body under it (so cloth and skin move as
 one), it has real UVs and a fabric surface (no cracks, no flat plastic), and it follows the body's shape morphs through the
 skin under it (so the layers keep their gaps on any build). The game's existing per-spawn safety nets (the body mask, the edge
-flare, the waistband fit, the lift) stay, and later phases move them into the asset too. Phase 1 is built in this lane: it fixes
-all three approved art jobs and gives the player's kit real UVs, with every rig byte-identical.
+flare, the waistband fit, the lift) stay, and later phases move them into the asset too. Phase 1 is built in this lane, with every rig
+byte-identical: the short's legs (job 1) and the football jersey (job 2) are refitted, and the player's kit has real UVs.
+Job 3 (the waistband over the tee on a heavy build) is **not fixed**: the first attempt measured worse on screen and ships off.
 
 ## 1. What the best games do (plain words)
 
@@ -86,7 +87,36 @@ skin): male **36 % → at most 6 %** in any height band, female **26 % → at mo
 
 ### 3.3 Before → after, on screen
 
-KIT-FIT-BROWSER-NUMBERS
+The browser rig (`scripts/probes/kit-fit/run.sh`: the real spawn, kit, mask and identity code in headless Chromium; the old files
+served from an overlay and the new knob off for "before", one build, one gate hold), desktop, 10 subjects, 402 shots (every pose ×
+5 cameras for the player's bodies, 3 for rivals). **Skin through cloth** = pixels of skin within 4 cm of a garment drawn inside
+its silhouette; **flicker** = pixels whose class flips under a 0.4 mm camera nudge.
+
+| Group | Skin through cloth, px (% of garment) | Flicker, px |
+|---|---|---|
+| Closet (5 bodies incl. girth max / min) | 63,077 (1.07 %) → 90,807 (1.62 %) — **worse**, see below | 629 → 1,634 |
+| In a game (dunk scene, ink + light rig) | 24,115 (1.05 %) → 29,355 (1.27 %) — worse | 5,124 → 4,211 |
+| Rivals (grit, yara) | 6,910 (1.41 %) → 5,944 (1.22 %) | 769 → **296** |
+| Football jersey (male, female) | 66,472 (3.74 %) → 60,053 (3.37 %) | 19,687 → **10,930** |
+| **All** | 160,574 (1.54 %) → 186,159 (1.83 %) | 26,209 → **17,071** |
+
+Per subject, the worse rows have two causes, and the contact sheet shows both:
+- **The "follow the body" switch (job 3) made the girth-max bodies worse**: male 18,730 → 26,692 px, female 13,773 → 34,875 px
+  (her tee 5,298 → 20,755: bust and shoulders through it). It copies the NEAREST skin's movement, and where the cloth bridges a
+  hollow (under the bust) the nearest skin barely moves while the skin it covers swells. It also does not touch what job 3
+  really is — the short's waistband drawn over the tee's hem (a garment-over-garment fault the skin metric cannot see; it is
+  visible as the ragged band in the girth-max rows, before and after). So it **ships off** (`kit.garmentFollowBody` 0 = exactly
+  as before) and job 3 is **not fixed**: phase 2. A rerun of those subjects with it off: KIT-FIT-OFF-NUMBERS
+- **The leg fit trades the big faults for small ones under the short**: the kicking thigh no longer comes out through the
+  short (male high kick 1,407 → 147 px; female lunge 1,487 → 647; grit's kick 714 → 151), but with the inner leg now on its own
+  thigh, close front shots of the run, squat and dunk show more small slivers of thigh at the inner hem (game male: short
+  1,138 → 4,031 px over 45 shots; female 975 → 2,280). Phase 2's baked mask closes those (the mask still leaves skin drawn
+  within its margin of a hem).
+- The rig's noise is ±5–16 % a subject (kit-glitch measured it); the default male and female in the Closet improved
+  (16,222 → 15,488 and 14,352 → 13,752).
+
+**Contact sheet** (before | after; beauty shot, then the class pass with skin through cloth in red):
+`kit-fit-before-after.jpg` in the lane's scratch folder (`…/scratchpad/kit-fit/rig/`; the path is in the lane report).
 
 ## 4. What phase 1 changed (built in this lane)
 
@@ -106,9 +136,10 @@ needed**: a Blender round trip rewrites the whole file and the rig would have to
 3. **The football jersey refitted** (job 2): its outer wall pushed out of both kit bodies (4 mm above the waist, 22 mm in the
    waist band, over the runtime's 13 mm lift), the push spread to the inner wall so the shell keeps its thickness, the larger of
    the two bodies' pushes kept (one file fits both; a little looser on the female's shoulders).
-4. **Garments follow the body's shape** (job 3): `kit.garmentFollowBody` (feel knob, group "Kit · fit"; 1 on, 0 = as before) — a
-   worn top or short takes the bulk of the skin under it (`inflate.followMap` / `followDelta`, 4 nearest skin points within
-   8 cm), so the layers keep their gaps on any build. Runtime, small, in the Creator's shape code only.
+4. **Garments follow the body's shape** (job 3) — **built, measured worse, ships OFF**: `kit.garmentFollowBody` (feel knob,
+   group "Kit · fit"; 0 = as before, the default) makes a worn top or short take the bulk of the nearest skin
+   (`inflate.followMap` / `followDelta`). On screen it pushed the bust through the tee on the girth-max female (§3.3). Kept as a
+   switch for phase 2, which redoes it by projection along the garment's normal.
 
 **Cost.** Download: +79–80 KB a kit file (2–3 %), +22 KB a rival (3 %), +173 KB the football jersey (14 %: its positions are
 32-bit floats, as the original's). The new data is stored in the files' own compact types (byte normals, weights and joints,
@@ -119,8 +150,8 @@ provably untouched. No new mesh, material, texture or draw.
 
 | Phase | What | Exit gate (measured) |
 |---|---|---|
-| **1 — Fit the kit (built)** | §4: UVs, the short's legs, the jersey, follow-the-body | `scripts/kit-fit-tests.ts` green (GATE 0 fingerprints of all 29 rebaked files, UVs, leg tubes, jersey); torn edges on the kit bodies ≤ 30 % of before (82 % / 80 % fewer); farthest vertex ≤ 0.10 m; the browser before/after (§3.3) |
-| **2 — Bake the fit into every garment** | The rivals' tees (finding 6) through the same transfer; the body-hide mask, the lift and the edge flare baked into each garment file (the runtime keeps them as a fallback), so a spawn does no fitting on the CPU; the female tee's bust fold in its UVs (11 % shared texels) | Rival torn edges ≤ 20 a body over the 10 poses; mask and lift time per spawn → 0 ms on a baked garment (today paced over frames); skin through cloth ≤ 1 % of garment pixels on the browser rig |
+| **1 — Fit the kit (built)** | §4: UVs, the short's legs, the jersey (follow-the-body built but off) | Met: `scripts/kit-fit-tests.ts` green (GATE 0 fingerprints of all 29 rebaked files, UVs, leg tubes, jersey); torn edges on the kit bodies ≤ 30 % of before (82 % / 80 % fewer); farthest vertex ≤ 0.10 m; flicker down a third on screen. **Not met**: skin through cloth on screen did not drop overall (§3.3) |
+| **2 — Bake the fit into every garment** | Job 3 redone: the garment follows the skin it COVERS (projection along its normal) and a layer-order metric (the short drawn over the tee) on the rig; the slivers of thigh at the short's inner hem (§3.3); the rivals' tees (finding 6) through the same transfer; the body-hide mask, the lift and the edge flare baked into each garment file (the runtime keeps them as a fallback), so a spawn does no fitting on the CPU; the female tee's bust fold in its UVs (11 % shared texels) | Rival torn edges ≤ 20 a body over the 10 poses; mask and lift time per spawn → 0 ms on a baked garment (today paced over frames); skin through cloth ≤ 1 % of garment pixels on the browser rig |
 | **3 — The right garments** | A real basketball jersey (wide armholes, hem over the short) for the court modes and as `top_bonds`, cut from the CC0 MakeHuman tee in Blender like the rivals' sleeveless jersey (`style.py cut_sleeves`), with a second UV set for the player's own number; a clean football jersey re-model (symmetric, no mirrored print, no emissive, ≤ 4k triangles) | A 1v1 / 3v3 frame reads "basketball kit" (owner's eye); numbers per player; the football jersey under 4k triangles |
 | **4 — Cloth that moves** | A cheap sway on the short's hem and the jersey's tail in the vertex shader, driven by the body's speed (no new bones) | No new joint; ≤ 0.2 ms a frame on the phone profile; never through the legs (the browser rig's poke at the hem) |
 | **5 — Phones** | A lighter garment level of detail for far bodies (the crowd, the 3v3 far side) | 3v3 and 3-Point back inside their phone rows (HOOPS-AAA-GAP-SHOW §3.9) |

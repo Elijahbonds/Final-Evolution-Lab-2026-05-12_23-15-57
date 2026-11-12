@@ -25,9 +25,9 @@ describe('a garment takes the displacement of the skin under it', () => {
   it('a point with no skin in reach keeps its own bulk', () => {
     expect([d[6], d[7], d[8]]).toEqual([own[6], own[7], own[8]]);
   });
-  it('the knob ships on, and its row restores the old behaviour at 0', () => {
-    expect(GARMENT_FOLLOW_BODY).toBe(1);
+  it('the knob ships OFF (measured worse on the girth-max bodies: docs/KIT-FIT-PLAN.md §3.3); 0 is the old behaviour', () => {
+    expect(GARMENT_FOLLOW_BODY).toBe(0);
     const k = FEEL_KNOB_BY_ID.get('kit.garmentFollowBody')!;
-    expect([k.def, k.min, k.max, k.step]).toEqual([1, 0, 1, 1]);
+    expect([k.def, k.min, k.max, k.step]).toEqual([0, 0, 1, 1]);
   });
 });
