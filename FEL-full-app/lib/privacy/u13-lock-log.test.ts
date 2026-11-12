@@ -124,8 +124,8 @@ const UA = 'AgeScreenTest/1.0';
 // MERGE (lane/plat-bbs04 + finish-release 05c73483, 2026-11-03): hoops-cam.sql + teacher.sql, both pending files; pinned at
 // the merge (pinned at the merge commit). SQL HARDEN (2026-11-03): both pending files hardened (RLS, guards); re-pinned there.
 // STUDIO-SAVE x RELEASE (2026-11-12): lane/studio-save's merge of lane/finish-release at fbf197fb carries #373's
-// schema + StudioProjectSave SQL beside every pending file above; pinned at that merge (the commit after it sets the SHA).
-const PARENT = '4dae9fd412f6d4de17f2581029d40e0af25a655f';
+// schema + StudioProjectSave SQL beside every pending file above; pinned at that merge, 45c0c93f.
+const PARENT = '45c0c93fa398897fc1882152d150ff838b61038d';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {
