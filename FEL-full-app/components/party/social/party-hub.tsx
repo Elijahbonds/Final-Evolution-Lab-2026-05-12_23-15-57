@@ -24,7 +24,7 @@ export function LocalPartyFallback({ outdated = false }: { outdated?: boolean })
   const signedIn = visitor === 'signed-in';
   const href = signedIn ? '/play/party' : loginPath('/play/party');
   return (
-    <section data-testid="party-local-fallback" className="space-y-3 rounded-xl bg-white/[0.06] p-4 text-sm text-white/70">
+    <section data-testid="party-local-fallback" className="space-y-3 rounded-xl bg-white/[0.06] p-4 text-base text-white/70">
       <p role="status" data-testid={outdated ? 'party-outdated' : undefined}>
         {outdated
           ? 'Parties need a server update. Everything else works as usual.'
@@ -84,7 +84,7 @@ export function PartyHub({ initialCode = '' }: { initialCode?: string }) {
       <div>
         <p className="font-mono text-xs tracking-[0.3em] text-white/50">PARTY</p>
         <h1 className="fel-heading mt-1 text-3xl font-black">Play with friends, together</h1>
-        <p className="mt-1 text-sm text-white/55">Up to {PARTY_MAX} people. Chat, quick chat and emotes — and voice for 18+ accounts. Everyone plays their own game, or the host starts one for everybody. Nothing said in a party is recorded or kept.</p>
+        <p className="mt-1 text-base text-white/55">Up to {PARTY_MAX} people. Chat, quick chat and emotes — and voice for 18+ accounts. Everyone plays their own game, or the host starts one for everybody. Nothing said in a party is recorded or kept.</p>
       </div>
 
       {s.status === 'unavailable' ? (

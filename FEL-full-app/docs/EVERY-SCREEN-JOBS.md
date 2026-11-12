@@ -6,63 +6,169 @@
 
 **How to read it.** Taps are counted from the signed-in home; the Train tab is one tap. Typing is counted apart. Seconds are the rig's own, with no reading time: a floor, not a person's time. A camera job is walked to the moment it needs a person in front of the camera. "Stops" means a person cannot go further on that path today, and says where.
 
-**Today: 47 of 47 jobs can be walked to their end** (or to the camera); 0 stop.
+**Today: 51 of 51 jobs can be walked to their end** (or to the camera); 0 stop.
 
 ## An athlete training alone
 
 | Job | Taps | Typing | Seconds | What happens | The plan's budget |
 |---|---|---|---|---|---|
 | The wallet: each coin says where it came from | 0 | – | 0 | finishes | a balance always shows where it came from (phase 8) |
-| Pick a game on Play and start playing | 2 | – | 32.8 | finishes | pick a game → playing in ≤ 2 taps (phase 7) |
-| The party room: what each empty seat waits for | 0 | – | 0 | reaches it: the lobby: it waits for phones or controllers to join | a lobby always says what it is waiting for (phase 7) |
-| Start today's workout (today's drill) | 3 | – | 2 | reaches it: the drill is on camera: it needs a person in the picture | open app → first exercise in ≤ 2 taps and ≤ 10 s (phase 2) |
-| Start today's workout (a program kept on this phone) | 2 | – | 8.4 | finishes | open app → first exercise in ≤ 2 taps and ≤ 10 s (phase 2) |
-| Ask the AI builder for a program and start it | 4 | 1 | 10.5 | finishes | ask → first rep in ≤ 4 taps (phase 3) |
-| Change one thing in the program the AI built, and start it | 3 | – | 1.5 | finishes | change one thing without starting over; save, and start (phase 3) |
-| Log a set (in the program the AI built) | 1 | – | 7.7 | finishes | log a set in 1 tap (phase 2) |
-| Finish a session (in the program the AI built) | 15 (14 sets + 1 other) (+ 44 waits the rig skipped) | – | 39 | finishes | a 5-exercise session in ≤ 12 taps beyond the sets (phase 2) |
-| Test a jump (measure my vertical) | 3 | – | 2.6 | reaches it: the camera: three jumps in front of it (the reading itself is measured on recorded jumps, not on this rig) | vertical in ≤ 3 taps (phase 4) |
-| Run the movement screen | 3 | – | 2 | reaches it: the camera: four moves in front of it | movement screen in 3 taps and under 3 minutes (phase 4) |
-| See progress | 2 | – | 2 | finishes | progress number → its source in 1 tap (phase 4) |
-| See where a progress number came from | 2 | – | 11 | finishes | progress number → its source in 1 tap (phase 4) |
-| Find and join a group | 0 | – | 0 | reaches it: switched off until the group-booking tables are applied: the screen says so and offers what to do instead | join a group in ≤ 4 taps (phase 5) |
-| Book a 1:1 | 1 | – | 0.6 | reaches it: switched off until the group-booking tables are applied: the screen says so and offers what to do instead | book a 1:1 in ≤ 5 taps (phase 5) |
-| Cancel a booking | 0 | – | 0 | reaches it: switched off: nothing can be booked, so there is nothing to cancel; the notice says what to do instead | cancel in ≤ 3 taps with the rule shown first (phase 5) |
-| Find and join a group (booking open) | 4 | – | 1.9 | finishes | join a group in ≤ 4 taps (phase 5) |
-| Book a 1:1 (booking open) | 5 | – | 2.5 | finishes | book a 1:1 in ≤ 5 taps (phase 5) |
-| Cancel a booking (booking open) | 3 | – | 1.4 | finishes | cancel in ≤ 3 taps with the rule shown first (phase 5) |
 | Open the wallet | 2 | – | 1.3 | finishes | budget: this walk (phase 8) |
 | Open the store | 1 | – | 0.5 | finishes | budget: this walk (phase 8) |
-| Open the closet | 2 | – | 2.7 | finishes | budget: this walk (phase 8) |
+| Open the closet | 2 | – | 1.5 | finishes | budget: this walk (phase 8) |
 | Edit the profile | 2 | – | 1 | finishes | budget: this walk (phase 8) |
 | Find support | 2 | – | 1 | finishes | budget: this walk (phase 8) |
 | Spend coins (exchange for shards): the history says where it went | 2 | – | 6.5 | finishes | a purchase always shows where it came from (phase 8) |
-| Open a lesson (Train → Learn → Continue) | 3 | – | 1.7 | finishes | a lesson: reading in ≤ 2 taps from Learn (phase 9) |
+| Open a lesson (Train → Learn → Continue) | 3 | – | 1.6 | finishes | a lesson: reading in ≤ 2 taps from Learn (phase 9) |
 | Open a lesson from the chapter list | 1 | – | 0.5 | finishes | a lesson: reading in ≤ 2 taps (phase 9) |
-| Open Story | 1 | – | 0.6 | finishes | budget: this walk (phase 9) |
+| Open Story | 1 | – | 0.7 | finishes | budget: this walk (phase 9) |
 | Open Kitchens | 2 | – | 1 | finishes | budget: this walk (phase 9) |
-| Open Create | 2 | – | 1.1 | finishes | budget: this walk (phase 9) |
+| Open Create | 2 | – | 1 | finishes | budget: this walk (phase 9) |
 | Open the books (Press) | 2 | – | 1 | finishes | budget: this walk (phase 9) |
-| Find Teach on FEL | 3 | – | 1.4 | finishes | budget: this walk (phase 9) |
+| Find Teach on FEL | 3 | – | 1.5 | finishes | budget: this walk (phase 9) |
+| Journey: a player who only wants the games (a game, out, Story, another game) | 7 | – | 46.6 | finishes | no dead end (phase 10) |
+| Pick a game on Play and start playing | 2 | – | 29.3 | finishes | pick a game → playing in ≤ 2 taps (phase 7) |
+| The party room: what each empty seat waits for | 0 | – | 0 | reaches it: the lobby: it waits for phones or controllers to join | a lobby always says what it is waiting for (phase 7) |
+| Start today's workout (today's drill) | 3 | – | 1.8 | reaches it: the drill is on camera: it needs a person in the picture | open app → first exercise in ≤ 2 taps and ≤ 10 s (phase 2) |
+| Start today's workout (a program kept on this phone) | 2 | – | 8 | finishes | open app → first exercise in ≤ 2 taps and ≤ 10 s (phase 2) |
+| Ask the AI builder for a program and start it | 4 | 1 | 10.4 | finishes | ask → first rep in ≤ 4 taps (phase 3) |
+| Change one thing in the program the AI built, and start it | 3 | – | 1.4 | finishes | change one thing without starting over; save, and start (phase 3) |
+| Log a set (in the program the AI built) | 1 | – | 7.6 | finishes | log a set in 1 tap (phase 2) |
+| Finish a session (in the program the AI built) | 15 (14 sets + 1 other) (+ 44 waits the rig skipped) | – | 38.1 | finishes | a 5-exercise session in ≤ 12 taps beyond the sets (phase 2) |
+| Test a jump (measure my vertical) | 3 | – | 2.3 | reaches it: the camera: three jumps in front of it (the reading itself is measured on recorded jumps, not on this rig) | vertical in ≤ 3 taps (phase 4) |
+| Run the movement screen | 3 | – | 2.2 | reaches it: the camera: four moves in front of it | movement screen in 3 taps and under 3 minutes (phase 4) |
+| See progress | 2 | – | 1.9 | finishes | progress number → its source in 1 tap (phase 4) |
+| See where a progress number came from | 2 | – | 10.9 | finishes | progress number → its source in 1 tap (phase 4) |
+| Find and join a group | 0 | – | 0 | reaches it: switched off until the group-booking tables are applied: the screen says so and offers what to do instead | join a group in ≤ 4 taps (phase 5) |
+| Book a 1:1 | 1 | – | 0.5 | reaches it: switched off until the group-booking tables are applied: the screen says so and offers what to do instead | book a 1:1 in ≤ 5 taps (phase 5) |
+| Cancel a booking | 0 | – | 0 | reaches it: switched off: nothing can be booked, so there is nothing to cancel; the notice says what to do instead | cancel in ≤ 3 taps with the rule shown first (phase 5) |
+| Find and join a group (booking open) | 4 | – | 1.9 | finishes | join a group in ≤ 4 taps (phase 5) |
+| Book a 1:1 (booking open) | 5 | – | 2.4 | finishes | book a 1:1 in ≤ 5 taps (phase 5) |
+| Cancel a booking (booking open) | 3 | – | 1.4 | finishes | cancel in ≤ 3 taps with the rule shown first (phase 5) |
 
 ## A coached client
 
 | Job | Taps | Typing | Seconds | What happens | The plan's budget |
 |---|---|---|---|---|---|
-| Start today's workout (the coach's session) | 2 | – | 0.9 | finishes | open app → first exercise in ≤ 2 taps and ≤ 10 s (phase 2) |
+| Journey: a coached client (today's session, every set, progress, profile) | 14 (8 sets + 6 other) (+ 28 waits the rig skipped) | – | 28.4 | finishes | no dead end (phase 10) |
+| Start today's workout (the coach's session) | 2 | – | 1 | finishes | open app → first exercise in ≤ 2 taps and ≤ 10 s (phase 2) |
 | Log a set (the coach's session) | 1 | – | 8.1 | finishes | log a set in 1 tap (phase 2) |
-| Finish a session (the coach's session) | 9 (8 sets + 1 other) (+ 28 waits the rig skipped) | – | 24.2 | finishes | a 5-exercise session in ≤ 12 taps beyond the sets (phase 2) |
+| Finish a session (the coach's session) | 9 (8 sets + 1 other) (+ 28 waits the rig skipped) | – | 23.2 | finishes | a 5-exercise session in ≤ 12 taps beyond the sets (phase 2) |
 
 ## The coach
 
 | Job | Taps | Typing | Seconds | What happens | The plan's budget |
 |---|---|---|---|---|---|
+| Journey: the coach (who trained, change one exercise, reviews, groups) | 10 | – | 5.9 | finishes | no dead end (phase 10) |
 | See who trained | 2 | – | 2 | finishes | "Who needs me today" is the coach's first screen (phase 5) |
 | Adjust a program (change one exercise) | 6 | – | 3.9 | finishes | adjust one exercise in ≤ 4 taps (phase 5) |
 | Review a form clip | 3 | – | 2.4 | reaches it: switched off until the form-review table is applied: clients film a set and read their own flags; nothing reaches the coach yet, and the screen says so | – (phase 5) |
 | Take group attendance | 3 | – | 2.4 | reaches it: switched off until the group-booking tables are applied: the screen says so and offers what to do instead | attendance in ≤ 1 tap per person (phase 5) |
 | Open shot charts | 4 | – | 2.9 | reaches it: switched off until the shot-chart table is applied: the screen says so and offers a way back | – (phase 5) |
 | Take group attendance (booking open) | 4 | – | 2.9 | finishes | attendance in ≤ 1 tap per person (phase 5) |
+
+## Phase 10, part B: proving it (every screen re-scored; four journeys; every budget re-checked)
+
+**The scorecard: 54 of 187 screens pass all four (phase 1: 4 of 184).** All 187 screens were read on one production build
+of release 9ff7c8d1, with Nexus Studio switched on in the rig. The other 133 are named one by one in
+`docs/EVERY-SCREEN-SCORECARD.md` ("Before (phase 1) → after"), each with the worst problem and what it needs
+(`docs/every-screen/needs.json`). In short:
+
+| What it needs | Screens |
+|---|---|
+| Owner: wording (more than 40 words on a first screen, an empty line whose next step sits outside it, a policy page) | 37 |
+| Owner: switched-off features ("opens soon", "coming soon", Squads, Coach Pro, teaching, group booking, the coach store) | 33 |
+| Owner: the owner's tools (/admin, /coach/admin), the arena age gate, the `[OWNER: …]` blanks, Studio | 14 |
+| Nothing failed: a 3D screen's tap time cannot be read on a rig with no GPU (a phone check) | 14 |
+| Game lanes: the in-game HUD (12 px plates, item-slot contrast, cut-offs at 200 %) | 12 |
+| Not its own screen (it sends you on), a 404 by design, or a row the rig cannot make (a guardian token, a creator card) | 13 |
+| Speed or load shifts not solved in phase 10 (named in part A), and the map preview developer page | 6 |
+| A design call (button looks; /modes and /venues, where 16 px lines were tried and made things worse) | 4 |
+
+Nothing fails only because of clothes. The closet fails on button looks and small text, not the kit; the kit belongs to
+the kit-glitch lane.
+
+**The four journeys, each a walk in the suite. No dead end in any of them:**
+
+| Journey | Taps | Ends |
+|---|---|---|
+| A new athlete alone: home → Log in → Create account → the first game → out → Train → build a program → every set → progress → Play → Measure my vertical | 31 | at the camera (three jumps need a person) |
+| A coached client: Train → today's session → every set → saved → Train → progress → Profile | 14 | the profile |
+| The coach: the roster's week → the athlete → Program → change one exercise (saved) → Back → form reviews → Back → groups (what to do while they are off) | 10 | the groups notice, with its way on |
+| A player who only wants the games: Play → Flight Night → playing → out → Play → Story → Play → Ones | 7 | the next game's start card |
+
+The first runs found two walk faults, not app faults. The coach's athlete opens as a sheet with its own Back (the walk
+had reached for the tab bar). A game tile tapped while scrolled under the top bar did not open; the walk now picks one in
+view.
+
+**Every tap budget from phases 1–9 was walked again: 47 of 47 are unchanged; none went up.** All 51 walks (the 47, plus
+the four journeys) reach their end; five of them run on the booking-open (LIT) rig.
+
+**The /story check** (`scripts/every-screen/story-map-check.mts`): all 12 zone markers and labels sit fully on the map at
+390 px, at 100 % and at 150 % text. Its control moves every zone 60 px right, and it then reports six misses. So the check
+can see a miss.
+
+**Small fixes the re-score found:**
+- the controller page's name field has a name (it had only a placeholder; `/controller/[code]` now passes all four);
+- the big screen's "keeps the screen awake" line is readable (4.11:1 → over 4.5:1);
+- long lines at 16 px on `/live`, `/party` and Free play (`/play/irl`);
+- the account's three section headings move from 18 to 20 px.
+
+`/account`, `/live`, `/party` and `/controller/[code]` now pass all four. Two tries made things worse and were taken out:
+`/modes` (its tiles became different heights) and `/venues` (its two-line list was cut).
+
+**The owner's 15-minute phone check (the whole app):**
+
+1. *(2 min)* Signed out: open the home page → Log in → Create account. Birth date first, then name, email and password; the
+   terms tick is a real checkbox. Begin → you land in a game. Tap Home to leave it.
+2. *(3 min)* Train → Build my program → type "All I have is a band. Full body, 3 days a week." → Build it → Start today.
+   Tap through two sets, then Back. Train → My progress: your numbers are there.
+3. *(2 min)* Play → Measure my vertical: it asks your age only if your full birth date is not kept, then "Does anything
+   hurt?", then the camera.
+4. *(2 min)* Play → Flight Night → Tap to start → Home. Play → Story: every zone and its name are on screen; set your
+   phone's text larger and look again. Play → Ones: the start card's Controls box scrolls, and nothing is cut off.
+5. *(2 min)* Profile → Wallet (where each coin came from) → Store → Closet (buttons at finger size; the tools sit beside
+   your character) → Edit profile → Support.
+6. *(2 min)* Train → Learn → Continue (a lesson opens in one tap) → Kitchens → Fuel → Books.
+7. *(2 min)* As a coach: Train → Your roster → open an athlete → Program → change one exercise (saved on the tap) → Back
+   → Form reviews → Back → Groups: each switched-off tool says what to do instead.
+
+## What changed in phase 10, part A (the whole app, once more: fix; measured on the rig)
+
+Measured on the same rig before (release ccc9f830) and after, reading the tap with the CPU slowed 4×. Each tap was also
+probed three times on its own: the probe reports the event's whole duration and where the page spent its time.
+
+**Speed: the slowest screens, one by one**
+
+| Screen | Before | After | The fix (or why not) |
+|---|---|---|---|
+| `/studio`, "Make it for me" | 1440 ms (probe median 1584) | 16 ms, twice (probe median 664: the page's own load is still running when the probe taps) | the tap paints first, and the court is built in the next frame (same command, same undo step) |
+| `/profile`, the jump-check link | 424 ms (probe median 384) | 88 and 248 ms (probe median 208) | the turning 3D athlete is drawn once when WebGL has no graphics chip (the rig; a phone with its GPU blocked). With a GPU nothing changes |
+| `/story/boss`, "FACE THE GLITCH" | 232 ms (probe median 152) | 128 and 144 ms (probe median 104) | the fight starts in a React transition, so the tap paints first |
+| `/shop/shards` load shift | 0.273 | 0.001, twice | the packs are drawn from the server's answer, as `/store` does; they used to show and then vanish |
+| `/coach/join/[token]` late top bar | 0.135 | 0.001, twice | for someone signed in, the page holds the top bar's place until it arrives |
+| `/play/dunk` load shift | 0.048 | 0 and 0.054 | not fixed. The start card's controls switch from the keyboard list to the touch list once the page knows it is a phone; the server cannot tell |
+| `/play/sprint` tap | n/m (3D); probe median 1184 | probe median 1320 | not fixed. The tap waits behind the arena's own load, and behind the render watchdog's frame sample (a tuned guard: owner/game lane). An async start-card picture made no difference and was taken out |
+| `/play/music` tap | 176 ms (probe 200) | 168–176 ms (probe 192) | within budget in every rig reading; nothing to fix |
+| `/train/today-drill` tap | 264 ms | 280 ms | not fixed. The drill's 3D demo is drawn on the CPU on the rig (no GPU), and a still demo would hide the movement |
+| `/learn/feed`, `/play/party`, `/play/map-preview` load shifts | 0.035, 0.033, 0.058 | unchanged | not found. Two tries (equal tile heights; the map report anchored at the top) did not move the numbers and were taken out |
+| `/admin/metrics`, `/coach/admin/programs` | slow | — | the owner's tools: left as they are |
+
+**One look:** `/cards` now passes all four (9 text sizes → 5 steps; the long card lines at 16 px). `/kitchens/fuel` passes
+all four (its buttons share one look; the grocery list's buttons and rows are 44 px). The closet goes from 10 button looks
+to 8: its secondary buttons share the parts grid's look, and its long lines are 16 px. `/links` goes from 5 looks to 4:
+"Copy" matches the outline buttons; the fourth is a two-line button. `/learn/feed` has 4 looks (its topic tiles are
+different heights).
+
+**Carried over:** "The Snow Slope" is whole at 150 % text: the story zones are now centred on their points. Their class
+translate never applied, because motion writes the transform inline. Snowboard's "· PAR 60" did not appear in any of
+this phase's three readings (before or after); it is the board HUD's, and the HUD is the game lanes'. Spot the Scene's "CONTROLS" cut is gone
+now that the controls panel scrolls.
+
+**The start card's how-to panel now scrolls as a whole.** This was phase 7's recommendation; the owner has not answered,
+so it was built under the standing rule. It is easy to reverse. On a phone or with a keyboard, nothing is zoomed down:
+the rows are 14 px, a line of more than 12 words is 16 px, and the panel scrolls. A pad, which cannot scroll a box, still
+steps the rows and lines down to fit (never under 12 px). Nothing is hidden at 150 % or 200 % text.
 
 ## What changed in phase 9 (learn, create and the public pages, measured on the rig)
 

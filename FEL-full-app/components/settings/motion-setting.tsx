@@ -89,7 +89,7 @@ export function MotionSetting({ compact = false, className = '' }: { compact?: b
 
   return (
     <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5" role="group" aria-labelledby="motion-setting-heading">
-      <h3 id="motion-setting-heading" className="fel-heading mb-1 text-lg font-bold text-white">{t('settings.motion.heading')}</h3>
+      <h3 id="motion-setting-heading" className="fel-heading mb-1 text-[20px] font-bold text-white">{t('settings.motion.heading')}</h3>
       <p className={`mb-4 ${lineSize(t('settings.motion.body'), 'text-xs')} text-fel-dim`}>{t('settings.motion.body')}</p>
       <div className="flex flex-wrap gap-2">
         {MOTION_PREFS.map((p) => (

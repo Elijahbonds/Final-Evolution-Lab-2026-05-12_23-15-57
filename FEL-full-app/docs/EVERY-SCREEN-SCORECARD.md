@@ -2,11 +2,11 @@
 
 **Owner, 2026-11-10:** "To improve the total quality of the product from improving every screen."
 
-This is phase 1 of `docs/PLAN-EVERY-SCREEN-10PHASE.md`: every screen a person can reach, scored on the plan's four checks. It is the starting line for all ten phases. Written by `scripts/every-screen/score.mts --report` from the rig's last run (2026-11-11); do not edit it by hand.
+Every screen a person can reach, scored on the plan's four checks (`docs/PLAN-EVERY-SCREEN-10PHASE.md`): phase 1 was the starting line; this is phase 10's re-score of all of them. Written by `scripts/every-screen/score.mts --report` from the rig's last run (2026-11-12); do not edit it by hand.
 
 ## The number
 
-**48 of 187 screens pass all four checks.**
+**54 of 187 screens pass all four checks.**
 
 | | Screens |
 |---|---|
@@ -15,17 +15,213 @@ This is phase 1 of `docs/PLAN-EVERY-SCREEN-10PHASE.md`: every screen a person ca
 | Not a screen of its own: it only sends you on to another | 7 |
 | Switched off: a 404 for everyone today | 20 |
 | Not scored, with the reason (section 5) | 6 |
-| **Pass all four** | **48** |
+| **Pass all four** | **54** |
 | Training and coaching (phases 2–5): pass all four | 15 of 61 (44 scored) |
 
 | Check | Pass | Fail | Not measured |
 |---|---|---|---|
 | 1. Clear and quick | 101 | **53** | 0 |
-| 2. Looks finished | 79 | **75** | 0 |
-| 3. Fast and smooth | 125 | **11** | 18 |
-| 4. Right and trustworthy | 146 | **8** | 0 |
+| 2. Looks finished | 88 | **66** | 0 |
+| 3. Fast and smooth | 122 | **10** | 22 |
+| 4. Right and trustworthy | 148 | **6** | 0 |
 
 Of the 154 scored screens. "Not measured" is a 3D screen's tap time: the rig has no real GPU, so that one number is left open and the screen is not counted as passing.
+
+## Before (phase 1) → after (phase 10), every screen
+
+**Phase 1 (2026-11-10, `2829eb31`): 4 of 184 screens passed all four. Now: 54 of 187.** The scorer was tightened between them (READABLE's body-size rule, the notices rule, clipped text at 150 % and 200 %), so a ✓ now is harder to get than a ✓ then.
+
+Checks in order: 1 clear and quick · 2 looks finished · 3 fast and smooth · 4 right and trustworthy (✓ pass · ✗ fail · ? not measured).
+
+| Screen | Phase 1 | Now | Passes | Why not (the single worst problem) | What it needs |
+|---|---|---|---|---|---|
+| `/` | ✓ ✓ ✓ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/account` | ✗ ✗ ✗ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/account/bookings` | off | off | no | switched off: COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) | owner: switch it on — COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) |
+| `/account/coaching` | ✗ ✓ ✗ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/admin/funnel` | ✗ ✗ ✗ ✓ | ✗ ✗ ✓ ✓ | no | An empty state with no next step: "No wins yet". | owner: the owner's tools, left as they are |
+| `/admin/metrics` | ✗ ✗ ✗ ✓ | ✓ ✗ ✗ ✓ | no | An empty state with no next step: "No stored rollups yet. Click “Recompute” to generate them from traffic.". | owner: the owner's tools, left as they are |
+| `/admin/review` | ✗ ✗ ✗ ✗ | ✗ ✗ ✓ ✗ | no | "WAITING" does nothing when tapped. | owner: the owner's tools, left as they are |
+| `/age` | sends on | sends on | no | redirects to / for everyone who is signed in | nothing: it sends you on to its own screen |
+| `/arena` | ✗ ✗ ✗ ✗ | ✗ ✗ ✓ ✗ | no | 1 serious accessibility finding (contrast). | owner: the arena age-gate screen (#543), read only |
+| `/c/[code]` | off | off | no | not switched off: a challenge code that does not exist is the app's 404 (a real challenge needs a row a player makes by sending one) | nothing: not switched off: a challenge code that does not exist is the app's 404 (a real challenge needs a row a player makes by sending one) |
+| `/c/[code]/play` | sends on | sends on | no | redirects to /c/NONE00 for everyone who is signed in | nothing: it sends you on to its own screen |
+| `/camp` | ✗ ✗ ✗ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/card/[slug]` | not scored | not scored | no | not scored: needs a published creator card row; a new account has none | a row the rig cannot make: needs a published creator card row; a new account has none |
+| `/cards` | ✗ ✗ ✗ ✗ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/closet` | ✗ ✗ ✗ ✗ | ✓ ✗ ? ✓ | no | 8 button looks on one screen (at most 3). | a design call: one button look for the studio's tools (10 → 8 in phase 10); 3D: the tap time needs a phone. Clothes: kit-glitch lane |
+| `/coach` | ✗ ✓ ✗ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/coach-terms` | ✗ ✗ ✓ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/coach/[slug]` | off | off | no | switched off: COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL); or COACH_MARKETPLACE_ENABLED (find a coach) | owner: switch it on — COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL); or COACH_MARKETPLACE_ENABLED (find a coach) |
+| `/coach/[slug]/book/[listingId]` | off | off | no | switched off: COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) | owner: switch it on — COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) |
+| `/coach/[slug]/fee/[packageId]` | off | off | no | switched off: COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL); or COACH_MARKETPLACE_ENABLED (find a coach) | owner: switch it on — COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL); or COACH_MARKETPLACE_ENABLED (find a coach) |
+| `/coach/[slug]/programs/[lane]` | off | off | no | switched off: COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) | owner: switch it on — COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) |
+| `/coach/admin` | ✗ ✗ ✗ ✗ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/coach/admin/library` | ✗ ✗ ✗ ✓ | ✗ ✗ ✓ ✓ | no | 114 paragraphs of body copy under 16 px. | owner: the owner's tools, left as they are |
+| `/coach/admin/programs` | ✗ ✗ ✗ ✓ | ✗ ✗ ✗ ✓ | no | 343 words before scrolling (the budget is 40). | owner: the owner's tools, left as they are |
+| `/coach/business` | ✗ ✗ ✗ ✓ | ✗ ✗ ✓ ✓ | no | An empty state with no next step: "Coach Pro is not on sale yet. Nothing is limited until it is.". | owner: Coach Pro is not on sale; its empty line is the owner's |
+| `/coach/business/thanks` | ✗ ✗ ✗ ✓ | ✗ ✓ ✓ ✓ | no | 41 words before scrolling (the budget is 40). | owner: shorter wording on its first screen (cutting a screen's own explanation is new copy) |
+| `/coach/combine` | ✗ ✗ ✗ ✓ | ✗ ✗ ✓ ✓ | no | Unfinished mark on screen: "Saving combines to your account is coming soon. This combine is kept on this pho". | owner: the feature is not built or not switched on ("coming soon"); owner-gated |
+| `/coach/dashboard` | off | off | no | switched off: COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) | owner: switch it on — COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) |
+| `/coach/dashboard/settings` | off | off | no | switched off: COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) | owner: switch it on — COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) |
+| `/coach/form-review` | ✗ ✗ ✗ ✓ | ✗ ✓ ✓ ✓ | no | 56 words before scrolling (the budget is 40). | owner: shorter wording on its first screen (cutting a screen's own explanation is new copy) |
+| `/coach/groups` | ✗ ✗ ✗ ✓ | ✓ ✗ ✓ ✓ | no | Unfinished mark on screen: "Opens soon". | owner: group booking opens with the training deploy (its tables) |
+| `/coach/highlight/[id]` | ✗ ✗ ✗ ✓ | ✗ ✓ ✓ ✓ | no | 55 words before scrolling (the budget is 40). | owner: shorter wording on its first screen (cutting a screen's own explanation is new copy) |
+| `/coach/join` | ✗ ✗ ✓ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/coach/join/[token]` | ✗ ✗ ✗ ✓ | ✗ ✓ ✓ ✓ | no | 44 words before scrolling (the budget is 40). | owner: shorter wording on its first screen (cutting a screen's own explanation is new copy) |
+| `/coach/live/[room]` | off | off | no | switched off: NEXT_PUBLIC_COACH_LIVE_ENABLED (live coach sessions) | owner: switch it on — NEXT_PUBLIC_COACH_LIVE_ENABLED (live coach sessions) |
+| `/coach/offers/[offer]` | off | off | no | switched off: COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) | owner: switch it on — COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) |
+| `/coach/review/[bookingId]` | off | off | no | switched off: COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) | owner: switch it on — COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) |
+| `/coach/session` | ✗ ✗ ✗ ✓ | ✗ ✓ ✓ ✓ | no | 43 words before scrolling (the budget is 40). | owner: shorter wording on its first screen (cutting a screen's own explanation is new copy) |
+| `/coach/shots` | ✗ ✗ ✗ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/coach/thanks` | off | off | no | switched off: COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) | owner: switch it on — COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) |
+| `/coach/velocity` | ✗ ✗ ✗ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/coaches` | off | off | no | switched off: COACH_MARKETPLACE_ENABLED (find a coach) | owner: switch it on — COACH_MARKETPLACE_ENABLED (find a coach) |
+| `/consent/guardian` | ✗ ✗ ✗ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/consent/guardian/[token]` | not scored | not scored | no | not scored: needs a guardian-consent row with its emailed token | a row the rig cannot make: needs a guardian-consent row with its emailed token |
+| `/controller/[code]` | ✓ ✓ ✓ ✗ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/create` | ✗ ✗ ✗ ✓ | ✓ ✗ ✓ ✓ | no | An empty state with no next step: "Nothing yet. Pick a tile above: three steps and it is a card.". | owner wording: "Pick a tile above" — the tiles are the next step, outside its box |
+| `/create/[discipline]` | ✗ ✗ ✗ ✗ | ✗ ✗ ✓ ✗ | no | "From my Academy library" does nothing when tapped. | the rig taps the tab already chosen; owner wording for its 74 words |
+| `/creator` | ✗ ✗ ✗ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/creator/athlete` | ✗ ✗ ✗ ✗ | ✗ ✓ ✓ ✓ | no | 85 words before scrolling (the budget is 40). | owner: shorter wording on its first screen (cutting a screen's own explanation is new copy) |
+| `/credits` | ✗ ✗ ✓ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/education` | sends on | sends on | no | redirects to /learn for everyone who is signed in | nothing: it sends you on to its own screen |
+| `/education/course/[id]` | ✗ ✓ ✗ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/education/playbook` | ✗ ✗ ✗ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/education/playbook/[chapter]` | ✗ ✓ ✗ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/groups` | ✓ ✗ ✓ ✓ | ✓ ✗ ✓ ✓ | no | Unfinished mark on screen: "Opens soon". | owner: group booking opens with the training deploy (its tables) |
+| `/groups/[groupId]` | ✓ ✗ ✓ ✓ | ✓ ✗ ✓ ✓ | no | Unfinished mark on screen: "Opens soon". | owner: group booking opens with the training deploy (its tables) |
+| `/groups/one-on-one` | ✓ ✗ ✓ ✓ | ✓ ✗ ✓ ✓ | no | Unfinished mark on screen: "Opens soon". | owner: group booking opens with the training deploy (its tables) |
+| `/groups/trainer/[code]` | ✗ ✓ ✗ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/guardian/report/[token]` | not scored | not scored | no | not scored: needs a guardian report row with its emailed token | a row the rig cannot make: needs a guardian report row with its emailed token |
+| `/guidance` | ✗ ✗ ✗ ✓ | ✓ ✗ ✓ ✓ | no | An empty state with no next step: "no history yet — this is an invitation, not a recommendation". | the rig reads a reason bullet ("no history yet") as an empty state; each card has its "Start →" |
+| `/host` | ✗ ✗ ✓ ✗ | ✗ ✗ ✓ ✓ | no | 74 words before scrolling (the budget is 40). | owner wording: 74 words before scrolling on the big-screen start (its own explanation); its contrast was fixed in phase 10 |
+| `/join` | ✓ ✓ ✓ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/kitchens` | ✗ ✗ ✗ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/kitchens/fuel` | ✗ ✗ ✗ ✗ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/ladder` | ✗ ✗ ✗ ✓ | ✗ ✗ ✓ ✓ | no | Nothing in the screen itself leads on: only the app's own bars do. | owner: no season has finalized; nothing to lead on to until one does |
+| `/learn` | ✓ ✗ ✓ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/learn/feed` | ✓ ✗ ✗ ✓ | ✓ ✗ ✗ ✓ | no | The screen jumps as it loads (layout shift 0.035; the budget is 0.02). | speed pass: a 0.035 load shift, cause not found in phase 10 |
+| `/links` | ✗ ✗ ✓ ✓ | ✓ ✗ ✓ ✓ | no | 4 button looks on one screen (at most 3). | a design call: its fourth button look is one two-line button |
+| `/live` | ✗ ✗ ✗ ✗ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/live/schedule` | off | off | no | switched off: LIVE_STREAM_SCHEDULE_ENABLED (the live schedule) | owner: switch it on — LIVE_STREAM_SCHEDULE_ENABLED (the live schedule) |
+| `/login` | ✗ ✗ ✗ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/market` | ✗ ✗ ✗ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/media-kit` | ✗ ✗ ✓ ✓ | ✓ ✗ ✓ ✓ | no | Unfinished mark on screen: "[OWNER: monthly players, as of date]". | owner: fill the [OWNER: …] blanks (the owner's content) |
+| `/modes` | ✗ ✗ ✗ ✓ | ✓ ✗ ✓ ✓ | no | 29 paragraphs of body copy under 16 px. | a design call: tried in phase 10 — its descriptions at 16 px make the tiles different heights (6 button looks); taller equal tiles or fewer words |
+| `/multiplayer` | ✗ ✗ ✗ ✗ | ✗ ✗ ✓ ✗ | no | An empty state with no next step: "No matches yet. Create a challenge above to get started.". | owner wording: "Create a challenge above" — the next step is outside its box |
+| `/p/[token]` | not scored | not scored | no | not scored: needs a coach share-link row (a coach sharing a client's progress); none exists on a new account | a row the rig cannot make: needs a coach share-link row (a coach sharing a client's progress); none exists on a new account |
+| `/party` | ✗ ✗ ✓ ✗ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/party/[code]` | ✗ ✗ ✓ ✗ | ✗ ✗ ✓ ✓ | no | 108 words before scrolling (the budget is 40). | owner: shorter wording on its first screen (cutting a screen's own explanation is new copy) |
+| `/play` | ✗ ✗ ✗ ✓ | ✓ ✗ ✓ ✓ | no | Text cut off at 390 px: "Breakaway · Twelve Yards · Baseball · Moonsh". | owner: the Play shelf's mode lists clip at three lines (the owner's line-clamp-3, 2026-11-10) |
+| `/play/acting` | ✗ ✗ ✓ ✗ | ✗ ✗ ✓ ✓ | no | 45 words before scrolling (the budget is 40). | owner: shorter wording on its first screen (cutting a screen's own explanation is new copy) |
+| `/play/adventure` | ✗ ✗ ? ✓ | ✗ ✗ ? ✓ | no | Dead end: nothing on the screen leads on or back. | game lanes: the 3D adventure shows nothing the rig can read (no GPU); a phone check |
+| `/play/adventure-br` | ✗ ✗ ? ✗ | ✗ ✗ ? ✓ | no | Dead end: nothing on the screen leads on or back. | game lanes: the 3D adventure shows nothing the rig can read (no GPU); a phone check |
+| `/play/aero-aces` | ✗ ✗ ? ✗ | ✓ ✗ ✓ ✗ | no | 1 critical accessibility finding (contrast). | game lanes: the HUD's item slot contrast (the play itself) |
+| `/play/baseball` | ✗ ✗ ? ✗ | ✗ ✗ ? ✓ | no | 62 words before scrolling (the budget is 40). | owner: shorter wording on its first screen (cutting a screen's own explanation is new copy) |
+| `/play/big-air` | ✗ ✗ ? ✗ | ✓ ✓ ? ✓ | no |  | nothing failed: a 3D screen's tap time is not measured on the rig (no GPU); a phone check |
+| `/play/brain-brawl` | ✗ ✗ ? ✗ | ✓ ✓ ? ✓ | no |  | nothing failed: a 3D screen's tap time is not measured on the rig (no GPU); a phone check |
+| `/play/calibrate` | ✗ ✗ ✓ ✓ | ✗ ✗ ✓ ✓ | no | 98 words before scrolling (the budget is 40). | owner: shorter wording on its first screen (cutting a screen's own explanation is new copy) |
+| `/play/carnival` | ✓ ✓ ✗ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/play/carnival/recap` | ✓ ✓ ✓ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/play/dance` | ✗ ✗ ? ✗ | ✓ ✓ ? ✓ | no |  | nothing failed: a 3D screen's tap time is not measured on the rig (no GPU); a phone check |
+| `/play/derby` | ✗ ✗ ? ✗ | ✓ ✓ ✗ ✓ | no | "Capture and stream menu" answers a tap in 312 ms (the budget is 200 ms). | speed: on the rig (no GPU, CPU slowed 4×) the tap waits behind the page's own 3D or load; a phone check |
+| `/play/drills` | ✗ ✗ ✓ ✗ | ✗ ✓ ✓ ✓ | no | 123 words before scrolling (the budget is 40). | owner: shorter wording on its first screen (cutting a screen's own explanation is new copy) |
+| `/play/duel` | ✗ ✗ ? ✗ | ✓ ✓ ? ✓ | no |  | nothing failed: a 3D screen's tap time is not measured on the rig (no GPU); a phone check |
+| `/play/dunk` | ✗ ✗ ? ✗ | ✗ ✗ ✗ ✓ | no | Text cut off at 200 % zoom: "0" and 5 more. | game lanes: the start card's controls swap from the keyboard list to the touch list after load |
+| `/play/dunkduel` | ✗ ✓ ✓ ✓ | ✗ ✓ ✓ ✓ | no | 88 words before scrolling (the budget is 40). | owner: shorter wording on its first screen (cutting a screen's own explanation is new copy) |
+| `/play/football` | ✗ ✗ ? ✗ | ✓ ✗ ✓ ✓ | no | 3 pieces of text under 12 px. | game lanes: the in-game HUD / touch controller (text under 12 px is the play itself) |
+| `/play/freerun` | ✗ ✗ ? ✗ | ✓ ✗ ? ✓ | no | 1 piece of text under 12 px. | game lanes: the in-game HUD / touch controller (text under 12 px is the play itself) |
+| `/play/gb-shelf` | not listed | off | no | switched off: BINJGB_SHELF_ENABLED (the Game Boy homebrew shelf) | owner: switch it on — BINJGB_SHELF_ENABLED (the Game Boy homebrew shelf) |
+| `/play/gb-shelf/[slug]` | not listed | not scored | no | not scored: v1 of the homebrew shelf ships no titles (BINJGB-SHELF-1, OQ-10), so every slug is a 404 by design; switched off: BINJGB_SHELF_ENABLED (the Game Boy homebrew shelf) | a row the rig cannot make: v1 of the homebrew shelf ships no titles (BINJGB-SHELF-1, OQ-10), so every slug is a 404 by design; switched off: BINJGB_SHELF_ENABLED (the Game Boy homebrew shelf) |
+| `/play/golf` | ✗ ✗ ? ✗ | ✓ ✓ ? ✓ | no |  | nothing failed: a 3D screen's tap time is not measured on the rig (no GPU); a phone check |
+| `/play/irl` | ✗ ✗ ✓ ✗ | ✗ ✓ ✓ ✓ | no | 42 words before scrolling (the budget is 40). | owner: shorter wording on its first screen (cutting a screen's own explanation is new copy) |
+| `/play/karate` | ✗ ✗ ? ✗ | ✓ ✗ ✓ ✓ | no | 1 piece of text under 12 px. | game lanes: the in-game HUD / touch controller (text under 12 px is the play itself) |
+| `/play/karate-vs` | ✗ ✗ ? ✗ | ✓ ✓ ? ✓ | no |  | nothing failed: a 3D screen's tap time is not measured on the rig (no GPU); a phone check |
+| `/play/map-preview` | ✗ ✗ ✗ ✓ | ✗ ✗ ✗ ✓ | no | The screen jumps as it loads (layout shift 0.121; the budget is 0.02). | a developer page (the map perf report); its numbers update as it measures |
+| `/play/mirror` | ✗ ✗ ✗ ✓ | ✗ ✓ ✓ ✓ | no | 118 words before scrolling (the budget is 40). | owner: shorter wording on its first screen (cutting a screen's own explanation is new copy) |
+| `/play/mirror/assess` | ✗ ✓ ✓ ✓ | ✗ ✓ ✓ ✓ | no | 42 words before scrolling (the budget is 40; 31 words of approved notices not counted). | owner: shorter wording on its first screen (cutting a screen's own explanation is new copy) |
+| `/play/mirror/assess/results` | ✗ ✓ ✓ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/play/mirror/correctives` | ✗ ✗ ✓ ✓ | ✗ ✓ ✓ ✓ | no | 63 words before scrolling (the budget is 40). | owner: shorter wording on its first screen (cutting a screen's own explanation is new copy) |
+| `/play/mixedcombat` | ✗ ✗ ? ✗ | ✓ ✓ ? ✓ | no |  | nothing failed: a 3D screen's tap time is not measured on the rig (no GPU); a phone check |
+| `/play/music` | ✗ ✗ ✗ ✓ | ✗ ✗ ✓ ✓ | no | 74 words before scrolling (the budget is 40). | owner: shorter wording on its first screen (cutting a screen's own explanation is new copy) |
+| `/play/onevone` | ✗ ✗ ✓ ✗ | ✓ ✓ ? ✓ | no |  | nothing failed: a 3D screen's tap time is not measured on the rig (no GPU); a phone check |
+| `/play/party` | ✗ ✗ ✓ ✗ | ✗ ✗ ✗ ✓ | no | The screen jumps as it loads (layout shift 0.052; the budget is 0.02). | speed pass: a 0.033 load shift, cause not found in phase 10 |
+| `/play/shared` | off | off | no | a 404 by design: only its share links are pages (lib/nav/reachability.test.ts) | nothing: a 404 by design: only its share links are pages (lib/nav/reachability.test.ts) |
+| `/play/shared/[token]` | off | off | no | switched off: STUDIO_SHARE_ENABLED (Studio share links) | owner: switch it on — STUDIO_SHARE_ENABLED (Studio share links) |
+| `/play/showdown` | ✗ ✗ ? ✗ | ✓ ✓ ? ✓ | no |  | nothing failed: a 3D screen's tap time is not measured on the rig (no GPU); a phone check |
+| `/play/skateboard` | ✗ ✗ ✓ ✗ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/play/snowboard` | ✗ ✗ ✓ ✗ | ✓ ✗ ? ✓ | no | Text cut off at 200 % zoom: "· PAR 60". | game lanes: the HUD at 200 % zoom (the play itself) |
+| `/play/soccer` | ✗ ✗ ? ✗ | ✓ ✗ ? ✓ | no | Text cut off with 150 % text: "0" and 1 more. | game lanes: the HUD with 150 % text (the play itself) |
+| `/play/sprint` | ✗ ✗ ? ✗ | ✓ ✓ ? ✓ | no |  | nothing failed: a 3D screen's tap time is not measured on the rig (no GPU); a phone check |
+| `/play/surf` | ✗ ✗ ✓ ✗ | ✓ ✓ ? ✓ | no |  | nothing failed: a 3D screen's tap time is not measured on the rig (no GPU); a phone check |
+| `/play/tennis` | ✗ ✗ ? ✗ | ✓ ✓ ? ✓ | no |  | nothing failed: a 3D screen's tap time is not measured on the rig (no GPU); a phone check |
+| `/play/threepoint` | ✗ ✗ ? ✗ | ✓ ✓ ? ✓ | no |  | nothing failed: a 3D screen's tap time is not measured on the rig (no GPU); a phone check |
+| `/play/threevthree` | ✗ ✗ ✓ ✗ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/play/tiebreak` | sends on | sends on | no | redirects to /play/tennis for everyone who is signed in | nothing: it sends you on to its own screen |
+| `/play/training` | sends on | sends on | no | redirects to /train for everyone who is signed in | nothing: it sends you on to its own screen |
+| `/play/velocity-kart` | ✗ ✗ ? ✗ | ✓ ✗ ? ✗ | no | 1 critical accessibility finding (contrast). | game lanes: the HUD's item slot contrast (the play itself) |
+| `/play/volleyball` | ✗ ✗ ? ✗ | ✓ ✓ ? ✓ | no |  | nothing failed: a 3D screen's tap time is not measured on the rig (no GPU); a phone check |
+| `/play/who-scene-it` | ✗ ✗ ✓ ✗ | ✓ ✗ ✗ ✓ | no | "Capture and stream menu" answers a tap in 1176 ms (the budget is 200 ms). | speed: on the rig (no GPU, CPU slowed 4×) the tap waits behind the page's own 3D or load; a phone check |
+| `/press` | ✗ ✗ ✓ ✓ | ✓ ✗ ✓ ✓ | no | Unfinished mark on screen: "[OWNER: number]". | owner: fill the [OWNER: …] blanks (the owner's content) |
+| `/press/[slug]` | ✗ ✗ ✓ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/press/library` | ✗ ✗ ✓ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/press/receipt` | ✗ ✗ ✓ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/privacy` | ✗ ✗ ✓ ✓ | ✗ ✓ ✓ ✓ | no | Nothing in the screen itself leads on: only the app's own bars do. | owner: a policy page; nothing on it leads on (policy wording) |
+| `/pro` | ✗ ✗ ✗ ✓ | ✗ ✗ ✓ ✓ | no | Unfinished mark on screen: "Opens soon". | owner: Coach Pro is not on sale (switched off) |
+| `/profile` | ✗ ✗ ✗ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/profile/challenges` | ✗ ✗ ✗ ✓ | ✗ ✗ ✓ ✓ | no | 69 words before scrolling (the budget is 40). | owner: shorter wording on its first screen (cutting a screen's own explanation is new copy) |
+| `/profile/edit` | ✗ ✗ ✗ ✗ | ✗ ✗ ✓ ✓ | no | 79 words before scrolling (the budget is 40). | owner: shorter wording on its first screen (cutting a screen's own explanation is new copy) |
+| `/profile/week` | ✗ ✗ ✗ ✓ | ✗ ✗ ✓ ✓ | no | 114 words before scrolling (the budget is 40). | owner: shorter wording on its first screen (cutting a screen's own explanation is new copy) |
+| `/program/[accessId]` | off | off | no | switched off: COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) | owner: switch it on — COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) |
+| `/program/unlock` | off | off | no | switched off: COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) | owner: switch it on — COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) |
+| `/purchase-terms` | ✗ ✗ ✓ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/screen` | ✗ ✓ ✓ ✓ | ✗ ✓ ✓ ✓ | no | 42 words before scrolling (the budget is 40; 31 words of approved notices not counted). | owner: shorter wording on its first screen (cutting a screen's own explanation is new copy) |
+| `/screen/privacy` | ✓ ✓ ✓ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/screen/program/[lane]` | ✗ ✓ ✓ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/session/[bookingId]` | off | off | no | switched off: COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) | owner: switch it on — COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) |
+| `/sessions` | ✗ ✓ ✗ ✗ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/settings` | sends on | sends on | no | redirects to /account for everyone who is signed in | nothing: it sends you on to its own screen |
+| `/shop` | ✗ ✗ ✗ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/shop/shards` | ✗ ✗ ✗ ✓ | ✗ ✗ ✓ ✓ | no | Nothing in the screen itself leads on: only the app's own bars do. | owner: payments are off, so the page has nothing to buy; its wording is the owner's |
+| `/signature` | ✗ ✗ ✗ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/signup` | ✗ ✗ ✗ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/squads` | ✗ ✗ ✗ ✓ | ✓ ✗ ✓ ✓ | no | Unfinished mark on screen: "Squads and teams are coming soon. Your drills, games and streak keep counting in". | owner: Squads are switched off until the groups tables are applied |
+| `/squads/[id]` | ✗ ✗ ✗ ✓ | ✓ ✗ ✓ ✓ | no | Unfinished mark on screen: "Squads and teams are coming soon. Your drills, games and streak keep counting in". | owner: Squads are switched off until the groups tables are applied |
+| `/squads/join/[token]` | ✓ ✗ ✓ ✓ | ✓ ✗ ✓ ✓ | no | Unfinished mark on screen: "Squads and teams are coming soon. Your drills, games and streak keep counting in". | owner: Squads are switched off until the groups tables are applied |
+| `/store` | ✗ ✗ ✗ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/store-terms` | ✗ ✗ ✓ ✓ | ✓ ✗ ✓ ✓ | no | An empty state with no next step: "Nothing here stops you from contacting a government consumer-protection agency.". | owner: a legal sentence the rig reads as an empty state (policy wording) |
+| `/story` | ✗ ✗ ✗ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/story/boss` | ✗ ✗ ✗ ✗ | ✗ ✗ ✓ ✓ | no | 2 pieces of text under 12 px. | game lanes: the in-game HUD / touch controller (text under 12 px is the play itself) |
+| `/story/rail` | ✗ ✗ ✗ ✗ | ✗ ✗ ✓ ✓ | no | 2 pieces of text under 12 px. | game lanes: the in-game HUD / touch controller (text under 12 px is the play itself) |
+| `/studio` | off | ✗ ✗ ✗ ✓ | no | The screen jumps as it loads (layout shift 0.027; the budget is 0.02). | owner: Nexus Studio is flag-gated and unlinked (its own lanes); a 0.027 load shift |
+| `/support` | ✗ ✗ ✗ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/teach` | ✗ ✗ ✗ ✓ | ✓ ✗ ✓ ✓ | no | Unfinished mark on screen: "Teaching on FEL opens soon.". | owner: teaching is not open yet |
+| `/teach/motion` | not listed | ✗ ✗ ✓ ✓ | no | Unfinished mark on screen: "Motion lessons open soon.". | owner: teaching is not open yet |
+| `/team` | ✗ ✗ ✓ ✓ | ✓ ✗ ✓ ✓ | no | Unfinished mark on screen: "[OWNER: profiles]". | owner: fill the [OWNER: …] blanks (the owner's content) |
+| `/team/[slug]` | ✗ ✗ ✓ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/terms` | ✗ ✗ ✓ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/train` | ✗ ✗ ✗ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/train/build` | ✗ ✗ ✗ ✓ | ✗ ✓ ✓ ✓ | no | 168 words before scrolling (the budget is 40). | owner: shorter wording on its first screen (cutting a screen's own explanation is new copy) |
+| `/train/combine` | ✗ ✗ ✗ ✓ | ✓ ✗ ✓ ✓ | no | Unfinished mark on screen: "Combine results are coming soon.". | owner: the feature is not built or not switched on ("coming soon"); owner-gated |
+| `/train/jumps` | ✗ ✗ ✗ ✓ | ✗ ✓ ✓ ✓ | no | 77 words before scrolling (the budget is 40). | owner: shorter wording on its first screen (cutting a screen's own explanation is new copy) |
+| `/train/library` | ✗ ✗ ✗ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/train/programs` | ✗ ✗ ✗ ✓ | ✓ ✗ ✓ ✓ | no | Unfinished mark on screen: "Signature programs are coming soon. The daily drill and the exercise library are". | owner: the feature is not built or not switched on ("coming soon"); owner-gated |
+| `/train/programs/[id]` | ✗ ✗ ✗ ✓ | ✗ ✗ ✓ ✓ | no | 238 words before scrolling (the budget is 40). | owner: shorter wording on its first screen (cutting a screen's own explanation is new copy) |
+| `/train/progress` | ✗ ✗ ✗ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/train/readiness` | ✗ ✗ ✗ ✓ | ✗ ✓ ✓ ✓ | no | 57 words before scrolling (the budget is 40; 15 words of approved notices not counted). | owner: shorter wording on its first screen (cutting a screen's own explanation is new copy) |
+| `/train/shots` | ✗ ✗ ✗ ✓ | ✗ ✓ ✓ ✓ | no | 75 words before scrolling (the budget is 40; 17 words of approved notices not counted). | owner: shorter wording on its first screen (cutting a screen's own explanation is new copy) |
+| `/train/speed` | ✗ ✗ ✗ ✓ | ✗ ✗ ✓ ✓ | no | 66 words before scrolling (the budget is 40). | owner: shorter wording on its first screen (cutting a screen's own explanation is new copy) |
+| `/train/today-drill` | ✗ ✗ ✗ ✓ | ✗ ✓ ✗ ✓ | no | "Start" answers a tap in 456 ms (the budget is 200 ms). | speed: the drill's 3D demo is drawn on the CPU on the rig (no GPU); a phone check |
+| `/train/velocity` | ✗ ✗ ✗ ✓ | ✗ ✗ ✓ ✓ | no | 88 words before scrolling (the budget is 40). | owner: shorter wording on its first screen (cutting a screen's own explanation is new copy) |
+| `/training` | sends on | sends on | no | redirects to /coach for everyone who is signed in | nothing: it sends you on to its own screen |
+| `/try` | ✗ ✓ ✓ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/u/[slug]` | not scored | not scored | no | not scored: needs a published creator card row; a new account has none | a row the rig cannot make: needs a published creator card row; a new account has none |
+| `/venues` | ✗ ✗ ✗ ✓ | ✓ ✗ ✓ ✓ | no | 1 paragraph of body copy under 16 px. | a design call: tried in phase 10 — the venue card's two-line mode list at 16 px is cut off; a taller card or a shorter list |
+| `/wallet` | ✗ ✗ ✗ ✗ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/welcome` | ✗ ✗ ✗ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
+| `/work-with-us` | ✗ ✗ ✓ ✓ | ✓ ✗ ✓ ✓ | no | Unfinished mark on screen: "[OWNER: link to the application, P2]". | owner: fill the [OWNER: …] blanks (the owner's content) |
+| `/workout` | ✗ ✗ ✗ ✓ | ✗ ✗ ✓ ✓ | no | 183 words before scrolling (the budget is 40). | owner: shorter wording on its first screen (cutting a screen's own explanation is new copy) |
 
 ## 1. How a screen is scored
 
@@ -42,7 +238,7 @@ The real app (a production build) runs against a throwaway local database, and a
 
 **Sorting screens into do-this, menu and reading pages** ("Kind" in the table) is a first sorting by address (`kindOf`), an `assumption:`; only a do-this screen takes the 40-word rule. Each phase corrects its own screens.
 
-**Controls: passed** on 2026-11-11 18:33 UTC (scorer version 5).
+**Controls: passed** on 2026-11-12 04:22 UTC (scorer version 5).
 
 **The scorer was checked before it was believed** (`score.mts --plant`, and again at the start of every crawl): a clean control page must pass all four, and each planted fault (three bright buttons, 120 words, a 30 px target, a dead end, "Coming soon", an owner placeholder, an empty state, a wordless spinner, sideways scroll, 10 px text, six text sizes, five button looks, slow first content, a jumping banner, a blocking tap handler, a link to a missing page, a link to nowhere, a button that does nothing, an unnamed button, a bare measured number) must be flagged on its own page and fail only its own check.
 
@@ -52,15 +248,15 @@ The plan's rule: fix the shared thing first. "Alone" is how many screens would p
 
 | # | Fault | Screens | Alone | Check |
 |---|---|---|---|---|
-| 1 | More than 40 words before scrolling on a do-this screen | 40 | 15 | 1 |
-| 2 | Body copy under 16 px | 29 | 5 | 2 |
-| 3 | More than 4 text sizes on one screen | 17 | 1 | 2 |
+| 1 | More than 40 words before scrolling on a do-this screen | 41 | 16 | 1 |
+| 2 | Body copy under 16 px | 22 | 1 | 2 |
+| 3 | More than 4 text sizes on one screen | 16 | 0 | 2 |
 | 4 | More than 3 button looks on one screen | 15 | 1 | 2 |
 | 5 | Tap targets under 44 px in the screen itself | 13 | 0 | 1 |
 | 6 | An empty state with no next step | 10 | 3 | 2 |
 | 7 | Unfinished mark: "opens soon" | 9 | 5 | 2 |
-| 8 | Text under 12 px | 9 | 3 | 2 |
-| 9 | The main action answers a tap in more than 200 ms | 6 | 1 | 3 |
+| 8 | Text under 12 px | 9 | 2 | 2 |
+| 9 | The screen jumps as it loads | 6 | 0 | 3 |
 | 10 | Unfinished mark: "coming soon" | 6 | 5 | 2 |
 
 **Where the common faults come from (read from the rig's element lists below, 2026-11-10).** The plan's rule is
@@ -85,7 +281,7 @@ at 4, a screen that uses only the approved sizes still fails. Recommend: 5, the 
 scale is a fault. Until the owner answers, the scorer keeps the plan's 4 (it is the approved number) and this page says
 how many screens fail at exactly 5.
 
-Measured for that call: 60 scored screens use exactly 5 text sizes; with 5 allowed, 0 more screens would pass all four today (the other faults on them stay).
+Measured for that call: 62 scored screens use exactly 5 text sizes; with 5 allowed, 0 more screens would pass all four today (the other faults on them stay).
 
 <details><summary>The elements behind them (the rig's own list)</summary>
 
@@ -120,82 +316,79 @@ Measured for that call: 60 scored screens use exactly 5 text sizes; with 5 allow
 - 1 × `"STAKE & POST DUEL" 207×40 button.inline-flex.items-center.gap-2.rounded-lg`
 - 1 × `"REFRESH" 90×28 button.inline-flex.items-center.gap-1.5.rounded-md`
 - 1 × `"on" 13×13 input in [data-business-dashboard]`
-- 1 × `"Copy" 68×30 button.flex.items-center.gap-1.rounded-md`
+- 1 × `"Catalina Ballpark — THE BALL" 154×28 button.rounded-full.border.px-3.py-1 in [data-splash-pickers]`
 
-**Text sizes per screen:** 0 sizes: 1 screens; 1 sizes: 2 screens; 2 sizes: 2 screens; 3 sizes: 48 screens; 4 sizes: 25 screens; 5 sizes: 60 screens; 6 sizes: 11 screens; 7 sizes: 2 screens; 8 sizes: 2 screens; 10 sizes: 1 screens
+**Text sizes per screen:** 0 sizes: 1 screens; 1 sizes: 2 screens; 2 sizes: 2 screens; 3 sizes: 46 screens; 4 sizes: 26 screens; 5 sizes: 62 screens; 6 sizes: 11 screens; 7 sizes: 2 screens; 8 sizes: 2 screens
 
 **The sizes themselves (screens that use each)**
 
 - 144 × `12px`
+- 128 × `16px`
 - 127 × `20px`
-- 127 × `16px`
 - 98 × `14px`
 - 73 × `30px`
 - 16 × `18px`
 - 13 × `24px`
-- 10 × `13px`
+- 9 × `13px`
 - 8 × `44px`
-- 7 × `36px`
+- 8 × `36px`
 - 6 × `22px`
 - 4 × `13.6px`
 - 4 × `21px`
-- 3 × `12.5px`
-- 2 × `19px`
+- 2 × `12.5px`
 - 2 × `28px`
 - 2 × `15px`
 - 2 × `10.8108px`
 - 2 × `14.4144px`
-- 1 × `15.5px`
 - 1 × `17px`
 - 1 × `26px`
 - 1 × `40px`
+- 1 × `19px`
 - 1 × `60px`
 - 1 × `13.5px`
 
-**Button looks per screen:** 0: 32; 1: 67; 2: 23; 3: 17; 4: 4; 5: 3; 6: 3; 7: 3; 8: 1; 10: 1
+**Button looks per screen:** 0: 32; 1: 66; 2: 23; 3: 18; 4: 5; 5: 1; 6: 4; 7: 3; 8: 2
 
 **Text under the READABLE floor**
 
-- 5 × `body-small 12px div>div>div>p`
-- 4 × `body-small 14px div>div>div>p`
 - 3 × `body-small 12px div>main>p`
+- 3 × `body-small 12px div>div>div>p`
 - 3 × `hud-small 12px div>div>span[data-hud-plate=true]>span`
-- 2 × `body-small 14px main[data-live=1]>div>p`
-- 2 × `body-small 14px main[data-live=1]>section[data-testid]>p[data-testid]`
+- 2 × `body-small 14px div>div>div>p`
 - 2 × `hud-small 12px div[data-hud-frame=true]>div>div[data-hud-plate=true]>div`
 - 2 × `hud-small 12px div[data-hud-frame=true]>div>span[data-hud-plate=true]>span`
-- 2 × `body-small 12.04px div[data-splash-main=true]>span[data-controls-panel=touch]>span[data-controls-lines=true]>span`
 - 2 × `tiny 10.81px div>div>button>span`
 - 1 × `body-small 12px div>section>div>p`
 - 1 × `body-small 12px main>div>section>p`
 - 1 × `body-small 12px main>div>section>div`
 - 1 × `body-small 12px main>div>div>span`
-- 1 × `body-small 12.5px section>ul>li>p`
-- 1 × `body-small 12px aside>div>div>p`
+- 1 × `body-small 12px main[data-testid=library-review]>section>div[data-testid=review-row]>div`
+- 1 × `body-small 12px section>div[data-testid=review-row]>ul>li`
+- 1 × `body-small 12px div[data-testid=review-row]>div>div>div`
+- 1 × `body-small 13px div>div[data-testid=signature-review]>p`
+- 1 × `body-small 12.5px div>div[data-testid=signature-review]>p[data-not-ready=true]`
 
 **Accessibility findings**
 
 - 1 × `serious contrast: button "STAKE & POST DUEL"`
-- 1 × `critical label: input[data-testid=controller-name] "Your name"`
-- 1 × `serious contrast: p "Goes fullscreen and keeps the screen awake."`
 - 1 × `critical label: select "Flight NightAero AcesVelocity KartDowntownStompG"`
 - 1 × `critical contrast: div "NONE"`
 - 1 × `critical contrast: div "NO ITEM"`
 
 **What moves as a screen loads**
 
-- 71 × `a.inline-flex.min-h-11.items-center`
-- 71 × `a.fel-press.inline-flex.min-h-11`
-- 3 × `#text`
-- 2 × `h1.text-4xl.font-black.tracking-wide`
-- 2 × `div.fel-boot-bar.h-full.rounded-full`
-- 2 × `svg`
+- 72 × `a.inline-flex.min-h-11.items-center`
+- 72 × `a.fel-press.inline-flex.min-h-11`
+- 4 × `#text`
+- 3 × `h1.text-4xl.font-black.tracking-wide`
+- 3 × `svg`
+- 2 × `span.flex.w-[min(30rem,92vw)].min-h-0`
+- 2 × `div.flex.w-full.shrink-0`
+- 2 × `div.mt-3.flex.flex-col`
+- 2 × `p.text-[12px].font-black.tracking-[0.4em]`
 - 1 × `div.mt-8.overflow-x-auto`
 - 1 × `button.inline-flex.items-center.gap-2`
 - 1 × `div.mt-6.space-y-8`
-- 1 × `div.flex.min-w-0.shrink`
-- 1 × `div.flex.gap-2`
-- 1 × `section.mt-6`
 
 **Empty states with no next step**
 
@@ -359,7 +552,7 @@ Not measured yet: run `scripts/every-screen/dark.mts`.
 | `/train/library` | signed-in | hub | ✓ | ✓ | ✓ | ✓ | **passes all four** |
 | `/train/programs` | signed-in | hub | ✓ | ✗ | ✓ | ✓ | Unfinished mark on screen: "Signature programs are coming soon. The daily drill and the exercise library are". |
 | `/train/programs/[id]` | admin | do | ✗ | ✗ | ✓ | ✓ | 238 words before scrolling (the budget is 40). review: a number with no method line (the list links no program while it is switched off: opened by its address) |
-| `/train/today-drill` | signed-in | do | ✗ | ✓ | ✗ | ✓ | "Start" answers a tap in 280 ms (the budget is 200 ms). |
+| `/train/today-drill` | signed-in | do | ✗ | ✓ | ✗ | ✓ | "Start" answers a tap in 456 ms (the budget is 200 ms). |
 | `/training` | nobody (redirects away) | do | – | – | – | – | *not its own screen: redirects to /coach for everyone who is signed in* |
 | `/workout` | signed-in | do | ✗ | ✗ | ✓ | ✓ | 183 words before scrolling (the budget is 40). |
 
@@ -441,89 +634,89 @@ Not measured yet: run `scripts/every-screen/dark.mts`.
 | `/try` | anyone | do | ✓ | ✓ | ✓ | ✓ | **passes all four** |
 | `/welcome` | signed-in | hub | ✓ | ✓ | ✓ | ✓ | **passes all four** |
 
-### Phase 7 — around the games (57 screens; 6 of 49 scored pass all four)
+### Phase 7 — around the games (57 screens; 7 of 49 scored pass all four)
 
 | Screen | Who | Kind | 1 | 2 | 3 | 4 | The single worst problem |
 |---|---|---|---|---|---|---|---|
 | `/arena` | signed-in | hub | ✗ | ✗ | ✓ | ✗ | 1 serious accessibility finding (contrast). |
 | `/c/[code]` | anyone | do | – | – | – | – | *switched off: a 404 (not switched off: a challenge code that does not exist is the app's 404 (a real challenge needs a row a player makes by sending one))* |
 | `/c/[code]/play` | nobody (redirects away) | do | – | – | – | – | *not its own screen: redirects to /c/NONE00 for everyone who is signed in* |
-| `/controller/[code]` | anyone | do | ✓ | ✓ | ✓ | ✗ | 1 critical accessibility finding (label). (a made-up room code: the screen a phone shows before the TV answers) |
-| `/host` | anyone | do | ✗ | ✗ | ✓ | ✗ | 1 serious accessibility finding (contrast). |
+| `/controller/[code]` | anyone | do | ✓ | ✓ | ✓ | ✓ | **passes all four** (a made-up room code: the screen a phone shows before the TV answers) |
+| `/host` | anyone | do | ✗ | ✗ | ✓ | ✓ | 74 words before scrolling (the budget is 40). |
 | `/ladder` | signed-in | hub | ✗ | ✗ | ✓ | ✓ | Nothing in the screen itself leads on: only the app's own bars do. |
-| `/live` | signed-in | hub | ✓ | ✗ | ✓ | ✓ | 2 paragraphs of body copy under 16 px. |
+| `/live` | signed-in | hub | ✓ | ✓ | ✓ | ✓ | **passes all four** |
 | `/live/schedule` | nobody (a 404 for everyone) | do | – | – | – | – | *switched off: a 404 (LIVE_STREAM_SCHEDULE_ENABLED (the live schedule))* |
 | `/modes` | anyone | hub | ✓ | ✗ | ✓ | ✓ | 29 paragraphs of body copy under 16 px. |
 | `/multiplayer` | signed-in | hub | ✗ | ✗ | ✓ | ✗ | An empty state with no next step: "No matches yet. Create a challenge above to get started.". |
-| `/party` | anyone | hub | ✓ | ✗ | ✓ | ✓ | 2 paragraphs of body copy under 16 px. |
+| `/party` | anyone | hub | ✓ | ✓ | ✓ | ✓ | **passes all four** |
 | `/party/[code]` | anyone | do | ✗ | ✗ | ✓ | ✓ | 108 words before scrolling (the budget is 40). (a made-up party code) |
 | `/play` | signed-in | hub | ✓ | ✗ | ✓ | ✓ | Text cut off at 390 px: "Breakaway · Twelve Yards · Baseball · Moonsh". |
 | `/play/acting` | signed-in | do | ✗ | ✗ | ✓ | ✓ | 45 words before scrolling (the budget is 40). |
 | `/play/adventure` | anyone | do | ✗ | ✗ | ? | ✓ | Dead end: nothing on the screen leads on or back. |
 | `/play/adventure-br` | anyone | do | ✗ | ✗ | ? | ✓ | Dead end: nothing on the screen leads on or back. |
 | `/play/aero-aces` | signed-in | do | ✓ | ✗ | ✓ | ✗ | 1 critical accessibility finding (contrast). |
-| `/play/baseball` | signed-in | do | ✗ | ✗ | ? | ✓ | 66 words before scrolling (the budget is 40). |
+| `/play/baseball` | signed-in | do | ✗ | ✗ | ? | ✓ | 62 words before scrolling (the budget is 40). |
 | `/play/big-air` | signed-in | do | ✓ | ✓ | ? | ✓ | not measured: tap response; Fast and smooth: a 3D screen: the rig has no real GPU, so the tap response is not timed |
-| `/play/brain-brawl` | signed-in | do | ✓ | ✓ | ✓ | ✓ | **passes all four** |
+| `/play/brain-brawl` | signed-in | do | ✓ | ✓ | ? | ✓ | not measured: tap response; Fast and smooth: a 3D screen: the rig has no real GPU, so the tap response is not timed |
 | `/play/calibrate` | signed-in | do | ✗ | ✗ | ✓ | ✓ | 98 words before scrolling (the budget is 40). |
 | `/play/carnival` | signed-in | do | ✓ | ✓ | ✓ | ✓ | **passes all four** |
 | `/play/carnival/recap` | signed-in | do | ✓ | ✓ | ✓ | ✓ | **passes all four** |
 | `/play/dance` | signed-in | do | ✓ | ✓ | ? | ✓ | not measured: tap response; Fast and smooth: a 3D screen: the rig has no real GPU, so the tap response is not timed |
-| `/play/derby` | signed-in | do | ✓ | ✓ | ? | ✓ | not measured: tap response; Fast and smooth: a 3D screen: the rig has no real GPU, so the tap response is not timed |
+| `/play/derby` | signed-in | do | ✓ | ✓ | ✗ | ✓ | "Capture and stream menu" answers a tap in 312 ms (the budget is 200 ms). |
 | `/play/duel` | signed-in | do | ✓ | ✓ | ? | ✓ | not measured: tap response; Fast and smooth: a 3D screen: the rig has no real GPU, so the tap response is not timed |
-| `/play/dunk` | signed-in | do | ✓ | ✗ | ✓ | ✓ | 1 piece of text under 12 px. |
+| `/play/dunk` | signed-in | do | ✗ | ✗ | ✗ | ✓ | Text cut off at 200 % zoom: "0" and 5 more. |
 | `/play/dunkduel` | signed-in | do | ✗ | ✓ | ✓ | ✓ | 88 words before scrolling (the budget is 40). |
 | `/play/football` | signed-in | do | ✓ | ✗ | ✓ | ✓ | 3 pieces of text under 12 px. |
-| `/play/freerun` | signed-in | do | ✓ | ✗ | ✓ | ✓ | 1 piece of text under 12 px. |
+| `/play/freerun` | signed-in | do | ✓ | ✗ | ? | ✓ | 1 piece of text under 12 px. |
 | `/play/gb-shelf` | nobody (a 404 for everyone) | do | – | – | – | – | *switched off: a 404 (BINJGB_SHELF_ENABLED (the Game Boy homebrew shelf))* |
 | `/play/gb-shelf/[slug]` | unknown (no fixture) | do | – | – | – | – | *not scored: v1 of the homebrew shelf ships no titles (BINJGB-SHELF-1, OQ-10), so every slug is a 404 by design; switched off: BINJGB_SHELF_ENABLED (the Game Boy homebrew shelf)* |
-| `/play/golf` | signed-in | do | ✓ | ✓ | ✓ | ✓ | **passes all four** |
-| `/play/irl` | signed-in | do | ✗ | ✗ | ✓ | ✓ | 1 paragraph of body copy under 16 px. |
-| `/play/karate` | signed-in | do | ✓ | ✗ | ? | ✓ | 1 piece of text under 12 px. |
+| `/play/golf` | signed-in | do | ✓ | ✓ | ? | ✓ | not measured: tap response; Fast and smooth: a 3D screen: the rig has no real GPU, so the tap response is not timed |
+| `/play/irl` | signed-in | do | ✗ | ✓ | ✓ | ✓ | 42 words before scrolling (the budget is 40). |
+| `/play/karate` | signed-in | do | ✓ | ✗ | ✓ | ✓ | 1 piece of text under 12 px. |
 | `/play/karate-vs` | signed-in | do | ✓ | ✓ | ? | ✓ | not measured: tap response; Fast and smooth: a 3D screen: the rig has no real GPU, so the tap response is not timed |
-| `/play/map-preview` | signed-in | do | ✗ | ✗ | ✗ | ✓ | The screen jumps as it loads (layout shift 0.061; the budget is 0.02). |
+| `/play/map-preview` | signed-in | do | ✗ | ✗ | ✗ | ✓ | The screen jumps as it loads (layout shift 0.121; the budget is 0.02). |
 | `/play/mixedcombat` | signed-in | do | ✓ | ✓ | ? | ✓ | not measured: tap response; Fast and smooth: a 3D screen: the rig has no real GPU, so the tap response is not timed |
-| `/play/music` | signed-in | do | ✗ | ✗ | ✗ | ✓ | "TAP TO START" answers a tap in 256 ms (the budget is 200 ms). |
-| `/play/onevone` | signed-in | do | ✓ | ✗ | ✓ | ✓ | 5 paragraphs of body copy under 16 px. |
-| `/play/party` | signed-in | do | ✗ | ✗ | ✗ | ✓ | The screen jumps as it loads (layout shift 0.033; the budget is 0.02). |
+| `/play/music` | signed-in | do | ✗ | ✗ | ✓ | ✓ | 74 words before scrolling (the budget is 40). review: a number with no method line |
+| `/play/onevone` | signed-in | do | ✓ | ✓ | ? | ✓ | not measured: tap response; Fast and smooth: a 3D screen: the rig has no real GPU, so the tap response is not timed |
+| `/play/party` | signed-in | do | ✗ | ✗ | ✗ | ✓ | The screen jumps as it loads (layout shift 0.052; the budget is 0.02). |
 | `/play/shared` | nobody (a 404 for everyone) | do | – | – | – | – | *switched off: a 404 (a 404 by design: only its share links are pages (lib/nav/reachability.test.ts))* |
 | `/play/shared/[token]` | nobody (a 404 for everyone) | do | – | – | – | – | *switched off: a 404 (STUDIO_SHARE_ENABLED (Studio share links))* |
 | `/play/showdown` | signed-in | do | ✓ | ✓ | ? | ✓ | not measured: tap response; Fast and smooth: a 3D screen: the rig has no real GPU, so the tap response is not timed |
-| `/play/skateboard` | signed-in | do | ✓ | ✓ | ? | ✓ | not measured: tap response; Fast and smooth: a 3D screen: the rig has no real GPU, so the tap response is not timed |
+| `/play/skateboard` | signed-in | do | ✓ | ✓ | ✓ | ✓ | **passes all four** |
 | `/play/snowboard` | signed-in | do | ✓ | ✗ | ? | ✓ | Text cut off at 200 % zoom: "· PAR 60". |
-| `/play/soccer` | signed-in | do | ✓ | ✗ | ✓ | ✓ | Text cut off with 150 % text: "0" and 1 more. |
+| `/play/soccer` | signed-in | do | ✓ | ✗ | ? | ✓ | Text cut off with 150 % text: "0" and 1 more. |
 | `/play/sprint` | signed-in | do | ✓ | ✓ | ? | ✓ | not measured: tap response; Fast and smooth: a 3D screen: the rig has no real GPU, so the tap response is not timed |
-| `/play/surf` | signed-in | do | ✓ | ✓ | ✓ | ✓ | **passes all four** |
-| `/play/tennis` | signed-in | do | ✓ | ✓ | ✓ | ✓ | **passes all four** |
+| `/play/surf` | signed-in | do | ✓ | ✓ | ? | ✓ | not measured: tap response; Fast and smooth: a 3D screen: the rig has no real GPU, so the tap response is not timed |
+| `/play/tennis` | signed-in | do | ✓ | ✓ | ? | ✓ | not measured: tap response; Fast and smooth: a 3D screen: the rig has no real GPU, so the tap response is not timed |
 | `/play/threepoint` | signed-in | do | ✓ | ✓ | ? | ✓ | not measured: tap response; Fast and smooth: a 3D screen: the rig has no real GPU, so the tap response is not timed |
-| `/play/threevthree` | signed-in | do | ✓ | ✗ | ✓ | ✓ | 3 paragraphs of body copy under 16 px. |
+| `/play/threevthree` | signed-in | do | ✓ | ✓ | ✓ | ✓ | **passes all four** |
 | `/play/tiebreak` | nobody (redirects away) | do | – | – | – | – | *not its own screen: redirects to /play/tennis for everyone who is signed in* |
-| `/play/velocity-kart` | signed-in | do | ✓ | ✗ | ✓ | ✗ | 1 critical accessibility finding (contrast). |
+| `/play/velocity-kart` | signed-in | do | ✓ | ✗ | ? | ✗ | 1 critical accessibility finding (contrast). |
 | `/play/volleyball` | signed-in | do | ✓ | ✓ | ? | ✓ | not measured: tap response; Fast and smooth: a 3D screen: the rig has no real GPU, so the tap response is not timed |
-| `/play/who-scene-it` | signed-in | do | ✓ | ✗ | ? | ✓ | 1 piece of text under 12 px. |
+| `/play/who-scene-it` | signed-in | do | ✓ | ✗ | ✗ | ✓ | "Capture and stream menu" answers a tap in 1176 ms (the budget is 200 ms). |
 | `/venues` | signed-in | hub | ✓ | ✗ | ✓ | ✓ | 1 paragraph of body copy under 16 px. |
 
-### Phase 8 — your things (24 screens; 5 of 20 scored pass all four)
+### Phase 8 — your things (24 screens; 8 of 20 scored pass all four)
 
 | Screen | Who | Kind | 1 | 2 | 3 | 4 | The single worst problem |
 |---|---|---|---|---|---|---|---|
-| `/account` | signed-in | hub | ✓ | ✗ | ✓ | ✓ | 5 text sizes on one screen besides 16 px body text (at most 4). |
+| `/account` | signed-in | hub | ✓ | ✓ | ✓ | ✓ | **passes all four** |
 | `/admin/funnel` | admin | hub | ✗ | ✗ | ✓ | ✓ | An empty state with no next step: "No wins yet". |
 | `/admin/metrics` | admin | hub | ✓ | ✗ | ✗ | ✓ | An empty state with no next step: "No stored rollups yet. Click “Recompute” to generate them from traffic.". |
 | `/admin/review` | admin | hub | ✗ | ✗ | ✓ | ✗ | "WAITING" does nothing when tapped. |
 | `/card/[slug]` | unknown (no fixture) | do | – | – | – | – | *not scored: needs a published creator card row; a new account has none* |
-| `/cards` | signed-in | hub | ✓ | ✗ | ✓ | ✓ | 7 paragraphs of body copy under 16 px. |
-| `/closet` | signed-in | hub | ✓ | ✗ | ? | ✓ | 4 paragraphs of body copy under 16 px. |
+| `/cards` | signed-in | hub | ✓ | ✓ | ✓ | ✓ | **passes all four** |
+| `/closet` | signed-in | hub | ✓ | ✗ | ? | ✓ | 8 button looks on one screen (at most 3). |
 | `/market` | signed-in | hub | ✓ | ✓ | ✓ | ✓ | **passes all four** |
 | `/p/[token]` | unknown (no fixture) | do | – | – | – | – | *not scored: needs a coach share-link row (a coach sharing a client's progress); none exists on a new account* |
 | `/pro` | signed-in | do | ✗ | ✗ | ✓ | ✓ | Unfinished mark on screen: "Opens soon". |
-| `/profile` | signed-in | hub | ✓ | ✓ | ✗ | ✓ | "Jump check, hands on hips →" answers a tap in 520 ms (the budget is 200 ms). |
+| `/profile` | signed-in | hub | ✓ | ✓ | ✓ | ✓ | **passes all four** |
 | `/profile/challenges` | signed-in | do | ✗ | ✗ | ✓ | ✓ | 69 words before scrolling (the budget is 40). |
 | `/profile/edit` | signed-in | do | ✗ | ✗ | ✓ | ✓ | 79 words before scrolling (the budget is 40). |
 | `/profile/week` | signed-in | do | ✗ | ✗ | ✓ | ✓ | 114 words before scrolling (the budget is 40). |
 | `/settings` | nobody (redirects away) | do | – | – | – | – | *not its own screen: redirects to /account for everyone who is signed in* |
 | `/shop` | signed-in | hub | ✓ | ✓ | ✓ | ✓ | **passes all four** |
-| `/shop/shards` | signed-in | do | ✗ | ✗ | ✗ | ✓ | Nothing in the screen itself leads on: only the app's own bars do. review: a number with no method line |
+| `/shop/shards` | signed-in | do | ✗ | ✗ | ✓ | ✓ | Nothing in the screen itself leads on: only the app's own bars do. review: a number with no method line |
 | `/squads` | signed-in | hub | ✓ | ✗ | ✓ | ✓ | Unfinished mark on screen: "Squads and teams are coming soon. Your drills, games and streak keep counting in". |
 | `/squads/[id]` | signed-in | do | ✓ | ✗ | ✓ | ✓ | Unfinished mark on screen: "Squads and teams are coming soon. Your drills, games and streak keep counting in". (the teams-and-squads tables are not applied) |
 | `/squads/join/[token]` | anyone | do | ✓ | ✗ | ✓ | ✓ | Unfinished mark on screen: "Squads and teams are coming soon. Your drills, games and streak keep counting in". (the teams-and-squads tables are not applied) |
@@ -532,7 +725,7 @@ Not measured yet: run `scripts/every-screen/dark.mts`.
 | `/u/[slug]` | unknown (no fixture) | do | – | – | – | – | *not scored: needs a published creator card row; a new account has none* |
 | `/wallet` | signed-in | hub | ✓ | ✓ | ✓ | ✓ | **passes all four** |
 
-### Phase 9 — learn, create and the public pages (36 screens; 15 of 34 scored pass all four)
+### Phase 9 — learn, create and the public pages (36 screens; 17 of 34 scored pass all four)
 
 | Screen | Who | Kind | 1 | 2 | 3 | 4 | The single worst problem |
 |---|---|---|---|---|---|---|---|
@@ -550,10 +743,10 @@ Not measured yet: run `scripts/every-screen/dark.mts`.
 | `/guardian/report/[token]` | unknown (no fixture) | read | – | – | – | – | *not scored: needs a guardian report row with its emailed token* |
 | `/guidance` | signed-in | read | ✓ | ✗ | ✓ | ✓ | An empty state with no next step: "no history yet — this is an invitation, not a recommendation". |
 | `/kitchens` | signed-in | read | ✓ | ✓ | ✓ | ✓ | **passes all four** |
-| `/kitchens/fuel` | signed-in | read | ✗ | ✗ | ✓ | ✓ | 16 tap targets under 44 px (smallest: "Copy"). |
+| `/kitchens/fuel` | signed-in | read | ✓ | ✓ | ✓ | ✓ | **passes all four** |
 | `/learn` | anyone | read | ✓ | ✓ | ✓ | ✓ | **passes all four** |
 | `/learn/feed` | anyone | read | ✓ | ✗ | ✗ | ✓ | The screen jumps as it loads (layout shift 0.035; the budget is 0.02). |
-| `/links` | anyone | read | ✓ | ✗ | ✓ | ✓ | 5 button looks on one screen (at most 3). |
+| `/links` | anyone | read | ✓ | ✗ | ✓ | ✓ | 4 button looks on one screen (at most 3). |
 | `/media-kit` | anyone | read | ✓ | ✗ | ✓ | ✓ | Unfinished mark on screen: "[OWNER: monthly players, as of date]". |
 | `/press` | anyone | read | ✓ | ✗ | ✓ | ✓ | Unfinished mark on screen: "[OWNER: number]". |
 | `/press/[slug]` | anyone | read | ✓ | ✓ | ✓ | ✓ | **passes all four** |
@@ -562,10 +755,10 @@ Not measured yet: run `scripts/every-screen/dark.mts`.
 | `/privacy` | anyone | read | ✗ | ✓ | ✓ | ✓ | Nothing in the screen itself leads on: only the app's own bars do. |
 | `/purchase-terms` | anyone | read | ✓ | ✓ | ✓ | ✓ | **passes all four** |
 | `/store-terms` | anyone | read | ✓ | ✗ | ✓ | ✓ | An empty state with no next step: "Nothing here stops you from contacting a government consumer-protection agency.". |
-| `/story` | signed-in | read | ✓ | ✗ | ✓ | ✓ | Text cut off with 150 % text: "The Snow Slope". |
-| `/story/boss` | signed-in | read | ✗ | ✗ | ✗ | ✓ | "FACE THE GLITCH" answers a tap in 280 ms (the budget is 200 ms). |
+| `/story` | signed-in | read | ✓ | ✓ | ✓ | ✓ | **passes all four** |
+| `/story/boss` | signed-in | read | ✗ | ✗ | ✓ | ✓ | 2 pieces of text under 12 px. |
 | `/story/rail` | signed-in | read | ✗ | ✗ | ✓ | ✓ | 2 pieces of text under 12 px. |
-| `/studio` | admin | hub | ✗ | ✗ | ✗ | ✓ | "Make it for me" answers a tap in 1672 ms (the budget is 200 ms). |
+| `/studio` | admin | hub | ✗ | ✗ | ✗ | ✓ | The screen jumps as it loads (layout shift 0.027; the budget is 0.02). |
 | `/teach` | signed-in | hub | ✓ | ✗ | ✓ | ✓ | Unfinished mark on screen: "Teaching on FEL opens soon.". |
 | `/teach/motion` | signed-in | do | ✗ | ✗ | ✓ | ✓ | Unfinished mark on screen: "Motion lessons open soon.". |
 | `/team` | anyone | read | ✓ | ✗ | ✓ | ✓ | Unfinished mark on screen: "[OWNER: profiles]". |

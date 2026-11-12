@@ -255,6 +255,7 @@ function JoinScreen({
         value={name}
         onChange={(e) => setName(e.target.value.slice(0, 16))}
         placeholder="Your name"
+        aria-label="Your name"
         maxLength={16}
         autoComplete="nickname"
         className="w-full max-w-xs rounded-lg bg-white/10 px-4 py-3 text-center outline-none placeholder:text-white/50"
