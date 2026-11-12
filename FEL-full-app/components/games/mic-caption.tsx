@@ -2,16 +2,29 @@
 // THE MIC on screen (2026-09-24): the lower third for what the court's MC (or the sidekick, or a player) just said, and the
 // switch for the voice. The mode sets `mic` / `micWho` through ModeMic; the words show whether or not the voice plays (muted,
 // no audio, a bank that never arrived), and the harness's caption bus reads `mic` out to screen readers.
-import { useState } from 'react';
-import { Mic, MicOff, SlidersHorizontal } from 'lucide-react';
+import { useState, useSyncExternalStore } from 'react';
+import { Captions, Mic, MicOff, SlidersHorizontal } from 'lucide-react';
 import { SoundKit } from '@/lib/babylon/audio/SoundKit';
 import { VoiceKit } from '@/lib/babylon/audio/mic/VoiceKit';
 import { VolumeMixer } from '@/lib/audio/ui/VolumeMixer';
 import { HUD_FONT_CLASS, HUD_PLATE, HudText, hudColor, hudType } from './tv-hud';
+import { readCcPref, showMicCaption, writeCcPref } from '@/lib/babylon/ui/micSubtitles';
 
-export function MicCaption({ text, who, className = 'bottom-[14%]', flow = false }: { text: unknown; who: unknown; className?: string; /** In the flow of a parent column (the dunk host's bottom stack) instead of a layer of its own at `className`. */ flow?: boolean }) {
+// hoops-p08 (2026-11-12): THE PLAYER'S SUBTITLE SWITCH (the CC chip beside MC), one store so the chip and the caption agree.
+const ccListeners = new Set<() => void>();
+let ccValue: boolean | null = null;
+const ccGet = (): boolean => (ccValue ??= readCcPref());
+const ccSet = (on: boolean): void => { ccValue = on; writeCcPref(on); for (const l of ccListeners) l(); };
+const ccSub = (l: () => void): (() => void) => { ccListeners.add(l); return () => { ccListeners.delete(l); }; };
+export function useCaptionsOn(): boolean { return useSyncExternalStore(ccSub, ccGet, () => false); }
+
+/** `voiced` (hoops-p08): the host's `hud.micVoiced` — the line's audio started. A voiced line shows no subtitle unless the player turned
+ *  subtitles on (CC) or the `hud.mcSubsWithVoice` knob is 1 (as before); a line with no audio always shows. Hosts that do not pass it
+ *  (the dance room) draw every line, as before. */
+export function MicCaption({ text, who, className = 'bottom-[14%]', flow = false, voiced = false }: { text: unknown; who: unknown; className?: string; /** In the flow of a parent column (the dunk host's bottom stack) instead of a layer of its own at `className`. */ flow?: boolean; voiced?: unknown }) {
+  const cc = useCaptionsOn();
   const line = typeof text === 'string' ? text : '';
-  if (!line) return null;
+  if (!line || !showMicCaption(voiced === true, cc)) return null;
   const name = typeof who === 'string' ? who : '';
   return (
     <div data-mic-caption className={`pointer-events-none ${flow ? 'relative flex w-full' : `absolute inset-x-0 ${className}`} z-10 flex justify-center px-4 ${HUD_FONT_CLASS}`} aria-hidden>
@@ -29,9 +42,10 @@ export function MicCaption({ text, who, className = 'bottom-[14%]', flow = false
 /** The MC's voice on or off (kept across sessions). Off stops what is playing; the captions stay.
  *  VOICEOVER (2026-10-06): and a MIX button beside it: the voice level and the output (phone speaker / TV / headphones), the
  *  same controls the dance room and the Academy show (lib/audio/ui/VolumeMixer.tsx), so a hoops player can find them mid-game. */
-export function MicToggle({ className = 'right-3 top-[18%]', flow = false }: { className?: string; flow?: boolean }) {
+export function MicToggle({ className = 'right-3 top-[18%]', flow = false, cc = true }: { className?: string; flow?: boolean; /** hoops-p08: the CC chip (on its own row under MIX / MC, so the row keeps its width) */ cc?: boolean }) {
   const [on, setOn] = useState(() => SoundKit.voiceOn);
   const [mix, setMix] = useState(false);
+  const ccOn = useCaptionsOn();
   const flip = () => {
     const next = !on;
     SoundKit.setVoice(next); setOn(next);
@@ -57,6 +71,18 @@ export function MicToggle({ className = 'right-3 top-[18%]', flow = false }: { c
           MC
         </button>
       </div>
+      {cc && (
+        <div className="flex items-center gap-1">
+          {/* hoops-p08: subtitles for the MC while his voice is on (off by default: the voice carries the line; with the voice off the
+              words always show) */}
+          <button type="button" onClick={(e) => { ccSet(!ccOn); e.currentTarget.blur(); }} onMouseDown={(e) => e.preventDefault()} onPointerDown={(e) => e.stopPropagation()}
+            aria-label={ccOn ? 'Turn the announcer subtitles off' : 'Turn the announcer subtitles on'} aria-pressed={ccOn} data-qa="mic-cc"
+            className={chip} style={chipStyle(ccOn ? 0.8 : 0.4)}>
+            <Captions className="h-3 w-3" />
+            CC
+          </button>
+        </div>
+      )}
       {mix && (
         // a slider keeps focus after a drag, and the arrow keys would then move it instead of the player: hand focus back on release
         <div className="pointer-events-auto rounded-lg bg-black/75 px-3 py-2 shadow-lg" style={{ width: 240 }}
