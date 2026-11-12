@@ -36,7 +36,8 @@ describe('the modes\' hooks', () => {
   }
   it('the glue crosses on the carry — no requestMove, no roll, no odds', () => {
     const body = glue.slice(glue.indexOf('export class PlayerGuardHand'), glue.indexOf('export function comboBanner'));
-    expect(body).toMatch(/carry\.runMove\('crossover', \{ pace: 1 \}\)/);
+    // hoops-p06: the call may carry the hand change's catch lead (`hoops.handChangeCatchLeadSec`; at 0.06 it is `{ pace: 1 }` exactly — hoopsFlow.restGap.test.ts)
+    expect(body).toMatch(/carry\.runMove\('crossover', [^;]*\{ pace: 1(, catchLeadSec: lead)? \}/);
     expect(body).not.toMatch(/requestMove\(|roll\(|Math\.random|resolveHandleMove/);
   });
 });
@@ -52,7 +53,7 @@ describe('PlayerGuardHand on a carry', () => {
       let crossedAt = -1;
       for (let f = 1; f <= 120 && crossedAt < 0; f++) if (g.step(1 / 60, c as never, me, { x: dx, z: 0.6 }, true, 'T')) crossedAt = f / 60;
       // one of the two sides is the ball side: there the hand crosses; on the other it was already away from him
-      if (crossedAt > 0) { expect(crossedAt).toBeCloseTo(AI_HAND_DWELL_SEC, 1); expect(c.runMove).toHaveBeenCalledWith('crossover', { pace: 1 }); expect(g.crosses).toBe(1); }
+      if (crossedAt > 0) { expect(crossedAt).toBeCloseTo(AI_HAND_DWELL_SEC, 1); expect(c.runMove).toHaveBeenCalledWith('crossover', expect.objectContaining({ pace: 1 }));   /* hoops-p06: + the catch lead (its exact call: hoopsFlow.restGap.test.ts) */ expect(g.crosses).toBe(1); }
       else expect(c.runs).toBe(0);
     }
     const far = carry(), g2 = new PlayerGuardHand();
