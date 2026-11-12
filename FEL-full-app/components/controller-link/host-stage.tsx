@@ -279,7 +279,7 @@ export function HostStage({ modeId: initialModeId, couch = false, exitHref }: Ho
             onClick={start}
             style={{ padding: '14px 28px', borderRadius: 12, border: 'none', background: '#00E5FF', color: '#04202a', cursor: 'pointer', font: '700 16px system-ui', letterSpacing: 1 }}
           >START THE SCREEN</button>
-          <p style={{ margin: '14px 0 0', color: '#6b7280', font: '400 12px/1.5 system-ui' }}>
+          <p style={{ margin: '14px 0 0', color: '#9ca3af', font: '400 12px/1.5 system-ui' }}>{/* EVERY-SCREEN P10: #6b7280 was 4.11:1 */}
             Goes fullscreen and keeps the screen awake.
           </p>
           {couch && exitHref ? (

@@ -13,7 +13,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT, STATE } from './rig.mts';
 import { discover } from './routes.mts';
-import { readResults } from './results.mts';
+import { readResults, type Result } from './results.mts';
 import type { DarkRow } from './dark.mts';
 import * as judgeNs from '../../lib/every-screen/judge.ts';
 
@@ -115,7 +115,7 @@ export async function report(): Promise<void> {
   P();
   P('**Owner, 2026-11-10:** "To improve the total quality of the product from improving every screen."');
   P();
-  P(`This is phase 1 of \`docs/PLAN-EVERY-SCREEN-10PHASE.md\`: every screen a person can reach, scored on the plan's four checks. It is the starting line for all ten phases. Written by \`scripts/every-screen/score.mts --report\` from the rig's last run (${json.measuredAt?.slice(0, 10) ?? 'not run'}); do not edit it by hand.`);
+  P(`Every screen a person can reach, scored on the plan's four checks (\`docs/PLAN-EVERY-SCREEN-10PHASE.md\`): phase 1 was the starting line; this is phase 10's re-score of all of them. Written by \`scripts/every-screen/score.mts --report\` from the rig's last run (${json.measuredAt?.slice(0, 10) ?? 'not run'}); do not edit it by hand.`);
   P();
   P('## The number');
   P();
@@ -137,6 +137,7 @@ export async function report(): Promise<void> {
   P();
   P(`Of the ${scored.length} scored screens. "Not measured" is a 3D screen's tap time: the rig has no real GPU, so that one number is left open and the screen is not counted as passing.`);
   P();
+  beforeAfter(P, all, n, pass.length);
   P('## 1. How a screen is scored');
   P();
   P('The real app (a production build) runs against a throwaway local database, and a phone-sized browser (390 × 844, CPU slowed 4×) opens every screen as the least-privileged person who can see it. The rules are `lib/every-screen/judge.ts`; each number below is the plan\'s.');
@@ -310,4 +311,39 @@ export async function report(): Promise<void> {
   console.log(`${pass.length} of ${n} pass all four  (scored ${scored.length}, alias ${json.totals.alias}, off ${json.totals.off}, not scored ${json.totals.notScored})`);
   for (const c of CHECKS) console.log(`  ${CHECK_NAME[c].padEnd(24)} pass ${byCheck[c].pass}  fail ${byCheck[c].fail}  n/m ${byCheck[c].nm}`);
   console.log('  top faults:'); ranked.slice(0, 12).forEach(([id, routes]) => console.log(`    ${String(routes.length).padStart(3)}  alone ${String(unlock(id)).padStart(3)}  ${nameOf(id)}`));
+}
+
+/**
+ * EVERY-SCREEN P10 (part B): the plan's "before → after for every screen". Before is phase 1's baseline as it was committed
+ * (docs/every-screen/scorecard-phase1.json, 3ab930cf, scorer version of that day); after is this run. A screen that does
+ * not pass all four is named with its reason (the run's worst fault, or why it was not scored) and what it needs, from
+ * docs/every-screen/needs.json (route → what it needs: an owner decision, a table, another lane, or a fix).
+ */
+function beforeAfter(P: (s?: string) => void, all: Result[], n: number, passNow: number): void {
+  const f = join(ROOT, 'docs/every-screen/scorecard-phase1.json');
+  if (!existsSync(f)) return;
+  const before = JSON.parse(readFileSync(f, 'utf8')) as { measuredAt: string; commit: string; totals: { screens: number; passAll: number; scored: number }; screens: { route: string; state: string; checks: Record<string, string> | null; passAll: boolean }[] };
+  const needsFile = join(ROOT, 'docs/every-screen/needs.json');
+  const needs: Record<string, string> = existsSync(needsFile) ? JSON.parse(readFileSync(needsFile, 'utf8')) : {};
+  const B = new Map(before.screens.map((s) => [s.route, s]));
+  const cell = (st: string | undefined, c: Record<string, string> | null | undefined) =>
+    st === 'scored' && c ? CHECKS.map((k) => mark(c[k])).join(' ') : st === 'alias' ? 'sends on' : st === 'off' ? 'off' : st === 'not-scored' ? 'not scored' : st ? st : 'not listed';
+  P(`## Before (phase 1) → after (phase 10), every screen`);
+  P();
+  P(`**Phase 1 (${before.measuredAt?.slice(0, 10)}, \`${before.commit}\`): ${before.totals.passAll} of ${before.totals.screens} screens passed all four. Now: ${passNow} of ${n}.** ` +
+    'The scorer was tightened between them (READABLE\'s body-size rule, the notices rule, clipped text at 150 % and 200 %), so a ✓ now is harder to get than a ✓ then.');
+  P();
+  P('Checks in order: 1 clear and quick · 2 looks finished · 3 fast and smooth · 4 right and trustworthy (✓ pass · ✗ fail · ? not measured).');
+  P();
+  P('| Screen | Phase 1 | Now | Passes | Why not (the single worst problem) | What it needs |');
+  P('|---|---|---|---|---|---|');
+  for (const r of [...all].sort((a, b) => a.route.localeCompare(b.route))) {
+    const b = B.get(r.route);
+    const v = r.verdict;
+    const ok = r.state === 'scored' && v?.passAll;
+    const why = ok ? '' : r.state === 'scored' && v ? (v.worst?.say ?? '') : (r.reason ?? r.state);
+    const need = ok ? '' : needs[r.route] ?? (r.state === 'alias' ? 'nothing: it sends you on to its own screen' : '');
+    P(`| \`${r.route}\` | ${cell(b?.state, b?.checks)} | ${cell(r.state, v?.checks)} | ${ok ? '**yes**' : 'no'} | ${esc(why)} | ${esc(need)} |`);
+  }
+  P();
 }

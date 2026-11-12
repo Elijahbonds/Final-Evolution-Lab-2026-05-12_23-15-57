@@ -55,7 +55,7 @@ export function LiveView({ scheduleEnabled = false }: { scheduleEnabled?: boolea
     <div className="mx-auto max-w-6xl px-4 py-6">
       <div className="mb-5">
         <h1 className="flex items-center gap-2 text-2xl font-bold text-white"><Radio className="h-6 w-6 text-red-400" /> Live</h1>
-        <p className="text-sm text-white/50">Classes, creator highlights, and live training with Elijah Bonds and the FEL studio.</p>
+        <p className="text-base text-white/50">Classes, creator highlights, and live training with Elijah Bonds and the FEL studio.</p>
       </div>
 
       {scheduleEnabled && (
@@ -127,7 +127,7 @@ export function LiveView({ scheduleEnabled = false }: { scheduleEnabled?: boolea
       </section>
 
       {/* Provider note (honest) */}
-      <div className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.02] p-4 text-xs text-white/50">
+      <div className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.02] p-4 text-base text-white/50">
         <ShieldQuestion className="mt-0.5 h-4 w-4 shrink-0 text-white/50" />
         <p>Live video streams connect to a licensed streaming provider when configured. No class can be watched here yet: the video player activates once a stream URL is provided by the studio, and class passes go on sale then, so nothing is charged before a class can be watched. Chat is disabled for members under 18.</p>
       </div>
