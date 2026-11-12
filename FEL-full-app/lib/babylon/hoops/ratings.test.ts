@@ -3,13 +3,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   HOOPS_RATING_IDS, HOOPS_POSITIONS, NEUTRAL_ATHLETE, NEUTRAL_RATINGS, POSITION_LEAN, HEIGHT_LEAN_PER_IN, TODAY_TUNING, RATING_MIN, RATING_MAX,
-  HEIGHT_DEFAULT_IN, HEIGHT_MIN_IN, HEIGHT_MAX_IN, TODAY_HANDLE, CHAIN_WINDOW_SEC_PER_HANDLE, TODAY_TOP_SPEED_MPS, TODAY_STRIP_REACH_M,
+  HEIGHT_DEFAULT_IN, HEIGHT_MIN_IN, HEIGHT_MAX_IN, TODAY_HANDLE, CHAIN_WINDOW_SEC_PER_HANDLE, TODAY_TOP_SPEED_MPS, TODAY_STEAL_RANGE_M, HEIGHT_LOOK_PER_IN, heightLookScale,
   bands, clampHeight, effectLine, heightLabel, heightLine, lift, ratingFreeRun, runContextOf, sameAsToday, startingRatings, tuningFor,
   type HoopsAthlete, type RatingBands,
 } from './ratings';
 import { BASELINE_HANDLE, chainWindowSec } from '../core/HandleSystem';
 import { DEFAULT_MOVEMENT } from '../core/CourtMovement';
-import { STRIP_REACH_M } from './steals';
+import { readFileSync } from 'node:fs';
 import { MOVE_LEAN_MPS } from './rulebook';
 import { COMPETITIVE_PARAMS } from '../core/playFrame';
 import { STAKED_RUN_PARAMS } from '../core/Difficulty';
@@ -82,11 +82,11 @@ describe('the stated bands (at 90, and a quarter of it the other way at 40)', ()
     expect(tuningFor(at({ finishing: 40 }), CASUAL).finishContestScale).toBeCloseTo(1.0375, 12);
   });
 
-  it('defense: slide ×1.06, steal reach ×1.05 (1.2 → 1.26 m), block reach +0.04 m at 90', () => {
+  it('defense: slide ×1.06, poke range ×1.05 (1.6 → 1.68 m), block reach +0.04 m at 90', () => {
     const d = tuningFor(at({ defense: 90 }), CASUAL);
     expect(d.slideSpeedScale).toBeCloseTo(1.06, 12);
     expect(d.stealReachScale).toBeCloseTo(1.05, 12);
-    expect(STRIP_REACH_M * d.stealReachScale).toBeCloseTo(1.26, 12);
+    expect(TODAY_STEAL_RANGE_M * d.stealReachScale).toBeCloseTo(1.68, 12);
     expect(d.blockReachAddM).toBeCloseTo(0.04, 12);
   });
 
@@ -134,11 +134,13 @@ describe('rating-free where others compare', () => {
 });
 
 describe('the restated numbers are today\'s', () => {
-  it('handle, chain window, top speed, steal reach', () => {
+  it('handle, chain window, top speed, the hero\'s poke range in both modes', () => {
     expect(TODAY_HANDLE).toBe(BASELINE_HANDLE);
     expect(chainWindowSec(51) - chainWindowSec(50)).toBeCloseTo(CHAIN_WINDOW_SEC_PER_HANDLE, 12);
     expect(TODAY_TOP_SPEED_MPS).toBe(DEFAULT_MOVEMENT.maxSpeed);
-    expect(TODAY_STRIP_REACH_M).toBe(STRIP_REACH_M);
+    expect(TODAY_STEAL_RANGE_M).toBe(1.6);
+    expect(readFileSync('lib/babylon/modes/OneVOneMode.ts', 'utf8')).toMatch(/^const STEAL_RANGE = 1\.6;/m);
+    expect(readFileSync('lib/babylon/modes/ThreeVThreeMode.ts', 'utf8')).toMatch(/me\.slot\.intent\.steal && [^\n]*< ratedStealRange\(1\.6, rated\.tuning\)\)/);
   });
 });
 
@@ -151,12 +153,16 @@ describe('the words', () => {
     expect(effectLine('handle', 90)).toBe('Combo window +0.10 s, moves beat a defender more easily');
     expect(effectLine('finishing', 90)).toBe('Defenders bother your finishes 15% less');
     expect(effectLine('finishing', 40)).toBe('Defenders bother your finishes 3.8% more');
-    expect(effectLine('defense', 90)).toBe('Slide +6%, steal reach +6 cm, block reach +4 cm');
+    expect(effectLine('defense', 90)).toBe('Slide +6%, steal reach +8 cm, block reach +4 cm');
+    expect(effectLine('defense', 47)).toBe('Slide −0.5%, steal reach −0.6 cm, block reach −0.3 cm');
   });
 
   it('heights', () => {
     expect(heightLabel(76)).toBe('6\'4"'); expect(heightLabel(72)).toBe('6\'0"'); expect(heightLabel(80)).toBe('6\'8"');
     expect(heightLine(76)).toBe('Standard reach'); expect(heightLine(80)).toBe('Reach +6 cm'); expect(heightLine(72)).toBe('Reach −6 cm');
+    expect(heightLookScale(76)).toBe(1); expect(heightLookScale(80)).toBeCloseTo(1.04, 12); expect(heightLookScale(72)).toBeCloseTo(0.96, 12);
+    expect(heightLookScale(80, 0.05)).toBe(1.04);   // never past the cosmetic clamp
+    expect(heightLookScale(80, 0)).toBe(1); expect(HEIGHT_LOOK_PER_IN).toBe(0.01);
     expect(clampHeight(99)).toBe(HEIGHT_MAX_IN); expect(clampHeight(10)).toBe(HEIGHT_MIN_IN); expect(clampHeight('x')).toBe(HEIGHT_DEFAULT_IN);
   });
 });

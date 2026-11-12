@@ -69,7 +69,12 @@ export const aiBlockLeadSec = (): number => feel('hoops.aiBlockLeadSec', AI_BLOC
 
 /** A defender as the block test sees him: where he stands (planar root), his contest jump's age (Infinity = on the floor) and whether
  *  his hands are UP (a hand-up hold, a block reach or a jump). Hands down never block. */
-export interface Blocker { x: number; z: number; jumpAge: number; handsUp: boolean }
+export interface Blocker {
+  x: number; z: number; jumpAge: number; handsUp: boolean;
+  /** hoops-builder (owner 2026-11-12): extra reach on the arm (m) from the hero's Defense rating and playing height
+   *  (ratings.ts blockReachAddM + reachAddM). Absent = 0: today's reach, exactly. */
+  reachAddM?: number;
+}
 
 /** How high the contest jump has carried the body at `age` s (0 on the floor). The modes' own curve (sin over JUMP_SEC). */
 export function jumpRise(age: number, jumpSec = JUMP_SEC, rise = JUMP_RISE_M): number {
@@ -86,7 +91,7 @@ export function releaseFrom(ball: P3, shooterFeetY: number, style: ShotStyle): P
 
 /** The top of his reach right now (m): the shoulder on the jump, plus the arm straight up. */
 export function reachTop(b: Blocker, ahead = 0): number {
-  return shoulderM() + jumpRise(b.jumpAge + ahead) + armM();
+  return shoulderM() + jumpRise(b.jumpAge + ahead) + armM() + (b.reachAddM ?? 0);
 }
 
 /** Metres from the ball's centre to the nearest point the hand can be (0 = the ball is inside his reach). Infinity with the hands down. */
@@ -94,7 +99,7 @@ export function reachGap(b: Blocker, ball: P3, ahead = 0): number {
   if (!b.handsUp && !(b.jumpAge + ahead >= 0 && b.jumpAge + ahead < JUMP_SEC)) return Infinity;   // hands down: a landed jump is on the floor
   const sy = shoulderM() + jumpRise(b.jumpAge + ahead);
   const d = Math.hypot(ball.x - b.x, ball.y - sy, ball.z - b.z);
-  return Math.max(0, d - armM());
+  return Math.max(0, d - armM() - (b.reachAddM ?? 0));
 }
 
 /** The hand is on the ball THIS frame (a dunk in flight, a falling ball over the ring). */
