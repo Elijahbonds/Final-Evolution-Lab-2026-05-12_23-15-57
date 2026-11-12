@@ -14,7 +14,7 @@ import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } 
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
-import { HudBanner, HudChip, HudFrame, HudLine, HudMeter, HudPips, HudPlate, HudText, ScoreValue, Scorebug, hudLineStep, hudLineTrim, HUD_LINE_PAD } from './tv-hud';
+import { HudBanner, HudChip, HudFrame, HudLine, HudMeter, HudPips, HudPlate, HudText, ScoreValue, Scorebug, hudLineStep, hudLineTrim, HUD_LINE_PAD, DANGER_CHIP_FILL } from './tv-hud';
 import { gameResultFromSession } from '@/lib/sessions/gameResultFromSession';
 
 type Hud = Record<string, HudValue>;

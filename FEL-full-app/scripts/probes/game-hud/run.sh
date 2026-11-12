@@ -21,7 +21,7 @@ for m in ${MODES//,/ }; do
     tag=${pair%%:*}; host=${pair#*:}
     [ -f "$OUT/$m-$tag.json" ] && continue
     [ $(( $(date +%s) - t0 )) -gt $BUDGET ] && { echo "budget: stop before $m $tag"; exit 0; }
-    only=phone,desktop
+    only=phone,desktop; case $m in onevone|dunk) only=phone;; esac   # the hoops check: upright and sideways phone
     ONLY=$only npx tsx "$HERE/hud.mts" "$OUT" "$tag" "$host" "$m" 2>&1 | grep -v '^\[probe\]'
   done
 done
