@@ -1647,6 +1647,87 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/core/NexusVenue.ts COVERED_SKY_OFF',
     hint: 'On a phone the basketball courts drop the look stack backdrop dome and ring: the venue own opaque sky sphere sits inside them and hides them completely. Same picture. 0 = kept, as before.',
   },
+  // ── hoops-p09 (1v1 / 3v3 phase 9 "one rulebook": the play audit's sinkers 2 to 6 and 10) ──
+  {
+    id: 'hoops.skillShotOn', label: 'Shots: the release decides (1) / a rate and a draw (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · one rulebook',
+    source: 'lib/babylon/hoops/rulebook.ts SKILL_SHOT_ON',
+    hint: 'On: a release inside the green goes in and one outside it misses; the contest and the distance shrink the green. Off: the grade sets a make rate and the ring draws, as before.',
+  },
+  {
+    id: 'hoops.jumpGreenScale', label: 'Jump shot green: share of the old width', def: 1, min: 0.5, max: 1, step: 0.01, unit: 'x', group: 'Hoops · one rulebook',
+    source: 'lib/babylon/hoops/rulebook.ts JUMP_GREEN_SCALE',
+    hint: 'The jumper and fadeaway green is this share of its old width. Ships at 1 (as before). The proposal to try: 0.62, about 70 ms on an open jumper. Finishes keep their own bars.',
+  },
+  {
+    id: 'hoops.freeFinishContest', label: 'Finish: goes in untimed below this contest', def: 0.3, min: 0, max: 1, step: 0.05, unit: '', group: 'Hoops · one rulebook',
+    source: 'lib/babylon/hoops/rulebook.ts FREE_FINISH_CONTEST',
+    hint: 'With the release deciding: a layup or other finish nobody is contesting this much goes in however it was timed. 0 = every finish needs the green.',
+  },
+  {
+    id: 'hoops.finishContestNarrow', label: 'Finish: a full contest narrows its green by', def: 0.5, min: 0, max: 0.8, step: 0.05, unit: '', group: 'Hoops · one rulebook',
+    source: 'lib/babylon/hoops/rulebook.ts FINISH_CONTEST_NARROW',
+    hint: 'With the release deciding: a contested layup or other finish has a narrower green, by this share at a full contest. 0 = only the meter narrowing.',
+  },
+  {
+    id: 'hoops.aiSharedShotOn', label: 'AI shoots on the same meter (1) / its own table (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · one rulebook',
+    source: 'lib/babylon/hoops/rulebook.ts AI_SHARED_SHOT_ON',
+    hint: 'On: the 1v1 rival, the 3v3 rivals and your 3v3 teammates release on your meter with a hand per level, and the same rule decides. Off: their own make tables, as before.',
+  },
+  {
+    id: 'hoops.aiTimingRookieMs', label: 'AI hand: ROOKIE timing spread', def: 100, min: 10, max: 150, step: 1, unit: 'ms', group: 'Hoops · one rulebook',
+    source: 'lib/babylon/hoops/rulebook.ts AI_TIMING_ROOKIE_MS',
+    hint: 'How far off the green centre a ROOKIE release lands, typically (one standard deviation). Bigger = misses more.',
+  },
+  {
+    id: 'hoops.aiTimingProMs', label: 'AI hand: PRO timing spread', def: 71, min: 10, max: 150, step: 1, unit: 'ms', group: 'Hoops · one rulebook',
+    source: 'lib/babylon/hoops/rulebook.ts AI_TIMING_PRO_MS',
+    hint: 'The same for PRO (also staked, ranked and head-to-head runs).',
+  },
+  {
+    id: 'hoops.aiTimingEliteMs', label: 'AI hand: ELITE timing spread', def: 52, min: 10, max: 150, step: 1, unit: 'ms', group: 'Hoops · one rulebook',
+    source: 'lib/babylon/hoops/rulebook.ts AI_TIMING_ELITE_MS',
+    hint: 'The same for ELITE.',
+  },
+  {
+    id: 'hoops.aiTimingMateMs', label: 'AI hand: your 3v3 teammates timing spread', def: 71, min: 10, max: 150, step: 1, unit: 'ms', group: 'Hoops · one rulebook',
+    source: 'lib/babylon/hoops/rulebook.ts AI_TIMING_MATE_MS',
+    hint: 'The same for your 3v3 teammates, at every difficulty.',
+  },
+  {
+    id: 'hoops.moveReadOn', label: 'Moves and fakes: read the man (1) / a roll (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · one rulebook',
+    source: 'lib/babylon/hoops/rulebook.ts MOVE_READ_ON',
+    hint: 'On: a dribble move, the jab, the pump fake, the pass fake and off the head beat him only when he is off balance, coming at you or moving the wrong way (no roll); a set man holds. Off: the odds and the roll, as before.',
+  },
+  {
+    id: 'hoops.moveLeanMps', label: 'Read: moving the wrong way faster than', def: 0.6, min: 0.2, max: 2, step: 0.05, unit: 'm/s', group: 'Hoops · one rulebook',
+    source: 'lib/babylon/hoops/rulebook.ts MOVE_LEAN_MPS',
+    hint: 'A defender moving across you this fast, the other way from the move, is beaten by it.',
+  },
+  {
+    id: 'hoops.moveCommitMps', label: 'Read: coming at you faster than', def: 1.4, min: 0.5, max: 4, step: 0.05, unit: 'm/s', group: 'Hoops · one rulebook',
+    source: 'lib/babylon/hoops/rulebook.ts MOVE_COMMIT_MPS',
+    hint: 'A defender coming at you this fast has committed: a move, a jab or a pump fake beats him.',
+  },
+  {
+    id: 'hoops.passFakeLaneCos', label: 'Pass fake: he bites when this square to the lane', def: 0.6, min: 0.2, max: 1, step: 0.05, unit: '', group: 'Hoops · one rulebook',
+    source: 'lib/babylon/hoops/rulebook.ts PASS_FAKE_LANE_COS',
+    hint: 'With the read on: a pass fake moves a defender who stands at least this squarely in the lane to the man you showed.',
+  },
+  {
+    id: 'hoops.gatherCloseoutOn', label: 'AI closes out on a jump shot gather (1) / holds (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · one rulebook',
+    source: 'lib/babylon/hoops/rulebook.ts GATHER_CLOSEOUT_ON',
+    hint: 'On: after his reaction time (ROOKIE 420, PRO 220, ELITE 120 ms) the man on you steps up when you gather for a jumper. Off: he holds his arm length spot, as before.',
+  },
+  {
+    id: 'hoops.gatherCloseoutM', label: 'Closeout on the gather: steps up to', def: 0.8, min: 0.4, max: 1.4, step: 0.05, unit: 'm', group: 'Hoops · one rulebook',
+    source: 'lib/babylon/hoops/rulebook.ts GATHER_CLOSEOUT_M',
+    hint: 'How far off the shooter the closeout on the gather finishes.',
+  },
+  {
+    id: 'hoops.pressFloorOn', label: 'Dunk press never pays less than no press (1) / old table (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · one rulebook',
+    source: 'lib/babylon/hoops/rulebook.ts PRESS_FLOOR_ON',
+    hint: 'On: a showtime flush or a trick dunk pressed at the wrong moment goes in at least as often as not pressing. Off: early 42, late 50 against 70 untimed, as before.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));

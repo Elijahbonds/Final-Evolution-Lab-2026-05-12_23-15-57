@@ -117,7 +117,7 @@ import {
   hasMove, MOVE_HANDLE, type MoveOutcome,   // the stick's snatchback is gated on the same rating doMove gates on
 } from '../core/HandleSystem';   // Street chains x 2K brakes, gated on the handle the PRQ scan earned
 import {
-  THREAT_IDLE, inTripleThreat, isJabInput, jabBiteOdds, canJab, throwJab, tickThreat, jabBurst,
+  THREAT_IDLE, inTripleThreat, isJabInput, jabBiteOdds, canJab, throwJab, tickThreat, jabBurst, JAB_RANGE,
   type ThreatState,
 } from '../core/TripleThreat';   // the stance the half-court game starts from
 import {
@@ -128,7 +128,7 @@ import { isTipInEligible, tipInMakeChance } from '../core/TipIn';   // HOOPS-10P
 import { attachBallToHand, gatherBallToHand, releaseBall } from '../anim/ballRig';
 import { dunkMissVelocity, dunkVerdict } from '../core/RimForAll';   // lane/hoops-shot-core: dunks on the rim (clankOffRim retired here)
 import { rightHandHoops, rightHandBall, hoopsHand, leftDribbleTwins } from '../anim/hoopsHand';   // HOOPS MOTION phase 3: right-handed on screen
-import { requestMove, sizeUpMoveOf, type HandleHost } from '../anim/handleMotion';   // HOOPS MOTION phase 4b: one renderer for the handle moves
+import { requestMove, sizeUpMoveOf, moveSideFor, type HandleHost } from '../anim/handleMotion';   // HOOPS MOTION phase 4b: one renderer for the handle moves
 import { findBone } from '../anim/boneLookup';
 import { sideAwayFrom, sideOfVector } from '../anim/athleteSide';               // HOOPS MOTION phase 3: the one visual-side helper (phase 4b: a crossing move's side is its end hand's; the bite's is still sideAwayFrom's)
 import { mountRimReach, rimReachWeight, type RimReachHandle } from '../anim/rimReach';   // HAND AND RIM (owner, 2026-09-18): the ball hand meets the iron on a game dunk
@@ -245,6 +245,8 @@ import { jumperPace, finishPace, jumperFromRiseOn } from '../hoops/releaseTiming
 import { riseStartOf, variantFor } from '../anim/opponentMotion';   // hoops-p04; hoops-p05: the capture a loop really plays (the defensive beats' legs)
 import { blockDiceOn, meetsRelease, releaseFrom, handOnBall, deflect, aiBlockJumpAtSec, type Blocker, type P3 } from '../hoops/blocks';   // hoops-p02 (1v1/3v3 phase 2): the hand meets the ball, for everyone
 import { oneContestOn, contestFrom, closingSpeed } from '../hoops/contest';   // hoops-p02: one contest model for every shooter
+import { skillShotOn, aiSharedShotOn, greenScaleFor, moveReadOn, readTheMan, manReadFrom, pressFloored, gatherCloseoutOn, isJumpShot, type ManRead } from '../hoops/rulebook';   // hoops-p09: one rulebook (shots, moves, the closeout, the press floor)
+import { heroSkillVerdict, rimFromRelease, aiRelease, missShapeFor } from '../core/SharedShot';   // hoops-p09: one shot model for every shooter
 import { stealDiceOn, aiStripLands } from '../hoops/steals';   // hoops-p02: the AI's strip is a hand on the ball
 import { HandCheckPlay } from '../hoops/handCheck';   // lane/hoops-round2 HOP-04: hand-checks, too many = a foul
 import { mountContactPoses } from '../hoops/contactPoses';   // lane/hoops-round2 HOP-04: forearm on hip, arm bar, chest in (drawn only)
@@ -534,8 +536,11 @@ export const OneVOneMode: ModeDefinition = (() => {
   const bankLook = new BankLook();   // hoops-shot-content: the angled set, the glance and the follow-through of a called-glass shot
   let ftLine: FreeThrowLine | null = null;   // hoops-shot-content: the free-throw line — a foul site's continuation runs after the trip
   const ftAfter = (...a: Parameters<FreeThrowLine['after']>): void => { if (ftLine) ftLine.after(...a); else a[2](); };
+  let meterJump = false;   // hoops-p09: the meter running is a jump shot's (the closeout on the gather reads it)
   const meterStart = (contest: number, style?: Parameters<ShotMeter['start']>[1], gather?: number): void => {
     shotMeter.start(contest, style ?? 'jumper', gather ?? 0); shotMeter.narrowBy(distanceGreenFactor(distXZ(me.root.position, RIM_FLOOR), style ?? 'jumper'));   // lane/hoops-shot-core: distance narrows the green (ShotWindow)
+    meterJump = isJumpShot(style ?? 'jumper');   // hoops-p09: the AI closes out on a jump shot's gather
+    shotMeter.narrowBy(greenScaleFor(style ?? 'jumper', contest));   // hoops-p09: the jump shots' green scale and a finish's contest narrowing (hoops/rulebook; hoops.jumpGreenScale 1 / hoops.skillShotOn 0 = today)
     hudGreen = `${shotMeter.greenCenter01.toFixed(3)},${shotMeter.greenHalfWidth01.toFixed(3)}`; hud({ shotMeterPerfect: perfectHud(shotMeter.greenHalfWidth01) });   // lane/hoops-shot-core: the PERFECT band on the HUD bar
     meter3d?.begin({ center: shotMeter.greenCenter01, half: shotMeter.greenHalfWidth01 });
   };
@@ -772,9 +777,11 @@ export const OneVOneMode: ModeDefinition = (() => {
    *  one error drawn so that P(made) == pct, and the dwell planned from that same error, so the scoreboard and the iron
    *  cannot disagree. Finishes at the rim (dunks, layups, put-backs) keep their own resolution: a layup is a placement,
    *  not a shot at the ring. */
+  /** The shooter's position seen from the rim, flat (RimPlay's `toShooter`). */
+  function flatFrom(shooterPos: Vector3): Vector3 { const v = shooterPos.subtract(RIM); v.y = 0; return v; }
   function rimVerdictFor(shooterPos: Vector3, pct: number, q01: number, short: number, lateral: number): RimVerdict {
     const toShooter = shooterPos.subtract(RIM); toShooter.y = 0;
-    const v = rimDecides(RIM, toShooter, pct, q01, { short, lateral });
+    const v = rimDecides(RIM, toShooter, pct, q01, { short, lateral });   // dice-off: only the knobs' off paths call it in 1v1 (hoops.skillShotOn 0, hoops.aiSharedShotOn 0)
     console.info(`[1V1-RIM] ring ${v.made ? 'YES' : 'no'} radial ${v.radial.toFixed(3)} m at pct ${pct.toFixed(2)}`);
     console.info(`[1V1-RIM] plan ${v.play.kind}${v.play.duration ? ` ${v.play.duration.toFixed(2)} s` : ''}`);
     return v;
@@ -1276,6 +1283,8 @@ export const OneVOneMode: ModeDefinition = (() => {
       // this exact curve is now MomentumFx.crowdLevel, applied by the harness for every mode --
       // it was extracted FROM here because this is the mode people have actually played
       meSlot.poll(dt);
+      // hoops-p09: THE CLOSEOUT ON THE GATHER — once his tier's reaction has passed inside my jump-shot meter, the on-ball brain steps up
+      if (foeBrain) foeBrain.closeOnGather = gatherCloseoutOn() && possession === 'mine' && meterJump && shotMeter.active && shotMeter.t * shotMeter.durationSec >= aiReactMs(runTier()) / 1000;
       foeSlot.poll(dt);
       if (ftLine?.active) { ftLine.update(dt); return; }   // hoops-shot-content: a dead ball at the line — live play waits for the trip
       // HOOPS KINETIC: my velocity off the root (defense has no dribble controller under me), the vault's arc, the drift cooldown
@@ -1605,7 +1614,10 @@ export const OneVOneMode: ModeDefinition = (() => {
                   handle,
                   shownThisPossession: threat.shown,
                 }) : 0;
-                bought = live && roll() < odds;
+                // hoops-p09: he bites the jab when he is coming at you or off balance, and only the first two a possession (he learns); no roll
+                const jabRead = moveReadOn() ? readTheMan(foeManRead(null)) : null;
+                bought = jabRead ? live && dist <= JAB_RANGE && threat.shown < 2 && jabRead.beat
+                  : live && roll() < odds;   // dice-off: hoops.moveReadOn 0
                 threat = throwJab(threat, bought);
                 burstArmed = bought;
               } },
@@ -1747,7 +1759,7 @@ export const OneVOneMode: ModeDefinition = (() => {
               const snr = requestMove(meHost(), {
                 move: 'snatch_back', fadeSec: moveFadeSec(sprintOk), speedRatio: 1,   // H2b (plan §4.13): its own v2 clip (MOVE_CLIP), not the step-back's gather
                 decide: { kind: 'custom', run: () => {
-                  const sno = resolveHandleMove('snatch_back', chain, handle, { present: foeStunSec <= 0 && !foeFloored, closing: foeVelLast.length() > 1.4, set: false, within: distXZ(me.root.position, foe.root.position) < SHAKE_RANGE }, roll, MOVES_UNLOCKED_GATE);
+                  const sno = resolveHandleMove('snatch_back', chain, handle, { present: foeStunSec <= 0 && !foeFloored, closing: foeVelLast.length() > 1.4, set: false, within: distXZ(me.root.position, foe.root.position) < SHAKE_RANGE, man: foeManRead(null) }, roll, MOVES_UNLOCKED_GATE);   // hoops-p09: a step back off the man beats him when he is coming at you
                   chain = sno.chain;
                   console.info(`[1V1-HANDLE] move snatch_back (chain ${chain.length}, handle ${handle}, ${sno.tier})`);
                   reactToBreak(ctx, sno, pick.side ?? 'right');
@@ -2646,9 +2658,17 @@ export const OneVOneMode: ModeDefinition = (() => {
     // Phase 8: the rival banks from the wing — inside the square's band, a third of his jumpers go off the glass, with the bank's edge
     const rivalBank = style !== 'layup' && inBankBand(foe.root.position, RIM_FLOOR, BOARD_NORMAL) && roll() < 0.34 ? bankPoint(foe.root.position, RIM, BOARD_NORMAL) : null;
     if (rivalBank) console.info('[1V1-RIM] rival calls glass');
-    const rivalVerdict = rimVerdictFor(foe.root.position, Math.min(0.98, rivalShotPct(range, contest, style) / Math.max(0.5, nrv.mistake) + (rivalBank ? BANK_PCT_BONUS : 0)), shotMiss.quality01, shotMiss.short, shotMiss.lateral);
+    // hoops-p09 ONE RULEBOOK: he releases on MY meter with his tier's hand (core/SharedShot aiRelease) — the same grade, the same rule
+    // (skill: inside the green; or the same rate table under hoops.skillShotOn 0); his own table behind hoops.aiSharedShotOn 0
+    const rStyle: ShotStyle = style === 'layup' ? (look === 'hook' ? 'hook' : 'layup') : look === 'floater' ? 'floater' : look === 'fade' ? 'fadeaway' : 'jumper';
+    const rRel = aiSharedShotOn() ? aiRelease({ who: runTier(), style: rStyle, contest, distM: range, mistake: nrv.mistake, banked: !!rivalBank }, roll) : null;
+    if (rRel) { const ms = missShapeFor(rRel.quality, contest); shotMiss.quality01 = ms.quality01; shotMiss.short = ms.short; console.info(`[1V1-RIM] rival release ${rStyle} ${rRel.quality} ${(rRel.offsetSec * 1000).toFixed(0)} ms off, green ±${(rRel.halfSec * 1000).toFixed(0)} ms (${runTier()} hand)`); }
+    const rivalVerdict = rRel && skillShotOn() ? rimFromRelease(RIM, flatFrom(foe.root.position), rRel.verdict.made, rRel.verdict.closeness, shotMiss.quality01, { short: shotMiss.short, lateral: shotMiss.lateral })
+      : rRel ? rimVerdictFor(foe.root.position, rRel.ratePct, shotMiss.quality01, shotMiss.short, shotMiss.lateral)   // dice-off: hoops.skillShotOn 0
+      : rimVerdictFor(foe.root.position, Math.min(0.98, rivalShotPct(range, contest, style) / Math.max(0.5, nrv.mistake) + (rivalBank ? BANK_PCT_BONUS : 0)), shotMiss.quality01, shotMiss.short, shotMiss.lateral);   // dice-off: hoops.aiSharedShotOn 0
     const made = rivalVerdict.made;
     arcPoints = style === 'layup' ? 2 : isThree(foe.root.position, RIM) ? 3 : 2;
+    console.info(`[1V1-RIM] rival shot ${made ? 'IN' : 'out'} (${arcPoints})`);   // hoops-p09: the rival's verdict on one line (the probes count it)
     // The RIVAL's miss has to be readable too. Measured with a probe: every rim contact in a 150 s run
     // came back "front — SHORT", because only the hero's release recorded a profile and the AI fell
     // through to the default short bias — so the iron answered identically every single time, which is
@@ -2804,7 +2824,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         if (showtimeK === null && (showtimePress || k >= SHOWTIME_DEADLINE_K)) {
           const j = showtimePress ? judgeShowtime(k) : 'none'; showtimePress = false; showtimeK = k; showtimeJudge = j;
           meter3d?.end(j === 'none' ? 'held' : j);
-          made = roll() < SHOWTIME_PCT[j] * (kind === 'poster' ? Math.max(0.6, c.pct) : 1);
+          made = roll() < pressFloored(SHOWTIME_PCT[j], SHOWTIME_PCT.none) * (kind === 'poster' ? Math.max(0.6, c.pct) : 1);   // hoops-p09: a mistimed flush never pays less than no press (hoops.pressFloorOn)
           if (j === 'perfect') { ctx.juice.hitStop(70); ctx.camDirector.pulse(0.7, 0.45); SoundKit.play('crowdCheer', { volume: 0.6 }); }
           bannerFlash(ctx, j === 'perfect' ? `${picked.label} — PERFECT!` : j === 'good' ? `${picked.label}!` : j === 'early' ? 'EARLY — OFF THE FRONT' : j === 'late' ? 'LATE — OFF THE BACK' : picked.label, 800);
           console.info(`[1V1-SHOWTIME] flush ${j} at k ${k.toFixed(2)} made ${made}`);
@@ -2846,7 +2866,7 @@ export const OneVOneMode: ModeDefinition = (() => {
             bannerFlash(ctx, onTheBump ? `${spec.label} ON HIM!` : spec.label, 900);
           } else {
             // a trick you could not land is a decision with a price — that is what makes throwing one mean anything
-            made = roll() < trickPctFor(c.pct, spec, judge);
+            made = roll() < pressFloored(trickPctFor(c.pct, spec, judge), c.pct);   // hoops-p09: a mistimed trick never pays less than the plain dunk (hoops.pressFloorOn)
             bannerFlash(ctx, judge === 'early' ? 'TOO EARLY!' : 'TOO LATE!', 700);
           }
           resolved = true;
@@ -3179,7 +3199,11 @@ export const OneVOneMode: ModeDefinition = (() => {
     pumpWindow = STEP_THROUGH_SEC;
     meAnimTree.beat('bball_pump_fake', { fadeSec: 0.06 });
     SoundKit.play('whoosh', { pitch: 1.3, volume: 0.25 });
-    const bit = !!defPos && foeStunSec === 0 && !foeFloored && distXZ(me.root.position, defPos) <= PUMP_BITE_RANGE && roll() < PUMP_BITE_CHANCE;
+    // hoops-p09: he leaves his feet when he is flying at you (closing out, or already in the air); a man sitting back does not bite. No roll
+    const pumpRead = moveReadOn() ? readTheMan(foeManRead(null)) : null;
+    const bit = !!defPos && foeStunSec === 0 && !foeFloored && distXZ(me.root.position, defPos) <= PUMP_BITE_RANGE
+      && (pumpRead ? pumpRead.why === 'committed' || pumpRead.why === 'offBalance'
+        : roll() < PUMP_BITE_CHANCE);   // dice-off: hoops.moveReadOn 0
     if (bit) {
       foeStunSec = PUMP_BITE_STUN;
       foeAnimTree.beat('bball_block_reach');
@@ -3434,7 +3458,12 @@ export const OneVOneMode: ModeDefinition = (() => {
       short: (quality === 'early' ? 0.8 : quality === 'late' ? -0.8 : quality === 'brick' ? 0.3 : 0) + shotContest * 0.7,
       lateral: quality === 'brick' ? (Math.random() < 0.5 ? -0.7 : 0.7) : 0,
     };
-    const verdict = rimVerdictFor(me.root.position, Math.min(0.98, pct), shotMiss.quality01, shotMiss.short, shotMiss.lateral);
+    // hoops-p09 ONE RULEBOOK: the release decides (core/SharedShot) — inside the green it goes in, outside it misses, the contest at the
+    // release and the distance narrow the green; the grade's rate and the ring's draw behind hoops.skillShotOn 0
+    const skillV = skillShotOn() ? heroSkillVerdict(quality, shotMeter.offsetSec, { style: currentShot?.style ?? 'jumper', meterHalfSec: shotMeter.greenHalfSec, releaseContest: shotContest, distM: distXZ(me.root.position, RIM_FLOOR), gatherSec: shotMeter.gatherSec, fatigue01: meFatigue01, momentum: mbus.multiplier(), banked: !!banked }) : null;
+    if (skillV) console.info(`[1V1-RIM] release ${skillV.why}: ${(shotMeter.offsetSec * 1000).toFixed(0)} ms off, green ±${(skillV.halfSec * 1000).toFixed(0)} ms → ${skillV.made ? 'IN' : 'out'}`);
+    const verdict = skillV ? rimFromRelease(RIM, flatFrom(me.root.position), skillV.made, skillV.closeness, shotMiss.quality01, { short: shotMiss.short, lateral: shotMiss.lateral })
+      : rimVerdictFor(me.root.position, Math.min(0.98, pct), shotMiss.quality01, shotMiss.short, shotMiss.lateral);   // dice-off: hoops.skillShotOn 0
     const made = verdict.made;
     // D1: the AI's block at the release — a hand up (or a jump) inside range; the ball is knocked LOOSE from the hand
     const blockChance = foeStunSec > 0 || foeFloored ? 0 : aiBlockChance(currentShot?.style ?? 'jumper', foeDist, foeUp, foeVelLast.length() < 1.0);
@@ -3561,6 +3590,11 @@ export const OneVOneMode: ModeDefinition = (() => {
     if (clip) foeAnimTree.beat(clip, { fadeSec: 0.06 });
     console.info(`[1V1-DEF] react ${r.kind}${r.tune.dist > 0 ? ` ${r.tune.dist} m` : ''}${clip ? ` → ${clip}` : ''}`);
   }
+  /** hoops-p09 (one rulebook): what he is doing at my press, in my frame — off balance (in his jump, or in his reach), coming at me,
+   *  or moving across me — for a move's read (hoops/rulebook readTheMan). */
+  function foeManRead(moveSide: 'left' | 'right' | null): ManRead {
+    return manReadFrom(me.root.position, me.root.rotation.y, foe.root.position, foeVelLast, foeBlockJumpAge < JUMP_SEC || foeStealReach.showing, moveSide);
+  }
   function meHost(): HandleHost {
     return {
       carry: meCarry, flow: meFlow,   // hoops-moves: the combo window (anim/comboFlow)
@@ -3599,6 +3633,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         closing: foeVelLast.length() > 1.4 && facingCos(foe.root.rotation.y, foe.root.position, me.root.position) > 0,
         set: foeVelLast.length() < 0.6,
         within: distXZ(me.root.position, foe.root.position) < SHAKE_RANGE,
+        man: foeManRead(moveSideFor(meHost(), { move, hint: dirHint, cutSide, path: move === 'steezo_roll' ? 'momentum_btb' : undefined })),   // hoops-p09: the read, not the roll
       }, roll, MOVES_UNLOCKED_GATE) },   // H2: owned at the unlock gate, priced at the player's handle
       clipFor: variant === 'slide' ? (d) => `bball_btb_slide_${d}` : undefined,
     });
@@ -3634,7 +3669,10 @@ export const OneVOneMode: ModeDefinition = (() => {
         defenderSpeed: foeVelLast.length(),
       });
       SoundKit.play('whoosh', { pitch: 1.35, volume: 0.4 });
-      if (odds > 0 && roll() < odds) {
+      // hoops-p09: it comes off clean when the odds are on your side (≥ 0.5: in range, square to you, not moving fast), else it is lost
+      const clean = moveReadOn() ? odds >= 0.5
+        : odds > 0 && roll() < odds;   // dice-off: hoops.moveReadOn 0
+      if (clean) {
         // off him and back to me: he is cooked, and the crowd knows
         foeStunSec = Math.max(foeStunSec, 0.8);
         foeAnimTree.beat('bball_contact_react');
