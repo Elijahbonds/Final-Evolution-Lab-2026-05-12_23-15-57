@@ -104,9 +104,14 @@ async function matrix(): Promise<void> {
       if (s.tiers && !s.tiers.includes(tier)) continue;
       const page = await browser.newPage({ viewport: { width: W, height: H } });
       page.on('pageerror', (e) => cells.push({ subject: s.id, tier, pose: '-', clip: null, cam: '-', screen: { pageerror: String(e).slice(0, 300) } }));
-      try { await runSubject(page, srv.url, s, tier, s.rivalPoses && !poseIds.length ? poses.filter((p) => s.rivalPoses!.includes(p.id)) : poses, s.cams && !camIds.length ? cams.filter((c) => s.cams!.includes(c.id)) : cams, cells, shots); }
+      // a renderer killed for memory (the shared machine) leaves page calls hanging: a crash or 6 minutes fails this subject only
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const guard = new Promise<never>((_, no) => { page.on('crash', () => no(new Error('renderer crashed'))); timer = setTimeout(() => no(new Error('subject timed out (360 s)')), 360_000); });
+      guard.catch(() => undefined);
+      try { await Promise.race([runSubject(page, srv.url, s, tier, s.rivalPoses && !poseIds.length ? poses.filter((p) => s.rivalPoses!.includes(p.id)) : poses, s.cams && !camIds.length ? cams.filter((c) => s.cams!.includes(c.id)) : cams, cells, shots), guard]); }
       catch (e) { cells.push({ subject: s.id, tier, pose: '-', clip: null, cam: '-', screen: { failed: String((e as Error).message ?? e).slice(0, 300) } }); console.log(`  ${s.id} ${tier}: FAILED ${String(e).slice(0, 200)}`); }
-      await page.close();
+      finally { clearTimeout(timer); }
+      await page.close().catch(() => undefined);
       writeFileSync(join(OUT, `${name}.json`), JSON.stringify(cells));
     }
   } finally { await browser.close(); srv.close(); }
