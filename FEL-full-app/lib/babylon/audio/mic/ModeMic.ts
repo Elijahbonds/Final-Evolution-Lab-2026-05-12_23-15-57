@@ -96,7 +96,7 @@ export class ModeMic {
     this.crowdPending = null;
     void VoiceKit.playUrl(p.pick.line.url, this.court, () => {
       if (this.disposed) return;
-      this.ctx.setHud({ mic: p.pick.caption, micWho: p.pick.who });
+      this.ctx.setHud({ mic: p.pick.caption, micWho: p.pick.who, micVoiced: true });   // hoops-p08: the fan's clip is playing
       this.captionUntil = now() + 4;
     });
   }
@@ -184,15 +184,17 @@ export class ModeMic {
       // VOICEOVER: the caption goes up when the audio actually starts (onStart: a line that waited its turn shows then, not
       // when it was asked for), or at once when there is no audio (muted, no bank, no Web Audio: the words still land). A line
       // the lane dropped (stale, cooling down, a bigger moment had the mic) shows nothing: nothing was said.
-      void VoiceKit.playEx(c, this.court, () => { if (caption) this.showCaption(c); }).then((r) => {
+      void VoiceKit.playEx(c, this.court, () => { if (caption) this.showCaption(c, true); }).then((r) => {
         logCue(c, r);
-        if (captionWithoutAudio(r) && caption) this.showCaption(c);
+        if (captionWithoutAudio(r) && caption) this.showCaption(c, false);
       });
     }
   }
-  private showCaption(c: MicCue): void {
+  /** hoops-p08: `voiced` — the line's audio started (the hosts keep its subtitle off while the voice carries it, lib/babylon/ui/hudHints
+   *  showMicCaption); false when there is no audio and the words are the only way the line lands. */
+  private showCaption(c: MicCue, voiced: boolean): void {
     if (this.disposed) return;
-    this.ctx.setHud({ mic: c.caption, micWho: c.speaker });
+    this.ctx.setHud({ mic: c.caption, micWho: c.speaker, micVoiced: voiced });
     this.captionUntil = now() + c.sec + 0.7;
   }
   private clearCaption(): void { this.captionUntil = 0; try { this.ctx.setHud({ mic: '', micWho: '' }); } catch { /* the harness is gone */ } }
