@@ -18,6 +18,7 @@ import {
 import { recordServerEvent } from '@/lib/analytics-server';
 import { isStakingPaused, stakingPausedDetail, STAKING_PAUSED_CODE, STAKING_PAUSED_STATUS } from '@/lib/stakingPause';
 import { isUnlistedMode } from '@/lib/unlisted-modes';
+import { arenaEntryGate } from '@/lib/age/arenaAgeBand';
 
 /**
  * POST /api/arena/create
@@ -52,6 +53,10 @@ export async function POST(req: NextRequest) {
   }
   const feeCheck = validateArenaFee(feeLc);
   if (!feeCheck.ok) return NextResponse.json({ error: feeCheck.reason, detail: feeCheck.detail }, { status: 400 });
+  // ARENA-AGE-1 (Cyber F1 fix 1, T5): an entry duel is for verified adults (DB birth year). A teen or unknown-age
+  // account gets 403 with a plain reason (and, for an unknown age, where to add the year) before any row or LC moves.
+  const ageRefusal = await arenaEntryGate(prisma as any, userId);
+  if (ageRefusal) return ageRefusal;
 
   try {
     const match = await prisma.$transaction(async (tx: any) => {

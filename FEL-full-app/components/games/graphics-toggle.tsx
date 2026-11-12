@@ -32,7 +32,7 @@ export function GraphicsToggle() {
         value={choice}
         title={tier ? `Graphics — running the ${tier} tier` : 'Graphics'}
         onChange={(e) => { const c = parseGraphicsChoice(e.target.value) ?? 'auto'; setChoice(c); writeGraphicsChoice(c); }}
-        className="h-8 rounded-md border border-white/10 bg-[#050505] px-2 font-mono text-xs text-white/60
+        className="h-11 rounded-md border border-white/10 bg-[#050505] px-2 font-mono text-xs text-white/60
                    transition-colors hover:border-[#00E5FF]/50 hover:text-[#00E5FF]"
       >
         {GRAPHICS_CHOICES.map((c) => <option key={c} value={c}>{LABEL[c]}</option>)}

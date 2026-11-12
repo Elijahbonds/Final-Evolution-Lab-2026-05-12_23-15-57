@@ -31,7 +31,7 @@ export function JoinButton({ token, coachName, already }: { token: string; coach
 
   if (state === 'done') {
     return (
-      <p className="mt-7 inline-flex items-center gap-2 rounded-xl border border-[#00FF9D]/40 bg-[#00FF9D]/10 px-5 py-3 font-bold text-[#00FF9D]">
+      <p className="mt-7 inline-flex items-center gap-2 rounded-xl border border-fel-emerald/40 bg-fel-emerald/10 px-5 py-3 font-bold text-fel-emerald">
         <Check className="h-4 w-4" /> You are on {coachName}&apos;s roster
       </p>
     );
@@ -42,14 +42,14 @@ export function JoinButton({ token, coachName, already }: { token: string; coach
       <button
         onClick={join}
         disabled={state === 'working'}
-        className="mt-7 inline-flex items-center gap-2 rounded-xl bg-[#00E5FF] px-6 py-3 font-bold text-[#050505] transition-transform hover:scale-[1.02] disabled:opacity-60"
+        className="mt-7 inline-flex items-center gap-2 rounded-xl bg-fel-cyan px-6 py-3 font-bold text-fel-bg transition-transform hover:scale-[1.02] disabled:opacity-60"
       >
         {state === 'working' ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
         Join {coachName}
       </button>
-      {error && <p className="mt-3 max-w-xs text-xs text-[#FF3366]">{error}</p>}
+      {error && <p className="mt-3 max-w-xs text-xs text-fel-crimson">{error}</p>}
       {next && (
-        <a href={next.startsWith('/age') ? `/age?next=${encodeURIComponent(`/coach/join/${token}`)}` : next} className="mt-2 inline-block text-xs font-bold text-[#00E5FF] underline" data-teen-gate-next>
+        <a href={next.startsWith('/age') ? `/age?next=${encodeURIComponent(`/coach/join/${token}`)}` : next} className="mt-2 inline-block text-xs font-bold text-fel-cyan underline" data-teen-gate-next>
           {next.startsWith('/age') ? 'Add your birth year' : 'Ask your guardian to approve coach training'}
         </a>
       )}

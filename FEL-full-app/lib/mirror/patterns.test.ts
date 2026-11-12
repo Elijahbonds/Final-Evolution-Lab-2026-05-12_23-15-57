@@ -163,7 +163,7 @@ describe('lungePattern.audit(): mounted — clean, a caving knee either side, th
       const r = lungePattern.audit(frames(name), {});
       expect(r.readableFrames, name).toBe(0);
       expect(r.faults.every((f) => f.status === 'unreadable'), name).toBe(true);
-      expect(r.note, name).toMatch(/square/i);
+      expect(r.note, name).toMatch(/straight on/i);   // test changed: copy rewrite (CUE-REWRITE) — same meaning: face the camera
     }
   });
 

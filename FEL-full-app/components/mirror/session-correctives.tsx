@@ -36,7 +36,7 @@ export function SessionCorrectives({ summary, youth = 'unknownAge' }: SessionCor
         <>
           {c.release.length > 0 && (
             <div data-release className="mt-3">
-              <p className="font-mono text-[9.5px] font-bold uppercase tracking-[0.18em] text-white/40">Release first · adults</p>
+              <p className="font-mono text-[12px] font-bold uppercase tracking-[0.18em] text-white/50">Release first · adults</p>
               <ol className="mt-1.5 grid gap-2">
                 {c.release.map((r) => (
                   <li key={r.zone} data-release-zone={r.zone} className="rounded-xl border border-white/8 px-3.5 py-2.5 text-[12.5px] leading-relaxed">
@@ -44,8 +44,8 @@ export function SessionCorrectives({ summary, youth = 'unknownAge' }: SessionCor
                     <p className="mt-0.5 text-white/60">{sentence(r.tool)} {sentence(r.pin)}</p>
                     <p className="mt-0.5 text-white/60">{sentence(r.stretch)}</p>
                     <p className="mt-0.5 text-white/55">Breath: {sentence(r.breath)}</p>
-                    <p className="mt-0.5 text-white/45">{r.avoid}</p>
-                    <p className="mt-0.5 text-white/45">{r.because}</p>
+                    <p className="mt-0.5 text-white/50">{r.avoid}</p>
+                    <p className="mt-0.5 text-white/50">{r.because}</p>
                   </li>
                 ))}
               </ol>
@@ -53,7 +53,7 @@ export function SessionCorrectives({ summary, youth = 'unknownAge' }: SessionCor
           )}
           {c.band.length > 0 && (
             <div className="mt-3">
-              <p className="font-mono text-[9.5px] font-bold uppercase tracking-[0.18em] text-white/40">Band drills</p>
+              <p className="font-mono text-[12px] font-bold uppercase tracking-[0.18em] text-white/50">Band drills</p>
               <ol className="mt-1.5 grid gap-2">
                 {c.band.map((d) => (
                   <li key={d.signal} data-band={d.signal} className="rounded-xl border border-[#00E5FF]/20 px-3.5 py-2.5 text-[12.5px] leading-relaxed">
@@ -78,7 +78,7 @@ export function SessionCorrectives({ summary, youth = 'unknownAge' }: SessionCor
 
       {!c.off && (
         <>
-          <p className="mt-3 text-[11.5px] leading-relaxed text-white/40">{c.caution}</p>
+          <p className="mt-3 text-[12px] leading-relaxed text-white/50">{c.caution}</p>
           <Link href={CORRECTIVES_PATH} className="mt-2 inline-block text-[12.5px] font-semibold text-[#00E5FF] hover:underline">
             All correctives and your program →
           </Link>
@@ -97,7 +97,7 @@ export function CorrectivesPicker({ youth = 'unknownAge' }: { youth?: YouthGate 
   if (youth !== null) return null;
   return (
     <nav aria-label="Correctives" data-corrective-picker className="-mt-2 mb-4 flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-[12px]">
-      <span className="font-mono text-[9.5px] uppercase tracking-[0.16em] text-white/35">Correctives</span>
+      <span className="font-mono text-[12px] uppercase tracking-[0.16em] text-white/50">Correctives</span>
       {MIRROR_CORRECTIVE_SESSIONS.map((c) => (
         <Link key={c.id} href={c.href} className="font-bold text-[#00E5FF]/80 hover:text-[#00E5FF]">{c.label}</Link>
       ))}

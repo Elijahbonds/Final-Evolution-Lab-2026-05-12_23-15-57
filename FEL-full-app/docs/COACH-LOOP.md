@@ -44,7 +44,13 @@ request they could send today would satisfy the gate.
 5. assumption: the request date is a sound proxy only because steps 1–4 ship together. A `covers` (or `wordingVersion`)
    column on `GuardianConsent` would make it exact; that is a schema change for a schema lane.
 
-### Proposed wording — FOR THE OWNER'S APPROVAL, NOT LIVE
+### Approved wording (owner, in chat, 2026-10-27, card C10) — NOT LIVE YET
+
+Approved as written. It is in code word for word (`lib/consent/guardianGate.ts` `coachTrainingConsentWords`, held to
+this block by `tests/owner-approvals/consent-wording.test.ts`), but no screen shows it yet: it goes live with go-live
+steps 2–4 above, all together, and the last paragraph stays out until the withdraw path exists
+(`GUARDIAN_WITHDRAW_LIVE = false`), as the card recommended. The Privacy and Terms text it needs shipped with policy
+version `2026-10-27` (`lib/policies.ts`, card C11).
 
 For the guardian's accept screen and email (replaces the single `camp_plan` line; the list joins as today's
 `guardianConsentAsk` does):
@@ -65,7 +71,7 @@ For the guardian's accept screen and email (replaces the single `camp_plan` line
 > You can withdraw this at any time from the link in this email; **{name}**'s coach then stops seeing new training, and
 > the report links stop working.
 
-Policy text the same rule needs (owner and counsel; not drafted here): Privacy §1 (training logs of 13–17s), §2 (who
+Policy text the same rule needs (written 2026-10-27 on the owner's approval, card C11, in `lib/policies.ts`; not lawyer-reviewed): Privacy §1 (training logs of 13–17s), §2 (who
 sees them: the coach), §5 (the minor rules: training is not health data; what a guardian's yes unlocks), and the
 guardian's email used for reports; Terms §2 (13–17 on a coach's roster only with a guardian's consent).
 
@@ -104,6 +110,11 @@ day (in-memory per server instance).
 ---
 
 ## 3. Named groups (owner, 2026-10-23: yes — for a schema lane)
+
+> **Built on by lane/teams-squads (2026-10-25):** these two models became one shared core for teams and squads —
+> `TrainingGroup` (kind `team`, owner = the coach) and `TrainingGroupMember`, in
+> `prisma/pending/2026-10-25-teams-squads.sql` (not applied). The roster rule below is kept in code. See
+> `docs/TEAMS-SQUADS.md`. The models and SQL below are the original proposal, kept for the record.
 
 Today "assign to a group" offers Everyone or the athletes who already share a program name. A named group a coach keeps
 (a team, a class) needs two tables. **Not applied by this lane**: no edit to `prisma/schema.prisma`, no file in

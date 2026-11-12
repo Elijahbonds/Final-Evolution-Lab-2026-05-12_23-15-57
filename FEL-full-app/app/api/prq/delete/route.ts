@@ -3,8 +3,8 @@ import { readWallet } from '@/lib/wallet/wallet-service';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { postLc } from '@/lib/ledger';
-import { erasePrqData, erasureReason } from '@/lib/prq-data-rights';
+import { recordErasureEvent } from '@/lib/data-rights/rights';
+import { erasePrqData, erasureReason, movementRowsErased } from '@/lib/prq-data-rights';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,12 +19,14 @@ export async function POST() {
   // one transaction. A bought workout plan survives: WorkoutPlan.scanId is SetNull (lib/prq-data-rights.ts).
   const erased = await prisma.$transaction((tx) => erasePrqData(tx, userId));
 
-  if (erased.prqEntries > 0 || erased.movementHistory > 0) {
-    // Ledger the deletion as an event (wallet untouched)
+  // DATA-RIGHTS-SWEEP: the movement count includes the readiness jump checks and filmed-set form reviews (pending tables)
+  if (erased.prqEntries > 0 || movementRowsErased(erased) > 0) {
+    // Ledger the deletion as an event (wallet untouched). DATA-RIGHTS-SWEEP: a CreditLedger event row, not postLc —
+    // postLc's double-entry mirror refuses a zero posting, so this answered 500 after every real erase
+    // (lib/data-rights/rights.ts recordErasureEvent has the measurement).
     const walletView = await readWallet(prisma, userId);   // pass 5 phase 1
-    await postLc(prisma, {
+    await recordErasureEvent(prisma, {
       userId,
-      amount: 0,
       reason: erasureReason(erased),
       balanceAfter: walletView.lc,
       dedupeKey: `prq-erase:${userId}:${Date.now()}`,
@@ -32,5 +34,5 @@ export async function POST() {
   }
 
   // `deleted` stays the PRQ entry count it always was; `history` is the movement-history rows
-  return NextResponse.json({ ok: true, deleted: erased.prqEntries, history: erased.movementHistory });
+  return NextResponse.json({ ok: true, deleted: erased.prqEntries, history: movementRowsErased(erased) });
 }

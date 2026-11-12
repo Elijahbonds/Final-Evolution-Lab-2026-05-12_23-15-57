@@ -80,7 +80,7 @@ describe('every pattern gets a warm-up, in the Wake-Up\'s own order, inside its 
       const gated = (!!input.isYouth && !input.coachAssignedImpact) || (!!input.painDecision && STOPS.includes(input.painDecision));
       for (const id of WAKE_UP_BY_MINUTES[input.minutes]) {
         const ph = WAKE_UP.phases.find((x) => x.id === id)!;
-        if (!phaseImpact(ph) || !gated) expect(ids, `${id} ${JSON.stringify(input)}`).toContain(id);
+        if (!phaseImpact(ph) || !(gated || (input.isYouth && ph.adultOnly))) expect(ids, `${id} ${JSON.stringify(input)}`).toContain(id);
       }
       // a rock-and-hold whenever the Wake-Up leaves a stretch's worth of room (an adult's 10 is the Wake-Up alone)
       const wakeSec = p.steps.filter((s) => s.kind === 'wake_up').reduce((t, s) => t + s.seconds, 0);
@@ -168,7 +168,7 @@ describe('youth never gets a jump or a landing unless a coach assigned it (owner
 
   it('with a coach\'s jump work in today\'s Prime, a youth athlete keeps the Wake-Up\'s jumps (and is told why)', () => {
     const p = gen({ isYouth: true, coachAssignedImpact: true, coachPrime: true, minutes: 14 });
-    expect(p.steps.filter((s) => s.impact).map((s) => s.id)).toEqual(['build-the-rhythm', 'prime-the-launch']);
+    expect(p.steps.filter((s) => s.impact).map((s) => s.id)).toEqual(['prime-the-launch']);
     expect(p.notes.map((n) => n.id)).toEqual(expect.arrayContaining(['coach_impact', 'coach_prime']));
     expect(p.notes.map((n) => n.id)).not.toContain('youth_impact');
     // MIRROR-COACH P6 FIX (2026-09-29, review minor): this line pinned the OPPOSITE — youth + coachAssignedImpact with no
@@ -177,7 +177,7 @@ describe('youth never gets a jump or a landing unless a coach assigned it (owner
     // future caller. A coach's jump work keeps the Wake-Up's own jumping phases; FEL's primer for a minor is the calm one.
     const noPrime = gen({ isYouth: true, coachAssignedImpact: true });
     expect(noPrime.steps.find((s) => s.kind === 'primer')!.id).toBe('fast-squat-primer');
-    expect(noPrime.steps.filter((s) => s.impact).map((s) => s.id)).toEqual(['build-the-rhythm', 'prime-the-launch']);
+    expect(noPrime.steps.filter((s) => s.impact).map((s) => s.id)).toEqual(['prime-the-launch']);
     expect(heldBackLines(noPrime).join(' ')).not.toMatch(/wait for your coach/);
   });
 
@@ -508,7 +508,7 @@ describe('today\'s inputs', () => {
       expect(item.coaching.jumpLand, row.name).toBe(true);
       const inputs = sessionWarmupInputs([item, squat]);
       const p = generateWarmup({ pattern: inputs.pattern, weakestZone: null, minutes: 14, isYouth: true, painDecision: null, readiness: null, coachAssignedImpact: inputs.coachAssignedImpact, coachPrime: inputs.coachPrime });
-      expect(p.steps.filter((s) => s.impact).map((s) => s.id), row.name).toEqual(['build-the-rhythm', 'prime-the-launch']);
+      expect(p.steps.filter((s) => s.impact).map((s) => s.id), row.name).toEqual(['prime-the-launch']);
       expect(p.notes.map((n) => n.id)).toContain('coach_impact');
     }
   });

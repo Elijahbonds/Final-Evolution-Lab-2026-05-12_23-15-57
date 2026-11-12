@@ -80,6 +80,7 @@ import { BODY_FIGHT } from '../combat/bodyFightFlags';
 import { readBodyKicks } from '@/lib/move/bodyPlayChoice';
 import type { BodyEvent } from '@/lib/pose/BodyReader';
 import type { BodyView } from '../core/ModeHarness';
+import { applyInertialBlend } from '../anim/inertialize';   // GAMEPLAY-CLEAN P2 #2
 
 let modeVenue: VenueHandle | null = null;   // ship pass 4: the mounted venue spec, disposed with the mode
 
@@ -817,6 +818,7 @@ export const ShowdownMode: ModeDefinition = (() => {
       meMove = new CombatMovement(); foeMove = new CombatMovement();
       meDef = new DefenseController(); foeDef = new DefenseController();
       meAnim = new CombatAnimTree(player.animator); foeAnim = new CombatAnimTree(rival.animator);
+      applyInertialBlend(player.animator, 'measured');   // SWITCH-ON: on by default here (anim.inertialModesOn; 0 = linear, as before)   // GAMEPLAY-CLEAN P2 #2: AF-1 inertial transitions behind anim.inertial (default off: linear, unchanged)
       // CHI is the exertion signal here rather than guard: in this mode the meter you spend IS the effort,
       // and a fighter who has emptied it should carry himself like someone who just spent it.
       mePosture = mountPostureLayer(ctx.scene, player.skeleton, player.root, () => feedFor(meBio, () => rival, meMotion, 1 - chakra.value / CHI_MAX), 'SHOW-PP');

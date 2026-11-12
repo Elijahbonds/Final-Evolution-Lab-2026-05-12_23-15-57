@@ -179,6 +179,8 @@ Generated from lib/screen/PROPOSED-thresholds.ts (THRESHOLDS_VERSION `jump-scree
 | `calib.frontMs` | Standing still facing the camera | §3.3 | 3000 | ms | spec [TUNE-EJ] |  | no | |
 | `calib.sideMs` | Standing still side-on | §3.3 | 2000 | ms | spec [TUNE-EJ] |  | no | |
 | `calib.maxSway` | Lane default: hip sway allowed during a calibration hold | §3.3 | 0.02 | body-height fraction | spec [TUNE-EJ] |  | no | |
+| `vertical.standDrift` | Lane default (VERTICAL-EASY): arms-free jump refused when the feet before take-off sit this far from the stand's floor line (bench max 0.021; the owner's recorded take after 40 cm of travel 0.161) | §4 T5 | 0.08 | body-height fraction | spec [TUNE-EJ] |  | no | |
+| `calib.swayFallback` | Lane default (VERTICAL-EASY): sway allowed once a front stand has been refused (landmark jitter alone reads 0.016 at the bench's realistic noise, 0.03 at 2×) | §3.3 | 0.05 | body-height fraction | spec [TUNE-EJ] |  | no | |
 | `calib.accept` | Lane default: a hold counts when it spans 90% of its time with 60% of its frames usable (at least 5), and the body is over 0.2 of the image tall (moved from calibration.ts) | §3.3 | spanShare 0.9 · frameShare 0.6 · minFrames 5 · minBodyHeight 0.2 | share / frames / image height | spec [TUNE-EJ] |  | no | |
 | `geom.heelRise` | Heel lifts above its calibrated floor line by more than this | §3.2 | 0.015 | body-height fraction | spec [TUNE-EJ] |  | no | |
 | `geom.lensHfovDeg` | Lane default: lens width the FPPA parallax correction assumes (a knee moving toward the lens) | §3.2 | 60 | deg | spec [TUNE-EJ] |  | no | |

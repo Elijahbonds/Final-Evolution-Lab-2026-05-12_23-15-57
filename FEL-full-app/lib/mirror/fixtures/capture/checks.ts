@@ -33,8 +33,7 @@ import { KinematicEngine } from '@/lib/babylon/nexus/neuro-mirror/rules/kinemati
 import { DEFAULT_THRESHOLDS, type KinematicThresholds } from '@/lib/babylon/nexus/neuro-mirror/rules/config';
 import { auditSquat } from '../../squatPattern';
 import { auditLunge, LungeAudit, LUNGE_THRESHOLDS } from '../../lungeAudit';
-import { lungePhaseToMovement } from '../../lungeStage';
-import { RepCounter } from '@/lib/babylon/nexus/neuro-mirror/rules/rep-counter';
+import { LungeRepCounter } from '../../lungeReps';
 import { auditHinge, HINGE_THRESHOLDS } from '../../hingeAudit';
 import { auditPushup, PUSHUP_THRESHOLDS } from '../../pushupAudit';
 import { PRESS_ROW_PERSIST_FRAMES, pressRowFrameFaults, type PressRowFault } from '../../pressRowStage';
@@ -395,16 +394,16 @@ export function repsCounted(take: CapturedTake, s: Session): RepCount[] {
 }
 
 /**
- * The Mirror's lunge tab: reps as the harness counts them, the live LungeAudit's phase through the reused RepCounter
+ * The Mirror's lunge tab: reps as the harness counts them, the live LungeAudit's read through lungeReps.ts LungeRepCounter
  * (mirror-harness.tsx's lunge branch; one set, one counter). The per-side stage gating on top is not replayed.
  */
 export function lungeReps(frames: readonly PoseFrame[]): number {
   const audit = new LungeAudit();
-  const counter = new RepCounter();
+  const counter = new LungeRepCounter();
   let n = 0;
   for (const f of adapter(frames)) {
     const read = audit.evaluate({ landmarks: f.landmarks, timestampMs: f.timestampMs, present: f.present });
-    if (counter.feed(lungePhaseToMovement(read.phase), f.timestampMs)) n++;
+    if (counter.feed(read, f.timestampMs)) n++;
   }
   return n;
 }

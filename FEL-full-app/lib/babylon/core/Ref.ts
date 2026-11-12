@@ -25,6 +25,7 @@ export type RuleId =
   | 'and_one'
   | 'loose_ball_foul'
   | 'reach_in'
+  | 'hand_check'
   | 'three_seconds'
   | 'shot_clock'
   | 'goaltending'
@@ -133,6 +134,17 @@ export const HANDBOOK: readonly RuleEntry[] = [
     shots: 0,
     whistle: true,
     says: 'A defender who reaches through the handler rather than at the ball. The handler keeps it.',
+  },
+  {
+    // lane/hoops-round2 HOP-04 (owner 2026-10-20: "hand-checks (too many = foul)"): counted in hoops/handCheck
+    id: 'hand_check',
+    call: 'HAND-CHECK',
+    award: 'offense',
+    deadBall: true,
+    shots: 0,
+    whistle: true,
+    says: 'A forearm on the handler\'s hip is defence; putting it back on him again and again is not. Too many hand-checks in a '
+      + 'few seconds and the handler keeps the ball.',
   },
   {
     id: 'three_seconds',
@@ -277,6 +289,15 @@ export function shotFoul(made: boolean): RuleId {
  */
 export function isGoaltending(ballVelY: number, ballY: number, rimY: number): boolean {
   return ballVelY < -0.2 && ballY > rimY;
+}
+
+/**
+ * GOALTENDING NEEDS A TOUCH (owner 2026-10-20, HOOPS DEFENSE; 1v1 / 3v3 ten-phase pass, phase 2). The modes called it on "I am off the
+ * floor near the rim while their ball falls above the ring" — a jump that never came near the ball was goaltending. Now the call also
+ * needs `touched`: the defender's hand on the ball that frame (hoops/blocks handOnBall). The rule's own read is unchanged.
+ */
+export function isGoaltendTouch(touched: boolean, ballVelY: number, ballY: number, rimY: number): boolean {
+  return touched && isGoaltending(ballVelY, ballY, rimY);
 }
 
 /** Seconds an offensive body may stand in the paint before the ref calls it. */

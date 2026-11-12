@@ -248,6 +248,11 @@ export class DunkReplayRecorder {
         let left = rt, s = 0;
         while (s < segs.length && left > segs[s].dur) { left -= segs[s].dur; s++; }
         const frozen = s >= segs.length;
+        // DUNK-FLAGSHIP Phase 8: NO POSTER, NO POSTER CAMERA. With no freeze (an ordinary make) the clock running past the last cut
+        // still took the poster's camera for the one frame before finish() — and finish() hands the live root back, so that frame
+        // drew the poster's low shot of an empty rim with the dunker on the floor out of it (measured: 1 frame of 188, on every
+        // ordinary make, a cut nobody authored). The cut simply ends.
+        if (frozen && freeze <= 0) { finish(); return; }
         const newCut = s !== seg;   // a hard cut jumps the clock: the ball goes straight to its place, no ease across the cut
         if (newCut) {
           seg = s; this.cutNow = s;

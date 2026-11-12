@@ -77,7 +77,7 @@ export function UploadPicker({ onFile, style }: { onFile: (f: File) => void; sty
             onFile(f);
           }} />
       </label>
-      <span data-qa="upload-hint" style={{ fontSize: 11, opacity: 0.7, flexBasis: '100%' }}>{UPLOAD_HINT}</span>
+      <span data-qa="upload-hint" style={{ fontSize: 12, opacity: 0.7, flexBasis: '100%' }}>{UPLOAD_HINT}</span>
       {/* CREATE HUB (owner 2026-10-06): the owner's review queue is the "online review" decision #15 waited for, so the
           off-device door is open (uploadPrivacy.ts UPLOAD_DOORS) and the file you ticked can be submitted as a track. */}
       {lastFile && UPLOAD_DOORS.offDevice && (

@@ -89,6 +89,7 @@ import type { BodyEvent } from '@/lib/pose/BodyReader';
 import type { BodyView } from '../core/ModeHarness';
 import { boneNode } from '../anim/boneLookup';
 import { rampFighterVel } from '../core/fighterRamp';
+import { applyInertialBlend } from '../anim/inertialize';   // GAMEPLAY-CLEAN P2 #2
 
 type Phase = 'loadout' | 'fighting' | 'roundOver' | 'matchOver';
 type Loadout = 'fists' | 'staff';
@@ -906,6 +907,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
       installSafePlay(rival.animator, 'mixedcombat-rival');
       ctx.groundLock?.track(rival.root, rival.skeleton);
       meAnim = newFighterAnim(new CombatAnimTree(player.animator));
+      applyInertialBlend(player.animator, 'measured');   // SWITCH-ON: on by default here (anim.inertialModesOn; 0 = linear, as before)   // GAMEPLAY-CLEAN P2 #2: AF-1 inertial transitions behind anim.inertial (default off: linear, unchanged)
       foeAnim = newFighterAnim(new CombatAnimTree(rival.animator));
       meAnim.tree.onSettle = (st) => { if (st.startsWith('strike_')) endStrike(true); };
       // phase 6 seam: when does the rival's swing land? (−1 = nothing in flight) — the probe's perfect-dodge / parry driver reads it

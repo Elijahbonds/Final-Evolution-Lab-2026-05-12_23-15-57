@@ -34,6 +34,7 @@ import { mountVenueMap } from '../visual/VenueMaps';
 import { buildCrowdStand, fieldMaterial } from '../visual/PlacePack';
 import { spawnMeshyProp } from '../visual/meshyProps';
 import { RIM_HEIGHT_M, DUNK_RIM_RADIUS, HOOP } from '../core/courtDims';
+import { quietCanvas } from '../core/canvasA11y';
 
 // ── spec ──────────────────────────────────────────────────────────────────
 
@@ -1281,6 +1282,8 @@ export function buildNexusScene(scene: Scene, spec: NexusWebSpec, canvas?: HTMLC
 /** Convenience for a standalone page or a render harness. */
 export function mountNexus(canvas: HTMLCanvasElement, spec: NexusWebSpec): { engine: Engine; scene: Scene; built: BuiltScene } {
   const engine = new Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
+  // SCREEN-FIXES (2026-11-10): named, and out of the Tab order (Babylon makes it 1): lib/babylon/core/canvasA11y.ts
+  quietCanvas(engine, canvas, 'A 3D map preview');
   const scene = new Scene(engine);
   const built = buildNexusScene(scene, spec, canvas);
   engine.runRenderLoop(() => scene.render());

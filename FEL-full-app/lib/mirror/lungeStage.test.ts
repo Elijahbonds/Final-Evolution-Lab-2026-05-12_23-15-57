@@ -150,7 +150,7 @@ describe('lungeSideResult: the per-side result the review card reads', () => {
   it('a side never reached says so', () => {
     const r = lungeSideResult(initialLungeSession(), 'right');
     expect(r.reps).toBe(0);
-    expect(r.line).toMatch(/not reached/i);
+    expect(r.line).toMatch(/not done/i); // test changed: copy rewrite (CUE-REWRITE) — same meaning
   });
 
   it('an unreadable side is reported as such, not as a clean 0-fault set', () => {
@@ -161,7 +161,7 @@ describe('lungeSideResult: the per-side result the review card reads', () => {
     };
     const r = lungeSideResult(s, 'left');
     expect(r.unreadable).toBe(true);
-    expect(r.line).toMatch(/not read/i);
+    expect(r.line).toMatch(/not checked/i); // test changed: copy rewrite (CUE-REWRITE) — same meaning
   });
 
   it('a clean, readable side reports its rep count and no faults', () => {
@@ -174,7 +174,7 @@ describe('lungeSideResult: the per-side result the review card reads', () => {
     expect(r.unreadable).toBe(false);
     expect(r.reps).toBe(8);
     expect(r.faultRepCounts).toEqual({});
-    expect(r.line).toMatch(/no faults/i);
+    expect(r.line).toMatch(/nothing to fix/i); // test changed: copy rewrite (CUE-REWRITE) — same meaning
   });
 
   it('a faulted side counts how many REPS carried each fault, not how many frames', () => {

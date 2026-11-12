@@ -8,7 +8,7 @@ import {
 
 function ExternalLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer" className="text-[#00E5FF] hover:underline">
+    <a href={href} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 min-w-11 items-center text-[#00E5FF] hover:underline">
       {children}
     </a>
   );
@@ -30,8 +30,8 @@ function Entry({ c }: { c: Credit }) {
         {c.link ? <ExternalLink href={c.link}>{c.title}</ExternalLink> : c.title}
       </h3>
       <p className="mt-0.5 text-xs text-white/50">{c.by}</p>
-      <p className="mt-2 text-sm text-white/70">{c.used}</p>
-      <p className="mt-2 text-xs text-white/50">
+      <p className="mt-2 text-base text-white/70">{c.used}</p>
+      <p className="mt-2 text-base text-white/50">
         Licence: <Licence c={c} />
         {c.notice ? <> · acknowledgement above</> : null}
       </p>
@@ -44,7 +44,7 @@ export function CreditsList({ credits = CREDITS }: { credits?: Credit[] }) {
   return (
     <div>
       <h1 className="fel-heading text-3xl font-bold text-white">CREDITS &amp; LICENCES</h1>
-      <p className="mt-2 text-sm text-white/50">
+      <p className="mt-2 text-base text-white/60">
         Final Evolution Lab is built on other people’s work as well as our own. These are the outside assets, models,
         motion, voices, typefaces and engines the app ships, what each is used for, and the licence it comes under.
         {/* HOTFIX (2026-09-24): not "every outside source", which would overclaim: the npm libraries the app is built
@@ -53,12 +53,12 @@ export function CreditsList({ credits = CREDITS }: { credits?: Credit[] }) {
 
       {notices.length > 0 ? (
         <section aria-labelledby="credits-required" className="mt-6 fel-panel rounded-xl p-6">
-          <h2 id="credits-required" className="fel-heading text-lg font-bold text-white">Required acknowledgements</h2>
+          <h2 id="credits-required" className="fel-heading text-[20px] font-bold text-white">Required acknowledgements</h2>
           <ul className="mt-3 space-y-3">
             {notices.map((c) => (
               <li key={c.id}>
                 <p className="text-xs text-white/50">{c.title}</p>
-                <blockquote className="mt-1 border-l-2 border-[#A855F7]/40 pl-3 text-sm text-white/80">{c.notice}</blockquote>
+                <blockquote className="mt-1 border-l-2 border-[#A855F7]/40 pl-3 text-base text-white/80">{c.notice}</blockquote>
               </li>
             ))}
           </ul>
@@ -70,7 +70,7 @@ export function CreditsList({ credits = CREDITS }: { credits?: Credit[] }) {
         if (list.length === 0) return null;
         return (
           <section key={s} aria-labelledby={`credits-${s}`} className="mt-6 fel-panel rounded-xl p-6">
-            <h2 id={`credits-${s}`} className="fel-heading text-lg font-bold text-white">{SECTION_TITLES[s]}</h2>
+            <h2 id={`credits-${s}`} className="fel-heading text-[20px] font-bold text-white">{SECTION_TITLES[s]}</h2>
             <ul className="mt-3">
               {list.map((c) => <Entry key={c.id} c={c} />)}
             </ul>
@@ -78,9 +78,9 @@ export function CreditsList({ credits = CREDITS }: { credits?: Credit[] }) {
         );
       })}
 
-      <p className="mt-6 text-center text-xs text-white/40">
+      <p className="mt-6 text-center text-xs text-white/50">
         Something missing or wrong? Write to{' '}
-        <a href="mailto:support@finalevolutionlab.com" className="text-[#00E5FF] hover:underline">support@finalevolutionlab.com</a>.
+        <a href="mailto:support@finalevolutionlab.com" className="inline-flex min-h-11 items-center text-[#00E5FF] hover:underline">support@finalevolutionlab.com</a>.
       </p>
     </div>
   );

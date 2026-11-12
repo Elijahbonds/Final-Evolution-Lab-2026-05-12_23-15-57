@@ -12,6 +12,7 @@ import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { SessionContext } from 'next-auth/react';
 import { ArrowRight, Check, X } from 'lucide-react';
+import { TYPE, lineSize } from '@/lib/design/type';
 import type { PlanItem } from '@/lib/knowledge/scheduler';
 import type { LearnState } from '@/lib/knowledge/state';
 import type { Card } from '@/lib/knowledge/types';
@@ -108,11 +109,13 @@ export function LearnWhileYouWait({ compact = false, className = '' }: { compact
       onPointerDown={(e) => e.stopPropagation()}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/45">Learn while you wait</span>
-        <span className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: accent }}>{topic.label}</span>
+        <span className="text-[12px] font-bold uppercase tracking-[0.18em] text-white/50">Learn while you wait</span>
+        <span className="text-[12px] font-bold uppercase tracking-[0.14em]" style={{ color: accent }}>{topic.label}</span>
       </div>
       <p className="mt-1.5 text-[14px] font-bold leading-snug text-white">{card.type === 'fact' ? `Did you know? ${headline}` : headline}</p>
-      {text && <p className="mt-1 text-[12.5px] leading-snug text-white/70">{text}</p>}
+      {/* SCREEN-FIXES (2026-11-10): on the type scale (it was 12.5 px, off it, on every game's start screen): a line of more
+          than 12 words is body copy and reads at 16 px, a shorter one at the 14 px supporting size. Size only. */}
+      {text && <p data-learn-text className={`mt-1 ${lineSize(text)} text-white/70`}>{text}</p>}
 
       {card.type === 'quiz' && (
         <div className="mt-2 grid gap-1.5">
@@ -120,7 +123,7 @@ export function LearnWhileYouWait({ compact = false, className = '' }: { compact
             const tone = picked === null ? 'idle' : authored === card.answer ? 'right' : authored === picked ? 'wrong' : 'dim';
             return (
               <button key={authored} type="button" disabled={picked !== null} onClick={() => answer(authored)}
-                className="flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left text-[12.5px] font-semibold"
+                className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left ${TYPE.small} font-semibold`}
                 style={{
                   borderColor: tone === 'right' ? '#3DDC97' : tone === 'wrong' ? '#FF6A5B' : 'rgba(255,255,255,0.12)',
                   color: tone === 'dim' ? 'rgba(255,255,255,0.4)' : '#fff',
@@ -134,10 +137,10 @@ export function LearnWhileYouWait({ compact = false, className = '' }: { compact
         </div>
       )}
 
-      {topic.notAdvice && <p className="mt-1.5 text-[10.5px] text-amber-200/60">{mods.topics.NOT_ADVICE_LINE[topic.notAdvice]}</p>}
+      {topic.notAdvice && <p className="mt-1.5 text-[12px] text-amber-200/60">{mods.topics.NOT_ADVICE_LINE[topic.notAdvice]}</p>}
 
       <div className="mt-2.5 flex items-center justify-between gap-2">
-        <button type="button" onClick={next} className="rounded-full bg-white/10 px-3 py-1 text-[12px] font-bold text-white hover:bg-white/20">
+        <button type="button" onClick={next} className="inline-flex min-h-11 items-center rounded-full bg-white/10 px-3 text-[12px] font-bold text-white hover:bg-white/20">
           {card.type === 'quiz' && picked === null ? 'Skip' : 'Next card'}
         </button>
         {!compact && (

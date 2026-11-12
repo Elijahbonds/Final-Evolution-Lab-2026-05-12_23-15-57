@@ -17,6 +17,8 @@ import { OFF_DAY_ITEMS, OFF_DAY_KIND, OFF_DAY_LABEL, offDayWouldRewind } from '.
 import { TREE_INCLUDE, toTree } from './server';
 import { moveWithinSection, sessionWarnings, type SessionWarning } from './structure';
 import { EMPTY_LOG_WHERE, logHasContent } from './setLog';
+// COACH-PARITY (2026-10-26): the paste-a-program import's confirmed write (one delegating branch below)
+import { applyImport, LIBRARY_DEPS, type ApplyDeps } from './import/apply';
 import { PIN_EXERCISE, bandAllowed, youthRules } from './taxonomy';
 
 export type BuilderDb = Pick<PrismaClient, 'coachingProgram' | 'programExercise' | 'session' | 'sessionExercise' | 'exerciseLog' | 'facilitatorProfile' | 'user' | 'clientSession'>;
@@ -25,7 +27,7 @@ export type BuilderResult<T> = ({ ok: true } & T) | { ok: false; status: number;
 const fail = (status: number, error: string) => ({ ok: false as const, status, error });
 
 /** POST /api/coach/programs/:id/exercises — one builder action by the program's certified coach. */
-export async function builderAction(db: BuilderDb, userId: string, programId: string, body: Record<string, unknown>): Promise<BuilderResult<{ tree: ProgramTree }>> {
+export async function builderAction(db: BuilderDb, userId: string, programId: string, body: Record<string, unknown>, importDeps: ApplyDeps = LIBRARY_DEPS): Promise<BuilderResult<{ tree: ProgramTree }>> {
   const program = await db.coachingProgram.findUnique({ where: { id: programId }, select: { id: true, coachId: true, clientId: true } });
   if (!program) return fail(404, 'not_found');
   if (program.coachId !== userId) return fail(403, 'forbidden');
@@ -271,6 +273,11 @@ export async function builderAction(db: BuilderDb, userId: string, programId: st
       },
       select: { id: true },
     });
+  } else if (body.action === 'import_program') {
+    // COACH-PARITY (2026-10-26): the coach's confirmed paste-a-program review grid into this BLANK program — every rule
+    // (blank only, validateExerciseSpec, the coach's own catalogue, youth rules, one nested write) in lib/coach/import/apply.ts
+    const r = await applyImport(db, userId, program, body, importDeps);
+    if (!r.ok) return fail(r.status, r.at ? `${r.error}@${r.at}` : r.error);
   } else return fail(400, 'unknown_action');
 
   const full = await db.coachingProgram.findUnique({ where: { id: programId }, include: TREE_INCLUDE });

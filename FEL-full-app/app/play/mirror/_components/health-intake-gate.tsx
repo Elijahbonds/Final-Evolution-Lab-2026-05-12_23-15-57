@@ -89,15 +89,17 @@ async function fetchStatus(): Promise<StatusResponse> {
 }
 
 function GateShell({ children }: { children: ReactNode }) {
+  // EVERY-SCREEN P5: top-aligned, so the card grows downward when "Checking in…" becomes the form (centred, its top
+  // moved up: the rig measured a layout shift of 0.154 on /play/mirror)
   return (
-    <div className="flex min-h-[60vh] items-center justify-center p-6">
+    <div className="flex min-h-[60vh] items-start justify-center p-6 pt-10">
       <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/[0.04] p-5">{children}</div>
     </div>
   );
 }
 
 const primaryBtn =
-  'w-full rounded-xl bg-[#00E5FF] py-3 text-[15px] font-bold text-black disabled:opacity-50';
+  'w-full rounded-xl bg-[#00E5FF] py-3 text-[16px] font-bold text-black disabled:opacity-50';
 const quietBtn =
   'w-full rounded-xl border border-white/15 bg-transparent py-3 text-[14px] font-semibold text-white/70 disabled:opacity-50';
 // the consent screen's refusal (R-HEALTH-CLIENT, FE PM 19:56 PT): an outline, beside the primary agree
@@ -279,7 +281,7 @@ export function HealthIntakeGate({ children, canWriteHealth = false, localStatus
     return (
       <GateShell>
         <h2 className="text-[20px] font-black leading-tight text-white">One more thing first</h2>
-        <p className="mt-2 text-[13.5px] leading-snug text-white/70">
+        <p className="mt-2 text-[16px] leading-snug text-white/70">
           Because you&apos;re under 18 (or haven&apos;t told us your birth year yet), a parent or guardian needs to say
           it&apos;s OK before we can save this. Nothing you just answered was kept.
         </p>
@@ -294,7 +296,7 @@ export function HealthIntakeGate({ children, canWriteHealth = false, localStatus
     return (
       <GateShell>
         <h2 className="text-[20px] font-black leading-tight text-white">Before you continue</h2>
-        <p className="mt-2 text-[15px] font-semibold leading-snug text-[#FFB020]">{status.redFlagCopy}</p>
+        <p className="mt-2 text-[16px] font-semibold leading-snug text-[#FFB020]">{status.redFlagCopy}</p>
         <p className="mt-2 text-[12px] leading-snug text-white/50">This isn&apos;t a diagnosis — it&apos;s just a pause until you&apos;ve checked with a clinician.</p>
         <button type="button" disabled={busy} onClick={markCleared} className={`${quietBtn} mt-4`}>
           I&apos;ve checked — mark cleared
@@ -311,7 +313,7 @@ export function HealthIntakeGate({ children, canWriteHealth = false, localStatus
     return (
       <GateShell>
         <h2 className="text-[20px] font-black leading-tight text-white">Before you continue</h2>
-        <p className="mt-2 text-[15px] font-semibold leading-snug text-[#FFB020]">{RED_FLAG_COPY}</p>
+        <p className="mt-2 text-[16px] font-semibold leading-snug text-[#FFB020]">{RED_FLAG_COPY}</p>
         <p className="mt-2 text-[12px] leading-snug text-white/50">This isn&apos;t a diagnosis — it&apos;s just a pause until you&apos;ve checked with a clinician.</p>
         <p className="mt-2 text-[12px] leading-snug text-white/50">{NOTHING_SAVED_LINE}</p>
         <button type="button" onClick={markCleared} className={`${quietBtn} mt-4`}>
@@ -355,7 +357,7 @@ export function HealthIntakeGate({ children, canWriteHealth = false, localStatus
     return (
       <GateShell>
         <h2 className="text-[20px] font-black leading-tight text-white">{status.consent.title}</h2>
-        <ul className="mt-3 list-disc space-y-2 pl-5 text-[13.5px] leading-snug text-white/75">
+        <ul className="mt-3 list-disc space-y-2 pl-5 text-[16px] leading-snug text-white/75">
           {status.consent.bullets.map((b) => (
             <li key={b}><ConsentBulletText text={b} /></li>
           ))}
@@ -377,7 +379,7 @@ export function HealthIntakeGate({ children, canWriteHealth = false, localStatus
     return (
       <GateShell>
         {browserOnly && qIndex === 0 && <p className="mb-3 text-[12.5px] leading-snug text-white/60">{BROWSER_ONLY_LINE}</p>}
-        <p className="text-[12px] font-semibold uppercase tracking-wide text-white/40">
+        <p className="text-[12px] font-semibold uppercase tracking-wide text-white/50">
           Question {qIndex + 1} of {questions.length}
         </p>
         <h2 className="mt-2 text-[19px] font-black leading-tight text-white">{q.prompt}</h2>

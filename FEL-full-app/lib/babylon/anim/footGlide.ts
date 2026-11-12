@@ -27,6 +27,7 @@ import { Quaternion, Vector3 } from '@babylonjs/core';
 import type { Observer, Scene, Skeleton, TransformNode } from '@babylonjs/core';
 import { findBone } from './boneLookup';
 import { plantLeg } from './FootPlanting';
+import { legPole } from './legSink';
 import { animDt } from './motionLayers';
 
 /** A foot moving over the floor slower than this (m/s) is left where it is drawn: a planted foot, a settling one. (new) */
@@ -105,7 +106,7 @@ export function stepFoot(s: FootState, i: FootIn): { x: number; y: number; z: nu
   return out.y > i.c.y + 1e-4 || out.x !== i.c.x || out.z !== i.c.z ? out : null;
 }
 
-interface Leg { hip: TransformNode; knee: TransformNode; ankle: TransformNode; last: Vector3; seen: boolean; floor: number; s: FootState }
+interface Leg { hip: TransformNode; knee: TransformNode; ankle: TransformNode; pole: Vector3 | null; last: Vector3; seen: boolean; floor: number; s: FootState }
 const lq = (n: TransformNode): Quaternion => n.rotationQuaternion ?? Quaternion.FromEulerVector(n.rotation);
 const PER_SKELETON = new WeakMap<Skeleton, FootGlide>();
 
@@ -127,7 +128,7 @@ export class FootGlide {
   constructor(private scene: Scene, skeleton: Skeleton, private root: TransformNode) {
     for (const sd of ['Left', 'Right'] as const) {
       const hip = findBone(skeleton, `${sd}UpLeg`)?.getTransformNode(), knee = findBone(skeleton, `${sd}Leg`)?.getTransformNode(), ankle = findBone(skeleton, `${sd}Foot`)?.getTransformNode();
-      if (hip && knee && ankle) this.legs.push({ hip, knee, ankle, last: new Vector3(), seen: false, floor: NaN, s: footIdle() });
+      if (hip && knee && ankle) this.legs.push({ hip, knee, ankle, pole: null, last: new Vector3(), seen: false, floor: NaN, s: footIdle() });
     }
     this.obs = this.legs.length === 2 ? scene.onAfterAnimationsObservable.add(() => this.apply()) : null;
   }
@@ -167,7 +168,7 @@ export class FootGlide {
       const t = new Vector3(tgt.x, tgt.y, tgt.z); this.moved[i] = Vector3.Distance(t, ins[i].p);
       const chain = lq(l.hip).multiply(lq(l.knee)).multiply(lq(l.ankle));
       const bend = l.knee.getAbsolutePosition().subtract(l.hip.getAbsolutePosition().add(t).scale(0.5));
-      const miss = plantLeg(l.hip, l.knee, l.ankle, t, bend.lengthSquared() > 1e-4 ? bend.normalize() : fwd);
+      const miss = plantLeg(l.hip, l.knee, l.ankle, t, legPole(l, bend, this.root, fwd));   // hoops-p04b: legSink's pole (the clip's plane, held through straight)
       // a held foot the leg can no longer reach (the hips moved off it) steps from where the leg could put it
       if (l.s.mode === 'held' && miss > HELD_MISS_M) { l.ankle.computeWorldMatrix(true); const a = l.ankle.getAbsolutePosition(); l.s.mode = 'step'; l.s.t = 0; l.s.from = { x: a.x, y: a.y, z: a.z }; l.s.drawn = { ...l.s.from }; }
       // the foot keeps its turn (the hips did not move: its turn under the hips is its turn in the world)

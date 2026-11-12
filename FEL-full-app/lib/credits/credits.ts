@@ -16,6 +16,8 @@
 // an exact list: a new unlabeled entry fails the test, and so does a pending entry whose licence has been recorded.
 
 import { signedPdEntries, type PdEntry } from '../babylon/music/pdShelf';
+// G1(a) (Cyber A6): binjgb's upstream LICENSE, bundled as a string from the file itself (never retyped, never served).
+import BINJGB_LICENSE_TEXT from '../../third_party/binjgb/LICENSE?raw';
 
 /** CMU's required acknowledgement, word for word. The test fails if a character of it changes. */
 export const CMU_ACKNOWLEDGEMENT =
@@ -121,7 +123,7 @@ export const CREDITS: Credit[] = [
     section: 'motion',
     title: 'CMU Graphics Lab Motion Capture Database',
     by: 'Carnegie Mellon University',
-    used: 'Rival and style motion (combat, hoops, capoeira, tricking, parkour) and the body-reading test captures. We read the cgspeed BVH conversion and retarget it onto our rig.',
+    used: 'Basketball moves for the player and the rivals (the 29 bball_mc_* captures: dribbles, runs, slides, the jumpshot), 12 strikes for the rivals (karate_mc_jab, karate_mc_hook, karate_mc_roundhouse, karate_mc_high_kick, karate_mc_cross, karate_mc_uppercut, karate_mc_whirl, karate_mc_backspin, karate_mc_typhoon, karate_mc_hammer, karate_mc_heavy, karate_mc_rush), a football run, style motion (capoeira, tricking, parkour) and the body-reading test captures. We read the cgspeed BVH conversion and retarget it onto our rig.',
     licence: CMU_TERMS,
     status: 'terms',
     link: 'http://mocap.cs.cmu.edu/',
@@ -139,7 +141,7 @@ export const CREDITS: Credit[] = [
     section: 'motion',
     title: 'Universal Animation Library 2 (Standard)',
     by: 'Quaternius',
-    used: 'Hit reactions, knockdowns and get-ups for the rivals.',
+    used: 'Hit reaction, knockdown, get-up and stagger for the rivals (karate_mc_hit_react, karate_mc_knockdown, karate_mc_get_up, karate_mc_stagger).',
     licence: 'CC0 1.0',
     licenceUrl: OPEN_LICENCES['CC0 1.0'],
     status: 'open',
@@ -152,7 +154,7 @@ export const CREDITS: Credit[] = [
     section: 'motion',
     title: "The owner's own motion captures",
     by: 'Recorded by the owner, converted with DeepMotion Animate 3D',
-    used: 'Moves captured from the owner’s own videos: dunks, jumps, shots, and the golf, tennis, volleyball, baseball, football and board takes.',
+    used: 'Moves captured from the owner’s own videos: dunks, jumps, and the golf, tennis, volleyball, baseball, football and board takes.',
     licence: "Owner's own capture",
     status: 'first-party',
     recordedIn: ['scripts/mocap/sources.mts', 'scripts/mocap/_inventory.mts', 'docs/history/HUMAN-MODEL-RESEARCH.md'],
@@ -231,6 +233,23 @@ export const CREDITS: Credit[] = [
       'scripts/avatar/rivals.mts', 'scripts/avatar/mpfb/rival.py', 'public/models/rivals/*.json'],
     // HOTFIX (2026-09-24): models/_forge/ left this entry for 'fel': it holds the code-built FORGE hero, not a kit body.
     covers: ['models/skins/', 'models/fel-hero.glb', 'models/fel-hero.json', 'models/fel-hero.mobile.glb', 'models/candidates/', 'models/rivals/'],
+    manifestLicences: ['CC0 (MakeHuman community assets)'],
+  },
+  // DEMO-MODELS-1 (2026-11-09; owner "Yes full swap"): the coach body that replaces the Meshy scan behind DEMO_COACH_BODY_ENABLED
+  // and friends. Built on the MPFB2 builder body (the same topology and 22-bone rig as the kit bodies) with the owner's approved
+  // likeness (v7.2) and outfit C; files copied byte-for-byte from QC-coach-prep2 (sha256 051adcc0…7643 / e05d1822…9244).
+  {
+    id: 'coach-body',
+    section: 'models',
+    title: 'The coach body (MPFB2 builder body with the owner’s likeness)',
+    by: 'MakeHuman Community (MPFB2 builder body); likeness and outfit by the owner',
+    used: 'The coach and demo body: the owner’s own likeness on the MakeHuman builder body, with its hair, tee, shorts, socks and shoes.',
+    licence: 'CC0',
+    licenceUrl: OPEN_LICENCES.CC0,
+    status: 'open',
+    link: 'https://github.com/makehumancommunity/mpfb2',
+    recordedIn: ['lib/babylon/core/heroBody.ts', 'lib/babylon/core/demoModels.ts'],
+    covers: ['models/coach/'],
     manifestLicences: ['CC0 (MakeHuman community assets)'],
   },
   {
@@ -379,6 +398,24 @@ export const CREDITS: Credit[] = [
     manifestLicences: [],
   },
   {
+    // BINJGB-SHELF-1 (spec §3.2, Cyber G3/G5): the Homebrew Shelf's player, vendored at a pinned commit. Text only: no
+    // outbound link (G5). Served only while BINJGB_SHELF_ENABLED is on, by app/vendor/binjgb/[file]/route.ts (middleware
+    // 404s /vendor/binjgb/* otherwise). G1(a) (Cyber A6): the records live in third_party/binjgb/, outside public/, and the
+    // MIT notice is shown on /credits verbatim from that LICENSE file.
+    id: 'binjgb',
+    section: 'software',
+    title: 'binjgb',
+    by: 'Ben Smith (binji)',
+    used: 'Homebrew player: binjgb by Ben Smith (binji), MIT License.',
+    licence: 'MIT',
+    licenceUrl: OPEN_LICENCES.MIT,
+    status: 'open',
+    notice: BINJGB_LICENSE_TEXT,
+    recordedIn: ['third_party/binjgb/LICENSE', 'third_party/binjgb/VENDOR.md'],
+    covers: ['vendor/binjgb/'],
+    manifestLicences: [],
+  },
+  {
     id: 'mediapipe',
     section: 'software',
     title: 'MediaPipe Tasks Vision and the Pose Landmarker models',
@@ -461,16 +498,19 @@ export const CREDITS: Credit[] = [
     recordedIn: [
       'lib/babylon/audio/SoundKit.ts', 'lib/babylon/music/WalkOut.ts', 'scripts/backdrop/paint-beach-dome.py', 'scripts/venue/navmesh-gen.mts',
       'scripts/anim-audit.ts', 'scripts/avatar/forge.mts', 'scripts/avatar/roster.mts', 'docs/history/SHIP-PASS-3.md', 'docs/history/SHIP-PASS-6-LOOK.md',
+      'scripts/brand/make-app-icons.ts', 'public/models/props/smooth/CREDITS.md',
     ],
     evidence: [
       'models/_forge/: the FORGE hero and its roster, "built from nothing but code" (scripts/avatar/forge.mts, scripts/avatar/roster.mts), archived there 2026-09-04 (docs/history/SHIP-PASS-3.md)',
       'models/props/venice/: "the second writer\'s venice kit (far pier, three sail billboards)" (docs/history/SHIP-PASS-6-LOOK.md); the files are Blender boxes and cylinders (pier_deck, pier_post_*, sail_hull/mast/cloth) with flat materials and no textures',
+      'models/props/smooth/: VENUE-SMOOTH-1 (2026-10-29), the Venice market tent v2, modelled and textured on the box by the 3D Art lane with its own glbw.py writer (geometry and procedural stripe fabric; no outside source); listed in that folder\'s CREDITS.md',
       'og-image.png: the app\'s name and tagline in the brand colours over plain circles and lines; no outside imagery in it',
+      'icons/: the installable-app icons (192, 512, maskable 512, apple-touch 180), drawn from favicon.svg by scripts/brand/make-app-icons.ts (APP-FEEL, 2026-10-25); no outside imagery',
       'models/dragon/: the dragon ride partner (v5, phase4-swoop p4s5 LODs), built from scratch in free Blender 4.2.3 by the 3D Art lane (65-bone DR_ rig, clips, sculpt and bakes; sparse morphs by its own script); its build notes record "No Meshy GLB was opened or edited" and free tools only (fel-specs dragon-ride-build/phase4-power/README.md, phase4-detail/README.md)',
     ],
     covers: [
       'favicon.svg', 'models/navmesh/', 'anim-audit/', 'agent-manifest.json', 'backdrops/baked/beach.jpg',
-      'models/_forge/', 'models/props/venice/', 'og-image.png', 'models/dragon/',
+      'models/_forge/', 'models/props/venice/', 'models/props/smooth/', 'og-image.png', 'models/dragon/', 'icons/',
     ],
     manifestLicences: [],
   },
@@ -521,6 +561,8 @@ export function pdCredits(entries: readonly PdEntry[] = signedPdEntries()): Cred
 /** Files under public/ that are not assets, each with the reason. */
 export const NOT_ASSETS: Record<string, string> = {
   '_prisma/': 'the generated Prisma client, copied into public/ for the deploy bundle (docs/DEPLOY-NOTES-PRISMA.md): server code, not an asset',
+  'sw.js': 'the service worker (APP-FEEL, 2026-10-25): hand-written code served from the site root, not an asset',
+  'offline.html': 'the offline fallback page the service worker shows (APP-FEEL, 2026-10-25): FEL\'s own text, not an asset',
 };
 
 const matches = (path: string, cover: string) =>

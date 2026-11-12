@@ -9,7 +9,7 @@
 // the selection. The box is drawn here, in the DOM: a capture-phase listener on this wrapper takes the pointer before the
 // canvas (so the camera never starts an orbit under a box), and the viewport answers which objects the box framed.
 
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import type { StudioReplayAngle, StudioTransform, StudioVenue, V3 } from '@/lib/nexus-studio/doc';
 import type { BudgetSample } from '@/lib/nexus-studio/budget';
 import type { SnapSettings } from '@/lib/nexus-studio/snap';
@@ -49,6 +49,8 @@ export interface ViewportPanelProps {
   onPreviewEnd(): void;
   /** Track 3: the venue's cast, decoded — the viewport stands it on the hero's spot on the real rig. */
   cast?: ExportCast | null;
+  /** STUDIO-EASY: a card laid over the 3D view's top-left (the first-court guide), so it never covers a panel or a button. */
+  overlay?: ReactNode;
 }
 
 export const ViewportPanel = forwardRef<ViewportHandle, ViewportPanelProps>(function ViewportPanel(p, ref) {
@@ -161,14 +163,17 @@ export const ViewportPanel = forwardRef<ViewportHandle, ViewportPanelProps>(func
         const at = vp.groundAt(e.clientX - r.left, e.clientY - r.top) ?? vp.focusPoint();
         cbs.current.onDropItem(id, at);
       }}>
-      <canvas ref={canvasRef} className="absolute inset-0 h-full w-full outline-none" style={{ touchAction: 'none' }} tabIndex={0} aria-label="Venue viewport: drag to orbit, right-drag to pan, wheel to zoom, click to select, Shift- or Ctrl-click to add, Shift-drag to box-select" data-testid="studio-canvas" />
+      <canvas ref={canvasRef} className="absolute inset-0 h-full w-full outline-none focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[color:var(--fel-focus,#00E5FF)]" style={{ touchAction: 'none' }} tabIndex={0} aria-label="Venue viewport: drag to orbit, right-drag to pan, wheel to zoom, click to select, Shift- or Ctrl-click to add, Shift-drag to box-select" data-testid="studio-canvas" />
+      {p.overlay && <div className="pointer-events-none absolute inset-x-2 top-2 z-20 md:right-auto">{p.overlay}</div>}
       {box && (
         <div aria-hidden data-testid="select-box" className="pointer-events-none absolute border"
           style={{ left: Math.min(box.a.x, box.b.x), top: Math.min(box.a.y, box.b.y), width: Math.abs(box.b.x - box.a.x), height: Math.abs(box.b.y - box.a.y), borderColor: C.cyan, background: 'rgba(0,229,255,0.08)' }} />
       )}
       {status !== 'ready' && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px]" style={{ color: status === 'error' ? C.crimson : C.dim }}>
-          {status === 'error' ? `The viewport could not start: ${error}` : 'Building the venue on the mode’s own engine path…'}
+          {status === 'error'
+            ? <span className="max-w-sm px-4 text-center">The 3D view could not start. Reload the page to try again.<span className="mt-1 block text-[12px]" style={{ color: C.dim }}>{error}</span></span>
+            : 'Loading the court…'}
         </div>
       )}
     </div>

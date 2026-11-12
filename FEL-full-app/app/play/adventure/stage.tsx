@@ -26,6 +26,8 @@ import { RebindPanel } from '@/components/adventure/RebindPanel';
 import { AdventureRadial } from '@/components/adventure/AdventureRadial';
 
 const MODE_KEY = 'adventure';
+/** The route's name, as app/play/adventure/page.tsx titles it. */
+export const ADVENTURE_TITLE = 'The Adventure';
 
 type Gate = 'checking' | 'pick' | 'ready';
 
@@ -89,13 +91,16 @@ export function AdventureStoryStage({ signedIn }: { signedIn: boolean }) {
         input: bus,
         onPhase: (p, d) => { if (!disposed) { setPhase(p); if (p === 'error') setErr(String(d)); } },
         onHud: (h) => { if (!disposed) setHud((prev) => ({ ...prev, ...h })); },
+        // PUBLIC-POLISH (2026-11-02, live sweep D4): the server said who this is, so a guest's spawn does not ask the closet
+        // (a 401 and a console error for every guest; FIRST-DUNK-BUDGET's flag, as /try passes it)
+        guest: !signedIn,
         // account XP waits for the session route to take a new mode (Phase B report); the Adventure level is in the save
         resultSink: async () => {},
       }).then((s) => { if (disposed) s(); else stop = s; })
         .catch((e) => { if (!disposed) setErr(String(e?.message ?? e)); });
     }, 0);
     return () => { disposed = true; mountedRef.current = false; stop?.(); clearTimeout(startTimer); };
-  }, [gate]);
+  }, [gate, signedIn]);
 
   const start = () => busRef.current?.emit({ t: 'button', btn: 'START', pressed: true });
   const playing = phase === 'playing' || phase === 'countdown';
@@ -106,7 +111,9 @@ export function AdventureStoryStage({ signedIn }: { signedIn: boolean }) {
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none outline-none" />
       {gate === 'pick' && (
         <div className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-4 bg-black/85 p-4">
-          <p className="text-[10px] tracking-[0.3em] text-white/50">THE ADVENTURE [PLACEHOLDER]</p>
+          {/* PUBLIC-POLISH (2026-11-02, live sweep J5): the route's own name (its page title), not "[PLACEHOLDER]". The chapter,
+              move and monster names stay [PLACEHOLDER] until the owner names them (their own guards hold that). */}
+          <p className="text-[12px] tracking-[0.3em] text-white/50">{ADVENTURE_TITLE.toUpperCase()}</p>
           <PartnerPicker slots={slots} onPick={pick} />
           {err && <p className="text-red-400">{err}</p>}
         </div>
@@ -115,7 +122,7 @@ export function AdventureStoryStage({ signedIn }: { signedIn: boolean }) {
       {gate === 'ready' && playing && ui.dialogue && <DialogueBox d={ui.dialogue} cmd={storyUi.command} />}
       {gate === 'ready' && (phase === 'ready' || phase === 'loading') && (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-black/70 p-4">
-          <p className="text-[10px] tracking-[0.3em] text-white/50">THE ADVENTURE · {chapter?.title ?? ''}</p>
+          <p className="text-[12px] tracking-[0.3em] text-white/50">THE ADVENTURE · {chapter?.title ?? ''}</p>
           <Controls />
           <button type="button" disabled={phase !== 'ready'} onClick={(e) => { e.currentTarget.blur(); start(); }}
             className="rounded bg-[#00E5FF] px-6 py-2 font-bold text-black disabled:opacity-40">
@@ -126,7 +133,7 @@ export function AdventureStoryStage({ signedIn }: { signedIn: boolean }) {
       )}
       {phase === 'paused' && (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 overflow-y-auto bg-black/75 p-4">
-          <p className="text-[10px] tracking-[0.3em] text-white/50">PAUSED{ui.objective ? ` · ${ui.objective.toUpperCase()}` : ''}</p>
+          <p className="text-[12px] tracking-[0.3em] text-white/50">PAUSED{ui.objective ? ` · ${ui.objective.toUpperCase()}` : ''}</p>
           <div className="flex gap-2">
             <button type="button" data-testid="adventure-mirror-toggle" onClick={(e) => { e.currentTarget.blur(); storyUi.command.setMirror(!ui.mirror); }}
               className={`rounded px-3 py-1 font-bold ${ui.mirror ? 'bg-[#facc15] text-black' : 'bg-white/10'}`}>
@@ -136,7 +143,7 @@ export function AdventureStoryStage({ signedIn }: { signedIn: boolean }) {
               {rebind ? 'CONTROLS' : 'REBIND'}
             </button>
           </div>
-          {ui.mirror && <p className="max-w-md text-center text-[10px] text-white/50">Mirror: real punches, kicks, guards and slips charge your special (estimated engagement, never a measurement). Never required.</p>}
+          {ui.mirror && <p className="max-w-md text-center text-[12px] text-white/50">Mirror: real punches, kicks, guards and slips charge your special (estimated engagement, never a measurement). Never required.</p>}
           {rebind ? <RebindPanel onSaved={() => storyUi.command.reloadBindings()} /> : <Controls />}
           <button type="button" onClick={(e) => { e.currentTarget.blur(); start(); }} className="rounded bg-[#00E5FF] px-6 py-2 font-bold text-black">RESUME</button>
         </div>
@@ -157,14 +164,14 @@ function Controls() {
   const rows = buttonMap(MODE_KEY);
   return (
     <div className="max-h-[60vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-white/10 bg-black/60 p-3" data-testid="adventure-controls">
-      <p className="mb-2 text-[9px] font-black tracking-[0.3em] text-white/45">BUTTONS</p>
+      <p className="mb-2 text-[12px] font-black tracking-[0.3em] text-white/50">BUTTONS</p>
       <div className="mb-3 grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
         {rows.map((r) => (
           <p key={r.input + r.action} className="flex justify-between gap-2"><span className="text-white/50">{r.input}</span><span className="font-bold">{r.action}</span></p>
         ))}
       </div>
-      <table className="w-full text-left text-[10px]">
-        <thead className="text-white/40"><tr><th className="pr-2">ACTION</th><th className="pr-2">PAD</th><th className="pr-2">KEYS</th><th>TOUCH</th></tr></thead>
+      <table className="w-full text-left text-[12px]">
+        <thead className="text-white/50"><tr><th className="pr-2">ACTION</th><th className="pr-2">PAD</th><th className="pr-2">KEYS</th><th>TOUCH</th></tr></thead>
         <tbody>
           <tr className="border-t border-white/5"><td className="py-0.5 pr-2">STORY · FINISH A LINE · HOLD TO SKIP</td><td className="pr-2 text-white/70">A</td><td className="pr-2 text-white/70">SPACE · J</td><td className="text-white/70">TAP THE BOX</td></tr>
           {CONTROLS_SHEET.map((r) => (
@@ -185,7 +192,7 @@ function Hud({ hud }: { hud: Record<string, HudValue> }) {
   return (
     <>
       {s('objective') && (
-        <p className="pointer-events-none absolute left-3 top-3 z-10 max-w-[60vw] text-[11px] font-bold tracking-wide text-white/85"
+        <p className="pointer-events-none absolute left-3 top-3 z-10 max-w-[60vw] text-[12px] font-bold tracking-wide text-white/85"
           style={{ left: 'max(0.75rem, env(safe-area-inset-left))' }} data-testid="adventure-objective">◆ {s('objective')!.toUpperCase()}</p>
       )}
       <div className="pointer-events-none absolute right-3 top-3 z-10 w-56 space-y-1" style={{ right: 'max(0.75rem, env(safe-area-inset-right))' }} data-testid="adventure-hud">
@@ -195,8 +202,8 @@ function Hud({ hud }: { hud: Record<string, HudValue> }) {
         {hud.fusionOpen === true && (
           <Meter label="FU" fill={bar(n('fusion'), 100)} color="#a78bfa" text={n('fused') > 0 ? `FUSED ${n('fused')}s · T${n('tier')}` : `${n('fusion')}% · T${n('tier')}`} />
         )}
-        <p className="text-[10px] text-white/70">{`SLOT ${n('slot')}${s('spell') ? ` · ${s('spell')}` : ''}${s('partner') ? ` · PARTNER ${s('partner')!.toUpperCase()}` : ''}`}</p>
-        {s('lock') && <p className="text-[10px] font-bold text-[#e6fbff]">◎ {s('lock')}</p>}
+        <p className="text-[12px] text-white/70">{`SLOT ${n('slot')}${s('spell') ? ` · ${s('spell')}` : ''}${s('partner') ? ` · PARTNER ${s('partner')!.toUpperCase()}` : ''}`}</p>
+        {s('lock') && <p className="text-[12px] font-bold text-[#e6fbff]">◎ {s('lock')}</p>}
       </div>
     </>
   );
@@ -205,11 +212,11 @@ function Hud({ hud }: { hud: Record<string, HudValue> }) {
 function Meter({ label, fill, color, text }: { label: string; fill: string; color: string; text: string }) {
   return (
     <div className="flex items-center gap-1.5">
-      <span className="w-5 text-[9px] text-white/50">{label}</span>
+      <span className="w-5 text-[12px] text-white/50">{label}</span>
       <div className="relative h-2.5 flex-1 overflow-hidden rounded bg-white/10">
         <div className="absolute inset-y-0 left-0" style={{ width: fill, background: color }} />
       </div>
-      <span className="w-20 text-right text-[9px] text-white/70">{text}</span>
+      <span className="w-20 text-right text-[12px] text-white/70">{text}</span>
     </div>
   );
 }

@@ -48,6 +48,7 @@ import { HeatScore, scoreWave } from '../core/SurfHeat';
 import { BannerQueue, BANNER_PRIO } from '../core/BannerQueue';
 import { HudDelta } from './rideHud';
 import { Coyote } from '../core/gameFeel';
+import { applyInertialBlend } from '../anim/inertialize';   // GAMEPLAY-CLEAN-7
 import { fitToAir, skateAirBudget } from './skateScore';
 import {
   SURF_GRAB, surfGrabFor, grabFits, surfAirLeft, neutralCutSign, pocketBar, barrelVerdict, tubeRead, BuoyWatch, NEAR_MISS_PTS,
@@ -496,6 +497,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
       rig = await buildRig(ctx, CFG.heroUrl, new Vector3(0, 0, -50 + POCKET.min + 3), 0, world.ground, '#ffd75e', 'surfboard', { stickDown: 0.9, rayLength: 8, carveAccel: 9 * BOARD_PACE, maxSpeed: 16 * BOARD_PACE });   // WALLS + SPEED: +35% across the face
       tricks = new TrickMachine(rig, (h) => ctx.setHud(h), { momentum: trickMomentum, anim: 'external', onBeat: (b) => { if (b === 'land' || b === 'land_sketchy') { landBeatT = LAND_BEAT_SEC; lastLanding = b === 'land_sketchy' ? 'sketchy' : 'clean'; spray?.splash(rig.char.root.position, b === 'land' ? 0.5 : 0.8); } else { bailBeatT = BAIL_BEAT_SEC; spray?.splash(rig.char.root.position, 1); } } });
       animTree = new BoardAnimTree(rig.char.animator);
+      applyInertialBlend(rig.char.animator, 'surf');   // GAMEPLAY-CLEAN-7: on by default on the surfer (anim.inertialSurfOn; 0 = linear, as before)
       posture?.dispose();
       posture = mountPostureLayer(ctx.scene, rig.char.skeleton, rig.char.root, () => {
         const { window, pose, legs } = boardPose(bio);

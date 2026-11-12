@@ -37,6 +37,9 @@ import {
   swapPrescription, swappedLine, unreadGateAction, type GateAction, type GateRow,
 } from './protocolGate';
 import { coachAssignedProgram, loadLadder, loadProtocolFacts } from './protocolGateServer';
+// COACH-READINESS (2026-10-25): today's jump check — Low under the coach's "ease off" rule eases the work rows (never harder)
+import { applyTodayReadiness, type TodayReadinessNote } from './readiness/today';
+import type { TodayReadiness } from './readiness/types';
 
 // MIRROR-COACH P8 (2026-09-29): + the four tables the protocol gate reads (protocolGateServer.ts) — only touched when
 // today's session holds a gated item.
@@ -71,6 +74,8 @@ export interface TodayPayload {
      * lastTimeLine). Optional: an exercise never done before has no entry, and a payload without it reads as before.
      */
     lastTime?: Record<string, ProgressPoint>;
+    /** COACH-READINESS (2026-10-25): today's jump check read Low under this coach's rule — why, and what eased. Absent otherwise. */
+    readiness?: TodayReadinessNote;
   } | null;
   /** `cooldownDone` (MIRROR-COACH P6): the open session's automatic cool-down was already tapped done. */
   open: { id: string; logs: OpenLog[]; cooldownDone: boolean } | null;
@@ -153,7 +158,7 @@ function lastTimeFor(p: any, exercises: readonly TodayExercise[]): Record<string
 }
 
 /** GET /api/coach/me/today — the client's next session across their active programs, with the open log and recent coach comments. */
-export async function loadToday(db: TodayDb, userId: string, now: Date = new Date()): Promise<TodayPayload> {
+export async function loadToday(db: TodayDb, userId: string, now: Date = new Date(), extras: { readiness?: (coachId: string) => Promise<TodayReadiness | null> } = {}): Promise<TodayPayload> {
   // MIRROR-COACH P5 FIX (2026-09-29, code review): computed once, ahead of the program loop, so it lands in every
   // return below regardless of which one this call takes (a live session, a finished program, or no program at all —
   // a standing red flag should read as blocked on every one of those, not just the common case).
@@ -198,7 +203,11 @@ export async function loadToday(db: TodayDb, userId: string, now: Date = new Dat
 
     const exercises: TodayExercise[] = [];
     const held: TodayHeldItem[] = [];
-    for (const e of next.session.exercises) {
+    // COACH-READINESS: the route reads today's check (lib/coach/readiness/server.ts todayReadiness); a failed read serves as written
+    const coachName = coach?.name ?? coach?.email?.split('@')[0] ?? 'coach';
+    const rd = extras.readiness ? await extras.readiness(p.coachId).catch(() => null) : null;
+    const ready = applyTodayReadiness(next.session.exercises, rd, { youth, coachName, patternOf: (e) => (rows.get(e.id) as { pattern?: string | null } | undefined)?.pattern ?? null });
+    for (const e of ready.rows) {
       const a = actions.get(e.id);
       if (a && a.kind !== 'keep') {
         const { why, href } = a.unread ? { why: GATE_UNREAD_LINE, href: null } : athleteWhy(a.reasons);
@@ -219,7 +228,7 @@ export async function loadToday(db: TodayDb, userId: string, now: Date = new Dat
     }
 
     return {
-      program: { id: p.id, name: p.name, coachName: coach?.name ?? coach?.email?.split('@')[0] ?? 'coach' },
+      program: { id: p.id, name: p.name, coachName },
       today: {
         block: { id: next.block.id, order: next.block.order, label: next.block.label, targetDate: next.block.targetDate },
         session: {
@@ -230,6 +239,7 @@ export async function loadToday(db: TodayDb, userId: string, now: Date = new Dat
         index: next.index, total: next.total,
         week: { label: next.block.label, entries: weekView(next.block.sessions, done, next.session.id) },
         lastTime: lastTimeFor(p, exercises),
+        ...(ready.note ? { readiness: ready.note } : {}),
       },
       open: open ? { id: open.id, logs: open.exerciseLogs as unknown as OpenLog[], cooldownDone: !!open.cooldownDoneAt } : null,
       recentComments: recentComments.map((l) => ({ exercise: l.sessionExercise.exercise.name, comment: l.coachComment, at: l.coachCommentAt })),

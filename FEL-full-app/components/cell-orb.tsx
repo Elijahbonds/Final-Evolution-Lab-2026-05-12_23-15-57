@@ -97,7 +97,7 @@ export function CellOrb() {
               <div className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-[#C79BFF]" />
                 <span className="fel-heading text-sm font-bold text-white">CELL</span>
-                <span className="rounded bg-[#A855F7]/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[#C79BFF]">Nexus</span>
+                <span className="rounded bg-[#A855F7]/20 px-1.5 py-0.5 text-[12px] font-bold uppercase tracking-wider text-[#C79BFF]">Nexus</span>
               </div>
               <div className="flex items-center gap-1">
                 <Link href={CELL_STUDIO_HREF} className="rounded p-1 text-white/50 hover:text-white" aria-label="Open Creator Studio"><Maximize2 className="h-4 w-4" /></Link>
@@ -107,7 +107,7 @@ export function CellOrb() {
 
             <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
               {messages.length === 0 && (
-                <div className="mt-6 text-center text-xs text-white/40">
+                <div className="mt-6 text-center text-xs text-white/50">
                   <p className="mb-1 text-white/60">I&apos;m CELL, the Nexus construct.</p>
                   <p>Ask me to sketch a mode, a mechanic, or a training construct.</p>
                 </div>
@@ -127,7 +127,7 @@ export function CellOrb() {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
                 placeholder="Ask CELL…"
-                className="flex-1 rounded-lg border border-white/15 bg-black/40 px-3 py-2 text-xs text-white placeholder:text-white/30 focus:border-[#A855F7]/60 focus:outline-none"
+                className="flex-1 rounded-lg border border-white/15 bg-black/40 px-3 py-2 text-xs text-white placeholder:text-white/50 focus:border-[#A855F7]/60 focus:outline-none"
               />
               <button onClick={send} disabled={busy || !input.trim()} className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#A855F7] text-white transition hover:bg-[#9333EA] disabled:opacity-50">
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}

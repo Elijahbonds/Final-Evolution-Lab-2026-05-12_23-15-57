@@ -6,10 +6,18 @@ import { readFileSync } from 'node:fs';
 
 const src = (p: string): string => readFileSync(p, 'utf8');
 const code = (p: string): string => src(p).split('\n').filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join('\n');
-const PAGE = code('app/consent/guardian/page.tsx');
+// EVERY-SCREEN P6: the page's two lines moved word for word into lib/consent/guardian-copy.ts (marked as approved notices);
+// the page is what it renders, so the page and its copy are read together, and the page must render both lines
+const PAGE_ONLY = code('app/consent/guardian/page.tsx');
+const PAGE = `${PAGE_ONLY}\n${code('lib/consent/guardian-copy.ts')}`;
 const GATE = code('app/play/mirror/_components/guardian-consent-gate.tsx');
 
 describe('what the guardian page tells a player the OK unlocks', () => {
+  it('the page renders its two lines from the copy module', () => {
+    expect(PAGE_ONLY).toMatch(/\{CONSENT_DONE_LINE\}/);
+    expect(PAGE_ONLY).toMatch(/\{CONSENT_UNDER_18_LINE\}/);
+  });
+
   it('no screen promises the Mirror, pain check-ins or the daily check-in open with a guardian\'s OK', () => {
     expect(PAGE).not.toMatch(/are open now/);
     for (const s of [PAGE, GATE]) {

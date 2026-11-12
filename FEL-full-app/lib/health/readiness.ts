@@ -314,7 +314,7 @@ export const COACH_READINESS_WINDOW_MS = 36 * 3_600_000;
 /**
  * One client's latest check-in, as their coach may see it — or null, which means the board shows NOTHING for this
  * client: no consent, no check-in, or a check-in with nothing in it. Unlike a pain flag (lib/health/pain.ts
- * coachPainFlag, which says "Client paused an exercise" without consent because the coach has to know to adjust the
+ * coachPainFlag, which says "Athlete paused an exercise" without consent because the coach has to know to adjust the
  * program), a readiness check-in without consent is not the coach's business at all — not even that one exists.
  * `hasCoachViewConsent` is a live 'coach_view' grant for THIS coach, checked by the caller; the attention route also
  * never queries a non-consenting client's rows in the first place, so this is the second lock, not the only one.

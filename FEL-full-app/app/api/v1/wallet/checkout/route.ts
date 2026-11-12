@@ -6,6 +6,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { getStripe } from '@/lib/stripe';
 import { purchasesEnabledFromEnv } from '@/lib/wallet/purchases';
+import { allowlistPermits } from '@/lib/payments/allowlist';
 import { getCoinStorePack, coinStorePackTotal } from '@/lib/wallet/catalog';
 import { storeClosed } from '@/lib/coach-store/gate';
 import { siteOrigin } from '@/lib/stripe/site-origin';
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
   // STORE-READY B10: no key -> payments_not_set_up; key but VIRTUAL_PURCHASES_ENABLED off ->
   // virtual_purchases_off. Both are 409 store_closed, never 503, before anything else runs.
   if (!(process.env.STRIPE_SECRET_KEY ?? '').trim()) return storeClosed('payments_not_set_up');
-  if (!purchasesEnabledFromEnv()) return storeClosed('virtual_purchases_off');
+  if (!purchasesEnabledFromEnv() || !allowlistPermits('coins')) return storeClosed('virtual_purchases_off'); // + PURCHASES_ALLOWLIST (payments-ready)
 
   let body: any;
   try {

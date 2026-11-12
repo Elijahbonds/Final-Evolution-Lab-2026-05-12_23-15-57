@@ -35,6 +35,8 @@ export const PUBLIC_STATIC_PATHS = [
   '/privacy',
   '/terms',
   '/store-terms',
+  '/purchase-terms', // OWNER-APPROVALS 2026-10-27 (card C28)
+  '/coach-terms', // OWNER-APPROVALS 2026-10-27 (card C12)
 ] as const;
 
 /** Every public path: the static pages, each book's page and each approved team profile's page. */

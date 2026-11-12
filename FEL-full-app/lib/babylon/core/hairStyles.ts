@@ -7,6 +7,7 @@
 // and are never touched here. Pure mapping + a mesh visibility pass.
 
 import type { AbstractMesh } from '@babylonjs/core';
+import { isCoachHairName } from './demoModels';
 
 export type HairNodeKey = 'cap' | 'afro' | 'buzz' | 'bun' | 'ponytail' | 'braids' | 'hijab';
 export const HAIR_NODE_KEYS: readonly HairNodeKey[] = ['cap', 'afro', 'buzz', 'bun', 'ponytail', 'braids', 'hijab'];
@@ -65,6 +66,21 @@ export function applyHairStyle(meshes: AbstractMesh[], style: string | undefined
     if (!match) continue;
     found++;
     m.isVisible = match[1] === want;
+  }
+  return found;
+}
+
+/**
+ * DEMO-MODELS-1 (2026-11-09): the coach body (heroBody COACH_BODY_URL) carries its own hair as `CoachHair_<style>`, outside the forge's
+ * Hair_<key> set, so neither applyHairStyle nor the code-built hair ever hid it (QC-coach-prep2: "Bald or hood-up won't hide this
+ * hair"). Shows it, or hides it when the look says so. Returns the coach hair nodes found (0 on every other body: a no-op).
+ */
+export function applyCoachHairHide(meshes: AbstractMesh[], hide: boolean): number {
+  let found = 0;
+  for (const m of meshes) {
+    if (!isCoachHairName(m.name)) continue;
+    found++;
+    m.isVisible = !hide;
   }
   return found;
 }

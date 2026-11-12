@@ -24,17 +24,17 @@ export default async function SupportPage() {
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[#00E5FF]/10 border border-[#00E5FF]/30">
               <Mail className="h-5 w-5 text-[#00E5FF]" />
             </div>
-            <div>
-              <h2 className="fel-heading text-lg font-bold text-white">Contact Us</h2>
+            <div className="min-w-0">
+              <h2 className="fel-heading text-[20px] font-bold text-white">Contact Us</h2>
               <a
                 href={`mailto:${BUSINESS_CONTACT_EMAIL}`}
-                className="font-mono text-sm text-[#00E5FF] hover:underline"
+                className="inline-flex min-h-11 items-center font-mono text-sm text-[#00E5FF] [overflow-wrap:anywhere] hover:underline"
               >
                 {BUSINESS_CONTACT_EMAIL}
               </a>
             </div>
           </div>
-          <p className="mt-3 text-xs text-white/50">
+          <p className="mt-3 text-base text-white/50">
             For account issues, billing questions, bug reports, or feature requests.
             Include your account email and a description of the issue.
           </p>
@@ -50,7 +50,7 @@ export default async function SupportPage() {
             <FileText className="h-5 w-5 text-[#FFD700]" />
             <div>
               <h3 className="fel-heading text-sm font-bold text-white">Terms of Service</h3>
-              <p className="text-[10px] text-white/40">Usage terms &amp; conditions</p>
+              <p className="text-[12px] text-white/50">Usage terms &amp; conditions</p>
             </div>
           </Link>
           <Link
@@ -60,7 +60,7 @@ export default async function SupportPage() {
             <Shield className="h-5 w-5 text-[#A855F7]" />
             <div>
               <h3 className="fel-heading text-sm font-bold text-white">Privacy Policy</h3>
-              <p className="text-[10px] text-white/40">How we handle your data</p>
+              <p className="text-[12px] text-white/50">How we handle your data</p>
             </div>
           </Link>
           <Link
@@ -70,7 +70,7 @@ export default async function SupportPage() {
             <Award className="h-5 w-5 text-[#00E5FF]" />
             <div>
               <h3 className="fel-heading text-sm font-bold text-white">Credits &amp; Licences</h3>
-              <p className="text-[10px] text-white/40">Who made what we use</p>
+              <p className="text-[12px] text-white/50">Who made what we use</p>
             </div>
           </Link>
         </div>

@@ -231,7 +231,7 @@ export interface WarmupStep {
   pacer?: DrillPhase['pacer'];
 }
 
-export type HeldReason = 'time' | 'youth_impact' | 'pain' | 'coach_prime' | 'unavailable' | 'jump_gate';
+export type HeldReason = 'time' | 'youth_impact' | 'pain' | 'coach_prime' | 'unavailable' | 'jump_gate' | 'adult_only';
 
 export interface WarmupNote { id: NoteId; text: string }
 export type NoteId =
@@ -306,6 +306,7 @@ const HELD_WORDS: Record<HeldReason, string> = {
   coach_prime: "your coach's Prime section covers it",
   unavailable: 'left out until your details load',
   jump_gate: "jumps and landings wait for FEL's jump checks",
+  adult_only: 'adults only for now: about 60 jumps, over the 55 a session FEL allows under 18',
 };
 /** One line per reason for what the plan left out ("Release the Locks: left out to fit the time"). */
 export function heldBackLines(plan: Pick<WarmupPlan, 'heldBack'>): string[] {
@@ -455,6 +456,12 @@ export function generateWarmup(input: WarmupInput): WarmupPlan {
     if (!keep.includes(phase.id)) { heldBack.push({ id: phase.id, name: phase.name, why: 'time' }); continue; }
     if (WAKE_UP_IMPACT_GATED && impactOff && phaseImpact(phase)) {
       heldBack.push({ id: phase.id, name: phase.name, why: gatedWhy });
+      continue;
+    }
+    // YOUTH-CONTACT-CAP (Elijah, 2026-10-26): an adults-only phase (Build the Rhythm, ~60 pogos) never reaches a youth
+    // athlete, even when a coach put jumps in today's Prime
+    if (input.isYouth && phase.adultOnly) {
+      heldBack.push({ id: phase.id, name: phase.name, why: 'adult_only' });
       continue;
     }
     if (low && phase.id === LAUNCH_PHASE_ID && phase.durationSec > LOW_DAY_LAUNCH_SEC) {

@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { AdventureBRLoader } from './loader';
 
 export const dynamic = 'force-dynamic';
@@ -18,6 +20,10 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false, nocache: true, googleBot: { index: false, follow: false } },
 };
 
-export default function AdventureBRPage() {
-  return <AdventureBRLoader />;
+// PUBLIC-POLISH (2026-11-02): the session is read here, as /play/adventure does, so the stage can tell the harness a guest
+// is a guest (no closet read: it was a 401 on every guest load). A failed read is a guest, which only skips that read.
+export default async function AdventureBRPage() {
+  let signedIn = false;
+  try { signedIn = !!(await getServerSession(authOptions))?.user; } catch { signedIn = false; }
+  return <AdventureBRLoader signedIn={signedIn} />;
 }

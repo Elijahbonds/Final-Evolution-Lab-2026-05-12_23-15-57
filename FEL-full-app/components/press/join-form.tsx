@@ -44,12 +44,12 @@ export function JoinForm() {
         placeholder="you@email.com"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        className="w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#F5C518]/70"
+        className="min-h-11 w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none placeholder:text-white/50 focus:border-[#F5C518]/70"
       />
       <button
         type="submit"
         disabled={status === 'busy'}
-        className="rounded-md bg-[#F5C518] px-5 py-2 text-sm font-semibold text-black hover:bg-[#ffd84a] disabled:opacity-60"
+        className="min-h-11 rounded-md bg-[#F5C518] px-5 py-2 text-sm font-semibold text-black hover:bg-[#ffd84a] disabled:opacity-60"
       >
         {status === 'busy' ? 'Sending…' : 'Send it'}
       </button>

@@ -57,11 +57,12 @@ function usd(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`;
 }
 
-export function CoinStore() {
+/** `initialPurchasesEnabled`: the server's answer (app/store/page.tsx), so the coin packs are drawn, or not, from the start. */
+export function CoinStore({ initialPurchasesEnabled = null }: { initialPurchasesEnabled?: boolean | null } = {}) {
   const [balances, setBalances] = useState<Balances>({ coins: 0, shards: 0 });
   // FEATURES-UX-SHOP (2026-09-08): ONE purchases truth (lib/wallet/purchases.ts) — this store said "shard packs are sold
   // separately" while /shop/shards showed a disabled placeholder on every Buy. Both now read the same flag and the same copy.
-  const purchasesEnabled = usePurchasesEnabled();
+  const purchasesEnabled = usePurchasesEnabled(initialPurchasesEnabled);
   const copy = shardSaleCopy(purchasesEnabled);
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -117,7 +118,7 @@ export function CoinStore() {
           <h1 className="text-2xl font-bold text-white">Coin Store</h1>
           {/* ARENA-10PHASE P10 said "sold separately" unconditionally; FEATURES-UX-SHOP: the line is the purchases flag's own words,
               and "Shard Store" is the link in every state. */}
-          <p className="text-sm text-white/50">
+          <p className="text-base text-white/50">
             {copy.coinStoreShards.split('Shard Store')[0]}
             <Link href="/shop/shards" className="text-[#C79BFF] hover:underline">Shard Store</Link>
             {copy.coinStoreShards.split('Shard Store')[1]}
@@ -141,9 +142,9 @@ export function CoinStore() {
       <section>
         <div className="mb-3 flex items-center gap-2">
           <ShoppingCart className="h-4 w-4 text-[#00E5FF]" />
-          <h2 className="text-lg font-semibold text-white">Coin Packs</h2>
+          <h2 className="text-[20px] font-semibold text-white">Coin Packs</h2>
           {copy.badge && (
-            <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] uppercase tracking-wide text-white/50">{copy.badge}</span>
+            <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[12px] uppercase tracking-wide text-white/50">{copy.badge}</span>
           )}
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -158,7 +159,7 @@ export function CoinStore() {
                 className="relative flex flex-col rounded-xl border border-[#FFD700]/25 bg-gradient-to-b from-[#FFD700]/[0.06] to-transparent p-4"
               >
                 {pack.tag && (
-                  <span className="absolute -top-2 right-3 rounded-full bg-[#00E5FF] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-black">{pack.tag}</span>
+                  <span className="absolute -top-2 right-3 rounded-full bg-[#00E5FF] px-2 py-0.5 text-[12px] font-bold uppercase tracking-wide text-black">{pack.tag}</span>
                 )}
                 <div className="mb-1 flex items-center gap-2 text-[#FFD700]">
                   <Coins className="h-5 w-5" />
@@ -184,9 +185,9 @@ export function CoinStore() {
       <section>
         <div className="mb-1 flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-[#00FF9D]" />
-          <h2 className="text-lg font-semibold text-white">Spend Your Balance</h2>
+          <h2 className="text-[20px] font-semibold text-white">Spend Your Balance</h2>
         </div>
-        <p className="mb-3 text-xs text-white/50">Coins and shards are spent on the page that uses what you buy.</p>
+        <p className="mb-3 text-base text-white/50">Coins and shards are spent on the page that uses what you buy.</p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {WHERE_TO_SPEND.map((w) => {
             const isShard = w.currency === 'shards';
@@ -202,7 +203,7 @@ export function CoinStore() {
                 </span>
                 <span className={`inline-flex items-center gap-1 text-xs ${isShard ? 'text-[#C79BFF]' : 'text-[#FFD700]'}`}>
                   {isShard ? <Gem className="h-3.5 w-3.5" /> : <Coins className="h-3.5 w-3.5" />} {w.currency}
-                  <ChevronRight className="h-4 w-4 text-white/40" />
+                  <ChevronRight className="h-4 w-4 text-white/50" />
                 </span>
               </Link>
             );

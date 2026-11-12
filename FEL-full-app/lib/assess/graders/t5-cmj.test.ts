@@ -26,7 +26,7 @@ describe('T5 height is flight time: h = g·t²/8', () => {
       expect(r.t5.jumps).toHaveLength(3);
       r.t5.jumps.forEach((j, k) => expect(Math.abs(j.flightMs - c.truth[k].flightMs), `jump ${k + 1}`).toBeLessThanOrEqual(10));
       expect(r.t5.bestJump).toBe(2);
-      expect(r.t5.bestHeightCm!).toBeCloseTo(45, 0);
+      expect(r.t5.bestHeightCm!).toBeCloseTo(c.truth[1].heightCm, 0);   // JUMP-PRO: the clip's own flight (44.1 cm), not the 45 it was asked for
     });
   }
 

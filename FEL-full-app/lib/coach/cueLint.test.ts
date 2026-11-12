@@ -26,8 +26,11 @@ describe('the rules catch internal-focus cues (negative controls) and let extern
     ['Pack the chin and go.', 'squeeze'],
     ['Brace hard, then pull.', 'squeeze'],
     ['Squeeze at the top.', 'squeeze'],
-    ['Knees out.', 'leads'],
-    ['Shoulders down and back.', 'leads'],
+    // test changed: guard relaxed (CUE-REWRITE 2026-10-27, owner call 1). "Knees out." and "Shoulders down and back." were
+    // negative controls; a ≤5-word body-part-plus-direction live cue now passes (cueLint.ts isDirectionCue, the brief's
+    // own examples). They moved to DIRECTION below. The same cue made longer still fails here:
+    ['Knees out, and keep them pushed there.', 'leads'],
+    ['Shoulders down and back, hold them there.', 'leads'],
     ['Heels heavy — pull the floor toward your heel.', 'leads'],
     ['Tuck your chin.', 'anchored'],
     ['Stack tall — shoulders level over your hips.', 'anchored'],
@@ -53,6 +56,18 @@ describe('the rules catch internal-focus cues (negative controls) and let extern
   ];
   it.each(EXTERNAL)('passes: "%s"', (text) => {
     expect(lintCue(text, 'attention')).toEqual([]);
+  });
+
+  // CUE-REWRITE (2026-10-27): the live direction cue — ≤5 words, a body part with the way it moves — passes rules 3–4;
+  // rules 1–2 still apply to it (no muscle, nothing to squeeze), and a body part with no direction still fails.
+  const DIRECTION = ['Knees out.', 'Shoulders down and back.', 'Knees out over toes', 'Heels down', 'Chest up', 'Slow down. Knees out.'];
+  it.each(DIRECTION)('passes as a live direction cue: "%s"', (text) => {
+    expect(lintCue(text, 'attention')).toEqual([]);
+  });
+  it('a short body-part cue with no direction, or with a muscle or a squeeze, still fails', () => {
+    expect(lintCue('Tuck your chin.', 'attention').map((x) => x.rule)).toContain('anchored');
+    expect(lintCue('Glutes up.', 'attention').map((x) => x.rule)).toContain('muscle');
+    expect(lintCue('Squeeze knees out.', 'attention').map((x) => x.rule)).toContain('squeeze');
   });
 
   it('an instruction may name where the body goes (rules 1–2 only); an attention cue may not lead with it', () => {

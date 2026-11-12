@@ -274,3 +274,60 @@ export function requiredCoachStoreBookHref(profileSlug: string): string {
 export function mediaKitProfile(): CreatorProfile | undefined {
   return getApprovedProfile(MEDIA_KIT.profileSlug);
 }
+
+// ── ONB-05: the approved public-page copy (docs/PLATFORM-ROADMAP.md Appendix B) ─────────────────────────────────────
+//
+// Owner, OWNER INBOX taps 2026-10-20: "public pages copy APPROVED (Appendix B; owner blanks still to fill)". The words
+// below are Appendix B's drafts as approved, split only where a blank sits. Every blank is an `{ owner }` part, which
+// the pages draw as a visible [OWNER: …] marker (components/public-copy/owner-copy.tsx) until the owner fills it
+// (OWN-21: number of sports, press email, monthly players + date, sponsor packages and rates, team profiles, reply days).
+// Filling a blank = replacing the part with the owner's words; nothing here is invented.
+
+/** Approved text, or a blank the owner fills. */
+export type CopyPart = string | { owner: string };
+
+export interface PublicPageCopy {
+  /** The frame's one-line lede: the draft's opening sentence. */
+  lede: string;
+  /** The rest of the draft, blanks marked. */
+  body: readonly CopyPart[];
+}
+
+export const PUBLIC_PAGE_COPY = {
+  press: {
+    lede: 'Final Evolution Lab is a game and a training platform in one.',
+    body: [
+      'Final Evolution Lab is a game and a training platform in one: play ', { owner: 'number' },
+      ' sports and movement modes on a phone, a TV or a computer, learn from approved teachers, and train with a coach. ',
+      'The books behind it are below. Press and partnership questions: ', { owner: 'press email' }, '.',
+    ],
+  },
+  mediaKit: {
+    lede: 'Partner with FEL.',
+    body: [
+      "We don't run ads. Brands appear as credited, family-safe sponsorships: a venue players play in, a weekly challenge, ",
+      'or a team page. ', { owner: 'monthly players, as of date' }, ', ', { owner: 'packages and rates' }, '. ',
+      'Sponsors receive aggregate results only, never player data.',
+    ],
+  },
+  team: {
+    lede: 'The people building Final Evolution Lab.',
+    body: [{ owner: 'profiles' }, '.'],
+  },
+  workWithUs: {
+    lede: 'Brands, teachers, schools and creators: tell us what you have in mind.',
+    body: [
+      'Teachers can apply to teach on FEL ', { owner: 'link to the application, P2' }, '. ',
+      'Brands: we work with family-safe partners only (see our brand policy', { owner: 'brand policy link' }, '). ',
+      'We reply within ', { owner: 'days' }, '.',
+    ],
+  },
+} as const satisfies Record<string, PublicPageCopy>;
+
+/** /team's booking sentence (Appendix B), said only while the coach store is open (lib/creator/teamCopy.ts has the rest). */
+export const TEAM_BOOK_OPEN = 'Book a session with a coach through the coach store.';
+
+/** The blanks still open in a page's copy, by name (what OWN-21 has left to fill). */
+export function ownerBlanks(parts: readonly CopyPart[]): string[] {
+  return parts.flatMap((p) => (typeof p === 'string' ? [] : [p.owner]));
+}

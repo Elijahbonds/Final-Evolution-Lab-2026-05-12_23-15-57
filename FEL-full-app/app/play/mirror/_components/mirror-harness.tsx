@@ -11,8 +11,16 @@
 // claims. No biomechanical statistics are fabricated — the only numbers shown
 // are the ones the engine actually computes for this session.
 
+import { mirrorScreenSure } from '@/lib/results/trust';
+import { REVIEW_COPY, levelWord, repsLine } from '@/lib/cue-style/review';
+import { MOVEMENT_NAMES } from '@/lib/cue-style/names';   // CUE-REWRITE: the review cards' words
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { MEASURE_VERTICAL_HREF } from '@/lib/vertical/door';   // VERTICAL-EASY: the one front door
+import { MEASURE_VERTICAL } from '@/lib/vertical/copy';
+import { JUMP_TAB_LINE } from '@/lib/tools-easy/copy';
+import { ResultCard } from '@/components/result-card/result-card';
+import { lungeVerdict, mirrorReviewView } from '@/lib/coach-tools/reviewResult';
 import { ArrowLeft, Loader2, PauseCircle, ScanLine, Volume2, VolumeX } from 'lucide-react';
 import { NOT_SAVED_ON_DEVICE, mirrorSave } from './mirror-save';   // R-HEALTH-CLIENT: no save request unless the server said so
 // MIRROR-FIRST P1 (2026-10-07): the camera, the pose runtime, the screen-awake lock and the pause on a hidden tab live in
@@ -38,7 +46,7 @@ import { DunkTracker, refusalLine, type DunkMetrics } from '@/lib/irl/dunkTracke
 // session ended. This keeps the numbers — and only the numbers; the clip never leaves the phone.
 import { attemptFrom, progressLine, readProgress, type DunkProgress } from '@/lib/irl/dunkProgress';
 import type { PoseFrame } from '@/lib/babylon/nexus/neuro-mirror/pose/mediapipe-adapter';
-import { RepCounter, type RepState } from '@/lib/babylon/nexus/neuro-mirror/rules/rep-counter';
+import type { RepState } from '@/lib/babylon/nexus/neuro-mirror/rules/rep-counter';
 import type { SquatFault } from '@/lib/babylon/nexus/neuro-mirror/rules/squat-audit';
 import { CueEngine, VALGUS_CUE_VERIFIED, cueableFaults, fadeReviewLines, type CueEvent, type FaultId } from '@/lib/babylon/nexus/neuro-mirror/rules/cue-engine';
 // MIRROR-COACH P9 (2026-09-30): the press/row's three faults reach the coach (lib/mirror/pressRowStage.ts), the coach
@@ -72,12 +80,15 @@ import { chipLabel } from '@/lib/mirror/hudChip';
 // changes: `pose` is handed to onFrame for every analysis mode already). RepCounter is REUSED for the rep count (the
 // phase brief's own words), the same class the press/row pattern already counts by — one instance, reset at the
 // left→right hand-over. lungeStage.ts is the pure per-frame step (the same discipline squatStage.ts explains).
+// MIRROR-FIXES (2026-10-25): the lunge's rep book is lib/mirror/lungeReps.ts LungeRepCounter now, counted on LungeAudit's
+// depth01 — RepCounter on the audit's velocity phase counted 24 of 76 jittered lunges (that file's header says why).
+import { LungeRepCounter } from '@/lib/mirror/lungeReps';
 import { MIRROR_PATTERNS } from '@/lib/mirror/patterns';
 import { LungeAudit, type LungeFault } from '@/lib/mirror/lungeAudit';
 import { checkFraming, framingLine } from '@/lib/mirror/framing';
 import { ConfidenceFloor } from '@/lib/pose/confidenceFloor';   // MIRROR P3 (capture): "move closer / more light" on the lite model
 import {
-  LUNGE_CUE_TABLE, LUNGE_FAULT_LABEL, LUNGE_REPS_PER_SIDE, initialLungeSession, lungePhaseToMovement,
+  LUNGE_CUE_TABLE, LUNGE_FAULT_LABEL, LUNGE_REPS_PER_SIDE, initialLungeSession,
   lungeSideResult, stepLungeSession, type LungeSessionState, type LungeSide,
 } from '@/lib/mirror/lungeStage';
 // THE GUIDED MOVEMENT SCREEN. Every one of these was written for this and then never mounted — the runner, the
@@ -102,7 +113,8 @@ import type { YouthGate } from '@/lib/mirror/screenCorrectives';
 // summary (lib/mirror/correctives.ts; adults only, youth rules show none).
 import { CorrectivesPicker, SessionCorrectives } from '@/components/mirror/session-correctives';
 import { sessionLikeFromSummary } from '@/lib/mirror/correctives';
-import { speakNatural } from '@/lib/babylon/audio/voice/speakNatural';   // VOICEOVER (2026-10-06)
+import { speakNatural } from '@/lib/babylon/audio/voice/speakNatural';
+import { speechMs } from '@/lib/cue-style/speech';   // CUE-REWRITE (2026-10-27): the coach waits while a line is said   // VOICEOVER (2026-10-06)
 // MIRROR-MOVES P2 (2026-10-07; plan Phase 2, "every live movement talks"): `?pattern=` opens a tab (patternParam.ts, read by
 // page.tsx); the hip hinge and the push-up are live tabs (owner decision 2026-10-07: both), each a side-on guided set graded
 // rep by rep by its tested batch audit (sideRepStage.ts) with its own coach; the lunge speaks through its own CueEngine; and
@@ -358,11 +370,11 @@ export function MirrorHarness({
 
   // THE LUNGE (MIRROR-COACH P4 lane 1, 2026-09-25, owner decision #9: "lunge — mount"). LungeAudit runs live off the
   // raw pose stream (no analysis mode needed — see the import comment above); lib/mirror/lungeStage.ts is the pure
-  // per-frame step (the same discipline as the squat's), and RepCounter is the reused rep book — ONE instance, reset
+  // per-frame step (the same discipline as the squat's), and LungeRepCounter (lungeReps.ts) is the rep book — ONE instance, reset
   // at the left→right hand-over, since the two sides are separate sets. React state below mirrors the session ref
   // for rendering only; lungeSessionRef is what stepLungeSession actually reads and writes.
   const lungeAuditRef = useRef(new LungeAudit());
-  const lungeRepCounterRef = useRef(new RepCounter());
+  const lungeRepCounterRef = useRef(new LungeRepCounter());
   const lungeSessionRef = useRef(initialLungeSession());
   const [lungeSession, setLungeSession] = useState<LungeSessionState>(initialLungeSession());
   // MIRROR-MOVES P2: the lunge's own coach (its own table — the squat's 'shallow' says something else), one set per side
@@ -505,7 +517,9 @@ export function MirrorHarness({
   const start = useCallback(async () => {
     // A fresh runner per session, so a second screen is a second screen rather than a resumed one.
     if (patternRef.current === 'screen') {
-      runnerRef.current = new ScreenRunner(screenIdRef.current);
+      // TOOLS-EASY (2026-10-28; SCREEN-EASY owner call 5, flagged): front-on first, then side-on, then from behind — two
+      // turns instead of four; the stations, holds and graders are the protocol's (lib/mirror/screen.ts screenRunFor)
+      runnerRef.current = new ScreenRunner(screenIdRef.current, { order: 'frontFirst' });
       screenSentRef.current = false;
       lastSaidRef.current = '';
       runnerKeyRef.current = '';
@@ -534,7 +548,7 @@ export function MirrorHarness({
     setSquareUpSaid(false);
     setDeeperSaid(false);
     lungeAuditRef.current.reset();
-    lungeRepCounterRef.current = new RepCounter();
+    lungeRepCounterRef.current = new LungeRepCounter();
     lungeSessionRef.current = initialLungeSession();
     setLungeSession(initialLungeSession());
     lungeCueRef.current.reset();
@@ -652,11 +666,13 @@ export function MirrorHarness({
             if (step.squareUp) {
               setSquareUpSaid(true);
               speak(SQUARE_UP_LINE, { protect: true });
+              cueEngineRef.current.holdFor(now, speechMs(SQUARE_UP_LINE));   // CUE-REWRITE: one voice at a time
             }
             // the first shallow descent of the session: say it once, then shallow reps count, marked (squatStage.ts)
             if (step.deeperPrompt) {
               setDeeperSaid(true);
               speak(DEEPER_LINE, { protect: true });
+              cueEngineRef.current.holdFor(now, speechMs(DEEPER_LINE));   // CUE-REWRITE: one voice at a time
             }
             if (step.cueFaults) {
               const evt = cueEngineRef.current.decide(now, step.cueFaults);
@@ -688,19 +704,20 @@ export function MirrorHarness({
             hud.set({ lungeFramedRight: framing.ok });
             if (lungeSessionRef.current.stage !== 'review') {
               const was = lungeSessionRef.current.stage;
-              const repInfo = lungeRepCounterRef.current.feed(lungePhaseToMovement(lungeRead.phase), now);
+              const repDone = lungeRepCounterRef.current.feed(lungeRead, now);
               const step = stepLungeSession(lungeSessionRef.current, {
                 nowMs: now, present: lungeRead.present, framedRight: framing.ok, phase: lungeRead.phase,
-                faults: lungeRead.faults, repCompleted: !!repInfo,
+                faults: lungeRead.faults, repCompleted: repDone,
               });
               lungeSessionRef.current = step.state;
               if (step.repCounted || step.stageChanged || step.findingsChanged) setLungeSession(step.state);
               // the left→right hand-over (and review) gets a FRESH rep counter: the two sides are separate sets
-              if (step.stageChanged) lungeRepCounterRef.current = new RepCounter();
+              if (step.stageChanged) lungeRepCounterRef.current = new LungeRepCounter();
               // the turn line is said ONCE per side, never looped (P1's lesson — see lungeStage.ts); the banner
               // itself reads lungeSession.turnPromptSaid[stage] directly, so no separate "said" flag is kept here
               if (step.turnPrompt) {
                 speak(framingLine('turned'), { protect: true });
+                lungeCueRef.current.holdFor(now, speechMs(framingLine('turned')));   // CUE-REWRITE: one voice at a time
               }
               // MIRROR-MOVES P2: the lunge's coach — this frame's cue, then the rep it ended, then the side's set (pressRow's order)
               if (step.cueFaults) {
@@ -1010,12 +1027,13 @@ export function MirrorHarness({
   // MIRROR-COACH P4 lane 1: the squat and the lunge read their full title straight from MIRROR_PATTERNS (the
   // registry's own label, entry one and two) — pressRow/jump/screen are not pattern-audit entries and keep their own.
   const PATTERN_TITLE: Record<Pattern, string> = {
-    pressRow: 'Split-Stance Press / Row',
+    // CUE-REWRITE (2026-10-27): the canonical movement names (lib/cue-style/names.ts)
+    pressRow: MOVEMENT_NAMES.pressRow,
     squat: SQUAT_PATTERN.label,
     lunge: LUNGE_PATTERN.label,
-    hinge: 'Hip Hinge',
-    pushup: 'Push-up',
-    jump: 'Vertical Jump',
+    hinge: MOVEMENT_NAMES.hinge,
+    pushup: MOVEMENT_NAMES.pushup,
+    jump: 'Vertical Jump', // the full accessible name (scripts/mirror-v2-tests.ts pins it)
     screen: 'Movement Screen',
   };
   const live = status === 'live';
@@ -1042,20 +1060,20 @@ export function MirrorHarness({
           <Link
             href="/train"
             aria-label="Back to Train"
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.03]
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.03]
                        text-white/55 transition-colors hover:border-white/25 hover:text-white"
           >
             <ArrowLeft className="h-[18px] w-[18px]" />
           </Link>
           <div className="min-w-0">
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-[#00E5FF]">The Mirror</p>
-            <h1 className="fel-heading truncate text-[22px] font-black leading-none tracking-tight text-white md:text-[26px]">
+            <p className="font-mono text-[12px] font-bold uppercase tracking-[0.22em] text-[#00E5FF]">The Mirror</p>
+            <h1 className="fel-heading truncate pb-[2px] text-[22px] font-black leading-tight tracking-tight text-white md:text-[26px]">
               {PATTERN_TITLE[pattern]}
             </h1>
           </div>
           <span
             className="ml-auto inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-1.5 font-mono
-                       text-[10px] font-bold uppercase tracking-[0.14em]"
+                       text-[12px] font-bold uppercase tracking-[0.14em]"
             style={{
               borderColor: live ? 'rgba(0,255,157,0.35)' : 'rgba(255,255,255,0.12)',
               color: live ? '#00FF9D' : 'rgba(255,255,255,0.4)',
@@ -1096,7 +1114,7 @@ export function MirrorHarness({
                 className={`shrink-0 whitespace-nowrap rounded-xl px-3.5 py-2 text-[12.5px] font-bold transition-all duration-200
                             disabled:cursor-not-allowed disabled:opacity-40
                             ${on ? 'bg-white/[0.07] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.10)]'
-                                 : 'text-white/45 hover:text-white/75'}`}
+                                 : 'text-white/50 hover:text-white/75'}`}
               >
                 {PATTERN_SHORT[key]}
               </button>
@@ -1108,7 +1126,7 @@ export function MirrorHarness({
             and grown-up step come first, for everyone (lib/screen/routes.ts). Not offered mid-session: leaving the page
             ends the set. */}
         {!live && !paused && (
-          <p className="-mt-2 mb-4 text-[12px] text-white/45">
+          <p className="-mt-2 mb-4 text-[12px] text-white/50">
             <Link href="/screen" data-quick-screen className="font-semibold text-white/70 underline-offset-2 hover:text-white hover:underline">
               Quick Screen
             </Link>
@@ -1152,7 +1170,7 @@ export function MirrorHarness({
               {status === 'requesting' || status === 'loading-model' ? (
                 <>
                   <Loader2 className="h-7 w-7 animate-spin text-[#00E5FF]" />
-                  <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-white/55">
+                  <p className="font-mono text-[12px] uppercase tracking-[0.18em] text-white/55">
                     {status === 'requesting' ? 'Asking for the camera' : 'Loading the pose model'}
                   </p>
                 </>
@@ -1176,7 +1194,7 @@ export function MirrorHarness({
                       Prop the phone up, step back until your whole body is in frame, and start when you are ready.
                     </p>
                   </div>
-                  <p className="mx-auto max-w-md text-[11.5px] leading-relaxed text-white/35">
+                  <p className="mx-auto max-w-md text-[12px] leading-relaxed text-white/50">
                     This shows <span className="text-white/60">estimated engagement</span> inferred from joint
                     movement. It does not measure muscle activation, and it is not a medical assessment. Everything
                     runs in your browser — the camera feed is never uploaded.
@@ -1194,13 +1212,13 @@ export function MirrorHarness({
               <div className="pointer-events-none absolute left-4 top-4 flex items-center gap-2">
                 {/* MIRROR-COACH P2 (2026-09-26): a map over every pattern (lib/mirror/hudChip.ts). The ternary here sent
                     the Movement Screen to its last arm, `squatStage`, so the chip read BREATHE through the whole screen. */}
-                <span className="max-w-[58vw] truncate rounded-lg bg-black/55 px-2.5 py-1.5 font-mono text-[10px] font-bold
+                <span className="max-w-[58vw] truncate rounded-lg bg-black/55 px-2.5 py-1.5 font-mono text-[12px] font-bold
                                  uppercase tracking-[0.16em] text-white/75 backdrop-blur-sm sm:max-w-none">
                   {chipLabel({ pattern, phase, jumpState, squatStage, lungeStage: lungeSession.stage, runner, hingeStage: hingeSession.stage, pushupStage: pushupSession.stage })}
                 </span>
                 {showFrameBudget && (
                   <span
-                    className="rounded-lg bg-black/55 px-2 py-1.5 font-mono text-[10px] backdrop-blur-sm"
+                    className="rounded-lg bg-black/55 px-2 py-1.5 font-mono text-[12px] backdrop-blur-sm"
                     style={{ color: frameMs > 50 ? '#FFC24B' : 'rgba(255,255,255,0.4)' }}
                   >
                     {frameMs.toFixed(1)}ms
@@ -1242,7 +1260,7 @@ export function MirrorHarness({
                       >
                         {Math.ceil(runner.remainingSec)}
                       </span>
-                      <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/50">
+                      <span className="font-mono text-[12px] uppercase tracking-[0.18em] text-white/50">
                         {runner.phase === 'holding' ? 'Hold' : runner.phase === 'retest' ? 'Once more' : 'Get set'} · station {runner.stationIndex + 1}
                       </span>
                     </div>
@@ -1260,7 +1278,7 @@ export function MirrorHarness({
                       <p className="fel-heading text-[40px] font-black leading-none text-white">
                         {cameraChecksRead(runner.screen, runner.results).readCount}
                       </p>
-                      <p className="mt-1 font-mono text-[9.5px] uppercase tracking-[0.18em] text-white/45">Checks read</p>
+                      <p className="mt-1 font-mono text-[12px] uppercase tracking-[0.18em] text-white/50">Checks read</p>
                     </>
                   )
                 ) : pattern === 'jump' ? (
@@ -1270,7 +1288,7 @@ export function MirrorHarness({
                         {Math.max(...jumps.map((j) => j.verticalCm))}
                         <span className="ml-1 text-[16px]">cm</span>
                       </p>
-                      <p className="mt-1 font-mono text-[9.5px] uppercase tracking-[0.18em] text-white/45">Best jump · estimated</p>
+                      <p className="mt-1 font-mono text-[12px] uppercase tracking-[0.18em] text-white/50">Best jump · estimated</p>
                     </>
                   )
                 ) : isSideRep(pattern) ? (
@@ -1281,7 +1299,7 @@ export function MirrorHarness({
                         <p className="fel-heading text-[40px] font-black leading-none text-white">
                           {ss.stage === 'review' ? ss.checkReps.length + ss.workReps.length : ss.reps}
                         </p>
-                        <p className="mt-1 font-mono text-[9.5px] uppercase tracking-[0.18em] text-white/45">
+                        <p className="mt-1 font-mono text-[12px] uppercase tracking-[0.18em] text-white/50">
                           {ss.stage === 'check' || ss.stage === 'work' ? `Reps · ${ss.stage}` : 'Reps'}
                         </p>
                       </>
@@ -1292,7 +1310,7 @@ export function MirrorHarness({
                     <p className="fel-heading text-[40px] font-black leading-none text-white">
                       {lungeSession.stage === 'review' ? lungeSession.workReps.left.length + lungeSession.workReps.right.length : lungeSession.reps}
                     </p>
-                    <p className="mt-1 font-mono text-[9.5px] uppercase tracking-[0.18em] text-white/45">
+                    <p className="mt-1 font-mono text-[12px] uppercase tracking-[0.18em] text-white/50">
                       {lungeSession.stage === 'review' ? 'Reps' : `Reps · ${lungeSession.stage} leg`}
                     </p>
                   </>
@@ -1301,7 +1319,7 @@ export function MirrorHarness({
                     <p className="fel-heading text-[40px] font-black leading-none text-white">
                       {pattern === 'squat' ? squatReps : reps?.reps ?? 0}
                     </p>
-                    <p className="mt-1 font-mono text-[9.5px] uppercase tracking-[0.18em] text-white/45">Reps</p>
+                    <p className="mt-1 font-mono text-[12px] uppercase tracking-[0.18em] text-white/50">Reps</p>
                   </>
                 )}
               </div>
@@ -1356,6 +1374,15 @@ export function MirrorHarness({
                   End session
                 </button>
               </>
+            ) : !live && pattern === 'jump' ? (
+              // TOOLS-EASY (2026-10-28; VERTICAL-EASY owner call 5): the Jump tab no longer measures. It read a vertical
+              // with its own reader (DunkTracker: no stand, no countdown, cm only) — a third number that could disagree
+              // with "Measure my vertical" and the jump check. Its one action is now the front door; the dunk progress
+              // below (what you jumped before) stays.
+              <Link href={MEASURE_VERTICAL_HREF} data-measure-vertical-primary
+                className="rounded-2xl bg-[#00E5FF] px-7 py-3 text-[14px] font-black text-black shadow-[0_10px_40px_-12px_#00E5FF]">
+                {MEASURE_VERTICAL}
+              </Link>
             ) : !live ? (
               <>
                 <button
@@ -1409,16 +1436,16 @@ export function MirrorHarness({
         {pattern === 'squat' && live && (
           <p className="mt-4 text-[13px] leading-relaxed text-white/55">
             {squatStage === 'breathe' && (
-              <><span className="font-bold text-white">Breathe first.</span> {squatBreathLine()} The breath is the bedrock — everything else builds on it.</>
+              <><span className="font-bold text-white">Breathe first.</span> {squatBreathLine()} A calm breath first makes the rest easier.</>
             )}
             {squatStage === 'check' && (
-              <><span className="font-bold text-white">The movement check.</span> {SQUAT_CHECK_REPS} slow squats — heels, shoulders and shift{VALGUS_CUE_VERIFIED ? ', and knees (face the camera square-on)' : ' (knees measured, not judged)'}. Squat {Math.min(squatReps + 1, SQUAT_CHECK_REPS)} of {SQUAT_CHECK_REPS}.</>
+              <><span className="font-bold text-white">First, {SQUAT_CHECK_REPS} slow squats.</span> The camera watches your heels, balance{VALGUS_CUE_VERIFIED ? ' and knees (face it straight on)' : ' (knees watched, not judged)'}. Squat {Math.min(squatReps + 1, SQUAT_CHECK_REPS)} of {SQUAT_CHECK_REPS}.</>
             )}
             {squatStage === 'work' && (
-              <><span className="font-bold text-white">The work set.</span> {SQUAT_WORK_REPS} squats — cued from what the camera measures. Squat {Math.min(squatReps + 1, SQUAT_WORK_REPS)} of {SQUAT_WORK_REPS}.</>
+              <><span className="font-bold text-white">Now {SQUAT_WORK_REPS} squats.</span> The coach talks you through what the camera sees. Squat {Math.min(squatReps + 1, SQUAT_WORK_REPS)} of {SQUAT_WORK_REPS}.</>
             )}
             {squatStage === 'review' && (
-              <><span className="font-bold text-white">Review.</span> What faulted, what was cued, and whether the correction held.</>
+              <><span className="font-bold text-white">Your set.</span> What the camera saw, what the coach said, and whether the fix stuck.</>
             )}
           </p>
         )}
@@ -1489,7 +1516,7 @@ export function MirrorHarness({
                     }}
                   >
                     <span className="block text-[13.5px] font-bold text-white">{label} screen</span>
-                    <span className="mt-0.5 block text-[11.5px] text-white/45">{blurb}</span>
+                    <span className="mt-0.5 block text-[12px] text-white/50">{blurb}</span>
                   </button>
                 );
               })}
@@ -1524,6 +1551,10 @@ export function MirrorHarness({
                     is listed as not read ("Score 78 · from 5 of 6 checks read" · "Head float · not read") */}
                 {scoreLine(screenSummary) && (
                   <p className="mt-4 text-[13px] font-semibold leading-relaxed text-white/80" data-score-line>{scoreLine(screenSummary)}</p>
+                )}
+                {scoreLine(screenSummary) && (
+                  // EVERY-SCREEN P4: how the score was read, and how sure (lib/results/trust.ts, recorded fixtures)
+                  <p className="mt-1 text-[16px] leading-snug text-white/70" data-score-sure><span className="text-white/85">{mirrorScreenSure().method}.</span> {mirrorScreenSure().sure}</p>
                 )}
                 {notReadLines(screenSummary).length > 0 && (
                   <ul className="mt-1 text-[12.5px] leading-relaxed text-white/55" data-not-read>
@@ -1608,7 +1639,7 @@ export function MirrorHarness({
                       />
                       <span className="min-w-0">
                         <span className="block truncate text-[13px] font-semibold text-white/85">{label}</span>
-                        <span className="mt-0.5 block font-mono text-[9.5px] uppercase tracking-[0.14em] text-white/35">
+                        <span className="mt-0.5 block font-mono text-[12px] uppercase tracking-[0.14em] text-white/50">
                           {!seen ? (live ? 'Not in view' : 'Waiting for the camera')
                             : !judged ? 'Measured · not judged yet'
                               : notRead ? 'Not square · not read'
@@ -1651,7 +1682,7 @@ export function MirrorHarness({
                       />
                       <span className="min-w-0">
                         <span className="block truncate text-[13px] font-semibold text-white/85">{LUNGE_FAULT_LABEL[id]}</span>
-                        <span className="mt-0.5 block font-mono text-[9.5px] uppercase tracking-[0.14em] text-white/35">
+                        <span className="mt-0.5 block font-mono text-[12px] uppercase tracking-[0.14em] text-white/50">
                           {!seen ? (live ? 'Not in view' : 'Waiting for the camera')
                             : notRead ? 'Not square · not read'
                               : faulting ? 'Estimated fault' : 'Estimated stable'}
@@ -1664,6 +1695,10 @@ export function MirrorHarness({
             </>
           ) : pattern === 'jump' ? (
             <>
+              {/* VERTICAL-EASY (2026-10-27): one front door for a vertical — the guided check (countdown, three jumps, JUMP-PRO's
+                  reader). This tab keeps its own dunk-progress read. */}
+              {/* TOOLS-EASY (2026-10-28): the door is the stage's one action now (above); this says why there is no camera here */}
+              <p data-jump-tab-line className="mb-4 text-[15px] text-white/75">{JUMP_TAB_LINE}</p>
               {/* WHAT YOU CAME BACK FOR. The best to beat, the rhythm you are keeping, the line over weeks, and
                   the next dunk named — the four the owner asked for, in the order they matter when you are
                   standing in a gym with your phone propped against a bag. */}
@@ -1671,7 +1706,7 @@ export function MirrorHarness({
                 <section className="mb-5 rounded-2xl border border-white/8 bg-white/[0.02] p-5">
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
-                      <p className="font-mono text-[9.5px] font-bold uppercase tracking-[0.18em] text-white/35">
+                      <p className="font-mono text-[12px] font-bold uppercase tracking-[0.18em] text-white/50">
                         Your best · estimated
                       </p>
                       <p className="fel-heading text-[40px] font-black leading-none text-[#FFD700]">
@@ -1680,7 +1715,7 @@ export function MirrorHarness({
                       </p>
                       {dunkProgress.trendCmPerWeek !== null && (
                         <p
-                          className="mt-1.5 font-mono text-[10px] uppercase tracking-[0.14em]"
+                          className="mt-1.5 font-mono text-[12px] uppercase tracking-[0.14em]"
                           style={{ color: dunkProgress.trendCmPerWeek >= 0 ? '#00FF9D' : '#FF7A2F' }}
                         >
                           {dunkProgress.trendCmPerWeek >= 0 ? '+' : ''}{dunkProgress.trendCmPerWeek} cm / week · estimated
@@ -1693,7 +1728,7 @@ export function MirrorHarness({
                         <p className="fel-heading text-[22px] font-black leading-none text-white">
                           {dunkProgress.streakDays}
                         </p>
-                        <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.14em] text-white/35">
+                        <p className="mt-1 font-mono text-[12px] uppercase tracking-[0.14em] text-white/50">
                           Day streak
                         </p>
                       </div>
@@ -1701,7 +1736,7 @@ export function MirrorHarness({
                         <p className="fel-heading text-[22px] font-black leading-none text-white">
                           {dunkProgress.thisWeek}
                         </p>
-                        <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.14em] text-white/35">
+                        <p className="mt-1 font-mono text-[12px] uppercase tracking-[0.14em] text-white/50">
                           This week
                         </p>
                       </div>
@@ -1709,7 +1744,7 @@ export function MirrorHarness({
                         <p className="fel-heading text-[22px] font-black leading-none text-white">
                           {dunkProgress.attempts}
                         </p>
-                        <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.14em] text-white/35">
+                        <p className="mt-1 font-mono text-[12px] uppercase tracking-[0.14em] text-white/50">
                           Jumps
                         </p>
                       </div>
@@ -1743,7 +1778,7 @@ export function MirrorHarness({
 
                   {dunkProgress.next && (
                     <div className="mt-5 border-t border-white/[0.06] pt-4">
-                      <p className="font-mono text-[9.5px] font-bold uppercase tracking-[0.16em] text-[#00E5FF]">
+                      <p className="font-mono text-[12px] font-bold uppercase tracking-[0.16em] text-[#00E5FF]">
                         Next dunk · {dunkProgress.next.family}
                       </p>
                       <p className="mt-1.5 text-[13.5px] leading-relaxed text-white/70">{dunkProgress.next.ask}</p>
@@ -1753,7 +1788,7 @@ export function MirrorHarness({
                   {dunkProgress.landed.length > 0 && (
                     <div className="mt-3 flex flex-wrap gap-1.5">
                       {dunkProgress.landed.map((f) => (
-                        <span key={f} className="rounded-md bg-[#00FF9D]/12 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.12em] text-[#00FF9D]">
+                        <span key={f} className="rounded-md bg-[#00FF9D]/12 px-2 py-0.5 font-mono text-[12px] uppercase tracking-[0.12em] text-[#00FF9D]">
                           {f}
                         </span>
                       ))}
@@ -1770,17 +1805,17 @@ export function MirrorHarness({
                   flight time is several centimetres. Every camera number says so. */}
               <h2 className="fel-heading mb-3 text-[15px] font-bold text-white/80">Jumps · estimated from flight time</h2>
               {jumps.length === 0 ? (
-                <p className="text-[13px] text-white/45">
+                <p className="text-[13px] text-white/50">
                   Stand tall, let the floor calibrate, then jump. The landing settles the rep.
                 </p>
               ) : (
                 <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                   {jumps.map((j, i) => (
                     <li key={i} className="flex items-baseline justify-between gap-3 rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-3">
-                      <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-white/35">Jump {i + 1}</span>
+                      <span className="font-mono text-[12px] uppercase tracking-[0.16em] text-white/50">Jump {i + 1}</span>
                       <span className="text-right">
                         <span className="fel-heading text-[20px] font-black text-[#FFD700]">{j.verticalCm}<span className="text-[12px]">cm</span></span>
-                        <span className="mt-0.5 block font-mono text-[9.5px] text-white/30">{j.flightTimeMs}ms · {j.takeoff}</span>
+                        <span className="mt-0.5 block font-mono text-[12px] text-white/50">{j.flightTimeMs}ms · {j.takeoff}</span>
                       </span>
                     </li>
                   ))}
@@ -1804,7 +1839,7 @@ export function MirrorHarness({
                           to "Lumbo-pelvi…" and the row said nothing. The name is the thing being read. */}
                       <span className="min-w-0">
                         <span className="block text-[13px] font-semibold leading-tight text-white/85">{ZONE_LABEL[id]}</span>
-                        <span className="mt-0.5 block font-mono text-[9.5px] uppercase tracking-[0.14em] text-white/35">
+                        <span className="mt-0.5 block font-mono text-[12px] uppercase tracking-[0.14em] text-white/50">
                           {ZONE_STATE_LABEL[st]}
                         </span>
                       </span>
@@ -1817,18 +1852,26 @@ export function MirrorHarness({
         </section>
 
         {/* The review of a guided squat — what faulted, what was said, and whether it held. */}
+        {/* COACH-TOOLS-EASY (2026-11-02; the coordinator's item 4): the squat review is the P3 result card's "no number"
+            variant — the verdict (squatReviewVerdict, unchanged) in one line, and what the camera saw and the coach said
+            under Details, unchanged */}
         {pattern === 'squat' && squatStage === 'review' && (
-          <section className="mt-6 rounded-2xl border border-white/8 bg-white/[0.02] p-5">
-            <h2 className="fel-heading text-[15px] font-bold text-white/80">What the camera measured</h2>
+          <section className="mt-6" data-squat-review>
+            <ResultCard reveal={false} seeAll={false} view={mirrorReviewView(MOVEMENT_NAMES.squat, squatWorkReps.length, squatReviewVerdict(squatWorkReps, cueLog, {
+                cueable: (f) => cueableFaults(f),
+                // a knee never read square was not judged, cue or no cue (MIRROR-COACH P2)
+                kneeJudged: VALGUS_CUE_VERIFIED && kneeRecord.squareFrames > 0,
+              }).line)} details={(<>
+            <h2 className="fel-heading text-[15px] font-bold text-white/80">{REVIEW_COPY.heading}</h2>
             <div className="mt-3 grid gap-5 sm:grid-cols-2">
               <div>
-                <p className="font-mono text-[9.5px] uppercase tracking-[0.16em] text-white/35">Findings</p>
+                <p className="font-mono text-[12px] uppercase tracking-[0.16em] text-white/50">{REVIEW_COPY.firstReps}</p>
                 {/* Only faults the coach may judge are findings; the knee is reported separately below while unverified. */}
                 {/* MIRROR-COACH P2 (2026-09-26): "Clean structure — load it" was the verified line; with the knee on, a
                     check with nothing flagged says only that — the knee line below says whether the knees were read. */}
                 {cueableFaults(squatFindings).length === 0 ? (
                   <p className="mt-2 text-[13px] text-white/60">
-                    {VALGUS_CUE_VERIFIED ? 'No faults measured in the check.' : 'No judged faults in the check.'}
+                    {VALGUS_CUE_VERIFIED ? REVIEW_COPY.nothingInCheck : REVIEW_COPY.nothingJudged}
                   </p>
                 ) : (
                   <ul className="mt-2 space-y-1.5">
@@ -1854,10 +1897,10 @@ export function MirrorHarness({
                   const numbers = showFrameBudget && kneeRecord.left !== null && kneeRecord.right !== null;
                   if (!kneeLine && !numbers) return null;
                   return (
-                    <p className="mt-3 text-[12px] leading-relaxed text-white/40">
+                    <p className="mt-3 text-[12px] leading-relaxed text-white/50">
                       {kneeLine}
                       {numbers && (
-                        <span className="mt-1 block font-mono text-[10.5px] text-white/35">
+                        <span className="mt-1 block font-mono text-[12px] text-white/50">
                           estimated worst inward (hip half-widths): L {kneeRecord.left!.toFixed(2)} · R {kneeRecord.right!.toFixed(2)}
                           {' '}· flagged frames {kneeRecord.flaggedFrames} · square frames {kneeRecord.squareFrames}
                           {' '}· not square {kneeRecord.notSquareFrames}
@@ -1868,14 +1911,14 @@ export function MirrorHarness({
                 })()}
               </div>
               <div>
-                <p className="font-mono text-[9.5px] uppercase tracking-[0.16em] text-white/35">What was cued</p>
+                <p className="font-mono text-[12px] uppercase tracking-[0.16em] text-white/50">{REVIEW_COPY.coachSaid}</p>
                 {cueLog.length === 0 ? (
-                  <p className="mt-2 text-[13px] text-white/60">No corrections were cued during the work set.</p>
+                  <p className="mt-2 text-[13px] text-white/60">{REVIEW_COPY.coachSaidNothing}</p>
                 ) : (
                   <ul className="mt-2 space-y-1.5">
                     {cueLog.map((c, i) => (
                       <li key={i} className="text-[13px] text-white/70">
-                        <span className="font-mono text-[10px] uppercase tracking-wider text-white/30">{c.level}</span>{' '}{c.text}
+                        <span className="font-mono text-[12px] uppercase tracking-wider text-white/50">{levelWord(c.level)}</span>{' '}{c.text}
                       </li>
                     ))}
                   </ul>
@@ -1885,43 +1928,43 @@ export function MirrorHarness({
             {/* MIRROR-COACH P1 (2026-09-25): "held" is read from the last reps (lib/mirror/squatStage.ts
                 squatReviewVerdict). It used to be "any cue and no regress", which said "The correction held" over a
                 set whose heels rose on all eight reps. */}
-            <p className="mt-4 border-t border-white/[0.06] pt-4 text-[13px] leading-relaxed text-white/50">
-              {squatReviewVerdict(squatWorkReps, cueLog, {
-                cueable: (f) => cueableFaults(f),
-                // a knee never read square was not judged, cue or no cue (MIRROR-COACH P2)
-                kneeJudged: VALGUS_CUE_VERIFIED && kneeRecord.squareFrames > 0,
-              }).line}
-            </p>
+
             <FadeLines lines={fadeLines} />
+            </>)} />
           </section>
         )}
 
         {/* The lunge's review — the PER-SIDE result (MIRROR-COACH P4 lane 1: "the review card, and the per-side
             result"). A squat lets the strong side hide; the lunge cannot, so the two sides are read side by side. */}
+        {/* MIRROR-RESULTS (2026-11-03): the lunge's review on the result card's "no number" variant, as the squat's — "Lunge ·
+            N reps", each side's own "what we saw" as the line (lungeVerdict), the per-side panel under Details, unchanged */}
         {pattern === 'lunge' && lungeSession.stage === 'review' && (
-          <section className="mt-6 rounded-2xl border border-white/8 bg-white/[0.02] p-5">
-            <h2 className="fel-heading text-[15px] font-bold text-white/80">What the camera measured — each side</h2>
+          <section className="mt-6" data-lunge-review>
+            <ResultCard reveal={false} seeAll={false} view={mirrorReviewView(MOVEMENT_NAMES.lunge,
+              lungeSession.workReps.left.length + lungeSession.workReps.right.length,
+              lungeVerdict((['left', 'right'] as LungeSide[]).map((side) => lungeSideResult(lungeSession, side))))} details={(<>
+            <h2 className="fel-heading text-[15px] font-bold text-white/80">{REVIEW_COPY.headingEachSide}</h2>
             <div className="mt-3 grid gap-5 sm:grid-cols-2">
               {(['left', 'right'] as LungeSide[]).map((side) => {
                 const r = lungeSideResult(lungeSession, side);
                 return (
                   <div key={side}>
-                    <p className="font-mono text-[9.5px] uppercase tracking-[0.16em] text-white/35">
+                    <p className="font-mono text-[12px] uppercase tracking-[0.16em] text-white/50">
                       {side === 'left' ? 'Left leg forward' : 'Right leg forward'}
                     </p>
                     <p className="fel-heading mt-1 text-[24px] font-black leading-none text-white">
-                      {r.reps}<span className="ml-1.5 text-[12px] font-mono uppercase tracking-[0.14em] text-white/35">reps</span>
+                      {r.reps}<span className="ml-1.5 text-[12px] font-mono uppercase tracking-[0.14em] text-white/50">reps</span>
                     </p>
                     {r.unreadable ? (
-                      <p className="mt-2 text-[13px] text-[#FFC24B]">Not square to the camera through this set — not read.</p>
+                      <p className="mt-2 text-[13px] text-[#FFC24B]">{REVIEW_COPY.turnedAway}</p>
                     ) : Object.keys(r.faultRepCounts).length === 0 ? (
-                      <p className="mt-2 text-[13px] text-white/60">{r.reps ? 'No faults measured.' : 'Not reached.'}</p>
+                      <p className="mt-2 text-[13px] text-white/60">{r.reps ? REVIEW_COPY.nothingToFix : REVIEW_COPY.notDone}</p>
                     ) : (
                       <ul className="mt-2 space-y-1.5">
                         {(Object.entries(r.faultRepCounts) as [LungeFault, number][]).map(([id, n]) => (
                           <li key={id} className="flex gap-2 text-[13px] text-white/70">
                             <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-[#FF3366]" />
-                            {LUNGE_FAULT_LABEL[id]} — {n} of {r.reps} reps
+                            {repsLine(LUNGE_FAULT_LABEL[id], n, r.reps)}
                           </li>
                         ))}
                       </ul>
@@ -1935,20 +1978,21 @@ export function MirrorHarness({
               <ul className="mt-4 space-y-1.5 border-t border-white/[0.06] pt-4" data-lunge-cues>
                 {cueLog.map((c, i) => (
                   <li key={i} className="text-[13px] text-white/70">
-                    <span className="font-mono text-[10px] uppercase tracking-wider text-white/30">{c.level}</span>{' '}{c.text}
+                    <span className="font-mono text-[12px] uppercase tracking-wider text-white/50">{levelWord(c.level)}</span>{' '}{c.text}
                   </li>
                 ))}
               </ul>
             )}
             <FadeLines lines={fadeLines} />
+            </>)} />
           </section>
         )}
 
         {pattern === 'hinge' && hingeSession.stage === 'review' && (
-          <SideRepReviewCard spec={HINGE_LIVE} state={hingeSession} label={hingeLabel} cueLog={cueLog} fadeLines={fadeLines} />
+          <SideRepReviewCard spec={HINGE_LIVE} state={hingeSession} label={hingeLabel} cueLog={cueLog} fadeLines={fadeLines} movement={MOVEMENT_NAMES.hinge} />
         )}
         {pattern === 'pushup' && pushupSession.stage === 'review' && (
-          <SideRepReviewCard spec={PUSHUP_LIVE} state={pushupSession} label={pushupLabel} cueLog={cueLog} fadeLines={fadeLines} />
+          <SideRepReviewCard spec={PUSHUP_LIVE} state={pushupSession} label={pushupLabel} cueLog={cueLog} fadeLines={fadeLines} movement={MOVEMENT_NAMES.pushup} />
         )}
 
         {/* MIRROR-PROGRESS: "vs your last 3" for the set End just closed — on its own tab only */}
@@ -1980,7 +2024,7 @@ export function MirrorHarness({
               {PATTERN_ZONES.map((id) => (
                 <li key={id} className="flex items-baseline gap-3 text-[13px]">
                   <span className="min-w-0 flex-1 truncate text-white/70">{ZONE_LABEL[id]}</span>
-                  <span className="shrink-0 font-mono text-[12px] text-white/45">
+                  <span className="shrink-0 font-mono text-[12px] text-white/50">
                     {secs(summary.timeInStableMs[id])}s stable
                   </span>
                   <span
@@ -2030,7 +2074,7 @@ function Figure({ label, value, accent }: { label: string; value: string; accent
   return (
     <div>
       <p className="fel-heading text-[24px] font-black leading-none" style={{ color: accent ?? '#FFFFFF' }}>{value}</p>
-      <p className="mt-1.5 font-mono text-[9.5px] uppercase tracking-[0.16em] text-white/35">{label}</p>
+      <p className="mt-1.5 font-mono text-[12px] uppercase tracking-[0.16em] text-white/50">{label}</p>
     </div>
   );
 }

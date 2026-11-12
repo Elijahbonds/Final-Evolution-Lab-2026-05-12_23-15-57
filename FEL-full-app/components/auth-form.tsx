@@ -5,12 +5,16 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { signIn, signOut } from 'next-auth/react';
 import { AgeStep, AgeTurnAway, ageBlockPresent } from '@/components/age-step';
-import { Dumbbell, Gamepad2 } from 'lucide-react';
 import { ModeCarousel } from '@/components/onboarding/mode-carousel';
+import { PathPicker } from '@/components/onboarding/path-picker';
 import { MODE_INFO, canonicalModeKey } from '@/lib/game-data';
 import {
-  DEFAULT_FIRST_GAME, destinationFor, resolveFirstGame, type OnboardingPath,
+  DEFAULT_FIRST_GAME, destinationFor, pathFor, resolveFirstGame, type OnboardingPath,
 } from '@/lib/onboarding/firstRun';
+import { FIRST_WINS } from '@/lib/onboarding/firstWin';
+import { readFirstTouch, signupAttribution } from '@/lib/marketing/utm';
+import { ageScreenOutcome } from '@/lib/privacy/ageScreen';
+import { track } from '@/lib/analytics';
 import { motion } from 'framer-motion';
 import { Loader2, Check } from 'lucide-react';
 import { CURRENT_POLICY_VERSION } from '@/lib/policies';
@@ -43,8 +47,8 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
   // A /c/<code> challenge, or any other safe ?next=, survives the hop between login and signup.
   const [challengeCode, setChallengeCode] = useState<string | null>(null);
   const [returnPath, setReturnPath] = useState<string | null>(null);
-  // WHAT THEY CAME FOR, asked before they commit to anything. Some people arrive to play and some arrive to be
-  // assessed; sending both to the same shelf loses one of them.
+  // WHAT THEY CAME FOR, asked before they commit to anything (ONB-01: play / train / learn / teach / create). Sending
+  // everybody to the same shelf loses most of them; each answer lands on its own first win (lib/onboarding/firstWin.ts).
   const [path, setPath] = useState<OnboardingPath>('play');
   const [firstGame, setFirstGame] = useState<string>(DEFAULT_FIRST_GAME);
   // The creator whose card or QR brought them, resolved from ?ref by /api/onboarding/host.
@@ -54,6 +58,9 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
   // FN-BOX-1b: the full date the age step locked with the year ('YYYY-MM-DD'); the server stores it as User.dob.
   const [birthDate, setBirthDate] = useState<string | null>(null);
   const [turnedAway, setTurnedAway] = useState(false);
+  // Teach is offered only once the age step says verified adult (null until it is locked: held meanwhile).
+  const isAdult = birthYear === null ? null : ageScreenOutcome(birthYear) === 'adult';
+  useEffect(() => { if (path === 'teach' && isAdult !== true) setPath('play'); }, [path, isAdult]);
 
   useEffect(() => {
     // The last game they picked, so somebody coming back is offered what they chose before rather than the default.
@@ -114,10 +121,14 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
           setLoading(false);
           return;
         }
+        // ONB-04: where the first visit came from (utm_* / ?ref, kept first-party by AttributionCapture), sent once, with
+        // the account. Nothing at all when the visit carried no tags.
+        let utm: ReturnType<typeof signupAttribution>;
+        try { utm = signupAttribution(readFirstTouch(window.localStorage)); } catch { utm = undefined; }
         const res = await fetch('/api/signup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password, name, policyVersion: CURRENT_POLICY_VERSION, birthYear, ...(birthDate ? { birthDate } : {}), ...(refCode ? { ref: refCode } : {}) }),
+          body: JSON.stringify({ email, password, name, policyVersion: CURRENT_POLICY_VERSION, birthYear, ...(birthDate ? { birthDate } : {}), ...(refCode ? { ref: refCode } : {}), ...(utm ? { utm } : {}) }),
         });
         const j = await res.json().catch(() => ({}));
         if (!res.ok) {
@@ -166,7 +177,11 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
         window.location.replace(challengeReturnPath(challengeCode));
         return;
       }
-      const fallback = destinationFor(path, resolveFirstGame({ creatorMode: host?.mode, chosen: firstGame }));
+      // Teach is for verified adults; anyone else who somehow holds it lands on train (pathFor). Play keeps the creator's
+      // game first: a scanned card still opens the creator's signature mode (resolveFirstGame).
+      const landing = pathFor(path, { adult: isAdult === true });
+      if (mode === 'signup') track('path_chosen', { path: landing, where: 'signup' });
+      const fallback = destinationFor(landing, resolveFirstGame({ creatorMode: host?.mode, chosen: firstGame }));
       // safePostSignInDestination (not loginDestination) also refuses a ?next= that points back at /login itself
       // (bare, or nested as next=/login?next=/login), so a crafted or re-encoded query cannot recreate the loop.
       const dest = safePostSignInDestination(nextRaw, fallback);
@@ -198,6 +213,9 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
   if (turnedAway) return <AgeTurnAway />;
 
   const credentialsOpen = mode === 'login' || birthYear !== null;
+  // EVERY-SCREEN P7 (owner, 2026-11-11): the birth date first; "What did you come for?" and the first game come after it is
+  // confirmed. Same questions, same words, in that order.
+  const choicesOpen = mode === 'signup' && birthYear !== null;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#050505] px-3 py-6 sm:px-4">
@@ -227,12 +245,12 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
             priority
             className="mx-auto mb-2 h-[72px] w-auto opacity-90 sm:h-[92px]"
           />
-          <h1 className="fel-heading text-[26px] font-bold leading-none sm:text-4xl">
+          <h1 className="fel-heading text-[30px] font-bold leading-none sm:text-4xl">
             <span className="text-[#00E5FF] fel-glow-cyan">FINAL EVOLUTION</span> LAB
           </h1>
-          <p className="mx-auto mt-2 max-w-xs text-[13px] text-white/55 sm:max-w-none sm:text-sm">
+          <p className="mx-auto mt-2 max-w-xs text-[14px] text-white/55 sm:max-w-none sm:text-sm">
             {mode === 'login'
-              ? 'Real sports, real training — your on-court reps become real stats.'
+              ? 'Real sports. Real training. Real stats.'
               : 'Pick your arena, then create your athlete profile.'}
           </p>
         </div>
@@ -255,70 +273,43 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
           >
             <span
               aria-hidden
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-full font-mono text-[13px] font-black text-black"
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-full font-mono text-[14px] font-black text-black"
               style={{ background: host.accent ?? '#00E5FF' }}
             >
               {host.name.slice(0, 1).toUpperCase()}
             </span>
-            <p className="min-w-0 text-[13px] leading-snug text-white/70">
+            <p className="min-w-0 text-[14px] leading-snug text-white/70">
               <span className="font-bold text-white">{host.name}</span> sent you
-              {host.mode && MODE_INFO[host.mode] && (
+              {host.mode && MODE_INFO[host.mode] && path === 'play' && (
                 <> — you are starting in <span className="font-bold text-white">{MODE_INFO[host.mode].name}</span>.</>
               )}
             </p>
           </div>
         )}
 
-        {/* THE TWO WAYS IN. This used to be six hardcoded sports that saved your answer to localStorage and then
-            sent you to the home page regardless. Asking is only worth doing if the answer changes where you land,
-            and now it does. */}
-        {mode === 'signup' && (
+        {/* THE WAYS IN (ONB-01). This used to be six hardcoded sports that saved your answer to localStorage and then
+            sent you to the home page regardless; then two (play or body). Asking is only worth doing if the answer
+            changes where you land, and each of the five lands on its own first win. */}
+        {choicesOpen && (
           <div className="mb-5">
-            <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-white/35">
-              What did you come for?
-            </p>
-            <div className="grid grid-cols-2 gap-2.5">
-              {([
-                { id: 'play' as const, icon: Gamepad2, title: 'Play first', line: 'Drop into a game now.', accent: '#00E5FF' },
-                { id: 'body' as const, icon: Dumbbell, title: 'Body first', line: 'Screen your movement, then train.', accent: '#00FF9D' },
-              ]).map((o) => {
-                const on = path === o.id;
-                const Icon = o.icon;
-                return (
-                  <button
-                    key={o.id}
-                    type="button"
-                    onClick={() => setPath(o.id)}
-                    aria-pressed={on}
-                    className="rounded-2xl border p-3.5 text-left transition-all duration-200"
-                    style={{
-                      borderColor: on ? `${o.accent}66` : 'rgba(255,255,255,0.10)',
-                      background: on ? `${o.accent}10` : 'rgba(255,255,255,0.02)',
-                    }}
-                  >
-                    <Icon className="h-[18px] w-[18px]" style={{ color: on ? o.accent : 'rgba(255,255,255,0.35)' }} strokeWidth={2.2} />
-                    <span className="fel-heading mt-2 block text-[14px] font-bold leading-none text-white">{o.title}</span>
-                    <span className="mt-1.5 block text-[11.5px] leading-snug text-white/45">{o.line}</span>
-                  </button>
-                );
-              })}
-            </div>
+            <PathPicker value={path} onChange={setPath} adult={isAdult} />
           </div>
         )}
 
         {/* The games, as a rail you swipe. The focused card preloads its mode so entry is instant. */}
-        {mode === 'signup' && path === 'play' && (
+        {choicesOpen && path === 'play' && (
           <div className="mb-6">
             <ModeCarousel lead={host?.mode ?? null} value={firstGame} onChange={rememberGame} accent={host?.accent} />
           </div>
         )}
 
-        {mode === 'signup' && path === 'body' && (
-          <div className="mb-6 rounded-2xl border border-[#00FF9D]/25 bg-[#00FF9D]/[0.04] p-4">
-            <p className="fel-heading text-[14px] font-bold text-white">You will start in the Mirror</p>
-            <p className="mt-1.5 text-[12.5px] leading-relaxed text-white/50">
-              A movement screen from your phone camera — prop it up, step back, and it scores what it sees. The
-              games are still there when you want them.
+        {choicesOpen && path !== 'play' && (
+          <div className="mb-6 rounded-2xl border p-4" data-first-win-preview={path}
+            style={{ borderColor: `${FIRST_WINS[path].accent}40`, background: `${FIRST_WINS[path].accent}0A` }}>
+            <p className="font-mono text-[12px] font-bold uppercase tracking-[0.16em]" style={{ color: FIRST_WINS[path].accent }}>Your first win</p>
+            <p className="fel-heading mt-1 text-[14px] font-bold text-white">{FIRST_WINS[path].title}</p>
+            <p className="mt-1.5 text-[16px] leading-relaxed text-white/60">
+              {FIRST_WINS[path].steps[0].text} About {FIRST_WINS[path].aboutSec} seconds, right after you join.
             </p>
           </div>
         )}
@@ -337,31 +328,36 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
               placeholder="Athlete name"
               value={name}
               onChange={(e) => setName(e?.target?.value ?? '')}
-              className="w-full rounded-md border border-white/10 bg-[#16161A] px-4 py-3 text-sm text-white placeholder-white/30 outline-none transition-colors focus:border-[#00E5FF]/60"
+              className="w-full rounded-md border border-white/10 bg-[#16161A] px-4 py-3 text-sm text-white placeholder-white/50 outline-none transition-colors focus:border-[#00E5FF]/60"
             />
           )}
           <input
             type="email"
             required
+            aria-label="Email"
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e?.target?.value ?? '')}
-            className="w-full rounded-md border border-white/10 bg-[#16161A] px-4 py-3 text-sm text-white placeholder-white/30 outline-none transition-colors focus:border-[#00E5FF]/60"
+            className="w-full rounded-md border border-white/10 bg-[#16161A] px-4 py-3 text-sm text-white placeholder-white/50 outline-none transition-colors focus:border-[#00E5FF]/60"
           />
           <input
             type="password"
             required
             minLength={6}
+            aria-label="Password"
             placeholder="Password (6+ characters)"
             value={password}
             onChange={(e) => setPassword(e?.target?.value ?? '')}
-            className="w-full rounded-md border border-white/10 bg-[#16161A] px-4 py-3 text-sm text-white placeholder-white/30 outline-none transition-colors focus:border-[#00E5FF]/60"
+            className="w-full rounded-md border border-white/10 bg-[#16161A] px-4 py-3 text-sm text-white placeholder-white/50 outline-none transition-colors focus:border-[#00E5FF]/60"
           />
           {mode === 'signup' && (
-            <label className="flex items-start gap-3 cursor-pointer select-none">
+            // EVERY-SCREEN P7 (owner, 2026-11-11): a real checkbox, named by its label's words, usable from the keyboard and by a
+            // screen reader; the box beside it is its picture. Same words, same rule: it must be ticked to continue.
+            <label className="flex min-h-11 items-start gap-3 cursor-pointer select-none">
+              <input type="checkbox" checked={policyAccepted} onChange={(e) => setPolicyAccepted(e.target.checked)} className="peer sr-only" data-terms-tick />
               <span
-                onClick={() => setPolicyAccepted(!policyAccepted)}
-                className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors ${
+                aria-hidden
+                className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-[#00E5FF] ${
                   policyAccepted ? 'border-[#00E5FF] bg-[#00E5FF]/20' : 'border-white/20 bg-[#16161A]'
                 }`}
               >
@@ -378,7 +374,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
           <button
             type="submit"
             disabled={loading || (mode === 'signup' && !policyAccepted)}
-            className="fel-heading flex w-full items-center justify-center gap-2 rounded-md bg-[#00E5FF] py-3 text-lg font-bold text-black transition-all hover:bg-[#00E5FF]/85 hover:shadow-[0_0_24px_rgba(0,229,255,0.45)] disabled:opacity-50"
+            className="fel-heading flex w-full items-center justify-center gap-2 rounded-md bg-[#00E5FF] py-3 text-[20px] font-bold text-black transition-all hover:bg-[#00E5FF]/85 hover:shadow-[0_0_24px_rgba(0,229,255,0.45)] disabled:opacity-50"
           >
             {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : mode === 'login' ? 'ENTER THE LAB' : 'BEGIN EVOLUTION'}
           </button>
@@ -387,14 +383,14 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
           {mode === 'login' ? (
             <>
               New athlete?{' '}
-              <Link href={challengeCode ? challengeSignupHref(challengeCode) : returnPath ? `/signup?next=${encodeURIComponent(returnPath)}` : '/signup'} className="font-semibold text-[#00E5FF] hover:underline">
+              <Link href={challengeCode ? challengeSignupHref(challengeCode) : returnPath ? `/signup?next=${encodeURIComponent(returnPath)}` : '/signup'} className="inline-flex min-h-11 items-center font-semibold text-[#00E5FF] hover:underline">
                 Create account
               </Link>
             </>
           ) : (
             <>
               Already registered?{' '}
-              <Link href={challengeCode ? challengeLoginHref(challengeCode) : returnPath ? loginPath(returnPath) : '/login'} className="font-semibold text-[#00E5FF] hover:underline">
+              <Link href={challengeCode ? challengeLoginHref(challengeCode) : returnPath ? loginPath(returnPath) : '/login'} className="inline-flex min-h-11 items-center font-semibold text-[#00E5FF] hover:underline">
                 Sign in
               </Link>
             </>
@@ -402,16 +398,16 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
         </p>
         {/* M12.7 — legal links reachable from the login view, mirroring signup. */}
         {mode === 'login' && (
-          <p className="mt-4 text-center text-xs text-white/35">
-            <a href="/terms" target="_blank" className="hover:text-[#00E5FF] hover:underline">Terms</a>
+          <p className="mt-4 text-center text-xs text-fel-quiet">
+            <a href="/terms" target="_blank" className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-[#00E5FF] hover:underline">Terms</a>
             <span className="mx-2">·</span>
-            <a href="/privacy" target="_blank" className="hover:text-[#00E5FF] hover:underline">Privacy</a>
+            <a href="/privacy" target="_blank" className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-[#00E5FF] hover:underline">Privacy</a>
             <span className="mx-2">·</span>
-            <a href="/support" target="_blank" className="hover:text-[#00E5FF] hover:underline">Support</a>
+            <a href="/support" target="_blank" className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-[#00E5FF] hover:underline">Support</a>
             {/* HOTFIX (2026-09-24): the licence notices sit with the other legal links, named so they do not read as
                 the Lab Credits wallet. */}
             <span className="mx-2">·</span>
-            <a href="/credits" target="_blank" className="hover:text-[#00E5FF] hover:underline">Credits &amp; licences</a>
+            <a href="/credits" target="_blank" className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-[#00E5FF] hover:underline">Credits &amp; licences</a>
           </p>
         )}
       </motion.div>

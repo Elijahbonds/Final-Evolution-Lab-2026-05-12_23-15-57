@@ -286,7 +286,7 @@ export function CalibrateClient({ returnTo = null }: { returnTo?: string | null 
               {offset > 0 ? '+' : ''}
               {offset} ms
             </p>
-            <p className="mt-1 text-xs text-white/40">{offsetLine(offset)}</p>
+            <p className="mt-1 text-xs text-white/50">{offsetLine(offset)}</p>
             {heard === 0 ? (
               <p className="mt-1 text-xs text-[#FFD700]">No taps heard — press Recalibrate and tap on every click.</p>
             ) : !steady ? (
@@ -342,7 +342,7 @@ export function CalibrateClient({ returnTo = null }: { returnTo?: string | null 
         )}
       </div>
 
-      <div className="mt-4 flex items-center justify-between gap-3 text-xs text-white/45">
+      <div className="mt-4 flex items-center justify-between gap-3 text-xs text-white/50">
         <span>
           {saved.saved ? (
             <>
@@ -353,7 +353,7 @@ export function CalibrateClient({ returnTo = null }: { returnTo?: string | null 
             <>No offset saved on this device yet.</>
           )}
         </span>
-        <Link href={returnTo ?? '/modes'} className="shrink-0 text-[#00E5FF] hover:underline">
+        <Link href={returnTo ?? '/modes'} className="inline-flex min-h-11 shrink-0 items-center text-[#00E5FF] hover:underline">
           {returnTo ? 'Back to the room' : 'Back to modes'}
         </Link>
       </div>

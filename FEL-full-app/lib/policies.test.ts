@@ -26,6 +26,7 @@ const TEXT_BY_VERSION: Record<string, string> = {
   '2026-10-14': 'd0dd0d8daf1d3367',  // LANE-SYNC: CREATOR-PLATFORM §1 Work-with-us bullet + BUSINESS-ADDRESS #2012 mailbox together
   '2026-10-14b': '6d4d960aced45bf7',  // PARTY-PRIVACY: §2 gains the Parties bullet (party name, nothing recorded, voice 18+, block on the device, reports kept 12 months)
   '2026-10-16': 'f5be67c85745dff0',   // STUDIO-AI-DISCLOSURE: §1 and §2 name the Studio AI builder's requests (venue request + settings only, signed-in 13+, rate-limited)
+  '2026-10-27': '7cac849a7676781b',   // OWNER-APPROVALS (owner in chat, cards C11/C28/C03): Terms §1 names the Purchase and Coach Terms, Terms §2 teens on a coach roster; Privacy §1/§2 training logs, form reviews (90-day replay), the guardian's details; §5 training logs are not health data; §7 Stripe for every product
 };
 
 describe('the policy version', () => {
@@ -57,8 +58,11 @@ describe('the policy version', () => {
   // the text; 2026-10-13 is now an earlier version and keeps its fingerprint above.
   // test changed (2026-10-16, owner-approved Studio AI builder disclosure, lane/owner-1016): was toBe('2026-10-14b'). The
   // version moves with the text; 2026-10-14b is now an earlier version and keeps its fingerprint above.
+  // test changed (2026-10-27, owner-approved C11/C28/C03 text, lane/owner-approvals): was toBe('2026-10-16'). The version
+  // moves with the text; 2026-10-16 is now an earlier version and keeps its fingerprint above.
   it('is the final, non-draft label', () => {
-    expect(CURRENT_POLICY_VERSION).toBe('2026-10-16');
+    expect(CURRENT_POLICY_VERSION).toBe('2026-10-27');
+    expect(CURRENT_POLICY_VERSION).not.toBe('2026-10-16');
     expect(CURRENT_POLICY_VERSION).not.toBe('2026-10-14b');
     expect(CURRENT_POLICY_VERSION).not.toBe('2026-10-14');
     expect(CURRENT_POLICY_VERSION).not.toBe('2026-10-13');
@@ -79,7 +83,7 @@ describe('the policy version', () => {
   });
 
   it('keeps every earlier version fingerprint (the record of what each signup accepted)', () => {
-    for (const v of ['2026-09-24-draft', '2026-09-25-draft', '2026-09-29-draft', '2026-09-29b-draft', '2026-09-29c-draft', '2026-09-30-draft', '2026-10-01-draft', '2026-10-07-draft', '2026-10-07', '2026-10-12', '2026-10-13']) {
+    for (const v of ['2026-09-24-draft', '2026-09-25-draft', '2026-09-29-draft', '2026-09-29b-draft', '2026-09-29c-draft', '2026-09-30-draft', '2026-10-01-draft', '2026-10-07-draft', '2026-10-07', '2026-10-12', '2026-10-13', '2026-10-14', '2026-10-14b', '2026-10-16']) {
       expect(TEXT_BY_VERSION).toHaveProperty(v);
     }
   });
@@ -526,5 +530,49 @@ describe('the Studio AI builder is named in Privacy §1 and §2', () => {
     expect(edits).toContain('Creator asks: ${prompt');
     const brief = edits.slice(edits.indexOf('export function venueBrief'), edits.indexOf('const ENUMS'));
     expect(brief).not.toMatch(/dobYear|birth|email|user|session|character|health|account/i);
+  });
+});
+
+// OWNER-APPROVALS (2026-10-27; owner, in chat: "You do it. I approve." — cards C11, C28 and C03's recommendation). Each new
+// line says what the code does, read from the code: these hold the text to it.
+describe('teens on a coach roster, training logs, form reviews, payments (C11, C03, C28)', () => {
+  it('Terms §2: 13–17 on a coach roster only after a guardian says yes to coached training; the under-13 and 18+ rules are unchanged', async () => {
+    const t2 = TERMS_CONTENT.slice(TERMS_CONTENT.indexOf('## 2.'), TERMS_CONTENT.indexOf('## 3.'));
+    expect(t2).toMatch(/13 to 17, you can join a coach’s roster on FEL and train with that coach here only after a parent or legal guardian has said yes to coached training/);
+    expect(t2).toContain('You must be 18 or older to buy anything, book coaching or a review, or agree to the store terms.');
+    expect(t2).toContain('We can’t create an account for anyone under 13.');
+    // the code it describes: no consent covers coach training until the owner's go-live date, so every teen fails closed
+    const { COACH_TRAINING_CONSENT_SINCE, coversCoachTraining } = await import('@/lib/coach/coachConsent');
+    expect(coversCoachTraining({ requestedAt: new Date() }, COACH_TRAINING_CONSENT_SINCE)).toBe(COACH_TRAINING_CONSENT_SINCE != null);
+  });
+
+  it('Privacy §1/§2: training logs, the 90-day skeleton replay, the guardian email used only for the report', async () => {
+    const p1 = PRIVACY_CONTENT.slice(PRIVACY_CONTENT.indexOf('## 1.'), PRIVACY_CONTENT.indexOf('## 2.'));
+    const p2 = PRIVACY_CONTENT.slice(PRIVACY_CONTENT.indexOf('## 2.'), PRIVACY_CONTENT.indexOf('## 3.'));
+    expect(p1).toMatch(/\*\*Training logs:\*\*/);
+    expect(p1).toMatch(/only after a parent or guardian has said yes to coached training/);
+    const { TRACKS_KEEP_DAYS } = await import('@/lib/coach/formReview/store');
+    expect(p1).toContain(`We keep the skeleton replay for ${TRACKS_KEEP_DAYS} days, then delete it.`);
+    expect(p1).toMatch(/never the video/);
+    expect(p2).toMatch(/Your coach sees the training you log on their programs/);
+    expect(p2).toMatch(/nothing measured about the body/);
+    expect(p2).toMatch(/We use their email only for that report and for the consent itself/);
+  });
+
+  it('Privacy §5: training logs are not health data, and a guardian’s yes never unlocks health data (no under-18 rule loosened)', () => {
+    const p5 = PRIVACY_CONTENT.slice(PRIVACY_CONTENT.indexOf('## 5.'), PRIVACY_CONTENT.indexOf('## 6.'));
+    expect(p5).toMatch(/\*\*Training logs are not health data\.\*\*/);
+    expect(p5).toMatch(/saved only for players 18 and over, with or without it/);
+    // the existing minor rule stays word for word
+    expect(p5).toContain('If you are under 18, or you have not told us your birth year, a parent or guardian has to give that consent before any of it is collected');
+  });
+
+  it('Privacy §7: Stripe for every product; Terms §1 names the Purchase and Coach Terms by their pages', async () => {
+    expect(PRIVACY_CONTENT).toMatch(/Stripe processes the payments for everything sold on FEL — FEL Pro, the season pass, coin packs, the coach store and coaches’ packages/);
+    expect(PRIVACY_CONTENT).not.toContain('Payment processing (when enabled) uses Stripe');
+    const { PURCHASE_TERMS_HREF } = await import('@/lib/purchase-terms');
+    const { COACH_TERMS_HREF } = await import('@/lib/payments/terms');
+    expect(TERMS_CONTENT).toContain(`the Purchase Terms and Refund Policy at ${PURCHASE_TERMS_HREF} also apply`);
+    expect(TERMS_CONTENT).toContain(`the Coach Terms and Payout Terms at ${COACH_TERMS_HREF} also apply`);
   });
 });

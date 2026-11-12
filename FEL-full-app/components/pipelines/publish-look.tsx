@@ -8,7 +8,7 @@ import { PublishAsCardLink } from '@/components/create/publish-as-card';
 export function PublishLookAsCard({ title }: { title?: string }) {
   return (
     <PublishAsCardLink discipline="fashion" entry={{ from: 'closet', ...(title ? { title } : {}) }} qa="publish-look-as-card"
-      className="mt-2 flex w-full items-center justify-center rounded-xl border border-cyan-400/40 py-2 text-xs font-bold text-cyan-200 hover:bg-cyan-400/10">
+      className="mt-2 flex min-h-11 w-full items-center justify-center rounded-lg border border-cyan-400/40 bg-white/[0.03] py-2 text-[12px] text-cyan-200 hover:bg-cyan-400/10">
       Publish this look as a card
     </PublishAsCardLink>
   );

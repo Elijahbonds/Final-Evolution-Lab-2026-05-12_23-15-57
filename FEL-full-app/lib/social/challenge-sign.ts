@@ -161,6 +161,20 @@ export function verifyChallenge(payload: ChallengePayload, sig: string, now: num
   }
 }
 
+/**
+ * CHALLENGES-2: an HMAC under the same secret for another challenge record (the result receipt,
+ * lib/social/challenge-receipt.ts), domain-separated so it can never stand in for a payload signature. Throws
+ * ChallengeSecretMissingError with no secret, like signing does.
+ */
+export function challengeHmac(domain: string, input: string): string {
+  return hmac(secret(), `fel-challenge:${domain}\n${input}`);
+}
+
+/** Constant-time compare of two challengeHmac outputs (strict 32-byte base64url, else false). */
+export function challengeHmacMatches(expected: string, got: unknown): boolean {
+  return sigMatches(expected, got);
+}
+
 /** Verify a payload against its signature (see verifyChallenge). */
 export function verifyPayload(payload: ChallengePayload, sig: string): boolean {
   return verifyChallenge(payload, sig) !== null;

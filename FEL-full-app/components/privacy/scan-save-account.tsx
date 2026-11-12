@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { SCAN_SAVE_CONSENT_TEXT } from '@/lib/privacy/scanSaveConsent';
+import { lineSize } from '@/lib/design/type';
 
 type Item = { id: string; kind: string; at: string; numbers: Record<string, string | number | null> };
 
@@ -22,15 +23,18 @@ export function ScanSaveAccountPanel(props: {
 }) {
   return (
     <section className="rounded-xl border border-white/10 bg-white/[0.02] p-5" data-testid="scan-save-account">
-      <h2 className="fel-heading text-lg font-bold text-white">Jump numbers</h2>
-      <label className="mt-3 flex items-start gap-3 text-sm text-white/80">
+      <h2 className="fel-heading text-[20px] font-bold text-white">Jump numbers</h2>
+      <label className={`mt-3 flex min-h-11 cursor-pointer items-start gap-3 ${lineSize(SCAN_SAVE_CONSENT_TEXT, 'text-sm')} text-white/80`}>
         <input
           data-testid="scan-save-toggle"
           type="checkbox"
           checked={props.optedIn}
           disabled={props.busy}
           onChange={(e) => props.onToggle(e.target.checked)}
+          className="peer sr-only"
         />
+        {/* EVERY-SCREEN P8: the real checkbox is above (named by this label's words); this is its picture */}
+        <span aria-hidden className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border text-[12px] peer-focus-visible:ring-2 peer-focus-visible:ring-[#00E5FF] ${props.optedIn ? 'border-[#00E5FF] bg-[#00E5FF]/20 text-[#00E5FF]' : 'border-white/30'} ${props.busy ? 'opacity-50' : ''}`}>{props.optedIn ? '✓' : ''}</span>
         <span>{SCAN_SAVE_CONSENT_TEXT}</span>
       </label>
       {!props.optedIn && props.hasSaved ? (
@@ -44,7 +48,7 @@ export function ScanSaveAccountPanel(props: {
           Delete my saved history
         </button>
       ) : null}
-      {props.note ? <p className="mt-2 text-xs text-white/60">{props.note}</p> : null}
+      {props.note ? <p className={`mt-2 ${lineSize(props.note, 'text-xs')} text-white/60`}>{props.note}</p> : null}
       {props.visible && props.items.length > 0 ? (
         <ul className="mt-4 space-y-2 text-xs text-white/70">
           {props.items.map((item) => (

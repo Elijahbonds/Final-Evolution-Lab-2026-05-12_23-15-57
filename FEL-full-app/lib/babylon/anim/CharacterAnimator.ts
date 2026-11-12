@@ -18,6 +18,60 @@
 import type { AnimationGroup, Scene, Observer } from '@babylonjs/core';
 import { resolveClip } from './clipResolver';
 import { ledgerFor, requestAllowed, scopeFallback, suiteOfClip, type ClipScope } from './clipScope';
+import { inertialAllBonesOn, inertialDt, inertialEndedHoldOn, inertialHipsPosOn, inertialTwinLinearOn, inertialHalfLife, inertialMatchVelOn, inertialStep, quatFromAxisAngle, quatMul, quatMulConj, quatToAxisAngle, type Quat } from './inertialize';
+import { feel } from '../../feel-panel/feel';
+
+/**
+ * GAMEPLAY-CLEAN P5 (2026-11-10): A ONE-SHOT THAT RUNS OUT INSIDE ITS OWN FADE-OUT IS HELD, feel knob `anim.fadeHoldEnded` (1 on).
+ *
+ * A crossfade ramps the outgoing clip's weight down over fadeSec. When that clip is a one-shot cut a few frames before its natural
+ * end — a strike or a hit react whose beat the mode ends by a timer, the settle arriving while the clip still has 3–5 frames to play —
+ * the clip reaches its end INSIDE the fade and Babylon stops its group: the weight it still had (0.6–0.8 of the body on a 0.18–0.2 s
+ * fade) is gone in ONE frame. Babylon fills a weight total under 1 with the incoming clip's "original value", the pose the bones held
+ * on the frame that clip STARTED, layers and all — a stale pose, so the body jumps from the one-shot's last frame toward where it was
+ * several frames earlier, then fades on from there. Measured in play (the rig, 14 s runs): Showdown's `karate_mc_hit_react` → `guard`,
+ * every bone on the frame after the react ran out (arms 21–30°, thighs 22–25°, spine 15° — the same numbers at 3.30, 4.75 and 9.32 s);
+ * Karate's jab → run, the right forearm 31–39° (2.47, 11.63, 12.95 s). freezeAtEnd already holds a fading-out clip's last frame, but
+ * only when a caller asks from the clip's end callback — and a cut clip's callback is detached when the cut starts (3d, final review),
+ * so nothing asked. Now the fade itself watches its outgoing clip: a ONE-SHOT that stopped at its natural end while the fade is still
+ * running is restarted as the frozen loop on its last frame (startFrozen, the freeze's own mechanism) at the weight the fade has it at,
+ * and fades out from there. 0 = the outgoing clip is left stopped, exactly as before. A loop, a clip stopped from anywhere else, a
+ * reverse-played clip and the inertial blend are untouched.
+ */
+export const FADE_HOLD_ENDED_ON = 1;
+
+/** AF-1: how a clip switch with fadeSec > 0 blends — 'linear' (the weight crossfade, the default) or 'inertial' (inertialize.ts). */
+export type BlendMode = 'linear' | 'inertial';
+
+/** AF-1: the slice of a Babylon TransformNode / Bone the inertial blend reads and writes (duck-typed: this file imports no values). */
+interface InertialQuat { x: number; y: number; z: number; w: number; set(x: number, y: number, z: number, w: number): unknown; clone(): InertialQuat }
+interface InertialVec { x: number; y: number; z: number; set(x: number, y: number, z: number): unknown; clone(): InertialVec }
+interface InertialNode { name: string; rotationQuaternion?: InertialQuat | null; position?: InertialVec | null; getClassName?(): string }
+/** AF-1: one animated node's history (the last two poses the animator showed) and its live offset. */
+interface InertialTrack {
+  last: Quat | null; prior: Quat | null;
+  lastP: [number, number, number] | null; priorP: [number, number, number] | null;
+  axis: [number, number, number]; x: number; v: number; rotOn: boolean;
+  pOff: [number, number, number]; pVel: [number, number, number]; posOn: boolean;
+  /** SWITCH-ON (anim.inertialMatchVel): the offset as a rotation vector (axis × angle) and its velocity, both 3-D, and the new clip's
+   *  raw pose on the switch frame, read again one frame later to take the new clip's own motion out of the offset's start. */
+  r3: [number, number, number]; w3: [number, number, number]; raw0: Quat | null; raw0P: [number, number, number] | null; dstDue: boolean;
+  /** SWITCH-ON (anim.inertialAllBones): the last clip keyed this node and the current one does not — it eases from the pose it showed
+   *  onto its rest (where a linear fade-out leaves it) instead of freezing there. */
+  toRest: boolean;
+  halfLife: number; hips: boolean; bone: boolean;
+  /** The inertial frame number the pose was last recorded on (history older than the frame before is stale). */
+  stamp: number;
+  scratchQ: InertialQuat | null; scratchP: InertialVec | null;
+}
+/** AF-1: a switch's starting velocity is capped (a teleported or re-spawned pose must not fling the offset). */
+const INERTIAL_MAX_ANG_VEL = 30, INERTIAL_MAX_LIN_VEL = 10;
+const INERTIAL_HIPS = /(^|[:_|])hips$/i;
+/** GAMEPLAY-CLEAN-7 (anim.inertialHipsPos): a spawned body's nodes are clones, `Hips_c240` — the Hips by name on those too. */
+const INERTIAL_HIPS_CLONE = /(^|[:_|])hips_c\d+$/i;
+const isHips = (name: string): boolean => INERTIAL_HIPS.test(name) || (INERTIAL_HIPS_CLONE.test(name) && inertialHipsPosOn());
+/** AF-1: a node a clip keys — its rotation (rotationQuaternion track) and/or, on the Hips, its position (position track). */
+interface InertialTarget { n: InertialNode; rot: boolean; pos: boolean }
 
 export interface PlayOpts {
   loop?: boolean;
@@ -60,6 +114,19 @@ export class CharacterAnimator {
   /** SHARED-ANIM-BUS: the mode's clip scope (clipScope.ts). null = unscoped (every suite). */
   private scope: ClipScope | null = null;
   private refusedOnce = new Set<string>();
+  /** AF-1: the blend mode (default 'linear' — nothing below runs until setBlendMode('inertial')). */
+  private blend: BlendMode = 'linear';
+  private inertialObs: Observer<Scene> | null = null;
+  /** AF-1: a clip switch waiting for the next evaluated frame, at this half-life (s). */
+  private inertialSwitch: { halfLife: number; defer?: boolean; ended?: boolean } | null = null;
+  /** GAMEPLAY-CLEAN P6: inside this frame's animation pass (onBeforeAnimations → this body's inertialFrame) — see LATE SWITCH. */
+  private inAnimate = false;
+  private animBeginObs: Observer<Scene> | null = null;
+  private inertialTracks = new Map<InertialNode, InertialTrack>();
+  private inertialTargets = new Map<AnimationGroup, InertialTarget[]>();
+  private inertialHistDt = 0;
+  private inertialFrameNo = 0;
+  private inertialRest = new Map<InertialNode, Quat>();
 
   constructor(private scene: Scene, groups: AnimationGroup[]) {
     for (const g of groups) this.register(g);
@@ -67,6 +134,13 @@ export class CharacterAnimator {
 
   register(g: AnimationGroup): void {
     g.stop();
+    // SWITCH-ON (anim.inertialAllBones): each keyed node's pose before any clip of this body moves it — the rest a linear fade-out
+    // settles a bone on when the clip after it does not key that bone (read only by the inertial blend)
+    for (const ta of g.targetedAnimations) {
+      const n = ta.target as InertialNode | null;
+      const q = n && ta.animation.targetProperty === 'rotationQuaternion' ? n.rotationQuaternion : null;
+      if (n && q && !this.inertialRest.has(n)) this.inertialRest.set(n, [q.x, q.y, q.z, q.w]);
+    }
     this.groups.set(g.name, g);
     this.names = null;
   }
@@ -186,6 +260,30 @@ export class CharacterAnimator {
       if (prev && prev !== next) this.retire(prev); else prev?.stop();   // HOOPS MOTION phase 3d: a cut with no fade retires too
       this.fadingOut = null;
       next.setWeightForAllAnimatables(1);
+      if (this.blend === 'inertial') this.inertialCut();   // AF-1: a hard cut stays a hard cut — no offset carries across it
+      return;
+    }
+    // GAMEPLAY-CLEAN-7 (anim.inertialTwinLinear): a hand change (a dribble loop ↔ its left-hand twin) crossfades linearly on an inertial body
+    const twinLinear = this.blend === 'inertial' && !!prev && prev !== next && CharacterAnimator.isLeftTwin(prev) !== CharacterAnimator.isLeftTwin(next) && inertialTwinLinearOn();
+    if (twinLinear) this.inertialSwitch = null;   // no offset is started for it; live ones keep decaying
+    if (this.blend === 'inertial' && !twinLinear) {
+      // AF-1: INERTIAL SWITCH — the new clip takes the body at full weight NOW and the outgoing clip is retired on this frame; the
+      // difference from the pose the body last showed decays out over the next frames (inertialFrame). fadingOut stays null, so a
+      // freeze started under this switch joins the current clip at weight 1.
+      // GAMEPLAY-CLEAN-7 (anim.inertialEndedHold): did the outgoing clip run to its END before this switch (a one-shot's end callback)?
+      // Babylon has stopped it, so under the linear crossfade a bone only it keyed holds where it ended; read before it is retired.
+      const ended = !!prev && prev !== next && !prev.isPlaying;
+      if (prev && prev !== next) this.retire(prev);
+      this.fadingOut = null;
+      this.fadingOutWeight = 1;
+      next.setWeightForAllAnimatables(1);
+      // GAMEPLAY-CLEAN P6, LATE SWITCH: a play() made INSIDE the animation pass — from a clip's end callback (every tree's settle,
+      // neverBindPose's "back to the base loop"), or an after-animations observer that runs before inertialFrame — starts a clip that
+      // has NOT been evaluated this frame: the bones still hold the old clip's pose, so the offset captured now is ~0 and the whole
+      // switch lands on the NEXT frame with nothing to decay it. Measured on the hero: a hit react ending into the idle, the left
+      // forearm 0.0° then 55.3° in one frame; a knockdown ending, the right arm 0.0° then 56.6° (linear: 23.6° / 14.9°). Such a
+      // switch is captured one frame later, once the new clip has been evaluated; live offsets keep decaying meanwhile.
+      this.inertialSwitch = { halfLife: inertialHalfLife(fadeSec), defer: this.inAnimate, ended };
       return;
     }
     this.fadingOut = prev && prev !== next ? prev : null;
@@ -195,9 +293,20 @@ export class CharacterAnimator {
     const w0 = prev && prev !== next ? CharacterAnimator.weightOf(prev) : 1;
     this.fadingOutWeight = w0;
     let t = 0;
+    // P5: the outgoing one-shot's playhead as the fade last saw it (and the step before): how it is known to have run to its END
+    const out = prev && prev !== next ? prev : null;
+    const outOneShot = !!out && (out as unknown as { loopAnimation?: boolean }).loopAnimation === false;
+    let seen = out ? CharacterAnimator.frameOf(out) : NaN, step = 0;
     this.fadeObs = this.scene.onBeforeRenderObservable.add(() => {
       t += this.scene.getEngine().getDeltaTime() / 1000;
       const k = Math.min(1, t / fadeSec);
+      if (out && outOneShot) {
+        if (out.isPlaying) { const f = CharacterAnimator.frameOf(out); if (Number.isFinite(f)) { if (Number.isFinite(seen)) step = f - seen; seen = f; } }
+        else if (k < 1 && this.fadingOut === out && !out.isStarted && !this.pendingFreeze.has(out) && step >= 0 && Number.isFinite(seen)
+          && seen + 2 * Math.max(step, 1) >= out.to && feel('anim.fadeHoldEnded', FADE_HOLD_ENDED_ON) >= 0.5) {
+          this.startFrozen(out, w0 * (1 - k));   // ran out inside its own fade-out: its last frame, at the fade's weight (set again below)
+        }
+      }
       next.setWeightForAllAnimatables(k);
       this.fadingOutWeight = w0 * (1 - k);
       if (prev && prev !== next) prev.setWeightForAllAnimatables(w0 * (1 - k));
@@ -234,6 +343,12 @@ export class CharacterAnimator {
   private detachEnd(g: AnimationGroup): void {
     this.endObs.get(g)?.remove(true);
     this.endObs.delete(g);
+  }
+
+  /** A playing group's playhead (its first animatable's master frame), or NaN. */
+  private static frameOf(g: AnimationGroup): number {
+    const f = (g as unknown as { animatables?: { masterFrame?: number }[] }).animatables?.[0]?.masterFrame;
+    return typeof f === 'number' ? f : NaN;
   }
 
   /** A playing group's blend weight (its animatables carry it; −1 = never set = full). */
@@ -398,6 +513,7 @@ export class CharacterAnimator {
     this.dropPendingFreezes();
     this.fadeObs?.remove();
     this.fadeObs = null;
+    if (this.blend === 'inertial') this.inertialCut();   // AF-1: a parked body carries no offset into its next owner
     this.fadingOut = null;
     this.current = null;
     this.currentName = '';
@@ -407,7 +523,303 @@ export class CharacterAnimator {
   dispose(): void {
     this.dropPendingFreezes();
     this.fadeObs?.remove();
+    this.inertialObs?.remove(); this.inertialObs = null;   // AF-1
+    this.animBeginObs?.remove(); this.animBeginObs = null;   // P6
     this.endObs.forEach((o, g) => g.onAnimationGroupEndObservable.remove(o as never));
     this.groups.forEach((g) => g.stop());
+  }
+
+  /** GAMEPLAY-CLEAN-7: a left-hand dribble twin (hoopsHand.leftDribbleTwins marks each with `felLeftTwinOf`). */
+  private static isLeftTwin(g: AnimationGroup): boolean {
+    return !!(g.metadata as { felLeftTwinOf?: string } | null | undefined)?.felLeftTwinOf;
+  }
+
+  /** AF-1: the blend mode this body's clip switches use. */
+  get blendMode(): BlendMode { return this.blend; }
+
+  /**
+   * AF-1: switch this body's clip transitions between the linear crossfade and the inertial blend (inertialize.ts). 'inertial'
+   * mounts one insert-first after-animations observer (ahead of FootPlanting / LandingAbsorb / LimbDrag, so they act on the
+   * blended pose); 'linear' removes it and drops any live offset. The modes opt in behind the `anim.inertial` knob.
+   */
+  setBlendMode(mode: BlendMode): void {
+    if (mode === this.blend) return;
+    this.blend = mode;
+    if (mode === 'inertial') {
+      this.inertialObs = this.scene.onAfterAnimationsObservable.add(() => this.inertialFrame(), undefined, true);
+      this.animBeginObs = this.scene.onBeforeAnimationsObservable.add(() => { this.inAnimate = true; });   // P6: LATE SWITCH
+    } else {
+      this.inertialObs?.remove(); this.inertialObs = null;
+      this.animBeginObs?.remove(); this.animBeginObs = null; this.inAnimate = false;
+      this.inertialCut();
+      this.inertialTracks.clear();
+    }
+  }
+
+  /** AF-1: drop the pending switch and every live offset (history stays: it is what the body showed). */
+  private inertialCut(): void {
+    this.inertialSwitch = null;
+    this.inertialTracks.forEach((t) => { t.rotOn = false; t.posOn = false; t.x = 0; t.v = 0; t.r3 = [0, 0, 0]; t.w3 = [0, 0, 0]; t.dstDue = false; t.toRest = false; });
+  }
+
+  /** AF-1: the nodes a clip keys — rotation-quaternion tracks, plus the Hips' position track — once per group. Only KEYED channels
+   *  carry an offset: a channel nobody rewrites each frame would accumulate it. */
+  private inertialTargetsOf(g: AnimationGroup): InertialTarget[] {
+    let list = this.inertialTargets.get(g);
+    if (list) return list;
+    const by = new Map<InertialNode, InertialTarget>();
+    for (const ta of g.targetedAnimations) {
+      const n = ta.target as InertialNode | null;
+      if (!n || typeof n.name !== 'string') continue;
+      const prop = ta.animation.targetProperty;
+      const rot = prop === 'rotationQuaternion' && !!n.rotationQuaternion;
+      const pos = (prop === 'position' || prop.startsWith('position.')) && isHips(n.name) && !!n.position;
+      if (!rot && !pos) continue;
+      const e = by.get(n) ?? { n, rot: false, pos: false };
+      e.rot ||= rot; e.pos ||= pos;
+      by.set(n, e);
+    }
+    list = [...by.values()];
+    this.inertialTargets.set(g, list);
+    return list;
+  }
+
+  private inertialTrack(n: InertialNode): InertialTrack {
+    let t = this.inertialTracks.get(n);
+    if (!t) {
+      t = {
+        last: null, prior: null, lastP: null, priorP: null,
+        axis: [1, 0, 0], x: 0, v: 0, rotOn: false, pOff: [0, 0, 0], pVel: [0, 0, 0], posOn: false,
+        r3: [0, 0, 0], w3: [0, 0, 0], raw0: null, raw0P: null, dstDue: false, toRest: false,
+        halfLife: 0, hips: isHips(n.name), bone: n.getClassName?.() === 'Bone', stamp: -1, scratchQ: null, scratchP: null,
+      };
+      this.inertialTracks.set(n, t);
+    }
+    return t;
+  }
+
+  /** AF-1: one frame of the inertial blend — start a pending switch's offsets, decay the live ones, apply them, record the pose. */
+  private inertialFrame(): void {
+    this.inAnimate = false;   // P6: the animation pass is over for this body; a play() from here on is evaluated before the next capture
+    const cur = this.current;
+    if (!cur) return;
+    const dt = inertialDt(this.scene.getEngine().getDeltaTime() / 1000, this.scene.animationTimeScale);
+    const targets = this.inertialTargetsOf(cur);
+    const frame = ++this.inertialFrameNo;
+    const sw = this.inertialSwitch;
+    // SWITCH-ON: the velocity-matched variant (anim.inertialMatchVel, inertialize.ts). Off: AF-1's one-axis offset, exactly as it was.
+    const mv = inertialMatchVelOn();
+    const late = !!sw?.defer;
+    if (sw && late) sw.defer = false;   // P6: LATE SWITCH — captured on the next frame; this frame decays and records as usual
+    const capture = !!sw && !late;      // this frame starts the switch's offsets (no decay step on it)
+    if (sw && capture) {
+      this.inertialSwitch = null;
+      this.inertialTracks.forEach((t) => { t.rotOn = false; t.posOn = false; t.dstDue = false; t.toRest = false; });
+      const hd = this.inertialHistDt;
+      // GAMEPLAY-CLEAN-7 (anim.inertialEndedHold, 1): after a clip that ran to its end they HOLD instead (linear's behaviour there)
+      if (inertialAllBonesOn() && !(sw.ended && inertialEndedHoldOn())) {
+        // the nodes the body showed last frame that the new clip does not key: ease each from that pose onto its rest
+        const keyed = new Set(targets.map((x) => x.n));
+        for (const { n, rot } of this.inertialAllTargets()) {
+          if (keyed.has(n) || !rot || !n.rotationQuaternion) continue;
+          const t = this.inertialTrack(n), rest = this.inertialRest.get(n);
+          if (!rest || t.stamp !== frame - 1 || !t.last) continue;
+          const { axis, angle } = quatToAxisAngle(quatMulConj(t.last, rest));
+          if (angle < 1e-6) continue;
+          t.halfLife = sw.halfLife; t.toRest = true; t.rotOn = true;
+          t.r3 = [axis[0] * angle, axis[1] * angle, axis[2] * angle]; t.w3 = [0, 0, 0]; t.dstDue = false;
+        }
+      }
+      for (const { n, rot, pos } of targets) {
+        const t = this.inertialTrack(n);
+        t.halfLife = sw.halfLife;
+        const fresh = t.stamp === frame - 1;   // the body showed this node's pose on the frame before
+        const rq = rot ? n.rotationQuaternion : null;
+        if (rq && fresh && t.last) {
+          const now: Quat = [rq.x, rq.y, rq.z, rq.w];
+          const { axis, angle } = quatToAxisAngle(quatMulConj(t.last, now));
+          let v0 = 0;
+          if (t.prior && hd > 0) {
+            const w = quatToAxisAngle(quatMulConj(t.last, t.prior));
+            v0 = (w.angle / hd) * (w.axis[0] * axis[0] + w.axis[1] * axis[1] + w.axis[2] * axis[2]);
+            v0 = Math.max(-INERTIAL_MAX_ANG_VEL, Math.min(INERTIAL_MAX_ANG_VEL, v0));
+          }
+          if (angle > 1e-9 || Math.abs(v0) > 1e-9) { t.axis = axis; t.x = angle; t.v = v0; t.rotOn = true; }
+          if (mv) {
+            // the offset as a 3-D rotation vector; its velocity the OLD motion's full angular velocity (not its share along the offset's
+            // axis), the new clip's own velocity taken out one frame later (below), so the body's motion carries across the switch
+            t.r3 = [axis[0] * angle, axis[1] * angle, axis[2] * angle];
+            t.w3 = [0, 0, 0];
+            if (t.prior && hd > 0) {
+              const w = quatToAxisAngle(quatMulConj(t.last, t.prior));
+              const sp = Math.min(INERTIAL_MAX_ANG_VEL, w.angle / hd);
+              t.w3 = [w.axis[0] * sp, w.axis[1] * sp, w.axis[2] * sp];
+            }
+            t.raw0 = now; t.dstDue = true;
+            t.rotOn = angle > 1e-9 || Math.hypot(t.w3[0], t.w3[1], t.w3[2]) > 1e-9;
+          }
+        }
+        const p = pos ? n.position : null;
+        if (p && fresh && t.lastP) {
+          t.pOff = [t.lastP[0] - p.x, t.lastP[1] - p.y, t.lastP[2] - p.z];
+          t.pVel = [0, 0, 0];
+          if (t.priorP && hd > 0) {
+            for (let i = 0; i < 3; i++) {
+              t.pVel[i] = Math.max(-INERTIAL_MAX_LIN_VEL, Math.min(INERTIAL_MAX_LIN_VEL, (t.lastP[i] - t.priorP[i]) / hd));
+            }
+          }
+          t.posOn = true;
+          if (mv) { t.raw0P = [p.x, p.y, p.z]; t.dstDue = true; }
+        }
+      }
+    } else if (dt > 0 && !mv) {
+      this.inertialTracks.forEach((t) => {
+        if (t.rotOn) {
+          const s = inertialStep(t.x, t.v, t.halfLife, dt);
+          t.x = s.x; t.v = s.v;
+          if (Math.abs(t.x) < 1e-7 && Math.abs(t.v) < 1e-6) { t.rotOn = false; t.x = 0; t.v = 0; }
+        }
+        if (t.posOn) {
+          let live = false;
+          for (let i = 0; i < 3; i++) {
+            const s = inertialStep(t.pOff[i], t.pVel[i], t.halfLife, dt);
+            t.pOff[i] = s.x; t.pVel[i] = s.v;
+            if (Math.abs(s.x) >= 1e-7 || Math.abs(s.v) >= 1e-6) live = true;
+          }
+          if (!live) t.posOn = false;
+        }
+      });
+    }
+    for (const { n, rot, pos } of targets) {
+      const t = this.inertialTrack(n);
+      const rq = rot ? n.rotationQuaternion : null;
+      // P6, LATE SWITCH: this frame the bones show a pose that is neither clip's (the old one torn down mid-pass, the new one started
+      // in it) — 51.6° from the frame before and 60° from the new clip on the hero. Hold the pose the body showed last; the switch is
+      // captured against it next frame, from the new clip's real pose.
+      const hold = late && t.stamp === frame - 1;
+      if (mv && !capture && dt > 0) this.inertialStepMatched(t, hold ? null : rq ?? null, hold ? null : pos ? n.position ?? null : null, dt);
+      if (hold && rq && t.last) {
+        if (t.bone) { const sq = (t.scratchQ ??= rq.clone()); sq.set(t.last[0], t.last[1], t.last[2], t.last[3]); n.rotationQuaternion = sq; }
+        else rq.set(t.last[0], t.last[1], t.last[2], t.last[3]);
+      } else if (mv && rq && t.rotOn) {
+        const ang = Math.hypot(t.r3[0], t.r3[1], t.r3[2]);
+        const ax: [number, number, number] = ang > 1e-12 ? [t.r3[0] / ang, t.r3[1] / ang, t.r3[2] / ang] : [1, 0, 0];
+        const q = quatMul(quatFromAxisAngle(ax, ang), [rq.x, rq.y, rq.z, rq.w]);
+        if (t.bone) { const sq = (t.scratchQ ??= rq.clone()); sq.set(q[0], q[1], q[2], q[3]); n.rotationQuaternion = sq; }
+        else rq.set(q[0], q[1], q[2], q[3]);
+      } else if (rq && t.rotOn) {
+        const q = quatMul(quatFromAxisAngle(t.axis, t.x), [rq.x, rq.y, rq.z, rq.w]);
+        if (t.bone) { const sq = (t.scratchQ ??= rq.clone()); sq.set(q[0], q[1], q[2], q[3]); n.rotationQuaternion = sq; }
+        else rq.set(q[0], q[1], q[2], q[3]);
+      }
+      const p = pos ? n.position : null;
+      if (hold && p && t.lastP) {
+        if (t.bone) { const sp = (t.scratchP ??= p.clone()); sp.set(t.lastP[0], t.lastP[1], t.lastP[2]); n.position = sp; }
+        else p.set(t.lastP[0], t.lastP[1], t.lastP[2]);
+      } else if (p && t.posOn) {
+        const x = p.x + t.pOff[0], y = p.y + t.pOff[1], z = p.z + t.pOff[2];
+        if (t.bone) { const sp = (t.scratchP ??= p.clone()); sp.set(x, y, z); n.position = sp; }
+        else p.set(x, y, z);
+      }
+      const contiguous = t.stamp === frame - 1;
+      const shown = rot ? n.rotationQuaternion : null;
+      if (shown) { t.prior = contiguous ? t.last : null; t.last = [shown.x, shown.y, shown.z, shown.w]; }
+      const sp = pos ? n.position : null;
+      if (sp) { t.priorP = contiguous ? t.lastP : null; t.lastP = [sp.x, sp.y, sp.z]; }
+      t.stamp = frame;
+    }
+    // SWITCH-ON (anim.inertialAllBones): keep the pose history of EVERY node a clip of this body keys, not only the current clip's.
+    // A clip that keys a subset (the 'guard' capture keys 7 bones, not the legs) left the legs with no history, so the next clip that
+    // keys them (guard → guard step / run) had no offset there and the knee jumped 32–62° in one frame (headless, the hero).
+    if (inertialAllBonesOn()) {
+      const cur = new Set(targets.map((x) => x.n));
+      for (const { n, rot, pos } of this.inertialAllTargets()) {
+        if (cur.has(n)) continue;
+        const t = this.inertialTrack(n);
+        const rest = this.inertialRest.get(n), rq = rot ? n.rotationQuaternion : null;
+        if (t.toRest && rest && rq) {
+          if (!capture && dt > 0) this.inertialStepMatched(t, null, null, dt);
+          const a = Math.hypot(t.r3[0], t.r3[1], t.r3[2]);
+          const q = t.rotOn && a > 1e-12 ? quatMul(quatFromAxisAngle([t.r3[0] / a, t.r3[1] / a, t.r3[2] / a], a), rest) : rest;
+          if (t.bone) { const sq = (t.scratchQ ??= rq.clone()); sq.set(q[0], q[1], q[2], q[3]); n.rotationQuaternion = sq; }
+          else rq.set(q[0], q[1], q[2], q[3]);
+          if (!t.rotOn) t.toRest = false;
+        }
+        const contiguous = t.stamp === frame - 1;
+        const shown = rot ? n.rotationQuaternion : null;
+        if (shown) { t.prior = contiguous ? t.last : null; t.last = [shown.x, shown.y, shown.z, shown.w]; }
+        const sp = pos ? n.position : null;
+        if (sp) { t.priorP = contiguous ? t.lastP : null; t.lastP = [sp.x, sp.y, sp.z]; }
+        t.stamp = frame;
+      }
+    }
+    // P6, PARTIAL CLIPS: a node the current clip does not key (the authored `guard` keys 7 bones; the jab before it keyed the legs)
+    // is still shown — frozen at its last value — and the next clip that keys it must blend FROM that. It used to go unrecorded while
+    // such a clip played, so the next switch found no fresh pose for it and applied no offset: the right leg 35.7° in one frame on the
+    // hero (jab → guard → guard step; linear 4.0°). Every node this body has tracked is recorded every frame.
+    this.inertialTracks.forEach((t, n) => {
+      if (t.stamp === frame) return;
+      const contiguous = t.stamp === frame - 1;
+      const shown = n.rotationQuaternion;
+      if (shown) { t.prior = contiguous ? t.last : null; t.last = [shown.x, shown.y, shown.z, shown.w]; }
+      const sp = t.hips ? n.position : null;
+      if (sp) { t.priorP = contiguous ? t.lastP : null; t.lastP = [sp.x, sp.y, sp.z]; }
+      t.stamp = frame;
+    });
+    this.inertialHistDt = dt;
+  }
+
+  /** SWITCH-ON: every node any of this body's clips keys (rotation, and the Hips position), rebuilt when a clip is added. */
+  private inertialAllCache: { size: number; list: InertialTarget[] } | null = null;
+  private inertialAllTargets(): InertialTarget[] {
+    if (this.inertialAllCache?.size === this.groups.size) return this.inertialAllCache.list;
+    const by = new Map<InertialNode, InertialTarget>();
+    this.groups.forEach((g) => { for (const x of this.inertialTargetsOf(g)) { const e = by.get(x.n) ?? { n: x.n, rot: false, pos: false }; e.rot ||= x.rot; e.pos ||= x.pos; by.set(x.n, e); } });
+    const list = [...by.values()];
+    this.inertialAllCache = { size: this.groups.size, list };
+    return list;
+  }
+
+  /**
+   * SWITCH-ON (anim.inertialMatchVel): one frame of the velocity-matched offset for one node, BEFORE it is applied. On the first frame
+   * after a switch, the new clip's own motion over that frame (its raw pose now against its raw pose on the switch frame) is taken out of
+   * the offset's velocity — Holden's v₀ = v_old − v_new — so a clip that starts fast (a strike's first frames) does not add its full speed
+   * on top of the old motion; the body keeps the speed it had and eases into the new clip's. Then each axis of the rotation vector (and
+   * the Hips offset) takes the same critically damped step as AF-1's.
+   */
+  private inertialStepMatched(t: InertialTrack, rq: InertialQuat | null, p: InertialVec | null, dt: number): void {
+    if (t.dstDue) {
+      t.dstDue = false;
+      if (rq && t.rotOn && t.raw0) {
+        const d = quatToAxisAngle(quatMulConj([rq.x, rq.y, rq.z, rq.w], t.raw0));
+        const sp = Math.min(INERTIAL_MAX_ANG_VEL, d.angle / dt);
+        for (let i = 0; i < 3; i++) t.w3[i] -= d.axis[i] * sp;
+        const m = Math.hypot(t.w3[0], t.w3[1], t.w3[2]);
+        if (m > INERTIAL_MAX_ANG_VEL) for (let i = 0; i < 3; i++) t.w3[i] *= INERTIAL_MAX_ANG_VEL / m;
+      }
+      if (p && t.posOn && t.raw0P) {
+        const v = [p.x, p.y, p.z];
+        for (let i = 0; i < 3; i++) t.pVel[i] = Math.max(-INERTIAL_MAX_LIN_VEL, Math.min(INERTIAL_MAX_LIN_VEL, t.pVel[i] - (v[i] - t.raw0P[i]) / dt));
+      }
+      t.raw0 = null; t.raw0P = null;
+    }
+    if (t.rotOn) {
+      let live = false;
+      for (let i = 0; i < 3; i++) {
+        const s = inertialStep(t.r3[i], t.w3[i], t.halfLife, dt);
+        t.r3[i] = s.x; t.w3[i] = s.v;
+        if (Math.abs(s.x) >= 1e-7 || Math.abs(s.v) >= 1e-6) live = true;
+      }
+      if (!live) { t.rotOn = false; t.r3 = [0, 0, 0]; t.w3 = [0, 0, 0]; }
+    }
+    if (t.posOn) {
+      let live = false;
+      for (let i = 0; i < 3; i++) {
+        const s = inertialStep(t.pOff[i], t.pVel[i], t.halfLife, dt);
+        t.pOff[i] = s.x; t.pVel[i] = s.v;
+        if (Math.abs(s.x) >= 1e-7 || Math.abs(s.v) >= 1e-6) live = true;
+      }
+      if (!live) t.posOn = false;
+    }
   }
 }

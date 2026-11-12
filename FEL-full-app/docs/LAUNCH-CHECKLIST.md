@@ -122,9 +122,9 @@ The policy files are not edited here. They are only pointed to.
 | E1 | Reduced motion: the OS setting is honoured, with an in-app override | **done** | `lib/a11y/reducedMotion.ts` (+ `.test.ts`): no flashes, no camera shake, hit-stop and slow-mo cut to a cue, gameplay timing unchanged. The control is `components/settings/motion-setting.tsx`, on Profile and on every mode's boot splash. About 50 effect sites read it, among them `JuiceKit`, `LightRig`, `DunkReplayCam`, `koReplay`, the crowds and the TV HUD's `use-hud-motion.ts` |
 | E2 | Controller in a game: start and play | **done** | `components/games/use-start-wake.ts` (any button starts), `lib/babylon/core/InputBus.ts`, `lib/gamepad-bridge.ts`, the controls screen `lib/ui/controlsScreen.ts` |
 | E3 | Controller on the end screen (d-pad, A and B, focus moves to the nearest button) | **done** | `components/games/end-screen/nav.ts` (`spatialNext`) |
-| E4 | **Controller and remote focus in the menus** (the Play shelf, tabs, Profile, sign-in) | **not done** | no gamepad or spatial focus code outside the games: `getGamepads` is read in no `components/shell/**` file nor in `app/play/page.tsx`. A pad user must touch or click to reach a mode. Keyboard focus rings exist only where `.fel-focus` is used (`app/theme.css`) |
-| E5 | Screen-reader labels and colour contrast on the menus | **unknown** | no audit recorded |
-| E6 | Captions for spoken lines | **unknown** (partly done) | the MC voice indexes carry caption text and load before dunk 1 (`6abc52c2`). No mode-wide audit is recorded |
+| E4 | **Controller and remote focus in the menus** (the Play shelf, tabs, Profile, sign-in) | **done** (lane/a11y-design, A11-02) | `lib/nav/focus.ts`, mounted once in `components/shell/status-rail.tsx`: d-pad, stick and a remote's arrows move focus with the end card's `spatialNext`, A activates, B goes back; it stands aside on a running mode, the learn feed, the end card and text fields. One cyan focus ring for every keyboard, pad and remote stop (`app/globals.css`). Rig: `scripts/a11y/pad-run.mts` reaches `/play/karate` from `/play` in 9 pad presses, no touch or click |
+| E5 | Screen-reader labels and colour contrast on the menus | **done on the lane's pages; 3 criticals routed** (A11-01) | `scripts/a11y/audit.mts` (WCAG 2.2 AA on the 10 key pages, rules in `lib/a11y/wcag.ts`): 150 violations → 17 (42 critical → 3). Play, Train, Profile, Learn, Education and the Playbook at 0; the 3 criticals are the sign-in / sign-up fields' labels in `components/auth-form.tsx` and `components/age-step.tsx` (first-run's), routed |
+| E6 | Captions for spoken lines | **done (audited)** (A11-04) | `docs/CAPTIONS-AUDIT.md`, `scripts/a11y/captions-audit.mts`: 37 speech sites, every spoken line a player acts on has an on-screen equivalent. Crowd chants (ambient) and live party voice are uncaptioned by design (owner calls in the doc); lesson films need a caption track before the first one ships |
 
 ---
 
@@ -155,9 +155,9 @@ need your art.
 | G2 | Every Babylon game host uses the shared TV HUD (10-foot type, safe frame) | **done** | `HudFrame` in all 21 `components/games/*-babylon.tsx` hosts (`components/games/tv-hud/**`; the hoops hosts moved in #242) |
 | G3 | A TV-browser host page and phone controllers | **done in code** | `/host?mode=<id>` (`app/host/page.tsx`, a thin host stage), phone pads at `/controller/[code]`, the couch room at `/play/party`. It needs `CONTROLLER_LINK_KV_*` in production (runbook §8.3) |
 | G4 | Screen-mirroring lag compensation (AirPlay, Chromecast) | **done** | `lib/controller-link/tvMode.ts`: 1.35× timing windows when mirrored. Detection suggests it and the player chooses |
-| G5 | Remote or pad navigation of the menus on a TV browser | **not done** | same gap as E4. `/host` avoids the menus by taking the mode as a query |
+| G5 | Remote or pad navigation of the menus on a TV browser | **done** (A11-02) | same as E4: a remote's arrows and Back keys (LG 461, Tizen 10009) drive `lib/nav/focus.ts` |
 | G6 | A real TV test: a TV browser on `/host`, and phone-to-TV mirroring of a mode | **unknown** | `docs/DEPLOY-CHECKLIST-PARTY.md` §4 has the five-minute test. It is not recorded as run against production |
-| G7 | Text legible from a couch on the non-game pages (shelf, end screen) | **unknown** | the 10-foot scale covers the in-game HUD. The React pages were not checked on a TV |
+| G7 | Text legible from a couch on the non-game pages (shelf, end screen) | **done for the menus; end screen routed** (A11-05) | `lib/design/couch.ts`: with a pad or remote on a big sideways screen (or Account → Big-screen menus: On) the page column zooms like the HUD, 2.25× at 1080p. Rig: every text run on `/play` ≥ 24.8 px at 1080p (was min 9 px, 62 runs under 24). The end screen (`components/games/end-screen/**`) is not this lane's and is not zoomed yet |
 
 ---
 

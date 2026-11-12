@@ -17,29 +17,29 @@ export function CreatorFrame({
   return (
     <div className="min-h-screen bg-[#070707] pb-24 text-white">
       {signedIn ? null : <PublicTopBar />}
-      <p className="bg-[#3a1214] px-4 py-2 text-center text-[11px] leading-relaxed text-[#ffb4b4]">
+      <p className="bg-[#3a1214] px-4 py-2 text-center text-base leading-relaxed text-[#ffb4b4]">
         {EXAMPLE_RATE_NOTE}
       </p>
       <main className="mx-auto max-w-5xl px-4 py-8">
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/40">
-              <Link href="/" className="hover:text-white/70">Final Evolution Lab</Link>
+            <p className="text-[12px] font-semibold uppercase tracking-[0.22em] text-white/50">
+              <Link href="/" className="inline-flex min-h-11 items-center hover:text-white/70">Final Evolution Lab</Link>
             </p>
-            <h1 className="fel-heading text-4xl text-white sm:text-5xl">{title}</h1>
-            <p className="mt-2 max-w-xl text-sm text-white/60">{lede}</p>
+            <h1 className="fel-heading text-[30px] text-white sm:text-5xl">{title}</h1>
+            <p className="mt-2 max-w-xl text-base text-white/60">{lede}</p>
           </div>
           <nav className="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-wider">
-            <Link href="/team" className="rounded-md border border-white/15 px-3 py-1.5 text-white/80 hover:border-[#F5C518]/70">Team</Link>
-            <Link href="/media-kit" className="rounded-md border border-white/15 px-3 py-1.5 text-white/80 hover:border-[#F5C518]/70">Media kit</Link>
-            <Link href="/work-with-us" className="rounded-md bg-[#F5C518] px-3 py-1.5 text-black hover:bg-[#ffd84a]">Work with us</Link>
+            <Link href="/team" className="inline-flex min-h-11 items-center rounded-md border border-white/15 px-3 py-1.5 text-white/80 hover:border-[#F5C518]/70">Team</Link>
+            <Link href="/media-kit" className="inline-flex min-h-11 items-center rounded-md border border-white/15 px-3 py-1.5 text-white/80 hover:border-[#F5C518]/70">Media kit</Link>
+            <Link href="/work-with-us" className="inline-flex min-h-11 items-center rounded-md bg-[#F5C518] px-3 py-1.5 text-black hover:bg-[#ffd84a]">Work with us</Link>
           </nav>
         </header>
         {children}
-        <footer className="mt-12 flex flex-wrap gap-4 border-t border-white/10 pt-4 text-[11px] text-white/35">
-          <Link href="/terms" className="hover:text-white/70">Terms</Link>
-          <Link href="/privacy" className="hover:text-white/70">Privacy</Link>
-          <Link href="/support" className="hover:text-white/70">Support</Link>
+        <footer className="mt-12 flex flex-wrap items-center gap-x-4 border-t border-white/10 pt-4 text-[12px] text-white/50">
+          <Link href="/terms" className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-white/70">Terms</Link>
+          <Link href="/privacy" className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-white/70">Privacy</Link>
+          <Link href="/support" className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-white/70">Support</Link>
           <span>Profiles, rates and stats marked EXAMPLE are draft information.</span>
         </footer>
       </main>
@@ -49,14 +49,14 @@ export function CreatorFrame({
 
 export function ExampleBadge({ label = 'EXAMPLE' }: { label?: string }) {
   return (
-    <span className="ml-2 inline-block rounded border border-[#ff8b8b]/50 bg-[#3a1214] px-1.5 py-0.5 align-middle text-[10px] font-semibold uppercase tracking-wider text-[#ffb4b4]">
+    <span className="ml-2 inline-block rounded border border-[#ff8b8b]/50 bg-[#3a1214] px-1.5 py-0.5 align-middle text-[12px] font-semibold uppercase tracking-wider text-[#ffb4b4]">
       {label}
     </span>
   );
 }
 
 export function ProfilePhoto({ name, photoUrl, size = 'md' }: { name: string; photoUrl: string | null; size?: 'md' | 'lg' }) {
-  const box = size === 'lg' ? 'h-40 w-40 text-5xl' : 'h-20 w-20 text-2xl';
+  const box = size === 'lg' ? 'h-40 w-40 text-[30px]' : 'h-20 w-20 text-[20px]';
   if (photoUrl) {
     // eslint-disable-next-line @next/next/no-img-element
     return <img src={photoUrl} alt={name} className={`${box} rounded-2xl object-cover`} />;
@@ -70,5 +70,5 @@ export function ProfilePhoto({ name, photoUrl, size = 'md' }: { name: string; ph
 }
 
 export function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#F5C518]">{children}</h2>;
+  return <h2 className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#F5C518]">{children}</h2>;
 }

@@ -81,6 +81,9 @@ vi.mock('@/lib/analytics-server', () => ({
 vi.mock('@/lib/social/challenge-service', () => ({
   markOpened: async (...a: unknown[]) => { h.opened.push(a); return { code: 'C1', modeKey: 'dunk', score: 1, display: 'x', tag: 't' }; },
   resolveAttempt: async (a: Record<string, unknown>) => { h.attempts.push(a); return { beat: false }; },
+  // CHALLENGES-2: the attempt route reads the verified challenge first (48-hour clock, rep kind); a live score challenge
+  verifiedChallenge: async () => ({ link: { code: 'C1', modeKey: 'dunk' }, payload: { v: 2, modeKey: 'dunk', score: 1, tag: 't', ghost: [], t: Date.now() } }),
+  CHALLENGE_EXPIRED: 'expired',
 }));
 vi.mock('bcryptjs', () => ({ default: { hash: async () => 'hashed' } }));
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: () => ({ ok: true, retryAfterSec: 0 }), clientKeyFromHeaders: () => '203.0.113.9' }));
@@ -284,15 +287,25 @@ describe('POST /api/signup claims the guest by hash', () => {
 });
 
 describe('POST /api/challenge/[code]/open and /attempt', () => {
-  it('open mints a hashed row and passes the hash to the funnel; the cookie is the guest cookie', async () => {
-    vi.stubEnv('NODE_ENV', 'production');
+  // CHALLENGES-2 (test changed): an open no longer STARTS a guest. It minted a row and a cookie before the year question,
+  // which /try's rule (PRIVACY-CORE 1b: the year first, a guest row only on an adult answer) forbids; the challenge's
+  // play page now asks first and starts the guest through POST /api/guest. What this test pinned still holds for a guest
+  // that exists: the open passes the token's HASH to the funnel, never the token.
+  it('open passes an existing guest\'s hash to the funnel and writes nothing; with no guest it mints no row and no cookie', async () => {
+    const t = mintGuestToken();
+    h.cookies = { fel_guest: t };
     const res = await openPost(new Request('http://fel.test/x', { method: 'POST' }), { params: { code: 'C1' } });
     expect(res.status).toBe(200);
-    const t = guestCookieValue()!;
-    expect(setCookies()[0]).toMatch(/^__Host-fel_guest=/);
-    expect(h.guests[0].token).toBe(hashGuestToken(t));
     expect(h.opened[0]).toEqual(['C1', hashGuestToken(t), null]);
+    expect(h.guestOps).toEqual([]);
+    expect(setCookies()).toEqual([]);
     expect(everything()).not.toContain(t);
+    h.cookies = {};
+    const fresh = await openPost(new Request('http://fel.test/x', { method: 'POST' }), { params: { code: 'C1' } });
+    expect(fresh.status).toBe(200);
+    expect(h.opened[1]).toEqual(['C1', null, null]);
+    expect(h.guestOps).toEqual([]);
+    expect(setCookies()).toEqual([]);
   });
 
   it('open with fel_age_gate: no guest row, no cookie, the open counted with no guest id', async () => {

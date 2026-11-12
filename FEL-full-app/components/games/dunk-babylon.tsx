@@ -20,14 +20,17 @@ import { MODES } from '@/lib/babylon/modes/dunkRegistry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { PadChips } from '@/lib/babylon/ui/PadChips';
 import { HostLobby } from '@/components/controller-link/host-lobby';
+import { familyFor, withButtons, type PadFamily } from '@/lib/input/padLabels';
 import { controllerConfigFor } from '@/lib/controller-link/schemas/registry';
 import { toInputBus } from '@/lib/controller-link/modeBridge';
 import { hnode, hnum } from './hud-format';
 import { DunkPoster } from './dunk-poster';
 import { DunkBeatStrip } from './dunk-beat-strip';
 import { DunkFieldBoard } from './dunk-field-board';
+import { DunkSpecialsChip } from './dunk-specials-chip';
 import { decodeTakeoff, ZONE_HEX } from '@/lib/babylon/core/DunkTakeoffRead';
 import { MicCaption, MicToggle } from './mic-caption';
+import { DunkPreloadCard } from './dunk-preload-card';   // RUNUP-STALL-3
 import { HUD_PLATE, HUD_TEXT_ALPHA, HudBanner, HudChip, HudFrame, HudMeter, HudPlate, HudText, LINE_CLAMP_STYLE, ScoreValue, Scorebug, hudColor, hudType, type HudTone } from './tv-hud';
 import { JudgeCards } from './judge-cards';
 import type { HudPoster } from '@/lib/babylon/core/ModeHarness';
@@ -37,6 +40,9 @@ type Hud = Record<string, HudValue>;
 /** Venice DualShock pad: on phones (< 640 px) the hint and the beat strip sit above the pad column (the diamond stacks over the LOOK
  *  stick, about 264 px); the clamp is a media switch in pure CSS — this project's Tailwind emits no max-* variants. */
 const PAD_LIFT = 'clamp(2.5rem, calc((640px - 100vw) * 999), 17.5rem)';
+/** DUNK-FLAGSHIP P10: the hint row's reserved height — two lines of the HUD's body type (the clamp's limit) plus the plate's own
+ *  vertical padding (py-1.5), on the row's own type so `lh` is the hint's line. A browser without `lh` ignores it (the row hugs its text, as before). */
+const HINT_SLOT_STYLE = { minHeight: 'calc(2lh + 0.75rem)' } as const;
 
 /** A tappable chip (SKIP / RUN IT BACK / CHALLENGE): the plate, the label step and a tone, on a real button. */
 const chipButtonStyle = (tone: HudTone) => ({
@@ -81,6 +87,9 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
   const [bootAttempt, setBootAttempt] = useState(0);
   // CONTROLLER-UNIVERSAL-MULTI: the chips and the phone link need the bus in RENDER, and busRef alone never re-renders
   const [bus, setBus] = useState<InputBus | null>(null);
+  // CONTROLLER-TRY-FIX item 4: the first pad's label family (an Xbox pad says RT, not R2); null with no pad = the hint as the mode wrote it
+  const [padFamily, setPadFamily] = useState<PadFamily | null>(null);
+  useEffect(() => (bus ? bus.onPads((pads) => setPadFamily(pads.length ? familyFor(pads[0].profileId) : null)) : undefined), [bus]);
 
   const retryBoot = useCallback(() => {
     endedRef.current = false;
@@ -230,7 +239,8 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
 
   const judging = Array.isArray(hud.judgeReveal) && (hud.judgeReveal as HudScoreCard[]).length > 0;
   // the banner's text (none while the judges hold the screen), and whether it rides high (the dunker is in the air)
-  const bannerText = !judging && typeof hud.banner === 'string' ? hud.banner : '';
+  // CONTROLLER-TRY-FIX item 5 (C6): no banner while the night card is up — the report is ON the card (hud.nightReport)
+  const bannerText = !judging && !card && typeof hud.banner === 'string' ? hud.banner : '';
   const bannerUp = bannerText !== '' && hud.bannerHigh === true;
   // the timing verdict: how the dunk was actually landed, under the judges' cards' slot
   const timing = !judging && typeof hud.slamTiming === 'string' && hud.slamTiming !== '' && phase === 'playing';
@@ -278,6 +288,7 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
           {/* WHOSE TRACK IS PLAYING. The walk-out is audio first -- it plays whether or not this draws -- but a
               player should be able to see that the thing they authored in the Music Room is the thing coming
               out of the speakers. Phrased by walkOutLine so the wording lives in one place. */}
+          {typeof hud.preloadReady === 'number' && phase === 'playing' && <DunkPreloadCard value={hud.preloadReady} />}
           {typeof hud.walkOutNow === 'string' && hud.walkOutNow && phase === 'playing' && (
             <HudChip tone="you" alpha={0.85} size="caption" className="uppercase">{hud.walkOutNow}</HudChip>
           )}
@@ -302,10 +313,8 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
             {hud.prop != null && (
               <HudChip tone="power" size="body">{hnode(hud.prop)}</HudChip>
             )}
-            {/* SEASON SPECIALS: the kangaroo, the sky tap, the board-top flip and the backboard run are the PRO lane's — named and locked, never missing */}
-            {hud.specials === 'LOCKED' && (
-              <HudChip tone="score" alpha={0.8} size="caption" style={{ fontWeight: 700 }}>SPECIALS · SEASON PASS</HudChip>
-            )}
+            {/* SEASON SPECIALS: the kangaroo, the sky tap, the board-top flip and the backboard run are the PRO lane's — named and locked, never missing (a guest is not shown the pass label) */}
+            <DunkSpecialsChip specials={hud.specials} guest={guest} />
             {hud.style != null && (
               <HudChip tone="score" size="body">{hnode(hud.style)}</HudChip>
             )}
@@ -384,7 +393,7 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
           )}
         </div>
       ) : null}
-      {!judging && !bannerUp && <HudBanner text={bannerText} tone="you" size="score" className="top-[38%]" />}
+      {!judging && !bannerUp && !card && <HudBanner text={bannerText} tone="you" size="score" className="top-[38%]" />}
 
       {hud.poster && typeof hud.poster === 'object' && !Array.isArray(hud.poster) && phase === 'playing' && (
         <DunkPoster poster={hud.poster as HudPoster} onClose={() => setHud((h) => ({ ...h, poster: null }))} />
@@ -403,25 +412,31 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
                         colour (the stripe gold, the elbow cyan, the paint white); the beat strip takes this spot in the air
             beat strip  RISE · HANG · PRE · SLAM, the tricks under their beats, PERFECT FLIGHT; stands aside for the triple cut and the judges
             MC          what the court's MC just said
-            call        the judges' call on the dunk ("FROM THE STRIPE!"), the top of the column */}
+            call        the judges' call on the dunk ("FROM THE STRIPE!"), the top of the column
+          DUNK-FLAGSHIP P10 (no layout shift at 390×844; measured with scripts/probes/_dunk-host-cls.mts): THE COLUMN'S BOX IS FIXED AND THE
+          HINT HAS A TWO-LINE SLOT. The column was anchored at its bottom only, so its box grew and shrank with what it held, and the hint
+          (one line or two, re-worded every few seconds on the runway) pushed the chip and the MC's caption up and down a line each time.
+          The box now spans from the top of the stage to the hint's slot (it never changes; the rows still stack up from the bottom), and
+          the hint's row is always two lines tall with its plate at the top of it — a one-line hint leaves the second line empty. */}
       {(() => {
         const t = decodeTakeoff(hud.takeoff);
         const beats = typeof hud.beats === 'string' && hud.beats ? hud.beats : '';
         const cutting = typeof hud.cut === 'string' && hud.cut;
-        const hint = typeof hud.hint === 'string' && hud.hint && phase === 'playing' ? hud.hint : '';
+        // CONTROLLER-TRY-FIX item 4: the live hint names the pad's own buttons (withButtons; the mode's words are unchanged, null = as written)
+        const hint = typeof hud.hint === 'string' && hud.hint && phase === 'playing' ? withButtons(hud.hint, padFamily) : '';
         const takeoff = t && phase === 'playing' && !judging && !beats ? t : null;
         const strip = beats && phase === 'playing' && !judging && !cutting ? beats : '';
         const mic = phase === 'playing' && !judging && typeof hud.mic === 'string' && hud.mic ? hud.mic : '';
         const call = !judging && hud.slamPulse !== true && typeof hud.call === 'string' && hud.call && phase === 'playing' ? hud.call : '';   // (the call yields to the SLAM! cue: the QTE window is the one thing on screen then)
         if (!hint && !takeoff && !strip && !mic && !call) return null;
         return (
-          <div data-dunk-bottom className="pointer-events-none absolute inset-x-0 flex flex-col-reverse items-center gap-[0.35rem] px-3" style={{ bottom: PAD_LIFT }}>
+          <div data-dunk-bottom className="pointer-events-none absolute inset-x-0 top-0 flex flex-col-reverse items-center gap-[0.35rem] px-3" style={{ bottom: PAD_LIFT }}>
             {hint && (
-              <div className="w-full text-center">
-                <HudPlate as="span" className="inline-block max-w-[min(92%,980px)] px-3 py-1.5">
+              <HudText as="div" size="body" className="w-full text-center" style={HINT_SLOT_STYLE}>
+                <HudPlate as="span" className="inline-block max-w-[min(92%,980px)] px-3 py-1.5 align-top">
                   <HudText as="div" size="body" alpha={0.8} style={LINE_CLAMP_STYLE}>{hint}</HudText>
                 </HudPlate>
-              </div>
+              </HudText>
             )}
             {takeoff && (
               <HudPlate as="span" className="inline-flex items-center px-3 py-1">
@@ -459,6 +474,10 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
             <HudText as="div" size="banner" tone={card === 'WON' ? 'score' : 'text'} className="mt-1 uppercase" style={{ fontWeight: 800 }}>
               {card === 'WON' ? 'YOU TOOK THE CARD' : typeof hud.nightField === 'string' && hud.nightField.startsWith('CUT') ? 'CUT AT THE LINE' : 'RIVAL TOOK THE CARD'}
             </HudText>
+            {/* CONTROLLER-TRY-FIX item 5 (C6): the night report, one caption under the headline (it was a banner across this card) */}
+            {typeof hud.nightReport === 'string' && hud.nightReport ? (
+              <HudText as="div" size="caption" alpha={0.8} className="mt-1" data-night-report>{hud.nightReport}</HudText>
+            ) : null}
             {/* dunk-next phase 5: how the field went — the champion, the final, or where the cut fell */}
             {typeof hud.nightField === 'string' && hud.nightField ? (
               <HudText as="div" size="label" tone="score" className="mt-1 uppercase">{hud.nightField}</HudText>
@@ -527,7 +546,8 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
       {controllerConfig && bus && (
         <HostLobby config={controllerConfig} onInput={onControllerInput} onPadInput={onPhonePad} collapsed={phase === 'playing'} lazy={process.env.NODE_ENV === 'production'} anchor="left-4 top-14" bus={bus} />
       )}
-      {bus && <PadChips bus={bus} className="left-4 bottom-4" />}
+      {/* CONTROLLER-TRY-FIX item 2: the lobby line says "connected" (top-left, 4 s), so no second toast here; and no chip while a run is live */}
+      {bus && <PadChips bus={bus} className="left-4 bottom-4" toast={false} quiet={phase !== 'playing'} />}
 
       {/* M35: THE single touch control surface — one overlay per mode, ever. */}
       {(phase === 'playing' || phase === 'countdown') && busRef.current && (

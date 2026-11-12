@@ -40,8 +40,8 @@ export function RebindPanel({ onSaved }: { onSaved: () => void }) {
   };
   const reset = () => { storeBindings({}); setStored({}); setDraft(Object.fromEntries(ADVENTURE_ACTIONS.map((a) => [a, primary(null, a)]))); onSaved(); };
   return (
-    <div className="w-full max-w-2xl rounded-lg border border-white/10 bg-black/60 p-3 text-[10px]" data-testid="adventure-rebind">
-      <p className="mb-2 text-[9px] font-black tracking-[0.3em] text-white/45">REBIND (PAD)</p>
+    <div className="w-full max-w-2xl rounded-lg border border-white/10 bg-black/60 p-3 text-[12px]" data-testid="adventure-rebind">
+      <p className="mb-2 text-[12px] font-black tracking-[0.3em] text-white/50">REBIND (PAD)</p>
       <div className="grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
         {ADVENTURE_ACTIONS.map((a) => (
           <label key={a} className="flex items-center justify-between gap-2">
@@ -56,7 +56,7 @@ export function RebindPanel({ onSaved }: { onSaved: () => void }) {
       <div className="mt-2 flex gap-2">
         <button type="button" onClick={(e) => { e.currentTarget.blur(); save(); }} className="rounded bg-white/15 px-3 py-1 font-bold">SAVE BINDINGS</button>
         <button type="button" onClick={(e) => { e.currentTarget.blur(); reset(); }} className="rounded px-3 py-1 text-white/60">DEFAULTS</button>
-        {stored && Object.keys(stored).length > 0 && <span className="self-center text-white/40">{Object.keys(stored).length} CHANGED</span>}
+        {stored && Object.keys(stored).length > 0 && <span className="self-center text-white/50">{Object.keys(stored).length} CHANGED</span>}
       </div>
     </div>
   );

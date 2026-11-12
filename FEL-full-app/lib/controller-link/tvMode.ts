@@ -67,7 +67,7 @@ export interface DisplayGuess {
   confident: boolean;
 }
 
-const TV_UA = /tizen|web0s|webos|netcast|googletv|android tv|bravia|aft[a-z]|crkey|hbbtv|smart-?tv/i;
+export const TV_UA = /tizen|web0s|webos|netcast|googletv|android tv|bravia|aft[a-z]|crkey|hbbtv|smart-?tv/i;
 
 /**
  * Guess how this host is being displayed.

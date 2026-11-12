@@ -40,6 +40,7 @@ import { captions } from './captions';
 import { captionsFromHud, rememberHud } from './hudCaptions';   // MECHANICS PASS: press → perceivable answer, agent-only   // M43: unlock audio on first user gesture
 import type { BackdropFamily } from '../visual/Backdrops';
 import { FrameGuard, assertSpawned } from './FrameGuard';
+import { OccluderFade, OCCLUDER_FADE_OFF } from './OccluderFade';   // gameplay-clean (2026-10-28): what blocks the view of the hero goes see-through
 import { watchCanvasFit } from './canvasFit';       // M95 (Pass 2): cap DPR + backing-pixel budget
 import { prewarmScene, prewarmWanted } from './shaderPrewarm';
 import { installLoadProgress, LoadStallClock } from './loadProgress';   // FIRST-DUNK-BUDGET: the load watchdog watches the download
@@ -48,6 +49,7 @@ import { PerfMonitor, budgetForTier } from './PerfMonitor';          // M67: dev
 import { mountPerfGuard } from './perfGuard';
 import { mountHitchProbe } from './hitchProbe';
 import { mountPerfStats } from './perfStats';
+import { pagePlayStamp } from './playFrame';   // NEX-03: the competitive-context stamp
 import { setGradeExposure } from '../scene/gradeUniform';                // PERF-LAG (2026-10-24): the per-frame exposure beat as a uniform                         // PERF-LAG (2026-10-24): anonymous fps + time-to-first-playable to game_diag                     // S1 HITCH (2026-10-22): worst frame, p5 fps, and builds / clones / compiles after the intro                       // PERF-GUARD (2026-10-06): paced frames, adaptive quality, idle
 import { setReady, clearReady } from './readyMarker';  // M67: smoke-test readiness gate
 import { installAgentBridge, agentBridge, agentEnabled } from './AgentBridge';  // M69: agent control plane
@@ -376,6 +378,10 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       hitch = mountHitchProbe({ scene, publish: devOrAgentHooks() });
       perfStats = mountPerfStats({ engine, tier, guard: () => { const g = guard.snapshot(); return g.policy.governor || g.policy.pacing ? g : null; } });   // PERF-LAG
       if (opts.heroOverride) scene.metadata.felHeroOverride = opts.heroOverride;   // dev rollout flag (?hero=)
+      // DEMO-MODELS-1 v2: this scene is /try's guest dunk demo (the host's known-guest mount of `dunk`), the ONE place setting 4
+      // (TRY_GUEST_COACH_BODY_ENABLED) may apply (CharacterLibrary.playerBodyContextOf). Scene-scoped: no other scene is stamped.
+      if (opts.guest === true && def.modeId === 'dunk') scene.metadata.felTryDunkGuest = true;
+      Object.assign(scene.metadata, pagePlayStamp());   // NEX-03: felCompetitive / felRanked from the page's ?arena= ?c= ?mp= ?signature= (playFrame.ts), before the mode loads
       // M69: publish the agent control bridge (no-op unless ?agent=1). Idempotent —
       // re-registers the same mode list and re-binds window.__NEXUS_AGENT__ each mount.
       installAgentBridge(AGENT_MODES);
@@ -414,6 +420,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   let ambientStarted = false;   // M43: crowd/dojo bed starts once, on first input
   let unsub: (() => void) | null = null;
   let frameGuard: FrameGuard | null = null;
+  let occluderFade: OccluderFade | null = null;   // gameplay-clean: live play only, like the frame guard
   let iblShadows: IblShadowsHandle | null = null;
   const replayTrack: TransformNode[] = [];   // vis-board: nodes a mode asked ctx.trackReplay to record (registered when the director is built, after load())
   let replay: ReplayDirector | null = null;   // A9.12: a mode that asked for replays (def.replay)
@@ -422,6 +429,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     phase = p;
     // M37: hero-off-screen watchdog runs only during live play.
     if (p === 'playing') frameGuard?.start(); else frameGuard?.stop();
+    if (p === 'playing') occluderFade?.start(); else occluderFade?.stop();   // a replay, a pause or the card gets the scene back as built
     // M67: a shader compile is a defect only while gameplay is actually running.
     perf.setPlaying(p === 'playing');
     // M67: publish readiness for the smoke test. 'loaded' vs 'playing' matters —
@@ -611,6 +619,8 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
 
   // M37: hero-framing watchdog — recenters the camera if the hero leaves frame.
   frameGuard = new FrameGuard(scene, camera, () => heroRef.current, camDirector, () => objectiveRef.current);
+  occluderFade = new OccluderFade(scene, () => heroRef.current, def.modeId);
+  camDirector.leadEase = !OCCLUDER_FADE_OFF.has(def.modeId);   // GAMEPLAY-CLEAN P2 #10: the eased look-ahead — not under the hoops lanes' modes (routed)
   // `instrument` (2026-09-12): SceneInstrumentation is a bare module specifier, so a probe running
   // IN the page cannot import it — which is why per-mode performance had never been measured and the
   // locomotion Phase 3 gate ("animation pass <= 4 ms") had to be reported unjudgeable. Handing the
@@ -635,6 +645,8 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     // THE MIC (2026-09-24): the audio graph, so a probe can record what the game actually sounds like (the MC on the PA, the
     // crowd ducking under him) instead of trusting that a cue that was logged was also heard
     audio: () => SoundKit.graph(),
+    // gameplay-clean: how many meshes the occluder fade holds see-through right now (the audit rig reads it)
+    occluders: () => occluderFade?.count ?? 0,
   };
   // CONTROLLER-STICK-LIVE (2026-09-14): a QA eye on the production server (`next start`, /try) waited 120 s for
   // `__FEL_DEV__.input`, which only a dev build published — so it read an empty roster and zero slot events under
@@ -1030,6 +1042,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     agentBridge()?.detach();   // M69
     renderWatchdog?.disarm();
     frameGuard?.stop();
+    occluderFade?.dispose();
     unBody();            // MOVEMENT PLAY P3: no more body frames for this mode…
     store.unmount();     // …and its card goes (a stale writer — a later mount took over — does nothing)
     unsub?.();

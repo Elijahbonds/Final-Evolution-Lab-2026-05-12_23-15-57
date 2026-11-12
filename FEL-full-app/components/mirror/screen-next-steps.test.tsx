@@ -1,3 +1,5 @@
+// CUE-REWRITE (2026-10-27) — test changed: copy rewrite. The check names and lines asserted below follow the rewritten
+// copy (lib/cue-style/names.ts, docs/CUE-AUDIT.md); what each assertion checks is unchanged.
 // The athlete's own view after a Movement Screen (MIRROR-COACH P3, 2026-09-26): the same flag → FIX line + corrective
 // block mapping the coach's draft uses, in plain words; what to run again; what needs nothing; and "this is what the
 // camera saw, not a diagnosis". A server render is the card's first paint, so it is pinned here without a DOM. The
@@ -32,26 +34,27 @@ describe('what to work on, after the screen', () => {
   it('a flag: what the camera saw, the FIX line, and the corrective block with its movements', () => {
     const t = text(render(grades({ shoulderLevel: g('shoulderLevel', { value: 0.1 }) })));
     expect(t).toContain('1 thing to work on, from what the camera saw.');
-    expect(t).toContain('Shoulder height, left shoulder higher');
-    expect(t).toContain('The camera saw 0.10 of a shoulder width, left higher · estimated.');
+    expect(t).toContain('Shoulder level, left shoulder higher');
+    expect(t).toContain('The camera saw: left side higher by about 10% of your shoulder width · estimated.');
+    expect(t).toContain('Your two sides start from a tilt.');   // CUE-REWRITE: what it means, between saw and do
     expect(t).toContain(`What to do: ${fixLine('shoulderLevel')}`);
-    expect(t).toContain('Open the ribcage · about 6 min');
-    expect(t).toContain('Side-lying open book, 6 per side');
+    expect(t).toContain('Loosen the upper back · about 6 min');   // test changed: copy rewrite (CUE-REWRITE) — same meaning
+    expect(t).toContain('Open book: lie on your side and open your top arm, 6 per side');
   });
 
   it('two flags that share a block show it once', () => {
     const html = render(grades({ hipLevel: g('hipLevel', { value: 0.12 }), singleLegL: g('singleLegL', { touchDowns: 1 }) }));
     expect((html.match(/data-work-item/g) ?? []).length).toBe(2);
-    expect(text(html).split('Trunk and hip hold').length - 1).toBe(2);   // the block once, then "same block as above"
-    expect(text(html)).toContain('Same block as above: Trunk and hip hold.');
+    expect(text(html).split('Hip and middle hold').length - 1).toBe(2);   // the block once, then "same block as above"
+    expect(text(html)).toContain('Same block as above: Hip and middle hold.');
   });
 
   it('a check the camera could not read is "run it again" — never a pass, never nothing-to-do', () => {
     const t = text(render(grades({ headFloat: g('headFloat', { readableFrames: 5, value: null, uncertainty: null, spread: null }) })));
     expect(t).toContain('Run these again');
-    expect(t).toMatch(/Head float Not read: too few clear frames .* Hold still in the shot for the whole count\./);
-    expect(t).toContain('Nothing to work on from: Heel line, Knee window, Hip level, Shoulder height, Single-leg stance.');
-    expect(t).not.toMatch(/Nothing to work on from:[^.]*Head float/);
+    expect(t).toMatch(/Head position Not read: the camera got too few clear looks .* Hold still in the shot for the whole count\./);
+    expect(t).toContain('Nothing to work on from: Heels from behind, Knees from the front, Hip level, Shoulder level, One-leg balance.');
+    expect(t).not.toMatch(/Nothing to work on from:[^.]*Head position/);
   });
 
   // MIRROR-COACH P3 review (2026-09-26): PLAN item 9 — the written correctives are "off for minors"; no birth year on file
@@ -60,13 +63,13 @@ describe('what to work on, after the screen', () => {
     const gs = grades({ shoulderLevel: g('shoulderLevel', { value: 0.1 }) });
     for (const youth of ['minor', 'unknownAge'] as const) {
       const t = text(render(gs, youth));
-      expect(t).not.toContain('Open the ribcage');
+      expect(t).not.toContain('Loosen the upper back');
       expect(t).not.toContain('Side-lying open book');
       expect(t).toContain(`What to do: ${fixLine('shoulderLevel')}`);
       expect(t).toContain(text(YOUTH_BLOCKS_OFF[youth]).trim());
     }
     const noProp = text(renderToStaticMarkup(createElement(ScreenNextSteps, { screen: 'modified', grades: gs })));
-    expect(noProp).not.toContain('Open the ribcage');
+    expect(noProp).not.toContain('Loosen the upper back');
     expect(noProp).toContain(text(YOUTH_BLOCKS_OFF.unknownAge).trim());
   });
 
@@ -74,7 +77,7 @@ describe('what to work on, after the screen', () => {
     const html = render(grades());
     expect(html).not.toContain('data-work-item');
     expect(html).not.toContain('What to do');
-    expect(text(html)).toContain('Nothing flagged in any check the camera read.');
+    expect(text(html)).toContain('Nothing to work on in any check the camera read.');
   });
 
   it('closes on "what the camera saw, not a diagnosis", and says nothing else about health', () => {
@@ -99,7 +102,7 @@ describe('P9: the written corrective under a flag', () => {
   it('an adult: the shoulder flag names its release and band drill and links to them', () => {
     const html = render(grades({ shoulderLevel: g('shoulderLevel', { value: 0.1 }) }));
     const t = text(html);
-    expect(t).toContain('Written corrective: release first: where the neck meets the shoulder · band drill: Band-up shoulder hold.');
+    expect(t).toContain('Extra drill: release first: where the neck meets the shoulder · band drill: Band-up shoulder hold.');
     expect(html).toContain('href="/play/mirror/correctives#band-drills"');
     expect(html).toContain('data-written-corrective="shoulderLevel"');
     // MIRROR-COACH P9 fix: the screen's own set-up — standing, no rowing handle, and the side the screen read higher
@@ -122,7 +125,7 @@ describe('P9: the written corrective under a flag', () => {
   it('the knee flag links to the release; a check with none (the head float) shows no line', () => {
     const knee = render(grades({ kneeWindow: g('kneeWindow', { value: 0.7, bySide: { left: 0.7, right: 0.05 } }) }));
     // MIRROR-COACH P9 fix: "release first:" with no drill after it read as cut off — the knee has a release only
-    expect(text(knee)).toContain('Written corrective: release: the back of the hip — the fleshy part you sit on.');
+    expect(text(knee)).toContain('Extra drill: release: the back of the hip — the fleshy part you sit on.');
     expect(text(knee)).not.toContain('release first');
     expect(knee).toContain('href="/play/mirror/correctives#release"');
     const head = render(grades({ headFloat: g('headFloat', { value: 0.2 }) }));

@@ -33,10 +33,10 @@ export function YourBuildPanel({ metrics, prq0to100, onChange, onReset }: {
     <section className="fel-panel mt-4 rounded-2xl p-4" data-testid="your-build">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/50">Your Build · scan input</p>
+          <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-white/50">Your Build · scan input</p>
           <p className="mt-0.5 text-xs text-white/55">Movement-screen metrics until a Mirror scan lands. Saved on this device.</p>
         </div>
-        <button type="button" onClick={onReset} className="flex items-center gap-1 rounded-md border border-white/15 px-2.5 py-1.5 text-xs font-bold text-white/80 hover:bg-white/10">
+        <button type="button" onClick={onReset} className="flex min-h-11 items-center gap-1 rounded-md border border-white/15 bg-white/[0.04] px-2.5 py-1.5 text-xs font-bold text-white/80 hover:bg-white/10">
           <RotateCcw className="h-3.5 w-3.5" /> Defaults
         </button>
       </div>
@@ -46,22 +46,22 @@ export function YourBuildPanel({ metrics, prq0to100, onChange, onReset }: {
           <label key={f.key} className="block">
             <span className="flex items-center justify-between text-xs">
               <span className="font-bold text-white/85">{f.label}</span>
-              <span className="font-mono tabular-nums text-white/70">{metrics[f.key]}{f.unit ? <span className="text-white/40"> {f.unit}</span> : null}</span>
+              <span className="font-mono tabular-nums text-white/70">{metrics[f.key]}{f.unit ? <span className="text-white/50"> {f.unit}</span> : null}</span>
             </span>
             <input
               type="range" aria-label={f.label} min={f.min} max={f.max} step={f.step} value={metrics[f.key]}
               onChange={(e) => set(f.key, e.target.value)}
-              className="mt-1 w-full accent-[#00E5FF]"
+              className="mt-1 min-h-11 w-full accent-[#00E5FF]"
             />
-            <span className="block text-[10px] text-white/40">{f.hint}</span>
+            <span className="block text-[12px] text-white/50">{f.hint}</span>
           </label>
         ))}
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-white/[0.06] pt-3">
-        <span className="rounded-full border border-[#A855F7]/40 bg-[#A855F7]/10 px-2.5 py-1 text-xs font-bold text-[#A855F7]" data-testid="derived-leak">LEAK · {LEAK_LABEL[leak].toUpperCase()}</span>
+        <span className="rounded-full border border-[#A855F7]/40 bg-[#A855F7]/10 px-2.5 py-1 text-xs font-bold text-[#C79BFF]" data-testid="derived-leak">LEAK · {LEAK_LABEL[leak].toUpperCase()}</span>
         <span className="rounded-full border border-[#00E5FF]/40 bg-[#00E5FF]/10 px-2.5 py-1 text-xs font-bold text-[#00E5FF]" data-testid="derived-band">{band ? BAND_LABEL[band] : 'LOAD · reading PRQ…'}</span>
-        <span className="font-mono text-[11px] text-white/45">weakest {PILLAR_LABELS[screen.weakest]} · screen {screen.overall}</span>
+        <span className="font-mono text-[12px] text-white/50">weakest {PILLAR_LABELS[screen.weakest]} · screen {screen.overall}</span>
       </div>
     </section>
   );

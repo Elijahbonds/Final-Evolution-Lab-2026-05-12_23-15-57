@@ -4,11 +4,10 @@ import type { Prisma } from '@/lib/generated/prisma';
 import { prisma } from '@/lib/db';
 import { getStripe } from '@/lib/stripe';
 import { isVerifiedAdult } from './adult';
-import { isAllowlistedCoach } from './coaches';
 import { iceServers } from './call/iceServers';
 import { makingOfferCollision, signalExpiresAt, signalRole, signalRowCap, signalTooBig } from './call/limits';
 import { programAccessOpen } from './access';
-import { isMissingTable, logStoreUnavailable, reviewsCanBeSold, storeClosed } from './gate';
+import { isMissingTable, isStoreCoach, logStoreUnavailable, reviewsCanBeSold, storeClosed } from './gate';
 import { coachingIcs } from './ics';
 import { parseManifest, priceOk } from './manifest';
 import { connectionFailureReschedule, decideCancel, decideJoin } from './policy';
@@ -190,7 +189,7 @@ export async function uploadUrl(userId: string, bookingId: string, body: { bytes
     const booking = await prisma.booking.findUnique({ where: { id: bookingId } });
     const reply = body.role === 'reply';
     const allowed = booking && booking.kind === 'video_review' && booking.status === 'PAID'
-      && (reply ? booking.coachUserId === userId && isAllowlistedCoach(userId) : booking.clientUserId === userId);
+      && (reply ? booking.coachUserId === userId && (await isStoreCoach(userId)) : booking.clientUserId === userId);
     if (!booking || !allowed) return NextResponse.json({ error: 'not_found' }, { status: 404 });
     if (!(await isVerifiedAdult(prisma, userId))) return NextResponse.json({ error: 'adults_only' }, { status: 403 });
     const mime = typeof body.mime === 'string' ? body.mime : '';
@@ -249,7 +248,7 @@ export async function submitReview(userId: string, bookingId: string, body: { cl
 export async function deliverReview(userId: string, bookingId: string, body: { replyText?: unknown; drills?: unknown; replyObject?: unknown }): Promise<NextResponse> {
   try {
     const booking = await prisma.booking.findUnique({ where: { id: bookingId } });
-    if (!booking || booking.coachUserId !== userId || !isAllowlistedCoach(userId)) {
+    if (!booking || booking.coachUserId !== userId || !(await isStoreCoach(userId))) {
       return NextResponse.json({ error: 'not_found' }, { status: 404 });
     }
     const drills = Array.isArray(body.drills) ? body.drills.filter((v): v is string => typeof v === 'string') : [];
@@ -557,7 +556,7 @@ export function icsFor(bookingId: string, startsAt: Date, endsAt: Date, origin: 
 }
 
 export async function saveCoachSettings(userId: string, body: Record<string, unknown>): Promise<NextResponse> {
-  if (!isAllowlistedCoach(userId)) return NextResponse.json({ error: 'not_found' }, { status: 404 });
+  if (!(await isStoreCoach(userId))) return NextResponse.json({ error: 'not_found' }, { status: 404 });
   const data: {
     businessMailingAddress?: string | null;
     reviewSlaHours?: number;
@@ -603,7 +602,7 @@ export async function saveCoachSettings(userId: string, body: Record<string, unk
 }
 
 export async function setListingPrice(userId: string, listingId: string, priceCents: number): Promise<NextResponse> {
-  if (!isAllowlistedCoach(userId)) return NextResponse.json({ error: 'not_found' }, { status: 404 });
+  if (!(await isStoreCoach(userId))) return NextResponse.json({ error: 'not_found' }, { status: 404 });
   if (!priceOk(priceCents)) return NextResponse.json({ error: 'price_bounds' }, { status: 400 });
   const listing = await prisma.marketplaceListing.findUnique({ where: { id: listingId } });
   if (!listing || listing.creatorId !== userId || listing.listingType !== 'COACH_STORE') {

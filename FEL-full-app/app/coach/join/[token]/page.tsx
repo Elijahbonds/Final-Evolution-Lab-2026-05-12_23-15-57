@@ -38,8 +38,8 @@ export default async function JoinPage({ params }: { params: { token: string } }
 
   if (state !== 'open') {
     return (
-      <Shell>
-        <p className="font-mono text-[11px] uppercase tracking-widest text-white/40">Coach invite</p>
+      <Shell signedIn={!!me}>
+        <p className="font-mono text-[12px] uppercase tracking-widest text-fel-dim">Coach invite</p>
         <h1 className="fel-heading mt-3 text-2xl font-bold text-white">
           {state === 'expired' ? 'This invite has expired' : 'This invite has been used'}
         </h1>
@@ -50,10 +50,10 @@ export default async function JoinPage({ params }: { params: { token: string } }
 
   if (me && me === invite.coachId) {
     return (
-      <Shell>
+      <Shell signedIn={!!me}>
         <h1 className="fel-heading text-2xl font-bold text-white">That is your own invite link</h1>
         <p className="mt-3 text-sm text-white/55">Share it with an athlete instead — this is what they will see.</p>
-        <Link href="/coach" className="mt-6 inline-flex rounded-xl bg-[#00E5FF] px-5 py-2.5 font-bold text-[#050505]">Back to your roster</Link>
+        <Link href="/coach" className="mt-6 inline-flex rounded-xl bg-fel-cyan px-5 py-2.5 font-bold text-fel-bg">Back to your roster</Link>
       </Shell>
     );
   }
@@ -65,12 +65,12 @@ export default async function JoinPage({ params }: { params: { token: string } }
     : false;
 
   return (
-    <Shell>
-      <p className="font-mono text-[11px] uppercase tracking-widest text-white/40">Coach invite</p>
+    <Shell signedIn={!!me}>
+      <p className="font-mono text-[12px] uppercase tracking-widest text-fel-dim">Coach invite</p>
       <h1 className="fel-heading mt-3 text-3xl font-bold text-white">
         {invite.coachName} <span className="text-white/50">wants to coach you</span>
       </h1>
-      <p className="mt-4 max-w-sm text-sm leading-relaxed text-white/60">
+      <p className="mt-4 max-w-sm text-base leading-relaxed text-white/60">
         Accept and {invite.coachName} can build your programming, watch your movement screens and send you work.
         You can leave at any time.
       </p>
@@ -80,11 +80,11 @@ export default async function JoinPage({ params }: { params: { token: string } }
           <>
             <Link
               href={`/signup?next=${encodeURIComponent(`/coach/join/${token}`)}`}
-              className="mt-7 inline-flex rounded-xl bg-[#00E5FF] px-6 py-3 font-bold text-[#050505] transition-transform hover:scale-[1.02]"
+              className="mt-7 inline-flex rounded-xl bg-fel-cyan px-6 py-3 font-bold text-fel-bg transition-transform hover:scale-[1.02]"
             >
               Make an account and join
             </Link>
-            <Link href={`/login?next=${encodeURIComponent(`/coach/join/${token}`)}`} className="mt-3 text-xs text-white/45 underline">
+            <Link href={`/login?next=${encodeURIComponent(`/coach/join/${token}`)}`} className="mt-3 text-xs text-fel-dim underline">
               I already have one
             </Link>
           </>
@@ -93,11 +93,16 @@ export default async function JoinPage({ params }: { params: { token: string } }
   );
 }
 
-function Shell({ children }: { children: React.ReactNode }) {
+/** EVERY-SCREEN P10: signed in, the app's top bar will arrive over this page once the session loads; its place is held
+ *  (components/shell/status-rail.tsx's spacer) so the page does not jump down when it does. */
+const HOLD_RAIL = '[data-fel-rail-spacer]{height:3.5rem!important}';
+
+function Shell({ children, signedIn = false }: { children: React.ReactNode; signedIn?: boolean }) {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-[#050505] px-6 text-center">
-      <Link href="/" className="fel-heading mb-10 text-lg font-bold text-white">
-        FINAL <span className="text-[#00E5FF]">EVOLUTION</span> LAB
+    <div className="flex min-h-screen flex-col items-center justify-center bg-fel-bg px-6 text-center">
+      {signedIn && <style>{HOLD_RAIL}</style>}
+      <Link href="/" className="fel-heading mb-10 inline-flex min-h-11 items-center text-lg font-bold text-white">
+        FINAL <span className="text-fel-cyan">EVOLUTION</span> LAB
       </Link>
       {children}
     </div>

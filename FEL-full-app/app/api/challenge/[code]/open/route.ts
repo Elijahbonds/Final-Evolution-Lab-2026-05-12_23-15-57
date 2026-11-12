@@ -8,18 +8,21 @@
  * TIP-GUEST-TOKEN-HASH (2026-10-19): the row and the events carry the token's
  * hash (lib/guestSession.ts); a browser with the AGE-SCREEN block flag gets no
  * guest row and no cookie, and the open is counted without a guest id.
+ *
+ * CHALLENGES-2 (2026-10-24): an open no longer STARTS a guest. /try's rule (PRIVACY-CORE 1b) is that the year is asked
+ * before any guest row exists, and the challenge's play page now asks it the same way and starts the guest only on an
+ * adult answer (POST /api/guest). The open is counted with the guest id this browser already has, or none. An open
+ * after the challenge's 48 hours is counted and answered `expired: true`.
  */
 
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { cookies } from 'next/headers';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/db';
 import { markOpened } from '@/lib/social/challenge-service';
-import { recordServerEvent } from '@/lib/analytics-server';
-import { hashGuestToken, mintGuestToken } from '@/lib/guest';
-import { createGuestSession, findGuestSession, guestTokenFrom, setGuestCookie } from '@/lib/guestSession';
+import { guestIdFrom } from '@/lib/guestSession';
 import { AGE_BLOCK_COOKIE } from '@/lib/privacy/ageScreen';
+import { challengeExpiresAt, isChallengeExpired } from '@/lib/social/challenge-terms';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,20 +30,8 @@ export async function POST(_req: Request, { params }: { params: { code: string }
   const session = await getServerSession(authOptions);
   const userId = (session?.user as any)?.id ?? null;
 
-  let guestId: string | null = null;
   const jar = cookies();
-  if (!userId && !jar.get(AGE_BLOCK_COOKIE)) {
-    let token = guestTokenFrom(jar)?.token ?? null;
-    guestId = token ? hashGuestToken(token) : null;
-    const existing = guestId ? await findGuestSession(prisma, guestId) : null;
-    if (!existing) {
-      token = mintGuestToken();
-      guestId = hashGuestToken(token);
-      await createGuestSession(prisma, guestId);
-      await recordServerEvent({ name: 'guest_start', guestId, props: { via: 'challenge_open' } });
-    }
-    setGuestCookie(jar, token!);
-  }
+  const guestId = userId || jar.get(AGE_BLOCK_COOKIE) ? null : guestIdFrom(jar);
 
   const link = await markOpened(params.code, guestId, userId);
   if (!link) return NextResponse.json({ error: 'not_found' }, { status: 404 });
@@ -52,5 +43,7 @@ export async function POST(_req: Request, { params }: { params: { code: string }
     score: link.score,
     display: link.display,
     tag: link.tag,
+    expiresAt: challengeExpiresAt(link.payload as { t?: unknown }),
+    expired: isChallengeExpired(link.payload as { t?: unknown }),
   });
 }

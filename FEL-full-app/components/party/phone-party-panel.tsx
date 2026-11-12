@@ -14,7 +14,7 @@ export function PhonePartyPanel({ party, client, onLeave }: { party: PartyView; 
 
   if (party.phase === 'playing') {
     return (
-      <div data-testid="phone-party-strip" className="flex items-center justify-between gap-2 rounded-xl border px-3 py-2 font-mono text-[11px]" style={{ borderColor: `${tone}66` }}>
+      <div data-testid="phone-party-strip" className="flex items-center justify-between gap-2 rounded-xl border px-3 py-2 font-mono text-[12px]" style={{ borderColor: `${tone}66` }}>
         <span className="font-black" style={{ color: tone }}>{party.seat ?? 'NEXT'}{me ? ` · ${me.name}` : ''}</span>
         <span className="truncate text-white/60">
           {!party.seat ? 'You’re in from the next game' : party.mode.style === 'turns' ? (party.yourGo ? 'YOUR GO!' : party.note || 'Watch the TV') : party.mode.title}
@@ -26,20 +26,20 @@ export function PhonePartyPanel({ party, client, onLeave }: { party: PartyView; 
   return (
     <div data-testid="phone-party-panel" className="flex flex-col gap-4">
       <div className="rounded-2xl border p-4 text-center" style={{ borderColor: `${tone}88`, background: `${tone}14` }}>
-        <p className="font-mono text-[10px] tracking-[0.3em] text-white/40">{party.seat ? 'YOU ARE' : 'WAITING FOR A SEAT'}</p>
+        <p className="font-mono text-[12px] tracking-[0.3em] text-white/50">{party.seat ? 'YOU ARE' : 'WAITING FOR A SEAT'}</p>
         <p data-testid="phone-party-seat" className="fel-heading text-4xl font-black" style={{ color: tone }}>{party.seat ?? 'NEXT UP'}</p>
         {me && <p className="font-mono text-sm text-white/80">{me.name}</p>}
       </div>
 
       <div className="text-center">
-        <p className="font-mono text-[10px] tracking-[0.3em] text-white/40">{party.phase === 'results' ? 'JUST PLAYED' : 'UP NEXT'}</p>
+        <p className="font-mono text-[12px] tracking-[0.3em] text-white/50">{party.phase === 'results' ? 'JUST PLAYED' : 'UP NEXT'}</p>
         <div className="mt-1 flex items-center justify-center gap-3">
           {party.captain && party.phase === 'lobby' && (
             <button type="button" data-testid="phone-party-prev" onClick={() => send('prev')} className="rounded-lg bg-white/10 px-4 py-2 text-xl">◀</button>
           )}
           <div>
             <p data-testid="phone-party-mode" className="fel-heading text-2xl font-black">{party.mode.title}</p>
-            <p className="font-mono text-[10px] text-white/50">{party.mode.players} · {party.mode.style === 'turns' ? 'TAKE TURNS' : 'SAME TIME'}</p>
+            <p className="font-mono text-[12px] text-white/50">{party.mode.players} · {party.mode.style === 'turns' ? 'TAKE TURNS' : 'SAME TIME'}</p>
           </div>
           {party.captain && party.phase === 'lobby' && (
             <button type="button" data-testid="phone-party-next" onClick={() => send('next')} className="rounded-lg bg-white/10 px-4 py-2 text-xl">▶</button>
@@ -70,18 +70,18 @@ export function PhonePartyPanel({ party, client, onLeave }: { party: PartyView; 
           <button type="button" data-testid="phone-party-rematch" onClick={() => send('rematch')} className="rounded-xl bg-[#00E5FF] py-4 font-black tracking-widest text-[#04202a]">REMATCH</button>
           <button type="button" onClick={() => send('lobby')} className="rounded-xl border border-white/20 py-4 font-bold text-white/80">CHANGE GAME</button>
         </div>
-      ) : <p className="text-center text-xs text-white/45">The first player picks what’s next.</p>)}
+      ) : <p className="text-center text-xs text-white/50">The first player picks what’s next.</p>)}
 
       <ul className="flex flex-wrap justify-center gap-1.5">
         {party.seats.map((s) => (
-          <li key={s.label} className="rounded-full border px-2.5 py-0.5 font-mono text-[10px]" style={{ borderColor: `${s.color}88`, color: s.color, fontWeight: s.you ? 900 : 400 }}>
+          <li key={s.label} className="rounded-full border px-2.5 py-0.5 font-mono text-[12px]" style={{ borderColor: `${s.color}88`, color: s.color, fontWeight: s.you ? 900 : 400 }}>
             {s.label} {s.name}{s.ready ? ' ✓' : ''}
           </li>
         ))}
-        {party.waiting > 0 && <li className="font-mono text-[10px] text-white/40">+{party.waiting} waiting</li>}
+        {party.waiting > 0 && <li className="font-mono text-[12px] text-white/50">+{party.waiting} waiting</li>}
       </ul>
 
-      <button type="button" data-testid="phone-party-leave" onClick={onLeave} className="mx-auto font-mono text-[10px] tracking-widest text-white/35 underline">LEAVE THE ROOM</button>
+      <button type="button" data-testid="phone-party-leave" onClick={onLeave} className="mx-auto font-mono text-[12px] tracking-widest text-white/50 underline">LEAVE THE ROOM</button>
     </div>
   );
 }

@@ -100,7 +100,8 @@ vi.mock('@/lib/db', () => ({
       findMany: async ({ where }: Row) => matchesWhere(where),
       findUnique: async ({ where }: Row) => db.matches.find((m) => m.id === where.id) ?? null,
     },
-    user: { findMany: async () => [{ id: USER, name: 'You' }, { id: HOUSE, name: 'House' }] },
+    // ARENA-AGE-1: the Arena entry routes read the DB birth year (adults only); these players are adults.
+    user: { findUnique: async () => ({ dobYear: 1990 }), findMany: async () => [{ id: USER, name: 'You' }, { id: HOUSE, name: 'House' }] },
     matchEvent: { findMany: async () => [] },
     $transaction: async (fn: (t: typeof tx) => unknown) => fn(tx),
   },

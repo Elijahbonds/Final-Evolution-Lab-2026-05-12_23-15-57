@@ -114,7 +114,7 @@ export default function ControllerPage({ code }: { code: string }) {
   if (state === 'failed' && !config) {
     return (
       <div data-testid="controller-room-missing" className="flex min-h-[100dvh] flex-col items-center justify-center gap-4 bg-[#07090d] px-6 text-center text-white">
-        <p className="font-mono text-xs tracking-[0.3em] text-white/40">ROOM {code}</p>
+        <p className="font-mono text-xs tracking-[0.3em] text-white/50">ROOM {code}</p>
         <p className="fel-heading text-2xl font-black">Can’t find that game</p>
         <p className="max-w-xs text-sm text-white/55">The party screen may have closed, or the code changed. Check the code on the TV.</p>
         <a href={JOIN_PATH} className="rounded-xl bg-[#00E5FF] px-6 py-3 font-bold text-black">TYPE A CODE</a>
@@ -138,7 +138,7 @@ export default function ControllerPage({ code }: { code: string }) {
           the WebSocket fallback is playable but noticeably worse, and saying so beats letting the game
           just feel bad for no visible reason. */}
       {(relay.padName || relay.unsupported || relay.path === 'socket') && (
-        <div className="px-4 pb-1 text-[11px] font-mono text-white/45">
+        <div className="px-4 pb-1 text-[12px] font-mono text-white/50">
           {relay.padName && <span>{relay.padName} · {relay.framesSent} frames</span>}
           {relay.path === 'socket' && <span className="text-[#ffd75e]"> · slow path (relay)</span>}
           {relay.unsupported && <p className="mt-1 text-[#ffd75e]">{relay.unsupported}</p>}
@@ -148,7 +148,7 @@ export default function ControllerPage({ code }: { code: string }) {
       <main className="flex flex-1 flex-col justify-center gap-6 px-4 pb-8">
         {party && <PhonePartyPanel party={party} client={clientRef.current} onLeave={leave} />}
         {!config && (
-          <p className="text-center text-sm text-white/40">Waiting for the host…</p>
+          <p className="text-center text-sm text-white/50">Waiting for the host…</p>
         )}
         {config && !party && <SchemaControls config={config} client={clientRef.current} live={roomState} />}
         {config && party && !partyBetween && (
@@ -211,7 +211,7 @@ export function SchemaControls({ config, client, live = null }: { config: ModeCo
         }
         return <DpadPad key={i} action={s.dpad.action} client={client} />;
       })}
-      {line && <p data-testid="pad-feel" className="text-center font-mono text-[11px] text-white/45">{line}</p>}
+      {line && <p data-testid="pad-feel" className="text-center font-mono text-[12px] text-white/50">{line}</p>}
     </>
   );
 }
@@ -222,7 +222,7 @@ export function SchemaControls({ config, client, live = null }: { config: ModeCo
  */
 function RoomChips({ state }: { state: RoomState }) {
   return (
-    <div data-testid="room-state" role="status" aria-live="polite" className="flex flex-wrap items-center justify-center gap-2 font-mono text-[11px]">
+    <div data-testid="room-state" role="status" aria-live="polite" className="flex flex-wrap items-center justify-center gap-2 font-mono text-[12px]">
       {state.chips.map((c, i) => {
         const tone = c.tone ?? '#e8d9c2';
         return (
@@ -247,7 +247,7 @@ function JoinScreen({
   return (
     <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-6 bg-[#07090d] px-6 text-white">
       <div className="text-center">
-        <p className="font-mono text-xs tracking-[0.3em] text-white/40">{left ? 'YOU LEFT THE ROOM' : invitedTo ? `YOU’RE INVITED TO PLAY ${invitedTo.toUpperCase()}` : 'FEL CONTROLLER'}</p>
+        <p className="font-mono text-xs tracking-[0.3em] text-white/50">{left ? 'YOU LEFT THE ROOM' : invitedTo ? `YOU’RE INVITED TO PLAY ${invitedTo.toUpperCase()}` : 'FEL CONTROLLER'}</p>
         <p data-testid="controller-code" className="mt-2 font-mono text-4xl font-bold tracking-[0.2em] text-[#00E5FF]">{code}</p>
       </div>
       <input
@@ -255,12 +255,13 @@ function JoinScreen({
         value={name}
         onChange={(e) => setName(e.target.value.slice(0, 16))}
         placeholder="Your name"
+        aria-label="Your name"
         maxLength={16}
         autoComplete="nickname"
-        className="w-full max-w-xs rounded-lg bg-white/10 px-4 py-3 text-center outline-none placeholder:text-white/30"
+        className="w-full max-w-xs rounded-lg bg-white/10 px-4 py-3 text-center outline-none placeholder:text-white/50"
       />
       {name && cleanPlayerName(name) !== name.trim() && (
-        <p className="-mt-4 font-mono text-[10px] text-white/40">The TV will show: {cleanPlayerName(name) || 'PLAYER'} (letters, numbers, up to {PLAYER_NAME_MAX})</p>
+        <p className="-mt-4 font-mono text-[12px] text-white/50">The TV will show: {cleanPlayerName(name) || 'PLAYER'} (letters, numbers, up to {PLAYER_NAME_MAX})</p>
       )}
       {/* The join tap doubles as the user gesture iOS requires before it will
           even consider granting motion access. */}
@@ -312,7 +313,7 @@ function MotionPad({
           ENABLE MOTION
         </button>
         {needsPerm && (
-          <p className="max-w-xs text-xs text-white/35">
+          <p className="max-w-xs text-xs text-white/50">
             iOS needs permission and an https page for tilt. If nothing happens, use the button below.
           </p>
         )}

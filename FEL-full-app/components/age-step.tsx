@@ -60,11 +60,14 @@ export function AgeStep({
   onLocked,
   onBlocked,
   nextPath = '/',
+  ready = true,
 }: {
   mode: 'signup' | 'account';
   onLocked?: (year: number, birthDate: string) => void;
   onBlocked?: () => void;
   nextPath?: string;
+  /** PERF-834-LCP (a): false while the page has not hydrated — Continue stays disabled (a tap before handlers attach is lost). */
+  ready?: boolean;
 }) {
   const [away, setAway] = useState(ageBlockPresent);
   const [year, setYear] = useState('');
@@ -125,6 +128,7 @@ export function AgeStep({
       <p className="text-center text-sm text-white/70">{AGE_QUESTION}</p>
       {locked === null ? (
         <select
+          aria-label="Birth year"
           value={year}
           onChange={(e) => { setYear(e.target.value); setInvalid(null); }}
           className="w-full rounded-md border border-white/10 bg-[#16161A] px-4 py-3 text-sm text-white outline-none transition-colors focus:border-[#00E5FF]/60"
@@ -168,7 +172,7 @@ export function AgeStep({
         <button
           type="button"
           onClick={onContinue}
-          disabled={busy}
+          disabled={busy || !ready}
           className="fel-heading flex w-full items-center justify-center rounded-md bg-[#00E5FF] py-3 text-lg font-bold text-black transition-all hover:bg-[#00E5FF]/85 disabled:opacity-50"
         >
           Continue

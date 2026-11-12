@@ -189,6 +189,10 @@ export class InputBus {
   private spaceDownAt = 0;
   /** True while ANY local pad is held (the touch overlay hides on it). */
   public gamepadActive = false;
+  /** COUCH TURNS (lane/hoops-couch, 2026-10-24): which local pads feed the MERGED stream (`on()`). null = every pad (the
+   *  default, unchanged). A turn-based host (the 3PT shootout) passes the shooter who is up, so another seat's pad never
+   *  fires their shot. The slot stream (`onSlot`), the keyboard and the touch deck are untouched. */
+  public padFilter: ((slot: number) => boolean) | null = null;
   // ── the body channel (MOVEMENT PLAY P3) ──
   private bodyListeners = new Set<BodyListener>();
   /** The latest packet since start(); null before any, and after a final one. */
@@ -557,7 +561,7 @@ export class InputBus {
       // arrived as B, on every Switch controller, with nothing in the tree able to notice.
       const canon = applyRemap(readPad(pad, s.profile), readRemap(s.profile.id));
       s.canon = canon;
-      canons.push(canon);
+      if (!this.padFilter || this.padFilter(slot)) canons.push(canon);   // COUCH TURNS: only the shooter who is up
       if (this.slotListeners.size) this.emitSlotPad(slot, s, canon);
     });
     // HOTFIX (2026-09-24): while SPACE is held the keyboard is pulling R too, and the two share ONE R stream. The merged pad

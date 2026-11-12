@@ -16,6 +16,8 @@
 //      contestedPct(): the contest bites the make chance itself (it used to narrow only the meter); the shot is ALTERED (a
 //      higher, later arc) when the contest is strong.
 import { BLOCK_WINDOW_SEC } from './BasketballCore';
+import type { Tier } from './Difficulty';
+import { feel } from '../../feel-panel/feel';   // hoops-p02: hoops.aiBlockJumpChance
 
 /** A grounded hand-up inside this of the shooter contests. */
 export const HAND_UP_RANGE = 2.2;   // a closeout with a hand up, not only an arm's length (measured: the AI's press settles 1.4–2.0 m out, so 1.6 never fired)
@@ -29,10 +31,30 @@ export const BUMP_STRIP_WINDOW_SEC = 0.4;
 export const BUMP_STRIP_EXPOSURE = 0.75;
 /** A set AI defender bumped by the handler strips this often. */
 export const AI_BUMP_STRIP_CHANCE = 0.18;   // per collision, and only off a real sprint into a SET body (a 3 s drive used to lose the ball ~44 % of the time)
+/** OV75-1 (H-04): the bump strip's odds per opponent tier. PRO and ELITE are AI_BUMP_STRIP_CHANCE exactly.
+ *  ROOKIE is Option B (PM 2026-10-24, TUNE): 0.06 (a third of PRO) with a 5000 ms cooldown below.
+ *  Option A (the alternative, TUNE): rookie 0 — no strip on the bump at ROOKIE, the cooldown then unused. */
+export const AI_BUMP_STRIP_CHANCE_BY_TIER: Readonly<Record<Tier, number>> = {
+  rookie: 0.06,                    // TUNE(elijah): Option B, a third of PRO (Option A: 0, no strip on the bump)
+  pro: AI_BUMP_STRIP_CHANCE,       // 0.18, unchanged
+  elite: AI_BUMP_STRIP_CHANCE,     // 0.18, unchanged
+};
+/** OV75-1: the gap between two bump-strip rolls, per tier (ms). PRO/ELITE = the 2500 literal the 1v1 gate used. */
+export const BUMP_STRIP_COOLDOWN_MS_BY_TIER: Readonly<Record<Tier, number>> = {
+  rookie: 5000,                    // TUNE(elijah): Option B, twice PRO (Option A: unused, chance 0)
+  pro: 2500,                       // unchanged
+  elite: 2500,                     // unchanged
+};
+/** The bump strip's odds for this opponent tier (an unknown tier plays PRO's). */
+export const aiBumpStripChance = (t: Tier): number => AI_BUMP_STRIP_CHANCE_BY_TIER[t] ?? AI_BUMP_STRIP_CHANCE;
+/** The gap between two bump-strip rolls for this opponent tier (ms). */
+export const bumpStripCooldownMs = (t: Tier): number => BUMP_STRIP_COOLDOWN_MS_BY_TIER[t] ?? 2500;
 /** The AI raises a hand on a load inside range this often … */
 export const AI_HAND_UP_CHANCE = 0.75;
-/** … and jumps to block a metered shot this often (timed to the green). */
-export const AI_BLOCK_JUMP_CHANCE = 0.3;
+/** … and jumps to block a metered shot this often (timed to the green). TUNED 0.3 → 0.45 (hoops-p02, coordinator call 2A: with the
+ *  block decided by the hand on the ball, a grounded hand-up never reaches a release, so the jump is the AI's block). It is his
+ *  choice to leave the floor, never the block's outcome. Knob `hoops.aiBlockJumpChance`. */
+export const AI_BLOCK_JUMP_CHANCE = 0.45;
 /** A block needs the hand inside this of the shooter. */
 export const AI_BLOCK_RANGE = 1.9;   // a JUMPING defender's reach (measured: the armed blocker released from 1.6–1.8 m and the chance came out 0)
 /** The AI's block chance at the release with a hand up inside range, set and square: a layup / dunk at the rim is far more
@@ -73,9 +95,10 @@ export function bumpExposure(exposure: number, bumpAgeSec: number): number {
   return bumpAgeSec <= BUMP_STRIP_WINDOW_SEC ? Math.max(exposure, BUMP_STRIP_EXPOSURE) : exposure;
 }
 
-/** A set defender bumped by the handler (a hard contact with the handler as the attacker) rolls a strip. */
-export function aiBumpStrips(set: boolean, facingCos: number, rng: () => number): boolean {
-  return set && facingCos >= HAND_UP_FACING_COS && rng() < AI_BUMP_STRIP_CHANCE;
+/** A set defender bumped by the handler (a hard contact with the handler as the attacker) rolls a strip. OV75-1: `chance` is
+ *  the tier's odds (aiBumpStripChance); left out it is AI_BUMP_STRIP_CHANCE, as before. A chance of 0 never strips. */
+export function aiBumpStrips(set: boolean, facingCos: number, rng: () => number, chance: number = AI_BUMP_STRIP_CHANCE): boolean {
+  return set && facingCos >= HAND_UP_FACING_COS && rng() < chance;
 }
 
 /** The player's jump swats a dunker in the air: the jump is fresh (inside the block window), the dunker is inside range and
@@ -154,7 +177,7 @@ export function aiHandsUp(dist: number, facingCos: number, rng: () => number): b
  */
 export type AiShotRead = 'block' | 'handUp' | 'none' | 'pending';
 export function aiShotRead(dist: number, facingCos: number, atGather: boolean, rng: () => number): AiShotRead {
-  if (atGather && dist <= AI_BLOCK_RANGE + 0.3 && facingCos >= 0 && rng() < AI_BLOCK_JUMP_CHANCE) return 'block';
+  if (atGather && dist <= AI_BLOCK_RANGE + 0.3 && facingCos >= 0 && rng() < feel('hoops.aiBlockJumpChance', AI_BLOCK_JUMP_CHANCE)) return 'block';
   if (dist > HAND_UP_RANGE || facingCos < HAND_UP_FACING_COS) return 'pending';
   return rng() < AI_HAND_UP_CHANCE ? 'handUp' : 'none';
 }

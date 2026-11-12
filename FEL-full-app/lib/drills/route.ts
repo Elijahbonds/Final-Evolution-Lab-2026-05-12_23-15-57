@@ -13,6 +13,7 @@
 import type { Drill } from './chart';
 import { SCREEN_HOME } from '../screen/routes';
 import { COUNTERMOVEMENT_GEOMETRY, POGO_BILATERAL, POGO_UNILATERAL, SAFE_LANDING, WAKE_UP, drillById } from './drills';
+import { HOOPS_DRILLS } from './hoopsDrills';
 
 export const DRILLS_PATH = '/play/drills';
 /** The query key that opens one drill: /play/drills?drill=<id>. */
@@ -21,11 +22,21 @@ export const DRILL_PARAM = 'drill';
 /** The drills on the route, in the order the page lists them: the wake-up first, then chapter 6 in the book's order. */
 export const ROUTE_DRILLS: readonly Drill[] = [WAKE_UP, COUNTERMOVEMENT_GEOMETRY, POGO_BILATERAL, POGO_UNILATERAL, SAFE_LANDING];
 
+/** PLAT-P09 (BBS-03): the second shelf, ball skills (hoopsDrills.ts), at /play/drills?shelf=hoops. */
+export const SHELF_PARAM = 'shelf';
+export const HOOPS_SHELF = 'hoops';
+export type DrillShelf = 'playbook' | 'hoops';
+export const SHELF_DRILLS: Readonly<Record<DrillShelf, readonly Drill[]>> = { playbook: ROUTE_DRILLS, hoops: HOOPS_DRILLS };
+/** Every drill the route offers, on either shelf. */
+export const OFFERED_DRILLS: readonly Drill[] = [...ROUTE_DRILLS, ...HOOPS_DRILLS];
+export const shelfOf = (raw: string | null | undefined): DrillShelf => (raw === HOOPS_SHELF ? 'hoops' : 'playbook');
+export const shelfHref = (s: DrillShelf): string => (s === 'hoops' ? `${DRILLS_PATH}?${SHELF_PARAM}=${HOOPS_SHELF}` : DRILLS_PATH);
+
 /** The drill a ?drill= value names, when the route offers it; null for anything else (an id off the shelf included). */
 export function routeDrill(id: string | null | undefined): Drill | null {
   if (!id) return null;
   const d = drillById(id);
-  return d && ROUTE_DRILLS.includes(d) ? d : null;
+  return d && OFFERED_DRILLS.includes(d) ? d : null;
 }
 
 /** The address that opens a drill on the route (its detail, never the camera: the camera always waits for a tap). */
@@ -40,8 +51,14 @@ export function drillChapterHref(d: Pick<Drill, 'source'>): string | null {
 
 /** "Playbook ch. 6 · Drill 3: The Safe Landing Check" — where the drill is written, for the page. */
 export function drillSourceLine(d: Pick<Drill, 'source'>): string {
+  if (d.source.book === 'fel') return `FEL ball skills · ${d.source.section}`;
   const book = d.source.book === 'playbook' ? 'Playbook' : 'The Art of Dunking';
   return `${book} ch. ${d.source.chapter} · ${d.source.section}`;
+}
+
+/** The shelf card's short source ("Playbook ch. 6", "Ball skills"). */
+export function drillShortSource(d: Pick<Drill, 'source'>): string {
+  return d.source.book === 'fel' ? 'Ball skills' : d.source.book === 'playbook' ? `Playbook ch. ${d.source.chapter}` : `Art of Dunking ch. ${d.source.chapter}`;
 }
 
 /** Minutes, rounded up, for the list ("10 min"). */

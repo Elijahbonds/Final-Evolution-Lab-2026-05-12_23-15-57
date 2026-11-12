@@ -1,3 +1,4 @@
+// CUE-REWRITE (2026-10-27) — test changed: copy rewrite ("Scan a couple more times" → "Do a couple more sets"; "Retest" → "Check-up"); same meaning.
 // A PROGRAM IS NOT A DIAGNOSIS (2026-09-13).
 //
 // The Mirror's non-negotiable constraint is that everything it says is ESTIMATED ENGAGEMENT — never a
@@ -82,13 +83,13 @@ describe('IT REFUSES TO PROGRAM FROM NOTHING', () => {
     const p = buildProgram([]);
     expect(p.blocks).toEqual([]);
     expect(p.sessions).toBe(0);
-    expect(p.headline).toMatch(/scan a couple more/i);
+    expect(p.headline).toMatch(/do a couple more sets/i);
   });
 
   it('ONE session is not enough, however bad it looked', () => {
     const p = buildProgram([sess(1, { rib_thoracic: 20, lumbo_pelvic: 20, upper_traps: 20 })]);
     expect(p.blocks).toEqual([]);
-    expect(p.headline).toMatch(/scan a couple more/i);
+    expect(p.headline).toMatch(/do a couple more sets/i);
   });
 
   it('thin sessions do not count toward the history at all', () => {
@@ -212,7 +213,7 @@ describe('P9: the 4-session retest is scheduled, not just carried', () => {
     expect(c.sessionsToRetest).toBe(0);
     expect(c.retestNext).toBe(false);
     expect(c.line).toBe('');
-    expect(c.program.headline).toMatch(/scan a couple more/i);
+    expect(c.program.headline).toMatch(/do a couple more sets/i);
   });
 
   it('the program is SET by the session that first earns one, and the retest is RETEST_AFTER sessions later', () => {
@@ -222,12 +223,12 @@ describe('P9: the 4-session retest is scheduled, not just carried', () => {
     expect(set.sessionsDone).toBe(0);
     expect(set.sessionsToRetest).toBe(4);
     expect(set.line).toBe(retestLine(4));
-    expect(set.line).toMatch(/Retest in 4 press\/row sets/);
+    expect(set.line).toMatch(/Check-up in 4 press and row sets/);   // test changed: copy rewrite (CUE-REWRITE) — same meaning
     const three = programCycle([drift(1), drift(2), drift(3), drift(4), drift(5)]);
     expect(three.sessionsDone).toBe(3);
     expect(three.sessionsToRetest).toBe(1);
     expect(three.retestNext).toBe(true);
-    expect(three.line).toMatch(/next press\/row set in the Mirror is the retest/);
+    expect(three.line).toMatch(/next press and row set in the Mirror is the check-up/);   // test changed: copy rewrite (CUE-REWRITE) — same meaning
   });
 
   it('the program in force does NOT change inside a cycle, whatever the sessions show', () => {

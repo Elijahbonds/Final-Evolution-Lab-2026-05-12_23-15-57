@@ -28,6 +28,8 @@ import {   // lane/hoops-reverse: the hoops gears' numbers (feel knobs, defaults
   HOOPS_JOG_TAU, HOOPS_SPRINT_TAU, HOOPS_JOG_ACCEL, HOOPS_SPRINT_ACCEL, HOOPS_LOAD_SCALE, HOOPS_GEAR_DOWN_DECEL, HOOPS_STOP_DECEL_LOW,
   HOOPS_STOP_DECEL_HIGH, HOOPS_PLANT_DECEL, HOOPS_TURN_TRUE_ARC, HOOPS_KICK_SEC, HOOPS_CUT_SEC, HOOPS_JERK, HOOPS_REVERSE_DEG,
   HOOPS_REVERSE_DECEL, liveGears, jerkLimit, turnToward,
+  HANDLER_STOP_DECEL_LOW, HANDLER_STOP_DECEL_HIGH, HANDLER_JOG_TAU, HANDLER_JOG_ACCEL, HANDLER_LOAD_SCALE, HANDLER_FIRST_STEP_MPS,
+  HANDLER_REVERSE_PLANT_HOLD, HANDLER_REVERSE_LAUNCH_SEC, HOOPS_HANDLER_TURN_DEG,
 } from './HoopsStick';
 
 export interface MovementTuning {
@@ -81,6 +83,10 @@ export interface GearTuning {
   jerk?: number;           // m/s³ — the most the speed's acceleration changes in a second (0: off)
   reverseDeg?: number;     // ° — a stick this far round from the travel is a REVERSAL: brake through zero, push off the new way
   reverseDecel?: number;   // m/s² — the reversal's brake
+  /** hoops-p01 (the ball handler's; each off / release when absent — core/HoopsStick). */
+  firstStep?: number;        // m/s — a stick pushed from a standstill starts the body at this speed on the press's frame (0: none)
+  reversePlantHold?: number; // 1 = a reversal's plant holds its floor speed on the old line (release); 0 = it brakes straight through zero
+  reverseLaunchSec?: number; // s — the push-off out of a reversal is a launch for this long (0: a loaded step, release)
 }
 /** The launch after a move: accel caps ×, for this long (owner: "faster launches"). */
 export const LAUNCH_BOOST = 1.7, LAUNCH_SEC = 0.45;
@@ -95,6 +101,20 @@ export const GEARS_HOOPS: GearTuning = {
   plantDecel: HOOPS_PLANT_DECEL, trueArc: HOOPS_TURN_TRUE_ARC, kickSec: HOOPS_KICK_SEC, cutSec: HOOPS_CUT_SEC, jerk: HOOPS_JERK,
   reverseDeg: HOOPS_REVERSE_DEG, reverseDecel: HOOPS_REVERSE_DECEL,
 };
+
+/** hoops-p01 (controls that answer): THE BALL HANDLER'S GEARS — the 1v1 / 3v3 DribbleController's. GEARS_HOOPS with the stop and launch a
+ *  phase-1 gate needs (H3a's own numbers, #311) and the three new answers (the first step, the reversal's plant and push-off); every one a
+ *  feel knob (core/HoopsStick: RELEASE_STICK_PRESET is the release stick). GEARS_HOOPS stays release: the dunk approach runs on it. */
+export const GEARS_HANDLER: GearTuning = {
+  ...GEARS_HOOPS,
+  jogTau: HANDLER_JOG_TAU, jogAccel: HANDLER_JOG_ACCEL, loadScale: HANDLER_LOAD_SCALE,   // TUNED 0.17 → 0.10 s, 15 → 22 m/s², 0.45 → 0.7
+  stopDecelLow: HANDLER_STOP_DECEL_LOW, stopDecelHigh: HANDLER_STOP_DECEL_HIGH,          // TUNED 22 → 32, 11 → 26 m/s²
+  turnRateDeg: HOOPS_HANDLER_TURN_DEG,                                                     // (the handler's turn-rate knob, as before: 540)
+  firstStep: HANDLER_FIRST_STEP_MPS, reversePlantHold: HANDLER_REVERSE_PLANT_HOLD, reverseLaunchSec: HANDLER_REVERSE_LAUNCH_SEC,   // TUNED (new)
+};
+/** A committed hop (the step-back's ignoreStickFor) glides on the RELEASE stop whatever the gears or the knobs say: its travel is the move's
+ *  separation (#311 kept it; hoops-p01 keeps it for the handler's firmer stop too). */
+const HOP_STOP = { low: HOOPS_STOP_DECEL_LOW, high: HOOPS_STOP_DECEL_HIGH } as const;
 
 export const DEFAULT_MOVEMENT: MovementTuning = {
   maxSpeed: 6.4,
@@ -138,6 +158,7 @@ export class CourtMovement {
   private cutDebt = 0;         // hoops-reverse (H3a): m/s of the cut cost still to pay (spread over cutSec)
   private cutRate = 0;
   private accPrev = 0;         // hoops-reverse (H3a): last frame's speed acceleration (m/s²), for the jerk limit
+  private plantRev = false;    // hoops-p01: this plant is a reversal's, and brakes straight through (reversePlantHold 0)
   /** hoops-reverse (owner 2026-10-24): this frame's retreat cap, a share of jog speed (DribbleController sets it from the stick; 1 = none). */
   retreatK = 1;
   private live: MovementTuning | null = null;   // hoops-reverse: this frame's tuning, the gears through the feel panel (built once)
@@ -226,6 +247,10 @@ export class CourtMovement {
         this.cutActive = true;
         this.plantTimer = t.plantBleedSec;
         this.plantFloor = speed * (1 - 0.55 * Math.min(1, speed / t.maxSpeed));
+        // hoops-p01: a REVERSAL's plant (the stick reverseDeg+ round) with reversePlantHold 0 brakes through zero instead of holding its floor
+        const g = t.gears;
+        this.plantRev = !!g && g.reversePlantHold === 0 && !!g.reverseDeg && Vector3.Dot(this.vel, wantDir) <= Math.cos((g.reverseDeg * Math.PI) / 180);   // (vel is unit length here)
+        if (this.plantRev) this.plantFloor = 0;
       }
       if (!opposed) this.cutActive = false;
 
@@ -236,6 +261,10 @@ export class CourtMovement {
         if (t.gears?.jerk) newSpeed = Math.max(this.plantFloor, jerkLimit(speed, newSpeed, this.accPrev, t.gears.jerk, dt, idt));   // H3a: the plant comes on over a few frames
         if (t.gears) this.accPrev = (newSpeed - speed) * idt;
         if (speed > 0.001) this.vel.copyFrom(this.vel.normalize().scale(newSpeed)); else this.vel.setAll(0);
+        if (this.plantRev && newSpeed <= 0.25) {   // hoops-p01: through zero the reversal's plant is done — the push-off, a launch
+          this.plantTimer = 0; this.plantRev = false;
+          if (t.gears?.reverseLaunchSec) this.launchFor(t.gears.reverseLaunchSec);
+        }
       } else {
         // Turn-rate cap at speed (lateral G): steer current velocity toward
         // the wanted direction, then accelerate along it.
@@ -276,7 +305,10 @@ export class CourtMovement {
           const k = Math.min(1, maxTurn / angle);
           dir = turnToward(dir, wantDir, angle, k, !!t.gears?.trueArc);   // (trueArc 0: exactly the old Vector3.Lerp(dir, wantDir, k).normalize())
         }
-        if (!reversing && angle >= revRad) dir = wantDir.clone();   // all but stopped: push off the new way
+        if (!reversing && angle >= revRad) {   // all but stopped: push off the new way
+          dir = wantDir.clone();
+          if (t.gears?.reverseLaunchSec && speed > 0.001) this.launchFor(t.gears.reverseLaunchSec);   // hoops-p01: the push-off is a launch
+        }
         let newSpeed: number;
         if (t.gears && reversing) {
           newSpeed = Math.max(0, speedT - (t.gears.reverseDecel ?? t.decel) * dt);
@@ -306,6 +338,9 @@ export class CourtMovement {
             const add = Math.min(this.kickLeft, (g.sprintKick / g.kickSec) * dt);
             newSpeed = Math.min(t.maxSpeed * this.speedScale, newSpeed + add); this.kickLeft -= add;
           }
+          // hoops-p01 THE FIRST STEP: pushed from a standstill, the body leaves at `firstStep` on this frame (after the jerk limit — it is the
+          // answer to the press, not a ramp), then the loaded ramp carries on from there
+          if (g.firstStep && idt > 0 && speedT < 0.05 && err > 0) { const f = Math.min(topSpeed, g.firstStep + Math.max(0, newSpeed - speedT)); if (f > newSpeed) { newSpeed = f; this.accPrev = (newSpeed - speedT) * idt; } }
         } else {
           // Burst off the mark, slower cruise ramp when sprinting at pace.
           const a = speedT < 1.2 ? t.accel : (sprint ? t.sprintAccel : t.accel);
@@ -329,8 +364,9 @@ export class CourtMovement {
       if (speed > 0) {
         // hoops-reverse (H3a): a COMMITTED HOP (ignoreStickFor: the step-back) glides on the shipped gears, whatever the stop knobs say — its
         // travel is the move's separation (#311: the firmer stop cut a step-back's hop from 0.30 m to 0.23 m)
-        const hop = this.stickOffLeft > 0, g = hop && !this.pausedNow ? this.tune.gears : t.gears;
-        const decel = g ? (this.pausedNow ? g.stopDecelLow * 1.5 : g.stopDecelLow + (g.stopDecelHigh - g.stopDecelLow) * Math.min(1, speed / t.maxSpeed)) : t.decel;   // pausin' stops on a dime
+        const hop = this.stickOffLeft > 0 && !this.pausedNow, g = t.gears;
+        const lo = hop ? HOP_STOP.low : g?.stopDecelLow ?? 0, hi = hop ? HOP_STOP.high : g?.stopDecelHigh ?? 0;   // hoops-p01: the hop's glide is release's, by name
+        const decel = g ? (this.pausedNow ? g.stopDecelLow * 1.5 : lo + (hi - lo) * Math.min(1, speed / t.maxSpeed)) : t.decel;   // pausin' stops on a dime
         let newSpeed = Math.max(0, speed - decel * dt);
         if (t.gears?.jerk && !this.pausedNow && !hop) newSpeed = Math.max(0, jerkLimit(speed, newSpeed, this.accPrev, t.gears.jerk, dt, idt));   // H3a: the brake comes on over a few frames
         if (t.gears) { this.accPrev = newSpeed > 0 ? (newSpeed - speed) * idt : 0; this.kickLeft = 0; this.cutDebt = 0; }
@@ -352,7 +388,7 @@ export class CourtMovement {
   }
 
   /** Hard stop (possession change, whistle). Keeps facing. */
-  stop(): void { this.vel.setAll(0); this.plantTimer = 0; this.holdLeft = 0; this.slew = null; this.stickOffLeft = 0; this.kickLeft = 0; this.cutDebt = 0; this.accPrev = 0; }
+  stop(): void { this.vel.setAll(0); this.plantTimer = 0; this.plantRev = false; this.holdLeft = 0; this.slew = null; this.stickOffLeft = 0; this.kickLeft = 0; this.cutDebt = 0; this.accPrev = 0; }
 }
 
 /** Binds a character root to a Havok capsule. KINEMATIC (ANIMATED motion

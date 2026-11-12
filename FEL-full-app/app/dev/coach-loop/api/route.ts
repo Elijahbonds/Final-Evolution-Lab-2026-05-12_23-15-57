@@ -44,7 +44,8 @@ function seed(): { store: LoopStore; programId: string } {
     row({ id: 'pe-flow', name: '90/90 hip switch', category: 'mobility', pattern: 'mobility', braceMode: 'none', skillLayer: 'joints',
       primaryCues: ['Both knees stay on the floor', 'Turn from the hips, not the low back'], commonFaults: [{ fault: 'Hands pushing the floor', correctionCue: 'Hands off: let the hips do the turn' }] }),
     row({ id: 'pe-pogo', name: 'Pogo hops', category: 'plyometric', pattern: 'locomotion', braceMode: 'reflex', skillLayer: 'jump-land',
-      demoVideoUrl: 'https://youtu.be/q1HLjLbhS2s', primaryCues: ['Stiff ankles, springy contacts'], commonFaults: [{ fault: 'Long ground contacts', correctionCue: 'Off the floor as fast as it touches' }] }),
+      demoVideoUrl: null,   // COACH-DELIVERY COA-09: no YouTube demo in the dev harness either (own storage only)
+      primaryCues: ['Stiff ankles, springy contacts'], commonFaults: [{ fault: 'Long ground contacts', correctionCue: 'Off the floor as fast as it touches' }] }),
     row({ id: 'pe-box', name: 'Box squat', category: 'lower-body', pattern: 'squat', braceMode: 'set' }),
     row({ id: 'pe-goblet', name: 'Goblet squat', category: 'lower-body', pattern: 'squat', braceMode: 'set', skillLayer: 'strength', equipment: ['kettlebell'],
       demoVideoUrl: 'https://fel.local/v/goblet-squat.mp4',

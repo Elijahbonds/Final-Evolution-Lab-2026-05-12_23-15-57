@@ -18,7 +18,7 @@ export default function CreativeHub({ publicCreator }: { publicCreator: boolean 
     <div className="min-h-screen bg-neutral-950 pb-20 text-neutral-100">
       <div className="p-5">
         <h1 className="text-3xl font-black">Create</h1>
-        <p className="mt-1 max-w-2xl text-sm text-neutral-400">
+        <p className="mt-1 max-w-2xl text-base text-neutral-400">
           Make it, set it up in three steps, see where it lands. FEL reviews every public card first, then plays it in the game, credited to you.
         </p>
         {!publicCreator && (
@@ -36,9 +36,9 @@ export default function CreativeHub({ publicCreator }: { publicCreator: boolean 
             <Link key={g.id} href={`/create/${g.id}`} data-qa={`tile-${g.id}`}
               className={`group relative flex flex-col rounded-2xl bg-neutral-900 p-4 transition hover:bg-neutral-800 ${i === 0 ? 'sm:col-span-2 lg:col-span-1' : ''}`}>
               <span className={`absolute left-0 top-4 h-8 w-1 rounded-r ${g.color}`} aria-hidden />
-              <span className="text-lg font-black">{g.label}</span>
+              <span className="text-[20px] font-black">{g.label}</span>
               <span className="text-sm text-neutral-400">{g.blurb}</span>
-              <span className="mt-3 text-[10px] uppercase tracking-widest text-neutral-500">Shows up in</span>
+              <span className="mt-3 text-[12px] uppercase tracking-widest text-neutral-400">Shows up in</span>
               <ul className="mt-1 space-y-0.5 text-xs">
                 {rows.map((s) => <li key={s.where} className="text-neutral-200">● {s.where}</li>)}
               </ul>
