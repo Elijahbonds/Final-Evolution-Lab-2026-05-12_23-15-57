@@ -117,7 +117,8 @@ describe('hoops pause — one controls list, the panel', () => {
   it('a long list scrolls inside the panel\'s bounded box rather than spilling off a phone', () => {
     const html = card('paused', 'onevone');
     expect(html).toMatch(/data-controls-panel="keys" class="[^"]*\bflex\b[^"]*\bmin-h-0\b[^"]*\bflex-col\b[^"]*\bmax-h-\[60vh\]/);
-    expect(html).toMatch(/data-controls-lines="[^"]*" class="[^"]*\bmin-h-0\b[^"]*\boverflow-y-auto\b/);
+    // EVERY-SCREEN P10: the panel scrolls as a whole (it was the lines' own box; at 150 % and 200 % text that box cut its words)
+    expect(html).toMatch(/data-controls-panel="keys" class="[^"]*\bmin-h-0\b[^"]*\boverflow-y-auto\b/);
     // the 1v1's list is the longest a panel carries: more lines than any curated list's budget, so the scroll is the plan
     expect(controlsSheet('onevone', 'keys').lines.length).toBeGreaterThan(PANEL_MAX_LINES * 2);
     // READY's panel is bounded too (26vh, 38vh from sm) — the same lines box scrolls there

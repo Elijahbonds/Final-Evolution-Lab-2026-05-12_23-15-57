@@ -42,6 +42,10 @@ interface RailData { prq: PrqDisplay; isAdmin: boolean }
  * visitor once the store opens.
  */
 export const RAIL_OPEN_TO_VISITORS: readonly string[] = ['/login', '/signup', '/coach/join', '/squads/join'];
+export const opensToVisitors = (pathname: string): boolean => {
+  const p = pathname.toLowerCase().replace(/\/+$/, '') || '/';
+  return RAIL_OPEN_TO_VISITORS.some((r) => p === r || p.startsWith(`${r}/`));
+};
 export const reservesRail = (pathname: string): boolean => {
   const p = pathname.toLowerCase().replace(/\/+$/, '') || '/';
   return isSignedInOnly(p) && !RAIL_OPEN_TO_VISITORS.some((r) => p === r || p.startsWith(`${r}/`));
@@ -82,6 +86,10 @@ export function StatusRail() {
   // page that rendered at all means someone is signed in: there the rail is drawn while the session loads, empty, so
   // nothing moves when it fills. Elsewhere (the home, a public page) nothing is drawn until the answer, as before.
   if (chromeHiddenFor(pathname)) return null;
+  // EVERY-SCREEN P10: on a path a visitor may stay on (an invite), the rail's place is held by a spacer while the session
+  // loads. It is 0 px tall, unless the page, which knows on the server who is signed in, makes it the rail's height
+  // (/coach/join/[token]): then the rail arrives in its own place and nothing moves (the rig measured 0.135 there).
+  if (status === 'loading' && opensToVisitors(pathname)) return <div aria-hidden data-fel-rail-spacer className="h-0" />;
   if (status !== 'authenticated' && !(status === 'loading' && reservesRail(pathname))) return null;
 
   return (

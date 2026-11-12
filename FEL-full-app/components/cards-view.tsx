@@ -29,6 +29,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { CARD_CATALOG, type Card, type CardType } from '@/lib/card-catalog';
+import { lineSize } from '@/lib/design/type';   // EVERY-SCREEN P10
 import { WALLET_REFRESH_EVENT } from '@/components/wallet-chip';
 
 const TYPE_META: Record<CardType, { icon: any; label: string; accent: string }> = {
@@ -155,7 +156,7 @@ export function CardsView() {
             Earn Lab Credits by training, then unlock drills, challenges &amp; cosmetics.
           </p>
         </div>
-        <span className="inline-flex items-center gap-2 rounded-lg border border-[#FFD700]/40 bg-[#FFD700]/10 px-4 py-2 font-mono text-lg font-bold text-[#FFD700]">
+        <span className="inline-flex items-center gap-2 rounded-lg border border-[#FFD700]/40 bg-[#FFD700]/10 px-4 py-2 font-mono text-[20px] font-bold text-[#FFD700]">
           <Coins className="h-5 w-5" />
           {balance ?? '–'} LC
         </span>
@@ -190,7 +191,7 @@ export function CardsView() {
                       <Icon className="h-5 w-5" style={{ color: meta.accent }} />
                     </div>
                     <div>
-                      <h3 className="fel-heading text-lg font-bold leading-tight text-white">
+                      <h3 className="fel-heading text-[20px] font-bold leading-tight text-white">
                         {card.title}
                       </h3>
                       <span className="font-mono text-[12px] uppercase tracking-wider text-white/60">
@@ -198,7 +199,7 @@ export function CardsView() {
                       </span>
                     </div>
                   </div>
-                  <p className="mt-3 flex-1 text-xs leading-relaxed text-white/70">
+                  <p className={`mt-3 flex-1 ${lineSize(card.description, 'text-xs')} leading-relaxed text-white/70`}>
                     {card.description}
                   </p>
 
@@ -292,7 +293,7 @@ export function CardsView() {
                             <Icon className="h-5 w-5" style={{ color: meta.accent }} />
                           </div>
                           <div>
-                            <h3 className="fel-heading text-lg font-bold leading-tight text-white">
+                            <h3 className="fel-heading text-[20px] font-bold leading-tight text-white">
                               {card.title}
                             </h3>
                             <span className="font-mono text-[12px] uppercase tracking-wider text-white/60">
@@ -300,7 +301,7 @@ export function CardsView() {
                             </span>
                           </div>
                         </div>
-                        <p className="mt-3 flex-1 text-xs leading-relaxed text-white/70">
+                        <p className={`mt-3 flex-1 ${lineSize(card.description, 'text-xs')} leading-relaxed text-white/70`}>
                           {card.description}
                         </p>
                         <button

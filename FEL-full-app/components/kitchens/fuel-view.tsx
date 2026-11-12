@@ -106,7 +106,7 @@ export function FuelView() {
           <h1 className="fel-heading mt-1 text-[30px] font-bold text-white">Today&apos;s fuel</h1>
           <p className="mt-1 text-sm text-white/60">Your Build&apos;s current leak and load, as a plate. Food tags only.</p>
         </div>
-        <button type="button" onClick={() => void rebuild()} className="flex min-h-11 items-center gap-1 rounded-md border border-white/15 px-2.5 py-1.5 text-xs font-bold text-white/80 hover:bg-white/10">
+        <button type="button" onClick={() => void rebuild()} className="flex min-h-11 items-center gap-1 rounded-md border border-white/15 bg-white/[0.04] px-2.5 py-1.5 text-xs font-bold text-white/80 hover:bg-white/10">
           <RefreshCw className="h-3.5 w-3.5" /> Rebuild
         </button>
       </div>

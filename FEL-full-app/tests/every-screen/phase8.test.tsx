@@ -55,7 +55,8 @@ describe('empty states lead on, with labels the app already uses', () => {
 describe('the controls panel hides nothing at 150 % text', () => {
   it('its rows scroll in their own box once the fit is at its floor, and the fit reads that box', () => {
     const p = src('components/games/controls-panel.tsx');
-    expect(p).toMatch(/data-controls-rows className="[^"]*\bmin-h-0\b[^"]*\boverflow-y-auto\b/);
+    // P10: the rows' scroll box became the panel's (the panel scrolls as a whole); still nothing is cut
+    expect(p).toMatch(/className=\{`flex w-\[min\(30rem,92vw\)\] min-h-0 flex-col gap-1\.5 overflow-y-auto/);
     expect(p).toContain("panel.querySelector<HTMLElement>('[data-controls-rows]')");
     expect(p).toContain('font-mono text-[14px] font-black text-[#22d3ee]">{r.input}');   // the size is phase 7's, untouched
   });
