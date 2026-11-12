@@ -45,6 +45,9 @@ import { animDt } from './motionLayers';
 import { ClipHandClock, clipLockTune, guardTune, stepGuardK, GUARD_BAR_POLE } from './RestDribble';   // lane/h3-handler (#312 port): the bounce at rest, the guard
 import { feel } from '../../feel-panel/feel';   // hoops-p04b: knob hoops.carryArmSpeedSec (lib/feel-panel/knobs.ts)
 import { ArmEase } from './MoveEase';   // lane/h3-handler (#314 port): a move's hand-overs ease
+// HOOPS-SOUND (phase 11a, 2026-11-12): the ball this carry draws meeting the floor plays the bounce (audio/dribbleSound.ts)
+import { SoundKit } from '../audio/SoundKit';
+import { DRIBBLE_SOUND_ON, FloorContact, bounceVolume, claimDribbleRole, panFor, type BounceRole, type DribbleSoundRole } from '../audio/dribbleSound';
 
 export interface BallCarryOpts {
   scene: Scene;
@@ -67,6 +70,12 @@ export interface BallCarryOpts {
    * the gap). Default true: every existing caller runs exactly as before.
    */
   idleStride?: boolean;
+  /**
+   * HOOPS-SOUND (phase 11a): whose dribble this is for its sound — the player's (full dribble volume), an AI handler's (a share of it),
+   * or none. Not given: the first hoops carry mounted on the scene is the player's, every later one an AI's (dribbleSound.ts
+   * claimDribbleRole). A carry that is not `hoops` (the dunk runway) makes no sound either way.
+   */
+  soundRole?: DribbleSoundRole;
 }
 /** Where a crossing's ball meets the floor, in the root's frame (x across, z forward; m). Phase 4b: unused — a crossing is a crossover
  *  PATH (handlePaths) with its own floor point; kept in the signatures so a caller that names one still compiles. */
@@ -341,6 +350,43 @@ export function moveHandAt(path: Pick<HandlePath, 'startHand' | 'segs'>, t: numb
   return h;
 }
 
+// HOOPS-SOUND (phase 11a, 2026-11-12): THE BALL ON THE FLOOR IS HEARD. One watcher per ball (the first hoops carry that has it installs
+// it, the last one to go removes it), read after every drawn frame — after the carry, a move's path, the mode's gather or the loose
+// ball's physics have all placed it — so whoever moved it, every floor contact is seen, and seen once (one detector per ball: a contact
+// is never heard twice). Its level comes from how fast the ball came down and whose it is: the carry dribbling it (the player's, or an
+// AI handler's at a share), else 'loose' (a rebound, the last bounce into a gather, a bounce pass) at the player's level. Panned to
+// where the ball is on screen. Knob hoops.dribbleSoundOn (0: silent, as before).
+interface BallSoundCarry { active(): boolean; role: DribbleSoundRole; ballR: number; floor(): number }
+const ballFloorWatches = new WeakMap<AbstractMesh, { carries: Set<BallSoundCarry>; stop(): void }>();
+function watchBallFloor(scene: Scene, ball: AbstractMesh, carry: BallSoundCarry): () => void {
+  let w = ballFloorWatches.get(ball);
+  if (!w) {
+    const carries = new Set<BallSoundCarry>(), contact = new FloorContact();
+    let floor = carry.floor(), ballR = carry.ballR;
+    const obs = scene.onAfterRenderObservable.add(() => {
+      if (ball.isDisposed() || feel('hoops.dribbleSoundOn', DRIBBLE_SOUND_ON) < 0.5) { contact.reset(); return; }
+      let who: BounceRole = 'loose';
+      for (const c of carries) if (c.active()) { who = c.role; floor = c.floor(); ballR = c.ballR; break; }
+      const b = ball.getAbsolutePosition();
+      const speed = contact.step(b.y - floor - ballR, animDt(scene.getEngine().getDeltaTime() / 1000, scene.animationTimeScale));
+      if (!(speed > 0)) return;
+      let pan = 0;
+      const cam = scene.activeCamera;
+      if (cam) {
+        const c = cam.globalPosition, r = cam.getDirection(Vector3.Right());
+        const dx = b.x - c.x, dy = b.y - c.y, dz = b.z - c.z;
+        pan = panFor(dx * r.x + dy * r.y + dz * r.z, Math.hypot(dx, dy, dz));
+      }
+      SoundKit.play('bounce', { volume: bounceVolume(speed, who), pan, tag: who });
+    });
+    w = { carries, stop: () => { scene.onAfterRenderObservable.remove(obs); } };
+    ballFloorWatches.set(ball, w);
+  }
+  const ww = w;
+  ww.carries.add(carry);
+  return () => { ww.carries.delete(carry); if (!ww.carries.size) { ww.stop(); ballFloorWatches.delete(ball); } };
+}
+
 export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   const armW = opts.armIntensity ?? 1;
   const hoops = !!opts.hoops;
@@ -363,6 +409,8 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   let prevArm: ArmChain | null = null; let switchLeft = 0;
   const prevHandT = new Vector3(), prevPole = new Vector3();
   let active = false;
+  // HOOPS-SOUND (phase 11a): whose dribble this is (only a hoops carry sounds: the dunk runway keeps its own; watchBallFloor below)
+  const soundRole: DribbleSoundRole = hoops ? claimDribbleRole(opts.scene, opts.soundRole) : 'off';
   let phase = 0;
   let pending = false;   // a frame was recorded since the last after-animations pass
   let frameDt = 0, stamp = 0;   // the recorded frame's dt, and a counter of drawn frames (the arm memo's continuity)
@@ -1113,6 +1161,11 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   // before-render drives (the 3v3 driver). Once per drawn frame.
   const obsLimit = hoops ? opts.scene.onBeforeCameraRenderObservable.add(() => { if (limitedAt === stamp) return; limitedAt = stamp; followRoot(); limitHeldBall(); armEase?.apply(stamp, passDt, !!mv); }) : null;   // (+ #314 port: the arm ease, last)
 
+  // HOOPS-SOUND (phase 11a): this carry's ball is heard meeting the floor (its role and floor while it is the one dribbling)
+  const unwatchFloor = soundRole === 'off' ? null : watchBallFloor(opts.scene, opts.ball, {
+    active: () => active, role: soundRole, ballR: p.ballR,
+    floor: () => (Number.isFinite(floorY) ? floorY : opts.root.getAbsolutePosition().y),
+  });
   const api: BallCarry = {
     get active() { return active; },
     get phase() { return phase; },
@@ -1211,7 +1264,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
       frameDt = dt; lastSpeed01 = speed01;
       pending = true;
     },
-    dispose() { opts.scene.onAfterAnimationsObservable.remove(obs); if (obsDrawn) opts.scene.onAfterRenderObservable.remove(obsDrawn); if (obsLimit) opts.scene.onBeforeCameraRenderObservable.remove(obsLimit); },
+    dispose() { unwatchFloor?.(); opts.scene.onAfterAnimationsObservable.remove(obs); if (obsDrawn) opts.scene.onAfterRenderObservable.remove(obsDrawn); if (obsLimit) opts.scene.onBeforeCameraRenderObservable.remove(obsLimit); },
   };
   return api;
 }

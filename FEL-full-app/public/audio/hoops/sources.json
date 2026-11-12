@@ -1,0 +1,349 @@
+{
+  "set": "hoops-foley",
+  "version": 1,
+  "date": "2026-11-12",
+  "sources": [
+    {
+      "id": "bsb-1045",
+      "file": "bsb-1045.mp3",
+      "title": "Ball Rebounds (\"three different rebounds of a ball\")",
+      "author": "Joseph Sardin (BigSoundBank)",
+      "licence": "CC0 1.0 (public domain)",
+      "page": "https://bigsoundbank.com/ball-rebounds-s1045.html",
+      "download": "https://bigsoundbank.com/UPLOAD/mp3/1045.mp3?v=d",
+      "sha256": "610c8bd30695877ff31ffc0e12a5ae1b842f8da724d97dc71ed80259e23233a2",
+      "bytes": 316068
+    },
+    {
+      "id": "bsb-1825",
+      "file": "bsb-1825.mp3",
+      "title": "Ball against wall #1 (\"ball bouncing off a wall\")",
+      "author": "Joseph Sardin (BigSoundBank)",
+      "licence": "CC0 1.0 (public domain)",
+      "page": "https://bigsoundbank.com/balloon-against-wall-1-s1825.html",
+      "download": "https://bigsoundbank.com/UPLOAD/mp3/1825.mp3?v=d",
+      "sha256": "e700c83816a8c639db97701700abe977d353f8d3064cb89e8576b58661eed2f1",
+      "bytes": 24228
+    },
+    {
+      "id": "bsb-0938",
+      "file": "bsb-0938.mp3",
+      "title": "Gnashing basketball (\"squeaking shoes, as you hear during a basketball or handball tournament indoors\")",
+      "author": "Joseph Sardin (BigSoundBank)",
+      "licence": "CC0 1.0 (public domain)",
+      "page": "https://bigsoundbank.com/gnashing-basketball-s0938.html",
+      "download": "https://bigsoundbank.com/UPLOAD/mp3/0938.mp3?v=d",
+      "sha256": "64bda68cd42608f3723489604773c2be8cecef662cb87c1287d1b9b567338f98",
+      "bytes": 449408
+    },
+    {
+      "id": "bsb-1771",
+      "file": "bsb-1771.mp3",
+      "title": "Falling steel bar #1",
+      "author": "Joseph Sardin (BigSoundBank)",
+      "licence": "CC0 1.0 (public domain)",
+      "page": "https://bigsoundbank.com/falling-sheet-steel-bar-1-s1771.html",
+      "download": "https://bigsoundbank.com/UPLOAD/mp3/1771.mp3?v=d",
+      "sha256": "aa69b15788794ecfe5513bf6cf3f509cefa72b1897abd367acc8edebb9008419",
+      "bytes": 44388
+    },
+    {
+      "id": "bsb-1772",
+      "file": "bsb-1772.mp3",
+      "title": "Falling steel bar #2",
+      "author": "Joseph Sardin (BigSoundBank)",
+      "licence": "CC0 1.0 (public domain)",
+      "page": "https://bigsoundbank.com/falling-sheet-steel-bar-2-s1772.html",
+      "download": "https://bigsoundbank.com/UPLOAD/mp3/1772.mp3?v=d",
+      "sha256": "5c7456c89fc7184ac3ecd83436e33793735d597708d19e4f4040c191ff8b243c",
+      "bytes": 66468
+    },
+    {
+      "id": "bsb-1773",
+      "file": "bsb-1773.mp3",
+      "title": "Falling steel bar #3",
+      "author": "Joseph Sardin (BigSoundBank)",
+      "licence": "CC0 1.0 (public domain)",
+      "page": "https://bigsoundbank.com/falling-sheet-steel-bar-3-s1773.html",
+      "download": "https://bigsoundbank.com/UPLOAD/mp3/1773.mp3?v=d",
+      "sha256": "e9ffc6a24964539577bb62b5ac7b6b70624c9aff19ef471d14ff95eb61483261",
+      "bytes": 54948
+    },
+    {
+      "id": "bsb-0399",
+      "file": "bsb-0399.mp3",
+      "title": "Rubbing tent canvas or shower curtain",
+      "author": "Joseph Sardin (BigSoundBank)",
+      "licence": "CC0 1.0 (public domain)",
+      "page": "https://bigsoundbank.com/tent-or-curtain-shower-s0399.html",
+      "download": "https://bigsoundbank.com/UPLOAD/mp3/0399.mp3?v=d",
+      "sha256": "7445d9d4545d7cfb88e58210e04bb7b81b082c99d2f5145537593c4ea5d702ac",
+      "bytes": 1029351
+    },
+    {
+      "id": "bsb-0560",
+      "file": "bsb-0560.mp3",
+      "title": "Djembe: hand flat in the center",
+      "author": "Joseph Sardin (BigSoundBank)",
+      "licence": "CC0 1.0 (public domain)",
+      "page": "https://bigsoundbank.com/djembe-hand-flat-in-the-center-s0560.html",
+      "download": "https://bigsoundbank.com/UPLOAD/mp3/0560.mp3?v=d",
+      "sha256": "541b1651905fb17fbc62bc9860337c3f404dfa8a83bbb9778242b464d7671df9",
+      "bytes": 451328
+    },
+    {
+      "id": "bsb-0236",
+      "file": "bsb-0236.mp3",
+      "title": "Shouts and applauses of teens #1 (\"teens who shout Yeah and applaud\")",
+      "author": "Joseph Sardin (BigSoundBank)",
+      "licence": "CC0 1.0 (public domain)",
+      "page": "https://bigsoundbank.com/shouts-and-applauses-of-teens-1-s0236.html",
+      "download": "https://bigsoundbank.com/UPLOAD/mp3/0236.mp3?v=d",
+      "sha256": "fb6b711aaaf738e9646cb9b210c40a152cba8a53b38e24b2a15f4b0201ffda20",
+      "bytes": 172432
+    },
+    {
+      "id": "bsb-0237",
+      "file": "bsb-0237.mp3",
+      "title": "Shouts and applauses of teens #2",
+      "author": "Joseph Sardin (BigSoundBank)",
+      "licence": "CC0 1.0 (public domain)",
+      "page": "https://bigsoundbank.com/shouts-and-applauses-of-teens-2-s0237.html",
+      "download": "https://bigsoundbank.com/UPLOAD/mp3/0237.mp3?v=d",
+      "sha256": "95a4f366d867b9b8f71d731c2f53abf692b49340de9459c40b3e255ea887bd71",
+      "bytes": 223632
+    },
+    {
+      "id": "bsb-3515",
+      "file": "bsb-3515.mp3",
+      "title": "Crowd of 50-60 people #1 (\"discussions among a small crowd of about 50 to 60 people\")",
+      "author": "Joseph Sardin (BigSoundBank)",
+      "licence": "CC0 1.0 (public domain)",
+      "page": "https://bigsoundbank.com/crowd-of-50-60-people-1-s3515.html",
+      "download": "https://bigsoundbank.com/UPLOAD/mp3/3515.mp3?v=d",
+      "sha256": "fe32b490d9e07b55a7d1f9f1d31682b1b2bd6e9349339791a95c29be37a280fb",
+      "bytes": 4327080
+    }
+  ],
+  "files": [
+    {
+      "file": "bounce_1.mp3",
+      "source": "bsb-1045",
+      "sourceAt": 0.175,
+      "seconds": 0.318,
+      "kbps": 80,
+      "bytes": 3918,
+      "sha256": "0521d61be35440f3c9ca3250532c69525ff18cc30bddf08add04f256075eb8dd"
+    },
+    {
+      "file": "bounce_2.mp3",
+      "source": "bsb-1045",
+      "sourceAt": 1.095,
+      "seconds": 0.321,
+      "kbps": 80,
+      "bytes": 3918,
+      "sha256": "5474c8bd03365c4741cf713c45bae9e932c84a2eb3ac0412a70b15120c540790"
+    },
+    {
+      "file": "bounce_3.mp3",
+      "source": "bsb-1045",
+      "sourceAt": 3.11,
+      "seconds": 0.322,
+      "kbps": 80,
+      "bytes": 3918,
+      "sha256": "e2ec6da3265c731edb0fd4e7fdb9a2114bcc8bb5c1359ee9a3b645fdbc944df9"
+    },
+    {
+      "file": "bounce_4.mp3",
+      "source": "bsb-1045",
+      "sourceAt": 3.94,
+      "seconds": 0.318,
+      "kbps": 80,
+      "bytes": 3918,
+      "sha256": "aa746ce4cc2134176a37514a9fd7c5479790d61c37ac62f1d28304abada1662e"
+    },
+    {
+      "file": "bounce_5.mp3",
+      "source": "bsb-1045",
+      "sourceAt": 6.79,
+      "seconds": 0.321,
+      "kbps": 80,
+      "bytes": 3918,
+      "sha256": "94f293bb20bc75cfe961158fc1cb4c5e67ff91582537044cd65630b53b78d6c9"
+    },
+    {
+      "file": "bounce_6.mp3",
+      "source": "bsb-1825",
+      "sourceAt": 0.06,
+      "seconds": 0.301,
+      "kbps": 80,
+      "bytes": 3657,
+      "sha256": "93902f5dce7831a1bba0b1827402093235c50c40bdabad16354ff6e652285410"
+    },
+    {
+      "file": "squeak_1.mp3",
+      "source": "bsb-0938",
+      "sourceAt": 0.295,
+      "seconds": 0.303,
+      "kbps": 80,
+      "bytes": 3657,
+      "sha256": "a4944384cc949d4082130786c862bde16d01e5c962ccd587ab9d060c10a25548"
+    },
+    {
+      "file": "squeak_2.mp3",
+      "source": "bsb-0938",
+      "sourceAt": 0.775,
+      "seconds": 0.303,
+      "kbps": 80,
+      "bytes": 3657,
+      "sha256": "61313eefb6d04460e12425a7b01d2b8773d1aa6a3ab90d3cee2934b2cc1548b2"
+    },
+    {
+      "file": "squeak_3.mp3",
+      "source": "bsb-0938",
+      "sourceAt": 1.79,
+      "seconds": 0.307,
+      "kbps": 80,
+      "bytes": 3657,
+      "sha256": "20cb68d01dcb50aaf9e8501842af989952c3c2d724deb569fdb96be7893425b5"
+    },
+    {
+      "file": "squeak_4.mp3",
+      "source": "bsb-0938",
+      "sourceAt": 2.93,
+      "seconds": 0.33,
+      "kbps": 80,
+      "bytes": 3918,
+      "sha256": "21141b5f7f5a32d226317b5a5ca28d7844326b93cdea70761140010fc6e830cb"
+    },
+    {
+      "file": "squeak_5.mp3",
+      "source": "bsb-0938",
+      "sourceAt": 4.985,
+      "seconds": 0.317,
+      "kbps": 80,
+      "bytes": 3918,
+      "sha256": "25962888ef468079c96fefe8186c593d2188d6213b99d475adafd93127becaca"
+    },
+    {
+      "file": "rim_1.mp3",
+      "source": "bsb-1771",
+      "sourceAt": 0.045,
+      "seconds": 0.698,
+      "kbps": 80,
+      "bytes": 7576,
+      "sha256": "f583d7b795cff56b41ef25e625259cee1a12a52a59689a03f6d915c568194139"
+    },
+    {
+      "file": "rim_2.mp3",
+      "source": "bsb-1773",
+      "sourceAt": 0.055,
+      "seconds": 0.75,
+      "kbps": 80,
+      "bytes": 8098,
+      "sha256": "294208d81431cf36f3293feb2f9572cbc281f96035b370e1a400e4633a947358"
+    },
+    {
+      "file": "rim_3.mp3",
+      "source": "bsb-1772",
+      "sourceAt": 0.085,
+      "seconds": 1.001,
+      "kbps": 80,
+      "bytes": 10710,
+      "sha256": "3415a9e788f6c0aa10ac02c0f5efcce9d6c149b9639fa3b079c90f73b7b4a513"
+    },
+    {
+      "file": "net_1.mp3",
+      "source": "bsb-0399",
+      "sourceAt": 16.565,
+      "seconds": 0.301,
+      "kbps": 80,
+      "bytes": 3657,
+      "sha256": "e41690acb2ccf6b4cfa28aa98eae2c5f817a361335c40cd97412596788445106"
+    },
+    {
+      "file": "net_2.mp3",
+      "source": "bsb-0399",
+      "sourceAt": 22.175,
+      "seconds": 0.3,
+      "kbps": 80,
+      "bytes": 3657,
+      "sha256": "45dfed0517b71ce7586a071aa815d156fdfb4b1ad1fcb5eb53b3c0f170e16176"
+    },
+    {
+      "file": "net_3.mp3",
+      "source": "bsb-0399",
+      "sourceAt": 20.265,
+      "seconds": 0.297,
+      "kbps": 80,
+      "bytes": 3657,
+      "sha256": "e69f0f8196c2dc3e28e7df74063d01bbed660247338ca3e2b25b9aae89a56122"
+    },
+    {
+      "file": "net_4.mp3",
+      "source": "bsb-0399",
+      "sourceAt": 17.56,
+      "seconds": 0.302,
+      "kbps": 80,
+      "bytes": 3657,
+      "sha256": "50687feeaf0b4df7c1261c75a1bf60f2fb22b4912f8f28a883647fa109b6997a"
+    },
+    {
+      "file": "catch_1.mp3",
+      "source": "bsb-0560",
+      "sourceAt": 0.11,
+      "seconds": 0.13,
+      "kbps": 80,
+      "bytes": 1829,
+      "sha256": "6ad637ba00d4f2c6b35fcc60082365c3799d421ac4059c447e7abfd6aea10f25"
+    },
+    {
+      "file": "catch_2.mp3",
+      "source": "bsb-0560",
+      "sourceAt": 1.535,
+      "seconds": 0.131,
+      "kbps": 80,
+      "bytes": 2090,
+      "sha256": "9f708950d5ed32c466160b98407447676a436448802d0092fa6148d712db825c"
+    },
+    {
+      "file": "catch_3.mp3",
+      "source": "bsb-0560",
+      "sourceAt": 3.265,
+      "seconds": 0.13,
+      "kbps": 80,
+      "bytes": 1829,
+      "sha256": "c9e7ba80c07849e00d99a0fc5d22cfde5ea03571ed003078f29ec290cd62428b"
+    },
+    {
+      "file": "cheer_1.mp3",
+      "source": "bsb-0236",
+      "sourceAt": 0.035,
+      "seconds": 3.209,
+      "kbps": 64,
+      "bytes": 26121,
+      "sha256": "d212c6997b6bc0c5e201f72e6eee7ee0b7a534e62c07a011d3d45ec6b1bfa81c"
+    },
+    {
+      "file": "cheer_2.mp3",
+      "source": "bsb-0237",
+      "sourceAt": 0.035,
+      "seconds": 3.612,
+      "kbps": 64,
+      "bytes": 29465,
+      "sha256": "46b93d648dfa35aa55ba50a120db00ad27c81df697a7ad4228abe0f1db2f958d"
+    },
+    {
+      "file": "crowd_bed.mp3",
+      "source": "bsb-3515",
+      "sourceAt": null,
+      "seconds": 14,
+      "kbps": 64,
+      "bytes": 112430,
+      "sha256": "3ed0b11021051a4e022c7aa00a2c0045083d3b10e49e27626d0bfa40235b9bb5",
+      "loopFrom": 14,
+      "loopLen": 14,
+      "steadinessDb": 1.46
+    }
+  ]
+}
