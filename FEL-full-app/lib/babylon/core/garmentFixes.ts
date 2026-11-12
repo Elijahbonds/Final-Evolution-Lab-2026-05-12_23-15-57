@@ -349,6 +349,9 @@ export function ensureGarmentUVs(mesh: AbstractMesh): boolean {
     for (let i = 0; i < corners; i++) seq[i] = i;
     mesh.setIndices(seq, corners, false);
     mesh.refreshBoundingInfo();
+    // KIT-GLITCH: these UVs are a paint atlas, not a surface layout — nothing that TILES may read them (fabric.weaveFits).
+    // A fresh metadata object: the loader's may be shared with the container's source mesh.
+    mesh.metadata = { ...(mesh.metadata ?? {}), felAtlasUV: true };
     return true;
   } catch (e) {
     console.warn(`[FEL-KIT] garment UVs skipped on ${mesh.name}: ${String((e as Error)?.message ?? e).slice(0, 120)}`);
@@ -366,6 +369,30 @@ export const GARMENT_Z_OFFSET = -4;
  * the tee's hem and shoulder blades were still pierced at 8 mm (karate strip test, 2026-09-05) */
 export const GARMENT_INFLATE: Record<'tops' | 'shorts', number> = { tops: 0.013, shorts: 0.02 };
 const inflated = new WeakSet<AbstractMesh>();
+
+/**
+ * KIT-GLITCH (owner 2026-11-12: "skin pokes through"). UNITS, measured on the rig (scripts/probes/kit-glitch, rig.mts
+ * diag … bindScale / gaps): GARMENT_INFLATE is metres, but it was added to the vertex data in BIND units. Since the
+ * KIT-NO-HIGH-BOOTS rebake (2026-10-20) a garment's bind space is not metres: one bind unit along a normal skins to 0.25 m
+ * on the kit tee and 0.17 m on the court short (the inverse binds carry the export's scale; the edge flare in bodyMask
+ * already converts for it). So the tee stood 3.2 mm off where 13 mm was meant, the short 3.4 mm for 20, and the skin came
+ * through in every twist. Each vertex now converts the metres through its own inverse binds (`metresPerBind`), the ratio
+ * the live skin gives (within 4 % at rest). Pinned by kitGlitch.test.ts.
+ */
+/** Metres one bind unit along unit normal `n` of vertex `v` becomes, through its skin's inverse binds (the rest pose, before
+ *  any frame: the linked bone transforms are rigid, so the inverse binds carry the whole scale). Each inverse bind maps into
+ *  its OWN bone's frame, so the lengths are averaged, never the vectors (those cancel across bones). 1 when unreadable. */
+export function metresPerBind(ibms: readonly ArrayLike<number>[], mi: ArrayLike<number>, mw: ArrayLike<number>, v: number, nx: number, ny: number, nz: number): number {
+  let sum = 0, tot = 0;
+  for (let k = 0; k < 4; k++) {
+    const w = mw[v * 4 + k]; if (!(w > 0)) continue;
+    const I = ibms[mi[v * 4 + k]]; if (!I) continue;
+    sum += w * Math.hypot(I[0] * nx + I[4] * ny + I[8] * nz, I[1] * nx + I[5] * ny + I[9] * nz, I[2] * nx + I[6] * ny + I[10] * nz); tot += w;
+  }
+  const s = tot > 0 ? sum / tot : 0;
+  return s > 1e-6 && Number.isFinite(s) ? s : 1;
+}
+
 export function liftOffBody(mesh: AbstractMesh, slot: 'tops' | 'shorts'): void {
   const mat = mesh.material;
   if (mat && mat.zOffset !== GARMENT_Z_OFFSET) mat.zOffset = GARMENT_Z_OFFSET;
@@ -380,7 +407,15 @@ export function liftOffBody(mesh: AbstractMesh, slot: 'tops' | 'shorts'): void {
     mesh.makeGeometryUnique();
     const out = new Float32Array(positions.length);
     const d = GARMENT_INFLATE[slot];
-    for (let i = 0; i < positions.length; i++) out[i] = positions[i] + normals[i] * d;
+    const N = normals;
+    const mi = mesh.getVerticesData(VertexBuffer.MatricesIndicesKind), mw = mesh.getVerticesData(VertexBuffer.MatricesWeightsKind);
+    const ibms: ArrayLike<number>[] | null = mesh.skeleton ? [] : null;   // by matrix slot (Bone._index), which joint indices address
+    if (ibms && mesh.skeleton) for (const b of mesh.skeleton.bones) ibms[(b as unknown as { _index: number })._index ?? mesh.skeleton.bones.indexOf(b)] = b.getAbsoluteInverseBindMatrix().m;
+    for (let v = 0; v < positions.length / 3; v++) {
+      const nx = N[v * 3], ny = N[v * 3 + 1], nz = N[v * 3 + 2];
+      const k = d / (ibms && mi && mw ? metresPerBind(ibms, mi, mw, v, nx, ny, nz) : 1);   // metres → this vertex's bind units
+      out[v * 3] = positions[v * 3] + nx * k; out[v * 3 + 1] = positions[v * 3 + 1] + ny * k; out[v * 3 + 2] = positions[v * 3 + 2] + nz * k;
+    }
     mesh.setVerticesData(VertexBuffer.PositionKind, out, false);   // updateVerticesData is a silent no-op on the loader's non-updatable buffer
     mesh.refreshBoundingInfo();
   } catch (e) {
