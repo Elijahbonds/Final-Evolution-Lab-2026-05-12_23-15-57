@@ -29,7 +29,7 @@
 //
 // Takes the database as an argument (the Today pattern), so the route tests run the real code over the in-memory Today
 // store on a lane whose database is offline on purpose.
-import type { PrismaClient } from '@/public/_prisma/client';
+import type { PrismaClient } from '@/lib/generated/prisma';
 import { ASSESSMENT_KIND } from '../assess/prqWrite';
 import { activeCoachViewConsent, activeHealthDataConsent, type ConsentRow } from '../health/consent';
 import { INTAKE_REASK_DAYS, latestIntake } from '../health/intake';

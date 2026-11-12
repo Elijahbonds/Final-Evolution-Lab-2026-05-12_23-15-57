@@ -9,7 +9,7 @@ import { Loader2, Search, ChevronRight, Play, Dumbbell, Target, Zap, X, Check, P
 import { LibraryDemo, videoSource } from '@/components/library/library-demo';
 import type { LibraryCard } from '@/lib/library/server';
 import { CATALOGUE_ERROR_COPY, PATTERN_INFO, nameKey } from '@/lib/coach/catalogue';
-import type { BraceMode, MovementPattern } from '@/public/_prisma/client';
+import type { BraceMode, MovementPattern } from '@/lib/generated/prisma';
 import { MyCatalogue, TagRow } from './my-catalogue';
 // EXERCISE-LIBRARY (2026-10-25): the shared library, first on the tab for everyone
 import { LibraryBrowser } from '@/components/library/library-browser';

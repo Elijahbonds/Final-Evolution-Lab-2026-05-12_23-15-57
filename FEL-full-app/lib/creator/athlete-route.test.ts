@@ -6,7 +6,7 @@
 // measured axes now and Finalize writes Prisma.DbNull when there are none.
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { Prisma } from '@/public/_prisma/client';
+import { Prisma } from '@/lib/generated/prisma';
 
 const getServerSession = vi.fn();
 vi.mock('next-auth', () => ({ getServerSession: (...a: unknown[]) => getServerSession(...a) }));

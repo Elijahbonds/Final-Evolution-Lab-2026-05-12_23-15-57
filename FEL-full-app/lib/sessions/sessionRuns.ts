@@ -15,7 +15,7 @@
 
 import { keepTier, startResult } from '@/lib/sessions/runTier';
 import type { Tier } from '@/lib/babylon/core/Difficulty';
-import type { Prisma, PrismaClient } from '@/public/_prisma/client';
+import type { Prisma, PrismaClient } from '@/lib/generated/prisma';
 import { canonicalModeKey } from '@/lib/game-data';
 import { MAX_DURATION_FLOOR_MS, RUN_GRACE_MS, ruleFor } from './modeScoreRules';
 import type { Eligibility } from './runEligibility';

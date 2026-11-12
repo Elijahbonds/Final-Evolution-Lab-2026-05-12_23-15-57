@@ -2,7 +2,7 @@
 // and their GuardianConsent rows. A verified adult stops after the first. A read that fails CLOSES the gate — a
 // training write is never let through because the age could not be read.
 import { NextResponse } from 'next/server';
-import type { PrismaClient } from '@/public/_prisma/client';
+import type { PrismaClient } from '@/lib/generated/prisma';
 import { teenGate, teenGateBody, type TeenGateResult } from './teenGate';
 import { verifiedAdult } from '@/lib/privacy/verifiedAdult';
 

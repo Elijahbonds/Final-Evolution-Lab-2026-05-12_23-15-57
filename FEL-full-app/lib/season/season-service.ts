@@ -16,7 +16,7 @@
  */
 
 import { prisma } from '@/lib/db';
-import type { Prisma } from '@/public/_prisma/client';
+import type { Prisma } from '@/lib/generated/prisma';
 import { recordServerEvent } from '@/lib/analytics-server';
 import { postLc } from '@/lib/ledger';
 import { settleRecoveryFor } from '@/lib/prq-recovery';

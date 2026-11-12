@@ -18,7 +18,7 @@
 // if any, goes to the athlete's thread as an ordinary message. A write that fails part-way leaves the decision 'partial'
 // with what was written; one that fails before anything was written removes the claim so the coach can try again.
 
-import type { PrismaClient } from '@/public/_prisma/client';
+import type { PrismaClient } from '@/lib/generated/prisma';
 import { builderAction, type BuilderDb } from '../builderServer';
 import { mergeSpecUpdate, validateExerciseSpec } from '../loop';
 import { logHasContent } from '../setLog';

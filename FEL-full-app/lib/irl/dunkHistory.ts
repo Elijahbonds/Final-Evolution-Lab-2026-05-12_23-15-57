@@ -12,7 +12,7 @@
 //
 // Pure apart from the one query: the database client is passed in, so it is tested against a fake one.
 
-import type { Prisma } from '@/public/_prisma/client';
+import type { Prisma } from '@/lib/generated/prisma';
 import type { DunkAttempt } from './dunkProgress';
 import type { DunkFamily } from './dunkTracker';
 

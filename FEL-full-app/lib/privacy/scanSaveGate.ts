@@ -22,7 +22,7 @@
 //
 // No import from lib/coach, lib/mirror, lib/camp or lib/move (held by other lanes).
 import { NextResponse } from 'next/server';
-import type { Prisma } from '@/public/_prisma/client';
+import type { Prisma } from '@/lib/generated/prisma';
 import { scanSaveOptIn } from './scanSaveOptIn';
 import { verifiedAdult } from './verifiedAdult';
 

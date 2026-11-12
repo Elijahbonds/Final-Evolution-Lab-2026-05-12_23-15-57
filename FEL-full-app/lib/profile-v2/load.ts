@@ -7,7 +7,7 @@
 // read-the-age-first round trip and no minor's rows are fetched to be dropped. Every read fails soft to its empty value:
 // one missing table (an unapplied pending SQL file) costs its block, never the page.
 
-import type { Prisma } from '@/public/_prisma/client';
+import type { Prisma } from '@/lib/generated/prisma';
 import { RIVAL_HISTORY_SINCE } from '@/lib/rival-history';
 import { SAVED_NUMBER_KINDS } from '@/lib/privacy/scanSaveConsent';
 import { assembleProfile, type ProfileRows, type ProfileV2Data } from './assemble';

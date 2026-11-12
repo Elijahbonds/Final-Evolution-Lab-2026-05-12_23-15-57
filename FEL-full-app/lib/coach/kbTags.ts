@@ -24,7 +24,7 @@
 // break into three short cues; they are the KB item's own instructions, shortened. `prescribable: false` marks an
 // assessment: the posture audit is a coach's look at an athlete, not a set anybody does, and FEL's camera screen is
 // the prescribing assessment (P3). The bridge refuses it.
-import type { BraceMode, MovementPattern } from '@/public/_prisma/client';
+import type { BraceMode, MovementPattern } from '@/lib/generated/prisma';
 import type { KbTagsLike } from './catalogue';
 
 export interface KbTags extends KbTagsLike {

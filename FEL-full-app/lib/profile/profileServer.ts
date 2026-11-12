@@ -27,7 +27,7 @@
 // dropped old readings would take that judgement away from the surfaces that are supposed to make it.
 
 import 'server-only';
-import type { PrismaClient } from '@/public/_prisma/client';
+import type { PrismaClient } from '@/lib/generated/prisma';
 import { snapshotFrom } from './scanToSnapshot';
 import { isPrqEstimate } from '../prq';
 import {

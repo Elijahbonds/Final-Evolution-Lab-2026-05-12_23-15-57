@@ -32,7 +32,7 @@
 // either one re-opens the flow, so a birthday into adulthood or a changed question set is never stuck behind a
 // year-old answer.
 
-import type { Prisma } from '@/public/_prisma/client';
+import type { Prisma } from '@/lib/generated/prisma';
 import { verifiedAdult } from '../privacy/verifiedAdult';
 
 export const INTAKE_VERSION = '2026-09-29';

@@ -20,7 +20,7 @@
 // trainer sees only the groups they run. Payment is "pay at the gym" unless every online switch is on (rules.ts payPlan),
 // and then the route only says so: the client pays through the EXISTING coach-business checkout. No route here calls Stripe.
 import 'server-only';
-import type { PrismaClient } from '@/public/_prisma/client';
+import type { PrismaClient } from '@/lib/generated/prisma';
 import { readTeenGate, type TeenGateDb } from '@/lib/coach/teenGateServer';
 import { teenGateBody } from '@/lib/coach/teenGate';
 import { connectGate } from '@/lib/coach-business/connect';

@@ -18,7 +18,7 @@
 
 import 'dotenv/config';
 import assert from 'assert';
-import { PrismaClient, Prisma } from '@/public/_prisma/client';
+import { PrismaClient, Prisma } from '@/lib/generated/prisma';
 import {
   postTransaction,
   getBalance,

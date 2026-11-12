@@ -31,7 +31,7 @@
 //
 // Pure data + guards: no Prisma client value, no DOM. The enum TYPES come from the generated client so a value added
 // to the schema without a label here fails the type check.
-import type { MovementPattern, SessionSection } from '@/public/_prisma/client';
+import type { MovementPattern, SessionSection } from '@/lib/generated/prisma';
 import { gapExceedsEighteenYears } from '@/lib/age/ageRules';
 
 // ── session sections ────────────────────────────────────────────────────────────────────────────────────────────────

@@ -24,7 +24,7 @@
 //     SessionExercise id, so a log of the easier step saves against the slot the coach prescribed. The gate's reads
 //     (lib/coach/protocolGateServer.ts) are made only when today's session HAS a gated item: every other Today costs
 //     exactly what it did.
-import type { PrismaClient } from '@/public/_prisma/client';
+import type { PrismaClient } from '@/lib/generated/prisma';
 import { nextSession, orderedSessions, progressSeries, validateLog, type CleanLog, type LogRow, type ProgressPoint } from './loop';
 import { TREE_INCLUDE, toTree } from './server';
 import { logEntryIsEmpty, logHasWork, summaryToWrite, type CleanSet } from './setLog';

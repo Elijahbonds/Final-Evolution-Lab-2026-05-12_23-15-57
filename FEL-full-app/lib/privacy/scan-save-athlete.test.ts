@@ -23,7 +23,7 @@ vi.mock('@/lib/privacy/scanSaveOptIn', async (importOriginal) => {
 });
 
 import { NextRequest } from 'next/server';
-import { Prisma } from '@/public/_prisma/client';
+import { Prisma } from '@/lib/generated/prisma';
 import { POST as athletePOST } from '@/app/api/v1/creator/athlete/route';
 import { defaultEquipped, defaultFace, defaultJersey } from '@/lib/closet/wearable-catalog';
 import { scanSaveOptIn } from '@/lib/privacy/scanSaveOptIn';

@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@/public/_prisma/client';
+import type { PrismaClient } from '@/lib/generated/prisma';
 import { PENDING_SLOT_MS } from '@/lib/coach-store/constants';
 
 /**

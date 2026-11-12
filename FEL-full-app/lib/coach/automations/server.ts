@@ -15,7 +15,7 @@
 //   · LIVE ROSTER ONLY (lib/coach/parity/people.ts coachPeople): an athlete who left is never messaged; a team reaches only
 //     its members who are on the coach's live roster (docs/COACH-LOOP.md §3).
 import 'server-only';
-import type { PrismaClient } from '@/public/_prisma/client';
+import type { PrismaClient } from '@/lib/generated/prisma';
 import { addDays, dayOf } from '@/lib/groups/week';
 import { missedFactsFor } from '../alerts';
 import { readTeenGate } from '../teenGateServer';

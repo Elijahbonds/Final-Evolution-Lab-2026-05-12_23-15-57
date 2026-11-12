@@ -6,7 +6,7 @@ import { isCertifiedCoach } from '@/lib/coach/server';
 import { draftSquad, rebaseTargetDate } from '@/lib/coach/duplicate';
 import { rosterIdsWhere } from '@/lib/coach/rosterLookup';
 import { prescriptionCopy } from '@/lib/coach/structure';
-import type { Prisma } from '@/public/_prisma/client';
+import type { Prisma } from '@/lib/generated/prisma';
 import type { ProgramTree } from '@/lib/coach/loop';
 
 /**

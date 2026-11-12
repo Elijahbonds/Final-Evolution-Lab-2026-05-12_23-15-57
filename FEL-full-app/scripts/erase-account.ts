@@ -19,7 +19,7 @@
  * work: the OWNER runs it (CLAUDE.md). Nothing in CI or the app calls it.
  */
 import 'dotenv/config';
-import { PrismaClient } from '@/public/_prisma/client';
+import { PrismaClient } from '@/lib/generated/prisma';
 import { eraseAccount, erasureSummary, recordErasureEvent, type AccountErasure } from '@/lib/data-rights/rights';
 
 function arg(name: string): string | null {

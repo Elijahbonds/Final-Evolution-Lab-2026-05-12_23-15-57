@@ -23,7 +23,7 @@ import { join } from 'node:path';
 import bcrypt from 'bcryptjs';
 import { chromium, type BrowserContext } from 'playwright-core';
 import { chromiumExe } from './_chromium.mts';
-import { PrismaClient } from '../../public/_prisma/client/index.js';
+import { PrismaClient } from '../../lib/generated/prisma/index.js';
 
 const BASE = process.env.PROBE_BASE ?? 'http://127.0.0.1:3301';
 const DB = process.env.PROBE_DB ?? '';

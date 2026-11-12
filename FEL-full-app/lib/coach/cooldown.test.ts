@@ -3,7 +3,7 @@
 // follow the patterns the session trained; nothing in it is off-limits under youth rules; the done tap lands on the
 // right coached session; and every line it can show is FEL's own words — no risk/prevent/injury, no condition, no book.
 import { describe, expect, it } from 'vitest';
-import type { MovementPattern } from '@/public/_prisma/client';
+import type { MovementPattern } from '@/lib/generated/prisma';
 import { BREATH_CYCLE_MS } from '@/lib/mirror/squatStage';
 import { screenText } from '@/lib/share/screen';
 import { PATTERNS } from './catalogue';

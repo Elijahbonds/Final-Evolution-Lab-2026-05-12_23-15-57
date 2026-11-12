@@ -31,7 +31,7 @@ import { join } from 'node:path';
 import bcrypt from 'bcryptjs';
 import { chromium, type BrowserContext, type Page } from 'playwright-core';
 import { chromiumExe } from './_chromium.mts';
-import { PrismaClient } from '../../public/_prisma/client/index.js';
+import { PrismaClient } from '../../lib/generated/prisma/index.js';
 // lib/health/intake.ts is transpiled to CommonJS under tsx, whose named exports Node's ESM loader can't see statically:
 // read it through a dynamic import (the export itself, or the module.exports object behind `default`).
 const intakeModule: any = await import('../../lib/health/intake');

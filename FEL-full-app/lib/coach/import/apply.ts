@@ -14,7 +14,7 @@
 //   · youth rules (lib/coach/taxonomy.ts youthRules: under 18, or no birth year): no adults-only library entry, no row
 //     that pins (PIN_EXERCISE), the same refusals as the builder's add;
 //   · everything is validated before the first write.
-import type { Prisma } from '@/public/_prisma/client';
+import type { Prisma } from '@/lib/generated/prisma';
 import type { LibraryIndex } from '@/lib/library/search/engine';
 import { libraryToCatalogue } from '@/lib/library/bridge';
 import { nameKey, validateCatalogueCreate, type CleanCatalogueItem } from '../catalogue';

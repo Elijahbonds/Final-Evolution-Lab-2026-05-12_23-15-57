@@ -1,7 +1,7 @@
 // The coaching loop — pure logic behind /api/coach/* (SPEC-PASSION-PIPELINES lane 1, C1–C3). Babylon-free, Prisma-free,
 // so it runs as tests: which session is "today", what a valid log or exercise spec looks like, who may touch a program,
 // and how a client's logs become a progress series. The routes stay thin.
-import type { SessionSection } from '@/public/_prisma/client';
+import type { SessionSection } from '@/lib/generated/prisma';
 import { STRUCTURE_DEFAULTS, validateStructure, type CleanStructure, type StructureError, type StructureInput } from './structure';
 import { fromKg, toKg, validateSets, type CleanSet, type WeightUnit } from './setLog';
 

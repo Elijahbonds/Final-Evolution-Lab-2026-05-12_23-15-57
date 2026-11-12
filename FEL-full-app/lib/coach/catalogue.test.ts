@@ -28,7 +28,8 @@ describe('the schema the catalogue is written against', () => {
   });
 
   it('the generated client matches: the compound coachId_name key exists and `name` alone is no longer a unique key', () => {
-    const dts = readFileSync(`${ROOT}/public/_prisma/client/index.d.ts`, 'utf8');
+    // PRISMA-PUBLIC step 2: the client the app loads is lib/generated/prisma (public/_prisma/client stays until step 4).
+    const dts = readFileSync(`${ROOT}/lib/generated/prisma/index.d.ts`, 'utf8');
     expect(dts).toMatch(/coachId_name\?: ProgramExerciseCoachIdNameCompoundUniqueInput/);
     const unique = /export type ProgramExerciseWhereUniqueInput = [\s\S]*?\n\s*\}/.exec(dts)?.[0] ?? '';
     expect(unique).not.toMatch(/\n\s*name\?: string/);

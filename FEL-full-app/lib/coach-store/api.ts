@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { NextResponse } from 'next/server';
-import type { Prisma } from '@/public/_prisma/client';
+import type { Prisma } from '@/lib/generated/prisma';
 import { prisma } from '@/lib/db';
 import { getStripe } from '@/lib/stripe';
 import { isVerifiedAdult } from './adult';

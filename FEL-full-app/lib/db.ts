@@ -1,5 +1,11 @@
-import { Prisma, PrismaClient } from '@/public/_prisma/client'
+import { Prisma, PrismaClient } from '@/lib/generated/prisma'
 import { cloudSqlEnabled, createCloudSqlPrisma } from '@/lib/db/cloudSql'
+import { resolveQueryEngine } from '@/lib/db/queryEngine'
+
+// PRISMA-PUBLIC step 2 (docs/PRISMA-PUBLIC-PLAN.md): the client is lib/generated/prisma, no longer public/_prisma/client.
+// Its engine does not ride with it to the deployed function (lib/ is never packaged); next.config.js copies it into
+// <distDir>/prisma-engine, and this points PRISMA_QUERY_ENGINE_LIBRARY at it before any client is constructed.
+resolveQueryEngine()
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined

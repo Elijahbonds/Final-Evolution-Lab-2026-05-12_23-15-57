@@ -15,7 +15,7 @@
 // Notes" and their usual synonyms); a blank Week or Day cell repeats the one above (a merged cell copies as blank). With no
 // header, each row is read as day? + exercise + sets + reps + the rest.
 // Pure.
-import type { SessionSection } from '@/public/_prisma/client';
+import type { SessionSection } from '@/lib/generated/prisma';
 import { WEEK_DAYS, type WeekDayName } from '../offDay';
 import { guessDelimiter, parseCsv } from './csv';
 import { normalise, readDose, readRepsUnit, toSeconds, MAX_SETS } from './dose';

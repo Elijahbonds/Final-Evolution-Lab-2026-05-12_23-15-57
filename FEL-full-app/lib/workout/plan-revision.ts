@@ -41,7 +41,7 @@
  * The data export (lib/prq-data-rights.ts) carries no WorkoutPlan rows, so there is no unrevised copy to reach there.
  */
 
-import type { Prisma, PrismaClient } from '@/public/_prisma/client';
+import type { Prisma, PrismaClient } from '@/lib/generated/prisma';
 import { NO_FLIGHT_FALLBACK, PLAN_POOLS, isDepthDrop, landingOf, poolOf, swapInWeek, type PlanExercise } from './plan-generator';
 import type { Pillar } from './movement-screen';
 import { RELAUNCH_FREE_LINE } from './plan-sale';

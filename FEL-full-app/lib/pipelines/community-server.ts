@@ -3,7 +3,7 @@
 // once per request in between. Server only.
 
 import 'server-only';
-import type { PrismaClient } from '@/public/_prisma/client';
+import type { PrismaClient } from '@/lib/generated/prisma';
 import { publicCardWhere } from '@/lib/creator/creative-card-review';
 import { buildCommunity, KIND_DISCIPLINE, type CommunityEntry, type CommunityKind, type CommunityRow } from './community';
 

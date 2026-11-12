@@ -43,7 +43,7 @@
  *       the plan under paidPlanId(the charge). A retry with the same browser key gets spend()'s receipt for the same
  *       charge and finds (or, when the first write failed, writes) the same plan: one charge, one plan.
  */
-import type { PrismaClient } from '@/public/_prisma/client';
+import type { PrismaClient } from '@/lib/generated/prisma';
 import { spend as walletSpend, WalletError } from '@/lib/wallet/wallet-service';
 import { REASON } from '@/lib/wallet/reward-rules';
 import { getSku, skuOnSale } from '@/lib/wallet/catalog';
