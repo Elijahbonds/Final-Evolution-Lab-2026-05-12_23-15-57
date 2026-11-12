@@ -76,6 +76,8 @@ describe('no pad or keyboard words on a touch screen', () => {
     expect(touchHint('Y — SELF-LOB standing: toss it up, then run and catch it in the air', 'dunk')).toBe('');
     expect(touchHint('GO GET THE BOARD · L1 BOXES OUT', 'onevone')).toBe('GO GET THE BOARD');
     expect(touchHint('Y GO UP · B KICK-UP · X HAND', 'dunk')).toBe('');
+    // measured on the phone (hud-overlap after3, Flight Night): a face-button chord leaked onto the touch screen
+    expect(touchHint('X+DOWN CARTWHEEL · B+UP FLIP — then release to jump', 'dunk')).toBe('');
     expect(touchHint('HOLD RT to load the jump · A at the rim to SLAM', 'dunkduel')).toBe('');
     expect(touchHint('HOLD to run — then tap jump', 'dunk')).toBe('HOLD to run — then tap jump');
   });

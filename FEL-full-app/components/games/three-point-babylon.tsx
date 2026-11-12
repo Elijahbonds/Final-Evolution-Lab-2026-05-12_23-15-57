@@ -35,7 +35,7 @@ import { HostLobby } from '@/components/controller-link/host-lobby';
 import { controllerConfigFor } from '@/lib/controller-link/schemas/registry';
 import { toInputBus } from '@/lib/controller-link/modeBridge';
 import { hnum } from './hud-format';
-import { HudBanner, HudChip, HudFrame, HudMeter, HudPlate, HudText, ScoreValue, hudColor, type HudTone } from './tv-hud';
+import { HUD_CLEAR_CORNER, HudBanner, HudChip, HudFrame, HudMeter, HudPlate, HudText, ScoreValue, hudColor, type HudTone } from './tv-hud';
 import { MicCaption, MicToggle } from './mic-caption';   // THE MIC (2026-09-24)
 import { ThreePointOptions } from './three-point-options';   // IMPROVE (2026-10-06) #8: the shot input on the pause screen
 
@@ -336,7 +336,11 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
           under the shooter drawn from the SAME bands the mode grades with. */}
       {phase === 'playing' && (
         // pt-9 while a turn banner is up: at its own top-3 slot the score covered it (measured), so the stack starts under it
-        <div className={`absolute inset-x-0 top-3 z-20 flex flex-col items-center gap-1.5 ${turnLine ? 'pt-[7.5rem]' : ''}`}>
+        // hoops-p08 (game-hud's HUD_CLEAR_CORNER): on a taller sideways screen the shell's ⋯ and top-centre buttons sit over this
+        // bezel; the attribute's rule pads the OUTER box clear of them, and the turn banner's pt-[7.5rem] stays on the inner one, so
+        // the two add up instead of one overriding the other
+        <div {...HUD_CLEAR_CORNER} className="absolute inset-x-0 top-3 z-20">
+        <div className={`flex flex-col items-center gap-1.5 ${turnLine ? 'pt-[7.5rem]' : ''}`}>
           <div className="flex items-end gap-5">
             <HudPlate className="px-5 py-1.5 leading-none"><ScoreValue value={hnum(hud.score)} size="hero" tone="score" /></HudPlate>
             {/* IMPROVE (2026-10-06) #6: the practice rack has no clock (the mode sends clock: null) */}
@@ -397,6 +401,7 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
               <Standings rows={hud.board as StandingRow[]} you={up ? shooterName(up) : undefined} />
             </HudPlate>
           )}
+        </div>
         </div>
       )}
 
