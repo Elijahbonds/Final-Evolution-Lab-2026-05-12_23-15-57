@@ -82,7 +82,7 @@ export default function FreeRunBabylon({ onEnd }: GameProps) {
       <div className="absolute inset-x-0 top-0 flex items-start justify-between px-4 py-3">
         {/* RIVALS (owner brief 2026-09-18): the rank and the gap to the leader, top-left */}
         {hud.place ? (
-          <HudPlate className={`px-3 ${hudLineStep(placeLine, 'caption') === 'body' ? 'py-1' : 'py-1.5'}`}>
+          <HudPlate className={`${hudLineStep(placeLine, 'caption') === 'body' ? 'whitespace-nowrap px-2 py-0.5' : 'px-3 py-1.5'}`}>
             <HudText as="div" size="caption" alpha={0.6}>PLACE</HudText>
             <ScoreValue value={String(hud.place)} tone="score" />
             <HudText as="div" size={hudLineStep(placeLine, 'caption')} tone={hud.delta === 'LEADING' ? 'good' : 'text'} alpha={hud.delta === 'LEADING' ? 1 : 0.7} style={{ fontWeight: 800 }}>{placeLine}</HudText>
@@ -103,7 +103,9 @@ export default function FreeRunBabylon({ onEnd }: GameProps) {
             <HudChip tone={hud.pbSplit.includes('−') ? 'good' : 'danger'} size={hudLineStep(hud.pbSplit, 'caption')} style={{ fontWeight: 800, ...hudLineTrim(hud.pbSplit, 'caption') }}>{hud.pbSplit}</HudChip>
           ) : null}
         </div>
-        <HudPlate className={`px-3 ${hudLineStep(tierLine, 'caption') === 'body' ? 'py-1' : 'py-1.5'} text-right`}>
+        {/* GAME-HUD (2026-11-12): the tier line at the 14 px line step stays ONE line (it wrapped on a 390 px phone and the plate
+            grew a third taller); the plate's padding gives back what the bigger letters take (measured on the opening HUD) */}
+        <HudPlate className={`${hudLineStep(tierLine, 'caption') === 'body' ? 'whitespace-nowrap px-2 py-0.5' : 'px-3 py-1.5'} text-right`}>
           <HudText as="div" size={hudLineStep(tierLine, 'caption')} alpha={0.6}>{tierLine}</HudText>
           <HudText as="div" size="value" tone={hud.lane === 'HIGH' ? 'info' : hud.lane === 'LOW' ? 'heat' : 'text'} alpha={hud.lane === 'HIGH' || hud.lane === 'LOW' ? 1 : 0.8}>{hud.lane ? `${String(hud.lane)} LANE` : hnode(hud.route, 'LOW LINE')}</HudText>
         </HudPlate>
