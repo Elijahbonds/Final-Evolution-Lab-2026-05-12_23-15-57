@@ -30,6 +30,9 @@ import { DunkFieldBoard } from './dunk-field-board';
 import { DunkSpecialsChip } from './dunk-specials-chip';
 import { decodeTakeoff, ZONE_HEX } from '@/lib/babylon/core/DunkTakeoffRead';
 import { MicCaption, MicToggle } from './mic-caption';
+import { useBelowFold } from './hoops-bottom-stack';   // hoops-p08
+import { useHintDevice } from './use-hoops-hint';   // hoops-p08
+import { touchHint } from '@/lib/babylon/ui/hudHints';   // hoops-p08
 import { DunkPreloadCard } from './dunk-preload-card';   // RUNUP-STALL-3
 import { HUD_PLATE, HUD_TEXT_ALPHA, HudBanner, HudChip, HudFrame, HudMeter, HudPlate, HudText, LINE_CLAMP_STYLE, ScoreValue, Scorebug, hudColor, hudType, type HudTone } from './tv-hud';
 import { JudgeCards } from './judge-cards';
@@ -90,6 +93,11 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
   // CONTROLLER-TRY-FIX item 4: the first pad's label family (an Xbox pad says RT, not R2); null with no pad = the hint as the mode wrote it
   const [padFamily, setPadFamily] = useState<PadFamily | null>(null);
   useEffect(() => (bus ? bus.onPads((pads) => setPadFamily(pads.length ? familyFor(pads[0].profileId) : null)) : undefined), [bus]);
+  // hoops-p08: on a touch screen the hint names no pad button and no key (hudHints.touchHint), and the bottom stack lifts into view
+  // when the stage runs under the bottom of the screen (an upright phone), as the touch deck does
+  const { device: hintDevice } = useHintDevice();
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const bottomBelow = useBelowFold(bottomRef, phase === 'playing');
 
   const retryBoot = useCallback(() => {
     endedRef.current = false;
@@ -424,17 +432,18 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
         const cutting = typeof hud.cut === 'string' && hud.cut;
         // CONTROLLER-TRY-FIX item 4: the live hint names the pad's own buttons (withButtons; the mode's words are unchanged, null = as written)
         const hint = typeof hud.hint === 'string' && hud.hint && phase === 'playing' ? withButtons(hud.hint, padFamily) : '';
+        const shownHint = hint && hintDevice === 'touch' ? touchHint(String(hud.hint), 'dunk') : hint;   // hoops-p08: no pad or key words on touch
         const takeoff = t && phase === 'playing' && !judging && !beats ? t : null;
         const strip = beats && phase === 'playing' && !judging && !cutting ? beats : '';
         const mic = phase === 'playing' && !judging && typeof hud.mic === 'string' && hud.mic ? hud.mic : '';
         const call = !judging && hud.slamPulse !== true && typeof hud.call === 'string' && hud.call && phase === 'playing' ? hud.call : '';   // (the call yields to the SLAM! cue: the QTE window is the one thing on screen then)
-        if (!hint && !takeoff && !strip && !mic && !call) return null;
+        if (!shownHint && !takeoff && !strip && !mic && !call) return null;
         return (
-          <div data-dunk-bottom className="pointer-events-none absolute inset-x-0 top-0 flex flex-col-reverse items-center gap-[0.35rem] px-3" style={{ bottom: PAD_LIFT }}>
-            {hint && (
+          <div ref={bottomRef} data-dunk-bottom className="pointer-events-none absolute inset-x-0 top-0 flex flex-col-reverse items-center gap-[0.35rem] px-3" style={{ bottom: bottomBelow ? `calc(${PAD_LIFT} + ${bottomBelow}px)` : PAD_LIFT }}>
+            {shownHint && (
               <HudText as="div" size="body" className="w-full text-center" style={HINT_SLOT_STYLE}>
                 <HudPlate as="span" className="inline-block max-w-[min(92%,980px)] px-3 py-1.5 align-top">
-                  <HudText as="div" size="body" alpha={0.8} style={LINE_CLAMP_STYLE}>{hint}</HudText>
+                  <HudText as="div" size="body" alpha={0.8} style={LINE_CLAMP_STYLE}>{shownHint}</HudText>
                 </HudPlate>
               </HudText>
             )}

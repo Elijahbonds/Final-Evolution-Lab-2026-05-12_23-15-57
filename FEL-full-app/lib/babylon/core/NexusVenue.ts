@@ -318,7 +318,7 @@ export function mountVenue(ctx: VenueCtx, modeId: string, options: MountVenueOpt
   const hooks: DressingHooks | undefined = options.deferDressing ? { start: (job) => { dressingJobs.push(job); }, landed: (job) => { landedJobs.push(job); } } : undefined;
   if (!location && /^basketball_/.test(modeId)) decorateVeniceBoardwalk(ctx.scene, built.root, scanShiftZ, modeId === 'basketball_dunk' || (VQ.venice() && /^basketball_(h2h|3v3)$/.test(modeId)) ? 'venice-dunk' : 'lawn', hooks,
     // hoops-p08: the cut-out crowd strip stands behind the dunk's rim only (1v1, 3v3 and 3-Point share basketball_h2h / _3v3)
-    { crowdCards: modeId === 'basketball_dunk' || feel('venue.halfCourtCrowdCards', HALF_COURT_CROWD_CARDS) >= 0.5 });   // VENUE-QUALITY v1: venue.veniceHoopsV1 (off) gives 1v1/3v3 the dunk's Venice
+    { crowdCards: modeId === 'basketball_dunk' || feel('venue.halfCourtCrowdCards', HALF_COURT_CROWD_CARDS) >= 0.5, phoneRail: modeId !== 'basketball_dunk' });   // VENUE-QUALITY v1: venue.veniceHoopsV1 (off) gives 1v1/3v3 the dunk's Venice
   void dressHoop(ctx.scene, built.root);   // owner 2026-09-05: the scanned Venice hoop stands in for the procedural one, every court, every location
   let props: VenuePropsHandle | null = null; let propsGone = false;
   // HIDE THE STUBS WHEN THE KIT IS ON (SHARED-PLACE-FLOOR). A spec's 'palm' is a cylinder under a six-sided cone and its

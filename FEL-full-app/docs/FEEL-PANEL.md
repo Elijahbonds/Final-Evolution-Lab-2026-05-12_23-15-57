@@ -650,3 +650,22 @@ The audit is `docs/HOOPS-AAA-GAP-SHOW.md` (sinkers 2 and 4); the before / after 
 - `venue.halfCourtCrowdCards` 0 (`nexus/veniceBoardwalk.ts`): the boardwalk row's twelve flat cut-out figures stand behind the dunk's
   rim only (the dunk and the duel). 1v1, 3v3 and 3-Point stand on the same Venice and had them right behind their rim; they no
   longer load the file. 1 = on every Venice court, as before.
+
+### hoops-p08 — phone budget (2026-11-12)
+
+Group "Hoops · phone budget". Each is NEW; its "as before" value restores the old build exactly. What they cut was found with the lane's
+census probe (`scripts/probes/hoops-p08/scene-census.mts`: the phone's worst frame, mesh by mesh); `scripts/hoops-phone-budget-tests.ts`
+holds the result in CI. Phone tier only unless said.
+- `perf.phoneInkTrim` 1 (`scene/phoneCasters.ts`): the ink contour (AnimeInk: two extra draws a part) skips the eyes, the shoe soles, the
+  socks and the accessories — each inside a bigger part's outline. The body, hair, top, shorts and shoes keep their line. 0 = every part.
+- `perf.phoneSockCast` 0 (`scene/phoneCasters.ts`): the sock stays out of the 512² shadow map (its shadow is inside the leg's). 1 = it casts.
+- `perf.phoneFarPropTex` 512 (`scene/phoneTextureCap.ts`): in 1v1, 3v3 and 3-Point the parked bus and sedan (30–60 m off) upload their
+  maps at 512² (32 MB → 8 MB). The dunk parks the bus on its corner as a wall-run prop and keeps 1024². 1024 = as before.
+- `perf.propMergeOn` 1 (`visual/VenueProps.ts`, every tier): a prop model's parts that share a material are one thin-instanced mesh (the
+  far pier: fifteen parts in two materials → two; the Venice dunk set: 35 masters → 22). Same geometry, same placements. 0 = one per part.
+- `perf.sharedGroundOn` 1 (`nexus/veniceBoardwalk.ts`, every tier): the boardwalk's tiled grounds share one texture per look (the tiling is
+  in the UVs: the same repeat), so the four aprons are one mesh, and the posts and the flags share a material and are one mesh each. 0 =
+  a texture copy, a material and a draw per plane.
+- `perf.phoneRailBodies` 3 (`nexus/veniceBoardwalk.ts`): a phone's Venice rail keeps three of its five onlookers (the ends and the middle).
+  Half-court modes only (1v1, 3v3, 3-Point); the dunk and the duel keep their rail. FLAG: this one is visible — two fewer
+  people at the side of the court on a phone. 5 = all five.

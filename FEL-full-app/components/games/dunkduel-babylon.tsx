@@ -17,6 +17,8 @@ import { hnode, hnum } from './hud-format';
 import { HUD_TEXT_ALPHA, HudBanner, HudChip, HudFrame, HudMeter, HudPlate, HudText, HudLowerThird } from './tv-hud';
 import { JudgeCards } from './judge-cards';
 import { MicCaption, MicToggle } from './mic-caption';
+import { useHintDevice } from './use-hoops-hint';   // hoops-p08
+import { touchHint } from '@/lib/babylon/ui/hudHints';   // hoops-p08
 
 type Hud = Record<string, HudValue>;
 
@@ -106,6 +108,7 @@ export default function DunkDuelBabylon({ onEnd }: GameProps) {
   }, [emit]);
 
   const showHud = phase === 'playing';
+  const { device: hintDevice } = useHintDevice();   // hoops-p08: no pad or key words on a touch screen
 
   return (
     <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl border border-white/10 bg-black">
@@ -125,9 +128,9 @@ export default function DunkDuelBabylon({ onEnd }: GameProps) {
                 DUNK {hnode(hud.dunkNum, '1/2')} · {hnode(hud.style, 'POWER')} · {hnode(hud.prop, 'NO PROP')}
               </HudText>
             </div>
-            {typeof hud.hint === 'string' && hud.hint && (
+            {typeof hud.hint === 'string' && hud.hint && (hintDevice !== 'touch' || touchHint(hud.hint, 'dunkduel')) && (
               <HudPlate className="mx-auto mt-1 max-w-xs px-2 py-0.5">
-                <HudText size="body" alpha={0.85}>{hud.hint}</HudText>
+                <HudText size="body" alpha={0.85}>{hintDevice === 'touch' ? touchHint(hud.hint, 'dunkduel') : hud.hint}</HudText>
               </HudPlate>
             )}
             {/* charge meter — the loaded jump, while it loads */}

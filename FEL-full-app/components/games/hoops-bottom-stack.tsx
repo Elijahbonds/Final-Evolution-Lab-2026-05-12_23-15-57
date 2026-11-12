@@ -11,24 +11,32 @@ import { HUD_PLATE, HudText, LINE_CLAMP_STYLE, PHONE_THUMB_GAP_CLASS, hudColor, 
 /** Where the column starts: above the deck on an upright phone, near the bottom otherwise (the dunk host's PAD_LIFT). */
 export const HOOPS_STACK_LIFT = 'clamp(2.5rem, calc((640px - 100vw) * 999), 17.5rem)';
 
+/** How far (px) the stage behind `ref` runs past the bottom of the screen — an upright phone under the shell's header. The touch deck
+ *  lifts itself into view by that much (TouchOverlay fitDeck); a bottom column has to as well, or its rows sit under the deck. */
+export function useBelowFold(ref: { current: HTMLElement | null }, on = true): number {
+  const [below, setBelow] = useState(0);
+  const read = (): void => {
+    const stage = ref.current?.parentElement?.getBoundingClientRect();
+    if (!stage) return;   // not on screen yet: read again on the render that shows it
+    const b = Math.max(0, Math.round(stage.bottom - window.innerHeight));
+    setBelow((v) => (v === b ? v : b));
+  };
+  useEffect(() => { if (on) read(); });   // every render: the column may have just appeared (one rect read, no state change unless it moved)
+  useEffect(() => {
+    if (!on) return;
+    window.addEventListener('resize', read);
+    window.addEventListener('scroll', read, { passive: true });
+    return () => { window.removeEventListener('resize', read); window.removeEventListener('scroll', read); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- read only touches the ref and the setter
+  }, [on]);
+  return below;
+}
+
 /** The rows, lowest first, each with a stable key. A falsy row takes no room. */
 export function HoopsBottomStack({ rows }: { rows: ReadonlyArray<readonly [string, ReactNode]> }) {
   const live = rows.filter(([, r]) => !!r);
-  // the stage can run past the bottom of the screen (an upright phone under the shell's header): the touch deck lifts itself into
-  // view by that much (TouchOverlay fitDeck), so the column does too, or its rows sit under the deck or off the screen
   const ref = useRef<HTMLDivElement>(null);
-  const [below, setBelow] = useState(0);
-  useEffect(() => {
-    const on = () => {
-      const stage = ref.current?.parentElement?.getBoundingClientRect();
-      const b = stage ? Math.max(0, Math.round(stage.bottom - window.innerHeight)) : 0;
-      setBelow((v) => (v === b ? v : b));
-    };
-    on();
-    window.addEventListener('resize', on);
-    window.addEventListener('scroll', on, { passive: true });
-    return () => { window.removeEventListener('resize', on); window.removeEventListener('scroll', on); };
-  }, [live.length > 0]);
+  const below = useBelowFold(ref, live.length > 0);
   if (!live.length) return null;
   return (
     <div ref={ref} data-hoops-bottom className="pointer-events-none absolute inset-x-0 top-0 flex flex-col-reverse items-center gap-[0.35rem] px-3" style={{ bottom: below ? `calc(${HOOPS_STACK_LIFT} + ${below}px)` : HOOPS_STACK_LIFT }}>

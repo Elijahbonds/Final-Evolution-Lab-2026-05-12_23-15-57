@@ -1641,7 +1641,7 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
   },  {
     id: 'perf.phoneRailBodies', label: 'Phone: people on the boardwalk rail', def: 3, min: 0, max: 5, step: 1, unit: '', group: 'Hoops · phone budget',
     source: 'lib/babylon/nexus/veniceBoardwalk.ts PHONE_RAIL_BODIES',
-    hint: 'On a phone the Venice court rail keeps this many of its five onlookers (the ends and the middle). Each is nine draw parts and about 10 MB of maps. 5 = all five, as before.',
+    hint: 'On a phone the half-court Venice rail (1v1, 3v3, 3-Point) keeps this many of its five onlookers (the ends and the middle). Each is nine draw parts and about 10 MB of maps. 5 = all five, as before.',
   },
 ];
 

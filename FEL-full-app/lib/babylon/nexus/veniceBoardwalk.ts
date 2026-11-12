@@ -49,7 +49,7 @@ export function railSpots<T>(spots: readonly T[], n: number): T[] {
 export const SIGN_FRONT_UVS = new Vector4(0, 0, 1, 1), SIGN_BACK_UVS = new Vector4(1, 0, 0, 1);
 
 /** hoops-p08: what the Venice dressing mounts. `crowdCards` — the boardwalk row's 12 flat cut-out figures (venice_crowd_cards.glb). */
-export interface VeniceDressingOpts { crowdCards?: boolean }
+export interface VeniceDressingOpts { crowdCards?: boolean; /** hoops-p08: the phone's rail cap applies (the half-court modes; the dunk keeps its rail). */ phoneRail?: boolean }
 /** venue.halfCourtCrowdCards: 0 = the cut-out figures only behind the dunk's rim (new: 1v1, 3v3 and 3-Point stand on the same Venice and
  *  the cards stood right behind their rim, "black cardboard people", docs/HOOPS-AAA-GAP-SHOW.md sinker 4); 1 = on every Venice court
  *  that mounts the dunk dressing, as before. */
@@ -329,7 +329,7 @@ export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode, scanS
   const fillRail = (): void => {
     if (holder.isDisposed()) return;
     const spots = railSpots(Array.from({ length: 9 }, (_, i) => new Vector3(railX + (i % 2) * 0.7, 0, SCAN_N + 1.5 + i * 3.0)),
-      (scene.metadata as { felTier?: string } | null)?.felTier === 'mobile' ? feel('perf.phoneRailBodies', PHONE_RAIL_BODIES) : Infinity);   // hoops-p08
+      opts.phoneRail && (scene.metadata as { felTier?: string } | null)?.felTier === 'mobile' ? feel('perf.phoneRailBodies', PHONE_RAIL_BODIES) : Infinity);   // hoops-p08
     const rail = new Onlookers(scene, spots, '#2b3550', new Vector3(0, 0, SCAN_MID), dressing ? { oneBodyPerFrame: true } : {});   // RUNUP-STALL-1 v3: the deferred (dunk) rail lands one body a frame
     const life = scene.onBeforeRenderObservable.add(() => rail.update(scene.getEngine().getDeltaTime() / 1000));
     holder.onDisposeObservable.add(() => { scene.onBeforeRenderObservable.remove(life); rail.dispose(); });

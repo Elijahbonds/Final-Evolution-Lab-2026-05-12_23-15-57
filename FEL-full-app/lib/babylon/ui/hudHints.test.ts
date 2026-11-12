@@ -75,6 +75,8 @@ describe('no pad or keyboard words on a touch screen', () => {
     // the dunk's Y is RUN (a held trigger) on the deck, not the Y button: it is never renamed, so the line goes
     expect(touchHint('Y — SELF-LOB standing: toss it up, then run and catch it in the air', 'dunk')).toBe('');
     expect(touchHint('GO GET THE BOARD · L1 BOXES OUT', 'onevone')).toBe('GO GET THE BOARD');
+    expect(touchHint('Y GO UP · B KICK-UP · X HAND', 'dunk')).toBe('');
+    expect(touchHint('HOLD to run — then tap jump', 'dunk')).toBe('HOLD to run — then tap jump');
   });
   it('a pad and the keys read the line as the mode wrote it', () => {
     const l = 'TAP THE STICK TO JAB · SQUARE (L) SHOOT · L2 (F) POST UP';
