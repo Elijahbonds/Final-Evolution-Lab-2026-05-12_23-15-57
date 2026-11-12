@@ -226,6 +226,8 @@ async function phoneRun(browser: Browser, inpage: string, mode: string, url: str
     // after, upright and sideways (in play the HUD's content depends on what the scripted player did)
     res.readyCoverPortrait = await page.evaluate(PLAY_READ).catch(() => null);
     await page.setViewportSize({ width: 844, height: 390 }); await page.waitForTimeout(1500);
+    // the console view arrives with the shell's next render, slow on this box: read once it is there
+    await page.waitForSelector('[data-fel-console]', { timeout: 15000 }).catch(() => {}); await page.waitForTimeout(500);
     res.readyCoverPhone = await page.evaluate(PLAY_READ).catch(() => null);
     await step(errs, 'shot', () => SHOT(page, `${mode}-${TAG}-ready-phone`));
     await page.setViewportSize({ width: 390, height: 844 }); await page.waitForTimeout(1500);
@@ -236,6 +238,7 @@ async function phoneRun(browser: Browser, inpage: string, mode: string, url: str
     res.playPortrait = await step(errs, 'playPortrait', () => readPlay(page, true));
     await step(errs, 'shot', () => SHOT(page, `${mode}-${TAG}-play-portrait`));
     await page.setViewportSize({ width: 844, height: 390 }); await page.waitForTimeout(2500);
+    await page.waitForSelector('[data-fel-console]', { timeout: 15000 }).catch(() => {});
     await play(page, 2000);
     res.playPhone = await step(errs, 'playPhone', () => readPlay(page, true));
     await step(errs, 'shot', () => SHOT(page, `${mode}-${TAG}-play-phone`));
