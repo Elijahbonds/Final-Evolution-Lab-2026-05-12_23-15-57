@@ -161,9 +161,9 @@ interface ModeScene {
 }
 // measured 2026-11-12, scripts/probes/hoops-p08/scene-census.mts on the lane's after build (390×844 DPR 3, mobile tier, SEED 7, 6 s)
 export const SCENES: Record<string, ModeScene> = {
-  threevthree: { row: 'threevthree', cast: 'threevthree', rivalsInFrame: 5, rivalsOnCourt: 5, railOnVenice: true, heroInFrame: 1, baseDraws: 0, baseMeshes: 0, dynamicMb: { shared: 0, copied: 0 }, venice: true, propSet: 'venice-dunk' },
-  threepoint: { row: 'threepoint', cast: 'threepoint', rivalsInFrame: 3, rivalsOnCourt: 5, railOnVenice: true, heroInFrame: 1, baseDraws: 0, baseMeshes: 0, dynamicMb: { shared: 0, copied: 0 }, venice: true, propSet: 'venice-dunk' },
-  onevone: { row: 'onevone', cast: 'onevone', rivalsInFrame: 1, rivalsOnCourt: 1, railOnVenice: true, heroInFrame: 1, baseDraws: 0, baseMeshes: 0, dynamicMb: { shared: 0, copied: 0 }, venice: true, propSet: 'venice-dunk' },
+  threevthree: { row: 'threevthree', cast: 'threevthree', rivalsInFrame: 5, rivalsOnCourt: 5, railOnVenice: true, heroInFrame: 1, baseDraws: 0, baseMeshes: 0, dynamicMb: { shared: 36.1, copied: 45.4 }, venice: true, propSet: 'venice-dunk' },
+  threepoint: { row: 'threepoint', cast: 'threepoint', rivalsInFrame: 3, rivalsOnCourt: 4, railOnVenice: true, heroInFrame: 1, baseDraws: 0, baseMeshes: 0, dynamicMb: { shared: 35.4, copied: 44.7 }, venice: true, propSet: 'venice-dunk' },
+  onevone: { row: 'onevone', cast: 'onevone', rivalsInFrame: 1, rivalsOnCourt: 1, railOnVenice: true, heroInFrame: 1, baseDraws: 0, baseMeshes: 0, dynamicMb: { shared: 33.4, copied: 42.7 }, venice: true, propSet: 'venice-dunk' },
 };
 
 function rivalFiles(cast: string): string[] {

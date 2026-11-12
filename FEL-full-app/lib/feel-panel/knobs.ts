@@ -1642,6 +1642,10 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'perf.phoneRailBodies', label: 'Phone: people on the boardwalk rail', def: 2, min: 0, max: 5, step: 1, unit: '', group: 'Hoops · phone budget',
     source: 'lib/babylon/nexus/veniceBoardwalk.ts PHONE_RAIL_BODIES',
     hint: 'On a phone the half-court Venice rail (1v1, 3v3, 3-Point) keeps this many of its five onlookers, spread along it (two: the ends). Each is nine draw parts and about 10 MB of maps. 5 = all five, as before.',
+  },  {
+    id: 'perf.coveredSkyOff', label: 'Phone: drop the backdrop dome the court sky covers (1) / keep it (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/babylon/core/NexusVenue.ts COVERED_SKY_OFF',
+    hint: 'On a phone the basketball courts drop the look stack backdrop dome and ring: the venue own opaque sky sphere sits inside them and hides them completely. Same picture. 0 = kept, as before.',
   },
 ];
 

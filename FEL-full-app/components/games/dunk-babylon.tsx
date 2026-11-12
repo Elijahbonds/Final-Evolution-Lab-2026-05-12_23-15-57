@@ -98,6 +98,7 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
   const { device: hintDevice } = useHintDevice();
   const bottomRef = useRef<HTMLDivElement>(null);
   const bottomBelow = useBelowFold(bottomRef, phase === 'playing');
+  const hudShown = useMemo(() => (hintDevice === 'touch' && typeof hud.hint === 'string' && hud.hint ? { ...hud, hint: touchHint(hud.hint, 'dunk') } : hud), [hud, hintDevice]);
 
   const retryBoot = useCallback(() => {
     endedRef.current = false;
@@ -427,23 +428,26 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
           The box now spans from the top of the stage to the hint's slot (it never changes; the rows still stack up from the bottom), and
           the hint's row is always two lines tall with its plate at the top of it — a one-line hint leaves the second line empty. */}
       {(() => {
+        const hud = hudShown;   // hoops-p08: on a touch screen the hint names no pad button and no key (hudHints.touchHint)
         const t = decodeTakeoff(hud.takeoff);
         const beats = typeof hud.beats === 'string' && hud.beats ? hud.beats : '';
         const cutting = typeof hud.cut === 'string' && hud.cut;
         // CONTROLLER-TRY-FIX item 4: the live hint names the pad's own buttons (withButtons; the mode's words are unchanged, null = as written)
         const hint = typeof hud.hint === 'string' && hud.hint && phase === 'playing' ? withButtons(hud.hint, padFamily) : '';
-        const shownHint = hint && hintDevice === 'touch' ? touchHint(String(hud.hint), 'dunk') : hint;   // hoops-p08: no pad or key words on touch
         const takeoff = t && phase === 'playing' && !judging && !beats ? t : null;
         const strip = beats && phase === 'playing' && !judging && !cutting ? beats : '';
         const mic = phase === 'playing' && !judging && typeof hud.mic === 'string' && hud.mic ? hud.mic : '';
         const call = !judging && hud.slamPulse !== true && typeof hud.call === 'string' && hud.call && phase === 'playing' ? hud.call : '';   // (the call yields to the SLAM! cue: the QTE window is the one thing on screen then)
-        if (!shownHint && !takeoff && !strip && !mic && !call) return null;
+        if (!hint && !takeoff && !strip && !mic && !call) return null;
         return (
-          <div ref={bottomRef} data-dunk-bottom className="pointer-events-none absolute inset-x-0 top-0 flex flex-col-reverse items-center gap-[0.35rem] px-3" style={{ bottom: bottomBelow ? `calc(${PAD_LIFT} + ${bottomBelow}px)` : PAD_LIFT }}>
-            {shownHint && (
+          // hoops-p08: the wrapper ends where the screen does (an upright phone's stage runs under it), so the column's PAD_LIFT counts
+          // from the visible bottom, as the touch deck does
+          <div ref={bottomRef} className="pointer-events-none absolute inset-x-0 top-0" style={{ bottom: bottomBelow }}>
+          <div data-dunk-bottom className="pointer-events-none absolute inset-x-0 top-0 flex flex-col-reverse items-center gap-[0.35rem] px-3" style={{ bottom: PAD_LIFT }}>
+            {hint && (
               <HudText as="div" size="body" className="w-full text-center" style={HINT_SLOT_STYLE}>
                 <HudPlate as="span" className="inline-block max-w-[min(92%,980px)] px-3 py-1.5 align-top">
-                  <HudText as="div" size="body" alpha={0.8} style={LINE_CLAMP_STYLE}>{shownHint}</HudText>
+                  <HudText as="div" size="body" alpha={0.8} style={LINE_CLAMP_STYLE}>{hint}</HudText>
                 </HudPlate>
               </HudText>
             )}
@@ -462,6 +466,7 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
                 <HudPlate as="span" className="inline-block px-3 py-1"><HudText size="value" tone="score" className="uppercase italic">{call}</HudText></HudPlate>
               </div>
             )}
+          </div>
           </div>
         );
       })()}

@@ -33,7 +33,15 @@ describe('the half court Venice (hoops-p08)', () => {
   it('the shared grounds: one texture and one material per look, tiling in the UVs; 0 = a copy per plane, as before', () => {
     expect(SHARED_GROUND_ON).toBe(1);
     expect(SRC).toMatch(/const su = Math\.max\(1, w \/ TILE_M\[kind\]\), sv = Math\.max\(1, d \/ TILE_M\[kind\]\)/);   // the old texture u/v scale
-    expect(SRC).toMatch(/m\.albedoTexture = groundTextureFor\(scene, kind, 1, 1\)/);
+    expect(SRC).toMatch(/const t = groundTexture\(scene, kind\);/);   // the kind's own tile, not a copy
     expect(SRC).toMatch(/m\.albedoTexture = groundTextureFor\(scene, kind, w \/ TILE_M\[kind\], d \/ TILE_M\[kind\]\)/);   // the old path, kept
+  });
+  it('a phone court drops the backdrop dome its own sky covers (the venue sky, radius 200, is inside the dome, 280, and the ring, 235)', () => {
+    expect(VENUE).toMatch(/feel\('perf\.coveredSkyOff', COVERED_SKY_OFF\) >= 0\.5/);
+    expect(VENUE).toMatch(/for \(const name of \['bk_dome', 'bk_ring'\]\)/);
+    const sky = readFileSync('lib/babylon/nexus/NexusWebScene.ts', 'utf8'), bk = readFileSync('lib/babylon/visual/Backdrops.ts', 'utf8');
+    expect(sky).toMatch(/CreateSphere\('nexus_sky', \{ diameter: 400,/);
+    expect(bk).toMatch(/CreateSphere\('bk_dome', \{ diameter: 560,/);
+    expect(bk).toMatch(/CreateCylinder\('bk_ring', \{\s*diameter: 470,/);
   });
 });

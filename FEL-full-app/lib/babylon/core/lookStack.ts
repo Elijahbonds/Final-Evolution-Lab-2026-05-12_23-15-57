@@ -88,7 +88,7 @@ export async function mountLookStack(o: LookStackOpts): Promise<LookStack> {
   // M61: painted sky + horizon backdrop (2 meshes, unlit, auto-rotating)
   const backdrop = mountBackdrop(scene, o.backdrop?.() ?? MOOD_TO_FAMILY[mood] ?? 'park', mood);
   // M59 / A9.6: the ink outlines (the anime line for the party modes, a distance-true contour for the sports)
-  const unink = autoInk(scene, inkStyleFor(o.modeId), tier);
+  const unink = autoInk(scene, inkStyleFor(o.modeId));
   const camDirector = new CameraDirector(scene, camera, o.camPreset);
   const letterbox = mountLetterbox(scene, o.canvas, () => camDirector.cinematic01);   // A9.12: the intro's and the replays' bars
   return { engine, fit, tier, scene, camera, mood, lights, ssao, backdrop, unink, camDirector, letterbox };

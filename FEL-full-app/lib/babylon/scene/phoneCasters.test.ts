@@ -61,9 +61,11 @@ describe('phoneCasters — the ink and the sock (hoops-p08)', () => {
     expect(phoneSkipsCasterMaterial('shoes.shoes_evo_wear', 'mobile')).toBe(false);
     expect(phoneSkipsCasterMaterial(null, 'mobile')).toBe(false);
   });
-  it('autoInk asks it with the tier, and the look stack hands the tier in', () => {
+  it('autoInk asks it with the tier (the scene\'s own, which the look stack sets before it inks)', () => {
     const ink = readFileSync(join(__dirname, '../visual/AnimeInk.ts'), 'utf8');
     expect(ink).toMatch(/phoneSkipsInk\(m\.name, m\.material\?\.name, tier, feel\('perf\.phoneInkTrim', PHONE_INK_TRIM\)\) \? 'off' : style/);
-    expect(readFileSync(join(__dirname, '../core/lookStack.ts'), 'utf8')).toContain('autoInk(scene, inkStyleFor(o.modeId), tier)');
+    expect(ink).toMatch(/tier: string = \(scene\.metadata as \{ felTier\?: string \} \| null\)\?\.felTier \?\? 'desktop'/);
+    const look = readFileSync(join(__dirname, '../core/lookStack.ts'), 'utf8');
+    expect(look.indexOf('scene.metadata ??= {}).felTier = tier')).toBeLessThan(look.indexOf('autoInk(scene, inkStyleFor(o.modeId))'));
   });
 });

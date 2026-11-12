@@ -90,7 +90,7 @@ export function inkCharacter(meshes: AbstractMesh[], style: InkStyle = 'anime'):
  *  skinned mesh that ever spawns — hero, rivals, mobs, the Yeti — gets
  *  inked automatically, existing and future. Returns a disposer.
  *  `style` (A9.6): the mode's ink — see INK_STYLE_BY_MODE; the default is the anime line every caller had. */
-export function autoInk(scene: Scene, style: InkStyle = 'anime', tier: string = 'desktop'): () => void {
+export function autoInk(scene: Scene, style: InkStyle = 'anime', tier: string = (scene.metadata as { felTier?: string } | null)?.felTier ?? 'desktop'): () => void {
   // The outline is an inverted hull drawn with depth: on a body wearing FITTED
   // garments the body's hull buried anything tighter than the ink width — the
   // kit hero played bare-legged (measured 2026-09-04; the Closet, which has no
