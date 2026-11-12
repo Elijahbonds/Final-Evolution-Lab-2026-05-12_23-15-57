@@ -386,3 +386,28 @@ The owner answered four proposals from phase 6 (relayed by the coordinator). Eac
    on-court reps become real stats.").
 4. **Terms tick:** a real `<input type="checkbox">` inside its label. Same words, same rule (it must be ticked to
    continue), now usable from the keyboard and with a screen reader.
+
+## 2026-11-12 — owner 2026-11-12: shipping, deploy order, hoops, sound, art, screens
+
+The owner answered these (relayed by the coordinator). One line each.
+
+1. **Shipping:** `main` does not move until hoops phase 8 has landed. Then the coordinator smoke-tests a production build,
+   and the owner deploys and does the phone check.
+2. **PR #452 ("Delete my account" and "Sign out everywhere"):** merged as written, with policy version 2026-10-27b.
+3. **Deploy session order:** #431 (the Prisma engine move) first; #373 (Studio save to the account) in a later session.
+4. **Coach store and live coach sessions:** stay off for now.
+5. **Hoops green width:** a feel test on the phone first (`hoops.jumpGreenScale`, 1 against 0.62). It ships at 1 until
+   the owner says otherwise.
+6. **1v1 rival layup rates under the one rulebook:** keep the new numbers (Rookie 35 %, Pro 42 %, Elite 56 %).
+7. **3v3:** first to 21 on a 4-minute clock (it was 90 s).
+8. **Replays:** any press skips the replay.
+9. **Sound:** free CC0 recordings. Music: the owner's own tracks.
+10. **Finger and face bones:** a lane of their own, after sound and the moving net.
+11. **Art jobs approved:** a hoop with a moving net, a hand-change animation, and the 3 clothing fixes.
+12. **The "⋯" capture menu:** stays in the corner; the HUD keeps clear of it.
+13. **Builder:** the body on screen follows the playing height, within its 96–104 % range.
+14. **today-drill:** the Start bar stays pinned.
+15. **Coach screens:** shorter first-screen wording, reviewed by the owner before it ships (lane `lane/coach-words`;
+    the drafts are `docs/COACH-WORDING-REVIEW.md`).
+16. **Story:** keep #589's small readability touches (labels, tap targets). Otherwise leave Story alone.
+17. **Karate VS:** the in-game overlap is left as it is.
