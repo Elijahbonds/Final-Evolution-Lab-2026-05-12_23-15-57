@@ -659,13 +659,14 @@ holds the result in CI. Phone tier only unless said.
 - `perf.phoneInkTrim` 1 (`scene/phoneCasters.ts`): the ink contour (AnimeInk: two extra draws a part) skips the eyes, the shoe soles, the
   socks and the accessories — each inside a bigger part's outline. The body, hair, top, shorts and shoes keep their line. 0 = every part.
 - `perf.phoneSockCast` 0 (`scene/phoneCasters.ts`): the sock stays out of the 512² shadow map (its shadow is inside the leg's). 1 = it casts.
-- `perf.phoneFarPropTex` 512 (`scene/phoneTextureCap.ts`): in 1v1, 3v3 and 3-Point the parked bus and sedan (30–60 m off) upload their
-  maps at 512² (32 MB → 8 MB). The dunk parks the bus on its corner as a wall-run prop and keeps 1024². 1024 = as before.
+- `perf.phoneFarPropTex` 512 (`scene/phoneTextureCap.ts`): in 1v1, 3v3 and 3-Point the parked bus and sedan (30–60 m off) and the ball
+  (24 cm) upload their maps at 512² (37 MB → 9 MB). The dunk parks the bus on its corner as a wall-run prop and keeps 1024². 1024 = as before.
 - `perf.propMergeOn` 1 (`visual/VenueProps.ts`, every tier): a prop model's parts that share a material are one thin-instanced mesh (the
   far pier: fifteen parts in two materials → two; the Venice dunk set: 35 masters → 22). Same geometry, same placements. 0 = one per part.
-- `perf.sharedGroundOn` 1 (`nexus/veniceBoardwalk.ts`, every tier): the boardwalk's tiled grounds share one texture per look (the tiling is
-  in the UVs: the same repeat), so the four aprons are one mesh, and the posts and the flags share a material and are one mesh each. 0 =
-  a texture copy, a material and a draw per plane.
-- `perf.phoneRailBodies` 3 (`nexus/veniceBoardwalk.ts`): a phone's Venice rail keeps three of its five onlookers (the ends and the middle).
-  Half-court modes only (1v1, 3v3, 3-Point); the dunk and the duel keep their rail. FLAG: this one is visible — two fewer
-  people at the side of the court on a phone. 5 = all five.
+- `perf.sharedGroundOn` 1 (`nexus/veniceBoardwalk.ts`, every tier): the boardwalk's tiled grounds wear the kind's one painted tile (the
+  tiling is in the UVs: the same repeat) instead of a copy each, and the two sand planes share one grain and one mottle; so the four
+  aprons, the two sands, the two seas, the two surf strips, the posts and the flags are one mesh each. 0 = a texture copy, a material and
+  a draw per plane.
+- `perf.phoneRailBodies` 2 (`nexus/veniceBoardwalk.ts`): a phone's Venice rail keeps two of its five onlookers (the two ends).
+  Half-court modes only (1v1, 3v3, 3-Point); the dunk and the duel keep their rail. FLAG: this one is visible — three fewer
+  people at the side of the court on a phone (the 3v3's texture memory reaches its row only with it). 5 = all five.

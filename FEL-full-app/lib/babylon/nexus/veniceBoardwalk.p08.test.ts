@@ -20,10 +20,11 @@ describe('the half court Venice (hoops-p08)', () => {
     expect(SRC).toMatch(/sideOrientation: Mesh\.DOUBLESIDE, frontUVs: SIGN_FRONT_UVS, backUVs: SIGN_BACK_UVS/);
     expect(SRC).not.toMatch(/m\.backFaceCulling = false;\s*\n\s*plane\.material = m;/);
   });
-  it('the rail: five onlookers as before on every tier; a phone keeps three (the ends and the middle); 5 restores all five', () => {
+  it('the rail: five onlookers as before on every tier; a half-court phone keeps two (the ends); 5 restores all five', () => {
     const spots = Array.from({ length: 9 }, (_, i) => i);
     expect(railSpots(spots, Infinity)).toEqual(spots);          // Onlookers then takes 0, 2, 4, 6, 8 itself
-    expect(PHONE_RAIL_BODIES).toBe(3);
+    expect(PHONE_RAIL_BODIES).toBe(2);
+    expect(railSpots(spots, 2)).toEqual([0, 8]);
     expect(railSpots(spots, 3)).toEqual([0, 4, 8]);
     expect(railSpots(spots, 5)).toEqual(spots);
     expect(railSpots(spots, 1)).toEqual([4]);

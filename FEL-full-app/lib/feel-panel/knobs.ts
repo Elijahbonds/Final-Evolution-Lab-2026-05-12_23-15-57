@@ -1627,9 +1627,9 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'On a phone the sock under the shoe stays out of the shadow map (its shadow is inside the leg). 1 = it casts, as before.',
   },
   {
-    id: 'perf.phoneFarPropTex', label: 'Phone: parked bus and sedan texture size (half court)', def: 512, min: 256, max: 1024, step: 256, unit: 'px', group: 'Hoops · phone budget',
+    id: 'perf.phoneFarPropTex', label: 'Phone: parked bus, sedan and ball texture size (half court)', def: 512, min: 256, max: 1024, step: 256, unit: 'px', group: 'Hoops · phone budget',
     source: 'lib/babylon/scene/phoneTextureCap.ts PHONE_FAR_PROP_MAX',
-    hint: 'In 1v1, 3v3 and 3-Point on a phone the far parked bus and sedan upload their maps at this edge. 1024 = as before.',
+    hint: 'In 1v1, 3v3 and 3-Point on a phone the far parked bus and sedan and the ball (24 cm: never 512 px on a phone) upload their maps at this edge. 1024 = as before.',
   },  {
     id: 'perf.propMergeOn', label: 'Venue props: one draw per material per model (1) / per part (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
     source: 'lib/babylon/visual/VenueProps.ts PROP_MERGE_ON',
@@ -1637,11 +1637,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
   },  {
     id: 'perf.sharedGroundOn', label: 'Venice boardwalk: shared ground and sign materials (1) / one per plane (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
     source: 'lib/babylon/nexus/veniceBoardwalk.ts SHARED_GROUND_ON',
-    hint: 'The tiled grounds share one texture per look (tiling in the UVs), and the four aprons, the posts and the flags are one mesh each. Same picture. 0 = a texture copy, a material and a draw per plane, as before.',
+    hint: 'The tiled grounds share one painted tile per kind (tiling in the UVs) and the sands one grain; the aprons, sands, seas, surf strips, posts and flags are one mesh each. Same picture. 0 = a texture copy, a material and a draw per plane, as before.',
   },  {
-    id: 'perf.phoneRailBodies', label: 'Phone: people on the boardwalk rail', def: 3, min: 0, max: 5, step: 1, unit: '', group: 'Hoops · phone budget',
+    id: 'perf.phoneRailBodies', label: 'Phone: people on the boardwalk rail', def: 2, min: 0, max: 5, step: 1, unit: '', group: 'Hoops · phone budget',
     source: 'lib/babylon/nexus/veniceBoardwalk.ts PHONE_RAIL_BODIES',
-    hint: 'On a phone the half-court Venice rail (1v1, 3v3, 3-Point) keeps this many of its five onlookers (the ends and the middle). Each is nine draw parts and about 10 MB of maps. 5 = all five, as before.',
+    hint: 'On a phone the half-court Venice rail (1v1, 3v3, 3-Point) keeps this many of its five onlookers, spread along it (two: the ends). Each is nine draw parts and about 10 MB of maps. 5 = all five, as before.',
   },
 ];
 

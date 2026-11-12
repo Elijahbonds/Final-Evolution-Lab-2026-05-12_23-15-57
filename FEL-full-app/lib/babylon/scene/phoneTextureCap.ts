@@ -54,7 +54,9 @@ export function isModelImageUrl(url: string | null | undefined): boolean {
  * from the court and cover a few dozen pixels of a phone's width. On a phone their maps upload at PHONE_FAR_PROP_MAX.
  * `perf.phoneFarPropTex` sets the edge (1024 = as before, the general model cap).
  */
-export const PHONE_FAR_PROP_FILES: readonly string[] = ['/models/meshy/hoopbus.glb', '/models/meshy/sedan.glb'];
+export const PHONE_FAR_PROP_FILES: readonly string[] = ['/models/meshy/hoopbus.glb', '/models/meshy/sedan.glb',
+  // and the ball: 24 cm, it never covers 512 px of a phone's screen, even in a replay's close-up (its 1024² map: 5.3 MB)
+  '/models/meshy/ball-basketball.glb'];
 /** The modes where those vehicles only ever stand far off (the half-court Venice modes). The dunk parks the bus on the court's corner
  *  as a wall-run prop (DunkMode parkCornerProps): there it is close, and keeps its maps. */
 export const PHONE_FAR_PROP_MODES: ReadonlySet<string> = new Set(['onevone', 'threevthree', 'threepoint']);

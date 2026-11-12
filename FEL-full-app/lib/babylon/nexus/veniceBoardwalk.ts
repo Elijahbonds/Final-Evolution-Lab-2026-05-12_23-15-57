@@ -20,7 +20,7 @@ import { phoneHalf } from '../scene/phoneTrim';   // lane/owner-1016: a phone ke
 import { Color3, DynamicTexture, InstancedMesh, Mesh, MeshBuilder, PBRMaterial, SceneLoader, StandardMaterial, Texture, TransformNode, Vector3, Vector4, VertexData } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { mountStreetCourt, STREET_COURT_PALETTE, VENICE_DUNK_COURT_PALETTE } from '../visual/CourtSurface';
-import { courtLogoTexture, groundTextureFor, signTexture, TILE_M, type GroundKind } from '../visual/groundTextures';
+import { courtLogoTexture, groundTexture, groundTextureFor, signTexture, TILE_M, type GroundKind } from '../visual/groundTextures';
 import { HOOP_SCAN, spawnMeshyProp } from '../visual/meshyProps';
 import { MAX_BODIES, Onlookers } from '../visual/Onlookers';
 import { heroPalmScale, VENICE_BOARDWALK_ROW, VENICE_ENV2_DIR, VENICE_HERO_PALMS, VENICE_PALM_LODS, VENICE_ROW_PALMS } from '../visual/venuePropSets';
@@ -32,9 +32,9 @@ import { feel } from '@/lib/feel-panel/feel';   // hoops-p08: venue.halfCourtCro
 
 const COURT = { hx: 8, hz: 14 };                 // 16 × 28 court slab (venueSpecs basketball_*)
 /** hoops-p08 (perf.phoneRailBodies): how many people stand on the boardwalk rail on a PHONE. The rail is nine spots and Onlookers
- *  takes every other one (five roster bodies, each nine parts and ~9.6 MB of maps); a phone keeps three of those five, spread the
- *  same way (the two ends and the middle). 5 = all five, as before. Other tiers always keep five. */
-export const PHONE_RAIL_BODIES = 3;
+ *  takes every other one (five roster bodies, each nine parts and ~9.6 MB of maps); on 1v1, 3v3 and 3-Point a phone keeps two of those
+ *  five (the two ends): the 3v3's texture memory is inside its phone row only so. 5 = all five, as before. Other tiers keep five. */
+export const PHONE_RAIL_BODIES = 2;
 /** Pure: the rail's spots for a cap of `n` bodies — Onlookers' own every-other pick (MAX_BODIES), then `n` of those spread evenly. */
 export function railSpots<T>(spots: readonly T[], n: number): T[] {
   const step = Math.max(1, Math.ceil(spots.length / MAX_BODIES));
@@ -94,7 +94,9 @@ function flat(scene: Scene, name: string, w: number, d: number, x: number, z: nu
     if (!m || !scene.materials.includes(m)) {   // (a venue disposed and mounted again in the same scene made a new one)
       m = new PBRMaterial(`vb_ground_${kind}_${(mul ?? 'w').replace('#', '')}_mat`, scene);
       m.roughness = rough; m.metallic = 0; m.environmentIntensity = 0.35;
-      m.albedoTexture = groundTextureFor(scene, kind, 1, 1); m.albedoColor = mul ? Color3.FromHexString(mul) : Color3.White();
+      // the kind's own painted tile (groundTextures' per-scene source), not a copy of it: one texture per kind for every look
+      const t = groundTexture(scene, kind); t.wrapU = Texture.WRAP_ADDRESSMODE; t.wrapV = Texture.WRAP_ADDRESSMODE; t.anisotropicFilteringLevel = 8;
+      m.albedoTexture = t; m.albedoColor = mul ? Color3.FromHexString(mul) : Color3.White();
       cache.set(key, m);
     }
     g.material = m;
@@ -169,6 +171,7 @@ export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode, scanS
     const beachW = D.bikeX[0] - westSea, beachD = L - northSea, sandNW = far - D.bikeX[0], sandND = D.northSand - northSea;
     veniceSand(scene, flat(scene, 'vb_sand', beachW, beachD, (westSea + D.bikeX[0]) / 2, (northSea + L) / 2, 0.008, SAND, holder, 1), SAND, beachW, beachD);
     veniceSand(scene, flat(scene, 'vb_sand_n', sandNW, sandND, (D.bikeX[0] + far) / 2, (northSea + D.northSand) / 2, 0.008, SAND, holder, 1), SAND, sandNW, sandND);
+    if (feel('perf.sharedGroundOn', SHARED_GROUND_ON) >= 0.5) mergeSameLook(holder, /^vb_sand(_n)?$/, 'vb_sand');   // hoops-p08: one sand
     const eastLen = L - D.northSand, eastMid = (D.northSand + L) / 2;
     flat(scene, 'vb_bikepath', D.bikeX[1] - D.bikeX[0], eastLen, (D.bikeX[0] + D.bikeX[1]) / 2, eastMid, 0.011, '#8C8484', holder, 0.85, 'asphalt', '#8C8484');
     flat(scene, 'vb_walk', D.walkX[1] - D.walkX[0], eastLen, (D.walkX[0] + D.walkX[1]) / 2, eastMid, 0.011, '#E2D8CA', holder, 1, 'concrete', '#E2D8CA');
@@ -230,6 +233,8 @@ export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode, scanS
     : MeshBuilder.CreateGround('vb_sea_n', { width: L * 2, height: L }, scene);
   seaN.position.set(0, 0, dunkEnv ? sq.north.z : northSea - L / 2); seaN.parent = holder; seaN.material = seaMat; seaN.isPickable = false;
   if (dunkEnv) { shoreFoam(scene, holder, westSea, northSea, L + 25, L); sunGlitter(scene, holder, westSea, northSea); }   // north waterline to the east sand's end, west one to the south
+  // hoops-p08: the two sea planes (one material) and the two surf strips (one material) are one mesh each
+  if (feel('perf.sharedGroundOn', SHARED_GROUND_ON) >= 0.5) { mergeSameLook(holder, /^vb_sea_[wn]$/, 'vb_sea'); mergeSameLook(holder, /^vb_shore_foam_[wn]$/, 'vb_shore_foam'); }
   // The sun is PAINTED into the beach dome (scripts/backdrop/paint-beach-dome.py, u≈0.33): a 3D disc at the dome wall rendered as a
   // navy coin from the threes and ones cameras (depth against the dome at 190 m) while it read white from dunk's. No disc.
   void zSpanN;
@@ -486,7 +491,31 @@ function sunGlitter(scene: Scene, holder: TransformNode, westSea: number, northS
  * so the tile has no seam, and no strokes at all) over a low-frequency mottle as the detail map, tiled every ~44 m — the
  * tonal roll a beach has, and it breaks up the 4 m repeat.
  */
+/** hoops-p08: the two sand planes' painted grain and mottle, made once per scene (they were painted twice, identically). */
+const sandShared = new WeakMap<Scene, { grain: DynamicTexture; mottle: DynamicTexture; mat: PBRMaterial }>();
 function veniceSand(scene: Scene, mesh: Mesh, mul: string, w: number, d: number): void {
+  // hoops-p08 (perf.sharedGroundOn): the grain's 4 m tiling goes into the plane's UVs, so both planes can wear ONE grain, ONE mottle
+  // (its 44 m roll is then a fixed 4/44 of the UV repeat on both) and one material — and be one mesh. Only when neither plane's
+  // repeat is clamped (both are hundreds of metres), so the picture is the same.
+  const su = w / TILE_M.sand, sv = d / TILE_M.sand;
+  if (feel('perf.sharedGroundOn', SHARED_GROUND_ON) >= 0.5 && su >= 11 && sv >= 11) {
+    const own = mesh.material as PBRMaterial;
+    let hit = sandShared.get(scene);
+    if (!hit || !scene.materials.includes(hit.mat)) {
+      veniceSandPaint(scene, mesh, mul, TILE_M.sand, TILE_M.sand);   // paints a grain and a mottle at a repeat of 1 on `own`
+      const grain = own.albedoTexture as DynamicTexture, mottle = own.detailMap.texture as DynamicTexture;
+      mottle.uScale = mottle.vScale = TILE_M.sand / 44;
+      hit = { grain, mottle, mat: own }; sandShared.set(scene, hit);
+      const holder = mesh.parent;
+      holder?.onDisposeObservable.add(() => { grain.dispose(); mottle.dispose(); sandShared.delete(scene); });
+    } else { mesh.material = hit.mat; own.dispose(); }
+    const uv = mesh.getVerticesData('uv');
+    if (uv) { for (let i = 0; i < uv.length; i += 2) { uv[i] *= su; uv[i + 1] *= sv; } mesh.setVerticesData('uv', uv, false); }
+    return;
+  }
+  veniceSandPaint(scene, mesh, mul, w, d);
+}
+function veniceSandPaint(scene: Scene, mesh: Mesh, mul: string, w: number, d: number): void {
   const mat = mesh.material as PBRMaterial;
   const S = 512, grain = new DynamicTexture('vb_sand_grain', S, scene, true);
   const g = grain.getContext() as CanvasRenderingContext2D, r = lcg(0x5a4d);
@@ -531,7 +560,7 @@ function veniceSand(scene: Scene, mesh: Mesh, mul: string, w: number, d: number)
   mottle.uScale = Math.max(1, w / 44); mottle.vScale = Math.max(1, d / 44);
   mat.detailMap.isEnabled = true; mat.detailMap.texture = mottle;
   mat.detailMap.diffuseBlendLevel = 0.65; mat.detailMap.bumpLevel = 0; mat.detailMap.roughnessBlendLevel = 0;
-  mesh.onDisposeObservable.add(() => { grain.dispose(); mottle.dispose(); });
+  if (!(feel('perf.sharedGroundOn', SHARED_GROUND_ON) >= 0.5)) mesh.onDisposeObservable.add(() => { grain.dispose(); mottle.dispose(); });   // (shared: the holder disposes them)
 }
 
 /** Bake every mesh in `meshes` into one mesh per material, in `into`'s space (the glTF loader's handedness flip included;

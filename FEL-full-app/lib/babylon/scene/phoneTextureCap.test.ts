@@ -137,6 +137,7 @@ describe('phoneTextureCap — the far vehicles (hoops-p08)', () => {
     expect(capFor('/models/meshy/sedan.glb#image0', 1024, 1024, 1024)).toBe(1024);
     expect(capFor('/models/meshy/hoop.glb#image0', 2048, 2048)).toBe(1024);
     expect(capFor('/models/rivals/ace.glb#image3', 1024, 1024)).toBe(1024);
+    expect(capFor('/models/meshy/ball-basketball.glb#image0', 1024, 1024)).toBe(512);
   });
   it('only the half-court modes: the dunk parks the bus on its corner as a wall-run prop, up close', () => {
     expect([...PHONE_FAR_PROP_MODES].sort()).toEqual(['onevone', 'threepoint', 'threevthree']);
