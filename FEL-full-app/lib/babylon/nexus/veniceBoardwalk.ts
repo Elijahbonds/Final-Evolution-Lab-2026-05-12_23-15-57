@@ -88,15 +88,21 @@ function flat(scene: Scene, name: string, w: number, d: number, x: number, z: nu
   if (kind && feel('perf.sharedGroundOn', SHARED_GROUND_ON) >= 0.5) {
     const uv = g.getVerticesData('uv');
     if (uv) { const su = Math.max(1, w / TILE_M[kind]), sv = Math.max(1, d / TILE_M[kind]); for (let i = 0; i < uv.length; i += 2) { uv[i] *= su; uv[i + 1] *= sv; } g.setVerticesData('uv', uv, false); }
+    // The tint (`mul`) rides in the plane's VERTEX COLOURS, not the material's albedo colour: the PBR shader multiplies both into
+    // the albedo the same way (albedoColor × texture × vertex colour), so the picture is the same, and planes of one kind and one
+    // roughness — the walk, the plaza and the aprons, three concretes — share ONE material and can be one mesh.
+    const tint = mul ? Color3.FromHexString(mul) : Color3.White(), n = g.getTotalVertices(), col = new Float32Array(n * 4);
+    for (let i = 0; i < n; i++) col.set([tint.r, tint.g, tint.b, 1], i * 4);
+    g.setVerticesData('color', col, false);
     let cache = groundMats.get(scene); if (!cache) { cache = new Map(); groundMats.set(scene, cache); }
-    const key = `${kind}|${mul ?? ''}|${rough}`;
+    const key = `${kind}|${rough}`;
     let m = cache.get(key);
     if (!m || !scene.materials.includes(m)) {   // (a venue disposed and mounted again in the same scene made a new one)
-      m = new PBRMaterial(`vb_ground_${kind}_${(mul ?? 'w').replace('#', '')}_mat`, scene);
+      m = new PBRMaterial(`vb_ground_${kind}_mat`, scene);
       m.roughness = rough; m.metallic = 0; m.environmentIntensity = 0.35;
       // the kind's own painted tile (groundTextures' per-scene source), not a copy of it: one texture per kind for every look
       const t = groundTexture(scene, kind); t.wrapU = Texture.WRAP_ADDRESSMODE; t.wrapV = Texture.WRAP_ADDRESSMODE; t.anisotropicFilteringLevel = 8;
-      m.albedoTexture = t; m.albedoColor = mul ? Color3.FromHexString(mul) : Color3.White();
+      m.albedoTexture = t; m.albedoColor = Color3.White();
       cache.set(key, m);
     }
     g.material = m;
@@ -176,6 +182,7 @@ export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode, scanS
     flat(scene, 'vb_bikepath', D.bikeX[1] - D.bikeX[0], eastLen, (D.bikeX[0] + D.bikeX[1]) / 2, eastMid, 0.011, '#8C8484', holder, 0.85, 'asphalt', '#8C8484');
     flat(scene, 'vb_walk', D.walkX[1] - D.walkX[0], eastLen, (D.walkX[0] + D.walkX[1]) / 2, eastMid, 0.011, '#E2D8CA', holder, 1, 'concrete', '#E2D8CA');
     flat(scene, 'vb_plaza', far - D.plazaX0, eastLen, (D.plazaX0 + far) / 2, eastMid, 0.01, '#857A70', holder, 1, 'concrete', '#857A70');
+    if (feel('perf.sharedGroundOn', SHARED_GROUND_ON) >= 0.5) mergeSameLook(holder, /^vb_(apron|walk|plaza)$/, 'vb_concrete');   // hoops-p08: the three concretes, one mesh (their tints are vertex colours)
     // the bike path's dashed centre line: one plane, the dashes are its alpha-tested texture (3 m dash, 3 m gap)
     const dashTex = new DynamicTexture('vb_bike_dash_tex', { width: 16, height: 64 }, scene, false);
     { const c = dashTex.getContext() as CanvasRenderingContext2D; c.clearRect(0, 0, 16, 64); c.fillStyle = '#E8B83A'; c.fillRect(0, 0, 16, 32); dashTex.update(false); dashTex.hasAlpha = true; }

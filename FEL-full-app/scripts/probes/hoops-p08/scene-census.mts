@@ -43,7 +43,7 @@ const INIT = `(() => {
  *  as a whole), the frame's total (SceneInstrumentation), and the WORST frame's split is kept. */
 const INSTALL = `(() => {
   const scene = window.__FEL_DEV__.scene; const engine = scene.getEngine(); const si = window.__FEL_DEV__.instrument();
-  const W = window.__CEN = { per: new Map(), worst: null, worstDraws: -1, frames: 0, totals: [] };
+  const W = window.__CEN = { per: new Map(), worst: null, worstDraws: -1, frames: 0, totals: [], worstActive: [], cam: null };
   const wrap = (m) => { if (m.__cenWrapped || typeof m.render !== 'function') return; m.__cenWrapped = true; const orig = m.render;
     m.render = function (...a) { const d0 = engine._drawCalls.current; const r = orig.apply(this, a); W.per.set(this, (W.per.get(this) || 0) + (engine._drawCalls.current - d0)); return r; }; };
   for (const m of scene.meshes) wrap(m);
@@ -55,6 +55,7 @@ const INSTALL = `(() => {
   engine.onEndFrameObservable.add(() => {
     const total = si.drawCallsCounter.current; W.frames++; W.totals.push(total);
     if (total > W.worstDraws) { W.worstDraws = total; W.worst = { per: new Map(W.per), shadow: sd, active: [...scene.getActiveMeshes().data.slice(0, scene.getActiveMeshes().length)] }; }
+    const na = scene.getActiveMeshes().length; if (na > W.worstActive.length) W.worstActive = [...scene.getActiveMeshes().data.slice(0, na)];   // the worst ACTIVE-MESH frame, its own (the budget's activeMeshes is a per-metric worst)
   });
   return 'ok';
 })()`;
@@ -81,12 +82,13 @@ const CENSUS = `(async () => {
     tex.push({ url: String(t.url || '').slice(-90), w: t.width, h: t.height, mb: Math.round(mb * 100) / 100, rt: RT.has(t.source), src: t.source });
   }
   const sorted = [...W.totals].sort((a, b) => a - b);
+  const worstActive = W.worstActive.map((m) => ({ name: m.name, cls: m.getClassName(), anc: anc(m), skinned: !!m.skeleton, src: m.sourceMesh ? m.sourceMesh.name : null }));
   // every shadow caster (the full render list: a cache re-bake draws all of them in one frame)
   const casterList = [];
   for (const l of scene.lights) { const sg = l.getShadowGenerator && l.getShadowGenerator(); const map = sg && sg.getShadowMap && sg.getShadowMap(); if (!map || !map.renderList) continue;
     for (const m of map.renderList) casterList.push({ name: m.name, mat: m.material ? m.material.name : null, sub: m.subMeshes ? m.subMeshes.length : 0, thin: m.thinInstanceCount || 0, on: m.isEnabled() && m.isVisible, skinned: !!m.skeleton, anc: anc(m).slice(0, 2) }); }
   return { frameDraws: W.worstDraws, shadowDraws: W.worst.shadow, frames: W.frames, drawsP50: sorted[Math.floor(sorted.length / 2)], activeMeshes: W.worst.active.length,
-    meshesTotal: scene.meshes.length, materials: scene.materials.length, meshes, tex, casterList,
+    meshesTotal: scene.meshes.length, materials: scene.materials.length, meshes, tex, casterList, worstActive,
     texMb: tex.filter((t) => !t.rt).reduce((s, t) => s + t.mb, 0), tier: scene.metadata && scene.metadata.felTier };
 })()`;
 
