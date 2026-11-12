@@ -154,7 +154,7 @@ say('ready after ' + loadWallS.toFixed(0) + ' s wall; page.js: ' + await ev(fs.r
 // wall (a prop that landed after the start ran its callbacks on a wall-chosen frame: one run spawned 176 meshes, two 178, and that run's
 // play differed)
 let settled = null;
-{ let last = -1, stable = 0; for (let i = 0; i < 240 && stable < 6; i++) { const st = await ev(() => { const sc = window.__FEL_DEV__.scene; return [typeof sc.getWaitingItemsCount === 'function' ? sc.getWaitingItemsCount() : 0, sc.meshes.length, sc.animationGroups.length, sc.skeletons.length, sc.materials.length, sc.textures.length]; }); if (st[0] === 0 && st[1] === last && inflight.size === 0) stable++; else stable = 0; last = st[1]; settled = st; await new Promise((r) => setTimeout(r, 500)); } say(`settled: ${JSON.stringify(settled)} [waiting, meshes, clips, skeletons, materials, textures]; ${inflight.size} requests in flight`); }
+{ let last = -1, stable = 0; const tries = Number(process.env.SETTLE_TRIES ?? 240); for (let i = 0; i < tries && stable < 6; i++) { if (process.env.HG_DEBUG && i % 10 === 0) say(`settle ${i}: inflight ${inflight.size} ${[...inflight].slice(0, 3).map((r) => r.url().slice(0, 90)).join(' ')}`); const st = await ev(() => { const sc = window.__FEL_DEV__.scene; return [typeof sc.getWaitingItemsCount === 'function' ? sc.getWaitingItemsCount() : 0, sc.meshes.length, sc.animationGroups.length, sc.skeletons.length, sc.materials.length, sc.textures.length]; }); if (st[0] === 0 && st[1] === last && inflight.size === 0) stable++; else stable = 0; last = st[1]; settled = st; await new Promise((r) => setTimeout(r, 500)); } say(`settled: ${JSON.stringify(settled)} [waiting, meshes, clips, skeletons, materials, textures]; ${inflight.size} requests in flight`); }
 { const v = await ev((sd) => window.__go(sd), SEED); GO = true; goWall = Date.now(); if (process.env.HG_DEBUG) say(`go at clock ${v}, raf ${JSON.stringify(await ev(() => window.__rafN))}`); }   // hoops-p05: the deterministic clock from here (see INIT)
 if (process.env.RAND_STACK) await ev((r) => { window.__rand.stackFrames = r; }, process.env.RAND_STACK.split('-').map(Number));   // RAND_STACK=a-b: who drew a random number on frames a..b (and every draw made outside a frame)
 // START, on the rig's clock: 6 frames at READY first (a timer the load left pending fires there, on every run), then the press
@@ -253,6 +253,10 @@ if (SCEN === 'game') {
   result.poss = await possLoop();
   if (process.env.POSS_MOTION) { await ev(() => window.__hg.stop()); result.handEv = await ev(() => window.__hg.handEv || []); result.analysis = await ev((o) => window.__hg.analyse(o), { popList: !!process.env.POP_LIST }); if (process.env.POP_LIST) { result.clips = await ev(() => window.__hg.clips || []); result.stageEv = await ev(() => window.__hg.stageEv || []); result.states = await ev(() => window.__hg.states || []); } } result.log = await ev(() => window.__LOG); result.hud = await ev(() => window.__hud); result.snaps = await ev(() => window.__hg.snaps || []);
   { const names = await ev(() => Object.keys(window.__hg.strips).filter((k) => k.startsWith('auto-'))); for (const nm of names) await saveStrip(nm); result.autoStrips = names; }
+} else if (SCEN === 'ext') {   // hoops-gather: a scenario that lives in another lane's probe folder — EXT=<module>, its default export is
+  // handed the driver's own clock and page (the deterministic clock above, the page.js helpers already in the page)
+  const ext = await import(path.resolve(process.env.EXT));
+  await ext.default({ ev, page, runFrames, waitGame, shot, saveStrip, say, checkpoint, result, MODE, OUT, HERE });
 } else if (SCEN === 'input') {
   const S = (fn, arg) => ev(fn, arg);
   const setOff = () => S((m) => { const s = window.__FEL_DEV__.scene.metadata[m]; s.offense(); }, MODE);
