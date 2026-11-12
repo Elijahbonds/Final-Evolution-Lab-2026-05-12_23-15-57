@@ -62,7 +62,8 @@ export function SlotBar(p: SlotBarProps) {
   const sel = p.slots.find((s) => s.id === p.selected);
   useEffect(() => { if (p.openPaste) { setPasting(true); setPasteError(null); } }, [p.openPaste]);
 
-  const btn = 'flex min-h-11 items-center gap-1 rounded-lg bg-white/5 px-2 py-1 text-[12px] text-white/80 transition hover:bg-white/10 disabled:opacity-30';
+  // EVERY-SCREEN P10: the studio's one secondary button look (the parts and paint grids' own)
+  const btn = 'flex min-h-11 items-center gap-1 rounded-lg border border-white/10 bg-white/[0.03] px-2 py-1 text-[12px] text-white/80 transition hover:border-cyan-400/50 disabled:opacity-30';
   return (
     <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3" aria-label="Saved characters">
       <div className="mb-2 flex items-center justify-between">

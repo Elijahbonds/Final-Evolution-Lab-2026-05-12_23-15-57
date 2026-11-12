@@ -19,14 +19,15 @@ import { shardSaleCopy } from '@/lib/wallet/purchases';
 import { usePurchasesEnabled } from '@/lib/wallet/use-purchases-enabled';
 import { postVerifyCheckoutSession } from '@/components/stripe/verify-checkout-session';
 
-export function ShardStore() {
+/** `initialPurchasesEnabled`: the server's answer (app/shop/shards/page.tsx), as /store does (coin-store.tsx). */
+export function ShardStore({ initialPurchasesEnabled = null }: { initialPurchasesEnabled?: boolean | null } = {}) {
   const params = useSearchParams();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [balance, setBalance] = useState<number | null>(null);
   // ARENA-10PHASE P10: no STRIPE key means no checkout, and the buttons say so up front instead of a live "Buy" that toasts
   // a placeholder after the click. FEATURES-UX-SHOP: the flag AND the copy come from lib/wallet/purchases.ts — the same words
   // the coin store, the wallet page and the header chip use.
-  const purchasesEnabled = usePurchasesEnabled();
+  const purchasesEnabled = usePurchasesEnabled(initialPurchasesEnabled);
   const copy = shardSaleCopy(purchasesEnabled);
 
   async function refreshBalance() {

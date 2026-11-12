@@ -47,7 +47,7 @@ export function CopyCode({ code }: { code: string }) {
       data-copy-code={code}
       onClick={copy}
       aria-live="polite"
-      className="inline-flex min-h-[48px] min-w-[96px] items-center justify-center rounded-2xl border-2 border-[#00E5FF] px-4 text-[16px] font-bold text-[#00E5FF]"
+      className="inline-flex min-h-[56px] min-w-[96px] items-center justify-center rounded-2xl border-2 border-[#00E5FF] px-4 text-[16px] font-bold text-[#00E5FF]"
     >
       {status === 'copied' ? 'Copied' : status === 'blocked' ? 'Copy blocked' : 'Copy'}
     </button>

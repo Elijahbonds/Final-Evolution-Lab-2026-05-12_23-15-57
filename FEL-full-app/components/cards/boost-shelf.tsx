@@ -11,6 +11,7 @@ import { useState } from 'react';
 import { Check, Gem, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { BOOST_CARDS, purchaseCheck, type BoostCard } from '@/lib/cards/boosts';
+import { lineSize } from '@/lib/design/type';   // EVERY-SCREEN P10
 
 export function BoostShelf({ shards, owned }: { shards: number; owned: string[] }) {
   const [have, setHave] = useState<string[]>(owned);
@@ -47,7 +48,7 @@ export function BoostShelf({ shards, owned }: { shards: number; owned: string[] 
     <section className="mt-10">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h2 className="fel-heading text-[19px] font-bold text-white">Creator cards</h2>
+          <h2 className="fel-heading text-[20px] font-bold text-white">Creator cards</h2>
           <p className="mt-1 text-base text-white/50">
             Cosmetic cards: a card frame and links to the creator&apos;s own work. They never change a rating, PRQ,
             vertical or any game stat.
@@ -84,7 +85,7 @@ export function BoostShelf({ shards, owned }: { shards: number; owned: string[] 
                   >
                     {c.creator}
                   </p>
-                  <h3 className="fel-heading mt-1 text-[15.5px] font-bold leading-tight text-white">{c.title}</h3>
+                  <h3 className="fel-heading mt-1 text-[16px] font-bold leading-tight text-white">{c.title}</h3>
                 </div>
                 {mine && (
                   <span
@@ -97,7 +98,7 @@ export function BoostShelf({ shards, owned }: { shards: number; owned: string[] 
                 )}
               </div>
 
-              <p className="mt-2 text-[12.5px] italic leading-relaxed text-white/50">“{c.tagline}”</p>
+              <p className={`mt-2 ${lineSize(c.tagline, 'text-[12px]')} italic leading-relaxed text-white/50`}>“{c.tagline}”</p>
 
               <p className="mt-3 font-mono text-[12px] uppercase tracking-[0.14em] text-white/50">Cosmetic · no stat effect</p>
 
@@ -111,7 +112,7 @@ export function BoostShelf({ shards, owned }: { shards: number; owned: string[] 
                     type="button"
                     onClick={() => buy(c)}
                     disabled={!check.ok || working}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-[13px]
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-[14px]
                                font-bold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                     style={{ borderColor: `${c.accent}35`, background: `${c.accent}0D` }}
                   >

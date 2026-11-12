@@ -9,7 +9,7 @@
 // follows the venue, so a light placed by hand from Assets also completes step 2.
 
 import { useEffect, useState } from 'react';
-import { Check, Sparkles, X, Play } from 'lucide-react';
+import { Check, Loader2, Sparkles, X, Play } from 'lucide-react';
 import { TYPE } from '@/lib/design/type';
 import { reducedMotion } from '@/lib/a11y/reducedMotion';
 import {
@@ -53,10 +53,18 @@ export function FirstCourt({ venue, run, onWatch, onPlaced, onFinish, onSkip, on
   }, [step]);
 
   // one tap: the whole court (night light, floods, fans, the walk-in intro) as one undo step, then straight to "Play it"
+  // EVERY-SCREEN P10: the tap answers first (the button shows it is working), then the court is built after that frame is
+  // painted. Built inside the tap, the whole court (lights, stands, the intro: ~1 s of work on a slow phone) held the screen
+  // still for 1.7–2 s with the CPU slowed 4× before anything showed the tap had landed. Same command, same one undo step.
+  const [building, setBuilding] = useState(false);
   const quick = () => {
-    const r = quickCourtCommand(venue);
-    if (!r) return;
-    run(r.cmd); onPlaced?.(r.ids); setPicked('nightGame'); setAdded(['floods', 'fans']); setWatched('skipped');
+    if (building) return;
+    setBuilding(true);
+    requestAnimationFrame(() => setTimeout(() => {
+      const r = quickCourtCommand(venue);
+      if (r) { run(r.cmd); onPlaced?.(r.ids); setPicked('nightGame'); setAdded(['floods', 'fans']); setWatched('skipped'); }
+      setBuilding(false);
+    }, 0));
   };
   const pick = (mood: (typeof GUIDE_LIGHTS)[number]['mood']) => { run(lightCommand(venue, mood)); setPicked(mood); };
   const add = (what: GuideAdd) => {
@@ -101,9 +109,9 @@ export function FirstCourt({ venue, run, onWatch, onPlaced, onFinish, onSkip, on
 
       <div className="mt-3 flex flex-wrap gap-2">
         {step === 0 && (
-          <button type="button" onClick={quick} data-testid="guide-quick" data-fel-primary className={`${choice} w-full border-transparent ${ring(hint)}`}
+          <button type="button" onClick={quick} data-testid="guide-quick" data-fel-primary aria-busy={building} disabled={building} className={`${choice} w-full border-transparent ${ring(hint)}`}
             style={{ background: 'linear-gradient(180deg, #4df0ff 0%, var(--fel-accent, #00E5FF) 55%, #00c8e0 100%)', color: '#050505' }}>
-            <Sparkles className="h-4 w-4" aria-hidden /> Make it for me
+            {building ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Sparkles className="h-4 w-4" aria-hidden />} Make it for me
           </button>
         )}
         {step === 0 && GUIDE_LIGHTS.map((l, i) => (

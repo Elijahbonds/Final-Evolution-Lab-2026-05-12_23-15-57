@@ -36,7 +36,7 @@ export function YourBuildPanel({ metrics, prq0to100, onChange, onReset }: {
           <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-white/50">Your Build · scan input</p>
           <p className="mt-0.5 text-xs text-white/55">Movement-screen metrics until a Mirror scan lands. Saved on this device.</p>
         </div>
-        <button type="button" onClick={onReset} className="flex min-h-11 items-center gap-1 rounded-md border border-white/15 px-2.5 py-1.5 text-xs font-bold text-white/80 hover:bg-white/10">
+        <button type="button" onClick={onReset} className="flex min-h-11 items-center gap-1 rounded-md border border-white/15 bg-white/[0.04] px-2.5 py-1.5 text-xs font-bold text-white/80 hover:bg-white/10">
           <RotateCcw className="h-3.5 w-3.5" /> Defaults
         </button>
       </div>

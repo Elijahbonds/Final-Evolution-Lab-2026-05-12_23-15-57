@@ -279,8 +279,11 @@ function ZoneWaypoint({
     <motion.button
       type="button"
       onClick={onSelect}
-      className="group absolute z-10 -translate-x-1/2 -translate-y-1/2 outline-none"
-      style={{ left: `${zone.position.x}%`, top: `${zone.position.y}%` }}
+      // EVERY-SCREEN P10: centred by motion's own x/y. The Tailwind translate on this class never applied: motion writes the
+      // element's transform inline (its scale), which replaced it, so every zone sat half its width right of its point and
+      // "The Snow Slope" (x 86 %) ran 14.5 px off the map with 150 % text.
+      className="group absolute z-10 outline-none"
+      style={{ left: `${zone.position.x}%`, top: `${zone.position.y}%`, x: '-50%', y: '-50%' }}
       initial={{ opacity: 0, scale: 0.6 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ delay: index * 0.05, type: 'spring', stiffness: 260, damping: 20 }}

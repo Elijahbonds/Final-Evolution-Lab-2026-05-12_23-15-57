@@ -64,6 +64,7 @@ export default function Athlete3D(props: Athlete3DProps) {
           import('@/lib/a11y/reducedMotion'),
           import('@/lib/babylon/scene/QualityTier'),
         ]);
+        const { classifyGpu } = await import('@/lib/babylon/scene/tierRule');
         mark('modules');
         await yieldToPage();
         const canvas = ref.current;
@@ -149,20 +150,37 @@ export default function Athlete3D(props: Athlete3DProps) {
           if (turn) { turn.idleRotationSpeed = TURN_RAD_S; turn.idleRotationWaitTime = 2500; turn.idleRotationSpinupTime = 1200; turn.zoomStopsAnimation = false; }
         }
 
+        // EVERY-SCREEN P10: with no graphics chip (WebGL drawn by the CPU: SwiftShader, llvmpipe — the rig, and a phone whose
+        // GPU is blocked), each frame of the turning athlete took 0.3 s of the page's own time at the 4×-slowed rig, so a tap
+        // anywhere on the profile waited behind a frame (the jump-check link: 0.4–0.5 s). There the athlete is drawn once and
+        // stands still, and draws again only while a finger turns it (and for a moment after). With a GPU nothing changes.
+        let software = false;
+        try { software = classifyGpu((engine as unknown as { getGlInfo?(): { renderer?: string } }).getGlInfo?.()?.renderer) === 'software'; } catch { software = false; }
+        let turning = false;
+        let settle: ReturnType<typeof setTimeout> | null = null;
         let visible = !document.hidden, onScreen = true, running = false;
         const sync = () => {
-          const want = visible && onScreen;
+          const want = visible && onScreen && (!software || turning);
           if (want && !running) { engine.runRenderLoop(() => scene.render()); running = true; }
           else if (!want && running) { engine.stopRenderLoop(); running = false; }
         };
+        const onDown = () => { if (!software) return; if (settle) clearTimeout(settle); turning = true; sync(); };
+        const onUp = () => { if (!software) return; if (settle) clearTimeout(settle); settle = setTimeout(() => { turning = false; sync(); }, 1200); };
+        canvas.addEventListener('pointerdown', onDown);
+        window.addEventListener('pointerup', onUp);
+        window.addEventListener('pointercancel', onUp);
         const onVis = () => { visible = !document.hidden; sync(); };
         const io = typeof IntersectionObserver !== 'undefined' ? new IntersectionObserver((es) => { onScreen = es.some((e) => e.isIntersecting); sync(); }) : null;
         io?.observe(canvas);
-        const onResize = () => engine.resize();
+        const onResize = () => { engine.resize(); if (software && !running) scene.render(); };   // a resize clears the canvas
         document.addEventListener('visibilitychange', onVis);
         window.addEventListener('resize', onResize);
         sync();
         cleanup = () => {
+          if (settle) clearTimeout(settle);
+          canvas.removeEventListener('pointerdown', onDown);
+          window.removeEventListener('pointerup', onUp);
+          window.removeEventListener('pointercancel', onUp);
           document.removeEventListener('visibilitychange', onVis);
           window.removeEventListener('resize', onResize);
           io?.disconnect();

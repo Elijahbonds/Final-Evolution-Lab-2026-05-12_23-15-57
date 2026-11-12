@@ -110,7 +110,7 @@ export function PartsTab({ parts, onChange, accent, canUndo, canRedo, onUndo, on
           <input type="range" min={3} max={16} value={cluster} onChange={(e) => setCluster(Number(e.target.value))} className="min-h-11 w-28 accent-cyan-400" aria-label="Spikes in the cluster" />
           <span className="w-5 tabular-nums text-white/50">{cluster}</span>
           <button type="button" onClick={addCluster} disabled={!fitsBudget(parts, 1)}
-            className="min-h-11 rounded-md bg-cyan-400/15 px-2 py-1 font-semibold text-cyan-200 transition hover:bg-cyan-400/25 disabled:opacity-30">Add spikes to the head</button>
+            className="min-h-11 rounded-lg border border-white/10 bg-white/[0.03] px-2 py-1 text-[12px] text-cyan-200 transition hover:border-cyan-400/50 disabled:opacity-30">Add spikes to the head</button>
           <span className="text-[12px] text-white/50">Each spike is its own part — edit or delete any of them.</span>
         </div>
       </section>
