@@ -48,6 +48,10 @@ export const SUBJECTS: Subject[] = [
   ...RIVALS.map((r) => ({ id: `rival-${r}`, modeId: 'onevone', closet: false, spawn: { kind: 'rival', url: `/models/rivals/${r}.glb`, name: r.toUpperCase() }, rivalPoses: ['idle', 'run', 'dunk', 'squat', 'overhead', 'kick', 'celebrate'], cams: ['mid-front', 'mid-back', 'far-front'] })),
   // the kit packs (Meshy garments skinned to the rig, attached late): football and baseball tops on a rival
   { id: 'pack-football', modeId: 'football', closet: false, spawn: { kind: 'rival', url: '/models/rivals/grit.glb', name: 'GRIT' } },
+  { id: 'pack-football-player', modeId: 'football', closet: false, spawn: { kind: 'player', body: 'kit-male' } },
+  { id: 'pack-football-female', modeId: 'football', closet: false, spawn: { kind: 'player', body: 'kit-female' } },
+  { id: 'pack-football-tusk', modeId: 'football', closet: false, spawn: { kind: 'rival', url: '/models/rivals/tusk.glb', name: 'TUSK' } },
+  { id: 'pack-football-dash', modeId: 'football', closet: false, spawn: { kind: 'rival', url: '/models/rivals/dash.glb', name: 'DASH' } },
   { id: 'pack-baseball', modeId: 'derby', closet: false, spawn: { kind: 'rival', url: '/models/rivals/rook.glb', name: 'ROOK' } },
 ];
 

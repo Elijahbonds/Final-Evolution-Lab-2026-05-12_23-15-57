@@ -10,7 +10,7 @@ import { SceneLoader, VertexBuffer } from '@babylonjs/core';
 import type { AbstractMesh, AssetContainer, Mesh, Scene, Skeleton } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { sportKitDefault } from './sportKitDefaults';
-import { ensureGarmentUVs, fixGarment, syncGarmentVisibility } from './garmentFixes';
+import { ensureGarmentUVs, fixGarment, liftOffBody, syncGarmentVisibility } from './garmentFixes';
 import { scheduleBodyMask, shareBodyBounds, isBodyMesh } from './bodyMask';
 import { coachGarmentSlotOf, demoModelFlags } from './demoModels';
 
@@ -79,7 +79,7 @@ export function applyKit(meshes: AbstractMesh[], wardrobe: Wardrobe | null | und
     fixGarment(list.find((m) => m.isVisible && !/_primitive[1-9]/.test(m.name)) ?? show, slot, showId);
     // a garment the body does not carry but a kit PACK does (owner 2026-09-05: Meshy garments skinned to the rig):
     // fetch it, bind it to this body's skeleton, and swap it in when it lands
-    if (want && !byId(want) && KIT_PACKS[want]) void attachKitPack(list[0], slot, want, list);
+    if (want && !byId(want) && KIT_PACKS[want] && packFitsBody(meshes)) void attachKitPack(list[0], slot, want, list);
   }
   // CLOTHING-ALONE (2026-09-14): garments cull with the body, and the skin under a shown garment is not drawn (bodyMask.ts)
   const body = meshes.find((m) => isBodyMesh(m.name));
@@ -109,6 +109,28 @@ function kitOwner(meshes: readonly AbstractMesh[]): object | null {
   return null;
 }
 const coveredSlots = new WeakMap<object, ReadonlySet<KitSlot>>();
+
+/**
+ * KIT-GLITCH (owner 2026-11-12: "skin pokes through", "wrong or missing pieces"; on rivals). A kit PACK garment is fitted in
+ * Blender to ONE body — scripts/meshy/fit-garment.py takes the hero file — and the kit bodies share its shape. The 24 forge
+ * rivals are their own builds (scripts/avatar/rivals.mts: MakeHuman's muscle, weight and proportions, 1.70–2.08 m), and the
+ * football jersey, the default top for everyone in football, does not fit them: measured on the rig at idle, 50–54 % of the
+ * jersey inside the rival's body (its quarter-point 15–18 mm under the skin) and 4,800–6,100 px of skin through it at 1.8 m
+ * (grit, tusk, dash), the chest and shoulders bare in a run — against 27–35 % and −2 / −7 mm on the kit bodies it was
+ * fitted to. A body that carries its own build (a forge rival: its armature's `athlete` extra) wears no pack: the slot shows
+ * the body's own garment, as it does for any item the body does not carry. Kit bodies (the player's) still get the pack.
+ */
+export function packFitsBody(meshes: readonly AbstractMesh[]): boolean {
+  for (const m of meshes) {
+    if (!kitOf(m.name)) continue;
+    for (let n: { metadata?: unknown; parent?: unknown } | null = m; n; n = (n.parent as typeof n) ?? null) {
+      const extras = (n.metadata as { gltf?: { extras?: { athlete?: unknown } } } | null | undefined)?.gltf?.extras;
+      if (extras?.athlete != null) return false;
+    }
+    return true;
+  }
+  return true;
+}
 /** Is this kit slot covered by code-built clothes on the body `sibling` belongs to (as applyKit last decided)? */
 export function kitSlotCovered(sibling: AbstractMesh, slot: KitSlot): boolean {
   return coveredSlots.get(bodyNodeOf(sibling) ?? sibling)?.has(slot) ?? false;
@@ -177,6 +199,11 @@ async function attachKitPack(sibling: AbstractMesh, slot: KitSlot, itemId: strin
     const s0 = inst.skeletons[0] ?? m0?.skeleton ?? null;
     if (!m0 || !s0) { console.warn(`[FEL-KIT] pack ${itemId}: instantiate produced no skinned mesh`); return; }
     m0.setEnabled(false); m0.isVisible = false; m0.parent = null;
+    // KIT-GLITCH: the pack's tops and shorts stand off the skin like the body's own (GARMENT_INFLATE in metres, the depth
+    // offset): done ONCE on the template, whose geometry every spawn's clone shares, so a football defender spawned mid-game
+    // pays nothing for it (the per-spawn rewrite was why packs went without, 2026-09-05). Measured on the kit body at idle:
+    // see the KIT-GLITCH note in the commit and kitGlitch.test.ts.
+    if (slot === 'tops' || slot === 'shorts') liftOffBody(m0, slot);
     for (const r of inst.rootNodes) if (r !== m0 && r.getChildMeshes().length === 0) r.dispose();
     tpl = { mesh: m0, skeleton: s0 };
     let map = templates.get(scene); if (!map) { map = new Map(); templates.set(scene, map); }

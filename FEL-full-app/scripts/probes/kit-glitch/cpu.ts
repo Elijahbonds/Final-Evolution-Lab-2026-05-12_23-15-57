@@ -90,6 +90,7 @@ export async function measureBodies(keys: string[], opts: { wardrobe?: Wardrobe;
         for (let v = 0; v < gw.length / 3; v += 2) { let bd = Infinity; for (let u = 0; u < bw.P.length / 3; u += 3) { const d = (bw.P[u * 3] - gw[v * 3]) ** 2 + (bw.P[u * 3 + 1] - gw[v * 3 + 1]) ** 2 + (bw.P[u * 3 + 2] - gw[v * 3 + 2]) ** 2; if (d < bd) bd = d; } far = Math.max(far, Math.sqrt(bd)); }
         reads.push({ mesh: g.name.replace(/_c[^_]*$/, '').replace(/_c\w+$/, ''), tear, maxRatio: +maxRatio.toFixed(2), float: +far.toFixed(3), tearBones });
       }
+      pokeTag = `${key}:${clip}`;
       const pk = cpuPoke(body, bw, garments);
       const r: PoseRead = { body: key, clip, frac, garments: reads, poke: pk.total, pokeBySlot: pk.bySlot };
       out.push(r); opts.log?.(r);
@@ -107,21 +108,29 @@ async function main(): Promise<void> {
   const reads = await measureBodies(keys, { log: (r) => console.log(JSON.stringify({ b: r.body, c: `${r.clip}@${r.frac}`, poke: r.poke, pk: r.pokeBySlot, g: r.garments.map((g) => `${g.mesh.replace(/^Kit_/, '')} tear${g.tear} ×${g.maxRatio} float${g.float}${g.tear ? ' ' + JSON.stringify(g.tearBones) : ''}`) })) });
   console.warn = silence;
   let tear = 0, floatMax = 0, poke = 0; const ps: Record<string, number> = {}; for (const r of reads) { poke += r.poke; for (const [k, v] of Object.entries(r.pokeBySlot)) ps[k] = (ps[k] ?? 0) + v; for (const g of r.garments) { tear += g.tear; floatMax = Math.max(floatMax, g.float); } }
+  if (process.env.POKE_BONES) console.log('BONES', JSON.stringify(pokeBones));
   console.log('TOTAL', JSON.stringify({ poses: reads.length, tear, floatMax, poke, pokeBySlot: ps }));
 }
+export const pokeBones: Record<string, number> = {};
+let pokeTag = '';
 /** POKE (CPU): drawn body vertices (in a triangle the mask kept) that project onto a garment triangle within 3 cm and stand
  *  OUTSIDE it (more than 1 mm along the garment's outward normal): skin through cloth, counted per slot. */
 export function cpuPoke(body: Mesh, bw: { P: Float32Array; N: Float32Array }, garments: Mesh[]): { total: number; bySlot: Record<string, number> } {
+  const bmi = body.getVerticesData('matricesIndices'), bmw = body.getVerticesData('matricesWeights');
   const drawnV = new Uint8Array(bw.P.length / 3); const bi = body.getIndices()!; for (let i = 0; i < bi.length; i++) drawnV[bi[i]] = 1;
   const C = 0.04, key = (i: number, j: number, k: number) => `${i},${j},${k}`;
   const bySlot: Record<string, number> = {}; let total = 0;
   const hit = new Uint8Array(drawnV.length);
   for (const g of garments) {
     const slot = maskSlotOf(g.name) ?? '?'; const sw = skinnedWorld(g)!; const P = sw.P, N = sw.N, ind = g.getIndices()!;
+    // only skin on a bone this garment rides is "under" it (a hand beside the shorts is an honest occluder)
+    const gmi = g.getVerticesData('matricesIndices')!, gmw = g.getVerticesData('matricesWeights')!, gb = g.skeleton!.bones, rides = new Set<string>();
+    for (let q = 0; q < gmw.length; q++) if (gmw[q] > 0.1) rides.add(gb[gmi[q]]?.name ?? '');
+    const domOf = (v: number) => { let bi = 0, bv = -1; for (let q = 0; q < 4; q++) if (bmw![v * 4 + q] > bv) { bv = bmw![v * 4 + q]; bi = bmi![v * 4 + q]; } return body.skeleton!.bones[bi]?.name ?? ''; };
     const grid = new Map<string, number[]>();
     for (let t = 0; t + 2 < ind.length; t += 3) { const a = ind[t] * 3; const kk = key(Math.floor(P[a] / C), Math.floor(P[a + 1] / C), Math.floor(P[a + 2] / C)); let l = grid.get(kk); if (!l) grid.set(kk, l = []); l.push(t); }
     for (let v = 0; v < drawnV.length; v++) {
-      if (!drawnV[v] || hit[v]) continue;
+      if (!drawnV[v] || hit[v] || !rides.has(domOf(v))) continue;
       const x = bw.P[v * 3], y = bw.P[v * 3 + 1], z = bw.P[v * 3 + 2];
       const ci = Math.floor(x / C), cj = Math.floor(y / C), ck = Math.floor(z / C);
       let best = Infinity, sd = 0;
@@ -144,7 +153,10 @@ export function cpuPoke(body: Mesh, bw: { P: Float32Array; N: Float32Array }, ga
           best = Math.abs(d); sd = d;
         }
       }
-      if (best < Infinity && sd > 0.001) { hit[v] = 1; total++; bySlot[slot] = (bySlot[slot] ?? 0) + 1; }
+      if (best < Infinity && sd > 0.001) {
+        hit[v] = 1; total++; bySlot[slot] = (bySlot[slot] ?? 0) + 1;
+        if (process.env.POKE_BONES) { let bi = 0, bv = -1; for (let q = 0; q < 4; q++) if (bmw![v * 4 + q] > bv) { bv = bmw![v * 4 + q]; bi = bmi![v * 4 + q]; } const k = `${slot}:${body.skeleton!.bones[bi]?.name}${process.env.POKE_BONES === 'pose' ? '@' + pokeTag : ''}`; pokeBones[k] = (pokeBones[k] ?? 0) + 1; }
+      }
     }
   }
   return { total, bySlot };
