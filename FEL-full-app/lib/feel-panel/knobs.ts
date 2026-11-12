@@ -1768,7 +1768,7 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
   {
     id: 'hoops.rateStealReachBand', label: 'Defense 90: steal reach plus', def: 0.05, min: 0, max: 0.15, step: 0.01, unit: 'x', group: 'Hoops · ratings',
     source: 'lib/babylon/hoops/ratings.ts RATE_STEAL_REACH_BAND',
-    hint: 'Share added to the steal reach (1.2 m) at Defense 90.',
+    hint: 'Share added to the hero poke range (1.6 m) at Defense 90.',
   },
   {
     id: 'hoops.rateBlockReachM', label: 'Defense 90: block reach plus', def: 0.04, min: 0, max: 0.12, step: 0.01, unit: 'm', group: 'Hoops · ratings',
@@ -1778,7 +1778,12 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
   {
     id: 'hoops.heightReachMPerIn', label: 'Playing height: reach per inch over the standard', def: 0.015, min: 0, max: 0.04, step: 0.001, unit: 'm', group: 'Hoops · ratings',
     source: 'lib/babylon/hoops/ratings.ts HEIGHT_REACH_M_PER_IN',
-    hint: 'Metres of standing reach (blocks, contests, the rim) per inch of playing height over the standard frame; under it, the same off.',
+    hint: 'Metres of reach (the hero block reach and his release height against a block) per inch of playing height over the standard frame; under it, the same off.',
+  },
+  {
+    id: 'hoops.heightLookPerIn', label: 'Playing height: drawn taller per inch over the standard', def: 0.01, min: 0, max: 0.01, step: 0.001, unit: 'x', group: 'Hoops · ratings',
+    source: 'lib/babylon/hoops/ratings.ts HEIGHT_LOOK_PER_IN',
+    hint: 'How much bigger the hero is drawn per inch of playing height (6ft 8 at 104 percent, 6ft 0 at 96). Drawing only, casual runs only. 0 = the standard body.',
   },
   // ── lane/kit-fit (owner 2026-11-12: "fix how the clothes fit, how they look") ──
   {
