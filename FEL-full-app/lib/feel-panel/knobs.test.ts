@@ -58,6 +58,7 @@ import * as P2C from '@/lib/babylon/hoops/contest';   // hoops-p02
 import * as P3R from '@/lib/babylon/hoops/rivalOffense';   // hoops-p03
 import * as P3T from '@/lib/babylon/hoops/teamOffense3v3';   // hoops-p03
 import * as P4T from '@/lib/babylon/anim/hoopsTransitions';   // hoops-p04
+import * as RB from '@/lib/babylon/hoops/rulebook';   // hoops-p09
 import * as P4R from '@/lib/babylon/hoops/releaseTiming';   // hoops-p04
 import { PLANT_RELEASE_FADE_SEC, DEFENSE_LEGS_ON, BACKPEDAL_REVERSE_ON, CLOSEOUT_STEP_ON, LOOP_IN_STEP_ON } from '@/lib/babylon/anim/basketballTree';   // hoops-p04, hoops-p05
 import * as P5S from '@/lib/babylon/anim/hipSteer';   // hoops-p05
@@ -383,6 +384,15 @@ describe('the feel knob catalogue', () => {
     expect(OVERTIME_3V3_SEC).toBe(30);
     expect(def('baseball.batGripLostM')).toBe(BAT_GRIP_LOST_M);   // bat-grip-2 (new)
     expect(def('baseball.batGripBackM')).toBe(BAT_GRIP_BACK_M);
+    // hoops-p09 (one rulebook; new, the owner has not felt these)
+    expect(def('hoops.skillShotOn')).toBe(RB.SKILL_SHOT_ON); expect(def('hoops.jumpGreenScale')).toBe(RB.JUMP_GREEN_SCALE);
+    expect(def('hoops.freeFinishContest')).toBe(RB.FREE_FINISH_CONTEST); expect(def('hoops.aiSharedShotOn')).toBe(RB.AI_SHARED_SHOT_ON);
+    expect(def('hoops.aiTimingRookieMs')).toBe(RB.AI_TIMING_ROOKIE_MS); expect(def('hoops.aiTimingProMs')).toBe(RB.AI_TIMING_PRO_MS);
+    expect(def('hoops.aiTimingEliteMs')).toBe(RB.AI_TIMING_ELITE_MS); expect(def('hoops.aiTimingMateMs')).toBe(RB.AI_TIMING_MATE_MS);
+    expect(def('hoops.moveReadOn')).toBe(RB.MOVE_READ_ON); expect(def('hoops.moveLeanMps')).toBe(RB.MOVE_LEAN_MPS);
+    expect(def('hoops.moveCommitMps')).toBe(RB.MOVE_COMMIT_MPS); expect(def('hoops.passFakeLaneCos')).toBe(RB.PASS_FAKE_LANE_COS);
+    expect(def('hoops.gatherCloseoutOn')).toBe(RB.GATHER_CLOSEOUT_ON); expect(def('hoops.gatherCloseoutM')).toBe(RB.GATHER_CLOSEOUT_M);
+    expect(def('hoops.pressFloorOn')).toBe(RB.PRESS_FLOOR_ON); expect(def('hoops.finishContestNarrow')).toBe(RB.FINISH_CONTEST_NARROW);
   });
 
   it('every row is well formed: unique `<area>.<camelName>` id, min ≤ default ≤ max, the default on the step grid, a source', () => {

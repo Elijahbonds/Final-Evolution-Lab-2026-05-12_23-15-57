@@ -634,3 +634,40 @@ Group "Hoops · flow and pace". Each is NEW; 0 restores the old behaviour exactl
   (the audit: 14 of 21 hard pops in a 22 s idle 1v1 run). On the move it is the rule as before (`hoops.aiHandDwellSec` 0.35, `hoops.aiHandGapSec`
   0.9, unchanged). Its crossing also takes `hoops.handChangeCatchLeadSec` (headless, that path: 56 → 35 hard events in 64 changes, as the
   carry's own). 0 = as before. Feel-check: 1v1, stand dribbling with him shading you; the ball should not ping-pong.
+
+## hoops-p09, 2026-11-12 (1v1 / 3v3 phase 9 "one rulebook"; the play audit's sinkers 2 to 6 and 10; the owner has not felt these yet)
+
+Group "Hoops · one rulebook". Each is NEW, and its OFF value restores the old behaviour exactly (`lib/babylon/hoops/rulebook.test.ts`
+pins both). Measured with `scripts/probes/hoops-p09/rulebook-measure.mts` (before = every knob off).
+- `hoops.skillShotOn` 1 (`hoops/rulebook.ts`, `core/SharedShot.ts`): **the release decides the shot.** Inside the green it goes in, outside
+  it misses; how far outside says how (a rim-out just past the edge, a brick far off; early short, late long). The contest AT THE RELEASE
+  and the distance only narrow the green; tiredness and a cold run narrow it a little, a hot run and called glass widen it a little. No
+  draw. 0 = the grade sets a rate (perfect 0.97, good 0.80, early 0.35, late 0.30) and the ring draws, as before.
+- `hoops.jumpGreenScale` **ships at 1 (today's width)** (coordinator 2026-11-12: the rule alone removes the luck without costing a decent
+  player points before the owner has felt a narrower green). **The proposal for the shooting session is 0.62**: the jumper and fadeaway
+  green at this share of the old width (an open jumper's green 117 → 72 ms at 4.5 m, 104 → 65 ms from three). Session: start at 1.0 and
+  narrow toward 0.62 (0.8 in between: a decent thumb 25.7 points over the 20 shots). Measured: at 1.0 a decent thumb (45 ms) scores the
+  same over a game's 20 shots as before (29.5 → 29.5 points) while a masher falls 18 → 6; at 0.62 the decent thumb falls to 22 and a
+  sharp one (12 ms) rises 39 → 46.
+- `hoops.freeFinishContest` 0.3: a layup or other finish contested less than this goes in however it was timed. 0 = every finish needs the green.
+- `hoops.finishContestNarrow` 0.5: with the release deciding, a contested finish's green is narrowed by this share at a full contest (the
+  layup bars are floored, so a body on you barely narrowed them; the old contest bite on the rate did that job). 0 = no extra narrowing.
+- `hoops.aiSharedShotOn` 1: the 1v1 rival, the 3v3 rivals and your 3v3 teammates release on YOUR meter (their style, contest and
+  distance), graded and decided by the same rule. What differs is their hand: a timing error drawn from a spread per level,
+  `hoops.aiTimingRookieMs` 100 / `hoops.aiTimingProMs` 71 / `hoops.aiTimingEliteMs` 52 / `hoops.aiTimingMateMs` 71 ms; a rival behind and
+  forcing it spreads wider, one protecting a lead a little tighter (core/Nerve). The lob and the putback stay dunk rates. 0 = their own
+  tables (rivalShotPct, rivalReleasePct, matePct), as before. Measured at the shipped width (the rival sim, human-like defender): the 1v1
+  rival's jumpers ROOKIE 7 → 17 %, PRO 7 → 24 %, ELITE 6 → 31 %; his layups 53 / 54 / 55 → 35 / 42 / 56 %; the 3v3 rivals' points a shot
+  0.41 / 0.54 / 0.67 → 0.38 / 0.56 / 0.76. The spreads were picked against the green: the same rates as 62 / 44 / 32 give at the proposed
+  0.62, so if the session narrows the green, tighten these by the same share (× the new scale) or the rivals get worse.
+- `hoops.moveReadOn` 1 (`hoops/rulebook.ts readTheMan`; HandleSystem, TripleThreat's jab, the pump fake, the pass fake, off the head): a
+  move or a fake beats the man only when he is off balance (in his jump or his reach), coming at you faster than `hoops.moveCommitMps`
+  1.4 m/s, or moving across you the wrong way faster than `hoops.moveLeanMps` 0.6 m/s (the modes' own "closing" and "set" lines). Against
+  a set man the move keeps the ball safe and nothing more. The jab bites only the first two of a possession; the pass fake moves a man
+  standing at least `hoops.passFakeLaneCos` 0.6 square in the lane; off the head comes off clean when its odds are 0.5 or better. No roll.
+  0 = the odds and the roll, as before.
+- `hoops.gatherCloseoutOn` 1 (`DefenderBrain.closeOnGather`): once his tier's reaction (420 / 220 / 120 ms) has passed inside your jump-shot
+  meter, the man on you steps up to `hoops.gatherCloseoutM` 0.8 m. The pull-up three for a decent thumb: 1.7 → 0.6 to 0.7 points a shot at
+  PRO and ELITE. Its answers: the pump fake (he is flying at you, so he bites) and a move into his closeout. 0 = he holds his spot.
+- `hoops.pressFloorOn` 1: a showtime flush or a trick dunk pressed at the wrong moment pays at least what not pressing pays (showtime
+  early 42 → 70 %, late 50 → 70 %; a mistimed trick pays the plain dunk). 0 = the old table.

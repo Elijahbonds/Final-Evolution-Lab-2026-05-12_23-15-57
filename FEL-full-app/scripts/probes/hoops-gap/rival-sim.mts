@@ -6,7 +6,7 @@
 //         to 1.0 m in front of the driver on his line to the rim, a poke every 0.6–1.6 s inside 1.6 m at 50 %, a block jump 220 ms after
 //         the gather) — or a HUMAN-like one (`--def human`: the same, seeing the rival REACT_MS late). The poke is the mode's read
 //         (the decision's exposure ≥ STEAL_EXPOSURE_MIN in STEAL_RANGE, else a whiff: a stun and a blow-by), the block is phase 2's
-//         geometry (hoops/blocks meetsRelease), the contest phase 2's one model (hoops/contest), the make chance rivalShotPct (untouched).
+//         geometry (hoops/blocks meetsRelease), the contest phase 2's one model (hoops/contest), the make chance rivalShotPct (untouched) — or, with hoops.aiSharedShotOn (hoops-p09), the shared model at his tier's hand.
 //   3v3 — see the 3v3 section below (hoops/teamOffense3v3 on AiMover bodies, or the release's lerped drive: `--team 0`).
 //   npx tsx scripts/probes/hoops-gap/rival-sim.mts [--mode 1v1|3v3|both] [--n 200] [--tier pro|rookie|elite|all] [--kit 0|1] [--team 0|1]
 //                                                  [--def bot|human] [--seed 7] [--json out.json]
@@ -21,6 +21,12 @@ const { RivalKit, windowedVariety, actionVariety } = await import(APP + '/lib/ba
 const { AiMover } = await import(APP + '/lib/babylon/core/AiMovement.ts');
 const { meetsRelease, releaseFrom } = await import(APP + '/lib/babylon/hoops/blocks.ts');
 const { contestFrom, closingSpeed } = await import(APP + '/lib/babylon/hoops/contest.ts');
+// hoops-p09: with hoops.aiSharedShotOn (the default) the rival's make is the shared model's (core/SharedShot) for his tier's hand — the
+// expected value over his timing, integrated (no draw); FEEL='{"hoops.aiSharedShotOn":0}' reads his old table (rivalShotPct), as before
+const { expectedMake } = await import(APP + '/lib/babylon/core/SharedShot.ts');
+const RB = await import(APP + '/lib/babylon/hoops/rulebook.ts');
+const rivalMake = (range: number, contest: number, style: 'layup' | 'jumper', tier: string): number =>
+  RB.aiSharedShotOn() ? expectedMake(style, contest, range, RB.aiTimingSigmaSec(tier as never), RB.skillShotOn()) : rivalShotPct(range, contest, style);
 const { Vector3 } = await import('@babylonjs/core');
 
 setFeelUser(true); setFeelSession(null);
@@ -120,7 +126,7 @@ function sim1v1(tier: string) {
         const one = contestFrom({ dist: dd, facingCos: 1, handUp: false, jumpAge, closeMps: closingSpeed(me, meCtl.vel, self) });
         const range = Math.hypot(self.x - RIM_FLOOR.x, self.z - RIM_FLOOR.z);
         const key = style === 'layup' ? 'layup' : 'jumper';
-        (shots[key] ??= { n: 0, pct: [] }).n++; shots[key].pct.push(rivalShotPct(range, one.contest, style));
+        (shots[key] ??= { n: 0, pct: [] }).n++; shots[key].pct.push(rivalMake(range, one.contest, style, tier));
         end = 'shot'; break;
       }
     }
