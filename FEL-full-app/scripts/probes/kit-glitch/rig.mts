@@ -191,9 +191,10 @@ async function sheet(): Promise<void> {
   const browser = await chromium.launch({ executablePath: chromiumExe(), args: GL_ARGS });
   try {
     const page = await browser.newPage();
+    await page.evaluate('window.__name = window.__name || function (f) { return f; }');   // tsx names arrow functions with a helper the page lacks
     const url = await page.evaluate(async ([rows, w, h]) => {
       const load = (src: string) => new Promise<HTMLImageElement>((ok) => { const i = new Image(); i.onload = () => ok(i); i.src = src; });
-      const cols = 4, cw = w as number, ch = h as number, lab = 46;
+      const cols = 4, cw = w as number, ch = h as number, lab = 66;
       const cv = document.createElement('canvas'); cv.width = cols * cw; cv.height = (rows as unknown[]).length * (ch + lab); const g = cv.getContext('2d')!;
       g.fillStyle = '#111'; g.fillRect(0, 0, cv.width, cv.height);
       let y = 0;
@@ -204,6 +205,20 @@ async function sheet(): Promise<void> {
         g.fillStyle = '#f88'; g.fillText(`BEFORE: skin-through-cloth ${sb.poke} px · flicker ${sb.flipsGarment} px`, 8, y + 38);
         g.fillStyle = '#8f8'; g.fillText(`AFTER: ${sa.poke} px · ${sa.flipsGarment} px`, 2 * cw + 8, y + 38);
         const imgs = await Promise.all([r.b.shot!, r.b.pokeShot!, r.a.shot!, r.a.pokeShot!].map(load));
+        // STRIPES: mean |Laplacian| of luminance over the garment silhouette (the poke overlay's garment pixels) in the beauty shot
+        const stripes = (shot: HTMLImageElement, mask: HTMLImageElement) => {
+          const w = shot.width, h = shot.height, c1 = document.createElement('canvas'); c1.width = w; c1.height = h; const g1 = c1.getContext('2d')!; g1.drawImage(shot, 0, 0);
+          const c2 = document.createElement('canvas'); c2.width = w; c2.height = h; const g2 = c2.getContext('2d')!; g2.drawImage(mask, 0, 0);
+          const S = g1.getImageData(0, 0, w, h).data, M = g2.getImageData(0, 0, w, h).data;
+          const L = (i: number) => 0.299 * S[i * 4] + 0.587 * S[i * 4 + 1] + 0.114 * S[i * 4 + 2];
+          const gar = (i: number) => (Math.abs(M[i * 4] - 70) < 25 && Math.abs(M[i * 4 + 2] - 90) < 25) || (M[i * 4] > 200 && M[i * 4 + 1] < 90);
+          let sum = 0, n = 0;
+          for (let y = 2; y < h - 2; y++) for (let x = 2; x < w - 2; x++) { const i = y * w + x; if (!gar(i) || !gar(i - 2) || !gar(i + 2) || !gar(i - 2 * w) || !gar(i + 2 * w)) continue; sum += Math.abs(4 * L(i) - L(i - 1) - L(i + 1) - L(i - w) - L(i + w)); n++; }
+          return n ? sum / n : 0;
+        };
+        const eb = stripes(imgs[0], imgs[1]), ea = stripes(imgs[2], imgs[3]);
+        (window as unknown as { __stripes: unknown[] }).__stripes = [...((window as unknown as { __stripes?: unknown[] }).__stripes ?? []), { cell: `${r.b.subject} ${r.b.pose} ${r.b.cam}`, before: +eb.toFixed(2), after: +ea.toFixed(2) }];
+        g.fillStyle = '#ccc'; g.fillText(`stripe energy ${eb.toFixed(2)}`, 8, y + 58); g.fillText(`stripe energy ${ea.toFixed(2)}`, 2 * cw + 8, y + 58);
         g.drawImage(imgs[0], 0, y + lab, cw, ch); g.drawImage(imgs[1], cw, y + lab, cw, ch);
         g.drawImage(imgs[2], 2 * cw, y + lab, cw, ch); g.drawImage(imgs[3], 3 * cw, y + lab, cw, ch);
         y += ch + lab;
@@ -211,6 +226,7 @@ async function sheet(): Promise<void> {
       return cv.toDataURL('image/jpeg', 0.82);
     }, [rows, Math.round(W * 0.75), Math.round(H * 0.75)] as const);
     writeFileSync(outJpg, Buffer.from(url.split(',')[1], 'base64'));
+    console.log('stripes', JSON.stringify(await page.evaluate(() => (window as unknown as { __stripes?: unknown[] }).__stripes ?? [])));
     console.log('wrote', outJpg, rows.length, 'rows');
   } finally { await browser.close(); }
 }

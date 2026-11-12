@@ -1,5 +1,6 @@
 // KIT-GLITCH: before → after over the SAME cells. Reads matrix JSONs (rig.mts), keeps only the cells present in both, and
-// prints each symptom per group (closet / game / rival / pack) and tier.
+// prints each symptom per group (closet / game / rival / pack) and tier. "Off the skin" is the rig's offSkin: no body vertex within
+// its 10 cm search (the browser rig caps it at 0.5); the headless cpu.ts gives the exact distance.
 //   npx tsx scripts/probes/kit-glitch/compare.mts "before1.json,before2.json" "after1.json,after2.json"
 import { readFileSync } from 'node:fs';
 import type { Cell } from './rig.mts';
@@ -36,7 +37,7 @@ for (const k of keys) {
 }
 const pct = (t: Agg) => (100 * t.poke / Math.max(1, t.px)).toFixed(2);
 console.log(`cells compared: ${keys.length}`);
-console.log('group              cells | skin-through px (% of garment)        | cells ≥100 px | flicker px     | cells ≥25 flicker | floating (>0.2 m) poses');
+console.log('group              cells | skin-through px (% of garment)        | cells ≥100 px | flicker px     | cells ≥25 flicker | a piece >10 cm off the skin (poses)');
 for (const [k, { b, a }] of [...G].sort()) {
   console.log(`${k.padEnd(18)} ${String(b.cells).padStart(5)} | ${String(b.poke).padStart(7)} (${pct(b)}%) → ${String(a.poke).padStart(7)} (${pct(a)}%) | ${String(b.pokeCells).padStart(4)} → ${String(a.pokeCells).padStart(4)} | ${String(b.flips).padStart(5)} → ${String(a.flips).padStart(5)} | ${String(b.flipCells).padStart(4)} → ${String(a.flipCells).padStart(4)} | ${b.floatCells} → ${a.floatCells}`);
   console.log(`${''.padEnd(25)} by slot ${JSON.stringify(b.slots)} → ${JSON.stringify(a.slots)}`);
