@@ -63,11 +63,26 @@ describe('the replay at the dead ball', () => {
     expect(b.deadBall(next)).toBe(true);
     expect(f.calls.highlights.length).toBe(1);
     expect(f.calls.highlights[0].objective).toBe(RIM);
-    expect(f.calls.highlights[0].lastSeconds).toBeGreaterThan(2);
+    // hoops-p06 (phase 6): the replay holds the game at most `hoops.replayCapSec` (2.5 s) ON SCREEN — 1.25 recorded seconds at half speed;
+    // the old ' > 2 s recorded' is the knob-0 length, held below
+    expect(f.calls.highlights[0].lastSeconds).toBeGreaterThan(1);
+    expect(f.calls.highlights[0].lastSeconds / 0.5).toBeLessThanOrEqual(2.5 + 1e-9);
     expect(resets).toBe(0);   // not before the replay is over: it would put the bodies back where the frame left them
     await f.finishReplay();
     expect(resets).toBe(1);
     expect(b.replays).toBe(1);
+  });
+  it('hoops-p06: with `hoops.replayCapSec` 0 the replay is the plan\'s own length (over 2 s recorded), as before', async () => {
+    const { setFeelOverride, setFeelSession, setFeelUser, resetFeelForTests } = await import('../../feel-panel/feel');
+    setFeelUser(true); setFeelSession(null); setFeelOverride('hoops.replayCapSec', 0);
+    try {
+      const { scene } = rig(); const f = fakeCtx(scene);
+      const b = mountHoopsBroadcast(f.ctx, { rim: RIM, final: () => false });
+      f.ctx.momentum.report({ kind: 'ankle_break' });
+      expect(b.deadBall(() => undefined)).toBe(true);
+      expect(f.calls.highlights[0].lastSeconds).toBeGreaterThan(2);
+      await f.finishReplay();
+    } finally { resetFeelForTests(); }
   });
   it('the mode\'s own reset coming back through its hook is not planned a second time', async () => {
     const { scene } = rig(); const f = fakeCtx(scene);

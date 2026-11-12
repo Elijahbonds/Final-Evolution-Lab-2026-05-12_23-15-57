@@ -482,7 +482,7 @@ export class DribbleController {
  */
 export const BODY_STANDOFF = 1.10;
 
-export function resolveBodyCollision(a: Vector3, b: Vector3, radius = 0.55): boolean {
+export function resolveBodyCollision(a: Vector3, b: Vector3, radius = BODY_STANDOFF / 2): boolean {   // hoops-p06 (phase 7): the one standoff (was the literal 0.55)
   const dx = b.x - a.x, dz = b.z - a.z;
   const distSq = dx * dx + dz * dz;
   const minDist = radius * 2;

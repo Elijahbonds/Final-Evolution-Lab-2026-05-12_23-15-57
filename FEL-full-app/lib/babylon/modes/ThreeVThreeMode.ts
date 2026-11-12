@@ -138,7 +138,8 @@ import {   // HOOPS-MOVE-KIT-A amendment (D1–D3): the defense contest package 
 import { AiReachTell, aiReachGate, aiReachStunSec, aiReachTellSec, AI_REACH_COOLDOWN_SEC, type ReachOutcome } from '../core/ReachTell';   // lane/hoops-def-tell (#273 T-A): the reach shows before it resolves
 import { contactCap } from '../core/BodySeparation';   // lane/hoops-def-tell (#273 T-C): the pair loop's capped push
 import { HAND_UP_SEC, handUpContest, distXZ, proximityContest01, LAYUP_RANGE, DUNK_RANGE, bodySide } from '../core/BasketballCore';
-import { boardWinner, BOX_OUT_RANGE, jobObjective, type BoardBody } from '../core/HoopsOffball';   // HOOPS-MOVE-KIT-A O1–O3
+import { boardWinner, BOX_OUT_RANGE, BOARD_BOX_EDGE, jobObjective, type BoardBody } from '../core/HoopsOffball';   // HOOPS-MOVE-KIT-A O1–O3
+import { boardBounceOn, boardPick } from '../hoops/rebound';   // hoops-p06 (1v1/3v3 phase 6): the bounce decides the board race, not a die
 import { resolveRim, forcedMissProfile } from '../core/RimPhysics';                               // the miss meets the iron it earned
 import { type RimVerdict } from '../core/RimDecides';   // THE RIM DECIDES (Phase 7): the ring's geometry answers the shot
 import { planRimPlay, forcedMakeProfile, maybeAirball, rimPlaySuffix, type RimPlay } from '../core/RimPlay';   // RIM PLAY (2026-09-18): the ball's time on the iron
@@ -2176,7 +2177,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           if (dunking && (A === me || B === me)) { resolveBodyCollision(A.char.root.position, B.char.root.position); continue; }   // the flight's own bump handles the dunk
           const key = `${i}|${j}`;
           const cooling = (contactCooldown.get(key) ?? 0) > nowMs;   // one impulse + one event per collision (the Havok solver's 300 ms pair gate)
-          const c = resolveBodyContact(A.char.root.position, B.char.root.position, A === me ? me.drib.vel : A.vel, B === me ? me.drib.vel : B.vel, 0.55,
+          const c = resolveBodyContact(A.char.root.position, B.char.root.position, A === me ? me.drib.vel : A.vel, B === me ? me.drib.vel : B.vel, BODY_STANDOFF / 2,   // hoops-p06 (phase 7): the one standoff (was the literal 0.55, the same number)
             { airborneA: A === me && !!finish, airborneB: B === me && !!finish, exchange: !cooling, ...contactCap(dt) });   // #273 T-C: a capped push, never a one-frame pop
           if (!c || cooling || c.closing <= 0.8) continue;
           contactCooldown.set(key, nowMs + 300);
@@ -2918,12 +2919,12 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           mic?.say({ moment: 'game.blocked', priority: 2, crowd: { moment: 'crowd.heckle', n: 2 } }); micTalk(swatBy, 'player.trash.stop'); micSlump();   // THE MIC
           swing(heroSwing({ play: 'block', by: 'foe', on: 'me', dunk: true })); putHud(ctx, { momentum });   // HIS swat is MY turnover (it reported swing('block'): a stop against me credited me); here, so a foul in the air wins (1v1)
           bannerClearLater(ctx, 1000);
-          later(900, () => boardAfterMiss(ctx));
+          later(900, () => boardAfterMiss(ctx, 'me'));
         } else {
           putHud(ctx, { banner: kind === 'poster' ? 'STUFFED AT THE RIM!' : 'RATTLED OUT' });
           mic?.say({ moment: 'game.miss', crowd: { moment: 'crowd.groan', n: 1 } }); micSlump();   // THE MIC
           bannerClearLater(ctx, 800);
-          later(900, () => boardAfterMiss(ctx));
+          later(900, () => boardAfterMiss(ctx, 'me'));
         }
       }
     };
@@ -3502,20 +3503,26 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     if (board.age > 4) {
       const why = bodies.map((x) => `${x.id} d=${Math.hypot(ballSim.pos.x - x.pos.x, ballSim.pos.z - x.pos.z).toFixed(2)}${x.unavailable ? '!' : ''}`).join(' ');
       console.info(`[3V3-BOARD] nobody came down with it (${why}) — falling back to the race`);
+      const shot: 'me' | 'foe' = board.shooter === 'foe' ? 'foe' : 'me';
       board = null;
       endChase();
-      boardAfterMiss(ctx);
+      boardAfterMiss(ctx, shot);
     }
   }
 
   /** O2: the board is a race — the nearest body names the favourite, a seal is worth a body length, the bounce jitters it. */
-  function boardAfterMiss(ctx: ModeContext): void {
+  function boardAfterMiss(ctx: ModeContext, shooter?: 'me' | 'foe'): void {
     const bodies: BoardBody[] = [
       { team: 'me', pos: me.char.root.position, boxing: !!me.slot.intent.brace },
       ...mates.map((m) => ({ team: 'me' as const, pos: m.char.root.position, boxing: !!mateBrain(m)?.boxing })),
       ...foes.map((f) => ({ team: 'foe' as const, pos: f.char.root.position, boxing: !!foeBrain(f)?.boxing })),
     ];
-    const winner = boardWinner(bodies, ball.getAbsolutePosition());
+    // hoops-p06 (phase 6): no die — the ball's bounce spot, the seal and a jump that is up (hoops/rebound). Knob 0: boardWinner's dice exactly
+    const jumps = [myJumpAge, ...mates.map((m) => m.jumpAge), ...foes.map((f) => f.jumpAge)];
+    const winner = boardBounceOn()
+      ? boardPick(bodies.map((b, i) => ({ team: b.team, pos: b.pos, boxing: b.boxing, jumpAge: jumps[i] })), ball.getAbsolutePosition(), ballSim.active ? ballSim.vel : Vector3.Zero(),
+        { boxEdge: BOARD_BOX_EDGE, jumpWindowSec: HAND_UP_SEC, shooter }).team
+      : boardWinner(bodies, ball.getAbsolutePosition());
     endBoxOut();
     console.info(`[3V3-OFF] board → ${winner}`);
     putHud(ctx, { banner: winner === 'me' ? (me.slot.intent.brace ? 'BOXED OUT — YOUR BOARD' : 'YOUR BOARD') : 'THEIR BOARD' });
@@ -3777,7 +3784,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     bannerClearLater(ctx, 900);
     console.info('[3V3-DEF] blocked at the release');
     startBoxOut('mine');
-    later(900, () => boardAfterMiss(ctx));
+    later(900, () => boardAfterMiss(ctx, 'me'));
   }
   /** D2: a defender takes the ball — knocked LOOSE from my hand toward him, the reach on him; the possession follows once it
    *  settles (it used to warp straight to the rival's possession). */
@@ -3909,7 +3916,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         } else {
           if (!swatted) { SoundKit.play('miss'); putHud(ctx, { banner: 'THEY RATTLED IT OUT' }); mic?.crowd('crowd.cheer', 1); }   // THE MIC: the stands like the stop
           bannerClearLater(ctx, 900);   // IMPROVE (2026-10-06) #7 #10: the clear on the mode's clock; the hint follows the state (tickHint)
-          later(900, () => boardAfterMiss(ctx));
+          later(900, () => boardAfterMiss(ctx, 'foe'));
         }
         done();
       };
