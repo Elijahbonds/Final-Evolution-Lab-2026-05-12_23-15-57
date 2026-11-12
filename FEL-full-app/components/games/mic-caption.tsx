@@ -12,9 +12,9 @@ import { readCcPref, showMicCaption, writeCcPref } from '@/lib/babylon/ui/micSub
 
 // hoops-p08 (2026-11-12): THE PLAYER'S SUBTITLE SWITCH (the CC chip beside MC), one store so the chip and the caption agree.
 const ccListeners = new Set<() => void>();
-let ccOn: boolean | null = null;
-const ccGet = (): boolean => (ccOn ??= readCcPref());
-const ccSet = (on: boolean): void => { ccOn = on; writeCcPref(on); for (const l of ccListeners) l(); };
+let ccValue: boolean | null = null;
+const ccGet = (): boolean => (ccValue ??= readCcPref());
+const ccSet = (on: boolean): void => { ccValue = on; writeCcPref(on); for (const l of ccListeners) l(); };
 const ccSub = (l: () => void): (() => void) => { ccListeners.add(l); return () => { ccListeners.delete(l); }; };
 export function useCaptionsOn(): boolean { return useSyncExternalStore(ccSub, ccGet, () => false); }
 
@@ -42,10 +42,10 @@ export function MicCaption({ text, who, className = 'bottom-[14%]', flow = false
 /** The MC's voice on or off (kept across sessions). Off stops what is playing; the captions stay.
  *  VOICEOVER (2026-10-06): and a MIX button beside it: the voice level and the output (phone speaker / TV / headphones), the
  *  same controls the dance room and the Academy show (lib/audio/ui/VolumeMixer.tsx), so a hoops player can find them mid-game. */
-export function MicToggle({ className = 'right-3 top-[18%]', flow = false }: { className?: string; flow?: boolean }) {
+export function MicToggle({ className = 'right-3 top-[18%]', flow = false, cc = true }: { className?: string; flow?: boolean; /** hoops-p08: the CC chip (on its own row under MIX / MC, so the row keeps its width) */ cc?: boolean }) {
   const [on, setOn] = useState(() => SoundKit.voiceOn);
   const [mix, setMix] = useState(false);
-  const cc = useCaptionsOn();
+  const ccOn = useCaptionsOn();
   const flip = () => {
     const next = !on;
     SoundKit.setVoice(next); setOn(next);
@@ -70,15 +70,19 @@ export function MicToggle({ className = 'right-3 top-[18%]', flow = false }: { c
           {on ? <Mic className="h-3 w-3" /> : <MicOff className="h-3 w-3" />}
           MC
         </button>
-        {/* hoops-p08: subtitles for the MC while his voice is on (off by default: the voice carries the line; with the voice off the
-            words always show) */}
-        <button type="button" onClick={(e) => { ccSet(!cc); e.currentTarget.blur(); }} onMouseDown={(e) => e.preventDefault()} onPointerDown={(e) => e.stopPropagation()}
-          aria-label={cc ? 'Turn the announcer subtitles off' : 'Turn the announcer subtitles on'} aria-pressed={cc} data-qa="mic-cc"
-          className={chip} style={chipStyle(cc ? 0.8 : 0.4)}>
-          <Captions className="h-3 w-3" />
-          CC
-        </button>
       </div>
+      {cc && (
+        <div className="flex items-center gap-1">
+          {/* hoops-p08: subtitles for the MC while his voice is on (off by default: the voice carries the line; with the voice off the
+              words always show) */}
+          <button type="button" onClick={(e) => { ccSet(!ccOn); e.currentTarget.blur(); }} onMouseDown={(e) => e.preventDefault()} onPointerDown={(e) => e.stopPropagation()}
+            aria-label={ccOn ? 'Turn the announcer subtitles off' : 'Turn the announcer subtitles on'} aria-pressed={ccOn} data-qa="mic-cc"
+            className={chip} style={chipStyle(ccOn ? 0.8 : 0.4)}>
+            <Captions className="h-3 w-3" />
+            CC
+          </button>
+        </div>
+      )}
       {mix && (
         // a slider keeps focus after a drag, and the arrow keys would then move it instead of the player: hand focus back on release
         <div className="pointer-events-auto rounded-lg bg-black/75 px-3 py-2 shadow-lg" style={{ width: 240 }}

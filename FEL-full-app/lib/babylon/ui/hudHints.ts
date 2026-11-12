@@ -135,8 +135,8 @@ export function touchHint(line: string, mode: string): string {
   }
   // tidy what the swap leaves: "SHOOT SHOOT" → "SHOOT", "BLOCK TO BLOCK" → "TAP BLOCK", "HOLD CHARGE = TAKE THE CHARGE" → "HOLD CHARGE"
   s = s.replace(/\b([A-Z!]+) \1\b/g, '$1').replace(/\b([A-Z!]+) TO \1\b/g, 'TAP $1').replace(/\b(CHARGE)(?: =)? TAKE THE CHARGE\b/g, '$1');
-  // a part that opens on a face letter ("Y GO UP", "B KICK-UP") names a pad button too
-  const parts = s.split(/\s·\s/).map((p) => p.trim()).filter((p) => p && !PAD_WORD.test(p) && !/^[ABXY]\s(?=[A-Z])/.test(p));
+  // a part that opens on a face letter ("Y GO UP", "B KICK-UP", "A at the rim") names a pad button too
+  const parts = s.split(/\s·\s/).map((p) => p.trim()).filter((p) => p && !PAD_WORD.test(p) && !/^[ABXY]\s/.test(p));
   return parts.join(' · ');
 }
 
