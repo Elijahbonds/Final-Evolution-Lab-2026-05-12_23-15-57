@@ -27,6 +27,15 @@ import { MotionConfig } from 'framer-motion';
 import { useHudReducedMotion } from './use-hud-motion';
 import { HUD_FONT_CLASS, HUD_TEXT_SHADOW, hudFontSize } from './tokens';
 
+/**
+ * GAME-HUD (2026-11-12): the capture menu's corner, for a HUD whose top bezel is not the shared row shape. The HudFrame
+ * already keeps the whole HUD below the shell's ⋯ menu on an upright phone (app/game-surface.css rule 6); on a taller
+ * sideways screen the rule moves a host's top row (`absolute inset-x-0 top-0 … justify-between`) clear of the menu and of
+ * the shell's top-centre buttons. A host whose top-left readout lives elsewhere spreads this on that element to get the
+ * same clearance: `<div {...HUD_CLEAR_CORNER} className="absolute left-4 top-3 …">`.
+ */
+export const HUD_CLEAR_CORNER = { 'data-hud-clear-corner': '' } as const;
+
 /** The class that hides the HUD while the shell's end card is up (see END_CARD_ATTR). */
 export const END_CARD_HANDOFF_CLASS = '[div:has(>[data-end-screen])_&]:opacity-0';
 /** Console view: the host box is already the safe frame, so the wrapper sits flush with it. */

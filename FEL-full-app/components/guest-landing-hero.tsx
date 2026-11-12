@@ -29,6 +29,10 @@ export function GuestLandingHero() {
   // PLAY NOW, docked where a thumb is. The two sentences that sat under it ("Already have an athlete? …", "Friend
   // hosting a game? …") are two labelled doors now. Words: public copy approved in ONB (Appendix B) is kept as the
   // headline and the PLAY NOW / Log in doors; the supporting line is cut to eight words.
+  // FLOAT-COVERS (2026-11-12): PLAY NOW flows first in the hero's action row instead of docking at the screen's edge. The
+  // hero fills the first screen with its words at the bottom, so the button still sits low, where a thumb is. Docked, at
+  // 150 % text it floated over the "Measure my vertical" door. Same label, the same full-width pill on a phone, the same
+  // tap target; the room the hero kept under its actions for the dock (dockSpace) goes with it.
   const play = () => { track('play_now_click', { target: 'landing_hero' }); void flush(); };
   return (
     <div className="relative">
@@ -39,11 +43,12 @@ export function GuestLandingHero() {
         imagePosition="50% 22%"
         eyebrow={t('landing.eyebrow')}
         accent="var(--fel-gold)"
-        dockSpace
         title={<>{t('landing.title.a')}<br />{t('landing.title.b')} <span className="text-fel-cyan [text-shadow:0_0_28px_rgba(0,229,255,0.55)]">{t('landing.title.c')}</span></>}
         line={t('landing.line')}
       >
-        <PrimaryCta href="/try" docked above="edge" onClick={play} icon={<Flame aria-hidden className="h-6 w-6" />}>{t('landing.play')}</PrimaryCta>
+        <div className="w-full max-w-md md:w-auto [&>a]:w-full md:[&>a]:w-auto">
+          <PrimaryCta href="/try" onClick={play} icon={<Flame aria-hidden className="h-6 w-6" />}>{t('landing.play')}</PrimaryCta>
+        </div>
         <Chip href="/login" icon={<Trophy aria-hidden className="h-4 w-4 text-fel-gold" />}>{t('landing.login')}</Chip>
         {/* MULTIPLAYER (2026-10-06): a friend's TV shows a code — the guest's one-step way into their game */}
         <Chip href="/join" testId="landing-join" icon={<ArrowRight aria-hidden className="h-4 w-4" />}>{t('landing.join')}</Chip>
