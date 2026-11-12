@@ -17,7 +17,7 @@
  "/coach/form-review": "owner: shorter wording on its first screen (cutting a screen's own explanation is new copy)",
  "/coach/groups": "owner: group booking opens with the training deploy (its tables)",
  "/coach/highlight/[id]": "owner: shorter wording on its first screen (cutting a screen's own explanation is new copy)",
- "/coach/join/[token]": "owner: shorter wording on its first screen (cutting a screen's own explanation is new copy)",
+ "/coach/join/[token]": "owner: shorter wording on its first screen (cutting a screen's own explanation is new copy); speed: the page's column shifts once as it loads in two of three reads (layout shift 0.064 / 0.001 / 0.064 on 2026-11-12, median 0.064; the budget is 0.02)",
  "/coach/live/[room]": "owner: switch it on — NEXT_PUBLIC_COACH_LIVE_ENABLED (live coach sessions)",
  "/coach/offers/[offer]": "owner: switch it on — COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL)",
  "/coach/review/[bookingId]": "owner: switch it on — COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL)",
@@ -124,5 +124,8 @@
  "/u/[slug]": "a row the rig cannot make: needs a published creator card row; a new account has none",
  "/venues": "a design call: tried in phase 10 — the venue card's two-line mode list at 16 px is cut off; a taller card or a shorter list",
  "/work-with-us": "owner: fill the [OWNER: …] blanks (the owner's content)",
- "/workout": "owner: shorter wording on its first screen (cutting a screen's own explanation is new copy)"
+ "/workout": "owner: shorter wording on its first screen (cutting a screen's own explanation is new copy)",
+ "/account": "a fix: the \"Jump numbers\" panel (components/privacy/scan-save-account.tsx) draws nothing until its two fetches answer, then appears at the top of the page for a verified adult and pushes every section under it down. Layout shift 0.112 / 0.112 / 0.106 over three reads on 2026-11-12 (median 0.112; the budget is 0.02). Phase 10B read 0.001; assumption: its rig person was not shown the panel. Reserving the panel's room, or deciding it on the server, fixes it",
+ "/login": "speed: \"ENTER THE LAB\" answers a tap in 344 / 336 / 232 ms over three reads on 2026-11-12 (median 336 ms; the budget is 200 ms), read with the CPU slowed 4× while the machine's load was 9–13 on 4 cores. Phase 10B read 184 ms; no code on the screen changed between the two. A check on a quiet machine or a phone",
+ "/train": "speed: the tap the scorer makes (\"Account settings →\") answers in 176 / 208 / 224 ms over three reads on 2026-11-12 (median 208 ms; the budget is 200 ms), on the same busy machine (load 9–13 on 4 cores). Phase 10B read 144 ms; no code on the screen changed between the two. A check on a quiet machine or a phone"
 }

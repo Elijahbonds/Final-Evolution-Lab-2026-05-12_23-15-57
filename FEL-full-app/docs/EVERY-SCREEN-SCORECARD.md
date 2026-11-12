@@ -36,7 +36,7 @@ Checks in order: 1 clear and quick · 2 looks finished · 3 fast and smooth · 4
 | Screen | Phase 1 | Now | Passes | Why not (the single worst problem) | What it needs |
 |---|---|---|---|---|---|
 | `/` | ✓ ✓ ✓ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
-| `/account` | ✗ ✗ ✗ ✓ | ✓ ✓ ✗ ✓ | no | The screen jumps as it loads (layout shift 0.106; the budget is 0.02). |  |
+| `/account` | ✗ ✗ ✗ ✓ | ✓ ✓ ✗ ✓ | no | The screen jumps as it loads (layout shift 0.112; the budget is 0.02). | a fix: the "Jump numbers" panel (components/privacy/scan-save-account.tsx) draws nothing until its two fetches answer, then appears at the top of the page for a verified adult and pushes every section under it down. Layout shift 0.112 / 0.112 / 0.106 over three reads on 2026-11-12 (median 0.112; the budget is 0.02). Phase 10B read 0.001; assumption: its rig person was not shown the panel. Reserving the panel's room, or deciding it on the server, fixes it |
 | `/account/bookings` | off | off | no | switched off: COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) | owner: switch it on — COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) |
 | `/account/coaching` | ✗ ✓ ✗ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
 | `/admin/funnel` | ✗ ✗ ✗ ✓ | ✗ ✗ ✓ ✓ | no | An empty state with no next step: "No wins yet". | owner: the owner's tools, left as they are |
@@ -68,7 +68,7 @@ Checks in order: 1 clear and quick · 2 looks finished · 3 fast and smooth · 4
 | `/coach/groups` | ✗ ✗ ✗ ✓ | ✓ ✗ ✓ ✓ | no | Unfinished mark on screen: "Opens soon". | owner: group booking opens with the training deploy (its tables) |
 | `/coach/highlight/[id]` | ✗ ✗ ✗ ✓ | ✗ ✓ ✓ ✓ | no | 53 words before scrolling (the budget is 40). | owner: shorter wording on its first screen (cutting a screen's own explanation is new copy) |
 | `/coach/join` | ✗ ✗ ✓ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
-| `/coach/join/[token]` | ✗ ✗ ✗ ✓ | ✗ ✓ ✗ ✓ | no | The screen jumps as it loads (layout shift 0.064; the budget is 0.02). | owner: shorter wording on its first screen (cutting a screen's own explanation is new copy) |
+| `/coach/join/[token]` | ✗ ✗ ✗ ✓ | ✗ ✓ ✗ ✓ | no | The screen jumps as it loads (layout shift 0.064; the budget is 0.02). | owner: shorter wording on its first screen (cutting a screen's own explanation is new copy); speed: the page's column shifts once as it loads in two of three reads (layout shift 0.064 / 0.001 / 0.064 on 2026-11-12, median 0.064; the budget is 0.02) |
 | `/coach/live/[room]` | off | off | no | switched off: NEXT_PUBLIC_COACH_LIVE_ENABLED (live coach sessions) | owner: switch it on — NEXT_PUBLIC_COACH_LIVE_ENABLED (live coach sessions) |
 | `/coach/offers/[offer]` | off | off | no | switched off: COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) | owner: switch it on — COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) |
 | `/coach/review/[bookingId]` | off | off | no | switched off: COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) | owner: switch it on — COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) |
@@ -105,7 +105,7 @@ Checks in order: 1 clear and quick · 2 looks finished · 3 fast and smooth · 4
 | `/links` | ✗ ✗ ✓ ✓ | ✓ ✗ ✓ ✓ | no | 4 button looks on one screen (at most 3). | a design call: its fourth button look is one two-line button |
 | `/live` | ✗ ✗ ✗ ✗ | ✓ ✓ ✓ ✓ | **yes** |  |  |
 | `/live/schedule` | off | off | no | switched off: LIVE_STREAM_SCHEDULE_ENABLED (the live schedule) | owner: switch it on — LIVE_STREAM_SCHEDULE_ENABLED (the live schedule) |
-| `/login` | ✗ ✗ ✗ ✓ | ✓ ✓ ✗ ✓ | no | "ENTER THE LAB" answers a tap in 472 ms (the budget is 200 ms). |  |
+| `/login` | ✗ ✗ ✗ ✓ | ✓ ✓ ✗ ✓ | no | "ENTER THE LAB" answers a tap in 336 ms (the budget is 200 ms). | speed: "ENTER THE LAB" answers a tap in 344 / 336 / 232 ms over three reads on 2026-11-12 (median 336 ms; the budget is 200 ms), read with the CPU slowed 4× while the machine's load was 9–13 on 4 cores. Phase 10B read 184 ms; no code on the screen changed between the two. A check on a quiet machine or a phone |
 | `/market` | ✗ ✗ ✗ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
 | `/media-kit` | ✗ ✗ ✓ ✓ | ✓ ✗ ✓ ✓ | no | Unfinished mark on screen: "[OWNER: monthly players, as of date]". | owner: fill the [OWNER: …] blanks (the owner's content) |
 | `/modes` | ✗ ✗ ✗ ✓ | ✓ ✗ ✓ ✓ | no | 29 paragraphs of body copy under 16 px. | a design call: tried in phase 10 — its descriptions at 16 px make the tiles different heights (6 button looks); taller equal tiles or fewer words |
@@ -201,7 +201,7 @@ Checks in order: 1 clear and quick · 2 looks finished · 3 fast and smooth · 4
 | `/team` | ✗ ✗ ✓ ✓ | ✓ ✗ ✓ ✓ | no | Unfinished mark on screen: "[OWNER: profiles]". | owner: fill the [OWNER: …] blanks (the owner's content) |
 | `/team/[slug]` | ✗ ✗ ✓ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
 | `/terms` | ✗ ✗ ✓ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
-| `/train` | ✗ ✗ ✗ ✓ | ✓ ✓ ✗ ✓ | no | "Account settings →" answers a tap in 248 ms (the budget is 200 ms). |  |
+| `/train` | ✗ ✗ ✗ ✓ | ✓ ✓ ✗ ✓ | no | "Account settings →" answers a tap in 208 ms (the budget is 200 ms). | speed: the tap the scorer makes ("Account settings →") answers in 176 / 208 / 224 ms over three reads on 2026-11-12 (median 208 ms; the budget is 200 ms), on the same busy machine (load 9–13 on 4 cores). Phase 10B read 144 ms; no code on the screen changed between the two. A check on a quiet machine or a phone |
 | `/train/build` | ✗ ✗ ✗ ✓ | ✗ ✓ ✓ ✓ | no | 126 words before scrolling (the budget is 40). | owner: shorter wording on its first screen (cutting a screen's own explanation is new copy) |
 | `/train/combine` | ✗ ✗ ✗ ✓ | ✓ ✗ ✓ ✓ | no | Unfinished mark on screen: "Combine results are coming soon.". | owner: the feature is not built or not switched on ("coming soon"); owner-gated |
 | `/train/jumps` | ✗ ✗ ✗ ✓ | ✗ ✓ ✓ ✓ | no | 77 words before scrolling (the budget is 40). | owner: shorter wording on its first screen (cutting a screen's own explanation is new copy) |
@@ -551,7 +551,7 @@ Not measured yet: run `scripts/every-screen/dark.mts`.
 | `/program/[accessId]` | nobody (a 404 for everyone) | do | – | – | – | – | *switched off: a 404 (COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL))* |
 | `/program/unlock` | nobody (a 404 for everyone) | do | – | – | – | – | *switched off: a 404 (COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL))* |
 | `/signature` | signed-in | hub | ✓ | ✓ | ✓ | ✓ | **passes all four** |
-| `/train` | signed-in | hub | ✓ | ✓ | ✗ | ✓ | "Account settings →" answers a tap in 248 ms (the budget is 200 ms). |
+| `/train` | signed-in | hub | ✓ | ✓ | ✗ | ✓ | "Account settings →" answers a tap in 208 ms (the budget is 200 ms). |
 | `/train/library` | signed-in | hub | ✓ | ✓ | ✓ | ✓ | **passes all four** |
 | `/train/programs` | signed-in | hub | ✓ | ✗ | ✓ | ✓ | Unfinished mark on screen: "Signature programs are coming soon. The daily drill and the exercise library are". |
 | `/train/programs/[id]` | admin | do | ✗ | ✗ | ✓ | ✓ | 238 words before scrolling (the budget is 40). review: a number with no method line (the list links no program while it is switched off: opened by its address) |
@@ -632,7 +632,7 @@ Not measured yet: run `scripts/every-screen/dark.mts`.
 | `/consent/guardian` | signed-in | do | ✓ | ✓ | ✓ | ✓ | **passes all four** |
 | `/consent/guardian/[token]` | unknown (no fixture) | do | – | – | – | – | *not scored: needs a guardian-consent row with its emailed token* |
 | `/join` | anyone | do | ✓ | ✓ | ✓ | ✓ | **passes all four** |
-| `/login` | anyone | do | ✓ | ✓ | ✗ | ✓ | "ENTER THE LAB" answers a tap in 472 ms (the budget is 200 ms). |
+| `/login` | anyone | do | ✓ | ✓ | ✗ | ✓ | "ENTER THE LAB" answers a tap in 336 ms (the budget is 200 ms). |
 | `/signup` | anyone | do | ✓ | ✓ | ✓ | ✓ | **passes all four** |
 | `/try` | anyone | do | ✓ | ✓ | ✓ | ✓ | **passes all four** |
 | `/welcome` | signed-in | hub | ✓ | ✓ | ✓ | ✓ | **passes all four** |
@@ -703,7 +703,7 @@ Not measured yet: run `scripts/every-screen/dark.mts`.
 
 | Screen | Who | Kind | 1 | 2 | 3 | 4 | The single worst problem |
 |---|---|---|---|---|---|---|---|
-| `/account` | signed-in | hub | ✓ | ✓ | ✗ | ✓ | The screen jumps as it loads (layout shift 0.106; the budget is 0.02). |
+| `/account` | signed-in | hub | ✓ | ✓ | ✗ | ✓ | The screen jumps as it loads (layout shift 0.112; the budget is 0.02). |
 | `/admin/funnel` | admin | hub | ✗ | ✗ | ✓ | ✓ | An empty state with no next step: "No wins yet". |
 | `/admin/metrics` | admin | hub | ✓ | ✗ | ✗ | ✓ | An empty state with no next step: "No stored rollups yet. Click “Recompute” to generate them from traffic.". |
 | `/admin/review` | admin | hub | ✗ | ✗ | ✓ | ✗ | "WAITING" does nothing when tapped. |

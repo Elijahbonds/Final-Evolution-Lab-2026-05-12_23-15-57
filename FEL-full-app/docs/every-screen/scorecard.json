@@ -1,7 +1,7 @@
 {
  "what": "The every-screen scorecard: docs/PLAN-EVERY-SCREEN-10PHASE.md, phase 1. Written by scripts/every-screen/score.mts --report.",
- "measuredAt": "2026-11-12T15:23:50.748Z",
- "commit": "4b0ced8c",
+ "measuredAt": "2026-11-12T17:14:18.899Z",
+ "commit": "4369de35",
  "budgets": {
   "wordsFoldDo": 40,
   "tapPx": 44,
@@ -242,7 +242,7 @@
     "right": "pass"
    },
    "passAll": false,
-   "worst": "The screen jumps as it loads (layout shift 0.106; the budget is 0.02).",
+   "worst": "The screen jumps as it loads (layout shift 0.112; the budget is 0.02).",
    "faults": [
     "layout-shift"
    ],
@@ -254,9 +254,9 @@
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 3,
-    "firstContentMs": 648,
-    "layoutShift": 0.106,
-    "tapMs": 96,
+    "firstContentMs": 488,
+    "layoutShift": 0.112,
+    "tapMs": 80,
     "tapped": "Download my data",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -1256,7 +1256,7 @@
   },
   {
    "route": "/coach/join/[token]",
-   "url": "/coach/join/KETMKV1D~dd6Mkfnxhg_Kn7qmsO7GbeYH60j5jo3A",
+   "url": "/coach/join/3AN8D9QE~nKj7Nt9ptccjcDiJv35t8tusvPAjobq6",
    "phase": 5,
    "area": "coaching",
    "kind": "do",
@@ -1279,14 +1279,14 @@
    "review": [],
    "unmeasured": [],
    "numbers": {
-    "wordsBeforeScroll": 44,
+    "wordsBeforeScroll": 46,
     "brightButtons": 1,
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 1,
-    "firstContentMs": 348,
+    "firstContentMs": 288,
     "layoutShift": 0.064,
-    "tapMs": 104,
+    "tapMs": 176,
     "tapped": "Join Coach Riley",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -2517,7 +2517,7 @@
     "right": "pass"
    },
    "passAll": false,
-   "worst": "\"ENTER THE LAB\" answers a tap in 472 ms (the budget is 200 ms).",
+   "worst": "\"ENTER THE LAB\" answers a tap in 336 ms (the budget is 200 ms).",
    "faults": [
     "slow-tap"
    ],
@@ -2529,9 +2529,9 @@
     "smallTargets": 0,
     "textSizes": 4,
     "buttonLooks": 2,
-    "firstContentMs": 760,
+    "firstContentMs": 1192,
     "layoutShift": 0,
-    "tapMs": 472,
+    "tapMs": 336,
     "tapped": "ENTER THE LAB",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -6104,7 +6104,7 @@
     "right": "pass"
    },
    "passAll": false,
-   "worst": "\"Account settings →\" answers a tap in 248 ms (the budget is 200 ms).",
+   "worst": "\"Account settings →\" answers a tap in 208 ms (the budget is 200 ms).",
    "faults": [
     "slow-tap"
    ],
@@ -6116,9 +6116,9 @@
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 2,
-    "firstContentMs": 704,
+    "firstContentMs": 768,
     "layoutShift": 0.001,
-    "tapMs": 248,
+    "tapMs": 208,
     "tapped": "Account settings →",
     "brokenLinks": 0,
     "a11yCritical": 0,
