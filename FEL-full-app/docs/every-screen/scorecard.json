@@ -15,14 +15,14 @@
  "totals": {
   "screens": 187,
   "scored": 154,
-  "passAll": 54,
+  "passAll": 57,
   "alias": 7,
   "off": 20,
   "notScored": 6,
   "byCheck": {
    "clear": {
-    "pass": 101,
-    "fail": 53,
+    "pass": 104,
+    "fail": 50,
     "nm": 0
    },
    "finished": {
@@ -44,15 +44,15 @@
   "trainingAndCoaching": {
    "screens": 61,
    "scored": 44,
-   "passAll": 14
+   "passAll": 17
   }
  },
  "faults": [
   {
    "id": "too-many-words",
    "name": "More than 40 words before scrolling on a do-this screen",
-   "screens": 40,
-   "wouldPassIfFixed": 16
+   "screens": 37,
+   "wouldPassIfFixed": 13
   },
   {
    "id": "body-small",
@@ -993,33 +993,32 @@
    "state": "scored",
    "reason": null,
    "checks": {
-    "clear": "fail",
+    "clear": "pass",
     "finished": "pass",
     "fast": "pass",
     "right": "pass"
    },
-   "passAll": false,
-   "worst": "41 words before scrolling (the budget is 40).",
-   "faults": [
-    "too-many-words"
-   ],
+   "passAll": true,
+   "worst": null,
+   "faults": [],
    "review": [],
    "unmeasured": [],
    "numbers": {
-    "wordsBeforeScroll": 41,
+    "wordsBeforeScroll": 36,
     "brightButtons": 1,
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 2,
-    "firstContentMs": 424,
+    "firstContentMs": 264,
     "layoutShift": 0.001,
-    "tapMs": 72,
+    "tapMs": 96,
     "tapped": "Go to Coach",
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
     "jsKb": 241
-   }
+   },
+   "measuredBy": "lane/coach-words 2026-11-12 (this row only; the rest of the card is the every-screen run)"
   },
   {
    "route": "/coach/combine",
@@ -1115,7 +1114,7 @@
     "right": "pass"
    },
    "passAll": false,
-   "worst": "56 words before scrolling (the budget is 40).",
+   "worst": "50 words before scrolling (the budget is 40).",
    "faults": [
     "too-many-words"
    ],
@@ -1124,12 +1123,12 @@
     "tap response"
    ],
    "numbers": {
-    "wordsBeforeScroll": 56,
+    "wordsBeforeScroll": 50,
     "brightButtons": 0,
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 1,
-    "firstContentMs": 732,
+    "firstContentMs": 376,
     "layoutShift": 0.001,
     "tapMs": null,
     "tapped": null,
@@ -1137,7 +1136,8 @@
     "a11yCritical": 0,
     "a11ySerious": 0,
     "jsKb": 614
-   }
+   },
+   "measuredBy": "lane/coach-words 2026-11-12 (this row only; the rest of the card is the every-screen run)"
   },
   {
    "route": "/coach/groups",
@@ -1189,16 +1189,14 @@
    "state": "scored",
    "reason": "no highlight row exists on a new account: the screen for a link that names none",
    "checks": {
-    "clear": "fail",
+    "clear": "pass",
     "finished": "pass",
     "fast": "pass",
     "right": "pass"
    },
-   "passAll": false,
-   "worst": "53 words before scrolling (the budget is 40).",
-   "faults": [
-    "too-many-words"
-   ],
+   "passAll": true,
+   "worst": null,
+   "faults": [],
    "review": [],
    "unmeasured": [],
    "numbers": {
@@ -1207,15 +1205,16 @@
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 0,
-    "firstContentMs": 380,
+    "firstContentMs": 260,
     "layoutShift": 0.001,
-    "tapMs": 80,
+    "tapMs": 64,
     "tapped": "Your coaching →",
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
     "jsKb": 496
-   }
+   },
+   "measuredBy": "lane/coach-words 2026-11-12 (this row only; the rest of the card is the every-screen run)"
   },
   {
    "route": "/coach/join",
@@ -1279,20 +1278,21 @@
    "review": [],
    "unmeasured": [],
    "numbers": {
-    "wordsBeforeScroll": 46,
+    "wordsBeforeScroll": 42,
     "brightButtons": 1,
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 1,
-    "firstContentMs": 288,
+    "firstContentMs": 264,
     "layoutShift": 0.064,
-    "tapMs": 176,
+    "tapMs": 72,
     "tapped": "Join Coach Riley",
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
     "jsKb": 242
-   }
+   },
+   "measuredBy": "lane/coach-words 2026-11-12 (this row only; the rest of the card is the every-screen run)"
   },
   {
    "route": "/coach/live/[room]",
@@ -1359,16 +1359,14 @@
    "state": "scored",
    "reason": null,
    "checks": {
-    "clear": "fail",
+    "clear": "pass",
     "finished": "pass",
     "fast": "pass",
     "right": "pass"
    },
-   "passAll": false,
-   "worst": "43 words before scrolling (the budget is 40).",
-   "faults": [
-    "too-many-words"
-   ],
+   "passAll": true,
+   "worst": null,
+   "faults": [],
    "review": [],
    "unmeasured": [],
    "numbers": {
@@ -1377,15 +1375,16 @@
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 1,
-    "firstContentMs": 328,
+    "firstContentMs": 332,
     "layoutShift": 0.001,
-    "tapMs": 88,
+    "tapMs": 96,
     "tapped": "Dunk session",
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
     "jsKb": 506
-   }
+   },
+   "measuredBy": "lane/coach-words 2026-11-12 (this row only; the rest of the card is the every-screen run)"
   },
   {
    "route": "/coach/shots",
