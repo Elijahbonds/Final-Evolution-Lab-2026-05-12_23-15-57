@@ -50,7 +50,7 @@ export const CONDITIONING: Family[] = [
     setup: 'Clear a few metres of floor around you.',
     cues: ['Keep every rep clean: the same rep at the end as at the start.', 'Breathe out on the hardest part of each rep.', 'Land quiet whenever you leave the floor.'],
     faults: [
-      { fault: 'Reps getting sloppy as you tire', fix: 'Slow down or rest; clean reps only.' },
+      { fault: 'Form slipping as you tire', fix: 'Slow down or rest; clean reps only.' },
       { fault: 'Holding the breath', fix: 'Breathe out on every effort.' },
     ],
     dosage: secs(4, 30, 30),
@@ -59,7 +59,7 @@ export const CONDITIONING: Family[] = [
       { name: 'Burpee', v: 'burpee', level: 'intermediate', cue: 'Hands to the floor, hop back, chest to the floor, push up, hop in, jump tall.' },
       { name: 'Mountain Climber Run', v: 'mountain-climber', level: 'beginner', setup: 'High plank, arms straight.', cue: 'Drive the knees toward the floor under your chest, one after the other, quick and light.', primary: ['hip-flexors', 'abs'], secondary: ['delts', 'quads'] },
       { name: 'Jumping Jack', v: 'jumping-jack', level: 'beginner', plane: 'frontal', cue: 'Jump the feet out and in with the hands meeting overhead, light on the floor.', goals: ['conditioning', 'warmup'] },
-      { name: 'Seal Jack', v: 'seal-jack', level: 'beginner', plane: 'frontal', cue: 'Jump the feet out and in while the hands clap out to the walls and back in front.', goals: ['conditioning', 'warmup'] },
+      { name: 'Seal Jack', v: 'seal-jack', level: 'beginner', plane: 'frontal', cue: 'Jump your feet out and in while your hands clap out to the walls and back in front.', goals: ['conditioning', 'warmup'] },
     ],
   },
   {
@@ -74,7 +74,7 @@ export const CONDITIONING: Family[] = [
     ],
     dosage: { sets: 1, seconds: 120, restSec: 0 },
     variants: [
-      { name: '90/90 Breathing', v: '90-90', level: 'beginner', equipment: ['mat', 'wall'], setup: 'On your back with the feet flat on a wall, knees and hips bent to right angles.', cue: 'Press the heels gently into the wall and breathe out until the ribs settle toward the floor.' },
+      { name: '90/90 Breathing', v: '90-90', level: 'beginner', equipment: ['mat', 'wall'], setup: 'On your back with the feet flat on a wall, knees and hips bent to right angles.', cue: 'Press your heels gently into the wall and breathe out until your ribs settle to the floor.' },
       { name: 'Crocodile Breathing', v: 'crocodile', level: 'beginner', setup: 'Lie face down on a mat, forehead resting on the stacked hands.', cue: 'Breathe so the belt line pushes into the floor and the lower back rises.' },
       { name: 'Box Breathing', v: 'box', level: 'beginner', setup: 'Sit tall on the floor or a chair.', cues: ['Breathe in for four, hold for four, out for four, hold for four.', 'Keep each side of the box the same length.', 'Let the shoulders stay low and still.'] },
       { name: 'Long-Exhale Walk', v: 'walk', level: 'beginner', equipment: [], setup: 'Walk slowly around the room or the court.', cue: 'Breathe in for three steps and out for six, a slow, steady beat.', dosage: { sets: 1, seconds: 180, restSec: 0 }, goals: ['cooldown'] },

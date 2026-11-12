@@ -80,7 +80,7 @@ export function PoseStage({ stream, showVideo, latest, flagUntil, aspect, label 
         <canvas ref={canvas} data-live-skeleton className="pointer-events-none absolute inset-0 h-full w-full" />
       </div>
       <audio ref={audio} autoPlay data-live-audio className="hidden" />
-      <div className="absolute left-2 top-2 rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-semibold text-white/85">{label}</div>
+      <div className="absolute left-2 top-2 rounded-md bg-black/60 px-2 py-0.5 text-[12px] font-semibold text-white/85">{label}</div>
     </div>
   );
 }

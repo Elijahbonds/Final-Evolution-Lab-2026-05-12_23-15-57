@@ -16,6 +16,7 @@ import { AGE_BLOCK_COOKIE, AGE_INVALID, ageBlockCookieHeader, ageScreenOutcome, 
 import { writeUserDob } from '@/lib/age/userDob';
 import type { RawDb } from '@/lib/coach/pendingSchema';
 import { logU13Lock } from '@/lib/privacy/u13LockLog';
+import { attributionProps, cleanAttribution } from '@/lib/marketing/utm';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,6 +30,8 @@ const signupSchema = z.object({
   // FN-BOX-1b: the full date beside the year, 'YYYY-MM-DD'. Optional (an older client sends the year alone); when sent it
   // must be a real, past date in birthYear's year.
   birthDate: z.string({ invalid_type_error: AGE_INVALID }).max(10, AGE_INVALID).optional(),
+  // ONB-04: the first visit's utm_* / ref tags (lib/marketing/utm.ts). Cleaned there; anything else is dropped, never an error.
+  utm: z.unknown().optional(),
 });
 
 function randAttr() {
@@ -162,7 +165,7 @@ export async function POST(req: Request) {
         name: 'signup_complete',
         userId: user.id,
         guestId: guestHash,
-        props: { fromGuest: Boolean(guestHash) },
+        props: { fromGuest: Boolean(guestHash), ...attributionProps(cleanAttribution(parsed.data.utm)) },
       });
     } catch (err) {
       console.error('signup funnel telemetry failed', err);

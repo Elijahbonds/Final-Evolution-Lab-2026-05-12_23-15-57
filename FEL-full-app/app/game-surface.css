@@ -205,6 +205,19 @@
     top: auto !important;
     bottom: max(4px, env(safe-area-inset-bottom, 0px)) !important;
   }
+  /* gameplay-clean (2026-10-28): IN PLAY the capture menu (⋯, GameCaptureHud: top-left, 60x47 px, z 45) joins this bottom
+   * row, just left of the shell's buttons. At the top-left it sat on every mode's first HUD chip — measured on a sideways
+   * phone: golf's HOLE 1/5, baseball's INN 1/3 · OUTS, aero's PLACE. READY keeps it where it was (4d below lays the card's
+   * corner out around it), and so does the end card. 88 px = half the row (pause, leave, body, full screen: 4 × 36 + 3 × 6
+   * = 162) + its 6 px gap; scaled to the row's 36 px height from its own right edge. */
+  [data-fel-console]:not(:has([data-fel-fullbleed])):not(:has([data-end-screen])) > [data-capture-ui] {
+    top: auto !important;
+    bottom: max(4px, env(safe-area-inset-bottom, 0px)) !important;
+    left: auto !important;
+    right: calc(50% + 88px) !important;
+    transform: scale(0.77);
+    transform-origin: right bottom;
+  }
   /* and a hint keeps to the gap between the thumb clusters (the compact deck reaches ~30 % in from each side) */
   [data-fel-console] > div:has(> canvas) > div.inset-x-0.text-center > span.fel-panel.font-mono {
     max-width: 44% !important;   /* !important: the base clamp rule below comes later in the file */
@@ -284,6 +297,12 @@
   max-height: 100%;
   min-height: 0;
 }
+/* SCREEN-FIXES (2026-11-10): the start card's middle slot (boot-splash.tsx) holds its height in portrait only; sideways it
+ * steps aside, so the left column is exactly what it was */
+[data-fel-console] [data-splash-slot] { display: contents !important; }
+/* SCREEN-FIXES-2 (2026-11-11): upright, the learn card scrolls inside the slot rather than grow it; sideways it is the card
+ * it was (it does not give up height in the left column: the CONTROLS panel does) */
+[data-fel-console] [data-splash-slot] > [data-learn-idle] { min-height: auto !important; overflow: visible !important; }
 [data-fel-console] [data-splash-main] > [data-controls-panel] {
   max-height: none !important;
   flex: 0 1 auto;
@@ -314,7 +333,8 @@
   [data-fel-console] [data-splash-main] { gap: 0.35rem; }
   [data-fel-console] [data-splash-main] > h1 { font-size: 1.875rem; }
   [data-fel-console] [data-splash-main] > h1 + p { line-height: 1.3; }
-  [data-fel-console] [data-splash-main] > button.fel-cta { margin-top: 0; }
+  [data-fel-console] [data-splash-main] > button.fel-cta,
+  [data-fel-console] [data-splash-main] > [data-splash-slot] > button.fel-cta { margin-top: 0; }
   [data-fel-console] [data-controls-panel] { padding-top: 0.3rem; padding-bottom: 0.35rem; gap: 0.2rem; }
   [data-fel-console] [data-controls-rows] { row-gap: 0; line-height: 1.3; }
   [data-fel-console] [data-controls-lines] { padding-top: 0.2rem; }
@@ -358,6 +378,16 @@ div:has(> [data-capture-ui]) > div:has(> canvas) > [data-fel-fullbleed] > [data-
   zoom: calc(var(--fel-splash-corner-zoom) / var(--fel-hud-zoom, 1));
   left: calc(4.75rem / var(--fel-splash-corner-zoom));
   top: calc(0.5rem / var(--fel-splash-corner-zoom));
+}
+/*    - SCREEN-FIXES-2 (2026-11-11): and on a card with the MOTION chip but no
+ *      ⋯ (a host without the capture menu, /try), the column still starts
+ *      below the chip (12-40 px down), not 16 px down under it. A card taller
+ *      than the phone starts at the top, so the chip was drawn over the venue
+ *      line (skateboard's "VENICE SKATEPARK"; every game's start screen measured
+ *      with scripts/probes/screen-fixes/corner-overlap.mts). Only while the
+ *      chip is there (loading and READY); sideways the console padding wins. */
+[data-fel-fullbleed]:has(> [data-splash-corner]) > [data-splash-column] {
+  padding-top: 3.5rem;
 }
 /*    - Upright, the column starts below that row (the ⋯ ends 43 px down the
  *      card) rather than under it. Sideways the console padding wins. */

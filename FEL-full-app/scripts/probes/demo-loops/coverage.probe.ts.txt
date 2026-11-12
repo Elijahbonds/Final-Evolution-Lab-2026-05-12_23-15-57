@@ -1,0 +1,18 @@
+// DEMO-LOOPS probe: how many approved library entries have a loop, and the entries without one by family (largest first).
+// A copy of the lane's scratch test, kept here so the next batch has it. To run:
+//   cp scripts/probes/demo-loops/coverage.probe.ts.txt lib/library/zz-measure.test.ts
+//   MEASURE_OUT=/path/measure.json npx vitest run lib/library/zz-measure.test.ts
+// Delete the copy afterwards (never commit a zz-*.test.ts).
+import { it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { loadLibraryFiles } from './files';
+import { demoFor } from './demo';
+import { EXERCISE_CLIPS } from '@/lib/babylon/anim/authored/exercise';
+it.skipIf(!process.env.MEASURE_OUT)('measure', () => {
+  const all = loadLibraryFiles();
+  const approved = all.filter((e) => e.review.status === 'approved');
+  const fam = new Map<string, string[]>();
+  for (const e of approved) { if (demoFor(e)) continue; (fam.get(e.family) ?? fam.set(e.family, []).get(e.family)!).push(`${e.name} [${e.variation}|${e.equipment.join(',')}]`); }
+  writeFileSync(process.env.MEASURE_OUT!, JSON.stringify({ approved: approved.length, approvedWithLoop: approved.filter((e) => demoFor(e)).length, clips: EXERCISE_CLIPS.length,
+    families: [...fam.entries()].sort((a, b) => b[1].length - a[1].length).map(([family, miss]) => ({ family, n: miss.length, miss })) }, null, 1));
+});

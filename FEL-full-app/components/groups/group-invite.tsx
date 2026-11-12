@@ -33,10 +33,10 @@ export function GroupInvite({ groupId, invite, canEdit, onChanged }: { groupId: 
         <>
           <p className="mt-1 text-[12.5px] text-white/55">Read out the code, send the link, or show the QR. They type the code on the Squads page.</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="font-mono text-[22px] font-bold tracking-[0.18em] text-[#00E5FF]" data-group-code>{invite.code}</span>
+            <span className="font-mono text-[22px] font-bold tracking-[0.18em] text-fel-cyan" data-group-code>{invite.code}</span>
             <span className="ml-auto flex gap-1.5">
               <button onClick={copy} title="Copy the link" aria-label="Copy the link" className="grid h-11 w-11 place-items-center rounded-lg border border-white/15 text-white/75">
-                {copied ? <Check className="h-4 w-4 text-[#00FF9D]" /> : <Copy className="h-4 w-4" />}
+                {copied ? <Check className="h-4 w-4 text-fel-emerald" /> : <Copy className="h-4 w-4" />}
               </button>
               <button onClick={showQr} title="Show the QR" aria-label="Show the QR" className="grid h-11 w-11 place-items-center rounded-lg border border-white/15 text-white/75"><QrCode className="h-4 w-4" /></button>
             </span>

@@ -185,7 +185,9 @@ describe('the profile failure state is a stop, not a spinner plus a stop', () =>
     const profileBlock = between(shell, '{!profile && unreachable && (', '<AnimatePresence>');
     expect(profileBlock).toContain("Can&apos;t reach the server. Check your connection, then try again.");
     expect(profileBlock).toContain(') : !unreachable ? (');
-    expect(profileBlock).toContain('<Loader2 className="h-8 w-8 animate-spin text-[#00E5FF]" />');
+    // EVERY-SCREEN P7: the loader says what it waits for (it was a bare spinner)
+    expect(profileBlock).toContain('<Loader2 aria-hidden className="h-8 w-8 animate-spin text-[#00E5FF]" />');
+    expect(profileBlock).toContain('{GAME_LOADING}');
     expect(profileBlock).toContain(') : null}');
   });
 });

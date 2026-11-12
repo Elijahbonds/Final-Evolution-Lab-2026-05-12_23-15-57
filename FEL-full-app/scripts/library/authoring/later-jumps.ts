@@ -84,11 +84,11 @@ type Row = readonly [string, string, number, string, string, Partial<Variant>?];
 /** The progressions, one family per kind of jump (so search's family diversity and the review list read them apart). */
 const PROGRESSIONS: readonly [string, readonly Row[]][] = [
   ['vertical-jump-builds', [
-    ['Squat Jump from a Pause', 'squat-jump-pause', 1, 'id:squat-jump', 'Sit in the quarter squat for two seconds, then push the floor away hard with no dip.'],
+    ['Squat Jump from a Pause', 'squat-jump-pause', 1, 'id:squat-jump', 'Hold a quarter squat for two seconds, then push the floor away hard with no dip.'],
     ['Squat Jump, Hands on Hips', 'squat-jump-hips', 1, 'id:squat-jump', 'Hands stay on the belt line: the floor push does all the work.'],
     ['Countermovement Jump, Hands on Hips', 'cmj-hips', 1, 'id:countermovement-jump', 'Hands stay on the belt line: dip and push the floor away in one fast motion.'],
     ['Countermovement Jump to a Target Touch', 'cmj-target', 1, 'id:countermovement-jump', 'Dip, then reach one hand up to touch the target on the wall at the top.', { equipment: ['wall'] }],
-    ['Tuck Jump to Stick', 'tuck-stick', 1, 'id:tuck-jump', 'Knees up toward the ceiling at the top, then open and stick the landing still and silent.'],
+    ['Tuck Jump to Stick', 'tuck-stick', 1, 'id:tuck-jump', 'Knees up toward the ceiling at the top, then open and land still and silent.'],
     ['Switch Split Jump to Stick', 'split-stick', 1, 'id:switch-split-jump', 'Switch the legs in the air and stick the split landing still and silent.'],
     ['Split Squat Jump from a Pause', 'split-pause', 1, 'id:switch-split-jump', 'Hold the bottom of the split squat for two seconds, then push the floor away.'],
     ['Single-Leg Vertical Jump to Stick', 'sl-vert-stick', 2, 'id:single-leg-vertical-jump', 'Push the floor away on one leg and stick the landing on the same one.'],
@@ -107,7 +107,7 @@ const PROGRESSIONS: readonly [string, readonly Row[]][] = [
     ['Single-Leg Broad Jump to Stick', 'broad-sl', 2, 'id:broad-jump-to-stick', 'Push off one leg out to the line and stick it on the same leg.', { laterality: 'unilateral' }],
     ['Broad Jump to Vertical Jump', 'broad-vert', 2, 'id:broad-jump-to-stick', 'Broad jump to the line, then on landing jump straight up toward the ceiling.'],
     ['Broad Jump from a Pause', 'broad-pause', 1, 'id:broad-jump-to-stick', 'Hold the quarter squat for two seconds, then jump out to the line with no dip.'],
-    ['Kneeling Broad Jump', 'broad-kneel', 2, 'id:broad-jump-to-stick', 'From tall kneeling, swing and pop up onto both feet as far out as you can land quiet.', { equipment: ['mat'] }],
+    ['Kneeling Broad Jump', 'broad-kneel', 2, 'id:broad-jump-to-stick', 'From tall kneeling, swing and pop up onto both feet, as far out as you can land quietly.', { equipment: ['mat'] }],
     ['Standing Triple Jump', 'triple', 2, 'id:broad-jump-to-stick', 'Hop, step, and jump to the line in three long contacts, then stick it.'],
   ]],
   ['hurdle-hops', [
@@ -124,8 +124,8 @@ const PROGRESSIONS: readonly [string, readonly Row[]][] = [
     ['Four-Step Approach Jump', 'approach-4', 2, 'id:three-step-approach-jump', 'Four steps, the last two quick, then plant and lift off toward the target.'],
     ['Five-Step Approach Jump', 'approach-5', 2, 'id:three-step-approach-jump', 'Five steps building speed, then a quick last two and lift toward the target.'],
     ['Two-Foot Approach Jump to Rim Touch', 'approach-rim', 2, 'id:three-step-approach-jump', 'Gather on two feet under the target and reach up to touch the rim.', { equipment: ['hoop'] }],
-    ['One-Foot Approach Jump to Backboard Touch', 'approach-board', 2, 'id:one-foot-approach-jump', 'Take off the floor like a layup and touch as high on the backboard as you can.', { equipment: ['hoop'] }],
-    ['Approach Jump with Ball Reach', 'approach-ball', 2, 'id:three-step-approach-jump', 'Carry the ball high and reach it up toward the target at the top of the jump.', { equipment: ['basketball', 'hoop'] }],
+    ['One-Foot Approach Jump to Backboard Touch', 'approach-board', 2, 'id:one-foot-approach-jump', 'Take off like a layup and touch as high on the backboard as you can.', { equipment: ['hoop'] }],
+    ['Approach Jump with Ball Reach', 'approach-ball', 2, 'id:three-step-approach-jump', 'Carry the ball high and reach it up to the target at the top of the jump.', { equipment: ['basketball', 'hoop'] }],
     ['Approach Jump off a Dribble', 'approach-dribble', 2, 'id:one-foot-approach-jump', 'Two hard dribbles, gather, and rise off the floor toward the target.', { equipment: ['basketball', 'hoop'], goals: ['finishing'] }],
     ['Slide-Step Block Jump', 'block-slide', 1, '', 'Two slides along the line, then jump straight up with hands reaching to the ceiling.', { plane: 'frontal', sport: ['volleyball', 'basketball'] }],
     ['Crossover-Step Block Jump', 'block-cross', 2, '', 'Crossover step along the line, plant square, and jump straight up, hands high.', { plane: 'frontal', sport: ['volleyball', 'basketball'] }],
@@ -148,10 +148,10 @@ const PROGRESSIONS: readonly [string, readonly Row[]][] = [
     ['Lateral Hop to Vertical Jump', 'hop-vert', 2, 'id:lateral-hop-to-stick', 'Hop sideways over the line, land, and jump straight up toward the ceiling.'],
     ['Drop Landing to Broad Jump', 'drop-broad', 2, 'id:drop-landing-from-low-box', 'Step off the low box, stick it, then broad jump to the line and stick again.', { equipment: ['box'] }],
     ['Drop Landing to Lateral Bound', 'drop-land-bound', 2, 'id:drop-landing-from-low-box', 'Step off the low box, stick it, then bound sideways and stick again.', { equipment: ['box'], plane: 'frontal' }],
-    ['Drop Landing with Ball Catch', 'drop-catch', 1, 'id:drop-landing-from-low-box', 'Step off the low box as a partner tosses the ball; catch it and stick the landing.', { equipment: ['box', 'basketball'], sport: ['basketball', 'general'] }],
+    ['Drop Landing with Ball Catch', 'drop-catch', 1, 'id:drop-landing-from-low-box', 'Step off the low box as a partner tosses the ball; catch it and land still.', { equipment: ['box', 'basketball'], sport: ['basketball', 'general'] }],
     ['Single-Leg Drop Landing with Ball Catch', 'drop-catch-sl', 2, 'id:single-leg-drop-landing', 'Step off onto one leg as the ball arrives; catch it and stick it still.', { equipment: ['box', 'basketball'], laterality: 'unilateral', sport: ['basketball', 'general'] }],
     ['Lateral Hop to Stick with Partner Push', 'hop-push', 2, 'id:lateral-hop-to-stick', 'Hop sideways over the line; a partner gives a light push as you land; stick it.', { laterality: 'unilateral', plane: 'frontal' }],
-    ['Jump to Stick with Partner Push', 'jump-push', 1, 'id:broad-jump-to-stick', 'Jump out to the line; a partner gives a light push as you land; stick it still.'],
+    ['Jump to Stick with Partner Push', 'jump-push', 1, 'id:broad-jump-to-stick', 'Jump out to the line; a partner gives a light push as you land. Stick it still.'],
     ['Crossover Bound to Stick', 'cross-bound', 2, 'id:lateral-bound-to-stick', 'Bound across in front of the standing leg toward the line and stick it.', { laterality: 'unilateral', plane: 'frontal' }],
     ['Split Jump to Vertical Jump', 'split-vert', 2, 'id:switch-split-jump', 'One switch split jump, land, then jump straight up off both feet.'],
   ]],
@@ -183,7 +183,7 @@ const UPPER: readonly [string, string, number, string, Partial<Variant>?][] = [
   ['Incline Plyo Push-Up', 'incline', 1, 'Hands on the box: push it away fast so the hands leave the box, land soft.', { equipment: ['box'] }],
   ['Kneeling Plyo Push-Up', 'kneeling', 1, 'From the knees, push the floor away fast so the hands leave it, land soft.', { equipment: ['mat'] }],
   ['Plyo Push-Up to Plates', 'plates', 2, 'Push the floor away and land each hand on a plate, then push back down.', { equipment: ['plate'], youthOk: false }],
-  ['Med Ball Drop Push-Up', 'mb-drop', 2, 'Hands on the ball, drop them to the floor and push the floor away back onto the ball.', { equipment: ['medicine-ball'], youthOk: false }],
+  ['Med Ball Drop Push-Up', 'mb-drop', 2, 'Hands on the ball: drop to the floor, then push the floor away back onto the ball.', { equipment: ['medicine-ball'], youthOk: false }],
 ];
 const LOADED: readonly [string, string, number, string, Variant['equipment'], string?][] = [
   ['Trap Bar Jump', 'trap-bar', 2, 'Light trap bar at the hips: dip and push the floor away hard, land quiet.', ['trap-bar']],
@@ -191,7 +191,7 @@ const LOADED: readonly [string, string, number, string, Variant['equipment'], st
   ['Weight-Vest Countermovement Jump', 'vest-cmj', 2, 'Vest on: dip and push the floor away; if the landing gets loud, take it off.', ['weight-vest'], 'id:countermovement-jump'],
   ['Weight-Vest Broad Jump', 'vest-broad', 2, 'Vest on: jump out to the line and stick it still and silent.', ['weight-vest'], 'id:broad-jump-to-stick'],
   ['Band-Assisted Jump', 'band-assist', 1, 'A band overhead lightens the take-off: leave the floor fast, land quiet.', ['band'], 'id:countermovement-jump'],
-  ['Band-Resisted Broad Jump', 'band-resist', 2, 'A partner holds a band at the hips: jump out to the line against it and stick it.', ['band'], 'id:broad-jump-to-stick'],
+  ['Band-Resisted Broad Jump', 'band-resist', 2, 'A partner holds a band at your hips. Jump out to the line and stick it.', ['band'], 'id:broad-jump-to-stick'],
 ];
 
 // ── rope footwork ─────────────────────────────────────────────────────────────────────────────────────────────────

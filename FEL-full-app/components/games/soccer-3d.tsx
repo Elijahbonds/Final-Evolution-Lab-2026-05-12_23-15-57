@@ -514,17 +514,17 @@ export default function Soccer3D(props: GameProps) {
           <div className="absolute top-3 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1">
             <div className="flex items-center gap-5 px-5 py-1.5 rounded-xl" style={{ background: 'rgba(5,5,8,0.75)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,229,255,0.2)' }}>
               <span className="text-2xl font-bold text-[#00E5FF]">{hud.pGoals}</span>
-              <span className="text-[11px] text-white/60 font-mono">{hud.sudden ? 'SUDDEN DEATH' : 'BEST OF 5'}</span>
+              <span className="text-[12px] text-white/60 font-mono">{hud.sudden ? 'SUDDEN DEATH' : 'BEST OF 5'}</span>
               <span className="text-2xl font-bold text-[#FF3366]">{hud.aiGoals}</span>
             </div>
-            <div className="flex gap-3 items-center px-3 py-0.5 rounded-lg font-mono text-[10px] text-white/70" style={{ background: 'rgba(5,5,8,0.8)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div className="flex gap-3 items-center px-3 py-0.5 rounded-lg font-mono text-[12px] text-white/70" style={{ background: 'rgba(5,5,8,0.8)', border: '1px solid rgba(255,255,255,0.08)' }}>
               <span>YOU {hud.shotsP}/5</span><span>RIVAL {hud.shotsAI}/5</span>
               <span style={{ color: '#C99BF7' }}>CAM {hud.camRig.toUpperCase()}</span>
             </div>
           </div>
 
           {/* PRQ */}
-          <div className="absolute top-3 right-3 text-right font-mono text-[11px]" style={{ color: hud.prqColor }}>
+          <div className="absolute top-3 right-3 text-right font-mono text-[12px]" style={{ color: hud.prqColor }}>
             {hud.role === 'shooter' ? 'SHOOTER' : 'KEEPER'} · {hud.prqLabel}
           </div>
 
@@ -541,7 +541,7 @@ export default function Soccer3D(props: GameProps) {
                 <div className="absolute inset-y-0 left-[60%] w-[32%] bg-[#00FF9D]/30" />
                 <div className="h-full rounded" style={{ width: `${hud.power * 100}%`, background: hud.power > 0.6 && hud.power < 0.92 ? '#00FF9D' : hud.power >= 0.97 ? '#FF3366' : '#00E5FF' }} />
               </div>
-              <p className="mt-1 text-center text-[10px] font-mono text-white/60">TAP IN THE GREEN ZONE</p>
+              <p className="mt-1 text-center text-[12px] font-mono text-white/60">TAP IN THE GREEN ZONE</p>
             </div>
           )}
 

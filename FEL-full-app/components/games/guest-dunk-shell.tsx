@@ -4,18 +4,19 @@ import dynamicImport from 'next/dynamic';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Loader2, Trophy, Flame, ArrowRight, ExternalLink, X } from 'lucide-react';
+import { Trophy, Flame, ArrowRight, ExternalLink, X } from 'lucide-react';
 import { prqGrade } from '@/lib/prq';
 import { is3D, isBabylon } from '@/components/three/flags';
 import { track, flush } from '@/lib/analytics';
 import { AgeStep, ageBlockPresent, writeAgeBlockFlag } from '@/components/age-step';
 import { ageScreenOutcome } from '@/lib/privacy/ageScreen';
+import { lockTryAge, tabStorage, tryAgeBand } from '@/lib/privacy/tryAgeGate';   // TRY-AGE-PLACEHOLDER-1 (flag ageBands)
 import type { GameProps, GameResult } from '@/components/games/game-shell';
+import { GameLoading } from '@/components/games/game-loading';
+import { REVIEW_BUTTON_LABEL } from '@/lib/coach-store/storeOffers';   // STORE-OFFER-1 (a constant: no flag read on the client)
 
 const spinner = () => (
-  <div className="flex h-[60vh] items-center justify-center">
-    <Loader2 className="h-8 w-8 animate-spin text-[#00E5FF]" />
-  </div>
+  <GameLoading />
 );
 
 const DunkGame2D = dynamicImport(() => import('@/components/games/dunk-game'), { ssr: false, loading: spinner });
@@ -38,7 +39,7 @@ const DunkBabylon = dynamicImport(() => import('@/components/games/dunk-babylon'
  */
 type GuestGate = 'ask' | 'blocked' | 'local' | 'adult';
 
-export function GuestDunkShell({ challengeCode }: { challengeCode?: string | null }) {
+export function GuestDunkShell({ challengeCode, reviewHref = null, ageBands = false }: { challengeCode?: string | null; reviewHref?: string | null; /** TRY-AGE-PLACEHOLDER-1: TRY_AGE_BANDS_ENABLED (default off) */ ageBands?: boolean }) {
   // Engine selection must match /play/dunk: isBabylon FIRST, then the 3D
   // fallback. This shell checked only is3D, so the guest path — the PLAY NOW
   // button, and therefore the first thing every new player ever sees — mounted
@@ -70,6 +71,11 @@ export function GuestDunkShell({ challengeCode }: { challengeCode?: string | nul
   const started = useRef(false);
   const judged = useRef(false);
 
+  // PERF-834-LCP (a): the age step's buttons are in the server HTML before React attaches their handlers — a tap at ~2 s was
+  // dropped and the page sat on the question for minutes (DIAG Q1). They stay disabled, with a "Loading…" line, until mount.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => { setHydrated(true); }, []);
+
   // A browser that already carries the block flag skips the question. Reads only; sends nothing.
   useEffect(() => {
     if (gate === 'ask' && ageBlockPresent()) setGate('blocked');
@@ -89,11 +95,20 @@ export function GuestDunkShell({ challengeCode }: { challengeCode?: string | nul
       void flush();
     })();
   };
-  const onAgeLocked = (year: number) => {
+  const onAgeLocked = (year: number, birthDate?: string) => {
+    if (ageBands) {
+      // TRY-AGE-PLACEHOLDER-1: the full date picks the band; only the band is kept (the session lock), never the date
+      const g = lockTryAge(tabStorage(), tryAgeBand(birthDate));
+      if (g === 'adult') startGuest();
+      else if (g === 'blocked') { writeAgeBlockFlag(); setGate('blocked'); }
+      else setGate('local');
+      return;
+    }
     if (ageScreenOutcome(year) === 'adult') startGuest();
     else setGate('local');
   };
   const onAgeBlocked = () => {
+    if (ageBands) lockTryAge(tabStorage(), 'under-13');   // TRY-AGE-PLACEHOLDER-1: a blocked answer holds for the session
     writeAgeBlockFlag();
     setGate('blocked');
   };
@@ -218,7 +233,7 @@ export function GuestDunkShell({ challengeCode }: { challengeCode?: string | nul
               type="button"
               aria-label="Close"
               onClick={() => setClaimOpen(false)}
-              className="absolute right-3 top-3 rounded-md p-1 text-white/40 transition-colors hover:text-white"
+              className="absolute right-3 top-3 rounded-md p-1 text-white/50 transition-colors hover:text-white"
             >
               <X className="h-4 w-4" />
             </button>
@@ -265,7 +280,7 @@ export function GuestDunkShell({ challengeCode }: { challengeCode?: string | nul
               <span className="text-[#00E5FF] fel-glow-cyan">FINAL EVOLUTION</span> LAB
             </span>
           )}
-          <span className="ml-auto rounded-md border border-[#00FF9D]/40 px-2.5 py-1 font-mono text-[10px] text-[#00FF9D]">
+          <span className="ml-auto rounded-md border border-[#00FF9D]/40 px-2.5 py-1 font-mono text-[12px] text-[#00FF9D]">
             GUEST · NO ACCOUNT NEEDED
           </span>
           {/* TRY-ONBOARD G3: after the first night the claim is ALWAYS reachable and NEVER in
@@ -275,7 +290,7 @@ export function GuestDunkShell({ challengeCode }: { challengeCode?: string | nul
           {resultHref && !result && (
             <Link
               href={resultHref}
-              className="rounded-md border border-[#FFD700]/40 px-2.5 py-1 font-mono text-[10px] text-[#FFD700] transition-colors hover:bg-[#FFD700]/10"
+              className="inline-flex min-h-[40px] items-center rounded-md border border-[#FFD700]/40 px-3 font-mono text-[12px] text-[#FFD700] transition-colors hover:bg-[#FFD700]/10"
               data-action="challenge-result"
             >
               RESULT
@@ -285,7 +300,7 @@ export function GuestDunkShell({ challengeCode }: { challengeCode?: string | nul
             <button
               type="button"
               onClick={() => setClaimOpen(true)}
-              className="rounded-md border border-[#00E5FF]/40 px-2.5 py-1 font-mono text-[10px] text-[#00E5FF] transition-colors hover:bg-[#00E5FF]/10"
+              className="inline-flex min-h-[40px] items-center rounded-md border border-[#00E5FF]/40 px-3 font-mono text-[12px] text-[#00E5FF] transition-colors hover:bg-[#00E5FF]/10"
             >
               CLAIM
             </button>
@@ -295,7 +310,7 @@ export function GuestDunkShell({ challengeCode }: { challengeCode?: string | nul
           {!result && (
             <Link
               href="/"
-              className="rounded-md border border-white/15 px-2.5 py-1 font-mono text-[10px] text-white/45 transition-colors hover:border-white/40 hover:text-white"
+              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md border border-white/25 px-3 font-mono text-[12px] text-white/75 transition-colors hover:border-white/40 hover:text-white"
             >
               QUIT
             </Link>
@@ -303,17 +318,25 @@ export function GuestDunkShell({ challengeCode }: { challengeCode?: string | nul
         </div>
       </header>
 
-      <div className="relative mx-auto w-full max-w-[1200px] flex-1 px-2 py-3 sm:px-4">
+      {/* CONTROLLER-TRY-FIX item 1 (C1): while the stage is live the game owns the pad (lib/nav/focus.ts OWNS_INPUT), so the site's menu
+          focus stands aside: pad A no longer focuses and clicks the header QUIT, and pad B no longer runs history.back(). The age step,
+          the claim sheet and the result modal keep pad navigation (the attribute is off there). The age gate itself is untouched. */}
+      <div className="relative mx-auto w-full max-w-[1200px] flex-1 px-2 py-3 sm:px-4" data-own-input={gate !== 'ask' && !claimOpen && !result ? '' : undefined}>
         {gate === 'ask' ? (
           <div className="py-10" data-testid="guest-age-step">
-            <AgeStep mode="signup" onLocked={onAgeLocked} onBlocked={onAgeBlocked} />
+            <AgeStep mode="signup" onLocked={onAgeLocked} onBlocked={onAgeBlocked} ready={hydrated} />
             <button
               type="button"
               onClick={() => setGate('local')}
-              className="mx-auto mt-4 block font-mono text-xs text-white/45 transition-colors hover:text-white"
+              disabled={!hydrated}
+              aria-busy={!hydrated}
+              className="mx-auto mt-4 block min-h-[44px] px-4 font-sans text-[14px] font-medium text-white/70 underline-offset-4 transition-colors hover:text-white hover:underline disabled:cursor-wait disabled:opacity-60"
             >
               Play without saving
             </button>
+            {!hydrated && (
+              <p role="status" className="mt-2 text-center font-mono text-[12px] text-white/50">Loading…</p>
+            )}
           </div>
         ) : babylon ? (
           // G7: NO `key={gameKey}` on this one. The Babylon dunk resets itself in place;
@@ -346,7 +369,7 @@ export function GuestDunkShell({ challengeCode }: { challengeCode?: string | nul
                 transition={{ type: 'spring', damping: 22 }}
                 className="fel-panel w-full max-w-md rounded-2xl p-7 text-center"
               >
-                <Trophy className={`mx-auto h-12 w-12 ${result.won ? 'text-[#FFD700]' : 'text-white/30'}`} />
+                <Trophy className={`mx-auto h-12 w-12 ${result.won ? 'text-[#FFD700]' : 'text-white/50'}`} />
                 <h2 className="fel-heading mt-3 text-4xl font-bold text-white">
                   {result.headline ?? 'NICE DUNK'}
                 </h2>
@@ -373,6 +396,17 @@ export function GuestDunkShell({ challengeCode }: { challengeCode?: string | nul
                   GO AGAIN
                 </button>
                 {claimLink}
+                {/* STORE-OFFER-1: "Book a review" — only when the server passed the review listing (store flag on) and the age step
+                    said adult (the existing gate; "Play without saving" never shows it) */}
+                {reviewHref && gate === 'adult' && (
+                  <Link
+                    href={reviewHref}
+                    data-action="book-review"
+                    className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-[#FFD700]/40 px-6 py-3 font-mono text-xs text-[#FFD700] transition-colors hover:bg-[#FFD700]/10"
+                  >
+                    {REVIEW_BUTTON_LABEL} <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                )}
 
                 <div className="mt-4 flex items-center justify-center gap-3">
                   {resultHref && (

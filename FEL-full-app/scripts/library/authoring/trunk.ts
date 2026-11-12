@@ -99,7 +99,7 @@ export const TRUNK: Family[] = [
     family: 'rotational-power', block: B, category: 'power', pattern: 'rotation', plane: 'transverse', laterality: 'unilateral', skillLayer: 'wake-up', braceMode: 'reflex',
     primary: ['obliques', 'glutes'], secondary: ['abs', 'delts', 'adductors'], goals: ['power', 'trunk'], sport: ['general', 'basketball', 'tennis', 'football'],
     lowLoad: ['knee', 'back'], youthOk: true, equipment: ['medicine-ball', 'wall'], clip: 'throw',
-    setup: 'Stand side-on to a solid wall, a medicine ball held at the back hip.',
+    setup: 'Stand side-on to a solid wall, a med ball held at the back hip.',
     cues: ['Throw it through the wall: full speed every rep.', 'Turn the back foot and let the throw start from the floor.', 'Reset still between reps so every throw is fast.'],
     faults: [
       { fault: 'Arms-only throws', fix: 'Turn the back foot against the floor first; the arms finish the throw.' },
@@ -126,7 +126,7 @@ export const TRUNK: Family[] = [
     ],
     dosage: reps(3, '10-12', 45),
     variants: [
-      { name: 'Modified Curl-Up', v: 'curl-up', level: 'beginner', setup: 'On your back, one knee bent and one leg long, hands under the lower back.', cue: 'Lift the head and the top of the shoulders an inch off the floor and hold for a beat.' },
+      { name: 'Modified Curl-Up', v: 'curl-up', level: 'beginner', setup: 'On your back, one knee bent and one leg long, hands under the lower back.', cue: 'Lift your head and the tops of your shoulders an inch off the floor and hold a beat.' },
       { name: 'Hollow Body Hold, Tucked', v: 'hollow-tuck', level: 'beginner', ladder: 'hollow', setup: 'On your back, knees pulled in, arms reaching toward the feet.', cues: ['Press the lower back into the floor and lift the shoulders a little.', 'Hold still and breathe out long.', 'Make yourself a shallow banana shape on the floor.'], dosage: secs(3, 20, 30) },
       { name: 'Hollow Body Hold', v: 'hollow', level: 'intermediate', ladder: 'hollow', setup: 'On your back, legs long and low, arms reaching overhead.', cues: ['Press the lower back into the floor and hover the heels a few inches above it.', 'Hold still and breathe out long.', 'Make yourself a shallow banana shape on the floor.'], dosage: secs(3, 20, 30) },
       { name: 'Hollow Body Rock', v: 'hollow-rock', level: 'advanced', ladder: 'hollow', setup: 'Hold the hollow body shape on the floor.', cues: ['Rock gently along the floor without the banana shape changing.', 'Breathe out long through the rocks.', 'Stop the set when the shape breaks.'], dosage: reps(3, '10', 45) },

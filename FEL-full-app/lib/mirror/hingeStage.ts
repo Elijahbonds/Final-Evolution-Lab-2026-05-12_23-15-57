@@ -13,6 +13,7 @@
 //
 // The thresholds the grade uses are hingeAudit.ts's HINGE_THRESHOLDS — PROPOSED, untouched here (the capture lane tunes
 // them). The two numbers below only find where a rep starts and ends; they are new and marked TUNE.
+import { FAULT_NAMES } from '@/lib/cue-style/names';
 import type { Lm } from '@/lib/pose/landmarks';
 import { LEFT_HIP, LEFT_KNEE, LEFT_SHOULDER, RIGHT_HIP, RIGHT_KNEE, RIGHT_SHOULDER } from '@/lib/pose/landmarks';
 import { HINGE_CUES, auditHinge, hipFlexionDeg, type HingeFaultId } from './hingeAudit';
@@ -29,10 +30,11 @@ export const HINGE_REP_UP_DEG = 15;
 export const HINGE_FAULTS: readonly HingeFaultId[] = ['dowelLine', 'hingeRatio', 'shinAngle'];
 
 /** What each fault is called in the review — what the camera saw, never a cause or a diagnosis. */
+// CUE-REWRITE (2026-10-27): the canonical names (lib/cue-style/names.ts).
 export const HINGE_FAULT_LABEL: Readonly<Record<HingeFaultId, string>> = {
-  dowelLine: 'Head-to-hips line breaking (the broomstick line)',
-  hingeRatio: 'Knees doing the work — hips not travelling back',
-  shinAngle: 'Shin drifting forward over the toes',
+  dowelLine: FAULT_NAMES.backBends,
+  hingeRatio: FAULT_NAMES.kneesTooMuch,
+  shinAngle: FAULT_NAMES.shinsForward,
 };
 
 const vis = (l: Lm | undefined): l is Lm => !!l && l.v >= 0.5;
@@ -62,9 +64,9 @@ export const HINGE_CUE_TABLE = cueTableFor(HINGE_CUES, HINGE_FAULTS);
 
 /** Before Start: how to set the phone up, and the safety line. Said on the tab, not spoken. */
 export const HINGE_FRAMING = [
-  'Stand side-on to the phone, about 2–3 m away, with the phone at hip height — the camera reads your hips travelling back, which it cannot see from the front.',
-  'Bodyweight only. Hinge only as far as your back stays long, like a broomstick along it from head to hips — stop the set if anything hurts.',
+  'Stand side-on to the phone, 2 to 3 m away, phone at hip height.',
+  'Hip hinge: push your hips back, back flat. Bodyweight only. If anything hurts, stop and tell your coach.',
 ] as const;
 
 /** During setup: what to do before the first rep counts. */
-export const HINGE_SETUP_LINE = 'Side-on to the camera, standing tall, arms hanging — the check starts when you are still.';
+export const HINGE_SETUP_LINE = 'Stand side-on and tall, arms down. Hold still to start.';

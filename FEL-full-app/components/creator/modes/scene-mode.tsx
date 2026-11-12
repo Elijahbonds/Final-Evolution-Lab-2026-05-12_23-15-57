@@ -41,7 +41,7 @@ export default function SceneMode({ onPublish, submitLabel = 'Submit pack for re
                 </label>
               ))}
             </div>
-            {qs.length > 1 && <button onClick={() => setQs((a) => a.filter((_, j) => j !== i))} className="text-xs text-neutral-500">remove</button>}
+            {qs.length > 1 && <button onClick={() => setQs((a) => a.filter((_, j) => j !== i))} className="text-xs text-neutral-400">remove</button>}
           </div>
         ))}
         {qs.length < 8 && <button onClick={() => setQs((a) => [...a, blank()])} className="rounded-lg bg-neutral-800 px-3 py-2 text-sm">+ question</button>}

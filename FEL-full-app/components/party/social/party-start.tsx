@@ -18,12 +18,12 @@ export function StartSection({ s }: { s: PartyState }) {
   const host = isHost(s);
   const pick = ONLINE_MODES.find((m) => m.id === mode)!;
   if (!host) {
-    return <p className="text-xs text-white/45">The host can start a game for the whole party. Until then, play anything — the party comes with you.</p>;
+    return <p className="text-xs text-white/50">The host can start a game for the whole party. Until then, play anything — the party comes with you.</p>;
   }
   const crowd = s.members.filter((m) => m.connected).length;
   return (
     <section aria-label="Start together" className="space-y-2 rounded-xl border border-white/10 bg-white/[0.03] p-3">
-      <h3 className="font-mono text-[10px] tracking-[0.25em] text-white/45">START TOGETHER</h3>
+      <h3 className="font-mono text-[12px] tracking-[0.25em] text-white/50">START TOGETHER</h3>
       <div className="flex gap-2">
         <label className="sr-only" htmlFor="party-start-mode">Game to start together</label>
         <select id="party-start-mode" data-testid="party-start-mode" value={mode} onChange={(e) => setMode(e.target.value)}
@@ -36,7 +36,7 @@ export function StartSection({ s }: { s: PartyState }) {
           <Play className="h-4 w-4" /> Start
         </button>
       </div>
-      <p className="text-[11px] text-white/45">
+      <p className="text-[12px] text-white/50">
         Everyone gets 5 seconds to cancel. {pick.title} seats {pick.humans}{crowd > pick.humans ? ` — the first ${pick.humans} in the party play, everyone else stays in the party` : ''}.
       </p>
     </section>

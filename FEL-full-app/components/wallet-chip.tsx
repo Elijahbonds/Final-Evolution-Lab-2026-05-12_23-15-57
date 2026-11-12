@@ -89,18 +89,18 @@ export function WalletChip({ className }: WalletChipProps) {
     >
       <Coins className="h-3.5 w-3.5 text-amber-400" aria-hidden="true" />
       {state === 'error' ? (
-        <span className="text-xs font-medium tracking-wide text-zinc-500">—</span>
+        <span className="text-xs font-medium tracking-wide text-zinc-400">—</span>
       ) : (
         <motion.span
           className={cn(
             'font-mono text-sm font-semibold tabular-nums tracking-tight text-zinc-100',
-            state === 'loading' && 'animate-pulse text-zinc-500'
+            state === 'loading' && 'animate-pulse text-zinc-400'
           )}
         >
           {displayBalance}
         </motion.span>
       )}
-      <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
+      <span className="text-[12px] font-semibold uppercase tracking-widest text-zinc-400">
         LC
       </span>
     </motion.div>

@@ -62,7 +62,7 @@ export const STRENGTH_EXTRA: Family[] = [
       { name: 'Sandbag Bear-Hug Squat', v: 'bear-hug-squat', level: 'beginner' },
       { name: 'Sandbag Zercher Squat', v: 'zercher-squat', level: 'intermediate', setup: 'Sandbag in the crook of the elbows, hands together.' },
       { name: 'Sandbag Reverse Lunge', v: 'reverse-lunge', level: 'intermediate', laterality: 'alternating', cue: 'Step back softly and drive the floor down through your front heel to return.' },
-      { name: 'Sandbag Ground-to-Shoulder', v: 'ground-shoulder', level: 'advanced', laterality: 'alternating', setup: 'Sandbag on the floor between the feet.', cue: 'Hinge, lap the bag, then stand and roll it onto one shoulder.', youthOk: false, goals: ['power', 'strength'] },
+      { name: 'Sandbag Ground-to-Shoulder', v: 'ground-shoulder', level: 'advanced', laterality: 'alternating', setup: 'Sandbag on the floor between the feet.', cue: 'Hips back, lap the bag, then stand and roll it onto one shoulder.', youthOk: false, goals: ['power', 'strength'] },
       { name: 'Sandbag Shouldered Carry', v: 'shoulder-carry', level: 'intermediate', laterality: 'unilateral', setup: 'Sandbag resting on one shoulder.', cue: 'Grow tall toward the ceiling and take short, quiet steps.', dosage: meters(4, 30, 60) },
     ],
   },
@@ -74,7 +74,7 @@ export const STRENGTH_EXTRA: Family[] = [
     cues: [WALL_BEHIND, 'Stand tall by driving the hips forward to the wall ahead.', 'Pause at the top for a beat.'],
     faults: [
       { fault: 'Finishing by leaning back', fix: 'Stand tall and stop at a straight line to the floor.' },
-      { fault: 'Squatting the hinge', fix: 'Push the wall behind you; the shins stay near vertical.' },
+      { fault: 'Squatting instead of pushing the hips back', fix: 'Push the wall behind you; the shins stay near vertical.' },
     ],
     dosage: reps(3, '12-15', 45),
     variants: [
@@ -124,7 +124,7 @@ export const STRENGTH_EXTRA: Family[] = [
       { name: 'Suspension Trainer Row', v: 'strap-row', level: 'beginner', equipment: ['suspension-trainer'], setup: 'Hold the straps, lean back with the body straight, heels on the floor.', cue: 'Pull your chest to the handles as one straight plank.' },
       { name: 'Suspension Trainer Face Pull', v: 'strap-face-pull', level: 'intermediate', equipment: ['suspension-trainer'], setup: 'Hold the straps at face height, lean back with the body straight.', cue: 'Pull the handles toward your forehead, finishing with the hands beside your ears.', primary: ['rear-delts', 'mid-back'], secondary: ['rotator-cuff'], goals: ['shoulder', 'posture'] },
       { name: 'Band Straight-Arm Pulldown', v: 'band-straight-arm', level: 'beginner', equipment: ['band'], setup: 'A band anchored high, an end in each hand, arms long in front.', cue: 'Sweep the band down to your thighs with straight arms, then let it back up slow.' },
-      { name: 'Kettlebell High Pull, Light', v: 'kb-high-pull', level: 'intermediate', equipment: ['kettlebell'], setup: 'Kettlebell between the feet, hinge back and grip the handle.', cue: 'Snap the hips through and pull the bell close to chest height, elbow high.', goals: ['power'], youthOk: true },
+      { name: 'Kettlebell High Pull, Light', v: 'kb-high-pull', level: 'intermediate', equipment: ['kettlebell'], setup: 'Kettlebell between the feet, push your hips back and grip the handle.', cue: 'Snap the hips through and pull the bell close to chest height, elbow high.', goals: ['power'], youthOk: true },
     ],
   },
 ];

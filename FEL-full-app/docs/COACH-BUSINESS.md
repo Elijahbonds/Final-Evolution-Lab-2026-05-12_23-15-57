@@ -20,6 +20,10 @@ Lane `lane/coach-business`. The code is in `lib/coach-business/**`, `app/api/coa
 | `COACH_PRO_PRICE_USD_CENTS` | **Owner decision.** The Pro price per month. Unset (or not a whole number of cents from 100 to 1,000,000) means **3900, $39**. The one value behind every place the price shows or is charged: the Coach Pro upgrade, `/api/stripe/checkout` `FEL_COACH` (`lib/stripe.ts` reads it) and the B2B paywall line (`lib/pro-guard.ts`). |
 | `COACH_FREE_CLIENT_LIMIT` | **Owner decision.** How many active clients a Free coach can have. Unset means **3**. |
 | `COACH_MARKETPLACE_ENABLED` | Opens `/coaches` and applying to a coach. **Off:** `/coaches` is a 404. |
+| `PLATFORM_FEE_BPS_FREE`, `PLATFORM_FEE_BPS_PRO` | **Owner decision (2026-10-27, in chat: "5% on free, 0% on Pro").** FEL's share in basis points by the coach's plan. Unset = **500 (5%)** on Free and **0 (0%)** on Pro. `PLATFORM_FEE_BPS_PRO=500` restores 5% on Pro. |
+| `PLATFORM_FEE_CAP_CENTS_MONTHLY` | **Owner decision (open).** The most FEL takes from one coach per calendar month (UTC), in cents. Unset = no cap. Read from FEL's ledger. |
+| `REFUND_PROCESSING_FEE` | **Owner decision (2026-10-27, in chat: "refund in full").** Unset = **on**: a refund also returns the buyer's share of the processing fee, and FEL absorbs Stripe's fee (store terms §2.6). `0`/`false`/`off`/`no` = the processing fee is not refunded (the old rule). |
+| `STRIPE_CONNECT_WEBHOOK_SECRET` | The signing secret of the "events on connected accounts" endpoint (same URL). Unset = `account.updated` never arrives. |
 
 The coach's public page `/coach/[slug]` is open while **either** `COACH_STORE_ENABLED` or `COACH_MARKETPLACE_ENABLED` is on.
 
@@ -34,6 +38,7 @@ The coach's public page `/coach/[slug]` is open while **either** `COACH_STORE_EN
 
 - **Free** also covers the profile, packages people apply for, and the marketplace listing.
 - **Who counts as Pro:** anyone with an active `FEL_COACH` or `FEL_FACILITY` subscription, or anyone on the coach-store allowlist.
+- **FEL's fee** (owner, 2026-10-27): **5% on Free, 0% on Pro** (`PLATFORM_FEE_BPS_FREE` / `_PRO`). The buyer pays Stripe's processing fee on top in both cases.
 - **The upgrade:** it sells the existing `FEL_COACH` product at `COACH_PRO_PRICE_USD_CENTS`. The existing webhook, verify-session and refund paths handle it.
 
 The gates are wired in three places:
@@ -109,7 +114,12 @@ Every month ends with the coach at P − F and FEL at F (+1¢).
 
 ### Refunds
 
-**Decision: the processing fee is not refunded.** A refund returns part or all of the **listed price**. Stripe keeps its
+**Superseded 2026-10-27 (owner, in chat, card "refund-fee": "refund in full").** `REFUND_PROCESSING_FEE` now defaults
+**on**: a refund returns the price **and** the same share of the processing fee, and FEL absorbs Stripe's fee (see
+"Refunding the processing fee" under Payments-ready below). TUNED (money). The rule below is what `REFUND_PROCESSING_FEE=0`
+still does.
+
+**The old decision: the processing fee is not refunded.** A refund returns part or all of the **listed price**. Stripe keeps its
 fee on a refunded charge, so returning X would make FEL pay Stripe's fee out of its own 5%.
 
 - The refund sets `reverse_transfer`, so the coach's transfer is reversed in proportion.
@@ -180,14 +190,57 @@ The SQL is in `prisma/pending/2026-10-25-coach-business.sql`. It is additive onl
 
    Live mode stays off until:
 
-   - the coach terms and payout terms are signed (see the drafts the lane left for the owner);
-   - the business address is set;
-   - refund and dispute ownership is decided.
+   - ~~the coach terms and payout terms are signed~~ — **written 2026-10-27** on the owner's approval (`/coach-terms`,
+     `lib/coach-terms.ts`, card C12; not lawyer-reviewed). `COACH_TERMS_VERSION` is set, so live mode no longer refuses
+     with `coach_terms_unsigned`: it now waits only on `COACH_CONNECT_LIVE` and the live key, which are the owner's;
+   - the business address is set (it is: `lib/legal/business.ts`);
+   - ~~refund and dispute ownership is decided~~ — **decided 2026-10-27**: refunds in full (`REFUND_PROCESSING_FEE` on);
+     the coach bears a dispute's fee and loss, and FEL may recover it and a negative balance from future payouts (the
+     coach terms §7). **Not built:** that recovery. The terms give FEL the right, but no code takes it yet.
+
+## Payments-ready (lane `lane/payments-ready`, 2026-10-26)
+
+What the code does so that payments work safely the moment the owner signs the terms and sets the keys. Every default
+is today's behaviour. `npx tsx scripts/payments-preflight.ts --env-file <deploy env file>` checks a config before each
+switch-on (it prints no secret).
+
+- **Terms ticks.** The buyer ticks the store terms before a package checkout (409 `terms_required` otherwise), and the
+  version and time ride on the Checkout Session, payment and subscription metadata (`terms_version`,
+  `terms_accepted_at`), the store terms' own pattern. The coach ticks the coach terms before Connect onboarding; the
+  acceptance is kept on the Express account's metadata (`coach_terms_version`, `coach_terms_accepted_at`).
+  **The coach and payout terms are written (2026-10-27, card C12):** `COACH_TERMS_VERSION` = `coach-terms-2026-10-27`,
+  `COACH_TERMS_HREF` = `/coach-terms` (the text is `lib/coach-terms.ts`). Buyers of a coach's package tick the Purchase
+  Terms (`/purchase-terms`, card C28) instead of the coach store's terms. Were the version ever `null` again, test mode
+  would record a placeholder version and live mode would refuse to start (409 `store_closed` `coach_terms_unsigned`).
+- **`account.updated`** (Connect endpoint) re-reads the coach's account from Stripe and keeps charges, payouts,
+  details and, once `2026-10-26-payments-ready.sql` is applied, `requirementsDue`. `/coach/business` shows "Finish your
+  Stripe setup" until all are done.
+- **Disputes** on a coach's sale (`charge.dispute.created`, `.updated`, `.closed`, `.funds_withdrawn`,
+  `.funds_reinstated` on the platform endpoint) are recorded per dispute on the sale (`CoachSaleDispute`), shown to the
+  coach on `/coach/business`, and FEL's ledger books what Stripe withdrew (amount + dispute fee,
+  `COACH_CONNECT_DISPUTE_WITHDRAWN`) and returned (`COACH_CONNECT_DISPUTE_REINSTATED`), once per dispute. A dispute on a
+  destination charge is FEL's money. **Not built (owner call, payout terms):** recovering a lost dispute from the coach.
+- **Refunding the processing fee** (`REFUND_PROCESSING_FEE`, on by default since 2026-10-27): a refund of part R of the price refunds R plus the same
+  share of X to the buyer; FEL hands the coach back its share of F **and** of X, so the coach ends exactly where they do
+  today; the X share is booked as `COACH_CONNECT_PROCESSING_FEE_REFUND` (FEL absorbing Stripe's fee). A Dashboard refund
+  of any size maps back to the price share it covers.
+- **The platform fee** is `platformFee(plan, price, month so far)` (`lib/coach-business/fees.ts`). Under a cap, the
+  month so far is FEL's `COACH_CONNECT_FEE` less `COACH_CONNECT_FEE_REFUND` for that coach this UTC month (every ledger
+  row now carries the `coachId`), plus the coach's open checkouts. A monthly renewal is capped on its draft
+  (`invoice.created` writes the capped split on the invoice's own metadata); `invoice.paid` caps a renewal whose draft
+  was missed. The plan is read as today (`planServer.ts`): a failed read counts as Pro, on purpose (coordinator,
+  2026-10-26: charging a coach more than their plan allows is worse than FEL losing a few cents), so a sale made during a
+  database blip takes the Pro rate; one PII-free log line says so.
+
+**Owner's Stripe steps this adds:** on the platform endpoint also subscribe `charge.dispute.created`,
+`charge.dispute.updated`, `charge.dispute.closed`, `charge.dispute.funds_withdrawn`, `charge.dispute.funds_reinstated`;
+add a second endpoint, same URL, for **events on connected accounts** with `account.updated`, and put its signing secret
+in `STRIPE_CONNECT_WEBHOOK_SECRET`; apply `prisma/pending/2026-10-26-payments-ready.sql` after the coach-business file.
 
 ## Known limits
 
 - A **monthly** sale is cancelled from the dashboard, not refunded. Refund its invoice in the Stripe dashboard instead. That refund's charge carries no sale metadata, so FEL's fee refund for it is not booked automatically.
-- **Connect account status** is refreshed when the coach comes back from onboarding (`GET /api/coach/business/connect`). There is no `account.updated` Connect webhook yet.
+- **Connect account status** is refreshed when the coach comes back from onboarding (`GET /api/coach/business/connect`), and by `account.updated` once the Connect endpoint and `STRIPE_CONNECT_WEBHOOK_SECRET` are set (payments-ready).
 - **Reviews:** no rating system exists, so the page shows only client-approved results, and the JSON-LD claims no rating.
 - **Stripe's card fee** is passed to the buyer (above). The processing fee is sized to **US cards at 2.9% + 30¢**.
   - Cards that cost more come out of FEL's 5%. International cards are +1.5% and currency conversion +1%. On an

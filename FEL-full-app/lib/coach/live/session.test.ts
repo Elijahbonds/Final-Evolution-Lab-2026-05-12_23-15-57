@@ -1,3 +1,4 @@
+// test changed: copy rewrite (cue-rewrite lane) - flag lines use the canonical fault names; grouping, order, sides and reps unchanged.
 import { describe, expect, it } from 'vitest';
 import { addRep, buildSummary, initialCoachSession, liveSet, parseSummary, pickExercise, setFlagLines, settleSet, startSet, stopSet, summaryText } from './session';
 import type { WireRep } from './wire';
@@ -27,8 +28,8 @@ describe('the coach\'s sets', () => {
   it('flag lines group by fault, in coaching order, with the reps', () => {
     const lines = setFlagLines({ movement: 'squat', reps: [rep(1), rep(3, ['heelRise', 'kneeValgus'], { kneeValgus: 'left' }), rep(6, ['kneeValgus'], { kneeValgus: 'left' })] });
     expect(lines).toEqual([
-      'Knee drifting inward on the descent (left) — reps 3, 6',
-      'Heels lifting on the descent — rep 3',
+      'Knees cave in (left) — reps 3, 6',
+      'Heels lift — rep 3',
     ]);
   });
 });
@@ -49,7 +50,7 @@ describe('the summary: the only thing a live session keeps', () => {
     const text = summaryText(sum, 24);
     expect(text).toBe([
       'Live session summary (24 min): 2 sets, 5 reps, 1 flagged.',
-      '1. Squat: 3 reps — Knee drifting inward on the descent (right) — rep 2',
+      '1. Squat: 3 reps — Knees cave in (right) — rep 2',
       '2. Hip hinge: 2 reps, no flags',
       'Counted by the camera. Not recorded.',
     ].join('\n'));

@@ -175,7 +175,7 @@ export default function MusicMode({ onPublish, submitLabel = 'Publish as Creator
           <div key={t.sampleId} className="flex items-center gap-1">
             <button
               onClick={() => setTracks((p) => p.map((x, i) => (i === ti ? { ...x, muted: !x.muted } : x)))}
-              className={`w-16 shrink-0 rounded py-2 text-xs ${t.muted ? 'bg-neutral-800 text-neutral-500' : 'bg-neutral-700'}`}>
+              className={`w-16 shrink-0 rounded py-2 text-xs ${t.muted ? 'bg-neutral-800 text-neutral-400' : 'bg-neutral-700'}`}>
               {DEFAULT_KIT[ti].name}
             </button>
             <div className="flex flex-1 gap-1">

@@ -1,3 +1,5 @@
+// CUE-REWRITE (2026-10-27) — test changed: copy rewrite. The flag lines use the canonical fault names now
+// (lib/cue-style/names.ts: "Left knee caves in", "Back bends"); every assertion checks what it checked before.
 // COACH-VIDEO-REVIEW (2026-10-24): the per-rep score, the flags, the headline and the trend.
 import { describe, expect, it } from 'vitest';
 import { FAULT_COST_BY_RANK, FLAG_BELOW_SCORE, flagsFor, orderFaults, scoreRep, scoreReps, setHeadline, summarize, trendLine } from './score';
@@ -39,7 +41,7 @@ describe('the flags', () => {
     const reps = scoreReps('squat', [rep(1, []), rep(2, ['heelRise']), rep(3, ['kneeValgus'], true, { kneeValgus: 'left' }), rep(4, ['kneeValgus', 'heelRise'], true, { kneeValgus: 'both' }), rep(5, ['kneeValgus'], true, { kneeValgus: 'right' })]);
     const flags = flagsFor('squat', reps);
     expect(flags.map((f) => [f.rep, f.score, f.worst])).toEqual([[4, 40, true], [3, 65, false], [5, 65, false]]);
-    expect(flags.map((f) => f.reason)).toEqual(['Both knees cave on rep 4', 'Left knee caves on rep 3', 'Right knee caves on rep 5']);
+    expect(flags.map((f) => f.reason)).toEqual(['Both knees cave in on rep 4', 'Left knee caves in on rep 3', 'Right knee caves in on rep 5']);
     expect(flags[0].cue).toBeTruthy();
     expect(flags.some((f) => f.rep === 2)).toBe(false);   // a lone heel lift (75) beside worse reps is not flagged
   });
@@ -53,7 +55,7 @@ describe('the flags', () => {
   it('on a tie the worst is the first time it happened', () => {
     const flags = flagsFor('lunge', scoreReps('lunge', [rep(1, ['kneeIn'], true, { kneeIn: 'right' }), rep(2, ['kneeIn'], true, { kneeIn: 'right' })]));
     expect(flags.map((f) => [f.rep, f.worst])).toEqual([[1, true], [2, false]]);
-    expect(flags[0].reason).toBe('Right knee caves on rep 1');
+    expect(flags[0].reason).toBe('Right front knee caves in on rep 1');
   });
 
   it('a rep that was not read is never flagged', () => {
@@ -69,7 +71,7 @@ describe('the summary and the words', () => {
 
   it('the headline says what was counted and the worst flag, in that order', () => {
     const reps = scoreReps('squat', [rep(1, []), rep(2, ['kneeValgus'], true, { kneeValgus: 'left' })]);
-    expect(setHeadline('squat', summarize(reps), flagsFor('squat', reps))).toBe('2 reps counted. Left knee caves on rep 2.');
+    expect(setHeadline('squat', summarize(reps), flagsFor('squat', reps))).toBe('2 reps counted. Left knee caves in on rep 2.');
     expect(setHeadline('squat', summarize([]), [])).toMatch(/^No squat reps were counted/);
     expect(setHeadline('hinge', summarize(scoreReps('hinge', [rep(1, [], false)])), [])).toMatch(/could not read your form/);
     expect(setHeadline('pushup', summarize(scoreReps('pushup', [rep(1, [])])), [])).toBe('1 rep counted. Every rep the camera read looked clean.');

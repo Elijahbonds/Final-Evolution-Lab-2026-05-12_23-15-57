@@ -33,6 +33,7 @@ import type { PhotoShot } from '@/components/closet/studio/photo-mode';
 import { useEffect, useRef, useState } from 'react';
 import type { MutableRefObject } from 'react';
 import type { FaceConfig, JerseyConfig } from '@/lib/closet/wearable-catalog';
+import { quietCanvas } from '@/lib/babylon/core/canvasA11y';
 
 export interface StudioEvents {
   /** a tap on the body: the region it selects (a second tap on the same spot widens it), the finest region there and
@@ -134,8 +135,8 @@ export default function AvatarPreview(props: AvatarPreviewProps) {
     let cleanup: (() => void) | null = null;
     (async () => {
       const { Engine, Scene, ArcRotateCamera, Vector3 } = await import('@babylonjs/core');
-      const { applyCanvasFit, fitCanvas } = await import('@/lib/babylon/core/canvasFit');
-      const { detectQualityTier } = await import('@/lib/babylon/scene/QualityTier');
+      const { applyCanvasFit } = await import('@/lib/babylon/core/canvasFit');
+      const { deviceTierDecision } = await import('@/lib/babylon/scene/tierRule');
       const { CharacterLibrary } = await import('@/lib/babylon/core/CharacterLibrary');
       const { applyIdentity } = await import('@/lib/babylon/core/playerIdentity');
       const { applyPresentation, stampPresentation } = await import('@/lib/babylon/creator/shape/presentation');
@@ -154,9 +155,15 @@ export default function AvatarPreview(props: AvatarPreviewProps) {
       if (disposed || !canvasRef.current) return;
 
       const box = canvasRef.current;
-      const fit0 = fitCanvas({ cssWidth: box.clientWidth || 260, cssHeight: box.clientHeight || 260, dpr: window.devicePixelRatio || 1 });
-      const tier = detectQualityTier(box, fit0);
+      // DEMO-SPEED-3 (owner-approved 2026-10-28): the tier is the SCREEN's (tierRule deviceTierDecision), as the library stage and
+      // the profile decide it — not this canvas's box. Read off the box, a desktop Closet whose stage is under 700 px tall was
+      // a "phone-sized viewport": the phone shading, the scan's and the kit bodies' phone files, no antialiasing. 'high'
+      // reads as 'desktop' here (the Studio's two-tier view, QualityTier BaseTier).
+      const screenTier = deviceTierDecision().tier;
+      const tier: 'mobile' | 'desktop' = screenTier === 'mobile' ? 'mobile' : 'desktop';
       const engine = new Engine(box, tier === 'desktop', { alpha: true, adaptToDeviceRatio: false, stencil: false });
+      // SCREEN-FIXES (2026-11-10): named, and out of the Tab order (Babylon makes it 1): lib/babylon/core/canvasA11y.ts
+      quietCanvas(engine, box);
       applyCanvasFit(engine, box);
       const scene = new Scene(engine);
       // phase 4d: the tier the paint, the bendable parts and the identity layer read (a phone gets the phone sizes)
@@ -582,7 +589,7 @@ export default function AvatarPreview(props: AvatarPreviewProps) {
         {knob('rotate', 'Turn the part: drag round the ring', { left: 'var(--ring)', top: 0 }, '⟳')}
         {knob('scale', 'Resize the part: drag out or in', { left: 'calc(var(--ring) * 0.7071)', top: 'calc(var(--ring) * 0.7071)' }, '⤡')}
       </div>
-      {perfOn && <pre ref={perfRef} className="pointer-events-none absolute left-2 top-24 z-20 rounded bg-black/70 px-2 py-1 font-mono text-[10px] leading-tight text-emerald-300" />}
+      {perfOn && <pre ref={perfRef} className="pointer-events-none absolute left-2 top-24 z-20 rounded bg-black/70 px-2 py-1 font-mono text-[12px] leading-tight text-emerald-300" />}
     </div>
   );
 }

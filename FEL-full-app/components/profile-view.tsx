@@ -8,6 +8,7 @@ import { AvatarFigure } from '@/components/avatar-figure';
 import { Sparkles, Check, Plus, X, Loader2, Download, Trash2, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
+import { TYPE, lineSize } from '@/lib/design/type';
 
 // PROFILE V2 (owner 2026-10-24): this file used to BE the profile — a header, the athlete roster, mode mastery, the PRQ
 // attributes, data rights and health data, one long page that fetched four things after it hydrated. The profile is now
@@ -41,16 +42,16 @@ export function AthletePicker({ initialKey }: { initialKey: string | null }) {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="fel-heading text-[19px] font-bold text-white">YOUR ATHLETE</h2>
-          <p className="text-xs text-white/45">Pick the body type you're building toward. Your athlete shows up across the Lab.</p>
+          <p className={`${TYPE.body} text-white/50`}>Pick the body type you're building toward. Your athlete shows up across the Lab.</p>
         </div>
         <a
           href="/closet"
-          className="inline-flex items-center gap-1.5 rounded-md border border-[#C79BFF]/40 bg-[#C79BFF]/10 px-3 py-1.5 text-xs font-bold text-[#C79BFF] transition-colors hover:bg-[#C79BFF]/20"
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-[#C79BFF]/40 bg-[#C79BFF]/10 px-3 py-1.5 text-xs font-bold text-[#C79BFF] transition-colors hover:bg-[#C79BFF]/20"
         >
           <Sparkles className="h-3.5 w-3.5" /> CUSTOMIZE YOUR LOOK
         </a>
       </div>
-      <p className="mt-1 text-[11px] text-white/35">
+      <p className={`mt-1 ${TYPE.body} text-white/50`}>
         Face, gear, and card skin live in the <a href="/closet" className="text-[#C79BFF]/80 underline underline-offset-2 hover:text-[#C79BFF]">Closet</a> — or scan your face there and let it build you.
       </p>
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -75,10 +76,10 @@ export function AthletePicker({ initialKey }: { initialKey: string | null }) {
               <div className="fel-heading mt-1 text-center text-sm font-bold" style={{ color: r.accent }}>
                 {saving === r.key ? 'SAVING…' : r.name.toUpperCase()}
               </div>
-              <div className="text-center text-[10px] uppercase tracking-wider text-white/70">
+              <div className="text-center text-[12px] uppercase tracking-wider text-white/70">
                 {r.sex} · {r.build} · {r.bias.join(' / ')}
               </div>
-              <p className="mt-1 hidden text-center text-[11px] leading-snug text-white/70 sm:block">{r.tagline}</p>
+              <p className="mt-1 hidden text-center text-[12px] leading-snug text-white/70 sm:block">{r.tagline}</p>
             </button>
           );
         })}
@@ -132,16 +133,16 @@ export function PrqDataRights() {
 
   return (
     <div className="mt-8 rounded-xl border border-white/10 bg-white/[0.02] p-5">
-      <h3 className="fel-heading text-lg font-bold text-white mb-1">YOUR DATA RIGHTS</h3>
+      <h3 className="fel-heading text-[20px] font-bold text-white mb-1">YOUR DATA RIGHTS</h3>
       {/* REVIEW (2026-09-24, D5): both buttons cover the movement history too (lib/prq-data-rights.ts), the numbers
           worked out from the camera that the privacy policy sends people here to export or delete */}
-      <p className="text-xs text-white/40 mb-4">
+      <p className={`${TYPE.body} text-fel-dim mb-4`}>
         Export or delete your PRQ measurements and your movement history (jumps, dunks, form reads and screens worked out from the camera) at any time.
       </p>
       <div className="flex flex-wrap gap-3">
         <button
           onClick={handleExport}
-          className="inline-flex items-center gap-2 rounded-md border border-[#00E5FF]/30 bg-[#00E5FF]/10 px-4 py-2 text-xs font-bold text-[#00E5FF] transition-colors hover:bg-[#00E5FF]/20"
+          className="inline-flex min-h-11 items-center gap-2 rounded-md border border-[#00E5FF]/30 bg-[#00E5FF]/10 px-4 py-2 text-xs font-bold text-[#00E5FF] transition-colors hover:bg-[#00E5FF]/20"
         >
           <Download className="h-3.5 w-3.5" /> EXPORT DATA (JSON)
         </button>
@@ -149,13 +150,13 @@ export function PrqDataRights() {
           <button
             data-test-ignore="opens-confirm-dialog"
             onClick={() => setShowConfirm(true)}
-            className="inline-flex items-center gap-2 rounded-md border border-[#FF3366]/30 bg-[#FF3366]/10 px-4 py-2 text-xs font-bold text-[#FF3366] transition-colors hover:bg-[#FF3366]/20"
+            className="inline-flex min-h-11 items-center gap-2 rounded-md border border-[#FF3366]/30 bg-[#FF3366]/10 px-4 py-2 text-xs font-bold text-[#FF3366] transition-colors hover:bg-[#FF3366]/20"
           >
             <Trash2 className="h-3.5 w-3.5" /> DELETE PRQ + MOVEMENT HISTORY
           </button>
         ) : (
           <div className="flex items-center gap-2">
-            <span className="text-xs text-[#FF3366]">Deletes every PRQ entry and all movement history (Mirror dunks, screens, form reads). Bought plans stay. This is permanent.</span>
+            <span className={`${TYPE.body} text-[#FF3366]`}>Deletes every PRQ entry and all movement history (Mirror dunks, screens, form reads). Bought plans stay. This is permanent.</span>
             <button
               onClick={handleDelete}
               disabled={deleting}
@@ -258,10 +259,10 @@ export function HealthDataSection() {
 
   return (
     <div className="mt-8 rounded-xl border border-white/10 bg-white/[0.02] p-5">
-      <h3 className="fel-heading flex items-center gap-2 text-lg font-bold text-white mb-1">
+      <h3 className="fel-heading flex items-center gap-2 text-[20px] font-bold text-white mb-1">
         <ShieldCheck className="h-4 w-4 text-[#00E5FF]" /> HEALTH DATA
       </h3>
-      <p className="text-xs text-white/40 mb-4">
+      <p className={`${TYPE.body} text-fel-dim mb-4`}>
         Your health intake, pain check-ins, daily check-ins and Dial-Up Breath uses, kept separately from the rest of your account: opt-in only, stored on FEL
         only, never sold, never used for ads, never in a share link, and never scored or paid. See Privacy §5.
       </p>
@@ -269,11 +270,12 @@ export function HealthDataSection() {
       <div className="flex items-center justify-between rounded-lg border border-white/10 p-3">
         <div>
           <div className="text-sm font-bold text-white">Health data collection</div>
-          <div className="text-xs text-white/40">
-            {granted
+          {(() => {
+            const line = granted
               ? `On${view?.healthData.grantedAt ? ` since ${new Date(view.healthData.grantedAt).toLocaleDateString()}` : ''} — ${healthStoredLine(view?.counts)}`
-              : 'Off — nothing is being collected.'}
-          </div>
+              : 'Off — nothing is being collected.';
+            return <div className={`${lineSize(line, 'text-xs')} text-fel-dim`}>{line}</div>;
+          })()}
         </div>
         <Switch
           checked={granted}
@@ -290,7 +292,7 @@ export function HealthDataSection() {
             <div key={c.coachId} className="flex items-center justify-between rounded-lg border border-white/10 p-3">
               <div>
                 <div className="text-sm text-white">{c.name}</div>
-                <div className="text-xs text-white/40">
+                <div className="text-xs text-white/50">
                   {c.viewGranted ? 'Can see your intake and pain check-ins.' : granted ? 'Not shared.' : 'Turn on health data collection to share.'}
                 </div>
               </div>
@@ -310,13 +312,13 @@ export function HealthDataSection() {
           <button
             data-test-ignore="opens-confirm-dialog"
             onClick={() => setShowErase(true)}
-            className="inline-flex items-center gap-2 rounded-md border border-[#FF3366]/30 bg-[#FF3366]/10 px-4 py-2 text-xs font-bold text-[#FF3366] transition-colors hover:bg-[#FF3366]/20"
+            className="inline-flex min-h-11 items-center gap-2 rounded-md border border-[#FF3366]/30 bg-[#FF3366]/10 px-4 py-2 text-xs font-bold text-[#FF3366] transition-colors hover:bg-[#FF3366]/20"
           >
             <Trash2 className="h-3.5 w-3.5" /> ERASE HEALTH DATA
           </button>
         ) : (
           <div className="flex items-center gap-2">
-            <span className="text-xs text-[#FF3366]">Deletes your intake, every pain check-in, every daily check-in and your Dial-Up Breath uses. Your consent records are kept as proof of agreement and withdrawal. Never touches a workout plan or your PRQ history. This is permanent.</span>
+            <span className={`${TYPE.body} text-[#FF3366]`}>Deletes your intake, every pain check-in, every daily check-in and your Dial-Up Breath uses. Your consent records are kept as proof of agreement and withdrawal. Never touches a workout plan or your PRQ history. This is permanent.</span>
             <button
               onClick={handleErase}
               disabled={erasing}
@@ -398,7 +400,7 @@ export function PrqFoundation() {
       <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="fel-heading text-[19px] font-bold text-white">PRQ ATTRIBUTES</h2>
-          <p className="text-xs text-white/45">
+          <p className="text-xs text-white/50">
             Performance Readiness Quotient — every value is traceable to its source.
             {prq && ` ${prq.measured}/${prq.total} measured.`}
           </p>
@@ -406,7 +408,7 @@ export function PrqFoundation() {
         <button
           data-test-ignore="opens-log-form"
           onClick={() => openForm()}
-          className="inline-flex items-center gap-1.5 rounded-md border border-[#00E5FF]/40 bg-[#00E5FF]/10 px-3 py-1.5 text-xs font-bold text-[#00E5FF] transition-colors hover:bg-[#00E5FF]/20"
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-[#00E5FF]/40 bg-[#00E5FF]/10 px-3 py-1.5 text-xs font-bold text-[#00E5FF] transition-colors hover:bg-[#00E5FF]/20"
         >
           <Plus className="h-3.5 w-3.5" /> LOG ENTRY
         </button>
@@ -416,9 +418,9 @@ export function PrqFoundation() {
         // the same badge every surface prints (lib/prq-display): "PRQ —" until something is measured
         const d = prqDisplay(prq);
         return (
-          <div className="mt-3 inline-flex items-center gap-2 rounded-lg border px-4 py-2 font-mono text-lg font-bold" style={{ color: d.color, borderColor: `${d.color}4d`, background: `${d.color}1a` }}>
+          <div className="mt-3 inline-flex items-center gap-2 rounded-lg border px-4 py-2 font-mono text-[20px] font-bold" style={{ color: d.color, borderColor: `${d.color}4d`, background: `${d.color}1a` }}>
             {d.label}
-            <span className="text-xs font-normal text-white/40">({d.coverage} measured)</span>
+            <span className="text-xs font-normal text-white/50">({d.coverage} measured)</span>
           </div>
         );
       })()}
@@ -438,10 +440,10 @@ export function PrqFoundation() {
                 <span className="text-sm font-medium text-white/80">{attr.label}</span>
                 {val !== null ? (
                   <span className="font-mono text-sm font-bold" style={{ color }}>
-                    {val.toFixed(1)} <span className="text-[10px] text-white/40">{m?.unit}</span>
+                    {val.toFixed(1)} <span className="text-[12px] text-white/50">{m?.unit}</span>
                   </span>
                 ) : (
-                  <span className="text-xs italic text-white/30">not measured</span>
+                  <span className="text-xs italic text-white/50">not measured</span>
                 )}
               </div>
               {val !== null && (
@@ -453,7 +455,7 @@ export function PrqFoundation() {
                 </div>
               )}
               {sourceLabel && (
-                <div className="mt-1.5 flex items-center justify-between text-[10px] text-white/30">
+                <div className="mt-1.5 flex items-center justify-between text-[12px] text-white/50">
                   <span>Source: {sourceLabel}</span>
                   <span>{new Date(m!.measuredAt).toLocaleDateString('en-US', { timeZone: 'UTC' })}</span>
                 </div>
@@ -461,7 +463,7 @@ export function PrqFoundation() {
               {val === null && (
                 <button
                   onClick={() => openForm(attr.key)}
-                  className="mt-2 text-[10px] font-bold text-[#00E5FF]/70 hover:text-[#00E5FF]"
+                  className="mt-1 inline-flex min-h-11 items-center text-[12px] font-bold text-[#00E5FF]/70 hover:text-[#00E5FF]"
                 >
                   + Log measurement
                 </button>
@@ -475,17 +477,17 @@ export function PrqFoundation() {
       {showForm && (
         <div className="fel-panel mt-6 rounded-xl p-5">
           <div className="flex items-center justify-between">
-            <h3 className="fel-heading text-lg font-bold text-white">LOG PRQ ENTRY</h3>
-            <button onClick={() => setShowForm(false)} className="text-white/40 hover:text-white">
+            <h3 className="fel-heading text-[20px] font-bold text-white">LOG PRQ ENTRY</h3>
+            <button onClick={() => setShowForm(false)} className="text-white/50 hover:text-white">
               <X className="h-4 w-4" />
             </button>
           </div>
-          <p className="mb-4 text-xs text-white/40">
+          <p className="mb-4 text-xs text-white/50">
             Record a self-measured value. Source is always “Manual.”
           </p>
           <div className="grid gap-3 sm:grid-cols-3">
             <div>
-              <label className="mb-1 block text-[10px] uppercase tracking-wider text-white/50">Attribute</label>
+              <label className="mb-1 block text-[12px] uppercase tracking-wider text-white/50">Attribute</label>
               <select
                 value={formAttr}
                 onChange={(e) => { setFormAttr(e.target.value); setFormUnit(''); }}
@@ -497,7 +499,7 @@ export function PrqFoundation() {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-[10px] uppercase tracking-wider text-white/50">Value</label>
+              <label className="mb-1 block text-[12px] uppercase tracking-wider text-white/50">Value</label>
               <input
                 type="number"
                 step="any"
@@ -505,11 +507,11 @@ export function PrqFoundation() {
                 value={formValue}
                 onChange={(e) => setFormValue(e.target.value)}
                 placeholder="e.g. 28"
-                className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/25"
+                className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/50"
               />
             </div>
             <div>
-              <label className="mb-1 block text-[10px] uppercase tracking-wider text-white/50">Unit</label>
+              <label className="mb-1 block text-[12px] uppercase tracking-wider text-white/50">Unit</label>
               <select
                 value={formUnit || selectedUnits[0] || 'score'}
                 onChange={(e) => setFormUnit(e.target.value)}

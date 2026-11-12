@@ -77,14 +77,14 @@ export function PartsTab({ parts, onChange, accent, canUndo, canRedo, onUndo, on
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-white/10 bg-white/[0.02] p-3">
         <div className="min-w-[140px] flex-1">
-          <div className="flex items-center justify-between text-[11px] text-white/60">
+          <div className="flex items-center justify-between text-[12px] text-white/60">
             <span className="flex items-center gap-1"><Layers className="h-3.5 w-3.5 text-cyan-400" /> Parts on your body</span>
             <span className="tabular-nums" aria-label="parts used">{used} / {PART_BUDGET}</span>
           </div>
           <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/10">
             <div className="h-full rounded-full transition-all" style={{ width: `${(100 * used) / PART_BUDGET}%`, backgroundColor: used >= PART_BUDGET ? '#FF3366' : '#00E5FF' }} />
           </div>
-          <p className="mt-1 text-[10px] text-white/35">A mirrored part counts twice.</p>
+          <p className="mt-1 text-[12px] text-white/50">A mirrored part counts twice.</p>
         </div>
         <button type="button" onClick={onUndo} disabled={!canUndo} aria-label="Undo" title="Undo (Ctrl+Z)"
           className="flex items-center gap-1 rounded-lg bg-white/5 px-2.5 py-1.5 text-xs text-white/80 transition hover:bg-white/10 disabled:opacity-30"><Undo2 className="h-3.5 w-3.5" /> Undo</button>
@@ -99,26 +99,26 @@ export function PartsTab({ parts, onChange, accent, canUndo, canRedo, onUndo, on
             const ok = fitsBudget(parts, 1);
             return (
               <button key={shape} type="button" disabled={!ok} onClick={() => add(shape)} title={`Add a ${SHAPE_LABELS[shape].toLowerCase()} (starts on the ${BONE_LABELS[PART_START[shape].bone].toLowerCase()})`}
-                className="flex items-center justify-center gap-1 rounded-lg border border-white/10 bg-white/[0.03] px-2 py-1.5 text-[11px] text-white/80 transition hover:border-cyan-400/50 hover:bg-cyan-400/10 disabled:opacity-30">
+                className="flex min-h-11 items-center justify-center gap-1 rounded-lg border border-white/10 bg-white/[0.03] px-2 py-1.5 text-[12px] text-white/80 transition hover:border-cyan-400/50 hover:bg-cyan-400/10 disabled:opacity-30">
                 <Plus className="h-3 w-3 text-cyan-300/80" /> {SHAPE_LABELS[shape]}
               </button>
             );
           })}
         </div>
-        <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-[11px] text-white/60">
+        <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-[12px] text-white/60">
           <span>Spike cluster</span>
-          <input type="range" min={3} max={16} value={cluster} onChange={(e) => setCluster(Number(e.target.value))} className="w-28 accent-cyan-400" aria-label="Spikes in the cluster" />
+          <input type="range" min={3} max={16} value={cluster} onChange={(e) => setCluster(Number(e.target.value))} className="min-h-11 w-28 accent-cyan-400" aria-label="Spikes in the cluster" />
           <span className="w-5 tabular-nums text-white/50">{cluster}</span>
           <button type="button" onClick={addCluster} disabled={!fitsBudget(parts, 1)}
-            className="rounded-md bg-cyan-400/15 px-2 py-1 font-semibold text-cyan-200 transition hover:bg-cyan-400/25 disabled:opacity-30">Add spikes to the head</button>
-          <span className="text-[10px] text-white/35">Each spike is its own part — edit or delete any of them.</span>
+            className="min-h-11 rounded-lg border border-white/10 bg-white/[0.03] px-2 py-1 text-[12px] text-cyan-200 transition hover:border-cyan-400/50 disabled:opacity-30">Add spikes to the head</button>
+          <span className="text-[12px] text-white/50">Each spike is its own part — edit or delete any of them.</span>
         </div>
       </section>
 
       <section>
         <h3 className="mb-2 text-sm font-semibold text-white/80">Placed parts</h3>
         {parts.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-white/10 p-4 text-center text-xs text-white/40">No parts yet. Add one above — spikes, plates, fins, a visor — and place it anywhere on the body.</p>
+          <p className="rounded-lg border border-dashed border-white/10 p-4 text-center text-base text-white/50">No parts yet. Add one above — spikes, plates, fins, a visor — and place it anywhere on the body.</p>
         ) : (
           <ul className="max-h-56 space-y-1 overflow-y-auto pr-1" aria-label="Placed parts">
             {parts.map((p) => {
@@ -130,9 +130,9 @@ export function PartsTab({ parts, onChange, accent, canUndo, canRedo, onUndo, on
                     className="flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs transition"
                     style={{ borderColor: on ? '#00E5FF' : 'rgba(255,255,255,0.08)', backgroundColor: on ? 'rgba(0,229,255,0.08)' : 'rgba(255,255,255,0.02)' }}>
                     <span className="h-3.5 w-3.5 shrink-0 rounded-full border border-white/20" style={{ backgroundColor: p.colour }} />
-                    <span className="flex-1 truncate text-white/85">{SHAPE_LABELS[p.shape]} <span className="text-white/40">· {BONE_LABELS[p.bone]}</span></span>
-                    {p.mirror && <span className="flex items-center gap-0.5 text-[10px] text-cyan-300/80" title="Mirrored (counts twice)"><FlipHorizontal className="h-3 w-3" /> ×2</span>}
-                    <span className="text-[10px] capitalize text-white/35">{p.finish}</span>
+                    <span className="flex-1 truncate text-white/85">{SHAPE_LABELS[p.shape]} <span className="text-white/50">· {BONE_LABELS[p.bone]}</span></span>
+                    {p.mirror && <span className="flex items-center gap-0.5 text-[12px] text-cyan-300/80" title="Mirrored (counts twice)"><FlipHorizontal className="h-3 w-3" /> ×2</span>}
+                    <span className="text-[12px] capitalize text-white/50">{p.finish}</span>
                     <button type="button" aria-label={`Duplicate ${SHAPE_LABELS[p.shape]}`} title="Duplicate" disabled={!fitsBudget(parts, partCost(p))}
                       onClick={(e) => { e.stopPropagation(); const next = duplicatePart(parts, p.id); if (next) { onChange(next); setSelectedId(next[next.findIndex((x) => x.id === p.id) + 1].id); } }}
                       className="rounded p-1 text-white/50 hover:bg-white/10 hover:text-white disabled:opacity-30"><Copy className="h-3.5 w-3.5" /></button>
@@ -150,14 +150,14 @@ export function PartsTab({ parts, onChange, accent, canUndo, canRedo, onUndo, on
       {selected && (
         <section className="space-y-4 rounded-xl border border-cyan-400/20 bg-cyan-400/[0.03] p-4" aria-label="Selected part">
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="flex flex-col gap-1 text-[11px] text-white/60">
+            <label className="flex flex-col gap-1 text-[12px] text-white/60">
               <span>Shape</span>
               <select value={selected.shape} onChange={(e) => edit({ shape: e.target.value as PartShape })}
                 className="rounded-md border border-white/10 bg-[#0b1220] px-2 py-1.5 text-xs text-white">
                 {SHAPE_ORDER.map((s) => <option key={s} value={s}>{SHAPE_LABELS[s]}</option>)}
               </select>
             </label>
-            <label className="flex flex-col gap-1 text-[11px] text-white/60">
+            <label className="flex flex-col gap-1 text-[12px] text-white/60">
               <span>On the</span>
               <select value={selected.bone} onChange={(e) => edit({ bone: e.target.value as PartBone })}
                 className="rounded-md border border-white/10 bg-[#0b1220] px-2 py-1.5 text-xs text-white">
@@ -171,7 +171,7 @@ export function PartsTab({ parts, onChange, accent, canUndo, canRedo, onUndo, on
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <label className="flex items-center gap-2 text-[11px] text-white/60">
+            <label className="flex items-center gap-2 text-[12px] text-white/60">
               <span>Colour</span>
               <input type="color" value={selected.colour.toLowerCase()} aria-label="Part colour"
                 onChange={(e) => edit({ colour: e.target.value.toUpperCase() }, 'colour')} className="h-8 w-10 cursor-pointer rounded border border-white/15 bg-transparent" />
@@ -180,13 +180,13 @@ export function PartsTab({ parts, onChange, accent, canUndo, canRedo, onUndo, on
             <div className="flex gap-1" role="group" aria-label="Finish">
               {FINISHES.map((f: Finish) => (
                 <button key={f} type="button" aria-pressed={selected.finish === f} onClick={() => edit({ finish: f })}
-                  className="rounded-full px-2.5 py-1 text-[11px] transition"
+                  className="rounded-full px-2.5 py-1 text-[12px] transition"
                   style={{ backgroundColor: selected.finish === f ? '#00E5FF' : 'rgba(255,255,255,0.05)', color: selected.finish === f ? '#050505' : 'rgba(255,255,255,0.75)', border: `1px solid ${selected.finish === f ? '#00E5FF' : 'rgba(255,255,255,0.12)'}` }}>
                   {FINISH_LABELS[f]}
                 </button>
               ))}
             </div>
-            <label className="flex items-center gap-2 text-[11px] text-white/70" title={selected.mirror ? 'Also on the other side' : fitsBudget(parts, 1) ? 'Add the mirror image on the other side (counts twice)' : 'No room left in the 64-part budget'}>
+            <label className="flex items-center gap-2 text-[12px] text-white/70" title={selected.mirror ? 'Also on the other side' : fitsBudget(parts, 1) ? 'Add the mirror image on the other side (counts twice)' : 'No room left in the 64-part budget'}>
               <input type="checkbox" checked={selected.mirror} disabled={!selected.mirror && !fitsBudget(parts, 1)}
                 onChange={(e) => edit({ mirror: e.target.checked })} className="accent-cyan-400" />
               <FlipHorizontal className="h-3.5 w-3.5" /> Mirror
@@ -196,7 +196,7 @@ export function PartsTab({ parts, onChange, accent, canUndo, canRedo, onUndo, on
           {/* CREATOR-PLAN phase 4c: a second colour (a split or a stripe), bend and sway, sit on the bulk */}
           <SliderGroup title="Second colour">
             <div className="flex flex-wrap items-center gap-3">
-              <label className="flex items-center gap-2 text-[11px] text-white/70">
+              <label className="flex items-center gap-2 text-[12px] text-white/70">
                 <input type="checkbox" checked={!!selected.colour2} aria-label="Two-tone"
                   onChange={(e) => edit(e.target.checked ? { colour2: selected.colour === '#FFFFFF' ? '#111111' : '#FFFFFF' } : { colour2: undefined, tone: undefined, toneAxis: undefined, toneAt: undefined, toneWidth: undefined })} className="accent-cyan-400" />
                 Two-tone
@@ -219,10 +219,10 @@ export function PartsTab({ parts, onChange, accent, canUndo, canRedo, onUndo, on
           {isSwingShape(selected.shape) && (
             <SliderGroup title="Bend and sway">
               <NumSlider label="Sway" value={selected.swing ?? 0} min={RANGES.swing[0]} max={RANGES.swing[1]} step={0.01} onChange={(v) => edit({ swing: v }, 'swing')} />
-              <p className="text-[10px] text-white/35">0 keeps it rigid. Above 0 it bends along its length and swings as you move (a lighter version on phones).</p>
+              <p className="text-[12px] text-white/50">0 keeps it rigid. Above 0 it bends along its length and swings as you move (a lighter version on phones).</p>
             </SliderGroup>
           )}
-          <label className="flex items-center gap-2 text-[11px] text-white/70" title="When this body segment is bulked up (Shape tab), the part moves out with it instead of sinking in">
+          <label className="flex items-center gap-2 text-[12px] text-white/70" title="When this body segment is bulked up (Shape tab), the part moves out with it instead of sinking in">
             <input type="checkbox" checked={!!selected.follow} onChange={(e) => edit({ follow: e.target.checked ? true : undefined })} className="accent-cyan-400" />
             Sit on top of the bulk
           </label>
@@ -247,7 +247,7 @@ export function PartsTab({ parts, onChange, accent, canUndo, canRedo, onUndo, on
             ))}
           </SliderGroup>
           <button type="button" onClick={() => { const s = PART_START[selected.shape]; edit({ bone: s.bone, pos: [...s.pos], rot: [...s.rot], scale: [...s.scale] }); }}
-            className="flex items-center gap-1 text-[11px] text-cyan-300/80 hover:text-cyan-200"><RotateCcw className="h-3 w-3" /> Reset placement</button>
+            className="flex items-center gap-1 text-[12px] text-cyan-300/80 hover:text-cyan-200"><RotateCcw className="h-3 w-3" /> Reset placement</button>
         </section>
       )}
     </div>
@@ -256,7 +256,7 @@ export function PartsTab({ parts, onChange, accent, canUndo, canRedo, onUndo, on
 
 function Pill({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
-    <button type="button" aria-pressed={on} onClick={onClick} className="rounded-full px-2.5 py-1 text-[11px] transition"
+    <button type="button" aria-pressed={on} onClick={onClick} className="rounded-full px-2.5 py-1 text-[12px] transition"
       style={{ backgroundColor: on ? '#00E5FF' : 'rgba(255,255,255,0.05)', color: on ? '#050505' : 'rgba(255,255,255,0.75)', border: `1px solid ${on ? '#00E5FF' : 'rgba(255,255,255,0.12)'}` }}>
       {children}
     </button>
@@ -266,7 +266,7 @@ function Pill({ on, onClick, children }: { on: boolean; onClick: () => void; chi
 export function SliderGroup({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-white/45">{title}</h4>
+      <h4 className="mb-1.5 text-[12px] font-semibold uppercase tracking-wider text-white/50">{title}</h4>
       <div className="space-y-1.5">{children}</div>
     </div>
   );
@@ -300,6 +300,6 @@ export function HexField({ value, onCommit, label = 'Part colour hex' }: { value
     <input type="text" value={shown} maxLength={7} aria-label={label} spellCheck={false}
       onChange={(e) => setDraft(e.target.value.startsWith('#') ? e.target.value : `#${e.target.value}`)}
       onBlur={commit} onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setDraft(null); }}
-      className="w-20 rounded border border-white/10 bg-white/5 px-1.5 py-1 font-mono text-[11px] uppercase text-white/80" />
+      className="w-20 rounded border border-white/10 bg-white/5 px-1.5 py-1 font-mono text-[12px] uppercase text-white/80" />
   );
 }

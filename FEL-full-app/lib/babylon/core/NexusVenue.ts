@@ -22,6 +22,7 @@ import { mountVenueProps, propSetFor, type VenuePropsHandle } from '../visual/Ve
 import { VENUE_PROP_SETS, surroundSize, surroundColor, surroundDetail } from '../visual/venuePropSets';
 import { Color3, MeshBuilder, PBRMaterial } from '@babylonjs/core';
 import { dressHoop } from '../visual/meshyProps';
+import { VQ } from '../scene/venueQualityV1';
 import { decorateVeniceBoardwalk, type DressingHooks } from '../nexus/veniceBoardwalk';
 import { NavBounds } from './NavBounds';
 import { MAPS } from '../../map-data';
@@ -33,6 +34,7 @@ import { applyLocation, COURT_LOCATIONS, isCourtLocationId } from '../nexus/cour
 import { fieldMaterial } from '../visual/PlacePack';
 import type { CombatArena } from '../combat/arenas';
 import type { PlaceLook } from '../nexus/placeLooks';
+import { onePerFrame } from './onePerFrame';   // RUNUP-STALL-4
 
 export interface VenueHandle {
   /** Ship pass 4, phase 3: the walkable-area navmesh baked from this venue's map (null until loaded, or when the venue has no map). */
@@ -59,6 +61,9 @@ export interface VenueHandle {
   /** FIRST-DUNK-BUDGET: mount the dressing a `deferDressing` venue held back (the prop set, the onlookers). Idempotent; resolves
    *  once the prop set has landed or failed. A venue that did not defer has already started it. */
   mountDressing(): Promise<void>;
+  /** RUNUP-STALL-4 (DunkMode, knob dunk.preloadSet): run the dressing jobs one per frame when mountDressing() starts them,
+   *  instead of all at once. Call before mountDressing(); no effect once it has started. */
+  paceDressing?(): void;
   dispose(): void;
 }
 
@@ -310,7 +315,7 @@ export function mountVenue(ctx: VenueCtx, modeId: string, options: MountVenueOpt
   // FIRST-DUNK-BUDGET: the dressing's jobs — started together by mountDressing(), at once unless the mode deferred them
   const dressingJobs: Array<() => Promise<void> | void> = [], landedJobs: Array<() => void> = [];
   const hooks: DressingHooks | undefined = options.deferDressing ? { start: (job) => { dressingJobs.push(job); }, landed: (job) => { landedJobs.push(job); } } : undefined;
-  if (!location && /^basketball_/.test(modeId)) decorateVeniceBoardwalk(ctx.scene, built.root, scanShiftZ, modeId === 'basketball_dunk' ? 'venice-dunk' : 'lawn', hooks);
+  if (!location && /^basketball_/.test(modeId)) decorateVeniceBoardwalk(ctx.scene, built.root, scanShiftZ, modeId === 'basketball_dunk' || (VQ.venice() && /^basketball_(h2h|3v3)$/.test(modeId)) ? 'venice-dunk' : 'lawn', hooks);   // VENUE-QUALITY v1: venue.veniceHoopsV1 (off) gives 1v1/3v3 the dunk's Venice
   void dressHoop(ctx.scene, built.root);   // owner 2026-09-05: the scanned Venice hoop stands in for the procedural one, every court, every location
   let props: VenuePropsHandle | null = null; let propsGone = false;
   // HIDE THE STUBS WHEN THE KIT IS ON (SHARED-PLACE-FLOOR). A spec's 'palm' is a cylinder under a six-sided cone and its
@@ -343,7 +348,9 @@ export function mountVenue(ctx: VenueCtx, modeId: string, options: MountVenueOpt
     }, () => fallback('failed to load')));
   }
   let dressing: Promise<void> | null = null;
-  const mountDressing = (): Promise<void> => (dressing ??= Promise.all(dressingJobs.map((job) => job())).then(() => {
+  let dressingPaced = false;   // RUNUP-STALL-4: paceDressing() (knob on only); off, the jobs start together as before
+  const pacedJobs = (): Promise<unknown> => onePerFrame(dressingJobs.map((job) => () => Promise.resolve(job())), (cb) => { ctx.scene.onBeforeRenderObservable.addOnce(cb); }, () => disposed);
+  const mountDressing = (): Promise<void> => (dressing ??= (dressingPaced ? pacedJobs() : Promise.all(dressingJobs.map((job) => job()))).then(() => {
     if (!propsGone) for (const job of landedJobs) job();
   }));
   if (!options.deferDressing) void mountDressing();
@@ -430,6 +437,7 @@ export function mountVenue(ctx: VenueCtx, modeId: string, options: MountVenueOpt
       }
     },
     mountDressing,
+    paceDressing() { dressingPaced = true; },
     dispose() {
       disposed = true;
       ctx.camDirector?.invalidateBounds?.();

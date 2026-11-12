@@ -29,16 +29,30 @@ describe('the daily drill card', () => {
     const out = decode(html(viewFrom('u1', hooper(), OPEN, NOW)));
     expect(out).toContain('data-daily-drill="open"');
     expect(out).toContain("Today's drill · 6 min");
-    expect(out).toContain('Safe Landing Check');
-    expect(out).toContain('Picked from your lowest number: shooting, 40% of 30 shots made.');
-    expect(out).toContain('Finish it for 10 Lab Credits, and day 4 of your streak.');
-    expect(out).toContain('href="/train/today-drill"');
+    // test changed: drill redesign (TODAY-DRILL 2026-10-27) — the card says the plain name and why today in plain words
+    expect(out).toContain('Soft landings');
+    expect(out).toContain('Shooting is your lowest score (40%). Today: soft landings.');
+    expect(out).toContain('Steady landings on every jump.');
+    expect(out).not.toContain('data-daily-explainer');
+    // test changed: drill redesign (less text, owner 2026-10-27) — the reward as one short line, amounts unchanged
+    expect(out).toContain('+10 Lab Credits · Day 4 streak');
+    // test changed (EVERY-SCREEN P2, 2026-11-10, flagged): a returning athlete's Start opens the drill on camera at once
+    // (?start=1), one tap fewer to the first move; a first-timer still gets the drill's page (asserted next)
+    expect(out).toContain('href="/train/today-drill?start=1"');
     expect(out).not.toContain('data-daily-nudge');
+  });
+
+  it('a first-timer\'s Start opens the drill\'s page first (its steps and cues)', () => {
+    const v = viewFrom('u1', newAdult(), OPEN, NOW);
+    expect(v.newcomer).toBe(true);
+    expect(decode(html(v))).toContain('href="/train/today-drill"');
   });
 
   it('no number yet: the Wake-Up and the nudge to measure', () => {
     const out = decode(html(viewFrom('u1', newAdult(), OPEN, NOW)));
-    expect(out).toContain('Pre-Game Wake-Up');
+    // test changed: drill redesign — the plain name, and a first-timer's one-line explainer
+    expect(out).toContain('Full-body wake-up');
+    expect(out).toContain('data-daily-explainer');
     expect(out).toContain('data-daily-nudge');
     expect(out).toContain('href="/account"');
   });

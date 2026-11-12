@@ -78,7 +78,8 @@ Before it is applied the check still runs (phone history), Today is as written, 
    the Quick Screen's camera is 18+. `TEEN_READINESS = false` in `lib/coach/readiness/gate.ts`.
 3. **Easing without the coach's grant**: a saved Low check eases the athlete's own session under their coach's rule even
    when the coach is not told (no coach_view); the athlete is told the coach was not. Alternative: ease only when shared.
-4. **Copy** (`lib/coach/readiness/copy.ts`): draft product copy, no medical words (tested against `MEDICAL_WORDS`).
+4. **Copy** (`lib/coach/readiness/copy.ts`): **approved as written** (owner, in chat, 2026-10-27, card C15), no medical
+   words (tested against `MEDICAL_WORDS`).
 5. **Retention / data rights**: kept until the athlete deletes it (DELETE `/api/readiness/check`, alerts cascade); not
    yet in `lib/prq-data-rights.ts` export/erase.
 6. **Coaching thresholds as plain constants**, not feel-panel knobs (the weekly-draft precedent). assumption.

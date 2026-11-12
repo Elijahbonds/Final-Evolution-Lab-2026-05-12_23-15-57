@@ -20,6 +20,8 @@
 //      using — the tree would have regressed it. Carry / route / truck all ride it now.
 
 import type { CharacterAnimator } from './CharacterAnimator';
+import { StrideRateFilter, strideRate } from '../core/StrideMatch';
+import { feel } from '../../feel-panel/feel';
 
 export type FootballAnimState =
   | 'presnap_idle' | 'snap' | 'dropback' | 'throw'
@@ -44,7 +46,40 @@ export interface FootballAnimInput {
   rushing: boolean;
   celebrating?: boolean;
   dejected?: boolean;
+  /** GAMEPLAY-CLEAN P2 #6: the carrier's planar speed (m/s) — the carry loop's stride is paced to it. Absent: the loop runs at 1×. */
+  speedMps?: number;
+  /** The frame's dt for the stride filter (default 1/60). */
+  dtSec?: number;
 }
+
+/** GAMEPLAY-CLEAN P2 #6 (2026-11-03): THE CARRY'S STRIDE. `football_carry_run` played at 1× for every speed: the rig measured its planted
+ *  feet covering 2.1 m/s of ground against a carrier at 7.7 m/s (stance pace, scratchpad stance.mjs — the base `run` reads 5.0 there,
+ *  where LocoBus's calibrated runRef is 4.8, so the probe agrees with the movement probe). MEASURED, not tuned: the speed the clip's
+ *  stride matches the ground at, as the carrier wears it (with RunPosture's layer on). */
+export const FOOTBALL_CARRY_PACE_MPS = 2.1;
+/** TUNE (new): the carry's top playback rate. Matching 7.7 m/s outright would want 3.6× — a cartoon cadence — so the rate stops at
+ *  1.4× (0.6 s cycle → 4.7 steps a second, a ball carrier's sprint cadence); the rest of the gap is the clip's short stride, which
+ *  is clip work (GATE 0) and is routed, not hidden here. Feel knob `football.carryStrideMax`. */
+export const FOOTBALL_CARRY_RATE_MAX = 1.4;
+/** OWNER CALL (2026-11-10, delegated; recommended option): the hurdle's own way in. The hurdle rides the stiff-arm slot (its
+ *  clip arrives through `moveClip`), so it took that slot's 0.06 s fade: the carry's stride to the jump's tuck in under four
+ *  frames. Measured headless on the hero over 24 carry phases (footballTree.hurdleFade.test): the thigh turns 24-25 deg in ONE
+ *  frame at 0.06 s (the rig read 26 deg in play), 15-17 deg at 0.12 s, 13-15 deg at 0.15 s; the carry's own stride is 6 deg a
+ *  frame, so past ~0.15 s there is little left to win. 0.12 s keeps the tuck inside the first quarter of the 0.5 s hop.
+ *  TUNED (flagged): the hurdle's fade 0.06 -> 0.12 s. Feel knob `football.hurdleFadeSec`; 0.06 is the old blend exactly.
+ *  The juke, the spin and the stiff arm itself keep 0.06 s. */
+export const FOOTBALL_HURDLE_CLIP = 'jump_up';
+export const FOOTBALL_HURDLE_FADE_SEC = 0.12;
+/** GAMEPLAY-CLEAN P5 (2026-11-10): THE HURDLE'S WAY OUT. The hop's clip (0.5 s) runs out a few frames before the landing and the
+ *  tree settles on the carry over the carry's own 0.1 s: the arms come from the jump's reach down to the tuck — the off arm 150° — in
+ *  six frames. The rig read it in play as football's last repeating hard pop, the same numbers at every hurdle (LeftArm 31°, RightArm
+ *  23°, RightForeArm 15° a frame; GAMEPLAY-CLEAN-AUDIT §4g — §4e had put it down to the carry loop's own keys, which turn the arms
+ *  under 7° a frame). Measured headless on the hero over 6 carry phases at 1× and 1.4× (footballTree.hurdleExit.test): the off arm
+ *  30.9° a frame at 0.1 s, 19.6° at 0.16, 15.7° at 0.2, 12.6° at 0.25. 0.2 s halves it and is done 8 frames after the feet are down.
+ *  TUNED (new, flagged): the hurdle → carry blend 0.1 → 0.2 s. Feel knob `football.hurdleExitFadeSec`; 0.1 is the old blend exactly.
+ *  Every other way into the carry (the snap, a juke, a spin, the stiff arm itself) keeps the carry's 0.1 s. */
+export const FOOTBALL_HURDLE_EXIT_FADE_SEC = 0.2;
+const STRIDE_STATES: ReadonlySet<FootballAnimState> = new Set<FootballAnimState>(['route_run', 'carry', 'truck']);
 
 export interface FootballClipChoice { state: FootballAnimState; clip: string; loop: boolean; fadeSec: number }
 
@@ -89,6 +124,7 @@ export function chooseFootballClip(i: FootballAnimInput): FootballClipChoice {
   else state = 'presnap_idle';
   const c: FootballClipChoice = { state, ...CLIP_FOR[state] };
   if (i.moveClip && (state === 'juke' || state === 'spin' || state === 'stiff_arm')) c.clip = i.moveClip;
+  if (state === 'stiff_arm' && c.clip === FOOTBALL_HURDLE_CLIP) c.fadeSec = feel('football.hurdleFadeSec', FOOTBALL_HURDLE_FADE_SEC);
   return c;
 }
 
@@ -115,6 +151,10 @@ export class FootballAnimTree {
   private spent: FootballAnimState | null = null;
   private token = 0;
   private lastInput: FootballAnimInput | null = null;
+  private strideFilter = new StrideRateFilter();
+  /** P5: what the tree last PLAYED (clearBeat forgets `current`, not this): the hurdle's way out is read off it. */
+  private playedState: FootballAnimState | null = null;
+  private playedClip = '';
   /** Fires when a one-shot ENDS on its own (never when the tree cut it) — the mode clears its move / beat here. */
   onSettle: ((state: FootballAnimState) => void) | null = null;
   constructor(private animator: CharacterAnimator) {}
@@ -125,6 +165,11 @@ export class FootballAnimTree {
     if (this.spent && c.state !== this.spent) this.spent = null;
     if (this.spent && c.state === this.spent) c = settleAfter(this.spent, input);
     if (c.state !== this.current) this.enter(c);
+    // STRIDE MATCHING, every frame, on the RUNNING loop (never through play(): the state guard above keeps the tree stable)
+    if (input.speedMps !== undefined && STRIDE_STATES.has(c.state)) {
+      const want = strideRate(input.speedMps, FOOTBALL_CARRY_PACE_MPS, feel('football.carryStrideMax', FOOTBALL_CARRY_RATE_MAX));
+      this.animator.setPlaybackScale?.(c.clip, this.strideFilter.step(want, input.dtSec ?? 1 / 60));
+    }
     return c.state;
   }
   private enter(c: FootballClipChoice): void {
@@ -139,15 +184,18 @@ export class FootballAnimTree {
       const after = settleAfter(st, this.lastInput ?? EMPTY_INPUT);
       if (after.state !== st) this.enter(after);
     } : undefined;
-    this.animator.play(c.clip, onEnd ? { loop: c.loop, fadeSec: c.fadeSec, onEnd } : { loop: c.loop, fadeSec: c.fadeSec });
-    this.current = st;
+    // P5: out of the hurdle onto the carry — its own, longer blend (FOOTBALL_HURDLE_EXIT_FADE_SEC)
+    const fadeSec = st === 'carry' && this.playedState === 'stiff_arm' && this.playedClip === FOOTBALL_HURDLE_CLIP
+      ? feel('football.hurdleExitFadeSec', FOOTBALL_HURDLE_EXIT_FADE_SEC) : c.fadeSec;
+    this.animator.play(c.clip, onEnd ? { loop: c.loop, fadeSec, onEnd } : { loop: c.loop, fadeSec });
+    this.current = st; this.playedState = st; this.playedClip = c.clip;
   }
   /** The mode's beat window closed (or a NEW beat of the same kind landed): forget it so the next update re-chooses. */
   clearBeat(...states: FootballAnimState[]): void {
     if (this.current && states.includes(this.current)) this.current = null;
     if (this.spent && states.includes(this.spent)) this.spent = null;
   }
-  reset(): void { this.current = null; this.spent = null; this.lastInput = null; }
+  reset(): void { this.current = null; this.spent = null; this.lastInput = null; this.playedState = null; this.playedClip = ''; }
 }
 
 const EMPTY_INPUT: FootballAnimInput = {

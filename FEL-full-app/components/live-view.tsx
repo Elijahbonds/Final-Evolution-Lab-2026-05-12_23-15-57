@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
+import { readToast } from '@/components/ui/fel/toast';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Radio, Loader2, Play, Sparkles, Ticket, Calendar, ShieldQuestion } from 'lucide-react';
@@ -43,7 +44,7 @@ export function LiveView({ scheduleEnabled = false }: { scheduleEnabled?: boolea
         body: JSON.stringify({ idempotency_key: newIdempotencyKey(), sku_id: sku, quantity: 1 }),
       });
       const j = await res.json();
-      if (res.status === 409) { toast.error('Not enough shards. Earn by playing or exchange coins in the Wallet.'); return; }
+      if (res.status === 409) { readToast.error('Not enough shards. Earn by playing or exchange coins in the Wallet.'); return; }
       if (!res.ok) throw new Error(j?.error || 'purchase failed');
       toast.success(sku === 'class_monthly' ? 'Monthly class pass active!' : 'Single class pass added!');
     } catch (e: any) { toast.error(e?.message || 'Purchase failed'); }
@@ -78,7 +79,7 @@ export function LiveView({ scheduleEnabled = false }: { scheduleEnabled?: boolea
       {ad && (
         <button onClick={() => router.push(ad.href)} className="mb-6 flex w-full items-center justify-between gap-4 rounded-2xl border border-cyan-400/30 bg-gradient-to-r from-cyan-400/10 to-transparent px-5 py-4 text-left transition hover:border-cyan-400/60">
           <div>
-            <span className="mb-1 inline-block rounded bg-cyan-400/20 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-cyan-300">{ad.label}</span>
+            <span className="mb-1 inline-block rounded bg-cyan-400/20 px-1.5 py-0.5 text-[12px] font-bold tracking-wider text-cyan-300">{ad.label}</span>
             <div className="text-base font-bold text-white">{ad.headline}</div>
           </div>
           <span className="shrink-0 rounded-xl bg-cyan-400 px-4 py-2 text-sm font-bold text-black">{ad.cta}</span>
@@ -108,7 +109,7 @@ export function LiveView({ scheduleEnabled = false }: { scheduleEnabled?: boolea
           heading and the badge say these are live classes that are not on air yet. */}
       {live.length > 0 && (
         <section className="mb-8">
-          <h2 className="mb-1 flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-red-400/80"><span className="inline-flex h-2 w-2 rounded-full bg-red-500/60" /> Live classes</h2>
+          <h2 className="mb-1 flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-red-400/85"><span className="inline-flex h-2 w-2 rounded-full bg-red-500/60" /> Live classes</h2>
           <p className="mb-3 text-xs text-white/50">Not streaming yet. These run live once the studio connects a stream.</p>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {live.map((p) => <ProgramCard key={p.id} p={p} live />)}
@@ -127,7 +128,7 @@ export function LiveView({ scheduleEnabled = false }: { scheduleEnabled?: boolea
 
       {/* Provider note (honest) */}
       <div className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.02] p-4 text-xs text-white/50">
-        <ShieldQuestion className="mt-0.5 h-4 w-4 shrink-0 text-white/40" />
+        <ShieldQuestion className="mt-0.5 h-4 w-4 shrink-0 text-white/50" />
         <p>Live video streams connect to a licensed streaming provider when configured. No class can be watched here yet: the video player activates once a stream URL is provided by the studio, and class passes go on sale then, so nothing is charged before a class can be watched. Chat is disabled for members under 18.</p>
       </div>
     </div>
@@ -139,15 +140,15 @@ function ProgramCard({ p, live }: { p: StreamProgram; live?: boolean }) {
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
       <div className="relative h-28" style={{ background: `linear-gradient(135deg, ${accent}, transparent)` }}>
-        <span className="absolute left-3 top-3 rounded bg-black/40 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">{p.category}</span>
-        {live && <span className="absolute right-3 top-3 rounded bg-black/50 px-2 py-0.5 text-[10px] font-bold text-red-300">LIVE CLASS · NOT ON AIR YET</span>}
+        <span className="absolute left-3 top-3 rounded bg-black/65 px-2 py-0.5 text-[12px] font-bold uppercase tracking-wider text-white">{p.category}</span>
+        {live && <span className="absolute right-3 top-3 rounded bg-black/50 px-2 py-0.5 text-[12px] font-bold text-red-300">LIVE CLASS · NOT ON AIR YET</span>}
         <button className="absolute inset-0 flex items-center justify-center" onClick={() => toast('Stream player activates when the studio provides a live URL.', { icon: '📺' })} aria-label={`Play ${p.title}`}>
           <span className="flex h-12 w-12 items-center justify-center rounded-full bg-black/50 backdrop-blur transition hover:scale-110"><Play className="h-5 w-5 text-white" /></span>
         </button>
       </div>
       <div className="p-4">
         <div className="text-sm font-bold text-white">{p.title}</div>
-        <div className="text-xs text-white/40">{p.host}</div>
+        <div className="text-xs text-white/50">{p.host}</div>
         <p className="mt-1.5 text-xs text-white/55">{p.blurb}</p>
       </div>
     </motion.div>

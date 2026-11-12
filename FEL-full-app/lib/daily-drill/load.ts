@@ -19,6 +19,7 @@ import { pickFocus, planFor, type DailyPlan, type Focus } from './plan';
 import { SHOT_SCAN_KIND, SKILL_WINDOW_DAYS, skillsFrom, type SkillReading, type SkillRows } from './skills';
 import { measureNudge, whyLine, type Nudge } from './copy';
 import { specMinutes } from './compose';
+import { tomorrowLine, whyToday } from './guide';
 
 /** The ledger key that is the day's claim: one per player per PT day (claim.ts writes it; nothing else may). */
 export const dailyDrillKey = (userId: string, day: string): string => `daily_drill:${day}:${userId}`;
@@ -34,7 +35,7 @@ export interface DailyDrillDb {
   mirrorSession: { findMany(a: unknown): Promise<any[]> };
   prqEntry: { findMany(a: unknown): Promise<any[]> };
   playerProfile: { findUnique(a: unknown): Promise<any> };
-  walletLedgerEntry: { findUnique(a: unknown): Promise<any> };
+  walletLedgerEntry: { findUnique(a: unknown): Promise<any>; count?(a: unknown): Promise<number> };
   rewardRule?: { findUnique(a: unknown): Promise<any> };
 }
 
@@ -46,7 +47,14 @@ export interface DrillRows extends SkillRows {
   claim: { delta: unknown; metadata: unknown } | null;
   /** The live amount (the RewardRule row, else the default). */
   credit: number;
+  /** TODAY-DRILL: days in the NEWCOMER_DAYS before today with the day's drill done (a count over the claims' own keys);
+   *  null when it was not read or the read failed (the page then treats the account as a returning one). */
+  recentDrills?: number | null;
 }
+
+/** TODAY-DRILL: no drill finished in this many days before today = a first-timer (or back after a long break), who
+ *  gets the two-line explainer and the full instructions open. assumption: four weeks away is "new again". */
+export const NEWCOMER_DAYS = 28;
 
 const soft = <T>(p: Promise<T>, empty: T): Promise<T> => p.catch(() => empty);
 
@@ -67,7 +75,12 @@ export async function readDrillRows(db: DailyDrillDb, userId: string, now: Date)
   const mirrorWhere: Prisma.MirrorSessionWhereInput = { userId, patternId: { in: ['squat', 'lunge'] }, createdAt: window, user: { is: canSave } };
   const prqWhere: Prisma.PrqEntryWhereInput = { userId, unit: 'score', attribute: { in: ['power', 'flexibility'] }, measuredAt: window };
 
-  const [user, optIn, jumpScans, shotScans, mirrorSessions, prqEntries, profile, claim, credit] = await Promise.all([
+  // TODAY-DRILL: the days before today, by the claims' own unique keys (an index lookup, no amounts read)
+  const recentKeys = lastPtDays(now, NEWCOMER_DAYS + 1).slice(1).map((d) => dailyDrillKey(userId, d));
+  const countRecent = db.walletLedgerEntry.count
+    ? soft(db.walletLedgerEntry.count({ where: { idempotencyKey: { in: recentKeys } } }).then((n) => (Number.isFinite(Number(n)) ? Number(n) : null)), null)
+    : Promise.resolve(null);
+  const [user, optIn, jumpScans, shotScans, mirrorSessions, prqEntries, profile, claim, credit, recentDrills] = await Promise.all([
     soft(db.user.findUnique({ where: { id: userId }, select: { dobYear: true } }), null),
     soft(db.scanSaveOptIn.findUnique({ where: { userId }, select: { scope: true, granted: true, revokedAt: true } }), null),
     soft(db.workoutScan.findMany({ where: jumpWhere, orderBy: { createdAt: 'desc' }, take: DRILL_READ_CAP.scans, select: { kind: true, metrics: true, createdAt: true } }), []),
@@ -77,12 +90,13 @@ export async function readDrillRows(db: DailyDrillDb, userId: string, now: Date)
     soft(db.playerProfile.findUnique({ where: { userId }, select: { streakDays: true, lastStreakAt: true, lastActiveAt: true } }), null),
     soft(db.walletLedgerEntry.findUnique({ where: { idempotencyKey: dailyDrillKey(userId, day) }, select: { delta: true, metadata: true } }), null),
     drillCredit(db),
+    countRecent,
   ]);
   // a read that answered something other than rows (a stand-in, a half-applied table) is no rows
   const list = <T>(x: T[] | null | undefined): T[] => (Array.isArray(x) ? x : []);
   return {
     user, optIn, jumpScans: list(jumpScans), shotScans: list(shotScans), mirrorSessions: list(mirrorSessions), prqEntries: list(prqEntries),
-    profile, claim, credit,
+    profile, claim, credit, recentDrills,
   };
 }
 
@@ -100,6 +114,13 @@ export interface DailyDrillView {
   /** Today's claim, once made. */
   done: { amount: number; streakDays: number | null } | null;
   streak: { days: number; opensToday: boolean; nextDays: number };
+  /** TODAY-DRILL: no drill done in the NEWCOMER_DAYS before today (and none today): the first-time explainer shows. */
+  newcomer: boolean;
+  /** TODAY-DRILL: why today, said plainly from the number it was picked from (guide.ts whyToday). */
+  whyToday: string;
+  /** TODAY-DRILL: tomorrow's likely focus and drill: the same pick over the same readings with tomorrow's date (a
+   *  reading taken today can still change it, and the line says "likely"). Nothing new is read or kept. */
+  tomorrow: { focus: Focus; drillId: string | null; line: string };
 }
 
 /** The view from the rows and today's access. Pure (exported for the tests). */
@@ -112,6 +133,10 @@ export function viewFrom(userId: string, rows: DrillRows, access: ReturnType<typ
   const step = streakStep(rows.profile, now.getTime(), 'play');
   const meta = (rows.claim?.metadata && typeof rows.claim.metadata === 'object' ? rows.claim.metadata : {}) as Record<string, unknown>;
   const claimedDays = typeof meta.streakDays === 'number' ? meta.streakDays : null;
+  const nextDay = ptDayBounds(new Date(start.getTime() + DAY_MS + 3 * 3_600_000)).day;
+  const pickTomorrow = pickFocus(skills, userId, nextDay);
+  const planTomorrow = planFor(pickTomorrow.focus, access);
+  const tomorrowDrill = planTomorrow?.drillId ?? null;
   return {
     day,
     focus: pick.focus,
@@ -122,6 +147,9 @@ export function viewFrom(userId: string, rows: DrillRows, access: ReturnType<typ
     credit: rows.credit,
     done: rows.claim ? { amount: Number(rows.claim.delta ?? 0), streakDays: claimedDays } : null,
     streak: { days: Math.max(0, rows.profile?.streakDays ?? 0), opensToday: step.due || step.owed, nextDays: step.streakDays },
+    newcomer: !rows.claim && rows.recentDrills === 0,
+    whyToday: whyToday(pick.focus, pick.skill, pick.tiedWith.length > 0, plan?.drillId ?? 'wake-up'),
+    tomorrow: { focus: pickTomorrow.focus, drillId: tomorrowDrill, line: tomorrowLine(pick.focus, pickTomorrow.focus, tomorrowDrill, pick.skill) },
   };
 }
 

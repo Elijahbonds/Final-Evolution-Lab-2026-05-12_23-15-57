@@ -42,7 +42,10 @@ that, `/squads` says "coming soon", `GET /api/groups` answers `{ available: fals
    matches it).
 2. **Teens in squads.** Approve guardian wording that covers squads, put it live, then set `SQUADS_CONSENT_SINCE`.
    Policy text is also needed (docs/PLATFORM-ROADMAP.md §4.1 "Friends for teens": Privacy §1/§2, Terms §2/§5,
-   community guidelines). **DRAFT for review, not live, not legal text:**
+   community guidelines). **Approved by the owner, in chat, 2026-10-27 (card C08); not live yet.** In code word for
+   word as `lib/consent/guardianGate.ts` `squadsConsentWords`; it goes live with the withdraw path and the go-live
+   date (the steps are in that file), so `SQUADS_CONSENT_SINCE` stays null. The last sentence stays out until the
+   withdraw path exists (`GUARDIAN_WITHDRAW_LIVE = false`).
 
    > FEL is a training app. **{name}** would like to join a squad: a small group of friends who see whether each
    > other did the daily drill, a weekly points table from drills and games, and preset reactions (like 🔥 or 👏).
@@ -53,7 +56,7 @@ that, `/squads` says "coming soon", `GET /api/groups` answers `{ available: fals
 
    The withdraw path does not exist yet (COACH-LOOP §1 step 4 has the same gap).
 3. **Teens on teams** follow COACH-LOOP §1 (the coach-training wording); nothing new here.
-4. **League scoring** (new numbers): drill day 10, finished game 2 (up to 15 a week), win 3 (up to 10 a week). "Real
+4. **League scoring** (new numbers; approved with the C09 wording, owner in chat 2026-10-27, since the league line states them): drill day 10, finished game 2 (up to 15 a week), win 3 (up to 10 a week). "Real
    reps" in the league = drill days, because that is the training everyone (teens too) has on the server; measured
    Mirror reps are on the board only, so the league stays fair to people who keep numbers on the phone. A tie at the
    top shelves no trophy. Owner's eye: change `LEAGUE_POINTS` / `LEAGUE_CAPS` in `lib/groups/activity.ts`.
@@ -63,7 +66,8 @@ that, `/squads` says "coming soon", `GET /api/groups` answers `{ available: fals
    squad's is preset words. Say if a team with minors should also use preset names.
 8. **Adults and minors in one squad.** Nothing stops an adult who has the code joining a squad with a teen in it (the
    rules above still hold). Say if a squad with a minor should be minor-only, or owner-approved joins.
-9. **Copy** in `lib/groups/copy.ts` and the components: plain product lines for review.
+9. **Copy** in `lib/groups/copy.ts` and the components: **approved as written** (owner, in chat, 2026-10-27, card C09),
+   including the league line's points (item 4).
 
 ## 4. Verified jumps: why the jump board is empty today (finding)
 

@@ -6,6 +6,7 @@
 // Each unique model loads once per scene and repeats as instances; props are
 // scenery only — not pickable, no collisions, outside every playing area.
 // Assets: public/models/props/<kit>/<model>.glb (Kenney, CC0; see manifest.json).
+import { VQ } from '../scene/venueQualityV1';
 import { Color3, Matrix, PBRMaterial, Quaternion, Ray, SceneLoader, TransformNode, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, ISceneLoaderAsyncResult, Mesh, Scene } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
@@ -256,6 +257,7 @@ export function propSetFor(specVenueId: string): string | null {
     karate_h2h: 'dojo', karate_endless: 'dojo', golf_loop: 'links', derby: 'ballpark', penalty: 'stadium', football_rush: 'gridiron',
     tennis: 'venice-court', volleyball: 'beach-court', gymnastics: 'gym', dance: 'dojo',   // P5: volleyball had the SURF set (authored for a 90 m water strip — the bus 60 m out over nothing)
   };
+  if (VQ.venice() && (specVenueId === 'basketball_h2h' || specVenueId === 'basketball_3v3')) return 'venice-dunk';   // VENUE-QUALITY v1 (venue.veniceHoopsV1, off): no kit lollipop palms / bushes / lawn tufts
   return map[specVenueId] ?? null;
 }
 

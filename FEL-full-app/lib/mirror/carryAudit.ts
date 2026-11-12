@@ -184,7 +184,7 @@ export function auditCarry(frames: readonly PoseFrame[], ctx: MirrorPatternConte
     return {
       faults: (['trunkSideLean', 'hipHike', 'shoulderShrug', 'rhythm'] as const).map((id) => unreadable(id)),
       readableFrames: bodies.length,
-      note: bodies.length === 0 ? 'turn to face the camera — the carry reads from the front' : 'hold the carry a little longer so the camera can get a steady read',
+      note: bodies.length === 0 ? 'Turn to face the camera. The carry is read from the front.' : 'Hold the carry a little longer so the camera gets a steady look.',
     };
   }
 
@@ -225,9 +225,9 @@ export function auditCarry(frames: readonly PoseFrame[], ctx: MirrorPatternConte
       }
     : unreadable('rhythm');
 
-  const faultWords = [lean.status === 'fault' && 'trunk lean', hike.status === 'fault' && 'hip hike', shrug.status === 'fault' && 'shoulder shrug']
+  const faultWords = [lean.status === 'fault' && 'leaning to one side', hike.status === 'fault' && 'hip hiking up', shrug.status === 'fault' && 'shoulder shrugging up']
     .filter((v): v is string => !!v);
-  const note = faultWords.length ? `what the camera saw: ${faultWords.join(', ')}` : 'what the camera saw: level through the march';
+  const note = faultWords.length ? `What the camera saw: ${faultWords.join(', ')}.` : 'What the camera saw: level the whole way.';
 
   return { faults: [hike, shrug, lean, rhythm], readableFrames: bodies.length, note };
 }
@@ -242,19 +242,21 @@ function unitFor(id: CarryFaultId): string {
 // MIRROR-COACH P9 (2026-09-30): reworded to FEL's external-focus policy (lib/coach/cueLint.ts, whose test lints this
 // table): a cue that names a body part leads with the floor, the wall, the ceiling, the camera or the load, and nothing
 // names a muscle to squeeze or feel. The fault each line answers, and its three levels, are unchanged.
+// CUE-REWRITE (2026-10-27): cue, escalate and reply are said mid-rep (2–5 words, docs/CUE-STYLE.md); regress is said
+// when the set stops (one plain action, ≤ 14 words). Same faults, same intent; before/after in docs/CUE-AUDIT.md.
 export const CARRY_CUES: readonly CueRule[] = [
-  { faultId: 'hipHike', cue: 'Keep the belt line level as you step — no hiking up on the loaded side.',
-    escalate: 'Still hiking. Shorten the step until the belt line stays level.',
-    regress: 'Set the weight down. Just march the pattern, hips level, then pick it back up.' },
-  { faultId: 'shoulderShrug', cue: 'Let the load pull that arm long — the shoulder stays away from your ear.',
-    escalate: 'Still riding up. Switch the load to the other hand for a set and come back to this one.',
-    regress: 'A lighter load, the same long arm — let the load hang it, then build back up.' },
-  { faultId: 'trunkSideLean', cue: 'Grow tall toward the ceiling — shoulders level over your hips.',
-    escalate: 'Still leaning off to one side. Slow the march and find the tall line before you speed back up.',
-    regress: 'Hold the tall line standing still first, no march, then add the steps back in.' },
-  { faultId: 'rhythm', cue: 'Find one even beat and keep it for every step.',
-    escalate: 'The beat is still uneven. Count it out loud, same count every step.',
-    regress: 'Slow it right down — an even, unhurried step matters more than a fast one.' },
+  { faultId: 'hipHike', cue: 'Hips level as you step',
+    escalate: 'Shorter steps. Hips level.',
+    regress: 'Set the weight down. March in place with level hips, then pick it up.' },
+  { faultId: 'shoulderShrug', cue: 'Let the weight hang',
+    escalate: 'Shoulder down, arm long',
+    regress: 'Use a lighter weight and let it pull your arm long.' },
+  { faultId: 'trunkSideLean', cue: 'Stand tall and level',
+    escalate: 'Slower. Stand tall.',
+    regress: 'Stand still and tall first, then add the steps back in.' },
+  { faultId: 'rhythm', cue: 'Even steps',
+    escalate: 'Count each step out loud',
+    regress: 'Slow down. Even, calm steps matter more than fast ones.' },
 ];
 
 /**

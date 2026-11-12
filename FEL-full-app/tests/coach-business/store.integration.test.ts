@@ -89,7 +89,9 @@ describe.skipIf(!RUN)('coach-business tables on a real Postgres', () => {
       retrieve: async () => ({ amount: 1_000_000, amount_refunded: feeBack }),
       createRefund: async (_id: string, p: { amount: number }) => { feeBack += p.amount; return {}; },
     } };
-    const deps = { db: prisma, post: ledger.post, stripe: () => stripe };
+    // test changed (owner-approvals, 2026-10-27): REFUND_PROCESSING_FEE defaults ON now; this test holds the price-only
+    // refund on real rows, so it names that rule. The database assertions are unchanged.
+    const deps = { db: prisma, post: ledger.post, stripe: () => stripe, env: { REFUND_PROCESSING_FEE: '0' } as unknown as NodeJS.ProcessEnv };
     const charge = (refundedTotal: number) => ({ id: `ch_${TAG}`, refundedTotal, applicationFeeId: `fee_${TAG}` });
     const session: any = { id: `cs_${TAG}`, mode: 'payment', payment_status: 'paid', payment_intent: `pi_${TAG}`, metadata: { product: 'COACH_CONNECT', saleId: sale } };
     expect(await webhook.fulfilConnectCheckout(deps, session)).toBe('fulfilled');

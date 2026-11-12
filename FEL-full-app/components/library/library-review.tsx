@@ -45,34 +45,34 @@ export function LibraryReview() {
     } finally { setBusy(false); }
   };
 
-  if (!data) return <div className="flex justify-center py-16 text-white/40"><Loader2 className="h-5 w-5 animate-spin" /></div>;
+  if (!data) return <div className="flex justify-center py-16 text-white/50"><Loader2 className="h-5 w-5 animate-spin" /></div>;
   const current = data.batches.find((b) => b.batch === batch);
 
   return (
     <main className="mx-auto max-w-[960px] space-y-4 px-4 py-6" data-testid="library-review">
       <header className="space-y-1">
         <h1 className="fel-heading text-xl text-white">Exercise library review</h1>
-        <p className="text-xs text-white/50">Drafts are seed facts in FEL&apos;s words and FEL-authored entries. Nothing reaches a coach by default, or any athlete, until it is approved here.</p>
+        <p className="text-base text-white/50">Drafts are seed facts in FEL&apos;s words and FEL-authored entries. Nothing reaches a coach by default, or any athlete, until it is approved here.</p>
         {!data.ready && <p className="rounded-lg border border-[#FFD700]/30 bg-[#FFD700]/[0.06] px-3 py-2 text-xs text-[#FFD700]/90">{NOT_READY}</p>}
       </header>
 
       <section className="space-y-2">
-        <h2 className="text-[11px] uppercase tracking-wider text-white/40">Batches</h2>
+        <h2 className="text-[12px] uppercase tracking-wider text-white/50">Batches</h2>
         <div className="flex flex-wrap gap-1.5">
-          <button onClick={() => { setBatch(null); setOffset(0); }} className={`rounded-lg border px-2 py-1 text-[11px] ${!batch ? 'border-[#00E5FF]/40 text-[#00E5FF]' : 'border-white/10 text-white/60'}`}>All</button>
+          <button onClick={() => { setBatch(null); setOffset(0); }} className={`min-h-11 min-w-11 rounded-lg border px-2 py-1 text-[12px] ${!batch ? 'border-[#00E5FF]/40 text-[#00E5FF]' : 'border-white/10 text-white/60'}`}>All</button>
           {data.batches.map((b) => (
-            <button key={b.batch} onClick={() => { setBatch(b.batch); setOffset(0); }} className={`rounded-lg border px-2 py-1 text-[11px] ${batch === b.batch ? 'border-[#00E5FF]/40 text-[#00E5FF]' : 'border-white/10 text-white/60'}`}>
-              {b.batch} <span className="text-white/35">{b.draft}/{b.total}</span>
+            <button key={b.batch} onClick={() => { setBatch(b.batch); setOffset(0); }} className={`min-h-11 min-w-11 rounded-lg border px-2 py-1 text-[12px] ${batch === b.batch ? 'border-[#00E5FF]/40 text-[#00E5FF]' : 'border-white/10 text-white/60'}`}>
+              {b.batch} <span className="text-white/50">{b.draft}/{b.total}</span>
             </button>
           ))}
         </div>
-        <div className="flex flex-wrap items-center gap-2 text-[11px]">
+        <div className="flex flex-wrap items-center gap-2 text-[12px]">
           {(['draft', 'approved', 'rejected', 'all'] as const).map((s) => (
-            <button key={s} onClick={() => { setStatus(s); setOffset(0); }} className={`rounded-md px-2 py-0.5 ${status === s ? 'bg-white/10 text-white' : 'text-white/45'}`}>{s}</button>
+            <button key={s} onClick={() => { setStatus(s); setOffset(0); }} className={`min-h-11 min-w-11 rounded-md px-2 py-0.5 ${status === s ? 'bg-white/10 text-white' : 'text-white/50'}`}>{s}</button>
           ))}
           {current && current.draft > 0 && (
             <button disabled={busy} onClick={() => { if (confirm(`Approve all ${current.draft} drafts in ${current.batch}?`)) void act({ action: 'approve-batch', batch: current.batch }, `${current.batch} approved`); }}
-              className="ml-auto inline-flex items-center gap-1 rounded-lg border border-[#7BD389]/40 px-2.5 py-1 text-[#7BD389] disabled:opacity-40" data-testid="approve-batch">
+              className="ml-auto inline-flex min-h-11 items-center gap-1 rounded-lg border border-[#7BD389]/40 px-2.5 py-1 text-[#7BD389] disabled:opacity-40" data-testid="approve-batch">
               <Check className="h-3.5 w-3.5" /> Approve batch ({current.draft})
             </button>
           )}
@@ -82,36 +82,36 @@ export function LibraryReview() {
       {editing && <EditEntry e={editing} busy={busy} onCancel={() => setEditing(null)} onSave={async (entry, approve) => { if (await act({ action: 'edit', entry, approve }, approve ? 'Saved and approved' : 'Saved')) setEditing(null); }} />}
 
       <section className="space-y-2">
-        <h2 className="text-[11px] uppercase tracking-wider text-white/40">{data.total.toLocaleString()} {status === 'all' ? '' : status} entries{batch ? ` in ${batch}` : ''}</h2>
+        <h2 className="text-[12px] uppercase tracking-wider text-white/50">{data.total.toLocaleString()} {status === 'all' ? '' : status} entries{batch ? ` in ${batch}` : ''}</h2>
         {data.entries.map((e) => (
           <div key={e.id} className="fel-card space-y-1 rounded-xl p-3" data-testid="review-row">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <div className="text-sm text-white">{e.name} <span className="text-[10px] text-white/35">{e.level} · {e.pattern} · {e.equipment.join(', ') || 'no equipment'}</span></div>
-                <div className="text-[11px] text-white/45">{e.setup}</div>
+                <div className="text-sm text-white">{e.name} <span className="text-[12px] text-white/50">{e.level} · {e.pattern} · {e.equipment.join(', ') || 'no equipment'}</span></div>
+                <div className="text-[12px] text-white/50">{e.setup}</div>
               </div>
               <div className="flex shrink-0 gap-1">
-                <button disabled={busy} onClick={() => void act({ action: 'approve', ids: [e.id] }, `${e.name} approved`)} aria-label={`Approve ${e.name}`} className="rounded-lg p-1.5 text-[#7BD389]/80 hover:text-[#7BD389]"><Check className="h-4 w-4" /></button>
-                <button disabled={busy} onClick={() => setEditing(e)} aria-label={`Edit ${e.name}`} className="rounded-lg p-1.5 text-white/50 hover:text-white"><Pencil className="h-4 w-4" /></button>
-                <button disabled={busy} onClick={() => void act({ action: 'reject', ids: [e.id] }, `${e.name} rejected`)} aria-label={`Reject ${e.name}`} className="rounded-lg p-1.5 text-white/40 hover:text-[#FF3366]"><X className="h-4 w-4" /></button>
+                <button disabled={busy} onClick={() => void act({ action: 'approve', ids: [e.id] }, `${e.name} approved`)} aria-label={`Approve ${e.name}`} className="grid h-11 w-11 place-items-center rounded-lg text-[#7BD389]/80 hover:text-[#7BD389]"><Check className="h-4 w-4" /></button>
+                <button disabled={busy} onClick={() => setEditing(e)} aria-label={`Edit ${e.name}`} className="grid h-11 w-11 place-items-center rounded-lg text-white/50 hover:text-white"><Pencil className="h-4 w-4" /></button>
+                <button disabled={busy} onClick={() => void act({ action: 'reject', ids: [e.id] }, `${e.name} rejected`)} aria-label={`Reject ${e.name}`} className="grid h-11 w-11 place-items-center rounded-lg text-white/50 hover:text-[#FF3366]"><X className="h-4 w-4" /></button>
               </div>
             </div>
             <ul className="list-disc pl-4 text-[12px] text-white/65">{e.cues.map((c) => <li key={c}>{c}</li>)}</ul>
-            <div className="text-[11px] text-white/45">{e.faults.map((f) => `${f.fault} → ${f.fix}`).join(' · ')}</div>
+            <div className="text-[12px] text-white/50">{e.faults.map((f) => `${f.fault} → ${f.fix}`).join(' · ')}</div>
           </div>
         ))}
         <div className="flex justify-between text-xs">
-          <button disabled={offset === 0} onClick={() => setOffset((o) => Math.max(0, o - 50))} className="text-white/60 disabled:opacity-30">Previous</button>
-          <button disabled={offset + 50 >= data.total} onClick={() => setOffset((o) => o + 50)} className="text-white/60 disabled:opacity-30">Next</button>
+          <button disabled={offset === 0} onClick={() => setOffset((o) => Math.max(0, o - 50))} className="min-h-11 min-w-11 text-white/60 disabled:opacity-30">Previous</button>
+          <button disabled={offset + 50 >= data.total} onClick={() => setOffset((o) => o + 50)} className="min-h-11 min-w-11 text-white/60 disabled:opacity-30">Next</button>
         </div>
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-[11px] uppercase tracking-wider text-white/40">Coach submissions ({data.queue.length})</h2>
-        {data.queue.length === 0 && <p className="text-xs text-white/35">Nothing waiting.</p>}
+        <h2 className="text-[12px] uppercase tracking-wider text-white/50">Coach submissions ({data.queue.length})</h2>
+        {data.queue.length === 0 && <p className="text-xs text-white/50">Nothing waiting.</p>}
         {data.queue.map((s) => (
           <div key={s.id} className="fel-card space-y-1 rounded-xl p-3">
-            <div className="text-sm text-white">{s.payload.name} <span className="text-[10px] text-white/35">from {s.coachName ?? 'a coach'} · {s.payload.pattern ?? 'no pattern'}</span></div>
+            <div className="text-sm text-white">{s.payload.name} <span className="text-[12px] text-white/50">from {s.coachName ?? 'a coach'} · {s.payload.pattern ?? 'no pattern'}</span></div>
             <ul className="list-disc pl-4 text-[12px] text-white/65">{s.payload.primaryCues.map((c) => <li key={c}>{c}</li>)}</ul>
             <div className="flex gap-2 pt-1">
               <button disabled={busy} onClick={() => void act({ action: 'moderate', submissionId: s.id, decision: 'approved' }, `${s.payload.name} added to the library`)} className="rounded-lg border border-[#7BD389]/40 px-2.5 py-1 text-xs text-[#7BD389]">Approve</button>
@@ -139,11 +139,11 @@ function EditEntry({ e, busy, onCancel, onSave }: { e: LibraryCard; busy: boolea
   return (
     <div className="fel-card space-y-2 rounded-xl border border-[#00E5FF]/20 p-4" data-testid="review-edit">
       <div className="text-sm text-white">Edit {e.name}</div>
-      <label className="block space-y-1 text-[11px] text-white/45">Name<input value={name} onChange={(x) => setName(x.target.value)} className={input} /></label>
-      <label className="block space-y-1 text-[11px] text-white/45">Set-up<textarea value={setup} onChange={(x) => setSetup(x.target.value)} rows={2} className={input} /></label>
-      <label className="block space-y-1 text-[11px] text-white/45">Cues (one per line, up to 3)<textarea value={cues} onChange={(x) => setCues(x.target.value)} rows={3} className={input} /></label>
-      <label className="block space-y-1 text-[11px] text-white/45">Faults (fault | fix, one per line)<textarea value={faults} onChange={(x) => setFaults(x.target.value)} rows={3} className={input} /></label>
-      <label className="block space-y-1 text-[11px] text-white/45">Level
+      <label className="block space-y-1 text-[12px] text-white/50">Name<input value={name} onChange={(x) => setName(x.target.value)} className={input} /></label>
+      <label className="block space-y-1 text-[12px] text-white/50">Set-up<textarea value={setup} onChange={(x) => setSetup(x.target.value)} rows={2} className={input} /></label>
+      <label className="block space-y-1 text-[12px] text-white/50">Cues (one per line, up to 3)<textarea value={cues} onChange={(x) => setCues(x.target.value)} rows={3} className={input} /></label>
+      <label className="block space-y-1 text-[12px] text-white/50">Faults (fault | fix, one per line)<textarea value={faults} onChange={(x) => setFaults(x.target.value)} rows={3} className={input} /></label>
+      <label className="block space-y-1 text-[12px] text-white/50">Level
         <select value={level} onChange={(x) => setLevel(x.target.value as LibraryCard['level'])} className={input}>
           {['beginner', 'intermediate', 'advanced'].map((l) => <option key={l} value={l}>{l}</option>)}
         </select>

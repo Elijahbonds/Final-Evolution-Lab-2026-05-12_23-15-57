@@ -71,7 +71,7 @@ export function ShareWeek({ minor, phoneOnly }: { minor: boolean; phoneOnly: boo
   return (
     <section aria-labelledby="share-week-h" className="mt-6 rounded-2xl border border-white/[0.07] bg-[#0c0c11] p-4">
       <h2 id="share-week-h" className="fel-heading text-[16px] font-bold text-white">Share your week</h2>
-      <p className="mt-1 text-[12px] leading-snug text-white/50">
+      <p className="mt-1 text-base leading-snug text-white/50">
         An image of this card. You see it first; nothing is posted unless you share it.
         {phoneOnly && ' Numbers kept only on this phone aren’t on it.'}
       </p>
@@ -81,7 +81,8 @@ export function ShareWeek({ minor, phoneOnly }: { minor: boolean; phoneOnly: boo
         <label className="mt-3 flex min-h-11 items-center gap-2.5 text-[13px] text-white/75">
           <input type="checkbox" checked={withName} data-share-name="choice"
             onChange={(e) => { setWithName(e.target.checked); setPhase({ kind: 'idle' }); setSaid(null); }}
-            className="h-4 w-4 accent-[#00E5FF]" />
+            className="peer sr-only" />
+          <span aria-hidden className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border text-[12px] peer-focus-visible:ring-2 peer-focus-visible:ring-[#00E5FF] ${withName ? 'border-[#00E5FF] bg-[#00E5FF]/20 text-[#00E5FF]' : 'border-white/30'}`}>{withName ? '✓' : ''}</span>
           Put my name on it
         </label>
       )}

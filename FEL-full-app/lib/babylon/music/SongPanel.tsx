@@ -255,7 +255,7 @@ export default function SongPanel({ engine, tracks, playing, bpm, steps, say, S,
   };
 
   const total = songBars(chain);
-  const mini: React.CSSProperties = { background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 11, padding: '0 3px' };
+  const mini: React.CSSProperties = { background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 12, padding: '0 3px' };
   const delSection = confirmDelete ? sections.find((s) => s.id === confirmDelete) ?? null : null;
   return (
     <div style={{ marginTop: 14, padding: 10, borderRadius: 10, background: 'rgba(0,0,0,0.22)' }}>
@@ -288,7 +288,7 @@ export default function SongPanel({ engine, tracks, playing, bpm, steps, say, S,
                 ) : (
                   <>
                     <b>{s.name}</b>
-                    <span style={{ opacity: 0.65, fontSize: 11 }}>· {Math.round(s.swing * 100)}% swing · in chain ×{chainUses(chain, s.id)}</span>
+                    <span style={{ opacity: 0.65, fontSize: 12 }}>· {Math.round(s.swing * 100)}% swing · in chain ×{chainUses(chain, s.id)}</span>
                     <button style={mini} onClick={() => setRenaming({ id: s.id, name: s.name })}>RENAME</button>
                     <button style={{ ...mini, ...(gridHidden ? { opacity: 0.5 } : {}) }} data-qa="section-update" title={gridHidden ? HIDDEN_GRID_LINE : undefined} onClick={() => updateFromGrid(s)}>UPDATE FROM GRID</button>
                     <button style={mini} onClick={() => addToChain(s)}>+ CHAIN</button>
@@ -354,7 +354,7 @@ export default function SongPanel({ engine, tracks, playing, bpm, steps, say, S,
             <PublishFileAsCard discipline="music" style={S.btnAlt} entry={{ from: 'song-render', title: song.title }} file={() => mixBlob.current}
               meta={{ fileName: 'fel-song-mix.wav', mime: 'audio/wav', bpm, title: song.title }}>PUBLISH AS CARD</PublishFileAsCard>
           )}
-          {stems.map((s) => <a key={s.name} href={s.url} download={`fel-stem-${s.name.replace(/\s+/g, '_')}.wav`} style={{ ...S.btnAlt, textDecoration: 'none', fontSize: 11 }}>⬇ {s.name}</a>)}
+          {stems.map((s) => <a key={s.name} href={s.url} download={`fel-stem-${s.name.replace(/\s+/g, '_')}.wav`} style={{ ...S.btnAlt, textDecoration: 'none', fontSize: 12 }}>⬇ {s.name}</a>)}
         </div>
       )}
     </div>

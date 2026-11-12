@@ -42,10 +42,12 @@ export interface CatalogueCoachingRow {
 }
 
 export interface TodayFault { fault: string; fix: string | null }
+// COACH-DELIVERY COA-09 (2026-10-27; owner 2026-10-20: "NO YouTube (own storage only; strict no-ads)"): a YouTube demo is no
+// longer embedded. It is a labelled outbound link (`site: 'youtube'`): no iframe, no player, no ads on FEL.
+// assumption (the backlog's): an existing YouTube URL stays reachable as a plain link rather than being dropped.
 export type DemoMedia =
-  | { kind: 'youtube'; src: string; href: string }
   | { kind: 'file'; src: string; href: string }
-  | { kind: 'link'; href: string };
+  | { kind: 'link'; href: string; site?: 'youtube' };
 
 export interface TodayCoaching {
   /** The catalogue's cues (up to three), in the coach's words. */
@@ -152,8 +154,8 @@ export function faultsFrom(json: unknown): TodayFault[] {
 }
 
 /**
- * What the card can do with a demo link: a YouTube link plays in an embed, a video file in a <video>, anything else
- * http(s) opens in a new tab. Not http(s) — a `javascript:` link, a bare word — is no demo at all (the catalogue
+ * What the card can do with a demo link: a video file (FEL's own storage) plays in a <video>; a YouTube link, and anything
+ * else http(s), opens in a new tab as a labelled link — never an embed (COA-09). Not http(s) — a `javascript:` link, a bare word — is no demo at all (the catalogue
  * refuses those on save, lib/coach/catalogue.ts; a row written before that check might still hold one).
  */
 export function demoMedia(url: unknown): DemoMedia | null {
@@ -165,10 +167,10 @@ export function demoMedia(url: unknown): DemoMedia | null {
   const host = u.hostname.replace(/^www\.|^m\./, '');
   let yt = '';
   if (host === 'youtu.be') yt = u.pathname.slice(1).split('/')[0];
-  else if (host === 'youtube.com' || host === 'youtube-nocookie.com') {
+  else if (/^youtube(?:-nocookie)?\.com$/.test(host)) {   // youtube.com and its no-cookie host: both are YouTube, both a link
     yt = u.searchParams.get('v') ?? (/^\/(?:embed|shorts)\/([\w-]+)/.exec(u.pathname)?.[1] ?? '');
   }
-  if (yt && /^[\w-]{6,20}$/.test(yt)) return { kind: 'youtube', src: `https://www.youtube-nocookie.com/embed/${yt}?rel=0`, href };
+  if (yt && /^[\w-]{6,20}$/.test(yt)) return { kind: 'link', href, site: 'youtube' };
   if (/\.(mp4|webm|mov|m4v)$/i.test(u.pathname)) return { kind: 'file', src: href, href };
   return { kind: 'link', href };
 }

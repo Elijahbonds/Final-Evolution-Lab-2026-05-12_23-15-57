@@ -1,6 +1,8 @@
 import localFont from 'next/font/local'
+import type { Viewport } from 'next'
 import { TabBar } from '@/components/shell/tab-bar'
 import { StatusRail } from '@/components/shell/status-rail'
+import { NavScrollTop } from '@/components/shell/nav-scroll-top'
 import './globals.css'
 import './theme.css'
 // M95 (Pass 2): mobile canvas fix — on portrait phones the shared 16:10 game
@@ -8,10 +10,14 @@ import './theme.css'
 // ~80% without clipping any control. Desktop/landscape/tablet are untouched.
 import './game-surface.css'
 import { Providers } from '@/components/providers'
+import { AttributionCapture } from '@/components/onboarding/attribution-capture'
 import { Toaster } from '@/components/ui/sonner'
 import { ChunkLoadErrorHandler } from '@/components/chunk-load-error-handler'
 import { SoundtrackDock } from '@/components/soundtrack/soundtrack-dock'
 import { PartyDock } from '@/components/party/social/party-dock'
+import { ServiceWorkerRegistrar } from '@/components/pwa/sw-register'
+import { InstallPrompt } from '@/components/pwa/install-prompt'
+import { APP_NAME, APP_SHORT_NAME, APPLE_TOUCH_ICON_HREF, MANIFEST_HREF, THEME_COLOR } from '@/lib/pwa/manifest'
 
 export const dynamic = 'force-dynamic'
 
@@ -68,7 +74,7 @@ const chakraPetch = localFont({
 // a category, not a hook, and a different pitch from the landing page's "60 seconds to a
 // dunk — no account, no download". Whoever opened the link was sold something vaguer than
 // what they were about to get.
-const HOOK = '60 seconds to a dunk. No account, no download — drop into Venice Beach and throw down right now.'
+const HOOK = 'Play free on Venice Beach, then train for real. Built by pro dunker Elijah Bonds. No account needed to start.'
 
 // THE FAVICON, ONCE (FDB-2, 2026-10-17). `metadata.icons` rendered two links (icon + shortcut, the same file) inside the
 // metadata Next re-renders on every client navigation, and public/ files are served with max-age=0, so /links → /try
@@ -82,19 +88,33 @@ export const metadata = {
   title: 'Final Evolution Lab',
   description: HOOK,
   // no `icons`: the favicon is FAVICON_HREF's one <link> in RootLayout's <head>
+  // INSTALLABLE (app-feel, 2026-10-25): the name under the home-screen icon, and iPhone's full-screen tags. These are
+  // <meta> tags, which fetch nothing. The manifest and apple-touch-icon LINKS sit in <head> below, beside the favicon,
+  // for the reason FDB-2 moved the favicon there (lib/pwa/manifest.ts).
+  applicationName: APP_NAME,
+  appleWebApp: { capable: true, title: APP_SHORT_NAME, statusBarStyle: 'black' as const },
   openGraph: {
     type: 'website',
     siteName: 'Final Evolution Lab',
-    title: '60 Seconds to a Dunk',
+    title: 'Dunk in Venice now. Then train to dunk for real.',
     description: HOOK,
     images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'Final Evolution Lab — Venice Beach court at golden hour' }],
   },
   twitter: {
     card: 'summary_large_image',
-    title: '60 Seconds to a Dunk',
+    title: 'Dunk in Venice now. Then train to dunk for real.',
     description: HOOK,
     images: ['/og-image.png'],
   },
+}
+
+// The phone's browser bar and status bar take the page's black (--fel-bg). width / initial-scale are Next's own
+// defaults, written out because exporting `viewport` is what sets theme-color. No viewport-fit=cover yet: that moves
+// every page under the notch, and the home-screen device check (LAUNCH-CHECKLIST F5/F7) decides it.
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  themeColor: THEME_COLOR,
 }
 
 export default function RootLayout({
@@ -106,6 +126,8 @@ export default function RootLayout({
     <html lang="en" className={`dark ${barlow.variable} ${plexSans.variable} ${jetbrainsMono.variable} ${chakraPetch.variable}`} suppressHydrationWarning>
       <head>
         <link rel="icon" href={FAVICON_HREF} type="image/svg+xml" />
+        <link rel="manifest" href={MANIFEST_HREF} />
+        <link rel="apple-touch-icon" href={APPLE_TOUCH_ICON_HREF} />
       </head>
       <body className="font-sans min-h-screen bg-[#050505]">
         <Providers>
@@ -116,13 +138,21 @@ export default function RootLayout({
           <StatusRail />
           {/* CREATOR SOUNDTRACK (owner, 2026-10-06): the menu music and its Now Playing chip; silent on the Quick Screen */}
           <SoundtrackDock />
+          {/* ONB-04: utm_* / ?ref on the first page view, kept first-party on this browser for the sign-up (renders nothing) */}
+          <AttributionCapture />
           {children}
+          {/* EVERY-SCREEN P5: a page opened by a tap starts at its top, never under the sticky rail (components/shell/nav-scroll-top.tsx) */}
+          <NavScrollTop />
           {/* The same three tabs, at the bottom of a phone where a thumb is. On a desktop this renders nothing and
               the rail above carries them instead. */}
           <TabBar />
           <Toaster theme="dark" position="top-center" />
           {/* IMPORTANT: Do not remove — handles chunk loading race conditions in the dev server */}
           <ChunkLoadErrorHandler />
+          {/* INSTALLABLE (app-feel): the service worker's switch (off unless NEXT_PUBLIC_SW_ENABLED) and the one-time
+              "Install FEL" offer, which shows only on the hub pages, never in a game or on a TV. */}
+          <ServiceWorkerRegistrar />
+          <InstallPrompt />
         </Providers>
         {/* PSN-STYLE PARTY (owner, 2026-10-09): outside <Providers> so nothing ever remounts it — the party and its voice
             carry on across every page and into every game. Renders nothing when you are not in a party. */}

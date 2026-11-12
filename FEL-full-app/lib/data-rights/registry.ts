@@ -294,6 +294,15 @@ export const REGISTRY: Record<string, TableRights> = {
       { col: 'coachId', export: OTHERS, erase: 'delete', why: "An erased coach's inbox." },
     ],
   },
+  // VBT (lane vbt, prisma/pending/2026-10-26-vbt.sql)
+  VbtSet: { subjects: [{ col: 'userId', export: true, erase: 'delete', why: "The athlete's own bar-speed numbers (speeds, reps, velocity loss; never video). The feature's own delete (DELETE /api/vbt/sets) does the same." }] },
+  VbtZoneTarget: { subjects: [{ col: 'coachId', export: true, erase: 'delete', why: "The coach's own velocity-zone targets on their program slots; the athlete's program stays as written." }] },
+  // BBS-04 (platform lane plat-bbs04, prisma/pending/2026-11-03-hoops-cam.sql)
+  HoopsCamSession: { subjects: [{ col: 'userId', export: true, erase: 'delete', why: "The player's own shot and dribble numbers (made / missed, approximate spots, dribble counts; never video). The feature's own delete (DELETE /api/hoops-cam/sessions) does the same." }] },
+  // TEACHER PLATFORM (plat-p10, prisma/pending/2026-11-03-teacher.sql)
+  TeacherApplication: { subjects: [{ col: 'userId', export: true, erase: 'delete', why: "The applicant's own application (discipline, bio, sample, links) and the owner's decision on it." }] },
+  TeacherRole: { subjects: [{ col: 'userId', export: true, erase: 'delete', why: 'The teacher role the owner granted; erased with the account (a re-joining teacher applies again).' }] },
+  TeachCourse: { subjects: [{ col: 'teacherId', export: true, erase: 'delete', why: "The teacher's own courses. No student progress is stored with them (it stays on the student's device)." }] },
   // COACH-BUSINESS (#442, #445)
   CoachConnectAccount: { subjects: [{ col: 'userId', export: true, erase: 'keep', why: 'The Stripe Connect account that CoachSale money records name. ' + MONEY }] },
   CoachPackage: { subjects: [{ col: 'coachId', export: true, erase: { scrub: { active: 'false' } }, why: 'Sales point at it (CoachSale.packageId Restrict): it stays, off sale.' }] },
@@ -303,6 +312,9 @@ export const REGISTRY: Record<string, TableRights> = {
       { col: 'buyerId', export: true, erase: 'keep', why: MONEY },
     ],
   },
+  // PAYMENTS-READY (prisma/pending/2026-10-26-payments-ready.sql): a buyer's dispute on a coach's sale. No buyer column (the
+  // sale names the buyer); the coach sees it as their in-app notice.
+  CoachSaleDispute: { subjects: [{ col: 'coachId', export: true, erase: 'keep', why: 'A dispute on a coach\'s sale: Stripe withdrew and returned money on it. ' + MONEY }] },
   CoachMarketProfile: { subjects: [{ col: 'userId', export: true, erase: 'delete', why: 'The marketplace listing settings; deleting delists the coach.' }] },
   CoachHighlight: {
     subjects: [
@@ -324,6 +336,11 @@ export const REGISTRY: Record<string, TableRights> = {
     ],
   },
   LibraryExercise: { subjects: [{ col: 'reviewerId', export: OTHERS, erase: 'nullify', why: 'Shared catalogue entry; the reviewer is no longer named.' }] },
+  // SIGNATURE-PROGRAMS (#451)
+  SignatureEnrollment: { subjects: [{ col: 'userId', export: true, erase: 'delete', why: "The athlete's place in a signature program: the sessions done and the plan's adaptations. Their own training data." }] },
+  SignatureProgramReview: { subjects: [{ col: 'reviewerId', export: OTHERS, erase: 'nullify', why: "The owner's review of FEL's own program (one row per program); the program stays, the reviewer is no longer named." }] },
+  // PROGRAM-ASK-2 (lane/program-ask-2; prisma/pending/2026-11-03-program-ask.sql). Adults only; no health answer or body number.
+  AskedProgram: { subjects: [{ col: 'userId', export: true, erase: 'delete', why: "The person's own asked-for training plan: the ask, the chips they changed, the sessions done and the checkpoint answers. Their own training data." }] },
   // TEAMS-SQUADS (#441)
   TrainingGroup: { omit: ['inviteToken'], subjects: [{ col: 'ownerId', export: true, erase: 'delete', why: 'An owner cannot leave a group, only delete it (lib/groups/rules.ts); erasing the owner deletes it, and its members and feed cascade.' }] },
   TrainingGroupMember: { subjects: [{ col: 'userId', export: true, erase: 'delete', why: 'Leaves every group.' }] },
@@ -331,6 +348,95 @@ export const REGISTRY: Record<string, TableRights> = {
     subjects: [
       { col: 'fromUserId', export: true, erase: 'delete', why: "The person's reactions, nudges and posts (the foreign key cascades the same way)." },
       { col: 'toUserId', export: true, erase: 'delete', why: 'Reactions, nudges and trophies aimed at the person (the foreign key cascades the same way).' },
+    ],
+  },
+  // COMBINE-DAY (lane/combine-day; prisma/pending/2026-10-25-combine-day.sql). Numbers only: no frame, video or note.
+  CombineEvent: { subjects: [{ col: 'coachId', export: true, erase: 'delete', why: "The coach's own combines (name, stations, weights). Erasing the coach deletes them, and their entrants and results cascade (the foreign keys do the same), as a team goes with its owner." }] },
+  CombineEntrant: { subjects: [{ col: 'athleteId', export: true, erase: 'delete', why: "That the athlete was on a coach's combine; it goes with them (the foreign key cascades the same way)." }] },
+  CombineResult: { subjects: [{ col: 'athleteId', export: true, erase: 'delete', why: "The athlete's own combine numbers (jump, approach and drill reads, hand-timed times). Other athletes' results stay with the coach's combine (the foreign key cascades the same way)." }] },
+
+  // NEXUS-PUBLISH (lane/nexus-publish, NEX-06, prisma/pending/2026-10-26-studio-share.sql): Studio venue share links
+  StudioShareLink: { omit: ['tokenHash'], subjects: [{ col: 'creatorId', export: true, erase: 'delete', why: "The creator's own share links (the venue they shared, its name, the display name shown on it, how often it was opened). Erasing the creator deletes them, and every link stops working (the foreign key cascades the same way). The token's hash is never exported: it is a credential." }] },
+
+  // COACH-PARITY (lane/coach-parity, prisma/pending/2026-10-26-coach-parity.sql): check-in forms and coach habits
+  CoachCheckinForm: { subjects: [{ col: 'coachId', export: true, erase: 'delete', why: "The coach's own forms. The assignments and the answers under them cascade with them (the athletes' answers to an erased coach's form go too: owner call, docs/COACH-PARITY.md)." }] },
+  CoachCheckinAssign: {
+    subjects: [
+      { col: 'coachId', export: true, erase: 'delete', why: "The coach's own assignments." },
+      { col: 'scopeId', where: `"scope" = 'athlete' AND "scopeId" = $1`, export: OTHERS, erase: 'delete', why: 'A coach assigning a form to this one athlete is about them; it goes with them.' },
+    ],
+  },
+  CoachCheckinAnswer: {
+    subjects: [
+      { col: 'athleteId', export: true, erase: 'delete', why: "The athlete's own answers, health answers included (the FK cascades the same way)." },
+      { col: 'coachId', export: OTHERS, erase: 'delete', why: "An erased coach's inbox of answers: they cascade with the coach's forms." },
+    ],
+  },
+  CoachHabit: {
+    subjects: [
+      { col: 'coachId', export: true, erase: 'delete', why: "The coach's own habits; the athletes' ticks on them cascade (owner call, docs/COACH-PARITY.md)." },
+      { col: 'scopeId', where: `"scope" = 'athlete' AND "scopeId" = $1`, export: OTHERS, erase: 'delete', why: 'A habit a coach set for this one athlete is about them; it goes with them, and its ticks with it.' },
+    ],
+  },
+  CoachHabitTick: { subjects: [{ col: 'athleteId', export: true, erase: 'delete', why: "The athlete's own ticks (the FK cascades the same way)." }] },
+
+  // COACH-DELIVERY (lane/coach-delivery, prisma/pending/2026-10-26-coach-delivery.sql): automations, the readiness survey,
+  // branding, roster sessions and the calendar feed, client reviews. Retention choices are owner calls (docs/COACH-DELIVERY.md).
+  CoachAutomation: {
+    subjects: [
+      { col: 'coachId', export: true, erase: 'delete', why: "The coach's own automations; their audit rows cascade (the messages they posted stay in the program threads, as any coach message does)." },
+      { col: 'scopeId', where: `"scope" = 'athlete' AND "scopeId" = $1`, export: OTHERS, erase: 'delete', why: 'An automation a coach aimed at this one athlete is about them; it goes with them.' },
+    ],
+  },
+  CoachAutomationRun: {
+    subjects: [
+      { col: 'athleteId', export: true, erase: 'delete', why: 'The audit of what an automation posted to this athlete, and when (the FK cascades the same way).' },
+      { col: 'coachId', export: OTHERS, erase: 'delete', why: "An erased coach's automation audit: it cascades with the coach's automations." },
+    ],
+  },
+  ReadinessSurvey: { subjects: [{ col: 'userId', export: true, erase: 'delete', why: "The athlete's own readiness answers (health data). The feature's own delete (DELETE /api/coach/me/readiness-survey) does the same." }] },
+  CoachBranding: { subjects: [{ col: 'coachId', export: true, erase: 'delete', why: "The coach's own logo path and accent colour; the logo file in the public bucket is the coach's to delete with it (owner call)." }] },
+  CoachRosterSession: {
+    subjects: [
+      { col: 'coachId', export: true, erase: 'delete', why: "The coach's own calendar sessions." },
+      { col: 'scopeId', where: `"scope" = 'athlete' AND "scopeId" = $1`, export: OTHERS, erase: 'delete', why: 'A session a coach set for this one athlete is about them; it goes with them.' },
+    ],
+  },
+  CoachCalendarFeed: { omit: ['nonce'], subjects: [{ col: 'userId', export: true, erase: 'delete', why: 'The calendar-feed link key; deleting it kills every copy of the link.' }] },
+  CoachReview: {
+    subjects: [
+      { col: 'athleteId', export: true, erase: 'delete', why: "The athlete's own review of a coach: their words, so they go with them." },
+      { col: 'coachId', export: OTHERS, erase: 'delete', why: "Reviews of an erased coach: the page they were shown on is gone, so they go too (owner call: docs/COACH-DELIVERY.md)." },
+    ],
+  },
+
+  // ── group classes and in-person 1:1 (GROUP-BOOKING, pending SQL 2026-11-02-group-booking.sql) ─────────────────────
+  GroupTrainer: {
+    omit: ['inviteCode'],
+    subjects: [
+      { col: 'ownerId', export: OTHERS, erase: 'delete', why: "The business owner's list of trainers: it goes with the owner's account." },
+      { col: 'trainerUserId', export: true, erase: 'delete', why: "The trainer's own place on the owner's team (name, gyms, hours); it goes with them." },
+    ],
+  },
+  GroupClass: {
+    subjects: [
+      { col: 'ownerId', export: true, erase: 'keep', why: "The owner's group schedule. Other people's seats and passes (money records) point at it, so it stays; it holds no personal detail beyond the group's name." },
+      { col: 'trainerUserId', export: true, erase: 'keep', why: 'Which trainer runs a group. The group stays for its members; the id then points at the tombstone account, which has no name.' },
+    ],
+  },
+  GroupPass: {
+    subjects: [
+      { col: 'userId', export: true, erase: 'keep', why: 'What was reserved, the price and when it was paid in person. ' + MONEY },
+      { col: 'markedPaidByUserId', export: OTHERS, erase: 'keep', why: 'Who marked a payment received: part of the money record. ' + MONEY },
+    ],
+  },
+  GroupSeat: { subjects: [{ col: 'userId', export: true, erase: 'delete', why: "The person's own seats and attendance; deleting a future seat frees it for someone else. The pass (the money record) stays." }] },
+  GroupWaitlist: { subjects: [{ col: 'userId', export: true, erase: 'delete', why: OWN }] },
+  InPersonSession: {
+    subjects: [
+      { col: 'clientUserId', export: true, erase: 'keep', why: 'A booked 1:1: the price, the gym, the time and whether it was paid. ' + MONEY },
+      { col: 'trainerUserId', export: true, erase: 'keep', why: "The trainer's side of a client's 1:1, a money record. " + MONEY },
+      { col: 'markedPaidByUserId', export: OTHERS, erase: 'keep', why: 'Who marked a payment received: part of the money record. ' + MONEY },
     ],
   },
 

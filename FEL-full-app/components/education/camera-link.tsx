@@ -14,8 +14,8 @@ export function CameraLink({ movement, label, compact = false }: { movement: Mir
       href={cameraHref(movement)}
       data-camera-link={movement}
       className={compact
-        ? 'inline-flex items-center gap-1.5 text-[12.5px] font-bold text-[#00E5FF] underline-offset-2 hover:underline'
-        : 'inline-flex items-center gap-2 rounded-xl border border-[#00E5FF]/30 bg-[#00E5FF]/[0.06] px-3.5 py-2 text-[13px] font-bold text-[#00E5FF] transition-colors hover:border-[#00E5FF]/60'}
+        ? 'inline-flex min-h-11 items-center gap-1.5 text-[12px] font-bold text-[#00E5FF] underline-offset-2 hover:underline'
+        : 'inline-flex items-center gap-2 rounded-xl border border-[#00E5FF]/30 bg-[#00E5FF]/[0.06] px-3.5 py-2 text-[14px] font-bold text-[#00E5FF] transition-colors hover:border-[#00E5FF]/60'}
     >
       <Camera aria-hidden className="h-4 w-4 shrink-0" />
       {label ?? `Check it on camera: ${MOVEMENT_LABEL[movement]}`}

@@ -343,7 +343,7 @@ export default function RailGrindGame({ grade, prq, onEnd, gamepad }: GameProps)
         {!started && (
           <div className="absolute inset-0 flex flex-col items-center justify-center rounded-lg bg-black/70 backdrop-blur-sm">
             <h2 className="fel-heading text-4xl font-bold text-white">NEXUS RAIL</h2>
-            <p className="mt-2 max-w-md text-center text-sm text-white/60">
+            <p className="mt-2 max-w-md text-center text-base text-white/60">
               Grind the rail to the Arena District. Jump gaps, duck barriers, keep your balance.
               Collect orbs for score. Reach {3000}m to clear.
             </p>

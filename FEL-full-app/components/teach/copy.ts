@@ -1,0 +1,35 @@
+// components/teach/copy.ts — PLAT-P10 (2026-11-03): the teacher platform's fixed lines. No legal, terms or money text (the
+// teacher agreement and pricing are the owner's: courses are free first).
+export const TEACH_COPY = {
+  opensSoon: 'Teaching on FEL opens soon.',
+  applyTitle: 'Teach on FEL',
+  applyLede: 'Tell us what you teach. The owner reviews every application.',
+  discipline: 'What you teach',
+  bio: 'About you',
+  bioHint: 'Who you coach and how long. Two or three sentences.',
+  sample: 'A sample of how you teach',
+  sampleHint: 'Write one short lesson the way you would say it.',
+  links: 'Links (optional)',
+  send: 'Send my application',
+  pending: 'Your application is with the owner.',
+  approved: 'You can teach on FEL.',
+  rejected: 'The owner did not approve this application.',
+  adultsOnly: 'Teachers are 18 or over.',
+  studio: 'Your course',
+  newCourse: 'Start a course',
+  addLesson: 'Add a lesson',
+  addBlock: 'Add a block',
+  save: 'Save draft',
+  publish: 'Publish',
+  published: 'Published. Students can open it.',
+  preview: 'Preview',
+  edit: 'Edit',
+  free: 'Free',
+  queueTitle: 'Teacher applications',
+  queueEmpty: 'No applications waiting.',
+  approve: 'Approve',
+  reject: 'Reject',
+  badge: 'Teacher',
+} as const;
+
+export const BLOCK_LABEL = { card: 'Card', demo: 'Demo', camera: 'Camera check', quiz: 'Quiz', practice: 'Practice', audio: 'Audio', video: 'Video', book: 'Book' } as const;

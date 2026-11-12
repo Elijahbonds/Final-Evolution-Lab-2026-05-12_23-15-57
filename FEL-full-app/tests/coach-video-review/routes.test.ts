@@ -1,3 +1,4 @@
+// test changed: copy rewrite (cue-rewrite lane) - knee flag reads "caves in" (canonical name "Knees cave in"); same side and rep.
 // COACH-VIDEO-REVIEW (2026-10-24): the three route files over the in-memory database — the session, the size cap, and
 // the GAP 1 gate (canSaveScanNumbers, called in the route file itself: lib/privacy/scanSaveGate.ts row 1k).
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -48,7 +49,7 @@ describe('POST /api/coach/form-reviews', () => {
     expect(res.status).toBe(200);
     expect(h.canSaveCalls).toEqual(['adult']);
     expect(w.rows).toHaveLength(1);
-    expect((await res.json()).flags[0].reason).toBe('Right knee caves on rep 2');
+    expect((await res.json()).flags[0].reason).toBe('Right knee caves in on rep 2');
   });
 
   it('the gate says no: 403, nothing stored', async () => {
@@ -74,12 +75,12 @@ describe('the queue, one set, the reply, delete', () => {
     as('coach');
     const q = await (await GET(new NextRequest('http://x/api/coach/form-reviews'))).json();
     expect(q.unreviewed).toBe(1);
-    expect(q.items[0].flags[0].reason).toBe('Right knee caves on rep 2');
+    expect(q.items[0].flags[0].reason).toBe('Right knee caves in on rep 2');
     const one = await (await GET_ONE(new NextRequest(`http://x/api/coach/form-reviews/${id}`), { params: { id } })).json();
     expect(one.review.tracks.length).toBeGreaterThan(0);
     const r = await REPLY(new NextRequest(`http://x/api/coach/form-reviews/${id}/reply`, { method: 'POST', body: JSON.stringify({ cueId: one.presets[0].id }) }), { params: { id } });
     expect(r.status).toBe(200);
-    expect(w.messages[0].body).toMatch(/^Form review · Goblet squat, rep 2 \(Right knee caves\)\nCue: /);
+    expect(w.messages[0].body).toMatch(/^Form review · Goblet squat, rep 2 \(Right knee caves in\)\nCue: /);
     as('adult');
     const mine = await (await GET(new NextRequest('http://x/api/coach/form-reviews?mine=1'))).json();
     expect(mine.items[0].status).toBe('reviewed');

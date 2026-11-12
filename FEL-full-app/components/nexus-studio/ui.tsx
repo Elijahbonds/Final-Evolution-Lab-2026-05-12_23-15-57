@@ -23,7 +23,7 @@ export const C = {
 export function PanelTitle({ children, right }: { children: ReactNode; right?: ReactNode }) {
   return (
     <div className="flex items-center justify-between px-3 pb-1.5 pt-3">
-      <h2 className="font-display text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: C.dim }}>{children}</h2>
+      <h2 className="font-display text-[12px] font-semibold uppercase tracking-[0.16em]" style={{ color: C.dim }}>{children}</h2>
       {right}
     </div>
   );
@@ -69,7 +69,7 @@ export function ColorField({ value, onChange, onDone, disabled, label }: { value
     <span className="flex items-center gap-2">
       <input type="color" aria-label={label} value={value} disabled={disabled} className="h-6 w-9 cursor-pointer rounded border bg-transparent p-0" style={{ borderColor: C.line }}
         onChange={(e) => onChange(e.target.value)} onBlur={() => onDone?.()} />
-      <code className="text-[11px]" style={{ color: C.dim }}>{value}</code>
+      <code className="text-[12px]" style={{ color: C.dim }}>{value}</code>
     </span>
   );
 }
@@ -94,7 +94,7 @@ export function Toggle({ on, onChange, disabled, label }: { on: boolean; onChang
 export function ToolButton({ active, onClick, title, children, disabled, shortcut }: { active?: boolean; onClick(): void; title: string; children: ReactNode; disabled?: boolean; shortcut?: string }) {
   return (
     <button type="button" onClick={onClick} disabled={disabled} title={shortcut ? `${title} (${shortcut})` : title} aria-label={title} aria-pressed={active}
-      className="flex h-8 min-w-8 items-center justify-center gap-1 rounded-md border px-2 text-[12px] transition-colors disabled:opacity-35"
+      className="flex h-8 min-w-8 items-center justify-center gap-1 rounded-md border px-2 text-[12px] transition-colors disabled:opacity-35 max-md:h-11 max-md:min-w-11"
       style={{ borderColor: active ? C.cyan : 'transparent', background: active ? 'rgba(0,229,255,0.14)' : 'transparent', color: active ? C.cyan : C.text }}>
       {children}
     </button>

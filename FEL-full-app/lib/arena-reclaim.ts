@@ -70,6 +70,7 @@
 
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { arenaPayWinner, arenaRefund, appendMatchEvent, resolveArena } from '@/lib/arena';
+import { isTeenPractice, TEEN_PRACTICE_EXPIRED_REASON } from '@/lib/arena-teen';
 import { isMusicDuel, readMusicSeats, houseSeatOf } from '@/lib/arena-music';
 import { drawHouseScore } from '@/lib/arena-ghost';
 import { scoreCeilingFor, killSwitchOn } from '@/lib/arena-score-integrity';
@@ -252,6 +253,17 @@ export async function reclaimOne(db: ReclaimDb, matchId: string, now: Date = new
         console.error(`[arena-reclaim] ${m.id} (${m.mode}): ${plan.why} — an open duel in a state no route makes; left untouched`);
       }
       return { matchId, mode: m.mode, outcome: 'skipped', why: plan.why } as ReclaimResult;
+    }
+    // ARENA-AGE-1: an expired teen practice duel (the teen never posted a score) locked nothing, so it closes with no
+    // ledger write at all (applyLc refuses a 0 move) and pays no prize.
+    if (isTeenPractice(m)) {
+      const closed = await tx.competitionMatch.updateMany({
+        where: { id: m.id, currency: 'LC', status: m.status, player1Score: m.player1Score ?? null, expiresAt: { lte: now } },
+        data: { status: 'VOIDED' },
+      });
+      if (!closed || closed.count !== 1) return { matchId, mode: m.mode, outcome: 'raced' } as ReclaimResult;
+      await appendMatchEvent(tx, m.id, 'REFUNDED', null, { reason: TEEN_PRACTICE_EXPIRED_REASON, teenPractice: true, entry: 0, refunded: [] });
+      return { matchId, mode: m.mode, outcome: 'voided', refunded: [] } as ReclaimResult;
     }
     // MUSIC-SUITE P6 FIX PASS: a music duel's seats are its ATTEMPTS (a start has played; a pre-house-beat score has not)
     let legacy: string[] = [];

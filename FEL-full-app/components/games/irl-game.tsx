@@ -167,7 +167,7 @@ export default function IrlGame({ onEnd }: GameProps) {
     <div className="min-h-screen w-full" style={{ background: BG, color: '#fff' }}>
       <div className="mx-auto max-w-xl px-5 py-6">
         <div className="mb-6 flex items-center justify-between">
-          <Link href="/creator" className="inline-flex items-center gap-2 text-sm text-white/60 transition hover:text-white">
+          <Link href="/creator" className="inline-flex min-h-11 items-center gap-2 text-sm text-white/60 transition hover:text-white">
             <ArrowLeft className="h-4 w-4" /> Creator Hub
           </Link>
           <span className="text-xs font-semibold tracking-[0.3em]" style={{ color: GREEN }}>FEL · IRL</span>
@@ -225,7 +225,7 @@ function IntroScreen({ onStart }: { onStart: () => void }) {
         Measure your real vertical. Hold your phone securely (a zipped pocket is best), start the session,
         and jump. Height is calculated from your airborne time — <span className="text-white/80">g·t²/8</span>.
       </p>
-      <ul className="mt-4 space-y-1 text-xs text-white/40">
+      <ul className="mt-4 space-y-1 text-xs text-white/50">
         <li>• Land softly on the balls of your feet.</li>
         <li>• Thrown or dropped phones are rejected, not scored.</li>
         <li>• Everything is measured locally.</li>
@@ -304,8 +304,8 @@ export function ResultsScreen({ session, onReplay, onMenu }: { session: IRLSessi
 function Stat({ label, value, unit, color }: { label: string; value: string; unit: string; color: string }) {
   return (
     <div className="rounded-xl border border-white/8 bg-white/[0.02] p-4">
-      <div className="text-3xl font-black tabular-nums" style={{ color }}>{value}<span className="text-base font-normal text-white/40">{unit}</span></div>
-      <div className="mt-1 text-xs uppercase tracking-widest text-white/40">{label}</div>
+      <div className="text-3xl font-black tabular-nums" style={{ color }}>{value}<span className="text-base font-normal text-white/50">{unit}</span></div>
+      <div className="mt-1 text-xs uppercase tracking-widest text-white/50">{label}</div>
     </div>
   );
 }

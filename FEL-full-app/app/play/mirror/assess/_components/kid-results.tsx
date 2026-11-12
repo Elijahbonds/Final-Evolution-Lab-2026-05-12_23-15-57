@@ -7,6 +7,7 @@
 // page. No link out of the screen. Nothing here writes or sends anything: the numbers come in as props, from the page's
 // memory.
 import { aboutInches } from '@/lib/screen/jump';
+import { notice } from '@/lib/every-screen/notices';
 import Link from 'next/link';
 import { jumpChange, jumpChangeLine } from '@/lib/screen/kid';
 import { DISCLAIMER, KID_JUMP, KID_NO_CAMERA_BODY, KID_NO_CAMERA_BUTTON, KID_NO_CAMERA_TITLE, KID_NO_JUMP, KID_SAVE_LINE, PRIVACY_LINK, RUN_IT_AGAIN, STOP_LINE } from '@/lib/screen/copy';
@@ -18,8 +19,8 @@ export function KidResults({ jumpIn, lastIn, onRunAgain }: { jumpIn: number | nu
   return (
     <div data-kid-results className="space-y-3">
       <div className="space-y-1">
-        <p data-disclaimer className="text-[16px] font-bold leading-snug text-white">{DISCLAIMER}</p>
-        <p data-stop-line className="text-[16px] text-white/70">{STOP_LINE}</p>
+        <p {...notice('medical')} data-disclaimer className="text-[16px] font-bold leading-snug text-white">{DISCLAIMER}</p>
+        <p {...notice('medical')} data-stop-line className="text-[16px] text-white/70">{STOP_LINE}</p>
       </div>
       {jumpIn !== null ? (
         <section data-kid-number className="rounded-3xl border border-white/15 bg-white/[0.04] p-5 text-center">

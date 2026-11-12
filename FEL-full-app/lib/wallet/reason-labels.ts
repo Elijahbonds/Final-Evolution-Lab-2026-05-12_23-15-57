@@ -18,6 +18,7 @@ export const REASON_LABELS: Record<string, ReasonLabel> = {
   ARENA_ENTRY: { label: 'Arena entry', kind: 'spend' },
   ARENA_WINNINGS: { label: 'Arena winnings', kind: 'earn' },
   ARENA_REFUND: { label: 'Arena refund', kind: 'earn' },
+  ARENA_TEEN_PRIZE: { label: 'Arena practice prize', kind: 'earn' },   // ARENA-AGE-1
   SHOP_PURCHASE: { label: 'Shop purchase', kind: 'spend' },
   LESSON_COMPLETE: { label: 'Lesson complete', kind: 'earn' },
   LADDER_PRIZE: { label: 'Ladder prize', kind: 'earn' },

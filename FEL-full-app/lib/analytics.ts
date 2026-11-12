@@ -53,6 +53,13 @@ export interface AnalyticsEventMap {
   signup_complete: { fromChallenge?: string; fromGuest?: boolean };
   /** Ship pass 2: a game diagnostic that used to live only in the console. */
   game_diag: { kind: string; mode: string; detail: string };
+  // --- ONB-01/02 first run (2026-10-25): which path, and how long the first win took. No ids beyond the bus's own. ---
+  path_chosen: { path: string; where: 'signup' | 'welcome' };
+  first_win: { path: string; sec: number };
+  // --- BINJGB-SHELF-1 (Cyber G9): stored anonymously (lib/analyticsAnon.ts). A shelf title's slug only — v1 ships no
+  // titles, so it never fires. Load-your-own sends { source: 'local' } and nothing else: no file name, hash or bytes. ---
+  homebrew_shelf_play: { slug: string };
+  homebrew_local_play: { source: 'local' };
 }
 
 export type AnalyticsEventName = keyof AnalyticsEventMap;

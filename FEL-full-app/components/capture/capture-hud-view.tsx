@@ -64,7 +64,7 @@ export function RecLiveIndicator({ rec, live }: { rec: boolean; live: boolean })
   const chip = (text: string) => (
     <span key={text} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
       <span aria-hidden style={{ width: 9, height: 9, borderRadius: '50%', background: '#FF3366', boxShadow: '0 0 6px #FF3366' }} />
-      <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.12em', color: '#FF3366' }}>{text}</span>
+      <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.12em', color: '#FF3366' }}>{text}</span>
     </span>
   );
   return (
@@ -170,7 +170,7 @@ export function CaptureHudView(props: CaptureHudViewProps) {
         aria-expanded={menu.open}
         onClick={() => dispatch({ type: 'trigger' })}
         onKeyDown={onTriggerKeyDown}
-        style={{ ...btn, padding: '6px 12px', fontSize: 15, lineHeight: 1 }}
+        style={{ ...btn, padding: '6px 12px', fontSize: 15, lineHeight: 1, minWidth: 44, minHeight: 44 }}
       >
         ⋯
       </button>
@@ -219,9 +219,9 @@ export function CaptureHudView(props: CaptureHudViewProps) {
           ) : null}
         </div>
       ) : null}
-      {props.codecNote ? <p data-testid="capture-codec" style={{ margin: 0, flexBasis: '100%', fontSize: 11, color: '#FFD700' }}>{props.codecNote}</p> : null}
-      {props.note ? <p data-testid="capture-note" style={{ margin: 0, flexBasis: '100%', fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>{props.note}</p> : null}
-      {props.streamOn ? <p data-testid="stream-note" style={{ margin: 0, flexBasis: '100%', fontSize: 11, lineHeight: 1.35, color: 'rgba(255,255,255,0.65)' }}>{RTMP_NOTE}</p> : null}
+      {props.codecNote ? <p data-testid="capture-codec" style={{ margin: 0, flexBasis: '100%', fontSize: 12, color: '#FFD700' }}>{props.codecNote}</p> : null}
+      {props.note ? <p data-testid="capture-note" style={{ margin: 0, flexBasis: '100%', fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>{props.note}</p> : null}
+      {props.streamOn ? <p data-testid="stream-note" style={{ margin: 0, flexBasis: '100%', fontSize: 12, lineHeight: 1.35, color: 'rgba(255,255,255,0.65)' }}>{RTMP_NOTE}</p> : null}
     </div>
   );
 }
@@ -240,7 +240,7 @@ export function StreamGuides() {
       <div style={corner({ top: 0, right: 0, borderWidth: '2px 2px 0 0' })} />
       <div style={corner({ bottom: 0, left: 0, borderWidth: '0 0 2px 2px' })} />
       <div style={corner({ bottom: 0, right: 0, borderWidth: '0 2px 2px 0' })} />
-      <p style={{ position: 'absolute', top: 8, left: 36, margin: 0, color: '#00E5FF', fontSize: 11, fontWeight: 700, letterSpacing: '0.14em' }}>
+      <p style={{ position: 'absolute', top: 8, left: 36, margin: 0, color: '#00E5FF', fontSize: 12, fontWeight: 700, letterSpacing: '0.14em' }}>
         16:9 · SAFE AREA
       </p>
     </div>

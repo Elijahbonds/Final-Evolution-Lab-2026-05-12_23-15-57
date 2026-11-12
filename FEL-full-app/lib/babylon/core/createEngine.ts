@@ -14,6 +14,7 @@
 
 import { Engine, WebGPUEngine } from '@babylonjs/core';
 import type { AbstractEngine } from '@babylonjs/core';
+import { quietCanvas } from './canvasA11y';
 
 /** Options every engine in this app shares regardless of backend. */
 const SHARED = { adaptToDeviceRatio: true, antialias: true } as const;
@@ -33,6 +34,7 @@ export async function createEngine(canvas: HTMLCanvasElement): Promise<AbstractE
       if (await WebGPUEngine.IsSupportedAsync) {
         const engine = new WebGPUEngine(canvas, { ...SHARED });
         await engine.initAsync();
+        quietCanvas(engine, canvas);
         return engine;
       }
       console.info('[FEL] WebGPU requested but unsupported here — using WebGL2.');
@@ -48,5 +50,9 @@ export async function createEngine(canvas: HTMLCanvasElement): Promise<AbstractE
   // first contest's context was still alive and unlost on its detached canvas after the second contest. Chrome caps
   // live contexts at 16 per page and evicts the OLDEST when the cap is hit; on a memory-starved box the GPU process
   // dies first. loseContext() on dispose returns the context's memory the moment the mode exits.
-  return new Engine(canvas, true, { ...SHARED, loseContextOnDispose: true });
+  const engine = new Engine(canvas, true, { ...SHARED, loseContextOnDispose: true });
+  // SCREEN-FIXES (2026-11-10): every game's canvas is named and out of the Tab order (lib/babylon/core/canvasA11y.ts);
+  // a host that named its canvas keeps its name
+  quietCanvas(engine, canvas);
+  return engine;
 }

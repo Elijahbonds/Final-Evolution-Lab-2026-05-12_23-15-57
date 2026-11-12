@@ -6,6 +6,10 @@ import { useState } from 'react';
 import { MARKET_GOALS } from '@/lib/coach-business/market';
 import type { PackageAction } from '@/lib/coach-business/packages';
 import { loginPath } from '@/lib/auth/safeNext';
+import { BUYER_TERMS } from '@/lib/payments/terms';
+import { BuyEntry } from '@/components/shop/buy-sheet';
+import { payCoachPackage } from '@/lib/shop/checkout';
+import type { ShopItem } from '@/lib/shop/model';
 
 export const BUSINESS_API = '/api/coach/business';
 
@@ -22,18 +26,33 @@ function signInFirst(slug: string): string {
   return loginPath(`/coach/${slug}`);
 }
 
+/** The pre-PLAT-P07 inline Book (tick, then Book): kept for components/coach-business pages outside the shop front and pinned
+ *  by tests/coach-business/payments-ready-ui.test.tsx. The coach page books through PackageBuy (the shop's buy sheet). */
 export function BookButton({ slug, packageId }: { slug: string; packageId: string }) {
   const [sent, setSent] = useState<Sent>({ kind: 'idle' });
+  // PAYMENTS-READY: the buyer ticks the store terms before Stripe is called (the server checks the same version).
+  const [agreed, setAgreed] = useState(false);
+  const terms = BUYER_TERMS.coach_package;
   const book = async () => {
+    if (!agreed) return;
     setSent({ kind: 'busy' });
-    const r = await post(`${BUSINESS_API}/checkout`, { packageId });
+    const r = await post(`${BUSINESS_API}/checkout`, { packageId, termsAccepted: true, termsVersion: terms.version });
     if (r.status === 401) { window.location.href = signInFirst(slug); return; }
     if (r.ok && typeof r.json.url === 'string') { window.location.href = r.json.url; return; }
+    if (r.status === 409 && r.json.error === 'terms_required') {
+      setAgreed(false);
+      setSent({ kind: 'error', text: 'The store terms were updated. Reload the page and tick the box again.' });
+      return;
+    }
     setSent({ kind: 'error', text: typeof r.json.message === 'string' ? r.json.message : 'Checkout could not start. Try again.' });
   };
   return (
     <div>
-      <button type="button" onClick={book} disabled={sent.kind === 'busy'} data-action="book"
+      <label className="mb-2 flex items-start gap-2 text-xs text-white/70" data-buyer-terms>
+        <input type="checkbox" className="mt-0.5" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
+        <span>I agree to the <a className="font-bold text-cyan-300 underline" href={terms.href} target="_blank" rel="noopener noreferrer">store terms</a>.</span>
+      </label>
+      <button type="button" onClick={book} disabled={sent.kind === 'busy' || !agreed} data-action="book"
         className="min-h-11 rounded-xl bg-cyan-300 px-4 text-sm font-bold text-black disabled:opacity-60">
         {sent.kind === 'busy' ? 'Opening checkout…' : 'Book'}
       </button>
@@ -83,6 +102,14 @@ export function ApplyForm({ slug, packageId, label = 'Apply' }: { slug: string; 
       {sent.kind === 'error' ? <p role="alert" className="text-sm text-amber-200">{sent.text}</p> : null}
     </div>
   );
+}
+
+/** PLAT-P07 (2026-11-02): Book through the shop's buy sheet — what you get (the package's own lines), the store terms
+ *  (the same version the route checks), then pay (POST /api/coach/business/checkout, unchanged). */
+export function PackageBuy({ slug, item, includes }: { slug: string; item: ShopItem; includes: readonly string[] }) {
+  const terms = BUYER_TERMS.coach_package;
+  return <BuyEntry item={item} label="Book" action="book" includes={includes} terms={{ href: terms.href }}
+    pay={() => payCoachPackage(fetch, { slug, packageId: item.id, termsVersion: terms.version })} />;
 }
 
 export function PackageCta({ slug, packageId, action }: { slug: string; packageId: string; action: PackageAction }) {

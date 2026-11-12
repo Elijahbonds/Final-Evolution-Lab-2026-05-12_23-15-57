@@ -6,7 +6,7 @@
 
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { ArrowDown, ArrowUp, CopyPlus, Minus } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, CopyPlus, Minus } from 'lucide-react';
 import type { Rollup } from '@/lib/groups/activity';
 
 const card = 'rounded-2xl border border-white/10 bg-white/[0.03] p-4 sm:p-5';
@@ -57,19 +57,27 @@ export function TeamRollup({ groupId, rollup, onChanged }: { groupId: string; ro
             <span className="font-mono text-[12px] text-white/70">{r.drillDays}/7 drills</span>
             <span className="font-mono text-[12px] text-white/50">{r.runsThisWeek} games</span>
             <span aria-label={r.trend ?? 'no activity'} className="w-4">
-              {r.trend === 'up' ? <ArrowUp className="h-4 w-4 text-[#00FF9D]" /> : r.trend === 'down' ? <ArrowDown className="h-4 w-4 text-[#FF7A2F]" /> : r.trend === 'same' ? <Minus className="h-4 w-4 text-white/40" /> : null}
+              {r.trend === 'up' ? <ArrowUp className="h-4 w-4 text-fel-emerald" /> : r.trend === 'down' ? <ArrowDown className="h-4 w-4 text-fel-ember" /> : r.trend === 'same' ? <Minus className="h-4 w-4 text-fel-dim" /> : null}
             </span>
           </li>
         ))}
-        {rollup.rows.length === 0 && <li className="py-2 text-[13px] text-white/45">No athletes yet. Share the team code below.</li>}
+        {rollup.rows.length === 0 && <li className="py-2 text-[13px] text-fel-dim">No athletes yet. Share the team code below.</li>}
       </ul>
       <label className="mt-3 flex min-h-[44px] items-center gap-3 text-[13px] text-white/80">
-        <input type="checkbox" className="h-5 w-5 accent-[#00FF9D]" checked={rollup.drillAssigned} disabled={busy} onChange={(e) => setDrill(e.target.checked)} />
+        {/* PLAT-BBS04-2 (coordinator 2026-11-10): the checkbox itself is a 44 x 44 tap target (it was 20 x 20: the rig's
+            a11y scan, 2.5.8 serious), and the row is laid out as it always was. The slot is the 20 px the box always took;
+            the real input is centred on it and reaches 12 px past each edge (inside the label's own 44 px row, the gap
+            and the card's padding); the box and tick the eye sees are drawn in the slot and never take the tap. */}
+        <span className="relative h-5 w-5 shrink-0" data-rollup-drill-slot>
+          <input type="checkbox" className="peer absolute -inset-3 m-0 h-11 w-11 cursor-pointer appearance-none rounded-lg bg-transparent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-9px] focus-visible:outline-fel-cyan disabled:cursor-default" checked={rollup.drillAssigned} disabled={busy} onChange={(e) => setDrill(e.target.checked)} data-rollup-drill />
+          <span aria-hidden className="pointer-events-none absolute inset-0 rounded border border-white/60 bg-black/40 peer-checked:border-fel-emerald peer-checked:bg-fel-emerald peer-disabled:opacity-50" />
+          <Check aria-hidden className="pointer-events-none absolute left-0.5 top-0.5 h-4 w-4 text-fel-bg opacity-0 peer-checked:opacity-100" strokeWidth={3} />
+        </span>
         Assign the daily drill to the whole team
       </label>
       {ids.length > 0 && (programs === null
         ? (
-          <button onClick={openAssign} className="mt-2 inline-flex min-h-[44px] items-center gap-1.5 text-[13px] font-bold text-[#00E5FF]">
+          <button onClick={openAssign} className="mt-2 inline-flex min-h-[44px] items-center gap-1.5 text-[13px] font-bold text-fel-cyan">
             <CopyPlus className="h-4 w-4" /> Assign a program to the team
           </button>
         ) : programs.length === 0 ? (
@@ -79,7 +87,7 @@ export function TeamRollup({ groupId, rollup, onChanged }: { groupId: string; ro
             <select value={pick} onChange={(e) => setPick(e.target.value)} aria-label="Program" className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-white/15 bg-black/40 px-2 text-[13px] text-white">
               {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
-            <button onClick={assign} disabled={busy} className="min-h-[44px] rounded-lg bg-[#00E5FF] px-4 text-[13px] font-bold text-[#050505] disabled:opacity-50">Assign to {ids.length}</button>
+            <button onClick={assign} disabled={busy} className="min-h-[44px] rounded-lg bg-fel-cyan px-4 text-[13px] font-bold text-fel-bg disabled:opacity-50">Assign to {ids.length}</button>
           </div>
         ))}
     </section>

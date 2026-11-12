@@ -6,7 +6,7 @@ import { loginPath } from '@/lib/auth/safeNext';
 import { prisma } from '@/lib/db';
 import { ReviewStudio } from '@/components/coach-store/review-studio';
 import { isCoachStoreEnabled } from '@/lib/flags';
-import { isAllowlistedCoach } from '@/lib/coach-store/coaches';
+import { isStoreCoach } from '@/lib/coach-store/gate';
 import { isMissingTable, logStoreUnavailable } from '@/lib/coach-store/gate';
 import { reviewHref, reviewRole, reviewStudioOpen } from '@/lib/coach-store/reviewLink';
 
@@ -28,7 +28,7 @@ export default async function ReviewPage({ params }: { params: { bookingId: stri
     return <main className="px-4 py-8 text-white">Coach store is not set up yet.</main>;
   }
   if (!booking || !reviewStudioOpen(booking)) notFound();
-  const role = reviewRole(booking, userId, isAllowlistedCoach(userId));
+  const role = reviewRole(booking, userId, await isStoreCoach(userId));
   if (!role) notFound();
   return (
     <main className="mx-auto max-w-xl px-4 py-8">

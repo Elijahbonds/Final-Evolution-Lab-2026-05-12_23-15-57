@@ -1,3 +1,5 @@
+// CUE-REWRITE (2026-10-27) — test changed: copy rewrite. The check names and lines asserted below follow the rewritten
+// copy (lib/cue-style/names.ts, docs/CUE-AUDIT.md); what each assertion checks is unchanged.
 // The server's half of the graders (MIRROR-COACH P3, 2026-09-25): what it keeps from a posted screen and what it
 // refuses. The route runs this module for real in lib/mirror/screen-route.test.ts; these hold its rules one by one,
 // and sweep every camera check's value range to show the server's status is the grader's own, value for value.
@@ -182,7 +184,7 @@ describe('the review\'s cases', () => {
     const d = decideScreenPost({ screenId: 's', checks: [base.kneeWindow, base.hipLevel, base.shoulderLevel] }, 'a');
     if (!d.ok) throw new Error('expected ok');
     expect(d.reward.pay).toBe(false);
-    expect(d.reward.message).toMatch(/^The camera read 3 checks \(Knee window, Hip level, Shoulder height\), all at one station — not enough to count as a screen/);
+    expect(d.reward.message).toMatch(/^The camera read 3 checks \(Knees from the front, Hip level, Shoulder level\), all at one station — not enough to count as a screen/);
     // two stations, three checks: a screen
     expect(regradeClaims('modified', [base.hipLevel, base.shoulderLevel, base.headFloat])).toMatchObject({ readableStations: 2, provisional: false });
     expect(MIN_READABLE_CAMERA_STATIONS).toBe(2);
@@ -223,7 +225,7 @@ describe('the review\'s cases', () => {
     const tooSmall = (c: CameraCheckClaim) => ({ ...c, status: 'unreadable' as const, value: null, readableFrames: 3, uncertainty: null, spread: null, reason: 'tooSmall' as const, bySide: undefined });
     const out = regradeClaims('modified', [base.hipLevel, base.shoulderLevel, tooSmall(base.headFloat), tooSmall(base.heelLine), tooSmall(base.kneeWindow)]);
     const line = screenReadLine(out)!;
-    expect(line).toBe('The camera read 2 checks (Hip level, Shoulder height), all at one station — not enough to count as a screen, so it pays nothing this time. Most of the rest: you were too small in the shot to read this. Come a little closer to the phone.');
+    expect(line).toBe('The camera read 2 checks (Hip level, Shoulder level), all at one station — not enough to count as a screen, so it pays nothing this time. Most of the rest: you were too small in the shot to read this. Come a little closer to the phone.');
     expect(line).not.toMatch(/step back|run it again/i);
     expect(screenText(line)).toEqual([]);
     // nothing read at all

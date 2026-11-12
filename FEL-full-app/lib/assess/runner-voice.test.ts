@@ -128,15 +128,19 @@ describe('SCREEN A 3: the pain check after each test, by voice and one big tap',
     const run = drive({ maxLoops: 900 });
     expect(run.v.step).toBe('done');
     expect(run.steps.filter((s) => s.startsWith('painCheck:'))).toHaveLength(4);   // after each TEST, incl. T1's second part
-    expect(run.said).toContain(PAIN_CHECK_LINE);
+    // SCREEN-EASY (test changed): the done line and the question are one line ("Three. Ankle bend: done. Any pain? …")
+    expect(run.said.filter((s) => s.endsWith(PAIN_CHECK_LINE))).toHaveLength(4);
     // and it really waited: drive() feeds plain standing frames between the check and the tap, with the clock running
   });
 
   it('the check does not advance on its own while the athlete walks back', () => {
     const run = drive({ maxLoops: 900 });
-    const t1 = run.steps.indexOf('miniResult:');
+    // SCREEN-EASY (test changed): the last part of a test goes straight to its pain check (the 3 s "done" card is gone),
+    // and the check is still there on the next frame: only the tap (or both hands up) moves it on
+    const t1 = run.steps.indexOf('painCheck:');
     expect(t1).toBeGreaterThan(0);
-    expect(run.steps[t1 + 1]).toBe('painCheck:');
+    expect(run.steps[t1 - 1]).toMatch(/^active:/);
+    expect(run.steps).not.toContain('miniResult:');
   });
 
   it('"Yes" stops the screen with pain and nothing is scored after', () => {
@@ -269,7 +273,9 @@ describe('SCREEN A 9: the restart loop is capped', () => {
     // out of frame: pose timestamps keep moving (the camera still delivers frames — the athlete is just not in them)
     const absentMs = th('gate.absenceRestartMs') + 400;
     const absence = () => { for (let g = 0; g < absentMs; g += 33) push({ t, present: false, image: [] }); };
-    const back = (ms = 6600) => { for (let g = 0; g < ms; g += 33) push(STAND.front.frames[0]); };
+    // SCREEN-EASY (test changed, the driver only): back in the shot for 10 s, was 6.6 — the runner now lets the retry
+    // line ("Lost you for a moment — trying this move once more.", ~4 s) be said before the countdown starts
+    const back = (ms = 10000) => { for (let g = 0; g < ms; g += 33) push(STAND.front.frames[0]); };
     const marks: number[] = [];
     const saidPastCap: string[] = [];
     for (let round = 0; round < PART_RESTART_MAX + 2; round++) {

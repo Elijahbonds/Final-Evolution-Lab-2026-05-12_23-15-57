@@ -283,3 +283,106 @@ Relay (not a direct quote):
 
 ## #372 HESI owner trail (relay log, Oct 20, 2026)
 - 4:57 PM PT Oct 20: QA reports Elijah told QA 'Yes, I approved both' for the 5-frame hang minimum and HESI_EXPLODE_FLOOR 0.95 (relay via PM). Direct: 7:33 AM PT Oct 20, in Autopilot's 1:1, yes to HESI v2, count 5 held frames, min 5*DT ~83 ms.
+
+## 2026-11-10 — five open calls, delegated ("get the new Fable 5.2 to handle those 5 open calls")
+
+The owner handed the five calls that were waiting on them to the coordinator. Each took the recommended option (the
+standing rule above), is reversible, and is flagged here so it can be overturned. Work is on `lane/owner-calls-1110`.
+
+1. **Dunk finish: the shipped finish stays, and `dunk.slamVariants` stays off.** Changing where the ball meets the rim
+   would change the end of every dunk in the flagship mode, which the owner has felt and signed off. Follow-up (not built):
+   the over-the-ring contact as its own off-by-default knob (`dunk.finishOverRing`), so the owner can feel it before any
+   default moves.
+2. **Football hurdle: a longer blend, behind a setting.** `football.hurdleFadeSec` 0.12 s (was the shared 0.06 s).
+   **TUNED (flagged).** Worst one-frame thigh turn 24–25° → 15–17°, measured headless on the hero. 0.06 = the old blend.
+   Not yet felt by the owner; not measured in the browser rig.
+3. **Hoops hero slide: fix it (run above the slide's cap; stepping legs under the reach and block beats).** Decided, NOT
+   built. The hero already takes the crossover run above 2.8 m/s sideways (`defendRunFor`, H2c), so what is left is not a
+   switch: it needs the 1v1 rig to be deterministic first (lane/hoops-p05, unfinished) and measured work there.
+4. **Pending SQL: prepared, not applied.** Writing to production is the owner's step and this session has no route to
+   it. `scripts/pending-sql/cli.ts` makes it one command (`plan`, then `apply`), proven on throwaway Postgres 16
+   databases; `docs/PENDING-SQL.md`. The owner runs it.
+5. **#527 closed** (the coordinator's own duplicate of a fix that #522 carried).
+
+## 2026-11-10 — the every-screen pass
+
+- The owner: "To improve the total quality of the product from improving every screen." Scope: **every screen,
+  training and coaching first.** A screen is done when it is clear and quick to use, looks finished, is fast and smooth
+  on a phone, and is right and trustworthy (all four). Polish what exists; an athlete training alone first; real people
+  are using training and coaching already or this month; review by screenshots and numbers after each phase.
+- **"I approve, go"** on `docs/PLAN-EVERY-SCREEN-10PHASE.md` as written, including its three new speed budgets (first
+  content ≤ 2.5 s, layout shift ≤ 0.02, tap response ≤ 200 ms on the throttled phone).
+- The seven stopped lanes were restarted the same day at the owner's word ("restart those lanes and finish those").
+
+## 2026-11-10 — switch it on
+
+- The owner: **"anything that's turned off because it needs to be improved, let's improve it and turn it on."**
+- Lane `lane/switch-on` (cut from `lane/finish-release` at `d394b11b`). The inventory of every switch that is off, why, and
+  which class it is in, is `docs/SWITCH-ON.md`. Class A (off because it is not good enough yet) is improved to a written,
+  measured gate and then turned on, each flip flagged from → to; every off value still restores the old behaviour exactly,
+  with a test. Class B (money, legal or policy text, age or consent rules, owner accounts or keys, a pending SQL table,
+  production environment variables, or an explicit owner decision to keep it off) is listed with exactly what turns it on and
+  who does it, and is not flipped. Class C (not really off: an A/B, a developer tool, or 0 is the newer behaviour) is listed.
+- Not this lane's while their lanes run: the dunk switches, the hoops switches, `baseballBat.ts`, the every-screen lane's
+  screens, the owner's age-gate work on `main` (#543, #544).
+
+## 2026-11-10 — fix the demos, fix the screens
+
+The owner: **"Fix the demos, fix the screens, address what you found above."** Taken on the owner's word (each is
+reversible). Work is on `lane/screen-fixes` (the screens) and the demos lane (the demos).
+
+1. **Coach templates may play draft entries' demos** (the animation only; nothing else about a draft entry is shown).
+2. **Body text at the approved 16 px does not count against the per-screen text-size budget** (the scorer's "at most 4
+   text sizes"; `TYPE.body`). Every other size, on the scale or off it, still counts.
+3. **The Play shelf's mode lists may wrap to 3 lines** (`line-clamp-3`; it was 2). Recommended by readable-2: three lines
+   show five of the six cut-off lists in full on a phone.
+4. **/account and /profile/edit long copy moves to 16 px** (`TYPE.body`). Size only: not a word of the wording changes.
+   The other screens' supporting lines stay as they are.
+5. **Everything the earlier lanes measured and did not fix is fixed:** the home hero's two headline lines drawn on each
+   other (the owner-approved wording of PR #540 stays exactly as it is); /play/party's contrast and its cut-off join
+   banner; /profile/edit's "Save card" contrast; /train's "Your week" label; the layout shift on /store, /workout, /modes
+   and the shared start screen (`boot-splash.tsx`: the layout only, never what it loads or when); the React hydration
+   mismatch on every game screen (its cause, not the warning); the 3D canvas's name and Tab order wherever a 3D stage is
+   mounted; and the start screens' "learn" card text, moved onto the type scale (size only).
+
+## 2026-11-11 — deploy cadence, short plans, Nexus Studio, pace
+
+The owner answered four questions (relayed by the coordinator).
+
+1. **Deploy cadence:** no deploy until all the training phases (1–5 of `docs/PLAN-EVERY-SCREEN-10PHASE.md`) are done;
+   then one deploy.
+2. **Short builder plans: "slightly longer, told".** A 20–30 minute request that is built 5–10 minutes longer, with the
+   plain line that says so (`lib/program-ask/kept.ts`, `copy.ts`), stays as it is.
+3. **Nexus Studio: "fix the last 4 first".** A separate lane, `studio-22`, takes it.
+4. **Pace:** phases 5–10 run back to back; each phase starts as soon as the one before it merges.
+
+## 2026-11-11 (later) — booking, notices and the word budget, text size
+
+The owner answered three questions (relayed by the coordinator).
+
+1. **Booking opens with the training deploy.** The owner applies `prisma/pending/2026-11-02-group-booking.sql` and sets
+   the business owner. It stays "reserve, pay at the gym": no online payment.
+2. **Approved notices do not count toward the 40-word budget.** Medical, privacy and consent text is the owner's approved
+   wording: it stays word for word and no longer counts against the first screen's words. Everything else still counts.
+   The judge excludes only notices marked as such in the code (`data-notice` on an owner-approved notice block, tied to the
+   approved copy in `lib/every-screen/notices.ts`), never by guessing from the words.
+3. **Text size: keep it.** A line of more than about 12 words goes to 16 px (`lineSize`, READABLE.md): size only, never
+   the wording. Apply it across the rest of the app's screens as each phase reaches them.
+
+## 2026-11-11 (evening) — the second age question, sign-up order, the login tagline, the terms tick
+
+The owner answered four proposals from phase 6 (relayed by the coordinator). Each is held by a test
+(`tests/every-screen/phase7-owner.test.tsx`).
+
+1. **Skip the second age question.** A signed-in person with a birth date on file is not asked "How old are you?" in the
+   vertical test and the movement check (Quick Screen): the age band comes from the account. Signed-out people, and
+   accounts without a birth date, keep the question exactly as it is. The age rules do not change: the band is
+   `tryAgeBand` of the full birth date (the 13th and 18th birthdays, exact), and it is answered through the screen's own
+   age path. A birth year alone does not skip it. Until `prisma/pending/2026-10-19-user-dob.sql` is applied, production
+   keeps only the year, so everyone is still asked.
+2. **Sign-up order.** The birth date first; the five "What did you come for?" choices come after it is confirmed. Same
+   questions, same words.
+3. **/login tagline:** exactly "Real sports. Real training. Real stats." (it replaces "Real sports, real training — your
+   on-court reps become real stats.").
+4. **Terms tick:** a real `<input type="checkbox">` inside its label. Same words, same rule (it must be ticked to
+   continue), now usable from the keyboard and with a screen reader.

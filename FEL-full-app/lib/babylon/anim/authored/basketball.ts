@@ -47,6 +47,7 @@ export const BASKETBALL_CLIPS = [
   'bball_shimmy_quick',                          // H2b (plan §4.23): the post hook's R2 shimmy (it played the hesi at 1.5×)
   'bball_def_retreat', 'bball_def_lunge_left', 'bball_def_lunge_right', 'bball_def_standup',   // H2c: the defender's reactions (core/DefenderReact)
   'bball_def_cross_run_left', 'bball_def_cross_run_right',   // H2c: the crossover step (lateral past a slide's reach)
+  'bball_closeout_step',   // hoops-p05b: the closeout that steps at the pace it fires at (chop steps under the high hand)
   'bball_stepback_rival',                        // H2c (plan §4.21): the rival's 0.30 s step-back (it played the hesi)
   'bball_skip_gather_left', 'bball_skip_gather_right',   // H2e: the skip gather (core/FinishFootwork)
   'bball_ankle_stumble', 'bball_ankle_slip',
@@ -838,6 +839,47 @@ export function buildDefCrossRun(scene: Scene, sk: Skeleton, side: 'left' | 'rig
   return buildPoseClip(scene, sk, `bball_def_cross_run_${side}`, 0.5, side === 'right' ? defCrossRunKeys() : defCrossRunKeys().map(mirrorKey), { smooth: true });
 }
 
+/**
+ * THE STEPPING CLOSEOUT (hoops-p05b; owner 2026-11-10: "the hero's slide — fix it"). `closeoutFor` fires only at speed01 >= 0.45 (2.9 m/s
+ * and up), but `bball_closeout` (above) swings its legs in place: it covers about 0.5 m/s at rate 1, 0.9 at the rate cap, and every
+ * closeout skated (slide-bench, the man 2 m ahead: planted-foot slide p90 0.9 / 9.2 / 10.6 cm a frame at 3 / 4 / 5 m/s). This one is the
+ * same picture — the chest up, the hips low, one hand HIGH at the shooter, the other out — on feet that really travel: short, quick chop
+ * steps, keyed the way the crossover step is (in the body frame, a planted foot runs from +Z to -Z along the travel through its stance,
+ * so it stays on the floor at the paced speed). A loop of two steps, CLOSEOUT_STEP_SEC; each foot is down half of it while the body
+ * covers 2 × CLOSEOUT_STEP_Z: 3.6 m/s at rate 1 — the closeout's stride reference (HOOPS_STRIDE.run, StrideMatch byState.closeout) — so
+ * the stride matcher's 0.55–1.85 covers 2.0–6.7 m/s, every speed the closeout fires at. Feet a defensive base apart, a low chop lift.
+ */
+export const CLOSEOUT_STEP_SEC = 0.3;
+export const CLOSEOUT_STEP_Z = 0.27;   // = 3.6 m/s × (CLOSEOUT_STEP_SEC / 2) / 2
+const closeoutStepKeys = (): PoseKey[] => {
+  const keys: PoseKey[] = [];
+  const Z = CLOSEOUT_STEP_Z, LIFT = 0.09, W = 0.17, T = CLOSEOUT_STEP_SEC;
+  // 16 keys, and a swing with no corners: the foot leaves and meets the floor with a flat lift (sin^2) and an eased travel (smoothstep) —
+  // with 8 keys and a sine lift the knee turned ~600 deg/s on a few key intervals at rate 1 (clip-flip.mts), ~1 000 at a closeout's 6 m/s
+  const N = 16;
+  for (let k = 0; k <= N; k++) {
+    const p = k / N;
+    const stance = (q: number) => Z - 4 * Z * q;                              // q 0..0.5: +Z -> -Z (planted, the paced speed)
+    const ease = (u: number) => u * u * (3 - 2 * u);
+    const swing = (q: number) => -Z + 2 * Z * ease((q - 0.5) / 0.5);          // q 0.5..1: -Z -> +Z (in the air), eased
+    const lift = (q: number) => LIFT * Math.sin(Math.PI * (q - 0.5) / 0.5) ** 2;
+    const pl = (p + 0.5) % 1;                                                 // the left foot half a loop behind
+    const right: V3 = p <= 0.5 ? [W, ANKLE_Y, stance(p)] : [W, ANKLE_Y + lift(p), swing(p)];
+    const left: V3 = pl <= 0.5 ? [-W, ANKLE_Y, stance(pl)] : [-W, ANKLE_Y + lift(pl), swing(pl)];
+    const bob = -0.10 - 0.02 * Math.cos(4 * Math.PI * p);                    // lowest at each mid-stance
+    keys.push({
+      t: T * p,
+      bones: { Hips: [0, 3 * Math.sin(2 * Math.PI * p), 0], Spine: [12, 0, -3], Neck: [-8, 0, 0] },
+      hands: { Right: [0.30, 2.05, 0.24] as V3, Left: [-0.30, 1.45, 0.32] as V3 },   // the closeout's high hand, and the other out
+      hipsY: bob, feet: feetAt(bob, { Left: left, Right: right }), kneesFront: true,
+    });
+  }
+  return keys;
+};
+export function buildCloseoutStep(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  return buildPoseClip(scene, sk, 'bball_closeout_step', CLOSEOUT_STEP_SEC, closeoutStepKeys(), { smooth: true });
+}
+
 /** The hard slide: sat down — hips a hand lower than the stance slide, thighs wider, chest tall. Loops. */
 export function buildDefendSlideHard(scene: Scene, sk: Skeleton, dir: 'left' | 'right'): AnimationGroup | null {
   const s = dir === 'left' ? 1 : -1;
@@ -1146,7 +1188,7 @@ const OFF_R: V3 = [0.25, 1.0, 0.12];   // the right hand relaxed, once the ball 
  * loop's own seam). Every low contact below (the momentum cross's catch, the between's, the behind-the-back's, the double cross's two, the
  * Shammgod's push and catch, the in-and-out's) is reached the same way: hips down, the chest over.
  */
-const CROSSOVER_V2: readonly V2Key[] = [
+export const CROSSOVER_V2: readonly V2Key[] = [
   { t: 0, bones: { ...torso(0, 14), ...LEGS.stance }, hipsY: -0.05, R: 'on', L: OFF_HAND },
   { t: 0.08, bones: { ...torso(10, 20, 4), ...LEGS.pushR }, hipsY: -0.07, R: 'on', L: { near: 0.30, off: [0.02, 0.16, -0.10] } },
   { t: 0.19, bones: { ...torso(24, 27, 8), ...LEGS.wide }, hipsY: -0.12, R: { near: 0.08, off: [0.04, 0.10, -0.06] }, L: { near: 0.30, off: [0.0, 0.06, -0.04] } },
@@ -1173,11 +1215,11 @@ const MOMENTUM_CROSS_V2: readonly V2Key[] = [
  * the floor), the chest pitched over (Spine 34°), the hips turned a little toward the catch.
  */
 const ANKLE_Y = 0.095;   // the ankle target that lands the hero's ankles at their stance height (0.068–0.075 m) — a stance ankle, reference metres
-const STANCE_FEET = { Left: [-0.19, ANKLE_Y, 0.085] as V3, Right: [0.19, ANKLE_Y, 0.085] as V3 };
+export const STANCE_FEET = { Left: [-0.19, ANKLE_Y, 0.085] as V3, Right: [0.19, ANKLE_Y, 0.085] as V3 };
 const SPLIT_FEET = { Left: [-0.19, ANKLE_Y, 0.25] as V3, Right: [0.21, ANKLE_Y, -0.20] as V3 };
 const TRAIL_MID: V3 = [0.20, ANKLE_Y + 0.05, -0.06];   // the trail foot in the air, halfway back (or forward)
 const LEAD_MID: V3 = [-0.19, ANKLE_Y + 0.05, 0.17];    // the lead foot in the air, halfway out (or back)
-const BETWEEN_V2: readonly V2Key[] = [
+export const BETWEEN_V2: readonly V2Key[] = [
   { t: 0, bones: { ...torso(0, 14) }, hipsY: -0.05, R: 'on', L: OFF_HAND, feet: STANCE_FEET },
   { t: 0.05, bones: { ...torso(3, 21, -2, [-6, 0, 0]) }, hipsY: -0.12, R: 'on', L: OFF_HAND, feet: { Left: STANCE_FEET.Left, Right: TRAIL_MID } },
   { t: 0.10, bones: { ...torso(6, 28, -4, [-8, 0, 0]) }, hipsY: -0.22, R: 'on', L: { near: 0.30, off: [-0.02, 0.18, 0.06] }, feet: { Left: STANCE_FEET.Left, Right: SPLIT_FEET.Right } },
@@ -1197,7 +1239,7 @@ const BETWEEN_V2: readonly V2Key[] = [
  * out and back, never across the body — on the carry's pole (V2_BALL_POLE, as every hand on the path): its own wrap pole (0.8, −0.2, −0.5)
  * sat 17° from the carry's solve at the wrap's release (handleV2.test's hand-over read).
  */
-const BEHIND_V2: readonly V2Key[] = [
+export const BEHIND_V2: readonly V2Key[] = [
   { t: 0, bones: { ...torso(0, 14), ...LEGS.stance }, hipsY: -0.05, R: 'on', L: OFF_HAND },
   { t: 0.08, bones: { ...torso(-14, 18, 8), ...LEGS.load }, hipsY: -0.10, R: 'on', L: [-0.28, 0.94, 0.10] },
   { t: 0.14, bones: { ...torso(-22, 19, 12), ...LEGS.wide }, hipsY: -0.12, R: 'on', L: { near: 0.34, off: [-0.02, 0.18, -0.06] } },

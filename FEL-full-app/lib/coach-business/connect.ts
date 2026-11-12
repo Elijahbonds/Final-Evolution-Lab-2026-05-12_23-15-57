@@ -22,6 +22,9 @@
 //   no STRIPE_SECRET_KEY             → 409 store_closed payments_not_set_up
 //   a LIVE key, COACH_CONNECT_LIVE off → 409 store_closed live_mode_off  (test mode only until the owner says otherwise)
 //   NEXTAUTH_URL unset               → 409 store_closed site_url_not_set (Stripe URLs never come from a request header)
+//   a LIVE key, COACH_CONNECT_LIVE on, but no signed coach terms (lib/payments/terms.ts COACH_TERMS_VERSION null)
+//                                    → 409 store_closed coach_terms_unsigned (PAYMENTS-READY: live coach payments wait for
+//                                      the owner's signed coach + payout terms; test mode is unaffected)
 import type Stripe from 'stripe';
 import { NextResponse } from 'next/server';
 import { isLiveKey, isTestKey } from '@/lib/coach-store/stripeMode';
@@ -30,13 +33,14 @@ import { CHECKOUT_HOLD_MINUTES, PAYMENTS_NOT_LIVE, isCoachConnectLive, isCoachCo
 import { feeRefundDue, subscriptionFeePercent, type SaleSplit } from './fees';
 import { billingOf, type CoachPackage } from './packages';
 import { invoiceChargeOrIntent } from '@/lib/coach-store/stripeShapes';
+import { coachTermsSigned, termsMetadata, type AcceptedTerms } from '@/lib/payments/terms';
 
 export const CONNECT_PRODUCT = 'COACH_CONNECT' as const;
 
-export type ConnectClosedReason = 'payments_off' | 'payments_not_set_up' | 'live_mode_off' | 'site_url_not_set';
+export type ConnectClosedReason = 'payments_off' | 'payments_not_set_up' | 'live_mode_off' | 'site_url_not_set' | 'coach_terms_unsigned';
 export type ConnectGate = { ok: true; key: string; live: boolean; origin: string } | { ok: false; reason: ConnectClosedReason };
 
-export function connectGate(env: NodeJS.ProcessEnv = process.env): ConnectGate {
+export function connectGate(env: NodeJS.ProcessEnv = process.env, coachTermsVersion?: string | null): ConnectGate {
   if (!isCoachConnectPaymentsEnabled(env)) return { ok: false, reason: 'payments_off' };
   const key = (env.STRIPE_SECRET_KEY ?? '').trim();
   if (!key) return { ok: false, reason: 'payments_not_set_up' };
@@ -44,6 +48,8 @@ export function connectGate(env: NodeJS.ProcessEnv = process.env): ConnectGate {
   if (isTestKey(key)) live = false;
   else if (isLiveKey(key)) {
     if (!isCoachConnectLive(env)) return { ok: false, reason: 'live_mode_off' };
+    // PAYMENTS-READY: no live coach payments before the coach + payout terms are signed (lib/payments/terms.ts).
+    if (!coachTermsSigned(coachTermsVersion)) return { ok: false, reason: 'coach_terms_unsigned' };
     live = true;
   } else return { ok: false, reason: 'payments_not_set_up' };
   const origin = siteOrigin(env);
@@ -64,7 +70,7 @@ export function paymentsClosed(reason: ConnectClosedReason): NextResponse {
 
 /** The subset of the Stripe SDK this file calls, so a test hands in a recorder instead of the network. */
 export interface ConnectStripe {
-  accounts: Pick<Stripe['accounts'], 'create' | 'retrieve' | 'createLoginLink'>;
+  accounts: Pick<Stripe['accounts'], 'create' | 'retrieve' | 'createLoginLink' | 'update'>;
   accountLinks: Pick<Stripe['accountLinks'], 'create'>;
   checkout: { sessions: Pick<Stripe['checkout']['sessions'], 'create' | 'retrieve'> };
   refunds: Pick<Stripe['refunds'], 'create'>;
@@ -73,13 +79,23 @@ export interface ConnectStripe {
   applicationFees: Pick<Stripe['applicationFees'], 'retrieve' | 'createRefund'>;
   invoices: Pick<Stripe['invoices'], 'retrieve' | 'update'>;
   paymentIntents: Pick<Stripe['paymentIntents'], 'retrieve'>;
+  /** PAYMENTS-READY: a disputed renewal's payment → its invoice → the sale (webhook disputes). */
+  invoicePayments: Pick<Stripe['invoicePayments'], 'list'>;
 }
 
 /** The part of the Stripe SDK the webhook needs for the fee steps (a subset of ConnectStripe). */
 export type ConnectFeeStripe = Pick<ConnectStripe, 'applicationFees' | 'invoices' | 'paymentIntents' | 'charges'>;
+/** PAYMENTS-READY: what the webhook's account and dispute steps add (account.updated re-reads the account; a dispute
+ *  on a renewal is traced through its invoice). */
+export type ConnectEventStripe = ConnectFeeStripe & Partial<Pick<ConnectStripe, 'accounts' | 'invoicePayments'>>;
 
-/** Create the coach's Express account. Idempotent at Stripe for 24 h on the user id; the store keeps the first id for good. */
-export async function createExpressAccount(stripe: ConnectStripe, input: { userId: string; email: string | null; profileUrl: string | null }): Promise<{ id: string; livemode: boolean }> {
+/** The account metadata keys a coach's terms acceptance is kept under (PAYMENTS-READY). */
+export const COACH_TERMS_META_PREFIX = 'coach_';
+
+/** Create the coach's Express account. Idempotent at Stripe for 24 h on the user id; the store keeps the first id for good.
+ *  PAYMENTS-READY: the coach-terms acceptance (version + time) rides on the account's metadata, like the store terms on a
+ *  purchase. */
+export async function createExpressAccount(stripe: ConnectStripe, input: { userId: string; email: string | null; profileUrl: string | null; terms?: AcceptedTerms }): Promise<{ id: string; livemode: boolean }> {
   const acct = await stripe.accounts.create({
     type: 'express',
     country: 'US',
@@ -89,9 +105,21 @@ export async function createExpressAccount(stripe: ConnectStripe, input: { userI
       product_description: 'Athletic coaching sold through Final Evolution',
       ...(input.profileUrl ? { url: input.profileUrl } : {}),
     },
-    metadata: { userId: input.userId, product: CONNECT_PRODUCT },
+    metadata: { userId: input.userId, product: CONNECT_PRODUCT, ...(input.terms ? termsMetadata(input.terms, COACH_TERMS_META_PREFIX) : {}) },
   }, { idempotencyKey: `coach-connect-account:${input.userId}` });
   return { id: acct.id, livemode: Boolean((acct as { livemode?: boolean }).livemode) };
+}
+
+/**
+ * An existing account: record the coach's acceptance of `terms` on it, once per version (the first acceptance of a
+ * version keeps its time). Returns true when it wrote.
+ */
+export async function recordCoachTerms(stripe: ConnectStripe, accountId: string, terms: AcceptedTerms): Promise<boolean> {
+  const acct = await stripe.accounts.retrieve(accountId);
+  const meta = (acct as { metadata?: Record<string, string> | null }).metadata ?? {};
+  if (meta[`${COACH_TERMS_META_PREFIX}terms_version`] === terms.version) return false;
+  await stripe.accounts.update(accountId, { metadata: termsMetadata(terms, COACH_TERMS_META_PREFIX) });
+  return true;
 }
 
 export async function onboardingLink(stripe: ConnectStripe, accountId: string, origin: string): Promise<string> {
@@ -105,10 +133,24 @@ export async function onboardingLink(stripe: ConnectStripe, accountId: string, o
 }
 
 export interface ConnectStatus { chargesEnabled: boolean; payoutsEnabled: boolean; detailsSubmitted: boolean }
+/** PAYMENTS-READY: the status plus whether Stripe is asking the coach for something (requirements due now or past due,
+ *  or the account disabled), which is what "finish your Stripe setup" on /coach/business keys on. */
+export interface ConnectFullStatus extends ConnectStatus { requirementsDue: boolean }
 
-export async function readAccountStatus(stripe: ConnectStripe, accountId: string): Promise<ConnectStatus> {
-  const a = await stripe.accounts.retrieve(accountId);
-  return { chargesEnabled: !!a.charges_enabled, payoutsEnabled: !!a.payouts_enabled, detailsSubmitted: !!a.details_submitted };
+/** Stripe's account → the status FEL keeps. Pure (account.updated hands the same shape). */
+export function accountStatusOf(a: Pick<Stripe.Account, 'charges_enabled' | 'payouts_enabled' | 'details_submitted'> & { requirements?: { currently_due?: string[] | null; past_due?: string[] | null; disabled_reason?: string | null } | null }): ConnectFullStatus {
+  const r = a.requirements ?? null;
+  const due = (r?.currently_due?.length ?? 0) > 0 || (r?.past_due?.length ?? 0) > 0 || !!r?.disabled_reason;
+  return { chargesEnabled: !!a.charges_enabled, payoutsEnabled: !!a.payouts_enabled, detailsSubmitted: !!a.details_submitted, requirementsDue: due };
+}
+
+export async function readAccountStatus(stripe: Pick<ConnectStripe, 'accounts'>, accountId: string): Promise<ConnectFullStatus> {
+  return accountStatusOf(await stripe.accounts.retrieve(accountId));
+}
+
+/** Does the coach still have something to do at Stripe? (No account yet counts.) */
+export function needsStripeSetup(s: (ConnectStatus & { requirementsDue?: boolean }) | null): boolean {
+  return !s || !s.detailsSubmitted || !s.chargesEnabled || !s.payoutsEnabled || !!s.requirementsDue;
 }
 
 /** The coach's Express dashboard (balance, payouts, payout schedule, bank details). Single-use URL. */
@@ -128,12 +170,15 @@ export interface CheckoutInput {
   split: SaleSplit;
   origin: string;
   now: Date;
+  /** PAYMENTS-READY: the buyer's terms acceptance, kept on the session, payment and subscription metadata. */
+  terms?: AcceptedTerms;
 }
 
 /** The metadata every object of a Connect sale carries, so the shared webhook can route it here (webhook.ts), and so each
  *  monthly invoice knows its exact split (the subscription's metadata is copied onto every invoice). */
-export function saleMetadata(input: Pick<CheckoutInput, 'saleId' | 'pkg' | 'buyerId' | 'split'>): Record<string, string> {
+export function saleMetadata(input: Pick<CheckoutInput, 'saleId' | 'pkg' | 'buyerId' | 'split' | 'terms'>): Record<string, string> {
   return {
+    ...(input.terms ? termsMetadata(input.terms) : {}),
     product: CONNECT_PRODUCT, saleId: input.saleId, packageId: input.pkg.id, coachId: input.pkg.coachId, buyerId: input.buyerId,
     priceCents: String(input.split.priceCents),
     processingFeeCents: String(input.split.processingFeeCents),

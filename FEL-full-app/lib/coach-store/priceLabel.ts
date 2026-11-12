@@ -36,3 +36,15 @@ export function continueLabel(priceCents: number, manifest: CoachManifest): stri
   if (length) return `Buy ${length} · ${price}`;
   return `Buy · ${price}${period ?? ''}`;
 }
+
+/** PLAT-P07 (2026-11-02): how often a shop price bills. */
+export type ShopCadence = 'once' | 'week' | 'month';
+
+/**
+ * PLAT-P07: THE one price line every storefront card shows (lib/shop/model.ts) — /coaches, a coach's page, /press and
+ * /pro: "$65.00", "$29.99/month", "$6.00/week". formatCents is still the one place money is formatted; the amount is
+ * always the source's own (never a typed number).
+ */
+export function shopPriceLabel(cents: number, cadence: ShopCadence = 'once'): string {
+  return cadence === 'once' ? formatCents(cents) : `${formatCents(cents)}/${cadence}`;
+}

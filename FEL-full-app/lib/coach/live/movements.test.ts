@@ -1,3 +1,4 @@
+// test changed: copy rewrite (cue-rewrite lane) - flagLine still reads the Mirror's review label (now the canonical names in lib/cue-style/names.ts) with the knee's side.
 import { describe, expect, it } from 'vitest';
 import { cuePresets, cueText, flagLine, GENERAL_CUES, LIVE_MOVEMENTS, LIVE_SPECS } from './movements';
 import { lintCue } from '@/lib/coach/cueLint';
@@ -24,7 +25,7 @@ describe('the live presets', () => {
   });
 
   it('a flag reads as the Mirror\'s review label, with a knee\'s side', () => {
-    expect(flagLine('squat', 'kneeValgus', 'left')).toBe('Knee drifting inward on the descent (left)');
-    expect(flagLine('pushup', 'bodyLine')).toBe('Hips off the head-to-heels line (sagging or piking)');
+    expect(flagLine('squat', 'kneeValgus', 'left')).toBe('Knees cave in (left)');
+    expect(flagLine('pushup', 'bodyLine')).toBe('Hips sag or pike');
   });
 });

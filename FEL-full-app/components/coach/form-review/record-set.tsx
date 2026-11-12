@@ -7,15 +7,16 @@
 //      the drills use). The picture is shown to the athlete as a self-view and goes nowhere else.
 //   2. Each frame goes through lib/coach/formReview/reader.ts: the reps are counted live, and each closed rep is graded
 //      by the movement's tested audit.
-//   3. Stop: every rep scored, the worst rep and any rep under the line flagged with its reason ("Left knee caves on rep
+//   3. Stop: every rep scored, the worst rep and any rep under the line flagged with its reason ("Left knee caves in on rep
 //      4") and the Mirror's own cue for it — on the phone, at once, before anything is sent. The flagged rep replays as a
 //      skeleton beside the best one.
 //   4. Send: the POSE DATA ONLY (lib/coach/formReview/payload.ts) goes to the coach's queue, if the gates allow it
 //      (lib/coach/formReview/gate.ts). Video never: there is no clip option while lib/coach/formReview/clipPolicy.ts says
 //      so, and a minor never gets one.
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { lineSize } from '@/lib/design/type';
 import Link from 'next/link';
-import { Camera, CheckCircle2, Loader2, Send, Square, Trash2 } from 'lucide-react';
+import { Camera, CheckCircle2, Loader2, Square, Trash2 } from 'lucide-react';
 import { poseService } from '@/lib/pose/PoseService';
 import type { Lm, PoseFrame } from '@/lib/pose/landmarks';
 import { HUD_HZ, MirrorWakeLock, type WakeLockApiLike } from '@/lib/mirror/liveCamera';
@@ -26,9 +27,19 @@ import { flagsFor, scoreReps, setHeadline, summarize, type RepFlag, type ScoredR
 import { buildSubmission, MAX_SET_MS, type FormReviewSubmission } from '@/lib/coach/formReview/payload';
 import { VIDEO_STAYS_LINE } from '@/lib/coach/formReview/clipPolicy';
 import type { RecordContext } from '@/lib/coach/formReview/gate';
-import { repChips, replayPick } from '@/lib/coach/formReview/view';
+import { flagResult, repChips, replayPick } from '@/lib/coach/formReview/view';
 import { PoseReplay } from './pose-replay';
 import { SelfView } from '@/components/games/body-play';
+// TOOLS-EASY (2026-10-28): the shared setup card until the first rep, one voice, one name for the stop button
+import { SetupCard } from '@/components/tools-easy/setup-card';
+import { useOneVoice } from '@/components/tools-easy/use-one-voice';
+import { SetupReader, type SetupWord } from '@/lib/tools-easy/setup';
+import { READY_LINE, STOP_AND_READ } from '@/lib/tools-easy/copy';
+import { ResultCard } from '@/components/result-card/result-card';
+import { formReviewView } from '@/lib/coach-tools/reviewResult';
+
+/** The movements that start standing, so the standing framing check reads them (a push-up is read lying down: no card). */
+const STANDING_START: ReadonlySet<string> = new Set(['squat', 'lunge', 'hinge']);
 
 export const FORM_REVIEWS_API = '/api/coach/form-reviews';
 
@@ -37,10 +48,10 @@ type Phase = 'ready' | 'starting' | 'recording' | 'done' | 'sending' | 'sent';
 interface Result { reps: ScoredRep[]; flags: RepFlag[]; set: SetSummary; submission: FormReviewSubmission }
 
 const CHIP_CLASS: Record<string, string> = {
-  clean: 'border-[#00FF9D]/40 text-[#00FF9D]',
+  clean: 'border-fel-emerald/40 text-fel-emerald',
   flagged: 'border-[#FFB020]/60 bg-[#FFB020]/10 text-[#FFB020]',
   minor: 'border-white/25 text-white/75',
-  unread: 'border-white/10 text-white/35',
+  unread: 'border-white/10 text-fel-quiet',
 };
 
 /**
@@ -72,6 +83,8 @@ export function RecordSet({ ctx, api = FORM_REVIEWS_API }: { ctx: RecordContext;
   const wake = useRef<MirrorWakeLock | null>(null);
   const overlay = useRef<HTMLCanvasElement>(null);
   const latest = useRef<PoseFrame | null>(null);
+  const [setup, setSetup] = useState<SetupWord | null>(null);
+  const voice = useOneVoice('form-review');
 
   const loadMine = useCallback(() => {
     fetch(`${api}?mine=1`).then((r) => (r.ok ? r.json() : null)).then((j) => setMine(j?.available ? j.items : null)).catch(() => setMine(null));
@@ -100,6 +113,7 @@ export function RecordSet({ ctx, api = FORM_REVIEWS_API }: { ctx: RecordContext;
 
   const finish = useCallback(() => {
     release();
+    voice.hush();
     if (poseService().status.source === 'camera') poseService().stop();
     const all = frames.current;
     const reps = scoreReps(ctx.movement, reader.current?.reps() ?? []);
@@ -110,7 +124,7 @@ export function RecordSet({ ctx, api = FORM_REVIEWS_API }: { ctx: RecordContext;
     setResult({ reps, flags, set: summarize(reps), submission });
     setFocus(flags[0]?.rep ?? null);
     setPhase('done');
-  }, [ctx, release]);
+  }, [ctx, release, voice]);
 
   const start = useCallback(async () => {
     setWhy(null); setResult(null); setCount(0); setSendError(null);
@@ -123,17 +137,25 @@ export function RecordSet({ ctx, api = FORM_REVIEWS_API }: { ctx: RecordContext;
     wake.current ??= new MirrorWakeLock((navigator as Navigator & { wakeLock?: WakeLockApiLike }).wakeLock ?? null, document);
     void wake.current.hold();
     let t0: number | null = null;
+    const guide = STANDING_START.has(ctx.movement) ? new SetupReader(spec.view) : null;
+    let word = '', reps = 0;
+    setSetup(null);
     off.current.push(svc.onFrame((f) => {
       t0 ??= f.t;
       // only what the reader and the replay need: the image landmarks, never the picture
       frames.current.push({ t: f.t, present: f.present, image: f.present ? f.image.map((l) => ({ x: l.x, y: l.y, z: l.z, v: l.v })) : [] });
       latest.current = frames.current[frames.current.length - 1];
       const closed = reader.current?.step(latest.current);
-      if (closed) setCount(closed.n);
+      if (closed) { setCount(closed.n); reps = closed.n; }
+      // TOOLS-EASY: until the first rep, the setup card's one word (the movement's own view), said when it changes
+      if (guide && reps === 0) {
+        const w = guide.push(latest.current);
+        if (w.word !== word) { word = w.word; setSetup(w); voice.say(w.ready ? `${w.word}. ${READY_LINE}` : w.word); }
+      }
       if (f.t - t0 >= MAX_SET_MS) finish();
     }));
     setPhase('recording');
-  }, [ctx.movement, finish]);
+  }, [ctx.movement, finish, spec.view, voice]);
 
   const send = useCallback(async () => {
     if (!result) return;
@@ -165,10 +187,10 @@ export function RecordSet({ ctx, api = FORM_REVIEWS_API }: { ctx: RecordContext;
   return (
     <div className="space-y-4" data-record-set={ctx.movement}>
       <div className="fel-card space-y-2 rounded-xl p-4">
-        <div className="text-[11px] uppercase tracking-wider text-white/40">Film a set for your coach</div>
+        <div className="text-[12px] uppercase tracking-wider text-fel-dim">Film a set for your coach</div>
         <h1 className="text-lg font-bold text-white">{ctx.exerciseName}</h1>
-        <p className="text-sm text-white/65">{spec.setup}</p>
-        <p className="text-xs text-white/45">The camera counts your reps and reads each one. Every number is an estimate.</p>
+        <p className={`${lineSize(spec.setup)} text-white/65`}>{spec.setup}</p>
+        <p className="text-base text-fel-dim">The camera counts your reps and reads each one. Every number is an estimate.</p>
       </div>
 
       {/* collapsed (not unmounted: the camera attaches to it on "Film it again") once a set has been read */}
@@ -176,6 +198,9 @@ export function RecordSet({ ctx, api = FORM_REVIEWS_API }: { ctx: RecordContext;
         {/* Z-P4-4: the camera picture is shown in one place only, SelfView (components/games/body-play.tsx), mirrored as before */}
         <SelfView className="absolute inset-0 h-full w-full rounded-none" style={{ aspectRatio: 'auto' }} />
         <canvas ref={overlay} width={480} height={640} aria-hidden className={`pointer-events-none absolute inset-0 h-full w-full ${phase === 'recording' ? '' : 'hidden'}`} data-live-skeleton />
+        {phase === 'recording' && count === 0 && setup && (
+          <SetupCard word={setup.word} ready={setup.ready} line={setup.ready ? READY_LINE : setup.line} picture={spec.view === 'side' ? 'side' : 'front'} />
+        )}
         {phase === 'recording' && (
           <div className="absolute left-3 top-3 rounded-lg bg-black/60 px-3 py-1.5 text-white" aria-live="polite">
             <span className="text-3xl font-black tabular-nums" data-rep-count>{count}</span>
@@ -189,25 +214,31 @@ export function RecordSet({ ctx, api = FORM_REVIEWS_API }: { ctx: RecordContext;
         )}
       </div>
 
-      {why && <p role="alert" className="text-sm text-[#FF3366]">{why}</p>}
+      {why && <p role="alert" className="text-sm text-fel-crimson">{why}</p>}
 
       <div className="flex gap-2">
         {phase === 'recording' ? (
           <button type="button" onClick={finish} data-record-stop className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-white px-4 font-bold text-black">
-            <Square className="h-4 w-4" /> Stop — I&apos;m done
+            <Square className="h-4 w-4" /> {STOP_AND_READ}
           </button>
         ) : (
           <button type="button" onClick={() => void start()} disabled={phase === 'starting' || phase === 'sending'} data-record-start
-            className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-[#00E5FF] px-4 font-bold text-black disabled:opacity-50">
+            className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-fel-cyan px-4 font-bold text-black disabled:opacity-50">
             {phase === 'starting' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
             {result ? 'Film it again' : 'Start the camera'}
           </button>
         )}
       </div>
 
+      {/* COACH-TOOLS-EASY (2026-11-02; the coordinator's item 4): the set's read is the P3 result card's "no number" variant
+          (lib/results/view.ts value null) — what the camera saw in one line, one next step (send it to the coach, or film it
+          again), and everything else unchanged under Details */}
       {result && (
-        <div className="fel-card space-y-3 rounded-xl p-4" data-set-result>
-          <p className="text-base font-semibold text-white" data-set-headline>{setHeadline(ctx.movement, result.set, result.flags)}</p>
+        <div data-set-result>
+          <ResultCard view={formReviewView(ctx.exerciseName, result.set.reps, setHeadline(ctx.movement, result.set, result.flags), canSend && phase !== 'sent')}
+            onNext={canSend && phase !== 'sent' ? () => void send() : () => void start()} reveal={false} seeAll={false} details={(
+        <div className="space-y-3">
+          <p className="sr-only" data-set-headline>{setHeadline(ctx.movement, result.set, result.flags)}</p>
           {result.set.setScore !== null && (
             <p className="text-xs text-white/50">Set score {result.set.setScore} / 100 (estimated) · {result.set.clean} of {result.set.read} read reps clean</p>
           )}
@@ -225,7 +256,11 @@ export function RecordSet({ ctx, api = FORM_REVIEWS_API }: { ctx: RecordContext;
                 <li key={f.rep} className="rounded-lg border border-[#FFB020]/30 bg-[#FFB020]/5 p-2" data-flag={f.rep}>
                   <button type="button" onClick={() => setFocus(f.rep)} className="block w-full text-left">
                     <span className="block text-sm font-semibold text-[#FFB020]">{f.reason}{f.worst ? ' · worst rep' : ''}</span>
-                    {f.cue && <span className="mt-0.5 block text-sm text-white/80">{f.cue}</span>}
+                    {/* CUE-REWRITE: what it means and what to do next set (lib/coach/formReview/view.ts flagResult) */}
+                    {(() => { const r = flagResult(ctx.movement, f); return (<>
+                      <span className="mt-0.5 block text-sm text-white/70" data-flag-means>{r.means}</span>
+                      <span className="mt-0.5 block text-sm text-white/85" data-flag-next>{r.next.text}</span>
+                    </>); })()}
                   </button>
                 </li>
               ))}
@@ -234,32 +269,29 @@ export function RecordSet({ ctx, api = FORM_REVIEWS_API }: { ctx: RecordContext;
           {pick && <PoseReplay tracks={result.submission.tracks} aspect={result.submission.aspect} rep={pick.rep} best={pick.best} />}
           <p className="text-xs text-white/55" data-video-line>{VIDEO_STAYS_LINE}</p>
           {phase === 'sent' ? (
-            <p className="flex items-center gap-2 text-sm font-semibold text-[#00FF9D]" data-sent><CheckCircle2 className="h-4 w-4" /> Sent to your coach.</p>
-          ) : canSend ? (
-            <button type="button" onClick={() => void send()} disabled={phase === 'sending'} data-send
-              className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-[#00E5FF]/50 bg-[#00E5FF]/10 px-4 font-bold text-[#00E5FF] disabled:opacity-50">
-              {phase === 'sending' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Send the rep data to my coach
-            </button>
-          ) : !ctx.send.ok ? (
+            <p className="flex items-center gap-2 text-sm font-semibold text-fel-emerald" data-sent><CheckCircle2 className="h-4 w-4" /> Sent to your coach.</p>
+          ) : canSend ? null /* COACH-TOOLS-EASY: the card's own button sends it */ : !ctx.send.ok ? (
             <p className="text-sm text-white/65" data-send-refused={ctx.send.error}>
               {ctx.send.message}{' '}
-              {ctx.send.href && ctx.send.action && <Link href={ctx.send.href} className="text-[#00E5FF] underline">{ctx.send.action}</Link>}
+              {ctx.send.href && ctx.send.action && <Link href={ctx.send.href} className="text-fel-cyan underline">{ctx.send.action}</Link>}
             </p>
           ) : !ctx.ready ? (
             <p className="text-sm text-white/65" data-send-not-ready>Sending sets to your coach opens soon. Your flags are above, and nothing was sent.</p>
           ) : null}
-          {sendError && <p role="alert" className="text-sm text-[#FF3366]">{sendError}</p>}
+          {sendError && <p role="alert" className="text-sm text-fel-crimson">{sendError}</p>}
+        </div>
+          )} />
         </div>
       )}
 
       {mine && mine.length > 0 && (
         <div className="fel-card space-y-2 rounded-xl p-4" data-my-sets>
-          <div className="text-[11px] uppercase tracking-wider text-white/40">Sets you sent</div>
+          <div className="text-[12px] uppercase tracking-wider text-fel-dim">Sets you sent</div>
           {mine.slice(0, 6).map((m) => (
             <div key={m.id} className="flex items-center justify-between gap-2 text-sm">
               <span className="min-w-0 truncate text-white/80">{m.exerciseName} · {m.reps} reps{m.setScore !== null ? ` · ${m.setScore}` : ''}</span>
               <span className="flex shrink-0 items-center gap-2">
-                <span className={m.status === 'reviewed' ? 'text-[#00FF9D]' : 'text-white/45'}>{m.status === 'reviewed' ? 'Reviewed' : 'Waiting'}</span>
+                <span className={m.status === 'reviewed' ? 'text-fel-emerald' : 'text-fel-dim'}>{m.status === 'reviewed' ? 'Reviewed' : 'Waiting'}</span>
                 <button type="button" onClick={() => void remove(m.id)} aria-label={`Delete the ${m.exerciseName} set`} className="grid h-9 w-9 place-items-center rounded-lg border border-white/10 text-white/50">
                   <Trash2 className="h-4 w-4" />
                 </button>

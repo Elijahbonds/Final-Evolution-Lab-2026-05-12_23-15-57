@@ -9,6 +9,8 @@
 // missing the load fails and CharacterLibrary falls back to the hero — the
 // roster can never brick a mode.
 
+import { COACH_BODY_MOBILE_URL, COACH_BODY_URL } from './heroBody';
+
 export interface RosterAthlete {
   key: string;
   url: string;
@@ -131,7 +133,11 @@ export const MODE_CAST: Record<string, readonly string[]> = {
 export const DEFAULT_HERO_URL = '/models/elijah-meshy.glb';
 export const FORGE_HERO_URL = '/models/fel-hero.glb';
 
-const HERO_URLS = new Set([DEFAULT_HERO_URL, FORGE_HERO_URL, 'fel-hero.glb', 'elijah-meshy.glb', '/models/elijah-hero.glb', 'elijah-hero.glb', 'hero.glb']);
+// DEMO-MODELS-1: the coach body's files are hero spellings too — a tinted spawn on one gets a roster body, never the coach, and a
+// bare coach filename means "the hero" like every other bare spelling. The full coach path loads as asked (it is a player body:
+// heroBody.isPlayerBodyUrl). DEFAULT_HERO_URL is still the scan (heroBody.test pins it); who wears the coach is demoModels.ts.
+const HERO_URLS = new Set([DEFAULT_HERO_URL, FORGE_HERO_URL, 'fel-hero.glb', 'elijah-meshy.glb', '/models/elijah-hero.glb', 'elijah-hero.glb', 'hero.glb',
+  COACH_BODY_URL, COACH_BODY_MOBILE_URL, 'fel-elijah-coach.prep2.glb', 'fel-elijah-coach.prep2.mobile.glb']);
 
 /** Any empty or bare hero spelling ('', 'hero.glb', 'elijah-hero.glb') means
  *  "the hero". The procedural path ignored the URL entirely, so these call

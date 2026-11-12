@@ -68,77 +68,67 @@ export const FAULT_PRIORITY: FaultId[] = [
 // for one to be squeezed. The old line is kept in a comment where it changed. Where the measured read limits the
 // wording (armFall is a sideways read, so "floor"/"forward" stay out of it — cue-engine.test.ts; the press/row reads
 // only the RIGHT arm, so its cards say "the handle", never "both elbows"), the wording follows the read.
+// CUE-REWRITE (2026-10-27, owner playtest: "the language needs to change… it needs to be clear"): every card is in the
+// style guide's shape (docs/CUE-STYLE.md, lib/cue-style/style.ts). `cue`, `reply` and `escalate` are said MID-REP: 2–5
+// words, action first, one at a time. `regress` is said when the set stops: one plain action, ≤ 14 words. The P9 lines
+// ("Press the floor apart with your feet — knees travel out over your second toes", 13 words) were accurate and
+// unreadable mid-rep; the words that only a coach knows ("tripod", "Ninety-ninety breathing", "Box squat", "Fifty-fifty")
+// are gone. Where a plain body-part cue is clearest ("Knees out over toes") it is used: lib/coach/cueLint.ts lets a
+// ≤5-word live cue name a body part with its direction (owner call, flagged in docs/CUE-AUDIT.md). The P9 wording is in
+// docs/CUE-AUDIT.md's before/after table. What each fault reads is unchanged (armFall is still a sideways read: no
+// "forward", "floor" or "ceiling"; the press/row still reads the right arm only: "the handle", never "both").
 const CUES: Record<FaultId, CueCard> = {
   kneeValgus: {
-    // was: 'Knees out over your second toes — press the floor apart.'
-    cue: 'Press the floor apart with your feet — knees travel out over your second toes.',
-    escalate: 'Still drifting. Spread the floor apart with your feet — all the way down, all the way up.',
-    regress: 'Hold the bottom. Breathe. Own the position before you move again.',
-    // MIRROR-MOVES P2: the reply to a repeated fault — simpler, the same outside anchor
-    reply: 'Spread the floor with your feet on the way down.',
+    cue: 'Knees out over toes',
+    escalate: 'Slow down. Knees out.',
+    regress: 'Stop. Squat slowly to a chair, knees over toes. Five reps.',
+    reply: 'Knees wide',
   },
   heelRise: {
-    // was: 'Heels heavy. Toes long and flat — pull the floor toward your heel.'
-    cue: 'Stay heavy on the floor through the whole foot — heels stay down as you sit.',
-    // was: 'Your heels are leaving me. Sit SLOWER, heels pinned — the ankle earns the depth.'
-    escalate: 'Still lifting. Sit slower and keep the floor under your heels — the depth can wait.',
-    regress: 'Stop the set. Ankle rocks against the wall, ten each side, then we go again.',
-    reply: 'Whole foot on the floor. Sit slower.',
+    cue: 'Keep your heels down',
+    escalate: 'Slow down. Heels down.',
+    regress: 'Stop. Rock one knee toward a wall, ten each side, then squat again.',
+    reply: 'Heels down',
   },
-  // armFall is the shoulder midpoint drifting SIDEWAYS (a front camera reads x — squat-audit.ts). The card used to
-  // coach a forward fall ("reach the ceiling", "your arms are falling to the floor"), which is not what was measured.
+  // armFall is the shoulder midpoint drifting SIDEWAYS (a front camera reads x — squat-audit.ts).
   armFall: {
-    // was: 'Stay centred — shoulders over the middle of your feet on the way down.'
-    cue: 'Sink straight down the middle, square to the camera — shoulders stay over the centre of your stance.',
-    // was: 'Still drifting to one side. Slow the descent and press both feet evenly.'
-    escalate: 'Still drifting to one side. Slow the descent and press evenly into the ground under both feet.',
-    regress: 'Hold the top. Reset your stance, breathe twice, then descend only as far as you stay centred.',
-    reply: 'Straight down the middle of your stance.',
+    cue: 'Stay in the middle',
+    escalate: 'Slower. Stay in the middle.',
+    regress: 'Stop. Reset your feet. Squat only as low as you stay in the middle.',
+    reply: 'Stay centred',
   },
   lateralShift: {
-    cue: 'Fifty-fifty. Don\'t travel — split the floor between both feet.',
-    escalate: 'You\'re sliding off centre. Freeze at the bottom — find the middle, then rise.',   // one spelling: centre (P1 review)
-    regress: 'Stop. Reset your tripod, and give me a half-squat with no travel.',
-    reply: 'Even on the floor under both feet.',
+    cue: 'Weight even on both feet',
+    escalate: 'Slower. Stay even.',
+    regress: 'Stop. Reset your feet and do half squats, weight even on both feet.',
+    reply: 'Both feet push equally',
   },
   shallow: {
-    // was: 'Own the bottom — hip crease to your knee line, then drive up.'
-    cue: 'Own the bottom — sit to about chair height, then push the floor away.',
-    escalate: 'Deeper. Slow the way down and sit INTO it — then explode.',
-    regress: 'Box squat: sit to a chair height, touch, and stand tall. Depth before speed.',
-    reply: 'Sit to chair height, then stand.',
+    cue: 'Sit to chair height',
+    escalate: 'Slow down. Sit lower.',
+    regress: 'Squat to a chair: sit, touch, stand tall. Depth before speed.',
+    reply: 'A little lower',
   },
-  // elbowFlare is the working (right) elbow rising toward or above the shoulder line, on the press or the row
-  // (kinematic-engine.ts: flareRatio). The card used to say "pull it to your ribs, not out to the side" and "feel the
-  // lat do the work": a body part to pin, and a muscle to feel.
+  // elbowFlare is the working (right) elbow rising toward or above the shoulder line, on the press or the row.
   elbowFlare: {
-    // was: 'Elbow tracks home — pull it to your ribs, not out to the side.'
-    cue: 'Keep the handle\'s path low — row it to your back pocket, press it straight out at the wall.',
-    // was: 'The elbow is drifting out. Pin it to your side and pull THROUGH the hip.'
-    escalate: 'Still climbing. Aim the handle at your back pocket on the row, and straight at the wall ahead on the press.',
-    // was: 'Slow the rep down. Half speed, elbow glued, feel the lat do the work.'
-    regress: 'Half speed and a lighter handle — row to your back pocket until the path stays low.',
-    reply: 'Handle to your back pocket.',
+    cue: 'Row the handle low',
+    escalate: 'Slower. Handle stays low.',
+    regress: 'Use a lighter handle at half speed. Row it to your back pocket.',
+    reply: 'Back pocket',
   },
-  // shrug is the working shoulder riding up above the shoulder line during the PULL (kinematic-engine.ts).
+  // shrug is the working shoulder riding up above the shoulder line during the PULL.
   shrug: {
-    // was: 'Shoulder stays down — neck long. The trap stays out of this.'
-    cue: 'Pull the handle back toward the wall behind you, not up toward the ceiling.',
-    // was: 'You\'re shrugging the pull. Depress the shoulder FIRST, then row.'
-    escalate: 'Still riding up. Let the handle pull your arm long first, then row it back to your pocket.',
-    // was: 'Reset. Shoulder blade down and back, hold two seconds, then pull.'
-    regress: 'Reset with a lighter handle. Let it hang from a long arm for two seconds, then row.',
-    reply: 'Pull back to the wall, not up.',
+    cue: 'Pull the handle back',
+    escalate: 'Slower. Pull back, not up.',
+    regress: 'Use a lighter handle. Let it hang with a long arm, then row.',
+    reply: 'Back, not up',
   },
-  // MIRROR-COACH P1 review (2026-09-25): the base cue still said "Ribs stacked over pelvis — seal the cylinder" after the
-  // escalation was reworded; the pose model has no rib landmark, and this fault is shoulders over hips.
+  // trunkOffset is shoulders over hips (there is no rib landmark).
   trunkOffset: {
-    // was: 'Shoulders stacked over hips — set your brace before you move.'
-    cue: 'Stand tall toward the ceiling — shoulders stay stacked over your hips.',
-    // was: 'Your shoulders are drifting off your hips. Exhale fully, stack up, then go.'
-    escalate: 'Still leaning off to one side. Exhale fully, grow tall toward the ceiling, then go.',
-    regress: 'Stop. Ninety-ninety breathing, three breaths, then we rebuild the rep.',
-    reply: 'Grow tall toward the ceiling.',
+    cue: 'Shoulders over hips',
+    escalate: 'Slower. Stand tall.',
+    regress: 'Stop. Take three slow breaths, stand tall, then start again.',
+    reply: 'Stand tall',
   },
 };
 
@@ -229,6 +219,9 @@ export interface CueEvent<F extends string = FaultId> {
    *  in its place (MIRROR-MOVES P2). */
   level: 'cue' | 'reply' | 'escalate' | 'regress' | 'confirm';
 }
+
+/** The one confirmation, said once when a cued fault clears. CUE-REWRITE (2026-10-27): was "There it is. Own it." */
+export const CONFIRM_LINE = 'That\'s it. Keep it.';
 
 const HOLD_DOWN_MS = 6000;        // TUNE(elijah): one cue lands before the next
 const REPEAT_WINDOW_MS = 12000;   // TUNE(elijah): same fault still faulting → escalate
@@ -336,6 +329,8 @@ export class CueEngine<F extends string = FaultId> {
    *  session's first HOLD_DOWN_MS (measured: the first fault never got cued). */
   private lastCueAt: number | null = null;
   private lastFault: F | null = null;
+  /** CUE-REWRITE (2026-10-27): the coach stays quiet until this pose time — another line is still being said (holdFor). */
+  private quietUntil: number | null = null;
   private faultSinceMs = new Map<F, number>();
   private clearedAtMs = new Map<F, number>();
   private confirmed = new Set<F>();
@@ -363,6 +358,7 @@ export class CueEngine<F extends string = FaultId> {
    */
   reset(): void {
     this.lastCueAt = null;
+    this.quietUntil = null;
     this.lastFault = null;
     this.faultSinceMs.clear();
     this.clearedAtMs.clear();
@@ -477,6 +473,18 @@ export class CueEngine<F extends string = FaultId> {
     return report;
   }
 
+  /**
+   * CUE-REWRITE (2026-10-27) — ONE VOICE AT A TIME. Another line was just said (a stage line, the square-up line, the
+   * "sit deeper" line): no cue starts until it has been said (`ms`, lib/cue-style/speech.ts speechMs). Measured on the
+   * rig's synthetic feeds: the side-on patterns' first correction started 3.0–3.5 s into a ~4 s stage announcement. The
+   * fault is still tracked while the coach waits (decide runs its bookkeeping); only the voice waits, and the cue is said
+   * on the first frame after the line ends if the fault is still there. Detection is unchanged.
+   */
+  holdFor(nowMs: number, ms: number): void {
+    const until = nowMs + Math.max(0, ms);
+    this.quietUntil = this.quietUntil === null ? until : Math.max(this.quietUntil, until);
+  }
+
   /** Feed the measured fault set. Returns a cue when the coach speaks. */
   decide(nowMs: number, active: readonly F[]): CueEvent<F> | null {
     const evt = this.decideVoice(nowMs, active);
@@ -513,7 +521,10 @@ export class CueEngine<F extends string = FaultId> {
       }
     }
 
-    // a cleared fault earns ONE confirmation ("there it is — own it"), then silence. Never for a fault on screen, and
+    // CUE-REWRITE: another line is still being said — the bookkeeping above ran; the voice waits (holdFor)
+    if (this.quietUntil !== null && nowMs < this.quietUntil) return null;
+
+    // a cleared fault earns ONE confirmation ("that's it — keep it"), then silence. Never for a fault on screen, and
     // (P9 fix) at a faded level only for a fault the coach spoke about this set — a confirmation is speech too, and
     // 'summaryOnly' says nothing during the set.
     for (const [f, clearedAt] of this.clearedAtMs) {
@@ -525,7 +536,7 @@ export class CueEngine<F extends string = FaultId> {
         this.clearedAtMs.delete(f);
         this.lastCueAt = nowMs;
         this.escalations.delete(f);
-        return { fault: f, text: 'There it is. Own it.', level: 'confirm' };
+        return { fault: f, text: CONFIRM_LINE, level: 'confirm' };
       }
     }
 
@@ -575,23 +586,22 @@ export function fadeReviewLines<F extends string>(report: SetReport<F>, label: (
   const lower = (t: string) => t.charAt(0).toLowerCase() + t.slice(1);
   for (const r of report.faults) {
     const name = label(r.fault);
+    // CUE-REWRITE (2026-10-27): plain words for what the coach did and will do, no engine terms ("cued every third time
+    // it showed", "left for this summary"). The before/after is in docs/CUE-AUDIT.md.
     if (r.returned) {
-      lines.push(`${name} came back on ${r.faultReps} of ${report.reps} reps, so the cues for it started again.`);
+      lines.push(`${name}: back on ${r.faultReps} of ${report.reps} reps, so the coach reminds you every rep again.`);
     } else if (r.slipped) {
-      // MIRROR-COACH P9 fix: the words follow the reps — a fault on half the set was not being "held"
-      lines.push(`${name}: ${r.faultReps} of ${report.reps} reps${r.level === 'summaryOnly' ? ', not cued during the set' : ', cued every third time it showed'}. `
-        + `That is too often to leave it, so next set it gets ${r.next === 'everyRep' ? 'a cue every time it shows' : 'a cue every third time it shows'} again.`);
+      lines.push(`${name}: ${r.faultReps} of ${report.reps} reps${r.level === 'summaryOnly' ? ', not said during the set' : ', with a reminder every third time'}. `
+        + `Next set, a reminder ${r.next === 'everyRep' ? 'every time' : 'every third time'}.`);
     } else if (r.level === 'summaryOnly' && r.faultReps > 0) {
-      lines.push(`${name}: ${r.faultReps} of ${report.reps} reps. Left for this summary: it had stayed away at the end of your earlier sets.`);
+      lines.push(`${name}: ${r.faultReps} of ${report.reps} reps. Not said during the set, because you had fixed it in earlier sets.`);
     } else if (r.level === 'everyThird' && r.faultReps > r.spoken) {
-      lines.push(`${name}: ${r.faultReps} of ${report.reps} reps, cued every third time it showed.`);
+      lines.push(`${name}: ${r.faultReps} of ${report.reps} reps, with a reminder every third time.`);
     }
-    // MIRROR-COACH P9 fix (2026-09-30, code review): it said "<fault> held." — read plainly, the FAULT persisted, the
-    // opposite of what landed means (the fix held: the fault stayed away for the last LANDED_CLEAR_REPS reps)
     if (r.landed && r.next !== r.level) {
       lines.push(r.next === 'everyThird'
-        ? `Fixed and kept: ${lower(name)} stayed away for the last ${LANDED_CLEAR_REPS}+ reps. Next set it gets a cue every third time it shows.`
-        : `Fixed and kept again: ${lower(name)} stayed away for the last ${LANDED_CLEAR_REPS}+ reps. Next set it is saved for the end of the set.`);
+        ? `Fixed: ${lower(name)} did not show on your last ${LANDED_CLEAR_REPS}+ reps. Next set, fewer reminders.`
+        : `Fixed again: ${lower(name)} did not show on your last ${LANDED_CLEAR_REPS}+ reps. Next set, the coach saves it for the end.`);
     }
   }
   return lines;

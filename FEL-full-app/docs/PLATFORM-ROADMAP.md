@@ -431,6 +431,21 @@ half of P9 wait for the feel lanes. P8 last (most legal work). The audience orde
   optional short video beside it).
 - **Needs from the owner:** RIG-ADJACENT sign-off (Q7); Privacy line for teachers' motion recordings; the teacher
   agreement's consent clause.
+- **Status (lane/plat-next, 2026-11-10).** Built, dark: §2.3 item 1 (the runtime adapter, `lib/motion-lesson/adapter.ts`:
+  the pelvis lift, the leg fit, and a jump's flight read from the picture), item 2 (the lesson file, `format.ts`:
+  24–35 KB a minute measured), and the PLAYER half of item 3 (`components/motion-lesson/**`: speed, mirror, loop a
+  phrase, turn the camera) on a preview page, `/teach/motion`, that only the owner's roles and course authors can open.
+  The preview plays the owner's own committed takes, so done-when 3 (two bodies, feet planted) and 5 (the owner watches
+  on a phone and signs off) can be answered. NOT built, each waiting on the owner: the recorder half of item 3 and item 5
+  (storage) — a teacher's recording is a new data use, so it needs the Privacy line and the consent clause above; item 4
+  (compare); a `motion` block in a course (`lib/teach/course.ts`). Done-when 1 (a squat pattern and an 8-count dance
+  phrase recorded on a phone) needs a person and a phone: the takes used are jumps and dunk approaches.
+  Measured on the rig (2026-11-10, `scripts/probes/motion-lesson/{rig,speed}.mts`): the first screen 36 words, 4 font
+  sizes, no sideways scroll, every control ≥ 44 px, 0 accessibility findings; both bodies (the male kit, the owner's scan)
+  with feet planted (slide p90 0.3–3.6 cm a frame); jumps leave the floor (0.22–0.75 m). The every-screen speed budgets
+  on the 4×-slowed phone: first content 0.9 s (≤ 2.5 s, passes), layout shift 0.0001 (≤ 0.02, passes), a tap answered
+  in 0.64–1.16 s (≤ 0.2 s, FAILS on the rig). A 3D frame alone took 150–167 ms there (SwiftShader, a software GPU, on a
+  machine at load ~14); a new clip's build, 130–450 ms, now runs after the tap's frame. Not measured on a real phone.
 
 ### P4. Media layer (M)
 

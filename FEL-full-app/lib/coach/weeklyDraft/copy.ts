@@ -1,10 +1,10 @@
 // lib/coach/weeklyDraft/copy.ts — COACH-AI-DRAFT (2026-10-24): every sentence the weekly draft says.
 //
-// OWNER CALL: all of this is new product copy, written by a lane. None of it is legal or policy text. The lines that
-// touch pain or a professional are marked SAFETY-COPY: they follow the pain check-in's own wording
-// (lib/health/painRule.ts PAIN_DECISION_COPY — "check with a clinician", "tell an adult") and say what to do next,
-// never what is wrong: no diagnosis, no condition, no treatment, no promise. The owner should read those first
-// (docs/COACH-AI-DRAFT.md lists them).
+// OWNER-APPROVED (owner, in chat, 2026-10-27: "You do it. I approve." — Owner Inbox card C02, approved with its one
+// recommended change: the internal document's name is out of the coach's notReady line). Product copy written by a
+// lane; none of it is legal or policy text. The lines that touch pain or a professional are marked SAFETY-COPY: they
+// follow the pain check-in's own wording (lib/health/painRule.ts PAIN_DECISION_COPY — "check with a clinician", "tell an
+// adult") and say what to do next, never what is wrong: no diagnosis, no condition, no treatment, no promise.
 //
 // Client-safe: the Drafts inbox and the athlete's card import it.
 
@@ -21,7 +21,7 @@ export const DRAFTS_COPY = {
   noteLabel: 'Note to your athlete (optional)',
   notePlaceholder: 'One line they will see with the update',
   empty: 'Nothing to draft this week. Drafts come from logged sessions, so they appear once your athletes train.',
-  notReady: 'Approvals switch on when the drafts table is set up (docs/COACH-AI-DRAFT.md). You can read this week’s drafts now.',
+  notReady: 'Approvals switch on when the drafts table is set up. You can read this week’s drafts now.',
   held: 'Held back',
   context: 'What the draft read',
   ai: 'Wording by the AI coach. The changes are FEL’s rules.',
@@ -61,7 +61,7 @@ export const SKIP_COPY: Record<string, string> = {
 export function easeOffReason(o: { detailed: boolean; hardStop: boolean; teen: boolean; items: string[] }): string {
   const what = o.detailed && o.items.length
     ? `They reported pain on ${o.items.join(', ')} in the last two weeks.`
-    // no more than the attention board's own generic flag says (lib/health/pain.ts coachPainFlag: "Client paused an exercise")
+    // no more than the attention board's own generic flag says (lib/health/pain.ts coachPainFlag: "Athlete paused an exercise")
     : 'They paused an exercise in the last two weeks (the details are shared only with their consent).';
   if (o.hardStop) {
     return `${what} The check-in told them to stop that exercise and ${o.teen ? 'tell an adult' : 'check with a clinician'}. Ease off this week, and do not load it again until they have.`;

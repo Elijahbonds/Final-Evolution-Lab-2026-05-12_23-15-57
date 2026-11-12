@@ -3,7 +3,8 @@
 // cycle. Modes spawning a BARE hero (no tint/skinTone chosen) get the player's
 // saved look applied automatically; explicit colors always win (rivals/NPCs).
 
-import { applyHairStyle } from './hairStyles';
+import { applyHairStyle, applyCoachHairHide } from './hairStyles';
+import { demoModelFlagsFrom, setDemoModelFlags } from './demoModels';
 import { applyKit, type Wardrobe } from './kit';
 import { reportDiag } from './diag';
 import { applyFaceMorphs, resolveFaceWeightMap } from './faceMorphs';
@@ -27,6 +28,7 @@ import { hairCover, resolveHair } from '../../creator/look/hair';
 import { eyeParams } from '../creator/eyes/eyeTexture';
 import { RawTexture } from '@babylonjs/core';
 import { signedOutVisitor } from './visitor';
+import { takeHeroBodyRead } from './heroBodyRead';
 
 type TintMat = Material & { albedoColor?: Color3; diffuseColor?: Color3; bumpTexture?: { dispose(): void } | null };
 
@@ -120,11 +122,13 @@ export async function resolveIdentity(force = false): Promise<PlayerIdentity> {
     // FIRST-DUNK-BUDGET: a visitor the host knows is signed out is not asked (a guest's closet is a 401, and null is what a 401 gave).
     const [closet, heroBody] = await Promise.all([
       signedOut ? null : fetch('/api/v1/closet?for=spawn').then((r) => (r.ok ? r.json() : null)).catch(() => null),
-      fetch('/api/v1/hero-body').then((r) => (r.ok ? r.json() : null)).catch(() => null) as Promise<HeroBodyAnswer | null>,
+      takeHeroBodyRead(),   // DEMO-SPEED: the library stage's early read when one is fresh (heroBodyRead.ts), else this read's own
     ]);
     // TEENS (owner decision 2026-10-06, "Every mode, device only"): a lookLocal player's row holds only the catalog
     // defaults, so their look comes from the device copy — read here, never sent anywhere (lib/creator/look/slots.ts).
     const local = closet?.lookLocal === true && TEEN_DEVICE_LOOK_EVERYWHERE ? readLocalLook() : null;
+    // DEMO-MODELS-1: the server's demo-model settings ride on this answer (absent = all off, as live)
+    setDemoModelFlags(demoModelFlagsFrom(heroBody?.demo));
     const id = identityFrom(closet, heroBody, local);
     if (gen === generation) { cached = id; cachedSignedOut = signedOut; }
     return id;
@@ -134,7 +138,7 @@ export async function resolveIdentity(force = false): Promise<PlayerIdentity> {
 }
 
 /** What /api/v1/hero-body answers. */
-export interface HeroBodyAnswer { body?: HeroBodyKind; frame?: Record<string, unknown> | null; palette?: PaletteOverrides | null; scanOwned?: boolean }
+export interface HeroBodyAnswer { body?: HeroBodyKind; frame?: Record<string, unknown> | null; palette?: PaletteOverrides | null; scanOwned?: boolean; demo?: unknown }
 
 /**
  * The identity from the two answers (pure: resolveIdentity's fetches feed it; tests drive it directly).
@@ -315,9 +319,11 @@ export function applyIdentity(
   // can fit the body it hides the baked Hair_* nodes applyHairStyle just chose; elsewhere (the scan, a roster body) that
   // node stays. A hood up or a helmet part takes the hair off; worn headwear presses tall hair down. On a 'body' apply the
   // doc's clothes and parts are not built, so they cover nothing.
-  syncHair(spawn, resolveHair(id.face, doc, hidden), {
-    cover: hairCover(parts === 'full' ? doc : null, parts === 'full' ? { accessories: id.accessories, wornParts: id.wornParts } : {}),
-  });
+  const cover = hairCover(parts === 'full' ? doc : null, parts === 'full' ? { accessories: id.accessories, wornParts: id.wornParts } : {});
+  syncHair(spawn, resolveHair(id.face, doc, hidden), { cover });
+  // DEMO-MODELS-1: the coach body's own hair node (CoachHair_*, which applyHairStyle never matches) takes the same hide paths: Bald,
+  // a doc that hides the hair or the head, a raised hood or a helmet. A no-op on every body without one.
+  applyCoachHairHide(spawn.meshes, id.face.hairStyle === 'Bald' || hidden.hair || hidden.head || cover === 'hide');
   watchReadiness(spawn);
   if (parts === 'body') return;
   // 3) Wardrobe palette — jersey/shorts/shoes tints by mesh/material slot name. The doc's colours win (a no-op when

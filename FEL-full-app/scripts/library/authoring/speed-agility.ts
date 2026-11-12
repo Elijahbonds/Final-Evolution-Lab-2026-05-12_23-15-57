@@ -86,7 +86,7 @@ export const SPEED_AGILITY: Family[] = [
     dosage: reps(4, '2', 90),
     variants: [
       { name: '5-10-5 Shuttle', v: '5-10-5', level: 'intermediate', setup: 'Three cones in a line, 5 metres apart; start at the middle one.', aliases: ['Pro Agility Shuttle', '5-10-5 Drill'] },
-      { name: 'T-Drill', v: 't-drill', level: 'intermediate', setup: 'Four cones in a T: one at the base, three across the top 10 metres away, 5 metres apart.', cue: 'Sprint, shuffle, shuffle, shuffle, backpedal, facing the same way the whole time.' },
+      { name: 'T-Drill', v: 't-drill', level: 'intermediate', setup: 'Four cones in a T: one at the base, three across the top 10 metres away, 5 metres apart.', cue: 'Sprint, three shuffles, backpedal, facing the same way the whole time.' },
       { name: 'Three-Cone L-Drill', v: 'l-drill', level: 'advanced', setup: 'Three cones in an L, 5 metres apart.', aliases: ['L-Drill', 'Three-Cone Drill'] },
       { name: 'Cone Weave', v: 'weave', level: 'beginner', setup: 'Six cones in a zig-zag, 3 metres apart.', cue: 'Weave through the cones, planting the outside foot close to each cone.' },
       { name: 'Box Drill', v: 'box', level: 'intermediate', setup: 'Four cones in a 5-metre square.', cue: 'Sprint, shuffle, backpedal, shuffle around the square, hips low at each cone.' },

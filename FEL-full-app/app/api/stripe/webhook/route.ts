@@ -20,6 +20,7 @@ import {
 import { revokeForRefundedCharge } from '@/lib/stripe/refund-revoke';
 import { isWalletSession, walletCheckoutCompleted } from '@/lib/wallet/stripe-wallet-events';
 import { fulfilCoachConnect, isCoachConnectEvent } from '@/lib/coach-business/webhook';
+import { coachConnectEvent } from '@/lib/coach-business/events';
 import { prismaConnectDeps } from '@/lib/coach-business/server';
 import type Stripe from 'stripe';
 
@@ -41,12 +42,41 @@ export async function POST(req: NextRequest) {
   const sig = req.headers.get('stripe-signature');
   if (!sig) return NextResponse.json({ error: 'Missing signature' }, { status: 400 });
 
-  let event: Stripe.Event;
-  try {
-    event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
-  } catch (err: any) {
-    console.error('[stripe-webhook] Signature verification failed:', err.message);
+  // PAYMENTS-READY: events on coaches' CONNECTED accounts (account.updated) come from a second Stripe endpoint ("events on
+  // connected accounts") with its own signing secret, STRIPE_CONNECT_WEBHOOK_SECRET. The same URL verifies either secret;
+  // an event that matches neither is refused exactly as before.
+  const connectSecret = (process.env.STRIPE_CONNECT_WEBHOOK_SECRET ?? '').trim();
+  let event: Stripe.Event | null = null;
+  let lastError = '';
+  for (const secret of connectSecret ? [webhookSecret, connectSecret] : [webhookSecret]) {
+    try {
+      event = stripe.webhooks.constructEvent(rawBody, sig, secret);
+      break;
+    } catch (err: any) {
+      lastError = err?.message ?? String(err);
+    }
+  }
+  if (!event) {
+    console.error('[stripe-webhook] Signature verification failed:', lastError);
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
+  }
+
+  // PAYMENTS-READY (lib/coach-business/events.ts): a coach's Express account changed (account.updated), or a buyer
+  // disputed a coach's sale (charge.dispute.*). Asked before everything else; anything that is not the coach business's
+  // answers null here and carries on below exactly as before. A failure returns 500 so Stripe retries.
+  if (event.type === 'account.updated' || event.type.startsWith('charge.dispute.')) {
+    try {
+      const outcome = await coachConnectEvent(prismaConnectDeps(), event);
+      if (outcome) return NextResponse.json({ received: true, coachConnect: outcome });
+    } catch (err) {
+      console.error('[stripe-webhook] coach-connect event failed', err instanceof Error ? err.message : err);
+      return NextResponse.json({ error: 'handler_failed' }, { status: 500 });
+    }
+  }
+  // An event from a CONNECTED account that is not handled above is acknowledged and left alone: no handler below is about
+  // a coach's own account.
+  if ((event as { account?: string }).account) {
+    return NextResponse.json({ received: true, ignored: 'connected_account_event' });
   }
 
   // COACH-BUSINESS (2026-10-25): a coach's own sale through Stripe Connect (metadata.product COACH_CONNECT). Handled

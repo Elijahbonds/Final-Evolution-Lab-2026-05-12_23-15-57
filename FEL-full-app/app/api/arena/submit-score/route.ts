@@ -22,6 +22,8 @@ import { checkStakeScore, killSwitchOn, STAKE_REFUSAL_STATUS } from '@/lib/arena
 import { isExpired } from '@/lib/arena-reclaim';
 import { readDuelRun } from '@/lib/arena-duel-run';
 import { checkRateLimits, retryAfterHeaders } from '@/lib/rate-limits/policy';
+import { isTeenPractice, awardTeenPrize } from '@/lib/arena-teen';
+import { arenaBand } from '@/lib/age/arenaAgeBand';
 
 /**
  * POST /api/arena/submit-score
@@ -99,10 +101,16 @@ export async function POST(req: NextRequest) {
       // reclaim sweep (lib/arena-reclaim.ts) owns it from that instant: it refunds whoever did not play, or settles to
       // the one side that did. Before this nothing read expiresAt, so a duel stayed open to a score forever.
       if (isExpired(match.expiresAt, new Date())) {
-        throw new ArenaError('EXPIRED', 'This duel has expired: stakes nobody played for are refunded, and a side that played wins by forfeit.', 409);
+        // ARENA-AGE-1: a practice duel's refusal uses practice words (T6); the entry-duel wording is unchanged.
+        throw new ArenaError('EXPIRED', isTeenPractice(match) ? 'This practice duel has expired. Start a new one from the Arena.' : 'This duel has expired: stakes nobody played for are refunded, and a side that played wins by forfeit.', 409);
       }
       // A duel needs both players before scores count.
       if (!match.player2Id) throw new ArenaError('WAITING_OPPONENT', 'Waiting for an opponent to join.', 409);
+      // ARENA-AGE-1: a practice duel is for under-18 / unknown-age accounts only, re-read from the DB at submit — an
+      // account that is a verified adult can't post to one (no free prize for adults), whoever opened it. Before any write.
+      if (isTeenPractice(match) && (await arenaBand(prisma as any, userId)).band === 'adult') {
+        throw new ArenaError('PRACTICE_UNDER_18_ONLY', 'Practice duels are for players under 18. Use Quick Match.', 403);
+      }
 
       // MUSIC-SUITE P6: a music duel's score is what the server makes of the player's one recorded attempt — no attempt,
       // no score (409 NO_ATTEMPT); an unfinished one, 0; a finished one, judgeHouseSet on its taps. checkStakeScore then
@@ -186,8 +194,9 @@ export async function POST(req: NextRequest) {
       // the match seed + skill history that strictly PREDATES this match —
       // the submitted score is never an input, so the draw can't be pulled
       // toward it. Deterministic: re-submitting draws the same number.
+      // ARENA-AGE-1: a teen practice duel seats a House Rival the same way (and the same draw).
       const ghostSide: 'p1' | 'p2' | null =
-        match.matchType === 'GHOST_DUEL' ? (isP1 ? 'p2' : 'p1') : null;
+        match.matchType === 'GHOST_DUEL' || isTeenPractice(match) ? (isP1 ? 'p2' : 'p1') : null;
       const ghostScoreMissing =
         ghostSide === 'p1' ? match.player1Score === null : match.player2Score === null;
       if (ghostSide && ghostScoreMissing && match.seed) {
@@ -213,6 +222,26 @@ export async function POST(req: NextRequest) {
       // Not both in yet — hold.
       if (p1Score === null || p2Score === null || p1Score === undefined || p2Score === undefined) {
         return { settled: false, status: 'ACTIVE', mySubmitted: true };
+      }
+
+      // ARENA-AGE-1 (Cyber T1, T2, T3): a teen practice duel has no entry and no pot. A win pays the fixed server prize
+      // under the daily cap (lib/arena-teen.ts); a loss or a tie moves nothing. Never arenaPayWinner / arenaRefund.
+      if (isTeenPractice(match)) {
+        const teenResult = resolveArena(p1Score, p2Score);
+        const teenWinnerId = teenResult === 'tie' ? null : teenResult === 'p1' ? match.player1Id : match.player2Id;
+        const iWonTeen = teenWinnerId !== null && teenWinnerId === userId;
+        const prize = iWonTeen ? await awardTeenPrize(tx, { userId, matchId }) : { awarded: 0, capped: false };
+        const updated = await tx.competitionMatch.update({
+          where: { id: matchId },
+          data: teenResult === 'tie' ? { status: 'VOIDED' } : { status: 'SETTLED', winnerId: teenWinnerId },
+        });
+        await appendMatchEvent(tx, matchId, 'SETTLED', null, {
+          teenPractice: true, winnerId: teenWinnerId, prize: prize.awarded, prizeCapped: prize.capped, p1Score, p2Score,
+        });
+        return {
+          settled: true, status: updated.status, result: teenResult, winnerId: teenWinnerId, iWon: iWonTeen,
+          teenPractice: true, prize: prize.awarded, prizeCapped: prize.capped, p1Score, p2Score, feeLc: 0,
+        };
       }
 
       // Both scores are in — resolve + settle.

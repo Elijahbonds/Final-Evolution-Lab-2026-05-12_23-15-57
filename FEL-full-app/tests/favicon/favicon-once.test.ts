@@ -40,12 +40,22 @@ describe('the favicon is one link in the root layout\'s <head>', () => {
   // FDB-3 (PM, 2026-10-17: AM still counts the icon 3× a run — 2 on /links, 1 on /try). Measured: every one is /favicon.svg from
   // this one link, fetched again by the browser after Next's own history updates (replaceState('/links') at hydration, pushState
   // ('/try') on the hop) in a fresh, off-the-record context — not a second icon source. These hold that there is none.
-  it('no second icon source: no web manifest, no manifest/apple-touch link, no /favicon.ico or apple-touch-icon file', () => {
+  // INSTALLABLE (app-feel, round 7, 2026-10-25; test changed): the owner approved an installable app, which needs a web
+  // manifest and an apple-touch-icon. They follow the favicon's rule instead of being banned: ONE link each, in the root
+  // layout's own <head> (rendered once per document, never re-rendered by a navigation), and never from Next's metadata
+  // (app/manifest.ts or `manifest:` would put the link in the tree Next re-renders on every hop, as `icons` did).
+  it('no second icon source: no metadata manifest, no /favicon.ico; one manifest and one apple-touch link, in the root <head>', () => {
     expect(readdirSync(path.join(ROOT, 'app')).filter((f) => /^manifest\.(ts|js|json|webmanifest)$/.test(f))).toEqual([]);
     expect(readdirSync(path.join(ROOT, 'public')).filter((f) => /\.webmanifest$|^manifest\.json$|^favicon\.ico$|^apple-touch-icon/.test(f))).toEqual([]);
     const tsx = (dir: string): string[] => readdirSync(dir).flatMap((e) => { const p = path.join(dir, e); return statSync(p).isDirectory() ? tsx(p) : /\.tsx$/.test(e) && !/\.test\.tsx$/.test(e) ? [p] : []; });
     const extra = [...tsx(path.join(ROOT, 'app')), ...tsx(path.join(ROOT, 'components'))].filter((f) => /rel=["'](?:manifest|apple-touch-icon|shortcut icon|mask-icon)["']|\bmanifest\s*:\s*['"]/.test(code(readFileSync(f, 'utf8'))));
-    expect(extra.map((f) => path.relative(ROOT, f))).toEqual([]);
+    expect(extra.map((f) => path.relative(ROOT, f))).toEqual(['app/layout.tsx']);
+    const head = layout.slice(layout.indexOf('<head>'), layout.indexOf('</head>'));
+    expect(head).toContain('<link rel="manifest" href={MANIFEST_HREF} />');
+    expect(head).toContain('<link rel="apple-touch-icon" href={APPLE_TOUCH_ICON_HREF} />');
+    expect(code(layout).match(/rel="manifest"/g)).toHaveLength(1);
+    expect(code(layout).match(/rel="apple-touch-icon"/g)).toHaveLength(1);
+    expect(code(layout)).not.toMatch(/\bmanifest\s*:/);
     const iconLinks = [...routeFiles(path.join(ROOT, 'app'))].flatMap((f) => code(readFileSync(f, 'utf8')).match(/rel=["'](?:shortcut )?icon["']/g) ?? []);
     expect(iconLinks).toHaveLength(1);   // the root layout's, across every layout, page and template
   });

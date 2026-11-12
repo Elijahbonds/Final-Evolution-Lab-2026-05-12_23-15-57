@@ -15,6 +15,9 @@ export interface InviteEmailInput {
   /** Where a code is typed, as a full URL (origin + /coach/join). The code line is left out without it. */
   codeUrl: string | null;
   expiresAt: Date;
+  /** COACH-DELIVERY COA-04: the coach's brand line ("Dee Lane · Dee Strength", lib/coach/branding.ts brandSignOff), or null.
+   *  The email stays plain text (lib/mail: no HTML), so the brand is a sign-off, never a logo or a colour. */
+  signOff?: string | null;
 }
 
 const firstWord = (s: string | null) => (s ?? '').trim().split(/\s+/)[0] || null;
@@ -34,6 +37,7 @@ export function inviteEmail(i: InviteEmailInput): { subject: string; text: strin
     `The invite works once and closes on ${until}.`,
     '',
     'If you were not expecting this, you can ignore it. Nothing happens unless you open the link and join.',
+    ...(i.signOff ? ['', `— ${i.signOff}`] : []),
   ];
   return { subject: `${coach} invited you to train on Final Evolution Lab`, text: lines.join('\n') };
 }

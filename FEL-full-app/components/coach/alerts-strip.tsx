@@ -38,13 +38,13 @@ export function AlertsStrip({ alerts, shownIds }: { alerts: readonly CoachAlert[
         <ul className="space-y-1.5">
           {missed.map((a) => (
             <li key={a.clientId} className="flex items-start gap-2 rounded-lg bg-white/4 px-3 py-2 text-sm" data-alert={a.kind}>
-              <CalendarX2 className="mt-0.5 h-4 w-4 shrink-0 text-[#FFD700]" aria-hidden="true" />
+              <CalendarX2 className="mt-0.5 h-4 w-4 shrink-0 text-fel-gold" aria-hidden="true" />
               <span className="min-w-0 break-words"><span className="font-medium text-white/90">{a.name}</span>{' '}<span className="text-white/55">{a.line}</span></span>
             </li>
           ))}
         </ul>
       )}
-      <button onClick={() => void email()} disabled={busy} className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-white/15 px-2.5 py-1 text-[11px] text-white/70 disabled:opacity-50" data-alerts-email>
+      <button onClick={() => void email()} disabled={busy} className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-white/15 px-2.5 py-1 text-[12px] text-white/70 disabled:opacity-50" data-alerts-email>
         {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Mail className="h-3 w-3" />} Email me these {total} alert{total === 1 ? '' : 's'}
       </button>
     </div>

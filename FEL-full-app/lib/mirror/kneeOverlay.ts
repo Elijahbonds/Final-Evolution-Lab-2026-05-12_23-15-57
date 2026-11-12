@@ -65,4 +65,4 @@ export function kneeArrows(landmarks: readonly (OverlayPoint | undefined)[], W: 
 }
 
 /** The line painted under the arrows: the action, never a cause (no band, no muscle). */
-export const KNEE_OVERLAY_LINE = 'KNEES OUT — PRESS THE FLOOR APART';
+export const KNEE_OVERLAY_LINE = 'KNEES OUT OVER TOES';   // CUE-REWRITE: the live cue's words (cue-engine.ts CUES.kneeValgus)

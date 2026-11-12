@@ -43,6 +43,7 @@ const PUBLIC_BY_DESIGN: Record<string, string> = {
   'health/route.ts': 'liveness probe, no data',
   'health/db/route.ts': 'database liveness probe, no rows returned',
   'stripe/webhook/route.ts': 'Stripe calls it; authenticated by signature, not session',
+  'coach/schedule/feed/[token]/route.ts': 'a calendar app subscribing to an .ics URL sends no cookie, so the link is the key: a 256-bit HMAC over the user id and a per-person nonce, compared in constant time, reset or switched off by its owner, served only for a verified adult, and any bad link is a 404 (tests/coach-delivery/schedule.test.ts)',
   'books/webhook/route.ts': 'Stripe calls it for book purchases; authenticated by signature, not a user session',
   'creator/inquiry/route.ts': 'public brand inquiry intake; validated, honeypot, rate limited, stores no IP or IP hash, fails closed (503) until its table exists',
   'v1/wallet/stripe-webhook/route.ts': 'the wallet\'s own Stripe endpoint; authenticated by signature, not session',

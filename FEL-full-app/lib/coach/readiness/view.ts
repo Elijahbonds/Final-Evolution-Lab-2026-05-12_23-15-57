@@ -4,6 +4,7 @@
 // Pure, client-safe.
 
 import { BAND_LABEL, coachedNextLine, reasonLine, soloLine } from './copy';
+import { nextLineFor } from './next';
 import { applyRule, athleteRead, baselineOf, measure, SOLO_RULE } from './rules';
 import type { DayJumps, PriorCheck, ReadinessBand, ReadinessFacts, ReadinessRead, ReadinessReason, ReadinessRule } from './types';
 
@@ -49,9 +50,10 @@ export function viewOf(o: { today: DayJumps; facts: ReadinessFacts; read: Readin
   // the coach the band came from: the one whose rule read it (the easing one first), named in the next line
   const lead = o.coaches.find((c) => c.rule === read.rule) ?? o.coaches[0] ?? null;
   const coachTold = !!lead && o.saved && o.told.includes(lead.coachId);
-  const next = solo
+  // CUE-REWRITE: every band gets a next step (lib/coach/readiness/next.ts)
+  const next = nextLineFor(read.band, solo
     ? soloLine(read.band)
-    : coachedNextLine({ band: read.band, ease: read.ease && o.saved, coachName: lead?.coachName ?? null, coachTold, shared: !!lead?.shared });
+    : coachedNextLine({ band: read.band, ease: read.ease && o.saved, coachName: lead?.coachName ?? null, coachTold, shared: !!lead?.shared }));
   return {
     day: o.today.day, band: read.band, reason: read.reason, label: BAND_LABEL[read.band],
     line: reasonLine({ reason: read.reason, dropPct: facts.dropPct, feel: facts.feel, baselineN: facts.baseline?.n ?? 0, priorChecks: o.priorChecks, ruleDropPct: read.rule.dropPct }),

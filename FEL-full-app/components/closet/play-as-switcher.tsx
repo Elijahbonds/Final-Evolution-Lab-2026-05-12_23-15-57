@@ -65,13 +65,13 @@ export function PlayAsSwitcher({ tint = '#00E5FF', reload = () => window.locatio
 
   return (
     <div className="mt-2 flex flex-col items-center gap-1.5" aria-label="Play as">
-      <p className="text-[9px] font-black tracking-[0.3em] text-white/45">PLAY AS</p>
+      <p className="text-[12px] font-black tracking-[0.3em] text-white/50">PLAY AS</p>
       <div className="flex flex-wrap items-center justify-center gap-2">
         {state.slots.map((s) => {
           const on = s.id === state.active;
           return (
             <button key={s.id} type="button" onClick={() => void pick(s.id)} aria-pressed={on} disabled={!!busy}
-              className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-black tracking-wider transition ${on ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
+              className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-black tracking-wider transition ${on ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
               style={on ? { background: tint, borderColor: tint } : { borderColor: 'rgba(255,255,255,0.2)' }}>
               <span aria-hidden className="flex -space-x-1">
                 <span className="inline-block h-2.5 w-2.5 rounded-full border border-black/30" style={{ background: s.chips.skin }} />

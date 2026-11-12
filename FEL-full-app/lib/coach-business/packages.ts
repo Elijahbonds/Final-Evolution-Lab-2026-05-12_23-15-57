@@ -5,7 +5,9 @@
 // in raw SQL (store.ts) and the checkout re-checks every rule here before Stripe is asked for anything.
 import { PACKAGE_MAX_CENTS, PACKAGE_MIN_CENTS } from './config';
 
-export const PACKAGE_KINDS = ['monthly', 'session_pack', 'single_review', 'program'] as const;
+// COACH-DELIVERY COA-12 (2026-10-27): 'team_fee' — a one-off fee a coach sends to their roster or a team (lib/coach-business/
+// teamFee.ts). It is never listed on the public page or in find-a-coach (store.ts activePackagesFor leaves it out).
+export const PACKAGE_KINDS = ['monthly', 'session_pack', 'single_review', 'program', 'team_fee'] as const;
 export type PackageKind = (typeof PACKAGE_KINDS)[number];
 
 export const PACKAGE_KIND_LABELS: Record<PackageKind, string> = {
@@ -13,6 +15,7 @@ export const PACKAGE_KIND_LABELS: Record<PackageKind, string> = {
   session_pack: 'Session pack',
   single_review: 'Single review',
   program: 'Program',
+  team_fee: 'Team fee',
 };
 
 /** How the price reads: monthly bills every month, the rest once. */

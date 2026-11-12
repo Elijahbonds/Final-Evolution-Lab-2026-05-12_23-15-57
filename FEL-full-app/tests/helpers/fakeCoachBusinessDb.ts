@@ -9,6 +9,11 @@ type Row = Record<string, any>;
 
 export interface FakeState {
   ready: boolean;
+  /** PAYMENTS-READY: prisma/pending/2026-10-26-payments-ready.sql applied (CoachSaleDispute + requirementsDue). */
+  paymentsReady: boolean;
+  disputes: Map<string, Row>;
+  /** PAYMENTS-READY: the LedgerTransaction rows the monthly-cap read sees ({ kind, metadata, createdAt }). */
+  ledger: { kind: string; metadata: Record<string, unknown>; createdAt: Date }[];
   instructors: { userId: string; slug: string; displayName: string; headline: string | null; specialties: string[]; published: boolean }[];
   packages: Map<string, Row>;
   sales: Map<string, Row>;
@@ -20,13 +25,17 @@ export interface FakeState {
   statements: string[];
 }
 
-export function fakeCoachBusinessDb(init: Partial<Pick<FakeState, 'ready'>> = {}) {
+export function fakeCoachBusinessDb(init: Partial<Pick<FakeState, 'ready' | 'paymentsReady'>> = {}) {
   const s: FakeState = {
     ready: init.ready ?? true,
+    paymentsReady: init.paymentsReady ?? true,
+    disputes: new Map(),
+    ledger: [],
     instructors: [], packages: new Map(), sales: new Map(), connect: new Map(), market: new Map(), highlights: new Map(), applications: new Map(),
     users: new Map(), statements: [],
   };
-  const name = (sql: string) => (Object.entries(SQL).find(([, v]) => v === sql)?.[0]) ?? (sql.includes('information_schema.tables') ? 'probe' : sql.includes('pg_advisory') ? 'lock' : null);
+  const name = (sql: string) => (Object.entries(SQL).find(([, v]) => v === sql)?.[0])
+    ?? (sql.includes('information_schema.tables') ? (sql.includes('CoachSaleDispute') ? 'paymentsReadyProbe' : 'probe') : sql.includes('pg_advisory') ? 'lock' : null);
   const now = () => new Date();
   const holding = (r: Row, at: Date) => ['PAID', 'ACTIVE', 'PARTIALLY_REFUNDED'].includes(r.status) || (r.status === 'PENDING' && new Date(r.holdExpiresAt) > at);
 
@@ -35,6 +44,26 @@ export function fakeCoachBusinessDb(init: Partial<Pick<FakeState, 'ready'>> = {}
     s.statements.push(n ?? sql);
     switch (n) {
       case 'probe': return s.ready ? [{ ok: 1 }] : [];
+      case 'paymentsReadyProbe': return s.ready && s.paymentsReady ? [{ ok: 1 }] : [];
+      case 'connectDueFor': { const r = s.connect.get(v[0]); return r ? [{ requirementsDue: !!r.requirementsDue }] : []; }
+      case 'connectByAccount': { const r = [...s.connect.values()].find((c) => c.stripeAccountId === v[0]); return r ? [{ ...r }] : []; }
+      case 'saleByPaymentIntent': return [...s.sales.values()].filter((r) => r.paymentIntentId === v[0]).map((r) => ({ id: r.id }));
+      case 'saleBySubscription': return [...s.sales.values()].filter((r) => r.subscriptionId === v[0]).map((r) => ({ id: r.id }));
+      case 'coachFeesSince': {
+        let n = 0;
+        for (const t of s.ledger) {
+          if (t.metadata.coachId !== v[0] || t.createdAt < v[1]) continue;
+          if (t.kind === 'COACH_CONNECT_FEE') n += Number(t.metadata.feeCents ?? 0);
+          else if (t.kind === 'COACH_CONNECT_FEE_REFUND') n -= Number(t.metadata.feeReturnedCents ?? 0);
+        }
+        return [{ n }];
+      }
+      case 'coachPendingFees':
+        return [{ n: [...s.sales.values()].filter((r) => r.coachId === v[0] && r.status === 'PENDING' && new Date(r.holdExpiresAt) > v[1]).reduce((a, r) => a + r.feeCents, 0) }];
+      case 'disputeById': return s.disputes.has(v[0]) ? [{ ...s.disputes.get(v[0]) }] : [];
+      case 'disputesForCoach':
+        return [...s.disputes.values()].filter((d) => d.coachId === v[0])
+          .map((d) => ({ ...d, title: s.packages.get(s.sales.get(d.saleId)?.packageId)?.title ?? '' }));
       case 'lock': case 'lockPackage': return [];
       case 'marketProfile': return s.market.has(v[0]) ? [{ ...s.market.get(v[0]) }] : [];
       case 'listedCoaches':
@@ -86,6 +115,32 @@ export function fakeCoachBusinessDb(init: Partial<Pick<FakeState, 'ready'>> = {}
         Object.assign(r, { chargesEnabled: v[1], payoutsEnabled: v[2], detailsSubmitted: v[3] });
         return 1;
       }
+      case 'updateConnectDue': {
+        if (!s.paymentsReady) throw Object.assign(new Error('column "requirementsDue" of relation "CoachConnectAccount" does not exist'), { code: '42703' });
+        const r = [...s.connect.values()].find((c) => c.stripeAccountId === v[0]);
+        if (!r) return 0;
+        Object.assign(r, { chargesEnabled: v[1], payoutsEnabled: v[2], detailsSubmitted: v[3], requirementsDue: v[4] });
+        return 1;
+      }
+      case 'insertDispute':
+        if (s.disputes.has(v[0])) return 0;
+        s.disputes.set(v[0], {
+          id: v[0], saleId: v[1], coachId: v[2], chargeId: v[3], amountCents: v[4], reason: v[5], stripeStatus: v[6], outcome: 'OPEN',
+          withdrawnCents: 0, reinstatedCents: 0, livemode: v[7], createdAt: now(), closedAt: null,
+        });
+        return 1;
+      case 'setDisputeStatus': {
+        const d = s.disputes.get(v[0]);
+        if (!d || d.outcome !== 'OPEN') return 0;
+        Object.assign(d, { stripeStatus: v[1], outcome: v[2], closedAt: v[2] === 'OPEN' ? null : now() });
+        return 1;
+      }
+      case 'setDisputeFunds': {
+        const d = s.disputes.get(v[0]);
+        if (!d || d.withdrawnCents !== v[1] || d.reinstatedCents !== v[2]) return 0;
+        Object.assign(d, { withdrawnCents: v[3], reinstatedCents: v[4] });
+        return 1;
+      }
       case 'insertSale':
         s.sales.set(v[0], {
           id: v[0], packageId: v[1], coachId: v[2], buyerId: v[3], kind: v[4], status: 'PENDING', amountCents: v[5], feeCents: v[6],
@@ -130,8 +185,10 @@ export function fakeCoachBusinessDb(init: Partial<Pick<FakeState, 'ready'>> = {}
   return { db, state: s };
 }
 
-/** A ledger that keeps one row per idempotency key (LedgerTransaction.idempotencyKey is unique) and refuses an unbalanced one. */
-export function fakeLedger() {
+/** A ledger that keeps one row per idempotency key (LedgerTransaction.idempotencyKey is unique) and refuses an unbalanced one.
+ *  PAYMENTS-READY: given the fake database's state, each new row is also visible to its monthly-cap read (state.ledger),
+ *  stamped `clock()`. */
+export function fakeLedger(mirror?: FakeState, clock: () => Date = () => new Date()) {
   const rows: LedgerPost[] = [];
   const keys = new Set<string>();
   return {
@@ -142,6 +199,7 @@ export function fakeLedger() {
       if (keys.has(tx.idempotencyKey)) return;
       keys.add(tx.idempotencyKey);
       rows.push(tx);
+      mirror?.ledger.push({ kind: tx.kind, metadata: { ...tx.metadata }, createdAt: clock() });
     },
     /** FEL's net platform revenue in cents (money in is a negative PLATFORM_REVENUE posting). */
     revenue(): number {

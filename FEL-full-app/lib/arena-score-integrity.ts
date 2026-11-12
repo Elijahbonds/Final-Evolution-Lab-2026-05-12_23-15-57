@@ -790,7 +790,7 @@ export function isRejudgedStakeMode(mode: string | null | undefined): boolean {
  */
 export const NOT_STAKEABLE_HERE = {
   code: 'NOT_STAKEABLE_HERE',
-  detail: (mode: string | null | undefined): string => `A ${canonicalStakeMode(String(mode ?? ''))} stake is settled only in the Arena, from a recorded attempt — it can't be staked here.`,
+  detail: (mode: string | null | undefined): string => `A ${canonicalStakeMode(String(mode ?? ''))} entry duel is settled only in the Arena, from a recorded attempt — it can't be entered here.`,
 } as const;
 
 /**
@@ -807,7 +807,7 @@ export function checkStakeScore(input: { mode: string; score: unknown; card?: un
   const key = canonicalStakeMode(String(input.mode ?? ''));
   const ceiling = scoreCeilingFor(key);
   if (!ceiling) {
-    return { ok: false, code: 'NO_SCORE_CEILING', detail: `"${input.mode}" has no score ceiling, so a stake on it cannot be settled. ${NOT_RECORDED}` };
+    return { ok: false, code: 'NO_SCORE_CEILING', detail: `"${input.mode}" has no score ceiling, so an entry on it cannot be settled. ${NOT_RECORDED}` };
   }
   const ceilingApplied = !(input.killSwitch && ceiling.swapsUnderKillSwitch);
   if (ceilingApplied && score > ceiling.max) {

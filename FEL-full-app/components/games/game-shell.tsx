@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AnimatePresence } from 'framer-motion';
 import { Maximize2, Minimize2, ArrowLeft, Loader2 } from 'lucide-react';
+import { GAME_LOADING } from '@/components/games/game-loading';
 import type { PrqGrade } from '@/lib/prq';
 import { readPrqDisplay, type PrqDisplay } from '@/lib/prq-display';
 import { PhysicalGamepadPoller } from '@/lib/gamepad-bridge';
@@ -18,6 +19,7 @@ import { VirtualController } from './virtual-controller';
 import { ReplayInPlaceContext } from './replay-in-place';
 import { BodyControl } from './body-control';
 import { GraphicsToggle } from './graphics-toggle';
+import { PauseButton } from './pause-button';   // gameplay-clean: a pause a thumb can reach (ESC → START, every harness mode)
 import { GameCaptureHud } from '@/components/capture/game-capture-hud';
 import { LearnWhileYouWait } from '@/components/learn/learn-while-you-wait';
 import type { SessionTallies } from '@/lib/game-systems';
@@ -126,7 +128,7 @@ export function GameShell(props: {
   gameProps?: Record<string, unknown>;
 }) {
   return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-[#050505]"><Loader2 className="h-8 w-8 animate-spin text-[#00E5FF]" /></div>}>
+    <Suspense fallback={<div role="status" className="flex min-h-screen flex-col items-center justify-center gap-3 bg-[#050505]"><Loader2 aria-hidden className="h-8 w-8 animate-spin text-[#00E5FF]" /><p className="text-[16px] text-white/60">{GAME_LOADING}</p></div>}>
       <GameShellInner {...props} />
     </Suspense>
   );
@@ -158,6 +160,9 @@ function GameShellInner({
   // ECONOMY-SESSIONS-HARDEN: an agent or playtest run is started as one, so the server records it and pays nothing
   const agentRun = searchParams.get('agent') === '1';
   const playtestRun = searchParams.get('playtest') === '1';
+  // NEX-06 (owner 2026-10-20: "player content is practice-only, never ranked or staked"): a Studio share link's run is started as
+  // a playtest run, so the server records it and pays nothing (lib/nexus-studio/share.ts)
+  const shareRun = searchParams.has('share');
   // QA P0-01: `display` is what the header badge prints (the measured PRQ, lib/prq-display); prq / grade stay the modes'
   // difficulty inputs.
   const [profile, setProfile] = useState<{ prq: number; grade: PrqGrade; display: PrqDisplay } | null>(null);
@@ -210,7 +215,7 @@ function GameShellInner({
   const startServerRun = useCallback((): Promise<string | null> => {
     const url = `/api/sessions/start${agentRun ? '?agent=1' : ''}`;
     return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
-      mode, ...(playtestRun ? { playtest: true } : {}),
+      mode, ...(playtestRun || shareRun ? { playtest: true } : {}),
       // TIER-SERVER: the head-to-head this run is for, so the server records its tier (PRO) at the start
       ...(arenaMatchId ? { arenaMatchId } : {}), ...(mpCode ? { mp: mpCode } : {}), ...(challengeCode ? { c: challengeCode } : {}),
     }) })
@@ -229,7 +234,7 @@ function GameShellInner({
         import('@/lib/agentRunHooks').then(({ setAgentRunHooksAllowed }) => setAgentRunHooksAllowed(false));
         return null;
       });
-  }, [mode, agentRun, playtestRun, arenaMatchId, mpCode, challengeCode]);
+  }, [mode, agentRun, playtestRun, shareRun, arenaMatchId, mpCode, challengeCode]);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [shareState, setShareState] = useState<'idle' | 'minting' | 'copied'>('idle');
   const scheme = getScheme(mode);
@@ -461,6 +466,8 @@ function GameShellInner({
                     iWon: ar.iWon,
                     payout: ar.payout,
                     feeLc: ar.feeLc,
+                    // ARENA-AGE-1: a practice duel's card says "prize", never the entry-duel words
+                    ...(ar.teenPractice ? { teenPractice: true, prize: Number(ar.prize) || 0, prizeCapped: Boolean(ar.prizeCapped) } : {}),
                     myScore: arenaScore,
                     oppScore: p1 === undefined || p2 === undefined ? undefined : p1 === arenaScore ? p2 : p1,
                   });
@@ -703,40 +710,45 @@ function GameShellInner({
         <div className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5">
           <Link
             href="/"
-            className="flex shrink-0 items-center gap-1.5 rounded-md border border-white/10 px-2.5 py-1.5 text-xs font-medium text-white/60 transition-colors hover:border-[#00E5FF]/50 hover:text-[#00E5FF]"
+            className="flex shrink-0 items-center gap-1.5 rounded-md border border-white/10 px-2.5 py-1.5 text-xs font-medium text-white/60 transition-colors hover:border-[#00E5FF]/50 hover:text-[#00E5FF] min-h-11"
           >
             <ArrowLeft className="h-3.5 w-3.5" /> Home
           </Link>
           <div className="min-w-0">
             <h1 className="fel-heading text-xl font-bold leading-none text-white">{title}</h1>
-            <p className="font-mono text-[10px] text-white/40">{venue}</p>
+            <p className="font-mono text-[12px] text-white/50">{venue}</p>
           </div>
           {/* BODY CONTROL, for every mode at once. It is an input device, not a mode feature — poseControl maps
               a body to the same FelInput a gamepad produces and emitToLive posts it to whichever bus is running,
               so no mode file knows this exists. */}
           <div className="ml-auto flex items-center gap-3">
+            <PauseButton />
             <BodyControl />
           </div>
-          {profile && (
+          {/* EVERY-SCREEN P2: the badge's place is held while the profile loads (it arrived late and the wrapped row
+              moved under it: layout shift on every game screen) */}
+          {profile ? (
             <span
               className="whitespace-nowrap rounded-md border px-2.5 py-1 font-mono text-xs"
               style={{ borderColor: `${profile.display.color}55`, color: profile.display.color }}
             >
               {profile.display.badge}
             </span>
-          )}
+          ) : <span aria-hidden className="invisible whitespace-nowrap rounded-md border px-2.5 py-1 font-mono text-xs">PRQ — · NOT MEASURED</span>}
           <GraphicsToggle />   {/* visual-foundation: Auto / Performance / Quality, applied on the next load */}
-          {fsAvailable && (
+          {/* EVERY-SCREEN P2: 44 px, and its place held until the browser says whether full screen exists (it appeared
+              after the first paint and moved the row) */}
+          {fsAvailable ? (
             <button
               type="button"
               onClick={onFullscreen}
               aria-label={fsOn ? 'Leave full screen' : 'Full screen'}
-              className="grid h-8 w-8 place-items-center rounded-md border border-white/10 text-white/50
+              className="grid h-11 w-11 place-items-center rounded-md border border-white/10 text-white/50
                          transition-colors hover:border-[#00E5FF]/50 hover:text-[#00E5FF]"
             >
               {fsOn ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
             </button>
-          )}
+          ) : <span aria-hidden className="h-11 w-11" />}
         </div>
       </header>
 
@@ -754,6 +766,7 @@ function GameShellInner({
             while full-bleed — with the header up they would be a second copy of it. */}
         {fullBleed && !streamOn && (
           <div data-game-chrome data-fel-corner className="pointer-events-none absolute right-2 top-2 z-30 flex items-center gap-1.5">
+            <PauseButton />
             <Link
               href="/play"
               aria-label="Leave the game"
@@ -789,8 +802,9 @@ function GameShellInner({
             </ThreeDErrorBoundary>
           </ReplayInPlaceContext.Provider>
         ) : !unreachable ? (
-          <div className="flex h-[60vh] items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-[#00E5FF]" />
+          <div role="status" className="flex h-[60vh] flex-col items-center justify-center gap-3">
+            <Loader2 aria-hidden className="h-8 w-8 animate-spin text-[#00E5FF]" />
+            <p className="text-[16px] text-white/60">{GAME_LOADING}</p>
           </div>
         ) : null}
 

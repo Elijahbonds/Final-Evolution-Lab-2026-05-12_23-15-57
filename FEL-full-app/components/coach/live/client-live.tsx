@@ -199,13 +199,13 @@ export function ClientLive({ room, join, signalApi = '/api/coach/live/signal' }:
           <div className="fel-card flex items-center gap-3 rounded-xl p-3">
             <div className="text-center">
               <div className="text-4xl font-black tabular-nums" data-client-rep-count>{set?.reps ?? 0}</div>
-              <div className="text-[11px] uppercase tracking-wider text-white/50">{set ? `Set ${set.id}` : 'Between sets'}</div>
+              <div className="text-[12px] uppercase tracking-wider text-white/50">{set ? `Set ${set.id}` : 'Between sets'}</div>
             </div>
             <div className="text-sm text-white/75">
               {movement ? <><div className="font-semibold">{LIVE_SPECS[movement].label}</div><div className="text-white/60">{setupLine(movement)}</div></> : 'Your coach picks the exercise.'}
             </div>
           </div>
-          <p className="text-[11px] text-white/45" data-live-sending>
+          <p className="text-[12px] text-fel-dim" data-live-sending>
             Sending: {[sending.pose ? 'pose' : null, sending.video ? 'video' : null, sending.voice ? 'voice' : null].filter(Boolean).join(', ') || 'nothing yet'}. {NOT_RECORDED}
           </p>
           {phase === 'ended'

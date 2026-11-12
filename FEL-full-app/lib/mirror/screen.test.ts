@@ -1,3 +1,5 @@
+// CUE-REWRITE (2026-10-27) — test changed: copy rewrite. The check names and lines asserted below follow the rewritten
+// copy (lib/cue-style/names.ts, docs/CUE-AUDIT.md); what each assertion checks is unchanged.
 import { describe, expect, it } from 'vitest';
 import {
   FULL_SCREEN, MODIFIED_SCREEN, NOT_GRADED_LINE, NOT_READ_LINE, SCREEN_DISCLAIMER, TURN_CUE, cameraChecksRead, checkSlots, distinctChecks,
@@ -62,9 +64,9 @@ describe('the screen protocol', () => {
     expect(r.redFlags).toBe(0);
     expect(r.triage).toBe('proceed');
     expect(r.score).toBe(100);
-    expect(r.programming.join(' ')).toMatch(/train normally/i);
-    expect(r.programming.join(' ')).toMatch(/monthly|growth spurt/i);
-    expect(r.headline).toBe('Nothing flagged. That is a platform you can load.');
+    expect(r.programming.join(' ')).toMatch(/train as normal/i);
+    expect(r.programming.join(' ')).toMatch(/each month|growth spurt/i);
+    expect(r.headline).toBe('Nothing to work on. You are ready to train harder.');
   });
 
   it('weights a ONE-SIDED failure above a bilateral one — asymmetry beats severity', () => {
@@ -74,13 +76,13 @@ describe('the screen protocol', () => {
     expect(oneSided.asymmetries).toBe(1);
     expect(oneSided.score).toBeLessThan(bilateral.score!);
     expect(oneSided.headline).toMatch(/left/);
-    expect(oneSided.headline).toMatch(/one side off and one side fine/i);
+    expect(oneSided.headline).toMatch(/one side off matters more/i);
   });
 
   it('three red flags sends them to a person, and says what they can still do', () => {
     const r = scoreScreen('modified', [res('heelLine', 'fail', 'right'), res('kneeWindow', 'fail'), res('singleLeg', 'fail', 'right')]);
     expect(r.triage).toBe('seeSpecialist');
-    expect(r.programming.join(' ')).toMatch(/controlled intensity/i);
+    expect(r.programming.join(' ')).toMatch(/easy to medium effort/i);
     expect(r.programming.join(' ')).toMatch(/not medical clearance/i);
     expect(r.suggestions.length).toBeGreaterThan(0);     // it still tells them what to work on
   });
@@ -90,15 +92,15 @@ describe('the screen protocol', () => {
     expect(r.meaning.length).toBe(2);                    // both the fail and the borderline are explained
     expect(r.suggestions.length).toBe(1);                // only the fail gets prescribed work
     expect(r.meaning.join(' ')).toMatch(/pelvis|tilt/i);
-    expect(r.suggestions.join(' ')).toMatch(/single-leg|hip/i);
+    expect(r.suggestions.join(' ')).toMatch(/one-leg|single-leg|hip/i);
   });
 
   it('names the checks a camera could not take instead of quietly dropping them', () => {
     const r = scoreScreen('full', [res('heelLine', 'stable')]);
     // MIRROR-COACH P3 (2026-09-25): named as NOT SCORED (the athlete's answers and the coach's checks), not as "not
     // measured" camera checks — they were listed as missing on every screen, so no screen could ever be complete
-    expect(r.notScored).toEqual(['Rib angle and breath', 'Pelvic tilt (hands on the hip points)', 'Seated rotation, each side']);
-    expect(r.notMeasured.join(' ')).not.toMatch(/rib angle|pelvic tilt|rotation/i);
+    expect(r.notScored).toEqual(['Breathing', 'Pelvis tilt (coach checks)', 'Seated turn, each side']);
+    expect(r.notMeasured.join(' ')).not.toMatch(/breathing|pelvis tilt|seated turn/i);
     expect(r.ranAll).toBe(false);
   });
 
@@ -118,8 +120,8 @@ describe('a screen nothing graded is not a clean screen', () => {
     expect(empty.score).toBeNull();
     expect(empty.triage).toBe('notGraded');
     expect(empty.headline).toBe(NOT_GRADED_LINE);
-    expect(empty.headline).not.toMatch(/nothing flagged|platform you can load/i);
-    expect(empty.programming.join(' ')).not.toMatch(/train normally/i);
+    expect(empty.headline).not.toMatch(/nothing to work on|ready to train harder/i);
+    expect(empty.programming.join(' ')).not.toMatch(/train as normal/i);
   });
 
   it('says it was not graded, without telling the athlete to step back and retry', () => {
@@ -130,7 +132,7 @@ describe('a screen nothing graded is not a clean screen', () => {
   it('names every CAMERA check as not measured, and the breath station as not scored (MIRROR-COACH P3)', () => {
     expect(empty.notMeasured.length).toBe(new Set(MODIFIED_SCREEN.flatMap((s) => s.checks.filter((c) => c.source === 'camera').map((c) => c.id))).size);
     expect(empty.notMeasured).toHaveLength(6);
-    expect(empty.notScored).toEqual(['Rib angle and breath']);
+    expect(empty.notScored).toEqual(['Breathing']);
     expect(empty.ranAll).toBe(false);
   });
 
@@ -143,13 +145,13 @@ describe('a screen nothing graded is not a clean screen', () => {
     expect(one.score).toBe(100);
     expect(scoreLine(one)).toBe('Score 100 · from 1 of 6 checks read');
     expect(one.triage).toBe('partial');
-    expect(one.headline).not.toMatch(/nothing flagged|platform you can load/i);
+    expect(one.headline).not.toMatch(/^nothing to work on|ready to train harder/i);
   });
 });
 
 // MIRROR-COACH P1 review (2026-09-25): "at least one result" made a screen graded AND clear. scoreScreen('modified',
 // [{heelLine, stable}]) returned score 100, "Nothing flagged. That is a platform you can load.", "Train normally.", and
-// notMeasured ['Rib angle and breath'] — the five unmeasured camera checks silently dropped — and the coach read it as
+// notMeasured ['Breathing'] — the five unmeasured camera checks silently dropped — and the coach read it as
 // "Their last screen came back clear."
 describe('a partly graded screen is not a clear screen', () => {
   const one = scoreScreen('modified', [res('heelLine', 'stable')]);
@@ -164,14 +166,14 @@ describe('a partly graded screen is not a clear screen', () => {
     // MIRROR-COACH P3: out of the 7 CAMERA slots (P1 counted 8 with the breath slot, which no screen can fill).
     // CHANGED ON PURPOSE (P3 follow-up, 2026-09-28): out of the 6 camera CHECKS — the one count the panel's "Checks read",
     // the score line and the server's readableCameraChecks share (cameraChecksRead) — and the rest named as not read
-    expect(one.headline).toBe('Partly graded: 1 of 6 camera checks read and none flagged; not read: Knee window, Hip level, Shoulder height, Head float, Single-leg stance, 30 seconds a side — so this is not a clear screen.');
-    expect(one.headline).not.toMatch(/nothing flagged|platform you can load/i);
+    expect(one.headline).toBe('Partly read: 1 of 6 camera checks read, nothing to work on. Not read: Knees from the front, Hip level, Shoulder level, Head position, One-leg balance, 30 seconds a side. So this is not a full screen yet.');
+    expect(one.headline).not.toMatch(/^nothing to work on|ready to train harder/i);
     expect(one.programming).toEqual([]);
   });
 
   it('names EVERY camera check that did not come back', () => {
     expect(one.notMeasured).toEqual([
-      'Knee window', 'Hip level', 'Shoulder height', 'Head float', 'Single-leg stance, 30 seconds a side',
+      'Knees from the front', 'Hip level', 'Shoulder level', 'Head position', 'One-leg balance, 30 seconds a side',
     ]);
     // the same list on an ungraded screen: every camera check (MIRROR-COACH P3: the breath station is in notScored)
     expect(scoreScreen('modified', []).notMeasured).toHaveLength(6);
@@ -181,7 +183,7 @@ describe('a partly graded screen is not a clear screen', () => {
     const noRightLeg = complete('modified').filter((r) => !(r.checkId === 'singleLeg' && r.side === 'right'));
     expect(isCompleteScreen('modified', noRightLeg)).toBe(false);
     expect(scoreScreen('modified', noRightLeg).triage).toBe('partial');
-    expect(scoreScreen('modified', noRightLeg).notMeasured).toEqual(['Single-leg stance, 30 seconds a side']);
+    expect(scoreScreen('modified', noRightLeg).notMeasured).toEqual(['One-leg balance, 30 seconds a side']);
     expect(isCompleteScreen('modified', complete('modified'))).toBe(true);
     // MIRROR-COACH P3: the full screen's extra stations are coach checks, never scored, so its camera slots are the
     // modified screen's (P1: false, when the coach and breath slots counted and no screen could ever fill them)
@@ -195,7 +197,7 @@ describe('a partly graded screen is not a clear screen', () => {
     expect(r.score).toBe(78);
     expect(scoreLine(r)).toBe('Score 78 · from 2 of 6 checks read');
     // P3 review (2026-09-26): a level flag's side is the HIGHER hip, and the headline says so
-    expect(r.headline).toBe('Hip level was flagged for a closer look: the left hip read higher.');
+    expect(r.headline).toBe('Hip level: worth working on. Your left hip sat higher.');
     const three = scoreScreen('modified', [res('heelLine', 'fail', 'right'), res('kneeWindow', 'fail'), res('singleLeg', 'fail', 'right')]);
     expect(three.triage).toBe('seeSpecialist');
     // was null: 100 − 22 (heel, one-sided) − 15 (knee, no side) − 15 (the right leg flagged, the LEFT leg not read: not
@@ -203,7 +205,7 @@ describe('a partly graded screen is not a clear screen', () => {
     // leg as fine) over the 3 checks read
     expect(three.score).toBe(48);
     expect(three.asymmetries).toBe(1);                   // the heel only
-    expect(three.notRead).toEqual(['Hip level', 'Shoulder height', 'Head float', 'Single-leg stance, 30 seconds a side (left leg)']);
+    expect(three.notRead).toEqual(['Hip level', 'Shoulder level', 'Head position', 'One-leg balance, 30 seconds a side (left leg)']);
   });
 });
 
@@ -219,9 +221,9 @@ describe('the score is over the camera checks that were read, and always says so
 
   it('the live proof\'s screen: Score 78 · from 5 of 6 checks read, the head float listed as not read — triage and headline unchanged', () => {
     const s = scoreScreen('modified', live);
-    expect(s).toMatchObject({ graded: true, score: 78, readCount: 5, totalCount: 6, notRead: ['Head float'], notMeasured: ['Head float'] });
+    expect(s).toMatchObject({ graded: true, score: 78, readCount: 5, totalCount: 6, notRead: ['Head position'], notMeasured: ['Head position'] });
     expect(scoreLine(s)).toBe('Score 78 · from 5 of 6 checks read');
-    expect(notReadLines(s)).toEqual(['Head float · not read']);
+    expect(notReadLines(s)).toEqual(['Head position · not read']);
     expect(s).toMatchObject({ movementFlags: 1, asymmetries: 1, triage: 'addressFirst', ranAll: false });
   });
 
@@ -264,12 +266,12 @@ describe('the score is over the camera checks that were read, and always says so
     const noRightLeg = complete('modified').filter((r) => !(r.checkId === 'singleLeg' && r.side === 'right'));
     const s = scoreScreen('modified', noRightLeg);
     expect(s).toMatchObject({ readCount: 6, totalCount: 6, score: 100, triage: 'partial', legsNotRead: 1 });
-    expect(s.notRead).toEqual(['Single-leg stance, 30 seconds a side (right leg)']);
-    expect(notReadLines(s)).toEqual(['Single-leg stance, 30 seconds a side (right leg) · not read']);
-    expect(s.headline).toMatch(/; not read: Single-leg stance, 30 seconds a side \(right leg\) — so this is not a clear screen\.$/);
+    expect(s.notRead).toEqual(['One-leg balance, 30 seconds a side (right leg)']);
+    expect(notReadLines(s)).toEqual(['One-leg balance, 30 seconds a side (right leg) · not read']);
+    expect(s.headline).toMatch(/ Not read: One-leg balance, 30 seconds a side \(right leg\)\. So this is not a full screen yet\.$/);
     // CHANGED ON PURPOSE (the follow-up's review, 2026-09-28): the count says the missing leg beside "6 of 6"
     expect(scoreLine(s)).toBe('Score 100 · from 6 of 6 checks read, one leg not read');
-    expect(s.headline).toBe('Partly graded: 6 of 6 camera checks read, one leg not read, and none flagged; not read: Single-leg stance, 30 seconds a side (right leg) — so this is not a clear screen.');
+    expect(s.headline).toBe('Partly read: 6 of 6 camera checks read, one leg not read, nothing to work on. Not read: One-leg balance, 30 seconds a side (right leg). So this is not a full screen yet.');
   });
 
   it('the payout rule is unchanged: a score is shown, and still only ≥ 3 checks from ≥ 2 stations pays', () => {
@@ -342,8 +344,8 @@ describe('the variant a screen is stored as', () => {
     const full = scoreScreen('full', all), mod = scoreScreen('modified', all);
     expect({ ...full, screen: 'x', notScored: [] }).toEqual({ ...mod, screen: 'x', notScored: [] });
     expect(full.triage).toBe('proceed');
-    expect(full.notScored).toEqual(['Rib angle and breath', 'Pelvic tilt (hands on the hip points)', 'Seated rotation, each side']);
-    expect(mod.notScored).toEqual(['Rib angle and breath']);
+    expect(full.notScored).toEqual(['Breathing', 'Pelvis tilt (coach checks)', 'Seated turn, each side']);
+    expect(mod.notScored).toEqual(['Breathing']);
   });
 });
 
@@ -370,7 +372,7 @@ describe('only camera checks are scored', () => {
 
   it('a sided flag is worded as a closer look, never "failed"', () => {
     const r = scoreScreen('modified', complete('modified', [res('kneeWindow', 'fail', 'left')]));
-    expect(r.headline).toMatch(/^Knee window was flagged for a closer look on the left knee\. One side off and one side fine/);
+    expect(r.headline).toMatch(/^Knees from the front: worth working on, on the left knee\. One side off matters more/);
     expect(r.headline).not.toMatch(/failed/i);
   });
 });
@@ -384,13 +386,13 @@ describe('a check flagged on every slot is ONE bilateral finding; the side a hea
     expect(r.asymmetries).toBe(0);
     expect(r.score).toBe(85);
     expect(r.triage).toBe('addressFirst');
-    expect(r.headline).toBe('1 flag worth clearing before you add intensity.');
+    expect(r.headline).toBe('1 thing to work on before you train harder.');
     expect(r.headline).not.toMatch(/one side fine|left|right/i);
     expect(r.meaning).toHaveLength(1);                   // one explanation for one finding
     // one leg only: one ONE-SIDED finding, named by its leg
     const one = scoreScreen('modified', complete('modified', [res('singleLeg', 'stable', 'left'), res('singleLeg', 'fail', 'right')]));
     expect(one).toMatchObject({ movementFlags: 1, asymmetries: 1, score: 78 });
-    expect(one.headline).toMatch(/^Single-leg stance, 30 seconds a side was flagged for a closer look on the right leg\. One side off and one side fine/);
+    expect(one.headline).toMatch(/^One-leg balance, 30 seconds a side: worth working on, on the right leg\. One side off matters more/);
   });
 
   it('both legs plus one more flag is two findings, not three — addressFirst, not seeSpecialist', () => {
@@ -398,12 +400,12 @@ describe('a check flagged on every slot is ONE bilateral finding; the side a hea
     expect(r.movementFlags).toBe(2);
     expect(r.triage).toBe('addressFirst');
     // the one-sided finding leads the headline, worded as what the side means
-    expect(r.headline).toBe('Hip level was flagged for a closer look: the right hip read higher.');
+    expect(r.headline).toBe('Hip level: worth working on. Your right hip sat higher.');
   });
 
   it('a shoulder-level flag names the higher shoulder, without the one-side-off line', () => {
     const r = scoreScreen('modified', complete('modified', [res('shoulderLevel', 'fail', 'left')]));
-    expect(r.headline).toBe('Shoulder height was flagged for a closer look: the left shoulder read higher.');
+    expect(r.headline).toBe('Shoulder level: worth working on. Your left shoulder sat higher.');
     expect(r.asymmetries).toBe(1);
   });
 
@@ -482,10 +484,10 @@ describe('a two-sided check read on one leg', () => {
   it('left leg flagged, right leg NOT READ: a finding that names its leg — not one-sided, no "one side fine", 15 not 22', () => {
     const s = scoreScreen('modified', [...base, leftFlag]);
     expect(s).toMatchObject({ movementFlags: 1, asymmetries: 0, score: 85, triage: 'addressFirst', legsNotRead: 1 });
-    expect(s.headline).toBe('Single-leg stance, 30 seconds a side was flagged for a closer look on the left leg; the right leg was not read.');
+    expect(s.headline).toBe('One-leg balance, 30 seconds a side: worth working on, on the left leg. The right leg was not read.');
     expect(s.headline).not.toMatch(/one side fine/i);
     expect(scoreLine(s)).toBe('Score 85 · from 6 of 6 checks read, one leg not read');
-    expect(notReadLines(s)).toEqual(['Single-leg stance, 30 seconds a side (right leg) · not read']);
+    expect(notReadLines(s)).toEqual(['One-leg balance, 30 seconds a side (right leg) · not read']);
   });
 
   it('the unread leg no longer scores what a pass scores: read clean it is one-sided (78), read flagged it is bilateral (85)', () => {
@@ -493,7 +495,7 @@ describe('a two-sided check read on one leg', () => {
     const pass = scoreScreen('modified', [...base, leftFlag, res('singleLeg', 'stable', 'right')]);
     const fail = scoreScreen('modified', [...base, leftFlag, res('singleLeg', 'fail', 'right')]);
     expect(pass).toMatchObject({ score: 78, asymmetries: 1 });
-    expect(pass.headline).toMatch(/one side off and one side fine/i);
+    expect(pass.headline).toMatch(/one side off matters more/i);
     expect(fail).toMatchObject({ score: 85, asymmetries: 0 });
     expect(unread.score).not.toBe(pass.score);            // it was 78: the unread leg earned a pass's score
     expect(unread.score).toBe(fail.score);                // no side penalty either way until the other leg is read
@@ -504,7 +506,7 @@ describe('a two-sided check read on one leg', () => {
   it('a one-sided flag elsewhere still leads the headline; the unread leg is counted, not hidden', () => {
     const s = scoreScreen('modified', [res('heelLine', 'fail', 'left'), leftFlag]);
     expect(s).toMatchObject({ movementFlags: 2, asymmetries: 1, score: 100 - 22 - 15, legsNotRead: 1 });
-    expect(s.headline).toMatch(/^Heel line was flagged for a closer look on the left heel/);
+    expect(s.headline).toMatch(/^Heels from behind: worth working on, on the left heel/);
     expect(scoreLine(s)).toBe('Score 63 · from 2 of 6 checks read, one leg not read');
   });
 
@@ -512,6 +514,6 @@ describe('a two-sided check read on one leg', () => {
     const s = scoreScreen('modified', base);
     expect(s.legsNotRead).toBeUndefined();
     expect(scoreLine(s)).toBe('Score 100 · from 5 of 6 checks read');
-    expect(s.notRead).toEqual(['Single-leg stance, 30 seconds a side']);
+    expect(s.notRead).toEqual(['One-leg balance, 30 seconds a side']);
   });
 });

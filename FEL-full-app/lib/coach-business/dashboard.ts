@@ -2,15 +2,18 @@
 // profile save. Reads by the coach's own id only.
 import { prisma } from '@/lib/db';
 import { isMissingTable } from '@/lib/coach-store/gate';
-import { coachProPriceCents, isCoachMarketplaceEnabled } from './config';
-import { paymentsLive } from './connect';
+import { coachProPriceCents, isCoachMarketplaceEnabled, platformFeePolicy } from './config';
+import { connectGate, needsStripeSetup, paymentsLive } from './connect';
+import { platformFeeLabel } from './fees';
+import { coachTermsView, type CoachTermsView } from '@/lib/payments/terms';
 import { cleanGoals, cleanSports, type MarketGoal, type Sport } from './market';
 import { spotsLeft, type CoachPackage } from './packages';
 import { coachPlanStatus, type CoachPlanStatus } from './planServer';
 import { cleanProfileText, slugFromName, slugOk } from './profile';
 import {
-  applicationsFor, businessReady, connectFor, highlightsFor, marketProfile, packagesFor, saveMarketProfile, salesForCoach, takenFor,
-  type ApplicationView, type CoachSaleView, type ConnectRow, type RawDb,
+  applicationsFor, businessReady, connectFor, connectRequirementsDue, disputesForCoach, highlightsFor, marketProfile, packagesFor, saveMarketProfile,
+  salesForCoach, takenFor,
+  type ApplicationView, type CoachDisputeView, type CoachSaleView, type ConnectRow, type RawDb,
 } from './store';
 import { planDb } from './server';
 
@@ -27,7 +30,15 @@ export interface Dashboard {
   profile: DashboardProfile | null;
   market: { listed: boolean; acceptingClients: boolean; sports: Sport[]; goals: MarketGoal[] };
   packages: (CoachPackage & { spotsLeft: number | null })[];
-  connect: Pick<ConnectRow, 'chargesEnabled' | 'payoutsEnabled' | 'detailsSubmitted' | 'livemode'> | null;
+  connect: (Pick<ConnectRow, 'chargesEnabled' | 'payoutsEnabled' | 'detailsSubmitted' | 'livemode'> & { requirementsDue: boolean }) | null;
+  /** PAYMENTS-READY: Stripe still needs something from the coach (no account, details, charges, payouts, requirements). */
+  needsStripeSetup: boolean;
+  /** PAYMENTS-READY: the coach terms the Connect tick box names (version to send back; link once they exist). */
+  coachTerms: CoachTermsView;
+  /** PAYMENTS-READY: FEL's fee for this coach, as a sentence fragment ("5%"), from the owner's fee settings. */
+  feeLabel: string;
+  /** PAYMENTS-READY: disputes on this coach's sales, newest first (the in-app notice). */
+  disputes: CoachDisputeView[];
   sales: CoachSaleView[];
   applications: ApplicationView[];
   highlights: { id: string; text: string; state: 'waiting' | 'approved' | 'withdrawn' }[];
@@ -48,21 +59,29 @@ async function instructorFor(userId: string): Promise<DashboardProfile | null> {
 
 export async function loadDashboard(db: RawDb, userId: string, now: Date = new Date()): Promise<Dashboard> {
   const [plan, profile, ready] = await Promise.all([coachPlanStatus(planDb(), userId), instructorFor(userId), businessReady(db)]);
+  const gate = connectGate();
   const base: Dashboard = {
     ready, plan, proPriceCents: coachProPriceCents(), paymentsLive: paymentsLive(), marketplaceOn: isCoachMarketplaceEnabled(), profile,
     market: { listed: false, acceptingClients: true, sports: [], goals: [] },
-    packages: [], connect: null, sales: [], applications: [], highlights: [],
+    packages: [], connect: null, needsStripeSetup: true, coachTerms: coachTermsView(gate.ok && gate.live),
+    feeLabel: platformFeeLabel(platformFeePolicy(), plan.plan), disputes: [], sales: [], applications: [], highlights: [],
   };
   if (!ready) return base;
-  const [market, packages, connect, sales, applications, highlights] = await Promise.all([
+  const [market, packages, connect, sales, applications, highlights, requirementsDue, disputes] = await Promise.all([
     marketProfile(db, userId), packagesFor(db, userId), connectFor(db, userId), salesForCoach(db, userId), applicationsFor(db, userId), highlightsFor(db, userId),
+    connectRequirementsDue(db, userId), disputesForCoach(db, userId),
   ]);
+  const connectView = connect
+    ? { chargesEnabled: !!connect.chargesEnabled, payoutsEnabled: !!connect.payoutsEnabled, detailsSubmitted: !!connect.detailsSubmitted, livemode: !!connect.livemode, requirementsDue }
+    : null;
   const taken = await takenFor(db, packages.map((p) => p.id), now);
   return {
     ...base,
     market: market ? { listed: !!market.listed, acceptingClients: !!market.acceptingClients, sports: cleanSports(market.sports), goals: cleanGoals(market.goals) } : base.market,
     packages: packages.map((p) => ({ ...p, spotsLeft: spotsLeft(p.capacity, taken.get(p.id) ?? 0) })),
-    connect: connect ? { chargesEnabled: !!connect.chargesEnabled, payoutsEnabled: !!connect.payoutsEnabled, detailsSubmitted: !!connect.detailsSubmitted, livemode: !!connect.livemode } : null,
+    connect: connectView,
+    needsStripeSetup: needsStripeSetup(connectView),
+    disputes,
     sales,
     applications,
     highlights: highlights.map((h) => ({ id: h.id, text: h.text, state: h.revokedAt ? 'withdrawn' : h.consentAt ? 'approved' : 'waiting' })),

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { startTransition, useEffect, useRef, useState } from 'react';   // EVERY-SCREEN P10: the start renders in a transition, so the tap paints first
 import type { GameProps } from '@/components/games/game-shell';
 import {
   createShake, triggerShake, updateShake, applyShake,
@@ -354,14 +354,14 @@ export default function GlitchBossGame({ grade, prq, onEnd, gamepad }: GameProps
           <div className="absolute inset-0 flex flex-col items-center justify-center rounded-lg bg-black/80 backdrop-blur-sm">
             <h2 className="fel-heading text-4xl font-bold text-[#FF3366]">THE VERTIGO</h2>
             <p className="mt-1 font-mono text-xs text-[#A855F7]">GLITCH BOSS · CHAPTER 1</p>
-            <p className="mt-3 max-w-md text-center text-sm text-white/60">
+            <p className="mt-3 max-w-md text-center text-base text-white/60">
               A manifestation of your weakest stat. Three phases: dodge projectiles, land combo strikes in timing windows, then execute the aerial QTE finisher. The boss is stronger when your PRQ is lower.
             </p>
             <div className="mt-4 grid grid-cols-2 gap-x-8 gap-y-1 font-mono text-xs text-white/55">
               <span>SPACE / W — Jump (dodge)</span><span>J / K — Strike (combo)</span>
               <span>QTE keys flash on screen</span><span>Boss strength: ~{Math.round(Math.max(10, 90 - prq * 0.8))}</span>
             </div>
-            <button onClick={() => setStarted(true)} className="fel-heading mt-6 rounded-md bg-[#FF3366] px-10 py-3 text-xl font-bold text-white transition-all hover:shadow-[0_0_28px_rgba(255,51,102,0.5)]">
+            <button onClick={() => startTransition(() => setStarted(true))} className="fel-heading mt-6 rounded-md bg-[#FF3366] px-10 py-3 text-xl font-bold text-white transition-all hover:shadow-[0_0_28px_rgba(255,51,102,0.5)]">
               FACE THE GLITCH
             </button>
           </div>

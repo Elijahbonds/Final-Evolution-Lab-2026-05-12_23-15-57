@@ -19,7 +19,7 @@ export default async function SignaturePage() {
         <h1 className="fel-heading text-3xl font-bold text-white">
           SIGNATURE <span className="text-[#FFD700]">CHALLENGE</span>
         </h1>
-        <p className="mt-1 font-mono text-xs text-white/50">
+        <p className="mt-1 font-sans text-[16px] leading-[1.5] text-white/60">
           Three seeded hoops challenges — same for every athlete this week. One shot a day. Climb the board.
         </p>
         <SignatureView />

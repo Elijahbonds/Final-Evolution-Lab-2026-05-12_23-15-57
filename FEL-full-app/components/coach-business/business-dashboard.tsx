@@ -2,6 +2,7 @@
 // COACH-BUSINESS: /coach/business — the coach runs their business here: Free or Pro, payments (Stripe Connect), the
 // public profile and marketplace opt-in, packages, sales and refunds, applications, and client-approved results.
 // Every number and switch shown comes from GET /api/coach/business; nothing is decided in the browser.
+import { BusinessTodo } from '@/components/coach-tools/business-todo';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import type { Dashboard } from '@/lib/coach-business/dashboard';
@@ -63,8 +64,11 @@ export function BusinessDashboard({ api = DASHBOARD_API }: { api?: string }) {
       </header>
       {note ? <p role="status" className="rounded-xl border border-white/10 bg-white/[0.05] px-3 py-2 text-sm">{note}</p> : null}
       {!d.ready ? <p className={card}>Packages, payments and the marketplace are not set up yet. Your profile still saves.</p> : null}
+      {/* COACH-TOOLS-EASY (2026-11-02): what is left, first; each a jump to its card below (no card changed) */}
+      <BusinessTodo d={d} />
       <PlanCard d={d} api={api} onNote={setNote} />
       <PaymentsCard d={d} api={api} onNote={setNote} />
+      {d.ready && d.disputes?.length ? <DisputesCard d={d} api={api} onNote={setNote} /> : null}
       <ProfileCard d={d} api={api} onSaved={load} onNote={setNote} />
       {d.ready ? <PackagesCard d={d} api={api} onSaved={load} onNote={setNote} /> : null}
       {d.ready && d.sales.length ? <SalesCard d={d} api={api} onSaved={load} onNote={setNote} /> : null}
@@ -94,7 +98,7 @@ function PlanCard({ d, api, onNote }: CardProps) {
       ) : null}
       <ul className="mt-3 space-y-1 text-sm text-white/80">
         {PRO_FEATURES.map((f) => (
-          <li key={f} className="flex gap-2"><span aria-hidden="true" className={d.plan.plan === 'pro' || !d.plan.gatesOn ? 'text-cyan-300' : 'text-white/30'}>✓</span><span>{PRO_FEATURE_LABELS[f]}</span></li>
+          <li key={f} className="flex gap-2"><span aria-hidden="true" className={d.plan.plan === 'pro' || !d.plan.gatesOn ? 'text-cyan-300' : 'text-white/50'}>✓</span><span>{PRO_FEATURE_LABELS[f]}</span></li>
         ))}
       </ul>
       {d.plan.plan === 'pro' ? null : !d.plan.gatesOn ? (
@@ -106,32 +110,83 @@ function PlanCard({ d, api, onNote }: CardProps) {
   );
 }
 
+/**
+ * PAYMENTS-READY: the coach's tick on the coach terms, required before Stripe onboarding opens. While the terms are not
+ * written (test mode only) the box says so instead of linking; the server checks the same version (409 terms_required).
+ */
+function CoachTermsTick({ d, agreed, onChange }: { d: Dashboard; agreed: boolean; onChange: (v: boolean) => void }) {
+  const t = d.coachTerms;
+  return (
+    <label className="mt-3 flex items-start gap-2 text-sm text-white/80" data-coach-terms>
+      <input type="checkbox" className="mt-0.5 h-5 w-5 shrink-0" checked={agreed} onChange={(e) => onChange(e.target.checked)} />
+      <span>
+        I agree to the{' '}
+        {t?.href ? <a className="font-bold text-cyan-300 underline" href={t.href} target="_blank" rel="noopener noreferrer">coach terms and payout terms</a> : 'coach terms and payout terms'}
+        {t?.signed ? '.' : ' (not published yet; test mode only).'}
+      </span>
+    </label>
+  );
+}
+
 function PaymentsCard({ d, api, onNote }: CardProps) {
   const [busy, setBusy] = useState(false);
-  const go = async (path: string) => {
+  const [agreed, setAgreed] = useState(false);
+  const go = async (path: string, body?: unknown) => {
     setBusy(true);
-    const r = await call(`${api}${path}`, 'POST');
+    const r = await call(`${api}${path}`, 'POST', body);
     setBusy(false);
     if (r.ok && typeof r.json.url === 'string') { window.location.href = r.json.url; return; }
+    if (r.status === 409 && r.json.error === 'terms_required') { setAgreed(false); onNote('The coach terms changed. Tick the box again.'); return; }
     onNote(said(r.json, 'Payments could not open.'));
   };
+  const onboard = () => go('/connect', { termsAccepted: true, termsVersion: d.coachTerms?.version ?? null });
   const c = d.connect;
+  const fee = d.feeLabel ?? '5%';
+  const setupUnfinished = !c || !c.detailsSubmitted || !c.chargesEnabled;
   return (
     <section className={card} aria-labelledby="pay-h" data-payments={d.paymentsLive ? 'live' : 'off'}>
       <h2 id="pay-h" className={h2}>Payments</h2>
       {!d.paymentsLive ? (
-        <p className="mt-1 text-sm text-white/70" data-payments-not-live>{PAYMENTS_NOT_LIVE} Clients apply from your page and you reply. When payments open, clients pay you directly and FEL keeps 5%.</p>
-      ) : !c || !c.detailsSubmitted || !c.chargesEnabled ? (
+        <p className="mt-1 text-base text-white/70" data-payments-not-live>{PAYMENTS_NOT_LIVE} Clients apply from your page and you reply. When payments open, clients pay you directly and FEL keeps {fee}.</p>
+      ) : setupUnfinished ? (
         <>
-          <p className="mt-1 text-sm text-white/70">Clients pay you through Stripe. Money goes to your own Stripe account and FEL keeps 5% of each sale.</p>
-          <button type="button" className={`${btn} mt-3`} disabled={busy || !d.ready} onClick={() => go('/connect')}>{c ? 'Finish setting up payments' : 'Set up payments'}</button>
+          {c ? <p className="mt-1 text-sm font-bold text-amber-200" data-finish-stripe>Finish your Stripe setup to take payments.</p> : null}
+          <p className="mt-1 text-sm text-white/70">Clients pay you through Stripe. Money goes to your own Stripe account and FEL keeps {fee} of each sale.</p>
+          <CoachTermsTick d={d} agreed={agreed} onChange={setAgreed} />
+          <button type="button" className={`${btn} mt-3`} disabled={busy || !d.ready || !agreed} onClick={onboard}>{c ? 'Finish setting up payments' : 'Set up payments'}</button>
         </>
       ) : (
         <>
           <p className="mt-1 text-sm text-emerald-300">Payments are on.{c.payoutsEnabled ? ' Payouts go to your bank on Stripe’s schedule.' : ' Add a bank account in Stripe to get paid out.'}</p>
+          {d.needsStripeSetup ? (
+            <>
+              <p className="mt-2 text-sm font-bold text-amber-200" data-finish-stripe>Finish your Stripe setup: Stripe needs a few more details from you.</p>
+              <CoachTermsTick d={d} agreed={agreed} onChange={setAgreed} />
+              <button type="button" className={`${btn} mt-3`} disabled={busy || !agreed} onClick={onboard}>Finish your Stripe setup</button>
+            </>
+          ) : null}
           <button type="button" className={`${ghost} mt-3`} disabled={busy} onClick={() => go('/connect/dashboard')}>Open Stripe (balance and payouts)</button>
         </>
       )}
+    </section>
+  );
+}
+
+const DISPUTE_STATE: Record<string, string> = { OPEN: 'under review', WON: 'closed in your favour', LOST: 'lost' };
+
+/** PAYMENTS-READY: the in-app notice of a client's dispute on a sale. Product copy only; no policy. */
+function DisputesCard({ d }: CardProps) {
+  return (
+    <section className={card} aria-labelledby="disp-h" data-disputes>
+      <h2 id="disp-h" className={h2}>Disputed payments</h2>
+      <ul className="mt-3 space-y-2 text-sm">
+        {d.disputes.map((x) => (
+          <li key={x.id} className="rounded-xl border border-amber-200/30 p-3" data-dispute={x.outcome}>
+            <p className="font-bold">{x.title}{x.livemode ? '' : ' · test'}</p>
+            <p className="text-xs text-white/60">A client disputed {money(x.amountCents)} with their bank on {x.createdAt.slice(0, 10)} · {DISPUTE_STATE[x.outcome] ?? x.outcome.toLowerCase()}</p>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
@@ -225,7 +280,14 @@ function PackagesCard({ d, api, onSaved, onNote }: CardProps) {
               <p className="font-bold">{k.title}</p>
               <p className="text-xs text-white/50">{PACKAGE_KIND_LABELS[k.kind]} · {packagePriceLabel(k.priceCents, k.kind)}{k.capacity !== null ? ` · ${k.spotsLeft} of ${k.capacity} open` : ''}{k.active ? '' : ' · off your page'}</p>
             </div>
-            <button type="button" className={ghost} onClick={() => setActive(k.id, !k.active)}>{k.active ? 'Take off page' : 'Put back'}</button>
+            <div className="flex flex-wrap gap-2">
+              {/* COACH-DELIVERY COA-12: a team fee goes to the roster's program threads (adults; the server says who) */}
+              {k.kind === 'team_fee' && k.active ? <button type="button" className={ghost} data-team-fee-send onClick={async () => {
+                const r = await call(`${api}/team-fee`, 'POST', { packageId: k.id, scope: 'roster' });
+                onNote(r.ok ? `Sent to ${r.json.sent ?? 0} athlete${r.json.sent === 1 ? '' : 's'}${r.json.skippedMinor ? `; ${r.json.skippedMinor} under 18 skipped (a parent pays from the link)` : ''}.` : said(r.json, 'Not sent.'));
+              }}>Send to roster</button> : null}
+              <button type="button" className={ghost} onClick={() => setActive(k.id, !k.active)}>{k.kind === 'team_fee' ? (k.active ? 'Close' : 'Reopen') : k.active ? 'Take off page' : 'Put back'}</button>
+            </div>
           </li>
         ))}
       </ul>
@@ -270,9 +332,23 @@ function SalesCard({ d, api, onSaved, onNote }: CardProps) {
             <li key={s.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/10 p-3">
               <div className="min-w-0">
                 <p className="font-bold">{s.title}{s.livemode ? '' : ' · test'}</p>
-                <p className="text-xs text-white/50">{money(s.amountCents)} · FEL 5% {money(s.feeCents)}{s.refundedCents ? ` · refunded ${money(s.refundedCents)}` : ''} · you {money(Math.max(0, net))} · {s.status.toLowerCase().replace('_', ' ')}</p>
+                <p className="text-xs text-white/50">{money(s.amountCents)} · FEL fee {money(s.feeCents)}{s.refundedCents ? ` · refunded ${money(s.refundedCents)}` : ''} · you {money(Math.max(0, net))} · {s.status.toLowerCase().replace('_', ' ')}</p>
               </div>
               {refundable || cancellable ? <button type="button" className={ghost} disabled={busy === s.id} onClick={() => refund(s.id)}>{cancellable ? 'Cancel' : 'Refund'}</button> : null}
+              {/* COACH-DELIVERY COA-11: move running monthly coaching to another monthly package (upgrade prorated; downgrade at renewal) */}
+              {cancellable && d.packages.some((k) => k.kind === 'monthly' && k.active && k.id !== s.packageId) ? (
+                <select aria-label="Change package" className={`${input} max-w-[12rem]`} value="" disabled={busy === s.id} data-sale-change onChange={async (e) => {
+                  if (!e.target.value) return;
+                  setBusy(s.id);
+                  const r = await call(`${api}/sales/${s.id}/change`, 'POST', { packageId: e.target.value });
+                  setBusy(null);
+                  onNote(r.ok ? (r.json.prorated ? 'Changed. The difference for this month is on the next invoice.' : 'Changed. The new price starts at the next renewal.') : said(r.json, 'The change did not go through.'));
+                  await onSaved?.();
+                }}>
+                  <option value="">Change package…</option>
+                  {d.packages.filter((k) => k.kind === 'monthly' && k.active && k.id !== s.packageId).map((k) => <option key={k.id} value={k.id}>{k.title} · {packagePriceLabel(k.priceCents, k.kind)}</option>)}
+                </select>
+              ) : null}
             </li>
           );
         })}

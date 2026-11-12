@@ -46,7 +46,7 @@ export default function DetailsStep({ draft, ctx, onDraft }: { draft: FlowDraft;
               <span className="mb-1 block text-xs uppercase tracking-wide text-neutral-400">Loop for menus (optional)</span>
               <div className="flex flex-wrap items-center gap-2">
                 <button className={chip(false)} onClick={() => setArt({ loop: { startSec: 0, endSec: Math.min(art.durationSec!, 30) } })}>Loop the first 30 s</button>
-                <span className="text-xs text-neutral-500">Without a loop, menus play the whole track and fade.</span>
+                <span className="text-xs text-neutral-400">Without a loop, menus play the whole track and fade.</span>
               </div>
             </div>
           )}
@@ -59,7 +59,7 @@ export default function DetailsStep({ draft, ctx, onDraft }: { draft: FlowDraft;
               <input type="number" min={1} step={0.1} value={art.loop.endSec} aria-label="loop end, seconds"
                 onChange={(e) => setArt({ loop: { ...art.loop!, endSec: Math.min(art.durationSec ?? 240, +e.target.value) } })} className="w-20 rounded bg-neutral-900 px-2 py-1" />
               <span>s</span>
-              {art.origin === 'upload' && <button className="text-xs text-neutral-500 underline" onClick={() => { const { loop: _drop, ...rest } = art; onDraft({ art: rest as ArtPayloadBody }); }}>no loop</button>}
+              {art.origin === 'upload' && <button className="text-xs text-neutral-400 underline" onClick={() => { const { loop: _drop, ...rest } = art; onDraft({ art: rest as ArtPayloadBody }); }}>no loop</button>}
             </div>
           )}
           <label className="block">
@@ -99,7 +99,7 @@ export default function DetailsStep({ draft, ctx, onDraft }: { draft: FlowDraft;
               return <button key={a} data-qa={`allergen-${a}`} className={chip(on)} onClick={() => setArt({ allergens: on ? (art.allergens ?? []).filter((x) => x !== a) : CARD_ALLERGENS.filter((x) => x === a || (art.allergens ?? []).includes(x)) })}>{ALLERGEN_LABEL[a]}</button>;
             })}
           </div>
-          <p className="mt-1 text-[11px] text-neutral-500">Chef-declared from the ingredients, not tested. Players check their own labels.</p>
+          <p className="mt-1 text-[12px] text-neutral-400">Chef-declared from the ingredients, not tested. Players check their own labels.</p>
         </div>
       )}
 
@@ -143,7 +143,7 @@ export default function DetailsStep({ draft, ctx, onDraft }: { draft: FlowDraft;
         <input type="checkbox" checked={draft.rightsTicked} onChange={(e) => onDraft({ rightsTicked: e.target.checked })} className="mt-1 h-5 w-5 shrink-0" />
         <span className="text-sm text-neutral-200">
           {rights.text}
-          <span className="mt-1 block text-[10px] uppercase tracking-wide text-neutral-500">Rights statement {rights.version}</span>
+          <span className="mt-1 block text-[12px] uppercase tracking-wide text-neutral-400">Rights statement {rights.version}</span>
         </span>
       </label>
     </div>

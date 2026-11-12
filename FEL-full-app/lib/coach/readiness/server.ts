@@ -27,7 +27,8 @@ import {
   type RawDb, type StoredCheck,
 } from './store';
 import { ALERT_WINDOW_DAYS, BASELINE_WINDOW_DAYS, MIN_JUMPS, READINESS_TODAY_HOURS, TREND_CHECKS, TWICE_GAP_DAYS } from './thresholds';
-import type { DayJumps, PriorCheck, ReadinessFacts, RuleScope, TodayReadiness } from './types';
+import type { DayJumps, PriorCheck, ReadinessFacts, ReadinessRule, RuleScope, TodayReadiness } from './types';
+import { barSpeedToday, sourceAlerts, surveyToday, type SourceToday } from './sources';
 import { readDay, viewOf, type CoachRuleCtx, type ReadinessView, type TrendPoint } from './view';
 
 const DAY_MS = 86_400_000;
@@ -171,16 +172,28 @@ export async function deleteHistory(db: ReadinessDb, userId: string, now: Date =
  */
 export async function todayReadiness(db: ReadinessDb, userId: string, coachId: string, now: Date = new Date()): Promise<TodayReadiness | null> {
   const nowMs = now.getTime();
+  const ctx = (await coachRules(db, userId, nowMs)).find((c) => c.coachId === coachId);
+  if (!ctx) return null;
+  // COACH-DELIVERY (2026-10-26): today's check may be the jump check, a warm-up bar-speed set or the survey
+  // (./sources.ts); the newest of today's stands, read under this coach's rule either way
+  const [jump, bar, survey] = await Promise.all([jumpToday(db, userId, ctx, now), barSpeedToday(db, userId, ctx, now), surveyToday(db, userId, ctx, now)]);
+  const newest = [jump, bar, survey].filter((x): x is SourceToday => !!x).sort((a, b) => b.at - a.at)[0];
+  return newest?.r ?? null;
+}
+
+async function jumpToday(db: ReadinessDb, userId: string, ctx: CoachRuleCtx, now: Date): Promise<SourceToday | null> {
+  const nowMs = now.getTime();
   const recent = await checksFor(db, userId, new Date(nowMs - (TWICE_GAP_DAYS + 1) * DAY_MS), 8, nowMs);
   if (!recent?.length) return null;
   const today = recent.find((c) => Date.parse(c.createdAt) >= nowMs - READINESS_TODAY_HOURS * HOUR_MS && isPlausibleToday(c.day, now));
   if (!today) return null;
-  const ctx = (await coachRules(db, userId, nowMs)).find((c) => c.coachId === coachId);
-  if (!ctx) return null;
   const prev = recent.filter((c) => c.day < today.day).sort((a, b) => (a.day < b.day ? 1 : -1))[0];
   const read = applyRule(factsOf(today), ctx.rule, prev ? asPrior(prev) : null, today.day);
   const told = await toldFor(db, userId, today.day, nowMs);
-  return { band: read.band, reason: read.reason, ease: read.ease, dropPct: today.dropPct, feel: today.feel, baselineN: today.baselineN ?? 0, rule: ctx.rule, coachTold: told.includes(coachId), shared: ctx.shared, day: today.day };
+  return {
+    at: Date.parse(today.createdAt),
+    r: { band: read.band, reason: read.reason, ease: read.ease, dropPct: today.dropPct, feel: today.feel, baselineN: today.baselineN ?? 0, rule: ctx.rule, coachTold: told.includes(ctx.coachId), shared: ctx.shared, day: today.day, source: 'jump' },
+  };
 }
 
 // ── the coach ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -204,9 +217,18 @@ export async function coachBoard(db: ReadinessDb, coachId: string, now: Date = n
     return coachMaySee({ onRoster: true, coachView: shared.has(u.id), adult: gates.adult }) && gates.canSaveScan;
   }).map((u) => u.id));
   const name = (id: string) => nameOf(users.find((u) => u.id === id));
-  const alerts = ((await alertsForCoach(db, coachId, new Date(nowMs - ALERT_WINDOW_DAYS * DAY_MS), nowMs)) ?? [])
+  const jumpAlerts = ((await alertsForCoach(db, coachId, new Date(nowMs - ALERT_WINDOW_DAYS * DAY_MS), nowMs)) ?? [])
     .filter((a) => visible.has(a.athleteId))
-    .map((a) => ({ ...a, name: name(a.athleteId), line: coachAlertLine({ name: name(a.athleteId), dropPct: a.dropPct, reason: a.reason, action: a.action }) }));
+    .map((a) => ({ ...a, source: 'jump' as const }));
+  // COACH-DELIVERY (2026-10-26): Lows from a warm-up bar-speed set (the jump check's gate: `visible`) and from the survey
+  // (health data: roster + coach_view + verified adult), computed on read (./sources.ts)
+  const surveyIds = users.filter((u) => coachMaySee({ onRoster: true, coachView: shared.has(u.id), adult: verifiedAdult(u.dobYear ?? null, now) })).map((u) => u.id);
+  const ruleCache = new Map<string, Promise<ReadinessRule | null>>();
+  const ruleOf = (athleteId: string) => ruleCache.get(athleteId) ?? ruleCache.set(athleteId, coachRules(db, athleteId, nowMs).then((cs) => cs.find((c) => c.coachId === coachId)?.rule ?? null)).get(athleteId)!;
+  const extra = await sourceAlerts(db, { barSpeedIds: [...visible], surveyIds, windowDays: ALERT_WINDOW_DAYS, ruleOf }, now).catch(() => []);
+  const alerts = [...jumpAlerts, ...extra]
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+    .map((a) => ({ ...a, name: name(a.athleteId), line: coachAlertLine({ name: name(a.athleteId), dropPct: a.dropPct, reason: a.reason, action: a.action, source: a.source }) }));
   const checks = await checksForUsers(db, [...visible], new Date(nowMs - 7 * DAY_MS), nowMs);
   const latest = [...visible].flatMap((id) => {
     const c = checks.filter((x) => x.userId === id).sort((a, b) => (a.day < b.day ? 1 : -1))[0];

@@ -3,10 +3,13 @@
 // alone: Squad gate 3), the stop line and the "Have a parent open this" card. No hooks, no client state: the results
 // view, the lane page, the privacy page and the tests all render these.
 import Link from 'next/link';
+import { notice } from '@/lib/every-screen/notices';
 import type { ReactNode } from 'react';
-import { AlertOctagon, AlertTriangle, ArrowLeft, CheckCircle2, CircleDashed, Users } from 'lucide-react';
+import { AlertOctagon, AlertTriangle, ArrowLeft, CheckCircle2, CircleDashed, Eye, EyeOff, Users } from 'lucide-react';
 import { BAND_WORDS, type BandWord } from '@/lib/screen/PROPOSED-thresholds';
-import { EARLY_VERSION, EARLY_VERSION_LINE, PARENT_BODY, PARENT_TITLE, STOP_LINE } from '@/lib/screen/copy';
+import { EARLY_VERSION, EARLY_VERSION_LINE, PARENT_BODY, PARENT_TITLE, STOP_LINE, TRUST_REASON_LINES, TRUST_WORDS } from '@/lib/screen/copy';
+import { tr } from '@/lib/screen/PROPOSED-trust';
+import type { TrustLevel, TrustReason } from '@/lib/screen/trust-rows';
 import { SCREEN_HOME } from '@/lib/screen/routes';
 import { SYSTEM_FONT_STACK } from '@/lib/screen/font';
 
@@ -31,6 +34,29 @@ export function BandChip({ band, size = 'md' }: { band: BandWord | null; size?: 
 }
 
 /**
+ * MIRROR-TRUST-RATING: how clearly the camera saw it, as a word and a colour beside the band (never in place of it).
+ * High takes the band-green token, Medium amber, Low grey, so Low can never be read as a Red band.
+ */
+export const TRUST_COLOUR: Record<TrustLevel, string> = { high: BAND_COLOUR.green, medium: BAND_COLOUR.yellow, low: BAND_COLOUR.unread };
+
+export function TrustChip({ level }: { level: TrustLevel; reasons?: readonly TrustReason[] }) {
+  const Icon = level === 'low' ? EyeOff : Eye;
+  return (
+    <span data-trust={level} data-colour={TRUST_COLOUR[level]} className="inline-flex items-center gap-1.5 text-[16px] font-bold" style={{ color: TRUST_COLOUR[level] }}>
+      <Icon aria-hidden className="h-4 w-4" />
+      <span data-trust-word>{TRUST_WORDS[level]}</span>
+    </span>
+  );
+}
+
+/** Medium and Low add one line: the level and its first reasons (all are kept; the register says how many show). High adds none. */
+export function TrustReasonLine({ level, reasons }: { level: TrustLevel; reasons: readonly TrustReason[] }) {
+  if (level === 'high' || !reasons.length) return null;
+  const shown = reasons.slice(0, tr('trust.reasonsShown')).map((r) => TRUST_REASON_LINES[r]).join('; ');
+  return <p data-trust-reason className="mt-0.5 text-[16px] leading-snug text-white/70">{`${TRUST_WORDS[level]}: ${shown}.`}</p>;
+}
+
+/**
  * "Early version", with its line: on every screen that shows a band, a score or a cue. The plain words for the
  * PROPOSED file's own label (S-7); that label stays as it is for the other screens that import it.
  */
@@ -52,7 +78,7 @@ export const EarlyTag = () => (
 
 /** "If anything hurts, stop." Under DISCLAIMER on the results and the program page (owner, 2026-09-29; S-13). */
 export const StopLine = ({ className = 'text-[16px] text-white/70' }: { className?: string }) => (
-  <p data-stop-line className={className}>{STOP_LINE}</p>
+  <p {...notice('medical')} data-stop-line className={className}>{STOP_LINE}</p>
 );
 
 /**
@@ -76,11 +102,14 @@ export function ParentCard() {
  * mount next-auth (a session request, `nextauth.message` in localStorage) or set a guest cookie.
  */
 export function ScreenFrame({ children, right, back = SCREEN_HOME, title = 'Quick Screen' }: { children: ReactNode; right?: ReactNode; back?: string | (() => void); title?: string }) {
-  const arrow = 'grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.03] text-white/70';
+  const arrow = 'fel-press grid h-12 w-12 shrink-0 place-items-center rounded-full border border-white/10 bg-white/[0.04] text-white/80';
   return (
-    <div data-screen-frame className="relative min-h-screen bg-[#050505] text-white" style={{ fontFamily: SYSTEM_FONT_STACK }}>
+    // PREMIUM-UI P6 (2026-10-27): the frame on the design system's ink and glow; the system font stays (gate 1)
+    <div data-screen-frame className="relative min-h-screen bg-fel-bg text-white [background-image:var(--fel-page-glow)]" style={{ fontFamily: SYSTEM_FONT_STACK }}>
       <div className="relative mx-auto max-w-[560px] px-4 pb-10 pt-3">
-        <header className="mb-3 flex items-center gap-3">
+        {/* EVERY-SCREEN P7: the title keeps 12rem; on a phone, Flip camera and Voice drop to their own row instead of squeezing
+            "FREE MOVEMENT CHECK / Quick Screen" to "Quick…" (the rig's phase-6 picture) */}
+        <header className="mb-3 flex flex-wrap items-center gap-3">
           {typeof back === 'function' ? (
             <button type="button" onClick={back} data-back aria-label="Back one step" className={arrow}>
               <ArrowLeft className="h-[18px] w-[18px]" />
@@ -90,9 +119,9 @@ export function ScreenFrame({ children, right, back = SCREEN_HOME, title = 'Quic
               <ArrowLeft className="h-[18px] w-[18px]" />
             </Link>
           )}
-          <div className="min-w-0">
+          <div className="min-w-[12rem] flex-1">
             <p className="text-[16px] font-bold uppercase tracking-[0.18em] text-[#00E5FF]">Free movement check</p>
-            <h1 className="truncate text-[22px] font-black leading-none tracking-tight">{title}</h1>
+            <h1 className="truncate pb-[2px] text-[22px] font-black leading-tight tracking-tight">{title}</h1>
           </div>
           {right ? <div className="ml-auto">{right}</div> : null}
         </header>
@@ -105,12 +134,13 @@ export function ScreenFrame({ children, right, back = SCREEN_HOME, title = 'Quic
 /** One step's card: a heading and its primary action inside the first screen (gate 1). */
 export function StepCard({ children, testId }: { children: ReactNode; testId?: string }) {
   return (
-    <section data-step={testId} className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
+    <section data-step={testId} className="fel-surface !rounded-3xl p-5">
       {children}
     </section>
   );
 }
 
-export const primaryBtn = 'inline-flex min-h-12 w-full items-center justify-center rounded-full bg-[#00E5FF] px-6 py-3.5 text-[16px] font-black text-black disabled:opacity-40';
-export const outlineBtn = 'inline-flex min-h-12 w-full items-center justify-center rounded-full border-2 border-[#00E5FF] px-6 py-3 text-[16px] font-bold text-[#00E5FF]';
-export const quietBtn = 'inline-flex min-h-12 w-full items-center justify-center rounded-full border border-white/20 px-6 py-3 text-[16px] font-bold text-white';
+// PREMIUM-UI P6: the one accent as the kit's pill (gradient, glow, press); the outline and quiet ones press too
+export const primaryBtn = 'fel-press inline-flex min-h-12 w-full items-center justify-center rounded-full bg-gradient-to-b from-[#4df0ff] via-[#00E5FF] to-[#00c8e0] px-6 py-3.5 text-[16px] font-black text-[#021014] shadow-[0_10px_28px_-8px_rgba(0,229,255,0.55),inset_0_1px_0_rgba(255,255,255,0.45)] disabled:opacity-40';
+export const outlineBtn = 'fel-press inline-flex min-h-12 w-full items-center justify-center rounded-full border-2 border-[#00E5FF] px-6 py-3 text-[16px] font-bold text-[#00E5FF]';
+export const quietBtn = 'fel-press inline-flex min-h-12 w-full items-center justify-center rounded-full border border-white/20 px-6 py-3 text-[16px] font-bold text-white';

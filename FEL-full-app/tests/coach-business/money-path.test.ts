@@ -8,8 +8,21 @@ import { checkoutParams, connectGate } from '@/lib/coach-business/connect';
 import { saleSplit } from '@/lib/coach-business/fees';
 import { coachConnectMeta, fulfilCoachConnect, fulfilConnectCheckout, type ConnectDeps } from '@/lib/coach-business/webhook';
 import { fakeCoachBusinessDb, fakeLedger, seedCoach } from '@/tests/helpers/fakeCoachBusinessDb';
+// test changed (owner-approvals, 2026-10-27, card C28): buyers tick the Purchase Terms now (lib/payments/terms.ts
+// BUYER_TERMS → /purchase-terms), not the coach store's terms, so the tick's version is read from BUYER_TERMS. The
+// assertions are unchanged.
+import { BUYER_TERMS } from '@/lib/payments/terms';
+const BUYER_TERMS_VERSION = BUYER_TERMS.coach_package.version;
 
-const ON = { COACH_CONNECT_PAYMENTS_ENABLED: '1', STRIPE_SECRET_KEY: 'sk_test_abc', NEXTAUTH_URL: 'https://fel.test' } as unknown as NodeJS.ProcessEnv;
+// test changed (payments-ready): a package checkout now needs the buyer's store-terms tick before Stripe is called
+// (lib/payments/terms.ts), so every call passes it. No assertion here changed for it; tests/coach-business/
+// payments-ready.test.ts covers the refusal without the tick.
+const TICK = { termsAccepted: true, termsVersion: BUYER_TERMS_VERSION };
+
+// test changed (owner-approvals, 2026-10-27): REFUND_PROCESSING_FEE defaults ON now (owner, "refund in full"). The refund
+// tests below hold the price-only refund rule (the processing fee kept), so this env names that rule; the assertions are
+// unchanged. The refund-in-full default is held in tests/owner-approvals/coach-fee-refund.test.ts and payments-ready.test.ts.
+const ON = { COACH_CONNECT_PAYMENTS_ENABLED: '1', STRIPE_SECRET_KEY: 'sk_test_abc', NEXTAUTH_URL: 'https://fel.test', REFUND_PROCESSING_FEE: '0' } as unknown as NodeJS.ProcessEnv;
 const NOW = new Date('2026-10-25T18:00:00Z');
 
 /** Anything touched throws: proof a closed path never reached it. */
@@ -61,16 +74,21 @@ beforeEach(() => resetBusinessProbe());
 
 describe('the switch: flag off means no charge path at all', () => {
   it('payments off → 409 store_closed payments_off, before the database or Stripe is touched', async () => {
-    const r = await startPackageCheckout({ ...deps().d, env: {} as NodeJS.ProcessEnv, db: trap('db'), stripe: () => trap('stripe') }, 'buyer', 'pkg-1');
+    const r = await startPackageCheckout({ ...deps().d, env: {} as NodeJS.ProcessEnv, db: trap('db'), stripe: () => trap('stripe') }, 'buyer', 'pkg-1', TICK);
     expect(r).toEqual({ ok: false, status: 409, error: 'store_closed', reason: 'payments_off' });
   });
 
   it('a LIVE key is refused while COACH_CONNECT_LIVE is off (test mode only)', async () => {
     const env = { ...ON, STRIPE_SECRET_KEY: 'sk_live_abc' } as NodeJS.ProcessEnv;
     expect(connectGate(env)).toEqual({ ok: false, reason: 'live_mode_off' });
-    const r = await startPackageCheckout({ ...deps().d, env, db: trap('db'), stripe: () => trap('stripe') }, 'buyer', 'pkg-1');
+    const r = await startPackageCheckout({ ...deps().d, env, db: trap('db'), stripe: () => trap('stripe') }, 'buyer', 'pkg-1', TICK);
     expect(r).toMatchObject({ status: 409, reason: 'live_mode_off' });
+    // test changed (payments-ready): with COACH_CONNECT_LIVE on, live mode now also waits for the signed coach terms
+    // (COACH_TERMS_VERSION is null until the owner signs them); with a signed version it opens as before.
+    // test changed (owner-approvals, 2026-10-27, card C12): the coach terms are written now, so "unsigned" is passed as null
+    expect(connectGate({ ...env, COACH_CONNECT_LIVE: '1' } as NodeJS.ProcessEnv, null)).toEqual({ ok: false, reason: 'coach_terms_unsigned' });
     expect(connectGate({ ...env, COACH_CONNECT_LIVE: '1' } as NodeJS.ProcessEnv)).toMatchObject({ ok: true, live: true });
+    expect(connectGate({ ...env, COACH_CONNECT_LIVE: '1' } as NodeJS.ProcessEnv, 'coach-terms-2026-11-01')).toMatchObject({ ok: true, live: true });
   });
 
   it('no key, a strange key, or no site URL is closed too', () => {
@@ -88,7 +106,7 @@ describe('checkout', () => {
   it('a one-off package: a destination charge to the coach, 5% + the processing fee as the application fee, test mode, a held spot', async () => {
     const { d, fake, stripe } = deps();
     seedCoach(fake.state, { priceCents: 19_999 });
-    const r = await startPackageCheckout(d, 'buyer-1', 'pkg-1');
+    const r = await startPackageCheckout(d, 'buyer-1', 'pkg-1', TICK);
     expect(r).toMatchObject({ ok: true, url: 'https://checkout.stripe.test/c' });
     const call = stripe.calls.find((c) => c.op === 'checkout.create')!;
     expect(call.params.mode).toBe('payment');
@@ -124,12 +142,12 @@ describe('checkout', () => {
   it('refusals, in order: own package, coach not ready, a minor buyer — none reaches Stripe', async () => {
     const { d, fake, stripe } = deps();
     seedCoach(fake.state);
-    expect(await startPackageCheckout(d, 'coach-1', 'pkg-1')).toMatchObject({ status: 400, error: 'own_package' });
-    const minor = await startPackageCheckout({ ...d, isAdult: async () => false }, 'teen-1', 'pkg-1');
+    expect(await startPackageCheckout(d, 'coach-1', 'pkg-1', TICK)).toMatchObject({ status: 400, error: 'own_package' });
+    const minor = await startPackageCheckout({ ...d, isAdult: async () => false }, 'teen-1', 'pkg-1', TICK);
     expect(minor).toMatchObject({ status: 403, error: 'adults_only' });
     expect((minor as any).message).toMatch(/parent or guardian/);
     fake.state.connect.get('coach-1')!.chargesEnabled = false;
-    expect(await startPackageCheckout(d, 'buyer-1', 'pkg-1')).toMatchObject({ status: 409, error: 'coach_not_ready' });
+    expect(await startPackageCheckout(d, 'buyer-1', 'pkg-1', TICK)).toMatchObject({ status: 409, error: 'coach_not_ready' });
     expect(stripe.calls).toEqual([]);
     expect(fake.state.sales.size).toBe(0);
   });
@@ -138,24 +156,24 @@ describe('checkout', () => {
     const env = { ...ON, COACH_PRO_ENABLED: '1' } as NodeJS.ProcessEnv;
     const { d, fake } = deps({ env });
     seedCoach(fake.state);
-    expect(await startPackageCheckout(d, 'buyer-1', 'pkg-1')).toMatchObject({ status: 409, error: 'coach_not_ready' });
-    expect(await startPackageCheckout({ ...d, plan: async () => 'pro' }, 'buyer-1', 'pkg-1')).toMatchObject({ ok: true });
+    expect(await startPackageCheckout(d, 'buyer-1', 'pkg-1', TICK)).toMatchObject({ status: 409, error: 'coach_not_ready' });
+    expect(await startPackageCheckout({ ...d, plan: async () => 'pro' }, 'buyer-1', 'pkg-1', TICK)).toMatchObject({ ok: true });
   });
 
   it('capacity: the last spot goes to one buyer; an expired hold frees it; a Stripe failure releases it', async () => {
     const { d, fake } = deps();
     seedCoach(fake.state, { capacity: 1 });
-    expect(await startPackageCheckout(d, 'buyer-1', 'pkg-1')).toMatchObject({ ok: true });
-    expect(await startPackageCheckout(d, 'buyer-2', 'pkg-1')).toMatchObject({ status: 409, error: 'package_full' });
+    expect(await startPackageCheckout(d, 'buyer-1', 'pkg-1', TICK)).toMatchObject({ ok: true });
+    expect(await startPackageCheckout(d, 'buyer-2', 'pkg-1', TICK)).toMatchObject({ status: 409, error: 'package_full' });
     const later = new Date(NOW.getTime() + 31 * 60_000);
-    expect(await startPackageCheckout({ ...d, now: later }, 'buyer-2', 'pkg-1')).toMatchObject({ ok: true });
+    expect(await startPackageCheckout({ ...d, now: later }, 'buyer-2', 'pkg-1', TICK)).toMatchObject({ ok: true });
     const failing = fakeStripe();
     failing.api.checkout.sessions.create = async () => { throw new Error('stripe down'); };
     const { d: d2, fake: f2 } = deps({ stripe: failing });
     seedCoach(f2.state, { capacity: 1 });
-    expect(await startPackageCheckout(d2, 'buyer-1', 'pkg-1')).toMatchObject({ status: 502 });
+    expect(await startPackageCheckout(d2, 'buyer-1', 'pkg-1', TICK)).toMatchObject({ status: 502 });
     expect([...f2.state.sales.values()][0].status).toBe('EXPIRED');
-    expect(await startPackageCheckout({ ...d2, stripe: () => fakeStripe().api }, 'buyer-2', 'pkg-1')).toMatchObject({ ok: true });
+    expect(await startPackageCheckout({ ...d2, stripe: () => fakeStripe().api }, 'buyer-2', 'pkg-1', TICK)).toMatchObject({ ok: true });
   });
 });
 
@@ -167,10 +185,11 @@ function evt(type: string, object: any, id = `evt_${Math.random().toString(36).s
 async function paidSale(kind = 'session_pack', priceCents = 19_999) {
   const { d, fake, stripe } = deps();
   seedCoach(fake.state, { kind, priceCents, capacity: null });
-  const r = await startPackageCheckout(d, 'buyer-1', 'pkg-1');
+  const r = await startPackageCheckout(d, 'buyer-1', 'pkg-1', TICK);
   if (!r.ok) throw new Error('setup');
   const ledger = fakeLedger();
-  const cdeps: ConnectDeps = { db: fake.db as any, post: ledger.post, stripe: () => stripe.api };
+  // test changed (owner-approvals): the webhook's deps carry ON (the price-only refund rule), as the checkout's do
+  const cdeps: ConnectDeps = { db: fake.db as any, post: ledger.post, stripe: () => stripe.api, env: ON };
   const meta = { product: 'COACH_CONNECT', saleId: r.saleId, buyerId: 'buyer-1' };
   return { fake, ledger, cdeps, saleId: r.saleId, meta, stripe, d };
 }

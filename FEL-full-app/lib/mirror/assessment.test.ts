@@ -43,7 +43,7 @@ describe('the Mirror grades what it watched', () => {
   it('refuses to grade what the camera barely saw, and says what to do instead', () => {
     const thin = assessSquat(scan({ confidence: 0.3 }));
     expect(thin.provisional).toBe(true);
-    expect(thin.headline).toMatch(/in frame|in shot/i);
+    expect(thin.headline).toMatch(/in frame|in (the )?shot/i);   // test changed: copy rewrite — "in the shot"
     expect(assessSquat(scan({ confidence: MIN_GRADEABLE_CONFIDENCE })).provisional).toBe(false);
   });
 

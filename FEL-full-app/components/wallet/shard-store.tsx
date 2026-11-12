@@ -19,14 +19,15 @@ import { shardSaleCopy } from '@/lib/wallet/purchases';
 import { usePurchasesEnabled } from '@/lib/wallet/use-purchases-enabled';
 import { postVerifyCheckoutSession } from '@/components/stripe/verify-checkout-session';
 
-export function ShardStore() {
+/** `initialPurchasesEnabled`: the server's answer (app/shop/shards/page.tsx), as /store does (coin-store.tsx). */
+export function ShardStore({ initialPurchasesEnabled = null }: { initialPurchasesEnabled?: boolean | null } = {}) {
   const params = useSearchParams();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [balance, setBalance] = useState<number | null>(null);
   // ARENA-10PHASE P10: no STRIPE key means no checkout, and the buttons say so up front instead of a live "Buy" that toasts
   // a placeholder after the click. FEATURES-UX-SHOP: the flag AND the copy come from lib/wallet/purchases.ts — the same words
   // the coin store, the wallet page and the header chip use.
-  const purchasesEnabled = usePurchasesEnabled();
+  const purchasesEnabled = usePurchasesEnabled(initialPurchasesEnabled);
   const copy = shardSaleCopy(purchasesEnabled);
 
   async function refreshBalance() {
@@ -108,14 +109,14 @@ export function ShardStore() {
           <h1 className="flex items-center gap-2 text-2xl font-bold text-white">
             <Gem className="h-6 w-6 text-[#C79BFF]" /> Get Shards
             {copy.badge && (
-              <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white/50">{copy.badge}</span>
+              <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[12px] font-semibold uppercase tracking-wide text-white/50">{copy.badge}</span>
             )}
           </h1>
           <p className="mt-1 text-sm text-white/50">{copy.shardStoreIntro}</p>
         </div>
         <div className="shrink-0 rounded-xl border border-[#C79BFF]/30 bg-[#C79BFF]/5 px-3 py-2 text-right">
-          <div className="text-[10px] uppercase tracking-wide text-white/40">Balance</div>
-          <div className="flex items-center justify-end gap-1 text-lg font-bold text-[#C79BFF]">
+          <div className="text-[12px] uppercase tracking-wide text-white/50">Balance</div>
+          <div className="flex items-center justify-end gap-1 text-[20px] font-bold text-[#C79BFF]">
             <Gem className="h-4 w-4" /> {balance === null ? '—' : balance.toLocaleString()}
           </div>
         </div>
@@ -133,7 +134,7 @@ export function ShardStore() {
               className="relative flex flex-col rounded-2xl border border-white/10 bg-white/[0.03] p-5 transition hover:border-[#C79BFF]/40 hover:bg-[#C79BFF]/[0.04]"
             >
               {pack.badge && (
-                <span className="absolute -top-2 right-4 rounded-full bg-[#A855F7] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow-lg">
+                <span className="absolute -top-2 right-4 rounded-full bg-[#A855F7] px-2.5 py-0.5 text-[12px] font-bold uppercase tracking-wide text-white shadow-lg">
                   {pack.badge}
                 </span>
               )}
@@ -141,7 +142,7 @@ export function ShardStore() {
               <div className="mt-2 flex items-baseline gap-2">
                 <Gem className="h-6 w-6 text-[#C79BFF]" />
                 <span className="text-3xl font-extrabold text-white">{total.toLocaleString()}</span>
-                <span className="text-sm text-white/40">shards</span>
+                <span className="text-sm text-white/50">shards</span>
               </div>
               {pack.bonus > 0 && (
                 <div className="mt-1 flex items-center gap-1 text-xs font-semibold text-[#00FF9D]">
@@ -149,7 +150,7 @@ export function ShardStore() {
                 </div>
               )}
               <div className="mt-4 flex items-center justify-between">
-                <span className="text-lg font-bold text-white">{usd(pack.usdCents)}</span>
+                <span className="text-[20px] font-bold text-white">{usd(pack.usdCents)}</span>
                 <button
                   onClick={() => buy(pack)}
                   disabled={busy}

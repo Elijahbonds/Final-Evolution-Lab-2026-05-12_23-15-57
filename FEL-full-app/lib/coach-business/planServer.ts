@@ -30,7 +30,10 @@ export async function readCoachPlan(db: PlanDb, userId: string, env: NodeJS.Proc
     const subscriptions = await db.subscription.findMany({ where: { userId, status: 'ACTIVE' }, select: { product: true, status: true } });
     return planFor({ subscriptions, allowlisted: false });
   } catch (e) {
-    console.warn('[coach-business] plan read failed; not gating', e instanceof Error ? e.name : typeof e);
+    // PAYMENTS-READY (coordinator, 2026-10-26): kept as Pro on purpose. A failed read never gates the coach, and a sale
+    // made in that moment takes FEL's Pro rate (PLATFORM_FEE_BPS_PRO): charging a coach more than their plan allows is
+    // worse than FEL losing a few cents on a database blip. One line, no id, no PII.
+    console.warn('[coach-business] plan read failed; counted as Pro (not gated, Pro fee rate)', e instanceof Error ? e.name : typeof e);
     return 'pro';
   }
 }

@@ -1,3 +1,5 @@
+// CUE-REWRITE (2026-10-27) — test changed: copy rewrite. The flag lines use the canonical fault names now
+// (lib/cue-style/names.ts: "Left knee caves in", "Back bends"); every assertion checks what it checked before.
 // COACH-VIDEO-REVIEW (2026-10-24): which program exercises the camera reviews, and the words it uses.
 import { describe, expect, it } from 'vitest';
 import { cueFor, faultPhrase, isFault, MOVEMENT_SPECS, REVIEW_MOVEMENTS, reviewMovementFor } from './movements';
@@ -43,11 +45,11 @@ describe('the words', () => {
   });
 
   it('a knee names its side; a fault with no side reads as is', () => {
-    expect(faultPhrase('squat', 'kneeValgus', 'left')).toBe('Left knee caves');
-    expect(faultPhrase('squat', 'kneeValgus', 'both')).toBe('Both knees cave');
-    expect(faultPhrase('lunge', 'wobble', 'right')).toBe('Right knee wobbles');
-    expect(faultPhrase('lunge', 'kneeIn', null)).toBe('Knee caves');
-    expect(faultPhrase('hinge', 'dowelLine', 'left')).toBe('Back line breaks');
+    expect(faultPhrase('squat', 'kneeValgus', 'left')).toBe('Left knee caves in');
+    expect(faultPhrase('squat', 'kneeValgus', 'both')).toBe('Both knees cave in');
+    expect(faultPhrase('lunge', 'wobble', 'right')).toBe('Right front knee wobbles');
+    expect(faultPhrase('lunge', 'kneeIn', null)).toBe('Front knee caves in');
+    expect(faultPhrase('hinge', 'dowelLine', 'left')).toBe('Back bends');
   });
 
   it('no line claims a measurement or a diagnosis', () => {

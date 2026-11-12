@@ -12,6 +12,7 @@ import React, { useEffect, useState } from 'react';
 import type { ModePhase } from '@/lib/babylon';
 import { venueThumb } from '@/lib/babylon/ui/venueThumbs';
 import { CardSlot } from './card-slot';
+import { chipInk, pickedChip } from './chip-ink';   // SCREEN-FIXES-2: a picked chip's letters at AA on its own colour
 import { MotionSetting } from '@/components/settings/motion-setting';
 import { PausedLayer } from './paused-layer';
 import { LearnWhileYouWait } from '@/components/learn/learn-while-you-wait';   // KNOWLEDGE-FEED v1: one card while the arena loads
@@ -19,6 +20,7 @@ import { useSoundtrackStage } from '@/components/soundtrack/soundtrack-stage';
 import { ControlsPanel } from './controls-panel';
 import { BodyPlayReady, BodyPlayReadyLine, BodyPlayLayer } from './body-play';
 import { bootErrorRequiresPageReload } from './boot-error';
+import { detectPadFamily } from '@/lib/input/padLabels';
 import { PlayAsSwitcher } from '@/components/closet/play-as-switcher';   // CREATOR-PLAN phase 4a: "Play as …" a saved character
 import { BASKETBALL_MODE_IDS, COURT_LOCATIONS, readCourtLocation, readyCourtLocations, writeCourtLocation, type CourtLocationId } from '@/lib/babylon/nexus/courtLocations';
 import { BALL_SKINS, readBallSkin, readyBallSkins, writeBallSkin, type BallSkinId } from '@/lib/babylon/nexus/ballSkins';
@@ -35,6 +37,7 @@ import { arenasFor, readCombatArena, writeCombatArena, COMBAT_MODE_IDS, type Com
 import { COURT_LAYOUTS, COURT_LAYOUT_MODES, readCourtLayout, writeCourtLayout, type CourtLayoutId } from '@/lib/babylon/nexus/courtLayout';   // COURT LAYOUT (2026-09-18): the 3v3's chokepoint
 import { SET_LENGTH_MODES, setLengthsFor, setLengthLabel, readSetLength, writeSetLength, setLengthLocked, type SetLengthId } from '@/lib/babylon/nexus/setLength';   // IMPROVE (2026-10-06): volleyball's short set, tennis's quick match
 import { looksFor, readPlaceLook, writePlaceLook } from '@/lib/babylon/nexus/placeLooks';
+import { restorePlace } from '@/lib/nexus-studio/published';   // NEX-02: Restore the shipped place over a published Studio venue
 import { tierList, readTier, writeTier, profileFor, type Tier } from '@/lib/babylon/core/Difficulty';
 import { headToHeadRun } from '@/lib/babylon/modes/onevoneRules';
 import { OneVOneWinBy2 } from './onevone-win-by-2';   // owner 2026-10-06: the 1v1's win-by-2 pick
@@ -44,6 +47,15 @@ import {
   readySchools, readBlend, writeBlend, blendName, schoolById, blendTraits, STYLE_TRAIT_KEYS,
   type StyleBlend,
 } from '@/lib/babylon/combat/schools';
+
+/** SCREEN-FIXES (2026-11-10): the start card's middle slot (the loading bar and the learn card, or START and its lines),
+ *  held at one height from the first frame so nothing under it moves when the learn card arrives or START replaces it.
+ *  NEW number, measured (splash-cls.mts): the loading bar (26 px) + the gap (16) + the compact learn card (175-185 px for a
+ *  lesson or fact card at the 2026-11-10 sizes). Not a feel number.
+ *  SCREEN-FIXES-2 (2026-11-11): 230 -> 237. Measured with the card pinned (splash-cls.mts [seeds]): the bar, its line and the
+ *  gaps above the card take 52 px, and the lesson and fact cards are 150-185 px, so 230 still grew by 7 px for a 185 px card.
+ *  237 holds every lesson and fact card whole; a taller one (a quiz, 225 px) scrolls inside the slot while loading. */
+export const SPLASH_SLOT_MIN_PX = 237;
 
 // M37 E12 FIX: venue slugs resolve to PROCEDURAL canvas thumbnails (venueThumbs)
 // instead of /img/venues/*.jpg files that 404 on every mode route.
@@ -291,6 +303,7 @@ export function SplashCard(props: BootSplashProps) {
   const placeList = looksFor(props.modeId);
   const [placeId, setPlaceId] = useState<string>('home');
   useEffect(() => { if (placeList.length) setPlaceId(readPlaceLook(props.modeId)?.id ?? 'home'); }, [placeList.length, props.modeId]);
+  const restore = restorePlace(placeList, placeId);
   const pickPlace = (id: string) => {
     if (id === placeId) return;
     writePlaceLook(props.modeId, id);
@@ -378,27 +391,42 @@ export function SplashCard(props: BootSplashProps) {
       )}
       {/* CONTROLS SCREEN (2026-10-06): the column scrolls (safe-centred) rather than clip when a portrait card holds the
           controls and three pickers: START stays at the top of what shows, and no picker is cut off out of reach.
-          Where the corner row (MOTION, the shell's ⋯, the controller pills) needs it to start lower: game-surface.css 4d. */}
+          Where the corner row (MOTION, the shell's ⋯, the controller pills) needs it to start lower: game-surface.css 4d
+          (SCREEN-FIXES-2: below the MOTION chip on every screen that shows it, not only where a shell put its ⋯). */}
       <div data-splash-column className="absolute inset-0 flex flex-col items-center justify-center gap-4 overflow-y-auto px-6 py-4 text-center [justify-content:safe_center] [scrollbar-width:none]">
         {/* data-splash-main: display: contents everywhere but a sideways screen, where it is the left column — title,
             START and the CONTROLS panel, which gives up its height (its lines scroll) before START leaves the screen */}
         <div data-splash-main className="contents">
-        <p className="text-[11px] font-black tracking-[0.4em]" style={{ color: v.tint }}>{v.sub}</p>
+        <p className="text-[12px] font-black tracking-[0.4em]" style={{ color: v.tint }}>{v.sub}</p>
         <h1 className="text-4xl font-black tracking-wide text-white drop-shadow-lg">{props.title}</h1>
         {props.goal && (props.phase === 'ready' || props.phase === 'loading') && (
           <p className="max-w-md text-[12px] font-bold tracking-[0.18em] text-white/85">{props.goal}</p>
         )}
         {(props.phase === 'ready' || props.phase === 'loading') && props.readyLead}
 
+        {/* SCREEN-FIXES (2026-11-10): ONE SLOT for the part of the card that changes while the arena loads, the same height in
+            both phases (SPLASH_SLOT_MIN_PX, a phone held upright; sideways the slot is display: contents, game-surface.css 4b).
+            Loading, it holds the bar and the learn card, which arrives after a lazy import; READY, it holds START and its
+            lines, centred. Before, the card's arrival pushed the CONTROLS panel and every picker down, and the swap to START
+            pulled them back up: a layout shift of 0.06-0.29 on the card alone (scripts/probes/screen-fixes/splash-cls.mts),
+            0.21-0.24 on the dunk host (DUNK-FLAGSHIP §15). Layout only: what loads, and when, is unchanged. */}
+        {/* SCREEN-FIXES-2 (2026-11-11): and while loading the slot is that height at most, too. A learn card taller than the
+            room left under the bar (a quiz, a long lesson: 227 px measured on skateboard) used to grow the slot and push
+            the CONTROLS panel down 49 px, then let it back up at READY (0.081 on the card alone). It now scrolls inside
+            the slot instead: nothing is cut off, every line and button stays reachable. Sideways the slot is display:
+            contents and the card is as it was (game-surface.css 4b). Layout only. */}
+        {(props.phase === 'ready' || props.phase === 'loading') && (
+        <div data-splash-slot={props.phase} className={`flex w-full shrink-0 flex-col items-center gap-4 ${props.phase === 'ready' ? 'justify-center' : 'justify-start'}`}
+          style={props.phase === 'loading' ? { minHeight: SPLASH_SLOT_MIN_PX, maxHeight: SPLASH_SLOT_MIN_PX } : { minHeight: SPLASH_SLOT_MIN_PX }}>
         {props.phase === 'loading' && (
-          <div className="w-56">
+          <div className="w-56 shrink-0">
             <div className="h-1.5 overflow-hidden rounded-full bg-white/15">
               <div className="fel-boot-bar h-full rounded-full" style={{ background: v.tint }} />
             </div>
-            <p className="mt-2 text-[11px] tracking-widest text-white/60">LOADING ARENA…</p>
+            <p className="mt-2 text-[12px] tracking-widest text-white/60">LOADING ARENA…</p>
           </div>
         )}
-        {props.phase === 'loading' && <LearnWhileYouWait compact className="mt-1" />}
+        {props.phase === 'loading' && <LearnWhileYouWait compact className="mt-1 min-h-0 shrink overflow-y-auto overscroll-contain" />}
 
         {props.phase === 'ready' && (
           <button
@@ -414,6 +442,8 @@ export function SplashCard(props: BootSplashProps) {
             TAP TO START
           </button>
         )}
+        {/* CONTROLLER-TRY-FIX item 4 (C5): with a pad in, the card says the pad starts it too (any real press wakes play, StartWake) */}
+        {props.phase === 'ready' && <PadStartLine />}
         {/* MOVEMENT PLAY P3 (2026-09-24): the hands-up START, said once the camera sees you (it wakes a calibrated body,
             BodySession). The line reads the session itself, so the splash does not re-render with the ring, and holds
             its room while the camera is on, so the card does not jump when a detection is missed (the step-4a review).
@@ -426,6 +456,8 @@ export function SplashCard(props: BootSplashProps) {
         {props.phase === 'ready' && <PlayAsSwitcher tint={v.tint} />}
         {/* MULTIPLAYER (2026-10-06): a game friends can play together says so, and opens the party room with it picked */}
         {props.phase === 'ready' && <PartyInvite modeId={props.modeId} />}
+        </div>
+        )}
         {/* CONTROLS SCREEN (console-view lane, 2026-10-06). Owner: "take off that wall of text when the game starts, maybe
             have that show as a beginning screen for the controls." The mode's button map for the device in use, and its
             own words — which the harness now keeps off the play screen (lib/babylon/ui/staticControls.ts). The pause
@@ -439,12 +471,12 @@ export function SplashCard(props: BootSplashProps) {
         <div data-splash-pickers className="contents">
         {isCourt && (props.phase === 'ready' || props.phase === 'loading') && readyCourtLocations().length > 1 && (
           <div className="mt-3 flex flex-col items-center gap-1.5">
-            <p className="text-[9px] font-black tracking-[0.3em] text-white/45">LOCATION</p>
+            <p className="text-[12px] font-black tracking-[0.3em] text-white/50">LOCATION</p>
             <div className="flex flex-wrap items-center justify-center gap-2">
               {readyCourtLocations().map((l) => (
                 <button key={l.id} type="button" onClick={() => pickLocation(l.id)}
-                  className={`rounded-full border px-3 py-1 text-[10px] font-black tracking-wider transition ${l.id === loc ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
-                  style={l.id === loc ? { background: l.tint, borderColor: l.tint } : { borderColor: `${l.tint}88` }}>
+                  className={`rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${l.id === loc ? '' : 'text-white/80 hover:bg-white/10'}`}
+                  style={l.id === loc ? pickedChip(l.tint) : { borderColor: `${l.tint}88` }}>
                   {l.name.toUpperCase()}
                 </button>
               ))}
@@ -454,31 +486,31 @@ export function SplashCard(props: BootSplashProps) {
 
         {isCourt && (props.phase === 'ready' || props.phase === 'loading') && readyBallSkins().length > 1 && (
           <div className="mt-2 flex flex-col items-center gap-1.5">
-            <p className="text-[9px] font-black tracking-[0.3em] text-white/45">BALL</p>
+            <p className="text-[12px] font-black tracking-[0.3em] text-white/50">BALL</p>
             <div className="flex flex-wrap items-center justify-center gap-2">
               {readyBallSkins().map((b) => (
                 <button key={b.id} type="button" onClick={() => pickBall(b.id)} title={b.sub}
                   aria-label={`${b.label} — ${b.sub}`} aria-pressed={b.id === ball}
-                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-[10px] font-black tracking-wider transition ${b.id === ball ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
-                  style={b.id === ball ? { background: b.tint, borderColor: b.tint } : { borderColor: `${b.tint}88` }}>
+                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${b.id === ball ? '' : 'text-white/80 hover:bg-white/10'}`}
+                  style={b.id === ball ? pickedChip(b.tint) : { borderColor: `${b.tint}88` }}>
                   <span aria-hidden className="inline-block h-2.5 w-2.5 rounded-full"
                     style={{ background: b.tint2 ? `linear-gradient(135deg, ${b.tint}, ${b.tint2})` : b.tint, boxShadow: `0 0 6px ${b.tint}aa` }} />
                   {b.label}
                 </button>
               ))}
             </div>
-            <p className="max-w-[22rem] text-[9px] leading-tight tracking-wide text-white/40">{BALL_SKINS[ball].sub}</p>
+            <p className="max-w-[22rem] text-[12px] leading-tight tracking-wide text-white/50">{BALL_SKINS[ball].sub}</p>
           </div>
         )}
 
         {wxFamily && (props.phase === 'ready' || props.phase === 'loading') && readyWeathers(wxFamily).length > 1 && (
           <div className="mt-2 flex flex-col items-center gap-1.5">
-            <p className="text-[9px] font-black tracking-[0.3em] text-white/45">WEATHER</p>
+            <p className="text-[12px] font-black tracking-[0.3em] text-white/50">WEATHER</p>
             <div className="flex flex-wrap items-center justify-center gap-2">
               {readyWeathers(wxFamily).map((w) => (
                 <button key={w.id} type="button" onClick={() => pickWeather(w.id)} aria-pressed={w.id === wx}
-                  className={`rounded-full border px-3 py-1 text-[10px] font-black tracking-wider transition ${w.id === wx ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
-                  style={w.id === wx ? { background: w.tint, borderColor: w.tint } : { borderColor: `${w.tint}88` }}>
+                  className={`rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${w.id === wx ? '' : 'text-white/80 hover:bg-white/10'}`}
+                  style={w.id === wx ? pickedChip(w.tint) : { borderColor: `${w.tint}88` }}>
                   {w.name}
                 </button>
               ))}
@@ -488,18 +520,18 @@ export function SplashCard(props: BootSplashProps) {
 
         {disc && (props.phase === 'ready' || props.phase === 'loading') && readyVenues(disc).length > 1 && (
           <div className="mt-3 flex flex-col items-center gap-1.5">
-            <p className="text-[9px] font-black tracking-[0.3em] text-white/45">VENUE</p>
+            <p className="text-[12px] font-black tracking-[0.3em] text-white/50">VENUE</p>
             <div className="flex flex-wrap items-center justify-center gap-2">
               {readyVenues(disc).map((v) => (
                 <button key={v.id} type="button" onClick={() => pickVenue(v.id)} title={v.sub}
                   aria-label={`${v.name} — ${v.sub}`} aria-pressed={v.id === venue}
-                  className={`rounded-full border px-3 py-1 text-[10px] font-black tracking-wider transition ${v.id === venue ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
-                  style={v.id === venue ? { background: v.palette.accent, borderColor: v.palette.accent } : { borderColor: `${v.palette.accent}88` }}>
+                  className={`rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${v.id === venue ? '' : 'text-white/80 hover:bg-white/10'}`}
+                  style={v.id === venue ? pickedChip(v.palette.accent) : { borderColor: `${v.palette.accent}88` }}>
                   {v.name}
                 </button>
               ))}
             </div>
-            <p className="max-w-[24rem] text-[9px] leading-tight tracking-wide text-white/40">
+            <p className="max-w-[24rem] text-[12px] leading-tight tracking-wide text-white/50">
               {readyVenues(disc).find((v) => v.id === venue)?.sub ?? ''}
             </p>
           </div>
@@ -507,18 +539,18 @@ export function SplashCard(props: BootSplashProps) {
 
         {arenaMode && (props.phase === 'ready' || props.phase === 'loading') && arenasFor(arenaMode).length > 1 && (
           <div className="mt-3 flex flex-col items-center gap-1.5">
-            <p className="text-[9px] font-black tracking-[0.3em] text-white/45">ARENA</p>
+            <p className="text-[12px] font-black tracking-[0.3em] text-white/50">ARENA</p>
             <div className="flex flex-wrap items-center justify-center gap-2">
               {arenasFor(arenaMode).map((a) => (
                 <button key={a.id} type="button" onClick={() => pickArena(a.id)} title={a.sub}
                   aria-label={`${a.name} — ${a.sub}`} aria-pressed={a.id === arenaId}
-                  className={`rounded-full border px-3 py-1 text-[10px] font-black tracking-wider transition ${a.id === arenaId ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
-                  style={a.id === arenaId ? { background: a.tint, borderColor: a.tint } : { borderColor: `${a.tint}88` }}>
+                  className={`rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${a.id === arenaId ? '' : 'text-white/80 hover:bg-white/10'}`}
+                  style={a.id === arenaId ? pickedChip(a.tint) : { borderColor: `${a.tint}88` }}>
                   {a.name.toUpperCase()}
                 </button>
               ))}
             </div>
-            <p className="max-w-[24rem] text-[9px] leading-tight tracking-wide text-white/40">
+            <p className="max-w-[24rem] text-[12px] leading-tight tracking-wide text-white/50">
               {arenasFor(arenaMode).find((a) => a.id === arenaId)?.sub ?? ''}
             </p>
           </div>
@@ -526,62 +558,69 @@ export function SplashCard(props: BootSplashProps) {
 
         {placeList.length > 1 && (props.phase === 'ready' || props.phase === 'loading') && (
           <div className="mt-3 flex flex-col items-center gap-1.5">
-            <p className="text-[9px] font-black tracking-[0.3em] text-white/45">PLACE</p>
+            <p className="text-[12px] font-black tracking-[0.3em] text-white/50">PLACE</p>
             <div className="flex flex-wrap items-center justify-center gap-2">
               {placeList.map((l) => (
                 <button key={l.id} type="button" onClick={() => pickPlace(l.id)} title={l.sub}
                   aria-label={`${l.name} — ${l.sub}`} aria-pressed={l.id === placeId}
-                  className={`rounded-full border px-3 py-1 text-[10px] font-black tracking-wider transition ${l.id === placeId ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
-                  style={l.id === placeId ? { background: l.tint, borderColor: l.tint } : { borderColor: `${l.tint}88` }}>
+                  className={`rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${l.id === placeId ? '' : 'text-white/80 hover:bg-white/10'}`}
+                  style={l.id === placeId ? pickedChip(l.tint) : { borderColor: `${l.tint}88` }}>
                   {l.name.toUpperCase()}
                 </button>
               ))}
             </div>
-            <p className="max-w-[24rem] text-[9px] leading-tight tracking-wide text-white/40">{placeList.find((l) => l.id === placeId)?.sub ?? ''}</p>
+            <p className="max-w-[24rem] text-[12px] leading-tight tracking-wide text-white/50">{placeList.find((l) => l.id === placeId)?.sub ?? ''}</p>
+            {/* NEX-02 (owner 2026-10-20): a venue the owner published from Nexus Studio is the default place; one tap puts the shipped one back */}
+            {restore && (
+              <button type="button" onClick={() => pickPlace(restore.id)} data-testid="place-restore"
+                className="rounded-full border border-white/25 px-3 py-1 text-[12px] font-black tracking-[0.2em] text-white/70 transition hover:bg-white/10">
+                RESTORE {restore.name.toUpperCase()}
+              </button>
+            )}
           </div>
         )}
 
         {hasCourt && (props.phase === 'ready' || props.phase === 'loading') && (
           <div className="mt-3 flex flex-col items-center gap-1.5">
-            <p className="text-[9px] font-black tracking-[0.3em] text-white/45">COURT</p>
+            <p className="text-[12px] font-black tracking-[0.3em] text-white/50">COURT</p>
             <div className="flex flex-wrap items-center justify-center gap-2">
               {COURT_LAYOUTS.map((l) => (
                 <button key={l.id} type="button" onClick={() => pickCourt(l.id)} title={l.sub}
                   aria-label={`${l.name} — ${l.sub}`} aria-pressed={l.id === courtId}
-                  className={`rounded-full border px-3 py-1 text-[10px] font-black tracking-wider transition ${l.id === courtId ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
-                  style={l.id === courtId ? { background: l.tint, borderColor: l.tint } : { borderColor: `${l.tint}88` }}>
+                  className={`rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${l.id === courtId ? '' : 'text-white/80 hover:bg-white/10'}`}
+                  style={l.id === courtId ? pickedChip(l.tint) : { borderColor: `${l.tint}88` }}>
                   {l.name.toUpperCase()}
                 </button>
               ))}
             </div>
-            <p className="max-w-[24rem] text-[9px] leading-tight tracking-wide text-white/40">{COURT_LAYOUTS.find((l) => l.id === courtId)?.sub ?? ''}</p>
+            <p className="max-w-[24rem] text-[12px] leading-tight tracking-wide text-white/50">{COURT_LAYOUTS.find((l) => l.id === courtId)?.sub ?? ''}</p>
           </div>
         )}
         {hasSetLen && (props.phase === 'ready' || props.phase === 'loading') && (
           <div className="mt-3 flex flex-col items-center gap-1.5">
-            <p className="text-[9px] font-black tracking-[0.3em] text-white/45">{setLengthLabel(props.modeId)}</p>
+            <p className="text-[12px] font-black tracking-[0.3em] text-white/50">{setLengthLabel(props.modeId)}</p>
             <div className="flex flex-wrap items-center justify-center gap-2">
               {setLengthsFor(props.modeId).map((l) => (
                 <button key={l.id} type="button" onClick={() => pickSetLen(l.id)} title={l.sub}
                   aria-label={`${l.name} — ${l.sub}`} aria-pressed={l.id === setLenId}
-                  className={`rounded-full border px-3 py-1 text-[10px] font-black tracking-wider transition ${l.id === setLenId ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
-                  style={l.id === setLenId ? { background: l.tint, borderColor: l.tint } : { borderColor: `${l.tint}88` }}>
+                  className={`rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${l.id === setLenId ? '' : 'text-white/80 hover:bg-white/10'}`}
+                  style={l.id === setLenId ? pickedChip(l.tint) : { borderColor: `${l.tint}88` }}>
                   {l.name.toUpperCase()}
                 </button>
               ))}
             </div>
-            <p className="max-w-[24rem] text-[9px] leading-tight tracking-wide text-white/40">{setLengthsFor(props.modeId).find((l) => l.id === setLenId)?.sub ?? ''}</p>
+            <p className="max-w-[24rem] text-[12px] leading-tight tracking-wide text-white/50">{setLengthsFor(props.modeId).find((l) => l.id === setLenId)?.sub ?? ''}</p>
           </div>
         )}
         {disc && (props.phase === 'ready' || props.phase === 'loading') && skinsFor(disc).length > 1 && (
           <div className="mt-2 flex flex-col items-center gap-1.5">
-            <p className="text-[9px] font-black tracking-[0.3em] text-white/45">DECK</p>
+            <p className="text-[12px] font-black tracking-[0.3em] text-white/50">DECK</p>
             <div className="flex flex-wrap items-center justify-center gap-2">
               {skinsFor(disc).map((d) => (
                 <button key={d.id} type="button" onClick={() => pickDeck(d.id)} title={d.sub}
                   aria-label={`${d.label} — ${d.sub}`} aria-pressed={d.id === deck}
-                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-[10px] font-black tracking-wider transition ${d.id === deck ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
-                  style={d.id === deck ? { background: d.tint, borderColor: d.tint } : { borderColor: `${d.tint}88` }}>
+                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${d.id === deck ? '' : 'text-white/80 hover:bg-white/10'}`}
+                  style={d.id === deck ? pickedChip(d.tint) : { borderColor: `${d.tint}88` }}>
                   <span aria-hidden className="inline-block h-2.5 w-2.5 rounded-full"
                     style={{ background: d.tint2 ? `linear-gradient(135deg, ${d.tint}, ${d.tint2})` : d.tint, boxShadow: `0 0 6px ${d.tint}aa` }} />
                   {d.label}
@@ -593,18 +632,18 @@ export function SplashCard(props: BootSplashProps) {
 
         {isMusic && (props.phase === 'ready' || props.phase === 'loading') && readyMusicStages().length > 1 && (
           <div className="mt-3 flex flex-col items-center gap-1.5">
-            <p className="text-[9px] font-black tracking-[0.3em] text-white/45">STAGE</p>
+            <p className="text-[12px] font-black tracking-[0.3em] text-white/50">STAGE</p>
             <div className="flex flex-wrap items-center justify-center gap-2">
               {readyMusicStages().map((m) => (
                 <button key={m.id} type="button" onClick={() => pickStage(m.id)} title={m.sub}
                   aria-label={`${m.label} — ${m.sub}`} aria-pressed={m.id === stage}
-                  className={`rounded-full border px-3 py-1 text-[10px] font-black tracking-wider transition ${m.id === stage ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
-                  style={m.id === stage ? { background: m.tint, borderColor: m.tint } : { borderColor: `${m.tint}88` }}>
+                  className={`rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${m.id === stage ? '' : 'text-white/80 hover:bg-white/10'}`}
+                  style={m.id === stage ? pickedChip(m.tint) : { borderColor: `${m.tint}88` }}>
                   {m.label}
                 </button>
               ))}
             </div>
-            <p className="max-w-[24rem] text-[9px] leading-tight tracking-wide text-white/40">
+            <p className="max-w-[24rem] text-[12px] leading-tight tracking-wide text-white/50">
               {readyMusicStages().find((m) => m.id === stage)?.sub ?? ''}
             </p>
           </div>
@@ -612,18 +651,18 @@ export function SplashCard(props: BootSplashProps) {
 
         {race && (props.phase === 'ready' || props.phase === 'loading') && readyCourses(race).length > 1 && (
           <div className="mt-3 flex flex-col items-center gap-1.5">
-            <p className="text-[9px] font-black tracking-[0.3em] text-white/45">MAP</p>
+            <p className="text-[12px] font-black tracking-[0.3em] text-white/50">MAP</p>
             <div className="flex flex-wrap items-center justify-center gap-2">
               {readyCourses(race).map((c) => (
                 <button key={c.id} type="button" onClick={() => pickMap(c.id)} title={c.sub}
                   aria-label={`${c.name} — ${c.sub}`} aria-pressed={c.id === map}
-                  className={`rounded-full border px-3 py-1 text-[10px] font-black tracking-wider transition ${c.id === map ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
-                  style={c.id === map ? { background: c.tint, borderColor: c.tint } : { borderColor: `${c.tint}88` }}>
+                  className={`rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${c.id === map ? '' : 'text-white/80 hover:bg-white/10'}`}
+                  style={c.id === map ? pickedChip(c.tint) : { borderColor: `${c.tint}88` }}>
                   {c.name}
                 </button>
               ))}
             </div>
-            <p className="max-w-[24rem] text-[9px] leading-tight tracking-wide text-white/40">
+            <p className="max-w-[24rem] text-[12px] leading-tight tracking-wide text-white/50">
               {readyCourses(race).find((c) => c.id === map)?.sub ?? ''}
             </p>
           </div>
@@ -631,16 +670,16 @@ export function SplashCard(props: BootSplashProps) {
 
         {race === 'kart' && kartRace && (props.phase === 'ready' || props.phase === 'loading') && (
           <div className="mt-2 flex flex-col items-center gap-1.5">
-            <p className="text-[9px] font-black tracking-[0.3em] text-white/45">RACE</p>
+            <p className="text-[12px] font-black tracking-[0.3em] text-white/50">RACE</p>
             <div className="flex flex-wrap items-center justify-center gap-2">
               {([['2 LAPS', 2], ['GRAND PRIX · 3 LAPS', KART_GP_LAPS]] as const).map(([label, laps]) => (
                 <button key={laps} type="button" onClick={() => pickKartRace({ ...kartRace, laps })} aria-pressed={kartRace.laps === laps}
-                  className={`rounded-full border border-white/40 px-3 py-1 text-[10px] font-black tracking-wider transition ${kartRace.laps === laps ? 'bg-white text-black' : 'text-white/80 hover:bg-white/10'}`}>
+                  className={`rounded-full border border-white/40 px-3 py-1 text-[12px] font-black tracking-wider transition ${kartRace.laps === laps ? 'bg-white text-black' : 'text-white/80 hover:bg-white/10'}`}>
                   {label}
                 </button>
               ))}
               <button type="button" onClick={() => pickKartRace({ ...kartRace, mirror: !kartRace.mirror })} aria-pressed={kartRace.mirror}
-                className={`rounded-full border border-white/40 px-3 py-1 text-[10px] font-black tracking-wider transition ${kartRace.mirror ? 'bg-white text-black' : 'text-white/80 hover:bg-white/10'}`}>
+                className={`rounded-full border border-white/40 px-3 py-1 text-[12px] font-black tracking-wider transition ${kartRace.mirror ? 'bg-white text-black' : 'text-white/80 hover:bg-white/10'}`}>
                 MIRROR
               </button>
             </div>
@@ -649,11 +688,11 @@ export function SplashCard(props: BootSplashProps) {
 
         {race === 'kart' && kartRain !== null && (props.phase === 'ready' || props.phase === 'loading') && (
           <div className="mt-2 flex flex-col items-center gap-1.5">
-            <p className="text-[9px] font-black tracking-[0.3em] text-white/45">WEATHER</p>
+            <p className="text-[12px] font-black tracking-[0.3em] text-white/50">WEATHER</p>
             <div className="flex flex-wrap items-center justify-center gap-2">
               <button type="button" onClick={toggleKartRain} aria-pressed={kartRain} title="Rain: a wet road and falling rain. Looks only - handling, grip and speed are the same."
                 aria-label={`Rain ${kartRain ? 'on' : 'off'} — looks only, handling is unchanged`}
-                className={`rounded-full border px-3 py-1 text-[10px] font-black tracking-wider transition ${kartRain ? '' : 'text-white/80 hover:bg-white/10'}`}
+                className={`rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${kartRain ? '' : 'text-white/80 hover:bg-white/10'}`}
                 style={kartRain ? { background: hudColor('info'), borderColor: hudColor('info'), color: hudColor('ink') } : { borderColor: hudColor('info', 0.53) }}>
                 RAIN {kartRain ? 'ON' : 'OFF'}
               </button>
@@ -663,21 +702,21 @@ export function SplashCard(props: BootSplashProps) {
 
         {race && (props.phase === 'ready' || props.phase === 'loading') && readyVehicles(race).length > 1 && (
           <div className="mt-2 flex flex-col items-center gap-1.5">
-            <p className="text-[9px] font-black tracking-[0.3em] text-white/45">{race === 'kart' ? 'KART' : 'AIRCRAFT'}</p>
+            <p className="text-[12px] font-black tracking-[0.3em] text-white/50">{race === 'kart' ? 'KART' : 'AIRCRAFT'}</p>
             <div className="flex flex-wrap items-center justify-center gap-2">
               {readyVehicles(race).map((r) => (
                 <button key={r.id} type="button" onClick={() => pickRide(r.id)} title={r.sub}
                   aria-label={`${r.name} — ${r.sub}`} aria-pressed={r.id === ride}
-                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-[10px] font-black tracking-wider transition ${r.id === ride ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
-                  style={r.id === ride ? { background: r.tint, borderColor: r.tint } : { borderColor: `${r.tint}88` }}>
-                  <Bars bars={r.bars} tint={r.id === ride ? '#000' : r.tint} />
+                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${r.id === ride ? '' : 'text-white/80 hover:bg-white/10'}`}
+                  style={r.id === ride ? pickedChip(r.tint) : { borderColor: `${r.tint}88` }}>
+                  <Bars bars={r.bars} tint={r.id === ride ? chipInk(r.tint) : r.tint} />
                   {r.name}
                 </button>
               ))}
             </div>
             {/* the SUB names the cost. A vehicle pick with no downside is not a choice, so the screen says
                 what you are giving up rather than only what you are getting. */}
-            <p className="max-w-[24rem] text-[9px] leading-tight tracking-wide text-white/40">
+            <p className="max-w-[24rem] text-[12px] leading-tight tracking-wide text-white/50">
               {readyVehicles(race).find((r) => r.id === ride)?.sub ?? ''}
             </p>
           </div>
@@ -685,19 +724,19 @@ export function SplashCard(props: BootSplashProps) {
 
         {isWeaponMode && (props.phase === 'ready' || props.phase === 'loading') && readyWeapons().length > 1 && (
           <div className="mt-3 flex flex-col items-center gap-1.5">
-            <p className="text-[9px] font-black tracking-[0.3em] text-white/45">WEAPON</p>
+            <p className="text-[12px] font-black tracking-[0.3em] text-white/50">WEAPON</p>
             <div className="flex flex-wrap items-center justify-center gap-2">
               {readyWeapons().map((w) => (
                 <button key={w.id} type="button" onClick={() => pickWeapon(w.id)} title={w.sub}
                   aria-label={`${w.name} — ${w.sub}`} aria-pressed={w.id === weapon}
-                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-[10px] font-black tracking-wider transition ${w.id === weapon ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
-                  style={w.id === weapon ? { background: w.tint, borderColor: w.tint } : { borderColor: `${w.tint}88` }}>
-                  <Bars bars={{ speed: w.bars.reach, hold: w.bars.speed, edge: w.bars.power }} tint={w.id === weapon ? '#000' : w.tint} />
+                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${w.id === weapon ? '' : 'text-white/80 hover:bg-white/10'}`}
+                  style={w.id === weapon ? pickedChip(w.tint) : { borderColor: `${w.tint}88` }}>
+                  <Bars bars={{ speed: w.bars.reach, hold: w.bars.speed, edge: w.bars.power }} tint={w.id === weapon ? chipInk(w.tint) : w.tint} />
                   {w.name}
                 </button>
               ))}
             </div>
-            <p className="max-w-[24rem] text-[9px] leading-tight tracking-wide text-white/40">
+            <p className="max-w-[24rem] text-[12px] leading-tight tracking-wide text-white/50">
               {readyWeapons().find((w) => w.id === weapon)?.sub ?? ''}
             </p>
           </div>
@@ -705,18 +744,18 @@ export function SplashCard(props: BootSplashProps) {
 
         {isStyleMode && (props.phase === 'ready' || props.phase === 'loading') && (
           <div className="mt-3 flex flex-col items-center gap-1.5">
-            <p className="text-[9px] font-black tracking-[0.3em] text-white/45">FIGHTING STYLE</p>
+            <p className="text-[12px] font-black tracking-[0.3em] text-white/50">FIGHTING STYLE</p>
             <div className="flex flex-wrap items-center justify-center gap-2">
               {readySchools().map((sc) => (
                 <button key={sc.id} type="button" onClick={() => pickSchool(sc.id)} title={sc.sub}
                   aria-label={`${sc.name} — ${sc.sub}`} aria-pressed={sc.id === style.primary}
-                  className={`rounded-full border px-3 py-1 text-[10px] font-black tracking-wider transition ${sc.id === style.primary ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
-                  style={sc.id === style.primary ? { background: sc.tint, borderColor: sc.tint } : { borderColor: `${sc.tint}88` }}>
+                  className={`rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${sc.id === style.primary ? '' : 'text-white/80 hover:bg-white/10'}`}
+                  style={sc.id === style.primary ? pickedChip(sc.tint) : { borderColor: `${sc.tint}88` }}>
                   {sc.name}
                 </button>
               ))}
             </div>
-            <p className="max-w-[24rem] text-[9px] leading-tight tracking-wide text-white/40">
+            <p className="max-w-[24rem] text-[12px] leading-tight tracking-wide text-white/50">
               {schoolById(style.primary).sub}
             </p>
 
@@ -724,12 +763,12 @@ export function SplashCard(props: BootSplashProps) {
                 different blends of fighting styles". Safe at every setting by construction: both schools
                 spend the same trait budget and a mix is a convex combination, so no blend can exceed it. */}
             <div className="mt-1 flex flex-wrap items-center justify-center gap-1.5">
-              <span className="text-[9px] font-black tracking-[0.3em] text-white/35">BLEND WITH</span>
+              <span className="text-[12px] font-black tracking-[0.3em] text-white/50">BLEND WITH</span>
               {readySchools().filter((sc) => sc.id !== style.primary).map((sc) => (
                 <button key={sc.id} type="button" aria-pressed={sc.id === style.secondary}
                   onClick={() => setBlend({ primary: style.primary, secondary: sc.id, mix: style.mix > 0 ? style.mix : 0.3 })}
-                  className={`rounded-full border px-2 py-0.5 text-[9px] font-bold tracking-wider transition ${sc.id === style.secondary ? 'text-black' : 'text-white/60 hover:bg-white/10'}`}
-                  style={sc.id === style.secondary ? { background: sc.tint, borderColor: sc.tint } : { borderColor: 'rgba(255,255,255,0.18)' }}>
+                  className={`rounded-full border px-2 py-0.5 text-[12px] font-bold tracking-wider transition ${sc.id === style.secondary ? '' : 'text-white/60 hover:bg-white/10'}`}
+                  style={sc.id === style.secondary ? pickedChip(sc.tint) : { borderColor: 'rgba(255,255,255,0.18)' }}>
                   {sc.name}
                 </button>
               ))}
@@ -743,7 +782,7 @@ export function SplashCard(props: BootSplashProps) {
                   onChange={(e) => setBlend({ ...style, mix: Number(e.currentTarget.value) / 100 })}
                   className="w-full accent-white"
                 />
-                <span className="font-mono text-[10px] font-black tracking-wider text-white/80">{blendName(style)}</span>
+                <span className="font-mono text-[12px] font-black tracking-wider text-white/80">{blendName(style)}</span>
                 {/* the six traits of the blend you are actually going to fight with — the slider is only
                     meaningful if you can see what it does */}
                 <div className="flex items-end gap-2">
@@ -753,7 +792,7 @@ export function SplashCard(props: BootSplashProps) {
                       <span key={k} className="flex flex-col items-center gap-0.5">
                         <span className="inline-block w-[6px] rounded-sm"
                           style={{ height: Math.max(2, Math.round(v * 14)), background: v >= 1 ? '#8fe0a0' : '#e0847a', opacity: 0.85 }} />
-                        <span className="text-[7px] uppercase tracking-wider text-white/35">{k}</span>
+                        <span className="text-[12px] uppercase tracking-wider text-white/50">{k}</span>
                       </span>
                     );
                   })}
@@ -765,20 +804,20 @@ export function SplashCard(props: BootSplashProps) {
 
         {hasTiers && (props.phase === 'ready' || props.phase === 'loading') && (
           <div className="mt-3 flex flex-col items-center gap-1.5">
-            <p className="text-[9px] font-black tracking-[0.3em] text-white/45">OPPONENT</p>
+            <p className="text-[12px] font-black tracking-[0.3em] text-white/50">OPPONENT</p>
             <div className="flex flex-wrap items-center justify-center gap-2">
               {tierList().map((t) => (
                 <button key={t.id} type="button" onClick={() => pickTier(t.id)} title={t.sub}
                   aria-label={`${t.name} — ${t.sub}`} aria-pressed={t.id === tier}
-                  className={`rounded-full border px-3 py-1 text-[10px] font-black tracking-wider transition ${t.id === tier ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
-                  style={t.id === tier ? { background: t.tint, borderColor: t.tint } : { borderColor: `${t.tint}88` }}>
+                  className={`rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${t.id === tier ? '' : 'text-white/80 hover:bg-white/10'}`}
+                  style={t.id === tier ? pickedChip(t.tint) : { borderColor: `${t.tint}88` }}>
                   {t.name}
                 </button>
               ))}
             </div>
             {/* the line says what the opponent is LIKE, never "easy" or "hard" — a tier is a different
                 opponent, not the same one with a handicap */}
-            <p className="max-w-[24rem] text-[9px] leading-tight tracking-wide text-white/40">
+            <p className="max-w-[24rem] text-[12px] leading-tight tracking-wide text-white/50">
               {profileFor(tier).sub}
             </p>
           </div>
@@ -836,4 +875,19 @@ export function ejectTransition(mount: HTMLElement): Promise<void> {
     requestAnimationFrame(() => { el.style.transform = 'translateY(0)'; });
     setTimeout(() => { resolve(); setTimeout(() => el.remove(), 400); }, 360);
   });
+}
+
+/** CONTROLLER-TRY-FIX item 4 (C5): 'or press any button' under TAP TO START while a pad is in — the night card's own words
+ *  (dunk-babylon). Read after mount (the browser's pads), so the server's markup is the old card exactly; nothing without a pad. */
+export const PAD_START_LINE = 'or press any button';
+export function PadStartLine() {
+  const [pad, setPad] = useState(false);
+  useEffect(() => {
+    const read = (): void => setPad(detectPadFamily() !== null);
+    read();
+    window.addEventListener('gamepadconnected', read);
+    window.addEventListener('gamepaddisconnected', read);
+    return () => { window.removeEventListener('gamepadconnected', read); window.removeEventListener('gamepaddisconnected', read); };
+  }, []);
+  return pad ? <span data-pad-start-line className="mt-1 font-mono text-xs text-white/60">{PAD_START_LINE}</span> : null;
 }

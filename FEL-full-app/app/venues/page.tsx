@@ -34,7 +34,7 @@ export default async function VenuesPage() {
       aside={
         <Link
           href="/play"
-          className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-3.5 py-2 text-[12.5px]
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/10 px-3.5 py-2 text-[12px]
                      font-bold text-white/60 transition-colors hover:border-white/25 hover:text-white"
         >
           <ArrowLeft className="h-4 w-4" /> All modes

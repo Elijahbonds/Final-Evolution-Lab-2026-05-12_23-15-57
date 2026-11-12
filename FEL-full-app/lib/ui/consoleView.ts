@@ -9,7 +9,7 @@
 //     laptop or console browser on a TV at 1920x1080 or 1280x720 — kept the page layout: the 52 px header, a 1200 px
 //     max-width column, and the hosts' 16:10 / `100dvh - 3.25rem` boxes, so the game was a framed window with black
 //     around it and the page scrolled.
-//   - The HUD is drawn in fixed CSS pixels (text-[10px], text-xs, 96 px sticks). At 1080 px tall that is 1 % of the
+//   - The HUD is drawn in fixed CSS pixels (text-[12px], text-xs, 96 px sticks). At 1080 px tall that is 1 % of the
 //     screen height — a caption you cannot read from a couch — while the same pixels on a 390 px phone are 2.6 %.
 //   - The HUD and the touch deck were anchored 12 px from the edge: under a landscape iPhone's notch, and inside the
 //     strip a TV overscans off the picture.

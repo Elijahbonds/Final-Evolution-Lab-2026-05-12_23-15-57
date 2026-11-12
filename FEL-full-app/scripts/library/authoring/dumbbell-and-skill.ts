@@ -61,7 +61,7 @@ export const DUMBBELL_AND_SKILL: Family[] = [
     variants: [
       { name: 'Dumbbell Squeeze Press', v: 'squeeze-press', level: 'intermediate', equipment: ['dumbbell', 'bench'], setup: 'Lie on a bench, two dumbbells pressed together over the chest.', cue: 'Press the dumbbells into each other the whole rep as they travel.' },
       { name: 'Dumbbell Landmine-Angle Press', v: 'angle-press', level: 'beginner', laterality: 'unilateral', setup: 'Split stance, one dumbbell at the shoulder held by the top end.', cue: 'Press the dumbbell up and forward at an angle, toward the top of the wall ahead.' },
-      { name: 'Dumbbell Arnold-Style Press', v: 'rotating-press', level: 'intermediate', setup: 'Seated or standing, dumbbells at the shoulders, palms facing you.', cue: 'Turn the palms out as you press up toward the ceiling, and back on the way down.', cautions: ['Needs comfortable overhead range.'] },
+      { name: 'Dumbbell Arnold-Style Press', v: 'rotating-press', level: 'intermediate', setup: 'Seated or standing, dumbbells at the shoulders, palms facing you.', cue: 'Turn your palms out as you press up toward the ceiling, and back on the way down.', cautions: ['Needs comfortable overhead range.'] },
       { name: 'Dumbbell Pullover', v: 'pullover', level: 'intermediate', equipment: ['dumbbell', 'bench'], setup: 'Lie on a bench, one dumbbell held over the chest by the top end in both hands.', cue: 'Lower the dumbbell back over your head toward the floor on an arc, then return.', primary: ['lats', 'chest'], secondary: ['triceps', 'serratus'], cautions: ['Needs comfortable overhead range.'] },
       { name: 'Dumbbell Incline Y Raise', v: 'incline-y', level: 'beginner', equipment: ['dumbbell', 'bench'], setup: 'Lie face down on a low incline bench, a light dumbbell hanging in each hand.', cue: 'Lift the dumbbells up and out in a Y toward the wall ahead, thumbs up.', primary: ['mid-back', 'rear-delts'], secondary: ['rotator-cuff'], pattern: 'pull', goals: ['shoulder', 'posture'] },
       { name: 'Dumbbell Renegade Row', v: 'renegade', level: 'advanced', laterality: 'alternating', setup: 'High plank with the hands on two dumbbells, feet wide.', cue: 'Row one dumbbell to your ribs while the other pushes the floor away; hips still.', primary: ['lats', 'mid-back', 'deep-core'], secondary: ['obliques', 'biceps'], pattern: 'pull', goals: ['trunk'] },
@@ -100,7 +100,7 @@ export const DUMBBELL_AND_SKILL: Family[] = [
     dosage: reps(3, '8 makes', 30),
     variants: [
       { name: 'Two-Cone Finish Read', v: 'two-cone', level: 'intermediate', setup: 'Two cones near the basket; a partner points to one as you drive.', cue: 'Finish on the side away from the cone your partner points to.' },
-      { name: 'Drive and Kick Footwork', v: 'drive-kick', level: 'intermediate', cue: 'Drive past the cone, jump stop, and pass the ball out to a target on the wall.', goals: ['handles', 'footwork'] },
+      { name: 'Drive and Kick Footwork', v: 'drive-kick', level: 'intermediate', cue: 'Drive past the cone, jump stop, and pass the ball to a target on the wall.', goals: ['handles', 'footwork'] },
       { name: 'Pro-Hop Finish', v: 'pro-hop', level: 'advanced', cue: 'Hop past the cone onto both feet, then rise strong with the ball high.' },
       { name: 'Crossover Gather Finish', v: 'cross-gather', level: 'advanced', cue: 'Cross the ball low at the cone, gather on the next step, and finish soft.' },
     ],

@@ -1,8 +1,8 @@
 // flow — the Quick Screen's steps before the camera, as a pure reducer (SCREEN-SHIP, 2026-09-29; SCREEN-FIX).
 //
 //   start → age → (under 18 or no age: "A grown-up is with me") → "Does anything hurt right now?"
-//         → "Which foot do you take off from when you jump?" (SCREEN A, tap: Left / Right / Not sure) → the camera card
-//         → camera
+//         → "Which foot do you take off from when you jump?" (SCREEN A, tap: Left / Right / Not sure; the full screen
+//         only — VERTICAL-EASY: the jump alone skips it) → the camera card → camera
 //
 // The age is asked ONCE per run: a `start` carrying a locked answer (lib/screen/store.ts lockAge) skips the question —
 // and since AGE-RESET (audit 2.2, 2026-10-03) the page clears the answer on every new Start, so a `start` in practice
@@ -20,8 +20,21 @@ import { needsGrownUp, type AgeBand } from './age';
 
 export type PreStep = 'intro' | 'age' | 'grownUp' | 'pain' | 'painStop' | 'takeoff' | 'cameraInfo' | 'camera';
 
-/** Jump-only runs T5. Full runs T1–T3 and T5. A start with no kind is the full screen. */
-export type ScreenKind = 'jump' | 'full';
+/**
+ * Jump-only runs T5. Full runs T1–T3 and T5. A start with no kind is the full screen. VERTICAL-EASY (owner, 2026-10-27):
+ * 'vertical' is "Measure my vertical" — T5 read arms free, its own series on the device (lib/vertical/series.ts); 'jump'
+ * stays the hands-on-hips jump check whose number the server's jump rows hold.
+ */
+export type ScreenKind = 'jump' | 'vertical' | 'full';
+/** The runs that measure the jump alone (no take-off foot asked). */
+export const isJumpOnly = (k: ScreenKind): boolean => k === 'jump' || k === 'vertical';
+/**
+ * SCREEN-EASY (owner, 2026-10-28: "Screening needs to be faster and easier"): the runs that ask the take-off foot —
+ * none now. Measured: nothing on the Quick Screen's result reads it (it labelled findings the results page never shows,
+ * and the landing record's jump is not sided), so the runner gets null: unknown, never a guessed foot (SCREEN A
+ * requirement 2 still holds — no default foot). A check that needs it later lists its run here and the tap comes back.
+ */
+export const ASKS_TAKEOFF: ReadonlySet<ScreenKind> = new Set<ScreenKind>();
 
 export interface PreState {
   step: PreStep;
@@ -57,7 +70,7 @@ export function backStep(s: PreState): PreState {
     case 'age': case 'grownUp': case 'painStop': return PRE_START;
     case 'pain': return s.age && needsGrownUp(s.age) ? { step: 'grownUp', age: s.age, gate: null, kind: s.kind } : PRE_START;
     case 'takeoff': return { ...s, step: 'pain' };
-    case 'cameraInfo': return { ...s, step: 'takeoff' };
+    case 'cameraInfo': return { ...s, step: ASKS_TAKEOFF.has(s.kind) ? 'takeoff' : 'pain' };
     case 'camera': return { ...s, step: 'cameraInfo' };
   }
 }
@@ -79,7 +92,10 @@ export function preStep(s: PreState, e: PreEvent, now: Date = new Date()): PreSt
       return backStep(s);
     case 'pain':
       if (s.step !== 'pain' || !s.gate) return s;
-      return e.hurts ? { step: 'painStop', age: s.age, gate: null, kind: s.kind } : { ...s, step: 'takeoff' };
+      // VERTICAL-EASY (2026-10-27): the jump alone never asks the take-off foot. It labels the sided checks only (the
+      // full screen's), and the jump's own number does not use it; "Do the full screen" asks it then (assess-app.tsx).
+      if (e.hurts) return { step: 'painStop', age: s.age, gate: null, kind: s.kind };
+      return ASKS_TAKEOFF.has(s.kind) ? { ...s, step: 'takeoff' } : { ...s, step: 'cameraInfo' };
     case 'takeoff':
       if (s.step !== 'takeoff' || !s.gate) return s;
       return { ...s, step: 'cameraInfo' };

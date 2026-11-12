@@ -65,6 +65,8 @@ export interface MarketCard {
   fromPriceCents: number | null;
   fromMonthly: boolean;
   acceptingClients: boolean;
+  /** COACH-DELIVERY COA-10: shown client reviews (count, average), when there are any. */
+  rating?: { count: number; avg: number } | null;
 }
 
 /** The listed coaches matching a query. A coach not accepting clients is still listed (their page says so), after the rest. */

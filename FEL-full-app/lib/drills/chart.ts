@@ -24,7 +24,8 @@ export type CoachPrompt =
  * about 2 m of floor and a camera in front (owner's decision: jumping in place, approaches become steps).
  */
 export interface DrillSource {
-  book: 'playbook' | 'art-of-dunking';
+  /** PLAT-P09: 'fel' = FEL's own drill (the ball-skill shelf, hoopsDrills.ts): no book has it; chapter 0. */
+  book: 'playbook' | 'art-of-dunking' | 'fel';
   chapter: number;
   section: string;
   adapted?: string;
@@ -61,6 +62,11 @@ export interface DrillPhase {
   pacer?: { from: number; inSec: number; holdSec: number; outSec: number; rounds: number };
   /** Set when the phase is its own section of the book (the wake-up's six phases). */
   source?: DrillSource;
+  /**
+   * YOUTH-CONTACT-CAP (PM, 2026-10-26): adults only for now — about 60 jump contacts in one go, over the 55 a session
+   * FEL allows under 18. Held for a youth athlete whatever else is true (a coach's Prime jumps included).
+   */
+  adultOnly?: true;
 }
 
 export interface Drill {
@@ -72,6 +78,8 @@ export interface Drill {
   /** What the book says to look at, as ids for the form read (phase 10): knee90, hipsBack, kneeOverFoot … */
   checks: string[];
   phases: DrillPhase[];
+  /** YOUTH-CONTACT-CAP (PM, 2026-10-26): the whole drill is adults only for now (see DrillPhase.adultOnly). */
+  adultOnly?: true;
 }
 
 // ── layout rules (the chart tests hold every drill to these) ─────────────────────────────────────────────────────────

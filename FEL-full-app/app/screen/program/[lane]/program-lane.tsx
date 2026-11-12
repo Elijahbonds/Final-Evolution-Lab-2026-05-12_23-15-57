@@ -15,6 +15,7 @@
 // page no longer reads NEXT_PUBLIC_PROGRAM_SIGNUP_ENABLED, until the email waitlist can save safely.
 // "Not a medical exam" shows ONCE on every version of this page (S-13): DISCLAIMER, then the stop line.
 import { useEffect, useState } from 'react';
+import { notice } from '@/lib/every-screen/notices';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Dumbbell } from 'lucide-react';
@@ -57,7 +58,7 @@ export function ProgramLaneView({ lane, state, dunkHref = null }: { lane: LaneSl
     return (
       <div data-parent-view className="space-y-3">
         <div className="space-y-1">
-          <p className="text-[16px] text-white/60">{DISCLAIMER}</p>
+          <p {...notice('medical')} className="text-[16px] text-white/60">{DISCLAIMER}</p>
           <StopLine />
         </div>
         <ParentCard />
@@ -74,7 +75,7 @@ export function LaneBody({ lane, s, dunkHref = null }: { lane: LaneSlug; s: Scre
   if (!s.lane) {
     return (
       <StepCard testId="no-pick">
-        <p className="text-[16px] text-white/60">{DISCLAIMER}</p>
+        <p {...notice('medical')} className="text-[16px] text-white/60">{DISCLAIMER}</p>
         <StopLine className="mt-1 text-[16px] text-white/70" />
         <p className="mt-3 text-[16px] leading-snug text-white/80">Your screen was not finished, so there is no program pick yet. {NO_PICK_LINE}</p>
         <Link href={RESULTS_PATH} prefetch={false} data-back-to-results className={`${quietBtn} mt-4`}>{BACK_TO_RESULTS}</Link>
@@ -87,7 +88,7 @@ export function LaneBody({ lane, s, dunkHref = null }: { lane: LaneSlug; s: Scre
   return (
     <div data-lane-page={lane} className="space-y-3">
       <div className="space-y-1">
-        <p className="text-[16px] text-white/60">{DISCLAIMER}</p>
+        <p {...notice('medical')} className="text-[16px] text-white/60">{DISCLAIMER}</p>
         <StopLine />
       </div>
       <section data-lane-header className="rounded-3xl border border-[#00E5FF]/30 bg-[#00E5FF]/[0.05] p-4">

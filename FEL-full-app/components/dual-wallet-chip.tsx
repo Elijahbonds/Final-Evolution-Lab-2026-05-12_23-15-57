@@ -32,6 +32,11 @@ type FetchState = 'loading' | 'ready' | 'error';
 // the reason with the balance (refund_notes). Each note pops once: its ledger id is remembered on this device, and in
 // memory too, so a blocked localStorage still shows it once per page load rather than on every refocus. The wallet
 // history keeps the same words for good.
+/** EVERY-SCREEN P5: the earn the chip fires itself (below), shown by the chip rather than as a toast; and how long a gain shows. */
+const DAILY_EVENT = 'daily_first_session';
+const GAIN_MS = 2600;
+/** EVERY-SCREEN P5: whether an earn shows by the chip (quietly) rather than as a toast over the screen. */
+export const quietGain = (event: string | undefined): boolean => event === DAILY_EVENT;
 const REFUND_SEEN_KEY = 'fel:refund_notes_seen';
 const refundSeenThisLoad = new Set<string>();
 
@@ -83,6 +88,7 @@ export function DualWalletChip({ className }: DualWalletChipProps) {
   const lc = useCountUp();   // lab credits — the arena's and the shop's currency, folded into the wallet 2026-09-04
   const seq = useRef(0);
   const firedRef = useRef(false);
+  const [gain, setGain] = useState<string | null>(null);
   const lastRef = useRef<{ coins: number; shards: number; lc: number } | null>(null);   // last balances we showed — a replayed earn returns the same ones
 
   // PACK THE FIVE #2 (2026-09-04): the first-session faucet. DAILY_FIRST_SESSION existed as a rule with no client
@@ -107,7 +113,7 @@ export function DualWalletChip({ className }: DualWalletChipProps) {
     let who = '';
     try { const s = await fetch('/api/auth/session', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)); who = String((s?.user as { id?: string; email?: string } | undefined)?.id ?? (s?.user as { email?: string } | undefined)?.email ?? ''); } catch { /* no session → no faucet */ }
     if (!who) return;
-    const ok = await reportEarn({ idempotency_key: `daily_first_session:${day}:${who}`, event_type: 'daily_first_session', payload: { day, source: 'wallet-chip' } });
+    const ok = await reportEarn({ idempotency_key: `daily_first_session:${day}:${who}`, event_type: DAILY_EVENT, payload: { day, source: 'wallet-chip' } });
     if (ok) { try { window.localStorage.setItem(mark, '1'); } catch { /* fine */ } }
   }, []);
 
@@ -152,10 +158,18 @@ export function DualWalletChip({ className }: DualWalletChipProps) {
         if (g.coins > 0) parts.push(`+${g.coins.toLocaleString('en-US')} coins`);
         if (g.shards > 0) parts.push(`+${g.shards} shards`);
         if ((g.lc ?? 0) > 0) parts.push(`+${(g.lc as number).toLocaleString('en-US')} credits`);
-        toast.success(parts.join('  ·  '), {
-          description: detail?.capped ? 'Daily cap reached — reduced reward' : undefined,
-          duration: 2600,
-        });
+        // EVERY-SCREEN P5: the daily first-session bonus lands on whatever screen opens first, so its toast sat over that
+        // screen's own first tap (the rig: /coach's timing check). It shows by the chip instead: same words and amount,
+        // drawn over nothing that takes a tap (pointer-events-none) and out of the layout (absolute), so nothing moves.
+        if (quietGain(detail?.event)) {
+          setGain(`${parts.join('  ·  ')}${detail?.capped ? ' · Daily cap reached — reduced reward' : ''}`);
+          window.setTimeout(() => setGain(null), GAIN_MS);
+        } else {
+          toast.success(parts.join('  ·  '), {
+            description: detail?.capped ? 'Daily cap reached — reduced reward' : undefined,
+            duration: GAIN_MS,
+          });
+        }
       }
       // Reconcile against the server in case of caps/rounding.
       void refresh();
@@ -184,9 +198,13 @@ export function DualWalletChip({ className }: DualWalletChipProps) {
 
   return (
     <div
-      className={cn('inline-flex items-center gap-1.5', className)}
+      className={cn('relative inline-flex items-center gap-1.5', className)}
       aria-label="Coins, shards and lab credits balance"
     >
+      <span role="status" aria-live="polite" data-wallet-gain={gain ? '1' : '0'}
+        className={cn('pointer-events-none absolute left-0 top-full z-10 mt-1 whitespace-nowrap rounded-md bg-[#FFD700] px-2 py-0.5 font-mono text-xs font-bold text-black transition-opacity', gain ? 'opacity-100' : 'opacity-0')}>
+        {gain ?? ''}
+      </span>
       {/* Coins */}
       <span
         className="inline-flex items-center gap-1.5 rounded-md border border-[#FFD700]/40 bg-[#FFD700]/5 px-2.5 py-1 font-mono text-xs text-[#FFD700]"

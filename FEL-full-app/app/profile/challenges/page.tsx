@@ -42,7 +42,7 @@ export default async function ChallengesPage() {
   return (
     <main className="mx-auto max-w-[640px] space-y-6 px-4 py-8 pb-24">
       <header>
-        <div className="font-mono text-[11px] uppercase tracking-[0.2em] text-white/40">Friends</div>
+        <div className="font-mono text-[12px] uppercase tracking-[0.2em] text-white/50">Friends</div>
         <h1 className="fel-heading text-3xl font-bold text-white">Challenges</h1>
         <p className="mt-1 text-sm text-white/55">Send a score to beat. It stays open for 48 hours.</p>
       </header>
@@ -70,9 +70,9 @@ export default async function ChallengesPage() {
                 <li key={r.code} className="flex items-center justify-between gap-3 py-2.5">
                   <div className="min-w-0">
                     <div className="truncate text-sm text-white">{challengeTitle(r.modeKey, { metric: null })}</div>
-                    <div className="font-mono text-[11px] text-white/50">You {formatChallengeScore({ metric: null }, r.score)} · them {formatChallengeScore({ metric: null }, r.target)} · {o === 'won' ? 'you won' : o === 'tie' ? 'tie' : 'they won'}</div>
+                    <div className="font-mono text-[12px] text-white/50">You {formatChallengeScore({ metric: null }, r.score)} · them {formatChallengeScore({ metric: null }, r.target)} · {o === 'won' ? 'you won' : o === 'tie' ? 'tie' : 'they won'}</div>
                   </div>
-                  <Link href={`/c/${encodeURIComponent(r.code)}`} className="shrink-0 rounded-md border border-[#00E5FF]/40 px-3 py-1.5 font-mono text-[11px] text-[#00E5FF]">Rematch</Link>
+                  <Link href={`/c/${encodeURIComponent(r.code)}`} className="shrink-0 rounded-md border border-[#00E5FF]/40 px-3 py-1.5 font-mono text-[12px] text-[#00E5FF]">Rematch</Link>
                 </li>
               );
             })}
@@ -83,7 +83,11 @@ export default async function ChallengesPage() {
       <section className="fel-panel rounded-2xl p-5" aria-labelledby="sent-h">
         <h2 id="sent-h" className="fel-heading text-lg font-bold text-white">You sent</h2>
         {sent.length === 0 ? (
-          <p className="mt-2 text-sm text-white/55">Nothing yet. Finish a run and tap Challenge on the result.</p>
+          <>
+            <p className="mt-2 text-base text-white/55">Nothing yet. Finish a run and tap Challenge on the result.</p>
+            {/* EVERY-SCREEN P8: the empty state leads on (the label is the Play tab's own) */}
+            <Link href="/play" className="mt-2 inline-flex min-h-11 items-center text-[14px] font-bold text-fel-cyan">Play →</Link>
+          </>
         ) : (
           <ul className="mt-3 divide-y divide-white/10">
             {sent.map((l) => {
@@ -94,9 +98,9 @@ export default async function ChallengesPage() {
                 <li key={l.code} className="flex items-center justify-between gap-3 py-2.5">
                   <div className="min-w-0">
                     <div className="truncate text-sm text-white">{challengeTitle(l.modeKey, terms)} · {formatChallengeScore(terms, l.score)}</div>
-                    <div className="font-mono text-[11px] text-white/50">{l.opened} opened · {l.attempted} played · {l.beaten} beat it{left ? ` · ${left}` : ''}</div>
+                    <div className="font-mono text-[12px] text-white/50">{l.opened} opened · {l.attempted} played · {l.beaten} beat it{left ? ` · ${left}` : ''}</div>
                   </div>
-                  <Link href={`/c/${encodeURIComponent(l.code)}`} className="shrink-0 font-mono text-[11px] text-white/60 underline-offset-4 hover:underline">Open</Link>
+                  <Link href={`/c/${encodeURIComponent(l.code)}`} className="shrink-0 font-mono text-[12px] text-white/60 underline-offset-4 hover:underline">Open</Link>
                 </li>
               );
             })}

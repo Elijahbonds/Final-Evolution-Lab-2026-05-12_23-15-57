@@ -206,7 +206,7 @@ export function auditHinge(
   if (!side) {
     return {
       faults: (['hingeRatio', 'dowelLine', 'shinAngle'] as HingeFaultId[]).map((id) => unreadable(id, undefined)),
-      readableFrames: 0, note: 'Too little of you in view to tell which side is toward the camera.',
+      readableFrames: 0, note: 'Step back so your whole body is in the shot.',
     };
   }
 
@@ -288,8 +288,9 @@ export function auditHinge(
   // whichever phase-4/5 lane wires up the per-athlete store, and this reading calibrates fresh from its own frames.
   void ctx.baseline;
   const note = hr.status === 'unreadable'
-    ? 'Estimated: not enough hip travel in this clip to read a hinge ratio.'
-    : `Estimated: hinge ratio ${hr.value.toFixed(2)} (hip:knee) · dowel line ${faults[1].status === 'unreadable' ? 'not read' : `${faults[1].value.toFixed(0)}° off`} · shin ${faults[2].status === 'unreadable' ? 'not read' : `${faults[2].value.toFixed(0)}°`}`;
+    ? 'Your hips did not move back enough in this clip to read. Push them back further next time.'
+    // CUE-REWRITE: each number with what it is ("hinge ratio 1.40 (hip:knee)" → how much more the hips bent than the knees)
+    : `Estimated: your hips bent about ${hr.value.toFixed(1)} times as much as your knees · back line ${faults[1].status === 'unreadable' ? 'not read' : `about ${faults[1].value.toFixed(0)}° off straight`} · shins ${faults[2].status === 'unreadable' ? 'not read' : `tipped about ${faults[2].value.toFixed(0)}°`}`;
 
   return { faults, readableFrames, note };
 }
@@ -300,27 +301,29 @@ export function auditHinge(
 // MIRROR-COACH P9 (2026-09-30): reworded to FEL's external-focus policy (lib/coach/cueLint.ts, whose test lints this
 // table): a cue that names a body part leads with the floor, the wall, the ceiling, the camera or the load, and nothing
 // names a muscle to squeeze or feel. The fault each line answers, and its three levels, are unchanged.
+// CUE-REWRITE (2026-10-27): cue, escalate and reply are said mid-rep (2–5 words, docs/CUE-STYLE.md); regress is said
+// when the set stops (one plain action, ≤ 14 words). Same faults, same intent; before/after in docs/CUE-AUDIT.md.
 export const HINGE_CUES: readonly CueRule[] = [
   {
     faultId: 'hingeRatio',
-    cue: 'Close a door behind you with your hips — more hips back, and the knee stays soft.',
-    escalate: 'Still squatting it. Send the hips back to the wall behind you before the knee bends at all.',
-    regress: 'Hands on a wall or a doorframe. Hinge back only until the stretch stops you, no lower — the range earns itself.',
-    reply: 'Hips back to the wall behind you.',
+    cue: 'Hips back, knees soft',
+    escalate: 'Slower. Hips back first.',
+    regress: 'Hands on a wall. Push your hips back only as far as is comfortable.',
+    reply: 'Hips back',
   },
   {
     faultId: 'dowelLine',
-    cue: 'Hinge as if a broomstick lies along your back — it stays touching your head and your hips.',
-    escalate: 'That line is still breaking. Eyes to a spot on the floor a few feet ahead, then hinge without losing the broomstick.',
-    regress: 'Pick a spot on the floor a few feet ahead and hold your eyes there the whole rep — the line follows the eyes.',
-    reply: 'Keep the broomstick touching, head to hips.',
+    cue: 'Back flat, like a board',
+    escalate: 'Slower. Keep your back flat.',
+    regress: 'Look at a spot on the floor ahead and keep your eyes there.',
+    reply: 'Long, flat back',
   },
   {
     faultId: 'shinAngle',
-    cue: 'Send the hips back toward the wall behind you — the shin stays still, the knee stays put.',
-    escalate: 'Still drifting forward. Sit back toward your heels as the hips travel back to the wall.',
-    regress: 'Stand an inch off a wall behind you. If your knee taps it, the shin travelled too far — reset and go slower.',
-    reply: 'Hips to the wall, knee stays put.',
+    cue: 'Hips back, shins still',
+    escalate: 'Slower. Shins stay still.',
+    regress: 'Face a wall an inch away. If your knee taps it, go slower.',
+    reply: 'Shins stay still',
   },
 ];
 

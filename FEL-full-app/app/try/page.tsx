@@ -2,6 +2,8 @@ import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
 import { GuestDunkShell } from '@/components/games/guest-dunk-shell';
+import { reviewOfferHref } from '@/lib/coach-store/storeOffers';
+import { isTryAgeBandsEnabled } from '@/lib/flags';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,5 +19,5 @@ export default async function TryPage({ searchParams }: { searchParams: { c?: st
   if (session) {
     redirect(code ? `/play/dunk?c=${code}` : '/play/dunk');
   }
-  return <GuestDunkShell challengeCode={code} />;
+  return <GuestDunkShell challengeCode={code} reviewHref={reviewOfferHref()} ageBands={isTryAgeBandsEnabled()} />;   // STORE-OFFER-1: null (no button) while the store flag is off
 }

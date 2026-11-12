@@ -31,7 +31,8 @@ describe('one exercise, with its coaching', () => {
     const e = todayExercise(tree({ section: 'key', isKeySet: true, effortBand: 'drive', setupCues: ['tripod-down', 'nonsense-id'], workSeconds: null }), FULL, names);
     expect(e.coaching.cues).toEqual(['Elbows inside the knees', 'Spread the floor', 'Chest proud']);   // three, the catalogue's limit
     expect(e.coaching.faults).toEqual([{ fault: 'Knees drift in', fix: 'Push the knees out over the toes' }, { fault: 'Heels lift', fix: null }]);
-    expect(e.coaching.demo).toEqual({ kind: 'youtube', src: 'https://www.youtube-nocookie.com/embed/q1HLjLbhS2s?rel=0', href: 'https://youtu.be/q1HLjLbhS2s' });
+    // test changed (COACH-DELIVERY COA-09, owner 2026-10-20 "NO YouTube"): a YouTube demo is a labelled outbound link, not an embed
+    expect(e.coaching.demo).toEqual({ kind: 'link', href: 'https://youtu.be/q1HLjLbhS2s', site: 'youtube' });
     expect(e.coaching.easier).toEqual({ id: 'pe-box', name: 'Box Squat' });
     expect(e.coaching.harder).toEqual({ id: 'pe-front', name: 'Front Squat' });
     expect(e.coaching.pattern).toEqual({ id: 'squat', label: 'Squat' });
@@ -97,9 +98,10 @@ describe('faults and demos, read defensively', () => {
   });
 
   it('demoMedia: YouTube plays in an embed, a video file in <video>, other http(s) is a link, anything else is nothing', () => {
-    expect(demoMedia('https://www.youtube.com/watch?v=q1HLjLbhS2s&t=3')).toMatchObject({ kind: 'youtube', src: 'https://www.youtube-nocookie.com/embed/q1HLjLbhS2s?rel=0' });
-    expect(demoMedia('https://m.youtube.com/shorts/q1HLjLbhS2s')).toMatchObject({ kind: 'youtube' });
-    expect(demoMedia('https://youtube.com/embed/q1HLjLbhS2s')).toMatchObject({ kind: 'youtube' });
+    // test changed (COACH-DELIVERY COA-09): every YouTube form is an outbound link with site 'youtube', never an embed src
+    expect(demoMedia('https://www.youtube.com/watch?v=q1HLjLbhS2s&t=3')).toEqual({ kind: 'link', href: 'https://www.youtube.com/watch?v=q1HLjLbhS2s&t=3', site: 'youtube' });
+    expect(demoMedia('https://m.youtube.com/shorts/q1HLjLbhS2s')).toMatchObject({ kind: 'link', site: 'youtube' });
+    expect(demoMedia('https://youtube.com/embed/q1HLjLbhS2s')).toMatchObject({ kind: 'link', site: 'youtube' });
     expect(demoMedia('https://fel.local/v/split-squat.mp4')).toEqual({ kind: 'file', src: 'https://fel.local/v/split-squat.mp4', href: 'https://fel.local/v/split-squat.mp4' });
     expect(demoMedia('https://vimeo.com/12345')).toEqual({ kind: 'link', href: 'https://vimeo.com/12345' });
     expect(demoMedia('https://www.youtube.com/watch')).toEqual({ kind: 'link', href: 'https://www.youtube.com/watch' });

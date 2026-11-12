@@ -10,12 +10,18 @@ vi.mock('next/navigation', async (orig) => ({
   usePathname: () => '/play/mirror/assess',
 }));
 
+// EVERY-SCREEN P7 (owner, 2026-11-11): the page is async now (it reads the signed-in account's birth date, if any, so the
+// age question is not asked twice); a guest renders exactly as before
+const assessPage = async (): Promise<ReturnType<typeof createElement>> => {
+  const { default: Page } = await import('@/app/play/mirror/assess/page');
+  return (Page as unknown as (p: object) => Promise<ReturnType<typeof createElement>>)({});
+};
+
 const text = (h: string) => h.replace(/<[^>]+>/g, ' ').replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/\s+/g, ' ');
 
 describe('(a) /play/mirror/assess renders for a guest', () => {
   it('no session read, no sign-in wall: the start step, the disclaimer, the "Early version" label and Start', async () => {
-    const { default: Page } = await import('@/app/play/mirror/assess/page');
-    const h = renderToStaticMarkup(createElement(Page));
+    const h = renderToStaticMarkup(await assessPage());
     const t = text(h);
     expect(t).toContain('Quick Screen');
     expect(t).toContain('This is a free movement check, not a medical exam.');
@@ -26,13 +32,17 @@ describe('(a) /play/mirror/assess renders for a guest', () => {
     expect(t).toContain('Hands-on-hips jump');
     expect(t).not.toMatch(/dorsiflexion|countermovement/i);
     expect(h).toMatch(/<a[^>]*href="\/screen\/privacy"/);
-    expect(h).toMatch(/data-primary[^>]*>Just test my jump \(about 1 min\)/);
+    expect(h).toMatch(/data-primary[^>]*>Measure my vertical \(about 1 min\)/);
     expect(h).toContain('Full movement screen (about 5 min)');
     expect(t).not.toMatch(/sign in|log in|create an account/i);
-    // the page module reads no session any more
+    // CHANGED (EVERY-SCREEN P7, owner 2026-11-11): the page reads the session for one thing, the account's birth date, so a
+    // signed-in person is not asked their age twice. It still never walls: no redirect, no sign-in path (the old check was
+    // "reads no session at all", which the owner's decision replaces).
     const { readFileSync } = await import('node:fs');
     const { join } = await import('node:path');
-    expect(readFileSync(join(__dirname, '../../app/play/mirror/assess/page.tsx'), 'utf8')).not.toMatch(/getServerSession|authOptions/);
+    const pageSrc = readFileSync(join(__dirname, '../../app/play/mirror/assess/page.tsx'), 'utf8');
+    expect(pageSrc).not.toMatch(/redirect\(|loginPath|signIn/);
+    expect(pageSrc).toContain('accountAge={accountAgeBand(dob)}');
   });
 
   it('the screen pages set the system font stack (gate 1), and no screen component asks for mono or the display chain', async () => {
@@ -44,7 +54,7 @@ describe('(a) /play/mirror/assess renders for a guest', () => {
     expect(readFileSync(join(dir, 'camera-help.tsx'), 'utf8')).toMatch(/fontFamily: SYSTEM_FONT_STACK/);
     const files = [...readdirSync(dir).filter((f) => f.endsWith('.tsx')).map((f) => join(dir, f)), join(__dirname, '../../app/screen/program/[lane]/program-lane.tsx')];
     for (const f of files) expect(readFileSync(f, 'utf8'), f).not.toMatch(/font-mono|fel-heading|--fel-font-display|Courier/);
-    const h = renderToStaticMarkup(createElement((await import('@/app/play/mirror/assess/page')).default));
+    const h = renderToStaticMarkup(await assessPage());
     expect(h).toMatch(/data-screen-frame="true"[^>]*style="font-family:-apple-system, BlinkMacSystemFont, &#x27;Segoe UI&#x27;, Roboto, sans-serif"/);
   });
 });
@@ -54,10 +64,11 @@ describe('(d) /screen: one stable QR address', () => {
     const { default: ScreenEntry } = await import('@/app/screen/page');
     const h = renderToStaticMarkup(createElement(ScreenEntry));
     const t = text(h);
-    expect(t.indexOf('Just test my jump (about 1 min)')).toBeGreaterThan(-1);
-    expect(t.indexOf('Just test my jump (about 1 min)')).toBeLessThan(t.indexOf('Full movement screen (about 5 min)'));
-    expect(t.indexOf('Just test my jump (about 1 min)')).toBeLessThan(t.indexOf('This is a free movement check, not a medical exam.'));
-    expect(h).toMatch(/href="\/play\/mirror\/assess\?run=jump"/);
+    expect(t.indexOf('Measure my vertical (about 1 min)')).toBeGreaterThan(-1);
+    expect(t.indexOf('Measure my vertical (about 1 min)')).toBeLessThan(t.indexOf('Full movement screen (about 5 min)'));
+    expect(t.indexOf('Measure my vertical (about 1 min)')).toBeLessThan(t.indexOf('This is a free movement check, not a medical exam.'));
+    // test changed (VERTICAL-EASY, 2026-10-27): the start card's first button is "Measure my vertical", the arms-free run
+    expect(h).toMatch(/href="\/play\/mirror\/assess\?run=vertical"/);
     expect(h).toMatch(/href="\/play\/mirror\/assess\?run=full"/);
     expect(h).not.toMatch(/[?&amp;]src=/);
     expect(h).not.toMatch(/NEXT_REDIRECT|pose|wasm|mediapipe/i);
@@ -105,7 +116,7 @@ describe('S-2: the back arrow never leaves the screen', () => {
     const { ProgramLane } = await import('@/app/screen/program/[lane]/program-lane');
     const pages = {
       frameDefault: renderToStaticMarkup(createElement(ScreenFrame, null, 'x')),
-      start: renderToStaticMarkup(createElement((await import('@/app/play/mirror/assess/page')).default)),
+      start: renderToStaticMarkup(await assessPage()),
       results: renderToStaticMarkup(createElement((await import('@/app/play/mirror/assess/results/page')).default)),
       program: renderToStaticMarkup(createElement(ProgramLane, { lane: 'dunking' })),
       privacy: renderToStaticMarkup(createElement((await import('@/app/screen/privacy/page')).default)),
