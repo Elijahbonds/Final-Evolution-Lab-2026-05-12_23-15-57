@@ -11,7 +11,8 @@
 //     too, so a closeout during the gather costs you). Tired legs and a cold run shrink it a little, a hot run and called glass
 //     widen it a little — the same things that moved the make chance before, now moving the window instead. A finish nobody is
 //     contesting (hoops.freeFinishContest) goes in however it was timed: an open layup is not a timing test.
-//   THE GREEN (hoops.jumpGreenScale): the jump shots' green is this share of today's width (the proposal: 0.62, an open jumper's
+//   THE GREEN (hoops.jumpGreenScale): the jump shots' green is this share of today's width — SHIPPED at 1 (today's width, coordinator
+//     2026-11-12: the rule removes the luck without costing a decent player points); the proposal for the owner's session is 0.62 (an open jumper's
 //     green about 70 ms instead of 105–117 ms). Finishes keep their own bars.
 //   THE AI SHOOTS THE SAME SHOT (hoops.aiSharedShotOn): the 1v1 rival, the 3v3 rivals and my 3v3 teammates release on the same
 //     meter, graded and decided by the same rule; what differs is their HAND — a timing error drawn from a spread per level
@@ -33,8 +34,9 @@ import { PERFECT_BAND_SHARE } from '../core/shotBands';
 // ── the knobs (every one NEW; the OFF value restores the old behaviour exactly) ──────────────────────────────────────────────
 /** 1 = the release decides the shot (inside the green is a make); 0 = the grade's rate and the ring's draw (today). Knob `hoops.skillShotOn`. */
 export const SKILL_SHOT_ON = 1;
-/** The jump shots' green as a share of today's width. PROPOSAL for the owner's shooting session; 1 = today. Knob `hoops.jumpGreenScale`. */
-export const JUMP_GREEN_SCALE = 0.62;
+/** The jump shots' green as a share of today's width. Shipped at 1 (today's width); 0.62 (about 70 ms open) is the PROPOSAL for the owner's
+ *  shooting session. Knob `hoops.jumpGreenScale`. */
+export const JUMP_GREEN_SCALE = 1;
 /** Under the skill model a FINISH's green is also narrowed by the contest, by this much at a full contest (×(1 − k × contest)): the layup
  *  bars are floored (ShotMeter.start's 0.05) so a body on you barely narrowed them, and the rate model's contest bite (CONTEST_PCT_BITE)
  *  was what made a contested layup hard. 0 = no extra narrowing. Knob `hoops.finishContestNarrow`. */
@@ -43,12 +45,15 @@ export const FINISH_CONTEST_NARROW = 0.5;
 export const FREE_FINISH_CONTEST = 0.3;
 /** 1 = the AI releases on the shared meter with its level's hand; 0 = its own rate tables (today). Knob `hoops.aiSharedShotOn`. */
 export const AI_SHARED_SHOT_ON = 1;
-/** The AI's timing spread (one standard deviation of its release error, ms) per level. Knobs `hoops.aiTiming{Rookie,Pro,Elite,Mate}Ms`. */
-export const AI_TIMING_ROOKIE_MS = 62;
-export const AI_TIMING_PRO_MS = 44;
-export const AI_TIMING_ELITE_MS = 32;
+/** The AI's timing spread (one standard deviation of its release error, ms) per level. Knobs `hoops.aiTiming{Rookie,Pro,Elite,Mate}Ms`.
+ *  Picked against the green they meet: at the shipped width (hoops.jumpGreenScale 1) these hold the rivals' jump-shot make rates where
+ *  the spreads 62 / 44 / 32 put them at the proposed 0.62 (the same numbers × 1 / 0.62): the 1v1 rival's jumpers against a set man
+ *  17 / 24 / 31 %, the 3v3 rivals' points a shot 0.38 / 0.56 / 0.76 (0.41 / 0.54 / 0.67 before). Narrow the green → tighten these with it. */
+export const AI_TIMING_ROOKIE_MS = 100;
+export const AI_TIMING_PRO_MS = 71;
+export const AI_TIMING_ELITE_MS = 52;
 /** My 3v3 teammates' hand, at every difficulty (the difficulty is the other team's). */
-export const AI_TIMING_MATE_MS = 44;
+export const AI_TIMING_MATE_MS = 71;
 /** 1 = a move or a fake beats the man only on a read (off balance, lunging, moving the wrong way); 0 = the odds and the roll (today). Knob `hoops.moveReadOn`. */
 export const MOVE_READ_ON = 1;
 /** Moving across you faster than this (m/s) the wrong way is a man you can beat — the "set" line the modes already draw (0.6). Knob `hoops.moveLeanMps`. */

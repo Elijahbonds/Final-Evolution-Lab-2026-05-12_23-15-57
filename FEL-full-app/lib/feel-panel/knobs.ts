@@ -1609,9 +1609,9 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'On: a release inside the green goes in and one outside it misses; the contest and the distance shrink the green. Off: the grade sets a make rate and the ring draws, as before.',
   },
   {
-    id: 'hoops.jumpGreenScale', label: 'Jump shot green: share of the old width (proposal)', def: 0.62, min: 0.5, max: 1, step: 0.01, unit: 'x', group: 'Hoops · one rulebook',
+    id: 'hoops.jumpGreenScale', label: 'Jump shot green: share of the old width', def: 1, min: 0.5, max: 1, step: 0.01, unit: 'x', group: 'Hoops · one rulebook',
     source: 'lib/babylon/hoops/rulebook.ts JUMP_GREEN_SCALE',
-    hint: 'PROPOSAL. The jumper and fadeaway green is this share of its old width (0.62 is about 70 ms on an open jumper). Finishes keep their own bars. 1 = as before.',
+    hint: 'The jumper and fadeaway green is this share of its old width. Ships at 1 (as before). The proposal to try: 0.62, about 70 ms on an open jumper. Finishes keep their own bars.',
   },
   {
     id: 'hoops.freeFinishContest', label: 'Finish: goes in untimed below this contest', def: 0.3, min: 0, max: 1, step: 0.05, unit: '', group: 'Hoops · one rulebook',
@@ -1629,22 +1629,22 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'On: the 1v1 rival, the 3v3 rivals and your 3v3 teammates release on your meter with a hand per level, and the same rule decides. Off: their own make tables, as before.',
   },
   {
-    id: 'hoops.aiTimingRookieMs', label: 'AI hand: ROOKIE timing spread', def: 62, min: 10, max: 150, step: 1, unit: 'ms', group: 'Hoops · one rulebook',
+    id: 'hoops.aiTimingRookieMs', label: 'AI hand: ROOKIE timing spread', def: 100, min: 10, max: 150, step: 1, unit: 'ms', group: 'Hoops · one rulebook',
     source: 'lib/babylon/hoops/rulebook.ts AI_TIMING_ROOKIE_MS',
     hint: 'How far off the green centre a ROOKIE release lands, typically (one standard deviation). Bigger = misses more.',
   },
   {
-    id: 'hoops.aiTimingProMs', label: 'AI hand: PRO timing spread', def: 44, min: 10, max: 150, step: 1, unit: 'ms', group: 'Hoops · one rulebook',
+    id: 'hoops.aiTimingProMs', label: 'AI hand: PRO timing spread', def: 71, min: 10, max: 150, step: 1, unit: 'ms', group: 'Hoops · one rulebook',
     source: 'lib/babylon/hoops/rulebook.ts AI_TIMING_PRO_MS',
     hint: 'The same for PRO (also staked, ranked and head-to-head runs).',
   },
   {
-    id: 'hoops.aiTimingEliteMs', label: 'AI hand: ELITE timing spread', def: 32, min: 10, max: 150, step: 1, unit: 'ms', group: 'Hoops · one rulebook',
+    id: 'hoops.aiTimingEliteMs', label: 'AI hand: ELITE timing spread', def: 52, min: 10, max: 150, step: 1, unit: 'ms', group: 'Hoops · one rulebook',
     source: 'lib/babylon/hoops/rulebook.ts AI_TIMING_ELITE_MS',
     hint: 'The same for ELITE.',
   },
   {
-    id: 'hoops.aiTimingMateMs', label: 'AI hand: your 3v3 teammates timing spread', def: 44, min: 10, max: 150, step: 1, unit: 'ms', group: 'Hoops · one rulebook',
+    id: 'hoops.aiTimingMateMs', label: 'AI hand: your 3v3 teammates timing spread', def: 71, min: 10, max: 150, step: 1, unit: 'ms', group: 'Hoops · one rulebook',
     source: 'lib/babylon/hoops/rulebook.ts AI_TIMING_MATE_MS',
     hint: 'The same for your 3v3 teammates, at every difficulty.',
   },

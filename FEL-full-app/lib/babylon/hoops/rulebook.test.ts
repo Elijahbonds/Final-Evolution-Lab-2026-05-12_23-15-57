@@ -50,9 +50,11 @@ describe('the shot: the release decides', () => {
       for (const d of [1.5, 3, 4.5, 6, 7.5, 9]) { const h = meterFor(style, 0, d).greenHalfSec; expect(h).toBeLessThanOrEqual(prev + 1e-12); prev = h; }
     }
   });
-  it('the proposal: an open jumper green is about 70 ms (it was 105 to 117)', () => {
+  it('ships at today\'s width (1); the proposal 0.62 makes an open jumper green about 70 ms (it was 105 to 117)', () => {
     const ms = (d: number): number => 2 * meterFor('jumper', 0, d).greenHalfSec * 1000;
-    expect(JUMP_GREEN_SCALE).toBe(0.62);
+    expect(JUMP_GREEN_SCALE).toBe(1);
+    expect(ms(4.5)).toBeGreaterThan(112); expect(ms(4.5)).toBeLessThan(122);   // today's 117
+    knob('hoops.jumpGreenScale', 0.62);
     expect(ms(4.5)).toBeGreaterThan(65); expect(ms(4.5)).toBeLessThan(76);
     expect(ms(6.75)).toBeGreaterThan(60); expect(ms(6.75)).toBeLessThan(70);
   });

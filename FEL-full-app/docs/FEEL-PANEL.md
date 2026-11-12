@@ -643,8 +643,10 @@ pins both). Measured with `scripts/probes/hoops-p09/rulebook-measure.mts` (befor
   it misses; how far outside says how (a rim-out just past the edge, a brick far off; early short, late long). The contest AT THE RELEASE
   and the distance only narrow the green; tiredness and a cold run narrow it a little, a hot run and called glass widen it a little. No
   draw. 0 = the grade sets a rate (perfect 0.97, good 0.80, early 0.35, late 0.30) and the ring draws, as before.
-- `hoops.jumpGreenScale` 0.62, **a proposal for the shooting session**: the jumper and fadeaway green is this share of the old width (an
-  open jumper's green 117 → 72 ms at 4.5 m, 104 → 65 ms from three). 1 = the old width. Measured: at 1.0 a decent thumb (45 ms) scores the
+- `hoops.jumpGreenScale` **ships at 1 (today's width)** (coordinator 2026-11-12: the rule alone removes the luck without costing a decent
+  player points before the owner has felt a narrower green). **The proposal for the shooting session is 0.62**: the jumper and fadeaway
+  green at this share of the old width (an open jumper's green 117 → 72 ms at 4.5 m, 104 → 65 ms from three). Session: start at 1.0 and
+  narrow toward 0.62 (0.8 in between: a decent thumb 25.7 points over the 20 shots). Measured: at 1.0 a decent thumb (45 ms) scores the
   same over a game's 20 shots as before (29.5 → 29.5 points) while a masher falls 18 → 6; at 0.62 the decent thumb falls to 22 and a
   sharp one (12 ms) rises 39 → 46.
 - `hoops.freeFinishContest` 0.3: a layup or other finish contested less than this goes in however it was timed. 0 = every finish needs the green.
@@ -652,10 +654,12 @@ pins both). Measured with `scripts/probes/hoops-p09/rulebook-measure.mts` (befor
   layup bars are floored, so a body on you barely narrowed them; the old contest bite on the rate did that job). 0 = no extra narrowing.
 - `hoops.aiSharedShotOn` 1: the 1v1 rival, the 3v3 rivals and your 3v3 teammates release on YOUR meter (their style, contest and
   distance), graded and decided by the same rule. What differs is their hand: a timing error drawn from a spread per level,
-  `hoops.aiTimingRookieMs` 62 / `hoops.aiTimingProMs` 44 / `hoops.aiTimingEliteMs` 32 / `hoops.aiTimingMateMs` 44 ms (PRO is a decent human's
-  thumb); a rival behind and forcing it spreads wider, one protecting a lead a little tighter (core/Nerve). The lob and the putback stay
-  dunk rates. 0 = their own tables (rivalShotPct, rivalReleasePct, matePct), as before. The 1v1 rival's jumpers against a set defender
-  (the rival sim, human-like defender): ROOKIE 7 → 17 %, PRO 7 → 24 %, ELITE 6 → 32 %.
+  `hoops.aiTimingRookieMs` 100 / `hoops.aiTimingProMs` 71 / `hoops.aiTimingEliteMs` 52 / `hoops.aiTimingMateMs` 71 ms; a rival behind and
+  forcing it spreads wider, one protecting a lead a little tighter (core/Nerve). The lob and the putback stay dunk rates. 0 = their own
+  tables (rivalShotPct, rivalReleasePct, matePct), as before. Measured at the shipped width (the rival sim, human-like defender): the 1v1
+  rival's jumpers ROOKIE 7 → 17 %, PRO 7 → 24 %, ELITE 6 → 31 %; his layups 53 / 54 / 55 → 35 / 42 / 56 %; the 3v3 rivals' points a shot
+  0.41 / 0.54 / 0.67 → 0.38 / 0.56 / 0.76. The spreads were picked against the green: the same rates as 62 / 44 / 32 give at the proposed
+  0.62, so if the session narrows the green, tighten these by the same share (× the new scale) or the rivals get worse.
 - `hoops.moveReadOn` 1 (`hoops/rulebook.ts readTheMan`; HandleSystem, TripleThreat's jab, the pump fake, the pass fake, off the head): a
   move or a fake beats the man only when he is off balance (in his jump or his reach), coming at you faster than `hoops.moveCommitMps`
   1.4 m/s, or moving across you the wrong way faster than `hoops.moveLeanMps` 0.6 m/s (the modes' own "closing" and "set" lines). Against
