@@ -81,7 +81,8 @@ try {
         choice = await p.evaluate(() => { const R = (window as any).__readout; const s = R.readoutSource(); return s ? (window as any).__engineChoice(s.engine) : null; });
         sample = await p.evaluate(() => (window as any).__s?.sample() ?? null);
         overlay = await p.evaluate(() => (document.querySelector('[data-fel-perf-readout]') as HTMLElement | null)?.innerText ?? '');
-        await p.screenshot({ path: path.join(OUT, `${tag}.jpg`), type: 'jpeg', quality: 72 });
+        // a WebGPU canvas can hang a headless screenshot (measured 2026-11-12): the row never waits on it
+        await p.screenshot({ path: path.join(OUT, `${tag}.jpg`), type: 'jpeg', quality: 72, timeout: 20_000 }).catch((e) => msgs.push(`probe: screenshot failed: ${String(e).slice(0, 80)}`));
         // flush the analytics queue the way a phone does when the tab goes away (pagehide → sendBeacon)
         await p.evaluate(() => window.dispatchEvent(new Event('pagehide')));
         await sleep(1500);
