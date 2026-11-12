@@ -9,6 +9,9 @@ import { ScanSaveAccount } from '@/components/privacy/scan-save-account';
 import { TabPage } from '@/components/shell/tab-page';
 import { AccessibilitySettings } from '@/components/settings/accessibility-settings';
 import { PrqDataRights, HealthDataSection } from '@/components/profile-view';
+import { prisma } from '@/lib/db';
+import { readScanSaveAccountState } from '@/lib/privacy/scanSaveAccountState';
+import { DeleteAccount } from '@/components/account/delete-account';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,6 +19,11 @@ export const dynamic = 'force-dynamic';
 export default async function AccountPage() {
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect(loginPath(ACCOUNT_SETTINGS_PATH));
+  // ACCOUNT-SHIFT (2026-11-12): the "Jump numbers" panel's state is read here, so a verified adult gets the panel in the
+  // first paint instead of after two requests (it used to appear on top and push every section down: CLS 0.112). The
+  // same reads the panel's routes answer with; on no id or a failed read the panel fetches on its own, as before.
+  const userId = (session.user as { id?: string }).id;
+  const scanSave = typeof userId === 'string' && userId ? await readScanSaveAccountState(prisma, userId).catch(() => null) : null;
 
   return (
     <TabPage
@@ -24,7 +32,7 @@ export default async function AccountPage() {
       lede="Download your data, choose whether jump numbers are saved, or erase the health data stored for this account."
       accent="#00E5FF"
     >
-      <ScanSaveAccount />
+      <ScanSaveAccount initial={scanSave} />
       <AccountSettings email={session.user.email ?? ''} />
       {/* PROFILE V2 (2026-10-24): the settings that lived on the profile — motion, PRQ data rights, health data */}
       <PrqDataRights />
@@ -33,6 +41,8 @@ export default async function AccountPage() {
           A11-03 / A11-05 (2026-10-25): with it, colour vision for the game HUD and the big-screen menus. */}
       <div className="mt-8"><AccessibilitySettings /></div>
       <p className="mt-4 text-sm"><Link href="/account/coaching" className="inline-flex min-h-11 items-center">Coaching</Link></p>
+      {/* ACCOUNT-DELETE (owner, 2026-10-25): delete the account, with a confirm step */}
+      <DeleteAccount />
     </TabPage>
   );
 }
