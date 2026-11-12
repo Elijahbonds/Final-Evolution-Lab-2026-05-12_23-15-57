@@ -93,7 +93,7 @@ scratch; the frames are the rig's auto-strips and the counter's screenshots).
 
 | # | Dimension | Now | What a 10 looks like | Evidence (the short form; §3 has the numbers) |
 |---|---|---|---|---|
-| 1 | Control response | **7** | The athlete moves the frame you push, stops where you let go, cuts with weight and never ignores a press — in play, at a dead ball, during a replay. | Phase 1 on the rig: stick onset 2 frames, stop from a jog 150 ms / 0.29 m, from a sprint 233 ms / 0.68 m, flicks 8/8 standing and jogging (1v1), the shot buffer ≤ 17 ms [PRIOR]. Left: wide turns at 64 % of the turn rate, the sprint kick and the cut cost in one frame (`HoopsStick.ts:43–49`, H3a off), presses swallowed for a replay's ~3.8 s [PRIOR p01]. The input tests were not re-run at this tip (the shared gate was saturated); phase 1's are the latest. |
+| 1 | Control response | **7** | The athlete moves the frame you push, stops where you let go, cuts with weight and never ignores a press — in play, at a dead ball, during a replay. | Phase 1 on the rig: stick onset 2 frames, stop from a jog 150 ms / 0.29 m, from a sprint 233 ms / 0.68 m, flicks 8/8 standing and jogging (1v1), the shot buffer ≤ 17 ms [PRIOR]. Left: wide turns at 64 % of the turn rate, the sprint kick and the cut cost in one frame (`HoopsStick.ts:43–49`, H3a off), presses swallowed for a replay's ~3.8 s [PRIOR p01]. Re-read at this tip: onset 2 frames, stops 150 / 233 ms, shot 17 ms; the walk to 90 % pace 350 ms (bar 250) [HG]. |
 | 2 | Ball handling | **4** | Every move reads the defender: it beats him when he is leaning the wrong way and fails when he is set, and you can see why. The ball lives in the palm; a hand change is a crossing, never a snap. | 16 dribble moves + size-ups + pausin + a post game (`HandleSystem.ts:61`); but a move beats a man on a roll (`HandleSystem.ts:525`, odds 0.10 for one crossover on a moving man, `:330–336`); every auto hand change snaps both arms 104–134° in one frame [GC]; the handle is 50 for everybody (`HandleSystem.ts:183`, H9 not wired). |
 | 3 | Shooting | **4** | Timing is the skill and the skill shows within a game; the green is earned, distance and the contest matter, the rival shoots by the same rules, and every miss has a reason you can read. | Rich shot vocabulary and an honest ring (`RimDecides.ts:107`). But the grade sets a RATE and a draw decides the shot; the open green is 105–117 ms (2K's is ~55 ms); a random presser makes 39 % of open threes, the rival 38 %; contested shots need 500–630 attempts before a decent timer separates from luck [SKILL]. |
 | 4 | Passing | **4** | You choose the pass (chest, bounce, lob, touch, no-look, a lead to a cutter), it goes where you aimed, its risk is readable, and the catch flows into the next action. | The type is chosen FOR you (`BallHandling.ts:118–144`); the target is the stick cone or the most open man (`:82–115`); a chest pass flies a flat 14 m/s (`:146`); since p05b it lands in the hands [PRIOR]. Interceptions exist ("PICKED OFF"). No pass in 1v1 by design. |
@@ -111,10 +111,20 @@ animation between clips and depth are the furthest from the bar.
 
 ### 3.1 Control response — 7
 
-*Not re-measured at `fbf197fb`*: the shared browser gate was saturated for most of this lane's run, and the input → response tests
-(`drive.mjs <mode> input`) were dropped for the possession run that gives the frame strips. Phase 1's before → after on the same rig
-is the latest reading, and nothing merged since touches the stick or the buffer (phases 2–5 own defence, the rivals, the feet and the
-ball).
+Re-measured at `fbf197fb` on the hoops-gap rig (1v1, seed 7, PRO, the stick, stop and shot groups; the flick, poke and block groups
+did not fit the gate hold and keep phase 1's reading):
+
+| Read | Now | Bar |
+|---|---|---|
+| stick onset (root moved 2 cm) | 2 frames (33 ms) median; one of the two samples 23 frames | ≤ 2 frames |
+| 90 % of the jog's pace | **350 ms** (21–25 frames) walking; 150 ms on the turbo | ≤ 250 ms |
+| reversal | 17 ms walking, 200 ms on the turbo | ≤ 220 ms |
+| stop from a jog (4.3 m/s) | 150 ms, 0.29 m | ≤ 250 ms, ≤ 0.6 m |
+| stop from a sprint (6.4 m/s) | 233 ms, 0.68 m | ≤ 350 ms, ≤ 1.0 m |
+| shot press → meter / body / ball up | 17 / 17 / 67 ms | ≤ 1 frame / ≤ 1 frame / ≤ 4 frames |
+
+The stop and the shot answer at the bar; the walk-up to pace is slow (the gate phase 1 read only on the movement harness, 250 ms), and
+one stick press of two took 23 frames to move the body (the first press of the run, after the check: not explained here).
 
 - What phase 1 bought, on the deterministic rig [PRIOR p01]: stick onset 4 → 2 frames; stop from a jog 250 → 150 ms (0.53 → 0.29 m),
   from a sprint 417 → 233 ms (1.40 → 0.68 m); flicks standing / jogging 1v1 8/8 → 8/8, 6/8 → 8/8, 3v3 6/8 → 7/8, 4/8 → 8/8; silent
