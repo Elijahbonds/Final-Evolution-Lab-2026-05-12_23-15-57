@@ -7,7 +7,8 @@
 // scenery only — not pickable, no collisions, outside every playing area.
 // Assets: public/models/props/<kit>/<model>.glb (Kenney, CC0; see manifest.json).
 import { VQ } from '../scene/venueQualityV1';
-import { Color3, Matrix, PBRMaterial, Quaternion, Ray, SceneLoader, TransformNode, Vector3 } from '@babylonjs/core';
+import { Color3, Matrix, Mesh as BjsMesh, PBRMaterial, Quaternion, Ray, SceneLoader, TransformNode, Vector3 } from '@babylonjs/core';
+import { feel } from '@/lib/feel-panel/feel';   // hoops-p08: perf.propMergeOn
 import type { AbstractMesh, ISceneLoaderAsyncResult, Mesh, Scene } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { VENUE_PROP_SETS, type PropPlacement } from './venuePropSets';
@@ -162,7 +163,7 @@ export async function mountVenueProps(scene: Scene, venueKey: string, parent?: T
   let count = 0;
   const instances: AbstractMesh[] = [];
   /** Collected per master, then uploaded once as a thin-instance matrix buffer. */
-  const thin: Array<{ master: Mesh; matrix: Matrix }> = [];
+  const thin: Array<{ master: Mesh; matrix: Matrix; local: Matrix; world: Matrix; model: string }> = [];
   const down = new Vector3(0, -1, 0);
   let snapped = 0, missed = 0;
   // the ground was built THIS frame and has not rendered yet: its world matrix is still identity, so a ray would hit a
@@ -210,12 +211,42 @@ export async function mountVenueProps(scene: Scene, venueKey: string, parent?: T
         src.rotationQuaternion?.clone() ?? Quaternion.FromEulerVector(src.rotation),
         src.position.clone(),
       );
-      thin.push({ master, matrix: local.multiply(holder.getWorldMatrix()) });
+      thin.push({ master, matrix: local.multiply(holder.getWorldMatrix()), local, world: holder.getWorldMatrix().clone(), model: `${p.kit}/${p.model}` });
     }
     count++;
   }));
   if (opts.snapToGround) console.info(`[FEL-PROPS] ${venueKey}: ${snapped} placements dropped onto the ground, ${missed} kept their authored height`);
 
+  // hoops-p08 (2026-11-12): ONE MASTER PER MATERIAL PER MODEL. A model's parts that share a material (the far pier: a deck, two
+  // rails and eight posts in two materials — eleven draws for two looks) are baked into one mesh, each part's own transform in its
+  // vertices, and that mesh is thin-instanced at the placements instead. Same pixels; one draw where there were many, in the main
+  // pass and in a shadow re-bake. The kit's own meshes are left as they were (a mode's copy clones them). perf.propMergeOn 0 = as before.
+  const merged: Mesh[] = [];
+  if (feel('perf.propMergeOn', PROP_MERGE_ON) >= 0.5) {
+    const groups = new Map<string, Map<Mesh, typeof thin>>();
+    for (const t of thin) {
+      if (!t.master.material) continue;
+      const k = `${t.model}|${t.master.material.uniqueId}`;
+      const g = groups.get(k) ?? new Map<Mesh, typeof thin>(); groups.set(k, g);
+      const list = g.get(t.master) ?? []; list.push(t); g.set(t.master, list);
+    }
+    for (const g of groups.values()) {
+      const plan = mergePlan(g);
+      if (!plan) continue;
+      const parts = [...g.keys()].map((m, i) => { const c = m.clone(`${m.name}_part${i}`, null, true, false) as BjsMesh; c.makeGeometryUnique(); c.bakeTransformIntoVertices(plan.locals[i]); return c; });
+      const one = BjsMesh.MergeMeshes(parts, true, true);
+      if (!one) continue;
+      const first = [...g.keys()][0];
+      one.name = `${first.name}_merged`; one.material = first.material; one.receiveShadows = true; one.isPickable = false;
+      one.parent = null; one.position.set(0, 0, 0); one.rotation.set(0, 0, 0); one.rotationQuaternion = null; one.scaling.set(1, 1, 1);
+      const buf = new Float32Array(plan.worlds.length * 16);
+      plan.worlds.forEach((w, k) => w.copyToArray(buf, k * 16));
+      one.setEnabled(true);
+      one.thinInstanceSetBuffer('matrix', buf, 16, true);
+      merged.push(one);
+      for (const m of g.keys()) for (let i = thin.length - 1; i >= 0; i--) if (thin[i].master === m) thin.splice(i, 1);   // drawn by the merge now
+    }
+  }
   // upload one matrix buffer per master: N copies collapse to a single draw each
   const byMaster = new Map<Mesh, Matrix[]>();
   for (const t of thin) { const list = byMaster.get(t.master) ?? []; list.push(t.matrix); byMaster.set(t.master, list); }
@@ -231,15 +262,34 @@ export async function mountVenueProps(scene: Scene, venueKey: string, parent?: T
     master.thinInstanceSetBuffer('matrix', buf, 16, true);
     touched.push(master);
   }
-  console.info(`[FEL-PROPS] ${venueKey}: ${thin.length} placements across ${byMaster.size} thin-instanced masters`);
+  console.info(`[FEL-PROPS] ${venueKey}: ${thin.length} placements across ${byMaster.size} thin-instanced masters${merged.length ? ` + ${merged.length} merged by material` : ''}`);
   return {
     root, count,
     dispose() {
       for (const m of touched) { try { m.thinInstanceCount = 0; m.setEnabled(false); } catch { /* disposed */ } }
+      for (const m of merged) m.dispose();
       for (const m of instances) m.dispose();
       root.dispose();
     },
   };
+}
+
+/** perf.propMergeOn: 1 = a model's parts that share a material are drawn as one mesh (new); 0 = one draw per part, as before. */
+export const PROP_MERGE_ON = 1;
+
+/**
+ * hoops-p08: may one model's parts that share a material be merged, and with what? Every part must stand at the same placements
+ * (it does when one model's placements all carry the same tint — a different tint is a different material, so a different group),
+ * in the same order. Returns each part's own transform and the placements' world matrices, or null (fewer than two parts, or the
+ * placements differ). Pure.
+ */
+export function mergePlan<P>(g: Map<P, Array<{ local: Matrix; world: Matrix }>>): { locals: Matrix[]; worlds: Matrix[] } | null {
+  if (g.size < 2) return null;
+  const lists = [...g.values()];
+  const n = lists[0].length;
+  if (!n || lists.some((l) => l.length !== n)) return null;
+  for (let k = 0; k < n; k++) for (const l of lists) if (!l[k].world.equalsWithEpsilon(lists[0][k].world, 1e-6)) return null;
+  return { locals: lists.map((l) => l[0].local), worlds: lists[0].map((t) => t.world) };
 }
 
 /** The tint a placement gives one part of its model: a plain hex tints every part, a map tints by the part's material name. */

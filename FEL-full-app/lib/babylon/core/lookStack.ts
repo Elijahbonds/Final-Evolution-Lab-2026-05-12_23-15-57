@@ -75,7 +75,7 @@ export async function mountLookStack(o: LookStackOpts): Promise<LookStack> {
   (scene.metadata ??= {}).felTier = tier;   // read by CharacterLibrary for per-spawn quality
   // PHONE-PERF (2026-10-14): a phone uploads a glTF model's texture at 1024² at most (phoneTextureCap.ts); desktop untouched.
   // In the shared look stack so the Studio's phone preview counts the same texture memory a mode does.
-  installPhoneTextureCap(engine, tier);
+  installPhoneTextureCap(engine, tier, undefined, o.modeId);   // hoops-p08: + the mode, for the far vehicles' cap
   installPhoneActiveTrim(scene, tier);   // lane/owner-1016 (2026-10-16): empty `__root__` meshes leave the active list on a phone; no pixel changes (phoneTrim.ts)
   scene.metadata.felModeId = o.modeId;      // read by kit.applyKit for the sport's default kit (owner decision 2026-09-05)
   o.onScene?.(scene, { engine, fit, tier });
@@ -88,7 +88,7 @@ export async function mountLookStack(o: LookStackOpts): Promise<LookStack> {
   // M61: painted sky + horizon backdrop (2 meshes, unlit, auto-rotating)
   const backdrop = mountBackdrop(scene, o.backdrop?.() ?? MOOD_TO_FAMILY[mood] ?? 'park', mood);
   // M59 / A9.6: the ink outlines (the anime line for the party modes, a distance-true contour for the sports)
-  const unink = autoInk(scene, inkStyleFor(o.modeId));
+  const unink = autoInk(scene, inkStyleFor(o.modeId), tier);
   const camDirector = new CameraDirector(scene, camera, o.camPreset);
   const letterbox = mountLetterbox(scene, o.canvas, () => camDirector.cinematic01);   // A9.12: the intro's and the replays' bars
   return { engine, fit, tier, scene, camera, mood, lights, ssao, backdrop, unink, camDirector, letterbox };

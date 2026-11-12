@@ -473,7 +473,7 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
       {busReady && busRef.current && <PadChips bus={busRef.current} className="left-4 top-4" />}
 
       {/* THE MIC: the MC's words just above the call and the meter (the scoreboard owns the top, the board the right) */}
-      {phase === 'playing' && <MicCaption text={micLine.text} who={micLine.who} className="bottom-[12rem]" />}
+      {phase === 'playing' && <MicCaption text={micLine.text} who={micLine.who} voiced={hud.micVoiced} className="bottom-[12rem]" />}
       {/* The switch never takes focus from a click: Space is the keyboard's SHOOT and fires on keyup, and a focused button
           answers that same keyup with a click — every shot after one click on MC would flip the announcer on and off */}
       {phase === 'playing' && (

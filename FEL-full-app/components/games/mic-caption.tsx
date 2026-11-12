@@ -8,7 +8,7 @@ import { SoundKit } from '@/lib/babylon/audio/SoundKit';
 import { VoiceKit } from '@/lib/babylon/audio/mic/VoiceKit';
 import { VolumeMixer } from '@/lib/audio/ui/VolumeMixer';
 import { HUD_FONT_CLASS, HUD_PLATE, HudText, hudColor, hudType } from './tv-hud';
-import { readCcPref, showMicCaption, writeCcPref } from '@/lib/babylon/ui/hudHints';
+import { readCcPref, showMicCaption, writeCcPref } from '@/lib/babylon/ui/micSubtitles';
 
 // hoops-p08 (2026-11-12): THE PLAYER'S SUBTITLE SWITCH (the CC chip beside MC), one store so the chip and the caption agree.
 const ccListeners = new Set<() => void>();

@@ -1604,7 +1604,7 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
   },  // ── hoops-p08 (clean screen and phone budget, docs/HOOPS-AAA-GAP-SHOW.md) ──
   {
     id: 'hud.mcSubsWithVoice', label: 'MC subtitles while his voice plays: on (1) / off (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · screen',
-    source: 'lib/babylon/ui/hudHints.ts MC_SUBS_WITH_VOICE',
+    source: 'lib/babylon/ui/micSubtitles.ts MC_SUBS_WITH_VOICE',
     hint: 'Off: a line the MC is saying out loud shows no subtitle (the player can still turn subtitles on with CC; with the voice off the words always show). 1 = every line subtitled, as before.',
   },
   {
@@ -1616,6 +1616,24 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'venue.halfCourtCrowdCards', label: 'Flat cut-out crowd behind the 1v1 / 3v3 / 3-Point rim: on (1) / off (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · screen',
     source: 'lib/babylon/nexus/veniceBoardwalk.ts HALF_COURT_CROWD_CARDS',
     hint: 'Off: the twelve flat crowd cards stand only behind the dunk rim. 1 = also behind the half-court rim at Venice, as before.',
+  },  {
+    id: 'perf.phoneInkTrim', label: 'Phone: no ink line on hidden body parts (1) / every part (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/babylon/scene/phoneCasters.ts PHONE_INK_TRIM',
+    hint: 'On a phone the contour line skips the eyes, the shoe soles, the socks and the accessories (each is inside a bigger part). Two draws a part. 0 = every part inked, as before.',
+  },
+  {
+    id: 'perf.phoneSockCast', label: 'Phone: socks cast a shadow (1) / not (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/babylon/scene/phoneCasters.ts PHONE_SOCK_CAST',
+    hint: 'On a phone the sock under the shoe stays out of the shadow map (its shadow is inside the leg). 1 = it casts, as before.',
+  },
+  {
+    id: 'perf.phoneFarPropTex', label: 'Phone: parked bus and sedan texture size (half court)', def: 512, min: 256, max: 1024, step: 256, unit: 'px', group: 'Hoops · phone budget',
+    source: 'lib/babylon/scene/phoneTextureCap.ts PHONE_FAR_PROP_MAX',
+    hint: 'In 1v1, 3v3 and 3-Point on a phone the far parked bus and sedan upload their maps at this edge. 1024 = as before.',
+  },  {
+    id: 'perf.propMergeOn', label: 'Venue props: one draw per material per model (1) / per part (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/babylon/visual/VenueProps.ts PROP_MERGE_ON',
+    hint: 'A prop model whose parts share a material (the far pier: eleven parts, two materials) is drawn as one mesh per material. Same picture. 0 = one draw per part, as before.',
   },
 ];
 

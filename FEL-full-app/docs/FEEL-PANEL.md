@@ -634,3 +634,19 @@ Group "Hoops · flow and pace". Each is NEW; 0 restores the old behaviour exactl
   (the audit: 14 of 21 hard pops in a 22 s idle 1v1 run). On the move it is the rule as before (`hoops.aiHandDwellSec` 0.35, `hoops.aiHandGapSec`
   0.9, unchanged). Its crossing also takes `hoops.handChangeCatchLeadSec` (headless, that path: 56 → 35 hard events in 64 changes, as the
   carry's own). 0 = as before. Feel-check: 1v1, stand dribbling with him shading you; the ball should not ping-pong.
+
+### hoops-p08 — clean screen (2026-11-12)
+
+Group "Hoops · screen". Each is NEW; its off value restores the old behaviour exactly (tests pin both: `lib/babylon/ui/hudHints.test.ts`).
+The audit is `docs/HOOPS-AAA-GAP-SHOW.md` (sinkers 2 and 4); the before / after counts are in the lane's report.
+- `hud.mcSubsWithVoice` 0 (`ui/micSubtitles.ts`): a line the court's MC is saying out loud (ModeMic marks `micVoiced` when the line's audio
+  starts) shows no subtitle box; the player can turn subtitles on with the new CC chip beside MC (kept on the device), and a line with
+  no audio (the voice off, no bank, no Web Audio) always shows its words. Screen readers are unchanged (they read `mic` from the caption
+  bus). 1 = every line subtitled, as before. Feel-check: 1v1 on a phone; the MC talks and nothing covers the player.
+- `hud.hintPlays` 3 (`ui/hudHints.ts`): the one-line control hint in 1v1 and 3v3 shows for the first three plays of a mode in a session
+  (a play ends at a score on either side, a shot or dunk that starts, the next ball, the next dunk), then stops. "GET OUT OF THE PAINT"
+  is a rule warning and always shows. On a touch screen the hint never names a pad button or a key: a button the touch deck has is
+  named by the deck's own word (SQUARE (L) → SHOOT), and any part that still names a pad or a key is dropped. 0 = always, as before.
+- `venue.halfCourtCrowdCards` 0 (`nexus/veniceBoardwalk.ts`): the boardwalk row's twelve flat cut-out figures stand behind the dunk's
+  rim only (the dunk and the duel). 1v1, 3v3 and 3-Point stand on the same Venice and had them right behind their rim; they no
+  longer load the file. 1 = on every Venice court, as before.
