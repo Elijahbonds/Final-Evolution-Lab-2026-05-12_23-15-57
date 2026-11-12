@@ -85,7 +85,9 @@ import { syncedShotSpeed } from '../core/BallHandling';   // (hoops-shot-content
 import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
 import { type SpawnedCharacter } from '../core/CharacterLibrary';
 import { CharacterPipeline } from '../core/characterPipeline';   // suite pass: the sanctioned spawn paths
-import { tintGarmentSlot, SLOT_KEYS } from '../core/playerIdentity';   // …and the team jerseys
+import { tintGarmentSlot, SLOT_KEYS, applyProportions } from '../core/playerIdentity';   // …and the team jerseys (hoops-builder: + the drawn playing height)
+import { playFrameWorld } from '../core/playFramePoint';   // hoops-builder: the ball on a hero drawn at his playing height, read on the standard frame
+import { TODAY_RUN, loadRatedTuning, ratedLog, ratedLookScale, ratedSpeedScale, ratedGreenStart, ratedGreenRelease, ratedFinishContest, ratedStealRange, ratedBlocker, ratedRelease, ratedManRead, type RatedRun } from '../hoops/ratedPlay';   // hoops-builder phase B: the hero's ratings (TODAY_TUNING in a rating-free run)
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
 import { VenueKit } from '../visual/VenueKit';
@@ -401,8 +403,10 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   let meReach: RimReachHandle | null = null;   // HAND AND RIM: the dunk's hand onto the ring
   let meterJump = false;   // hoops-p09: the meter running is a jump shot's (the closeout on the gather reads it)
   const meterStart = (contest: number, style?: Parameters<ShotMeter['start']>[1], gather?: number): void => {
+    contest = ratedFinishContest(contest, style ?? 'jumper', rated.tuning);   // hoops-builder: the Finishing rating (a finish's contest; 1 at 50)
     shotMeter.start(contest, style ?? 'jumper', gather ?? 0); shotMeter.narrowBy(distanceGreenFactor(distXZ(me.char.root.position, RIM_FLOOR), style ?? 'jumper'));   // lane/hoops-shot-core: distance narrows the green (ShotWindow)
     meterJump = isJumpShot(style ?? 'jumper');   // hoops-p09: the AI closes out on a jump shot's gather
+    ratedGreenStart(shotMeter, style ?? 'jumper', rated.tuning);   // hoops-builder: the Shooting rating's green (jump shots; 1 at 50)
     shotMeter.narrowBy(greenScaleFor(style ?? 'jumper', contest));   // hoops-p09: the jump shots' green scale and a finish's contest narrowing (hoops/rulebook; hoops.jumpGreenScale 1 / hoops.skillShotOn 0 = today)
     hudGreen = `${shotMeter.greenCenter01.toFixed(3)},${shotMeter.greenHalfWidth01.toFixed(3)}`; if (ctx0) putHud(ctx0, { shotMeterPerfect: perfectHud(shotMeter.greenHalfWidth01) });   // lane/hoops-shot-core: the PERFECT band on the HUD bar
     meter3d?.begin({ center: shotMeter.greenCenter01, half: shotMeter.greenHalfWidth01 });
@@ -479,6 +483,10 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   // ── HOOPS-MOVE-KIT-B: the post kit (M4–M6) ──
   /** The handle drives the vocabulary and the chain window (HandleSystem) — 3v3 never had either. */
   let handle = BASELINE_HANDLE;
+  /** hoops-builder (owner 2026-11-12): the hero's ratings for this run — TODAY_RUN (today's numbers, exactly) until loaded, in a rating-free
+   *  run, for a guest and with hoops.ratingsOn 0. `heroDrawnScaled`: his body is drawn at his playing height, so the ball is read on the
+   *  standard frame (playFrameWorld) and the drawn size changes no outcome (REACH-FREEZE). */
+  let rated: RatedRun = { ...TODAY_RUN }; let heroDrawnScaled = false;
   let chain: ChainState = { ...CHAIN_IDLE };
   /** Phase 4: the chain as it stood before the last stick flick, and when — a sweep resolving inside FLICK_RETRACT_SEC of it
    *  retracts that flick (a rotation's entry sample crosses the flick ring before the 140° accumulates; measured +3–5 per run). */
@@ -619,9 +627,9 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   const jobOf = (b: Body): string => aware.job(b) ?? (b === me ? (carrierId === 'me' ? 'handler' : carrierId === 'foeTeam' ? (meHandUp ? 'contest' : me.slot.intent.brace ? 'boxout' : 'onball') : 'space') : mateBrain(b)?.job ?? (foeBrain(b) ? (b === driver ? 'handler' : foeBrain(b)!.job) : 'idle'));
   const jumpY = (age: number): number => age === Infinity ? 0 : Math.max(0, Math.sin(Math.min(1, age / JUMP_SEC) * Math.PI) * JUMP_APEX);
   const mateArc = new ShotArc();                 // teammate / rival shots FLY (the ball used to hang at the release point)
-  const ballWorld = (): Vector3 => ball.getAbsolutePosition();
+  const ballWorld = (): Vector3 => (heroDrawnScaled ? playFrameWorld(ball) : ball.getAbsolutePosition());   // hoops-builder: standard frame when drawn scaled
   // hoops-p02: a body as the block test (hoops/blocks) and the contest (hoops/contest) see it
-  const meBlocker = (): Blocker => ({ x: me.char.root.position.x, z: me.char.root.position.z, jumpAge: myJumpAge, handsUp: meHandUp });
+  const meBlocker = (): Blocker => ratedBlocker({ x: me.char.root.position.x, z: me.char.root.position.z, jumpAge: myJumpAge, handsUp: meHandUp }, rated.tuning);   // hoops-builder: Defense + height reach
   const bodyBlocker = (b: Body, handsUp = foeHandUp === b): Blocker => ({ x: b.char.root.position.x, z: b.char.root.position.z, jumpAge: b.jumpAge, handsUp });
   const vec3 = (p: P3): Vector3 => new Vector3(p.x, p.y, p.z);
   /** One defender's contest on a shooter at `at` (hoops/contest): the hand up is mine (`meHandUp`) or the AI's hold (`foeHandUp`). */
@@ -1109,6 +1117,10 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       agentCtl = agentBridge() ? new AgentControlSource() : null;
       if (agentCtl) { ctx.agent.control = agentCtl; ctx.agent.getScore = () => myScore; }
       me = await spawnBody(new Vector3(0, 0, 6), undefined, false, 'teammate');
+      // hoops-builder phase B: the hero's ratings, and his body drawn at his playing height (casual runs; the standard frame otherwise)
+      rated = await loadRatedTuning(ctx.scene.metadata); heroDrawnScaled = ratedLookScale(rated) !== 1;
+      if (heroDrawnScaled) applyProportions(me.char, { heightScale: ratedLookScale(rated), buildScale: 1 });
+      console.info(`[3V3-RATED] ${ratedLog(rated)}`);
       MoveDip.for(ctx.scene, me.char.skeleton, me.char.root, (n) => me.char.animator.groupFor(n));   // hoops-dip (owner 10-20; BEFORE MoveLegs: both insert first, so the pass runs moveLegs → the dip → the foot planter): the body sinks into the crossover / momentum cross / behind-the-back (anim/moveDip)
       LocoAccent.for(ctx.scene, me.char.skeleton, me.char.root, () => accentState(me.tree)); meRest.mount(ctx.scene, me.char.skeleton, me.char.root);   // (+ h3-handler: the protect's sink, same slot)   // hoops-dip movement pass: the decel step and the push-off drawn on the body (anim/locoAccent; after the posture, before the carries)
       me.tree.attachSteer(HipSteer.for(ctx.scene, me.char.skeleton, me.char.root));   // hoops-p05 (owner 2026-11-10, the hero's slide): built BEFORE MoveLegs (both insert first: the pass runs moveLegs → the steer → the dip)
@@ -1183,6 +1195,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       // `?handle=` — the same probe override 1v1 carries. Chain depth is only reachable at a real handle,
       // so without this the 3v3 vocabulary could be shipped and never actually driven past depth 1.
       if (typeof window !== 'undefined') {
+        handle = rated.tuning.handle;   // hoops-builder: the Handle rating (BASELINE_HANDLE at 50); ?handle= below still wins
         const q = Number(new URLSearchParams(window.location.search).get('handle'));
         if (Number.isFinite(q) && q > 0) { handle = Math.max(0, Math.min(100, q)); console.info(`[3V3-HANDLE] handle ${handle} (override)`); }
       }
@@ -1411,7 +1424,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         const wantHandUp = !!me.slot.intent.contest && myJumpAge === Infinity && !meFloored && meStunSec === 0;
         if (wantHandUp !== meHandUp) { meHandUp = wantHandUp; if (meHandUp) console.info('[3V3-DEF] hand up (me)'); else me.tree.releaseHold(); }
         if (meHandUp && !me.tree.busy) me.tree.hold('bball_hand_up', { fadeSec: 0.14 });
-        if (me.slot.intent.steal && driver && driverHasBall() && !driveStolen && !foeDunkFlight && meStunSec === 0 && distXZ(me.char.root.position, driver.char.root.position) < 1.6) {   // HOTFIX (2026-09-24): only on a man with the ball (above)
+        if (me.slot.intent.steal && driver && driverHasBall() && !driveStolen && !foeDunkFlight && meStunSec === 0 && distXZ(me.char.root.position, driver.char.root.position) < ratedStealRange(1.6, rated.tuning)) {   // HOTFIX (2026-09-24): only on a man with the ball (above)
           me.tree.beat('bball_steal_reach', { fadeSec: 0.14 });
           // lane/hoops-round2 HOP-01 (owner 10-20: "3v3 steals like 1v1, no 30% coin flip"): 1v1's exposure read on his real ball (hoops/steals)
           const strip = driveStrip({ brainExposure01: teamO && driver === teamDriver ? teamExposure : undefined, moveExposed01: carries.get(driver)?.move?.exposed01 ?? 0, velX: driverVelEst.x, velZ: driverVelEst.z, toRimX: RIM.x - driver.char.root.position.x, toRimZ: RIM.z - driver.char.root.position.z, phase: driveK > 0 && driveK >= 1 - GATHER_TELL_SEC / driveSec ? 'gather' : driveK > 0 ? 'drive' : 'check', bumpAge, dist: distXZ(me.char.root.position, driver.char.root.position) });
@@ -1696,7 +1709,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         const railId = rail ? rail.id : null;
         if (railId && railId !== railNow) { railRuns++; if (performance.now() - railCallAt > CHOKE.railCallSec * 1000) { railCallAt = performance.now(); ctx.juice.callout('RAIL RUN', '#22d3ee', 380); } console.info(`[3V3-CHOKE] rail run along ${railId}`); }
         railNow = railId;
-        me.drib.speedScale = (slipNow ? SLIPSTREAM.speedMult : 1) * (meBurstLeft > 0 ? SLING.burstMult : 1) * synergy.meMult * (rail ? CHOKE.railMult : 1);
+        me.drib.speedScale = (slipNow ? SLIPSTREAM.speedMult : 1) * (meBurstLeft > 0 ? SLING.burstMult : 1) * synergy.meMult * (rail ? CHOKE.railMult : 1)
+          * ratedSpeedScale(rated.tuning, carrierId === 'foeTeam');   // hoops-builder: the Speed rating, × Defense's slide on defense (1 at 50)
       }
       // HOOPS KINETIC: the MOMENTUM DRIFT (LT + the turbo + a hard cut) keeps the speed through the turn; a defender in front of
       // the old line inside reach is left on the wrong foot. `wish` is already the world wish here; the cut takes world z.
@@ -2608,6 +2622,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     if (oneContestOn()) shotContest = contestOn(foes.filter((f) => f.stunSec === 0 && !f.floored).map((f) => contestBody(f, me.char.root.position))).contest;
     // HOOPS-MOVE-KIT-B M5: the shielding shoulder is between him and the ball — the hand that gets there is worth less
     if (currentShot?.style === 'hook') shotContest = hookShield(shotContest);
+    shotContest = ratedFinishContest(shotContest, currentShot?.style ?? 'jumper', rated.tuning);   // hoops-builder: the Finishing rating (1 at 50)
     // M12: CALLED GLASS — R1 held inside the band routes the ball through the square, and a bank from there is a real edge
     if (!banked && me.slot.intent.glass && inBankBand(me.char.root.position, RIM_FLOOR, BOARD_NORMAL)) banked = bankPoint(me.char.root.position, RIM, BOARD_NORMAL);
     if (banked) console.info(`[3V3-MOVE] called glass at ${banked.x.toFixed(2)}, ${banked.y.toFixed(2)}, ${banked.z.toFixed(2)}`);
@@ -2621,7 +2636,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     arcQuality = quality;
     // hoops-p09 ONE RULEBOOK: the release decides (core/SharedShot) — inside the green it goes in, outside it misses, the contest at the
     // release and the distance narrow the green; the grade's rate and the ring's draw behind hoops.skillShotOn 0
-    const skillV = skillShotOn() ? heroSkillVerdict(quality, shotMeter.offsetSec, { style: currentShot?.style ?? 'jumper', meterHalfSec: shotMeter.greenHalfSec, releaseContest: shotContest, distM: distXZ(me.char.root.position, RIM_FLOOR), gatherSec: shotMeter.gatherSec, fatigue01: meFatigue01, momentum: mbus.multiplier(), banked: !!banked }) : null;
+    const skillV = skillShotOn() ? heroSkillVerdict(quality, shotMeter.offsetSec, { style: currentShot?.style ?? 'jumper', meterHalfSec: shotMeter.greenHalfSec, releaseContest: shotContest, distM: distXZ(me.char.root.position, RIM_FLOOR), gatherSec: shotMeter.gatherSec, fatigue01: meFatigue01, momentum: mbus.multiplier(), banked: !!banked, ratingGreen: ratedGreenRelease(currentShot?.style ?? 'jumper', rated.tuning) }) : null;
     if (skillV) console.info(`[3V3-RIM] release ${skillV.why}: ${(shotMeter.offsetSec * 1000).toFixed(0)} ms off, green ±${(skillV.halfSec * 1000).toFixed(0)} ms → ${skillV.made ? 'IN' : 'out'}`);
     const myMiss = { q01: quality === 'perfect' ? 0.95 : quality === 'early' || quality === 'late' ? 0.55 : 0.2, short: (quality === 'early' ? 0.8 : quality === 'late' ? -0.8 : quality === 'brick' ? 0.3 : 0) + shotContest * 0.7, lateral: quality === 'brick' ? (Math.random() < 0.5 ? -0.7 : 0.7) : 0 };
     const v3 = skillV ? rimFromRelease(RIM, flatFrom(me.char.root.position), skillV.made, skillV.closeness, myMiss.q01, { short: myMiss.short, lateral: myMiss.lateral })
@@ -2631,7 +2646,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     const blockChance = near ? aiBlockChance(currentShot?.style ?? 'jumper', nearDist, nearUp, near.vel.length() < 1.0) : 0;
     // hoops-p02: HIS HAND MEETS MY BALL (hoops/blocks) — my release's own arc against the contesting body's reach on his timed jump;
     // no roll (the old chance is logged: what the dice would have charged), the roll behind hoops.blockDiceOn
-    const aiRead = blockDiceOn() || !near ? null : meetsRelease(bodyBlocker(near, foeHandUp === near || near === armed), releaseFrom(ballWorld(), 0, currentShot?.style ?? 'jumper'), RIM, currentShot?.style ?? 'jumper', alteredApex(shotContest));
+    const aiRead = blockDiceOn() || !near ? null : meetsRelease(bodyBlocker(near, foeHandUp === near || near === armed), ratedRelease(releaseFrom(ballWorld(), 0, currentShot?.style ?? 'jumper'), rated.tuning), RIM, currentShot?.style ?? 'jumper', alteredApex(shotContest));
     console.info(`[3V3-DEF] my release ${currentShot?.style} contest ${shotContest.toFixed(2)} fatigue ${meFatigue01.toFixed(2)} handUp ${foeHandUp === near && !!near} jump ${!!near && near.jumpAge <= HAND_UP_SEC} block ${blockChance.toFixed(2)} rim ${distXZ(me.char.root.position, RIM_FLOOR).toFixed(2)} q ${quality} mod ${pctMod.toFixed(2)} pct ${pct.toFixed(2)} made ${arcMade} dist ${nearDist.toFixed(2)} oldContest ${oldContest.toFixed(2)}${aiRead ? ` geo ${aiRead.hit ? 'HIT' : 'miss'} gap ${aiRead.gap.toFixed(2)} at ${aiRead.t.toFixed(2)} s ball y ${aiRead.at.y.toFixed(2)} reach ${aiRead.reachTop.toFixed(2)} jumpAge ${near!.jumpAge === Infinity ? 'none' : near!.jumpAge.toFixed(2)}` : ''}`);
     if (aiRead ? aiRead.hit : blockChance > 0 && roll() < blockChance) { blockedShot(ctx, near!, aiRead ? vec3(deflect(bodyBlocker(near!, true), aiRead.at, aiRead.t)) : null); return; }
     releaseBall(ball);
@@ -3606,7 +3621,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   /** hoops-p09 (one rulebook): what this defender is doing at my press, in my frame — off balance (in his jump, or in his reach),
    *  coming at me, or moving across me — for a move's read (hoops/rulebook readTheMan). */
   function manReadOf(f: Body, moveSide: 'left' | 'right' | null): ManRead {
-    return manReadFrom(me.char.root.position, me.char.root.rotation.y, f.char.root.position, f.vel, f.jumpAge < JUMP_SEC || !!f.reach?.showing, moveSide);
+    return ratedManRead(manReadFrom(me.char.root.position, me.char.root.rotation.y, f.char.root.position, f.vel, f.jumpAge < JUMP_SEC || !!f.reach?.showing, moveSide), rated.tuning);   // hoops-builder: the Handle rating's lean line
   }
   function meHost(): HandleHost {
     return {

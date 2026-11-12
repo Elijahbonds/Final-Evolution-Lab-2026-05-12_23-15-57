@@ -21,7 +21,7 @@
 // pulling Babylon in; ratings.test.ts pins them against HandleSystem and the rulebook.
 
 import { feel } from '../../feel-panel/feel';
-import { playStampFor } from '../core/playFrame';
+import { COSMETIC_CLAMP, playStampFor } from '../core/playFrame';
 
 // ── the athlete ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
 export const HOOPS_RATING_IDS = ['speed', 'handle', 'shooting', 'finishing', 'defense'] as const;
@@ -95,8 +95,9 @@ export const TODAY_HANDLE = 50;
 export const CHAIN_WINDOW_SEC_PER_HANDLE = 0.0052;
 /** CourtMovement.DEFAULT_MOVEMENT.maxSpeed: today's top speed (m/s). */
 export const TODAY_TOP_SPEED_MPS = 6.4;
-/** steals.STRIP_REACH_M: how far a reach gets from the reacher's root to the ball today (m). */
-export const TODAY_STRIP_REACH_M = 1.2;
+/** The hero's poke range today (m): OneVOneMode STEAL_RANGE and ThreeVThreeMode's on-ball poke, both 1.6. (steals.STRIP_REACH_M is the
+ *  AI reacher's, not the hero's.) */
+export const TODAY_STEAL_RANGE_M = 1.6;
 
 // ── the bands (every one NEW; a feel knob each, group "Hoops · ratings"; 0 = that rating changes nothing) ──────────────────────
 /** 1 = ratings change play in casual runs; 0 = everyone plays today's numbers, everywhere. Knob `hoops.ratingsOn`. */
@@ -113,12 +114,18 @@ export const RATE_GREEN_BAND = 0.1;
 export const RATE_FINISH_BAND = 0.15;
 /** Defense 90: the defensive slide's speed × (1 + this). Knob `hoops.rateSlideBand`. */
 export const RATE_SLIDE_BAND = 0.06;
-/** Defense 90: the steal reach (STRIP_REACH_M) × (1 + this). Knob `hoops.rateStealReachBand`. */
+/** Defense 90: the hero's poke range (1.6 m) × (1 + this). Knob `hoops.rateStealReachBand`. */
 export const RATE_STEAL_REACH_BAND = 0.05;
 /** Defense 90: the block reach + this (m). Knob `hoops.rateBlockReachM`. */
 export const RATE_BLOCK_REACH_M = 0.04;
-/** Each inch of playing height over 6'4": standing reach + this (m) — blocks, contests and the rim. Knob `hoops.heightReachMPerIn`. */
+/** Each inch of playing height over 6'4": standing reach + this (m) — the hero's block reach and his release height against a block.
+ *  Knob `hoops.heightReachMPerIn`. */
 export const HEIGHT_REACH_M_PER_IN = 0.015;
+/** THE LOOK (owner 2026-11-12: "the body on screen follows the playing height, within its allowed 96–104 % range"): each inch over 6'4"
+ *  draws the hero this much taller (6'0" 96 %, 6'8" 104 %), clamped to playFrame.COSMETIC_CLAMP. Drawing only: the modes read the ball on
+ *  his hand through the standard frame (playFramePoint), so the drawn size changes no outcome. Knob `hoops.heightLookPerIn` (0 = today's
+ *  body at every height). */
+export const HEIGHT_LOOK_PER_IN = 0.01;
 
 export const ratingsOn = (): boolean => feel('hoops.ratingsOn', RATINGS_ON) >= 0.5;
 
@@ -147,11 +154,11 @@ export interface HoopsTuning {
   finishContestScale: number;
   /** Defense: × the on-ball slide speed. */
   slideSpeedScale: number;
-  /** Defense: × the steal reach (STRIP_REACH_M). */
+  /** Defense: × the hero's poke range (1.6 m). */
   stealReachScale: number;
   /** Defense: + block reach (m). */
   blockReachAddM: number;
-  /** Height: + standing reach (m) — the block, the contest hand and the rim. */
+  /** Height: + standing reach (m) — the hero's block reach and his release height against a block. */
   reachAddM: number;
 }
 
@@ -269,7 +276,7 @@ export function effectLine(id: HoopsRatingId, rating: number, b: RatingBands = b
     case 'handle': return `Combo window ${sec(l * b.handle * CHAIN_WINDOW_SEC_PER_HANDLE)}, moves beat a defender ${l > 0 ? 'more' : 'less'} easily`;
     case 'shooting': return `Green window ${pct(l * b.green)}`;
     case 'finishing': return `Defenders bother your finishes ${pct(l * b.finish).replace(/^[+−]/, '')} ${l > 0 ? 'less' : 'more'}`;
-    case 'defense': return `Slide ${pct(l * b.slide)}, steal reach ${cm(l * b.stealReach * TODAY_STRIP_REACH_M)}, block reach ${cm(l * b.blockReachM)}`;
+    case 'defense': return `Slide ${pct(l * b.slide)}, steal reach ${cm(l * b.stealReach * TODAY_STEAL_RANGE_M)}, block reach ${cm(l * b.blockReachM)}`;
   }
 }
 
@@ -277,4 +284,11 @@ export function effectLine(id: HoopsRatingId, rating: number, b: RatingBands = b
 export function heightLine(heightIn: number, b: RatingBands = bands()): string {
   const dh = clampHeight(heightIn) - HEIGHT_DEFAULT_IN;
   return dh === 0 ? 'Standard reach' : `Reach ${cm(dh * b.heightReachMPerIn)}`;
+}
+
+/** How tall the hero is DRAWN at this playing height (a root scale; 1 at 6'4"), inside the cosmetic clamp. Rating-free runs and
+ *  `hoops.ratingsOn` 0 draw the standard body: the caller decides that (ratedPlay.ratedLookScale). */
+export function heightLookScale(heightIn: number, perIn: number = feel('hoops.heightLookPerIn', HEIGHT_LOOK_PER_IN)): number {
+  const [lo, hi] = COSMETIC_CLAMP.height;
+  return clamp(1 + (clampHeight(heightIn) - HEIGHT_DEFAULT_IN) * perIn, lo, hi);
 }
