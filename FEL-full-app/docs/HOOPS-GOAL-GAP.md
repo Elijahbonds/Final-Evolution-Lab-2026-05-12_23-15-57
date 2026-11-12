@@ -320,7 +320,7 @@ race in its runs (every board in them was the live one).
 
 **Phase 6, pace.** The dead-ball beats in the code, from the HUD's score to the next live ball: 1v1 my make 0.7 s (make-it-take-it: my
 ball at once), their make 0.9 s + the 0.5 s check = 1.4 s, their dunk 1.0 s (1.6 s with me on the floor) + 0.5; 3v3 my make 0.3 s to their
-ball, their make 0.9 s. Rig: PACEROWS. Big plays (a dunk, a block, an ankle-breaker, a poster) add a replay at the dead ball: 2.4–5
+ball, their make 0.9 s. Rig: 1v1 their layup → the check called 0.92 s later, live at 1.42 s (seed 7, size-up on); 3v3 my make → their drive under way 1.38 s (knobs off: these beats are not this lane's). Both under 2.5 s before and after. (The rig's 1v1 offence runs could not read my own make: under NODRAW the harness's render watchdog trips a few seconds after a dead ball and the mode reloads — a rig artifact, not the game; the drawn runs do not do it.) Big plays (a dunk, a block, an ankle-breaker, a poster) add a replay at the dead ball: 2.4–5
 recorded seconds at half speed, **4.8–10 s on screen** before → **at most 2.5 s** (`hoops.replayCapSec`, the window around the moment).
 
 **Phase 6, possession medians** (`rival-sim.mts`, 200 possessions a tier; "bot" = the rig's scripted defender, who reaches every 0.6–1.6 s
