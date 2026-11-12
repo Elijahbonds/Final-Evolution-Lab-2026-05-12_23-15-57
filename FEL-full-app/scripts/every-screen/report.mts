@@ -26,6 +26,7 @@ export const FAULT_NAME: Record<string, string> = {
   'too-many-words': 'More than 40 words before scrolling on a do-this screen',
   'many-primary': 'More than one bright button on the first screen',
   'dead-end': 'Dead end: nothing leads on or back',
+  'float-covers': 'A floating button covers text or a link on the first screen',
   'only-chrome': 'Only the app\'s bars lead on',
   'text-sizes': 'More than 4 text sizes on one screen',
   'button-looks': 'More than 3 button looks on one screen',
