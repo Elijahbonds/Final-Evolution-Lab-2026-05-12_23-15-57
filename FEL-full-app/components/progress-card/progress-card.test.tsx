@@ -103,7 +103,8 @@ describe('the weekly door', () => {
     expect(readFileSync(join(root, 'app/train/page.tsx'), 'utf8')).toContain('<WeekCardEntry />');
     const profile = readFileSync(join(root, 'app/profile/page.tsx'), 'utf8');
     expect(profile).toMatch(/<PrimaryCta href="\/profile\/week" testId="profile-week-card"/);
-    expect(profile).not.toMatch(/<PrimaryCta href="\/profile\/week"[^>]*\bdocked\b/);
+    const card = profile.split('\n').find((l) => l.includes('testId="profile-week-card"')) ?? '';
+    expect(card).not.toMatch(/\bdocked\b/);
   });
 });
 
