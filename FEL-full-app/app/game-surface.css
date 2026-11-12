@@ -93,6 +93,17 @@
     aspect-ratio: auto !important;
     height: 100% !important;
   }
+  /* GAME-HUD (2026-11-12): ...except a game's host in the moment before GameShell turns console view on. The media
+   * query applies the instant the phone turns sideways; the console view arrives with the shell's next render (its
+   * resize handler), which on a busy main thread is a few hundred ms later. In between, the stage is still the page
+   * layout's, which has no height to take 100 % of, so the host collapsed to its 2 px border and cut off every readout
+   * inside it (the every-screen scorer read Gate Crasher's "· PAR 60" cut off at 200 % zoom, 640 x 400: measured, the
+   * host 608 x 2 px, console view not yet on). The host keeps its 16:10 box until the console view takes over, where
+   * rule 1 below places it. */
+  div:has(> [data-capture-ui]):not([data-fel-console]) > [class*="aspect-[16/10]"] {
+    aspect-ratio: 16 / 10 !important;
+    height: auto !important;
+  }
 }
 
 /* In actual fullscreen the element IS the screen, so anything still reserving
@@ -429,28 +440,19 @@ div:has(> [data-capture-ui]) > div:has(> canvas) > [data-fel-fullbleed] > [data-
  *    an 8 px bar, so it covers the stage's (8..68, 8..68). Every HudFrame host puts its first readout in that corner, so
  *    the menu sat on it: measured by the every-screen pass on the tiebreak's TIEBREAK title (390 x 844), and before that
  *    on golf's HOLE 1/5, baseball's INN · OUTS, aero's PLACE and football's 1 & 10. A sideways phone moves the menu into
- *    the bottom row in play (rule 3 above); everywhere else it stays, so the HUD's top row starts after it instead.
- *    One rule for every mode, on the shape the hosts share (rather than twenty hosts): the top row of a HudFrame
- *    (`absolute inset-x-0 top-0 … justify-between px-4`) and a top-left stack (`absolute left-4 top-4`). Only the row's
- *    LEFT padding moves: its readouts keep their order, sizes and the right-hand corner; nothing is added to the screen.
- *    - Page layout (an upright phone, a narrow window): the host sits 8 px in (16 px from 640 px wide, sm:px-4) plus its
- *      1 px border, so the row starts at 68 + 6 px gap - 9 px = 65 px (57 px from 640 px). */
-div:not([data-fel-console]):has(> [data-capture-ui]) > div:has(> canvas) > [data-hud-frame] > .absolute.inset-x-0.top-0.justify-between {
-  padding-left: 65px;
-}
-div:not([data-fel-console]):has(> [data-capture-ui]) > div:has(> canvas) > [data-hud-frame] > .absolute.left-4.top-4 {
-  left: 65px;
-}
-@media (min-width: 640px) {
-  div:not([data-fel-console]):has(> [data-capture-ui]) > div:has(> canvas) > [data-hud-frame] > .absolute.inset-x-0.top-0.justify-between {
-    padding-left: 57px;
-  }
-  div:not([data-fel-console]):has(> [data-capture-ui]) > div:has(> canvas) > [data-hud-frame] > .absolute.left-4.top-4 {
-    left: 57px;
-  }
+ *    the bottom row in play (rule 3 above); everywhere else it stays, so the HUD keeps clear of it instead. One rule for
+ *    every mode, on the shape the hosts share (the HudFrame), not twenty hosts:
+ *    - Page layout (an upright phone, a narrow window): the HUD's frame starts BELOW the menu. The host's top edge is
+ *      13 px down the stage (12 px padding + its 1 px border), the menu ends 68 px down, and a top row's own 12 px padding
+ *      (py-3) is inside the frame, so the frame starts 46 px down and the row's chips start at 58 px, clear of the menu
+ *      with 3 px to spare. The whole HUD moves down together (its rows and the stacks hung under them), keeping every
+ *      readout's place relative to the others; nothing is added, and the rows keep their full width. (Moving only the
+ *      top row right instead was tried: penalty's READY row, KICK · ⏱ · FLOW · PTS, then ran 11 px off a 390 px phone.) */
+div:not([data-fel-console]):has(> [data-capture-ui]) > div:has(> canvas) > [data-hud-frame] {
+  top: max(46px, env(safe-area-inset-top, 0px)) !important;
 }
 /*    - Console view on a screen taller than a phone (a laptop or tablet sideways, a TV), where the menu stays top-left in
- *      play: the host is the title-safe frame (--fel-frame-l in) and the HUD is zoomed, so the row keeps its own 1rem
+ *      play: the host is the title-safe frame (--fel-frame-l in) and the HUD is zoomed, so the top row keeps its own 1rem
  *      unless the frame leaves less than the menu's 74 px; then it starts after the menu, in the zoomed HUD's own px.
  *      At 1280 x 720 the frame is 64 px in and the row's 1rem is 24 px on the screen: 88 px, clear, so nothing moves. */
 @media (min-height: 521px) {

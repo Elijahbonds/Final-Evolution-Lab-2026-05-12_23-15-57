@@ -71,13 +71,14 @@ describe('the capture menu\'s corner: one rule the HUD keeps clear of (app/game-
     const view = read('components/capture/capture-hud-view.tsx');
     expect(view).toMatch(/padding: 8, borderRadius: 12/);
     expect(view).toMatch(/minWidth: 44, minHeight: 44/);
-    // 8 + 8 + 44 + 8 = 68 px; +6 px gap; minus the host's own offset (8 px stage padding + 1 px border; 16 + 1 from 640 px)
-    expect(68 + 6 - 9).toBe(65);
-    expect(68 + 6 - 17).toBe(57);
-    expect(css).toMatch(/> \[data-hud-frame\] > \.absolute\.inset-x-0\.top-0\.justify-between \{\s*padding-left: 65px;/);
-    expect(css).toMatch(/> \[data-hud-frame\] > \.absolute\.left-4\.top-4 \{\s*left: 65px;/);
-    expect(css).toMatch(/padding-left: 57px;/);
+    // 8 + 8 + 44 + 8 = 68 px down the stage; the host's top is 12 + 1 px down it; a top row's own py-3 (12 px) is inside
+    // the frame: a frame 46 px down puts the row's chips at 13 + 46 + 12 = 71 px, clear of the menu's 68
+    expect(13 + 46 + 12).toBeGreaterThan(68);
+    expect(css).toMatch(/div:not\(\[data-fel-console\]\):has\(> \[data-capture-ui\]\) > div:has\(> canvas\) > \[data-hud-frame\] \{\s*top: max\(46px, env\(safe-area-inset-top, 0px\)\) !important;/);
     expect(css).toMatch(/padding-left: max\(1rem, calc\(\(74px - var\(--fel-frame-l\)\) \/ var\(--fel-hud-zoom, 1\)\)\);/);
+  });
+  it('the HUD frame is the one place the rule lands (a HudFrame host needs no change of its own)', () => {
+    expect(read('components/games/tv-hud/hud-frame.tsx')).toMatch(/data-hud-frame/);
   });
   it('a sideways phone in play keeps its own rule (the menu is in the bottom row there): the console rule is for taller screens', () => {
     const i = css.indexOf('6. THE CAPTURE MENU');

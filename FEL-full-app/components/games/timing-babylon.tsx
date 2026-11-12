@@ -195,8 +195,10 @@ export function makeTimingHost(opts: TimingHostOpts) {
             one palette, the 10-foot type scale, the display face for numbers, framer-motion calls — in the same slots,
             from the same keys, gated exactly as before. */}
         <HudFrame>
-        {/* HUD bezel */}
-        <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-3 px-4 py-3">
+        {/* HUD bezel. GAME-HUD (2026-11-12): its spacing in px (the same 12 / 16 px as gap-3 px-4 at 100 %): the readouts
+            are px, so rem spacing was the one part of the row that grew with the phone's text size, and at 150 % text it
+            pushed the score 36-40 px off a 390 px phone (the every-screen scorer, /play/soccer: penalty's READY row). */}
+        <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-[12px] px-[16px] py-3">
           {/* M42 E20: render the mode's own round label as-is (RD/SHOT/KICK/PITCH) — no dup prefix */}
           <HudChip tone="you" size="value">{hnode(hud.round, '—')}</HudChip>
           {/* BREAKAWAY (owner brief 2026-09-18): the shot clock and the FLOW gauge (wall runs, rebounds, slides, a fast dribble) that sets the shot's power */}
