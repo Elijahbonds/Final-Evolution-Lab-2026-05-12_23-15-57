@@ -183,7 +183,7 @@ export default function DunkDuelBabylon({ onEnd }: GameProps) {
 
       {/* THE MIC (2026-09-24): what the court's MC just said, and the switch for the voice */}
       {phase === 'playing' && <MicCaption text={hud.mic} who={hud.micWho} voiced={hud.micVoiced} />}
-      {phase === 'playing' && <MicToggle />}
+      {phase === 'playing' && <MicToggle cc={hintDevice !== 'touch'} />}   {/* hoops-p08: on a touch screen the duel's button deck covers the CC chip's row; the CC choice made in any other hoops mode carries (it is stored) */}
 
       <BootSplash
         modeId="dunkduel"
