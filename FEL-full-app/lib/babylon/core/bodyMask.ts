@@ -519,11 +519,12 @@ function fitShortsUnderTop(body: Mesh, bodySkin: { P: Float32Array; N: Float32Ar
 
 /**
  * KIT-GLITCH (owner 2026-11-12: "clothes floating off the body"). The waistband fit hands each fitted vertex of the short the
- * skin weights of the body point under it, and "under it" was the NEAREST skin of any kind. With an arm hanging at the side,
- * or a hand on the hip when the fit ran, the nearest skin to the short's side was the forearm: those vertices took 100 %
- * forearm weights and followed the arm in every move, a spike off the hip (measured on the rig: shorts vertices weighted
- * LeftForeArm 1.00, 3.6 bind units from the hips). Only skin that rides the torso and legs lends weights: a body vertex
- * with at most WAIST_DONOR_MAX of its weight on the arms, hands, neck or head.
+ * skin weights of the body point under it, and "under it" was the NEAREST skin of any kind. The fit runs in the pose the
+ * body holds — idle, hands hanging beside the hips — and there the nearest skin to the short's sides was the forearm and
+ * the hand: on the male kit 141 shorts vertices took arm weights (50 on rival ace), and when the arms went up (a jumper,
+ * a dunk) a piece of the short went with them, 0.46–0.48 m off the hip (scripts/probes/kit-glitch/cpu.ts; pinned by
+ * kitGlitch.test.ts and scripts/kit-glitch-tests.ts). Only skin that rides the torso and legs lends weights: a body vertex
+ * with at most WAIST_DONOR_MAX of its weight on the shoulders, arms, hands, neck or head.
  */
 export const WAIST_DONOR_BONES = /(Shoulder|Arm|ForeArm|Hand|Neck|Head)$/;
 export const WAIST_DONOR_MAX = 0.2;

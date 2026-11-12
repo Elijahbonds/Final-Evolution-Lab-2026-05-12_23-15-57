@@ -90,7 +90,8 @@ export async function measureBodies(keys: string[], opts: { wardrobe?: Wardrobe;
         for (let v = 0; v < gw.length / 3; v += 2) { let bd = Infinity; for (let u = 0; u < bw.P.length / 3; u += 3) { const d = (bw.P[u * 3] - gw[v * 3]) ** 2 + (bw.P[u * 3 + 1] - gw[v * 3 + 1]) ** 2 + (bw.P[u * 3 + 2] - gw[v * 3 + 2]) ** 2; if (d < bd) bd = d; } far = Math.max(far, Math.sqrt(bd)); }
         reads.push({ mesh: g.name.replace(/_c[^_]*$/, '').replace(/_c\w+$/, ''), tear, maxRatio: +maxRatio.toFixed(2), float: +far.toFixed(3), tearBones });
       }
-      const r: PoseRead = { body: key, clip, frac, garments: reads, poke: 0, pokeBySlot: {} };
+      const pk = cpuPoke(body, bw, garments);
+      const r: PoseRead = { body: key, clip, frac, garments: reads, poke: pk.total, pokeBySlot: pk.bySlot };
       out.push(r); opts.log?.(r);
     }
     root.dispose();
@@ -103,9 +104,50 @@ export async function measureBodies(keys: string[], opts: { wardrobe?: Wardrobe;
 async function main(): Promise<void> {
   const keys = process.argv.slice(2).length ? process.argv.slice(2) : ['male', 'female', 'rival:ace', 'rival:grit', 'rival:yara'];
   const silence = console.warn; console.warn = () => undefined; console.info = () => undefined; console.log = ((l) => (...a: unknown[]) => { if (!/^(BJS|\[FEL-)/.test(String(a[0]))) l(...a); })(console.log);
-  const reads = await measureBodies(keys, { log: (r) => console.log(JSON.stringify({ b: r.body, c: `${r.clip}@${r.frac}`, g: r.garments.map((g) => `${g.mesh.replace(/^Kit_/, '')} tear${g.tear} ×${g.maxRatio} float${g.float}${g.tear ? ' ' + JSON.stringify(g.tearBones) : ''}`) })) });
+  const reads = await measureBodies(keys, { log: (r) => console.log(JSON.stringify({ b: r.body, c: `${r.clip}@${r.frac}`, poke: r.poke, pk: r.pokeBySlot, g: r.garments.map((g) => `${g.mesh.replace(/^Kit_/, '')} tear${g.tear} ×${g.maxRatio} float${g.float}${g.tear ? ' ' + JSON.stringify(g.tearBones) : ''}`) })) });
   console.warn = silence;
-  let tear = 0, floatMax = 0; for (const r of reads) for (const g of r.garments) { tear += g.tear; floatMax = Math.max(floatMax, g.float); }
-  console.log('TOTAL', JSON.stringify({ poses: reads.length, tear, floatMax }));
+  let tear = 0, floatMax = 0, poke = 0; const ps: Record<string, number> = {}; for (const r of reads) { poke += r.poke; for (const [k, v] of Object.entries(r.pokeBySlot)) ps[k] = (ps[k] ?? 0) + v; for (const g of r.garments) { tear += g.tear; floatMax = Math.max(floatMax, g.float); } }
+  console.log('TOTAL', JSON.stringify({ poses: reads.length, tear, floatMax, poke, pokeBySlot: ps }));
 }
+/** POKE (CPU): drawn body vertices (in a triangle the mask kept) that project onto a garment triangle within 3 cm and stand
+ *  OUTSIDE it (more than 1 mm along the garment's outward normal): skin through cloth, counted per slot. */
+export function cpuPoke(body: Mesh, bw: { P: Float32Array; N: Float32Array }, garments: Mesh[]): { total: number; bySlot: Record<string, number> } {
+  const drawnV = new Uint8Array(bw.P.length / 3); const bi = body.getIndices()!; for (let i = 0; i < bi.length; i++) drawnV[bi[i]] = 1;
+  const C = 0.04, key = (i: number, j: number, k: number) => `${i},${j},${k}`;
+  const bySlot: Record<string, number> = {}; let total = 0;
+  const hit = new Uint8Array(drawnV.length);
+  for (const g of garments) {
+    const slot = maskSlotOf(g.name) ?? '?'; const sw = skinnedWorld(g)!; const P = sw.P, N = sw.N, ind = g.getIndices()!;
+    const grid = new Map<string, number[]>();
+    for (let t = 0; t + 2 < ind.length; t += 3) { const a = ind[t] * 3; const kk = key(Math.floor(P[a] / C), Math.floor(P[a + 1] / C), Math.floor(P[a + 2] / C)); let l = grid.get(kk); if (!l) grid.set(kk, l = []); l.push(t); }
+    for (let v = 0; v < drawnV.length; v++) {
+      if (!drawnV[v] || hit[v]) continue;
+      const x = bw.P[v * 3], y = bw.P[v * 3 + 1], z = bw.P[v * 3 + 2];
+      const ci = Math.floor(x / C), cj = Math.floor(y / C), ck = Math.floor(z / C);
+      let best = Infinity, sd = 0;
+      for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (let k = -1; k <= 1; k++) {
+        const l = grid.get(key(ci + i, cj + j, ck + k)); if (!l) continue;
+        for (const t of l) {
+          const a = ind[t], b = ind[t + 1], c = ind[t + 2];
+          const ax = P[a * 3], ay = P[a * 3 + 1], az = P[a * 3 + 2];
+          const ux = P[b * 3] - ax, uy = P[b * 3 + 1] - ay, uz = P[b * 3 + 2] - az, vx = P[c * 3] - ax, vy = P[c * 3 + 1] - ay, vz = P[c * 3 + 2] - az;
+          let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx; const nl = Math.hypot(nx, ny, nz); if (nl < 1e-12) continue; nx /= nl; ny /= nl; nz /= nl;
+          if (nx * (N[a * 3] + N[b * 3] + N[c * 3]) + ny * (N[a * 3 + 1] + N[b * 3 + 1] + N[c * 3 + 1]) + nz * (N[a * 3 + 2] + N[b * 3 + 2] + N[c * 3 + 2]) < 0) { nx = -nx; ny = -ny; nz = -nz; }
+          const px = x - ax, py = y - ay, pz = z - az, d = px * nx + py * ny + pz * nz;
+          if (Math.abs(d) > 0.03 || Math.abs(d) >= best) continue;
+          // inside the triangle (barycentric, 5 % slack) once projected onto its plane
+          const qx = px - d * nx, qy = py - d * ny, qz = pz - d * nz;
+          const d00 = ux * ux + uy * uy + uz * uz, d01 = ux * vx + uy * vy + uz * vz, d11 = vx * vx + vy * vy + vz * vz, d20 = qx * ux + qy * uy + qz * uz, d21 = qx * vx + qy * vy + qz * vz, den = d00 * d11 - d01 * d01;
+          if (Math.abs(den) < 1e-16) continue;
+          const bv = (d11 * d20 - d01 * d21) / den, bw2 = (d00 * d21 - d01 * d20) / den;
+          if (bv < -0.05 || bw2 < -0.05 || bv + bw2 > 1.05) continue;
+          best = Math.abs(d); sd = d;
+        }
+      }
+      if (best < Infinity && sd > 0.001) { hit[v] = 1; total++; bySlot[slot] = (bySlot[slot] ?? 0) + 1; }
+    }
+  }
+  return { total, bySlot };
+}
+
 if (require.main === module) void main();

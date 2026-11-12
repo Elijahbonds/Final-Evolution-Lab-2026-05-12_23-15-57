@@ -11,6 +11,8 @@ import { applyKit } from './kit';
 import { GARMENT_INFLATE, metresPerBind } from './garmentFixes';
 import { skinnedWorld, maskBodyNow } from './bodyMask';
 import { applySkinShading } from './skinShading';
+import { CharacterAnimator } from '../anim/CharacterAnimator';
+import { registerAuthoredClips } from '../anim/authored';
 import type { PBRMaterial } from '@babylonjs/core';
 
 const FILES = { male: 'public/models/candidates/fel-kit-male.glb', female: 'public/models/candidates/fel-kit-female.glb', rival: 'public/models/rivals/ace.glb' } as const;
@@ -98,23 +100,30 @@ describe('skin through cloth: the lift off the body is in METRES (garmentFixes.l
 });
 
 describe('floating: the waistband fit never hands the shorts an ARM\'s weights (bodyMask WAIST_DONOR_*)', () => {
-  it('with the hands on the hips when the mask runs, no shorts vertex rides an arm, a hand, the neck or the head', () => {
-    const s = spawn('male');
-    applyKit(s.meshes, { tops: 'top_bonds', shorts: 'shorts_court' }, 'onevone');
-    const body = s.meshes.find((m) => /^Body/.test(m.name)) as Mesh;
-    // bring both forearms in to the hips (the hands-on-hips pose a celebration or a stance can hold when the fit runs)
-    const node = (name: string) => body.skeleton!.bones.find((b) => b.name === name)!.getTransformNode()!;
-    for (const [side, sign] of [['Left', 1], ['Right', -1]] as const) {
-      node(`${side}Arm`).rotationQuaternion = null; node(`${side}Arm`).rotation.set(0, 0, sign * 0.15);
-      node(`${side}ForeArm`).rotationQuaternion = null; node(`${side}ForeArm`).rotation.set(0, sign * 1.2, 0);
-    }
-    scene.render();
-    maskBodyNow(body, s.meshes);
+  it.each(['male', 'rival'] as Body[])('%s: fitted at idle (hands beside the hips), the shorts stay on the hips when the arms go up', (body) => {
+    const s = spawn(body);
+    const sk = s.meshes.find((m) => /^Body/.test(m.name))!.skeleton!;
+    const animator = new CharacterAnimator(scene, []);
+    registerAuthoredClips(animator, scene, sk, null);
+    applyKit(s.meshes, null, 'onevone');
+    animator.play('idle_stand', { loop: true, fadeSec: 0, restart: true });
+    for (let i = 0; i < 3; i++) scene.render();
+    maskBodyNow(s.meshes.find((m) => /^Body/.test(m.name)) as Mesh, s.meshes);   // the fit runs in the pose the body holds: idle
     const sh = shown(s.meshes, /^Kit_shorts_/);
+    // the shorts are authored on Hips / UpLeg / Spine only: anything on a limb came from the fit
     const mi = sh.getVerticesData('matricesIndices')!, mw = sh.getVerticesData('matricesWeights')!, bones = sh.skeleton!.bones;
-    let onLimb = 0;   // the shorts are authored on Hips / UpLeg / Spine only: anything on a limb came from the fit
+    let onLimb = 0;
     for (let v = 0; v < mw.length / 4; v++) { let w = 0; for (let k = 0; k < 4; k++) if (/(Shoulder|Arm|Hand|Neck|Head)$/.test(bones[mi[v * 4 + k]]?.name ?? '')) w += mw[v * 4 + k]; if (w > 0.2) onLimb++; }
     expect(onLimb).toBe(0);
+    // the jumper's release, both arms overhead: before the fix a piece of the shorts rode the forearm 0.46 m off the hip
+    const g = animator.play('jumpshot', { loop: true, fadeSec: 0, restart: true })!;
+    g.goToFrame(g.from + (g.to - g.from) * 0.5); g.pause();
+    for (let i = 0; i < 2; i++) scene.render();
+    const bw = skinnedWorld(s.meshes.find((m) => /^Body/.test(m.name)) as Mesh)!.P, gw = skinnedWorld(sh)!.P;
+    let far = 0;
+    for (let v = 0; v < gw.length / 3; v += 2) { let bd = Infinity; for (let u = 0; u < bw.length / 3; u += 3) bd = Math.min(bd, (bw[u * 3] - gw[v * 3]) ** 2 + (bw[u * 3 + 1] - gw[v * 3 + 1]) ** 2 + (bw[u * 3 + 2] - gw[v * 3 + 2]) ** 2); far = Math.max(far, Math.sqrt(bd)); }
+    expect(far).toBeLessThan(0.15);
+    animator.dispose();
     s.root.dispose();
-  });
+  }, 60_000);
 });

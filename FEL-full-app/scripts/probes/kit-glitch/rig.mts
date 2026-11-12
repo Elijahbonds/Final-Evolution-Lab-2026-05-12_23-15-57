@@ -160,6 +160,58 @@ async function diag(): Promise<void> {
   } finally { await browser.close(); srv.close(); }
 }
 
+/** cells: CELLS="subject|tier|pose|cam;…" — the beauty shot and the poke overlay of each, with its screen numbers → <OUT>/<NAME>.json */
+async function cells(): Promise<void> {
+  const want = (process.env.CELLS ?? '').split(';').filter(Boolean).map((c) => { const [subject, tier, pose, cam] = c.split('|'); return { subject, tier, pose, cam }; });
+  await bundle();
+  const srv = await serve();
+  const browser = await chromium.launch({ executablePath: chromiumExe(), args: GL_ARGS });
+  const out: Cell[] = [];
+  try {
+    for (const w of want) {
+      const s = SUBJECTS.find((x) => x.id === w.subject)!, p = POSES.find((x) => x.id === w.pose)!, c = CAMS.find((x) => x.id === w.cam)!;
+      const page = await browser.newPage({ viewport: { width: W, height: H } });
+      await runSubject(page, srv.url, s, w.tier, [p], [c], out, true);
+      await page.close();
+    }
+  } finally { await browser.close(); srv.close(); }
+  writeFileSync(join(OUT, `${process.env.NAME ?? 'cells'}.json`), JSON.stringify(out.filter((c) => c.shot)));
+}
+
+/** sheet <before.json> <after.json> <out.jpg>: each cell as before | after, beauty over the poke overlay, labelled. */
+async function sheet(): Promise<void> {
+  const [bf, af, outJpg] = process.argv.slice(3);
+  const B = JSON.parse(readFileSync(bf, 'utf8')) as Cell[], A = JSON.parse(readFileSync(af, 'utf8')) as Cell[];
+  const rows = B.map((b) => ({ b, a: A.find((x) => x.subject === b.subject && x.tier === b.tier && x.pose === b.pose && x.cam === b.cam) })).filter((r) => r.a);
+  const browser = await chromium.launch({ executablePath: chromiumExe(), args: GL_ARGS });
+  try {
+    const page = await browser.newPage();
+    const url = await page.evaluate(async ([rows, w, h]) => {
+      const load = (src: string) => new Promise<HTMLImageElement>((ok) => { const i = new Image(); i.onload = () => ok(i); i.src = src; });
+      const cols = 4, cw = w as number, ch = h as number, lab = 46;
+      const cv = document.createElement('canvas'); cv.width = cols * cw; cv.height = (rows as unknown[]).length * (ch + lab); const g = cv.getContext('2d')!;
+      g.fillStyle = '#111'; g.fillRect(0, 0, cv.width, cv.height);
+      let y = 0;
+      for (const r of rows as { b: Cell; a: Cell }[]) {
+        const sb = r.b.screen as { poke: number; flipsGarment: number }, sa = r.a.screen as { poke: number; flipsGarment: number };
+        g.fillStyle = '#fff'; g.font = '16px sans-serif';
+        g.fillText(`${r.b.subject} · ${r.b.tier} · ${r.b.pose} (${r.b.clip}) · ${r.b.cam}`, 8, y + 18);
+        g.fillStyle = '#f88'; g.fillText(`BEFORE: skin-through-cloth ${sb.poke} px · flicker ${sb.flipsGarment} px`, 8, y + 38);
+        g.fillStyle = '#8f8'; g.fillText(`AFTER: ${sa.poke} px · ${sa.flipsGarment} px`, 2 * cw + 8, y + 38);
+        const imgs = await Promise.all([r.b.shot!, r.b.pokeShot!, r.a.shot!, r.a.pokeShot!].map(load));
+        g.drawImage(imgs[0], 0, y + lab, cw, ch); g.drawImage(imgs[1], cw, y + lab, cw, ch);
+        g.drawImage(imgs[2], 2 * cw, y + lab, cw, ch); g.drawImage(imgs[3], 3 * cw, y + lab, cw, ch);
+        y += ch + lab;
+      }
+      return cv.toDataURL('image/jpeg', 0.82);
+    }, [rows, Math.round(W * 0.75), Math.round(H * 0.75)] as const);
+    writeFileSync(outJpg, Buffer.from(url.split(',')[1], 'base64'));
+    console.log('wrote', outJpg, rows.length, 'rows');
+  } finally { await browser.close(); }
+}
+
 if (job === 'matrix') await matrix();
+else if (job === 'cells') await cells();
+else if (job === 'sheet') await sheet();
 else if (job === 'diag') await diag();
 else if (job === 'summary') console.log(summary(JSON.parse(readFileSync(process.argv[3], 'utf8'))));
