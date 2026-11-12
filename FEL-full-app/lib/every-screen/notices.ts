@@ -24,6 +24,12 @@ export const APPROVED_NOTICES: readonly { from: string; name: string; kind: Noti
   { from: '@/lib/hoops-cam/copy', name: 'PRIVACY_LINE', kind: 'privacy' },
   { from: '@/lib/consent/guardian-copy', name: 'CONSENT_DONE_LINE', kind: 'consent' },
   { from: '@/lib/consent/guardian-copy', name: 'CONSENT_UNDER_18_LINE', kind: 'privacy' },
+  // COACH-WORDS (2026-11-12): proposed by lane/coach-words, word for word as the screens showed them; the owner approves or
+  // rejects each in docs/COACH-WORDING-REVIEW.md
+  { from: '@/lib/coach-business/highlight-copy', name: 'HIGHLIGHT_CONSENT_LINE', kind: 'consent' },
+  { from: '@/lib/session-setup/copy', name: 'COURT_NAMES_LINE', kind: 'privacy' },
+  { from: '@/lib/session-setup/copy', name: 'COURT_NUMBERS_KEPT_LINE', kind: 'privacy' },
+  { from: '@/lib/session-setup/copy', name: 'COURT_NUMBERS_NOT_SENT_LINE', kind: 'privacy' },
 ];
 
 /** The attribute for an approved notice's element: `<p {...notice('medical')}>{DISCLAIMER}</p>`. */
