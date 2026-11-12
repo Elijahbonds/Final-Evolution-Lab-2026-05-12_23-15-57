@@ -24,10 +24,19 @@ function cover(p) {
     if (d.k === 'bg' && d.a < 0.1) continue;
     paint(g[d.cls], d.x, d.y, d.w, d.h);
   }
-  for (const t of p.textDump ?? []) if (g[t.cls]) paint(g[t.cls], t.x, t.y, t.r - t.x, t.b - t.y);
+  // a run of text inside a plate is drawn only inside it (a truncated chip clips its overflow: the range's box does not),
+  // so a text box is cut to the smallest painted box of its own layer that holds its first glyph
+  const boxes = (p.dump ?? []).filter((d) => g[d.cls] && !d.big && !(d.k === 'bg' && d.a < 0.1));
+  for (const t of p.textDump ?? []) {
+    if (!g[t.cls]) continue;
+    let x0 = t.x, y0 = t.y, x1 = t.r, y1 = t.b;
+    const host = boxes.filter((d) => d.cls === t.cls && d.x <= t.x + 1 && d.y <= t.y + 1 && d.x + d.w >= t.x + 2 && d.y + d.h >= t.y + 2).sort((a2, b2) => a2.w * a2.h - b2.w * b2.h)[0];
+    if (host) { x0 = Math.max(x0, host.x); y0 = Math.max(y0, host.y); x1 = Math.min(x1, host.x + host.w); y1 = Math.min(y1, host.y + host.h); }
+    if (x1 > x0 && y1 > y0) paint(g[t.cls], x0, y0, x1 - x0, y1 - y0);
+  }
   const n = (arr) => arr.reduce((s, v) => s + v, 0);
   const all = new Uint8Array(gw * gh); for (const a of Object.values(g)) for (let i = 0; i < a.length; i++) all[i] |= a[i];
-  const pct = (k) => Math.round((k / (gw * gh)) * 1000) / 10;
+  const pct = (k) => Math.round((k / (gw * gh)) * 10000) / 100;
   return { hud: pct(n(g.hud)), deck: pct(n(g.deck)), chrome: pct(n(g.chrome)), all: pct(n(all)) };
 }
 // READY (the opening HUD under the card: the same in every run, so before and after compare like for like), then in play

@@ -15,7 +15,7 @@ import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } 
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
-import { HUD_TEXT_ALPHA, HudBanner, HudChip, HudFrame, HudLine, HudMeter, HudPlate, HudText, ScoreValue, Scorebug, hudColor, hudLineStep, hudLineTrim, HUD_LINE_TRIM_PAD, HUD_LINE_PAD } from './tv-hud';
+import { HUD_TEXT_ALPHA, HudBanner, HudChip, HudFrame, HudLine, HudMeter, HudPlate, HudText, ScoreValue, Scorebug, hudColor, hudLineStep, hudLineTrim, HUD_LINE_PAD } from './tv-hud';
 import { footballHeadline, footballSessionWon, gameResultFromSession } from '@/lib/sessions/gameResultFromSession';
 import { medalName } from '@/lib/babylon/modes/footballRushRules';
 /** FOOTBALL UPGRADE: the breakaway meter's lines arrive as '0.333,0.667'. */
@@ -116,7 +116,10 @@ export default function FootballBabylon({ onEnd }: GameProps) {
           <ScoreValue value={hnode(hud.score, 0)} size="stat" tone="score" />
           <HudText size="caption" tone="score">PTS</HudText>
         </Scorebug>
-        <HudChip tone="good" size="body" style={{ paddingBlock: HUD_LINE_TRIM_PAD }}>{hnode(hud.yards, 0)} YD · {hnode(hud.evades, 0)} EVA</HudChip>
+        {/* GAME-HUD (2026-11-12): a line (n YD · n EVA), so the 14 px line step; the chip hugs it (no vertical padding,
+            0.6em at the sides) so the top row, with the field strip's 14 px BALL ON / 1ST AT under it, hides no more of
+            the field than it did (measured on the opening HUD, phone and desktop) */}
+        <HudChip tone="good" size="body" style={{ paddingBlock: 0, paddingInline: '0.6em' }}>{hnode(hud.yards, 0)} YD · {hnode(hud.evades, 0)} EVA</HudChip>
       </div>
 
       {/* drive state chips: breakaway gear + truck cooldown */}

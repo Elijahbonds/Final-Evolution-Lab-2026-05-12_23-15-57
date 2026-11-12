@@ -140,7 +140,7 @@ export default function AeroAcesBabylon({ onEnd }: GameProps) {
             <HudMeter label="SLIPSTREAM" labelTone="info" value={Math.min(100, hnum(hud.draft))} max={100} tone="you" width="100%" height="thin" />
           </HudPlate>
         ) : null}
-        <HudPlate className={`px-3 ${hnum(hud.toGate) > 0 ? 'py-0.5' : 'py-1'} text-right`}>
+        <HudPlate className={`${hnum(hud.toGate) > 0 ? 'px-2 py-0.5' : 'px-3 py-1'} text-right`}>
           <ScoreValue value={hnum(hud.speed)} size="stat" pop={false} /><HudText size="caption" alpha={0.5}> KM/H</HudText>
           {hnum(hud.toGate) > 0 ? <HudText as="div" size={hudLineStep(`RING ${hnum(hud.toGate)} m`, 'caption')} tone="info">RING {hnum(hud.toGate)} m</HudText> : null}
         </HudPlate>
