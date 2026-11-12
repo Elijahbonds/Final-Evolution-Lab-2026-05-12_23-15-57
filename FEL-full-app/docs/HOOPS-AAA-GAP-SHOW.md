@@ -23,8 +23,7 @@ tone or filtered noise; the ball makes **no sound when it is dribbled**; the cro
 cardboard cut-out spectators right behind the rim, a dunk crowd of five bodies cloned a hundred times); (3) the **screen is
 crowded and collides with itself** (on a phone the MC's subtitle box covers the player; the shell's buttons sit on top of the
 score in both top corners; control hints in pad and keyboard words sit on the court; a 16-line control sheet; a trivia card about
-computers while a basketball game loads). The camera,
-the replay director, the mix engineering and the HUD system are real foundations to build on. Overall: **about 4 / 10 against
+computers while a basketball game loads). The camera, the replay director, the mix engineering and the HUD system are real foundations to build on. Overall: **about 4 / 10 against
 the AAA bar** — strongest in venue and camera plumbing, weakest in audio, faces and the net.
 
 ## 1. How this was measured
@@ -40,8 +39,14 @@ the AAA bar** — strongest in venue and camera plumbing, weakest in audio, face
   the numbers. `run.sh` runs a job under the shared gate with its own server. Two profiles: **desktop 1920×1080** (the 'desktop'
   tier — SwiftShader is not a discrete GPU, so a gaming PC's 'high' tier is not shown) and **phone landscape 844×390** (touch,
   DPR 2, the 'mobile' tier).
+- **Runs taken** ([S]): phone landscape — 1v1 (11.6 game s), 3v3 (7.2), 3-Point (6.0), Flight Night (16.6), the duel (11.7), the
+  carnival (14.1); desktop 1080p — 1v1 and Flight Night (start card, tip-off, play). Each run: start card, tip-off, play shots,
+  pause, results.
 - **[P] the phone profile** (`scripts/probes/_perf-sweep.mts`, the repo's instrument, on the bare-mode bundle `site/mode.html`):
   844×390, DPR 3, mobile tier, 4× CPU throttle, virtual time: JS per frame, draws, meshes, bodies, texture MB, heap.
+- The brief's other perf probes: `_draw-budget.mts` and `_fps-tier.mts` hard-code a Mac's Chrome and port 3061 (they do not run
+  here); `_hoops-cam-bench.mts` benches the hoops **camera-tracking** product (shot detection on drawn gym frames,
+  `lib/hoops-cam/`), not the game's camera — none of the three was used; `_perf-sweep.mts` is their successor.
 - **[C] code**, `file:line` at `fbf197fb`. **[D]** earlier measured docs, cited where used (`HOOPS-GOAL-GAP.md`,
   `VISUAL-PASS-PLAN.md`, `EVERY-SCREEN-*.md`, `config/mobileBudget.json`).
 - **Limits, said plainly.** SwiftShader draws on the CPU, so frame *times* are not a phone's or a PC's; draw counts, compile counts,
@@ -63,8 +68,8 @@ Scores are against the AAA class, 10 = that class at its best. "Now" is today's 
 | 6 | Moments and juice | **5** | Every big play gets its moment: the crowd erupts, the camera finds it, a short replay from a better angle, the scorer reacts; the end of a game is an event — a final-play replay, a box score, the player's best moments — then "play again" in one press | Replays exist and are well built (letterbox, depth of field, half speed; dunk's triple cut + orbit + poster); but 1v1/3v3 replay only posters, ankle-breakers, blocks, dunks and steals, every second possession at most, never the final basket (`hoopsMoments.ts:23-37`); no slow-mo on a 1v1/3v3 dunk (`OneVOneMode.ts:3385`); the results card's box score is one text line (`proofLine.ts:31-42`); Play again is first and focused (`end-screen.tsx:353,630`) |
 | 7 | Audio | **2** | Recorded sound: the ball's thump on concrete and wood, the net's swish and the chain's rattle, rim clangs that differ, sneakers that squeak by the cut, a crowd that breathes, groans and erupts, two commentators who know the game, music that fits the court, a mix you never think about | **Every effect is synthesised** (`SoundKit.ts:1-8`): the swish is 0.22 s of filtered noise (`:328-341`), the crowd's cheer and groan are filtered brown noise (`:490-505`), the crowd bed is a noise loop (`:512-535`); **no dribble sound at all** (no cue on the ball's floor contact anywhere in `lib/babylon`); the MC and crowd voices are Kokoro text-to-speech at 24 kHz (`scripts/mic/build-mic.mts:7`); no music in 1v1/3v3/3-Point/carnival. The mix plumbing (buses, ducking, limiter, output presets) is good |
 | 8 | Menus and flow round play | **4** | From the menu to tip-off in seconds, with a loading screen that builds the matchup (who you face, where, the stakes); pick the court, rival and difficulty on one clean card; a pause with resume, restart, settings and quit; nothing to read before you play | A start card with location, ball, opponent tier (`boot-splash.tsx:429-474,818`); but the loading card is trivia about computers ("Computers count in binary", `learn-while-you-wait.tsx` on `boot-splash.tsx:429`), the 1v1 offence sheet is one 16-line string (`onevoneRules.ts:96`) that names a rival product in its own copy ("RIGHT STICK (2K, …)"), the pause is the controls sheet only (`paused-layer.tsx:33`), Play → playing is 2 taps and **35 s** on the throttled phone (EVERY-SCREEN-JOBS.md:197) |
-| 9 | Performance | **5** | A locked 60 on a recent phone (or an even 30 on an old one) with no hitch on the first dunk or replay, loading in a few seconds, small downloads | See 3.9: phone shaders pre-warmed (1 GL link in play, [S]); 1v1 and 3v3 fetch **19.5 / 20.6 MB** before READY against Flight Night's 4.6 MB ([S]); 3v3 on the phone tier drew a median **311** draws in play in the full page (row: 208) — see 3.9 for the instrument's own row; no anti-aliasing on a phone |
-| 10 | Polish and consistency | **4** | Nothing glitches: no clipping, no flicker, no jagged edges, no shimmer, signs read the right way, every court as finished as the best | Bodies inside each other on the check ([S] 1v1), dark streaks on the hero's shirt, jagged palm fronds on desktop ([S] dunk), a mirrored "VENICE BEACH COURTS" sign seen from the court, the "FLIGHT NIGHT" billboard over a 1v1 game, a flat untextured blue block beside the dunk rim |
+| 9 | Performance | **4** | A locked 60 on a recent phone (or an even 30 on an old one) with no hitch on the first dunk or replay, loading in a few seconds, small downloads | See 3.9 [P]: **3v3 and 3-Point are over their phone budget rows** (draws 309 / 344 vs 208 / 264, active meshes ~2×, texture 237 / 199 MB vs 174 / 173); 3v3 animation 18 ms a frame at 4× throttle; heap churn 14–19 MB/s; phone shaders pre-warmed (1 GL link in play); 1v1/3v3 fetch 19.5 / 20.6 MB before READY vs Flight Night 4.6 MB; no anti-aliasing on a phone |
+| 10 | Polish and consistency | **4** | Nothing glitches: no clipping, no flicker, no jagged edges, no shimmer, signs read the right way, every court as finished as the best | Bodies inside each other on the check ([S] 1v1), dark streaks on the hero's shirt, jagged palm fronds on desktop ([S] dunk), a mirrored "VENICE BEACH COURTS" sign seen from the court, the "FLIGHT NIGHT" billboard over a 1v1 game, the judges' table three plain boxes with nobody at it (`JudgesTable.ts:56-67`), no anti-aliasing on a phone |
 
 ## 3. The evidence, dimension by dimension
 
@@ -80,6 +85,8 @@ contact sheet (section 8). "[S] phone" = 844×390 landscape, mobile tier; "[S] d
 | hero whole (feet and head) in frame | 100 % | 100 % | 80 % (the rim camera leaves his feet below the frame in the flight, by design) |
 | the intro's hand-over when the player presses | a 15 m swoop in 0.33 s (up to 1.35 m a frame), then a **35° one-frame turn** onto the play camera | the same: up to 1.46 m a frame, then the turn | — |
 
+- The other modes on the phone: 3-Point's live camera is calm (0 snaps, turn p99 38 °/s after its crane intro); the duel's intro
+  opens with a 25 m / 112° cut and then swoops up to 2.3 m a frame into play; the carnival's hand-over swoops like 1v1's.
 - **Good:** the follow is damped and leads the play (`CameraDirector.ts:132` hoops, `:142` team); the hero never left the frame in
   live play; the 3v3 'team' camera turned at a p99 of 69 °/s; replays have letterbox, depth of field and half speed
   (`scene/ReplayDirector.ts:253,319`); Flight Night has the triple cut, a fourth orbit angle and a poster (`core/DunkCuts.ts:21-35`).
@@ -126,6 +133,12 @@ contact sheet (section 8). "[S] phone" = 844×390 landscape, mobile tier; "[S] d
   stripes it found); the defender's head and arm are inside the hero's on the check (contact is the sister lane's).
 - Rivals are all distinct people (the forge cast, `athleteRoster.ts:98-125`), which is good; they share one art pipeline that
   differs from the owner's scan.
+- **Kits on court** are a tee and shorts (the forge garment contract: `jersey.top_tee`, `shorts.shorts_baggy`, two shoe models) —
+  no numbers or names, no basketball jersey cut; 3v3 teams read by shirt colour and the ring under each body ([S]
+  `threevthree-phone/02`). (The hero's football jersey and the crotch stretch are the kit-glitch lane's open Blender items.)
+- **LOD:** no body has a level of detail (no pop, full cost on every body, VISUAL-PASS-PLAN A5); the Venice palms switch at 25 / 60 m
+  (rig log "LOD 25/60 m") and the 3v3 camera stands 18–29 m back (VISUAL-PASS-PLAN vis-hoops-court finding 5), on that boundary —
+  a pop there was not measured.
 - **A 10:** faces that hold up in a replay close-up and move (eyes, brows, mouth, effort), hands with fingers round the ball,
   skin with detail and sweat, hair with volume, kits that fold, shoes with detail, and every rival a finished individual.
 
@@ -150,7 +163,9 @@ contact sheet (section 8). "[S] phone" = 844×390 landscape, mobile tier; "[S] d
 - **Words over the play on a phone.** The MC's subtitle box (two lines of 20-plus px capitals) sits over the bottom-centre of the
   frame — exactly where the hero stands in the behind-the-player camera — in [S] `onevone-phone/01,02`, `dunk-phone/01`,
   `threevthree-phone/02`. In 3v3 three layers of text stack there at once: the subtitle, the pass chip ("J · CHEST PASS") and the
-  control hint ("TAP THE STICK … CIRCLE (K) SCREEN").
+  control hint ("TAP THE STICK … CIRCLE (K) SCREEN"). In 3-Point on a phone ([S] `threepoint-phone/02-play-g5.0.jpg`) the
+  subtitle, the five rack-pip plates, the "CUT ≈ 14 · TOP 3 ADVANCE" chip and the EARLY / PERFECT / GOOD / LATE legend are drawn
+  over each other across the middle of the screen, and the meter bar runs through the shooter.
 - **Device words.** The phone's hint and pause sheet use pad and keyboard words ("SQUARE (L)", "L2 (F)", "R2 (SHIFT)", "J ·");
   the dunk's hint on a phone is "X — NEXT PROP FAMILY · D-PAD picks inside: RIGHT oops, LEFT lobs, DOWN the rest, UP none".
 - The score bug is two numbers and a dash at the 'stat' size (18 px on a phone, `tokens.ts:162`), no names or colours
@@ -187,7 +202,7 @@ What the game asked SoundKit to play in the [S] phone runs (the synthesised cues
 - **No cue fires when the ball hits the floor.** The hero dribbled for the whole 1v1 and 3v3 runs; no cue in the log is a bounce,
   and no code plays one (`anim/Dribble.ts`, `anim/ballCarry.ts`, `core/BasketballCore.ts` contain no SoundKit call;
   `handleFx.ts:121` describes "the dribble's pound" that does not exist).
-- A 3v3 **pass plays `uiTick`** — the menu click (`ThreeVThreeMode.ts:2262`).
+- A 3v3 **pass plays `uiTick`** — the menu click — and throws a spark burst from the passer's chest (`ThreeVThreeMode.ts:2262-2264`).
 - Every cue is synthesised (`SoundKit.ts:1-8`): swish = 0.22 s of band-passed white noise (`:328-341`), rim rattle = three
   triangle-wave pings (`:310-326`), squeak = noise through a Q-12 band-pass chirp (`:360-372`), cheer and groan = 1.4 s of band-passed
   brown noise (`:490-505`), the crowd bed = a looping brown-noise band with a 0.15 Hz swell (`:512-535`), the "ooh" = twelve
@@ -222,7 +237,40 @@ What the game asked SoundKit to play in the [S] phone runs (the synthesised cues
 - **A 10:** tip-off within a few seconds of the tap, a loading screen that builds the matchup, one clean pre-game card, a real pause
   menu, nothing to read before playing.
 
-<!-- PERF -->
+### 3.9 Performance — 4
+
+**[P] the phone profile** (`_perf-sweep.mts`: 844×390 landscape, DPR 3, mobile tier, 4× CPU throttle, virtual time, `SEED=7`,
+`?perf=off`, 6 game seconds a mode, the bare-mode bundle; the "row" is `lib/babylon/config/mobileBudget.json`, measured 2026-10-14):
+
+| mode | JS per frame p50 / p95 (ms, 4× throttle) | update + animation p50 (ms) | draws p50 / max (row) | active meshes max (row) | skinned bodies (row) | texture MB (row) | particles max (row) | heap after GC (MB) |
+|---|---|---|---|---|---|---|---|---|
+| threevthree | 85.6 / 186.2 | 4.0 + 18.0 | 309 / 354 (208) | 200 (98) | 15 (16) | 237 (174) | 0 (12) | 196 |
+| onevone | 59.3 / 143.6 | 3.6 + 11.1 | 155 / 197 (202) | 138 (83) | 11 (15) | 197 (256) | 0 (12) | 153 |
+| dunk | 27.5 / 58.3 | 2.1 + 2.9 | 85 / 102 (173) | 91 (81) | 5 (15) | 111 (220) | 4 (12) | 75 |
+| threepoint | 70.5 / 139.4 | 2.2 + 6.2 | 344 / 373 (264) | 239 (93) | 15 (16) | 199 (173) | 0 (0) | 174 |
+| dunkduel | 52.9 / 147.6 | 1.7 + 5.3 | 181 / 241 (-) | 165 (-) | 12 (-) | 190 (-) | 8 (-) | 124 |
+| carnival | 29.6 / 68.1 | 0.9 + 3.3 | 97 / 152 (255) | 65 (71) | 2 (8) | 182 (196) | 240 (0) | 143 |
+
+- **3v3 and 3-Point are over their phone rows today** — draws 309 / 344 against 208 / 264 (+49 % / +30 %), active meshes about
+  twice the row (200 vs 98; 239 vs 93), texture 237 / 199 MB against 174 / 173. 1v1 and the dunk are over on active meshes
+  (138 vs 83; 91 vs 81); the carnival's particles (240) have a row of 0. The full page ([S], with the HUD) agrees: 3v3 drew a
+  median of 311 in play. These rows were set on 2026-10-14; since then the half-court venue took the Venice dunk kit (rig log:
+  `basketball_h2h: "venice-dunk" kit on` — 79 prop placements, the boardwalk row, the crowd cards) and the forge rivals arrived with
+  10 materials each (assumption: the growth is mostly these two; not attributed draw by draw). Nothing in CI reads a live phone
+  run against the rows (`scripts/mobile-budget-tests.ts` checks the table, not the game), so it went unseen.
+- **Where the CPU goes on a phone:** 3v3's animation and its layers take **18.0 ms a frame** at 4× throttle (about 4.5 ms on the
+  phone itself) beside 4.0 ms of game update; 1v1 11.1 + 3.6. The shadow map (512², blurred) re-renders 58 casters every frame
+  in 3v3 and 3-Point. The heap churns 14–19 MB a game second in the court modes (garbage collection pauses on a phone).
+- **Shader compiles in play:** phone 1 GL link after START in 1v1, 3v3, 3-Point and Flight Night ([S]: the phone pre-warm works —
+  `core/shaderPrewarm.ts`); 0 in the duel; **3 in the carnival** (at 0, 1.4 and 5.1 s of play — its events build after START, so the
+  load-time pre-warm cannot see their materials: a hitch on a phone each time an event first builds). Desktop is not pre-warmed (VISUAL-PASS-PLAN owner-1016: "Desktop is left as it was"); a desktop first-dunk
+  or first-replay hitch was not measured (section 9).
+- **Load:** see 3.8 (19.5–20.6 MB before READY in 1v1/3v3 against 4.6 MB in Flight Night; 35 s Play → playing on the throttled
+  phone).
+- **No anti-aliasing on a phone** (MSAA 1; FXAA only below DPR 1.5, `QualityTier.ts:134`, `LightRig.ts:232-235`): fine detail
+  (the cage's 160-bar panels, court lines, the rim) shimmers in motion.
+- **A 10:** a locked frame rate inside the phone rows on a mid-range phone, no compile or garbage hitch on a first dunk or replay,
+  tip-off within seconds.
 
 ### 3.10 Polish and consistency — 4
 
@@ -234,6 +282,11 @@ What the game asked SoundKit to play in the [S] phone runs (the synthesised cues
 - **Jagged palm fronds** on desktop ([S] `dunk-desktop` crop): alpha-tested leaves with MSAA but no alpha-to-coverage.
 - The phone has **no anti-aliasing at all** at DPR ≥ 1.5 (MSAA 1, FXAA off — [S] scene read `samples [1]`, `fxaa false`;
   `LightRig.ts:232-235`): the chain-link cage, the lines and the rim shimmer on a phone.
+- In the dunk duel on a phone ([S] `dunkduel-phone/03-play-g10.0.jpg`) the 3D score tower stands in the left third of the frame,
+  cut off by its edge, the dunker is framed at the very bottom edge (head and shoulders), "P1: 0" sits under the "⋯" menu and
+  "P2: 0" under the full-screen button.
+- In 3-Point a bystander's head and shoulders fill the bottom of the phone frame, between the camera and the court ([S]
+  `threepoint-phone/02-play-g5.0.jpg`) — the crowd's camera-line rule (w3-crowds) covers the stands' seats, not this body.
 - Bodies inside each other on the check and streaks on the shirt (3.3); the judges' table is three plain boxes with nobody behind
   it (`JudgesTable.ts:56-67`).
 - **A 10:** none of the above visible in an hour of play.
@@ -248,18 +301,19 @@ animation that cannot be written in code), *GATE 0* (the rig), or *code* (none o
 | Rank | Sinker | Evidence | Reach | Severity | Likely cause | Size | Needs |
 |---|---|---|---|---|---|---|---|
 | 1 | **It sounds synthetic, and the ball is silent when dribbled.** Every effect is a synthesiser tone or filtered noise; the most-heard sound in basketball — the ball on the floor — is not there | SFX log [S] (table 3.7): no floor-contact cue in any mode; `SoundKit.ts:1-8` ("entirely SYNTHESIZED … zero external assets"); swish `:328-341`, crowd `:490-505`; `handleFx.ts:121` refers to "the dribble's pound", which no code plays | every mode, every second of play | High | No recorded sound library; no cue on the dribble's floor contact (`anim/Dribble.ts`, `anim/ballCarry.ts`, `BasketballCore.ts` call no sound) | M (a sample player in SoundKit + the cue) + the sounds | **art** (a recorded or licensed CC0 foley set: ball on concrete/wood, rim, chain and nylon net, sneakers, crowd); the cue itself is code |
-| 2 | **Words on the court — on a phone they cover the player.** The MC's subtitle box (two lines of yellow capitals) sits bottom-centre, where the hero stands; in 3v3 the subtitle, the pass chip ("J · CHEST PASS", a keyboard letter on touch) and a control hint ("TAP THE STICK … CIRCLE (K) SCREEN") stack on top of each other there | [S] phone: the hero hidden behind the subtitle in 4 of 4 play shots (1v1 ×2, Flight Night, 3v3); desktop 1v1 and dunk shots; `basketball-babylon.tsx:151-155,165`; `three-v-three-babylon.tsx:158-162`; phase 9's own gate is "0 static control text on the court" (PLAN-HOOPS-1V1-3V3-10PHASE.md) | every mode, most of the game; worst on a phone | High | Captions on whenever the MC talks (`mic-caption.tsx`); the hint line every possession | S | **owner** (captions off by default when the voice is on — an accessibility setting stays) |
+| 2 | **Words on the court — on a phone they cover the player.** The MC's subtitle box (two lines of yellow capitals) sits bottom-centre, where the hero stands; in 3v3 the subtitle, the pass chip ("J · CHEST PASS", a keyboard letter on touch) and a control hint ("TAP THE STICK … CIRCLE (K) SCREEN") stack on top of each other there | [S] phone: the hero hidden behind the subtitle in 4 of 4 play shots (1v1 ×2, Flight Night, 3v3); in 3-Point five HUD layers drawn over each other mid-screen; desktop 1v1 and dunk shots; `basketball-babylon.tsx:151-155,165`; `three-v-three-babylon.tsx:158-162`; phase 9's own gate is "0 static control text on the court" (PLAN-HOOPS-1V1-3V3-10PHASE.md) | every mode, most of the game; worst on a phone | High | Captions on whenever the MC talks (`mic-caption.tsx`); the hint line every possession | S | **owner** (captions off by default when the voice is on — an accessibility setting stays) |
 | 3 | **The shell's buttons sit on top of the score.** Top-left the "⋯" capture menu covers the player's score; top-right pause / back / body / full-screen cover the mode's chips (POWER, HYPE, TO 11) | [S] crops: dunk desktop top-left and top-right, 1v1 desktop; EVERY-SCREEN-JOBS.md:215 ("the menu owns the stage's corner in every mode") | every hoops mode, the whole game, phone and desktop | High | `components/games/game-shell.tsx` corner chrome over `HudFrame`'s top bezel (`tv-hud/hud-frame.tsx`), each host's bezel at `top-0 px-4 py-3` (`basketball-babylon.tsx:117`) | S | **owner** (where the capture menu lives: recommendation — into the pause, and HudFrame keeps a safe inset under the shell's buttons) |
 | 4 | **Black cardboard people stand right behind the rim** in 1v1 and 3v3 (and at Venice in 3-Point): twelve flat dark figures — a cyclist, a dog walker, a skater — in the frame of every shot | [S] 1v1 desktop crop (behind the hoop, every possession); the cards file `public/models/props/venice/env2/venice_crowd_cards.glb` (12 `crowd_card_*` nodes) | 1v1, 3v3, Venice 3-Point; every shot at the rim | High | The boardwalk row's crowd strip (`veniceBoardwalk.ts:507,561-562`; `venuePropSets.ts:103-108` `crowdAt`), drawn dark against the lit stalls | S (hide the strip on the half-court modes) / M (the baked 3D crowd, A9.9, in its place) | code (the 3D crowd exists: `visual/crowd/`) |
 | 5 | **The net never moves; a glowing ring and a wireframe cone pop over the hoop on a make** | `HoopJuice.ts:3-13` (the Meshy hoop is ONE mesh: pole, board, rim and net) and `:44-60` (a 12-sided wireframe cylinder `juice_net` and an emissive torus `juice_rim`, alpha 0.7, shown ~0.9 s); [S] make shots | every make, every mode on `hoop.glb` (1v1, 3v3, 3-Point, dunk, duel, carnival) | High | One-mesh hoop asset; the "net" is an overlay | M | **art** (a hoop with the net as its own skinned or vertex-animated mesh) + code (the swish / rattle / dunk response, ball contact) |
 | 6 | **Faces and hands are placeholder-grade next to the court** — faces never move, no fingers round the ball, flat skin, buzz-cut hair maps | glb read: every body 22 joints, **0 face shapes**; hero scan 97 k triangles on one 2048² map; rivals 30–33 k triangles, skin 1024², hair 512² (`public/models/rivals/*.glb`); [S] 1v1 crop (flat back of head, plastic skin) | every mode; worst in the walk-in intro, replays, celebrations and the dunk's poster | High | The 22-bone spec (AGENT-OPERATING-RULES.md: "Keep the 22-bone spec"), scan/MakeHuman assets without face rigs | L | **GATE 0 + owner** (extend the spec with finger and face joints or face shapes — a rig decision) + **art** |
-| 7 | **The 1v1 / 3v3 court is empty and the crowd is noise.** An 8-body rail on the boardwalk (no stands — owner call), no 3D crowd; the cheer and groan are 1.4 s of filtered brown noise; the "ooh" is twelve sawtooth oscillators | `veniceBoardwalk.ts:242-249`; `mountModeCrowd` only in `ThreePointMode.ts:1568`, `DunkMode.ts:1630`, `DunkDuelMode.ts:921`; `SoundKit.ts:490-505`; `handleFx.ts:150-190` | 1v1, 3v3; constant | Med-High | The crowd roll-out (w3-crowds) skipped the two court modes; synthesised crowd | M | code (mount the baked crowd round the court, off the camera line) + **art** (a recorded crowd bed and reactions) |
-| 8 | **35 seconds to play, and the loading card is about computers** | EVERY-SCREEN-JOBS.md:197 (2 taps, 35 s on the throttled phone); [S] start card; 1v1 and 3v3 fetch 19.5 / 20.6 MB of models, voice banks and engine files before READY against Flight Night's 4.6 MB (3.8); `boot-splash.tsx:18,429` (`LearnWhileYouWait`, "TECH & AI · Computers count in binary") | every launch of every hoops mode | Med-High | Everything loads before READY (voices, the dressing's bus and sedan, six rivals); the knowledge feed card on the hoops splash | M | **owner** (the knowledge card on game splashes was a product decision: recommendation — a matchup card on hoops splashes) |
-| 9 | **The camera jumps at every dead ball and has no dunk shot in 1v1 / 3v3** | `snapTo` at possession resets (`OneVOneMode.ts:1180,2052,2421`; `ThreeVThreeMode.ts:970,1188`); "No hang slowMo … no FOV gather" (`OneVOneMode.ts:3385`, `ThreeVThreeMode.ts:3977`); [S] camera table 3.1 | 1v1, 3v3; every made basket | Med | Resets teleport the bodies and the camera cuts to them | S–M | code (a broadcast dead-ball angle or a quick dip between possessions; a dunk angle like Flight Night's) — feel: camera numbers are pinned, new behaviour only |
-| 10 | **A crowd of clones at Flight Night** — about a hundred fans from five bodies sharing one texture, the same hoodie side by side, nobody raises an arm | [S] dunk tip-off crop; `crowdBake.ts:3,31` (five bodies, one texture); VISUAL-PASS-PLAN w3-crowds ("the bodies' arms are skinned to the TORSO … no fan can raise an arm") | dunk, dunk duel, 3-Point; constant | Med | Five crowd bodies; arms skinned to the torso | M | **art** (more crowd bodies, a re-skin for arms) + code (tint and outfit variation per instance) |
-| 11 | **The end of a game is not an event** — no replay of the winning basket (replays never play the final moment), the box score is one text line, no highlights | `hoopsMoments.ts:23-37` (`final` excluded), `proofLine.ts:31-42`, `end-screen/highlights.ts:12-29` (no hoops keys); [S] results shot | every game end, 1v1 / 3v3 | Med | Replays only at dead balls inside the game; the shared end card | M | code + **owner** (whether the final basket replays before the card) |
-| 12 | **Polish slips**: two bodies inside each other on the check, dark streaks on the hero's shirt, a mirrored "VENICE BEACH COURTS" sign from the court side, the FLIGHT NIGHT billboard over a 1v1 game, jagged palm fronds, the judges' table three plain boxes with nobody at it | [S] crops; `veniceBoardwalk.ts:188-196` (one-sided sign plane with `backFaceCulling = false`), `:198-208` (the billboard); `JudgesTable.ts:56-67` | intermittent, all Venice modes | Low-Med | Contact separation (play lane), shadow / kit seams, single-sided signage, alpha-tested foliage without alpha-to-coverage | S each | code; the body overlap is the sister lane's |
-| 13 | **The 1v1 controls sheet is a 16-line wall and names a rival product** ("RIGHT STICK (2K, relative to the ball hand)") | [S] start card and pause; `onevoneRules.ts:96` | 1v1 start card and pause | Low-Med | One string with every control | S | **owner** (copy: recommendation — drop the product name, split into a first-play card of five lines and a full list behind "More") |
+| 7 | **3v3 and 3-Point are over their phone budget** — the frame a phone must draw has grown since the rows were set | [P] (3.9): draws 309 / 344 vs rows 208 / 264, active meshes 200 / 239 vs 98 / 93, texture 237 / 199 MB vs 174 / 173; 3v3 animation 18 ms a frame at 4× throttle; heap churn 14–19 MB/s | 3v3 and 3-Point on every phone; the whole game | High on a phone (frame drops; not measured on a real device) | The half-court venue now carries the Venice dunk kit (79 prop placements, the boardwalk row, the crowd cards) and the forge rivals have 10 materials each (assumption: not attributed draw by draw); nothing in CI runs the phone profile against the rows | M | code (phase 10: merge and cull the dressing on the half-court modes, a material atlas for the rivals, a CI phone-profile check)
+| 8 | **The 1v1 / 3v3 court is empty and the crowd is noise.** An 8-body rail on the boardwalk (no stands — owner call), no 3D crowd; the cheer and groan are 1.4 s of filtered brown noise; the "ooh" is twelve sawtooth oscillators | `veniceBoardwalk.ts:242-249`; `mountModeCrowd` only in `ThreePointMode.ts:1568`, `DunkMode.ts:1630`, `DunkDuelMode.ts:921`; `SoundKit.ts:490-505`; `handleFx.ts:150-190` | 1v1, 3v3; constant | Med-High | The crowd roll-out (w3-crowds) skipped the two court modes; synthesised crowd | M | code (mount the baked crowd round the court, off the camera line) + **art** (a recorded crowd bed and reactions) |
+| 9 | **35 seconds to play, and the loading card is about computers** | EVERY-SCREEN-JOBS.md:197 (2 taps, 35 s on the throttled phone); [S] start card; 1v1 and 3v3 fetch 19.5 / 20.6 MB of models, voice banks and engine files before READY against Flight Night's 4.6 MB (3.8); `boot-splash.tsx:18,429` (`LearnWhileYouWait`, "TECH & AI · Computers count in binary") | every launch of every hoops mode | Med-High | Everything loads before READY (voices, the dressing's bus and sedan, six rivals); the knowledge feed card on the hoops splash | M | **owner** (the knowledge card on game splashes was a product decision: recommendation — a matchup card on hoops splashes) |
+| 10 | **The camera jumps at every dead ball and has no dunk shot in 1v1 / 3v3** | `snapTo` at possession resets (`OneVOneMode.ts:1180,2052,2421`; `ThreeVThreeMode.ts:970,1188`); "No hang slowMo … no FOV gather" (`OneVOneMode.ts:3385`, `ThreeVThreeMode.ts:3977`); [S] camera table 3.1 | 1v1, 3v3; every made basket | Med | Resets teleport the bodies and the camera cuts to them | S–M | code (a broadcast dead-ball angle or a quick dip between possessions; a dunk angle like Flight Night's) — feel: camera numbers are pinned, new behaviour only |
+| 11 | **A crowd of clones at Flight Night** — about a hundred fans from five bodies sharing one texture, the same hoodie side by side, nobody raises an arm | [S] dunk tip-off crop; `crowdBake.ts:3,31` (five bodies, one texture); VISUAL-PASS-PLAN w3-crowds ("the bodies' arms are skinned to the TORSO … no fan can raise an arm") | dunk, dunk duel, 3-Point; constant | Med | Five crowd bodies; arms skinned to the torso | M | **art** (more crowd bodies, a re-skin for arms) + code (tint and outfit variation per instance) |
+| 12 | **The end of a game is not an event** — no replay of the winning basket (replays never play the final moment), the box score is one text line, no highlights | `hoopsMoments.ts:23-37` (`final` excluded), `proofLine.ts:31-42`, `end-screen/highlights.ts:12-29` (no hoops keys); [S] results shot | every game end, 1v1 / 3v3 | Med | Replays only at dead balls inside the game; the shared end card | M | code + **owner** (whether the final basket replays before the card) |
+| 13 | **Polish slips**: two bodies inside each other on the check, dark streaks on the hero's shirt, a mirrored "VENICE BEACH COURTS" sign from the court side, the FLIGHT NIGHT billboard over a 1v1 game, jagged palm fronds, the judges' table three plain boxes with nobody at it | [S] crops; `veniceBoardwalk.ts:188-196` (one-sided sign plane with `backFaceCulling = false`), `:198-208` (the billboard); `JudgesTable.ts:56-67` | intermittent, all Venice modes | Low-Med | Contact separation (play lane), shadow / kit seams, single-sided signage, alpha-tested foliage without alpha-to-coverage | S each | code; the body overlap is the sister lane's |
+| 14 | **The 1v1 controls sheet is a 16-line wall and names a rival product** ("RIGHT STICK (2K, relative to the ball hand)") | [S] start card and pause; `onevoneRules.ts:96` | 1v1 start card and pause | Low-Med | One string with every control | S | **owner** (copy: recommendation — drop the product name, split into a first-play card of five lines and a full list behind "More") |
 
 
 ## 5. The fix plan, in phases
@@ -268,6 +322,12 @@ The existing presentation phases of `docs/PLAN-HOOPS-1V1-3V3-10PHASE.md` (8 came
 take most of the code work; three new phases take what needs new sound, a new hoop and the rig. **Owner items are marked ⚑**;
 everything else is reversible code a lane can do and flag. Feel numbers that are tuned today (camera distances, heights, FOV,
 lags; timing windows) stay as they are: every item below is new behaviour behind a switch whose off value is today's.
+
+**Already decided by the owner, not yet built for the court modes** (`docs/OWNER-DECISIONS.md`, 2026-10-20 QUALITY) — these
+need no new ask: "Loading: play sooner, stream the rest (court + you first, extras in background) for every mode, like first-dunk"
+(:199 — Flight Night does it, 1v1/3v3 load 19.5–20.6 MB first); "One shared impact kit (… brief slow-mo on biggest …)" (:201 —
+1v1/3v3 dunks have none); "Cameras: smooth damped follow + slight look-ahead; distances/heights/FOV unchanged" (:202 — kept by
+every item here); "Audio: surface footsteps, body/cloth on contact, crowd follows tension, spatial sound" (:203 — phase 11).
 
 ### First three moves (recommended)
 
@@ -281,21 +341,24 @@ lags; timing windows) stay as they are: every item below is new behaviour behind
 3. **The net** (phase 12a, M, needs a small art job). The hoop with its net as its own mesh, a vertex-animated net that swishes,
    jumps on a rim-in and yanks on a dunk; the wireframe cone and the glowing ring go.
 
+Alongside them, code only and no owner call: **put 3v3 and 3-Point back inside their phone rows** (phase 10, sinker 7) — a
+regression since 2026-10-14 that no check in CI can see today.
+
 ### Mapped onto the existing phases
 
 | Phase | Adds (sinker #) | Gate (measured by this lane's rig unless said) | ⚑ |
 |---|---|---|---|
-| **8 — Broadcast camera and a live court** (existing) | the dead-ball cut: a short broadcast angle or dip instead of the snap at every reset (9); a dunk angle and a brief hang slow-mo in 1v1/3v3 like Flight Night's (9); the baked 3D crowd round the 1v1/3v3 court, off the camera line, reacting to the momentum bus (7); the cut-out cards gone from the half-court modes (4); the final basket replayed before the results card (11) | `show.mts`: live camera snaps outside cuts 0 and turn p99 ≤ 120 °/s (today: 3.1), the intro's hand-over eased (no one-frame turn), hero whole in frame 100 %, all six 3v3 bodies in frame ≥ 90 %; a replay on the final basket; the crowd visible in the tip-off shot | ⚑ the final-basket replay (it delays the card ~2.5 s) |
-| **9 — Premium HUD and menus** (existing) | 9a "clear the screen" (2, 3, 13 and the 3v3 J chip); a matchup loading card (who, where, the tier) in place of the trivia card on hoops splashes (8); a pause with Resume / Restart / Settings / Quit beside the controls; the controls sheet as five first-play lines with "All controls" behind it; a results card with a real box score (FG, 3PT, steals, blocks, assists — the modes already send them) and the best play's replay as its backdrop (11) | `show.mts` results and pause shots at 844×390 and 1920×1080; no element over the scorebug (an overlap check on the HUD's own boxes); 0 control text on the court after the first two possessions | ⚑ the capture menu's home; ⚑ captions default; ⚑ the knowledge card on game splashes; ⚑ copy (the 1v1 sheet's product name) |
-| **10 — Phone budget, re-measure, reel** (existing) | READY sooner: voice banks, the venue's parked cars and bus, and far props streamed after READY (8); desktop shader pre-warm, or a first-dunk / first-replay compile check on desktop (3.9); alpha-to-coverage or MSAA on alpha-tested foliage on desktop (12); this file's tables as the baseline | `_perf-sweep.mts` rows inside `mobileBudget.json`; GL links during play ≤ 3 on the phone and on desktop; bytes before READY (3.8) halved for 1v1/3v3; wall to READY on the every-screen rig ≤ 20 s | — |
+| **8 — Broadcast camera and a live court** (existing) | the dead-ball cut: a short broadcast angle or dip instead of the snap at every reset (10); a dunk angle and a brief hang slow-mo in 1v1/3v3 like Flight Night's (10); the baked 3D crowd round the 1v1/3v3 court, off the camera line, reacting to the momentum bus (8); the cut-out cards gone from the half-court modes (4); the final basket replayed before the results card (12) | `show.mts`: live camera snaps outside cuts 0 and turn p99 ≤ 120 °/s (today: 3.1), the intro's hand-over eased (no one-frame turn), hero whole in frame 100 %, all six 3v3 bodies in frame ≥ 90 %; a replay on the final basket; the crowd visible in the tip-off shot | ⚑ the final-basket replay (it delays the card ~2.5 s) |
+| **9 — Premium HUD and menus** (existing) | 9a "clear the screen" (2, 3, 14 and the 3v3 J chip); a matchup loading card (who, where, the tier) in place of the trivia card on hoops splashes (9); a pause with Resume / Restart / Settings / Quit beside the controls; the controls sheet as five first-play lines with "All controls" behind it; a results card with a real box score (FG, 3PT, steals, blocks, assists — the modes already send them) and the best play's replay as its backdrop (12) | `show.mts` results and pause shots at 844×390 and 1920×1080; no element over the scorebug (an overlap check on the HUD's own boxes); 0 control text on the court after the first two possessions | ⚑ the capture menu's home; ⚑ captions default; ⚑ the knowledge card on game splashes; ⚑ copy (the 1v1 sheet's product name) |
+| **10 — Phone budget, re-measure, reel** (existing) | READY sooner: voice banks, the venue's parked cars and bus, and far props streamed after READY (9); 3v3 and 3-Point back inside their phone rows — the Venice kit merged and culled on the half-court modes, a material atlas for the rivals, the shadow casters cut (7); desktop shader pre-warm, or a first-dunk / first-replay compile check on desktop (3.9); alpha-to-coverage or MSAA on alpha-tested foliage on desktop (13); a CI job that runs the phone profile against the rows; this file's tables as the baseline | `_perf-sweep.mts` rows inside `mobileBudget.json` (today 3v3 and 3-Point are not: 3.9); GL links during play ≤ 3 on the phone and on desktop; bytes before READY (3.8) halved for 1v1/3v3; wall to READY on the every-screen rig ≤ 20 s | — |
 
 ### New phases
 
 | Phase | What | Size | Needs |
 |---|---|---|---|
-| **11 — The sound of the court** | 11a the sample player, the foley set and the dribble cue (1); 11b sound by surface (concrete, wood, the rooftop's rubber), rim hits by speed, the chain net on the streetball courts, sneaker squeaks by the cut's strength (they exist as synths — `handleFx.ts`, `OneVOneMode.ts:2440`); 11c a recorded crowd bed and reactions (murmur, rising "ooh", eruption, groan) driven by the momentum bus that already exists (7); 11d music: a court bed under menus and dead balls in 1v1/3v3/3-Point (none today), ducked by the mix that already exists; 11e the MC: a second booth voice and fewer, better-timed lines (today one TTS voice on a PA) | L | ⚑ the sound set (buy, license CC0, or record); ⚑ music source; ⚑ voices (the voiceover lane's TTS or recorded people) |
+| **11 — The sound of the court** | 11a the sample player, the foley set and the dribble cue (1); 11b sound by surface (concrete, wood, the rooftop's rubber), rim hits by speed, the chain net on the streetball courts, sneaker squeaks by the cut's strength (they exist as synths — `handleFx.ts`, `OneVOneMode.ts:2440`); 11c a recorded crowd bed and reactions (murmur, rising "ooh", eruption, groan) driven by the momentum bus that already exists (8); 11d music: a court bed under menus and dead balls in 1v1/3v3/3-Point (none today), ducked by the mix that already exists; 11e the MC: a second booth voice and fewer, better-timed lines (today one TTS voice on a PA) | L | ⚑ the sound set (buy, license CC0, or record); ⚑ music source; ⚑ voices (the voiceover lane's TTS or recorded people) |
 | **12 — The hoop and the ball** | 12a the net as its own mesh with cloth-like motion (5); 12b the rim shake from the dunk's spring on every hoop (it exists for the dunk: `HoopJuice` rim dip) and the backboard shiver; 12c a ball with a grain normal map, seams and a soft contact shadow at every bounce; 12d a chain-net option for the streetball courts | M | art (the hoop re-export; a ball texture) |
-| **13 — People up close** | 13a ⚑ GATE 0: extend the 22-bone spec with finger joints and face joints or face shapes (eyes, brows, jaw) — every clip, test and planting is built on 22 today; 13b faces that blink, look and show effort; hands that wrap the ball (6); 13c skin, hair and kit materials at a close-up's resolution on desktop (the phone keeps today's caps); 13d crowd variety: more bodies, arms that cheer (today five bodies, arms skinned to the torso) (10) | L | ⚑ GATE 0 (the rig), art (faces, hands, hair, crowd bodies), animation |
+| **13 — People up close** | 13a ⚑ GATE 0: extend the 22-bone spec with finger joints and face joints or face shapes (eyes, brows, jaw) — every clip, test and planting is built on 22 today; 13b faces that blink, look and show effort; hands that wrap the ball (6); 13c skin, hair and kit materials at a close-up's resolution on desktop (the phone keeps today's caps); 13d crowd variety: more bodies, arms that cheer (today five bodies, arms skinned to the torso) (11) | L | ⚑ GATE 0 (the rig), art (faces, hands, hair, crowd bodies), animation |
 
 
 ## 6. Owner items, with the recommendation first
@@ -329,3 +392,28 @@ The rig plays on a virtual clock (one game frame per drawn frame), so a slow box
 shared 4-core box the phone profile ran ~1.5 game seconds a minute and the desktop profile (4096 cascaded shadows, SSAO, MSAA on
 software GL) far less. `LOCATION=rooftop` (or blossom, orbit, canopy) shoots another court.
 
+## 8. The contact sheet
+
+`hoops-aaa-gap-worst-sights.jpg` in this lane's scratch folder (`…/scratchpad/hoops-audit-show/`): fifteen captioned tiles, phone
+landscape and desktop 1080p — the subtitle over the player (1v1), five HUD layers over each other (3-Point), the stacked words in
+3v3, the menu on the score, the buttons on the chips, the cut-out people behind the rim, the bodies inside each other, the cloned
+crowd, the duel's score tower and edge-framed dunker, the mirrored sign, pad words on a touch screen, the loading trivia, the
+results card, the controls wall, the carnival's in-play compiles.
+
+## 9. Not measured, and why
+
+- **A make, a replay and the dunk's flush on the rig.** The scripted player missed every jumper and every slam window in the
+  short runs (one 3-Point make landed after the last shot of its run), so the net overlay, the replays and the dunk's cut are
+  described from the code, not photographed (the probe shoots them when they happen: `show.mts` watches for the swish / score
+  cues, the `[HOOPS-REPLAY]` line and the cinematic flag).
+- **The carnival's hoops event.** The seeded night opened on Strike Storm (the dojo), so Slam Rush was not reached; the carnival
+  rows here are the hub, the dojo event and the cards.
+- **Desktop shots of 3v3, 3-Point, the duel and the carnival.** The desktop tier (4096-px cascaded shadows, ambient occlusion,
+  MSAA) ran at well under one game frame a second on this box, and the browser gate was shared by six lanes; the desktop evidence
+  is 1v1 and Flight Night. The phone profile covers all six modes.
+- **Frame rate on a real phone or PC.** SwiftShader renders on the CPU; the update and animation milliseconds, draws, links and
+  bytes are comparable, the frame time is not. A real-device check (the owner's phone) is the only true FPS.
+- **The other four courts** (Blossom Park, Orbit, Canopy Court, Night Rooftop): the probe takes `LOCATION=`; no gate time was left.
+- **Audio by ear.** The rig records which cues were asked for; it does not judge how they sound. The verdict on the synthesised
+  sounds is from the code (what each one is made of) — the owner's ear is the judge.
+- **Memory on a phone.** The page's JS heap was 300–320 MB in the rig's dev handles; GPU memory: texture MB in 3.9.
