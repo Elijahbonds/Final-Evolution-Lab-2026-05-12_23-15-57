@@ -1754,6 +1754,16 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/anim/ballCarry.ts PICKUP_TOP_GAP_M',
     hint: 'A ball this close to the top of its bounce is taken at once.',
   },
+  {
+    id: 'hoops.pickupContactM', label: 'Pick-up: taken when the ball is this close to the palm', def: 0.04, min: 0, max: 0.15, step: 0.01, unit: 'm', group: 'Hoops · gathers',
+    source: 'lib/babylon/anim/ballCarry.ts PICKUP_CONTACT_M',
+    hint: 'How near the palm (past the ball\'s radius) the rising ball must be to be taken.',
+  },
+  {
+    id: 'hoops.pickupOverrunSec', label: 'Pick-up: extra time to rise to the hand', def: 0.1, min: 0, max: 0.2, step: 0.01, unit: 's', group: 'Hoops · gathers',
+    source: 'lib/babylon/anim/ballCarry.ts PICKUP_OVERRUN_SEC',
+    hint: 'When the hand did not get all the way down, the ball rises on to it for at most this long.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));

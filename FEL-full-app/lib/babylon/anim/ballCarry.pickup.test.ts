@@ -3,7 +3,7 @@
 // 8.1 m/s to a still hand. With `hoops.pickupReadOn` 1 it stays on its bounce and the hand meets it; with 0 nothing changes.
 import { describe, expect, it } from 'vitest';
 import { Bone, Matrix, MeshBuilder, NullEngine, Quaternion, Scene, Skeleton, TransformNode, Vector3 } from '@babylonjs/core';
-import { mountBallCarry, planPickUp, fallingPhaseAt, risingPhaseAt, PICKUP_READ_ON, PICKUP_WAIT_MAX_SEC, PICKUP_REACH_M, PICKUP_RATE_MAX, PICKUP_TOP_GAP_M, type BallCarry } from './ballCarry';
+import { mountBallCarry, planPickUp, fallingPhaseAt, risingPhaseAt, PICKUP_READ_ON, PICKUP_WAIT_MAX_SEC, PICKUP_REACH_M, PICKUP_RATE_MAX, PICKUP_TOP_GAP_M, PICKUP_CONTACT_M, PICKUP_OVERRUN_SEC, type BallCarry } from './ballCarry';
 import { attachBallToHand } from './ballRig';
 import { resetFeelForTests, setFeelOverride, setFeelSession, setFeelUser } from '../../feel-panel/feel';
 import { FEEL_KNOB_BY_ID } from '../../feel-panel/knobs';
@@ -97,6 +97,8 @@ describe('planPickUp (pure)', () => {
     expect(FEEL_KNOB_BY_ID.get('hoops.pickupReachM')!.def).toBe(PICKUP_REACH_M);
     expect(FEEL_KNOB_BY_ID.get('hoops.pickupRateMax')!.def).toBe(PICKUP_RATE_MAX);
     expect(FEEL_KNOB_BY_ID.get('hoops.pickupTopGapM')!.def).toBe(PICKUP_TOP_GAP_M);
+    expect(FEEL_KNOB_BY_ID.get('hoops.pickupContactM')!.def).toBe(PICKUP_CONTACT_M);
+    expect(FEEL_KNOB_BY_ID.get('hoops.pickupOverrunSec')!.def).toBe(PICKUP_OVERRUN_SEC);
   });
 });
 
@@ -138,7 +140,7 @@ describe('ballCarry.pickUp', () => {
       let frames = 0, minHand = hand0, gapAtTake = Infinity; d.reset();
       for (; frames < 40 && !r.ball.parent; frames++) { d.frame(1 / 60, 0, false); r.nodes.LeftHand.computeWorldMatrix(true); minHand = Math.min(minHand, r.nodes.LeftHand.getAbsolutePosition().y); if (r.ball.parent) gapAtTake = handGap(r, 'LeftHand'); }
       expect(r.ball.parent).toBe(r.nodes.LeftHand);
-      expect(frames).toBeLessThanOrEqual(Math.ceil(PICKUP_WAIT_MAX_SEC * 60) + 1);
+      expect(frames).toBeLessThanOrEqual(Math.ceil((PICKUP_WAIT_MAX_SEC + PICKUP_OVERRUN_SEC) * 60) + 1);
       expect(gapAtTake).toBeLessThan(gap0 - 0.25);          // it is taken far nearer the hand than it was at the press
       expect(minHand).toBeLessThan(hand0 - 0.05);           // the hand went down to it
       expect(Math.max(...d.path)).toBeLessThan(0.16);        // the ball never jumps

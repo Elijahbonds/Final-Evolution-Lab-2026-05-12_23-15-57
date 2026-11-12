@@ -260,6 +260,10 @@ export const PICKUP_REACH_M = 0.3;
 export const PICKUP_RATE_MAX = 2;
 /** A ball whose centre is within this of the top of its stroke is taken at once, as today (m). Knob `hoops.pickupTopGapM`. */
 export const PICKUP_TOP_GAP_M = 0.1;
+/** The take: the ball within this of touching the dribbling palm as drawn (m, past its radius). Knob `hoops.pickupContactM`. */
+export const PICKUP_CONTACT_M = 0.04;
+/** Past the planned meeting the ball rises on at its own pace to the palm, at most this much longer (s) — then it is taken wherever it is. Knob `hoops.pickupOverrunSec`. */
+export const PICKUP_OVERRUN_SEC = 0.1;
 /** The plan of a pick-up that waits for the bounce (pure, for the carry and its tests): from the ball's height over the floor (its
  *  centre, m) and whether it is rising, on the stroke `p` at `rateHz` bounces a second — the phase it is on now, the phase where the hand
  *  meets it, the pace the bounce runs at to get there, and how long that takes. null = take it now (near the top, or it cannot be met
@@ -729,7 +733,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   /** The held ball's last drawn point, the hand that held it, the root's (a teleport — a check — is not a whip), and the ball arm's
    *  and chest's local rotations as drawn (spine → forearm), sampled after the frame rendered. */
   let heldPrevBall: Vector3 | null = null, heldPrevHand: 'Left' | 'Right' | null = null; const heldPrevRoot = new Vector3();
-  const drawnBall = new Vector3(); let drawnAt = -1, limitedAt = -1;
+  const drawnBall = new Vector3(); let drawnAt = -1, limitedAt = -1, drawnVy = 0;
   // the dribbled ball as the after-animations pass placed it: the root it was placed from (and that root's yaw), and on which frame
   const placedRoot = new Vector3(); let placedYaw = 0, placedAt = -1;
   let passDt = 1 / 60;   // this drawn frame's dt (the held cap is a speed)
@@ -808,7 +812,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   };
   /** After the frame rendered: the ball as drawn, and (while held) the ball arm's locals as drawn. */
   const sampleDrawn = (): void => {
-    opts.ball.computeWorldMatrix(true); drawnBall.copyFrom(opts.ball.getAbsolutePosition()); drawnAt = stamp;
+    opts.ball.computeWorldMatrix(true); { const y = opts.ball.getAbsolutePosition().y; drawnVy = drawnAt === stamp - 1 ? y - drawnBall.y : 0; } drawnBall.copyFrom(opts.ball.getAbsolutePosition()); drawnAt = stamp;   // (hoops-gather G1: drawnVy, the drawn ball's last vertical step)
     if (active && !mv && handRootLocal(side, drawnHand)) { drawnHandAt = stamp; drawnHandSide = side; }   // (the clip clock's held-pose read)
     const held = ballHandNow();
     if (held) {
@@ -831,7 +835,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   const lastLocal = new Vector3(), lastVel = new Vector3(); let lastLocalAt = -1;
   // hoops-gather G1: a pick-up waiting for the bounce (pickUp): the target hand, the bounce's phase and pace to the meeting, the hand's
   // start height (root frame), and the offset from the ball as drawn to the stroke's point at the start (faded out over the wait)
-  let pick: { hand: RigHand | null; t: number; sec: number; phase: number; meet: number; rate: number; handY0: number; off: Vector3; push: number; releaseSec?: number } | null = null;
+  let pick: { hand: RigHand | null; t: number; sec: number; phase: number; meet: number; rate: number; natural: number; handY0: number; off: Vector3; push: number; releaseSec?: number } | null = null;
   const athleteOf = (sd: 'Left' | 'Right'): MoveHand => sideOfRigHand(opts.skeleton, opts.root, `${sd}Hand`);
   const rigOf = (h: MoveHand): 'Left' | 'Right' => (rigHandOnSide(opts.skeleton, opts.root, h) === 'LeftHand' ? 'Left' : 'Right');
   const moveArms: Record<'Left' | 'Right', ArmChain | null> = { Left: armChain(opts.skeleton, 'Left'), Right: armChain(opts.skeleton, 'Right') };
@@ -1020,12 +1024,16 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     if (pk.hand && pk.hand !== `${side}Hand`) gatherBallToHand(opts.ball, opts.skeleton, pk.hand);   // palm to palm, as a held hand-off
     releaseLeft = releaseTotal = Math.max(1e-3, pk.releaseSec ?? RELEASE_FADE_SEC); releaseDt = 0;   // the reach lets go from where it met the ball
   };
+  const _pp = new Vector3();
   const applyPick = (dt: number): void => {
     const pk = pick!;
     if (opts.ball.parent !== null || (opts.ball.metadata as { felReleased?: boolean } | null)?.felReleased) { pick = null; releaseLeft = releaseTotal = Math.max(1e-3, pk.releaseSec ?? RELEASE_FADE_SEC); releaseDt = 0; return; }   // stolen, released, taken by another call: the reach lets go as a let-go does
     pk.t += dt;
     const u = Math.min(1, pk.t / pk.sec), e = u * u * (3 - 2 * u);
-    let ph = pk.phase + pk.rate * pk.t; if (ph > pk.meet) ph = pk.meet;
+    // the bounce runs at the planned pace to the meeting point, then on at its own pace to the top: the take is where the ball reaches the
+    // palm AS IT IS DRAWN (the reach may not get the hand all the way down: a clip under it, a body that cannot fold that far)
+    const natural = Math.max(1e-3, pk.natural);
+    const ph = pk.t <= pk.sec ? pk.phase + pk.rate * pk.t : Math.min(1, pk.meet + natural * (pk.t - pk.sec));
     const s = dribbleAtPushed(ph, p), sx = sideSign(side);
     ballToWorld(s.ball.x * sx, s.ball.y, s.ball.z + pk.push, world);
     world.addInPlace(pk.off.scale(1 - e));
@@ -1040,8 +1048,19 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
       toWorld(sx * BALL_ELBOW_POLE[0], BALL_ELBOW_POLE[1], BALL_ELBOW_POLE[2], pole).subtractInPlace(opts.root.getAbsolutePosition());
       reachShaped(arm, handT, pole, armW, dt, stamp);
       reachedAt = stamp;
+      // the shot's hand, when it is the OTHER one, comes to the ball's far side for the meeting (both hands onto it: the gather)
+      if (pk.hand && pk.hand !== `${side}Hand` && offArm) {
+        offLocal.set(s.ball.x * sx - sx * (p.ballR + 0.06), s.ball.y + 0.04, s.ball.z + pk.push);
+        toWorld(offLocal.x, offLocal.y, offLocal.z, offT);
+        toWorld(-sx * OFF_ELBOW_POLE[0], OFF_ELBOW_POLE[1], OFF_ELBOW_POLE[2], offPole).subtractInPlace(opts.root.getAbsolutePosition());
+        offW = armW * e; reachShaped(offArm, offT, offPole, offW, dt, stamp);
+      }
     }
-    if (pk.t >= pk.sec - 1e-6) takePick();
+    // the take: the ball's top at the dribbling palm as drawn (on its way up, past the floor), at the top of the stroke, or the hard cap
+    const hn = handNodes[side];
+    let atPalm = false;
+    if (hn && ph > PUSHED_FLOOR_PHASE) { hn.computeWorldMatrix(true); Vector3.TransformCoordinatesToRef(palmOffsetOf(opts.ball, `${side}Hand`) as Vector3, hn.getWorldMatrix(), _pp); atPalm = Vector3.Distance(_pp, world) <= p.ballR + feel('hoops.pickupContactM', PICKUP_CONTACT_M); }
+    if ((pk.t >= pk.sec - 1e-6 && atPalm) || ph >= 0.999 || pk.t >= pk.sec + feel('hoops.pickupOverrunSec', PICKUP_OVERRUN_SEC)) takePick();
   };
   const applyHoops = () => {
     stamp++;
@@ -1273,23 +1292,25 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
         if (hand && !md?.felReleased && (!par || par === handNodes.Left || par === handNodes.Right)) gatherBallToHand(opts.ball, opts.skeleton, hand);
         return 'now';
       };
-      if (!hoops || !active || mv || feel('hoops.pickupReadOn', PICKUP_READ_ON) < 0.5 || opts.ball.parent !== null) return asToday();
+      if (!hoops || !active || feel('hoops.pickupReadOn', PICKUP_READ_ON) < 0.5 || opts.ball.parent !== null) return asToday();
       // the ball as drawn now (this frame's placement), and which way it is going (the last two placements, in the ball's own frame)
       opts.ball.computeWorldMatrix(true);
       const at = opts.ball.getAbsolutePosition().clone();
       const fl = Number.isFinite(floorY) ? floorY : opts.root.getAbsolutePosition().y;
-      const rising = lastLocalAt >= 0 ? lastVel.y > 0 : phase > PUSHED_FLOOR_PHASE;
+      // a move's path (a crossing, the auto hand's cross) places the ball itself: which way it is going is read off the ball as drawn
+      const rising = mv ? drawnVy > 0 : lastLocalAt >= 0 ? lastVel.y > 0 : phase > PUSHED_FLOOR_PHASE;
       const rate = lockHz > 0 ? lockHz : p.hzIdle + (p.hzFast - p.hzIdle) * Math.min(1, Math.max(0, lastSpeed01));
       const plan = planPickUp(at.y - fl, rising, p, rate, { waitMaxSec: feel('hoops.pickupWaitMaxSec', PICKUP_WAIT_MAX_SEC), reachM: feel('hoops.pickupReachM', PICKUP_REACH_M), rateMax: feel('hoops.pickupRateMax', PICKUP_RATE_MAX), topGapM: feel('hoops.pickupTopGapM', PICKUP_TOP_GAP_M) });
       if (!plan) return asToday();
       // park the dribble as update(false) does — the move and the queue dropped — but keep the ball free and the reach on
       active = false; queued = null; lastLocalAt = -1; releaseLeft = 0;
+      if (mv) { const m = mv; mv = null; m.opts.onEvent?.('cancel', m.name); }   // (as update(false) does: the move is dropped, the ball goes on from where it is)
       const push = PUSH_AHEAD_M * pushK, sx = sideSign(side);
       const s0 = dribbleAtPushed(plan.phase0, p);
       ballToWorld(s0.ball.x * sx, s0.ball.y, s0.ball.z + push, world);
-      const off = at.subtract(world); if (off.length() > 0.5) off.setAll(0);
+      const off = at.subtract(world); if (off.length() > 0.5) { active = true; return asToday(); }   // nowhere near its stroke (a move's far point): taken as today
       const h0 = dribbleAtPushed(plan.phase0, p).hand.y;
-      pick = { hand: hand ?? null, t: 0, sec: plan.sec, phase: plan.phase0, meet: plan.phaseMeet, rate: plan.rate, handY0: h0, off, push, releaseSec };
+      pick = { hand: hand ?? null, t: 0, sec: plan.sec, phase: plan.phase0, meet: plan.phaseMeet, rate: plan.rate, natural: rate, handY0: h0, off, push, releaseSec };
       return 'reading';
     },
     setGuard(k: number) { guardTarget = Math.min(1, Math.max(0, Number.isFinite(k) ? k : 0)); },

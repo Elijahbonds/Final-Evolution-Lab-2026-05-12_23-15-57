@@ -718,3 +718,6 @@ All new numbers; every switch ships OFF, so the game plays exactly as before unt
   at most `hoops.pickupRateMax` 2× its pace so it never waits longer than `hoops.pickupWaitMaxSec` 0.2 s; a ball within
   `hoops.pickupTopGapM` 0.1 m of the top is taken at once (as before). Off: the ball is taken on the press frame wherever it is and flown up to
   the hand (measured: 57–94 cm off the palm when pressed near the floor). The meter and the body answer the press on its frame either way.
+  The take is the ball within `hoops.pickupContactM` 0.04 m of the palm as drawn (past its radius); a hand that did not get all the way
+  down gets the ball rising on to it for at most `hoops.pickupOverrunSec` 0.1 s more. When the shot wants the other hand, it comes to the
+  ball's far side for the meeting (both hands on it), then takes it.

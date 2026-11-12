@@ -68,6 +68,8 @@ export function analyseTrial(tr, bones) {
   if (out.heldAtPress) { let k = ix - 1; while (k > 0 && (F[k - 1].hold === 'L' || F[k - 1].hold === 'R')) k--; out.heldSinceF = F[k].f - tr.pressF; }
   if (pk >= 0) {
     const K = F[pk]; out.pickF = K.f - tr.pressF; out.pickHand = K.hold; out.pickBallY = r2(K.b[1]);
+    // (hoops-gather G1) how far the picking palm went DOWN to the ball between the press and the pick (the hand meeting the ball)
+    { const a = palmOf(F[ix - 1], K.hold), b = palmOf(K, K.hold); out.handDownCm = a && b ? r1((a[1] - b[1]) * 100) : null; }
     out.gapAtPickCm = r1(gapOf(K, K.hold) * 100);
     let seat = -1, stepMax = 0, upMax = 0, stepAt = null;
     for (let i = pk; i < Math.min(F.length, pk + 40); i++) {
@@ -222,14 +224,14 @@ export function pooled(rows) {
   const ok = rows.filter((r) => !r.failed && !/^(esc|trap)_|control/.test(r.kind) && r.pickF !== undefined && r.pickF !== null);
   const med = (a) => { const v = a.filter((x) => x !== null && x !== undefined && Number.isFinite(x)); return v.length ? pct(v, 0.5) : null; };
   const mx = (a) => { const v = a.filter((x) => x !== null && x !== undefined && Number.isFinite(x)); return v.length ? Math.max(...v) : null; };
-  const line = (rs) => ({ n: rs.length, gapMed: r1(med(rs.map((r) => r.gapAtPickCm))), gapMax: r1(mx(rs.map((r) => r.gapAtPickCm))), seatMed: med(rs.map((r) => r.seatF)), seatMax: mx(rs.map((r) => r.seatF)), unseated: rs.filter((r) => r.seatF === null || r.seatF === undefined).length, yank: rs.filter((r) => r.yank).length, handShareMed: r2(med(rs.map((r) => r.handShare))), pickMed: med(rs.map((r) => r.pickF)), pickMax: mx(rs.map((r) => r.pickF)),
+  const line = (rs) => ({ n: rs.length, gapMed: r1(med(rs.map((r) => r.gapAtPickCm))), gapMax: r1(mx(rs.map((r) => r.gapAtPickCm))), seatMed: med(rs.map((r) => r.seatF)), seatMax: mx(rs.map((r) => r.seatF)), unseated: rs.filter((r) => r.seatF === null || r.seatF === undefined).length, yank: rs.filter((r) => r.yank).length, handShareMed: r2(med(rs.map((r) => r.handShare))), handDownMed: r1(med(rs.map((r) => r.handDownCm))), pickMed: med(rs.map((r) => r.pickF)), pickMax: mx(rs.map((r) => r.pickF)),
     hard: rs.reduce((a, r) => a + (r.hardPops || 0), 0), pressHard: rs.reduce((a, r) => a + (r.pressHard || 0), 0), over25: rs.reduce((a, r) => a + (r.armOver25 || 0), 0), armWorst: r1(mx(rs.map((r) => r.armWorst?.deg))), slideP90: r1(med(rs.map((r) => r.slideP90Cm))), slideMax: r1(mx(rs.map((r) => r.slideMaxCm))), relMed: med(rs.map((r) => r.releaseMs)), reDropMed: r1(med(rs.map((r) => r.reDropCm))), reDropMax: r1(mx(rs.map((r) => r.reDropCm))) });
   const by = (key) => { const m = new Map(); for (const r of ok) { const k = key(r); if (!m.has(k)) m.set(k, []); m.get(k).push(r); } return [...m.entries()].sort().map(([k, rs]) => ({ k, ...line(rs) })); };
   return { byPhase: by((r) => `${r.mode}|${r.phaseAt}`), byKind: by((r) => `${r.mode}|${r.kind}`), all: line(ok) };
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url) && process.argv.includes('--pooled')) {
   const rows = []; for (const f of process.argv.slice(2).filter((a) => a.endsWith('.json'))) { const o = JSON.parse(fs.readFileSync(f, 'utf8')); for (const tr of o.trials) rows.push({ mode: o.mode, ...analyseTrial(tr, o.bones) }); }
-  const P = pooled(rows); const cols = ['k', 'n', 'gapMed', 'gapMax', 'seatMed', 'seatMax', 'unseated', 'yank', 'handShareMed', 'pickMed', 'pickMax', 'hard', 'pressHard', 'over25', 'armWorst', 'slideP90', 'slideMax', 'relMed', 'reDropMed', 'reDropMax'];
+  const P = pooled(rows); const cols = ['k', 'n', 'gapMed', 'gapMax', 'seatMed', 'seatMax', 'unseated', 'yank', 'handShareMed', 'handDownMed', 'pickMed', 'pickMax', 'hard', 'pressHard', 'over25', 'armWorst', 'slideP90', 'slideMax', 'relMed', 'reDropMed', 'reDropMax'];
   for (const [name, t] of [['by phase', P.byPhase], ['by kind', P.byKind]]) { console.log(`\n${name}\n` + cols.join('\t')); for (const x of t) console.log(cols.map((c) => x[c] ?? '—').join('\t')); }
   console.log('\nall', JSON.stringify(P.all));
 }
