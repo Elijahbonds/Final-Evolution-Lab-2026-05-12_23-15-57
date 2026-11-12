@@ -25,9 +25,17 @@ export default async function ReceiptPage({ searchParams }: { searchParams: { se
   if (!sessionId) {
     return (
       <PressFrame signedIn={signedIn}>
-        <h2 className="fel-heading mt-8 text-3xl">Receipt</h2>
-        <p className="mt-3 text-sm text-white/60">This page needs the checkout session from Stripe.</p>
-        <Link href="/press" className="mt-4 inline-block text-sm text-[#F5C518]">Back to the catalog</Link>
+        {/* PUBLIC-POLISH (2026-11-02, live sweep D3): opened with no checkout session (a bookmark, a typed URL) it said
+            "This page needs the checkout session from Stripe". Nothing is looked up or granted on this branch; it now
+            says so in plain words and offers the shop and the library. The paid path below is unchanged. */}
+        <h2 className="fel-heading mt-8 text-3xl">Nothing to show here</h2>
+        <p className="mt-3 text-base text-white/60">
+          Your receipt opens here right after you check out. Books you have bought are in My Library.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <Link href="/press" className="inline-flex min-h-11 items-center rounded-md bg-[#F5C518] px-4 py-2 text-sm font-semibold text-black">Go to the shop</Link>
+          <Link href="/press/library" className="inline-flex min-h-11 items-center rounded-md border border-white/15 px-4 py-2 text-sm font-semibold text-white/80">My Library</Link>
+        </div>
       </PressFrame>
     );
   }
@@ -85,7 +93,7 @@ export default async function ReceiptPage({ searchParams }: { searchParams: { se
       {lookupError ? <p className="mt-4 max-w-lg text-sm text-[#ffb4b4]">{lookupError}</p> : null}
       {!lookupError && paid ? (
         <div className="mt-4 max-w-xl rounded-2xl border border-white/10 bg-[#101010] p-5">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#F5C518]">Payment received</p>
+          <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-[#F5C518]">Payment received</p>
           <p className="mt-2 text-xl text-white">{book?.title ?? 'Book'}</p>
           <p className="text-sm text-white/55">{offer ? formatLabel(offer.format) : 'Purchase'}</p>
           {amount != null ? (

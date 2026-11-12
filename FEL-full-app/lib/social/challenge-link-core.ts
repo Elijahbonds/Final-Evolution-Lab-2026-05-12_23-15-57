@@ -19,6 +19,21 @@ export interface ChallengeKeyMoment {
   [k: string]: number | string | boolean;
 }
 
+/**
+ * CHALLENGES-2 (2026-10-24): what a challenge is on beyond a game score, and which challenge it answers. Optional, and
+ * absent on a plain score challenge, so a plain challenge signs exactly the bytes it did before. Signed with the rest of
+ * the payload (CHALLENGE-SIGN-V2 signs nested keys). Read it through lib/social/challenge-terms.ts termsOf.
+ */
+export interface ChallengeExtra {
+  /** 'rep': a measured Mirror number (`metric`: 'jump' | 'form') instead of a game score. */
+  kind?: 'rep';
+  metric?: string;
+  /** A rematch: the code of the challenge this one answers, that challenge's score and its name tag. */
+  re?: string;
+  reScore?: number;
+  reTag?: string;
+}
+
 export interface ChallengePayload {
   v: number;
   modeKey: string;
@@ -26,8 +41,9 @@ export interface ChallengePayload {
   display?: string;
   tag: string;
   ghost: ChallengeKeyMoment[];
-  /** Server stamps real epoch ms; 0 until signed. */
+  /** Server stamps real epoch ms; 0 until signed. A v2 challenge lives 48 h from it (challenge-terms.ts). */
   t: number;
+  x?: ChallengeExtra;
 }
 
 export interface MintInput {
@@ -36,6 +52,7 @@ export interface MintInput {
   display?: string;
   keyMoments?: ChallengeKeyMoment[];
   athleteTag?: string;
+  extra?: ChallengeExtra;
 }
 
 export interface MintResult {
@@ -71,7 +88,7 @@ function b64urlDecode(s: string): string {
 
 export class ChallengeLinkCore {
   /** Mint from a finished run. keyMoments = sparse replay beats for the ghost. */
-  static mint({ modeKey, score, display, keyMoments = [], athleteTag = 'ATHLETE' }: MintInput): MintResult {
+  static mint({ modeKey, score, display, keyMoments = [], athleteTag = 'ATHLETE', extra }: MintInput): MintResult {
     if (!modeKey || score == null) throw new Error('mode+score required');
     const payload: ChallengePayload = {
       v: 2, // CHALLENGE-SIGN-V2: signPayload signs the full payload as v2 (v1 rows verify until the sunset)
@@ -81,6 +98,7 @@ export class ChallengeLinkCore {
       tag: String(athleteTag).slice(0, 16),
       ghost: keyMoments.slice(0, 40), // hard cap: links stay tiny
       t: 0, // server stamps real time + signature
+      ...(extra && Object.keys(extra).length ? { x: { ...extra } } : {}),
     };
     return { payload, path: `/c/${ChallengeLinkCore.encode(payload)}` };
   }

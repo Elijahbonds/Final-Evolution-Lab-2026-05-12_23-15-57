@@ -16,6 +16,7 @@ import {
 } from '@/lib/create/flow';
 import { guideFor, visibleShowcases } from '@/lib/create/disciplines';
 import { statusOf } from '@/lib/create/status';
+import { lineSize } from '@/lib/design/type';   // EVERY-SCREEN P9
 import { uploadMedia, UploadError } from '@/lib/create/upload';
 import { uploadMime } from '@/lib/create/media';
 import { rememberCard } from '@/lib/create/use-my-cards';
@@ -30,7 +31,7 @@ import type { CookingPublishPayload } from '@/components/creator/modes/cooking-m
 import type { WritingPublishPayload } from '@/components/creator/modes/writing-mode';
 import type { FashionPublishPayload } from '@/components/creator/modes/fashion-mode';
 
-const loading = () => <p className="p-4 text-sm text-neutral-500">Loading the editor…</p>;
+const loading = () => <p className="p-4 text-sm text-neutral-400">Loading the editor…</p>;
 const ArtMode = dynamic(() => import('@/components/creator/modes/art-mode'), { ssr: false, loading });
 const DanceMode = dynamic(() => import('@/components/creator/modes/dance-mode'), { ssr: false, loading });
 const ActingMode = dynamic(() => import('@/components/creator/modes/acting-mode'), { ssr: false, loading });
@@ -147,11 +148,11 @@ export default function GuidedFlow({ discipline, entry, ...props }: FlowProps & 
     <div className="min-h-screen bg-neutral-950 pb-24 text-neutral-100">
       <header className="sticky top-0 z-30 border-b border-white/5 bg-neutral-950/90 px-4 py-3 backdrop-blur">
         <div className="flex items-center gap-3">
-          <Link href="/create" className="rounded-lg bg-neutral-800 px-3 py-1.5 text-sm font-bold">← Create</Link>
+          <Link href="/create" className="inline-flex min-h-11 items-center rounded-lg bg-neutral-800 px-3 py-1.5 text-sm font-bold">← Create</Link>
           <div className="min-w-0">
-            <div className="truncate text-lg font-black">{guide.label}</div>
-            {entry.from && entry.from !== 'hub' && <div className="truncate text-[11px] text-neutral-400">from {SOURCE_LABEL[entry.from]}</div>}
-            {draft.remixOf && <div className="truncate text-[11px] text-violet-300">a remix: the original&apos;s creator is credited</div>}
+            <div className="truncate text-[20px] font-black">{guide.label}</div>
+            {entry.from && entry.from !== 'hub' && <div className="truncate text-[12px] text-neutral-400">from {SOURCE_LABEL[entry.from]}</div>}
+            {draft.remixOf && <div className="truncate text-[12px] text-violet-300">a remix: the original&apos;s creator is credited</div>}
           </div>
         </div>
         <ol className="mt-3 grid grid-cols-3 gap-2" aria-label="Steps">
@@ -160,7 +161,7 @@ export default function GuidedFlow({ discipline, entry, ...props }: FlowProps & 
             return (
               <li key={s}>
                 <button data-qa={`step-${s}`} disabled={!reachable} onClick={() => go(s)} aria-current={step === s ? 'step' : undefined}
-                  className={`w-full rounded-lg px-2 py-1.5 text-left text-[11px] font-bold leading-tight ${step === s ? 'bg-amber-400 text-black' : reachable ? 'bg-neutral-800 text-neutral-200' : 'bg-neutral-900 text-neutral-600'}`}>
+                  className={`min-h-11 w-full rounded-lg px-2 py-1.5 text-left text-[12px] font-bold leading-tight ${step === s ? 'bg-amber-400 text-black' : reachable ? 'bg-neutral-800 text-neutral-200' : 'bg-neutral-900 text-neutral-400'}`}>
                   {i + 1}. {STEP_LABEL[s]}
                 </button>
               </li>
@@ -172,7 +173,7 @@ export default function GuidedFlow({ discipline, entry, ...props }: FlowProps & 
       <main className="mx-auto max-w-4xl p-4">
         {step === 'make' && (
           <>
-            <p className="mb-3 text-sm text-neutral-400">{guide.make}.{draft.art ? ' You already made one: making another replaces it.' : ''}</p>
+            <p className={`mb-3 ${lineSize(guide.make, 'text-sm')} text-neutral-400`}>{guide.make}.{draft.art ? ' You already made one: making another replaces it.' : ''}</p>
             <MakeStep discipline={discipline} entry={entry} props={props} onMade={onMade} />
             {draft.art && <button onClick={() => go('details')} className="mt-4 rounded-xl bg-neutral-800 px-5 py-2 text-sm font-bold">Keep what I made →</button>}
           </>

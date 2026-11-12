@@ -44,7 +44,7 @@ describe("DunkMode: the take-off's A is not the slam", () => {
   it("only the player's two presses launch as 'press' (A on the run, RUN let go); the line, beats, the bus and the watchdog are the mode's", () => {
     expect(DUNK.match(/launchDunk\(ctx, 'press'\)/g)).toHaveLength(2);
     expect(onInput).toMatch(/if \(e\.btn === 'A' && phase === 'charge'\) \{\s*if \(!runwayBeat\) launchDunk\(ctx, 'press'\);/);
-    expect(onInput).toMatch(/if \(e\.value === 0\) launchDunk\(ctx, 'press'\);/);
+    expect(onInput).toMatch(/if \(rt === 0\) \{ console\.info\([^\n]*\); launchDunk\(ctx, 'press'\); \}/);   // dunk-flagship Phase 5: the let-go of the folded hand/body pull `rt`, its source logged
     expect(DUNK.match(/launchDunk\(ctx0?!?\)/g)!.length).toBeGreaterThanOrEqual(4);   // the line, the beat's end, the bus, the watchdog
   });
 
@@ -93,7 +93,10 @@ describe('DunkDuelMode: the first press decides, the take-off is not it, and A o
     const flight = onInput.indexOf("if (e.t === 'button' && e.btn === 'A' && e.pressed && phase === 'cinematic') {");
     expect(jump).toBeGreaterThan(0);
     expect(flight).toBeGreaterThan(jump);
-    expect(onInput).toMatch(/if \(e\.value === 0\) launchDunk\(ctx, 'press'\);/);
+    // test changed (gameplay-clean, routed from dunk-flagship P5): RUN let go is the FOLDED pull (the hand's and the body's,
+    // dunkDuelRules RunPull) reaching 0, not one event's own value — an idle pad's re-sent 0 no longer launches a body's run
+    expect(onInput).toMatch(/const rt = runPull\.take\(e\);/);
+    expect(onInput).toMatch(/if \(rt === 0\) \{[\s\S]*?launchDunk\(ctx, 'press'\); \}/);
     expect(DUEL.match(/launchDunk\(ctx, 'press'\)/g)).toHaveLength(2);
     expect(DUEL.match(/launchDunk\(ctx\)/g)).toHaveLength(2);   // the line and the watchdog are the mode's own
   });

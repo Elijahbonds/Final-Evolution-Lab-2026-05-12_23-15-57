@@ -84,7 +84,8 @@ describe('the Quick Screen, start to finish', () => {
     expect(seq.slice(0, 4)).toEqual(['framing', 'pain', 'takeoff', 'calibrate']);
     for (const p of QUICK_PARTS) expect(run.steps, p.id).toContain(`active:${p.id}`);
     expect(run.steps).toContain('calibrateSide:T1-side');
-    expect(seq.filter((s) => s === 'miniResult')).toHaveLength(4);
+    // SCREEN-EASY (2026-10-28; test changed): the test's "done" line heads its pain check — no 3 s card before it
+    expect(seq.filter((s) => s === 'miniResult')).toHaveLength(0);
     expect(seq.filter((s) => s === 'painCheck')).toHaveLength(4);
   });
 
@@ -102,8 +103,9 @@ describe('the Quick Screen, start to finish', () => {
   it('says one thing at a time: the setup, the countdown, the rep count, the mini-result — and no pattern coaching', () => {
     expect(run.said).toEqual(expect.arrayContaining(['3', '2', '1', 'Go.', 'One', 'Two', 'Three. Done.', 'Any pain right now? Tap yes or no.']));
     // SCREEN-SHIP: the per-test card says "done" (no score mid-screen; the grades come once, in words, on the results)
-    expect(run.said.some((s) => /^Three\. Overhead squat: done\.$/.test(s))).toBe(true);
-    expect(run.said.some((s) => /^Three\. Single-leg squat: done\.$/.test(s))).toBe(true);
+    // SCREEN-EASY (test changed): …and the pain question follows in the same line (lib/screen/copy.ts PAIN_CHECK_LINE)
+    expect(run.said.some((s) => /^Three\. Overhead squat: done\. Any pain\?/.test(s))).toBe(true);
+    expect(run.said.some((s) => /^Three\. Single-leg squat: done\. Any pain\?/.test(s))).toBe(true);
     expect(run.said.filter((s) => s === 'Three. Done.').length).toBe(3);   // the beat after T1-front, T2-left, T3-left
     expect(run.said.filter((s) => /knees? out|chest up|brace|keep your back|straighten/i.test(s))).toEqual([]);
   });
@@ -152,15 +154,20 @@ describe('pain stops the screen', () => {
   });
 
   it('pain after a test: that test is 0/3, the rest never run, no MQS, no PRQ', () => {
-    const run = drive({ painAt: 'T2' });
+    // SCREEN-EASY (2026-10-28; test changed): the run order is T1 facing, T3, T5, T1 side-on, T2 — so pain after the
+    // single-leg squat (the first TEST to finish) stops the screen before the jump, T1's side-on reps and the wall
+    const run = drive({ painAt: 'T3' });
     const res = run.v.result!;
     expect(run.v.step).toBe('stopped');
-    expect(res.tests.map((t) => `${t.id}:${t.status}`)).toEqual(['T1:scored', 'T2:painStop', 'T3:skipped', 'T5:skipped']);
-    expect(res.tests[1].score03).toBe(0);
+    const by = Object.fromEntries(res.tests.map((t) => [t.id, t]));
+    expect(by.T3.status).toBe('painStop');
+    expect(by.T3.score03).toBe(0);
+    expect(by.T5.status).toBe('skipped');
+    expect(by.T2.status).toBe('skipped');
     expect(res.mqs).toBeNull();
     expect(res.prqPreview).toEqual([]);
     expect(res.findings).toEqual([]);
-    expect(run.steps.some((s) => s.startsWith('active:T3'))).toBe(false);
+    for (const p of ['T5', 'T1-side', 'T2-left', 'T2-right']) expect(run.steps.some((s) => s.startsWith(`active:${p}`)), p).toBe(false);
   });
 
   it('pain reported mid-test stops it there', () => {

@@ -33,6 +33,8 @@ import { PREMIUM_DRESSING } from './dressingFlags';   // M108 broadcast dressing
 import { mountVenueMap } from '../visual/VenueMaps';
 import { buildCrowdStand, fieldMaterial } from '../visual/PlacePack';
 import { spawnMeshyProp } from '../visual/meshyProps';
+import { RIM_HEIGHT_M, DUNK_RIM_RADIUS, HOOP } from '../core/courtDims';
+import { quietCanvas } from '../core/canvasA11y';
 
 // ── spec ──────────────────────────────────────────────────────────────────
 
@@ -68,7 +70,7 @@ export interface Grade {
  * rather than eyeballed, and rim height is the single most-known number in
  * basketball.
  */
-export const HOOP_RIM_OFFSET = { y: 3.05, z: 0.72 } as const;
+export const HOOP_RIM_OFFSET = { y: RIM_HEIGHT_M, z: HOOP.POLE_BEHIND_RIM_M } as const;
 
 /** M110 — the procedural horizon backdrops. Each paints a recognisable place
  *  into the sky-dome texture (buildings, stands, peaks, sea, dojo interior…)
@@ -573,17 +575,17 @@ function buildProp(scene: Scene, p: PropSpec, root: TransformNode, shadows: Shad
     case 'hoop': {
       // Rim placement comes from HOOP_RIM_OFFSET so a mode can compute where the
       // ball actually has to go. See the constant for why that matters.
-      const pole = MeshBuilder.CreateCylinder('pole', { height: 3.30 * s, diameter: 0.16 * s }, scene);
-      pole.position.y = (3.30 * s) / 2;
+      const pole = MeshBuilder.CreateCylinder('pole', { height: HOOP.POLE_H_M * s, diameter: HOOP.POLE_D_M * s }, scene);
+      pole.position.y = (HOOP.POLE_H_M * s) / 2;
       pole.material = surface(scene, 'poleMat', '#2A2E37', 0.5, 0.4);
       add(pole);
       // Regulation backboard is 1.8m wide x 1.05m tall with its lower edge
       // level with the rim, so its centre sits half a board above rim height.
-      const board = MeshBuilder.CreateBox('board', { width: 1.8 * s, height: 1.05 * s, depth: 0.06 * s }, scene);
-      board.position.set(0, (HOOP_RIM_OFFSET.y + 0.45) * s, 0.3 * s);
+      const board = MeshBuilder.CreateBox('board', { width: HOOP.BOARD_W * s, height: HOOP.BOARD_H * s, depth: HOOP.BOARD_D * s }, scene);
+      board.position.set(0, (HOOP_RIM_OFFSET.y + HOOP.BOARD_CENTRE_ABOVE_RIM_M) * s, HOOP.BOARD_CENTRE_Z_M * s);
       board.material = surface(scene, 'boardMat', '#F4F1E8', 0.4);
       add(board);
-      const rim = MeshBuilder.CreateTorus('rim', { diameter: 0.90 * s, thickness: 0.055 * s, tessellation: 24 }, scene);
+      const rim = MeshBuilder.CreateTorus('rim', { diameter: DUNK_RIM_RADIUS * 2 * s, thickness: HOOP.RIM_TUBE_M * s, tessellation: 24 }, scene);
       rim.position.set(0, HOOP_RIM_OFFSET.y * s, HOOP_RIM_OFFSET.z * s);
       rim.material = emissive(scene, 'rimMat', p.color ?? '#FF6B00', 0.5);
       add(rim);
@@ -591,8 +593,8 @@ function buildProp(scene: Scene, p: PropSpec, root: TransformNode, shadows: Shad
         // M108: a hanging net under the rim — the single clearest tell that
         // separates a real hoop from a bare ring. Wireframe tube = net cords.
         const net = MeshBuilder.CreateCylinder('hoopnet',
-          { height: 0.42 * s, diameterTop: 0.82 * s, diameterBottom: 0.44 * s, tessellation: 12, cap: Mesh.NO_CAP }, scene);
-        net.position.set(0, HOOP_RIM_OFFSET.y * s - 0.21 * s, HOOP_RIM_OFFSET.z * s);
+          { height: HOOP.NET_H * s, diameterTop: HOOP.NET_TOP_D * s, diameterBottom: HOOP.NET_BOTTOM_D * s, tessellation: 12, cap: Mesh.NO_CAP }, scene);
+        net.position.set(0, HOOP_RIM_OFFSET.y * s - HOOP.NET_CENTRE_BELOW_RIM_M * s, HOOP_RIM_OFFSET.z * s);
         const nmat = new StandardMaterial('hoopNetMat', scene);
         nmat.emissiveColor = c3('#FFFFFF'); nmat.disableLighting = true;
         nmat.wireframe = true; nmat.alpha = 0.85;
@@ -1280,6 +1282,8 @@ export function buildNexusScene(scene: Scene, spec: NexusWebSpec, canvas?: HTMLC
 /** Convenience for a standalone page or a render harness. */
 export function mountNexus(canvas: HTMLCanvasElement, spec: NexusWebSpec): { engine: Engine; scene: Scene; built: BuiltScene } {
   const engine = new Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
+  // SCREEN-FIXES (2026-11-10): named, and out of the Tab order (Babylon makes it 1): lib/babylon/core/canvasA11y.ts
+  quietCanvas(engine, canvas, 'A 3D map preview');
   const scene = new Scene(engine);
   const built = buildNexusScene(scene, spec, canvas);
   engine.runRenderLoop(() => scene.render());

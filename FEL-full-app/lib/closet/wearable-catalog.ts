@@ -76,7 +76,11 @@ export function defaultFace(): FaceConfig {
 }
 
 export type WearableSlot = 'headwear' | 'tops' | 'shorts' | 'shoes' | 'accessory';
-export interface Wearable { itemId: string; slot: WearableSlot; name: string; coinPrice: number; accent: string }
+// `name` is STORED (a saved build's gear names it: creator/schema/gear.ts, wallet/dead-buys.ts) and never changes; `label`,
+// when set, is what the screens show instead (KIT-NO-HIGH-BOOTS, owner 2026-10-20: "rename the display label only").
+export interface Wearable { itemId: string; slot: WearableSlot; name: string; coinPrice: number; accent: string; label?: string }
+/** What a screen shows for a wearable: its display label, else its stored name. */
+export function wearableLabel(w: Pick<Wearable, 'name' | 'label'>): string { return w.label ?? w.name; }
 
 // TUNE(elijah) — cosmetic catalog + coin pricing.
 export const WEARABLES: Wearable[] = [
@@ -89,7 +93,7 @@ export const WEARABLES: Wearable[] = [
   { itemId: 'top_football', slot: 'tops', name: 'Gridiron Jersey', coinPrice: 650, accent: '#7F1D1D' },
   { itemId: 'shorts_court', slot: 'shorts', name: 'Court Shorts', coinPrice: 350, accent: '#00E5FF' },
   { itemId: 'shorts_glitch', slot: 'shorts', name: 'Glitch Shorts', coinPrice: 500, accent: '#FF3366' },
-  { itemId: 'shoes_evo', slot: 'shoes', name: 'Evolution Hi-Tops', coinPrice: 800, accent: '#00E5FF' },
+  { itemId: 'shoes_evo', slot: 'shoes', name: 'Evolution Hi-Tops', coinPrice: 800, accent: '#00E5FF', label: 'Evolution Low-Tops' },   // the kit's shoe is a low-cut since KIT-NO-HIGH-BOOTS
   { itemId: 'shoes_flight', slot: 'shoes', name: 'Flight Trainers', coinPrice: 600, accent: '#A855F7' },
   { itemId: 'acc_chain', slot: 'accessory', name: 'Shard Chain', coinPrice: 450, accent: '#C79BFF' },
   { itemId: 'acc_sleeve', slot: 'accessory', name: 'Power Sleeve', coinPrice: 200, accent: '#FF3366' },

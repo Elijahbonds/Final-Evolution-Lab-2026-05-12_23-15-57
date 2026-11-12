@@ -49,9 +49,20 @@
 // already a full window old stays old enough after an erase. BreathLog rows are still deleted, so the rolling use
 // count can clear; the owner accepted that. A first opt-in, whose oldest grant is new, still waits the week.
 //
+// DATA-RIGHTS-SWEEP (2026-10-25): TWO PENDING MOVEMENT TABLES RIDE ALONG. The daily readiness jump check (PR #447,
+// prisma/pending/2026-10-25-coach-readiness.sql: "not yet in the prq-data-rights export/erase") is a camera jump number,
+// and the coach form review (PR #438, 2026-10-24-coach-form-review.sql) is the form read of a filmed set: both are the
+// "jumps ... form reads ... worked out from the camera" the Profile panel names. The export carries them as
+// `readinessJumpChecks` and `formReviews`, and erasePrqData deletes them (the coach's ReadinessAlert rows cascade with
+// the checks, as the feature's own delete does). They are raw SQL behind a fresh information_schema read
+// (lib/data-rights/rights.ts): a table not applied yet is skipped quietly — [] in the export, no count in the erase. The
+// health-only erase does not touch them: they are movement numbers, not health answers. Every other table a person has
+// is classified in lib/data-rights/registry.ts, which the account export and the account erase follow.
+//
 // Kept out of the route files so it can be tested against a fake client (vitest does not collect app/).
 
 import type { Prisma } from '@/public/_prisma/client';
+import { collectPrqMovement, erasePrqMovement, hasRaw } from '@/lib/data-rights/rights';
 
 type Db = Pick<Prisma.TransactionClient, 'prqEntry' | 'gameSession' | 'workoutScan' | 'healthIntake' | 'painCheckIn' | 'healthConsent' | 'readinessCheckIn' | 'breathLog'>;
 
@@ -97,6 +108,8 @@ export async function collectPrqExport(db: Db, userId: string, now: Date = new D
     // MIRROR-COACH P7: every breath-toolbox use, whole — its kind, the coached session it was for, when.
     db.breathLog.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }),
   ]);
+  // DATA-RIGHTS-SWEEP: the pending movement tables (header). A client without raw calls (a test stand-in) has none.
+  const movement = hasRaw(db) ? await collectPrqMovement(db, userId) : { readinessJumpChecks: [], formReviews: [] };
 
   return {
     exportedAt: now.toISOString(),
@@ -109,6 +122,8 @@ export async function collectPrqExport(db: Db, userId: string, now: Date = new D
     healthConsents,
     readinessCheckIns,
     breathLogs,
+    readinessJumpChecks: movement.readinessJumpChecks,
+    formReviews: movement.formReviews,
   };
 }
 
@@ -130,6 +145,10 @@ export interface ErasedCounts extends HealthErasedCounts {
   prqEntries: number;
   /** WorkoutScan rows deleted: every movement-history row, of every kind. */
   movementHistory: number;
+  /** DATA-RIGHTS-SWEEP: ReadinessJumpCheck rows deleted. Present only when the client has raw calls (always in production). */
+  readinessJumpChecks?: number;
+  /** DATA-RIGHTS-SWEEP: CoachFormReview rows (the client's filmed sets) deleted. Present only when the client has raw calls. */
+  formReviews?: number;
 }
 
 /**
@@ -164,12 +183,19 @@ export async function erasePrqData(
   const prq = await db.prqEntry.deleteMany({ where: { userId } });
   const history = await db.workoutScan.deleteMany({ where: { userId } });
   const health = await eraseHealthData(db, userId);
-  return { prqEntries: prq.count, movementHistory: history.count, ...health };
+  // DATA-RIGHTS-SWEEP: the pending movement tables (header), in the same transaction.
+  const movement = hasRaw(db) ? await erasePrqMovement(db, userId) : null;
+  return { prqEntries: prq.count, movementHistory: history.count, ...health, ...(movement ?? {}) };
+}
+
+/** Every camera movement row an erase deleted: WorkoutScan plus the pending movement tables. */
+export function movementRowsErased(c: ErasedCounts): number {
+  return c.movementHistory + (c.readinessJumpChecks ?? 0) + (c.formReviews ?? 0);
 }
 
 /** The ledger line for an erasure (the wallet is untouched; the event is recorded). */
 export function erasureReason(c: ErasedCounts): string {
   const health = c.healthIntakes + c.painCheckIns + c.healthConsents + c.readinessCheckIns + c.breathLogs;
-  return `PRQ data erasure: ${c.prqEntries} entries, ${c.movementHistory} movement history rows and `
+  return `PRQ data erasure: ${c.prqEntries} entries, ${movementRowsErased(c)} movement history rows and `
     + `${health} health record${health === 1 ? '' : 's'} deleted`;
 }

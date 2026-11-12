@@ -7,7 +7,7 @@ import { Vector3 } from '@babylonjs/core';
 import { DribbleController } from './BasketballCore';
 import { CourtMovement, DEFAULT_MOVEMENT, GEARS_HOOPS, type GearTuning } from './CourtMovement';
 import {
-  H3A_STICK_PRESET, HOOPS_CUT_SEC, HOOPS_GEAR_DOWN_DECEL, HOOPS_HANDLER_TURN_DEG, HOOPS_JERK, HOOPS_JOG_ACCEL, HOOPS_JOG_TAU, HOOPS_KICK_SEC,
+  H3A_STICK_PRESET, RELEASE_STICK_PRESET, HOOPS_CUT_SEC, HOOPS_GEAR_DOWN_DECEL, HOOPS_HANDLER_TURN_DEG, HOOPS_JERK, HOOPS_JOG_ACCEL, HOOPS_JOG_TAU, HOOPS_KICK_SEC,
   HOOPS_LOAD_SCALE, HOOPS_PLANT_DECEL, HOOPS_REVERSE_DECEL, HOOPS_REVERSE_DEG, HOOPS_SPRINT_ACCEL, HOOPS_SPRINT_TAU, HOOPS_STOP_DECEL_HIGH,
   HOOPS_STOP_DECEL_LOW, HOOPS_TURN_TRUE_ARC, HOOPS_RETREAT_SPEED_K, jerkLimit, turnToward,
 } from './HoopsStick';
@@ -39,7 +39,10 @@ describe('the defaults are release (no knob moved)', () => {
     expect(GEARS_HOOPS).toMatchObject({ jogTau: 0.17, sprintTau: 0.15, jogAccel: 15, sprintAccel: 24, loadScale: 0.45, gearDownDecel: 9, stopDecelLow: 22, stopDecelHigh: 11 });
   });
 
-  it('a session with no reversal in it is, frame for frame, what release did (start, turbo, off, 90° cut, drift, walk, stop, a 120° cross)', () => {
+  // test changed (hoops-p01): the handler's defaults are now TUNED (GEARS_HANDLER), so "no knob moved" is no longer release — the release
+  // stick is RELEASE_STICK_PRESET, one paste on the panel, and this pins that the paste really is release, frame for frame
+  it('with RELEASE_STICK_PRESET a session with no reversal in it is, frame for frame, what release did (start, turbo, off, 90° cut, drift, walk, stop, a 120° cross)', () => {
+    openPanel(RELEASE_STICK_PRESET);
     // Recorded from origin/lane/finish-release d309b459 (before this lane) with the same script: [frame, vx, vz] every 12th frame.
     const BASE: [number, number, number][] = [[5, 0, 0.9006], [17, 0, 3.259], [29, 0, 4.0351], [41, 0, 4.2601], [53, 0, 4.3254], [65, 0, 5.8821], [77, 0, 6.274], [89, 0, 6.3693], [101, 0, 6.3925], [113, 0, 5.4963], [125, 0, 4.352], [137, 0, 4.352], [149, 1.8262, 3.7005], [161, 4.2866, 0], [173, 4.3331, 0], [185, 3.6482, 2.3508], [197, 3.0689, 3.0689], [209, 2.8623, 1.9082], [221, 1.6213, 1.0809], [233, 0, 0], [245, 0, 0], [257, 0, 0], [269, 0, 0], [281, 0, 0.9006], [293, 0, 3.259], [305, 0, 4.0351], [317, 0, 4.2601], [329, 3.9715, -2.2929], [341, 3.5098, -2.0264], [353, 3.7152, -2.1449], [365, 2.3836, -1.3762], [377, 0, 0], [389, 0, 0]];
     const c120 = Math.cos((120 * Math.PI) / 180), s120 = Math.sin((120 * Math.PI) / 180);
@@ -47,6 +50,7 @@ describe('the defaults are release (no knob moved)', () => {
       : t < 3.0 ? [1, 0, false] : t < 3.4 ? [0.7, -0.7, false] : t < 3.8 ? [0.3, -0.2, false] : t < 4.6 ? [0, 0, false]
       : t < 5.4 ? [0, -1, false] : t < 6.0 ? [s120, -c120, false] : [0, 0, false];
     const tr = drive(new DribbleController(), 6.6, script);
+    resetFeelForTests(); delete g.window;
     for (const [i, vx, vz] of BASE) { expect(tr[i][0], `frame ${i} vx`).toBeCloseTo(vx, 3); expect(tr[i][1], `frame ${i} vz`).toBeCloseTo(vz, 3); }
   });
 
@@ -143,7 +147,10 @@ describe('the H3a preset (group "Hoops · movement"): #311\'s tuned stick, throu
     const stopFrom = (sprint: boolean) => { const d = new DribbleController(); drive(d, 1.5, FWD(sprint)); return ms((drive(d, 1.5, () => [0, 0, false]).findIndex(([x, z]) => Math.hypot(x, z) < 0.3) + 1) * DT); };
     return { start90, stopJog: stopFrom(false), stopSprint: stopFrom(true) };
   };
-  it('closed panel: today\'s numbers (start 450 ms, stops 233 / 400 ms)', () => {
+  // test changed (hoops-p01): the closed panel is the handler's TUNED stick now (H3a's start and stops + the first step); release is the paste
+  it('closed panel: the handler\'s numbers (start 250 ms, stops 150 / 217 ms — to under 0.3 m/s); RELEASE_STICK_PRESET: release\'s (450, 233 / 400 ms)', () => {
+    expect(measure()).toEqual({ start90: 250, stopJog: 150, stopSprint: 217 });
+    openPanel(RELEASE_STICK_PRESET);
     expect(measure()).toEqual({ start90: 450, stopJog: 233, stopSprint: 400 });
   });
   it('the preset in a playtest run: #311\'s numbers (start 267 ms, stops 150 / 233 ms), and the reversal still flips', () => {
@@ -159,9 +166,9 @@ describe('the H3a preset (group "Hoops · movement"): #311\'s tuned stick, throu
     openPanel(H3A_STICK_PRESET);
     expect(jump(drive(new DribbleController(), 4.4, script))).toBeLessThan(0.6);
   });
-  it('a ranked / paid run ignores the device\'s overrides: today\'s numbers', () => {
-    openPanel(H3A_STICK_PRESET, '?ranked=1');
-    expect(measure()).toEqual({ start90: 450, stopJog: 233, stopSprint: 400 });
+  it('a ranked / paid run ignores the device\'s overrides: the defaults\' numbers', () => {
+    openPanel(RELEASE_STICK_PRESET, '?ranked=1');   // test changed (hoops-p01): the defaults are the handler's; a release paste is ignored there too
+    expect(measure()).toEqual({ start90: 250, stopJog: 150, stopSprint: 217 });
   });
   it('the turn rate knob moves the ball handler only, never the dunk approach (#311 set 720 on the DribbleController alone)', () => {
     // a 90° stick from a jog: the travel's heading 0.1 s later (a 90° stick is no crossover: that needs a reversal of the stick)
@@ -203,7 +210,7 @@ describe('THE RETREAT CAP (owner 2026-10-24: "a real backpedal is slower than ru
     openPanel({ 'hoops.retreatSpeedK': 1 });
     expect(speed(retreat(false).tr)).toBeCloseTo(JOG, 2);
     expect(speed(retreat(true).tr)).toBeCloseTo(DEFAULT_MOVEMENT.maxSpeed, 2);
-    expect(flipSec(retreat(false).tr)).toBeCloseTo(0.217, 2);
+    expect(flipSec(retreat(false).tr)).toBeCloseTo(0.117, 2);   // test changed (hoops-p01): 0.217 → 0.117, the reversal's plant brakes through (hoops.reversePlantHold 0)
   });
   it('the dunk approach (CourtMovement with no DribbleController) never reads it', () => {
     openPanel({ 'hoops.retreatSpeedK': 0.3 });

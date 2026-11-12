@@ -25,7 +25,9 @@ import { HOOP_SCAN, spawnMeshyProp } from '../visual/meshyProps';
 import { Onlookers } from '../visual/Onlookers';
 import { heroPalmScale, VENICE_BOARDWALK_ROW, VENICE_ENV2_DIR, VENICE_HERO_PALMS, VENICE_PALM_LODS, VENICE_ROW_PALMS } from '../visual/venuePropSets';
 import { veniceSunPosition } from '../visual/veniceSurroundVisibility';
+import { RIM_HEIGHT_M } from '../core/courtDims';
 import type { AbstractMesh, Material, Scene } from '@babylonjs/core';
+import { setPbrRoughnessUniform } from '../scene/pbrUniform';   // perf-lag: the sea's shimmer without a shader re-prepare a frame
 
 const COURT = { hx: 8, hz: 14 };                 // 16 × 28 court slab (venueSpecs basketball_*)
 export const BOARDWALK = { apron: 3, grass: 5, walkW: 9, sandW: 34 };
@@ -169,15 +171,16 @@ export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode, scanS
   let t = 0;
   const obs = scene.onBeforeRenderObservable.add(() => {
     const dt = scene.getEngine().getDeltaTime() / 1000; t += dt;
-    if (!waves) { seaMat.roughness = 0.35 + Math.sin(t * 0.7) * 0.06; return; }
-    seaMat.roughness = SEA.roughness + Math.sin(t * 0.7) * 0.025;
+    // perf-lag: the same value through the uniform, not the setter (which re-prepared the sea's shader every frame: pbrUniform.ts)
+    if (!waves) { setPbrRoughnessUniform(seaMat, 0.35 + Math.sin(t * 0.7) * 0.06); return; }
+    setPbrRoughnessUniform(seaMat, SEA.roughness + Math.sin(t * 0.7) * 0.025);
     waves.uOffset = (waves.uOffset + dt * 0.011) % 1; waves.vOffset = (waves.vOffset + dt * 0.006) % 1;
   });
   holder.onDisposeObservable.add(() => { scene.onBeforeRenderObservable.remove(obs); waves?.dispose(); });
   // Owner 2026-09-05: the far baseline carries the scanned hoop as well, mirrored — the court reads as a full court
   void spawnMeshyProp(scene, 'hoop', holder, 'vb_far_hoop').then((root) => {
     if (!root) return;
-    const s = 3.05 / HOOP_SCAN.rimY; root.scaling.setAll(s); root.rotation.y = Math.PI;
+    const s = RIM_HEIGHT_M / HOOP_SCAN.rimY; root.scaling.setAll(s); root.rotation.y = Math.PI;
     root.position.set(0, 0, SCAN_S - 0.6 + HOOP_SCAN.rimZ * s);   // owner: on the south key's baseline, where the paint ends
   });
   // Pass 7 phase 4 — signage with real names: an entrance sign at the south gate, a scoreboard plate behind the far hoop,
@@ -243,7 +246,7 @@ export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode, scanS
   // biggest thing on the dunk's first download after the bus)
   const fillRail = (): void => {
     if (holder.isDisposed()) return;
-    const rail = new Onlookers(scene, Array.from({ length: 9 }, (_, i) => new Vector3(railX + (i % 2) * 0.7, 0, SCAN_N + 1.5 + i * 3.0)), '#2b3550', new Vector3(0, 0, SCAN_MID));
+    const rail = new Onlookers(scene, Array.from({ length: 9 }, (_, i) => new Vector3(railX + (i % 2) * 0.7, 0, SCAN_N + 1.5 + i * 3.0)), '#2b3550', new Vector3(0, 0, SCAN_MID), dressing ? { oneBodyPerFrame: true } : {});   // RUNUP-STALL-1 v3: the deferred (dunk) rail lands one body a frame
     const life = scene.onBeforeRenderObservable.add(() => rail.update(scene.getEngine().getDeltaTime() / 1000));
     holder.onDisposeObservable.add(() => { scene.onBeforeRenderObservable.remove(life); rail.dispose(); });
   };
@@ -502,7 +505,12 @@ export function shareFarFrondMaterial(lod1Frond: Mesh, lod2Frond: Mesh): void {
  */
 export async function mountVeniceDunkDressing(scene: Scene, holder: TransformNode): Promise<VeniceDressingHandle | null> {
   const files = [...VENICE_PALM_LODS.files, 'venice_boardwalk_kit.glb', 'venice_crowd_cards.glb'];
-  const settled = await Promise.allSettled(files.map((f) => SceneLoader.ImportMeshAsync('', VENICE_ENV2_DIR, f, scene)));
+  // DUNK-FLAGSHIP (2026-10-27): each file is HIDDEN the moment it lands. An import goes into the scene at the world origin, and the
+  // dressing waits for all five files before it places anything — so the files that arrived first stood at the origin, the
+  // boardwalk's single-sided fronts facing +Z, between the run-up camera (z 8) and the dunker at the start of the runway (z −1.2):
+  // measured on the rig, a ray from the camera to the hero hit facade_taco, facade_tattoo and the hero palm, and the first runway
+  // of the night was shot through a taco stand. They are shown again below, in the same task that places them (no frame between).
+  const settled = await Promise.allSettled(files.map((f) => SceneLoader.ImportMeshAsync('', VENICE_ENV2_DIR, f, scene).then((r) => { r.meshes[0]?.setEnabled(false); return r; })));
   const all = settled.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []));
   // one missing file drops the whole dressing (a palm without its LODs, a crowd without its row) and nothing it loaded stays
   if (all.length < files.length || holder.isDisposed() || scene.isDisposed) {
@@ -511,7 +519,7 @@ export async function mountVeniceDunkDressing(scene: Scene, holder: TransformNod
     return null;
   }
   const lods = all.slice(0, 3), [kit, crowd] = all.slice(3);
-  for (const r of all) for (const m of r.meshes) m.isPickable = false;
+  for (const r of all) { r.meshes[0]?.setEnabled(true); for (const m of r.meshes) m.isPickable = false; }   // (placed before the next frame: no await from here)
 
   // the palms
   const part = (r: (typeof lods)[number], mat: string) => r.meshes.find((m) => m.material?.name === mat) as Mesh | undefined;

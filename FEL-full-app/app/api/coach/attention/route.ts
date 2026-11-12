@@ -21,7 +21,7 @@ import { complianceAlerts, missedFactsFor, type CoachAlert } from '@/lib/coach/a
  * lib/coach/attention.ts's triage/compliance pipeline is untouched, on purpose, so this stays a pure addition with
  * no risk to its own large test suite. A client's pain check-ins never enter triage, compliance or any PRQ/readiness
  * signal (decision #4/#12): this is its OWN small, consent-gated list, read by lib/health/pain.ts's coachPainFlag —
- * without a live 'coach_view' HealthConsent grant for THIS coach, an entry says only "Client paused an exercise",
+ * without a live 'coach_view' HealthConsent grant for THIS coach, an entry says only "Athlete paused an exercise",
  * never which exercise, where, or how bad.
  *
  * MIRROR-COACH P6 (2026-09-29): `readiness` is the same kind of pure addition, and stricter. A client's daily

@@ -7,6 +7,7 @@ import { youthGateFor } from '@/lib/mirror/screenCorrectives';
 import { isHardStopped, latestIntake, needsIntake } from '@/lib/health/intake';
 import { canSaveScanNumbers, logGateFailure } from '@/lib/privacy/scanSaveGate';
 import { canWriteHealthData } from '@/lib/privacy/healthWriteGate';
+import { verifiedAdult } from '@/lib/privacy/verifiedAdult';
 import { MirrorHarness } from './_components/mirror-harness';
 import { DEFAULT_MIRROR_TAB, tabFromParam } from '@/lib/mirror/patternParam';
 import { HealthIntakeGate } from './_components/health-intake-gate';
@@ -75,7 +76,12 @@ export default async function MirrorPage(props: { searchParams?: { pattern?: str
   return (
     <div className="min-h-screen bg-[#050505] pb-20">
       <HealthIntakeGate canWriteHealth={canWriteHealth} localStatus={localStatus}>
-        <MirrorHarness youth={youthGateFor(user?.dobYear)} initialPattern={initialPattern} canSaveScan={canSaveScan} />
+        <MirrorHarness
+          youth={youthGateFor(user?.dobYear)}
+          initialPattern={initialPattern}
+          canSaveScan={canSaveScan}
+          scanSaveEligible={verifiedAdult(user?.dobYear)}
+        />
       </HealthIntakeGate>
     </div>
   );

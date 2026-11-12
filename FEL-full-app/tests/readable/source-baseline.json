@@ -1,0 +1,33 @@
+{
+ "note": "tests/readable/source-floor.test.ts: a file may not rise above its line; numbers only go down. docs/READABLE.md.",
+ "totals": {
+  "size": 0,
+  "colour": 7
+ },
+ "files": {
+  "app/coach/admin/_components/kb-admin.tsx": {
+   "colour": 1,
+   "why": "reviewed: text-fel-violet / text-fel-indigo on an ICON (lucide draws currentColor): non-text, 3:1 is its bar (1.4.11)"
+  },
+  "components/education/chapter-list.tsx": {
+   "colour": 1,
+   "why": "reviewed: text-fel-violet / text-fel-indigo on an ICON (lucide draws currentColor): non-text, 3:1 is its bar (1.4.11)"
+  },
+  "components/groups/groups-home.tsx": {
+   "colour": 1,
+   "why": "reviewed: text-fel-violet / text-fel-indigo on an ICON (lucide draws currentColor): non-text, 3:1 is its bar (1.4.11)"
+  },
+  "components/groups/teams-panel.tsx": {
+   "colour": 1,
+   "why": "reviewed: text-fel-violet / text-fel-indigo on an ICON (lucide draws currentColor): non-text, 3:1 is its bar (1.4.11)"
+  },
+  "components/profile-v2/badges-section.tsx": {
+   "colour": 2,
+   "why": "reviewed: text-fel-violet / text-fel-indigo on an ICON (lucide draws currentColor): non-text, 3:1 is its bar (1.4.11)"
+  },
+  "components/program-ask/program-builder.tsx": {
+   "colour": 1,
+   "why": "reviewed: text-fel-violet / text-fel-indigo on an ICON (lucide draws currentColor): non-text, 3:1 is its bar (1.4.11)"
+  }
+ }
+}

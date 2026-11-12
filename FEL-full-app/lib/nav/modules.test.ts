@@ -24,6 +24,10 @@ const ROOT = join(__dirname, '..', '..');
 /** Files that are reached some way other than an import, each with the reason. */
 const NOT_IMPORTED: Record<string, string> = {
   'lib/babylon/modes/registry.ts': 'the mode registry — loaded by key at runtime, not by a static import',
+  // CUE-REWRITE (2026-10-27): the style screen's corpus — every line in scope, gathered for corpus.test.ts and the audit.
+  'lib/cue-style/corpus.ts': 'test support — gathers every cue, result and library line for lib/cue-style/corpus.test.ts (the style screen) and the CUE-AUDIT counts; tests are not counted as consumers',
+  // COACH-AI-DRAFT (2026-10-24): the brief says behind a flag, off, until an AI-coach surface makes it natural; none does yet
+  'lib/coach/weeklyDraft/solo.ts': 'solo drafts (the weekly draft with safe limits, no human coach): an owner call, flagged off (COACH_SOLO_DRAFTS_ENABLED) and wired to no surface yet; tested in solo.test.ts',
   // CREATOR SOUNDTRACK phase 0 (owner, 2026-10-06, "storage = Google Cloud Storage"): the creative-card upload route was
   // this file's only caller and now signs GCS uploads (lib/soundtrack/storage.ts). Cards made before still point at S3
   // objects, and removing the AWS path is the owner's call (a file this lane did not create), so it stays, named here.
@@ -38,6 +42,7 @@ const NOT_IMPORTED: Record<string, string> = {
   // A headed-rig probe or the integrity model importing it means deleting this line.
   // lane/hoops-def-tell (owner 2026-10-23, #274 rebuilt): HOOPS-BLOCK-SET BLK-1 is the selector core, pure, landed BEFORE its mode
   // wiring (BLK-2, which waits on T-B, the contest window). Its tests and the feel panel's catalogue read it. BLK-2 deletes this line.
+  'lib/controller-link/shootoutTurns.ts': 'the phone-only shootout running order, superseded by lib/hoops/couchTurns.ts (lane/hoops-couch, #435: camera + pads + phones in one lineup); only its own test calls it — delete both in a cleanup once #435 has played on a real couch',
   'lib/babylon/core/HoopsBlocks.ts': 'BLK-1 block selector core (selectBlock / blockFoul), pure; the modes call it from BLK-2, after T-B — only its test calls it today',
   'lib/babylon/core/trainingSim.ts': 'the training scoring model — run by trainingSim.test.ts and the integrity suite\'s ceiling basis; tests are not counted as consumers',
   // BODY-PLAY-WORKS (2026-10-01): the public-repo rule for a committed pose recording. The walk lives in
@@ -115,9 +120,9 @@ const KNOWN_ORPHANS: readonly string[] = [
   // (MIRROR-COACH P1 baseline): lib/mirror/fixtures/measure.ts runs it on every landmark fixture, so it is MEASURED
   // now — but it is still not mounted in the Mirror; that is phase 4. This one is still waiting.
   'lib/kitchens/fromScreen.ts',
-  // The coach layer — written, tested, unreachable.
+  // The coach layer — written, tested, unreachable. (lib/coach-service.ts came off on 2026-10-24: COACH-AI-DRAFT's
+  // weekly drafts call its kill-switched callCoachLLM — lib/coach/weeklyDraft/server.ts aiCallerFromEnv.)
   'lib/coach-interfaces.ts',
-  'lib/coach-service.ts',
   // Engine and platform pieces. bvh.ts and recognisable.ts came off on 2026-09-21: they were never orphaned,
   // the checker just could not see the .mts scripts importing them. sourceScan.ts moved to NOT_IMPORTED.
   'lib/babylon/anim/mocapClip.ts',
@@ -131,7 +136,6 @@ const KNOWN_ORPHANS: readonly string[] = [
   'lib/competition/payoutMethods.ts',
   'lib/env.ts',
   'lib/offline-cache.ts',
-  'lib/profile/dashboard.ts',
   'lib/story/progression-gates.ts',
   'lib/stream/StreamSession.ts',
   'lib/voice/VoiceRoom.ts',

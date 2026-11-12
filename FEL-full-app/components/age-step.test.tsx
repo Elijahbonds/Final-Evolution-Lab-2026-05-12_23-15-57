@@ -48,3 +48,14 @@ describe('age step', () => {
     expect(fromFlag).not.toContain('type="email"');
   });
 });
+
+// FN-BOX-1b (2026-10-19): the month and day are asked beside the year, as plain inputs (no second pre-selected option).
+describe('age step: the full date', () => {
+  it('renders a Month and a Day input under the year, and still exactly one selected option', () => {
+    const markup = html();
+    expect(markup).toMatch(/<input[^>]*aria-label="Month"/);
+    expect(markup).toMatch(/<input[^>]*aria-label="Day"/);
+    expect((markup.match(/<option\b[^>]*\bselected\b/g) ?? [])).toHaveLength(1);
+    expect(markup).toContain('When were you born?');
+  });
+});

@@ -5,6 +5,7 @@
 // facilitated session and read the deltas), Templates (export / import / fork).
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { readToast } from '@/components/ui/fel/toast';
 import { GraduationCap, Target, ClipboardList, Copy, Loader2, Check, Lock, Play, Sparkles, BookOpen } from 'lucide-react';
 import Link from 'next/link';
 import { drillPlayHref } from '@/lib/curriculum/drillRoutes';
@@ -86,7 +87,7 @@ export function CampPaywall({ body }: { body: CampPaywallBody }) {
     <section data-testid="camp-paywall" className="rounded-xl border border-amber-300/30 bg-amber-300/[0.06] p-5">
       <p className="flex items-center gap-2 text-sm font-bold text-amber-200"><Lock className="h-4 w-4" /> {body.feature ?? 'Camp'} is part of FEL Coach</p>
       {body.message && <p className="mt-2 text-sm text-white/80">{body.message}</p>}
-      {body.free && <p className="mt-2 text-xs text-white/60">{body.free}</p>}
+      {body.free && <p className="mt-2 text-base text-white/60">{body.free}</p>}
     </section>
   );
 }
@@ -135,12 +136,12 @@ export function CampView() {
   return (
     <main className="mx-auto max-w-3xl px-4 pt-6 text-white">
       <div className="mb-5">
-        <h1 className="text-2xl font-black tracking-tight">Camp Blueprint</h1>
+        <h1 className="text-[30px] font-black tracking-tight">Camp Blueprint</h1>
         <p className="text-sm text-white/50">Mentorship, on the Neuro-Mechanic&apos;s Blueprint. {assess ? <span className={certified ? 'text-emerald-300' : 'text-white/70'}>{STATUS_LABEL[assess.status] ?? assess.status}</span> : null}</p>
       </div>
       <div className="mb-6 grid grid-cols-5 gap-1 rounded-xl border border-white/10 bg-white/[0.03] p-1">
         {tabs.map(({ key, label, icon: Icon }) => (
-          <button key={key} onClick={() => setTab(key)} className={`flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-semibold transition ${tab === key ? 'bg-cyan-400/15 text-cyan-300' : 'text-white/60 hover:text-white'}`}>
+          <button key={key} onClick={() => setTab(key)} className={`flex min-h-11 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-semibold transition ${tab === key ? 'bg-cyan-400/15 text-cyan-300' : 'text-white/60 hover:text-white'}`}>
             <Icon className="h-3.5 w-3.5" /> {label}
           </button>
         ))}
@@ -186,7 +187,7 @@ export function Certify({ state, onDone }: { state: AssessState | null; onDone: 
         toast.error(describeGate({ open: false, reason: r.error, retryAfterSec: r.retryAfterSec ?? null }) ?? r.error);
         setOpen(null); setAnswers({}); await onDone(); return;
       }
-      if (r.error === 'stale_questions') { toast.error('This assessment was updated while you had it open. Nothing was submitted; it has been reloaded.'); setOpen(null); setAnswers({}); await onDone(); return; }
+      if (r.error === 'stale_questions') { readToast.error('This assessment was updated while you had it open. Nothing was submitted; it has been reloaded.'); setOpen(null); setAnswers({}); await onDone(); return; }
       if (r.error === 'incomplete_answers') { toast.error(`${r.missing ?? 'Some'} question${r.missing === 1 ? '' : 's'} unanswered`); return; }
       if (r.error === 'concurrent_attempt') { toast.error('The server was busy and nothing was recorded; try again.'); await onDone(); return; }
       toast.error(r.error); return;
@@ -205,14 +206,14 @@ export function Certify({ state, onDone }: { state: AssessState | null; onDone: 
         <div key={m.ref} className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h3 className="text-sm font-semibold">{m.title} {m.required && <span className="ml-1 rounded bg-white/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-white/60">required</span>}</h3>
+              <h3 className="text-sm font-semibold">{m.title} {m.required && <span className="ml-1 rounded bg-white/10 px-1.5 py-0.5 text-[12px] uppercase tracking-wider text-white/60">required</span>}</h3>
               <p className="mt-1 text-xs text-white/50">{m.summary}</p>
             </div>
             {isPassed(m) ? <span className="flex items-center gap-1 text-xs text-emerald-300"><Check className="h-3.5 w-3.5" /> passed</span>
               : <button disabled={m.attempt?.open === false && open !== m.ref} onClick={() => { setOpen(open === m.ref ? null : m.ref); setAnswers({}); }} className="rounded-lg border border-cyan-400/40 bg-cyan-400/10 px-3 py-1.5 text-xs font-bold text-cyan-300 disabled:opacity-40">{open === m.ref ? 'Close' : 'Take assessment'}</button>}
           </div>
           {!isPassed(m) && m.attempt && (
-            <p className="mt-2 text-[11px] text-white/45" data-testid="assess-gate">
+            <p className="mt-2 text-[12px] text-white/50" data-testid="assess-gate">
               {describeGate(m.attempt) ?? `${m.attempt.attemptsLeft} attempt${m.attempt.attemptsLeft === 1 ? '' : 's'} left in this window.`}
             </p>
           )}
@@ -301,7 +302,7 @@ function Plans({ plans, me, certified, onChange }: { plans: Plan[]; me: string |
           </label>
           <div className="flex flex-wrap items-center gap-2">
             <button onClick={askFollowups} disabled={busy === 'followups' || !goal.trim()} className="flex items-center gap-1.5 rounded-lg border border-white/15 px-3 py-1.5 text-xs disabled:opacity-40"><Sparkles className="h-3.5 w-3.5" /> Coach follow-ups</button>
-            {followups.map((f, i) => <span key={i} className="rounded-full bg-white/[0.06] px-2.5 py-1 text-[11px] text-white/70">{f}</span>)}
+            {followups.map((f, i) => <span key={i} className="rounded-full bg-white/[0.06] px-2.5 py-1 text-[12px] text-white/70">{f}</span>)}
           </div>
           <label className="block text-xs text-white/60">The mentee says the goal back (lock only when they can)
             <input value={saidBack} onChange={(e) => setSaidBack(e.target.value)} className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white" placeholder="Their words" />
@@ -309,9 +310,9 @@ function Plans({ plans, me, certified, onChange }: { plans: Plan[]; me: string |
           <div>
             <p className="mb-1 text-xs text-white/60">Milestones</p>
             {milestones.map((m, i) => (
-              <div key={i} className="mb-1.5 flex gap-2"><input value={m.label} onChange={(e) => setMilestones((ms) => ms.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} className="flex-1 rounded-lg border border-white/10 bg-black/40 px-3 py-1.5 text-xs text-white" aria-label={`Milestone ${i + 1}`} /><span className="self-center text-[11px] text-white/40">{m.sessions.length} session{m.sessions.length > 1 ? 's' : ''}</span></div>
+              <div key={i} className="mb-1.5 flex gap-2"><input value={m.label} onChange={(e) => setMilestones((ms) => ms.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} className="flex-1 rounded-lg border border-white/10 bg-black/40 px-3 py-1.5 text-xs text-white" aria-label={`Milestone ${i + 1}`} /><span className="self-center text-[12px] text-white/50">{m.sessions.length} session{m.sessions.length > 1 ? 's' : ''}</span></div>
             ))}
-            <div className="flex gap-3"><button onClick={() => setMilestones((ms) => [...ms, { label: `Milestone ${ms.length + 1}`, sessions: [{ label: 'Session 1' }] }])} className="text-[11px] text-cyan-300">+ milestone</button><button onClick={() => setMilestones(arcMilestones())} className="text-[11px] text-cyan-300">Use the eight-week arc</button></div>
+            <div className="flex gap-3"><button onClick={() => setMilestones((ms) => [...ms, { label: `Milestone ${ms.length + 1}`, sessions: [{ label: 'Session 1' }] }])} className="text-[12px] text-cyan-300">+ milestone</button><button onClick={() => setMilestones(arcMilestones())} className="text-[12px] text-cyan-300">Use the eight-week arc</button></div>
           </div>
           <button onClick={draft} disabled={!mentee || !goal.trim() || busy === 'draft'} className="flex items-center gap-2 rounded-lg bg-cyan-400 px-4 py-2 text-xs font-black text-black disabled:opacity-40">{busy === 'draft' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Target className="h-3.5 w-3.5" />} Draft plan</button>
         </div>
@@ -324,9 +325,9 @@ function Plans({ plans, me, certified, onChange }: { plans: Plan[]; me: string |
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold">{p.goalText}</p>
-                <p className="text-[11px] text-white/50">{mine ? 'You facilitate' : 'Your plan'} · {p.status} · {p.linkedModuleKeys.join(', ') || 'no modules'}</p>
+                <p className="text-[12px] text-white/50">{mine ? 'You facilitate' : 'Your plan'} · {p.status} · {p.linkedModuleKeys.join(', ') || 'no modules'}</p>
               </div>
-              <span className={`rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider ${p.status === 'active' ? 'bg-emerald-400/15 text-emerald-300' : p.status === 'locked' ? 'bg-amber-400/15 text-amber-300' : 'bg-white/10 text-white/60'}`}>{p.status}</span>
+              <span className={`rounded-full px-2 py-0.5 text-[12px] uppercase tracking-wider ${p.status === 'active' ? 'bg-emerald-400/15 text-emerald-300' : p.status === 'locked' ? 'bg-amber-400/15 text-amber-300' : 'bg-white/10 text-white/60'}`}>{p.status}</span>
             </div>
             {mine && p.status === 'draft' && <button onClick={() => act(p.id, 'lock')} disabled={!!busy} className="mt-3 flex items-center gap-1.5 rounded-lg border border-amber-400/40 bg-amber-400/10 px-3 py-1.5 text-xs font-bold text-amber-300"><Lock className="h-3.5 w-3.5" /> Lock goal</button>}
             {mine && p.status === 'locked' && (
@@ -381,7 +382,7 @@ function SessionTab({ plans, onChange }: { plans: Plan[]; onChange: () => Promis
           {arc.output && <p className="mt-1 text-white/60"><span className="text-cyan-300">Output:</span> {arc.output}</p>}
           {arc.script.length > 0 && <ul className="mt-1.5 list-disc pl-4 text-white/70">{arc.script.map((l, i) => <li key={i}>“{l}”</li>)}</ul>}
           <p className="mt-2 text-white/80"><span className="text-cyan-300">The Bridge, this week:</span> “{bridge}”</p>
-          <button type="button" onClick={() => setNotes((n) => n.startsWith('Bridge') ? n : `Bridge, week ${week}: ${n}`)} className="mt-1.5 rounded-lg border border-white/15 px-2.5 py-1 text-[11px]">Note the mentee&apos;s answer</button>
+          <button type="button" onClick={() => setNotes((n) => n.startsWith('Bridge') ? n : `Bridge, week ${week}: ${n}`)} className="mt-1.5 rounded-lg border border-white/15 px-2.5 py-1 text-[12px]">Note the mentee&apos;s answer</button>
         </div>
         <select value={modules} onChange={(e) => setModules(e.target.value)} className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs text-white" aria-label="Lesson covered">
           {lessons.map((l) => <option key={l.ref} value={l.ref}>{l.ref} — {l.title}</option>)}
@@ -392,12 +393,12 @@ function SessionTab({ plans, onChange }: { plans: Plan[]; onChange: () => Promis
             <ul className="mt-1 list-disc pl-4 text-white/60">{lesson.keyPoints.map((k, i) => <li key={i}>{k}</li>)}</ul>
             <p className="mt-2 text-white/70"><span className="text-cyan-300">Drill:</span> {lesson.drill.text}</p>
             <Link href={drillPlayHref(lesson.drill.modeKey)} className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-cyan-400/40 bg-cyan-400/10 px-3 py-1.5 font-bold text-cyan-300"><Play className="h-3.5 w-3.5" /> Play the drill · {lesson.drill.modeKey}</Link>
-            <p className="mt-1 text-[11px] text-white/40">The game attaches itself to this plan when you record the session.</p>
+            <p className="mt-1 text-[12px] text-white/50">The game attaches itself to this plan when you record the session.</p>
           </div>
         )}
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white" placeholder="One honest note: the one thing that changed or did not" />
         <button onClick={record} disabled={busy} className="flex items-center gap-2 rounded-lg bg-cyan-400 px-4 py-2 text-xs font-black text-black disabled:opacity-40">{busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ClipboardList className="h-3.5 w-3.5" />} Record session</button>
-        <p className="text-[11px] text-white/40">The mentee&apos;s games since the last record attach automatically; PRQ and movement deltas and the resiliency log are computed on the server.</p>
+        <p className="text-[12px] text-white/50">The mentee&apos;s games since the last record attach automatically; PRQ and movement deltas and the resiliency log are computed on the server.</p>
       </div>
       {rows.map((s) => (
         <div key={s.id} className="rounded-xl border border-white/10 bg-white/[0.02] p-4 text-xs">
@@ -447,7 +448,7 @@ function Templates({ templates, plans, certified, onChange }: { templates: Templ
       {templates.map((t) => (
         <div key={t.id} className="rounded-xl border border-white/10 bg-white/[0.02] p-4 text-xs">
           <div className="flex items-start justify-between gap-3">
-            <div><p className="text-sm font-semibold text-white">{t.name} <span className="text-white/40">v{t.version}</span></p><p className="text-white/50">{t.structure?.blocks?.length ?? 0} milestone{(t.structure?.blocks?.length ?? 0) === 1 ? '' : 's'} · curriculum {t.curriculumVersion} · used {t.uses}×{t.forkedFromId ? ' · fork' : ''}</p></div>
+            <div><p className="text-sm font-semibold text-white">{t.name} <span className="text-white/50">v{t.version}</span></p><p className="text-white/50">{t.structure?.blocks?.length ?? 0} milestone{(t.structure?.blocks?.length ?? 0) === 1 ? '' : 's'} · curriculum {t.curriculumVersion} · used {t.uses}×{t.forkedFromId ? ' · fork' : ''}</p></div>
             {certified && <div className="flex gap-2"><button onClick={() => post({ action: 'fork', templateId: t.id }, 'Forked')} className="rounded-lg border border-white/15 px-2.5 py-1">Fork</button><button onClick={() => setImportFor({ templateId: t.id, email: '', goal: t.name })} className="rounded-lg border border-cyan-400/40 bg-cyan-400/10 px-2.5 py-1 text-cyan-300">Import</button></div>}
           </div>
           {importFor?.templateId === t.id && (
@@ -490,7 +491,7 @@ function Curriculum({ plans, onChange }: { plans: Plan[]; onChange: () => Promis
   return (
     <section className="space-y-5 text-sm">
       <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-        <p className="text-[11px] uppercase tracking-wider text-white/40">{PROGRAM.type}</p>
+        <p className="text-[12px] uppercase tracking-wider text-white/50">{PROGRAM.type}</p>
         <h3 className="mt-1 text-base font-semibold">The thesis — say it out loud in week 1</h3>
         {THESIS.map((t, i) => <p key={i} className="mt-2 text-white/75">{t}</p>)}
         <p className="mt-3 text-xs text-white/50">Deliverable: {PROGRAM.deliverable}. Designed for replication: {PROGRAM.replication}.</p>
@@ -498,7 +499,7 @@ function Curriculum({ plans, onChange }: { plans: Plan[]; onChange: () => Promis
       <div className="grid gap-3 sm:grid-cols-3">
         {TRACKS.map((t) => (
           <div key={t.key} className={`rounded-xl border p-4 ${t.key === 'bridge' ? 'border-cyan-400/30 bg-cyan-400/5' : 'border-white/10 bg-white/[0.02]'}`}>
-            <p className="text-[11px] uppercase tracking-wider text-white/40">{t.loop} · {t.cadence}</p>
+            <p className="text-[12px] uppercase tracking-wider text-white/50">{t.loop} · {t.cadence}</p>
             <h4 className="mt-1 font-semibold">{t.name}</h4>
             <p className="mt-1 text-xs text-white/65">{t.body}</p>
           </div>
@@ -509,7 +510,7 @@ function Curriculum({ plans, onChange }: { plans: Plan[]; onChange: () => Promis
         <div className="space-y-2">
           {ARC.map((w) => (
             <details key={w.week} className={`rounded-xl border p-4 ${w.plateau ? 'border-amber-400/40 bg-amber-400/5' : 'border-white/10 bg-white/[0.02]'}`}>
-              <summary className="cursor-pointer font-semibold">Week {w.week} — {w.name}{w.plateau ? <span className="ml-2 rounded bg-amber-400/15 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-amber-300">the most important session</span> : null}</summary>
+              <summary className="cursor-pointer font-semibold">Week {w.week} — {w.name}{w.plateau ? <span className="ml-2 rounded bg-amber-400/15 px-1.5 py-0.5 text-[12px] uppercase tracking-wider text-amber-300">the most important session</span> : null}</summary>
               {w.output && <p className="mt-2 text-xs text-white/70"><span className="text-cyan-300">Output:</span> {w.output}</p>}
               {w.body.map((b, i) => <p key={i} className="mt-2 text-xs text-white/65">{b}</p>)}
               {w.script.length > 0 && <div className="mt-2 text-xs"><p className="text-white/50">Facilitator script</p><ul className="mt-1 list-disc pl-4 text-white/75">{w.script.map((l, i) => <li key={i}>“{l}”</li>)}</ul></div>}
@@ -534,10 +535,10 @@ function Curriculum({ plans, onChange }: { plans: Plan[]; onChange: () => Promis
               <select value={visibleId} onChange={(e) => setPlanId(e.target.value)} className="rounded-lg border border-white/10 bg-black/40 px-3 py-1.5 text-xs text-white" aria-label="Plan for this worksheet">{plans.map((p) => <option key={p.id} value={p.id}>{p.goalText}</option>)}</select>
               <button type="button" onClick={saveWorksheet} disabled={busy} className="flex items-center gap-2 rounded-lg bg-cyan-400 px-3 py-1.5 text-xs font-black text-black disabled:opacity-40">{busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />} Save to the plan</button>
             </>
-          ) : <span className="text-[11px] text-white/40">No plan yet — draft one on the Plans tab to save the worksheet with it.</span>}
+          ) : <span className="text-[12px] text-white/50">No plan yet — draft one on the Plans tab to save the worksheet with it.</span>}
           <button type="button" onClick={copyWorksheet} className="flex items-center gap-2 rounded-lg border border-white/15 px-3 py-1.5 text-xs"><Copy className="h-3.5 w-3.5" /> Copy</button>
         </div>
-        {plan?.pathwayMap?.updatedAt && <p className="mt-2 text-[11px] text-white/40">Saved {new Date(plan.pathwayMap.updatedAt).toLocaleString()}</p>}
+        {plan?.pathwayMap?.updatedAt && <p className="mt-2 text-[12px] text-white/50">Saved {new Date(plan.pathwayMap.updatedAt).toLocaleString()}</p>}
       </div>
       <div className="rounded-xl border border-cyan-400/30 bg-cyan-400/5 p-4">
         <h3 className="text-base font-semibold">The Bridge — weekly transfer prompts</h3>
@@ -550,7 +551,7 @@ function Curriculum({ plans, onChange }: { plans: Plan[]; onChange: () => Promis
       </div>
       <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4"><h4 className="font-semibold">Facilitator standards</h4><ul className="mt-2 list-disc pl-4 text-xs text-white/70">{STANDARDS.map((m, i) => <li key={i} className="mt-1">{m}</li>)}</ul></div>
       <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4"><h4 className="font-semibold">Replication package</h4><ol className="mt-2 list-decimal pl-4 text-xs text-white/70">{REPLICATION.map((m, i) => <li key={i} className="mt-1">{m}</li>)}</ol><p className="mt-2 text-xs text-white/50">The lookup table of pre-built pathway maps is a growing asset, not a prerequisite. Every cycle run adds maps to it.</p></div>
-      <p className="text-[11px] text-white/40">Camp Blueprint {CAMP_BLUEPRINT_VERSION} · source: docs/CAMP-BLUEPRINT.md</p>
+      <p className="text-[12px] text-white/50">Camp Blueprint {CAMP_BLUEPRINT_VERSION} · source: docs/CAMP-BLUEPRINT.md</p>
     </section>
   );
 }

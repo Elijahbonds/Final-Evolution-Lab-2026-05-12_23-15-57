@@ -77,3 +77,22 @@ export function styleTierFor(style: 'power' | 'flashy' | 'sig', airTricks: numbe
   if (style === 'flashy' && airTricks <= 0) return tiers.power;
   return tiers[style];
 }
+
+/**
+ * RUN's pull, folded (gameplay-clean, routed from dunk-flagship P5 — DunkMode's same fix). The body's RT reaches the mode from
+ * onBody, past the bus's arbiter, while a seated pad re-sends its own trigger every frame (InputBus.pollPads): an idle pad's 0,
+ * one frame after the body's jog started the run, read as "RUN let go" and took off on the first step. The pull is the deeper of
+ * the hand's (pad, keys, touch) and the body's; with no body it is exactly the hand's. The body's run ends at the take-off.
+ */
+export class RunPull {
+  hand = 0;
+  body = 0;
+  /** An R-trigger event's value, from whichever source sent it; the pull after it. */
+  take(e: { value: number; src?: string }): number {
+    if (e.src === 'body') this.body = e.value; else this.hand = e.value;
+    return this.value;
+  }
+  get value(): number { return Math.max(this.hand, this.body); }
+  /** The take-off, or a new attempt: RUN is the hand's again. */
+  endBody(): void { this.body = 0; }
+}

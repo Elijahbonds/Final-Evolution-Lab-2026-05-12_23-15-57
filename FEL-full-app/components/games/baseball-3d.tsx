@@ -413,11 +413,11 @@ export default function Baseball3D(props: GameProps) {
           {/* scoreboard */}
           <div className="absolute top-3 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1">
             <div className="flex items-center gap-5 px-5 py-1.5 rounded-xl" style={{ background: 'rgba(5,5,8,0.75)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,229,255,0.2)' }}>
-              <span className="text-2xl font-bold text-[#00FF9D]">{hud.homers}<span className="text-[11px] text-white/50"> HR</span></span>
-              <span className="text-[11px] text-white/60 font-mono">SCORE {hud.score}</span>
-              <span className="text-2xl font-bold text-[#FF3366]">{hud.outs}<span className="text-[11px] text-white/50"> OUT</span></span>
+              <span className="text-2xl font-bold text-[#00FF9D]">{hud.homers}<span className="text-[12px] text-white/50"> HR</span></span>
+              <span className="text-[12px] text-white/60 font-mono">SCORE {hud.score}</span>
+              <span className="text-2xl font-bold text-[#FF3366]">{hud.outs}<span className="text-[12px] text-white/50"> OUT</span></span>
             </div>
-            <div className="flex gap-3 items-center px-3 py-0.5 rounded-lg font-mono text-[10px] text-white/70" style={{ background: 'rgba(5,5,8,0.8)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div className="flex gap-3 items-center px-3 py-0.5 rounded-lg font-mono text-[12px] text-white/70" style={{ background: 'rgba(5,5,8,0.8)', border: '1px solid rgba(255,255,255,0.08)' }}>
               <span>PITCH {hud.pitch.toUpperCase()}</span>
               <span>{WIN_HOMERS} HR TO WIN · {MAX_OUTS} OUTS</span>
               <span style={{ color: '#C99BF7' }}>CAM {hud.camRig.toUpperCase()}</span>
@@ -425,7 +425,7 @@ export default function Baseball3D(props: GameProps) {
           </div>
 
           {/* PRQ */}
-          <div className="absolute top-3 right-3 text-right font-mono text-[11px]" style={{ color: hud.prqColor }}>DERBY · {hud.prqLabel}</div>
+          <div className="absolute top-3 right-3 text-right font-mono text-[12px]" style={{ color: hud.prqColor }}>DERBY · {hud.prqLabel}</div>
 
           {/* Wii-Sports style timing readability bar */}
           {hud.barActive && (
@@ -438,7 +438,7 @@ export default function Baseball3D(props: GameProps) {
                 {/* moving marker */}
                 <div className="absolute inset-y-0 w-1 bg-[#FFD700]" style={{ left: `${hud.swingBar * 100}%`, transition: 'none' }} />
               </div>
-              <p className="mt-1 text-center text-[10px] font-mono text-white/60">SWING IN THE GREEN FOR A BARREL</p>
+              <p className="mt-1 text-center text-[12px] font-mono text-white/60">SWING IN THE GREEN FOR A BARREL</p>
             </div>
           )}
 

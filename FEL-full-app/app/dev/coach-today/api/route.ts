@@ -33,7 +33,8 @@ function seed(): TodayStore {
     catalogueRow({ id: 'pe-flow', coachId: COACH, name: '90/90 hip switch', category: 'mobility', pattern: 'mobility', braceMode: 'none', skillLayer: 'joints',
       primaryCues: ['Both knees stay on the floor', 'Turn from the hips, not the low back'], commonFaults: [{ fault: 'Hands pushing the floor', correctionCue: 'Hands off: let the hips do the turn' }] }),
     catalogueRow({ id: 'pe-pogo', coachId: COACH, name: 'Pogo hops', category: 'plyometric', pattern: 'locomotion', braceMode: 'reflex', skillLayer: 'jump-land',
-      demoVideoUrl: 'https://youtu.be/q1HLjLbhS2s', primaryCues: ['Stiff ankles, springy contacts', 'Heels barely leave the floor'],
+      demoVideoUrl: null,   // COACH-DELIVERY COA-09: no YouTube demo in the dev harness either (own storage only)
+      primaryCues: ['Stiff ankles, springy contacts', 'Heels barely leave the floor'],
       commonFaults: [{ fault: 'Long ground contacts', correctionCue: 'Off the floor as fast as it touches' }, { fault: 'Heels sink at contact', correctionCue: 'Stay on the balls of the feet' }] }),
     catalogueRow({ id: 'pe-box', coachId: COACH, name: 'Box squat', category: 'lower-body', pattern: 'squat', braceMode: 'set' }),
     catalogueRow({ id: 'pe-goblet', coachId: COACH, name: 'Goblet squat', category: 'lower-body', pattern: 'squat', braceMode: 'set', skillLayer: 'strength', equipment: ['kettlebell'],

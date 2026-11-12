@@ -4,6 +4,7 @@
  */
 
 import Stripe from 'stripe';
+import { coachProPriceCents } from './coach-business/config';
 
 let _stripe: Stripe | null = null;
 
@@ -48,7 +49,9 @@ export const STRIPE_PRODUCTS = {
   FEL_COACH: {
     name: 'FEL Coach',
     description: 'Run mentees, plans, assessments and session logging as a credentialed facilitator.',
-    priceUsd: 3900,                 // $39/month, one facilitator
+    // One price for FEL Coach / Coach Pro wherever it is charged or shown: COACH_PRO_PRICE_USD_CENTS, default $39/month
+    // (owner, 2026-10-25). Read on each use, so the env drives /api/stripe/checkout, the upgrade and the paywall alike.
+    get priceUsd(): number { return coachProPriceCents(); },
     interval: 'month' as const,
     product: 'FEL_COACH' as const,
   },

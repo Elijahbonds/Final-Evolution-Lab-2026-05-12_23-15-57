@@ -1,8 +1,12 @@
-import { describe, expect, it } from 'vitest';
-import { createElement } from 'react';
+import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+// TEST CHANGED (screen-fixes, 2026-11-10): /modes reads the session on the server now (its sign-in hints are in the first
+// draw, not after it), so the page is async: the session is stubbed (a signed-out visitor) and the page awaited. The
+// assertions are unchanged.
+vi.mock('next-auth', () => ({ getServerSession: vi.fn(async () => null) }));
+vi.mock('@/lib/auth', () => ({ authOptions: {} }));
 import ModesPage from '@/app/modes/page';
 import { MODE_INFO } from './game-data';
 import {
@@ -52,6 +56,12 @@ describe('mode menu contract', () => {
     }
   });
 
+  it('story mode copy matches the linked map flow, not the parked standalone boss route', () => {
+    const desc = modeMenuMetaFor('storyMode').desc;
+    expect(desc).toMatch(/clear zone bosses/i);
+    expect(desc).not.toMatch(/Glitch Boss/i);
+  });
+
   it('only hides keys that exist in MODE_INFO', () => {
     const unknownHiddenKeys = [...HIDDEN_FROM_MODE_MENU].filter((key) => !(key in MODE_INFO));
     expect(unknownHiddenKeys).toEqual([]);
@@ -68,8 +78,8 @@ describe('mode menu contract', () => {
     }
   });
 
-  it('/modes is a real all-modes index, not a redirect back to Play', () => {
-    const html = renderToStaticMarkup(createElement(ModesPage));
+  it('/modes is a real all-modes index, not a redirect back to Play', async () => {
+    const html = renderToStaticMarkup(await ModesPage());
     expect(html).toContain('All live modes');
     expect(html).toContain('Brain Brawl');
     expect(html).toContain('Tiebreak Blitz');

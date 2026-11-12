@@ -74,6 +74,7 @@ import {
   GameTimers, kickLanding, positionedCatch, kickMoveStep, KICK_LAND, rampTier, coinLayout, contextPrompts, truckReady01, hopY,
   medalFor, parLine, bestDriveIndex, loadFootballBest, saveFootballBestIfHigher, hudChanges, FB_HUD_HZ,
 } from './footballRushRules';
+import { applyInertialBlend } from '../anim/inertialize';   // GAMEPLAY-CLEAN P2 #2
 
 let rushVenue: VenueHandle | null = null;   // ship pass 4: the mounted venue spec, disposed with the mode
 let studio: StudioExtras | null = null;   // NEXUS STUDIO: a dev-only ?venue='s extras (null without one)
@@ -436,7 +437,7 @@ export const FootballRushMode: ModeDefinition = (() => {
   /** BIOMECH-WAVE2: one read of the play, two consumers — the tree picks the clip, the Posture Poses layer picks the
    *  body under it. Called once per frame in EVERY phase (the pre-snap read included, which is where the runner used
    *  to jog on the spot). */
-  function drive3D(speed01: number, trucking: boolean, kickRun = false): void {
+  function drive3D(speed01: number, trucking: boolean, kickRun = false, speedMps?: number, dtSec?: number): void {
     const t = performance.now();
     if (move && t > moveUntil) { move = null; dodging = false; }   // a move the tree never settled (safety)
     const celebrating = t < celebrateUntil;
@@ -450,6 +451,7 @@ export const FootballRushMode: ModeDefinition = (() => {
       runningRoute: false, carrying: !set && !downed && speed01 > 0.15,
       move, moveClip: move ? moveClip : undefined, catching: 'none',
       beingTackled: downed, blocking: false, rushing: false, celebrating,
+      speedMps, dtSec,   // GAMEPLAY-CLEAN P2 #6: the carry loop's stride paces to the carrier (footballTree)
     };
     animTree?.update(input);
   }
@@ -799,6 +801,7 @@ export const FootballRushMode: ModeDefinition = (() => {
       ctx.groundLock?.track(runner.root, runner.skeleton);
       ctx.heroRef.current = runner.root;
       animTree = new FootballAnimTree(runner.animator);
+      applyInertialBlend(runner.animator, 'football');   // GAMEPLAY-CLEAN-7: on by default on the runner (anim.inertialFootballOn; 0 = linear, as before)   // GAMEPLAY-CLEAN P2 #2: AF-1 inertial transitions behind anim.inertial (default off: linear, unchanged)
       animTree.onSettle = (st) => { if (st === 'juke' || st === 'spin' || st === 'stiff_arm') { move = null; dodging = false; } };
       posture?.dispose();
       posture = mountPostureLayer(ctx.scene, runner.skeleton, runner.root, () => {
@@ -980,13 +983,13 @@ export const FootballRushMode: ModeDefinition = (() => {
         // IMPROVE (2026-10-06) #2: while the kick hangs the returner MOVES — he has to get under where it comes down (the
         // ring marks it). A rate toward the stick's velocity; the snap's forward push still waits for the catch.
         const kickUp = !!kick && !kick.caught;
-        let speed01 = 0;
+        let speed01 = 0, speedMps = 0;
         if (kickUp) {
           run = kickMoveStep(run, stickX, stickY, dt);
           const p = runner.root.position;
           p.x = Math.max(-FIELD_HALF_X, Math.min(FIELD_HALF_X, p.x + run.vx * dt));
           p.z = Math.max(-3, Math.min(KICK_LAND.zMax + 1, p.z + run.vz * dt));   // never up into the front (its first man stands 6 m off)
-          const sp = Math.hypot(run.vx, run.vz); speed01 = Math.min(1, sp / 8);
+          const sp = Math.hypot(run.vx, run.vz); speed01 = Math.min(1, sp / 8); speedMps = sp;
           if (sp > 0.5) runner.root.rotation.y = stepYaw(runner.root.rotation.y, Math.atan2(run.vx, run.vz), dt, TURN_RATE);
         }
         if (kickUp) tickKick(ctx, dt);
@@ -994,7 +997,7 @@ export const FootballRushMode: ModeDefinition = (() => {
         refreshReads();
         tickBlockers(ctx, dt, true);
         findNearest();
-        drive3D(speed01, false, kickUp);   // the tree runs every phase: SET at the line is a window, not the absence of one
+        drive3D(speed01, false, kickUp, speedMps, dt);   // the tree runs every phase: SET at the line is a window, not the absence of one
         weather.update(dt); weatherFx?.update(dt);
         if (preSnap) { run.vx = 0; run.vz = 0; }   // still SET (the catch snaps it, and sets the run itself)
         lineArrow?.show(false);
@@ -1182,7 +1185,7 @@ export const FootballRushMode: ModeDefinition = (() => {
         timers.later(clock, TD_HOLD_SEC, () => { if (ended) return; drive = next; newDrive(ctx, `TOUCHDOWN! · DRIVE ${next}/${DRIVES}`); }, 'drive');
       }
 
-      drive3D(Math.min(1, vel.length() / 8), trucking);
+      drive3D(Math.min(1, vel.length() / 8), trucking, false, vel.length(), dt);
       ctx.camDirector.look(lookX, lookY, dt);
       ctx.camDirector.update(runner.root.position, vel, null);
     },

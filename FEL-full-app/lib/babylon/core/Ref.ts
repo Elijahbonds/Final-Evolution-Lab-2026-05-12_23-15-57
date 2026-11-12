@@ -25,6 +25,7 @@ export type RuleId =
   | 'and_one'
   | 'loose_ball_foul'
   | 'reach_in'
+  | 'hand_check'
   | 'three_seconds'
   | 'shot_clock'
   | 'goaltending'
@@ -133,6 +134,17 @@ export const HANDBOOK: readonly RuleEntry[] = [
     shots: 0,
     whistle: true,
     says: 'A defender who reaches through the handler rather than at the ball. The handler keeps it.',
+  },
+  {
+    // lane/hoops-round2 HOP-04 (owner 2026-10-20: "hand-checks (too many = foul)"): counted in hoops/handCheck
+    id: 'hand_check',
+    call: 'HAND-CHECK',
+    award: 'offense',
+    deadBall: true,
+    shots: 0,
+    whistle: true,
+    says: 'A forearm on the handler\'s hip is defence; putting it back on him again and again is not. Too many hand-checks in a '
+      + 'few seconds and the handler keeps the ball.',
   },
   {
     id: 'three_seconds',
@@ -279,6 +291,15 @@ export function isGoaltending(ballVelY: number, ballY: number, rimY: number): bo
   return ballVelY < -0.2 && ballY > rimY;
 }
 
+/**
+ * GOALTENDING NEEDS A TOUCH (owner 2026-10-20, HOOPS DEFENSE; 1v1 / 3v3 ten-phase pass, phase 2). The modes called it on "I am off the
+ * floor near the rim while their ball falls above the ring" — a jump that never came near the ball was goaltending. Now the call also
+ * needs `touched`: the defender's hand on the ball that frame (hoops/blocks handOnBall). The rule's own read is unchanged.
+ */
+export function isGoaltendTouch(touched: boolean, ballVelY: number, ballY: number, rimY: number): boolean {
+  return touched && isGoaltending(ballVelY, ballY, rimY);
+}
+
 /** Seconds an offensive body may stand in the paint before the ref calls it. */
 export const THREE_SECOND_LIMIT = 3;
 
@@ -324,20 +345,17 @@ export function possessionAfterScore(format: ScoringFormat, scorer: Side): Side 
 }
 
 /**
- * Free throws are NOT implemented in this build, in either mode.
+ * Free throws ARE implemented (lane/hoops-shot-content, owner 2026-10-20), in 1v1 and 3v3.
  *
- * The handbook carries `shots` because a rulebook should say what a foul is worth, and `judge()` returns
- * it — but nothing has ever read it. Both modes play a pickup format (first to 11 / first to 21,
- * make-it-take-it or alternating) where a foul is answered with the ball rather than with free throws, so
- * that is what they do: an and-one keeps the basket and the possession, a foul on a miss hands the ball
- * back. That is correct for the format and it is the reason nobody noticed `shots` going unread.
- *
- * This flag exists so the gap is stated rather than implied. A mode that starts honouring `Call.shots`
- * should flip it, and the test that pins this should be updated in the same commit.
+ * Until then both modes answered a shooting foul with the ball alone and `Call.shots` was read by nobody. Now a foul on the hero's
+ * shot sends him to the line: `core/FreeThrows.freeThrowsFor` turns this call into the trip (two shots, three on a fouled three,
+ * one on an and-one), `core/FreeThrowLine` runs it as a dead ball, and after the last shot the ball goes where `judge()` already
+ * sent it — the fouled team. `foulAward` below says 'shots' for a shooting foul and an and-one; every other foul is still the ball.
+ * (Was `false` with the test pinning it; flipped with that test in the same commit, as this comment asked.)
  */
-export const FREE_THROWS_IMPLEMENTED = false;
+export const FREE_THROWS_IMPLEMENTED = true;
 
-/** What a foul is actually worth today: possession, not shots. */
+/** What a foul is actually worth today: shots for a shooting foul / an and-one (then the ball), the ball for everything else. */
 export function foulAward(call: Call): 'ball_back' | 'shots' {
   return FREE_THROWS_IMPLEMENTED && call.shots > 0 ? 'shots' : 'ball_back';
 }

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
+import { readToast } from '@/components/ui/fel/toast';
 import { CalendarDays, Loader2, Users, Lock, Check, Sparkles, Dumbbell } from 'lucide-react';
 import { newIdempotencyKey } from '@/lib/wallet/client';
 import { ELIJAH_COACH_STORE_HREF } from '@/lib/creator/coachStoreHrefs';
@@ -42,7 +43,7 @@ export function BookButton({ price, balance, isBooked, busy, color, textColor, o
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : isBooked ? <><Check className="h-4 w-4" /> Booked</> : short > 0 ? <>Need {short} more shard{short === 1 ? '' : 's'}</> : <><Sparkles className="h-4 w-4" /> Book · {price} shards</>}
       </button>
       {!isBooked && short > 0 && (
-        <a href="/wallet" className="mt-1.5 block text-center text-[11px] text-cyan-300 underline">How to earn shards</a>
+        <a href="/wallet" className="mt-1 flex min-h-11 items-center justify-center text-[12px] text-cyan-300 underline">How to earn shards</a>
       )}
     </>
   );
@@ -104,7 +105,7 @@ export function SessionsView() {
       });
       const j = await res.json();
       if (res.status === 403 && j?.error === 'minors_cannot_book_private') { toast.error('Private 1-on-1 sessions are for members 18+.'); return; }
-      if (res.status === 409 && j?.needShards) { toast.error('Not enough shards. Earn by playing or exchange coins in the Wallet.'); return; }
+      if (res.status === 409 && j?.needShards) { readToast.error('Not enough shards. Earn by playing or exchange coins in the Wallet.'); return; }
       if (res.status === 409) { toast.error(BOOKING_REFUSED[j?.error] ?? 'Session unavailable.'); await load(); return; }
       if (!res.ok) throw new Error(j?.error || 'booking failed');
       toast.success(BOOKED_TOAST);
@@ -132,7 +133,8 @@ export function SessionsView() {
   );
 
   if (loading) {
-    return <div className="flex min-h-[60vh] items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-cyan-400" /></div>;
+    // EVERY-SCREEN P5: the spinner says what it waits for (the rig, under load: "a spinner with no words")
+    return <div role="status" className="flex min-h-[60vh] items-center justify-center gap-2 text-[16px] text-white/60"><Loader2 className="h-6 w-6 animate-spin text-cyan-400" aria-hidden />Loading sessions…</div>;
   }
 
   return (
@@ -183,7 +185,7 @@ export function SessionsView() {
             return (
               <motion.div key={s.sessionKey} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
                 <div className="flex items-center gap-2 text-sm font-bold text-white"><Dumbbell className="h-4 w-4 text-red-400" /> {s.label}</div>
-                <div className="text-xs text-white/40">Hosted by {s.host} · up to {s.capacity} athletes</div>
+                <div className="text-xs text-white/50">Hosted by {s.host} · up to {s.capacity} athletes</div>
                 {shareBox(s.sessionKey)}
                 <BookButton price={s.shards} balance={shards} isBooked={isBooked} busy={booking === s.sessionKey} color="#00E5FF" textColor="#050505" onBook={() => book('group_workout', s.sessionKey)} />
               </motion.div>
@@ -207,7 +209,7 @@ export function SessionsView() {
               return (
                 <motion.div key={s.sessionKey} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl border border-purple-400/20 bg-purple-400/[0.05] p-4">
                   <div className="text-sm font-bold text-white">{s.label}</div>
-                  <div className="text-xs text-white/40">Direct session with Elijah Bonds</div>
+                  <div className="text-xs text-white/50">Direct session with Elijah Bonds</div>
                   {shareBox(s.sessionKey)}
                   <BookButton price={s.shards} balance={shards} isBooked={isBooked} busy={booking === s.sessionKey} color="#A855F7" textColor="#fff" onBook={() => book('private_1on1', s.sessionKey)} />
                 </motion.div>

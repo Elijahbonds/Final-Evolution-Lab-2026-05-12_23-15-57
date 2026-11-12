@@ -240,8 +240,9 @@ describe('STATIC: page.tsx', () => {
     expect(code).toContain("from '@/lib/privacy/healthWriteGate'");
     expect(code).not.toMatch(/thisYear|getFullYear|dobYear\s*[<>]/);
   });
-  it('the intake screen is handed canWriteHealth, the Mirror canSaveScan', () => {
+  it('the intake screen is handed canWriteHealth, the Mirror canSaveScan and adult opt-in eligibility', () => {
     expect(code).toContain('<HealthIntakeGate canWriteHealth={canWriteHealth} localStatus={localStatus}>');
-    expect(code).toContain('canSaveScan={canSaveScan} />');
+    expect(code).toContain('canSaveScan={canSaveScan}');
+    expect(code).toContain('scanSaveEligible={verifiedAdult(user?.dobYear)}');
   });
 });

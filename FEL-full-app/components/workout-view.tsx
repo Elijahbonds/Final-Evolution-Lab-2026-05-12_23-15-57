@@ -1,9 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { lineSize } from '@/lib/design/type';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
+import { readToast } from '@/components/ui/fel/toast';
 import { Activity, Sparkles, ShieldCheck, Trash2, ChevronRight, Info, Gift } from 'lucide-react';
 import { PILLAR_LABELS, analyzeMovement, defaultMetrics, type Pillar } from '@/lib/workout/movement-screen';
 import { buildAvatarSpec } from '@/lib/workout/avatar-builder';
@@ -50,6 +52,9 @@ export const DEMO_CONSENT =
 // to /api/v1/workout/scan, which stored them as a real WorkoutScan, and playerIdentity reads the newest scan's
 // avatarSpec as a measured body. A real movement screen is the Mirror's, which measures with the camera.
 // MIRROR-COACH P8 (2026-09-29): and it has nothing to do with a plan — a plan is picked by the answers above it.
+/** The equipment line's lead (EVERY-SCREEN P5: kept out of className, where the Tailwind scan read "need:" as a class). */
+const NEED = 'You need:';
+
 export function demoScan(): { analysis: Analysis; avatarSpec: AvatarSpec } {
   const m = defaultMetrics();
   return { analysis: analyzeMovement(m), avatarSpec: buildAvatarSpec(m) };
@@ -130,7 +135,7 @@ export function WorkoutView({ initialData = null }: { initialData?: PageData | n
       void load();
       return;
     }
-    if (!res) { toast.error('No answer from the server. Press it again: it finishes this same purchase.'); return; }
+    if (!res) { readToast.error('No answer from the server. Press it again: it finishes this same purchase.'); return; }
     if (j?.error === 'plan_not_saved') { toast.error(String(j.message ?? 'The plan did not save. Press it again.')); return; }
     delete pendingKey.current[p.tier];
     if (j?.error === 'insufficient_funds') toast.error(`Not enough shards: the ${p.name} is ${p.price} shards.`);
@@ -143,7 +148,7 @@ export function WorkoutView({ initialData = null }: { initialData?: PageData | n
     if (!consent || !ageOk) { toast.error('Please tick both boxes first.'); return; }
     const d = demoScan();   // nothing is posted: a demo is not a measurement
     setAnalysis(d.analysis); setSpec(d.avatarSpec);
-    toast.message('Demo scan: sample numbers, not a measurement of you. Nothing was saved.');
+    readToast.message('Demo scan: sample numbers, not a measurement of you. Nothing was saved.');
   };
 
   // The route deletes EVERY saved WorkoutScan and WorkoutPlan of this account: the Mirror's dunk history and movement
@@ -173,8 +178,8 @@ export function WorkoutView({ initialData = null }: { initialData?: PageData | n
         <Activity className="h-6 w-6 text-[#00E5FF]" />
         <h1 className="text-2xl font-bold text-white">Training plans</h1>
       </div>
-      <p className="text-white/60 text-sm mb-2">{WORKOUT_INTRO}</p>
-      <p className="text-white/40 text-xs mb-5">{WAVE_LINE}</p>
+      <p className={`text-white/60 ${lineSize(WORKOUT_INTRO)} mb-2`}>{WORKOUT_INTRO}</p>
+      <p className={`text-white/50 ${lineSize(WAVE_LINE, 'text-xs')} mb-5`}>{WAVE_LINE}</p>
 
       {/* MIRROR-COACH P8: the relaunch. The answers pick a FEL template; the server picks again with the account's age. */}
       <section aria-label="Pick your plan" className="rounded-xl border border-white/10 bg-white/[0.03] p-4 mb-4 space-y-3">
@@ -184,14 +189,14 @@ export function WorkoutView({ initialData = null }: { initialData?: PageData | n
             {offer?.ageHref && <Link href={offer.ageHref} className="text-[#00E5FF] underline-offset-2 hover:underline">Open your health answers</Link>}
           </p>
         )}
-        {offer && !ageNeeded && youth && <p className="text-xs text-[#FFD700]/90">{WORKOUT_YOUTH_LINE}</p>}
-        {offer && !ageNeeded && !youth && <p className="text-xs text-white/50">{WORKOUT_JUMP_LINE}</p>}
+        {offer && !ageNeeded && youth && <p className={`${lineSize(WORKOUT_YOUTH_LINE, 'text-xs')} text-[#FFD700]/90`}>{WORKOUT_YOUTH_LINE}</p>}
+        {offer && !ageNeeded && !youth && <p className={`${lineSize(WORKOUT_JUMP_LINE, 'text-xs')} text-white/50`}>{WORKOUT_JUMP_LINE}</p>}
         {!ageNeeded && <>
         <fieldset className="flex flex-wrap items-center gap-2">
           <legend className="mb-1 text-xs font-semibold text-white/70">Days a week you train</legend>
           {dayChoices.map((d) => (
             <button key={d} type="button" aria-pressed={days === d} onClick={() => setAnswers((a) => ({ ...a, daysPerWeek: d as WorkoutAnswers['daysPerWeek'] }))}
-              className={`rounded-lg border px-3 py-1.5 text-sm ${days === d ? 'border-[#00E5FF] text-[#00E5FF]' : 'border-white/15 text-white/70'}`}>{d} days</button>
+              className={`min-h-11 rounded-lg border px-3 py-1.5 text-sm ${days === d ? 'border-[#00E5FF] text-[#00E5FF]' : 'border-white/15 text-white/70'}`}>{d} days</button>
           ))}
         </fieldset>
         {!youth && (
@@ -199,7 +204,7 @@ export function WorkoutView({ initialData = null }: { initialData?: PageData | n
             <legend className="mb-1 text-xs font-semibold text-white/70">Equipment</legend>
             {(['bodyweight', 'gym'] as const).map((e) => (
               <button key={e} type="button" aria-pressed={answers.equipment === e} onClick={() => setAnswers((a) => ({ ...a, equipment: e }))}
-                className={`rounded-lg border px-3 py-1.5 text-sm ${answers.equipment === e ? 'border-[#00E5FF] text-[#00E5FF]' : 'border-white/15 text-white/70'}`}>{e === 'gym' ? 'Full gym' : 'Bodyweight (home)'}</button>
+                className={`min-h-11 rounded-lg border px-3 py-1.5 text-sm ${answers.equipment === e ? 'border-[#00E5FF] text-[#00E5FF]' : 'border-white/15 text-white/70'}`}>{e === 'gym' ? 'Full gym' : 'Bodyweight (home)'}</button>
             ))}
           </fieldset>
         )}
@@ -207,9 +212,9 @@ export function WorkoutView({ initialData = null }: { initialData?: PageData | n
         {preview && (
           <div className="rounded-lg border border-white/10 p-3" data-template={preview.id}>
             <p className="text-sm font-semibold text-white">Your template: {preview.name}</p>
-            <p className="text-xs text-white/60">{preview.summary}</p>
-            <p className="mt-1 text-[11px] text-white/40">{templateShapeLine(preview)} · You need: {preview.equipmentLine}</p>
-            {preview.dailyTargetMinutes ? <p className="mt-1 text-[11px] text-white/40">{dailyTargetLine(preview.dailyTargetMinutes)}</p> : null}
+            <p className={`${lineSize(preview.summary, 'text-xs')} text-white/60`}>{preview.summary}</p>
+            <p className={`mt-1 ${lineSize([templateShapeLine(preview), NEED, preview.equipmentLine].join(' '), 'text-[12px]')} text-white/50`}>{templateShapeLine(preview)} · {NEED} {preview.equipmentLine}</p>
+            {preview.dailyTargetMinutes ? <p className="mt-1 text-[12px] text-white/50">{dailyTargetLine(preview.dailyTargetMinutes)}</p> : null}
           </div>
         )}
         {/* MIRROR-COACH P8 FIX: the line that matches what could not be read (it always blamed the past purchases) */}
@@ -221,32 +226,32 @@ export function WorkoutView({ initialData = null }: { initialData?: PageData | n
             {offer.products.filter((p) => p.onSale).map((p) => (
               <div key={p.tier} className="rounded-lg border border-white/10 p-3 flex flex-col gap-1" data-product={p.tier}>
                 <p className="text-sm font-semibold text-white">{p.name}</p>
-                <p className="text-[11px] text-white/50">{p.line}</p>
+                <p className={`${lineSize(p.line, 'text-[12px]')} text-white/50`}>{p.line}</p>
                 {p.unfinished
-                  ? <p className="text-[11px] text-[#FFD700]" data-unfinished>{unfinishedLine(p.name)}</p>
+                  ? <p className="text-[12px] text-[#FFD700]" data-unfinished>{unfinishedLine(p.name)}</p>
                   : p.free
-                    ? <p className="text-[11px] text-[#00FF9D] flex items-center gap-1"><Gift className="h-3 w-3" />{WORKOUT_FREE_LINE}</p>
-                    : <p className="text-[11px] text-white/70">{p.price} shards</p>}
+                    ? <p className="text-[12px] text-[#00FF9D] flex items-center gap-1"><Gift className="h-3 w-3" />{WORKOUT_FREE_LINE}</p>
+                    : <p className="text-[12px] text-white/70">{p.price} shards</p>}
                 <button type="button" onClick={() => void buy(p)} disabled={busy !== null}
-                  className="mt-1 rounded-lg bg-[#00E5FF] py-2 text-sm font-semibold text-black disabled:opacity-50">
+                  className="mt-1 min-h-11 rounded-lg bg-[#00E5FF] py-2 text-sm font-semibold text-black disabled:opacity-50">
                   {busy === p.tier ? 'Working…' : p.unfinished ? `Get your ${p.name}` : p.free ? `Get the ${p.name} free` : `Buy for ${p.price} shards`}
                 </button>
               </div>
             ))}
           </div>
         )}
-        <p className="text-[10px] text-white/30">A plan is a list of sessions to follow at your own pace. Not medical advice.</p>
+        <p className="text-[16px] text-white/50">A plan is a list of sessions to follow at your own pace. Not medical advice.</p>
       </section>
 
       <SavedPlans saved={data === null ? null : data === 'error' ? 'error' : data.plans} />
 
-      <p className="text-white/40 text-xs mb-2">A real movement screen is measured in <Link href="/play/mirror" className="text-[#00E5FF] hover:underline">the Mirror</Link>. The demo below uses sample numbers and does not change your plan.</p>
+      <p className="text-white/50 text-[16px] mb-2">A real movement screen is measured in <Link href="/play/mirror" className="text-[#00E5FF] hover:underline">the Mirror</Link>. The demo below uses sample numbers and does not change your plan.</p>
 
       {/* The demo scan: sample numbers, worked out on this page */}
       <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 mb-4 space-y-2">
         <label className="flex items-start gap-2 text-sm text-white/80">
           <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-1 accent-[#00E5FF]" />
-          <span>{DEMO_CONSENT} <span className="text-white/40">Not medical advice.</span></span>
+          <span>{DEMO_CONSENT} <span className="text-white/50">Not medical advice.</span></span>
         </label>
         <label className="flex items-center gap-2 text-sm text-white/80">
           <input type="checkbox" checked={ageOk} onChange={(e) => setAgeOk(e.target.checked)} className="accent-[#00E5FF]" />
@@ -270,10 +275,10 @@ export function WorkoutView({ initialData = null }: { initialData?: PageData | n
           <div className="rounded-xl border border-white/10 bg-gradient-to-b from-white/[0.05] to-transparent p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-white font-semibold">Sample Mini-Avatar</h3>
-              <span className="text-[9px] uppercase tracking-wide bg-white/10 text-white/60 px-2 py-0.5 rounded-full">Sample</span>
+              <span className="text-[12px] uppercase tracking-wide bg-white/10 text-white/60 px-2 py-0.5 rounded-full">Sample</span>
             </div>
             <MiniAvatar spec={spec} />
-            <p className="text-center text-white/40 text-xs mt-2 capitalize">{spec.stance} build</p>
+            <p className="text-center text-white/50 text-xs mt-2 capitalize">{spec.stance} build</p>
           </div>
           {/* Pillars */}
           <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
@@ -284,20 +289,20 @@ export function WorkoutView({ initialData = null }: { initialData?: PageData | n
             <div className="space-y-2">
               {(Object.keys(analysis.pillars) as Pillar[]).map((p) => (
                 <div key={p}>
-                  <div className="flex justify-between text-[11px] text-white/60"><span className={p === analysis.weakest ? 'text-[#FF3366]' : ''}>{PILLAR_LABELS[p]}</span><span>{Math.round(analysis.pillars[p])}</span></div>
+                  <div className="flex justify-between text-[12px] text-white/60"><span className={p === analysis.weakest ? 'text-[#FF3366]' : ''}>{PILLAR_LABELS[p]}</span><span>{Math.round(analysis.pillars[p])}</span></div>
                   <div className="h-1.5 rounded-full bg-white/10 overflow-hidden"><div className="h-full rounded-full" style={{ width: `${analysis.pillars[p]}%`, background: p === analysis.weakest ? '#FF3366' : '#00E5FF' }} /></div>
                 </div>
               ))}
             </div>
             <ul className="mt-3 space-y-1">
-              {analysis.flags.map((f, i) => <li key={i} className="text-[11px] text-white/50 flex gap-1"><ShieldCheck className="h-3 w-3 text-[#00FF9D] shrink-0 mt-0.5" />{f}</li>)}
+              {analysis.flags.map((f, i) => <li key={i} className="text-[12px] text-white/50 flex gap-1"><ShieldCheck className="h-3 w-3 text-[#00FF9D] shrink-0 mt-0.5" />{f}</li>)}
             </ul>
           </div>
         </motion.div>
       )}
 
       {(analysis || plans.length > 0) && (
-        <button onClick={deleteScans} disabled={busy === 'delete'} className="mt-5 flex items-center gap-1.5 text-xs text-white/40 hover:text-[#FF3366]">
+        <button onClick={deleteScans} disabled={busy === 'delete'} className="mt-5 flex items-center gap-1.5 text-xs text-white/50 hover:text-[#FF3366]">
           <Trash2 className="h-3.5 w-3.5" /> Delete all my saved scans and plans
         </button>
       )}
@@ -309,7 +314,7 @@ export function WorkoutView({ initialData = null }: { initialData?: PageData | n
 export function SavedPlans({ saved }: { saved: SavedPlan[] | null | 'error' }) {
   if (saved === null) return null;
   if (saved === 'error') {
-    return <p className="mb-4 text-xs text-white/40">Your saved plans could not be loaded just now. Reload the page to try again.</p>;
+    return <p className="mb-4 text-xs text-white/50">Your saved plans could not be loaded just now. Reload the page to try again.</p>;
   }
   if (!saved.length) return null;
   return (
@@ -350,21 +355,21 @@ function TemplatePlanViewer({ plan }: { plan: Extract<SavedPlan, { kind: 'templa
       <div className="flex flex-wrap items-center gap-2 mb-1">
         <Sparkles className="h-4 w-4 text-[#FFD700]" />
         <h3 className="text-white font-semibold">{product?.name ?? 'Plan'} · {plan.template?.name ?? plan.focus}</h3>
-        {plan.free && <span className="text-[10px] rounded-full bg-[#00FF9D]/10 px-2 py-0.5 text-[#00FF9D]">Free: you bought a plan here before</span>}
+        {plan.free && <span className="text-[12px] rounded-full bg-[#00FF9D]/10 px-2 py-0.5 text-[#00FF9D]">Free: you bought a plan here before</span>}
       </div>
       {plan.template && <p className="mb-1 text-xs text-white/50">{plan.template.summary}</p>}
-      {plan.template?.dailyTargetLine && <p className="mb-2 text-[11px] text-white/40">{plan.template.dailyTargetLine}</p>}
+      {plan.template?.dailyTargetLine && <p className="mb-2 text-[12px] text-white/50">{plan.template.dailyTargetLine}</p>}
       <div className="space-y-3 max-h-[520px] overflow-y-auto pr-1">
         {plan.weeks.map((wk) => {
           const week = fullWeek(wk.sessions);
           const session = (s: (typeof wk.sessions)[number], i: number) => (
             <div key={i} className="mb-2">
-              <div className="text-white/70 text-[11px] font-semibold">{s.day} — {s.label}</div>
+              <div className="text-white/70 text-[12px] font-semibold">{s.day} — {s.label}</div>
               {s.items.map((it) => (
-                <div key={it.id} className="pl-1 text-[11px] text-white/50" data-plan-item={it.exercise}>
+                <div key={it.id} className="pl-1 text-[12px] text-white/50" data-plan-item={it.exercise}>
                   <div className="flex flex-wrap items-center gap-1">
                     <ChevronRight className="h-3 w-3 text-[#00FF9D]" />{it.name} · {it.dose}
-                    {it.cue && <span className="text-white/30">({it.cue})</span>}
+                    {it.cue && <span className="text-white/50">({it.cue})</span>}
                   </div>
                   {it.gate && <div className="pl-4 mt-0.5"><GateSwapLine note={it.gate} /></div>}
                 </div>
@@ -379,15 +384,15 @@ function TemplatePlanViewer({ plan }: { plan: Extract<SavedPlan, { kind: 'templa
                 ? <div key={slot.day} data-plan-day={slot.day} data-kind="training">{slot.entries.map(session)}</div>
                 : (
                   <div key={slot.day} className="mb-2" data-plan-day={slot.day} data-kind="off">
-                    <div className="text-[#7BD389]/80 text-[11px] font-semibold">{slot.day} — Off day</div>
-                    <div className="pl-4 text-[11px] text-white/40">{OFF_DAY_WEEK_LINE}</div>
+                    <div className="text-[#7BD389]/80 text-[12px] font-semibold">{slot.day} — Off day</div>
+                    <div className="pl-4 text-[12px] text-white/50">{OFF_DAY_WEEK_LINE}</div>
                   </div>
                 )) : wk.sessions.map(session)}
             </div>
           );
         })}
       </div>
-      <p className="mt-3 text-[10px] text-white/30">Not medical advice.</p>
+      <p className="mt-3 text-[12px] text-white/50">Not medical advice.</p>
     </motion.div>
   );
 }
@@ -419,11 +424,11 @@ function PlanViewer({ plan }: { plan: LegacyPlan }) {
           const week = fullWeek(days);
           const dayBlock = (d: any, i: number) => (
             <div key={i} className="mb-2">
-              <div className="text-white/70 text-[11px] font-semibold">{d?.day}{d?.block ? ` — ${d.block}` : ''}</div>
+              <div className="text-white/70 text-[12px] font-semibold">{d?.day}{d?.block ? ` — ${d.block}` : ''}</div>
               {(Array.isArray(d?.exercises) ? d.exercises : []).map((ex: any, j: number) => (
-                <div key={j} className="flex flex-wrap items-center gap-1 text-[11px] text-white/50">
+                <div key={j} className="flex flex-wrap items-center gap-1 text-[12px] text-white/50">
                   <ChevronRight className="h-3 w-3 text-[#00FF9D]" />{ex?.name} · {ex?.sets}×{ex?.reps}
-                  {ex?.cue && <span className="text-white/30">({ex.cue})</span>}
+                  {ex?.cue && <span className="text-white/50">({ex.cue})</span>}
                   {ex?.replaced && <span className="basis-full pl-4 text-[#00E5FF]/70">in place of {ex.replaced}</span>}
                   {/* an adult's depth drop after week 4 (lib/workout/plan-revision.ts holdLateDepthDrops) */}
                   {ex?.held === HELD_FOR_PROTOCOL && <span className="basis-full pl-4 text-[#FFD700]/80">{HELD_LINE}</span>}
@@ -438,15 +443,15 @@ function PlanViewer({ plan }: { plan: LegacyPlan }) {
                 ? <div key={slot.day} data-plan-day={slot.day} data-kind="training">{slot.entries.map(dayBlock)}</div>
                 : (
                   <div key={slot.day} className="mb-2" data-plan-day={slot.day} data-kind="off">
-                    <div className="text-[#7BD389]/80 text-[11px] font-semibold">{slot.day} — Off day</div>
-                    <div className="pl-4 text-[11px] text-white/40">{OFF_DAY_WEEK_LINE}</div>
+                    <div className="text-[#7BD389]/80 text-[12px] font-semibold">{slot.day} — Off day</div>
+                    <div className="pl-4 text-[12px] text-white/50">{OFF_DAY_WEEK_LINE}</div>
                   </div>
                 )) : days.map(dayBlock)}
             </div>
           );
         })}
       </div>
-      <p className="mt-3 text-[10px] text-white/30">Not medical advice.</p>
+      <p className="mt-3 text-[12px] text-white/50">Not medical advice.</p>
     </motion.div>
   );
 }

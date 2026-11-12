@@ -107,7 +107,8 @@ export interface RockHoldStep {
   source: string;
 }
 
-const HOLD_LINE = 'Then hold still where it stops and let one long breath out.';
+// CUE-REWRITE (2026-10-27): shorter, so each rock-and-hold reads as one breath of instruction
+const HOLD_LINE = 'Then hold still and breathe out slowly.';
 
 const rockHold = (r: Omit<RockHoldStep, 'youthSafe' | 'impact' | 'seconds'>): RockHoldStep =>
   ({ ...r, youthSafe: true, impact: false, seconds: ROCK_HOLD_SEC });
@@ -211,7 +212,7 @@ export const PRIMERS: readonly Primer[] = [
   {
     id: 'broad-jump-primer', name: 'Short Broad Jump Primer', patterns: ['hinge'], impact: true, youthSafe: false,
     dose: { sets: 2, reps: '2 short jumps', seconds: 60 }, lowDay: { sets: 1, reps: '2 short jumps', seconds: 30 },
-    cue: 'Swing the arms, jump forward a short way, land quiet on both feet and stick it. Walk back, go again.', source: 'fel',
+    cue: 'Swing your arms, jump forward a short way, land quietly on both feet and stick it.', source: 'fel',
   },
   {
     id: 'hip-snap-primer', name: 'Hip Snap Primer', patterns: ['hinge'], impact: false, youthSafe: true,
@@ -236,7 +237,7 @@ export const PRIMERS: readonly Primer[] = [
   {
     id: 'fast-row-primer', name: 'Fast Row Primer', patterns: ['pull'], impact: false, youthSafe: true,
     dose: { sets: 2, reps: '5', seconds: 60 }, lowDay: { sets: 1, reps: '5', seconds: 30 },
-    cue: 'Hold a sturdy door frame, lean back, pull the chest in fast, lower slow. Elbows toward your back pockets.', source: 'fel',
+    cue: 'Hold a sturdy door frame, lean back, pull your chest in fast, lower slowly.', source: 'fel',
   },
   {
     id: 'tall-march-primer', name: 'Tall March Primer', patterns: ['carry'], impact: false, youthSafe: true,
@@ -256,7 +257,7 @@ export const PRIMERS: readonly Primer[] = [
   {
     id: 'wall-drive-primer', name: 'Wall Drive Primer', patterns: ['locomotion'], impact: false, youthSafe: true,
     dose: { sets: 2, reps: '4 a side', seconds: 60 }, lowDay: { sets: 1, reps: '4 a side', seconds: 30 },
-    cue: 'Hands on a wall, body in a straight ramp, drive one knee up fast and set it back down.', source: 'playbook ch7 (The Wall Drive)',
+    cue: 'Hands on a wall, body a straight ramp: drive one knee up fast, then set it down.', source: 'playbook ch7 (The Wall Drive)',
   },
   {
     id: 'squat-reach-primer', name: 'Squat and Reach Primer', patterns: 'general', impact: false, youthSafe: true,

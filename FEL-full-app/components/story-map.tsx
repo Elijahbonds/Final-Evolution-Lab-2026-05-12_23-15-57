@@ -114,7 +114,7 @@ export default function StoryMap({ initialData, className }: StoryMapProps) {
       {/* Header */}
       <header className="relative z-10 flex items-end justify-between px-5 pb-3 pt-5">
         <div>
-          <p className="text-[10px] font-medium uppercase tracking-[0.35em] text-cyan-400/70">
+          <p className="text-[12px] font-medium uppercase tracking-[0.35em] text-cyan-400/70">
             Story Mode
           </p>
           <h1 className="mt-1 text-xl font-bold tracking-tight text-white">
@@ -123,15 +123,15 @@ export default function StoryMap({ initialData, className }: StoryMapProps) {
           <p className="mt-0.5 text-xs text-slate-400">{data.campaign.tagline}</p>
         </div>
         <div className="text-right">
-          <p className="text-[10px] uppercase tracking-widest text-slate-500">
+          <p className="text-[12px] uppercase tracking-widest text-slate-400">
             Progress
           </p>
           <p className="text-lg font-semibold tabular-nums text-cyan-300">
             {data.completionPct}%
           </p>
-          <div className="mt-1 flex items-center justify-end gap-1 text-[11px] text-slate-400">
+          <div className="mt-1 flex items-center justify-end gap-1 text-[12px] text-slate-400">
             <Trophy className="h-3 w-3 text-amber-400" aria-hidden />
-            {data.badgesEarned.length}/13
+            {data.badgesEarned.length}/{data.totalBadges}
           </div>
         </div>
       </header>
@@ -279,8 +279,11 @@ function ZoneWaypoint({
     <motion.button
       type="button"
       onClick={onSelect}
-      className="group absolute z-10 -translate-x-1/2 -translate-y-1/2 outline-none"
-      style={{ left: `${zone.position.x}%`, top: `${zone.position.y}%` }}
+      // EVERY-SCREEN P10: centred by motion's own x/y. The Tailwind translate on this class never applied: motion writes the
+      // element's transform inline (its scale), which replaced it, so every zone sat half its width right of its point and
+      // "The Snow Slope" (x 86 %) ran 14.5 px off the map with 150 % text.
+      className="group absolute z-10 outline-none"
+      style={{ left: `${zone.position.x}%`, top: `${zone.position.y}%`, x: '-50%', y: '-50%' }}
       initial={{ opacity: 0, scale: 0.6 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ delay: index * 0.05, type: 'spring', stiffness: 260, damping: 20 }}
@@ -305,7 +308,7 @@ function ZoneWaypoint({
         className={cn(
           'relative flex h-12 w-12 items-center justify-center rounded-full border-2 transition-colors',
           state === 'locked' &&
-            'border-slate-700 bg-slate-900/90 text-slate-600',
+            'border-slate-700 bg-slate-900/90 text-slate-400',
           state === 'open' &&
             'border-cyan-400/80 bg-slate-900 text-cyan-200 shadow-[0_0_18px_rgba(34,211,238,0.45)]',
           state === 'cleared' &&
@@ -342,14 +345,14 @@ function ZoneWaypoint({
 
       <span
         className={cn(
-          'mt-3 block max-w-[7.5rem] text-center text-[10px] font-semibold uppercase tracking-wider',
-          state === 'locked' ? 'text-slate-600' : 'text-slate-200',
+          'mt-3 block max-w-[7.5rem] text-center text-[12px] font-semibold uppercase tracking-wider',
+          state === 'locked' ? 'text-slate-400' : 'text-slate-200',
         )}
       >
         {zone.title}
       </span>
       {state === 'locked' ? (
-        <span className="mt-0.5 block max-w-[8.5rem] text-center text-[9px] leading-tight text-slate-600 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+        <span className="mt-0.5 block max-w-[8.5rem] text-center text-[12px] leading-tight text-slate-400 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
           {zone.unlockLabel}
         </span>
       ) : null}
@@ -396,7 +399,7 @@ function ZonePanel({
           <div className="flex items-start justify-between gap-4">
             <div>
               <p
-                className="text-[10px] font-medium uppercase tracking-[0.3em]"
+                className="text-[12px] font-medium uppercase tracking-[0.3em]"
                 style={{ color: zone.accent }}
               >
                 {/* HOTFIX (2026-09-24): was the raw route id ("onevone") — the name the rest of the app shows */}
@@ -420,7 +423,7 @@ function ZonePanel({
 
           {!zone.unlocked ? (
             <div className="mt-4 flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/60 px-3 py-2.5 text-xs text-slate-400">
-              <Lock className="h-3.5 w-3.5 shrink-0 text-slate-500" aria-hidden />
+              <Lock className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden />
               Unlock: {zone.unlockLabel}
             </div>
           ) : null}
@@ -481,7 +484,7 @@ function NodeRow({
               ? 'border-cyan-400/50 text-cyan-300'
               : playable
                 ? 'border-slate-600 text-slate-200'
-                : 'border-slate-800 text-slate-600',
+                : 'border-slate-800 text-slate-400',
           )}
           style={playable ? { borderColor: isBoss ? '#f59e0b' : accent } : undefined}
           aria-hidden
@@ -502,18 +505,18 @@ function NodeRow({
             <span
               className={cn(
                 'truncate text-sm font-semibold',
-                node.completed || playable ? 'text-white' : 'text-slate-500',
+                node.completed || playable ? 'text-white' : 'text-slate-400',
               )}
             >
               {node.title}
             </span>
             {isBoss ? (
-              <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-400">
+              <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[12px] font-bold uppercase tracking-wider text-amber-400">
                 Boss
               </span>
             ) : null}
             {isRecommended && playable ? (
-              <span className="rounded bg-cyan-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-cyan-300">
+              <span className="rounded bg-cyan-500/15 px-1.5 py-0.5 text-[12px] font-bold uppercase tracking-wider text-cyan-300">
                 Next
               </span>
             ) : null}
@@ -521,7 +524,7 @@ function NodeRow({
           <span className="mt-0.5 block truncate text-xs text-slate-400">
             {node.description}
           </span>
-          <span className="mt-1 flex items-center gap-3 text-[11px] tabular-nums text-slate-500">
+          <span className="mt-1 flex items-center gap-3 text-[12px] tabular-nums text-slate-400">
             {/* HOTFIX (2026-09-24): "Target 1,000" had no unit and a boss is now a win — the server says the goal */}
             <span>{node.goal}</span>
             <span className="text-cyan-400/80">+{node.rewardLC} LC</span>
@@ -532,7 +535,7 @@ function NodeRow({
         </span>
 
         {playable ? (
-          <ChevronRight className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
+          <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
         ) : null}
       </button>
     </li>

@@ -429,7 +429,7 @@ export default function RecordBooth(p: RecordBoothProps) {
   const groups = takeGroups(merged);
   const small: React.CSSProperties = { fontSize: 12, opacity: 0.8 };
   const sel: React.CSSProperties = { padding: '6px 6px', borderRadius: 8, border: '1px solid #7a5c9e', background: '#241736', color: '#f5ead9', minHeight: 36 };
-  const mini: React.CSSProperties = { background: 'transparent', border: '1px solid #5a4470', borderRadius: 6, color: 'inherit', cursor: 'pointer', fontSize: 11, padding: '4px 8px', minHeight: 30 };
+  const mini: React.CSSProperties = { background: 'transparent', border: '1px solid #5a4470', borderRadius: 6, color: 'inherit', cursor: 'pointer', fontSize: 12, padding: '4px 8px', minHeight: 30 };
   const lengths = [...new Set([...BOOTH_LENGTHS.filter((n) => n <= loopBars - region.fromBar), loopBars - region.fromBar, region.bars])].sort((a, b) => a - b);
   // MUSIC-SUITE P4 FIX PASS: the line names every term — the output delay's source, the desk's own (the limiter), the mic's
   const latLine = latency
@@ -453,7 +453,7 @@ export default function RecordBooth(p: RecordBoothProps) {
               ? <button data-qa="booth-close" style={S.btnAlt} disabled={busy} onClick={() => closeMic('Mic closed')}>CLOSE MIC</button>
               : <button data-qa="booth-arm" style={S.btnAlt} disabled={!engine} onClick={() => void arm()}>● ARM MIC</button>}
             {micOn && <InputMeter micRef={micRef} />}
-            {latLine && <span style={{ fontSize: 11, opacity: 0.7 }}>{latLine}</span>}
+            {latLine && <span style={{ fontSize: 12, opacity: 0.7 }}>{latLine}</span>}
           </div>
           <div style={S.row}>
             <label style={small}>FROM{' '}
@@ -507,17 +507,17 @@ export default function RecordBooth(p: RecordBoothProps) {
                     </span>
                     {g.takes.length > 1 && !isPick && <button data-qa="take-pick" style={{ ...mini, borderColor: '#ffb347', color: '#ffd75e' }} onClick={() => pick(t, g.takes.length - 1)}>PICK</button>}
                     <button data-qa="take-mute" aria-pressed={t.muted} style={{ ...mini, ...(t.muted ? { background: '#7a5c9e', color: '#fff' } : {}) }} onClick={() => toggleMute(t)}>{t.muted ? 'MUTED' : 'MUTE'}</button>
-                    <label style={{ fontSize: 11, display: 'inline-flex', gap: 4, alignItems: 'center' }}>GAIN
+                    <label style={{ fontSize: 12, display: 'inline-flex', gap: 4, alignItems: 'center' }}>GAIN
                       <input aria-label={`take ${i + 1} gain`} data-qa="take-gain" type="range" min={0} max={2} step={0.01} value={t.gain}
                         onChange={(e) => setDraft(t.id, { gain: +e.target.value })} onPointerUp={() => commit(t.id)} onKeyUp={() => commit(t.id)} onBlur={() => commit(t.id)} style={{ width: 80 }} />
                       <span style={{ width: 34 }}>{toDb(t.gain) <= -90 ? '−∞' : `${toDb(t.gain) >= 0 ? '+' : ''}${toDb(t.gain).toFixed(0)}`} dB</span>
                     </label>
-                    <label style={{ fontSize: 11, display: 'inline-flex', gap: 4, alignItems: 'center' }}>IN
+                    <label style={{ fontSize: 12, display: 'inline-flex', gap: 4, alignItems: 'center' }}>IN
                       <input aria-label={`take ${i + 1} trim start`} data-qa="take-trim-start" type="range" min={0} max={dur} step={0.01} value={t.trimStart}
                         onChange={(e) => setDraft(t.id, { trimStart: Math.min(+e.target.value, Math.max(0, dur - t.trimEnd - 0.05)) })} onPointerUp={() => commit(t.id)} onKeyUp={() => commit(t.id)} onBlur={() => commit(t.id)} style={{ width: 70 }} />
                       <span style={{ width: 32 }}>{t.trimStart.toFixed(2)}</span>
                     </label>
-                    <label style={{ fontSize: 11, display: 'inline-flex', gap: 4, alignItems: 'center' }}>OUT
+                    <label style={{ fontSize: 12, display: 'inline-flex', gap: 4, alignItems: 'center' }}>OUT
                       <input aria-label={`take ${i + 1} trim end`} data-qa="take-trim-end" type="range" min={0} max={dur} step={0.01} value={t.trimEnd}
                         onChange={(e) => setDraft(t.id, { trimEnd: Math.min(+e.target.value, Math.max(0, dur - t.trimStart - 0.05)) })} onPointerUp={() => commit(t.id)} onKeyUp={() => commit(t.id)} onBlur={() => commit(t.id)} style={{ width: 70 }} />
                       <span style={{ width: 32 }}>{t.trimEnd.toFixed(2)}</span>
@@ -577,8 +577,8 @@ function InputMeter({ micRef }: { micRef: React.MutableRefObject<BoothMic | null
       <span style={{ width: 120, height: 10, borderRadius: 5, background: '#241736', overflow: 'hidden', display: 'inline-block' }}>
         <div ref={barRef} style={{ height: '100%', width: '0%', background: 'linear-gradient(90deg,#22c55e,#eab308 75%,#ef4444)' }} />
       </span>
-      <span ref={dbRef} data-qa="input-meter-db" style={{ fontSize: 11, width: 44, opacity: 0.8 }}>−∞ dB</span>
-      <span ref={clipRef} title="clip" style={{ fontSize: 10, fontWeight: 800, color: '#ff5c5c', opacity: 0.15 }}>CLIP</span>
+      <span ref={dbRef} data-qa="input-meter-db" style={{ fontSize: 12, width: 44, opacity: 0.8 }}>−∞ dB</span>
+      <span ref={clipRef} title="clip" style={{ fontSize: 12, fontWeight: 800, color: '#ff5c5c', opacity: 0.15 }}>CLIP</span>
     </span>
   );
 }

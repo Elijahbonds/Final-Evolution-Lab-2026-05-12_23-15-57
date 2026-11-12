@@ -11,8 +11,8 @@ import { ArrowLeft, BookOpen, Camera, Clock } from 'lucide-react';
 import { setBodyPlayDobYear } from '@/lib/move/bodyPlayGrownUp';
 import { drillById } from '@/lib/drills/drills';
 import {
-  DRILLS_PATH, LANDING_CHECK_ENTRY, LANDING_UNLOCK_LABEL, LANDING_UNLOCK_LIVE, ROUTE_DRILLS, drillChapterHref, drillHref,
-  drillMinutes, drillSourceLine,
+  DRILLS_PATH, LANDING_CHECK_ENTRY, LANDING_UNLOCK_LABEL, LANDING_UNLOCK_LIVE, SHELF_DRILLS, drillChapterHref, drillHref,
+  drillMinutes, drillShortSource, drillSourceLine, shelfHref, type DrillShelf,
 } from '@/lib/drills/route';
 import { drillToRun, type DrillAccess, type DrillsAccess } from '@/lib/drills/gate';
 import type { BookLesson } from '@/lib/drills/playbookLinks';
@@ -30,13 +30,13 @@ const GATE_BADGE: Record<DrillAccess['gate'], string | null> = {
 
 function Badge({ gate }: { gate: DrillAccess['gate'] }) {
   const t = GATE_BADGE[gate];
-  return t ? <span className="rounded-full border border-amber-300/40 px-2 py-0.5 text-[11px] font-bold text-amber-200/90" data-drill-gate={gate}>{t}</span> : null;
+  return t ? <span className="rounded-full border border-amber-300/40 px-2 py-0.5 text-[12px] font-bold text-amber-200/90" data-drill-gate={gate}>{t}</span> : null;
 }
 
 function Note({ access }: { access: DrillsAccess }) {
   if (!access.note) return null;
   return (
-    <p className="rounded-xl border border-amber-300/25 bg-amber-300/[0.05] px-3 py-2 text-[13px] leading-snug text-amber-100/90" data-drill-note={access.impactHeld ?? ''}>
+    <p className="rounded-xl border border-amber-300/25 bg-amber-300/[0.05] px-3 py-2 text-[16px] leading-snug text-amber-100/90" data-drill-note={access.impactHeld ?? ''}>
       {access.note}{' '}
       {access.noteHref && <a href={access.noteHref} className="font-bold underline">See what&apos;s needed</a>}
     </p>
@@ -59,13 +59,35 @@ export function LandingUnlock({ access, live = LANDING_UNLOCK_LIVE }: { access: 
   );
 }
 
-function Shelf({ access, unlockLive }: { access: DrillsAccess; unlockLive?: boolean }) {
+/** PLAT-P09 (BBS-01/02): the ball shelf's door to the shot and dribble tracker (a plain link: its detector loads there only). */
+export const SHOTS_HREF = '/train/shots';
+
+/** PLAT-P09 (BBS-03): the two shelves, one tap apart. */
+export const SHELF_LABEL: Record<DrillShelf, string> = { playbook: 'Playbook drills', hoops: 'Ball skills' };
+
+function Shelf({ access, unlockLive, shelf = 'playbook' }: { access: DrillsAccess; unlockLive?: boolean; shelf?: DrillShelf }) {
+  const list = SHELF_DRILLS[shelf];
+  const shown = access.drills.filter((d) => list.some((x) => x.id === d.id));
   return (
     <div className="space-y-4">
+      <nav className="flex gap-2" aria-label="Drill shelves" data-drill-shelves>
+        {(['playbook', 'hoops'] as const).map((s) => (
+          <Link key={s} href={shelfHref(s)} aria-current={s === shelf ? 'page' : undefined} data-drill-shelf={s}
+            className={`inline-flex min-h-11 items-center rounded-full border px-4 text-[14px] font-bold ${s === shelf ? 'border-[#00FF9D]/60 text-[#00FF9D]' : 'border-white/15 text-white/70'}`}>
+            {SHELF_LABEL[s]}
+          </Link>
+        ))}
+      </nav>
+      {shelf === 'hoops' && (
+        <Link href={SHOTS_HREF} data-drill-shots-door
+          className="flex min-h-12 items-center justify-between gap-3 rounded-2xl border border-[#FF8A3D]/40 bg-[#FF8A3D]/[0.06] px-4 py-3 text-[14px] font-bold text-white">
+          <span>Count your shots and dribbles with a real ball</span><Camera aria-hidden className="h-4 w-4 text-[#FF8A3D]" />
+        </Link>
+      )}
       <Note access={access} />
-      {access.drills.some((d) => d.gate !== 'open') && <LandingUnlock access={access} live={unlockLive} />}
+      {shown.some((d) => d.gate !== 'open') && <LandingUnlock access={access} live={unlockLive} />}
       <ul className="grid gap-3 sm:grid-cols-2">
-        {ROUTE_DRILLS.map((d) => {
+        {list.map((d) => {
           const a = access.drills.find((x) => x.id === d.id)!;
           return (
             <li key={d.id}>
@@ -75,9 +97,10 @@ function Shelf({ access, unlockLive }: { access: DrillsAccess; unlockLive?: bool
                   <span className="text-[16px] font-bold text-white">{d.name}</span>
                   <Badge gate={a.gate} />
                 </span>
-                <span className="text-[13px] leading-relaxed text-white/55">{d.blurb}</span>
-                <span className="mt-auto flex items-center gap-3 font-mono text-[10.5px] uppercase tracking-[0.12em] text-white/40">
-                  <span>Playbook ch. {d.source.chapter}</span>
+                <span className="text-[16px] leading-normal text-white/55">{d.blurb}</span>
+                {/* PLAT-P09: 60% white (was 40%: 3.8:1 at 10.5 px, under 4.5) */}
+                <span className="mt-auto flex items-center gap-3 font-mono text-[12px] uppercase tracking-[0.12em] text-white/60">
+                  <span>{drillShortSource(d)}</span>
                   <span className="flex items-center gap-1"><Clock aria-hidden className="h-3 w-3" />{drillMinutes(d)} min</span>
                 </span>
               </Link>
@@ -85,7 +108,7 @@ function Shelf({ access, unlockLive }: { access: DrillsAccess; unlockLive?: bool
           );
         })}
       </ul>
-      <p className="text-[12px] text-white/45">{CAMERA_LINE}</p>
+      <p className="text-[16px] text-white/50">{CAMERA_LINE}</p>
     </div>
   );
 }
@@ -94,18 +117,18 @@ function BookWords({ lessons, chapterHref }: { lessons: BookLesson[]; chapterHre
   if (!lessons.length) return null;
   return (
     <section className="space-y-3 rounded-2xl border border-white/8 bg-white/[0.02] p-4" data-drill-book>
-      <h3 className="flex items-center gap-2 font-mono text-[10.5px] font-bold uppercase tracking-[0.16em] text-[#A855F7]">
+      <h3 className="flex items-center gap-2 font-mono text-[12px] font-bold uppercase tracking-[0.16em] text-[#A855F7]">
         <BookOpen aria-hidden className="h-3.5 w-3.5" /> From the Playbook
       </h3>
       {lessons.map((l) => (
         <div key={l.id} className="space-y-1">
           <p className="text-[14px] font-bold text-white">{l.title}</p>
-          {l.purpose && <p className="text-[13px] text-white/65">Purpose: {l.purpose}</p>}
+          {l.purpose && <p className="text-[16px] text-white/65">Purpose: {l.purpose}</p>}
           {l.steps.length > 0 ? (
-            <ol className="list-decimal space-y-0.5 pl-5 text-[13px] leading-relaxed text-white/70">
+            <ol className="list-decimal space-y-0.5 pl-5 text-[16px] leading-normal text-white/70">
               {l.steps.map((s, i) => <li key={i}>{s}</li>)}
             </ol>
-          ) : l.firstProse ? <p className="text-[13px] leading-relaxed text-white/70">{l.firstProse}</p> : null}
+          ) : l.firstProse ? <p className="text-[16px] leading-normal text-white/70">{l.firstProse}</p> : null}
         </div>
       ))}
       {chapterHref && <Link href={chapterHref} className="inline-block text-[13px] font-bold text-[#A855F7] underline-offset-2 hover:underline" data-drill-chapter-link>Read the chapter</Link>}
@@ -121,13 +144,13 @@ function DrillPage({ id, access, lessons, unlockLive }: { id: string; access: Dr
   if (live && run) return <DrillLive drill={run} onLeave={() => setLive(false)} />;
   return (
     <article className="space-y-4" data-drill-page={id}>
-      <Link href={DRILLS_PATH} className="inline-flex items-center gap-1.5 text-[13px] text-white/55 hover:text-white">
+      <Link href={drill.source.book === 'fel' ? shelfHref('hoops') : DRILLS_PATH} className="inline-flex items-center gap-1.5 text-[13px] text-white/55 hover:text-white">
         <ArrowLeft aria-hidden className="h-4 w-4" /> All drills
       </Link>
       <header className="space-y-1">
         <div className="flex items-center gap-2"><h2 className="text-2xl font-black text-white">{drill.name}</h2><Badge gate={a.gate} /></div>
-        <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-white/45">{drillSourceLine(drill)} · {drillMinutes(run ?? drill)} min</p>
-        <p className="text-[14px] leading-relaxed text-white/70">{drill.blurb}</p>
+        <p className="font-mono text-[12px] uppercase tracking-[0.12em] text-white/50">{drillSourceLine(drill)} · {drillMinutes(run ?? drill)} min</p>
+        <p className="text-[16px] leading-normal text-white/70">{drill.blurb}</p>
         {drill.source.adapted && <p className="text-[13px] text-white/55">On camera: {drill.source.adapted}</p>}
       </header>
       {a.gate !== 'open' && <Note access={access} />}
@@ -147,15 +170,17 @@ function DrillPage({ id, access, lessons, unlockLive }: { id: string; access: Dr
           <Camera aria-hidden className="h-4 w-4" /> Start with the camera
         </button>
       ) : null}
-      <p className="text-[12px] text-white/45">{CAMERA_LINE}</p>
+      <p className="text-[16px] text-white/50">{CAMERA_LINE}</p>
       <DrillDemo drill={drill} />
       <BookWords lessons={lessons} chapterHref={drillChapterHref(drill)} />
     </article>
   );
 }
 
-export function DrillsApp({ access, drillId, lessons, dobYear, unlockLive }: {
+export function DrillsApp({ access, drillId, lessons, dobYear, unlockLive, shelf = 'playbook' }: {
   access: DrillsAccess; drillId: string | null; lessons: BookLesson[]; dobYear: number | null;
+  /** PLAT-P09: which shelf the list shows (?shelf=hoops: the ball skills). */
+  shelf?: DrillShelf;
   /** Tests only: the landing-unlock button with LANDING_UNLOCK_LIVE's value overridden. */
   unlockLive?: boolean;
 }) {
@@ -176,12 +201,12 @@ export function DrillsApp({ access, drillId, lessons, dobYear, unlockLive }: {
   if (access.stopped) {
     return (
       <div className="space-y-3 rounded-xl border border-amber-300/25 p-6 text-center" data-drill-hard-stop>
-        <p className="text-[14px] text-white/75">{HARD_STOP_LINE}</p>
+        <p className="text-[16px] text-white/75">{HARD_STOP_LINE}</p>
         <Link href="/play/mirror" className="inline-block rounded-lg bg-white/10 px-4 py-2 text-xs font-semibold text-white/85">Go to the Mirror</Link>
       </div>
     );
   }
   return drillId
     ? <DrillPage key={drillId} id={drillId} access={access} lessons={lessons} unlockLive={unlockLive} />
-    : <Shelf access={access} unlockLive={unlockLive} />;
+    : <Shelf access={access} unlockLive={unlockLive} shelf={shelf} />;
 }

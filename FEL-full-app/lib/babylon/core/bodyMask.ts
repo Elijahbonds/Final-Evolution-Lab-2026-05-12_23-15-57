@@ -25,9 +25,10 @@
 // container's geometry are untouched: the body takes a unique geometry once, and its loaded indices are kept on the mesh
 // so every re-mask starts from the full body.
 import { BoundingInfo, Matrix, Vector3 } from '@babylonjs/core';
-import type { AbstractMesh, IndicesArray, Mesh, TransformNode } from '@babylonjs/core';
+import type { AbstractMesh, IndicesArray, Mesh, Scene, TransformNode } from '@babylonjs/core';
 import { boneNode } from '../anim/boneLookup';
 import { tubeCoverage, trimSpan, type TubeSpan } from './accessoryFit';
+import { coachGarmentSlotOf, demoModelFlags } from './demoModels';
 
 /** How far under a garment (from its open edge, metres) the skin must be before it is hidden. Tops and shorts leave a
  *  band at the hem so a garment that rides up never opens a hole into the body. */
@@ -308,6 +309,9 @@ export interface WaistFitInput {
   shortsP: ArrayLike<number>; shortsN: ArrayLike<number>; shortsInd: ArrayLike<number>;
   top: MaskSurface;
   bodyP: ArrayLike<number>; bodyN: ArrayLike<number>; bodyInd: ArrayLike<number>;
+  /** KIT-GLITCH: which body vertices may lend the short their place and skin weights (absent: all). The glue passes the
+   *  skin that rides the torso and legs — see WAIST_DONOR_BONES. */
+  bodyOk?: (v: number) => boolean;
 }
 export interface WaistFitResult {
   delta: Float32Array;
@@ -316,10 +320,11 @@ export interface WaistFitResult {
   liftedVerts: number; sunkVerts: number; maxLift: number; gapBefore: number; gapAfter: number }
 
 /** Closest point on the body's skin (triangles) to p, with the interpolated outward normal. */
-function skinProjector(P: ArrayLike<number>, N: ArrayLike<number>, ind: ArrayLike<number>, near: (x: number, y: number, z: number) => boolean) {
+function skinProjector(P: ArrayLike<number>, N: ArrayLike<number>, ind: ArrayLike<number>, near: (x: number, y: number, z: number) => boolean, ok?: (v: number) => boolean) {
   const grid = new Map<string, number[]>();
   for (let t = 0; t + 2 < ind.length; t += 3) {
     const a = ind[t]; if (!near(P[a * 3], P[a * 3 + 1], P[a * 3 + 2])) continue;
+    if (ok && !(ok(a) && ok(ind[t + 1]) && ok(ind[t + 2]))) continue;
     const kk = key(Math.floor(P[a * 3] / TC), Math.floor(P[a * 3 + 1] / TC), Math.floor(P[a * 3 + 2] / TC)); let l = grid.get(kk); if (!l) grid.set(kk, l = []); l.push(t);
   }
   return (x: number, y: number, z: number): { q: [number, number, number]; n: [number, number, number]; v: number } | null => {
@@ -381,7 +386,7 @@ export function fitWaistband(input: WaistFitInput, cfg = WAIST_FIT): WaistFitRes
     let sum = 0, mx = 0; for (let k = -2; k <= 2; k++) { const q = need[(s + k + SECT) % SECT]; sum += q; mx = Math.max(mx, q); }
     return Math.max(need[s], Math.min(mx, sum / 5));
   };
-  const project = skinProjector(input.bodyP, input.bodyN, input.bodyInd, (_x, y) => y > ringLo - cfg.band - 0.1 && y < ringHi + cfg.liftMax + 0.1);
+  const project = skinProjector(input.bodyP, input.bodyN, input.bodyInd, (_x, y) => y > ringLo - cfg.band - 0.1 && y < ringHi + cfg.liftMax + 0.1, input.bodyOk);
   const out = new Float32Array(n * 3);
   for (let v = 0; v < n; v++) { out[v * 3] = S[v * 3]; out[v * 3 + 1] = S[v * 3 + 1]; out[v * 3 + 2] = S[v * 3 + 2]; }
   let liftedVerts = 0, maxLift = 0;
@@ -497,7 +502,7 @@ function fitShortsUnderTop(body: Mesh, bodySkin: { P: Float32Array; N: Float32Ar
     if (want !== null && top && ind && tInd) {
       const sw = skinnedWorld(g, base), tw = skinnedWorld(top, top.__felFlare0);
       if (sw && tw) {
-        const res = fitWaistband({ shortsP: sw.P, shortsN: sw.N, shortsInd: ind, top: { P: tw.P, N: tw.N, ind: tInd }, bodyP: bodySkin.P, bodyN: bodySkin.N, bodyInd });
+        const res = fitWaistband({ shortsP: sw.P, shortsN: sw.N, shortsInd: ind, top: { P: tw.P, N: tw.N, ind: tInd }, bodyP: bodySkin.P, bodyN: bodySkin.N, bodyInd, bodyOk: waistDonorOk(body) });
         const { delta, ...rest } = res; stats = rest;
         for (let i = 0; i < delta.length; i++) sw.P[i] += delta[i];
         fitToBind(g, body, sw.P, delta, res.blend, res.donor, skin0, bind);
@@ -510,6 +515,24 @@ function fitShortsUnderTop(body: Mesh, bodySkin: { P: Float32Array; N: Float32Ar
     g.__felWaistTop = want;
     g.metadata = { ...(g.metadata ?? {}), felWaistFit: stats ? { lifted: stats.liftedVerts, sunk: stats.sunkVerts, maxLift: +stats.maxLift.toFixed(3), gapBefore: +stats.gapBefore.toFixed(3), gapAfter: +stats.gapAfter.toFixed(3) } : null };
   }
+}
+
+/**
+ * KIT-GLITCH (owner 2026-11-12: "clothes floating off the body"). The waistband fit hands each fitted vertex of the short the
+ * skin weights of the body point under it, and "under it" was the NEAREST skin of any kind. The fit runs in the pose the
+ * body holds — idle, hands hanging beside the hips — and there the nearest skin to the short's sides was the forearm and
+ * the hand: on the male kit 141 shorts vertices took arm weights (50 on rival ace), and when the arms went up (a jumper,
+ * a dunk) a piece of the short went with them, 0.46–0.48 m off the hip (scripts/probes/kit-glitch/cpu.ts; pinned by
+ * kitGlitch.test.ts and scripts/kit-glitch-tests.ts). Only skin that rides the torso and legs lends weights: a body vertex
+ * with at most WAIST_DONOR_MAX of its weight on the shoulders, arms, hands, neck or head.
+ */
+export const WAIST_DONOR_BONES = /(Shoulder|Arm|ForeArm|Hand|Neck|Head)$/;
+export const WAIST_DONOR_MAX = 0.2;
+function waistDonorOk(body: Mesh): ((v: number) => boolean) | undefined {
+  const mi = body.getVerticesData('matricesIndices'), mw = body.getVerticesData('matricesWeights'), bones = body.skeleton?.bones;
+  if (!mi || !mw || !bones) return undefined;
+  const limb = bones.map((b) => WAIST_DONOR_BONES.test(b.name));
+  return (v: number) => { let w = 0; for (let k = 0; k < 4; k++) if (limb[mi[v * 4 + k]]) w += mw[v * 4 + k]; return w <= WAIST_DONOR_MAX; };
 }
 
 function readSkin(mesh: Mesh): SkinData | null {
@@ -586,10 +609,15 @@ export function skinnedWorld(mesh: Mesh, positions?: ArrayLike<number>): { P: Fl
 }
 
 const SLOT_RE = /^Kit_(tops|shorts|shoes)_/;
-/** The garment slot of a mesh name — the split-off sole (`KitSole_*`) belongs to its shoe. */
+/** The garment slot of a mesh name — the split-off sole (`KitSole_*`) belongs to its shoe.
+ *  DEMO-MODELS-1 (2026-11-09): the coach body's garments are named `Top_*`, `Bottom_*`, `Shoe_*`, `Sock_*` (QC-coach-prep2), which
+ *  SLOT_RE never matched, so nothing masked the skin under them and it poked through the tee. With COACH_BODY_MASK_ENABLED on they
+ *  take their slots (demoModels.coachGarmentSlotOf); off, the answer is exactly the Kit_-only one it was. */
 export function maskSlotOf(name: string): string | null {
   if (/^KitSole_/.test(name)) return 'shoes';
-  return SLOT_RE.exec(name)?.[1] ?? null;
+  const kit = SLOT_RE.exec(name)?.[1];
+  if (kit) return kit;
+  return demoModelFlags().coachBodyMask ? coachGarmentSlotOf(name) : null;
 }
 /** The kit body's skin mesh: `Body` (loader clones append `_c<n>`). */
 export function isBodyMesh(name: string): boolean { return /^Body(_c\d+)?$/.test(name); }
@@ -610,6 +638,58 @@ export function worldScaleOf(mesh: AbstractMesh): number { const W = mesh.comput
  */
 export function isShrunk(mesh: AbstractMesh): boolean { return worldScaleOf(mesh) < SHRUNK_SCALE; }
 
+// RUNUP-STALL-4 (2026-10-30, PM: behind dunk.preloadSet only): a scene can ask for its bodies' mask fittings ONE PER FRAME.
+// AM's 4c95bc64 trace had several bodies' fittings land on the same after-render callback (a 1,404 ms task). Opted in, a
+// fitting that is due joins the scene's queue and the queue runs one fitting per rendered frame. Not opted in (every scene
+// unless DunkMode's preload turns it on): a fitting runs on the callback, exactly as before.
+const maskPaced = new WeakSet<object>();
+const maskQueues = new WeakMap<object, Array<() => void>>();
+// RUNUP-STALL-5: a queued fitting is a stepped job (maskBodySteps): the queue runs ONE STEP a frame (the body's skin, then the
+// garments, then the mask), so no fitting is one task. `queueMask` takes a plain job too (one step).
+type MaskJob = () => void;
+/** A stepped job as a queue entry: each call runs the next step; it re-queues itself at the head until done. */
+function steppedJob(scene: Scene, it: Iterator<unknown, unknown>, onError: (e: unknown) => void): MaskJob {
+  const job: MaskJob = () => {
+    let done = true;
+    try { done = !!it.next().done; } catch (e) { onError(e); }
+    if (!done) maskQueues.get(scene)?.unshift(job);
+  };
+  return job;
+}
+/** Turn the one-fitting-a-frame queue on (or off) for `scene`. */
+export function setMaskOnePerFrame(scene: Scene, on: boolean): void { if (on) maskPaced.add(scene); else maskPaced.delete(scene); }
+/** Whether `scene` fits its bodies one per frame. */
+export function masksOnePerFrame(scene: Scene): boolean { return maskPaced.has(scene); }
+// RUNUP-STALL-6 (2026-10-31, AM's df51b03e gate: knob on, the page never reached TAP TO START, 7-9 GB at 100% CPU).
+// Babylon's Observable.notifyObservers walks its LIVE observer array (`for (const obs of this._observers)`), so an
+// onAfterRenderObservable.addOnce made INSIDE an after-render callback runs in the same pass, not the next frame, and
+// scene.getFrameId() only moves in render(). STALL-5's first-draw wait (`getFrameId() <= schedFrame + 1` → addOnce(run))
+// therefore re-added itself forever in one notification, a new Observer each time; and STALL-4's drain ran the whole
+// queue in one frame. A paced re-wait now hops through the scene's NEXT before-render (a different observable, so it
+// lands on the next frame's after-render), and the first-draw wait is capped.
+/** RUNUP-STALL-6: `cb` on the next frame's after-render (a scene without onBeforeRenderObservable, e.g. a test's: its
+ *  next after-render notification, as before). */
+export function nextAfterRender(scene: Scene, cb: () => void): void {
+  const before = (scene as { onBeforeRenderObservable?: { addOnce(cb: () => void): unknown } }).onBeforeRenderObservable;
+  if (before) before.addOnce(() => { scene.onAfterRenderObservable.addOnce(cb); });
+  else scene.onAfterRenderObservable.addOnce(cb);
+}
+/** RUNUP-STALL-6: the most frames a paced fitting waits out its body's first draw. */
+export const FIRST_DRAW_WAIT_MAX = 3;
+
+function queueMask(scene: Scene, job: () => void): void {
+  let q = maskQueues.get(scene);
+  if (q) { q.push(job); return; }
+  maskQueues.set(scene, (q = [job]));
+  const drain = () => {
+    const next = q!.shift();
+    if (!next) { maskQueues.delete(scene); return; }   // a frame with nothing left: the queue closes
+    next();
+    nextAfterRender(scene, drain);   // stays open a frame: bodies due on this same callback join it (RUNUP-STALL-6: the NEXT frame)
+  };
+  drain();   // the first is due now (this callback); the rest one per rendered frame
+}
+
 /** Mask `meshes`' body under its shown garments after the next rendered frame (coalesced: the last call's mesh list wins). */
 export function scheduleBodyMask(meshes: AbstractMesh[]): void {
   const body = meshes.find((m) => isBodyMesh(m.name) && (m as Mesh).skeleton);
@@ -619,10 +699,31 @@ export function scheduleBodyMask(meshes: AbstractMesh[]): void {
   const first = !pending.has(body);
   pending.set(body, meshes);
   if (!first) return;
-  let waited = 0;
+  let waited = 0, gapWaits = 0;   // RUNUP-STALL-6: gapWaits caps the paced first-draw wait
+  const schedFrame = typeof (scene as { getFrameId?: () => number }).getFrameId === 'function' ? (scene as unknown as { getFrameId(): number }).getFrameId() : 0;   // RUNUP-STALL-5
   const run = () => {
     if (body.isDisposed()) { pending.delete(body); return; }
     if (isShrunk(body) && waited++ < SHRUNK_WAIT_FRAMES) { scene.onAfterRenderObservable.addOnce(run); return; }   // mid spawn-in: wait for its real size
+    // RUNUP-STALL-5: opted in, the fitting waits out the frame the body first drew on (its world-matrix walk is that frame's
+    // task), then runs one step a frame. (A scene without a frame counter, e.g. a test's, has no such frame to wait out.)
+    if (maskPaced.has(scene) && typeof (scene as { getFrameId?: () => number }).getFrameId === 'function' && (scene as unknown as { getFrameId(): number }).getFrameId() <= schedFrame + 1 && gapWaits++ < FIRST_DRAW_WAIT_MAX) { nextAfterRender(scene, run); return; }   // RUNUP-STALL-6: the next frame, capped
+    if (maskPaced.has(scene)) { queueMask(scene, steppedFit()); return; }   // RUNUP-STALL-4: opted in, one fitting a frame
+    fit();
+  };
+  const warnSkip = (e: unknown) => console.warn(`[FEL-KIT] body mask skipped: ${String((e as Error)?.message ?? e).slice(0, 140)}`);
+  /** RUNUP-STALL-5: the same fitting as `fit`, as a stepped queue job (one step a frame). */
+  const steppedFit = (): MaskJob => {
+    const b = body as AbstractMesh;   // (narrowed above; a generator's closure does not keep it)
+    function* steps(): Generator<void, void> {
+      if (b.isDisposed()) { pending.delete(b); return; }
+      const list = pending.get(b); pending.delete(b);
+      if (!list) return;
+      yield* maskBodySteps(b as Mesh, list);
+    }
+    return steppedJob(scene, steps(), warnSkip);
+  };
+  const fit = () => {
+    if (body.isDisposed()) { pending.delete(body); return; }
     const list = pending.get(body); pending.delete(body);
     if (!list) return;
     try { maskBodyNow(body as Mesh, list); } catch (e) { console.warn(`[FEL-KIT] body mask skipped: ${String((e as Error)?.message ?? e).slice(0, 140)}`); }
@@ -632,6 +733,14 @@ export function scheduleBodyMask(meshes: AbstractMesh[]): void {
 
 /** Mask now (the skeleton must hold a pose — after a render). Returns the result, or null when nothing could be measured. */
 export function maskBodyNow(body: Mesh, meshes: AbstractMesh[], why?: Record<string, number>): MaskResult | null {
+  // RUNUP-STALL-5: the fitting's steps, run to the end in this call (exactly the work, and the order, it always did)
+  const it = maskBodySteps(body, meshes, why);
+  for (;;) { const r = it.next(); if (r.done) return r.value; }
+}
+/** RUNUP-STALL-5: maskBodyNow in steps — it yields after the body's skin and after the garments' skins, so a paced queue
+ *  (setMaskOnePerFrame) can put each on its own frame. Run straight through it is maskBodyNow. A body disposed while the
+ *  steps wait is left alone. */
+export function* maskBodySteps(body: Mesh, meshes: AbstractMesh[], why?: Record<string, number>): Generator<void, MaskResult | null> {
   const md = (body.metadata ??= {}) as { felBodyIndices0?: IndicesArray; felBodyMask?: { hidden: Uint8Array; hiddenBySlot: Record<string, number>; trisBefore: number; trisAfter: number } };
   if (!md.felBodyIndices0) {
     const ind = body.getIndices(); if (!ind) return null;
@@ -642,6 +751,8 @@ export function maskBodyNow(body: Mesh, meshes: AbstractMesh[], why?: Record<str
   const bodySkin = skinnedWorld(body); if (!bodySkin) return null;
   meshes = withSiblings(body, meshes);
   try { fitShortsUnderTop(body, bodySkin, meta.felBodyIndices0!, meshes); } catch (e) { console.warn(`[FEL-KIT] waistband fit skipped: ${String((e as Error)?.message ?? e).slice(0, 140)}`); }
+  yield;   // RUNUP-STALL-5: step 1 done (the body's skin)
+  if (body.isDisposed()) return null;
   const bySlot = new Map<string, MaskSurface[]>();
   for (const m of meshes) {
     const slot = maskSlotOf(m.name); if (!slot || !m.isVisible || m.isDisposed() || !(m as Mesh).skeleton) continue;
@@ -654,6 +765,8 @@ export function maskBodyNow(body: Mesh, meshes: AbstractMesh[], why?: Record<str
     const s = skinnedWorld(m as Mesh, slot === 'shoes' ? undefined : (m as { __felFlare0?: Float32Array }).__felFlare0); const ind = (m as Mesh).getIndices(); if (!s || !ind) continue;
     (bySlot.get(slot) ?? bySlot.set(slot, []).get(slot)!).push({ P: s.P, N: s.N, ind });
   }
+  yield;   // RUNUP-STALL-5: step 2 done (the garments' skins)
+  if (body.isDisposed()) return null;
   try { trimTubesUnderTops(body, bySlot.get('tops') ?? []); } catch (e) { console.warn(`[FEL-KIT] accessory trim skipped: ${String((e as Error)?.message ?? e).slice(0, 140)}`); }
   const mi = body.getVerticesData('matricesIndices'), mw = body.getVerticesData('matricesWeights');
   const bones = body.skeleton!.bones;

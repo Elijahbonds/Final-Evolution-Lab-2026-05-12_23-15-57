@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fitGather, gatherDistAt, gatherProgress, gatherSpeedAt, planGather, GATHER_BRAKE_FROM, GATHER_CLIP_SEC, PENULT_CLIP_SEC } from './DunkGatherRun';
+import { fitGather, gatherFitDist, gatherDistAt, gatherProgress, gatherSpeedAt, planGather, GATHER_BRAKE_FROM, GATHER_CLIP_SEC, PENULT_CLIP_SEC } from './DunkGatherRun';
 
 describe('DunkGatherRun — push 1-2 at the runner\'s own speed', () => {
   it('keeps the run into the penultimate, then brakes smoothly to the plant\'s own speed', () => {
@@ -31,5 +31,20 @@ describe('DunkGatherRun — push 1-2 at the runner\'s own speed', () => {
     const early = fitGather(nat.dist * 1.25, 6.5, 2.24);     // a foot-locked start a little out: a touch slower, same shape
     expect(early.rate).toBeLessThan(nat.rate); expect(early.sec).toBeGreaterThan(nat.sec);
     expect(fitGather(0.01, 6.5, 2.24).rate).toBe(2); expect(fitGather(50, 6.5, 2.24).rate).toBe(0.6);
+  });
+  // DUNK-FLAGSHIP (a): a gather started at or outside gatherFitDist never clamps its rate, so its first frame runs at the run's
+  // own speed (the mode starts it one frame's travel before; measured before that: 7.0 → 5.98 m/s in one frame at a sprint).
+  it('starts at the run\'s own speed whenever it starts outside gatherFitDist', () => {
+    for (const v0 of [2.5, 4, 5.5, 7, 7.5]) for (const vEnd of [0.63, 2.24]) {
+      const d = gatherFitDist(v0, vEnd) + v0 / 60;
+      const fit = fitGather(d, v0, vEnd);
+      expect(fit.rate).toBeLessThanOrEqual(2);
+      const firstSpeed = (d * fit.rate * gatherSpeedAt(0, v0, vEnd)) / gatherDistAt(GATHER_CLIP_SEC, v0, vEnd);   // the mode's runNow at τ 0
+      if (fit.rate > 0.6) expect(firstSpeed).toBeCloseTo(v0, 6);
+    }
+    // inside it the old start dropped the speed: the measured case (7 m/s, 1.11 m out)
+    const late = fitGather(1.11, 7, 2.24);
+    expect(late.rate).toBe(2);
+    expect((1.11 * late.rate * 7) / gatherDistAt(GATHER_CLIP_SEC, 7, 2.24)).toBeLessThan(6.1);
   });
 });

@@ -269,11 +269,11 @@ export function BoardHud({ mode, stateRef, bus }: BoardHudProps) {
       {/* top bar: venue / time / score */}
       <div className="absolute left-0 right-0 top-2 flex items-start justify-between px-4">
         <div>
-          <div className="text-[10px] tracking-[0.3em] text-slate-400">{MODE_LABEL[mode]}</div>
+          <div className="text-[12px] tracking-[0.3em] text-slate-400">{MODE_LABEL[mode]}</div>
           <div ref={timeEl} className="text-lg font-bold tabular-nums text-slate-200">0:00</div>
         </div>
         <div className="text-right">
-          <div className="text-[10px] tracking-[0.3em] text-slate-400">SCORE</div>
+          <div className="text-[12px] tracking-[0.3em] text-slate-400">SCORE</div>
           <div
             ref={scoreEl}
             className="text-2xl font-black tabular-nums text-white"
@@ -382,14 +382,14 @@ export function BoardHud({ mode, stateRef, bus }: BoardHudProps) {
           style={{ height: '0%' }}
         />
       </div>
-      <div className="absolute bottom-3 left-3 text-[9px] tracking-widest text-slate-400">
+      <div className="absolute bottom-3 left-3 text-[12px] tracking-widest text-slate-400">
         BOOST
       </div>
 
       {/* speed readout */}
       <div className="absolute bottom-8 right-4 text-right">
         <div ref={speedEl} className="text-xl font-black tabular-nums text-slate-200">0</div>
-        <div className="text-[9px] tracking-widest text-slate-400">SPEED</div>
+        <div className="text-[12px] tracking-widest text-slate-400">SPEED</div>
       </div>
 
       {/* wipeout vignette */}

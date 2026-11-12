@@ -11,17 +11,17 @@ import type { StationRecord } from './screenRunner';
 import { formatGradeValue, type GradeStatus, type StationGrade } from './stationGraders';
 
 export const STATUS_LABEL: Record<GradeStatus, string> = {
-  pass: 'Pass',
-  flag: 'Flagged for a closer look',
+  pass: 'Looks good',
+  flag: 'Worth working on',
   unreadable: 'Not read',
 };
 
 /** Said under a check the camera could not read while its station's one retest is pending or running. */
-export const RETEST_OFFER = 'Retest this station — it runs once more, then the screen moves on.';
+export const RETEST_OFFER = 'Let\'s try this one once more. Then the screen moves on.';
 /** …after the retest also could not read it. */
-export const NOT_READ_AFTER_RETEST = 'Not read after one retest — kept as not read, never as a pass.';
+export const NOT_READ_AFTER_RETEST = 'Still not read after a second try, so it has no result.';
 /** …when the retest was skipped. */
-export const NOT_READ_SKIPPED = 'Kept as not read, never as a pass.';
+export const NOT_READ_SKIPPED = 'Skipped, so it has no result.';
 
 export interface CardRow {
   checkId: string;

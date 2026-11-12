@@ -1,0 +1,79 @@
+{
+ "measuredBy": "scripts/every-screen/trust.mts",
+ "jump": {
+  "basis": "recorded",
+  "unit": "cm",
+  "method": "Phone camera, facing you, hands on hips: the height from the time in the air",
+  "fixtures": [
+   "jump_two_foot_low",
+   "jump_two_foot_high"
+  ],
+  "jumpsInTakes": 7,
+  "jumpsRead": 6,
+  "reads": 56,
+  "meanMiss": 3.2,
+  "bias": -0.8,
+  "repeatSpread": 2.1
+ },
+ "quickScreen": {
+  "basis": "synthetic",
+  "unit": "colour",
+  "method": "Phone camera, four short moves: each check read from your joints against its own line",
+  "fixtures": [
+   "lib/screen-easy/sim.ts: a clean mover, realistic camera, 8 seeds"
+  ],
+  "runs": 8,
+  "completed": 8,
+  "checks": 48,
+  "sameColourPct": 94,
+  "angleSpreadDeg": 0.7,
+  "cleanMoverFailed": 5,
+  "cameraToResultMeanS": 143,
+  "cameraToResultMaxS": 143
+ },
+ "mirrorScreen": {
+  "basis": "recorded",
+  "unit": "points",
+  "method": "Phone camera, four short holds: each check read from your joints against its own line",
+  "fixtures": [
+   "stand_front",
+   "stand_side",
+   "stand_back",
+   "single_leg_left",
+   "single_leg_right",
+   "seated_rotation_front"
+  ],
+  "runs": 10,
+  "completed": 10,
+  "scoreMean": 100,
+  "repeatSpread": 0,
+  "flagsNotInTheKey": 0,
+  "checksRead": 60,
+  "checksTotal": 60
+ },
+ "sprint": {
+  "basis": "synthetic",
+  "unit": "s",
+  "method": "Phone camera at the line: the moment your body crosses it, timed between frames",
+  "fixtures": [
+   "scripts/sprint-accuracy.ts: 40 yd and flying 10 m at 60 fps"
+  ],
+  "runs": 70,
+  "meanMiss": 0.001,
+  "p95Miss": 0.003,
+  "insideItsOwnPm": 85
+ },
+ "vbt": {
+  "basis": "synthetic",
+  "unit": "m/s",
+  "method": "Phone camera side-on, tracking the plate: the bar's mean speed up",
+  "fixtures": [
+   "lib/vbt/bench.ts: back squat at the plate, 60 fps, six speeds × 10 seeds"
+  ],
+  "reps": 60,
+  "repsInSets": 60,
+  "meanMiss": 0.014,
+  "bias": -0.012,
+  "repeatSpread": 0.014
+ }
+}

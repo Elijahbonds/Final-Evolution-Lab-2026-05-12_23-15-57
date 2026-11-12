@@ -4,7 +4,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { isStudioCreatorEnabled, isVirtualPurchasesEnabled, FEATURE_DISABLED } from '@/lib/flags';
+import { isStudioCreatorEnabled, FEATURE_DISABLED } from '@/lib/flags';
+import { isPurchaseOpen } from '@/lib/payments/allowlist';
 import { STUDIO_CREDIT_PACKS } from '@/lib/studio-plan';
 import { studioCreditBalance } from '@/lib/studio-credits';
 import { getStripe } from '@/lib/stripe';
@@ -67,7 +68,7 @@ export async function POST(req: NextRequest) {
   // STORE-READY B10: no key -> payments_not_set_up; VIRTUAL_PURCHASES_ENABLED off ->
   // virtual_purchases_off. Both are 409 store_closed and nothing is fetched, written or charged.
   if (!(process.env.STRIPE_SECRET_KEY ?? '').trim()) return storeClosed('payments_not_set_up');
-  if (!isVirtualPurchasesEnabled()) return storeClosed('virtual_purchases_off');
+  if (!isPurchaseOpen('studio_credits')) return storeClosed('virtual_purchases_off'); // + PURCHASES_ALLOWLIST (payments-ready)
   // STORE-READY B3/B10: Stripe URLs come from the server constant NEXTAUTH_URL, never the Origin header.
   const origin = siteOrigin();
   if (!origin) return storeClosed('site_url_not_set');

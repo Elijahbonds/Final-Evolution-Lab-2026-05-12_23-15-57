@@ -87,6 +87,7 @@ import { BodyMotion, dynamicPose, COMBAT_DYNAMIC } from '../core/DynamicPosture'
 import { slewYaw, wrapYaw } from '../core/Biomech';
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
+import { applyInertialBlend } from '../anim/inertialize';   // GAMEPLAY-CLEAN P2 #2
 import { CombatAnimTree, type CombatAnimInput, type StrikeWeight } from '../anim/combatTree';
 import { BeatOwner } from '../anim/beatOwner';
 import type { ControlSource, Intent } from '../core/PlayerSlot';
@@ -1947,6 +1948,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       installSafePlay(partner.animator, 'agent-partner');
       ctx.groundLock?.track(partner.root, partner.skeleton);
       meTree = new CombatAnimTree(player.animator);
+      applyInertialBlend(player.animator, 'measured');   // SWITCH-ON: on by default here (anim.inertialModesOn; 0 = linear, as before)   // GAMEPLAY-CLEAN P2 #2: AF-1 inertial transitions behind anim.inertial (default off: linear, unchanged)
       partnerTree = new CombatAnimTree(partner.animator);
       // G5: the hero and the ally carry the chest / shoulders / head; the aim is the nearest agent's chest (the ring's
       // objective), the eyes go with it. No horde body gets a layer — see the header.

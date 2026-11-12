@@ -450,10 +450,10 @@ export default function ThreePoint3D(props: GameProps) {
           <div className="absolute top-3 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1">
             <div className="flex items-center gap-5 px-5 py-1.5 rounded-xl" style={{ background: 'rgba(5,5,8,0.75)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,215,0,0.25)' }}>
               <span className="text-2xl font-bold text-[#FFD700]">{hud.pts}</span>
-              <span className="text-[11px] text-white/60 font-mono">PTS · RACK {Math.min(hud.rack + 1, RACKS)}/{RACKS}</span>
+              <span className="text-[12px] text-white/60 font-mono">PTS · RACK {Math.min(hud.rack + 1, RACKS)}/{RACKS}</span>
               <span className="text-sm font-mono text-[#00E5FF]">{Math.ceil(hud.timeLeft)}s</span>
             </div>
-            <div className="flex gap-3 items-center px-3 py-0.5 rounded-lg font-mono text-[10px] text-white/70" style={{ background: 'rgba(5,5,8,0.8)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div className="flex gap-3 items-center px-3 py-0.5 rounded-lg font-mono text-[12px] text-white/70" style={{ background: 'rgba(5,5,8,0.8)', border: '1px solid rgba(255,255,255,0.08)' }}>
               <span style={{ color: hud.prqColor }}>{hud.prqLabel}</span>
               <span style={{ color: '#C99BF7' }}>CAM {hud.camRig.toUpperCase()}</span>
               {hud.streak > 1 && <span style={{ color: '#00FF9D' }}>{hud.streak} STREAK</span>}
@@ -509,7 +509,7 @@ export default function ThreePoint3D(props: GameProps) {
               <span className="text-white/70">{b.label}</span>
             </div>
           ))}
-          <div className="text-[10px] text-white/40 mt-2">Press any key to dismiss</div>
+          <div className="text-[12px] text-white/50 mt-2">Press any key to dismiss</div>
         </div>
       )}
 

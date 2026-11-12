@@ -115,7 +115,8 @@ function drive(o: { lossAt?: number; lossFrames?: number } = {}) {
   const stand = standFront(0.5).frames;
   const side = standSide('left', 0.5).frames;
   let fed = false;
-  for (let loop = 0; loop < 400 && !(v.step === 'position' && v.part === 'T1-side'); loop++) {
+  // SCREEN-EASY (2026-10-28; test changed): the part after T1's front reps is the left-leg squat (front-on parts first)
+  for (let loop = 0; loop < 400 && !(v.step === 'position' && v.part === 'T3-left'); loop++) {
     if (v.step === 'active' && !fed) {
       fed = true;
       const take = ohsFront().frames;
@@ -160,9 +161,10 @@ describe('the runner\'s beats (gate 2)', () => {
     expect(run.steps).not.toContain('paused');
   });
 
-  it('the side part begins after the done beat', () => {
+  it('the next part begins after the done beat (SCREEN-EASY: the left-leg squat; T1 side-on comes after the jump)', () => {
     const run = drive();
-    expect(run.v.part).toBe('T1-side');
+    expect(run.v.part).toBe('T3-left');
+    expect(run.steps).toContain('partDone');
     expect(ohsSide().frames.length).toBeGreaterThan(0);
   });
 });

@@ -169,9 +169,10 @@ export class PassFlight {
   active = false;
   private from = new Vector3(); private to = new Vector3();
   private t = 0; private duration = 0.3; private type: PassType = 'chest';
+  private aim = new Vector3(); private live: Vector3 | null = null;   // hoops-p05b: the aim as thrown, and the receiver's live catch point
 
   start(from: Vector3, to: Vector3, type: PassType, speedMult = 1): void {   // HOOPS KINETIC 3v3: a SLING-PASS flies faster
-    this.from.copyFrom(from); this.to.copyFrom(to);
+    this.from.copyFrom(from); this.to.copyFrom(to); this.aim.copyFrom(to); this.live = null;
     this.type = type;
     const dist = Vector3.Distance(from, to);
     this.duration = Math.max(0.14, dist / (PASS_SPEED[type] * speedMult));
@@ -179,10 +180,24 @@ export class PassFlight {
     this.active = true;
   }
 
+  /**
+   * hoops-p05b: THE PASS ARRIVES IN THE HANDS. The flight flew to the point it was aimed at on the throw (the receiver led at the ball's
+   * speed), and the catch was given wherever the receiver really was when it got there: a receiver who did not run the lead's line caught
+   * a ball up to 1.5 m from his palms (3v3 seed 7, the hero's pass to mate1: palms 1.14 / 1.48 m off the ball on the catch frame), drawn
+   * into the hand in one frame (1.67 m). Called each frame of the flight with the receiver's catch point, the flight's end eases from
+   * the thrown aim onto it (smoothstep in the flight's own progress: none at the throw, all of it at the catch), so the ball's path
+   * bends smoothly and lands on him. The flight's time is the throw's (catch timing unchanged). Not called (or null): the flight as it was.
+   */
+  homeTo(live: Vector3 | null): void {
+    if (!this.active || !live) return;
+    (this.live ??= new Vector3()).copyFrom(live);
+  }
+
   step(dt: number, ball: Vector3): boolean {
     if (!this.active) return true;
     this.t = Math.min(1, this.t + dt / this.duration);
     const k = this.t;
+    if (this.live) { const s = k * k * (3 - 2 * k); this.to.set(this.aim.x + (this.live.x - this.aim.x) * s, this.aim.y + (this.live.y - this.aim.y) * s, this.aim.z + (this.live.z - this.aim.z) * s); }
     ball.x = this.from.x + (this.to.x - this.from.x) * k;
     ball.z = this.from.z + (this.to.z - this.from.z) * k;
     if (this.type === 'chest') {

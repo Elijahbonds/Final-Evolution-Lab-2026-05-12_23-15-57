@@ -3,6 +3,7 @@ import { formatUsd } from '@/lib/books/bookCatalog';
 import {
   AUDIENCE_STATS,
   MEDIA_KIT,
+  PUBLIC_PAGE_COPY,
   mediaKitProfile,
   publicMediaKitHighlight,
   publicMediaKitPackageDetail,
@@ -10,6 +11,7 @@ import {
 } from '@/lib/creator/creatorCatalog';
 import { currentViewer } from '@/lib/creator/creatorViewer';
 import { CreatorFrame, ExampleBadge, ProfilePhoto, SectionTitle } from '@/components/creator-platform/creator-frame';
+import { OwnerCopy } from '@/components/public-copy/owner-copy';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Media kit — Final Evolution Lab' };
@@ -23,15 +25,17 @@ export default async function MediaKitPage() {
     <CreatorFrame
       signedIn={viewer.signedIn}
       title={<>Media <span className="text-[#F5C518]">kit</span></>}
-      lede="For brands and partners. Everything marked EXAMPLE is draft information until confirmed."
+      lede={PUBLIC_PAGE_COPY.mediaKit.lede}
     >
+      {/* ONB-05: Appendix B as approved (2026-10-20); [OWNER: …] marks a blank the owner still fills. */}
+      <OwnerCopy parts={PUBLIC_PAGE_COPY.mediaKit.body} className="mt-6 max-w-2xl text-base leading-relaxed text-white/75" />
       <section className="mt-8 grid gap-6 md:grid-cols-[180px_1fr]">
         {profile ? <ProfilePhoto name={profile.name} photoUrl={profile.photoUrl} size="lg" /> : null}
         <div>
           <SectionTitle>Bio</SectionTitle>
           <p className="fel-heading mt-1 text-3xl text-white">{profile?.name ?? 'Final Evolution Lab'}</p>
           <p className="mt-2 text-sm text-white/70">{publicProfileBio(profile)}</p>
-          <Link href="/work-with-us?source=media-kit" className="mt-4 inline-block rounded-md bg-[#F5C518] px-4 py-2 text-sm font-semibold text-black hover:bg-[#ffd84a]">
+          <Link href="/work-with-us?source=media-kit" className="mt-4 inline-flex min-h-11 items-center rounded-md bg-[#F5C518] px-4 py-2 text-sm font-semibold text-black hover:bg-[#ffd84a]">
             Inquire
           </Link>
         </div>
@@ -44,6 +48,9 @@ export default async function MediaKitPage() {
         </ul>
       </section>
 
+      {/* TRY-AGE-PLACEHOLDER-1 (live audit 2026-11-02): fixture audience numbers are never shown publicly; the section renders
+          only once AUDIENCE_STATS carries real numbers (isExample false). */}
+      {!audience.isExample && (
       <section className="mt-10">
         <div className="flex items-center">
           <SectionTitle>Audience</SectionTitle>
@@ -52,15 +59,16 @@ export default async function MediaKitPage() {
         <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {audience.stats.map((s) => (
             <div key={s.label} className="rounded-xl border border-white/10 bg-[#141414] p-4">
-              <p className="text-[11px] uppercase tracking-wider text-white/45">{s.label}</p>
+              <p className="text-[12px] uppercase tracking-wider text-white/50">{s.label}</p>
               <p className="fel-heading mt-1 text-3xl text-white">{s.value}</p>
             </div>
           ))}
         </div>
         {audience.isExample ? (
-          <p className="mt-2 text-[11px] text-white/35">Fixture numbers, not real stats.</p>
+          <p className="mt-2 text-[12px] text-white/50">Fixture numbers, not real stats.</p>
         ) : null}
       </section>
+      )}
 
       <section className="mt-10">
         <div className="flex items-center">
@@ -88,7 +96,7 @@ export default async function MediaKitPage() {
             </div>
           ))}
         </div>
-        <Link href="/work-with-us?source=media-kit" className="mt-4 inline-block rounded-md bg-[#F5C518] px-4 py-2 text-sm font-semibold text-black hover:bg-[#ffd84a]">
+        <Link href="/work-with-us?source=media-kit" className="mt-4 inline-flex min-h-11 items-center rounded-md bg-[#F5C518] px-4 py-2 text-sm font-semibold text-black hover:bg-[#ffd84a]">
           Inquire
         </Link>
       </section>

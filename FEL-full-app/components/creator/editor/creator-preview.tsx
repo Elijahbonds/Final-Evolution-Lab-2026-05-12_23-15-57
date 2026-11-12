@@ -48,6 +48,7 @@ import type { PreviewBinding } from '@/lib/creator/editor/previewBinding';
 import { poseLoops } from '@/lib/creator/editor/previewPose';
 import { PreviewControls } from '@/components/creator/editor/preview-controls';
 import { accessoriesForEquipped, wornPartsForEquipped } from '@/lib/closet/wearableAccessories';
+import { quietCanvas } from '@/lib/babylon/core/canvasA11y';
 
 export interface CreatorPreviewProps {
   binding: PreviewBinding;
@@ -83,6 +84,8 @@ export default function CreatorPreview({ binding, poseClip = null, height = 420 
       const fit0 = fitCanvas({ cssWidth: box.clientWidth || 320, cssHeight: box.clientHeight || height, dpr: window.devicePixelRatio || 1 });
       const tier = detectQualityTier(box, fit0);
       const engine = new Engine(box, tier === 'desktop', { alpha: true, adaptToDeviceRatio: false });
+      // SCREEN-FIXES (2026-11-10): named, and out of the Tab order (Babylon makes it 1): lib/babylon/core/canvasA11y.ts
+      quietCanvas(engine, box);
       applyCanvasFit(engine, box);
       const scene = new Scene(engine);
       scene.clearColor = new Color4(0.02, 0.02, 0.03, 1);

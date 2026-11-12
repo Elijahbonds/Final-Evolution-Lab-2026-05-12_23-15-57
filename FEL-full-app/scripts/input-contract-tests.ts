@@ -36,6 +36,8 @@ const read = (p: string) => fs.readFileSync(p, 'utf8');
 const relPlay = (p: string) => path.relative(PLAY, p);
 
 const SHELL_EXEMPT_ROUTES: Record<string, string> = {
+  // STUDIO-EASY (2026-10-28): /play/shared is a 404 index (its share links, /play/shared/[token], are the HELD landing, not a mode)
+  shared: 'a 404 index: Nexus Studio share links live under it (app/play/shared/[token], HELD); no mode plays here, so no GameShell',
   calibrate: 'timing calibration utility; it does not record a play session',
   'map-preview': 'auth-gated map preview, not a playable mode',
   mirror: 'Train-owned pose screen; mirror-coach owns its camera/session contract',
@@ -51,6 +53,7 @@ const SHELL_EXEMPT_ROUTES: Record<string, string> = {
   // DRILLS (2026-10-07, Mirror & coaching Phase 6): the Playbook drills on the camera. Not a game: no score is posted, no
   // session recorded, nothing paid; it runs body play's space check and the drill engine (lib/drills) on its own page.
   drills: 'Train-owned camera drills (lib/drills): records no play session and pays nothing, so no GameShell',
+  'gb-shelf': 'flag-gated Homebrew Shelf (BINJGB_SHELF_ENABLED, off by default): a sandboxed Game Boy emulator that records no play session and pays nothing, so no GameShell',
 };
 
 const LOADER_BYPASS_ROUTES: Record<string, string> = {

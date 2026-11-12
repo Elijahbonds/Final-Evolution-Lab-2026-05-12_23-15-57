@@ -1,9 +1,12 @@
 import Link from 'next/link';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { DoorsRow } from '@/components/shell/doors-row';
 import { TabPage } from '@/components/shell/tab-page';
 import { FAMILIES, OFF_SHELF, SHELF_MODE_COUNT, shelvedModes, type Family } from '@/lib/nav/families';
 import { modeMenuMetaFor, visibleModeEntries } from '@/lib/mode-menu';
 import { PartyBadge } from '@/components/party/party-badge';   // MULTIPLAYER: the games friends can play together
+import { ModesSignInNote, SignInChip } from '@/components/modes/sign-in-to-play';   // PUBLIC-POLISH: say sign-in first
 
 type ModeTile = {
   key: string;
@@ -28,12 +31,12 @@ function tileFor([key, info]: ReturnType<typeof visibleModeEntries>[number]): Mo
   };
 }
 
-function ModeCard({ tile }: { tile: ModeTile }) {
+function ModeCard({ tile, guest }: { tile: ModeTile; guest: boolean }) {
   const { Icon } = tile;
   return (
     <Link
       href={tile.href}
-      className="group flex h-full gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.025] p-4 transition-all duration-200 hover:bg-white/[0.055]"
+      className="group flex h-full min-w-0 gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.025] p-4 transition-all duration-200 hover:bg-white/[0.055]"
       style={{ ['--mode-accent' as string]: tile.color }}
     >
       <span
@@ -42,12 +45,15 @@ function ModeCard({ tile }: { tile: ModeTile }) {
       >
         <Icon className="h-5 w-5" />
       </span>
+      {/* READABLE (lane/readable-2): the name and the venue line wrap (they were one-line truncates, whose full width set the
+          card's minimum: at 150 % root font the page scrolled 6 px sideways); the card itself may shrink (min-w-0). */}
       <span className="min-w-0">
-        <span className="fel-heading block truncate text-[15px] font-bold text-white">{tile.name} <PartyBadge modeKey={tile.key} className="ml-1" /></span>
-        <span className="mt-0.5 block truncate font-mono text-[10.5px] uppercase tracking-[0.12em] text-white/35">
+        <span className="fel-heading block text-[15px] font-bold text-white">{tile.name} <PartyBadge modeKey={tile.key} className="ml-1" /></span>
+        <span className="mt-0.5 block font-sans text-[12px] uppercase tracking-[0.14em] text-fel-quiet">
           {tile.venue}
         </span>
-        <span className="mt-2 block text-[12.5px] leading-relaxed text-white/48">{tile.desc}</span>
+        <span className="mt-2 block text-[14px] leading-relaxed text-fel-dim">{tile.desc}</span>
+        <SignInChip serverGuest={guest} />
       </span>
     </Link>
   );
@@ -58,32 +64,38 @@ function ModeSection({
   blurb,
   accent,
   tiles,
+  guest,
 }: {
   title: string;
   blurb: string;
   accent: string;
   tiles: ModeTile[];
+  guest: boolean;
 }) {
   if (!tiles.length) return null;
   return (
-    <section className="rounded-3xl border border-white/[0.06] bg-white/[0.018] p-4 md:p-5">
+    <section className="fel-surface p-4 md:p-5">
       <header className="mb-4 flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h2 className="fel-heading text-[19px] font-black text-white">{title}</h2>
-          <p className="mt-1 text-[12.5px] text-white/45">{blurb}</p>
+          <h2 className="fel-heading text-[20px] font-bold text-white"><span aria-hidden className="mr-2 inline-block h-2 w-2 rounded-full align-middle" style={{ background: accent }} />{title}</h2>
+          <p className="mt-1 text-[14px] text-fel-dim">{blurb}</p>
         </div>
-        <p className="font-mono text-[11px] font-bold tabular-nums" style={{ color: accent }}>
+        {/* P10: the count in the text ladder (it was the family accent at 11 px, 4.27:1 for the darker accents) */}
+        <p className="font-sans text-[12px] font-semibold tabular-nums text-fel-dim">
           {tiles.length} {tiles.length === 1 ? 'mode' : 'modes'}
         </p>
       </header>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {tiles.map((tile) => <ModeCard key={tile.key} tile={tile} />)}
+        {tiles.map((tile) => <ModeCard key={tile.key} tile={tile} guest={guest} />)}
       </div>
     </section>
   );
 }
 
-export default function ModesPage() {
+export default async function ModesPage() {
+  // SCREEN-FIXES (2026-11-10): who is looking, from the server, so the sign-in note and the cards' chips are in the first
+  // draw for a signed-out visitor (they arrived after the browser's session read and moved every card down)
+  const guest = !(await getServerSession(authOptions));
   const byKey = new Map(visibleModeEntries().map((entry) => [entry[0], tileFor(entry)]));
   const shelved = new Set(shelvedModes());
   const sections = FAMILIES.map((family: Family) => ({
@@ -98,16 +110,20 @@ export default function ModesPage() {
     <TabPage
       eyebrow="Modes"
       title="All live modes"
-      lede={`${SHELF_MODE_COUNT} shelf modes plus ${offShelf.length} training-floor ${offShelf.length === 1 ? 'entry' : 'entries'}. Every card has a route, venue and play contract.`}
+      // PUBLIC-POLISH (2026-11-02, live sweep J7): plain words. It read "34 shelf modes plus 1 training-floor entry. Every
+      // card has a route, venue and play contract." — the shelf's own vocabulary, on a page visitors land on.
+      lede={`${SHELF_MODE_COUNT} games, grouped by sport, plus ${offShelf.length} training ${offShelf.length === 1 ? 'tool' : 'tools'} at the end. Pick one and play.`}
       accent="#00E5FF"
     >
       <div className="space-y-5">
-        {sections.map((section) => <ModeSection key={section.title} {...section} />)}
+        <ModesSignInNote serverGuest={guest} />
+        {sections.map((section) => <ModeSection key={section.title} {...section} guest={guest} />)}
         <ModeSection
           title="Training floor"
-          blurb={offShelf.map((tile) => OFF_SHELF[tile.key]).filter(Boolean).join(' · ') || 'Mode surfaces that live outside the Play shelf.'}
+          blurb={offShelf.map((tile) => OFF_SHELF[tile.key]).filter(Boolean).join(' · ') || 'Training tools that live outside the game list.'}
           accent="#00FF9D"
           tiles={offShelf}
+          guest={guest}
         />
       </div>
       <DoorsRow tab="play" />

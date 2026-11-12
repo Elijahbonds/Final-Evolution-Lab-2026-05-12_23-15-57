@@ -1,0 +1,626 @@
+// gameplay-clean audit driver (lane/gameplay-clean, 2026-10-28). Owner: "Gameplay needs to be really clean. All tools need
+// to be accessible, easy to use." One headless run per mode of the REAL /play page (./entry.tsx, built by ./build.mjs and
+// served statically), on a sideways phone (844x390, touch; DPR 1 so a drawn photograph is affordable on software GL), with scripted keyboard play for PLAY_S seconds of game
+// time, recording what the player would see:
+//
+//   motion   animation pops (a bone's angular speed ≥ 600°/s and ≥ 3.5× its neighbourhood — the motion probe's rule), root
+//            jumps, T-pose / rest-pose frames on the hero, foot skate (a planted foot's slide while the hero moves)
+//   camera   cuts (a one-frame jump of the eye > 0.6 m or the target > 0.8 m — the dunk probe's rule), and whether the hero
+//            can be seen: three rays (head, chest, hips) from the eye to the hero, blocked by a visible mesh that is not
+//            the hero's own (hidden = 2 of 3 blocked), every 4th frame
+//   HUD      on-screen words (DOM + Babylon GUI), text under 12 px, overlapping text, low contrast, small tap targets — on
+//            the READY card, in play (three moments) and on the pause
+//   perf     CPU frame time (the GPU's draws skipped, FAST=1: the dunk lane's validated fast mode) — the whole run, and a
+//            phone-tier window (4× CDP CPU throttle) at the end; draw calls per frame (counted, even when skipped) against
+//            the mobile budget (PerfMonitor MOBILE_BUDGET 600); wall time to READY and to the first playing frame
+//   input    press → the hero's first visible change (a clip change or a joint ≥ 5 cm off its extrapolated path), per tap
+//   flow     the phase timeline; the longest stretch of play where nothing moved and nothing on screen changed (stuck)
+//   controls a pause reachable on each device (START / ESC; a touch button), the controls panel on READY and on pause, a way
+//            out, the feel panel's tab, the touch deck answering a tap
+//   errors   page errors and console errors
+//
+// The clock is virtual from TAP TO START (every rendered frame is 1/60 s of game time; timers and intervals run on it), so
+// the motion numbers are a function of frames, not of this machine's load. The load is timed on the wall clock.
+//
+//   node audit.mjs <outDir> <mode,mode,...>     env: PORT=3661 PLAY_S=45 FAST=1 SHOTS=1 RM=0 (1: prefers-reduced-motion)
+import { createRequire } from 'node:module';
+import fs from 'node:fs';
+import path from 'node:path';
+import zlib from 'node:zlib';
+import { countPops } from './popCount.mjs';
+const require = createRequire(new URL('../../../package.json', import.meta.url).pathname);
+const { chromium } = require('playwright-core');
+
+const [OUT, MODES_ARG] = process.argv.slice(2);
+if (!OUT || !MODES_ARG) { console.error('usage: node audit.mjs <outDir> <mode,...>'); process.exit(2); }
+const MODES = MODES_ARG.split(',').filter(Boolean);
+const PORT = process.env.PORT ?? '3661';
+const HOST = process.env.HOST ?? '127.0.0.1';   // serve.mjs picks the site by host name (a before- and an after-build on one port)
+const PLAY_S = Number(process.env.PLAY_S ?? 22);   // 22 s of scripted play (was 30: on the shared box at load 10–19 the 230 s wall budget cut most runs to 15–25 s anyway)
+const PAUSE_AT = Number(process.env.PAUSE_AT ?? 10);
+const PERF_S = Number(process.env.PERF_S ?? 2.5);
+const FAST = process.env.FAST !== '0';
+const SHOTS = process.env.SHOTS !== '0';
+const RM = process.env.RM === '1';
+const TAG = process.env.TAG ?? (RM ? 'rm' : 'base');
+const QS = process.env.QS ?? '';
+const BOOT_S = Number(process.env.BOOT_S ?? 170);
+const MODE_WALL_S = Number(process.env.MODE_WALL_S ?? 300);   // the play loop's wall budget: past it, what was recorded is analysed (partial)
+fs.mkdirSync(OUT, { recursive: true });
+
+// ── the page's clock, input and recorder (installed before any module runs) ───────────────────────────────────────────
+// FEEL='anim.inertial=1,camera.leadEaseSec=0': feel-panel overrides for an A/B run (with QS='&playtest=1', the panel's own gate:
+// lib/feel-panel/sessionGate.ts). The overrides go into this device's storage before the page loads, exactly as the panel keeps them.
+const FEEL = Object.fromEntries((process.env.FEEL ?? '').split(',').filter(Boolean).map((kv) => { const [k, v] = kv.split('='); return [k, Number(v)]; }));
+const INIT = `(() => {
+  ${Object.keys(FEEL).length ? `try { localStorage.setItem('fel.feel.overrides.v1', ${JSON.stringify(JSON.stringify(FEEL))}); } catch {}` : ''}
+  const realNow = performance.now.bind(performance); window.__realNow = realNow;
+  { let t = 7 >>> 0; Math.random = () => { t += 0x6D2B79F5; let r = Math.imul(t ^ (t >>> 15), 1 | t); r ^= r + Math.imul(r ^ (r >>> 7), 61 | r); return ((r ^ (r >>> 14)) >>> 0) / 4294967296; }; }
+  window.__name = window.__name || function (f) { return f; };
+  let vt = 0; window.__vtOn = false; window.__freeze = false; window.__vtFrames = 0;
+  performance.now = () => (window.__vtOn ? vt : realNow());
+  window.__vtStart = () => { vt = realNow(); window.__vt0 = vt; window.__vtOn = true; };
+  window.__gameS = () => (window.__vtOn ? (vt - window.__vt0) / 1000 : -1);
+  const nST = window.setTimeout.bind(window), nCT = window.clearTimeout.bind(window), nSI = window.setInterval.bind(window), nCI = window.clearInterval.bind(window);
+  const timers = new Map(); let tid = 1e7;
+  window.setTimeout = (fn, ms, ...a) => {
+    if (!window.__vtOn || typeof fn !== 'function') return nST(fn, ms, ...a);
+    const id = tid++; timers.set(id, { at: vt + Math.max(0, Number(ms) || 0), fn, a }); return id;
+  };
+  window.clearTimeout = (id) => { if (timers.has(id)) timers.delete(id); else nCT(id); };
+  // intervals run on game time once it is on (performance.now is real until then): the watchdog's 1 s sample would
+  // otherwise fire every few frames on a slow software-GL box (the perf-lag rig's rule)
+  window.setInterval = (fn, ms, ...a) => { let last = performance.now(); const want = Math.max(1, Number(ms) || 0);
+    return nSI(() => { const n = performance.now(); if (n - last >= want) { last = n; fn(...a); } }, Math.min(want, 50)); };
+  const runDue = () => { for (const [id, t] of [...timers]) if (t.at <= vt + 1e-6) { timers.delete(id); nST(() => t.fn(...t.a), 0); } };
+  const raf = window.requestAnimationFrame.bind(window); let lastTs = -1;
+  window.requestAnimationFrame = (cb) => raf((ts) => {
+    if (ts !== lastTs) { lastTs = ts; if (window.__vtOn && !window.__freeze) { vt += 1000 / 60; window.__vtFrames++; try { window.__onVtFrame && window.__onVtFrame(); } catch (e) { window.__scriptErr = String(e); } runDue(); } }
+    cb(window.__vtOn ? vt : ts);
+  });
+  // shader programs linked, by phase: a link during PLAY is a hitch the player feels (PerfMonitor's own rule)
+  window.__links = { ready: 0, playing: 0, other: 0, playMs: 0, firstPlayMs: 0 };
+  for (const C of [window.WebGLRenderingContext, window.WebGL2RenderingContext]) { if (!C) continue; const lp = C.prototype.linkProgram;
+    C.prototype.linkProgram = function (prog) { const t = realNow(); const r = lp.call(this, prog); const ms = realNow() - t;
+      const ph = window.__sessionStore ? window.__sessionStore.view().phase : null; const L = window.__links;
+      if (ph === 'playing') { L.playing++; L.playMs += ms; if ((window.__gameS ? window.__gameS() : 99) < 1) L.firstPlayMs += ms; } else if (ph === 'ready') L.ready++; else L.other++; return r; }; }
+  window.__errs = []; window.addEventListener('error', (e) => window.__errs.push('error: ' + (e.message || '').slice(0, 200)));
+})()`;
+
+// ── the recorder: binds to __FEL_DEV__ (scene, hero), counts draws, times frames, samples the hero's visibility ─────────
+function installRecorder(cfg) {
+  const W = window, dev = W.__FEL_DEV__, scene = dev.scene, engine = scene.getEngine();
+  const R = W.__rec = { frames: [], clips: [], clipIx: new Map(), gNames: [], gIx: new Map(), occNames: [], occIx: new Map(), presses: [], bus: [], keys: new Set(), heroOk: false, skel: false, frameNo: 0 };
+  const ix = (map, arr, s) => { let i = map.get(s); if (i === undefined) { i = arr.length; arr.push(s); map.set(s, i); } return i; };
+  // DRAWS: counted always; skipped while FAST unless a photograph needs the pixels
+  let draws = 0; W.__fast = cfg.fast; W.__drawOn = !cfg.fast; W.__drawnFrames = 0;
+  const de = engine.drawElementsType.bind(engine), da = engine.drawArraysType.bind(engine);
+  engine.drawElementsType = (...a) => { draws++; if (W.__drawOn) de(...a); };
+  engine.drawArraysType = (...a) => { draws++; if (W.__drawOn) da(...a); };
+  // the render watchdog photographs the canvas; under FAST it would see the clear colour and "rescue" a healthy game
+  const T = W.__BABYLON_TOOLS;
+  if (T && cfg.fast) { const orig = T.CreateScreenshot; const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'); g.fillStyle = '#7a7a7a'; g.fillRect(0, 0, 64, 64); const gray = c.toDataURL();
+    T.CreateScreenshot = (eng, cam, size, cb, ...rest) => (W.__drawOn ? orig(eng, cam, size, cb, ...rest) : (cb && setTimeout(() => cb(gray), 0))); }
+  let fb = 0;
+  engine.onBeginFrameObservable.add(() => { fb = W.__realNow(); draws = 0; });
+  const clean = (n) => n.replace(/^mixamorig:?/, '').replace(/_c\d+$/, '').replace(/^.*[:|]/, '');
+  const JN = ['Hips', 'LeftFoot', 'RightFoot', 'LeftToeBase', 'RightToeBase', 'LeftHand', 'RightHand', 'Head', 'LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm', 'Spine2'];
+  const QN = ['Hips', 'Spine', 'Spine1', 'Spine2', 'Neck', 'Head', 'LeftShoulder', 'RightShoulder', 'LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand', 'LeftUpLeg', 'RightUpLeg', 'LeftLeg', 'RightLeg', 'LeftFoot', 'RightFoot', 'LeftToeBase', 'RightToeBase'];
+  let heroRef = null, jn = null, qn = null, rest = null, heroMeshes = null, bindAt = -99; const heroGroups = new Map();
+  const bind = (hero) => {
+    heroRef = hero; jn = qn = rest = null; heroMeshes = new Set();
+    if (!hero) return;
+    try { for (const m of hero.getChildMeshes(false)) heroMeshes.add(m); if (hero.getClassName && /Mesh/.test(hero.getClassName())) heroMeshes.add(hero); } catch {}
+    const sk = scene.skeletons.find((s) => s.bones.some((b) => { const t = b.getTransformNode && b.getTransformNode(); return t && (t === hero || t.isDescendantOf(hero)); }));
+    if (!sk) return;
+    const byName = new Map(); const restQ = new Map();
+    for (const b of sk.bones) { const t = b.getTransformNode && b.getTransformNode(); if (!t) continue; const n = clean(t.name); byName.set(n, t);
+      try { const q = new t.rotationQuaternion.constructor(); b.getRestPose().decompose(undefined, q, undefined); restQ.set(n, q); } catch {} }
+    jn = JN.map((n) => byName.get(n) || null); qn = QN.map((n) => byName.get(n) || null); rest = QN.map((n) => restQ.get(n) || null);
+    R.skel = true;
+  };
+  const r4 = (x) => Math.round(x * 1e4) / 1e4, r3 = (x) => Math.round(x * 1e3) / 1e3;
+  const camPose = () => { const c = scene.activeCamera; if (!c) return [0, 0, 0, 0, 0, 0];
+    const e = c.globalPosition || c.position; let t = null;
+    try { t = c.getTarget ? c.getTarget() : null; } catch {}
+    if (!t) { try { const r = c.getForwardRay(10); t = r.origin.add(r.direction.scale(10)); } catch { t = e; } }
+    return [r3(e.x), r3(e.y), r3(e.z), r3(t.x), r3(t.y), r3(t.z)]; };
+  // the hero's visibility: rays from the eye to head, chest and hips; a visible, non-hero mesh in between, bigger than a ball
+  const Ray = scene.activeCamera ? scene.activeCamera.getForwardRay(1).constructor : null;
+  const occlusion = (pts) => {
+    const c = scene.activeCamera; if (!c || !Ray) return [-1, -1];
+    const e = c.globalPosition || c.position; let blocked = 0, who = -1;
+    for (const p of pts) {
+      if (!p) continue;
+      const d = p.subtract(e); const len = d.length(); if (len < 1.2) continue;
+      const ray = new Ray(e.clone(), d.scale(1 / len), len - 1.0);   // a metre short: the hero's own gear and vehicle (aero's scarf, a wingtip) is not a blocked view
+      // the props and the world only: a skinned body (a rival, a horde fighter, their kit) in front of the hero is play, not a blocked view
+      const hits = scene.multiPickWithRay(ray, (m) => m.isEnabled() && m.isVisible && (m.visibility === undefined || m.visibility > 0.25) && !heroMeshes.has(m) && !m.skeleton
+        && m.getTotalVertices && m.getTotalVertices() > 0 && !(m.material && m.material.alpha !== undefined && m.material.alpha < 0.3)
+        && (m.getBoundingInfo().boundingSphere.radiusWorld > 0.3) && !/sky|ground|floor|court$|water|ocean|backdrop|dome|fog/i.test(m.name));
+      // only a face the player can SEE blocks the view: a single-sided wall seen from behind is culled (the combat rings'
+      // walls between an outside camera and the fighters: drawn through, picked anyway — 51–54 % "hidden" that was not)
+      const hit = (hits || []).sort((x, y) => x.distance - y.distance).find((h) => { const m = h.pickedMesh; const mat = m && m.material;
+        if (mat && mat.backFaceCulling === false) return true; const n = h.getNormal(true, true); if (!n) return true;
+        return n.x * ray.direction.x + n.y * ray.direction.y + n.z * ray.direction.z < 0; });
+      if (hit) { blocked++; if (who < 0) who = ix(R.occIx, R.occNames, hit.pickedMesh ? hit.pickedMesh.name.slice(0, 40) : '?'); }
+    }
+    return [blocked, who];
+  };
+  try { dev.input.on((e) => { if (R.bus.length < 4000) R.bus.push([W.__gameS(), e.t, e.btn || e.side || e.dir || '', e.pressed === undefined ? (e.value ?? e.x ?? '') : e.pressed, e.src || '']); }); } catch {}
+  const projIn = (p) => { try { const c = scene.activeCamera; const eng = scene.getEngine(); const w = eng.getRenderWidth(), hh = eng.getRenderHeight();
+    const V = p.constructor; const M = scene.getTransformMatrix(); const s = V.Project(p, M.constructor.Identity(), M, c.viewport.toGlobal(w, hh));
+    return s.z > 0 && s.z < 1 && s.x >= 0 && s.x <= w && s.y >= 0 && s.y <= hh ? 1 : 0; } catch { return -1; } };
+  scene.onAfterRenderObservable.add(() => {
+    if (W.__drawOn) W.__drawnFrames++;
+    if (!W.__vtOn) return;
+    const fe = W.__realNow() - fb; const r0 = W.__realNow();
+    const h = dev.hero ? dev.hero() : null;
+    if (h !== heroRef && R.frameNo - bindAt > 30) { bindAt = R.frameNo; bind(h); }
+    const ss = W.__sessionStore ? W.__sessionStore.view() : null;
+    const f = { t: r3(W.__gameS()), ph: ss ? ss.phase : null, d: draws, ms: r3(fe), k: [...R.keys].join('') };
+    R.frameNo++;
+    if (heroRef && jn) {
+      try {
+        const rp = heroRef.getAbsolutePosition(); f.r = [r3(rp.x), r3(rp.y), r3(rp.z)];
+        f.j = jn.map((n) => { if (!n) return null; const p = n.getAbsolutePosition(); return [r3(p.x), r3(p.y), r3(p.z)]; });
+        let restN = 0, restOk = 0;
+        f.q = qn.map((n, i) => { if (!n || !n.rotationQuaternion) return null; const q = n.rotationQuaternion;
+          const rq = rest[i]; if (rq) { restN++; const dot = Math.abs(q.x * rq.x + q.y * rq.y + q.z * rq.z + q.w * rq.w); if (dot > 0.99966) restOk++; }   // within 3°
+          return [r4(q.x), r4(q.y), r4(q.z), r4(q.w)]; });
+        f.rest = restN ? r3(restOk / restN) : null;
+        if (R.frameNo % 4 === 0) {
+          const pts = [jn[7] ? jn[7].getAbsolutePosition() : null, jn[12] ? jn[12].getAbsolutePosition() : null, jn[0] ? jn[0].getAbsolutePosition() : null];
+          const [b, who] = occlusion(pts); f.oc = b; f.ow = who; f.inf = pts[1] ? projIn(pts[1]) : -1;
+        }
+      } catch (e) { f.err = String(e).slice(0, 80); }
+      // the hero's playing clips, read off the scene's animation groups (each group is one clip on one body; the anim probe's
+      // readout came back empty on the CharacterAnimator bodies): the ones targeting the hero's nodes, weight > 0.3
+      try {
+        const names = [], all = [];
+        for (const g of scene.animationGroups) {
+          if (!g.isPlaying) continue;
+          let isH = heroGroups.get(g);
+          if (isH === undefined) { const t = g.targetedAnimations[0] && g.targetedAnimations[0].target; isH = !!(t && (t === heroRef || (t.isDescendantOf && t.isDescendantOf(heroRef)))); heroGroups.set(g, isH); }
+          // the weight a crossfade gives a clip is on its ANIMATABLES (CharacterAnimator.weightOf); the group's own `weight` stays −1.
+          // (Before clean-5 this read g.weight, so every playing clip read 1: the "> 0.3" below never dropped a fading clip.)
+          const aw = g.animatables && g.animatables[0] ? g.animatables[0].weight : null;
+          const w = aw == null || aw < 0 ? 1 : Math.max(0, Math.min(1, aw));
+          if (isH && w > 0.3) names.push(g.name.replace(/_c\d+$/, '').slice(0, 40));
+          // clean-5: every playing hero clip with its weight (a third clip under a fade, a clip dropped at a weight: poprank.mjs)
+          if (isH) all.push([ix(R.gIx, R.gNames, g.name.replace(/_c\d+$/, '').slice(0, 40)), Math.round(w * 100) / 100]);
+        }
+        f.c = ix(R.clipIx, R.clips, names.sort().join('+')); f.cw = all;
+      } catch {}
+    }
+    f.cam = camPose();
+    if (R.frameNo % 30 === 0) { const txt = (document.body.innerText || '').replace(/\s+/g, ' '); let hsh = 0; for (let i = 0; i < txt.length; i++) hsh = (hsh * 31 + txt.charCodeAt(i)) | 0; f.dom = hsh; }
+    f.rm = Math.round((W.__realNow() - r0) * 100) / 100;
+    R.frames.push(f);
+  });
+}
+
+// ── the scripted player (keyboard, in the page, on game time) ─────────────────────────────────────────────────────────
+function installScript(cfg) {
+  const W = window; const R = W.__rec;
+  const kd = (k) => { if (R.keys.has(k)) return; R.keys.add(k); W.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true })); };
+  const ku = (k) => { if (!R.keys.has(k)) return; R.keys.delete(k); W.dispatchEvent(new KeyboardEvent('keyup', { key: k, bubbles: true })); };
+  // the timeline (game seconds from the first playing frame): idle, forward, run right, a circle, left, PAUSE at
+  // cfg.pauseAt (held until the driver has photographed it), then mixed play with the run held in bursts; a face-button tap
+  // every 1.3 s (A, A, B, A, X, A, Y …), none in the second either side of the pause
+  const P = cfg.pauseAt;
+  const S = W.__S = { t0: null, tapUntil: new Map(), nextTap: 2, tapI: 0, pauseState: 'pending', resumeAt: null, done: false };
+  const CYCLE = ['j', 'j', 'k', 'j', 'l', 'j', 'i'];
+  const tap = (k, t) => { kd(k); S.tapUntil.set(k, t + 0.1); R.presses.push([t, k, R.frameNo]); };
+  const hold = (want) => { for (const k of ['w', 'a', 's', 'd', ' ']) (want.includes(k) ? kd : ku)(k); };
+  W.__onVtFrame = () => {
+    const ss = W.__sessionStore ? W.__sessionStore.view() : null; const ph = ss ? ss.phase : null;
+    if (S.t0 === null) { if (ph === 'playing') S.t0 = W.__gameS(); else return; }
+    const t = W.__gameS() - S.t0; S.t = t;
+    for (const [k, until] of [...S.tapUntil]) if (t >= until) { ku(k); S.tapUntil.delete(k); }
+    if (S.done) { hold([]); return; }
+    if (S.pauseState === 'pending' && t >= P) { hold([]); tap('escape', t); S.pauseState = 'pressed'; S.pressedAt = t; return; }
+    if (S.pauseState === 'pressed') { hold([]); if (ph === 'paused') { S.pauseState = 'paused'; S.pausedAfter = t - S.pressedAt; } else if (t - S.pressedAt > 1.5) S.pauseState = 'failed'; return; }
+    if (S.pauseState === 'paused') { hold([]); if (W.__pauseAck || t - S.pressedAt > 12) { tap('j', t); S.pauseState = 'resuming'; S.resumeAt = t; } return; }
+    if (S.pauseState === 'resuming') { if (ph === 'playing') { S.pauseState = 'resumed'; S.resumedAfter = t - S.resumeAt; } else if (t - S.resumeAt > 2) { S.pauseState = 'stuck-paused'; } }
+    if (t < 1.5) { hold([]); return; }
+    let want = '';
+    if (t < 5) want = 'w';
+    else if (t < 8) want = 'd ';
+    else if (t < 11) want = ['w', 'd', 's', 'a'][Math.floor((t - 8) / 0.75) % 4];
+    else if (t < P - 0.5) want = 'a';
+    else if (t < P + 1.5) want = '';
+    else { const k = Math.floor((t - P) / 2.5) % 4; want = ['w', 'wd', 'wa', 's'][k]; if ((t - P) % 5 < 1.2) want += ' '; }
+    hold(want);
+    if (t >= S.nextTap && !(t > P - 1 && t < P + 2)) { tap(CYCLE[S.tapI++ % CYCLE.length], t); S.nextTap = t + 1.3; }
+    if (t >= cfg.playS) { S.done = true; hold([]); }
+  };
+}
+
+// ── the screen, as a player reads it ──────────────────────────────────────────────────────────────────────────────────
+function auditScreen(where) {
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const lum = (c) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); };
+  const parse = (s) => { const m = /rgba?\(([^)]+)\)/.exec(s || ''); if (!m) return null; const p = m[1].split(/[ ,/]+/).filter(Boolean).map(Number); return [p[0], p[1], p[2], p.length > 3 ? p[3] : 1]; };
+  const over = (top, bot) => [0, 1, 2].map((i) => top[i] * top[3] + bot[i] * (1 - top[3]));
+  const effOpacity = (el) => { let o = 1; for (let e = el; e && e !== document.body; e = e.parentElement) { const cs = getComputedStyle(e); o *= Number(cs.opacity); if (cs.visibility === 'hidden' || cs.display === 'none') return 0; } return o; };
+  const zoomOf = (el) => { let z = 1; for (let e = el; e && e !== document.documentElement; e = e.parentElement) { const v = Number(getComputedStyle(e).zoom); if (v && isFinite(v)) z *= v; } return z; };
+  const texts = []; const tw = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let n = tw.nextNode(); n; n = tw.nextNode()) {
+    const s = n.textContent.replace(/\s+/g, ' ').trim(); if (!s) continue;
+    const el = n.parentElement; if (!el || el.closest('[aria-hidden="true"] svg, script, style, noscript')) continue;
+    if (el.closest('[data-testid="feel-tab"], [data-testid="feel-sheet"]')) continue;   // the owner's dev panel: the rig opens it; a player never sees it
+    // the controls are not the HUD: the touch deck's labels and the shell's buttons are counted apart (deckWords)
+    const inDeck = !!el.closest('[data-touch-deck], [data-fel-corner], [data-capture-ui]');
+    const range = document.createRange(); range.selectNodeContents(n); const r = range.getBoundingClientRect();
+    // < 2 px: a screen-reader-only line (the caption region's sr-only box is 1x1) is not on the screen
+    if (r.width < 2 || r.height < 2 || r.right < 0 || r.bottom < 0 || r.left > vw || r.top > vh) continue;
+    { const cs0 = getComputedStyle(el); if (cs0.clip && cs0.clip !== 'auto' && /rect\(0/.test(cs0.clip)) continue; }
+    const op = effOpacity(el); if (op < 0.05) continue;
+    const cs = getComputedStyle(el);
+    const px = parseFloat(cs.fontSize) * zoomOf(el);
+    // contrast: the text over the nearest painted background (composited over a mid-grey scene where it is see-through)
+    let fg = parse(cs.color) || [255, 255, 255, 1]; fg = [fg[0], fg[1], fg[2], fg[3] * op];
+    let bg = [119, 119, 119]; let backed = false; const layers = [];
+    for (let e = el; e && e !== document.body; e = e.parentElement) { const b = parse(getComputedStyle(e).backgroundColor); if (b && b[3] > 0.02) { layers.push(b); if (b[3] >= 0.5) backed = true; if (b[3] >= 0.98) break; } }
+    for (let i = layers.length - 1; i >= 0; i--) bg = over(layers[i], bg);
+    const fgc = over(fg, bg); const L1 = lum(fgc), L2 = lum(bg); const ratio = (Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05);
+    const shadow = cs.textShadow && cs.textShadow !== 'none';
+    const bold = Number(cs.fontWeight) >= 700; const large = px >= 24 || (bold && px >= 18.66);
+    texts.push({ deck: inDeck, s: s.slice(0, 60), words: s.split(' ').filter((w) => /[A-Za-z0-9]/.test(w)).length, px: Math.round(px * 10) / 10, ratio: Math.round(ratio * 100) / 100, need: large ? 3 : 4.5, backed, shadow, el, r: { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) } });
+  }
+  const small = texts.filter((t) => t.px < 12);
+  const lowC = texts.filter((t) => t.ratio < t.need && !(t.shadow && !t.backed));
+  const unbacked = texts.filter((t) => !t.backed && !t.shadow);
+  const overlaps = [];
+  for (let i = 0; i < texts.length; i++) for (let j = i + 1; j < texts.length; j++) {
+    const a = texts[i], b = texts[j]; if (a.el === b.el || a.el.contains(b.el) || b.el.contains(a.el)) continue;
+    const ix = Math.max(0, Math.min(a.r.x + a.r.w, b.r.x + b.r.w) - Math.max(a.r.x, b.r.x)), iy = Math.max(0, Math.min(a.r.y + a.r.h, b.r.y + b.r.h) - Math.max(a.r.y, b.r.y));
+    const area = ix * iy, minA = Math.min(a.r.w * a.r.h, b.r.w * b.r.h);
+    if (minA > 0 && area / minA > 0.25) overlaps.push(`${a.s.slice(0, 24)} ✕ ${b.s.slice(0, 24)}`);
+  }
+  // Babylon GUI text drawn on the canvas
+  let gui = { words: 0, small: 0, n: 0, ex: [] };
+  try {
+    const dev = window.__FEL_DEV__; const scene = dev && dev.scene; const canvas = scene && scene.getEngine().getRenderingCanvas();
+    const visible = (c) => { for (let x = c; x; x = x.parent) if (!x.isVisible || x.alpha === 0) return false; return true; };
+    for (const t of scene ? scene.textures : []) {
+      if (!t.getClassName || t.getClassName() !== 'AdvancedDynamicTexture' || !t.getDescendants) continue;
+      const sz = t.getSize(); const k = canvas && sz.height ? canvas.clientHeight / sz.height : 1;
+      for (const c of t.getDescendants(false)) {
+        if (c.getClassName() !== 'TextBlock' || !c.text || !String(c.text).trim() || !visible(c)) continue;
+        const words = String(c.text).split(/\s+/).filter((w) => /[A-Za-z0-9]/.test(w)).length; const px = (c.fontSizeInPixels || 0) * k;
+        gui.n++; gui.words += words; if (px > 0 && px < 12) { gui.small++; if (gui.ex.length < 4) gui.ex.push(`${String(c.text).slice(0, 30)} @${px.toFixed(1)}px`); }
+      }
+    }
+  } catch {}
+  const q = (sel) => [...document.querySelectorAll(sel)].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && effOpacity(e) > 0.05; });
+  const targets = q('button, a[href], [role="button"], input, select').filter((e) => !e.closest('[data-testid="feel-tab"]')).map((e) => { const r = e.getBoundingClientRect(); return { s: (e.getAttribute('aria-label') || e.textContent || '').trim().slice(0, 24), w: Math.round(r.width), h: Math.round(r.height) }; });
+  const label = (re) => q('button, a[href], [role="button"]').some((e) => re.test((e.getAttribute('aria-label') || '') + ' ' + (e.textContent || '')));
+  const ss = window.__sessionStore ? window.__sessionStore.view() : null;
+  return {
+    where, phase: ss ? ss.phase : null, words: texts.filter((t) => !t.deck).reduce((s, t) => s + t.words, 0), deckWords: texts.filter((t) => t.deck).reduce((s, t) => s + t.words, 0),
+    endScreen: !!document.querySelector('[data-end-screen]'), textNodes: texts.length,
+    small: small.length, smallEx: [...new Set(small.map((t) => `${t.s.slice(0, 28)} @${t.px}px`))].slice(0, 6),
+    smallest: texts.length ? Math.min(...texts.map((t) => t.px)) : null,
+    lowContrast: lowC.length, lowEx: lowC.slice(0, 5).map((t) => `${t.s.slice(0, 28)} ${t.ratio}:1`),
+    unbacked: unbacked.length, overlaps: overlaps.length, overlapEx: overlaps.slice(0, 5),
+    gui, tapSmall: targets.filter((t) => Math.min(t.w, t.h) < 44).length, tapTiny: targets.filter((t) => Math.min(t.w, t.h) < 24).length,
+    tapEx: targets.filter((t) => Math.min(t.w, t.h) < 44).slice(0, 6).map((t) => `${t.s || '?'} ${t.w}x${t.h}`),
+    controlsPanel: q('[data-controls-panel]').map((e) => e.getAttribute('data-controls-panel')),
+    controlsRows: document.querySelectorAll('[data-controls-panel] [data-controls-rows] > span').length,
+    pausedHeadline: /PAUSED — TAP TO RESUME/.test(document.body.innerText),
+    pauseButton: label(/\bpause\b/i), leaveButton: label(/leave the game|^\s*home\b|quit|exit/i),
+    feelTab: q('[data-testid="feel-tab"]').length > 0, feelActive: q('[data-testid="feel-tab"]').some((e) => String(e.className).includes('amber')), touchDeck: q('[data-touch-deck]').length > 0,
+    fullscreen: label(/full screen/i), tapToStart: /TAP TO START/.test(document.body.innerText),
+    text: [...new Set(texts.map((t) => t.s))].slice(0, 40).join(' | ').slice(0, 900),
+  };
+}
+
+// ── analysis ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+const pct = (a, p) => { if (!a.length) return null; const s = [...a].sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(p * (s.length - 1)))]; };
+const med = (a) => pct(a, 0.5);
+const r2 = (x) => (x === null || x === undefined || !isFinite(x) ? null : Math.round(x * 100) / 100);
+const qang = (a, b) => { if (!a || !b) return null; const d = Math.min(1, Math.abs(a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3])); return 2 * Math.acos(d) * 180 / Math.PI; };
+const dist = (a, b) => (a && b ? Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) : null);
+const QN = ['Hips', 'Spine', 'Spine1', 'Spine2', 'Neck', 'Head', 'LeftShoulder', 'RightShoulder', 'LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand', 'LeftUpLeg', 'RightUpLeg', 'LeftLeg', 'RightLeg', 'LeftFoot', 'RightFoot', 'LeftToeBase', 'RightToeBase'];
+const RIDE = new Set(['skateboard', 'snowboard_slalom', 'surf', 'velocitykart', 'aeroaces', 'bigair']);
+
+function analyze(mode, rec, S) {
+  const F = rec.frames; const play = F.filter((f) => f.ph === 'playing');
+  const dt = 1 / 60; const out = { frames: F.length, playFrames: play.length };
+  // pops (popCount.mjs: the shared counter; RESET frames — the root over 1 m in a frame, and the frame after — are cuts, skipped
+  // since clean-5; `hardPopEventsWithResets` keeps the old count beside it so tables from before clean-5 stay comparable)
+  const pc = countPops(F, rec.clips ?? [], QN);
+  const { pops, events, hard } = pc;
+  out.resetFrames = pc.resetFrames;
+  out.hardPopEventsWithResets = countPops(F, rec.clips ?? [], QN, { skipResets: false }).hard.length;
+  out.hardPopEvents = hard.length; out.hardPopsPerMin = pc.perMin(hard.length);
+  out.popEvents = events.length; out.popEventsPerMin = pc.perMin(events.length);
+  out.popEventEx = [...events].sort((a, b) => b.peak - a.peak).slice(0, 4).map((e) => `${e.t}s ${e.peak}°/s ${[...e.bones].slice(0, 4).join('+')} [${e.from} → ${e.to}]`);
+  // which clip changes the hard pops sit on: the transitions to soften first
+  { const tr = {}; for (const e of hard) { const k = `${e.from} → ${e.to}`; tr[k] = (tr[k] || 0) + 1; } out.hardPopTransitions = Object.entries(tr).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, n]) => `${n}× ${k}`); }
+  out.pops = pops.length; out.popsPerMin = r2(pops.length / Math.max(1e-6, play.length / 3600)); out.popEx = pops.sort((a, b) => b.degS - a.degS).slice(0, 5);
+  // root jumps (teleports) during play
+  const jumps = []; for (let i = 1; i < F.length; i++) { if (F[i].ph !== 'playing' || F[i - 1].ph !== 'playing') continue; const d = dist(F[i].r, F[i - 1].r); if (d !== null && d > 0.35) jumps.push({ t: F[i].t, m: r2(d) }); }
+  out.rootJumps = jumps.length; out.rootJumpEx = jumps.slice(0, 4);
+  // T-pose (arms out level) and rest-pose frames
+  // a T-pose is HELD: arms level and spread for 6+ frames in a row (football's and freerun's hits were 2-frame passes
+  // through level arms on a jump — the raw shows each one after a jump press)
+  let tpose = 0, restF = 0, tposeHeld = 0, tRun = 0;
+  for (const f of play) {
+    const isT = (() => { const j = f.j; if (!j || !j[8] || !j[9] || !j[10] || !j[11] || !j[5] || !j[6]) return false;
+      const lv = (a, b) => { const d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]]; const l = Math.hypot(...d); return l > 0 ? Math.abs(d[1]) / l : 1; };
+      return lv(j[8], j[10]) < 0.26 && lv(j[9], j[11]) < 0.26 && lv(j[10], j[5]) < 0.3 && lv(j[11], j[6]) < 0.3 && dist(j[5], j[6]) > dist(j[8], j[9]) * 3.4; })();
+    tRun = isT ? tRun + 1 : 0; if (tRun === 6) tposeHeld += 6; else if (tRun > 6) tposeHeld++;
+    if (f.rest !== null && f.rest !== undefined && f.rest >= 0.9) restF++;
+    const j = f.j; if (!j || !j[8] || !j[9] || !j[10] || !j[11] || !j[5] || !j[6]) continue;
+    const lvl = (a, b) => { const d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]]; const l = Math.hypot(...d); return l > 0 ? Math.abs(d[1]) / l : 1; };
+    const span = dist(j[5], j[6]), shoulders = dist(j[8], j[9]);
+    if (lvl(j[8], j[10]) < 0.26 && lvl(j[9], j[11]) < 0.26 && lvl(j[10], j[5]) < 0.3 && lvl(j[11], j[6]) < 0.3 && span > shoulders * 3.4) tpose++;
+  }
+  out.tposeFramesAny = tpose;
+  out.tposeFrames = tposeHeld; out.restPoseFrames = restF; out.skeleton = rec.skel;
+  // foot skate: a planted foot (within 4 cm of its own floor, slow vertically) sliding while the hero moves
+  if (!RIDE.has(mode)) {
+    const slides = [];
+    for (const fi of [3, 4]) {
+      const ys = play.map((f) => f.j?.[fi]?.[1]).filter((y) => y != null);
+      for (let i = 1; i < play.length; i++) {
+        const a = play[i - 1], b = play[i]; const pa = a.j?.[fi], pb = b.j?.[fi]; if (!pa || !pb || !a.r || !b.r) continue;
+        const lo = pct(ys.slice(Math.max(0, i - 60), i + 60), 0.05); if (lo === null) continue;
+        const planted = pb[1] < lo + 0.04 && Math.abs(pb[1] - pa[1]) / dt < 0.3;
+        const rootV = Math.hypot(b.r[0] - a.r[0], b.r[2] - a.r[2]) / dt;
+        if (planted && rootV > 0.5 && rootV < 15) slides.push(Math.hypot(pb[0] - pa[0], pb[2] - pa[2]) / dt);
+      }
+    }
+    // CONTACT skate (the robust one): each foot's lowest frame in a stride (a local minimum of the toe's height over ±5 frames)
+    // while the hero moves; at a real contact the foot stands still, so its ground speed there over the root's is the slide
+    // (karate's raw: the toe at floor height sliding 0.8 → 11.7 m/s under a 3.7 m/s root at the run's start)
+    const cv = [], cr = [];
+    for (const fi of [3, 4]) for (let i = 6; i < play.length - 6; i++) {
+      const y = play[i].j?.[fi]?.[1]; if (y == null) continue; let min = true;
+      for (let k = i - 5; k <= i + 5 && min; k++) { const yk = play[k].j?.[fi]?.[1]; if (yk != null && yk < y - 1e-6) min = false; }
+      if (!min) continue; const a = play[i - 1], b2 = play[i + 1]; if (!a.r || !b2.r || !a.j?.[fi] || !b2.j?.[fi]) continue;
+      const dtt = Math.max(1e-3, b2.t - a.t); const rv = Math.hypot(b2.r[0] - a.r[0], b2.r[2] - a.r[2]) / dtt; if (rv < 0.8 || rv > 15) continue;
+      // the SLOWEST the foot gets around that low point (±4 frames): a planted foot reaches ~0 somewhere in its stance, a
+      // skating one never drops under the body's speed (the low point alone can land on heel-strike or toe-off)
+      let v = Infinity;
+      for (let k = Math.max(1, i - 4); k <= Math.min(play.length - 1, i + 4); k++) { const p0 = play[k - 1].j?.[fi], p1 = play[k].j?.[fi]; const dk = play[k].t - play[k - 1].t; if (p0 && p1 && dk > 1e-4) v = Math.min(v, Math.hypot(p1[0] - p0[0], p1[2] - p0[2]) / dk); }
+      if (!isFinite(v)) continue; cv.push(v); cr.push(v / rv);
+    }
+    out.contacts = cv.length; out.contactSlideMed = r2(med(cv)); out.contactSlideRatio = r2(med(cr));
+    // through the floor: the toes below the hero's own root height (a grounded hero stands at its root)
+    const pen = play.filter((f) => f.j?.[3] && f.j?.[4] && f.r).map((f) => Math.min(f.j[3][1], f.j[4][1]) - f.r[1]);
+    out.toeBelowRootP01 = r2(pct(pen, 0.01));
+    out.skateFrames = slides.length; out.skateMed = r2(med(slides)); out.skateP90 = r2(pct(slides, 0.9));
+    out.skateShare = r2(slides.length ? slides.filter((v) => v > 0.25).length / slides.length : null);
+  } else out.skate = 'n/a (ride)';
+  // camera cuts
+  const cuts = []; const DE = new Array(F.length).fill(null), DA = new Array(F.length).fill(null);
+  for (let i = 1; i < F.length; i++) { const a = F[i - 1].cam, b = F[i].cam; if (!a || !b || F[i].ph !== 'playing' || F[i - 1].ph !== 'playing') continue;
+    // relative to the hero's own step: a chase camera behind a plane or a kart moves metres a frame and is not cutting.
+    // The look is an ANGLE (the view direction, eye → target), not the target point: a target 10 m out moves a metre on a
+    // 6° turn (aero's raw: 523 "cuts" that were a chase cam banking with the plane)
+    const hr = F[i].r && F[i - 1].r ? [F[i].r[0] - F[i - 1].r[0], F[i].r[1] - F[i - 1].r[1], F[i].r[2] - F[i - 1].r[2]] : [0, 0, 0];
+    const de = Math.hypot(b[0] - a[0] - hr[0], b[1] - a[1] - hr[1], b[2] - a[2] - hr[2]);
+    const da = [a[3] - a[0], a[4] - a[1], a[5] - a[2]], db = [b[3] - b[0], b[4] - b[1], b[5] - b[2]];
+    const la = Math.hypot(...da), lb = Math.hypot(...db);
+    const dtg = la > 1e-6 && lb > 1e-6 ? Math.acos(Math.max(-1, Math.min(1, (da[0] * db[0] + da[1] * db[1] + da[2] * db[2]) / (la * lb)))) * 180 / Math.PI : 0;
+    DE[i] = de; DA[i] = dtg; }
+  // a SNAP is a one-frame spike against its own neighbourhood (±6 frames): a camera that steadily trails a boosting plane by
+  // 0.7 m a frame is following, not cutting
+  for (let i = 1; i < F.length; i++) {
+    if (DE[i] === null) continue;
+    const nb = (A) => { const v = []; for (let k = i - 6; k <= i + 6; k++) if (k !== i && A[k] != null) v.push(A[k]); return med(v) ?? 0; };
+    const eyeSnap = DE[i] > 0.6 && DE[i] > 4 * nb(DE), turnSnap = DA[i] > 15 && DA[i] > 4 * nb(DA);
+    if (eyeSnap || turnSnap) cuts.push({ t: F[i].t, eye: r2(DE[i]), turnDeg: r2(DA[i]) });
+  }
+
+  // the intro (a crane, a reveal) may cut on purpose: the cuts more than 3 s after play (re)started are the ones a player feels as a snap
+  const starts = []; for (let i = 1; i < F.length; i++) if (F[i].ph === 'playing' && F[i - 1].ph !== 'playing') starts.push(F[i].t);
+  const inPlay = cuts.filter((c) => !starts.some((s0) => c.t >= s0 && c.t < s0 + 3));
+  out.camCutsAfterIntro = inPlay.length; out.camCutAfterEx = inPlay.slice(0, 5);
+  // shake: the eye's frame-to-frame acceleration net of the hero's (a shake is a high-frequency wobble; a follow is smooth).
+  // p95 in mm — the reduced-motion run (RM=1) should cut it where the shakes are
+  const acc = []; for (let i = 2; i < F.length; i++) { const a = F[i - 2], b = F[i - 1], c = F[i]; if (a.ph !== 'playing' || b.ph !== 'playing' || c.ph !== 'playing' || !a.cam || !a.r || !b.r || !c.r) continue;
+    const e = [0, 1, 2].map((k) => (c.cam[k] - c.r[k]) - 2 * (b.cam[k] - b.r[k]) + (a.cam[k] - a.r[k])); acc.push(Math.hypot(...e) * 1000); }
+  out.camShakeP95mm = r2(pct(acc, 0.95)); out.camShakeP99mm = r2(pct(acc, 0.99));
+  out.camCuts = cuts.length; out.camCutsPerMin = r2(cuts.length / Math.max(1e-6, play.length / 3600)); out.camCutEx = cuts.slice(0, 5);
+  // occlusion
+  const occ = play.filter((f) => f.oc !== undefined && f.oc >= 0);
+  const hidden = occ.filter((f) => f.oc >= 2), part = occ.filter((f) => f.oc === 1);
+  const who = {}; for (const f of occ) if (f.oc >= 1 && f.ow >= 0) who[rec.occNames[f.ow]] = (who[rec.occNames[f.ow]] || 0) + 1;
+  out.occSamples = occ.length; out.heroHiddenPct = r2(occ.length ? 100 * hidden.length / occ.length : null); out.heroPartPct = r2(occ.length ? 100 * part.length / occ.length : null);
+  const fr = occ.filter((f) => f.inf !== undefined && f.inf >= 0);
+  out.heroInFramePct = r2(fr.length ? 100 * fr.filter((f) => f.inf === 1).length / fr.length : null);
+  out.recMs = r2(med(F.map((f) => f.rm).filter((x) => x != null)));
+  out.occluders = Object.entries(who).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([n, c]) => `${n}×${c}`);
+  // perf
+  const ms = play.map((f) => f.ms).filter((x) => x > 0);
+  const win = play.filter((f) => f.thr); const wms = win.map((f) => f.ms).filter((x) => x > 0);
+  const dr = play.map((f) => f.d);
+  out.cpuMsMax = r2(ms.length ? Math.max(...ms) : null);
+  { const st = play.slice(0, 180).map((f) => f.ms).filter((x) => x > 0); out.startMaxMs = r2(st.length ? Math.max(...st) : null); }   // the first 3 s of play: a spawn or a load at START is a hitch the player feels
+  out.cpuMsP50 = r2(pct(ms, 0.5)); out.cpuMsP95 = r2(pct(ms, 0.95));
+  out.phoneCpuMsP50 = r2(pct(wms, 0.5)); out.phoneCpuMsP95 = r2(pct(wms, 0.95)); out.phoneFrames = wms.length;
+  out.drawsMean = r2(dr.reduce((s, x) => s + x, 0) / Math.max(1, dr.length)); out.drawsP95 = pct(dr, 0.95); out.drawsMax = dr.length ? Math.max(...dr) : null; out.drawBudget = 600;
+  // input response: each tap → the first frame the hero visibly changes (clip set, or a joint ≥ 5 cm off its path)
+  const lat = []; let noResp = 0;
+  for (const [t, k, fno] of rec.presses) {
+    if (!/^[jklis]$/.test(k)) continue;
+    const i0 = F.findIndex((f) => f.t >= t - 1e-6); if (i0 < 3 || !F[i0].j) continue;
+    if (F[i0].ph !== 'playing') continue;
+    const base = F[i0]; let hit = null;
+    for (let i = i0 + 1; i < Math.min(F.length, i0 + 46); i++) {
+      const f = F[i]; if (!f.j) break;
+      if (f.c !== undefined && base.c !== undefined && f.c !== base.c) { hit = i - i0; break; }
+      // joints in the hero's own frame, against a straight-line extrapolation of the 3 frames before the press
+      let dev = 0;
+      for (const ji of [5, 6, 1, 2, 7]) {
+        const p = f.j[ji], p0 = base.j[ji], pm = F[i0 - 3].j?.[ji]; if (!p || !p0 || !pm || !f.r || !base.r || !F[i0 - 3].r) continue;
+        const rel = (x, r) => [x[0] - r[0], x[1] - r[1], x[2] - r[2]];
+        const a = rel(p, f.r), b = rel(p0, base.r), c = rel(pm, F[i0 - 3].r); const n = i - i0;
+        const ex = [b[0] + (b[0] - c[0]) / 3 * n, b[1] + (b[1] - c[1]) / 3 * n, b[2] + (b[2] - c[2]) / 3 * n];
+        dev = Math.max(dev, Math.hypot(a[0] - ex[0], a[1] - ex[1], a[2] - ex[2]));
+      }
+      if (dev > 0.05 && i - i0 <= 45) { hit = i - i0; break; }
+    }
+    if (hit === null) noResp++; else lat.push(hit * 1000 / 60);
+  }
+  out.pressCount = lat.length + noResp; out.pressAnswered = lat.length; out.respMsMed = r2(med(lat)); out.respMsP90 = r2(pct(lat, 0.9));
+  // stuck: the longest stretch of play where the hero, the camera and the screen's words all stood still
+  let run = 0, best = 0, bestAt = null; let lastDom = null;
+  for (let i = 1; i < F.length; i++) {
+    const f = F[i], g = F[i - 1]; if (f.ph !== 'playing') { run = 0; continue; }
+    const still = (dist(f.r, g.r) ?? 0) < 0.002 && (dist(f.cam?.slice(0, 3), g.cam?.slice(0, 3)) ?? 0) < 0.002 && (f.c === g.c);
+    if (f.dom !== undefined) { if (lastDom !== null && f.dom !== lastDom) run = 0; lastDom = f.dom; }
+    if (still) { run++; if (run > best) { best = run; bestAt = f.t; } } else run = 0;
+  }
+  out.longestStillS = r2(best / 60); out.longestStillAt = bestAt;
+  // phases
+  const tl = []; for (const f of F) if (!tl.length || tl[tl.length - 1][1] !== f.ph) tl.push([f.t, f.ph]);
+  out.phases = tl.slice(0, 20); out.ended = F.some((f) => f.ph === 'ended');
+  out.pause = { state: S?.pauseState, after: r2(S?.pausedAfter), resumedAfter: r2(S?.resumedAfter) };
+  out.clipsSeen = rec.clips.length;
+  return out;
+}
+
+// ── re-analysis of saved recordings (REANALYZE=1: <outDir> holds <mode>-<tag>-raw.json.gz; the JSON rows are updated) ──
+if (process.env.REANALYZE === '1') {
+  for (const mode of MODES) {
+    const raw = path.join(OUT, `${mode}-${TAG}-raw.json.gz`), js = path.join(OUT, `${mode}-${TAG}.json`);
+    if (!fs.existsSync(raw) || !fs.existsSync(js)) { console.log(`${mode}: no recording`); continue; }
+    const { rec, S } = JSON.parse(zlib.gunzipSync(fs.readFileSync(raw)).toString());
+    const row = JSON.parse(fs.readFileSync(js, 'utf8'));
+    fs.writeFileSync(js, JSON.stringify(Object.assign(row, analyze(mode, rec, S)), null, 1));
+    console.log(`${mode}: re-analysed`);
+  }
+  process.exit(0);
+}
+
+// ── the run ───────────────────────────────────────────────────────────────────────────────────────────────────────────
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM_EXE ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+  args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--no-sandbox', '--autoplay-policy=no-user-gesture-required'] });
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+for (const mode of MODES) {
+  const tWall0 = Date.now(); const row = { mode, tag: TAG, at: new Date().toISOString(), playS: PLAY_S, pauseAt: PAUSE_AT };
+  const ctx = await b.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: Number(process.env.DPR ?? 1), isMobile: true, hasTouch: true, reducedMotion: RM ? 'reduce' : 'no-preference' });
+  await ctx.addInitScript({ content: INIT });
+  const p = await ctx.newPage();
+  const errs = []; const warnsN = { n: 0 };
+  p.on('pageerror', (e) => errs.push('pageerror: ' + String(e.message).split('\n')[0].slice(0, 180)));
+  p.on('console', (m) => { const t = m.text(); if (m.type() === 'error') errs.push(t.slice(0, 180)); else if (m.type() === 'warning') warnsN.n++; });
+  let crashed = false; p.on('crash', () => { crashed = true; });
+  const bad = []; p.on('response', (r) => { if (r.status() >= 400 && bad.length < 20) bad.push(`${r.status()} ${r.request().method()} ${r.url().replace(/^https?:\/\/[^/]+/, '').slice(0, 90)}`); });
+  const ev = (fn, arg) => Promise.race([p.evaluate(fn, arg), sleep(120000).then(() => { throw new Error('evaluate timeout'); })]);
+  const shot = async (name) => {
+    if (!SHOTS) return null;
+    await ev(() => { window.__freeze = true; window.__drawOn = true; window.__drawnFrames = 0; });
+    const t0 = Date.now(); while (Date.now() - t0 < 60000) { if ((await ev(() => window.__drawnFrames)) >= 2) break; await sleep(150); }
+    const f = path.join(OUT, `${mode}-${TAG}-${name}.jpg`);
+    try { await p.screenshot({ path: f, type: 'jpeg', quality: 62, scale: 'css', timeout: 90000 }); }
+    catch (e) { (row.shotErr = row.shotErr || []).push(`${name}: ${String(e.message).split('\n')[0].slice(0, 80)}`); return null; }
+    return f;
+  };
+  const unshot = () => ev((fast) => { window.__drawOn = !fast; window.__freeze = false; }, FAST);
+  try {
+    const cdp = await ctx.newCDPSession(p);
+    await p.goto(`http://${HOST}:${PORT}/index.html?mode=${mode}&perf=off${QS}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+    // READY: the TAP TO START card (or a mode with no splash: playing / its own card)
+    let st = {}; const tB = Date.now();
+    for (;;) {
+      st = await ev(() => ({ ph: window.__sessionStore?.view().phase ?? null, dev: !!window.__FEL_DEV__, tap: /TAP TO START/.test(document.body.innerText), err: (document.body.innerText || '').match(/Something went wrong|couldn.t load|error/i)?.[0] ?? null }));
+      if (st.ph === 'ready' || st.ph === 'playing' || st.ph === 'error' || crashed) break;
+      if (Date.now() - tB > BOOT_S * 1000) break;
+      // a host with a start card BEFORE it boots the mode (tiebreak: useStartWake, "any key … or tap on the card"): no harness
+      // phase at all until something is pressed — the rig presses, once, and says so
+      if (st.ph === null && !row.preStartPress && Date.now() - tB > 20000) {
+        row.preStartPress = (await ev(() => (document.body.innerText || '').replace(/\s+/g, ' ').slice(0, 160)));
+        if (SHOTS) await p.screenshot({ path: path.join(OUT, `${mode}-${TAG}-0prestart.jpg`), type: 'jpeg', quality: 62, scale: 'css', timeout: 60000 }).catch(() => {});
+        await ev(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'j' })); window.dispatchEvent(new KeyboardEvent('keyup', { key: 'j' })); });
+      }
+      await sleep(400);
+    }
+    row.readyS = r2((Date.now() - tWall0) / 1000); row.bootPhase = st.ph;
+    if (st.ph !== 'ready' && st.ph !== 'playing') { row.bootFail = st.ph ?? 'no phase'; throw new Error(`boot: phase ${st.ph}`); }
+    await ev(installRecorder, { fast: FAST });
+    if (st.ph === 'ready') {
+      if (SHOTS) { await shot('1ready'); }
+      row.ready = await ev(auditScreen, 'ready');
+      if (SHOTS) await unshot();
+    }
+    await ev(installScript, { playS: PLAY_S, pauseAt: PAUSE_AT });
+    await ev(() => window.__vtStart());
+    const tTap = Date.now();
+    if (st.ph === 'ready') {
+      const btn = p.locator('button', { hasText: 'TAP TO START' }).first();
+      if (await btn.count()) await btn.click({ timeout: 10000 }).catch((e) => { row.startClickErr = String(e.message).split('\n')[0].slice(0, 160); });
+      else await ev(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'j' })));
+      // a START that did not take (a click that landed on something over the button, or was swallowed): say so, then try
+      // the button's own click, then a face button — the player's other ways in
+      for (let k = 0; k < 2; k++) {
+        const t0 = Date.now(); let ph = null;
+        while (Date.now() - t0 < 15000) { ph = await ev(() => window.__sessionStore?.view().phase); if (ph !== 'ready') break; await sleep(500); }
+        if (ph !== 'ready') break;
+        (row.startRetries = row.startRetries || []).push(k === 0 ? 'element.click()' : 'J');
+        if (k === 0) await ev(() => { const b = [...document.querySelectorAll('button')].find((x) => /TAP TO START/.test(x.textContent || '')); if (b) b.click(); });
+        else await ev(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'j' })); window.dispatchEvent(new KeyboardEvent('keyup', { key: 'j' })); });
+      }
+    }
+    // play to the end of the script
+    let shots = (process.env.SHOT_AT ?? '5,14').split(',').map(Number).filter((x) => x < PLAY_S); let thr = false, first = null, pauseShot = false, touchDone = false;
+    const tPlay = Date.now();
+    for (;;) {
+      const s = await ev(() => ({ t: window.__S?.t ?? -1, ph: window.__sessionStore?.view().phase, ps: window.__S?.pauseState, done: window.__S?.done, g: window.__gameS(), n: window.__rec.frames.length }));
+      if (first === null && s.ph === 'playing') { first = Date.now(); row.firstPlayS = r2((first - tWall0) / 1000); row.tapToPlayS = r2((first - tTap) / 1000); }
+      if (s.ps === 'paused' && !pauseShot) {
+        pauseShot = true; if (SHOTS) await shot('3pause');
+        row.pauseScreen = await ev(auditScreen, 'pause'); if (SHOTS) await unshot();
+        await ev(() => { window.__pauseAck = true; });
+      }
+      if (shots.length && s.t >= shots[0] && s.ph === 'playing') {
+        const at = shots.shift(); if (SHOTS) await shot(`2play${at}`);
+        (row.play = row.play || []).push(await ev(auditScreen, `play@${at}`)); if (SHOTS) await unshot();
+      }
+      if (!touchDone && s.t >= PAUSE_AT + 4 && s.ph === 'playing') {
+        touchDone = true;
+        const at = await ev(() => { const deck = document.querySelector('[data-touch-deck]'); if (!deck) return null;
+          // the face buttons are 64 px <button>s; the one lowest and furthest right is the diamond's bottom slot (A)
+          const els = [...deck.querySelectorAll('button')].filter((e) => { const r = e.getBoundingClientRect(); return r.width >= 40 && r.width <= 90 && Math.abs(r.width - r.height) < 4; });
+          if (!els.length) return null; els.sort((a, b) => { const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect(); return (rb.bottom + rb.right * 0.01) - (ra.bottom + ra.right * 0.01); });
+          const r = els[0].getBoundingClientRect(); window.__busMark = window.__rec.bus.length; return { x: r.x + r.width / 2, y: r.y + r.height / 2, label: (els[0].textContent || '').trim().slice(0, 12) }; });
+        if (at) { await p.touchscreen.tap(at.x, at.y); await sleep(800); const got = await ev(() => window.__rec.bus.slice(window.__busMark).filter((e) => e[4] !== 'key' && e[4] !== 'space').map((e) => `${e[1]}:${e[2]}`).slice(0, 4));
+          row.touchTap = { label: at.label, events: got }; }
+        else row.touchTap = 'no deck';
+      }
+      if (!thr && s.t >= PLAY_S - PERF_S) { thr = true; await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 }); await ev(() => { window.__thr = true; }); }
+      if (s.done || crashed) break;
+      if (Date.now() - tPlay > MODE_WALL_S * 1000) { row.partial = `wall budget: game ${r2(s.t)} s, phase ${s.ph}`; break; }
+      if (first === null && Date.now() - tPlay > 90000) { row.noPlay = `no playing phase 90 s after TAP TO START (phase ${s.ph})`; break; }
+      if (process.env.PROGRESS && (globalThis.__pg = (globalThis.__pg || 0) + 1) % 40 === 0) console.error(`[${mode}] wall ${((Date.now() - tPlay) / 1000).toFixed(0)}s game ${r2(s.g)} script ${r2(s.t)} phase ${s.ph} frames ${s.n}`);
+      if (s.ph === 'ended' && s.t > 3) { row.endedAt = s.t; }
+      await sleep(250);
+    }
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 }).catch(() => {});
+    const rec = await ev(() => { const R = window.__rec; const thrFrom = R.frames.findIndex((f) => f.t >= (window.__thrT ?? 1e9)); return { frames: R.frames, clips: R.clips, gNames: R.gNames, cwv: 2, occNames: R.occNames, presses: R.presses, bus: R.bus.slice(0, 50), skel: R.skel, sw: (window.__felSw || []).slice(0, 4000) }; });   // clean-7: `sw`, the hero's clip switches, when a build records them (a diagnostic build only)
+    // frames the throttle covered: the last PERF_S seconds of the script
+    const S = await ev(() => ({ ...window.__S, tapUntil: undefined }));
+    const tEnd = rec.frames.length ? rec.frames[rec.frames.length - 1].t : 0;
+    for (const f of rec.frames) if (f.t >= tEnd - PERF_S + 0.5) f.thr = true;
+    Object.assign(row, analyze(mode, rec, S));
+    row.wallS = r2((Date.now() - tWall0) / 1000);
+    fs.writeFileSync(path.join(OUT, `${mode}-${TAG}-raw.json.gz`), zlib.gzipSync(JSON.stringify({ rec, S })));
+  } catch (e) { row.fail = String(e.message || e).slice(0, 200); }
+  row.errors = [...new Set(errs)].slice(0, 12); row.badUrls = [...new Set(bad)]; row.errorCount = errs.length; row.warnCount = warnsN.n; row.crashed = crashed;
+  try { row.links = await p.evaluate(() => window.__links); } catch {}
+  try { row.hitch = await p.evaluate(() => (window.__FEL_HITCH__ && window.__FEL_HITCH__.report ? window.__FEL_HITCH__.report() : null)); } catch {}   // the harness's own S1 probe: builds / clones / new programs split at the intro
+  try { row.scriptErr = await p.evaluate(() => window.__scriptErr ?? null); row.api = await p.evaluate(() => [...new Set(window.__api)].slice(0, 20)); } catch {}
+  fs.writeFileSync(path.join(OUT, `${mode}-${TAG}.json`), JSON.stringify(row, null, 1));
+  console.log(`${mode.padEnd(17)} ready ${row.readyS}s play ${row.firstPlayS}s frames ${row.frames} pops ${row.pops} cuts ${row.camCuts} hidden ${row.heroHiddenPct}% cpu ${row.cpuMsP50}/${row.cpuMsP95} phone ${row.phoneCpuMsP50}/${row.phoneCpuMsP95} draws ${row.drawsMean}/${row.drawsMax} resp ${row.respMsMed}ms pause ${row.pause?.state} err ${row.errorCount}${row.fail ? ' FAIL ' + row.fail : ''} (${row.wallS}s)`);
+  // clean-5: closing a context whose page is still spinning the virtual clock took about 110 s a mode on the shared box (the first
+  // sweep hold: 6 modes in 700 s, each reporting ~120 s). The row is written; give the close 5 s and move on.
+  await Promise.race([ctx.close().catch(() => {}), sleep(5000)]);
+}
+await Promise.race([b.close().catch(() => {}), sleep(5000)]);
+process.exit(0);   // (playwright kills the browser it launched when this process exits)

@@ -31,7 +31,7 @@ export const PAD_SLOTS: readonly PadSlot[] = [...PAD_LEFT, ...PAD_RIGHT];
 
 /**
  * What the pad is for right now (the room publishes it through padStore, DanceMode.publishPad):
- *   'pick'  the pick screen — ◀ ▶ browse, ▲ ▼ the level, A / B start, Y toggles MATCH;
+ *   'pick'  the pick screen — ◀ ▶ browse, ▲ ▼ the level, A / B start, Y toggles MATCH (X toggles FREE DANCE where it is offered);
  *   'any'   a song with MATCH off — A and B tap (the room reads A or B), X and Y do nothing, so they are drawn hollow;
  *   'match' a song with MATCH on — every button is a tap and the family it carries matters;
  *   'free'  inside a FREESTYLE section — every button dances the move it names, MATCH is not asked.
@@ -46,9 +46,17 @@ export interface DancePadState {
   matchOn: boolean;
   /** 'free' only: the move each button will dance on its next press (its name is what the button prints). */
   free: Partial<Record<PadSlot, string>>;
+  /**
+   * lane/dance-extras-2: the pick screen's FREE DANCE switch on X (dance/freeDance.ts) — on, off, or null where free dance is not
+   * offered (an Arena duel, a challenge, the ladder, a head-to-head chart: freeDanceBlock), when X stays an empty socket.
+   */
+  freeDance: boolean | null;
 }
 
-export const DEFAULT_PAD_STATE: DancePadState = { mode: 'any', matchOn: false, free: {} };
+export const DEFAULT_PAD_STATE: DancePadState = { mode: 'any', matchOn: false, free: {}, freeDance: null };
+
+/** The pick screen's X, by the free-dance switch (lane/dance-extras-2). */
+export const FREE_DANCE_LABEL = { on: 'FREE ON', off: 'FREE OFF' } as const;
 
 // ── what each button carries ─────────────────────────────────────────────────────────────────────────────────────────
 
@@ -99,6 +107,8 @@ export function padButtons(state: DancePadState): PadButton[] {
       case 'pick':
         if (slot === 'A' || slot === 'B') return press('START', slot);
         if (slot === 'Y') return press(state.matchOn ? 'MATCH ON' : 'MATCH OFF', 'Y');
+        // lane/dance-extras-2: X switches FREE DANCE where it is offered; anywhere else X does nothing on the pick screen
+        if (slot === 'X' && state.freeDance !== null && state.freeDance !== undefined) return press(state.freeDance ? FREE_DANCE_LABEL.on : FREE_DANCE_LABEL.off, 'X');
         return socket;
       case 'match':
         return press(slot, [...familiesOf(slot).map((f) => FAMILY_LABEL[f]), ...(familiesOf(slot).includes('freeze') ? [HOLD_LABEL] : [])].join(' · '));

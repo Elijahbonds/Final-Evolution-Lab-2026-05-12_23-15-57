@@ -109,7 +109,7 @@ export async function dressHoop(scene: Scene, venueRoot: TransformNode): Promise
     if (!root) break;
     // the scan's ring → the procedural rim's spot (the procedural 'rim' torus carries the prop's own scale)
     const rim = h.getChildMeshes().find((m) => m.name === 'rim');
-    const rimY = rim?.position.y ?? 3.05, rimZ = rim?.position.z ?? 0.72;
+    const rimY = rim?.position.y ?? RIM_HEIGHT_M, rimZ = rim?.position.z ?? 0.72;
     const s = rimY / HOOP_SCAN.rimY;
     root.scaling.setAll(s);
     root.position.set(0, 0, rimZ - HOOP_SCAN.rimZ * s);
@@ -121,6 +121,7 @@ export async function dressHoop(scene: Scene, venueRoot: TransformNode): Promise
 
 import { BALL_SKINS, readBallSkin, hexToRgb01 } from '../nexus/ballSkins';
 import { readBoardSkin } from '../nexus/boardSkins';
+import { RIM_HEIGHT_M } from '../core/courtDims';
 
 const BALL_KEY: Record<BallKind, MeshyPropKey | null> = { basketball: 'ball-basketball', soccer: 'ball-soccer', tennis: 'ball-tennis', volleyball: null };
 

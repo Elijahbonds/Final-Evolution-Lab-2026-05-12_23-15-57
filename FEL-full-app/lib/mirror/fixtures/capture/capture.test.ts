@@ -158,14 +158,16 @@ describe('the replay report on a synthetic capture (two phones)', () => {
     expect(t5).toEqual({ counted: 3, asked: 3 });
   });
 
-  it('counts the Mirror lunge\'s reps on full sets of 8 a leg: all of them clean, and reports what jitter loses', () => {
+  it('counts the Mirror lunge\'s reps on full sets of 8 a leg: all of them, clean and jittered', () => {
     const left = report.reps.find((r) => r.grader === 'Mirror lunge (left leg)')!, right = report.reps.find((r) => r.grader === 'Mirror lunge (right leg)')!;
     expect(left.byDevice['android-mid']).toEqual({ counted: 8, asked: 8 });
     expect(right.byDevice['android-mid']).toEqual({ counted: 8, asked: 8 });
-    // FINDING (lane/mirror-moves first, confirmed here, 2026-10-07; nothing changed: lungeAudit.ts/RepCounter are not this
-    // lane's): with the synth's landmark jitter the live lunge rep counter counts 1–6 of 8 (seeds 3, 5, 7, 11, 13;
-    // median 3), so a real set may never reach the right leg. The real capture's full sets measure it on the phones.
-    expect(left.byDevice.iphone.counted + right.byDevice.iphone.counted).toBeLessThan(16);
+    // FINDING (lane/mirror-moves first, confirmed here, 2026-10-07): with the synth's landmark jitter the live lunge rep
+    // counter (RepCounter on LungeAudit's velocity phase) counted 1–6 of 8 (seeds 3, 5, 7, 11, 13; median 3), and this
+    // asserted that loss (< 16). FIXED by lane/mirror-fixes (2026-10-25): the harness counts on LungeAudit's depth01
+    // (lib/mirror/lungeReps.ts), and the jittered phone counts every rep. The real capture's full sets measure it on the phones.
+    expect(left.byDevice.iphone).toEqual({ counted: 8, asked: 8 });
+    expect(right.byDevice.iphone).toEqual({ counted: 8, asked: 8 });
   });
 
   it('the jump at the captured 60 fps clears the 50 Hz gate and scores landing timing; the same take at 30 Hz cannot', () => {

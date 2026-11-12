@@ -9,10 +9,12 @@
 // consent from an old one is WHEN it was requested: a request made on or after the day the new wording went live was
 // asked with that wording. COACH_TRAINING_CONSENT_SINCE is that day.
 //
-// IT IS NULL TODAY, SO EVERY TEEN FAILS CLOSED. The new wording is a proposal awaiting the owner (docs/COACH-LOOP.md
-// §1); no guardian has been asked it, so no consent on file covers coach training. Until the wording is approved, live
-// on the guardian's screen, and this date set to its go-live day (the steps are in docs/COACH-LOOP.md §1), no 13–17
-// account joins a roster or saves coached training. Adults are unaffected; under-13s were never allowed.
+// IT IS NULL TODAY, SO EVERY TEEN FAILS CLOSED. The new wording was APPROVED by the owner on 2026-10-27 (in chat, "You
+// do it. I approve.", card C10; it is lib/consent/guardianGate.ts coachTrainingConsentWords, word for word), but no
+// guardian has been asked it yet, so no consent on file covers coach training. Until the words are live on the
+// guardian's screen, a re-request path exists, the withdraw path exists, and this date is set to their go-live day (the
+// steps are in docs/COACH-LOOP.md §1 and guardianGate.ts), no 13–17 account joins a roster or saves coached training.
+// Adults are unaffected; under-13s were never allowed.
 //
 // assumption: the request date is a sound proxy only if the accept screen shows the new wording from that date on. The
 // go-live steps say so; a `covers` column on GuardianConsent would make it exact (a schema change, not in this lane).

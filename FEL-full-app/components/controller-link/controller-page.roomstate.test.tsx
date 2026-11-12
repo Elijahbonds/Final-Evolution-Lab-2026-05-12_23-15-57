@@ -26,6 +26,9 @@ const page = (c: ModeControllerConfig, live?: RoomState | null): string =>
 const BEFORE_DANCE = '<main class="flex flex-1 flex-col justify-center gap-6 px-4 pb-8"><div class="grid gap-3" style="grid-template-columns:repeat(2, minmax(0, 1fr))"><button class="rounded-xl py-8 text-lg font-bold active:brightness-125" style="background:#22d3ee33;color:#22d3ee;border:1px solid #22d3ee66">TAP</button></div></main>';
 const BEFORE_DUNK = '<main class="flex flex-1 flex-col justify-center gap-6 px-4 pb-8"><div class="flex flex-col items-center gap-4 text-center"><p class="text-sm text-white/60">Tilt back to load your jump — release to launch</p><button class="rounded-lg bg-[#ffd75e] px-6 py-3 font-bold text-black">ENABLE MOTION</button></div><div class="mx-auto grid h-48 w-48 grid-cols-3 grid-rows-3 gap-1"><button style="grid-row:1;grid-column:2" class="rounded-lg bg-white/10 text-xl text-white/70 active:bg-white/25">▲</button><button style="grid-row:2;grid-column:1" class="rounded-lg bg-white/10 text-xl text-white/70 active:bg-white/25">◀</button><button style="grid-row:2;grid-column:3" class="rounded-lg bg-white/10 text-xl text-white/70 active:bg-white/25">▶</button><button style="grid-row:3;grid-column:2" class="rounded-lg bg-white/10 text-xl text-white/70 active:bg-white/25">▼</button></div><div class="grid gap-3" style="grid-template-columns:repeat(2, minmax(0, 1fr))"><button class="rounded-xl py-8 text-lg font-bold active:brightness-125" style="background:#22d3ee33;color:#22d3ee;border:1px solid #22d3ee66">RUN</button><button class="rounded-xl py-8 text-lg font-bold active:brightness-125" style="background:#ff6b3d33;color:#ff6b3d;border:1px solid #ff6b3d66">SLAM</button><button class="rounded-xl py-8 text-lg font-bold active:brightness-125" style="background:#a78bfa33;color:#a78bfa;border:1px solid #a78bfa66">STYLE</button></div></main>';
 
+/** The registry's `dance` entry as it was when BEFORE_DANCE was captured (one TAP button) — lane/dance-extras-2 gave dance the pad. */
+const DANCE_TAP_SCHEMA: ModeControllerConfig = { modeId: 'dance', title: 'The Cypher', maxPlayers: 1, askName: true, schemas: [{ kind: 'button', buttons: [{ action: 'A', label: 'TAP' }] }] };
+
 /** A state that lights and says everything it can: bank B, PLAYING, REC on — plus every action any schema has, lit. */
 const PLAYING_REC = phoneRoomState({ bank: 1, bankLabel: 'Pocket Bass', playing: true, recArm: true });
 const allActions = (c: ModeControllerConfig): string[] => c.schemas.flatMap((s) => (s.kind === 'button' ? s.buttons.map((b) => b.action) : s.kind === 'dpad' ? [s.dpad.action] : [s.motion.action]));
@@ -48,8 +51,12 @@ describe('a config that did not opt in: a room state changes NOTHING on its page
       expect(bare, id).not.toMatch(/room-state|data-lit|aria-pressed/);
     }
   });
-  it('dance and dunk still match the page as it was before P5, byte for byte, with a state in hand', () => {
-    expect(page(MODE_CONTROLLERS.dance, everything(MODE_CONTROLLERS.dance))).toBe(BEFORE_DANCE);
+  // TEST CHANGED (lane/dance-extras-2, 2026-10-24): the registry's `dance` entry is the dance PAD now (four hold buttons with the haptics
+  // hint, and the d-pad — schemas/dancePad.test.ts), so it is no longer the one-TAP-button page this string was captured from. The string
+  // still pins what it was for — the page renders a hint-less one-button schema exactly as before P5 — now from that schema itself, kept
+  // here verbatim (the entry as it was until this lane).
+  it('dance (its one-TAP schema as captured) and dunk still match the page as it was before P5, byte for byte, with a state in hand', () => {
+    expect(page(DANCE_TAP_SCHEMA, everything(DANCE_TAP_SCHEMA))).toBe(BEFORE_DANCE);
     expect(page(MODE_CONTROLLERS.dunk, everything(MODE_CONTROLLERS.dunk))).toBe(BEFORE_DUNK);
   });
 });

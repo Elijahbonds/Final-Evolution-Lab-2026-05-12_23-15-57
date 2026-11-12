@@ -31,9 +31,9 @@ export function CreatorHub() {
   return (
     <div className="min-h-screen w-full" style={{ background: BG, color: '#fff' }}>
       <div className="mx-auto max-w-5xl px-5 py-10">
-        <div className="mb-2 text-xs font-semibold tracking-[0.4em] text-white/40">FEL · CREATOR</div>
-        <h1 className="text-4xl font-black tracking-tight sm:text-5xl">Creator Hub</h1>
-        <p className="mt-3 max-w-2xl text-sm text-white/55">
+        <div className="mb-2 text-xs font-semibold tracking-[0.4em] text-white/50">FEL · CREATOR</div>
+        <h1 className="text-[30px] font-black tracking-tight sm:text-5xl">Creator Hub</h1>
+        <p className="mt-3 max-w-2xl text-base text-white/55">
           Nine creator disciplines, one arena. Pick a craft and perform or publish — each one scores or showcases
           what you actually do, not a menu you tap through.
         </p>
@@ -50,9 +50,9 @@ export function CreatorHub() {
               <UserRound className="h-7 w-7 text-white" />
             </div>
             <div>
-              <div className="text-xs font-semibold uppercase tracking-[0.32em] text-white/35">Character Creator</div>
-              <h2 className="mt-1 text-2xl font-black">Build your athlete</h2>
-              <p className="mt-2 max-w-2xl text-sm text-white/55">
+              <div className="text-xs font-semibold uppercase tracking-[0.32em] text-white/50">Character Creator</div>
+              <h2 className="mt-1 text-[20px] font-black">Build your athlete</h2>
+              <p className="mt-2 max-w-2xl text-base text-white/55">
                 Shape the hero every shipped mode wears — face, body, palette, nameplate, and active look.
               </p>
             </div>
@@ -83,7 +83,7 @@ export function CreatorHub() {
                 <div className="flex items-center gap-2">
                   <h2 className="text-xl font-bold">{d.name}</h2>
                 </div>
-                <p className="mt-2 flex-1 text-sm text-white/50">{d.tagline}</p>
+                <p className="mt-2 flex-1 text-base text-white/50">{d.tagline}</p>
                 <div className="mt-4 inline-flex items-center gap-1 text-sm font-semibold" style={{ color: d.color }}>
                   Enter <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />
                 </div>

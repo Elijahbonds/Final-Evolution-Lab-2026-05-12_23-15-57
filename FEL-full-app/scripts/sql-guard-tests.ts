@@ -75,7 +75,13 @@ ok('the 17 reviewed files of 2026-10-20 are all additive (none would be refused)
 });
 
 ok('each real file also matches in Prisma\'s grouped shape (comments and blank lines differ)', () => {
-  for (const f of pending) isMatch(decide(prismaShaped(f), pending), [f.name]);
+  // A pending file holding a non-additive statement (TIP-GUEST-TOKEN-HASH's backfills: the owner applies those by hand)
+  // is never eligible, in this shape too (docs/DB-GUARD.md, matcher rule 3) — the same split as the first check.
+  for (const f of pending) {
+    const d = decide(prismaShaped(f), pending);
+    if (parseSql(f.sql).statements.every(s => s.additive)) isMatch(d, [f.name]);
+    else assert.strictEqual(d.kind, 'unexpected', `${f.name} holds a non-additive statement, so it must never match`);
+  }
 });
 
 ok('a diff equal to two files matches both, in date order', () => {
@@ -211,7 +217,13 @@ ok('rollback lines: tables, added columns and enums, newest first; the guard nev
     'DROP TYPE "SessionKind";',
   ]);
   assert.deepStrictEqual(rollbackFor(file('message-read-markers').sql), ['ALTER TABLE "ProgramMessage" DROP COLUMN "readAt";']);
-  for (const f of pending) assert.ok(rollbackFor(f.sql).length > 0, `${f.name} has no rollback`);
+  // Every file db-guard could apply has an undo. A file holding a non-additive statement is never applied by db-guard (the
+  // owner applies it by hand, docs/DB-GUARD.md rule 3): TIP-GUEST-TOKEN-HASH's backfills rewrite data in place, so no
+  // DROP line can undo them, and cli.ts rollback is not that file's undo.
+  for (const f of pending) {
+    if (parseSql(f.sql).statements.every(s => s.additive)) assert.ok(rollbackFor(f.sql).length > 0, `${f.name} has no rollback`);
+    else assert.strictEqual(decide(f.sql, pending).kind, 'unexpected', `${f.name} is not additive, so db-guard must refuse it`);
+  }
 });
 
 ok('redact removes every part of the URL from public output', () => {

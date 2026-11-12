@@ -49,6 +49,20 @@ export function trickMatches(g: Pick<Goal, 'trickId' | 'where'>, e: Pick<GoalEve
   return (typeof g.where === 'string' ? [g.where] : g.where).some((w) => at.startsWith(w));
 }
 
+/** GAMEPLAY-CLEAN P2 #8 (2026-11-03): how many open goals the play screen names at once. */
+export const GOALS_SHOWN = 3;
+
+/** GAMEPLAY-CLEAN P2 #8: THE GOAL LIST ON THE PLAY SCREEN, the next few only. The skate HUD named all nine goals, done and open, as a
+ *  column over the bottom-left corner — 40 of the screen's 60 words in play (the audit's budget is 40 for the whole screen). The
+ *  bezel keeps the count (GOALS 2/9) and a goal still banners as it falls; the list says the next GOALS_SHOWN still open, in the
+ *  tracker's order, and how many more wait. All done: an empty list (the count says 9/9). */
+export function openGoalsLine(goals: readonly { done: boolean; label: string }[], max = GOALS_SHOWN): string {
+  const open = goals.filter((g) => !g.done);
+  const shown = open.slice(0, max).map((g) => `○ ${g.label}`);
+  if (open.length > max) shown.push(`+${open.length - max} MORE`);
+  return shown.join(' · ');
+}
+
 export class GoalTracker {
   readonly goals: Goal[];
   private collected = new Set<string>();

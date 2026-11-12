@@ -683,10 +683,10 @@ export default function ThreeVThree3D(props: GameProps) {
           <div className="absolute top-3 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1">
             <div className="flex items-center gap-5 px-5 py-1.5 rounded-xl" style={{ background: 'rgba(5,5,8,0.75)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,229,255,0.2)' }}>
               <span className="text-2xl font-bold text-[#00E5FF]">{hud.myScore}</span>
-              <span className="text-[11px] text-white/60 font-mono">3V3 · TO {TARGET} · {Math.ceil(hud.timeLeft)}s</span>
+              <span className="text-[12px] text-white/60 font-mono">3V3 · TO {TARGET} · {Math.ceil(hud.timeLeft)}s</span>
               <span className="text-2xl font-bold text-[#FF3366]">{hud.aiScore}</span>
             </div>
-            <div className="flex gap-3 items-center px-3 py-0.5 rounded-lg font-mono text-[10px] text-white/70" style={{ background: 'rgba(5,5,8,0.8)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div className="flex gap-3 items-center px-3 py-0.5 rounded-lg font-mono text-[12px] text-white/70" style={{ background: 'rgba(5,5,8,0.8)', border: '1px solid rgba(255,255,255,0.08)' }}>
               <span style={{ color: hud.prqColor }}>{hud.prqLabel}</span>
               <span style={{ color: '#C99BF7' }}>CAM {hud.camRig.toUpperCase()}</span>
               <span style={{ color: '#00FF9D' }}>{hud.assists} AST</span>
@@ -766,7 +766,7 @@ export default function ThreeVThree3D(props: GameProps) {
                 <div key={i}><span className="text-white">{b.key}</span> — {b.label}</div>
               ))}
             </div>
-            <div className="mt-3 text-[10px] text-white/40">{device === 'touch' ? 'TAP TO START' : 'PRESS ANY KEY TO START'}</div>
+            <div className="mt-3 text-[12px] text-white/50">{device === 'touch' ? 'TAP TO START' : 'PRESS ANY KEY TO START'}</div>
           </div>
         </div>
       )}

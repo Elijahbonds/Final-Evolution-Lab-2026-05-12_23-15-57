@@ -40,3 +40,37 @@ export function buildDunkLandAbsorb(scene: Scene, sk: Skeleton): AnimationGroup 
       hands: { Left: [-0.26, 0.86, 0.12], Right: [0.26, 0.86, 0.12] }, hipsY: 0 },
   ]);
 }
+
+// ── DUNK SWITCH-ON (owner 2026-11-10: "anything that's turned off because it needs to be improved, let's improve it and turn it on";
+// GATE 0 sign-off given for this clip) — THE DEEP ABSORB. Measured (DUNK-FLAGSHIP §6): the hips fall ~5 m/s into the landing and
+// stop within a frame, while the clip above sinks only ~0.12 m over 0.25 s (~0.5 m/s): the knees take almost none of the fall.
+// This one reaches its bottom in ~0.13 s (the clip above: 0.25 s), knees over the toes and the ankles dorsiflexed so the toes stay
+// on the floor, and rises on the same clock as the clip above (the same length and rise start, so the live celebration and the
+// card keep their beats). The clip alone cannot go deeper on this rig without the ankles going through the floor (measured: the feet
+// follow the hips down past ~0.1 m whatever the knees do), so the extra depth comes from DunkMode mounting anim/LandingAbsorb on
+// the hero — the legs re-solved after the clip with the feet held where they are, deeper the harder the fall (up to 0.11 m more at
+// ~5.7 m/s). Knob dunk.landAbsorbDeep (1 = this clip + that absorb, 0 = the clip above alone, exactly).
+export const LAND_ABSORB_DEEP_CLIP = 'dunk_land_absorb_deep';
+export const DEEP_HEEL_DOWN_T = 0.05;
+export const DEEP_BOTTOM_T = 0.13;
+/** The ankle's dorsiflexion at the bottom (°): the shin tilts forward over the foot, so the foot pitches back to keep the toes on the floor. */
+const FOOT_UP = 22;
+export function buildDunkLandAbsorbDeep(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const T = LAND_ABSORB_SEC;
+  return buildPoseClip(scene, sk, LAND_ABSORB_DEEP_CLIP, T, [
+    { t: 0, bones: { Hips: [2, 0, 0], Spine: [2, 0, 0], ...legs(-18, 28, 5) },
+      hands: { Left: [-0.20, 1.92, 0.08], Right: [0.20, 1.92, 0.08] }, poles: UP, hipsY: 0.02,
+      feet: { Right: [0.10, 0.04, LEAD_Z], Left: [-0.10, 0.04, TRAIL_Z] } },   // toe / ball contact, as the clip above
+    { t: DEEP_HEEL_DOWN_T, bones: { Hips: [8, 0, 0], Spine: [12, 0, 0], ...legs(-42, 62, 5) },
+      hands: { Left: [-0.22, 1.40, 0.34], Right: [0.22, 1.40, 0.34] }, poles: { Left: [-0.9, 0.0, -0.3], Right: [0.9, 0.0, -0.3] }, hipsY: -0.07,
+      feet: { Right: [0.10, 0.0, LEAD_Z], Left: [-0.10, 0.0, TRAIL_Z] }, kneePoles: { Right: [0.2, -0.5, 0.8], Left: [-0.2, -0.5, 0.8] } },   // heels down, already sinking (1 cm up: the trail foot read 3.3 cm under at 0)
+    { t: DEEP_BOTTOM_T, bones: { Hips: [22, 0, 0], Spine: [24, 0, 0], LeftUpLeg: [-82, 0, -2], RightUpLeg: [-78, 0, 2], LeftLeg: [116, 0, 0], RightLeg: [112, 0, 0], LeftFoot: [-FOOT_UP, 0, 0], RightFoot: [-FOOT_UP, 0, 0] },
+      hands: { Left: [-0.30, 0.80, 0.46], Right: [0.30, 0.80, 0.46] }, hipsY: -0.09,
+      feet: { Right: [0.10, 0.0, LEAD_Z], Left: [-0.10, 0.0, TRAIL_Z] }, kneePoles: { Right: [0.3, -0.4, 0.7], Left: [-0.3, -0.4, 0.7] } },   // deep bottom: ~0.25 m in ~0.12 s
+    { t: RISE_START_T, bones: { Hips: [14, 0, 0], Spine: [16, 0, 0], ...legs(-44, 64, 4), LeftFoot: [-FOOT_UP / 2, 0, 0], RightFoot: [-FOOT_UP / 2, 0, 0] },
+      hands: { Left: [-0.26, 0.92, 0.32], Right: [0.26, 0.92, 0.32] }, hipsY: -0.06,
+      feet: { Right: [0.10, 0.0, LEAD_Z], Left: [-0.10, 0.0, TRAIL_Z] } },   // held low, then rising
+    { t: T, bones: { Hips: [0, 0, 0], Spine: [4, 0, 0], ...legs(-12, 18) },
+      hands: { Left: [-0.26, 0.86, 0.12], Right: [0.26, 0.86, 0.12] }, hipsY: 0 },   // the same stand as the clip above
+  ]);
+}

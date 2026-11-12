@@ -12,5 +12,6 @@ export default async function LoginPage({ searchParams }: { searchParams?: { nex
   const raw = Array.isArray(next) ? next[0] : next;
   // LOGIN-LOOP-FIX: a next=/login (bare or nested) must not send an already-signed-in visitor back to /login.
   if (session) redirect(safePostSignInDestination(raw, '/'));
-  return <AuthForm mode="login" />;
+  // A11-01 (2026-10-25): the page's landmark (WCAG 1.3.1 / 2.4.1); the form itself is first-run's (components/auth-form.tsx)
+  return <main><AuthForm mode="login" /></main>;
 }

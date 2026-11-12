@@ -4,7 +4,7 @@
 // still unlocks. The /train card render is held by lib/train-page-unlisted.test.tsx (it needs auth/db mocks).
 
 import { describe, expect, it } from 'vitest';
-import { UNLISTED_MODES, isUnlistedMode, isUnlistedPlayHref, playSlugOf } from './unlisted-modes';
+import { UNLISTED_MODES, isUnlistedMode, isUnlistedPlayHref, modeIdOfPlayHref, playSlugOf } from './unlisted-modes';
 import { MODE_INFO, listedModeEntries, listedModeKeys } from './game-data';
 import { MODE_MENU_META, visibleModeEntries } from './mode-menu';
 import { FAMILIES, OFF_SHELF, familyOf, shelvedModes } from './nav/families';
@@ -24,10 +24,18 @@ describe('the central list', () => {
 
   it('reads a /play href: /play/training is a parked mode route, other hrefs are not', () => {
     expect(playSlugOf('/play/training')).toBe('training');
+    expect(modeIdOfPlayHref('/play/training')).toBe('training');
     expect(isUnlistedPlayHref('/play/training')).toBe(true);
     expect(isUnlistedPlayHref('/play/sprint')).toBe(false);
     expect(isUnlistedPlayHref('/training')).toBe(false);   // the programming page is not the game
     expect(isUnlistedPlayHref('/kitchens')).toBe(false);
+  });
+
+  it('checks parked routes by catalogue mode id, not just URL slug aliases', () => {
+    expect(playSlugOf('/play/onevone?c=duel')).toBe('onevone');
+    expect(modeIdOfPlayHref('/play/onevone?c=duel')).toBe('hoops1v1');
+    expect(modeIdOfPlayHref('/play/karate-vs')).toBe('karateVersus');
+    expect(modeIdOfPlayHref('/play/brain-brawl')).toBe('brainBrawl');
   });
 });
 

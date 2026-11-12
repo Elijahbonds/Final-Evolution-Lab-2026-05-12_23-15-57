@@ -13,7 +13,7 @@
 import { Color3, DynamicTexture, PBRMaterial } from '@babylonjs/core';
 import type { AbstractMesh, Observer, Scene, TransformNode } from '@babylonjs/core';
 import type { QualityTier } from '../scene/QualityTier';
-import { applyFabric } from './fabric';
+import { applyFabric, weaveFits } from './fabric';
 
 const PORE_TEX_KEY = '__felSkinPoreNormal';
 const PORE_SIZE = 256;
@@ -81,6 +81,10 @@ export interface SkinShadingResult { skin: number; cloth: number; other: number 
 export function applySkinShading(meshes: AbstractMesh[], scene: Scene, tier: QualityTier = 'desktop'): SkinShadingResult {
   const seen = new Set<PBRMaterial>();
   const out: SkinShadingResult = { skin: 0, cloth: 0, other: 0 };
+  // KIT-GLITCH: which meshes wear each material — a weave only goes where every one of them has authored UVs (fabric.weaveFits)
+  const wearers = new Map<unknown, AbstractMesh[]>();
+  for (const m of meshes) if (m.material) (wearers.get(m.material) ?? wearers.set(m.material, []).get(m.material)!).push(m);
+  const weave = (mat: PBRMaterial) => ({ weave: weaveFits(wearers.get(mat) ?? []) });
   for (const m of meshes) {
     const mat = m.material;
     if (!(mat instanceof PBRMaterial) || seen.has(mat)) continue;
@@ -117,15 +121,15 @@ export function applySkinShading(meshes: AbstractMesh[], scene: Scene, tier: Qua
       // surface with no normal is a silhouette filled in with a colour — which is what a close crop of the dunker
       // showed: a flat pink tee and a flat dark block of shorts. `applyFabric` keeps the sheen and adds the generated
       // weave map, at the tiling that fabric wants.
-      applyFabric(mat, name.startsWith('jersey') ? 'jersey' : 'shorts');
+      applyFabric(mat, name.startsWith('jersey') ? 'jersey' : 'shorts', weave(mat));
       out.cloth++;
     } else if (name.startsWith('sock')) {
-      applyFabric(mat, 'sock');
+      applyFabric(mat, 'sock', weave(mat));
       out.cloth++;
     } else if (name.startsWith('shoes')) {
       // Was near-white albedo at roughness 0.85 — read as a glowing block
       // under the IBL. Darker, glossier: a sneaker, not a lamp. The canvas weave came later.
-      applyFabric(mat, 'shoes');
+      applyFabric(mat, 'shoes', weave(mat));
       mat.albedoColor = mat.albedoColor.scale(0.82);
       out.other++;
     } else if (name.startsWith('hair')) {

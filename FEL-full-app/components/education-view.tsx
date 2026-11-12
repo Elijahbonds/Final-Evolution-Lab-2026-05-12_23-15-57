@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { CheckCircle2, Circle, Lock, GraduationCap, Dumbbell, ChevronDown, Loader2, Zap, Brain } from 'lucide-react';
 import { TRACKS, MODE_INFO, canonicalModeKey } from '@/lib/game-data';
+import { TYPE } from '@/lib/design/type';
 
 /** NEXUS adaptive queue item (from /api/nexus/queue) */
 interface NexusQueueItem {
@@ -88,12 +89,15 @@ export function EducationView() {
     }
   };
 
+  // PLAT-P04 (2026-10-27), owner call §5.2 (a): the Academy moved to the bottom of Learn (/learn) — a section of that page
+  // now, not a page of its own (/education redirects to /learn). Its lessons, its checkpoints and its Lab Credits are
+  // exactly as they were; only the header changed, from the page's EDUCATION title to the section's name.
   return (
-    <main className="mx-auto max-w-[900px] px-4 py-6">
+    <div data-academy>
       <div className="flex items-center gap-3">
-        <GraduationCap className="h-7 w-7 text-[#00E5FF]" />
+        <GraduationCap aria-hidden className="h-7 w-7 text-[#00E5FF]" />
         <div>
-          <h1 className="fel-heading text-3xl font-bold text-white">EDUCATION</h1>
+          <h2 id="academy" className={`${TYPE.heading} text-white`}>Academy</h2>
           <p className="text-sm text-white/50">Learn the theory. Run the drill. Earn Lab Credits.</p>
         </div>
       </div>
@@ -106,7 +110,7 @@ export function EducationView() {
               <Brain className="h-6 w-6 text-[#A855F7]" />
               <div>
                 <h2 className="fel-heading text-2xl font-bold text-white">NEXUS QUEUE</h2>
-                <p className="text-xs text-white/45">Adaptive lessons — personalised by the sequencer</p>
+                <p className="text-xs text-white/50">Adaptive lessons — personalised by the sequencer</p>
               </div>
               <span className="ml-auto rounded-full bg-[#A855F7]/15 px-3 py-1 font-mono text-xs font-bold text-[#A855F7]">
                 {nexusQueue.length} item{nexusQueue.length !== 1 ? 's' : ''}
@@ -124,10 +128,10 @@ export function EducationView() {
                       <Zap className="h-5 w-5 shrink-0 text-[#A855F7]" />
                       <div className="flex-1 min-w-0">
                         <span className="text-sm font-medium text-white/85 block truncate">{item.title}</span>
-                        <span className="text-xs text-white/40 block truncate">{item.reason}</span>
+                        <span className="text-xs text-white/50 block truncate">{item.reason}</span>
                       </div>
                       {item.difficulty != null && (
-                        <span className="font-mono text-[10px] text-white/30">
+                        <span className="font-mono text-[12px] text-white/50">
                           {'★'.repeat(item.difficulty)}{'☆'.repeat(5 - item.difficulty)}
                         </span>
                       )}
@@ -159,7 +163,7 @@ export function EducationView() {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <h2 className="fel-heading text-2xl font-bold text-white">{track.title}</h2>
-                  <p className="text-xs text-white/45">{track.subtitle}</p>
+                  <p className="text-xs text-white/50">{track.subtitle}</p>
                 </div>
                 <div className="text-right">
                   <span className="font-mono text-sm font-bold" style={{ color: track.accent }}>
@@ -182,7 +186,7 @@ export function EducationView() {
                   <div key={mod.key} className="mt-5">
                     <div className="flex items-center gap-2">
                       <h3 className="fel-heading text-lg font-bold text-white/85">{mod.title}</h3>
-                      {!prevDone && <Lock className="h-4 w-4 text-white/35" />}
+                      {!prevDone && <Lock className="h-4 w-4 text-white/50" />}
                     </div>
                     <div className="mt-2 space-y-2">
                       {(mod.lessons ?? []).map((lesson) => {
@@ -202,10 +206,10 @@ export function EducationView() {
                               {isDone ? (
                                 <CheckCircle2 className="h-5 w-5 shrink-0 text-[#00FF9D]" />
                               ) : (
-                                <Circle className="h-5 w-5 shrink-0 text-white/30" />
+                                <Circle className="h-5 w-5 shrink-0 text-white/50" />
                               )}
                               <span className="flex-1 text-sm font-medium text-white/85">{lesson.title}</span>
-                              <ChevronDown className={`h-4 w-4 text-white/40 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                              <ChevronDown className={`h-4 w-4 text-white/50 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
                             </button>
                             <AnimatePresence initial={false}>
                               {isOpen && (
@@ -259,7 +263,7 @@ export function EducationView() {
           </section>
         );
       })}
-      {!loaded && <p className="mt-6 text-center font-mono text-xs text-white/35">Loading progress…</p>}
-    </main>
+      {!loaded && <p className="mt-6 text-center font-mono text-xs text-white/50">Loading progress…</p>}
+    </div>
   );
 }

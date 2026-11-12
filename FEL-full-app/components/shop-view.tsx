@@ -91,7 +91,7 @@ export function ShopView({
           <h1 className="fel-heading text-3xl font-bold text-white">CREATOR CARD SHOP</h1>
           <p className="text-sm text-white/50">First-party cards. Server-authoritative wallet.</p>
         </div>
-        <span className="inline-flex items-center gap-2 rounded-lg border border-[#FFD700]/40 bg-[#FFD700]/10 px-4 py-2 font-mono text-lg font-bold text-[#FFD700]">
+        <span className="inline-flex items-center gap-2 rounded-lg border border-[#FFD700]/40 bg-[#FFD700]/10 px-4 py-2 font-mono text-[20px] font-bold text-[#FFD700]">
           <Coins className="h-5 w-5" />
           {credits ?? '–'} LC
         </span>
@@ -99,7 +99,7 @@ export function ShopView({
 
       {/* HOTFIX (2026-09-24): these cards unlock nothing yet, so they are shown but not sold. See shopCardOnSale. */}
       {SHOP_CARDS.some((c) => !shopCardOnSale(c.key)) && (
-        <p className="mt-3 text-xs text-white/55">
+        <p className="mt-3 text-base text-white/55">
           Cards marked NOT ON SALE YET don&apos;t unlock anything in the game yet, so this shop won&apos;t take Lab Credits for
           them. The cards on sale today are in{' '}
           <Link href="/cards" className="text-[#00E5FF] hover:underline">Creator Cards</Link>.
@@ -138,8 +138,8 @@ export function ShopView({
                   <Icon className="h-5 w-5" style={{ color: card.accent }} />
                 </div>
                 <div>
-                  <h3 className="fel-heading text-lg font-bold leading-tight text-white">{card.name}</h3>
-                  <span className="font-mono text-[10px] uppercase tracking-wider text-white/40">{meta?.label}</span>
+                  <h3 className="fel-heading text-[20px] font-bold leading-tight text-white">{card.name}</h3>
+                  <span className="font-mono text-[12px] uppercase tracking-wider text-white/50">{meta?.label}</span>
                 </div>
               </div>
               <p className="mt-3 flex-1 text-xs leading-relaxed text-white/55">{card.description}</p>
@@ -153,7 +153,7 @@ export function ShopView({
                       : 'cursor-default bg-[#FFD700]/10 text-[#FFE680]'
                     : onSale && canAfford
                       ? 'bg-[#00E5FF] text-black hover:bg-[#00E5FF]/85 hover:shadow-[0_0_18px_rgba(0,229,255,0.4)]'
-                      : 'cursor-not-allowed bg-white/10 text-white/35'
+                      : 'cursor-not-allowed bg-white/10 text-white/50'
                 }`}
               >
                 {busy === card.key ? (

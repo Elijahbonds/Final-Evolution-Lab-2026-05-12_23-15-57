@@ -145,3 +145,51 @@ export function guardianConsentAsk(menteeName: string): string {
  *  the file header — no screen shows either figure yet). Minutes, not sessions: a short daily habit, counted the way
  *  WHO's own youth guideline counts it. */
 export const YOUTH_DAILY_ACTIVITY_TARGET_MINUTES = 60;
+
+// ── OWNER-APPROVED WORDING, NOT LIVE YET (owner, in chat, 2026-10-27: "You do it. I approve.") ─────────────────────────
+// The two guardian-consent texts below were drafts for the owner (Owner Inbox cards C10 and C08; docs/COACH-LOOP.md §1
+// and docs/TEAMS-SQUADS.md §3). The owner approved both as written. They are kept here word for word
+// (tests/owner-approvals/consent-wording.test.ts holds them to the docs), and they are NOT on any screen yet, on
+// purpose: the screens keep guardianConsentAsk (today's camp-plan line) until the go-live steps ship TOGETHER, because a
+// consent's request date is the only record of which words the guardian saw (lib/coach/coachConsent.ts):
+//   1. the screens say these words for a request made on or after the go-live day;
+//   2. a teen whose accepted consent predates the words can send a new request (today /consent/guardian says "all set");
+//   3. COACH_TRAINING_CONSENT_SINCE / SQUADS_CONSENT_SINCE are set to that go-live day (a UTC midnight on or after the
+//      deploy — the deploy is the owner's, so the date is too);
+//   4. the guardian's withdraw path is built. NOTHING writes GuardianConsent.revokedAt today, so the withdraw sentences
+//      are held back by GUARDIAN_WITHDRAW_LIVE (false): the owner's own recommendation on both cards ("drop the last
+//      paragraph until the withdraw link is built"; "the withdraw link must be built before this goes live").
+// Until then COACH_TRAINING_CONSENT_SINCE and SQUADS_CONSENT_SINCE stay null and every 13–17 account fails closed, as before.
+
+/** The guardian withdraw path exists (step 4 above). False: nothing writes GuardianConsent.revokedAt yet. */
+export const GUARDIAN_WITHDRAW_LIVE = false;
+
+/** Card C10 (docs/COACH-LOOP.md §1), approved 2026-10-27: a guardian's yes to coached training. Paragraphs in order;
+ *  `yes` is the "If you say yes:" list. */
+export function coachTrainingConsentWords(name: string, withdrawLive: boolean = GUARDIAN_WITHDRAW_LIVE): {
+  lead: string; yesHeading: string; yes: string[]; never: string; withdraw: string | null;
+} {
+  return {
+    lead: `FEL is a training app. Before ${name} can join a coach's roster and train with them here, we ask a parent or guardian to confirm that's OK.`,
+    yesHeading: 'If you say yes:',
+    yes: [
+      `${name} can join a coach's roster on FEL, and that coach can write their training programs.`,
+      `FEL saves ${name}'s training: the sets they log (exercises, reps, weights, effort), the sessions they complete, the goals they set and how far through each program they are. Their coach sees it.`,
+      'You can get a training report by email: sessions and sets done, nothing measured about the body.',
+      'A camp plan their coach builds with them can go live.',
+    ],
+    never: 'What a yes never unlocks: Mirror scans, pain check-ins, daily check-ins and any health data are saved only for players 18 and over, with or without your yes.',
+    withdraw: withdrawLive ? `You can withdraw this at any time from the link in this email; ${name}'s coach then stops seeing new training, and the report links stop working.` : null,
+  };
+}
+
+/** Card C08 (docs/TEAMS-SQUADS.md §3), approved 2026-10-27: a guardian's yes to a teen joining squads. */
+export function squadsConsentWords(name: string, withdrawLive: boolean = GUARDIAN_WITHDRAW_LIVE): string[] {
+  return [
+    `FEL is a training app. ${name} would like to join a squad: a small group of friends who see whether each other did the daily drill, a weekly points table from drills and games, and preset reactions (like 🔥 or 👏).`,
+    'There are no messages, comments or private chats, and squads have no public page.',
+    `Squadmates see ${name}'s first name, whether they did the daily drill, their place in the weekly table and the challenges they choose to post.`,
+    `They never see ${name}'s game scores, camera numbers or health data.`,
+    ...(withdrawLive ? [`You can withdraw this at any time from the link in this email; ${name} then leaves every squad.`] : []),
+  ];
+}

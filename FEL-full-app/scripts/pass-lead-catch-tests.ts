@@ -35,8 +35,10 @@ ok(!/14 : type === 'lob' \? 9 : 10/.test(ballHandling), 'the old inline 14/9/10 
 ok(mode.includes("leadPoint, PASS_SPEED } from '../core/BallHandling';"), '3v3 imports leadPoint and PASS_SPEED from BallHandling');
 ok(/const toMe = leadPoint\(body\.char\.root\.position, me\.char\.root\.position, me\.drib\.vel, PASS_SPEED\.chest\)/.test(mode),
   'call-for-ball leads the return pass with "me"\'s own velocity (the human may be cutting toward the ball)');
-ok(/passFlight\.start\(body\.char\.root\.position\.add\(new Vector3\(0, 1\.2, 0\)\), toMe, 'chest', 1\);/.test(mode),
-  'call-for-ball throws at the led point, not the bare position it used to');
+// test changed (hoops-p05, phase 5): the START moved — a teammate's pass leaves from the ball (hoops/ballHandoff passStartFor, read before
+// the release), not from his root + 1.2 m. What this pins is the TARGET, the led point toMe; it still does, and the start is pinned too.
+ok(/passFlight\.start\(passFrom, toMe, 'chest', 1\);/.test(mode) && /const passFrom = passStartFor\(ball, body\.char\.root\);[^\n]*\n\s*releaseBall\(ball\);\n\s*passTargetId = 'me';/.test(mode),
+  'call-for-ball throws at the led point, not the bare position it used to (from the ball, read before the release)');
 ok(/const toTarget = type === 'lob'/.test(mode) && /: leadPoint\(ball\.getAbsolutePosition\(\), locked\.pos, mateVel\[locked\.id === 'mate0' \? 0 : 1\], PASS_SPEED\[type\]/.test(mode),
   'the main teammate pass leads chest/bounce throws with the mate\'s tracked velocity');
 ok(/type === 'lob'\s*\n\s*\? locked\.pos\.add\(new Vector3\(0, 1\.2, 0\)\)/.test(mode),

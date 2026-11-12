@@ -1,3 +1,4 @@
+// test changed: copy rewrite (cue-rewrite lane) - squatBreathLine reads in plain words; still built from the spec, and a changed spec still changes it.
 // The one breathing pacer (MIRROR-COACH P7, 2026-09-29). What this holds:
 //   · the schedule math: every in / hold / out / pause as [start, end) on the host's clock, from a pacer spec;
 //   · EQUALITY WITH THE DRILL CHART for WAKE_UP's Pressurize the System — its breathe / hold prompts, its STAND TALL
@@ -296,11 +297,11 @@ describe("the Mirror's breathe-first stage runs the one pacer on its own pose cl
 
   // MIRROR-COACH P7 FIX (2026-09-29, review): the harness line was hard-coded "4s · hold 2s · out slow 6s" beside the ring
   it("the stage's words come from the spec: today's line, and a changed spec changes the line with it", () => {
-    expect(squatBreathLine()).toBe('In through the nose 4s · hold 2s · out slow 6s, 3 cycles.');
-    expect(squatBreathLine({ from: 0, inSec: 5, holdSec: 0, outSec: 7, rounds: 4 })).toBe('In through the nose 5s · out slow 7s, 4 cycles.');
+    expect(squatBreathLine()).toBe('In through your nose for 4, hold 2, out slowly for 6. 3 times.');
+    expect(squatBreathLine({ from: 0, inSec: 5, holdSec: 0, outSec: 7, rounds: 4 })).toBe('In through your nose for 5, out slowly for 7. 4 times.');
     const harness = readFileSync('app/play/mirror/_components/mirror-harness.tsx', 'utf8');
     expect(harness).toContain('{squatBreathLine()}');
-    expect(harness).not.toMatch(/nose 4s · hold 2s/);
+    expect(harness).not.toMatch(/nose 4s · hold 2s|nose for 4, hold 2/);
   });
 
   it('the last breath out ends on the very pose frame the stage hands over to the check (30 fps, a late first frame)', () => {

@@ -29,11 +29,15 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { sessionStore } from '@/lib/babylon/core/sessionStore';
 import { CONTROLS_DEVICES, DEVICE_LABEL, controlsSheet, detectDevice, fitScale, type ControlsDevice } from '@/lib/ui/controlsScreen';
+import { detectPadFamily, type PadFamily } from '@/lib/input/padLabels';
+import { lineSize } from '@/lib/design/type';
 
 /** How much of the panel's content its box cuts off: the panel's own overflow and its lines' scroll box. */
 function cutPx(panel: HTMLElement): number {
   const lines = panel.querySelector<HTMLElement>('[data-controls-lines]');
-  return Math.max(panel.scrollHeight - panel.clientHeight, lines ? lines.scrollHeight - lines.clientHeight : 0);
+  const rows = panel.querySelector<HTMLElement>('[data-controls-rows]');
+  return Math.max(panel.scrollHeight - panel.clientHeight, lines ? lines.scrollHeight - lines.clientHeight : 0,
+    rows ? rows.scrollHeight - rows.clientHeight : 0);
 }
 
 // useLayoutEffect warns on the server (the splash renders there): the fit is a browser-only measure anyway
@@ -50,21 +54,28 @@ export function ControlsPanel({ modeId, hint, chooser = true, className = '' }: 
   const view = useSyncExternalStore(sessionStore.subscribe, sessionStore.view, sessionStore.view);
   const body = view.body !== 'off';
   const [device, setDevice] = useState<ControlsDevice>(() => detectDevice());
+  // CONTROLLER-TRY-FIX item 4: the pad in use names its own buttons (an Xbox pad's RT, a DualSense's CROSS); null = the generic words
+  const [family, setFamily] = useState<PadFamily | null>(null);
   useEffect(() => {
     // a pad plugged in (or first pressed) while the card is up is the device in use
-    const on = (): void => setDevice('pad');
-    const off = (): void => setDevice(detectDevice());
+    const on = (): void => { setDevice('pad'); setFamily(detectPadFamily()); };
+    const off = (): void => { setDevice(detectDevice()); setFamily(detectPadFamily()); };
+    setFamily(detectPadFamily());   // after mount only: the server's markup (and a test's) is the generic words
     window.addEventListener('gamepadconnected', on);
     window.addEventListener('gamepaddisconnected', off);
     return () => { window.removeEventListener('gamepadconnected', on); window.removeEventListener('gamepaddisconnected', off); };
   }, []);
-  const sheet = useMemo(() => controlsSheet(modeId, device, { body, fallback: hint }), [modeId, device, body, hint]);
+  const sheet = useMemo(() => controlsSheet(modeId, device, { body, fallback: hint, family: family ?? undefined }), [modeId, device, body, hint, family]);
   const ref = useRef<HTMLSpanElement>(null);
   useIsoLayoutEffect(() => {
     const panel = ref.current;
     if (!panel) return;
     // straight onto the element, not React state: a re-render per step would be a loop through the layout
     const apply = (s: number): void => { panel.style.setProperty('--fel-controls-fit', String(s)); panel.dataset.controlsFit = String(s); };
+    // EVERY-SCREEN P10 (phase 7's recommendation, built under the standing rule; the owner has not answered): on a phone and
+    // with keys the panel SCROLLS AS A WHOLE and nothing is zoomed: the rows stay 14 px and a line of more than 12 words is
+    // 16 px, at any text size. Only a pad, which cannot scroll a box, still steps the rows and lines down to fit.
+    if (device !== 'pad') { apply(1); return; }
     const fit = (): void => apply(fitScale((s) => { apply(s); return cutPx(panel) > 1; }));
     fit();
     if (typeof ResizeObserver === 'undefined') return;
@@ -74,7 +85,7 @@ export function ControlsPanel({ modeId, hint, chooser = true, className = '' }: 
     ro.observe(panel);
     if (panel.parentElement) ro.observe(panel.parentElement);
     return () => ro.disconnect();
-  }, [sheet]);
+  }, [sheet, device]);
   if (!sheet.rows.length && !sheet.lines.length) return null;
 
   return (
@@ -82,43 +93,45 @@ export function ControlsPanel({ modeId, hint, chooser = true, className = '' }: 
       // READY starts the game on a pointer-down anywhere that is not a button: reading (or finger-scrolling) the list
       // must not. On the pause a tap still resumes (the layer's click), which is what its headline says.
       onPointerDown={chooser ? (e) => e.stopPropagation() : undefined}
-      className={`flex w-[min(30rem,92vw)] min-h-0 flex-col gap-1.5 rounded-xl border border-white/10 bg-black/60 px-3 py-2 text-left ${className}`}>
+      className={`flex w-[min(30rem,92vw)] min-h-0 flex-col gap-1.5 overflow-y-auto overscroll-contain rounded-xl border border-white/10 bg-black/60 px-3 py-2 text-left [scrollbar-width:thin] ${className}`}>
       <span className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-        <span className="text-[10px] font-black tracking-[0.3em] text-white/70">CONTROLS</span>
+        <span className="text-[12px] font-black tracking-[0.3em] text-white/70">CONTROLS</span>
         {chooser ? (
           <span className="flex gap-1" role="group" aria-label="controls for">
             {CONTROLS_DEVICES.map((d) => (
               <button key={d} type="button" aria-pressed={d === device}
                 onClick={(e) => { e.currentTarget.blur(); setDevice(d); }}
-                className={`rounded-full border px-2 py-0.5 text-[9px] font-black tracking-wider transition ${d === device ? 'border-white bg-white text-black' : 'border-white/25 text-white/70 hover:bg-white/10'}`}>
+                className={`inline-flex min-h-11 items-center rounded-full border px-3 text-[12px] font-black tracking-wider transition ${d === device ? 'border-white bg-white text-black' : 'border-white/25 text-white/70 hover:bg-white/10'}`}>
                 {DEVICE_LABEL[d]}
               </button>
             ))}
           </span>
         ) : (
-          <span className="text-[9px] font-black tracking-wider text-white/50">{DEVICE_LABEL[device]}</span>
+          <span className="text-[12px] font-black tracking-wider text-white/50">{DEVICE_LABEL[device]}</span>
         )}
       </span>
+      {/* EVERY-SCREEN P10: the rows and the lines are the panel's own content now; the panel scrolls as a whole (P8b gave the
+          rows a scroll box of their own, P7 the lines: at 150 % and 200 % text each box cut its own words) */}
       {sheet.rows.length > 0 && (
-        <span data-controls-rows className="[zoom:var(--fel-controls-fit,1)] grid grid-cols-[auto_1fr_auto_1fr] gap-x-3 gap-y-0.5">
+        <span data-controls-rows className="[zoom:var(--fel-controls-fit,1)] grid shrink-0 grid-cols-[auto_1fr_auto_1fr] gap-x-3 gap-y-0.5">
           {sheet.rows.map((r) => (
             <span key={`${r.input}-${r.action}`} className="contents">
-              <span className="whitespace-nowrap font-mono text-[11px] font-black text-[#22d3ee]">{r.input}</span>
-              <span className="font-mono text-[11px] text-white/85">{r.action}</span>
+              <span className="whitespace-nowrap font-mono text-[14px] font-black text-[#22d3ee]">{r.input}</span>
+              <span className="font-mono text-[14px] text-white/85">{r.action}</span>
             </span>
           ))}
         </span>
       )}
       {sheet.lines.length > 0 && (
-        <span data-controls-lines className="[zoom:var(--fel-controls-fit,1)] block min-h-0 overflow-y-auto border-t border-white/10 pt-1.5 [scrollbar-width:thin]">
+        <span data-controls-lines className="[zoom:var(--fel-controls-fit,1)] block shrink-0 border-t border-white/10 pt-1.5">
           {sheet.groups.map((g, gi) => (
             <Fragment key={g.title ?? `group-${gi}`}>
               {g.title && (
                 <span data-controls-group={g.title} style={{ color: g.color }}
-                  className={`block text-[9px] font-black tracking-[0.3em]${gi > 0 ? ' pt-1.5' : ''}`}>{g.title}</span>
+                  className={`block text-[14px] font-black tracking-[0.3em]${gi > 0 ? ' pt-1.5' : ''}`}>{g.title}</span>
               )}
               {g.lines.map((l) => (
-                <span key={l} className="block pl-3 -indent-3 font-mono text-[10px] leading-snug text-white/75">· {l}</span>
+                <span key={l} className={`block pl-3 -indent-3 font-mono ${device === 'pad' ? 'text-[14px]' : lineSize(l, 'text-[14px]')} leading-snug text-white/75`}>· {l}</span>
               ))}
             </Fragment>
           ))}

@@ -10,7 +10,7 @@ export const AVAILABILITY_API = '/api/coach/availability';
 
 const TONE: Record<Availability, string> = {
   full: 'border-emerald-400/50 text-emerald-300 bg-emerald-400/10',
-  limited: 'border-[#FFD700]/50 text-[#FFD700] bg-[#FFD700]/10',
+  limited: 'border-fel-gold/50 text-fel-gold bg-fel-gold/10',
   out: 'border-[#FF2D95]/50 text-[#FF2D95] bg-[#FF2D95]/10',
 };
 
@@ -40,7 +40,7 @@ export function AvailabilityPicker({ clientId, value, onSaved }: { clientId: str
 
   return (
     <div className="flex flex-wrap items-center gap-1.5 pt-1" data-availability={value.status}>
-      <span className="text-[10px] uppercase tracking-wider text-white/35">Availability</span>
+      <span className="text-[12px] uppercase tracking-wider text-fel-quiet">Availability</span>
       {AVAILABILITY_STATUSES.map((s) => (
         <button
           key={s}
@@ -49,13 +49,13 @@ export function AvailabilityPicker({ clientId, value, onSaved }: { clientId: str
           aria-pressed={value.status === s}
           title={AVAILABILITY_LABEL[s].coach}
           onClick={() => save(s, s === 'full' ? '' : returnBy)}
-          className={`rounded-md border px-2 py-0.5 text-[11px] ${value.status === s ? TONE[s] : 'border-white/10 text-white/50'}`}
+          className={`rounded-md border px-2 py-0.5 text-[12px] ${value.status === s ? TONE[s] : 'border-white/10 text-white/50'}`}
         >
           {AVAILABILITY_LABEL[s].short}
         </button>
       ))}
       {value.status !== 'full' && (
-        <label className="flex items-center gap-1 text-[11px] text-white/45">
+        <label className="flex items-center gap-1 text-[12px] text-fel-dim">
           back
           <input
             type="date"

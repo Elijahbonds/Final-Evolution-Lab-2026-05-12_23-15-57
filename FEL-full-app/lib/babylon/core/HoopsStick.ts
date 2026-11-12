@@ -60,6 +60,45 @@ export const HOOPS_REVERSE_DECEL = 47.6;
  *  committed). Forward running, sprinting and lateral slides never read it. 1 = no cap (the game before this number). */
 export const HOOPS_RETREAT_SPEED_K = 0.7;
 
+// ── hoops-p01 (controls that answer, 1v1 / 3v3 ten-phase pass phase 1): THE BALL HANDLER'S GEARS ────────────────────────────────────────
+// The DribbleController (every 1v1 / 3v3 body) runs on GEARS_HANDLER (core/CourtMovement); GEARS_HOOPS above stays release for the dunk
+// approach (DunkMode — another lane's mode). The knobs read the handler's numbers as their defaults, so the panel's reset is the handler's
+// game (the dunk approach keeps its own unless a knob is dialled); RELEASE_STICK_PRESET puts the release stick back in one paste.
+/** TUNED (hoops-p01) 22 → 32 m/s² — the handler's stop at a walk: H3a's own number (#311). Gate: the stop from a jog ≤ 0.25 s / ≤ 0.6 m. */
+export const HANDLER_STOP_DECEL_LOW = 32;
+/** TUNED (hoops-p01) 11 → 26 m/s² — the handler's stop at top speed: H3a's. Release slid a sprint 0.42 s / 1.40 m; gate ≤ 0.35 s / ≤ 1.0 m. */
+export const HANDLER_STOP_DECEL_HIGH = 26;
+/** TUNED (hoops-p01) 0.17 → 0.10 s — the lag to the jog: H3a's. Gate: 90 % of the jog's pace ≤ 0.25 s (release 0.45 s). */
+export const HANDLER_JOG_TAU = 0.1;
+/** TUNED (hoops-p01) 15 → 22 m/s² — the accel cap toward the jog: H3a's. */
+export const HANDLER_JOG_ACCEL = 22;
+/** TUNED (hoops-p01) 0.45 → 0.7 — the loaded first step: H3a's lighter load. */
+export const HANDLER_LOAD_SCALE = 0.7;
+/** TUNED (new, hoops-p01) m/s — THE FIRST STEP: a stick pushed from a standstill starts the body at this speed on the press's own frame, then
+ *  the loaded ramp takes over — the press is answered in the frame it lands. Gate: the root moves 2 cm ≤ 2 frames from the press (release
+ *  4, H3a 3). 0 = no step (release). assumption: the least that meets the gate on H3a's ramp with a margin; not felt yet. */
+export const HANDLER_FIRST_STEP_MPS = 0.3;
+/** TUNED (new, hoops-p01) — THE PLANT ON A REVERSAL. 1 = release: a stick thrown back at pace plants and HOLDS the plant's floor speed on the
+ *  OLD line for the rest of the plant (0.12 s; 2.7 m/s the wrong way from a jog, measured), then brakes through zero; 0 = the plant is the
+ *  brake: it bleeds straight through zero at the plant's own rate and ends there. Turns and cuts under the reversal angle keep their plant. */
+export const HANDLER_REVERSE_PLANT_HOLD = 0;
+/** TUNED (new, hoops-p01) s — THE PUSH-OFF: out of a reversal the first step the new way is a launch for this long (no loaded step, the accel
+ *  caps × LAUNCH_BOOST — what a move's explode already gets). 0 = release (a loaded step from zero). Gate: a reversal at pace reaches half
+ *  the pace the new way ≤ 0.22 s (release 0.45 s, H3a 0.38 s). assumption: 0.2 s, the least that meets it (0.3 measured the same). */
+export const HANDLER_REVERSE_LAUNCH_SEC = 0.2;
+
+/** hoops-p01: the release stick as feel-panel values — paste it to put the ball handler back exactly as it shipped before this phase. */
+export const RELEASE_STICK_PRESET: Readonly<Record<string, number>> = Object.freeze({
+  'hoops.jogTau': HOOPS_JOG_TAU,
+  'hoops.jogAccel': HOOPS_JOG_ACCEL,
+  'hoops.loadScale': HOOPS_LOAD_SCALE,
+  'hoops.stopDecelLow': HOOPS_STOP_DECEL_LOW,
+  'hoops.stopDecelHigh': HOOPS_STOP_DECEL_HIGH,
+  'hoops.firstStepMps': 0,
+  'hoops.reversePlantHold': 1,
+  'hoops.reverseLaunchSec': 0,
+});
+
 /** THE H3a PRESET: #311's tuned stick (owner 2026-10-16/17, "acceleration felt off… too twitchy"), as feel-panel values. Paste it into the
  *  panel (Copy values' own format) to play it; docs/FEEL-PANEL.md has the from → to table. */
 export const H3A_STICK_PRESET: Readonly<Record<string, number>> = Object.freeze({
@@ -79,6 +118,10 @@ export const H3A_STICK_PRESET: Readonly<Record<string, number>> = Object.freeze(
   'hoops.jerk': 900,
   'hoops.reverseDeg': 135,
   'hoops.reverseDecel': 34,
+  // hoops-p01: #311 had none of these — its stick is theirs at release
+  'hoops.firstStepMps': 0,
+  'hoops.reversePlantHold': 1,
+  'hoops.reverseLaunchSec': 0,
 });
 
 /** The gears for this frame: `base` (GEARS_HOOPS, or a test's copy) with the feel panel's overrides, written into `out` (no allocation).
@@ -102,6 +145,10 @@ export function liveGears(base: GearTuning, out: GearTuning): GearTuning {
   out.jerk = base.jerk === undefined ? undefined : feel('hoops.jerk', base.jerk);
   out.reverseDeg = base.reverseDeg === undefined ? undefined : feel('hoops.reverseDeg', base.reverseDeg);
   out.reverseDecel = base.reverseDecel === undefined ? undefined : feel('hoops.reverseDecel', base.reverseDecel);
+  // hoops-p01: the handler's own (GEARS_HANDLER defines them; GEARS_HOOPS — the dunk approach — does not, so they never move it)
+  out.firstStep = base.firstStep === undefined ? undefined : feel('hoops.firstStepMps', base.firstStep);
+  out.reversePlantHold = base.reversePlantHold === undefined ? undefined : feel('hoops.reversePlantHold', base.reversePlantHold);
+  out.reverseLaunchSec = base.reverseLaunchSec === undefined ? undefined : feel('hoops.reverseLaunchSec', base.reverseLaunchSec);
   return out;
 }
 

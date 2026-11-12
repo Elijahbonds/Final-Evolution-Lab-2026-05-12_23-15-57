@@ -14,7 +14,7 @@ export function PlaybookCard() {
         <div className="flex items-start gap-3">
           <BookOpen aria-hidden className="mt-0.5 h-6 w-6 shrink-0 text-[#00FF9D]" />
           <div className="min-w-0 flex-1">
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[#00FF9D]">The Playbook</p>
+            <p className="font-mono text-[12px] font-bold uppercase tracking-[0.18em] text-[#00FF9D]">The Playbook</p>
             <h2 className="fel-heading mt-1 text-xl font-bold leading-tight text-white">How the body actually moves</h2>
             <p className="mt-1.5 text-[13.5px] leading-relaxed text-white/60">
               {CHAPTERS.length} chapters from The Neuro-Mechanic Playbook: the joints, the jump, the landing, the reset.

@@ -150,6 +150,14 @@ Check the webhook's deliveries in the Dashboard: every event should answer 200. 
    FEL Facility (roadmap: after launch), shard packs (roadmap: not at launch) and the legacy coach block and
    marketplace listings. (a) **Add a per-product allow list next to it** *(recommended: one small change in
    `/api/stripe/checkout` and the wallet routes)*; (b) accept it for launch.
+   **Built (payments-ready, 2026-10-26):** `PURCHASES_ALLOWLIST` (`lib/payments/allowlist.ts`). Unset = as above; set,
+   e.g. `PURCHASES_ALLOWLIST=fel_pro,coins`, = only those sell. FEL Pro now also asks the store-terms tick before Stripe
+   (409 `terms_required`), with the version and time on the session and subscription metadata.
+   **The buy page:** every "Get FEL Pro" link was a GET to the POST-only `/api/stripe/checkout` (405), so nobody could
+   buy. They now open `/pro` (signed in only): weekly or monthly at the existing prices, the store-terms tick, and a
+   button that POSTs and goes to Stripe. While FEL Pro is closed it shows "FEL Pro isn't on sale yet." Every refusal
+   (18+, terms, already Pro) is the route's own answer. The B2B paywalls' links go to the Coach Pro card on
+   `/coach/business`; FEL Facility has no buy page yet.
 2. **The cosmetic SKU delivers no item.** `cosm-chrome-visor` writes an Order and nothing reads it: no wardrobe item is
    granted and no UI sells it. Cosmetics are really bought with coins. (a) **Do not sell the SKU; sell coins**
    *(recommended)*; (b) wire the SKU to a wardrobe item first.
@@ -167,6 +175,13 @@ Check the webhook's deliveries in the Dashboard: every event should answer 200. 
    (b) accept it. It sells only while `STUDIO_CREATOR_ENABLED` is on as well as `VIRTUAL_PURCHASES_ENABLED`.
 
 ## 9. Text the owner (and counsel) must write
+
+**Written 2026-10-27 on the owner's approval (card C28; drafted by Claude, not lawyer-reviewed):** the Purchase Terms and
+Refund Policy (`lib/purchase-terms.ts`, `/purchase-terms`), which FEL Pro and coaches' packages now tick
+(`lib/payments/terms.ts` `BUYER_TERMS`), and Privacy §7 (Stripe for every product, policy version `2026-10-27`). Still
+open from the list below: an in-app cancel for FEL Pro (`/api/stripe/portal` exists, and nothing links to it; the terms
+say "cancel by email" until it does), and counsel's read of the automatic-renewal terms. The purchase-screen lines in
+`lib/stripe/adult-gate.ts` are unchanged: the terms say the same rule, 18+ verified by birth year.
 
 This lane edited no legal or policy copy. Needed before going live:
 

@@ -174,8 +174,9 @@ export const ENDLESS_CEILING_BASIS =
  *   - football, snowboarding: untimed but ended by their rules — 3 drives (FootballRushMode.ts:107), the last gate.
  *   - skateboarding, surfing: RUN_SEC 90 (arena-score-integrity MIRRORED.skateRunSec / surfRunSec).
  *   - velocityKart, aeroAces: races of course.laps laps (VelocityKartMode.ts:998, AeroAcesMode.ts:370).
- *   - dance: a song has an end (DanceMode finish(), :205-241). Its free-dance toggle (owner decision #3) is not built yet;
- *     when it is, it sends stats.endless (see the header) and is capped by that, not by this table.
+ *   - dance: a song has an end (DanceMode finish(), :205-241). Its free-dance toggle (owner decision #3) is built
+ *     (lane/dance-extras-2, 2026-10-24): it sends stats.endless and stats.freeDance (see the header) and is recorded unpaid —
+ *     isFreeDanceSession, below — rather than capped by this table.
  */
 export const ENDLESS_MODES: Readonly<Record<string, string>> = {
   music:
@@ -351,6 +352,7 @@ export function sessionWon(
   opts: { score?: number; statsForwarded?: boolean; opponentScore?: number } = {},
 ): boolean {
   if (!isCatalogueMode(mode)) return false;                  // P2 FIX PASS (D): no rules to win by
+  if (isFreeDanceSession(mode, stats)) return false;          // lane/dance-extras-2: free dance is judged by nobody, so won by nobody
   // WIN-SERVER (QA top-5 #2, 2026-10-15): a head-to-head hoops game is won on the board, not on the client's word. The
   // route sends the score and the opponent's score it stores; the claim must agree with the rules (the less-paying answer).
   const judged = judgeHeadToHead(canonicalModeKey(mode), opts.score, opts.opponentScore);
@@ -407,8 +409,34 @@ export function sessionAccuracy(mode: string, stats: RoomStats | null, durationS
     const read = readMusicSet(stats, durationSec);
     return read && read.ok ? read.accuracy : null;
   }
-  if (m === 'dance') return readDanceAccuracy(stats);
+  if (m === 'dance') return isFreeDanceSession(m, stats) ? null : readDanceAccuracy(stats);   // free dance is judged by nobody
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// The dance room's FREE DANCE (lane/dance-extras-2, owner 2026-10-24)
+// ---------------------------------------------------------------------------
+
+/** The stats key the dance room's free-dance run carries (lib/babylon/dance/freeDance.ts FREE_DANCE_STAT; the test pins the two). */
+export const FREE_DANCE_STAT = 'freeDance';
+/** The reason a free-dance run is recorded unpaid (the end card's lib/sessions/unpaidCopy.ts has its words). */
+export const FREE_DANCE_REASON = 'FREE_DANCE';
+
+/**
+ * Is this a FREE DANCE run — the Cypher with its judge off (lib/babylon/dance/freeDance.ts)? A dance session whose stats say
+ * `freeDance`, or say `endless` (the header's reservation for exactly this toggle: a dance song has an end, so only a run with no
+ * judge has none). Believing either label can only take pay away, so it is safe to believe.
+ *
+ * WHAT IT PAYS (owner 2026-10-24: "nothing beyond whatever the existing no-score / free-play floor rule allows"): NOTHING. The route
+ * records it on its run, unpaid, with no GameSession row — the AGENT / PLAYTEST path — so no XP, shards, Lab Credits, coins, PRQ,
+ * streak, season XP or mastery, and nothing the Arena's rival draw, the daily goals or a best reads. The played floor a no-score run
+ * could otherwise reach (sessionXp(0) = 10 XP, sessionShards(0) = 1: Prove It's payFloorOnly, the endless ceiling's floor) is paid
+ * through a GameSession row, and a score-0 dance row would feed the rival draw's median. Its score must be 0: anything else is
+ * SCORE_INVALID (`free_dance_scored`), never recorded as a scored run.
+ */
+export function isFreeDanceSession(mode: string, stats: RoomStats | null): boolean {
+  if (!stats || canonicalModeKey(mode) !== 'dance') return false;
+  return flag(stats[FREE_DANCE_STAT]) || flag(stats.endless);
 }
 
 /**

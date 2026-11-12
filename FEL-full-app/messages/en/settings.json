@@ -1,0 +1,38 @@
+{
+  "motion": {
+    "label": { "system": "Match device", "reduce": "Reduced", "full": "Full" },
+    "short": { "system": "AUTO", "reduce": "REDUCED", "full": "FULL" },
+    "word": { "reduced": "reduced", "full": "full", "reducedUpper": "REDUCED", "fullUpper": "FULL" },
+    "statusLink": "This page's link (?motion={url}) is holding {held} motion. Your choice applies once you leave it.",
+    "statusSystemReduce": "Your device asks for reduced motion, so the games are calm.",
+    "statusSystemFull": "Your device has no motion preference, so the games play in full.",
+    "statusReduce": "Reduced, whatever your device says.",
+    "statusFull": "Full, whatever your device says.",
+    "chipLink": "MOTION: LINK · {held}",
+    "chipLinkAria": "Motion and flashes: {held}, set by this page's link.",
+    "chipAuto": "MOTION: AUTO · {held}",
+    "chipFixed": "MOTION: {short}",
+    "chipAria": "Motion and flashes: {label}{auto}. Change to {next}.",
+    "chipAriaAuto": " ({held})",
+    "titleLink": "Set by this page's link.",
+    "titleReduced": "Reduced: no flashes or shake, shorter hit-stops. Same game timing.",
+    "titleFull": "Full: flashes, shake and slow-mo on the big moments.",
+    "heading": "MOTION & FLASHES",
+    "body": "Reduced turns off screen flashes and camera shake in every game, and cuts hit-stops and slow-motion to a blink. Only the picture changes: every window, timer and score is the same. A slow-mo you are timing a press inside (the dunk's hang) keeps its length for that reason."
+  },
+  "colorVision": {
+    "title": "COLOUR VISION",
+    "body": "Swaps the game HUD's colours for ones you can tell apart, and adds a pattern beside each colour cue: the perfect band hatched, the good band edged. Only colours and patterns change; every window, meter and score is the same.",
+    "off": "Standard",
+    "deuteranopia": "Deuteranopia (green-weak)",
+    "protanopia": "Protanopia (red-weak)",
+    "tritanopia": "Tritanopia (blue-weak)"
+  },
+  "couch": {
+    "title": "BIG-SCREEN MENUS",
+    "body": "On a TV, the menus grow to the size the game HUD is, so you can read them from the couch. Auto turns this on when a controller or a TV remote drives the menus on a big screen.",
+    "auto": "Auto",
+    "on": "On",
+    "off": "Off"
+  }
+}

@@ -11,8 +11,10 @@
 // grown-up step. A "yes" to pain ends the screen: no camera, no checks, nothing kept. The camera card says what the
 // camera is for, and only its button asks the browser for the camera.
 import { useState } from 'react';
+import { notice } from '@/lib/every-screen/notices';
 import Link from 'next/link';
 import {
+  DEVICE_ONLY_LINE,
   AGE_OPTIONS, AGE_QUESTION, CAMERA_INFO_BUTTON, CAMERA_INFO_LINES, CAMERA_INFO_TITLE, DISCLAIMER, FULL_SCREEN_BUTTON,
   GROWN_UP_BODY, GROWN_UP_CHECKBOX, GROWN_UP_TITLE, JUMP_ONLY_BUTTON, PAIN_QUESTION, PAIN_STOP,
   PRIVACY_LINK, SCREEN_TEST_NAMES, TAKEOFF_OPTIONS, TAKEOFF_QUESTION,
@@ -21,6 +23,7 @@ import type { AgeBand } from '@/lib/screen/age';
 import { PRIVACY_PATH } from '@/lib/screen/routes';
 import { PROTOCOL, type ProtocolTest } from '@/lib/assess/protocol';
 import { PreviewLabel, StepCard, primaryBtn, quietBtn } from './screen-ui';
+import { TAKEOFF_NOTE, VIDEO_STAYS } from '@/lib/screen-easy/copy';
 
 /** A check's name on the start card: the plain words where copy.ts has them (S-7), else the engine's name. */
 const testName = (t: ProtocolTest): string => (SCREEN_TEST_NAMES as Partial<Record<string, string>>)[t.id] ?? t.name;
@@ -31,8 +34,10 @@ export function StartStep({ onJump, onFull, jumpHref, fullHref }: {
   jumpHref?: string;
   fullHref?: string;
 }) {
-  const jumpClass = `${primaryBtn} mt-1`;
-  const fullClass = `${quietBtn} mt-2`;
+  // PUBLIC-POLISH (2026-11-02, live sweep J15): text-center. On /screen these are <Link>s, and an <a> does not centre a
+  // wrapped label the way a <button> does ("(about 1 / min)" sat left-aligned there, centred on /play/mirror/assess).
+  const jumpClass = `${primaryBtn} mt-1 text-center`;
+  const fullClass = `${quietBtn} mt-2 text-center`;
   return (
     <StepCard testId="start">
       {jumpHref
@@ -41,14 +46,14 @@ export function StartStep({ onJump, onFull, jumpHref, fullHref }: {
       {fullHref
         ? <Link href={fullHref} prefetch={false} data-run="full" className={fullClass}>{FULL_SCREEN_BUTTON}</Link>
         : <button type="button" data-run="full" onClick={onFull} className={fullClass}>{FULL_SCREEN_BUTTON}</button>}
-      <p data-disclaimer className="mt-3 text-[16px] font-bold leading-snug">{DISCLAIMER}</p>
+      <p {...notice('medical')} data-disclaimer className="mt-3 text-[16px] font-bold leading-snug">{DISCLAIMER}</p>
       <div className="mt-2"><PreviewLabel /></div>
       <h2 className="mt-4 text-[18px] font-black">One camera</h2>
       <ul data-start-checks className="mt-2 space-y-1 text-[16px] text-white/75">
         {PROTOCOL.filter((t) => !t.notBuilt).map((t) => <li key={t.id}>{testName(t)}{t.sided ? ', each side' : ''}</li>)}
       </ul>
-      <p className="mt-3 text-[16px] leading-snug text-white/60">
-        Everything runs on this device. The picture never leaves it, and nothing is sent anywhere.{' '}
+      <p {...notice('privacy')} className="mt-3 text-[16px] leading-snug text-white/60">
+        {DEVICE_ONLY_LINE}{' '}
         <Link href={PRIVACY_PATH} prefetch={false} data-privacy-link className="underline">{PRIVACY_LINK}</Link>
       </p>
     </StepCard>
@@ -88,7 +93,10 @@ export function PainStep({ onAnswer }: { onAnswer: (hurts: boolean) => void }) {
   return (
     <StepCard testId="pain">
       <h2 className="text-[22px] font-black leading-tight">{PAIN_QUESTION}</h2>
-      <p className="mt-1 text-[16px] text-white/60">{DISCLAIMER}</p>
+      <p {...notice('medical')} className="mt-1 text-[16px] text-white/60">{DISCLAIMER}</p>
+      {/* SCREEN-EASY: Train's card opens the full screen without the start card, so its privacy line is said here too
+          (the privacy page itself is one tap away on the results, under "More detail") */}
+      <p data-pain-privacy className="mt-1 text-[16px] text-white/60">{VIDEO_STAYS}</p>
       <div className="mt-4 space-y-2.5">
         <button type="button" data-primary data-pain="no" onClick={() => onAnswer(false)} className={primaryBtn}>No, nothing hurts</button>
         <button type="button" data-pain="yes" onClick={() => onAnswer(true)} className={quietBtn}>Yes, something hurts</button>
@@ -102,7 +110,7 @@ export function TakeoffStep({ onAnswer }: { onAnswer: (side: 'left' | 'right' | 
   return (
     <StepCard testId="takeoff">
       <h2 className="text-[22px] font-black leading-tight">{TAKEOFF_QUESTION}</h2>
-      <p className="mt-1 text-[16px] text-white/60">Asked once, before the camera. Your sided results are labelled with your jumping leg.</p>
+      <p className="mt-1 text-[16px] text-white/60">{TAKEOFF_NOTE}</p>
       <div role="group" aria-label={TAKEOFF_QUESTION} className="mt-4 space-y-2.5">
         {TAKEOFF_OPTIONS.map((o, i) => (
           <button key={o.label} type="button" {...(i === 0 ? { 'data-primary': true } : {})} data-takeoff={o.side ?? 'unsure'}

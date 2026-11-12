@@ -39,3 +39,11 @@ export { buildResult, type SessionResult } from './core/sessionResult';
 // ── premium feel (M29) ──
 export { JuiceKit } from './premium/JuiceKit';
 export { vibrate, padRumble, HAPTIC } from './premium/Haptics';
+
+// ── dragon ride (DRAGON-RIDE-COMBO-2026-10-23: Glide / Surf / Dunk Drop, the swoop and jump-off dunks) ──
+// Built and tested; no mode mounts it yet (which dunk plays when, and the Glide/Surf entry in story / royale, are open PM picks).
+export { loadDragonRig, type DragonRig } from './dragon/DragonRig';
+export { DragonRideMachine, inputFrom, pressEdges, RIDE_BINDINGS, type RideInput, type RideEnv, type RideState } from './dragon/dragonRideMachine';
+export { planDive, diveAt, type DivePlan } from './dragon/diveArc';
+export { SwoopDunk, swoopSeatAt, swoopHands } from './dragon/swoopDunk';
+export { JumpOffDunk, jumpOffSeatAt, planLeap } from './dragon/jumpOffDunk';

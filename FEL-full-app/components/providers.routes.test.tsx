@@ -70,7 +70,12 @@ const PAGES: Record<string, () => Promise<{ default: unknown }>> = {
 async function pageElement(file: string, route: string): Promise<ReactNode> {
   const mod = await PAGES[file]();
   const lane = /\/screen\/program\/([^/]+)$/.exec(route)?.[1];
-  return createElement(mod.default as never, (lane ? { params: { lane } } : {}) as never);
+  const props = (lane ? { params: { lane } } : {}) as never;
+  // EVERY-SCREEN P7: /play/mirror/assess is an async server page now (it reads the signed-in account's birth date, owner
+  // 2026-11-11): await it to its element, as Next does
+  const Page = mod.default as unknown as (p: never) => unknown;
+  if (Page.constructor.name === 'AsyncFunction') return (await Page(props)) as ReactNode;
+  return createElement(mod.default as never, props);
 }
 
 afterEach(() => { vi.unstubAllGlobals(); });
@@ -111,8 +116,8 @@ describe('every Quick Screen page renders under Providers with no SessionProvide
     expect(threw).toBe(false);
     expect(m.providerMounts).toBe(0);
     expect(html).toContain('data-session="unauthenticated"');
-    expect(html).toContain('Just test my jump (about 1 min)');
-    expect(html).toContain('href="/play/mirror/assess?run=jump"');
+    expect(html).toContain('Measure my vertical (about 1 min)');
+    expect(html).toContain('href="/play/mirror/assess?run=vertical"');   // test changed (VERTICAL-EASY): the front door
     expect(html).not.toContain('src=');
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(isQuickScreenPath('/screen')).toBe(true);

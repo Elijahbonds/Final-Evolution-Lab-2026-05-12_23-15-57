@@ -34,14 +34,14 @@ export function useVoice(): VoiceApi {
 export function VoiceSection({ s }: { s: PartyState }) {
   const v = useVoice();
   if (!s.rights.voice) {
-    return <p data-testid="party-voice-locked" className="text-xs text-white/45">Voice chat is for verified 18+ accounts.</p>;
+    return <p data-testid="party-voice-locked" className="text-xs text-white/50">Voice chat is for verified 18+ accounts.</p>;
   }
   const inVoice = s.members.filter((m) => m.voice).length;
   return (
     <section aria-label="Voice" className="space-y-2 rounded-xl border border-white/10 bg-white/[0.03] p-3">
       <div className="flex items-center gap-2">
-        <h3 className="font-mono text-[10px] tracking-[0.25em] text-white/45">VOICE</h3>
-        <span className="text-xs text-white/40">{inVoice} in voice · peer-to-peer · never recorded</span>
+        <h3 className="font-mono text-[12px] tracking-[0.25em] text-white/50">VOICE</h3>
+        <span className="text-xs text-white/50">{inVoice} in voice · peer-to-peer · never recorded</span>
       </div>
       {v.problem ? <p role="alert" data-testid="party-voice-problem" className="rounded-md bg-amber-400/10 px-2 py-1.5 text-xs text-amber-200">{v.problem}</p> : null}
       {!v.joined ? (

@@ -18,6 +18,8 @@ import type { Lm } from '@/lib/pose/landmarks';
 import { gradeOf } from '@/lib/mirror/assessment';
 import { th, type Band, type ThresholdId } from './thresholds';
 import type { AssessMode, Side, TestId } from './protocol';
+import type { JumpSession, TrialQuality } from '@/lib/jump/session';
+import type { ReboundSet } from '@/lib/jump/rebound';
 
 export type Score03 = 0 | 1 | 2 | 3;
 export type Grade = 'ELITE' | 'PRIMED' | 'READY' | 'RECOVERING';
@@ -206,6 +208,19 @@ export interface JumpRead {
   landingSymMs: number | null;
   /** Deepest knee bend in the dip (deg, reported only). */
   dipKneeFlex: number | null;
+  // ── JUMP-PRO (2026-10-24), additive: lib/jump/refine.ts and lib/jump/session.ts. prqWrite's record keeps its own
+  // allow-list: since JUMP-PRO 2 (2026-10-25) it saves `method`, `heightSdCm` and `quality` (the verified rule's facts,
+  // opted-in adults only); the rest stays in memory. ──
+  /** 'refined': re-timed from the whole flight (heightCm is the take-off-velocity height); 'frames': the finder's edges. */
+  method?: 'refined' | 'frames';
+  /** g·T²/8 of the (refined) flight, before the landing drop is taken out. */
+  heightFlightCm?: number;
+  /** ±1 SD of heightCm (cm), from the fits' own residuals; null on the finder's frames. */
+  heightSdCm?: number | null;
+  /** Hip height at touch-down minus at take-off (cm, − = landed lower), when it could be read. */
+  landDropCm?: number | null;
+  /** The trial's quality: what makes it less than lab-grade, in reasons (lib/jump/session.ts). */
+  quality?: TrialQuality;
 }
 
 export interface T5Extra {
@@ -225,6 +240,10 @@ export interface T5Extra {
   /** Height variation across the valid jumps (%), and whether it crossed the flag line. */
   cvPct: number | null;
   inconsistent: boolean;
+  /** JUMP-PRO: the session's valid jumps as a set — best, mean ± SD, the typical error and the smallest real change. */
+  session?: JumpSession;
+  /** JUMP-PRO: jumps that rebounded out of a landing (contact under 400 ms): contact time and RSI. */
+  rebounds?: ReboundSet;
 }
 
 export interface TestResult {

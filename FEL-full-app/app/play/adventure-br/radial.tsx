@@ -25,7 +25,7 @@ export function AdventureRadial({ bus }: { bus: InputBus }) {
 
   return (
     <div className="pointer-events-auto absolute z-30" style={{ right: 'max(1.5rem, env(safe-area-inset-right))', bottom: 'calc(max(0.75rem, env(safe-area-inset-bottom)) + 15rem)' }}>
-      <div ref={hub} className="relative flex h-14 w-14 touch-none select-none items-center justify-center rounded-full border border-white/25 bg-white/10 text-[9px] font-black tracking-widest text-white/70"
+      <div ref={hub} className="relative flex h-14 w-14 touch-none select-none items-center justify-center rounded-full border border-white/25 bg-white/10 text-[12px] font-black tracking-widest text-white/70"
         onPointerDown={(e) => { pointer.current = e.pointerId; try { (e.target as Element).setPointerCapture(e.pointerId); } catch { /* fine */ } setOpen(true); }}
         onPointerMove={(e) => { if (pointer.current !== e.pointerId) return; const [x, y] = at(e); send(gesture.current.move(x, y)); setOver(gesture.current.current?.id ?? null); }}
         onPointerUp={() => { pointer.current = null; send(gesture.current.end()); setOpen(false); setOver(null); }}
@@ -34,7 +34,7 @@ export function AdventureRadial({ bus }: { bus: InputBus }) {
         {open && RADIAL_SLICES.map((s, i) => {
           const p = slicePos(i);
           return (
-            <span key={s.id} className={`pointer-events-none absolute whitespace-nowrap rounded-full px-2 py-1 text-[9px] font-black ${over === s.id ? 'bg-white text-black' : 'bg-black/70 text-white/80'}`}
+            <span key={s.id} className={`pointer-events-none absolute whitespace-nowrap rounded-full px-2 py-1 text-[12px] font-black ${over === s.id ? 'bg-white text-black' : 'bg-black/70 text-white/80'}`}
               style={{ left: `calc(50% + ${p.x * RING_PX}px)`, top: `calc(50% + ${p.y * RING_PX}px)`, transform: 'translate(-50%, -50%)' }}>
               {s.label}
             </span>

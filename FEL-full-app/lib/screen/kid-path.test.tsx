@@ -175,7 +175,9 @@ describe('an under-18 run keeps the age answer and nothing else, and sends nothi
     p.ev({ type: 'start' });
     p.ev({ type: 'age', age: '18+' });
     p.ev({ type: 'pain', hurts: false });
-    expect(p.pre.step).toBe('takeoff');
+    // test changed (SCREEN-EASY, 2026-10-28): no run asks the take-off foot now — pain "no" is the camera card, and
+    // nothing at all is written for it (the "Not sure"-is-null rule still holds where a run asks: lib/screen/flow.ts)
+    expect(p.pre.step).toBe('cameraInfo');
     p.ev({ type: 'takeoff', side: null });
     expect(p.pre.step).toBe('cameraInfo');
     expect(writes().filter((w) => w.key === KEYS.takeoff)).toEqual([]);

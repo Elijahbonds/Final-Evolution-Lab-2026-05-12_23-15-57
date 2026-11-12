@@ -7,6 +7,7 @@ import React, { useEffect, useRef } from 'react';
 import {
   ArcRotateCamera, Color3, Color4, Engine, HemisphericLight, DirectionalLight, MeshBuilder, Scene, StandardMaterial, Texture, Vector3,
 } from '@babylonjs/core';
+import { quietCanvas } from '@/lib/babylon/core/canvasA11y';
 
 type Surface = 'court' | 'board' | 'kit' | 'ui';
 
@@ -17,6 +18,8 @@ export default function ArtPreview3D({ image, surface }: { image: string; surfac
     if (!canvas) return;
     let engine: Engine;
     try { engine = new Engine(canvas, true, { preserveDrawingBuffer: false, stencil: false }); } catch { return; }
+    // SCREEN-FIXES (2026-11-10): named, and out of the Tab order (Babylon makes it 1): lib/babylon/core/canvasA11y.ts
+    quietCanvas(engine, canvas);
     const scene = new Scene(engine);
     scene.clearColor = new Color4(0.04, 0.04, 0.05, 1);
     const cam = new ArcRotateCamera('cam', -Math.PI / 2.4, Math.PI / 3, surface === 'court' ? 9 : 4.2, Vector3.Zero(), scene);

@@ -47,7 +47,8 @@ describe('the safety copy (the research draft, verbatim)', () => {
   it('SCREEN A: the take-off tap, the pain check, the per-cause fixes, the beep line and the capped-restart line', () => {
     expect(COPY.TAKEOFF_QUESTION).toBe('Which foot do you take off from when you jump?');
     expect(COPY.TAKEOFF_OPTIONS.map((o) => [o.side, o.label])).toEqual([['left', 'Left'], ['right', 'Right'], [null, 'Not sure']]);
-    expect(COPY.PAIN_CHECK_LINE).toBe('Any pain in that one? Tap yes or no when you walk back.');
+    // SCREEN-EASY (2026-10-28; test changed): both hands up is the "no", from where the athlete stands; "yes" a tap
+    expect(COPY.PAIN_CHECK_LINE).toBe('Any pain? If not, put both hands up. If it hurts, tap Yes.');
     expect(COPY.BEEP_MEANS_COUNTED).toBe('Beep means it counted.');
     expect(COPY.RESTART_WAIT_LINE).toBe("Take your time. Walk back into the shot when you're ready.");
     expect(COPY.CALIBRATE_FRONT_LINE).toBe('Stand still, arms down, while I measure you. Three, two, one.');

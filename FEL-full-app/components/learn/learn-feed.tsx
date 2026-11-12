@@ -1,6 +1,6 @@
 'use client';
 
-// LearnFeed — the Knowledge Feed at /learn (KNOWLEDGE-FEED v1, owner 2026-10-06; docs/KNOWLEDGE-FEED.md).
+// LearnFeed — the Knowledge Feed at /learn/feed (PLAT-P04 moved it from /learn, now Learn's home; KNOWLEDGE-FEED v1, owner 2026-10-06; docs/KNOWLEDGE-FEED.md).
 //
 // A full-screen vertical timeline, one card per screen, CSS scroll-snap so a thumb swipe or a mouse wheel moves one
 // card; arrows/j/k/space and a gamepad's d-pad move exactly one card through lib/knowledge/feedNav. What comes next is
@@ -13,6 +13,7 @@ import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'r
 import Link from 'next/link';
 import { SessionContext } from 'next-auth/react';
 import { toast } from 'sonner';
+import { readToast } from '@/components/ui/fel/toast';
 import { BarChart3, Bookmark, ChevronUp, EyeOff, Flame, Heart, Share2, SlidersHorizontal, X } from 'lucide-react';
 import { CARDS } from '@/lib/knowledge/catalog';
 import { availableTopics, topicBlurb } from '@/lib/knowledge/topics';
@@ -157,7 +158,7 @@ export function LearnFeed() {
     if (r.goalBonus > 0) toast(`+${r.goalBonus} XP to your account for today's goal`);
     if (r.capHit && !capToldRef.current) {
       capToldRef.current = true;
-      toast("That's today's learning XP for your account — your streak and progress still count.");
+      readToast("That's today's learning XP for your account — your streak and progress still count.");
     }
   }, []);
 
@@ -317,7 +318,8 @@ export function LearnFeed() {
   const streak = liveStreak(state.streak, today);
   const topicsOffered = availableTopics(signedIn).map((t) => ({ ...t, blurb: topicBlurb(t, signedIn) }));
   const playbookLocked = state.topics.includes('playbook') ? lockedCount(CARDS, signedIn, 'playbook') : 0;
-  const closeHref = signedIn ? '/train' : '/';
+  // PLAT-P04: the feed is one shelf of Learn (/learn/feed), so closing it goes back to Learn
+  const closeHref = '/learn';
 
   const onTopicsDone = (picked: TopicId[]) => {
     const next = setTopics(stateRef.current ?? freshState(), picked);
@@ -337,10 +339,10 @@ export function LearnFeed() {
           <span className="font-black tracking-wide md:text-lg">Learn</span>
           <span className="mx-1 h-4 w-px bg-white/15" />
           <Flame className="h-4 w-4 text-orange-400" />
-          <span className="font-mono text-sm font-bold tabular-nums" data-learn-streak>{streak}</span>
+          <span className="font-display text-[16px] font-extrabold tabular-nums" data-learn-streak>{streak}</span>
           <span className="ml-1 flex items-center gap-1">
             <GoalRing done={done} size={22} />
-            <span className="font-mono text-sm font-bold tabular-nums" data-learn-goal>{Math.min(done, DAILY_GOAL)}/{DAILY_GOAL}</span>
+            <span className="font-display text-[16px] font-extrabold tabular-nums" data-learn-goal>{Math.min(done, DAILY_GOAL)}/{DAILY_GOAL}</span>
           </span>
         </div>
         <div className="pointer-events-auto flex gap-2">
@@ -374,7 +376,7 @@ export function LearnFeed() {
             <h2 className="text-[clamp(1.6rem,4vw,3rem)] font-black">You're all caught up</h2>
             <p className="max-w-md text-white/65 md:text-xl">Missed questions come back for review, and new reviews are due over the next few days. Add a topic for more.</p>
             {playbookLocked > 0 && (
-              <Link href={loginPath('/learn')} className="rounded-full border border-[#00FF9D]/50 px-5 py-2.5 font-bold text-[#00FF9D]" data-learn-signin>
+              <Link href={loginPath('/learn/feed')} className="rounded-full border border-[#00FF9D]/50 px-5 py-2.5 font-bold text-[#00FF9D]" data-learn-signin>
                 Sign in for {playbookLocked} more Playbook cards
               </Link>
             )}
@@ -397,9 +399,9 @@ export function LearnFeed() {
       )}
 
       {view === 'feed' && active === 0 && slides.length > 1 && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-[max(1rem,env(safe-area-inset-bottom))] z-10 flex flex-col items-center text-white/45" aria-hidden>
+        <div className="pointer-events-none absolute inset-x-0 bottom-[max(1rem,env(safe-area-inset-bottom))] z-10 flex flex-col items-center text-white/50" aria-hidden>
           <ChevronUp className={reduced ? 'h-5 w-5' : 'h-5 w-5 animate-bounce'} />
-          <span className="text-[11px] font-bold uppercase tracking-[0.2em] md:text-sm">Swipe · scroll · ↓ · d-pad</span>
+          <span className="text-[12px] font-bold uppercase tracking-[0.2em] md:text-sm">Swipe · scroll · ↓ · d-pad</span>
         </div>
       )}
 
@@ -441,7 +443,7 @@ export function LearnFeed() {
 function RailButton({ label, on, onClick, icon, activeColor }: { label: string; on: boolean; onClick: () => void; icon: React.ReactNode; activeColor: string }) {
   return (
     <button type="button" onClick={(e) => { e.currentTarget.blur(); onClick(); }} aria-label={label} aria-pressed={on}
-      className="flex flex-col items-center gap-0.5 text-[10px] font-bold uppercase tracking-wider text-white/70 md:text-xs">
+      className="flex flex-col items-center gap-0.5 text-[12px] font-bold uppercase tracking-wider text-white/70 md:text-xs">
       <span className="grid h-11 w-11 place-items-center rounded-full bg-white/10 backdrop-blur md:h-12 md:w-12" style={{ color: on ? activeColor : '#fff' }}>{icon}</span>
       {label}
     </button>

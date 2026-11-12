@@ -132,15 +132,48 @@ combo; flow only, no odds), and `hoops.guardRangeM` 2.0 m (`GuardHand.ts` `GUARD
 player's ball to the outside hand; the dwell and gap are the AI hand's `hoops.aiHandDwellSec` / `hoops.aiHandGapSec`).
 **assumption:** the bounds are safe, not tuned.
 
+lane/hoops-shot-content (group "Hoops · shooting"), defaults unchanged: `hoops.ftSetupSec` 0.9 s, `hoops.ftRoutineSec` 1.2 s,
+`hoops.ftSetSec` 0.3 s and `hoops.ftResultSec` 1.1 s (`FreeThrows.ts` `FT_SETUP_SEC`, `FT_ROUTINE_SEC`, `FT_SET_SEC`,
+`FT_RESULT_SEC`: the free-throw trip's beats, never its meter), `hoops.bankSetDeg` 12° and `hoops.bankGlanceMs` 1100 ms
+(`hoops/shotLooks.ts` `BANK_SET_DEG`, `BANK_GLANCE_MS`: the called bank's angled set and glance; look only, the ball's route is
+unchanged), and `hoops.ftDistNarrow01` 0 (`FreeThrows.ts` `FT_DIST_NARROW_01`: the share of a jumper's distance narrowing the line's
+green takes; owner 2026-10-24: 0, the full open window, ±65 ms; 1 = a jumper from the stripe, ±59 ms). Not knobs: the bank follow-through clips' own
+chest / glance yaw (`shotKit.ts` `BANK_CHEST_YAW_DEG` 14, `BANK_GLANCE_YAW_DEG` 22), which are baked into the clip's keys when
+the clip is built, not read at use. **assumption:** the bounds are safe, not tuned.
+
 lane/hoops-defense-fx (group "Hoops · defense"), defaults unchanged, all in `BallSideShade.ts`: `hoops.ballSideShadeOn` 1
 (`BALL_SIDE_SHADE_ON`; 0 = the old anchor exactly, for an A/B on the phone), `hoops.shadeOffsetM` 0.5 m, `hoops.shadeHoldSec`
 0.22 s, `hoops.shadeSlideMps` 2.4 m/s, `hoops.shadeDeadBandM` 0.08 m, `hoops.shadeRangeM` 2.4 m and `hoops.shadeReseedM` 1.0 m.
 **assumption:** the bounds are safe, not tuned. The shade moves only where the on-ball defender stands; no steal or strip odds,
 speed or timing window reads a knob here.
 
+lane/h3-handler (owner 2026-10-24: the still-missing parts of PRs #312 and #314, ported). Group "Hoops · handle (rest)": the dribble at
+rest — `hoops.protectDribbleOn` 1, `hoops.restBounceOn` 1, `hoops.restTempoIdle` 1.2, `hoops.restTempoProtect` 1.45, `hoops.clipLockGain` 3,
+`hoops.clipLockHzMax` 2.6 Hz, `hoops.clipLockMaxMps` 0.4 m/s (`anim/RestDribble.ts`); the eyes on the defender — `hoops.eyesOnDefenderOn` 1,
+`hoops.readRangeM` 3.5 m, `hoops.readSpeed01` 0.42, `hoops.readGlanceEverySec` 2.4 s, `hoops.readGlanceSec` 0.55 s (`core/HoopsLook.ts`); the
+guard — `hoops.protectGuardOn` 1, `hoops.guardBackM` 0.22 m, `hoops.guardOutM` 0.06 m, `hoops.guardDropM` 0.06 m, `hoops.guardSec` 0.15 s,
+`hoops.guardBarXM` / `YM` / `ZM` 0.15 / 1.06 / 0.34 m (`anim/RestDribble.ts`); the protect posture — `hoops.protectPostureOn` 1,
+`hoops.protectTurnDeg` 50°, `hoops.protectEyes` 0.9, `hoops.protectChestAim` 0.8 (`core/HoopsLook.ts`), `hoops.protectSinkM` 0.06 m,
+`hoops.protectSinkSec` 0.18 s (`anim/ProtectSink.ts`); the move ease — `hoops.moveEaseOn` 1, `hoops.moveEaseSec` 0.2 s,
+`hoops.moveEaseRateDeg` 1000°/s, `hoops.moveArmRateDeg` 1800°/s (`anim/MoveEase.ts`). Group "Hoops · jump shot": `hoops.jumperHopOn` 1
+(TUNED: the jump's air time 0.88–1.02 s → ~0.5 s; 0 = the old float), `hoops.jumperApexAfterReleaseSec` 0.03 s, `hoops.jumperMinLoadSec`
+0.08 s, `hoops.jumperHangOn` 1, `hoops.jumperHangScale` 0.1 (`core/JumperHop.ts`). Every `…On` knob at 0 gives back the old behaviour
+exactly (each module's test pins it). None of them moves a timing window, the release frame, a speed or an odds number. **assumption:**
+the bounds are safe, not tuned.
+
+lane/h3-aware (PR #313 / #315 ported onto release, owner 2026-10-24). Group "Hoops · 3v3 awareness": `hoops.offBallLookOn` 1
+(`OffBallLook.ts` `OFF_BALL_LOOK_ON`; 0 = the release feed), `hoops.manGlanceEverySec` 1.6 s, `hoops.manGlanceSec` 0.4 s;
+`hoops.possessionSwapOn` 1 (`PossessionSwap.ts`; 0 = every body keeps its own brain on their ball), `hoops.foeSpaceAngleK` 0.3 (×π),
+`hoops.hasBallM` 1.0 m (TUNED: release 1.8; 1.8 = release); `hoops.defenseStanceOn` 1 (`DefenseStance.ts`; 0 = no raise, the table's
+lean), `hoops.defenseRaiseM` 0.15 m, `hoops.raiseReach` 0.97, `hoops.stanceEaseSec` 0.18 s, `hoops.defendLeanDeg` −6° (TUNED: the table's
+10 / 8 in 3v3; the table itself is unchanged) and `hoops.defendSpine1Deg` 2° (TUNED: 8). Group "Hoops · teammate" (`threevthreeMate.ts`):
+`hoops.mateReadOn` 1 (0 = release's 1 %-a-frame roll), `hoops.mateSettleSec` 0.35 s, `hoops.mateReadSec` 0.9 s, `hoops.mateHoldMaxSec`
+1.8 s, `hoops.mateShootRangeM` 7.3 m, `hoops.mateDriveFromM` 8.5 m, `hoops.mateFinishM` 2.4 m, `hoops.mateDriveMaxSec` 1.6 s and
+`hoops.mateLaneM` 0.9 m. **assumption:** the bounds are safe, not tuned. No make rate reads a knob here: the teammate's shot is
+`teammateShoots` on the ring (RimDecides), unchanged.
 lane/hoops-def-tell (#273 and #274 rebuilt, owner 2026-10-23). Group "Hoops · defense", the tell and the separation shipped ON:
 `hoops.aiReachTellOn` 1 (`ReachTell.ts` `AI_REACH_TELL_ON`; 0 = the release's reach exactly), `hoops.aiReachTellSec` 0.25 s,
-`hoops.aiReachStunSec` 0.35 s, `hoops.aiReachGate` 0.5, `hoops.aiStealChance` 0.22, `hoops.aiStealOnBump` 0.6 (3v3's odds, unchanged,
+`hoops.aiReachStunSec` 0.35 s, `hoops.aiReachGate` 0.5 (TUNED 0.7 by hoops-p02, below), `hoops.aiStealChance` 0.22, `hoops.aiStealOnBump` 0.6 (3v3's odds, unchanged,
 now 1v1's too), `hoops.pokeReadOn` 1 (0 = the old per-frame poke at the deny point exactly), `hoops.stealRatePerSec` 1.2 /s,
 `hoops.pokeRangeM` 1.2 m, `hoops.pokeLeadSec` 0.1 s; `hoops.bodySepOn` 1 (`BodySeparation.ts` `BODY_SEP_ON`; 0 = the release's contact
 exactly), `hoops.capsuleRadius1v1M` 0.55 m (read when 1v1 loads its bodies: restart the run after changing it), `hoops.bodyHardGapM`
@@ -204,7 +237,367 @@ from a sprint 400 ms / 1.41 m → 233 ms / 0.73 m; the velocity flips on a strai
 at defaults) → 250 ms (H3a), and the retreat then runs at 3.05 m/s (the cap); a 90° cut settled 250 → 167 ms; the largest one-frame speed jump 1.13 → 0.57 m/s. These are #311's own
 numbers, reproduced exactly (the retreat cap aside: it came after #311). **assumption:** the bounds are safe, not tuned.
 
+lane/hoops-p01-controls (1v1 / 3v3 ten-phase pass, phase 1 "controls that answer"; group "Hoops · movement"). The 1v1 / 3v3
+ball handler (every DribbleController body) now runs on its own gears, `GEARS_HANDLER` (`core/CourtMovement.ts`); `GEARS_HOOPS` stays
+release, so the dunk approach (DunkMode) is unchanged unless a knob is dialled. Five rows' **defaults changed** to H3a's own numbers (the
+owner's #311 set), only where a phase-1 gate needed them, and three rows are **new**:
+
+| Knob | Release | Now (default) | Why (the gate) |
+|---|---|---|---|
+| `hoops.jogTau` (TUNED) | 0.17 s | 0.10 s (H3a) | 90 % of the jog's pace ≤ 0.25 s (release 0.45 s) |
+| `hoops.jogAccel` (TUNED) | 15 m/s² | 22 m/s² (H3a) | same |
+| `hoops.loadScale` (TUNED) | 0.45 | 0.7 (H3a) | same, and the onset |
+| `hoops.stopDecelLow` (TUNED) | 22 m/s² | 32 m/s² (H3a) | stop from a jog ≤ 0.25 s / ≤ 0.6 m |
+| `hoops.stopDecelHigh` (TUNED) | 11 m/s² | 26 m/s² (H3a) | stop from a sprint ≤ 0.35 s / ≤ 1.0 m (release slid 0.42 s / 1.40 m) |
+| `hoops.firstStepMps` (TUNED, new) | 0 | 0.3 m/s | the root moves 2 cm ≤ 2 frames after the press (release 4, H3a 3): the press is answered on its own frame |
+| `hoops.reversePlantHold` (TUNED, new) | 1 | 0 | a reversal at pace ≤ 0.22 s to half the pace the new way: release's plant held 2.7 m/s the OLD way for 0.1 s first |
+| `hoops.reverseLaunchSec` (TUNED, new) | 0 | 0.2 s | same: the push-off out of a reversal is a launch (no loaded step), as a move's explode is |
+
+The step-back's committed hop still glides on the release stop (22 / 11) by name, whatever these say. The H3a preset now also carries the
+three new knobs at their release values, so it still plays #311 exactly. **Everything is one paste from release**
+(`RELEASE_STICK_PRESET` in `HoopsStick.ts`):
+
+```json
+{ "hoops.jogTau": 0.17, "hoops.jogAccel": 15, "hoops.loadScale": 0.45, "hoops.stopDecelLow": 22, "hoops.stopDecelHigh": 11,
+  "hoops.firstStepMps": 0, "hoops.reversePlantHold": 1, "hoops.reverseLaunchSec": 0 }
+```
+
+Measured (the real DribbleController at 60 fps), release → now: onset 4 → 2 frames; jog to 90 % 450 → 250 ms; stop from a jog 250 ms /
+0.53 m → 150 ms / 0.29 m; from a sprint 417 ms / 1.40 m → 233 ms / 0.69 m; a jog reversal to half pace the new way 450 → 183 ms. The
+browser rig (`scripts/probes/hoops-gap`, the real modes, seed 7, PRO) agrees: onset 4 → 2 frames (1v1) and 3 → 2 (3v3); stop from a jog
+250 ms / 0.53 m → 150 ms / 0.29 m and from a sprint 417 ms / 1.40 m → 233 ms / 0.68–0.69 m in both modes. A snap reversal of the left
+stick at pace is a left-stick MOVE in the game (a behind-the-back / crossover cut), not this reversal: 283 ms to half pace, unchanged. **assumption:** the gates' bands are the hoops-audit's proposal, not owner numbers; the
+three new values are the least that meet them, not felt yet.
+
 lane/hoops-overtime (group "Hoops · rules"), **new**: `hoops.overtime3v3Sec` 30 s (`threevthreeOvertime.ts` `OVERTIME_3V3_SEC`, PR #268's
 number): a 3v3 tied at the horn plays sudden-death overtime on this clock, and level again when it runs out is another overtime.
 It moves only how long an overtime lasts, never who wins it or what a bucket is worth. **assumption:** the bounds (10–90 s) are
 safe, not tuned.
+lane/tiebreak-cam (group "Tennis · camera"), new number, default as shipped by that lane: `tennis.portraitHeroMargin` 0.15
+(`netPortraitCam.ts` `PORTRAIT_HERO_MARGIN`: on a phone held upright, Tennis and its tiebreak variant turn the play camera
+only when the player would come closer than this share of the frame's width to a side edge; wide screens are never touched).
+**assumption:** the bounds (0.05 to 0.35) are safe, not tuned.
+lane/dunk-flagship (group "Dunk · lobs"), new numbers, default as shipped by that lane: `dunk.oopLobFlightSec` 1.0 s
+(`DunkFlagship.ts` `OOP_LOB_FLIGHT_SEC`: the ALLEY-OOP passer lobs the ball while the dunker is still running, this long
+before the catch beat; it was a 0.35 s pass thrown after the take-off). It moves only when the pass leaves and how high it
+arcs; the catch, the slam window and the card are unchanged. **assumption:** the bounds (0.5 to 1.6 s) are safe, not tuned.
+lane/dunk-flagship Phase 3 (group "Dunk · lobs"), new number: `dunk.oopLateCatchClipT` 0.8 (`DunkFlagship.ts`
+`OOP_LATE_CATCH_CLIP_T`): when the dunker leaves the floor before the passer's run-throw is due (A early, RT let go early), the
+passer lobs on the take-off frame to this beat of the flight clip (the off-glass lob's hang beat). Before, it was a 0.35 s
+bullet thrown at 0.9 × the rise. Later gives a higher drop into the hand and less time before the slam window (1.05).
+**assumption:** the bounds (0.6 to 1.0) are safe, not tuned.
+lane/dunk-flagship Phase 5 (group "Dunk · body"), new, OFF by default: `dunk.realJumpPersonal` 0 (`DunkFlagship.ts`
+`REAL_JUMP_PERSONAL`): on, the body path's full take-off is the athlete's own VERIFIED best countermovement jump (a saved Quick
+Screen, read through GET /api/dunk/verified-jump: verified 18+ and opted in, checked at read time; lib/jump/seam.ts's verified
+rule) instead of the fixed 0.70 m; clamped to 0.25–0.95 m. No verified jump: the fixed mapping. Like every knob, never in
+ranked, staked or paid play.
+lane/dunk-flagship (group "Dunk · run-up"), new, default unchanged: `dunk.runwayStrideScale` 1 (`DunkFlagship.ts`
+`RUNWAY_STRIDE_SCALE`): the run-up's leg pace reference (3.6 ÷ 1.1 m/s, as shipped) × this. Re-paced to 3.95 m/s on the rig,
+the run-up skated less at a sprint and more at 2.5–5 m/s, no overall gain, so the shipped pace stays and this is the owner's
+dial. **assumption:** the bounds (0.8 to 1.4) are safe, not tuned.
+lane/dunk-flagship (group "Dunk · slam"), TUNED, flagged: `dunk.slamHitStopBigMs` 100 ms and `dunk.slamShakeBig` 0.18
+(`DunkFlagship.ts` `SLAM_HITSTOP_BIG_MS`, `SLAM_SHAKE_BIG`): a perfect slam's hit-stop and shake. Every make froze 70 ms and
+shook 0.12 before; an ordinary make (accuracy ≤ 0.5) still does, and cleaner ones grow toward these (`slamImpact`).
+**assumption:** the bounds (70–160 ms, 0.12–0.30) are safe, not tuned.
+
+lane/dunk-flagship Phase 7 (group "Dunk · finishes"), new, OFF by default: `dunk.slamVariants` 0 (`DunkSlamVariant.ts`
+`SLAM_VARIANTS_ON`): on, the LEFT STICK held at the A press inside the slam window calls the finish — back (away from the rim)
+a REVERSE (`dunk_finish_reverse`; the body turns its back to the iron at 15.7 rad/s and meets it once 0.8 of the half-turn is
+done), up a TWO-HAND POWER (`dunk_finish_two_hand`), each named on the card (+0.6 / +0.3 difficulty, new numbers). Read only on
+the live press inside the window; a called air trick keeps its own flush; the d-pad tricks are untouched (DunkSlamVariant.test).
+Like every knob, never in ranked, staked or paid play.
+
+lane/dunk-flagship P11 (group "Dunk · finishes"), new, OFF by default: `dunk.finishOverRing` 0 (`DunkOverRing.ts`
+`FINISH_OVER_RING`; owner call 1 of 2026-11-10: the shipped finish stays, this is the A/B to feel first). 0 = the shipped finish,
+line for line: the ball meets the front of the rim and the flush carries it in. 1 = the hand carries the ball over the ring —
+up in front of the rim, in over the lip, down through the middle — and lets it go inside the ring. Every dunk in the mode ends
+this way while it is on (the plain flush, the REVERSE, the TWO-HAND POWER, a called trick's flush). The numbers behind it are all
+new and read only with the knob on (`OVER_RING` in `DunkOverRing.ts`); the measured table is in `docs/DUNK-FLAGSHIP.md` §17.
+A ball the hand could not carry over in time is let go at the front of the rim as shipped: the knob never turns a make into a
+miss. Like every knob, never in ranked, staked or paid play (DunkUnlocks.verifiedJump.test proves it on this knob).
+
+lane/hoops-round2 (owner 2026-10-20, HOOPS DEFENSE / CONTACT; every number new, the owner has felt none of them yet):
+
+- Group "Hoops · AI reaction" (`hoops/reaction.ts`), **TUNED (new behaviour)**: `hoops.aiReactRookieMs` 420 ms, `hoops.aiReactProMs`
+  220 ms, `hoops.aiReactEliteMs` 120 ms (`AI_REACT_ROOKIE_MS` / `_PRO_MS` / `_ELITE_MS`, the owner's numbers and Difficulty's
+  `reactionMs`). Every hoops defender brain (1v1's rival, 3v3's three) sees the ball and the attackers this late, carried forward on
+  the motion it saw then: a straight run is tracked with no lag, a change of direction is seen this late. Before: 0 ms on every tier.
+  No speed, reach or odds changes. Staked and head-to-head runs play PRO, at the default.
+- Group "Hoops · team defense" (`hoops/teamDefense.ts`, 3v3 only): `hoops.doubleTeamOn` 1 (0 = one man on the ball, the release),
+  `hoops.doublePaintM` 3.0 m, `hoops.doubleAfterSec` 0.45 s, `hoops.doubleMaxSec` 2.0 s, `hoops.doubleCooldownSec` 4.0 s (a ball held
+  inside 3 m of the rim for 0.45 s draws the nearest other defender; he goes back on the pass, when the ball leaves the paint, or after
+  2 s; then none for 4 s); `hoops.switchOnScreenOn` 1 (0 = fight through every screen, the release), `hoops.switchHelpM` 2.6 m,
+  `hoops.switchCooldownSec` 1.5 s (a pick on the ball defender: the screener's man takes the ball when he is within 2.6 m of the
+  handler and nearer than the screened man; a swap, nobody unmarked).
+- Group "Hoops · contact" (`hoops/handCheck.ts`, `hoops/contactPoses.ts`, 1v1 and 3v3): `hoops.handCheckOn` 1 (0 = nothing counted,
+  nothing drawn), `hoops.handCheckReachOverM` 0.15 m (the forearm is on the hip inside BODY_STANDOFF 1.10 m + this; the standoff is
+  unchanged), `hoops.handCheckGapSec` 0.3 s, `hoops.handCheckFoulCount` 4, `hoops.handCheckWindowSec` 5 s (4 arrivals inside 5 s is the
+  Ref's HAND-CHECK; staying on the hip is one), `hoops.contactPoseOn` 1, `hoops.contactEaseInSec` 0.12 s, `hoops.contactEaseOutSec`
+  0.2 s, `hoops.contactChestLeanDeg` 7° (the drawn poses: the defender's forearm toward the hip, the handler's free arm as a bar, the
+  defender's chest in; drawn only, every rotation put back after the frame).
+
+**assumption:** the bounds are safe, not tuned. A ranked, staked or head-to-head run reads every default above (`feel()` is closed there).
+
+lane/dunk-flagship Phase 2 (group "Dunk · landing"), new, default unchanged: `dunk.landLeadSec` 0 s (`DunkFlagship.ts`
+`LAND_LEAD_SEC`): how long before touchdown the landing absorb fades in. A 0.10 s lead measured worse on the rig (the hips arrive
+faster into the same short crouch: landing hip pops 2 → 4), so it ships off; the owner's dial. **assumption:** the bounds (0 to
+0.25 s) are safe, not tuned.
+
+lane/hoops-p02-defense (1v1 / 3v3 ten-phase pass, phase 2 "defence is skill, not dice"; owner 2026-10-20 HOOPS DEFENSE; the owner has
+felt none of these yet — every default is flagged in the lane report):
+
+- Group "Hoops · blocks (hand meets ball)" (`hoops/blocks.ts`), **TUNED (new behaviour)**: `hoops.blockDiceOn` 0 (1 = today's block rolls
+  back exactly: `aiBlockChance`, `checkBlock`'s window, `jumpSwats`, goaltending with no touch); `hoops.blkShoulderM` 1.55 m and
+  `hoops.blkArmM` 0.85 m (the reach: a sphere of the arm around the shoulder, the shoulder riding the contest jump — 2.40 m standing);
+  `hoops.blkContactM` 0.14 m (the ball's centre this close to the reach is a touch); `hoops.blkLookSec` 0.25 s (how much of a release's
+  flight is read); `hoops.aiBlockLeadSec` **TUNED 0.15 → 0.25 s** (the AI leaves the floor this long before the release it expects, so the
+  top of his jump meets the ball); `hoops.aiBlockReactOn` 0 (1 = his jump also waits out his tier's reaction after my gather: measured,
+  a PRO jump then never reached a quick finish); `hoops.blkReleaseJumperM` 2.6 m (TUNED 2.45 → 2.6 after calls 1A / 2A) and `hoops.blkReleaseLayupM`
+  2.5 m (the block reads the ball from where it leaves the hand, above the court: the release fires before the clip's arms are up,
+  the rig read their layups leaving from 1.65–1.74 m, and from the chest any jump reached them); `hoops.blkDeflectMps` 2.4 m/s and `hoops.blkDeflectUpMps` 1.4 m/s (the ball off the hand, along
+  the line it was hit).
+- Group "Hoops · contest" (`hoops/contest.ts`), **TUNED (new behaviour)**: `hoops.oneContestOn` 1 (0 = each shooter's old formula);
+  `hoops.contestRangeM` 2.6 m (the distance term's zero; was 2.2 on my jumper, 3.0 on theirs and my mates'); `hoops.contestDistW` 1;
+  `hoops.contestJump` 0.32 and `hoops.contestJumpFloor` 0.35 (a contest jump on its curve: 0.32 at the top, 0.11 leaving or landing,
+  0 once landed — was a flat 0.3 for 0.7 s); `hoops.contestCloseout` 0.1 and `hoops.contestCloseoutFullMps` 3 m/s (a closeout running AT
+  the shooter adds up to 0.1; past him, nothing).
+- Group "Hoops · defense" (`hoops/steals.ts`, `hoops/pressure.ts`), **TUNED (new behaviour)**: `hoops.stealDiceOn` 0 (1 = today's strip
+  rolls: 0.22 a reach, 0.6 on the bump, 0.18 a bump strip); `hoops.stripReachM` 1.2 m (TUNED 0.95 → 1.2: the poke's own reach), `hoops.stripShieldM` 0.25 m,
+  `hoops.stripBallMaxY` 0.85 m (the strip lands when his hand can get to the ball: in reach, not behind the handler's body, off the
+  palm); `hoops.onBallCushionM` 1.35 m and `hoops.onBallCushionPerMps` 0.3 s (the on-ball man's most room on a moving handler: 1.35 m + 0.3 s ×
+  his speed — about today's room against a 6 m/s sprint, pressure on a probing dribble; 0 = today's contain lever, uncapped).
+
+**assumption:** the bounds are safe, not tuned; the defaults are this lane's calibration on the rig and the headless sim (lane report),
+not owner numbers. A ranked, staked or head-to-head run reads every default above.
+
+lane/hoops-p02-defense, coordinator calls 1A / 2A (2026-10-28), **TUNED**: `hoops.aiReachGate` 0.5 → 0.7 (a steal intent in range becomes
+a reach more often; the strip is still his hand on the ball) and, new as a knob, `hoops.aiBlockJumpChance` 0.3 → 0.45 (`HoopsDefense.ts`
+`AI_BLOCK_JUMP_CHANCE`: in range at my gather the AI leaves the floor this often, else a hand up; the block is his hand on the ball).
+
+lane/hoops-p03-rivals (1v1 / 3v3 ten-phase pass, phase 3 "rivals that play basketball"; owner playtest 2026-10-27; the owner has felt none of
+these yet — every default is flagged in the lane report). Group "Hoops · rival offense", all **new**:
+
+- The 1v1 rival's MOVE KIT (`hoops/rivalOffense.ts`): `hoops.rivalKitOn` 1 (0 = the release's script exactly: check, weave, sidestep,
+  step-back, three shots); the reads — `hoops.rivalTightM` 1.25 m (tight invites the spin, the hesitation and the post-up; off him, the
+  crossover and the in-and-out), `hoops.rivalClosingMps` 1.6 m/s (closing this fast is a bite: the hesitation), `hoops.rivalSagM` 2.6 m and
+  `hoops.rivalPullUpRangeM` 6.2 m (in his lane but this far off, inside this range: PRO and ELITE pull up), `hoops.rivalAdaptK` 1 (× the
+  tier's adapt rate: how hard he leans on what worked against you); the moves — `hoops.rivalHesiSec` 0.3 s, `hoops.rivalHesiGoMps` 5.8 m/s,
+  `hoops.rivalSpinSec` 0.6 s; the post-up — `hoops.rivalPostMinM` / `hoops.rivalPostMaxM` 2.6 / 10 m (the rim distances he posts from: a back-down from the check is in it — the rig's scripted defender holds him at the top, 9.4–9.9 m),
+  `hoops.rivalPostMps` 1.4 m/s (the back-down), `hoops.rivalPostMaxSec` 1.6 s (then the turnaround), `hoops.rivalPostHookM` 2.3 m (inside it,
+  a hook); the floater's corridor `hoops.rivalFloaterMinM` / `hoops.rivalFloaterMaxM` 2.0 / 5.0 m. No make chance reads a knob here: a
+  floater and a fade are `rivalShotPct` 'jumper' from where they leave the hand, a hook a 'layup'.
+- The 3v3 rival TEAM OFFENCE (`hoops/teamOffense3v3.ts`): `hoops.teamOffenseOn` 1 (0 = the release's one lerped drive exactly);
+  `hoops.rivalTakeBackM` 6.9 m (a fresh possession is taken back beyond the arc first; 0 = from where he is), `hoops.rivalHandlerMps`
+  3.4 m/s (his pace off the drive), `hoops.rivalProbeSec` 1.6 s (the probe at the top, × the tier), `hoops.rivalScreenWaitSec` 2.4 s,
+  `hoops.rivalBudgetSec` 10 s (past it he attacks now, × the tier), `hoops.rivalAttackPullUpSec` 0.8 s (held in front on the attack, the
+  pull-up), `hoops.rivalPullUpMaxM` 6.0 m (the off-the-dribble pull-up only inside it: the release's jumper base has no range term). The
+  attack's pace is the release's `DRIVE_MPS` 5.4 m/s and the tell its `GATHER_TELL_SEC` 0.35 s; every finish (`rivalReleasePct`, the
+  block, the contest) is the release's.
+
+**assumption:** the bounds are safe, not tuned; the defaults are this lane's calibration on the headless possession sim
+(`scripts/probes/hoops-gap/rival-sim.mts`) and the rig, not owner numbers. A ranked, staked or head-to-head run reads every default above.
+
+lane/hoops-p04 (1v1 / 3v3 ten-phase pass, phase 4 "feet and transitions"; owner 2026-10-20: "blend + minimum-hold rules on every clip
+change"). The owner has felt none of these yet; every default is flagged in the lane report.
+
+- Group "Hoops · transitions" (`anim/hoopsTransitions.ts`), **TUNED (new behaviour)**: `hoops.transitionRuleOn` 1 (0 = every state's
+  own fade and the old dwell exactly); the fade floors — `hoops.gaitFadeSec` 0.22 s (dribble / run loop to loop; was 0.10–0.18),
+  `hoops.defenseFadeSec` 0.2 s (slide / backpedal / closeout / crossover step; was 0.12–0.20), `hoops.crossFadeSec` 0.2 s (offence ↔
+  defence, a loop after a beat), `hoops.beatFadeFloorSec` 0.1 s (a mode's beat: a move, a reach, a shot — the clip still starts on the
+  press's frame; was as low as 0.05), `hoops.priorityFadeSec` 0.08 s (a stagger, the floor, a dunk); `hoops.minHoldSec` 0.22 s (a loop
+  plays this long before a sibling loop replaces it — the release's dwell, now for every loop group).
+- Same group (`hoops/releaseTiming.ts`): `hoops.releaseToClipOn` 1 (the rival's jumper / finish clip is paced so the ball leaves on its
+  release key — the 3v3 tell, the 1v1 gather; 0 = the clip from its first frame, as before) and `hoops.jumperFromRiseOn` 1 (the hero's
+  jumper is entered at its rise, its load dip skipped, and paced from there to the green; 0 = from the first frame). Neither moves a
+  release in time or a make chance: only the clip moves.
+- Same group (`anim/basketballTree.ts`, **TUNED (new behaviour)**): `hoops.plantReleaseFadeSec` 0.12 s — the plant-and-cut lock (0.18 s)
+  lets its foot back to the clip over this instead of in one frame; 0 = the old one-frame release. (Correction, hoops-p04b: p04 credited
+  the hero's 8–10 000 °/s thigh spike to this lock's release. The rig's stage tracer puts it on the stop accent below; this fade stays as
+  a general one-frame-release fix, not as that spike's cure.)
+- hoops-p04b, same group (`anim/locoAccent.ts`): `hoops.accentOffBeatsOn` 1 — the stop / start accent (the sink and lean, legSink's leg
+  re-solve) is off while the tree plays a beat or a hold, as the layer's header always said; 0 = it read the loop state under a beat and
+  kept sinking through the step-back gather (the thigh spike: 7 396 and 10 254 °/s, 1v1 seed 7 frames 343 / 349, traced to this layer).
+- hoops-p04b, same group (`hoops/contactPoses.ts`, **TUNED (new)**): `hoops.contactArmSwapSec` 0.15 s — which arm the contact poses drive
+  (the defender's hand-check arm, the handler's arm bar) eases per arm over this when it changes, and a handle move lets the bar go over it
+  (the hand-check keeps the last ball side through the move); 0 = the one-frame swap (3v3 seed 7: one arm 0 → 79°, the other 58 → 0° in
+  a frame, 3 500–6 000 °/s). A body's first contact still takes its arm at once (the hand-check's own k eases in).
+- hoops-p04b, same group (`anim/ballCarry.ts`, **TUNED (new)**): `hoops.carryArmSpeedSec` 0.12 s — the dribble's arm weights (the ball
+  arm's pace reach, the off arm's swing in at 0.35–0.65 of speed) follow the body's speed eased over this; a gear change stepped them in
+  a frame. 0 = the frame's speed, as before. The ball's push-ahead and the guard keep their own easing.
+- hoops-p05, same group (`anim/ballCarry.ts`): `hoops.carryLetGoToClipOn` 1 — when a shot, a pass or a pick-up takes the ball out of the
+  dribble, the ball arm (and the off arm) eases ALL the way back to the clip's pose over the let-go's own fade (0.14 s, unchanged). 0 = the
+  let-go as it was: the reach's target faded but the solved arm still sat about 44° off the clip on the fade's last frame and cut there in
+  one frame (the step-back gather, 1v1 seed 7: about 3 967 °/s, the hero's last severe pop in phase 4b). No new time, so no new number.
+- hoops-p05b, same group (`anim/ballCarry.ts`): `hoops.carryStartHandOn` 1 — a dribble starts from where the palm had the ball, and that
+  offset fades out over the first bounce (START_FADE_PHASE, unchanged). Only the ball took it: the hand went straight to the stroke's own
+  point, so the palm sat the offset off the ball through the whole first bounce (1v1 seed 7, the gear stop into the sprint: the first top
+  drawn 12.8 cm off; the hand tracer has the carry's own pass take the palm from on the ball to 13.5 cm off it). The hand now takes the
+  same faded offset — starting from where the hand held the ball (the held ball sits in the palm, not under the stroke's hand point),
+  so the wrist does not jump round the ball on the first frame — and the reach that takes the arm over from the hold keeps the elbow's
+  swing limit (720 °/s, unchanged) from its
+  first frame (without that, aiming the hand at the real ball swung the upper arm 8 696 °/s on the rig's first dribble frame). 0 = as it
+  was. No new number.
+- hoops-p05, the hero's slide (owner 2026-11-10: "fix it"), same group. Each is NEW BEHAVIOUR, on by default, with 0 = today's exactly:
+  - `hoops.backpedalReverseOn` 1 (`anim/basketballTree.ts`) — the captured backpedal (CMU 78_24) is a forward run on the hero rig, so a
+    retreat was a moonwalk (the feet ran forward on the spot while the body backed off). 1 plays it in reverse: the feet plant and the body
+    backs off over them. The stride reference is unchanged (3.31 m/s). 0 = forward, as before. Every body with the capture (hero, rival,
+    3v3) gets it: it is the clip's direction, not a hero rule.
+  - `hoops.defenseLegsOn` 1 (`anim/basketballTree.ts`, `anim/moveLegs.ts`) — the steal reach, the block reach and the held hand-up are
+    whole-body clips whose feet stand still. While one plays on a body moving on the floor, the legs keep the defensive loop they were in
+    (stride-matched, by speed: none under 1.0 m/s, all from 2.4 — the legs layer's own numbers), follow a change of direction after the
+    usual 0.22 s hold with the defence loops' own 0.2 s blend, and stand down in a block jump's flight. 0 = the clip's standing legs.
+  - `hoops.hipSteerOn` 1 (`anim/hipSteer.ts`, the hero in 1v1 and 3v3, on defence only) — the pelvis and legs turn toward where the body
+    is going while the chest stays on the man, so a diagonal slide or retreat steps along its travel. **NEW NUMBERS (flagged):**
+    `hoops.hipSteerMaxDeg` 50° (the most the pelvis turns off the chest), `hoops.hipSteerSec` 0.14 s (the ease), `hoops.hipSteerFromMps`
+    0.8 m/s and `hoops.hipSteerFullMps` 1.8 m/s (no turn under the first, all of it from the second). 0 = square hips, as before.
+- hoops-p05b, same group: `hoops.closeoutStepOn` 1 (`anim/basketballTree.ts`; the clip `bball_closeout_step`, authored in
+  `anim/authored/basketball.ts`) — the closeout fires only at 2.9 m/s and up, but the old closeout swung its legs in place (about 0.9 m/s at
+  its rate cap), so every closeout skated. The new clip is the same picture (chest up, hips low, one hand high) on chop steps paced to the
+  closeout's stride reference, 3.6 m/s at rate 1 (2.0–6.7 m/s across the stride matcher's range). Bench, the man 2 m ahead, 3–6 m/s:
+  slide p90 9–12 → 0.1–1.0 cm a frame. 0 = the old closeout clip exactly. No new feel number (the clip's own keys are pinned by a test).
+- hoops-p05b, same group: `hoops.loopInStepOn` 1 (`anim/basketballTree.ts` RIGHT_STRIKE_PHASE) — the stepping closeout started on its
+  first frame (the right foot landing) wherever the run it cut was in its stride, so through the crossfade the two clips had the legs in
+  opposite stances (3v3 seed 7: the two leg pops the switches added, 741–809 °/s). A run into it now starts it at the same point of the
+  stride. The table's numbers are where each clip's right foot lands (bball_mc_run 0.88, measured with the slide bench), not feel
+  numbers. 0 = as it was.
+- hoops-p05, phase 5 (the ball lives in the hand), same group: `hoops.passFromHandOn` 1 (`hoops/ballHandoff.ts`) — a 3v3 teammate's
+  pass (the swing, the ball back to me, the lob) starts its flight where the ball is in his hands; it started at his root + 1.2 m, so the
+  ball jumped out of the hand on the release. The aim point and the pass speed are unchanged. 0 = the old start.
+- hoops-p05b, phase 5, same group: `hoops.passHomeOn` 1 (`hoops/ballHandoff.ts`, `core/BallHandling.ts` PassFlight.homeTo) — a 3v3 chest
+  or bounce pass in flight eases its landing point from where it was aimed (the receiver led at the ball's speed) onto where the receiver
+  really is, at the same chest height (smoothstep in the flight's progress: nothing at the throw, all of it at the catch). The flight time
+  is the throw's, so catch timing is unchanged. It landed on its aim wherever he was: 3v3 seed 7, the hero's pass to mate1 caught with his
+  palms 1.14 / 1.48 m off the ball and drawn into the hand in one frame (1.67 m). The lob keeps its own aim. 0 = as it was.
+
+**assumption:** the bounds are safe, not tuned. A ranked, staked or head-to-head run reads every default above.
+
+lane/gameplay-clean-3 (owner: "Gameplay needs to be really clean"; the runtime pops clip-smooth could not reach). The owner has not felt it
+yet.
+
+- Group "Anim · transitions" (`anim/FootPlanting.ts`), **TUNED (new behaviour)**: `anim.plantEngageSec` 0.1 s. The foot planter on every
+  body now eases its two-bone leg solve in when it starts holding a foot and out when it stops, instead of stepping in one frame. The
+  solve throws the knee toward the root's forward, so on a stance whose knees open elsewhere (Derby's batter) the first solved frame
+  was a 25° thigh jump with the foot still. 0 = the old one-frame engage and release exactly. The pin, its weight curve and its release
+  fade (`RELEASE_FADE_SEC` 0.1 s) are unchanged.
+
+- Same group (`anim/PostureLayer.ts`), **TUNED (new behaviour)**: `anim.hipYawFold` 1. A posture window that keeps only part of the
+  clip hip turn (Football Rush `spin`, keep 0.5) read the clip yaw WRAPPED, which jumps from +180 to -180 degrees: the hips flipped
+  180 degrees in one frame at the half-turn. The read is folded past 90 degrees (unchanged up to 90, back to 0 at 180), so the strip
+  is continuous. 0 = the old wrapped read exactly.
+
+- Same group (`anim/FootPlanting.ts`, lane/gameplay-clean-4), **TUNED (new behaviour)**: `anim.plantReleaseSec` 0.1 s, the release
+  fade's own time. A pin the clip lets go of (a lift, a take-off, a landing) now eases back onto the clip in ROTATION: the hip and knee
+  the layer wrote last are held and slerped onto the clip's. The old release faded the target and solved it each frame, which rebuilt
+  the leg in one frame when the root or the clip jumped on that frame (Football Rush's hurdle and TD spike: thighs 41 to 70 degrees a
+  frame). 0 = the old target fade exactly.
+
+- Same group (`anim/FootPlanting.ts`, lane/gameplay-clean-5), **NEW (on / off, no tuned number)**: `anim.plantReplantEase` 1. A foot
+  that plants again while its leg is still easing off the last plant keeps easing (the release carries on under the new plant). The
+  clean-4 release ended on the spot at a replant and the leg snapped the rest of the way in one frame: a body sliding in a stance let
+  each foot go at the drift limit and took it straight back, so a thigh jumped about 33 degrees at every replant (measured headless,
+  `FootPlanting.replant.test.ts`; 6 degrees with the clean-4 release off). 0 = a replant ends the release at once, exactly as before.
+  Feel-check: Showdown or Karate, walk and strafe in guard; watch the knees.
+
+- Same group (`anim/CharacterAnimator.ts`, lane/gameplay-clean-5), **NEW (on / off, no tuned number)**: `anim.fadeHoldEnded` 1. A
+  one-shot move (a strike, a hit react) that reaches its last frame while it is still blending out is held on that frame until the
+  blend ends. Before, it stopped mid-blend, the weight it still had was gone in one frame, and the body jumped toward a stale pose:
+  Showdown's hit react into guard moved the arms 21 to 30 degrees and the thighs 22 to 25 in one frame, every time (the rig); on the
+  hero headless 33 degrees, now 16, no worse than the blend around it (`CharacterAnimator.fadeHold.test.ts`). 0 = the old behaviour
+  exactly. No blend time changed. This is the shared animator: every mode's moves blend out through it, the hoops modes included.
+  Feel-check: Showdown, take a hit and watch the body come back to guard.
+
+- Same group (`anim/FootPlanting.ts` + one call in `modes/AeroAcesMode.ts`, lane/gameplay-clean-5), **NEW (on / off, no tuned
+  number)**: `anim.plantSeatedOff` 1. A body its mode seats in a vehicle holds no foot plant. Every spawned hero carries the foot
+  planter, and the Aero Aces pilot sits with his ankles at the root's height, so the planter pinned his feet to the ground while the
+  plane flew on and let them go a frame later: knees 51 to 63 degrees and thighs 22 to 40 in one frame, 2 to 3 hard pops a run (the
+  rig; none with the planter off). Aero now marks its pilot seated. 0 = the mark is ignored, exactly the old layer. Feel-check: Aero
+  Aces, watch the pilot's knees through a loop.
+
+**assumption:** the bounds (0 to 0.4 s) are safe, not tuned. A ranked, staked or head-to-head run reads the defaults.
+
+## Owner calls, 2026-11-10 (delegated: "handle those 5 open calls"; lane/owner-calls-1110)
+
+The owner has not felt this yet.
+
+- Group "Anim · transitions" (`anim/footballTree.ts`), **TUNED (flagged)**: `football.hurdleFadeSec` 0.12 s (was the stiff-arm slot's
+  0.06 s, which the hurdle shared). How long the carry blends into the hurdle's jump. Measured headless on the hero over 24 carry
+  phases, at 1× and 1.4× carry rate (`footballTree.hurdleFade.test.ts`): the worst one-frame thigh turn is 24–25° at 0.06 s (the rig
+  read 26° in play), 15–17° at 0.12 s, 13–15° at 0.15 s; the knee 12–13° → 7.5–8.7°. The carry's own stride is about 6° a frame.
+  0.06 = the old blend exactly. The juke, the spin and the stiff arm keep 0.06 s. Feel-check: football, hurdle a downed man at a
+  sprint; do the legs tuck with the hop, or lag it?
+
+## Baseball bat, 2026-11-10 (lane/bat-grip-2)
+
+The owner has not felt this yet.
+
+- Group "Baseball · bat" (`modes/baseballBat.ts`), **NEW numbers (flagged)**: `baseball.batGripLostM` 0.4 m and
+  `baseball.batGripBackM` 0.3 m. The bat (Derby and the three-innings batter) is drawn only while both fists can be on it: it hides
+  once the fists are more than 0.4 m apart and comes back when they close to 0.3 m. Before, the bat was strung between the two
+  hands whatever the arms were doing, so the innings batter coming back to the stance (after a strikeout, a run, a celebration)
+  held it across hands 0.5 to 0.8 m apart for the first tenth of a second. Measured on the clips (`baseballBatHeld.test.ts`,
+  `scripts/probes/bat-grip-2/blend-headless.ts`): a held stance reads 0.07 m, the swing's follow-through 0.23 m, the swing back to
+  the stance 0.35 m at its widest (the bat stays drawn through it), a free hand 0.40 m and more. `batGripLostM` at its 2 m maximum
+  never hides the bat: the old behaviour exactly. Draw-only: no score, grade or timing reads the bat. Feel-check: baseball, strike
+  out or get a hit and watch the batter come back to the plate; does the bat appear in the hands cleanly, or pop in late?
+  **assumption:** the bounds (0.25 to 2 m, 0.1 to 0.4 m) are safe, not tuned.
+## gameplay-clean-5, 2026-11-10 (the hurdle's way out; the owner has not felt this yet)
+
+- Group "Anim · transitions" (`anim/footballTree.ts`), **TUNED (new, flagged)**: `football.hurdleExitFadeSec` 0.2 s (the hurdle used
+  the carry's own 0.1 s on the way out). How long the hurdle's jump blends back into the carry. The jump's clip runs out a few frames
+  before the landing and the arms came down from the jump's reach to the tuck in six frames: the rig read LeftArm 31, RightArm 23 and
+  RightForeArm 15 degrees a frame at every hurdle, football's last repeating hard pop. Measured headless on the hero over 6 carry
+  phases at 1× and 1.4× (`footballTree.hurdleExit.test.ts`): the off arm 30.9° a frame at 0.1 s, 19.6° at 0.16, 15.7° at 0.2, 12.6°
+  at 0.25. 0.1 = the old blend exactly. Every other way into the carry (the snap, a juke, a spin, the stiff arm) keeps 0.1 s.
+  Feel-check: football, hurdle at a sprint; do the arms come down with the landing, or hang in the air after it?
+
+lane/dunk-switch-on (owner 2026-11-10, "turn all 4 on"): `dunk.finishOverRing` and `dunk.slamVariants` default **1** (both off in
+staked, ranked and challenge runs whatever the default; 0 restores the old finish / slam exactly); new `dunk.slamPower` 1 (the
+TWO-HAND POWER on its own); `dunk.runwayStrideScale` **TUNED 1 → 1.1** (1 = the old pace); new `dunk.landAbsorbDeep` 1 (the deep
+landing; 0 = the old `dunk_land_absorb` alone). Measurements in docs/DUNK-FLAGSHIP.md §18.
+
+## gameplay-clean-6, 2026-11-10 (owner: "address what you found"; the owner has not felt these yet)
+
+- Group "Anim · transitions" (`anim/ballCarry.ts`), **NEW (on / off, no tuned number)**: `anim.carryPushedBounce` 1. The dunk run-up's
+  dribble uses the pushed bounce the hoops modes already use: the ball is fastest at the floor and the hand meets it slowing at the
+  top. The old bounce was fastest at the hand and turned round there in one frame, and the ball arm turned with it: 35 to 60 degrees
+  in one frame at every bounce (the rig's dunk run-up: 14 hard pops in 14 s). Headless on the hero: 56.8 → 26.2 degrees. Only the dunk
+  runway uses this carry. 0 = the old bounce exactly. Feel-check: dunk, run up with the ball; watch the dribbling arm.
+- `anim.inertial` (AF-1's inertial clip transitions, existing knob, still **0**): when on it now reaches every spawned body (it was
+  the heroes of the modes that opted in), and three of its holes are fixed with no knob of their own (they only run while a body is
+  inertial): a switch made from a clip's end callback (the late switch: a hit react or knockdown running out into the idle threw the
+  arms 55 to 57 degrees in one frame), clips that key only some bones (a leg the guard does not key: 35.7 degrees), and a node no
+  clip shown so far had keyed (guard to the high kick: the knee 68.4 degrees; now held by `anim.inertialAllBones`).
+- The switch-on lane's inertial work, taken over by this lane (coordinator 2026-11-10; `docs/SWITCH-ON.md` section 6 on
+  lane/switch-on), merged on top of the three fixes above. All read only while a body is inertial; each off value restores AF-1:
+  - `anim.inertialAllBones` 1 (new): every bone any of the body's clips keys keeps its pose history; a bone the new clip does not key
+    eases onto its bind pose. 0 = AF-1.
+  - `anim.inertialMatchVel` 1 (new): the offset is a 3-D rotation vector starting at the old motion's speed minus the new clip's. 0 = AF-1.
+  - `anim.inertialMinHalfLifeSec` **0.045 s** (new number): the shortest half-life an offset decays with (AF-1's 0.5 x the fade is
+    0.02 to 0.03 s on the fighters' switches). 0 = AF-1.
+  - `anim.inertialModesOn` **1** (new switch, ON): the inertial blend on by default on the hero in karate, karate VS, showdown, mixed
+    combat, duel and skateboard, the modes measured better; 0 = those modes linear exactly as before. Every other mode stays linear
+    unless `anim.inertial` is 1. Measurements and the per-mode decision: GAMEPLAY-CLEAN-AUDIT section 4h. Feel-check: karate, throw
+    jabs out of a run; showdown, take a hit; skateboard, push and ollie.
+
+## gameplay-clean-7, 2026-11-11 (owner: "address what you found above"; the owner has not felt these yet)
+
+All in group "Anim · transitions", all **NEW (on / off, no tuned number)**; each 0 restores the old behaviour exactly. Measurements:
+GAMEPLAY-CLEAN-AUDIT section 4i.
+- `anim.inertialEndedHold` 1: with inertial transitions, after a hit react or a knockdown has FINISHED and the idle takes over, the legs
+  the idle does not move stay where they are, as with the plain crossfade. Before, they swung back to the rest pose: the hero's thighs
+  up to 25 degrees a frame for about 10 frames (headless: 25.1 to 4.9 degrees; the plain crossfade 5.0). A move cut before its end
+  still eases those bones the old way (it matches the plain crossfade there). Feel-check: karate or showdown, get hit and stand still.
+- `anim.inertialHipsPos` 1: with inertial transitions, the hip height eases into the new move like the rotations do. The blend looked
+  for the hips by a name the bodies a mode spawns do not have (`Hips_c240`), so on every in-game body the hips jumped to the new move's
+  height in one frame (headless, crouch to idle: 25 cm in a frame to 3 cm; in play, the six inertial modes' largest hip step a frame
+  22-43 cm to 4-13 cm). The trade: skateboard's first push bends the right leg about 36 degrees for one frame (all three runs). Feel-check:
+  karate, a knockdown and the get-up; skateboard, the first push.
+- `anim.inertialFootballOn` 1 and `anim.inertialSurfOn` 1 (new switches, ON): the inertial blend by default on the football runner and
+  on the surfer (the rig measured fewer hard pops on each, two runs a side). 0 = the plain crossfade there, exactly as before.
+  Feel-check: football, juke and hurdle; surf, air and land.
+- `anim.inertialTwinLinear` 1: when a basketball body switches the ball to the other hand, that one switch uses the plain crossfade
+  even with inertial transitions on (inertial, both upper arms flipped about 128 degrees in one frame after every hand change in
+  3v3). Only matters where a basketball body is inertial, which none is by default.
+- `anim.celebrateEase` 1: the arms-up celebration after a made shot or a dunk (`dunk_mc_celebrate_big`) turns the upper arms at most
+  about 20 degrees a frame; its capture swung them 28 to 32 degrees a frame as the elbows came out (headless: 29.5 / 31.5 to 15.9 /
+  16.2 degrees). The clip is re-keyed when it is built; the file is not edited. Feel-check: 1v1, make a shot.

@@ -35,7 +35,7 @@ describe('the chip', () => {
   it('the other patterns read as before: press/row its phase, the jump its state, the squat its stage', () => {
     expect(chipLabel({ ...base, pattern: 'pressRow', phase: 'pull' })).toBe('pull');
     expect(chipLabel({ ...base, pattern: 'jump', jumpState: 'ready' })).toBe('Jump when ready');
-    expect(chipLabel({ ...base, pattern: 'jump', jumpState: 'airborne' })).toBe('Airborne');
+    expect(chipLabel({ ...base, pattern: 'jump', jumpState: 'airborne' })).toBe('In the air');   // test changed: copy rewrite (CUE-REWRITE) — 'Airborne' → 'In the air', same meaning
     expect(chipLabel({ ...base, pattern: 'jump', jumpState: 'calibrating' })).toBe('Stand still');
     expect(chipLabel({ ...base, pattern: 'jump', jumpState: 'landing' })).toBe('landing');
     expect(chipLabel({ ...base, pattern: 'squat', squatStage: 'work' })).toBe('work');

@@ -13,7 +13,7 @@ export default async function CoachAdminPage() {
   // Same helper /api/admin/metrics and /api/admin/diag use. Not a second copy of the check.
   if (!(await requireAdmin())) notFound();
   return (
-    <div className="min-h-screen bg-[#050505] pb-20">
+    <div className="min-h-screen bg-fel-bg pb-20">
       <KBAdmin />
     </div>
   );

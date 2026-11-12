@@ -22,7 +22,7 @@
 // app/consent/guardian/page.tsx mounts the exact same component as its own standalone page for the pain check-in's
 // locked prompt to link to.
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 
 interface StatusResponse {
@@ -57,8 +57,10 @@ const REQUEST_ERROR_COPY: Record<string, string> = {
 };
 
 function GateShell({ children }: { children: ReactNode }) {
+  // EVERY-SCREEN P5: top-aligned, so the card grows downward when "Checking in…" becomes the form (centred, its top
+  // moved up: the rig measured a layout shift of 0.154 on /play/mirror)
   return (
-    <div className="flex min-h-[60vh] items-center justify-center p-6">
+    <div className="flex min-h-[60vh] items-start justify-center p-6 pt-10">
       <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/[0.04] p-5">{children}</div>
     </div>
   );
@@ -110,14 +112,23 @@ export function GuardianConsentGate({ children }: { children: ReactNode }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const applyStatus = useCallback((data: StatusResponse) => {
+    setStatus(data);
+    if (data.birthYear) setBirthYear(String(data.birthYear));
+    setStage(!data.needsGuardian || data.status === 'accepted' ? 'ready' : data.status === 'pending' ? 'pending' : 'ask');
+  }, []);
+
+  const retryStatus = useCallback(() => {
+    setStage('loading');
+    void fetchStatus().then(applyStatus).catch(() => setStage('error'));
+  }, [applyStatus]);
+
   useEffect(() => {
     let cancelled = false;
     fetchStatus()
       .then((data) => {
         if (cancelled) return;
-        setStatus(data);
-        if (data.birthYear) setBirthYear(String(data.birthYear));
-        setStage(!data.needsGuardian || data.status === 'accepted' ? 'ready' : data.status === 'pending' ? 'pending' : 'ask');
+        applyStatus(data);
       })
       .catch(() => {
         if (!cancelled) setStage('error');
@@ -125,7 +136,7 @@ export function GuardianConsentGate({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [applyStatus]);
 
   const canSubmit = guardianName.trim().length > 0 && EMAIL.test(guardianEmail.trim()) && /^\d{4}$/.test(birthYear.trim());
 
@@ -169,7 +180,10 @@ export function GuardianConsentGate({ children }: { children: ReactNode }) {
   if (stage === 'error') {
     return (
       <GateShell>
-        <p className="text-[14px] text-white/60">Couldn&apos;t load this. Refresh to try again.</p>
+        <p className="text-[14px] text-white/60">Couldn&apos;t load this. Try again when your connection is back.</p>
+        <button type="button" onClick={retryStatus} className={`${quietBtn} mt-3`}>
+          Try again
+        </button>
       </GateShell>
     );
   }

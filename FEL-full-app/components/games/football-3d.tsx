@@ -437,13 +437,13 @@ export default function Football3D(props: GameProps) {
         <div className="pointer-events-none absolute inset-0">
           {/* Top HUD */}
           <div className="absolute left-1/2 top-3 -translate-x-1/2 rounded-lg border border-white/8 bg-black/70 px-5 py-2 text-center backdrop-blur-md">
-            <div className="fel-heading text-[10px] tracking-[0.2em] text-white/50">BREAKAWAY</div>
+            <div className="fel-heading text-[12px] tracking-[0.2em] text-white/50">BREAKAWAY</div>
             <div className="font-mono text-2xl font-bold text-[#00E5FF]">{hud.score}</div>
           </div>
 
           {/* Yardage rail */}
           <div className="absolute left-4 right-4 top-[70px]">
-            <div className="mb-1 flex justify-between font-mono text-[11px] text-white/60">
+            <div className="mb-1 flex justify-between font-mono text-[12px] text-white/60">
               <span>{hud.yards} YD</span>
               <span className="text-[#00FF9D]">EVADED {hud.evaded}</span>
               <span>{hud.toGo} TO GO</span>
@@ -474,7 +474,7 @@ export default function Football3D(props: GameProps) {
       </div>
 
       {/* Controls hint */}
-      <div className="mx-auto mt-3 max-w-[960px] px-3 text-center font-mono text-[11px] text-white/40">
+      <div className="mx-auto mt-3 max-w-[960px] px-3 text-center font-mono text-[12px] text-white/50">
         ←/→ or A/D steer · Q/E juke · S spin · F stiff-arm · SPACE hurdle
       </div>
 

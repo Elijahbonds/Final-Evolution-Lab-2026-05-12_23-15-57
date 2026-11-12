@@ -12,6 +12,7 @@ import {
   type Drill, type DrillPhase, type DrillTarget, alternate, repeat, round3, stepInterval, mirrorPhase,
   FIRST_LEAD_IN_SEC, LEAD_IN_SEC,
 } from './chart';
+import { HOOPS_DRILLS } from './hoopsDrills';
 
 // ── tempos and body timings ──────────────────────────────────────────────────────────────────────────────────────────
 
@@ -161,6 +162,7 @@ export const WAKE_UP: Drill = {
     },
     {
       id: 'build-the-rhythm', name: 'Build the Rhythm', durationSec: 120, presence: 'required',
+      adultOnly: true,   // YOUTH-CONTACT-CAP (PM 2026-10-26): 2 × POGO_WARMUP_COUNT = 60 pogo contacts, over the teen 55
       source: { book: PB, chapter: 5, section: 'Phase 5: Build the Rhythm (2 minutes)' },
       cue: 'Pogos: bounce on the balls of the feet, knees stiff, quick and quiet.',
       targets: [
@@ -238,6 +240,7 @@ const rest = (id: string, durationSec: number): DrillPhase => ({
 export const POGO_BILATERAL: Drill = {
   id: 'pogo-bilateral',
   name: 'Pogo Progression: Both Feet',
+  adultOnly: true,   // YOUTH-CONTACT-CAP (PM 2026-10-26): 3 × BILATERAL_CONTACTS = 60 contacts, over the teen 55
   blurb: 'Weeks 1–2 of the pogo progression: three sets of 20 quick, stiff, quiet contacts.',
   source: { book: PB, chapter: 6, section: 'Drill 2: The Oscillatory Pogo Progression' },
   checks: ['kneeBend15', 'armsOpposition'],
@@ -550,5 +553,6 @@ export const DRILLS: readonly Drill[] = [
 ];
 
 export function drillById(id: string): Drill | null {
-  return DRILLS.find((d) => d.id === id) ?? null;
+  // PLAT-P09: the ball-skill shelf's drills (hoopsDrills.ts) are found by id too; DRILLS stays the Playbook's eleven
+  return DRILLS.find((d) => d.id === id) ?? HOOPS_DRILLS.find((d) => d.id === id) ?? null;
 }

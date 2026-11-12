@@ -10,14 +10,14 @@ export function OfferCard({ book, offer, prominent = false }: { book: BookTitle;
   const border = offer.format === 'bundle' ? 'border-[#F5C518]' : 'border-white/10';
   return (
     <div className={`flex flex-col rounded-xl border ${border} bg-[#141414] p-3 ${prominent ? 'min-h-[148px]' : ''}`}>
-      <p className="text-[11px] uppercase tracking-wider text-white/45">{formatLabel(offer.format)}</p>
+      <p className="text-[12px] uppercase tracking-wider text-white/50">{formatLabel(offer.format)}</p>
       <p className="mt-2 flex items-baseline gap-2">
         <span className="text-xl font-semibold text-white">{formatUsd(offer.priceCents)}</span>
         {offer.priceIsExample ? (
-          <span className="text-[10px] font-bold uppercase tracking-wider text-[#ff6b6b]">Example</span>
+          <span className="text-[12px] font-bold uppercase tracking-wider text-[#ff6b6b]">Example</span>
         ) : null}
       </p>
-      <p className="mt-1 text-[11px] leading-snug text-white/40">
+      <p className="mt-1 text-[12px] leading-snug text-white/50">
         {offer.format === 'audiobook' && 'Stream in FEL. No download.'}
       </p>
       <div className="mt-auto pt-3">
@@ -33,9 +33,9 @@ export function OfferCard({ book, offer, prominent = false }: { book: BookTitle;
             Read on Kindle Unlimited
           </a>
         ) : (
-          <p className="text-xs text-white/40">Not for direct sale</p>
+          <p className="text-xs text-white/50">Not for direct sale</p>
         )}
-        {offer.directSaleNote ? <p className="mt-2 text-[10px] leading-snug text-white/35">{offer.directSaleNote}</p> : null}
+        {offer.directSaleNote ? <p className="mt-2 text-[12px] leading-snug text-white/50">{offer.directSaleNote}</p> : null}
       </div>
     </div>
   );
@@ -45,7 +45,7 @@ export function KindleLink({ book, className = '' }: { book: BookTitle; classNam
   const amazon = kindleUrl(book);
   if (!amazon) return null;
   return (
-    <a href={amazon} target="_blank" rel="noopener noreferrer" className={`text-xs text-white/60 hover:text-white ${className}`}>
+    <a href={amazon} target="_blank" rel="noopener noreferrer" className={`inline-flex min-h-11 items-center text-xs text-white/60 hover:text-white ${className}`}>
       Kindle on Amazon
     </a>
   );
@@ -59,18 +59,18 @@ export function CatalogCard({ book }: { book: BookTitle }) {
       <Link href={`/press/${book.slug}`} className="block">
         <div className="aspect-[3/4] overflow-hidden rounded-xl">
           <div className="flex h-full flex-col justify-between bg-[#161616] p-3" style={{ backgroundImage: 'repeating-linear-gradient(-45deg, #161616, #161616 8px, #1c1c1c 8px, #1c1c1c 9px)' }}>
-            <p className="text-[10px] uppercase tracking-[0.16em] text-[#F5C518]">Press</p>
-            <p className="fel-heading text-lg leading-tight text-white">{book.title}</p>
-            <p className="text-[10px] uppercase tracking-wider text-white/30">{book.track ?? 'Elijah Bonds'}</p>
+            <p className="text-[12px] uppercase tracking-[0.16em] text-[#F5C518]">Press</p>
+            <p className="fel-heading text-[20px] leading-tight text-white">{book.title}</p>
+            <p className="text-[12px] uppercase tracking-wider text-white/50">{book.track ?? 'Elijah Bonds'}</p>
           </div>
         </div>
         <h3 className="mt-3 text-sm font-semibold text-white">{book.title}</h3>
       </Link>
-      <p className="mt-1 text-[11px] text-white/40">{publicBookDescription(book)}</p>
+      <p className="mt-1 text-[12px] text-white/50">{publicBookDescription(book)}</p>
       {primary ? (
         <p className="mt-2 text-sm text-white">
           {formatUsd(primary.priceCents)}{' '}
-          {primary.priceIsExample ? <span className="text-[10px] font-bold uppercase text-[#ff6b6b]">Example</span> : null}
+          {primary.priceIsExample ? <span className="text-[12px] font-bold uppercase text-[#ff6b6b]">Example</span> : null}
         </p>
       ) : null}
       <div className="mt-3 flex flex-wrap items-center gap-2">

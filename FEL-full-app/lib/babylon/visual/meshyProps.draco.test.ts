@@ -55,6 +55,17 @@ describe('the Draco decoder is ours, never the CDN', () => {
  */
 const DRACO_FILES = [
   {
+    url: MESHY_PROP_URL('hoopbus'), bytes: 849_568,
+    // NEW PIN (HOOPBUS-SWAP, 2026-10-29): the corner bus was the float GLB 5a4df83d… (4,736,976 B); now 3D Art's Draco bus, 3,887,408 B smaller.
+    // Two of its three images are re-encoded to WebP, so the image and JSON pins are the new file's own (measured from it), not the replaced one's.
+    sha: 'b9cb9ecd77dfc3aedcb6ea3cb896bee6ef33ced554b99952d73d582ed5b3cfe8',
+    required: ['EXT_texture_webp', 'KHR_draco_mesh_compression'], textures: 3,
+    imgSha: '3092c8a00a237f577efa26fa6fe7c17a8f1e56499c603959946a344157d6025f', jsonSha: '7ff734e1fceeeca0ce61936d328a9c9b86f96e068f558d34947e3137460d2d4f',
+    // same mesh, material and triangles as 5a4df83d (verts 96,087 → 96,123: Draco splits seams); bounds and UVs measured from this file —
+    // its max y/z sit 0.17 / 0.19 mm off 5a4df83d's (4.17371, 2.07073), past the 0.1 mm the pin holds, so they are this file's
+    meshes: [{ name: 'Mesh_0', material: 'Material.001', verts: 96_123, tris: 111_926, min: [-4.49905, -0.00179, -2.07107], max: [4.49989, 4.17388, 2.07054], uv: [[0.00003, 0.99995], [0.00141, 0.99986]] }],
+  },
+  {
     url: MESHY_PROP_URL('hoop'), bytes: 893_740,
     // PIN MOVED (FDB-4) from FDB-2's 4b74e6d3702b23fc28d31ddbafa6515d6c9480929ff9785113287afc74f26d0d (int8 normals / uint16 UVs, which
     // only Babylon's worker path normalizes) to 3D Art's float-attribute Draco hoop: 21,844 B smaller and path-independent.
@@ -145,21 +156,21 @@ describe.each(DRACO_FILES)('$url is 3D Art\'s Draco file, and it decodes to the 
   });
 });
 
-describe('fel-kit-male.glb is the shrunk kit: new textures, the same body', () => {
-  it('is 3D Art\'s file (sha256 e4791bbf…); its JSON and all 23 geometry, skin and morph views are byte-identical to c9468a40', () => {
+describe('fel-kit-male.glb is the KIT-NO-HIGH-BOOTS kit (pass 3): low shoes, compression tee, the same body', () => {
+  it('is the pass-3 file (sha256 d2aa002f…); its JSON and all 54 geometry, skin and morph views are pinned', () => {
     const KIT = urlForHeroBody('kit-male');   // the guest's own body on /try
     expect(KIT).toBe('/models/candidates/fel-kit-male.glb');
-    expect(createHash('sha256').update(readFileSync(pub(KIT))).digest('hex')).toBe('e4791bbf7c2f219d3b4be0053fd6aa6e00ce54191e7d57e0a054cb57ad0344fb');
+    expect(createHash('sha256').update(readFileSync(pub(KIT))).digest('hex')).toBe('d2aa002f378cd73b1f560b288b3c7e701a0a04a171f042b219451cf4fab1016e');
     const { json, bin } = glb(KIT);
     const images = new Set((json.images ?? []).map((i) => i.bufferView));
-    expect(images.size).toBe(15);   // the image order phoneTextureCap's #image7 reads is the source's
+    expect(images.size).toBe(11);   // the image order phoneTextureCap's #image7 reads is the source's (#image7 is still the 2048² skin)
     const h = createHash('sha256'); let views = 0;
     json.bufferViews.forEach((v, i) => { if (images.has(i)) return; views++; h.update(bin.subarray(v.byteOffset ?? 0, (v.byteOffset ?? 0) + v.byteLength)); });
-    expect(views).toBe(23);
-    // pinned from the kit shipped before FDB-2 (blob c9468a40): the same two hashes over the same views and the same JSON
-    expect(h.digest('hex')).toBe('a360d96f08a75cccf412e7ff18c56002bad7286dc47347c8ad695e7ff2e83a70');
+    expect(views).toBe(54);
+    // pinned from the pass-3 kit (KIT-NO-HIGH-BOOTS, 2026-10-20, rebuilt on 4c45862a's textures), measured from the file
+    expect(h.digest('hex')).toBe('5ed36a554d2e85c0a31b4dcbcf8c45184bacac03c7e58920a54c9a268bcb0773');
     const { bufferViews: _v, buffers: _b, ...rest } = json;
-    expect(createHash('sha256').update(JSON.stringify(rest)).digest('hex')).toBe('9590adb833c3844ce66963fef0c47c17810dbb54b8ed05a294117322f09c10ed');
+    expect(createHash('sha256').update(JSON.stringify(rest)).digest('hex')).toBe('bf2a2e438dba0bd717e5dcff1d70eb96eed3a1a945d60fb591c2ba809000d0ea');
     expect([...(json.extensionsRequired ?? [])].sort()).toEqual(['EXT_texture_webp', 'KHR_mesh_quantization']);
   });
 });

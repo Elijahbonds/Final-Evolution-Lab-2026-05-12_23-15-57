@@ -239,6 +239,8 @@ describe('BASELINE 1: the prescribable catalogue can be filled from a page the a
       // controls: the walker does see what IS mounted — the coach's Clients tab and the client-only training view
       { file: `${ROOT}/app/coach/_components/clients-view.tsx`, name: 'ClientsView' },
       { file: `${ROOT}/components/training/TrainingDashboard.tsx`, name: 'TrainingClientView' },
+      // PLAT-P06 (2026-10-28): the coached athlete's one home, Today, takes over the "client view is mounted" control
+      { file: `${ROOT}/app/coach/_components/today-view.tsx`, name: 'TodayView' },
       { file: `${ROOT}/app/coach/admin/_components/kb-admin.tsx`, name: 'KBAdmin' },
     ], ROOT);
     measured.catalogue = { posters: posters.map((p) => p.slice(ROOT.length + 1)), mounts };
@@ -248,7 +250,10 @@ describe('BASELINE 1: the prescribable catalogue can be filled from a page the a
     expect(mounts['components/training/library/ExerciseLibrary.tsx#ExerciseLibrary'].served).toEqual([]);
     expect(mounts['components/training/TrainingDashboard.tsx#TrainingCoachDashboard'].served).toEqual([]);
     expect(mounts['app/coach/_components/clients-view.tsx#ClientsView'].served).toContain('app/coach/page.tsx');
-    expect(mounts['components/training/TrainingDashboard.tsx#TrainingClientView'].served).toContain('app/training/page.tsx');
+    // PLAT-P06 (2026-10-28), test changed: /training redirects to Today (one home), so TrainingClientView is unmounted on
+    // purpose (kept in the tree, reversible). The positive control moves to the client view that IS mounted: Today.
+    expect(mounts['components/training/TrainingDashboard.tsx#TrainingClientView'].served).toEqual([]);
+    expect(mounts['app/coach/_components/today-view.tsx#TodayView'].served).toContain('app/coach/page.tsx');
     expect(mounts['app/coach/admin/_components/kb-admin.tsx#KBAdmin'].served).toContain('app/coach/admin/page.tsx');
   });
 

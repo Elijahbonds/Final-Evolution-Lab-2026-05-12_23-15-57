@@ -116,7 +116,7 @@ export function TouchOverlay(props: { bus: InputBus; modeId: string; visible: bo
       {/* compact: the stick in the corner and the d-pad inboard of it (row-reverse keeps the DOM order) */}
       <div ref={colL} className={`pointer-events-auto absolute bottom-3 left-3 flex gap-2 ${compact ? 'flex-row-reverse items-end' : 'flex-col items-center'}`} style={lifted(compact ? COMPACT_LEFT : SAFE_LEFT, cs * fit.l, 'bottom left')}>
         <DPad bus={props.bus} />
-        <AnalogStick bus={props.bus} side="L" label="MOVE" />
+        {DEAD_L_STICK.has(props.modeId) ? <HollowStick /> : <AnalogStick bus={props.bus} side="L" label="MOVE" />}
       </div>
       {compact ? (
         // compact: the diamond in the corner with the boost pill over it, the right stick inboard of the diamond
@@ -170,10 +170,10 @@ function AnalogStick({ bus, side, label }: { bus: InputBus; side: 'L' | 'R'; lab
       onPointerMove={onMove}
       onPointerUp={() => { active.current = null; setVec(0, 0); }}
       onPointerCancel={() => { active.current = null; setVec(0, 0); }}
-      className="relative h-24 w-24 touch-none rounded-full border border-white/15 bg-white/5 backdrop-blur-sm">
+      className="fel-chrome-glass relative h-24 w-24 touch-none rounded-full border border-white/15 bg-white/5 backdrop-blur-sm">
       <div ref={knob}
         className="absolute left-1/2 top-1/2 -ml-6 -mt-6 h-12 w-12 rounded-full bg-white/20 shadow-lg transition-transform duration-75" />
-      <span className="absolute inset-0 flex items-center justify-center text-[8px] font-black tracking-widest text-white/30">
+      <span className="absolute inset-0 flex items-center justify-center text-[12px] font-black tracking-widest text-white/50">
         {label}
       </span>
     </div>
@@ -182,6 +182,11 @@ function AnalogStick({ bus, side, label }: { bus: InputBus; side: 'L' | 'R'; lab
 
 /** The R stick's socket on a mode that reads nothing from it (MODE-STICK-FACE, 2026-09-07): the same 96 px footprint
  *  so the diamond above it never moves, a dashed ring at 30 % like an inert verb — an empty socket, not a control. */
+/** gameplay-clean (2026-10-28): the modes whose LEFT stick moves nothing — a timed swing, a d-pad sprint, two quizzes. The deck
+ *  drew a live MOVE stick there that answered with nothing (the audit's photographs: baseball's bottom-left); it is the
+ *  inert dashed ring now, like an unbound right stick. touchOverlayFit.test.ts holds each to its mode file reading no L stick. */
+export const DEAD_L_STICK: ReadonlySet<string> = new Set(['baseball', 'sprint', 'brainbrawl', 'who_scene_it']);
+
 function HollowStick() {
   return <div aria-hidden="true" className="pointer-events-none h-24 w-24 rounded-full border border-dashed border-white opacity-30" />;
 }
@@ -189,7 +194,7 @@ function HollowStick() {
 function DPad({ bus }: { bus: InputBus }) {
   const press = (dir: 'up' | 'down' | 'left' | 'right') => () => bus.emit({ t: 'dpad', dir, pressed: true });
   const release = (dir: 'up' | 'down' | 'left' | 'right') => () => bus.emit({ t: 'dpad', dir, pressed: false });
-  const seg = 'absolute flex touch-none select-none items-center justify-center border border-white/15 bg-white/8 text-[10px] text-white/50 active:bg-white/25 active:text-white';
+  const seg = 'absolute flex touch-none select-none items-center justify-center border border-white/15 bg-white/8 text-[12px] text-white/50 active:bg-white/25 active:text-white';
   return (
     <div className="relative h-[72px] w-[72px]">
       <button
@@ -315,11 +320,11 @@ function Verb({ bus, def, slot }: { bus: InputBus; def: VerbButton; slot: 'A' | 
   return (
     <div className="relative">
       {def.hold && (
-        <span className="pointer-events-none absolute -top-3 left-1/2 -translate-x-1/2 text-[7px] font-black tracking-[0.2em] text-white/60">HOLD</span>
+        <span className="pointer-events-none absolute -top-3 left-1/2 -translate-x-1/2 text-[12px] font-black tracking-[0.2em] text-white/60">HOLD</span>
       )}
     <button
       onPointerDown={press} onPointerUp={release} onPointerCancel={release}
-      className="h-[64px] w-[64px] touch-none select-none rounded-full border-2 text-[10px] font-black tracking-wide text-white transition-transform duration-75 active:scale-90 active:brightness-150"
+      className="h-[64px] w-[64px] touch-none select-none rounded-full border-2 text-[12px] font-black tracking-wide text-white transition-transform duration-75 active:scale-90 active:brightness-150"
       style={{ borderColor: color, background: def.hold && holdV > 0 ? `conic-gradient(${color}cc ${Math.round(holdV * 360)}deg, ${color}22 0)` : `${color}22`, boxShadow: `0 0 18px ${color}44` }}>
       {def.label || slot}
     </button>

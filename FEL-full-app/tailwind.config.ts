@@ -1,4 +1,6 @@
 import type { Config } from 'tailwindcss';
+// A11-06 (2026-10-25): the design tokens' colours as `fel-*` classes (text-fel-dim, bg-fel-bg, border-fel-cyan/45).
+import { TAILWIND_FEL } from './lib/design/tokens';
 
 const config: Config = {
   darkMode: ['class'],
@@ -23,10 +25,15 @@ const config: Config = {
       // the 15/35/… steps; Tailwind 4 takes any integer.) Only classes found in content are emitted, so the unused
       // steps cost nothing, and the stock steps keep their values. tests/tailwind/opacity-scale.test.ts holds it.
       opacity: Object.fromEntries(Array.from({ length: 101 }, (_, i) => [String(i), String(i / 100)])),
+      // FONTS-FIX (lane/premium-ui P2, 2026-10-27): every face's var() carries its own fallback. `var(--font-sans), system-ui`
+      // with the variable missing is not "skip to system-ui": the whole declaration is invalid at computed-value time and the
+      // text falls back to the BROWSER DEFAULT, a serif. Production sets the variables on <html> (app/layout.tsx), so it
+      // never showed there; every rig without them (the probes) and the root crash screen, which renders its own <html>,
+      // drew in Times. With the fallback inside var(), a missing variable means the system sans. lib/design/fonts.test.ts.
       fontFamily: {
-        sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
-        display: ['var(--font-display)', 'var(--font-sans)', 'sans-serif'],
-        mono: ['var(--font-mono)', 'ui-monospace', 'monospace'],
+        sans: ['var(--font-sans, ui-sans-serif)', 'system-ui', 'sans-serif'],
+        display: ['var(--font-display, var(--font-sans, ui-sans-serif))', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        mono: ['var(--font-mono, ui-monospace)', 'ui-monospace', 'monospace'],
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
@@ -39,6 +46,7 @@ const config: Config = {
         sm: 'calc(var(--radius) - 4px)',
       },
       colors: {
+        fel: TAILWIND_FEL,
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         card: {

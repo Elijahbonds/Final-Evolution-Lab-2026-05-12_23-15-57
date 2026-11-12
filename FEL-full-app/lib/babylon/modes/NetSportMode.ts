@@ -80,6 +80,7 @@ export const ZONE_COST = 100;
 /** Rackets each side can lose before the match is over. */
 export const RACKETS = 3;
 import { assertSpawned } from '../core/FrameGuard';
+import { holdHeroInPortrait } from './netPortraitCam';   // lane/tiebreak-cam (2026-10-23): Tennis's upright frame keeps the player
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import {
@@ -1453,6 +1454,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
         const pull = Math.min(0.6, Math.max(0, (stray - 1.5) / 3));
         if (ball) { camAim.copyFrom(ball.position).scaleInPlace(1 - pull); me.root.position.scaleAndAddToRef(pull, camAim); }   // #17: no scale() temporary
         ctx.camDirector.update(camSubject, camVel, ball ? camAim : null);
+        if (!VOLLEY && ctx.camera) holdHeroInPortrait(ctx.camera, ctx.scene.getEngine().getAspectRatio(ctx.camera), me.root.position, ctx.camDirector.inIntro);   // lane/tiebreak-cam: upright only, keep the player in (netPortraitCam.ts)
         const bodyRightX = Math.cos(me.root.rotation.y);
         // the tree owns the clips: the shuffle INTENT in the body frame, plus the beat latches — fed every frame, every phase
         meTree.update({ move: step ? (step * bodyRightX > 0 ? 1 : -1) : 0, swing: meSwing, serve: meServe, block: meBlock });

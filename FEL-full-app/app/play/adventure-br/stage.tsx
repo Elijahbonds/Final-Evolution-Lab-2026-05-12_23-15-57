@@ -16,9 +16,11 @@ import { CONTROLS_SHEET } from '@/lib/babylon/adventure/host/inputMap';
 import type { BRResult } from '@/lib/babylon/adventure/br/match';
 import { AdventureRadial } from './radial';
 
+/** The route's name, as app/play/adventure-br/page.tsx titles it. */
+export const ADVENTURE_BR_TITLE = 'Adventure Battle Royale';
 const MODE_KEY = 'adventure_br';
 
-export function AdventureBRStage() {
+export function AdventureBRStage({ signedIn = false }: { signedIn?: boolean } = {}) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
   const mountedRef = useRef(false);
@@ -49,13 +51,16 @@ export function AdventureBRStage() {
         input: bus,
         onPhase: (p, d) => { if (!disposed) { setPhase(p); if (p === 'error') setErr(String(d)); } },
         onHud: (h) => { if (!disposed) setHud((prev) => ({ ...prev, ...h })); },
+        // PUBLIC-POLISH (2026-11-02, live sweep D4): a guest's spawn does not ask the closet (it was a 401 and a console
+        // error on every guest load); the page read the session, as /play/adventure's does
+        guest: !signedIn,
         // the end screen: the result as the sink gets it (nothing is posted: no reward route for the BR yet)
         resultSink: async (r) => { if (!disposed) setResult((r as { detail?: BRResult }).detail ?? null); },
       }).then((s) => { if (disposed) s(); else stop = s; })
         .catch((e) => { if (!disposed) setErr(String(e?.message ?? e)); });
     }, 0);
     return () => { disposed = true; mountedRef.current = false; stop?.(); clearTimeout(startTimer); };
-  }, []);
+  }, [signedIn]);
 
   const start = () => busRef.current?.emit({ t: 'button', btn: 'START', pressed: true });
   const playing = (phase === 'playing' || phase === 'countdown') && !result;
@@ -66,7 +71,8 @@ export function AdventureBRStage() {
       {playing && <Hud hud={hud} />}
       {(phase === 'ready' || phase === 'loading') && (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-black/70 p-4">
-          <p className="text-[10px] tracking-[0.3em] text-white/50">THE ADVENTURE · BATTLE ROYALE [PLACEHOLDER] · 12 FIGHTERS · NO GUNS</p>
+          {/* PUBLIC-POLISH (2026-11-02, live sweep J5): the route's own name (its page title), not "[PLACEHOLDER]" */}
+          <p className="text-[12px] tracking-[0.3em] text-white/50">{`${ADVENTURE_BR_TITLE.toUpperCase()} · 12 FIGHTERS · NO GUNS`}</p>
           <Controls />
           <button type="button" disabled={phase !== 'ready'} onClick={(e) => { e.currentTarget.blur(); start(); }}
             className="rounded bg-[#00E5FF] px-6 py-2 font-bold text-black disabled:opacity-40" data-testid="br-start">
@@ -77,7 +83,7 @@ export function AdventureBRStage() {
       )}
       {phase === 'paused' && !result && (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-black/70 p-4">
-          <p className="text-[10px] tracking-[0.3em] text-white/50">PAUSED</p>
+          <p className="text-[12px] tracking-[0.3em] text-white/50">PAUSED</p>
           <Controls />
           <button type="button" onClick={(e) => { e.currentTarget.blur(); start(); }} className="rounded bg-[#00E5FF] px-6 py-2 font-bold text-black">RESUME</button>
         </div>
@@ -99,15 +105,15 @@ function Controls() {
   const rows = buttonMap('adventure');
   return (
     <div className="max-h-[70vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-white/10 bg-black/60 p-3" data-testid="br-controls">
-      <p className="mb-2 text-[9px] font-black tracking-[0.3em] text-white/45">BUTTONS</p>
+      <p className="mb-2 text-[12px] font-black tracking-[0.3em] text-white/50">BUTTONS</p>
       <div className="mb-3 grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
         {rows.map((r) => (
           <p key={r.input + r.action} className="flex justify-between gap-2"><span className="text-white/50">{r.input}</span><span className="font-bold">{r.action}</span></p>
         ))}
       </div>
-      <p className="mb-2 text-[9px] text-white/50">Loot is picked up by walking over it · stand at a chest to open it · the storm closes in five phases · D-PAD ▲ calls your partner</p>
-      <table className="w-full text-left text-[10px]">
-        <thead className="text-white/40"><tr><th className="pr-2">ACTION</th><th className="pr-2">PAD</th><th className="pr-2">KEYS</th><th>TOUCH</th></tr></thead>
+      <p className="mb-2 text-[12px] text-white/50">Loot is picked up by walking over it · stand at a chest to open it · the storm closes in five phases · D-PAD ▲ calls your partner</p>
+      <table className="w-full text-left text-[12px]">
+        <thead className="text-white/50"><tr><th className="pr-2">ACTION</th><th className="pr-2">PAD</th><th className="pr-2">KEYS</th><th>TOUCH</th></tr></thead>
         <tbody>
           {CONTROLS_SHEET.map((r) => (
             <tr key={r.action} className="border-t border-white/5"><td className="py-0.5 pr-2">{r.action}</td><td className="pr-2 text-white/70">{r.pad}</td><td className="pr-2 text-white/70">{r.keys}</td><td className="text-white/70">{r.touch}</td></tr>
@@ -127,7 +133,7 @@ function Hud({ hud }: { hud: Record<string, HudValue> }) {
   const stage = s('zoneStage');
   return (
     <>
-      <div className="pointer-events-none absolute left-1/2 top-3 z-10 flex -translate-x-1/2 gap-3 rounded bg-black/45 px-3 py-1 text-[11px] font-bold" data-testid="br-hud-top">
+      <div className="pointer-events-none absolute left-1/2 top-3 z-10 flex -translate-x-1/2 gap-3 rounded bg-black/45 px-3 py-1 text-[12px] font-bold" data-testid="br-hud-top">
         <span>{n('alive')} LEFT</span>
         <span className={hud.storm ? 'text-fuchsia-300' : 'text-white/80'}>
           {stage === 'closed' ? 'STORM CLOSED' : `${stage === 'shrink' ? 'CLOSING' : 'ZONE'} ${n('zone')}s`}
@@ -139,7 +145,7 @@ function Hud({ hud }: { hud: Record<string, HudValue> }) {
         <Meter label="HP" fill={bar(n('hp'), n('hpMax'))} color={hud.downed ? '#f59e0b' : '#ef4444'} text={hud.downed ? `DOWN ${n('bleed')}s` : `${n('hp')}`} />
         <Meter label="EN" fill={bar(n('energy'), n('energyMax'))} color="#38bdf8" text={`${n('energy')}`} />
         <Meter label="FU" fill={bar(n('fusion'), 100)} color="#a78bfa" text={n('fused') > 0 ? `FUSED ${n('fused')}s` : `${n('fusion')}%`} />
-        <p className="text-[10px] text-white/70">{`SLOT ${n('slot')}${s('spell') ? ` · ${s('spell')!.replace('[PLACEHOLDER] ', '')}` : ''} · PARTNER ${s('summon') ?? ''}`}</p>
+        <p className="text-[12px] text-white/70">{`SLOT ${n('slot')}${s('spell') ? ` · ${s('spell')!.replace('[PLACEHOLDER] ', '')}` : ''} · PARTNER ${s('summon') ?? ''}`}</p>
       </div>
     </>
   );
@@ -169,11 +175,11 @@ function MiniMap({ hud }: { hud: Record<string, HudValue> }) {
 function Meter({ label, fill, color, text }: { label: string; fill: string; color: string; text: string }) {
   return (
     <div className="flex items-center gap-1.5">
-      <span className="w-5 text-[9px] text-white/50">{label}</span>
+      <span className="w-5 text-[12px] text-white/50">{label}</span>
       <div className="relative h-2.5 flex-1 overflow-hidden rounded bg-white/10">
         <div className="absolute inset-y-0 left-0" style={{ width: fill, background: color }} />
       </div>
-      <span className="w-16 text-right text-[9px] text-white/70">{text}</span>
+      <span className="w-16 text-right text-[12px] text-white/70">{text}</span>
     </div>
   );
 }
@@ -182,12 +188,12 @@ function EndScreen({ r }: { r: BRResult }) {
   const mins = Math.floor(r.survivedSec / 60), secs = String(r.survivedSec % 60).padStart(2, '0');
   return (
     <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-black/75 p-4 text-center" data-testid="br-end">
-      <p className="text-[10px] tracking-[0.3em] text-white/50">{r.mode === 'duo' ? 'DUOS' : 'SOLOS'} · BATTLE ROYALE</p>
+      <p className="text-[12px] tracking-[0.3em] text-white/50">{r.mode === 'duo' ? 'DUOS' : 'SOLOS'} · BATTLE ROYALE</p>
       <p className={`text-4xl font-black ${r.won ? 'text-[#00E5FF]' : 'text-white'}`}>{r.won ? 'LAST ONE STANDING' : `#${r.place} OF ${r.teams}`}</p>
       <div className="flex gap-6 text-sm">
         <span><b>{r.kos}</b> KO</span><span><b>{r.damage}</b> DAMAGE</span><span><b>{mins}:{secs}</b> SURVIVED</span>
       </div>
-      <p className="text-[10px] text-white/45">Offline match · nothing found in a match carries out of it · no rewards yet</p>
+      <p className="text-[12px] text-white/50">Offline match · nothing found in a match carries out of it · no rewards yet</p>
       <button type="button" onClick={() => { try { window.location.reload(); } catch { /* fine */ } }} className="rounded bg-[#00E5FF] px-6 py-2 font-bold text-black">PLAY AGAIN</button>
     </div>
   );

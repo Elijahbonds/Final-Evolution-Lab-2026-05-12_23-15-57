@@ -193,18 +193,20 @@ describe('possessionAfterScore', () => {
   });
 });
 
-describe('what a foul is worth in a game with no free throws', () => {
-  it('the handbook still says what a foul SHOULD be worth', () => {
+describe('what a foul is worth now that free throws exist (lane/hoops-shot-content, 2026-10-20)', () => {
+  it('the handbook still says what a foul is worth', () => {
     expect(rule('and_one').shots).toBe(1);
     expect(rule('shooting_foul').shots).toBe(2);
   });
 
-  it('BUT NOTHING IMPLEMENTS THEM, and the flag says so rather than implying it', () => {
-    // `Call.shots` has been computed and returned since the Ref was written and read by nobody. Both modes
-    // play a pickup format where a foul is answered with the ball. This is the honest statement of that.
-    expect(FREE_THROWS_IMPLEMENTED).toBe(false);
-    expect(foulAward(judge('and_one', { offense: 'me', fouled: 'me' }))).toBe('ball_back');
-    expect(foulAward(judge('shooting_foul', { offense: 'me', fouled: 'me' }))).toBe('ball_back');
+  // test changed: this pinned FREE_THROWS_IMPLEMENTED === false and 'ball_back' for both calls — the honest statement while nothing
+  // read `Call.shots`. Free throws are wired now (core/FreeThrows + core/FreeThrowLine), and Ref.ts asked for this pin to move with
+  // the flag in the same commit. The fouls that are NOT shooting fouls keep answering with the ball (asserted below, new).
+  it('A SHOOTING FOUL AND AN AND-ONE ARE SHOTS; every other foul is still the ball', () => {
+    expect(FREE_THROWS_IMPLEMENTED).toBe(true);
+    expect(foulAward(judge('and_one', { offense: 'me', fouled: 'me' }))).toBe('shots');
+    expect(foulAward(judge('shooting_foul', { offense: 'me', fouled: 'me' }))).toBe('shots');
+    for (const id of ['charge', 'blocking_foul', 'loose_ball_foul', 'reach_in'] as const) expect(foulAward(judge(id, { offense: 'me', fouled: 'me' })), id).toBe('ball_back');
   });
 
   it('and a foul gives the ball to the fouled team, which is what both modes now do', () => {

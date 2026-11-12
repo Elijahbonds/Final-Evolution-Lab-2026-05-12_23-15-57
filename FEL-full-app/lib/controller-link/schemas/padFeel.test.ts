@@ -134,6 +134,9 @@ describe('the hints are opt-in: only the Academy\'s two phone pages ask', () => 
       const h = hintsOf(c.schemas);
       if (id === 'music_flip') expect(h).toEqual({ haptics: true, velocity: true, compact: true });
       else if (id === 'music_perform') expect(h).toEqual({ haptics: true, compact: true });
+      // TEST CHANGED (lane/dance-extras-2, 2026-10-24): + the dance pad — its move buttons buzz (and so take touch-action: two fast taps
+      // are two taps), no velocity (a dance press lands or it does not), not compact
+      else if (id === 'dance') expect(h).toEqual({ haptics: true });
       else expect(hasHints(h), id).toBe(false);
     }
   });

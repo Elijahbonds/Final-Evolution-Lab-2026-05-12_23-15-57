@@ -19,7 +19,7 @@ export function PlaybookCardLinks({ cardId }: { cardId: string }) {
         href={links.chapter.href}
         prefetch={false}
         data-chapter-link
-        className="inline-flex items-center gap-1.5 text-[12.5px] font-bold text-[#00FF9D] underline-offset-2 hover:underline"
+        className="inline-flex min-h-11 items-center gap-1.5 text-[12px] font-bold text-[#00FF9D] underline-offset-2 hover:underline"
       >
         <BookOpen aria-hidden className="h-4 w-4 shrink-0" /> {links.chapter.label}
       </Link>

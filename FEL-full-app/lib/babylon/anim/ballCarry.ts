@@ -42,6 +42,9 @@ import { findBone } from './boneLookup';
 import { WristLayer, flexAxisLocal, handFlexAxisFromPoints, handPointsFromMeshes, PALM_LOCAL } from './WristLayer';
 import { rigHandOnSide, sideOfRigHand, type AthleteSide, type RigHand } from './athleteSide';
 import { animDt } from './motionLayers';
+import { ClipHandClock, clipLockTune, guardTune, stepGuardK, GUARD_BAR_POLE } from './RestDribble';   // lane/h3-handler (#312 port): the bounce at rest, the guard
+import { feel } from '../../feel-panel/feel';   // hoops-p04b: knob hoops.carryArmSpeedSec (lib/feel-panel/knobs.ts)
+import { ArmEase } from './MoveEase';   // lane/h3-handler (#314 port): a move's hand-overs ease
 
 export interface BallCarryOpts {
   scene: Scene;
@@ -113,6 +116,9 @@ export interface BallCarry {
   reset(): void;
   /** Hoops: the two-hand chest carry's weight (0..1), eased — a jog with the ball held (3PT). */
   setHold(k: number): void;
+  /** lane/h3-handler (#312 port): the PROTECT's weight (0..1), eased (RestDribble.GUARD_SEC) — the bounce back beside the hip, the palm
+   *  down with the sink, the off forearm across the front as a bar. At rest only: a moving body lets it go. */
+  setGuard(k: number): void;
   dispose(): void;
   readonly active: boolean;
   readonly phase: number;
@@ -155,6 +161,11 @@ export function heldReachOverride(search: string | null | undefined, dev: boolea
 const HELD_REACH = heldReachOverride(typeof location !== 'undefined' ? location.search : null, process.env.NODE_ENV === 'development');
 /** How far the elbow's twist may leave the clip's side at full weight (the dunk's REACH_POLE_CAP). */
 const REACH_POLE_CAP = Math.PI / 2;
+/** hoops-p04b: the dribble's arm weights (the ball arm's pace reach, the off arm's swing in and out at 0.35–0.65) read the body's speed01
+ *  eased over this long (s), not the frame's own: a gear change steps speed01 (stop → sprint), and with it the reach's weight, in one
+ *  frame — an arm turned 1 000–2 300 deg/s on the frames after `gear stop → sprint` (the rig's stage tracer: the carry). 0 = the frame's
+ *  speed01, as before. TUNED (new). Knob `hoops.carryArmSpeedSec`. The ball's own push-ahead and the guard keep their own easing. */
+export const CARRY_ARM_SPEED_SEC = 0.12;
 /** The fastest the carrying arm's elbow may swing round the shoulder→hand line between two drawn frames (deg per second). */
 export const ELBOW_SWING_RATE_DEG = 720;
 /** DUNK MOTION (2026-09-23): elbow pole DIRECTIONS in the root frame (x toward the arm's own side, then up, then forward). */
@@ -189,6 +200,15 @@ export const SNAP_TURN_RAD = Math.PI / 2;
 /** A dribble started with the ball below this share of the stroke starts on the way UP at the ball's height (risingPhaseAt); above it,
  *  at the top. Whatever is left of where the palm had the ball fades out over this much of the bounce. */
 export const START_FROM_TOP_ABOVE = 0.85, START_FADE_PHASE = 0.6;
+/**
+ * hoops-p05b: THE FIRST BOUNCE'S PALM RIDES THE SAME FADE AS ITS BALL. The dribble starts from where the palm had the ball (startOff,
+ * faded out over START_FADE_PHASE) — but only the BALL carried that offset: the hand went straight to the stroke's own hand point, so for
+ * the whole first bounce the palm sat the offset away from the ball (1v1 seed 7, the gear stop into the sprint: the hand tracer has the
+ * carry's own pass take the palm from ON the ball, −1.5 cm, to 13.5 cm off it on the activation frame, and the first top drawn 12.8 cm
+ * off — every layer after the carry moved palm and ball together). The hand target now takes the same faded offset.
+ * Knob `hoops.carryStartHandOn` (1): 0 = as it was (the ball alone carries the offset).
+ */
+export const CARRY_START_HAND_ON = 1;
 /** The phase on the pushed bounce's rising leg (floor → palm) whose height is `h01` of the stroke. */
 export function risingPhaseAt(h01: number): number {
   const want = Math.min(1, Math.max(0, h01));
@@ -267,6 +287,30 @@ function reachShaped(arm: ArmChain, target: Vector3, pole: Vector3, weight: numb
 }
 
 /**
+ * hoops-p05: THE LET-GO ENDS ON THE CLIP. The release fade scaled the reach's TARGET weight (k → 0), but the two-bone solve keeps its own
+ * elbow plane at any weight: with the hand target nearly back on the clip's hand, the arm still sat 44° off the clip, and the frame the
+ * fade ended it snapped there (1v1 seed 7, the step-back gather: the ball arm 108 → 95 → 82 → 71 → 59 → 44 → 0°, 3 967 deg/s; the rig's
+ * stage tracer). So through the let-go the solved arm is also blended back toward the clip's pose by the same weight (a slerp per bone,
+ * from the pose the clip drew this frame): at k = 0 it IS the clip's. Only the let-go: a live reach keeps its weight in the target.
+ * No new time: the fade is RELEASE_FADE_SEC (or the caller's releaseSec), unchanged — `hoops.carryArmSpeedSec` did not fit (it eases a
+ * speed, this is a fade that already had a length; what was missing was where it ends).
+ */
+export const CARRY_LET_GO_TO_CLIP_ON = 1;
+/** GAMEPLAY-CLEAN P6: feel knob `anim.carryPushedBounce` default — the non-hoops carry (the dunk runway) bounces the pushed shape (1). */
+export const CARRY_PUSHED_BOUNCE_ON = 1;
+function reachLettingGo(arm: ArmChain, target: Vector3, pole: Vector3, weight: number, dt: number, stamp: number): void {
+  // knob `hoops.carryLetGoToClipOn` (1): 0 = the let-go as it was (the reach's target weight alone: the one-frame cut at the fade's end)
+  if (feel('hoops.carryLetGoToClipOn', CARRY_LET_GO_TO_CLIP_ON) < 0.5) { reachShaped(arm, target, pole, weight, dt, stamp); return; }
+  const nodes = [arm.shoulder, arm.elbow, arm.hand];
+  const clip = nodes.map((n) => (n.rotationQuaternion ?? Quaternion.FromEulerVector(n.rotation)).clone());
+  reachShaped(arm, target, pole, weight, dt, stamp);
+  const w = Math.min(1, Math.max(0, weight));
+  if (w >= 1) return;
+  nodes.forEach((n, i) => { const q = n.rotationQuaternion; if (q) Quaternion.SlerpToRef(clip[i], q, w, q); });
+  for (const n of nodes) n.computeWorldMatrix(true);
+}
+
+/**
  * The lowest this body's hand can get above the root, in metres: the shoulder's height less the arm's length.
  * Measured off the live rig rather than assumed — the roster's arms are not the hero's.
  */
@@ -314,6 +358,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   let pending = false;   // a frame was recorded since the last after-animations pass
   let frameDt = 0, stamp = 0;   // the recorded frame's dt, and a counter of drawn frames (the arm memo's continuity)
   let lastSpeed01 = 0;
+  let armSpeed01 = 0;   // hoops-p04b: lastSpeed01 eased for the arm weights (CARRY_ARM_SPEED_SEC)
   let releaseLeft = 0, releaseDt = 1 / 60, releaseTotal = RELEASE_FADE_SEC;   // the let-go fade (see apply)
   let offArm: ArmChain | null = armChain(opts.skeleton, side === 'Right' ? 'Left' : 'Right');
   const offT = new Vector3(), offPole = new Vector3();
@@ -391,7 +436,13 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     }
     if (!pending) return;
     pending = false;
-    const s = dribbleAt(phase, p);
+    // GAMEPLAY-CLEAN P6: THE RUNWAY BOUNCE IS PUSHED TOO, feel knob `anim.carryPushedBounce` (1 on; 0 = dribbleAt, the runway as it
+    // was tuned). dribbleAt's ball is fastest AT THE PALM and turns round there in one frame (a parabola with its vertex on the
+    // floor), and the hand riding on top of it turned with it: the dunk runway's ball arm 35–60° in ONE frame at every bounce's top
+    // (phase 0.96 → 0.04; headless on the hero, and the rig's dunk run-up: 14 hard pops in 14 s). Hoops phase 3 fixed exactly this
+    // for the hoops carry (dribbleAtPushed: the fastest frame is the floor, the hand meets a ball slowing into it); the runway now
+    // takes the same shape. Same palm, same depth, same rate: only where in the bounce the ball is fast.
+    const s = feel('anim.carryPushedBounce', CARRY_PUSHED_BOUNCE_ON) >= 0.5 ? dribbleAtPushed(phase, p) : dribbleAt(phase, p);
     const sx = armSign(arm, side === 'Right' ? 1 : -1);
     // DUNK MOTION (2026-09-23): at pace the ball is PUSHED out ahead of the body (a sprint dribble), not bounced beside the hip
     const push = PUSH_AHEAD_M * Math.min(1, Math.max(0, lastSpeed01));
@@ -439,6 +490,10 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   const foreNodes = { Left: findBone(opts.skeleton, 'LeftForeArm')?.getTransformNode() ?? null, Right: findBone(opts.skeleton, 'RightForeArm')?.getTransformNode() ?? null };
   const footNodes = [findBone(opts.skeleton, 'LeftFoot')?.getTransformNode() ?? null, findBone(opts.skeleton, 'RightFoot')?.getTransformNode() ?? null];
   let startOff: Vector3 | null = null;          // an activation's offset from the palm to the bounce's point it starts at, faded out
+  const startShift = new Vector3();              // (hoops-p05b) this frame's share of startOff, added to the ball AND the hand
+  let startK = 0;                                // (hoops-p05b) the share of the start's offsets left this frame (1 → 0 over the fade)
+  let startHand: Vector3 | null = null, startHandPending = false;   // (hoops-p05b) the hand as held, off the stroke's hand point (full share)
+  const drawnHeldHand = new Vector3(); let drawnHeldAt = -1, drawnHeldSide: 'Left' | 'Right' | null = null;   // (hoops-p05b) the held ball's hand, as drawn
   let startAcc = 0;                              // the phase run since the activation (the fade's clock)
   let clock = 0, pendingDt = 0, rootSpeed = 0;  // the carry's own clock (s), the dt recorded since the last pass, planar root speed
   const lastRoot = new Vector3(); let rootSeen = false;
@@ -448,6 +503,13 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   // its new lock foot's own last strike; and when a catch could not be timed to that foot, the clock the lock's gain eases back from
   const strikeAt: Record<'right' | 'left', number> = { right: Number.NEGATIVE_INFINITY, left: Number.NEGATIVE_INFINITY };
   let lockEaseAt = Number.NEGATIVE_INFINITY;
+  // lane/h3-handler (#312 port, anim/RestDribble): the clip's ball-hand clock at rest, and where this carry DREW that hand last frame
+  // (root-local) with its reach on — a clip that does not key the arm leaves it where the reach put it, which is not the clip's hand
+  const clipClock = new ClipHandClock();
+  const drawnHand = new Vector3(), _hl = new Vector3(); let drawnHandAt = -1, drawnHandSide: 'Left' | 'Right' | null = null, reachedAt = -1;
+  let guardTarget = 0, guardK = 0;   // the protect (setGuard)
+  const pg: DribbleParams = { ...p };   // the stroke with the guard's palm drop (written each pass; no garbage)
+  const armEase = hoops ? new ArmEase(opts.skeleton) : null;   // lane/h3-handler (#314 port, anim/MoveEase)
   let holdTarget = 0, holdK = 0;
   let floorY = Number.NaN;   // the floor the ball bounces on (see strideTick)
   let ballYaw: number | null = null;   // the dribbled ball's own facing (see BALL_YAW_RATE)
@@ -564,6 +626,20 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     // stride — at gain 0 the bounce runs at the stride's own rate, so the miss is walked in, not snapped
     const gain = STRIDE_LOCK_GAIN * Math.min(1, Math.max(0, (clock - lockEaseAt) / Math.max(0.3, lockPeriod)));
     lockHz = active && rootSpeed > STRIDE_LOCK_MIN_MPS && since < 2 * lockPeriod ? strideLockHz(phase, since, lockPeriod, STRIDE_PHI_AT_STRIKE, gain) : 0;
+    // lane/h3-handler (#312 port): AT REST, THE CLIP'S HAND (RestDribble.ClipHandClock) — read before this pass reaches for anything
+    const cl = clipLockTune();
+    const atRest = !!cl && active && !mv && rootSpeed < cl.maxMps && !!handNodes[side];
+    const own = atRest && drawnHandAt === stamp - 1 && reachedAt === stamp - 1 && drawnHandSide === side && handRootLocal(side, _hl) && Vector3.DistanceSquared(_hl, drawnHand) < 1e-6;
+    clipClock.sample(atRest ? side : null, atRest && !own ? (handNodes[side]!.computeWorldMatrix(true), handNodes[side]!.getAbsolutePosition().y - rp.y) : null, clock, dt);
+    if (atRest && !lockHz) lockHz = clipClock.hz(phase, clock, cl!, strideLockHz);
+  };
+  /** A hand's position in the root's frame (the clip clock's held-pose read). */
+  const handRootLocal = (sd: 'Left' | 'Right', out: Vector3): boolean => {
+    const n = handNodes[sd]; if (!n) return false;
+    n.computeWorldMatrix(true); opts.root.computeWorldMatrix(true);
+    Quaternion.InverseToRef(opts.root.absoluteRotationQuaternion ?? Quaternion.Identity(), _q);
+    n.getAbsolutePosition().subtractToRef(opts.root.getAbsolutePosition(), out).applyRotationQuaternionInPlace(_q);
+    return true;
   };
   /** The two-hand chest carry (3PT's jog): each palm on its side of the ball, solved off this frame's shoulders. */
   const applyHold = (dt: number): void => {
@@ -669,8 +745,10 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   /** After the frame rendered: the ball as drawn, and (while held) the ball arm's locals as drawn. */
   const sampleDrawn = (): void => {
     opts.ball.computeWorldMatrix(true); drawnBall.copyFrom(opts.ball.getAbsolutePosition()); drawnAt = stamp;
+    if (active && !mv && handRootLocal(side, drawnHand)) { drawnHandAt = stamp; drawnHandSide = side; }   // (the clip clock's held-pose read)
     const held = ballHandNow();
     if (held) {
+      { const hn = handNodes[held]; if (hn) { hn.computeWorldMatrix(true); drawnHeldHand.copyFrom(hn.getAbsolutePosition()); drawnHeldAt = stamp; drawnHeldSide = held; } }   // (hoops-p05b)
       const bones = armOf[held];
       bones.forEach((n, i) => { (drawnLocals[i] ??= new Quaternion()).copyFrom(n.rotationQuaternion ?? Quaternion.Identity()); });
       drawnLocals.length = bones.length; drawnLocalsHand = held;
@@ -753,6 +831,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     }
     setSide(rigOf(mv.held));
     startOff = null; prevArm = null; switchLeft = 0;
+    armEase?.handOver();   // lane/h3-handler (#314 port): the hand-over into the move eases
     pending = true;   // drawn this frame (a held ball let go here is placed by the path, never left where it was)
     o.onEvent?.('start', path.move);
     if (path.segs[0] && !path.segs[0].hand) o.onEvent?.('release', path.move);   // (a falling ball re-aimed: already out of the hand)
@@ -781,7 +860,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   /** The move is over: the ball is at the end hand's top, at rest — the dribble takes it from phase 0 (the path's catch was timed to the
    *  lock foot; when it could not be, the lock's gain eases back). A queued move starts from here. */
   const endMove = (): void => {
-    const m = mv!; mv = null;
+    const m = mv!; mv = null; armEase?.handOver();   // (#314 port) …and the hand-over back to the dribble
     setSide(rigOf(m.path.endHand));
     phase = 0; startAcc = 0; startOff = null; prevArm = null; switchLeft = 0;
     if (!m.timed) lockEaseAt = clock;
@@ -897,8 +976,8 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
         // …and the elbow's swing limit runs on the drawn frame's clock even while a held reach's fade is paused: handed a 0 dt it did not
         // run at all, so a held arm's elbow flipped free as the clip under it moved (rF, the fade's off arm: 5900–6700°/s at the hand-overs)
         const ldt = rdt > 0 ? rdt : dt;
-        if (arm && armW > 0) { toWorld(handLocal.x, handLocal.y, handLocal.z, handT); reachShaped(arm, handT, pole, k * armW, ldt, stamp); }
-        if (offArm && offW > 0) { toWorld(offLocal.x, offLocal.y, offLocal.z, offT); reachShaped(offArm, offT, offPole, k * offW, ldt, stamp); }
+        if (arm && armW > 0) { toWorld(handLocal.x, handLocal.y, handLocal.z, handT); reachLettingGo(arm, handT, pole, k * armW, ldt, stamp); }   // hoops-p05: ends on the clip
+        if (offArm && offW > 0) { toWorld(offLocal.x, offLocal.y, offLocal.z, offT); reachLettingGo(offArm, offT, offPole, k * offW, ldt, stamp); }
       }
       if (holdK > 1e-3 && ballHandNow()) applyHold(dt);
       applyWrists(dt);
@@ -927,22 +1006,29 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
         const s0 = dribbleAtPushed(phase, p);
         ballToWorld(s0.ball.x * sideSign(side), s0.ball.y, s0.ball.z + PUSH_AHEAD_M * pushK, world);
         startOff = was.subtract(world); startAcc = 0;
+        startHand = null; startHandPending = true;   // (hoops-p05b) read on the reach below, where the stroke's hand point is known
         if (startOff.length() > 1.3) startOff = null;   // a ball that was nowhere near (a reset) just starts
       }
     }
+    // lane/h3-handler (#312 port): the protect's guard weight, eased (at rest only: a body on the move lets it go)
+    const gt = guardTune(); guardK = stepGuardK(guardK, gt.on ? guardTarget : 0, lastSpeed01, dt, gt.sec);
+    { const tau = feel('hoops.carryArmSpeedSec', CARRY_ARM_SPEED_SEC); armSpeed01 = tau > 0 ? armSpeed01 + (lastSpeed01 - armSpeed01) * Math.min(1, dt / tau) : lastSpeed01; }
     if (mv) { applyMove(dt); applyWrists(dt); settleHeld(mv); return; }   // HOOPS MOTION phase 4b: a move's path owns the ball and the hands
-    const s = dribbleAtPushed(phase, p);
+    pg.palmY = p.palmY - gt.dropM * guardK;   // (= p.palmY with no guard)
+    const s = dribbleAtPushed(phase, guardK > 0 ? pg : p);
     pushK += (Math.min(1, Math.max(0, lastSpeed01)) - pushK) * Math.min(1, dt / 0.25);
-    const push = PUSH_AHEAD_M * pushK;
-    const bx = s.ball.x * sx, bz = s.ball.z;
+    const push = PUSH_AHEAD_M * pushK - gt.backM * guardK;
+    const out = gt.outM * guardK;
+    const bx = (s.ball.x + out) * sx, bz = s.ball.z;
     // the ball's facing follows the body's at a ball's pace (BALL_YAW_RATE); a snap or a reset (> 90°) just takes the new one
     { const ry = rootYaw(); if (ballYaw == null) ballYaw = ry; let d = ry - ballYaw; d -= 2 * Math.PI * Math.round(d / (2 * Math.PI)); ballYaw = Math.abs(d) > Math.PI / 2 ? ry : ballYaw + Math.max(-BALL_YAW_RATE * dt, Math.min(BALL_YAW_RATE * dt, d)); }
     // THE BALL BOUNCES ON THE FLOOR, NOT ON THE ROOT (ballToWorld): a hop mid-dribble (the step-back) carried the ball up with the body and
     // gave it a second top at knee height, 0.33 m under the hand (measured)
     ballToWorld(bx, s.ball.y, bz + push, world);
+    startShift.setAll(0); startK = 0;
     if (startOff) {   // what is left of where the palm really had the ball, faded out over START_FADE_PHASE of the bounce (never a jump)
       const f = Math.min(1, startAcc / START_FADE_PHASE);
-      if (f >= 1) startOff = null; else world.addInPlace(startOff.scale(1 - f * f * (3 - 2 * f)));
+      if (f >= 1) startOff = null; else { startK = 1 - f * f * (3 - 2 * f); startOff.scaleToRef(startK, startShift); world.addInPlace(startShift); }
     }
     opts.ball.position.copyFrom(world);
     placedRoot.copyFrom(opts.root.getAbsolutePosition()); placedYaw = rootYaw(); placedAt = stamp;
@@ -950,24 +1036,47 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     // mid-bounce starts from
     { const was = _mv.copyFrom(lastLocal); ballLocalOf(world, push, lastLocal); if (lastLocalAt === stamp - 1 && dt > 0) lastVel.copyFrom(lastLocal).subtractInPlace(was).scaleInPlace(1 / dt); else lastVel.setAll(0); lastLocalAt = stamp; }
     if (arm && armW > 0) {
-      handLocal.set(s.hand.x * sx, s.hand.y, s.hand.z + push);
+      handLocal.set((s.hand.x + out) * sx, s.hand.y, s.hand.z + push);
       toWorld(handLocal.x, handLocal.y, handLocal.z, handT);
+      if (feel('hoops.carryStartHandOn', CARRY_START_HAND_ON) >= 0.5) {
+        handT.addInPlace(startShift);   // hoops-p05b: the palm rides the same fade
+        // …from where the HAND was: the held ball sits in the palm, not under the stroke's hand point (the hand bone 12 cm over the ball's
+        // centre), so the first frame still moved the wrist round the ball (14 cm on the rig) and bent the elbow in one frame (LeftForeArm
+        // 3 432 °/s). The hand as drawn holding it, off the stroke's point, fades out with the same share.
+        if (startHandPending) {
+          startHandPending = false;
+          startHand = startK > 0 && drawnHeldAt === stamp - 1 && drawnHeldSide === side ? drawnHeldHand.subtract(handT).scaleInPlace(1 / startK) : null;
+          if (startHand && startHand.length() > 0.5) startHand = null;   // (not the hand that had it: a reset)
+        }
+        if (startHand && startK > 0) handT.addInPlace(startHand.scale(startK)); else startHand = null;
+        // …and the reach that takes the arm over from the hold starts its elbow's swing limit from the arm as posed under it: with no
+        // reach last frame the limit had nothing to limit from, and the first solve swung the upper arm up to 145° in one frame (1v1
+        // seed 7, the gear stop into the sprint: LeftArm 8 696 °/s on the dribble's first frame, measured on the rig)
+        if (startOff && reachedAt !== stamp - 1) { forgetElbowSwing(arm); limitElbowSwing(arm, frameDt, stamp - 1, ELBOW_SWING_RATE_DEG); }
+      }
       toWorld(sx * BALL_ELBOW_POLE[0], BALL_ELBOW_POLE[1], BALL_ELBOW_POLE[2], pole).subtractInPlace(opts.root.getAbsolutePosition());
       const ks = switchLeft > 0 ? 1 - switchLeft / SWITCH_FADE_SEC : 1;
       // hoops-handle: never under the rising ball — the clip's hand (a stance with no ball arm) is lifted clear of the ball's top
       arm.hand.computeWorldMatrix(true);
-      const w = Math.max(s.handWeight, Math.min(1, lastSpeed01 * 1.6), clearOfBallWeight(arm.hand.getAbsolutePosition().y, handT.y, world.y + p.ballR));
+      const w = Math.max(s.handWeight, Math.min(1, armSpeed01 * 1.6), clearOfBallWeight(arm.hand.getAbsolutePosition().y, handT.y, world.y + p.ballR));
       reachShaped(arm, handT, pole, w * armW * ks, frameDt, stamp);
+      if (w * armW * ks > 0.05) reachedAt = stamp;   // (the clip clock's held-pose read)
       if (prevArm && ks < 1) reachShaped(prevArm, prevHandT, prevPole, w * armW * (1 - ks), frameDt, stamp);
-      if (!(offArm && lastSpeed01 > 0.35)) offW = 0;
-      if (offArm && lastSpeed01 > 0.35) {
-        const ow = Math.min(1, (lastSpeed01 - 0.35) / 0.3) * armW;
+      if (!(offArm && (armSpeed01 > 0.35 || guardK > 0.01))) offW = 0;
+      if (offArm && armSpeed01 > 0.35) {
+        const ow = Math.min(1, (armSpeed01 - 0.35) / 0.3) * armW;
         const knee = kneeForward(-sx);
         const swing = Math.max(-1, Math.min(1, -knee / 0.35));
         const baseY = Math.max(0.9, offFloorY) + 0.04;
         offLocal.set(-sx * 0.28, baseY + 0.16 * Math.max(0, swing) - 0.03 * Math.max(0, -swing), 0.10 + OFF_SWING_M * swing);
         toWorld(offLocal.x, offLocal.y, offLocal.z, offT); offW = ow;
         toWorld(-sx * OFF_ELBOW_POLE[0], OFF_ELBOW_POLE[1], OFF_ELBOW_POLE[2], offPole).subtractInPlace(opts.root.getAbsolutePosition());
+        reachShaped(offArm, offT, offPole, ow, frameDt, stamp);
+      } else if (offArm && guardK > 0.01) {   // lane/h3-handler (#312 port): the protect's arm bar (RestDribble.GUARD_BAR_*)
+        const ow = guardK * armW;
+        offLocal.set(sx * gt.bar[0], gt.bar[1] - gt.dropM * guardK, gt.bar[2]);
+        toWorld(offLocal.x, offLocal.y, offLocal.z, offT); offW = ow;
+        toWorld(sx * GUARD_BAR_POLE[0], GUARD_BAR_POLE[1], GUARD_BAR_POLE[2], offPole).subtractInPlace(opts.root.getAbsolutePosition());
         reachShaped(offArm, offT, offPole, ow, frameDt, stamp);
       }
     }
@@ -991,7 +1100,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   // the held ball's cap runs LAST, just before the camera draws: after the physics step (a Havok-driven root moves AFTER the
   // after-animations pass — measured on the 1v1 spin: the cap there let 0.20 m frames through) and after the modes' own
   // before-render drives (the 3v3 driver). Once per drawn frame.
-  const obsLimit = hoops ? opts.scene.onBeforeCameraRenderObservable.add(() => { if (limitedAt === stamp) return; limitedAt = stamp; followRoot(); limitHeldBall(); }) : null;
+  const obsLimit = hoops ? opts.scene.onBeforeCameraRenderObservable.add(() => { if (limitedAt === stamp) return; limitedAt = stamp; followRoot(); limitHeldBall(); armEase?.apply(stamp, passDt, !!mv); }) : null;   // (+ #314 port: the arm ease, last)
 
   const api: BallCarry = {
     get active() { return active; },
@@ -1025,7 +1134,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     },
     cancelMove() {
       queued = null; const m = mv; if (!m) return;
-      const h = holdingHand(); mv = null; m.opts.onEvent?.('cancel', m.name);
+      const h = holdingHand(); mv = null; armEase?.handOver(); m.opts.onEvent?.('cancel', m.name);
       if (active) { setSide(rigOf(h)); activating = true; }   // back into the dribble from where the ball is (the activation's own restart)
     },
     switchHand(via?: CrossPoint) {
@@ -1048,8 +1157,10 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
       if (s0 !== side) { side = s0; arm = armChain(opts.skeleton, side); offArm = armChain(opts.skeleton, otherSideOf(side)); }
       if (mv) { const m = mv; mv = null; m.opts.onEvent?.('cancel', m.name); } queued = null;
       prevArm = null; switchLeft = 0; startOff = null;
+      guardTarget = 0; guardK = 0;
     },
     setHold(k: number) { holdTarget = Math.min(1, Math.max(0, k)); },
+    setGuard(k: number) { guardTarget = Math.min(1, Math.max(0, Number.isFinite(k) ? k : 0)); },
     update(dt, speed01, wantActive, hz, releaseSec) {
       if (hoops) pendingDt += dt;
       if (wantActive !== active) {

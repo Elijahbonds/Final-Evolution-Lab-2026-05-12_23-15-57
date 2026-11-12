@@ -10,7 +10,8 @@
 // console line stays as it was.
 import { track } from '@/lib/analytics';
 
-export type DiagKind = 'frame' | 'ident' | 'clip' | 'cam' | 'fps' | 'context' | 'load';
+// 'fps' and 'ttfp' (perf-lag, 2026-10-24): perfStats.ts; stored with no user or guest id (lib/analyticsAnon.ts).
+export type DiagKind = 'frame' | 'ident' | 'clip' | 'cam' | 'fps' | 'context' | 'load' | 'ttfp';
 
 const WINDOW_MS = 10_000;
 const last = new Map<DiagKind, number>();

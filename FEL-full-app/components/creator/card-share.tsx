@@ -59,7 +59,7 @@ export function CardShare({ slug, accent, refCode = null, refShards = 0 }: {
           {copied ? 'LINK COPIED' : 'COPY THE LINK'}
         </button>
       </div>
-      <p className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-white/35">
+      <p className="flex items-center gap-1.5 font-mono text-[12px] uppercase tracking-wider text-white/50">
         <QrCode className="h-3 w-3" /> Bio link · sticker · flyer — one scan is the card
       </p>
       {refCode && refShards > 0 && (
@@ -67,10 +67,10 @@ export function CardShare({ slug, accent, refCode = null, refShards = 0 }: {
           className="mt-1 flex max-w-[22rem] flex-col items-center gap-1 rounded-xl border px-4 py-3 text-center"
           style={{ borderColor: `${accent}33`, background: `${accent}0d` }}
         >
-          <span className="font-mono text-[11px] font-bold uppercase tracking-wider" style={{ color: accent }}>
+          <span className="font-mono text-[12px] font-bold uppercase tracking-wider" style={{ color: accent }}>
             {refShards} shards a signup
           </span>
-          <span className="text-[11px] leading-snug text-white/55">
+          <span className="text-[12px] leading-snug text-white/55">
             Someone scans this card, makes an account, and the shards land in your wallet. Your code is{' '}
             <span className="font-mono font-bold text-white/80">{refCode}</span> — it travels in the link.
           </span>

@@ -70,7 +70,7 @@ export default function NoteRow({ row, songKey, layout, steps, playhead, locked,
   const noteRow = isNoteRow(track.sampleId);
   const range = choices.length ? `${choices[choices.length - 1].label} – ${choices[0].label}` : '';
   const btn: React.CSSProperties = {
-    minHeight: layout.compact ? 40 : 24, padding: '0 10px', borderRadius: 6, fontSize: 11, fontWeight: 800, cursor: 'pointer',
+    minHeight: layout.compact ? 40 : 24, padding: '0 10px', borderRadius: 6, fontSize: 12, fontWeight: 800, cursor: 'pointer',
     border: '1px solid #7a5c9e', background: 'transparent', color: '#e8d9c2',
   };
   /** MUSIC-SUITE P10: the stroke in progress. A TOUCH is `pending` until it lifts as a tap (P4 FIX PASS) or moves sideways
@@ -145,7 +145,7 @@ export default function NoteRow({ row, songKey, layout, steps, playhead, locked,
   return (
     <div data-qa="note-row" data-row={track.sampleId} data-window={wi}
       style={{ margin: '4px 0 8px', padding: 6, borderRadius: 8, background: 'rgba(34,211,238,0.07)', border: '1px solid rgba(34,211,238,0.35)' }}>
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginBottom: 6, fontSize: 11 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginBottom: 6, fontSize: 12 }}>
         <span style={{ fontWeight: 800, color: '#22d3ee' }}>♪ {row.label}</span>
         <span data-qa="note-row-key" style={{ opacity: 0.85 }}>
           {noteRow ? `${keyLabel(songKey)} · ${range}` : `the chop in ${keyLabel(songKey)}'s scale · 0 = as sliced`}
@@ -161,7 +161,7 @@ export default function NoteRow({ row, songKey, layout, steps, playhead, locked,
         style={{ display: 'grid', gridTemplateColumns: tpl.columns, gap: tpl.gap, userSelect: 'none' }}>
         {choices.map((c, ci) => (
           <React.Fragment key={c.midi}>
-            {!layout.compact && <div style={{ fontSize: 10, alignSelf: 'center', fontWeight: c.tonic ? 800 : 400, opacity: c.tonic ? 1 : 0.8 }}>{c.label}</div>}
+            {!layout.compact && <div style={{ fontSize: 12, alignSelf: 'center', fontWeight: c.tonic ? 800 : 400, opacity: c.tonic ? 1 : 0.8 }}>{c.label}</div>}
             {steps.map((s) => {
               const on = track.pattern[s] === true;
               const note = on ? noteOfStep(track, s, songKey) : null;
@@ -186,7 +186,7 @@ export default function NoteRow({ row, songKey, layout, steps, playhead, locked,
                   onPointerCancel={(e) => endStroke(e, false)}
                   style={{
                     height: layout.compact ? 40 : 20, minWidth: 0, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 9, fontWeight: lit || c.tonic ? 800 : 400, cursor: locked ? 'not-allowed' : 'pointer', touchAction: 'pan-y',
+                    fontSize: 12, fontWeight: lit || c.tonic ? 800 : 400, cursor: locked ? 'not-allowed' : 'pointer', touchAction: 'pan-y',
                     color: lit ? '#101018' : c.tonic ? '#f5ead9' : 'rgba(245,234,217,0.55)',
                     background: lit ? '#22d3ee' : c.tonic ? 'rgba(255,215,94,0.14)' : 'rgba(0,0,0,0.22)',
                     boxShadow: isBeatStart(s) && s !== steps[0] ? 'inset 2px 0 0 #9a7cc0' : undefined,
@@ -199,7 +199,7 @@ export default function NoteRow({ row, songKey, layout, steps, playhead, locked,
           </React.Fragment>
         ))}
       </div>
-      {!noteRow && <div style={{ fontSize: 10, opacity: 0.7, marginTop: 4 }}>0 = the chop as sliced · +12 = an octave up · the steps follow the song&apos;s scale</div>}
+      {!noteRow && <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>0 = the chop as sliced · +12 = an octave up · the steps follow the song&apos;s scale</div>}
     </div>
   );
 }

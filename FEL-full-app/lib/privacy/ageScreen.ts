@@ -6,6 +6,7 @@
 // nothing here is rendered as an age, a reason, or a "come back when".
 
 import { verifiedAdult } from './verifiedAdult';
+import { calendarDate, formatBirthDate, isFutureBirthDate, parseBirthDate } from '@/lib/age/ageRules';
 
 /** One-year block flag. A constant only: no age, no year, no account or guest id, no timestamp. */
 export const AGE_BLOCK_COOKIE = 'fel_age_gate';
@@ -13,9 +14,10 @@ export const AGE_BLOCK_VALUE = '1';
 export const AGE_BLOCK_MAX_AGE = 31536000;
 export const AGE_BLOCK_STORAGE_KEY = 'fel:ageGate';
 
-export const AGE_QUESTION = 'What year were you born?';
+export const AGE_QUESTION = 'When were you born?';
 export const AGE_TURN_AWAY = "Sorry, we can't create an account for you right now.";
 export const AGE_INVALID = 'Choose a year from the list.';
+export const AGE_DATE_INVALID = 'Enter the month and day you were born.';
 
 const EARLIEST_BIRTH_YEAR = 1900;
 
@@ -41,6 +43,21 @@ export function ageScreenOutcome(year: unknown, now: Date = new Date()): AgeScre
   if (thisYear - year <= 13) return 'blocked';
   if (verifiedAdult(year, now)) return 'adult';
   return 'teen';
+}
+
+/**
+ * FN-BOX-1b: the full birth date the age step sends beside the year, as 'YYYY-MM-DD', or null when it is not a real
+ * date, is after today, or is in a different year from `birthYear` (the year stays the one the block rule reads).
+ */
+export function birthDateFor(birthYear: unknown, month: unknown, day: unknown, now: Date = new Date()): string | null {
+  const d = calendarDate(birthYear, month, day);
+  return d && !isFutureBirthDate(d, now) ? formatBirthDate(d) : null;
+}
+
+/** FN-BOX-1b: a posted `birthDate` checked against the posted year: the normalised 'YYYY-MM-DD', or null. */
+export function postedBirthDate(birthYear: unknown, birthDate: unknown, now: Date = new Date()): string | null {
+  const d = parseBirthDate(birthDate);
+  return d && d.year === birthYear ? birthDateFor(d.year, d.month, d.day, now) : null;
 }
 
 /**

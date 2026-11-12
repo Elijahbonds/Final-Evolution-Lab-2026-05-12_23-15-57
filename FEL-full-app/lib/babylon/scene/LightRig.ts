@@ -24,6 +24,7 @@ import { mountEnvironmentIBL } from './EnvironmentIBL';
 import { motionPolicy } from '../../a11y/reducedMotion';
 import { FLASH_GAIN, stepFlashLevel } from '../core/ImpactFrame';
 import { phoneSkipsCaster } from './phoneCasters';   // phone-perf (2026-10-14)
+import { setGradeExposure } from './gradeUniform';   // perf-lag: the flash beat's exposure without a scene-wide define pass
 
 export interface LightRigHandle {
   hemi: HemisphericLight; sun: DirectionalLight;
@@ -263,7 +264,8 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
   let flashObs: ReturnType<Scene['onBeforeRenderObservable']['add']> | null = null;
   let flashLevel = 0;
   let harnessPaints = false;
-  const paintFlash = (): void => { pipeline.imageProcessing.exposure = rest.exposure * (1 + (FLASH_GAIN - 1) * flashLevel); };
+  // perf-lag: the flash's per-frame exposure as a uniform write (gradeUniform.ts), not the setter that re-prepared every material
+  const paintFlash = (): void => { setGradeExposure(pipeline.imageProcessing, rest.exposure * (1 + (FLASH_GAIN - 1) * flashLevel)); };
   return {
     hemi, sun, shadows, pipeline, tier, mood, kicker, glow, rest, shadowCache,
     adoptRest() {

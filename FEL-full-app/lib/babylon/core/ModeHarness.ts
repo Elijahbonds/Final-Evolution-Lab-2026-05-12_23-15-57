@@ -40,13 +40,17 @@ import { captions } from './captions';
 import { captionsFromHud, rememberHud } from './hudCaptions';   // MECHANICS PASS: press → perceivable answer, agent-only   // M43: unlock audio on first user gesture
 import type { BackdropFamily } from '../visual/Backdrops';
 import { FrameGuard, assertSpawned } from './FrameGuard';
+import { OccluderFade, OCCLUDER_FADE_OFF } from './OccluderFade';   // gameplay-clean (2026-10-28): what blocks the view of the hero goes see-through
 import { watchCanvasFit } from './canvasFit';       // M95 (Pass 2): cap DPR + backing-pixel budget
 import { prewarmScene, prewarmWanted } from './shaderPrewarm';
 import { installLoadProgress, LoadStallClock } from './loadProgress';   // FIRST-DUNK-BUDGET: the load watchdog watches the download
 import { setSignedOutVisitor } from './visitor';   // FIRST-DUNK-BUDGET: a known guest is not asked for what a guest is refused
 import { PerfMonitor, budgetForTier } from './PerfMonitor';          // M67: dev frame-budget monitor
 import { mountPerfGuard } from './perfGuard';
-import { mountHitchProbe } from './hitchProbe';                     // S1 HITCH (2026-10-22): worst frame, p5 fps, and builds / clones / compiles after the intro                       // PERF-GUARD (2026-10-06): paced frames, adaptive quality, idle
+import { mountHitchProbe } from './hitchProbe';
+import { mountPerfStats } from './perfStats';
+import { pagePlayStamp } from './playFrame';   // NEX-03: the competitive-context stamp
+import { setGradeExposure } from '../scene/gradeUniform';                // PERF-LAG (2026-10-24): the per-frame exposure beat as a uniform                         // PERF-LAG (2026-10-24): anonymous fps + time-to-first-playable to game_diag                     // S1 HITCH (2026-10-22): worst frame, p5 fps, and builds / clones / compiles after the intro                       // PERF-GUARD (2026-10-06): paced frames, adaptive quality, idle
 import { setReady, clearReady } from './readyMarker';  // M67: smoke-test readiness gate
 import { installAgentBridge, agentBridge, agentEnabled } from './AgentBridge';  // M69: agent control plane
 import { AGENT_MODES } from './agentModes';
@@ -64,7 +68,8 @@ import type { BodyRead, BodyEvent } from '@/lib/pose/BodyReader';
 import type { BodyChannels } from '@/lib/pose/bodyChannels';
 import type { ModeBodySpec } from '@/lib/input/bodyProfiles';
 import type { SessionStep } from './BodySession';
-import { bodySeamFor, type BodySeam } from './bodySeam';
+import { bodySeamFor, gateBodyFight, type BodySeam } from './bodySeam';
+import { bodyPlayDobYear } from '@/lib/move/bodyPlayGrownUp';
 import { sessionStore, stanceOnMount, type SessionWriter } from './sessionStore';   // (stanceOnMount: MOVEMENT PLAY P8)
 import { formReadStore } from '@/lib/move/formRead';   // HOOPS BODY (2026-10-07): the end card's FORM block
 import { renderDue } from './pausedRender';   // IMPROVE (2026-10-06, 3PT #18): the pause renders at ~10 fps
@@ -276,8 +281,12 @@ export interface HarnessOpts {
   /** FIRST-DUNK-BUDGET (2026-10-17): the host KNOWS the visitor is signed out (/try: the server sent everyone else to
    *  /play/dunk), so the spawn's closet read and the season read are not sent (visitor.ts). Absent is "not known". */
   guest?: boolean;
+  /** FN-BOX-1: the account's birth year, when the host has it. Absent reads the page's held year
+   *  (lib/move/bodyPlayGrownUp.setBodyPlayDobYear); null and a missing year are unknown, and unknown gets no fight body. */
+  dobYear?: number | null;
   /** COUCH (FN-0, 2026-10-19): the host-seat room. The harness takes no body at all — every seat, the host's included and
-   *  whatever anyone's age — so def.onBody is never called, the floor presses nothing and the Body card offers nothing. */
+   *  whatever anyone's age — so def.onBody is never called, the floor presses nothing and the Body card offers nothing.
+   *  FN-BOX-1 reads it too: gateBodyFight refuses every fight mode's body path in a couch room. */
   couch?: boolean;
   /** COUCH: the seats right now (lib/party/seats.ts couchSeatCount), read live through ctx.seatCount(). Ignored outside a
    *  couch room. */
@@ -320,6 +329,9 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
   // the one that replaced it (sessionStore, the step-2 review). And it comes down again if the mount never finishes
   // (the step-3 review): a throw anywhere before the disposer is handed back — the engine, the scene, a rig — would
   // otherwise leave a dead mode's card up until the next mount.
+  // FN-BOX-1 FIGHT-BODY-AGE-GATE (2026-10-19): a fight mode offers the body only to an 18+ birth year, never in couch
+  // mode; unknown is refused (bodySeam.gateBodyFight). Applied before the seam, so the card, `drives` and onBody agree.
+  def = gateBodyFight(def, { dobYear: opts.dobYear !== undefined ? opts.dobYear : bodyPlayDobYear(), couch: opts.couch === true });
   const seam = bodySeamFor(def);
   const store = sessionStore.mount({ ...seam.card, stance: stanceOnMount(seam.profile) });   // MOVEMENT PLAY P8: a board game asks for its stance from the mount
   setSignedOutVisitor(opts.guest === true);   // FIRST-DUNK-BUDGET: every mount says, so a host that does not know asks as before
@@ -345,6 +357,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   // once from the same fill-rate signal (visual-foundation: + the GPU, the high tier and the Graphics menu).
   let guard!: ReturnType<typeof mountPerfGuard>;
   let hitch!: ReturnType<typeof mountHitchProbe>;
+  let perfStats: ReturnType<typeof mountPerfStats> | null = null;
   let declaredMood!: VenueMood;
   const look = await mountLookStack({
     canvas: opts.canvas,
@@ -363,7 +376,12 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       // (worst frame, p5 fps over live play) and the per-scene counters a mode keeps at 0 after its intro: mid-play build(),
       // clone() and first-use shader compiles. Published as window.__FEL_HITCH__ under dev / agent runs (hitchProbe.ts).
       hitch = mountHitchProbe({ scene, publish: devOrAgentHooks() });
+      perfStats = mountPerfStats({ engine, tier, guard: () => { const g = guard.snapshot(); return g.policy.governor || g.policy.pacing ? g : null; } });   // PERF-LAG
       if (opts.heroOverride) scene.metadata.felHeroOverride = opts.heroOverride;   // dev rollout flag (?hero=)
+      // DEMO-MODELS-1 v2: this scene is /try's guest dunk demo (the host's known-guest mount of `dunk`), the ONE place setting 4
+      // (TRY_GUEST_COACH_BODY_ENABLED) may apply (CharacterLibrary.playerBodyContextOf). Scene-scoped: no other scene is stamped.
+      if (opts.guest === true && def.modeId === 'dunk') scene.metadata.felTryDunkGuest = true;
+      Object.assign(scene.metadata, pagePlayStamp());   // NEX-03: felCompetitive / felRanked from the page's ?arena= ?c= ?mp= ?signature= (playFrame.ts), before the mode loads
       // M69: publish the agent control bridge (no-op unless ?agent=1). Idempotent —
       // re-registers the same mode list and re-binds window.__NEXUS_AGENT__ each mount.
       installAgentBridge(AGENT_MODES);
@@ -402,6 +420,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   let ambientStarted = false;   // M43: crowd/dojo bed starts once, on first input
   let unsub: (() => void) | null = null;
   let frameGuard: FrameGuard | null = null;
+  let occluderFade: OccluderFade | null = null;   // gameplay-clean: live play only, like the frame guard
   let iblShadows: IblShadowsHandle | null = null;
   const replayTrack: TransformNode[] = [];   // vis-board: nodes a mode asked ctx.trackReplay to record (registered when the director is built, after load())
   let replay: ReplayDirector | null = null;   // A9.12: a mode that asked for replays (def.replay)
@@ -410,6 +429,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     phase = p;
     // M37: hero-off-screen watchdog runs only during live play.
     if (p === 'playing') frameGuard?.start(); else frameGuard?.stop();
+    if (p === 'playing') occluderFade?.start(); else occluderFade?.stop();   // a replay, a pause or the card gets the scene back as built
     // M67: a shader compile is a defect only while gameplay is actually running.
     perf.setPlaying(p === 'playing');
     // M67: publish readiness for the smoke test. 'loaded' vs 'playing' matters —
@@ -421,6 +441,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     else if (p === 'error') setReady(def.modeId, 'failed', typeof detail === 'string' ? detail : undefined);
     store.setPhase(p);   // MOVEMENT PLAY P4: the body-play store and the shell's Body button read the phase here
     guard.setPhase(p);   // PERF-GUARD: a pause, an end card or an error refreshes at 2 fps instead of the cap
+    perfStats?.setPhase(p);   // PERF-LAG: READY, START and live play, for the fps and ttfp reports
     opts.onPhase?.(p, detail);
   };
 
@@ -598,6 +619,8 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
 
   // M37: hero-framing watchdog — recenters the camera if the hero leaves frame.
   frameGuard = new FrameGuard(scene, camera, () => heroRef.current, camDirector, () => objectiveRef.current);
+  occluderFade = new OccluderFade(scene, () => heroRef.current, def.modeId);
+  camDirector.leadEase = !OCCLUDER_FADE_OFF.has(def.modeId);   // GAMEPLAY-CLEAN P2 #10: the eased look-ahead — not under the hoops lanes' modes (routed)
   // `instrument` (2026-09-12): SceneInstrumentation is a bare module specifier, so a probe running
   // IN the page cannot import it — which is why per-mode performance had never been measured and the
   // locomotion Phase 3 gate ("animation pass <= 4 ms") had to be reported unjudgeable. Handing the
@@ -622,6 +645,8 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     // THE MIC (2026-09-24): the audio graph, so a probe can record what the game actually sounds like (the MC on the PA, the
     // crowd ducking under him) instead of trusting that a cue that was logged was also heard
     audio: () => SoundKit.graph(),
+    // gameplay-clean: how many meshes the occluder fade holds see-through right now (the audit rig reads it)
+    occluders: () => occluderFade?.count ?? 0,
   };
   // CONTROLLER-STICK-LIVE (2026-09-14): a QA eye on the production server (`next start`, /try) waited 120 s for
   // `__FEL_DEV__.input`, which only a dev build published — so it read an empty roster and zero slot events under
@@ -997,7 +1022,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       gradeState = stepped.state;
       if (stepped.write) {
         lights.pipeline.imageProcessing.vignetteWeight = stepped.write.vignette;
-        lights.pipeline.imageProcessing.exposure = stepped.write.exposure;
+        setGradeExposure(lights.pipeline.imageProcessing, stepped.write.exposure);   // PERF-LAG: the same value, without re-preparing every material (gradeUniform.ts)
       }
     }
     // IMPROVE (2026-10-06, 3PT #18): every tick renders, except a paused one inside ~100 ms of the last paused render
@@ -1017,6 +1042,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     agentBridge()?.detach();   // M69
     renderWatchdog?.disarm();
     frameGuard?.stop();
+    occluderFade?.dispose();
     unBody();            // MOVEMENT PLAY P3: no more body frames for this mode…
     store.unmount();     // …and its card goes (a stale writer — a later mount took over — does nothing)
     unsub?.();
@@ -1033,6 +1059,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     perf.dispose();       // M67
     guard.dispose();      // PERF-GUARD
     hitch.dispose();      // S1 HITCH
+    perfStats?.dispose(); // PERF-LAG (before the engine goes: a mount left before play still reports its wait)
     clearReady();         // M67
     unink();              // M59
     backdrop.dispose();   // M61

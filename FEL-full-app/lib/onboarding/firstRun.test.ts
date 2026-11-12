@@ -1,20 +1,35 @@
 import { describe, expect, it } from 'vitest';
 import {
-  DEFAULT_FIRST_GAME, PATH_HOME, artFor, carouselOrder, destinationFor, hostFrom, isPath, isPlayableMode,
-  resolveFirstGame,
+  DEFAULT_FIRST_GAME, PATHS, PATH_HOME, artFor, carouselOrder, destinationFor, hostFrom, isPath, isPlayableMode,
+  pathFor, resolveFirstGame, toPath, welcomeHref,
 } from './firstRun';
+import { DAILY_DRILL_PATH } from '../daily-drill/copy';
 import { MODE_INFO } from '../game-data';
 import { shelvedModes } from '../nav/families';
 
 describe('the path', () => {
-  it('knows the two it offers and nothing else', () => {
-    expect(isPath('play')).toBe(true);
+  // test changed (ONB-01, 2026-10-25): the paths went from two (play, body) to five (play, train, learn, teach, create),
+  // so 'train' is now a path, and the old `body` is train's alias. The old assertions said the opposite of the owner's
+  // QUALITY decision of 2026-10-20 ("pick-your-path: play / train / learn / teach / create").
+  it('knows the five it offers, reads the old `body` as train, and nothing else', () => {
+    expect(PATHS).toEqual(['play', 'train', 'learn', 'teach', 'create']);
+    for (const p of PATHS) { expect(isPath(p)).toBe(true); expect(toPath(p)).toBe(p); }
     expect(isPath('body')).toBe(true);
-    for (const v of ['train', '', null, undefined, 'PLAY', 1]) expect(isPath(v)).toBe(false);
+    expect(toPath('body')).toBe('train');
+    for (const v of ['', null, undefined, 'PLAY', 'Train', 1, 'mirror']) { expect(isPath(v)).toBe(false); expect(toPath(v)).toBeNull(); }
   });
 
-  it('sends the body path to the Mirror, because the screen is the front door', () => {
-    expect(PATH_HOME.body).toBe('/play/mirror');
+  it('starts train at today\'s drill, and keeps `body` pointing where train points', () => {
+    expect(PATH_HOME.train).toBe(DAILY_DRILL_PATH);
+    expect(PATH_HOME.body).toBe(PATH_HOME.train);
+  });
+
+  it('holds teach for anyone who is not a verified adult: they get train', () => {
+    expect(pathFor('teach', { adult: true })).toBe('teach');
+    expect(pathFor('teach', { adult: false })).toBe('train');
+    for (const p of ['play', 'train', 'learn', 'create'] as const) expect(pathFor(p, { adult: false })).toBe(p);
+    expect(pathFor('nonsense', { adult: true })).toBe('play');
+    expect(pathFor('body', { adult: false })).toBe('train');
   });
 
   it('opens both paths on a route that exists', () => {
@@ -99,8 +114,14 @@ describe('where they land', () => {
     expect(destinationFor('play', 'nope')).toBe(MODE_INFO[DEFAULT_FIRST_GAME].href);
   });
 
-  it('ignores the game entirely on the body path', () => {
-    expect(destinationFor('body', 'skateboarding')).toBe('/play/mirror');
+  // test changed (ONB-02): body is train now, and train lands on its guided first win, not the Mirror.
+  it('ignores the game entirely on every path but play, which land on their first win', () => {
+    expect(destinationFor('body', 'skateboarding')).toBe(welcomeHref('train'));
+    for (const p of ['train', 'learn', 'teach', 'create'] as const) expect(destinationFor(p, 'skateboarding')).toBe(`/welcome?path=${p}`);
+  });
+
+  it('play still opens the game itself, the creator\'s first (the QR rule)', () => {
+    expect(destinationFor('play', resolveFirstGame({ creatorMode: 'skateboarding', chosen: 'tennis' }))).toBe(MODE_INFO.skateboarding.href);
   });
 });
 

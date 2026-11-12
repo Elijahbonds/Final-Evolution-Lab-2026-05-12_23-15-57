@@ -1,0 +1,27 @@
+{
+  "name": "free-exercise-db",
+  "repository": "https://github.com/yuhonas/free-exercise-db",
+  "commit": "f00c92c7dcf1216a928a52c3706c7ce8e2f71ed5",
+  "file": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/f00c92c7dcf1216a928a52c3706c7ce8e2f71ed5/dist/exercises.json",
+  "licence": "Unlicense",
+  "licenceUrl": "https://github.com/yuhonas/free-exercise-db/blob/f00c92c7dcf1216a928a52c3706c7ce8e2f71ed5/LICENSE.md",
+  "upstream": "https://github.com/wrkout/exercises.json (Unlicense)",
+  "retrieved": "2026-10-25",
+  "rows": 876,
+  "imported": 873,
+  "droppedAsDuplicates": 3,
+  "taken": [
+    "name",
+    "level",
+    "equipment",
+    "primaryMuscles",
+    "secondaryMuscles",
+    "category",
+    "id (as source.ref)",
+    "first image path (as a link)"
+  ],
+  "notTaken": [
+    "instructions (prose)",
+    "images (files)"
+  ]
+}

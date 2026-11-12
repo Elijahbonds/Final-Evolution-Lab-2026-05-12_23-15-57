@@ -10,6 +10,7 @@
 import { useEffect, useState } from 'react';
 import { Copy, Check, Gift, Users, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
+import { TYPE } from '@/lib/design/type';
 
 interface Stats {
   code: string | null;
@@ -54,7 +55,7 @@ export function ReferralCard() {
         <Gift className="h-5 w-5 text-[#A855F7]" />
         <h3 className="fel-heading text-lg font-bold text-white">Invite &amp; earn shards</h3>
       </div>
-      <p className="mt-1 text-sm text-white/60">
+      <p className={`mt-1 ${TYPE.body} text-white/60`}>
         Share your link. When a friend creates an athlete, you earn{' '}
         <span className="font-semibold text-[#C79BFF]">shards</span> — the currency you can’t buy.
       </p>
@@ -66,7 +67,8 @@ export function ReferralCard() {
         <button
           onClick={copy}
           disabled={!link}
-          className="inline-flex items-center gap-2 rounded-xl bg-[#A855F7] px-4 py-3 font-semibold text-white transition-transform hover:scale-[1.03] disabled:opacity-40"
+          // SCREEN-FIXES (2026-11-10): the same fill as "Save card" (white on #A855F7 was 3.96:1; on #9333EA, 5.38:1)
+          className="inline-flex items-center gap-2 rounded-xl bg-[#9333EA] px-4 py-3 font-semibold text-white transition-transform hover:scale-[1.03] disabled:opacity-40"
         >
           {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
           {copied ? 'Copied' : 'Copy'}
@@ -89,7 +91,7 @@ function Stat({ icon, label, value, color }: { icon: React.ReactNode; label: str
         {icon}
         <span className="text-xl font-black">{value}</span>
       </div>
-      <div className="mt-1 font-mono text-[10px] uppercase tracking-wider text-white/50">{label}</div>
+      <div className="mt-1 font-mono text-[12px] uppercase tracking-wider text-white/50">{label}</div>
     </div>
   );
 }

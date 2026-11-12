@@ -11,8 +11,8 @@ import { coverageLine, type CoverageState, type CoverageStrip as Strip } from '@
 const LOOK: Record<CoverageState, string> = {
   done: 'border-[#7BD389]/60 bg-[#7BD389]/15 text-[#7BD389]',
   open: 'border-white/25 text-white/70',
-  notProgrammed: 'border-dashed border-white/15 text-white/30',
-  untagged: 'border-white/10 text-white/40',
+  notProgrammed: 'border-dashed border-white/15 text-fel-quiet',
+  untagged: 'border-white/10 text-fel-dim',
 };
 
 export function CoverageStrip({ strip }: { strip: Strip }) {
@@ -25,7 +25,7 @@ export function CoverageStrip({ strip }: { strip: Strip }) {
             data-pattern={c.pattern}
             data-state={c.state}
             title={c.note}
-            className={`inline-flex items-center gap-0.5 rounded-md border px-1.5 py-0.5 text-[10px] leading-none ${LOOK[c.state]}`}
+            className={`inline-flex items-center gap-0.5 rounded-md border px-1.5 py-0.5 text-[12px] leading-none ${LOOK[c.state]}`}
           >
             {c.state === 'done' && <Check className="h-2.5 w-2.5" aria-hidden="true" />}
             <span aria-hidden="true">{c.label}{c.state === 'untagged' ? ' ?' : ''}</span>
@@ -33,7 +33,7 @@ export function CoverageStrip({ strip }: { strip: Strip }) {
           </li>
         ))}
       </ul>
-      <div className="text-[10px] text-white/40">{coverageLine(strip)}</div>
+      <div className="text-[12px] text-fel-dim">{coverageLine(strip)}</div>
     </div>
   );
 }
@@ -46,7 +46,7 @@ export function CoverageLegend() {
     </span>
   );
   return (
-    <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-white/45" data-testid="coverage-legend">
+    <div className="flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-fel-dim" data-testid="coverage-legend">
       {item('done', 'done in the last 7 days')}{item('open', 'in the program, not yet')}{item('notProgrammed', 'not in the program')}{item('untagged', '? untagged')}
     </div>
   );

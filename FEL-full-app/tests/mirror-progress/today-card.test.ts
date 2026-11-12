@@ -103,12 +103,19 @@ describe('todayCardFor', () => {
 });
 
 describe('the card', () => {
-  it('opens Today (/coach), says the session, and never says why training is paused', () => {
+  // EVERY-SCREEN P2 (2026-11-10, FLAGGED test change): a session card now STARTS today's session (/coach?start=today), so
+  // the first exercise is 2 taps from home (the plan's phase-2 gate). It asserted href="/coach" for a session card; an
+  // off day and a plan-only card still open Today itself, asserted below.
+  it('starts today\'s session (Today with the player open), says the session, and never says why training is paused', () => {
     const html = renderToStaticMarkup(createElement(TodayCard, { view: { kind: 'session', programName: 'Base block', coachName: 'Coach One', blockLabel: 'Week 1', sessionLabel: 'Day 1', index: 0, total: 8, exercises: 5, offDay: false } }));
     expect(TODAY_HREF).toBe('/coach');
-    expect(html).toContain('href="/coach"');
+    expect(html).toContain('href="/coach?start=today"');
+    expect(html).toContain('Start today&#x27;s session');
     expect(html).toContain('Week 1 · Day 1');
     expect(html).toContain('Session 1 of 8 · 5 exercises');
+    const off = renderToStaticMarkup(createElement(TodayCard, { view: { kind: 'session', programName: 'Base block', coachName: 'Coach One', blockLabel: 'Week 1', sessionLabel: 'Day 2', index: 1, total: 8, exercises: 0, offDay: true } }));
+    expect(off).toContain('href="/coach"');
+    expect(renderToStaticMarkup(createElement(TodayCard, { view: { kind: 'open', programName: 'Base block', coachName: 'Coach One' } }))).toContain('href="/coach"');
     const open = todayCardLines({ kind: 'open', programName: 'Base block', coachName: 'Coach One' });
     expect(Object.values(open).join(' ')).not.toMatch(/out|limited|red flag|pain|injur|clinician/i);
     expect(renderToStaticMarkup(createElement(TodayCard, { view: null }))).toBe('');

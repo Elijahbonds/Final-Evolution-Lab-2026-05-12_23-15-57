@@ -12,7 +12,7 @@ export default function SportSource({ onMade }: { onMade: (m: MadeThing) => void
   useEffect(() => {
     fetch('/api/v1/card/highlights').then((r) => (r.ok ? r.json() : null)).then((j) => setList(j?.candidates ?? [])).catch(() => setList([]));
   }, []);
-  if (list === null) return <p className="text-sm text-neutral-500">Loading your runs…</p>;
+  if (list === null) return <p className="text-sm text-neutral-400">Loading your runs…</p>;
   if (!list.length) return (
     <div className="rounded-2xl bg-neutral-900 p-5 text-sm text-neutral-300">
       <p>No runs yet. Play a mode, then come back and turn your best one into a card.</p>
@@ -26,7 +26,7 @@ export default function SportSource({ onMade }: { onMade: (m: MadeThing) => void
           <button data-qa="pick-run" onClick={() => onMade({ art: { kind: 'sport', routineId: h.id }, title: `${h.mode} ${h.kind === 'signature' ? 'signature' : 'best'}: ${h.score}` })}
             className="w-full rounded-xl bg-neutral-900 p-3 text-left transition hover:bg-neutral-800">
             <div className="text-sm font-bold capitalize text-neutral-100">{h.mode.replace(/_/g, ' ')}</div>
-            <div className="text-[11px] text-neutral-400">{h.kind} · {h.score} pts{h.won ? ' · won' : ''} · {new Date(h.at).toLocaleDateString()}</div>
+            <div className="text-[12px] text-neutral-400">{h.kind} · {h.score} pts{h.won ? ' · won' : ''} · {new Date(h.at).toLocaleDateString()}</div>
           </button>
         </li>
       ))}

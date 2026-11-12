@@ -3,7 +3,9 @@ import { cookies } from 'next/headers';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { AGE_BLOCK_COOKIE, AGE_INVALID, ageBlockCookieHeader, ageScreenOutcome } from '@/lib/privacy/ageScreen';
+import { AGE_BLOCK_COOKIE, AGE_INVALID, ageBlockCookieHeader, ageScreenOutcome, postedBirthDate } from '@/lib/privacy/ageScreen';
+import { writeUserDob } from '@/lib/age/userDob';
+import type { RawDb } from '@/lib/coach/pendingSchema';
 import { logU13Lock } from '@/lib/privacy/u13LockLog';
 
 export const dynamic = 'force-dynamic';
@@ -28,6 +30,8 @@ export async function GET() {
  * Write a blank dobYear once. A year already on file is 409 and is not updated. An under-13 answer is that same
  * conditional write and nothing else: one log line only when the write took, then 403 and the block cookie.
  * Nothing is deleted. assumption: (FE PM can reverse) a cookie-present retry logs nothing and writes nothing.
+ * FN-BOX-1b: a `birthDate` ('YYYY-MM-DD') sent with a year that is not blocked must be a real, past date in that year
+ * (else 400, nothing written); it is stored in User.dob after the year (lib/age/userDob.ts). A blocked year ignores it.
  */
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
@@ -40,6 +44,7 @@ export async function POST(req: Request) {
 
   const body = await req.json().catch(() => ({}));
   const year = (body as { birthYear?: unknown })?.birthYear;
+  const birthDate = (body as { birthDate?: unknown })?.birthDate;
 
   const user = await prisma.user.findUnique({ where: { id }, select: { dobYear: true } });
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
@@ -49,6 +54,10 @@ export async function POST(req: Request) {
 
   const outcome = ageScreenOutcome(year);
   if (outcome === 'invalid') {
+    return NextResponse.json({ error: AGE_INVALID }, { status: 400 });
+  }
+  const dob = outcome === 'blocked' || birthDate === undefined ? null : postedBirthDate(year, birthDate);
+  if (outcome !== 'blocked' && birthDate !== undefined && dob === null) {
     return NextResponse.json({ error: AGE_INVALID }, { status: 400 });
   }
 
@@ -68,5 +77,6 @@ export async function POST(req: Request) {
     );
   }
 
+  if (dob) await writeUserDob(prisma as unknown as RawDb, id, dob);
   return NextResponse.json({ ok: true });
 }

@@ -10,8 +10,9 @@ import { SceneLoader, VertexBuffer } from '@babylonjs/core';
 import type { AbstractMesh, AssetContainer, Mesh, Scene, Skeleton } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { sportKitDefault } from './sportKitDefaults';
-import { fixGarment, syncGarmentVisibility } from './garmentFixes';
+import { ensureGarmentUVs, fixGarment, liftOffBody, syncGarmentVisibility } from './garmentFixes';
 import { scheduleBodyMask, shareBodyBounds, isBodyMesh } from './bodyMask';
+import { coachGarmentSlotOf, demoModelFlags } from './demoModels';
 
 export type KitSlot = 'tops' | 'shorts' | 'shoes';
 export const KIT_SLOTS: readonly KitSlot[] = ['tops', 'shorts', 'shoes'];
@@ -22,10 +23,19 @@ export type Wardrobe = Partial<Record<KitSlot, string | null>>;
 // tinted in the starters' colours, while top_lab and shoes_flight stayed hidden). The suffix is optional here.
 const KIT_RE = /^Kit_(tops|shorts|shoes)_([A-Za-z0-9_-]+)/;
 const CLONE_SUFFIX = /_(?:c|pk)\d+(?![A-Za-z0-9])/;   // `Kit_tops_top_lab_c31` → `Kit_tops_top_lab`; kit-pack instances carry `_pk<n>`
+// KIT-NO-HIGH-BOOTS (2026-10-20): the low shoe is two primitives (shoe + low sock), and Babylon's glTF loader names each
+// `<node>_primitive<i>` under a TransformNode `<node>` — unparsed, the item read `shoes_evo_primitive0` and matched nothing
+const PRIMITIVE_SUFFIX = /_primitive\d+(?![0-9])/;   // `Kit_shoes_shoes_evo_primitive1_c4` → `Kit_shoes_shoes_evo`
 
-/** Parse a kit mesh name; null for anything else. */
+/** Parse a kit mesh name; null for anything else. Every primitive of a garment parses to the same item. */
 export function kitOf(meshName: string): { slot: KitSlot; itemId: string } | null {
-  const m = KIT_RE.exec(meshName.replace(CLONE_SUFFIX, '')); return m ? { slot: m[1] as KitSlot, itemId: m[2] } : null;
+  const m = KIT_RE.exec(meshName.replace(CLONE_SUFFIX, '').replace(PRIMITIVE_SUFFIX, '')); return m ? { slot: m[1] as KitSlot, itemId: m[2] } : null;
+}
+
+/** The node a garment hangs from on its body: a multi-primitive garment's parts sit one level down, under the
+ *  garment's own TransformNode, so their body is that node's parent. */
+function bodyNodeOf(m: AbstractMesh): object | null {
+  return PRIMITIVE_SUFFIX.test(m.name) && m.parent?.parent ? m.parent.parent : m.parent;
 }
 
 /** The mode the harness stamped on the scene these meshes live in (ModeHarness: `scene.metadata.felModeId`). */
@@ -47,29 +57,45 @@ function sceneModeId(meshes: AbstractMesh[]): string | undefined {
 export function applyKit(meshes: AbstractMesh[], wardrobe: Wardrobe | null | undefined, modeId: string | null = null, opts: KitOptions = {}): number {
   const bySlot = new Map<KitSlot, AbstractMesh[]>();
   for (const m of meshes) { const k = kitOf(m.name); if (!k) continue; (bySlot.get(k.slot) ?? bySlot.set(k.slot, []).get(k.slot)!).push(m); }
-  if (!bySlot.size) return 0;
+  if (!bySlot.size) { maskCoachBody(meshes); return 0; }
   const sport = sportKitDefault(modeId ?? sceneModeId(meshes));
   // CREATOR-PLAN phase 4e: the slots the player's code-built clothes cover show no kit garment at all (not the Closet pick,
   // not the sport's uniform); remembered on the body's node so a kit pack that lands later stays hidden too
   const covered = opts.covered ?? new Set<KitSlot>();
   const owner = kitOwner(meshes);
   if (owner) coveredSlots.set(owner, covered);
+  // every garment on the body, shown or not, gets its UVs at the first apply, before the shape, paint and mask layers
+  // cache anything per garment geometry (a top swapped in later must not change vertex count under a cached prep)
+  for (const list of bySlot.values()) for (const m of list) ensureGarmentUVs(m);
   let found = 0;
   for (const [slot, list] of bySlot) {
     if (covered.has(slot)) { for (const m of list) { m.isVisible = false; found++; syncGarmentVisibility(m); } continue; }
     const byId = (id: string | null | undefined) => (id ? list.find((m) => kitOf(m.name)!.itemId === id) : undefined);
     const want = wardrobe?.[slot] ?? sport[slot] ?? null;
     const show = byId(wardrobe?.[slot]) ?? byId(sport[slot]) ?? list[0];
-    for (const m of list) { m.isVisible = m === show; found++; syncGarmentVisibility(m); }
-    fixGarment(show, slot, kitOf(show.name)!.itemId);
+    const showId = kitOf(show.name)!.itemId;   // every part of the chosen garment shows (the low shoe's sock too)
+    for (const m of list) { m.isVisible = kitOf(m.name)!.itemId === showId; found++; syncGarmentVisibility(m); }
+    // the read fixes go on the garment's first primitive (the shoe, not its sock)
+    fixGarment(list.find((m) => m.isVisible && !/_primitive[1-9]/.test(m.name)) ?? show, slot, showId);
     // a garment the body does not carry but a kit PACK does (owner 2026-09-05: Meshy garments skinned to the rig):
     // fetch it, bind it to this body's skeleton, and swap it in when it lands
-    if (want && !byId(want) && KIT_PACKS[want]) void attachKitPack(list[0], slot, want, list);
+    if (want && !byId(want) && KIT_PACKS[want] && packFitsBody(meshes)) void attachKitPack(list[0], slot, want, list);
   }
   // CLOTHING-ALONE (2026-09-14): garments cull with the body, and the skin under a shown garment is not drawn (bodyMask.ts)
   const body = meshes.find((m) => isBodyMesh(m.name));
   if (body) { shareBodyBounds(body, meshes); scheduleBodyMask(meshes); }
   return found;
+}
+
+/** DEMO-MODELS-1 (2026-11-09): the coach body carries no Kit_ garments (its outfit is baked on as Top_/Bottom_/Shoe_/Sock_), so
+ *  applyKit's early return left its skin unmasked. With COACH_BODY_MASK_ENABLED on, a body with coach garments gets the same
+ *  bounds share and mask as a kit body; off, nothing runs (as before). Returns whether the mask was scheduled. */
+export function maskCoachBody(meshes: AbstractMesh[]): boolean {
+  if (!demoModelFlags().coachBodyMask) return false;
+  const body = meshes.find((m) => isBodyMesh(m.name));
+  if (!body || !meshes.some((m) => coachGarmentSlotOf(m.name))) return false;
+  shareBodyBounds(body, meshes); scheduleBodyMask(meshes);
+  return true;
 }
 
 /** CREATOR-PLAN phase 4e (2026-10-06): how applyKit is told what the player's code-built clothes cover. */
@@ -79,13 +105,35 @@ export interface KitOptions {
 }
 /** The node a body's garments hang under (the kit's `Human.rig`), which the covered slots are remembered on. */
 function kitOwner(meshes: readonly AbstractMesh[]): object | null {
-  for (const m of meshes) if (kitOf(m.name)) return m.parent ?? m;
+  for (const m of meshes) if (kitOf(m.name)) return bodyNodeOf(m) ?? m;
   return null;
 }
 const coveredSlots = new WeakMap<object, ReadonlySet<KitSlot>>();
+
+/**
+ * KIT-GLITCH (owner 2026-11-12: "skin pokes through", "wrong or missing pieces"; on rivals). A kit PACK garment is fitted in
+ * Blender to ONE body — scripts/meshy/fit-garment.py takes the hero file — and the kit bodies share its shape. The 24 forge
+ * rivals are their own builds (scripts/avatar/rivals.mts: MakeHuman's muscle, weight and proportions, 1.70–2.08 m), and the
+ * football jersey, the default top for everyone in football, does not fit them: measured on the rig at idle, 50–54 % of the
+ * jersey inside the rival's body (its quarter-point 15–18 mm under the skin) and 4,800–6,100 px of skin through it at 1.8 m
+ * (grit, tusk, dash), the chest and shoulders bare in a run — against 27–35 % and −2 / −7 mm on the kit bodies it was
+ * fitted to. A body that carries its own build (a forge rival: its armature's `athlete` extra) wears no pack: the slot shows
+ * the body's own garment, as it does for any item the body does not carry. Kit bodies (the player's) still get the pack.
+ */
+export function packFitsBody(meshes: readonly AbstractMesh[]): boolean {
+  for (const m of meshes) {
+    if (!kitOf(m.name)) continue;
+    for (let n: { metadata?: unknown; parent?: unknown } | null = m; n; n = (n.parent as typeof n) ?? null) {
+      const extras = (n.metadata as { gltf?: { extras?: { athlete?: unknown } } } | null | undefined)?.gltf?.extras;
+      if (extras?.athlete != null) return false;
+    }
+    return true;
+  }
+  return true;
+}
 /** Is this kit slot covered by code-built clothes on the body `sibling` belongs to (as applyKit last decided)? */
 export function kitSlotCovered(sibling: AbstractMesh, slot: KitSlot): boolean {
-  return coveredSlots.get(sibling.parent ?? sibling)?.has(slot) ?? false;
+  return coveredSlots.get(bodyNodeOf(sibling) ?? sibling)?.has(slot) ?? false;
 }
 
 /**
@@ -151,6 +199,11 @@ async function attachKitPack(sibling: AbstractMesh, slot: KitSlot, itemId: strin
     const s0 = inst.skeletons[0] ?? m0?.skeleton ?? null;
     if (!m0 || !s0) { console.warn(`[FEL-KIT] pack ${itemId}: instantiate produced no skinned mesh`); return; }
     m0.setEnabled(false); m0.isVisible = false; m0.parent = null;
+    // KIT-GLITCH: the pack's tops and shorts stand off the skin like the body's own (GARMENT_INFLATE in metres, the depth
+    // offset): done ONCE on the template, whose geometry every spawn's clone shares, so a football defender spawned mid-game
+    // pays nothing for it (the per-spawn rewrite was why packs went without, 2026-09-05). Measured on the kit body at idle:
+    // see the KIT-GLITCH note in the commit and kitGlitch.test.ts.
+    if (slot === 'tops' || slot === 'shorts') liftOffBody(m0, slot);
     for (const r of inst.rootNodes) if (r !== m0 && r.getChildMeshes().length === 0) r.dispose();
     tpl = { mesh: m0, skeleton: s0 };
     let map = templates.get(scene); if (!map) { map = new Map(); templates.set(scene, map); }

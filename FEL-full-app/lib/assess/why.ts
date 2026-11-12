@@ -48,9 +48,10 @@ export interface WhyContext {
 export const DRILLS = PR20_DRILLS;
 
 /** Said when pain stops the screen. Nothing is scored or saved after it. */
+// CUE-REWRITE (2026-10-27): the pain route in the style guide's words — stop, tell a person, see a health professional.
 export const PAIN_REFERRAL =
-  'Stopping here. Pain during a movement is a reason to see a qualified professional before screening or training '
-  + 'through it. Nothing from this screen was saved.';
+  'Stopping here. If something hurts, stop. Tell an adult or your coach, and see a health professional before you train. '
+  + 'Nothing was saved.';
 
 // ── formatting ──
 

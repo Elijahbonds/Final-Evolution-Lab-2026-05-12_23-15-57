@@ -1,3 +1,5 @@
+// CUE-REWRITE (2026-10-27) — test changed: copy rewrite. The check names and lines asserted below follow the rewritten
+// copy (lib/cue-style/names.ts, docs/CUE-AUDIT.md); what each assertion checks is unchanged.
 // The Movement Screen's one mapping from a camera check to what to do about it (MIRROR-COACH P3, 2026-09-26): a flag →
 // its FIX line + a corrective block; a check the camera could not read → retest, never a pass; a pass → nothing. The
 // grades here are the REAL grader's (stationGraders.regradeFromSummary over summary numbers), so a change to the
@@ -70,13 +72,13 @@ describe('a FLAG maps to its FIX line and its corrective block, with the value t
   it('the side: a one-sided flag carries the side the grader named; the single-leg stance always carries its leg', () => {
     const hip = outcomesFromGrades('modified', all({ hipLevel: grade('hipLevel', FLAG.hipLevel) })).find((o) => o.checkId === 'hipLevel')!;
     expect(hip.side).toBe('right');                      // value −0.12 = the RIGHT hip higher
-    expect(hip.value).toBe('0.12 of a shoulder width, right higher · estimated');
+    expect(hip.value).toBe('right side higher by about 12% of your shoulder width · estimated');
     expect(outcomeTitle(hip)).toBe('Hip level, right hip higher');
     // the hip FIX works "the low side": the flag's side is the HIGHER hip, so the line says which side is low
     expect(hip.fix).toBe(`${fixLine('hipLevel')} Here the low side is the left.`);
     const legs = outcomesFromGrades('modified', all({ singleLegL: grade('singleLegL', FLAG.singleLegL) })).filter((o) => o.checkId === 'singleLeg');
     expect(legs.map((o) => [o.side, o.status])).toEqual([['left', 'flag'], ['right', 'pass']]);
-    expect(outcomeTitle(legs[0])).toBe('Single-leg stance, left leg');
+    expect(outcomeTitle(legs[0])).toBe('One-leg balance, left leg');
   });
 
   it('every camera check has a FIX line, and every mapped block is one the playbook has', () => {
@@ -107,7 +109,7 @@ describe('a check the camera could not read is RETEST — never a pass, never cl
   it('an unreadable grade: retest, with the grader\'s own reason and the one thing to do', () => {
     const o = outcomesFromGrades('modified', all({ hipLevel: unreadable('hipLevel') })).find((x) => x.checkId === 'hipLevel')!;
     expect(o).toMatchObject({ status: 'retest', value: null, fix: null, block: null });
-    expect(o.note).toMatch(/^Not read: too few clear frames/);
+    expect(o.note).toMatch(/^Not read: the camera got too few clear looks/);
     expect(o.hint).toBe(RETEST_HINT.tooFewFrames);
   });
 
@@ -161,13 +163,14 @@ describe('the athlete\'s plan, in plain words', () => {
   it('a flag: the title, what the camera saw, what to do, and the block; a shared block is shown once', () => {
     const p = plan(all({ hipLevel: grade('hipLevel', FLAG.hipLevel), singleLegR: grade('singleLegR', FLAG.singleLegR) }));
     expect(p.headline).toBe('2 things to work on, from what the camera saw.');
-    expect(p.work.map((w) => w.title)).toEqual(['Hip level, right hip higher', 'Single-leg stance, right leg']);
-    expect(p.work[0].saw).toBe('The camera saw 0.12 of a shoulder width, right higher · estimated.');
+    expect(p.work.map((w) => w.title)).toEqual(['Hip level, right hip higher', 'One-leg balance, right leg']);
+    expect(p.work[0].saw).toBe('The camera saw: right side higher by about 12% of your shoulder width · estimated.');
+    expect(p.work[0].means).toBe('Your two sides start from a tilt.');   // CUE-REWRITE: the result's middle part
     expect(p.work[0].todo).toBe(`${fixLine('hipLevel')} Here the low side is the left.`);
-    expect(p.work[0].block?.title).toBe('Trunk and hip hold');
+    expect(p.work[0].block?.title).toBe('Hip and middle hold');
     expect([p.work[0].blockShownAbove, p.work[1].blockShownAbove]).toEqual([false, true]);
     // the left leg passed beside a flagged right leg: named with its leg, not as if the whole check were fine
-    expect(p.nothing).toEqual(['Heel line', 'Knee window', 'Shoulder height', 'Head float', 'Single-leg stance, left leg']);
+    expect(p.nothing).toEqual(['Heels from behind', 'Knees from the front', 'Shoulder level', 'Head position', 'One-leg balance, left leg']);
     expect(p.note).toBe(CAMERA_NOT_DIAGNOSIS);
   });
 
@@ -202,7 +205,7 @@ describe('the athlete\'s plan, in plain words', () => {
   it('nothing flagged but something not read: says to run those again — never "clear"', () => {
     const p = plan(all({ headFloat: unreadable('headFloat') }));
     expect(p.work).toEqual([]);
-    expect(p.retest).toEqual([{ title: 'Head float', why: expect.stringMatching(/^Not read: .* Hold still in the shot for the whole count\.$/) }]);
+    expect(p.retest).toEqual([{ title: 'Head position', why: expect.stringMatching(/^Not read: .* Hold still in the shot for the whole count\.$/) }]);
     expect(p.headline).toMatch(/run those again/);
     expect(p.headline).not.toMatch(/clear/i);
   });
@@ -214,7 +217,7 @@ describe('the athlete\'s plan, in plain words', () => {
   });
 
   it('everything read, nothing flagged', () => {
-    expect(plan(all()).headline).toBe('Nothing flagged in any check the camera read.');
+    expect(plan(all()).headline).toBe('Nothing to work on in any check the camera read.');
   });
 });
 

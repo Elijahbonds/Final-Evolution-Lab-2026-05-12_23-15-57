@@ -114,10 +114,11 @@ describe('what the review says', () => {
   it('compared: the number, the recent mean, and better / same / not as clean', () => {
     const v = progressView('squat', 'server', { kind: 'read', comparison: compareToRecent(0.75, [0.5, 0.5, 0.5], 'higherIsBetter', CLEAN_SHARE_SAME_BAND) });
     expect(v).toMatchObject({ kind: 'compared', heading: 'vs your last 3', where: WHERE_SERVER });
-    expect(v.line).toBe('Clean reps 75% — your last 3 averaged 50%. Better than your last 3.');
+    // test changed: copy rewrite (CUE-REWRITE) — the same comparison, plus the one next step
+    expect(v.line).toBe('Clean reps 75% — your last 3 averaged 50%. Better than your last 3. Keep doing what you did.');
     const w = progressView('pressRow', 'device', { kind: 'read', comparison: compareToRecent(1.5, [0.5], 'lowerIsBetter', 0.25) });
     expect(w.heading).toBe('vs your last 1');
-    expect(w.line).toBe('Zone faults per rep 1.5 — your last set 0.5. Not as clean as your last set.');
+    expect(w.line).toBe('Things to fix per rep 1.5 — your last set 0.5. Not as clean as your last set. Next set, go a little slower.');
     expect(w.where).toBe(WHERE_DEVICE);
   });
 

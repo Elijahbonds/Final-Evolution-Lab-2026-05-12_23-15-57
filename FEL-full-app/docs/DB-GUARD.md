@@ -318,6 +318,7 @@ To run one by hand: `npx prisma db execute --url "$PROD_DIRECT_URL" --stdin <<< 
     are modelled, each matching its pending file statement for statement, so this limit and the next one no longer
     apply once #373 is merged. `lib/party/social/reports.ts` and `lib/creator/inquiryStore.ts` still write through raw
     SQL behind their `information_schema` probe; the models only keep the schema and the database in agreement.
+- **For the raw-SQL files there is `scripts/pending-sql/cli.ts` (2026-11-10, `docs/PENDING-SQL.md`):** the owner's one command, by hand.
 - **The raw-SQL pending files are never applied by db-guard.** They are not in the schema, so they never appear in the
   diff. `OWNER-RUNBOOK.md` §6 stays the way to apply them.
 - **Hand-written files must be in Prisma's form to auto-apply.** `2026-10-07-adventure-save.sql` is not (§2).

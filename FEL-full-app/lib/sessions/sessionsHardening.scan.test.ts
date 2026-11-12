@@ -85,7 +85,7 @@ describe('ADDENDUM: the end card shows only what the server granted, and no dail
   });
 
   it('every reason the route can give has its own title and line', () => {
-    for (const r of ['AGENT', 'PLAYTEST', 'TEST_ACCOUNT', 'SCORE_INVALID', 'NO_RULES', 'RUN_MISSING', 'RUN_UNKNOWN', 'RUN_MODE_MISMATCH', 'RUN_EXPIRED', 'RUN_CLOSED', 'RUN_IN_FLIGHT']) {
+    for (const r of ['AGENT', 'PLAYTEST', 'TEST_ACCOUNT', 'SCORE_INVALID', 'NO_RULES', 'RUN_MISSING', 'RUN_UNKNOWN', 'RUN_MODE_MISMATCH', 'RUN_EXPIRED', 'RUN_CLOSED', 'RUN_IN_FLIGHT', 'FREE_DANCE']) {   // + FREE_DANCE (lane/dance-extras-2)
       expect(unpaidTitle(r), r).not.toBe('NOT PAID');
       expect(unpaidLine(r), r).not.toBe('Nothing was paid for this run.');
     }

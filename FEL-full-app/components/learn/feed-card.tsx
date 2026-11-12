@@ -61,13 +61,13 @@ export function FeedCard({
       data-card-id={card.id}
     >
       <header className="flex flex-wrap items-center gap-2">
-        <span className="rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] md:text-sm"
+        <span className="rounded-full px-3 py-1 text-[12px] font-bold uppercase tracking-[0.16em] md:text-sm"
           style={{ color: accent, background: `${accent}18`, boxShadow: `inset 0 0 0 1px ${accent}44` }}>
           {topic.label}
         </span>
-        <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/45 md:text-sm">{label}</span>
+        <span className="text-[12px] font-bold uppercase tracking-[0.16em] text-white/50 md:text-sm">{label}</span>
         {slide.reason === 'review' && (
-          <span className="flex items-center gap-1 rounded-full bg-white/8 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-white/70 md:text-sm">
+          <span className="flex items-center gap-1 rounded-full bg-white/8 px-2.5 py-1 text-[12px] font-bold uppercase tracking-[0.14em] text-white/70 md:text-sm">
             <Repeat2 className="h-3.5 w-3.5" /> Review
           </span>
         )}
@@ -132,9 +132,9 @@ export function FeedCard({
       )}
 
       <footer className="space-y-1 pt-1">
-        {topic.notAdvice && <p className="text-[11px] font-semibold text-amber-200/70 md:text-sm">{NOT_ADVICE_LINE[topic.notAdvice]}</p>}
-        {note && <p className="text-[11px] font-semibold md:text-sm" style={{ color: accent }} data-card-note>{note}</p>}
-        <p className="line-clamp-2 text-[10.5px] leading-snug md:text-[13px]" style={{ color: 'rgba(255,255,255,0.42)' }}>Source: {card.source}</p>
+        {topic.notAdvice && <p className="text-[12px] font-semibold text-amber-200/70 md:text-sm">{NOT_ADVICE_LINE[topic.notAdvice]}</p>}
+        {note && <p className="text-[12px] font-semibold md:text-sm" style={{ color: accent }} data-card-note>{note}</p>}
+        <p className="line-clamp-2 text-[12px] leading-snug md:text-[13px]" style={{ color: 'rgba(255,255,255,0.42)' }}>Source: {card.source}</p>
         <PlaybookCardLinks cardId={card.id} />
       </footer>
     </article>

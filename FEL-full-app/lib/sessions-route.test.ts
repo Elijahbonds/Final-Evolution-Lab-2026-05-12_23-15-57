@@ -1494,3 +1494,74 @@ describe('the finish rate limit (GameSession count, per user)', () => {
     }
   });
 });
+
+// lane/dance-extras-2 (owner 2026-10-24): FREE DANCE — the Cypher with its judge off (lib/babylon/dance/freeDance.ts). "It must pay
+// nothing beyond whatever the existing no-score / free-play floor rule allows; never stakeable; never feeds rivals or leaderboards;
+// can't be posted as a scored run." The route records it on its run, unpaid (FREE_DANCE), with no GameSession row.
+describe('FREE DANCE: recorded unpaid, never a scored run (lane/dance-extras-2)', () => {
+  const freeStats = (o: Record<string, unknown> = {}) => ({ freeDance: 1, endless: 1, moves: 37, bpm: 96, difficulty: 2, ...o });
+
+  it('a free-dance run pays nothing — no XP, shards, Lab Credits, coins, PRQ, streak, season XP or mastery — and writes no GameSession row', async () => {
+    const r = await post({ mode: 'dance', score: 0, won: false, duration: 150, played: true, stats: freeStats() });
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ ok: true, paid: false, reason: 'FREE_DANCE', sessionId: null, score: 0, won: false, xp: 0, shards: 0, credits: 0, coins: 0, prqDelta: 0, streakBonus: 0, season: null, mastery: null });
+    expect(h.runs[r.runId!]).toMatchObject({ status: 'recorded', score: 0 });
+    expectNothingPaid('free dance');
+    expect(h.streakWrites).toEqual([]);
+    expect(h.events).toContainEqual(expect.objectContaining({ name: 'session_unpaid', props: expect.objectContaining({ mode: 'dance', reason: 'FREE_DANCE' }) }));
+  });
+
+  it('…which is nothing beyond the no-score / free-play floor: under a played no-score run\'s floor (Prove It, the endless ceiling\'s) of 10 XP / 1 shard', async () => {
+    const r = await post({ mode: 'dance', score: 0, won: false, duration: 150, played: true, stats: freeStats() });
+    const floor = { xp: sessionXp(0, false), shards: sessionShards(0, false) };
+    expect(floor).toEqual({ xp: 10, shards: 1 });
+    expect(r.body.xp).toBeLessThanOrEqual(floor.xp);
+    expect(r.body.shards).toBeLessThanOrEqual(floor.shards);
+    expect(r.body.xp).toBeLessThanOrEqual(endlessCeilingFor(150, false).xp);
+    expect(r.body.credits).toBe(0);
+  });
+
+  it('a free-dance run on a streak day that is due still opens no streak day and pays no streak Lab Credits', async () => {
+    h.profile.lastStreakAt = new Date(Date.now() - 25 * 60 * 60 * 1000);
+    const r = await post({ mode: 'dance', score: 0, duration: 150, played: true, stats: freeStats() });
+    expect(r.body).toMatchObject({ paid: false, reason: 'FREE_DANCE', streakBonus: 0, credits: 0 });
+    expect(h.streakWrites).toEqual([]);
+    expect(h.lc).toEqual([]);
+  });
+
+  it('CAN\'T BE POSTED AS A SCORED RUN: a free-dance post with a score is SCORE_INVALID (free_dance_scored) — rejected, never recorded as scored, nothing paid', async () => {
+    for (const score of [1, 250, 4355]) {
+      const r = await post({ mode: 'dance', score, won: true, duration: 150, played: true, stats: freeStats() });
+      expect(r.status, String(score)).toBe(422);
+      expect(r.body, String(score)).toMatchObject({ ok: false, paid: false, reason: 'SCORE_INVALID', detail: 'free_dance_scored', limit: 0 });
+      expect(h.runs[r.runId!], String(score)).toMatchObject({ status: 'rejected' });
+    }
+    expectNothingPaid('scored free dance');
+  });
+
+  it('the header\'s reserved `endless` alone marks a dance run free (a dance song has an end; only a run with no judge has none)', async () => {
+    const r = await post({ mode: 'dance', score: 0, duration: 150, played: true, stats: { endless: 1, moves: 3 } });
+    expect(r.body).toMatchObject({ paid: false, reason: 'FREE_DANCE' });
+    const scored = await post({ mode: 'dance', score: 900, duration: 150, played: true, stats: { endless: true, perfect: 9 } });
+    expect(scored.body).toMatchObject({ reason: 'SCORE_INVALID', detail: 'free_dance_scored' });
+    expectNothingPaid('endless dance');
+  });
+
+  it('a claimed win on a free-dance run is no win', async () => {
+    const r = await post({ mode: 'dance', score: 0, won: true, duration: 150, played: true, stats: freeStats() });
+    expect(r.body).toMatchObject({ won: false, paid: false, reason: 'FREE_DANCE' });
+  });
+
+  it('a JUDGED dance run is paid exactly as before (no flag: a GameSession row, XP for its score)', async () => {
+    const stats = { hits: 40, rounds: 48, stars: 3, accuracy: 80, maxCombo: 22, perfect: 20, great: 12, good: 8, miss: 8 };
+    const r = await post({ mode: 'dance', score: 1200, won: true, duration: 150, played: true, stats });
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ ok: true, paid: true, won: true, xp: sessionXp(1200, true), shards: sessionShards(1200, true) });
+    expect(h.sessions[0]).toMatchObject({ mode: 'dance', score: 1200, won: true });
+  });
+
+  it('the flag means free dance in the dance room only: a music set carrying it is not a free-dance run', async () => {
+    const r = await post({ mode: 'music', score: 0, duration: 60, played: true, stats: { ...musicSet({ bars: 8, notes: 128, perfects: 0, goods: 0 }), freeDance: 1 } });
+    expect(r.body.reason).not.toBe('FREE_DANCE');
+  });
+});

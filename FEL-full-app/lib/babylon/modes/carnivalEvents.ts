@@ -35,6 +35,7 @@ import { dressBall } from '../visual/meshyProps';   // the hoops modes' Meshy ba
 import { attachBallToHand } from '../anim/ballRig';
 import { rightHandDunks } from '../anim/dunkHand';                           // HOOPS MOTION phase 3: right-handed on screen (Slam Rush)
 import { rightHandHoops, rightHandBall, hoopsHand } from '../anim/hoopsHand';
+import { RIM_HEIGHT_M } from '../core/courtDims';
 
 export interface CarnivalEvent {
   id: string;
@@ -176,7 +177,7 @@ export function slamRush(): CarnivalEvent {
   let shownCharge = -1;
   let charging = false, charge = 0, makes = 0, cooldown = 0;
   let gathered = false;   // this charge's gather has been thrown (it is held, not looped — see gather())
-  const rim = new Vector3(0, 3.05, -0.6);
+  const rim = new Vector3(0, RIM_HEIGHT_M, -0.6);
   /** HOTFIX (2026-09-24): THE GATHER IS ONE-WAY — the rip down into the loaded crouch the launch starts from (0.5 s). It was
    *  LOOPED through the whole charge, so the body snapped back up to standing and crouched again twice a second. It plays
    *  once and holds the load now. A launch still in flight is let finish (tick retries): the new charge follows it. */

@@ -14,8 +14,8 @@ export function FormFeedback() {
   return (
     <div className="px-4 py-10">
       <div className="mx-auto mb-6 max-w-md text-center">
-        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-[#00E5FF]/20 bg-gradient-to-br from-[#00E5FF]/15 to-[#00FF9D]/10">
-          <ScanLine className="h-8 w-8 text-[#00E5FF]" />
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-fel-cyan/20 bg-gradient-to-br from-fel-cyan/15 to-fel-emerald/10">
+          <ScanLine className="h-8 w-8 text-fel-cyan" />
         </div>
         <h3 className="fel-heading mb-2 text-xl text-white">Form Check</h3>
         <p className="text-sm text-white/50">
@@ -33,8 +33,8 @@ export function FormFeedback() {
               className="fel-card group block rounded-xl p-4 transition-colors hover:border-white/20"
             >
               <span className="block text-sm font-medium text-white">{m.title}</span>
-              <span className="mt-1 block text-xs leading-relaxed text-white/45">{m.reads}</span>
-              <span className="mt-2 flex items-center gap-2 text-xs text-[#00E5FF]/80 group-hover:text-[#00E5FF]">
+              <span className="mt-1 block text-xs leading-relaxed text-fel-dim">{m.reads}</span>
+              <span className="mt-2 flex items-center gap-2 text-xs text-fel-cyan/80 group-hover:text-fel-cyan">
                 The Mirror · {m.tab} tab
                 <ArrowRight className="h-3 w-3" />
               </span>
@@ -45,10 +45,10 @@ export function FormFeedback() {
 
       <div className="mx-auto mt-6 w-full max-w-md">
         <Link href="/screen" data-quick-screen className="fel-card group flex items-start gap-3 rounded-xl p-4 transition-colors hover:border-white/20">
-          <Timer className="mt-0.5 h-5 w-5 shrink-0 text-[#00FF9D]" />
+          <Timer className="mt-0.5 h-5 w-5 shrink-0 text-fel-emerald" />
           <span>
             <span className="block text-sm font-medium text-white">Quick Screen</span>
-            <span className="mt-1 block text-xs leading-relaxed text-white/45">
+            <span className="mt-1 block text-xs leading-relaxed text-fel-dim">
               No account needed: your jump in about a minute, or the full screen in about five. Nothing is sent.
             </span>
           </span>

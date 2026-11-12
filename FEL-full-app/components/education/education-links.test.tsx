@@ -26,8 +26,12 @@ describe('the Playbook card on /education', () => {
     expect(text(h)).toContain('Open the Playbook');
   });
 
-  it('is mounted on /education', () => {
-    expect(readFileSync('app/education/page.tsx', 'utf8')).toMatch(/<PlaybookCard \/>/);
+  // test changed (PLAT-P04, 2026-10-27): /education redirects to /learn, whose home opens the course itself (Continue, the
+  // chapter rings — components/learn/learn-home.test.tsx), so this card is no longer mounted there. Was: "is mounted on
+  // /education" (<PlaybookCard /> in app/education/page.tsx).
+  it('/education now lands on Learn, which opens the course', () => {
+    expect(readFileSync('app/education/page.tsx', 'utf8')).toMatch(/redirect\('\/learn'\)/);
+    expect(readFileSync('components/learn/learn-home.tsx', 'utf8')).toMatch(/href=\{`\/education\/playbook\/\$\{c\.number\}`\}/);
   });
 });
 

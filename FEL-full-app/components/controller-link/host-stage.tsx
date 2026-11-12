@@ -73,7 +73,7 @@ export function HostStage({ modeId: initialModeId, couch = false, exitHref }: Ho
     <div data-host-modes style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', margin: '0 0 18px' }}>
       {modes.map((m) => (
         <button key={m.modeId} type="button" data-mode={m.modeId} aria-pressed={m.modeId === modeId} onClick={() => choose(m.modeId)}
-          style={{ padding: '8px 12px', borderRadius: 10, border: `1px solid ${m.modeId === modeId ? '#00E5FF' : '#26304a'}`, background: m.modeId === modeId ? '#00E5FF22' : 'transparent', color: m.modeId === modeId ? '#00E5FF' : '#cfd6e4', cursor: 'pointer', font: '600 13px system-ui' }}>
+          style={{ padding: '8px 12px', minHeight: 44, borderRadius: 10, border: `1px solid ${m.modeId === modeId ? '#00E5FF' : '#26304a'}`, background: m.modeId === modeId ? '#00E5FF22' : 'transparent', color: m.modeId === modeId ? '#00E5FF' : '#cfd6e4', cursor: 'pointer', font: '600 13px system-ui' }}>
           {m.title}
         </button>
       ))}
@@ -279,7 +279,7 @@ export function HostStage({ modeId: initialModeId, couch = false, exitHref }: Ho
             onClick={start}
             style={{ padding: '14px 28px', borderRadius: 12, border: 'none', background: '#00E5FF', color: '#04202a', cursor: 'pointer', font: '700 16px system-ui', letterSpacing: 1 }}
           >START THE SCREEN</button>
-          <p style={{ margin: '14px 0 0', color: '#6b7280', font: '400 12px/1.5 system-ui' }}>
+          <p style={{ margin: '14px 0 0', color: '#9ca3af', font: '400 12px/1.5 system-ui' }}>{/* EVERY-SCREEN P10: #6b7280 was 4.11:1 */}
             Goes fullscreen and keeps the screen awake.
           </p>
           {couch && exitHref ? (
@@ -370,7 +370,7 @@ export function CouchSplash({ title, phase, error, onStart }: { title: string; p
 export function CouchSeats({ table, hasPads }: { table: SeatTable; hasPads: boolean }) {
   const open = Math.max(0, COUCH_SEATS - table.seats.length);
   return (
-    <div data-testid="couch-seats" className="pointer-events-none absolute bottom-4 left-4 z-30 flex flex-col gap-1 font-mono text-[11px]">
+    <div data-testid="couch-seats" className="pointer-events-none absolute bottom-4 left-4 z-30 flex flex-col gap-1 font-mono text-[12px]">
       <div className="flex gap-1">
         {table.seats.map((s) => (
           <span key={s.key} data-seat={s.label} data-kind={s.kind} className="rounded bg-black/70 px-2 py-0.5 font-bold" style={{ color: s.color }}>
@@ -378,7 +378,7 @@ export function CouchSeats({ table, hasPads }: { table: SeatTable; hasPads: bool
           </span>
         ))}
         {Array.from({ length: open }, (_, i) => (
-          <span key={`open-${i}`} className="rounded border border-white/15 px-2 py-0.5 text-white/40">P{table.seats.length + i + 1}</span>
+          <span key={`open-${i}`} className="rounded border border-white/15 px-2 py-0.5 text-white/50">P{table.seats.length + i + 1}</span>
         ))}
       </div>
       {open > 0 ? <span className="text-white/50">{openSeatHint(hasPads)}</span> : null}

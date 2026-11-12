@@ -23,6 +23,7 @@ import { Quaternion, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, Bone, Scene, Skeleton, TransformNode } from '@babylonjs/core';
 import { findBone } from './boneLookup';
 import { localAfterWorldDelta, solveChainInFrame } from './TwoBoneIK';
+import { feel } from '../../feel-panel/feel';
 
 export type Side = 'Left' | 'Right';
 
@@ -104,6 +105,72 @@ export function pinWeight(driftM: number, maxDrift: number): number {
 }
 /** A pin let go by the clip (a lift, a swing) fades out over this long instead of dropping in one frame. */
 export const RELEASE_FADE_SEC = 0.1;
+/**
+ * GAMEPLAY-CLEAN P3 (2026-11-03): THE SOLVE ITSELF ENGAGES AND LETS GO OVER A BLEND, feel knob `anim.plantEngageSec`.
+ *
+ * The pin's own weight was blended (pinWeight, the release fade) — but only as a lerp of the TARGET between the clip's ankle and the
+ * pin, and the two-bone solve that lands it rebuilds the whole leg with its knee toward the root's FORWARD at any weight. So the
+ * first frame the layer solved, the leg jumped from the clip's knee direction to the pole's, even with the foot where the clip had it;
+ * and the frame it stopped (a pin within 2 mm of the clip, a fade run out) it jumped back. Measured on Derby's batter, standing still
+ * in `baseball_stance` (knees open toward the plate, not toward the root's forward): the right thigh 25.4–25.6° in ONE frame, then
+ * held, four times in 14 s, the foot moving under 3 mm; in the swing's stride the left thigh 40–62° a frame. The clip alone never
+ * does it (clip-smooth's §4d). Now the KNEE POLE eases over this long: from the clip's own knee direction when the layer starts
+ * solving a leg (a solve that changes nothing) to the root's forward, and back when it stops; the pin's target is solved at full
+ * weight throughout, so a plant holds exactly as hard. 0 = the old one-frame engage and release exactly. The pin, its weight
+ * curve and its release fade are unchanged.
+ */
+export const PLANT_ENGAGE_SEC = 0.1;
+/**
+ * GAMEPLAY-CLEAN P4 (2026-11-03): THE RELEASE EASES IN ROTATION, feel knob `anim.plantReleaseSec` (default RELEASE_FADE_SEC's 0.1 s).
+ *
+ * A let-go pin faded by moving its TARGET from the pin back onto the clip's ankle over RELEASE_FADE_SEC, each frame a full solve to
+ * that target. When the release comes with a jump in the clip or the root — a take-off (the root rising past AIRBORNE_VY lifts every
+ * pin), a landing that drops the root 0.36 m in a frame, the TD spike cutting the hurdle, a get-up off the floor — the solve to a
+ * target the new pose no longer reaches rebuilt the leg in one frame: Football Rush's thighs 41–70° a frame there (29° with the
+ * planter off). Now the leg lets go in ROTATION: the hip and knee the layer last wrote are held and slerped onto the clip's over
+ * this long, so a release can never move the leg more than the clip itself plus 1/this of the gap a frame. 0 = the old target fade
+ * exactly. The engage (anim.plantEngageSec), the pin and its weight are unchanged.
+ */
+export const PLANT_RELEASE_SEC = RELEASE_FADE_SEC;
+
+/**
+ * GAMEPLAY-CLEAN P5 (2026-11-10): A FOOT THAT PLANTS AGAIN CARRIES ITS RELEASE THROUGH, feel knob `anim.plantReplantEase` (1 on).
+ *
+ * P4's rotation release holds the leg the layer last wrote and slerps it onto the clip's over PLANT_RELEASE_SEC. A foot that planted
+ * AGAIN inside that time ENDED the release on the spot (`relLeft = 0`) — and the release had also zeroed the engage, so the new plant's
+ * first solve is the clip's own pose: the leg jumped the rest of the way from the held pose to the clip in ONE frame, then eased back
+ * out to the pole. It happens every time a pin is let go and taken straight back: a stance foot sliding to the drift limit (released
+ * there, low and still, so planted again on the next frame — "a clip that never steps slides smoothly at the drift limit", S7), a
+ * one-frame airborne read on a landing or a step down. Measured headless on a stance with its knees turned out 40°, the root sliding
+ * at 0.5–3 m/s: the thigh 33.5° in a frame at every release (6.4° with P4 off; 40° before P3) — P4 had put back most of the pop P3
+ * took out, on this path only. Now the release carries on under the new plant: the held hip and knee keep slerping onto whatever the
+ * layer solves this frame (the clip's pose at first, the pinned one as the engage comes back), for what is left of the release time.
+ * 0 = a replant ends the release at once, exactly as P4 shipped. The pin, its weight, the engage and the release time are unchanged.
+ */
+export const PLANT_REPLANT_EASE_ON = 1;
+
+/** The solve's engage weight one frame on (pure): toward 1 while the layer solves the leg, toward 0 when it stops, at 1/`sec` a second
+ *  — a hard step at `sec` ≤ 0 (the old behaviour). */
+export function stepEngage(w: number, solving: boolean, dt: number, sec: number): number {
+  const want = solving ? 1 : 0;
+  if (!(sec > 0)) return want;
+  const k = Math.max(0, dt) / sec;
+  return want > w ? Math.min(want, w + k) : Math.max(want, w - k);
+}
+/**
+ * GAMEPLAY-CLEAN P5 (2026-11-10): A SEATED BODY HOLDS NO PIN, feel knob `anim.plantSeatedOff` (1 on). Every spawned hero carries this
+ * layer (CharacterLibrary.spawn), and contact is read from the clip's ankle height over the root: a pilot sitting in a cockpit has
+ * his ankles at the root's height, so the layer read his feet as DOWN and pinned them to the world while the plane flew on at
+ * 14–30 m/s — let go at the drift limit a frame later, pinned again, every few frames. Aero Aces in play (the rig, 14 s): knees 51–63°
+ * and thighs 22–40° in one frame, 2–3 hard pops a run; with `?noplant=1` none, every bone under 1.3° a frame. A mode that seats its
+ * body says so (setPlantingSeated); the layer then treats the body as AIRBORNE (MOVEMENT POLISH below): a pin it holds is let go
+ * through the release, and none is taken. A body not marked seated runs exactly as before. 0 = the mark is ignored.
+ */
+export const PLANT_SEATED_OFF_ON = 1;
+const seatedBodies = new WeakSet<Skeleton>();
+/** A mode that seats this body in a vehicle (a cockpit, a kart) marks it: its feet hold no pin until unmarked. */
+export function setPlantingSeated(skeleton: Skeleton, seated: boolean): void { if (seated) seatedBodies.add(skeleton); else seatedBodies.delete(skeleton); }
+
 /** MOVEMENT POLISH (2026-10-06): a root moving vertically faster than this (m/s) is in the air — a jump, a drop — and holds no pin. A
  *  walking body's root does not bob (the clips carry the bob below it); steps and ramps move it well under this. */
 export const AIRBORNE_VY = 1.2;
@@ -164,38 +231,64 @@ export function applyWorldDelta(n: TransformNode, delta: Quaternion, w = 1): voi
  *  `target` (world), knee toward `pole`. Knee first — its delta is defined on
  *  the pre-aim pose — then the hip, which the knee inherits. Returns the
  *  ankle's remaining miss in metres. */
-export function plantLeg(hip: TransformNode, knee: TransformNode, ankle: TransformNode, target: Vector3, pole: Vector3): number {
-  // solved in the rig's own frame — see TwoBoneIK.solveChainInFrame (handedness)
-  return solveChainInFrame(hip, knee, ankle, target, pole, 1).miss;
+/** P3 (pure, given the nodes): the knee pole at engage `e` — the clip's own knee direction (the knee off the hip–ankle line, world)
+ *  slerped toward `forward` by `e`. A straight leg has no knee direction of its own: `forward`. Written into `out`. */
+export function engagePole(leg: { hip: TransformNode; knee: TransformNode; ankle: TransformNode }, forward: Vector3, e: number, out: Vector3): Vector3 {
+  leg.hip.computeWorldMatrix(true); leg.knee.computeWorldMatrix(true); leg.ankle.computeWorldMatrix(true);
+  const h = leg.hip.getAbsolutePosition(), k = leg.knee.getAbsolutePosition(), a = leg.ankle.getAbsolutePosition();
+  const ax = a.x - h.x, ay = a.y - h.y, az = a.z - h.z; const len2 = ax * ax + ay * ay + az * az;
+  const kx = k.x - h.x, ky = k.y - h.y, kz = k.z - h.z;
+  const t = len2 > 1e-8 ? (kx * ax + ky * ay + kz * az) / len2 : 0;
+  let bx = kx - ax * t, by = ky - ay * t, bz = kz - az * t; const bl = Math.hypot(bx, by, bz);
+  const f = forward.length() > 1e-8 ? forward : Vector3.Forward();
+  if (bl < 1e-3 || e >= 1) return out.copyFrom(f);   // the pole the layer always used, as given (no renormalise: bit for bit at engage 1)
+  bx /= bl; by /= bl; bz /= bl;
+  const fl = f.length();
+  out.set(bx + (f.x / fl - bx) * e, by + (f.y / fl - by) * e, bz + (f.z / fl - bz) * e);
+  return out.length() > 1e-6 ? out.normalize() : out.copyFrom(f).normalize();
 }
+
+export function plantLeg(hip: TransformNode, knee: TransformNode, ankle: TransformNode, target: Vector3, pole: Vector3, weight = 1): number {
+  // solved in the rig's own frame — see TwoBoneIK.solveChainInFrame (handedness); `weight` slerps the solve's rotations (P3: the engage)
+  return solveChainInFrame(hip, knee, ankle, target, pole, weight).miss;
+}
+
+/** Dev probes only: `?noplant=1` mounts no foot planting (the A/B, like `?noposture=1` and `?nomotion=1`). */
+export const PLANT_OFF = process.env.NODE_ENV === 'development' && typeof location !== 'undefined' && /[?&]noplant=1/.test(location.search);
 
 export function mountFootPlanting(scene: Scene, skinned: AbstractMesh, skeleton: Skeleton, opts: FootPlantingOpts): FootPlantingHandle {
   void skinned;   // kept in the signature: callers pass it, and a per-mesh solver may want it again
   const intensity = opts.intensity ?? 1;
   const params = opts.params ?? DEFAULT_CONTACT;
   const debug = { left: { planted: false, pin: { x: 0, y: 0, z: 0 } }, right: { planted: false, pin: { x: 0, y: 0, z: 0 } } };
-  if (intensity <= 0) return { dispose() { /* off */ }, debug };
+  if (intensity <= 0 || PLANT_OFF) return { dispose() { /* off */ }, debug };
 
   // The pin is stored in the ROOT's frame at plant time and rebuilt each frame
   // with the root's CURRENT yaw but its PLANT-TIME position: root translation
   // (the thing that makes feet skate) is resisted; code-driven turning in place
   // is not fought, or every facing change would wind the legs up.
   type Leg = { side: Side; hip: TransformNode; knee: TransformNode; ankle: TransformNode; pinLocal: Vector3; rootAtPlant: Vector3;
-    prevClip: Vector3 | null; prevRoot: Vector3 | null; fadeLeft: number; fadeW: number; fadeTarget: Vector3; claimPin: Vector3 | null };
+    prevClip: Vector3 | null; prevRoot: Vector3 | null; fadeLeft: number; fadeW: number; fadeTarget: Vector3; claimPin: Vector3 | null;
+    /** P3: the solve's engage weight (stepEngage). */
+    engage: number;
+    /** P4: the hip / knee rotations the layer wrote last (and on which frame), and a rotation release in flight (held pose, time left). */
+    outHip: Quaternion; outKnee: Quaternion; outFrame: number; relHip: Quaternion; relKnee: Quaternion; relLeft: number };
   const legs: Leg[] = [];
   for (const side of ['Left', 'Right'] as Side[]) {
     const hip = bone(skeleton, `${side}UpLeg`)?.getTransformNode() ?? null;
     const knee = bone(skeleton, `${side}Leg`)?.getTransformNode() ?? null;
     const ankle = bone(skeleton, `${side}Foot`)?.getTransformNode() ?? null;
     if (!hip || !knee || !ankle) continue;
-    legs.push({ side, hip, knee, ankle, pinLocal: new Vector3(), rootAtPlant: new Vector3(), prevClip: null, prevRoot: null, fadeLeft: 0, fadeW: 0, fadeTarget: new Vector3(), claimPin: null });
+    legs.push({ side, hip, knee, ankle, pinLocal: new Vector3(), rootAtPlant: new Vector3(), prevClip: null, prevRoot: null, fadeLeft: 0, fadeW: 0, fadeTarget: new Vector3(), claimPin: null, engage: 0,
+      outHip: new Quaternion(), outKnee: new Quaternion(), outFrame: -2, relHip: new Quaternion(), relKnee: new Quaternion(), relLeft: 0 });
   }
   if (legs.length === 0) return { dispose() { /* no legs */ }, debug };
 
   // RIG-PERF (2026-10-16): no garbage per frame. The root's pose, each clip ankle, the swing steps and the contact read go through
   // the scratches below instead of fresh clones and literals (the same values, the same arithmetic); the legs loop is indexed.
   // A contact state still changes object only when stepContact makes a new one, as before.
-  const target = new Vector3();
+  const target = new Vector3(), pole = new Vector3();
+  let frameNo = 0;   // P4: the layer's own frame count (a release holds only a pose written on the frame before)
   const rootPos = new Vector3(), ankle = new Vector3(), rel = new Vector3();
   const rootRot = new Quaternion(), rootInv = new Quaternion();
   const rootStepS = { x: 0, z: 0 }, relStep = { x: 0, z: 0 }, ankleXYZ = { x: 0, y: 0, z: 0 };
@@ -204,6 +297,10 @@ export function mountFootPlanting(scene: Scene, skinned: AbstractMesh, skeleton:
     rootPos.copyFrom(opts.root.getAbsolutePosition());
     rootRot.copyFrom(opts.root.absoluteRotationQuaternion);
     const dt = Math.min(0.1, Math.max(1e-4, scene.getEngine().getDeltaTime() / 1000));
+    const engageSec = feel('anim.plantEngageSec', PLANT_ENGAGE_SEC);
+    const releaseSec = feel('anim.plantReleaseSec', PLANT_RELEASE_SEC);
+    const replantEase = feel('anim.plantReplantEase', PLANT_REPLANT_EASE_ON) >= 0.5;
+    frameNo++;
     for (let li = 0; li < legs.length; li++) {
       const leg = legs[li];
       leg.ankle.computeWorldMatrix(true);
@@ -218,9 +315,10 @@ export function mountFootPlanting(scene: Scene, skinned: AbstractMesh, skeleton:
       // jump lifts the root with the ankle — so the foot planted at take-off stayed pinned to the floor's XZ while the body flew on, and
       // let go only at the drift limit (Free Run's take-off at 6 m/s: the trailing foot dragged back, then caught up 34 cm/frame² in a
       // frame on a hard jump, 25 with this, _movement-probe). The root rising or falling faster than AIRBORNE_VY lifts every pin (with the release fade).
-      const flying = !!pr && Math.abs(rootPos.y - pr.y) / dt > AIRBORNE_VY;
+      // (P5: a body its mode has seated is airborne for this layer — no pin is taken, a held one is let go)
+      const flying = (seatedBodies.has(skeleton) && feel('anim.plantSeatedOff', PLANT_SEATED_OFF_ON) >= 0.5) || (!!pr && Math.abs(rootPos.y - pr.y) / dt > AIRBORNE_VY);
       leg.prevClip = pc ?? new Vector3(); leg.prevClip.copyFrom(ankle); leg.prevRoot = pr ?? new Vector3(); leg.prevRoot.copyFrom(rootPos);
-      if (jumped) { debug[leg.side === 'Left' ? 'left' : 'right'] = { planted: false, pin: { x: ankle.x, y: ankle.y, z: ankle.z } }; leg.fadeLeft = 0; leg.claimPin = null; continue; }   // a teleport: nothing to hold
+      if (jumped) { debug[leg.side === 'Left' ? 'left' : 'right'] = { planted: false, pin: { x: ankle.x, y: ankle.y, z: ankle.z } }; leg.fadeLeft = 0; leg.claimPin = null; leg.engage = 0; leg.relLeft = 0; continue; }   // a teleport: nothing to hold
       const key = leg.side === 'Left' ? 'left' : 'right';
       const prev = debug[key];
       let next: ContactState;
@@ -229,7 +327,7 @@ export function mountFootPlanting(scene: Scene, skinned: AbstractMesh, skeleton:
       debug[key] = next;
       // S30: a claimed leg is the claimant's (the contact state above still reads the clip); the claim's end hands the foot over from its pin
       const claim = legClaims.get(skeleton)?.get(leg.side);
-      if (claim) { (leg.claimPin ??= new Vector3()).copyFrom(claim); leg.fadeLeft = 0; continue; }
+      if (claim) { (leg.claimPin ??= new Vector3()).copyFrom(claim); leg.fadeLeft = 0; leg.engage = 1; leg.relLeft = 0; continue; }   // (the claimant solves the leg, its knee to the forward: the hand-over carries on from there)
       let handover = false;
       if (leg.claimPin) {
         handover = true;
@@ -238,17 +336,31 @@ export function mountFootPlanting(scene: Scene, skinned: AbstractMesh, skeleton:
         leg.claimPin = null;
       }
       if (!next.planted) {
+        // P4: let go in ROTATION — the leg the layer wrote last frame, slerped onto the clip's (PLANT_RELEASE_SEC)
+        if (prev.planted && !handover && releaseSec > 0 && leg.outFrame === frameNo - 1) {
+          leg.relHip.copyFrom(leg.outHip); leg.relKnee.copyFrom(leg.outKnee); leg.relLeft = releaseSec; leg.fadeLeft = 0; leg.engage = 0;
+        }
+        if (leg.relLeft > 0) {
+          leg.relLeft = Math.max(0, leg.relLeft - dt);
+          const k = releaseSec > 0 ? 1 - leg.relLeft / releaseSec : 1;
+          Quaternion.SlerpToRef(leg.relHip, leg.hip.rotationQuaternion!, k, leg.hip.rotationQuaternion!);
+          Quaternion.SlerpToRef(leg.relKnee, leg.knee.rotationQuaternion!, k, leg.knee.rotationQuaternion!);
+          leg.hip.computeWorldMatrix(true); leg.knee.computeWorldMatrix(true); leg.ankle.computeWorldMatrix(true);
+          continue;
+        }
         // let go by the clip: the pin FADES instead of dropping — a planted foot the clip lifts or swings eases onto the clip
         if (prev.planted && !handover) leg.fadeLeft = RELEASE_FADE_SEC;
         if (leg.fadeLeft > 0 && leg.fadeW > 0.001) {
           if (flying && rootStep) { leg.fadeTarget.x += rootStep.x; leg.fadeTarget.z += rootStep.z; }   // (polish) a pin let go in the air fades out WITH the body
           leg.fadeLeft = Math.max(0, leg.fadeLeft - dt);
           const w = leg.fadeW * (leg.fadeLeft / RELEASE_FADE_SEC);
-          if (w > 0.001) { target.copyFrom(leg.fadeTarget); target.y = ankle.y; Vector3.LerpToRef(ankle, target, w, target); plantLeg(leg.hip, leg.knee, leg.ankle, target, opts.root.forward); }
+          if (w > 0.001) { target.copyFrom(leg.fadeTarget); target.y = ankle.y; Vector3.LerpToRef(ankle, target, w, target); solveEngaged(leg, target, true, dt, engageSec); continue; }
         }
+        solveEngaged(leg, ankle, false, dt, engageSec);
         continue;
       }
       leg.fadeLeft = 0;
+      if (!(replantEase && releaseSec > 0)) leg.relLeft = 0;   // (P4: a foot that plants again ends a release in flight; P5: it carries it through — carryRelease)
       if (!prev.planted && !handover) {
         // touchdown: remember where the foot is, in the root's frame
         leg.rootAtPlant.copyFrom(rootPos);
@@ -259,11 +371,34 @@ export function mountFootPlanting(scene: Scene, skinned: AbstractMesh, skeleton:
       const drift = Math.hypot(ankle.x - target.x, ankle.z - target.z);
       const w = pinWeight(drift, params.maxDrift) * intensity;
       leg.fadeW = w; leg.fadeTarget.copyFrom(target);   // what a release fades out from
-      if (w <= 0.001 || drift < 0.002) continue;
+      if (w <= 0.001 || drift < 0.002) { solveEngaged(leg, ankle, false, dt, engageSec); carryRelease(leg, dt, releaseSec); continue; }
       Vector3.LerpToRef(ankle, target, w, target);
-      plantLeg(leg.hip, leg.knee, leg.ankle, target, opts.root.forward);
+      solveEngaged(leg, target, true, dt, engageSec);
+      carryRelease(leg, dt, releaseSec);
     }
   });
+  /** P5: a release still in flight when its foot planted again — the held hip and knee go on slerping onto what the layer wrote this
+   *  frame (the clip's pose, or the new plant's solve), over what is left of the release. Nothing when no release is in flight. */
+  function carryRelease(leg: Leg, dt: number, releaseSec: number): void {
+    if (!(leg.relLeft > 0)) return;
+    leg.relLeft = Math.max(0, leg.relLeft - dt);
+    const k = releaseSec > 0 ? 1 - leg.relLeft / releaseSec : 1;
+    Quaternion.SlerpToRef(leg.relHip, leg.hip.rotationQuaternion!, k, leg.hip.rotationQuaternion!);
+    Quaternion.SlerpToRef(leg.relKnee, leg.knee.rotationQuaternion!, k, leg.knee.rotationQuaternion!);
+    leg.hip.computeWorldMatrix(true); leg.knee.computeWorldMatrix(true); leg.ankle.computeWorldMatrix(true);
+    leg.outHip.copyFrom(leg.hip.rotationQuaternion!); leg.outKnee.copyFrom(leg.knee.rotationQuaternion!); leg.outFrame = frameNo;   // what a later release holds
+  }
+  /** P3: solve the leg with its KNEE POLE eased by the engage. The pin's target is solved at full weight (the plant is as strong as
+   *  ever); what blends is where the solve throws the knee: from the clip's own knee (engage 0 — a solve toward the clip's ankle
+   *  with the clip's knee IS the clip's pose: nothing moves) to the root's forward (engage 1, the layer as it was). Not solving
+   *  while the engage runs out: toward the clip's ankle, the knee easing back to the clip's. Nothing once the engage is spent. */
+  function solveEngaged(leg: Leg, to: Vector3, solving: boolean, dt: number, engageSec: number): void {
+    leg.engage = stepEngage(leg.engage, solving, dt, engageSec);
+    if (leg.engage <= 0.001) return;
+    if (to !== target) target.copyFrom(to);
+    plantLeg(leg.hip, leg.knee, leg.ankle, target, engagePole(leg, opts.root.forward, leg.engage, pole), 1);
+    leg.outHip.copyFrom(leg.hip.rotationQuaternion!); leg.outKnee.copyFrom(leg.knee.rotationQuaternion!); leg.outFrame = frameNo;   // P4: what a release holds
+  }
   return {
     debug,
     dispose() { scene.onAfterAnimationsObservable.remove(obs); },

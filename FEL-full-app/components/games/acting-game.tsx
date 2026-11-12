@@ -203,7 +203,7 @@ export default function ActingGame({ onEnd }: GameProps) {
     <div className="min-h-screen w-full" style={{ background: BG, color: '#fff' }}>
       <div className="mx-auto max-w-3xl px-5 py-6">
         <div className="mb-6 flex items-center justify-between">
-          <Link href="/creator" className="inline-flex items-center gap-2 text-sm text-white/60 transition hover:text-white">
+          <Link href="/creator" className="inline-flex min-h-11 items-center gap-2 text-sm text-white/60 transition hover:text-white">
             <ArrowLeft className="h-4 w-4" /> Creator Hub
           </Link>
           <span className="text-xs font-semibold tracking-[0.3em]" style={{ color: RED }}>FEL · ACTING</span>
@@ -353,10 +353,10 @@ function PerformScreen({
               }}
             >
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: INTENSITY_COLOR[l.intensity] }}>
+                <span className="text-[12px] font-semibold uppercase tracking-widest" style={{ color: INTENSITY_COLOR[l.intensity] }}>
                   {l.intensity} · cue {l.cueAt.toFixed(1)}s
                 </span>
-                {state === 'done' && <span className="text-[10px]" style={{ color: GREEN }}>✓</span>}
+                {state === 'done' && <span className="text-[12px]" style={{ color: GREEN }}>✓</span>}
               </div>
               <div className="mt-1 text-lg font-semibold">{l.text}</div>
             </div>
@@ -419,7 +419,7 @@ function ResultsScreen({
                   {(ls.total * 100).toFixed(0)}%
                 </span>
               </div>
-              <div className="mt-1 flex items-center justify-between text-[11px] text-white/45">
+              <div className="mt-1 flex items-center justify-between text-[12px] text-white/50">
                 <span>timing {(ls.timing * 100).toFixed(0)} · energy {(ls.energy * 100).toFixed(0)} · range {(ls.range * 100).toFixed(0)}</span>
                 <span className="italic">{ls.note}</span>
               </div>

@@ -23,8 +23,9 @@ import { spinBackspin } from '../visual/BallSpin';
 import { sideOfVector } from '../anim/athleteSide';   // HOOPS MOTION phase 3: the one visual-side helper (the rival's crossover side)
 import { sampleRimPlay, type RimPlay, type RimTouch } from './RimPlay';   // RIM PLAY (2026-09-18): the ball's time on the iron
 import type { AIBehavior, Intent } from './PlayerSlot';
-import { CourtMovement, CUT_COST_HOOPS, DEFAULT_MOVEMENT, GEARS_HOOPS, type Gear } from './CourtMovement';
-import { HOOPS_HANDLER_TURN_DEG, retreatCapK } from './HoopsStick';   // hoops-reverse: the handler's turn rate (a feel knob; 540 = DEFAULT_MOVEMENT's)
+import { hasBallM } from './PossessionSwap';   // lane/h3-aware (#313 H3c): "his man has the ball" — HAS_BALL_M, a feel knob
+import { CourtMovement, CUT_COST_HOOPS, DEFAULT_MOVEMENT, GEARS_HANDLER, type Gear } from './CourtMovement';
+import { retreatCapK } from './HoopsStick';   // hoops-reverse: the retreat cap (the handler's turn rate now rides in GEARS_HANDLER — hoops-p01)
 import { PERFECT_BAND_SHARE } from './shotBands';   // lane/hoops-shot-core: the perfect band's share, one constant for the grade and both bars
 import {   // HOOPS-MOVE-KIT-A O1–O3: the off-ball jobs (screen / roll / pop / crash, box-out, navigating a screen)
   screenSpot, pickScreenSide, stepScreen, SCREEN_IDLE, rollLaneOpen, rollTarget, crashSpot, navigateAround, boxOutSpot, SCREEN_MIN_RIM_DIST,
@@ -32,6 +33,7 @@ import {   // HOOPS-MOVE-KIT-A O1–O3: the off-ball jobs (screen / roll / pop /
 } from './HoopsOffball';
 import { BallSideShade } from './BallSideShade';   // hoops-defense-fx (owner 2026-10-20): the on-ball man shades the ball side
 import { aiPokes } from './ReachTell';   // lane/hoops-def-tell (#273 T-A): the poke is a per-second rate aimed at the led ball
+import { cushionLever } from '../hoops/pressure';   // hoops-p02 (1v1/3v3 phase 2): the on-ball man's cushion on a moving handler
 
 // ── Movement ─────────────────────────────────────────────────────────────
 export interface DribbleResult { crossover: boolean; hesitation: boolean; speed01: number; facingRad: number; planting: boolean; gear: Gear; intensity01: number; paceChange: boolean }
@@ -139,7 +141,7 @@ export class DribbleController {
   private explodeFloor = DribbleController.EXPLODE_FLOOR;
 
   constructor(cfg = { maxSpeed: 6.4, accel: 26, decel: 34, turnRate: 9, crossoverBoost: 2.2 }) {
-    this.movement = new CourtMovement({ ...DEFAULT_MOVEMENT, maxSpeed: cfg.maxSpeed, gears: { ...GEARS_HOOPS, turnRateDeg: HOOPS_HANDLER_TURN_DEG }, cutCost: CUT_COST_HOOPS });   // hoops-reverse: the handler's turn rate is a feel knob (540, as before)   // Phase 5: a stick cut at pace costs speed   // DRIBBLE PACE: the gears are on for the ball handler
+    this.movement = new CourtMovement({ ...DEFAULT_MOVEMENT, maxSpeed: cfg.maxSpeed, gears: GEARS_HANDLER, cutCost: CUT_COST_HOOPS });   // hoops-p01: the handler's own gears (GEARS_HOOPS + the phase-1 stop / launch, turnRateDeg as before)   // hoops-reverse: the handler's turn rate is a feel knob (540, as before)   // Phase 5: a stick cut at pace costs speed   // DRIBBLE PACE: the gears are on for the ball handler
     this.crossoverBoost = cfg.crossoverBoost;
   }
   private crossoverBoost: number;
@@ -832,7 +834,7 @@ export class DefenderBrain implements AIBehavior {
 
   decide(dt: number, self: Vector3, ball: Vector3, hoop: Vector3, allies: Vector3[] = [], foes: Vector3[] = []): Intent {
     const mark = this.markIndex !== null ? foes[this.markIndex] ?? null : null;
-    const markHasBall = mark ? distXZ(mark, ball) < 1.8 : false;
+    const markHasBall = mark ? distXZ(mark, ball) < hasBallM() : false;   // lane/h3-aware (#313): 1.8 → 1.0 m (core/PossessionSwap HAS_BALL_M)
     // A LIVE BALL outranks everything. Measured in 3v3: after a miss every one of the six bodies sat
     // 8-19 m from the ball holding its seal or its crash lane, and the board fell through to the dice
     // roll — because no job in the system meant "go and get the actual ball".
@@ -935,7 +937,7 @@ export class DefenderBrain implements AIBehavior {
     if (onBall && !beaten && !press && handlerSpeed < 0.9) {
       const armLever = DefenderBrain.ARMS_LENGTH / Math.max(0.5, Vector3.Distance(anchor, hoop));
       if (lever > armLever) denyPoint = Vector3.Lerp(anchor, hoop, armLever);
-    }
+    } else if (onBall && !beaten && !press) denyPoint = Vector3.Lerp(anchor, hoop, cushionLever(lever, distXZ(anchor, hoop), handlerSpeed));   // hoops-p02: on a MOVING handler, at most a cushion off him (hoops/pressure)
     if (!onBall) denyPoint = Vector3.Lerp(denyPoint, ball, 0.22);
     if (helping) denyPoint = Vector3.Lerp(hoop, ball, 0.2);   // the low man steps INTO the drive
 
@@ -1136,6 +1138,18 @@ export class TurboMeter {
 }
 
 // ── NEW (v3): the ball flight arc ────────────────────────────────────────
+/** A release's flight: how long it takes and how high it bows over the straight line (m). ShotArc flies it; hoops/blocks reads the
+ *  same numbers to know where the ball will be in its first frames (hoops-p02: the block is the hand meeting THIS ball). */
+export function shotArcShape(style: ShotStyle, dist: number, apexAdd = 0): { duration: number; apex: number } {
+  const layupLike = style === 'layup' || style === 'reverse' || style === 'scoop' || style === 'spinLayup' || style === 'hangLayup';
+  return {
+    duration: layupLike ? 0.4 : Math.min(0.9, 0.45 + dist * 0.045),
+    // HOOPS-MOVE-KIT-B: a hook goes UP and over the shoulder (a high soft arc off the block); a fadeaway is a longer,
+    // higher ball because the body is falling away from the rim as it leaves
+    apex: (style === 'floater' ? 2.2 : layupLike ? 0.9 : style === 'hook' ? 2.0 : style === 'fadeaway' ? 1.85 : 1.6) + apexAdd,   // HOOPS-MOVE-KIT-A D3: an ALTERED release arcs higher
+  };
+}
+
 /** Parabolic flight from the release point to the rim (or a front-rim
  *  clang point for misses). Pure visual sell — the make/miss is decided at
  *  release; step() returns 'flying' | 'made' | 'missed' when it lands. */
@@ -1173,11 +1187,9 @@ export class ShotArc {
       this.to.x += (Math.random() - 0.5) * 0.3;
       this.to.z += 0.22;
     }
-    const dist = Vector3.Distance(from, rim);
-    this.duration = style === 'layup' || style === 'reverse' || style === 'scoop' || style === 'spinLayup' || style === 'hangLayup' ? 0.4 : Math.min(0.9, 0.45 + dist * 0.045);
-    // HOOPS-MOVE-KIT-B: a hook goes UP and over the shoulder (a high soft arc off the block); a fadeaway is a longer,
-    // higher ball because the body is falling away from the rim as it leaves
-    this.apex = (style === 'floater' ? 2.2 : style === 'layup' || style === 'reverse' || style === 'scoop' || style === 'spinLayup' || style === 'hangLayup' ? 0.9 : style === 'hook' ? 2.0 : style === 'fadeaway' ? 1.85 : 1.6) + apexAdd;   // HOOPS-MOVE-KIT-A D3: an ALTERED release arcs higher
+    const shape = shotArcShape(style, Vector3.Distance(from, rim), apexAdd);   // hoops-p02: one formula, read by the block test too
+    this.duration = shape.duration;
+    this.apex = shape.apex;
     this.t = 0;
     this.active = true;
   }
@@ -1328,7 +1340,10 @@ export const LAYUP_STRIDE_SPEED = 2.4;        // a layup is gathered IN STRIDE �
 export const HAND_UP_SEC = 0.7;                // a jump this recent still puts a hand in the shot …
 export const HAND_UP_CONTEST = 0.3;            // … worth this much contest
 
-export type AttackPhase = 'check' | 'drive' | 'sidestep' | 'blowby' | 'stepback' | 'gather' | 'released';
+export type AttackPhase = 'check' | 'drive' | 'sidestep' | 'blowby' | 'stepback' | 'gather' | 'released'
+  | 'hesi' | 'spin' | 'post';   // hoops-p03: the move kit's (hoops/rivalOffense) — the release's script never enters them
+/** hoops-p03: how a rival shot looks (the odds are its style's: a floater / fade is a 'jumper', a hook a 'layup'). */
+export type RivalShotLook = 'floater' | 'hook' | 'fade' | null;
 export interface AttackDecision {
   /** Wish velocity (m/s, planar). */
   wish: Vector3;
@@ -1343,6 +1358,24 @@ export interface AttackDecision {
   crossover: 'left' | 'right' | null;
   /** The release frame: the shot to take now. HOOPS-MOVE-KIT-A D1: a beaten defender (the blow-by) gets DUNKED on. */
   shot: 'layup' | 'jumper' | 'dunk' | null;
+  /** hoops-p03 (the move kit only): the action started this frame (hoops/rivalOffense RIVAL_ACTIONS) — the mode's clip and log. */
+  action?: string | null;
+  /** hoops-p03: his back is to the rim (the post-up, the turnaround's gather). */
+  backToRim?: boolean;
+  /** hoops-p03: how the shot looks (a floater, a hook, a fade); null = the release's own. */
+  look?: RivalShotLook;
+  /** hoops-p03: the side of HIS body a kit move started this frame goes to (the ball's end side on a behind-the-back) — the clip's. */
+  moveSide?: 'left' | 'right' | null;
+  /** hoops-p04: on a gather frame, the shot it is for (the clip is paced to its release: hoops/releaseTiming). */
+  shotPlan?: 'layup' | 'jumper' | 'dunk' | null;
+}
+/** hoops-p03: the brain's decision, delegated (hoops/rivalOffense RivalKit). It owns its per-possession state and writes the brain's
+ *  public t / phase / containedSec, which the mode reads. */
+export interface AttackerDelegate {
+  decide(b: AttackerBrain, dt: number, self: Vector3, defender: Vector3, hoop: Vector3, opts: { defenderAirborne: boolean }): AttackDecision;
+  reset(b: AttackerBrain): void;
+  blowBy(b: AttackerBrain): void;
+  noteStolen(): void;
 }
 
 export class AttackerBrain {
@@ -1366,17 +1399,24 @@ export class AttackerBrain {
    *  DUNK on him. A defender who was never there (an unguarded drive) is just a layup line, which is what the open-drive
    *  check expects. */
   private beaten = false;
+  /** hoops-p03: the MOVE KIT and its reads (hoops/rivalOffense RivalKit, by tier) — when set, the decision is the kit's; null = the
+   *  release's script below, exactly (knob `hoops.rivalKitOn` 0). */
+  kit: AttackerDelegate | null = null;
   constructor(private rng: () => number = Math.random) { this.reset(); }
+  /** hoops-p03: hand the brain a kit (or null: the script). Starts a fresh possession on it. */
+  useKit(kit: AttackerDelegate | null): void { this.kit = kit; this.reset(); }
   /** The defender picked a crossover: fewer crossovers, more shuffles, from now on. */
-  noteStolen(): void { this.caution = Math.min(CROSSOVER_CHANCE - CROSSOVER_FLOOR, this.caution + CAUTION_PER_STEAL); }
+  noteStolen(): void { this.caution = Math.min(CROSSOVER_CHANCE - CROSSOVER_FLOOR, this.caution + CAUTION_PER_STEAL); this.kit?.noteStolen(); }
   reset(): void {
     this.caution = Math.max(0, this.caution - CAUTION_DECAY);
     this.t = 0; this.phase = 'check'; this.containedSec = 0; this.side = this.rng() < 0.5 ? -1 : 1;
     this.sideSec = 0; this.blowbySec = 0; this.gatherSec = 0; this.stepbackSec = 0; this.pending = null; this.beaten = false; this.swayPhase = this.rng() * Math.PI * 2;
+    this.kit?.reset(this);
   }
   /** A whiffed reach / a jump at nothing opens the lane: the rival goes NOW. No effect once the shot is up. */
-  blowBy(): void { if (this.phase === 'gather' || this.phase === 'released' || this.phase === 'check' || this.phase === 'stepback') return; this.phase = 'blowby'; this.blowbySec = 0; this.beaten = this.containedSec > 0.15; }
+  blowBy(): void { if (this.kit) { this.kit.blowBy(this); return; } if (this.phase === 'gather' || this.phase === 'released' || this.phase === 'check' || this.phase === 'stepback') return; this.phase = 'blowby'; this.blowbySec = 0; this.beaten = this.containedSec > 0.15; }
   decide(dt: number, self: Vector3, defender: Vector3, hoop: Vector3, opts: { defenderAirborne: boolean } = { defenderAirborne: false }): AttackDecision {
+    if (this.kit) return this.kit.decide(this, dt, self, defender, hoop, opts);
     this.t += dt;
     const zero = new Vector3(0, 0, 0);
     if (this.phase === 'released') return { wish: zero, phase: 'released', contained: false, exposure: 0, step: false, crossover: null, shot: null };
@@ -1388,7 +1428,7 @@ export class AttackerBrain {
       // a layup gathers in stride (the last step to the rim); a jumper rises on the spot
       const stride = (this.pending === 'layup' || this.pending === 'dunk') && dist > 0.9 ? dir.scale(LAYUP_STRIDE_SPEED) : zero;
       if (this.gatherSec >= GATHER_SEC) { this.phase = 'released'; return { wish: zero, phase: 'released', contained: false, exposure: 0, step: false, crossover: null, shot: this.pending }; }
-      return { wish: stride, phase: 'gather', contained: false, exposure: 0, step: false, crossover: null, shot: null };
+      return { wish: stride, phase: 'gather', contained: false, exposure: 0, step: false, crossover: null, shot: null, shotPlan: this.pending };
     }
     const perp = new Vector3(-dir.z, 0, dir.x);               // the lane's lateral
     if (this.phase === 'stepback') {
@@ -1453,7 +1493,7 @@ export class AttackerBrain {
       if (inLane) { this.phase = 'stepback'; this.stepbackSec = 0; wish = dir.scale(-STEPBACK_SPEED); exposure = 0.2; }
       else { this.phase = 'gather'; this.gatherSec = 0; wish = zero; exposure = 0; }
     }
-    return { wish, phase: this.phase, contained: inLane, exposure, step, crossover, shot: null };
+    return { wish, phase: this.phase, contained: inLane, exposure, step, crossover, shot: null, ...(this.phase === 'gather' ? { shotPlan: this.pending } : {}) };
   }
 }
 /** Which side of the body a lateral vector is on — the athlete's DRAWN side, through the one helper (athleteSide.ts; HOOPS MOTION

@@ -131,7 +131,9 @@ describe('the rules reach the game (#1 #2 #5 #6 #7 #9)', () => {
   });
   it('#9 every ending posts the box score', () => {
     expect(CODE).not.toMatch(/ctx\.end\([^)]*\{ foeScore, assists \}\)/);
-    expect(CODE.match(/ctx\.end\([^;]*endStats\(\)\)/g)?.length).toBe(9);
+    // test changed (hoops-shot-content, 2026-10-20): 9 → 10 — a new ending, a free throw that reaches the target (the line's score hook), and it
+    // posts the box score like the other nine; the assertion (every ending posts endStats) is the same
+    expect(CODE.match(/ctx\.end\([^;]*endStats\(\)\)/g)?.length).toBe(10);
     expect(fn('resolveMyShot')).toMatch(/box\.fga\+\+;/);
   });
 });
