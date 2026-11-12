@@ -70,6 +70,8 @@ export interface ScreenFacts {
   hscroll: { phone: number | null; zoom200: number | null; font150: number | null };
   /** key text cut off (a number, a heading, a control's label), per set-up */
   clipped: { phone: string[]; zoom200: string[]; font150: string[] };
+  /** EVERY-SCREEN (2026-11-12): what a floating button covers on the first screen, at 390 px and with 150 % text */
+  covered?: { phone: string[]; font150: string[] };
   /** READABLE.md size misses at phone width: text under 12 px, body copy under 16 px */
   tiny: number;
   bodySmall: number;
@@ -112,6 +114,8 @@ export function faultsOf(f: ScreenFacts): Fault[] {
   const ownSmall = f.smallTargets.filter((t) => !t.chrome);
   const barSmall = f.smallTargets.filter((t) => t.chrome);
   if (ownSmall.length) add('clear', 'small-targets', Math.min(55, 25 + ownSmall.length), `${plural(ownSmall.length, 'tap target')} under ${BUDGET.tapPx} px (smallest: "${[...ownSmall].sort((a, b) => Math.min(a.w, a.h) - Math.min(b.w, b.h))[0].label}").`);
+  const cov = [...(f.covered?.phone ?? []), ...(f.covered?.font150 ?? [])];
+  if (cov.length) add('clear', 'float-covers', 60, `A floating button covers what is under it: ${cov[0]}${cov.length > 1 ? ` (and ${cov.length - 1} more)` : ''}.`);
   if (barSmall.length) add('clear', 'small-targets-bars', Math.min(40, 20 + barSmall.length), `${plural(barSmall.length, 'tap target')} under ${BUDGET.tapPx} px in the app's own bars.`);
 
   // 2. Looks finished

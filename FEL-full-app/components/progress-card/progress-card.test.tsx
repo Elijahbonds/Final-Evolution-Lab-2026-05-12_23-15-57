@@ -95,11 +95,15 @@ describe('the weekly door', () => {
   // TEST CHANGED (premium-ui P4, 2026-10-27): the Profile tab's door moved from a text link in the progress header to the
   // tab's ONE docked primary (app/profile/page.tsx), same href and the same data-testid; the intent — the weekly door is on
   // the Profile tab — is what this still holds.
+  // TEST CHANGED (profile-week-card, 2026-11-12): the primary no longer docks. Docked, it floated over "This week" and the
+  // jump-check link on a phone's first screen; it now flows in the hero. Same href and data-testid, and it stays the tab's
+  // primary. The test now also holds that it is not docked, so the cover cannot come back unnoticed.
   it('is on Train and is the Profile tab\'s primary', () => {
     const root = join(__dirname, '..', '..');
     expect(readFileSync(join(root, 'app/train/page.tsx'), 'utf8')).toContain('<WeekCardEntry />');
     const profile = readFileSync(join(root, 'app/profile/page.tsx'), 'utf8');
-    expect(profile).toMatch(/<PrimaryCta href="\/profile\/week" docked testId="profile-week-card"/);
+    expect(profile).toMatch(/<PrimaryCta href="\/profile\/week" testId="profile-week-card"/);
+    expect(profile).not.toMatch(/<PrimaryCta href="\/profile\/week"[^>]*\bdocked\b/);
   });
 });
 

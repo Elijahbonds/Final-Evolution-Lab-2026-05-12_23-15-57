@@ -240,5 +240,54 @@ export function readTap(): { dur: number; mutations: number; urlChanged: boolean
   return { dur: Math.round(w.__esTap.dur), mutations: w.__esTap.mutations, urlChanged: location.href !== w.__esTap.url, focusChanged: document.activeElement !== w.__esTap.focus, requests: performance.getEntriesByType('resource').length - w.__esTap.reqs };
 }
 
-declare global { interface Window { __es: { measure: typeof measure; mainAction: typeof mainAction; armTap: typeof armTap; readTap: typeof readTap } } }
-window.__es = { measure, mainAction, armTap, readTap };
+/**
+ * EVERY-SCREEN (profile-week-card, 2026-11-12): a floating button that covers what is under it. A "float" is a fixed layer
+ * outside the app's own bars that holds a link or a button (a docked primary, a corner control). On the screen as it
+ * first paints (scroll 0), every readable run of text and every link or button under one of the float's own controls is
+ * checked at the middle of the overlap with elementFromPoint: if the float's control is what is on top there, that
+ * content is covered. The tab bar and the status rail are chrome (the page is laid out around them) and are not floats.
+ * The page's hero ([data-fel-hero], a <header> outside <main>) is the screen's own, not the status rail: a docked primary
+ * lives inside it, so inChrome's header rule would hide exactly the float this check is for (it missed /profile that way).
+ */
+const chromeHere = (el: Element) => inChrome(el) && !(el.closest('[data-fel-hero]') && !el.closest('nav,[role="navigation"],[data-tabbar-strip],[data-fel-chrome]'));
+export function covered(): string[] {
+  const out: string[] = [];
+  const floats: { box: Element; ctl: Element; r: DOMRect; label: string }[] = [];
+  for (const el of Array.from(document.body.querySelectorAll('*'))) {
+    if (getComputedStyle(el).position !== 'fixed' || chromeHere(el) || !shown(el)) continue;
+    if (el.parentElement && floats.some((f) => f.box.contains(el))) continue;
+    const ctls = (el.matches('a[href],button') ? [el] : Array.from(el.querySelectorAll('a[href],button'))).filter((c) => shown(c) && !chromeHere(c));
+    for (const c of ctls) floats.push({ box: el, ctl: c, r: c.getBoundingClientRect(), label: labelOf(c) });
+  }
+  if (!floats.length) return out;
+  const seen = new Set<string>();
+  const check = (what: string, r: DOMRect, node: Element) => {
+    if (r.bottom <= 0 || r.top >= innerHeight || r.width < 1 || r.height < 1) return;
+    for (const f of floats) {
+      if (f.box.contains(node) || node.contains(f.box)) continue;
+      const x1 = Math.max(r.left, f.r.left), x2 = Math.min(r.right, f.r.right), y1 = Math.max(r.top, f.r.top), y2 = Math.min(r.bottom, f.r.bottom);
+      if (x2 - x1 < 4 || y2 - y1 < 4) continue;
+      const hit = document.elementFromPoint((x1 + x2) / 2, (y1 + y2) / 2);
+      if (!hit || !f.ctl.contains(hit)) continue;
+      const key = `${f.label}|${what}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      if (out.length < 6) out.push(`"${f.label.slice(0, 30)}" covers ${what}`);
+    }
+  };
+  const tw = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let n = tw.nextNode(); n; n = tw.nextNode()) {
+    const t = (n.textContent || '').trim(); const el = n.parentElement;
+    if (!t || !el || !words(t) || el.closest('script,style,noscript,[data-es-ignore]') || chromeHere(el) || !shown(el)) continue;
+    const rg = document.createRange(); rg.selectNodeContents(n);
+    check(`"${t.slice(0, 36)}"`, rg.getBoundingClientRect(), el);
+  }
+  for (const el of Array.from(document.querySelectorAll('a[href],button'))) {
+    if (chromeHere(el) || !shown(el)) continue;
+    check(`the ${el.tagName === 'A' ? 'link' : 'button'} "${labelOf(el).slice(0, 30)}"`, el.getBoundingClientRect(), el);
+  }
+  return out;
+}
+
+declare global { interface Window { __es: { measure: typeof measure; mainAction: typeof mainAction; armTap: typeof armTap; readTap: typeof readTap; covered: typeof covered } } }
+window.__es = { measure, mainAction, armTap, readTap, covered };
