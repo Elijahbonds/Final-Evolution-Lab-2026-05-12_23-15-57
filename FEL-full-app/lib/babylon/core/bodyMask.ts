@@ -309,6 +309,9 @@ export interface WaistFitInput {
   shortsP: ArrayLike<number>; shortsN: ArrayLike<number>; shortsInd: ArrayLike<number>;
   top: MaskSurface;
   bodyP: ArrayLike<number>; bodyN: ArrayLike<number>; bodyInd: ArrayLike<number>;
+  /** KIT-GLITCH: which body vertices may lend the short their place and skin weights (absent: all). The glue passes the
+   *  skin that rides the torso and legs — see WAIST_DONOR_BONES. */
+  bodyOk?: (v: number) => boolean;
 }
 export interface WaistFitResult {
   delta: Float32Array;
@@ -317,10 +320,11 @@ export interface WaistFitResult {
   liftedVerts: number; sunkVerts: number; maxLift: number; gapBefore: number; gapAfter: number }
 
 /** Closest point on the body's skin (triangles) to p, with the interpolated outward normal. */
-function skinProjector(P: ArrayLike<number>, N: ArrayLike<number>, ind: ArrayLike<number>, near: (x: number, y: number, z: number) => boolean) {
+function skinProjector(P: ArrayLike<number>, N: ArrayLike<number>, ind: ArrayLike<number>, near: (x: number, y: number, z: number) => boolean, ok?: (v: number) => boolean) {
   const grid = new Map<string, number[]>();
   for (let t = 0; t + 2 < ind.length; t += 3) {
     const a = ind[t]; if (!near(P[a * 3], P[a * 3 + 1], P[a * 3 + 2])) continue;
+    if (ok && !(ok(a) && ok(ind[t + 1]) && ok(ind[t + 2]))) continue;
     const kk = key(Math.floor(P[a * 3] / TC), Math.floor(P[a * 3 + 1] / TC), Math.floor(P[a * 3 + 2] / TC)); let l = grid.get(kk); if (!l) grid.set(kk, l = []); l.push(t);
   }
   return (x: number, y: number, z: number): { q: [number, number, number]; n: [number, number, number]; v: number } | null => {
@@ -382,7 +386,7 @@ export function fitWaistband(input: WaistFitInput, cfg = WAIST_FIT): WaistFitRes
     let sum = 0, mx = 0; for (let k = -2; k <= 2; k++) { const q = need[(s + k + SECT) % SECT]; sum += q; mx = Math.max(mx, q); }
     return Math.max(need[s], Math.min(mx, sum / 5));
   };
-  const project = skinProjector(input.bodyP, input.bodyN, input.bodyInd, (_x, y) => y > ringLo - cfg.band - 0.1 && y < ringHi + cfg.liftMax + 0.1);
+  const project = skinProjector(input.bodyP, input.bodyN, input.bodyInd, (_x, y) => y > ringLo - cfg.band - 0.1 && y < ringHi + cfg.liftMax + 0.1, input.bodyOk);
   const out = new Float32Array(n * 3);
   for (let v = 0; v < n; v++) { out[v * 3] = S[v * 3]; out[v * 3 + 1] = S[v * 3 + 1]; out[v * 3 + 2] = S[v * 3 + 2]; }
   let liftedVerts = 0, maxLift = 0;
@@ -498,7 +502,7 @@ function fitShortsUnderTop(body: Mesh, bodySkin: { P: Float32Array; N: Float32Ar
     if (want !== null && top && ind && tInd) {
       const sw = skinnedWorld(g, base), tw = skinnedWorld(top, top.__felFlare0);
       if (sw && tw) {
-        const res = fitWaistband({ shortsP: sw.P, shortsN: sw.N, shortsInd: ind, top: { P: tw.P, N: tw.N, ind: tInd }, bodyP: bodySkin.P, bodyN: bodySkin.N, bodyInd });
+        const res = fitWaistband({ shortsP: sw.P, shortsN: sw.N, shortsInd: ind, top: { P: tw.P, N: tw.N, ind: tInd }, bodyP: bodySkin.P, bodyN: bodySkin.N, bodyInd, bodyOk: waistDonorOk(body) });
         const { delta, ...rest } = res; stats = rest;
         for (let i = 0; i < delta.length; i++) sw.P[i] += delta[i];
         fitToBind(g, body, sw.P, delta, res.blend, res.donor, skin0, bind);
@@ -511,6 +515,23 @@ function fitShortsUnderTop(body: Mesh, bodySkin: { P: Float32Array; N: Float32Ar
     g.__felWaistTop = want;
     g.metadata = { ...(g.metadata ?? {}), felWaistFit: stats ? { lifted: stats.liftedVerts, sunk: stats.sunkVerts, maxLift: +stats.maxLift.toFixed(3), gapBefore: +stats.gapBefore.toFixed(3), gapAfter: +stats.gapAfter.toFixed(3) } : null };
   }
+}
+
+/**
+ * KIT-GLITCH (owner 2026-11-12: "clothes floating off the body"). The waistband fit hands each fitted vertex of the short the
+ * skin weights of the body point under it, and "under it" was the NEAREST skin of any kind. With an arm hanging at the side,
+ * or a hand on the hip when the fit ran, the nearest skin to the short's side was the forearm: those vertices took 100 %
+ * forearm weights and followed the arm in every move, a spike off the hip (measured on the rig: shorts vertices weighted
+ * LeftForeArm 1.00, 3.6 bind units from the hips). Only skin that rides the torso and legs lends weights: a body vertex
+ * with at most WAIST_DONOR_MAX of its weight on the arms, hands, neck or head.
+ */
+export const WAIST_DONOR_BONES = /(Shoulder|Arm|ForeArm|Hand|Neck|Head)$/;
+export const WAIST_DONOR_MAX = 0.2;
+function waistDonorOk(body: Mesh): ((v: number) => boolean) | undefined {
+  const mi = body.getVerticesData('matricesIndices'), mw = body.getVerticesData('matricesWeights'), bones = body.skeleton?.bones;
+  if (!mi || !mw || !bones) return undefined;
+  const limb = bones.map((b) => WAIST_DONOR_BONES.test(b.name));
+  return (v: number) => { let w = 0; for (let k = 0; k < 4; k++) if (limb[mi[v * 4 + k]]) w += mw[v * 4 + k]; return w <= WAIST_DONOR_MAX; };
 }
 
 function readSkin(mesh: Mesh): SkinData | null {

@@ -140,7 +140,7 @@ export function fabricNormalMap(scene: Scene, kind: keyof typeof FABRICS = 'jers
  * One map per FABRIC is shared across every garment of that kind in the scene — four 256² textures for every character
  * on the court, not four per body.
  */
-export function applyFabric(mat: PBRMaterial, kind: keyof typeof FABRICS): void {
+export function applyFabric(mat: PBRMaterial, kind: keyof typeof FABRICS, opts: { weave?: boolean } = {}): void {
   const look = FABRICS[kind];
   mat.metallic = 0;
   mat.roughness = look.roughness;
@@ -151,6 +151,7 @@ export function applyFabric(mat: PBRMaterial, kind: keyof typeof FABRICS): void 
     const scene = mat.getScene();
     if (!scene) return;
     if (look.tile <= 0) { mat.bumpTexture = null; return; }   // too small for a weave: see the `band` note above
+    if (opts.weave === false) { mat.bumpTexture = null; return; }   // no authored UVs to tile it across: see weaveFits
     // ONE TEXTURE PER FABRIC, NEVER A CLONE. Tiling lives on the texture, not the material, so each fabric needs its
     // own — and the obvious way to get one, `weave.clone()`, is a trap this repo has now hit twice: a CLONED
     // DynamicTexture never becomes ready, every material holding one stays never-ready, and a never-ready material
@@ -158,4 +159,22 @@ export function applyFabric(mat: PBRMaterial, kind: keyof typeof FABRICS): void 
     // garments were all still present, just not rendering. Four 256² maps is nothing; a clone is a bug.
     mat.bumpTexture = fabricNormalMap(scene, kind);
   } catch { /* canvas-less runtime: the material is still matte cloth, just smooth */ }
+}
+
+/**
+ * KIT-GLITCH (owner 2026-11-12: "the clothes look glitched out sometimes" — flicker or stripes). A WEAVE NEEDS AUTHORED UVs.
+ *
+ * The weave tiles across a garment's UVs (`tile` times), so it reads as cloth only where the UVs run continuously over the
+ * surface. The kit bodies' tee and shorts and every body's low sock ship with NO UVs, and since KIT-NO-HIGH-BOOTS
+ * (2026-10-20) garmentFixes.ensureGarmentUVs gives them a paint ATLAS instead: every triangle its own little cell. The weave
+ * sampled through that atlas is a fresh patch per triangle, its ribs at whatever angle each triangle's corners land, and
+ * the bump's tangent frame jumps at every edge: hatched stripes in some triangles, a sawtooth band along the hem's slivers,
+ * the whole garment faceted (measured on the rig, scripts/probes/kit-glitch: the stripes go when the bump goes, and stay
+ * with the body hidden, shadows off, back faces culled and the depth offset off — so they are the map, not a depth fight).
+ * Before 10-20 these garments had no UV attribute at all and the map sampled one constant texel: no weave showed. So a
+ * material any of whose meshes carries no AUTHORED UVs takes the fabric's roughness and sheen and no map; garments with
+ * their own UVs (the rivals' tees and shorts, the shoes) keep the weave exactly as before.
+ */
+export function weaveFits(meshes: readonly { isVerticesDataPresent(kind: string): boolean; metadata?: unknown }[]): boolean {
+  return meshes.every((m) => m.isVerticesDataPresent('uv') && !(m.metadata as { felAtlasUV?: boolean } | null | undefined)?.felAtlasUV);
 }
