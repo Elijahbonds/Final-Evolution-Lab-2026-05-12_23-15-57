@@ -15,7 +15,7 @@ import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } 
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
-import { HUD_TEXT_ALPHA, HudBanner, HudChip, HudFrame, HudLine, HudMeter, HudPlate, HudText, ScoreValue, Scorebug, hudColor, hudLineStep, hudLineTrim, HUD_LINE_PAD } from './tv-hud';
+import { HUD_TEXT_ALPHA, HudBanner, HudChip, HudFrame, HudLine, HudMeter, HudPlate, HudText, ScoreValue, Scorebug, hudColor, hudLineStep, hudLineTrim, HUD_LINE_PAD, DANGER_CHIP_FILL } from './tv-hud';
 import { footballHeadline, footballSessionWon, gameResultFromSession } from '@/lib/sessions/gameResultFromSession';
 import { medalName } from '@/lib/babylon/modes/footballRushRules';
 /** FOOTBALL UPGRADE: the breakaway meter's lines arrive as '0.333,0.667'. */
@@ -125,7 +125,7 @@ export default function FootballBabylon({ onEnd }: GameProps) {
       {/* drive state chips: breakaway gear + truck cooldown */}
       <div className="absolute left-4 top-14 flex flex-col items-start gap-1">
         {hud.breakaway === true && (
-          <HudChip plate={false} fill={0.25} tone="danger" className="rounded">BREAKAWAY</HudChip>
+          <HudChip plate={false} fill={DANGER_CHIP_FILL} tone="danger" className="rounded">BREAKAWAY</HudChip>
         )}
         {/* IMPROVE (2026-10-06) #7: the cooldown FILLS — a ring around the chip's dot, so a pull while it fills is not a dead button */}
         <HudChip plate={false} fill={hud.truckReady === false ? undefined : 0.15} tone="you" alpha={hud.truckReady === false ? 0.3 : 1} className="items-center rounded"

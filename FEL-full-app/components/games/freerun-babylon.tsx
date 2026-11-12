@@ -137,7 +137,7 @@ export default function FreeRunBabylon({ onEnd }: GameProps) {
           )}
           {/* IMPROVE (2026-10-06): a speed gate ahead — what it needs against your speed, from 15 m out */}
           {typeof hud.gateReq === 'string' && hud.gateReq && (
-            <HudChip plate={false} fill={0.25} tone={Number(hud.gateReady) ? 'good' : 'danger'} size={hudLineStep(hud.gateReq, 'caption')} className="rounded" style={{ fontWeight: 800, ...hudLineTrim(hud.gateReq, 'caption') }}>{hud.gateReq}</HudChip>
+            <HudChip plate={false} fill={DANGER_CHIP_FILL} tone={Number(hud.gateReady) ? 'good' : 'danger'} size={hudLineStep(hud.gateReq, 'caption')} className="rounded" style={{ fontWeight: 800, ...hudLineTrim(hud.gateReq, 'caption') }}>{hud.gateReq}</HudChip>
           )}
           {typeof hud.verbs === 'string' && hud.verbs && (
             <div className="flex flex-wrap gap-1">

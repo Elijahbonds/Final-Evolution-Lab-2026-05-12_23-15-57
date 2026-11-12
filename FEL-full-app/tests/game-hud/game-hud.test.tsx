@@ -6,7 +6,8 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { HUD_CLEAR_CORNER, HUD_TEXT_ALPHA, HUD_TYPE, HudMeter, hudLineStep } from '@/components/games/tv-hud';
+import { DANGER_CHIP_FILL, HUD_CLEAR_CORNER, HUD_RGB, HUD_TEXT_ALPHA, HUD_TYPE, HudMeter, hudLineStep } from '@/components/games/tv-hud';
+import { composite, contrastRatio } from '@/lib/a11y/wcag';
 import { READABLE, sizeMiss, wordCount } from '@/lib/readable/rules';
 import { VC_MIN_LABEL_PX, VC_TAP_PX, faceLabelPx } from '@/components/games/virtual-controller';
 
@@ -114,5 +115,11 @@ describe('the twelve screens\' own HUD fixes (size and contrast only)', () => {
       expect(src, f).toMatch(/\? 1 : HUD_TEXT_ALPHA\.faint\}/);
     }
     expect(HUD_TEXT_ALPHA.faint).toBeGreaterThanOrEqual(0.6);
+  });
+  it('a danger-lit chip with danger text passes 4.5:1 over the app background (it was 4.42:1 at a 0.25 fill)', () => {
+    const [r, g, b] = HUD_RGB.danger; const fg = { r, g, b, a: 1 }; const app = { r: 5, g: 5, b: 5, a: 1 };
+    expect(contrastRatio(fg, composite({ ...fg, a: 0.25 }, app))).toBeLessThan(4.5);
+    expect(contrastRatio(fg, composite({ ...fg, a: DANGER_CHIP_FILL }, app))).toBeGreaterThanOrEqual(4.5);
+    for (const f of ['freerun', 'football']) expect(read(`components/games/${f}-babylon.tsx`)).toMatch(/fill=\{DANGER_CHIP_FILL\}/);
   });
 });

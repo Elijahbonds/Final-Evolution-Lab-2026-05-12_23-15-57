@@ -214,6 +214,10 @@ export function hudLineTrim(text: unknown, size: HudSize): { paddingBlock?: stri
 /** A HudLine moved from the 12 px caption to the 14 px line step: its plate's padding, so the plate is no taller and only
  *  a little wider than the caption's was (0.2em 0.75em at 12 px: 2.4 / 9 px; this at 14 px: 0.7 / 5.6 px). */
 export const HUD_LINE_PAD = '0.05em 0.4em';
+/** GAME-HUD (2026-11-12): a plate-less chip lit in the danger tone with its text in the same tone (freerun's speed gate,
+ *  football's BREAKAWAY) was 4.42:1 at a 0.25 fill over the app's #050505 (measured in play: under WCAG's 4.5:1); at
+ *  0.2 it is 4.77:1 and still reads as the red chip. tests/game-hud holds the ratio. */
+export const DANGER_CHIP_FILL = 0.2;
 /** The chip's vertical padding when its text is a line at the line step (see hudLineTrim). */
 export const HUD_LINE_TRIM_PAD = '0.1em';
 
