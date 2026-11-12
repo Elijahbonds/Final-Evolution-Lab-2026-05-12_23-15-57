@@ -13,6 +13,9 @@ import { HighlightConsent } from '@/components/coach-business/highlight-consent'
 import { SessionHome } from '@/app/coach/session/_components/session-home';
 import { HIGHLIGHT_CONSENT_LINE } from '@/lib/coach-business/highlight-copy';
 import { COURT_NAMES_LINE, COURT_NUMBERS_KEPT_LINE, COURT_NUMBERS_NOT_SENT_LINE } from '@/lib/session-setup/copy';
+import { NOT_RECORDED_LINE } from '@/lib/coach/formReview/copy';
+import { JOIN_CONSENT_LINE } from '@/lib/coach/inviteCopy';
+import { APPROVED_NOTICES } from '@/lib/every-screen/notices';
 
 const text = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/&#x27;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 
@@ -38,5 +41,19 @@ describe('/coach/session: privacy wording, unchanged and marked as approved noti
     expect(text(no)).not.toContain(COURT_NUMBERS_KEPT_LINE);
     expect(yes.match(/data-notice="privacy"/g)).toHaveLength(2);
     expect(text(yes)).toContain('Court session');
+  });
+});
+
+describe('options B and C (owner-approved 2026-11-12)', () => {
+  it('B: the record screen\'s privacy line, word for word as before', () => {
+    expect(NOT_RECORDED_LINE).toBe('Nothing is recorded to a file.');
+  });
+  it('C: the invite\'s consent line says "your coach"; every other word is the old line\'s', () => {
+    const old = (name: string) => `Accept and ${name} can build your programming, watch your movement screens and send you work. You can leave at any time.`;
+    expect(JOIN_CONSENT_LINE).toBe(old('your coach'));
+  });
+  it('all six of this lane\'s lines are on the approved list with their kinds', () => {
+    const mine = APPROVED_NOTICES.filter((n) => /highlight-copy|session-setup\/copy|formReview\/copy|inviteCopy/.test(n.from)).map((n) => `${n.name}:${n.kind}`);
+    expect(mine.sort()).toEqual(['COURT_NAMES_LINE:privacy', 'COURT_NUMBERS_KEPT_LINE:privacy', 'COURT_NUMBERS_NOT_SENT_LINE:privacy', 'HIGHLIGHT_CONSENT_LINE:consent', 'JOIN_CONSENT_LINE:consent', 'NOT_RECORDED_LINE:privacy']);
   });
 });

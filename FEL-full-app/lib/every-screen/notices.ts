@@ -30,6 +30,9 @@ export const APPROVED_NOTICES: readonly { from: string; name: string; kind: Noti
   { from: '@/lib/session-setup/copy', name: 'COURT_NAMES_LINE', kind: 'privacy' },
   { from: '@/lib/session-setup/copy', name: 'COURT_NUMBERS_KEPT_LINE', kind: 'privacy' },
   { from: '@/lib/session-setup/copy', name: 'COURT_NUMBERS_NOT_SENT_LINE', kind: 'privacy' },
+  // COACH-WORDS options B and C, approved by the owner 2026-11-12
+  { from: '@/lib/coach/formReview/copy', name: 'NOT_RECORDED_LINE', kind: 'privacy' },
+  { from: '@/lib/coach/inviteCopy', name: 'JOIN_CONSENT_LINE', kind: 'consent' },
 ];
 
 /** The attribute for an approved notice's element: `<p {...notice('medical')}>{DISCLAIMER}</p>`. */

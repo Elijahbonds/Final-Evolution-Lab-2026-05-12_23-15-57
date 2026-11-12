@@ -37,6 +37,8 @@ import { SetupReader, type SetupWord } from '@/lib/tools-easy/setup';
 import { READY_LINE, STOP_AND_READ } from '@/lib/tools-easy/copy';
 import { ResultCard } from '@/components/result-card/result-card';
 import { formReviewView } from '@/lib/coach-tools/reviewResult';
+import { notice } from '@/lib/every-screen/notices';
+import { NOT_RECORDED_LINE } from '@/lib/coach/formReview/copy';
 
 /** The movements that start standing, so the standing framing check reads them (a push-up is read lying down: no card). */
 const STANDING_START: ReadonlySet<string> = new Set(['squat', 'lunge', 'hinge']);
@@ -187,7 +189,8 @@ export function RecordSet({ ctx, api = FORM_REVIEWS_API }: { ctx: RecordContext;
   return (
     <div className="space-y-4" data-record-set={ctx.movement}>
       <div className="fel-card space-y-2 rounded-xl p-4">
-        <div className="text-[12px] uppercase tracking-wider text-fel-dim">Film a set for your coach</div>
+        {/* COACH-WORDS option A (owner-approved 2026-11-12): was "Film a set for your coach" */}
+        <div className="text-[12px] uppercase tracking-wider text-fel-dim">For your coach</div>
         <h1 className="text-lg font-bold text-white">{ctx.exerciseName}</h1>
         <p className={`${lineSize(spec.setup)} text-white/65`}>{spec.setup}</p>
         {/* COACH-WORDS (owner 2026-11-12: shorter first-screen wording, reviewed by the owner in docs/COACH-WORDING-REVIEW.md).
@@ -211,8 +214,9 @@ export function RecordSet({ ctx, api = FORM_REVIEWS_API }: { ctx: RecordContext;
         )}
         {phase !== 'recording' && phase !== 'starting' && !result && (
           <div className="absolute inset-0 grid place-items-center p-6 text-center text-sm text-white/50">
-            {/* COACH-WORDS: "Your camera shows here." is gone (the box and its camera icon say it); the privacy line is unchanged */}
-            <span><Camera className="mx-auto mb-2 h-8 w-8" />Nothing is recorded to a file.</span>
+            {/* COACH-WORDS: "Your camera shows here." is gone (the box and its camera icon say it); the privacy line is unchanged,
+                and (option B, owner-approved 2026-11-12) marked as an approved privacy notice */}
+            <span><Camera className="mx-auto mb-2 h-8 w-8" /><span {...notice('privacy')}>{NOT_RECORDED_LINE}</span></span>
           </div>
         )}
       </div>

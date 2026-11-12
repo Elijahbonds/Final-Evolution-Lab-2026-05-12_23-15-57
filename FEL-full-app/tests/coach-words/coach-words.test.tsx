@@ -48,13 +48,17 @@ describe('/coach/join/[token]', () => {
     token: 't1', coachId: 'coach1', use: 'once', closedAt: null, expiresAt: new Date(at + 86_400_000), joined: 0,
     createdAt: new Date(at - 1000), coach: { name: 'Coach Riley' }, ...over,
   });
-  it('an open invite: no "Coach invite" label over the heading; what the athlete agrees to is word for word', async () => {
+  // TEST CHANGED (2026-11-12, owner-approved option C): the consent line says "your coach" in place of the coach's name; every
+  // other word is unchanged, and it is an approved consent notice. The old assertion held the name-in-the-line wording.
+  it('an open invite: no "Coach invite" label; the consent line (option C) is marked, the name stays in the heading and button', async () => {
     h.invite = invite(); h.session = { user: { id: 'athlete1' } };
-    const shown = text(renderToStaticMarkup(await JoinPage({ params: { token: 't1' } })));
+    const html = renderToStaticMarkup(await JoinPage({ params: { token: 't1' } }));
+    const shown = text(html);
     expect(shown).not.toContain('Coach invite');
     expect(shown).toContain('Coach Riley wants to coach you');
-    // consent wording: unchanged
-    expect(shown).toContain('Accept and Coach Riley can build your programming, watch your movement screens and send you work. You can leave at any time.');
+    expect(shown).toContain('Accept and your coach can build your programming, watch your movement screens and send you work. You can leave at any time.');
+    expect(shown).not.toContain('Accept and Coach Riley');
+    expect(html).toContain('data-notice="consent"');
     expect(shown).toContain('Join Coach Riley');
     h.session = null;
   });
@@ -68,12 +72,17 @@ describe('/coach/join/[token]', () => {
 });
 
 describe('/coach/form-review, the record screen before filming', () => {
+  // TEST CHANGED (2026-11-12, owner-approved options A and B): the label is "For your coach" (was "Film a set for your
+  // coach"), and the privacy line is an approved privacy notice (its words unchanged).
   it('one short line on what the camera does; the estimate and privacy lines are word for word', () => {
-    const shown = text(renderToStaticMarkup(createElement(RecordSet, { ctx: { programId: 'p1', sessionExerciseId: 's1', exerciseName: 'Goblet squat', movement: 'squat', ready: true, send: { ok: true } } as never })));
+    const html = renderToStaticMarkup(createElement(RecordSet, { ctx: { programId: 'p1', sessionExerciseId: 's1', exerciseName: 'Goblet squat', movement: 'squat', ready: true, send: { ok: true } } as never }));
+    const shown = text(html);
     expect(shown).toContain('The camera counts and checks each rep. Every number is an estimate.');
     expect(shown).not.toContain('The camera counts your reps and reads each one.');
     expect(shown).not.toContain('Your camera shows here.');
     expect(shown).toContain('Nothing is recorded to a file.');                // privacy: unchanged
-    expect(shown).toContain('Film a set for your coach');
+    expect(shown).toContain('For your coach');
+    expect(shown).not.toContain('Film a set for your coach');
+    expect(html).toContain('<span data-notice="privacy">Nothing is recorded to a file.</span>');
   });
 });
