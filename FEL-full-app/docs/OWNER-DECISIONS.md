@@ -386,3 +386,6 @@ The owner answered four proposals from phase 6 (relayed by the coordinator). Eac
    on-court reps become real stats.").
 4. **Terms tick:** a real `<input type="checkbox">` inside its label. Same words, same rule (it must be ticked to
    continue), now usable from the keyboard and with a screen reader.
+- **owner 2026-11-12 (hoops gathers, G3):** an escape thrown into the closed side of a trap (double team) IS a steal (`docs/HOOPS-GATHER-ESCAPE-PLAN.md`).
+- **owner 2026-11-12 (hoops gathers, G5):** the mid-air adjustment uses the right stick in the air, like the dunk trick stick.
+- **owner 2026-11-12 (hoops gathers, G6):** a hop step with the stick at rest IS a jump stop.

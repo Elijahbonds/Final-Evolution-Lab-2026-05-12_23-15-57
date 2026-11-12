@@ -1683,6 +1683,32 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/hoops/rulebook.ts PRESS_FLOOR_ON',
     hint: 'On: a showtime flush or a trick dunk pressed at the wrong moment goes in at least as often as not pressing. Off: early 42, late 50 against 70 untimed, as before.',
   },
+  // ── hoops-gather G1 (owner 2026-11-12, "good gathers and pick ups"; docs/HOOPS-GATHER-ESCAPE-PLAN.md): the pick-up reads the bounce ──
+  {
+    id: 'hoops.pickupReadOn', label: 'Pick-up reads the bounce (1) / takes it where it is (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · gathers',
+    source: 'lib/babylon/anim/ballCarry.ts PICKUP_READ_ON',
+    hint: 'On: a shot pressed while the ball is low keeps it on its bounce and the hand goes down to meet it. Off: the ball flies up to a still hand, as before.',
+  },
+  {
+    id: 'hoops.pickupWaitMaxSec', label: 'Pick-up: longest wait for the bounce', def: 0.2, min: 0.05, max: 0.35, step: 0.01, unit: 's', group: 'Hoops · gathers',
+    source: 'lib/babylon/anim/ballCarry.ts PICKUP_WAIT_MAX_SEC',
+    hint: 'The most the hand waits for a low ball to come up before it takes it as before.',
+  },
+  {
+    id: 'hoops.pickupReachM', label: 'Pick-up: hand goes down to meet it by', def: 0.3, min: 0, max: 0.5, step: 0.01, unit: 'm', group: 'Hoops · gathers',
+    source: 'lib/babylon/anim/ballCarry.ts PICKUP_REACH_M',
+    hint: 'How far under the dribbling palm the hand reaches to meet the rising ball.',
+  },
+  {
+    id: 'hoops.pickupRateMax', label: 'Pick-up: last bounce up to this much faster', def: 2, min: 1, max: 3, step: 0.1, unit: 'x', group: 'Hoops · gathers',
+    source: 'lib/babylon/anim/ballCarry.ts PICKUP_RATE_MAX',
+    hint: 'A harder last dribble so a low ball meets the hand inside the wait.',
+  },
+  {
+    id: 'hoops.pickupTopGapM', label: 'Pick-up: take it at once within', def: 0.1, min: 0, max: 0.3, step: 0.01, unit: 'm', group: 'Hoops · gathers',
+    source: 'lib/babylon/anim/ballCarry.ts PICKUP_TOP_GAP_M',
+    hint: 'A ball this close to the top of its bounce is taken at once.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));
