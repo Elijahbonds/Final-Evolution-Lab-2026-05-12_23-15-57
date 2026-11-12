@@ -665,8 +665,10 @@ holds the result in CI. Phone tier only unless said.
   far pier: fifteen parts in two materials → two; the Venice dunk set: 35 masters → 22). Same geometry, same placements. 0 = one per part.
 - `perf.sharedGroundOn` 1 (`nexus/veniceBoardwalk.ts`, every tier): the boardwalk's tiled grounds wear the kind's one painted tile (the
   tiling is in the UVs: the same repeat) instead of a copy each, and the two sand planes share one grain and one mottle; so the four
-  aprons, the two sands, the two seas, the two surf strips, the posts and the flags are one mesh each. 0 = a texture copy, a material and
-  a draw per plane.
+  aprons, the two sands, the two seas, the two surf strips, the posts and the flags are one mesh each. A plane's tint rides in its vertex
+  colours (the PBR shader multiplies albedo colour, texture and vertex colour the same way), so the aprons, the walk and the plaza (one
+  concrete, three tints) are ONE mesh too. (The sands share only when both planes are
+  long enough for the shared repeat to be the same picture; measured on 3v3 and 3-Point, the north strip keeps its own.) 0 = a texture copy, a material and a draw per plane.
 - `perf.phoneRailBodies` 2 (`nexus/veniceBoardwalk.ts`): a phone's Venice rail keeps two of its five onlookers (the two ends).
   Half-court modes only (1v1, 3v3, 3-Point); the dunk and the duel keep their rail. FLAG: this one is visible — three fewer
   people at the side of the court on a phone (the 3v3's texture memory reaches its row only with it). 5 = all five.
