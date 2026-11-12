@@ -243,7 +243,7 @@ export function AccountSaveView({ a }: { a: AccountSaveApi }) {
   return (
     <span className="relative" data-testid="account-save">
       <button type="button" onClick={a.togglePanel} aria-expanded={s.panelOpen} aria-haspopup="dialog" data-testid="account-status"
-        className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px]" style={{ color: warn ? C.ember : s.status === 'in-account' ? C.dim : C.gold }}>
+        className="flex items-center gap-1 rounded-md px-2 py-1 text-[12px]" style={{ color: warn ? C.ember : s.status === 'in-account' ? C.dim : C.gold }}>
         <Icon className={`h-3.5 w-3.5 ${s.status === 'saving' ? 'animate-spin' : ''}`} aria-hidden /> {LABEL[s.status]}
       </button>
       {s.panelOpen && (
@@ -263,7 +263,7 @@ export function AccountSaveView({ a }: { a: AccountSaveApi }) {
                 <button type="button" className={btn} style={{ border: `1px solid ${C.line}` }} disabled={s.busy} onClick={a.useMine}>Use this device’s</button>
                 <button type="button" className={btn} style={{ border: `1px solid ${C.line}` }} disabled={s.busy} onClick={a.useTheirs}>Use my account’s</button>
               </div>
-              <p className="mt-1.5 text-[11px]" style={{ color: C.dim }}>Keep both saves this device’s version as a new project, then opens your account’s copy.</p>
+              <p className="mt-1.5 text-[12px]" style={{ color: C.dim }}>Keep both saves this device’s version as a new project, then opens your account’s copy.</p>
             </div>
           )}
           {s.status === 'deleted-elsewhere' && (
@@ -294,7 +294,7 @@ export function AccountSaveView({ a }: { a: AccountSaveApi }) {
               </div>
             </div>
           )}
-          <div className="mb-1 flex items-center justify-between text-[11px] uppercase tracking-[0.14em]" style={{ color: C.dim }}>
+          <div className="mb-1 flex items-center justify-between text-[12px] uppercase tracking-[0.14em]" style={{ color: C.dim }}>
             <span>Saved projects</span>
             {s.quota && <span data-testid="account-quota">{s.quota.projects} of {s.quota.maxProjects} · {kb(s.quota.bytes)} of {kb(s.quota.maxBytes)}</span>}
           </div>
@@ -303,7 +303,7 @@ export function AccountSaveView({ a }: { a: AccountSaveApi }) {
             {s.projects.map((p) => (
               <li key={p.projectId} className="flex items-center gap-2 rounded px-1.5 py-1" style={{ background: p.projectId === s.currentId ? 'rgba(0,229,255,0.08)' : 'transparent' }}>
                 <span className="min-w-0 flex-1 truncate" title={p.name}>{p.name}{p.projectId === s.currentId ? ' (open)' : ''}</span>
-                <span className="shrink-0 text-[11px]" style={{ color: C.dim }}>{kb(p.bytes)}</span>
+                <span className="shrink-0 text-[12px]" style={{ color: C.dim }}>{kb(p.bytes)}</span>
                 <button type="button" title={`Open “${p.name}”`} aria-label={`Open ${p.name}`} disabled={s.busy || p.projectId === s.currentId} onClick={() => a.requestOpen(p.projectId)} className="disabled:opacity-40"><FolderOpen className="h-3.5 w-3.5" /></button>
                 <button type="button" title={`Delete “${p.name}” from your account`} aria-label={`Delete ${p.name}`} disabled={s.busy} onClick={() => a.requestDelete(p.projectId)} className="disabled:opacity-40"><Trash2 className="h-3.5 w-3.5" /></button>
               </li>
