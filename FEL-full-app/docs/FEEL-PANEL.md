@@ -749,7 +749,8 @@ Measured (2026-11-12, `scripts/probes/hoops-sound/`: the real hoops screens on t
 Group "Hoops · ratings" (`lib/babylon/hoops/ratings.ts`). A rating runs 40 to 90. Each band below is the change AT 90; at 40 the number
 moves the other way by a quarter of it; at 50 nothing moves, whatever the band. Every one is NEW, and 0 takes that rating out of play
 (`lib/babylon/hoops/ratings.test.ts` pins rating 50 = today and each edge). Casual runs only: a ranked, staked, arena, challenge, online or
-party run plays today's numbers. **Not read by any mode yet** (phase B wires them after hoops-p08 merges); until then they move nothing in play.
+party run plays today's numbers (and so does an agent / probe run). **Phase B (2026-11-12) wires them into 1v1 and 3v3** through
+`lib/babylon/hoops/ratedPlay.ts`; the measured edges are `scripts/probes/hoops-builder/bands.mts`.
 - `hoops.ratingsOn` 1: the ratings change play. 0 = every athlete plays today's numbers, in every run.
 - `hoops.rateSpeedBand` 0.06: top speed (6.4 m/s → 6.78 at 90) and first-step acceleration ×1.06 at 90 (×0.985 at 40).
 - `hoops.rateHandleBand` 20: the handle the moves read, 50 → 70 at 90 (45 at 40): the combo window 0.44 → 0.54 s and a tighter dribble.
@@ -758,6 +759,10 @@ party run plays today's numbers. **Not read by any mode yet** (phase B wires the
 - `hoops.rateGreenBand` 0.1: the jump-shot green ×1.10 at 90 (×0.975 at 40). The owner's 2026-10-20 rule: ratings widen the green in casual only.
 - `hoops.rateFinishBand` 0.15: the contest a defender puts on a layup or a dunk ×0.85 at 90.
 - `hoops.rateSlideBand` 0.06: the defensive slide ×1.06 at 90.
-- `hoops.rateStealReachBand` 0.05: the steal reach (`hoops.stripReachM` 1.2 m) ×1.05 at 90 (1.26 m).
+- `hoops.rateStealReachBand` 0.05: the hero's poke range (1v1 `STEAL_RANGE` and the 3v3 poke, both 1.6 m) ×1.05 at 90 (1.68 m).
 - `hoops.rateBlockReachM` 0.04: block reach +0.04 m at 90.
-- `hoops.heightReachMPerIn` 0.015: playing height, 6'0" to 6'8": standing reach +1.5 cm an inch over 6'4" (6'8" +6 cm, 6'0" −6 cm).
+- `hoops.heightReachMPerIn` 0.015: playing height, 6'0" to 6'8": the hero's block reach and his release height against a block +1.5 cm an
+  inch over 6'4" (6'8" +6 cm, 6'0" −6 cm).
+- `hoops.heightLookPerIn` 0.01 (phase B; owner 2026-11-12 "the body on screen follows the playing height"): the hero is DRAWN 1 % taller an
+  inch over 6'4" (6'0" 96 %, 6'8" 104 %, the cosmetic clamp). Drawing only: while he is drawn scaled the modes read the ball on his hand on
+  the standard frame (playFramePoint), so the size changes no outcome. Casual runs only; 0 = the standard body.

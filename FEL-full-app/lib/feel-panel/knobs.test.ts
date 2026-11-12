@@ -406,6 +406,7 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.rateGreenBand')).toBe(HR.RATE_GREEN_BAND); expect(def('hoops.rateFinishBand')).toBe(HR.RATE_FINISH_BAND);
     expect(def('hoops.rateSlideBand')).toBe(HR.RATE_SLIDE_BAND); expect(def('hoops.rateStealReachBand')).toBe(HR.RATE_STEAL_REACH_BAND);
     expect(def('hoops.rateBlockReachM')).toBe(HR.RATE_BLOCK_REACH_M); expect(def('hoops.heightReachMPerIn')).toBe(HR.HEIGHT_REACH_M_PER_IN);
+    expect(def('hoops.heightLookPerIn')).toBe(HR.HEIGHT_LOOK_PER_IN);   // hoops-builder phase B (new)
   });
 
   it('every row is well formed: unique `<area>.<camelName>` id, min ≤ default ≤ max, the default on the step grid, a source', () => {
