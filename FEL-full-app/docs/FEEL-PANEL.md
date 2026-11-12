@@ -709,3 +709,21 @@ pins both). Measured with `scripts/probes/hoops-p09/rulebook-measure.mts` (befor
   PRO and ELITE. Its answers: the pump fake (he is flying at you, so he bites) and a move into his closeout. 0 = he holds his spot.
 - `hoops.pressFloorOn` 1: a showtime flush or a trick dunk pressed at the wrong moment pays at least what not pressing pays (showtime
   early 42 → 70 %, late 50 → 70 %; a mistimed trick pays the plain dunk). 0 = the old table.
+
+## hoops-builder, 2026-11-12 (the hoops ratings; owner: "5 ratings … that really change how you play, within limits"; the owner has not felt these yet)
+
+Group "Hoops · ratings" (`lib/babylon/hoops/ratings.ts`). A rating runs 40 to 90. Each band below is the change AT 90; at 40 the number
+moves the other way by a quarter of it; at 50 nothing moves, whatever the band. Every one is NEW, and 0 takes that rating out of play
+(`lib/babylon/hoops/ratings.test.ts` pins rating 50 = today and each edge). Casual runs only: a ranked, staked, arena, challenge, online or
+party run plays today's numbers. **Not read by any mode yet** (phase B wires them after hoops-p08 merges); until then they move nothing in play.
+- `hoops.ratingsOn` 1: the ratings change play. 0 = every athlete plays today's numbers, in every run.
+- `hoops.rateSpeedBand` 0.06: top speed (6.4 m/s → 6.78 at 90) and first-step acceleration ×1.06 at 90 (×0.985 at 40).
+- `hoops.rateHandleBand` 20: the handle the moves read, 50 → 70 at 90 (45 at 40): the combo window 0.44 → 0.54 s and a tighter dribble.
+  Moves stay unlocked for everyone (H2's `MOVES_UNLOCKED_GATE` is untouched).
+- `hoops.rateReadBand` 0.15: the "moving the wrong way" line a move needs (rulebook `hoops.moveLeanMps` 0.6 m/s) ×0.85 at 90 (0.51 m/s).
+- `hoops.rateGreenBand` 0.1: the jump-shot green ×1.10 at 90 (×0.975 at 40). The owner's 2026-10-20 rule: ratings widen the green in casual only.
+- `hoops.rateFinishBand` 0.15: the contest a defender puts on a layup or a dunk ×0.85 at 90.
+- `hoops.rateSlideBand` 0.06: the defensive slide ×1.06 at 90.
+- `hoops.rateStealReachBand` 0.05: the steal reach (`hoops.stripReachM` 1.2 m) ×1.05 at 90 (1.26 m).
+- `hoops.rateBlockReachM` 0.04: block reach +0.04 m at 90.
+- `hoops.heightReachMPerIn` 0.015: playing height, 6'0" to 6'8": standing reach +1.5 cm an inch over 6'4" (6'8" +6 cm, 6'0" −6 cm).

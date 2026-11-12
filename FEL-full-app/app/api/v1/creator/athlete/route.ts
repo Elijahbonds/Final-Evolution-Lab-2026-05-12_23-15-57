@@ -145,7 +145,12 @@ export async function POST(req: NextRequest) {
   built.animations = holdAnimations(built.animations, hold);
   // Jersey colours live in the build, not on AvatarLook. A minor's row keeps the catalog defaults.
   if (!hold.uploadLook) built.palette = toBuild({}).palette;
-  const stored = { ...built, privacy: privacyRecord(hold) };
+  // lane/hoops-builder (owner 2026-11-12): the hoops builder's part of the build (position, playing height, upgrade steps and the
+  // points earned) is written by /api/v1/creator/hoops, and this editor knows nothing about it — so Finalize carries the stored one
+  // over, or saving a look would wipe a player's earned points.
+  const prevBuild = (await prisma.athleteBuild.findUnique({ where: { userId }, select: { build: true } }))?.build as { hoops?: unknown } | null | undefined;
+  const prevHoops = prevBuild && typeof prevBuild === 'object' && !Array.isArray(prevBuild) ? prevBuild.hoops : undefined;
+  const stored = { ...built, privacy: privacyRecord(hold), ...(prevHoops !== undefined ? { hoops: prevHoops } : {}) };
   const owned = new Set((await prisma.ownedWearable.findMany({ where: { userId } })).map((o) => o.itemId));
   // Inventory stays. What is WORN does not upload for anyone who is not a verified adult.
   const refused = hold.uploadLook ? refusedItems(look.equipped, owned) : [];

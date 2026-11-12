@@ -387,6 +387,22 @@ The owner answered four proposals from phase 6 (relayed by the coordinator). Eac
 4. **Terms tick:** a real `<input type="checkbox">` inside its label. Same words, same rule (it must be ticked to
    continue), now usable from the keyboard and with a screen reader.
 
+## 2026-11-12 — the hoops builder; Story left alone
+
+The owner answered two questions (relayed by the coordinator).
+
+1. **Hoops builder: "Simple builder: pick height and a position, plus 5 ratings (speed, handle, shooting, finishing, defense)
+   that really change how you play, within limits. Earn upgrade points by playing. Ranked, staked and arena games stay
+   rating-free, as today."** Built on the Creator, not beside it: the position, the playing height, the upgrade steps and the
+   points live in the athlete's one build record (`AthleteBuild.build.hoops`, versioned; no schema change), the Creator's PRQ
+   ceilings cap the ratings, and the screen is `/creator/hoops` (linked from the Creator). The ratings → game numbers, with each
+   band, are `lib/babylon/hoops/ratings.ts` (rating 50 at 6'4" is today's numbers exactly; every band is a feel knob, group
+   "Hoops · ratings"; `hoops.ratingsOn` 0 puts everyone on today's numbers). Every run that is ranked, staked, arena, a challenge,
+   online or a party plays the standard numbers (playFrame's competitive stamp). Wiring the ratings into the modes is phase B,
+   after the hoops-p08 lane merges. This continues the 2026-10-20 HOOPS SHOOTING line ("Creator ratings slightly widen the green
+   in CASUAL modes only").
+2. **Story games: leave alone for now** (no button-style change, no further Story work).
+
 ## 2026-11-12 — owner 2026-11-12: shipping, deploy order, hoops, sound, art, screens
 
 The owner answered these (relayed by the coordinator). One line each.
@@ -405,11 +421,12 @@ The owner answered these (relayed by the coordinator). One line each.
 10. **Finger and face bones:** a lane of their own, after sound and the moving net.
 11. **Art jobs approved:** a hoop with a moving net, a hand-change animation, and the 3 clothing fixes.
 12. **The "⋯" capture menu:** stays in the corner; the HUD keeps clear of it.
-13. **Builder:** the body on screen follows the playing height, within its 96–104 % range.
+13. **Builder** (adds to the hoops builder entry above): the body on screen follows the playing height, within its
+    96–104 % range.
 14. **today-drill:** the Start bar stays pinned.
 15. **Coach screens:** shorter first-screen wording, reviewed by the owner before it ships (lane `lane/coach-words`;
     the drafts are `docs/COACH-WORDING-REVIEW.md`).
-16. **Story:** keep #589's small readability touches (labels, tap targets). Otherwise leave Story alone.
+16. **Story:** "leave alone" (the entry above) stands; #589's small readability touches (labels, tap targets) are kept.
 17. **Karate VS:** the in-game overlap is left as it is.
 18. **Social basketball setting:** a PARK area (outdoor home courts, a run to queue for, a place to hang out), built from
     the Adventure map pieces and part of the Adventure hub (one world: story ↔ courts, same player, party and look). Build
