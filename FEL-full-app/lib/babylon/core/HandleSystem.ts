@@ -191,6 +191,11 @@ export const BASELINE_HANDLE = 50;
  * every caller that passes none gates exactly as before).
  */
 export const MOVES_UNLOCKED_GATE = 100;
+// hoops-builder phase B (owner 2026-11-12; H9 wired WITHOUT the gate): the modes now pass the Handle RATING's handle as `handle`
+// (lib/babylon/hoops/ratings.ts: 50 → BASELINE_HANDLE, today; the band 45–70 by default). The gate above stays: every move stays unlocked
+// for everyone. Inside that band the handle moves only the chain window (chainWindowSec) here — isHardBreak needs 72+ and the odds are
+// the dice path's (hoops.moveReadOn 0) — and the lean read lives in hoops/rulebook readTheMan (ManRead.leanScale). Nothing in this
+// file changed for it; a later rework of the escapes can treat `handle` as "the rating's handle" and nothing else.
 
 /**
  * How long after one move the next can still chain off it.

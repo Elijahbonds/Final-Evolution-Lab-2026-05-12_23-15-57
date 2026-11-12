@@ -402,6 +402,11 @@ The owner answered two questions (relayed by the coordinator).
    after the hoops-p08 lane merges. This continues the 2026-10-20 HOOPS SHOOTING line ("Creator ratings slightly widen the green
    in CASUAL modes only").
 2. **Story games: leave alone for now** (no button-style change, no further Story work).
+3. **The body on screen follows the playing height** (owner 2026-11-12, relayed with phase B), within the cosmetic 96–104 %: 6'0" is drawn
+   at 96 %, 6'8" at 104 %, 1 % an inch. Drawing only (REACH-FREEZE holds: the ball on the hand is read on the standard frame while the hero
+   is drawn scaled). assumption (coordinator's call to make, flagged): a rating-free run draws the standard body, as today, so a ranked or
+   staked game looks exactly as it did.
+4. **Handle: every move stays unlocked** (H2's gate kept). The Handle rating moves only the combo window and the lean a move needs.
 
 ## 2026-11-12 — owner 2026-11-12: shipping, deploy order, hoops, sound, art, screens
 
@@ -421,13 +426,12 @@ The owner answered these (relayed by the coordinator). One line each.
 10. **Finger and face bones:** a lane of their own, after sound and the moving net.
 11. **Art jobs approved:** a hoop with a moving net, a hand-change animation, and the 3 clothing fixes.
 12. **The "⋯" capture menu:** stays in the corner; the HUD keeps clear of it.
-13. **Builder** (adds to the hoops builder entry above): the body on screen follows the playing height, within its
-    96–104 % range.
-14. **today-drill:** the Start bar stays pinned.
-15. **Coach screens:** shorter first-screen wording, reviewed by the owner before it ships (lane `lane/coach-words`;
-    the drafts are `docs/COACH-WORDING-REVIEW.md`).
-16. **Story:** "leave alone" (the entry above) stands; #589's small readability touches (labels, tap targets) are kept.
-17. **Karate VS:** the in-game overlap is left as it is.
-18. **Social basketball setting:** a PARK area (outdoor home courts, a run to queue for, a place to hang out), built from
+13. **today-drill:** the Start bar stays pinned.
+14. **Coach screens:** shorter first-screen wording, reviewed by the owner before it ships (lane `lane/coach-words`;
+    `docs/COACH-WORDING-REVIEW.md`). Approved the same day: every row, the consent and privacy lines as approved notices,
+    and options A, B and C (C: the invite's consent line says "your coach" instead of the coach's name).
+15. **Story:** "leave alone" (the entry above) stands; #589's small readability touches (labels, tap targets) are kept.
+16. **Karate VS:** the in-game overlap is left as it is.
+17. **Social basketball setting:** a PARK area (outdoor home courts, a run to queue for, a place to hang out), built from
     the Adventure map pieces and part of the Adventure hub (one world: story ↔ courts, same player, party and look). Build
     it after the current hoops work, together with the Adventure hub. Menus keep one-tap 1v1/3v3.
