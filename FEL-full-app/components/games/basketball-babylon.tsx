@@ -145,7 +145,9 @@ export default function BasketballBabylon({ onEnd }: GameProps) {
         </span>
       </div>
 
-      {phase === 'playing' && <HudBanner text={typeof hud.banner === 'string' ? hud.banner : ''} tone="you" plate={false} className="top-1/3" />}
+      {/* hoops-p08: the call stays at a third of the stage — on an upright phone (under 640 px) it heads the bottom stack instead, where the
+          MC's line cannot sit on it (measured: the 3v3's taller stack reached it) */}
+      {phase === 'playing' && <HudBanner text={typeof hud.banner === 'string' ? hud.banner : ''} tone="you" plate={false} className="top-1/3 hidden sm:flex" />}
       {/* hoops-p08: THE BOTTOM STACK, lowest first — IMPROVE (2026-10-06) #1's ONE line for the state you are in (for the first plays),
           the shot meter, the MC's line (heard: no subtitle unless CC) — one column, so no layer can sit on another */}
       {phase === 'playing' && (
@@ -153,6 +155,7 @@ export default function BasketballBabylon({ onEnd }: GameProps) {
           ['hint', hint ? <StackLine text={hint} alpha={0.75} /> : null],
           ['meter', meter !== null ? <HoopsShotMeter t={meter} green={hud.shotMeterGreen} perfect={hud.shotMeterPerfect} /> : null],
           ['mic', typeof hud.mic === 'string' && hud.mic ? <MicCaption flow text={hud.mic} who={hud.micWho} voiced={hud.micVoiced} /> : null],
+          ['call', typeof hud.banner === 'string' && hud.banner ? <div className="sm:hidden"><HudBanner flow text={hud.banner} tone="you" plate={false} /></div> : null],
         ]} />
       )}
       </HudFrame>

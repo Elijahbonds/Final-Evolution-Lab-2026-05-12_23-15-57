@@ -402,7 +402,9 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
 
       {/* the release meter + the call — bottom centre, under the shooter, couch-size */}
       {phase === 'playing' && (
-        <div className="absolute inset-x-0 bottom-24 z-20 flex flex-col items-center gap-2">
+        // hoops-p08: on a sideways phone (a short screen) the column sits lower — the touch deck is at the sides there, and at 6 rem up
+        // the column (the MC's line, the call, the meter) reached the score stack's CUT chip (measured, scripts/probes/hoops-p08)
+        <div className="absolute inset-x-0 bottom-24 z-20 flex flex-col items-center gap-2 [@media(orientation:landscape)_and_(max-height:520px)]:bottom-6">
           {/* hoops-p08: THE MIC in this column, over the call and the meter. At 12 rem up as a layer of its own it landed on the rack
               pips, the CUT chip and the timing key on a sideways phone (docs/HOOPS-AAA-GAP-SHOW.md 3.5); here nothing can sit on it */}
           <MicCaption flow text={micLine.text} who={micLine.who} voiced={hud.micVoiced} />

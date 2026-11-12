@@ -156,7 +156,9 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
         <HudChip tone="score" size="body">{typeof hud.time === 'number' ? `${typeof hud.period === 'string' && hud.period ? `${hud.period} ` : ''}${hud.time}s` : 'TO 21'}</HudChip>
       </div>
 
-      {phase === 'playing' && <HudBanner text={typeof hud.banner === 'string' ? hud.banner : ''} tone="you" plate={false} className="top-1/3" />}
+      {/* hoops-p08: the call stays at a third of the stage — on an upright phone (under 640 px) it heads the bottom stack instead, where the
+          MC's line cannot sit on it (measured: the 3v3's taller stack reached it) */}
+      {phase === 'playing' && <HudBanner text={typeof hud.banner === 'string' ? hud.banner : ''} tone="you" plate={false} className="top-1/3 hidden sm:flex" />}
 
       {/* hoops-p08: THE BOTTOM STACK, lowest first — IMPROVE (2026-10-06) #7's ONE line for the state you are in (for the first plays),
           #5's chip for what the PASS button would throw right now (the ring under the mate is its colour), the shot meter, the MC's
@@ -167,6 +169,7 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
           ['pass', pass ? <HudChip size="caption" tone={pass === 'NO LANE' ? 'text' : 'you'} alpha={pass === 'NO LANE' ? 0.5 : 1}>{passBtn ? `${passBtn} · ${pass}` : pass}</HudChip> : null],
           ['meter', meter !== null ? <HoopsShotMeter t={meter} green={hud.shotMeterGreen} perfect={hud.shotMeterPerfect} /> : null],
           ['mic', typeof hud.mic === 'string' && hud.mic ? <MicCaption flow text={hud.mic} who={hud.micWho} voiced={hud.micVoiced} /> : null],
+          ['call', typeof hud.banner === 'string' && hud.banner ? <div className="sm:hidden"><HudBanner flow text={hud.banner} tone="you" plate={false} /></div> : null],
         ]} />
       )}
       </HudFrame>
