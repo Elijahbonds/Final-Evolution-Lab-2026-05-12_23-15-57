@@ -46,10 +46,10 @@ export function GroceryList({ rxId, items }: { rxId: string; items: GroceryItem[
           <p className="mt-0.5 font-mono text-xs text-white/60">{done} / {items.length} in the basket</p>
         </div>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={copy} className="flex items-center gap-1 rounded-md border border-white/15 px-2.5 py-1.5 text-xs font-bold text-white/80 hover:bg-white/10">
+          <button type="button" onClick={copy} className="flex min-h-11 items-center gap-1 rounded-md border border-white/15 bg-white/[0.04] px-2.5 py-1.5 text-xs font-bold text-white/80 hover:bg-white/10">
             <Copy className="h-3.5 w-3.5" /> Copy
           </button>
-          <button type="button" onClick={share} className="flex items-center gap-1 rounded-md border border-[#00E5FF]/40 bg-[#00E5FF]/10 px-2.5 py-1.5 text-xs font-bold text-[#00E5FF] hover:bg-[#00E5FF]/20">
+          <button type="button" onClick={share} className="flex min-h-11 items-center gap-1 rounded-md border border-[#00E5FF]/40 bg-[#00E5FF]/10 px-2.5 py-1.5 text-xs font-bold text-[#00E5FF] hover:bg-[#00E5FF]/20">
             <Share2 className="h-3.5 w-3.5" /> Share
           </button>
         </div>
@@ -61,7 +61,7 @@ export function GroceryList({ rxId, items }: { rxId: string; items: GroceryItem[
           const on = Boolean(checked[key]);
           return (
             <li key={key}>
-              <button type="button" onClick={() => toggle(key)} className="flex w-full items-center gap-3 py-2 text-left">
+              <button type="button" onClick={() => toggle(key)} className="flex min-h-11 w-full items-center gap-3 py-2 text-left">
                 <span className={`flex h-5 w-5 items-center justify-center rounded border ${on ? 'border-[#00FF9D] bg-[#00FF9D]/20 text-[#00FF9D]' : 'border-white/25 text-transparent'}`}>
                   <Check className="h-3.5 w-3.5" />
                 </span>

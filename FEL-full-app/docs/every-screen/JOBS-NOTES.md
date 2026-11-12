@@ -1,3 +1,40 @@
+## What changed in phase 10, part A (the whole app, once more: fix; measured on the rig)
+
+Measured on the same rig before (release ccc9f830) and after, reading the tap with the CPU slowed 4×. Each tap was also
+probed three times on its own: the probe reports the event's whole duration and where the page spent its time.
+
+**Speed: the slowest screens, one by one**
+
+| Screen | Before | After | The fix (or why not) |
+|---|---|---|---|
+| `/studio`, "Make it for me" | 1440 ms (probe median 1584) | 16 ms, twice (probe median 664: the page's own load is still running when the probe taps) | the tap paints first, and the court is built in the next frame (same command, same undo step) |
+| `/profile`, the jump-check link | 424 ms (probe median 384) | 88 and 248 ms (probe median 208) | the turning 3D athlete is drawn once when WebGL has no graphics chip (the rig; a phone with its GPU blocked). With a GPU nothing changes |
+| `/story/boss`, "FACE THE GLITCH" | 232 ms (probe median 152) | 128 and 144 ms (probe median 104) | the fight starts in a React transition, so the tap paints first |
+| `/shop/shards` load shift | 0.273 | 0.001, twice | the packs are drawn from the server's answer, as `/store` does; they used to show and then vanish |
+| `/coach/join/[token]` late top bar | 0.135 | 0.001, twice | for someone signed in, the page holds the top bar's place until it arrives |
+| `/play/dunk` load shift | 0.048 | 0 and 0.054 | not fixed. The start card's controls switch from the keyboard list to the touch list once the page knows it is a phone; the server cannot tell |
+| `/play/sprint` tap | n/m (3D); probe median 1184 | probe median 1320 | not fixed. The tap waits behind the arena's own load, and behind the render watchdog's frame sample (a tuned guard: owner/game lane). An async start-card picture made no difference and was taken out |
+| `/play/music` tap | 176 ms (probe 200) | 168–176 ms (probe 192) | within budget in every rig reading; nothing to fix |
+| `/train/today-drill` tap | 264 ms | 280 ms | not fixed. The drill's 3D demo is drawn on the CPU on the rig (no GPU), and a still demo would hide the movement |
+| `/learn/feed`, `/play/party`, `/play/map-preview` load shifts | 0.035, 0.033, 0.058 | unchanged | not found. Two tries (equal tile heights; the map report anchored at the top) did not move the numbers and were taken out |
+| `/admin/metrics`, `/coach/admin/programs` | slow | — | the owner's tools: left as they are |
+
+**One look:** `/cards` now passes all four (9 text sizes → 5 steps; the long card lines at 16 px). `/kitchens/fuel` passes
+all four (its buttons share one look; the grocery list's buttons and rows are 44 px). The closet goes from 10 button looks
+to 8: its secondary buttons share the parts grid's look, and its long lines are 16 px. `/links` goes from 5 looks to 4:
+"Copy" matches the outline buttons; the fourth is a two-line button. `/learn/feed` has 4 looks (its topic tiles are
+different heights).
+
+**Carried over:** "The Snow Slope" is whole at 150 % text: the story zones are now centred on their points. Their class
+translate never applied, because motion writes the transform inline. Snowboard's "· PAR 60" did not appear in any of
+this phase's three readings (before or after); it is the board HUD's, and the HUD is the game lanes'. Spot the Scene's "CONTROLS" cut is gone
+now that the controls panel scrolls.
+
+**The start card's how-to panel now scrolls as a whole.** This was phase 7's recommendation; the owner has not answered,
+so it was built under the standing rule. It is easy to reverse. On a phone or with a keyboard, nothing is zoomed down:
+the rows are 14 px, a line of more than 12 words is 16 px, and the panel scrolls. A pad, which cannot scroll a box, still
+steps the rows and lines down to fit (never under 12 px). Nothing is hidden at 150 % or 200 % text.
+
 ## What changed in phase 9 (learn, create and the public pages, measured on the rig)
 
 **Of the phase's 34 scored screens, 15 now pass all four (3 on the phase's first build):** `/camp`, `/coach-terms`,

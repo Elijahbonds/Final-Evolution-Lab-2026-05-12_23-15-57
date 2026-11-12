@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { startTransition, useEffect, useRef, useState } from 'react';   // EVERY-SCREEN P10: the start renders in a transition, so the tap paints first
 import type { GameProps } from '@/components/games/game-shell';
 import {
   createShake, triggerShake, updateShake, applyShake,
@@ -361,7 +361,7 @@ export default function GlitchBossGame({ grade, prq, onEnd, gamepad }: GameProps
               <span>SPACE / W — Jump (dodge)</span><span>J / K — Strike (combo)</span>
               <span>QTE keys flash on screen</span><span>Boss strength: ~{Math.round(Math.max(10, 90 - prq * 0.8))}</span>
             </div>
-            <button onClick={() => setStarted(true)} className="fel-heading mt-6 rounded-md bg-[#FF3366] px-10 py-3 text-xl font-bold text-white transition-all hover:shadow-[0_0_28px_rgba(255,51,102,0.5)]">
+            <button onClick={() => startTransition(() => setStarted(true))} className="fel-heading mt-6 rounded-md bg-[#FF3366] px-10 py-3 text-xl font-bold text-white transition-all hover:shadow-[0_0_28px_rgba(255,51,102,0.5)]">
               FACE THE GLITCH
             </button>
           </div>

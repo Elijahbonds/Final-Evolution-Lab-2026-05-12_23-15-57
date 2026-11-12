@@ -5,6 +5,7 @@
 // the Closet feeds it what the player does.
 
 import { X } from 'lucide-react';
+import { lineSize } from '@/lib/design/type';   // EVERY-SCREEN P10
 import { WALK_COPY, WALK_SECONDS, WALK_STEPS, walkCurrent, type WalkState } from '@/lib/creator/look/studio/walkthrough';
 
 /** NEXUS STUDIO "Edit in the Closet" (studio-5): the Studio-edit mode has no Save Look. Its last step is the hand-back, which the
@@ -26,7 +27,7 @@ export function WalkthroughCard({ state, onNext, onSkip, studioEdit }: { state: 
         <button type="button" onClick={onSkip} aria-label="Skip the walkthrough" className="-mr-2 grid h-11 w-11 place-items-center rounded text-white/50 hover:text-white"><X className="h-3.5 w-3.5" /></button>
       </div>
       <h3 className="mt-1 font-display text-base font-bold text-white">{copy.title}</h3>
-      <p className="mt-1 text-[12px] leading-relaxed text-white/65">{copy.body}</p>
+      <p className={`mt-1 ${lineSize(copy.body, 'text-[12px]')} leading-relaxed text-white/65`}>{copy.body}</p>
       <div className="mt-2 flex items-center justify-between">
         <div className="flex gap-1" aria-hidden>
           {WALK_STEPS.map((s, i) => <span key={s} className="h-1 w-6 rounded-full" style={{ background: i <= state.step ? 'var(--fel-cyan)' : 'rgba(255,255,255,0.15)' }} />)}

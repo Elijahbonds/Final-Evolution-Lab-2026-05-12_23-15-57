@@ -30,6 +30,7 @@ import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyn
 import { sessionStore } from '@/lib/babylon/core/sessionStore';
 import { CONTROLS_DEVICES, DEVICE_LABEL, controlsSheet, detectDevice, fitScale, type ControlsDevice } from '@/lib/ui/controlsScreen';
 import { detectPadFamily, type PadFamily } from '@/lib/input/padLabels';
+import { lineSize } from '@/lib/design/type';
 
 /** How much of the panel's content its box cuts off: the panel's own overflow and its lines' scroll box. */
 function cutPx(panel: HTMLElement): number {
@@ -71,6 +72,10 @@ export function ControlsPanel({ modeId, hint, chooser = true, className = '' }: 
     if (!panel) return;
     // straight onto the element, not React state: a re-render per step would be a loop through the layout
     const apply = (s: number): void => { panel.style.setProperty('--fel-controls-fit', String(s)); panel.dataset.controlsFit = String(s); };
+    // EVERY-SCREEN P10 (phase 7's recommendation, built under the standing rule; the owner has not answered): on a phone and
+    // with keys the panel SCROLLS AS A WHOLE and nothing is zoomed: the rows stay 14 px and a line of more than 12 words is
+    // 16 px, at any text size. Only a pad, which cannot scroll a box, still steps the rows and lines down to fit.
+    if (device !== 'pad') { apply(1); return; }
     const fit = (): void => apply(fitScale((s) => { apply(s); return cutPx(panel) > 1; }));
     fit();
     if (typeof ResizeObserver === 'undefined') return;
@@ -80,7 +85,7 @@ export function ControlsPanel({ modeId, hint, chooser = true, className = '' }: 
     ro.observe(panel);
     if (panel.parentElement) ro.observe(panel.parentElement);
     return () => ro.disconnect();
-  }, [sheet]);
+  }, [sheet, device]);
   if (!sheet.rows.length && !sheet.lines.length) return null;
 
   return (
@@ -88,7 +93,7 @@ export function ControlsPanel({ modeId, hint, chooser = true, className = '' }: 
       // READY starts the game on a pointer-down anywhere that is not a button: reading (or finger-scrolling) the list
       // must not. On the pause a tap still resumes (the layer's click), which is what its headline says.
       onPointerDown={chooser ? (e) => e.stopPropagation() : undefined}
-      className={`flex w-[min(30rem,92vw)] min-h-0 flex-col gap-1.5 rounded-xl border border-white/10 bg-black/60 px-3 py-2 text-left ${className}`}>
+      className={`flex w-[min(30rem,92vw)] min-h-0 flex-col gap-1.5 overflow-y-auto overscroll-contain rounded-xl border border-white/10 bg-black/60 px-3 py-2 text-left [scrollbar-width:thin] ${className}`}>
       <span className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <span className="text-[12px] font-black tracking-[0.3em] text-white/70">CONTROLS</span>
         {chooser ? (
@@ -105,11 +110,10 @@ export function ControlsPanel({ modeId, hint, chooser = true, className = '' }: 
           <span className="text-[12px] font-black tracking-wider text-white/50">{DEVICE_LABEL[device]}</span>
         )}
       </span>
-      {/* EVERY-SCREEN P8b: at 150 % text a short box still cut the last row (8.4 px of "❚❚ PAUSE" on Spot the Scene) once the
-          fit reached its floor. The rows now scroll in their own box past it, as the lines do: nothing is hidden. The fit
-          still steps them down first (cutPx reads this box too), and they give up height far more slowly than the lines. */}
+      {/* EVERY-SCREEN P10: the rows and the lines are the panel's own content now; the panel scrolls as a whole (P8b gave the
+          rows a scroll box of their own, P7 the lines: at 150 % and 200 % text each box cut its own words) */}
       {sheet.rows.length > 0 && (
-        <span data-controls-rows className="[zoom:var(--fel-controls-fit,1)] grid min-h-0 shrink-[0.2] grid-cols-[auto_1fr_auto_1fr] gap-x-3 gap-y-0.5 overflow-y-auto [scrollbar-width:thin]">
+        <span data-controls-rows className="[zoom:var(--fel-controls-fit,1)] grid shrink-0 grid-cols-[auto_1fr_auto_1fr] gap-x-3 gap-y-0.5">
           {sheet.rows.map((r) => (
             <span key={`${r.input}-${r.action}`} className="contents">
               <span className="whitespace-nowrap font-mono text-[14px] font-black text-[#22d3ee]">{r.input}</span>
@@ -119,7 +123,7 @@ export function ControlsPanel({ modeId, hint, chooser = true, className = '' }: 
         </span>
       )}
       {sheet.lines.length > 0 && (
-        <span data-controls-lines className="[zoom:var(--fel-controls-fit,1)] block min-h-0 overflow-y-auto border-t border-white/10 pt-1.5 [scrollbar-width:thin]">
+        <span data-controls-lines className="[zoom:var(--fel-controls-fit,1)] block shrink-0 border-t border-white/10 pt-1.5">
           {sheet.groups.map((g, gi) => (
             <Fragment key={g.title ?? `group-${gi}`}>
               {g.title && (
@@ -127,7 +131,7 @@ export function ControlsPanel({ modeId, hint, chooser = true, className = '' }: 
                   className={`block text-[14px] font-black tracking-[0.3em]${gi > 0 ? ' pt-1.5' : ''}`}>{g.title}</span>
               )}
               {g.lines.map((l) => (
-                <span key={l} className="block pl-3 -indent-3 font-mono text-[14px] leading-snug text-white/75">· {l}</span>
+                <span key={l} className={`block pl-3 -indent-3 font-mono ${device === 'pad' ? 'text-[14px]' : lineSize(l, 'text-[14px]')} leading-snug text-white/75`}>· {l}</span>
               ))}
             </Fragment>
           ))}

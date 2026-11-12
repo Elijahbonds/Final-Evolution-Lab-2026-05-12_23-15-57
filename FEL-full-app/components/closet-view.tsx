@@ -773,7 +773,7 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan: faceSca
         {/* a phone's stage is small: the walkthrough sits at the top of the editor there */}
         <div className="mb-3 md:hidden"><WalkthroughCard state={walk} onNext={() => walkDo('next')} onSkip={() => walkDo('skip')} {...(studioEdit ? { studioEdit: true } : {})} /></div>
         <div className="mb-4 space-y-3">
-          <p className="text-[12px] text-white/50">Design your avatar&apos;s face, gear, and card skin. Everyone belongs here — the options are built to represent you. Tap the body to choose a region, drag the stage to spin, pinch or scroll to zoom.</p>
+          <p className="text-base text-white/50">Design your avatar&apos;s face, gear, and card skin. Everyone belongs here — the options are built to represent you. Tap the body to choose a region, drag the stage to spin, pinch or scroll to zoom.</p>
           {studioEdit ? (
             <p className="rounded-lg border border-cyan-400/30 bg-cyan-400/5 px-3 py-2 text-[12px] text-white/75" role="status">Editing <b>{studioEdit.name}</b> for Nexus Studio. Nothing here is saved to your Closet; <b>Back to Nexus Studio</b> hands the look back.</p>
           ) : (<>
