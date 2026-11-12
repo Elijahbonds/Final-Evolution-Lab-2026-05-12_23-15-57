@@ -27,6 +27,7 @@ import { isClothMesh, clothMeshOf } from '@/lib/babylon/creator/clothes/renderCl
 import { defaultFace, defaultJersey } from '@/lib/closet/wearable-catalog';
 import type { CreatorDoc } from '@/lib/creator/look/doc';
 import { kitOf } from '@/lib/babylon/core/kit';
+import { setFeelOverride, setFeelSession, setFeelUser } from '@/lib/feel-panel/feel';
 
 /** A body vertex within this of a garment surface (this pose) is "under the garment" for the poke count. */
 const POKE_NEAR = 0.04;
@@ -34,7 +35,7 @@ const POKE_NEAR = 0.04;
 const JITTER = 0.0004;
 
 type Tier = 'mobile' | 'desktop' | 'high';
-interface InitOpts { tier: Tier; modeId: string; closet: boolean; w: number; h: number }
+interface InitOpts { tier: Tier; modeId: string; closet: boolean; w: number; h: number; knobs?: Record<string, number> }
 interface SpawnOptsKG { kind: 'player' | 'rival'; body?: HeroBodyKind; url?: string; name?: string; tint?: string; creator?: CreatorDoc | null; wardrobe?: Record<string, string>; frame?: { heightScale: number; buildScale: number } }
 
 const CLASS = {
@@ -57,6 +58,8 @@ function canvasEl(w: number, h: number): HTMLCanvasElement {
 
 async function init(o: InitOpts): Promise<void> {
   opts = o;
+  // KIT-FIT: feel knobs for this page (a before / after of a runtime switch in one build), through the panel's own path
+  if (o.knobs && Object.keys(o.knobs).length) { setFeelUser(true); setFeelSession(null); for (const [k, v] of Object.entries(o.knobs)) setFeelOverride(k, v); }
   const canvas = canvasEl(o.w, o.h);
   // no MSAA: the class passes count exact colours (a blended edge pixel would be neither class)
   engine = new Engine(canvas, false, { preserveDrawingBuffer: true, stencil: !o.closet, alpha: false, adaptToDeviceRatio: false });

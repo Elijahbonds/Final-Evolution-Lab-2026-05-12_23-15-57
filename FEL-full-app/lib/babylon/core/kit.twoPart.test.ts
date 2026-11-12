@@ -76,12 +76,14 @@ describe('a garment without UVs gets an atlas (Creator paint draws through UVs)'
       else expect(m.getTotalVertices(), m.name).toBe(b.tris * 3);
       expect(m.getVerticesData(VertexBuffer.MatricesWeightsKind)!.length, m.name).toBe(m.getTotalVertices() * 4);
     }
-    // a hidden garment gets its UVs at the same first apply, so its vertex count never changes under a later cache
+    // a hidden garment gets its UVs at the same first apply, so its vertex count never changes under a later cache (since the
+    // KIT-FIT rebake the kit's garments carry authored UVs, so that count is the loaded one; a UV-less garment's is 3 a triangle)
     const bonds = meshes.find((m) => m.name === 'Kit_tops_top_bonds_c1')!;
+    const want = before.get(bonds.name)!.uv ? before.get(bonds.name)!.verts : before.get(bonds.name)!.tris * 3;
     expect(bonds.isVisible).toBe(false);
-    expect(bonds.getTotalVertices()).toBe(before.get(bonds.name)!.tris * 3);
+    expect(bonds.getTotalVertices()).toBe(want);
     applyKit(meshes, { tops: 'top_bonds' });
-    expect(bonds.getTotalVertices()).toBe(before.get(bonds.name)!.tris * 3);
+    expect(bonds.getTotalVertices()).toBe(want);
     scene.dispose();
   }, 120_000);
 });

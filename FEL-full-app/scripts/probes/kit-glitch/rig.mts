@@ -41,7 +41,8 @@ function serve(): Promise<{ url: string; close(): void }> {
     const p = decodeURIComponent((req.url ?? '/').split('?')[0]);
     // the closet / hero-body reads answer "guest": the rig applies its own identity
     if (p.startsWith('/api/')) { res.writeHead(401, { 'content-type': 'application/json' }); res.end('null'); return; }
-    const f = [join(SITE, p === '/' ? 'index.html' : p), join(ROOT, 'public', p)].find((x) => existsSync(x) && statSync(x).isFile());
+    // KIT-FIT: OVERLAY=<dir> serves a candidate asset (a rebake) in place of public/'s, so before and after run in one hold
+    const f = [join(SITE, p === '/' ? 'index.html' : p), ...(process.env.OVERLAY ? [join(process.env.OVERLAY, p)] : []), join(ROOT, 'public', p)].find((x) => existsSync(x) && statSync(x).isFile());
     if (!f) { res.writeHead(404); res.end(); return; }
     res.writeHead(200, { 'content-type': TYPES[extname(f)] ?? 'application/octet-stream', 'cache-control': 'max-age=3600' });
     res.end(readFileSync(f));
@@ -58,7 +59,7 @@ export interface Cell { subject: string; tier: string; pose: string; clip: strin
 async function runSubject(page: Page, base: string, s: Subject, tier: string, poses: typeof POSES, cams: typeof CAMS, out: Cell[], shots: boolean): Promise<void> {
   await page.goto(`${base}/`, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => !!(window as unknown as { __KG?: { ready: boolean } }).__KG?.ready, undefined, { timeout: 60_000 });
-  await kg(page, 'init', { tier, modeId: s.modeId, closet: s.closet, w: W, h: H });
+  await kg(page, 'init', { tier, modeId: s.modeId, closet: s.closet, w: W, h: H, knobs: process.env.KNOBS ? JSON.parse(process.env.KNOBS) : undefined });
   const t0 = Date.now();
   await kg(page, 'spawn', s.spawn);
   // the mask and the shoe's late fold land after the first rendered frames

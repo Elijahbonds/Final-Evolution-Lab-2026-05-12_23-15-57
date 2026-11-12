@@ -727,3 +727,12 @@ party run plays today's numbers. **Not read by any mode yet** (phase B wires the
 - `hoops.rateStealReachBand` 0.05: the steal reach (`hoops.stripReachM` 1.2 m) ×1.05 at 90 (1.26 m).
 - `hoops.rateBlockReachM` 0.04: block reach +0.04 m at 90.
 - `hoops.heightReachMPerIn` 0.015: playing height, 6'0" to 6'8": standing reach +1.5 cm an inch over 6'4" (6'8" +6 cm, 6'0" −6 cm).
+
+## kit-fit, 2026-11-12 (owner: "fix how the clothes fit, how they look"; the owner has not felt this yet)
+
+Group **Kit · fit**. A look switch, not a feel number: it moves no body, no bone and no timing.
+
+- `kit.garmentFollowBody` 1: on a Creator build (the girth sliders), a worn top or short (the kit's own, a kit pack's) takes the
+  bulk of the skin under it, so the tee stays over the short and both stay over the skin on any build (the kit-glitch lane's
+  open item: on the girth-max body the waistband showed through the tee's hem). 0 = each garment bulks through its own skin
+  weights, as before. Applied the next time the shape changes. `lib/babylon/creator/shape/renderShape.ts` `GARMENT_FOLLOW_BODY`.

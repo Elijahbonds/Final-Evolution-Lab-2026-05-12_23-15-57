@@ -8,9 +8,9 @@
  * every shown garment is measured (scripts/probes/kit-glitch/cpu.ts):
  *   · FLOAT — the farthest garment vertex from the skin. A garment vertex that takes an arm's weights follows the arm and
  *     stands off the hip as a spike (measured 0.48 m before the waistband donor rule; 0.06–0.09 m is a loose short's hem).
- *   · TEAR  — garment edges past ×2 of their bind length AND past ×1.5 of the skin under them. Not fixed for the shorts
- *     (its own coarse weights; a full skin transfer made the crotch worse, measured), so this HOLDS the measured level: a
- *     change that tears it further fails here.
+ *   · TEAR  — garment edges past ×2 of their bind length AND past ×1.5 of the skin under them. KIT-GLITCH could not fix the
+ *     shorts (a plain skin transfer made the crotch worse: the leg tubes crossed into each other); KIT-FIT fitted each tube
+ *     to its own thigh first (docs/KIT-FIT-PLAN.md). This HOLDS the measured level: a change that tears it further fails here.
  * The on-screen proof (poke-through and flicker in pixels, every tier) is the browser rig, scripts/probes/kit-glitch/rig.mts.
  *
  * Run: npx tsx scripts/kit-glitch-tests.ts
@@ -20,9 +20,11 @@ import { measureBodies, type PoseRead } from './probes/kit-glitch/cpu';
 
 /** A garment vertex farther than this from the skin, in any pose, is floating (a spike or a flap). */
 const FLOAT_MAX = 0.15;
-/** A short's torn edges per pose as measured at the fix (male kit court short: 17 in a stride, 25 in a high kick; the rivals'
- *  baggy short up to 28 in a high kick): held, not raised. */
-const SHORTS_TEAR_HELD = 30;
+/** A short's torn edges per pose, held at the measured level, never raised. KIT-GLITCH measured 17 in a stride and 25 in a high
+ *  kick on the male kit short, up to 28 on the rivals' baggy short (held at 30). KIT-FIT (lane/kit-fit, the leg tubes fitted to
+ *  their own thigh and weighted from it: scripts/avatar/kit-fit/bake.ts) brought them to 4 / 9 / 21 (male / grit / yara, worst
+ *  pose each): held at 22. */
+const SHORTS_TEAR_HELD = 22;
 /** Every other garment: no torn edges beyond a handful in any pose (the tee measured 0–4). */
 const OTHER_TEAR_MAX = 8;
 

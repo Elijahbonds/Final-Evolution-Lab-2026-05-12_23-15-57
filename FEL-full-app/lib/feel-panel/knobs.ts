@@ -1780,6 +1780,12 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/hoops/ratings.ts HEIGHT_REACH_M_PER_IN',
     hint: 'Metres of standing reach (blocks, contests, the rim) per inch of playing height over the standard frame; under it, the same off.',
   },
+  // ── lane/kit-fit (owner 2026-11-12: "fix how the clothes fit, how they look") ──
+  {
+    id: 'kit.garmentFollowBody', label: 'Clothes follow the body shape on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Kit · fit',
+    source: 'lib/babylon/creator/shape/renderShape.ts GARMENT_FOLLOW_BODY',
+    hint: 'On: a worn top or short takes the bulk of the skin under it on a Creator build, so layers keep their gap. Off: each garment bulks by its own weights.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));

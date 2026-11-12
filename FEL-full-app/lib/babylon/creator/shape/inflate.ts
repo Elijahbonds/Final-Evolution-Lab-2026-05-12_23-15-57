@@ -230,3 +230,47 @@ export function invert3(m: ArrayLike<number>): Float32Array {
     C * r, -(a * h - b * g) * r, (a * e - b * d) * r,
   ]);
 }
+
+/**
+ * GARMENTS FOLLOW THE BODY (lane/kit-fit, owner 2026-11-12: "fix how the clothes fit"). A garment's own skin weights are not
+ * the body's under it — the kit tee's hem rides the spine while the skin under it rides the hips — so a bulk computed through
+ * the garment's own weights swells the cloth by a different amount than the skin it covers: on the girth-max body the short's
+ * waistband outgrew the tee's hem and showed through it (the kit-glitch lane's open item). The industry's answer is that
+ * the garment is DRIVEN by the body shape: each garment vertex takes the displacement of the skin under it (Epic's outfit
+ * resizing, a proxy / wrap deformer, The Sims' body-matched garment morphs), so every layer keeps its offset off the skin.
+ *
+ * `followMap` binds each target vertex (rest, metres) to its `k` nearest source vertices within `reach` (inverse-distance
+ * weights); `followDelta` reads the source's offsets through it. A vertex with no source in reach keeps `own` (its own bulk).
+ * Pure; the map depends only on rest positions, so a caller caches it per (garment, body) geometry.
+ */
+export interface FollowMap { idx: Int32Array; w: Float32Array; k: number }
+export function followMap(dstP: Float32Array, srcP: Float32Array, reach = 0.06, k = 4): FollowMap {
+  const n = dstP.length / 3, m = srcP.length / 3, C = reach;
+  const grid = new Map<string, number[]>();
+  for (let u = 0; u < m; u++) { const key = `${Math.floor(srcP[u * 3] / C)},${Math.floor(srcP[u * 3 + 1] / C)},${Math.floor(srcP[u * 3 + 2] / C)}`; let a = grid.get(key); if (!a) grid.set(key, a = []); a.push(u); }
+  const idx = new Int32Array(n * k).fill(-1), w = new Float32Array(n * k);
+  const bd = new Float64Array(k), bi = new Int32Array(k);
+  for (let v = 0; v < n; v++) {
+    bd.fill(Infinity); bi.fill(-1);
+    const x = dstP[v * 3], y = dstP[v * 3 + 1], z = dstP[v * 3 + 2], ci = Math.floor(x / C), cj = Math.floor(y / C), ck = Math.floor(z / C);
+    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (let l = -1; l <= 1; l++) {
+      const a = grid.get(`${ci + i},${cj + j},${ck + l}`); if (!a) continue;
+      for (const u of a) {
+        const d = Math.hypot(srcP[u * 3] - x, srcP[u * 3 + 1] - y, srcP[u * 3 + 2] - z); if (d > reach || d >= bd[k - 1]) continue;
+        let s = k - 1; while (s > 0 && bd[s - 1] > d) { bd[s] = bd[s - 1]; bi[s] = bi[s - 1]; s--; }
+        bd[s] = d; bi[s] = u;
+      }
+    }
+    let tot = 0; for (let s = 0; s < k; s++) if (bi[s] >= 0) tot += 1 / Math.max(bd[s], 1e-4);
+    for (let s = 0; s < k; s++) if (bi[s] >= 0) { idx[v * k + s] = bi[s]; w[v * k + s] = 1 / Math.max(bd[s], 1e-4) / tot; }
+  }
+  return { idx, w, k };
+}
+export function followDelta(map: FollowMap, srcD: Float32Array, own: Float32Array): Float32Array {
+  const n = own.length / 3, out = new Float32Array(n * 3), { idx, w, k } = map;
+  for (let v = 0; v < n; v++) {
+    if (idx[v * k] < 0) { out[v * 3] = own[v * 3]; out[v * 3 + 1] = own[v * 3 + 1]; out[v * 3 + 2] = own[v * 3 + 2]; continue; }
+    for (let s = 0; s < k; s++) { const u = idx[v * k + s]; if (u < 0) continue; const ws = w[v * k + s]; out[v * 3] += ws * srcD[u * 3]; out[v * 3 + 1] += ws * srcD[u * 3 + 1]; out[v * 3 + 2] += ws * srcD[u * 3 + 2]; }
+  }
+  return out;
+}

@@ -40,29 +40,33 @@ const shown = (meshes: AbstractMesh[], re: RegExp) => meshes.find((m) => re.test
 const median = (a: number[]) => { const s = [...a].sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; };
 
 describe('stripes: a tiling weave never reads a paint atlas (fabric.weaveFits)', () => {
-  it('the kit tee and shorts (no authored UVs, atlas since 2026-10-20) and every sock get no weave; authored UVs keep it', () => {
+  it('a garment cut into the paint atlas gets no weave; authored UVs keep it (the kit tee, shorts and sock have them since KIT-FIT)', () => {
     // node has no canvas, so the scene is handed the weave maps fabric.ts would draw (it reuses a live cached map)
     const fake = (k: string) => ({ name: `weave_${k}`, getInternalTexture: () => ({}), level: 1, uScale: 1, vScale: 1 });
     for (const k of ['jersey', 'shorts', 'shoes', 'sock']) (scene.metadata as Record<string, unknown>)[`__felFabricWeaveNormal_${k}`] = fake(k);
     const male = spawn('male');
     const rival = spawn('rival');
-    applySkinShading(male.meshes, scene, 'desktop');
-    applySkinShading(rival.meshes, scene, 'desktop');
-    applyKit(male.meshes, null, 'onevone');
-    applyKit(rival.meshes, null, 'onevone');
+    const atlas = spawn('female');
+    // a garment WITHOUT UVs (as the kit tee and shorts shipped from 2026-10-20 until the kit-fit rebake) still gets the atlas, and
+    // a weave sampled through the atlas is a fresh patch per triangle (stripes): it must get none
+    for (const m of atlas.meshes) if (/^Kit_(tops|shorts)_/.test(m.name)) { (m as Mesh).makeGeometryUnique(); (m as Mesh).removeVerticesData('uv'); }
+    for (const b of [male, rival, atlas]) applySkinShading(b.meshes, scene, 'desktop');
+    for (const b of [male, rival, atlas]) applyKit(b.meshes, null, 'onevone');
     const bump = (meshes: AbstractMesh[], re: RegExp) => ((meshes.find((m) => re.test(m.name))!.material as PBRMaterial).bumpTexture as { name?: string } | null)?.name ?? null;
-    // the kit's tee and shorts carry the generated atlas: a weave sampled through it is a fresh patch per triangle (stripes)
-    expect(bump(male.meshes, /^Kit_tops_top_bonds/)).toBeNull();
-    expect(bump(male.meshes, /^Kit_shorts_shorts_court/)).toBeNull();
-    expect(bump(male.meshes, /^Kit_shoes_shoes_evo_primitive1/)).toBeNull();   // the low sock
-    expect(bump(rival.meshes, /^Kit_shoes_shoes_evo_primitive1/)).toBeNull();
-    expect(shown(male.meshes, /^Kit_tops_/).metadata?.felAtlasUV).toBe(true);
-    // the rival's tee, shorts and every shoe were authored with UVs: the weave tiles across them as designed
+    expect(bump(atlas.meshes, /^Kit_tops_top_bonds/)).toBeNull();
+    expect(bump(atlas.meshes, /^Kit_shorts_shorts_court/)).toBeNull();
+    expect(shown(atlas.meshes, /^Kit_tops_/).metadata?.felAtlasUV).toBe(true);
+    // KIT-FIT (scripts/avatar/kit-fit/bake.ts): the kit's tee, shorts and low sock carry authored UVs now — no atlas, the weave
+    // tiles across them as it does on the rivals' textured garments and every shoe
+    expect(shown(male.meshes, /^Kit_tops_/).metadata?.felAtlasUV).toBeUndefined();
+    expect(bump(male.meshes, /^Kit_tops_top_bonds/)).toBe('weave_jersey');
+    expect(bump(male.meshes, /^Kit_shorts_shorts_court/)).toBe('weave_shorts');
+    expect(bump(male.meshes, /^Kit_shoes_shoes_evo_primitive1/)).toBe('weave_shoes');   // the low sock (its material is `shoes.shoes_evo.sock_low`: the shoe's canvas)
     expect(bump(rival.meshes, /^Kit_tops_/)).toBe('weave_jersey');
     expect(bump(rival.meshes, /^Kit_shorts_/)).toBe('weave_shorts');
     expect(bump(male.meshes, /^Kit_shoes_shoes_evo_primitive0/)).toBe('weave_shoes');
     for (const k of ['jersey', 'shorts', 'shoes', 'sock']) delete (scene.metadata as Record<string, unknown>)[`__felFabricWeaveNormal_${k}`];
-    male.root.dispose(); rival.root.dispose();
+    male.root.dispose(); rival.root.dispose(); atlas.root.dispose();
   });
 });
 
@@ -76,10 +80,11 @@ describe('skin through cloth: the lift off the body is in METRES (garmentFixes.l
     const before = { tee: skinnedWorld(tee0)!.P.slice(), sh: skinnedWorld(sh0)!.P.slice(), teeInd: Array.from(tee0.getIndices()!), shInd: Array.from(sh0.getIndices()!) };
     applyKit(s.meshes, { tops: 'top_bonds', shorts: 'shorts_court' }, 'onevone');
     const lift = (m: Mesh, P0: Float32Array, ind0: number[]) => {
-      // applyKit unwelds (one vertex per triangle corner): corner i of the new mesh is vertex ind0[i] of the loaded one
-      const P = skinnedWorld(m)!.P;
+      // a garment without UVs is unwelded by applyKit (corner i of the new mesh is vertex ind0[i] of the loaded one); one with
+      // UVs (the kit's since KIT-FIT) keeps its vertices, so vertex i is vertex i
+      const P = skinnedWorld(m)!.P, same = P.length === P0.length;
       const d: number[] = [];
-      for (let i = 0; i < ind0.length; i++) d.push(Math.hypot(P[i * 3] - P0[ind0[i] * 3], P[i * 3 + 1] - P0[ind0[i] * 3 + 1], P[i * 3 + 2] - P0[ind0[i] * 3 + 2]));
+      for (let i = 0; i < (same ? P0.length / 3 : ind0.length); i++) { const o = same ? i : ind0[i]; d.push(Math.hypot(P[i * 3] - P0[o * 3], P[i * 3 + 1] - P0[o * 3 + 1], P[i * 3 + 2] - P0[o * 3 + 2])); }
       return median(d);
     };
     // the bind units are 0.25 m (tee) and 0.17 m (shorts) on these files: the unit bug lifted 3 mm, not 13 / 20

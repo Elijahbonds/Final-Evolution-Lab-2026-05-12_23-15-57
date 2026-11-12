@@ -48,9 +48,11 @@ import {
 } from '../../../creator/look/shape';
 import { GIRTH_KEYS, type CreatorDoc, type GirthKey } from '../../../creator/look/doc';
 import {
-  dominantOn, emptyTable, groupTransfer, invert3, lowestAlong, segmentRadius, shapeDelta, spanAlong, tableIsNeutral, toLocal,
-  weightOn, weldedNormals, type BoneShapeTable, type SkinField,
+  dominantOn, emptyTable, followDelta, followMap, groupTransfer, invert3, lowestAlong, segmentRadius, shapeDelta, spanAlong, tableIsNeutral, toLocal,
+  weightOn, weldedNormals, type BoneShapeTable, type FollowMap, type SkinField,
 } from './inflate';
+import { maskSlotOf } from '../../core/bodyMask';
+import { feel } from '../../../feel-panel/feel';
 
 type V3 = [number, number, number];
 export const SHAPE_TARGET = 'felShape';
@@ -135,6 +137,16 @@ const NECK_FALLBACK_M = 0.08;
 /** How far round an eyeball the face skin that carries it reaches (metres). assumption: 4 cm takes in the lids, the
  *  brow and the cheek above the bone; judged from the kit's proportions, not a rendered view. */
 const EYE_REACH_M = 0.04;
+/**
+ * kit.garmentFollowBody (lane/kit-fit): 1 = a worn top or short (the kit's, a kit pack's) takes the bulk of the skin under it
+ * (inflate.followDelta), so the layers keep their offsets on any build — the girth-max body's waistband no longer outgrows the
+ * tee's hem; 0 = each garment bulks through its own weights, as before.
+ */
+export const GARMENT_FOLLOW_BODY = 1;
+/** How far (m, at rest) a garment vertex looks for the skin it follows; beyond it keeps its own bulk (a loose hem's tip). */
+const FOLLOW_REACH_M = 0.08;
+const followMaps = new Map<string, FollowMap>();
+const followsBody = (mesh: AbstractMesh): boolean => { const s = maskSlotOf(mesh.name); return s === 'tops' || s === 'shorts'; };
 const measures = new Map<string, BodyMeasure | null>();
 
 function jointsOf(sk: Skeleton): Record<string, V3> {
@@ -365,7 +377,8 @@ export function syncShape(
   fitPlate(spawn, s, m);
 
   // the morph: one summed target per mesh
-  const sig = JSON.stringify([s.girth, s.body.hands, s.body.feet]);
+  const follow = feel('kit.garmentFollowBody', GARMENT_FOLLOW_BODY) >= 0.5;
+  const sig = JSON.stringify([s.girth, s.body.hands, s.body.feet, follow]);
   const bodyPrep = prepFor(body);
   let bodyDelta: Float32Array | null = null;
   let morphed = 0;
@@ -394,6 +407,14 @@ export function syncShape(
     } else {
       rest = mesh === body && bodyDelta ? bodyDelta : shapeDelta(prep.field, table);
       if (mesh === body) bodyDelta = rest;
+      else if (follow && bodyPrep && followsBody(mesh)) {
+        // the skin's own displacement under each garment vertex (the body's delta is the same array its own morph uses)
+        bodyDelta ??= shapeDelta(bodyPrep.field, tableFor(bodyPrep, m, s));
+        const fk = `${prep.key}|${bodyPrep.key}`;
+        let fm = followMaps.get(fk);
+        if (!fm) { fm = followMap(prep.field.P, bodyPrep.field.P, FOLLOW_REACH_M); followMaps.set(fk, fm); }
+        rest = followDelta(fm, bodyDelta, rest);
+      }
     }
     const local = toLocal(rest, prep.field, prep.linv);
     const out = new Float32Array(prep.base.length);
@@ -434,7 +455,7 @@ export function shapeTargetOf(mesh: AbstractMesh): MorphTarget | null {
 }
 
 /** Tests: forget every cached prep and measurement. */
-export function resetShapeCaches(): void { preps.clear(); measures.clear(); prepOfMesh = new WeakMap(); }
+export function resetShapeCaches(): void { preps.clear(); measures.clear(); followMaps.clear(); prepOfMesh = new WeakMap(); }
 /** How many preps are cached, and their bytes (for the memory report). */
 export function shapeCacheStats(): { preps: number; bytes: number } {
   let bytes = 0;
