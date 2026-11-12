@@ -363,6 +363,14 @@ the run loop's own capture), every pop 1 405 → 1 205, the catching palm on the
 linear here; not re-measured in the modes. Not fixed: idle's changes (the old ball arm), the run loop's own arm keys, and the stick's own
 crossover moves (their paths keep the schedule's lead).
 
+After the play audit (HOOPS-AAA-GAP-PLAY, PR #583): most of the pops in play are the AUTOMATIC outside hand (core/GuardHand) crossing about
+once a second while guarded at rest. Its crossing (modes/hoopsFlow, `runMove('crossover')`) now takes the same catch lead (headless, that
+path: 56 → 35), and standing it crosses at most once in 1.5 s (`hoops.guardHandRestGapSec`; unit test: at rest the gaps go from the rule's
+~0.9 s to ≥ 1.5 s, on the move unchanged). Not re-measured with the audit's player counter (`mash-audit.mjs`): the numbers above are this
+lane's headless probe, which drives the tree and the carry itself (the counter's agent-bridge bug does not reach it). The bump's
+contact reaction (a forearm 58–90° in a frame, the audit's other hard pop) is not touched here. A dedicated hand-change pose or clip, the
+arm following the ball, would take the rest; it needs clip work (GATE 0) or a code-built pose — not done.
+
 ## 4. Ranked gaps
 
 Ranked by what the owner feels first × how far from the bar. "Shared" = touches one of the shared hoops files.

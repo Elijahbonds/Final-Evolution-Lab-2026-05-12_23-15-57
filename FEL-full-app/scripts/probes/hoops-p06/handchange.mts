@@ -59,7 +59,14 @@ for (const [label, mps] of LOOPS) {
       let worst = 0; let prev = nodes.map((x) => (x?.rotationQuaternion ?? Quaternion.Identity()).clone());
       for (let i = 0; i < n; i++) {
         tree.update(input(hand)); vt += 1000 / 60;
-        if (carry) { if ((carry.handAfterMove === 'Left' ? 'left' : 'right') !== hand) carry.toSide(hand); carry.update(1 / 60, Math.min(1, mps / 6.4), true); }
+        if (carry) {
+          if ((carry.handAfterMove === 'Left' ? 'left' : 'right') !== hand) {
+            // GUARD=1: the crossing the automatic outside hand runs (modes/hoopsFlow PlayerGuardHand: runMove 'crossover', with the catch lead)
+            if (process.env.GUARD === '1') { const lead = Number(kv.find((x) => x.startsWith('hoops.handChangeCatchLeadSec='))?.split('=')[1] ?? 0.45); carry.runMove('crossover', lead > 0.06 ? { pace: 1, catchLeadSec: lead } : { pace: 1 }); }
+            else carry.toSide(hand);
+          }
+          carry.update(1 / 60, Math.min(1, mps / 6.4), true);
+        }
         root.position.z -= mps / 60;
         scene.render();
         if (carry) { if (lastSide && carry.side !== lastSide) catchGaps.push(palmGap(carry.side)); lastSide = carry.side; }

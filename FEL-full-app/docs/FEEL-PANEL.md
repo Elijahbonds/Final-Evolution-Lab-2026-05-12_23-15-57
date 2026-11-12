@@ -629,3 +629,8 @@ Group "Hoops · flow and pace". Each is NEW; 0 restores the old behaviour exactl
 - Phase 7 (bodies that touch) adds no knob: both its gates already read true on the release (0 overlap frames in nine rig runs; defensive
   clip changes ≤ 2.5 a second, the 1v1 hero 0.6 with the size-up on). The 3v3 pair loop now reads the one standoff (`BODY_STANDOFF / 2`,
   the same 0.55 m it typed). HOOPS-GOAL-GAP §3i.
+- `hoops.guardHandRestGapSec` 1.5 s (`modes/hoopsFlow.ts`; the play audit's sinker 1, HOOPS-AAA-GAP-PLAY): standing guarded (under 0.6 m/s),
+  the automatic outside hand crosses the ball at most once in 1.5 s; it crossed about once a second, and every crossing is a hand change
+  (the audit: 14 of 21 hard pops in a 22 s idle 1v1 run). On the move it is the rule as before (`hoops.aiHandDwellSec` 0.35, `hoops.aiHandGapSec`
+  0.9, unchanged). Its crossing also takes `hoops.handChangeCatchLeadSec` (headless, that path: 56 → 35 hard events in 64 changes, as the
+  carry's own). 0 = as before. Feel-check: 1v1, stand dribbling with him shading you; the ball should not ping-pong.

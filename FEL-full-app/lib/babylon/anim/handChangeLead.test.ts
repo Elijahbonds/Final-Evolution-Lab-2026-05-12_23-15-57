@@ -37,7 +37,7 @@ describe('the hand change: the catching hand comes to meet the ball', () => {
   });
   it('only the carry\'s own hand change asks for it', () => {
     const src = readFileSync('lib/babylon/anim/ballCarry.ts', 'utf8');
-    expect(src.match(/catchLeadSec: lead/g)?.length).toBe(1);
+    expect(src.match(/catchLeadSec: lead/g)?.length).toBe(1);   // (and the guard hand's crossing: modes/hoopsFlow.restGap.test.ts)
     expect(src).toMatch(/const switchHoops = [\s\S]{0,700}feel\('hoops\.handChangeCatchLeadSec', HAND_CHANGE_CATCH_LEAD_SEC\)/);
   });
 });

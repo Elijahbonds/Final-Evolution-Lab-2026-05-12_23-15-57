@@ -1597,6 +1597,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/anim/ballCarry.ts HAND_CHANGE_CATCH_LEAD_SEC',
     hint: 'On a dribble hand change the other hand starts to come and meet the ball this long before it catches it, instead of swinging to it in four frames. 0.06 = as before.',
   },
+  {
+    id: 'hoops.guardHandRestGapSec', label: 'Outside hand at rest: at most one cross per', def: 1.5, min: 0, max: 4, step: 0.1, unit: 's', group: 'Hoops · flow and pace',
+    source: 'lib/babylon/modes/hoopsFlow.ts GUARD_HAND_REST_GAP_SEC',
+    hint: 'Standing guarded, the automatic outside hand crosses the ball no more than once in this long (it crossed about once a second). On the move it is the rule as before. 0 = as before.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));
