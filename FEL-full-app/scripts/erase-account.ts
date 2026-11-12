@@ -4,9 +4,11 @@
  * Privacy §4 (lib/policies.ts): "Until an in-app delete option exists, you can have your account and personal data
  * deleted by emailing ... from the email address on your account." Until this script, that request had no tool: a hand
  * `DELETE FROM "User"` either fails (Order, Subscription, Booking ... are Restrict) or cascades through Wallet into the
- * wallet ledger, which no erase in this repo has ever deleted. This runs lib/data-rights/rights.ts eraseAccount, which
- * follows lib/data-rights/registry.ts table by table, and records the event as a CreditLedger row (amount 0, counts
- * only), all in ONE transaction.
+ * wallet ledger, which no erase in this repo has ever deleted. This runs lib/data-rights/accountDelete.ts
+ * eraseAccountNow — the SAME function the in-app "Delete my account" calls (ACCOUNT-DELETE, 2026-10-25) — which follows
+ * lib/data-rights/registry.ts table by table and records the event once as a CreditLedger row (amount 0, counts only),
+ * all in ONE transaction with the account row locked. Running it again on an erased account sweeps again and records
+ * nothing new.
  *
  *   npx tsx scripts/erase-account.ts --user <id> --email <the account's email>            # dry run: counts only
  *   npx tsx scripts/erase-account.ts --user <id> --email <the account's email> --commit   # IRREVERSIBLE
@@ -20,7 +22,8 @@
  */
 import 'dotenv/config';
 import { PrismaClient } from '@/public/_prisma/client';
-import { eraseAccount, erasureSummary, recordErasureEvent, type AccountErasure } from '@/lib/data-rights/rights';
+import { erasureSummary, type AccountErasure } from '@/lib/data-rights/rights';
+import { eraseAccountNow, previewAccountErase, txRunner } from '@/lib/data-rights/accountDelete';
 
 function arg(name: string): string | null {
   const i = process.argv.indexOf(`--${name}`);
@@ -46,17 +49,13 @@ async function main(): Promise<void> {
     if (found[0].email.toLowerCase() !== email.toLowerCase()) throw new Error('the email does not match that account; nothing done');
     if (!commit) {
       console.log('DRY RUN: nothing is changed. Add --commit to erase.');
-      print(await eraseAccount(db, userId, { dryRun: true }));
+      print(await previewAccountErase(db, userId));
       return;
     }
-    const done = await db.$transaction(async (tx) => {
-      const e = await eraseAccount(tx, userId);
-      const w = await tx.$queryRawUnsafe<{ lc: bigint }[]>(`SELECT "lc" FROM "Wallet" WHERE "playerId" = $1`, userId);
-      await recordErasureEvent(tx, { userId, reason: erasureSummary(e), balanceAfter: Number(w[0]?.lc ?? 0), dedupeKey: `account-erase:${userId}:${Date.now()}` });
-      return e;
-    }, { timeout: 120_000, maxWait: 10_000 });
-    console.log('ERASED.');
-    print(done);
+    // the same erase the in-app "Delete my account" runs (lib/data-rights/accountDelete.ts)
+    const done = await eraseAccountNow(txRunner(db), userId, 'operator');
+    console.log(done.alreadyErased ? 'ALREADY ERASED (swept again; no second event).' : 'ERASED.');
+    print(done.erasure);
   } finally {
     await db.$disconnect();
   }

@@ -176,11 +176,18 @@ describe('the erasure event on the ledger', () => {
     expect(made).toEqual([{ data: { userId: 'u1', amount: 0, reason: 'PRQ data erasure: 1 entries', balanceAfter: 40, dedupeKey: 'prq-erase:u1:1' } }]);
   });
 
-  it('the PRQ delete route and the operator script record it that way, never through postLc (static)', () => {
+  // test changed (ACCOUNT-DELETE, 2026-10-25): the account erase's event moved from the script into the shared core
+  // (lib/data-rights/accountDelete.ts), which the script AND the in-app route now call; the same two rules follow it.
+  it('the PRQ delete route and the account erase core record it that way, never through postLc (static)', () => {
     const root = join(__dirname, '../..');
-    for (const f of ['app/api/prq/delete/route.ts', 'scripts/erase-account.ts']) {
+    for (const f of ['app/api/prq/delete/route.ts', 'lib/data-rights/accountDelete.ts']) {
       const src = readFileSync(join(root, f), 'utf8');
       expect(src, f).toMatch(/recordErasureEvent\(/);
+      expect(src, f).not.toMatch(/\bpostLc\s*\(|import[^;]*\bpostLc\b/);
+    }
+    for (const f of ['scripts/erase-account.ts', 'app/api/account/delete/route.ts']) {
+      const src = readFileSync(join(root, f), 'utf8');
+      expect(src, f).toMatch(/eraseAccountNow\(/);
       expect(src, f).not.toMatch(/\bpostLc\s*\(|import[^;]*\bpostLc\b/);
     }
   });

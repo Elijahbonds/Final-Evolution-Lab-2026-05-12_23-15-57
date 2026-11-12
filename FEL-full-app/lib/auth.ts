@@ -1,10 +1,16 @@
 import { type NextAuthOptions } from 'next-auth';
+import type { JWT } from 'next-auth/jwt';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { PrismaAdapter } from '@next-auth/prisma-adapter';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/db';
 import { isUnreachable } from '@/lib/db/errors';
 import { AUTH_SERVICE_UNAVAILABLE } from '@/lib/auth-errors';
+import { isTombstoneEmail } from '@/lib/data-rights/tombstone';
+import { aliveIsFresh, isKnownErased, markAccountErased, noteAlive } from '@/lib/auth/accountStatus';
+
+/** The token of an erased account: no subject, no claims. The session callback reads it as signed out. */
+const signedOutToken = (): JWT => ({}) as JWT;
 
 export const authOptions: NextAuthOptions = {
   // @next-auth/prisma-adapter is typed against a client generated into node_modules/.prisma. Ours is generated into
@@ -62,6 +68,9 @@ export const authOptions: NextAuthOptions = {
         }
 
         if (!user?.password) return null;
+        // ACCOUNT-DELETE: an erased account's placeholder never signs in (its password is already '', above; this
+        // holds even if a later edit gave it one).
+        if (isTombstoneEmail(user.id, user.email)) return null;
         const valid = await bcrypt.compare(credentials.password, user.password);
         if (!valid) return null;
         return {
@@ -90,11 +99,26 @@ export const authOptions: NextAuthOptions = {
       // moment the database blinks — the role refresh alone re-queries every
       // five minutes for everyone. On failure keep the claims the token already
       // carries and leave roleAt unset so the next refresh retries.
-      if (token.sub && (!token.role || !token.roleAt || Date.now() - (token.roleAt as number) > 5 * 60_000)) {
+      //
+      // ACCOUNT-DELETE (owner, 2026-10-25: "sign out everywhere immediately"): the same read also checks the account is
+      // not erased, and runs whenever this instance has not seen the account alive in the last 30 s
+      // (lib/auth/accountStatus.ts has the cost and the reasoning). An erased or missing account gets an EMPTY token,
+      // and the session callback below turns that into no session at all.
+      const sub = typeof token.sub === 'string' ? token.sub : null;
+      if (sub && isKnownErased(sub)) return signedOutToken();
+      const roleDue = !!sub && (!token.role || !token.roleAt || Date.now() - (token.roleAt as number) > 5 * 60_000);
+      if (sub && (roleDue || !aliveIsFresh(sub))) {
         try {
-          const u = await prisma.user.findUnique({ where: { id: token.sub as string }, select: { role: true } });
-          token.role = u?.role ?? 'player';
-          token.roleAt = Date.now();
+          const u = await prisma.user.findUnique({ where: { id: sub }, select: { role: true, email: true } });
+          if (!u || isTombstoneEmail(sub, (u as { email?: string | null }).email)) {
+            markAccountErased(sub);
+            return signedOutToken();
+          }
+          noteAlive(sub);
+          if (roleDue) {
+            token.role = u.role ?? 'player';
+            token.roleAt = Date.now();
+          }
         } catch (err) {
           // Deliberately does NOT fall back to 'player': that would silently
           // demote an admin mid-session. An absent role still reads as 'player'
@@ -117,6 +141,9 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     async session({ session, token }) {
+      // ACCOUNT-DELETE: a token with no account (the jwt callback emptied it: the account was erased) is NO session.
+      // getServerSession answers null for an empty object, and /api/auth/session sends {} (useSession: unauthenticated).
+      if (!token?.sub) return {} as typeof session;
       if (session?.user && token?.sub) {
         (session.user as any).id = token.sub;
         (session.user as any).profileId = token.profileId ?? null;

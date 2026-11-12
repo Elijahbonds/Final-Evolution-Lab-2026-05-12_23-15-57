@@ -9,6 +9,7 @@ import { ScanSaveAccount } from '@/components/privacy/scan-save-account';
 import { TabPage } from '@/components/shell/tab-page';
 import { AccessibilitySettings } from '@/components/settings/accessibility-settings';
 import { PrqDataRights, HealthDataSection } from '@/components/profile-view';
+import { DeleteAccount } from '@/components/account/delete-account';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,6 +34,8 @@ export default async function AccountPage() {
           A11-03 / A11-05 (2026-10-25): with it, colour vision for the game HUD and the big-screen menus. */}
       <div className="mt-8"><AccessibilitySettings /></div>
       <p className="mt-4 text-sm"><Link href="/account/coaching" className="inline-flex min-h-11 items-center">Coaching</Link></p>
+      {/* ACCOUNT-DELETE (owner, 2026-10-25): delete the account, with a confirm step */}
+      <DeleteAccount />
     </TabPage>
   );
 }
