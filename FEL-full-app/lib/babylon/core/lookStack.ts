@@ -75,7 +75,7 @@ export async function mountLookStack(o: LookStackOpts): Promise<LookStack> {
   (scene.metadata ??= {}).felTier = tier;   // read by CharacterLibrary for per-spawn quality
   // PHONE-PERF (2026-10-14): a phone uploads a glTF model's texture at 1024² at most (phoneTextureCap.ts); desktop untouched.
   // In the shared look stack so the Studio's phone preview counts the same texture memory a mode does.
-  installPhoneTextureCap(engine, tier);
+  installPhoneTextureCap(engine, tier, undefined, o.modeId);   // hoops-p08: + the mode, for the far vehicles' cap
   installPhoneActiveTrim(scene, tier);   // lane/owner-1016 (2026-10-16): empty `__root__` meshes leave the active list on a phone; no pixel changes (phoneTrim.ts)
   scene.metadata.felModeId = o.modeId;      // read by kit.applyKit for the sport's default kit (owner decision 2026-09-05)
   o.onScene?.(scene, { engine, fit, tier });

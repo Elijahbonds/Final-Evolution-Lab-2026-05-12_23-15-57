@@ -36,3 +36,36 @@ describe('phoneCasters', () => {
     expect(at).toBeLessThan(c.indexOf('shadows.addShadowCaster(mesh, true);'));
   });
 });
+
+// hoops-p08 (2026-11-12): the phone budget — no ink contour on the parts inside a bigger part, and the sock out of the shadow map
+import { PHONE_INK_TRIM, PHONE_SOCK_CAST, phoneSkipsCasterMaterial, phoneSkipsInk } from './phoneCasters';
+describe('phoneCasters — the ink and the sock (hoops-p08)', () => {
+  it('a phone draws no ink for the eyes, the sole, the accessories and the sock; the silhouette keeps its line', () => {
+    expect(PHONE_INK_TRIM).toBe(1);
+    for (const [n, m] of [['eyes_c304', 'eyes'], ['KitSole_evo_c315', 'kitSole.evo'], ['acc_337_legsleeve', 'acc_337_legsleeve'], ['Kit_shoes_shoes_evo_primitive1_c316', 'shoes.shoes_evo.sock_low_wear']]) {
+      expect(phoneSkipsInk(n, m, 'mobile'), n).toBe(true);
+    }
+    for (const [n, m] of [['Body_c307', 'skin'], ['Hair_buzz_c306', 'hair.buzz'], ['Kit_tops_top_tee_c311', 'jersey.top_tee_wear_wear'], ['Kit_shorts_shorts_baggy_c310', 'shorts.shorts_baggy_wear'], ['Kit_shoes_shoes_evo_primitive0_c315', 'shoes.shoes_evo_wear']]) {
+      expect(phoneSkipsInk(n, m, 'mobile'), n).toBe(false);
+    }
+  });
+  it('only on a phone, and the knob at 0 inks every part as before', () => {
+    for (const tier of ['desktop', 'high']) expect(phoneSkipsInk('eyes_c1', 'eyes', tier)).toBe(false);
+    expect(phoneSkipsInk('eyes_c1', 'eyes', 'mobile', 0)).toBe(false);
+  });
+  it('the sock leaves a phone\'s shadow map (by its material); 1 restores it; other tiers keep it', () => {
+    expect(PHONE_SOCK_CAST).toBe(0);
+    expect(phoneSkipsCasterMaterial('shoes.shoes_evo.sock_low_wear', 'mobile')).toBe(true);
+    expect(phoneSkipsCasterMaterial('shoes.shoes_evo.sock_low_wear', 'mobile', 1)).toBe(false);
+    expect(phoneSkipsCasterMaterial('shoes.shoes_evo.sock_low_wear', 'desktop')).toBe(false);
+    expect(phoneSkipsCasterMaterial('shoes.shoes_evo_wear', 'mobile')).toBe(false);
+    expect(phoneSkipsCasterMaterial(null, 'mobile')).toBe(false);
+  });
+  it('autoInk asks it with the tier (the scene\'s own, which the look stack sets before it inks)', () => {
+    const ink = readFileSync(join(__dirname, '../visual/AnimeInk.ts'), 'utf8');
+    expect(ink).toMatch(/phoneSkipsInk\(m\.name, m\.material\?\.name, tier, feel\('perf\.phoneInkTrim', PHONE_INK_TRIM\)\) \? 'off' : style/);
+    expect(ink).toMatch(/tier: string = \(scene\.metadata as \{ felTier\?: string \} \| null\)\?\.felTier \?\? 'desktop'/);
+    const look = readFileSync(join(__dirname, '../core/lookStack.ts'), 'utf8');
+    expect(look.indexOf('scene.metadata ??= {}).felTier = tier')).toBeLessThan(look.indexOf('autoInk(scene, inkStyleFor(o.modeId))'));
+  });
+});
