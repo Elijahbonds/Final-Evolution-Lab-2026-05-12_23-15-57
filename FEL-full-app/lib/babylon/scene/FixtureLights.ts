@@ -231,6 +231,9 @@ export function mountFixtureLights(scene: Scene, tier: QualityTier, mood: VenueM
     lights.push(l);
   }
   if (patchClusteredSheen()) console.info('[FEL-FIXTURE] patched Babylon\'s clustered sheen term (normalW → N)');
+  // device-perf (2026-11-12): Babylon's WGSL include has the same bug (measured in 9.23: the same `normalW` inside the same function,
+  // whose normal is `N`), so under the WebGPU trial every sheen kit near a fixture light would vanish the same way. Same one-token fix.
+  if (patchClusteredSheen(ShaderStore.IncludesShadersStoreWGSL)) console.info('[FEL-FIXTURE] patched Babylon\'s WGSL clustered sheen term (normalW → N)');
   let container: ClusteredLightContainer;
   try {
     container = new ClusteredLightContainer('fel_fixture_lights', [], scene);

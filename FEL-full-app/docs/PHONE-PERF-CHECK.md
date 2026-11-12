@@ -67,8 +67,27 @@ panel) and only where the phone's browser offers WebGPU; anything else runs WebG
 load Babylon's shader translator from its CDN (that would be a third-party script on the page), so a shader written only in
 the older GLSL language is not drawn under WebGPU.
 
-What the test machine found is recorded below (`scripts/probes/device-perf/readout-run.mts`).
+### What the test machine found (2026-11-12)
 
-### What WebGPU does not draw yet
+- **WebGPU cannot be measured here.** This machine's Chrome and the test Chromium both offer a software WebGPU adapter
+  (Google SwiftShader, with `--enable-unsafe-webgpu`). Babylon's WebGPU engine starts on it, but the device is lost within
+  about a second, every texture upload after that fails, and the tab crashes. A bare Babylon scene with no app code at all
+  (a box and a sphere, `scripts/probes/device-perf/bare-entry.mjs`) crashes the same way, so this is the machine, not the
+  game. No WebGPU frame time or draw-call cost could be measured; **your phone is the first real WebGPU test.**
+- **Fixed: five material add-ons refused WebGPU.** The avatar colour tint, the sky dome, the wet court, the snow glint and
+  the ocean each made the game fail to load under WebGPU (Babylon rejects an add-on that does not say it supports WebGPU's
+  shader language, and the tint rides every material once a body is built). Each already handled WebGPU itself, so each now
+  says so. Under WebGL nothing changes. Held by `lib/babylon/core/webgpuPlugins.test.ts` (it failed before the fix).
+- **Fixed: a Babylon bug that would have hidden the kits under WebGPU.** On desktop and high tiers, where venue fixture
+  lights are on, Babylon 9.23's clustered-light code reads a variable that is not there when it lights cloth, and the kit
+  fails to draw. We already patched the WebGL copy of that code (`scene/FixtureLights.ts`); the WebGPU copy has the same
+  bug, and now gets the same one-word patch. Phones never turn fixture lights on.
+- **Not drawn under WebGPU (written only in the older GLSL language):**
+  - **the 3D shot meter** in 1v1, 3v3, Three-Point, Dunk and Dunk Duel and at the free-throw line (`visual/ShotMeter3D.ts`).
+    In the WebGPU try the meter will be missing; that is expected, not a new bug;
+  - the heat haze over fire pits and lava (desktop tier only, so never on a phone).
+  The sky gradient, the wet-court puddles, the snow glint and the ocean waves fall back to the plain material under WebGPU.
+- **Everything else** in the hoops modes uses Babylon's own materials and effects (PBR, shadows, the post-processing
+  pipeline), which Babylon ships in both languages.
 
-(filled in from the rig run)
+To make WebGPU a real option, the shot meter's small shader needs a WebGPU version (about 30 lines), checked on a phone.
