@@ -14,6 +14,8 @@
 import '@babylonjs/core/Rendering/outlineRenderer';     // side-effect: enables mesh.renderOutline
 import { Color3 } from '@babylonjs/core';
 import type { AbstractMesh, PBRMaterial, Scene, StandardMaterial } from '@babylonjs/core';
+import { phoneSkipsInk, PHONE_INK_TRIM } from '../scene/phoneCasters';
+import { feel } from '@/lib/feel-panel/feel';
 
 const INK_COLOR = Color3.FromHexString('#1a1230');      // deep indigo, softer than pure black
 export const INK_WIDTH = 0.015;
@@ -88,7 +90,7 @@ export function inkCharacter(meshes: AbstractMesh[], style: InkStyle = 'anime'):
  *  skinned mesh that ever spawns — hero, rivals, mobs, the Yeti — gets
  *  inked automatically, existing and future. Returns a disposer.
  *  `style` (A9.6): the mode's ink — see INK_STYLE_BY_MODE; the default is the anime line every caller had. */
-export function autoInk(scene: Scene, style: InkStyle = 'anime'): () => void {
+export function autoInk(scene: Scene, style: InkStyle = 'anime', tier: string = (scene.metadata as { felTier?: string } | null)?.felTier ?? 'desktop'): () => void {
   // The outline is an inverted hull drawn with depth: on a body wearing FITTED
   // garments the body's hull buried anything tighter than the ink width — the
   // kit hero played bare-legged (measured 2026-09-04; the Closet, which has no
@@ -103,7 +105,9 @@ export function autoInk(scene: Scene, style: InkStyle = 'anime'): () => void {
   const tryInk = (m: AbstractMesh): void => {
     if (seen.has(m) || !m.skeleton) return;
     seen.add(m);
-    inkCharacter([m], style);
+    // hoops-p08: a phone draws no contour for a part inside a bigger part's (phoneCasters.phoneSkipsInk: eyes, sole, sock, accessories)
+    inkCharacter([m], phoneSkipsInk(m.name, m.material?.name, tier, feel('perf.phoneInkTrim', PHONE_INK_TRIM)) ? 'off' : style);
+    if (!m.renderOutline) return;
     if (style === 'distance') inked.push(m);
   };
   for (const m of scene.meshes) tryInk(m);

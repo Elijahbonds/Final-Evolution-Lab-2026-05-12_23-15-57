@@ -117,10 +117,30 @@ describe('phoneTextureCap', () => {
   it('the look stack installs it once the tier is known, before anything loads (and the harness mounts the look stack)', () => {
     const h = readFileSync(join(__dirname, '../core/lookStack.ts'), 'utf8');
     const tierAt = h.indexOf('const tier: QualityTier =');
-    const capAt = h.indexOf('installPhoneTextureCap(engine, tier);');
+    // test changed (hoops-p08): the call also hands the mode in (the far vehicles' cap is per mode) — was the exact text
+    // 'installPhoneTextureCap(engine, tier);'; the placement it holds is the same
+    const capAt = h.indexOf('installPhoneTextureCap(engine, tier, undefined, o.modeId);');
     expect(tierAt).toBeGreaterThan(0);
     expect(capAt).toBeGreaterThan(tierAt);
     expect(capAt).toBeLessThan(h.indexOf('mountLightRig('));
     expect(readFileSync(join(__dirname, '../core/ModeHarness.ts'), 'utf8')).toContain('mountLookStack(');
+  });
+});
+
+// hoops-p08 (2026-11-12): the far parked vehicles on the half-court modes
+import { PHONE_FAR_PROP_MAX, PHONE_FAR_PROP_MODES, phoneCapFor as capFor } from './phoneTextureCap';
+describe('phoneTextureCap — the far vehicles (hoops-p08)', () => {
+  it('the bus and the sedan cap at 512 where the mode asks for it; 1024 restores the model cap; other models keep 1024', () => {
+    expect(PHONE_FAR_PROP_MAX).toBe(512);
+    expect(capFor('data:/models/meshy/hoopbus.glb#image1', 1024, 1024)).toBe(512);
+    expect(capFor('/models/meshy/sedan.glb#image0', 1024, 1024)).toBe(512);
+    expect(capFor('/models/meshy/sedan.glb#image0', 1024, 1024, 1024)).toBe(1024);
+    expect(capFor('/models/meshy/hoop.glb#image0', 2048, 2048)).toBe(1024);
+    expect(capFor('/models/rivals/ace.glb#image3', 1024, 1024)).toBe(1024);
+    expect(capFor('/models/meshy/ball-basketball.glb#image0', 1024, 1024)).toBe(512);
+  });
+  it('only the half-court modes: the dunk parks the bus on its corner as a wall-run prop, up close', () => {
+    expect([...PHONE_FAR_PROP_MODES].sort()).toEqual(['onevone', 'threepoint', 'threevthree']);
+    expect(PHONE_FAR_PROP_MODES.has('dunk')).toBe(false);
   });
 });
