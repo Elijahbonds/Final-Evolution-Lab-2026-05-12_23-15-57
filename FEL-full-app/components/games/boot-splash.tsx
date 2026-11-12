@@ -368,7 +368,9 @@ export function SplashCard(props: BootSplashProps) {
     // data-fel-fullbleed: in console view the HUD keeps to the title-safe frame, but this card's art is the whole screen
     // (app/game-surface.css). data-splash-column / data-splash-pickers: a sideways screen lays the card out in two
     // columns — title and START on the left, the pickers on the right — instead of one column taller than the screen.
-    <div data-fel-fullbleed className="absolute inset-0 z-40 overflow-hidden"
+    // data-splash-phase (GAME-HUD, 2026-11-12): game-surface.css lets the shell's ⋯ menu leave the HUD's corner as soon as the
+    // countdown starts (the tip-off is play: the score is up), not only once this card is gone
+    <div data-fel-fullbleed data-splash-phase={props.phase} className="absolute inset-0 z-40 overflow-hidden"
       // SHARED-START-UNSTICK: on READY the whole card is the start button. A press that misses the pill (a thumb on
       // the art, a click in the corner) used to do nothing, and a player reads a card that ignores them as a hang.
       // The pickers are buttons and keep their own clicks; everything else starts on pointer DOWN, so a hold starts too.

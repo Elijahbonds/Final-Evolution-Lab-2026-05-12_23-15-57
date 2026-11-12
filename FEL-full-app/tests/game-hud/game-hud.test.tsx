@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { HUD_TEXT_ALPHA, HUD_TYPE, HudMeter, hudLineStep } from '@/components/games/tv-hud';
+import { HUD_CLEAR_CORNER, HUD_TEXT_ALPHA, HUD_TYPE, HudMeter, hudLineStep } from '@/components/games/tv-hud';
 import { READABLE, sizeMiss, wordCount } from '@/lib/readable/rules';
 import { VC_MIN_LABEL_PX, VC_TAP_PX, faceLabelPx } from '@/components/games/virtual-controller';
 
@@ -79,6 +79,19 @@ describe('the capture menu\'s corner: one rule the HUD keeps clear of (app/game-
   });
   it('the HUD frame is the one place the rule lands (a HudFrame host needs no change of its own)', () => {
     expect(read('components/games/tv-hud/hud-frame.tsx')).toMatch(/data-hud-frame/);
+  });
+  it('a host whose top-left readout is not the shared row adopts the same clearance with HUD_CLEAR_CORNER', () => {
+    expect(HUD_CLEAR_CORNER).toEqual({ 'data-hud-clear-corner': '' });
+    expect(css).toMatch(/> \[data-hud-frame\] \[data-hud-clear-corner\] \{\s*padding-left: max\(1rem/);
+    // and on a taller sideways screen the row starts below the shell's top-centre buttons (6 px down, 36 px x <= 1.25, + 4)
+    expect(css).toMatch(/padding-top: max\(0\.75rem, calc\(\(10px \+ 36px \* min\(var\(--fel-hud-zoom, 1\), 1\.25\) - var\(--fel-frame-t\)\) \/ var\(--fel-hud-zoom, 1\)\)\);/);
+    const at = (h: number) => { const z = Math.min(2.25, Math.max(1, h / 480)); const cz = Math.min(z, 1.25); const t = Math.round(h * 0.05);
+      return t + Math.max(12 * z, 10 + 36 * cz - t); };
+    for (const h of [600, 720, 800, 1080]) expect(at(h), `${h}`).toBeGreaterThanOrEqual(6 + 36 * Math.min(Math.min(2.25, h / 480), 1.25) + 4);
+  });
+  it('the menu leaves the HUD\'s corner from the countdown on (a sideways phone), not only once the card is gone', () => {
+    expect(read('components/games/boot-splash.tsx')).toMatch(/data-fel-fullbleed data-splash-phase=\{props\.phase\}/);
+    expect(css).toMatch(/\[data-fel-console\]:not\(:has\(\[data-fel-fullbleed\]:not\(\[data-splash-phase="countdown"\]\)\)\):not\(:has\(\[data-end-screen\]\)\) > \[data-capture-ui\]/);
   });
   it('a sideways phone in play keeps its own rule (the menu is in the bottom row there): the console rule is for taller screens', () => {
     const i = css.indexOf('6. THE CAPTURE MENU');
