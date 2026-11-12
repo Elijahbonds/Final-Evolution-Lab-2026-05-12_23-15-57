@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 type Row = Record<string, any>;
 
 const m = vi.hoisted(() => {
-  type StoreName = 'prqEntry' | 'gameSession' | 'workoutScan' | 'healthIntake' | 'painCheckIn' | 'healthConsent' | 'readinessCheckIn' | 'breathLog' | 'mirrorSession' | 'playerProfile' | 'user';
+  type StoreName = 'prqEntry' | 'gameSession' | 'workoutScan' | 'healthIntake' | 'painCheckIn' | 'healthConsent' | 'readinessCheckIn' | 'breathLog' | 'mirrorSession' | 'playerProfile' | 'user' | 'studioProjectSave';
   const t = (d: string) => new Date(`2026-09-${d}T12:00:00.000Z`);
   const blank = (): Record<StoreName, Row[]> => ({
     prqEntry: [
@@ -48,6 +48,11 @@ const m = vi.hoisted(() => {
     user: [
       { id: 'u1', email: 'ada@fel.test', name: 'Ada', createdAt: t('01'), dobYear: 1990, password: 'secret-ada' },
       { id: 'other', email: 'bea@fel.test', name: 'Bea', createdAt: t('01'), dobYear: 1985, password: 'secret-bea' },
+    ],
+    // STUDIO SAVE (2026-10-17): saved Nexus Studio projects
+    studioProjectSave: [
+      { userId: 'u1', projectId: 'proj_ada', name: 'Ada court', rev: 2, createdAt: t('10'), updatedAt: t('20'), bytes: 40, version: 1, doc: { id: 'proj_ada' } },
+      { userId: 'other', projectId: 'proj_bea', name: 'Bea venue', rev: 1, createdAt: t('10'), updatedAt: t('20'), bytes: 40, version: 1, doc: { id: 'proj_bea' } },
     ],
   });
   const state: {
@@ -97,6 +102,7 @@ const m = vi.hoisted(() => {
     mirrorSession: table('mirrorSession'),
     playerProfile: table('playerProfile'),
     user: table('user'),
+    studioProjectSave: table('studioProjectSave'),
   };
   state.prisma = prisma;
   return state;
@@ -136,6 +142,9 @@ describe('GET /api/account/export', () => {
     expect(json).not.toContain('secret-bea');
     expect(json).not.toContain('assess-9');
     expect(json).not.toContain('bea@fel.test');
+    // owner Q7: the saved Studio projects, the caller's only, with the document and without the size/version columns
+    expect(body.studioProjects).toEqual([{ projectId: 'proj_ada', name: 'Ada court', rev: 2, createdAt: '2026-09-10T12:00:00.000Z', updatedAt: '2026-09-20T12:00:00.000Z', doc: { id: 'proj_ada' } }]);
+    expect(json).not.toContain('proj_bea');
     expect(res.headers.get('Content-Disposition')).toMatch(/fel-account-export-/);
   });
 });

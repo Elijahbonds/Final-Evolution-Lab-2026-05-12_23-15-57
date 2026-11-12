@@ -46,9 +46,15 @@ const UA = 'AgeScreenTest/1.0';
 // pinned at the lane/party-chat merge of lane/finish-release, the first commit carrying all three pending files.
 // PARTY-PRIVACY (this lane) prisma/pending/2026-10-13-party-report.sql RETENTION comment only (12 months, with the delete
 // statement; pending SQL only, no column or index added) at 521c52c1.
+// STUDIO-SAVE (owner-approved 2026-10-17) StudioProjectSave model + regenerated client +
+// prisma/pending/2026-10-17-studio-project-save.sql (pending SQL only, applied in the deploy session) at fe5064a8.
+// PENDING-MODELS (owner 2026-10-20, "Add the 3 models"; lane/studio-save) PartyReport, CreatorInquiry,
+// BookFulfillmentEvent and BookEntitlement models matching their pending SQL + regenerated client at cb1029d8.
 // RATE-LIMITS (lane/rate-limits, PR #289 rebuilt on release, 2026-10-23): the RateLimit model (table rate_limits) in
 // schema.prisma and prisma/pending/2026-10-16-rate-limits.sql at 3887ceef. lane/studio-save (#373) also changes prisma/:
 // whichever of the two lands second bumps this to the merge commit carrying both.
+// STUDIO-SAVE x RATE-LIMITS: lane/studio-save landed second, so pinned at its merge of lane/finish-release, the first
+// commit carrying both (RateLimit and #373's five models in one regenerated client), d4d15aca.
 // TIP-GUEST-TOKEN-HASH (lane/guest-token-hash, 2026-10-19; release sync 2026-10-24) prisma/pending/
 // 2026-10-19-guest-token-hash-{1-add,2-clear-raw}.sql (pending SQL only; schema.prisma untouched) at a8838788, the
 // lane's merge of lane/finish-release, the first commit carrying them beside RATE-LIMITS. lane/fn-box-1b also adds
@@ -117,7 +123,9 @@ const UA = 'AgeScreenTest/1.0';
 // file above.
 // MERGE (lane/plat-bbs04 + finish-release 05c73483, 2026-11-03): hoops-cam.sql + teacher.sql, both pending files; pinned at
 // the merge (pinned at the merge commit). SQL HARDEN (2026-11-03): both pending files hardened (RLS, guards); re-pinned there.
-const PARENT = '4dae9fd412f6d4de17f2581029d40e0af25a655f';
+// STUDIO-SAVE x RELEASE (2026-11-12): lane/studio-save's merge of lane/finish-release at fbf197fb carries #373's
+// schema + StudioProjectSave SQL beside every pending file above; pinned at that merge, 45c0c93f.
+const PARENT = '45c0c93fa398897fc1882152d150ff838b61038d';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {

@@ -1,5 +1,6 @@
 // The account-settings download: the caller's own Mirror assessments (WorkoutScan rows, via collectPrqExport),
-// Mirror sessions, and profile, plus the health and movement bundle Profile already exports.
+// Mirror sessions, and profile, plus the health and movement bundle Profile already exports, and the Nexus Studio projects
+// saved to the account (studioProjects).
 //
 // The user id is the signed-in session's. This function has no other way to choose a person.
 // profile is an allow-list: password, KYC, and every other User column are not copied.
@@ -12,6 +13,7 @@
 
 import type { Prisma } from '@/public/_prisma/client';
 import { collectPrqExport } from '@/lib/prq-data-rights';
+import { studioProjectsForExport } from '@/lib/nexus-studio/cloudStore';
 import { collectTables, hasRaw, type CollectedTables } from '@/lib/data-rights/rights';
 
 type Db = Pick<
@@ -19,6 +21,7 @@ type Db = Pick<
   | 'prqEntry' | 'gameSession' | 'workoutScan'
   | 'healthIntake' | 'painCheckIn' | 'healthConsent' | 'readinessCheckIn' | 'breathLog'
   | 'user' | 'playerProfile' | 'mirrorSession'
+  | 'studioProjectSave'
 >;
 
 /** Columns a person may download about their own account. password is not one of them. */
@@ -46,11 +49,13 @@ export function publicProfile(row: ProfileRow | null) {
 
 /** JSON fields for "Download my data". `userId` is the signed-in user and the only filter. */
 export async function collectAccountExport(db: Db, userId: string, now?: Date) {
-  const [base, user, playerProfile, mirrorSessions] = await Promise.all([
+  const [base, user, playerProfile, mirrorSessions, studioProjects] = await Promise.all([
     collectPrqExport(db, userId, now),
     db.user.findUnique({ where: { id: userId }, select: PROFILE_SELECT }),
     db.playerProfile.findUnique({ where: { userId } }),
     db.mirrorSession.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }),
+    // STUDIO SAVE (owner, 2026-10-17, Q7): the Nexus Studio projects saved to this account, documents included
+    studioProjectsForExport(db, userId),
   ]);
   // A client without raw calls (a test stand-in) has no account tables to read.
   const accountTables: CollectedTables = hasRaw(db) ? await collectTables(db, userId) : { tables: {}, notYetCreated: [] };
@@ -59,6 +64,7 @@ export async function collectAccountExport(db: Db, userId: string, now?: Date) {
     profile: publicProfile(user),
     playerProfile,
     mirrorSessions,
+    studioProjects,
     accountTables,
   };
 }

@@ -26,7 +26,9 @@ const TEXT_BY_VERSION: Record<string, string> = {
   '2026-10-14': 'd0dd0d8daf1d3367',  // LANE-SYNC: CREATOR-PLATFORM §1 Work-with-us bullet + BUSINESS-ADDRESS #2012 mailbox together
   '2026-10-14b': '6d4d960aced45bf7',  // PARTY-PRIVACY: §2 gains the Parties bullet (party name, nothing recorded, voice 18+, block on the device, reports kept 12 months)
   '2026-10-16': 'f5be67c85745dff0',   // STUDIO-AI-DISCLOSURE: §1 and §2 name the Studio AI builder's requests (venue request + settings only, signed-in 13+, rate-limited)
+  '2026-10-17': '65a6d38721c3f5ac',   // STUDIO-SAVE: §1 Studio projects, §2 how saved projects are used, §4 delete and download (never shipped on its own: the label went to the combined text, 2026-10-27b)
   '2026-10-27': '7cac849a7676781b',   // OWNER-APPROVALS (owner in chat, cards C11/C28/C03): Terms §1 names the Purchase and Coach Terms, Terms §2 teens on a coach roster; Privacy §1/§2 training logs, form reviews (90-day replay), the guardian's details; §5 training logs are not health data; §7 Stripe for every product
+  '2026-10-27b': 'fa639d2c22fff040',  // MERGE (lane/studio-save x finish-release, 2026-11-12): the 2026-10-27 text plus STUDIO-SAVE's §1/§2/§4 lines, both unedited; 2026-10-27 is live, so the combined text takes its own label
 };
 
 describe('the policy version', () => {
@@ -58,10 +60,16 @@ describe('the policy version', () => {
   // the text; 2026-10-13 is now an earlier version and keeps its fingerprint above.
   // test changed (2026-10-16, owner-approved Studio AI builder disclosure, lane/owner-1016): was toBe('2026-10-14b'). The
   // version moves with the text; 2026-10-14b is now an earlier version and keeps its fingerprint above.
+  // test changed (2026-10-20, owner-approved Studio save text, lane/studio-save): was toBe('2026-10-16'). The version moves with
+  // the text; 2026-10-16 is now an earlier version and keeps its fingerprint above.
   // test changed (2026-10-27, owner-approved C11/C28/C03 text, lane/owner-approvals): was toBe('2026-10-16'). The version
   // moves with the text; 2026-10-16 is now an earlier version and keeps its fingerprint above.
+  // test changed (2026-11-12, release merged into lane/studio-save): was toBe('2026-10-17') on this branch and toBe('2026-10-27')
+  // on the release. The combined text is labelled 2026-10-27b; both earlier labels keep their fingerprints above.
   it('is the final, non-draft label', () => {
-    expect(CURRENT_POLICY_VERSION).toBe('2026-10-27');
+    expect(CURRENT_POLICY_VERSION).toBe('2026-10-27b');
+    expect(CURRENT_POLICY_VERSION).not.toBe('2026-10-27');
+    expect(CURRENT_POLICY_VERSION).not.toBe('2026-10-17');
     expect(CURRENT_POLICY_VERSION).not.toBe('2026-10-16');
     expect(CURRENT_POLICY_VERSION).not.toBe('2026-10-14b');
     expect(CURRENT_POLICY_VERSION).not.toBe('2026-10-14');
@@ -83,7 +91,7 @@ describe('the policy version', () => {
   });
 
   it('keeps every earlier version fingerprint (the record of what each signup accepted)', () => {
-    for (const v of ['2026-09-24-draft', '2026-09-25-draft', '2026-09-29-draft', '2026-09-29b-draft', '2026-09-29c-draft', '2026-09-30-draft', '2026-10-01-draft', '2026-10-07-draft', '2026-10-07', '2026-10-12', '2026-10-13', '2026-10-14', '2026-10-14b', '2026-10-16']) {
+    for (const v of ['2026-09-24-draft', '2026-09-25-draft', '2026-09-29-draft', '2026-09-29b-draft', '2026-09-29c-draft', '2026-09-30-draft', '2026-10-01-draft', '2026-10-07-draft', '2026-10-07', '2026-10-12', '2026-10-13', '2026-10-14', '2026-10-14b', '2026-10-16', '2026-10-17', '2026-10-27']) {
       expect(TEXT_BY_VERSION).toHaveProperty(v);
     }
   });

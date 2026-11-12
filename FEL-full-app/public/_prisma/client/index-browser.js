@@ -1439,6 +1439,70 @@ exports.Prisma.AdventureSaveScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.StudioProjectSaveScalarFieldEnum = {
+  userId: 'userId',
+  projectId: 'projectId',
+  name: 'name',
+  version: 'version',
+  rev: 'rev',
+  bytes: 'bytes',
+  doc: 'doc',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.PartyReportScalarFieldEnum = {
+  id: 'id',
+  reporterId: 'reporterId',
+  reportedId: 'reportedId',
+  reportedName: 'reportedName',
+  partyCode: 'partyCode',
+  reason: 'reason',
+  reportedAt: 'reportedAt',
+  createdAt: 'createdAt'
+};
+
+exports.Prisma.CreatorInquiryScalarFieldEnum = {
+  id: 'id',
+  brand: 'brand',
+  contactName: 'contactName',
+  email: 'email',
+  budgetRange: 'budgetRange',
+  dates: 'dates',
+  deliverables: 'deliverables',
+  message: 'message',
+  profileSlug: 'profileSlug',
+  source: 'source',
+  status: 'status',
+  createdAt: 'createdAt'
+};
+
+exports.Prisma.BookFulfillmentEventScalarFieldEnum = {
+  id: 'id',
+  eventId: 'eventId',
+  type: 'type',
+  paymentIntentId: 'paymentIntentId',
+  createdAt: 'createdAt'
+};
+
+exports.Prisma.BookEntitlementScalarFieldEnum = {
+  id: 'id',
+  email: 'email',
+  userId: 'userId',
+  offerId: 'offerId',
+  format: 'format',
+  bookSlug: 'bookSlug',
+  stripeSessionId: 'stripeSessionId',
+  stripePaymentIntentId: 'stripePaymentIntentId',
+  stripeEventId: 'stripeEventId',
+  amountCents: 'amountCents',
+  currency: 'currency',
+  status: 'status',
+  revokedAt: 'revokedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.RateLimitScalarFieldEnum = {
   bucket: 'bucket',
   hits: 'hits',
@@ -1737,6 +1801,11 @@ exports.Prisma.ModelName = {
   CallSignal: 'CallSignal',
   CoachStoreReferral: 'CoachStoreReferral',
   AdventureSave: 'AdventureSave',
+  StudioProjectSave: 'StudioProjectSave',
+  PartyReport: 'PartyReport',
+  CreatorInquiry: 'CreatorInquiry',
+  BookFulfillmentEvent: 'BookFulfillmentEvent',
+  BookEntitlement: 'BookEntitlement',
   RateLimit: 'RateLimit'
 };
 

@@ -50,6 +50,11 @@ function fake() {
       { id: 'pp1', userId: 'u1', strength: 40 },
       { id: 'pp9', userId: 'other', strength: 99 },
     ],
+    // STUDIO SAVE (2026-10-17): Nexus Studio projects saved to the account
+    studioProjectSave: [
+      { id: 'sp1', userId: 'u1', projectId: 'proj_ada', name: 'Ada court', rev: 3, createdAt: t('10'), updatedAt: t('22'), doc: { kind: 'nexus-studio-project', id: 'proj_ada' } },
+      { id: 'sp9', userId: 'other', projectId: 'proj_bea', name: 'Bea secret venue', rev: 1, createdAt: t('10'), updatedAt: t('22'), doc: { kind: 'nexus-studio-project', id: 'proj_bea' } },
+    ],
     user: [
       { id: 'u1', email: 'ada@fel.test', name: 'Ada', createdAt: t('01'), dobYear: 1990, password: 'secret-ada' },
       { id: 'other', email: 'bea@fel.test', name: 'Bea', createdAt: t('01'), dobYear: 1985, password: 'secret-bea' },
@@ -84,6 +89,7 @@ function fake() {
     breathLog: table('breathLog'),
     mirrorSession: table('mirrorSession'),
     playerProfile: table('playerProfile'),
+    studioProjectSave: table('studioProjectSave'),
     // The fake returns the password column on purpose. The export must not copy it.
     user: table('user'),
   };
@@ -100,10 +106,28 @@ describe('collectAccountExport', () => {
     expect(out.playerProfile).toMatchObject({ id: 'pp1', userId: 'u1' });
     expect(out.profile).toMatchObject({ id: 'u1', email: 'ada@fel.test', name: 'Ada', dobYear: 1990 });
     const json = JSON.stringify(out);
-    for (const leaked of ['assess-9', 'ms9', 'pp9', 'p9', 'g9', 'hi9', 'pc9', 'hc9', 'rc9', 'bl9', 'bea@fel.test', 'secret-ada', 'secret-bea']) {
+    for (const leaked of ['assess-9', 'ms9', 'pp9', 'p9', 'g9', 'hi9', 'pc9', 'hc9', 'rc9', 'bl9', 'bea@fel.test', 'secret-ada', 'secret-bea', 'proj_bea', 'Bea secret venue']) {
       expect(json, leaked).not.toContain(leaked);
     }
     expect(out.profile && Object.keys(out.profile).sort()).toEqual(['createdAt', 'dobYear', 'email', 'id', 'name']);
+  });
+
+  it('includes the caller\'s saved Studio projects, documents and all, and nobody else\'s (owner Q7)', async () => {
+    const f = fake();
+    const out = await collectAccountExport(f.db, 'u1');
+    expect(out.studioProjects).toHaveLength(1);
+    expect(out.studioProjects[0]).toMatchObject({ projectId: 'proj_ada', name: 'Ada court', rev: 3, doc: { id: 'proj_ada' } });
+  });
+
+  it('a Studio table that is not there yet (P2021) exports as none and the rest still downloads; any other error is not hidden', async () => {
+    const f = fake();
+    const missing = Object.assign(new Error('The table `public.StudioProjectSave` does not exist'), { code: 'P2021' });
+    (f.db as { studioProjectSave: { findMany: () => Promise<never> } }).studioProjectSave.findMany = async () => { throw missing; };
+    const out = await collectAccountExport(f.db, 'u1');
+    expect(out.studioProjects).toEqual([]);
+    expect(out.mirrorSessions).toHaveLength(1);
+    (f.db as { studioProjectSave: { findMany: () => Promise<never> } }).studioProjectSave.findMany = async () => { throw new Error('connection reset'); };
+    await expect(collectAccountExport(f.db, 'u1')).rejects.toThrow('connection reset');
   });
 
   it('publicProfile drops a password even when the row has one', () => {
