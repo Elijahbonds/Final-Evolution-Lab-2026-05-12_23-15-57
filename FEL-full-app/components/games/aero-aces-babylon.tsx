@@ -24,7 +24,7 @@ import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { gameResultFromSession } from '@/lib/sessions/gameResultFromSession';
 import { hnode, hnum } from './hud-format';
 import { RaceCourseMap, THREAT_POS, THREAT_ARROW } from './race-course-map';
-import { HudBanner, HudChip, HudFrame, HudLine, HudMeter, HudPlate, HudText, ScoreValue, hudColor, type HudTone } from './tv-hud';
+import { HUD_TEXT_ALPHA, HudBanner, HudChip, HudFrame, HudLine, HudMeter, HudPlate, HudText, ScoreValue, hudColor, hudLineStep, type HudTone } from './tv-hud';
 
 type Hud = Record<string, HudValue>;
 
@@ -102,14 +102,14 @@ export default function AeroAcesBabylon({ onEnd }: GameProps) {
           <HudText as="div" size="caption" alpha={0.6}>PLACE</HudText>
           <ScoreValue value={hnode(hud.pos, '—')} size="hero" tone="score" />
           {/* RACING PASS phase 5: the gap — seconds to the plane ahead, or the lead */}
-          {hud.gap ? <HudText as="div" size="caption" tone={String(hud.gap).startsWith('LEAD') ? 'good' : 'text'} alpha={String(hud.gap).startsWith('LEAD') ? 1 : 0.8} style={{ fontWeight: 800 }}>{String(hud.gap)}</HudText> : null}
+          {hud.gap ? <HudText as="div" size={hudLineStep(String(hud.gap), 'caption')} tone={String(hud.gap).startsWith('LEAD') ? 'good' : 'text'} alpha={String(hud.gap).startsWith('LEAD') ? 1 : 0.8} style={{ fontWeight: 800 }}>{String(hud.gap)}</HudText> : null}
         </HudPlate>
         <div className="flex flex-col items-center gap-1">
           <HudPlate className="px-4 py-1.5"><ScoreValue value={`${Number(hud.time ?? 0).toFixed(1)}s`} size="stat" pop={false} /></HudPlate>
           <HudChip size="label" style={{ fontWeight: 800 }} alpha={0.85}>LAP {hnode(hud.lap, '—')}</HudChip>
           {/* IMPROVE (2026-10-06) #1: the delta to your best race on this circuit — green ahead, red behind */}
           {typeof hud.pb === 'string' && hud.pb
-            ? <HudChip size="caption" tone={hud.pb.includes('−') ? 'good' : 'danger'} style={{ fontWeight: 800 }}>{hud.pb}</HudChip>
+            ? <HudChip size={hudLineStep(hud.pb, 'caption')} tone={hud.pb.includes('−') ? 'good' : 'danger'} style={{ fontWeight: 800 }}>{hud.pb}</HudChip>
             : null}
         </div>
         <div className="flex items-start gap-2">
@@ -122,7 +122,9 @@ export default function AeroAcesBabylon({ onEnd }: GameProps) {
             style={{ borderRadius: 10, border: `2px solid ${hud.itemKind && ITEM_TONE[String(hud.itemKind)] ? hudColor(ITEM_TONE[String(hud.itemKind)], 1) : hudColor('text', 0.15)}` }}
           >
             <HudText as="div" size="caption" alpha={0.6}>ITEM</HudText>
-            <HudText as="div" size="value" tone={ITEM_TONE[String(hud.itemKind ?? '')] ?? 'text'} alpha={ITEM_TONE[String(hud.itemKind ?? '')] ? 1 : 0.35} style={{ fontWeight: 800 }}>
+            <HudText as="div" size="value" tone={ITEM_TONE[String(hud.itemKind ?? '')] ?? 'text'} alpha={ITEM_TONE[String(hud.itemKind ?? '')] ? 1 : HUD_TEXT_ALPHA.faint} style={{ fontWeight: 800 }}>
+              {/* GAME-HUD (2026-11-12): the empty slot's NONE was the body colour at 0.35, 2.91:1 on the plate (WCAG wants
+                  4.5:1); at the palette's faint alpha (0.62) it still reads as empty beside a lit item, and passes */}
               {hud.item ? String(hud.item) : 'NONE'}
             </HudText>
           </HudPlate>
@@ -140,7 +142,7 @@ export default function AeroAcesBabylon({ onEnd }: GameProps) {
         ) : null}
         <HudPlate className="px-3 py-1 text-right">
           <ScoreValue value={hnum(hud.speed)} size="stat" pop={false} /><HudText size="caption" alpha={0.5}> KM/H</HudText>
-          {hnum(hud.toGate) > 0 ? <HudText as="div" size="caption" tone="info">RING {hnum(hud.toGate)} m</HudText> : null}
+          {hnum(hud.toGate) > 0 ? <HudText as="div" size={hudLineStep(`RING ${hnum(hud.toGate)} m`, 'caption')} tone="info">RING {hnum(hud.toGate)} m</HudText> : null}
         </HudPlate>
       </div>
       <CourseMap hud={hud} />
@@ -153,7 +155,7 @@ export default function AeroAcesBabylon({ onEnd }: GameProps) {
       )}
 
       <BoostGauge hud={hud} className="absolute inset-x-0 bottom-28" />
-      {phase === 'playing' && <HudLine text={typeof hud.hint === 'string' ? hud.hint : ''} className="bottom-16" size="caption" alpha={0.7} />}
+      {phase === 'playing' && <HudLine text={typeof hud.hint === 'string' ? hud.hint : ''} className="bottom-16" alpha={0.7} />}
       <HudBanner text={typeof hud.banner === 'string' ? hud.banner : ''} tone="score" />
       </HudFrame>
 

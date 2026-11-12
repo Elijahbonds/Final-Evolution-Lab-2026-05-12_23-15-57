@@ -423,3 +423,41 @@ div:has(> [data-capture-ui]) > div:has(> canvas) > [data-fel-fullbleed] > [data-
     max-width: min(92vw, 560px) !important;
   }
 }
+
+/* 6. THE CAPTURE MENU'S CORNER: a safe area the HUD keeps clear (game-hud, 2026-11-12).
+ *    GameShell's capture menu (⋯, GameCaptureHud) sits at the stage's top-left on EVERY game: 8 px in, a 44 px button in
+ *    an 8 px bar, so it covers the stage's (8..68, 8..68). Every HudFrame host puts its first readout in that corner, so
+ *    the menu sat on it: measured by the every-screen pass on the tiebreak's TIEBREAK title (390 x 844), and before that
+ *    on golf's HOLE 1/5, baseball's INN · OUTS, aero's PLACE and football's 1 & 10. A sideways phone moves the menu into
+ *    the bottom row in play (rule 3 above); everywhere else it stays, so the HUD's top row starts after it instead.
+ *    One rule for every mode, on the shape the hosts share (rather than twenty hosts): the top row of a HudFrame
+ *    (`absolute inset-x-0 top-0 … justify-between px-4`) and a top-left stack (`absolute left-4 top-4`). Only the row's
+ *    LEFT padding moves: its readouts keep their order, sizes and the right-hand corner; nothing is added to the screen.
+ *    - Page layout (an upright phone, a narrow window): the host sits 8 px in (16 px from 640 px wide, sm:px-4) plus its
+ *      1 px border, so the row starts at 68 + 6 px gap - 9 px = 65 px (57 px from 640 px). */
+div:not([data-fel-console]):has(> [data-capture-ui]) > div:has(> canvas) > [data-hud-frame] > .absolute.inset-x-0.top-0.justify-between {
+  padding-left: 65px;
+}
+div:not([data-fel-console]):has(> [data-capture-ui]) > div:has(> canvas) > [data-hud-frame] > .absolute.left-4.top-4 {
+  left: 65px;
+}
+@media (min-width: 640px) {
+  div:not([data-fel-console]):has(> [data-capture-ui]) > div:has(> canvas) > [data-hud-frame] > .absolute.inset-x-0.top-0.justify-between {
+    padding-left: 57px;
+  }
+  div:not([data-fel-console]):has(> [data-capture-ui]) > div:has(> canvas) > [data-hud-frame] > .absolute.left-4.top-4 {
+    left: 57px;
+  }
+}
+/*    - Console view on a screen taller than a phone (a laptop or tablet sideways, a TV), where the menu stays top-left in
+ *      play: the host is the title-safe frame (--fel-frame-l in) and the HUD is zoomed, so the row keeps its own 1rem
+ *      unless the frame leaves less than the menu's 74 px; then it starts after the menu, in the zoomed HUD's own px.
+ *      At 1280 x 720 the frame is 64 px in and the row's 1rem is 24 px on the screen: 88 px, clear, so nothing moves. */
+@media (min-height: 521px) {
+  [data-fel-console]:has(> [data-capture-ui]) > div:has(> canvas) > [data-hud-frame] > .absolute.inset-x-0.top-0.justify-between {
+    padding-left: max(1rem, calc((74px - var(--fel-frame-l)) / var(--fel-hud-zoom, 1)));
+  }
+  [data-fel-console]:has(> [data-capture-ui]) > div:has(> canvas) > [data-hud-frame] > .absolute.left-4.top-4 {
+    left: max(1rem, calc((74px - var(--fel-frame-l)) / var(--fel-hud-zoom, 1)));
+  }
+}

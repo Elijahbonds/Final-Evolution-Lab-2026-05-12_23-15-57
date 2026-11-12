@@ -14,7 +14,7 @@ import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } 
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
-import { HudBanner, HudChip, HudFrame, HudLine, HudMeter, HudPips, HudPlate, HudText, ScoreValue, Scorebug } from './tv-hud';
+import { HudBanner, HudChip, HudFrame, HudLine, HudMeter, HudPips, HudPlate, HudText, ScoreValue, Scorebug, hudLineStep } from './tv-hud';
 import { gameResultFromSession } from '@/lib/sessions/gameResultFromSession';
 
 type Hud = Record<string, HudValue>;
@@ -67,6 +67,10 @@ export default function FreeRunBabylon({ onEnd }: GameProps) {
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => { busRef.current?.emit(e); }, []);
   const tapStart = useCallback(() => emit({ t: 'button', btn: 'START', pressed: true }), [emit]);
   const speed = Number(hud.speed ?? 0), speedMax = Number(hud.speedMax ?? 6.4);
+  // GAME-HUD (2026-11-12): the lines below, as strings, so a line of 3+ words takes the HUD's 14 px line step (hudLineStep)
+  const placeLine = `${String(hud.delta ?? '')}${Number(hud.draft) >= 100 ? ' · SLINGSHOT READY' : Number(hud.draft) > 0 ? ` · DRAFT ${hnode(hud.draft, 0)}%` : ''}`;
+  const tierLine = `${hnode(hud.tier, 'ROOKIE')}${hud.track ? ` · ${String(hud.track).toUpperCase()}` : ''}`;
+  const speedLabel = `SPEED ${speed.toFixed(1)} m/s`;
 
   return (
     <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl border border-white/10 bg-black">
@@ -81,7 +85,7 @@ export default function FreeRunBabylon({ onEnd }: GameProps) {
           <HudPlate className="px-3 py-1.5">
             <HudText as="div" size="caption" alpha={0.6}>PLACE</HudText>
             <ScoreValue value={String(hud.place)} tone="score" />
-            <HudText as="div" size="caption" tone={hud.delta === 'LEADING' ? 'good' : 'text'} alpha={hud.delta === 'LEADING' ? 1 : 0.7} style={{ fontWeight: 800 }}>{String(hud.delta ?? '')}{Number(hud.draft) >= 100 ? ' · SLINGSHOT READY' : Number(hud.draft) > 0 ? ` · DRAFT ${hnode(hud.draft, 0)}%` : ''}</HudText>
+            <HudText as="div" size={hudLineStep(placeLine, 'caption')} tone={hud.delta === 'LEADING' ? 'good' : 'text'} alpha={hud.delta === 'LEADING' ? 1 : 0.7} style={{ fontWeight: 800 }}>{placeLine}</HudText>
           </HudPlate>
         ) : null}
         <HudPlate className="px-3 py-1.5">
@@ -96,11 +100,11 @@ export default function FreeRunBabylon({ onEnd }: GameProps) {
           <HudChip alpha={0.7} size="caption">CHECKPOINT {hnode(hud.checkpoint, '0/2')}</HudChip>
           {/* IMPROVE (2026-10-06): the last checkpoint's split against the personal best (− is ahead) */}
           {typeof hud.pbSplit === 'string' && hud.pbSplit && phase === 'playing' ? (
-            <HudChip tone={hud.pbSplit.includes('−') ? 'good' : 'danger'} size="caption" style={{ fontWeight: 800 }}>{hud.pbSplit}</HudChip>
+            <HudChip tone={hud.pbSplit.includes('−') ? 'good' : 'danger'} size={hudLineStep(hud.pbSplit, 'caption')} style={{ fontWeight: 800 }}>{hud.pbSplit}</HudChip>
           ) : null}
         </div>
         <HudPlate className="px-3 py-1.5 text-right">
-          <HudText as="div" size="caption" alpha={0.6}>{hnode(hud.tier, 'ROOKIE')}{hud.track ? ` · ${String(hud.track).toUpperCase()}` : ''}</HudText>
+          <HudText as="div" size={hudLineStep(tierLine, 'caption')} alpha={0.6}>{tierLine}</HudText>
           <HudText as="div" size="value" tone={hud.lane === 'HIGH' ? 'info' : hud.lane === 'LOW' ? 'heat' : 'text'} alpha={hud.lane === 'HIGH' || hud.lane === 'LOW' ? 1 : 0.8}>{hud.lane ? `${String(hud.lane)} LANE` : hnode(hud.route, 'LOW LINE')}</HudText>
         </HudPlate>
       </div>
@@ -108,7 +112,7 @@ export default function FreeRunBabylon({ onEnd }: GameProps) {
       {/* speed + the verbs the speed unlocks */}
       {phase === 'playing' && typeof hud.speed === 'number' && (
         <div className="absolute left-4 top-24 flex flex-col items-start gap-1">
-          <HudMeter label={`SPEED ${speed.toFixed(1)} m/s`} labelAlpha={0.6} value={speed} max={speedMax} width="10rem" height="bar"
+          <HudMeter label={speedLabel} labelSize={hudLineStep(speedLabel, 'caption')} labelAlpha={0.6} value={speed} max={speedMax} width="10rem" height="bar"
             tone={speed >= 5.2 ? 'heat' : speed >= 2.6 ? 'you' : 'text'} fillAlpha={speed >= 2.6 ? 1 : 0.5} />
           {/* FLOW (owner brief 2026-09-18): the tier pips buy top speed and spend as a landing burst; KINETIC is the overdrive (Y) */}
           {typeof hud.flow === 'number' && (
@@ -130,7 +134,7 @@ export default function FreeRunBabylon({ onEnd }: GameProps) {
           )}
           {/* IMPROVE (2026-10-06): a speed gate ahead — what it needs against your speed, from 15 m out */}
           {typeof hud.gateReq === 'string' && hud.gateReq && (
-            <HudChip plate={false} fill={0.25} tone={Number(hud.gateReady) ? 'good' : 'danger'} size="caption" className="rounded" style={{ fontWeight: 800 }}>{hud.gateReq}</HudChip>
+            <HudChip plate={false} fill={0.25} tone={Number(hud.gateReady) ? 'good' : 'danger'} size={hudLineStep(hud.gateReq, 'caption')} className="rounded" style={{ fontWeight: 800 }}>{hud.gateReq}</HudChip>
           )}
           {typeof hud.verbs === 'string' && hud.verbs && (
             <div className="flex flex-wrap gap-1">
@@ -142,7 +146,7 @@ export default function FreeRunBabylon({ onEnd }: GameProps) {
         </div>
       )}
 
-      {phase === 'playing' && <HudLine text={typeof hud.hint === 'string' ? hud.hint : ''} className="bottom-16" size="caption" alpha={0.7} />}
+      {phase === 'playing' && <HudLine text={typeof hud.hint === 'string' ? hud.hint : ''} className="bottom-16" alpha={0.7} />}
       <HudBanner text={typeof hud.banner === 'string' ? hud.banner : ''} tone="score" />
       </HudFrame>
 

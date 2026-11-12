@@ -14,7 +14,7 @@
 // layout covers no more of the play area than it did), and at least TV_MIN_READ_PX once the 1080p zoom applies.
 import { HUD_ZOOM_MAX, TV_SAFE } from '@/lib/ui/consoleView';
 import { cuePalette, onColorVisionChange, readColorVision, shapeCues, type ColorVision } from '@/lib/a11y/colorVision';
-import { readableMs } from '@/lib/readable/rules';
+import { READABLE, readableMs, wordCount } from '@/lib/readable/rules';
 
 /** READABLE (2026-11-02): how long a passing HUD message stays up — its own ms or its read time (words × 0.3 s + 1 s),
  *  whichever is longer (lib/readable/rules.ts). */
@@ -188,6 +188,18 @@ export function hudRenderedPx(size: HudSize, zoom: number): number {
 export function hudFontSize(size: HudSize): string {
   const s = HUD_TYPE[size];
   return `calc(${s.phone}px + (var(--fel-hud-zoom, 1) - 1) * ${s.growth}px)`;
+}
+
+/**
+ * GAME-HUD (lane/game-hud, 2026-11-12): the step a run of HUD text draws at. A HUD LINE (READABLE.hudLineWords, 3+ words:
+ * "0 YD · 0 EVA", "LEAD 0.6 s", a hint) is read mid-play, so it takes the HUD's line floor (READABLE.hudPhonePx, 14 px:
+ * the `body` step); a label or a value (PLACE, LAP 1/3) keeps the step it was given. Pure and opt-in: a host calls it for
+ * the runs it means, so a host that does not is exactly as it was.
+ */
+export function hudLineStep(text: unknown, size: HudSize): HudSize {
+  if (HUD_TYPE[size].phone >= READABLE.hudPhonePx) return size;
+  const words = wordCount(typeof text === 'string' || typeof text === 'number' ? String(text) : '');
+  return words >= READABLE.hudLineWords ? 'body' : size;
 }
 
 /** Inline style for HUD text at a step, in the display face. */

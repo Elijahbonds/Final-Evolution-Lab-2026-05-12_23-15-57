@@ -26,7 +26,11 @@ import { BASKETBALL_MODE_IDS, COURT_LOCATIONS, readCourtLocation, readyCourtLoca
 import { BALL_SKINS, readBallSkin, readyBallSkins, writeBallSkin, type BallSkinId } from '@/lib/babylon/nexus/ballSkins';
 import { readyVenues, readBoardVenue, writeBoardVenue, type BoardDiscipline } from '@/lib/babylon/nexus/boardVenues';
 import { readyWeathers, readWeather, writeWeather, readKartWeather, writeKartRain, WEATHER_FAMILY_OF, type WeatherPick } from '@/lib/babylon/nexus/weather';
-import { hudColor } from './tv-hud/tokens';   // the TV HUD palette: the kart's Rain chip lights in its `info` (sky) tone
+import { hudColor } from './tv-hud/tokens';
+import { MAX_SMALL_WORDS } from '@/lib/design/type';   // the TV HUD palette: the kart's Rain chip lights in its `info` (sky) tone
+
+/** Words in a goal line, as the type scale counts them (lib/design/type.ts lineSize). */
+const goalWords = (t: string) => t.split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
 import { readyMusicStages, readMusicStage, writeMusicStage, type MusicStageId } from '@/lib/babylon/music/musicStage';
 import { skinsFor, readBoardSkin, writeBoardSkin } from '@/lib/babylon/nexus/boardSkins';
 import { readyCourses, readCourse, writeCourse } from '@/lib/babylon/core/RaceCourse';
@@ -400,7 +404,11 @@ export function SplashCard(props: BootSplashProps) {
         <p className="text-[12px] font-black tracking-[0.4em]" style={{ color: v.tint }}>{v.sub}</p>
         <h1 className="text-4xl font-black tracking-wide text-white drop-shadow-lg">{props.title}</h1>
         {props.goal && (props.phase === 'ready' || props.phase === 'loading') && (
-          <p className="max-w-md text-[12px] font-bold tracking-[0.18em] text-white/85">{props.goal}</p>
+          // GAME-HUD (2026-11-12): a goal of more than 12 words is body copy (the owner's 2026-11-11 text-size rule, lineSize):
+          // 16 px upright, where the card has the room (Gate Crasher's "CLEAR 15 OF 30 GATES TO CRASH IT · …" read 12 px:
+          // the scorer's body-small on /play/snowboard). Sideways it keeps 12 px: there the left column is measured tight
+          // (game-surface.css 4b, controls-screen-2). Size only; a short goal is exactly as it was.
+          <p className={`max-w-md ${goalWords(props.goal) > MAX_SMALL_WORDS ? 'text-[16px] [[data-fel-console]_&]:text-[12px]' : 'text-[12px]'} font-bold tracking-[0.18em] text-white/85`}>{props.goal}</p>
         )}
         {(props.phase === 'ready' || props.phase === 'loading') && props.readyLead}
 

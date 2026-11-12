@@ -23,7 +23,7 @@ import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode, hnum } from './hud-format';
 import { RaceCourseMap, THREAT_POS, THREAT_ARROW } from './race-course-map';
-import { HudBanner, HudChip, HudFrame, HudLine, HudMeter, HudPlate, HudText, ScoreValue, type HudTone } from './tv-hud';
+import { HUD_TEXT_ALPHA, HudBanner, HudChip, HudFrame, HudLine, HudMeter, HudPlate, HudText, ScoreValue, hudLineStep, type HudTone } from './tv-hud';
 import { gameResultFromSession } from '@/lib/sessions/gameResultFromSession';
 
 type Hud = Record<string, HudValue>;
@@ -32,6 +32,11 @@ type Hud = Record<string, HudValue>;
 const KART_ITEM_TONE: Record<string, HudTone> = { missile: 'danger', boost: 'you', shield: 'score', mine: 'good' };
 /** The mini-turbo tiers' spark colours (racing pass phase 8): blue, sky, orange, purple — as palette tones. */
 const MINI_TONE: HudTone[] = ['you', 'info', 'heat', 'power'];
+/** GAME-HUD (2026-11-12): the centre column's long chips (the ghost being chased, the cup line). The cap was 14rem, so with
+ *  150 % text it grew to 336 px and pushed the LAP / item plate 66 px off a 390 px phone (the every-screen scorer); the
+ *  HUD's text is in px, so the cap is too (224 px, the same at 100 %). The text inside ends in an ellipsis rather than
+ *  being cut mid-letter. */
+const CAPPED_CHIP = 'max-w-[224px] truncate [&>span]:min-w-0 [&>span]:truncate';
 
 export default function VelocityKartBabylon({ onEnd }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -112,19 +117,19 @@ export default function VelocityKartBabylon({ onEnd }: GameProps) {
           <HudPlate className="px-4 py-1.5"><ScoreValue value={`${Number(hud.time ?? 0).toFixed(1)}s`} pop={false} /></HudPlate>
           {hud.pos ? <HudChip tone="score" size="label" style={{ fontWeight: 800 }}>{String(hud.pos)}</HudChip> : null}
           {/* RACING PASS phase 5: the gap — seconds to the kart ahead, or the lead */}
-          {hud.gap ? <HudChip size="caption" tone={String(hud.gap).startsWith('LEAD') ? 'good' : 'text'} alpha={String(hud.gap).startsWith('LEAD') ? 1 : 0.8} style={{ fontWeight: 800 }}>{String(hud.gap)}</HudChip> : null}
+          {hud.gap ? <HudChip size={hudLineStep(String(hud.gap), 'caption')} tone={String(hud.gap).startsWith('LEAD') ? 'good' : 'text'} alpha={String(hud.gap).startsWith('LEAD') ? 1 : 0.8} style={{ fontWeight: 800 }}>{String(hud.gap)}</HudChip> : null}
           {/* IMPROVE (2026-10-06) #2: the ghost's delta (green ahead, red behind), the PB being chased and the cup — the mode
               computed all three every frame and nothing drew them */}
           {typeof hud.delta === 'string' && hud.delta && hud.delta !== '—'
-            ? <HudChip size="caption" tone={hud.delta.startsWith('−') ? 'good' : 'danger'} style={{ fontWeight: 800 }}>PB {hud.delta}</HudChip>
+            ? <HudChip size={hudLineStep(`PB ${hud.delta}`, 'caption')} tone={hud.delta.startsWith('−') ? 'good' : 'danger'} style={{ fontWeight: 800 }}>PB {hud.delta}</HudChip>
             : null}
-          {typeof hud.chasing === 'string' && hud.chasing ? <HudChip size="caption" alpha={0.8} className="max-w-[14rem] truncate" style={{ fontWeight: 800, letterSpacing: '0.1em' }}>{hud.chasing}</HudChip> : null}
-          {typeof hud.cup === 'string' && hud.cup ? <HudChip size="caption" tone="score" alpha={0.9} className="max-w-[14rem] truncate">{hud.cup}</HudChip> : null}
+          {typeof hud.chasing === 'string' && hud.chasing ? <HudChip size={hudLineStep(hud.chasing, 'caption')} alpha={0.8} className={CAPPED_CHIP} style={{ fontWeight: 800, letterSpacing: '0.1em' }}>{hud.chasing}</HudChip> : null}
+          {typeof hud.cup === 'string' && hud.cup ? <HudChip size={hudLineStep(hud.cup, 'caption')} tone="score" alpha={0.9} className={CAPPED_CHIP}>{hud.cup}</HudChip> : null}
         </div>
         <HudPlate className="px-3 py-1.5 text-right">
           <HudText as="div" size="caption" alpha={0.6}>LAP {hnode(hud.lap, '—')}</HudText>
           {/* ITEMS (2026-09-18): what the last balloon gave you; A fires it */}
-          <HudText as="div" size="value" className="mt-1" tone={KART_ITEM_TONE[String(hud.itemKind ?? '')] ?? 'text'} alpha={KART_ITEM_TONE[String(hud.itemKind ?? '')] ? 1 : 0.35} style={{ fontWeight: 800 }}>{hud.item ? String(hud.item) : 'NO ITEM'}</HudText>
+          <HudText as="div" size="value" className="mt-1" tone={KART_ITEM_TONE[String(hud.itemKind ?? '')] ?? 'text'} alpha={KART_ITEM_TONE[String(hud.itemKind ?? '')] ? 1 : HUD_TEXT_ALPHA.faint} style={{ fontWeight: 800 }}>{hud.item ? String(hud.item) : 'NO ITEM'}</HudText>
         </HudPlate>
       </div>
 
@@ -155,7 +160,7 @@ export default function VelocityKartBabylon({ onEnd }: GameProps) {
       )}
 
       <BoostGauge hud={hud} className="absolute inset-x-0 bottom-28" />
-      {phase === 'playing' && <HudLine text={typeof hud.hint === 'string' ? hud.hint : ''} className="bottom-16" size="caption" alpha={0.7} />}
+      {phase === 'playing' && <HudLine text={typeof hud.hint === 'string' ? hud.hint : ''} className="bottom-16" alpha={0.7} />}
       <HudBanner text={typeof hud.banner === 'string' ? hud.banner : ''} tone="score" />
       </HudFrame>
 
