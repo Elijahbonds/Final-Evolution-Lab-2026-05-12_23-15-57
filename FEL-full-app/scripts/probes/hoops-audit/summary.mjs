@@ -5,6 +5,7 @@
 //   node scripts/probes/hoops-audit/summary.mjs <outDir> [--md]
 import fs from 'node:fs';
 import path from 'node:path';
+import zlib from 'node:zlib';
 const [dir] = process.argv.slice(2);
 const MD = process.argv.includes('--md');
 if (!dir) { console.error('usage: node summary.mjs <outDir> [--md]'); process.exit(2); }
@@ -13,7 +14,11 @@ for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.json') && !x.ends
   const r = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
   if (r.fail) { rows.push({ run: f.replace('.json', ''), fail: r.fail }); continue; }
   const playF = path.join(dir, f.replace('.json', '-play.json'));
-  const play = fs.existsSync(playF) ? JSON.parse(fs.readFileSync(playF, 'utf8')) : null;
+  // the tapped log: audit.mjs saves the page's __S (with mash-audit's log in it) in its raw recording; the -play.json is the fallback
+  const rawF = path.join(dir, f.replace('.json', '-raw.json.gz'));
+  let play = null;
+  try { if (fs.existsSync(rawF)) { const S = JSON.parse(zlib.gunzipSync(fs.readFileSync(rawF)).toString()).S; if (S && S.log) play = { presses: S.presses ?? null, log: S.log }; } } catch { /* an unreadable recording: no play columns */ }
+  if (!play && fs.existsSync(playF)) play = JSON.parse(fs.readFileSync(playF, 'utf8'));
   const L = play ? play.log.map((x) => x[1]) : [];
   const n = (re) => L.filter((m) => re.test(m)).length;
   const ev = play ? {
