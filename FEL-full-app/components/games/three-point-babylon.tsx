@@ -403,6 +403,9 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
       {/* the release meter + the call — bottom centre, under the shooter, couch-size */}
       {phase === 'playing' && (
         <div className="absolute inset-x-0 bottom-24 z-20 flex flex-col items-center gap-2">
+          {/* hoops-p08: THE MIC in this column, over the call and the meter. At 12 rem up as a layer of its own it landed on the rack
+              pips, the CUT chip and the timing key on a sideways phone (docs/HOOPS-AAA-GAP-SHOW.md 3.5); here nothing can sit on it */}
+          <MicCaption flow text={micLine.text} who={micLine.who} voiced={hud.micVoiced} />
           {typeof hud.banner === 'string' && hud.banner && (
             <HudBanner flow text={hud.banner} tone={hud.banner.startsWith('MISS') ? 'text' : 'you'} />
           )}
@@ -472,8 +475,8 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
       )}
       {busReady && busRef.current && <PadChips bus={busRef.current} className="left-4 top-4" />}
 
-      {/* THE MIC: the MC's words just above the call and the meter (the scoreboard owns the top, the board the right) */}
-      {phase === 'playing' && <MicCaption text={micLine.text} who={micLine.who} voiced={hud.micVoiced} className="bottom-[12rem]" />}
+      {/* THE MIC: the MC's words just above the call and the meter (the scoreboard owns the top, the board the right) — hoops-p08: in
+          the bottom column now, above */}
       {/* The switch never takes focus from a click: Space is the keyboard's SHOOT and fires on keyup, and a focused button
           answers that same keyup with a click — every shot after one click on MC would flip the announcer on and off */}
       {phase === 'playing' && (

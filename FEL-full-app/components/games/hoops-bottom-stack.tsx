@@ -5,7 +5,7 @@
 // in the order they are read, growing up from one slot — the same cure the dunk host's bottom stack took (WAVE 3, dunk-babylon.tsx) —
 // so no length, size or zoom can lay one on another. The slot sits above the touch deck on an upright phone (narrower than 640 px,
 // where the deck's two columns fill the bottom 17.5 rem) and 2.5 rem up everywhere else.
-import type { ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { HUD_PLATE, HudText, LINE_CLAMP_STYLE, PHONE_THUMB_GAP_CLASS, hudColor, type HudSize } from './tv-hud';
 
 /** Where the column starts: above the deck on an upright phone, near the bottom otherwise (the dunk host's PAD_LIFT). */
@@ -14,9 +14,24 @@ export const HOOPS_STACK_LIFT = 'clamp(2.5rem, calc((640px - 100vw) * 999), 17.5
 /** The rows, lowest first, each with a stable key. A falsy row takes no room. */
 export function HoopsBottomStack({ rows }: { rows: ReadonlyArray<readonly [string, ReactNode]> }) {
   const live = rows.filter(([, r]) => !!r);
+  // the stage can run past the bottom of the screen (an upright phone under the shell's header): the touch deck lifts itself into
+  // view by that much (TouchOverlay fitDeck), so the column does too, or its rows sit under the deck or off the screen
+  const ref = useRef<HTMLDivElement>(null);
+  const [below, setBelow] = useState(0);
+  useEffect(() => {
+    const on = () => {
+      const stage = ref.current?.parentElement?.getBoundingClientRect();
+      const b = stage ? Math.max(0, Math.round(stage.bottom - window.innerHeight)) : 0;
+      setBelow((v) => (v === b ? v : b));
+    };
+    on();
+    window.addEventListener('resize', on);
+    window.addEventListener('scroll', on, { passive: true });
+    return () => { window.removeEventListener('resize', on); window.removeEventListener('scroll', on); };
+  }, [live.length > 0]);
   if (!live.length) return null;
   return (
-    <div data-hoops-bottom className="pointer-events-none absolute inset-x-0 top-0 flex flex-col-reverse items-center gap-[0.35rem] px-3" style={{ bottom: HOOPS_STACK_LIFT }}>
+    <div ref={ref} data-hoops-bottom className="pointer-events-none absolute inset-x-0 top-0 flex flex-col-reverse items-center gap-[0.35rem] px-3" style={{ bottom: below ? `calc(${HOOPS_STACK_LIFT} + ${below}px)` : HOOPS_STACK_LIFT }}>
       {live.map(([k, r]) => <div key={k} className="flex w-full justify-center">{r}</div>)}
     </div>
   );

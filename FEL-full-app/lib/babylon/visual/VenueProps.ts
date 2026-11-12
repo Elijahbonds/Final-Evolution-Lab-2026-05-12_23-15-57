@@ -218,7 +218,7 @@ export async function mountVenueProps(scene: Scene, venueKey: string, parent?: T
   if (opts.snapToGround) console.info(`[FEL-PROPS] ${venueKey}: ${snapped} placements dropped onto the ground, ${missed} kept their authored height`);
 
   // hoops-p08 (2026-11-12): ONE MASTER PER MATERIAL PER MODEL. A model's parts that share a material (the far pier: a deck, two
-  // rails and eight posts in two materials — eleven draws for two looks) are baked into one mesh, each part's own transform in its
+  // rails and twelve posts in two materials — fifteen draws for two looks; 35 masters became 22 on the Venice dunk set) are baked into one mesh, each part's own transform in its
   // vertices, and that mesh is thin-instanced at the placements instead. Same pixels; one draw where there were many, in the main
   // pass and in a shadow re-bake. The kit's own meshes are left as they were (a mode's copy clones them). perf.propMergeOn 0 = as before.
   const merged: Mesh[] = [];

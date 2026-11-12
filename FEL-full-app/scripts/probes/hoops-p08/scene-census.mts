@@ -22,6 +22,7 @@ const TAG = process.env.TAG ?? 'run';
 const SECONDS = Number(process.env.SECONDS ?? 6);
 const SEED = Number(process.env.SEED ?? 7);
 const RASTER = Number(process.env.RASTER ?? 4);
+// FEEL='{"knob.id": value}': play on those feel-panel values (the bare bundle's ?feel=, scripts/probes/hoops-gap/entry.mjs) — one build, several variants
 fs.mkdirSync(OUT, { recursive: true });
 
 const INIT = `(() => {
@@ -97,7 +98,7 @@ for (const mode of MODES) {
   const ev = <T,>(fn: string | (() => T)): Promise<T> => Promise.race([p.evaluate(fn as never) as Promise<T>, new Promise<never>((_, rej) => setTimeout(() => rej(new Error('evaluate timed out')), 300000))]);
   const t0 = Date.now();
   try {
-    await p.goto(`${PAGE}?mode=${mode}&perf=off`, { waitUntil: 'domcontentloaded', timeout: 240000 });
+    await p.goto(`${PAGE}?mode=${mode}&perf=off${process.env.FEEL ? '&feel=' + encodeURIComponent(process.env.FEEL) : ''}`, { waitUntil: 'domcontentloaded', timeout: 240000 });
     let state = '';
     for (let i = 0; i < 600; i++) {
       state = await ev(() => (window as unknown as { __phase?: string }).__phase ?? '');

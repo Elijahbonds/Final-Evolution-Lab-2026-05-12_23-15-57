@@ -22,14 +22,29 @@ import '@babylonjs/loaders/glTF';
 import { mountStreetCourt, STREET_COURT_PALETTE, VENICE_DUNK_COURT_PALETTE } from '../visual/CourtSurface';
 import { courtLogoTexture, groundTextureFor, signTexture, TILE_M, type GroundKind } from '../visual/groundTextures';
 import { HOOP_SCAN, spawnMeshyProp } from '../visual/meshyProps';
-import { Onlookers } from '../visual/Onlookers';
+import { MAX_BODIES, Onlookers } from '../visual/Onlookers';
 import { heroPalmScale, VENICE_BOARDWALK_ROW, VENICE_ENV2_DIR, VENICE_HERO_PALMS, VENICE_PALM_LODS, VENICE_ROW_PALMS } from '../visual/venuePropSets';
 import { veniceSunPosition } from '../visual/veniceSurroundVisibility';
 import { RIM_HEIGHT_M } from '../core/courtDims';
 import type { AbstractMesh, Material, Scene } from '@babylonjs/core';
 import { setPbrRoughnessUniform } from '../scene/pbrUniform';   // perf-lag: the sea's shimmer without a shader re-prepare a frame
+import { feel } from '@/lib/feel-panel/feel';   // hoops-p08: venue.halfCourtCrowdCards, perf.sharedGroundOn
 
 const COURT = { hx: 8, hz: 14 };                 // 16 × 28 court slab (venueSpecs basketball_*)
+/** hoops-p08 (perf.phoneRailBodies): how many people stand on the boardwalk rail on a PHONE. The rail is nine spots and Onlookers
+ *  takes every other one (five roster bodies, each nine parts and ~9.6 MB of maps); a phone keeps three of those five, spread the
+ *  same way (the two ends and the middle). 5 = all five, as before. Other tiers always keep five. */
+export const PHONE_RAIL_BODIES = 3;
+/** Pure: the rail's spots for a cap of `n` bodies — Onlookers' own every-other pick (MAX_BODIES), then `n` of those spread evenly. */
+export function railSpots<T>(spots: readonly T[], n: number): T[] {
+  const step = Math.max(1, Math.ceil(spots.length / MAX_BODIES));
+  const picked = spots.filter((_, i) => i % step === 0).slice(0, MAX_BODIES);
+  if (!(n < picked.length)) return [...spots];
+  if (n <= 0) return [];
+  if (n === 1) return [picked[Math.floor(picked.length / 2)]];
+  return Array.from({ length: n }, (_, k) => picked[Math.round((k * (picked.length - 1)) / (n - 1))]);
+}
+
 /** hoops-p08: a sign's two faces — the front as Babylon lays it, the back with u reversed so its text is not mirrored. */
 export const SIGN_FRONT_UVS = new Vector4(0, 0, 1, 1), SIGN_BACK_UVS = new Vector4(1, 0, 0, 1);
 
@@ -57,9 +72,34 @@ export type BoardwalkEnv = 'lawn' | 'venice-dunk';
  *  when the dressing mounts; `landed` runs one once the venue's prop set (the lamps the flags hang on) has landed. */
 export interface DressingHooks { start(job: () => void): void; landed(job: () => void): void }
 
+/** hoops-p08 (2026-11-12): perf.sharedGroundOn — 1: the boardwalk's tiled grounds share one texture and one material per look (new);
+ *  0: a texture copy and a material per plane, as before. */
+export const SHARED_GROUND_ON = 1;
+/** One material per (scene, kind, tint, roughness): the planes' tiling lives in their UVs, so planes that look alike share it. */
+const groundMats = new WeakMap<Scene, Map<string, PBRMaterial>>();
+
 function flat(scene: Scene, name: string, w: number, d: number, x: number, z: number, y: number, hex: string, holder: TransformNode, rough = 1, kind?: GroundKind, mul?: string): Mesh {
-  const g = MeshBuilder.CreateGround(name, { width: w, height: d }, scene);
+  const g = MeshBuilder.CreateGround(name, { width: w, height: d, updatable: false }, scene);
   g.position.set(x, y, z); g.parent = holder; g.isPickable = false; g.receiveShadows = true;
+  // hoops-p08: SHARED, NOT COPIED. Each tiled plane used to paint its own copy of the kind's 512² texture (1.3 MB each: six concrete
+  // copies on the Venice dunk boardwalk) with the tiling in the texture's u/v scale, and its own material — so no two planes could ever
+  // be one draw. The tiling now goes into the plane's UVs (the same repeat: max(1, size / tile)), and the planes that look the same
+  // share one texture and one material; mergeSameLook() then draws them as one mesh. Pixel for pixel the same sampling.
+  if (kind && feel('perf.sharedGroundOn', SHARED_GROUND_ON) >= 0.5) {
+    const uv = g.getVerticesData('uv');
+    if (uv) { const su = Math.max(1, w / TILE_M[kind]), sv = Math.max(1, d / TILE_M[kind]); for (let i = 0; i < uv.length; i += 2) { uv[i] *= su; uv[i + 1] *= sv; } g.setVerticesData('uv', uv, false); }
+    let cache = groundMats.get(scene); if (!cache) { cache = new Map(); groundMats.set(scene, cache); }
+    const key = `${kind}|${mul ?? ''}|${rough}`;
+    let m = cache.get(key);
+    if (!m || !scene.materials.includes(m)) {   // (a venue disposed and mounted again in the same scene made a new one)
+      m = new PBRMaterial(`vb_ground_${kind}_${(mul ?? 'w').replace('#', '')}_mat`, scene);
+      m.roughness = rough; m.metallic = 0; m.environmentIntensity = 0.35;
+      m.albedoTexture = groundTextureFor(scene, kind, 1, 1); m.albedoColor = mul ? Color3.FromHexString(mul) : Color3.White();
+      cache.set(key, m);
+    }
+    g.material = m;
+    return g;
+  }
   // PBR like every kit prop: a StandardMaterial under the venue sun + grade blew the grass to lime and the sand to white
   const m = new PBRMaterial(`${name}_mat`, scene);
   m.albedoColor = Color3.FromHexString(hex); m.roughness = rough; m.metallic = 0; m.environmentIntensity = 0.35;
@@ -71,6 +111,22 @@ function flat(scene: Scene, name: string, w: number, d: number, x: number, z: nu
   }
   g.material = m;
   return g;
+}
+
+/** hoops-p08: the static planes under `holder` that share a material become one mesh (the four concrete aprons: four draws → one). */
+function mergeSameLook(holder: TransformNode, names: RegExp, into: string): void {
+  const byMat = new Map<Material, Mesh[]>();
+  for (const m of holder.getChildMeshes(true)) {
+    if (!(m instanceof Mesh) || !m.material || !names.test(m.name)) continue;
+    const l = byMat.get(m.material) ?? []; l.push(m); byMat.set(m.material, l);
+  }
+  for (const [mat, group] of byMat) {
+    if (group.length < 2) continue;
+    const one = Mesh.MergeMeshes(group, true, true);
+    if (!one) continue;
+    // MergeMeshes bakes each plane's WORLD matrix: setParent keeps that world place under the holder
+    one.name = into; one.setParent(holder); one.material = mat; one.isPickable = false; one.receiveShadows = true;
+  }
 }
 
 /**
@@ -92,6 +148,7 @@ export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode, scanS
   const SCAN_N = -2.1 + scanShiftZ, SCAN_S = 23.9 + scanShiftZ, SCAN_MID = 10.9 + scanShiftZ;
   flat(scene, 'vb_apron_n', ax * 2, apron, 0, SCAN_N - apron / 2, 0.012, '#B9AFA0', holder, 1, 'concrete');
   flat(scene, 'vb_apron_s', ax * 2, apron, 0, SCAN_S + apron / 2, 0.012, '#B9AFA0', holder, 1, 'concrete');
+  if (feel('perf.sharedGroundOn', SHARED_GROUND_ON) >= 0.5) mergeSameLook(holder, /^vb_apron_[nsew]$/, 'vb_apron');   // hoops-p08: one draw, one material
   // one continuous surround out to the dome wall (190 m): grass east of the apron, the boardwalk, more grass to the shop line;
   // the coast wraps the NORTH (behind the hoop, where the dunk camera looks) and the WEST — sand, then water to the horizon
   const L = 190, GRASS = '#3A5233', GRASS2 = '#3E5838';   // inside the 400 m sky sphere (radius 200); greyed greens — the grade pushes greens toward lime
@@ -197,13 +254,23 @@ export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode, scanS
   // hoops-p08 (docs/HOOPS-AAA-GAP-SHOW.md 3.10): the gate sign read "VENICE BEACH COURTS" mirrored from the court — one plane drawn
   // from both sides (backFaceCulling off) shows its back face with the text reversed. A sign is now double-sided GEOMETRY whose back
   // face has its u flipped (SIGN_BACK_UVS), so it reads the right way round from either side; still one mesh, one draw.
+  // hoops-p08: signs that carry the same picture share one material (the four FEL flags), and the posts share one (they are one paint)
+  const share = feel('perf.sharedGroundOn', SHARED_GROUND_ON) >= 0.5;
+  const signMats = new Map<unknown, StandardMaterial>();
   const sign = (name: string, w: number, h: number, pos: [number, number, number], yaw: number, tex: ReturnType<typeof signTexture>) => {
     const plane = MeshBuilder.CreatePlane(name, { width: w, height: h, sideOrientation: Mesh.DOUBLESIDE, frontUVs: SIGN_FRONT_UVS, backUVs: SIGN_BACK_UVS }, scene);
     plane.position.set(pos[0], pos[1], pos[2]); plane.rotation.y = yaw; plane.parent = holder; plane.isPickable = false;
-    const m = new StandardMaterial(`${name}_mat`, scene); m.emissiveTexture = tex; m.emissiveColor = Color3.Black(); m.disableLighting = true; m.backFaceCulling = true;
+    let m = share ? signMats.get(tex) : undefined;
+    if (!m) { m = new StandardMaterial(`${name}_mat`, scene); m.emissiveTexture = tex; m.emissiveColor = Color3.Black(); m.disableLighting = true; m.backFaceCulling = true; if (share) signMats.set(tex, m); }
     plane.material = m; return plane;
   };
-  const post = (name: string, x: number, z: number, hgt: number) => { const c = MeshBuilder.CreateCylinder(name, { height: hgt, diameter: 0.14 }, scene); c.position.set(x, hgt / 2, z); c.parent = holder; c.isPickable = false; const pm = new PBRMaterial(`${name}_mat`, scene); pm.albedoColor = Color3.FromHexString('#2A2E37'); pm.roughness = 0.6; pm.metallic = 0.4; c.material = pm; return c; };
+  let postMat: PBRMaterial | null = null;
+  const post = (name: string, x: number, z: number, hgt: number) => {
+    const c = MeshBuilder.CreateCylinder(name, { height: hgt, diameter: 0.14 }, scene); c.position.set(x, hgt / 2, z); c.parent = holder; c.isPickable = false;
+    let pm = share ? postMat : null;
+    if (!pm) { pm = new PBRMaterial(`${name}_mat`, scene); pm.albedoColor = Color3.FromHexString('#2A2E37'); pm.roughness = 0.6; pm.metallic = 0.4; if (share) postMat = pm; }
+    c.material = pm; return c;
+  };
   post('vb_gate_post_l', 7.1, SCAN_S + 3.6, 3.4); post('vb_gate_post_r', 10.9, SCAN_S + 3.6, 3.4);   // owner: back off the paint, to the right
   sign('vb_gate_sign', 4.2, 1.0, [9, 3.0, SCAN_S + 3.6], Math.PI, signTexture(scene, ['VENICE BEACH COURTS', 'FINAL EVOLUTION LAB · EST. 2026'], { bg: '#1E2A44', accent: '#F2B84B' }));
   const flightNight = signTexture(scene, ['FLIGHT NIGHT', 'VENICE · OPEN RUN · ALL LEVELS'], { bg: '#141826', fg: '#FFE9B0', accent: '#FF6B3D' });
@@ -223,6 +290,9 @@ export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode, scanS
   const flags = Array.from({ length: 4 }, (_, i) => { const z = -36 + i * 24; return sign(`vb_flag_${i}`, 0.5, 1.25, [19.55, 4.0, z + 0.5], Math.PI / 2, flagTex); });
   // FIRST-DUNK-BUDGET: the lamps come with the prop set, so on a deferred dressing the flags wait for them rather than float
   if (dressing) { for (const f of flags) f.setEnabled(false); dressing.landed(() => { for (const f of flags) if (!f.isDisposed()) f.setEnabled(true); }); }
+  // hoops-p08: the posts and (when they show at once) the flags are one mesh each — one draw where there were four
+  else if (share) mergeSameLook(holder, /^vb_flag_\d$/, 'vb_flags');
+  if (share) mergeSameLook(holder, /^vb_(gate|scoreboard)_post_[lr]$/, 'vb_posts');
   // Pass 7 phase 5 — air: six gulls (three on a phone) wheel over the northern water on slow ellipses (billboards on a painted chevron).
   // Cheap: six unlit planes and one observer.
   const gullTex = new DynamicTexture('vb_gull_tex', 64, scene, false);
@@ -258,7 +328,9 @@ export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode, scanS
   // biggest thing on the dunk's first download after the bus)
   const fillRail = (): void => {
     if (holder.isDisposed()) return;
-    const rail = new Onlookers(scene, Array.from({ length: 9 }, (_, i) => new Vector3(railX + (i % 2) * 0.7, 0, SCAN_N + 1.5 + i * 3.0)), '#2b3550', new Vector3(0, 0, SCAN_MID), dressing ? { oneBodyPerFrame: true } : {});   // RUNUP-STALL-1 v3: the deferred (dunk) rail lands one body a frame
+    const spots = railSpots(Array.from({ length: 9 }, (_, i) => new Vector3(railX + (i % 2) * 0.7, 0, SCAN_N + 1.5 + i * 3.0)),
+      (scene.metadata as { felTier?: string } | null)?.felTier === 'mobile' ? feel('perf.phoneRailBodies', PHONE_RAIL_BODIES) : Infinity);   // hoops-p08
+    const rail = new Onlookers(scene, spots, '#2b3550', new Vector3(0, 0, SCAN_MID), dressing ? { oneBodyPerFrame: true } : {});   // RUNUP-STALL-1 v3: the deferred (dunk) rail lands one body a frame
     const life = scene.onBeforeRenderObservable.add(() => rail.update(scene.getEngine().getDeltaTime() / 1000));
     holder.onDisposeObservable.add(() => { scene.onBeforeRenderObservable.remove(life); rail.dispose(); });
   };

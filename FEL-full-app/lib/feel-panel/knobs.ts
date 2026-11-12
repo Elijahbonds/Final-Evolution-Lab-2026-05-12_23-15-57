@@ -1633,7 +1633,15 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
   },  {
     id: 'perf.propMergeOn', label: 'Venue props: one draw per material per model (1) / per part (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
     source: 'lib/babylon/visual/VenueProps.ts PROP_MERGE_ON',
-    hint: 'A prop model whose parts share a material (the far pier: eleven parts, two materials) is drawn as one mesh per material. Same picture. 0 = one draw per part, as before.',
+    hint: 'A prop model whose parts share a material (the far pier: fifteen parts, two materials) is drawn as one mesh per material. Same picture. 0 = one draw per part, as before.',
+  },  {
+    id: 'perf.sharedGroundOn', label: 'Venice boardwalk: shared ground and sign materials (1) / one per plane (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/babylon/nexus/veniceBoardwalk.ts SHARED_GROUND_ON',
+    hint: 'The tiled grounds share one texture per look (tiling in the UVs), and the four aprons, the posts and the flags are one mesh each. Same picture. 0 = a texture copy, a material and a draw per plane, as before.',
+  },  {
+    id: 'perf.phoneRailBodies', label: 'Phone: people on the boardwalk rail', def: 3, min: 0, max: 5, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/babylon/nexus/veniceBoardwalk.ts PHONE_RAIL_BODIES',
+    hint: 'On a phone the Venice court rail keeps this many of its five onlookers (the ends and the middle). Each is nine draw parts and about 10 MB of maps. 5 = all five, as before.',
   },
 ];
 

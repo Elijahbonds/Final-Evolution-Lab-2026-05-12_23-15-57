@@ -10,6 +10,8 @@ set -u
 PORT=${PORT:-3352}
 if [ "${1:-}" = "--inner" ]; then
   shift; site=$1; job=$2; shift 2
+  # a server left on the port (a killed run) would serve the WRONG site to this job: refuse instead of measuring it
+  if curl -s -o /dev/null "http://127.0.0.1:$PORT/"; then echo "run.sh: port $PORT is already serving — stop that server first"; exit 3; fi
   node scripts/probes/hoops-gap/serve.mjs "$site" "$PORT" > "$site/serve.log" 2>&1 &
   SP=$!
   trap 'kill $SP 2>/dev/null' EXIT

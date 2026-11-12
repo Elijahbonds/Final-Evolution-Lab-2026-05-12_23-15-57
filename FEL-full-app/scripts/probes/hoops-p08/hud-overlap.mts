@@ -11,7 +11,9 @@
 //     in it — they are the game-hud lane's), measured tight with a Range, or (b) a HUD meter bar ([data-hud-meter-bar]). Opacity is
 //     multiplied up the tree; a box under 5 % is not drawn. The READY / pause splash is not up while it measures.
 //   * an OVERLAP is two boxes from different elements, neither inside the other, whose rectangles share at least 12 px² (2 px each
-//     way). Each pair is named by the first words of both, so the same collision seen in many samples counts once.
+//     way). Each pair is named by the first words of both, so the same collision seen in many samples counts once. Counted twice:
+//     anywhere in the stage (`pairs`), and ON SCREEN (`pairsOnScreen`: the shared rectangle clipped to the viewport — an upright
+//     phone's stage runs under the bottom of the screen, and a collision there is not seen).
 // Two readings per mode and view:
 //   * PLAY — the scripted player (the show rig's) plays SECONDS game seconds; the DOM is read every half game second. The pairs any
 //     sample saw, and the worst sample.
@@ -101,13 +103,19 @@ const READ = `(() => {
     for (const q of r.getClientRects()) if (q.width >= 2 && q.height >= 2) boxes.push({ el, x: q.left, y: q.top, w: q.width, h: q.height, label: txt.slice(0, 28) });
   }
   for (const el of stage.querySelectorAll('[data-hud-meter-bar]')) { if (alpha(el) < 0.05) continue; const q = el.getBoundingClientRect(); if (q.width >= 2 && q.height >= 2) boxes.push({ el, x: q.left, y: q.top, w: q.width, h: q.height, label: '[meter bar]' }); }
-  const pairs = [];
+  const pairs = [], seen = [];
   for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
     const a = boxes[i], b = boxes[j]; if (a.el === b.el || a.el.contains(b.el) || b.el.contains(a.el)) continue;
     const w = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x), h = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
-    if (w >= 2 && h >= 2 && w * h >= 12) pairs.push([a.label, b.label].sort().join('  ×  ') + '  (' + Math.round(w * h) + ' px²)');
+    if (w >= 2 && h >= 2 && w * h >= 12) {
+      const tag = [a.label, b.label].sort().join('  ×  ') + '  (' + Math.round(w * h) + ' px²)';
+      pairs.push(tag);
+      // ON SCREEN: the overlap, clipped to the viewport (an upright phone's stage runs under the bottom of the screen)
+      const x0 = Math.max(a.x, b.x, 0), x1 = Math.min(a.x + a.w, b.x + b.w, innerWidth), y0 = Math.max(a.y, b.y, 0), y1 = Math.min(a.y + a.h, b.y + b.h, innerHeight);
+      if (x1 - x0 >= 2 && y1 - y0 >= 2 && (x1 - x0) * (y1 - y0) >= 12) seen.push(tag);
+    }
   }
-  return { boxes: boxes.length, pairs };
+  return { boxes: boxes.length, pairs, seen };
 })()`;
 
 const key = (p: string) => p.replace(/\s+\(\d+ px²\)$/, '');
@@ -137,28 +145,29 @@ async function runOne(b: import('playwright-core').Browser, mode: string, view: 
     if (await ev<boolean>(`/PAUSED — TAP TO RESUME/.test(document.body.innerText)`)) await press('START');
     await ev(`window.__HOLD = 0`);
     // PLAY
-    const seen = new Map<string, number>(); let worst = 0, samples = 0, samplesWith = 0;
+    const seen = new Map<string, number>(), onScreen = new Map<string, number>(); let worst = 0, samples = 0, samplesWith = 0;
     for (let next = 0.5; ;) {
       const g = await ev<number>(`window.__G()`);
       if (g >= next) {
         if (await ev<boolean>(`/PAUSED — TAP TO RESUME/.test(document.body.innerText)`)) { await press('START'); continue; }
-        const r = await ev<{ boxes: number; pairs: string[] }>(READ);
+        const r = await ev<{ boxes: number; pairs: string[]; seen: string[] }>(READ);
         samples++; if (r.pairs.length) samplesWith++; worst = Math.max(worst, r.pairs.length);
         for (const pr of r.pairs) seen.set(key(pr), (seen.get(key(pr)) ?? 0) + 1);
+        for (const pr of r.seen) onScreen.set(key(pr), (onScreen.get(key(pr)) ?? 0) + 1);
         next = g + 0.5;
       }
       if (g >= SECONDS || Date.now() - t0 > 1500000) break;
       await p.waitForTimeout(300);
     }
-    out.play = { samples, samplesWith, worst, distinct: seen.size, pairs: Object.fromEntries(seen) };
+    out.play = { samples, samplesWith, worst, distinct: seen.size, pairs: Object.fromEntries(seen), distinctOnScreen: onScreen.size, pairsOnScreen: Object.fromEntries(onScreen) };
     // STACK
     await ev(`window.__HOLD = 1`); await waitFrames(10);
     const stack = STACK[mode] ?? {};
     for (const voiced of [true, false]) {
       await ev(`window.__FEL_DEV__.hud(${JSON.stringify({ ...stack, micVoiced: voiced })})`);
       await waitFrames(4);
-      const r = await ev<{ boxes: number; pairs: string[] }>(READ);
-      out[voiced ? 'stackVoiceOn' : 'stackVoiceOff'] = { boxes: r.boxes, overlaps: r.pairs.length, pairs: r.pairs };
+      const r = await ev<{ boxes: number; pairs: string[]; seen: string[] }>(READ);
+      out[voiced ? 'stackVoiceOn' : 'stackVoiceOff'] = { boxes: r.boxes, overlaps: r.pairs.length, pairs: r.pairs, onScreen: r.seen.length, pairsOnScreen: r.seen };
       if (!voiced) {
         await setScale(base); await waitFrames(2);
         await p.screenshot({ path: path.join(OUT, `${TAG}-${mode}-${view}-stack.jpg`), type: 'jpeg', quality: 80, timeout: 300000 });
