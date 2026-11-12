@@ -72,3 +72,24 @@ describe('the athlete\'s PRQ is what was measured', () => {
     expect(arg.create.prq).toEqual({ speed: 80 });
   });
 });
+
+// lane/hoops-builder (owner 2026-11-12): the hoops builder's part of the build is written by /api/v1/creator/hoops; Finalize, which
+// knows nothing about it, must carry it over or saving a look would wipe a player's earned points.
+describe('Finalize keeps the hoops build', () => {
+  it('a stored build.hoops rides into the new build untouched', async () => {
+    axesFor.mockResolvedValue(null);
+    const hoops = { v: 1, position: 'big', heightIn: 79, steps: { defense: 4 }, points: { earned: 12, through: null, day: null, dayEarned: 0 } };
+    buildRow.mockResolvedValue({ build: { attributes: {}, hoops } });
+    expect((await finalize()).status).toBe(200);
+    const arg = buildUpsert.mock.calls[0][0];
+    expect(arg.update.build.hoops).toEqual(hoops);
+    expect(arg.create.build.hoops).toEqual(hoops);
+  });
+
+  it('no stored hoops part: none is invented', async () => {
+    axesFor.mockResolvedValue(null);
+    buildRow.mockResolvedValue(null);
+    expect((await finalize()).status).toBe(200);
+    expect('hoops' in buildUpsert.mock.calls[0][0].update.build).toBe(false);
+  });
+});
