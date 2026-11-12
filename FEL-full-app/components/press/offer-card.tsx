@@ -45,7 +45,7 @@ export function KindleLink({ book, className = '' }: { book: BookTitle; classNam
   const amazon = kindleUrl(book);
   if (!amazon) return null;
   return (
-    <a href={amazon} target="_blank" rel="noopener noreferrer" className={`text-xs text-white/60 hover:text-white ${className}`}>
+    <a href={amazon} target="_blank" rel="noopener noreferrer" className={`inline-flex min-h-11 items-center text-xs text-white/60 hover:text-white ${className}`}>
       Kindle on Amazon
     </a>
   );
@@ -60,7 +60,7 @@ export function CatalogCard({ book }: { book: BookTitle }) {
         <div className="aspect-[3/4] overflow-hidden rounded-xl">
           <div className="flex h-full flex-col justify-between bg-[#161616] p-3" style={{ backgroundImage: 'repeating-linear-gradient(-45deg, #161616, #161616 8px, #1c1c1c 8px, #1c1c1c 9px)' }}>
             <p className="text-[12px] uppercase tracking-[0.16em] text-[#F5C518]">Press</p>
-            <p className="fel-heading text-lg leading-tight text-white">{book.title}</p>
+            <p className="fel-heading text-[20px] leading-tight text-white">{book.title}</p>
             <p className="text-[12px] uppercase tracking-wider text-white/50">{book.track ?? 'Elijah Bonds'}</p>
           </div>
         </div>

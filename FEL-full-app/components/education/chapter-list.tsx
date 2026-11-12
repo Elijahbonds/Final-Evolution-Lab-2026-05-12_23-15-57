@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { BookOpen, Check, Gem } from 'lucide-react';
 import { CHAPTERS, CHAPTER_SHARDS, chapterProgress, courseProgress } from '@/lib/education/course';
 import { COLOR } from '@/lib/design/tokens';
+import { lineSize } from '@/lib/design/type';   // EVERY-SCREEN P9
 
 const AUDIENCE_LABEL: Record<string, string> = { athlete: 'Athlete', parent: 'Parent', coach: 'Coach' };
 
@@ -73,7 +74,7 @@ export function ChapterList() {
                   </span>
                   <div className="min-w-0 flex-1">
                     <h3 className="fel-heading text-[16px] font-bold leading-tight text-white">{c.title}</h3>
-                    <p className="mt-1 text-[12.5px] leading-snug text-fel-dim">{c.subtitle}</p>
+                    <p className={`mt-1 ${lineSize(c.subtitle, 'text-[12px]')} leading-snug text-fel-dim`}>{c.subtitle}</p>
                   </div>
                 </div>
 

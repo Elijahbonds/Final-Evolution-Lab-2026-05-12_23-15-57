@@ -21,8 +21,8 @@
 export const LEGAL_PROSE = [
   'text-base leading-[1.7] text-white/70 [overflow-wrap:anywhere]',
   '[&>div>:first-child]:mt-0',
-  '[&_h1]:mb-3 [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:leading-tight [&_h1]:text-white [&_h1]:font-display [&_h1]:uppercase [&_h1]:tracking-[0.04em]',
-  '[&_h2]:mb-2 [&_h2]:mt-7 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:leading-snug [&_h2]:text-white [&_h2]:font-display [&_h2]:uppercase [&_h2]:tracking-[0.04em]',
+  '[&_h1]:mb-3 [&_h1]:text-[30px] [&_h1]:font-bold [&_h1]:leading-tight [&_h1]:text-white [&_h1]:font-display [&_h1]:uppercase [&_h1]:tracking-[0.04em]',
+  '[&_h2]:mb-2 [&_h2]:mt-7 [&_h2]:text-[20px] [&_h2]:font-bold [&_h2]:leading-snug [&_h2]:text-white [&_h2]:font-display [&_h2]:uppercase [&_h2]:tracking-[0.04em]',
   '[&_h3]:mb-1.5 [&_h3]:mt-5 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-white [&_h3]:font-display [&_h3]:uppercase [&_h3]:tracking-[0.04em]',
   '[&_p]:my-3',
   '[&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-3 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-1 [&_li]:pl-1 [&_li]:marker:text-white/50',

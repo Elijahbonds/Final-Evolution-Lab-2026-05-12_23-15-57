@@ -61,18 +61,18 @@ export default async function PressPage() {
       {/* ONB-05: Appendix B as approved (2026-10-20); [OWNER: …] marks a blank the owner still fills. */}
       <section className="mt-10" data-press-about>
         <h2 className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#F5C518]">About Final Evolution Lab</h2>
-        <OwnerCopy parts={PUBLIC_PAGE_COPY.press.body} className="mt-2 max-w-2xl text-sm leading-relaxed text-white/75" />
+        <OwnerCopy parts={PUBLIC_PAGE_COPY.press.body} className="mt-2 max-w-2xl text-base leading-relaxed text-white/75" />
       </section>
 
       <section className="mt-10">
         <h2 className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#F5C518]">My Library</h2>
         <div className="mt-3 rounded-2xl border border-white/10 bg-[#101010] p-5">
-          <p className="text-sm text-white/70">
+          <p className="text-base text-white/70">
             {session
               ? 'Your audiobooks are in My Library: stream them here. Audiobooks are stream only, with no download.'
               : 'Log in with the email you check out with. Purchases made as a guest are waiting on that address.'}
           </p>
-          <Link href="/press/library" className="mt-3 inline-block rounded-md bg-[#F5C518] px-4 py-2 text-sm font-semibold text-black">
+          <Link href="/press/library" className="mt-3 inline-flex min-h-11 items-center rounded-md bg-[#F5C518] px-4 py-2 text-sm font-semibold text-black">
             {session ? 'Open My Library' : 'Log in to My Library'}
           </Link>
         </div>
@@ -97,7 +97,7 @@ export default async function PressPage() {
             </a>
           ))}
         </div>
-        <p className="mt-2 text-[12px] text-white/50">
+        <p className="mt-2 text-base text-white/50">
           PJF Performance Band is an affiliate link. Final Evolution may earn a commission.
         </p>
       </section>

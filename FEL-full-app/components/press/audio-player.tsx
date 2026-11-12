@@ -161,7 +161,7 @@ export function AudioPlayer({
             type="button"
             aria-label={`Back ${SKIP_SECONDS} seconds`}
             onClick={() => skip(-SKIP_SECONDS)}
-            className="rounded-md border border-white/15 px-2 py-1 font-mono text-[12px] text-white/70"
+            className="min-h-11 min-w-11 rounded-md border border-white/15 px-2 py-1 font-mono text-[12px] text-white/70"
           >
             −{SKIP_SECONDS}s
           </button>
@@ -169,7 +169,7 @@ export function AudioPlayer({
             type="button"
             aria-label={`Forward ${SKIP_SECONDS} seconds`}
             onClick={() => skip(SKIP_SECONDS)}
-            className="rounded-md border border-white/15 px-2 py-1 font-mono text-[12px] text-white/70"
+            className="min-h-11 min-w-11 rounded-md border border-white/15 px-2 py-1 font-mono text-[12px] text-white/70"
           >
             +{SKIP_SECONDS}s
           </button>
@@ -177,7 +177,7 @@ export function AudioPlayer({
             type="button"
             aria-label="Playback speed"
             onClick={() => setSpeed((s) => nextSpeed(s))}
-            className="rounded-md border border-white/15 px-2 py-1 font-mono text-[12px] text-white/70"
+            className="min-h-11 min-w-11 rounded-md border border-white/15 px-2 py-1 font-mono text-[12px] text-white/70"
           >
             {speed}×
           </button>
@@ -204,7 +204,7 @@ export function AudioPlayer({
               type="button"
               disabled={!ch.canPlay}
               onClick={() => void load(ch.id, ch.id === activeId && !audioRef.current?.getAttribute('src') ? pendingSeek.current : null)}
-              className={`flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm ${
+              className={`flex min-h-11 w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm ${
                 ch.id === activeId ? 'bg-[#F5C518]/15 text-white' : 'text-white/75 hover:bg-white/5'
               } disabled:cursor-not-allowed disabled:text-white/30`}
             >

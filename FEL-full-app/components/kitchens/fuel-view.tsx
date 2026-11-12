@@ -103,10 +103,10 @@ export function FuelView() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-white/50">FEL Kitchens · Fuel</p>
-          <h1 className="fel-heading mt-1 text-2xl font-bold text-white">Today&apos;s fuel</h1>
+          <h1 className="fel-heading mt-1 text-[30px] font-bold text-white">Today&apos;s fuel</h1>
           <p className="mt-1 text-sm text-white/60">Your Build&apos;s current leak and load, as a plate. Food tags only.</p>
         </div>
-        <button type="button" onClick={() => void rebuild()} className="flex items-center gap-1 rounded-md border border-white/15 px-2.5 py-1.5 text-xs font-bold text-white/80 hover:bg-white/10">
+        <button type="button" onClick={() => void rebuild()} className="flex min-h-11 items-center gap-1 rounded-md border border-white/15 px-2.5 py-1.5 text-xs font-bold text-white/80 hover:bg-white/10">
           <RefreshCw className="h-3.5 w-3.5" /> Rebuild
         </button>
       </div>
@@ -121,7 +121,7 @@ export function FuelView() {
         <>
           <section className="fel-panel mt-4 rounded-2xl p-4">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-[#A855F7]/40 bg-[#A855F7]/10 px-2.5 py-1 text-xs font-bold text-[#A855F7]" data-testid="rx-leak">LEAK · {rx.leakLabel.toUpperCase()}</span>
+              <span className="rounded-full border border-[#A855F7]/40 bg-[#A855F7]/10 px-2.5 py-1 text-xs font-bold text-[#C79BFF]" data-testid="rx-leak">LEAK · {rx.leakLabel.toUpperCase()}</span>
               <span className="rounded-full border border-[#00E5FF]/40 bg-[#00E5FF]/10 px-2.5 py-1 text-xs font-bold text-[#00E5FF]" data-testid="rx-band">{BAND_LABEL[rx.loadBand]}</span>
               {shownPrq && <span className="rounded-full border border-white/15 px-2.5 py-1 font-mono text-xs text-white/70">{shownPrq.label}</span>}
               <span className="font-mono text-[12px] text-white/50">scan {rx.sourceScanDate}</span>
@@ -148,7 +148,7 @@ export function FuelView() {
                 </li>
               ))}
             </ul>
-            <p className="mt-2 px-1 text-[12px] leading-snug text-white/50">{ALLERGEN_NOTE}</p>
+            <p className="mt-2 px-1 text-base leading-snug text-white/50">{ALLERGEN_NOTE}</p>
           </section>
 
           <div className="mt-4">
@@ -172,7 +172,7 @@ export function FuelView() {
             </div>
           </section>
 
-          <p className="mt-6 pb-4 text-center text-[12px] leading-relaxed text-white/50">{rx.disclaimer}</p>
+          <p className="mt-6 pb-4 text-center text-base leading-relaxed text-white/50">{rx.disclaimer}</p>
         </>
       )}
     </div>

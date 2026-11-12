@@ -1,7 +1,7 @@
 {
  "what": "The every-screen scorecard: docs/PLAN-EVERY-SCREEN-10PHASE.md, phase 1. Written by scripts/every-screen/score.mts --report.",
- "measuredAt": "2026-11-11T20:43:32.136Z",
- "commit": "30bb4553",
+ "measuredAt": "2026-11-11T22:55:01.747Z",
+ "commit": "77ce0c27",
  "budgets": {
   "wordsFoldDo": 40,
   "tapPx": 44,
@@ -14,30 +14,30 @@
  },
  "totals": {
   "screens": 187,
-  "scored": 153,
-  "passAll": 36,
+  "scored": 154,
+  "passAll": 48,
   "alias": 7,
-  "off": 21,
+  "off": 20,
   "notScored": 6,
   "byCheck": {
    "clear": {
-    "pass": 83,
-    "fail": 70,
+    "pass": 101,
+    "fail": 53,
     "nm": 0
    },
    "finished": {
-    "pass": 69,
-    "fail": 84,
+    "pass": 79,
+    "fail": 75,
     "nm": 0
    },
    "fast": {
     "pass": 125,
-    "fail": 10,
+    "fail": 11,
     "nm": 18
    },
    "right": {
-    "pass": 143,
-    "fail": 10,
+    "pass": 146,
+    "fail": 8,
     "nm": 0
    }
   },
@@ -49,52 +49,40 @@
  },
  "faults": [
   {
-   "id": "body-small",
-   "name": "Body copy under 16 px",
-   "screens": 48,
-   "wouldPassIfFixed": 5
-  },
-  {
    "id": "too-many-words",
    "name": "More than 40 words before scrolling on a do-this screen",
    "screens": 40,
-   "wouldPassIfFixed": 14
+   "wouldPassIfFixed": 15
+  },
+  {
+   "id": "body-small",
+   "name": "Body copy under 16 px",
+   "screens": 29,
+   "wouldPassIfFixed": 5
   },
   {
    "id": "text-sizes",
    "name": "More than 4 text sizes on one screen",
-   "screens": 29,
-   "wouldPassIfFixed": 0
-  },
-  {
-   "id": "small-targets",
-   "name": "Tap targets under 44 px in the screen itself",
-   "screens": 27,
-   "wouldPassIfFixed": 0
+   "screens": 17,
+   "wouldPassIfFixed": 1
   },
   {
    "id": "button-looks",
    "name": "More than 3 button looks on one screen",
-   "screens": 16,
-   "wouldPassIfFixed": 0
+   "screens": 15,
+   "wouldPassIfFixed": 1
   },
   {
-   "id": "small-targets-bars",
-   "name": "Tap targets under 44 px in the app's own bars",
-   "screens": 16,
-   "wouldPassIfFixed": 3
-  },
-  {
-   "id": "tiny-text",
-   "name": "Text under 12 px",
+   "id": "small-targets",
+   "name": "Tap targets under 44 px in the screen itself",
    "screens": 13,
-   "wouldPassIfFixed": 3
+   "wouldPassIfFixed": 0
   },
   {
    "id": "empty-no-next",
    "name": "An empty state with no next step",
    "screens": 10,
-   "wouldPassIfFixed": 0
+   "wouldPassIfFixed": 3
   },
   {
    "id": "unfinished:opens soon",
@@ -103,16 +91,22 @@
    "wouldPassIfFixed": 5
   },
   {
+   "id": "tiny-text",
+   "name": "Text under 12 px",
+   "screens": 9,
+   "wouldPassIfFixed": 3
+  },
+  {
+   "id": "slow-tap",
+   "name": "The main action answers a tap in more than 200 ms",
+   "screens": 6,
+   "wouldPassIfFixed": 1
+  },
+  {
    "id": "unfinished:coming soon",
    "name": "Unfinished mark: \"coming soon\"",
    "screens": 6,
    "wouldPassIfFixed": 5
-  },
-  {
-   "id": "only-chrome",
-   "name": "Only the app's bars lead on",
-   "screens": 6,
-   "wouldPassIfFixed": 0
   },
   {
    "id": "layout-shift",
@@ -121,34 +115,28 @@
    "wouldPassIfFixed": 0
   },
   {
-   "id": "slow-tap",
-   "name": "The main action answers a tap in more than 200 ms",
+   "id": "only-chrome",
+   "name": "Only the app's bars lead on",
    "screens": 5,
    "wouldPassIfFixed": 1
   },
   {
    "id": "a11y-critical",
    "name": "Critical accessibility findings",
-   "screens": 5,
+   "screens": 4,
    "wouldPassIfFixed": 1
-  },
-  {
-   "id": "clipped:font150",
-   "name": "Text cut off (150 % text)",
-   "screens": 5,
-   "wouldPassIfFixed": 2
   },
   {
    "id": "unfinished:placeholder text",
    "name": "Unfinished mark: \"placeholder text\"",
    "screens": 4,
-   "wouldPassIfFixed": 0
+   "wouldPassIfFixed": 2
   },
   {
-   "id": "a11y-serious",
-   "name": "Serious accessibility findings",
-   "screens": 3,
-   "wouldPassIfFixed": 0
+   "id": "clipped:font150",
+   "name": "Text cut off (150 % text)",
+   "screens": 4,
+   "wouldPassIfFixed": 2
   },
   {
    "id": "button-does-nothing",
@@ -157,8 +145,8 @@
    "wouldPassIfFixed": 0
   },
   {
-   "id": "many-primary",
-   "name": "More than one bright button on the first screen",
+   "id": "a11y-serious",
+   "name": "Serious accessibility findings",
    "screens": 2,
    "wouldPassIfFixed": 0
   },
@@ -175,14 +163,8 @@
    "wouldPassIfFixed": 0
   },
   {
-   "id": "hscroll:phone",
-   "name": "Sideways scroll (390 px)",
-   "screens": 1,
-   "wouldPassIfFixed": 0
-  },
-  {
-   "id": "hscroll:font150",
-   "name": "Sideways scroll (150 % text)",
+   "id": "many-primary",
+   "name": "More than one bright button on the first screen",
    "screens": 1,
    "wouldPassIfFixed": 0
   },
@@ -195,6 +177,12 @@
   {
    "id": "blank",
    "name": "A blank screen",
+   "screens": 1,
+   "wouldPassIfFixed": 0
+  },
+  {
+   "id": "small-targets-bars",
+   "name": "Tap targets under 44 px in the app's own bars",
    "screens": 1,
    "wouldPassIfFixed": 0
   }
@@ -248,29 +236,27 @@
    "state": "scored",
    "reason": null,
    "checks": {
-    "clear": "fail",
+    "clear": "pass",
     "finished": "fail",
     "fast": "pass",
     "right": "pass"
    },
    "passAll": false,
-   "worst": "1 tap target under 44 px (smallest: \"Health data collection\").",
+   "worst": "5 text sizes on one screen besides 16 px body text (at most 4).",
    "faults": [
-    "small-targets",
-    "text-sizes",
-    "button-looks"
+    "text-sizes"
    ],
    "review": [],
    "unmeasured": [],
    "numbers": {
     "wordsBeforeScroll": 81,
     "brightButtons": 0,
-    "smallTargets": 1,
+    "smallTargets": 0,
     "textSizes": 6,
-    "buttonLooks": 4,
-    "firstContentMs": 384,
+    "buttonLooks": 3,
+    "firstContentMs": 468,
     "layoutShift": 0.001,
-    "tapMs": 88,
+    "tapMs": 128,
     "tapped": "Download my data",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -564,28 +550,25 @@
    "state": "scored",
    "reason": null,
    "checks": {
-    "clear": "fail",
-    "finished": "fail",
+    "clear": "pass",
+    "finished": "pass",
     "fast": "pass",
     "right": "pass"
    },
-   "passAll": false,
-   "worst": "1 paragraph of body copy under 16 px.",
-   "faults": [
-    "body-small",
-    "small-targets"
-   ],
+   "passAll": true,
+   "worst": null,
+   "faults": [],
    "review": [],
    "unmeasured": [],
    "numbers": {
     "wordsBeforeScroll": 60,
     "brightButtons": 0,
-    "smallTargets": 5,
-    "textSizes": 4,
+    "smallTargets": 0,
+    "textSizes": 5,
     "buttonLooks": 1,
-    "firstContentMs": 296,
+    "firstContentMs": 376,
     "layoutShift": 0.001,
-    "tapMs": 56,
+    "tapMs": 48,
     "tapped": "Certify",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -742,27 +725,25 @@
    "state": "scored",
    "reason": null,
    "checks": {
-    "clear": "fail",
+    "clear": "pass",
     "finished": "pass",
     "fast": "pass",
     "right": "pass"
    },
-   "passAll": false,
-   "worst": "3 tap targets under 44 px in the app's own bars.",
-   "faults": [
-    "small-targets-bars"
-   ],
+   "passAll": true,
+   "worst": null,
+   "faults": [],
    "review": [],
    "unmeasured": [
     "tap response"
    ],
    "numbers": {
-    "wordsBeforeScroll": 153,
+    "wordsBeforeScroll": 139,
     "brightButtons": 0,
-    "smallTargets": 3,
+    "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 0,
-    "firstContentMs": 296,
+    "firstContentMs": 432,
     "layoutShift": 0,
     "tapMs": null,
     "tapped": null,
@@ -1632,10 +1613,7 @@
    "passAll": false,
    "worst": "An empty state with no next step: \"Nothing yet. Pick a tile above: three steps and it is a card.\".",
    "faults": [
-    "empty-no-next",
-    "body-small",
-    "text-sizes",
-    "button-looks"
+    "empty-no-next"
    ],
    "review": [],
    "unmeasured": [],
@@ -1644,10 +1622,10 @@
     "brightButtons": 0,
     "smallTargets": 0,
     "textSizes": 5,
-    "buttonLooks": 4,
-    "firstContentMs": 284,
+    "buttonLooks": 3,
+    "firstContentMs": 356,
     "layoutShift": 0.001,
-    "tapMs": 64,
+    "tapMs": 56,
     "tapped": "Music Build a beat, flip a sample, perform it live SHOWS UP ",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -1676,22 +1654,19 @@
    "faults": [
     "button-does-nothing",
     "empty-no-next",
-    "too-many-words",
-    "body-small",
-    "small-targets",
-    "small-targets-bars"
+    "too-many-words"
    ],
    "review": [],
    "unmeasured": [],
    "numbers": {
     "wordsBeforeScroll": 74,
     "brightButtons": 0,
-    "smallTargets": 6,
+    "smallTargets": 0,
     "textSizes": 4,
     "buttonLooks": 1,
-    "firstContentMs": 276,
+    "firstContentMs": 288,
     "layoutShift": 0.001,
-    "tapMs": 64,
+    "tapMs": 48,
     "tapped": "From my Academy library",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -1711,16 +1686,13 @@
    "reason": null,
    "checks": {
     "clear": "pass",
-    "finished": "fail",
+    "finished": "pass",
     "fast": "pass",
     "right": "pass"
    },
-   "passAll": false,
-   "worst": "5 paragraphs of body copy under 16 px.",
-   "faults": [
-    "body-small",
-    "text-sizes"
-   ],
+   "passAll": true,
+   "worst": null,
+   "faults": [],
    "review": [],
    "unmeasured": [],
    "numbers": {
@@ -1729,9 +1701,9 @@
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 1,
-    "firstContentMs": 412,
+    "firstContentMs": 680,
     "layoutShift": 0.001,
-    "tapMs": 112,
+    "tapMs": 104,
     "tapped": "CHARACTER CREATOR Build your athlete Shape the hero every sh",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -1751,37 +1723,29 @@
    "reason": null,
    "checks": {
     "clear": "fail",
-    "finished": "fail",
+    "finished": "pass",
     "fast": "pass",
-    "right": "fail"
+    "right": "pass"
    },
    "passAll": false,
-   "worst": "The screen scrolls sideways at 390 px (157 px).",
+   "worst": "85 words before scrolling (the budget is 40).",
    "faults": [
-    "hscroll:phone",
-    "a11y-critical",
-    "hscroll:font150",
-    "too-many-words",
-    "small-targets",
-    "small-targets-bars",
-    "body-small"
+    "too-many-words"
    ],
    "review": [],
-   "unmeasured": [
-    "tap response"
-   ],
+   "unmeasured": [],
    "numbers": {
-    "wordsBeforeScroll": 102,
+    "wordsBeforeScroll": 85,
     "brightButtons": 0,
-    "smallTargets": 26,
-    "textSizes": 4,
+    "smallTargets": 0,
+    "textSizes": 5,
     "buttonLooks": 3,
-    "firstContentMs": 460,
+    "firstContentMs": 540,
     "layoutShift": 0.001,
-    "tapMs": null,
+    "tapMs": 104,
     "tapped": "MISC",
     "brokenLinks": 0,
-    "a11yCritical": 1,
+    "a11yCritical": 0,
     "a11ySerious": 0,
     "jsKb": 2430
    }
@@ -1797,18 +1761,14 @@
    "state": "scored",
    "reason": null,
    "checks": {
-    "clear": "fail",
-    "finished": "fail",
+    "clear": "pass",
+    "finished": "pass",
     "fast": "pass",
     "right": "pass"
    },
-   "passAll": false,
-   "worst": "35 tap targets under 44 px (smallest: \"CMU Graphics Lab Motion Capture Database\").",
-   "faults": [
-    "small-targets",
-    "small-targets-bars",
-    "text-sizes"
-   ],
+   "passAll": true,
+   "worst": null,
+   "faults": [],
    "review": [],
    "unmeasured": [
     "tap response"
@@ -1816,10 +1776,10 @@
    "numbers": {
     "wordsBeforeScroll": 241,
     "brightButtons": 0,
-    "smallTargets": 38,
-    "textSizes": 6,
+    "smallTargets": 0,
+    "textSizes": 5,
     "buttonLooks": 0,
-    "firstContentMs": 352,
+    "firstContentMs": 376,
     "layoutShift": 0,
     "tapMs": null,
     "tapped": null,
@@ -1876,7 +1836,7 @@
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 0,
-    "firstContentMs": 412,
+    "firstContentMs": 320,
     "layoutShift": 0.001,
     "tapMs": null,
     "tapped": null,
@@ -1898,34 +1858,29 @@
    "reason": null,
    "checks": {
     "clear": "pass",
-    "finished": "fail",
+    "finished": "pass",
     "fast": "pass",
     "right": "pass"
    },
-   "passAll": false,
-   "worst": "1 paragraph of body copy under 16 px.",
-   "faults": [
-    "body-small",
-    "text-sizes"
-   ],
+   "passAll": true,
+   "worst": null,
+   "faults": [],
    "review": [],
-   "unmeasured": [
-    "tap response"
-   ],
+   "unmeasured": [],
    "numbers": {
     "wordsBeforeScroll": 78,
     "brightButtons": 0,
     "smallTargets": 0,
-    "textSizes": 7,
+    "textSizes": 5,
     "buttonLooks": 3,
-    "firstContentMs": 452,
+    "firstContentMs": 400,
     "layoutShift": 0.001,
-    "tapMs": null,
-    "tapped": null,
+    "tapMs": 80,
+    "tapped": "1 THE BODY'S CONTROL PANEL Nervous system basics for speed, ",
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
-    "jsKb": 279
+    "jsKb": 280
    }
   },
   {
@@ -1955,7 +1910,7 @@
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 2,
-    "firstContentMs": 436,
+    "firstContentMs": 280,
     "layoutShift": 0.001,
     "tapMs": 80,
     "tapped": "MARK DONE",
@@ -2148,33 +2103,28 @@
    "state": "scored",
    "reason": null,
    "checks": {
-    "clear": "fail",
+    "clear": "pass",
     "finished": "fail",
     "fast": "pass",
     "right": "pass"
    },
    "passAll": false,
-   "worst": "Nothing in the screen itself leads on: only the app's own bars do.",
+   "worst": "An empty state with no next step: \"no history yet — this is an invitation, not a recommendation\".",
    "faults": [
-    "only-chrome",
-    "empty-no-next",
-    "body-small",
-    "text-sizes"
+    "empty-no-next"
    ],
    "review": [],
-   "unmeasured": [
-    "tap response"
-   ],
+   "unmeasured": [],
    "numbers": {
-    "wordsBeforeScroll": 126,
+    "wordsBeforeScroll": 108,
     "brightButtons": 0,
     "smallTargets": 0,
-    "textSizes": 9,
+    "textSizes": 5,
     "buttonLooks": 0,
-    "firstContentMs": 384,
+    "firstContentMs": 332,
     "layoutShift": 0.001,
-    "tapMs": null,
-    "tapped": null,
+    "tapMs": 96,
+    "tapped": "Start →",
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
@@ -2274,17 +2224,14 @@
    "state": "scored",
    "reason": null,
    "checks": {
-    "clear": "fail",
-    "finished": "fail",
+    "clear": "pass",
+    "finished": "pass",
     "fast": "pass",
     "right": "pass"
    },
-   "passAll": false,
-   "worst": "2 paragraphs of body copy under 16 px.",
-   "faults": [
-    "body-small",
-    "small-targets"
-   ],
+   "passAll": true,
+   "worst": null,
+   "faults": [],
    "review": [],
    "unmeasured": [
     "tap response"
@@ -2292,10 +2239,10 @@
    "numbers": {
     "wordsBeforeScroll": 94,
     "brightButtons": 0,
-    "smallTargets": 3,
-    "textSizes": 5,
+    "smallTargets": 0,
+    "textSizes": 4,
     "buttonLooks": 3,
-    "firstContentMs": 384,
+    "firstContentMs": 292,
     "layoutShift": 0.001,
     "tapMs": null,
     "tapped": "Today's fuel — your Build, as a plate →",
@@ -2319,31 +2266,29 @@
     "clear": "fail",
     "finished": "fail",
     "fast": "pass",
-    "right": "fail"
+    "right": "pass"
    },
    "passAll": false,
-   "worst": "34 tap targets under 44 px (smallest: \"Jump height\").",
+   "worst": "16 tap targets under 44 px (smallest: \"Copy\").",
    "faults": [
     "small-targets",
-    "a11y-serious",
-    "body-small",
     "button-looks"
    ],
    "review": [],
    "unmeasured": [],
    "numbers": {
-    "wordsBeforeScroll": 97,
+    "wordsBeforeScroll": 86,
     "brightButtons": 0,
-    "smallTargets": 34,
-    "textSizes": 4,
-    "buttonLooks": 4,
-    "firstContentMs": 556,
+    "smallTargets": 16,
+    "textSizes": 5,
+    "buttonLooks": 5,
+    "firstContentMs": 272,
     "layoutShift": 0.001,
-    "tapMs": 168,
+    "tapMs": 104,
     "tapped": "Rebuild",
     "brokenLinks": 0,
     "a11yCritical": 0,
-    "a11ySerious": 3,
+    "a11ySerious": 0,
     "jsKb": 251
    }
   },
@@ -2418,7 +2363,7 @@
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 0,
-    "firstContentMs": 432,
+    "firstContentMs": 628,
     "layoutShift": 0,
     "tapMs": null,
     "tapped": "Chapter 1: The Body's Control Panel",
@@ -2445,9 +2390,8 @@
     "right": "pass"
    },
    "passAll": false,
-   "worst": "Text cut off with 150 % text: \"How minds remember, decide and form habits\" and 3 more.",
+   "worst": "The screen jumps as it loads (layout shift 0.035; the budget is 0.02).",
    "faults": [
-    "clipped:font150",
     "layout-shift",
     "button-looks"
    ],
@@ -2461,7 +2405,7 @@
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 4,
-    "firstContentMs": 1524,
+    "firstContentMs": 1008,
     "layoutShift": 0.035,
     "tapMs": null,
     "tapped": "Close the feed",
@@ -2482,29 +2426,27 @@
    "state": "scored",
    "reason": null,
    "checks": {
-    "clear": "fail",
+    "clear": "pass",
     "finished": "fail",
     "fast": "pass",
     "right": "pass"
    },
    "passAll": false,
-   "worst": "2 bright buttons compete on the first screen (Take the free movement screen, Copy).",
+   "worst": "5 button looks on one screen (at most 3).",
    "faults": [
-    "many-primary",
-    "button-looks",
-    "text-sizes"
+    "button-looks"
    ],
    "review": [],
    "unmeasured": [],
    "numbers": {
     "wordsBeforeScroll": 38,
-    "brightButtons": 2,
+    "brightButtons": 1,
     "smallTargets": 0,
-    "textSizes": 6,
+    "textSizes": 4,
     "buttonLooks": 5,
-    "firstContentMs": 352,
+    "firstContentMs": 304,
     "layoutShift": 0,
-    "tapMs": 96,
+    "tapMs": 72,
     "tapped": "Take the free movement screen",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -2654,7 +2596,7 @@
    "state": "scored",
    "reason": null,
    "checks": {
-    "clear": "fail",
+    "clear": "pass",
     "finished": "fail",
     "fast": "pass",
     "right": "pass"
@@ -2663,24 +2605,20 @@
    "worst": "Unfinished mark on screen: \"[OWNER: monthly players, as of date]\".",
    "faults": [
     "unfinished:placeholder text",
-    "tiny-text",
-    "body-small",
-    "small-targets",
-    "text-sizes",
-    "small-targets-bars"
+    "text-sizes"
    ],
    "review": [],
    "unmeasured": [],
    "numbers": {
-    "wordsBeforeScroll": 80,
-    "brightButtons": 1,
-    "smallTargets": 8,
-    "textSizes": 7,
+    "wordsBeforeScroll": 78,
+    "brightButtons": 0,
+    "smallTargets": 0,
+    "textSizes": 6,
     "buttonLooks": 1,
-    "firstContentMs": 524,
+    "firstContentMs": 388,
     "layoutShift": 0,
     "tapMs": 64,
-    "tapped": "Inquire",
+    "tapped": "FINAL EVOLUTION LAB",
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
@@ -4746,7 +4684,7 @@
    "state": "scored",
    "reason": null,
    "checks": {
-    "clear": "fail",
+    "clear": "pass",
     "finished": "fail",
     "fast": "pass",
     "right": "pass"
@@ -4756,22 +4694,18 @@
    "faults": [
     "unfinished:placeholder text",
     "unfinished:opens soon",
-    "small-targets",
-    "tiny-text",
-    "body-small",
     "text-sizes",
-    "button-looks",
-    "small-targets-bars"
+    "button-looks"
    ],
    "review": [],
    "unmeasured": [],
    "numbers": {
-    "wordsBeforeScroll": 80,
+    "wordsBeforeScroll": 72,
     "brightButtons": 0,
-    "smallTargets": 13,
-    "textSizes": 7,
+    "smallTargets": 0,
+    "textSizes": 6,
     "buttonLooks": 4,
-    "firstContentMs": 360,
+    "firstContentMs": 316,
     "layoutShift": 0,
     "tapMs": 88,
     "tapped": "FINAL EVOLUTION LAB",
@@ -4792,30 +4726,25 @@
    "state": "scored",
    "reason": null,
    "checks": {
-    "clear": "fail",
-    "finished": "fail",
+    "clear": "pass",
+    "finished": "pass",
     "fast": "pass",
     "right": "pass"
    },
-   "passAll": false,
-   "worst": "11 tap targets under 44 px (smallest: \"on\").",
-   "faults": [
-    "small-targets",
-    "body-small",
-    "text-sizes",
-    "small-targets-bars"
-   ],
+   "passAll": true,
+   "worst": null,
+   "faults": [],
    "review": [],
    "unmeasured": [],
    "numbers": {
-    "wordsBeforeScroll": 78,
+    "wordsBeforeScroll": 75,
     "brightButtons": 0,
-    "smallTargets": 12,
+    "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 2,
-    "firstContentMs": 388,
+    "firstContentMs": 368,
     "layoutShift": 0,
-    "tapMs": 64,
+    "tapMs": 96,
     "tapped": "FINAL EVOLUTION LAB",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -4834,28 +4763,23 @@
    "state": "scored",
    "reason": null,
    "checks": {
-    "clear": "fail",
-    "finished": "fail",
+    "clear": "pass",
+    "finished": "pass",
     "fast": "pass",
     "right": "pass"
    },
-   "passAll": false,
-   "worst": "3 paragraphs of body copy under 16 px.",
-   "faults": [
-    "body-small",
-    "small-targets",
-    "text-sizes",
-    "small-targets-bars"
-   ],
+   "passAll": true,
+   "worst": null,
+   "faults": [],
    "review": [],
    "unmeasured": [],
    "numbers": {
     "wordsBeforeScroll": 92,
     "brightButtons": 1,
-    "smallTargets": 8,
+    "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 3,
-    "firstContentMs": 304,
+    "firstContentMs": 336,
     "layoutShift": 0,
     "tapMs": 64,
     "tapped": "Log in",
@@ -4876,28 +4800,23 @@
    "state": "scored",
    "reason": null,
    "checks": {
-    "clear": "fail",
-    "finished": "fail",
+    "clear": "pass",
+    "finished": "pass",
     "fast": "pass",
     "right": "pass"
    },
-   "passAll": false,
-   "worst": "3 paragraphs of body copy under 16 px.",
-   "faults": [
-    "body-small",
-    "small-targets",
-    "text-sizes",
-    "small-targets-bars"
-   ],
+   "passAll": true,
+   "worst": null,
+   "faults": [],
    "review": [],
    "unmeasured": [],
    "numbers": {
     "wordsBeforeScroll": 90,
     "brightButtons": 1,
-    "smallTargets": 8,
+    "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 3,
-    "firstContentMs": 288,
+    "firstContentMs": 300,
     "layoutShift": 0,
     "tapMs": 56,
     "tapped": "Go to the shop",
@@ -4926,8 +4845,7 @@
    "passAll": false,
    "worst": "Nothing in the screen itself leads on: only the app's own bars do.",
    "faults": [
-    "only-chrome",
-    "small-targets-bars"
+    "only-chrome"
    ],
    "review": [],
    "unmeasured": [
@@ -4936,10 +4854,10 @@
    "numbers": {
     "wordsBeforeScroll": 165,
     "brightButtons": 0,
-    "smallTargets": 3,
+    "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 0,
-    "firstContentMs": 388,
+    "firstContentMs": 372,
     "layoutShift": 0,
     "tapMs": null,
     "tapped": null,
@@ -5009,7 +4927,7 @@
     "right": "pass"
    },
    "passAll": false,
-   "worst": "\"Jump check, hands on hips →\" answers a tap in 408 ms (the budget is 200 ms).",
+   "worst": "\"Jump check, hands on hips →\" answers a tap in 520 ms (the budget is 200 ms).",
    "faults": [
     "slow-tap"
    ],
@@ -5021,14 +4939,14 @@
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 2,
-    "firstContentMs": 904,
+    "firstContentMs": 400,
     "layoutShift": 0.001,
-    "tapMs": 408,
+    "tapMs": 520,
     "tapped": "Jump check, hands on hips →",
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
-    "jsKb": 2459
+    "jsKb": 2035
    }
   },
   {
@@ -5201,27 +5119,25 @@
    "state": "scored",
    "reason": null,
    "checks": {
-    "clear": "fail",
+    "clear": "pass",
     "finished": "pass",
     "fast": "pass",
     "right": "pass"
    },
-   "passAll": false,
-   "worst": "3 tap targets under 44 px in the app's own bars.",
-   "faults": [
-    "small-targets-bars"
-   ],
+   "passAll": true,
+   "worst": null,
+   "faults": [],
    "review": [],
    "unmeasured": [
     "tap response"
    ],
    "numbers": {
-    "wordsBeforeScroll": 150,
+    "wordsBeforeScroll": 142,
     "brightButtons": 0,
-    "smallTargets": 3,
+    "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 0,
-    "firstContentMs": 380,
+    "firstContentMs": 448,
     "layoutShift": 0,
     "tapMs": null,
     "tapped": null,
@@ -5446,9 +5362,9 @@
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 0,
-    "firstContentMs": 324,
+    "firstContentMs": 480,
     "layoutShift": 0.001,
-    "tapMs": 64,
+    "tapMs": 80,
     "tapped": "Creator Cards",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -5743,7 +5659,7 @@
    "state": "scored",
    "reason": null,
    "checks": {
-    "clear": "fail",
+    "clear": "pass",
     "finished": "fail",
     "fast": "pass",
     "right": "pass"
@@ -5751,8 +5667,7 @@
    "passAll": false,
    "worst": "An empty state with no next step: \"Nothing here stops you from contacting a government consumer-protection agency.\".",
    "faults": [
-    "empty-no-next",
-    "small-targets-bars"
+    "empty-no-next"
    ],
    "review": [],
    "unmeasured": [
@@ -5761,10 +5676,10 @@
    "numbers": {
     "wordsBeforeScroll": 189,
     "brightButtons": 0,
-    "smallTargets": 3,
+    "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 0,
-    "firstContentMs": 448,
+    "firstContentMs": 452,
     "layoutShift": 0,
     "tapMs": null,
     "tapped": null,
@@ -5803,9 +5718,9 @@
     "smallTargets": 0,
     "textSizes": 3,
     "buttonLooks": 0,
-    "firstContentMs": 304,
+    "firstContentMs": 328,
     "layoutShift": 0.001,
-    "tapMs": 200,
+    "tapMs": 176,
     "tapped": "The Snow Slope — locked: Clear The Surf Pier · PRQ 55+",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -5830,11 +5745,10 @@
     "right": "pass"
    },
    "passAll": false,
-   "worst": "\"FACE THE GLITCH\" answers a tap in 272 ms (the budget is 200 ms).",
+   "worst": "\"FACE THE GLITCH\" answers a tap in 280 ms (the budget is 200 ms).",
    "faults": [
     "slow-tap",
     "tiny-text",
-    "body-small",
     "small-targets",
     "button-looks",
     "text-sizes"
@@ -5845,11 +5759,11 @@
     "wordsBeforeScroll": 71,
     "brightButtons": 1,
     "smallTargets": 3,
-    "textSizes": 7,
+    "textSizes": 6,
     "buttonLooks": 7,
-    "firstContentMs": 452,
+    "firstContentMs": 380,
     "layoutShift": 0,
-    "tapMs": 272,
+    "tapMs": 280,
     "tapped": "FACE THE GLITCH",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -5877,7 +5791,6 @@
    "worst": "2 pieces of text under 12 px.",
    "faults": [
     "tiny-text",
-    "body-small",
     "small-targets",
     "button-looks",
     "text-sizes"
@@ -5888,11 +5801,11 @@
     "wordsBeforeScroll": 52,
     "brightButtons": 1,
     "smallTargets": 3,
-    "textSizes": 7,
+    "textSizes": 6,
     "buttonLooks": 7,
-    "firstContentMs": 352,
+    "firstContentMs": 488,
     "layoutShift": 0,
-    "tapMs": 112,
+    "tapMs": 160,
     "tapped": "GRIND",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -5906,17 +5819,40 @@
    "phase": 9,
    "area": "learn-create-public",
    "kind": "hub",
-   "audience": "nobody (a 404 for everyone)",
-   "scoredAs": null,
-   "state": "off",
-   "reason": "switched off: NEXUS_STUDIO_ENABLED (Nexus Studio)",
-   "checks": null,
+   "audience": "admin",
+   "scoredAs": "admin",
+   "state": "scored",
+   "reason": null,
+   "checks": {
+    "clear": "fail",
+    "finished": "fail",
+    "fast": "fail",
+    "right": "pass"
+   },
    "passAll": false,
-   "worst": null,
-   "faults": [],
+   "worst": "\"Make it for me\" answers a tap in 1672 ms (the budget is 200 ms).",
+   "faults": [
+    "slow-tap",
+    "button-looks",
+    "small-targets-bars"
+   ],
    "review": [],
    "unmeasured": [],
-   "numbers": null
+   "numbers": {
+    "wordsBeforeScroll": 89,
+    "brightButtons": 1,
+    "smallTargets": 7,
+    "textSizes": 5,
+    "buttonLooks": 7,
+    "firstContentMs": 344,
+    "layoutShift": 0,
+    "tapMs": 1672,
+    "tapped": "Make it for me",
+    "brokenLinks": 0,
+    "a11yCritical": 0,
+    "a11ySerious": 0,
+    "jsKb": 2663
+   }
   },
   {
    "route": "/support",
@@ -5984,9 +5920,9 @@
     "smallTargets": 0,
     "textSizes": 4,
     "buttonLooks": 1,
-    "firstContentMs": 336,
+    "firstContentMs": 308,
     "layoutShift": 0.001,
-    "tapMs": 72,
+    "tapMs": 96,
     "tapped": "See a course: the Playbook →",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -6026,7 +5962,7 @@
     "smallTargets": 0,
     "textSizes": 4,
     "buttonLooks": 0,
-    "firstContentMs": 304,
+    "firstContentMs": 312,
     "layoutShift": 0.001,
     "tapMs": null,
     "tapped": null,
@@ -6047,7 +5983,7 @@
    "state": "scored",
    "reason": null,
    "checks": {
-    "clear": "fail",
+    "clear": "pass",
     "finished": "fail",
     "fast": "pass",
     "right": "pass"
@@ -6055,22 +5991,17 @@
    "passAll": false,
    "worst": "Unfinished mark on screen: \"[OWNER: profiles]\".",
    "faults": [
-    "unfinished:placeholder text",
-    "tiny-text",
-    "body-small",
-    "small-targets",
-    "small-targets-bars",
-    "text-sizes"
+    "unfinished:placeholder text"
    ],
    "review": [],
    "unmeasured": [],
    "numbers": {
     "wordsBeforeScroll": 74,
     "brightButtons": 0,
-    "smallTargets": 8,
+    "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 0,
-    "firstContentMs": 440,
+    "firstContentMs": 288,
     "layoutShift": 0,
     "tapMs": 64,
     "tapped": "FINAL EVOLUTION LAB",
@@ -6091,30 +6022,25 @@
    "state": "scored",
    "reason": null,
    "checks": {
-    "clear": "fail",
-    "finished": "fail",
+    "clear": "pass",
+    "finished": "pass",
     "fast": "pass",
     "right": "pass"
    },
-   "passAll": false,
-   "worst": "11 tap targets under 44 px (smallest: \"FINAL EVOLUTION LAB\").",
-   "faults": [
-    "small-targets",
-    "body-small",
-    "small-targets-bars",
-    "text-sizes"
-   ],
+   "passAll": true,
+   "worst": null,
+   "faults": [],
    "review": [],
    "unmeasured": [],
    "numbers": {
-    "wordsBeforeScroll": 72,
+    "wordsBeforeScroll": 53,
     "brightButtons": 0,
-    "smallTargets": 15,
+    "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 2,
     "firstContentMs": 292,
     "layoutShift": 0,
-    "tapMs": 88,
+    "tapMs": 64,
     "tapped": "FINAL EVOLUTION LAB",
     "brokenLinks": 0,
     "a11yCritical": 0,
@@ -6133,16 +6059,14 @@
    "state": "scored",
    "reason": null,
    "checks": {
-    "clear": "fail",
+    "clear": "pass",
     "finished": "pass",
     "fast": "pass",
     "right": "pass"
    },
-   "passAll": false,
-   "worst": "3 tap targets under 44 px in the app's own bars.",
-   "faults": [
-    "small-targets-bars"
-   ],
+   "passAll": true,
+   "worst": null,
+   "faults": [],
    "review": [],
    "unmeasured": [
     "tap response"
@@ -6150,10 +6074,10 @@
    "numbers": {
     "wordsBeforeScroll": 154,
     "brightButtons": 0,
-    "smallTargets": 3,
+    "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 0,
-    "firstContentMs": 356,
+    "firstContentMs": 320,
     "layoutShift": 0,
     "tapMs": null,
     "tapped": "/coach-terms",
@@ -6875,7 +6799,7 @@
    "state": "scored",
    "reason": null,
    "checks": {
-    "clear": "fail",
+    "clear": "pass",
     "finished": "fail",
     "fast": "pass",
     "right": "pass"
@@ -6883,24 +6807,19 @@
    "passAll": false,
    "worst": "Unfinished mark on screen: \"[OWNER: link to the application, P2]\".",
    "faults": [
-    "unfinished:placeholder text",
-    "tiny-text",
-    "body-small",
-    "small-targets",
-    "small-targets-bars",
-    "text-sizes"
+    "unfinished:placeholder text"
    ],
    "review": [],
    "unmeasured": [],
    "numbers": {
-    "wordsBeforeScroll": 100,
+    "wordsBeforeScroll": 91,
     "brightButtons": 0,
-    "smallTargets": 8,
+    "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 0,
-    "firstContentMs": 388,
+    "firstContentMs": 316,
     "layoutShift": 0,
-    "tapMs": 88,
+    "tapMs": 64,
     "tapped": "FINAL EVOLUTION LAB",
     "brokenLinks": 0,
     "a11yCritical": 0,

@@ -12,7 +12,7 @@ export function ProductCard({ item, href, titleHref, side, children }: { item: S
   const body = (
     <>
       <div className="flex items-start justify-between gap-3">
-        <h3 className={L.cardTitle}>{titleHref ? <Link href={titleHref} className="underline-offset-4 hover:underline">{item.title}</Link> : item.title}</h3>
+        <h3 className={L.cardTitle}>{titleHref ? <Link href={titleHref} className="inline-flex min-h-11 items-center underline-offset-4 hover:underline">{item.title}</Link> : item.title}</h3>
         {side ? <span className={L.cardSide}>{side}</span> : null}
       </div>
       {item.oneLine ? <p className={L.cardLine}>{item.oneLine}</p> : null}

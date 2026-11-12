@@ -8,7 +8,7 @@ import {
 
 function ExternalLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer" className="text-[#00E5FF] hover:underline">
+    <a href={href} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 min-w-11 items-center text-[#00E5FF] hover:underline">
       {children}
     </a>
   );
@@ -53,7 +53,7 @@ export function CreditsList({ credits = CREDITS }: { credits?: Credit[] }) {
 
       {notices.length > 0 ? (
         <section aria-labelledby="credits-required" className="mt-6 fel-panel rounded-xl p-6">
-          <h2 id="credits-required" className="fel-heading text-lg font-bold text-white">Required acknowledgements</h2>
+          <h2 id="credits-required" className="fel-heading text-[20px] font-bold text-white">Required acknowledgements</h2>
           <ul className="mt-3 space-y-3">
             {notices.map((c) => (
               <li key={c.id}>
@@ -70,7 +70,7 @@ export function CreditsList({ credits = CREDITS }: { credits?: Credit[] }) {
         if (list.length === 0) return null;
         return (
           <section key={s} aria-labelledby={`credits-${s}`} className="mt-6 fel-panel rounded-xl p-6">
-            <h2 id={`credits-${s}`} className="fel-heading text-lg font-bold text-white">{SECTION_TITLES[s]}</h2>
+            <h2 id={`credits-${s}`} className="fel-heading text-[20px] font-bold text-white">{SECTION_TITLES[s]}</h2>
             <ul className="mt-3">
               {list.map((c) => <Entry key={c.id} c={c} />)}
             </ul>
@@ -80,7 +80,7 @@ export function CreditsList({ credits = CREDITS }: { credits?: Credit[] }) {
 
       <p className="mt-6 text-center text-xs text-white/50">
         Something missing or wrong? Write to{' '}
-        <a href="mailto:support@finalevolutionlab.com" className="text-[#00E5FF] hover:underline">support@finalevolutionlab.com</a>.
+        <a href="mailto:support@finalevolutionlab.com" className="inline-flex min-h-11 items-center text-[#00E5FF] hover:underline">support@finalevolutionlab.com</a>.
       </p>
     </div>
   );

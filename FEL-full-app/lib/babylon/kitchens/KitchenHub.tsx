@@ -84,19 +84,19 @@ export default function KitchenHub({
     root: { color: '#f4efe6', background: 'linear-gradient(160deg,#2e1c14 0%,#3a2a1a 55%,#1c2a20 100%)', padding: 16, borderRadius: 12 },
     h1: { fontSize: 20, fontWeight: 800, color: '#ffb347' },
     tabs: { display: 'flex', gap: 8, margin: '10px 0' },
-    tab: { padding: '6px 14px', borderRadius: 20, border: '1px solid #8a6a3a', background: 'transparent', color: '#e8dcc2', cursor: 'pointer' },
+    tab: { minHeight: 44, padding: '6px 14px', borderRadius: 20, border: '1px solid #8a6a3a', background: 'transparent', color: '#e8dcc2', cursor: 'pointer' },
     tabOn: { background: '#8a6a3a', color: '#fff' },
     row: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 10 },
     input: { padding: 8, borderRadius: 8, border: '1px solid #8a6a3a', background: '#241a10', color: '#f4efe6' },
     area: { width: '100%', minHeight: 90, padding: 10, borderRadius: 8, border: '1px solid #8a6a3a', background: '#241a10', color: '#f4efe6', fontFamily: 'inherit' },
-    btn: { padding: '8px 14px', borderRadius: 8, border: 'none', background: '#ffb347', color: '#241505', fontWeight: 700, cursor: 'pointer' },
-    btnAlt: { padding: '6px 12px', borderRadius: 8, border: '1px solid #ffb347', background: 'transparent', color: '#ffb347', cursor: 'pointer', fontSize: 13 },
+    btn: { minHeight: 44, padding: '8px 14px', borderRadius: 8, border: 'none', background: '#ffb347', color: '#241505', fontWeight: 700, cursor: 'pointer' },
+    btnAlt: { minHeight: 44, padding: '6px 12px', borderRadius: 8, border: '1px solid #ffb347', background: 'transparent', color: '#ffb347', cursor: 'pointer', fontSize: 14 },
     card: { padding: 12, borderRadius: 10, background: 'rgba(0,0,0,0.3)', marginTop: 8 },
     tagRow: { display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 },
     tag: { fontSize: 12, padding: '3px 8px', borderRadius: 10, background: '#3a2a14', color: '#e8cf9e' },
-    compliance: { marginTop: 14, padding: '8px 12px', borderLeft: '3px solid #ffb347', fontSize: 12, opacity: 0.8, lineHeight: 1.5 },
+    compliance: { marginTop: 14, padding: '8px 12px', borderLeft: '3px solid #ffb347', fontSize: 16, opacity: 0.8, lineHeight: 1.5 },
     note: { marginTop: 10, padding: '8px 12px', borderRadius: 8, background: '#8a6a3a', color: '#fff', width: 'fit-content' },
-    notLive: { marginTop: 8, padding: '6px 10px', borderRadius: 8, border: '1px solid #ffb347', fontSize: 12, color: '#ffd9a0' },
+    notLive: { marginTop: 8, padding: '6px 10px', borderRadius: 8, border: '1px solid #ffb347', fontSize: 16, color: '#ffd9a0' },
   };
 
   return (
@@ -121,7 +121,7 @@ export default function KitchenHub({
 
       {floor === 'eat' && (
         <>
-          {KitchenMarket.plans().length === 0 && <div style={{ opacity: 0.6, fontSize: 13 }}>no meal plans yet — chefs are firing up</div>}
+          {KitchenMarket.plans().length === 0 && <div style={{ opacity: 0.6, fontSize: 14 }}>no meal plans yet — chefs are firing up</div>}
           {KitchenMarket.plans().map((p) => {
             const kitchen = KitchenMarket.kitchen(p.kitchenId);
             const mine = KitchenMarket.myMealSubs(profile.id).some((s) => s.planId === p.id);
@@ -149,7 +149,7 @@ export default function KitchenHub({
 
       {floor === 'cook' && (
         <>
-          <div style={{ fontSize: 13, fontWeight: 700, marginTop: 6 }}>1 — GET A KITCHEN</div>
+          <div style={{ fontSize: 14, fontWeight: 700, marginTop: 6 }}>1 — GET A KITCHEN</div>
           {KitchenMarket.kitchens().map((k) => (
             <div key={k.id} style={S.card}>
               <div style={{ fontWeight: 700 }}>{k.name} <span style={{ opacity: 0.6, fontWeight: 400 }}>· {k.city}</span></div>
@@ -169,7 +169,7 @@ export default function KitchenHub({
               </div>
             </div>
           ))}
-          <div style={{ fontSize: 13, fontWeight: 700, marginTop: 16 }}>2 — PUBLISH YOUR MEAL PLAN</div>
+          <div style={{ fontSize: 14, fontWeight: 700, marginTop: 16 }}>2 — PUBLISH YOUR MEAL PLAN</div>
           <div style={S.row}>
             <input style={S.input} placeholder="plan title…" value={pTitle} onChange={(e) => setPTitle(e.target.value)} />
             <select style={S.input} value={pKitchen} onChange={(e) => setPKitchen(e.target.value)}>

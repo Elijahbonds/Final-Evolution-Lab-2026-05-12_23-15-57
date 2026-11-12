@@ -6,7 +6,7 @@
 
 **How to read it.** Taps are counted from the signed-in home; the Train tab is one tap. Typing is counted apart. Seconds are the rig's own, with no reading time: a floor, not a person's time. A camera job is walked to the moment it needs a person in front of the camera. "Stops" means a person cannot go further on that path today, and says where.
 
-**Today: 38 of 38 jobs can be walked to their end** (or to the camera); 0 stop.
+**Today: 47 of 47 jobs can be walked to their end** (or to the camera); 0 stop.
 
 ## An athlete training alone
 
@@ -33,10 +33,17 @@
 | Cancel a booking (booking open) | 3 | – | 1.4 | finishes | cancel in ≤ 3 taps with the rule shown first (phase 5) |
 | Open the wallet | 2 | – | 1.3 | finishes | budget: this walk (phase 8) |
 | Open the store | 1 | – | 0.5 | finishes | budget: this walk (phase 8) |
-| Open the closet | 2 | – | 1.9 | finishes | budget: this walk (phase 8) |
-| Edit the profile | 2 | – | 1.1 | finishes | budget: this walk (phase 8) |
+| Open the closet | 2 | – | 2.7 | finishes | budget: this walk (phase 8) |
+| Edit the profile | 2 | – | 1 | finishes | budget: this walk (phase 8) |
 | Find support | 2 | – | 1 | finishes | budget: this walk (phase 8) |
 | Spend coins (exchange for shards): the history says where it went | 2 | – | 6.5 | finishes | a purchase always shows where it came from (phase 8) |
+| Open a lesson (Train → Learn → Continue) | 3 | – | 1.7 | finishes | a lesson: reading in ≤ 2 taps from Learn (phase 9) |
+| Open a lesson from the chapter list | 1 | – | 0.5 | finishes | a lesson: reading in ≤ 2 taps (phase 9) |
+| Open Story | 1 | – | 0.6 | finishes | budget: this walk (phase 9) |
+| Open Kitchens | 2 | – | 1 | finishes | budget: this walk (phase 9) |
+| Open Create | 2 | – | 1.1 | finishes | budget: this walk (phase 9) |
+| Open the books (Press) | 2 | – | 1 | finishes | budget: this walk (phase 9) |
+| Find Teach on FEL | 3 | – | 1.4 | finishes | budget: this walk (phase 9) |
 
 ## A coached client
 
@@ -56,6 +63,54 @@
 | Take group attendance | 3 | – | 2.4 | reaches it: switched off until the group-booking tables are applied: the screen says so and offers what to do instead | attendance in ≤ 1 tap per person (phase 5) |
 | Open shot charts | 4 | – | 2.9 | reaches it: switched off until the shot-chart table is applied: the screen says so and offers a way back | – (phase 5) |
 | Take group attendance (booking open) | 4 | – | 2.9 | finishes | attendance in ≤ 1 tap per person (phase 5) |
+
+## What changed in phase 9 (learn, create and the public pages, measured on the rig)
+
+**Of the phase's 34 scored screens, 15 now pass all four (3 on the phase's first build):** `/camp`, `/coach-terms`,
+`/creator`, `/credits`, `/education/course/[id]`, `/education/playbook`, `/education/playbook/[chapter]`, `/kitchens`,
+`/learn`, `/press/[slug]`, `/press/library`, `/press/receipt`, `/purchase-terms`, `/team/[slug]`, `/terms`. App-wide
+36 → 48 of 187. The "before" is release 77ce0c27 built and read with Nexus Studio switched on in the rig.
+
+**The gate's two walks:** open a lesson → reading in **1 tap** from Learn (Continue) or from the chapter list; Studio's
+first screen says "Make your first court" and **"Make it for me" builds it in 1 tap**.
+
+**Tap budgets, set from the phase's first build** (later changes may not add a tap):
+
+| Area | The walk | Taps (the budget) |
+|---|---|---|
+| A lesson | Play → the Train tab → Learn → Continue (reading) | 3 |
+| A lesson, from the chapters | the Playbook → a chapter (reading) | 1 |
+| Studio | /studio → Make it for me | 1 |
+| Story | Play → Story (the tab's doors row) | 1 |
+| Kitchens | Play → the Train tab → Kitchens | 2 |
+| Create | Play → the Profile tab → Create | 2 |
+| Books (Press) | Play → the Profile tab → Books | 2 |
+| Teach on FEL | Play → the Train tab → Learn → Teach on FEL | 3 |
+| The terms, signed out | Support → Terms | 1 |
+
+**The app's shared switch** is a 44 px tap target with the same 44 × 24 px look (the button is the 44 px box; the track is
+drawn inside it). It is used in three places: the account's health-data switch, each coach's access switch under it, and
+the profile's "Make my profile public". `/account` now passes "clear and quick".
+
+**Owner-gated or the owner's content, left as they are:** `/teach`, `/teach/motion` ("opens soon": teaching is not open);
+`/press`, `/media-kit`, `/team`, `/work-with-us` (`[OWNER: …]` blanks the owner fills; the press page's "Opens soon");
+the coach's public pages `/coach/[slug]`, `/coaches` (switched off: the coach store and marketplace); `/guardian/report/[token]`
+(needs a guardian report row).
+
+**What the rest still need:**
+
+| Screen | Still fails | Needs |
+|---|---|---|
+| `/studio` | "Make it for me" takes 1.7–2 s with the CPU slowed 4× (it was not timed before); 7 button looks | the court build is the studio lanes' (speed: phase 10) |
+| `/story` | "The Snow Slope" cut with 150 % text | the map's zone labels near its edge: a measured fix, not a guess (a pixel width did not change it) |
+| `/story/boss`, `/story/rail` | the touch controller's 10.8 px words and 28 px buttons | the shared game controller: game lanes |
+| `/create`, `/create/[discipline]` | "Pick a tile above" and "No songs of yours" have their next step outside their own box; 74 words | wording, or moving the tiles: owner |
+| `/creator/athlete` | 85 words before scrolling | the editor's intro wording: owner |
+| `/guidance` | "no history yet" is a reason bullet the rig reads as an empty state (its card now has "Start →") | — (the rig's reading) |
+| `/store-terms`, `/privacy` | a legal sentence read as an empty state; nothing on the policy itself leads on | policy wording: owner |
+| `/kitchens/fuel` | 16 small targets left (the list's copy buttons), 5 button looks | a second pass on the fuel list |
+| `/learn/feed`, `/links` | a 0.035 load shift; 4–5 button looks | speed (phase 10); one button look |
+| `/profile` (phase 8) | the jump-check link answers in 0.4–0.5 s | phase 10 (not a cheap prefetch: left as the coordinator allowed) |
 
 ## What changed in phase 8, part 2 (your things, measured on the rig)
 

@@ -94,7 +94,7 @@ export function Toggle({ on, onChange, disabled, label }: { on: boolean; onChang
 export function ToolButton({ active, onClick, title, children, disabled, shortcut }: { active?: boolean; onClick(): void; title: string; children: ReactNode; disabled?: boolean; shortcut?: string }) {
   return (
     <button type="button" onClick={onClick} disabled={disabled} title={shortcut ? `${title} (${shortcut})` : title} aria-label={title} aria-pressed={active}
-      className="flex h-8 min-w-8 items-center justify-center gap-1 rounded-md border px-2 text-[12px] transition-colors disabled:opacity-35"
+      className="flex h-8 min-w-8 items-center justify-center gap-1 rounded-md border px-2 text-[12px] transition-colors disabled:opacity-35 max-md:h-11 max-md:min-w-11"
       style={{ borderColor: active ? C.cyan : 'transparent', background: active ? 'rgba(0,229,255,0.14)' : 'transparent', color: active ? C.cyan : C.text }}>
       {children}
     </button>

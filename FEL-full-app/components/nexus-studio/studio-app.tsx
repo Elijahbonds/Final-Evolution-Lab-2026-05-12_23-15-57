@@ -155,16 +155,16 @@ export function NexusStudioApp() {
       {track === 'venue' && <SkipLinks />}
       <header className="flex flex-wrap items-center gap-2 border-b px-3 py-1.5" style={{ borderColor: C.line, background: C.surface }}>
         {/* STUDIO-EASY: the Studio fills the screen (no app bar above it), so it carries its own way back */}
-        <Link href="/play" aria-label="Leave the Studio" title="Back to FEL" className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-white/5" style={{ color: C.dim }}><ArrowLeft className="h-4 w-4" aria-hidden /></Link>
+        <Link href="/play" aria-label="Leave the Studio" title="Back to FEL" className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-white/5 max-md:h-11 max-md:w-11" style={{ color: C.dim }}><ArrowLeft className="h-4 w-4" aria-hidden /></Link>
         <h1 className="font-display text-[13px] font-bold uppercase tracking-[0.22em]" style={{ color: C.cyan }}>Nexus Studio</h1>
         <input aria-label="Project name" value={doc.name} maxLength={60} onChange={(e) => studio.run(renameProject(e.target.value || 'Untitled project'))} onBlur={studio.seal}
-          className="w-32 rounded border bg-transparent px-2 py-0.5 text-[12px] outline-none md:w-44 focus:border-[color:var(--fel-cyan)]" style={{ borderColor: C.line }} />
+          className="w-32 rounded border bg-transparent px-2 py-0.5 text-[12px] outline-none max-md:min-h-11 md:w-44 focus:border-[color:var(--fel-cyan)]" style={{ borderColor: C.line }} />
         <nav className="flex flex-wrap gap-1 md:ml-2" role="tablist" aria-label="Studio tracks">
           {TRACKS.map((t) => {
             const Icon = TRACK_ICON[t.id];
             return (
               <button key={t.id} type="button" role="tab" aria-selected={track === t.id} onClick={() => setTrack(t.id)} title={t.phase}
-                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] max-md:min-h-10 ${t.id === 'ai' ? 'max-md:order-first' : ''}`}
+                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] max-md:min-h-11 ${t.id === 'ai' ? 'max-md:order-first' : ''}`}
                 style={{ background: track === t.id ? 'rgba(0,229,255,0.12)' : 'transparent', color: track === t.id ? C.cyan : C.dim }}>
                 <Icon className="h-3.5 w-3.5" aria-hidden /> {t.label}
               </button>
@@ -184,7 +184,7 @@ export function NexusStudioApp() {
           <ToolButton title="Import a project" onClick={() => fileRef.current?.click()}><Upload className="h-4 w-4" /></ToolButton>
           <input ref={fileRef} type="file" accept=".json,application/json" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void doImport(f); e.target.value = ''; }} />
           {track !== 'ai' && (
-            <button type="button" onClick={playtest} className="ml-1 flex items-center gap-1.5 rounded-md px-3 py-1 text-[12px] font-semibold" style={{ background: C.cyan, color: '#050505' }} title="Play your court in the game (practice: not ranked, earns nothing)">
+            <button type="button" onClick={playtest} className="ml-1 flex items-center gap-1.5 rounded-md px-3 py-1 text-[12px] font-semibold max-md:min-h-11" style={{ background: C.cyan, color: '#050505' }} title="Play your court in the game (practice: not ranked, earns nothing)">
               <Play className="h-3.5 w-3.5" aria-hidden /> Play-test in {targetOf(venue?.base.target ?? '')?.label ?? 'mode'}
             </button>
           )}

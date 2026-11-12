@@ -34,9 +34,9 @@ export const metadata: Metadata = {
   },
 };
 
-const primary = 'flex min-h-[56px] w-full items-center justify-center rounded-2xl bg-[#00E5FF] px-5 py-3 text-center text-[17px] font-black leading-tight text-black';
-const outline = 'flex min-h-[56px] w-full items-center justify-center rounded-2xl border-2 border-[#00E5FF] px-5 py-3 text-center text-[17px] font-bold leading-tight text-[#00E5FF]';
-const quiet = 'flex min-h-[56px] w-full items-center justify-center rounded-2xl border border-white/15 bg-white/[0.04] px-5 py-3 text-center text-[17px] font-bold leading-tight text-white';
+const primary = 'flex min-h-[56px] w-full items-center justify-center rounded-2xl bg-[#00E5FF] px-5 py-3 text-center text-[16px] font-black leading-tight text-black';
+const outline = 'flex min-h-[56px] w-full items-center justify-center rounded-2xl border-2 border-[#00E5FF] px-5 py-3 text-center text-[16px] font-bold leading-tight text-[#00E5FF]';
+const quiet = 'flex min-h-[56px] w-full items-center justify-center rounded-2xl border border-white/15 bg-white/[0.04] px-5 py-3 text-center text-[16px] font-bold leading-tight text-white';
 
 function ItemLink({ item, first }: { item: HubItem; first: boolean }) {
   const className = item.kind === 'internal' ? (first ? primary : outline) : quiet;
@@ -77,8 +77,8 @@ export default function LinksPage() {
     <main data-links-hub className="min-h-screen bg-[#050505] text-white">
       <div className="mx-auto w-full max-w-[440px] px-5 pb-16 pt-10">
         <header className="mb-8">
-          <p className="font-display text-[13px] font-bold uppercase tracking-[0.22em] text-[#00E5FF]">Final Evolution</p>
-          <h1 className="mt-2 font-display text-[40px] font-black leading-none tracking-tight">Links</h1>
+          <p className="font-display text-[12px] font-bold uppercase tracking-[0.22em] text-[#00E5FF]">Final Evolution</p>
+          <h1 className="mt-2 font-display text-[44px] font-black leading-none tracking-tight">Links</h1>
         </header>
         <div className="flex flex-col gap-3">
           {main.map((item, index) => {
@@ -89,14 +89,14 @@ export default function LinksPage() {
             return (
               <div key={item.id} data-item={item.id}>
                 {heading ? (
-                  <h2 id={heading} className="mb-3 mt-5 font-display text-[13px] font-bold uppercase tracking-[0.18em] text-white/55">
+                  <h2 id={heading} className="mb-3 mt-5 font-display text-[12px] font-bold uppercase tracking-[0.18em] text-white/55">
                     {HUB_SECTION_TITLES[heading]}
                   </h2>
                 ) : null}
                 <ItemLink item={item} first={index === 0} />
                 {item.code ? (
                   <div className="mt-2 flex items-center justify-between gap-3 rounded-2xl border border-white/10 px-4 py-2">
-                    <p className="text-[15px] leading-tight">
+                    <p className="text-[16px] leading-tight">
                       <span className="text-white/55">Code </span>
                       <span data-code className="font-mono text-[16px] font-bold tracking-wide text-[#FFD700]">{item.code}</span>
                     </p>
@@ -104,7 +104,7 @@ export default function LinksPage() {
                   </div>
                 ) : null}
                 {showDisclosure ? (
-                  <p id="affiliate-disclosure" data-affiliate-disclosure className="mt-2 px-1 text-center text-[13px] leading-snug text-white/75">
+                  <p id="affiliate-disclosure" data-affiliate-disclosure className="mt-2 px-1 text-center text-[14px] leading-snug text-white/75">
                     {AFFILIATE_DISCLOSURE}
                   </p>
                 ) : null}
@@ -114,7 +114,7 @@ export default function LinksPage() {
         </div>
         {follow.length > 0 ? (
           <nav aria-label={HUB_SECTION_TITLES.follow} data-follow className="mt-8">
-            <h2 id="follow" className="mb-1 font-display text-[13px] font-bold uppercase tracking-[0.18em] text-white/55">
+            <h2 id="follow" className="mb-1 font-display text-[12px] font-bold uppercase tracking-[0.18em] text-white/55">
               {HUB_SECTION_TITLES.follow}
             </h2>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1">

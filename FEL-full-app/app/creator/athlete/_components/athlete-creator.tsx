@@ -195,16 +195,20 @@ export default function AthleteCreator({ axes, profileId, adult = false }: Props
   const violations = resolution.issues.filter((i) => i.kind === 'violation').length;
 
   return (
-    <div className="mx-auto flex max-w-6xl gap-3 px-3 py-4">
+    <div className="mx-auto flex max-w-6xl gap-3 px-3 py-4 max-md:flex-col">
       {/* sidebar — jump anywhere; Finalize is the only gate */}
-      <nav className="w-48 shrink-0">
+      <nav className="w-48 shrink-0 max-md:w-full">
+        {/* EVERY-SCREEN P9: on a phone the sections are one row that scrolls sideways inside itself, above the editor (the
+            192 px column beside it pushed the page 172 px wide) */}
+        <div className="max-md:flex max-md:gap-1 max-md:overflow-x-auto max-md:pb-1">
         {SIDEBAR.map((s) => (
           <button key={s.key} onClick={() => setOpenKey(s.key)}
-            className={`mb-0.5 block w-full rounded-lg px-3 py-1.5 text-left font-mono text-[12px] uppercase tracking-wide transition-colors ${
+            className={`mb-0.5 block min-h-11 w-full rounded-lg px-3 py-1.5 text-left font-mono text-[12px] uppercase max-md:w-auto max-md:shrink-0 max-md:whitespace-nowrap tracking-wide transition-colors ${
               openKey === s.key ? 'bg-[var(--fel-cyan)] text-black' : s.table ? 'text-white/70 hover:bg-white/5' : 'text-white/50'}`}>
             {s.label}
           </button>
         ))}
+        </div>
         <div className="mt-3 px-3 font-mono text-[12px] text-white/50">
           <p>ATTR {resolution.budgets.attributePointsSpent}/{resolution.budgets.attributePointsCap}</p>
           <p>TRAIT {resolution.budgets.traitPointsSpent}/{resolution.budgets.traitPointsCap}</p>
@@ -219,10 +223,10 @@ export default function AthleteCreator({ axes, profileId, adult = false }: Props
         {/* IDENTITY HEADER (§1). The name plate is free text and therefore not a schema row — putting it
             here is what keeps the editor three row kinds wide. It is sanitised by the closet's own
             sanitizeJersey before it reaches the preview, so what is on the hero's back is what saves. */}
-        <div className="flex items-center gap-2 rounded-xl bg-white/[0.03] px-3 py-2">
+        <div className="flex flex-wrap items-center gap-2 rounded-xl bg-white/[0.03] px-3 py-2">
           <label htmlFor="plate" className="font-mono text-[12px] uppercase tracking-widest text-white/50">Name plate</label>
           <input id="plate" value={plate} onChange={(e) => setPlate(e.target.value)} placeholder="SURNAME"
-            maxLength={12} className="w-40 rounded-lg bg-black/40 px-2 py-1 font-mono text-xs uppercase text-white placeholder:text-white/50" />
+            maxLength={12} className="min-h-11 w-40 rounded-lg bg-black/40 px-2 py-1 font-mono text-xs uppercase text-white placeholder:text-white/50" />
           <span className="font-mono text-[12px] text-white/50">{binding.jersey.name || '—'} · #{binding.jersey.number}</span>
           <LookConsent adult={isAdult} consent={consent} onChange={(next) => { setConsent(next); writeConsent(next); }} />
         </div>
@@ -267,7 +271,7 @@ export default function AthleteCreator({ axes, profileId, adult = false }: Props
             <ul className="mt-3 space-y-1">
               {resolution.issues.map((i, n) => (
                 <li key={n} className={`font-mono text-[12px] ${i.kind === 'violation' ? 'text-[var(--fel-red)]' : 'text-[var(--fel-gold)]'}`}>
-                  <button onClick={() => setOpenKey(i.section)} className="underline">{i.section}</button> · {i.message}
+                  <button onClick={() => setOpenKey(i.section)} className="inline-flex min-h-11 items-center underline">{i.section}</button> · {i.message}
                 </li>
               ))}
             </ul>
@@ -275,7 +279,7 @@ export default function AthleteCreator({ axes, profileId, adult = false }: Props
               <ul className="mt-3 space-y-1 rounded-xl [background-color:color-mix(in_srgb,var(--fel-red)_10%,transparent)] p-3">
                 {serverIssues.map((i, n) => (
                   <li key={`s${n}`} className="font-mono text-[12px] text-[var(--fel-red)]">
-                    <button onClick={() => setOpenKey(i.section)} className="underline">{i.section}</button> · {i.message}
+                    <button onClick={() => setOpenKey(i.section)} className="inline-flex min-h-11 items-center underline">{i.section}</button> · {i.message}
                   </li>
                 ))}
               </ul>

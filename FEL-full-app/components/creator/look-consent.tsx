@@ -19,7 +19,7 @@ export function LookConsent({
     );
   }
   return (
-    <div className="space-y-1 font-mono text-[12px] leading-relaxed text-white/60">
+    <div className="space-y-1 font-mono text-base leading-relaxed text-white/60">
       <label className="flex min-h-11 cursor-pointer items-start gap-2 py-1">
         <input type="checkbox" checked={consent.saveLookNumbers}
           onChange={(e) => onChange({ saveLookNumbers: e.target.checked, modelTraining: e.target.checked && consent.modelTraining })}

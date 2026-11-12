@@ -29,12 +29,12 @@ export default async function ReceiptPage({ searchParams }: { searchParams: { se
             "This page needs the checkout session from Stripe". Nothing is looked up or granted on this branch; it now
             says so in plain words and offers the shop and the library. The paid path below is unchanged. */}
         <h2 className="fel-heading mt-8 text-3xl">Nothing to show here</h2>
-        <p className="mt-3 text-sm text-white/60">
+        <p className="mt-3 text-base text-white/60">
           Your receipt opens here right after you check out. Books you have bought are in My Library.
         </p>
         <div className="mt-4 flex flex-wrap gap-3">
-          <Link href="/press" className="inline-block rounded-md bg-[#F5C518] px-4 py-2 text-sm font-semibold text-black">Go to the shop</Link>
-          <Link href="/press/library" className="inline-block rounded-md border border-white/15 px-4 py-2 text-sm font-semibold text-white/80">My Library</Link>
+          <Link href="/press" className="inline-flex min-h-11 items-center rounded-md bg-[#F5C518] px-4 py-2 text-sm font-semibold text-black">Go to the shop</Link>
+          <Link href="/press/library" className="inline-flex min-h-11 items-center rounded-md border border-white/15 px-4 py-2 text-sm font-semibold text-white/80">My Library</Link>
         </div>
       </PressFrame>
     );

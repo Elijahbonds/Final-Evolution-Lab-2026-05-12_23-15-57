@@ -26,7 +26,7 @@ export default async function WorkWithUsPage({ searchParams }: { searchParams: {
       lede={PUBLIC_PAGE_COPY.workWithUs.lede}
     >
       {/* ONB-05: Appendix B as approved (2026-10-20); [OWNER: …] marks a blank the owner still fills. */}
-      <OwnerCopy parts={PUBLIC_PAGE_COPY.workWithUs.body} className="mt-6 max-w-2xl text-sm leading-relaxed text-white/75" />
+      <OwnerCopy parts={PUBLIC_PAGE_COPY.workWithUs.body} className="mt-6 max-w-2xl text-base leading-relaxed text-white/75" />
       <section className="mt-8 rounded-2xl border border-white/10 bg-[#101010] p-5">
         <SectionTitle>{profile ? `Inquiry for ${profile.name}` : 'Inquiry'}</SectionTitle>
         {open ? (
@@ -37,8 +37,8 @@ export default async function WorkWithUsPage({ searchParams }: { searchParams: {
             </p>
           </>
         ) : (
-          <p className="mt-4 rounded-md border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/80" role="status">
-            {INQUIRIES_UNAVAILABLE_MESSAGE} You can reach us through <Link href="/support" className="underline">Support</Link>.
+          <p className="mt-4 rounded-md border border-white/10 bg-white/5 px-4 py-3 text-base text-white/80" role="status">
+            {INQUIRIES_UNAVAILABLE_MESSAGE} You can reach us through <Link href="/support" className="inline-flex min-h-11 items-center underline">Support</Link>.
           </p>
         )}
       </section>
