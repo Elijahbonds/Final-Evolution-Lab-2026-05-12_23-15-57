@@ -201,12 +201,15 @@ export interface ManRead {
   offBalance: boolean;
   /** The side the move takes the ball and the body (null: a move with no side, e.g. a jab straight at him). */
   moveSide: 'left' | 'right' | null;
+  /** hoops-builder (owner 2026-11-12): the handler's handle rating as a share of the "moving the wrong way" line (ratings.ts
+   *  moveLeanScale; < 1 = he is beaten on a smaller lean). Absent = 1: today's line, exactly. */
+  leanScale?: number;
 }
 export type ReadVerdict = { beat: boolean; why: 'offBalance' | 'committed' | 'wrongWay' | 'set' };
 /** A move beats the man when he is off balance, coming at you (committed), or moving across you the wrong way; otherwise he holds and
  *  the move just keeps the ball safe. (How HARD he goes down stays the handle's call: HandleSystem.isHardBreak, as before.) */
 export function readTheMan(r: ManRead): ReadVerdict {
-  const wrongWay = r.moveSide !== null && (r.moveSide === 'right' ? -r.lateralMps : r.lateralMps) >= moveLeanMps();
+  const wrongWay = r.moveSide !== null && (r.moveSide === 'right' ? -r.lateralMps : r.lateralMps) >= moveLeanMps() * (r.leanScale ?? 1);
   if (r.offBalance) return { beat: true, why: 'offBalance' };
   if (wrongWay) return { beat: true, why: 'wrongWay' };
   if (r.closingMps >= moveCommitMps()) return { beat: true, why: 'committed' };
