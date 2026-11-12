@@ -621,3 +621,11 @@ Group "Hoops · flow and pace". Each is NEW; 0 restores the old behaviour exactl
 - `hoops.teamSizeUpSec` 1.5 s (`hoops/teamOffense3v3.ts`): the 3v3 rivals' FIRST touch of a possession (not a swing's catch) probes
   this much longer at the top (× the tier's probe share), with one more probe move. Flag: the same lever as `hoops.rivalProbeSec`, on
   the first touch only. 0 = the probe as before.
+- `hoops.handChangeCatchLeadSec` 0.45 s (`anim/ballCarry.ts`; `anim/handlePaths.ts` pathAt's `catchLeadSec`): on a dribble HAND CHANGE (the
+  carry's own crossing, not a stick or AI move) the hand that will catch the ball starts to come and meet it this long before the catch.
+  It used to be the schedule's 0.06 s: the arm swung 100–140° in four frames at the move limit (a hard pop on both arm bones). Headless,
+  the hero with the carry, 64 hand changes: hard events within half a second of a change 56 → 35; the catching palm on the catch frame
+  unchanged (median 0.20 m both). 0.06 = as before. Feel-check: 1v1, dribble at a stand and switch hands with the stick.
+- Phase 7 (bodies that touch) adds no knob: both its gates already read true on the release (0 overlap frames in nine rig runs; defensive
+  clip changes ≤ 2.5 a second, the 1v1 hero 0.6 with the size-up on). The 3v3 pair loop now reads the one standoff (`BODY_STANDOFF / 2`,
+  the same 0.55 m it typed). HOOPS-GOAL-GAP §3i.

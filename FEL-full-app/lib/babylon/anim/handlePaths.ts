@@ -433,7 +433,9 @@ function contactSpans(p: HandlePath, h: Hand): [number, number][] {
 }
 
 /** The path at `t` s (clamped to the path). */
-export function pathAt(p: HandlePath, t: number): PathSample {
+/** `catchLeadSec` (hoops-p06): how long before a contact the hand starts to reach for it (default CONTACT_FADE_SEC, the schedule's own); the
+ *  fade off after a contact is always CONTACT_FADE_SEC. */
+export function pathAt(p: HandlePath, t: number, catchLeadSec = CONTACT_FADE_SEC): PathSample {
   const tt = Math.min(p.duration, Math.max(0, t));
   const e = evalPath(p, tt);
   const k = p.duration > 0 ? tt / p.duration : 1;
@@ -446,7 +448,8 @@ export function pathAt(p: HandlePath, t: number): PathSample {
     for (const [a, b] of contactSpans(p, h)) {
       if (tt >= a && tt <= b) { w = 1; tgt = onTop(e.p); near = true; break; }
       const startsAt0 = a <= 1e-9, endsAtEnd = b >= p.duration - 1e-9;
-      if (tt < a && tt > a - CONTACT_FADE_SEC && !startsAt0) { const wi = 1 - (a - tt) / CONTACT_FADE_SEC; if (wi > w) { w = wi; tgt = onTop(evalPath(p, a).p); } near = true; }
+      const lead = Math.max(CONTACT_FADE_SEC, catchLeadSec);
+      if (tt < a && tt > a - lead && !startsAt0) { const wi = 1 - (a - tt) / lead; if (wi > w) { w = wi; tgt = onTop(evalPath(p, a).p); } near = true; }
       if (tt > b && tt < b + CONTACT_FADE_SEC && !endsAtEnd) { const wo = 1 - (tt - b) / CONTACT_FADE_SEC; if (wo > w) { w = wo; tgt = onTop(evalPath(p, b).p); } near = true; }
     }
     reach[h] = w; handTarget[h] = w > 0 ? tgt : null; if (near) contactHands.push(h);

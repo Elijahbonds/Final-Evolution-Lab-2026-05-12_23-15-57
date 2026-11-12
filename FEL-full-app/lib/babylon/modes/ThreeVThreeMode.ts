@@ -2177,7 +2177,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           if (dunking && (A === me || B === me)) { resolveBodyCollision(A.char.root.position, B.char.root.position); continue; }   // the flight's own bump handles the dunk
           const key = `${i}|${j}`;
           const cooling = (contactCooldown.get(key) ?? 0) > nowMs;   // one impulse + one event per collision (the Havok solver's 300 ms pair gate)
-          const c = resolveBodyContact(A.char.root.position, B.char.root.position, A === me ? me.drib.vel : A.vel, B === me ? me.drib.vel : B.vel, 0.55,
+          const c = resolveBodyContact(A.char.root.position, B.char.root.position, A === me ? me.drib.vel : A.vel, B === me ? me.drib.vel : B.vel, BODY_STANDOFF / 2,   // hoops-p06 (phase 7): the one standoff (was the literal 0.55, the same number)
             { airborneA: A === me && !!finish, airborneB: B === me && !!finish, exchange: !cooling, ...contactCap(dt) });   // #273 T-C: a capped push, never a one-frame pop
           if (!c || cooling || c.closing <= 0.8) continue;
           contactCooldown.set(key, nowMs + 300);

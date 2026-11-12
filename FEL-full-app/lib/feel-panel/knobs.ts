@@ -1592,6 +1592,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/hoops/teamOffense3v3.ts TEAM_SIZE_UP_SEC',
     hint: 'A fresh possession (not a swing catch) probes this much longer at the top, with one more probe move. The same lever as the 3v3 probe knob, first touch only. 0 = as before.',
   },
+  {
+    id: 'hoops.handChangeCatchLeadSec', label: 'Hand change: the catching hand reaches early by', def: 0.45, min: 0.06, max: 0.6, step: 0.01, unit: 's', group: 'Hoops · flow and pace',
+    source: 'lib/babylon/anim/ballCarry.ts HAND_CHANGE_CATCH_LEAD_SEC',
+    hint: 'On a dribble hand change the other hand starts to come and meet the ball this long before it catches it, instead of swinging to it in four frames. 0.06 = as before.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));
