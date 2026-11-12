@@ -190,7 +190,9 @@ export function RecordSet({ ctx, api = FORM_REVIEWS_API }: { ctx: RecordContext;
         <div className="text-[12px] uppercase tracking-wider text-fel-dim">Film a set for your coach</div>
         <h1 className="text-lg font-bold text-white">{ctx.exerciseName}</h1>
         <p className={`${lineSize(spec.setup)} text-white/65`}>{spec.setup}</p>
-        <p className="text-base text-fel-dim">The camera counts your reps and reads each one. Every number is an estimate.</p>
+        {/* COACH-WORDS (owner 2026-11-12: shorter first-screen wording, reviewed by the owner in docs/COACH-WORDING-REVIEW.md).
+            Was "The camera counts your reps and reads each one." "Every number is an estimate." is unchanged, word for word. */}
+        <p className="text-base text-fel-dim">The camera counts and checks each rep. Every number is an estimate.</p>
       </div>
 
       {/* collapsed (not unmounted: the camera attaches to it on "Film it again") once a set has been read */}
@@ -209,7 +211,8 @@ export function RecordSet({ ctx, api = FORM_REVIEWS_API }: { ctx: RecordContext;
         )}
         {phase !== 'recording' && phase !== 'starting' && !result && (
           <div className="absolute inset-0 grid place-items-center p-6 text-center text-sm text-white/50">
-            <span><Camera className="mx-auto mb-2 h-8 w-8" />Your camera shows here. Nothing is recorded to a file.</span>
+            {/* COACH-WORDS: "Your camera shows here." is gone (the box and its camera icon say it); the privacy line is unchanged */}
+            <span><Camera className="mx-auto mb-2 h-8 w-8" />Nothing is recorded to a file.</span>
           </div>
         )}
       </div>
