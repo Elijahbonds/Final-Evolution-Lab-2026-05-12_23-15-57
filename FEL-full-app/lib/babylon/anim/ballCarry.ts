@@ -35,7 +35,7 @@ import type { AbstractMesh, Scene, Skeleton, TransformNode } from '@babylonjs/co
 import { attachBallToHand, ballGathering, gatherBallToHand, palmOffsetOf } from './ballRig';
 import { DEFAULT_DRIBBLE, DRIBBLE_ELBOW_HEADROOM, HOOPS_DRIBBLE, PUSHED_FLOOR_PHASE, advancePhase, clearOfBallWeight, dribbleAt, dribbleAtPushed, fitDribbleToReach, pushedBounce01, strideLockHz, type DribbleParams } from './Dribble';
 import { armChain, reachArm, shapeReach, limitElbowSwing, forgetElbowSwing, type ArmChain } from './HandIK';
-import { pathFor, pathAt, cutInWindow, type HandlePath, type PathFrom, type PathLock, type PathMove, type PathSample } from './handlePaths';
+import { pathFor, pathAt, cutInWindow, CONTACT_FADE_SEC, type HandlePath, type PathFrom, type PathLock, type PathMove, type PathSample } from './handlePaths';
 import { MOVE_SHAPE } from '../core/HandleShape';
 import type { HandleMove } from '../core/HandleSystem';
 import { findBone } from './boneLookup';
@@ -83,7 +83,16 @@ export interface CarryMoveOpts {
   /** queueMove (hoops-moves, the combo window — anim/comboFlow): start at the running path's cut-in (cutInWindow: the hesi's float top)
    *  instead of its catch, when that window has not passed — at once when the running move is inside it. Default false. */
   cutIn?: boolean;
+  /** hoops-p06: the catching hand starts its reach this long before the catch (handlePaths.pathAt's catchLeadSec). Default: the schedule's. */
+  catchLeadSec?: number;
 }
+/** hoops-p06 (GAMEPLAY-CLEAN-AUDIT §4i, "left open" 1: the dribble HAND CHANGE pops). A hand change on a live dribble is a crossover path the
+ *  carry runs on its own (switchHand / toSide); the hand that will catch the ball is the clip's until CONTACT_FADE_SEC (0.06 s) before the
+ *  catch, and its pose in the other hand's loop is 100–140° from the catch point — so it swung there in four frames at the move's arm limit
+ *  (30° a frame: a hard event on both arm bones at 56 of 64 hand changes, scripts/probes/hoops-p06/handchange.mts). On THAT path the
+ *  catching hand comes to meet the ball over this long instead. Knob `hoops.handChangeCatchLeadSec`; 0.06 (the schedule's own) = as
+ *  before. Stick and AI moves keep the schedule's lead. */
+export const HAND_CHANGE_CATCH_LEAD_SEC = 0.45;
 /** The move under way (plan §3.3's `move`). */
 export interface CarryMoveState {
   name: string; t: number; k: number;
@@ -870,7 +879,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   /** A queued move starts at the running one's catch, from the ball as it is caught (plan §3.3: the double cross's second crossing). */
   const startQueued = (): void => {
     const m = mv!, q = queued!; queued = null;
-    const smp = pathAt(m.path, m.t);
+    const smp = pathAt(m.path, m.t, m.opts.catchLeadSec);
     // HOOPS-HAND-LABEL: the ball is still in flight to the end hand at this catch — the hand that HOLDS it carries into the queued move,
     // whose own catch hands it on when that palm has it (it flipped here, at the catch's t0, a frame or two before the palm reached it)
     setSide(rigOf(m.held));
@@ -897,7 +906,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   };
   /** The move's frame (the after-animations pass): the ball on its path, each hand by the contact schedule. */
   const applyMove = (dt: number): void => {
-    const m = mv!; const smp = pathAt(m.path, m.t); m.sample = smp; m.sampleT = m.t;
+    const m = mv!; const smp = pathAt(m.path, m.t, m.opts.catchLeadSec); m.sample = smp; m.sampleT = m.t;
     const sg = m.path.segs.find((x) => m.t <= x.t1) ?? m.path.segs[m.path.segs.length - 1]; m.segU = sg.t1 > sg.t0 ? (m.t - sg.t0) / (sg.t1 - sg.t0) : 1;
     // the ball's frame follows the root's turn at a ball's pace (BALL_YAW_RATE, the dribble's) — and never snaps with it: the facing snaps
     // at a cut (the left-stick reversal's −129°, the momentum cross's −55° in one frame; measured, the probe's first 4b run) swung a ball
@@ -1092,8 +1101,10 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
       if (ballHandNow()) gatherBallToHand(opts.ball, opts.skeleton, `${side}Hand`);
       return;
     }
-    if (mv) queued = { move: 'crossover', opts: {} };
-    else runMoveImpl('crossover');
+    const lead = feel('hoops.handChangeCatchLeadSec', HAND_CHANGE_CATCH_LEAD_SEC);   // hoops-p06: the catching hand meets the ball (see the constant)
+    const o: CarryMoveOpts = lead > CONTACT_FADE_SEC ? { catchLeadSec: lead } : {};
+    if (mv) queued = { move: 'crossover', opts: o };
+    else runMoveImpl('crossover', o);
   };
   const obs = opts.scene.onAfterAnimationsObservable.add(hoops ? applyHoops : apply);
   const obsDrawn = hoops ? opts.scene.onAfterRenderObservable.add(sampleDrawn) : null;
@@ -1120,7 +1131,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     get crossing() { return (!!mv && mv.crosses > 0) || (!!queued && crossesOf(queued.move) > 0); },
     get move() {
       const m = mv; if (!m) return null;
-      const smp = m.sampleT === m.t && m.sample ? m.sample : pathAt(m.path, m.t);
+      const smp = m.sampleT === m.t && m.sample ? m.sample : pathAt(m.path, m.t, m.opts.catchLeadSec);
       return { name: m.name, t: m.t, duration: m.path.duration, readAtK: m.path.readAtK, k: m.path.duration > 0 ? Math.min(1, m.t / m.path.duration) : 1, exposed01: smp.exposed, contactHands: smp.contactHands.slice(), contactRig: smp.contactHands.map(rigOf), contact: smp.contact, reach: { ...smp.reach }, startHand: m.path.startHand, endHand: m.path.endHand, cutIn: cutInWindow(m.path) };
     },
     runMove(spec: PathMove | HandlePath, o?: CarryMoveOpts) { return runMoveImpl(spec, o); },

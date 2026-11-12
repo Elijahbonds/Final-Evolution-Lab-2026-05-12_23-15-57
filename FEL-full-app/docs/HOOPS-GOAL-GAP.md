@@ -281,6 +281,96 @@ severe 2 → 2 (the frame-130 landing: left foot 4 735 → 4 395 °/s, right foo
 (release warps 1 → 0). The catch read sideways (the gate as now written): 4.8 and 2.0 cm (bar 12). The teammate's throw
 (`hoops.passFromHandOn`, measured on the call-back): the ball's step on the throw frame 45.6 → 23.9 cm (the flight's own pace).
 
+### 3i. hoops-p06 — phase 6 (flow and pace), phase 7 (bodies that touch), the hand change
+
+Release `fbf197fb`, seed 7, PRO. "Before" is the same bundle with this lane's knobs at 0 (the A/B the panel gives the owner) unless it says
+otherwise. Rig = the deterministic hoops-gap rig (`poss` runs, NODRAW, `scripts/probes/hoops-p06/analyze-p06.mjs`); sims are headless.
+
+**Phase 6, the board.** The live board (the ball bounces off chests, whoever reaches it has it) was already physical; the dice lived in the
+RACE the modes fall back on (a swat at the rim, a block at the release, a rattled-out dunk, a live board nobody came down with in 4 s):
+1v1 `REBOUND_JITTER`, 3v3 `BOARD_JITTER`, both ± 1.3 m. Now `hoops/rebound.ts`: the body nearest the ball's bounce spot, less the seal and a
+jump that is up; no roll (`hoops.boardBounceOn`). Jitter terms in the board decision: 2 → 0. Offensive-board share, the same situations
+before (the die's expectation) and after (`scripts/probes/hoops-p06/board-sim.mts`, 3 000 each; assumption: bodies stand still for the
+0.9 s before the race — in play they move toward the ball):
+
+| situation | offensive board, before → after |
+|---|---|
+| 1v1 swat  shooter me  box-out off | 94.3 % → 100.0 % (Δ +5.7) |
+| 1v1 swat  shooter me  box-out on | 100.0 % → 100.0 % (Δ +0.0) |
+| 1v1 swat  shooter foe box-out off | 94.5 % → 100.0 % (Δ +5.5) |
+| 1v1 swat  shooter foe box-out on | 34.2 % → 2.5 % (Δ -31.7) |
+| 1v1 stall shooter me  box-out off | 50.4 % → 50.6 % (Δ +0.2) |
+| 1v1 stall shooter me  box-out on | 84.7 % → 87.3 % (Δ +2.6) |
+| 1v1 stall shooter foe box-out off | 50.2 % → 49.7 % (Δ -0.5) |
+| 1v1 stall shooter foe box-out on | 15.6 % → 12.7 % (Δ -2.9) |
+| 3v3 swat  shooter me  box-out off | 74.8 % → 81.9 % (Δ +7.0) |
+| 3v3 swat  shooter me  box-out on | 95.9 % → 97.2 % (Δ +1.3) |
+| 3v3 swat  shooter foe box-out off | 74.2 % → 81.6 % (Δ +7.4) |
+| 3v3 swat  shooter foe box-out on | 38.4 % → 14.0 % (Δ -24.4) |
+| 3v3 stall shooter me  box-out off | 49.6 % → 50.1 % (Δ +0.5) |
+| 3v3 stall shooter me  box-out on | 73.1 % → 79.4 % (Δ +6.4) |
+| 3v3 stall shooter foe box-out off | 49.7 % → 49.3 % (Δ -0.4) |
+| 3v3 stall shooter foe box-out on | 27.1 % → 20.0 % (Δ -7.2) |
+
+Read: with no box-out the share stays within ± 0.5 points on a stalled board and moves + 5.5 to + 7.4 after a swat (the swatted ball comes
+back toward the shooter's side; the die used to give the far man a chance). With a box-out the seal now wins the race it is nearer for
+every time: the defence's box-out against their shot takes the board 66 → 97 % (1v1) and 62 → 86 % (3v3) after a swat. **Not within the
+plan's ± 5 points in the box-out rows** — that is what removing a ± 1.3 m die from a race between bodies a metre apart does. The rig saw no
+race in its runs (every board in them was the live one).
+
+**Phase 6, pace.** The dead-ball beats in the code, from the HUD's score to the next live ball: 1v1 my make 0.7 s (make-it-take-it: my
+ball at once), their make 0.9 s + the 0.5 s check = 1.4 s, their dunk 1.0 s (1.6 s with me on the floor) + 0.5; 3v3 my make 0.3 s to their
+ball, their make 0.9 s. Rig: 1v1 their layup → the check called 0.92 s later, live at 1.42 s (seed 7, size-up on); 3v3 my make → their drive under way 1.38 s (knobs off: these beats are not this lane's). Both under 2.5 s before and after. (The rig's 1v1 offence runs could not read my own make: under NODRAW the harness's render watchdog trips a few seconds after a dead ball and the mode reloads — a rig artifact, not the game; the drawn runs do not do it.) Big plays (a dunk, a block, an ankle-breaker, a poster) add a replay at the dead ball: 2.4–5
+recorded seconds at half speed, **4.8–10 s on screen** before → **at most 2.5 s** (`hoops.replayCapSec`, the window around the moment).
+
+**Phase 6, possession medians** (`rival-sim.mts`, 200 possessions a tier; "bot" = the rig's scripted defender, who reaches every 0.6–1.6 s
+at 50 %; "set" = the same defender who never reaches):
+
+| | before | after |
+|---|---|---|
+| 1v1 rival, PRO, bot | 2.63 s | 4.48 s |
+| 1v1 rival, PRO, set | 2.55 s | **6.77 s** |
+| 1v1 rival, ROOKIE / ELITE, set | 2.20 / 2.55 s | 5.25 / 7.52 s |
+| 3v3 rival, PRO, bot | 7.27 s | **8.65 s** |
+| 3v3 rival, ROOKIE / ELITE, bot | 5.60 / 7.53 s | 6.57 / 8.75 s |
+| 1v1 rig, their two possessions (seed 7) | 4.5, 2.0 s | 6.0, 11.8 s |
+
+The 1v1 size-up (`hoops.rivalSizeUpSec` 4 s) is the bigger change. Against the reaching bot the median stays under the band (4.5 s): a
+reach that misses at the top sends him (PRO 55 % of the time), and the bot reaches constantly. Its trade, measured against that bot (PRO):
+his shot mix moves from pull-ups to drives — layups 12 → 113, pull-ups 119 → 42, dunks 50 → 16 of 200 — and the bot's steals 19 → 29;
+ELITE's action variety drops to a minimum of 5 per 10 possessions (the phase 3 gate is 6; PRO stays 8). Against a defender who stays home
+every possession still ends in the same contested pull-up (6 %), only later. The make chances per shot type are untouched.
+
+**Phase 7.** Both gates read **already met on the release**, measured before any phase 7 change. Overlap (two roots under 0.6 m, outside resets):
+**0 frames** in all nine rig runs (1v1 and 3v3, their ball and mine, knobs on and off; 300–1 470 frames each), the closest pair 1.02 m
+(3v3) and 1.10 m (1v1) — the #273 separation and the 0.55 m capsules already hold the one standoff. Defensive clip changes (a clip starting
+on a defending body, per second of defence; `analyze-p06.mjs`): 1v1 hero 2.54 / 2.55 /s with the size-up off (two runs: just over the
+2.5 bar), **0.58–0.64 /s** with it on (the rival works at the top instead of attacking off the check); the 1v1 rival 0 /s; 3v3 hero 1.39,
+mates 1.04 / 1.21, their defenders 0.37–0.45 /s. A longer hold for the defence loops (0.4 s) was tried: 3v3 hero 1.39 → 1.13 /s but his
+pops 17 → 29 and a mate's planted-foot slide p90 0.45 → 8.7 cm (a held loop under a body already moving the other way) — reverted, not
+shipped. What phase 7 changes: the one standoff is now read, not retyped — 3v3's pair loop and `resolveBodyCollision` read
+`BODY_STANDOFF / 2` (the literal 0.55, the same number), pinned by `hoops/standoff.test.ts` with the capsules and the rule ranges. Not done
+(plan items outside this brief's gates): contact reactions by direction and force, the AI drawn hand.
+
+**The hand change** (GAMEPLAY-CLEAN-AUDIT §4i, left open 1). Headless (`scripts/probes/hoops-p06/handchange.mts`: the hero as a hoops mode
+spawns him, the tree's own hand change, the hoops carry on the ball arm, 64 hand changes over the idle / walk / jog / run loops, counted by
+the gameplay-clean counter). The pop is not the slerp alone: with the carry on, the hand that will CATCH the ball is the clip's until 0.06 s
+before the catch, then swings 100–140° to it in four frames at the move limit (30° a frame) — a hard event on both arm bones. On the carry's
+own hand-change crossing it now comes to meet the ball over 0.45 s (`hoops.handChangeCatchLeadSec`): hard events within half a second of
+a change **56 → 35** (by loop: idle 16 → 15, walk 16 → 7, jog 11 → 2, run 13 → 11; the clips alone, no carry, give 26 there, nearly all in
+the run loop's own capture), every pop 1 405 → 1 205, the catching palm on the catch frame unchanged (median 0.20 m). Inertial blend: 57 →
+36 (the same as linear: the twin swap is linear under it, `anim.inertialTwinLinear`), so 1v1 / 3v3 under the inertial blend do not beat
+linear here; not re-measured in the modes. Not fixed: idle's changes (the old ball arm), the run loop's own arm keys, and the stick's own
+crossover moves (their paths keep the schedule's lead).
+
+After the play audit (HOOPS-AAA-GAP-PLAY, PR #583): most of the pops in play are the AUTOMATIC outside hand (core/GuardHand) crossing about
+once a second while guarded at rest. Its crossing (modes/hoopsFlow, `runMove('crossover')`) now takes the same catch lead (headless, that
+path: 56 → 35), and standing it crosses at most once in 1.5 s (`hoops.guardHandRestGapSec`; unit test: at rest the gaps go from the rule's
+~0.9 s to ≥ 1.5 s, on the move unchanged). Not re-measured with the audit's player counter (`mash-audit.mjs`): the numbers above are this
+lane's headless probe, which drives the tree and the carry itself (the counter's agent-bridge bug does not reach it). The bump's
+contact reaction (a forearm 58–90° in a frame, the audit's other hard pop) is not touched here. A dedicated hand-change pose or clip, the
+arm following the ball, would take the rest; it needs clip work (GATE 0) or a code-built pose — not done.
+
 ## 4. Ranked gaps
 
 Ranked by what the owner feels first × how far from the bar. "Shared" = touches one of the shared hoops files.

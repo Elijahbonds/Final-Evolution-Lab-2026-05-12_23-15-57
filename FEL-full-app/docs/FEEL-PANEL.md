@@ -601,3 +601,36 @@ GAMEPLAY-CLEAN-AUDIT section 4i.
 - `anim.celebrateEase` 1: the arms-up celebration after a made shot or a dunk (`dunk_mc_celebrate_big`) turns the upper arms at most
   about 20 degrees a frame; its capture swung them 28 to 32 degrees a frame as the elbows came out (headless: 29.5 / 31.5 to 15.9 /
   16.2 degrees). The clip is re-keyed when it is built; the file is not edited. Feel-check: 1v1, make a shot.
+
+## hoops-p06, 2026-11-12 (1v1 / 3v3 phase 6 "flow and pace"; the owner has not felt these yet)
+
+Group "Hoops · flow and pace". Each is NEW; 0 restores the old behaviour exactly (tests pin both). Measurements: HOOPS-GOAL-GAP §3i.
+- `hoops.boardBounceOn` 1 (`hoops/rebound.ts`): the board RACE the modes fall back on (a swat at the rim, a block at the release, a
+  rattled-out dunk, and a live board nobody came down with in 4 s) has no die any more. It goes to the body nearest the spot where the
+  ball next comes down to `hoops.boardTakeYM` (2.4 m), less the seal (the mode's own 1.6 m) and `hoops.boardJumpEdgeM` (0.5 m) for a
+  jump that is still up. A dead heat goes to the defence. 0 = distance plus a 2.6 m random term, as before. Most boards were already
+  physical (the live board) and do not change. Feel-check: 1v1, get a shot swatted, then box out a miss.
+- `hoops.replayCapSec` 2.5 s (`court/hoopsMoments.ts`): a big-play replay (a dunk, a block, an ankle-breaker) holds the game at most this
+  long on screen, cut to the window around the moment (60 % before it, 40 % after). Before it was 2.4–5 recorded seconds at half speed:
+  4.8–10 s before the next possession. 0 = the old length. Feel-check: dunk on him; the replay should be short and on the moment.
+- `hoops.rivalSizeUpSec` 4 s (`hoops/rivalOffense.ts`): after the check the 1v1 rival works you beyond the arc (a walk to the top, a slow
+  weave, a probe move about every second — the kit's moves at a third of their push) for this long (× ROOKIE 0.75 / PRO 1 / ELITE 1.15,
+  ± 25 %) before he attacks. A probe that beats you ends it at once; a reach that misses is punished as often as his tier reads
+  (ROOKIE 15 %, PRO 55 %, ELITE 90 %); the 6 s shot clock counts only the attack after it. 0 = he attacks off the check, as before.
+  Feel-check: 1v1 PRO on defence: does he size you up, and does reaching at the top cost you?
+- `hoops.teamSizeUpSec` 1.5 s (`hoops/teamOffense3v3.ts`): the 3v3 rivals' FIRST touch of a possession (not a swing's catch) probes
+  this much longer at the top (× the tier's probe share), with one more probe move. Flag: the same lever as `hoops.rivalProbeSec`, on
+  the first touch only. 0 = the probe as before.
+- `hoops.handChangeCatchLeadSec` 0.45 s (`anim/ballCarry.ts`; `anim/handlePaths.ts` pathAt's `catchLeadSec`): on a dribble HAND CHANGE (the
+  carry's own crossing, not a stick or AI move) the hand that will catch the ball starts to come and meet it this long before the catch.
+  It used to be the schedule's 0.06 s: the arm swung 100–140° in four frames at the move limit (a hard pop on both arm bones). Headless,
+  the hero with the carry, 64 hand changes: hard events within half a second of a change 56 → 35; the catching palm on the catch frame
+  unchanged (median 0.20 m both). 0.06 = as before. Feel-check: 1v1, dribble at a stand and switch hands with the stick.
+- Phase 7 (bodies that touch) adds no knob: both its gates already read true on the release (0 overlap frames in nine rig runs; defensive
+  clip changes ≤ 2.5 a second, the 1v1 hero 0.6 with the size-up on). The 3v3 pair loop now reads the one standoff (`BODY_STANDOFF / 2`,
+  the same 0.55 m it typed). HOOPS-GOAL-GAP §3i.
+- `hoops.guardHandRestGapSec` 1.5 s (`modes/hoopsFlow.ts`; the play audit's sinker 1, HOOPS-AAA-GAP-PLAY): standing guarded (under 0.6 m/s),
+  the automatic outside hand crosses the ball at most once in 1.5 s; it crossed about once a second, and every crossing is a hand change
+  (the audit: 14 of 21 hard pops in a 22 s idle 1v1 run). On the move it is the rule as before (`hoops.aiHandDwellSec` 0.35, `hoops.aiHandGapSec`
+  0.9, unchanged). Its crossing also takes `hoops.handChangeCatchLeadSec` (headless, that path: 56 → 35 hard events in 64 changes, as the
+  carry's own). 0 = as before. Feel-check: 1v1, stand dribbling with him shading you; the ball should not ping-pong.
