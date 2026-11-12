@@ -411,3 +411,6 @@ The owner answered these (relayed by the coordinator). One line each.
     the drafts are `docs/COACH-WORDING-REVIEW.md`).
 16. **Story:** keep #589's small readability touches (labels, tap targets). Otherwise leave Story alone.
 17. **Karate VS:** the in-game overlap is left as it is.
+18. **Social basketball setting:** a PARK area (outdoor home courts, a run to queue for, a place to hang out), built from
+    the Adventure map pieces and part of the Adventure hub (one world: story ↔ courts, same player, party and look). Build
+    it after the current hoops work, together with the Adventure hub. Menus keep one-tap 1v1/3v3.
