@@ -722,8 +722,8 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       }
       setPhase('ready');
       // HOOPS-SOUND (phase 11a, 2026-11-12): a mode with recorded sound (the court modes) fetches it now, after READY, so it never
-      // slows the load; every cue plays its synth until its files are in (audio/samples.ts sampleBankFor)
-      void SoundKit.useSampleBank(sampleBankFor(def.modeId));
+      // slows the load; every cue plays its synth until its files are in (audio/samples.ts sampleBankFor). Sound never fails a load.
+      try { void SoundKit.useSampleBank(sampleBankFor(def.modeId)); } catch { /* the synths play */ }
       // M67: pre-warm every material now, on the loading→ready boundary, so a
       // first-visibility shader compile never hitches mid-play. Dev-only work.
       if (DEV) void perf.warmAll();
@@ -1052,7 +1052,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     unsub?.();
     input.stop();
     SoundKit.stopAmbient();   // M43: silence the ambient bed on teardown
-    void SoundKit.useSampleBank(null);   // HOOPS-SOUND: the next mode hears its own synths
+    try { void SoundKit.useSampleBank(null); } catch { /* nothing to release */ }   // HOOPS-SOUND: the next mode hears its own synths
     exitBed();                // PIPELINES: the page gets its soundtrack stage back
     VoiceKit.stopAll(0.1);    // THE MIC: whatever a mode left on the mic goes with it
     juice.dispose();

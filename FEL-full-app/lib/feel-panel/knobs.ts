@@ -1690,9 +1690,9 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'On: in 1v1, 3v3 and 3-Point the swish, rim, squeak, cheer, crowd bed, dribble and catch play CC0 recordings. Off: every sound is the synth, as before.',
   },
   {
-    id: 'hoops.dribbleSoundOn', label: 'Dribble makes a sound (1) / silent (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · sound',
+    id: 'hoops.dribbleSoundOn', label: 'Ball on the floor is heard (1) / silent (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · sound',
     source: 'lib/babylon/audio/dribbleSound.ts DRIBBLE_SOUND_ON',
-    hint: 'On: the ball is heard each time it hits the floor, every handler. Off: no dribble sound, as before.',
+    hint: 'On: the ball is heard each time it hits the floor: every dribble (yours and the AI), a bounce pass, a rebound. Off: silent, as before.',
   },
   {
     id: 'hoops.dribbleSoundVol', label: 'Dribble: volume', def: 0.6, min: 0, max: 1.5, step: 0.05, unit: '', group: 'Hoops · sound',
@@ -1705,9 +1705,9 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'An AI dribble as a share of yours, so your ball stays the one you hear.',
   },
   {
-    id: 'hoops.passCatchSoundOn', label: 'Pass is heard: catch and bounce pass (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · sound',
+    id: 'hoops.passCatchSoundOn', label: 'Pass is heard in the hands (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · sound',
     source: 'lib/babylon/audio/dribbleSound.ts PASS_CATCH_SOUND_ON',
-    hint: 'On: a 3v3 pass is heard in the hands when caught, and a bounce pass hitting the floor. Off: neither, as before.',
+    hint: 'On: a 3v3 pass is heard in the hands when it is caught. Off: no catch sound, as before.',
   },
   {
     id: 'hoops.passCatchVol', label: 'Catch: volume', def: 0.7, min: 0, max: 1.5, step: 0.05, unit: '', group: 'Hoops · sound',

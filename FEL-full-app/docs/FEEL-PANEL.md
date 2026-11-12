@@ -683,15 +683,25 @@ The sounds are CC0 recordings (`public/audio/hoops/CREDITS.md`). Tests: `lib/bab
   (dribble, catch). They load after READY, about 250 KB. Until a cue's files are in, or if they fail, the cue plays its synth. Every
   recording goes through the same SFX or crowd bus, ducking, limiter, mute and phone/TV/headphones preset as the synths. 0 = synth only,
   nothing fetched. Still synth either way: the groan, whistle, score chime, whoosh, impacts, the body thud and the backboard.
-- `hoops.dribbleSoundOn` 1 (`audio/dribbleSound.ts`, hooked in `anim/ballCarry.ts`): the ball is heard each time it meets the floor,
-  for every hoops handler (yours, the 1v1 rival, all six 3v3 bodies; the handle moves too). Once per bounce. It re-arms only after the
-  ball has risen 0.2 m. 0 = silent, as before.
+- `hoops.dribbleSoundOn` 1 (`audio/dribbleSound.ts`, a watcher on the ball installed by `anim/ballCarry.ts`): the ball is heard each
+  time it meets the floor, whoever moved it: every hoops handler's dribble (yours, the 1v1 rival, all six 3v3 bodies, the handle moves),
+  the last bounce into a gather, a bounce pass, a rebound. Once per contact (one detector per ball; it re-arms only after the ball has
+  risen 0.2 m). 0 = silent, as before.
 - `hoops.dribbleSoundVol` 0.6: your dribble's level at a full-speed bounce (5 m/s, the hoops dribble at 2 bounces a second). A bounce
   plays at its speed's share of that, from 0.3x to 1.25x.
-- `hoops.dribbleSoundAiK` 0.5: an AI handler's dribble as a share of yours. Which carry is yours: the first hoops carry a mode mounts
+- `hoops.dribbleSoundAiK` 0.5: an AI handler's dribble as a share of yours (a ball no carry has, such as a rebound, plays at yours). Which carry is yours: the first hoops carry a mode mounts
   (assumption, true of 1v1, 3v3 and 3-Point today; `BallCarryOpts.soundRole` names it explicitly when the mode files are next edited).
-- `hoops.passCatchSoundOn` 1 (`core/BallHandling.ts` PassFlight): a 3v3 pass is heard in the hands when it arrives, and a bounce pass
-  when it hits the floor. The throw still plays the menu click (`ThreeVThreeMode.ts` uiTick): that line belongs to the mode file, owned
-  by hoops-p08 now, and is listed for after it. 0 = neither, as before.
+- `hoops.passCatchSoundOn` 1 (`core/BallHandling.ts` PassFlight): a 3v3 pass is heard in the hands when it arrives. The throw still
+  plays the menu click (`ThreeVThreeMode.ts` uiTick): that line belongs to the mode file, owned by hoops-p08 now, and is listed for after
+  it. 0 = no catch sound, as before.
 - `hoops.passCatchVol` 0.7: the catch's level.
 Feel-check: 1v1, dribble in place and on the move; you should hear one bounce per dribble, louder on a hard crossover. 3v3, pass to a mate.
+Measured (2026-11-12, `scripts/probes/hoops-sound/`: the real hoops screens on the show rig's site, phone profile, seed 7, SwiftShader):
+- Dribble: 1v1, 12 game s: 15 floor contacts of the ball (read off its height alone), 15 bounce sounds, each on its contact's frame (14
+  same frame, 1 a frame early), no extra sound, no double. 3v3, 12 game s: 18 contacts, 18 sounds, all on the frame, no double. By whose:
+  1v1 player 2 / AI 12 / loose 1; 3v3 player 11 / AI 5 / loose 2.
+- Loading: no hoops file is fetched before READY (the harness's own `#<mode>-ready` marker); all 24 (251 KB) arrive 0.03–0.18 s after it
+  on this box, and the crowd bed switches to the recording.
+- Levels (`loudness.mts`, rendered offline through SoundKit's own graph, the loudest 50 ms at the limiter): each recording within 2 dB of
+  the synth it replaces (swish -48.7 / -48.0, rim -33.8 / -33.9, cheer about -35, bed -46); squeak -39 (its synth -71); bounce -38.5;
+  catch -40. Chromium decodes the bed to exactly 14.000 s, so the loop is seamless.

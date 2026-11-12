@@ -13,9 +13,9 @@
 //     exactly on the meter's green center: what you SEE is what you TIME.
 
 import { Vector3 } from '@babylonjs/core';
-// HOOPS-SOUND (phase 11a, 2026-11-12): PassFlight's catch and bounce-pass floor hit
+// HOOPS-SOUND (phase 11a, 2026-11-12): PassFlight's catch
 import { SoundKit } from '../audio/SoundKit';
-import { BOUNCE_REF_MPS, PASS_CATCH_SOUND_ON, PASS_CATCH_VOL, bounceVolume } from '../audio/dribbleSound';
+import { PASS_CATCH_SOUND_ON, PASS_CATCH_VOL } from '../audio/dribbleSound';
 import { feel } from '../../feel-panel/feel';
 
 // ── Dribble state machine ──────────────────────────────────────────────────
@@ -199,13 +199,8 @@ export class PassFlight {
 
   step(dt: number, ball: Vector3): boolean {
     if (!this.active) return true;
-    const k0 = this.t;
     this.t = Math.min(1, this.t + dt / this.duration);
     const k = this.t;
-    // HOOPS-SOUND (phase 11a, 2026-11-12): a bounce pass is heard hitting the floor (its midpoint), and every pass that arrives is heard
-    // in the hands (the 3v3 pass played the menu's click, ThreeVThreeMode's uiTick at the throw, and nothing at the catch).
-    // Knob hoops.passCatchSoundOn (0: neither, as before).
-    if (this.type === 'bounce' && k0 < 0.5 && k >= 0.5) passSound('bounce');
     if (this.live) { const s = k * k * (3 - 2 * k); this.to.set(this.aim.x + (this.live.x - this.aim.x) * s, this.aim.y + (this.live.y - this.aim.y) * s, this.aim.z + (this.live.z - this.aim.z) * s); }
     ball.x = this.from.x + (this.to.x - this.from.x) * k;
     ball.z = this.from.z + (this.to.z - this.from.z) * k;
@@ -224,16 +219,18 @@ export class PassFlight {
         ball.y = 0.05 + (this.to.y - 0.05) * u;
       }
     }
-    if (this.t >= 1) { this.active = false; passSound('catch'); return true; }
+    // HOOPS-SOUND (phase 11a, 2026-11-12): every pass that arrives is heard in the hands (the 3v3 pass played the menu's click,
+    // ThreeVThreeMode's uiTick at the throw, and nothing at the catch). A bounce pass's floor hit is the ball watcher's (anim/ballCarry.ts).
+    // Knob hoops.passCatchSoundOn (0: no catch sound, as before).
+    if (this.t >= 1) { this.active = false; catchSound(); return true; }
     return false;
   }
 }
 
-/** HOOPS-SOUND (phase 11a): the pass's two sounds — its floor hit (a bounce pass) and the catch. */
-function passSound(what: 'bounce' | 'catch'): void {
+/** HOOPS-SOUND (phase 11a): the catch. */
+function catchSound(): void {
   if (feel('hoops.passCatchSoundOn', PASS_CATCH_SOUND_ON) < 0.5) return;
-  if (what === 'catch') SoundKit.play('catch', { volume: feel('hoops.passCatchVol', PASS_CATCH_VOL), tag: 'pass' });
-  else SoundKit.play('bounce', { volume: bounceVolume(BOUNCE_REF_MPS, 'player'), tag: 'pass' });
+  SoundKit.play('catch', { volume: feel('hoops.passCatchVol', PASS_CATCH_VOL), tag: 'pass' });
 }
 
 // ── Animation-synced shot release ──────────────────────────────────────────

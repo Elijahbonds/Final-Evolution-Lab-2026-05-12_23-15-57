@@ -4,8 +4,8 @@
 import { describe, expect, it } from 'vitest';
 import { HOOPS_DRIBBLE, PUSHED_FLOOR_PHASE, dribbleAtPushed } from '../anim/Dribble';
 import {
-  BOUNCE_LEVEL_MAX, BOUNCE_LEVEL_MIN, BOUNCE_REF_MPS, DRIBBLE_SOUND_AI_K, DRIBBLE_SOUND_VOL, FloorContact, REARM_M, SAME_BALL_GAP_SEC,
-  bounceVolume, claimDribbleRole, firstForBall, panFor,
+  BOUNCE_LEVEL_MAX, BOUNCE_LEVEL_MIN, BOUNCE_REF_MPS, DRIBBLE_SOUND_AI_K, DRIBBLE_SOUND_VOL, FloorContact, REARM_M,
+  bounceVolume, claimDribbleRole, panFor,
 } from './dribbleSound';
 
 /** Drive a detector with the hoops dribble at `hz` for `sec`, frames from `dtAt(i)`. Returns contact frames' phases and speeds. */
@@ -80,6 +80,13 @@ describe('FloorContact: what is not a bounce', () => {
     for (const y of [0.1, REARM_M + 0.05, 0.4, 0.2, 0.05]) fc.step(y, 1 / 60);
     expect(fc.count).toBe(2);
   });
+  it('a ball slowed in the air (a hand or a move meeting it 13 cm up) is not a contact; the floor four frames later is (1v1 rig, frames 190-196)', () => {
+    const fc = new FloorContact(); const r = 0.12;
+    const ys = [0.47, 0.38, 0.29, 0.25, 0.21, 0.18, 0.14, 0.14, 0.17, 0.20, 0.23];
+    const hits = ys.map((y) => fc.step(y - r, 1 / 60));
+    expect(hits.findIndex((v) => v > 0)).toBe(6);   // frame 195: the ball 2 cm off the floor, not frame 192 at 13 cm
+    expect(hits.filter((v) => v > 0)).toHaveLength(1);
+  });
   it('reset() forgets the ball: no speed is read across the gap (a carry that stopped drawing it)', () => {
     const fc = new FloorContact();
     fc.step(0.9, 1 / 60);
@@ -105,15 +112,8 @@ describe('who hears what', () => {
     expect(bounceVolume(0.1, 'player')).toBeCloseTo(DRIBBLE_SOUND_VOL * BOUNCE_LEVEL_MIN, 12);
     expect(bounceVolume(40, 'player')).toBeCloseTo(DRIBBLE_SOUND_VOL * BOUNCE_LEVEL_MAX, 12);
     expect(bounceVolume(BOUNCE_REF_MPS, 'off')).toBe(0);
+    expect(bounceVolume(BOUNCE_REF_MPS, 'loose')).toBeCloseTo(DRIBBLE_SOUND_VOL, 12);   // a rebound or a gather's last bounce
     expect(bounceVolume(0, 'player')).toBe(0);
-  });
-  it('one ball\'s contact is reported once even if two carries place it on the same frame', () => {
-    const ball = {};
-    expect(firstForBall(ball, 10)).toBe(true);
-    expect(firstForBall(ball, 10)).toBe(false);
-    expect(firstForBall(ball, 10 + SAME_BALL_GAP_SEC * 0.9)).toBe(false);
-    expect(firstForBall(ball, 10 + SAME_BALL_GAP_SEC * 1.01)).toBe(true);
-    expect(firstForBall({}, 10)).toBe(true);           // another ball is its own
   });
   it('the pan is gentle and capped', () => {
     expect(panFor(0, 6)).toBe(0);

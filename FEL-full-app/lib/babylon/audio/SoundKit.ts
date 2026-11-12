@@ -651,7 +651,7 @@ class SoundKitImpl {
     this.bank = bank;
     if (feel('hoops.sampleSfxOn', SAMPLE_SFX_ON) < 0.5) return Promise.resolve();
     const b = bank;
-    return b.load().then(() => { if (this.bank === b) this.swapBedToSample(); });
+    return b.load().then(() => { if (this.bank === b) this.swapBedToSample(); }).catch(() => { /* the synth bed plays on */ });
   }
 
   /** The decoder: the game's context when it exists, else an offline one (so loading never builds the live context before a gesture). */

@@ -157,7 +157,10 @@ export class SampleBank<B> {
     const cue = this.cues[name], slots = this.buffers.get(name), rr = this.robins.get(name);
     if (!cue || !slots || !rr || !slots.some((b) => b !== null)) return null;
     let i = rr.next();
-    for (let k = 0; k < slots.length && slots[i] === null; k++) i = rr.next();
+    if (slots[i] === null) {   // that variation failed to load: the next loaded one after it (a failed file never silences a cue)
+      let k = 1; while (k < slots.length && slots[(i + k) % slots.length] === null) k++;
+      i = (i + k) % slots.length;
+    }
     const buffer = slots[i];
     if (buffer === null) return null;
     return { buffer, rate: jitterRate(cue.pitchJitter, this.rand), gain: cue.gain * jitterGain(cue.volJitterDb, this.rand), bus: cue.bus, maxVoices: cue.maxVoices };

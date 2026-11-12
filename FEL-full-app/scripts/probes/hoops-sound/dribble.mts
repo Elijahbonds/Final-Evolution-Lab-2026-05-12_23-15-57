@@ -4,7 +4,7 @@
 // around the mode's own host) on the rig's virtual clock (1/60 s of game per drawn frame, Math.random seeded), plays the show rig's
 // scripted player, and records on EVERY drawn frame the ball's height (the one 'ball' mesh) and every SoundKit cue the game asked for
 // (host-entry.tsx's window.__SFX: name, game time, volume, who asked, pan). Then it counts:
-//   * floor contacts of the ball, read off its height alone (a local low under 0.25 m that it rose 0.2 m out of) — the ground truth;
+//   * floor contacts of the ball, read off its height alone (a local low under 0.25 m it fell 0.2 m into) — the ground truth;
 //   * bounce cues, by who asked (player / ai / pass), matched to those contacts (a cue within 2 frames of a contact);
 //   * doubles: two bounce cues within 0.2 s (no dribble is that fast: 2 bounces a second at most);
 //   * the recordings: when each /audio/hoops/ file arrived against READY, and the bytes before READY by kind.
@@ -23,7 +23,8 @@ const OUT = process.env.OUT ?? '/tmp/hoops-sound';
 const SEED = Number(process.env.SEED ?? 7);
 const RASTER = Number(process.env.RASTER ?? 8);
 const WALL_CAP_S = Number(process.env.WALL_CAP_S ?? 900);
-const QUERY = process.env.QUERY ?? '';   // e.g. '&feel=…' is not wired; knobs are tested headless
+const QUERY = process.env.QUERY ?? '';
+const LOAD_ONLY = process.env.LOAD_ONLY === '1';   // stop 15 s after READY: the loading check only
 
 const INIT = `(() => {
   const realNow = performance.now.bind(performance); window.__realNow = realNow;
@@ -61,13 +62,15 @@ const INSTRUMENT = (mode: string) => `(() => {
   return ball ? 'ok' : 'no ball';
 })()`;
 
-/** Floor contacts read off the ball's height alone: a local low under 0.25 m that the ball then rises 0.2 m out of. */
+/** Floor contacts read off the ball's height alone: a local low under 0.25 m (the ball's centre; its radius is 0.12) that it FELL at
+ *  least 0.2 m into from its last high — a bounce's own signature, whoever moved the ball. */
 function contacts(ball: [number, number, number][]): number[] {
-  const out: number[] = []; let lowF = -1, lowY = Infinity;
+  const out: number[] = []; let high = -Infinity, lowF = -1, lowY = Infinity, falling = false;
   for (const [f, y] of ball) {
     if (!Number.isFinite(y)) continue;
-    if (y < lowY) { lowY = y; lowF = f; }
-    else if (y > lowY + 0.2) { if (lowY < 0.25) out.push(lowF); lowY = y; lowF = f; }   // it rose out of that low: a contact if it was the floor
+    if (!falling) { if (y > high) high = y; else if (y < high - 0.02) { falling = true; lowY = y; lowF = f; } }
+    else if (y < lowY) { lowY = y; lowF = f; }
+    else if (y > lowY + 0.02) { if (lowY < 0.25 && high - lowY >= 0.2) out.push(lowF); falling = false; high = y; }
   }
   return out;
 }
@@ -91,9 +94,20 @@ async function runMode(b: import('playwright-core').Browser, mode: string) {
   const out: Record<string, unknown> = { mode, seed: SEED, when: new Date().toISOString() };
   try {
     await p.goto(`${BASE}/host/index.html?mode=${mode}&agent=1&perf=off${QUERY}`, { waitUntil: 'domcontentloaded', timeout: 240000 });
-    await p.waitForFunction(() => /TAP TO START|PRESS START|START/i.test(document.body.innerText) && !!(window as unknown as { __FEL_DEV__?: unknown }).__FEL_DEV__, null, { timeout: 900000, polling: 1000 });
+    // READY is the harness's own marker (core/readyMarker.ts: #<modeId>-ready appears on 'loaded'), polled every 100 ms
+    await p.waitForFunction((m) => !!document.getElementById(`${m}-ready`) && !!(window as unknown as { __FEL_DEV__?: unknown }).__FEL_DEV__, mode, { timeout: 900000, polling: 100 });
     readyWall = wall(); out.wallToReadyS = readyWall;
     out.sampleAtReady = await ev(`window.__SK.sampleState()`);
+    if (LOAD_ONLY) {   // the loading check alone: what was fetched before READY, and when the recordings arrive after it
+      await p.waitForTimeout(15000);
+      out.sampleAtEnd = await ev(`window.__SK.sampleState()`);
+      const hoops = res.filter((r) => r.kind === 'hoops-audio');
+      const before: Record<string, number> = {}; for (const r of res) if (r.wall <= readyWall) before[r.kind] = (before[r.kind] ?? 0) + r.bytes;
+      out.loading = { hoopsFiles: hoops.length, hoopsBytes: hoops.reduce((a, r) => a + r.bytes, 0), hoopsBeforeReady: hoops.filter((r) => r.wall <= readyWall).length,
+        firstHoopsAfterReadyS: hoops.length ? +(Math.min(...hoops.map((r) => r.wall)) - readyWall).toFixed(2) : null,
+        lastHoopsAfterReadyS: hoops.length ? +(Math.max(...hoops.map((r) => r.wall)) - readyWall).toFixed(2) : null, bytesBeforeReadyByKind: before };
+      return;
+    }
     await ev(`(() => { const d = window.__FEL_DEV__; d.scene.getEngine().setHardwareScalingLevel(d.scene.getEngine().getHardwareScalingLevel() * ${RASTER}); return 1; })()`);
     await ev(`window.__HOLD = 1`);
     out.instrument = await ev(INSTRUMENT(mode));
@@ -143,8 +157,8 @@ async function runMode(b: import('playwright-core').Browser, mode: string) {
     out.wallTotalS = wall();
     fs.writeFileSync(path.join(dir, 'dribble.json'), JSON.stringify(out));
     await Promise.race([ctx.close(), new Promise((r) => setTimeout(r, 30000))]);
+    console.log(`[hoops-sound] ${mode}: ${JSON.stringify(out.summary ?? out.error ?? 'load only')} ${JSON.stringify(out.loading ?? {})}`);
   }
-  console.log(`[hoops-sound] ${mode}: ${JSON.stringify(out.summary ?? out.error)} ${JSON.stringify(out.loading ?? {})}`);
 }
 
 const b = await chromium.launch({ executablePath: process.env.CHROMIUM_EXE ?? chromiumExe(), args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--no-sandbox', '--autoplay-policy=no-user-gesture-required'] });
