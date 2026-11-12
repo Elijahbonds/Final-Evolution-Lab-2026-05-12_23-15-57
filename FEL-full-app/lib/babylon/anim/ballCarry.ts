@@ -302,6 +302,11 @@ export const HELD_MPS = 8.4, HELD_OVER_MPS = 1.8;
 export const HELD_STEP_M = HELD_MPS / 60, HELD_STEP_OVER_M = HELD_OVER_MPS / 60;
 /** Seconds the snap lasts, the follow-through holds, and the lag's gain (degrees of flex per degree/s of forearm swing). */
 export const WRIST_SNAP_SEC = 0.18, WRIST_AFTER_SEC = 0.8, WRIST_LAG_GAIN = 0.02;
+/** hoops-gather G2 (docs/HOOPS-GATHER-ESCAPE-PLAN.md §3, "the release wrist"): the smoothing time of the release's snap (s). Measured at
+ *  eec53f24: the ball hand's wrist turns 57.6° in ONE frame at the release of every set jumper and step-back (one hard pop a shot — the
+ *  largest family of hard pops after the press: 70 of 210 in the gather trials). 0.03 is the value it always had (TUNED, unchanged);
+ *  a longer ease spreads the same 58° snap over more frames. Knob `hoops.releaseSnapEaseSec`. */
+export const RELEASE_SNAP_EASE_SEC = 0.03;
 /** The dribbling wrist over a bounce (phase → degrees): cocked back as the ball arrives, the push through the top, a soft hand as it
  *  waits, cocked again to take the next one. Periodic, cosine-eased between the keys. */
 const DRIBBLE_WRIST_KEYS: readonly [number, number][] = [[0, -10], [0.12, 30], [0.3, 16], [0.6, 4], [0.86, -8], [0.96, -16], [1, -10]];
@@ -652,7 +657,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
         // both palms on the ball at the chest, giving with each step of the jog (the stride clock off the feet)
         if (holdK > 0.05) deg = WRIST_DEG.support + 5 * holdK * Math.sin(2 * Math.PI * Math.min(4, (clock - lockStrikeAt) / Math.max(0.3, lockPeriod)) + (sd === 'Left' ? 0 : Math.PI));
       } else if (releasedBy && sinceRelease < WRIST_AFTER_SEC + 0.4) {
-        if (sd === releasedBy) { deg = sinceRelease < WRIST_SNAP_SEC ? WRIST_DEG.snap : sinceRelease < WRIST_AFTER_SEC ? WRIST_DEG.after : WRIST_DEG.relaxed; smooth[sd] = sinceRelease < WRIST_SNAP_SEC ? 0.03 : 0.12; }
+        if (sd === releasedBy) { deg = sinceRelease < WRIST_SNAP_SEC ? WRIST_DEG.snap : sinceRelease < WRIST_AFTER_SEC ? WRIST_DEG.after : WRIST_DEG.relaxed; smooth[sd] = sinceRelease < WRIST_SNAP_SEC ? feel('hoops.releaseSnapEaseSec', RELEASE_SNAP_EASE_SEC) : 0.12; }   // hoops-gather G2: the snap's ease is a knob (0.03 = as before)
         else deg = WRIST_DEG.relaxed;
       }
       const swing = foreSwing(sd, dt);   // (read every frame so the memo stays continuous)
