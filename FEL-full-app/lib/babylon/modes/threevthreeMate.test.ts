@@ -110,7 +110,10 @@ describe('3v3 make rates are unchanged per decision type', () => {
     expect(shoots).toMatch(/const mateContest = oneContestOn\(\) \? contestOn\(.*\)\.contest : mateContestOld;/);
     expect(shoots).toMatch(/const mateStyle: 'layup' \| 'jumper' = dist < LAYUP_RANGE \? 'layup' : 'jumper';/);
     expect(shoots).toMatch(/const mPct = matePct\(finish, dist, mateContest, mateStyle\);/);
-    expect(shoots).toMatch(/const mv = rimVerdictFor\(mateMiss\.from, mPct, /);
+    // hoops-p09 (test changed: one shot model for every shooter): the mate's jumper / layup goes through the shared release first
+    // (core/SharedShot aiRelease); the matePct path is unchanged and is the knob's off path (hoops.aiSharedShotOn 0), and the lob's
+    expect(shoots).toMatch(/const mRel = finish === 'shot' && aiSharedShotOn\(\) \? aiRelease\(/);
+    expect(shoots).toMatch(/: rimVerdictFor\(mateMiss\.from, mPct, /);
   });
   it('the numbers per decision type (pinned): an open catch-and-shoot, a contested look at the hold\'s end, a drive\'s finish', () => {
     const d3 = (flat: number) => Math.hypot(flat, 3.05);   // the 3D distance teammateShoots measures (the ring is 3.05 m up)

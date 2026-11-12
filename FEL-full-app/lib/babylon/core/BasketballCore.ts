@@ -33,6 +33,7 @@ import {   // HOOPS-MOVE-KIT-A O1–O3: the off-ball jobs (screen / roll / pop /
 } from './HoopsOffball';
 import { BallSideShade } from './BallSideShade';   // hoops-defense-fx (owner 2026-10-20): the on-ball man shades the ball side
 import { aiPokes } from './ReachTell';   // lane/hoops-def-tell (#273 T-A): the poke is a per-second rate aimed at the led ball
+import { gatherCloseoutOn, gatherCloseoutM } from '../hoops/rulebook';   // hoops-p09: the closeout on a jump-shot gather
 import { cushionLever } from '../hoops/pressure';   // hoops-p02 (1v1/3v3 phase 2): the on-ball man's cushion on a moving handler
 
 // ── Movement ─────────────────────────────────────────────────────────────
@@ -822,6 +823,9 @@ export class DefenderBrain implements AIBehavior {
   /** The job this frame, for the mode's stance / facing / probes. */
   job: DefenseJob = 'deny';
   private closingOut = false;   // DEFENSE-LOOK: the closeout is sticky until he is on the man
+  /** hoops-p09 (one rulebook): the shooter he guards is GATHERING for a jump shot and his reaction time has passed — step up and
+   *  close out to hoops.gatherCloseoutM off him (the mode sets it, after the tier's reaction; hoops.gatherCloseoutOn 0 ignores it). */
+  closeOnGather = false;
   /** The objective the job faces (the handler, the boxed man, the ball). */
   objective: Vector3 | null = null;
   boxOut(mark: Vector3 | null): void { this.boxTarget = mark ? mark.clone() : null; }
@@ -938,6 +942,13 @@ export class DefenderBrain implements AIBehavior {
       const armLever = DefenderBrain.ARMS_LENGTH / Math.max(0.5, Vector3.Distance(anchor, hoop));
       if (lever > armLever) denyPoint = Vector3.Lerp(anchor, hoop, armLever);
     } else if (onBall && !beaten && !press) denyPoint = Vector3.Lerp(anchor, hoop, cushionLever(lever, distXZ(anchor, hoop), handlerSpeed));   // hoops-p02: on a MOVING handler, at most a cushion off him (hoops/pressure)
+    // hoops-p09: THE CLOSEOUT ON THE GATHER — a shooter rising for a jumper is stepped up on, the chest square, the hand coming up (the
+    // mode's aiContestLoad); the pull-up three off his arm's-length spot was the one look that beat every tier (HOOPS-AAA-GAP-PLAY §3.6)
+    let gatherClose = false;
+    if (this.closeOnGather && onBall && !beaten && gatherCloseoutOn()) {
+      const sh = handlerPos ?? ball; const toHoop = hoop.subtract(sh); toHoop.y = 0; const L = toHoop.length();
+      if (L > 1e-3) { denyPoint = sh.add(toHoop.scale(Math.min(gatherCloseoutM(), L * 0.9) / L)); denyPoint.y = 0; gatherClose = true; }
+    }
     if (!onBall) denyPoint = Vector3.Lerp(denyPoint, ball, 0.22);
     if (helping) denyPoint = Vector3.Lerp(hoop, ball, 0.2);   // the low man steps INTO the drive
 
@@ -950,7 +961,7 @@ export class DefenderBrain implements AIBehavior {
       if (nav) { if (this.navigating <= 0) this.over = this.rng() < 0.6; this.navigating = 0.5; to.addInPlace(nav.scale(1.6)); fighting = true; break; }
     }
     this.navigating = Math.max(0, this.navigating - dt);
-    this.job = fighting ? 'navigate' : helping ? 'help' : beaten ? 'recover' : closingOut ? 'closeout' : onBall ? 'onball' : 'deny';
+    this.job = fighting ? 'navigate' : helping ? 'help' : beaten ? 'recover' : closingOut || gatherClose ? 'closeout' : onBall ? 'onball' : 'deny';
     this.objective = onBall ? (mark ?? ball) : ball;
     // PLANAR distance. Vector3.Distance includes Y, and the deny point's Y
     // is lerped toward the rim (y=3.05) while the defender's feet are at 0 —
@@ -963,7 +974,7 @@ export class DefenderBrain implements AIBehavior {
     // approach 0.6m short of the press point, which parked the defender at
     // ~1.4m — just OUTSIDE poke range (1.1m). Pressure without arrival is a
     // statue with intent. Measured live: never stripped, never stole.
-    const out = steer(to, (dist > 3 || beaten || closingOut) && !fighting, press ? 0.2 : onBall ? 0.6 : 1.4,
+    const out = steer(to, (dist > 3 || beaten || closingOut || gatherClose) && !fighting, gatherClose ? 0.12 : press ? 0.2 : onBall ? 0.6 : 1.4,
       onBall && aiPokes(this.rng, this.aggression, dt, dist, ball, { x: hvx, z: hvz }, self));   // #273: core/ReachTell (the old `dist < 1.1 && rng() < aggression × 0.02` is its A/B off)
     if (fighting && this.over) { out.moveX *= 0.7; out.moveY *= 0.7; }   // fighting OVER the screen costs speed (FIGHT_SLOW)
     return out;

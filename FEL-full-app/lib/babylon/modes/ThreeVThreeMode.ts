@@ -99,7 +99,7 @@ import { attachBallToHand, gatherBallToHand, releaseBall } from '../anim/ballRig
 import { passStartFor, passCatchPoint } from '../hoops/ballHandoff';   // hoops-p05 (phase 5): a teammate's pass leaves from the ball, not from root + 1.2 m
 import { rightHandHoops, rightHandBall, hoopsHand, leftDribbleTwins } from '../anim/hoopsHand';   // HOOPS MOTION phase 3: right-handed on screen, every body
 import { sideAwayFrom, sideOfVector } from '../anim/athleteSide'; // HOOPS MOTION phase 3: the one visual-side helper (phase 4b: a crossing move's side is its end hand's; the bite's is still sideAwayFrom's)
-import { requestMove, sizeUpMoveOf, type HandleHost } from '../anim/handleMotion';   // HOOPS MOTION phase 4b: one renderer for the handle moves (1v1's too)
+import { requestMove, sizeUpMoveOf, moveSideFor, type HandleHost } from '../anim/handleMotion';   // HOOPS MOTION phase 4b: one renderer for the handle moves (1v1's too)
 import { findBone } from '../anim/boneLookup';
 import { mountRimReach, rimReachWeight, type RimReachHandle } from '../anim/rimReach';   // HAND AND RIM (owner, 2026-09-18)
 import { isFinishStyle, planDropStep, planShimmyFade, stickAtRim01, POST_DROP_STICK_MIN, SHIMMY_CONTEST_CUT, PUMP_MAX_SEC } from '../core/HoopsMoves';
@@ -152,7 +152,7 @@ import {
   hasMove, MOVE_HANDLE, type MoveOutcome,   // the stick's snatchback is gated on the same rating doMove gates on
 } from '../core/HandleSystem';   // the vocabulary 1v1 had and this mode did not
 import {
-  THREAT_IDLE, inTripleThreat, isJabInput, jabBiteOdds, canJab, throwJab, tickThreat, jabBurst,
+  THREAT_IDLE, inTripleThreat, isJabInput, jabBiteOdds, canJab, throwJab, tickThreat, jabBurst, JAB_RANGE,
   type ThreatState,
 } from '../core/TripleThreat';   // standing still with the ball is not idle — it is threatening
 import { inStance, stanceWish } from '../core/DefensiveStance';   // the slide was cosmetic until now
@@ -171,6 +171,8 @@ import { ReactiveDefender } from '../hoops/reaction';   // lane/hoops-round2 HOP
 import { aiReactMs } from '../hoops/reaction';   // hoops-p02: the AI's block jump is never before it could have read my shot
 import { blockDiceOn, meetsRelease, releaseFrom, handOnBall, deflect, aiBlockJumpAtSec, type Blocker, type P3 } from '../hoops/blocks';   // hoops-p02 (1v1/3v3 phase 2): the hand meets the ball, for everyone
 import { oneContestOn, contestFrom, contestOn, closingSpeed, type ContestBody } from '../hoops/contest';   // hoops-p02: one contest model for every shooter
+import { skillShotOn, aiSharedShotOn, greenScaleFor, moveReadOn, readTheMan, manReadFrom, pressFloored, gatherCloseoutOn, isJumpShot, type ManRead } from '../hoops/rulebook';   // hoops-p09: one rulebook (shots, moves, the closeout, the press floor)
+import { heroSkillVerdict, rimFromRelease, aiRelease, missShapeFor } from '../core/SharedShot';   // hoops-p09: one shot model for every shooter
 import { stealDiceOn, aiStripLands } from '../hoops/steals';   // hoops-p02: the AI's strip is a hand on the ball
 import { TeamDefense, type TeamDEvent } from '../hoops/teamDefense';   // lane/hoops-round2 HOP-03: the switch on a screen and the double team
 import { HandCheckPlay } from '../hoops/handCheck';   // lane/hoops-round2 HOP-04: hand-checks, too many = a foul
@@ -397,8 +399,11 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   let ftLine: FreeThrowLine | null = null;   // hoops-shot-content: the free-throw line — a foul site's continuation runs after the trip
   const ftAfter = (...a: Parameters<FreeThrowLine['after']>): void => { if (ftLine) ftLine.after(...a); else a[2](); };
   let meReach: RimReachHandle | null = null;   // HAND AND RIM: the dunk's hand onto the ring
+  let meterJump = false;   // hoops-p09: the meter running is a jump shot's (the closeout on the gather reads it)
   const meterStart = (contest: number, style?: Parameters<ShotMeter['start']>[1], gather?: number): void => {
     shotMeter.start(contest, style ?? 'jumper', gather ?? 0); shotMeter.narrowBy(distanceGreenFactor(distXZ(me.char.root.position, RIM_FLOOR), style ?? 'jumper'));   // lane/hoops-shot-core: distance narrows the green (ShotWindow)
+    meterJump = isJumpShot(style ?? 'jumper');   // hoops-p09: the AI closes out on a jump shot's gather
+    shotMeter.narrowBy(greenScaleFor(style ?? 'jumper', contest));   // hoops-p09: the jump shots' green scale and a finish's contest narrowing (hoops/rulebook; hoops.jumpGreenScale 1 / hoops.skillShotOn 0 = today)
     hudGreen = `${shotMeter.greenCenter01.toFixed(3)},${shotMeter.greenHalfWidth01.toFixed(3)}`; if (ctx0) putHud(ctx0, { shotMeterPerfect: perfectHud(shotMeter.greenHalfWidth01) });   // lane/hoops-shot-core: the PERFECT band on the HUD bar
     meter3d?.begin({ center: shotMeter.greenCenter01, half: shotMeter.greenHalfWidth01 });
   };
@@ -1352,6 +1357,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
 
       // poll every body; tick stagger timers
       net?.tick(me.slot.intent);   // no-op without ?net=
+      // hoops-p09: THE CLOSEOUT ON THE GATHER — once the tier's reaction has passed inside my jump-shot meter, my man's brain steps up
+      { const close = gatherCloseoutOn() && meterJump && shooting && shotMeter.active && shotMeter.t * shotMeter.durationSec >= aiReactMs(runTierNow) / 1000; for (const f of foes) { const fb = foeBrain(f); if (fb) fb.closeOnGather = close; } }
       for (const b of everyBody()) { b.slot.poll(dt); b.stunSec = Math.max(0, b.stunSec - dt); if (b.jumpAge !== Infinity) { b.jumpAge += dt; b.char.root.position.y = jumpY(b.jumpAge); if (b.jumpAge >= JUMP_SEC) { b.jumpAge = Infinity; b.char.root.position.y = 0; } } }
       if (myJumpAge !== Infinity) myJumpAge += dt;
       if (victimSlide) { const step = slideStep(victimSlide.left, dt, victimSlide.mps ?? undefined); victimSlide.body.char.root.position.addInPlace(victimSlide.dir.scale(step)); victimSlide.left -= step; if (victimSlide.left <= 1e-4) victimSlide = null; }   // DUNK-FANATIC
@@ -1781,7 +1788,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
             const snr = requestMove(meHost(), {
               move: 'snatch_back', fadeSec: moveFadeSec(sprintOk), speedRatio: 1,   // H2b (plan §4.13): its own v2 clip (MOVE_CLIP)
               decide: { kind: 'custom', run: () => {
-                const sno = resolveHandleMove('snatch_back', chain, handle, { present: !!nfS && nfS.stunSec <= 0 && !nfS.floored, closing: false, set: false, within: !!nfS && distXZ(me.char.root.position, nfS.char.root.position) < 2.4 }, roll, MOVES_UNLOCKED_GATE);
+                const sno = resolveHandleMove('snatch_back', chain, handle, { present: !!nfS && nfS.stunSec <= 0 && !nfS.floored, closing: false, set: false, within: !!nfS && distXZ(me.char.root.position, nfS.char.root.position) < 2.4, man: nfS ? manReadOf(nfS, null) : undefined }, roll, MOVES_UNLOCKED_GATE);   // hoops-p09: a step back off the man beats him when he is coming at you
                 chain = sno.chain;
                 console.info(`[3V3-HANDLE] move snatch_back (chain ${chain.length}, handle ${handle}, ${sno.tier})`);
                 reactToBreak(ctx, sno, nfS, 'snatch_back', pick.side ?? 'right');
@@ -1904,7 +1911,9 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
                   handle,
                   shownThisPossession: threat.shown,
                 }) : 0;
-                bought = !!nf && Math.random() < odds;
+                // hoops-p09: he bites the jab when he is coming at you or off balance, and only the first two a possession (he learns); no roll
+                bought = nf && moveReadOn() ? distXZ(me.char.root.position, nf.char.root.position) <= JAB_RANGE && threat.shown < 2 && readTheMan(manReadOf(nf, null)).beat
+                  : !!nf && Math.random() < odds;   // dice-off: hoops.moveReadOn 0
                 threat = throwJab(threat, bought);
                 burstArmed = bought;
               } },
@@ -2543,7 +2552,13 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       short: mateContest * 0.8 + Math.max(0, dist - 7) * 0.12,
       lateral: (Math.random() - 0.5) * 0.9,
     };
-    const mv = rimVerdictFor(mateMiss.from, mPct, mateMiss.quality01, mateMiss.short, mateMiss.lateral); const made = mv.made;   // lane/hoops-shot-core: on the ring, the rate kept
+    // hoops-p09 ONE RULEBOOK: his jumper or layup is released on MY meter with a teammate's hand (core/SharedShot aiRelease), decided by
+    // the same rule as mine; the lob and the putback are dunks and keep their rate. His own table behind hoops.aiSharedShotOn 0
+    const mRel = finish === 'shot' && aiSharedShotOn() ? aiRelease({ who: 'mate', style: mateStyle, contest: mateContest, distM: distXZ(body.char.root.position, RIM_FLOOR) }, Math.random) : null;
+    if (mRel) { const ms = missShapeFor(mRel.quality, mateContest); mateMiss.quality01 = ms.quality01; mateMiss.short = ms.short; console.info(`[3V3-RIM] mate release ${mateStyle} ${mRel.quality} ${(mRel.offsetSec * 1000).toFixed(0)} ms off, green ±${(mRel.halfSec * 1000).toFixed(0)} ms`); }
+    const mv = mRel && skillShotOn() ? rimFromRelease(RIM, flatFrom(mateMiss.from), mRel.verdict.made, mRel.verdict.closeness, mateMiss.quality01, { short: mateMiss.short, lateral: mateMiss.lateral })
+      : mRel ? rimVerdictFor(mateMiss.from, mRel.ratePct, mateMiss.quality01, mateMiss.short, mateMiss.lateral)   // dice-off: hoops.skillShotOn 0
+      : rimVerdictFor(mateMiss.from, mPct, mateMiss.quality01, mateMiss.short, mateMiss.lateral); const made = mv.made;   // the lob and the putback are DUNKS (their rate, as before); a jumper reaches here only with hoops.aiSharedShotOn 0
     mateArc.start(ball.getAbsolutePosition(), RIM, made, finish !== 'shot' ? 'layup' : 'jumper', 0, null, mv.play);   // RIM PLAY
     if (finish !== 'shot') { ctx.juice.shake(0.12, 120); ctx.feel?.impact?.(0.5); }
     if (made) {
@@ -2604,10 +2619,13 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     arcPoints = isThree(me.char.root.position, RIM) ? 3 : 2;
     arcLabel = currentShot?.label ?? 'SHOT';
     arcQuality = quality;
-    const v3 = rimVerdictFor(me.char.root.position, Math.min(0.98, pct),
-      quality === 'perfect' ? 0.95 : quality === 'early' || quality === 'late' ? 0.55 : 0.2,
-      (quality === 'early' ? 0.8 : quality === 'late' ? -0.8 : quality === 'brick' ? 0.3 : 0) + shotContest * 0.7,
-      quality === 'brick' ? (Math.random() < 0.5 ? -0.7 : 0.7) : 0);
+    // hoops-p09 ONE RULEBOOK: the release decides (core/SharedShot) — inside the green it goes in, outside it misses, the contest at the
+    // release and the distance narrow the green; the grade's rate and the ring's draw behind hoops.skillShotOn 0
+    const skillV = skillShotOn() ? heroSkillVerdict(quality, shotMeter.offsetSec, { style: currentShot?.style ?? 'jumper', meterHalfSec: shotMeter.greenHalfSec, releaseContest: shotContest, distM: distXZ(me.char.root.position, RIM_FLOOR), gatherSec: shotMeter.gatherSec, fatigue01: meFatigue01, momentum: mbus.multiplier(), banked: !!banked }) : null;
+    if (skillV) console.info(`[3V3-RIM] release ${skillV.why}: ${(shotMeter.offsetSec * 1000).toFixed(0)} ms off, green ±${(skillV.halfSec * 1000).toFixed(0)} ms → ${skillV.made ? 'IN' : 'out'}`);
+    const myMiss = { q01: quality === 'perfect' ? 0.95 : quality === 'early' || quality === 'late' ? 0.55 : 0.2, short: (quality === 'early' ? 0.8 : quality === 'late' ? -0.8 : quality === 'brick' ? 0.3 : 0) + shotContest * 0.7, lateral: quality === 'brick' ? (Math.random() < 0.5 ? -0.7 : 0.7) : 0 };
+    const v3 = skillV ? rimFromRelease(RIM, flatFrom(me.char.root.position), skillV.made, skillV.closeness, myMiss.q01, { short: myMiss.short, lateral: myMiss.lateral })
+      : rimVerdictFor(me.char.root.position, Math.min(0.98, pct), myMiss.q01, myMiss.short, myMiss.lateral);   // dice-off: hoops.skillShotOn 0
     arcMade = v3.made;
     // D1: the AI's block at the release (a hand up or a jump inside range) — the ball knocked LOOSE from my hand
     const blockChance = near ? aiBlockChance(currentShot?.style ?? 'jumper', nearDist, nearUp, near.vel.length() < 1.0) : 0;
@@ -2776,7 +2794,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
             SoundKit.play('whoosh', { pitch: 1.3, volume: 0.45 });
             bannerFlash(ctx, onTheBump ? `${spec.label} ON HIM!` : spec.label, 900);
           } else {
-            made = roll() < trickPctFor(c.pct, spec, judge);   // a trick you could not land is a decision with a price
+            made = roll() < pressFloored(trickPctFor(c.pct, spec, judge), c.pct);   // hoops-p09: a mistimed trick never pays less than the plain dunk (hoops.pressFloorOn)   // a trick you could not land is a decision with a price
             bannerFlash(ctx, judge === 'early' ? 'TOO EARLY!' : 'TOO LATE!', 700);
           }
           resolved = true;   // the make is decided (1v1's): the rim protector does not meet a thrown trick
@@ -2841,7 +2859,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         putHud(ctx, { shotMeterT: showtimeMeterT(k), shotMeterGreen: hudGreen });
         if (showtimeK === null && (showtimePress || k >= SHOWTIME_DEADLINE_K)) {
           const j = showtimePress ? judgeShowtime(k) : 'none'; showtimePress = false; showtimeK = k; showtimeJudge = j; meter3d?.end(j === 'none' ? 'held' : j);
-          made = roll() < SHOWTIME_PCT[j] * (kind === 'poster' ? Math.max(0.6, c.pct) : 1);
+          made = roll() < pressFloored(SHOWTIME_PCT[j], SHOWTIME_PCT.none) * (kind === 'poster' ? Math.max(0.6, c.pct) : 1);   // hoops-p09: a mistimed flush never pays less than no press (hoops.pressFloorOn)
           if (j === 'perfect') { ctx.juice.hitStop(70); ctx.camDirector.pulse(0.7, 0.45); SoundKit.play('crowdCheer', { volume: 0.6 }); }
           putHud(ctx, { banner: j === 'perfect' ? `${picked3.label} — PERFECT!` : j === 'good' ? `${picked3.label}!` : j === 'early' ? 'EARLY — OFF THE FRONT' : j === 'late' ? 'LATE — OFF THE BACK' : picked3.label }); bannerClearLater(ctx, 800);
           console.info(`[3V3-SHOWTIME] flush ${j} at k ${k.toFixed(2)} made ${made}`);
@@ -3099,7 +3117,11 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     pumpWindow = STEP_THROUGH_SEC;
     me.tree.beat('bball_pump_fake', { fadeSec: 0.06 });
     SoundKit.play('whoosh', { pitch: 1.3, volume: 0.25 });
-    const bit = !!near && near.stunSec === 0 && !near.floored && distXZ(me.char.root.position, near.char.root.position) <= PUMP_BITE_RANGE && roll() < PUMP_BITE_CHANCE;
+    // hoops-p09: he leaves his feet when he is flying at you (closing out, or already in the air); a man sitting back does not bite. No roll
+    const pumpRead = near && moveReadOn() ? readTheMan(manReadOf(near, null)) : null;
+    const bit = !!near && near.stunSec === 0 && !near.floored && distXZ(me.char.root.position, near.char.root.position) <= PUMP_BITE_RANGE
+      && (pumpRead ? pumpRead.why === 'committed' || pumpRead.why === 'offBalance'
+        : roll() < PUMP_BITE_CHANCE);   // dice-off: hoops.moveReadOn 0
     if (bit && near) { near.stunSec = PUMP_BITE_STUN; near.tree.beat('bball_block_reach'); SoundKit.play('whoosh', { pitch: 0.9, volume: 0.4 }); }
     putHud(ctx, { shotType: '', shotMeterT: 0, banner: bit ? 'HE BIT THE PUMP!' : 'PUMP FAKE' });
     if (bit) mic?.say({ moment: 'game.bite', crowd: { moment: 'crowd.ooh', n: 1 } });   // THE MIC
@@ -3333,6 +3355,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
    *  one error drawn so that P(made) == pct, and the dwell planned from that same error, so the scoreboard and the iron
    *  cannot disagree. Finishes at the rim (dunks, layups, put-backs) keep their own resolution: a layup is a placement,
    *  not a shot at the ring. */
+  /** The shooter's position seen from the rim, flat (RimPlay's `toShooter`). */
+  function flatFrom(shooterPos: Vector3): Vector3 { const v = shooterPos.subtract(RIM); v.y = 0; return v; }
   function rimVerdictFor(shooterPos: Vector3, pct: number, q01: number, short: number, lateral: number): RimVerdict {
     const toShooter = shooterPos.subtract(RIM); toShooter.y = 0;
     const v = rimDecidesExact(RIM, toShooter, pct, q01, { short, lateral });   // lane/hoops-shot-core: exact at every pct (RimForAll) — identical inside [0.005, 0.995]
@@ -3579,6 +3603,11 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
 
   /** HOOPS MOTION phase 4b: the hero as the handle renderer sees it (anim/handleMotion) — his carry, his tree's beat, his impulse (forward
    *  along the facing, lateral + toward the athlete's right). */
+  /** hoops-p09 (one rulebook): what this defender is doing at my press, in my frame — off balance (in his jump, or in his reach),
+   *  coming at me, or moving across me — for a move's read (hoops/rulebook readTheMan). */
+  function manReadOf(f: Body, moveSide: 'left' | 'right' | null): ManRead {
+    return manReadFrom(me.char.root.position, me.char.root.rotation.y, f.char.root.position, f.vel, f.jumpAge < JUMP_SEC || !!f.reach?.showing, moveSide);
+  }
   function meHost(): HandleHost {
     return {
       carry: carries.get(me) ?? null, flow: meFlow,   // hoops-moves: the combo window (anim/comboFlow)
@@ -3610,6 +3639,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         closing: !!foe && foe.char.root.position.subtract(me.char.root.position).length() > 0
           && facingCos(foe.char.root.rotation.y, foe.char.root.position, me.char.root.position) > 0,
         set: !!foe && foe.speed01 < 0.1,
+        man: foe ? manReadOf(foe, moveSideFor(meHost(), { move, hint: dirHint, cutSide, path: move === 'steezo_roll' ? 'momentum_btb' : undefined })) : undefined,   // hoops-p09: the read, not the roll
         within: !!foe && distXZ(me.char.root.position, foe.char.root.position) < SHAKE_RANGE,
       }, Math.random, MOVES_UNLOCKED_GATE) },   // H2: owned at the unlock gate, priced at the player's handle
       clipFor: variant === 'slide' ? (d) => `bball_btb_slide_${d}` : undefined,
@@ -3641,7 +3671,10 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         defenderSpeed: foe.speed01 * 6,
       });
       SoundKit.play('whoosh', { pitch: 1.35, volume: 0.4 });
-      if (odds > 0 && Math.random() < odds) {
+      // hoops-p09: it comes off clean when the odds are on your side (≥ 0.5: in range, square to you, not moving fast), else it is lost
+    const clean = moveReadOn() ? odds >= 0.5
+      : odds > 0 && Math.random() < odds;   // dice-off: hoops.moveReadOn 0
+    if (clean) {
         foe.stunSec = Math.max(foe.stunSec, 0.8);
         foe.tree.beat('bball_contact_react');
         SoundKit.play('impact', { pitch: 1.2, volume: 0.55 });
@@ -4457,7 +4490,14 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       quality01: Math.max(0.15, 0.85 - defenseFactor * 0.5),
       short: defenseFactor * 0.8, lateral: (Math.random() - 0.5) * 0.9,
     };
-    const rv = rimVerdictFor(mateMiss.from, rPct, mateMiss.quality01, mateMiss.short, mateMiss.lateral); const made = rv.made;   // lane/hoops-shot-core: on the ring, the rate kept
+    // hoops-p09 ONE RULEBOOK: he releases on MY meter with his tier's hand (core/SharedShot aiRelease), decided by the same rule as mine;
+    // the tier's rate table (threevthreeRules.rivalReleasePct) behind hoops.aiSharedShotOn 0
+    const fRel = aiSharedShotOn() ? aiRelease({ who: runTierNow, style: finishStyle, contest: defenseFactor, distM: distXZ(shooter.char.root.position, RIM_FLOOR), mistake: foeNrv.mistake }, Math.random) : null;
+    if (fRel) { const ms = missShapeFor(fRel.quality, defenseFactor); mateMiss.quality01 = ms.quality01; mateMiss.short = ms.short; console.info(`[3V3-RIM] rival release ${finishStyle} ${fRel.quality} ${(fRel.offsetSec * 1000).toFixed(0)} ms off, green ±${(fRel.halfSec * 1000).toFixed(0)} ms (${runTierNow} hand)`); }
+    const rv = fRel && skillShotOn() ? rimFromRelease(RIM, flatFrom(mateMiss.from), fRel.verdict.made, fRel.verdict.closeness, mateMiss.quality01, { short: mateMiss.short, lateral: mateMiss.lateral })
+      : fRel ? rimVerdictFor(mateMiss.from, fRel.ratePct, mateMiss.quality01, mateMiss.short, mateMiss.lateral)   // dice-off: hoops.skillShotOn 0
+      : rimVerdictFor(mateMiss.from, rPct, mateMiss.quality01, mateMiss.short, mateMiss.lateral); const made = rv.made;   // dice-off: hoops.aiSharedShotOn 0   // lane/hoops-shot-core: on the ring
+    console.info(`[3V3-RIM] rival shot ${made ? 'IN' : 'out'} (${points})`);   // hoops-p09: the rival's verdict on one line (the probes count it)
     mateArc.start(ball.getAbsolutePosition(), RIM, made, finishStyle, alteredApex(defenseFactor), null, rv.play);   // RIM PLAY
     startBoxOut('theirs');   // O2: my team seals their bodies while the ball is up
     if (made) {

@@ -29,7 +29,11 @@ const KIND = [
   [/rimDecides|Verdict|made|make/i, 'shot make (the ring at a rate)'],
   [/kick|catchAndShoot|pullUp|shooter|finish|openLane|DUNK_SHARE|drive|bank|intent|Intent|decide/i, 'AI decision'],
 ];
-const rows = [], cosmetic = [];
+// hoops-p09: a line tagged `dice-off: <knob> 0` is a draw that only runs on that knob's OFF path (the old behaviour kept one tap away);
+// with the knobs at their defaults it never runs. Listed apart, so the ledger reads what decides outcomes in the game as shipped.
+// `--all` counts them back in (the ledger as it read before hoops-p09).
+const ALL = process.argv.includes('--all');
+const rows = [], cosmetic = [], offPath = [];
 for (const rel of FILES) {
   const f = path.join(APP, rel); if (!fs.existsSync(f)) continue;
   const lines = fs.readFileSync(f, 'utf8').split('\n');
@@ -40,6 +44,7 @@ for (const rel of FILES) {
     if (COSMETIC.test(code) && !DRAW.test(code.replace(COSMETIC, ''))) { cosmetic.push(`${rel}:${i + 1}`); return; }
     if (/^\s*(export )?(function|const \w+ = \()/.test(code) && VERDICT.test(code) && !DRAW.test(code)) return;   // a definition, not a call
     const kind = (KIND.find(([re]) => re.test(code)) ?? [null, 'other'])[1];
+    if (!ALL && /dice-off:/.test(ln)) { offPath.push({ at: `${rel.replace('lib/babylon/', '')}:${i + 1}`, kind, knob: (ln.match(/dice-off: ([^\n]*)$/) ?? [, ''])[1].trim().slice(0, 80) }); return; }
     rows.push({ at: `${rel.replace('lib/babylon/', '')}:${i + 1}`, kind, code: code.trim().slice(0, 150) });
   });
 }
@@ -48,7 +53,9 @@ if (process.argv.includes('--md')) {
   console.log('| what the draw decides | sites | where (file:line) |'); console.log('|---|---|---|');
   for (const [k, v] of Object.entries(byKind).sort((a, b) => b[1].length - a[1].length)) console.log(`| ${k} | ${v.length} | ${v.map((r) => r.at).join(', ')} |`);
   console.log(`\ncosmetic only (a miss's or a loose ball's path): ${cosmetic.length} sites`);
+  if (offPath.length) { console.log(`\nretired to a knob's OFF path (never run at the defaults): ${offPath.length} sites`); for (const r of offPath) console.log(`- ${r.at} (${r.kind}) — ${r.knob}`); }
 } else {
   for (const [k, v] of Object.entries(byKind)) { console.log(`\n## ${k} (${v.length})`); for (const r of v) console.log(`  ${r.at}  ${r.code}`); }
   console.log(`\ncosmetic only: ${cosmetic.length}`);
+  if (offPath.length) { console.log(`\n## retired to a knob's OFF path (${offPath.length})`); for (const r of offPath) console.log(`  ${r.at}  [${r.kind}]  ${r.knob}`); }
 }
