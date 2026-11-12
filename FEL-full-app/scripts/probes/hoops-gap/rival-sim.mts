@@ -99,7 +99,7 @@ function sim1v1(tier: string) {
       lastPhase = dec.phase;
       // the poke (the bot: 50 % every 0.6–1.6 s inside 1.6 m) — the mode's read
       const dd = Math.hypot(self.x - me.x, self.z - me.z);
-      if (dd < 1.6 && t >= nextPoke && meStun === 0 && reachCd === 0 && jumpAge === Infinity) {
+      if (DEF !== 'set' && dd < 1.6 && t >= nextPoke && meStun === 0 && reachCd === 0 && jumpAge === Infinity) {   // hoops-p06: `--def set` never reaches (a patient defender: stays in front, contests)
         nextPoke = t + 0.6 + rng() * 1.0;
         if (rng() < 0.5) {
           reachCd = REACH_COOLDOWN_SEC;

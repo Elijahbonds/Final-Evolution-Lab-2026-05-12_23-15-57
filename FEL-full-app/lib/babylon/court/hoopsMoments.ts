@@ -70,6 +70,23 @@ export class HoopsMomentLog {
 }
 
 export interface HoopsReplayPlan { kind: HoopsMomentKind; /** seconds of the recording to show, ending at `endAt` */ lastSeconds: number; endAt: number }
+/** The speed the replay director plays at (ReplayDirector.REPLAY_SPEED; a test holds the two equal, so this file stays free of the scene). */
+export const REPLAY_PLAYBACK_SPEED = 0.5;
+/** hoops-p06 (phase 6, "big plays add ≤ 2.5 s for the replay cut"): the most a replay may hold the game, ON SCREEN (s). The plan above shows
+ *  2.4–5 recorded seconds at half speed: 4.8–10 s on screen before the next possession. Knob `hoops.replayCapSec` (0 = the plan's length). */
+export const REPLAY_CAP_SEC = 2.5;
+/** …and of the capped window, this share comes before the moment (the set-up: the crossover, the take-off), the rest after it. */
+export const REPLAY_CAP_LEAD_K = 0.6;
+/**
+ * Pure: the plan cut to `capSec` on screen — the same moment, the window around it (REPLAY_CAP_LEAD_K of it before, the rest after, never
+ * past `now`). A plan already inside the cap, a cap of 0, or no moment time (`at` null) comes back unchanged.
+ */
+export function capReplay(plan: HoopsReplayPlan, at: number | null, capSec: number, speed = REPLAY_PLAYBACK_SPEED): HoopsReplayPlan {
+  if (!(capSec > 0) || at === null || plan.lastSeconds / speed <= capSec + 1e-9) return plan;
+  const span = capSec * speed;
+  const endAt = Math.min(plan.endAt, at - span * REPLAY_CAP_LEAD_K + span);
+  return { ...plan, lastSeconds: span, endAt };
+}
 
 /** Pure: how long the replay of a moment at `at` runs when it is played at `now`: from MOMENT_LEAD_S before it, to now. */
 export function replayLength(at: number, now: number): number {
@@ -83,6 +100,8 @@ export class HoopsReplayPlanner {
   private played = 0;
   /** Replays played this run. */
   get count(): number { return this.played; }
+  /** hoops-p06: when the moment of the last plan happened (the recorder's clock); null before the first. */
+  lastAt: number | null = null;
 
   /** A dead ball at `now`. Returns the replay to play, or null (and the possession's moments are spent either way). */
   atDeadBall(now: number, opts: { final?: boolean; reduced?: boolean } = {}): HoopsReplayPlan | null {
@@ -91,9 +110,10 @@ export class HoopsReplayPlanner {
     const worthy = !!m && this.played < HOOPS_REPLAY_CAP;
     if (!this.pacer.offer(worthy, opts)) { this.pacer.tick(); return null; }
     this.played++;
+    this.lastAt = m!.at;   // hoops-p06: the moment's time, for the cap (capReplay)
     return { kind: m!.kind, lastSeconds: replayLength(m!.at, now), endAt: now };
   }
 
   /** A new run on the same closure. */
-  reset(): void { this.log.clear(); this.played = 0; this.pacer = new HighlightPacer(HOOPS_REPLAY_EVERY); }
+  reset(): void { this.log.clear(); this.played = 0; this.lastAt = null; this.pacer = new HighlightPacer(HOOPS_REPLAY_EVERY); }
 }

@@ -1561,6 +1561,37 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/scene/venueQualityV1.ts VQ',
     hint: 'On: static venue meshes freeze their world matrices. Off: as before.',
   },
+  // ── hoops-p06 (1v1 / 3v3 ten-phase pass, phase 6 "flow and pace") ──
+  {
+    id: 'hoops.boardBounceOn', label: 'Board race: the bounce decides (1) / the dice (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · flow and pace',
+    source: 'lib/babylon/hoops/rebound.ts BOARD_BOUNCE_ON',
+    hint: 'On: a swat, a block or a stalled board goes to the body nearest where the ball comes down (a seal and a jump that is up count). Off: distance plus a 2.6 m random term, as before.',
+  },
+  {
+    id: 'hoops.boardTakeYM', label: 'Board race: the height a board is taken at', def: 2.4, min: 1.2, max: 3.4, step: 0.05, unit: 'm', group: 'Hoops · flow and pace',
+    source: 'lib/babylon/hoops/rebound.ts BOARD_TAKE_Y_M',
+    hint: 'The race is run to the spot where the ball next comes down to this height.',
+  },
+  {
+    id: 'hoops.boardJumpEdgeM', label: 'Board race: a jump that is up is worth', def: 0.5, min: 0, max: 1.5, step: 0.05, unit: 'm', group: 'Hoops · flow and pace',
+    source: 'lib/babylon/hoops/rebound.ts BOARD_JUMP_EDGE_M',
+    hint: 'A body still in his jump when the race is called counts as this much nearer the ball.',
+  },
+  {
+    id: 'hoops.replayCapSec', label: 'Big-play replay: longest on screen', def: 2.5, min: 0, max: 10, step: 0.1, unit: 's', group: 'Hoops · flow and pace',
+    source: 'lib/babylon/court/hoopsMoments.ts REPLAY_CAP_SEC',
+    hint: 'A dunk, block or ankle-breaker replay holds the game at most this long (the window around the moment). 0 = the old 4.8 to 10 s replay.',
+  },
+  {
+    id: 'hoops.rivalSizeUpSec', label: '1v1 rival: sizes you up at the top for', def: 4, min: 0, max: 8, step: 0.1, unit: 's', group: 'Hoops · flow and pace',
+    source: 'lib/babylon/hoops/rivalOffense.ts RIVAL_SIZE_UP_SEC',
+    hint: 'After the check he works you beyond the arc (probe moves, no commitment) this long before he attacks; a probe that beats you or a reach that misses sends him now. 0 = he attacks off the check, as before.',
+  },
+  {
+    id: 'hoops.teamSizeUpSec', label: '3v3 rivals: the first touch sizes up longer by', def: 1.5, min: 0, max: 4, step: 0.1, unit: 's', group: 'Hoops · flow and pace',
+    source: 'lib/babylon/hoops/teamOffense3v3.ts TEAM_SIZE_UP_SEC',
+    hint: 'A fresh possession (not a swing catch) probes this much longer at the top, with one more probe move. The same lever as the 3v3 probe knob, first touch only. 0 = as before.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));

@@ -182,6 +182,7 @@ const WALL_S = Number(process.env.WALL_S ?? Infinity); const wallUp = () => (Dat
 // three runs compare frame for frame and their pops are counted over the same frames; WALL_S cuts on wall time, which differs). The rig
 // draws about one frame a second of wall on the shared box: size it to the hold.
 const MAX_FRAMES = Number(process.env.MAX_FRAMES ?? Infinity);
+const SNAP_EVERY = Number(process.env.SNAP_EVERY ?? 0); let lastSnap = -Infinity;   // hoops-p06
 const framesLeft = async () => MAX_FRAMES - (await ev(() => window.__frameNo || 0));
 async function possLoop() {
   const out = [];
@@ -211,6 +212,7 @@ async function possLoop() {
     let endAt = null;
     for (;;) {
       { const left = await framesLeft(); if (left <= 0) { result.cutAtFrame = MAX_FRAMES; break; } await runFrames(Math.min(30, left)); }   // hoops-p05: game frames, not wall; 30 at a time (the wall cap is checked between), never past MAX_FRAMES
+      if (SNAP_EVERY > 0) { const fr = await ev(() => window.__frameNo || 0); if (fr - lastSnap >= SNAP_EVERY) { lastSnap = fr; await shot(`${process.env.TAG ?? 'poss'}-f${String(fr).padStart(5, '0')}`); } }   // hoops-p06: SNAP_EVERY=N, a page screenshot every N game frames (JPG) for a frame strip
       const st = await ev((a) => { const L = window.__LOG || []; const since = L.filter((l) => l.f >= a[0]); const pc = window.__hg.possCode(); return { pc, shot: since.some((l) => new RegExp(a[1] === 'def' ? 'rival release|rival dunk|swat at k|my block read' : 'my release|blocked at the release|drive contest|mate shot').test(l.m)), over: since.some((l) => /strip by the ai|ai reach resolve strip|STOLEN|resetPossession|charge|REF\]/.test(l.m)) }; }, [f0, side]);
       const g = (await gameNow()) - t0;
       if (endAt === null && (st.shot || st.over || (side === 'def' ? st.pc === 1 : st.pc === 2))) endAt = g + TAIL;

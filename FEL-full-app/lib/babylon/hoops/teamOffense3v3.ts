@@ -66,6 +66,12 @@ const screenWaitSec = (): number => feel('hoops.rivalScreenWaitSec', RIVAL_SCREE
 const budgetSec = (): number => feel('hoops.rivalBudgetSec', RIVAL_BUDGET_SEC);
 const attackPullUpSec = (): number => feel('hoops.rivalAttackPullUpSec', RIVAL_ATTACK_PULLUP_SEC);
 const pullUpMaxM = (): number => feel('hoops.rivalPullUpMaxM', RIVAL_PULLUP_MAX_M);
+/** hoops-p06 (phase 6 "flow and pace": the 3v3 rival possession median 7.3 s at PRO against the plan's 8–16 s band). The possession's
+ *  FIRST touch (the check, a make, a board — not a swing's catch) works his man this much longer at the top (× the tier's probeK), with one
+ *  more probe move to fill it. FLAG: it is the same lever as `hoops.rivalProbeSec`, on the first touch only. Knob `hoops.teamSizeUpSec`;
+ *  0 = the probe exactly as before. */
+export const TEAM_SIZE_UP_SEC = 1.5;
+const teamSizeUpSec = (): number => feel('hoops.teamSizeUpSec', TEAM_SIZE_UP_SEC);
 
 /** What a tier's team does (not how often it goes in): its probe length and budget as shares of the knobs, how often a probe ends in a
  *  screen and in a swing, how many passes a possession can hold, whether it reads the screen (reject / hit the roll man). */
@@ -143,6 +149,8 @@ export class TeamOffense3v3 {
     this.phase = 'set'; this.phaseT = 0; this.move = null; this.moveT = 0; this.screenMate = -1; this.containedT = 0; this.kickRead = false; this.tellT = 0;
     this.probeFor = probeSec() * this.tt.probeK * (0.7 + 0.6 * this.rng()) * (o.fresh ? 1 : 0.6);
     this.movesLeft = this.tt.movesPerProbe; this.nextMoveAt = 0.25 + 0.4 * this.rng();
+    const su = o.fresh ? teamSizeUpSec() * this.tt.probeK : 0;   // hoops-p06: the first touch sizes up longer (no draw: 0 is the release's sequence)
+    if (su > 0) { this.probeFor += su; this.movesLeft += 1; }
   }
   get phaseNow(): HandlerPhase { return this.phase; }
   get budget(): number { return budgetSec() * this.tt.budgetK; }

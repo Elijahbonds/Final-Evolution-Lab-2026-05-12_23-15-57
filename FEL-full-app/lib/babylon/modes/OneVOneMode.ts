@@ -191,6 +191,7 @@ import {   // HOOPS-MOVE-KIT-A amendment (D1–D3): the defense contest package
 import { AiReachTell, aiReachTellOn, aiReachGate, aiReachStunSec, AI_REACH_COOLDOWN_SEC, type ReachOutcome } from '../core/ReachTell';   // lane/hoops-def-tell (#273 T-A): the AI reach shows before it resolves
 import { bodySepOn, capsuleRadius1v1, separateBodies } from '../core/BodySeparation';   // lane/hoops-def-tell (#273 T-C): body separation
 import { BOX_OUT_RANGE } from '../core/HoopsOffball';   // HOOPS-MOVE-KIT-A O2: the rival boxes me out on my shot
+import { boardBounceOn, boardPick } from '../hoops/rebound';   // hoops-p06 (1v1/3v3 phase 6): the bounce decides the board race, not a die
 import { MomentumBus } from '../core/MomentumBus';
 import { PlayerStateMachine } from '../core/PlayerStateMachine';   // HOOPS-10PHASE-2 phase 4: the explicit idle/dribble/gather/shoot/pass/dunk/land state, published read-only
 import { BasketballAnimTree, FootPlant } from '../anim/basketballTree';
@@ -3883,7 +3884,12 @@ export const OneVOneMode: ModeDefinition = (() => {
     const meD = Vector3.Distance(me.root.position, ball.position);
     const foeD = Vector3.Distance(foe.root.position, ball.position);
     const boxing = meSlot.intent.brace ?? false;
-    const edge = (foeD - meD) + (boxing ? BOX_OUT_EDGE : 0) + (Math.random() - 0.5) * REBOUND_JITTER;
+    // hoops-p06 (phase 6): no die — the ball's bounce spot, the seal and a jump that is up (hoops/rebound). Knob 0: the release's line, its draw included
+    const edge = boardBounceOn()
+      ? (boardPick([{ team: 'me', pos: me.root.position, boxing, jumpAge: myJumpAge }, { team: 'foe', pos: foe.root.position, boxing: false, jumpAge: foeBlockJumpAge }],
+        loose ? ballSim.pos : ball.getAbsolutePosition(), loose ? ballSim.vel : Vector3.Zero(),
+        { boxEdge: BOX_OUT_EDGE, jumpWindowSec: HAND_UP_SEC, shooter: possession === 'mine' ? 'me' : 'foe' }).team === 'me' ? 1 : 0)
+      : (foeD - meD) + (boxing ? BOX_OUT_EDGE : 0) + (Math.random() - 0.5) * REBOUND_JITTER;
     if (edge <= 0) startDefense(ctx, possession === 'mine' ? 'THEIR BOARD — DEFEND!' : 'THEIR BOARD — DEFEND AGAIN!');
     else { bannerFlash(ctx, boxing ? 'BOXED OUT — YOUR BOARD' : 'YOUR BOARD'); resetPositions(); }
   }
