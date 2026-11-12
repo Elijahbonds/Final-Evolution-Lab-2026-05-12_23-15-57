@@ -33,6 +33,7 @@ import {
   type FrameGradeState, type Grade,
 } from './ImpactFrame';
 import { SoundKit } from '../audio/SoundKit';
+import { sampleBankFor } from '../audio/samples';   // HOOPS-SOUND (phase 11a): the court modes' recorded sound
 import { enterBed, exitBed } from '@/lib/soundtrack/client';   // PIPELINES (2026-10-06): the in-game soundtrack bed
 import { VoiceKit } from '../audio/mic/VoiceKit';
 import { QaTrace } from './QaTrace';
@@ -720,6 +721,9 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
         else console.info(`[FEL-PERF] shader pre-warm ${warm.ready ? 'ready' : 'skipped'} in ${Math.round(warm.ms)} ms, ${Math.round(warm.readyMs)} of them to first ready (${warm.polls} polls, ${warm.frames} frames)`);
       }
       setPhase('ready');
+      // HOOPS-SOUND (phase 11a, 2026-11-12): a mode with recorded sound (the court modes) fetches it now, after READY, so it never
+      // slows the load; every cue plays its synth until its files are in (audio/samples.ts sampleBankFor)
+      void SoundKit.useSampleBank(sampleBankFor(def.modeId));
       // M67: pre-warm every material now, on the loading→ready boundary, so a
       // first-visibility shader compile never hitches mid-play. Dev-only work.
       if (DEV) void perf.warmAll();
@@ -1048,6 +1052,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     unsub?.();
     input.stop();
     SoundKit.stopAmbient();   // M43: silence the ambient bed on teardown
+    void SoundKit.useSampleBank(null);   // HOOPS-SOUND: the next mode hears its own synths
     exitBed();                // PIPELINES: the page gets its soundtrack stage back
     VoiceKit.stopAll(0.1);    // THE MIC: whatever a mode left on the mic goes with it
     juice.dispose();

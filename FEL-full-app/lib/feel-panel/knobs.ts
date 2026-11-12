@@ -1683,6 +1683,37 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/hoops/rulebook.ts PRESS_FLOOR_ON',
     hint: 'On: a showtime flush or a trick dunk pressed at the wrong moment goes in at least as often as not pressing. Off: early 42, late 50 against 70 untimed, as before.',
   },
+  // ── hoops-sound (phase 11a, 2026-11-12): recorded CC0 sound beside the synths, the dribble heard, the pass heard ──
+  {
+    id: 'hoops.sampleSfxOn', label: 'Recorded sounds on (1) / synth only (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · sound',
+    source: 'lib/babylon/audio/samples.ts SAMPLE_SFX_ON',
+    hint: 'On: in 1v1, 3v3 and 3-Point the swish, rim, squeak, cheer, crowd bed, dribble and catch play CC0 recordings. Off: every sound is the synth, as before.',
+  },
+  {
+    id: 'hoops.dribbleSoundOn', label: 'Dribble makes a sound (1) / silent (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · sound',
+    source: 'lib/babylon/audio/dribbleSound.ts DRIBBLE_SOUND_ON',
+    hint: 'On: the ball is heard each time it hits the floor, every handler. Off: no dribble sound, as before.',
+  },
+  {
+    id: 'hoops.dribbleSoundVol', label: 'Dribble: volume', def: 0.6, min: 0, max: 1.5, step: 0.05, unit: '', group: 'Hoops · sound',
+    source: 'lib/babylon/audio/dribbleSound.ts DRIBBLE_SOUND_VOL',
+    hint: 'Your dribble at a full speed bounce. A softer bounce plays quieter, a hard pound louder.',
+  },
+  {
+    id: 'hoops.dribbleSoundAiK', label: 'Dribble: AI handlers share', def: 0.5, min: 0, max: 1, step: 0.05, unit: '', group: 'Hoops · sound',
+    source: 'lib/babylon/audio/dribbleSound.ts DRIBBLE_SOUND_AI_K',
+    hint: 'An AI dribble as a share of yours, so your ball stays the one you hear.',
+  },
+  {
+    id: 'hoops.passCatchSoundOn', label: 'Pass is heard: catch and bounce pass (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · sound',
+    source: 'lib/babylon/audio/dribbleSound.ts PASS_CATCH_SOUND_ON',
+    hint: 'On: a 3v3 pass is heard in the hands when caught, and a bounce pass hitting the floor. Off: neither, as before.',
+  },
+  {
+    id: 'hoops.passCatchVol', label: 'Catch: volume', def: 0.7, min: 0, max: 1.5, step: 0.05, unit: '', group: 'Hoops · sound',
+    source: 'lib/babylon/audio/dribbleSound.ts PASS_CATCH_VOL',
+    hint: 'How loud a caught pass is.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));

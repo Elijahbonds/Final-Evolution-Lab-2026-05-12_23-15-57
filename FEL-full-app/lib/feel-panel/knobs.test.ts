@@ -70,6 +70,8 @@ import { STEAL_DICE_ON, STRIP_REACH_M, STRIP_SHIELD_M, STRIP_BALL_MAX_Y } from '
 import { ONBALL_CUSHION_M, ONBALL_CUSHION_PER_MPS } from '@/lib/babylon/hoops/pressure';   // hoops-p02
 
 import { BAT_GRIP_LOST_M, BAT_GRIP_BACK_M } from '@/lib/babylon/modes/baseballBat';   // bat-grip-2
+import { SAMPLE_SFX_ON } from '@/lib/babylon/audio/samples';   // hoops-sound
+import * as DS from '@/lib/babylon/audio/dribbleSound';   // hoops-sound
 
 function tsFiles(dir: string): string[] {
   const out: string[] = [];
@@ -393,6 +395,10 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.moveCommitMps')).toBe(RB.MOVE_COMMIT_MPS); expect(def('hoops.passFakeLaneCos')).toBe(RB.PASS_FAKE_LANE_COS);
     expect(def('hoops.gatherCloseoutOn')).toBe(RB.GATHER_CLOSEOUT_ON); expect(def('hoops.gatherCloseoutM')).toBe(RB.GATHER_CLOSEOUT_M);
     expect(def('hoops.pressFloorOn')).toBe(RB.PRESS_FLOOR_ON); expect(def('hoops.finishContestNarrow')).toBe(RB.FINISH_CONTEST_NARROW);
+    // hoops-sound (phase 11a; new, the owner has not heard these)
+    expect(def('hoops.sampleSfxOn')).toBe(SAMPLE_SFX_ON); expect(def('hoops.dribbleSoundOn')).toBe(DS.DRIBBLE_SOUND_ON);
+    expect(def('hoops.dribbleSoundVol')).toBe(DS.DRIBBLE_SOUND_VOL); expect(def('hoops.dribbleSoundAiK')).toBe(DS.DRIBBLE_SOUND_AI_K);
+    expect(def('hoops.passCatchSoundOn')).toBe(DS.PASS_CATCH_SOUND_ON); expect(def('hoops.passCatchVol')).toBe(DS.PASS_CATCH_VOL);
   });
 
   it('every row is well formed: unique `<area>.<camelName>` id, min ≤ default ≤ max, the default on the step grid, a source', () => {

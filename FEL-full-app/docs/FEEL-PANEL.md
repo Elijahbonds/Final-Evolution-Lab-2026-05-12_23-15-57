@@ -671,3 +671,27 @@ pins both). Measured with `scripts/probes/hoops-p09/rulebook-measure.mts` (befor
   PRO and ELITE. Its answers: the pump fake (he is flying at you, so he bites) and a move into his closeout. 0 = he holds his spot.
 - `hoops.pressFloorOn` 1: a showtime flush or a trick dunk pressed at the wrong moment pays at least what not pressing pays (showtime
   early 42 → 70 %, late 50 → 70 %; a mistimed trick pays the plain dunk). 0 = the old table.
+
+## hoops-sound, 2026-11-12 (phase 11a "the sound of the court", part one; the owner has not heard these yet)
+
+Group "Hoops · sound". Each is NEW, and its OFF value restores today's sound exactly. With all three switches off (`sampleSfxOn`,
+`dribbleSoundOn`, `passCatchSoundOn` at 0) the game asks for and plays exactly the cues it did before, as synths, and fetches nothing.
+The sounds are CC0 recordings (`public/audio/hoops/CREDITS.md`). Tests: `lib/babylon/audio/samples.test.ts`, `dribbleSound.test.ts`,
+`SoundKit.samples.test.ts`.
+- `hoops.sampleSfxOn` 1 (`audio/samples.ts`): in 1v1, 3v3 and the 3-point contest, recordings stand in for the synth swish (a nylon
+  rustle: no CC0 net recording was found), rim rattle, squeak and cheer, the crowd bed (a 14 s murmur loop) and the two new cues
+  (dribble, catch). They load after READY, about 250 KB. Until a cue's files are in, or if they fail, the cue plays its synth. Every
+  recording goes through the same SFX or crowd bus, ducking, limiter, mute and phone/TV/headphones preset as the synths. 0 = synth only,
+  nothing fetched. Still synth either way: the groan, whistle, score chime, whoosh, impacts, the body thud and the backboard.
+- `hoops.dribbleSoundOn` 1 (`audio/dribbleSound.ts`, hooked in `anim/ballCarry.ts`): the ball is heard each time it meets the floor,
+  for every hoops handler (yours, the 1v1 rival, all six 3v3 bodies; the handle moves too). Once per bounce. It re-arms only after the
+  ball has risen 0.2 m. 0 = silent, as before.
+- `hoops.dribbleSoundVol` 0.6: your dribble's level at a full-speed bounce (5 m/s, the hoops dribble at 2 bounces a second). A bounce
+  plays at its speed's share of that, from 0.3x to 1.25x.
+- `hoops.dribbleSoundAiK` 0.5: an AI handler's dribble as a share of yours. Which carry is yours: the first hoops carry a mode mounts
+  (assumption, true of 1v1, 3v3 and 3-Point today; `BallCarryOpts.soundRole` names it explicitly when the mode files are next edited).
+- `hoops.passCatchSoundOn` 1 (`core/BallHandling.ts` PassFlight): a 3v3 pass is heard in the hands when it arrives, and a bounce pass
+  when it hits the floor. The throw still plays the menu click (`ThreeVThreeMode.ts` uiTick): that line belongs to the mode file, owned
+  by hoops-p08 now, and is listed for after it. 0 = neither, as before.
+- `hoops.passCatchVol` 0.7: the catch's level.
+Feel-check: 1v1, dribble in place and on the move; you should hear one bounce per dribble, louder on a hard crossover. 3v3, pass to a mate.

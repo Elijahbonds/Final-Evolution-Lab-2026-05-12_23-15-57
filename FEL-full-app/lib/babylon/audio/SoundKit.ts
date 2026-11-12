@@ -6,6 +6,9 @@
 // drop in, so this is entirely SYNTHESIZED with the Web Audio API — the same
 // "procedural, zero external assets" philosophy VenueKit used for visuals.
 // One singleton, lazily created on first user gesture (autoplay policy safe).
+// HOOPS-SOUND (2026-11-12): no longer only synthesised. The court modes load a set of CC0 recordings after READY (samples.ts,
+// public/audio/hoops/CREDITS.md) that stand in for the swish, the rim, the squeak, the cheer and the crowd bed, and give the dribble
+// and the catch a sound; every synth stays as the fallback (a cue with nothing loaded plays it) and for every other mode.
 
 /** The looping beds startAmbient() can play ('none' = deliberately silent). */
 export type AmbientKind = 'stadium' | 'dojo' | 'ocean' | 'wind' | 'none';
@@ -31,8 +34,15 @@ export function momentumScalesBed(kind: AmbientKind | null): boolean { return ki
 //   swish   — clean through the net: a soft filtered hiss, no impact at all
 //   clang   — a chain net, or metal taking a hit
 //   squeak  — rubber on a hard floor: the sound a hard cut actually makes
+//
+// HOOPS-SOUND (phase 11a, 2026-11-12): two more, for the court — `bounce` (the dribble's floor contact: the most-heard sound in
+// basketball, and the game had none) and `catch` (a pass arriving in the hands). Both have a synth here like every cue; while the
+// hoops sample bank is loaded (samples.ts) they, and the swish, rim, squeak and cheer, play CC0 recordings instead (below: play).
 type SfxName = 'whoosh' | 'impact' | 'score' | 'miss' | 'whistle' | 'uiTick' | 'crowdCheer' | 'crowdGroan' | 'powerUp'
-  | 'thud' | 'rattle' | 'swish' | 'clang' | 'squeak' | 'exhaust';
+  | 'thud' | 'rattle' | 'swish' | 'clang' | 'squeak' | 'exhaust' | 'bounce' | 'catch';
+/** What a cue is asked to play with. `pan` (-1 left … 1 right) places a recorded hit in the stereo field; `tag` names who asked
+ *  (a probe's log reads it; the sound ignores it). */
+export interface PlayOpts { pitch?: number; volume?: number; pan?: number; tag?: string }
 
 // MUSIC-SUITE P7 (2026-09-29), room-mix-ux: the three player-set bus levels (lib/audio/volumes.ts owns the pure
 // arithmetic and the on-device persistence; this file is the only place that arithmetic reaches a real GainNode).
@@ -43,6 +53,9 @@ import {
 } from './voice/outputPreset';
 import { dbToGain } from './voice/loudness';
 import { duckPlan, type DuckSpec } from './voice/ducking';
+// HOOPS-SOUND (phase 11a): the recorded sounds beside the synths (samples.ts) and their switch (feel knob hoops.sampleSfxOn)
+import { SAMPLE_BANKS, SAMPLE_SFX_ON, SampleBank, bedLoopWindow, type SampleBankName, type LoadState } from './samples';
+import { feel } from '../../feel-panel/feel';
 
 /** Every bus's own tuned base gain BEFORE a player's volume multiplies it — voiceBus and musicBus already had these
  *  numbers (P2); SFX_BASE_GAIN is new (sfxBus below) and is 1 because every SfxName's envelope was already tuned to
@@ -208,6 +221,7 @@ class SoundKitImpl {
 
   private ensure(): AudioContext | null {
     if (this.ctx) return this.ctx;
+    if (typeof window === 'undefined') return null;   // HOOPS-SOUND: a cue asked for in node (a headless test) is silence, never a throw
     const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!Ctor) return null;
     // MUSIC-SUITE P2 FIX PASS (2026-09-25): no audio-session change here any more. P2 set 'playback' at this point, the
@@ -273,14 +287,56 @@ class SoundKitImpl {
     node.gain.exponentialRampToValueAtTime(0.0001, t + attack + decay);
   }
 
-  play(name: SfxName, opts: { pitch?: number; volume?: number } = {}): void {
+  play(name: SfxName, opts: PlayOpts = {}): void {
     if (!this.sfxEnabled) return;
     const ctx = this.ensure();
     if (!ctx || !this.master || !this.sfxBus) return;
     const vol = opts.volume ?? 1;
     const pitch = opts.pitch ?? 1;
+    // HOOPS-SOUND (phase 11a): a recording when the active bank has one for this cue; otherwise the synth below, exactly as before
+    if (this.playSample(name, ctx, vol, pitch, opts.pan)) return;
 
     switch (name) {
+      // HOOPS-SOUND (phase 11a): THE BALL ON THE FLOOR, synthesised (the fallback while the recordings load, or if they fail). A low
+      // body that drops fast, the rubber's "pung", and a short bright tick for the leather's slap.
+      case 'bounce': {
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(185 * pitch, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(92 * pitch, ctx.currentTime + 0.07);
+        const og = ctx.createGain();
+        this.env(og, ctx, 0.002, 0.1, 0.55 * vol);
+        osc.connect(og).connect(this.sfxBus);
+        osc.start(); osc.stop(ctx.currentTime + 0.13);
+        const tick = ctx.createBufferSource();
+        tick.buffer = this.noiseBuffer(ctx, 0.03);
+        const lp = ctx.createBiquadFilter();
+        lp.type = 'lowpass'; lp.frequency.value = 1800;
+        const tg = ctx.createGain();
+        this.env(tg, ctx, 0.001, 0.02, 0.2 * vol);
+        tick.connect(lp).connect(tg).connect(this.sfxBus);
+        tick.start(); tick.stop(ctx.currentTime + 0.04);
+        break;
+      }
+      // HOOPS-SOUND (phase 11a): A PASS ARRIVING IN THE HANDS, synthesised (the fallback). Palms on leather: a short mid slap of
+      // band-passed noise over a soft low knock.
+      case 'catch': {
+        const src = ctx.createBufferSource();
+        src.buffer = this.noiseBuffer(ctx, 0.06);
+        const bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass'; bp.Q.value = 1.1; bp.frequency.value = 1500 * pitch;
+        const g = ctx.createGain();
+        this.env(g, ctx, 0.001, 0.05, 1.0 * vol);   // (levels measured: the synth and the recording both near -40 dB at volume 1)
+        src.connect(bp).connect(g).connect(this.sfxBus);
+        src.start(); src.stop(ctx.currentTime + 0.07);
+        const osc = ctx.createOscillator();
+        osc.type = 'sine'; osc.frequency.value = 230 * pitch;
+        const og = ctx.createGain();
+        this.env(og, ctx, 0.002, 0.05, 0.7 * vol);
+        osc.connect(og).connect(this.sfxBus);
+        osc.start(); osc.stop(ctx.currentTime + 0.07);
+        break;
+      }
       // A BODY ON THE FLOOR. Low sine that drops fast, plus a short noise slap for the contact — no ring,
       // because a floor does not ring. This is the landing/knockdown sound the modes were faking with a
       // pitched-down `impact`.
@@ -515,6 +571,9 @@ class SoundKitImpl {
     if (kind === 'none' || !this.musicEnabled) return;
     const ctx = this.ensure();
     if (!ctx || !this.master) return;
+    // HOOPS-SOUND (phase 11a): the crowd bed is a recorded murmur while the hoops bank has it (else the noise bed below, as before)
+    if (kind === 'stadium' && this.startSampleBed(ctx, 1, 0)) return;
+    this.bedIsSample = false;
     const src = ctx.createBufferSource();
     src.buffer = this.noiseBuffer(ctx, 4, 'brown');
     src.loop = true;
@@ -548,6 +607,126 @@ class SoundKitImpl {
     this.crowdGain.gain.value = this.crowdBaseGain * (0.35 + k * 2.2);
   }
 
+  // ── HOOPS-SOUND (phase 11a, 2026-11-12): THE SAMPLE PLAYER ────────────────────────────────────────────────────────────────
+  // A mode that has recorded sound (samples.ts sampleBankFor: the court modes) gets its bank after READY (ModeHarness) and gives it
+  // back on teardown, so loading never slows the load and no other mode hears it. The bank fetches and decodes lazily, a few files at
+  // a time; until a cue's files are in (or if they fail, or with the knob off) the cue plays its synth. The recordings go through the
+  // SAME buses as the synths: the SFX bus (the player's SFX level, ducked under a voice), or the crowd duck for the crowd; the mute
+  // (setEnabled) and every output preset apply to them exactly as to the synths.
+  private bank: SampleBank<AudioBuffer> | null = null;
+  private bankName: SampleBankName | null = null;
+  private readonly banks = new Map<SampleBankName, SampleBank<AudioBuffer>>();
+  private readonly sampleVoices = new Map<string, number>();
+  private decoder: BaseAudioContext | null = null;
+  private bedIsSample = false;
+
+  /** The active bank and how far it has loaded (a probe reads it). */
+  sampleState(): { bank: SampleBankName | null; state: LoadState | 'none'; loaded: number; failed: number; bed: 'sample' | 'synth' | 'none' } {
+    const b = this.bank;
+    return { bank: this.bankName, state: b ? b.state : 'none', loaded: b?.loaded ?? 0, failed: b?.failed ?? 0, bed: this.crowdBed ? (this.bedIsSample ? 'sample' : 'synth') : 'none' };
+  }
+
+  /** Make `name` the active bank (null: none — the synths only) and start loading it if it is not loaded. The modes' harness calls
+   *  this after READY with sampleBankFor(modeId), and with null on teardown. Nothing is fetched while hoops.sampleSfxOn is 0. */
+  useSampleBank(name: SampleBankName | null): Promise<void> {
+    this.bankName = name;
+    if (!name) { this.bank = null; return Promise.resolve(); }
+    let bank = this.banks.get(name);
+    if (!bank) {
+      const def = SAMPLE_BANKS[name];
+      bank = new SampleBank<AudioBuffer>(def.cues, def.bed, {
+        fetch: async (url) => {
+          const res = await fetch(url);
+          if (!res.ok) throw new Error(`${res.status} ${url}`);
+          return res.arrayBuffer();
+        },
+        decode: (bytes) => {
+          const dec = this.decodeCtx();
+          if (!dec) return Promise.reject(new Error('no audio decoder'));
+          return dec.decodeAudioData(bytes);
+        },
+      });
+      this.banks.set(name, bank);
+    }
+    this.bank = bank;
+    if (feel('hoops.sampleSfxOn', SAMPLE_SFX_ON) < 0.5) return Promise.resolve();
+    const b = bank;
+    return b.load().then(() => { if (this.bank === b) this.swapBedToSample(); });
+  }
+
+  /** The decoder: the game's context when it exists, else an offline one (so loading never builds the live context before a gesture). */
+  private decodeCtx(): BaseAudioContext | null {
+    if (this.ctx) return this.ctx;
+    if (this.decoder) return this.decoder;
+    if (typeof window === 'undefined') return null;
+    const Off = window.OfflineAudioContext ?? (window as unknown as { webkitOfflineAudioContext?: typeof OfflineAudioContext }).webkitOfflineAudioContext;
+    this.decoder = Off ? new Off(1, 1, 44100) : null;
+    return this.decoder;
+  }
+
+  /** One recorded hit of `name` if the active bank has one loaded: true when it played (or was dropped at the cue's voice cap). */
+  private playSample(name: SfxName, ctx: AudioContext, vol: number, pitch: number, pan: number | undefined): boolean {
+    const bank = this.bank;
+    if (!bank || !this.sfxBus || !this.master || feel('hoops.sampleSfxOn', SAMPLE_SFX_ON) < 0.5) return false;
+    const s = bank.pick(name);
+    if (!s) return false;
+    const live = this.sampleVoices.get(name) ?? 0;
+    if (live >= s.maxVoices) return true;   // a pile-up: the hits already ringing carry it
+    const src = ctx.createBufferSource();
+    src.buffer = s.buffer;
+    src.playbackRate.value = Math.max(0.5, Math.min(2, pitch * s.rate));
+    const g = ctx.createGain();
+    g.gain.value = Math.max(0, vol * s.gain);
+    let tail: AudioNode = src.connect(g);
+    if (pan !== undefined && Number.isFinite(pan) && pan !== 0 && typeof ctx.createStereoPanner === 'function') {
+      const p = ctx.createStereoPanner();
+      p.pan.value = Math.max(-1, Math.min(1, pan));
+      tail = g.connect(p);
+    }
+    tail.connect(s.bus === 'crowd' ? (this.crowdDuck ?? this.master) : this.sfxBus);
+    this.sampleVoices.set(name, live + 1);
+    src.onended = () => {
+      this.sampleVoices.set(name, Math.max(0, (this.sampleVoices.get(name) ?? 1) - 1));
+      try { src.disconnect(); } catch { /* already gone */ }
+    };
+    src.start();
+    return true;
+  }
+
+  /** The recorded crowd bed at `level` × its base (the momentum swell's share), faded in over `fadeSec`. False: no recording to play. */
+  private startSampleBed(ctx: AudioContext, level: number, fadeSec: number): boolean {
+    const name = this.bankName, buf = this.bank?.bedBuffer();
+    if (!name || !buf || feel('hoops.sampleSfxOn', SAMPLE_SFX_ON) < 0.5) return false;
+    const def = SAMPLE_BANKS[name].bed;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.loop = true;
+    const w = bedLoopWindow(buf.duration, def.loopSec);
+    src.loopStart = w.start; src.loopEnd = w.end;
+    const fade = ctx.createGain();
+    if (fadeSec > 0) { fade.gain.setValueAtTime(0.0001, ctx.currentTime); fade.gain.setTargetAtTime(1, ctx.currentTime, fadeSec / 3); }
+    const g = ctx.createGain();
+    g.gain.value = def.gain * level;
+    src.connect(fade).connect(g).connect(this.crowdDuck ?? this.master!);
+    src.start(0, w.start);
+    this.crowdGain = g;
+    this.crowdBaseGain = def.gain;
+    this.bedIsSample = true;
+    this.crowdBed = { stop: () => { try { src.stop(); } catch { /* already stopped */ } } };
+    return true;
+  }
+
+  /** The bank finished loading under a synth stadium bed: crossfade it to the recording, at the momentum level it was playing at. */
+  private swapBedToSample(): void {
+    const ctx = this.ctx;
+    if (!ctx || this.ambientAsked !== 'stadium' || this.bedIsSample || !this.crowdBed || !this.crowdGain || !this.musicEnabled) return;
+    const oldBed = this.crowdBed, oldGain = this.crowdGain, level = this.crowdGain.gain.value / Math.max(1e-6, this.crowdBaseGain);
+    if (!this.startSampleBed(ctx, level, 1.2)) return;
+    oldGain.gain.cancelScheduledValues(ctx.currentTime);
+    oldGain.gain.setTargetAtTime(0, ctx.currentTime, 0.4);
+    setTimeout(() => oldBed.stop(), 2500);
+  }
+
   /**
    * The game mix, as a stream a local recording can add. The speakers are unchanged: this is a second
    * wire off the limiter. Null when this browser has no audio context. Never sent anywhere.
@@ -566,6 +745,7 @@ class SoundKitImpl {
     this.crowdBed?.stop();
     this.crowdBed = null;
     this.crowdGain = null;
+    this.bedIsSample = false;
     this.ambientAsked = null;   // AMBIENT FIX: teardown resets it, so a remount on the same page starts like the first
   }
 

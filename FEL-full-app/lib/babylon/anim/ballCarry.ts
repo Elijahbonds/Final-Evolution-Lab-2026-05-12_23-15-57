@@ -45,6 +45,9 @@ import { animDt } from './motionLayers';
 import { ClipHandClock, clipLockTune, guardTune, stepGuardK, GUARD_BAR_POLE } from './RestDribble';   // lane/h3-handler (#312 port): the bounce at rest, the guard
 import { feel } from '../../feel-panel/feel';   // hoops-p04b: knob hoops.carryArmSpeedSec (lib/feel-panel/knobs.ts)
 import { ArmEase } from './MoveEase';   // lane/h3-handler (#314 port): a move's hand-overs ease
+// HOOPS-SOUND (phase 11a, 2026-11-12): the ball this carry draws meeting the floor plays the bounce (audio/dribbleSound.ts)
+import { SoundKit } from '../audio/SoundKit';
+import { DRIBBLE_SOUND_ON, FloorContact, bounceVolume, claimDribbleRole, firstForBall, panFor, type DribbleSoundRole } from '../audio/dribbleSound';
 
 export interface BallCarryOpts {
   scene: Scene;
@@ -67,6 +70,12 @@ export interface BallCarryOpts {
    * the gap). Default true: every existing caller runs exactly as before.
    */
   idleStride?: boolean;
+  /**
+   * HOOPS-SOUND (phase 11a): whose dribble this is for its sound — the player's (full dribble volume), an AI handler's (a share of it),
+   * or none. Not given: the first hoops carry mounted on the scene is the player's, every later one an AI's (dribbleSound.ts
+   * claimDribbleRole). A carry that is not `hoops` (the dunk runway) makes no sound either way.
+   */
+  soundRole?: DribbleSoundRole;
 }
 /** Where a crossing's ball meets the floor, in the root's frame (x across, z forward; m). Phase 4b: unused — a crossing is a crossover
  *  PATH (handlePaths) with its own floor point; kept in the signatures so a caller that names one still compiles. */
@@ -363,6 +372,9 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   let prevArm: ArmChain | null = null; let switchLeft = 0;
   const prevHandT = new Vector3(), prevPole = new Vector3();
   let active = false;
+  // HOOPS-SOUND (phase 11a): the bounce's detector and whose dribble this is (only a hoops carry sounds: the dunk runway keeps its own)
+  const floorContact = new FloorContact();
+  const soundRole: DribbleSoundRole = hoops ? claimDribbleRole(opts.scene, opts.soundRole) : 'off';
   let phase = 0;
   let pending = false;   // a frame was recorded since the last after-animations pass
   let frameDt = 0, stamp = 0;   // the recorded frame's dt, and a counter of drawn frames (the arm memo's continuity)
@@ -905,6 +917,26 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     const reached = arm; setSide(rigOf(m.held)); if (moveReached) arm = reached;   // (the let-go's arm stays the one that reached hardest)
   };
   /** The move's frame (the after-animations pass): the ball on its path, each hand by the contact schedule. */
+  // HOOPS-SOUND (phase 11a, 2026-11-12): THE BOUNCE. Every frame this carry places the ball (the dribble, or a move's path), its height
+  // over the floor it bounces on goes to the contact detector; the frame it meets the floor plays the bounce once, at a level set by how
+  // fast it came down, panned to where it is on screen. One hook covers the plain dribble, the handle moves, the rival and all six 3v3
+  // bodies (the inactive ones place nothing). Knob hoops.dribbleSoundOn (0: no sound, as before).
+  const floorSound = (ballY: number, dt: number): void => {
+    if (soundRole === 'off' || feel('hoops.dribbleSoundOn', DRIBBLE_SOUND_ON) < 0.5) return;
+    const fl = Number.isFinite(floorY) ? floorY : opts.root.getAbsolutePosition().y;
+    const speed = floorContact.step(ballY - fl - p.ballR, dt);
+    if (!(speed > 0)) return;
+    const now = (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
+    if (!firstForBall(opts.ball, now)) return;
+    let pan = 0;
+    const cam = opts.scene.activeCamera;
+    if (cam) {
+      const c = cam.globalPosition, b = opts.ball.position, r = cam.getDirection(Vector3.Right());
+      const dx = b.x - c.x, dy = b.y - c.y, dz = b.z - c.z;
+      pan = panFor(dx * r.x + dy * r.y + dz * r.z, Math.hypot(dx, dy, dz));
+    }
+    SoundKit.play('bounce', { volume: bounceVolume(speed, soundRole), pan, tag: soundRole });
+  };
   const applyMove = (dt: number): void => {
     const m = mv!; const smp = pathAt(m.path, m.t, m.opts.catchLeadSec); m.sample = smp; m.sampleT = m.t;
     const sg = m.path.segs.find((x) => m.t <= x.t1) ?? m.path.segs[m.path.segs.length - 1]; m.segU = sg.t1 > sg.t0 ? (m.t - sg.t0) / (sg.t1 - sg.t0) : 1;
@@ -933,6 +965,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     const push = PUSH_AHEAD_M * pushK * movePushK(m.t / Math.max(1e-6, m.path.duration));
     ballToWorld(smp.ball.x, smp.ball.y, smp.ball.z + push, world);
     opts.ball.position.copyFrom(world);
+    floorSound(world.y, dt);   // HOOPS-SOUND: a move's floor contact is heard too
     placedRoot.copyFrom(opts.root.getAbsolutePosition()); placedYaw = rootYaw(); placedAt = stamp;
     lastVel.set(smp.vel.x, smp.vel.y, smp.vel.z); lastLocal.set(smp.ball.x, smp.ball.y, smp.ball.z); lastLocalAt = stamp;
     moveReached = false;
@@ -964,6 +997,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     strideTick(dt, sx);
     holdK += (holdTarget - holdK) * Math.min(1, dt / 0.2);
     if (!active) {
+      floorContact.reset();   // HOOPS-SOUND: this carry is not drawing the ball
       if (releaseLeft > 0) {
         // HOOPS MOTION phase 3c: THE LET-GO FADE RUNS ON THE DRAWN FRAME'S CLOCK. It ran on the dt of the mode's last update() — and a
         // possession change deactivates the carry with update(0, 0, false) and then stops calling it (a defender's carry gets no updates),
@@ -992,7 +1026,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
       applyWrists(dt);
       return;
     }
-    if (!pending) { applyWrists(dt); return; }
+    if (!pending) { floorContact.reset(); applyWrists(dt); return; }
     pending = false;
     if (activating) {
       // THE DRIBBLE STARTS FROM THE PALM AS DRAWN THIS FRAME: the ball is still in the hand (posed), let go here — an activation read in
@@ -1040,6 +1074,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
       if (f >= 1) startOff = null; else { startK = 1 - f * f * (3 - 2 * f); startOff.scaleToRef(startK, startShift); world.addInPlace(startShift); }
     }
     opts.ball.position.copyFrom(world);
+    floorSound(world.y, dt);   // HOOPS-SOUND: the dribble's floor contact
     placedRoot.copyFrom(opts.root.getAbsolutePosition()); placedYaw = rootYaw(); placedAt = stamp;
     // (phase 4b) the ball as drawn — the activation's fade included — in the ball frame less the push, and its velocity: where a move asked
     // mid-bounce starts from
