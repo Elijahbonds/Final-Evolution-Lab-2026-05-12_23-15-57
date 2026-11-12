@@ -13,7 +13,7 @@
 // and, once every lesson is done, the chapter's recap and its check. Somebody standing in their front room with a phone
 // propped up needs to see it and do it; the reasoning is what they read afterwards, or never.
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, Check, Lightbulb } from 'lucide-react';
 import { toast } from 'sonner';
 import { readToast } from '@/components/ui/fel/toast';
@@ -43,6 +43,15 @@ export function ChapterReader({ chapter, filmFor, startAt }: { chapter: Chapter;
   const start = startAt ? chapter.lessons.findIndex((l) => l.key === startAt) : -1;
   const [i, setI] = useState(Math.max(0, start));
   const [busy, setBusy] = useState(false);
+  // FLOAT-COVERS (2026-11-12): the primary sits at the end of the lesson now, so a step on (Mark done / Next) brings the
+  // next lesson's top into view instead of leaving the reader at its bottom. Only a step the reader took, not the first open.
+  const top = useRef<HTMLDivElement>(null);
+  const stepped = useRef(false);
+  useEffect(() => {
+    if (!stepped.current) return;
+    stepped.current = false;
+    top.current?.scrollIntoView?.({ block: 'start' });
+  }, [i]);
 
   useEffect(() => {
     let live = true;
@@ -80,7 +89,7 @@ export function ChapterReader({ chapter, filmFor, startAt }: { chapter: Chapter;
   const last = i === chapter.lessons.length - 1;
 
   const complete = useCallback(async () => {
-    if (!lesson || busy || isDone) { setI((n) => Math.min(chapter.lessons.length - 1, n + 1)); return; }
+    if (!lesson || busy || isDone) { stepped.current = !last; setI((n) => Math.min(chapter.lessons.length - 1, n + 1)); return; }
     setBusy(true);
     try {
       const res = await fetch('/api/education/playbook', {
@@ -93,6 +102,7 @@ export function ChapterReader({ chapter, filmFor, startAt }: { chapter: Chapter;
       if (j?.awarded > 0) toast.success(`Chapter done — ${j.awarded + (j.bonus > 0 ? j.bonus : 0)} shards.`);
       else if (j?.chapterComplete && j?.payPath === 'check') toast.success('Chapter read. The chapter check is below.');
       else if (j?.chapterComplete) toast.success('Chapter done.');
+      stepped.current = !last;
       setI((n) => Math.min(chapter.lessons.length - 1, n + 1));
     } catch {
       // EDU-LINKS (2026-10-07): this promised the place was saved on the device, and nothing saved it — the lesson was
@@ -101,7 +111,7 @@ export function ChapterReader({ chapter, filmFor, startAt }: { chapter: Chapter;
     } finally {
       setBusy(false);
     }
-  }, [lesson, busy, isDone, chapter]);
+  }, [lesson, busy, isDone, chapter, last]);
 
   if (!lesson) return <p className={`${TYPE.body} text-fel-dim`}>This chapter has no lessons yet.</p>;
 
@@ -110,7 +120,7 @@ export function ChapterReader({ chapter, filmFor, startAt }: { chapter: Chapter;
   const nextLabel = next === '/education/playbook' ? 'All chapters' : 'Next chapter';
 
   return (
-    <div className="pb-[8.75rem] md:pb-0">
+    <div ref={top} className="scroll-mt-24">
       <div className="mb-4 flex items-center gap-3" data-lesson-progress>
         <StatRing value={progress.pct} max={100} label="Chapter progress" display="" size={36} stroke={4} />
         <p className={`${TYPE.label} flex-1 text-fel-dim`}>Lesson {i + 1} of {chapter.lessons.length}</p>
@@ -154,14 +164,20 @@ export function ChapterReader({ chapter, filmFor, startAt }: { chapter: Chapter;
         <BookText lesson={lesson} />
       </article>
 
-      {/* The screen's one primary, where a thumb is: done, next, or on to the next chapter. */}
-      {chapterDone && last ? (
-        <PrimaryCta href={next} docked testId="lesson-primary">{nextLabel}</PrimaryCta>
-      ) : (
-        <PrimaryCta onClick={complete} docked testId="lesson-primary">
-          {isDone ? 'Next' : last ? 'Finish the chapter' : 'Mark done'}
-        </PrimaryCta>
-      )}
+      {/* The screen's one primary: done, next, or on to the next chapter.
+          FLOAT-COVERS (2026-11-12): it flows here, at the end of the lesson where the reading ends, instead of docking.
+          Docked, it floated over the lesson's own first lines on a phone ("Understand this" and the lesson title at 150 %
+          text), and the reader kept 8.75rem of empty room under the page for it. Same label, the same full-width pill on
+          a phone, the same tap target. */}
+      <div className="mt-6 w-full max-w-md md:w-auto [&>*]:w-full md:[&>*]:w-auto">
+        {chapterDone && last ? (
+          <PrimaryCta href={next} testId="lesson-primary">{nextLabel}</PrimaryCta>
+        ) : (
+          <PrimaryCta onClick={complete} testId="lesson-primary">
+            {isDone ? 'Next' : last ? 'Finish the chapter' : 'Mark done'}
+          </PrimaryCta>
+        )}
+      </div>
 
       {chapterDone && (
         <section data-chapter-done className="fel-surface mt-8 p-5">

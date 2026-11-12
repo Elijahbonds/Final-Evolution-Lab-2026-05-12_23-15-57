@@ -161,12 +161,17 @@ describe('carried from phase 3: the builder\'s first screen once a program is on
     expect(src).not.toContain('line-clamp-2">{q}');
     expect(src).toContain('<form hidden={!askOpen}');
   });
-  it('the lede is the builder\'s and steps aside once a program is shown; room is left under the docked Start', async () => {
+  // TEST CHANGED (float-covers, 2026-11-12): Start no longer docks. Docked, it floated over the week's day cards on a phone's
+  // first screen; it flows under the summary now, so the room once left under it (data-dock-spacer) is gone. The intent,
+  // nothing on the page ends up under the Start button, is held by asserting it is not docked.
+  it('the lede is the builder\'s and steps aside once a program is shown; Start flows in the page, not docked over it', async () => {
     const { readFileSync } = await import('node:fs');
     expect(readFileSync('app/train/build/page.tsx', 'utf8')).not.toContain('lede={PAGE_LEDE}');
     const src = readFileSync('components/program-ask/program-builder.tsx', 'utf8');
     expect(src).toContain('data-testid="program-lede"');
-    expect(src).toContain('data-dock-spacer');
+    const start = src.split('\n').find((l) => l.includes('testId="program-start"')) ?? '';
+    expect(start).toContain('<PrimaryCta onClick={start}');
+    expect(start).not.toMatch(/\bdocked\b/);
   });
 });
 
