@@ -1,3 +1,69 @@
+## Phase 10, part B: proving it (every screen re-scored; four journeys; every budget re-checked)
+
+**The scorecard: 54 of 187 screens pass all four (phase 1: 4 of 184).** All 187 screens were read on one production build
+of release 9ff7c8d1, with Nexus Studio switched on in the rig. The other 133 are named one by one in
+`docs/EVERY-SCREEN-SCORECARD.md` ("Before (phase 1) → after"), each with the worst problem and what it needs
+(`docs/every-screen/needs.json`). In short:
+
+| What it needs | Screens |
+|---|---|
+| Owner: wording (more than 40 words on a first screen, an empty line whose next step sits outside it, a policy page) | 37 |
+| Owner: switched-off features ("opens soon", "coming soon", Squads, Coach Pro, teaching, group booking, the coach store) | 33 |
+| Owner: the owner's tools (/admin, /coach/admin), the arena age gate, the `[OWNER: …]` blanks, Studio | 14 |
+| Nothing failed: a 3D screen's tap time cannot be read on a rig with no GPU (a phone check) | 14 |
+| Game lanes: the in-game HUD (12 px plates, item-slot contrast, cut-offs at 200 %) | 12 |
+| Not its own screen (it sends you on), a 404 by design, or a row the rig cannot make (a guardian token, a creator card) | 13 |
+| Speed or load shifts not solved in phase 10 (named in part A), and the map preview developer page | 6 |
+| A design call (button looks; /modes and /venues, where 16 px lines were tried and made things worse) | 4 |
+
+Nothing fails only because of clothes. The closet fails on button looks and small text, not the kit; the kit belongs to
+the kit-glitch lane.
+
+**The four journeys, each a walk in the suite. No dead end in any of them:**
+
+| Journey | Taps | Ends |
+|---|---|---|
+| A new athlete alone: home → Log in → Create account → the first game → out → Train → build a program → every set → progress → Play → Measure my vertical | 31 | at the camera (three jumps need a person) |
+| A coached client: Train → today's session → every set → saved → Train → progress → Profile | 14 | the profile |
+| The coach: the roster's week → the athlete → Program → change one exercise (saved) → Back → form reviews → Back → groups (what to do while they are off) | 10 | the groups notice, with its way on |
+| A player who only wants the games: Play → Flight Night → playing → out → Play → Story → Play → Ones | 7 | the next game's start card |
+
+The first runs found two walk faults, not app faults. The coach's athlete opens as a sheet with its own Back (the walk
+had reached for the tab bar). A game tile tapped while scrolled under the top bar did not open; the walk now picks one in
+view.
+
+**Every tap budget from phases 1–9 was walked again: 47 of 47 are unchanged; none went up.** All 51 walks (the 47, plus
+the four journeys) reach their end; five of them run on the booking-open (LIT) rig.
+
+**The /story check** (`scripts/every-screen/story-map-check.mts`): all 12 zone markers and labels sit fully on the map at
+390 px, at 100 % and at 150 % text. Its control moves every zone 60 px right, and it then reports six misses. So the check
+can see a miss.
+
+**Small fixes the re-score found:**
+- the controller page's name field has a name (it had only a placeholder; `/controller/[code]` now passes all four);
+- the big screen's "keeps the screen awake" line is readable (4.11:1 → over 4.5:1);
+- long lines at 16 px on `/live`, `/party` and Free play (`/play/irl`);
+- the account's three section headings move from 18 to 20 px.
+
+`/account`, `/live`, `/party` and `/controller/[code]` now pass all four. Two tries made things worse and were taken out:
+`/modes` (its tiles became different heights) and `/venues` (its two-line list was cut).
+
+**The owner's 15-minute phone check (the whole app):**
+
+1. *(2 min)* Signed out: open the home page → Log in → Create account. Birth date first, then name, email and password; the
+   terms tick is a real checkbox. Begin → you land in a game. Tap Home to leave it.
+2. *(3 min)* Train → Build my program → type "All I have is a band. Full body, 3 days a week." → Build it → Start today.
+   Tap through two sets, then Back. Train → My progress: your numbers are there.
+3. *(2 min)* Play → Measure my vertical: it asks your age only if your full birth date is not kept, then "Does anything
+   hurt?", then the camera.
+4. *(2 min)* Play → Flight Night → Tap to start → Home. Play → Story: every zone and its name are on screen; set your
+   phone's text larger and look again. Play → Ones: the start card's Controls box scrolls, and nothing is cut off.
+5. *(2 min)* Profile → Wallet (where each coin came from) → Store → Closet (buttons at finger size; the tools sit beside
+   your character) → Edit profile → Support.
+6. *(2 min)* Train → Learn → Continue (a lesson opens in one tap) → Kitchens → Fuel → Books.
+7. *(2 min)* As a coach: Train → Your roster → open an athlete → Program → change one exercise (saved on the tap) → Back
+   → Form reviews → Back → Groups: each switched-off tool says what to do instead.
+
 ## What changed in phase 10, part A (the whole app, once more: fix; measured on the rig)
 
 Measured on the same rig before (release ccc9f830) and after, reading the tap with the CPU slowed 4×. Each tap was also

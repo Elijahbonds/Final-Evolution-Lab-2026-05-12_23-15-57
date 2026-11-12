@@ -192,7 +192,7 @@ export default function IrlGame({ onEnd }: GameProps) {
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-8 text-center">
             <Activity className="mx-auto mb-4 h-12 w-12" style={{ color: CYAN }} />
             <h2 className="text-2xl font-bold">MOTION ACCESS</h2>
-            <p className="mx-auto mt-3 max-w-md text-sm text-white/60">
+            <p className="mx-auto mt-3 max-w-md text-base text-white/60">
               This phone requires your permission to read the motion sensor. Tap below, then allow access.
               Nothing is recorded or uploaded — samples stay on your device.
             </p>

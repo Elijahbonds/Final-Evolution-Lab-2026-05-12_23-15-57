@@ -41,7 +41,7 @@ export function ColorVisionSetting() {
   useEffect(() => { const sync = () => setV(readColorVision()); sync(); return onColorVisionChange(sync); }, []);
   return (
     <section className="rounded-xl border border-white/10 bg-white/[0.02] p-5" aria-labelledby="color-vision-heading" data-setting="color-vision">
-      <h3 id="color-vision-heading" className="fel-heading mb-1 text-lg font-bold text-white">{t('settings.colorVision.title')}</h3>
+      <h3 id="color-vision-heading" className="fel-heading mb-1 text-[20px] font-bold text-white">{t('settings.colorVision.title')}</h3>
       <p className={`mb-4 ${lineSize(t('settings.colorVision.body'), 'text-xs')} text-fel-dim`}>{t('settings.colorVision.body')}</p>
       <Choice value={v} options={COLOR_VISIONS} label={VISION_LABEL} onPick={(n) => { if (n !== v) { writeColorVision(n); setV(n); } }} />
     </section>
@@ -53,7 +53,7 @@ export function CouchSetting() {
   useEffect(() => { const sync = () => setP(readCouchPref()); sync(); return onCouchChange(sync); }, []);
   return (
     <section className="rounded-xl border border-white/10 bg-white/[0.02] p-5" aria-labelledby="couch-heading" data-setting="couch">
-      <h3 id="couch-heading" className="fel-heading mb-1 text-lg font-bold text-white">{t('settings.couch.title')}</h3>
+      <h3 id="couch-heading" className="fel-heading mb-1 text-[20px] font-bold text-white">{t('settings.couch.title')}</h3>
       <p className={`mb-4 ${lineSize(t('settings.couch.body'), 'text-xs')} text-fel-dim`}>{t('settings.couch.body')}</p>
       <Choice value={p} options={COUCH_PREFS} label={COUCH_LABEL} onPick={(n) => { if (n !== p) { writeCouchPref(n); setP(n); } }} />
     </section>
