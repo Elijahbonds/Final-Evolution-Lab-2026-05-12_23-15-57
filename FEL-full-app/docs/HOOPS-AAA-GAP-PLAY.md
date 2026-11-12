@@ -118,8 +118,8 @@ ball).
 
 - What phase 1 bought, on the deterministic rig [PRIOR p01]: stick onset 4 → 2 frames; stop from a jog 250 → 150 ms (0.53 → 0.29 m),
   from a sprint 417 → 233 ms (1.40 → 0.68 m); flicks standing / jogging 1v1 8/8 → 8/8, 6/8 → 8/8, 3v3 6/8 → 7/8, 4/8 → 8/8; silent
-  presses 2 → 0 (1v1); a shot pressed during a spin now fires the frame the spin clears. The meter answers in 1 frame. The 1v1 ball
-  still leaves the hand 14 frames after the press on a jumper (the load dip, by design of the clip).
+  presses 2 → 0 (1v1); a shot pressed during a spin now fires the frame the spin clears. The meter answers in 1 frame; since phase 4 the
+  ball rises 1 frame after the press (11 on a pull-up, the gather's own dip) [PRIOR p04].
 - **Turn radius at speed.** The handler turns at 540°/s, but by lerp-and-normalise, so a 90° stick turns at about 64 % of that
   (`HoopsStick.ts:39–43`, `HOOPS_TURN_TRUE_ARC 0`). The sprint press's kick (0.9 m/s) lands in one frame — 54 m/s² — and the cut cost is
   paid in one frame (`HoopsStick.ts:44–47`, `HOOPS_KICK_SEC 0`, `HOOPS_CUT_SEC 0`). H3a has all three as knobs; the owner has not felt
