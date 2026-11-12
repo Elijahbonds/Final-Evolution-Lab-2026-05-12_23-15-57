@@ -31,6 +31,19 @@ function haptic(feel: Feel) {
 
 const SPRING = { type: 'spring' as const, stiffness: 720, damping: 26, mass: 0.5 };
 
+/** GAME-HUD (2026-11-12): the app's text floor (TYPE.label, READABLE.minPx). The face buttons' long labels (STRIKE,
+ *  ATTACK) drew at 15 % of the button: 10.8 px on a 390 px phone (the every-screen scorer, /story/boss and /story/rail). */
+export const VC_MIN_LABEL_PX = 12;
+/** A face button's label size: 20 % of the button (15 % for a long label), never under the 12 px floor. Size only: the
+ *  button, its label and its place are as they were. */
+export function faceLabelPx(size: number, long: boolean): number {
+  return Math.max(VC_MIN_LABEL_PX, size * (long ? 0.15 : 0.2));
+}
+/** GAME-HUD (2026-11-12): the tray's two small controls (Controls, hide) were 28 px tall. Their TAP area is 44 px now (the
+ *  app's target size) while what they DRAW keeps its 28 px pill and circle: the transparent rim hides nothing of the
+ *  game, and a negative margin keeps the row, and so the tray, exactly as tall as it was. */
+export const VC_TAP_PX = 44;
+
 /* ── Ripple burst that fires each press ─────────────── */
 function Ripple({ token, color }: { token: number; color: string }) {
   return (
@@ -79,7 +92,7 @@ function FaceButton({
       style={{
         width: size, height: size,
         color: active ? '#050505' : color,
-        fontSize: long ? Math.max(9, size * 0.15) : size * 0.2,
+        fontSize: faceLabelPx(size, !!long),
         lineHeight: 1.05,
         textShadow: active ? 'none' : `0 0 10px ${color}77`,
         border: `2px solid ${active ? color : color + '80'}`,
@@ -312,7 +325,7 @@ function Trigger({
       onPointerLeave={(e) => { e.preventDefault(); onUp(); }}
       animate={{ scale: active ? 0.94 : 1 }}
       transition={SPRING}
-      className="pointer-events-auto relative flex select-none touch-none items-center justify-center overflow-hidden rounded-xl px-7 py-2.5 text-xs font-extrabold uppercase tracking-widest"
+      className="pointer-events-auto relative flex min-h-11 select-none touch-none items-center justify-center overflow-hidden rounded-xl px-7 py-2.5 text-xs font-extrabold uppercase tracking-widest"
       style={{
         color: active ? '#050505' : color,
         border: `2px solid ${active ? color : color + '80'}`,
@@ -403,17 +416,23 @@ export function VirtualController({ scheme }: { scheme: VCScheme }) {
           type="button"
           onClick={() => setShowLegend((s) => !s)}
           aria-label="Controls help"
-          className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-white/15 bg-black/60 px-3 py-1 text-[12px] font-semibold uppercase tracking-wider text-white/75 backdrop-blur-md transition hover:border-[#00E5FF]/50 hover:text-[#00E5FF]"
+          data-vc-tap
+          className="group pointer-events-auto -my-2 flex min-h-11 items-center"
         >
-          <Info className="h-3 w-3" /> Controls
+          <span className="flex items-center gap-1.5 rounded-full border border-white/15 bg-black/60 px-3 py-1 text-[12px] font-semibold uppercase tracking-wider text-white/75 backdrop-blur-md transition group-hover:border-[#00E5FF]/50 group-hover:text-[#00E5FF]">
+            <Info className="h-3 w-3" /> Controls
+          </span>
         </button>
         <button
           type="button"
           onClick={() => setVisible(false)}
           aria-label="Hide controller"
-          className="pointer-events-auto flex h-7 w-7 items-center justify-center rounded-full border border-white/15 bg-black/60 text-white/60 backdrop-blur-md transition hover:border-white/40 hover:text-white"
+          data-vc-tap
+          className="group pointer-events-auto -my-2 -mr-2 flex h-11 w-11 items-center justify-center"
         >
-          <X className="h-3.5 w-3.5" />
+          <span className="flex h-7 w-7 items-center justify-center rounded-full border border-white/15 bg-black/60 text-white/60 backdrop-blur-md transition group-hover:border-white/40 group-hover:text-white">
+            <X className="h-3.5 w-3.5" />
+          </span>
         </button>
       </div>
 

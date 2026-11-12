@@ -14,7 +14,7 @@
 // layout covers no more of the play area than it did), and at least TV_MIN_READ_PX once the 1080p zoom applies.
 import { HUD_ZOOM_MAX, TV_SAFE } from '@/lib/ui/consoleView';
 import { cuePalette, onColorVisionChange, readColorVision, shapeCues, type ColorVision } from '@/lib/a11y/colorVision';
-import { readableMs } from '@/lib/readable/rules';
+import { READABLE, readableMs, wordCount } from '@/lib/readable/rules';
 
 /** READABLE (2026-11-02): how long a passing HUD message stays up — its own ms or its read time (words × 0.3 s + 1 s),
  *  whichever is longer (lib/readable/rules.ts). */
@@ -189,6 +189,37 @@ export function hudFontSize(size: HudSize): string {
   const s = HUD_TYPE[size];
   return `calc(${s.phone}px + (var(--fel-hud-zoom, 1) - 1) * ${s.growth}px)`;
 }
+
+/**
+ * GAME-HUD (lane/game-hud, 2026-11-12): the step a run of HUD text draws at. A HUD LINE (READABLE.hudLineWords, 3+ words:
+ * "0 YD · 0 EVA", "LEAD 0.6 s", a hint) is read mid-play, so it takes the HUD's line floor (READABLE.hudPhonePx, 14 px:
+ * the `body` step); a label or a value (PLACE, LAP 1/3) keeps the step it was given. Pure and opt-in: a host calls it for
+ * the runs it means, so a host that does not is exactly as it was.
+ */
+export function hudLineStep(text: unknown, size: HudSize): HudSize {
+  if (HUD_TYPE[size].phone >= READABLE.hudPhonePx) return size;
+  const words = wordCount(typeof text === 'string' || typeof text === 'number' ? String(text) : '');
+  return words >= READABLE.hudLineWords ? 'body' : size;
+}
+
+/**
+ * GAME-HUD: what a chip gives back when its text moves up to the line step, so the HUD hides no more of the play area
+ * than it did. The 14 px line is ~3 px taller than the 12 px one; the chip's vertical padding goes from 0.25em to 0.1em
+ * (3.5 → 1.4 px at the HUD's 14 px base), so the plate is as tall as before (about 20 px) and only as much wider as the
+ * letters are (+6–10 %, less than the old letter spacing gave back). Nothing for a chip that kept its step.
+ */
+export function hudLineTrim(text: unknown, size: HudSize): { paddingBlock?: string } {
+  return hudLineStep(text, size) !== size ? { paddingBlock: HUD_LINE_TRIM_PAD } : {};
+}
+/** A HudLine moved from the 12 px caption to the 14 px line step: its plate's padding, so the plate is no taller and only
+ *  a little wider than the caption's was (0.2em 0.75em at 12 px: 2.4 / 9 px; this at 14 px: 0.7 / 5.6 px). */
+export const HUD_LINE_PAD = '0.05em 0.4em';
+/** GAME-HUD (2026-11-12): a plate-less chip lit in the danger tone with its text in the same tone (freerun's speed gate,
+ *  football's BREAKAWAY) was 4.42:1 at a 0.25 fill over the app's #050505 (measured in play: under WCAG's 4.5:1); at
+ *  0.2 it is 4.77:1 and still reads as the red chip. tests/game-hud holds the ratio. */
+export const DANGER_CHIP_FILL = 0.2;
+/** The chip's vertical padding when its text is a line at the line step (see hudLineTrim). */
+export const HUD_LINE_TRIM_PAD = '0.1em';
 
 /** Inline style for HUD text at a step, in the display face. */
 export function hudType(size: HudSize): { fontSize: string; lineHeight: number; letterSpacing: string; fontWeight: number } {
