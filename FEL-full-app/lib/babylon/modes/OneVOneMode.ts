@@ -2015,8 +2015,8 @@ export const OneVOneMode: ModeDefinition = (() => {
             // G6: the live dribble is PARKED — the ball comes back to the palm for the meter and leaves the HAND at the release
             // (the carry's deactivate sat inside the !shooting guard, so the ball stayed at its last bounce point on the floor
             // through the whole meter and the arc started from there — measured ball–hand 1.56 m in the load)
-            meCarry?.update(0, 0, false);
-            gatherToShootingHand();   // HOOPS MOTION phase 4b (U14): the jumper gathers in the RIGHT hand, whichever the dribble was in
+            if (meCarry) meCarry.pickUp(hoopsHand(me));   // hoops-gather G1: the carry's pick-up (reads the bounce behind hoops.pickupReadOn; off = the update(0, 0, false) + gather it replaced)
+            else gatherToShootingHand();   // HOOPS MOTION phase 4b (U14): the jumper gathers in the RIGHT hand, whichever the dribble was in
             const contest = contestLevel(me.root.position, defenderPos);
             shotContest = contest;
             currentShot = classifyShot(me.root.position, meDribble.vel, RIM, contest, posting ? post : faceUpRead(defenderPos));
@@ -3063,8 +3063,9 @@ export const OneVOneMode: ModeDefinition = (() => {
     const side = sideIn ?? (style === 'layup' ? pickLayupSide(me.root.position, RIM_FLOOR, me.root.rotation.y, defenderPos)
       : style === 'hook' ? pickHookSide(me.root.position, RIM_FLOOR, me.root.rotation.y, defenderPos)
       : style === 'reverse' ? reverseSide(me.root.position, RIM_FLOOR, me.root.rotation.y, meDribble.vel) : 'right');
-    meCarry?.update(0, 0, false);
-    gatherBallToHand(ball, me.skeleton, hoopsHand(me, side));   // HOOPS MOTION phase 3: the finishing hand AS DRAWN, gathered (was rig-named: the inside hand)
+    if (meCarry?.pickingUp) meCarry.pickUp(hoopsHand(me, side));   // hoops-gather G1: a pick-up still waiting for the bounce takes the finishing hand
+    else { meCarry?.update(0, 0, false);
+    gatherBallToHand(ball, me.skeleton, hoopsHand(me, side)); }   // HOOPS MOTION phase 3: the finishing hand AS DRAWN, gathered (was rig-named: the inside hand)
     if (preSec <= 0) meterStart(style === 'hook' ? hookShield(contest) : contest, style);   // a footwork gather already started it
     // M4: the fade's escape line — off the defender when he is on me, straight off the rim otherwise
     const plan = planFinish(style, side, shotMeter.durationSec, shotMeter.greenCenter01,
@@ -3164,8 +3165,8 @@ export const OneVOneMode: ModeDefinition = (() => {
     shooting = true;
     shotContest = plan.kind === 'shimmy' ? contest * SHIMMY_CONTEST_CUT : contest;   // the shimmy sells: the contest that reaches the fade is cut
     pumpWindow = 0;
-    meCarry?.update(0, 0, false);
-    gatherToShootingHand();   // HOOPS MOTION phase 4b (U14): the footwork's gather is the right hand's too
+    if (meCarry) meCarry.pickUp(hoopsHand(me));   // hoops-gather G1: the carry's pick-up (reads the bounce behind hoops.pickupReadOn; off = the update(0, 0, false) + gather it replaced)
+    else gatherToShootingHand();   // HOOPS MOTION phase 4b (U14): the footwork's gather is the right hand's too
     currentShot = plan.then === 'rise' ? classifyShot(me.root.position, meDribble.vel, RIM, contest) : { style: plan.then as ShotStyle, label: gatherLabel(plan.kind, 'FINISH'), pctMod: plan.then === 'floater' ? 1.0 : plan.then === 'fadeaway' ? 0.86 : 1.18, drift: 'none' };
     // ACROBATIC LAYUPS (2026-09-18): a hop that was going to RISE but classifies as a finish (the running layup band, the
     // scoop, the hang) ends IN that finish — it used to rise as a jumper under a "HANG & FINISH" label (measured)
@@ -3428,6 +3429,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   }
 
   function releaseJumper(ctx: ModeContext, quality: ShotQuality): void {
+    meCarry?.settlePickUp();   // hoops-gather G1: a pick-up still waiting for the bounce is taken before the ball leaves (no-op with it off)
     shooting = false;
     myJumperQuality = quality;   // HOOPS-10PHASE-2 phase 9: kept past the release for the make's own camera pulse
     box.fga++;   // IMPROVE (2026-10-06) #4: every release is an attempt (a blocked one too)

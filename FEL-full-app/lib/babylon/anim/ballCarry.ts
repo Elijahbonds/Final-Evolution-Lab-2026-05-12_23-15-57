@@ -1265,6 +1265,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     get pickingUp() { return !!pick; },
     settlePickUp() { if (pick) takePick(); },
     pickUp(hand?: RigHand, releaseSec?: number) {
+      if (pick) { if (hand) pick.hand = hand; return 'reading'; }   // already waiting for the bounce: only the hand it goes to changes
       const asToday = (): 'now' => {
         api.update(0, 0, false, undefined, releaseSec);
         const md = opts.ball.metadata as { felReleased?: boolean } | null;

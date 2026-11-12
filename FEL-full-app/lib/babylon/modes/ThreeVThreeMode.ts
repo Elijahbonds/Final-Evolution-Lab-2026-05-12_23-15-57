@@ -2382,7 +2382,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           banked = null;   // M12: each release calls its own glass
           // HOOPS MOTION phase 4b (U14): the dribble parked now (the carries loop would park it next frame, into whichever hand it was in) and
           // the ball gathered into the RIGHT hand
-          carries.get(me)?.update(0, 0, false); gatherToShootingHand();
+          { const c = carries.get(me); if (c) c.pickUp(hoopsHand(me.char)); else gatherToShootingHand(); }   // hoops-gather G1: the carry's pick-up (reads the bounce behind hoops.pickupReadOn; off = the update(0, 0, false) + gather it replaced)
           const contest = contestLevel(me.char.root.position, nearestFoePos);
           shotContest = contest;
           currentShot = classifyShot(me.char.root.position, me.drib.vel, RIM, contest, posting ? post : faceUpRead(nearestFoePos));
@@ -2591,6 +2591,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   }
 
   async function resolveMyShot(ctx: ModeContext, quality: ShotQuality): Promise<void> {
+    carries.get(me)?.settlePickUp();   // hoops-gather G1: a pick-up still waiting for the bounce is taken before the ball leaves (no-op with it off)
     shooting = false;
     box.fga++;   // IMPROVE (2026-10-06) #9: every release is an attempt (a blocked one too)
     const pctMod = currentShot?.pctMod ?? 1;
@@ -2992,8 +2993,9 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     const side = sideIn ?? (style === 'layup' ? pickLayupSide(me.char.root.position, RIM_FLOOR, me.char.root.rotation.y, defenderPos)
       : style === 'hook' ? pickHookSide(me.char.root.position, RIM_FLOOR, me.char.root.rotation.y, defenderPos)
       : style === 'reverse' ? reverseSide(me.char.root.position, RIM_FLOOR, me.char.root.rotation.y, me.drib.vel) : 'right');
-    carries.get(me)?.update(0, 0, false);
-    gatherBallToHand(ball, me.char.skeleton, hoopsHand(me.char, side));   // HOOPS MOTION phase 3: the finishing hand AS DRAWN, gathered (was rig-named: the inside hand)
+    if (carries.get(me)?.pickingUp) carries.get(me)!.pickUp(hoopsHand(me.char, side));   // hoops-gather G1: a pick-up still waiting for the bounce takes the finishing hand
+    else { carries.get(me)?.update(0, 0, false);
+    gatherBallToHand(ball, me.char.skeleton, hoopsHand(me.char, side)); }   // HOOPS MOTION phase 3: the finishing hand AS DRAWN, gathered (was rig-named: the inside hand)
     if (preSec <= 0) meterStart(style === 'hook' ? hookShield(contest) : contest, style);
     // M4: the fade's escape line — off the defender when he is on me, straight off the rim otherwise
     const plan = planFinish(style, side, shotMeter.durationSec, shotMeter.greenCenter01,
@@ -3084,8 +3086,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     shooting = true;
     shotContest = plan.kind === 'shimmy' ? contest * SHIMMY_CONTEST_CUT : contest;
     pumpWindow = 0;
-    carries.get(me)?.update(0, 0, false);
-    gatherToShootingHand();   // HOOPS MOTION phase 4b (U14): the footwork's gather is the right hand's too
+    { const c = carries.get(me); if (c) c.pickUp(hoopsHand(me.char)); else gatherToShootingHand(); }   // hoops-gather G1: the carry's pick-up (reads the bounce behind hoops.pickupReadOn; off = the update(0, 0, false) + gather it replaced)   // (U14: the footwork's gather is the right hand's too)
     currentShot = plan.then === 'rise' ? classifyShot(me.char.root.position, me.drib.vel, RIM, contest) : { style: plan.then as ShotStyle, label: gatherLabel(plan.kind, 'FINISH'), pctMod: plan.then === 'floater' ? 1.0 : 1.18, drift: 'none' };
     if (plan.then === 'rise' && isFinishStyle(currentShot.style)) plan.then = currentShot.style;   // ACROBATIC LAYUPS (2026-09-18): a hop that classifies as a finish ends IN it (the 1v1's)
     meterStart(contest, currentShot.style, plan.sec);
