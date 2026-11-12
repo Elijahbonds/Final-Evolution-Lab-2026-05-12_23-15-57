@@ -335,10 +335,12 @@ with a real player (`hoops-audit/mash-audit.mjs PLAYER=script` and `mash`): the 
 
 ## 6. The worst moments, drawn
 
-Frame strips (every second frame from the press, 480×270, the rig's drawn run): `scratchpad/hoops-gather/gather-escape-worst.jpg`
-(the coordinator's scratch; the absolute path is in the lane's report). Rows: the pull-up pressed at the floor (the ball flown up to a
-still hand), the standing jumper pressed at the floor, the pump → step-through's arm, the behind-the-back's hand, the retreat dribble,
-the 3v3 layup's scoop off the floor bounce, the 3v3 trap held and the snatch-back inside it.
+One JPG, `scratchpad/hoops-gather/gather-escape-worst.jpg` (the lane's scratch folder; its absolute path is in the lane's report): five
+rows, each eight frames (every second drawn frame, cropped to the hero), from a drawn 1v1 run at 480×270 that reproduced the numbers
+above — the pull-up pressed at the floor (62 cm, seated 9 frames later, hand share 0.05), the standing jumper pressed at the floor
+(61 cm, a yank), the pump → step-through (the left arm 98° in one frame at +8), the set behind-the-back (the ball hand 120° in one
+frame at +21, the gap 1.10 m before and after) and the retreat dribble (the same clip, 132° at +20). The 3v3 strips (the scoop off
+the floor bounce, the trap) did not fit the gate hold: not drawn; their numbers are in §2.
 
 ## 7. Flags, assumptions, and how to re-run
 
