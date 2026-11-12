@@ -15,7 +15,7 @@ import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } 
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
-import { HUD_TEXT_ALPHA, HudBanner, HudChip, HudFrame, HudLine, HudMeter, HudPlate, HudText, ScoreValue, Scorebug, hudColor, hudLineStep } from './tv-hud';
+import { HUD_TEXT_ALPHA, HudBanner, HudChip, HudFrame, HudLine, HudMeter, HudPlate, HudText, ScoreValue, Scorebug, hudColor, hudLineStep, hudLineTrim, HUD_LINE_TRIM_PAD, HUD_LINE_PAD } from './tv-hud';
 import { footballHeadline, footballSessionWon, gameResultFromSession } from '@/lib/sessions/gameResultFromSession';
 import { medalName } from '@/lib/babylon/modes/footballRushRules';
 /** FOOTBALL UPGRADE: the breakaway meter's lines arrive as '0.333,0.667'. */
@@ -116,7 +116,7 @@ export default function FootballBabylon({ onEnd }: GameProps) {
           <ScoreValue value={hnode(hud.score, 0)} size="stat" tone="score" />
           <HudText size="caption" tone="score">PTS</HudText>
         </Scorebug>
-        <HudChip tone="good" size="body">{hnode(hud.yards, 0)} YD · {hnode(hud.evades, 0)} EVA</HudChip>
+        <HudChip tone="good" size="body" style={{ paddingBlock: HUD_LINE_TRIM_PAD }}>{hnode(hud.yards, 0)} YD · {hnode(hud.evades, 0)} EVA</HudChip>
       </div>
 
       {/* drive state chips: breakaway gear + truck cooldown */}
@@ -134,7 +134,7 @@ export default function FootballBabylon({ onEnd }: GameProps) {
           <HudText size="label" tone={hud.truckReady === false ? 'text' : 'you'} alpha={hud.truckReady === false ? 0.3 : 1}>TRUCK {hud.truckReady === false ? '…' : 'READY'}</HudText>
         </HudChip>
         {/* KICKOFF RETURN (owner brief 2026-09-18): the lane you are in, and the SLINGSHOT gauge drafting behind a blocker fills */}
-        {typeof hud.lane === 'string' && hud.lane && <HudChip plate={false} fill={0.2} tone="score" size={hudLineStep(hud.lane, 'label')} className="rounded">{hud.lane}</HudChip>}
+        {typeof hud.lane === 'string' && hud.lane && <HudChip plate={false} fill={0.2} tone="score" size={hudLineStep(hud.lane, 'label')} style={hudLineTrim(hud.lane, 'label')} className="rounded">{hud.lane}</HudChip>}
         {typeof hud.slingshot === 'number' && (
           <HudMeter
             className="mt-0.5"
@@ -160,9 +160,9 @@ export default function FootballBabylon({ onEnd }: GameProps) {
             ticks={ticksOf(hud.breakawayTicks).map((t) => ({ at: t }))}
           />
         )}
-        {typeof hud.weather === 'string' && hud.weather && <HudChip plate={false} alpha={0.7} size={hudLineStep(hud.weather, 'label')} className="rounded" style={{ background: 'rgba(255, 255, 255, 0.1)' }}>{hud.weather}</HudChip>}
+        {typeof hud.weather === 'string' && hud.weather && <HudChip plate={false} alpha={0.7} size={hudLineStep(hud.weather, 'label')} className="rounded" style={{ background: 'rgba(255, 255, 255, 0.1)', ...hudLineTrim(hud.weather, 'label') }}>{hud.weather}</HudChip>}
         {/* IMPROVE (2026-10-06) #11: the session's target — the next medal and the points to it, and the viewer's best */}
-        {typeof hud.par === 'string' && hud.par && <HudChip tone="score" size={hudLineStep(hud.par, 'label')}>{hud.par}</HudChip>}
+        {typeof hud.par === 'string' && hud.par && <HudChip tone="score" size={hudLineStep(hud.par, 'label')} style={hudLineTrim(hud.par, 'label')}>{hud.par}</HudChip>}
       </div>
 
       {/* A+ mission #9 (Tecmo Bowl feel + Madden readability): the field strip — ball, line of scrimmage, first-down line
@@ -183,8 +183,8 @@ export default function FootballBabylon({ onEnd }: GameProps) {
           <div className="flex items-center gap-3">
             <HudText size="body" alpha={HUD_TEXT_ALPHA.muted}>BALL ON {hud.ballOn}</HudText>
             <HudText size="body" tone="score">1ST AT {hnode(hud.firstDown, '—')}</HudText>
-            <HudText size="body" alpha={HUD_TEXT_ALPHA.muted}>GOAL {hud.fieldLen}</HudText>
-            {typeof hud.drive === 'string' && hud.drive && <HudText size="body" alpha={HUD_TEXT_ALPHA.faint}>DRIVE {hud.drive}</HudText>}
+            <HudText size="caption" alpha={HUD_TEXT_ALPHA.muted}>GOAL {hud.fieldLen}</HudText>
+            {typeof hud.drive === 'string' && hud.drive && <HudText size={hudLineStep(`DRIVE ${hud.drive}`, 'caption')} alpha={HUD_TEXT_ALPHA.faint}>DRIVE {hud.drive}</HudText>}
           </div>
         </div>
       )}
@@ -219,7 +219,7 @@ export default function FootballBabylon({ onEnd }: GameProps) {
         </div>
       )}
 
-      <HudLine text={typeof hud.hint === 'string' ? hud.hint : ''} alpha={0.7} className="bottom-16" />
+      <HudLine text={typeof hud.hint === 'string' ? hud.hint : ''} alpha={0.7} padding={HUD_LINE_PAD} className="bottom-16" />
 
       <HudBanner text={typeof hud.banner === 'string' ? hud.banner : ''} tone="score" />
       </HudFrame>

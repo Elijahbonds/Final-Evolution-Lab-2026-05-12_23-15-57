@@ -17,7 +17,7 @@ import { mergeHud } from '@/lib/babylon/core/hudMerge';   // IMPROVE (2026-10-06
 import { clockText } from '@/lib/babylon/core/HundredPacing';   // IMPROVE (2026-10-06, #17): the run's clock to the 180 s cap
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
-import { HudBanner, HudChip, HudFrame, HudLine, HudMeter, HudText, ScoreValue, hudColor, hudLineStep } from './tv-hud';
+import { HudBanner, HudChip, HudFrame, HudLine, HudMeter, HudText, ScoreValue, hudColor, hudLineStep, hudLineTrim, HUD_LINE_TRIM_PAD } from './tv-hud';
 import { CombatEdgeCall } from './combat-hud-band';
 import { gameResultFromSession } from '@/lib/sessions/gameResultFromSession';
 
@@ -134,7 +134,7 @@ export default function KarateBabylon({ onEnd }: GameProps) {
           )}
         </div>
         {/* GAME-HUD (2026-11-12): a line (WAVE 1 · 0 KO · …), so the HUD's 14 px line step, not the 12 px label */}
-        <HudChip tone="score" size="body">
+        <HudChip tone="score" size="body" style={{ paddingBlock: HUD_LINE_TRIM_PAD }}>
           WAVE {hnode(hud.wave, 1)} · {hnode(hud.kos, 0)} KO
           {hud.coins != null && <> · <span style={{ color: hudColor('text') }}>{hnode(hud.coins, 0)}c</span></>}
           {/* IMPROVE (2026-10-06, #17): the time left on the run's 180 s cap — red in the last 30 s, which the mode also calls */}
@@ -178,7 +178,7 @@ export default function KarateBabylon({ onEnd }: GameProps) {
         <div className="absolute inset-x-0 bottom-10 flex flex-col items-center gap-1 px-4">
           <div className="flex flex-wrap justify-center gap-1.5">
             {hud.perks.split(' · ').map((p) => (
-              <HudChip key={p} alpha={0.85} size={hudLineStep(p, 'label')}>{p}</HudChip>
+              <HudChip key={p} alpha={0.85} size={hudLineStep(p, 'label')} style={hudLineTrim(p, 'label')}>{p}</HudChip>
             ))}
           </div>
           <HudText size="label" tone="score">

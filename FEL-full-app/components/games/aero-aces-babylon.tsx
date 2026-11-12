@@ -24,7 +24,7 @@ import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { gameResultFromSession } from '@/lib/sessions/gameResultFromSession';
 import { hnode, hnum } from './hud-format';
 import { RaceCourseMap, THREAT_POS, THREAT_ARROW } from './race-course-map';
-import { HUD_TEXT_ALPHA, HudBanner, HudChip, HudFrame, HudLine, HudMeter, HudPlate, HudText, ScoreValue, hudColor, hudLineStep, type HudTone } from './tv-hud';
+import { HUD_TEXT_ALPHA, HudBanner, HudChip, HudFrame, HudLine, HudMeter, HudPlate, HudText, ScoreValue, hudColor, hudLineStep, hudLineTrim, type HudTone, HUD_LINE_PAD } from './tv-hud';
 
 type Hud = Record<string, HudValue>;
 
@@ -98,7 +98,7 @@ export default function AeroAcesBabylon({ onEnd }: GameProps) {
       {/* AERO ACES like Diddy Kong Racing (2026-09-15): PLACE and LAP are the race; the ITEM slot and BANANAS are what you
           carry into it. The item box takes the balloon's colour so a glance says what FIRE will do. */}
       <div className="absolute inset-x-0 top-0 flex items-start justify-between px-4 py-3">
-        <HudPlate className="px-3 py-1.5">
+        <HudPlate className={`px-3 ${hud.gap && hudLineStep(String(hud.gap), 'caption') === 'body' ? 'py-1' : 'py-1.5'}`}>
           <HudText as="div" size="caption" alpha={0.6}>PLACE</HudText>
           <ScoreValue value={hnode(hud.pos, '—')} size="hero" tone="score" />
           {/* RACING PASS phase 5: the gap — seconds to the plane ahead, or the lead */}
@@ -109,7 +109,7 @@ export default function AeroAcesBabylon({ onEnd }: GameProps) {
           <HudChip size="label" style={{ fontWeight: 800 }} alpha={0.85}>LAP {hnode(hud.lap, '—')}</HudChip>
           {/* IMPROVE (2026-10-06) #1: the delta to your best race on this circuit — green ahead, red behind */}
           {typeof hud.pb === 'string' && hud.pb
-            ? <HudChip size={hudLineStep(hud.pb, 'caption')} tone={hud.pb.includes('−') ? 'good' : 'danger'} style={{ fontWeight: 800 }}>{hud.pb}</HudChip>
+            ? <HudChip size={hudLineStep(hud.pb, 'caption')} tone={hud.pb.includes('−') ? 'good' : 'danger'} style={{ fontWeight: 800, ...hudLineTrim(hud.pb, 'caption') }}>{hud.pb}</HudChip>
             : null}
         </div>
         <div className="flex items-start gap-2">
@@ -140,7 +140,7 @@ export default function AeroAcesBabylon({ onEnd }: GameProps) {
             <HudMeter label="SLIPSTREAM" labelTone="info" value={Math.min(100, hnum(hud.draft))} max={100} tone="you" width="100%" height="thin" />
           </HudPlate>
         ) : null}
-        <HudPlate className="px-3 py-1 text-right">
+        <HudPlate className={`px-3 ${hnum(hud.toGate) > 0 ? 'py-0.5' : 'py-1'} text-right`}>
           <ScoreValue value={hnum(hud.speed)} size="stat" pop={false} /><HudText size="caption" alpha={0.5}> KM/H</HudText>
           {hnum(hud.toGate) > 0 ? <HudText as="div" size={hudLineStep(`RING ${hnum(hud.toGate)} m`, 'caption')} tone="info">RING {hnum(hud.toGate)} m</HudText> : null}
         </HudPlate>
@@ -155,7 +155,7 @@ export default function AeroAcesBabylon({ onEnd }: GameProps) {
       )}
 
       <BoostGauge hud={hud} className="absolute inset-x-0 bottom-28" />
-      {phase === 'playing' && <HudLine text={typeof hud.hint === 'string' ? hud.hint : ''} className="bottom-16" alpha={0.7} />}
+      {phase === 'playing' && <HudLine text={typeof hud.hint === 'string' ? hud.hint : ''} className="bottom-16" alpha={0.7} padding={HUD_LINE_PAD} />}
       <HudBanner text={typeof hud.banner === 'string' ? hud.banner : ''} tone="score" />
       </HudFrame>
 

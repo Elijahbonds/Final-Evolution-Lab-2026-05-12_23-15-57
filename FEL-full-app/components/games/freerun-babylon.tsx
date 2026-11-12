@@ -14,7 +14,7 @@ import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } 
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
-import { HudBanner, HudChip, HudFrame, HudLine, HudMeter, HudPips, HudPlate, HudText, ScoreValue, Scorebug, hudLineStep } from './tv-hud';
+import { HudBanner, HudChip, HudFrame, HudLine, HudMeter, HudPips, HudPlate, HudText, ScoreValue, Scorebug, hudLineStep, hudLineTrim, HUD_LINE_PAD } from './tv-hud';
 import { gameResultFromSession } from '@/lib/sessions/gameResultFromSession';
 
 type Hud = Record<string, HudValue>;
@@ -82,7 +82,7 @@ export default function FreeRunBabylon({ onEnd }: GameProps) {
       <div className="absolute inset-x-0 top-0 flex items-start justify-between px-4 py-3">
         {/* RIVALS (owner brief 2026-09-18): the rank and the gap to the leader, top-left */}
         {hud.place ? (
-          <HudPlate className="px-3 py-1.5">
+          <HudPlate className={`px-3 ${hudLineStep(placeLine, 'caption') === 'body' ? 'py-1' : 'py-1.5'}`}>
             <HudText as="div" size="caption" alpha={0.6}>PLACE</HudText>
             <ScoreValue value={String(hud.place)} tone="score" />
             <HudText as="div" size={hudLineStep(placeLine, 'caption')} tone={hud.delta === 'LEADING' ? 'good' : 'text'} alpha={hud.delta === 'LEADING' ? 1 : 0.7} style={{ fontWeight: 800 }}>{placeLine}</HudText>
@@ -100,10 +100,10 @@ export default function FreeRunBabylon({ onEnd }: GameProps) {
           <HudChip alpha={0.7} size="caption">CHECKPOINT {hnode(hud.checkpoint, '0/2')}</HudChip>
           {/* IMPROVE (2026-10-06): the last checkpoint's split against the personal best (− is ahead) */}
           {typeof hud.pbSplit === 'string' && hud.pbSplit && phase === 'playing' ? (
-            <HudChip tone={hud.pbSplit.includes('−') ? 'good' : 'danger'} size={hudLineStep(hud.pbSplit, 'caption')} style={{ fontWeight: 800 }}>{hud.pbSplit}</HudChip>
+            <HudChip tone={hud.pbSplit.includes('−') ? 'good' : 'danger'} size={hudLineStep(hud.pbSplit, 'caption')} style={{ fontWeight: 800, ...hudLineTrim(hud.pbSplit, 'caption') }}>{hud.pbSplit}</HudChip>
           ) : null}
         </div>
-        <HudPlate className="px-3 py-1.5 text-right">
+        <HudPlate className={`px-3 ${hudLineStep(tierLine, 'caption') === 'body' ? 'py-1' : 'py-1.5'} text-right`}>
           <HudText as="div" size={hudLineStep(tierLine, 'caption')} alpha={0.6}>{tierLine}</HudText>
           <HudText as="div" size="value" tone={hud.lane === 'HIGH' ? 'info' : hud.lane === 'LOW' ? 'heat' : 'text'} alpha={hud.lane === 'HIGH' || hud.lane === 'LOW' ? 1 : 0.8}>{hud.lane ? `${String(hud.lane)} LANE` : hnode(hud.route, 'LOW LINE')}</HudText>
         </HudPlate>
@@ -134,7 +134,7 @@ export default function FreeRunBabylon({ onEnd }: GameProps) {
           )}
           {/* IMPROVE (2026-10-06): a speed gate ahead — what it needs against your speed, from 15 m out */}
           {typeof hud.gateReq === 'string' && hud.gateReq && (
-            <HudChip plate={false} fill={0.25} tone={Number(hud.gateReady) ? 'good' : 'danger'} size={hudLineStep(hud.gateReq, 'caption')} className="rounded" style={{ fontWeight: 800 }}>{hud.gateReq}</HudChip>
+            <HudChip plate={false} fill={0.25} tone={Number(hud.gateReady) ? 'good' : 'danger'} size={hudLineStep(hud.gateReq, 'caption')} className="rounded" style={{ fontWeight: 800, ...hudLineTrim(hud.gateReq, 'caption') }}>{hud.gateReq}</HudChip>
           )}
           {typeof hud.verbs === 'string' && hud.verbs && (
             <div className="flex flex-wrap gap-1">
@@ -146,7 +146,7 @@ export default function FreeRunBabylon({ onEnd }: GameProps) {
         </div>
       )}
 
-      {phase === 'playing' && <HudLine text={typeof hud.hint === 'string' ? hud.hint : ''} className="bottom-16" alpha={0.7} />}
+      {phase === 'playing' && <HudLine text={typeof hud.hint === 'string' ? hud.hint : ''} className="bottom-16" alpha={0.7} padding={HUD_LINE_PAD} />}
       <HudBanner text={typeof hud.banner === 'string' ? hud.banner : ''} tone="score" />
       </HudFrame>
 

@@ -129,7 +129,7 @@ const PLAY_READ = `(() => {
   const cap = document.querySelector('[data-capture-ui] [data-testid="capture-overflow"]');
   let capOver = 0; const capUnder = [];
   if (cap) { const c = cap.getBoundingClientRect();
-    for (const t of texts) { if (t.cls !== 'hud' && t.cls !== 'other') continue; const w = Math.min(c.right, t.r) - Math.max(c.left, t.x), h = Math.min(c.bottom, t.b) - Math.max(c.top, t.y); if (w > 0 && h > 0) { capOver += w * h; capUnder.push(t.t); } } }
+    for (const t of texts) { if (t.cls !== 'hud') continue; const w = Math.min(c.right, t.r) - Math.max(c.left, t.x), h = Math.min(c.bottom, t.b) - Math.max(c.top, t.y); if (w > 0 && h > 0) { capOver += w * h; capUnder.push(t.t); } } }
   return { canvas: { w: Math.round(cr.r - cr.x), h: Math.round(cr.b - cr.y) }, cover: { hud: pct(count(grids.hud)), deck: pct(count(grids.deck)), chrome: pct(count(grids.chrome)), other: pct(count(grids.other)), all: pct(count(all)) },
     cap: cap ? (() => { const c = cap.getBoundingClientRect(); return { x: Math.round(c.x), y: Math.round(c.y), w: Math.round(c.width), h: Math.round(c.height) }; })() : null,
     capOverPx2: Math.round(capOver), capUnder: [...new Set(capUnder)].slice(0, 6), canvasRect: cr, dump, textDump };
@@ -148,6 +148,15 @@ async function readPlay(page: Page, phone: boolean) {
   const sizes = await page.evaluate(`window.__readable.collect().filter((r) => !r.ariaHidden).map((r) => ({ t: r.text.slice(0, 30), px: Math.round(r.px * 10) / 10, w: r.words, hud: r.hud }))`).catch(() => []) as { t: string; px: number; w: number; hud: boolean }[];
   return { play, sq, f150: f150 && { clipped: f150.clipped, hs: f150.hs }, contrast: a11y.violations.filter((v) => v.rule === 'contrast').map((v) => `${v.severity} ${v.target} ${v.detail}`).slice(0, 8), under12: sizes.filter((s) => s.px < 11.95).map((s) => `${s.t} @${s.px}`).slice(0, 12), smallest: sizes.length ? Math.min(...sizes.map((s) => s.px)) : null };
 }
+
+/** what clips each cut-off text: the text's box and every ancestor that clips, with its box (a diagnosis) */
+const CLIP_DIAG = (clipped: string[]) => `((needles) => { const out = []; const tw = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+        for (let n = tw.nextNode(); n; n = tw.nextNode()) { const t = (n.textContent || '').trim(); if (!t || !needles.some((x) => x.startsWith(t.slice(0, 12)) || t.startsWith(x.slice(0, 12)))) continue;
+          const el = n.parentElement; const rg = document.createRange(); rg.selectNodeContents(n); const r = rg.getBoundingClientRect();
+          const anc = []; for (let e = el; e && e !== document.body; e = e.parentElement) { const cs = getComputedStyle(e); const b = e.getBoundingClientRect();
+            if (cs.overflowX !== 'visible' || cs.overflowY !== 'visible') anc.push(e.tagName.toLowerCase() + '.' + String(e.className).slice(0, 80) + ' [' + Math.round(b.left) + ',' + Math.round(b.top) + ' ' + Math.round(b.width) + 'x' + Math.round(b.height) + '] ' + cs.overflowX + '/' + cs.overflowY + ' zoom ' + cs.zoom); }
+          out.push({ t: t.slice(0, 40), box: [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)], console: !!document.querySelector('[data-fel-console]'), anc }); }
+        return out.slice(0, 6); })(${JSON.stringify(clipped.map((c) => c.replace(/ \[.*$/, '')))})`;
 
 const SHOT = async (page: Page, name: string) => { const png = await page.screenshot({ timeout: 120000 }); await sharp(png).jpeg({ quality: 78 }).toFile(join(OUT, 'shots', `${name}.jpg`)); };
 
@@ -201,15 +210,25 @@ async function phoneRun(browser: Browser, inpage: string, mode: string, url: str
       const phoneSq = await squeeze(page, true);
       await page.evaluate(`document.documentElement.style.fontSize = '150%'`); await page.waitForTimeout(250);
       const f150 = await squeeze(page, false);
+      const f150Diag = await page.evaluate(CLIP_DIAG(f150.clipped)).catch((e) => String(e));
       await page.evaluate(`document.documentElement.style.fontSize = ''`);
       await page.setViewportSize({ width: 640, height: 400 }); await page.waitForTimeout(400);
       const z200 = await squeeze(page, false);
+      // what clips each cut-off text at 200 %: the text's box and every ancestor that clips, with its box (a diagnosis)
+      const z200Diag = await page.evaluate(CLIP_DIAG(z200.clipped)).catch((e) => String(e));
       await page.setViewportSize({ width: 390, height: 844 }); await page.waitForTimeout(600);
-      return { tiny: phoneSq.tiny + phoneSq.hudSmall, hudSmall: phoneSq.hudSmall, bodySmall: phoneSq.bodySmall, samples: phoneSq.samples, clipped: { phone: phoneSq.clipped, font150: f150.clipped, zoom200: z200.clipped },
+      return { tiny: phoneSq.tiny + phoneSq.hudSmall, hudSmall: phoneSq.hudSmall, bodySmall: phoneSq.bodySmall, samples: phoneSq.samples, clipped: { phone: phoneSq.clipped, font150: f150.clipped, zoom200: z200.clipped }, z200Diag, f150Diag,
         critical: a11y.violations.filter((v) => v.severity === 'critical').map((v) => `${v.rule} ${v.target} ${v.detail}`), serious: a11y.violations.filter((v) => v.severity === 'serious').length,
         smallTargets: m?.smallTargets, textSizes: m?.textSizes, buttonLooks: m?.buttonLooks, buttonLookList: m?.buttonLookList };
     });
     await step(errs, 'shot', () => SHOT(page, `${mode}-${TAG}-ready-portrait`));
+    // the HUD under the READY card is the mode's opening HUD, the same in every run: the coverage to compare before and
+    // after, upright and sideways (in play the HUD's content depends on what the scripted player did)
+    res.readyCoverPortrait = await page.evaluate(PLAY_READ).catch(() => null);
+    await page.setViewportSize({ width: 844, height: 390 }); await page.waitForTimeout(1500);
+    res.readyCoverPhone = await page.evaluate(PLAY_READ).catch(() => null);
+    await step(errs, 'shot', () => SHOT(page, `${mode}-${TAG}-ready-phone`));
+    await page.setViewportSize({ width: 390, height: 844 }); await page.waitForTimeout(1500);
     // in play, upright, then sideways
     await tapStart(page, label, true);
     await play(page, PLAY_MS);
@@ -235,7 +254,7 @@ async function desktopRun(browser: Browser, inpage: string, mode: string, url: s
     await page.waitForTimeout(1000);
     await page.evaluate(inpage);
     await step(errs, 'shot', () => SHOT(page, `${mode}-${TAG}-ready-desktop`));
-    res.readyDesktop = await page.evaluate(PLAY_READ.replace("el.closest('[data-fel-fullbleed]') ||", '').replace("el.closest('[data-fel-fullbleed]') ||", '')).catch(() => null);
+    res.readyCoverDesktop = await page.evaluate(PLAY_READ).catch(() => null);
     await tapStart(page, label, false);
     await play(page, PLAY_MS);
     res.playDesktop = await step(errs, 'playDesktop', () => readPlay(page, false));

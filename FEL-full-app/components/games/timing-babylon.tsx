@@ -201,9 +201,12 @@ export function makeTimingHost(opts: TimingHostOpts) {
           <HudChip tone="you" size="value">{hnode(hud.round, '—')}</HudChip>
           {/* BREAKAWAY (owner brief 2026-09-18): the shot clock and the FLOW gauge (wall runs, rebounds, slides, a fast dribble) that sets the shot's power */}
           {typeof hud.clock === 'number' && clock > 0 && <HudChip tone={clock <= 3 ? 'danger' : 'text'} size="value">⏱ {hud.clock}s</HudChip>}
+          {/* GAME-HUD (2026-11-12): the FLOW bar 80 px (was 5rem). The HUD's type is in px, so a rem bar was the one thing in the
+              row that grew with the phone's text size: at 150 % text it was 120 px and pushed the score off a 390 px phone
+              (the every-screen scorer, /play/soccer: "0" and "PTS" cut off by 36-40 px). The same 80 px at 100 %. */}
           {typeof hud.flow === 'number' && flow >= 0 && (
             <HudPlate as="span" className="flex items-center px-[0.75em] py-[0.3em]">
-              <HudMeter layout="inline" label="FLOW" value={flow} max={100} tone={flow >= 70 ? 'score' : 'you'} fillAlpha={flow >= 70 ? 1 : 0.8} width="5rem"
+              <HudMeter layout="inline" label="FLOW" value={flow} max={100} tone={flow >= 70 ? 'score' : 'you'} fillAlpha={flow >= 70 ? 1 : 0.8} width="80px"
                 status={typeof hud.kinetic === 'string' && hud.kinetic ? hud.kinetic : undefined} statusTone="score" />
             </HudPlate>
           )}

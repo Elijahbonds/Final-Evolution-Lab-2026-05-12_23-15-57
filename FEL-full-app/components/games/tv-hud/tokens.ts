@@ -202,6 +202,21 @@ export function hudLineStep(text: unknown, size: HudSize): HudSize {
   return words >= READABLE.hudLineWords ? 'body' : size;
 }
 
+/**
+ * GAME-HUD: what a chip gives back when its text moves up to the line step, so the HUD hides no more of the play area
+ * than it did. The 14 px line is ~3 px taller than the 12 px one; the chip's vertical padding goes from 0.25em to 0.1em
+ * (3.5 → 1.4 px at the HUD's 14 px base), so the plate is as tall as before (about 20 px) and only as much wider as the
+ * letters are (+6–10 %, less than the old letter spacing gave back). Nothing for a chip that kept its step.
+ */
+export function hudLineTrim(text: unknown, size: HudSize): { paddingBlock?: string } {
+  return hudLineStep(text, size) !== size ? { paddingBlock: HUD_LINE_TRIM_PAD } : {};
+}
+/** A HudLine moved from the 12 px caption to the 14 px line step: its plate's padding, so the plate is no taller and only
+ *  a little wider than the caption's was (0.2em 0.75em at 12 px: 2.4 / 9 px; this at 14 px: 0.7 / 5.6 px). */
+export const HUD_LINE_PAD = '0.05em 0.4em';
+/** The chip's vertical padding when its text is a line at the line step (see hudLineTrim). */
+export const HUD_LINE_TRIM_PAD = '0.1em';
+
 /** Inline style for HUD text at a step, in the display face. */
 export function hudType(size: HudSize): { fontSize: string; lineHeight: number; letterSpacing: string; fontWeight: number } {
   const s = HUD_TYPE[size];

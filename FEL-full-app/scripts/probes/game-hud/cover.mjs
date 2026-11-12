@@ -30,16 +30,19 @@ function cover(p) {
   const pct = (k) => Math.round((k / (gw * gh)) * 1000) / 10;
   return { hud: pct(n(g.hud)), deck: pct(n(g.deck)), chrome: pct(n(g.chrome)), all: pct(n(all)) };
 }
-const views = [['playPortrait', 'upright phone'], ['playPhone', 'sideways phone'], ['playDesktop', 'desktop']];
+// READY (the opening HUD under the card: the same in every run, so before and after compare like for like), then in play
+const views = [['readyCoverPortrait', 'opening HUD, upright phone', true], ['readyCoverPhone', 'opening HUD, sideways phone', true], ['readyCoverDesktop', 'opening HUD, desktop', true],
+  ['playPortrait', 'in play, upright phone'], ['playPhone', 'in play, sideways phone'], ['playDesktop', 'in play, desktop']];
 const modes = [...new Set(fs.readdirSync(OUT).filter((f) => f.endsWith(`-${A}.json`)).map((f) => f.slice(0, -(`-${A}.json`).length)))].sort();
 const rows = [];
 for (const m of modes) {
   const rd = (t) => { try { return JSON.parse(fs.readFileSync(path.join(OUT, `${m}-${t}.json`), 'utf8')); } catch { return null; } };
   const a = rd(A), b = rd(B);
-  for (const [k, label] of views) {
-    const ca = cover(a?.[k]?.play), cb = cover(b?.[k]?.play);
+  for (const [k, label, direct] of views) {
+    const pa = direct ? a?.[k] : a?.[k]?.play, pb = direct ? b?.[k] : b?.[k]?.play;
+    const ca = cover(pa), cb = cover(pb);
     rows.push({ mode: m, view: label, [`hud ${A}`]: ca?.hud, [`hud ${B}`]: cb?.hud, [`deck ${A}`]: ca?.deck, [`deck ${B}`]: cb?.deck, [`all ${A}`]: ca?.all, [`all ${B}`]: cb?.all,
-      [`⋯ over HUD text px² ${A}`]: a?.[k]?.play?.capOverPx2, [`⋯ over HUD text px² ${B}`]: b?.[k]?.play?.capOverPx2 });
+      [`⋯ over HUD text px² ${A}`]: pa?.capOverPx2, [`⋯ over HUD text px² ${B}`]: pb?.capOverPx2 });
   }
 }
 console.table(rows);
