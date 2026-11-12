@@ -648,6 +648,9 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     audio: () => SoundKit.graph(),
     // gameplay-clean: how many meshes the occluder fade holds see-through right now (the audit rig reads it)
     occluders: () => occluderFade?.count ?? 0,
+    // hoops-p08 (2026-11-12): push a HUD update the way the mode would (the HUD-overlap probe stacks every bottom layer at
+    // once — caption, hint, pass chip, meter, banner — to measure the worst case, not only what a short run happened to show)
+    hud: (u: Record<string, HudValue>) => ctx.setHud(u),
   };
   // CONTROLLER-STICK-LIVE (2026-09-14): a QA eye on the production server (`next start`, /try) waited 120 s for
   // `__FEL_DEV__.input`, which only a dev build published — so it read an empty roster and zero slot events under

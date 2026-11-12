@@ -16,6 +16,7 @@ import { chipInk, pickedChip } from './chip-ink';   // SCREEN-FIXES-2: a picked 
 import { MotionSetting } from '@/components/settings/motion-setting';
 import { PausedLayer } from './paused-layer';
 import { LearnWhileYouWait } from '@/components/learn/learn-while-you-wait';   // KNOWLEDGE-FEED v1: one card while the arena loads
+import { HoopsMatchupCard, isHoopsMatchupMode } from './hoops-matchup-card';   // hoops-p08: the hoops courts load behind the matchup
 import { useSoundtrackStage } from '@/components/soundtrack/soundtrack-stage';
 import { ControlsPanel } from './controls-panel';
 import { BodyPlayReady, BodyPlayReadyLine, BodyPlayLayer } from './body-play';
@@ -436,7 +437,10 @@ export function SplashCard(props: BootSplashProps) {
             <p className="mt-2 text-[12px] tracking-widest text-white/60">LOADING ARENA…</p>
           </div>
         )}
-        {props.phase === 'loading' && <LearnWhileYouWait compact className="mt-1 min-h-0 shrink overflow-y-auto overscroll-contain" />}
+        {/* hoops-p08: a hoops court loads behind the MATCHUP (the court, who you face, how it is won) instead of the knowledge card */}
+        {props.phase === 'loading' && (isHoopsMatchupMode(props.modeId)
+          ? <HoopsMatchupCard modeId={props.modeId} location={loc} tier={hasTiers ? tier : null} tint={v.tint} />
+          : <LearnWhileYouWait compact className="mt-1 min-h-0 shrink overflow-y-auto overscroll-contain" />)}
 
         {props.phase === 'ready' && (
           <button

@@ -17,19 +17,43 @@
 // vendors and crowd behind the hoop (mountVeniceDunkDressing — placements in venuePropSets.ts), the sea as water, a sand with
 // no streaks, and the FLIGHT NIGHT sign up on the row's roof.
 import { phoneHalf } from '../scene/phoneTrim';   // lane/owner-1016: a phone keeps half the gulls
-import { Color3, DynamicTexture, InstancedMesh, Mesh, MeshBuilder, PBRMaterial, SceneLoader, StandardMaterial, Texture, TransformNode, Vector3, VertexData } from '@babylonjs/core';
+import { Color3, DynamicTexture, InstancedMesh, Mesh, MeshBuilder, PBRMaterial, SceneLoader, StandardMaterial, Texture, TransformNode, Vector3, Vector4, VertexData } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { mountStreetCourt, STREET_COURT_PALETTE, VENICE_DUNK_COURT_PALETTE } from '../visual/CourtSurface';
-import { courtLogoTexture, groundTextureFor, signTexture, TILE_M, type GroundKind } from '../visual/groundTextures';
+import { courtLogoTexture, groundTexture, groundTextureFor, signTexture, TILE_M, type GroundKind } from '../visual/groundTextures';
 import { HOOP_SCAN, spawnMeshyProp } from '../visual/meshyProps';
-import { Onlookers } from '../visual/Onlookers';
+import { MAX_BODIES, Onlookers } from '../visual/Onlookers';
 import { heroPalmScale, VENICE_BOARDWALK_ROW, VENICE_ENV2_DIR, VENICE_HERO_PALMS, VENICE_PALM_LODS, VENICE_ROW_PALMS } from '../visual/venuePropSets';
 import { veniceSunPosition } from '../visual/veniceSurroundVisibility';
 import { RIM_HEIGHT_M } from '../core/courtDims';
 import type { AbstractMesh, Material, Scene } from '@babylonjs/core';
 import { setPbrRoughnessUniform } from '../scene/pbrUniform';   // perf-lag: the sea's shimmer without a shader re-prepare a frame
+import { feel } from '@/lib/feel-panel/feel';   // hoops-p08: venue.halfCourtCrowdCards, perf.sharedGroundOn
 
 const COURT = { hx: 8, hz: 14 };                 // 16 × 28 court slab (venueSpecs basketball_*)
+/** hoops-p08 (perf.phoneRailBodies): how many people stand on the boardwalk rail on a PHONE. The rail is nine spots and Onlookers
+ *  takes every other one (five roster bodies, each nine parts and ~9.6 MB of maps); on 1v1, 3v3 and 3-Point a phone keeps two of those
+ *  five (the two ends): the 3v3's texture memory is inside its phone row only so. 5 = all five, as before. Other tiers keep five. */
+export const PHONE_RAIL_BODIES = 2;
+/** Pure: the rail's spots for a cap of `n` bodies — Onlookers' own every-other pick (MAX_BODIES), then `n` of those spread evenly. */
+export function railSpots<T>(spots: readonly T[], n: number): T[] {
+  const step = Math.max(1, Math.ceil(spots.length / MAX_BODIES));
+  const picked = spots.filter((_, i) => i % step === 0).slice(0, MAX_BODIES);
+  if (!(n < picked.length)) return [...spots];
+  if (n <= 0) return [];
+  if (n === 1) return [picked[Math.floor(picked.length / 2)]];
+  return Array.from({ length: n }, (_, k) => picked[Math.round((k * (picked.length - 1)) / (n - 1))]);
+}
+
+/** hoops-p08: a sign's two faces — the front as Babylon lays it, the back with u reversed so its text is not mirrored. */
+export const SIGN_FRONT_UVS = new Vector4(0, 0, 1, 1), SIGN_BACK_UVS = new Vector4(1, 0, 0, 1);
+
+/** hoops-p08: what the Venice dressing mounts. `crowdCards` — the boardwalk row's 12 flat cut-out figures (venice_crowd_cards.glb). */
+export interface VeniceDressingOpts { crowdCards?: boolean; /** hoops-p08: the phone's rail cap applies (the half-court modes; the dunk keeps its rail). */ phoneRail?: boolean }
+/** venue.halfCourtCrowdCards: 0 = the cut-out figures only behind the dunk's rim (new: 1v1, 3v3 and 3-Point stand on the same Venice and
+ *  the cards stood right behind their rim, "black cardboard people", docs/HOOPS-AAA-GAP-SHOW.md sinker 4); 1 = on every Venice court
+ *  that mounts the dunk dressing, as before. */
+export const HALF_COURT_CROWD_CARDS = 0;
 export const BOARDWALK = { apron: 3, grass: 5, walkW: 9, sandW: 34 };
 
 /**
@@ -48,9 +72,42 @@ export type BoardwalkEnv = 'lawn' | 'venice-dunk';
  *  when the dressing mounts; `landed` runs one once the venue's prop set (the lamps the flags hang on) has landed. */
 export interface DressingHooks { start(job: () => void): void; landed(job: () => void): void }
 
+/** hoops-p08 (2026-11-12): perf.sharedGroundOn — 1: the boardwalk's tiled grounds share one texture and one material per look (new);
+ *  0: a texture copy and a material per plane, as before. */
+export const SHARED_GROUND_ON = 1;
+/** One material per (scene, kind, tint, roughness): the planes' tiling lives in their UVs, so planes that look alike share it. */
+const groundMats = new WeakMap<Scene, Map<string, PBRMaterial>>();
+
 function flat(scene: Scene, name: string, w: number, d: number, x: number, z: number, y: number, hex: string, holder: TransformNode, rough = 1, kind?: GroundKind, mul?: string): Mesh {
-  const g = MeshBuilder.CreateGround(name, { width: w, height: d }, scene);
+  const g = MeshBuilder.CreateGround(name, { width: w, height: d, updatable: false }, scene);
   g.position.set(x, y, z); g.parent = holder; g.isPickable = false; g.receiveShadows = true;
+  // hoops-p08: SHARED, NOT COPIED. Each tiled plane used to paint its own copy of the kind's 512² texture (1.3 MB each: six concrete
+  // copies on the Venice dunk boardwalk) with the tiling in the texture's u/v scale, and its own material — so no two planes could ever
+  // be one draw. The tiling now goes into the plane's UVs (the same repeat: max(1, size / tile)), and the planes that look the same
+  // share one texture and one material; mergeSameLook() then draws them as one mesh. Pixel for pixel the same sampling.
+  if (kind && feel('perf.sharedGroundOn', SHARED_GROUND_ON) >= 0.5) {
+    const uv = g.getVerticesData('uv');
+    if (uv) { const su = Math.max(1, w / TILE_M[kind]), sv = Math.max(1, d / TILE_M[kind]); for (let i = 0; i < uv.length; i += 2) { uv[i] *= su; uv[i + 1] *= sv; } g.setVerticesData('uv', uv, false); }
+    // The tint (`mul`) rides in the plane's VERTEX COLOURS, not the material's albedo colour: the PBR shader multiplies both into
+    // the albedo the same way (albedoColor × texture × vertex colour), so the picture is the same, and planes of one kind and one
+    // roughness — the walk, the plaza and the aprons, three concretes — share ONE material and can be one mesh.
+    const tint = mul ? Color3.FromHexString(mul) : Color3.White(), n = g.getTotalVertices(), col = new Float32Array(n * 4);
+    for (let i = 0; i < n; i++) col.set([tint.r, tint.g, tint.b, 1], i * 4);
+    g.setVerticesData('color', col, false);
+    let cache = groundMats.get(scene); if (!cache) { cache = new Map(); groundMats.set(scene, cache); }
+    const key = `${kind}|${rough}`;
+    let m = cache.get(key);
+    if (!m || !scene.materials.includes(m)) {   // (a venue disposed and mounted again in the same scene made a new one)
+      m = new PBRMaterial(`vb_ground_${kind}_mat`, scene);
+      m.roughness = rough; m.metallic = 0; m.environmentIntensity = 0.35;
+      // the kind's own painted tile (groundTextures' per-scene source), not a copy of it: one texture per kind for every look
+      const t = groundTexture(scene, kind); t.wrapU = Texture.WRAP_ADDRESSMODE; t.wrapV = Texture.WRAP_ADDRESSMODE; t.anisotropicFilteringLevel = 8;
+      m.albedoTexture = t; m.albedoColor = Color3.White();
+      cache.set(key, m);
+    }
+    g.material = m;
+    return g;
+  }
   // PBR like every kit prop: a StandardMaterial under the venue sun + grade blew the grass to lime and the sand to white
   const m = new PBRMaterial(`${name}_mat`, scene);
   m.albedoColor = Color3.FromHexString(hex); m.roughness = rough; m.metallic = 0; m.environmentIntensity = 0.35;
@@ -64,13 +121,29 @@ function flat(scene: Scene, name: string, w: number, d: number, x: number, z: nu
   return g;
 }
 
+/** hoops-p08: the static planes under `holder` that share a material become one mesh (the four concrete aprons: four draws → one). */
+function mergeSameLook(holder: TransformNode, names: RegExp, into: string): void {
+  const byMat = new Map<Material, Mesh[]>();
+  for (const m of holder.getChildMeshes(true)) {
+    if (!(m instanceof Mesh) || !m.material || !names.test(m.name)) continue;
+    const l = byMat.get(m.material) ?? []; l.push(m); byMat.set(m.material, l);
+  }
+  for (const [mat, group] of byMat) {
+    if (group.length < 2) continue;
+    const one = Mesh.MergeMeshes(group, true, true);
+    if (!one) continue;
+    // MergeMeshes bakes each plane's WORLD matrix: setParent keeps that world place under the holder
+    one.name = into; one.setParent(holder); one.material = mat; one.isPickable = false; one.receiveShadows = true;
+  }
+}
+
 /**
  * `scanShiftZ`: how far the venue map is slid along z for this mode (NexusVenue). The scan is mounted for the half-court modes
  * (its north baseline meets the ones/threes rim at z −1.32); dunk's rim sits at z −11, so dunk slides the scan −9 and the
  * aprons, far hoop, centre logo and gate sign slide with it — the owner's Luma reference (2026-09-06) shows both hoops on
  * the concrete right behind each baseline.
  */
-export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode, scanShiftZ = 0, env: BoardwalkEnv = 'lawn', dressing?: DressingHooks): TransformNode {
+export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode, scanShiftZ = 0, env: BoardwalkEnv = 'lawn', dressing?: DressingHooks, opts: VeniceDressingOpts = {}): TransformNode {
   const holder = new TransformNode('venice_boardwalk', scene); holder.parent = root;
   const { apron, grass, walkW, sandW } = BOARDWALK;
   // concrete apron around the slab (a hair above the scan's painted ground), then the boardwalk strip to the east
@@ -83,6 +156,7 @@ export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode, scanS
   const SCAN_N = -2.1 + scanShiftZ, SCAN_S = 23.9 + scanShiftZ, SCAN_MID = 10.9 + scanShiftZ;
   flat(scene, 'vb_apron_n', ax * 2, apron, 0, SCAN_N - apron / 2, 0.012, '#B9AFA0', holder, 1, 'concrete');
   flat(scene, 'vb_apron_s', ax * 2, apron, 0, SCAN_S + apron / 2, 0.012, '#B9AFA0', holder, 1, 'concrete');
+  if (feel('perf.sharedGroundOn', SHARED_GROUND_ON) >= 0.5) mergeSameLook(holder, /^vb_apron_[nsew]$/, 'vb_apron');   // hoops-p08: one draw, one material
   // one continuous surround out to the dome wall (190 m): grass east of the apron, the boardwalk, more grass to the shop line;
   // the coast wraps the NORTH (behind the hoop, where the dunk camera looks) and the WEST — sand, then water to the horizon
   const L = 190, GRASS = '#3A5233', GRASS2 = '#3E5838';   // inside the 400 m sky sphere (radius 200); greyed greens — the grade pushes greens toward lime
@@ -103,10 +177,12 @@ export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode, scanS
     const beachW = D.bikeX[0] - westSea, beachD = L - northSea, sandNW = far - D.bikeX[0], sandND = D.northSand - northSea;
     veniceSand(scene, flat(scene, 'vb_sand', beachW, beachD, (westSea + D.bikeX[0]) / 2, (northSea + L) / 2, 0.008, SAND, holder, 1), SAND, beachW, beachD);
     veniceSand(scene, flat(scene, 'vb_sand_n', sandNW, sandND, (D.bikeX[0] + far) / 2, (northSea + D.northSand) / 2, 0.008, SAND, holder, 1), SAND, sandNW, sandND);
+    if (feel('perf.sharedGroundOn', SHARED_GROUND_ON) >= 0.5) mergeSameLook(holder, /^vb_sand(_n)?$/, 'vb_sand');   // hoops-p08: one sand
     const eastLen = L - D.northSand, eastMid = (D.northSand + L) / 2;
     flat(scene, 'vb_bikepath', D.bikeX[1] - D.bikeX[0], eastLen, (D.bikeX[0] + D.bikeX[1]) / 2, eastMid, 0.011, '#8C8484', holder, 0.85, 'asphalt', '#8C8484');
     flat(scene, 'vb_walk', D.walkX[1] - D.walkX[0], eastLen, (D.walkX[0] + D.walkX[1]) / 2, eastMid, 0.011, '#E2D8CA', holder, 1, 'concrete', '#E2D8CA');
     flat(scene, 'vb_plaza', far - D.plazaX0, eastLen, (D.plazaX0 + far) / 2, eastMid, 0.01, '#857A70', holder, 1, 'concrete', '#857A70');
+    if (feel('perf.sharedGroundOn', SHARED_GROUND_ON) >= 0.5) mergeSameLook(holder, /^vb_(apron|walk|plaza)$/, 'vb_concrete');   // hoops-p08: the three concretes, one mesh (their tints are vertex colours)
     // the bike path's dashed centre line: one plane, the dashes are its alpha-tested texture (3 m dash, 3 m gap)
     const dashTex = new DynamicTexture('vb_bike_dash_tex', { width: 16, height: 64 }, scene, false);
     { const c = dashTex.getContext() as CanvasRenderingContext2D; c.clearRect(0, 0, 16, 64); c.fillStyle = '#E8B83A'; c.fillRect(0, 0, 16, 32); dashTex.update(false); dashTex.hasAlpha = true; }
@@ -164,6 +240,8 @@ export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode, scanS
     : MeshBuilder.CreateGround('vb_sea_n', { width: L * 2, height: L }, scene);
   seaN.position.set(0, 0, dunkEnv ? sq.north.z : northSea - L / 2); seaN.parent = holder; seaN.material = seaMat; seaN.isPickable = false;
   if (dunkEnv) { shoreFoam(scene, holder, westSea, northSea, L + 25, L); sunGlitter(scene, holder, westSea, northSea); }   // north waterline to the east sand's end, west one to the south
+  // hoops-p08: the two sea planes (one material) and the two surf strips (one material) are one mesh each
+  if (feel('perf.sharedGroundOn', SHARED_GROUND_ON) >= 0.5) { mergeSameLook(holder, /^vb_sea_[wn]$/, 'vb_sea'); mergeSameLook(holder, /^vb_shore_foam_[wn]$/, 'vb_shore_foam'); }
   // The sun is PAINTED into the beach dome (scripts/backdrop/paint-beach-dome.py, u≈0.33): a 3D disc at the dome wall rendered as a
   // navy coin from the threes and ones cameras (depth against the dome at 190 m) while it read white from dunk's. No disc.
   void zSpanN;
@@ -185,13 +263,26 @@ export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode, scanS
   });
   // Pass 7 phase 4 — signage with real names: an entrance sign at the south gate, a scoreboard plate behind the far hoop,
   // flags on the boardwalk lamp posts (unlit boards so the paint reads under the grade; ~10 draws)
+  // hoops-p08 (docs/HOOPS-AAA-GAP-SHOW.md 3.10): the gate sign read "VENICE BEACH COURTS" mirrored from the court — one plane drawn
+  // from both sides (backFaceCulling off) shows its back face with the text reversed. A sign is now double-sided GEOMETRY whose back
+  // face has its u flipped (SIGN_BACK_UVS), so it reads the right way round from either side; still one mesh, one draw.
+  // hoops-p08: signs that carry the same picture share one material (the four FEL flags), and the posts share one (they are one paint)
+  const share = feel('perf.sharedGroundOn', SHARED_GROUND_ON) >= 0.5;
+  const signMats = new Map<unknown, StandardMaterial>();
   const sign = (name: string, w: number, h: number, pos: [number, number, number], yaw: number, tex: ReturnType<typeof signTexture>) => {
-    const plane = MeshBuilder.CreatePlane(name, { width: w, height: h }, scene);
+    const plane = MeshBuilder.CreatePlane(name, { width: w, height: h, sideOrientation: Mesh.DOUBLESIDE, frontUVs: SIGN_FRONT_UVS, backUVs: SIGN_BACK_UVS }, scene);
     plane.position.set(pos[0], pos[1], pos[2]); plane.rotation.y = yaw; plane.parent = holder; plane.isPickable = false;
-    const m = new StandardMaterial(`${name}_mat`, scene); m.emissiveTexture = tex; m.emissiveColor = Color3.Black(); m.disableLighting = true; m.backFaceCulling = false;
+    let m = share ? signMats.get(tex) : undefined;
+    if (!m) { m = new StandardMaterial(`${name}_mat`, scene); m.emissiveTexture = tex; m.emissiveColor = Color3.Black(); m.disableLighting = true; m.backFaceCulling = true; if (share) signMats.set(tex, m); }
     plane.material = m; return plane;
   };
-  const post = (name: string, x: number, z: number, hgt: number) => { const c = MeshBuilder.CreateCylinder(name, { height: hgt, diameter: 0.14 }, scene); c.position.set(x, hgt / 2, z); c.parent = holder; c.isPickable = false; const pm = new PBRMaterial(`${name}_mat`, scene); pm.albedoColor = Color3.FromHexString('#2A2E37'); pm.roughness = 0.6; pm.metallic = 0.4; c.material = pm; return c; };
+  let postMat: PBRMaterial | null = null;
+  const post = (name: string, x: number, z: number, hgt: number) => {
+    const c = MeshBuilder.CreateCylinder(name, { height: hgt, diameter: 0.14 }, scene); c.position.set(x, hgt / 2, z); c.parent = holder; c.isPickable = false;
+    let pm = share ? postMat : null;
+    if (!pm) { pm = new PBRMaterial(`${name}_mat`, scene); pm.albedoColor = Color3.FromHexString('#2A2E37'); pm.roughness = 0.6; pm.metallic = 0.4; if (share) postMat = pm; }
+    c.material = pm; return c;
+  };
   post('vb_gate_post_l', 7.1, SCAN_S + 3.6, 3.4); post('vb_gate_post_r', 10.9, SCAN_S + 3.6, 3.4);   // owner: back off the paint, to the right
   sign('vb_gate_sign', 4.2, 1.0, [9, 3.0, SCAN_S + 3.6], Math.PI, signTexture(scene, ['VENICE BEACH COURTS', 'FINAL EVOLUTION LAB · EST. 2026'], { bg: '#1E2A44', accent: '#F2B84B' }));
   const flightNight = signTexture(scene, ['FLIGHT NIGHT', 'VENICE · OPEN RUN · ALL LEVELS'], { bg: '#141826', fg: '#FFE9B0', accent: '#FF6B3D' });
@@ -211,6 +302,9 @@ export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode, scanS
   const flags = Array.from({ length: 4 }, (_, i) => { const z = -36 + i * 24; return sign(`vb_flag_${i}`, 0.5, 1.25, [19.55, 4.0, z + 0.5], Math.PI / 2, flagTex); });
   // FIRST-DUNK-BUDGET: the lamps come with the prop set, so on a deferred dressing the flags wait for them rather than float
   if (dressing) { for (const f of flags) f.setEnabled(false); dressing.landed(() => { for (const f of flags) if (!f.isDisposed()) f.setEnabled(true); }); }
+  // hoops-p08: the posts and (when they show at once) the flags are one mesh each — one draw where there were four
+  else if (share) mergeSameLook(holder, /^vb_flag_\d$/, 'vb_flags');
+  if (share) mergeSameLook(holder, /^vb_(gate|scoreboard)_post_[lr]$/, 'vb_posts');
   // Pass 7 phase 5 — air: six gulls (three on a phone) wheel over the northern water on slow ellipses (billboards on a painted chevron).
   // Cheap: six unlit planes and one observer.
   const gullTex = new DynamicTexture('vb_gull_tex', 64, scene, false);
@@ -246,7 +340,9 @@ export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode, scanS
   // biggest thing on the dunk's first download after the bus)
   const fillRail = (): void => {
     if (holder.isDisposed()) return;
-    const rail = new Onlookers(scene, Array.from({ length: 9 }, (_, i) => new Vector3(railX + (i % 2) * 0.7, 0, SCAN_N + 1.5 + i * 3.0)), '#2b3550', new Vector3(0, 0, SCAN_MID), dressing ? { oneBodyPerFrame: true } : {});   // RUNUP-STALL-1 v3: the deferred (dunk) rail lands one body a frame
+    const spots = railSpots(Array.from({ length: 9 }, (_, i) => new Vector3(railX + (i % 2) * 0.7, 0, SCAN_N + 1.5 + i * 3.0)),
+      opts.phoneRail && (scene.metadata as { felTier?: string } | null)?.felTier === 'mobile' ? feel('perf.phoneRailBodies', PHONE_RAIL_BODIES) : Infinity);   // hoops-p08
+    const rail = new Onlookers(scene, spots, '#2b3550', new Vector3(0, 0, SCAN_MID), dressing ? { oneBodyPerFrame: true } : {});   // RUNUP-STALL-1 v3: the deferred (dunk) rail lands one body a frame
     const life = scene.onBeforeRenderObservable.add(() => rail.update(scene.getEngine().getDeltaTime() / 1000));
     holder.onDisposeObservable.add(() => { scene.onBeforeRenderObservable.remove(life); rail.dispose(); });
   };
@@ -260,7 +356,7 @@ export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode, scanS
   logo.material = lm;
   console.info(dunkEnv ? '[FEL-VENICE] dunk boardwalk built (apron, beach, bike path, promenade, plaza, ocean) — props from venice-dunk'
     : '[FEL-VENICE] boardwalk scenery built (apron, grass, boardwalk, sand, ocean, sun) — props from venice-court-meshy');
-  if (dunkEnv) void mountVeniceDunkDressing(scene, holder).catch((e) => console.warn('[FEL-VENICE] dunk dressing failed to load:', (e as Error)?.message ?? e));
+  if (dunkEnv) void mountVeniceDunkDressing(scene, holder, opts).catch((e) => console.warn('[FEL-VENICE] dunk dressing failed to load:', (e as Error)?.message ?? e));
   return holder;
 }
 
@@ -402,7 +498,31 @@ function sunGlitter(scene: Scene, holder: TransformNode, westSea: number, northS
  * so the tile has no seam, and no strokes at all) over a low-frequency mottle as the detail map, tiled every ~44 m — the
  * tonal roll a beach has, and it breaks up the 4 m repeat.
  */
+/** hoops-p08: the two sand planes' painted grain and mottle, made once per scene (they were painted twice, identically). */
+const sandShared = new WeakMap<Scene, { grain: DynamicTexture; mottle: DynamicTexture; mat: PBRMaterial }>();
 function veniceSand(scene: Scene, mesh: Mesh, mul: string, w: number, d: number): void {
+  // hoops-p08 (perf.sharedGroundOn): the grain's 4 m tiling goes into the plane's UVs, so both planes can wear ONE grain, ONE mottle
+  // (its 44 m roll is then a fixed 4/44 of the UV repeat on both) and one material — and be one mesh. Only when neither plane's
+  // repeat is clamped (both are hundreds of metres), so the picture is the same.
+  const su = w / TILE_M.sand, sv = d / TILE_M.sand;
+  if (feel('perf.sharedGroundOn', SHARED_GROUND_ON) >= 0.5 && su >= 11 && sv >= 11) {
+    const own = mesh.material as PBRMaterial;
+    let hit = sandShared.get(scene);
+    if (!hit || !scene.materials.includes(hit.mat)) {
+      veniceSandPaint(scene, mesh, mul, TILE_M.sand, TILE_M.sand);   // paints a grain and a mottle at a repeat of 1 on `own`
+      const grain = own.albedoTexture as DynamicTexture, mottle = own.detailMap.texture as DynamicTexture;
+      mottle.uScale = mottle.vScale = TILE_M.sand / 44;
+      hit = { grain, mottle, mat: own }; sandShared.set(scene, hit);
+      const holder = mesh.parent;
+      holder?.onDisposeObservable.add(() => { grain.dispose(); mottle.dispose(); sandShared.delete(scene); });
+    } else { mesh.material = hit.mat; own.dispose(); }
+    const uv = mesh.getVerticesData('uv');
+    if (uv) { for (let i = 0; i < uv.length; i += 2) { uv[i] *= su; uv[i + 1] *= sv; } mesh.setVerticesData('uv', uv, false); }
+    return;
+  }
+  veniceSandPaint(scene, mesh, mul, w, d);
+}
+function veniceSandPaint(scene: Scene, mesh: Mesh, mul: string, w: number, d: number): void {
   const mat = mesh.material as PBRMaterial;
   const S = 512, grain = new DynamicTexture('vb_sand_grain', S, scene, true);
   const g = grain.getContext() as CanvasRenderingContext2D, r = lcg(0x5a4d);
@@ -447,7 +567,7 @@ function veniceSand(scene: Scene, mesh: Mesh, mul: string, w: number, d: number)
   mottle.uScale = Math.max(1, w / 44); mottle.vScale = Math.max(1, d / 44);
   mat.detailMap.isEnabled = true; mat.detailMap.texture = mottle;
   mat.detailMap.diffuseBlendLevel = 0.65; mat.detailMap.bumpLevel = 0; mat.detailMap.roughnessBlendLevel = 0;
-  mesh.onDisposeObservable.add(() => { grain.dispose(); mottle.dispose(); });
+  if (!(feel('perf.sharedGroundOn', SHARED_GROUND_ON) >= 0.5)) mesh.onDisposeObservable.add(() => { grain.dispose(); mottle.dispose(); });   // (shared: the holder disposes them)
 }
 
 /** Bake every mesh in `meshes` into one mesh per material, in `into`'s space (the glTF loader's handedness flip included;
@@ -503,8 +623,10 @@ export function shareFarFrondMaterial(lod1Frond: Mesh, lod2Frond: Mesh): void {
  *    material — two draws for four shops and three stalls. It does not cast.
  *  · THE CROWD: the file's 12-card strip, baked to one mesh (one draw); the card library is dropped. It does not cast.
  */
-export async function mountVeniceDunkDressing(scene: Scene, holder: TransformNode): Promise<VeniceDressingHandle | null> {
-  const files = [...VENICE_PALM_LODS.files, 'venice_boardwalk_kit.glb', 'venice_crowd_cards.glb'];
+export async function mountVeniceDunkDressing(scene: Scene, holder: TransformNode, opts: VeniceDressingOpts = {}): Promise<VeniceDressingHandle | null> {
+  // hoops-p08: the cut-out crowd strip only where it is asked for (the dunk and the duel); the half-court modes do not load the file
+  const withCrowd = opts.crowdCards !== false;
+  const files = [...VENICE_PALM_LODS.files, 'venice_boardwalk_kit.glb', ...(withCrowd ? ['venice_crowd_cards.glb'] : [])];
   // DUNK-FLAGSHIP (2026-10-27): each file is HIDDEN the moment it lands. An import goes into the scene at the world origin, and the
   // dressing waits for all five files before it places anything — so the files that arrived first stood at the origin, the
   // boardwalk's single-sided fronts facing +Z, between the run-up camera (z 8) and the dunker at the start of the runway (z −1.2):
@@ -558,12 +680,15 @@ export async function mountVeniceDunkDressing(scene: Scene, holder: TransformNod
   kit.meshes[0].dispose(false, false);   // the materials and the atlas stay: the baked meshes use them
 
   // the crowd strip, baked (the library row is the strip's source geometry and goes with the file)
-  const crowdAt = new TransformNode('vb_boardwalk_crowd', scene);
-  crowdAt.parent = holder; crowdAt.position.set(...VENICE_BOARDWALK_ROW.crowdAt);
-  crowd.meshes[0].parent = crowdAt;
-  const strip = crowd.meshes.filter((m) => /^crowd_strip_/.test(m.name));
-  const crowdMeshes = bakeByMaterial(scene, strip, crowdAt, 'vb_crowd', false);
-  crowd.meshes[0].dispose(false, false);
+  let strip: AbstractMesh[] = [], crowdMeshes: Mesh[] = [];
+  if (crowd) {
+    const crowdAt = new TransformNode('vb_boardwalk_crowd', scene);
+    crowdAt.parent = holder; crowdAt.position.set(...VENICE_BOARDWALK_ROW.crowdAt);
+    crowd.meshes[0].parent = crowdAt;
+    strip = crowd.meshes.filter((m) => /^crowd_strip_/.test(m.name));
+    crowdMeshes = bakeByMaterial(scene, strip, crowdAt, 'vb_crowd', false);
+    crowd.meshes[0].dispose(false, false);
+  }
 
   console.info(`[FEL-VENICE] dunk dressing: ${palms.length} baked palms (${palms.filter((p) => p.casts === 'whole').length} cast whole, ${palms.filter((p) => p.casts === 'trunk').length} their trunks; LOD ${VENICE_PALM_LODS.switchM.join('/')} m), boardwalk row in ${kitMeshes.length} draws, crowd of ${strip.length} cards in ${crowdMeshes.length}`);
   return { palms: palms.length, kit: kitMeshes, crowd: crowdMeshes };

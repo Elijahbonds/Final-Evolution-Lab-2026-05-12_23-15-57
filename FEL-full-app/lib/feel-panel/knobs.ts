@@ -1601,6 +1601,51 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'hoops.guardHandRestGapSec', label: 'Outside hand at rest: at most one cross per', def: 1.5, min: 0, max: 4, step: 0.1, unit: 's', group: 'Hoops · flow and pace',
     source: 'lib/babylon/modes/hoopsFlow.ts GUARD_HAND_REST_GAP_SEC',
     hint: 'Standing guarded, the automatic outside hand crosses the ball no more than once in this long (it crossed about once a second). On the move it is the rule as before. 0 = as before.',
+  },  // ── hoops-p08 (clean screen and phone budget, docs/HOOPS-AAA-GAP-SHOW.md) ──
+  {
+    id: 'hud.mcSubsWithVoice', label: 'MC subtitles while his voice plays: on (1) / off (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · screen',
+    source: 'lib/babylon/ui/micSubtitles.ts MC_SUBS_WITH_VOICE',
+    hint: 'Off: a line the MC is saying out loud shows no subtitle (the player can still turn subtitles on with CC; with the voice off the words always show). 1 = every line subtitled, as before.',
+  },
+  {
+    id: 'hud.hintPlays', label: 'Control hint: shown for the first plays', def: 3, min: 0, max: 20, step: 1, unit: 'plays', group: 'Hoops · screen',
+    source: 'lib/babylon/ui/hudHints.ts HINT_PLAYS',
+    hint: 'The one-line control hint shows for this many plays of a mode in a session (a score, a shot or the next ball ends a play), then stops. 0 = always, as before.',
+  },
+  {
+    id: 'venue.halfCourtCrowdCards', label: 'Flat cut-out crowd behind the 1v1 / 3v3 / 3-Point rim: on (1) / off (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · screen',
+    source: 'lib/babylon/nexus/veniceBoardwalk.ts HALF_COURT_CROWD_CARDS',
+    hint: 'Off: the twelve flat crowd cards stand only behind the dunk rim. 1 = also behind the half-court rim at Venice, as before.',
+  },  {
+    id: 'perf.phoneInkTrim', label: 'Phone: no ink line on hidden body parts (1) / every part (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/babylon/scene/phoneCasters.ts PHONE_INK_TRIM',
+    hint: 'On a phone the contour line skips the eyes, the shoe soles, the socks and the accessories (each is inside a bigger part). Two draws a part. 0 = every part inked, as before.',
+  },
+  {
+    id: 'perf.phoneSockCast', label: 'Phone: socks cast a shadow (1) / not (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/babylon/scene/phoneCasters.ts PHONE_SOCK_CAST',
+    hint: 'On a phone the sock under the shoe stays out of the shadow map (its shadow is inside the leg). 1 = it casts, as before.',
+  },
+  {
+    id: 'perf.phoneFarPropTex', label: 'Phone: parked bus, sedan and ball texture size (half court)', def: 512, min: 256, max: 1024, step: 256, unit: 'px', group: 'Hoops · phone budget',
+    source: 'lib/babylon/scene/phoneTextureCap.ts PHONE_FAR_PROP_MAX',
+    hint: 'In 1v1, 3v3 and 3-Point on a phone the far parked bus and sedan and the ball (24 cm: never 512 px on a phone) upload their maps at this edge. 1024 = as before.',
+  },  {
+    id: 'perf.propMergeOn', label: 'Venue props: one draw per material per model (1) / per part (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/babylon/visual/VenueProps.ts PROP_MERGE_ON',
+    hint: 'A prop model whose parts share a material (the far pier: fifteen parts, two materials) is drawn as one mesh per material. Same picture. 0 = one draw per part, as before.',
+  },  {
+    id: 'perf.sharedGroundOn', label: 'Venice boardwalk: shared ground and sign materials (1) / one per plane (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/babylon/nexus/veniceBoardwalk.ts SHARED_GROUND_ON',
+    hint: 'The tiled grounds share one painted tile per kind (tiling in the UVs) and the sands one grain; the aprons, sands, seas, surf strips, posts and flags are one mesh each. Same picture. 0 = a texture copy, a material and a draw per plane, as before.',
+  },  {
+    id: 'perf.phoneRailBodies', label: 'Phone: people on the boardwalk rail', def: 2, min: 0, max: 5, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/babylon/nexus/veniceBoardwalk.ts PHONE_RAIL_BODIES',
+    hint: 'On a phone the half-court Venice rail (1v1, 3v3, 3-Point) keeps this many of its five onlookers, spread along it (two: the ends). Each is nine draw parts and about 10 MB of maps. 5 = all five, as before.',
+  },  {
+    id: 'perf.coveredSkyOff', label: 'Phone: drop the backdrop dome the court sky covers (1) / keep it (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/babylon/core/NexusVenue.ts COVERED_SKY_OFF',
+    hint: 'On a phone the basketball courts drop the look stack backdrop dome and ring: the venue own opaque sky sphere sits inside them and hides them completely. Same picture. 0 = kept, as before.',
   },
   // ── hoops-p09 (1v1 / 3v3 phase 9 "one rulebook": the play audit's sinkers 2 to 6 and 10) ──
   {
@@ -1713,6 +1758,58 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'hoops.passCatchVol', label: 'Catch: volume', def: 0.7, min: 0, max: 1.5, step: 0.05, unit: '', group: 'Hoops · sound',
     source: 'lib/babylon/audio/dribbleSound.ts PASS_CATCH_VOL',
     hint: 'How loud a caught pass is.',
+  },
+  // ── hoops-builder (owner 2026-11-12): what the five hoops ratings and the playing height change, casual runs only. Every band is
+  //    the change at rating 90 (at 40 it moves the other way by a quarter of it); rating 50 is today at any band, and 0 = no effect.
+  {
+    id: 'hoops.ratingsOn', label: 'Hoops ratings change play (1) / everyone plays the same (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · ratings',
+    source: 'lib/babylon/hoops/ratings.ts RATINGS_ON',
+    hint: 'Off: every athlete plays the standard numbers in every run, exactly as before the builder. Ranked, staked, arena, challenge and online runs are always standard.',
+  },
+  {
+    id: 'hoops.rateSpeedBand', label: 'Speed 90: top speed and first step plus', def: 0.06, min: 0, max: 0.15, step: 0.01, unit: 'x', group: 'Hoops · ratings',
+    source: 'lib/babylon/hoops/ratings.ts RATE_SPEED_BAND',
+    hint: 'Share added to top speed (6.4 m/s) and acceleration at Speed 90.',
+  },
+  {
+    id: 'hoops.rateHandleBand', label: 'Handle 90: handle points over the standard 50', def: 20, min: 0, max: 40, step: 1, unit: '', group: 'Hoops · ratings',
+    source: 'lib/babylon/hoops/ratings.ts RATE_HANDLE_BAND',
+    hint: 'The handle the moves read at Handle 90 is 50 plus this: each point is 0.0052 s more combo window and a tighter dribble. Moves stay unlocked for everyone.',
+  },
+  {
+    id: 'hoops.rateReadBand', label: 'Handle 90: lean needed to beat a man, minus', def: 0.15, min: 0, max: 0.4, step: 0.01, unit: 'x', group: 'Hoops · ratings',
+    source: 'lib/babylon/hoops/ratings.ts RATE_READ_BAND',
+    hint: 'Share taken off the moving-the-wrong-way line (0.6 m/s) a move needs at Handle 90.',
+  },
+  {
+    id: 'hoops.rateGreenBand', label: 'Shooting 90: jump shot green wider by', def: 0.1, min: 0, max: 0.25, step: 0.01, unit: 'x', group: 'Hoops · ratings',
+    source: 'lib/babylon/hoops/ratings.ts RATE_GREEN_BAND',
+    hint: 'Share added to the jump shot green at Shooting 90 (casual runs only).',
+  },
+  {
+    id: 'hoops.rateFinishBand', label: 'Finishing 90: contest on a finish minus', def: 0.15, min: 0, max: 0.4, step: 0.01, unit: 'x', group: 'Hoops · ratings',
+    source: 'lib/babylon/hoops/ratings.ts RATE_FINISH_BAND',
+    hint: 'Share taken off the contest a defender puts on a layup or a dunk at Finishing 90.',
+  },
+  {
+    id: 'hoops.rateSlideBand', label: 'Defense 90: slide speed plus', def: 0.06, min: 0, max: 0.15, step: 0.01, unit: 'x', group: 'Hoops · ratings',
+    source: 'lib/babylon/hoops/ratings.ts RATE_SLIDE_BAND',
+    hint: 'Share added to the defensive slide at Defense 90.',
+  },
+  {
+    id: 'hoops.rateStealReachBand', label: 'Defense 90: steal reach plus', def: 0.05, min: 0, max: 0.15, step: 0.01, unit: 'x', group: 'Hoops · ratings',
+    source: 'lib/babylon/hoops/ratings.ts RATE_STEAL_REACH_BAND',
+    hint: 'Share added to the steal reach (1.2 m) at Defense 90.',
+  },
+  {
+    id: 'hoops.rateBlockReachM', label: 'Defense 90: block reach plus', def: 0.04, min: 0, max: 0.12, step: 0.01, unit: 'm', group: 'Hoops · ratings',
+    source: 'lib/babylon/hoops/ratings.ts RATE_BLOCK_REACH_M',
+    hint: 'Metres added to the block reach at Defense 90.',
+  },
+  {
+    id: 'hoops.heightReachMPerIn', label: 'Playing height: reach per inch over the standard', def: 0.015, min: 0, max: 0.04, step: 0.001, unit: 'm', group: 'Hoops · ratings',
+    source: 'lib/babylon/hoops/ratings.ts HEIGHT_REACH_M_PER_IN',
+    hint: 'Metres of standing reach (blocks, contests, the rim) per inch of playing height over the standard frame; under it, the same off.',
   },
 ];
 
