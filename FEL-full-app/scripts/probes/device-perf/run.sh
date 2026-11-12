@@ -13,7 +13,7 @@ if [ "${1:-}" = "--inner" ]; then
   trap 'kill $SP 2>/dev/null' EXIT
   for i in $(seq 1 30); do curl -s -o /dev/null "http://127.0.0.1:$PORT/" && break; sleep 1; done
   # which launch flags give this box's Chromium a WebGPU adapter (none: the WebGPU runs fall back to WebGL, and say so)
-  best=$(nice -n 5 npx tsx scripts/probes/device-perf/webgpu-avail.mts 2>&1 | tee "$site/webgpu-avail.log" | sed -n 's/^BEST=//p')
+  best=$(BASE="http://127.0.0.1:$PORT/mode.html?mode=none" nice -n 5 npx tsx scripts/probes/device-perf/webgpu-avail.mts 2>&1 | tee "$site/webgpu-avail.log" | sed -n 's/^BEST=//p')
   echo "webgpu flags: ${best:-none}"
   env CHROME_ARGS="${best:---enable-unsafe-webgpu}" "$@" PAGE="http://127.0.0.1:$PORT/mode.html" nice -n 5 npx tsx scripts/probes/device-perf/readout-run.mts
   exit $?

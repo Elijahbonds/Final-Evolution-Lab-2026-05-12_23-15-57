@@ -40,6 +40,9 @@ class GlintPlugin extends MaterialPluginBase {
   glint = 1; shade = 0.5; cell = 24; density = 0.05; fadeNear = 14; fadeFar = 60;
   private _enabled = false;
   constructor(material: Material) { super(material, PLUGIN, 310, { FEL_GLINT: false }); }
+  // device-perf (2026-11-12, the WebGPU trial): Babylon's default accepts GLSL only and THROWS when this is attached to a WGSL
+  // (WebGPU) material. Under WGSL it adds no code, so the snow has no glint. Under WebGL nothing changes (GLSL was already accepted).
+  isCompatible(): boolean { return true; }
   get isEnabled(): boolean { return this._enabled; }
   set isEnabled(v: boolean) { if (this._enabled === v) return; this._enabled = v; this.markAllDefinesAsDirty(); this._enable(v); }
   prepareDefines(defines: Record<string, unknown>): void { defines.FEL_GLINT = this._enabled; }

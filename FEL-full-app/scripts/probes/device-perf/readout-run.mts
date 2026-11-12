@@ -28,7 +28,14 @@ const ARGS = (process.env.CHROME_ARGS ?? '--enable-unsafe-webgpu --enable-featur
 fs.mkdirSync(OUT, { recursive: true });
 
 // the harness's 20 s load watchdog is a phone-on-a-network guard; software GL on a shared box can take longer to build a venue
-const INIT = `(() => { const st = window.setTimeout.bind(window); window.setTimeout = (fn, ms, ...a) => st(fn, ms === 20000 ? 300000 : ms, ...a); })()`;
+// and the analytics pipe (lib/analytics.ts) sends by navigator.sendBeacon with a Blob body, which the browser's request events do not
+// expose: the page keeps a copy of every body it beacons, for the probe to read (window.__beacons)
+const INIT = `(() => {
+  const st = window.setTimeout.bind(window); window.setTimeout = (fn, ms, ...a) => st(fn, ms === 20000 ? 300000 : ms, ...a);
+  window.__beacons = [];
+  const sb = navigator.sendBeacon && navigator.sendBeacon.bind(navigator);
+  if (sb) navigator.sendBeacon = (u, d) => { try { if (String(u).includes('/api/analytics') && d && d.text) d.text().then((t) => window.__beacons.push(t)); } catch (e) {} return sb(u, d); };
+})()`;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const summary: Record<string, unknown>[] = [];
@@ -78,6 +85,9 @@ try {
         // flush the analytics queue the way a phone does when the tab goes away (pagehide → sendBeacon)
         await p.evaluate(() => window.dispatchEvent(new Event('pagehide')));
         await sleep(1500);
+        for (const t of await p.evaluate(() => (window as any).__beacons as string[])) {
+          try { for (const e of (JSON.parse(t).events ?? [])) if (e?.name === 'game_diag') diag.push(e); } catch { diag.push({ raw: t.slice(0, 300) }); }
+        }
         const row = { tag, mode, asked: eng, phase, err, readyWallS: readyS, choice, sample, overlay, diag, console: [...new Set(msgs)].slice(0, 60) };
         fs.writeFileSync(path.join(OUT, `${tag}.json`), JSON.stringify(row, null, 2));
         summary.push(row);

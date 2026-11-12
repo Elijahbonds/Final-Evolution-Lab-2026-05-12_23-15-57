@@ -138,6 +138,8 @@ export interface ReadoutSample {
   frameP50: number;
   frameP95: number;
   worstMs: number;
+  /** Gaps over 1 s while the page was showing: a freeze the owner saw, kept out of the percentiles. */
+  stalls: number;
   cpuP50: number;
   cpuP95: number;
   draws: number;
@@ -173,10 +175,10 @@ export function readoutLines(s: ReadoutSample): string[] {
     `${s.modeId} · ${s.phase}`,
     `engine ${engineLabel(s.engine)}`,
     `fps ${r1(s.fps)} · frame p50 ${r1(s.frameP50)} p95 ${r1(s.frameP95)} ms`,
-    `worst ${Math.round(s.worstMs)} ms · cpu p50 ${r1(s.cpuP50)} p95 ${r1(s.cpuP95)} ms`,
+    `worst ${Math.round(s.worstMs)} ms${s.stalls ? ` · stalls>1s ${s.stalls}` : ''} · cpu p50 ${r1(s.cpuP50)} p95 ${r1(s.cpuP95)} ms`,
     `draws ${s.draws} (max ${s.drawsMax}) · meshes ${s.activeMeshes}/${s.meshes}`,
     `textures ${s.textures} · ≈${Math.round(s.textureMB)} MB · heap ${s.heapMB === null ? 'n/a' : `${Math.round(s.heapMB)} MB`}`,
-    `READY ${s1(s.readyModeMs)} from mode start · ${s1(s.readyPageMs)} from page open`,
+    `READY ${s1(s.readyModeMs)} (mode) · ${s1(s.readyPageMs)} (page)`,
     `${s.tier} · dpr ${r1(s.dpr)} · ${s.backing}${s.guard ? ` · cap ${s.guard.cap ?? 'off'} L${s.guard.level}` : ''}`,
   ];
 }
@@ -189,7 +191,7 @@ export function readoutReport(s: ReadoutSample): string {
     `mode ${s.modeId} · phase ${s.phase} · page ${s.path}`,
     `engine ${engineLabel(s.engine)}${s.engine?.asked ? ` · asked ${s.engine.asked}` : ''}`,
     `device ${s.os} · gpu ${s.gpuClass} (${s.renderer || 'unknown'}) · tier ${s.tier} · dpr ${r1(s.dpr)} · backing ${s.backing}`,
-    `fps ${r1(s.fps)} · frame p50 ${r1(s.frameP50)} ms · p95 ${r1(s.frameP95)} ms · worst ${Math.round(s.worstMs)} ms · over ${s.frames} frames`,
+    `fps ${r1(s.fps)} · frame p50 ${r1(s.frameP50)} ms · p95 ${r1(s.frameP95)} ms · worst ${Math.round(s.worstMs)} ms · over ${s.frames} frames · stalls over 1 s: ${s.stalls}`,
     `cpu per frame p50 ${r1(s.cpuP50)} ms · p95 ${r1(s.cpuP95)} ms`,
     `draw calls ${s.draws} (max ${s.drawsMax}) · active meshes ${s.activeMeshes} of ${s.meshes}`,
     `textures ${s.textures} · about ${Math.round(s.textureMB)} MB · js heap ${s.heapMB === null ? 'not reported by this browser' : `${Math.round(s.heapMB)} MB`}`,
@@ -200,30 +202,33 @@ export function readoutReport(s: ReadoutSample): string {
 
 // ── the sampler (only while the overlay is open) ────────────────────────────────────────────────────────────────────────────
 const RING = 300;            // ~5 s at 60 fps
-const MAX_INTERVAL_MS = 1000; // a longer gap is a pause, a hidden tab or a debugger, not a frame
+const MAX_INTERVAL_MS = 1000; // a longer gap is not a frame: counted as a stall (page showing) or ignored (page hidden)
 
 export interface ReadoutSampler { sample(): ReadoutSample; dispose(): void }
 
-type Host = { now(): number };
+type Host = { now(): number; hidden?(): boolean };
 
 function rendererOf(engine: AbstractEngine): string {
   try { return (engine as unknown as { getGlInfo?(): { renderer?: string } }).getGlInfo?.()?.renderer ?? ''; } catch { return ''; }
 }
 
-export function attachSampler(src: ReadoutSource, host: Host = { now: () => performance.now() }): ReadoutSampler {
+const browserHidden = () => typeof document !== 'undefined' && document.visibilityState === 'hidden';
+
+export function attachSampler(src: ReadoutSource, host: Host = { now: () => performance.now(), hidden: browserHidden }): ReadoutSampler {
   const { engine, scene } = src;
   const iv = new Float64Array(RING), wk = new Float64Array(RING), dc = new Float64Array(RING);
-  let n = 0, head = 0, tBegin = 0, lastBegin = NaN;
+  let n = 0, head = 0, tBegin = 0, lastBegin = NaN, stalls = 0;
   let si: SceneInstrumentation | null = null;
   try { si = new SceneInstrumentation(scene); } catch { si = null; }
-  const reset = () => { n = 0; head = 0; lastBegin = NaN; };
+  const reset = () => { n = 0; head = 0; lastBegin = NaN; stalls = 0; };
   src.onPhase.add(reset);
   const beginObs = engine.onBeginFrameObservable.add(() => { tBegin = host.now(); });
   const endObs = engine.onEndFrameObservable.add(() => {
     const now = host.now();
     const interval = tBegin - lastBegin;
     lastBegin = tBegin;
-    if (!(interval > 0) || interval > MAX_INTERVAL_MS) return;
+    if (!(interval > 0)) return;
+    if (interval > MAX_INTERVAL_MS) { if (!host.hidden?.()) stalls++; return; }
     iv[head] = interval; wk[head] = now - tBegin;
     dc[head] = (engine as unknown as { _drawCalls?: { current: number } })._drawCalls?.current ?? 0;
     head = (head + 1) % RING;
@@ -255,7 +260,7 @@ export function attachSampler(src: ReadoutSource, host: Host = { now: () => perf
         backing: `${engine.getRenderWidth()}x${engine.getRenderHeight()}`,
         frames: n,
         fps: k && sum > 0 ? (1000 * k) / sum : 0,
-        frameP50: pct(ivs, 0.5), frameP95: pct(ivs, 0.95), worstMs: n ? ivs[n - 1] : 0,
+        frameP50: pct(ivs, 0.5), frameP95: pct(ivs, 0.95), worstMs: n ? ivs[n - 1] : 0, stalls,
         cpuP50: pct(wks, 0.5), cpuP95: pct(wks, 0.95),
         draws: lastDraws, drawsMax,
         activeMeshes: active, meshes: scene.meshes.length,

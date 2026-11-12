@@ -43,7 +43,7 @@ describe('texture estimate', () => {
 const SAMPLE: ReadoutSample = {
   at: '2026-11-12 20:00:00 UTC', modeId: 'onevone', phase: 'playing', tier: 'mobile',
   engine: { backend: 'webgpu', asked: 'webgpu', note: 'WebGPU running (trial)' }, renderer: 'Apple GPU', gpuClass: 'integrated',
-  os: 'ios', dpr: 3, backing: '780x1688', frames: 300, fps: 59.6, frameP50: 16.7, frameP95: 18.4, worstMs: 41.2,
+  os: 'ios', dpr: 3, backing: '780x1688', frames: 300, fps: 59.6, frameP50: 16.7, frameP95: 18.4, worstMs: 41.2, stalls: 0,
   cpuP50: 4.1, cpuP95: 7.9, draws: 212, drawsMax: 240, activeMeshes: 180, meshes: 640, textures: 74, textureMB: 96.4,
   heapMB: null, readyModeMs: 3400, readyPageMs: 9100, playPageMs: 12000, guard: { cap: 60, level: 0, hardwareScalingLevel: 1.5 },
   path: '/play/onevone?playtest=1',
@@ -53,7 +53,7 @@ describe('what the owner reads and copies', () => {
   it('the overlay names the mode, the engine, the frame numbers, the draws, the memory and READY', () => {
     const t = readoutLines(SAMPLE).join('\n');
     for (const s of ['onevone · playing', 'engine WebGPU (WebGPU running (trial))', 'fps 59.6', 'p50 16.7', 'p95 18.4', 'worst 41 ms',
-      'cpu p50 4.1 p95 7.9', 'draws 212 (max 240)', 'meshes 180/640', 'textures 74', '≈96 MB', 'heap n/a', 'READY 3.4 s from mode start', '9.1 s from page open',
+      'cpu p50 4.1 p95 7.9', 'draws 212 (max 240)', 'meshes 180/640', 'textures 74', '≈96 MB', 'heap n/a', 'READY 3.4 s (mode)', '9.1 s (page)',
       'cap 60 L0']) expect(t).toContain(s);
   });
   it('the report is plain text with every number, flags READY over the 8 s budget, and says when the heap is not reported', () => {
@@ -68,6 +68,9 @@ describe('what the owner reads and copies', () => {
     expect(r).toContain('(over the 8 s budget)');
     expect(READY_BUDGET_MS).toBe(8000);
     expect(readoutReport({ ...SAMPLE, readyPageMs: 5000 })).not.toContain('over the 8 s budget');
+    expect(r).toContain('stalls over 1 s: 0');
+    expect(readoutLines(SAMPLE).join('\n')).not.toContain('stalls>1s');
+    expect(readoutLines({ ...SAMPLE, stalls: 3 }).join('\n')).toContain('worst 41 ms · stalls>1s 3');
   });
   it('the report carries no account, email or id — only the device class and the renderer the owner pastes themselves', () => {
     const r = readoutReport(SAMPLE);
@@ -138,6 +141,10 @@ describe('the live game and the sampler', () => {
     expect(a.guard).toEqual({ cap: 30, level: 2, hardwareScalingLevel: 2 });
     expect(a.meshes).toBe(1);
     expect(a.textures).toBeGreaterThanOrEqual(0);
+    expect(a.stalls).toBe(0);
+    frame(1500, 5);                             // a 1.5 s freeze while showing: a stall, not a frame
+    expect(s.sample().stalls).toBe(1);
+    expect(s.sample().worstMs).toBeCloseTo(50, 5);
     pub.setPhase('paused');
     expect(s.sample().frames).toBe(0);          // a new phase starts a new window
     s.dispose(); pub.dispose();

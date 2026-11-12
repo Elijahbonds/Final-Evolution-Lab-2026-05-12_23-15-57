@@ -42,13 +42,13 @@ warm or the game felt slow anywhere.
 | `onevone · playing` | the game and what it is doing (loading, ready, countdown, playing, paused) |
 | `engine WebGL2` | which graphics engine is running, and why, if it is not the normal one |
 | `fps 59.6 · frame p50 16.7 p95 18.4 ms` | frames per second now; the typical frame time and the slow-end frame time over the last ~5 seconds of this phase. 60 fps = 16.7 ms; 30 fps = 33.3 ms |
-| `worst 41 ms · cpu p50 4.1 p95 7.9 ms` | the slowest single frame (a visible stutter is over ~50 ms); the phone's JavaScript work per frame |
+| `worst 41 ms · stalls>1s 2 · cpu p50 4.1 p95 7.9 ms` | the slowest single frame (a visible stutter is over ~50 ms); freezes longer than a second (shown only when there were any); the phone's JavaScript work per frame |
 | `draws 212 (max 240) · meshes 180/640` | draw calls (how many separate things the graphics chip is asked to draw each frame) and meshes drawn / meshes in the scene |
 | `textures 74 · ≈96 MB · heap 82 MB` | images loaded on the graphics chip and an estimate of their memory; the JavaScript memory (Android only — iPhones do not report it: `n/a`) |
-| `READY 3.4 s from mode start · 9.1 s from page open` | how long until the READY card. Your budget (2026-10-20): **playable in 8 s** on a mid-range phone. The report says when it is over |
+| `READY 3.4 s (mode) · 9.1 s (page)` | how long until the READY card, from the game starting to load and from the page opening. Your budget (2026-10-20): **playable in 8 s** on a mid-range phone. The report says when it is over |
 | `mobile · dpr 3 · 780x1688 · cap 60 L0` | quality tier, screen density, the drawing size, and the perf guard's frame cap and step-down level (0 = full quality) |
 
-"From page open" is only meaningful when you opened the link fresh; after moving between games inside the app it counts
+"(page)" is only meaningful when you opened the link fresh; after moving between games inside the app it counts
 from when the app was first opened.
 
 ## The anonymous stats (already running)

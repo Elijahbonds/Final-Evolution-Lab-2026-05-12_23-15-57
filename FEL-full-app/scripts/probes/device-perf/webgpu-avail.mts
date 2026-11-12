@@ -1,6 +1,7 @@
 // device-perf (2026-11-12): does this box's headless Chromium expose WebGPU at all, and under which flags?
-//   npx tsx scripts/probes/device-perf/webgpu-avail.mts
-// The last line is BEST=<flags> (empty when no set gave an adapter).
+//   BASE=http://127.0.0.1:3761/ npx tsx scripts/probes/device-perf/webgpu-avail.mts
+// The last line is BEST=<flags> (empty when no set gave an adapter). navigator.gpu exists only in a SECURE context: about:blank is
+// not one (the first run of this probe reported gpu:false everywhere for that reason), so it loads BASE (a loopback page) when set.
 // Tries a few launch-flag sets on about:blank and reports navigator.gpu, the adapter and its info. No server needed.
 import { chromium } from 'playwright-core';
 import { chromiumExe } from '../_chromium.mts';
@@ -17,7 +18,7 @@ for (const [name, args] of Object.entries(SETS)) {
   const b = await chromium.launch({ executablePath: chromiumExe(), args });
   try {
     const p = await b.newPage();
-    await p.goto('about:blank');
+    await p.goto(process.env.BASE ?? 'about:blank');
     const r = await p.evaluate(async () => {
       const g = (navigator as unknown as { gpu?: { requestAdapter(o?: unknown): Promise<unknown> } }).gpu;
       if (!g) return { gpu: false };
