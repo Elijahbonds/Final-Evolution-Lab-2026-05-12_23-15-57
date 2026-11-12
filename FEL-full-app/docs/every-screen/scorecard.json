@@ -21,8 +21,8 @@
   "notScored": 6,
   "byCheck": {
    "clear": {
-    "pass": 104,
-    "fail": 50,
+    "pass": 105,
+    "fail": 49,
     "nm": 0
    },
    "finished": {
@@ -51,7 +51,7 @@
   {
    "id": "too-many-words",
    "name": "More than 40 words before scrolling on a do-this screen",
-   "screens": 37,
+   "screens": 36,
    "wouldPassIfFixed": 13
   },
   {
@@ -93,7 +93,7 @@
   {
    "id": "slow-tap",
    "name": "The main action answers a tap in more than 200 ms",
-   "screens": 9,
+   "screens": 10,
    "wouldPassIfFixed": 4
   },
   {
@@ -1114,7 +1114,7 @@
     "right": "pass"
    },
    "passAll": false,
-   "worst": "50 words before scrolling (the budget is 40).",
+   "worst": "41 words before scrolling (the budget is 40; 6 words of approved notices not counted).",
    "faults": [
     "too-many-words"
    ],
@@ -1123,12 +1123,12 @@
     "tap response"
    ],
    "numbers": {
-    "wordsBeforeScroll": 50,
+    "wordsBeforeScroll": 47,
     "brightButtons": 0,
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 1,
-    "firstContentMs": 376,
+    "firstContentMs": 876,
     "layoutShift": 0.001,
     "tapMs": null,
     "tapped": null,
@@ -1137,7 +1137,7 @@
     "a11ySerious": 0,
     "jsKb": 614
    },
-   "measuredBy": "lane/coach-words 2026-11-12 (this row only; the rest of the card is the every-screen run)"
+   "measuredBy": "lane/coach-words 2026-11-12, after the owner approved options A-C (this row only; the rest of the card is the every-screen run)"
   },
   {
    "route": "/coach/groups",
@@ -1264,7 +1264,7 @@
    "state": "scored",
    "reason": "a real invite made by the rig's coach, opened by an athlete who has not joined",
    "checks": {
-    "clear": "fail",
+    "clear": "pass",
     "finished": "pass",
     "fast": "fail",
     "right": "pass"
@@ -1273,7 +1273,7 @@
    "worst": "The screen jumps as it loads (layout shift 0.064; the budget is 0.02).",
    "faults": [
     "layout-shift",
-    "too-many-words"
+    "slow-tap"
    ],
    "review": [],
    "unmeasured": [],
@@ -1283,16 +1283,16 @@
     "smallTargets": 0,
     "textSizes": 5,
     "buttonLooks": 1,
-    "firstContentMs": 264,
+    "firstContentMs": 408,
     "layoutShift": 0.064,
-    "tapMs": 72,
+    "tapMs": 272,
     "tapped": "Join Coach Riley",
     "brokenLinks": 0,
     "a11yCritical": 0,
     "a11ySerious": 0,
     "jsKb": 242
    },
-   "measuredBy": "lane/coach-words 2026-11-12 (this row only; the rest of the card is the every-screen run)"
+   "measuredBy": "lane/coach-words 2026-11-12, after the owner approved options A-C (this row only; the rest of the card is the every-screen run)"
   },
   {
    "route": "/coach/live/[room]",

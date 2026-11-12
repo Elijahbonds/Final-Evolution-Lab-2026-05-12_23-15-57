@@ -8,7 +8,7 @@ Every screen a person can reach, scored on the plan's four checks (`docs/PLAN-EV
 
 **57 of 187 screens pass all four checks.**
 
-*Five rows re-measured by `lane/coach-words` on 2026-11-12 (the same scorer, version 6, two reads each), and patched into this page by hand because a five-screen run cannot regenerate the rest: `/coach/business/thanks`, `/coach/form-review`, `/coach/highlight/[id]`, `/coach/join/[token]`, `/coach/session`. Every other row, and the phase-1 column, is the every-screen run. Three of the five now pass, and each pass waits on the owner's yes in `docs/COACH-WORDING-REVIEW.md` (thanks: row 1.1; highlight: row 3.2; session: row 5.3, the last two marking consent and privacy wording as approved notices). A "no" puts that screen back to failing on words.*
+*Five rows re-measured by `lane/coach-words` on 2026-11-12 (the same scorer, version 6, two reads each), and patched into this page by hand because a five-screen run cannot regenerate the rest: `/coach/business/thanks`, `/coach/form-review`, `/coach/highlight/[id]`, `/coach/join/[token]`, `/coach/session`. Every other row, and the phase-1 column, is the every-screen run. Three of the five now pass. The owner approved every row of `docs/COACH-WORDING-REVIEW.md` on 2026-11-12, and options A–C; `/coach/form-review` and `/coach/join/[token]` were read twice more after A–C.*
 
 | | Screens |
 |---|---|
@@ -22,7 +22,7 @@ Every screen a person can reach, scored on the plan's four checks (`docs/PLAN-EV
 
 | Check | Pass | Fail | Not measured |
 |---|---|---|---|
-| 1. Clear and quick | 104 | **50** | 0 |
+| 1. Clear and quick | 105 | **49** | 0 |
 | 2. Looks finished | 88 | **66** | 0 |
 | 3. Fast and smooth | 120 | **16** | 18 |
 | 4. Right and trustworthy | 147 | **7** | 0 |
@@ -66,11 +66,11 @@ Checks in order: 1 clear and quick · 2 looks finished · 3 fast and smooth · 4
 | `/coach/combine` | ✗ ✗ ✗ ✓ | ✗ ✗ ✓ ✓ | no | Unfinished mark on screen: "Saving combines to your account is coming soon. This combine is kept on this pho". | owner: the feature is not built or not switched on ("coming soon"); owner-gated |
 | `/coach/dashboard` | off | off | no | switched off: COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) | owner: switch it on — COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) |
 | `/coach/dashboard/settings` | off | off | no | switched off: COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) | owner: switch it on — COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) |
-| `/coach/form-review` | ✗ ✗ ✗ ✓ | ✗ ✓ ✓ ✓ | no | 50 words before scrolling (the budget is 40). | owner: approve the shorter wording (docs/COACH-WORDING-REVIEW.md, rows 2.1 and 2.3): 56 -> 50 words on 2026-11-12 (two reads), still over the 40-word budget. What is left is the setup instruction, the estimate line and the privacy line; going further is the owner's choice (the review doc's options A and B) |
+| `/coach/form-review` | ✗ ✗ ✗ ✓ | ✗ ✓ ✓ ✓ | no | 41 words before scrolling (the budget is 40; 6 words of approved notices not counted). | owner: one word over after every approved cut (docs/COACH-WORDING-REVIEW.md rows 2.1-2.5, options A and B approved 2026-11-12): 56 -> 41 counted words (47 on the screen, 6 of them an approved privacy notice) on lane/coach-words' two reads (41, and 43 on the read that carried the rig's two-word "+100 coins" pop-up). What is left is the label, the exercise name, the setup line, the camera-and-estimate line and the button: a next cut is the owner's call |
 | `/coach/groups` | ✗ ✗ ✗ ✓ | ✓ ✗ ✓ ✓ | no | Unfinished mark on screen: "Opens soon". | owner: group booking opens with the training deploy (its tables) |
 | `/coach/highlight/[id]` | ✗ ✗ ✗ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
 | `/coach/join` | ✗ ✗ ✓ ✓ | ✓ ✓ ✓ ✓ | **yes** |  |  |
-| `/coach/join/[token]` | ✗ ✗ ✗ ✓ | ✗ ✓ ✗ ✓ | no | The screen jumps as it loads (layout shift 0.064; the budget is 0.02). | owner: approve the shorter wording (docs/COACH-WORDING-REVIEW.md, rows 4.1 and 4.3): 44 -> 42 words on 2026-11-12, still over 40 (the rest is the consent paragraph, the heading and the app's bars; option C in the review doc is the owner's); speed: the page's column shifts once as it loads in some reads (layout shift 0.064 / 0.001 in lane/coach-words' two reads on 2026-11-12, earlier 0.064 / 0.001 / 0.064; the budget is 0.02) |
+| `/coach/join/[token]` | ✗ ✗ ✗ ✓ | ✓ ✓ ✗ ✓ | no | The screen jumps as it loads (layout shift 0.064; the budget is 0.02). | speed (a fix, not wording): words now pass (owner-approved option C, 2026-11-12: 20 counted, the consent line an approved notice). On lane/coach-words' two reads of 2026-11-12 the main tap answered in 240 ms and 272 ms (budget 200; assumption: machine load, eight browser jobs were queued, and earlier reads were 72-176 ms), and the page's column shifted once as it loaded in one of them (layout shift 0.064 / 0.001; earlier reads 0.064 / 0.001 / 0.064; budget 0.02) |
 | `/coach/live/[room]` | off | off | no | switched off: NEXT_PUBLIC_COACH_LIVE_ENABLED (live coach sessions) | owner: switch it on — NEXT_PUBLIC_COACH_LIVE_ENABLED (live coach sessions) |
 | `/coach/offers/[offer]` | off | off | no | switched off: COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) | owner: switch it on — COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) |
 | `/coach/review/[bookingId]` | off | off | no | switched off: COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) | owner: switch it on — COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL) |
@@ -250,14 +250,14 @@ The plan's rule: fix the shared thing first. "Alone" is how many screens would p
 
 | # | Fault | Screens | Alone | Check |
 |---|---|---|---|---|
-| 1 | More than 40 words before scrolling on a do-this screen | 37 | 13 | 1 |
+| 1 | More than 40 words before scrolling on a do-this screen | 36 | 13 | 1 |
 | 2 | Body copy under 16 px | 21 | 1 | 2 |
 | 3 | More than 4 text sizes on one screen | 16 | 0 | 2 |
 | 4 | More than 3 button looks on one screen | 15 | 1 | 2 |
 | 5 | Tap targets under 44 px in the screen itself | 13 | 0 | 1 |
 | 6 | An empty state with no next step | 10 | 3 | 2 |
 | 7 | Unfinished mark: "opens soon" | 9 | 5 | 2 |
-| 8 | The main action answers a tap in more than 200 ms | 9 | 4 | 3 |
+| 8 | The main action answers a tap in more than 200 ms | 10 | 4 | 3 |
 | 9 | Text under 12 px | 9 | 2 | 2 |
 | 10 | The screen jumps as it loads | 7 | 1 | 3 |
 
@@ -454,11 +454,11 @@ Phase 1 fixed only what stops a person (`docs/EVERY-SCREEN-JOBS.md`). Everything
 
 **Phase 5** (21 scored screens, 11 pass all four):
 
-1. More than 40 words before scrolling on a do-this screen: 5 screens (`/coach/admin/library`, `/coach/admin/programs`, `/coach/combine`, `/coach/form-review`, `/coach/join/[token]`)
+1. More than 40 words before scrolling on a do-this screen: 4 screens (`/coach/admin/library`, `/coach/admin/programs`, `/coach/combine`, `/coach/form-review`)
 2. Unfinished mark: "opens soon": 4 screens (`/coach/groups`, `/groups`, `/groups/[groupId]`, `/groups/one-on-one`)
 3. Body copy under 16 px: 3 screens (`/coach/admin/library`, `/coach/admin/programs`, `/coach/business`)
 4. More than 4 text sizes on one screen: 3 screens (`/coach/admin/programs`, `/coach/business`, `/coach/combine`)
-5. The main action answers a tap in more than 200 ms: 1 screen (`/coach/admin/programs`)
+5. The main action answers a tap in more than 200 ms: 2 screens (`/coach/admin/programs`, `/coach/join/[token]`)
 6. An empty state with no next step: 1 screen (`/coach/business`)
 7. Tap targets under 44 px in the screen itself: 1 screen (`/coach/business`)
 8. Unfinished mark: "coming soon": 1 screen (`/coach/combine`)
@@ -605,11 +605,11 @@ Not measured yet: run `scripts/every-screen/dark.mts`.
 | `/coach/combine` | signed-in; scored as coach | do | ✗ | ✗ | ✓ | ✓ | Unfinished mark on screen: "Saving combines to your account is coming soon. This combine is kept on this pho". |
 | `/coach/dashboard` | nobody (a 404 for everyone) | hub | – | – | – | – | *switched off: a 404 (COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL))* |
 | `/coach/dashboard/settings` | nobody (a 404 for everyone) | do | – | – | – | – | *switched off: a 404 (COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL))* |
-| `/coach/form-review` | signed-in (coached client) | do | ✗ | ✓ | ✓ | ✓ | 50 words before scrolling (the budget is 40). (opened from the first exercise of the client's session, as the app links it) |
+| `/coach/form-review` | signed-in (coached client) | do | ✗ | ✓ | ✓ | ✓ | 41 words before scrolling (the budget is 40; 6 words of approved notices not counted). (opened from the first exercise of the client's session, as the app links it) |
 | `/coach/groups` | signed-in; scored as coach | do | ✓ | ✗ | ✓ | ✓ | Unfinished mark on screen: "Opens soon". |
 | `/coach/highlight/[id]` | signed-in | do | ✓ | ✓ | ✓ | ✓ | **passes all four** |
 | `/coach/join` | anyone | do | ✓ | ✓ | ✓ | ✓ | **passes all four** |
-| `/coach/join/[token]` | anyone; scored as solo | do | ✗ | ✓ | ✗ | ✓ | The screen jumps as it loads (layout shift 0.064; the budget is 0.02). (a real invite made by the rig's coach, opened by an athlete who has not joined) |
+| `/coach/join/[token]` | anyone; scored as solo | do | ✓ | ✓ | ✗ | ✓ | The screen jumps as it loads (layout shift 0.064; the budget is 0.02). (a real invite made by the rig's coach, opened by an athlete who has not joined) |
 | `/coach/live/[room]` | nobody (a 404 for everyone) | do | – | – | – | – | *switched off: a 404 (NEXT_PUBLIC_COACH_LIVE_ENABLED (live coach sessions))* |
 | `/coach/offers/[offer]` | nobody (a 404 for everyone) | do | – | – | – | – | *switched off: a 404 (COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL))* |
 | `/coach/review/[bookingId]` | nobody (a 404 for everyone) | do | – | – | – | – | *switched off: a 404 (COACH_STORE_ENABLED (the coach store; also needs the coach-store SQL))* |
