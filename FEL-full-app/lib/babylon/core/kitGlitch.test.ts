@@ -7,7 +7,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { NullEngine, Scene, ArcRotateCamera, Vector3, SceneLoader } from '@babylonjs/core';
 import type { AbstractMesh, AssetContainer, Mesh, TransformNode } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
-import { applyKit } from './kit';
+import { applyKit, packFitsBody } from './kit';
 import { GARMENT_INFLATE, metresPerBind } from './garmentFixes';
 import { skinnedWorld, maskBodyNow } from './bodyMask';
 import { applySkinShading } from './skinShading';
@@ -126,4 +126,19 @@ describe('floating: the waistband fit never hands the shorts an ARM\'s weights (
     animator.dispose();
     s.root.dispose();
   }, 60_000);
+});
+
+describe('wrong pieces: a kit pack is worn only by the bodies it was fitted to (kit.packFitsBody)', () => {
+  it('the kit bodies take packs; a forge rival (its own build) does not — measured 50–54 % of the football jersey inside a rival', () => {
+    const male = spawn('male'), female = spawn('female'), rival = spawn('rival');
+    expect(packFitsBody(male.meshes)).toBe(true);
+    expect(packFitsBody(female.meshes)).toBe(true);
+    expect(packFitsBody(rival.meshes)).toBe(false);
+    // in football (the jersey is the sport's default top) the rival shows its own top and asks for no pack
+    applyKit(rival.meshes, null, 'football');
+    const tops = rival.meshes.filter((m) => /^Kit_tops_/.test(m.name) && m.isVisible);
+    expect(tops.length).toBeGreaterThan(0);
+    expect(tops.every((m) => !/top_football/.test(m.name))).toBe(true);
+    male.root.dispose(); female.root.dispose(); rival.root.dispose();
+  });
 });
