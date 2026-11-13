@@ -712,8 +712,9 @@ pins both). Measured with `scripts/probes/hoops-p09/rulebook-measure.mts` (befor
 
 ### Hoops · gathers (lane/hoops-gather, owner 2026-11-12: "good escape moves, good gathers and pick ups"; `docs/HOOPS-GATHER-ESCAPE-PLAN.md`)
 
-All new numbers; every switch ships OFF, so the game plays exactly as before until the owner turns one on.
-- `hoops.pickupReadOn` 0 (`anim/ballCarry.ts` `pickUp`, G1): on, a shot / finish / footwork pressed while the ball is low keeps the ball on
+All new numbers. Every switch ships OFF except `hoops.pickupReadOn`, turned ON with G2 (coordinator 2026-11-12, flagged); each switch's 0
+restores the old behaviour exactly.
+- `hoops.pickupReadOn` 1 (`anim/ballCarry.ts` `pickUp`, G1): on, a shot / finish / footwork pressed while the ball is low keeps the ball on
   its own bounce while the dribbling hand goes down `hoops.pickupReachM` 0.3 m to meet it, and takes it where they meet; the last bounce runs
   at most `hoops.pickupRateMax` 2× its pace so it never waits longer than `hoops.pickupWaitMaxSec` 0.2 s; a ball within
   `hoops.pickupTopGapM` 0.1 m of the top is taken at once (as before). Off: the ball is taken on the press frame wherever it is and flown up to
