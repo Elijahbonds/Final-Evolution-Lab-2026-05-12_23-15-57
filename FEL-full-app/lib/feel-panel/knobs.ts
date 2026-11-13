@@ -1647,6 +1647,12 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/core/NexusVenue.ts COVERED_SKY_OFF',
     hint: 'On a phone the basketball courts drop the look stack backdrop dome and ring: the venue own opaque sky sphere sits inside them and hides them completely. Same picture. 0 = kept, as before.',
   },
+  // ── lane/hoops-perf (owner 2026-11-12: join each body into one mesh; cut the heap churn) ──
+  {
+    id: 'perf.bodyMergeOn', label: 'Bodies: parts drawn by a few meshes (1) / one mesh per part (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/babylon/core/bodyMerge.ts BODY_MERGE_ON',
+    hint: 'Every mode, every tier: once a body holds still, its parts that the renderer treats alike share one mesh (one sub-mesh per part, the same shaders, draw order and ink). Any change puts the parts back that frame. Same picture, fewer active meshes. 0 = one mesh per part, as before.',
+  },
   // ── hoops-p09 (1v1 / 3v3 phase 9 "one rulebook": the play audit's sinkers 2 to 6 and 10) ──
   {
     id: 'hoops.skillShotOn', label: 'Shots: the release decides (1) / a rate and a draw (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · one rulebook',

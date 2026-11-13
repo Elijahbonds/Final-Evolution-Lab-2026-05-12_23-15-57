@@ -673,6 +673,18 @@ holds the result in CI. Phone tier only unless said.
   Half-court modes only (1v1, 3v3, 3-Point); the dunk and the duel keep their rail. FLAG: this one is visible — three fewer
   people at the side of the court on a phone (the 3v3's texture memory reaches its row only with it). 5 = all five.
 
+## hoops-perf, 2026-11-12 (owner: "join each body into one mesh", "cut heap churn"; no feel number changes)
+
+Group "Hoops · phone budget". NEW; its off value restores the old build exactly.
+- `perf.bodyMergeOn` 1 (`core/bodyMerge.ts`, mounted by `core/CharacterLibrary.ts` for every spawned body, every mode, every tier):
+  once a body has held still for 12 frames, its skinned parts that the renderer treats alike (same skeleton, shadow maps, lights,
+  vertex attributes, morph target names, culling, render group, side, visibility) are drawn by ONE mesh with one sub-mesh per part.
+  The parts are not changed or disposed: they are only taken out of the camera pass and the render-target lists while the merged
+  mesh draws for them. It swaps in only when every sub-mesh compiled to the same shader its part draws with; opaque and
+  alpha-tested sub-meshes keep their part's place in the draw order, and the ink line is set per part. Any change to a part
+  (a kit swap, a tint, the body mask, a creator shape, a fade) puts the parts back that frame. Draws are the same; active meshes
+  drop (a court body: nine or ten parts become three or four). 0 = one mesh per part.
+
 ## hoops-p09, 2026-11-12 (1v1 / 3v3 phase 9 "one rulebook"; the play audit's sinkers 2 to 6 and 10; the owner has not felt these yet)
 
 Group "Hoops · one rulebook". Each is NEW, and its OFF value restores the old behaviour exactly (`lib/babylon/hoops/rulebook.test.ts`
