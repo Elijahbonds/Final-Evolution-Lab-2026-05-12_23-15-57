@@ -1730,7 +1730,7 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
   },
   // ── hoops-gather G1 (owner 2026-11-12, "good gathers and pick ups"; docs/HOOPS-GATHER-ESCAPE-PLAN.md): the pick-up reads the bounce ──
   {
-    id: 'hoops.pickupReadOn', label: 'Pick-up reads the bounce (1) / takes it where it is (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · gathers',
+    id: 'hoops.pickupReadOn', label: 'Pick-up reads the bounce (1) / takes it where it is (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · gathers',
     source: 'lib/babylon/anim/ballCarry.ts PICKUP_READ_ON',
     hint: 'On: a shot pressed while the ball is low keeps it on its bounce and the hand goes down to meet it. Off: the ball flies up to a still hand, as before.',
   },

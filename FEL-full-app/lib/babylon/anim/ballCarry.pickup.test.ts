@@ -90,8 +90,8 @@ describe('planPickUp (pure)', () => {
     expect(planPickUp(P.palmY - 0.2, true, P, 1.7, K)).toBeNull();
     expect(planPickUp(P.palmY - 0.6, false, P, 1.7, { ...K, waitMaxSec: 0.05, rateMax: 1 })).toBeNull();
   });
-  it('the knobs ship at the constants, and the switch ships OFF (today exactly)', () => {
-    expect(PICKUP_READ_ON).toBe(0);
+  it('the knobs ship at the constants, and the switch ships ON since G2 (0 restores the old pick-up: the OFF test below)', () => {
+    expect(PICKUP_READ_ON).toBe(1);
     expect(FEEL_KNOB_BY_ID.get('hoops.pickupReadOn')!.def).toBe(PICKUP_READ_ON);
     expect(FEEL_KNOB_BY_ID.get('hoops.pickupWaitMaxSec')!.def).toBe(PICKUP_WAIT_MAX_SEC);
     expect(FEEL_KNOB_BY_ID.get('hoops.pickupReachM')!.def).toBe(PICKUP_REACH_M);
@@ -117,7 +117,7 @@ function lowBall(readOn: number) {
 const handGap = (r: ReturnType<typeof rig>, hand: 'LeftHand' | 'RightHand') => { r.nodes[hand].computeWorldMatrix(true); r.ball.computeWorldMatrix(true); return Vector3.Distance(r.nodes[hand].getAbsolutePosition(), r.ball.getAbsolutePosition()); };
 
 describe('ballCarry.pickUp', () => {
-  it('OFF (the shipped default): taken on the press frame from wherever the ball is — the old sequence exactly', () => {
+  it('OFF (hoops.pickupReadOn 0): taken on the press frame from wherever the ball is — the old sequence exactly', () => {
     const { r, carry, d } = lowBall(0);
     try {
       expect(r.ball.position.y + 0).toBeLessThan(0.6);   // (the ball is low)

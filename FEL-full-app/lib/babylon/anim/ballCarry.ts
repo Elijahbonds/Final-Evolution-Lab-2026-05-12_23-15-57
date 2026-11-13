@@ -249,8 +249,9 @@ export function fallingPhaseAt(h01: number): number {
 // it up at the gather's 8.1 m/s to a hand that did not move (it closed 0–4 % of the gap), seated 9 frames later (worst 24); 41 of 45
 // floor presses lifted it from below the knee. At the top it was 4–9 cm and seated at once. So the top stays as it is, and below it the
 // ball keeps its own bounce while the hand goes down to meet it. Every number new, every one a knob whose 0 / off is today exactly.
-/** The pick-up reads the bounce (1) / takes the ball wherever it is, as before (0). Knob `hoops.pickupReadOn`. */
-export const PICKUP_READ_ON = 0;
+/** The pick-up reads the bounce (1) / takes the ball wherever it is, as before (0). Knob `hoops.pickupReadOn`. ON since G2 (coordinator
+ *  2026-11-12: flipped with G2, measured on; FLAGGED): 0 restores the old pick-up exactly. */
+export const PICKUP_READ_ON = 1;
 /** The longest the pick-up waits for the ball to come up (s). Knob `hoops.pickupWaitMaxSec`. */
 export const PICKUP_WAIT_MAX_SEC = 0.2;
 /** How far under the palm the dribbling hand goes to meet the rising ball (m). Knob `hoops.pickupReachM`. */
