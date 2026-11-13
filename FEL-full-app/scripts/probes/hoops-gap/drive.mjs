@@ -132,10 +132,11 @@ const waitGame = async (ms) => { if (GO) return runFrames(ms * 60 / 1000); const
 const start = () => ev(() => { window.__bus?.emit({ t: 'button', btn: 'START', pressed: true }); window.__bus?.emit({ t: 'button', btn: 'START', pressed: false }); });
 const seamOk = () => ev((m) => !!window.__FEL_DEV__?.scene?.metadata?.[m], MODE).catch(() => false);
 const FEELQ = process.env.FEEL ? `&feel=${encodeURIComponent(process.env.FEEL)}` : '';   // hoops-p01: feel-panel values for the run
+const EXTRAQ = process.env.QS ? `&${process.env.QS}` : '';   // move-feel: more of the page's query (QS=dummy=1: the 1v1 rival stands off in the corner, a dev seam)
 const inflight = new Set(); const lateReq = []; let goWall = 0;
 page.on('request', (r) => { const u = r.url(); if (u.startsWith('data:') || u.startsWith('blob:')) return; inflight.add(r); if (GO && lateReq.length < 200) lateReq.push([Date.now() - goWall, u.replace(/^https?:\/\/[^/]+/, '').slice(0, 120)]); });
 for (const k of ['requestfinished', 'requestfailed']) page.on(k, (r) => inflight.delete(r));
-await page.goto(`http://127.0.0.1:${PORT}/${PAGE}.html?mode=${MODE}&tier=${TIER}&perf=off${FEELQ}`, { waitUntil: 'domcontentloaded', timeout: 240000 });
+await page.goto(`http://127.0.0.1:${PORT}/${PAGE}.html?mode=${MODE}&tier=${TIER}&perf=off${FEELQ}${EXTRAQ}`, { waitUntil: 'domcontentloaded', timeout: 240000 });
 // hoops-p05 (restart): the load stops at READY. START is not pressed until the clock is the rig's (see INIT): pressed during the load,
 // the mode's update() had already run a wall-chosen number of frames when __go came.
 let ready = false;
@@ -253,6 +254,10 @@ if (SCEN === 'game') {
   result.poss = await possLoop();
   if (process.env.POSS_MOTION) { await ev(() => window.__hg.stop()); result.handEv = await ev(() => window.__hg.handEv || []); result.analysis = await ev((o) => window.__hg.analyse(o), { popList: !!process.env.POP_LIST }); if (process.env.POP_LIST) { result.clips = await ev(() => window.__hg.clips || []); result.stageEv = await ev(() => window.__hg.stageEv || []); result.states = await ev(() => window.__hg.states || []); } } result.log = await ev(() => window.__LOG); result.hud = await ev(() => window.__hud); result.snaps = await ev(() => window.__hg.snaps || []);
   { const names = await ev(() => Object.keys(window.__hg.strips).filter((k) => k.startsWith('auto-'))); for (const nm of names) await saveStrip(nm); result.autoStrips = names; }
+} else if (SCEN === 'ext') {   // hoops-gather: a scenario that lives in another lane's probe folder — EXT=<module>, its default export is
+  // handed the driver's own clock and page (the deterministic clock above, the page.js helpers already in the page)
+  const ext = await import(path.resolve(process.env.EXT));
+  await ext.default({ ev, page, runFrames, waitGame, shot, saveStrip, say, checkpoint, result, MODE, OUT, HERE });
 } else if (SCEN === 'input') {
   const S = (fn, arg) => ev(fn, arg);
   const setOff = () => S((m) => { const s = window.__FEL_DEV__.scene.metadata[m]; s.offense(); }, MODE);

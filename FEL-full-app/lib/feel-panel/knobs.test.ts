@@ -34,14 +34,14 @@ import * as BLK from '@/lib/babylon/core/HoopsBlocks';
 import {
   HOOPS_JOG_TAU, HOOPS_SPRINT_TAU, HOOPS_JOG_ACCEL, HOOPS_SPRINT_ACCEL, HOOPS_LOAD_SCALE, HOOPS_GEAR_DOWN_DECEL, HOOPS_STOP_DECEL_LOW, HOOPS_STOP_DECEL_HIGH,
   HOOPS_PLANT_DECEL, HOOPS_HANDLER_TURN_DEG, HOOPS_TURN_TRUE_ARC, HOOPS_KICK_SEC, HOOPS_CUT_SEC, HOOPS_JERK, HOOPS_REVERSE_DEG, HOOPS_REVERSE_DECEL,
-  HOOPS_RETREAT_SPEED_K,
+  HOOPS_RETREAT_SPEED_K, HOOPS_GEAR_BLEND_BAND, HOOPS_STICK_SPRINT_FALLBACK,
   HANDLER_JOG_TAU, HANDLER_JOG_ACCEL, HANDLER_LOAD_SCALE, HANDLER_STOP_DECEL_LOW, HANDLER_STOP_DECEL_HIGH, HANDLER_FIRST_STEP_MPS,
   HANDLER_REVERSE_PLANT_HOLD, HANDLER_REVERSE_LAUNCH_SEC,
 } from '@/lib/babylon/core/HoopsStick';
 import { PORTRAIT_HERO_MARGIN } from '@/lib/babylon/modes/netPortraitCam';
 import { OCCLUDER_FADE_ALPHA, OCCLUDER_FADE_SEC, OCCLUDER_HOLD_SEC } from '@/lib/babylon/core/OccluderFade';   // gameplay-clean
 import { FOOTBALL_CARRY_RATE_MAX, FOOTBALL_HURDLE_EXIT_FADE_SEC, FOOTBALL_HURDLE_FADE_SEC } from '@/lib/babylon/anim/footballTree';   // gameplay-clean P2 #6
-import { CAM_LEAD_EASE_SEC, CAM_LEAD_FULL_MPS } from '@/lib/babylon/core/CameraDirector';   // gameplay-clean P2 #10
+import { CAM_LEAD_EASE_SEC, CAM_LEAD_FULL_MPS, HOOPS_CAM_LEAD_EASE } from '@/lib/babylon/core/CameraDirector';   // gameplay-clean P2 #10
 import { PLANT_ENGAGE_SEC, PLANT_RELEASE_SEC, PLANT_REPLANT_EASE_ON, PLANT_SEATED_OFF_ON } from '@/lib/babylon/anim/FootPlanting';   // gameplay-clean P3 / P4 / P5
 import { FADE_HOLD_ENDED_ON } from '@/lib/babylon/anim/CharacterAnimator';   // gameplay-clean P5
 import { CARRY_PUSHED_BOUNCE_ON } from '@/lib/babylon/anim/ballCarry';   // gameplay-clean P6
@@ -363,6 +363,9 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.reversePlantHold')).toBe(HANDLER_REVERSE_PLANT_HOLD);
     expect(def('hoops.reverseLaunchSec')).toBe(HANDLER_REVERSE_LAUNCH_SEC);
     expect([HANDLER_FIRST_STEP_MPS, HANDLER_REVERSE_PLANT_HOLD, HANDLER_REVERSE_LAUNCH_SEC]).toEqual([0.3, 0, 0.2]);
+    expect(def('hoops.gearBlendBand')).toBe(HOOPS_GEAR_BLEND_BAND); expect(HOOPS_GEAR_BLEND_BAND).toBe(0);   // lane/move-feel (new, off: the step as shipped)
+    expect(def('hoops.stickSprintFallback')).toBe(HOOPS_STICK_SPRINT_FALLBACK); expect(HOOPS_STICK_SPRINT_FALLBACK).toBe(1);   // lane/move-feel (new, 1: as shipped)
+    expect(def('hoops.camLeadEase')).toBe(HOOPS_CAM_LEAD_EASE); expect(HOOPS_CAM_LEAD_EASE).toBe(0);   // lane/move-feel (new, off: the raw lead as shipped)
     expect(def('hoops.retreatSpeedK')).toBe(HOOPS_RETREAT_SPEED_K);   // TUNED (new), owner 2026-10-24
     expect(HOOPS_RETREAT_SPEED_K).toBe(0.7);
     // hoops-overtime (new: PR #268's 30 s)

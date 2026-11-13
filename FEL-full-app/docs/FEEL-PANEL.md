@@ -732,3 +732,32 @@ party run plays today's numbers (and so does an agent / probe run). **Phase B (2
 - `hoops.heightLookPerIn` 0.01 (phase B; owner 2026-11-12 "the body on screen follows the playing height"): the hero is DRAWN 1 % taller an
   inch over 6'4" (6'0" 96 %, 6'8" 104 %, the cosmetic clamp). Drawing only: while he is drawn scaled the modes read the ball on his hand on
   the standard frame (playFramePoint), so the size changes no outcome. Casual runs only; 0 = the standard body.
+
+## move-feel, 2026-11-12 (the owner: "Find out why the movement still feels off?"; docs/MOVE-FEEL-DIAGNOSIS.md; the owner has not felt these)
+
+Three NEW knobs, each **off by default (today's game exactly)**, each pinned in `lib/feel-panel/knobs.test.ts` and held by its own test:
+- `hoops.gearBlendBand` 0 (group "Hoops · movement"; `core/HoopsStick.ts` HOOPS_GEAR_BLEND_BAND, the 1v1 / 3v3 handler only): past the
+  stick's walk line (0.45) the jog starts at 85 % of its top, so a thumb on the line asks for 2.38 or 3.71 m/s (+56 %) a pixel apart. With
+  a band the jog's target eases up from the walk's edge over that much more stick; full tilt and every stick past line + band are
+  unchanged (`core/gearBand.test.ts`). Try 0.2.
+- `hoops.stickSprintFallback` 1 (`core/PlayerSlot.ts`): as shipped, until a trigger has ever reported (a phone whose TURBO pad has not been
+  touched, a keyboard before its first Shift) a stick past 0.85 IS the turbo: the same full push runs 6.2 m/s at the start of a game and
+  4.3 m/s once TURBO has been touched, and the fallback sprint empties the tank in 2.9 s and drops to a jog by itself. 0 = the turbo is the
+  button only (`core/PlayerSlot.sprintFallback.test.ts`). Try 0.
+- `hoops.camLeadEase` 0 (group "Camera · follow"; `core/CameraDirector.ts` HOOPS_CAM_LEAD_EASE, 1v1 and 3v3 only): the hoops modes never
+  took the eased look-ahead every other follow camera got in gameplay-clean P2 #10, so on a start, a stop, a cut or a turnaround the
+  point the camera looks at jumps in one frame. 1 = it eases over `camera.leadEaseSec` (0.2 s) and grows to full by `camera.leadFullMps`
+  (1 m/s) (`core/CameraDirector.hoopsLead.test.ts`). Try 1.
+
+**Try these values** (paste into the panel's values; every one is reversible from the panel's reset). The first three are #311's H3a
+switches that change no top speed, stop or distance — only how a change arrives:
+
+```json
+{ "hoops.turnTrueArc": 1, "hoops.kickSec": 0.1, "hoops.cutSec": 0.08,
+  "hoops.camLeadEase": 1, "hoops.gearBlendBand": 0.2, "hoops.stickSprintFallback": 0 }
+```
+
+Measured (`scripts/probes/move-feel/stick-feel.mts`, the real DribbleController at 60 fps; `PRESET=try` is the first three): a 90° cut at a
+jog turns 261 → 348 °/s over its first 100 ms and settles within 10° in 283 → 233 ms; at a sprint 203 → 275 °/s, 367 → 300 ms; the sprint
+cut's one-frame brake 71 → 17 m/s²; the turbo kick's one-frame push 68 → 23 m/s²; starts, stops and top speeds unchanged (jog 90 % 250 ms,
+stop 150 ms / 0.29 m, sprint stop 217 ms / 0.69 m). **assumption:** the bounds are safe, not tuned.

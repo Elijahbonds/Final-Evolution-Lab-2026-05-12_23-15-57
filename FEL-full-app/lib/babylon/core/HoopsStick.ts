@@ -55,6 +55,19 @@ export const HOOPS_REVERSE_DEG = 135;
  *  fixed reversal brakes exactly as hard as the plant it follows. H3a: 34. */
 export const HOOPS_REVERSE_DECEL = 47.6;
 
+/** (new, lane/move-feel 2026-11-12) stick units — THE WALK / JOG LINE, eased. A stick under the walk line (0.45) walks (top 2.43 m/s at the
+ *  line), past it jogs — and the jog STARTS at 0.85 of its top (3.70 m/s): a thumb at the line moves the target 52 % in one step (measured,
+ *  scripts/probes/move-feel/stick-feel.mts: 2.38 m/s at 0.44, 3.71 at 0.46). With a band the jog's target eases up from the walk's edge to the
+ *  jog curve over this much more stick (smoothstep), so a thumb near the line no longer surges. Full tilt, and every stick past line + band,
+ *  is exactly as shipped. 0 = the step, as shipped. */
+export const HOOPS_GEAR_BLEND_BAND = 0;
+
+/** (new, lane/move-feel 2026-11-12) 1 = as shipped: until a trigger has ever reported (a phone whose TURBO pad has not been touched yet, a
+ *  keyboard before its first Shift), a stick pushed past 0.85 IS the turbo (core/PlayerSlot's fallback) — so the same full push sprints at
+ *  6.4 m/s for the first part of a game and jogs at 4.35 once TURBO has been touched once, a thumb at 0.85 flips between the two, and the
+ *  fallback sprint drains the turbo tank in 2.9 s and drops to a jog by itself. 0 = the turbo is the button only, from the first frame. */
+export const HOOPS_STICK_SPRINT_FALLBACK = 1;
+
 /** TUNED (new) — owner decision 2026-10-24: "a real backpedal is slower than running forward". The share of JOG speed the handler may reach
  *  while RETREATING: the stick held against his facing (DribbleController's retreat dribble — the stick past 120° from the facing it holds,
  *  committed). Forward running, sprinting and lateral slides never read it. 1 = no cap (the game before this number). */
@@ -145,11 +158,20 @@ export function liveGears(base: GearTuning, out: GearTuning): GearTuning {
   out.jerk = base.jerk === undefined ? undefined : feel('hoops.jerk', base.jerk);
   out.reverseDeg = base.reverseDeg === undefined ? undefined : feel('hoops.reverseDeg', base.reverseDeg);
   out.reverseDecel = base.reverseDecel === undefined ? undefined : feel('hoops.reverseDecel', base.reverseDecel);
+  out.gearBand = base.gearBand === undefined ? undefined : feel('hoops.gearBlendBand', base.gearBand);   // lane/move-feel
   // hoops-p01: the handler's own (GEARS_HANDLER defines them; GEARS_HOOPS — the dunk approach — does not, so they never move it)
   out.firstStep = base.firstStep === undefined ? undefined : feel('hoops.firstStepMps', base.firstStep);
   out.reversePlantHold = base.reversePlantHold === undefined ? undefined : feel('hoops.reversePlantHold', base.reversePlantHold);
   out.reverseLaunchSec = base.reverseLaunchSec === undefined ? undefined : feel('hoops.reverseLaunchSec', base.reverseLaunchSec);
   return out;
+}
+
+/** lane/move-feel: the top speed a jog-zone stick asks for, with the walk / jog line eased over `band` (stick units; 0 = the step as shipped).
+ *  `mag` is past `walkStick`; `walkEdge` the walk's top at the line, `jogAt` the shipped jog curve at `mag`. Pure. */
+export function gearBandTop(mag: number, walkStick: number, walkEdge: number, jogAt: number, band: number): number {
+  if (!(band > 0) || mag >= walkStick + band) return jogAt;
+  const u = Math.max(0, Math.min(1, (mag - walkStick) / band)), k = u * u * (3 - 2 * u);
+  return walkEdge + (jogAt - walkEdge) * k;
 }
 
 /** The retreat cap for this frame (core/CourtMovement.retreatK): the knob when the stick is committed (past 0.6) and held more than 120°
