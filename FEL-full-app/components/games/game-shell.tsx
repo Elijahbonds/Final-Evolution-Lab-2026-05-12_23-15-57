@@ -36,6 +36,7 @@ import { feelOverridesUsed } from '@/lib/feel-panel/feel';   // feel-panel lane 
 import { isFreeDanceResult } from '@/lib/babylon/dance/freeDance';   // lane/dance-extras-2
 import { PartyInvite } from '@/components/party/party-invite';   // MULTIPLAYER: the results card's door to the party room
 import { formReadStore, formForPost } from '@/lib/move/formRead';   // HOOPS BODY (P10): the run's FORM read, adults only
+import { resultsAction } from '@/lib/creator/hoops/links';   // hoops-builder phase B
 import {
   type CarnivalStop, type CarnivalRunState,
   recordCarnivalResult, clearCarnivalRun,
@@ -839,6 +840,8 @@ function GameShellInner({
               onNavigate={(href) => router.push(href)}
               /* MULTIPLAYER: a game friends can play together offers the couch (not on a staked run); KNOWLEDGE-FEED v1: one card for the idle moment */
               sideCards={<>{!arenaMatchId && <PartyInvite modeId={mode} variant="card" />}<LearnWhileYouWait compact /></>}
+              /* hoops-builder phase B (owner 2026-11-12): a casual 1v1 / 3v3 result offers the hoops builder (lib/creator/hoops/links.ts) */
+              extraActions={resultsAction(mode, typeof window !== 'undefined' ? window.location.search : '')}
             />
           )}
         </AnimatePresence>

@@ -16,7 +16,8 @@ import { chipInk, pickedChip } from './chip-ink';   // SCREEN-FIXES-2: a picked 
 import { MotionSetting } from '@/components/settings/motion-setting';
 import { PausedLayer } from './paused-layer';
 import { LearnWhileYouWait } from '@/components/learn/learn-while-you-wait';   // KNOWLEDGE-FEED v1: one card while the arena loads
-import { HoopsMatchupCard, isHoopsMatchupMode } from './hoops-matchup-card';   // hoops-p08: the hoops courts load behind the matchup
+import { HoopsMatchupCard, isHoopsMatchupMode } from './hoops-matchup-card';
+import { HoopsPlayerLink } from './hoops-player-link';   // hoops-builder phase B: the way to /creator/hoops (1v1 / 3v3)   // hoops-p08: the hoops courts load behind the matchup
 import { useSoundtrackStage } from '@/components/soundtrack/soundtrack-stage';
 import { ControlsPanel } from './controls-panel';
 import { BodyPlayReady, BodyPlayReadyLine, BodyPlayLayer } from './body-play';
@@ -839,6 +840,8 @@ export function SplashCard(props: BootSplashProps) {
 
         {/* 1v1 WIN BY 2 (owner 2026-10-06): a player option, off by default; it draws nothing on a staked / head-to-head run */}
         {props.modeId === 'onevone' && (props.phase === 'ready' || props.phase === 'loading') && <OneVOneWinBy2 />}
+        {/* hoops-builder phase B (owner 2026-11-12): your hoops player — a link in a casual run, "standard ratings" in a rating-free one */}
+        {(props.phase === 'ready' || props.phase === 'loading') && <HoopsPlayerLink modeId={props.modeId} />}
         {/* 3PT OPTIONS (IMPROVE 2026-10-06 #5 #6 #8): the shot input, and — never on a staked / head-to-head run — the practice rack
             and the money rack */}
         {props.modeId === 'threepoint' && (props.phase === 'ready' || props.phase === 'loading') && <ThreePointOptions />}
