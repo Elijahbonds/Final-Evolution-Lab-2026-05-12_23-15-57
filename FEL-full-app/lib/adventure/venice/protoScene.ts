@@ -14,7 +14,7 @@
 
 import {
   ArcRotateCamera, Color3, Color4, DirectionalLight, DynamicTexture, HemisphericLight, Mesh, MeshBuilder, Scene,
-  StandardMaterial, TransformNode, UniversalCamera, Vector3, type Engine,
+  SceneInstrumentation, StandardMaterial, TransformNode, UniversalCamera, Vector3, type Engine,
 } from '@babylonjs/core';
 import { mountStreetCourt, VENICE_DUNK_COURT_PALETTE } from '../../babylon/visual/CourtSurface';
 import { spawnMeshyProp } from '../../babylon/visual/meshyProps';
@@ -25,7 +25,7 @@ export interface ProtoStats { drawCalls: number; activeMeshes: number; meshes: n
 export interface ProtoHandle {
   scene: Scene;
   /** 'walk' (eye height, WASD / arrows / drag) or 'map' (top-down). */
-  view(kind: 'walk' | 'map' | 'courts', at?: { x: number; z: number; yaw?: number }): void;
+  view(kind: 'walk' | 'map' | 'courts', at?: { x: number; z: number; lookX?: number; lookZ?: number }): void;
   where(): { district: string | null; spot: Spot | null };
   stats(): ProtoStats;
   ready: Promise<void>;
@@ -50,8 +50,10 @@ export function buildVeniceProto(engine: Engine, opts: { tier?: 'mobile' | 'desk
   (scene.metadata ??= {}).felTier = opts.tier ?? 'desktop';
   scene.clearColor = new Color4(0.98, 0.72, 0.52, 1);
   scene.fogMode = Scene.FOGMODE_EXP2; scene.fogDensity = 0.0022; scene.fogColor = new Color3(0.95, 0.74, 0.6);
-  const hemi = new HemisphericLight('vh_hemi', new Vector3(0, 1, 0), scene); hemi.intensity = 0.75; hemi.groundColor = new Color3(0.25, 0.3, 0.45);
-  const sun = new DirectionalLight('fel_sun', new Vector3(0.5, -0.8, 0.3), scene); sun.intensity = 1.6; sun.diffuse = new Color3(1, 0.86, 0.68);
+  const hemi = new HemisphericLight('vh_hemi', new Vector3(0, 1, 0), scene); hemi.intensity = 0.55; hemi.groundColor = new Color3(0.25, 0.3, 0.45);
+  const sun = new DirectionalLight('fel_sun', new Vector3(0.5, -0.8, 0.3), scene); sun.intensity = 0.75; sun.diffuse = new Color3(1, 0.88, 0.72);
+  // the frame's draw calls: Babylon resets the engine's counter per frame only while a SceneInstrumentation exists
+  const instr = new SceneInstrumentation(scene);
   const root = new TransformNode('vh_root', scene);
   const mats = new Map<string, StandardMaterial>();
   const mat = (hex: string, emissive = 0): StandardMaterial => {
@@ -138,16 +140,21 @@ export function buildVeniceProto(engine: Engine, opts: { tier?: 'mobile' | 'desk
   if (canvas) walkCam.attachControl(canvas, true);
   scene.onBeforeRenderObservable.add(() => { if (scene.activeCamera === walkCam) walkCam.position.y = EYE; });
 
-  const ready = Promise.allSettled(kitJobs).then(() => undefined);
+  // the dunk's dressing is laid out round ONE court: its palm rows would stand on the other three. Hide the palms inside a court.
+  const onCourt = (x: number, z: number) => SPOTS.some((s) => s.district === 'courts' && s.modes.length && s.id !== 'court.camera' && Math.abs(x - s.at[0]) < 12 && Math.abs(z - s.at[1]) < 18);
+  const ready = Promise.allSettled(kitJobs).then(() => {
+    for (const n of scene.transformNodes) if (/^vb_palm_\d+$/.test(n.name)) { const p = n.getAbsolutePosition(); if (onCourt(p.x, p.z)) n.setEnabled(false); }
+  });
   return {
     scene,
     ready,
     view(kind, at) {
       if (canvas) scene.activeCamera?.detachControl();
+      scene.fogMode = kind === 'map' ? Scene.FOGMODE_NONE : Scene.FOGMODE_EXP2;
       if (kind === 'map') scene.activeCamera = mapCam;
       else if (kind === 'courts') scene.activeCamera = courtsCam;
       else {
-        if (at) { walkCam.position.set(at.x, EYE, at.z); const y = at.yaw ?? 0; walkCam.setTarget(new Vector3(at.x + Math.sin(y) * 10, EYE, at.z - Math.cos(y) * 10)); }
+        if (at) { walkCam.position.set(at.x, EYE, at.z); walkCam.setTarget(new Vector3(at.lookX ?? at.x, EYE, at.lookZ ?? at.z - 10)); }
         scene.activeCamera = walkCam;
       }
       if (canvas) scene.activeCamera?.attachControl(canvas, true);
@@ -159,9 +166,8 @@ export function buildVeniceProto(engine: Engine, opts: { tier?: 'mobile' | 'desk
     stats() {
       let tex = 0;
       for (const t of scene.textures) { const s = t.getSize(); tex += s.width * s.height * 4 * ((t as { noMipmap?: boolean }).noMipmap ? 1 : 1.33); }
-      const eng = engine as unknown as { _drawCalls?: { current: number } };
-      return { drawCalls: eng._drawCalls?.current ?? -1, activeMeshes: scene.getActiveMeshes().length, meshes: scene.meshes.length, textureMb: Math.round(tex / 1e6), fps: Math.round(engine.getFps()) };
+      return { drawCalls: instr.drawCallsCounter.current, activeMeshes: scene.getActiveMeshes().length, meshes: scene.meshes.length, textureMb: Math.round(tex / 1e6), fps: Math.round(engine.getFps()) };
     },
-    dispose() { scene.dispose(); },
+    dispose() { instr.dispose(); scene.dispose(); },
   };
 }

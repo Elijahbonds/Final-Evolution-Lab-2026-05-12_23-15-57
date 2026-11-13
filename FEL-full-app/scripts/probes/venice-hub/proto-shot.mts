@@ -39,19 +39,20 @@ const browser = await chromium.launch({ executablePath: chromiumExe(), args: ['-
 const result: Record<string, unknown> = {};
 try {
   const VIEWS: Array<[string, string]> = [
-    ['walkup', `h => h.view('walk', { x: 6, z: -12, yaw: -2.2 })`],
+    ['walkup', `h => h.view('walk', { x: 10, z: -14, lookX: -44, lookZ: -72 })`],
     ['courts', `h => h.view('courts')`],
     ['map', `h => h.view('map')`],
   ];
   for (const [profile, ctxOpts] of [
     ['desktop', { viewport: { width: 1280, height: 720 } }],
     ['phone', { viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true }],
+    ['phone-placeholders', { viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true }],
   ] as const) {
     const ctx = await browser.newContext(ctxOpts);
     const page = await ctx.newPage();
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
-    await page.goto(`${base}?tier=${profile === 'phone' ? 'mobile' : 'desktop'}`);
+    await page.goto(`${base}?tier=${profile.startsWith('phone') ? 'mobile' : 'desktop'}${profile === 'phone-placeholders' ? '&kit=0' : ''}`);
     await page.waitForFunction(() => (window as unknown as { __ready?: boolean; __err?: string }).__ready || (window as unknown as { __err?: string }).__err, null, { timeout: 120000 });
     const per: Record<string, unknown> = {};
     for (const [name, fn] of VIEWS) {
@@ -64,7 +65,7 @@ try {
         else worst.activeMeshes = Math.max(s.activeMeshes, worst.activeMeshes);
       }
       per[name] = worst;
-      if (profile === 'desktop' || name === 'walkup') {
+      if (profile === 'desktop' || (profile === 'phone' && name === 'walkup')) {
         const file = path.join(OUT, `venice-proto-${name}-${profile}.jpg`);
         await page.screenshot({ path: file, type: 'jpeg', quality: 85 });
         console.log('wrote', file);

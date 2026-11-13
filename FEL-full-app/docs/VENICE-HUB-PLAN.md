@@ -44,6 +44,9 @@ prototype page. No mode file, no shared runtime file and no `/play` route change
   that is the scale a phone holds at budget, measured below.
 - **The zone tech (streaming, levels of detail) moves up** to right after the hoops park and the run (V3), and is proven
   on Venice itself before any zone is built.
+- **Measured on the prototype:** the whole Venice hub, every district in view as placeholders with the real court kit on
+  the four courts, costs 117 of a phone's 450 draw calls and 46 MB of textures, before any bodies. The courts' cost is
+  texture memory, not draws (§5.2).
 - **What is realistic:** zones 384–768 m across, not the several kilometres of the reference games, on a 3–4-year-old
   phone in a browser with this team. Sparse places (sea, snow, sky) can be bigger than dense ones (a town). The binding
   limit is texture memory, not draw calls (1v1 already uses 214 of the phone's 256 MB).
@@ -229,7 +232,7 @@ walk-up spot as Venice, §4).
 | Adventure story (hub + World 1) | ≈ 72 × 72 m in view | 53 | 19 | 100 | 6 |
 | One dressed Venice court (1v1): the court, the Venice dressing, 12 bodies | ≈ 128 × 128 m | 168 | 69 | 214 | 12 |
 | Skate park: the most dressed place | 112 × 112 m | 264 | 81 | 212 | 14 |
-| The Venice hub prototype, whole hub (placeholders + the court kit) | 320 × 512 m | see §5.2 | | | 0 |
+| The Venice hub prototype, the whole hub in view (placeholders + the court kit, §5.2) | 320 × 512 m | 117 | 202 | 46 | 0 |
 | Phone ceiling / the Adventure's plan budget (75 %) | | 600 / 450 | 400 / 300 | 256 / ≈ 200 | 16 / 12 |
 
 - **Grey pieces are cheap; dressed places are not.** A whole 5 × 5 BR map of untextured blocks costs about half of what
@@ -393,7 +396,7 @@ Marks: **OWNER** (names, art, money, a redeploy, a device test), **GATE 0** (ani
 
 | Phase | Delivers | Size | Exit gates (all measured) | Marks |
 |---|---|---|---|---|
-| **V1 The hoops park** | `VeniceHubMode` on the Adventure host (run, no combat); the courts district from pieces with the shipped Venice kit; four courts; walk-up cards launching 1v1, 3v3, dunk, dunk duel, 3-point, carnival, IRL; return to the spot; `/play/hub` unlisted; a `venice_hub` phone row and the static guard | **L** | Phone profile, worst frame ≤ 450 draws / 300 active / 200 MB; playable ≤ 8 s and full ≤ 20 s (rig, then the owner's phone); E2E: walk up → the mode starts in one tap → end → back at the same court; **no mode file in the diff**; every shelf route still one tap; tsc, ci-suite, vitest green | OWNER: the device feel walk; placeholder names stand. GATE 0 check only (walk and idle use existing clips; no rig edit). No ART |
+| **V1 The hoops park** | `VeniceHubMode` on the Adventure host (run, no combat); the courts district from pieces with the shipped Venice kit (one painted court texture shared by the four courts, §5.2); four courts; walk-up cards launching 1v1, 3v3, dunk, dunk duel, 3-point, carnival, IRL; return to the spot; `/play/hub` unlisted; a `venice_hub` phone row and the static guard | **L** | Phone profile, worst frame ≤ 450 draws / 300 active / 200 MB; playable ≤ 8 s and full ≤ 20 s (rig, then the owner's phone); E2E: walk up → the mode starts in one tap → end → back at the same court; **no mode file in the diff**; every shelf route still one tap; tsc, ci-suite, vitest green | OWNER: the device feel walk; placeholder names stand. GATE 0 check only (walk and idle use existing clips; no rig edit). No ART |
 | **V2 The run, party, online** | `run.ts` (queue, next up, winners stay, bots fill); "Run with the party"; 3v3 at six humans; the receive-only watch seat; hub presence for the party | **XL** (half of it in hoops files, after the hoops lanes) | 5 headless runs rotate correctly; 6 real devices play a 3v3 started from the hub; 4 watch a 1v1 from the bench; a host leaving hands over; a teen account sends no text or voice in the hub (server test); the budget holds with 6 bodies in view | OWNER: the netd redeploy, the 6-device test |
 | **V3 The zone tech, on Venice** (Adventure F, moved up) | Per-piece streaming (`spatialGrid` as the index, `AssetContainer` per piece type, load-ahead and drop with hysteresis), the LOD ring, the far silhouette, prefetch on approach; the whole 5 × 8 hub streamed with placeholders | **L** | A 10-minute scripted walk of the whole hub on the phone profile: worst frame within budget, no frame over 100 ms from a load, texture memory flat (nothing leaks); playable ≤ 8 s | none |
 | **V4 The boardwalk spine and the Venice places** | The stage, screen, arcade, plaza, skate park, outdoor gym, paddle courts, the sand's fields, the bike path, the break, the sandlot, as hub-scale places; 26 spots; the shuttle stop's card (zones "coming soon") | **L** | Every Venice spot launches its mode in one tap and returns; each district within its budget; the guard holds every district | OWNER: names for the districts. ART: optional (procedural and kits first) |
@@ -415,7 +418,32 @@ mode) and the frame's cost; three views: walk, courts, map. It shows **place and
 Shots and the phone-profile count come from `scripts/probes/venice-hub/proto-shot.mts` (esbuild bundle, the shared
 browser gate, this lane's port 3741):
 
-PROTO_RESULTS
+**Measured** (SwiftShader, the phone profile 390 × 844 DPR 3 touch with the mobile tier, worst of 20 frames per view;
+no bodies in the scene; frame rates on this rig are not a phone's and are not reported):
+
+| View | Draws | Active meshes | Texture MB |
+|---|---|---|---|
+| Walking up to the courts (eye height), with the court kit | 31–36 (two runs) | 69 | 46 |
+| The courts from above, with the court kit | 61 | 99 | 46 |
+| **The whole hub at once** (top view, every district and spot), with the court kit | **117** | **202** | **46** |
+| The whole hub, placeholders only (no court kit) | 105 | 105 | 7 |
+| Desktop, whole hub, with the court kit | 119 | 204 | 63 |
+
+What it says:
+- **The whole 5 × 8 hub as placeholders costs a quarter of the phone's draw budget** (117 of 450) with every piece in
+  view and no streaming at all. The layout's size is not the problem; the dressing and the bodies will be.
+- **The court kit's real cost is texture memory**: four courts add 39 MB (7 → 46 MB) but only 12 draws. Each painted
+  court makes its own texture (`CourtSurface.mountStreetCourt`, 1024² on a phone, ≈ 5.6 MB each with mips), so four
+  courts are ≈ 22 MB of identical paint. **V1 should paint one court texture and share it** across the park's courts.
+- Active meshes run above draws with the kit (202 against 117) because the palms are instances: Babylon counts each
+  instance as active and draws them together. The phone budget's active-mesh line (300) is the one to watch as the
+  dressing grows.
+
+Shots:
+- walking up to the courts: `/tmp/claude-0/-home-user-Final-Evolution-Lab-2026-05-12-23-15-57/e156aa0c-5ac6-5a64-b2e0-57cb533692fe/scratchpad/venice-hub/venice-proto-walkup-desktop.jpg` (phone: `/tmp/claude-0/-home-user-Final-Evolution-Lab-2026-05-12-23-15-57/e156aa0c-5ac6-5a64-b2e0-57cb533692fe/scratchpad/venice-hub/venice-proto-walkup-phone.jpg`)
+- the four courts from above: `/tmp/claude-0/-home-user-Final-Evolution-Lab-2026-05-12-23-15-57/e156aa0c-5ac6-5a64-b2e0-57cb533692fe/scratchpad/venice-hub/venice-proto-courts-desktop.jpg`
+- the whole hub from the top: `/tmp/claude-0/-home-user-Final-Evolution-Lab-2026-05-12-23-15-57/e156aa0c-5ac6-5a64-b2e0-57cb533692fe/scratchpad/venice-hub/venice-proto-map-desktop.jpg`. In the engine's top view south is at the top: see §7
+  on the mirrored frame.
 
 ---
 
@@ -470,6 +498,12 @@ PROTO_RESULTS
 - `assumption:` a phone chunk of one piece, not 256 m (owner question 12).
 - `assumption:` the per-piece budget (25 draws, 16 meshes) is derived from the measured rows above, not measured on a
   built piece; V1's guard measures it.
+- **The shipped Venice frame is a mirror of the real coastline.** The dressing puts the sea at −x and north at −z
+  (`nexus/veniceBoardwalk.ts`); in Babylon's left-handed space that means a player facing north has the sea on the
+  RIGHT, where on the real beach it is on the left. The layout keeps the shipped frame so the shipped dressing drops in
+  unchanged; the 2D maps are drawn north-up with the sea on the left as the data names it. `assumption:` nobody will
+  notice a mirrored real-world-inspired beach; if the owner wants it true to life, the hub flips the sign of x (one
+  transform on the hub root, and the dressing's own placements are mirrored with it).
 - No tuned number, no mode file, no shared runtime file, no route a player can reach was changed.
 
 _Sources: the owner's words (2026-11-12, relayed); `docs/ADVENTURE-PLAN.md`; `docs/OWNER-DECISIONS.md`; `docs/LANES.md`;

@@ -110,7 +110,7 @@ const cellsRect = (i0: number, i1: number, j0: number, j1: number): Cell[] => {
  *   j=7  S   surf break   sand          bike path          boardwalk end      marina
  */
 export const DISTRICTS: readonly District[] = [
-  { id: 'courts', name: '[PLACEHOLDER] The Courts', kind: 'court', phase: 'V1', cells: cellsRect(1, 2, 2, 3), color: '#2a6ca6',
+  { id: 'courts', name: '[PLACEHOLDER] The Courts', kind: 'court', phase: 'V1', cells: cellsRect(1, 2, 2, 3), color: '#7d8a80',
     inspiredBy: 'the outdoor courts between the sand and the boardwalk' },
   { id: 'water', name: '[PLACEHOLDER] The Water', kind: 'water', phase: 'V4', cells: [0, 1, 2, 3, 4, 5].map((j) => c(0, j)), color: '#1d4f7a',
     inspiredBy: 'the open Pacific west of the beach' },
