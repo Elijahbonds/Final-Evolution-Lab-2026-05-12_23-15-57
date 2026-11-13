@@ -270,6 +270,16 @@ The same rules for the hub and every zone (they are made of the same pieces):
 | Far silhouette, sea or terrain, sky dome, HUD | 25 | 15 | 30 |
 | **Total** (the Adventure plan's 75 % budget: 450 / 300 / ≈ 200) | **444** | **285** | **≤ 184** |
 
+**Per zone** (first cut; every zone keeps the common budget above, and what differs is how its space is filled):
+
+| Zone | Pieces (first cut) | Sparse share (sea / sky / snowfield) | Full-detail ring holds | LOD and far | Special loads | Traversal tuned to it | Phone notes |
+|---|---|---|---|---|---|---|---|
+| Coast & Islands | 36 | ≈ 60 % sea | one island's shore, a dock, a spot | an island = one merged mesh; the far islands one silhouette | one sea plane (the hub's `veniceBoardwalk` sea shader, `SEA`), the harbour town's kit | riding the partner on water, boats, short glides | the cheapest zone: sea pieces are one draw each |
+| Temple Wilds | 36 | ≈ 20 % (ravines) | the forest floor, a camp, the shrine steps | tree clusters become one card per piece; the cliff shrine is the landmark silhouette | the Chapter 1 world's pieces; creature camps spawn with their beat (≤ 5 monsters, as World 1) | rails along the ravines, wall runs on the ruins | the densest: trees are thin instances, one draw a species per piece |
+| Neon City | 36 | ≈ 10 % | one block, a rooftop, a court | each block one merged mesh with an emissive atlas; the skyline one silhouette | the night sky dome, the circuit's road ribbon (the kart's own builder) | rooftop rails, wall runs, the lift | night needs no shadows past the player (cheaper); emissive signs share one atlas |
+| The Mountain | 44 (4 × 11) | ≈ 70 % snowfield | the run's width around the rider | the slope's tiers as height tiles; pines as cards past 64 m | a terrain height tile per piece (ADVENTURE-PLAN F's "terrain height tiles"), the `slope` prop set's pines | board runs downhill, a lift back up, flight once fused | long and narrow: the 3 × 3 ring covers the run's width, so load-ahead is down the fall line only |
+| Canyon & Sky | 64 (8 × 8) | ≈ 80 % air and gorge | the canyon walls near the flyer | mesas and arches one mesh each; the caldera the landmark | the aero circuits' rock builders | flight cruise (the only zone sized for it) | the biggest by area, the cheapest per area; flight speed sets the load-ahead (≥ 2 pieces ahead at 40 m/s) |
+
 - **Chunk = one 64 m piece on phones** (assumption: a change from ADVENTURE-PLAN.md's 256 m chunks, which hold 16 pieces:
   too many to swap at once on a phone without a hitch). Each piece type is one `AssetContainer`, instanced per placement.
 - **Floating origin is not needed for these sizes.** Each zone is its own coordinate space (the load between zones resets
