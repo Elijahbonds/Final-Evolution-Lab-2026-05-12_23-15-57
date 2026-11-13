@@ -71,6 +71,8 @@ export interface GatherPlan {
   side?: FinishSide;
   /** H2e: the finish it ends in is laid off the glass (the skip gather's high-glass layup). */
   glass?: boolean;
+  /** hoops-gather G4 (core/ComboFinish): the footwork ends in THIS dunk instead of its finish (the euro / the hop into a dunk). */
+  dunk?: import('./HoopsDunks').HoopsDunk;
 }
 
 /** Plan the gather from the body at the squeeze. `stickBack01` = how far the stick is pulled AWAY from the rim (0..1). */

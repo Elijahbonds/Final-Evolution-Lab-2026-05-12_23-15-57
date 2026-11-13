@@ -162,6 +162,7 @@ import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cann
 import { ContactSystem, HARD_CONTACT_SPEED, FOUL_CLOSING_SPEED } from '../core/ContactSystem';
 import { HardHitDebounce } from './hardHitDebounce';
 import { pickHoopsDunk, dunkSpeedRatio, PAUSIN_DUNK } from '../core/HoopsDunks';
+import { comboDunkOn, comboDunkThen, comboDunkPick, gatherEnd } from '../core/ComboFinish';   // hoops-gather G4: the euro / the hop into a dunk
 import { trickFromFlick, trickWindow, judgeFlick, STICK_TRICK, CONTACT_TRICK_BONUS } from '../core/DunkTrickStick';
 import {   // HOOPS-MOVE-KIT-A (2026-09-08): the gather, the finish kit, the drive contest
   planGather, gatherWish, gatherLabel, gatherTravel, stickBack01, STEPBACK_STICK_BACK_MIN, type GatherPlan,
@@ -1570,7 +1571,8 @@ export const OneVOneMode: ModeDefinition = (() => {
           if (gather.t >= gather.plan.sec) {
             const plan = gather.plan; gather = null;
             // HOOPS-MOVE-KIT-B wave 2: the footwork gathers (step-through / hop / euro) end IN a finish, where the feet land
-            if (plan.then && plan.then !== 'rise') { startFinish(ctx, plan.then, shotContest, defPos, plan.side, plan.sec); if (plan.glass) banked = bankPoint(me.root.position, RIM, BOARD_NORMAL); }   // H2e: the skip gather lays it off the high glass
+            if (plan.dunk) { shooting = false; shotMeter.active = false; putHud(ctx, { shotMeterT: 0 }); console.info(`[1V1-MOVE] ${plan.kind} into the dunk: ${plan.dunk.label}`); startDunk(ctx, defPos && distXZ(me.root.position, defPos) < 1.5 ? 'poster' : 'dunk', plan.dunk); }   // hoops-gather G4
+            else if (plan.then && plan.then !== 'rise') { startFinish(ctx, plan.then, shotContest, defPos, plan.side, plan.sec); if (plan.glass) banked = bankPoint(me.root.position, RIM, BOARD_NORMAL); }   // H2e: the skip gather lays it off the high glass
             else beginRise(plan.kind);   // hoops-shot-content: the step-back rises on its own release
           }
         }
@@ -3162,6 +3164,11 @@ export const OneVOneMode: ModeDefinition = (() => {
       plan = planHopStep(meDribble.vel, me.root.position, RIM_FLOOR, dist < 2.8 ? 'layup' : 'rise');
     }
     if (!plan) return false;
+    if ((plan.kind === 'euro' || plan.kind === 'hop') && comboDunkOn()) {   // hoops-gather G4: the turbo held, fast, the last plant in range — the footwork's dunk
+      const end = gatherEnd(me.root.position, plan.legs), sp = meDribble.vel.length(), onMe = defenderPos ? distXZ(me.root.position, defenderPos) : Infinity;
+      if (comboDunkThen({ sprint: !!meSlot.intent.sprint, turbo01: turbo.t01, speed: sp, rimDistAfter: Math.hypot(end.x - RIM_FLOOR.x, end.z - RIM_FLOOR.z) }))
+        plan.dunk = comboDunkPick(plan.kind, { speed: sp, lateral01: 0, contest01: onMe < 1.5 ? 0.6 : 0, poster: false, momentum01: mbus.score01, roll });
+    }
     shooting = true;
     shotContest = plan.kind === 'shimmy' ? contest * SHIMMY_CONTEST_CUT : contest;   // the shimmy sells: the contest that reaches the fade is cut
     pumpWindow = 0;
@@ -3173,6 +3180,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     if (plan.then === 'rise' && isFinishStyle(currentShot.style)) plan.then = currentShot.style;
     meterStart(contest, currentShot.style, plan.sec);
     gather = { plan, t: 0 };
+    if (plan.dunk) { shooting = false; dunking = true; shotMeter.active = false; putHud(ctx, { shotMeterT: 0 }); }   // hoops-gather G4: no shot to meter — the footwork runs to its take-off
     meShotWin = 'footwork'; meShotSec = 0;
     // THE EURO'S CLIP FOLLOWS THE SIDE IT SELLS. This picked by `plan.kind` alone, so a euro that sold LEFT still
     // played the sell-right shape and the body went one way while the move went the other. `plan.side` is the

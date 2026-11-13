@@ -1769,6 +1769,16 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/anim/ballCarry.ts RELEASE_SNAP_EASE_SEC',
     hint: 'How smoothly the shooting wrist snaps through at the release. 0.03 = as before (it turns about 58 deg in one frame).',
   },
+  {
+    id: 'hoops.comboDunkOn', label: 'Euro step and hop step can end in a dunk (1) / never (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · gathers',
+    source: 'lib/babylon/core/ComboFinish.ts COMBO_DUNK_ON',
+    hint: 'On: the turbo held, fast, and the last step inside dunk range, the euro or the hop takes off into a dunk. Off: they end in a layup or floater, as before.',
+  },
+  {
+    id: 'hoops.comboDunkMinMps', label: 'Footwork dunk: fastest drive needed', def: 3.4, min: 2, max: 6, step: 0.1, unit: 'm/s', group: 'Hoops · gathers',
+    source: 'lib/babylon/core/ComboFinish.ts COMBO_DUNK_MIN_MPS',
+    hint: 'How fast the drive must be at the press for a euro or hop to become a dunk.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));

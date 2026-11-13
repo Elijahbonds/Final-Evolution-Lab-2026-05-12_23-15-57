@@ -721,3 +721,9 @@ All new numbers; every switch ships OFF, so the game plays exactly as before unt
   The take is the ball within `hoops.pickupContactM` 0.04 m of the palm as drawn (past its radius); a hand that did not get all the way
   down gets the ball rising on to it for at most `hoops.pickupOverrunSec` 0.1 s more. When the shot wants the other hand, it comes to the
   ball's far side for the meeting (both hands on it), then takes it.
+- `hoops.releaseSnapEaseSec` 0.03 s (`anim/ballCarry.ts`, G2): the smoothing of the shooting wrist's snap at the release (58°). 0.03 is
+  the value it always had (TUNED, unchanged): the wrist turns ~58° in one frame on every jumper. A longer ease spreads it over frames.
+- `hoops.comboDunkOn` 0 (`core/ComboFinish.ts`, G4): on, a euro or a hop step with the turbo held, at least `hoops.comboDunkMinMps`
+  3.4 m/s at the press and its last plant inside dunk range (2.8 m) takes off into a dunk: the euro's cross gives the angle (the windmill
+  at speed, the cradle without it), the hop's two feet none, a body in the way the double clutch (the drive dunk's own picker). Off:
+  they end in a layup or a floater, as before.

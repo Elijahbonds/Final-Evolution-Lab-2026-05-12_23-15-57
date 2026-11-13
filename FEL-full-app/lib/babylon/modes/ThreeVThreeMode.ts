@@ -199,6 +199,7 @@ import { mountHoopsCourt, type HoopsCourt } from '../court/mount/hoopsCourt';   
 import { HoopJuice } from '../visual/HoopJuice';   // A+ P0: the hoop answers the make (shared with Dunk / 1v1; Meshy never scaled)
 import { mountShotMeter3D, type ShotMeter3DHandle } from '../visual/ShotMeter3D';   // THE SHOT METER (owner, 2026-09-18): the 2K bar beside the shooter's head
 import { pickHoopsDunk, dunkSpeedRatio, PAUSIN_DUNK } from '../core/HoopsDunks';
+import { comboDunkOn, comboDunkThen, comboDunkPick, gatherEnd } from '../core/ComboFinish';   // hoops-gather G4: the euro / the hop into a dunk
 import { PARRY, parryVaultRead, vaultAt, DRIFT, driftRead, ankleBreak, DRIVE_BY, driveByRead, SLIPSTREAM, slipstreamRead, SLING, slingRead, SYNERGY, SynergyGauge, shockVictims } from '../core/HoopsKinetic';
 import { CHOKE, CHOKE_RAILS, readChoke, resolveRails, inChokeLane, railRunRead } from '../core/Chokepoint';
 import { readCourtLayout } from '../nexus/courtLayout';   // CHOKEPOINT COURT (owner brief, 2026-09-18 — the deferred layout)   // HOOPS KINETIC 3v3 (owner, 2026-09-18): slipstream / sling / synergy + the 1v1's duel reads
@@ -1869,7 +1870,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         if (gather.t >= gather.plan.sec) {
           const plan = gather.plan; gather = null;
           // HOOPS-MOVE-KIT-B wave 2: the footwork gathers (step-through / hop / euro) end IN a finish, where the feet land
-          if (plan.then && plan.then !== 'rise') { startFinish(ctx, plan.then, shotContest, nearestLiveFoe()?.char.root.position ?? null, plan.side, plan.sec); if (plan.glass) banked = bankPoint(me.char.root.position, RIM, BOARD_NORMAL); }   // H2e: the skip gather off the high glass
+          if (plan.dunk) { shooting = false; shotMeter.active = false; putHud(ctx, { shotMeterT: 0 }); console.info(`[3V3-MOVE] ${plan.kind} into the dunk: ${plan.dunk.label}`); const nf = nearestLiveFoe(); startDunk(ctx, nf && distXZ(me.char.root.position, nf.char.root.position) < 1.5 ? 'poster' : 'dunk', nf?.char.root.position ?? null, plan.dunk); }   // hoops-gather G4
+          else if (plan.then && plan.then !== 'rise') { startFinish(ctx, plan.then, shotContest, nearestLiveFoe()?.char.root.position ?? null, plan.side, plan.sec); if (plan.glass) banked = bankPoint(me.char.root.position, RIM, BOARD_NORMAL); }   // H2e: the skip gather off the high glass
           else beginRise(plan.kind);   // hoops-shot-content: the step-back rises on its own release
         }
       }
@@ -3083,6 +3085,11 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       plan = planHopStep(me.drib.vel, me.char.root.position, RIM_FLOOR, dist < 2.8 ? 'layup' : 'rise');
     }
     if (!plan) return false;
+    if ((plan.kind === 'euro' || plan.kind === 'hop') && comboDunkOn()) {   // hoops-gather G4: the turbo held, fast, the last plant in range — the footwork's dunk
+      const end = gatherEnd(me.char.root.position, plan.legs), sp = me.drib.vel.length(), onMe = defenderPos ? distXZ(me.char.root.position, defenderPos) : Infinity;
+      if (comboDunkThen({ sprint: !!me.slot.intent.sprint, turbo01: turbo.t01, speed: sp, rimDistAfter: Math.hypot(end.x - RIM_FLOOR.x, end.z - RIM_FLOOR.z) }))
+        plan.dunk = comboDunkPick(plan.kind, { speed: sp, lateral01: 0, contest01: onMe < 1.5 ? 0.6 : 0, poster: false, momentum01: mbus.score01, roll });
+    }
     shooting = true;
     shotContest = plan.kind === 'shimmy' ? contest * SHIMMY_CONTEST_CUT : contest;
     pumpWindow = 0;
@@ -3091,6 +3098,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     if (plan.then === 'rise' && isFinishStyle(currentShot.style)) plan.then = currentShot.style;   // ACROBATIC LAYUPS (2026-09-18): a hop that classifies as a finish ends IN it (the 1v1's)
     meterStart(contest, currentShot.style, plan.sec);
     gather = { plan, t: 0 };
+    if (plan.dunk) { shooting = false; dunking = true; shotMeter.active = false; putHud(ctx, { shotMeterT: 0 }); }   // hoops-gather G4: no shot to meter — the footwork runs to its take-off
     me.shotWin = 'footwork'; me.shotSec = 0;
     // THE EURO'S CLIP FOLLOWS THE SIDE IT SELLS. This picked by `plan.kind` alone, so a euro that sold LEFT still
     // played the sell-right shape and the body went one way while the move went the other. `plan.side` is the
