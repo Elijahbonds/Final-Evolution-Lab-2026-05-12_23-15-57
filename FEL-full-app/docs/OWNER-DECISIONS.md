@@ -386,3 +386,24 @@ The owner answered four proposals from phase 6 (relayed by the coordinator). Eac
    on-court reps become real stats.").
 4. **Terms tick:** a real `<input type="checkbox">` inside its label. Same words, same rule (it must be ticked to
    continue), now usable from the keyboard and with a screen reader.
+
+## 2026-11-12 — the hoops builder; Story left alone
+
+The owner answered two questions (relayed by the coordinator).
+
+1. **Hoops builder: "Simple builder: pick height and a position, plus 5 ratings (speed, handle, shooting, finishing, defense)
+   that really change how you play, within limits. Earn upgrade points by playing. Ranked, staked and arena games stay
+   rating-free, as today."** Built on the Creator, not beside it: the position, the playing height, the upgrade steps and the
+   points live in the athlete's one build record (`AthleteBuild.build.hoops`, versioned; no schema change), the Creator's PRQ
+   ceilings cap the ratings, and the screen is `/creator/hoops` (linked from the Creator). The ratings → game numbers, with each
+   band, are `lib/babylon/hoops/ratings.ts` (rating 50 at 6'4" is today's numbers exactly; every band is a feel knob, group
+   "Hoops · ratings"; `hoops.ratingsOn` 0 puts everyone on today's numbers). Every run that is ranked, staked, arena, a challenge,
+   online or a party plays the standard numbers (playFrame's competitive stamp). Wiring the ratings into the modes is phase B,
+   after the hoops-p08 lane merges. This continues the 2026-10-20 HOOPS SHOOTING line ("Creator ratings slightly widen the green
+   in CASUAL modes only").
+2. **Story games: leave alone for now** (no button-style change, no further Story work).
+3. **The body on screen follows the playing height** (owner 2026-11-12, relayed with phase B), within the cosmetic 96–104 %: 6'0" is drawn
+   at 96 %, 6'8" at 104 %, 1 % an inch. Drawing only (REACH-FREEZE holds: the ball on the hand is read on the standard frame while the hero
+   is drawn scaled). assumption (coordinator's call to make, flagged): a rating-free run draws the standard body, as today, so a ranked or
+   staked game looks exactly as it did.
+4. **Handle: every move stays unlocked** (H2's gate kept). The Handle rating moves only the combo window and the lean a move needs.

@@ -69,6 +69,7 @@ import { CONTACT_ARM_SWAP_SEC } from '@/lib/babylon/hoops/contactPoses';   // ho
 import { CARRY_ARM_SPEED_SEC, CARRY_LET_GO_TO_CLIP_ON, CARRY_START_HAND_ON } from '@/lib/babylon/anim/ballCarry';   // hoops-p04b, hoops-p05, hoops-p05b
 import { STEAL_DICE_ON, STRIP_REACH_M, STRIP_SHIELD_M, STRIP_BALL_MAX_Y } from '@/lib/babylon/hoops/steals';   // hoops-p02
 import { ONBALL_CUSHION_M, ONBALL_CUSHION_PER_MPS } from '@/lib/babylon/hoops/pressure';   // hoops-p02
+import * as HR from '@/lib/babylon/hoops/ratings';   // hoops-builder
 
 import { BAT_GRIP_LOST_M, BAT_GRIP_BACK_M } from '@/lib/babylon/modes/baseballBat';   // bat-grip-2
 
@@ -397,6 +398,13 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.moveCommitMps')).toBe(RB.MOVE_COMMIT_MPS); expect(def('hoops.passFakeLaneCos')).toBe(RB.PASS_FAKE_LANE_COS);
     expect(def('hoops.gatherCloseoutOn')).toBe(RB.GATHER_CLOSEOUT_ON); expect(def('hoops.gatherCloseoutM')).toBe(RB.GATHER_CLOSEOUT_M);
     expect(def('hoops.pressFloorOn')).toBe(RB.PRESS_FLOOR_ON); expect(def('hoops.finishContestNarrow')).toBe(RB.FINISH_CONTEST_NARROW);
+    // hoops-builder (the ratings' bands; new, the owner has not felt these; rating 50 is today at any value)
+    expect(def('hoops.ratingsOn')).toBe(HR.RATINGS_ON); expect(def('hoops.rateSpeedBand')).toBe(HR.RATE_SPEED_BAND);
+    expect(def('hoops.rateHandleBand')).toBe(HR.RATE_HANDLE_BAND); expect(def('hoops.rateReadBand')).toBe(HR.RATE_READ_BAND);
+    expect(def('hoops.rateGreenBand')).toBe(HR.RATE_GREEN_BAND); expect(def('hoops.rateFinishBand')).toBe(HR.RATE_FINISH_BAND);
+    expect(def('hoops.rateSlideBand')).toBe(HR.RATE_SLIDE_BAND); expect(def('hoops.rateStealReachBand')).toBe(HR.RATE_STEAL_REACH_BAND);
+    expect(def('hoops.rateBlockReachM')).toBe(HR.RATE_BLOCK_REACH_M); expect(def('hoops.heightReachMPerIn')).toBe(HR.HEIGHT_REACH_M_PER_IN);
+    expect(def('hoops.heightLookPerIn')).toBe(HR.HEIGHT_LOOK_PER_IN);   // hoops-builder phase B (new)
   });
 
   it('every row is well formed: unique `<area>.<camelName>` id, min ≤ default ≤ max, the default on the step grid, a source', () => {
