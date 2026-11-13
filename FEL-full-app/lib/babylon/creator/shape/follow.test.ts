@@ -31,3 +31,16 @@ describe('a garment takes the displacement of the skin under it', () => {
     expect([k.def, k.min, k.max, k.step]).toEqual([0, 0, 1, 1]);
   });
 });
+
+describe('never behind the skin (followNotBehind: what kit.garmentFollowBody does, off by default)', () => {
+  it('keeps its own bulk where the skin moves less, and adds only what the skin outgrows it by along its normal', async () => {
+    const { followNotBehind } = await import('./inflate');
+    const skinP = new Float32Array([0, 0, 0]), skinD = new Float32Array([0, 0.03, 0]);
+    const clothP = new Float32Array([0, 0.01, 0, 0, 0.01, 0.001]);
+    const own = new Float32Array([0, 0.01, 0, 0, 0.05, 0]);
+    const N = new Float32Array([0, 1, 0, 0, 1, 0]);
+    const d = followNotBehind(followMap(clothP, skinP, 0.08, 4), skinD, own, N);
+    expect(d[1]).toBeCloseTo(0.03, 5);   // the skin outgrew it: pushed out to the skin's 3 cm
+    expect(d[4]).toBeCloseTo(0.05, 5);   // its own bulk was larger: kept
+  });
+});

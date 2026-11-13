@@ -59,7 +59,7 @@ export interface Cell { subject: string; tier: string; pose: string; clip: strin
 async function runSubject(page: Page, base: string, s: Subject, tier: string, poses: typeof POSES, cams: typeof CAMS, out: Cell[], shots: boolean): Promise<void> {
   await page.goto(`${base}/`, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => !!(window as unknown as { __KG?: { ready: boolean } }).__KG?.ready, undefined, { timeout: 60_000 });
-  await kg(page, 'init', { tier, modeId: s.modeId, closet: s.closet, w: W, h: H, knobs: process.env.KNOBS ? JSON.parse(process.env.KNOBS) : undefined });
+  await kg(page, 'init', { tier, modeId: s.modeId, closet: s.closet, w: W, h: H, knobs: process.env.KNOBS ? JSON.parse(process.env.KNOBS) : undefined, steady: process.env.STEADY !== '0' });
   const t0 = Date.now();
   await kg(page, 'spawn', s.spawn);
   // the mask and the shoe's late fold land after the first rendered frames

@@ -274,3 +274,20 @@ export function followDelta(map: FollowMap, srcD: Float32Array, own: Float32Arra
   }
   return out;
 }
+
+/**
+ * NEVER BEHIND THE SKIN (lane/kit-fit; what `kit.garmentFollowBody` does since the copy-the-nearest-skin rule measured worse).
+ * A garment vertex keeps its own bulk `own`, and moves further out along its own outward normal `N` only by as much as the skin
+ * under it (followMap's blend of `srcD`) outgrows that bulk along the same normal. Where the cloth bridges a hollow (under a
+ * bust) the nearest skin barely moves, so the garment keeps its own bulk — the case that failed; where the skin swells faster
+ * than the garment's own weights say (a belly under a tee's hem riding the spine), the garment is pushed out with it. Pure.
+ */
+export function followNotBehind(map: FollowMap, srcD: Float32Array, own: Float32Array, N: Float32Array): Float32Array {
+  const skin = followDelta(map, srcD, own), out = Float32Array.from(own);
+  for (let v = 0; v < own.length / 3; v++) {
+    const nx = N[v * 3], ny = N[v * 3 + 1], nz = N[v * 3 + 2];
+    const s = skin[v * 3] * nx + skin[v * 3 + 1] * ny + skin[v * 3 + 2] * nz, o = own[v * 3] * nx + own[v * 3 + 1] * ny + own[v * 3 + 2] * nz;
+    if (s > o) { const k = s - o; out[v * 3] += nx * k; out[v * 3 + 1] += ny * k; out[v * 3 + 2] += nz * k; }
+  }
+  return out;
+}

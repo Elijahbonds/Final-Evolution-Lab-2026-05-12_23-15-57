@@ -35,7 +35,7 @@ const POKE_NEAR = 0.04;
 const JITTER = 0.0004;
 
 type Tier = 'mobile' | 'desktop' | 'high';
-interface InitOpts { tier: Tier; modeId: string; closet: boolean; w: number; h: number; knobs?: Record<string, number> }
+interface InitOpts { tier: Tier; modeId: string; closet: boolean; w: number; h: number; knobs?: Record<string, number>; steady?: boolean }
 interface SpawnOptsKG { kind: 'player' | 'rival'; body?: HeroBodyKind; url?: string; name?: string; tint?: string; creator?: CreatorDoc | null; wardrobe?: Record<string, string>; frame?: { heightScale: number; buildScale: number } }
 
 const CLASS = {
@@ -44,6 +44,8 @@ const CLASS = {
 type ClassName = keyof typeof CLASS;
 const CLASS_NAMES = Object.keys(CLASS) as ClassName[];
 
+/** KIT-FIT: steady poses (no breathing, 30 settle frames) unless the rig asks for the kit-glitch behaviour (STEADY=0). */
+let STEADY = true;
 let engine: Engine; let scene: Scene; let cam: ArcRotateCamera; let opts: InitOpts;
 let bodies: SpawnedCharacter[] = [];
 const errors: string[] = [];
@@ -58,6 +60,7 @@ function canvasEl(w: number, h: number): HTMLCanvasElement {
 
 async function init(o: InitOpts): Promise<void> {
   opts = o;
+  STEADY = o.steady !== false;
   // KIT-FIT: feel knobs for this page (a before / after of a runtime switch in one build), through the panel's own path
   if (o.knobs && Object.keys(o.knobs).length) { setFeelUser(true); setFeelSession(null); for (const [k, v] of Object.entries(o.knobs)) setFeelOverride(k, v); }
   const canvas = canvasEl(o.w, o.h);
@@ -103,6 +106,9 @@ async function spawn(o: SpawnOptsKG): Promise<number> {
   } else {
     s = await CharacterLibrary.spawn(scene, o.url!, { role: 'opponent', position: at, name: o.name, tint: o.tint });
   }
+  // KIT-FIT: a measurement must be repeatable — breathing (secondary motion) is a clock, so it is stopped; foot planting
+  // settles on a paused clip within the pose's settle frames (kit-fit found a run cell caught at two different moments)
+  if (STEADY) s.secondary.dispose();
   bodies.push(s);
   return bodies.length - 1;
 }
@@ -133,7 +139,7 @@ async function pose(clip: string, frac: number): Promise<string | null> {
     const f = g.from + (g.to - g.from) * frac;
     g.goToFrame(f); g.pause();
   }
-  for (let i = 0; i < 4; i++) { scene.render(); await new Promise((r) => requestAnimationFrame(r)); }
+  for (let i = 0; i < (STEADY ? 30 : 4); i++) { scene.render(); await new Promise((r) => requestAnimationFrame(r)); }
   frozen = true;
   return used;
 }

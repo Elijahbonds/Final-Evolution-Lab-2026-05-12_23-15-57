@@ -1789,7 +1789,12 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
   {
     id: 'kit.garmentFollowBody', label: 'Clothes follow the body shape on (1) / off (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Kit · fit',
     source: 'lib/babylon/creator/shape/renderShape.ts GARMENT_FOLLOW_BODY',
-    hint: 'Ships off (measured worse on heavy builds). On: a worn top or short takes the bulk of the nearest skin on a Creator build. Off: each garment bulks by its own weights, as before.',
+    hint: 'Ships off (not better on every build). On: a worn top or short never falls behind the skin under it on a Creator build. Off: each garment bulks by its own weights, as before.',
+  },
+  {
+    id: 'kit.shapeKeepsFit', label: 'Creator shape keeps the clothes fit on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Kit · fit',
+    source: 'lib/babylon/core/morphCarry.ts SHAPE_KEEPS_FIT',
+    hint: 'On: on a Creator build the shorts stay tucked under the top and the hems keep their flare. Off: the shape draws the clothes as loaded, before their fit.',
   },
 ];
 

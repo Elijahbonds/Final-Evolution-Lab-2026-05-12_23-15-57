@@ -15,6 +15,8 @@ import { readGlb, writeGlb, restPrims, nodeWorlds, appendAccessor, rigPrint, unt
 import { unwrap, uvQuality } from './unwrap';
 import { BodySurface } from './surface';
 
+/** Weight-smoothing rounds on a top that came with UVs (the forge rivals' tees). NEW (measured: smoothWeights' comment). */
+export const RIVAL_TOP_SMOOTH = 2;
 /** Metres of garment per UV unit: the rivals' textured tees and shorts measure 0.9–1.1 (_uvdensity.ts). */
 export const UV_SCALE = { tops: 1.0, shorts: 1.0, sock: 0.4 } as const;
 const flag = (n: string) => process.argv.includes(n);
@@ -45,10 +47,12 @@ export function transferWeights(p: Pick<RestPrim, 'P' | 'J' | 'W' | 'joints'>, b
   // the thigh joint the vertex is nearer in x; at the midline (±1 cm) and above the hips, either side.
   const L = bones.LeftUpLeg, R = bones.RightUpLeg, mid = L && R ? (L[0] + R[0]) / 2 : 0, hipY = L && R ? (L[1] + R[1]) / 2 : Infinity;
   const leftSign = L && R ? Math.sign(L[0] - R[0]) : 1;
+  // a sleeve (outside the shoulder joint's x) takes skin from its own arm's side only
+  const armX = bones.LeftArm && bones.RightArm ? Math.abs(bones.LeftArm[0] - bones.RightArm[0]) / 2 * 0.8 : Infinity;
   let moved = 0, far = 0;
   for (let v = 0; v < p.P.length / 3; v++) {
     const x = p.P[v * 3], y = p.P[v * 3 + 1];
-    const side = opts.side ? opts.side[v] : y < hipY && Math.abs(x - mid) > 0.01 ? (Math.sign(x - mid) === leftSign ? 1 : -1) : 0;
+    const side = opts.side ? opts.side[v] : (y < hipY || Math.abs(x - mid) > armX) && Math.abs(x - mid) > 0.01 ? (Math.sign(x - mid) === leftSign ? 1 : -1) : 0;
     const h = surf(side).closest(x, y, p.P[v * 3 + 2], opts.reach ?? 0.15);
     if (!h) { far++; continue; }
     const acc = new Map<number, number>();
@@ -59,6 +63,26 @@ export function transferWeights(p: Pick<RestPrim, 'P' | 'J' | 'W' | 'joints'>, b
     moved++;
   }
   return { moved, far };
+}
+
+/**
+ * WEIGHT SMOOTHING (Blender's "Smooth" in weight paint): each vertex's weights move `lambda` of the way to the mean of its
+ * mesh neighbours' (welded by position), `iters` times, then the four largest are kept and renormalised. The rivals' tees step
+ * from torso to arm in one edge at the sleeve seam and from spine to neck at the collar (measured, scripts/probes/kit-fit/
+ * tears.ts REST=bind), and a step is an edge that stretches when the arm comes down.
+ */
+export function smoothWeights(p: Pick<RestPrim, 'J' | 'W' | 'joints' | 'ind' | 'P'>, iters: number, lambda = 0.5): void {
+  const n = p.P.length / 3, nb: Set<number>[] = Array.from({ length: n }, () => new Set());
+  const wid = new Map<string, number[]>(); for (let v = 0; v < n; v++) { const k = `${Math.round(p.P[v * 3] / 5e-4)},${Math.round(p.P[v * 3 + 1] / 5e-4)},${Math.round(p.P[v * 3 + 2] / 5e-4)}`; (wid.get(k) ?? wid.set(k, []).get(k)!).push(v); }
+  for (let t = 0; t < p.ind.length; t += 3) for (const [a, b] of [[p.ind[t], p.ind[t + 1]], [p.ind[t + 1], p.ind[t + 2]], [p.ind[t + 2], p.ind[t]]]) { nb[a].add(b); nb[b].add(a); }
+  for (const g of wid.values()) for (const a of g) for (const b of g) if (a !== b) for (const c of nb[b]) nb[a].add(c);
+  const nj = p.joints.length;
+  let cur = Array.from({ length: n }, (_, v) => { const w = new Float32Array(nj); for (let k = 0; k < 4; k++) w[p.J[v * 4 + k]] += p.W[v * 4 + k]; return w; });
+  for (let it = 0; it < iters; it++) cur = cur.map((w, v) => { let c = 0; const m = new Float32Array(nj); for (const u of nb[v]) { for (let j = 0; j < nj; j++) m[j] += cur[u][j]; c++; } if (!c) return w; const o = new Float32Array(nj); for (let j = 0; j < nj; j++) o[j] = (1 - lambda) * w[j] + lambda * m[j] / c; return o; });
+  for (let v = 0; v < n; v++) {
+    const top = [...cur[v]].map((w, j) => [j, w] as const).filter(([, w]) => w > 1e-4).sort((a, b) => b[1] - a[1]).slice(0, 4); const sum = top.reduce((s, [, w]) => s + w, 0) || 1;
+    for (let k = 0; k < 4; k++) { p.J[v * 4 + k] = top[k]?.[0] ?? 0; p.W[v * 4 + k] = top[k] ? top[k][1] / sum : 0; }
+  }
 }
 
 /** The garment's connected pieces (welded by position): a piece id per vertex. */
@@ -118,7 +142,7 @@ export function fitLegTubes(P: Float32Array, ind: Uint32Array, body: RestPrim, b
 
 export interface BakeReport { file: string; garments: Record<string, unknown>[]; rig: string; untouched: string }
 
-export function bake(inPath: string, outPath: string, opts: { uv?: boolean; legs?: boolean } = {}): BakeReport {
+export function bake(inPath: string, outPath: string, opts: { uv?: boolean; legs?: boolean; topSmooth?: number } = {}): BakeReport {
   const g = readGlb(inPath);
   const rig0 = rigPrint(g);
   const bones = bonePositions(g);
@@ -126,7 +150,7 @@ export function bake(inPath: string, outPath: string, opts: { uv?: boolean; legs
   const body = prims.find((p) => p.name === 'Body')!;
   // what changes: a garment without UVs gets them; every short gets its legs fitted. A garment with UVs that is not a short
   // (the rivals' tees) is left exactly as it is.
-  const targets = prims.filter((p) => (/^Kit_(tops|shorts)_/.test(p.name) || (/^Kit_shoes_/.test(p.name) && p.prim === 1)) && (!p.uv || (/^Kit_shorts_/.test(p.name) && opts.legs !== false)));
+  const targets = prims.filter((p) => (/^Kit_(tops|shorts)_/.test(p.name) || (/^Kit_shoes_/.test(p.name) && p.prim === 1)) && (!p.uv || (/^Kit_shorts_/.test(p.name) && opts.legs !== false) || (/^Kit_tops_/.test(p.name) && (opts.topSmooth ?? RIVAL_TOP_SMOOTH) > 0)));
   const edited = new Set(targets.map((p) => `${p.mesh}:${p.prim}`));
   const untouched0 = untouchedPrint(g, edited);
   const report: Record<string, unknown>[] = [];
@@ -140,6 +164,10 @@ export function bake(inPath: string, outPath: string, opts: { uv?: boolean; legs
     const P = Float32Array.from(p.P);
     if (slot === 'shorts' && opts.legs !== false) { const f = fitLegTubes(P, p.ind, body, bones); legSide = f.side; row.legs = { tubes: f.tubes, moved: f.moved }; }
     if (slot === 'shorts' && opts.legs !== false) row.transfer = transferWeights({ P, J, W, joints: p.joints }, body, bones, { side: legSide });
+    // the forge rivals' tees (the tops that came with UVs): two smoothing rounds — tee tears ace 50 -> 20, grit 30 -> 8 over 10 poses,
+    // skin through the tee down too; on the kit's own tee it measured no better (male 6 -> 10), so it is left alone
+    const topSmooth = opts.topSmooth ?? RIVAL_TOP_SMOOTH;
+    if (slot === 'tops' && p.uv && topSmooth) { smoothWeights({ P, J, W, joints: p.joints, ind: p.ind }, topSmooth); row.smooth = topSmooth; }
     let from = Uint32Array.from({ length: p.P.length / 3 }, (_, i) => i), uv: Float32Array | null = p.uv, ind = p.ind;
     if (!p.uv && opts.uv !== false) {
       const u = unwrap({ P, N: p.N, J, W, ind: p.ind, joints: p.joints, bonePos: bones, scale: UV_SCALE[slot] });
@@ -176,6 +204,6 @@ export function bake(inPath: string, outPath: string, opts: { uv?: boolean; legs
 
 if (require.main === module) {
   const [inPath, outPath] = process.argv.slice(2).filter((a) => !a.startsWith('--'));
-  const r = bake(inPath, outPath, { uv: !flag('--no-uv'), legs: !flag('--no-legs') });
+  const r = bake(inPath, outPath, { uv: !flag('--no-uv'), legs: !flag('--no-legs'), topSmooth: process.env.KIT_FIT_TOP_SMOOTH ? Number(process.env.KIT_FIT_TOP_SMOOTH) : undefined });
   if (flag('--json')) console.log(JSON.stringify(r)); else { console.log('rig', r.rig.slice(0, 16), 'untouched', r.untouched.slice(0, 16)); for (const x of r.garments) console.log(JSON.stringify(x)); }
 }

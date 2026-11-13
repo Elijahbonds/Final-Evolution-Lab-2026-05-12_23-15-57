@@ -30,6 +30,7 @@ import { Color3, Matrix, Mesh, PBRMaterial, Vector3, VertexBuffer } from '@babyl
 import type { AbstractMesh, FloatArray, IndicesArray, Skeleton } from '@babylonjs/core';
 import type { KitSlot } from './kit';
 import { isShrunk } from './bodyMask';
+import { carryShapeMorph } from './morphCarry';
 
 export const SNEAKER_ROUGHNESS = 0.85;
 /** A shoe taller than this (m, sole bottom to top, rest pose) is a boot and gets its shaft folded. */
@@ -164,7 +165,7 @@ function fixShoeGeometry(mesh: Mesh, itemId: string, skeleton: Skeleton, positio
 
   if (!newPositions && !splitSole) return notes.join('+');
   mesh.makeGeometryUnique();   // this clone only — the container's source geometry stays as loaded
-  if (newPositions) mesh.setVerticesData(VertexBuffer.PositionKind, newPositions, false);
+  if (newPositions) { carryShapeMorph(mesh, positions, newPositions); mesh.setVerticesData(VertexBuffer.PositionKind, newPositions, false); }   // KIT-FIT: a shaped foot keeps the fold
   if (newSkin) { mesh.setVerticesData(VertexBuffer.MatricesIndicesKind, newSkin.mi, false); mesh.setVerticesData(VertexBuffer.MatricesWeightsKind, newSkin.mw, false); }
   if (splitSole) {
     const suffix = /_c\d+$/.exec(mesh.name)?.[0] ?? '';
@@ -417,6 +418,7 @@ export function liftOffBody(mesh: AbstractMesh, slot: 'tops' | 'shorts'): void {
       out[v * 3] = positions[v * 3] + nx * k; out[v * 3 + 1] = positions[v * 3 + 1] + ny * k; out[v * 3 + 2] = positions[v * 3 + 2] + nz * k;
     }
     mesh.setVerticesData(VertexBuffer.PositionKind, out, false);   // updateVerticesData is a silent no-op on the loader's non-updatable buffer
+    carryShapeMorph(mesh, positions, out);   // KIT-FIT: a Creator shape already on the garment keeps the lift (morphCarry.ts)
     mesh.refreshBoundingInfo();
   } catch (e) {
     console.warn(`[FEL-KIT] garment inflate skipped on ${mesh.name}: ${String((e as Error)?.message ?? e).slice(0, 120)}`);

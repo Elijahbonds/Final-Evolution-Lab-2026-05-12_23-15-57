@@ -1,6 +1,6 @@
 // KIT-FIT: WHERE a garment tears in a pose (the kit-glitch TEAR rule: an edge past ×2 of its bind length and ×1.5 of the skin
 // under it), as rest-pose positions and the bones at each end. Headless, the real kit + mask code (as cpu.ts).
-//   npx tsx scripts/probes/kit-fit/tears.ts <male|female|file:<glb>> <clip@frac> [Kit_shorts]
+//   npx tsx scripts/probes/kit-fit/tears.ts <male|female|rival:<k>|file:<glb>> <clip@frac> [Kit_shorts]
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { NullEngine, Scene, ArcRotateCamera, Vector3, SceneLoader } from '@babylonjs/core';
@@ -22,7 +22,7 @@ async function main(): Promise<void> {
   scene.activeCamera = new ArcRotateCamera('c', -Math.PI / 2, 1.2, 3.2, new Vector3(0, 1, 0), scene);
   scene.metadata = { felTier: 'desktop', felModeId: 'onevone' };
   (engine as unknown as { getDeltaTime: () => number }).getDeltaTime = () => 1000 / 60; scene.useConstantAnimationDeltaTime = true;
-  const f = key.startsWith('file:') ? key.slice(5) : resolve(ROOT, files[key]);
+  const f = key.startsWith('file:') ? key.slice(5) : resolve(ROOT, files[key] ?? `public/models/rivals/${key.replace(/^rival:/, '')}.glb`);
   const c = await SceneLoader.LoadAssetContainerAsync('', `data:model/gltf-binary;base64,${readFileSync(f).toString('base64')}`, scene, undefined, '.glb');
   const inst = c.instantiateModelsToScene((x) => `${x}_c`, false, { doNotInstantiate: true });
   for (const g of inst.animationGroups) g.stop(); sanitizeImportedGroups(inst.animationGroups);
@@ -33,7 +33,9 @@ async function main(): Promise<void> {
   const body = meshes.find((m) => isBodyMesh(m.name.replace(/_c$/, '')) || /^Body/.test(m.name)) as Mesh;
   maskBodyNow(body, meshes);
   const g = meshes.find((m) => m.name.startsWith(want) && m.isVisible) as Mesh;
-  const rest = skinnedWorld(g)!.P.slice(); const bodyRest = skinnedWorld(body)!.P.slice();
+  // REST=bind measures against the garment as modelled (its bind pose, as scripts/probes/kit-glitch/cpu.ts does); default: idle
+  const bindOf = (m: Mesh) => { const P = m.getVerticesData('position')!, W = m.computeWorldMatrix(true).m, o = new Float32Array(P.length); for (let v = 0; v < P.length / 3; v++) { const x = P[v * 3], y = P[v * 3 + 1], z = P[v * 3 + 2]; o[v * 3] = x * W[0] + y * W[4] + z * W[8]; o[v * 3 + 1] = x * W[1] + y * W[5] + z * W[9]; o[v * 3 + 2] = x * W[2] + y * W[6] + z * W[10]; } return o; };
+  const rest = process.env.REST === 'bind' ? bindOf(g) : skinnedWorld(g)!.P.slice(); const bodyRest = skinnedWorld(body)!.P.slice();
   const grp = animator.play(clip, { loop: true, fadeSec: 0, restart: true })!; for (const o of scene.animationGroups) if (o !== grp && o.isPlaying) o.stop();
   grp.goToFrame(grp.from + (grp.to - grp.from) * Number(frac ?? 0.5)); grp.pause(); for (let i = 0; i < 2; i++) scene.render();
   const gw = skinnedWorld(g)!.P, bw = skinnedWorld(body)!.P, ind = g.getIndices()!;

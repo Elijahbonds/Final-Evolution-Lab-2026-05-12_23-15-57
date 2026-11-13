@@ -407,3 +407,9 @@ The owner answered two questions (relayed by the coordinator).
    is drawn scaled). assumption (coordinator's call to make, flagged): a rating-free run draws the standard body, as today, so a ranked or
    staked game looks exactly as it did.
 4. **Handle: every move stays unlocked** (H2's gate kept). The Handle rating moves only the combo window and the lean a move needs.
+
+## 2026-11-13 — kit fit: cloth motion and the new jerseys (owner 2026-11-13, relayed by the coordinator)
+
+1. **Cloth motion: a sway in the renderer, no rig change** (the 22-bone spec stays). docs/KIT-FIT-PLAN.md phase 4.
+2. **The new basketball and football jerseys: in-house and free**, cut from the MakeHuman garments in Blender on the owner's Mac
+   (docs/JERSEY-BUILD-STEPS.md). docs/KIT-FIT-PLAN.md phase 3.

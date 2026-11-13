@@ -48,10 +48,11 @@ import {
 } from '../../../creator/look/shape';
 import { GIRTH_KEYS, type CreatorDoc, type GirthKey } from '../../../creator/look/doc';
 import {
-  dominantOn, emptyTable, followDelta, followMap, groupTransfer, invert3, lowestAlong, segmentRadius, shapeDelta, spanAlong, tableIsNeutral, toLocal,
+  dominantOn, emptyTable, followMap, followNotBehind, groupTransfer, invert3, lowestAlong, segmentRadius, shapeDelta, spanAlong, tableIsNeutral, toLocal,
   weightOn, weldedNormals, type BoneShapeTable, type FollowMap, type SkinField,
 } from './inflate';
 import { maskSlotOf } from '../../core/bodyMask';
+import { shapeKeepsFit } from '../../core/morphCarry';
 import { feel } from '../../../feel-panel/feel';
 
 type V3 = [number, number, number];
@@ -138,12 +139,13 @@ const NECK_FALLBACK_M = 0.08;
  *  brow and the cheek above the bone; judged from the kit's proportions, not a rendered view. */
 const EYE_REACH_M = 0.04;
 /**
- * kit.garmentFollowBody (lane/kit-fit): 1 = a worn top or short (the kit's, a kit pack's) takes the bulk of the skin under it
- * (inflate.followDelta); 0 = each garment bulks through its own weights, as before. SHIPS OFF: measured on the browser rig
- * (docs/KIT-FIT-PLAN.md §3.3) it made the girth-max bodies WORSE — female 13,773 → 34,875 px of skin through cloth over
- * 50 shots, the bust and shoulders through the tee — because the NEAREST skin under a garment that bridges a hollow (under the
- * bust) barely moves while the skin it covers swells. Phase 2 redoes it by projection along the garment's normal, measured on
- * a layer-order metric (the short drawn over the tee), which the skin metric does not see.
+ * kit.garmentFollowBody (lane/kit-fit): 1 = a worn top or short is never left behind the skin under it on a Creator build
+ * (inflate.followNotBehind: its own bulk, plus whatever the skin outgrows it by along its normal); 0 = each garment bulks through
+ * its own weights, as before. SHIPS OFF. The first version (copy the nearest skin's movement) measured worse on the browser rig
+ * (girth-max female 13,773 -> 34,875 px: the bust through the tee, where the cloth bridges the hollow under it). This version,
+ * headless at girth 1.6 over 8 poses (scripts/probes/kit-fit/exposed.ts): the short over the tee 448 -> 300 on the male but
+ * 363 -> 388 on the female, skin through cloth unchanged — not better on every body, so it stays off. What fixed job 3 is
+ * core/morphCarry.ts (the shape no longer undoes the waistband fit).
  */
 export const GARMENT_FOLLOW_BODY = 0;
 /** How far (m, at rest) a garment vertex looks for the skin it follows; beyond it keeps its own bulk (a loose hem's tip). */
@@ -416,12 +418,16 @@ export function syncShape(
         const fk = `${prep.key}|${bodyPrep.key}`;
         let fm = followMaps.get(fk);
         if (!fm) { fm = followMap(prep.field.P, bodyPrep.field.P, FOLLOW_REACH_M); followMaps.set(fk, fm); }
-        rest = followDelta(fm, bodyDelta, rest);
+        rest = followNotBehind(fm, bodyDelta, rest, prep.field.N);
       }
     }
     const local = toLocal(rest, prep.field, prep.linv);
+    // KIT-FIT (core/morphCarry.ts): built on the garment's CURRENT vertices, so a fit that already landed (the waistband tucked
+    // under the top, the flare) is kept — the prep's base is the vertices as first measured, before any fit
+    const now = shapeKeepsFit() ? mesh.getVerticesData('position') : null;
+    const base = now && now.length === prep.base.length ? now : prep.base;
     const out = new Float32Array(prep.base.length);
-    for (let i = 0; i < out.length; i++) out[i] = prep.base[i] + local[i];
+    for (let i = 0; i < out.length; i++) out[i] = base[i] + local[i];
     setTarget(mesh, st, out, sig);
   }
   const summary: ShapeSummary = { shape: s, morphed, targetsPerMesh: 1 };

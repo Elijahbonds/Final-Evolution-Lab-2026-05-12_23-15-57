@@ -29,6 +29,7 @@ import type { AbstractMesh, IndicesArray, Mesh, Scene, TransformNode } from '@ba
 import { boneNode } from '../anim/boneLookup';
 import { tubeCoverage, trimSpan, type TubeSpan } from './accessoryFit';
 import { coachGarmentSlotOf, demoModelFlags } from './demoModels';
+import { carryShapeMorph } from './morphCarry';
 
 /** How far under a garment (from its open edge, metres) the skin must be before it is hidden. Tops and shorts leave a
  *  band at the hem so a garment that rides up never opens a hole into the body. */
@@ -471,6 +472,7 @@ function flareGarmentEdges(mesh: Mesh, slot: string): void {
   const flareD = new Float32Array(pos.length); for (let i = 0; i < pos.length; i++) flareD[i] = out[i] - pos[i];
   (mesh as { __felFlareD?: Float32Array }).__felFlareD = flareD;   // kept as a delta: the waistband fit re-bases a short under it
   mesh.setVerticesData('position', out, false);
+  carryShapeMorph(mesh, pos, out);   // KIT-FIT: a Creator shape on this garment keeps the flare (morphCarry.ts)
   mesh.metadata = { ...(mesh.metadata ?? {}), felEdgeFlare: moved };
 }
 
@@ -510,7 +512,9 @@ function fitShortsUnderTop(body: Mesh, bodySkin: { P: Float32Array; N: Float32Ar
     }
     const out = new Float32Array(bind); const fd = g.__felFlareD;
     if (fd && fd.length === out.length) for (let i = 0; i < out.length; i++) out[i] += fd[i];
+    const was = g.getVerticesData('position');
     g.setVerticesData('position', out, false);
+    if (was) carryShapeMorph(g, was, out);   // KIT-FIT: a Creator shape on this short keeps the waistband fit (morphCarry.ts)
     g.__felFlare0 = bind;   // what the mask (and a later flare) measures: the fitted short, un-flared
     g.__felWaistTop = want;
     g.metadata = { ...(g.metadata ?? {}), felWaistFit: stats ? { lifted: stats.liftedVerts, sunk: stats.sunkVerts, maxLift: +stats.maxLift.toFixed(3), gapBefore: +stats.gapBefore.toFixed(3), gapAfter: +stats.gapAfter.toFixed(3) } : null };
