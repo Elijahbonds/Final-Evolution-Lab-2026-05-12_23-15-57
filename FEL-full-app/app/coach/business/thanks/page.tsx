@@ -21,8 +21,11 @@ export default async function CoachBusinessThanksPage({ searchParams }: { search
         {signedIn ? null : <PublicTopBar />}
         <main className="mx-auto max-w-xl px-4 py-16 text-white" data-thanks="none">
           <h1 className="text-2xl font-black">Nothing to show here</h1>
+          {/* COACH-WORDS (owner 2026-11-12: shorter first-screen wording, the owner reviews docs/COACH-WORDING-REVIEW.md). The
+              first sentence was "This page opens after you pay for a coach's package, to confirm the booking." The payment
+              sentence after it is unchanged, word for word. */}
           <p className="mt-3 text-base text-white/70">
-            This page opens after you pay for a coach&apos;s package, to confirm the booking. There is no payment to look up from here.
+            This page confirms a coach booking after you pay. There is no payment to look up from here.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link href="/coach" className="inline-flex min-h-11 items-center rounded-xl bg-cyan-300 px-4 py-2 text-sm font-bold text-black">Go to Coach</Link>
