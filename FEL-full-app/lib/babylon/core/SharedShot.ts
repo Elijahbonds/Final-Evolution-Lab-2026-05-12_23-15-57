@@ -46,11 +46,14 @@ export interface ReleaseWindowIn extends ReleaseWindowMods {
   /** The rim distance (m) — the distance narrowing, as at the start. */
   distM: number;
   gatherSec?: number;
+  /** hoops-builder (owner 2026-11-12): the hero's Shooting rating on a jump shot's green (ratings.ts greenScale; the caller passes 1
+   *  for a finish and in a rating-free run). The meter showed the green with it, so the release is judged against it too. Absent = 1. */
+  ratingGreen?: number;
 }
 /** The green's half-width a release is judged against (s): the narrower of what the meter showed and what the release's contest gives,
  *  times the modifiers. */
 export function releaseHalfSec(w: ReleaseWindowIn): number {
-  const atRelease = meterFor(w.style, w.releaseContest, w.distM, w.gatherSec ?? 0).greenHalfSec;
+  const atRelease = meterFor(w.style, w.releaseContest, w.distM, w.gatherSec ?? 0).greenHalfSec * (w.ratingGreen ?? 1);
   const shown = w.meterHalfSec > 0 ? w.meterHalfSec : atRelease;
   return Math.min(shown, atRelease) * windowModFactor(w, FATIGUE_PCT_BITE, BANK_PCT_BONUS);
 }

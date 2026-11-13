@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Music, Mic, Zap, Palette, Dumbbell, ArrowRight, Clapperboard, ChefHat, Shirt, PenLine, UserRound } from 'lucide-react';
+import { Music, Mic, Zap, Palette, Dumbbell, ArrowRight, Clapperboard, ChefHat, Shirt, PenLine, UserRound, Trophy } from 'lucide-react';
 
 // Creator Hub — every card below opens a shipped play or guided Create flow.
 
@@ -59,6 +59,31 @@ export function CreatorHub() {
           </div>
           <div className="inline-flex items-center gap-1 text-sm font-semibold text-white">
             Open Athlete Creator <ArrowRight className="h-4 w-4" />
+          </div>
+        </Link>
+
+        {/* lane/hoops-builder (owner 2026-11-12): the hoops part of the same athlete */}
+        <Link
+          href="/creator/hoops"
+          className="mt-4 flex flex-col gap-4 rounded-3xl border border-white/10 bg-white/[0.04] p-6 transition hover:border-white/25 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div className="flex items-center gap-4">
+            <div
+              className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl"
+              style={{ background: 'rgba(255, 215, 0, 0.1)', border: '1px solid rgba(255,215,0,0.35)' }}
+            >
+              <Trophy className="h-7 w-7 text-[#FFD700]" />
+            </div>
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-[0.32em] text-white/50">Hoops builder</div>
+              <h2 className="mt-1 text-[20px] font-black">Your hoops player</h2>
+              <p className="mt-2 max-w-2xl text-base text-white/55">
+                Pick a position and a height, then raise five ratings with points you earn by playing.
+              </p>
+            </div>
+          </div>
+          <div className="inline-flex items-center gap-1 text-sm font-semibold text-white">
+            Open hoops builder <ArrowRight className="h-4 w-4" />
           </div>
         </Link>
 

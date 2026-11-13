@@ -386,6 +386,55 @@ The owner answered four proposals from phase 6 (relayed by the coordinator). Eac
    on-court reps become real stats.").
 4. **Terms tick:** a real `<input type="checkbox">` inside its label. Same words, same rule (it must be ticked to
    continue), now usable from the keyboard and with a screen reader.
+
+## 2026-11-12 — the hoops builder; Story left alone
+
+The owner answered two questions (relayed by the coordinator).
+
+1. **Hoops builder: "Simple builder: pick height and a position, plus 5 ratings (speed, handle, shooting, finishing, defense)
+   that really change how you play, within limits. Earn upgrade points by playing. Ranked, staked and arena games stay
+   rating-free, as today."** Built on the Creator, not beside it: the position, the playing height, the upgrade steps and the
+   points live in the athlete's one build record (`AthleteBuild.build.hoops`, versioned; no schema change), the Creator's PRQ
+   ceilings cap the ratings, and the screen is `/creator/hoops` (linked from the Creator). The ratings → game numbers, with each
+   band, are `lib/babylon/hoops/ratings.ts` (rating 50 at 6'4" is today's numbers exactly; every band is a feel knob, group
+   "Hoops · ratings"; `hoops.ratingsOn` 0 puts everyone on today's numbers). Every run that is ranked, staked, arena, a challenge,
+   online or a party plays the standard numbers (playFrame's competitive stamp). Wiring the ratings into the modes is phase B,
+   after the hoops-p08 lane merges. This continues the 2026-10-20 HOOPS SHOOTING line ("Creator ratings slightly widen the green
+   in CASUAL modes only").
+2. **Story games: leave alone for now** (no button-style change, no further Story work).
+3. **The body on screen follows the playing height** (owner 2026-11-12, relayed with phase B), within the cosmetic 96–104 %: 6'0" is drawn
+   at 96 %, 6'8" at 104 %, 1 % an inch. Drawing only (REACH-FREEZE holds: the ball on the hand is read on the standard frame while the hero
+   is drawn scaled). assumption (coordinator's call to make, flagged): a rating-free run draws the standard body, as today, so a ranked or
+   staked game looks exactly as it did.
+4. **Handle: every move stays unlocked** (H2's gate kept). The Handle rating moves only the combo window and the lean a move needs.
+
+## 2026-11-12 — owner 2026-11-12: shipping, deploy order, hoops, sound, art, screens
+
+The owner answered these (relayed by the coordinator). One line each.
+
+1. **Shipping:** `main` does not move until hoops phase 8 has landed. Then the coordinator smoke-tests a production build,
+   and the owner deploys and does the phone check.
+2. **PR #452 ("Delete my account" and "Sign out everywhere"):** merged as written, with policy version 2026-10-27b.
+3. **Deploy session order:** #431 (the Prisma engine move) first; #373 (Studio save to the account) in a later session.
+4. **Coach store and live coach sessions:** stay off for now.
+5. **Hoops green width:** a feel test on the phone first (`hoops.jumpGreenScale`, 1 against 0.62). It ships at 1 until
+   the owner says otherwise.
+6. **1v1 rival layup rates under the one rulebook:** keep the new numbers (Rookie 35 %, Pro 42 %, Elite 56 %).
+7. **3v3:** first to 21 on a 4-minute clock (it was 90 s).
+8. **Replays:** any press skips the replay.
+9. **Sound:** free CC0 recordings. Music: the owner's own tracks.
+10. **Finger and face bones:** a lane of their own, after sound and the moving net.
+11. **Art jobs approved:** a hoop with a moving net, a hand-change animation, and the 3 clothing fixes.
+12. **The "⋯" capture menu:** stays in the corner; the HUD keeps clear of it.
+13. **today-drill:** the Start bar stays pinned.
+14. **Coach screens:** shorter first-screen wording, reviewed by the owner before it ships (lane `lane/coach-words`;
+    `docs/COACH-WORDING-REVIEW.md`). Approved the same day: every row, the consent and privacy lines as approved notices,
+    and options A, B and C (C: the invite's consent line says "your coach" instead of the coach's name).
+15. **Story:** "leave alone" (the entry above) stands; #589's small readability touches (labels, tap targets) are kept.
+16. **Karate VS:** the in-game overlap is left as it is.
+17. **Social basketball setting:** a PARK area (outdoor home courts, a run to queue for, a place to hang out), built from
+    the Adventure map pieces and part of the Adventure hub (one world: story ↔ courts, same player, party and look). Build
+    it after the current hoops work, together with the Adventure hub. Menus keep one-tap 1v1/3v3.
 - **owner 2026-11-12 (hoops gathers, G3):** an escape thrown into the closed side of a trap (double team) IS a steal (`docs/HOOPS-GATHER-ESCAPE-PLAN.md`).
 - **owner 2026-11-12 (hoops gathers, G5):** the mid-air adjustment uses the right stick in the air, like the dunk trick stick.
 - **owner 2026-11-12 (hoops gathers, G6):** a hop step with the stick at rest IS a jump stop.

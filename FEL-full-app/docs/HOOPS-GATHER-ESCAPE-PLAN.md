@@ -333,6 +333,21 @@ with a real player (`hoops-audit/mash-audit.mjs PLAYER=script` and `mash`): the 
 | 6 | G6 jump stop, pro hop | M | GATE 0 (the sideways hop); **owner**: the input (the hop with the stick at rest = the jump stop?) |
 | 7 | G7 re-measure | S | — |
 
+## 5b. Status (2026-11-13)
+
+- **G1 shipped with G2** (one PR): the pick-up reads the bounce, `hoops.pickupReadOn` **ON** (coordinator 2026-11-13, flagged; 0 restores
+  the old pick-up). 1v1: pick-ups within 8 cm of the palm 13 of 59 → 23 of 31, yanks off the floor 13 of 59 → 0 (floor median 67 → 4 cm).
+  3v3: floor median 66 → 16 cm, yanks 13 of 47 → 2 of 18, but only 3 of 18 within 8 cm — presses at drive / sprint speed still fall back
+  or are taken at the overrun cap (open).
+- **G2, partial:** the release wrist's snap ease is a knob (`hoops.releaseSnapEaseSec`, ships at the tuned 0.03; 0.08 measured: the release
+  hand's worst turn a frame, median 40 → 18° in 1v1, 36 → 17° in 3v3 — put to the owner as a feel test). The existing inertial blend
+  (`anim.inertial`) was measured on the gathers and is not proposed (press-blend hard pops 0.74 → 0.50 a trial, all hard pops 1.39 → 1.50).
+  Open: the one dip (median 6–15 cm on drives), the pump → step-through.
+- **GATE 0 job (clip foot keys): the hop step's planted foot.** Measured: through `bball_hop_step` the root moves 0.5–1 cm a frame while the
+  "planted" foot moves 4–14 cm a frame (the clip's own feet swing under a still body); the drive gathers' slide p90 stays 4–7 cm against
+  the 3 cm bar. It needs the clip's foot contacts re-keyed (or the clip re-captured), not code — GATE 0 (verify the rig before and after).
+- **G4 code is in** (`core/ComboFinish.ts`, `hoops.comboDunkOn` off): the euro and the hop into a dunk. Not yet measured on the rig.
+
 ## 6. The worst moments, drawn
 
 One JPG, `scratchpad/hoops-gather/gather-escape-worst.jpg` (the lane's scratch folder; its absolute path is in the lane's report): five
