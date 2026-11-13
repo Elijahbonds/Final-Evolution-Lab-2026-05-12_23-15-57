@@ -1728,6 +1728,63 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/hoops/rulebook.ts PRESS_FLOOR_ON',
     hint: 'On: a showtime flush or a trick dunk pressed at the wrong moment goes in at least as often as not pressing. Off: early 42, late 50 against 70 untimed, as before.',
   },
+  // ── hoops-builder (owner 2026-11-12): what the five hoops ratings and the playing height change, casual runs only. Every band is
+  //    the change at rating 90 (at 40 it moves the other way by a quarter of it); rating 50 is today at any band, and 0 = no effect.
+  {
+    id: 'hoops.ratingsOn', label: 'Hoops ratings change play (1) / everyone plays the same (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · ratings',
+    source: 'lib/babylon/hoops/ratings.ts RATINGS_ON',
+    hint: 'Off: every athlete plays the standard numbers in every run, exactly as before the builder. Ranked, staked, arena, challenge and online runs are always standard.',
+  },
+  {
+    id: 'hoops.rateSpeedBand', label: 'Speed 90: top speed and first step plus', def: 0.06, min: 0, max: 0.15, step: 0.01, unit: 'x', group: 'Hoops · ratings',
+    source: 'lib/babylon/hoops/ratings.ts RATE_SPEED_BAND',
+    hint: 'Share added to top speed (6.4 m/s) and acceleration at Speed 90.',
+  },
+  {
+    id: 'hoops.rateHandleBand', label: 'Handle 90: handle points over the standard 50', def: 20, min: 0, max: 40, step: 1, unit: '', group: 'Hoops · ratings',
+    source: 'lib/babylon/hoops/ratings.ts RATE_HANDLE_BAND',
+    hint: 'The handle the moves read at Handle 90 is 50 plus this: each point is 0.0052 s more combo window and a tighter dribble. Moves stay unlocked for everyone.',
+  },
+  {
+    id: 'hoops.rateReadBand', label: 'Handle 90: lean needed to beat a man, minus', def: 0.15, min: 0, max: 0.4, step: 0.01, unit: 'x', group: 'Hoops · ratings',
+    source: 'lib/babylon/hoops/ratings.ts RATE_READ_BAND',
+    hint: 'Share taken off the moving-the-wrong-way line (0.6 m/s) a move needs at Handle 90.',
+  },
+  {
+    id: 'hoops.rateGreenBand', label: 'Shooting 90: jump shot green wider by', def: 0.1, min: 0, max: 0.25, step: 0.01, unit: 'x', group: 'Hoops · ratings',
+    source: 'lib/babylon/hoops/ratings.ts RATE_GREEN_BAND',
+    hint: 'Share added to the jump shot green at Shooting 90 (casual runs only).',
+  },
+  {
+    id: 'hoops.rateFinishBand', label: 'Finishing 90: contest on a finish minus', def: 0.15, min: 0, max: 0.4, step: 0.01, unit: 'x', group: 'Hoops · ratings',
+    source: 'lib/babylon/hoops/ratings.ts RATE_FINISH_BAND',
+    hint: 'Share taken off the contest a defender puts on a layup or a dunk at Finishing 90.',
+  },
+  {
+    id: 'hoops.rateSlideBand', label: 'Defense 90: slide speed plus', def: 0.06, min: 0, max: 0.15, step: 0.01, unit: 'x', group: 'Hoops · ratings',
+    source: 'lib/babylon/hoops/ratings.ts RATE_SLIDE_BAND',
+    hint: 'Share added to the defensive slide at Defense 90.',
+  },
+  {
+    id: 'hoops.rateStealReachBand', label: 'Defense 90: steal reach plus', def: 0.05, min: 0, max: 0.15, step: 0.01, unit: 'x', group: 'Hoops · ratings',
+    source: 'lib/babylon/hoops/ratings.ts RATE_STEAL_REACH_BAND',
+    hint: 'Share added to the hero poke range (1.6 m) at Defense 90.',
+  },
+  {
+    id: 'hoops.rateBlockReachM', label: 'Defense 90: block reach plus', def: 0.04, min: 0, max: 0.12, step: 0.01, unit: 'm', group: 'Hoops · ratings',
+    source: 'lib/babylon/hoops/ratings.ts RATE_BLOCK_REACH_M',
+    hint: 'Metres added to the block reach at Defense 90.',
+  },
+  {
+    id: 'hoops.heightReachMPerIn', label: 'Playing height: reach per inch over the standard', def: 0.015, min: 0, max: 0.04, step: 0.001, unit: 'm', group: 'Hoops · ratings',
+    source: 'lib/babylon/hoops/ratings.ts HEIGHT_REACH_M_PER_IN',
+    hint: 'Metres of reach (the hero block reach and his release height against a block) per inch of playing height over the standard frame; under it, the same off.',
+  },
+  {
+    id: 'hoops.heightLookPerIn', label: 'Playing height: drawn taller per inch over the standard', def: 0.01, min: 0, max: 0.01, step: 0.001, unit: 'x', group: 'Hoops · ratings',
+    source: 'lib/babylon/hoops/ratings.ts HEIGHT_LOOK_PER_IN',
+    hint: 'How much bigger the hero is drawn per inch of playing height (6ft 8 at 104 percent, 6ft 0 at 96). Drawing only, casual runs only. 0 = the standard body.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));

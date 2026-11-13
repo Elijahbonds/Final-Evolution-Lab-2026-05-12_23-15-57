@@ -49,6 +49,8 @@ const DETECTORS: { what: string; re: RegExp }[] = [
 const NOT_MOVEMENT: Record<string, string> = {
   'app/api/prq/entries/route.ts': "manual PrqEntry rows (source 'manual', typed by the athlete): GAP 1 says not pose-derived",
   'lib/prq-entries.ts': 'the generic PrqEntry writer (createPrqEntry). Each CALLER is classified by its source: the camera callers are 1d (assessment) and 1f (sessions form, via lib/move/formWrite.ts); the manual route and the sessions drillResult are not movement',
+  // lane/hoops-builder (owner 2026-11-12)
+  'lib/creator/hoops/hoopsBuild-server.ts': 'writes only AthleteBuild.build.hoops (a picked position, a picked playing height, upgrade steps and points earned from finished games), never the prq snapshot column: nothing measured, nothing pose-derived',
 };
 /** app/api/sessions/route.ts (1f) also writes the drillResult PrqEntry (GAP 1: not pose-derived); only its `form` write is movement. */
 
