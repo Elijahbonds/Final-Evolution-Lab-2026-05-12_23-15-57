@@ -1883,6 +1883,16 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/hoops/response/pumpHold.ts PUMP_BALL_HAND_ON',
     hint: 'On: the ball stays in the hands while the pump plays, and the step-through takes it from there. Off (as before): the dribble restarts the frame after the pump and the ball drops loose.',
   },
+  {
+    id: 'hoops.comboDunkOn', label: 'Euro step and hop step can end in a dunk (1) / never (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · gathers',
+    source: 'lib/babylon/core/ComboFinish.ts COMBO_DUNK_ON',
+    hint: 'On: the turbo held, fast, and the last step inside dunk range, the euro or the hop takes off into a dunk. Off: they end in a layup or floater, as before.',
+  },
+  {
+    id: 'hoops.comboDunkMinMps', label: 'Footwork dunk: fastest drive needed', def: 3.4, min: 2, max: 6, step: 0.1, unit: 'm/s', group: 'Hoops · gathers',
+    source: 'lib/babylon/core/ComboFinish.ts COMBO_DUNK_MIN_MPS',
+    hint: 'How fast the drive must be at the press for a euro or hop to become a dunk.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));
