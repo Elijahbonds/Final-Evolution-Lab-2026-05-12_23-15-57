@@ -82,6 +82,9 @@ describe('/coach/form-review, the record screen before filming', () => {
     expect(shown).not.toContain('Your camera shows here.');
     expect(shown).toContain('Nothing is recorded to a file.');                // privacy: unchanged
     expect(shown).toContain('For your coach');
+    // owner-approved cut 2026-11-13 (review doc row 2.6): the squat's setup line ends "Then go." (was "Stand still, then go.")
+    expect(shown).toContain('Phone at hip height, 2 to 3 m away, facing you. Then go.');
+    expect(shown).not.toContain('Stand still, then go.');
     expect(shown).not.toContain('Film a set for your coach');
     expect(html).toContain('<span data-notice="privacy">Nothing is recorded to a file.</span>');
   });
