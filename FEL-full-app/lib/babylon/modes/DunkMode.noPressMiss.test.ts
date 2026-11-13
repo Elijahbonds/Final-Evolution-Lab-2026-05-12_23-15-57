@@ -130,8 +130,10 @@ describe('K-DNP7 — no new input', () => {
     expect(count(DUNK, 'slamSeen = true')).toBe(2);
     expect(count(DUNK, 'bufferSlam(')).toBe(3);
     expect(count(DUNK, 'slamNow(ctx')).toBe(3);
-    expect(count(DUNK, 'e.btn ===')).toBe(38);
-    expect(count(DUNK, "e.t === 'button'")).toBe(27);
+    // test changed (hoops-flow, owner 2026-11-12 "any press skips a replay"): +1 each — the triple cut's any-press skip (cutSkip) reads
+    // `e.t === 'button' && e.btn === 'A'` to keep A's judges hurry. It skips the cut only; it reaches no slam path (the counts above).
+    expect(count(DUNK, 'e.btn ===')).toBe(39);
+    expect(count(DUNK, "e.t === 'button'")).toBe(28);
   });
   it('nothing about the hint sits in an input handler', () => {
     for (const f of ['airButton', 'bufferSlam']) expect(fn(f)).not.toMatch(/flushHint|flushGate|FLUSH_HINT/);

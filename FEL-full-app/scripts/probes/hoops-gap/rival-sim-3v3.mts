@@ -214,6 +214,7 @@ export async function sim3v3(tier: string, o: Opts) {
     makePct: Object.fromEntries(Object.entries(shots).map(([k, a]) => [k, { n: a.length, pct: a.some((x) => Number.isFinite(x)) ? +(100 * mean(a.filter((x) => Number.isFinite(x)))).toFixed(1) : null }])),
     ptsPerShot: +mean(pts).toFixed(3),
     steals, picks, blocks, capped, mix, driverAccelP99: +p99(driverAcc).toFixed(1),
+    lensRaw: lens, ptsPerPoss: pts.reduce((a, b) => a + b, 0) / o.n,   // hoops-flow: the game-length model reads the raw lengths and the expected points a possession
   };
 }
 export function print(r: Awaited<ReturnType<typeof sim3v3>>) {

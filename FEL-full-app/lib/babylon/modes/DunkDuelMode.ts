@@ -41,6 +41,7 @@ import { readPlayerIcon } from '../visual/playerIcon';
 import { dressBall } from '../visual/meshyProps';   // IMPROVE (2026-10-06) #10: the duel ball is a basketball
 import { mountShotMeter3D, type ShotMeter3DHandle } from '../visual/ShotMeter3D';   // IMPROVE (2026-10-06) #7: the contest's slam meter
 import { DunkReplayRecorder, pausableDelay } from '../scene/DunkReplayCam';   // IMPROVE (2026-10-06) #12: the make, replayed
+import { ReplaySkipGate, replaySkipOn } from '../core/replaySkip';   // hoops-flow (owner 2026-11-12): any press skips the cut (knob hoops.replaySkipOn)
 import { motionPolicy } from '@/lib/a11y/reducedMotion';   // WAVE 3: the orbit angle is camera travel
 import { showCuts, cutsSec } from '../core/DunkCuts';
 import { DunkFlight, DUNK_TRICKS, cueOf, cueVerdict, cueFireAt, CUE_BEAT_LABEL, type DunkTrick } from '../core/DunkSystem';   // IMPROVE (2026-10-06) #8: air tricks
@@ -174,6 +175,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
   const reveal = new ScoreReveal();               // #6: confer → cards → drum → total
   let revealed: JudgeScore[] = [], revealScores: JudgeScore[] = [], judgeHold = -1, verdictBanner = '', revealOn = false;
   let replay: DunkReplayRecorder | null = null, cutting = false, contactAt = 0;   // #12
+  const cutSkip = new ReplaySkipGate(null);   // hoops-flow: a trigger pulled during the cut is the cut's until it is let go
   let modeGen = 0;                                // #13: bumped on dispose — a promise that resolves after it touches nothing
   let modeClock = 0, bannerUntil = 0;             // #11: the mode's own clock (it stops with the game) and the banner's expiry
   const later: { at: number; fn: () => void }[] = [];
@@ -940,6 +942,13 @@ export const DunkDuelMode: ModeDefinition = (() => {
       if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; if (!lookSeen && (Math.abs(e.x) > 0.12 || Math.abs(e.y) > 0.12)) { lookSeen = true; console.info('[LOOK] R stick live'); } }
       // IMPROVE (2026-10-06) #12: A or B during the replay cuts it (a tap / Space already did — a pad or a phone could only sit through it)
       if (cutting && e.t === 'button' && e.pressed && (e.btn === 'A' || e.btn === 'B')) { replay?.stop(); console.info('[DUEL-SHOW] triple cut skipped on the pad'); return; }
+      // hoops-flow (owner 2026-11-12, knob hoops.replaySkipOn): ANY press ends the cut — every button, the d-pad, a trigger pulled (the
+      // crossing) — and is the cut's, never a prop pick or a run. 0: A or B only (the line above), as before.
+      if (e.t !== 'stick') {
+        const v = cutSkip.see(e, cutting && replaySkipOn());
+        if (v === 'skip') { replay?.stop(); console.info('[DUEL-SHOW] triple cut skipped (any press)'); return; }
+        if (v === 'drop') return;
+      }
       // IMPROVE (2026-10-06) #9: the FIRST card offers the match length — B steps 2 → 3 → 5 dunks each (and gives the card its time again)
       if (phase === 'handoff' && firstCard() && e.t === 'button' && e.btn === 'B' && e.pressed) {
         dunksEach = nextMatchLength(dunksEach); phaseSec = 0;

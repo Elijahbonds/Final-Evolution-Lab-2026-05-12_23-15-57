@@ -38,8 +38,12 @@ describe('a d-pad press skips a replay', () => {
     expect(latch.pass({ t: 'dpad', dir: 'right', pressed: false }, 30)).toBe(true);   // once
   });
 
-  it('a stick, a trigger or a release does not skip (the line requires e.pressed on a button or d-pad event)', () => {
+  // test changed (hoops-flow, owner 2026-11-12 "any press skips a replay"): this line still holds as written — the button / d-pad skip
+  // line takes no stick, trigger or release. A mode that ASKS (ModeDefinition.replaySkipAny: 1v1, 3v3, 3PT) now also skips on a stick
+  // pushed or a trigger pulled, through core/replaySkip's gate; every other mode is unchanged. replaySkip.test.ts holds that path.
+  it('the button / d-pad line takes no stick, trigger or release (a stick or trigger skips only for a mode that asks: replaySkipAny)', () => {
     expect(harness).not.toMatch(/replayHold && e\.t === 'stick'/);
     expect(harness).not.toMatch(/replayHold && e\.t === 'trigger'/);
+    expect(harness).toMatch(/const anySkip = \(\): boolean => phase === 'playing' && replayHold && !!def\.replaySkipAny\?\.\(\);/);
   });
 });

@@ -318,6 +318,7 @@ export class ReplayDirector {
         this.dof?.set(0, 10); this.dof?.live(false);
         if (this.scene.metadata) this.scene.metadata.felCinematic = 0;
         this._playing = false; this.angleNow = null; this.finishActive = null;
+        this.skipFn = null;   // hoops-flow: a late skip (a second input in the same task) must not put the bodies back a second time
         resolve();
       };
       this.skipFn = skip;
@@ -327,7 +328,11 @@ export class ReplayDirector {
 
   private skipFn: (() => void) | null = null;
   /** A press during a replay: skip to the live moment (ignored while paused — the press that resumes is not a skip). */
-  skip(): void { this.skipFn?.(); }
+  skip(): void {
+    const f = this.skipFn; if (!f || !this._playing) return;
+    f();
+    if (!this._playing) console.info('[REPLAY-SKIP] a press ended the replay');   // hoops-flow: probes count skips off this line
+  }
   /** End a replay in flight; a no-op when none is playing. */
   stop(): void { this.finishActive?.(); }
 

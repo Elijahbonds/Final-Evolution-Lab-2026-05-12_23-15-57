@@ -228,6 +228,7 @@ import { SHOWTIME_FLUSH_K, SHOWTIME_GOOD_K, showtimeAsked, pickShowtime, judgeSh
 import type { ParticleSystem } from '@babylonjs/core';   // suite pass: the hot hand's shot trails (the dunk contest's ball trail, on the game)
 import { mountHandleFx, type HandleFx } from '../court/mount/handleFx';   // hoops-defense-fx (2026-10-20): the handle's squeak, slap, rumble, punch and ooh
 import { mountHoopsCourt, type HoopsCourt } from '../court/mount/hoopsCourt';   // vis-hoops-court (2026-10-14): the broadcast, the scuffs and the dusk
+import { replaySkipOn } from '../core/replaySkip';   // hoops-flow (owner 2026-11-12): any press skips the replay (knob hoops.replaySkipOn)
 import { HoopJuice } from '../visual/HoopJuice';   // A+ P0: the hoop answers the make (shared with Dunk; Meshy never scaled)
 import { mountShotMeter3D, type ShotMeter3DHandle } from '../visual/ShotMeter3D';   // THE SHOT METER (owner, 2026-09-18): the 2K bar beside the shooter's head
 import { assertSpawned } from '../core/FrameGuard';
@@ -1004,6 +1005,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   return {
     modeId: 'onevone', mood: 'goldenHour', camPreset: 'hoops',
     intro: 'walkIn', replay: true, replayCast: () => ({ bodies: [me.root, foe.root], loose: [ball] }),   // vis-hoops-court: the broadcast opens and replays the possession's best moment
+    replaySkipAny: replaySkipOn,   // hoops-flow (owner 2026-11-12): any press — a flick, a trigger, a tap — skips the replay and the ball comes back
     // HOOPS BODY (2026-10-07): the body plays 1v1 through the hero's ControlSource; its claimed events land here
     body: COURT_BODY,
     onBody: (_ctx: ModeContext, ev: BodyEvent, view: BodyView): boolean => bodyCtl?.see(ev, view) ?? false,

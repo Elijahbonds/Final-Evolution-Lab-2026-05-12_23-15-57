@@ -14,14 +14,14 @@ describe('the hoops matchup card', () => {
     expect(HOOPS_MATCHUP.onevone.rule).toMatch(/FIRST TO 11\b/);
     expect(src('OneVOneMode.ts')).toMatch(/MAKE IT, TAKE IT/);
     expect(src('ThreeVThreeMode.ts')).toMatch(/const TARGET_SCORE = 21;/);
-    expect(src('ThreeVThreeMode.ts')).toMatch(/const POSSESSION_SEC = 90;/);
-    expect(HOOPS_MATCHUP.threevthree.rule).toMatch(/^90 SECONDS · FIRST TO 21\b/);
+    expect(src('threevthreeOvertime.ts')).toMatch(/export const THREE_GAME_SEC = 240;/);   // hoops-flow (owner 2026-11-12): 4 minutes, was 90 s
+    expect(HOOPS_MATCHUP.threevthree.rule).toMatch(/^4 MINUTES · FIRST TO 21\b/);
     expect(src('threePointRules.ts')).toMatch(/export const TP_FINALISTS = 3;/);
     expect(HOOPS_MATCHUP.threepoint.rule).toMatch(/TOP 3\b/);
     // nothing else on any card is a number
     for (const [k, m] of Object.entries(HOOPS_MATCHUP)) {
       const nums = `${m.kicker} ${m.you} ${m.them} ${m.rule}`.match(/\d+/g) ?? [];
-      const allowed: Record<string, string[]> = { onevone: ['1', '1', '11'], threevthree: ['3', '3', '90', '21'], threepoint: ['3'], dunkduel: ['1', '2'] };
+      const allowed: Record<string, string[]> = { onevone: ['1', '1', '11'], threevthree: ['3', '3', '4', '21'], threepoint: ['3'], dunkduel: ['1', '2'] };
       expect(nums, k).toEqual(allowed[k] ?? []);
     }
   });

@@ -55,7 +55,7 @@ export const MODES: Record<string, ModeDefinition> = {
   penalty: PenaltyMode,
   golf: GolfMode,
   // Rollout wave 4 — basketball simulator family (M48) on PlayerSlot +
-  // BasketballCore. 1V1 first-to-11, 3V3 first-to-21 on a 90s clock.
+  // BasketballCore. 1V1 first-to-11, 3V3 first-to-21 on a 4-minute clock (hoops-flow, owner 2026-11-12; was 90 s).
   onevone: OneVOneMode,
   // Ported off react-three-fiber so the whole basketball family is Babylon.
   threepoint: ThreePointMode,

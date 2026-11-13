@@ -17,7 +17,7 @@ interface Matchup { kicker: string; you: string; them: string; rule: string }
 /** Each hoops mode's matchup, in its own words (the HUD's chips and banners). The numbers are pinned to the modes by the test. */
 export const HOOPS_MATCHUP: Readonly<Record<string, Matchup>> = {
   onevone: { kicker: '1 ON 1', you: 'YOU', them: 'THE RIVAL', rule: 'FIRST TO 11 · MAKE IT, TAKE IT' },
-  threevthree: { kicker: '3 ON 3', you: 'YOUR THREE', them: 'THEIR THREE', rule: '90 SECONDS · FIRST TO 21 WINS IT EARLY' },
+  threevthree: { kicker: '3 ON 3', you: 'YOUR THREE', them: 'THEIR THREE', rule: '4 MINUTES · FIRST TO 21 WINS IT EARLY' },   // hoops-flow (owner 2026-11-12): the 4-minute clock
   threepoint: { kicker: 'THE SHOOTOUT', you: 'YOU', them: 'THE FIELD', rule: 'QUALIFYING ON THE CLOCK · THE TOP 3 GO TO THE FINAL' },
   dunk: { kicker: 'FLIGHT NIGHT', you: 'YOU', them: 'THE RIVAL', rule: 'THE JUDGES SCORE EVERY DUNK' },
   dunkduel: { kicker: 'PROVE IT', you: 'PLAYER 1', them: 'PLAYER 2', rule: 'DUNK FOR DUNK · THE JUDGES DECIDE' },

@@ -1582,6 +1582,17 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/court/hoopsMoments.ts REPLAY_CAP_SEC',
     hint: 'A dunk, block or ankle-breaker replay holds the game at most this long (the window around the moment). 0 = the old 4.8 to 10 s replay.',
   },
+  // ── hoops-flow (owner 2026-11-12): the 3v3 game clock, and any press skips a replay ──
+  {
+    id: 'hoops.replaySkipOn', label: 'Replay: any press skips it (1) / buttons only (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · flow and pace',
+    source: 'lib/babylon/core/replaySkip.ts REPLAY_SKIP_ON',
+    hint: 'On: during a hoops replay (1v1, 3v3, the 3-point money ball, the dunk and duel cuts) a flick, a trigger, a stick push or a tap on the court skips it and the ball comes back; the press is not also a shot or a move. Off: only a button or d-pad press skips it, as before.',
+  },
+  {
+    id: 'hoops.threeGameSec', label: '3v3 game clock', def: 240, min: 60, max: 600, step: 10, unit: 's', group: 'Hoops · flow and pace',
+    source: 'lib/babylon/modes/threevthreeOvertime.ts THREE_GAME_SEC',
+    hint: 'First to 21 or the leader when this clock runs out (a tie goes to overtime). Read when the game starts. 90 = the old clock.',
+  },
   {
     id: 'hoops.rivalSizeUpSec', label: '1v1 rival: sizes you up at the top for', def: 4, min: 0, max: 8, step: 0.1, unit: 's', group: 'Hoops · flow and pace',
     source: 'lib/babylon/hoops/rivalOffense.ts RIVAL_SIZE_UP_SEC',

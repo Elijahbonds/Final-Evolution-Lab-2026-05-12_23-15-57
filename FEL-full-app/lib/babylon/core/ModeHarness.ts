@@ -19,6 +19,7 @@ import { mountSweat } from './skinShading';   // vis-foundation-2 A9.14: the her
 import { wave2Look } from '../scene/lookPolicy';
 import type { IntroKind } from '../scene/broadcastShots';
 import { ReplayDirector, characterRoots, mountReplayDof, type ReplayPlayOpts } from '../scene/ReplayDirector';   // A9.12
+import { ReplaySkipGate } from './replaySkip';   // hoops-flow (owner 2026-11-12): any press skips a replay (def.replaySkipAny)
 import { buildResult, type ResultSink, type SessionResult } from './sessionResult';
 import { JuiceKit } from '../premium/JuiceKit';
 import { motionPolicy } from '../../a11y/reducedMotion';   // HOTFIX (2026-09-24): the impact frame asks too
@@ -229,6 +230,10 @@ export interface ModeDefinition {
    *  flattens the frame — on the piste's foreground the mean luma goes 222 → 198 and the groom texture's std 6.3 → 2.6 (its stripes and soft
    *  shadows are gone) — so a mode whose ground is mostly white or whose look is in its surfaces opts out. The replay is otherwise the same (letterbox, angles, half speed). Default: DOF on. */
   replayDof?: boolean;
+  /** hoops-flow (owner 2026-11-12, "any press skips a replay"): read at each input during a replay — true, and a trigger pulled, a stick
+   *  pushed out from rest or a tap on the stage skips it too, not only a button or d-pad press (core/replaySkip: the skipping input is
+   *  the replay's, never a shot or a move). Absent or false: the button / d-pad skip alone, as before. */
+  replaySkipAny?: () => boolean;
   /** vis-race (wave 2): the bodies a replay records, when they are not skinned characters — a race's vehicles (the player's
    *  first: it is the shot's subject), whose rivals are plain nodes `characterRoots` cannot find. Read once, after load().
    *  Absent: the hero and the skinned characters nearest it (every other replay mode). */
@@ -425,6 +430,11 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   const replayTrack: TransformNode[] = [];   // vis-board: nodes a mode asked ctx.trackReplay to record (registered when the director is built, after load())
   let replay: ReplayDirector | null = null;   // A9.12: a mode that asked for replays (def.replay)
   let replayHold = false;                     // a replay is on screen: the mode's update() waits
+  const replaySkip = new ReplaySkipGate('L');   // hoops-flow: a stick, trigger or tap skips too (def.replaySkipAny)
+  const anySkip = (): boolean => phase === 'playing' && replayHold && !!def.replaySkipAny?.();
+  // hoops-flow: a tap on the bare stage (no control under it, so no bus event) skips a replay too — for a mode that asks
+  const onStageTap = (): void => { if (anySkip()) { replaySkip.skips++; replay?.skip(); } };
+  opts.canvas.addEventListener?.('pointerdown', onStageTap);
   const setPhase = (p: ModePhase, detail?: number | string) => {
     phase = p;
     // M37: hero-off-screen watchdog runs only during live play.
@@ -712,6 +722,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       // vis-board: replayDof === false runs the replay without depth of field (a white or surface-led look it would flatten).
       replay = def.replay ? new ReplayDirector(scene, camera, raceBodies?.length ? raceBodies : cast?.bodies?.length ? cast.bodies : characterRoots(scene, heroRef.current), cast?.loose ?? [], (def.replayDof === false ? null : mountReplayDof(scene, lights.pipeline, tier))) : null;
       for (const n of replayTrack) replay?.track(n);
+      if (process.env.NODE_ENV === 'development' && replay) (scene.metadata ??= {}).felReplay = { director: replay, hold: () => replayHold };   // hoops-flow: the rig reads the replay (dev only)
       // SHADER PRE-WARM (lane/owner-1016, 2026-10-16; owner: "pre-warm shaders on phones at load"). Behind the boot splash — the
       // phase is still 'loading' — and AFTER the 20 s watchdog above is cleared, so it cannot trip it; it has its own cap
       // (shaderPrewarm.ts) and READY comes either way. Phone tier only; dev keeps warmAll after READY (below).
@@ -820,6 +831,15 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     // replay (a mid-race overtake) that only a button could skip would have been unskippable for the one player who most needs it to be
     // skippable. The latch keys a d-pad press as `d:<dir>` already, so its release is swallowed unpaired like a button's.
     if (phase === 'playing' && replayHold && (e.t === 'button' || e.t === 'dpad') && e.pressed) { replay?.skip(); wakeLatch.wake(e, performance.now(), true); return; }
+    // hoops-flow (owner 2026-11-12): for a mode that asks, a trigger pulled or a stick pushed out from rest skips it as well — and is the
+    // replay's (a flick is not also a crossover on the fresh possession; a trigger's release is not a launch) until it is let go; the
+    // walking stick (L) is passed on as well, so a held stick moves the body when the ball comes back. Sticks and triggers are read on
+    // every playing frame (a crossing needs the value before it), so this runs outside replays too.
+    if (phase === 'playing' && def.replaySkipAny && (e.t === 'stick' || e.t === 'trigger')) {
+      const v = replaySkip.see(e, anySkip());
+      if (v === 'skip' || v === 'skipPass') replay?.skip();
+      if (v === 'skip' || v === 'drop') return;
+    }
     if (phase === 'playing') {
       const now = performance.now();
       if (!wakeLatch.pass(e, now)) return;
@@ -1070,6 +1090,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     sweat?.dispose();     // A9.14
     iblShadows?.dispose();
     replay?.dispose();   // A9.12
+    opts.canvas.removeEventListener?.('pointerdown', onStageTap);   // hoops-flow
     ssao?.dispose();
     lights.dispose();
     scene.dispose();

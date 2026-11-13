@@ -65,17 +65,18 @@ describe('NB-3 + ELITE (#391): the overtime\'s fresh check is a fresh shot clock
 });
 
 describe('NB-3: the copy matches the clock', () => {
-  const regulation = Number(/const POSSESSION_SEC = (\d+);/.exec(SRC)?.[1]);
+  // hoops-flow (owner 2026-11-12): the regulation clock moved to threevthreeOvertime (THREE_GAME_SEC 240, was the mode's POSSESSION_SEC 90)
+  const regulation = Number(/export const THREE_GAME_SEC = (\d+);/.exec(readFileSync(join(__dirname, 'threevthreeOvertime.ts'), 'utf8'))?.[1]);
   it('the hub says first to 21, the mode\'s own regulation clock, and overtime on a tie', () => {
     const d = MODE_MENU_META.hoops3v3.desc;
-    expect(regulation).toBe(90);
+    expect(regulation).toBe(240);
     expect(d).toMatch(/First to 21/);
-    expect(d).toContain(`${regulation}-second clock`);
+    expect(d).toContain(`${regulation / 60}-minute clock`);
     expect(d).toMatch(/tie goes to overtime: next bucket wins/);
     expect(SRC).toMatch(/const TARGET_SCORE = 21;/);
   });
   it('the scorebug\'s clock chip names the period in overtime; the card\'s headline says it was decided there', () => {
-    expect(HOST).toMatch(/hud\.period === 'string' && hud\.period \? `\$\{hud\.period\} ` : ''\}\$\{hud\.time\}s`/);
+    expect(HOST).toMatch(/gameClockText\(hud\.time, typeof hud\.period === 'string' \? hud\.period : ''\)/);   // hoops-flow: 'OT 30s', m:ss from a minute
     expect(HOST).toMatch(/headline: overtimeHeadline\(won, Number\(r\.stats\?\.overtimes \?\? 0\)\) \?\? /);
     expect(HOST).not.toMatch(/'DRAW'|DEAD EVEN/);   // the mode never ends level now (verdict-contract)
   });

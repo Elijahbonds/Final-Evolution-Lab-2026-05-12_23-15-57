@@ -196,6 +196,7 @@ import { SHOWTIME_FLUSH_K, SHOWTIME_GOOD_K, showtimeAsked, pickShowtime, judgeSh
 import type { ParticleSystem } from '@babylonjs/core';   // suite pass: the hot hand's shot trails (the dunk contest's ball trail, on the game)
 import { mountHandleFx, type HandleFx } from '../court/mount/handleFx';   // hoops-defense-fx (2026-10-20): the handle's squeak, slap, rumble, punch and ooh
 import { mountHoopsCourt, type HoopsCourt } from '../court/mount/hoopsCourt';   // vis-hoops-court (2026-10-14): the broadcast, the scuffs, the dusk and the streetball arena
+import { replaySkipOn } from '../core/replaySkip';   // hoops-flow (owner 2026-11-12): any press skips the replay (knob hoops.replaySkipOn)
 import { HoopJuice } from '../visual/HoopJuice';   // A+ P0: the hoop answers the make (shared with Dunk / 1v1; Meshy never scaled)
 import { mountShotMeter3D, type ShotMeter3DHandle } from '../visual/ShotMeter3D';   // THE SHOT METER (owner, 2026-09-18): the 2K bar beside the shooter's head
 import { pickHoopsDunk, dunkSpeedRatio, PAUSIN_DUNK } from '../core/HoopsDunks';
@@ -208,7 +209,7 @@ import type { ModeContext, ModeDefinition, HudValue, BodyView } from '../core/Mo
 import type { BodyEvent } from '@/lib/pose/BodyReader';
 import { distanceGreenFactor, perfectHud, releaseGradeLabel } from '../core/ShotWindow';   // lane/hoops-shot-core
 import { PlayerShotClock, playerShotClockSec } from '../core/ShotClock';   // lane/hoops-shot-core
-import { hornCall, overtimeSec, periodLabel, OVERTIME_BALL, OVERTIME_BANNER, OVERTIME_BANNER_MS } from './threevthreeOvertime';   // lane/hoops-overtime (NB-3)
+import { hornCall, overtimeSec, periodLabel, OVERTIME_BALL, OVERTIME_BANNER, OVERTIME_BANNER_MS, THREE_GAME_SEC, threeGameSec, introNamesClock } from './threevthreeOvertime';   // lane/hoops-overtime (NB-3); hoops-flow: the game clock
 import { readTier, type Tier } from '../core/Difficulty';   // IMPROVE (2026-10-06) #3: the shared OPPONENT pick
 import { hintSwap } from './onevoneRules';     // IMPROVE (2026-10-06) #7: the 1v1's hint dwell (the urgent lines share its prefixes)
 import {   // IMPROVE (2026-10-06): the threevthree items of docs/IMPROVEMENTS-2026-10-05.md, as pure logic
@@ -249,7 +250,7 @@ const FORMAT: ScoringFormat = 'alternating';
 // basketball core. The real line is 6.71m in the corners and 7.24m at the top,
 // and that difference IS the shot selection: a corner three is the bargain and
 // the top of the key is the hard one. isThree() now answers it per angle.
-const POSSESSION_SEC = 90;
+// hoops-flow (owner 2026-11-12): the game clock is threevthreeOvertime's THREE_GAME_SEC (240 s, knob hoops.threeGameSec; it was 90 s here).
 /** BIOMECH-HOOPS-WAVE1: the facing slew (rad/s); a defender inside this range keeps his chest on the carrier. */
 const FACE_RATE = 10, FACE_RIM_RATE = 6, DEFEND_FACE_RANGE = 6;
 
@@ -338,7 +339,8 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   const kin = { drifts: 0, ankles: 0, parries: 0, driveBys: 0, slings: 0, slipSec: 0, ignitions: 0, shocks: 0 };
   let arc: ShotArc;
   let arcMade = false, arcPoints = 0, arcLabel = '', arcQuality: ShotQuality = 'good';
-  let myScore = 0, foeScore = 0, assists = 0, timeLeft = POSSESSION_SEC;
+  let gameSec = THREE_GAME_SEC;   // hoops-flow: this run's game clock (read at the run's start: a knob moved mid-game waits for the next one)
+  let myScore = 0, foeScore = 0, assists = 0, timeLeft = gameSec;
   /** Where the OTHER team stands, for Nerve. Lateness reads off whoever is closer to 21. */
   const foeStanding = () =>
     standingOf(foeScore, myScore, TARGET_SCORE, Math.min(1, Math.max(myScore, foeScore) / TARGET_SCORE));
@@ -991,12 +993,14 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   return {
     modeId: 'threevthree', mood: 'goldenHour', camPreset: 'team',
     intro: 'walkIn', replay: true, replayCast: () => ({ bodies: bodiesAll.map((b) => b.char.root), loose: [ball] }),   // vis-hoops-court: the broadcast opens and replays the possession's best moment
+    replaySkipAny: replaySkipOn,   // hoops-flow (owner 2026-11-12): any press — a flick, a trigger, a tap — skips the replay and the ball comes back
     // HOOPS BODY (2026-10-07): the body plays my man through his ControlSource; its claimed events land here
     body: COURT_BODY,
     onBody: (_ctx: ModeContext, ev: BodyEvent, view: BodyView): boolean => bodyCtl?.see(ev, view) ?? false,
     // NB-1 (HONEST-START): load() ran at page load, before the start screen's OPPONENT pick — this run plays the pick
     onPlay() {
       if (myScore !== 0 || foeScore !== 0) return;   // only before the first bucket
+      gameSec = threeGameSec(); timeLeft = gameSec; if (ctx0) putHud(ctx0, { time: Math.ceil(timeLeft) });   // hoops-flow: the game clock this run plays (a knob read at READY, as the tier is)
       const tier = runTier();
       for (const r of reactives) r.setTier(tier);   // lane/hoops-round2 HOP-02: the pick's reaction delay
       const next = THREEV_TIER[tier] ?? THREEV_TIER.pro;
@@ -1160,7 +1164,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       mark = MeshBuilder.CreateTorus('3v3_mark', { diameter: 1.05, thickness: 0.05, tessellation: 40 }, ctx.scene);
       markMat = new StandardMaterial('3v3_mark_mat', ctx.scene); markMat.disableLighting = true; markMat.alpha = 0.85;
       mark.material = markMat; mark.isPickable = false; mark.setEnabled(false);
-      hoopsFx?.dispose(); hoopsFx = mountHoopsCourt(ctx, { kind: 'threevthree', rim: RIM, bodies: () => bodiesAll.map((b) => b.char.root), final: () => ended || buzzer, progress: () => overtimes ? 1 : Math.max(myScore / TARGET_SCORE, foeScore / TARGET_SCORE, 1 - timeLeft / POSSESSION_SEC),
+      hoopsFx?.dispose(); hoopsFx = mountHoopsCourt(ctx, { kind: 'threevthree', rim: RIM, bodies: () => bodiesAll.map((b) => b.char.root), final: () => ended || buzzer, progress: () => overtimes ? 1 : Math.max(myScore / TARGET_SCORE, foeScore / TARGET_SCORE, 1 - timeLeft / gameSec),
         teams: { mine: () => mates.map((b) => b.char.root), theirs: () => foes.map((b) => b.char.root), mineColor: TEAM_JERSEY.mine, theirsColor: TEAM_JERSEY.theirs } });
       handleFx?.dispose(); handleFx = mountHandleFx(ctx, { carry: () => carries.get(me) ?? null });   // hoops-defense-fx
       hoopJuice?.dispose(); hoopJuice = new HoopJuice(ctx.scene, RIM);   // A+ P0: juice-only ring + net, material clones — no meshy_hoop_* transform is touched
@@ -1187,7 +1191,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         if (Number.isFinite(q) && q > 0) { handle = Math.max(0, Math.min(100, q)); console.info(`[3V3-HANDLE] handle ${handle} (override)`); }
       }
 
-      myScore = 0; foeScore = 0; assists = 0; timeLeft = POSSESSION_SEC; ended = false; buzzer = false; overtimes = 0; otBannerHold = 0;   // IMPROVE (2026-10-06) #17: a second run on this closure started with the last run's horn blown (it ended at its first quiet frame)
+      gameSec = threeGameSec(); myScore = 0; foeScore = 0; assists = 0; timeLeft = gameSec; ended = false; buzzer = false; overtimes = 0; otBannerHold = 0;   // IMPROVE (2026-10-06) #17: a second run on this closure started with the last run's horn blown (it ended at its first quiet frame)
       shotContest = 0; foeCloseMem = foes.map(() => 0);
       ctx.heroRef.current = me.char.root;
       ctx.objectiveRef.current = RIM;
@@ -4047,12 +4051,12 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     if (who && Math.random() < chance) mic?.then({ who, moment });
   }
   /** Every frame: the mic's clock, the welcome on the first live frame, and now and then an open mate calling for it. No
-   *  filler and no idle crowd: the 90 s clock never stops, so a run has no dead time to fill. */
+   *  filler and no idle crowd: the game clock never stops, so a run has no dead time to fill. */
   function micTick(ctx: ModeContext): void {
     if (!mic) return;
     mic.update();
     if (!micOpened && ctx.phase() === 'playing') {
-      // the welcome to this court, then what the run is (to 21, a 90 s clock) — once the voices are in (the 1v1's gate: a call
+      // the welcome to this court, then what the run is (to 21, a 90 s clock: said on a 90 s game only, hoops-flow) — once the voices are in (the 1v1's gate: a call
       // made before the banks land is let go), and not at all if they arrive after the run is under way. PRIORITY 1: the ball
       // is live on this frame and the welcome runs ~9 s, so at priority 2 it swallowed every priority-2 call under it (the
       // opening dunk, three, steal, block — equal priority is only queued inside the last 1.2 s); now a real play cuts in.
@@ -4060,7 +4064,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       if (mic.ready) {
         micOpened = true;
         mic.say({ moment: 'intro.court', priority: 1, crowd: { moment: 'crowd.hype', n: 2 } });
-        mic.then({ moment: 'game.intro.threes', priority: 1 });
+        if (introNamesClock(gameSec)) mic.then({ moment: 'game.intro.threes', priority: 1 });   // hoops-flow: its recorded lines say "ninety seconds" — only on a 90 s game
         micMateAt = performance.now() + 15000;   // the mates let the welcome finish
       } else if (performance.now() - micLiveAt > 6000) micOpened = true;
     }

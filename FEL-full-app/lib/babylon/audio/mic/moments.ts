@@ -94,7 +94,7 @@ export const MOMENTS: readonly MomentSpec[] = [
   { id: 'three.clinch', group: 'three', say: 'The player just passed the number: it is won.', maxWords: 6, mc: 3 },
   { id: 'three.champion', group: 'three', say: 'The player is the three-point champion.', maxWords: 14, mc: 3 },
 
-  // ── the runs: 1v1 (Ones, to 11, make it take it) and 3v3 (Threes, to 21, a 90 s clock) ──────────────────────────
+  // ── the runs: 1v1 (Ones, to 11, make it take it) and 3v3 (Threes, to 21; the welcome names a 90 s clock, said on a 90 s game only) ──
   { id: 'game.intro.ones', group: 'game', say: 'A one-on-one run opens: first to eleven, make it take it.', maxWords: 20, mc: 2 },
   { id: 'game.intro.threes', group: 'game', say: 'A three-on-three run opens: first to twenty-one, a ninety-second clock.', maxWords: 20, mc: 2 },
   { id: 'game.check', group: 'game', say: 'Check ball: the other side has it, the player is on defense.', maxWords: 6, mc: 4 },

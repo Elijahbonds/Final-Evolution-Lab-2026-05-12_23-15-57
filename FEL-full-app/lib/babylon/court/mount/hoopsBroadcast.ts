@@ -67,7 +67,7 @@ export function mountHoopsBroadcast(ctx: ModeContext, opts: HoopsBroadcastOpts):
       replaying = true;
       console.info(`[HOOPS-REPLAY] ${plan.kind}: the last ${plan.lastSeconds.toFixed(1)} s`);
       void ctx.highlight({ lastSeconds: plan.lastSeconds, endAt: plan.endAt, objective: opts.rim })
-        .catch(() => { /* a replay that failed is a replay not shown */ })
+        .catch((e) => { console.warn('[HOOPS-REPLAY] not shown:', String(e).slice(0, 160)); })   // a replay that failed is a replay not shown (hoops-flow: and says so)
         .then(() => { replaying = false; if (gone) return; bypass = true; try { next(); } finally { bypass = false; } });   // a mode torn down during its replay is not reset
       return true;
     },

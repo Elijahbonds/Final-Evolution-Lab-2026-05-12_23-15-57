@@ -6,6 +6,7 @@
 //   node drive.mjs <mode> <scenario> <outDir>       mode: onevone | threevthree
 //     scenario game  — a scripted human plays GAME_S seconds of game time (natural flow, no seams forcing possessions);
 //                      every log line, HUD update and input is kept; motion / ball / camera metrics per body
+//     scenario replay — hoops-flow: a forced big-play replay and one press of each kind during it (frames to skip, swallowed presses)
 //     scenario input — the input -> response tests (seams set the possession): stick (walk + turbo), shot, the 8 flicks
 //                      from a standing dribble and from a jog, pass (3v3), poke, block; frame strips of a move, a shot and
 //                      a defensive possession
@@ -253,6 +254,59 @@ if (SCEN === 'game') {
   result.poss = await possLoop();
   if (process.env.POSS_MOTION) { await ev(() => window.__hg.stop()); result.handEv = await ev(() => window.__hg.handEv || []); result.analysis = await ev((o) => window.__hg.analyse(o), { popList: !!process.env.POP_LIST }); if (process.env.POP_LIST) { result.clips = await ev(() => window.__hg.clips || []); result.stageEv = await ev(() => window.__hg.stageEv || []); result.states = await ev(() => window.__hg.states || []); } } result.log = await ev(() => window.__LOG); result.hud = await ev(() => window.__hud); result.snaps = await ev(() => window.__hg.snaps || []);
   { const names = await ev(() => Object.keys(window.__hg.strips).filter((k) => k.startsWith('auto-'))); for (const nm of names) await saveStrip(nm); result.autoStrips = names; }
+} else if (SCEN === 'replay') {
+  // hoops-flow (owner 2026-11-12, "any press skips a replay"): a big-play replay forced at a dead ball (the court's probe seam: note an
+  // ankle-breaker, call the possession), then ONE press of each kind ~20 frames into it — a right-stick flick, a trigger, Square, the
+  // d-pad, the walking stick, a tap on the stage. Per press: the frames until the replay is gone and the hero is back on the check spot
+  // (the next possession), and what the game made of the press in the 40 frames after (a move, a shot). Run it with FEEL
+  // {"hoops.replaySkipOn":0} (the old skip: buttons and the d-pad only) and without (on). KINDS=flick,trigger,X,dpad,stickL,tap
+  const KINDS = (process.env.KINDS ?? 'flick,trigger,X,dpad,stickL,tap').split(',');
+  await ev(() => window.__hg.start());
+  result.replay = [];
+  for (const kind of KINDS) {
+    await ev((m) => window.__FEL_DEV__.scene.metadata[m].offense(), MODE); await waitGame(300);
+    await ev(() => window.__hg.emit({ t: 'stick', side: 'L', x: 1, y: 0 })); await waitGame(700);   // walk off the check spot, so the reset is seen
+    await ev(() => window.__hg.emit({ t: 'stick', side: 'L', x: 0, y: 0 })); await waitGame(1200);
+    const r = await ev((a) => window.__awaitFrames((async ([kind, MODE]) => {
+      const dev = window.__FEL_DEV__, scene = dev.scene, HG = window.__hg, H = scene.metadata.felHoops, seam = scene.metadata[MODE];
+      const cine = () => !!(scene.metadata && scene.metadata.felCinematic);
+      const top = (n) => { while (n && n.parent) n = n.parent; return n; };
+      const hero = () => top(dev.hero()).getAbsolutePosition().clone();
+      const frames = (n) => new Promise((res) => { const f0 = HG.frame; const o = scene.onAfterRenderObservable.add(() => { if (HG.frame - f0 >= n) { scene.onAfterRenderObservable.remove(o); res(); } }); });
+      const P = hero();
+      H.reset(); H.note('ankles'); seam.offense();
+      const cineF = []; for (let i = 0; i < 4; i++) { await frames(1); cineF.push(cine() ? 1 : 0); }
+      const RD = scene.metadata.felReplay;   // (dev: the harness's director; NODRAW=1 runs trip the render watchdog — phase 'error' — after ~5 s: run without it)
+      if (!cine()) return { kind, started: false, cineF, phase: window.__phase, rd: RD ? { playing: RD.director.playing, hold: RD.hold(), rec: +RD.director.recordedSec.toFixed(2) } : null };
+      await frames(18);
+      const L0 = (window.__LOG || []).length, f0 = HG.frame;
+      const canvas = scene.getEngine().getRenderingCanvas();
+      const press = { flick: () => HG.emit({ t: 'stick', side: 'R', x: -1, y: 0 }), trigger: () => HG.emit({ t: 'trigger', side: 'R', value: 1 }),
+        X: () => HG.emit({ t: 'button', btn: 'X', pressed: true }), dpad: () => HG.emit({ t: 'dpad', dir: 'up', pressed: true }),
+        stickL: () => HG.emit({ t: 'stick', side: 'L', x: 0, y: -1 }), tap: () => canvas.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 7, pointerType: 'touch' })) }[kind];
+      const let_go = { flick: () => HG.emit({ t: 'stick', side: 'R', x: 0, y: 0 }), trigger: () => HG.emit({ t: 'trigger', side: 'R', value: 0 }),
+        X: () => HG.emit({ t: 'button', btn: 'X', pressed: false }), dpad: () => HG.emit({ t: 'dpad', dir: 'up', pressed: false }),
+        stickL: () => HG.emit({ t: 'stick', side: 'L', x: 0, y: 0 }), tap: () => canvas.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 7, pointerType: 'touch' })) }[kind];
+      press();
+      const atPress = cine();
+      let endF = null, backF = null;
+      await new Promise((res) => { const ob = scene.onAfterRenderObservable.add(() => {
+        const d = HG.frame - f0, h = hero();
+        if (endF === null && !cine()) endF = d;
+        if (backF === null && !cine() && Math.hypot(h.x - P.x, h.z - P.z) > 1) backF = d;
+        if ((endF !== null && backF !== null) || d > 420) { scene.onAfterRenderObservable.remove(ob); res(); } }); });
+      await frames(6); let_go();
+      await frames(40);
+      const lines = (window.__LOG || []).slice(L0).map((l) => [l.f - f0, String(l.m).slice(0, 110)]);
+      return { kind, started: true, cineAfterPress: atPress, framesToEnd: endF, framesToNextPossession: backF, replays: H.replays,
+        skipLine: lines.some((l) => /\[REPLAY-SKIP\]/.test(l[1])),
+        playLines: lines.filter((l) => /\[(1V1|3V3)-(HANDLE|STICK|MOVE|SHOT|PASS)|jumper|layup|pull.?up|crossover|spin/i.test(l[1]) && !/REPLAY/.test(l[1])).slice(0, 6) };
+    })(a)), [kind, MODE]);
+    say(`replay ${kind}: ${JSON.stringify(r)}`);
+    result.replay.push(r);
+    await waitGame(500);
+  }
+  result.log = await ev(() => window.__LOG);
 } else if (SCEN === 'input') {
   const S = (fn, arg) => ev(fn, arg);
   const setOff = () => S((m) => { const s = window.__FEL_DEV__.scene.metadata[m]; s.offense(); }, MODE);

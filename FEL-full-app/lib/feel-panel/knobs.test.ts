@@ -17,7 +17,8 @@ import { MOVE_EASE_ON, MOVE_EASE_SEC, MOVE_EASE_RATE_DEG, MOVE_ARM_RATE_DEG } fr
 import { JUMPER_HOP_ON, JUMPER_APEX_AFTER_RELEASE_SEC, JUMPER_MIN_LOAD_SEC, JUMPER_HANG_ON, JUMPER_HANG_SCALE } from '@/lib/babylon/core/JumperHop';
 import { FT_SETUP_SEC, FT_ROUTINE_SEC, FT_SET_SEC, FT_RESULT_SEC, FT_DIST_NARROW_01 } from '@/lib/babylon/core/FreeThrows';
 import { BANK_SET_DEG, BANK_GLANCE_MS } from '@/lib/babylon/hoops/shotLooks';
-import { OVERTIME_3V3_SEC } from '@/lib/babylon/modes/threevthreeOvertime';
+import { OVERTIME_3V3_SEC, THREE_GAME_SEC } from '@/lib/babylon/modes/threevthreeOvertime';
+import { REPLAY_SKIP_ON } from '@/lib/babylon/core/replaySkip';
 import { OOP_LOB_FLIGHT_SEC, OOP_LATE_CATCH_CLIP_T, REAL_JUMP_PERSONAL, RUNWAY_STRIDE_SCALE, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG, LAND_LEAD_SEC, LAND_ABSORB_DEEP } from '@/lib/babylon/core/DunkFlagship';   // dunk-flagship
 import { SLAM_VARIANTS_ON, SLAM_POWER_ON } from '@/lib/babylon/core/DunkSlamVariant';   // dunk-flagship Phase 7
 import { FINISH_OVER_RING } from '@/lib/babylon/core/DunkOverRing';   // dunk-flagship P11
@@ -366,6 +367,9 @@ describe('the feel knob catalogue', () => {
     expect(HOOPS_RETREAT_SPEED_K).toBe(0.7);
     // hoops-overtime (new: PR #268's 30 s)
     expect(def('hoops.overtime3v3Sec')).toBe(OVERTIME_3V3_SEC);
+    // hoops-flow (owner 2026-11-12): the 3v3 game clock (new knob, 240 s; 90 = before) and any press skips a replay (new, on; 0 = before)
+    expect(def('hoops.threeGameSec')).toBe(THREE_GAME_SEC); expect(THREE_GAME_SEC).toBe(240);
+    expect(def('hoops.replaySkipOn')).toBe(REPLAY_SKIP_ON); expect(REPLAY_SKIP_ON).toBe(1);
     expect(def('dunk.oopLobFlightSec')).toBe(OOP_LOB_FLIGHT_SEC);   // dunk-flagship (new)
     expect(def('dunk.oopLateCatchClipT')).toBe(OOP_LATE_CATCH_CLIP_T); // dunk-flagship Phase 3 (new)
     expect(def('dunk.realJumpPersonal')).toBe(REAL_JUMP_PERSONAL);     // dunk-flagship Phase 5 (new, off)

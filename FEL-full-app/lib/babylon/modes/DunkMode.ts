@@ -74,6 +74,7 @@ import { BodyMotion, dynamicPose } from '../core/DynamicPosture';   // the runwa
 import { POSTURE, posturePose, chestAimCorrection, hipYawStrip, easePose, clonePose, lowPassK, wrapRad, clamp, POSTURE_TAU, AIM_TAU, AIM_SPLIT, EYES_SPLIT, HEAD_YAW_CAP, HEAD_PITCH_CAP, type PosturePose, type PostureWindow, type PostureInput } from '../core/DunkPosture';   // DUNK-POSTURE: the Posture Poses layer
 import type { PlayOpts } from '../anim/CharacterAnimator';
 import { DunkReplayRecorder, pausableDelay } from '../scene/DunkReplayCam';
+import { ReplaySkipGate, replaySkipOn } from '../core/replaySkip';   // hoops-flow (owner 2026-11-12): any press skips the cut (knob hoops.replaySkipOn)
 import { SoundKit } from '../audio/SoundKit';
 import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
 import { SlamLatch, TakeoffEcho, type LaunchCause } from '../core/slamPress';   // HOTFIX (2026-09-24): the take-off's A is not the slam
@@ -797,6 +798,7 @@ export const DunkMode: ModeDefinition = (() => {
   // DUNK MOTION phase 12: the triple cut is on (the pose replay owns the body — the old re-fly stands aside); the celebration the
   // player threw on the d-pad after the make; the stands' phones
   let cutting = false, celebPick: CelebId | null = null, phoneFlashes: PhoneFlashes | null = null;
+  const cutSkip = new ReplaySkipGate(null);   // hoops-flow: a trigger pulled during the cut is the cut's until it is let go
   // THE MIC (owner, 2026-09-24: "add a MC announcer on the mic at the events so it has better commentary and audio"): the court's
   // MC calls the night — the welcome, who is up, the run, the make with the dunk's name, the judges' number, the misses, the rival,
   // the rounds, the winner — the sidekick answers the big ones, the stands shout, and the rival talks. Silent from take-off to the
@@ -1687,6 +1689,15 @@ export const DunkMode: ModeDefinition = (() => {
       // (or held on from the skip) runs the judges' beats REVEAL_HOLD_SPEED× — the next run-up follows the reveal's own end.
       // dunk-next phase 4: on HIS turn, B (the K key, the host's SKIP chip) goes straight to his card — see skipRivalDunk
       if (!aiFeeding && turn === 'rival' && e.t === 'button' && e.btn === 'B' && e.pressed) { skipRivalDunk(ctx); return; }
+      // hoops-flow (owner 2026-11-12, knob hoops.replaySkipOn): ANY press ends the cut — every button, the d-pad, a trigger pulled (the
+      // crossing: a seated pad re-sends its trigger every frame) — and the press is the cut's, never a prop pick or a run.
+      // A still hurries the judges (held); a d-pad press still throws your celebration as well (DUNK MOTION phase 12: it is called through
+      // the cut). 0: A or B only, as before. Sticks stay the run's (state).
+      if (!aiFeeding && e.t !== 'stick') {
+        const v = cutSkip.see(e, cutting && replaySkipOn());
+        if (v === 'skip') { replay.stop(); if (e.t === 'button' && e.btn === 'A') revealHold = true; console.info('[DUNK-SHOW] triple cut skipped (any press)'); if (e.t !== 'dpad') return; }
+        if (v === 'drop') return;
+      }
       if (!aiFeeding && e.t === 'button' && (e.btn === 'A' || e.btn === 'B')) {
         if (e.pressed && cutting) { replay.stop(); if (e.btn === 'A') revealHold = true; console.info('[DUNK-SHOW] triple cut skipped on the pad'); return; }
         if (e.btn === 'A') { if (!e.pressed) revealHold = false; else if (phase === 'judging' && reveal.active) { revealHold = true; return; } }
