@@ -47,7 +47,8 @@ export interface MovementSpec {
 export const MOVEMENT_SPECS: Readonly<Record<ReviewMovement, MovementSpec>> = {
   squat: {
     id: 'squat', label: 'Squat', view: 'front', faults: SQUAT_FAULTS, label_of: SQUAT_FAULT_LABEL, cues: SQUAT_CUES,
-    setup: 'Phone at hip height, 2 to 3 m away, facing you. Stand still, then go.',
+    // COACH-WORDS (owner-approved cut, 2026-11-13; docs/COACH-WORDING-REVIEW.md row 2.6): was "… Stand still, then go."
+    setup: 'Phone at hip height, 2 to 3 m away, facing you. Then go.',
   },
   lunge: {
     id: 'lunge', label: 'Lunge', view: 'front', faults: LUNGE_FAULTS, label_of: LUNGE_FAULT_LABEL, cues: LUNGE_CUES,
