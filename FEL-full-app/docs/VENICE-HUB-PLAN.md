@@ -417,7 +417,7 @@ Marks: **OWNER** (names, art, money, a redeploy, a device test), **GATE 0** (ani
 
 | Phase | Delivers | Size | Exit gates (all measured) | Marks |
 |---|---|---|---|---|
-| **V1 The hoops park** | `VeniceHubMode` on the Adventure host (run, no combat); the courts district from pieces with the shipped Venice kit (one painted court texture shared by the four courts, §5.2); four courts; walk-up cards launching 1v1, 3v3, dunk, dunk duel, 3-point, carnival, IRL; return to the spot; `/play/hub` unlisted; a `venice_hub` phone row and the static guard | **L** | Phone profile, worst frame ≤ 450 draws / 300 active / 200 MB; playable ≤ 8 s and full ≤ 20 s (rig, then the owner's phone); E2E: walk up → the mode starts in one tap → end → back at the same court; **no mode file in the diff**; every shelf route still one tap; tsc, ci-suite, vitest green | OWNER: the device feel walk; placeholder names stand. GATE 0 check only (walk and idle use existing clips; no rig edit). No ART |
+| **V1 The hoops park** | `VeniceHubMode` on the Adventure host (run, no combat); the courts district from pieces with the shipped Venice kit (one court mesh drawn at the four courts, §5.2); four courts; walk-up cards launching 1v1, 3v3, dunk, dunk duel, 3-point, carnival, IRL; return to the spot; `/play/hub` unlisted; a `venice_hub` phone row and the static guard | **L** | Phone profile, worst frame ≤ 450 draws / 300 active / 200 MB; playable ≤ 8 s and full ≤ 20 s (rig, then the owner's phone); E2E: walk up → the mode starts in one tap → end → back at the same court; **no mode file in the diff**; every shelf route still one tap; tsc, ci-suite, vitest green | OWNER: the device feel walk; placeholder names stand. GATE 0 check only (walk and idle use existing clips; no rig edit). No ART |
 | **V2 The run, party, online** | `run.ts` (queue, next up, winners stay, bots fill); "Run with the party"; 3v3 at six humans; the receive-only watch seat; hub presence for the party | **XL** (half of it in hoops files, after the hoops lanes) | 5 headless runs rotate correctly; 6 real devices play a 3v3 started from the hub; 4 watch a 1v1 from the bench; a host leaving hands over; a teen account sends no text or voice in the hub (server test); the budget holds with 6 bodies in view | OWNER: the netd redeploy, the 6-device test |
 | **V3 The zone tech, on Venice** (Adventure F, moved up) | Per-piece streaming (`spatialGrid` as the index, `AssetContainer` per piece type, load-ahead and drop with hysteresis), the LOD ring, the far silhouette, prefetch on approach; the whole 5 × 8 hub streamed with placeholders | **L** | A 10-minute scripted walk of the whole hub on the phone profile: worst frame within budget, no frame over 100 ms from a load, texture memory flat (nothing leaks); playable ≤ 8 s | none |
 | **V4 The boardwalk spine and the Venice places** | The stage, screen, arcade, plaza, skate park, outdoor gym, paddle courts, the sand's fields, the bike path, the break, the sandlot, as hub-scale places; 26 spots; the shuttle stop's card (zones "coming soon") | **L** | Every Venice spot launches its mode in one tap and returns; each district within its budget; the guard holds every district | OWNER: names for the districts. ART: optional (procedural and kits first) |
@@ -453,9 +453,12 @@ no bodies in the scene; frame rates on this rig are not a phone's and are not re
 What it says:
 - **The whole 5 × 8 hub as placeholders costs a quarter of the phone's draw budget** (117 of 450) with every piece in
   view and no streaming at all. The layout's size is not the problem; the dressing and the bodies will be.
-- **The court kit's real cost is texture memory**: four courts add 39 MB (7 → 46 MB) but only 12 draws. Each painted
-  court makes its own texture (`CourtSurface.mountStreetCourt`, 1024² on a phone, ≈ 5.6 MB each with mips), so four
-  courts are ≈ 22 MB of identical paint. **V1 should paint one court texture and share it** across the park's courts.
+- **The court kit's real cost is texture memory**: four courts add 39 MB (7 → 46 MB) but only 12 draws.
+  **Correction (venice-v1, 2026-11-17, measured):** this plan said four painted courts were ≈ 22 MB of identical paint.
+  That was an estimate, and it was wrong: `CourtSurface.mountStreetCourt` already caches the painted court per scene, so
+  the paint was never duplicated. What each separate court mesh does add is its own material and asphalt detail map
+  (512²): **+3 textures, about 4 MB** for four courts (73 → 77 MB on the phone rig). V1 draws the four courts as
+  instances of one mesh, which removes those 4 MB, and the guard holds it.
 - Active meshes run above draws with the kit (202 against 117) because the palms are instances: Babylon counts each
   instance as active and draws them together. The phone budget's active-mesh line (300) is the one to watch as the
   dressing grows.
@@ -535,3 +538,30 @@ _Sources: the owner's words (2026-11-12, relayed); `docs/ADVENTURE-PLAN.md`; `do
 `scripts/hoops-phone-budget-tests.ts`; `docs/SHIP-READINESS.md`; `server/netd/src/{room,partyRules}.ts`;
 `components/party/social/party-start.tsx`; `components/games/end-screen/end-screen.tsx`;
 `lib/babylon/adventure/{world,br,host}/*`._
+
+---
+
+## 8. V1, built (lane/venice-v1, 2026-11-17)
+
+The owner's go: "Ready to start". What V1 is, as built:
+
+- **`/play/venice`** (unlisted, noindex) mounts **`VeniceHubMode`** (`lib/babylon/modes/VeniceHubMode.ts`, registered, not
+  in `ENABLED_BABYLON_MODES`) on the Adventure host: walk, run, jump; no partner, no combat. It starts itself (a place,
+  not a match). The touch deck uses the floating stick (#600: `venice_hub` added to `FLOAT_STICK_MODES`). The player
+  is the Creator's look through `CharacterPipeline.spawnPlayer` (the body merge, #603, comes with the spawn), drawn at
+  the hoops builder's playing height (#593: `loadRatedTuning` + `ratedLookScale`).
+- **The courts district** (`lib/adventure/venice/hubWorld.ts`, `courtsView.ts`): four courts as instances of ONE court
+  mesh, the shipped Venice hoop on each, the Venice dressing round Court 3, concrete, sand, the bike path and the sea.
+- **Walk-up to play:** Court 1 → Ones, Court 2 (the run) → Threes, Court 3 → Flight Night, Court 4 → Downtown. One
+  tap opens the mode's own page (`lib/adventure/venice/hubReturn.ts launchHref`). On Courts 1 and 2 the party's host also
+  gets "Play with your party" (`partyClient().startTogether`). The party is party-only, as the owner chose.
+- **Coming back:** the end screen shows "Back to Venice", and B goes there, when the game was opened from a court
+  (`exitHrefFor` + `veniceReturnHref`: the query, or the hub's return mark for that page). You arrive beside the same court.
+- **The Play door:** a "Venice Beach" chip on the Play screen (`lib/adventure/venice/door.ts`). It is on by default, and
+  `VENICE_HUB_DOOR=0` hides it. The shelf is unchanged.
+- **Phone budget:** the `venice_hub` row in `mobileBudget.json` (measured by `scripts/probes/venice-hub/hub-rig.mts`:
+  46 draws, 54 active meshes, 73 MB, one body), and the guard `scripts/venice-hub-budget-tests.ts`. The guard holds the
+  place's textures at 41.4 MB (cap 43) and the one court mesh, and its control shows the unshared courts going over.
+- **Load (the rig, SwiftShader, 4× CPU throttle):** playable in 26–33 s, against 55 s for 1v1 on the same rig in the
+  same session. The rig overstates a phone (`docs/SHIP-READINESS.md` §1), so it cannot show the owner's 8 s target
+  either way. The owner's phone is the judge.

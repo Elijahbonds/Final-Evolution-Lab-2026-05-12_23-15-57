@@ -1675,6 +1675,10 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/visual/VenueProps.ts PROP_MERGE_ON',
     hint: 'A prop model whose parts share a material (the far pier: fifteen parts, two materials) is drawn as one mesh per material. Same picture. 0 = one draw per part, as before.',
   },  {
+    id: 'perf.veniceSharedCourt', label: 'Venice hub: one court mesh for the four courts (1) / one per court (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/adventure/venice/courtsView.ts VENICE_SHARED_COURT',
+    hint: 'The hub draws one court mesh at all four courts. Same picture. 0 = a mesh, material and detail map per court, as the prototype did (about 4 MB more on a phone, measured).',
+  },  {
     id: 'perf.sharedGroundOn', label: 'Venice boardwalk: shared ground and sign materials (1) / one per plane (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
     source: 'lib/babylon/nexus/veniceBoardwalk.ts SHARED_GROUND_ON',
     hint: 'The tiled grounds share one painted tile per kind (tiling in the UVs) and the sands one grain; the aprons, sands, seas, surf strips, posts and flags are one mesh each. Same picture. 0 = a texture copy, a material and a draw per plane, as before.',
