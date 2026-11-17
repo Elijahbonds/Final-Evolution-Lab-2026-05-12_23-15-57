@@ -24,7 +24,9 @@ export interface GarmentRead { mesh: string; tear: number; maxRatio: number; flo
 export interface PoseRead { body: string; clip: string; frac: number; garments: GarmentRead[]; poke: number; pokeBySlot: Record<string, number> }
 
 const files: Record<string, string> = { male: 'public/models/candidates/fel-kit-male.glb', female: 'public/models/candidates/fel-kit-female.glb' };
-const fileOf = (k: string) => files[k] ?? `public/models/rivals/${k.replace(/^rival:/, '')}.glb`;
+// KIT-FIT: `file:<path>` measures a candidate body file (a rebake) through the same code; CLIPS=<clip@frac,…> narrows the poses
+const fileOf = (k: string) => (k.startsWith('file:') ? k.slice(5) : files[k] ?? `public/models/rivals/${k.replace(/^rival:/, '')}.glb`);
+const envClips = (): [string, number][] | undefined => (process.env.CLIPS ? process.env.CLIPS.split(',').map((c) => { const [n, f] = c.split('@'); return [n, Number(f ?? 0.5)] as [string, number]; }) : undefined);
 
 export async function measureBodies(keys: string[], opts: { wardrobe?: Wardrobe; clips?: [string, number][]; log?: (r: PoseRead) => void } = {}): Promise<PoseRead[]> {
   const engine = new NullEngine();
@@ -105,7 +107,7 @@ export async function measureBodies(keys: string[], opts: { wardrobe?: Wardrobe;
 async function main(): Promise<void> {
   const keys = process.argv.slice(2).length ? process.argv.slice(2) : ['male', 'female', 'rival:ace', 'rival:grit', 'rival:yara'];
   const silence = console.warn; console.warn = () => undefined; console.info = () => undefined; console.log = ((l) => (...a: unknown[]) => { if (!/^(BJS|\[FEL-)/.test(String(a[0]))) l(...a); })(console.log);
-  const reads = await measureBodies(keys, { log: (r) => console.log(JSON.stringify({ b: r.body, c: `${r.clip}@${r.frac}`, poke: r.poke, pk: r.pokeBySlot, g: r.garments.map((g) => `${g.mesh.replace(/^Kit_/, '')} tear${g.tear} ×${g.maxRatio} float${g.float}${g.tear ? ' ' + JSON.stringify(g.tearBones) : ''}`) })) });
+  const reads = await measureBodies(keys, { clips: envClips(), log: (r) => console.log(JSON.stringify({ b: r.body, c: `${r.clip}@${r.frac}`, poke: r.poke, pk: r.pokeBySlot, g: r.garments.map((g) => `${g.mesh.replace(/^Kit_/, '')} tear${g.tear} ×${g.maxRatio} float${g.float}${g.tear ? ' ' + JSON.stringify(g.tearBones) : ''}`) })) });
   console.warn = silence;
   let tear = 0, floatMax = 0, poke = 0; const ps: Record<string, number> = {}; for (const r of reads) { poke += r.poke; for (const [k, v] of Object.entries(r.pokeBySlot)) ps[k] = (ps[k] ?? 0) + v; for (const g of r.garments) { tear += g.tear; floatMax = Math.max(floatMax, g.float); } }
   if (process.env.POKE_BONES) console.log('BONES', JSON.stringify(pokeBones));
