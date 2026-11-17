@@ -865,3 +865,21 @@ restores the old behaviour exactly.
   flown to the palm at the gather's 8.1 m/s (measured on the 3v3 speed set: 32-41 cm off the palm), then passed to the dunking hand.
   Feel-check: sprint in and dunk off a low dribble: the hand goes down to the ball, no snatch, and the ball is in the dunking hand
   before the feet leave.
+
+## move-feel-2, 2026-11-17 (owner: "stick right runs a straight line while held"; "redesign the phone stick")
+
+Two NEW knobs, **shipped ON** (assumption, flagged: the owner chose both; each knob's 0 restores the game before), pinned in
+`lib/feel-panel/knobs.test.ts`, each held by its own test:
+- `hoops.stickFrameHold` 1 (group "Hoops · movement"; `core/StickFrame.ts`, read in `OneVOneMode` camRel and `ThreeVThreeMode`'s wish): the
+  camera's flat axes are captured when the stick leaves centre (past 0.2) and held while it stays out; the stick home, or the camera more
+  than 75° from the held frame (a cut), takes the live camera again. Measured on the rig (a stick held still while the camera orbits the
+  rim): the run bent 36° over a 1 s sprint and 4.6° over a 0.7 s cut leg → 0° and 0° (3v3 cut leg 0°). The trade: by the time you let go,
+  "up" on the stick is the court direction it was when you pushed, up to the camera's turn since (18–35° a second held). 0 = the live camera
+  every frame.
+- `touch.floatStick` 1 (group "Hoops · movement"; `lib/babylon/ui/floatStick.ts`, TouchOverlay `FloatStick`; 1v1 and 3v3 only): a 172 × 136
+  zone where the fixed stick sat; the stick's centre appears under the thumb, its base 144 px (1.5× the old 96), full speed at its rim, a
+  10 % radial dead zone rescaled from 0. Measured (`scripts/probes/move-feel/phone-stick.mjs`, the real deck): thumb travel to full speed
+  48 → 70 px upright (7.9 → 11.5 mm, assumption 6.1 px a mm), 40.8 → 61.2 px sideways (6.7 → 10.0 mm); a thumb landing 20 px off the
+  stick's centre sent 0.42–0.49 (a jog) and now sends 0 (a standstill); a 30 px push sent full speed and now 0.35. No overlap with any other
+  control, inside the stage, in both orientations. "The same push always the same speed": with `hoops.stickSprintFallback` 0 and
+  `hoops.gearBlendBand` 0.2 (move-feel) the stick's scale has no hidden turbo and no step. 0 = the fixed 96 px stick.

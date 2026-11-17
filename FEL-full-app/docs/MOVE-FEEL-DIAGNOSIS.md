@@ -131,6 +131,15 @@ anyone else until the owner says which to keep.
 If the owner wants a little more snap after those, H3a's tuned numbers are the next step (they change TUNED numbers, so only on the owner's
 word): `hoops.handlerTurnDeg` 540 → 720 and `hoops.jerk` 0 → 900 (docs/FEEL-PANEL.md, the H3a preset).
 
+## 5b. Built after the owner's answers (2026-11-17, lane/move-feel-2)
+
+- **#1, the straight line:** `hoops.stickFrameHold` 1 (core/StickFrame). A held stick's run bend 36° (sprint) / 4.6° (cut leg) → 0° / 0° on the
+  rig; 3v3 cut leg 0°. Its off value restores the old stick.
+- **#4, the phone stick:** `touch.floatStick` 1 (lib/babylon/ui/floatStick). Full speed 7.9 → 11.5 mm of thumb upright, 6.7 → 10.0 mm sideways;
+  the landing thumb is a standstill (was a jog 0.42–0.49); a 10 % dead zone; clear of every other control in both orientations. Before / after:
+  `scratchpad/move-feel/phone/phone-stick.jpg`. Found while checking: the deck's d-pad arrows are 24 × 24 px upright (20.4 sideways), under the
+  44 px tap rule — before this change too (the floating zone's column trims them to 23.3 px upright).
+
 ## 6. Waiting on the owner
 
 1. **Feel §5 on the phone** and say which to keep (*recommend:* all six; the first is the biggest).
