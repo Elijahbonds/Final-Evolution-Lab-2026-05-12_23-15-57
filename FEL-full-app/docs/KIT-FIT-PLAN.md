@@ -15,8 +15,9 @@ skin under it (so the layers keep their gaps on any build). The game's existing 
 flare, the waistband fit, the lift) stay, and later phases move them into the asset too. Phase 1 is built in this lane, with every rig
 byte-identical: the short's legs (job 1) and the football jersey (job 2) are refitted, and the player's kit has real UVs.
 Phase 2 (§9) found and fixed job 3 (the Creator's shape was undoing the clothes' fit on every build), fitted the rivals' tees,
-and reworked the short's leg fit after a steady rig showed it let more skin through on screen. **Status: the Closet's default
-male and female still show more skin under the short than phase 0 (§9.4); every other measured body is better.**
+and measured the short's leg fit on a steady rig: it cut torn edges ~80 % but let more skin through on screen on 11 of 14 bodies,
+so it **ships off** and the shorts keep phase 0's shape and weights (with their UVs). Job 1 (the crotch) needs a one-piece short:
+the in-house art job (§9.4). Status against phase 0, every measured body: §9.6.
 
 ## 1. What the best games do (plain words)
 
@@ -157,7 +158,7 @@ provably untouched. No new mesh, material, texture or draw.
 
 | Phase | What | Exit gate (measured) |
 |---|---|---|
-| **1 — Fit the kit (built)** | §4: UVs, the short's legs, the jersey (follow-the-body built but off) | Met: `scripts/kit-fit-tests.ts` green (GATE 0 fingerprints of all 29 rebaked files, UVs, leg tubes, jersey); torn edges on the kit bodies ≤ 30 % of before (82 % / 80 % fewer); farthest vertex ≤ 0.10 m; flicker down a third on screen. **Not met**: skin through cloth on screen did not drop overall — the seam slits (§3.3) |
+| **1 — Fit the kit (built)** | §4: UVs, the jersey; the short's leg fit and follow-the-body built but off (§9) | Met: `scripts/kit-fit-tests.ts` green (GATE 0 fingerprints of all 29 rebaked files, UVs, leg tubes, jersey); torn edges on the kit bodies ≤ 30 % of before (82 % / 80 % fewer); farthest vertex ≤ 0.10 m; flicker down a third on screen. **Not met**: skin through cloth on screen did not drop overall — the seam slits (§3.3) |
 | **2 — Bake the fit into every garment** | FIRST: close the seam slits the leg fit widened (weld or overlap the short's leg tubes and band in the bake; game-scene skin under the short back to ≤ its before, 1,138 / 975 px); job 3 redone: the garment follows the skin it COVERS (projection along its normal) and a layer-order metric (the short drawn over the tee) on the rig; the slivers of thigh at the short's inner hem (§3.3); the rivals' tees (finding 6) through the same transfer; the body-hide mask, the lift and the edge flare baked into each garment file (the runtime keeps them as a fallback), so a spawn does no fitting on the CPU; the female tee's bust fold in its UVs (11 % shared texels) | Rival torn edges ≤ 20 a body over the 10 poses; mask and lift time per spawn → 0 ms on a baked garment (today paced over frames); skin through cloth ≤ 1 % of garment pixels on the browser rig |
 | **3 — The right garments** | A real basketball jersey (wide armholes, hem over the short) for the court modes and as `top_bonds`, cut from the CC0 MakeHuman tee in Blender like the rivals' sleeveless jersey (`style.py cut_sleeves`), with a second UV set for the player's own number; a clean football jersey re-model (symmetric, no mirrored print, no emissive, ≤ 4k triangles) | A 1v1 / 3v3 frame reads "basketball kit" (owner's eye); numbers per player; the football jersey under 4k triangles |
 | **4 — Cloth that moves** | A cheap sway on the short's hem and the jersey's tail in the vertex shader, driven by the body's speed (no new bones) | No new joint; ≤ 0.2 ms a frame on the phone profile; never through the legs (the browser rig's poke at the hem) |
@@ -227,19 +228,22 @@ all 24 rivals and kept on the 10 where both the tee's torn edges and the skin th
 dash 40 → 8, grit 30 → 8, lux 38 → 18, tusk 24 → 18, …: `bake.ts RIVAL_TEE_SMOOTHED`); on the other 14 it let more skin
 through (their builds fill the tee differently), so they keep their own.
 
-### 9.4 The short (item 1) — improved, not yet at phase 0 on the Closet's default bodies
+### 9.4 The short (item 1) — the leg fit ships OFF; the fix is a one-piece short
 
 The short is three pieces whose legs crossed into each other. The phase-1 fit put each leg on its own thigh, and eased that move
 into the neighbours, which pulled the front and back of each tube onto the thigh. Now an eased vertex never ends closer than 15 mm
-to its thigh. Measured (steady rig, browser, phase 0 → now):
-
-KIT-FIT-P2-NUMBERS
+to its thigh. Measured on the steady browser rig against phase 0, all 14 bodies (50 / 45 / 21 shots a body): skin under the short
+rose on every Closet, game and rival body even so (Closet male 2,863 → 4,719 px, game female 906 → 3,428, the rivals +120 to
++450), while the headless torn edges fell ~80 % (male 98 → 18). Pixels on the cloth seen from OUTSIDE (pokeFront) confirm a real
+part of it (Closet male +11 %), not only skin seen through the leg openings. So the leg fit is opt-in (`bake.ts --legs`) and the
+shipped shorts are phase 0's shape and weights.
 
 Tried and measured worse: lowering the band over the crotch (torn edges 18 → 30 male, 27 → 72 female), the body's weights only
 where the old ones were wrong (no change on screen), a larger ease (torn edges 20 → 38 → 61), stopping the cloth at the midline
 (47 / 42). What is left is coverage: in phase 0 the two crossed tubes double-covered the gap between the legs; any fit that keeps
-each tube on its own leg opens it. **The remaining fix is the garment itself**: a one-piece short with a real crotch (the in-house
-art job, on the owner's Mac, alongside the jerseys — docs/JERSEY-BUILD-STEPS.md's process applies to a short).
+each tube on its own leg opens it. **The fix is the garment itself**: a one-piece short with a real crotch, made the way the jerseys are
+(docs/JERSEY-BUILD-STEPS.md's process applies: MakeHuman `cortu_jeans_shorts` welded into one piece in Blender, exported with
+`fit-outfit.py --slot shorts`), then checked with `scripts/kit-glitch-tests.ts` (tears) and the browser rig (skin) before it ships.
 
 ### 9.5 Baking the skin-hiding into the files, and the perf lane's body merge (item 4 — written up, not built)
 
@@ -258,4 +262,31 @@ change with the browser rig before/after. Expected: no mask work per spawn on a 
 
 ### 9.6 Totals, every measured body (steady rig, desktop, phase 0 → phase 1 + 2)
 
-KIT-FIT-P2-TOTALS
+As shipped (leg fit off), the browser rig with steady poses, desktop, 50 / 45 / 21 / 35 shots a body (Closet / game / rival /
+football), phase 0 → now:
+
+| Body | Skin through cloth, px | of which under the short | Flicker, px |
+|---|---|---|---|
+| closet-male-default | 16,478 → 16,431 (better) | 2,863 → 2,865 | 42 → 63 (worse) |
+| closet-female-default | 13,255 → 13,569 (worse) | 3,029 → 3,364 | 52 → 55 (worse) |
+| closet-male-girth-max | 20,228 → 19,144 (better) | 6,970 → 5,732 | 45 → 50 (worse) |
+| closet-female-girth-max | 19,044 → 19,100 (worse) | 7,572 → 7,823 | 56 → 51  |
+| game-male-default | 18,069 → 14,694 (better) | 3,702 → 327 | 28 → 45 (worse) |
+| game-female-default | 10,711 → 11,598 (worse) | 906 → 2,083 | 38 → 22  |
+| game-male-girth-max | 10,495 → 11,854 (worse) | 1,149 → 3,786 | 14 → 36 (worse) |
+| rival-ace | 3,692 → 3,775 (worse) | 498 → 582 | 4 → 3  |
+| rival-dash | 3,838 → 3,667 (better) | 711 → 566 | 5 → 5  |
+| rival-grit | 3,565 → 3,798 (worse) | 473 → 608 | 5 → 1  |
+| rival-halo | 3,345 → 3,061 (better) | 515 → 475 | 5 → 5  |
+| rival-yara | 3,891 → 3,570 (better) | 572 → 450 | 6 → 6  |
+| pack-football-player | 36,552 → 30,472 (better) | 1,493 → 1,975 | 60 → 76 (worse) |
+| pack-football-female | 30,255 → 27,819 (better) | 2,156 → 2,032 | 41 → 45 (worse) |
+
+**Not every body is better (the coordinator's exit bar for the PR).** Better: the in-game male, the girth-max Closet male, both
+football bodies on skin (the jersey), three of five rivals. About equal: the Closet male. Worse: the Closet female (+2 %), the in-game
+female and the in-game girth-max male — with phase 0's short shape and weights, so not the leg fit: the short is now one welded
+mesh with UVs (it was cut into one cell a triangle at runtime) and the runtime fits (the waistband tuck, the edge flare) act on it
+differently in the game scene. Two of the smoothed-tee rivals show more skin through the tee on screen (ace 882 → 937, grit
+1,074 → 1,205) although both measured better headless: the headless count does not stand in for the screen there. Flicker is up
+by tens of pixels on several bodies. Those are the next investigation (§5 phase 2).
+Contact sheet: `kit-fit-before-after.jpg` in the lane's scratch folder (`…/scratchpad/kit-fit/rig2/`).
