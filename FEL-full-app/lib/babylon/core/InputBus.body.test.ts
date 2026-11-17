@@ -18,6 +18,7 @@ import path from 'node:path';
 import { InputBus, liveInputBuses, publishBodyToLive, type BodyOut, type BodyPacket, type FelInput } from './InputBus';
 import { isWakeInput, WakeLatch, PauseLedger } from './StartWake';
 import { LocalInputSource } from './PlayerSlot';
+import { resetFeelForTests, setFeelOverride, setFeelSession, setFeelUser } from '../../feel-panel/feel';
 import { HAPTIC } from '../premium/Haptics';
 import type { BodyEvent, BodyRead } from '@/lib/pose/BodyReader';
 import type { BodyChannels } from '@/lib/pose/bodyChannels';
@@ -563,7 +564,13 @@ describe('step 4b: what a mode receives across a pause (through the bus, the lat
     expect(h.verbs()).toEqual({ turbo: true, sprint: true, intense: true });
   });
 
-  it('a WASD-only player keeps the stick-magnitude sprint through a resume (no trigger ever reported)', () => {
+  // TEST CHANGED (lane/move-feel, owner 2026-11-17): the stick-magnitude sprint is off by default (hoops.stickSprintFallback 0); what this
+  // pins — a resume sends no trigger that would end the fallback — is read with the fallback opened at 1, as it was
+  it('a WASD-only player keeps the stick-magnitude sprint through a resume (no trigger ever reported; hoops.stickSprintFallback 1)', () => {
+    setFeelUser(true); setFeelSession(null); expect(setFeelOverride('hoops.stickSprintFallback', 1)).toBe(1);
+    try { wasdResume(); } finally { resetFeelForTests(); }
+  });
+  function wasdResume(): void {
     const r = rig(); r.bus.start();
     const h = harness(r);
     r.key('w'); later();
@@ -571,7 +578,7 @@ describe('step 4b: what a mode receives across a pause (through the bus, the lat
     r.key('Escape'); r.key('Escape', false); later(2000);
     r.key('k'); later(); r.key('k', false);
     expect(h.verbs()).toEqual({ turbo: false, sprint: true, intense: false });
-  });
+  }
 
   it('what the pause did change is re-sent: W let go of during the pause stops the hero; a Space charge let go reaches 0', () => {
     const r = rig(); r.bus.start();

@@ -245,6 +245,11 @@ const VERTICAL_LEAD_SHARE = 0.25;
  *  at once. TUNED (new) — steady running above 1 m/s keeps the same lead as before; what changes is how fast it may swing. */
 export const CAM_LEAD_EASE_SEC = 0.2;
 export const CAM_LEAD_FULL_MPS = 1.0;
+/** (new, lane/move-feel 2026-11-12) 0 = the game before 2026-11-17: 1v1 and 3v3 keep the RAW look-ahead (ModeHarness leaves `leadEase` off for the hoops
+ *  lanes' modes), so a hoops start, stop, cut or reversal swings the look-target in one frame — the 'turn whip' of the play camera. 1 = the
+ *  eased look-ahead every other follow mode has had since gameplay-clean P2 #10 (its own two knobs, `camera.leadEaseSec` and
+ *  `camera.leadFullMps`). Read live (knob `hoops.camLeadEase`) on the modes ModeHarness names (`leadEaseHoopsKnob`). */
+export const HOOPS_CAM_LEAD_EASE = 1;   // TUNED 0 → 1 (owner 2026-11-17: "turn all six on now"; 0 restores the raw lead)
 /** How much of the frustum half-height an objective may pull the target by. */
 const OBJECTIVE_BIAS_SHARE = 0.6;
 
@@ -449,6 +454,8 @@ export class CameraDirector {
   public broadcast = 0;
   /** GAMEPLAY-CLEAN P2 #10: ease the look-ahead (ModeHarness turns it off for the modes their own lanes hold). */
   public leadEase = true;
+  /** lane/move-feel: where `leadEase` is off, the knob `hoops.camLeadEase` may turn it on (ModeHarness sets this for 1v1 / 3v3). */
+  public leadEaseHoopsKnob = false;
   private leadSm: Vector3 | null = null;
   private leadRear = false;
 
@@ -899,7 +906,7 @@ export class CameraDirector {
     // A little vertical lead is still wanted, so you can see what you are
     // dropping into; it is just not worth a full metre-for-metre share.
     let ahead = chest;
-    const easeLead = this.leadEase && velocity !== undefined;
+    const easeLead = (this.leadEase || (this.leadEaseHoopsKnob && feel('hoops.camLeadEase', HOOPS_CAM_LEAD_EASE) > 0)) && velocity !== undefined;   // lane/move-feel: + the hoops knob
     if (velocity && velocity.lengthSquared() > 0.01) {
       const dir = velocity.normalizeToNew();
       const flat = new Vector3(dir.x, 0, dir.z);

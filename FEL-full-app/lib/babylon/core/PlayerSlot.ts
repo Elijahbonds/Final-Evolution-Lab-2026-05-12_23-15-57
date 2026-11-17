@@ -15,6 +15,8 @@
 
 import { Vector3 } from '@babylonjs/core';
 import type { FelInput } from './InputBus';
+import { feel } from '../../feel-panel/feel';   // lane/move-feel: the stick's turbo fallback is a feel knob (1 = as shipped)
+import { HOOPS_STICK_SPRINT_FALLBACK } from './HoopsStick';
 
 export interface Intent {
   moveX: number; moveY: number;        // -1..1, already deadzoned
@@ -203,7 +205,8 @@ export class LocalInputSource implements ControlSource {
       moveX: this.moveX, moveY: this.moveY,
       // R2 AND a direction. The magnitude fallback survives only until a trigger has reported once, so a pad whose
       // triggers have not been touched yet still moves the way it always did rather than refusing to run.
-      sprint: this.turboHeld || (!this.turboSeen && Math.hypot(this.moveX, this.moveY) > 0.85),
+      // lane/move-feel: `hoops.stickSprintFallback` 0 ends the fallback — the turbo is the button (or the trigger) only, from the first frame
+      sprint: this.turboHeld || (!this.turboSeen && Math.hypot(this.moveX, this.moveY) > 0.85 && feel('hoops.stickSprintFallback', HOOPS_STICK_SPRINT_FALLBACK) > 0),
       turbo: this.turboHeld,
       action: this.actionEdge, actionHeld: this.held,
       pass: this.passEdge, steal: this.stealEdge, jump: this.jumpEdge,
