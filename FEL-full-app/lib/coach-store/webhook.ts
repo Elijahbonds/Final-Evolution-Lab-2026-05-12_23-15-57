@@ -6,6 +6,8 @@ import { PLATFORM_FEE_RATE } from '@/lib/fees';
 import { termsVersionStatus } from '@/lib/store-terms';
 import { isVerifiedAdult } from './adult';
 import { slotStillFree } from './slotCheck';
+import { isFoundersCapEnabled } from '@/lib/flags';
+import { FOUNDERS_CLOSED_STATUSES, foundersStep, isFoundersListing, markFoundersRefundDue, withFoundersSpot } from './foundersCap';
 import {
   coachStorePostings,
   coachStoreSplit,
@@ -270,7 +272,7 @@ async function onCheckoutSession(session: Stripe.Checkout.Session, meta: Meta, _
   const subscription = session.mode === 'subscription';
   const fee = subscription ? 0 : await stripeFeeCents(session);
   const instructor = await prisma.instructor.findUnique({ where: { id: access.instructorId }, select: { userId: true } });
-  const moved = await prisma.programAccess.updateMany({
+  const activate = (db: typeof prisma) => db.programAccess.updateMany({
     where: { id: access.id, status: 'PENDING' },
     data: {
       status: 'ACTIVE',
@@ -281,6 +283,36 @@ async function onCheckoutSession(session: Stripe.Checkout.Session, meta: Meta, _
       stripeSubscriptionId: typeof session.subscription === 'string' ? session.subscription : session.subscription?.id ?? null,
     },
   });
+  // FOUNDERS-CAP-1 (L2 "re-check at fulfilment"): a paid Founders checkout becomes a member only while fewer than
+  // FOUNDERS_SPOTS other rows hold a spot (ACTIVE/PAST_DUE/PAUSED), counted under the same Founders lock as checkout.
+  // Over the cap the row is REFUND_DUE (never ACTIVE, no sale or referral posted), its subscription is cancelled at once
+  // (Cyber H1c), and the refund is a manual Dashboard step from the listFoundersRefundDue list (Cyber Q3).
+  // v3 (PM (c) / Cyber V3): every step of this Founders block runs through foundersStep, so a failure surfaces as a
+  // FoundersCapError — the webhook still throws it (Stripe retries); verify-session answers the buyer instead of a 500.
+  let moved: { count: number };
+  if (isFoundersCapEnabled() && (await foundersStep('checkout_listing', () => isFoundersListing(prisma, access.listingId)))) {
+    const subId = typeof session.subscription === 'string' ? session.subscription : session.subscription?.id ?? null;
+    if (FOUNDERS_CLOSED_STATUSES.includes(access.status as (typeof FOUNDERS_CLOSED_STATUSES)[number])) {
+      // An invoice.paid that landed first already refused this row (H1a), or it was refunded/cancelled: never ACTIVE.
+      if (access.status === 'REFUND_DUE') {
+        await foundersStep('checkout_cancel', () =>
+          markFoundersRefundDue(prisma, getStripe(), { accessId: access.id, from: [], subscriptionId: subId, source: 'checkout' }));
+        return 'refund_due';
+      }
+      return 'noop';
+    }
+    const claim = await foundersStep('checkout_claim', () => withFoundersSpot(
+      prisma, { now: new Date(), exceptId: access.id, includePending: false }, (tx) => activate(tx),
+    ));
+    if (!claim.ok) {
+      await foundersStep('checkout_cancel', () =>
+        markFoundersRefundDue(prisma, getStripe(), { accessId: access.id, from: ['PENDING'], subscriptionId: subId, source: 'checkout' }));
+      return 'refund_due';
+    }
+    moved = claim.value;
+  } else {
+    moved = await activate(prisma);
+  }
   if (moved.count === 0) return 'noop';
   // A subscription's money is recorded on invoice.paid so the first invoice and the checkout event are not two sales.
   if (!subscription && instructor) {
@@ -322,6 +354,33 @@ async function onInvoicePaid(event: Stripe.Event, meta: Meta, idempotencyKey: st
       ? await prisma.programAccess.findFirst({ where: { stripeSubscriptionId: subId } })
       : null;
   if (!access) return;
+  // FOUNDERS-CAP-1 (Cyber H1): under the cap, invoice.paid never makes a Founders member past the cap. ACTIVE/PAST_DUE
+  // renew as before; REFUND_DUE/REFUNDED/CANCELED never go back to ACTIVE (REFUND_DUE: subscription cancelled again,
+  // idempotently); any other row (PENDING when invoice.paid beats checkout.session.completed, PAUSED, EXPIRED) becomes
+  // ACTIVE only through withFoundersSpot. A refused or closed row posts no sale and no referral.
+  if (isFoundersCapEnabled() && access.status !== 'ACTIVE' && access.status !== 'PAST_DUE' && (await isFoundersListing(prisma, access.listingId))) {
+    if (access.status === 'REFUND_DUE') {
+      await markFoundersRefundDue(prisma, getStripe(), { accessId: access.id, from: [], subscriptionId: subId ?? access.stripeSubscriptionId, source: 'invoice' });
+      return;
+    }
+    if (FOUNDERS_CLOSED_STATUSES.includes(access.status as (typeof FOUNDERS_CLOSED_STATUSES)[number])) {
+      // v3 (PM (b) / Cyber V1): a REFUNDED or CANCELED member whose subscription still billed is owed this money back:
+      // the row goes REFUND_DUE (onto the refund list), the subscription is cancelled (same idempotent helper), no sale
+      // or referral. Logged by FEL row id and source only.
+      await markFoundersRefundDue(prisma, getStripe(), { accessId: access.id, from: [access.status], subscriptionId: subId ?? access.stripeSubscriptionId, source: `invoice_on_${access.status.toLowerCase()}` });
+      return;
+    }
+    const claim = await withFoundersSpot<{ count: number }>(prisma, { now: new Date(), exceptId: access.id, includePending: false }, (tx) =>
+      tx.programAccess.updateMany({
+        where: { id: access.id, status: access.status },
+        data: { status: 'ACTIVE', ...(subId && !access.stripeSubscriptionId ? { stripeSubscriptionId: subId } : {}) },
+      }));
+    if (!claim.ok) {
+      await markFoundersRefundDue(prisma, getStripe(), { accessId: access.id, from: [access.status], subscriptionId: subId ?? access.stripeSubscriptionId, source: 'invoice' });
+      return;
+    }
+    if (claim.value.count === 0) return; // the row moved under us; the next delivery sees its new status
+  }
   const grant = access.scope === 'all' && access.beneficiary === 'self';
   const credits = nextReviewCredits(access.reviewCredits, access.lastCreditInvoiceId, invoice.id, grant);
   const periodEnd = invoice.lines?.data?.[0]?.period?.end;
@@ -366,6 +425,9 @@ async function onSubscription(event: Stripe.Event, meta: Meta): Promise<void> {
     ? await prisma.programAccess.findUnique({ where: { id: meta.rowId } })
     : await prisma.programAccess.findFirst({ where: { stripeSubscriptionId: sub.id } });
   if (!access) return;
+  // FOUNDERS-CAP-1 (Cyber Q3): a REFUND_DUE row is left as it is until the refund lands — the cancel we sent fires
+  // customer.subscription.deleted, which must not turn it CANCELED (that would drop it off the refund-due list).
+  if (access.status === 'REFUND_DUE' && isFoundersCapEnabled()) return;
   const endUnix = subscriptionPeriodEndUnix(sub);
   const ended = event.type === 'customer.subscription.deleted' || sub.status === 'canceled';
   await prisma.programAccess.update({
@@ -392,7 +454,9 @@ async function onReverse(meta: Meta, dispute: boolean): Promise<void> {
   if (meta.rowId) {
     await prisma.booking.updateMany({ where: { id: meta.rowId, status: 'PAID' }, data: { status: dispute ? 'DISPUTED' : 'REFUNDED', slotLock: null } });
     await prisma.programAccess.updateMany({
-      where: { id: meta.rowId },
+      // FOUNDERS-CAP-1: under the cap a dispute never turns a REFUND_DUE row PAUSED (PAUSED holds a Founders spot and
+      // this buyer is not a member); a refund still moves it to REFUNDED, which takes it off the refund-due list.
+      where: dispute && isFoundersCapEnabled() ? { id: meta.rowId, status: { not: 'REFUND_DUE' } } : { id: meta.rowId },
       data: { status: dispute ? 'PAUSED' : 'REFUNDED', codeActive: false },
     });
     await prisma.coachStoreReferral.updateMany({ where: { sourceId: meta.rowId, status: { in: ['PENDING', 'PAYABLE'] } }, data: { status: 'REVERSED' } });
