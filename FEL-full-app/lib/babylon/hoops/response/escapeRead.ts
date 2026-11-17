@@ -25,10 +25,18 @@ import { readTheMan, moveLeanMps, type ManRead, type ReadVerdict } from '../rule
  *  late man (stunSec) is frozen on the spot — the backpedal he was in stops dead, so the read cost space there (measured +0.58-0.62 m
  *  against +0.17-1.01 m without it) — and the 3v3 hop-back is left as it was until its "late" lets the backpedal run on. */
 export const ESCAPE_READ_ON = 1;
-/** A crossing escape in a trap reads both men (1) / as today (0). Knob `hoops.trapReadOn`. OFF: not measured well — the split never
- *  bought space on the rig (the bodies' 1.10 m stand-off: the handler cannot pass between two men closer than 2.2 m, so he carried them
- *  with him at 1.10 m), and with the gap counted for that body the closed-side strip had not been exercised yet. */
-export const TRAP_READ_ON = 0;
+/** A crossing escape in a trap reads both men (1) / as today (0). Knob `hoops.trapReadOn`. ON since the owner's answer (2026-11-17: the
+ *  trap works both ways — a split when there is room, a steal on the closed side), with the squeeze below; FLAGGED. */
+export const TRAP_READ_ON = 1;
+/** THE SQUEEZE (owner 2026-11-17: "let the handler slip between two defenders when they are out of position, ~1.6 m apart"): for the
+ *  split's SQUEEZE_SEC the handler's body meets the two trappers at SQUEEZE_STANDOFF_M instead of the game's 1.10 m stand-off — a
+ *  shoulder through the gap — so two men 2 × SQUEEZE_STANDOFF_M apart can be split (1) / the 1.10 m stand-off holds, 2.2 m (0).
+ *  Knob `hoops.trapSqueezeOn`. */
+export const TRAP_SQUEEZE_ON = 1;
+/** The handler-to-trapper stand-off through a squeeze (m, centre to centre; the owner's ~1.6 m apart / 2). Knob `hoops.trapSqueezeM`. */
+export const SQUEEZE_STANDOFF_M = 0.8;
+/** How long the squeeze lasts from the cross (s): long enough to get the hips through at a drive. Knob `hoops.trapSqueezeSec`. */
+export const SQUEEZE_SEC = 0.6;
 /** How late a beaten man is (s): he brakes where the escape left him and stands for this long — the same as a man a move SHOOK
  *  (BasketballCore ANKLE_BREAK_STUN_SEC 0.7). Measured (1v1, a step-back off a drive he was backpedalling from, the stick let go): 0.45
  *  bought nothing over no read (0.66-0.77 m vs 0.60-0.81), 0.7 bought 1.72-1.80 m in 0.8 s (2.82-2.90 m from him vs 1.77-1.91 with no
@@ -48,6 +56,12 @@ export const SIDE_MIN_M = 0.15;
 export const escapeReadOn = (): boolean => feel('hoops.escapeReadOn', ESCAPE_READ_ON) >= 0.5;
 export const escapeLateSec = (): number => feel('hoops.escapeLateSec', ESCAPE_LATE_SEC);
 export const trapReadOn = (): boolean => feel('hoops.trapReadOn', TRAP_READ_ON) >= 0.5;
+export const trapSqueezeOn = (): boolean => feel('hoops.trapSqueezeOn', TRAP_SQUEEZE_ON) >= 0.5;
+export const squeezeStandoffM = (): number => feel('hoops.trapSqueezeM', SQUEEZE_STANDOFF_M);
+export const squeezeSec = (): number => feel('hoops.trapSqueezeSec', SQUEEZE_SEC);
+/** How far apart two trappers must be (centre to centre, m) for a body to pass between: one stand-off each side — the squeeze's when it
+ *  is on, else the game's (PASS_APART_M). */
+export const passApartM = (): number => (trapSqueezeOn() ? 2 * squeezeStandoffM() : PASS_APART_M);
 
 /** The step-back / hop-back against one man: off balance, or giving ground (moving away from the handler faster than the lean line). */
 export function stepBackRead(man: ManRead): ReadVerdict {
@@ -62,14 +76,15 @@ export type TrapVerdict = { kind: 'split' } | { kind: 'strip'; by: number } | { 
 
 /** A crossing escape inside a double team, going to `side` (the side the ball ends on, the athlete's), from `handler` facing `yaw`. */
 export function trapEscape(handler: XZ, yaw: number, side: 'left' | 'right', men: readonly TrapMan[],
-  k: { gapMinM?: number; reachM?: number } = {}): TrapVerdict {
+  k: { gapMinM?: number; reachM?: number; passApartM?: number } = {}): TrapVerdict {
   const gapMin = k.gapMinM ?? feel('hoops.trapGapMinM', TRAP_GAP_MIN_M), reach = k.reachM ?? feel('hoops.escapeStripReachM', ESCAPE_STRIP_REACH_M);
+  const apartMin = k.passApartM ?? passApartM();
   const rx = Math.cos(yaw), rz = -Math.sin(yaw), s = side === 'right' ? 1 : -1;   // anim/athleteSide.athleteRight
   const lat = (p: XZ): number => (p.x - handler.x) * rx + (p.z - handler.z) * rz;
   const dist = (p: XZ): number => Math.hypot(p.x - handler.x, p.z - handler.z);
   if (men.length >= 2) {
     const [a, b] = men;
-    const gap = Math.hypot(a.at.x - b.at.x, a.at.z - b.at.z) - PASS_APART_M;
+    const gap = Math.hypot(a.at.x - b.at.x, a.at.z - b.at.z) - apartMin;
     if (gap >= gapMin) return { kind: 'split' };
   }
   let by = -1, best = Infinity;

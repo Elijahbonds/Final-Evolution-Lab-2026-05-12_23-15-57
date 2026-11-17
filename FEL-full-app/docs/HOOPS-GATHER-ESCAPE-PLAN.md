@@ -407,6 +407,15 @@ with a real player (`hoops-audit/mash-audit.mjs PLAYER=script` and `mash`): the 
     frames in (phase A). The fix is a key between them (the hand coming round the hip) or a longer 0.25 → 0.34, re-verified on the rig
     (GATE 0: the reel and the hand probe before and after). The BTB slide (`SLIDE_V2`, its own keys) measured 30°/frame: not affected.
 
+- **The owner's answers (2026-11-17), built on lane/hoops-gather-6:**
+  - **The squeeze through a trap** (`hoops.trapSqueezeOn`, and `hoops.trapReadOn` now ON): 5 splits / 4 steals of 9 crossing reads
+    with it, 2 / 6 (and 2 open) without. A split leaves the second man 1.5-2.6 m off in 0.8 s; the near man stays at 1.1-1.5 m.
+  - **The drive dunk gathers, then goes up** (`hoops.dunkGatherOn` ON): 1.7-12.5 cm off the palm on the gathered dunks (59-72 cm yanks
+    with it off); the take-off 100-267 ms after the press (today 0).
+  - **A pump ends the dribble** (`hoops.pumpEndsDribbleOn` ON; overrides #601's assumption): see FEEL-PANEL; the step-through after a
+    pump still comes on the squeeze.
+  - **The 3v3 step-back's "late" that lets the backpedal run on:** not done in this pass (the 3v3 read stays off; see above).
+
 ## 6. The worst moments, drawn
 
 One JPG, `scratchpad/hoops-gather/gather-escape-worst.jpg` (the lane's scratch folder; its absolute path is in the lane's report): five

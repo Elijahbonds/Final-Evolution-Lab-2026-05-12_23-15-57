@@ -901,9 +901,24 @@ Two NEW knobs, **shipped ON** (assumption, flagged: the owner chose both; each k
   step back: the space is yours; step back on a man standing in front of you: he is still there.
 - `hoops.escapeLateSec` 0.7 s (G3): how long a beaten man brakes and stands before he recovers: the same as a man a move shook
   (`ANKLE_BREAK_STUN_SEC`). Measured: 0.45 s bought nothing over no read (the man braked onto the hop and closed again inside 0.8 s).
-- `hoops.trapReadOn` 0 (G3; OFF, the owner's call): in a 3v3 double team on the ball, a crossing move reads both men: SPLIT when a body
-  fits between them (2.2 m apart, the bodies' 1.10 m stand-off each side, plus `hoops.trapGapMinM` 0 m): both men late; STRIPPED when
-  it is thrown into the closed side, a trapper inside `hoops.escapeStripReachM` 1.5 m on the side the ball goes (the owner's rule
-  2026-11-12: an escape into the closed side of a trap is a steal); otherwise a man who bit is late. Measured with it on: 3 of 3 crosses
-  in a trap were stripped and none split: every trap the probe met was 1.3-2.2 m apart, which the bodies cannot pass. So on, a cross into
-  a trap is a turnover; the escapes out of a trap are the step-back and the pass. Left off for the owner to decide.
+- `hoops.trapReadOn` 1 (G3; ON since the owner's answer 2026-11-17, FLAGGED): in a 3v3 double team on the ball, a crossing move
+  (crossover, behind-the-back, between-the-legs: a move with a sideways body) reads both men: SPLIT when a body fits between them (with
+  the squeeze, 1.6 m apart, plus `hoops.trapGapMinM` 0 m): both men late; STRIPPED when it is thrown into the closed side, a trapper
+  inside `hoops.escapeStripReachM` 1.5 m on the side the ball goes (the owner's rule: an escape into the closed side of a trap is a
+  steal); otherwise a man who bit is late. Measured (3v3 trap trials, the crossover and the behind-the-back, 5 each): with the squeeze,
+  5 splits and 4 steals of 9 reads; without it (2.2 m), 2 splits, 6 steals, 2 open. A split leaves the second man 1.5-2.6 m off in 0.8 s;
+  the near man is still at 1.1-1.5 m. Off (0): as before.
+- `hoops.trapSqueezeOn` 1, `hoops.trapSqueezeM` 0.8 m, `hoops.trapSqueezeSec` 0.6 s (owner 2026-11-17: "let the handler slip between two
+  defenders ~1.6 m apart"): for the split's 0.6 s the handler meets the two trappers at 0.8 m centre to centre instead of the bodies'
+  1.10 m stand-off (no contact event), so two men 1.6 m apart can be split. Off: the stand-off holds and a split needs 2.2 m.
+- `hoops.dunkGatherOn` 1 (`hoops/response/dunkGather.ts`, owner 2026-11-17: "drive dunk — gather, then go up"; FLAGGED, on): a sprint
+  squeeze in dunk range gathers first — the last dribble meets the hands (the pick-up) — and the plant and take-off come when the ball is
+  in them, at most `hoops.dunkGatherMaxSec` 0.3 s after the press (a ball near the top goes up at once, as before). Measured (1v1 poster
+  dunks and 3v3 sprint dunks): the gathered dunks took the ball 1.7-12.5 cm off the palm, no yank (with it off the low ones were 59-72 cm,
+  yanked); the take-off came 100-267 ms after the press (today: on the press). Off: up on the press, as before.
+- `hoops.pumpEndsDribbleOn` 1 (`hoops/response/pumpHold.ts`, owner 2026-11-17: "a pump fake ends the dribble, like real basketball";
+  FLAGGED, on; this overrides phase 3's assumption that the dribble comes back, #601): after a pump the ball stays in the hands (the
+  chest hold) and the feet are set; no dribble move; the shot, the pass or the step-through only. Measured (a standing pump, then a
+  crossover flick 1.2 s later): on, 3 of 3 in 1v1 and 3 of 3 in 3v3 kept the ball in the hands for all 66 recorded frames, no move; the
+  step-through on the squeeze still comes (4 of 4). Off: the crossover played and the ball went back to the floor. Off: the dribble comes
+  back when the pump clip ends.
