@@ -52,6 +52,10 @@ export async function POST(req: Request, { params }: { params: { code: string } 
   // TRY-AGE-BANDS-FIX-1 (Cyber F2): a signed-out browser carrying the teen/unknown session flag posts no challenge attempt
   // (flag TRY_AGE_BANDS_ENABLED on). Nothing is read from the body to decide this: a forged age field changes nothing.
   if (!userId && isTryAgeBandsEnabled() && hasTryMinorFlag(jar)) return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+  // TRY-AGE-BANDS-FIX-1 v2 (Cyber N1): and the under-13 block cookie (fel_age_gate) is refused the same way — the stricter band must get at
+  // least the enforcement the teen band gets, and /api/guest already refuses it. Behind TRY_AGE_BANDS_ENABLED: with the flag off the
+  // route keeps resolving a blocked browser's attempt with no guest id (tests/guest-token-hash/routes.test.ts:325-327 pins that today).
+  if (!userId && isTryAgeBandsEnabled() && jar.get(AGE_BLOCK_COOKIE)) return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   const guestId = userId || jar.get(AGE_BLOCK_COOKIE) ? null : guestIdFrom(jar);
 
   const found = await verifiedChallenge(params.code);
@@ -91,6 +95,13 @@ export async function POST(req: Request, { params }: { params: { code: string } 
     await recordGuestResult(prisma as unknown as GuestDataDb, guestId, {
       code: params.code, modeKey: result.modeKey, score: result.attemptScore, target: result.targetScore, at: now,
     });
+  }
+  // TRY-AGE-BANDS-FIX-1 v2 (Cyber N2), flag on: with no user and no guest id the receipt would bind to the shared 'anon' viewer key, so a
+  // forwarded /c/<code>?r=<receipt> link would show this score to any other cookie-less visitor. No receipt (so no result link) is issued
+  // then; the outcome is still in the JSON for the caller.
+  if (!userId && !guestId && isTryAgeBandsEnabled()) {
+    const { receipt: _receipt, ...withoutReceipt } = result;
+    return NextResponse.json(withoutReceipt);
   }
   return NextResponse.json(result);
 }

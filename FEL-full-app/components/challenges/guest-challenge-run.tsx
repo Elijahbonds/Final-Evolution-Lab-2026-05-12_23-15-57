@@ -14,6 +14,9 @@ import { Loader2 } from 'lucide-react';
 import { prqGrade } from '@/lib/prq';
 import { AgeStep, ageBlockPresent, writeAgeBlockFlag } from '@/components/age-step';
 import { ageScreenOutcome } from '@/lib/privacy/ageScreen';
+import { lockTryAge, tabStorage, tryAgeBand } from '@/lib/privacy/tryAgeGate';   // TRY-AGE-BANDS-FIX-1 v2 N3 (flag ageBands)
+import { tryMinorPresent, writeTryMinorFlag } from '@/lib/privacy/tryMinorFlag';   // TRY-AGE-BANDS-FIX-1 v2 N3 (flag ageBands)
+import { readSessionAge } from '@/lib/screen/store';   // TRY-AGE-BANDS-FIX-1 v2 N3 (flag ageBands)
 import type { GameProps, GameResult } from '@/components/games/game-shell';
 import { formatChallengeScore, outcomeOf, type ChallengeOutcome } from '@/lib/social/challenge-terms';
 import { ChallengeResultCard, type ResultViewer } from './challenge-result-card';
@@ -32,8 +35,10 @@ const HOSTS: Record<string, React.ComponentType<GameProps>> = {
 type Gate = 'ask' | 'blocked' | 'local' | 'adult';
 type Done = { outcome: ChallengeOutcome; mine: number; theirs: number; viewer: ResultViewer };
 
-export function GuestChallengeRun({ code, modeKey, title, targetScore, theirName }: {
+export function GuestChallengeRun({ code, modeKey, title, targetScore, theirName, ageBands = false }: {
   code: string; modeKey: string; title: string; targetScore: number; theirName: string;
+  /** TRY-AGE-BANDS-FIX-1 v2 N3: TRY_AGE_BANDS_ENABLED (default off: the year-only answer this page shipped with). */
+  ageBands?: boolean;
 }) {
   const Game = HOSTS[modeKey];
   const [gate, setGate] = useState<Gate>('ask');
@@ -45,10 +50,38 @@ export function GuestChallengeRun({ code, modeKey, title, targetScore, theirName
     if (gate === 'ask' && ageBlockPresent()) setGate('blocked');
   }, [gate]);
 
+  // TRY-AGE-BANDS-FIX-1 v2 (Cyber N3), flag ageBands only: /try's rule, here too. A teen / unknown / under-13 answer already given is never
+  // asked again: the tab's session lock is read once on mount ('under-13' -> blocked; '13-17' or 'unknown' -> local), and the browser-session
+  // flag (fel_try_minor) carries a teen answer into a new tab. The block flag still wins. Reads only; sends nothing. Flag off: no change.
+  useEffect(() => {
+    if (!ageBands || ageBlockPresent()) return;
+    const held = readSessionAge(tabStorage());
+    if (held === 'under-13') setGate('blocked');
+    else if (held === '13-17' || held === 'unknown' || tryMinorPresent()) setGate('local');
+  }, [ageBands]);
+
   const startGuest = () => {
     online.current = true;
     setGate('adult');
     fetch('/api/guest', { method: 'POST' }).catch(() => {});
+  };
+
+  // With the flag on the FULL birth date picks the band (as on /try); only the band is kept (the session lock), never the date.
+  const onAgeLocked = (year: number, birthDate?: string) => {
+    if (ageBands) {
+      const g = lockTryAge(tabStorage(), tryAgeBand(birthDate));
+      if (g === 'adult') startGuest();
+      else if (g === 'blocked') { writeAgeBlockFlag(); setGate('blocked'); }
+      else { writeTryMinorFlag(); setGate('local'); }   // a teen or unknown answer also writes the session-only flag
+      return;
+    }
+    if (ageScreenOutcome(year) === 'adult') startGuest();
+    else setGate('local');
+  };
+  const onAgeBlocked = () => {
+    if (ageBands) lockTryAge(tabStorage(), 'under-13');   // a blocked answer holds for the session
+    writeAgeBlockFlag();
+    setGate('blocked');
   };
 
   const onEnd = useCallback(async (res: GameResult) => {
@@ -82,7 +115,7 @@ export function GuestChallengeRun({ code, modeKey, title, targetScore, theirName
       </div>
       {gate === 'ask' ? (
         <div className="py-6" data-testid="challenge-age-step">
-          <AgeStep mode="signup" onLocked={(year) => (ageScreenOutcome(year) === 'adult' ? startGuest() : setGate('local'))} onBlocked={() => { writeAgeBlockFlag(); setGate('blocked'); }} />
+          <AgeStep mode="signup" onLocked={onAgeLocked} onBlocked={onAgeBlocked} />
           <button type="button" onClick={() => setGate('local')} className="mx-auto mt-4 block min-h-[44px] px-4 font-sans text-[14px] font-medium text-white/70 underline-offset-4 hover:text-white hover:underline">
             Play without saving
           </button>

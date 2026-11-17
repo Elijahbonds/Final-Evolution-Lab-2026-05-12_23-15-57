@@ -8,6 +8,7 @@ import { GUEST_HOST_MODES } from '@/lib/social/challenge-guest-play';
 import { challengeTitle, displayTag, isChallengeExpired, termsOf } from '@/lib/social/challenge-terms';
 import { canonicalModeKey } from '@/lib/game-data';
 import { GuestChallengeRun } from '@/components/challenges/guest-challenge-run';
+import { isTryAgeBandsEnabled } from '@/lib/flags';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,6 +31,7 @@ export default async function ChallengePlayPage({ params }: { params: { code: st
     <div className="min-h-screen bg-[#050505] pb-10">
       <GuestChallengeRun
         code={found.code} modeKey={key} title={challengeTitle(found.modeKey, terms)} targetScore={found.score} theirName={displayTag(found.tag)}
+        ageBands={isTryAgeBandsEnabled()}   // TRY-AGE-BANDS-FIX-1 v2 N3 (default off)
       />
     </div>
   );
