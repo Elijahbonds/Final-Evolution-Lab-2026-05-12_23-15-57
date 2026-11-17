@@ -165,7 +165,6 @@ import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cann
 import { ContactSystem, HARD_CONTACT_SPEED, FOUL_CLOSING_SPEED } from '../core/ContactSystem';
 import { HardHitDebounce } from './hardHitDebounce';
 import { pickHoopsDunk, dunkSpeedRatio, PAUSIN_DUNK } from '../core/HoopsDunks';
-import { dunkTake } from '../anim/dunkTake';   // hoops-gather G4: the dunk's take reads the bounce
 import { comboDunkOn, comboDunkThen, comboDunkPick, gatherEnd } from '../core/ComboFinish';   // hoops-gather G4: the euro / the hop into a dunk
 import { trickFromFlick, trickWindow, judgeFlick, STICK_TRICK, CONTACT_TRICK_BONUS } from '../core/DunkTrickStick';
 import {   // HOOPS-MOVE-KIT-A (2026-09-08): the gather, the finish kit, the drive contest
@@ -2758,7 +2757,8 @@ export const OneVOneMode: ModeDefinition = (() => {
     // BIOMECH-HOOPS-WAVE1 G6: the live dribble is PARKED first — the ball comes back to the palm and rides the hand through
     // the flight (it used to stay at the last bounce point on the floor while the body flew, measured ballY 0.85 through the
     // whole flight); the launch's last frame is HELD to feet-down (the 0.35 s clip ran out mid-air into the run loop)
-    const toDunkHand = dunkTake(ball, me.skeleton, meCarry);   // DUNK MOTION phase 11: into the dunking hand over the take-off (hoops-gather G4: the take reads the bounce, hoops.dunkTakeReadOn; off = the park + dunkHandPass)
+    meCarry?.update(0, 0, false);
+    const toDunkHand = dunkHandPass(ball, me.skeleton);   // DUNK MOTION phase 11: into the dunking hand over the take-off
     // WHICH DUNK THIS DRIVE EARNED (owner, 2026-09-16). Every dunk in this mode played `dunk_launch` — the same two
     // clips off a jog down the middle and off a full-speed baseline drive through a set body — while the whole
     // authored dunk vocabulary was ALREADY on the rig: ClipScope gives `onevone` the suites ['hoops', 'dunk'], so
@@ -3187,7 +3187,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     }
     if (!plan) return false;
     if ((plan.kind === 'euro' || plan.kind === 'hop') && comboDunkOn()) {   // hoops-gather G4: the turbo held, fast, the last plant in range — the footwork's dunk
-      const end = gatherEnd(me.root.position, plan.legs), sp = meDribble.vel.length(), onMe = defenderPos ? distXZ(me.root.position, defenderPos) : Infinity;
+      const end = gatherEnd(me.root.position, plan.legs), sp = Math.max(meDribble.vel.length(), force?.hopVel?.length() ?? 0), onMe = defenderPos ? distXZ(me.root.position, defenderPos) : Infinity;
       if (comboDunkThen({ sprint: !!meSlot.intent.sprint, turbo01: turbo.t01, speed: sp, rimDistAfter: Math.hypot(end.x - RIM_FLOOR.x, end.z - RIM_FLOOR.z) }))
         plan.dunk = comboDunkPick(plan.kind, { speed: sp, lateral01: 0, contest01: onMe < 1.5 ? 0.6 : 0, poster: false, momentum01: mbus.score01, roll });
     }

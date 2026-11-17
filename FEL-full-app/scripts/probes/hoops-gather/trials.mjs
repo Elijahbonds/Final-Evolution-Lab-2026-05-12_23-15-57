@@ -34,8 +34,10 @@ export const KINDS = {
   esc_spin:       { kind: 'esc_spin', escape: true, flick: 'sweep', mag: 0.6, untilDist: 4.8, tailF: 70 },
   // G4: the footwork into a dunk, the turbo held (hoops.comboDunkOn 1 in the run's FEEL): pressed so the euro's 1.5 m and the hop's 0.8 m
   // land the last plant inside dunk range (2.8 m) — a squeeze already inside it is the plain drive dunk
-  euro_dunk:   { kind: 'euro_dunk', mag: 1, turbo: true, untilDist: 4.0, lateral: 1, setup: 'poster' },
-  hop_dunk:    { kind: 'hop_dunk', mag: 1, turbo: true, untilDist: 3.3, setup: 'poster' },
+  // (pressed AT the distance, any phase: waiting for a phase at a sprint carried the squeeze 1-2 m further, inside the drive dunk's range)
+  euro_dunk:   { kind: 'euro_dunk', mag: 1, turbo: true, untilDist: Number(process.env.EURO_AT ?? 4.0), lateral: 1, setup: 'poster', anyPhase: true },
+  hop_dunk:    { kind: 'hop_dunk', mag: 1, turbo: true, untilDist: Number(process.env.HOP_AT ?? 3.3), setup: 'poster', anyPhase: true },
+  hop2_dunk:   { kind: 'hop2_dunk', mag: 1, turbo: true, untilDist: Number(process.env.HOP_AT ?? 3.3), setup: 'poster', anyPhase: true, double: true },   // the player's hop: a double tap (H2e)
   // the pick-up AT SPEED (3v3: no poster seam, the drive runs from the check): a turbo pull-up and a turbo layup beside the drive kinds above
   spr_pullup:  { kind: 'spr_pullup', mag: 1, turbo: true, untilDist: 4.6 },
   spr_layup:   { kind: 'spr_layup', mag: 1, turbo: true, untilDist: 2.6 },
@@ -50,7 +52,7 @@ const SETS = {
   gathers: ['set', 'pullup', 'stepback', 'hop', 'euro', 'stepthrough'],
   finishes: ['layup', 'dunk'],
   escapes: ['esc_stepback', 'esc_snatchback', 'esc_btb', 'esc_retreat', 'esc_momcross', 'esc_spin'],
-  combo: ['euro_dunk', 'hop_dunk', 'dunk'],
+  combo: ['euro_dunk', 'hop_dunk', 'hop2_dunk', 'dunk'],
   speed: ['pullup', 'spr_pullup', 'hop', 'euro', 'layup', 'spr_layup', 'dunk', 'stepthrough'],
   trap: ['trap_stepback', 'trap_snatchback', 'trap_spin', 'trap_btb', 'trap_hold'],
 };
@@ -90,7 +92,7 @@ export default async function run({ ev, runFrames, waitGame, saveStrip, say, res
     // assumption (flagged in the doc): the AI's strip / block / hand-up ROLLS are forced off with the mode's own dev seam (luck 0.99 =
     // no chance lands), so a drive is not stripped on the bump before its gather. What is measured is the body and the ball, not the
     // outcome; the defender is still on the floor, still moves, still bumps
-    await ev(([m, lk]) => { const s = window.__FEL_DEV__.scene.metadata[m]; if (s.luck && lk !== 'off') s.luck(0.99); if (s.forceTie) s.forceTie(0, 85); s.offense(); }, [MODE, process.env.LUCK ?? '']);   // 3v3: the 90 s game clock and the score put back every trial (its own seam), or the game ends a third of the way in
+    await ev(([m, lk]) => { const s = window.__FEL_DEV__.scene.metadata[m]; if (s.luck && lk !== 'off') s.luck(0.99); if (s.forceTie) s.forceTie(0, 85); if (s.tank) s.tank(); s.offense(); }, [MODE, process.env.LUCK ?? '']);   // 3v3: the 90 s game clock and the score put back every trial (its own seam), or the game ends a third of the way in
     for (let i = 0; i < 40; i++) {
       await waitGame(250);
       const ok = await ev(() => { const L = window.__LOG || []; const f = window.__frameNo || 0; const replay = L.some((l) => /\[HOOPS-REPLAY\]/.test(l.m) && f - l.f < 360); return !replay && window.__gx.iHave() && window.__gx.phaseNow !== undefined; });
@@ -124,7 +126,7 @@ export default async function run({ ev, runFrames, waitGame, saveStrip, say, res
     }
   }
   const list = [];
-  for (const s of sets) for (const k of SETS[s] ?? []) if (!only || only.has(k)) for (const ph of KINDS[k].escape ? ['any'] : phases) for (let r = 0; r < reps; r++) list.push({ ...KINDS[k], phase: ph, rep: r });
+  for (const s of sets) for (const k of SETS[s] ?? []) if (!only || only.has(k)) for (const ph of KINDS[k].escape || KINDS[k].anyPhase ? ['any'] : phases) for (let r = 0; r < reps; r++) list.push({ ...KINDS[k], phase: ph, rep: r });
   if (process.env.SHUFFLE !== '0') { let s = 7; for (let i = list.length - 1; i > 0; i--) { s = (s * 1103515245 + 12345) & 0x7fffffff; const j = s % (i + 1); [list[i], list[j]] = [list[j], list[i]]; } }   // (a fixed shuffle: one kind's trials are not all at the end of a cut run)
   say(`trials: ${list.length} (${sets.join('+')} × ${phases.join('/')})`);
   for (const [i, spec] of list.entries()) {

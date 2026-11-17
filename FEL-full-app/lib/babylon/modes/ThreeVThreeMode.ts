@@ -203,7 +203,6 @@ import { replaySkipOn } from '../core/replaySkip';   // hoops-flow (owner 2026-1
 import { HoopJuice } from '../visual/HoopJuice';   // A+ P0: the hoop answers the make (shared with Dunk / 1v1; Meshy never scaled)
 import { mountShotMeter3D, type ShotMeter3DHandle } from '../visual/ShotMeter3D';   // THE SHOT METER (owner, 2026-09-18): the 2K bar beside the shooter's head
 import { pickHoopsDunk, dunkSpeedRatio, PAUSIN_DUNK } from '../core/HoopsDunks';
-import { dunkTake } from '../anim/dunkTake';   // hoops-gather G4: the dunk's take reads the bounce
 import { comboDunkOn, comboDunkThen, comboDunkPick, gatherEnd } from '../core/ComboFinish';   // hoops-gather G4: the euro / the hop into a dunk
 import { PARRY, parryVaultRead, vaultAt, DRIFT, driftRead, ankleBreak, DRIVE_BY, driveByRead, SLIPSTREAM, slipstreamRead, SLING, slingRead, SYNERGY, SynergyGauge, shockVictims } from '../core/HoopsKinetic';
 import { CHOKE, CHOKE_RAILS, readChoke, resolveRails, inChokeLane, railRunRead } from '../core/Chokepoint';
@@ -1220,6 +1219,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       resetPossession(true);
       if (process.env.NODE_ENV === 'development') { const dev = (window as unknown as { __FEL_DEV__?: { hoopsPosture?: unknown } }).__FEL_DEV__; const seam = { me: () => me.posture?.layer.get() ?? null, foe: () => foes[0]?.posture?.layer.get() ?? null, bio: () => ({ me: { ...me.bio }, foe: { ...(foes[0]?.bio ?? {}) } }), carrier: () => carrierId, offense: () => { if (!ended) resetPossession(true); }, defend: () => { if (!ended) { resetPossession(false); void opponentPossession(ctx); } }, /* resetPossession(false) only RESETS: its toMe branch is the only thing that hands the ball out, so on its own it leaves the rock wherever it was and no drive ever starts. opponentPossession() is what a defensive possession actually IS here — the 1v1 seam's defend() calls startDefense() for the same reason. */ attackPhase: () => (driveK > 0 && driveK >= 1 - GATHER_TELL_SEC / driveSec ? 'gather' : driveK > 0 ? 'drive' : 'check'), driveK: () => driveK, driveSpeed: () => (driver ? driver.vel.length() : 0), takingCharge: () => takingCharge, flightK: () => (dunkFlight ? dunkFlight.k : foeDunkFlight ? foeDunkFlight.k : -1)   /* MY flight's clock first (the showtime press is timed off it), then the rival's */, luck: (v: number | null) => { defenseLuck = v; }, bumpAge: () => bumpAge, handUp: () => ({ me: meHandUp, foe: !!foeHandUp }), post: () => { const n = nearestLiveFoe(); return { posting, spinning: !!spin, brace: !!me.slot.intent.brace, can: canPostUp(me.char.root.position, RIM_FLOOR, n ? n.char.root.position : null), carrying: carrierId === 'me', shooting, finish: !!finish, gather: !!gather, foeStun: n ? n.stunSec : -1, armed: spinArmed, pump: pumpWindow, glass: !!banked, held: me.tree.held ?? '' }; }, driverRoot: () => driver?.char.root ?? null, block: () => (ctx0 ? contestJump(ctx0) : false), /* the block with no bridge latency: the lab's jump was landing at driveK 1.00 behind its own steer queue */ ended: () => ended, kinetic: () => { const d = driver; const dv = d ? d.char.root.position.subtract(me.char.root.position) : null; const dist = dv ? Math.hypot(dv.x, dv.z) : -1; return { ...kin, synergy: synergy.value, overdrive: synergy.overdriveLeft, ltHeld, slipping, meSpeed: Math.hypot(me.drib.vel.x, me.drib.vel.z), dist, closing: d && dv && dist > 1e-3 ? -(driverVelEst.x * dv.x + driverVelEst.z * dv.z) / dist : 0, driveK, turbo: turbo.t01, carrier: carrierId, mateBurst: [...mateBurst], intent: { moveX: me.slot.intent.moveX, moveY: me.slot.intent.moveY, sprint: me.slot.intent.sprint }, choke, railRuns, railNow, inLane: inChokeLane(me2()), gates: { paused: me.drib.paused, stun: meStunSec, floored: meFloored, land: me.landSec, celebrate: me.celebrateSec, shooting, dunking, vault: !!vault } }; }, synergyAdd: (n: number) => { if (synergy.add(n) && ctx0) igniteOverdrive(ctx0); }, boxing: () => boxingOut,
           // NB-3 probe (lane/hoops-overtime): a forced tie — both sides on `pts`, `sec` left on the game clock — and the overtime read
+          tank: () => { turbo.t01 = 1; return true; },   // hoops-gather (probe seam): the turbo tank full, as 1v1's poster() leaves it — a sprint trial after a sprint trial ran dry
           forceTie: (pts: number, sec: number) => { if (ended) return false; myScore = pts; foeScore = pts; timeLeft = sec; if (ctx0) putHud(ctx0, { score: myScore, foeScore }); return true; }, overtimes: () => overtimes,
           // O3: every body's job, its objective and how squarely it faces it (the probes' awareness read)
           cuts: () => me.drib.cuts,   // Phase 5 dev readout: the cut cost the movement has charged
@@ -2732,7 +2732,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     }
     SoundKit.play('whoosh', { pitch: 0.85 });
     // BIOMECH-HOOPS-WAVE1 G6: the dribble parked, the ball in the palm through the flight; the launch's last frame HELD to feet-down (the 1v1's)
-    const toDunkHand = dunkTake(ball, me.char.skeleton, carries.get(me));   // DUNK MOTION phase 11: into the dunking hand over the take-off (hoops-gather G4: the take reads the bounce, hoops.dunkTakeReadOn; off = the park + dunkHandPass)
+    carries.get(me)?.update(0, 0, false);
+    const toDunkHand = dunkHandPass(ball, me.char.skeleton);   // DUNK MOTION phase 11: into the dunking hand over the take-off
     // WHICH DUNK THIS DRIVE EARNED — the same read 1v1 makes, off the same already-registered vocabulary (ClipScope
     // gives this mode the 'dunk' suite too). One clip for every dunk in the game was the fault; see HoopsDunks.
     const toRimNow3 = RIM_FLOOR.subtract(from); toRimNow3.y = 0;
@@ -3110,7 +3111,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     }
     if (!plan) return false;
     if ((plan.kind === 'euro' || plan.kind === 'hop') && comboDunkOn()) {   // hoops-gather G4: the turbo held, fast, the last plant in range — the footwork's dunk
-      const end = gatherEnd(me.char.root.position, plan.legs), sp = me.drib.vel.length(), onMe = defenderPos ? distXZ(me.char.root.position, defenderPos) : Infinity;
+      const end = gatherEnd(me.char.root.position, plan.legs), sp = Math.max(me.drib.vel.length(), force?.hopVel?.length() ?? 0), onMe = defenderPos ? distXZ(me.char.root.position, defenderPos) : Infinity;
       if (comboDunkThen({ sprint: !!me.slot.intent.sprint, turbo01: turbo.t01, speed: sp, rimDistAfter: Math.hypot(end.x - RIM_FLOOR.x, end.z - RIM_FLOOR.z) }))
         plan.dunk = comboDunkPick(plan.kind, { speed: sp, lateral01: 0, contest01: onMe < 1.5 ? 0.6 : 0, poster: false, momentum01: mbus.score01, roll });
     }
