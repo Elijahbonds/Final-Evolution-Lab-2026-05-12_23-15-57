@@ -347,6 +347,27 @@ with a real player (`hoops-audit/mash-audit.mjs PLAYER=script` and `mash`): the 
   "planted" foot moves 4–14 cm a frame (the clip's own feet swing under a still body); the drive gathers' slide p90 stays 4–7 cm against
   the 3 cm bar. It needs the clip's foot contacts re-keyed (or the clip re-captured), not code — GATE 0 (verify the rig before and after).
 - **G4 code is in** (`core/ComboFinish.ts`, `hoops.comboDunkOn` off): the euro and the hop into a dunk. Not yet measured on the rig.
+- **Phase 3, step 1 (2026-11-17): 3v3 pick-ups at drive and sprint speed** (`SET=speed`: pull-up, sprint pull-up, hop, euro, layup,
+  sprint layup, dunk, step-through × top / down / floor / up). At the release defaults, 10 of 11 presses at 2.8 m/s or more took the
+  ball at once, median 35 cm off the palm, 3 yanks. Why: (a) the stride lock slows the bounce to one a stride (0.5-1.5 Hz on the press),
+  so a low ball could not be met inside the 0.2 s wait: the harder last dribble is now counted from at least 2 Hz
+  (`hoops.pickupRateFloorHz`, FLAGGED; plans that fell back 10 → 7 in the same build); (b) a ball at the TOP of a pushed dribble at
+  speed sits 27-47 cm ahead of the palm, and the top is taken at once (open); (c) a sprint squeeze in range is a DUNK, and the dunk takes
+  the ball with the old gather at the take-off (`startDunk` → `update(0, 0, false)`, then `anim/dunkHand.ts`): 32-41 cm (open, the
+  dunk's own take; it snaps a ball that is not in a hand, so the pick-up's wait cannot simply be put in front of it). **With the
+  move-feel lane's six values set** (`hoops.camLeadEase` 1, `turnTrueArc` 1, `kickSec` 0.1, `cutSec` 0.08, `gearBlendBand` 0.2,
+  `stickSprintFallback` 0, on a scratch merge of `lane/move-feel`), two seeds: within 8 cm 7 of 12 and 7 of 12 at speed (median 6 cm),
+  against 1 of 13 at the defaults: the top-of-bounce gap mostly goes with them. 1v1 unchanged (20 of 28 within 8 cm, no yank).
+- **Phase 3, step 2: the pump into the step-through.** It was never a pump: the shot press, held through its own pump, was buffered
+  (hoops-p01's press buffer arms from the button held) and replayed the frame the pump ended, so every pump inside 5.4 m stepped
+  through one frame later, and the squeeze that was meant for the step-through became a double-tapped hop (14 of 14 pumps in four
+  runs). Fixed: only a press that goes down during the lock is buffered (`hoops.bufferFreshPressOn`, FLAGGED). Then the pump showed
+  its second fault: it ends the shot, the dribble restarted the next frame, and the ball fell loose 8-9 frames (0.2-0.6 m) through the
+  pump clip before the step-through picked it off the bounce. Fixed: the pump keeps the ball for its clip (`hoops.pumpBallHandOn`,
+  FLAGGED). Now: pump → (the player's squeeze) step-through 9 frames later, the ball in the hands throughout (loose frames 8-9 → 0);
+  3v3 arm turns over 25° a frame 32 → 13, worst 175 → 82°/frame; 1v1 worst 117 → 96. The pump's own up-and-down is a second dip by
+  design, so the re-drop bar does not apply to it. **assumption:** after a pump the dribble comes back once the clip ends (as the game
+  did); whether a pump should end the dribble is the owner's call.
 
 ## 6. The worst moments, drawn
 

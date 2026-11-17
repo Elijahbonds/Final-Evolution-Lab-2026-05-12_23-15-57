@@ -47,7 +47,8 @@
 //      1.6 m connects; a set defender I bump strips me on his roll, the ball loose, no warp); X HELD is a grounded hand-up
 //      that contests the driver's release (and the AI's contests mine), the contest biting the make chance and altering the arc.
 import { nerve, standingOf } from '../core/Nerve';
-import { PressBuffer } from '../hoops/response/pressBuffer';   // hoops-p01: the shot press waits out the move (was gameFeel's InputBuffer)
+import { PressBuffer } from '../hoops/response/pressBuffer';
+import { pumpHoldSec, pumpHolding } from '../hoops/response/pumpHold';   // hoops-gather: the pump keeps the ball while its clip plays   // hoops-p01: the shot press waits out the move (was gameFeel's InputBuffer)
 import { tickScuff, scuffPuffScale, scuffVolume, SCUFF_IDLE, type ScuffState } from '../core/ScuffFx';
 import { MeshBuilder, Vector3, StandardMaterial, Color3 } from '@babylonjs/core';
 import { dressBall } from '../visual/meshyProps';
@@ -520,6 +521,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   // frozen, so the opening is the geometry itself. A second timer nothing reads is dead state.
   let passFakeCooldown = 0;
   let spinClip = 'bball_spin';           // M9: the same machinery turns a PIVOT (a shorter sweep, no travel)
+  let pumpHoldFor = 0;                  // hoops-gather: seconds of the pump window the pump holds the ball (its clip)
   let pumpWindow = 0;                    // M8: seconds left in which a squeeze is a STEP-THROUGH (he bit the fake)
   let banked: Vector3 | null = null;     // M12: the glass point this release is routed through
   let driveContest: DriveContest | null = null;                                      // M2: the body in the dunk's path
@@ -1350,7 +1352,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       // flying ball to the dribble point (carrierId stays 'me' until the next possession)
       const ballReleased = !!(ball.metadata as { felReleased?: boolean } | undefined)?.felReleased;
       // HOOPS MOTION phase 3: an AI dribbler's pace is his own ground speed (a fixed 0.5 pushed a walking mate's ball out like a sprint)
-      for (const [b, c] of carries) c.update(dt, b === me ? meSpeed01 : Math.max(b.speed01, Math.min(1, Math.hypot(b.vel.x, b.vel.z) / 4.2)), cbNow === b && !(b === me && pausedDribble && !c.move) && !shooting && !mateShooting && !dunking && !passFlight.active && !arc.active && !finish && !gather && !ballReleased && !(b === me && !!spin && !c.move));   // HOOPS MOTION phase 4b (U19): …the hero's carry is ticked through a move's path (the spin's pull, PAUSIN's hold)
+      for (const [b, c] of carries) c.update(dt, b === me ? meSpeed01 : Math.max(b.speed01, Math.min(1, Math.hypot(b.vel.x, b.vel.z) / 4.2)), cbNow === b && !(b === me && pausedDribble && !c.move) && !shooting && !mateShooting && !dunking && !passFlight.active && !arc.active && !finish && !gather && !ballReleased && !(b === me && !!spin && !c.move) && !(b === me && pumpHolding(pumpWindow, pumpHoldFor, STEP_THROUGH_SEC)));   // HOOPS MOTION phase 4b (U19): …the hero's carry is ticked through a move's path (the spin's pull, PAUSIN's hold)
       if (STRONG_HAND_RETURNS) { // hoops-handle (owner 10-17): off — the ball stays in the hand a move left it in. H2d (plan §3.8, Q8): my ball goes back to the strong hand on a stop / after 1.2 s in the left — a quiet crossing, not a move
         const myC = carries.get(me); const nfH = nearestLiveFoe();
         const sh = stepStrongHand(strongHand, dt, { hand: myC?.handAfterMove === 'Left' ? 'left' : 'right', speed01: meSpeed01, moveActive: !!myC?.move,
@@ -2368,7 +2370,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         }
         // a squeeze made while the body is committed WAITS instead of vanishing
         shotBuffer.tick(!!(shooting || dunking || finish || spin), performance.now());   // hoops-p01: the lock the buffered squeeze waits out
-        if (iAmCarrier && meIntent.actionHeld > 0.02 && (shooting || dunking || finish || spin)) shotBuffer.press(performance.now());
+        shotBuffer.hold(iAmCarrier && meIntent.actionHeld > 0.02, !!(shooting || dunking || finish || spin), performance.now());   // hoops-gather: a press made DURING the lock (the one that started it is not buffered through its own pump)
         { // H2e (owner 2026-10-16): THE HOP STEP ON A DOUBLE TAP (see 1v1)
           const held = meIntent.actionHeld > 0.02, edge = held && !squeezeHeldWas; squeezeHeldWas = held;
           if (edge && iAmCarrier && !dunking && !posting && hopOnDoubleTap(tapRead())) {
@@ -3138,6 +3140,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     shotMeter.active = false;
     me.shotWin = 'pump'; me.shotSec = 0;
     pumpWindow = STEP_THROUGH_SEC;
+    pumpHoldFor = pumpHoldSec(me.char.animator.durationOf('bball_pump_fake')); if (pumpHoldFor > 0) carries.get(me)?.settlePickUp();   // hoops-gather: the pump keeps the ball (a pick-up still reading is taken now)
     me.tree.beat('bball_pump_fake', { fadeSec: 0.06 });
     SoundKit.play('whoosh', { pitch: 1.3, volume: 0.25 });
     // hoops-p09: he leaves his feet when he is flying at you (closing out, or already in the air); a man sitting back does not bite. No roll

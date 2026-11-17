@@ -1878,6 +1878,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'A harder last dribble so a low ball meets the hand inside the wait.',
   },
   {
+    id: 'hoops.pickupRateFloorHz', label: 'Pick-up: at speed, count that from at least', def: 2, min: 0, max: 3, step: 0.1, unit: 'Hz', group: 'Hoops · gathers',
+    source: 'lib/babylon/anim/ballCarry.ts PICKUP_RATE_FLOOR_HZ',
+    hint: 'At a drive or a sprint the bounce slows to one a stride, so a low ball could not be met in time and was yanked up. 0 = count from that slow bounce (as at G2).',
+  },
+  {
     id: 'hoops.pickupTopGapM', label: 'Pick-up: take it at once within', def: 0.1, min: 0, max: 0.3, step: 0.01, unit: 'm', group: 'Hoops · gathers',
     source: 'lib/babylon/anim/ballCarry.ts PICKUP_TOP_GAP_M',
     hint: 'A ball this close to the top of its bounce is taken at once.',
@@ -1896,6 +1901,16 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'hoops.releaseSnapEaseSec', label: 'Release: wrist snap ease', def: 0.03, min: 0.01, max: 0.15, step: 0.01, unit: 's', group: 'Hoops · gathers',
     source: 'lib/babylon/anim/ballCarry.ts RELEASE_SNAP_EASE_SEC',
     hint: 'How smoothly the shooting wrist snaps through at the release. 0.03 = as before (it turns about 58 deg in one frame).',
+  },
+  {
+    id: 'hoops.bufferFreshPressOn', label: 'Shot press: only a new press waits out a move (1) / a held one too (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · gathers',
+    source: 'lib/babylon/hoops/response/pressBuffer.ts BUFFER_FRESH_PRESS_ON',
+    hint: 'On: a pump fake holds; press again to step through. Off (as before): the press that made the pump is replayed when it ends, so every pump steps through at once.',
+  },
+  {
+    id: 'hoops.pumpBallHandOn', label: 'Pump fake: the ball stays in the hands (1) / back to the dribble at once (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · gathers',
+    source: 'lib/babylon/hoops/response/pumpHold.ts PUMP_BALL_HAND_ON',
+    hint: 'On: the ball stays in the hands while the pump plays, and the step-through takes it from there. Off (as before): the dribble restarts the frame after the pump and the ball drops loose.',
   },
 ];
 

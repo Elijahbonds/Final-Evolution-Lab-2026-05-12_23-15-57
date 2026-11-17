@@ -834,6 +834,25 @@ restores the old behaviour exactly.
   The take is the ball within `hoops.pickupContactM` 0.04 m of the palm as drawn (past its radius); a hand that did not get all the way
   down gets the ball rising on to it for at most `hoops.pickupOverrunSec` 0.1 s more. When the shot wants the other hand, it comes to the
   ball's far side for the meeting (both hands on it), then takes it.
+- `hoops.bufferFreshPressOn` 1 (`hoops/response/pressBuffer.ts` `BUFFER_FRESH_PRESS_ON`; FLAGGED, on by default): a shot press made while
+  the body is committed (a shot, a dunk, a spin) waits the move out and fires as it ends (hoops-p01); with this on only a press that went
+  down DURING the lock does. The press that started a shot is held through its own pump, so with it off (0, as before) the buffer replays
+  it the frame the pump ends: measured on every pump the gather probe made (1v1 and 3v3), the step-through started one frame after the
+  fake, the fake never showed, and the next squeeze became a double-tapped hop. On: the pump holds, and a squeeze inside its window
+  (`STEP_THROUGH_SEC` 1.0 s) is the step-through. Feel-check: pump, wait, step through; and tap Square during a spin: it still shoots
+  as the spin ends.
+- `hoops.pumpBallHandOn` 1 (`hoops/response/pumpHold.ts` `PUMP_BALL_HAND_ON`; FLAGGED, on by default): the pump fake keeps the ball in
+  the hands while its clip plays. The pump ends the shot, and the dribble used to restart on the very next frame from wherever the ball
+  was: measured, once the pump showed at all (`hoops.bufferFreshPressOn`), the ball left the hand 2 frames after the pump and fell
+  0.5-0.6 m loose through the pump clip before the step-through picked it up off the bounce. On: the dribble stays parked for the pump
+  clip's length (a pick-up still reading the bounce is taken at the pump), then comes back as before if nothing follows. Off (0): as
+  before. Feel-check: pump and wait: the ball stays at the chest through the fake; pump and step through: one carry, no drop.
+- `hoops.pickupRateFloorHz` 2 Hz (`anim/ballCarry.ts` `PICKUP_RATE_FLOOR_HZ`; FLAGGED, on by default; the default is `HOOPS_DRIBBLE.hzFast`):
+  the pick-up's harder last dribble (`hoops.pickupRateMax`) is counted from at least this rate. At a drive or a sprint the stride lock
+  slows the bounce to one a stride (measured 0.5-1.5 Hz on the press), so twice THAT could not meet a low ball inside the 0.2 s wait
+  and the pick-up fell back to the old take: on the 3v3 speed set 10 of 11 presses at 2.8 m/s or more were taken at once, a median
+  35 cm off the palm, 3 of them yanked up from below the knee. 0 = counted from the bounce's own rate (as at G2). Feel-check: sprint at
+  the rim and pull up off a low dribble: the hand meets the ball on its way up, no snatch.
 
 ## move-feel-2, 2026-11-17 (owner: "stick right runs a straight line while held"; "redesign the phone stick")
 
