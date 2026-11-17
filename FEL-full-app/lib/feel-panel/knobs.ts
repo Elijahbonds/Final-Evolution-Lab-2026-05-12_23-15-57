@@ -1827,6 +1827,47 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/hoops/ratings.ts HEIGHT_LOOK_PER_IN',
     hint: 'How much bigger the hero is drawn per inch of playing height (6ft 8 at 104 percent, 6ft 0 at 96). Drawing only, casual runs only. 0 = the standard body.',
   },
+  // ── hoops-gather G1 (owner 2026-11-12, "good gathers and pick ups"; docs/HOOPS-GATHER-ESCAPE-PLAN.md): the pick-up reads the bounce ──
+  {
+    id: 'hoops.pickupReadOn', label: 'Pick-up reads the bounce (1) / takes it where it is (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · gathers',
+    source: 'lib/babylon/anim/ballCarry.ts PICKUP_READ_ON',
+    hint: 'On: a shot pressed while the ball is low keeps it on its bounce and the hand goes down to meet it. Off: the ball flies up to a still hand, as before.',
+  },
+  {
+    id: 'hoops.pickupWaitMaxSec', label: 'Pick-up: longest wait for the bounce', def: 0.2, min: 0.05, max: 0.35, step: 0.01, unit: 's', group: 'Hoops · gathers',
+    source: 'lib/babylon/anim/ballCarry.ts PICKUP_WAIT_MAX_SEC',
+    hint: 'The most the hand waits for a low ball to come up before it takes it as before.',
+  },
+  {
+    id: 'hoops.pickupReachM', label: 'Pick-up: hand goes down to meet it by', def: 0.3, min: 0, max: 0.5, step: 0.01, unit: 'm', group: 'Hoops · gathers',
+    source: 'lib/babylon/anim/ballCarry.ts PICKUP_REACH_M',
+    hint: 'How far under the dribbling palm the hand reaches to meet the rising ball.',
+  },
+  {
+    id: 'hoops.pickupRateMax', label: 'Pick-up: last bounce up to this much faster', def: 2, min: 1, max: 3, step: 0.1, unit: 'x', group: 'Hoops · gathers',
+    source: 'lib/babylon/anim/ballCarry.ts PICKUP_RATE_MAX',
+    hint: 'A harder last dribble so a low ball meets the hand inside the wait.',
+  },
+  {
+    id: 'hoops.pickupTopGapM', label: 'Pick-up: take it at once within', def: 0.1, min: 0, max: 0.3, step: 0.01, unit: 'm', group: 'Hoops · gathers',
+    source: 'lib/babylon/anim/ballCarry.ts PICKUP_TOP_GAP_M',
+    hint: 'A ball this close to the top of its bounce is taken at once.',
+  },
+  {
+    id: 'hoops.pickupContactM', label: 'Pick-up: taken when the ball is this close to the palm', def: 0.04, min: 0, max: 0.15, step: 0.01, unit: 'm', group: 'Hoops · gathers',
+    source: 'lib/babylon/anim/ballCarry.ts PICKUP_CONTACT_M',
+    hint: 'How near the palm (past the ball\'s radius) the rising ball must be to be taken.',
+  },
+  {
+    id: 'hoops.pickupOverrunSec', label: 'Pick-up: extra time to rise to the hand', def: 0.1, min: 0, max: 0.2, step: 0.01, unit: 's', group: 'Hoops · gathers',
+    source: 'lib/babylon/anim/ballCarry.ts PICKUP_OVERRUN_SEC',
+    hint: 'When the hand did not get all the way down, the ball rises on to it for at most this long.',
+  },
+  {
+    id: 'hoops.releaseSnapEaseSec', label: 'Release: wrist snap ease', def: 0.03, min: 0.01, max: 0.15, step: 0.01, unit: 's', group: 'Hoops · gathers',
+    source: 'lib/babylon/anim/ballCarry.ts RELEASE_SNAP_EASE_SEC',
+    hint: 'How smoothly the shooting wrist snaps through at the release. 0.03 = as before (it turns about 58 deg in one frame).',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));
