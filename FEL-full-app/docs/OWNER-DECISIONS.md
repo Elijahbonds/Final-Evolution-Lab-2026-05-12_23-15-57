@@ -438,3 +438,9 @@ The owner answered these (relayed by the coordinator). One line each.
 - **owner 2026-11-12 (hoops gathers, G3):** an escape thrown into the closed side of a trap (double team) IS a steal (`docs/HOOPS-GATHER-ESCAPE-PLAN.md`).
 - **owner 2026-11-12 (hoops gathers, G5):** the mid-air adjustment uses the right stick in the air, like the dunk trick stick.
 - **owner 2026-11-12 (hoops gathers, G6):** a hop step with the stick at rest IS a jump stop.
+
+## 2026-11-13 — kit fit: cloth motion and the new jerseys (owner 2026-11-13, relayed by the coordinator)
+
+1. **Cloth motion: a sway in the renderer, no rig change** (the 22-bone spec stays). docs/KIT-FIT-PLAN.md phase 4.
+2. **The new basketball and football jerseys: in-house and free**, cut from the MakeHuman garments in Blender on the owner's Mac
+   (docs/JERSEY-BUILD-STEPS.md). docs/KIT-FIT-PLAN.md phase 3.
