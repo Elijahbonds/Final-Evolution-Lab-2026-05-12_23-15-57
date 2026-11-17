@@ -435,6 +435,9 @@ The owner answered these (relayed by the coordinator). One line each.
 17. **Social basketball setting:** a PARK area (outdoor home courts, a run to queue for, a place to hang out), built from
     the Adventure map pieces and part of the Adventure hub (one world: story ↔ courts, same player, party and look). Build
     it after the current hoops work, together with the Adventure hub. Menus keep one-tap 1v1/3v3.
+- **owner 2026-11-12 (hoops gathers, G3):** an escape thrown into the closed side of a trap (double team) IS a steal (`docs/HOOPS-GATHER-ESCAPE-PLAN.md`).
+- **owner 2026-11-12 (hoops gathers, G5):** the mid-air adjustment uses the right stick in the air, like the dunk trick stick.
+- **owner 2026-11-12 (hoops gathers, G6):** a hop step with the stick at rest IS a jump stop.
 
 ## 2026-11-17 — the movement (docs/MOVE-FEEL-DIAGNOSIS.md)
 
