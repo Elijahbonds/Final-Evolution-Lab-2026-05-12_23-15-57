@@ -15,8 +15,15 @@ import { readGlb, writeGlb, restPrims, nodeWorlds, appendAccessor, rigPrint, unt
 import { unwrap, uvQuality } from './unwrap';
 import { BodySurface } from './surface';
 
-/** Weight-smoothing rounds on a top that came with UVs (the forge rivals' tees). NEW (measured: smoothWeights' comment). */
+/** Weight-smoothing rounds on a forge rival's tee (a top that came with UVs). NEW (measured: smoothWeights' comment). */
 export const RIVAL_TOP_SMOOTH = 2;
+/**
+ * The rivals whose tee is smoothed: those where it measured better on BOTH counts (scripts/probes/kit-glitch/cpu.ts, 10 poses,
+ * the tee's torn edges and the skin through it, 2026-11-13): ace 50 -> 20 / 903 -> 842, dash 40 -> 8 / 990 -> 944, grit 30 -> 8,
+ * lux 38 -> 18, tusk 24 -> 18, … On the other 14 it let more skin through the tee (halo 615 -> 770, kite 474 -> 808: their builds
+ * fill the tee differently), so they keep their own weights.
+ */
+export const RIVAL_TEE_SMOOTHED: ReadonlySet<string> = new Set(['ace', 'blaze', 'dash', 'grit', 'lux', 'nyx', 'rook', 'tusk', 'volt', 'zeal']);
 /** Metres of garment per UV unit: the rivals' textured tees and shorts measure 0.9–1.1 (_uvdensity.ts). */
 export const UV_SCALE = { tops: 1.0, shorts: 1.0, sock: 0.4 } as const;
 const flag = (n: string) => process.argv.includes(n);
@@ -150,7 +157,7 @@ export function bake(inPath: string, outPath: string, opts: { uv?: boolean; legs
   const body = prims.find((p) => p.name === 'Body')!;
   // what changes: a garment without UVs gets them; every short gets its legs fitted. A garment with UVs that is not a short
   // (the rivals' tees) is left exactly as it is.
-  const targets = prims.filter((p) => (/^Kit_(tops|shorts)_/.test(p.name) || (/^Kit_shoes_/.test(p.name) && p.prim === 1)) && (!p.uv || (/^Kit_shorts_/.test(p.name) && opts.legs !== false) || (/^Kit_tops_/.test(p.name) && (opts.topSmooth ?? RIVAL_TOP_SMOOTH) > 0)));
+  const targets = prims.filter((p) => (/^Kit_(tops|shorts)_/.test(p.name) || (/^Kit_shoes_/.test(p.name) && p.prim === 1)) && (!p.uv || (/^Kit_shorts_/.test(p.name) && opts.legs !== false) || (/^Kit_tops_/.test(p.name) && (opts.topSmooth ?? (RIVAL_TEE_SMOOTHED.has(inPath.split('/').pop()!.replace(/\.glb$/, '')) ? RIVAL_TOP_SMOOTH : 0)) > 0)));
   const edited = new Set(targets.map((p) => `${p.mesh}:${p.prim}`));
   const untouched0 = untouchedPrint(g, edited);
   const report: Record<string, unknown>[] = [];
@@ -164,9 +171,10 @@ export function bake(inPath: string, outPath: string, opts: { uv?: boolean; legs
     const P = Float32Array.from(p.P);
     if (slot === 'shorts' && opts.legs !== false) { const f = fitLegTubes(P, p.ind, body, bones); legSide = f.side; row.legs = { tubes: f.tubes, moved: f.moved }; }
     if (slot === 'shorts' && opts.legs !== false) row.transfer = transferWeights({ P, J, W, joints: p.joints }, body, bones, { side: legSide });
-    // the forge rivals' tees (the tops that came with UVs): two smoothing rounds — tee tears ace 50 -> 20, grit 30 -> 8 over 10 poses,
-    // skin through the tee down too; on the kit's own tee it measured no better (male 6 -> 10), so it is left alone
-    const topSmooth = opts.topSmooth ?? RIVAL_TOP_SMOOTH;
+    // a forge rival's tee (a top that came with UVs), where it measured better (RIVAL_TEE_SMOOTHED); the kit's own tee measured no
+    // better (male 6 -> 10 torn edges), so it is left alone
+    const fileKey = inPath.split('/').pop()!.replace(/\.glb$/, '');
+    const topSmooth = opts.topSmooth ?? (RIVAL_TEE_SMOOTHED.has(fileKey) ? RIVAL_TOP_SMOOTH : 0);
     if (slot === 'tops' && p.uv && topSmooth) { smoothWeights({ P, J, W, joints: p.joints, ind: p.ind }, topSmooth); row.smooth = topSmooth; }
     let from = Uint32Array.from({ length: p.P.length / 3 }, (_, i) => i), uv: Float32Array | null = p.uv, ind = p.ind;
     if (!p.uv && opts.uv !== false) {

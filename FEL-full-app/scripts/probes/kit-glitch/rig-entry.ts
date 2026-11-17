@@ -108,7 +108,7 @@ async function spawn(o: SpawnOptsKG): Promise<number> {
   }
   // KIT-FIT: a measurement must be repeatable — breathing (secondary motion) is a clock, so it is stopped; foot planting
   // settles on a paused clip within the pose's settle frames (kit-fit found a run cell caught at two different moments)
-  if (STEADY) s.secondary.dispose();
+  if (STEADY) s.secondary?.dispose();
   bodies.push(s);
   return bodies.length - 1;
 }
