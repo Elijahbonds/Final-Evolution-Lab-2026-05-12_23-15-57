@@ -268,6 +268,12 @@ export const PICKUP_REACH_M = 0.3;
 /** The bounce may run at most this many times its own pace to meet the hand inside the wait (a harder last dribble). Knob
  *  `hoops.pickupRateMax`. */
 export const PICKUP_RATE_MAX = 2;
+/** hoops-gather (3v3 at speed): the speed-up is counted from at least this bounce rate (Hz). At a drive or a sprint the stride lock slows
+ *  the bounce to one a stride (measured 0.5-1.5 Hz on the press), so PICKUP_RATE_MAX of THAT could not meet a low ball inside the wait and
+ *  the pick-up fell back to the old take: measured on the 3v3 speed set, 10 of 11 presses at 2.8 m/s or more took the ball at once,
+ *  median 35 cm off the palm, 3 yanks. From this floor a stride-locked bounce may run as hard as a fast free dribble's last one.
+ *  0 = counted from the bounce's own rate (as at G2). Knob `hoops.pickupRateFloorHz`. */
+export const PICKUP_RATE_FLOOR_HZ = 2;
 /** A ball whose centre is within this of the top of its stroke is taken at once, as today (m). Knob `hoops.pickupTopGapM`. */
 export const PICKUP_TOP_GAP_M = 0.1;
 /** The take: the ball within this of touching the dribbling palm as drawn (m, past its radius). Knob `hoops.pickupContactM`. */
@@ -279,7 +285,7 @@ export const PICKUP_OVERRUN_SEC = 0.1;
  *  meets it, the pace the bounce runs at to get there, and how long that takes. null = take it now (near the top, or it cannot be met
  *  inside the wait at PICKUP_RATE_MAX). */
 export function planPickUp(ballY: number, rising: boolean, p: DribbleParams, rateHz: number,
-  k: { waitMaxSec: number; reachM: number; rateMax: number; topGapM: number }): { phase0: number; phaseMeet: number; rate: number; sec: number } | null {
+  k: { waitMaxSec: number; reachM: number; rateMax: number; topGapM: number; rateFloorHz?: number }): { phase0: number; phaseMeet: number; rate: number; sec: number } | null {
   const drop = Math.max(0.1, p.palmY - p.ballR);
   const h01 = (ballY - p.ballR) / drop;
   if (!(h01 >= -0.5) || !(rateHz > 0)) return null;
@@ -289,7 +295,7 @@ export function planPickUp(ballY: number, rising: boolean, p: DribbleParams, rat
   const phase0 = rising ? risingPhaseAt(Math.max(0, h01)) : fallingPhaseAt(Math.max(0, h01));
   const phaseMeet = risingPhaseAt(meet01);
   const dPhase = phaseMeet - phase0; if (!(dPhase > 0)) return null;
-  const natural = dPhase / rateHz, fastest = dPhase / (rateHz * Math.max(1, k.rateMax));
+  const natural = dPhase / rateHz, fastest = dPhase / (Math.max(rateHz, k.rateFloorHz ?? 0) * Math.max(1, k.rateMax));
   if (fastest > k.waitMaxSec + 1e-9) return null;                                   // cannot be met inside the wait: as today
   const sec = Math.max(fastest, Math.min(natural, k.waitMaxSec));
   return { phase0, phaseMeet, rate: dPhase / sec, sec };
@@ -1359,7 +1365,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
       // a move's path (a crossing, the auto hand's cross) places the ball itself: which way it is going is read off the ball as drawn
       const rising = mv ? drawnVy > 0 : lastLocalAt >= 0 ? lastVel.y > 0 : phase > PUSHED_FLOOR_PHASE;
       const rate = lockHz > 0 ? lockHz : p.hzIdle + (p.hzFast - p.hzIdle) * Math.min(1, Math.max(0, lastSpeed01));
-      const plan = planPickUp(at.y - fl, rising, p, rate, { waitMaxSec: feel('hoops.pickupWaitMaxSec', PICKUP_WAIT_MAX_SEC), reachM: feel('hoops.pickupReachM', PICKUP_REACH_M), rateMax: feel('hoops.pickupRateMax', PICKUP_RATE_MAX), topGapM: feel('hoops.pickupTopGapM', PICKUP_TOP_GAP_M) });
+      const plan = planPickUp(at.y - fl, rising, p, rate, { waitMaxSec: feel('hoops.pickupWaitMaxSec', PICKUP_WAIT_MAX_SEC), reachM: feel('hoops.pickupReachM', PICKUP_REACH_M), rateMax: feel('hoops.pickupRateMax', PICKUP_RATE_MAX), topGapM: feel('hoops.pickupTopGapM', PICKUP_TOP_GAP_M), rateFloorHz: feel('hoops.pickupRateFloorHz', PICKUP_RATE_FLOOR_HZ) });
       if (!plan) return asToday();
       // park the dribble as update(false) does — the move and the queue dropped — but keep the ball free and the reach on
       active = false; queued = null; lastLocalAt = -1; releaseLeft = 0;

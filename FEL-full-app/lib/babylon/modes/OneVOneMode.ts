@@ -85,7 +85,8 @@
 // timer; make-it-take-it both ways; the board is a race on both ends; the loose ball always steps.
 
 import { nerve, standingOf } from '../core/Nerve';
-import { PressBuffer } from '../hoops/response/pressBuffer';   // hoops-p01: the shot press waits out the move (was gameFeel's InputBuffer)
+import { PressBuffer } from '../hoops/response/pressBuffer';
+import { pumpHoldSec, pumpHolding } from '../hoops/response/pumpHold';   // hoops-gather: the pump keeps the ball while its clip plays   // hoops-p01: the shot press waits out the move (was gameFeel's InputBuffer)
 import { tickScuff, scuffPuffScale, scuffVolume, SCUFF_IDLE, type ScuffState } from '../core/ScuffFx';
 import { MeshBuilder, Quaternion, TransformNode as BABYLON_TransformNode, Vector3 } from '@babylonjs/core';
 import { dressBall } from '../visual/meshyProps';
@@ -616,6 +617,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   let camSnapPending = false;   // POLISH: a reset asks the camera to cut, not chase
   let ring: PlayerRingHandle | null = null;   // PLAYER RING: who you are, and how much turbo is left   // SHOWTIME: SQUARE in the air (raw, so a pad, a key and a probe all reach it), and whether the side camera is on
   let spinClip = 'bball_spin';           // M9: the same machinery turns a PIVOT (a shorter sweep, no travel)
+  let pumpHoldFor = 0;                  // hoops-gather: seconds of the pump window the pump holds the ball (its clip)
   let pumpWindow = 0;                    // M8: seconds left in which a squeeze is a STEP-THROUGH (he bit the fake)
   let banked: Vector3 | null = null;     // M12: the glass point this release is routed through
   let finish: { plan: FinishPlan; t: number; released: boolean } | null = null;
@@ -1703,7 +1705,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           meFootPlant.update(dt);
           // the ball leaves the palm while I carry; a crossover swaps hands
           // STICK HANDLE: pausin' holds the ball out. HOOPS MOTION phase 4b (U19): …unless a move's path has it (PAUSIN's `hold` segment)
-          meCarry?.update(dt, drib.speed01, carrying && !shooting && !dunking && !finish && !(pausedDribble && !meCarry?.move));
+          meCarry?.update(dt, drib.speed01, carrying && !shooting && !dunking && !finish && !(pausedDribble && !meCarry?.move) && !pumpHolding(pumpWindow, pumpHoldFor, STEP_THROUGH_SEC));   // hoops-gather: the pump keeps the ball
           if (STRONG_HAND_RETURNS) { // hoops-handle (owner 10-17): off — the ball stays in the hand a move left it in. H2d (plan §3.8, Q8): the ball goes back to the strong hand on a stop / after 1.2 s in the left — a quiet crossing, not a move
             const sh = stepStrongHand(strongHand, dt, { hand: meCarry?.handAfterMove === 'Left' ? 'left' : 'right', speed01: drib.speed01, moveActive: !!meCarry?.move,
               dribbling: !!meCarry?.active && carrying && possession === 'mine' && !shooting && !dunking && !finish && !gather && !spin && !pausedDribble,
@@ -1988,7 +1990,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         }
         // a squeeze made while the body is committed WAITS instead of vanishing
         shotBuffer.tick(!!(shooting || dunking || spin), performance.now());   // hoops-p01: the lock the buffered squeeze waits out
-        if (carrying && meSlot.intent.actionHeld > 0.02 && (shooting || dunking || spin)) shotBuffer.press(performance.now());
+        shotBuffer.hold(carrying && meSlot.intent.actionHeld > 0.02, !!(shooting || dunking || spin), performance.now());   // hoops-gather: a press made DURING the lock (the one that started it is not buffered through its own pump)
         { // H2e (owner 2026-10-16): THE HOP STEP ON A DOUBLE TAP — a second Square inside HOP_TAP_SEC of the first, on a drive, turns the
           // gather that press started (or the pump its quick release made) into the hop step (core/FinishFootwork)
           const held = meSlot.intent.actionHeld > 0.02, edge = held && !squeezeHeldWas; squeezeHeldWas = held;
@@ -3215,6 +3217,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     shotMeter.active = false;
     meShotWin = 'pump'; meShotSec = 0;
     pumpWindow = STEP_THROUGH_SEC;
+    pumpHoldFor = pumpHoldSec(me.animator.durationOf('bball_pump_fake')); if (pumpHoldFor > 0) meCarry?.settlePickUp();   // hoops-gather: the pump keeps the ball (a pick-up still reading is taken now)
     meAnimTree.beat('bball_pump_fake', { fadeSec: 0.06 });
     SoundKit.play('whoosh', { pitch: 1.3, volume: 0.25 });
     // hoops-p09: he leaves his feet when he is flying at you (closing out, or already in the air); a man sitting back does not bite. No roll
