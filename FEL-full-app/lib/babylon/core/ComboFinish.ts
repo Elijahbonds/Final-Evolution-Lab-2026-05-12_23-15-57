@@ -16,8 +16,10 @@ import { feel } from '../../feel-panel/feel';   // knobs hoops.comboDunkOn / hoo
 import { DUNK_RANGE, DUNK_MIN_TURBO } from './BasketballCore';
 import { pickHoopsDunk, ANGLED, type DunkRead, type HoopsDunk } from './HoopsDunks';
 
-/** A euro or a hop may end in a dunk (1) / never does (0: as before). Knob `hoops.comboDunkOn`. */
-export const COMBO_DUNK_ON = 0;
+/** A euro or a hop may end in a dunk (1) / never does (0: as before). Knob `hoops.comboDunkOn`. ON since phase 3 (coordinator 2026-11-17:
+ *  the owner asked for a euro step dunk; FLAGGED 0 → 1). Measured: the ball from the footwork's own pick-up, 1-6 cm off the palm, no yank;
+ *  OPEN: two arm pops in the footwork → dunk crossfade (164°/frame on one euro, 126°/frame on one hop). */
+export const COMBO_DUNK_ON = 1;
 /** The drive must be at least this fast at the squeeze (m/s) — the drive dunk's own floor is DUNK_MIN_SPEED 3.4 at the take-off; a gather
  *  bleeds some of it, so the read is at the squeeze. Knob `hoops.comboDunkMinMps`. */
 export const COMBO_DUNK_MIN_MPS = 3.4;

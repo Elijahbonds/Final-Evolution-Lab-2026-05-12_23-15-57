@@ -375,8 +375,8 @@ with a real player (`hoops-audit/mash-audit.mjs PLAYER=script` and `mash`): the 
   the speed at the SECOND press, after the gather bled it: now read at the first press, `force.hopVel`). The ball: always the
   footwork's own pick-up, 1-6 cm off the palm, no yank (the plain drive dunk on the same runs: 47-69 cm). The arm: worst 39-83°/frame
   on most, but 164 (one euro) and 126 (one hop) in the footwork → dunk crossfade (the same footwork into a layup: 36-103). The ball's
-  re-drop 6-35 cm (the dunk's own load after the footwork's). **Proposal: `hoops.comboDunkOn` → 1** (left at 0 for the coordinator /
-  owner), with the two crossfade pops as the open item. The 3v3 euro did not fire in the probe (its drives from the check never met
+  re-drop 6-35 cm (the dunk's own load after the footwork's). **`hoops.comboDunkOn` → 1** (coordinator 2026-11-17: the owner asked for a
+  euro step dunk; FLAGGED), with the two crossfade pops as the open item. The 3v3 euro did not fire in the probe (its drives from the check never met
   the euro's read at speed): not measured.
 - **The dunk take-off yank (cause c), tried and NOT shipped.** The drive dunk's take through the pick-up (wait for the bounce, into the
   dunking hand, settled by the take-off pass's end, 0.18 s) measured WORSE on the same seeds: 1v1 53 → 121 cm and 0.5 → 71 cm, settles

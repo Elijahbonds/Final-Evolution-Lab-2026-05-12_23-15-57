@@ -11,10 +11,12 @@ afterEach(() => resetFeelForTests());
 const read = { sprint: true, turbo01: 1, speed: 5.5, rimDistAfter: 2.0 };
 
 describe('ComboFinish (G4)', () => {
-  it('ships OFF: a euro or a hop never dunks, whatever the drive', () => {
-    expect(COMBO_DUNK_ON).toBe(0);
+  it('ships ON (phase 3, flagged); the knob at 0 is the old game: a euro or a hop never dunks, whatever the drive', () => {
+    expect(COMBO_DUNK_ON).toBe(1);
     expect(FEEL_KNOB_BY_ID.get('hoops.comboDunkOn')!.def).toBe(COMBO_DUNK_ON);
     expect(FEEL_KNOB_BY_ID.get('hoops.comboDunkMinMps')!.def).toBe(COMBO_DUNK_MIN_MPS);
+    expect(comboDunkThen(read)).toBe(true);
+    resetFeelForTests(); setFeelUser(true); setFeelSession(null); setFeelOverride('hoops.comboDunkOn', 0);
     expect(comboDunkThen(read)).toBe(false);
   });
   it('on: the turbo held with fuel, fast enough, and the last plant inside dunk range — and none of them alone', () => {

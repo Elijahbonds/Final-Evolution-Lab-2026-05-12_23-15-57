@@ -855,7 +855,8 @@ restores the old behaviour exactly.
   the rim and pull up off a low dribble: the hand meets the ball on its way up, no snatch.
 - `hoops.releaseSnapEaseSec` 0.03 s (`anim/ballCarry.ts`, G2): the smoothing of the shooting wrist's snap at the release (58°). 0.03 is
   the value it always had (TUNED, unchanged): the wrist turns ~58° in one frame on every jumper. A longer ease spreads it over frames.
-- `hoops.comboDunkOn` 0 (`core/ComboFinish.ts`, G4): on, a euro or a hop step with the turbo held, at least `hoops.comboDunkMinMps`
+- `hoops.comboDunkOn` 1 (`core/ComboFinish.ts`, G4; FLAGGED 0 → 1, the owner asked for a euro step dunk; open: two arm pops in the
+  footwork → dunk crossfade, 164°/frame on one euro and 126°/frame on one hop in the G4 runs): on, a euro or a hop step with the turbo held, at least `hoops.comboDunkMinMps`
   3.4 m/s at the press and its last plant inside dunk range (2.8 m) takes off into a dunk: the euro's cross gives the angle (the windmill
   at speed, the cradle without it), the hop's two feet none, a body in the way the double clutch (the drive dunk's own picker). Off:
   they end in a layup or a floater, as before.
