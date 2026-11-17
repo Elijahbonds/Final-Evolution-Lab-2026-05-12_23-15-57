@@ -162,7 +162,11 @@ describe('the H3a preset (group "Hoops · movement"): #311\'s tuned stick, throu
   it('the preset smooths the snaps: no one-frame speed jump over 0.6 m/s across a start, turbo, cut, reversal and stop (today 1.13)', () => {
     const script: Drive = (t) => t < 1 ? [0, -1, false] : t < 1.8 ? [0, -1, true] : t < 2.4 ? [0, -1, false] : t < 3.0 ? [1, 0, false] : t < 3.6 ? [-1, 0, false] : [0, 0, false];
     const jump = (tr: [number, number][]) => Math.max(...tr.slice(1).map(([x, z], i) => Math.hypot(x - tr[i][0], z - tr[i][1])));
+    // TEST CHANGED (lane/move-feel, owner 2026-11-17): the handler's defaults now spread the kick and the cut (kickSec 0.1, cutSec 0.08), so
+    // "today" is the release stick, opened through the panel; it still jumps over 1 m/s in a frame, and the preset still under 0.6
+    openPanel(RELEASE_STICK_PRESET);
     expect(jump(drive(new DribbleController(), 4.4, script))).toBeGreaterThan(1.0);
+    resetFeelForTests();
     openPanel(H3A_STICK_PRESET);
     expect(jump(drive(new DribbleController(), 4.4, script))).toBeLessThan(0.6);
   });

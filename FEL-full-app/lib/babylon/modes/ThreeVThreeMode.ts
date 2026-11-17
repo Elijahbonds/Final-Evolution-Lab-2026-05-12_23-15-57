@@ -47,7 +47,8 @@
 //      1.6 m connects; a set defender I bump strips me on his roll, the ball loose, no warp); X HELD is a grounded hand-up
 //      that contests the driver's release (and the AI's contests mine), the contest biting the make chance and altering the arc.
 import { nerve, standingOf } from '../core/Nerve';
-import { PressBuffer } from '../hoops/response/pressBuffer';   // hoops-p01: the shot press waits out the move (was gameFeel's InputBuffer)
+import { PressBuffer } from '../hoops/response/pressBuffer';
+import { pumpHoldSec, pumpHolding } from '../hoops/response/pumpHold';   // hoops-gather: the pump keeps the ball while its clip plays   // hoops-p01: the shot press waits out the move (was gameFeel's InputBuffer)
 import { tickScuff, scuffPuffScale, scuffVolume, SCUFF_IDLE, type ScuffState } from '../core/ScuffFx';
 import { MeshBuilder, Vector3, StandardMaterial, Color3 } from '@babylonjs/core';
 import { dressBall } from '../visual/meshyProps';
@@ -198,6 +199,7 @@ import { SHOWTIME_FLUSH_K, SHOWTIME_GOOD_K, showtimeAsked, pickShowtime, judgeSh
 import type { ParticleSystem } from '@babylonjs/core';   // suite pass: the hot hand's shot trails (the dunk contest's ball trail, on the game)
 import { mountHandleFx, type HandleFx } from '../court/mount/handleFx';   // hoops-defense-fx (2026-10-20): the handle's squeak, slap, rumble, punch and ooh
 import { mountHoopsCourt, type HoopsCourt } from '../court/mount/hoopsCourt';   // vis-hoops-court (2026-10-14): the broadcast, the scuffs, the dusk and the streetball arena
+import { replaySkipOn } from '../core/replaySkip';   // hoops-flow (owner 2026-11-12): any press skips the replay (knob hoops.replaySkipOn)
 import { HoopJuice } from '../visual/HoopJuice';   // A+ P0: the hoop answers the make (shared with Dunk / 1v1; Meshy never scaled)
 import { mountShotMeter3D, type ShotMeter3DHandle } from '../visual/ShotMeter3D';   // THE SHOT METER (owner, 2026-09-18): the 2K bar beside the shooter's head
 import { pickHoopsDunk, dunkSpeedRatio, PAUSIN_DUNK } from '../core/HoopsDunks';
@@ -210,7 +212,7 @@ import type { ModeContext, ModeDefinition, HudValue, BodyView } from '../core/Mo
 import type { BodyEvent } from '@/lib/pose/BodyReader';
 import { distanceGreenFactor, perfectHud, releaseGradeLabel } from '../core/ShotWindow';   // lane/hoops-shot-core
 import { PlayerShotClock, playerShotClockSec } from '../core/ShotClock';   // lane/hoops-shot-core
-import { hornCall, overtimeSec, periodLabel, OVERTIME_BALL, OVERTIME_BANNER, OVERTIME_BANNER_MS } from './threevthreeOvertime';   // lane/hoops-overtime (NB-3)
+import { hornCall, overtimeSec, periodLabel, OVERTIME_BALL, OVERTIME_BANNER, OVERTIME_BANNER_MS, THREE_GAME_SEC, threeGameSec, introNamesClock } from './threevthreeOvertime';   // lane/hoops-overtime (NB-3); hoops-flow: the game clock
 import { readTier, type Tier } from '../core/Difficulty';   // IMPROVE (2026-10-06) #3: the shared OPPONENT pick
 import { hintSwap } from './onevoneRules';     // IMPROVE (2026-10-06) #7: the 1v1's hint dwell (the urgent lines share its prefixes)
 import {   // IMPROVE (2026-10-06): the threevthree items of docs/IMPROVEMENTS-2026-10-05.md, as pure logic
@@ -223,6 +225,7 @@ import { ModeMic } from '../audio/mic/ModeMic';   // THE MIC (2026-09-24): the c
 import type { MicEvent } from '../audio/mic/MicDirector';
 import { dunkStingers } from '../audio/mic/names';
 import type { MomentumTier } from '../core/MomentumBus';
+import { StickFrame } from '../core/StickFrame';   // lane/move-feel-2: a held stick keeps its court frame
 
 /** Exported so hoop-alignment-tests can check it against the venue's hoop. */
 export const RIM = new Vector3(0, RIM_HEIGHT_M, -0.6);
@@ -251,7 +254,7 @@ const FORMAT: ScoringFormat = 'alternating';
 // basketball core. The real line is 6.71m in the corners and 7.24m at the top,
 // and that difference IS the shot selection: a corner three is the bargain and
 // the top of the key is the hard one. isThree() now answers it per angle.
-const POSSESSION_SEC = 90;
+// hoops-flow (owner 2026-11-12): the game clock is threevthreeOvertime's THREE_GAME_SEC (240 s, knob hoops.threeGameSec; it was 90 s here).
 /** BIOMECH-HOOPS-WAVE1: the facing slew (rad/s); a defender inside this range keeps his chest on the carrier. */
 const FACE_RATE = 10, FACE_RIM_RATE = 6, DEFEND_FACE_RANGE = 6;
 
@@ -337,10 +340,12 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   // the rival's drive is a CLOCKED path (his `vel` is zeroed every frame — see the foe loop), so his closing speed on me is
   // read off his position, the way the charge reads it
   const driverPrev = new Vector3(), driverVelEst = new Vector3(); let driverPrevFor: Body | null = null;
+  const stickFrame = new StickFrame();   // lane/move-feel-2: "stick right runs a straight line while held"
   const kin = { drifts: 0, ankles: 0, parries: 0, driveBys: 0, slings: 0, slipSec: 0, ignitions: 0, shocks: 0 };
   let arc: ShotArc;
   let arcMade = false, arcPoints = 0, arcLabel = '', arcQuality: ShotQuality = 'good';
-  let myScore = 0, foeScore = 0, assists = 0, timeLeft = POSSESSION_SEC;
+  let gameSec = THREE_GAME_SEC;   // hoops-flow: this run's game clock (read at the run's start: a knob moved mid-game waits for the next one)
+  let myScore = 0, foeScore = 0, assists = 0, timeLeft = gameSec;
   /** Where the OTHER team stands, for Nerve. Lateness reads off whoever is closer to 21. */
   const foeStanding = () =>
     standingOf(foeScore, myScore, TARGET_SCORE, Math.min(1, Math.max(myScore, foeScore) / TARGET_SCORE));
@@ -516,6 +521,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   // frozen, so the opening is the geometry itself. A second timer nothing reads is dead state.
   let passFakeCooldown = 0;
   let spinClip = 'bball_spin';           // M9: the same machinery turns a PIVOT (a shorter sweep, no travel)
+  let pumpHoldFor = 0;                  // hoops-gather: seconds of the pump window the pump holds the ball (its clip)
   let pumpWindow = 0;                    // M8: seconds left in which a squeeze is a STEP-THROUGH (he bit the fake)
   let banked: Vector3 | null = null;     // M12: the glass point this release is routed through
   let driveContest: DriveContest | null = null;                                      // M2: the body in the dunk's path
@@ -999,12 +1005,14 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   return {
     modeId: 'threevthree', mood: 'goldenHour', camPreset: 'team',
     intro: 'walkIn', replay: true, replayCast: () => ({ bodies: bodiesAll.map((b) => b.char.root), loose: [ball] }),   // vis-hoops-court: the broadcast opens and replays the possession's best moment
+    replaySkipAny: replaySkipOn,   // hoops-flow (owner 2026-11-12): any press — a flick, a trigger, a tap — skips the replay and the ball comes back
     // HOOPS BODY (2026-10-07): the body plays my man through his ControlSource; its claimed events land here
     body: COURT_BODY,
     onBody: (_ctx: ModeContext, ev: BodyEvent, view: BodyView): boolean => bodyCtl?.see(ev, view) ?? false,
     // NB-1 (HONEST-START): load() ran at page load, before the start screen's OPPONENT pick — this run plays the pick
     onPlay() {
       if (myScore !== 0 || foeScore !== 0) return;   // only before the first bucket
+      gameSec = threeGameSec(); timeLeft = gameSec; if (ctx0) putHud(ctx0, { time: Math.ceil(timeLeft) });   // hoops-flow: the game clock this run plays (a knob read at READY, as the tier is)
       const tier = runTier();
       for (const r of reactives) r.setTier(tier);   // lane/hoops-round2 HOP-02: the pick's reaction delay
       const next = THREEV_TIER[tier] ?? THREEV_TIER.pro;
@@ -1172,7 +1180,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       mark = MeshBuilder.CreateTorus('3v3_mark', { diameter: 1.05, thickness: 0.05, tessellation: 40 }, ctx.scene);
       markMat = new StandardMaterial('3v3_mark_mat', ctx.scene); markMat.disableLighting = true; markMat.alpha = 0.85;
       mark.material = markMat; mark.isPickable = false; mark.setEnabled(false);
-      hoopsFx?.dispose(); hoopsFx = mountHoopsCourt(ctx, { kind: 'threevthree', rim: RIM, bodies: () => bodiesAll.map((b) => b.char.root), final: () => ended || buzzer, progress: () => overtimes ? 1 : Math.max(myScore / TARGET_SCORE, foeScore / TARGET_SCORE, 1 - timeLeft / POSSESSION_SEC),
+      hoopsFx?.dispose(); hoopsFx = mountHoopsCourt(ctx, { kind: 'threevthree', rim: RIM, bodies: () => bodiesAll.map((b) => b.char.root), final: () => ended || buzzer, progress: () => overtimes ? 1 : Math.max(myScore / TARGET_SCORE, foeScore / TARGET_SCORE, 1 - timeLeft / gameSec),
         teams: { mine: () => mates.map((b) => b.char.root), theirs: () => foes.map((b) => b.char.root), mineColor: TEAM_JERSEY.mine, theirsColor: TEAM_JERSEY.theirs } });
       handleFx?.dispose(); handleFx = mountHandleFx(ctx, { carry: () => carries.get(me) ?? null });   // hoops-defense-fx
       hoopJuice?.dispose(); hoopJuice = new HoopJuice(ctx.scene, RIM);   // A+ P0: juice-only ring + net, material clones — no meshy_hoop_* transform is touched
@@ -1200,7 +1208,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         if (Number.isFinite(q) && q > 0) { handle = Math.max(0, Math.min(100, q)); console.info(`[3V3-HANDLE] handle ${handle} (override)`); }
       }
 
-      myScore = 0; foeScore = 0; assists = 0; timeLeft = POSSESSION_SEC; ended = false; buzzer = false; overtimes = 0; otBannerHold = 0;   // IMPROVE (2026-10-06) #17: a second run on this closure started with the last run's horn blown (it ended at its first quiet frame)
+      gameSec = threeGameSec(); myScore = 0; foeScore = 0; assists = 0; timeLeft = gameSec; ended = false; buzzer = false; overtimes = 0; otBannerHold = 0;   // IMPROVE (2026-10-06) #17: a second run on this closure started with the last run's horn blown (it ended at its first quiet frame)
       shotContest = 0; foeCloseMem = foes.map(() => 0);
       ctx.heroRef.current = me.char.root;
       ctx.objectiveRef.current = RIM;
@@ -1344,7 +1352,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       // flying ball to the dribble point (carrierId stays 'me' until the next possession)
       const ballReleased = !!(ball.metadata as { felReleased?: boolean } | undefined)?.felReleased;
       // HOOPS MOTION phase 3: an AI dribbler's pace is his own ground speed (a fixed 0.5 pushed a walking mate's ball out like a sprint)
-      for (const [b, c] of carries) c.update(dt, b === me ? meSpeed01 : Math.max(b.speed01, Math.min(1, Math.hypot(b.vel.x, b.vel.z) / 4.2)), cbNow === b && !(b === me && pausedDribble && !c.move) && !shooting && !mateShooting && !dunking && !passFlight.active && !arc.active && !finish && !gather && !ballReleased && !(b === me && !!spin && !c.move));   // HOOPS MOTION phase 4b (U19): …the hero's carry is ticked through a move's path (the spin's pull, PAUSIN's hold)
+      for (const [b, c] of carries) c.update(dt, b === me ? meSpeed01 : Math.max(b.speed01, Math.min(1, Math.hypot(b.vel.x, b.vel.z) / 4.2)), cbNow === b && !(b === me && pausedDribble && !c.move) && !shooting && !mateShooting && !dunking && !passFlight.active && !arc.active && !finish && !gather && !ballReleased && !(b === me && !!spin && !c.move) && !(b === me && pumpHolding(pumpWindow, pumpHoldFor, STEP_THROUGH_SEC)));   // HOOPS MOTION phase 4b (U19): …the hero's carry is ticked through a move's path (the spin's pull, PAUSIN's hold)
       if (STRONG_HAND_RETURNS) { // hoops-handle (owner 10-17): off — the ball stays in the hand a move left it in. H2d (plan §3.8, Q8): my ball goes back to the strong hand on a stop / after 1.2 s in the left — a quiet crossing, not a move
         const myC = carries.get(me); const nfH = nearestLiveFoe();
         const sh = stepStrongHand(strongHand, dt, { hand: myC?.handAfterMove === 'Left' ? 'left' : 'right', speed01: meSpeed01, moveActive: !!myC?.move,
@@ -1681,7 +1689,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       // MODE-STICK-FACE (2026-09-07): CAMERA-relative — the team camera looks at the rim (−z) from behind me, and in a
       // left-handed world a raw +x intent is SCREEN-LEFT (measured: stick-right Δscreen −5.6 m). Up = the camera's flat
       // forward, right = screen right, handed to the dribble in its stick space (+Y = −Z).
-      let wish = ctx.camDirector.forwardFlat().scale(meIntent.moveY).addInPlace(ctx.camDirector.rightFlat().scale(meIntent.moveX));
+      const camF = ctx.camDirector.forwardFlat(), camR = ctx.camDirector.rightFlat(); stickFrame.read(camF, camR, Math.hypot(meIntent.moveX, meIntent.moveY));   // lane/move-feel-2 (owner 2026-11-17): a held stick keeps its court frame (hoops.stickFrameHold)
+      let wish = camF.scale(meIntent.moveY).addInPlace(camR.scale(meIntent.moveX));
       // THE STANCE NOW COSTS AND PAYS. The slide animation was already here and did nothing to the body —
       // a crouched defender covered ground exactly like an upright one. In a stance you slide faster and
       // go forward slower; upright it is the other way round, which is what makes the crossover work.
@@ -2361,7 +2370,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         }
         // a squeeze made while the body is committed WAITS instead of vanishing
         shotBuffer.tick(!!(shooting || dunking || finish || spin), performance.now());   // hoops-p01: the lock the buffered squeeze waits out
-        if (iAmCarrier && meIntent.actionHeld > 0.02 && (shooting || dunking || finish || spin)) shotBuffer.press(performance.now());
+        shotBuffer.hold(iAmCarrier && meIntent.actionHeld > 0.02, !!(shooting || dunking || finish || spin), performance.now());   // hoops-gather: a press made DURING the lock (the one that started it is not buffered through its own pump)
         { // H2e (owner 2026-10-16): THE HOP STEP ON A DOUBLE TAP (see 1v1)
           const held = meIntent.actionHeld > 0.02, edge = held && !squeezeHeldWas; squeezeHeldWas = held;
           if (edge && iAmCarrier && !dunking && !posting && hopOnDoubleTap(tapRead())) {
@@ -2396,7 +2405,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           banked = null;   // M12: each release calls its own glass
           // HOOPS MOTION phase 4b (U14): the dribble parked now (the carries loop would park it next frame, into whichever hand it was in) and
           // the ball gathered into the RIGHT hand
-          carries.get(me)?.update(0, 0, false); gatherToShootingHand();
+          { const c = carries.get(me); if (c) c.pickUp(hoopsHand(me.char)); else gatherToShootingHand(); }   // hoops-gather G1: the carry's pick-up (reads the bounce behind hoops.pickupReadOn; off = the update(0, 0, false) + gather it replaced)
           const contest = contestLevel(me.char.root.position, nearestFoePos);
           shotContest = contest;
           currentShot = classifyShot(me.char.root.position, me.drib.vel, RIM, contest, posting ? post : faceUpRead(nearestFoePos));
@@ -2605,6 +2614,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   }
 
   async function resolveMyShot(ctx: ModeContext, quality: ShotQuality): Promise<void> {
+    carries.get(me)?.settlePickUp();   // hoops-gather G1: a pick-up still waiting for the bounce is taken before the ball leaves (no-op with it off)
     shooting = false;
     box.fga++;   // IMPROVE (2026-10-06) #9: every release is an attempt (a blocked one too)
     const pctMod = currentShot?.pctMod ?? 1;
@@ -3007,8 +3017,9 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     const side = sideIn ?? (style === 'layup' ? pickLayupSide(me.char.root.position, RIM_FLOOR, me.char.root.rotation.y, defenderPos)
       : style === 'hook' ? pickHookSide(me.char.root.position, RIM_FLOOR, me.char.root.rotation.y, defenderPos)
       : style === 'reverse' ? reverseSide(me.char.root.position, RIM_FLOOR, me.char.root.rotation.y, me.drib.vel) : 'right');
-    carries.get(me)?.update(0, 0, false);
-    gatherBallToHand(ball, me.char.skeleton, hoopsHand(me.char, side));   // HOOPS MOTION phase 3: the finishing hand AS DRAWN, gathered (was rig-named: the inside hand)
+    if (carries.get(me)?.pickingUp) carries.get(me)!.pickUp(hoopsHand(me.char, side));   // hoops-gather G1: a pick-up still waiting for the bounce takes the finishing hand
+    else { carries.get(me)?.update(0, 0, false);
+    gatherBallToHand(ball, me.char.skeleton, hoopsHand(me.char, side)); }   // HOOPS MOTION phase 3: the finishing hand AS DRAWN, gathered (was rig-named: the inside hand)
     if (preSec <= 0) meterStart(style === 'hook' ? hookShield(contest) : contest, style);
     // M4: the fade's escape line — off the defender when he is on me, straight off the rim otherwise
     const plan = planFinish(style, side, shotMeter.durationSec, shotMeter.greenCenter01,
@@ -3099,8 +3110,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     shooting = true;
     shotContest = plan.kind === 'shimmy' ? contest * SHIMMY_CONTEST_CUT : contest;
     pumpWindow = 0;
-    carries.get(me)?.update(0, 0, false);
-    gatherToShootingHand();   // HOOPS MOTION phase 4b (U14): the footwork's gather is the right hand's too
+    { const c = carries.get(me); if (c) c.pickUp(hoopsHand(me.char)); else gatherToShootingHand(); }   // hoops-gather G1: the carry's pick-up (reads the bounce behind hoops.pickupReadOn; off = the update(0, 0, false) + gather it replaced)   // (U14: the footwork's gather is the right hand's too)
     currentShot = plan.then === 'rise' ? classifyShot(me.char.root.position, me.drib.vel, RIM, contest) : { style: plan.then as ShotStyle, label: gatherLabel(plan.kind, 'FINISH'), pctMod: plan.then === 'floater' ? 1.0 : 1.18, drift: 'none' };
     if (plan.then === 'rise' && isFinishStyle(currentShot.style)) plan.then = currentShot.style;   // ACROBATIC LAYUPS (2026-09-18): a hop that classifies as a finish ends IN it (the 1v1's)
     meterStart(contest, currentShot.style, plan.sec);
@@ -3130,6 +3140,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     shotMeter.active = false;
     me.shotWin = 'pump'; me.shotSec = 0;
     pumpWindow = STEP_THROUGH_SEC;
+    pumpHoldFor = pumpHoldSec(me.char.animator.durationOf('bball_pump_fake')); if (pumpHoldFor > 0) carries.get(me)?.settlePickUp();   // hoops-gather: the pump keeps the ball (a pick-up still reading is taken now)
     me.tree.beat('bball_pump_fake', { fadeSec: 0.06 });
     SoundKit.play('whoosh', { pitch: 1.3, volume: 0.25 });
     // hoops-p09: he leaves his feet when he is flying at you (closing out, or already in the air); a man sitting back does not bite. No roll
@@ -4062,12 +4073,12 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     if (who && Math.random() < chance) mic?.then({ who, moment });
   }
   /** Every frame: the mic's clock, the welcome on the first live frame, and now and then an open mate calling for it. No
-   *  filler and no idle crowd: the 90 s clock never stops, so a run has no dead time to fill. */
+   *  filler and no idle crowd: the game clock never stops, so a run has no dead time to fill. */
   function micTick(ctx: ModeContext): void {
     if (!mic) return;
     mic.update();
     if (!micOpened && ctx.phase() === 'playing') {
-      // the welcome to this court, then what the run is (to 21, a 90 s clock) — once the voices are in (the 1v1's gate: a call
+      // the welcome to this court, then what the run is (to 21, a 90 s clock: said on a 90 s game only, hoops-flow) — once the voices are in (the 1v1's gate: a call
       // made before the banks land is let go), and not at all if they arrive after the run is under way. PRIORITY 1: the ball
       // is live on this frame and the welcome runs ~9 s, so at priority 2 it swallowed every priority-2 call under it (the
       // opening dunk, three, steal, block — equal priority is only queued inside the last 1.2 s); now a real play cuts in.
@@ -4075,7 +4086,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       if (mic.ready) {
         micOpened = true;
         mic.say({ moment: 'intro.court', priority: 1, crowd: { moment: 'crowd.hype', n: 2 } });
-        mic.then({ moment: 'game.intro.threes', priority: 1 });
+        if (introNamesClock(gameSec)) mic.then({ moment: 'game.intro.threes', priority: 1 });   // hoops-flow: its recorded lines say "ninety seconds" — only on a 90 s game
         micMateAt = performance.now() + 15000;   // the mates let the welcome finish
       } else if (performance.now() - micLiveAt > 6000) micOpened = true;
     }

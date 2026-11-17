@@ -19,7 +19,7 @@ import { hnode } from './hud-format';
 import { HUD_TEXT_ALPHA, HudBanner, HudChip, HudFrame, HudMeter, HudPlate, HudText, ScoreValue, Scorebug } from './tv-hud';
 import { HoopsShotMeter } from './hoops-shot-meter';
 import { HoopsShotClock } from './hoops-shot-clock';   // lane/hoops-shot-core: ELITE's shot clock on the scorebug
-import { overtimeHeadline } from '@/lib/babylon/modes/threevthreeOvertime';   // lane/hoops-overtime (NB-3): a tie at the horn is sudden death
+import { overtimeHeadline, gameClockText } from '@/lib/babylon/modes/threevthreeOvertime';   // lane/hoops-overtime (NB-3): a tie at the horn is sudden death
 import { MicCaption, MicToggle } from './mic-caption';   // THE MIC (2026-09-24): what the court's MC just said, and the voice switch
 import { HoopsBottomStack, StackLine } from './hoops-bottom-stack';   // hoops-p08: one column for the bottom layers
 import { useHintDevice, useHoopsHint } from './use-hoops-hint';   // hoops-p08: the hint for the first plays, in the device's words
@@ -152,8 +152,8 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
             </HudPlate>
           );
         })()}
-        {/* NB-3: the clock chip names the period in overtime ('OT 30s'), so the copy matches the clock */}
-        <HudChip tone="score" size="body">{typeof hud.time === 'number' ? `${typeof hud.period === 'string' && hud.period ? `${hud.period} ` : ''}${hud.time}s` : 'TO 21'}</HudChip>
+        {/* NB-3: the clock chip names the period in overtime ('OT 30s'), so the copy matches the clock; hoops-flow: a minute or more reads m:ss */}
+        <HudChip tone="score" size="body">{typeof hud.time === 'number' ? gameClockText(hud.time, typeof hud.period === 'string' ? hud.period : '') : 'TO 21'}</HudChip>
       </div>
 
       {/* hoops-p08: the call stays at a third of the stage — on an upright phone (under 640 px) it heads the bottom stack instead, where the

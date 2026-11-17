@@ -435,3 +435,17 @@ The owner answered these (relayed by the coordinator). One line each.
 17. **Social basketball setting:** a PARK area (outdoor home courts, a run to queue for, a place to hang out), built from
     the Adventure map pieces and part of the Adventure hub (one world: story ↔ courts, same player, party and look). Build
     it after the current hoops work, together with the Adventure hub. Menus keep one-tap 1v1/3v3.
+- **owner 2026-11-12 (hoops gathers, G3):** an escape thrown into the closed side of a trap (double team) IS a steal (`docs/HOOPS-GATHER-ESCAPE-PLAN.md`).
+- **owner 2026-11-12 (hoops gathers, G5):** the mid-air adjustment uses the right stick in the air, like the dunk trick stick.
+- **owner 2026-11-12 (hoops gathers, G6):** a hop step with the stick at rest IS a jump stop.
+
+## 2026-11-17 — the movement (docs/MOVE-FEEL-DIAGNOSIS.md)
+
+The owner answered the three questions of the move-feel diagnosis (relayed by the coordinator).
+
+1. **"Turn all six on now."** Shipped defaults, each still switchable off on the feel panel: `hoops.camLeadEase` 1, `hoops.turnTrueArc` 1,
+   `hoops.kickSec` 0.1, `hoops.cutSec` 0.08, `hoops.gearBlendBand` 0.2, `hoops.stickSprintFallback` 0 (docs/FEEL-PANEL.md, move-feel).
+2. **"Stick right" runs a straight line while the stick is held**, behind a switch so both can be felt (lane/move-feel-2).
+3. **The phone stick:** it appears under the thumb, about 1.5× today's size, a 10 % dead zone, the same push always the same speed; its own
+   switch, off = today's stick (lane/move-feel-2).
+

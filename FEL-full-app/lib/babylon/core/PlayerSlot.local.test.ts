@@ -6,6 +6,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { LocalInputSource } from './PlayerSlot';
+import { setFeelUser, setFeelSession, setFeelOverride, resetFeelForTests } from '@/lib/feel-panel/feel';
 
 describe('LocalInputSource 2K map', () => {
   it('pad: R2 is turbo, R1 is glass, L2 is post-up + intense, L1 is the plant only', () => {
@@ -43,9 +44,19 @@ describe('LocalInputSource 2K map', () => {
     i = s.poll();
     expect(i.brace).toBe(true); expect(i.intense).toBe(false);
   });
-  it('a pad that has never reported a trigger still sprints on a hard stick', () => {
+  // TEST CHANGED (lane/move-feel, owner 2026-11-17 "turn all six on now"): the stick-magnitude turbo fallback is OFF by default
+  // (hoops.stickSprintFallback 0), so a hard stick alone no longer sprints; the old rule is pinned with the knob at 1, as it was.
+  it('a pad that has never reported a trigger still sprints on a hard stick — with hoops.stickSprintFallback 1 (the old rule)', () => {
+    setFeelUser(true); setFeelSession(null); expect(setFeelOverride('hoops.stickSprintFallback', 1)).toBe(1);
+    try {
+      const s = new LocalInputSource();
+      s.feed({ t: 'stick', side: 'L', x: 1, y: 0 });
+      expect(s.poll().sprint).toBe(true);
+    } finally { resetFeelForTests(); }
+  });
+  it('by default (owner 2026-11-17) a hard stick alone is a jog: the turbo is R2 / TURBO / Shift', () => {
     const s = new LocalInputSource();
     s.feed({ t: 'stick', side: 'L', x: 1, y: 0 });
-    expect(s.poll().sprint).toBe(true);
+    expect(s.poll().sprint).toBe(false);
   });
 });

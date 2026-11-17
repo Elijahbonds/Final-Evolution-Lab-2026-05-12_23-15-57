@@ -834,19 +834,19 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'How fast the run of the ball handler turns toward the stick (slower near top speed). H3a: 720.',
   },
   {
-    id: 'hoops.turnTrueArc', label: 'Turn: true arc (1) / lerp (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · movement',
-    source: 'lib/babylon/core/HoopsStick.ts HOOPS_TURN_TRUE_ARC',
-    hint: '1 = a turn rotates at the full turn rate; 0 = the steer as shipped, which turns wide angles slower. H3a: 1.',
+    id: 'hoops.turnTrueArc', label: 'Turn: true arc (1) / lerp (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · movement',
+    source: 'lib/babylon/core/HoopsStick.ts HANDLER_TURN_TRUE_ARC',
+    hint: '1 = a turn rotates at the full turn rate (on since 2026-11-17); 0 = the old steer, which turns wide angles slower.',
   },
   {
-    id: 'hoops.kickSec', label: 'Turbo kick: spread over', def: 0, min: 0, max: 0.3, step: 0.01, unit: 's', group: 'Hoops · movement',
-    source: 'lib/babylon/core/HoopsStick.ts HOOPS_KICK_SEC',
-    hint: 'The kick of a turbo press is added over this long (0 = all in one frame, as shipped). H3a: 0.10.',
+    id: 'hoops.kickSec', label: 'Turbo kick: spread over', def: 0.1, min: 0, max: 0.3, step: 0.01, unit: 's', group: 'Hoops · movement',
+    source: 'lib/babylon/core/HoopsStick.ts HANDLER_KICK_SEC',
+    hint: 'The kick of a turbo press is added over this long (0.1 since 2026-11-17; 0 = all in one frame, the old kick).',
   },
   {
-    id: 'hoops.cutSec', label: 'Cut cost: paid over', def: 0, min: 0, max: 0.3, step: 0.01, unit: 's', group: 'Hoops · movement',
-    source: 'lib/babylon/core/HoopsStick.ts HOOPS_CUT_SEC',
-    hint: 'The speed a cut costs is paid over this long (0 = in one frame, as shipped). H3a: 0.08.',
+    id: 'hoops.cutSec', label: 'Cut cost: paid over', def: 0.08, min: 0, max: 0.3, step: 0.01, unit: 's', group: 'Hoops · movement',
+    source: 'lib/babylon/core/HoopsStick.ts HANDLER_CUT_SEC',
+    hint: 'The speed a cut costs is paid over this long (0.08 since 2026-11-17; 0 = in one frame, the old cut).',
   },
   {
     id: 'hoops.jerk', label: 'Smoothing: jerk limit', def: 0, min: 0, max: 2000, step: 50, unit: 'm/s³', group: 'Hoops · movement',
@@ -867,6 +867,29 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'hoops.retreatSpeedK', label: 'Retreat: share of jog speed', def: 0.7, min: 0.3, max: 1, step: 0.05, unit: '', group: 'Hoops · movement',
     source: 'lib/babylon/core/HoopsStick.ts HOOPS_RETREAT_SPEED_K',
     hint: 'The backpedal (the stick held against the facing) tops out at this share of a jog. Forward runs, sprints and slides never. 1 = no cap.',
+  },
+  // lane/move-feel-2 (new, owner 2026-11-17): a held stick keeps the court frame it was pushed in (core/StickFrame)
+  {
+    id: 'hoops.stickFrameHold', label: 'Stick: held stick runs a straight line (1) / turns with the camera (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · movement',
+    source: 'lib/babylon/core/StickFrame.ts HOOPS_STICK_FRAME_HOLD',
+    hint: '1v1 and 3v3. 1 = the direction a held stick points on the court stays put while the camera swings round the rim. 0 = the old stick, read against the live camera every frame (a held stick bent the run 30 to 43 degrees a second).',
+  },
+  // lane/move-feel-2 (new, owner 2026-11-17): the floating MOVE stick on the hoops touch deck (lib/babylon/ui/floatStick)
+  {
+    id: 'touch.floatStick', label: 'Phone: floating move stick (1) / fixed (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · movement',
+    source: 'lib/babylon/ui/floatStick.ts TOUCH_FLOAT_STICK',
+    hint: '1v1 and 3v3 on a touch screen. 1 = the stick appears under the thumb, 1.5 times the old size, a 10 percent dead zone. 0 = the old fixed 96 px stick.',
+  },
+  // lane/move-feel (new, 2026-11-12): the walk / jog line eased (0 = the step as shipped) — GEARS_HANDLER only (the dunk run-up never reads it)
+  {
+    id: 'hoops.gearBlendBand', label: 'Stick: walk to jog blend', def: 0.2, min: 0, max: 0.4, step: 0.05, unit: '', group: 'Hoops · movement',
+    source: 'lib/babylon/core/HoopsStick.ts HOOPS_GEAR_BLEND_BAND',
+    hint: 'Past the walk line the jog starts at 85 % of its top: a thumb near the line surges 2.4 to 3.7 m/s. This eases it over this much more stick (0.2 since 2026-11-17). 0 = the old step.',
+  },
+  {
+    id: 'hoops.stickSprintFallback', label: 'Stick: full push sprints until TURBO is touched (1) / never (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · movement',
+    source: 'lib/babylon/core/HoopsStick.ts HOOPS_STICK_SPRINT_FALLBACK',
+    hint: 'Before 2026-11-17 (1), a stick past 0.85 is the turbo until a trigger or the TURBO pad has been used once; then the same push jogs. 0 (since 2026-11-17) = the turbo is the button only.',
   },
   // hoops-p01 (new): the ball handler's answers — GEARS_HANDLER only (the dunk approach never reads them)
   {
@@ -1120,6 +1143,12 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'camera.leadFullMps', label: 'Look-ahead: full at speed', def: 1, min: 0.1, max: 4, step: 0.1, unit: 'm/s', group: 'Camera · follow',
     source: 'lib/babylon/core/CameraDirector.ts CAM_LEAD_FULL_MPS',
     hint: 'Ground speed at which the camera looks its full distance ahead; slower than this it looks closer to the player (no lead flicking around a near-standstill).',
+  },
+  // lane/move-feel (new, 2026-11-12): 1v1 / 3v3 take the eased look-ahead above (0 = their raw lead, as shipped)
+  {
+    id: 'hoops.camLeadEase', label: 'Hoops camera: eased look-ahead (1) / instant (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Camera · follow',
+    source: 'lib/babylon/core/CameraDirector.ts HOOPS_CAM_LEAD_EASE',
+    hint: '1v1 and 3v3 only. 1 since 2026-11-17. 0 = the old camera: the point ahead of the player swings in one frame on a start, stop, cut or turnaround. 1 = it eases (the two look-ahead knobs above).',
   },
   // GAMEPLAY-CLEAN P2 #6 (2026-11-03): the football carry's stride paces to the carrier (footballTree)
   {
@@ -1582,6 +1611,17 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/court/hoopsMoments.ts REPLAY_CAP_SEC',
     hint: 'A dunk, block or ankle-breaker replay holds the game at most this long (the window around the moment). 0 = the old 4.8 to 10 s replay.',
   },
+  // ── hoops-flow (owner 2026-11-12): the 3v3 game clock, and any press skips a replay ──
+  {
+    id: 'hoops.replaySkipOn', label: 'Replay: any press skips it (1) / buttons only (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · flow and pace',
+    source: 'lib/babylon/core/replaySkip.ts REPLAY_SKIP_ON',
+    hint: 'On: during a hoops replay (1v1, 3v3, the 3-point money ball, the dunk and duel cuts) a flick, a trigger, a stick push or a tap on the court skips it and the ball comes back; the press is not also a shot or a move. Off: only a button or d-pad press skips it, as before.',
+  },
+  {
+    id: 'hoops.threeGameSec', label: '3v3 game clock', def: 240, min: 60, max: 600, step: 10, unit: 's', group: 'Hoops · flow and pace',
+    source: 'lib/babylon/modes/threevthreeOvertime.ts THREE_GAME_SEC',
+    hint: 'First to 21 or the leader when this clock runs out (a tie goes to overtime). Read when the game starts. 90 = the old clock.',
+  },
   {
     id: 'hoops.rivalSizeUpSec', label: '1v1 rival: sizes you up at the top for', def: 4, min: 0, max: 8, step: 0.1, unit: 's', group: 'Hoops · flow and pace',
     source: 'lib/babylon/hoops/rivalOffense.ts RIVAL_SIZE_UP_SEC',
@@ -1728,6 +1768,37 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/hoops/rulebook.ts PRESS_FLOOR_ON',
     hint: 'On: a showtime flush or a trick dunk pressed at the wrong moment goes in at least as often as not pressing. Off: early 42, late 50 against 70 untimed, as before.',
   },
+  // ── hoops-sound (phase 11a, 2026-11-12): recorded CC0 sound beside the synths, the dribble heard, the pass heard ──
+  {
+    id: 'hoops.sampleSfxOn', label: 'Recorded sounds on (1) / synth only (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · sound',
+    source: 'lib/babylon/audio/samples.ts SAMPLE_SFX_ON',
+    hint: 'On: in 1v1, 3v3 and 3-Point the swish, rim, squeak, cheer, crowd bed, dribble and catch play CC0 recordings. Off: every sound is the synth, as before.',
+  },
+  {
+    id: 'hoops.dribbleSoundOn', label: 'Ball on the floor is heard (1) / silent (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · sound',
+    source: 'lib/babylon/audio/dribbleSound.ts DRIBBLE_SOUND_ON',
+    hint: 'On: the ball is heard each time it hits the floor: every dribble (yours and the AI), a bounce pass, a rebound. Off: silent, as before.',
+  },
+  {
+    id: 'hoops.dribbleSoundVol', label: 'Dribble: volume', def: 0.6, min: 0, max: 1.5, step: 0.05, unit: '', group: 'Hoops · sound',
+    source: 'lib/babylon/audio/dribbleSound.ts DRIBBLE_SOUND_VOL',
+    hint: 'Your dribble at a full speed bounce. A softer bounce plays quieter, a hard pound louder.',
+  },
+  {
+    id: 'hoops.dribbleSoundAiK', label: 'Dribble: AI handlers share', def: 0.5, min: 0, max: 1, step: 0.05, unit: '', group: 'Hoops · sound',
+    source: 'lib/babylon/audio/dribbleSound.ts DRIBBLE_SOUND_AI_K',
+    hint: 'An AI dribble as a share of yours, so your ball stays the one you hear.',
+  },
+  {
+    id: 'hoops.passCatchSoundOn', label: 'Pass is heard in the hands (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · sound',
+    source: 'lib/babylon/audio/dribbleSound.ts PASS_CATCH_SOUND_ON',
+    hint: 'On: a 3v3 pass is heard in the hands when it is caught. Off: no catch sound, as before.',
+  },
+  {
+    id: 'hoops.passCatchVol', label: 'Catch: volume', def: 0.7, min: 0, max: 1.5, step: 0.05, unit: '', group: 'Hoops · sound',
+    source: 'lib/babylon/audio/dribbleSound.ts PASS_CATCH_VOL',
+    hint: 'How loud a caught pass is.',
+  },
   // ── hoops-builder (owner 2026-11-12): what the five hoops ratings and the playing height change, casual runs only. Every band is
   //    the change at rating 90 (at 40 it moves the other way by a quarter of it); rating 50 is today at any band, and 0 = no effect.
   {
@@ -1784,6 +1855,62 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'hoops.heightLookPerIn', label: 'Playing height: drawn taller per inch over the standard', def: 0.01, min: 0, max: 0.01, step: 0.001, unit: 'x', group: 'Hoops · ratings',
     source: 'lib/babylon/hoops/ratings.ts HEIGHT_LOOK_PER_IN',
     hint: 'How much bigger the hero is drawn per inch of playing height (6ft 8 at 104 percent, 6ft 0 at 96). Drawing only, casual runs only. 0 = the standard body.',
+  },
+  // ── hoops-gather G1 (owner 2026-11-12, "good gathers and pick ups"; docs/HOOPS-GATHER-ESCAPE-PLAN.md): the pick-up reads the bounce ──
+  {
+    id: 'hoops.pickupReadOn', label: 'Pick-up reads the bounce (1) / takes it where it is (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · gathers',
+    source: 'lib/babylon/anim/ballCarry.ts PICKUP_READ_ON',
+    hint: 'On: a shot pressed while the ball is low keeps it on its bounce and the hand goes down to meet it. Off: the ball flies up to a still hand, as before.',
+  },
+  {
+    id: 'hoops.pickupWaitMaxSec', label: 'Pick-up: longest wait for the bounce', def: 0.2, min: 0.05, max: 0.35, step: 0.01, unit: 's', group: 'Hoops · gathers',
+    source: 'lib/babylon/anim/ballCarry.ts PICKUP_WAIT_MAX_SEC',
+    hint: 'The most the hand waits for a low ball to come up before it takes it as before.',
+  },
+  {
+    id: 'hoops.pickupReachM', label: 'Pick-up: hand goes down to meet it by', def: 0.3, min: 0, max: 0.5, step: 0.01, unit: 'm', group: 'Hoops · gathers',
+    source: 'lib/babylon/anim/ballCarry.ts PICKUP_REACH_M',
+    hint: 'How far under the dribbling palm the hand reaches to meet the rising ball.',
+  },
+  {
+    id: 'hoops.pickupRateMax', label: 'Pick-up: last bounce up to this much faster', def: 2, min: 1, max: 3, step: 0.1, unit: 'x', group: 'Hoops · gathers',
+    source: 'lib/babylon/anim/ballCarry.ts PICKUP_RATE_MAX',
+    hint: 'A harder last dribble so a low ball meets the hand inside the wait.',
+  },
+  {
+    id: 'hoops.pickupRateFloorHz', label: 'Pick-up: at speed, count that from at least', def: 2, min: 0, max: 3, step: 0.1, unit: 'Hz', group: 'Hoops · gathers',
+    source: 'lib/babylon/anim/ballCarry.ts PICKUP_RATE_FLOOR_HZ',
+    hint: 'At a drive or a sprint the bounce slows to one a stride, so a low ball could not be met in time and was yanked up. 0 = count from that slow bounce (as at G2).',
+  },
+  {
+    id: 'hoops.pickupTopGapM', label: 'Pick-up: take it at once within', def: 0.1, min: 0, max: 0.3, step: 0.01, unit: 'm', group: 'Hoops · gathers',
+    source: 'lib/babylon/anim/ballCarry.ts PICKUP_TOP_GAP_M',
+    hint: 'A ball this close to the top of its bounce is taken at once.',
+  },
+  {
+    id: 'hoops.pickupContactM', label: 'Pick-up: taken when the ball is this close to the palm', def: 0.04, min: 0, max: 0.15, step: 0.01, unit: 'm', group: 'Hoops · gathers',
+    source: 'lib/babylon/anim/ballCarry.ts PICKUP_CONTACT_M',
+    hint: 'How near the palm (past the ball\'s radius) the rising ball must be to be taken.',
+  },
+  {
+    id: 'hoops.pickupOverrunSec', label: 'Pick-up: extra time to rise to the hand', def: 0.1, min: 0, max: 0.2, step: 0.01, unit: 's', group: 'Hoops · gathers',
+    source: 'lib/babylon/anim/ballCarry.ts PICKUP_OVERRUN_SEC',
+    hint: 'When the hand did not get all the way down, the ball rises on to it for at most this long.',
+  },
+  {
+    id: 'hoops.releaseSnapEaseSec', label: 'Release: wrist snap ease', def: 0.03, min: 0.01, max: 0.15, step: 0.01, unit: 's', group: 'Hoops · gathers',
+    source: 'lib/babylon/anim/ballCarry.ts RELEASE_SNAP_EASE_SEC',
+    hint: 'How smoothly the shooting wrist snaps through at the release. 0.03 = as before (it turns about 58 deg in one frame).',
+  },
+  {
+    id: 'hoops.bufferFreshPressOn', label: 'Shot press: only a new press waits out a move (1) / a held one too (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · gathers',
+    source: 'lib/babylon/hoops/response/pressBuffer.ts BUFFER_FRESH_PRESS_ON',
+    hint: 'On: a pump fake holds; press again to step through. Off (as before): the press that made the pump is replayed when it ends, so every pump steps through at once.',
+  },
+  {
+    id: 'hoops.pumpBallHandOn', label: 'Pump fake: the ball stays in the hands (1) / back to the dribble at once (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · gathers',
+    source: 'lib/babylon/hoops/response/pumpHold.ts PUMP_BALL_HAND_ON',
+    hint: 'On: the ball stays in the hands while the pump plays, and the step-through takes it from there. Off (as before): the dribble restarts the frame after the pump and the ball drops loose.',
   },
 ];
 
