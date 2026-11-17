@@ -6,8 +6,11 @@
 //   it was sent, the anim tree's state and the locomotion clips playing on the hero (name, weight, speed ratio) — on change.
 // Per test it also keeps page.js's own analysis (HG.analyse: the pops, the planted-foot slide, the camera) over exactly those frames, so
 // the numbers sit beside the earlier lanes' (same instrument). ./analyze.mjs reads the JSON; ./sheet.py draws the JPG.
-//   gate-run.sh 890 ../hoops-gap/run-set.sh <site> <out> "onevone ext EXT=$PWD/scripts/probes/move-feel/feel-ext.mjs TAG=rel QS=dummy=1 NODRAW=1"
-//   env: TESTS=jog,sprint,... (default: all of the mode's)  STRIPS=1 (frame strips of the worst moments: leave NODRAW off)
+//   gate-run.sh 890 ../hoops-gap/run-set.sh <site> <out> "onevone ext EXT=$PWD/scripts/probes/move-feel/feel-ext.mjs TAG=rel QS=dummy=1 VIEW=320x180"
+//   env: TESTS=jog,sprint,... (default: all of the mode's)  STRIPS=1 (frame strips of the worst moments)
+//   NEVER NODRAW=1 on this release: the page's RenderWatchdog (core/RenderWatchdog) reads the undrawn canvas as black output, rescues at
+//   ~5 s and sets the mode's phase to 'error' at ~10 s — every test after that measures a frozen body (found 2026-11-13; each test keeps
+//   `diag0` / `diag1`, the phase and any error, so a frozen run is visible). Draw small instead (VIEW=320x180).
 //   QS=dummy=1 (1v1 only: the rival stands still off in a corner — the clean locomotion control; without it he guards)
 import fs from 'node:fs';
 import path from 'node:path';
@@ -29,6 +32,7 @@ const PAGE_REC = String.raw`(() => {
   MF.stickTo = (x, y) => { MF.stick = [x, y]; HG.emit({ t: 'stick', side: 'L', x, y }); };
   MF.turboTo = (on) => { MF.turbo = on ? 1 : 0; HG.turbo(!!on); };
   MF.mark = (m) => { MF.ev.push([HG.frame, m]); };
+  { const ce = console.error.bind(console); console.error = (...a) => { try { MF.errs = MF.errs || []; if (MF.errs.length < 20) MF.errs.push([HG.frame, a.map((x) => (x && x.stack) ? String(x.stack).slice(0, 900) : String(x)).join(' ').slice(0, 1200)]); } catch (e) {} ce(...a); }; }
   scene.onAfterRenderObservable.add(() => {
     if (!MF.rec) return;
     try {
@@ -79,7 +83,7 @@ export default async function run({ ev, runFrames, saveStrip, say, checkpoint, r
     await runFrames(T.side === 'def' ? 40 : 50);
     await ev(() => { const MF = window.__mf; MF.rows = []; MF.ev = []; MF.rec = true; window.__hg.start(); });
     const f0 = await ev(() => window.__hg.frame);
-    const diag = async () => ev((m) => { const s = window.__FEL_DEV__.scene.metadata[m]; const g = (f) => { try { return f(); } catch (e) { return 'err'; } }; return { phase: window.__phase, poss: g(() => (s.possession ? s.possession() : s.carrier())), ended: g(() => s.ended && s.ended()), carry: g(() => JSON.stringify(s.carry())), att: g(() => s.attackPhase && s.attackPhase()), hud: JSON.stringify(window.__hudNow).slice(0, 300) }; }, MODE);
+    const diag = async () => ev((m) => { const s = window.__FEL_DEV__.scene.metadata[m]; const g = (f) => { try { return f(); } catch (e) { return 'err'; } }; return { phase: window.__phase, err: String(window.__err || '').slice(0, 600), poss: g(() => (s.possession ? s.possession() : s.carrier())), ended: g(() => s.ended && s.ended()), carry: g(() => JSON.stringify(s.carry())), att: g(() => s.attackPhase && s.attackPhase()), hud: JSON.stringify(window.__hudNow).slice(0, 300) }; }, MODE);
     const diag0 = await diag();
     for (const [x, y, tb, n, mark] of T.steps) {
       await ev((a) => { const MF = window.__mf; MF.mark(a[3]); MF.stickTo(a[0], a[1]); if (a[2] !== null) MF.turboTo(a[2]); }, [x, y, tb, mark]);
@@ -91,7 +95,7 @@ export default async function run({ ev, runFrames, saveStrip, say, checkpoint, r
     const an = await ev(() => window.__hg.analyse({ popList: true }));
     const me = an.perBody.me || {};
     const log = await ev((a) => (window.__LOG || []).filter((l) => l.f >= a).map((l) => [l.f, l.m]), f0);
-    const diag1 = await diag();
+    const diag1 = await diag(); diag1.errs = await ev(() => window.__mf.errs || []);
     result.mf.tests.push({ name, side: T.side, f0, diag0, diag1, steps: T.steps, rows: rec.rows, ev: rec.ev, log: log.slice(0, 400),
       pops: me.pops, severe: me.severe, popList: me.popList || [], slideP90Cm: me.slideP90Cm, skates: me.skates, plantedFrames: me.plantedFrames, slideAll: me.slideAll || [], skateAt: me.skateAt || [], camera: an.camera });
     say(`mf ${name}: ${rec.rows.length} frames, pops ${me.pops} (severe ${me.severe}), slide p90 ${me.slideP90Cm} cm, cam turn p99 ${an.camera && an.camera.turnP99DegS}`);

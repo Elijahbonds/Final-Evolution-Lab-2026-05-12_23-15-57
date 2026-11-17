@@ -1,5 +1,5 @@
 // lane/move-feel (2026-11-12): THE HOOPS LOOK-AHEAD behind a knob — `hoops.camLeadEase` (CameraDirector HOOPS_CAM_LEAD_EASE, 0 = as
-// shipped). ModeHarness leaves the eased look-ahead off for 1v1 / 3v3 and names this knob on them (`leadEaseKnob`); at 0 a hoops cut swings
+// shipped). ModeHarness leaves the eased look-ahead off for 1v1 / 3v3 and opens this knob on them (`leadEaseHoopsKnob`); at 0 a hoops cut swings
 // the look-target in one frame exactly as before, at 1 it eases like every other follow mode's.
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import { ArcRotateCamera, NullEngine, Scene, Vector3 } from '@babylonjs/core';
@@ -14,7 +14,7 @@ function cut(knob: boolean): number[] {
   (engine as unknown as { getDeltaTime: () => number }).getDeltaTime = () => 1000 / 60;
   const cam = new ArcRotateCamera('cam', 0, 0, 10, Vector3.Zero(), scene);
   const dir = new CameraDirector(scene, cam, 'hoops');
-  dir.leadEase = false; dir.leadEaseKnob = knob ? 'hoops.camLeadEase' : null;   // as ModeHarness sets 1v1 / 3v3
+  dir.leadEase = false; dir.leadEaseHoopsKnob = knob;   // as ModeHarness sets 1v1 / 3v3
   const rim = new Vector3(0, 3.05, -0.6); const pos = new Vector3(0, 0, 6);
   dir.snapTo(pos, rim);
   for (let i = 0; i < 90; i++) dir.update(pos, new Vector3(4.3, 0, 0), rim);

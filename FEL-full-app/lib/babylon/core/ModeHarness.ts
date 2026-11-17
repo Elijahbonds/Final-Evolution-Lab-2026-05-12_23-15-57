@@ -621,7 +621,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   frameGuard = new FrameGuard(scene, camera, () => heroRef.current, camDirector, () => objectiveRef.current);
   occluderFade = new OccluderFade(scene, () => heroRef.current, def.modeId);
   camDirector.leadEase = !OCCLUDER_FADE_OFF.has(def.modeId);   // GAMEPLAY-CLEAN P2 #10: the eased look-ahead — not under the hoops lanes' modes (routed)
-  if (def.modeId === 'onevone' || def.modeId === 'threevthree') camDirector.leadEaseKnob = 'hoops.camLeadEase';   // lane/move-feel: theirs behind a knob (0 = as shipped)
+  if (def.modeId === 'onevone' || def.modeId === 'threevthree') camDirector.leadEaseHoopsKnob = true;   // lane/move-feel: theirs behind a knob (0 = as shipped)
   // `instrument` (2026-09-12): SceneInstrumentation is a bare module specifier, so a probe running
   // IN the page cannot import it — which is why per-mode performance had never been measured and the
   // locomotion Phase 3 gate ("animation pass <= 4 ms") had to be reported unjudgeable. Handing the
