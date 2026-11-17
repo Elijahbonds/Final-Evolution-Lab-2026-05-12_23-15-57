@@ -710,6 +710,40 @@ pins both). Measured with `scripts/probes/hoops-p09/rulebook-measure.mts` (befor
 - `hoops.pressFloorOn` 1: a showtime flush or a trick dunk pressed at the wrong moment pays at least what not pressing pays (showtime
   early 42 → 70 %, late 50 → 70 %; a mistimed trick pays the plain dunk). 0 = the old table.
 
+## hoops-sound, 2026-11-12 (phase 11a "the sound of the court", part one; the owner has not heard these yet)
+
+Group "Hoops · sound". Each is NEW, and its OFF value restores today's sound exactly. With all three switches off (`sampleSfxOn`,
+`dribbleSoundOn`, `passCatchSoundOn` at 0) the game asks for and plays exactly the cues it did before, as synths, and fetches nothing.
+The sounds are CC0 recordings (`public/audio/hoops/CREDITS.md`). Tests: `lib/babylon/audio/samples.test.ts`, `dribbleSound.test.ts`,
+`SoundKit.samples.test.ts`.
+- `hoops.sampleSfxOn` 1 (`audio/samples.ts`): in 1v1, 3v3 and the 3-point contest, recordings stand in for the synth swish (a nylon
+  rustle: no CC0 net recording was found), rim rattle, squeak and cheer, the crowd bed (a 14 s murmur loop) and the two new cues
+  (dribble, catch). They load after READY, about 250 KB. Until a cue's files are in, or if they fail, the cue plays its synth. Every
+  recording goes through the same SFX or crowd bus, ducking, limiter, mute and phone/TV/headphones preset as the synths. 0 = synth only,
+  nothing fetched. Still synth either way: the groan, whistle, score chime, whoosh, impacts, the body thud and the backboard.
+- `hoops.dribbleSoundOn` 1 (`audio/dribbleSound.ts`, a watcher on the ball installed by `anim/ballCarry.ts`): the ball is heard each
+  time it meets the floor, whoever moved it: every hoops handler's dribble (yours, the 1v1 rival, all six 3v3 bodies, the handle moves),
+  the last bounce into a gather, a bounce pass, a rebound. Once per contact (one detector per ball; it re-arms only after the ball has
+  risen 0.2 m). 0 = silent, as before.
+- `hoops.dribbleSoundVol` 0.6: your dribble's level at a full-speed bounce (5 m/s, the hoops dribble at 2 bounces a second). A bounce
+  plays at its speed's share of that, from 0.3x to 1.25x.
+- `hoops.dribbleSoundAiK` 0.5: an AI handler's dribble as a share of yours (a ball no carry has, such as a rebound, plays at yours). Which carry is yours: the first hoops carry a mode mounts
+  (assumption, true of 1v1, 3v3 and 3-Point today; `BallCarryOpts.soundRole` names it explicitly when the mode files are next edited).
+- `hoops.passCatchSoundOn` 1 (`core/BallHandling.ts` PassFlight): a 3v3 pass is heard in the hands when it arrives. The throw still
+  plays the menu click (`ThreeVThreeMode.ts` uiTick): that line belongs to the mode file, owned by hoops-p08 now, and is listed for after
+  it. 0 = no catch sound, as before.
+- `hoops.passCatchVol` 0.7: the catch's level.
+Feel-check: 1v1, dribble in place and on the move; you should hear one bounce per dribble, louder on a hard crossover. 3v3, pass to a mate.
+Measured (2026-11-12, `scripts/probes/hoops-sound/`: the real hoops screens on the show rig's site, phone profile, seed 7, SwiftShader):
+- Dribble: 1v1, 12 game s: 15 floor contacts of the ball (read off its height alone), 15 bounce sounds, each on its contact's frame (14
+  same frame, 1 a frame early), no extra sound, no double. 3v3, 12 game s: 18 contacts, 18 sounds, all on the frame, no double. By whose:
+  1v1 player 2 / AI 12 / loose 1; 3v3 player 11 / AI 5 / loose 2.
+- Loading: no hoops file is fetched before READY (the harness's own `#<mode>-ready` marker); all 24 (251 KB) arrive 0.03–0.18 s after it
+  on this box, and the crowd bed switches to the recording.
+- Levels (`loudness.mts`, rendered offline through SoundKit's own graph, the loudest 50 ms at the limiter): each recording within 2 dB of
+  the synth it replaces (swish -48.7 / -48.0, rim -33.8 / -33.9, cheer about -35, bed -46); squeak -39 (its synth -71); bounce -38.5;
+  catch -40. Chromium decodes the bed to exactly 14.000 s, so the loop is seamless.
+
 ## hoops-builder, 2026-11-12 (the hoops ratings; owner: "5 ratings … that really change how you play, within limits"; the owner has not felt these yet)
 
 Group "Hoops · ratings" (`lib/babylon/hoops/ratings.ts`). A rating runs 40 to 90. Each band below is the change AT 90; at 40 the number
@@ -732,6 +766,35 @@ party run plays today's numbers (and so does an agent / probe run). **Phase B (2
 - `hoops.heightLookPerIn` 0.01 (phase B; owner 2026-11-12 "the body on screen follows the playing height"): the hero is DRAWN 1 % taller an
   inch over 6'4" (6'0" 96 %, 6'8" 104 %, the cosmetic clamp). Drawing only: while he is drawn scaled the modes read the ball on his hand on
   the standard frame (playFramePoint), so the size changes no outcome. Casual runs only; 0 = the standard body.
+## hoops-flow, 2026-11-12 (owner decisions: "3v3 is first to 21 on a 4-minute clock", "any press skips a replay")
+
+Group "Hoops · flow and pace". Both are the owner's own calls; each knob puts the old behaviour back exactly (tests pin both ends).
+- `hoops.threeGameSec` 240 s (`modes/threevthreeOvertime.ts` `THREE_GAME_SEC`; it was `ThreeVThreeMode.ts` `POSSESSION_SEC` 90): the 3v3
+  game clock. First to 21 still ends it outright; at the horn the leader wins; level at the horn is the sudden-death overtime as before
+  (`hoops.overtime3v3Sec`, 30 s). Read when the game starts. The clock chip reads m:ss from a minute up ('4:00'), seconds under it. The
+  MC's recorded 3v3 welcome names a ninety-second clock, so it is said only on a 90 s game until the lines are re-recorded. 90 = before.
+  Feel-check: play a full PRO 3v3: does a comeback have room, and does the game still feel tight at the end?
+- `hoops.replaySkipOn` 1 (`core/replaySkip.ts` `REPLAY_SKIP_ON`): during a hoops replay (1v1, 3v3, the 3-point money ball, the dunk
+  contest's and the duel's cuts) any press ends it at once and the next possession starts: a button, the d-pad, a trigger pulled, a
+  stick pushed out from rest (a dribble flick, the keyboard's dribble keys) or a tap on the court. The skipping press is the replay's:
+  not a shot, not a dribble move (the right stick and a trigger are held back until let go); the walking stick is passed on, so a held
+  stick moves you when the ball comes back. In the dunk contest A still hurries the judges and the d-pad still throws your
+  celebration. 0 = only a button or d-pad press skips (the dunk cuts: A or B, a tap or Space), as before. Feel-check: 1v1, break his
+  ankles, score, and flick the stick the moment the replay starts.
+
+
+### Hoops · gathers (lane/hoops-gather, owner 2026-11-12: "good escape moves, good gathers and pick ups"; `docs/HOOPS-GATHER-ESCAPE-PLAN.md`)
+
+All new numbers. Every switch ships OFF except `hoops.pickupReadOn`, turned ON with G2 (coordinator 2026-11-12, flagged); each switch's 0
+restores the old behaviour exactly.
+- `hoops.pickupReadOn` 1 (`anim/ballCarry.ts` `pickUp`, G1): on, a shot / finish / footwork pressed while the ball is low keeps the ball on
+  its own bounce while the dribbling hand goes down `hoops.pickupReachM` 0.3 m to meet it, and takes it where they meet; the last bounce runs
+  at most `hoops.pickupRateMax` 2× its pace so it never waits longer than `hoops.pickupWaitMaxSec` 0.2 s; a ball within
+  `hoops.pickupTopGapM` 0.1 m of the top is taken at once (as before). Off: the ball is taken on the press frame wherever it is and flown up to
+  the hand (measured: 57–94 cm off the palm when pressed near the floor). The meter and the body answer the press on its frame either way.
+  The take is the ball within `hoops.pickupContactM` 0.04 m of the palm as drawn (past its radius); a hand that did not get all the way
+  down gets the ball rising on to it for at most `hoops.pickupOverrunSec` 0.1 s more. When the shot wants the other hand, it comes to the
+  ball's far side for the meeting (both hands on it), then takes it.
 
 ## kit-fit, 2026-11-12 (owner: "fix how the clothes fit, how they look"; the owner has not felt this yet)
 

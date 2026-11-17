@@ -17,7 +17,7 @@
 //
 // Pure: no scene. The mode asks hornCall() once a frame; the host and the proof line read the labels.
 
-import { feel } from '../../feel-panel/feel';   // feel-panel knob hoops.overtime3v3Sec (a playtest run only; never ranked/staked)
+import { feel } from '../../feel-panel/feel';   // feel-panel knobs hoops.overtime3v3Sec, hoops.threeGameSec (a playtest run only; never ranked/staked)
 
 /** (new) The overtime's game clock, in seconds — PR #268's 30. Feel knob `hoops.overtime3v3Sec`. */
 export const OVERTIME_3V3_SEC = 30;
@@ -27,6 +27,31 @@ export const OVERTIME_BANNER_MS = 1600;
 /** Who checks it up to open an overtime. `'me'`: your team, a fresh check (assumption — owner call: FIBA gives it to the side
  *  that did not open the game, which here is always them). */
 export const OVERTIME_BALL: 'me' | 'them' = 'me';
+
+/** THE GAME CLOCK (lane/hoops-flow, owner 2026-11-12: "3v3 is first to 21 on a 4-minute clock"). Was 90 s: with possessions of ~8 s a
+ *  side a game was ~6 possessions each, one hot hand decided it and a comeback had no room (HOOPS-AAA-GAP-PLAY §3.8). First to 21 still
+ *  ends it outright; at the horn the leader wins and a tie is this file's sudden-death overtime. Feel knob `hoops.threeGameSec` (90 = before). */
+export const THREE_GAME_SEC = 240;
+/** The clock the MC's recorded 3v3 welcome names ("ninety seconds on the clock", game.intro.threes): the line is said only on a game of
+ *  this length, so the booth never names a clock the game is not playing. */
+export const THREES_INTRO_CLOCK_SEC = 90;
+
+/** This run's game clock, in seconds (the shipped constant unless the owner's feel panel is open on a playtest run). */
+export function threeGameSec(): number {
+  return feel('hoops.threeGameSec', THREE_GAME_SEC);
+}
+/** Pure: may the booth play its recorded 3v3 welcome on a game of `gameSec` (it names the clock)? */
+export function introNamesClock(gameSec: number): boolean {
+  return Math.round(gameSec) === THREES_INTRO_CLOCK_SEC;
+}
+
+/** Pure: the 3v3 clock chip's words — the period first in overtime ('OT 30s'); a minute or more reads m:ss ('4:00', '1:05'), under a
+ *  minute whole seconds ('59s'), as before. (hoops-flow: a 240 s clock read '240s'.) */
+export function gameClockText(sec: number, period = ''): string {
+  const s = Math.max(0, Math.ceil(Number.isFinite(sec) ? sec : 0));
+  const t = s >= 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : `${s}s`;
+  return period ? `${period} ${t}` : t;
+}
 
 /** This run's overtime length (the shipped constant unless the owner's feel panel is open on a playtest run). */
 export function overtimeSec(): number {
