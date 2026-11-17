@@ -21,7 +21,7 @@ export const FLOAT_RADIUS_PX = FLOAT_BASE_PX / 2;                // 72
 /** The share of the travel that is still (owner: "10 % dead zone"), radial; the rest is rescaled to 0..1. */
 export const FLOAT_DEAD = 0.1;
 /** The zone a thumb may land in (CSS px, before the deck's own fit / compact scale): wider than the base so it can float. */
-export const FLOAT_ZONE_W = 184, FLOAT_ZONE_H = 136;   // (136: the upright deck keeps its fit — a taller zone shrank the whole left column, d-pad and all)
+export const FLOAT_ZONE_W = 172, FLOAT_ZONE_H = 136;   // (136: the upright deck keeps its fit — a taller zone shrank the whole left column, d-pad and all; 172: clear of the upright TURBO pad, measured by phone-stick.mjs)
 
 /** The stick vector for a thumb `dx, dy` (px, screen; +y down) from where it landed, at full speed `radius` px out: a radial dead zone of
  *  `dead` (rescaled, so 0..1 past it), clamped to the unit circle. Same sign convention as the bus (+y down). */

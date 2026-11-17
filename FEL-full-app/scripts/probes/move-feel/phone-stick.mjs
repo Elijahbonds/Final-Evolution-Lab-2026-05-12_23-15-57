@@ -28,6 +28,7 @@ const { chromium } = require('playwright-core');
 const exe = ['/opt/pw-browsers/chromium-1243/chrome-linux64/chrome', '/opt/pw-browsers/chromium-1194/chrome-linux/chrome'].find((p) => fs.existsSync(p));
 const b = await chromium.launch({ executablePath: exe, headless: true, args: ['--no-sandbox'] });
 const PX_PER_MM = 390 / 64;
+const ZONE_W = Number(/FLOAT_ZONE_W = (\d+)/.exec(fs.readFileSync(path.join(APP, 'lib/babylon/ui/floatStick.ts'), 'utf8'))[1]);   // the zone's unscaled width (the deck's fit scales it)
 const res = [];
 for (const [w, h] of [[390, 844], [844, 390]]) for (const float of [0, 1]) {
   const ctx = await b.newContext({ viewport: { width: w, height: h }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
@@ -45,7 +46,7 @@ for (const [w, h] of [[390, 844], [844, 390]]) for (const float of [0, 1]) {
   info.inStage = m.x >= info.stage.x - 0.5 && m.y >= info.stage.y - 0.5 && m.x + m.w <= info.stage.x + info.stage.w + 0.5 && m.y + m.h <= info.stage.y + info.stage.h + 0.5;
   info.smallestTapPx = Math.min(...info.others.map((o) => Math.min(o.w, o.h)), Math.min(m.w, m.h));
   // the scripted thumb: lands 20 px right of the control's centre (fixed) / anywhere in the zone (float), then 30 px and the full radius out
-  const scale = float ? m.w / 184 : m.w / 96; const radius = (float ? 72 : 48) * scale;
+  const scale = float ? m.w / ZONE_W : m.w / 96; const radius = (float ? 72 : 48) * scale;
   const cx = m.x + m.w / 2, cy = m.y + m.h * (float ? 0.55 : 0.5);
   const sent = async () => p.evaluate(() => { const s = window.__sent; const l = s[s.length - 1]; return l ? [+l.x.toFixed(2), +l.y.toFixed(2)] : null; });
   const target = float ? '[data-float-stick]' : 'div.h-24';
