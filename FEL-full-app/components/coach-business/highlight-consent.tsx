@@ -4,6 +4,8 @@
 import { useEffect, useState } from 'react';
 import { lineSize } from '@/lib/design/type';
 import { DarkInstead } from '@/components/every-screen/dark-instead';
+import { notice } from '@/lib/every-screen/notices';
+import { HIGHLIGHT_CONSENT_LINE } from '@/lib/coach-business/highlight-copy';
 
 /** EVERY-SCREEN P1 (2026-11-10): what the screen says when the result does not load. A 503 is the feature switched off
  *  (its pending tables), not a link meant for someone else: it said "This link is not for this account." either way. */
@@ -40,7 +42,8 @@ export function HighlightConsent({ id, api = '/api/coach/business/highlights' }:
   return (
     <main className="mx-auto max-w-xl px-4 py-12 text-white" data-highlight-consent>
       <h1 className="text-2xl font-black">Share a result?</h1>
-      <p className="mt-2 text-base text-white/70">Your coach would like to show this on their public page. Only these words show, never your name. You can withdraw it any time.</p>
+      {/* COACH-WORDS (2026-11-12): consent wording, unchanged word for word; marked as an approved consent notice */}
+      <p {...notice('consent')} className="mt-2 text-base text-white/70">{HIGHLIGHT_CONSENT_LINE}</p>
       {h ? (
         <>
           <blockquote className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-base">“{h.text}”</blockquote>

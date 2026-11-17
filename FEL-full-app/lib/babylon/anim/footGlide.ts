@@ -134,6 +134,16 @@ export class FootGlide {
   }
   dispose(): void { if (this.obs) { this.scene.onAfterAnimationsObservable.remove(this.obs); this.obs = null; } }
 
+  // hoops-perf (2026-11-12): the frame's intermediates are this body's own scratches (the 3v3 heap profile had footGlide at ~1.1 MB a
+  // game second: a forward vector, the per-leg reads, three arrays, the target, the chain quaternions and the bend vectors every frame).
+  // Same arithmetic in the same order: each ToRef form is its allocating form's own maths (Babylon's a.multiply(b) is
+  // a.multiplyToRef(b, new)); the foot's input is still a fresh-valued Vector3 read before either leg moves.
+  private readonly fwd = new Vector3();
+  private readonly ins = [{ p: new Vector3(), v: 0, h: 0 }, { p: new Vector3(), v: 0, h: 0 }];
+  private readonly tgt = new Vector3();
+  private readonly q1 = new Quaternion(); private readonly q2 = new Quaternion(); private readonly q3 = new Quaternion();
+  private readonly b1 = new Vector3(); private readonly b2 = new Vector3();
+
   private apply(): void {
     if (this.root.isDisposed()) { this.dispose(); return; }   // the body is gone
     const dt = animDt(this.scene.getEngine().getDeltaTime() / 1000, this.scene.animationTimeScale);
@@ -145,11 +155,13 @@ export class FootGlide {
     const placed = rootStep > GLIDE_TELEPORT_M;
     const bodyStill = placed || rootStep / dt < STILL_BODY_MPS;
     const yaw = this.root.absoluteRotationQuaternion ? this.root.absoluteRotationQuaternion.toEulerAngles().y : this.root.rotation.y;
-    const fwd = new Vector3(Math.sin(yaw), 0, Math.cos(yaw));
+    const fwd = this.fwd.set(Math.sin(yaw), 0, Math.cos(yaw));
     // the clip's ankles first (both, before either is moved: a step waits on the other foot's mode)
-    const ins = this.legs.map((l) => {
-      for (const n of [l.hip, l.knee, l.ankle]) n.computeWorldMatrix(true);
-      const p = l.ankle.getAbsolutePosition().clone();
+    const ins = this.ins;
+    for (let k = 0; k < this.legs.length; k++) {
+      const l = this.legs[k];
+      l.hip.computeWorldMatrix(true); l.knee.computeWorldMatrix(true); l.ankle.computeWorldMatrix(true);
+      const p = ins[k].p.copyFrom(l.ankle.getAbsolutePosition());
       const step = l.seen ? Math.hypot(p.x - l.last.x, p.z - l.last.z) : 0;
       const jumped = placed || step > GLIDE_TELEPORT_M;
       if (jumped) l.s = footIdle();
@@ -158,22 +170,24 @@ export class FootGlide {
       // (a still foot well under the floor already learnt is a clip's leg through it, not the floor: not learnt)
       if (v < FLOOR_STILL_MPS && h >= FLOOR_BAND_M[0] && h <= FLOOR_BAND_M[1] && !(h < l.floor - FLOOR_HOLE_M))
         l.floor = Number.isFinite(l.floor) ? l.floor + (h - l.floor) * (1 - Math.exp(-dt / FLOOR_TAU_SEC)) : h;
-      return { p, v, h };
-    });
-    const stepping = this.legs.map((l) => l.s.mode === 'step');
-    this.legs.forEach((l, i) => {
-      const tgt = stepFoot(l.s, { c: ins[i].p, h: ins[i].h, v: ins[i].v, floor: l.floor, rootY, bodyStill, otherStepping: stepping[1 - i] || this.legs[1 - i].s.mode === 'step', dt });
+      ins[k].v = v; ins[k].h = h;
+    }
+    const stepping0 = this.legs[0].s.mode === 'step', stepping1 = this.legs[1].s.mode === 'step';
+    for (let i = 0; i < this.legs.length; i++) {
+      const l = this.legs[i];
+      const tgt = stepFoot(l.s, { c: ins[i].p, h: ins[i].h, v: ins[i].v, floor: l.floor, rootY, bodyStill, otherStepping: (i === 0 ? stepping1 : stepping0) || this.legs[1 - i].s.mode === 'step', dt });
       this.modes[i] = l.s.mode; this.moved[i] = 0;
-      if (!tgt) return;
-      const t = new Vector3(tgt.x, tgt.y, tgt.z); this.moved[i] = Vector3.Distance(t, ins[i].p);
-      const chain = lq(l.hip).multiply(lq(l.knee)).multiply(lq(l.ankle));
-      const bend = l.knee.getAbsolutePosition().subtract(l.hip.getAbsolutePosition().add(t).scale(0.5));
+      if (!tgt) continue;
+      const t = this.tgt.set(tgt.x, tgt.y, tgt.z); this.moved[i] = Vector3.Distance(t, ins[i].p);
+      const chain = lq(l.hip).multiplyToRef(lq(l.knee), this.q1).multiplyToRef(lq(l.ankle), this.q2);
+      const bend = l.knee.getAbsolutePosition().subtractToRef(l.hip.getAbsolutePosition().addToRef(t, this.b1).scaleInPlace(0.5), this.b2);
       const miss = plantLeg(l.hip, l.knee, l.ankle, t, legPole(l, bend, this.root, fwd));   // hoops-p04b: legSink's pole (the clip's plane, held through straight)
       // a held foot the leg can no longer reach (the hips moved off it) steps from where the leg could put it
       if (l.s.mode === 'held' && miss > HELD_MISS_M) { l.ankle.computeWorldMatrix(true); const a = l.ankle.getAbsolutePosition(); l.s.mode = 'step'; l.s.t = 0; l.s.from = { x: a.x, y: a.y, z: a.z }; l.s.drawn = { ...l.s.from }; }
-      // the foot keeps its turn (the hips did not move: its turn under the hips is its turn in the world)
-      l.ankle.rotationQuaternion = Quaternion.Inverse(lq(l.hip).multiply(lq(l.knee))).multiply(chain);
+      // the foot keeps its turn (the hips did not move: its turn under the hips is its turn in the world). A FRESH quaternion on the
+      // node, as before (a reference anything kept to the old one must not see this write).
+      l.ankle.rotationQuaternion = Quaternion.InverseToRef(lq(l.hip).multiplyToRef(lq(l.knee), this.q3), this.q3).multiply(chain);
       l.ankle.computeWorldMatrix(true);
-    });
+    }
   }
 }
