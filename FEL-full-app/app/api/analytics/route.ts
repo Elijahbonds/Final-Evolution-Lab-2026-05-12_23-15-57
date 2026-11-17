@@ -23,6 +23,8 @@ import { recordServerEvents } from '@/lib/analytics-server';
 import { isAnonymousEvent } from '@/lib/analyticsAnon';   // perf-lag: the fps / ttfp perf stats carry no user or guest id
 import { guestIdFrom } from '@/lib/guestSession';
 import { AGE_BLOCK_COOKIE } from '@/lib/privacy/ageScreen';
+import { hasTryMinorFlag } from '@/lib/privacy/tryMinorFlag';
+import { isTryAgeBandsEnabled } from '@/lib/flags';
 import { normaliseHomebrewEvent } from '@/lib/binjgb/analyticsProps';   // BINJGB-SHELF-1 F5: allowlisted props for the anonymous homebrew events
 import { isServerOnlyEventName } from '@/lib/analyticsReserved';
 
@@ -60,7 +62,14 @@ export async function POST(req: Request) {
     // BINJGB-SHELF-1 F5 (Cyber build review dcbbec16): the two anonymous homebrew events get their props REBUILT from an
     // allowlist ({ source: 'local' }; a shipped { slug } or the event is dropped), so a crafted POST can't store a file
     // name or a hash under them. Every other event is unchanged.
+    // TRY-AGE-BANDS-FIX-1 (flag TRY_AGE_BANDS_ENABLED on, signed-out only): F2 — a browser with the teen/unknown session flag
+    // keeps only the anonymous events (no user, guest or page key); F3 — every game_diag from a signed-out browser is stored
+    // anonymously, so a local / teen run's diagnostics never join a guest id or the page's sessionKey. Flag off: unchanged.
+    const bands = !userId && isTryAgeBandsEnabled();
+    const anonymous = (e: { name: string; props?: unknown }) => isAnonymousEvent(e.name, e.props) || (bands && e.name === 'game_diag');
+    const minor = bands && hasTryMinorFlag(jar);
     const events = allowed.flatMap((e) => {
+      if (minor && !anonymous(e)) return [];
       const n = normaliseHomebrewEvent(e.name, e.props);
       return n.keep ? [{ ...e, props: n.props }] : [];
     });
@@ -73,7 +82,7 @@ export async function POST(req: Request) {
         ts: e.ts,
         // perf-lag: an anonymous row keeps no user, no guest and no page key (the page's sessionKey would join it back to that
         // page's signed-in rows)
-        ...(isAnonymousEvent(e.name, e.props) ? { userId: null, guestId: null, sessionKey: null } : { userId, guestId, sessionKey: e.sessionKey ?? null }),
+        ...(anonymous(e) ? { userId: null, guestId: null, sessionKey: null } : { userId, guestId, sessionKey: e.sessionKey ?? null }),
       })),
     );
     return new NextResponse(null, { status: 204 });

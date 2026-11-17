@@ -27,6 +27,8 @@ import { prisma } from '@/lib/db';
 import { CHALLENGE_EXPIRED, resolveAttempt, verifiedChallenge } from '@/lib/social/challenge-service';
 import { guestIdFrom } from '@/lib/guestSession';
 import { AGE_BLOCK_COOKIE } from '@/lib/privacy/ageScreen';
+import { hasTryMinorFlag } from '@/lib/privacy/tryMinorFlag';
+import { isTryAgeBandsEnabled } from '@/lib/flags';
 import { ANON_TAG, challengeExpiresAt, isChallengeExpired, termsOf, REP_METRICS } from '@/lib/social/challenge-terms';
 import { recordGuestResult, type GuestDataDb } from '@/lib/social/challenge-guest';
 import { measuredRepScore, type RepDb } from '@/lib/social/challenge-rep';
@@ -47,6 +49,9 @@ export async function POST(req: Request, { params }: { params: { code: string } 
   const userId = (session?.user as any)?.id ?? null;
   // TIP-GUEST-TOKEN-HASH: the events carry the token's hash; none at all for a browser with the age-block flag.
   const jar = cookies();
+  // TRY-AGE-BANDS-FIX-1 (Cyber F2): a signed-out browser carrying the teen/unknown session flag posts no challenge attempt
+  // (flag TRY_AGE_BANDS_ENABLED on). Nothing is read from the body to decide this: a forged age field changes nothing.
+  if (!userId && isTryAgeBandsEnabled() && hasTryMinorFlag(jar)) return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   const guestId = userId || jar.get(AGE_BLOCK_COOKIE) ? null : guestIdFrom(jar);
 
   const found = await verifiedChallenge(params.code);

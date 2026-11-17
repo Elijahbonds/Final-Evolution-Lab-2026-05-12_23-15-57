@@ -11,6 +11,8 @@ import { track, flush } from '@/lib/analytics';
 import { AgeStep, ageBlockPresent, writeAgeBlockFlag } from '@/components/age-step';
 import { ageScreenOutcome } from '@/lib/privacy/ageScreen';
 import { lockTryAge, tabStorage, tryAgeBand } from '@/lib/privacy/tryAgeGate';   // TRY-AGE-PLACEHOLDER-1 (flag ageBands)
+import { tryMinorPresent, writeTryMinorFlag } from '@/lib/privacy/tryMinorFlag';   // TRY-AGE-BANDS-FIX-1 F2 (flag ageBands)
+import { readSessionAge } from '@/lib/screen/store';   // TRY-AGE-BANDS-FIX-1 F1 (flag ageBands)
 import type { GameProps, GameResult } from '@/components/games/game-shell';
 import { REVIEW_BUTTON_LABEL } from '@/lib/coach-store/storeOffers';   // STORE-OFFER-1 (a constant: no flag read on the client)
 
@@ -82,6 +84,17 @@ export function GuestDunkShell({ challengeCode, reviewHref = null, ageBands = fa
     if (gate === 'ask' && ageBlockPresent()) setGate('blocked');
   }, [gate]);
 
+  // TRY-AGE-BANDS-FIX-1 (Cyber F1 + F2), flag ageBands only: a teen / unknown / under-13 answer already given is never asked again.
+  // F1: the tab's session lock is read once on mount, so a refresh does not show the question again ('under-13' -> blocked;
+  // '13-17' or 'unknown' -> local; '18+' or none -> ask). F2: the browser-session flag (fel_try_minor) carries a teen answer into a
+  // new tab, where the session lock is gone -> local. The block flag still wins. Reads only; sends nothing. Flag off: no change.
+  useEffect(() => {
+    if (!ageBands || ageBlockPresent()) return;
+    const held = readSessionAge(tabStorage());
+    if (held === 'under-13') setGate('blocked');
+    else if (held === '13-17' || held === 'unknown' || tryMinorPresent()) setGate('local');
+  }, [ageBands]);
+
   // Adult only: ensure an anonymous guest token exists, then record the play_now click.
   const startGuest = () => {
     online.current = true;
@@ -102,7 +115,7 @@ export function GuestDunkShell({ challengeCode, reviewHref = null, ageBands = fa
       const g = lockTryAge(tabStorage(), tryAgeBand(birthDate));
       if (g === 'adult') startGuest();
       else if (g === 'blocked') { writeAgeBlockFlag(); setGate('blocked'); }
-      else setGate('local');
+      else { writeTryMinorFlag(); setGate('local'); }   // F2: a teen or unknown answer also writes the session-only flag
       return;
     }
     if (ageScreenOutcome(year) === 'adult') startGuest();

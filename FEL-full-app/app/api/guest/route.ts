@@ -20,12 +20,19 @@ import { recordServerEvent } from '@/lib/analytics-server';
 import { hashGuestToken, mintGuestToken } from '@/lib/guest';
 import { createGuestSession, findGuestSession, guestTokenFrom, setGuestCookie } from '@/lib/guestSession';
 import { AGE_BLOCK_COOKIE } from '@/lib/privacy/ageScreen';
+import { hasTryMinorFlag } from '@/lib/privacy/tryMinorFlag';
+import { isTryAgeBandsEnabled } from '@/lib/flags';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST() {
   const jar = cookies();
   if (jar.get(AGE_BLOCK_COOKIE)) {
+    return NextResponse.json({ ok: false }, { status: 403 });
+  }
+  // TRY-AGE-BANDS-FIX-1 (Cyber F2): with TRY_AGE_BANDS_ENABLED on, a browser that gave a teen/unknown answer (session-only flag
+  // fel_try_minor) gets no row and no cookie either. The flag is the only input read: no age, band or birthdate field is.
+  if (isTryAgeBandsEnabled() && hasTryMinorFlag(jar)) {
     return NextResponse.json({ ok: false }, { status: 403 });
   }
 
