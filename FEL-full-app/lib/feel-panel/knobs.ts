@@ -1910,6 +1910,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/core/ComboFinish.ts COMBO_DUNK_MIN_MPS',
     hint: 'How fast the drive must be at the press for a euro or hop to become a dunk.',
   },
+  {
+    id: 'hoops.dunkTakeReadOn', label: 'Dunk take-off: the hand meets the bounce (1) / the ball flies to the palm (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · gathers',
+    source: 'lib/babylon/anim/dunkTake.ts DUNK_TAKE_READ_ON',
+    hint: 'On: a drive dunk takes the ball off its bounce into the dunking hand, as the pick-up does. Off (as before): the ball is flown to the palm at the take-off.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));

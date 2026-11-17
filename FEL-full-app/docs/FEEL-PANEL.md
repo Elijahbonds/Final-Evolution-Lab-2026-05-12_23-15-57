@@ -859,3 +859,9 @@ restores the old behaviour exactly.
   3.4 m/s at the press and its last plant inside dunk range (2.8 m) takes off into a dunk: the euro's cross gives the angle (the windmill
   at speed, the cradle without it), the hop's two feet none, a body in the way the double clutch (the drive dunk's own picker). Off:
   they end in a layup or a floater, as before.
+- `hoops.dunkTakeReadOn` 0 (`anim/dunkTake.ts` `DUNK_TAKE_READ_ON`, G4): a drive dunk's take-off takes the ball the way the pick-up
+  does: the ball keeps its bounce and meets the hand, taken by the dunking hand (both palms on it), by the end of the take-off's pass
+  (`DUNK_TAKE_BY_SEC` 0.18 s on the dunk's clock) at the latest. Off (as before): the dribble is parked at the take-off and the ball is
+  flown to the palm at the gather's 8.1 m/s (measured on the 3v3 speed set: 32-41 cm off the palm), then passed to the dunking hand.
+  Feel-check: sprint in and dunk off a low dribble: the hand goes down to the ball, no snatch, and the ball is in the dunking hand
+  before the feet leave.

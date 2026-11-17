@@ -203,6 +203,7 @@ import { replaySkipOn } from '../core/replaySkip';   // hoops-flow (owner 2026-1
 import { HoopJuice } from '../visual/HoopJuice';   // A+ P0: the hoop answers the make (shared with Dunk / 1v1; Meshy never scaled)
 import { mountShotMeter3D, type ShotMeter3DHandle } from '../visual/ShotMeter3D';   // THE SHOT METER (owner, 2026-09-18): the 2K bar beside the shooter's head
 import { pickHoopsDunk, dunkSpeedRatio, PAUSIN_DUNK } from '../core/HoopsDunks';
+import { dunkTake } from '../anim/dunkTake';   // hoops-gather G4: the dunk's take reads the bounce
 import { comboDunkOn, comboDunkThen, comboDunkPick, gatherEnd } from '../core/ComboFinish';   // hoops-gather G4: the euro / the hop into a dunk
 import { PARRY, parryVaultRead, vaultAt, DRIFT, driftRead, ankleBreak, DRIVE_BY, driveByRead, SLIPSTREAM, slipstreamRead, SLING, slingRead, SYNERGY, SynergyGauge, shockVictims } from '../core/HoopsKinetic';
 import { CHOKE, CHOKE_RAILS, readChoke, resolveRails, inChokeLane, railRunRead } from '../core/Chokepoint';
@@ -2728,8 +2729,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     }
     SoundKit.play('whoosh', { pitch: 0.85 });
     // BIOMECH-HOOPS-WAVE1 G6: the dribble parked, the ball in the palm through the flight; the launch's last frame HELD to feet-down (the 1v1's)
-    carries.get(me)?.update(0, 0, false);
-    const toDunkHand = dunkHandPass(ball, me.char.skeleton);   // DUNK MOTION phase 11: into the dunking hand over the take-off
+    const toDunkHand = dunkTake(ball, me.char.skeleton, carries.get(me));   // DUNK MOTION phase 11: into the dunking hand over the take-off (hoops-gather G4: the take reads the bounce, hoops.dunkTakeReadOn; off = the park + dunkHandPass)
     // WHICH DUNK THIS DRIVE EARNED — the same read 1v1 makes, off the same already-registered vocabulary (ClipScope
     // gives this mode the 'dunk' suite too). One clip for every dunk in the game was the fault; see HoopsDunks.
     const toRimNow3 = RIM_FLOOR.subtract(from); toRimNow3.y = 0;

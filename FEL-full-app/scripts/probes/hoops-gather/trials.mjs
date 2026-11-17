@@ -3,7 +3,7 @@
 //   /home/user/wt/gate-run.sh 890 scripts/probes/hoops-gap/run-set.sh <site> <out> \
 //     "onevone ext EXT=scripts/probes/hoops-gather/trials.mjs SET=gathers PHASES=top,floor NODRAW=1 TAG=g1"
 //
-// SET (comma list): control | gathers | finishes | escapes | speed (the drives and sprints, for 3v3) | strips (the frame strips of the worst moments, needs NODRAW unset)
+// SET (comma list): control | gathers | finishes | escapes | speed (the drives and sprints, for 3v3) | combo (G4: the euro / hop into a dunk, and the plain drive dunk) | strips (the frame strips of the worst moments, needs NODRAW unset)
 // PHASES (comma list, default top,down,floor,up): the dribble phase each gather is pressed in. REPS (default 1).
 // KINDS (comma list): only these trial kinds. MAX_TRIALS caps the run (the gate hold is the scarce thing).
 // Writes <out>/gather-<mode>-<TAG>.json after every trial (a hold that runs out keeps what was done). Read it with ./analyze.mjs.
@@ -32,6 +32,10 @@ export const KINDS = {
   esc_retreat:    { kind: 'esc_retreat', escape: true, flick: 'downaway', retreat: true, mag: 0.7, approachSec: 0.5, tailF: 70 },
   esc_momcross:   { kind: 'esc_momcross', escape: true, flick: 'upaway', turbo: true, mag: 0.6, untilDist: 4.8, tailF: 70 },
   esc_spin:       { kind: 'esc_spin', escape: true, flick: 'sweep', mag: 0.6, untilDist: 4.8, tailF: 70 },
+  // G4: the footwork into a dunk, the turbo held (hoops.comboDunkOn 1 in the run's FEEL): pressed so the euro's 1.5 m and the hop's 0.8 m
+  // land the last plant inside dunk range (2.8 m) — a squeeze already inside it is the plain drive dunk
+  euro_dunk:   { kind: 'euro_dunk', mag: 1, turbo: true, untilDist: 4.0, lateral: 1, setup: 'poster' },
+  hop_dunk:    { kind: 'hop_dunk', mag: 1, turbo: true, untilDist: 3.3, setup: 'poster' },
   // the pick-up AT SPEED (3v3: no poster seam, the drive runs from the check): a turbo pull-up and a turbo layup beside the drive kinds above
   spr_pullup:  { kind: 'spr_pullup', mag: 1, turbo: true, untilDist: 4.6 },
   spr_layup:   { kind: 'spr_layup', mag: 1, turbo: true, untilDist: 2.6 },
@@ -46,6 +50,7 @@ const SETS = {
   gathers: ['set', 'pullup', 'stepback', 'hop', 'euro', 'stepthrough'],
   finishes: ['layup', 'dunk'],
   escapes: ['esc_stepback', 'esc_snatchback', 'esc_btb', 'esc_retreat', 'esc_momcross', 'esc_spin'],
+  combo: ['euro_dunk', 'hop_dunk', 'dunk'],
   speed: ['pullup', 'spr_pullup', 'hop', 'euro', 'layup', 'spr_layup', 'dunk', 'stepthrough'],
   trap: ['trap_stepback', 'trap_snatchback', 'trap_spin', 'trap_btb', 'trap_hold'],
 };
