@@ -1924,7 +1924,7 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'On: a step-back beats a man on his heels or off balance (he is late), never a set man or one coming at you. Off: as before.',
   },
   {
-    id: 'hoops.trapReadOn', label: 'Trap: a cross splits an open gap, is stripped on the closed side (1) / as before (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · gathers',
+    id: 'hoops.trapReadOn', label: 'Trap: a cross splits an open gap, is stripped on the closed side (1) / as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · gathers',
     source: 'lib/babylon/hoops/response/escapeRead.ts TRAP_READ_ON',
     hint: 'On: a crossover in a double team splits the two men when a body fits between them, and is a steal thrown into a man on the closed side (the owner rule). Off: as before.',
   },
@@ -1942,6 +1942,36 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'hoops.escapeStripReachM', label: 'Trap: a cross into a man this close is stripped', def: 1.5, min: 0.8, max: 2.2, step: 0.05, unit: 'm', group: 'Hoops · gathers',
     source: 'lib/babylon/hoops/response/escapeRead.ts ESCAPE_STRIP_REACH_M',
     hint: 'A crossover thrown toward a trapper inside this, with the gap shut, is a steal (the owner rule).',
+  },
+  {
+    id: 'hoops.trapSqueezeOn', label: 'Trap: the handler can squeeze between the two men (1) / the full body standoff (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · gathers',
+    source: 'lib/babylon/hoops/response/escapeRead.ts TRAP_SQUEEZE_ON',
+    hint: 'On: a split lets the handler shoulder through two trappers about 1.6 m apart. Off: they must be 2.2 m apart.',
+  },
+  {
+    id: 'hoops.trapSqueezeM', label: 'Trap squeeze: body to body through the gap', def: 0.8, min: 0.55, max: 1.1, step: 0.05, unit: 'm', group: 'Hoops · gathers',
+    source: 'lib/babylon/hoops/response/escapeRead.ts SQUEEZE_STANDOFF_M',
+    hint: 'How close the handler passes each trapper on a split (the trap must be twice this apart).',
+  },
+  {
+    id: 'hoops.trapSqueezeSec', label: 'Trap squeeze: lasts', def: 0.6, min: 0.2, max: 1.2, step: 0.05, unit: 's', group: 'Hoops · gathers',
+    source: 'lib/babylon/hoops/response/escapeRead.ts SQUEEZE_SEC',
+    hint: 'How long after the split cross the handler can slip between the two men.',
+  },
+  {
+    id: 'hoops.dunkGatherOn', label: 'Drive dunk: gather the ball, then go up (1) / up on the press (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · gathers',
+    source: 'lib/babylon/hoops/response/dunkGather.ts DUNK_GATHER_ON',
+    hint: 'On: the press gathers the last dribble into the hands, then the plant and the take-off. Off: up on the press, the ball flown to the palm.',
+  },
+  {
+    id: 'hoops.dunkGatherMaxSec', label: 'Drive dunk: longest gather before the take-off', def: 0.3, min: 0.1, max: 0.5, step: 0.05, unit: 's', group: 'Hoops · gathers',
+    source: 'lib/babylon/hoops/response/dunkGather.ts DUNK_GATHER_MAX_SEC',
+    hint: 'The take-off waits for the ball at most this long after the press.',
+  },
+  {
+    id: 'hoops.pumpEndsDribbleOn', label: 'Pump fake ends the dribble (1) / dribble again after (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · gathers',
+    source: 'lib/babylon/hoops/response/pumpHold.ts PUMP_ENDS_DRIBBLE_ON',
+    hint: 'On: after a pump the ball stays in the hands and the feet are set: shoot, pass or step through. Off: the dribble comes back when the pump ends.',
   },
   {
     id: 'hoops.comboDunkOn', label: 'Euro step and hop step can end in a dunk (1) / never (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · gathers',

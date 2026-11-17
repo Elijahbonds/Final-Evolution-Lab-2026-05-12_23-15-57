@@ -127,6 +127,7 @@
     // the press: the first drawn frame that can answer it is the next one
     if (spec.strip) HG.strip(spec.strip, 16, 2);   // (16 drawn frames, every 2nd, from the press: needs NODRAW unset)
     const pressF = HG.frame + 1; o.pressF = pressF; o.distAtPress = +distRim().toFixed(2);
+    if (spec.prePump) { HG.press('X'); await waitSec(0.1); HG.release('X'); await waitSec(spec.pumpWaitSec ?? 1.2); o.pumpF = pressF; o.pressF = HG.frame + 1; }   // a pump, then (the dribble dead) the flick
     if (spec.escape) {
       // the R-stick map is relative to the ball hand (StickHandle.stickMoveFor reads handAfterMove): resolve 'downaway' / 'upaway' on this
       // frame, after any auto hand change has landed (no guard-hand crossing in the last 45 frames), never from a read taken earlier
