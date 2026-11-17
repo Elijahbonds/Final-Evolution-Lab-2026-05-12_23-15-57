@@ -59,7 +59,7 @@ export default async function PlayPage() {
         chips: (
           <>
             {/* MULTIPLAYER (2026-10-06): the couch — one screen, phones and pads, friends join by QR. */}
-            {veniceDoorOn() && <Chip href={VENICE_DOOR_HREF} testId="play-venice-entry" icon={<MapPin aria-hidden className="h-4 w-4 text-fel-cyan" />}>{t('play.venice')}</Chip>}
+            {veniceDoorOn() && <Chip href={VENICE_DOOR_HREF} prefetch={false} testId="play-venice-entry" icon={<MapPin aria-hidden className="h-4 w-4 text-fel-cyan" />}>{t('play.venice')}</Chip>}
             <Chip href="/play/party" testId="play-party-entry" icon={<Users aria-hidden className="h-4 w-4 text-fel-cyan" />}>{t('play.couch')}</Chip>
             <Chip href="/multiplayer" icon={<Swords aria-hidden className="h-4 w-4 text-fel-crimson" />}>{t('play.versus')}</Chip>
             {/* VERTICAL-EASY (2026-10-27): the one front door to measuring a vertical, one tap from the signed-in home */}

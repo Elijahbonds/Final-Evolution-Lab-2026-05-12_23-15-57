@@ -6,8 +6,9 @@
 // with the floating stick on a phone, and the party bar (the root layout's, on every page). Nothing else on screen.
 
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Play, Users } from 'lucide-react';
+import { ChevronLeft, Play, Users } from 'lucide-react';
 import { runMode, InputBus, type ModePhase } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
@@ -78,10 +79,15 @@ export function VeniceStage({ signedIn }: { signedIn: boolean }) {
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden bg-black text-white">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none outline-none" aria-label="Venice Beach: walk to a court to play" tabIndex={0} />
-      {err && <p role="alert" className="absolute inset-x-4 top-4 rounded-lg bg-black/80 p-3 text-base">The courts did not load. {err}</p>}
+      {/* the way back (every-screen: no dead end) — the Play shelf, where every game is still one tap */}
+      <Link href="/play" data-testid="venice-back" aria-label="Back to Play"
+        className="absolute left-3 top-3 z-10 inline-flex min-h-[44px] min-w-[44px] items-center gap-1 rounded-full bg-black/60 px-3 text-base font-bold text-white">
+        <ChevronLeft aria-hidden className="h-5 w-5" /> Play
+      </Link>
+      {err && <p role="alert" className="absolute inset-x-4 top-[4.25rem] rounded-lg bg-black/80 p-3 text-base">The courts did not load. {err}</p>}
       {phase === 'loading' && !err && <p className="absolute inset-x-0 top-1/2 text-center text-base text-white/80">Heading to the courts…</p>}
       {spot && phase === 'playing' && (
-        <div data-testid="venice-walkup" className="absolute inset-x-4 top-4 mx-auto max-w-sm rounded-2xl border border-white/15 bg-black/75 p-3 backdrop-blur">
+        <div data-testid="venice-walkup" className="absolute inset-x-4 top-[4.25rem] mx-auto max-w-sm rounded-2xl border border-white/15 bg-black/75 p-3 backdrop-blur">
           <p className="text-base font-bold">{spot.label.replace('[PLACEHOLDER] ', '')}</p>
           <div className="mt-2 flex flex-col gap-2">
             <button type="button" data-testid="venice-play" onClick={play}

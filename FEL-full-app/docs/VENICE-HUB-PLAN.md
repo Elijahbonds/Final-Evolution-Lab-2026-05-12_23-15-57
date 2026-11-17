@@ -565,3 +565,9 @@ The owner's go: "Ready to start". What V1 is, as built:
 - **Load (the rig, SwiftShader, 4× CPU throttle):** playable in 26–33 s, against 55 s for 1v1 on the same rig in the
   same session. The rig overstates a phone (`docs/SHIP-READINESS.md` §1), so it cannot show the owner's 8 s target
   either way. The owner's phone is the judge.
+- **Every-screen** (the production build on the throwaway database, 390 × 844, 4× throttle, scorer control `--plant` passed):
+  `/play/venice` is **clean**, after a "Play" back link was added (the first score caught a dead end). `/play` keeps its
+  owner-accepted fault ("text cut off", the shelf's line-clamp-3). Its tap response measured 272–368 ms with the door
+  and 248 ms with the door off (`VENICE_HUB_DOOR=0`), all on a loaded box, against the scorecard's 184 ms baseline and a
+  200 ms budget. The door's chip no longer prefetches `/play/venice` (`Chip prefetch={false}`). Whether the chip still
+  costs a little cannot be told apart from the box's load in these few runs. Re-measure on a quiet box.
