@@ -79,6 +79,14 @@ describe('patchClusteredSheen (Babylon 9.23: the clustered PBR loop reads the ca
     patchClusteredSheen();
     expect(ShaderStore.IncludesShadersStore.pbrClusteredLightingFunctions ?? '').not.toContain('computeSheenLighting(preInfo,normalW,');
   });
+  it('the WGSL include (WebGPU) carries the same bug in 9.23, and the same patch fixes it (device-perf)', async () => {
+    await import('@babylonjs/core/ShadersWGSL/ShadersInclude/pbrClusteredLightingFunctions.js');
+    const before = ShaderStore.IncludesShadersStoreWGSL.pbrClusteredLightingFunctions ?? '';
+    expect(before.length).toBeGreaterThan(0);
+    patchClusteredSheen(ShaderStore.IncludesShadersStoreWGSL);
+    expect(ShaderStore.IncludesShadersStoreWGSL.pbrClusteredLightingFunctions).not.toContain('computeSheenLighting(preInfo,normalW,');
+    expect(ShaderStore.IncludesShadersStoreWGSL.pbrClusteredLightingFunctions).toContain(before.includes('computeSheenLighting(preInfo,normalW,') ? 'computeSheenLighting(preInfo,N,' : 'computeSheenLighting(');
+  });
 });
 
 describe('mountFixtureLights on a scene', () => {
