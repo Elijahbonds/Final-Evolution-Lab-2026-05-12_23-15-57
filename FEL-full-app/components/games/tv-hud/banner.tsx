@@ -71,7 +71,7 @@ export function HudBanner({ text, tone = 'score', size = 'banner', className, pl
   );
 }
 
-export function HudLine({ text, children, tone = 'text', alpha = HUD_TEXT_ALPHA.muted, size = 'body', className = 'bottom-16', clamp = true, strong = false, edge, data, maxWidthClass = 'max-w-[min(92%,980px)]' }: {
+export function HudLine({ text, children, tone = 'text', alpha = HUD_TEXT_ALPHA.muted, size = 'body', className = 'bottom-16', clamp = true, strong = false, edge, data, maxWidthClass = 'max-w-[min(92%,980px)]', padding = '0.2em 0.75em' }: {
   text?: unknown;
   children?: ReactNode;
   tone?: HudTone;
@@ -86,6 +86,9 @@ export function HudLine({ text, children, tone = 'text', alpha = HUD_TEXT_ALPHA.
   data?: Record<string, string>;
   /** The line's width cap (a host that kept its line narrower, e.g. max-w-[70%]). */
   maxWidthClass?: string;
+  /** GAME-HUD (2026-11-12): the plate's padding. '0.2em 0.75em' as before; a host that moved its line up from the 12 px
+   *  caption to the 14 px line step passes HUD_LINE_PAD so the plate hides no more of the picture than it did. */
+  padding?: string;
 }) {
   const body = children ?? (typeof text === 'string' ? text : '');
   if (body === '' || body == null) return null;
@@ -100,7 +103,7 @@ export function HudLine({ text, children, tone = 'text', alpha = HUD_TEXT_ALPHA.
           background: HUD_PLATE.background,
           border: edge ? `1px solid ${hudColor(edge, 0.6)}` : HUD_PLATE.border,
           borderRadius: HUD_PLATE.radius,
-          padding: '0.2em 0.75em',
+          padding,
           ...(clamp ? LINE_CLAMP_STYLE : {}),
         }}
       >

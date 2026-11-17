@@ -11,6 +11,8 @@ import { DEFAULT_DUNKS, MAX_DUNKS, MAX_PLAYERS, MIN_DUNKS, rosterReady, sealRost
 import { endSession, readSession, rememberSession } from '@/lib/session-setup/memory';
 import { DRILL_CARDS, drillByLane, drillPhase, type TrainingLane } from '@/lib/session-setup/drills';
 import { PROGRAM_LANES_HEADER } from '@/lib/screen/PROPOSED-program-lanes';
+import { notice } from '@/lib/every-screen/notices';
+import { COURT_NAMES_LINE, COURT_NUMBERS_KEPT_LINE, COURT_NUMBERS_NOT_SENT_LINE } from '@/lib/session-setup/copy';
 
 const CLAIMS: { id: ClaimedAge; label: string }[] = [
   { id: '13-17', label: '13–17' },
@@ -73,9 +75,13 @@ export function SessionHome({ serverVerified, optedIn }: { serverVerified: boole
   return (
     <main className="mx-auto max-w-[720px] overflow-x-hidden px-4 py-6 text-base text-white">
       <h1 className="text-4xl font-black">Court session</h1>
+      {/* COACH-WORDS (2026-11-12): privacy wording, unchanged word for word (the same text, the same order); each line is
+          marked as an approved privacy notice */}
       <p className="mt-2 text-base text-white/70">
-        Nicknames only for anyone under 18 or who would rather not say. Those names stay in this session and leave when it ends.
-        {optedIn ? ' This account can keep adult jump numbers.' : ' Jump numbers are not sent anywhere.'}
+        <span {...notice('privacy')}>{COURT_NAMES_LINE}</span>{' '}
+        {optedIn
+          ? <span {...notice('privacy')}>{COURT_NUMBERS_KEPT_LINE}</span>
+          : <span {...notice('privacy')}>{COURT_NUMBERS_NOT_SENT_LINE}</span>}
       </p>
 
       {mode === 'home' && (

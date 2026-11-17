@@ -125,6 +125,14 @@ export function resolveSides(move: RenderMove, startHand: Side, o: { hint?: Side
   return { rendered: move, twin: false, endHand: startHand, clipDir: move !== 'jab' && MOVE_SHAPE[move].owner === 'mode' ? side : startHand, impulseDir: side };
 }
 
+/** hoops-p09 (one rulebook): the side a request will take the body — its impulseDir, from the same start hand requestMove reads — so a
+ *  call site's decision can read the defender against the way the move goes. Pure. */
+export function moveSideFor(host: Pick<HandleHost, 'carry'>, req: { move: RenderMove; hint?: Side; cutSide?: Side; path?: PathMove | false }): Side {
+  const carry = host.carry; const running = carry?.move ?? null;
+  const startHand: Side = running ? running.endHand : carry && carry.hand === 'Left' ? 'left' : 'right';
+  return resolveSides(req.move, startHand, { hint: req.hint, cutSide: req.cutSide, path: req.path }).impulseDir;
+}
+
 /** Render one handle move (see the header). The decision runs first, exactly once.
  *  A MOVE ALREADY RUNNING (4b review F2, plan §3.4 step 1: "it queues, or buffers one request"): the carry holds ONE queued path, and a
  *  later request REPLACES it — so this request starts from the RUNNING move's end hand (the carry's `hand` counts the queued move's

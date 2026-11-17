@@ -30,6 +30,9 @@ import { DunkFieldBoard } from './dunk-field-board';
 import { DunkSpecialsChip } from './dunk-specials-chip';
 import { decodeTakeoff, ZONE_HEX } from '@/lib/babylon/core/DunkTakeoffRead';
 import { MicCaption, MicToggle } from './mic-caption';
+import { useBelowFold } from './hoops-bottom-stack';   // hoops-p08
+import { useHintDevice } from './use-hoops-hint';   // hoops-p08
+import { touchHint } from '@/lib/babylon/ui/hudHints';   // hoops-p08
 import { DunkPreloadCard } from './dunk-preload-card';   // RUNUP-STALL-3
 import { HUD_PLATE, HUD_TEXT_ALPHA, HudBanner, HudChip, HudFrame, HudMeter, HudPlate, HudText, LINE_CLAMP_STYLE, ScoreValue, Scorebug, hudColor, hudType, type HudTone } from './tv-hud';
 import { JudgeCards } from './judge-cards';
@@ -90,6 +93,12 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
   // CONTROLLER-TRY-FIX item 4: the first pad's label family (an Xbox pad says RT, not R2); null with no pad = the hint as the mode wrote it
   const [padFamily, setPadFamily] = useState<PadFamily | null>(null);
   useEffect(() => (bus ? bus.onPads((pads) => setPadFamily(pads.length ? familyFor(pads[0].profileId) : null)) : undefined), [bus]);
+  // hoops-p08: on a touch screen the hint names no pad button and no key (hudHints.touchHint), and the bottom stack lifts into view
+  // when the stage runs under the bottom of the screen (an upright phone), as the touch deck does
+  const { device: hintDevice } = useHintDevice();
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const bottomBelow = useBelowFold(bottomRef, phase === 'playing');
+  const hudShown = useMemo(() => (hintDevice === 'touch' && typeof hud.hint === 'string' && hud.hint ? { ...hud, hint: touchHint(hud.hint, 'dunk') } : hud), [hud, hintDevice]);
 
   const retryBoot = useCallback(() => {
     endedRef.current = false;
@@ -419,6 +428,7 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
           The box now spans from the top of the stage to the hint's slot (it never changes; the rows still stack up from the bottom), and
           the hint's row is always two lines tall with its plate at the top of it — a one-line hint leaves the second line empty. */}
       {(() => {
+        const hud = hudShown;   // hoops-p08: on a touch screen the hint names no pad button and no key (hudHints.touchHint)
         const t = decodeTakeoff(hud.takeoff);
         const beats = typeof hud.beats === 'string' && hud.beats ? hud.beats : '';
         const cutting = typeof hud.cut === 'string' && hud.cut;
@@ -430,6 +440,9 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
         const call = !judging && hud.slamPulse !== true && typeof hud.call === 'string' && hud.call && phase === 'playing' ? hud.call : '';   // (the call yields to the SLAM! cue: the QTE window is the one thing on screen then)
         if (!hint && !takeoff && !strip && !mic && !call) return null;
         return (
+          // hoops-p08: the wrapper ends where the screen does (an upright phone's stage runs under it), so the column's PAD_LIFT counts
+          // from the visible bottom, as the touch deck does
+          <div ref={bottomRef} className="pointer-events-none absolute inset-x-0 top-0" style={{ bottom: bottomBelow }}>
           <div data-dunk-bottom className="pointer-events-none absolute inset-x-0 top-0 flex flex-col-reverse items-center gap-[0.35rem] px-3" style={{ bottom: PAD_LIFT }}>
             {hint && (
               <HudText as="div" size="body" className="w-full text-center" style={HINT_SLOT_STYLE}>
@@ -446,13 +459,14 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
               </HudPlate>
             )}
             {strip && <DunkBeatStrip value={strip} />}
-            {mic && <MicCaption flow text={hud.mic} who={hud.micWho} />}
+            {mic && <MicCaption flow text={hud.mic} who={hud.micWho} voiced={hud.micVoiced} />}
             {/* the call ("FROM THE STRIPE!") was a layer of its own at 58 % of the stage, and the caption now stands where it was */}
             {call && (
               <div className="w-full px-4 text-center">
                 <HudPlate as="span" className="inline-block px-3 py-1"><HudText size="value" tone="score" className="uppercase italic">{call}</HudText></HudPlate>
               </div>
             )}
+          </div>
           </div>
         );
       })()}

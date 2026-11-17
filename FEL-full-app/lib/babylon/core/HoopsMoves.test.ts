@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { planShimmyFade, planDropStep, stickAtRim01, SHIMMY_SEC, DROP_STEP_SEC, DROP_STEP_SPEED } from './HoopsMoves';   // THE POST GAME (2026-09-18)
 import { Vector3 } from '@babylonjs/core';
+import { resetFeelForTests, setFeelOverride, setFeelSession, setFeelUser } from '../../feel-panel/feel';   // hoops-p09: the pass fake's off path
 import {
   planGather, gatherWish, gatherTravel, gatherLabel, stickBack01, PULLUP_TRAVEL_MAX, GATHER_PULLUP_MAX_SEC, GATHER_PULLUP_MIN_SEC,
   pickLayupSide, planFinish, finishHopY, finishStride, FINISH_RELEASE_KEY_SEC, FINISH_HOP_APEX,
@@ -743,14 +744,27 @@ describe('the pass fake', () => {
     expect(far.bit).toBe(false);
   });
 
-  it('a bad roll means he simply does not buy it', () => {
-    expect(passFakeBite({ passer, target, defender: new Vector3(2, 0, 6) }, never).bit).toBe(false);
+  // hoops-p09 (test changed: the pass fake is a READ now, hoops.moveReadOn 1 — no roll). The two roll assertions below are unchanged and
+  // pinned on the knob's off path, which is exactly the old behaviour; the read path has its own pins after them.
+  const offPath = (fn: () => void): void => { setFeelUser(true); setFeelSession(null); setFeelOverride('hoops.moveReadOn', 0); try { fn(); } finally { resetFeelForTests(); } };
+  it('a bad roll means he simply does not buy it (hoops.moveReadOn 0: the old roll)', () => {
+    offPath(() => expect(passFakeBite({ passer, target, defender: new Vector3(2, 0, 6) }, never).bit).toBe(false));
   });
 
-  it('no bite leaves the defender exactly where he was', () => {
-    const at = new Vector3(2, 0, 6);
-    const to = passFakeShiftTo(at, passFakeBite({ passer, target, defender: at }, never));
-    expect(to.equalsWithEpsilon(at, 1e-9)).toBe(true);
+  it('no bite leaves the defender exactly where he was (hoops.moveReadOn 0: the old roll)', () => {
+    offPath(() => {
+      const at = new Vector3(2, 0, 6);
+      const to = passFakeShiftTo(at, passFakeBite({ passer, target, defender: at }, never));
+      expect(to.equalsWithEpsilon(at, 1e-9)).toBe(true);
+    });
+  });
+
+  it('hoops-p09 THE READ: a man square in the lane bites whatever the dice say; one at its edge reads it and stays home', () => {
+    expect(passFakeBite({ passer, target, defender: new Vector3(2, 0, 6) }, never).bit).toBe(true);    // cos 1: in the lane
+    const edge = new Vector3(2 * 0.45, 0, 6 + 2 * Math.sin(Math.acos(0.45)));                            // 2 m off, cos 0.45: past the 0.2 gate, short of 0.6
+    expect(passFakeBite({ passer, target, defender: edge }, always).bit).toBe(false);
+    offPath(() => expect(passFakeBite({ passer, target, defender: edge }, always).bit).toBe(true));   // the control: the old roll would have bitten him
+    expect(passFakeShiftTo(edge, passFakeBite({ passer, target, defender: edge }, always)).equalsWithEpsilon(edge, 1e-9)).toBe(true);
   });
 
   it('degenerate geometry never produces NaN', () => {

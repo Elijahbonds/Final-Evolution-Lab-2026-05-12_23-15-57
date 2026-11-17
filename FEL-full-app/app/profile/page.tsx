@@ -44,12 +44,20 @@ export default async function ProfilePage() {
 
   return (
     // PREMIUM-UI P4 (2026-10-27): the Venice sunset full-bleed with the athlete's name on it; the athlete and the PRQ ring
-    // open the page; ONE primary — this week's card, the share — docked; Edit and Settings are two quiet doors.
+    // open the page; ONE primary — this week's card, the share; Edit and Settings are two quiet doors.
+    // PROFILE-WEEK-CARD (2026-11-12): the primary flows in the hero's action row instead of docking. Docked, it floated over
+    // the first screen on a phone: at 390 x 844 it covered the jump-check link by 33 px (100 % text) and the Edit and Settings
+    // chips (150 % text), and sat on "This week" on shorter phones. Same label, the same full-width pill on a phone (the
+    // wrapper keeps the dock's width), the same tap target.
     <TabPage eyebrow={t('profile.eyebrow')} title={data.identity.name} lede={t('profile.lede')}
       hero={{
         image: '/backdrops/venice-sky-sunset.jpg',
         imagePosition: '50% 70%',
-        primary: <PrimaryCta href="/profile/week" docked testId="profile-week-card" icon={<CalendarDays aria-hidden className="h-5 w-5" />}>{t('profile.weekCard')}</PrimaryCta>,
+        primary: (
+          <div className="w-full max-w-md md:w-auto [&>a]:w-full md:[&>a]:w-auto">
+            <PrimaryCta href="/profile/week" testId="profile-week-card" icon={<CalendarDays aria-hidden className="h-5 w-5" />}>{t('profile.weekCard')}</PrimaryCta>
+          </div>
+        ),
         chips: <ProfileActions />,
       }}
     >

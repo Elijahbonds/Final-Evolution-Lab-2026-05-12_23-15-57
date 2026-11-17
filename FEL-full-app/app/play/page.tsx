@@ -34,7 +34,10 @@ export default async function PlayPage() {
   const homebrewRow = await homebrewRowFor(me);
   // The week card is not on Play any more: it is Profile's one primary and sits on Train (P4 follow-up, 2026-10-27).
   // PREMIUM-UI P4 (2026-10-27): the Venice court at golden hour full-bleed, the shelf's promise in one line, and ONE
-  // primary — the Prove It dunk duel, the flagship, docked where a thumb is. Couch and Versus are two quiet doors beside it.
+  // primary — the Prove It dunk duel, the flagship. Couch and Versus are two quiet doors beside it.
+  // FLOAT-COVERS (2026-11-12): the primary flows in the hero's action row instead of docking, as on Profile. Docked, it
+  // floated over the first screen on a phone: the "Ones" tile at 100 % text, the Couch and Versus doors at 150 %. Same
+  // label, the same full-width pill on a phone (the wrapper keeps the dock's width), the same tap target.
   return (
     <TabPage
       eyebrow={t('play.eyebrow')}
@@ -45,9 +48,11 @@ export default async function PlayPage() {
         imagePosition: '50% 38%',
         primary: (
           // DUNK-LOOP-HANDSFREE: one obvious way into the camera-forward Prove It flow.
-          <PrimaryCta href="/play/dunkduel" docked data-testid="play-dunk-session-entry" icon={<Camera aria-hidden className="h-5 w-5" />}>
-            {t('play.proveIt')}
-          </PrimaryCta>
+          <div className="w-full max-w-md md:w-auto [&>a]:w-full md:[&>a]:w-auto">
+            <PrimaryCta href="/play/dunkduel" data-testid="play-dunk-session-entry" icon={<Camera aria-hidden className="h-5 w-5" />}>
+              {t('play.proveIt')}
+            </PrimaryCta>
+          </div>
         ),
         chips: (
           <>

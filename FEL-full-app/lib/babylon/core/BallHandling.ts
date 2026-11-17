@@ -13,6 +13,10 @@
 //     exactly on the meter's green center: what you SEE is what you TIME.
 
 import { Vector3 } from '@babylonjs/core';
+// HOOPS-SOUND (phase 11a, 2026-11-12): PassFlight's catch
+import { SoundKit } from '../audio/SoundKit';
+import { PASS_CATCH_SOUND_ON, PASS_CATCH_VOL } from '../audio/dribbleSound';
+import { feel } from '../../feel-panel/feel';
 
 // ── Dribble state machine ──────────────────────────────────────────────────
 export type DribbleState = 'idle' | 'speed' | 'crossover' | 'protect';
@@ -215,9 +219,18 @@ export class PassFlight {
         ball.y = 0.05 + (this.to.y - 0.05) * u;
       }
     }
-    if (this.t >= 1) { this.active = false; return true; }
+    // HOOPS-SOUND (phase 11a, 2026-11-12): every pass that arrives is heard in the hands (the 3v3 pass played the menu's click,
+    // ThreeVThreeMode's uiTick at the throw, and nothing at the catch). A bounce pass's floor hit is the ball watcher's (anim/ballCarry.ts).
+    // Knob hoops.passCatchSoundOn (0: no catch sound, as before).
+    if (this.t >= 1) { this.active = false; catchSound(); return true; }
     return false;
   }
+}
+
+/** HOOPS-SOUND (phase 11a): the catch. */
+function catchSound(): void {
+  if (feel('hoops.passCatchSoundOn', PASS_CATCH_SOUND_ON) < 0.5) return;
+  SoundKit.play('catch', { volume: feel('hoops.passCatchVol', PASS_CATCH_VOL), tag: 'pass' });
 }
 
 // ── Animation-synced shot release ──────────────────────────────────────────

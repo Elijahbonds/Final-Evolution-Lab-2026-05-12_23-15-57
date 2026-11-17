@@ -27,6 +27,7 @@ import { isClothMesh, clothMeshOf } from '@/lib/babylon/creator/clothes/renderCl
 import { defaultFace, defaultJersey } from '@/lib/closet/wearable-catalog';
 import type { CreatorDoc } from '@/lib/creator/look/doc';
 import { kitOf } from '@/lib/babylon/core/kit';
+import { setFeelOverride, setFeelSession, setFeelUser } from '@/lib/feel-panel/feel';
 
 /** A body vertex within this of a garment surface (this pose) is "under the garment" for the poke count. */
 const POKE_NEAR = 0.04;
@@ -34,7 +35,7 @@ const POKE_NEAR = 0.04;
 const JITTER = 0.0004;
 
 type Tier = 'mobile' | 'desktop' | 'high';
-interface InitOpts { tier: Tier; modeId: string; closet: boolean; w: number; h: number }
+interface InitOpts { tier: Tier; modeId: string; closet: boolean; w: number; h: number; knobs?: Record<string, number>; steady?: boolean }
 interface SpawnOptsKG { kind: 'player' | 'rival'; body?: HeroBodyKind; url?: string; name?: string; tint?: string; creator?: CreatorDoc | null; wardrobe?: Record<string, string>; frame?: { heightScale: number; buildScale: number } }
 
 const CLASS = {
@@ -43,6 +44,8 @@ const CLASS = {
 type ClassName = keyof typeof CLASS;
 const CLASS_NAMES = Object.keys(CLASS) as ClassName[];
 
+/** KIT-FIT: steady poses (no breathing, 30 settle frames) unless the rig asks for the kit-glitch behaviour (STEADY=0). */
+let STEADY = true;
 let engine: Engine; let scene: Scene; let cam: ArcRotateCamera; let opts: InitOpts;
 let bodies: SpawnedCharacter[] = [];
 const errors: string[] = [];
@@ -57,6 +60,9 @@ function canvasEl(w: number, h: number): HTMLCanvasElement {
 
 async function init(o: InitOpts): Promise<void> {
   opts = o;
+  STEADY = o.steady !== false;
+  // KIT-FIT: feel knobs for this page (a before / after of a runtime switch in one build), through the panel's own path
+  if (o.knobs && Object.keys(o.knobs).length) { setFeelUser(true); setFeelSession(null); for (const [k, v] of Object.entries(o.knobs)) setFeelOverride(k, v); }
   const canvas = canvasEl(o.w, o.h);
   // no MSAA: the class passes count exact colours (a blended edge pixel would be neither class)
   engine = new Engine(canvas, false, { preserveDrawingBuffer: true, stencil: !o.closet, alpha: false, adaptToDeviceRatio: false });
@@ -100,6 +106,9 @@ async function spawn(o: SpawnOptsKG): Promise<number> {
   } else {
     s = await CharacterLibrary.spawn(scene, o.url!, { role: 'opponent', position: at, name: o.name, tint: o.tint });
   }
+  // KIT-FIT: a measurement must be repeatable — breathing (secondary motion) is a clock, so it is stopped; foot planting
+  // settles on a paused clip within the pose's settle frames (kit-fit found a run cell caught at two different moments)
+  if (STEADY) s.secondary?.dispose();
   bodies.push(s);
   return bodies.length - 1;
 }
@@ -130,7 +139,7 @@ async function pose(clip: string, frac: number): Promise<string | null> {
     const f = g.from + (g.to - g.from) * frac;
     g.goToFrame(f); g.pause();
   }
-  for (let i = 0; i < 4; i++) { scene.render(); await new Promise((r) => requestAnimationFrame(r)); }
+  for (let i = 0; i < (STEADY ? 30 : 4); i++) { scene.render(); await new Promise((r) => requestAnimationFrame(r)); }
   frozen = true;
   return used;
 }
@@ -167,7 +176,7 @@ function flatMat(name: string, rgb: readonly number[], src: Material | null, ver
 
 interface PassState { restore: () => void }
 /** Swap every character mesh's material for its class colour. The body takes per-vertex key / skin colours. */
-function classMaterials(hideBody: boolean, hideOthers: boolean): PassState {
+function classMaterials(hideBody: boolean, hideOthers: boolean, frontOnly = false): PassState {
   const undo: (() => void)[] = [];
   const amb = scene.ambientColor.clone(); scene.ambientColor = Color3.White(); undo.push(() => { scene.ambientColor = amb; });
   const ip = scene.imageProcessingConfiguration.isEnabled; scene.imageProcessingConfiguration.isEnabled = false; undo.push(() => { scene.imageProcessingConfiguration.isEnabled = ip; });
@@ -191,6 +200,7 @@ function classMaterials(hideBody: boolean, hideOthers: boolean): PassState {
       const prev = m.material;
       const vc = cls === 'key' && !!near;
       const mat = flatMat(`kg_${cls}`, CLASS[cls], prev, vc);
+      if (frontOnly) mat.backFaceCulling = true;   // KIT-FIT: only cloth seen from OUTSIDE (see measureScreen's pokeFront)
       if (vc && m === body) {
         const n = m.getTotalVertices(), col = new Float32Array(n * 4);
         for (let v = 0; v < n; v++) { const c = near![v] ? CLASS.key : CLASS.skin; col[v * 4] = c[0] / 255; col[v * 4 + 1] = c[1] / 255; col[v * 4 + 2] = c[2] / 255; col[v * 4 + 3] = 1; }
@@ -277,6 +287,12 @@ function measureScreen(): Record<string, unknown> {
   st = classMaterials(true, true);
   const b = readClasses();
   st.restore();
+  // KIT-FIT: the same garments-alone pass with back faces culled. Skin poking THROUGH cloth has the cloth's OUTSIDE behind it;
+  // skin seen through an opening (up a leg, between the legs, past a sleeve) has only the far wall's INSIDE behind it, which the
+  // count above also calls "through cloth". pokeFront counts only the first.
+  st = classMaterials(true, true, true);
+  const bf = readClasses();
+  st.restore();
   scene.render();
   lastPoke = { a, b, w, h };
   const bySlot: Record<string, number> = {}; const cover: Record<string, number> = {};
@@ -287,6 +303,8 @@ function measureScreen(): Record<string, unknown> {
     if (a[i] === CI.key) { poke++; bySlot[sl] = (bySlot[sl] ?? 0) + 1; }
     if (a[i] === CI.skin) skinShown++;
   }
+  let pokeFront = 0; const frontBySlot: Record<string, number> = {};
+  for (let i = 0; i < w * h; i++) if (GARMENT.has(bf[i]) && a[i] === CI.key) { pokeFront++; const sl = CLASS_NAMES[bf[i]]; frontBySlot[sl] = (frontBySlot[sl] ?? 0) + 1; }
   // flicker: interior pixels of the first frame (all 8 neighbours the same class) whose class flips in the nudged frame
   let flips = 0, flipsGarment = 0; const flipPairs: Record<string, number> = {};
   const sk = (c: number) => (c === CI.skin ? CI.key : c);   // the body's two shades are one surface
@@ -304,7 +322,7 @@ function measureScreen(): Record<string, unknown> {
     const k = `${CLASS_NAMES[c]}>${CLASS_NAMES[c2]}`; flipPairs[k] = (flipPairs[k] ?? 0) + 1;
     if (GARMENT.has(c) || GARMENT.has(c2)) flipsGarment++;
   }
-  return { w, h, garmentPx: covered, cover, poke, pokeBySlot: bySlot, pokePct: covered ? +(100 * poke / covered).toFixed(3) : 0, farSkinOverGarment: skinShown, flips, flipsGarment, flipPairs };
+  return { w, h, garmentPx: covered, cover, poke, pokeBySlot: bySlot, pokeFront, pokeFrontBySlot: frontBySlot, pokePct: covered ? +(100 * poke / covered).toFixed(3) : 0, farSkinOverGarment: skinShown, flips, flipsGarment, flipPairs };
 }
 /** The last poke pass as an RGBA overlay image (garment silhouette grey, poke pixels red, flicker not shown). */
 function pokeImage(): string | null {

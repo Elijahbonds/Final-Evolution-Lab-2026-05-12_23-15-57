@@ -167,7 +167,8 @@ export class ReplayDirector {
     const out = new Float32Array(this.tracked.length * 7);
     this.tracked.forEach((n, k) => {
       const q = n.rotationQuaternion ?? Quaternion.FromEulerVector(n.rotation);
-      out.set([n.position.x, n.position.y, n.position.z, q.x, q.y, q.z, q.w], k * 7);
+      const o = k * 7;   // hoops-perf: written in place (an array of seven a node a sample was ~0.2 MB a game second in 3v3)
+      out[o] = n.position.x; out[o + 1] = n.position.y; out[o + 2] = n.position.z; out[o + 3] = q.x; out[o + 4] = q.y; out[o + 5] = q.z; out[o + 6] = q.w;
     });
     return out;
   }
@@ -195,7 +196,8 @@ export class ReplayDirector {
     const out = new Float32Array(nodes.length * 7);
     nodes.forEach((n, k) => {
       const q = n.rotationQuaternion ?? Quaternion.FromEulerVector(n.rotation);
-      out.set([n.position.x, n.position.y, n.position.z, q.x, q.y, q.z, q.w], k * 7);
+      const o = k * 7;   // hoops-perf: written in place (an array of seven a node a sample was ~0.2 MB a game second in 3v3)
+      out[o] = n.position.x; out[o + 1] = n.position.y; out[o + 2] = n.position.z; out[o + 3] = q.x; out[o + 4] = q.y; out[o + 5] = q.z; out[o + 6] = q.w;
     });
     return out;
   }
@@ -318,6 +320,7 @@ export class ReplayDirector {
         this.dof?.set(0, 10); this.dof?.live(false);
         if (this.scene.metadata) this.scene.metadata.felCinematic = 0;
         this._playing = false; this.angleNow = null; this.finishActive = null;
+        this.skipFn = null;   // hoops-flow: a late skip (a second input in the same task) must not put the bodies back a second time
         resolve();
       };
       this.skipFn = skip;
@@ -327,7 +330,11 @@ export class ReplayDirector {
 
   private skipFn: (() => void) | null = null;
   /** A press during a replay: skip to the live moment (ignored while paused — the press that resumes is not a skip). */
-  skip(): void { this.skipFn?.(); }
+  skip(): void {
+    const f = this.skipFn; if (!f || !this._playing) return;
+    f();
+    if (!this._playing) console.info('[REPLAY-SKIP] a press ended the replay');   // hoops-flow: probes count skips off this line
+  }
   /** End a replay in flight; a no-op when none is playing. */
   stop(): void { this.finishActive?.(); }
 

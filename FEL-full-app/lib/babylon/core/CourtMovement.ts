@@ -30,6 +30,7 @@ import {   // lane/hoops-reverse: the hoops gears' numbers (feel knobs, defaults
   HOOPS_REVERSE_DECEL, liveGears, jerkLimit, turnToward,
   HANDLER_STOP_DECEL_LOW, HANDLER_STOP_DECEL_HIGH, HANDLER_JOG_TAU, HANDLER_JOG_ACCEL, HANDLER_LOAD_SCALE, HANDLER_FIRST_STEP_MPS,
   HANDLER_REVERSE_PLANT_HOLD, HANDLER_REVERSE_LAUNCH_SEC, HOOPS_HANDLER_TURN_DEG,
+  HOOPS_GEAR_BLEND_BAND, gearBandTop, HANDLER_TURN_TRUE_ARC, HANDLER_KICK_SEC, HANDLER_CUT_SEC,
 } from './HoopsStick';
 
 export interface MovementTuning {
@@ -87,6 +88,8 @@ export interface GearTuning {
   firstStep?: number;        // m/s — a stick pushed from a standstill starts the body at this speed on the press's frame (0: none)
   reversePlantHold?: number; // 1 = a reversal's plant holds its floor speed on the old line (release); 0 = it brakes straight through zero
   reverseLaunchSec?: number; // s — the push-off out of a reversal is a launch for this long (0: a loaded step, release)
+  /** lane/move-feel (off / the step as shipped when absent or 0 — core/HoopsStick HOOPS_GEAR_BLEND_BAND). */
+  gearBand?: number;         // stick units — the jog's target eases up from the walk's edge over this much stick past the walk line
 }
 /** The launch after a move: accel caps ×, for this long (owner: "faster launches"). */
 export const LAUNCH_BOOST = 1.7, LAUNCH_SEC = 0.45;
@@ -111,6 +114,8 @@ export const GEARS_HANDLER: GearTuning = {
   stopDecelLow: HANDLER_STOP_DECEL_LOW, stopDecelHigh: HANDLER_STOP_DECEL_HIGH,          // TUNED 22 → 32, 11 → 26 m/s²
   turnRateDeg: HOOPS_HANDLER_TURN_DEG,                                                     // (the handler's turn-rate knob, as before: 540)
   firstStep: HANDLER_FIRST_STEP_MPS, reversePlantHold: HANDLER_REVERSE_PLANT_HOLD, reverseLaunchSec: HANDLER_REVERSE_LAUNCH_SEC,   // TUNED (new)
+  gearBand: HOOPS_GEAR_BLEND_BAND,   // lane/move-feel: TUNED 0 → 0.2 (owner 2026-11-17) — the handler's only: the dunk run-up never reads it
+  trueArc: HANDLER_TURN_TRUE_ARC, kickSec: HANDLER_KICK_SEC, cutSec: HANDLER_CUT_SEC,   // lane/move-feel: TUNED 0 → 1, 0 → 0.1 s, 0 → 0.08 s (owner 2026-11-17); GEARS_HOOPS keeps 0
 };
 /** A committed hop (the step-back's ignoreStickFor) glides on the RELEASE stop whatever the gears or the knobs say: its travel is the move's
  *  separation (#311 kept it; hoops-p01 keeps it for the handler's firmer stop too). */
@@ -229,7 +234,8 @@ export class CourtMovement {
       const wantDir = new Vector3(moveX, 0, -moveY).normalize();
       // gears: a soft stick is a WALK (its own top), a pushed one a jog, the turbo a sprint — three speeds, not one scaled by the stick
       const gearTop = t.gears
-        ? (sprint ? t.maxSpeed : mag < t.gears.walkStick ? t.maxSpeed * t.gears.walkFactor * (mag / t.gears.walkStick) : t.maxSpeed * t.jogFactor * (0.85 + 0.15 * (mag - t.gears.walkStick) / (1 - t.gears.walkStick)))
+        ? (sprint ? t.maxSpeed : mag < t.gears.walkStick ? t.maxSpeed * t.gears.walkFactor * (mag / t.gears.walkStick)
+          : gearBandTop(mag, t.gears.walkStick, t.maxSpeed * t.gears.walkFactor, t.maxSpeed * t.jogFactor * (0.85 + 0.15 * (mag - t.gears.walkStick) / (1 - t.gears.walkStick)), t.gears.gearBand ?? 0))   // lane/move-feel: the line eased (band 0: as shipped)
         : t.maxSpeed * (sprint ? 1 : t.jogFactor) * mag;
       let topSpeed = gearTop * this.speedScale;
       if (this.retreatK < 1) topSpeed = Math.min(topSpeed, t.maxSpeed * t.jogFactor * this.speedScale * this.retreatK);   // hoops-reverse: a backpedal is slower

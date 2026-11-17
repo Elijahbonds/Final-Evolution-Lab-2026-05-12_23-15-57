@@ -277,7 +277,14 @@ export function ProgramBuilder({ initialQuestion = '' }: { initialQuestion?: str
             <p data-testid="program-summary" className={`${TYPE.body} text-white/85`}>{p.summary}</p>
             <p className={`${TYPE.small} text-fel-soft`}>{saved?.programId === p.id ? (onAccount ? SAVED_ACCOUNT_LINE : SAVED_LINE) : ''}{pos.total ? ` ${pos.done} of ${pos.total} sessions done.` : ''}</p>
           </div>
-          {canStart && <PrimaryCta docked onClick={start} icon={<Play className="h-5 w-5" />} testId="program-start">{START_TODAY}</PrimaryCta>}
+          {/* FLOAT-COVERS (2026-11-12): Start flows here, under the summary, instead of docking. Docked, it floated over the
+              week's day cards on a phone's first screen (A1, the drill, its sets) and over the summary at 150 % text. Same
+              label, the same full-width pill on a phone, the same tap target. */}
+          {canStart && (
+            <div className="w-full max-w-md md:w-auto [&>button]:w-full md:[&>button]:w-auto">
+              <PrimaryCta onClick={start} icon={<Play className="h-5 w-5" />} testId="program-start">{START_TODAY}</PrimaryCta>
+            </div>
+          )}
           {nextLocked && <p className={`${lineSize(FREE_WEEK_LINE)} text-fel-gold`}>{FREE_WEEK_LINE}</p>}
 
           {pos.pendingCheckpoint && (
@@ -322,8 +329,6 @@ export function ProgramBuilder({ initialQuestion = '' }: { initialQuestion?: str
           the page, the player sat inside the page's own stacking context, UNDER the tab bar and the status rail: its one
           button (Start now / Set done) and its close and pause could not be tapped (measured on the rig: the tab bar's
           icon was the element on top of the button). */}
-      {/* EVERY-SCREEN P4: room under the last line for the docked Start (fixed on a phone), so nothing ends under it */}
-      {canStart && <div aria-hidden data-dock-spacer className="h-24 md:hidden" />}
       {playing && <Layer><SessionPlayer session={playing.session} mode="device" onFinish={finish} onClose={() => setPlaying(null)} /></Layer>}
     </div>
   );

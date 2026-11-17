@@ -21,13 +21,16 @@ export type MeterHeight = keyof typeof METER_HEIGHT;
 const pc = (f: number) => `${Math.round(clamp01(f) * 10000) / 100}%`;
 
 export function HudMeter({
-  label, labelTone, labelAlpha, status, statusTone = 'text', layout = 'stack', value, max = 100, tone = 'you', fillAlpha = 1,
+  label, labelTone, labelAlpha, labelSize = 'caption', status, statusTone = 'text', layout = 'stack', value, max = 100, tone = 'you', fillAlpha = 1,
   fillStyle, height = 'bar', width = '7rem', segments, ticks, markers, framed = false, glow = false, round = true, className = '',
   title, children,
 }: {
   label?: ReactNode;
   labelTone?: HudTone;
   labelAlpha?: number;
+  /** GAME-HUD (2026-11-12): the label's step. `caption` as before; a host passes `hudLineStep(label, 'caption')` for a
+   *  label that is a line (SPEED 4.2 m/s, SLINGSHOT READY — L1), which then reads at the HUD's 14 px line floor. */
+  labelSize?: HudSize;
   /** A short state read after the label (READY, SLAM READY, LAND IT). */
   status?: ReactNode;
   statusTone?: HudTone;
@@ -59,7 +62,7 @@ export function HudMeter({
   const h = METER_HEIGHT[height];
   const radius = round ? (h <= 10 ? 999 : 6) : 2;
   const labelEl = label != null && label !== '' && (
-    <span style={{ ...hudType('caption'), color: labelTone ? hudColor(labelTone, labelAlpha ?? 1) : hudColor('text', labelAlpha ?? HUD_TEXT_ALPHA.muted) }}>{label}</span>
+    <span style={{ ...hudType(labelSize), color: labelTone ? hudColor(labelTone, labelAlpha ?? 1) : hudColor('text', labelAlpha ?? HUD_TEXT_ALPHA.muted) }}>{label}</span>
   );
   const statusEl = status != null && status !== '' && (
     <span style={{ ...hudType('caption'), fontWeight: 800, color: hudColor(statusTone) }}>{status}</span>

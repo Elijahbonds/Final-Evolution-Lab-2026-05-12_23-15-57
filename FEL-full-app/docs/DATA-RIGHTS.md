@@ -22,10 +22,12 @@ export and the erase follow that classification.
   and the client's filmed-set form reviews (#438) too: camera movement numbers, which is what that panel promises.
   The coach's readiness alerts cascade with the checks, as the feature's own delete does. The health-only erase does
   not touch them.
-- **Account erase.** No in-app route (Privacy §4 still says "by email"; no policy copy was changed). The owner runs
-  `npx tsx scripts/erase-account.ts --user <id> --email <account email>` (dry run, counts only), then the same with
-  `--commit`. One transaction: rows that stay are scrubbed first, then the person's own rows are deleted, then the
-  `User` row becomes a tombstone, and a CreditLedger event row records the counts.
+- **Account erase.** In the app since lane/account-delete (section 5): Account settings → **Delete my account**. The
+  owner can still run `npx tsx scripts/erase-account.ts --user <id> --email <account email>` (dry run, counts only),
+  then the same with `--commit`. Both call ONE function, `lib/data-rights/accountDelete.ts` eraseAccountNow. One
+  transaction: the account row locked, rows that stay are scrubbed first, then the person's own rows are deleted, then
+  the `User` row becomes a tombstone, and a CreditLedger event row records the counts once (Privacy §4 still says "by
+  email": the wording change is `docs/DRAFT-policy-account-deletion.md`, for the owner).
 - **Bug fixed (measured):** `/api/prq/delete` recorded its event with `postLc(amount: 0)` after the erase had
   committed. The double-entry mirror refuses a zero posting after the CreditLedger row is written, so every real PRQ
   delete erased, left the row and answered 500. It now writes the event row only.
@@ -62,8 +64,8 @@ export and the erase follow that classification.
    CompetitionMatch/MatchEvent, MpMatch winners (names scrubbed), CrmNote authorship, programs a coach wrote for clients.
 9. **Deleted that others could see**: the person's ChallengeLinks (closes `/c/<code>`), squads they own (an owner
    cannot leave, only delete), their coach testimonials and applications, a coach's readiness alerts about them.
-10. **Signed-in sessions** survive an erase until the token expires (JWT); `lib/auth.ts` refreshes the role, not the
-    account. A follow-up there could end a session whose email is `erased-*@erased.invalid`. Not touched here.
+10. **Signed-in sessions** end with the erase (lane/account-delete, owner decision 3): `lib/auth.ts`'s jwt callback
+    reads the account with the role and empties a placeholder's token (section 5).
 11. **Tables keyed by email only** (CreatorInquiry, an unconverted MarketingLead, BookEntitlement.email) are not matched
     by the account email, because it is not verified and matching on it could hand over or delete a stranger's rows.
     The owner handles those by hand on an email request.
@@ -178,3 +180,53 @@ handles: CampTemplate, CrmActivity, CrmDeal, CrmNote, LibraryExercise).
 | Wallet | schema | — → added | — | playerId: keep |
 | WorkoutPlan | schema | — → added | — | userId: delete |
 | WorkoutScan | schema | yes → yes (movementHistory) | PRQ (+scan-history: some kinds) | userId: delete |
+
+## 5. In-app "Delete my account" (lane/account-delete, owner decisions 2026-10-25)
+
+Owner decisions: (1) the erase above is approved, placeholder `User` row included; (2) add an in-app "Delete my
+account" with a confirm step; (3) sign out everywhere immediately when an account is erased.
+
+| Piece | File |
+|---|---|
+| The one erase both callers use: row lock, registry erase, event once (fixed dedupe key `account-erase`), audit log of counts and source | `lib/data-rights/accountDelete.ts` |
+| Who may delete in the app, and what to settle first | `lib/data-rights/deleteGate.ts` |
+| The words, each "kept" line tied to the policy line it repeats | `lib/data-rights/deleteCopy.ts` |
+| 5 tries per account per 15 min, in `rate_limits`, per-instance window when that table is missing | `lib/data-rights/deleteRateLimit.ts` |
+| GET (blocked? why) / POST (the delete) | `app/api/account/delete/route.ts` |
+| The panel in account settings | `components/account/delete-account.tsx` |
+| Sessions of an erased account end | `lib/auth/accountStatus.ts`, `lib/auth.ts` |
+| The privacy-policy change, DRAFT, for the owner | `docs/DRAFT-policy-account-deletion.md` |
+
+**The flow.** Signed in → rate limit (counted before the password is looked at) → the confirm box (`confirm: true`) →
+already erased? 200 again, nothing new (a retry after a dropped answer) → re-authentication: the typed email is the
+account's AND the password is right (one 403 for both) → not blocked → `eraseAccountNow(…, 'in-app')` → the session
+cookie cleared, the client signs out.
+
+**Sign out everywhere.** Sessions are NextAuth JWTs (`session.strategy: 'jwt'`); the Prisma adapter never writes a
+Session row for them, so there is no row to delete. Every `getServerSession` runs the `jwt` callback, which already
+read the `User` row every 5 minutes for the role. That read now selects the email too; a placeholder
+(`erased-<id>@erased.invalid`, `lib/data-rights/tombstone.ts`) or a missing row gets an empty token, and the `session`
+callback makes that no session (getServerSession → null, `/api/auth/session` → `{}`), so every route and page treats
+it as signed out. To be quick rather than 5-minutes-late, the read also runs when this server instance has not seen the
+account alive in the last 30 s (`ACCOUNT_STATUS_TTL_MS`, new): at most one small primary-key read per account per
+instance per 30 s, none for an account read in the last 30 s, none for an account known erased. Immediate on the
+instance that ran the erase (it marks it) and in the deleting browser (cookie cleared); within 30 s on the others.
+A database error keeps the session (fail open, as the role refresh always did). The placeholder never signs in: its
+password is `''` and `authorize()` refuses a placeholder email outright.
+
+**Minors (owner call).** Under 18 by birth year, or no birth year (the consent rule, `needsGuardian`: blank reads as
+under 18), is BLOCKED in the app with "ask your parent or guardian to email us" (no birth year: also "if you're 18 or
+over, email us from the address on this account"). Why: a guardian has no account here, so there is no in-app place
+for one to act, and nothing in the repo says whether a minor may delete their own account. Alternatives for the owner:
+let a minor delete their own (deleting is privacy-protective), or a guardian delete on the signed guardian link.
+
+**Obligations (chosen: block, with the list).** A booking as coach or client that is paid and not yet delivered or
+attended, held at checkout, refund due or disputed; a payout PENDING/PROCESSING; an FEL subscription that will renew
+(ACTIVE/PAST_DUE/INCOMPLETE, not cancel-at-period-end); a coach-business monthly plan sold or bought (CoachSale
+ACTIVE) or a checkout still open. Not handled automatically: cancelling Stripe subscriptions, refunding or moving
+payouts from inside an erase is outward-facing money work with its own webhook paths, and half-doing it in a database
+transaction is how money gets lost. Each item is something the person can settle and then retry. A one-off PAID
+coach-business package is not counted (nothing records when its sessions are used up); say if it should be.
+
+**The audit event** is the CreditLedger row (amount 0, reason = counts + source, on the placeholder's id, which names
+nobody after the erase) and one log line of counts and source, never the id.

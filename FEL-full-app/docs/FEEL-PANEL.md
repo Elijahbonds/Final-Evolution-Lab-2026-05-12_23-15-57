@@ -601,3 +601,288 @@ GAMEPLAY-CLEAN-AUDIT section 4i.
 - `anim.celebrateEase` 1: the arms-up celebration after a made shot or a dunk (`dunk_mc_celebrate_big`) turns the upper arms at most
   about 20 degrees a frame; its capture swung them 28 to 32 degrees a frame as the elbows came out (headless: 29.5 / 31.5 to 15.9 /
   16.2 degrees). The clip is re-keyed when it is built; the file is not edited. Feel-check: 1v1, make a shot.
+
+## hoops-p06, 2026-11-12 (1v1 / 3v3 phase 6 "flow and pace"; the owner has not felt these yet)
+
+Group "Hoops · flow and pace". Each is NEW; 0 restores the old behaviour exactly (tests pin both). Measurements: HOOPS-GOAL-GAP §3i.
+- `hoops.boardBounceOn` 1 (`hoops/rebound.ts`): the board RACE the modes fall back on (a swat at the rim, a block at the release, a
+  rattled-out dunk, and a live board nobody came down with in 4 s) has no die any more. It goes to the body nearest the spot where the
+  ball next comes down to `hoops.boardTakeYM` (2.4 m), less the seal (the mode's own 1.6 m) and `hoops.boardJumpEdgeM` (0.5 m) for a
+  jump that is still up. A dead heat goes to the defence. 0 = distance plus a 2.6 m random term, as before. Most boards were already
+  physical (the live board) and do not change. Feel-check: 1v1, get a shot swatted, then box out a miss.
+- `hoops.replayCapSec` 2.5 s (`court/hoopsMoments.ts`): a big-play replay (a dunk, a block, an ankle-breaker) holds the game at most this
+  long on screen, cut to the window around the moment (60 % before it, 40 % after). Before it was 2.4–5 recorded seconds at half speed:
+  4.8–10 s before the next possession. 0 = the old length. Feel-check: dunk on him; the replay should be short and on the moment.
+- `hoops.rivalSizeUpSec` 4 s (`hoops/rivalOffense.ts`): after the check the 1v1 rival works you beyond the arc (a walk to the top, a slow
+  weave, a probe move about every second — the kit's moves at a third of their push) for this long (× ROOKIE 0.75 / PRO 1 / ELITE 1.15,
+  ± 25 %) before he attacks. A probe that beats you ends it at once; a reach that misses is punished as often as his tier reads
+  (ROOKIE 15 %, PRO 55 %, ELITE 90 %); the 6 s shot clock counts only the attack after it. 0 = he attacks off the check, as before.
+  Feel-check: 1v1 PRO on defence: does he size you up, and does reaching at the top cost you?
+- `hoops.teamSizeUpSec` 1.5 s (`hoops/teamOffense3v3.ts`): the 3v3 rivals' FIRST touch of a possession (not a swing's catch) probes
+  this much longer at the top (× the tier's probe share), with one more probe move. Flag: the same lever as `hoops.rivalProbeSec`, on
+  the first touch only. 0 = the probe as before.
+- `hoops.handChangeCatchLeadSec` 0.45 s (`anim/ballCarry.ts`; `anim/handlePaths.ts` pathAt's `catchLeadSec`): on a dribble HAND CHANGE (the
+  carry's own crossing, not a stick or AI move) the hand that will catch the ball starts to come and meet it this long before the catch.
+  It used to be the schedule's 0.06 s: the arm swung 100–140° in four frames at the move limit (a hard pop on both arm bones). Headless,
+  the hero with the carry, 64 hand changes: hard events within half a second of a change 56 → 35; the catching palm on the catch frame
+  unchanged (median 0.20 m both). 0.06 = as before. Feel-check: 1v1, dribble at a stand and switch hands with the stick.
+- Phase 7 (bodies that touch) adds no knob: both its gates already read true on the release (0 overlap frames in nine rig runs; defensive
+  clip changes ≤ 2.5 a second, the 1v1 hero 0.6 with the size-up on). The 3v3 pair loop now reads the one standoff (`BODY_STANDOFF / 2`,
+  the same 0.55 m it typed). HOOPS-GOAL-GAP §3i.
+- `hoops.guardHandRestGapSec` 1.5 s (`modes/hoopsFlow.ts`; the play audit's sinker 1, HOOPS-AAA-GAP-PLAY): standing guarded (under 0.6 m/s),
+  the automatic outside hand crosses the ball at most once in 1.5 s; it crossed about once a second, and every crossing is a hand change
+  (the audit: 14 of 21 hard pops in a 22 s idle 1v1 run). On the move it is the rule as before (`hoops.aiHandDwellSec` 0.35, `hoops.aiHandGapSec`
+  0.9, unchanged). Its crossing also takes `hoops.handChangeCatchLeadSec` (headless, that path: 56 → 35 hard events in 64 changes, as the
+  carry's own). 0 = as before. Feel-check: 1v1, stand dribbling with him shading you; the ball should not ping-pong.
+
+### hoops-p08 — clean screen (2026-11-12)
+
+Group "Hoops · screen". Each is NEW; its off value restores the old behaviour exactly (tests pin both: `lib/babylon/ui/hudHints.test.ts`).
+The audit is `docs/HOOPS-AAA-GAP-SHOW.md` (sinkers 2 and 4); the before / after counts are in the lane's report.
+- `hud.mcSubsWithVoice` 0 (`ui/micSubtitles.ts`): a line the court's MC is saying out loud (ModeMic marks `micVoiced` when the line's audio
+  starts) shows no subtitle box; the player can turn subtitles on with the new CC chip beside MC (kept on the device), and a line with
+  no audio (the voice off, no bank, no Web Audio) always shows its words. Screen readers are unchanged (they read `mic` from the caption
+  bus). 1 = every line subtitled, as before. Feel-check: 1v1 on a phone; the MC talks and nothing covers the player.
+- `hud.hintPlays` 3 (`ui/hudHints.ts`): the one-line control hint in 1v1 and 3v3 shows for the first three plays of a mode in a session
+  (a play ends at a score on either side, a shot or dunk that starts, the next ball, the next dunk), then stops. "GET OUT OF THE PAINT"
+  is a rule warning and always shows. On a touch screen the hint never names a pad button or a key: a button the touch deck has is
+  named by the deck's own word (SQUARE (L) → SHOOT), and any part that still names a pad or a key is dropped. 0 = always, as before.
+- `venue.halfCourtCrowdCards` 0 (`nexus/veniceBoardwalk.ts`): the boardwalk row's twelve flat cut-out figures stand behind the dunk's
+  rim only (the dunk and the duel). 1v1, 3v3 and 3-Point stand on the same Venice and had them right behind their rim; they no
+  longer load the file. 1 = on every Venice court, as before.
+
+### hoops-p08 — phone budget (2026-11-12)
+
+Group "Hoops · phone budget". Each is NEW; its "as before" value restores the old build exactly. What they cut was found with the lane's
+census probe (`scripts/probes/hoops-p08/scene-census.mts`: the phone's worst frame, mesh by mesh); `scripts/hoops-phone-budget-tests.ts`
+holds the result in CI. Phone tier only unless said.
+- `perf.phoneInkTrim` 1 (`scene/phoneCasters.ts`): the ink contour (AnimeInk: two extra draws a part) skips the eyes, the shoe soles, the
+  socks and the accessories — each inside a bigger part's outline. The body, hair, top, shorts and shoes keep their line. 0 = every part.
+- `perf.phoneSockCast` 0 (`scene/phoneCasters.ts`): the sock stays out of the 512² shadow map (its shadow is inside the leg's). 1 = it casts.
+- `perf.phoneFarPropTex` 512 (`scene/phoneTextureCap.ts`): in 1v1, 3v3 and 3-Point the parked bus and sedan (30–60 m off) and the ball
+  (24 cm) upload their maps at 512² (37 MB → 9 MB). The dunk parks the bus on its corner as a wall-run prop and keeps 1024². 1024 = as before.
+- `perf.propMergeOn` 1 (`visual/VenueProps.ts`, every tier): a prop model's parts that share a material are one thin-instanced mesh (the
+  far pier: fifteen parts in two materials → two; the Venice dunk set: 35 masters → 22). Same geometry, same placements. 0 = one per part.
+- `perf.sharedGroundOn` 1 (`nexus/veniceBoardwalk.ts`, every tier): the boardwalk's tiled grounds wear the kind's one painted tile (the
+  tiling is in the UVs: the same repeat) instead of a copy each, and the two sand planes share one grain and one mottle; so the four
+  aprons, the two sands, the two seas, the two surf strips, the posts and the flags are one mesh each. A plane's tint rides in its vertex
+  colours (the PBR shader multiplies albedo colour, texture and vertex colour the same way), so the aprons, the walk and the plaza (one
+  concrete, three tints) are ONE mesh too. (The sands share only when both planes are
+  long enough for the shared repeat to be the same picture; measured on 3v3 and 3-Point, the north strip keeps its own.) 0 = a texture copy, a material and a draw per plane.
+- `perf.phoneRailBodies` 2 (`nexus/veniceBoardwalk.ts`): a phone's Venice rail keeps two of its five onlookers (the two ends).
+  Half-court modes only (1v1, 3v3, 3-Point); the dunk and the duel keep their rail. FLAG: this one is visible — three fewer
+  people at the side of the court on a phone (the 3v3's texture memory reaches its row only with it). 5 = all five.
+
+## hoops-perf, 2026-11-12 (owner: "join each body into one mesh", "cut heap churn"; no feel number changes)
+
+Group "Hoops · phone budget". NEW; its off value restores the old build exactly.
+- `perf.bodyMergeOn` 1 (`core/bodyMerge.ts`, mounted by `core/CharacterLibrary.ts` for every spawned body, every mode; 1 = the phone
+  tier, 2 = every tier):
+  once a body has held still for 12 frames, its skinned parts that the renderer treats alike (same skeleton, shadow maps, lights,
+  vertex attributes, morph target names, culling, render group, side, visibility) are drawn by ONE mesh with one sub-mesh per part.
+  The parts are not changed or disposed: they are only taken out of the camera pass and the render-target lists while the merged
+  mesh draws for them. It swaps in only when every sub-mesh compiled to the same shader its part draws with; opaque and
+  alpha-tested sub-meshes keep their part's place in the draw order, and the ink line is set per part. Any change to a part
+  (a kit swap, a tint, the body mask, a creator shape, a fade) puts the parts back that frame. Draws are the same; active meshes
+  drop (a court body: nine or ten parts become three or four). Phone by default: the phone's frame measured identical (0 px on every
+  look and court checked); desktop's cascaded shadow showed small differences on two looks (football kit body 181 px, max step 21; a
+  tall Creator frame 12 px, max 4). Kit PACK garments keep their own mesh. 0 = one mesh per part.
+
+## hoops-p09, 2026-11-12 (1v1 / 3v3 phase 9 "one rulebook"; the play audit's sinkers 2 to 6 and 10; the owner has not felt these yet)
+
+Group "Hoops · one rulebook". Each is NEW, and its OFF value restores the old behaviour exactly (`lib/babylon/hoops/rulebook.test.ts`
+pins both). Measured with `scripts/probes/hoops-p09/rulebook-measure.mts` (before = every knob off).
+- `hoops.skillShotOn` 1 (`hoops/rulebook.ts`, `core/SharedShot.ts`): **the release decides the shot.** Inside the green it goes in, outside
+  it misses; how far outside says how (a rim-out just past the edge, a brick far off; early short, late long). The contest AT THE RELEASE
+  and the distance only narrow the green; tiredness and a cold run narrow it a little, a hot run and called glass widen it a little. No
+  draw. 0 = the grade sets a rate (perfect 0.97, good 0.80, early 0.35, late 0.30) and the ring draws, as before.
+- `hoops.jumpGreenScale` **ships at 1 (today's width)** (coordinator 2026-11-12: the rule alone removes the luck without costing a decent
+  player points before the owner has felt a narrower green). **The proposal for the shooting session is 0.62**: the jumper and fadeaway
+  green at this share of the old width (an open jumper's green 117 → 72 ms at 4.5 m, 104 → 65 ms from three). Session: start at 1.0 and
+  narrow toward 0.62 (0.8 in between: a decent thumb 25.7 points over the 20 shots). Measured: at 1.0 a decent thumb (45 ms) scores the
+  same over a game's 20 shots as before (29.5 → 29.5 points) while a masher falls 18 → 6; at 0.62 the decent thumb falls to 22 and a
+  sharp one (12 ms) rises 39 → 46.
+- `hoops.freeFinishContest` 0.3: a layup or other finish contested less than this goes in however it was timed. 0 = every finish needs the green.
+- `hoops.finishContestNarrow` 0.5: with the release deciding, a contested finish's green is narrowed by this share at a full contest (the
+  layup bars are floored, so a body on you barely narrowed them; the old contest bite on the rate did that job). 0 = no extra narrowing.
+- `hoops.aiSharedShotOn` 1: the 1v1 rival, the 3v3 rivals and your 3v3 teammates release on YOUR meter (their style, contest and
+  distance), graded and decided by the same rule. What differs is their hand: a timing error drawn from a spread per level,
+  `hoops.aiTimingRookieMs` 100 / `hoops.aiTimingProMs` 71 / `hoops.aiTimingEliteMs` 52 / `hoops.aiTimingMateMs` 71 ms; a rival behind and
+  forcing it spreads wider, one protecting a lead a little tighter (core/Nerve). The lob and the putback stay dunk rates. 0 = their own
+  tables (rivalShotPct, rivalReleasePct, matePct), as before. Measured at the shipped width (the rival sim, human-like defender): the 1v1
+  rival's jumpers ROOKIE 7 → 17 %, PRO 7 → 24 %, ELITE 6 → 31 %; his layups 53 / 54 / 55 → 35 / 42 / 56 %; the 3v3 rivals' points a shot
+  0.41 / 0.54 / 0.67 → 0.38 / 0.56 / 0.76. The spreads were picked against the green: the same rates as 62 / 44 / 32 give at the proposed
+  0.62, so if the session narrows the green, tighten these by the same share (× the new scale) or the rivals get worse.
+- `hoops.moveReadOn` 1 (`hoops/rulebook.ts readTheMan`; HandleSystem, TripleThreat's jab, the pump fake, the pass fake, off the head): a
+  move or a fake beats the man only when he is off balance (in his jump or his reach), coming at you faster than `hoops.moveCommitMps`
+  1.4 m/s, or moving across you the wrong way faster than `hoops.moveLeanMps` 0.6 m/s (the modes' own "closing" and "set" lines). Against
+  a set man the move keeps the ball safe and nothing more. The jab bites only the first two of a possession; the pass fake moves a man
+  standing at least `hoops.passFakeLaneCos` 0.6 square in the lane; off the head comes off clean when its odds are 0.5 or better. No roll.
+  0 = the odds and the roll, as before.
+- `hoops.gatherCloseoutOn` 1 (`DefenderBrain.closeOnGather`): once his tier's reaction (420 / 220 / 120 ms) has passed inside your jump-shot
+  meter, the man on you steps up to `hoops.gatherCloseoutM` 0.8 m. The pull-up three for a decent thumb: 1.7 → 0.6 to 0.7 points a shot at
+  PRO and ELITE. Its answers: the pump fake (he is flying at you, so he bites) and a move into his closeout. 0 = he holds his spot.
+- `hoops.pressFloorOn` 1: a showtime flush or a trick dunk pressed at the wrong moment pays at least what not pressing pays (showtime
+  early 42 → 70 %, late 50 → 70 %; a mistimed trick pays the plain dunk). 0 = the old table.
+
+## hoops-sound, 2026-11-12 (phase 11a "the sound of the court", part one; the owner has not heard these yet)
+
+Group "Hoops · sound". Each is NEW, and its OFF value restores today's sound exactly. With all three switches off (`sampleSfxOn`,
+`dribbleSoundOn`, `passCatchSoundOn` at 0) the game asks for and plays exactly the cues it did before, as synths, and fetches nothing.
+The sounds are CC0 recordings (`public/audio/hoops/CREDITS.md`). Tests: `lib/babylon/audio/samples.test.ts`, `dribbleSound.test.ts`,
+`SoundKit.samples.test.ts`.
+- `hoops.sampleSfxOn` 1 (`audio/samples.ts`): in 1v1, 3v3 and the 3-point contest, recordings stand in for the synth swish (a nylon
+  rustle: no CC0 net recording was found), rim rattle, squeak and cheer, the crowd bed (a 14 s murmur loop) and the two new cues
+  (dribble, catch). They load after READY, about 250 KB. Until a cue's files are in, or if they fail, the cue plays its synth. Every
+  recording goes through the same SFX or crowd bus, ducking, limiter, mute and phone/TV/headphones preset as the synths. 0 = synth only,
+  nothing fetched. Still synth either way: the groan, whistle, score chime, whoosh, impacts, the body thud and the backboard.
+- `hoops.dribbleSoundOn` 1 (`audio/dribbleSound.ts`, a watcher on the ball installed by `anim/ballCarry.ts`): the ball is heard each
+  time it meets the floor, whoever moved it: every hoops handler's dribble (yours, the 1v1 rival, all six 3v3 bodies, the handle moves),
+  the last bounce into a gather, a bounce pass, a rebound. Once per contact (one detector per ball; it re-arms only after the ball has
+  risen 0.2 m). 0 = silent, as before.
+- `hoops.dribbleSoundVol` 0.6: your dribble's level at a full-speed bounce (5 m/s, the hoops dribble at 2 bounces a second). A bounce
+  plays at its speed's share of that, from 0.3x to 1.25x.
+- `hoops.dribbleSoundAiK` 0.5: an AI handler's dribble as a share of yours (a ball no carry has, such as a rebound, plays at yours). Which carry is yours: the first hoops carry a mode mounts
+  (assumption, true of 1v1, 3v3 and 3-Point today; `BallCarryOpts.soundRole` names it explicitly when the mode files are next edited).
+- `hoops.passCatchSoundOn` 1 (`core/BallHandling.ts` PassFlight): a 3v3 pass is heard in the hands when it arrives. The throw still
+  plays the menu click (`ThreeVThreeMode.ts` uiTick): that line belongs to the mode file, owned by hoops-p08 now, and is listed for after
+  it. 0 = no catch sound, as before.
+- `hoops.passCatchVol` 0.7: the catch's level.
+Feel-check: 1v1, dribble in place and on the move; you should hear one bounce per dribble, louder on a hard crossover. 3v3, pass to a mate.
+Measured (2026-11-12, `scripts/probes/hoops-sound/`: the real hoops screens on the show rig's site, phone profile, seed 7, SwiftShader):
+- Dribble: 1v1, 12 game s: 15 floor contacts of the ball (read off its height alone), 15 bounce sounds, each on its contact's frame (14
+  same frame, 1 a frame early), no extra sound, no double. 3v3, 12 game s: 18 contacts, 18 sounds, all on the frame, no double. By whose:
+  1v1 player 2 / AI 12 / loose 1; 3v3 player 11 / AI 5 / loose 2.
+- Loading: no hoops file is fetched before READY (the harness's own `#<mode>-ready` marker); all 24 (251 KB) arrive 0.03–0.18 s after it
+  on this box, and the crowd bed switches to the recording.
+- Levels (`loudness.mts`, rendered offline through SoundKit's own graph, the loudest 50 ms at the limiter): each recording within 2 dB of
+  the synth it replaces (swish -48.7 / -48.0, rim -33.8 / -33.9, cheer about -35, bed -46); squeak -39 (its synth -71); bounce -38.5;
+  catch -40. Chromium decodes the bed to exactly 14.000 s, so the loop is seamless.
+
+## hoops-builder, 2026-11-12 (the hoops ratings; owner: "5 ratings … that really change how you play, within limits"; the owner has not felt these yet)
+
+Group "Hoops · ratings" (`lib/babylon/hoops/ratings.ts`). A rating runs 40 to 90. Each band below is the change AT 90; at 40 the number
+moves the other way by a quarter of it; at 50 nothing moves, whatever the band. Every one is NEW, and 0 takes that rating out of play
+(`lib/babylon/hoops/ratings.test.ts` pins rating 50 = today and each edge). Casual runs only: a ranked, staked, arena, challenge, online or
+party run plays today's numbers (and so does an agent / probe run). **Phase B (2026-11-12) wires them into 1v1 and 3v3** through
+`lib/babylon/hoops/ratedPlay.ts`; the measured edges are `scripts/probes/hoops-builder/bands.mts`.
+- `hoops.ratingsOn` 1: the ratings change play. 0 = every athlete plays today's numbers, in every run.
+- `hoops.rateSpeedBand` 0.06: top speed (6.4 m/s → 6.78 at 90) and first-step acceleration ×1.06 at 90 (×0.985 at 40).
+- `hoops.rateHandleBand` 20: the handle the moves read, 50 → 70 at 90 (45 at 40): the combo window 0.44 → 0.54 s and a tighter dribble.
+  Moves stay unlocked for everyone (H2's `MOVES_UNLOCKED_GATE` is untouched).
+- `hoops.rateReadBand` 0.15: the "moving the wrong way" line a move needs (rulebook `hoops.moveLeanMps` 0.6 m/s) ×0.85 at 90 (0.51 m/s).
+- `hoops.rateGreenBand` 0.1: the jump-shot green ×1.10 at 90 (×0.975 at 40). The owner's 2026-10-20 rule: ratings widen the green in casual only.
+- `hoops.rateFinishBand` 0.15: the contest a defender puts on a layup or a dunk ×0.85 at 90.
+- `hoops.rateSlideBand` 0.06: the defensive slide ×1.06 at 90.
+- `hoops.rateStealReachBand` 0.05: the hero's poke range (1v1 `STEAL_RANGE` and the 3v3 poke, both 1.6 m) ×1.05 at 90 (1.68 m).
+- `hoops.rateBlockReachM` 0.04: block reach +0.04 m at 90.
+- `hoops.heightReachMPerIn` 0.015: playing height, 6'0" to 6'8": the hero's block reach and his release height against a block +1.5 cm an
+  inch over 6'4" (6'8" +6 cm, 6'0" −6 cm).
+- `hoops.heightLookPerIn` 0.01 (phase B; owner 2026-11-12 "the body on screen follows the playing height"): the hero is DRAWN 1 % taller an
+  inch over 6'4" (6'0" 96 %, 6'8" 104 %, the cosmetic clamp). Drawing only: while he is drawn scaled the modes read the ball on his hand on
+  the standard frame (playFramePoint), so the size changes no outcome. Casual runs only; 0 = the standard body.
+
+## move-feel, 2026-11-12 (the owner: "Find out why the movement still feels off?"; docs/MOVE-FEEL-DIAGNOSIS.md)
+
+**Owner, 2026-11-17: "Turn all six on now."** The six values of the list below are the shipped defaults since then, each still a knob whose
+off value restores the game before (TUNED, from → to): `hoops.camLeadEase` 0 → 1, `hoops.turnTrueArc` 0 → 1, `hoops.kickSec` 0 → 0.1 s,
+`hoops.cutSec` 0 → 0.08 s, `hoops.gearBlendBand` 0 → 0.2, `hoops.stickSprintFallback` 1 → 0. The three H3a switches moved on the 1v1 / 3v3
+ball handler only (`HANDLER_TURN_TRUE_ARC`, `HANDLER_KICK_SEC`, `HANDLER_CUT_SEC` in `GEARS_HANDLER`): the dunk approach (`GEARS_HOOPS`) keeps
+0, as it keeps the release stick for every phase-1 number (**assumption:** the owner's six are about 1v1 / 3v3, the modes measured).
+`RELEASE_STICK_PRESET` now carries all four movement ones at their old values, so one paste still puts the release stick back.
+
+The section as written on 2026-11-12, when they were off:
+
+Three NEW knobs, each **off by default (today's game exactly)**, each pinned in `lib/feel-panel/knobs.test.ts` and held by its own test:
+- `hoops.gearBlendBand` 0 (group "Hoops · movement"; `core/HoopsStick.ts` HOOPS_GEAR_BLEND_BAND, the 1v1 / 3v3 handler only): past the
+  stick's walk line (0.45) the jog starts at 85 % of its top, so a thumb on the line asks for 2.38 or 3.71 m/s (+56 %) a pixel apart. With
+  a band the jog's target eases up from the walk's edge over that much more stick; full tilt and every stick past line + band are
+  unchanged (`core/gearBand.test.ts`). Try 0.2.
+- `hoops.stickSprintFallback` 1 (`core/PlayerSlot.ts`): as shipped, until a trigger has ever reported (a phone whose TURBO pad has not been
+  touched, a keyboard before its first Shift) a stick past 0.85 IS the turbo: the same full push runs 6.2 m/s at the start of a game and
+  4.3 m/s once TURBO has been touched, and the fallback sprint empties the tank in 2.9 s and drops to a jog by itself. 0 = the turbo is the
+  button only (`core/PlayerSlot.sprintFallback.test.ts`). Try 0.
+- `hoops.camLeadEase` 0 (group "Camera · follow"; `core/CameraDirector.ts` HOOPS_CAM_LEAD_EASE, 1v1 and 3v3 only): the hoops modes never
+  took the eased look-ahead every other follow camera got in gameplay-clean P2 #10, so on a start, a stop, a cut or a turnaround the
+  point the camera looks at jumps in one frame. 1 = it eases over `camera.leadEaseSec` (0.2 s) and grows to full by `camera.leadFullMps`
+  (1 m/s) (`core/CameraDirector.hoopsLead.test.ts`). Try 1.
+
+**Try these values** (2026-11-12; now the defaults — paste them with 0s / 1 to feel the old game). The first three are #311's H3a
+switches that change no top speed, stop or distance — only how a change arrives:
+
+```json
+{ "hoops.turnTrueArc": 1, "hoops.kickSec": 0.1, "hoops.cutSec": 0.08,
+  "hoops.camLeadEase": 1, "hoops.gearBlendBand": 0.2, "hoops.stickSprintFallback": 0 }
+```
+
+Measured (`scripts/probes/move-feel/stick-feel.mts`, the real DribbleController at 60 fps; `PRESET=try` is the first three): a 90° cut at a
+jog turns 261 → 348 °/s over its first 100 ms and settles within 10° in 283 → 233 ms; at a sprint 203 → 275 °/s, 367 → 300 ms; the sprint
+cut's one-frame brake 71 → 17 m/s²; the turbo kick's one-frame push 68 → 23 m/s²; starts, stops and top speeds unchanged (jog 90 % 250 ms,
+stop 150 ms / 0.29 m, sprint stop 217 ms / 0.69 m). **assumption:** the bounds are safe, not tuned.
+
+## hoops-flow, 2026-11-12 (owner decisions: "3v3 is first to 21 on a 4-minute clock", "any press skips a replay")
+
+Group "Hoops · flow and pace". Both are the owner's own calls; each knob puts the old behaviour back exactly (tests pin both ends).
+- `hoops.threeGameSec` 240 s (`modes/threevthreeOvertime.ts` `THREE_GAME_SEC`; it was `ThreeVThreeMode.ts` `POSSESSION_SEC` 90): the 3v3
+  game clock. First to 21 still ends it outright; at the horn the leader wins; level at the horn is the sudden-death overtime as before
+  (`hoops.overtime3v3Sec`, 30 s). Read when the game starts. The clock chip reads m:ss from a minute up ('4:00'), seconds under it. The
+  MC's recorded 3v3 welcome names a ninety-second clock, so it is said only on a 90 s game until the lines are re-recorded. 90 = before.
+  Feel-check: play a full PRO 3v3: does a comeback have room, and does the game still feel tight at the end?
+- `hoops.replaySkipOn` 1 (`core/replaySkip.ts` `REPLAY_SKIP_ON`): during a hoops replay (1v1, 3v3, the 3-point money ball, the dunk
+  contest's and the duel's cuts) any press ends it at once and the next possession starts: a button, the d-pad, a trigger pulled, a
+  stick pushed out from rest (a dribble flick, the keyboard's dribble keys) or a tap on the court. The skipping press is the replay's:
+  not a shot, not a dribble move (the right stick and a trigger are held back until let go); the walking stick is passed on, so a held
+  stick moves you when the ball comes back. In the dunk contest A still hurries the judges and the d-pad still throws your
+  celebration. 0 = only a button or d-pad press skips (the dunk cuts: A or B, a tap or Space), as before. Feel-check: 1v1, break his
+  ankles, score, and flick the stick the moment the replay starts.
+
+
+### Hoops · gathers (lane/hoops-gather, owner 2026-11-12: "good escape moves, good gathers and pick ups"; `docs/HOOPS-GATHER-ESCAPE-PLAN.md`)
+
+All new numbers. Every switch ships OFF except `hoops.pickupReadOn`, turned ON with G2 (coordinator 2026-11-12, flagged); each switch's 0
+restores the old behaviour exactly.
+- `hoops.pickupReadOn` 1 (`anim/ballCarry.ts` `pickUp`, G1): on, a shot / finish / footwork pressed while the ball is low keeps the ball on
+  its own bounce while the dribbling hand goes down `hoops.pickupReachM` 0.3 m to meet it, and takes it where they meet; the last bounce runs
+  at most `hoops.pickupRateMax` 2× its pace so it never waits longer than `hoops.pickupWaitMaxSec` 0.2 s; a ball within
+  `hoops.pickupTopGapM` 0.1 m of the top is taken at once (as before). Off: the ball is taken on the press frame wherever it is and flown up to
+  the hand (measured: 57–94 cm off the palm when pressed near the floor). The meter and the body answer the press on its frame either way.
+  The take is the ball within `hoops.pickupContactM` 0.04 m of the palm as drawn (past its radius); a hand that did not get all the way
+  down gets the ball rising on to it for at most `hoops.pickupOverrunSec` 0.1 s more. When the shot wants the other hand, it comes to the
+  ball's far side for the meeting (both hands on it), then takes it.
+- `hoops.bufferFreshPressOn` 1 (`hoops/response/pressBuffer.ts` `BUFFER_FRESH_PRESS_ON`; FLAGGED, on by default): a shot press made while
+  the body is committed (a shot, a dunk, a spin) waits the move out and fires as it ends (hoops-p01); with this on only a press that went
+  down DURING the lock does. The press that started a shot is held through its own pump, so with it off (0, as before) the buffer replays
+  it the frame the pump ends: measured on every pump the gather probe made (1v1 and 3v3), the step-through started one frame after the
+  fake, the fake never showed, and the next squeeze became a double-tapped hop. On: the pump holds, and a squeeze inside its window
+  (`STEP_THROUGH_SEC` 1.0 s) is the step-through. Feel-check: pump, wait, step through; and tap Square during a spin: it still shoots
+  as the spin ends.
+- `hoops.pumpBallHandOn` 1 (`hoops/response/pumpHold.ts` `PUMP_BALL_HAND_ON`; FLAGGED, on by default): the pump fake keeps the ball in
+  the hands while its clip plays. The pump ends the shot, and the dribble used to restart on the very next frame from wherever the ball
+  was: measured, once the pump showed at all (`hoops.bufferFreshPressOn`), the ball left the hand 2 frames after the pump and fell
+  0.5-0.6 m loose through the pump clip before the step-through picked it up off the bounce. On: the dribble stays parked for the pump
+  clip's length (a pick-up still reading the bounce is taken at the pump), then comes back as before if nothing follows. Off (0): as
+  before. Feel-check: pump and wait: the ball stays at the chest through the fake; pump and step through: one carry, no drop.
+- `hoops.pickupRateFloorHz` 2 Hz (`anim/ballCarry.ts` `PICKUP_RATE_FLOOR_HZ`; FLAGGED, on by default; the default is `HOOPS_DRIBBLE.hzFast`):
+  the pick-up's harder last dribble (`hoops.pickupRateMax`) is counted from at least this rate. At a drive or a sprint the stride lock
+  slows the bounce to one a stride (measured 0.5-1.5 Hz on the press), so twice THAT could not meet a low ball inside the 0.2 s wait
+  and the pick-up fell back to the old take: on the 3v3 speed set 10 of 11 presses at 2.8 m/s or more were taken at once, a median
+  35 cm off the palm, 3 of them yanked up from below the knee. 0 = counted from the bounce's own rate (as at G2). Feel-check: sprint at
+  the rim and pull up off a low dribble: the hand meets the ball on its way up, no snatch.
+
+## move-feel-2, 2026-11-17 (owner: "stick right runs a straight line while held"; "redesign the phone stick")
+
+Two NEW knobs, **shipped ON** (assumption, flagged: the owner chose both; each knob's 0 restores the game before), pinned in
+`lib/feel-panel/knobs.test.ts`, each held by its own test:
+- `hoops.stickFrameHold` 1 (group "Hoops · movement"; `core/StickFrame.ts`, read in `OneVOneMode` camRel and `ThreeVThreeMode`'s wish): the
+  camera's flat axes are captured when the stick leaves centre (past 0.2) and held while it stays out; the stick home, or the camera more
+  than 75° from the held frame (a cut), takes the live camera again. Measured on the rig (a stick held still while the camera orbits the
+  rim): the run bent 36° over a 1 s sprint and 4.6° over a 0.7 s cut leg → 0° and 0° (3v3 cut leg 0°). The trade: by the time you let go,
+  "up" on the stick is the court direction it was when you pushed, up to the camera's turn since (18–35° a second held). 0 = the live camera
+  every frame.
+- `touch.floatStick` 1 (group "Hoops · movement"; `lib/babylon/ui/floatStick.ts`, TouchOverlay `FloatStick`; 1v1 and 3v3 only): a 172 × 136
+  zone where the fixed stick sat; the stick's centre appears under the thumb, its base 144 px (1.5× the old 96), full speed at its rim, a
+  10 % radial dead zone rescaled from 0. Measured (`scripts/probes/move-feel/phone-stick.mjs`, the real deck): thumb travel to full speed
+  48 → 70 px upright (7.9 → 11.5 mm, assumption 6.1 px a mm), 40.8 → 61.2 px sideways (6.7 → 10.0 mm); a thumb landing 20 px off the
+  stick's centre sent 0.42–0.49 (a jog) and now sends 0 (a standstill); a 30 px push sent full speed and now 0.35. No overlap with any other
+  control, inside the stage, in both orientations. "The same push always the same speed": with `hoops.stickSprintFallback` 0 and
+  `hoops.gearBlendBand` 0.2 (move-feel) the stick's scale has no hidden turbo and no step. 0 = the fixed 96 px stick.

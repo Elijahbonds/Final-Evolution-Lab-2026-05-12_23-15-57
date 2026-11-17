@@ -110,7 +110,8 @@ const squeeze = async (page: Page, phone: boolean) => {
     if (m === 'tiny' || m === 'hud-small') tiny++; else if (m === 'body-small') bodySmall++;
     if (m && samples.length < 8) samples.push({ rule: m, text: r.text.slice(0, 40), px: r.px, path: r.path.slice(-110) });
   }
-  return { clipped: [...new Set(clipped)].slice(0, 6), hs, tiny, bodySmall, samples, culprits: hs > 2 ? await page.evaluate('window.__readable.hScrollCulprits()').catch(() => []) as string[] : [] };
+  const covered = await page.evaluate('window.scrollTo(0, 0), window.__es.covered()').catch(() => []) as string[];
+  return { clipped: [...new Set(clipped)].slice(0, 6), hs, tiny, bodySmall, samples, covered, culprits: hs > 2 ? await page.evaluate('window.__readable.hScrollCulprits()').catch(() => []) as string[] : [] };
 };
 
 async function loadOnce(browser: Browser, state: ReturnType<typeof storageState>, url: string, inpage: string, routeHtml?: string) {
@@ -215,6 +216,7 @@ async function scoreUrl(browser: Browser, state: ReturnType<typeof storageState>
     textSizes: m.textSizes, buttonLooks: m.buttonLooks,
     hscroll: { phone: sq.phone?.hs ?? null, zoom200: sq.zoom200?.hs ?? null, font150: sq.font150?.hs ?? null },
     clipped: { phone: sq.phone?.clipped ?? [], zoom200: sq.zoom200?.clipped ?? [], font150: sq.font150?.clipped ?? [] } as Clip,
+    covered: { phone: sq.phone?.covered ?? [], font150: sq.font150?.covered ?? [] },
     tiny: sq.phone?.tiny ?? 0, bodySmall: sq.phone?.bodySmall ?? 0,
     fcpMs: m.fcp, cls: m.cls, tapMs, tapDidNothing, tapLabel,
     brokenLinks: broken, nowhereLinks: m.nowhere, pageErrors: L.errors,

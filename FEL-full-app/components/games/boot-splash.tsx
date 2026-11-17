@@ -16,6 +16,8 @@ import { chipInk, pickedChip } from './chip-ink';   // SCREEN-FIXES-2: a picked 
 import { MotionSetting } from '@/components/settings/motion-setting';
 import { PausedLayer } from './paused-layer';
 import { LearnWhileYouWait } from '@/components/learn/learn-while-you-wait';   // KNOWLEDGE-FEED v1: one card while the arena loads
+import { HoopsMatchupCard, isHoopsMatchupMode } from './hoops-matchup-card';
+import { HoopsPlayerLink } from './hoops-player-link';   // hoops-builder phase B: the way to /creator/hoops (1v1 / 3v3)   // hoops-p08: the hoops courts load behind the matchup
 import { useSoundtrackStage } from '@/components/soundtrack/soundtrack-stage';
 import { ControlsPanel } from './controls-panel';
 import { BodyPlayReady, BodyPlayReadyLine, BodyPlayLayer } from './body-play';
@@ -26,7 +28,11 @@ import { BASKETBALL_MODE_IDS, COURT_LOCATIONS, readCourtLocation, readyCourtLoca
 import { BALL_SKINS, readBallSkin, readyBallSkins, writeBallSkin, type BallSkinId } from '@/lib/babylon/nexus/ballSkins';
 import { readyVenues, readBoardVenue, writeBoardVenue, type BoardDiscipline } from '@/lib/babylon/nexus/boardVenues';
 import { readyWeathers, readWeather, writeWeather, readKartWeather, writeKartRain, WEATHER_FAMILY_OF, type WeatherPick } from '@/lib/babylon/nexus/weather';
-import { hudColor } from './tv-hud/tokens';   // the TV HUD palette: the kart's Rain chip lights in its `info` (sky) tone
+import { hudColor } from './tv-hud/tokens';
+import { MAX_SMALL_WORDS } from '@/lib/design/type';   // the TV HUD palette: the kart's Rain chip lights in its `info` (sky) tone
+
+/** Words in a goal line, as the type scale counts them (lib/design/type.ts lineSize). */
+const goalWords = (t: string) => t.split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
 import { readyMusicStages, readMusicStage, writeMusicStage, type MusicStageId } from '@/lib/babylon/music/musicStage';
 import { skinsFor, readBoardSkin, writeBoardSkin } from '@/lib/babylon/nexus/boardSkins';
 import { readyCourses, readCourse, writeCourse } from '@/lib/babylon/core/RaceCourse';
@@ -364,7 +370,9 @@ export function SplashCard(props: BootSplashProps) {
     // data-fel-fullbleed: in console view the HUD keeps to the title-safe frame, but this card's art is the whole screen
     // (app/game-surface.css). data-splash-column / data-splash-pickers: a sideways screen lays the card out in two
     // columns — title and START on the left, the pickers on the right — instead of one column taller than the screen.
-    <div data-fel-fullbleed className="absolute inset-0 z-40 overflow-hidden"
+    // data-splash-phase (GAME-HUD, 2026-11-12): game-surface.css lets the shell's ⋯ menu leave the HUD's corner as soon as the
+    // countdown starts (the tip-off is play: the score is up), not only once this card is gone
+    <div data-fel-fullbleed data-splash-phase={props.phase} className="absolute inset-0 z-40 overflow-hidden"
       // SHARED-START-UNSTICK: on READY the whole card is the start button. A press that misses the pill (a thumb on
       // the art, a click in the corner) used to do nothing, and a player reads a card that ignores them as a hang.
       // The pickers are buttons and keep their own clicks; everything else starts on pointer DOWN, so a hold starts too.
@@ -400,7 +408,11 @@ export function SplashCard(props: BootSplashProps) {
         <p className="text-[12px] font-black tracking-[0.4em]" style={{ color: v.tint }}>{v.sub}</p>
         <h1 className="text-4xl font-black tracking-wide text-white drop-shadow-lg">{props.title}</h1>
         {props.goal && (props.phase === 'ready' || props.phase === 'loading') && (
-          <p className="max-w-md text-[12px] font-bold tracking-[0.18em] text-white/85">{props.goal}</p>
+          // GAME-HUD (2026-11-12): a goal of more than 12 words is body copy (the owner's 2026-11-11 text-size rule, lineSize):
+          // 16 px upright, where the card has the room (Gate Crasher's "CLEAR 15 OF 30 GATES TO CRASH IT · …" read 12 px:
+          // the scorer's body-small on /play/snowboard). Sideways it keeps 12 px: there the left column is measured tight
+          // (game-surface.css 4b, controls-screen-2). Size only; a short goal is exactly as it was.
+          <p className={`max-w-md ${goalWords(props.goal) > MAX_SMALL_WORDS ? 'text-[16px] [[data-fel-console]_&]:text-[12px]' : 'text-[12px]'} font-bold tracking-[0.18em] text-white/85`}>{props.goal}</p>
         )}
         {(props.phase === 'ready' || props.phase === 'loading') && props.readyLead}
 
@@ -426,7 +438,10 @@ export function SplashCard(props: BootSplashProps) {
             <p className="mt-2 text-[12px] tracking-widest text-white/60">LOADING ARENA…</p>
           </div>
         )}
-        {props.phase === 'loading' && <LearnWhileYouWait compact className="mt-1 min-h-0 shrink overflow-y-auto overscroll-contain" />}
+        {/* hoops-p08: a hoops court loads behind the MATCHUP (the court, who you face, how it is won) instead of the knowledge card */}
+        {props.phase === 'loading' && (isHoopsMatchupMode(props.modeId)
+          ? <HoopsMatchupCard modeId={props.modeId} location={loc} tier={hasTiers ? tier : null} tint={v.tint} />
+          : <LearnWhileYouWait compact className="mt-1 min-h-0 shrink overflow-y-auto overscroll-contain" />)}
 
         {props.phase === 'ready' && (
           <button
@@ -825,6 +840,8 @@ export function SplashCard(props: BootSplashProps) {
 
         {/* 1v1 WIN BY 2 (owner 2026-10-06): a player option, off by default; it draws nothing on a staked / head-to-head run */}
         {props.modeId === 'onevone' && (props.phase === 'ready' || props.phase === 'loading') && <OneVOneWinBy2 />}
+        {/* hoops-builder phase B (owner 2026-11-12): your hoops player — a link in a casual run, "standard ratings" in a rating-free one */}
+        {(props.phase === 'ready' || props.phase === 'loading') && <HoopsPlayerLink modeId={props.modeId} />}
         {/* 3PT OPTIONS (IMPROVE 2026-10-06 #5 #6 #8): the shot input, and — never on a staked / head-to-head run — the practice rack
             and the money rack */}
         {props.modeId === 'threepoint' && (props.phase === 'ready' || props.phase === 'loading') && <ThreePointOptions />}

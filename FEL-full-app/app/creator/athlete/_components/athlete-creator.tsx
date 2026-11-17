@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
 import CreatorEditor from '@/components/creator/editor/creator-editor';
 import { bindPreview, bindFace } from '@/lib/creator/editor/previewBinding';
 import { clipForChoice } from '@/lib/creator/schema/animations';
@@ -217,6 +218,10 @@ export default function AthleteCreator({ axes, profileId, adult = false }: Props
             {violations ? `${violations} to fix` : 'VALID'}
           </p>
         </div>
+        {/* lane/hoops-builder (owner 2026-11-12): the same athlete's hoops position, height and ratings */}
+        <Link href="/creator/hoops" className="mt-2 inline-flex min-h-11 items-center rounded-lg px-3 font-mono text-[12px] uppercase tracking-wide text-[var(--fel-cyan)] hover:bg-white/5">
+          Hoops ratings →
+        </Link>
       </nav>
 
       <div className="flex min-w-0 flex-1 flex-col gap-2">

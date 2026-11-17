@@ -195,15 +195,20 @@ export function makeTimingHost(opts: TimingHostOpts) {
             one palette, the 10-foot type scale, the display face for numbers, framer-motion calls — in the same slots,
             from the same keys, gated exactly as before. */}
         <HudFrame>
-        {/* HUD bezel */}
-        <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-3 px-4 py-3">
+        {/* HUD bezel. GAME-HUD (2026-11-12): its spacing in px (the same 12 / 16 px as gap-3 px-4 at 100 %): the readouts
+            are px, so rem spacing was the one part of the row that grew with the phone's text size, and at 150 % text it
+            pushed the score 36-40 px off a 390 px phone (the every-screen scorer, /play/soccer: penalty's READY row). */}
+        <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-[12px] px-[16px] py-3">
           {/* M42 E20: render the mode's own round label as-is (RD/SHOT/KICK/PITCH) — no dup prefix */}
           <HudChip tone="you" size="value">{hnode(hud.round, '—')}</HudChip>
           {/* BREAKAWAY (owner brief 2026-09-18): the shot clock and the FLOW gauge (wall runs, rebounds, slides, a fast dribble) that sets the shot's power */}
           {typeof hud.clock === 'number' && clock > 0 && <HudChip tone={clock <= 3 ? 'danger' : 'text'} size="value">⏱ {hud.clock}s</HudChip>}
+          {/* GAME-HUD (2026-11-12): the FLOW bar 80 px (was 5rem). The HUD's type is in px, so a rem bar was the one thing in the
+              row that grew with the phone's text size: at 150 % text it was 120 px and pushed the score off a 390 px phone
+              (the every-screen scorer, /play/soccer: "0" and "PTS" cut off by 36-40 px). The same 80 px at 100 %. */}
           {typeof hud.flow === 'number' && flow >= 0 && (
             <HudPlate as="span" className="flex items-center px-[0.75em] py-[0.3em]">
-              <HudMeter layout="inline" label="FLOW" value={flow} max={100} tone={flow >= 70 ? 'score' : 'you'} fillAlpha={flow >= 70 ? 1 : 0.8} width="5rem"
+              <HudMeter layout="inline" label="FLOW" value={flow} max={100} tone={flow >= 70 ? 'score' : 'you'} fillAlpha={flow >= 70 ? 1 : 0.8} width="80px"
                 status={typeof hud.kinetic === 'string' && hud.kinetic ? hud.kinetic : undefined} statusTone="score" />
             </HudPlate>
           )}

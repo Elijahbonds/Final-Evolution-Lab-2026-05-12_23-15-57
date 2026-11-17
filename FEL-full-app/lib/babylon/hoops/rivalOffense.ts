@@ -94,7 +94,21 @@ export const RIVAL_ADAPT_K = 1;
 /** A defender closing this fast (m/s along the line to him) is biting: the hesitation reads him. Knob `hoops.rivalClosingMps`. */
 export const RIVAL_CLOSING_MPS = 1.6;
 
+/** hoops-p06 (phase 6 "flow and pace": the 1v1 rival possession median 2.4–2.7 s against the plan's 6–12 s band). THE SIZE-UP: after the
+ *  check he works his man at the top for this long (× the tier, ±25 %) before he goes — a walk to the arc, a slow weave and a probe move
+ *  every second or so (the kit's own, at a probe's size: not a commitment). A probe that beats his man, a jump at nothing or a post-up ends
+ *  it at once; the shot clock (SHOT_CLOCK_SEC) counts only the attack after it. Knob `hoops.rivalSizeUpSec`; 0 = straight from the check
+ *  into the attack, exactly as before. */
+export const RIVAL_SIZE_UP_SEC = 4.0;
+/** The tiers size up differently (ROOKIE is impatient, ELITE works you longer). */
+export const SIZE_UP_TIER: Readonly<Record<Tier, number>> = { rookie: 0.75, pro: 1, elite: 1.15 };
+/** Where he works (m from the rim: just beyond the arc), how fast he walks to it (m/s), and a probe's size against the attack's. */
+export const SIZE_UP_AT_M = 7.4, SIZE_UP_WALK_MPS = 1.2, SIZE_UP_FWD_K = 0.3, SIZE_UP_LAT_K = 0.6;
+/** The gap between his probes at the top (s, + up to 0.6 s). */
+export const SIZE_UP_PROBE_GAP_SEC = 0.9;
+
 export const rivalKitOn = (): boolean => feel('hoops.rivalKitOn', RIVAL_KIT_ON ? 1 : 0) >= 0.5;
+export const rivalSizeUpSec = (): number => feel('hoops.rivalSizeUpSec', RIVAL_SIZE_UP_SEC);
 const tightM = (): number => feel('hoops.rivalTightM', RIVAL_TIGHT_M);
 const hesiSec = (): number => feel('hoops.rivalHesiSec', RIVAL_HESI_SEC);
 const hesiGoMps = (): number => feel('hoops.rivalHesiGoMps', RIVAL_HESI_GO_MPS);
@@ -252,6 +266,8 @@ export class RivalKit implements AttackerDelegate {
   private swayPhase = 0; private beaten = false; private drove = 0; private droveSaid = false; private sagRead = false;
   private lastDef: { x: number; z: number } | null = null; private closing = 0;
   private stealArmed: KitMove | null = null;
+  // hoops-p06: the size-up (its length this possession, how long it has run, the next probe, and the time it took off the shot clock)
+  private sizing = false; private sizeUpFor = 0; private sizeT = 0; private nextProbeAt = 0; private sized = 0;
   constructor(readonly tier: Tier, private rng: () => number = Math.random) { this.profile = profileFor(tier); }
 
   reset(b: AttackerBrain): void {
@@ -260,6 +276,7 @@ export class RivalKit implements AttackerDelegate {
     this.move = null; this.moveT = 0; this.judge = null; this.pending = null; this.look = null; this.lastMove = null;
     this.gatherSec = 0; this.stepbackSec = 0; this.blowbySec = 0; this.postSec = 0; this.beaten = false; this.drove = 0; this.droveSaid = false;
     this.sagRead = false; this.lastDef = null; this.closing = 0; this.stealArmed = null;
+    this.sizing = false; this.sizeUpFor = 0; this.sizeT = 0; this.nextProbeAt = 0; this.sized = 0;
     this.swayPhase = this.rng() * Math.PI * 2;
     b.t = 0; b.phase = 'check'; b.containedSec = 0;
   }
@@ -268,6 +285,9 @@ export class RivalKit implements AttackerDelegate {
   blowBy(b: AttackerBrain): void {
     if (b.phase === 'gather' || b.phase === 'released' || b.phase === 'check' || b.phase === 'stepback' || b.phase === 'post') return;
     if (this.move === 'spin') return;   // a spin is committed: he is already going round
+    // hoops-p06: at the top, sizing up with the ball protected, a reach that misses is punished as his tier reads (core/Difficulty punishRate:
+    // ROOKIE 0.15, PRO 0.55, ELITE 0.9); otherwise he pulls it back and keeps working
+    if (this.sizing && this.rng() >= this.profile.punishRate) return;
     const wasContained = b.containedSec > 0.15;
     this.endMove(b);
     b.phase = 'blowby'; this.blowbySec = 0; this.beaten = wasContained;
@@ -277,6 +297,48 @@ export class RivalKit implements AttackerDelegate {
     this.lastMove = this.move ?? this.lastMove; this.move = null; this.moveT = 0;
   }
   private say(a: RivalAction): RivalAction { this.actions.push(a); return a; }
+
+  /** hoops-p06: one frame of THE SIZE-UP (RIVAL_SIZE_UP_SEC): to his spot beyond the arc at a walk, a slow weave with the ball protected,
+   *  and every second or so a probe — the kit's move at a probe's size, picked by the same read. */
+  private sizeUp(b: AttackerBrain, dt: number, self: Vector3, defender: Vector3, dist: number, dir: Vector3, perp: Vector3, inLane: boolean, lat: number): AttackDecision {
+    this.sizeT += dt; this.sized += dt;
+    let wish: Vector3; let exposure: number; let action: RivalAction | null = null; let crossover: 'left' | 'right' | null = null; let step = false;
+    let moveSide: 'left' | 'right' | null = null;
+    if (this.move) {
+      // a probe in progress: the kit's move at a probe's size (a jab of it, not the commitment)
+      this.moveT += dt;
+      const f = moveFrame(this.move, this.moveT);
+      wish = dir.scale(f.fwd * SIZE_UP_FWD_K).addInPlace(perp.scale(f.lat * SIZE_UP_LAT_K * this.moveSide));
+      exposure = f.exposure;
+      if (f.exposure >= 0.5) this.stealArmed = this.move;
+      b.phase = this.move === 'hesitation' ? 'hesi' : 'sidestep';
+      if (f.done) this.endMove(b);
+    } else {
+      // working at the top: to his spot beyond the arc at a walk, a slow weave, the ball protected
+      b.phase = 'drive';
+      const fwd = Math.max(-SIZE_UP_WALK_MPS, Math.min(SIZE_UP_WALK_MPS, (dist - SIZE_UP_AT_M) * 1.5));
+      const swayV = Math.cos(b.t * 1.8 + this.swayPhase) * 0.5 * 1.8;
+      wish = dir.scale(fwd).addInPlace(perp.scale(swayV));
+      exposure = Math.min(0.3, Math.abs(swayV) / EXPOSURE_LATERAL_SPEED);
+      if (this.sizeT >= this.nextProbeAt && this.sizeT < this.sizeUpFor - 0.3) {
+        const read: DefenderRead = { dist: Math.hypot(defender.x - self.x, defender.z - self.z), inLane, closing: this.closing, rimDist: dist };
+        const w = moveWeights(this.tier, read, this.memory, b.caution, this.lastMove);
+        w.post_up = 0; w.spin = 0;   // a post-up and a spin are attacks, never a probe
+        const m = pickWeighted(w, this.rng()) ?? 'shuffle';
+        this.move = m; this.moveT = 0; step = true;
+        this.moveSide = Math.abs(lat) < 0.12 ? (this.rng() < 0.5 ? -1 : 1) : lat > 0 ? -1 : 1;
+        moveSide = bodySide(dir, perp.scale(this.moveSide));
+        if (m === 'crossover') crossover = moveSide;
+        if (m !== 'shuffle') action = this.say(m);
+        this.nextProbeAt = this.sizeT + SIZE_UP_PROBE_GAP_SEC + 0.6 * this.rng();
+        const f = moveFrame(m, 0);
+        wish = dir.scale(f.fwd * SIZE_UP_FWD_K).addInPlace(perp.scale(f.lat * SIZE_UP_LAT_K * this.moveSide));
+        exposure = f.exposure;
+        b.phase = m === 'hesitation' ? 'hesi' : 'sidestep';
+      }
+    }
+    return decision(intoBody(wish, self, defender, 0), b.phase, { contained: inLane, exposure, step, crossover, action, moveSide });
+  }
 
   decide(b: AttackerBrain, dt: number, self: Vector3, defender: Vector3, hoop: Vector3, opts: { defenderAirborne: boolean }): AttackDecision {
     b.t += dt;
@@ -317,6 +379,9 @@ export class RivalKit implements AttackerDelegate {
     if (b.phase === 'check') {
       if (b.t < CHECK_HOLD_SEC) return decision(ZERO(), 'check', { contained: inLane });
       b.phase = 'drive';
+      // hoops-p06: the size-up starts here (no draw with the knob at 0: the release's sequence exactly)
+      const su = rivalSizeUpSec();
+      if (su > 0) { this.sizing = true; this.sizeT = 0; this.sizeUpFor = su * SIZE_UP_TIER[this.tier] * (0.75 + 0.5 * this.rng()); this.nextProbeAt = 0.4 + 0.5 * this.rng(); }
     }
     // the judge of the last move: it WORKED if his body left the lane while I went by (a beaten defender)
     if (this.judge) {
@@ -326,11 +391,15 @@ export class RivalKit implements AttackerDelegate {
         const m = this.judge.move; this.memory[m] = Math.max(-1, Math.min(1, this.memory[m] * 0.6 + (this.judge.won ? 0.6 : -0.3)));
         // (a move that clears him is a LAYUP line, as an open drive is: D1's dunk stays the blow-by's — a whiffed reach, a jump at nothing.
         //  Measured: a move's win as "beaten" doubled his dunks against a late defender, 88 → 173 in 300, the mix the odds sit on)
+        if (this.judge.won) this.sizing = false;   // hoops-p06: a probe that beat him is the attack, now
         this.judge = null;
       }
     }
     // the pump-fake read (a defender in the air with nothing to block): driven past — not out of a committed spin or the post
     if (opts.defenderAirborne && dDist < 2.2 && b.phase !== 'blowby' && b.phase !== 'post' && this.move !== 'spin') this.blowBy(b);
+    // hoops-p06: THE SIZE-UP at the top (see RIVAL_SIZE_UP_SEC). A blow-by (a jump at nothing, a whiffed reach) ends it.
+    if (this.sizing && (b.phase === 'blowby' || b.phase === 'post' || this.sizeT >= this.sizeUpFor)) this.sizing = false;
+    if (this.sizing) return this.sizeUp(b, dt, self, defender, dist, dir, perp, inLane, lat);
 
     let wish: Vector3; let exposure = 0; let step = false; let crossover: 'left' | 'right' | null = null; let action: RivalAction | null = null;
     let backToRim = false; let moveSide: 'left' | 'right' | null = null;
@@ -400,7 +469,7 @@ export class RivalKit implements AttackerDelegate {
     // THE FINISH. At the rim: a layup — a dunk on a beaten man (D1). Held in front (or the clock): the tier's finish mix.
     const moving = this.move === 'hesitation' || this.move === 'spin' || this.move === 'in_and_out' || this.move === 'behind';
     if (dist < LAYUP_RANGE && (!inLane || b.containedSec > 0.5)) { this.pending = this.beaten && !inLane ? 'dunk' : 'layup'; this.look = null; }
-    else if (!moving && (b.containedSec >= CONTAIN_PULLUP_SEC * Math.max(0.45, b.patience) || b.t >= SHOT_CLOCK_SEC)) {
+    else if (!moving && (b.containedSec >= CONTAIN_PULLUP_SEC * Math.max(0.45, b.patience) || b.t - this.sized >= SHOT_CLOCK_SEC)) {
       if (dist < LAYUP_RANGE) { this.pending = 'layup'; this.look = null; }
       else {
         const fw = FINISH_WEIGHTS[this.tier];

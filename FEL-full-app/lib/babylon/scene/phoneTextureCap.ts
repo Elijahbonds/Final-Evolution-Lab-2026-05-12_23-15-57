@@ -20,6 +20,7 @@
 // fails if the method stops existing or stops reading the cap, so an upgrade breaks a test, not a phone.
 
 import { KIT_BODY_URL } from '../core/heroBody';
+import { feel } from '@/lib/feel-panel/feel';   // hoops-p08: perf.phoneFarPropTex
 
 /** The largest edge a glTF model's texture is uploaded at on the phone tier. */
 export const PHONE_MODEL_TEXTURE_MAX = 1024;
@@ -47,10 +48,29 @@ export function isModelImageUrl(url: string | null | undefined): boolean {
   return typeof url === 'string' && MODEL_IMAGE.test(url);
 }
 
-/** Pure: the edge cap a phone uploads this image under, or Infinity for none (not a model image). */
-export function phoneCapFor(url: string | null | undefined, w: number, h: number): number {
+/**
+ * hoops-p08 (2026-11-12): THE PARKED VEHICLES. The Venice courts park a bus and a sedan on the street past the boardwalk (venuePropSets),
+ * three 1024² maps each on a phone — 32 MB of the 3v3's 237 MB (census, scripts/probes/hoops-p08), for two props that stand 30-60 m
+ * from the court and cover a few dozen pixels of a phone's width. On a phone their maps upload at PHONE_FAR_PROP_MAX.
+ * `perf.phoneFarPropTex` sets the edge (1024 = as before, the general model cap).
+ */
+export const PHONE_FAR_PROP_FILES: readonly string[] = ['/models/meshy/hoopbus.glb', '/models/meshy/sedan.glb',
+  // and the ball: 24 cm, it never covers 512 px of a phone's screen, even in a replay's close-up (its 1024² map: 5.3 MB)
+  '/models/meshy/ball-basketball.glb'];
+/** The modes where those vehicles only ever stand far off (the half-court Venice modes). The dunk parks the bus on the court's corner
+ *  as a wall-run prop (DunkMode parkCornerProps): there it is close, and keeps its maps. */
+export const PHONE_FAR_PROP_MODES: ReadonlySet<string> = new Set(['onevone', 'threevthree', 'threepoint']);
+export const PHONE_FAR_PROP_MAX = 512;
+function isFarPropImage(url: string): boolean {
+  const file = url.replace(/#image\d+$/, '');
+  return PHONE_FAR_PROP_FILES.some((u) => file.endsWith(u));
+}
+
+/** Pure: the edge cap a phone uploads this image under, or Infinity for none (not a model image). `farProp`: the knob's edge. */
+export function phoneCapFor(url: string | null | undefined, w: number, h: number, farProp = PHONE_FAR_PROP_MAX): number {
   if (!isModelImageUrl(url)) return Infinity;
   if (isPlayerKitImage(url as string)) return Math.max(w, h) >= 2048 ? PHONE_KIT_SKIN_MAX : PHONE_KIT_OTHER_MAX;
+  if (isFarPropImage(url as string)) return Math.min(PHONE_MODEL_TEXTURE_MAX, farProp);
   return PHONE_MODEL_TEXTURE_MAX;
 }
 
@@ -73,7 +93,8 @@ interface CappableEngine {
  * Install the cap on this engine when the tier is mobile. Returns the uninstall (a no-op when nothing was installed).
  * Idempotent per engine.
  */
-export function installPhoneTextureCap(engine: unknown, tier: string, cap = PHONE_MODEL_TEXTURE_MAX): () => void {
+export function installPhoneTextureCap(engine: unknown, tier: string, cap = PHONE_MODEL_TEXTURE_MAX, modeId: string | null = null): () => void {
+  const farOk = !!modeId && PHONE_FAR_PROP_MODES.has(modeId);
   const e = engine as CappableEngine & { __felTexCap?: boolean };
   if (tier !== 'mobile' || typeof e?._prepareWebGLTexture !== 'function' || e.__felTexCap) return () => {};
   const own = Object.prototype.hasOwnProperty.call(e, '_prepareWebGLTexture');
@@ -82,7 +103,7 @@ export function installPhoneTextureCap(engine: unknown, tier: string, cap = PHON
   e._prepareWebGLTexture = function capped(texture, ...rest) {
     // Babylon's signature: (texture, extension, scene, img, ...) — the image's own size picks the kit body's split
     const img = rest[2] as { width?: number; height?: number } | undefined;
-    const rule = phoneCapFor(texture?.url, img?.width ?? 0, img?.height ?? 0);
+    const rule = phoneCapFor(texture?.url, img?.width ?? 0, img?.height ?? 0, farOk ? feel('perf.phoneFarPropTex', PHONE_FAR_PROP_MAX) : PHONE_MODEL_TEXTURE_MAX);
     if (!Number.isFinite(rule)) return original(texture, ...rest);
     const want = Math.min(cap, rule);
     const caps = e.getCaps();

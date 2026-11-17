@@ -24,6 +24,8 @@ const { TeamOffense3v3, crossesHand } = await import(APP + '/lib/babylon/hoops/t
 const { moveFrame, windowedVariety } = await import(APP + '/lib/babylon/hoops/rivalOffense.ts');
 const { meetsRelease, releaseFrom } = await import(APP + '/lib/babylon/hoops/blocks.ts');
 const { contestOn, closingSpeed } = await import(APP + '/lib/babylon/hoops/contest.ts');
+const { expectedMake } = await import(APP + '/lib/babylon/core/SharedShot.ts');   // hoops-p09: the shared shot model
+const RB = await import(APP + '/lib/babylon/hoops/rulebook.ts');
 const { driveStrip } = await import(APP + '/lib/babylon/hoops/steals.ts');
 const { Vector3 } = await import('@babylonjs/core');
 
@@ -92,7 +94,9 @@ export async function sim3v3(tier: string, o: Opts) {
       const ball = releaseFrom({ x: sh.x + toRim.x / L * 0.3, y: style === 'jumper' ? 1.75 : 1.7, z: sh.z + toRim.z / L * 0.3 }, 0, style);
       if (meetsRelease({ x: mine[0].x, z: mine[0].z, jumpAge, handsUp: false }, ball, RIM, style).hit) { blocks++; acts.push(style === 'layup' ? 'layup' : 'pull_up'); end = 'block'; return; }
       const c = contestOn(mine.map((m, i) => ({ dist: d2(m, sh), facingCos: 1, handUp: false, jumpAge: i === 0 ? jumpAge : Infinity, closeMps: i === 0 ? closingSpeed(m, meCtl.vel, sh) : 0 })));
-      const pct = rivalReleasePct({ style, pullUp, distToRim: d2(sh, RIM_FLOOR), defenseFactor: c.contest, ground: 0, mistake: 1 }, knobs);
+      // hoops-p09: the shared model at the tier's hand (core/SharedShot, integrated over his timing) with hoops.aiSharedShotOn; else the tier's table
+      const pct = RB.aiSharedShotOn() ? expectedMake(style, c.contest, d2(sh, RIM_FLOOR), RB.aiTimingSigmaSec(tier as never), RB.skillShotOn())
+        : rivalReleasePct({ style, pullUp, distToRim: d2(sh, RIM_FLOOR), defenseFactor: c.contest, ground: 0, mistake: 1 }, knobs);
       const key = style === 'layup' ? 'layup' : pullUp ? 'jumper_cs' : 'jumper';
       (shots[key] ??= []).push(pct); pts.push(pct * rivalPoints(style, isThree(sh, RIM)));
       acts.push(style === 'layup' ? 'layup' : 'pull_up');
@@ -210,6 +214,7 @@ export async function sim3v3(tier: string, o: Opts) {
     makePct: Object.fromEntries(Object.entries(shots).map(([k, a]) => [k, { n: a.length, pct: a.some((x) => Number.isFinite(x)) ? +(100 * mean(a.filter((x) => Number.isFinite(x)))).toFixed(1) : null }])),
     ptsPerShot: +mean(pts).toFixed(3),
     steals, picks, blocks, capped, mix, driverAccelP99: +p99(driverAcc).toFixed(1),
+    lensRaw: lens, ptsPerPoss: pts.reduce((a, b) => a + b, 0) / o.n,   // hoops-flow: the game-length model reads the raw lengths and the expected points a possession
   };
 }
 export function print(r: Awaited<ReturnType<typeof sim3v3>>) {

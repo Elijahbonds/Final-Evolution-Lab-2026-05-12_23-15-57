@@ -50,6 +50,14 @@ describe('the four checks (docs/PLAN-EVERY-SCREEN-10PHASE.md)', () => {
       expect(own).toEqual(['small-targets']);
       expect(bar).toEqual(['small-targets-bars']);
     });
+    it('a floating button over readable content or a link fails, at 390 px or with 150 % text (2026-11-12)', () => {
+      const phone = judge(clean({ covered: { phone: ['"YOUR WEEK CARD" covers "This week"'], font150: [] } }));
+      expect(phone.checks.clear).toBe('fail');
+      expect(phone.faults.map((f) => f.id)).toEqual(['float-covers']);
+      expect(ids(clean({ covered: { phone: [], font150: ['"Go" covers the link "Jump check"'] } }))).toEqual(['float-covers']);
+      expect(ids(clean({ covered: { phone: [], font150: [] } }))).toEqual([]);
+      expect(ids(clean())).toEqual([]);   // facts read before the check existed carry no `covered`
+    });
   });
 
   describe('2. looks finished', () => {
