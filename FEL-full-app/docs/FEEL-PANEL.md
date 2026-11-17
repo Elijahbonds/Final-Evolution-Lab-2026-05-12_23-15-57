@@ -868,6 +868,13 @@ restores the old behaviour exactly.
   and the pick-up fell back to the old take: on the 3v3 speed set 10 of 11 presses at 2.8 m/s or more were taken at once, a median
   35 cm off the palm, 3 of them yanked up from below the knee. 0 = counted from the bounce's own rate (as at G2). Feel-check: sprint at
   the rim and pull up off a low dribble: the hand meets the ball on its way up, no snatch.
+- `hoops.releaseSnapEaseSec` 0.03 s (`anim/ballCarry.ts`, G2): the smoothing of the shooting wrist's snap at the release (58°). 0.03 is
+  the value it always had (TUNED, unchanged): the wrist turns ~58° in one frame on every jumper. A longer ease spreads it over frames.
+- `hoops.comboDunkOn` 1 (`core/ComboFinish.ts`, G4; FLAGGED 0 → 1, the owner asked for a euro step dunk; open: two arm pops in the
+  footwork → dunk crossfade, 164°/frame on one euro and 126°/frame on one hop in the G4 runs): on, a euro or a hop step with the turbo held, at least `hoops.comboDunkMinMps`
+  3.4 m/s at the press and its last plant inside dunk range (2.8 m) takes off into a dunk: the euro's cross gives the angle (the windmill
+  at speed, the cradle without it), the hop's two feet none, a body in the way the double clutch (the drive dunk's own picker). Off:
+  they end in a layup or a floater, as before.
 
 ## move-feel-2, 2026-11-17 (owner: "stick right runs a straight line while held"; "redesign the phone stick")
 
