@@ -51,6 +51,7 @@ import { PerfMonitor, budgetForTier } from './PerfMonitor';          // M67: dev
 import { mountPerfGuard } from './perfGuard';
 import { mountHitchProbe } from './hitchProbe';
 import { mountPerfStats } from './perfStats';
+import { publishReadoutSource } from './perfReadout';   // DEVICE-PERF: the owner's perf readout reads the live game (no per-frame cost)
 import { pagePlayStamp } from './playFrame';   // NEX-03: the competitive-context stamp
 import { setGradeExposure } from '../scene/gradeUniform';                // PERF-LAG (2026-10-24): the per-frame exposure beat as a uniform                         // PERF-LAG (2026-10-24): anonymous fps + time-to-first-playable to game_diag                     // S1 HITCH (2026-10-22): worst frame, p5 fps, and builds / clones / compiles after the intro                       // PERF-GUARD (2026-10-06): paced frames, adaptive quality, idle
 import { setReady, clearReady } from './readyMarker';  // M67: smoke-test readiness gate
@@ -364,6 +365,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   let guard!: ReturnType<typeof mountPerfGuard>;
   let hitch!: ReturnType<typeof mountHitchProbe>;
   let perfStats: ReturnType<typeof mountPerfStats> | null = null;
+  let readout: ReturnType<typeof publishReadoutSource> | null = null;
   let declaredMood!: VenueMood;
   const look = await mountLookStack({
     canvas: opts.canvas,
@@ -383,6 +385,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       // clone() and first-use shader compiles. Published as window.__FEL_HITCH__ under dev / agent runs (hitchProbe.ts).
       hitch = mountHitchProbe({ scene, publish: devOrAgentHooks() });
       perfStats = mountPerfStats({ engine, tier, guard: () => { const g = guard.snapshot(); return g.policy.governor || g.policy.pacing ? g : null; } });   // PERF-LAG
+      readout = publishReadoutSource({ engine, scene, modeId: def.modeId, tier, guard: () => { const g = guard.snapshot(); return g.policy.governor || g.policy.pacing ? g : null; } });   // DEVICE-PERF
       if (opts.heroOverride) scene.metadata.felHeroOverride = opts.heroOverride;   // dev rollout flag (?hero=)
       // DEMO-MODELS-1 v2: this scene is /try's guest dunk demo (the host's known-guest mount of `dunk`), the ONE place setting 4
       // (TRY_GUEST_COACH_BODY_ENABLED) may apply (CharacterLibrary.playerBodyContextOf). Scene-scoped: no other scene is stamped.
@@ -453,6 +456,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     store.setPhase(p);   // MOVEMENT PLAY P4: the body-play store and the shell's Body button read the phase here
     guard.setPhase(p);   // PERF-GUARD: a pause, an end card or an error refreshes at 2 fps instead of the cap
     perfStats?.setPhase(p);   // PERF-LAG: READY, START and live play, for the fps and ttfp reports
+    readout?.setPhase(p);     // DEVICE-PERF: time to READY, and the readout's frame window restarts per phase
     opts.onPhase?.(p, detail);
   };
 
@@ -1089,6 +1093,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     guard.dispose();      // PERF-GUARD
     hitch.dispose();      // S1 HITCH
     perfStats?.dispose(); // PERF-LAG (before the engine goes: a mount left before play still reports its wait)
+    readout?.dispose();   // DEVICE-PERF
     clearReady();         // M67
     unink();              // M59
     backdrop.dispose();   // M61

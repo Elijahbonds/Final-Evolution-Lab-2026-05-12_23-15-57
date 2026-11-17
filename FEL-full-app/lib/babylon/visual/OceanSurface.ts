@@ -109,6 +109,9 @@ class OceanPlugin extends MaterialPluginBase {
   bands: { from: number; to: number; mix: number; soft: number; chop: number; color: Color3 }[] = [];
 
   constructor(material: Material) { super(material, PLUGIN, 250, { FEL_OCEAN: false, FEL_OCEAN_BAND: false, FEL_OCEAN_LIGHT: false }); }
+  // device-perf (2026-11-12, the WebGPU trial): Babylon's default accepts GLSL only and THROWS when this is attached to a WGSL
+  // (WebGPU) material. Under WGSL it adds no code, so the sea is the plain PBR water. Under WebGL nothing changes (GLSL was already accepted).
+  isCompatible(): boolean { return true; }
 
   get isEnabled(): boolean { return this._enabled; }
   set isEnabled(v: boolean) { if (this._enabled === v) return; this._enabled = v; this.markAllDefinesAsDirty(); this._enable(v); }

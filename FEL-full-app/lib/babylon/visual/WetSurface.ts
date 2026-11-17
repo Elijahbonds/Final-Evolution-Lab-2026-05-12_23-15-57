@@ -30,6 +30,9 @@ class WetPlugin extends MaterialPluginBase {
   wet = 0;
   private _enabled = false;
   constructor(material: Material) { super(material, PLUGIN, 260, { FEL_WET: false }); }
+  // device-perf (2026-11-12, the WebGPU trial): Babylon's default accepts GLSL only and THROWS when this is attached to a WGSL
+  // (WebGPU) material. Under WGSL it adds no code, so the court keeps its dry look. Under WebGL nothing changes (GLSL was already accepted).
+  isCompatible(): boolean { return true; }
   get isEnabled(): boolean { return this._enabled; }
   set isEnabled(v: boolean) { if (this._enabled === v) return; this._enabled = v; this.markAllDefinesAsDirty(); this._enable(v); }
   prepareDefines(defines: Record<string, unknown>): void { defines.FEL_WET = this._enabled; }

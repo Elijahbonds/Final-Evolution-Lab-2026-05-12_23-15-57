@@ -72,6 +72,9 @@ class SkyPlugin extends MaterialPluginBase {
   haze = new Color3(0.8, 0.8, 0.8); hazeAmt = 0.3; horizonY = BAKE_HORIZON_Y;
   private _enabled = false;
   constructor(material: Material) { super(material, PLUGIN, 300, { FEL_SKY: false }); }
+  // device-perf (2026-11-12, the WebGPU trial): Babylon's default accepts GLSL only and THROWS when this is attached to a WGSL
+  // (WebGPU) material. Under WGSL it adds no code, so the dome keeps its plain look. Under WebGL nothing changes (GLSL was already accepted).
+  isCompatible(): boolean { return true; }
   get isEnabled(): boolean { return this._enabled; }
   set isEnabled(v: boolean) { if (this._enabled === v) return; this._enabled = v; this.markAllDefinesAsDirty(); this._enable(v); }
   prepareDefines(defines: Record<string, unknown>): void { defines.FEL_SKY = this._enabled; }
