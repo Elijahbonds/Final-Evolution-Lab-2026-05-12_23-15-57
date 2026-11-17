@@ -21,7 +21,7 @@ import { prqGrade } from '@/lib/prq';
 import { SoundKit } from '@/lib/babylon/audio/SoundKit';
 import { setAgentRunHooksAllowed } from '@/lib/agentRunHooks';
 
-type W = Window & { __PATH: string; __SESSION: unknown; __SFX: { t: number; name: string; vol?: number }[]; __END?: (won: boolean) => void };
+type W = Window & { __PATH: string; __SESSION: unknown; __SFX: { t: number; name: string; vol?: number; tag?: string; pan?: number }[]; __END?: (won: boolean) => void; __SK?: unknown };
 const w = window as unknown as W;
 w.__SFX = [];
 const q = new URLSearchParams(location.search);
@@ -43,9 +43,11 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
 };
 
 // every synthesised cue the game asks for, on the page clock
-const play = SoundKit.play.bind(SoundKit) as (name: string, opts?: { volume?: number }) => void;
+// (hoops-sound, 2026-11-12: + who asked — the dribble's player / ai / pass — and the pan; and SoundKit itself, for its sample state)
+const play = SoundKit.play.bind(SoundKit) as (name: string, opts?: { volume?: number; tag?: string; pan?: number }) => void;
+w.__SK = SoundKit;
 (SoundKit as unknown as { play: typeof play }).play = (name, opts) => {
-  if (w.__SFX.length < 20000) w.__SFX.push({ t: Math.round(performance.now()), name, vol: opts?.volume });
+  if (w.__SFX.length < 20000) w.__SFX.push({ t: Math.round(performance.now()), name, vol: opts?.volume, tag: opts?.tag, pan: opts?.pan });
   return play(name, opts);
 };
 

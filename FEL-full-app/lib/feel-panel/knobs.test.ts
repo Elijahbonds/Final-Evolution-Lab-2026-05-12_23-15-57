@@ -17,7 +17,8 @@ import { MOVE_EASE_ON, MOVE_EASE_SEC, MOVE_EASE_RATE_DEG, MOVE_ARM_RATE_DEG } fr
 import { JUMPER_HOP_ON, JUMPER_APEX_AFTER_RELEASE_SEC, JUMPER_MIN_LOAD_SEC, JUMPER_HANG_ON, JUMPER_HANG_SCALE } from '@/lib/babylon/core/JumperHop';
 import { FT_SETUP_SEC, FT_ROUTINE_SEC, FT_SET_SEC, FT_RESULT_SEC, FT_DIST_NARROW_01 } from '@/lib/babylon/core/FreeThrows';
 import { BANK_SET_DEG, BANK_GLANCE_MS } from '@/lib/babylon/hoops/shotLooks';
-import { OVERTIME_3V3_SEC } from '@/lib/babylon/modes/threevthreeOvertime';
+import { OVERTIME_3V3_SEC, THREE_GAME_SEC } from '@/lib/babylon/modes/threevthreeOvertime';
+import { REPLAY_SKIP_ON } from '@/lib/babylon/core/replaySkip';
 import { OOP_LOB_FLIGHT_SEC, OOP_LATE_CATCH_CLIP_T, REAL_JUMP_PERSONAL, RUNWAY_STRIDE_SCALE, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG, LAND_LEAD_SEC, LAND_ABSORB_DEEP } from '@/lib/babylon/core/DunkFlagship';   // dunk-flagship
 import { SLAM_VARIANTS_ON, SLAM_POWER_ON } from '@/lib/babylon/core/DunkSlamVariant';   // dunk-flagship Phase 7
 import { FINISH_OVER_RING } from '@/lib/babylon/core/DunkOverRing';   // dunk-flagship P11
@@ -34,14 +35,14 @@ import * as BLK from '@/lib/babylon/core/HoopsBlocks';
 import {
   HOOPS_JOG_TAU, HOOPS_SPRINT_TAU, HOOPS_JOG_ACCEL, HOOPS_SPRINT_ACCEL, HOOPS_LOAD_SCALE, HOOPS_GEAR_DOWN_DECEL, HOOPS_STOP_DECEL_LOW, HOOPS_STOP_DECEL_HIGH,
   HOOPS_PLANT_DECEL, HOOPS_HANDLER_TURN_DEG, HOOPS_TURN_TRUE_ARC, HOOPS_KICK_SEC, HOOPS_CUT_SEC, HOOPS_JERK, HOOPS_REVERSE_DEG, HOOPS_REVERSE_DECEL,
-  HOOPS_RETREAT_SPEED_K,
+  HOOPS_RETREAT_SPEED_K, HOOPS_GEAR_BLEND_BAND, HOOPS_STICK_SPRINT_FALLBACK,
   HANDLER_JOG_TAU, HANDLER_JOG_ACCEL, HANDLER_LOAD_SCALE, HANDLER_STOP_DECEL_LOW, HANDLER_STOP_DECEL_HIGH, HANDLER_FIRST_STEP_MPS,
-  HANDLER_REVERSE_PLANT_HOLD, HANDLER_REVERSE_LAUNCH_SEC,
+  HANDLER_REVERSE_PLANT_HOLD, HANDLER_REVERSE_LAUNCH_SEC, HANDLER_TURN_TRUE_ARC, HANDLER_KICK_SEC, HANDLER_CUT_SEC,
 } from '@/lib/babylon/core/HoopsStick';
 import { PORTRAIT_HERO_MARGIN } from '@/lib/babylon/modes/netPortraitCam';
 import { OCCLUDER_FADE_ALPHA, OCCLUDER_FADE_SEC, OCCLUDER_HOLD_SEC } from '@/lib/babylon/core/OccluderFade';   // gameplay-clean
 import { FOOTBALL_CARRY_RATE_MAX, FOOTBALL_HURDLE_EXIT_FADE_SEC, FOOTBALL_HURDLE_FADE_SEC } from '@/lib/babylon/anim/footballTree';   // gameplay-clean P2 #6
-import { CAM_LEAD_EASE_SEC, CAM_LEAD_FULL_MPS } from '@/lib/babylon/core/CameraDirector';   // gameplay-clean P2 #10
+import { CAM_LEAD_EASE_SEC, CAM_LEAD_FULL_MPS, HOOPS_CAM_LEAD_EASE } from '@/lib/babylon/core/CameraDirector';   // gameplay-clean P2 #10
 import { PLANT_ENGAGE_SEC, PLANT_RELEASE_SEC, PLANT_REPLANT_EASE_ON, PLANT_SEATED_OFF_ON } from '@/lib/babylon/anim/FootPlanting';   // gameplay-clean P3 / P4 / P5
 import { FADE_HOLD_ENDED_ON } from '@/lib/babylon/anim/CharacterAnimator';   // gameplay-clean P5
 import { CARRY_PUSHED_BOUNCE_ON } from '@/lib/babylon/anim/ballCarry';   // gameplay-clean P6
@@ -71,6 +72,8 @@ import { ONBALL_CUSHION_M, ONBALL_CUSHION_PER_MPS } from '@/lib/babylon/hoops/pr
 import * as HR from '@/lib/babylon/hoops/ratings';   // hoops-builder
 
 import { BAT_GRIP_LOST_M, BAT_GRIP_BACK_M } from '@/lib/babylon/modes/baseballBat';   // bat-grip-2
+import { SAMPLE_SFX_ON } from '@/lib/babylon/audio/samples';   // hoops-sound
+import * as DS from '@/lib/babylon/audio/dribbleSound';   // hoops-sound
 
 function tsFiles(dir: string): string[] {
   const out: string[] = [];
@@ -348,9 +351,10 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.stopDecelHigh')).toBe(HANDLER_STOP_DECEL_HIGH);
     expect(def('hoops.plantDecel')).toBe(HOOPS_PLANT_DECEL);
     expect(def('hoops.handlerTurnDeg')).toBe(HOOPS_HANDLER_TURN_DEG);
-    expect(def('hoops.turnTrueArc')).toBe(HOOPS_TURN_TRUE_ARC);
-    expect(def('hoops.kickSec')).toBe(HOOPS_KICK_SEC);
-    expect(def('hoops.cutSec')).toBe(HOOPS_CUT_SEC);
+    expect(def('hoops.turnTrueArc')).toBe(HANDLER_TURN_TRUE_ARC);   // lane/move-feel: the handler's TUNED values (owner 2026-11-17); the release constants below stay 0
+    expect(def('hoops.kickSec')).toBe(HANDLER_KICK_SEC);
+    expect(def('hoops.cutSec')).toBe(HANDLER_CUT_SEC);
+    expect([HANDLER_TURN_TRUE_ARC, HANDLER_KICK_SEC, HANDLER_CUT_SEC]).toEqual([1, 0.1, 0.08]);   // TUNED 0 → 1, 0 → 0.1, 0 → 0.08 (owner 2026-11-17)
     expect(def('hoops.jerk')).toBe(HOOPS_JERK);
     expect(def('hoops.reverseDeg')).toBe(HOOPS_REVERSE_DEG);
     expect(def('hoops.reverseDecel')).toBe(HOOPS_REVERSE_DECEL);
@@ -363,10 +367,16 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.reversePlantHold')).toBe(HANDLER_REVERSE_PLANT_HOLD);
     expect(def('hoops.reverseLaunchSec')).toBe(HANDLER_REVERSE_LAUNCH_SEC);
     expect([HANDLER_FIRST_STEP_MPS, HANDLER_REVERSE_PLANT_HOLD, HANDLER_REVERSE_LAUNCH_SEC]).toEqual([0.3, 0, 0.2]);
+    expect(def('hoops.gearBlendBand')).toBe(HOOPS_GEAR_BLEND_BAND); expect(HOOPS_GEAR_BLEND_BAND).toBe(0.2);   // lane/move-feel: TUNED 0 → 0.2 (owner 2026-11-17)
+    expect(def('hoops.stickSprintFallback')).toBe(HOOPS_STICK_SPRINT_FALLBACK); expect(HOOPS_STICK_SPRINT_FALLBACK).toBe(0);   // lane/move-feel: TUNED 1 → 0 (owner 2026-11-17)
+    expect(def('hoops.camLeadEase')).toBe(HOOPS_CAM_LEAD_EASE); expect(HOOPS_CAM_LEAD_EASE).toBe(1);   // lane/move-feel: TUNED 0 → 1 (owner 2026-11-17)
     expect(def('hoops.retreatSpeedK')).toBe(HOOPS_RETREAT_SPEED_K);   // TUNED (new), owner 2026-10-24
     expect(HOOPS_RETREAT_SPEED_K).toBe(0.7);
     // hoops-overtime (new: PR #268's 30 s)
     expect(def('hoops.overtime3v3Sec')).toBe(OVERTIME_3V3_SEC);
+    // hoops-flow (owner 2026-11-12): the 3v3 game clock (new knob, 240 s; 90 = before) and any press skips a replay (new, on; 0 = before)
+    expect(def('hoops.threeGameSec')).toBe(THREE_GAME_SEC); expect(THREE_GAME_SEC).toBe(240);
+    expect(def('hoops.replaySkipOn')).toBe(REPLAY_SKIP_ON); expect(REPLAY_SKIP_ON).toBe(1);
     expect(def('dunk.oopLobFlightSec')).toBe(OOP_LOB_FLIGHT_SEC);   // dunk-flagship (new)
     expect(def('dunk.oopLateCatchClipT')).toBe(OOP_LATE_CATCH_CLIP_T); // dunk-flagship Phase 3 (new)
     expect(def('dunk.realJumpPersonal')).toBe(REAL_JUMP_PERSONAL);     // dunk-flagship Phase 5 (new, off)
@@ -394,6 +404,10 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.moveCommitMps')).toBe(RB.MOVE_COMMIT_MPS); expect(def('hoops.passFakeLaneCos')).toBe(RB.PASS_FAKE_LANE_COS);
     expect(def('hoops.gatherCloseoutOn')).toBe(RB.GATHER_CLOSEOUT_ON); expect(def('hoops.gatherCloseoutM')).toBe(RB.GATHER_CLOSEOUT_M);
     expect(def('hoops.pressFloorOn')).toBe(RB.PRESS_FLOOR_ON); expect(def('hoops.finishContestNarrow')).toBe(RB.FINISH_CONTEST_NARROW);
+    // hoops-sound (phase 11a; new, the owner has not heard these)
+    expect(def('hoops.sampleSfxOn')).toBe(SAMPLE_SFX_ON); expect(def('hoops.dribbleSoundOn')).toBe(DS.DRIBBLE_SOUND_ON);
+    expect(def('hoops.dribbleSoundVol')).toBe(DS.DRIBBLE_SOUND_VOL); expect(def('hoops.dribbleSoundAiK')).toBe(DS.DRIBBLE_SOUND_AI_K);
+    expect(def('hoops.passCatchSoundOn')).toBe(DS.PASS_CATCH_SOUND_ON); expect(def('hoops.passCatchVol')).toBe(DS.PASS_CATCH_VOL);
     // hoops-builder (the ratings' bands; new, the owner has not felt these; rating 50 is today at any value)
     expect(def('hoops.ratingsOn')).toBe(HR.RATINGS_ON); expect(def('hoops.rateSpeedBand')).toBe(HR.RATE_SPEED_BAND);
     expect(def('hoops.rateHandleBand')).toBe(HR.RATE_HANDLE_BAND); expect(def('hoops.rateReadBand')).toBe(HR.RATE_READ_BAND);
