@@ -14,7 +14,9 @@ one), it has real UVs and a fabric surface (no cracks, no flat plastic), and it 
 skin under it (so the layers keep their gaps on any build). The game's existing per-spawn safety nets (the body mask, the edge
 flare, the waistband fit, the lift) stay, and later phases move them into the asset too. Phase 1 is built in this lane, with every rig
 byte-identical: the short's legs (job 1) and the football jersey (job 2) are refitted, and the player's kit has real UVs.
-Job 3 (the waistband over the tee on a heavy build) is **not fixed**: the first attempt measured worse on screen and ships off.
+Phase 2 (§9) found and fixed job 3 (the Creator's shape was undoing the clothes' fit on every build), fitted the rivals' tees,
+and reworked the short's leg fit after a steady rig showed it let more skin through on screen. **Status: the Closet's default
+male and female still show more skin under the short than phase 0 (§9.4); every other measured body is better.**
 
 ## 1. What the best games do (plain words)
 
@@ -161,14 +163,14 @@ provably untouched. No new mesh, material, texture or draw.
 | **4 — Cloth that moves** | A cheap sway on the short's hem and the jersey's tail in the vertex shader, driven by the body's speed (no new bones) | No new joint; ≤ 0.2 ms a frame on the phone profile; never through the legs (the browser rig's poke at the hem) |
 | **5 — Phones** | A lighter garment level of detail for far bodies (the crowd, the 3v3 far side) | 3v3 and 3-Point back inside their phone rows (HOOPS-AAA-GAP-SHOW §3.9) |
 
-## 6. Owner questions (multiple choice, recommendation first)
+## 6. Owner questions — ANSWERED (owner 2026-11-13, docs/OWNER-DECISIONS.md): 1 (a), 2 (a)
 
 1. **Cloth that moves (phase 4).** (a) **A vertex sway in the shader, no rig change** — recommended: it keeps the owner's 22-bone
    spec, costs almost nothing on a phone, and covers a short's hem and a jersey's tail; (b) add 2–4 cloth bones to the rig — real
    secondary motion, but it changes the 22-bone spec every clip and test is built on (GATE 0); (c) no cloth motion.
 2. **Who makes the basketball jersey and the new football jersey (phase 3).** (a) **In-house, free**: cut from the CC0 MakeHuman
    garments in Blender on the owner's Mac (the MPFB scripts are ready; this machine has no MPFB) — recommended; (b) buy or
-   commission a sports-kit pack (money).
+   commission a sports-kit pack (money). The steps: docs/JERSEY-BUILD-STEPS.md.
 
 Everything else in this plan is reversible and is being done on the standing rule (take the recommended option, flag it).
 
@@ -195,3 +197,65 @@ BEFORE_OVERLAY=<dir with models/…> /home/user/wt/gate-run.sh 2400 bash scripts
 - **Body masking is not changed**: it already exists (`bodyMask.ts`) and its baking is phase 2.
 - **The mirrored football print and the emissive map** need the re-model (phase 3); the refit only fixes the fit.
 - **The crowd** (`crowd/*.glb`) has its clothes baked into the body (no garments): nothing to fit; its variety is HOOPS-AAA-GAP-SHOW §3.3.
+
+## 9. Phase 2 (2026-11-13 → 11-17)
+
+### 9.1 The rig had to be made repeatable first
+
+The phase-1 browser comparison caught one "run" cell at two different moments (a deep stride before, upright after): breathing
+(secondary motion) runs on a clock and foot planting had not settled. The rig now stops the breathing and lets a paused pose
+settle for 30 frames (`STEADY`, default on). With steady poses the phase-1 claim "the kicking thigh no longer comes out through
+the short" did **not** hold up — it was the two moments — and the short's skin-through rose on the Closet bodies (male 2,863 →
+6,733 px over 50 shots). The rig also gained **pokeFront**: skin with the cloth's OUTSIDE behind it. The old count also calls skin
+seen through an opening (up a leg, between the legs) "through cloth".
+
+### 9.2 Job 3 — found and fixed: the Creator's shape undid the clothes' fit
+
+The Creator's shape is a morph target holding ABSOLUTE positions taken before the garments' fit; the GPU draws it at influence 1,
+so on every Creator build the waistband fit (the short tucked under the top), the edge flare and the shoe's fold were drawn as if
+never done — 225 of the 293 waistband-fitted vertices on the male kit (`scripts/probes/kit-fit/morphfit.ts`). Now the fit moves
+the morph with it (`lib/babylon/core/morphCarry.ts`) and the shape is built on the garment's current vertices
+(`renderShape.ts`); knob `kit.shapeKeepsFit` (1; 0 = as before). Headless, girth 1.6, 8 poses, the short drawn over the tee
+(`scripts/probes/kit-fit/exposed.ts`, validated: 53 at a normal build, 521 at girth 1.6): male 4,437 → 448, female 4,602 → 363.
+On screen: girth-max male skin through cloth 20,228 → 17,168 px and its short 6,970 → 3,902. `kit.garmentFollowBody` now means
+"never behind the skin" and stays off (better on the male, worse on the female, headless).
+
+### 9.3 The rivals' tees
+
+Body weights on a tee were much worse (ace 50 → 236 torn edges). Two rounds of smoothing the tee's own weights were measured on
+all 24 rivals and kept on the 10 where both the tee's torn edges and the skin through it improved (ace 50 → 20 / 903 → 842,
+dash 40 → 8, grit 30 → 8, lux 38 → 18, tusk 24 → 18, …: `bake.ts RIVAL_TEE_SMOOTHED`); on the other 14 it let more skin
+through (their builds fill the tee differently), so they keep their own.
+
+### 9.4 The short (item 1) — improved, not yet at phase 0 on the Closet's default bodies
+
+The short is three pieces whose legs crossed into each other. The phase-1 fit put each leg on its own thigh, and eased that move
+into the neighbours, which pulled the front and back of each tube onto the thigh. Now an eased vertex never ends closer than 15 mm
+to its thigh. Measured (steady rig, browser, phase 0 → now):
+
+KIT-FIT-P2-NUMBERS
+
+Tried and measured worse: lowering the band over the crotch (torn edges 18 → 30 male, 27 → 72 female), the body's weights only
+where the old ones were wrong (no change on screen), a larger ease (torn edges 20 → 38 → 61), stopping the cloth at the midline
+(47 / 42). What is left is coverage: in phase 0 the two crossed tubes double-covered the gap between the legs; any fit that keeps
+each tube on its own leg opens it. **The remaining fix is the garment itself**: a one-piece short with a real crotch (the in-house
+art job, on the owner's Mac, alongside the jerseys — docs/JERSEY-BUILD-STEPS.md's process applies to a short).
+
+### 9.5 Baking the skin-hiding into the files, and the perf lane's body merge (item 4 — written up, not built)
+
+Today the body mask (and the waistband fit, the flare) runs after a spawn's first frames, on the CPU, paced one fitting a frame,
+and rewrites the body's index buffer. The perf lane's body merge (`lib/babylon/core/bodyMerge.ts`, lane/hoops-perf) rebuilds a
+body's merged mesh whenever a part's index buffer, geometry or morph changes, after `BODY_MERGE_SETTLE_FRAMES` (30) of stillness —
+so today every spawn merges, unmerges when the mask lands, and merges again. Baking it:
+1. the bake (`bake.ts`) runs the same pure `computeBodyMask` per garment item at rest and stores the hidden body vertices as a
+   bit set in the garment mesh's extras (`felHide`), plus each (top, short) pair's waistband fit as a position delta;
+2. `applyKit` applies the union of the shown items' bit sets to the body's indices synchronously, before the first frame, and
+   skips the after-frame fitting when every shown garment carries one (a Creator shape, code-built clothes or a kit pack fall
+   back to today's runtime fit);
+3. the merge then builds once and never unmerges for the mask.
+That changes `kit.ts` and `bodyMask.ts`'s scheduling, so it waits for the perf lane to merge first, then lands as its own lane
+change with the browser rig before/after. Expected: no mask work per spawn on a default body; the look is the same rules.
+
+### 9.6 Totals, every measured body (steady rig, desktop, phase 0 → phase 1 + 2)
+
+KIT-FIT-P2-TOTALS

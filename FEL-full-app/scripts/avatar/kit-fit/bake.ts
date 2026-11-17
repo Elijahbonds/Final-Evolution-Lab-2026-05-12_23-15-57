@@ -1,12 +1,13 @@
 // KIT-FIT bake (lane/kit-fit, owner 2026-11-12: "We need to fix how the clothes fit, how they look. Do research and make the
 // best decision"; the three clothing art jobs approved the same day). docs/KIT-FIT-PLAN.md says why each step is here.
 //
-//   npx tsx scripts/avatar/kit-fit/bake.ts <in.glb> <out.glb> [--no-uv] [--no-legs] [--json]
+//   npx tsx scripts/avatar/kit-fit/bake.ts <in.glb> <out.glb> [--no-uv] [--legs] [--json]
 //
 // On the kit body's OWN garments (Kit_tops_*, Kit_shorts_*, the low sock — the second primitive of each Kit_shoes_*):
 //   1. UVS     a real unwrap (unwrap.ts) where the file has none, so the runtime stops cutting the garment into one cell a
 //              triangle (the cracks and the stripes) and the fabric weave can come back.
-//   2. LEGS    (approved job 1, "the shorts and body stretch at the crotch in a kick or a lunge") each leg tube of the short
+//   2. LEGS    (OFF by default since 2026-11-17, --legs: it cut torn edges ~80 % headless but let MORE skin through the short on
+//              screen on 11 of 14 bodies, steady browser rig — docs/KIT-FIT-PLAN.md §9.4) (approved job 1, "the shorts and body stretch at the crotch in a kick or a lunge") each leg tube of the short
 //              is fitted to ITS OWN thigh (fitLegTubes: the tubes crossed the midline into each other) and takes that thigh's
 //              skin weights (transferWeights), so a stride no longer drags one leg's cloth across the crotch.
 // Nothing else changes: the rig, every other mesh, the materials and the textures keep their exact bytes (glb.ts appends
@@ -171,7 +172,7 @@ export function bake(inPath: string, outPath: string, opts: { uv?: boolean; legs
   const body = prims.find((p) => p.name === 'Body')!;
   // what changes: a garment without UVs gets them; every short gets its legs fitted. A garment with UVs that is not a short
   // (the rivals' tees) is left exactly as it is.
-  const targets = prims.filter((p) => (/^Kit_(tops|shorts)_/.test(p.name) || (/^Kit_shoes_/.test(p.name) && p.prim === 1)) && (!p.uv || (/^Kit_shorts_/.test(p.name) && opts.legs !== false) || (/^Kit_tops_/.test(p.name) && (opts.topSmooth ?? (RIVAL_TEE_SMOOTHED.has(inPath.split('/').pop()!.replace(/\.glb$/, '')) ? RIVAL_TOP_SMOOTH : 0)) > 0)));
+  const targets = prims.filter((p) => (/^Kit_(tops|shorts)_/.test(p.name) || (/^Kit_shoes_/.test(p.name) && p.prim === 1)) && (!p.uv || (/^Kit_shorts_/.test(p.name) && opts.legs === true) || (/^Kit_tops_/.test(p.name) && (opts.topSmooth ?? (RIVAL_TEE_SMOOTHED.has(inPath.split('/').pop()!.replace(/\.glb$/, '')) ? RIVAL_TOP_SMOOTH : 0)) > 0)));
   const edited = new Set(targets.map((p) => `${p.mesh}:${p.prim}`));
   const untouched0 = untouchedPrint(g, edited);
   const report: Record<string, unknown>[] = [];
@@ -183,8 +184,8 @@ export function bake(inPath: string, outPath: string, opts: { uv?: boolean; legs
     const row: Record<string, unknown> = { mesh: p.name, prim: p.prim, slot, verts0: p.P.length / 3, tris: p.ind.length / 3 };
     let legSide: Int8Array | undefined;
     const P = Float32Array.from(p.P);
-    if (slot === 'shorts' && opts.legs !== false) { const f = fitLegTubes(P, p.ind, body, bones); legSide = f.side; row.legs = { tubes: f.tubes, moved: f.moved }; }
-    if (slot === 'shorts' && opts.legs !== false) row.transfer = transferWeights({ P, J, W, joints: p.joints }, body, bones, { side: legSide });
+    if (slot === 'shorts' && opts.legs === true) { const f = fitLegTubes(P, p.ind, body, bones); legSide = f.side; row.legs = { tubes: f.tubes, moved: f.moved }; }
+    if (slot === 'shorts' && opts.legs === true) row.transfer = transferWeights({ P, J, W, joints: p.joints }, body, bones, { side: legSide });
     // a forge rival's tee (a top that came with UVs), where it measured better (RIVAL_TEE_SMOOTHED); the kit's own tee measured no
     // better (male 6 -> 10 torn edges), so it is left alone
     const fileKey = inPath.split('/').pop()!.replace(/\.glb$/, '');
@@ -216,7 +217,7 @@ export function bake(inPath: string, outPath: string, opts: { uv?: boolean; legs
     report.push(row);
   }
   // record what was done on the mesh (read by kit-fit-tests and, later, the runtime): extras on the MESH, never on a node
-  for (const p of targets) { const m = g.json.meshes[p.mesh]; m.extras = { ...(m.extras ?? {}), felKitFit: { v: 1, uv: opts.uv !== false, legs: opts.legs !== false } }; }
+  for (const p of targets) { const m = g.json.meshes[p.mesh]; m.extras = { ...(m.extras ?? {}), felKitFit: { v: 1, uv: opts.uv !== false, legs: opts.legs === true } }; }
   const rig1 = rigPrint(g), untouched1 = untouchedPrint(g, edited);
   if (rig1 !== rig0) throw new Error('GATE 0: the rig fingerprint changed — refusing to write');
   if (untouched1 !== untouched0) throw new Error('an untouched primitive, material or texture changed — refusing to write');
@@ -226,6 +227,6 @@ export function bake(inPath: string, outPath: string, opts: { uv?: boolean; legs
 
 if (require.main === module) {
   const [inPath, outPath] = process.argv.slice(2).filter((a) => !a.startsWith('--'));
-  const r = bake(inPath, outPath, { uv: !flag('--no-uv'), legs: !flag('--no-legs'), topSmooth: process.env.KIT_FIT_TOP_SMOOTH ? Number(process.env.KIT_FIT_TOP_SMOOTH) : undefined });
+  const r = bake(inPath, outPath, { uv: !flag('--no-uv'), legs: flag('--legs'), topSmooth: process.env.KIT_FIT_TOP_SMOOTH ? Number(process.env.KIT_FIT_TOP_SMOOTH) : undefined });
   if (flag('--json')) console.log(JSON.stringify(r)); else { console.log('rig', r.rig.slice(0, 16), 'untouched', r.untouched.slice(0, 16)); for (const x of r.garments) console.log(JSON.stringify(x)); }
 }

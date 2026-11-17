@@ -10,8 +10,6 @@
  *   · LOOK — the kit body's own tee, short and sock carry real UVs (inside the unit square, few texels shared), so the runtime no
  *     longer cuts them into one cell a triangle (the cracks) and the fabric weave can tile them (the stripes it caused are gone
  *     with the cells). The phone file's garments are the desktop file's, vertex for vertex.
- *   · FIT (job 1) — each leg tube of every short stays on its own side of the body (it crossed ~6 cm into the other leg) and
- *     is never led by the other thigh (26–100 % of it before, on the kit short).
  *   · FIT (job 2) — the football jersey's outer wall stands off both kit bodies' skin at rest (36 % / 26 % of it was under).
  * The posed proof (tears, floats, skin through cloth) is scripts/kit-glitch-tests.ts and the browser rig (scripts/probes/kit-fit).
  *
@@ -21,7 +19,6 @@ import assert from 'node:assert';
 import { resolve } from 'node:path';
 import { readGlb, restPrims, rigPrint, nodeWorlds, readAccessor, mul, blend } from './avatar/kit-fit/glb';
 import { uvQuality } from './avatar/kit-fit/unwrap';
-import { pieces } from './avatar/kit-fit/bake';
 import { BodySurface } from './avatar/kit-fit/surface';
 
 const PUB = resolve(__dirname, '../public/models');
@@ -40,11 +37,6 @@ const RIG: Record<string, string> = {
 const KITS = ['candidates/fel-kit-male.glb', 'candidates/fel-kit-female.glb'];
 /** UV texels shared by two triangles, at most (a cylinder unroll folds a little at the shoulders: measured 6–10 %). */
 const UV_OVERLAP_MAX = 0.12;
-/** A leg tube's vertex may stand this far past the midline toward the other leg, at most (m): the inner thigh's own skin. */
-const LEG_CROSS_MAX = 0.012;
-/** The other thigh's weight a leg tube's vertex may carry, at most: it never leads. Measured after the fit: 0.40 at worst, at a
- *  tube's top where the crotch skin itself blends both thighs; before it, whole vertices rode the other thigh (1.00). */
-const OTHER_THIGH_MAX = 0.45;
 /** The jersey's outer wall under the skin at rest, at most (share of its outward-facing vertices, per kit body). */
 const JERSEY_UNDER_MAX = 0.08;
 
@@ -71,33 +63,6 @@ function main(): void {
       const d = restPrims(readGlb(`${PUB}/${f}`)).filter((p) => /^Kit_/.test(p.name)), m = restPrims(readGlb(`${PUB}/${f.replace('.glb', '.mobile.glb')}`)).filter((p) => /^Kit_/.test(p.name));
       assert.equal(m.length, d.length, `${f}: garment count`);
       d.forEach((p, i) => { assert.deepEqual([...m[i].p0], [...p.p0], `${f} ${p.name}: positions differ on the phone`); assert.deepEqual([...m[i].W], [...p.W], `${f} ${p.name}: weights differ`); });
-    }
-  });
-
-  ok(`every short's leg tubes stay on their own side (≤ ${LEG_CROSS_MAX * 1000} mm past the midline) and ride their own thigh (≤ ${OTHER_THIGH_MAX * 100} % of the other)`, () => {
-    const files = [...KITS, ...Object.keys(RIG).filter((f) => f.startsWith('rivals/'))];
-    for (const f of files) {
-      const g = readGlb(`${PUB}/${f}`), W = nodeWorlds(g), at = (n: string) => W[(g.json.nodes as { name: string }[]).findIndex((x) => x.name === n)];
-      const L = at('LeftUpLeg'), R = at('RightUpLeg'), mid = (L[12] + R[12]) / 2, hipY = (L[13] + R[13]) / 2, leftSign = Math.sign(L[12] - R[12]);
-      for (const p of restPrims(g)) {
-        if (!/^Kit_shorts_/.test(p.name)) continue;
-        const piece = pieces(p.P, p.ind), sum = new Map<number, [number, number, number]>();
-        for (let v = 0; v < p.P.length / 3; v++) { const s = sum.get(piece[v]) ?? [0, 0, 0]; s[0] += p.P[v * 3]; s[1] += p.P[v * 3 + 1]; s[2]++; sum.set(piece[v], s); }
-        let tubes = 0;
-        for (const [id, [sx, sy, c]] of sum) {
-          const cx = sx / c, cy = sy / c; if (!(cy < hipY && Math.abs(cx - mid) > 0.03)) continue;
-          tubes++;
-          const side = Math.sign(cx - mid) === leftSign ? 1 : -1, other = p.joints.indexOf(side === 1 ? 'RightUpLeg' : 'LeftUpLeg');
-          for (let v = 0; v < p.P.length / 3; v++) {
-            if (piece[v] !== id) continue;
-            const cross = -(p.P[v * 3] - mid) * leftSign * side;
-            assert.ok(cross <= LEG_CROSS_MAX, `${f} ${p.name}: a ${side === 1 ? 'left' : 'right'} leg vertex ${(cross * 1000).toFixed(0)} mm into the other leg`);
-            let w = 0; for (let k = 0; k < 4; k++) if (p.J[v * 4 + k] === other) w += p.W[v * 4 + k];
-            assert.ok(w <= OTHER_THIGH_MAX, `${f} ${p.name}: a ${side === 1 ? 'left' : 'right'} leg vertex carries ${(w * 100).toFixed(0)} % of the other thigh`);
-          }
-        }
-        assert.equal(tubes, 2, `${f} ${p.name}: two leg tubes`);
-      }
     }
   });
 
