@@ -5,13 +5,14 @@ import {
   Skeleton, StandardMaterial, SubMesh, TransformNode, Vector3, VertexBuffer,
 } from '@babylonjs/core';
 import type { Mesh } from '@babylonjs/core';
-import { BODY_MERGE_ON, BODY_MERGE_SETTLE_FRAMES, MERGED_PREFIX, bodyAwarePainterCompare, groupKeyOf, meshesAfterMerge, mountBodyMerge, type PartFacts } from './bodyMerge';
+import { BODY_MERGE_ON, BODY_MERGE_SETTLE_FRAMES, MERGED_PREFIX, bodyAwarePainterCompare, bodyMergeOnFor, groupKeyOf, meshesAfterMerge, mountBodyMerge, type PartFacts } from './bodyMerge';
 
 function rig() {
   const engine = new NullEngine();
   // the null engine reports 16 vertex uniform vectors: too few for any skinned mesh to be "ready" (a GPU reports hundreds)
   (engine.getCaps() as { maxVertexUniformVectors: number }).maxVertexUniformVectors = 1024;
   const scene = new Scene(engine);
+  scene.metadata = { felTier: 'mobile' };   // the merge's default tier
   const cam = new FreeCamera('cam', new Vector3(0, 1, -6), scene); cam.setTarget(new Vector3(0, 1, 0));
   new HemisphericLight('h', new Vector3(0, 1, 0), scene);
   const root = new TransformNode('__root___c1', scene);
@@ -180,6 +181,18 @@ describe('bodyMerge: a body in a scene', () => {
     expect(merged(scene)).toHaveLength(0);
     expect(body.layerMask).toBe(0x0fffffff);
     expect((scene as unknown as { __felBodyMerge?: unknown }).__felBodyMerge).toBeUndefined();
+    scene.dispose();
+  });
+
+  it('the tiers: 1 = the phone only, 2 = every tier, 0 = none', async () => {
+    expect([bodyMergeOnFor('mobile', 1), bodyMergeOnFor('desktop', 1), bodyMergeOnFor('high', 1), bodyMergeOnFor(undefined, 1)]).toEqual([true, false, false, false]);
+    expect([bodyMergeOnFor('desktop', 2), bodyMergeOnFor('mobile', 0)]).toEqual([true, false]);
+    const { scene, root, skeleton, body, frames } = rig();
+    scene.metadata = { felTier: 'desktop' };
+    mountBodyMerge(scene, root, skeleton, 1);
+    await frames(BODY_MERGE_SETTLE_FRAMES + 12);
+    expect(merged(scene)).toHaveLength(0);
+    expect(body.layerMask).toBe(0x0fffffff);
     scene.dispose();
   });
 

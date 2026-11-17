@@ -1677,9 +1677,9 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
   },
   // ── lane/hoops-perf (owner 2026-11-12: join each body into one mesh; cut the heap churn) ──
   {
-    id: 'perf.bodyMergeOn', label: 'Bodies: parts drawn by a few meshes (1) / one mesh per part (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    id: 'perf.bodyMergeOn', label: 'Bodies: parts drawn by a few meshes (1 phone, 2 every tier) / one mesh per part (0)', def: 1, min: 0, max: 2, step: 1, unit: '', group: 'Hoops · phone budget',
     source: 'lib/babylon/core/bodyMerge.ts BODY_MERGE_ON',
-    hint: 'Every mode, every tier: once a body holds still, its parts that the renderer treats alike share one mesh (one sub-mesh per part, the same shaders, draw order and ink). Any change puts the parts back that frame. Same picture, fewer active meshes. 0 = one mesh per part, as before.',
+    hint: 'Every mode: once a body holds still, its parts that the renderer treats alike share one mesh (one sub-mesh per part, the same shaders, draw order and ink). Any change puts the parts back that frame. Same picture, fewer active meshes. 1 = the phone tier (measured identical there), 2 = every tier, 0 = one mesh per part, as before.',
   },
   // ── hoops-p09 (1v1 / 3v3 phase 9 "one rulebook": the play audit's sinkers 2 to 6 and 10) ──
   {

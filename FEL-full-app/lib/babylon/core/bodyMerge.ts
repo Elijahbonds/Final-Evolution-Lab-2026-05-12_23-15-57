@@ -34,13 +34,18 @@
 //     shape, a fade — anything — puts the parts back THAT frame, and the body is merged again once it has held still for
 //     BODY_MERGE_SETTLE_FRAMES. A part with a pending onBeforeRender (garmentFixes' late fold) is never hidden.
 //
-// `perf.bodyMergeOn` (1 on, every tier; 0 = nothing is merged and nothing is installed, as before).
+// `perf.bodyMergeOn` (1 = the phone tier, 2 = every tier; 0 = nothing is merged and nothing is installed, as before).
 import { BoundingInfo, Matrix, Mesh, MorphTarget, MorphTargetManager, MultiMaterial, SubMesh, Vector3, VertexBuffer } from '@babylonjs/core';
 import type { AbstractMesh, Material, Node, Nullable, Observer, Scene, Skeleton, TransformNode } from '@babylonjs/core';
 import { feel } from '@/lib/feel-panel/feel';
 
-/** perf.bodyMergeOn: 1 = a body's parts are drawn by as few meshes as the renderer allows (new); 0 = one mesh per part, as before. */
+/** perf.bodyMergeOn: 1 = on the PHONE tier a body's parts are drawn by as few meshes as the renderer allows (new); 2 = on every tier;
+ *  0 = one mesh per part, as before. Phone only by default: measured on the rig, the phone's frame is identical merged (0 px on every
+ *  look and court checked), while desktop's cascaded 4096 shadow showed small differences on two looks (181 px, max step 21, on the
+ *  football kit body; 12 px, max 4, on a tall Creator frame) — and the active-mesh budget this serves is the phone's. */
 export const BODY_MERGE_ON = 1;
+/** Pure: is the merge on for a scene of this tier, at this knob value? */
+export function bodyMergeOnFor(tier: string | undefined, on: number): boolean { return on >= 1.5 || (on >= 0.5 && tier === 'mobile'); }
 /** Frames a body must hold still (nothing structural changing) before it is merged — or merged again after a change. */
 export const BODY_MERGE_SETTLE_FRAMES = 12;
 /** Frames a built merge may wait for its shaders before it is given up (the parts keep drawing; rebuilt on the next change). */
@@ -192,6 +197,14 @@ function twinOffset(s: Skeleton, body: Skeleton): Matrix | null {
     let scale = 1; for (let k = 0; k < 16; k++) scale = Math.max(scale, Math.abs(x.m[k]));
     for (let k = 0; k < 16; k++) if (Math.abs(xi.m[k] - x.m[k]) > 1e-5 * scale) { ok = false; break; }
   }
+  // the normals are carried by X's 3x3 and re-normalised, which is exact only for a rotation and ONE scale: anything else (a skew, a
+  // per-axis scale) keeps its part out of the merge
+  if (ok && x) {
+    const m = x.m;
+    const cx = Math.hypot(m[0], m[1], m[2]), cy = Math.hypot(m[4], m[5], m[6]), cz = Math.hypot(m[8], m[9], m[10]);
+    const dot = (a: number, b: number) => (m[a] * m[b] + m[a + 1] * m[b + 1] + m[a + 2] * m[b + 2]) / (Math.hypot(m[a], m[a + 1], m[a + 2]) * Math.hypot(m[b], m[b + 1], m[b + 2]));
+    if (Math.abs(cx - cy) > 1e-5 * cx || Math.abs(cx - cz) > 1e-5 * cx || Math.abs(dot(0, 4)) > 1e-5 || Math.abs(dot(0, 8)) > 1e-5 || Math.abs(dot(4, 8)) > 1e-5) ok = false;
+  }
   const out = ok && x ? (x.isIdentity() ? IDENTITY : x) : null;
   m.set(s, out);
   return out;
@@ -210,8 +223,11 @@ function twinWhy(s: Skeleton, body: Skeleton): string {
   }
   return 'its bind space is not one matrix away';
 }
+/** A kit PACK garment (kit.ts attachKitPack: `…_pk<n>`, its own skeleton clone fitted in another bind space, attached late). Measured
+ *  on the football pack: merged, it drew 815 px differently (max step 121) — packs keep their own mesh. */
+const PACK_PART = /_pk\d+$/;
 function isCandidate(m: AbstractMesh, skeleton: Skeleton): m is AnyMesh {
-  return m instanceof Mesh && m.getClassName() === 'Mesh' && !m.name.startsWith(MERGED_PREFIX) && !!m.skeleton && sameSkinning(m.skeleton, skeleton)
+  return m instanceof Mesh && m.getClassName() === 'Mesh' && !m.name.startsWith(MERGED_PREFIX) && !PACK_PART.test(m.name) && !!m.skeleton && sameSkinning(m.skeleton, skeleton)
     && !(m.metadata as { felMergedBody?: boolean } | null)?.felMergedBody;
 }
 
@@ -813,7 +829,8 @@ function debugHandle(scene: Scene, r: SceneReg): BodyMergeDebug {
 export interface BodyMergeHandle { dispose(): void }
 /** Merge this body's parts (when the knob is on), now and after every change. Disposing restores every part. */
 export function mountBodyMerge(scene: Scene, root: TransformNode, skeleton: Skeleton, on = feel('perf.bodyMergeOn', BODY_MERGE_ON)): BodyMergeHandle {
-  if (on < 0.5 || !scene.onBeforeActiveMeshesEvaluationObservable) return { dispose() { /* off: nothing installed */ } };
+  const tier = (scene.metadata as { felTier?: string } | null)?.felTier;
+  if (!bodyMergeOnFor(tier, on) || !scene.onBeforeActiveMeshesEvaluationObservable) return { dispose() { /* off: nothing installed */ } };
   const reg = regFor(scene);
   const b: Body = { root, skeleton, candidates: null, groups: [], lastSig: new Float64Array(0), stable: 0, built: false, lastChange: '', lastBuild: '', parked: [], disposed: false };
   reg.bodies.push(b);
