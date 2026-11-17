@@ -368,6 +368,22 @@ with a real player (`hoops-audit/mash-audit.mjs PLAYER=script` and `mash`): the 
   3v3 arm turns over 25° a frame 32 → 13, worst 175 → 82°/frame; 1v1 worst 117 → 96. The pump's own up-and-down is a second dip by
   design, so the re-drop bar does not apply to it. **assumption:** after a pump the dribble comes back once the clip ends (as the game
   did); whether a pump should end the dribble is the owner's call.
+- **Phase 3, step 3: G4 measured** (`SET=combo`, on the release with move-feel A+B in it; 1v1 from the poster seam, 3v3 from the check;
+  the probe presses the euro AT 3.3-3.6 m and the hop as a double tap at 3.3 m — waiting for a bounce phase at a sprint carried the
+  squeeze 1-2 m further, inside the plain drive dunk's range). With `hoops.comboDunkOn` 1: **the euro into a dunk fired on every euro
+  pressed at speed (1v1: 4 of 4 over two runs), the double-tapped hop into a dunk 2 of 3 in 1v1 and 2 of 2 in 3v3** (the third read
+  the speed at the SECOND press, after the gather bled it: now read at the first press, `force.hopVel`). The ball: always the
+  footwork's own pick-up, 1-6 cm off the palm, no yank (the plain drive dunk on the same runs: 47-69 cm). The arm: worst 39-83°/frame
+  on most, but 164 (one euro) and 126 (one hop) in the footwork → dunk crossfade (the same footwork into a layup: 36-103). The ball's
+  re-drop 6-35 cm (the dunk's own load after the footwork's). **`hoops.comboDunkOn` → 1** (coordinator 2026-11-17: the owner asked for a
+  euro step dunk; FLAGGED), with the two crossfade pops as the open item. The 3v3 euro did not fire in the probe (its drives from the check never met
+  the euro's read at speed): not measured.
+- **The dunk take-off yank (cause c), tried and NOT shipped.** The drive dunk's take through the pick-up (wait for the bounce, into the
+  dunking hand, settled by the take-off pass's end, 0.18 s) measured WORSE on the same seeds: 1v1 53 → 121 cm and 0.5 → 71 cm, settles
+  at the deadline 53-69 cm, because the body leaves the floor while the ball is still on its bounce, and the late take flies it farther.
+  Removed (no knob). The fix this needs is the take-off timed to the gather (the last dribble met in the hands, then the plant), which
+  changes WHEN a drive dunk leaves the floor: a dunk-timing feel call for the owner / the dunk lane, not a pick-up knob. Until then the
+  combo dunks are the yank-free way up.
 
 - **G3, escapes (2026-11-17, lane/hoops-gather-5).** New probe trials: the step-back off a drive (he backpedals; the stick let go with
   the flick), the step-back against a man closing out, the cross in a trap each way (`SET=g3`, `SET=g3trap`).
