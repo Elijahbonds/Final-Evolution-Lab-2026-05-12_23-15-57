@@ -1919,6 +1919,31 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'On: the ball stays in the hands while the pump plays, and the step-through takes it from there. Off (as before): the dribble restarts the frame after the pump and the ball drops loose.',
   },
   {
+    id: 'hoops.escapeReadOn', label: 'Step-back escape reads the man (1) / as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · gathers',
+    source: 'lib/babylon/hoops/response/escapeRead.ts ESCAPE_READ_ON',
+    hint: 'On: a step-back beats a man on his heels or off balance (he is late), never a set man or one coming at you. Off: as before.',
+  },
+  {
+    id: 'hoops.trapReadOn', label: 'Trap: a cross splits an open gap, is stripped on the closed side (1) / as before (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · gathers',
+    source: 'lib/babylon/hoops/response/escapeRead.ts TRAP_READ_ON',
+    hint: 'On: a crossover in a double team splits the two men when a body fits between them, and is a steal thrown into a man on the closed side (the owner rule). Off: as before.',
+  },
+  {
+    id: 'hoops.escapeLateSec', label: 'Escape: a beaten man is late by', def: 0.7, min: 0.1, max: 1, step: 0.05, unit: 's', group: 'Hoops · gathers',
+    source: 'lib/babylon/hoops/response/escapeRead.ts ESCAPE_LATE_SEC',
+    hint: 'How long a defender who bit stays where the escape left him before he recovers.',
+  },
+  {
+    id: 'hoops.trapGapMinM', label: 'Trap: extra room a split needs', def: 0, min: 0, max: 1, step: 0.05, unit: 'm', group: 'Hoops · gathers',
+    source: 'lib/babylon/hoops/response/escapeRead.ts TRAP_GAP_MIN_M',
+    hint: 'Beyond the room a body needs to pass between the two trappers (2.2 m apart). Tighter than that, the trap is shut.',
+  },
+  {
+    id: 'hoops.escapeStripReachM', label: 'Trap: a cross into a man this close is stripped', def: 1.5, min: 0.8, max: 2.2, step: 0.05, unit: 'm', group: 'Hoops · gathers',
+    source: 'lib/babylon/hoops/response/escapeRead.ts ESCAPE_STRIP_REACH_M',
+    hint: 'A crossover thrown toward a trapper inside this, with the gap shut, is a steal (the owner rule).',
+  },
+  {
     id: 'hoops.comboDunkOn', label: 'Euro step and hop step can end in a dunk (1) / never (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · gathers',
     source: 'lib/babylon/core/ComboFinish.ts COMBO_DUNK_ON',
     hint: 'On: the turbo held, fast, and the last step inside dunk range, the euro or the hop takes off into a dunk. Off: they end in a layup or floater, as before.',

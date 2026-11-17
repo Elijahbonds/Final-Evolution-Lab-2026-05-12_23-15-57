@@ -41,6 +41,11 @@ export const KINDS = {
   // the pick-up AT SPEED (3v3: no poster seam, the drive runs from the check): a turbo pull-up and a turbo layup beside the drive kinds above
   spr_pullup:  { kind: 'spr_pullup', mag: 1, turbo: true, untilDist: 4.6 },
   spr_layup:   { kind: 'spr_layup', mag: 1, turbo: true, untilDist: 2.6 },
+  // G3: the step-back against a man who BIT — backing out (he follows, coming at me), then the flick; and the cross in a trap, each side
+  esc_stepback_bit: { kind: 'esc_stepback_bit', escape: true, flick: 'down', retreat: true, mag: 1, approachSec: 0.6, waitClose: true, tailF: 70 },
+  esc_stepback_drive: { kind: 'esc_stepback_drive', escape: true, flick: 'down', mag: 0.9, untilDist: 4.8, stickOff: true, tailF: 70 },   // he backpedals on the drive
+  trap_cross_l:    { kind: 'trap_cross_l', trap: true, escape: true, flick: 'left', mag: 0.8, untilDist: 2.6, tailF: 70 },
+  trap_cross_r:    { kind: 'trap_cross_r', trap: true, escape: true, flick: 'right', mag: 0.8, untilDist: 2.6, tailF: 70 },
   // the TRAP (3v3 only: hoops/teamDefense doubles a ball held in the paint): drive to 2.6 m, stop, wait for the double, then the escape
   trap_stepback:   { kind: 'trap_stepback', trap: true, escape: true, flick: 'down', mag: 0.8, untilDist: 2.6, tailF: 70 },
   trap_snatchback: { kind: 'trap_snatchback', trap: true, escape: true, flick: 'down', turbo: true, mag: 0.8, untilDist: 2.6, tailF: 70 },
@@ -52,6 +57,8 @@ const SETS = {
   gathers: ['set', 'pullup', 'stepback', 'hop', 'euro', 'stepthrough'],
   finishes: ['layup', 'dunk'],
   escapes: ['esc_stepback', 'esc_snatchback', 'esc_btb', 'esc_retreat', 'esc_momcross', 'esc_spin'],
+  g3: ['esc_stepback', 'esc_stepback_bit', 'esc_stepback_drive', 'esc_retreat', 'esc_snatchback'],
+  g3trap: ['trap_stepback', 'trap_cross_l', 'trap_cross_r', 'trap_hold'],
   combo: ['euro_dunk', 'hop_dunk', 'hop2_dunk', 'dunk'],
   speed: ['pullup', 'spr_pullup', 'hop', 'euro', 'layup', 'spr_layup', 'dunk', 'stepthrough'],
   trap: ['trap_stepback', 'trap_snatchback', 'trap_spin', 'trap_btb', 'trap_hold'],
