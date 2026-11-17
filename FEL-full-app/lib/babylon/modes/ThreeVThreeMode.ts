@@ -48,6 +48,8 @@
 //      that contests the driver's release (and the AI's contests mine), the contest biting the make chance and altering the arc.
 import { nerve, standingOf } from '../core/Nerve';
 import { PressBuffer } from '../hoops/response/pressBuffer';
+import { escapeLateSec, trapEscape, trapReadOn } from '../hoops/response/escapeRead';   // hoops-gather G3: escapes read the defenders
+import { moveImpulse } from '../core/HandleSystem';   // hoops-gather G3: a crossing escape (a lateral body) in a trap
 import { pumpHoldSec, pumpHolding } from '../hoops/response/pumpHold';   // hoops-gather: the pump keeps the ball while its clip plays   // hoops-p01: the shot press waits out the move (was gameFeel's InputBuffer)
 import { tickScuff, scuffPuffScale, scuffVolume, SCUFF_IDLE, type ScuffState } from '../core/ScuffFx';
 import { MeshBuilder, Vector3, StandardMaterial, Color3 } from '@babylonjs/core';
@@ -3687,6 +3689,22 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     const biteDir: 'left' | 'right' = dirHint ?? (foe ? sideAwayFrom(me.char.root.position, me.char.root.rotation.y, foe.char.root.position) : 'right');
     console.info(`[3V3-HANDLE] move ${move} ${moveDir} → ${r.clip ?? 'mode-owned'}${r.twin ? ` (same-hand twin ${r.rendered})` : ''} ball ${r.ball} ${r.startHand[0].toUpperCase()}→${r.endHand[0].toUpperCase()}`);
 
+    // hoops-gather G3: A CROSSING ESCAPE IN A TRAP reads both men (hoops/response/escapeRead trapEscape): through an open gap it SPLITS
+    // them (both late); into the closed side, a trapper inside his reach on the side the ball goes, it is STRIPPED (the owner's rule,
+    // 2026-11-12); to an open side, a man who bit is late. hoops.trapReadOn 0 (shipped): as before.
+    if (trapReadOn() && carrierId === 'me' && move !== 'off_the_head' && moveImpulse(move).lateral !== 0 && teamD.doubler !== null
+      && defenderBrains[teamD.doubler]?.mark === 0) {
+      const men = foes.filter((f) => f.stunSec <= 0 && !f.floored && distXZ(f.char.root.position, me.char.root.position) < SHAKE_RANGE)
+        .sort((a, b) => distXZ(a.char.root.position, me.char.root.position) - distXZ(b.char.root.position, me.char.root.position)).slice(0, 2);
+      if (men.length) {
+        const v = trapEscape(me.char.root.position, me.char.root.rotation.y, moveDir, men.map((f) => ({ at: f.char.root.position, read: manReadOf(f, moveDir) })));
+        if (v.kind === 'strip') { console.info(`[3V3-HANDLE] trap escape ${move} ${moveDir}: into the closed side — stripped`); stripBall(ctx, men[v.by], 'INTO THE TRAP — STRIPPED!'); return true; }
+        const late = v.kind === 'split' ? men : v.beat.map((i) => men[i]);
+        for (const f of late) f.stunSec = Math.max(f.stunSec, escapeLateSec());
+        if (v.kind === 'split') bannerFlash(ctx, 'SPLIT THE TRAP!', 800);
+        console.info(`[3V3-HANDLE] trap escape ${move} ${moveDir}: ${v.kind}${v.kind === 'open' ? ` (${late.length} late)` : ''}`);
+      }
+    }
     // OFF THE HEAD resolves here, not through the ankle-break roll: it is the one move where the ball
     // leaves your hands, so it is the one move that can lose it. Same rule in 1v1.
     if (move === 'off_the_head' && carrierId === 'me' && foe && !foe.floored && foe.stunSec <= 0) {

@@ -86,6 +86,7 @@
 
 import { nerve, standingOf } from '../core/Nerve';
 import { PressBuffer } from '../hoops/response/pressBuffer';
+import { escapeReadOn, escapeLateSec, stepBackRead } from '../hoops/response/escapeRead';   // hoops-gather G3: escapes read the defenders
 import { pumpHoldSec, pumpHolding } from '../hoops/response/pumpHold';   // hoops-gather: the pump keeps the ball while its clip plays   // hoops-p01: the shot press waits out the move (was gameFeel's InputBuffer)
 import { tickScuff, scuffPuffScale, scuffVolume, SCUFF_IDLE, type ScuffState } from '../core/ScuffFx';
 import { MeshBuilder, Quaternion, TransformNode as BABYLON_TransformNode, Vector3 } from '@babylonjs/core';
@@ -1770,6 +1771,13 @@ export const OneVOneMode: ModeDefinition = (() => {
               const toRimS = RIM_FLOOR.subtract(me.root.position); toRimS.y = 0;
               meDribble.stepBack(toRimS.x, toRimS.z, sprintOk); stepbackWindow = STEPBACK_WINDOW_SEC;
               SoundKit.play('whoosh', { pitch: 0.9, volume: 0.35 }); ctx.feel?.impact?.(0.1);
+              // hoops-gather G3: THE HOP-BACK READS HIM — a man on his heels (giving ground) or off balance is late by
+              // escapeLateSec, so the hop's travel is the space; a set man mirrors it, as before (hoops.escapeReadOn 0: no read at all)
+              if (escapeReadOn() && foeStunSec <= 0 && !foeFloored && distXZ(me.root.position, foe.root.position) < SHAKE_RANGE) {
+                const v = stepBackRead(foeManRead(null));
+                if (v.beat) foeStunSec = Math.max(foeStunSec, escapeLateSec());
+                console.info(`[1V1-HANDLE] escape stepback: ${v.beat ? `he bit (${v.why}), late ${escapeLateSec().toFixed(2)} s` : 'he is set, he stays with it'}`);
+              }
               continue;
             }
             if (pick.move === 'snatchback') {

@@ -369,6 +369,28 @@ with a real player (`hoops-audit/mash-audit.mjs PLAYER=script` and `mash`): the 
   design, so the re-drop bar does not apply to it. **assumption:** after a pump the dribble comes back once the clip ends (as the game
   did); whether a pump should end the dribble is the owner's call.
 
+- **G3, escapes (2026-11-17, lane/hoops-gather-5).** New probe trials: the step-back off a drive (he backpedals; the stick let go with
+  the flick), the step-back against a man closing out, the cross in a trap each way (`SET=g3`, `SET=g3trap`).
+  - **The step-back reads the man (1v1, `hoops.escapeReadOn` ON, FLAGGED):** beaten when he is on his heels or off balance, never a set
+    man, never one coming at you. Off a drive: 2.74-2.84 m from him 0.8 s later, against 1.77-1.91 m with no read (+1.0 m); a set man:
+    the same as no read (+0.58-0.73 m). `hoops.escapeLateSec` 0.7 s (0.45 bought nothing: he braked onto the hop and closed again).
+    Against a man closing out at 4.3 m/s no read helps: he brakes 1.4 m onto the hop and stands at 1.10 m (that man is beaten going BY
+    him, the moves' own read) — so the step-back does not count a closing man as beaten.
+  - **3v3 step-back: left as it was.** A late 3v3 man is frozen on the spot (stunSec stops his velocity dead), so a backpedalling man
+    stopped nearer: the read measured +0.58-0.62 m against +0.17-1.01 m without it. Open: a "late" that lets his backpedal run on.
+  - **The trap (`hoops.trapReadOn`, OFF for the owner):** the read and the owner's rule are in (split / stripped / open, by both men's
+    geometry). On: 3 of 3 crosses in a trap stripped, 0 split — every trap measured was 1.3-2.2 m apart, which the bodies' 1.10 m
+    stand-off cannot pass. A split that works needs the trap's bodies to let a handler through (the collision rule), not a read.
+  - **Spin-out:** already read by the spin's own pivot / shoulder read (`[3V3-MOVE] spin shoulder clear beaten`); not changed. The
+    rig's sweep still throws between-the-legs instead of a spin (phase A: an owner try on the phone first).
+  - **Retreat dribble:** unchanged; its separation is the handler running away (1v1 +0.9-1.2 m in 0.8 s: the 1v1 defender does not
+    follow a retreat). It still plays the behind-the-back (below).
+  - **The behind-the-back whip is a clip job (GATE 0), not runtime code:** `bball_behind_back_*` is authored in
+    `anim/authored/basketball.ts` (`BEHIND_V2`): the ball hand goes from its key behind the back (t 0.25 s, `R: { near: 0.14 }`) to out
+    in front (t 0.34 s, `R: [0.22, 0.92, 0.02]`) in 0.09 s, and the arm's solve flips the hand through it — 112-146° in one frame, 15-25
+    frames in (phase A). The fix is a key between them (the hand coming round the hip) or a longer 0.25 → 0.34, re-verified on the rig
+    (GATE 0: the reel and the hand probe before and after). The BTB slide (`SLIDE_V2`, its own keys) measured 30°/frame: not affected.
+
 ## 6. The worst moments, drawn
 
 One JPG, `scratchpad/hoops-gather/gather-escape-worst.jpg` (the lane's scratch folder; its absolute path is in the lane's report): five

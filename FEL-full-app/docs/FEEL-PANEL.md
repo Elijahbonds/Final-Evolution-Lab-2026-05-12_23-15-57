@@ -886,3 +886,17 @@ Two NEW knobs, **shipped ON** (assumption, flagged: the owner chose both; each k
   stick's centre sent 0.42–0.49 (a jog) and now sends 0 (a standstill); a 30 px push sent full speed and now 0.35. No overlap with any other
   control, inside the stage, in both orientations. "The same push always the same speed": with `hoops.stickSprintFallback` 0 and
   `hoops.gearBlendBand` 0.2 (move-feel) the stick's scale has no hidden turbo and no step. 0 = the fixed 96 px stick.
+- `hoops.escapeReadOn` 1 (`hoops/response/escapeRead.ts` `ESCAPE_READ_ON`, G3; FLAGGED, on; 1v1): the step-back (the hop-back escape)
+  reads the man, never a roll: a man on his heels (giving ground toward the rim faster than `hoops.moveLeanMps`, the backpedal that cuts
+  a drive off) or off balance is beaten and late by `hoops.escapeLateSec`; a set man, or one coming at you, is not (he mirrors, as before;
+  the ball is safe). Measured (1v1, the step-back off a drive, the stick let go): 2.74-2.84 m from him 0.8 s later (+1.58-1.74 m) against
+  1.77-1.91 m with no read; against a set man +0.58-0.73 m, the same as no read. Off (0): as before. Feel-check: drive, he backs off,
+  step back: the space is yours; step back on a man standing in front of you: he is still there.
+- `hoops.escapeLateSec` 0.7 s (G3): how long a beaten man brakes and stands before he recovers: the same as a man a move shook
+  (`ANKLE_BREAK_STUN_SEC`). Measured: 0.45 s bought nothing over no read (the man braked onto the hop and closed again inside 0.8 s).
+- `hoops.trapReadOn` 0 (G3; OFF, the owner's call): in a 3v3 double team on the ball, a crossing move reads both men: SPLIT when a body
+  fits between them (2.2 m apart, the bodies' 1.10 m stand-off each side, plus `hoops.trapGapMinM` 0 m): both men late; STRIPPED when
+  it is thrown into the closed side, a trapper inside `hoops.escapeStripReachM` 1.5 m on the side the ball goes (the owner's rule
+  2026-11-12: an escape into the closed side of a trap is a steal); otherwise a man who bit is late. Measured with it on: 3 of 3 crosses
+  in a trap were stripped and none split: every trap the probe met was 1.3-2.2 m apart, which the bodies cannot pass. So on, a cross into
+  a trap is a turnover; the escapes out of a trap are the step-back and the pass. Left off for the owner to decide.
