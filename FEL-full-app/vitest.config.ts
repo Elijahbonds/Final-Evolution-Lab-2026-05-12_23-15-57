@@ -27,6 +27,14 @@ export default defineConfig({
     // fast; the default 5s timeout fails them for no good reason.
     testTimeout: 180_000,   // the headless check suites spawn a script with its own 120 s limit; under a sweep load a 60 s test timeout fired first (three false alarms 2026-09-05 and 06)
     hookTimeout: 120_000,
+    // The full suite is large enough that an overloaded worker can die after
+    // all tests report pass, leaving a buried "worker exited unexpectedly"
+    // diagnostic. Keep the pool bounded so the gate fails on tests, not VM
+    // pressure.
+    pool: 'forks',
+    minWorkers: 1,
+    maxWorkers: 4,
+    poolOptions: { forks: { minForks: 1, maxForks: 4 } },
   },
   // React components compile against the AUTOMATIC JSX runtime everywhere else in this app (Next sets it), so a
   // component that imports only the hooks it uses — as CaptionRegion does — throws "React is not defined" under
