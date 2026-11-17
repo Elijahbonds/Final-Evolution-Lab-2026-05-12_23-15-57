@@ -264,11 +264,16 @@ The same rules for the hub and every zone (they are made of the same pieces):
 
 | Phone budget (worst frame) | Draws | Active meshes | Texture MB |
 |---|---|---|---|
-| Bodies: the player, the partner, ≤ 4 party, ≤ 6 NPCs or creatures (12) | 130 | 110 | 90 |
+| Bodies: the player, the partner, ≤ 4 party, ≤ 6 NPCs or creatures (12) | 130 | 80 (110 before #603) | 90 |
 | Full pieces: 9 × (25 draws / 16 meshes) | 225 | 144 | one zone atlas set ≤ 64 |
 | LOD ring: 16 × 4 / 1 | 64 | 16 | (shared) |
 | Far silhouette, sea or terrain, sky dome, HUD | 25 | 15 | 30 |
-| **Total** (the Adventure plan's 75 % budget: 450 / 300 / ≈ 200) | **444** | **285** | **≤ 184** |
+| **Total** (the Adventure plan's 75 % budget: 450 / 300 / ≈ 200) | **444** | **255** | **≤ 184** |
+
+**Since this table was first written (2026-11-17):** #603 draws each body's parts with a few merged meshes on every tier
+(`core/bodyMerge.ts`, `perf.bodyMergeOn`); measured on 3v3's phone profile it cut active meshes 109 → 79 and left draws
+(194) and texture memory (165 MB) unchanged. So bodies now cost about 30 % fewer active meshes; draws and textures stay
+the limits, and the table above is updated for it. Not re-measured on the hub prototype (it has no bodies).
 
 **Per zone** (first cut; every zone keeps the common budget above, and what differs is how its space is filled):
 
@@ -386,6 +391,12 @@ unlisted route, `/play/hub` [PLACEHOLDER], with the same noindex and no-links ru
 - The hub is **party-only**: no strangers walk your Venice. A teen's look never uploads (`TEEN_DEVICE_LOOK_EVERYWHERE`,
   `lib/creator/look/slots.ts`), so friends see the default look, as in the Adventure's online plan.
 - No new data leaves the device: the return spot is in `sessionStorage`; presence is relayed, never stored.
+
+### Touch
+- **The hub walks on the new floating phone stick** (#600: `lib/babylon/ui/floatStick.ts`, drawn by TouchOverlay's
+  `FloatStick`, knob `touch.floatStick`, shipped on for hoops): the stick appears under the thumb, a 10 % dead zone, the
+  same push always the same speed. One stick for the hub and the courts, so walking up to a court and playing on it feel
+  the same. The walk-up card's Play button sits outside the stick's zone.
 
 ### Menus
 - **One tap stays.** The Play shelf, every `/play/<mode>` route and the party's Start together are unchanged. The hub is
