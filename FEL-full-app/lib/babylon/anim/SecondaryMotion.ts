@@ -17,10 +17,14 @@
 //
 // Bone names are the LOCKED unprefixed spec (AvatarSkeletonSpec.md).
 
-import { Quaternion, Vector3 } from '@babylonjs/core';
+import { Matrix, Quaternion, Vector3 } from '@babylonjs/core';
 import type { Scene, Skeleton, TransformNode } from '@babylonjs/core';
 import { findBone } from './boneLookup';
 import { AdditiveQuat, AdditiveScalar } from './AdditiveTrack';
+
+/** hoops-perf: the constant axes (Vector3.Right() / Forward() made a new vector each call). */
+const AXIS_RIGHT: Readonly<Vector3> = Vector3.Right();
+const AXIS_FORWARD: Readonly<Vector3> = Vector3.Forward();
 
 export interface SecondaryMotionOpts {
   /** World-space point the head should track; null = none this frame. */
@@ -97,10 +101,12 @@ export function mountSecondaryMotion(scene: Scene, skeleton: Skeleton, opts: Sec
   const chestRot = new AdditiveQuat(), chestScaleX = new AdditiveScalar(), chestScaleY = new AdditiveScalar();
   const hipsRot = new AdditiveQuat(), hipsX = new AdditiveScalar();
   const headRot = new AdditiveQuat();
+  const applyOut = new Quaternion();
+  const lookInv = new Matrix(), lookLocal = new Vector3(), lookHead = new Vector3();
   const applyQuat = (node: TransformNode, track: AdditiveQuat, delta: Quaternion): void => {
     const q = node.rotationQuaternion!;
     const b = track.baseFor(q.x, q.y, q.z, q.w);
-    const out = new Quaternion(b[0], b[1], b[2], b[3]).multiplyInPlace(delta);
+    const out = applyOut.set(b[0], b[1], b[2], b[3]).multiplyInPlace(delta);   // hoops-perf: a scratch, the same product
     q.copyFrom(out); track.wrote(out.x, out.y, out.z, out.w);
   };
   const obs = scene.onAfterAnimationsObservable.add(() => {
@@ -117,7 +123,7 @@ export function mountSecondaryMotion(scene: Scene, skeleton: Skeleton, opts: Sec
       const sy = chestScaleY.baseFor(chest.scaling.y) * (1 + 0.015 * b * calm);
       chest.scaling.set(sx, sy, sx); chestScaleX.wrote(sx); chestScaleY.wrote(sy);
       if (chest.rotationQuaternion) {
-        Quaternion.RotationAxisToRef(Vector3.Right(), -0.02 * b * calm, tmpQ);
+        Quaternion.RotationAxisToRef(AXIS_RIGHT, -0.02 * b * calm, tmpQ);
         applyQuat(chest, chestRot, tmpQ);
       }
     }
@@ -127,7 +133,7 @@ export function mountSecondaryMotion(scene: Scene, skeleton: Skeleton, opts: Sec
       const hx = hipsX.baseFor(hips.position.x) + 0.012 * w * calm;
       hips.position.x = hx; hipsX.wrote(hx);
       if (hips.rotationQuaternion) {
-        Quaternion.RotationAxisToRef(Vector3.Forward(), 0.015 * w * calm, tmpQ);
+        Quaternion.RotationAxisToRef(AXIS_FORWARD, 0.015 * w * calm, tmpQ);
         applyQuat(hips, hipsRot, tmpQ);
       }
     }
@@ -140,9 +146,9 @@ export function mountSecondaryMotion(scene: Scene, skeleton: Skeleton, opts: Sec
         const headPos = head.getAbsolutePosition();
         // target in the head's parent space so yaw/pitch are relative to the neck
         const parent = head.parent as TransformNode | null;
-        const inv = parent ? parent.getWorldMatrix().clone().invert() : null;
-        const local = inv ? Vector3.TransformCoordinates(target, inv) : target.subtract(headPos);
-        const headLocal = inv ? Vector3.TransformCoordinates(headPos, inv) : Vector3.Zero();
+        const inv = parent ? parent.getWorldMatrix().invertToRef(lookInv) : null;   // hoops-perf: scratches, the same maths
+        const local = inv ? Vector3.TransformCoordinatesToRef(target, inv, lookLocal) : target.subtractToRef(headPos, lookLocal);
+        const headLocal = inv ? Vector3.TransformCoordinatesToRef(headPos, inv, lookHead) : lookHead.setAll(0);
         local.subtractToRef(headLocal, tmpV);
         // the forge faces +z: yaw about +y, pitch about +x
         wantYaw = Math.atan2(tmpV.x, tmpV.z);
