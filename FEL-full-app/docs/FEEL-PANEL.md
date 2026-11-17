@@ -732,3 +732,18 @@ party run plays today's numbers (and so does an agent / probe run). **Phase B (2
 - `hoops.heightLookPerIn` 0.01 (phase B; owner 2026-11-12 "the body on screen follows the playing height"): the hero is DRAWN 1 % taller an
   inch over 6'4" (6'0" 96 %, 6'8" 104 %, the cosmetic clamp). Drawing only: while he is drawn scaled the modes read the ball on his hand on
   the standard frame (playFramePoint), so the size changes no outcome. Casual runs only; 0 = the standard body.
+## hoops-flow, 2026-11-12 (owner decisions: "3v3 is first to 21 on a 4-minute clock", "any press skips a replay")
+
+Group "Hoops · flow and pace". Both are the owner's own calls; each knob puts the old behaviour back exactly (tests pin both ends).
+- `hoops.threeGameSec` 240 s (`modes/threevthreeOvertime.ts` `THREE_GAME_SEC`; it was `ThreeVThreeMode.ts` `POSSESSION_SEC` 90): the 3v3
+  game clock. First to 21 still ends it outright; at the horn the leader wins; level at the horn is the sudden-death overtime as before
+  (`hoops.overtime3v3Sec`, 30 s). Read when the game starts. The clock chip reads m:ss from a minute up ('4:00'), seconds under it. The
+  MC's recorded 3v3 welcome names a ninety-second clock, so it is said only on a 90 s game until the lines are re-recorded. 90 = before.
+  Feel-check: play a full PRO 3v3: does a comeback have room, and does the game still feel tight at the end?
+- `hoops.replaySkipOn` 1 (`core/replaySkip.ts` `REPLAY_SKIP_ON`): during a hoops replay (1v1, 3v3, the 3-point money ball, the dunk
+  contest's and the duel's cuts) any press ends it at once and the next possession starts: a button, the d-pad, a trigger pulled, a
+  stick pushed out from rest (a dribble flick, the keyboard's dribble keys) or a tap on the court. The skipping press is the replay's:
+  not a shot, not a dribble move (the right stick and a trigger are held back until let go); the walking stick is passed on, so a held
+  stick moves you when the ball comes back. In the dunk contest A still hurries the judges and the d-pad still throws your
+  celebration. 0 = only a button or d-pad press skips (the dunk cuts: A or B, a tap or Space), as before. Feel-check: 1v1, break his
+  ankles, score, and flick the stick the moment the replay starts.
