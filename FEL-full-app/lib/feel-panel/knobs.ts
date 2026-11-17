@@ -1875,9 +1875,9 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'Ships off (not better on every build). On: a worn top or short never falls behind the skin under it on a Creator build. Off: each garment bulks by its own weights, as before.',
   },
   {
-    id: 'kit.shapeKeepsFit', label: 'Creator shape keeps the clothes fit on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Kit · fit',
+    id: 'kit.shapeKeepsFit', label: 'Creator shape keeps the clothes fit: all (1) / outward only (2) / off (0)', def: 1, min: 0, max: 2, step: 1, unit: '', group: 'Kit · fit',
     source: 'lib/babylon/core/morphCarry.ts SHAPE_KEEPS_FIT',
-    hint: 'On: on a Creator build the shorts stay tucked under the top and the hems keep their flare. Off: the shape draws the clothes as loaded, before their fit.',
+    hint: 'On (1): on a Creator build the shorts stay tucked under the top and the hems keep their flare. 2: only the fit\'s outward moves are kept. Off (0): the shape draws the clothes as loaded, before their fit.',
   },
 ];
 

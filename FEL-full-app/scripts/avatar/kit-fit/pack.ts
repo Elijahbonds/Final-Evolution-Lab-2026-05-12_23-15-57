@@ -22,7 +22,7 @@ import { BodySurface } from './surface';
 /** Metres the jersey's outer wall stands off the skin under the runtime's 13 mm lift, above the waist band and in it. NEW. */
 export const PACK_FIT = { ease: 0.004, waistEase: 0.022, waistBand: 0.14, spread: 0.025, facing: 0.2 } as const;
 
-export function fitPack(packPath: string, outPath: string, bodyPaths: string[], cfg = PACK_FIT): Record<string, unknown> {
+export function fitPack(packPath: string, outPath: string, bodyPaths: string[], cfg: { readonly [K in keyof typeof PACK_FIT]: number } = PACK_FIT): Record<string, unknown> {
   const pack = readGlb(packPath);
   const rig0 = rigPrint(pack);
   const pn = (pack.json.nodes as { mesh?: number; skin?: number; name: string }[]).find((n) => n.mesh != null && n.skin != null)!;
@@ -86,7 +86,7 @@ export function fitPack(packPath: string, outPath: string, bodyPaths: string[], 
   }
   const out = new Float32Array(nv * 3); for (let i = 0; i < out.length; i++) out[i] = p0[i] + best[i];
   pack.json.meshes[pn.mesh!].primitives[primIdx] = { ...prim, attributes: { ...prim.attributes, POSITION: appendAccessor(pack, out, 'VEC3', 'float', 34962) } };
-  const m = pack.json.meshes[pn.mesh!]; m.extras = { ...(m.extras ?? {}), felKitFit: { v: 1, pack: PACK_FIT } };
+  const m = pack.json.meshes[pn.mesh!]; m.extras = { ...(m.extras ?? {}), felKitFit: { v: 1, pack: cfg } };
   if (rigPrint(pack) !== rig0) throw new Error('GATE 0: the pack rig changed — refusing to write');
   if (untouchedPrint(pack, new Set([`${pn.mesh}:${primIdx}`])) !== untouched0) throw new Error('pack content outside the jersey changed — refusing to write');
   writeGlb(outPath, pack);
@@ -94,6 +94,8 @@ export function fitPack(packPath: string, outPath: string, bodyPaths: string[], 
 }
 
 if (require.main === module) {
-  const [inP, outP, ...bodies] = process.argv.slice(2);
-  console.log(JSON.stringify(fitPack(inP, outP, bodies), null, 1));
+  // PACK_EASE / PACK_WAIST_EASE (m) try a variant without editing the shipped numbers
+  const [inP, outP, ...bodies] = process.argv.slice(2), env = process.env;
+  const cfg = { ...PACK_FIT, ...(env.PACK_EASE ? { ease: Number(env.PACK_EASE) } : {}), ...(env.PACK_WAIST_EASE ? { waistEase: Number(env.PACK_WAIST_EASE) } : {}) };
+  console.log(JSON.stringify(fitPack(inP, outP, bodies, cfg), null, 1));
 }

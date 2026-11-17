@@ -8,7 +8,7 @@ import type { AssetContainer, Mesh, TransformNode } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { applyKit } from './kit';
 import { maskBodyNow } from './bodyMask';
-import { carryShapeMorph, SHAPE_KEEPS_FIT } from './morphCarry';
+import { carryShapeMorph, keptFitDelta, SHAPE_KEEPS_FIT } from './morphCarry';
 import { syncShape } from '../creator/shape/renderShape';
 import { FEEL_KNOB_BY_ID } from '../../feel-panel/knobs';
 import { resetFeelForTests, setFeelOverride, setFeelSession, setFeelUser } from '../../feel-panel/feel';
@@ -52,7 +52,7 @@ describe('a garment\'s fit survives the Creator\'s shape (kit.shapeKeepsFit)', (
   it('ships on, and its knob row restores the old behaviour at 0', () => {
     expect(SHAPE_KEEPS_FIT).toBe(1);
     const k = FEEL_KNOB_BY_ID.get('kit.shapeKeepsFit')!;
-    expect([k.def, k.min, k.max, k.step]).toEqual([1, 0, 1, 1]);
+    expect([k.def, k.min, k.max, k.step]).toEqual([1, 0, 2, 1])   // 2 = outward-only (KIT-FIT-PLAN §10.2 follow-up);
   });
   it('on the male kit at girth 1.6 the shape keeps the waistband fit on nearly every fitted vertex', () => {
     const r = shapedFit();
@@ -71,5 +71,10 @@ describe('a garment\'s fit survives the Creator\'s shape (kit.shapeKeepsFit)', (
     expect(carryShapeMorph(mesh, [0, 0, 0], [0.5, 0, -1])).toBe(1);
     expect([...P]).toEqual([1.5, 2, 2]);
     expect(carryShapeMorph(mesh, [0, 0], [1, 1])).toBe(0);
+  });
+  it('mode 2 keeps only a fit\'s outward moves (along the vertex normal); mode 1 keeps all of them', () => {
+    const before = [0, 0, 0, 0, 0, 0], after = [0, 0.01, 0, 0, -0.02, 0], n = [0, 1, 0, 0, 1, 0];
+    expect([...keptFitDelta(before, after, n, 2)].map((x) => +x.toFixed(3))).toEqual([0, 0.01, 0, 0, 0, 0]);
+    expect([...keptFitDelta(before, after, n, 1)].map((x) => +x.toFixed(3))).toEqual([0, 0.01, 0, 0, -0.02, 0]);
   });
 });

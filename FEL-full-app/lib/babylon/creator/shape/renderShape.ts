@@ -52,7 +52,7 @@ import {
   weightOn, weldedNormals, type BoneShapeTable, type FollowMap, type SkinField,
 } from './inflate';
 import { maskSlotOf } from '../../core/bodyMask';
-import { shapeKeepsFit } from '../../core/morphCarry';
+import { keptFitDelta, shapeKeepsFit } from '../../core/morphCarry';
 import { feel } from '../../../feel-panel/feel';
 
 type V3 = [number, number, number];
@@ -425,7 +425,8 @@ export function syncShape(
     // KIT-FIT (core/morphCarry.ts): built on the garment's CURRENT vertices, so a fit that already landed (the waistband tucked
     // under the top, the flare) is kept — the prep's base is the vertices as first measured, before any fit
     const now = shapeKeepsFit() ? mesh.getVerticesData('position') : null;
-    const base = now && now.length === prep.base.length ? now : prep.base;
+    const kept = now && now.length === prep.base.length ? keptFitDelta(prep.base, now, mesh.getVerticesData('normal')) : null;
+    const base = kept ? prep.base.map((b, i) => b + kept[i]) : prep.base;
     const out = new Float32Array(prep.base.length);
     for (let i = 0; i < out.length; i++) out[i] = base[i] + local[i];
     setTarget(mesh, st, out, sig);
