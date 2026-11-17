@@ -868,6 +868,18 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/core/HoopsStick.ts HOOPS_RETREAT_SPEED_K',
     hint: 'The backpedal (the stick held against the facing) tops out at this share of a jog. Forward runs, sprints and slides never. 1 = no cap.',
   },
+  // lane/move-feel-2 (new, owner 2026-11-17): a held stick keeps the court frame it was pushed in (core/StickFrame)
+  {
+    id: 'hoops.stickFrameHold', label: 'Stick: held stick runs a straight line (1) / turns with the camera (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · movement',
+    source: 'lib/babylon/core/StickFrame.ts HOOPS_STICK_FRAME_HOLD',
+    hint: '1v1 and 3v3. 1 = the direction a held stick points on the court stays put while the camera swings round the rim. 0 = the old stick, read against the live camera every frame (a held stick bent the run 30 to 43 degrees a second).',
+  },
+  // lane/move-feel-2 (new, owner 2026-11-17): the floating MOVE stick on the hoops touch deck (lib/babylon/ui/floatStick)
+  {
+    id: 'touch.floatStick', label: 'Phone: floating move stick (1) / fixed (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · movement',
+    source: 'lib/babylon/ui/floatStick.ts TOUCH_FLOAT_STICK',
+    hint: '1v1 and 3v3 on a touch screen. 1 = the stick appears under the thumb, 1.5 times the old size, a 10 percent dead zone. 0 = the old fixed 96 px stick.',
+  },
   // lane/move-feel (new, 2026-11-12): the walk / jog line eased (0 = the step as shipped) — GEARS_HANDLER only (the dunk run-up never reads it)
   {
     id: 'hoops.gearBlendBand', label: 'Stick: walk to jog blend', def: 0.2, min: 0, max: 0.4, step: 0.05, unit: '', group: 'Hoops · movement',
