@@ -34,11 +34,12 @@ import { phoneSkipsCaster, phoneSkipsCasterMaterial, phoneSkipsInk, PHONE_INK_TR
 import { phoneCapFor, PHONE_FAR_PROP_MAX, PHONE_FAR_PROP_MODES, PHONE_MODEL_TEXTURE_MAX } from '../lib/babylon/scene/phoneTextureCap';
 import { PROP_MERGE_ON } from '../lib/babylon/visual/VenueProps';
 import { HALF_COURT_CROWD_CARDS, PHONE_RAIL_BODIES, SHARED_GROUND_ON } from '../lib/babylon/nexus/veniceBoardwalk';
+import { BODY_MERGE_ON, meshesAfterMerge } from '../lib/babylon/core/bodyMerge';
 
 const PUB = resolve(process.cwd(), 'public');
 
 // ── reading a GLB ─────────────────────────────────────────────────────────────────────────────────────────────────────
-interface Glb { json: { meshes?: Array<{ name?: string; primitives: Array<{ material?: number }> }>; materials?: Array<{ name?: string }>; images?: Array<{ bufferView?: number; uri?: string; mimeType?: string }>; bufferViews?: Array<{ byteOffset?: number; byteLength: number }> }; bin: Buffer }
+interface Glb { json: { meshes?: Array<{ name?: string; primitives: Array<{ material?: number; targets?: unknown[]; attributes?: Record<string, number> }> }>; materials?: Array<{ name?: string }>; images?: Array<{ bufferView?: number; uri?: string; mimeType?: string }>; bufferViews?: Array<{ byteOffset?: number; byteLength: number }> }; bin: Buffer }
 const glbCache = new Map<string, Glb>();
 export function readGlb(url: string): Glb {
   const hit = glbCache.get(url); if (hit) return hit;
@@ -88,7 +89,7 @@ export function phoneTexMbOf(url: string, farProp: number): number {
 function phoneTexMbOfImage(url: string): number { const { w, h } = imageSize(readFileSync(resolve(PUB, url.replace(/^\//, '')))); return (w * h * 4 * 1.33) / 1048576; }
 
 // ── the bodies ───────────────────────────────────────────────────────────────────────────────────────────────────────
-export interface Part { name: string; mat: string; skinned: boolean }
+export interface Part { name: string; mat: string; skinned: boolean; /** carries morph targets (the skin: the face shapes) */ morph?: boolean; /** drawn with 32-bit indices: a garment the kit gives an atlas (garmentFixes.ensureGarmentUVs: a garment with no UVs is unwelded, Uint32) */ idx32?: boolean }
 /** The parts a court body shows, from its GLB: every primitive but the other shoe models', one hair (the file's first, as the kit
  *  shows one), and a runtime sole per shown shoe. Runtime names (the rules key on them): the eyes `eyes_`, the sole `KitSole_`. */
 export function bodyParts(url: string, shoe = 'shoes_evo'): Part[] {
@@ -99,22 +100,30 @@ export function bodyParts(url: string, shoe = 'shoes_evo'): Part[] {
     const mat = p.material !== undefined ? json.materials?.[p.material]?.name ?? '' : '';
     if (/^shoes\./.test(mat) && !mat.startsWith(`shoes.${shoe}`)) continue;
     if (/^hair\./.test(mat)) { if (hair) continue; hair = true; }
-    parts.push({ name: mat === 'eyes' ? 'eyes_' : `${m.name ?? 'part'}`, mat, skinned: true });
+    const garment = /^(jersey|shorts|shoes)\./.test(mat);
+    parts.push({ name: mat === 'eyes' ? 'eyes_' : `${m.name ?? 'part'}`, mat, skinned: true, morph: (p.targets?.length ?? 0) > 0, idx32: garment && p.attributes?.TEXCOORD_0 === undefined });
     if (mat === `shoes.${shoe}`) parts.push({ name: 'KitSole_', mat: 'kitSole', skinned: true });
   }
   return parts;
 }
-export interface Rules { inkTrim: number; sockCast: number; farProp: number; propMerge: number; crowdCards: number; sharedGround: number; railBodies: number }
-export const SHIPPED: Rules = { inkTrim: PHONE_INK_TRIM, sockCast: PHONE_SOCK_CAST, farProp: PHONE_FAR_PROP_MAX, propMerge: PROP_MERGE_ON, crowdCards: HALF_COURT_CROWD_CARDS, sharedGround: SHARED_GROUND_ON, railBodies: PHONE_RAIL_BODIES };
-/** Every hoops-p08 phone rule at the value its knob calls "as before". */
-export const AS_BEFORE: Rules = { inkTrim: 0, sockCast: 1, farProp: PHONE_MODEL_TEXTURE_MAX, propMerge: 0, crowdCards: 1, sharedGround: 0, railBodies: 5 };
+export interface Rules { inkTrim: number; sockCast: number; farProp: number; propMerge: number; crowdCards: number; sharedGround: number; railBodies: number; bodyMerge: number }
+export const SHIPPED: Rules = { inkTrim: PHONE_INK_TRIM, sockCast: PHONE_SOCK_CAST, farProp: PHONE_FAR_PROP_MAX, propMerge: PROP_MERGE_ON, crowdCards: HALF_COURT_CROWD_CARDS, sharedGround: SHARED_GROUND_ON, railBodies: PHONE_RAIL_BODIES, bodyMerge: BODY_MERGE_ON };
+/** Every hoops-p08 / hoops-perf phone rule at the value its knob calls "as before". */
+export const AS_BEFORE: Rules = { inkTrim: 0, sockCast: 1, farProp: PHONE_MODEL_TEXTURE_MAX, propMerge: 0, crowdCards: 1, sharedGround: 0, railBodies: 5, bodyMerge: 0 };
+/** A body part's shadow-map membership on the phone tier under the rules. */
+function castsOnPhone(p: Part, r: Rules): boolean { return !phoneSkipsCaster(p.name, 'mobile') && !phoneSkipsCasterMaterial(p.mat, 'mobile', r.sockCast); }
+/** hoops-perf: the MESHES one body is on the phone (core/bodyMerge: parts the renderer treats alike share one — on a court body the
+ *  shadow maps, the morph targets and the index width are what split them; the rest is alike, measured with the rig). Off: one per part. */
+export function bodyMeshes(parts: Part[], r: Rules): number {
+  return meshesAfterMerge(parts.map((p) => `${castsOnPhone(p, r) ? 'cast' : 'none'}|${p.morph ? 'morph' : ''}|${p.idx32 ? 32 : 16}`), r.bodyMerge);
+}
 /** One body's draws on the phone tier (main pass, ink, shadow map) under the rules. */
 export function bodyDraws(parts: Part[], r: Rules): number {
   let d = 0;
   for (const p of parts) {
     d += 1;
     if (p.skinned && !phoneSkipsInk(p.name, p.mat, 'mobile', r.inkTrim)) d += 2;
-    if (!phoneSkipsCaster(p.name, 'mobile') && !phoneSkipsCasterMaterial(p.mat, 'mobile', r.sockCast)) d += 1;
+    if (castsOnPhone(p, r)) d += 1;
   }
   return d;
 }
@@ -167,10 +176,15 @@ interface ModeScene {
 // measured 2026-11-12 on the lane's after build (390×844 DPR 3, mobile tier, SEED 7, 6 game s, 4× throttle; perf-after4, commit 'the three
 // Venice concretes are one mesh'): base = the sweep's worst-frame drawsMax / meshesMax / texMb − ledger(mode, SHIPPED, false)
 // (LEDGER_RAW=1 prints that). 3v3 194 / 109 / 165; 3-Point 231 / 101 / 159; 1v1 113 / 56 / 129.
+// RE-MEASURED 2026-11-13 (lane/hoops-perf, the body merge on: scripts/probes/hoops-perf/run.sh perf, the same profile, tag a2):
+// 3v3 194 / 79 / 165; 3-Point 231 / 94 / 159; 1v1 113 / 50 / 129. Draws and textures did not move (a merged part keeps its own draw);
+// the mesh bases were re-derived against the merged ledger. They hold more than the venue now: the player's kit body merges less than
+// a forge rival (its tops, shorts and sock are re-indexed 32-bit by the kit's UV atlas and its skin carries the face morphs), and a
+// body that changed in the last 12 frames shows its parts until it settles — the worst frame of a run is such a frame.
 export const SCENES: Record<string, ModeScene> = {
-  threevthree: { row: 'threevthree', cast: 'threevthree', heroInFrame: 1, rivalsInFrame: 5, rivalsInScene: 5, court: 'half', baseDraws: 42, baseMeshes: 50, baseTexMb: 31, copiedGroundMb: 9.3 },
-  threepoint: { row: 'threepoint', cast: 'threepoint', heroInFrame: 1, rivalsInFrame: 3, rivalsInScene: 4, court: 'half', baseDraws: 127, baseMeshes: 60, baseTexMb: 35, copiedGroundMb: 9.3 },
-  onevone: { row: 'onevone', cast: 'onevone', heroInFrame: 1, rivalsInFrame: 1, rivalsInScene: 1, court: 'half', baseDraws: 57, baseMeshes: 33, baseTexMb: 33, copiedGroundMb: 9.3 },
+  threevthree: { row: 'threevthree', cast: 'threevthree', heroInFrame: 1, rivalsInFrame: 5, rivalsInScene: 5, court: 'half', baseDraws: 42, baseMeshes: 54, baseTexMb: 31, copiedGroundMb: 9.3 },
+  threepoint: { row: 'threepoint', cast: 'threepoint', heroInFrame: 1, rivalsInFrame: 3, rivalsInScene: 4, court: 'half', baseDraws: 127, baseMeshes: 75, baseTexMb: 35, copiedGroundMb: 9.3 },
+  onevone: { row: 'onevone', cast: 'onevone', heroInFrame: 1, rivalsInFrame: 1, rivalsInScene: 1, court: 'half', baseDraws: 57, baseMeshes: 37, baseTexMb: 33, copiedGroundMb: 9.3 },
 };
 
 function rivalFiles(cast: string): string[] {
@@ -184,10 +198,10 @@ export function ledger(mode: string, r: Rules, withBase = true): Ledger {
   // the rules that the half court alone takes; the dunk keeps its crowd cards, rail and maps whatever the knobs say
   const rr: Rules = half ? r : { ...r, crowdCards: 1, railBodies: 5, farProp: PHONE_MODEL_TEXTURE_MAX };
   const casts = rivalFiles(s.cast);
-  const perRival = casts.map((u) => ({ u, d: bodyDraws(bodyParts(u), rr), n: bodyParts(u).length, mb: phoneTexMbOf(u, PHONE_MODEL_TEXTURE_MAX) }));
+  const perRival = casts.map((u) => ({ u, d: bodyDraws(bodyParts(u), rr), n: bodyMeshes(bodyParts(u), rr), mb: phoneTexMbOf(u, PHONE_MODEL_TEXTURE_MAX) }));
   const byDraws = [...perRival].sort((a, b) => b.d - a.d), byMb = [...perRival].sort((a, b) => b.mb - a.mb);
   const hero = bodyParts(KIT_BODY);
-  let draws = s.heroInFrame * bodyDraws(hero, rr), meshes = s.heroInFrame * hero.length;
+  let draws = s.heroInFrame * bodyDraws(hero, rr), meshes = s.heroInFrame * bodyMeshes(hero, rr);
   for (let i = 0; i < s.rivalsInFrame && byDraws.length; i++) { const b = byDraws[i % byDraws.length]; draws += b.d; meshes += b.n; }
   const masters = venice ? propMasters('venice-dunk', rr.propMerge) : 0;
   // textures: the player, one file per rival body in the scene (players + the rail), the court's own models, the Venice dressing
@@ -208,16 +222,14 @@ export function ledger(mode: string, r: Rules, withBase = true): Ledger {
 }
 
 // ── the checks ───────────────────────────────────────────────────────────────────────────────────────────────────────
-/** STILL OVER — a finding, frozen, printed every run (hoops-p08, measured 2026-11-12 on the after build). The ACTIVE MESHES of 3v3 and
- *  3-Point did not come back inside their rows: the bodies alone are ~60 of 3v3's 109 (six players at about ten parts each: body,
- *  top, shorts, two shoe parts and a sole, hair, eyes, the accessories), and what is left of the venue is ~45 meshes of different
- *  materials; 3-Point's worst frame swings 93–101 with the crowd cards' pose meshes and the rack balls. Getting there without a
- *  visible change means merging a body's parts into one multi-material mesh in the character pipeline (shared by every mode) —
- *  the owner's call, not this lane's. Frozen at what was measured: it may shrink, never grow, and an entry whose mode is back
- *  inside its row is stale (remove it). */
+/** STILL OVER — a finding, frozen, printed every run (hoops-p08, measured 2026-11-12; lowered by lane/hoops-perf 2026-11-13). p08 left the
+ *  ACTIVE MESHES of 3v3 (109 vs 98) and 3-Point (101 vs 93) over their rows: a body was nine or ten meshes. The body merge
+ *  (core/bodyMerge.ts, perf.bodyMergeOn) draws a body's parts with a few meshes: measured 3v3 79 — inside its row, entry removed —
+ *  and 3-Point 94, ONE over its row of 93 in its worst frame (its median frame is 77; the worst is a rival stepping up whose parts
+ *  show until it settles, the rack balls and the crowd cards' pose meshes). Frozen at 94: it may shrink, never grow; stale when back
+ *  inside. */
 export const STILL_OVER: Record<string, Partial<Record<'drawCalls' | 'activeMeshes' | 'textureMb', number>>> = {
-  threevthree: { activeMeshes: 109 },
-  threepoint: { activeMeshes: 101 },
+  threepoint: { activeMeshes: 94 },
 };
 
 /** The Venice dressing's content today (after hoops-p08): a new prop model, placement tint or dressing file must be measured first. */

@@ -3,7 +3,7 @@
 // 8.1 m/s to a still hand. With `hoops.pickupReadOn` 1 it stays on its bounce and the hand meets it; with 0 nothing changes.
 import { describe, expect, it } from 'vitest';
 import { Bone, Matrix, MeshBuilder, NullEngine, Quaternion, Scene, Skeleton, TransformNode, Vector3 } from '@babylonjs/core';
-import { mountBallCarry, planPickUp, fallingPhaseAt, risingPhaseAt, PICKUP_READ_ON, PICKUP_WAIT_MAX_SEC, PICKUP_REACH_M, PICKUP_RATE_MAX, PICKUP_TOP_GAP_M, PICKUP_CONTACT_M, PICKUP_OVERRUN_SEC, type BallCarry } from './ballCarry';
+import { mountBallCarry, planPickUp, fallingPhaseAt, risingPhaseAt, PICKUP_READ_ON, PICKUP_WAIT_MAX_SEC, PICKUP_REACH_M, PICKUP_RATE_MAX, PICKUP_RATE_FLOOR_HZ, PICKUP_TOP_GAP_M, PICKUP_CONTACT_M, PICKUP_OVERRUN_SEC, type BallCarry } from './ballCarry';
 import { attachBallToHand } from './ballRig';
 import { resetFeelForTests, setFeelOverride, setFeelSession, setFeelUser } from '../../feel-panel/feel';
 import { FEEL_KNOB_BY_ID } from '../../feel-panel/knobs';
@@ -89,6 +89,15 @@ describe('planPickUp (pure)', () => {
   it('rising past the hand\'s reach: take it now; a meeting that cannot be made inside the wait: take it now', () => {
     expect(planPickUp(P.palmY - 0.2, true, P, 1.7, K)).toBeNull();
     expect(planPickUp(P.palmY - 0.6, false, P, 1.7, { ...K, waitMaxSec: 0.05, rateMax: 1 })).toBeNull();
+  });
+  it('at speed (a stride-locked bounce, ~1.1 Hz) a low falling ball is met from the rate floor; 0 = as at G2 (taken now)', () => {
+    const y = P.ballR + 0.56 * (P.palmY - P.ballR);
+    expect(planPickUp(y, false, P, 1.15, { ...K, rateFloorHz: 0 })).toBeNull();
+    const pl = planPickUp(y, false, P, 1.15, { ...K, rateFloorHz: PICKUP_RATE_FLOOR_HZ })!;
+    expect(pl).not.toBeNull();
+    expect(pl.sec).toBeLessThanOrEqual(PICKUP_WAIT_MAX_SEC + 1e-9);
+    expect(pl.rate).toBeLessThanOrEqual(PICKUP_RATE_FLOOR_HZ * PICKUP_RATE_MAX + 1e-9);
+    expect(FEEL_KNOB_BY_ID.get('hoops.pickupRateFloorHz')!.def).toBe(PICKUP_RATE_FLOOR_HZ);
   });
   it('the knobs ship at the constants, and the switch ships ON since G2 (0 restores the old pick-up: the OFF test below)', () => {
     expect(PICKUP_READ_ON).toBe(1);

@@ -42,6 +42,7 @@ import { applyHairStyle, DEFAULT_HAIR_STYLE, HAIR_KEY_TO_STYLE } from './hairSty
 import { defaultFace } from '../../closet/wearable-catalog';
 import { mountSecondaryMotion, type SecondaryMotionHandle } from '../anim/SecondaryMotion';
 import { mountFootPlanting } from '../anim/FootPlanting';
+import { mountBodyMerge, type BodyMergeHandle } from './bodyMerge';
 import type { QualityTier } from '../scene/QualityTier';
 
 // M28 dance: make dance clip ids resolvable and pre-build mirrored variants once.
@@ -454,6 +455,7 @@ export const CharacterLibrary = {
       : null;
 
     if (role === 'player') trackPlayerBody(scene, root);
+    let merge: BodyMergeHandle | null = null;   // lane/hoops-perf: the body's parts drawn by a few meshes (bodyMerge.ts, perf.bodyMergeOn)
     const spawned: SpawnedCharacter = {
       id: `char_${spawnCounter}`,
       root, meshes, skeleton, animator, secondary,
@@ -461,6 +463,7 @@ export const CharacterLibrary = {
       dispose() {
         livePlayers.get(scene)?.delete(root);
         if (rosterPicked) dealtBodies.get(scene)?.delete(effectiveUrl);   // the person is free for the next spawn
+        merge?.dispose();   // the parts back in every list they were in, before they go
         accDispose?.();   // an accessory that outlives its body is a torus floating over the court
         planting?.dispose();
         secondary.dispose();
@@ -504,6 +507,9 @@ export const CharacterLibrary = {
     snapToGround(root, meshes, opts.position?.y ?? 0);
 
     attachContactShadow(scene, root);   // Pass 7 phase 8: a soft disc grounds the feet where the shadow map does not reach
+    // lane/hoops-perf (owner 2026-11-12, "join each body into one mesh"): once the body holds still, the parts that can share a
+    // mesh are drawn by one (same shaders, same order, same ink; any change puts the parts back). Off: nothing is installed.
+    merge = mountBodyMerge(scene, root, skeleton);
     return spawned;
   },
 };
