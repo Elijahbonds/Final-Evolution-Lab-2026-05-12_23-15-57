@@ -26,14 +26,31 @@ export const PARTY_MODE_FOR_SPOT: Readonly<Record<string, string>> = { 'court.on
 
 export interface StoreLike { getItem(k: string): string | null; setItem(k: string, v: string): void; removeItem(k: string): void }
 export interface ReturnMark { spot: string; route: string; at: number }
+export interface LaunchChoice { mode: string; label: string; href: string }
+export interface ModeInfoLike { name: string; href: string }
 
 const session = (): StoreLike | null => { try { return typeof window !== 'undefined' ? window.sessionStorage : null; } catch { return null; } };
 
 /** The page a court opens. */
-export function launchHref(s: Pick<Spot, 'id' | 'route' | 'kind'>): string {
-  const q = new URLSearchParams({ [FROM_PARAM]: FROM_VENICE, [SPOT_PARAM]: s.id });
+export function launchHref(s: Pick<Spot, 'id' | 'route' | 'kind'>, href = s.route): string {
+  const [path, query = ''] = href.split('?');
+  const q = new URLSearchParams(query);
+  q.set(FROM_PARAM, FROM_VENICE);
+  q.set(SPOT_PARAM, s.id);
   if (s.kind === 'court') q.set('location', 'venice');
-  return `${s.route}?${q.toString()}`;
+  return `${path}?${q.toString()}`;
+}
+
+/** Every mode a spot offers, each preserving the Venice return query. */
+export function launchChoices(s: Pick<Spot, 'id' | 'route' | 'kind' | 'modes'>, info: Record<string, ModeInfoLike | undefined>): LaunchChoice[] {
+  const seen = new Set<string>();
+  return s.modes.flatMap((mode) => {
+    const meta = info[mode];
+    const route = meta?.href ?? s.route;
+    if (!route || seen.has(route)) return [];
+    seen.add(route);
+    return [{ mode, label: meta?.name ?? mode, href: launchHref(s, route) }];
+  });
 }
 
 export function writeReturn(s: Pick<Spot, 'id' | 'route'>, now: number, store: StoreLike | null = session()): void {

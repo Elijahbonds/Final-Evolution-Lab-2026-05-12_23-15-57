@@ -2,12 +2,13 @@
 import { describe, expect, it } from 'vitest';
 import { buildHubWorld, courtsRect, returnSpawnFor, v1Area, v1Spots, V1_RIM_H } from './hubWorld';
 import {
-  clearReturn, FROM_VENICE, hubHrefFor, launchHref, PARTY_MODE_FOR_SPOT, readReturn, RETURN_KEY, RETURN_TTL_MS, spotFromSearch,
+  clearReturn, FROM_VENICE, hubHrefFor, launchChoices, launchHref, PARTY_MODE_FOR_SPOT, readReturn, RETURN_KEY, RETURN_TTL_MS, spotFromSearch,
   veniceReturnHref, writeReturn, type StoreLike,
 } from './hubReturn';
 import { veniceDoorOn, VENICE_DOOR_HREF } from './door';
 import { districtAt } from './layout';
 import { ONLINE_MODES } from '@/server/netd/src/partyRules';
+import { MODE_INFO } from '@/lib/game-data';
 
 const mem = (): StoreLike & { m: Map<string, string> } => {
   const m = new Map<string, string>();
@@ -59,6 +60,23 @@ describe('walking up and coming back', () => {
     expect(u.searchParams.get('from')).toBe(FROM_VENICE);
     expect(u.searchParams.get('spot')).toBe('court.ones');
     expect(u.searchParams.get('location')).toBe('venice');
+  });
+  it('offers every mode on a multi-mode court, each with the Venice return query', () => {
+    const [, , flight, arc] = v1Spots();
+    expect(launchChoices(flight, MODE_INFO).map((c) => [c.mode, c.label, new URL(c.href, 'http://x').pathname])).toEqual([
+      ['dunkContest', 'Flight Night', '/play/dunk'],
+      ['dunkduel', 'Prove It', '/play/dunkduel'],
+    ]);
+    expect(launchChoices(arc, MODE_INFO).map((c) => [c.mode, c.label, new URL(c.href, 'http://x').pathname])).toEqual([
+      ['threePoint', 'Downtown', '/play/threepoint'],
+      ['carnival', 'Game Night', '/play/carnival'],
+    ]);
+    for (const c of [...launchChoices(flight, MODE_INFO), ...launchChoices(arc, MODE_INFO)]) {
+      const u = new URL(c.href, 'http://x');
+      expect(u.searchParams.get('from')).toBe(FROM_VENICE);
+      expect(u.searchParams.get('spot')).toMatch(/^court\./);
+      expect(u.searchParams.get('location')).toBe('venice');
+    }
   });
   it('the end screen goes back to the court the game came from: by the query, or by the return mark', () => {
     const st = mem();
