@@ -439,7 +439,6 @@ The owner answered these (relayed by the coordinator). One line each.
 - **owner 2026-11-12 (hoops gathers, G5):** the mid-air adjustment uses the right stick in the air, like the dunk trick stick.
 - **owner 2026-11-12 (hoops gathers, G6):** a hop step with the stick at rest IS a jump stop.
 
-
 ## 2026-11-17 — the movement (docs/MOVE-FEEL-DIAGNOSIS.md)
 
 The owner answered the three questions of the move-feel diagnosis (relayed by the coordinator).
