@@ -225,6 +225,7 @@ import { ModeMic } from '../audio/mic/ModeMic';   // THE MIC (2026-09-24): the c
 import type { MicEvent } from '../audio/mic/MicDirector';
 import { dunkStingers } from '../audio/mic/names';
 import type { MomentumTier } from '../core/MomentumBus';
+import { StickFrame } from '../core/StickFrame';   // lane/move-feel-2: a held stick keeps its court frame
 
 /** Exported so hoop-alignment-tests can check it against the venue's hoop. */
 export const RIM = new Vector3(0, RIM_HEIGHT_M, -0.6);
@@ -339,6 +340,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   // the rival's drive is a CLOCKED path (his `vel` is zeroed every frame — see the foe loop), so his closing speed on me is
   // read off his position, the way the charge reads it
   const driverPrev = new Vector3(), driverVelEst = new Vector3(); let driverPrevFor: Body | null = null;
+  const stickFrame = new StickFrame();   // lane/move-feel-2: "stick right runs a straight line while held"
   const kin = { drifts: 0, ankles: 0, parries: 0, driveBys: 0, slings: 0, slipSec: 0, ignitions: 0, shocks: 0 };
   let arc: ShotArc;
   let arcMade = false, arcPoints = 0, arcLabel = '', arcQuality: ShotQuality = 'good';
@@ -1687,7 +1689,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       // MODE-STICK-FACE (2026-09-07): CAMERA-relative — the team camera looks at the rim (−z) from behind me, and in a
       // left-handed world a raw +x intent is SCREEN-LEFT (measured: stick-right Δscreen −5.6 m). Up = the camera's flat
       // forward, right = screen right, handed to the dribble in its stick space (+Y = −Z).
-      let wish = ctx.camDirector.forwardFlat().scale(meIntent.moveY).addInPlace(ctx.camDirector.rightFlat().scale(meIntent.moveX));
+      const camF = ctx.camDirector.forwardFlat(), camR = ctx.camDirector.rightFlat(); stickFrame.read(camF, camR, Math.hypot(meIntent.moveX, meIntent.moveY));   // lane/move-feel-2 (owner 2026-11-17): a held stick keeps its court frame (hoops.stickFrameHold)
+      let wish = camF.scale(meIntent.moveY).addInPlace(camR.scale(meIntent.moveX));
       // THE STANCE NOW COSTS AND PAYS. The slide animation was already here and did nothing to the body —
       // a crouched defender covered ground exactly like an upright one. In a stance you slide faster and
       // go forward slower; upright it is the other way round, which is what makes the crossover work.

@@ -834,19 +834,19 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'How fast the run of the ball handler turns toward the stick (slower near top speed). H3a: 720.',
   },
   {
-    id: 'hoops.turnTrueArc', label: 'Turn: true arc (1) / lerp (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · movement',
-    source: 'lib/babylon/core/HoopsStick.ts HOOPS_TURN_TRUE_ARC',
-    hint: '1 = a turn rotates at the full turn rate; 0 = the steer as shipped, which turns wide angles slower. H3a: 1.',
+    id: 'hoops.turnTrueArc', label: 'Turn: true arc (1) / lerp (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · movement',
+    source: 'lib/babylon/core/HoopsStick.ts HANDLER_TURN_TRUE_ARC',
+    hint: '1 = a turn rotates at the full turn rate (on since 2026-11-17); 0 = the old steer, which turns wide angles slower.',
   },
   {
-    id: 'hoops.kickSec', label: 'Turbo kick: spread over', def: 0, min: 0, max: 0.3, step: 0.01, unit: 's', group: 'Hoops · movement',
-    source: 'lib/babylon/core/HoopsStick.ts HOOPS_KICK_SEC',
-    hint: 'The kick of a turbo press is added over this long (0 = all in one frame, as shipped). H3a: 0.10.',
+    id: 'hoops.kickSec', label: 'Turbo kick: spread over', def: 0.1, min: 0, max: 0.3, step: 0.01, unit: 's', group: 'Hoops · movement',
+    source: 'lib/babylon/core/HoopsStick.ts HANDLER_KICK_SEC',
+    hint: 'The kick of a turbo press is added over this long (0.1 since 2026-11-17; 0 = all in one frame, the old kick).',
   },
   {
-    id: 'hoops.cutSec', label: 'Cut cost: paid over', def: 0, min: 0, max: 0.3, step: 0.01, unit: 's', group: 'Hoops · movement',
-    source: 'lib/babylon/core/HoopsStick.ts HOOPS_CUT_SEC',
-    hint: 'The speed a cut costs is paid over this long (0 = in one frame, as shipped). H3a: 0.08.',
+    id: 'hoops.cutSec', label: 'Cut cost: paid over', def: 0.08, min: 0, max: 0.3, step: 0.01, unit: 's', group: 'Hoops · movement',
+    source: 'lib/babylon/core/HoopsStick.ts HANDLER_CUT_SEC',
+    hint: 'The speed a cut costs is paid over this long (0.08 since 2026-11-17; 0 = in one frame, the old cut).',
   },
   {
     id: 'hoops.jerk', label: 'Smoothing: jerk limit', def: 0, min: 0, max: 2000, step: 50, unit: 'm/s³', group: 'Hoops · movement',
@@ -867,6 +867,29 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'hoops.retreatSpeedK', label: 'Retreat: share of jog speed', def: 0.7, min: 0.3, max: 1, step: 0.05, unit: '', group: 'Hoops · movement',
     source: 'lib/babylon/core/HoopsStick.ts HOOPS_RETREAT_SPEED_K',
     hint: 'The backpedal (the stick held against the facing) tops out at this share of a jog. Forward runs, sprints and slides never. 1 = no cap.',
+  },
+  // lane/move-feel-2 (new, owner 2026-11-17): a held stick keeps the court frame it was pushed in (core/StickFrame)
+  {
+    id: 'hoops.stickFrameHold', label: 'Stick: held stick runs a straight line (1) / turns with the camera (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · movement',
+    source: 'lib/babylon/core/StickFrame.ts HOOPS_STICK_FRAME_HOLD',
+    hint: '1v1 and 3v3. 1 = the direction a held stick points on the court stays put while the camera swings round the rim. 0 = the old stick, read against the live camera every frame (a held stick bent the run 30 to 43 degrees a second).',
+  },
+  // lane/move-feel-2 (new, owner 2026-11-17): the floating MOVE stick on the hoops touch deck (lib/babylon/ui/floatStick)
+  {
+    id: 'touch.floatStick', label: 'Phone: floating move stick (1) / fixed (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · movement',
+    source: 'lib/babylon/ui/floatStick.ts TOUCH_FLOAT_STICK',
+    hint: '1v1 and 3v3 on a touch screen. 1 = the stick appears under the thumb, 1.5 times the old size, a 10 percent dead zone. 0 = the old fixed 96 px stick.',
+  },
+  // lane/move-feel (new, 2026-11-12): the walk / jog line eased (0 = the step as shipped) — GEARS_HANDLER only (the dunk run-up never reads it)
+  {
+    id: 'hoops.gearBlendBand', label: 'Stick: walk to jog blend', def: 0.2, min: 0, max: 0.4, step: 0.05, unit: '', group: 'Hoops · movement',
+    source: 'lib/babylon/core/HoopsStick.ts HOOPS_GEAR_BLEND_BAND',
+    hint: 'Past the walk line the jog starts at 85 % of its top: a thumb near the line surges 2.4 to 3.7 m/s. This eases it over this much more stick (0.2 since 2026-11-17). 0 = the old step.',
+  },
+  {
+    id: 'hoops.stickSprintFallback', label: 'Stick: full push sprints until TURBO is touched (1) / never (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · movement',
+    source: 'lib/babylon/core/HoopsStick.ts HOOPS_STICK_SPRINT_FALLBACK',
+    hint: 'Before 2026-11-17 (1), a stick past 0.85 is the turbo until a trigger or the TURBO pad has been used once; then the same push jogs. 0 (since 2026-11-17) = the turbo is the button only.',
   },
   // hoops-p01 (new): the ball handler's answers — GEARS_HANDLER only (the dunk approach never reads them)
   {
@@ -1120,6 +1143,12 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'camera.leadFullMps', label: 'Look-ahead: full at speed', def: 1, min: 0.1, max: 4, step: 0.1, unit: 'm/s', group: 'Camera · follow',
     source: 'lib/babylon/core/CameraDirector.ts CAM_LEAD_FULL_MPS',
     hint: 'Ground speed at which the camera looks its full distance ahead; slower than this it looks closer to the player (no lead flicking around a near-standstill).',
+  },
+  // lane/move-feel (new, 2026-11-12): 1v1 / 3v3 take the eased look-ahead above (0 = their raw lead, as shipped)
+  {
+    id: 'hoops.camLeadEase', label: 'Hoops camera: eased look-ahead (1) / instant (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Camera · follow',
+    source: 'lib/babylon/core/CameraDirector.ts HOOPS_CAM_LEAD_EASE',
+    hint: '1v1 and 3v3 only. 1 since 2026-11-17. 0 = the old camera: the point ahead of the player swings in one frame on a start, stop, cut or turnaround. 1 = it eases (the two look-ahead knobs above).',
   },
   // GAMEPLAY-CLEAN P2 #6 (2026-11-03): the football carry's stride paces to the carrier (footballTree)
   {

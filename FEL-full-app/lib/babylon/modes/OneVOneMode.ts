@@ -255,6 +255,7 @@ import { stealDiceOn, aiStripLands } from '../hoops/steals';   // hoops-p02: the
 import { HandCheckPlay } from '../hoops/handCheck';   // lane/hoops-round2 HOP-04: hand-checks, too many = a foul
 import { mountContactPoses } from '../hoops/contactPoses';   // lane/hoops-round2 HOP-04: forearm on hip, arm bar, chest in (drawn only)
 import type { AmbientHandle } from '../visual/EffectsKit';
+import { StickFrame } from '../core/StickFrame';   // lane/move-feel-2: a held stick keeps its court frame
 import {   // IMPROVE (2026-10-06) #1 #2 #3 #4 #10: the pure rules (onevoneRules.test)
   ONEVONE_TIER, attackerPatience, winRule, gameWinner, onePointAway, winBy2Requested, readWinBy2Pick, type WinRule,
   hintFor, hintSwap, pushPip, emptyBox,
@@ -687,6 +688,7 @@ export const OneVOneMode: ModeDefinition = (() => {
 
   // IMPROVE (2026-10-06) #14 #15: the per-frame scratch — every one is filled and read inside one call or one frame's branch
   const _camF = new Vector3(), _camR = new Vector3(), _camRelOut: [number, number] = [0, 0];
+  const stickFrame = new StickFrame();   // lane/move-feel-2: "stick right runs a straight line while held"
   const _driveV = new Vector3(), _driveBack = new Vector3();
   const _foeVel = new Vector3(), _toMe = new Vector3(), _past = new Vector3(), _look = new Vector3(), _head = new Vector3();
   /** The point the world shot meter hangs beside: 1.72 m over a root (a kept vector — ShotMeter3D copies it). */
@@ -699,6 +701,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     // IMPROVE (2026-10-06) #14: the camera's flat axes into two kept vectors and the answer into a kept pair (it was four new
     // vectors and an array a frame); callers destructure it on the spot
     const f = ctx.camDirector.forwardFlatToRef(_camF), r = ctx.camDirector.rightFlatToRef(_camR);
+    stickFrame.read(f, r, Math.hypot(mx, my));   // lane/move-feel-2 (owner 2026-11-17): a held stick keeps its court frame (hoops.stickFrameHold)
     _camRelOut[0] = f.x * my + r.x * mx; _camRelOut[1] = -(f.z * my + r.z * mx);
     return _camRelOut;
   }
