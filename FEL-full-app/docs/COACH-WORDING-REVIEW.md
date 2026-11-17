@@ -5,7 +5,8 @@ before they ship. Lane `lane/coach-words`.
 
 **Owner's answer, 2026-11-12 (relayed by the coordinator): every row below is approved**, the notice proposals (rows 3.2
 and 5.3) included, and options A, B and C are approved and built (rows 2.4, 2.5 and 4.4). Option C is the one
-consent-wording change, and the owner chose it explicitly. Nothing is live until the lane merges and the owner deploys.
+consent-wording change, and the owner chose it explicitly. **2026-11-13:** one more cut approved and built (row 2.6).
+Nothing is live until the lane merges and the owner deploys.
 
 Each row is one line on the screen. The "Owner" column is the owner's answer.
 
@@ -50,12 +51,14 @@ processing, could not confirm) are all money wording and are **not changed**.
 | 2.3 | Your camera shows here. Nothing is recorded to a file. | Nothing is recorded to a file. | The black box with the camera icon already says where the camera shows. The privacy sentence is kept word for word. | approved 2026-11-12 |
 | 2.4 | Film a set for your coach *(small label above the exercise name)* | For your coach | Option A. The button still says "Start the camera". | approved 2026-11-12 |
 | 2.5 | *(the privacy line counted toward the 40 words)* | "Nothing is recorded to a file." marked as an approved privacy notice. Not a word changes. | Option B. | approved 2026-11-12 |
-| — | The exercise name · the setup line (e.g. "Side-on to the phone, 2 to 3 m away. Stand tall and still, then go.") · Start the camera | *(kept)* | How to stand, and the button: instructions, not explanation. | — |
+| 2.6 | Phone at hip height, 2 to 3 m away, facing you. Stand still, then go. *(the squat's setup line)* | Phone at hip height, 2 to 3 m away, facing you. Then go. | Saves 2 words. The other movements' setup lines are unchanged. | approved 2026-11-13 |
+| — | The exercise name · the rest of the setup line · Start the camera | *(kept)* | How to stand, and the button: instructions, not explanation. | — |
 
-**One word over** after every approved cut: 41 counted (47 on the screen, 6 of them the approved privacy notice) on
-the read without the rig's pop-up, 43 on the read that had it. What is left is the label, the exercise name, the setup
-line ("Phone at hip height, 2 to 3 m away, facing you. Stand still, then go."), the camera-and-estimate line and the
-button. A next cut is the owner's call (for example "Stand still, then go." → "Then go.").
+**Measured before row 2.6: one word over** after every approved cut: 41 counted (47 on the screen, 6 of them the
+approved privacy notice) on the read without the rig's pop-up, 43 on the read that had it. Row 2.6 (2026-11-13) takes 2
+more words off. **Not re-measured after row 2.6:** two production builds of the rig were killed for lack of memory on the
+shared machine on 2026-11-13, and a third waited over 20 minutes for a slot. assumption: by count, 41 → 39, which is under
+the 40-word budget; the screen's other checks passed on every earlier read. A rig read is still owed.
 
 ## 3. `/coach/highlight/[id]` — a coach asks to show your result on their public page
 
