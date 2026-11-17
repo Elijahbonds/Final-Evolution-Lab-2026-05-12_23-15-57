@@ -1,6 +1,6 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
-import { ArrowUpFromLine, Camera, ScanLine, Swords, Users } from 'lucide-react';
+import { ArrowUpFromLine, Camera, MapPin, ScanLine, Swords, Users } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
 import { loginPath } from '@/lib/auth/safeNext';
 import { TabPage } from '@/components/shell/tab-page';
@@ -22,6 +22,8 @@ import { FULL_SCREEN_HREF } from '@/lib/screen-easy/door';
 // BINJGB-SHELF-1 (OQ-8): the quiet Homebrew Shelf row — server-gated (flag AND titles > 0 AND 13+); v1 has no titles, so never
 import { homebrewRowFor } from '@/lib/binjgb/hubRow';
 import { HomebrewShelfRow } from '@/components/binjgb/homebrew-row';
+// VENICE V1 (owner 2026-11-17): the Venice door — walk the courts; every game is still one tap on the shelf below
+import { veniceDoorOn, VENICE_DOOR_HREF } from '@/lib/adventure/venice/door';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,6 +59,7 @@ export default async function PlayPage() {
         chips: (
           <>
             {/* MULTIPLAYER (2026-10-06): the couch — one screen, phones and pads, friends join by QR. */}
+            {veniceDoorOn() && <Chip href={VENICE_DOOR_HREF} prefetch={false} testId="play-venice-entry" icon={<MapPin aria-hidden className="h-4 w-4 text-fel-cyan" />}>{t('play.venice')}</Chip>}
             <Chip href="/play/party" testId="play-party-entry" icon={<Users aria-hidden className="h-4 w-4 text-fel-cyan" />}>{t('play.couch')}</Chip>
             <Chip href="/multiplayer" icon={<Swords aria-hidden className="h-4 w-4 text-fel-crimson" />}>{t('play.versus')}</Chip>
             {/* VERTICAL-EASY (2026-10-27): the one front door to measuring a vertical, one tap from the signed-in home */}

@@ -299,6 +299,22 @@
         "textureMb": 120,
         "particles": 80
       }
+    },
+    "venice_hub": {
+      "measured": {
+        "drawCalls": 46,
+        "activeMeshes": 54,
+        "skinnedBodies": 1,
+        "textureMb": 73,
+        "particles": 0
+      },
+      "budget": {
+        "drawCalls": 56,
+        "activeMeshes": 65,
+        "skinnedBodies": 2,
+        "textureMb": 88,
+        "particles": 0
+      }
     }
   },
   "knownOver": {

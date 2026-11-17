@@ -160,7 +160,8 @@ describe('every mode has its body profile', () => {
     // test changed (ADVENTURE A4, 2026-10-06): this was rows === every registered mode, which held only while every
     // registered mode was also enabled. A DEV-ONLY mode (registered for /dev/mode, not enabled, no player route) plays
     // session-only (resolveBodyProfile's fallback) and has no row; each one is named here, so a new gap still fails.
-    const DEV_ONLY = ['adventure', 'adventure_br'];
+    // venice-v1 (2026-11-17): + 'venice_hub' (the Venice hub mounts on its own page, /play/venice, like the Adventure's)
+    const DEV_ONLY = ['adventure', 'adventure_br', 'venice_hub'];
     for (const k of DEV_ONLY) expect(ENABLED_BABYLON_MODES.has(k), `${k} is enabled: it needs its body row`).toBe(false);
     expect(rows.length).toBe(Object.keys(MODES).length - DEV_ONLY.length);
     expect(new Set(rows.map((p) => p.key)).size).toBe(rows.length);

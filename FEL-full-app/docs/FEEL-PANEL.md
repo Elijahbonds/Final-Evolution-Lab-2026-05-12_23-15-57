@@ -663,6 +663,9 @@ holds the result in CI. Phone tier only unless said.
   (24 cm) upload their maps at 512² (37 MB → 9 MB). The dunk parks the bus on its corner as a wall-run prop and keeps 1024². 1024 = as before.
 - `perf.propMergeOn` 1 (`visual/VenueProps.ts`, every tier): a prop model's parts that share a material are one thin-instanced mesh (the
   far pier: fifteen parts in two materials → two; the Venice dunk set: 35 masters → 22). Same geometry, same placements. 0 = one per part.
+- `perf.veniceSharedCourt` 1 (`lib/adventure/venice/courtsView.ts`, the Venice hub, every tier; lane/venice-v1, 2026-11-17, NEW): the four courts
+  are ONE court mesh drawn as instances. 0 = a mesh, material and asphalt detail map per court (the prototype's way: about 4 MB more on a
+  phone, measured 73 → 77 MB; the painted court itself was already cached per scene).
 - `perf.sharedGroundOn` 1 (`nexus/veniceBoardwalk.ts`, every tier): the boardwalk's tiled grounds wear the kind's one painted tile (the
   tiling is in the UVs: the same repeat) instead of a copy each, and the two sand planes share one grain and one mottle; so the four
   aprons, the two sands, the two seas, the two surf strips, the posts and the flags are one mesh each. A plane's tint rides in its vertex

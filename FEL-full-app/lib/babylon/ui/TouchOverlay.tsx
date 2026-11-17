@@ -184,7 +184,7 @@ function AnalogStick({ bus, side, label }: { bus: InputBus; side: 'L' | 'R'; lab
 
 /** lane/move-feel-2 (owner 2026-11-17): the modes whose MOVE stick floats (lib/babylon/ui/floatStick; knob `touch.floatStick`, 0 = the fixed
  *  stick): the two hoops modes, where the diagnosis measured it. Every other mode keeps the fixed stick. */
-export const FLOAT_STICK_MODES: ReadonlySet<string> = new Set(['onevone', 'threevthree']);
+export const FLOAT_STICK_MODES: ReadonlySet<string> = new Set(['onevone', 'threevthree', 'venice_hub']);   // venice-v1: the hub walks on the courts' stick
 
 /** THE FLOATING MOVE STICK (lane/move-feel-2): a zone the thumb lands in; the stick's centre appears under the thumb (so the first contact
  *  is a standstill), 1.5× today's base, full speed at its rim, a 10 % dead zone (floatStick.ts). At rest a faint base shows where to put
