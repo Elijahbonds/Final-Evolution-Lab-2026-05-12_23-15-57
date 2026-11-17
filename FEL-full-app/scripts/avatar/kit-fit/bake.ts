@@ -24,7 +24,8 @@ export const RIVAL_TOP_SMOOTH = 2;
  * lux 38 -> 18, tusk 24 -> 18, … On the other 14 it let more skin through the tee (halo 615 -> 770, kite 474 -> 808: their builds
  * fill the tee differently), so they keep their own weights.
  */
-export const RIVAL_TEE_SMOOTHED: ReadonlySet<string> = new Set(['ace', 'blaze', 'dash', 'grit', 'lux', 'nyx', 'rook', 'tusk', 'volt', 'zeal']);
+// Empty since 2026-11-17: on screen the smoothing let more skin through the tee on 9 of 10 rivals (KIT-FIT-PLAN §10.4); was ace, blaze, dash, grit, lux, nyx, rook, tusk, volt, zeal.
+export const RIVAL_TEE_SMOOTHED: ReadonlySet<string> = new Set<string>();
 /** Metres of garment per UV unit: the rivals' textured tees and shorts measure 0.9–1.1 (_uvdensity.ts). */
 export const UV_SCALE = { tops: 1.0, shorts: 1.0, sock: 0.4 } as const;
 const flag = (n: string) => process.argv.includes(n);

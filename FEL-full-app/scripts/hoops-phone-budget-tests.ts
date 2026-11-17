@@ -229,7 +229,8 @@ export function ledger(mode: string, r: Rules, withBase = true): Ledger {
  *  show until it settles, the rack balls and the crowd cards' pose meshes). Frozen at 94: it may shrink, never grow; stale when back
  *  inside. */
 export const STILL_OVER: Record<string, Partial<Record<'drawCalls' | 'activeMeshes' | 'textureMb', number>>> = {
-  threepoint: { activeMeshes: 94 },
+  // lane/kit-fit 2026-11-17: removed, as this guard asks. The kit body's tee, short and sock now carry UVs, so they are no longer
+  // unwelded to 32-bit indices and the body merge folds them in with the 16-bit parts: 3-Point 94 -> 92, inside its row of 93.
 };
 
 /** The Venice dressing's content today (after hoops-p08): a new prop model, placement tint or dressing file must be measured first. */

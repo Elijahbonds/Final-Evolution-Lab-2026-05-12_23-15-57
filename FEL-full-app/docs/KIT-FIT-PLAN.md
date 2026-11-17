@@ -290,3 +290,30 @@ differently in the game scene. Two of the smoothed-tee rivals show more skin thr
 1,074 → 1,205) although both measured better headless: the headless count does not stand in for the screen there. Flicker is up
 by tens of pixels on several bodies. Those are the next investigation (§5 phase 2).
 Contact sheet: `kit-fit-before-after.jpg` in the lane's scratch folder (`…/scratchpad/kit-fit/rig2/`).
+
+## 11. The two follow-ups under the repeated-runs bar (2026-11-17, after the release merge at a5192420, body merge included)
+
+The bar: 3 runs a side in one gate hold per tier, desktop and phone, phase 0's kit bodies on both sides (`OVERLAY`), the unchanged
+`rival-halo` measured in every matrix as the control. Skin and the tops slot may not exceed phase 0's highest run; flicker and the
+lower-body slots may not exceed it by more than the control's spread. Tools: `scripts/probes/kit-glitch/rig.mts`; the judge is
+`scripts/probes/kit-fit/bar.cjs`. **Neither follow-up passed; both stay off.**
+
+**(a) Job 3 keeping only the outward moves (`kit.shapeKeepsFit` 2, `morphCarry.keptFitDelta`).** Headless at girth 1.6 on phase 0's
+files it keeps about half of job 3's win on the short over the tee (layer, male 4,437 → 2,595, female 4,602 → 3,060; the full carry
+1,386 / 1,371). On screen it is neutral within a few pixels on most shaped bodies, but not on all: Closet female girth-max desktop
+skin 18,757–18,963 → 18,937–19,120 with its shorts slot +200–300 px (the control's shorts spread: 114), Closet male frame-big desktop
+skin +60–200, and one phone run of game male girth-max at 18,292 px (shorts 9,798; the other two runs below phase 0). Fitting
+against the shaped body instead is the remaining idea; it changes when the waistband fit runs and was not tried.
+
+**(b) The football jersey with a larger ease (`pack.ts`, `PACK_EASE`).** One screening round, both tiers, was enough: the flicker
+grows WITH the ease (female desktop 44 → 76 at 10 mm, 88 at 16 mm; phone 31 → 90 / 98; the shipped 4 mm refit measured 53–68), and
+the female shorts slot rose (1,932 → 2,607). So the refit's flicker is not the jersey too close to the skin; it comes with pushing
+the shell out at all (the pushed lower band against the short is the suspect, `tops>shorts` flips). The replacement jersey (the
+owner's Mac job, docs/JERSEY-BUILD-STEPS.md) is the fix.
+
+**Also on this lane, 2026-11-17.** The ten rivals' tee smoothing is reverted to phase 0's files (`bake.ts RIVAL_TEE_SMOOTHED` is
+empty): it let more skin through the tee on screen (§10.4). A finding from the perf lane's guard (`scripts/hoops-phone-budget-tests.ts`)
+after the body merge landed: **the kit garments' UVs help the phone.** With UVs, the tee, short and sock are no longer unwelded to
+32-bit indices, so the body merge folds them in with the body's 16-bit parts. 3-Point's worst frame goes from 94 active meshes to
+92, back inside its row of 93, so the guard's frozen `STILL_OVER` entry was removed (the guard asks for it). If the UV unwrap
+ships, that comes with it. Kept off until the shorts are fixed by the one-piece short (docs/SHORTS-BUILD-STEPS.md).
