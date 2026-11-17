@@ -3,9 +3,7 @@
 // Who Scene It's rose, each on its own tint). The fix keeps each colour's hue and lifts it toward white only as far as
 // 4.5:1 needs, against the darkest and the lightest background the text sits on; a colour that already clears it is
 // returned as it is.
-import * as wcagNs from '@/lib/a11y/wcag';
-
-const { composite, contrastRatio, parseColor } = ((wcagNs as { default?: unknown }).default ?? wcagNs) as typeof wcagNs;
+import { composite, contrastRatio, parseColor } from '@/lib/a11y/wcag';
 
 /** The party room's page colour (party-room.tsx `bg-[#05070c]`). */
 export const PARTY_INK_BG = '#05070c';
