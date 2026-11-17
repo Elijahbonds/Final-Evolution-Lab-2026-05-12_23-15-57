@@ -101,6 +101,7 @@ import type { CameraDirector } from '../core/CameraDirector';
 import type { BodyView } from '../core/ModeHarness';
 import type { BodyEvent } from '@/lib/pose/BodyReader';
 import { BodyShot, THREE_BODY, meterTFor, BODY_SHOT_MAX_MS, HELD_ERR_MS, type ShotVerdict } from '@/lib/move/hoopsBody';   // HOOPS BODY (2026-10-07): the shot on the body's clock
+import { replaySkipOn } from '../core/replaySkip';   // hoops-flow (owner 2026-11-12): any press skips the replay (knob hoops.replaySkipOn)
 
 let modeVenue: VenueHandle | null = null;   // ship pass 4: the mounted venue spec, disposed with the mode
 // HOOPS-10PHASE-2 (3PT corner camera): CameraDirector.clampToBounds derives its camera-roaming
@@ -1366,6 +1367,7 @@ export const ThreePointMode: ModeDefinition = {
   mood: 'goldenHour',
   camPreset: 'hoops',
   replay: true,       // vis-hoops-dunk: the money ball on a hot streak, replayed (ctx.highlight in contactMake, through the board lane's ReplayGate)
+  replaySkipAny: replaySkipOn,   // hoops-flow (owner 2026-11-12): any press — a trigger, a tap — skips the money-ball replay too
   intro: THREE_POINT_INTRO,   // the broadcast crane over the venue before the first rack (skippable; none under reduced motion)
   replayDof: false,   // …without the depth of field (the board lane measured it flattening a frame on desktop; the replay is otherwise the same)
   replayCast: () => ({ bodies: player ? [player.root] : [], loose: [ball, ...flights.map((f) => f.mesh)].filter((m): m is Mesh => !!m) }),   // the shooter, and every ball
