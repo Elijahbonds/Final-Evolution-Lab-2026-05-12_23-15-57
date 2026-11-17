@@ -112,7 +112,10 @@ export function pieces(P: ArrayLike<number>, ind: ArrayLike<number>): Int32Array
  * the body only), the move is eased into the neighbours (a few smoothing rounds on the move, never pulling a moved vertex back
  * under the skin), and the side is returned per vertex for the weight transfer. Positions are world metres at rest.
  */
-export const LEG_FIT = { ease: 0.004, rounds: 4 } as const;
+/** ease: a moved crossing vertex stands this far off its own thigh (the runtime lifts the short 20 mm more); floor: an eased
+ *  neighbour never ends up closer than this to its thigh's skin, or its own start if that was closer (NEW, 2026-11-13: browser
+ *  rig, the Closet short 6,733 -> 4,590 px male, 7,193 -> 4,629 female against the phase-1 fit, torn edges unchanged). */
+export const LEG_FIT = { ease: 0.004, rounds: 4, floor: 0.015 } as const;
 export function fitLegTubes(P: Float32Array, ind: Uint32Array, body: RestPrim, bones: Record<string, [number, number, number]>, cfg = LEG_FIT): { side: Int8Array; moved: number; tubes: number } {
   const L = bones.LeftUpLeg, R = bones.RightUpLeg, n = P.length / 3, side = new Int8Array(n);
   if (!L || !R) return { side, moved: 0, tubes: 0 };
@@ -142,6 +145,17 @@ export function fitLegTubes(P: Float32Array, ind: Uint32Array, body: RestPrim, b
     const next = Float32Array.from(D);
     for (let v = 0; v < n; v++) { if (pinned[v] || !side[v]) continue; let c = 0; const m = [0, 0, 0]; for (const u of nb[v]) { if (side[u] !== side[v]) continue; for (let k = 0; k < 3; k++) m[k] += D[u * 3 + k]; c++; } if (c) for (let k = 0; k < 3; k++) next[v * 3 + k] = 0.5 * D[v * 3 + k] + 0.5 * m[k] / c; }
     D.set(next);
+  }
+  // an eased neighbour may slide with the move but never ends up closer to its own thigh's skin than `floor` (or than it started,
+  // when it started closer): the ease was pulling the front and back of each tube onto the thigh, and the thigh came through the
+  // short in a squat (browser rig, steady poses, 2026-11-13)
+  for (let v = 0; v < n; v++) {
+    if (pinned[v] || !side[v] || !(D[v * 3] || D[v * 3 + 1] || D[v * 3 + 2])) continue;
+    const s0 = surf[side[v]].closest(P[v * 3], P[v * 3 + 1], P[v * 3 + 2], 0.25); if (!s0) continue;
+    const x = P[v * 3] + D[v * 3], y = P[v * 3 + 1] + D[v * 3 + 1], z = P[v * 3 + 2] + D[v * 3 + 2];
+    const floor = Math.min(s0.signed, cfg.floor);
+    const s1 = surf[side[v]].closest(x, y, z, 0.25); if (!s1 || s1.signed >= floor) continue;
+    const k = floor - s1.signed; for (let q = 0; q < 3; q++) D[v * 3 + q] += s1.n[q] * k;
   }
   for (let i = 0; i < D.length; i++) P[i] += D[i];
   return { side, moved, tubes };

@@ -176,7 +176,7 @@ function flatMat(name: string, rgb: readonly number[], src: Material | null, ver
 
 interface PassState { restore: () => void }
 /** Swap every character mesh's material for its class colour. The body takes per-vertex key / skin colours. */
-function classMaterials(hideBody: boolean, hideOthers: boolean): PassState {
+function classMaterials(hideBody: boolean, hideOthers: boolean, frontOnly = false): PassState {
   const undo: (() => void)[] = [];
   const amb = scene.ambientColor.clone(); scene.ambientColor = Color3.White(); undo.push(() => { scene.ambientColor = amb; });
   const ip = scene.imageProcessingConfiguration.isEnabled; scene.imageProcessingConfiguration.isEnabled = false; undo.push(() => { scene.imageProcessingConfiguration.isEnabled = ip; });
@@ -200,6 +200,7 @@ function classMaterials(hideBody: boolean, hideOthers: boolean): PassState {
       const prev = m.material;
       const vc = cls === 'key' && !!near;
       const mat = flatMat(`kg_${cls}`, CLASS[cls], prev, vc);
+      if (frontOnly) mat.backFaceCulling = true;   // KIT-FIT: only cloth seen from OUTSIDE (see measureScreen's pokeFront)
       if (vc && m === body) {
         const n = m.getTotalVertices(), col = new Float32Array(n * 4);
         for (let v = 0; v < n; v++) { const c = near![v] ? CLASS.key : CLASS.skin; col[v * 4] = c[0] / 255; col[v * 4 + 1] = c[1] / 255; col[v * 4 + 2] = c[2] / 255; col[v * 4 + 3] = 1; }
@@ -286,6 +287,12 @@ function measureScreen(): Record<string, unknown> {
   st = classMaterials(true, true);
   const b = readClasses();
   st.restore();
+  // KIT-FIT: the same garments-alone pass with back faces culled. Skin poking THROUGH cloth has the cloth's OUTSIDE behind it;
+  // skin seen through an opening (up a leg, between the legs, past a sleeve) has only the far wall's INSIDE behind it, which the
+  // count above also calls "through cloth". pokeFront counts only the first.
+  st = classMaterials(true, true, true);
+  const bf = readClasses();
+  st.restore();
   scene.render();
   lastPoke = { a, b, w, h };
   const bySlot: Record<string, number> = {}; const cover: Record<string, number> = {};
@@ -296,6 +303,8 @@ function measureScreen(): Record<string, unknown> {
     if (a[i] === CI.key) { poke++; bySlot[sl] = (bySlot[sl] ?? 0) + 1; }
     if (a[i] === CI.skin) skinShown++;
   }
+  let pokeFront = 0; const frontBySlot: Record<string, number> = {};
+  for (let i = 0; i < w * h; i++) if (GARMENT.has(bf[i]) && a[i] === CI.key) { pokeFront++; const sl = CLASS_NAMES[bf[i]]; frontBySlot[sl] = (frontBySlot[sl] ?? 0) + 1; }
   // flicker: interior pixels of the first frame (all 8 neighbours the same class) whose class flips in the nudged frame
   let flips = 0, flipsGarment = 0; const flipPairs: Record<string, number> = {};
   const sk = (c: number) => (c === CI.skin ? CI.key : c);   // the body's two shades are one surface
@@ -313,7 +322,7 @@ function measureScreen(): Record<string, unknown> {
     const k = `${CLASS_NAMES[c]}>${CLASS_NAMES[c2]}`; flipPairs[k] = (flipPairs[k] ?? 0) + 1;
     if (GARMENT.has(c) || GARMENT.has(c2)) flipsGarment++;
   }
-  return { w, h, garmentPx: covered, cover, poke, pokeBySlot: bySlot, pokePct: covered ? +(100 * poke / covered).toFixed(3) : 0, farSkinOverGarment: skinShown, flips, flipsGarment, flipPairs };
+  return { w, h, garmentPx: covered, cover, poke, pokeBySlot: bySlot, pokeFront, pokeFrontBySlot: frontBySlot, pokePct: covered ? +(100 * poke / covered).toFixed(3) : 0, farSkinOverGarment: skinShown, flips, flipsGarment, flipPairs };
 }
 /** The last poke pass as an RGBA overlay image (garment silhouette grey, poke pixels red, flicker not shown). */
 function pokeImage(): string | null {
