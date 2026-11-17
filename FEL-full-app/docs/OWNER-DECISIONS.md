@@ -444,3 +444,14 @@ The owner answered these (relayed by the coordinator). One line each.
 1. **Cloth motion: a sway in the renderer, no rig change** (the 22-bone spec stays). docs/KIT-FIT-PLAN.md phase 4.
 2. **The new basketball and football jerseys: in-house and free**, cut from the MakeHuman garments in Blender on the owner's Mac
    (docs/JERSEY-BUILD-STEPS.md). docs/KIT-FIT-PLAN.md phase 3.
+
+## 2026-11-17 — the movement (docs/MOVE-FEEL-DIAGNOSIS.md)
+
+The owner answered the three questions of the move-feel diagnosis (relayed by the coordinator).
+
+1. **"Turn all six on now."** Shipped defaults, each still switchable off on the feel panel: `hoops.camLeadEase` 1, `hoops.turnTrueArc` 1,
+   `hoops.kickSec` 0.1, `hoops.cutSec` 0.08, `hoops.gearBlendBand` 0.2, `hoops.stickSprintFallback` 0 (docs/FEEL-PANEL.md, move-feel).
+2. **"Stick right" runs a straight line while the stick is held**, behind a switch so both can be felt (lane/move-feel-2).
+3. **The phone stick:** it appears under the thumb, about 1.5× today's size, a 10 % dead zone, the same push always the same speed; its own
+   switch, off = today's stick (lane/move-feel-2).
+

@@ -315,6 +315,16 @@ An unchanged subject was measured in the same hold as the pieces, and the before
 So the **tops slot and the totals of a big subject are repeatable; the lower-body slots and flicker are not** (the feet plant and
 the mask lands on frames that vary). A one-run "≤ phase 0" on flicker is a coin toss. Below, flicker is judged on several runs.
 
+### 10.1a The bar from now on (coordinator, 2026-11-17)
+
+A kit-fit piece ships only if, on the steady browser rig, for every subject it touches:
+- **runs:** at least **3 runs a side** (phase 0 and the piece), in one gate hold, plus an **unchanged control subject** measured in
+  the same hold (its own 3 runs give the noise band);
+- **skin, tops slot and big-subject totals:** at or below phase 0's runs (these repeat within a few %);
+- **flicker and the lower-body slots (shoes, shorts):** judged against the control's band, never on one run — the piece's runs may
+  not sit above phase 0's range by more than the control's spread.
+A one-run comparison is a sighting, not a result.
+
 ### 10.2 Job 3 (`kit.shapeKeepsFit`, core/morphCarry.ts) — dropped: more skin under the short in games
 
 | Subject (steady, desktop) | Skin px, phase 0 → job 3 | Shorts slot | Flicker |
