@@ -59,14 +59,14 @@ export const HOOPS_REVERSE_DECEL = 47.6;
  *  line), past it jogs — and the jog STARTS at 0.85 of its top (3.70 m/s): a thumb at the line moves the target 52 % in one step (measured,
  *  scripts/probes/move-feel/stick-feel.mts: 2.38 m/s at 0.44, 3.71 at 0.46). With a band the jog's target eases up from the walk's edge to the
  *  jog curve over this much more stick (smoothstep), so a thumb near the line no longer surges. Full tilt, and every stick past line + band,
- *  is exactly as shipped. 0 = the step, as shipped. */
-export const HOOPS_GEAR_BLEND_BAND = 0;
+ *  is exactly as shipped. 0 = the step (the game before 2026-11-17). */
+export const HOOPS_GEAR_BLEND_BAND = 0.2;   // TUNED 0 → 0.2 (owner 2026-11-17: "turn all six on now"; 0 restores the step)
 
-/** (new, lane/move-feel 2026-11-12) 1 = as shipped: until a trigger has ever reported (a phone whose TURBO pad has not been touched yet, a
+/** (new, lane/move-feel 2026-11-12) 1 = the game before 2026-11-17: until a trigger has ever reported (a phone whose TURBO pad has not been touched yet, a
  *  keyboard before its first Shift), a stick pushed past 0.85 IS the turbo (core/PlayerSlot's fallback) — so the same full push sprints at
  *  6.4 m/s for the first part of a game and jogs at 4.35 once TURBO has been touched once, a thumb at 0.85 flips between the two, and the
  *  fallback sprint drains the turbo tank in 2.9 s and drops to a jog by itself. 0 = the turbo is the button only, from the first frame. */
-export const HOOPS_STICK_SPRINT_FALLBACK = 1;
+export const HOOPS_STICK_SPRINT_FALLBACK = 0;   // TUNED 1 → 0 (owner 2026-11-17: "turn all six on now"; 1 restores the fallback)
 
 /** TUNED (new) — owner decision 2026-10-24: "a real backpedal is slower than running forward". The share of JOG speed the handler may reach
  *  while RETREATING: the stick held against his facing (DribbleController's retreat dribble — the stick past 120° from the facing it holds,
@@ -99,6 +99,16 @@ export const HANDLER_REVERSE_PLANT_HOLD = 0;
  *  caps × LAUNCH_BOOST — what a move's explode already gets). 0 = release (a loaded step from zero). Gate: a reversal at pace reaches half
  *  the pace the new way ≤ 0.22 s (release 0.45 s, H3a 0.38 s). assumption: 0.2 s, the least that meets it (0.3 measured the same). */
 export const HANDLER_REVERSE_LAUNCH_SEC = 0.2;
+/** TUNED (lane/move-feel, owner 2026-11-17 "turn all six on now") — the handler's turn is a real arc: HOOPS_TURN_TRUE_ARC 0 → 1 on the
+ *  1v1 / 3v3 ball handler (GEARS_HANDLER); the dunk approach (GEARS_HOOPS) keeps 0. A 90° stick turned at 261 °/s over its first 100 ms, now
+ *  348; within 10° in 283 → 233 ms (scripts/probes/move-feel/stick-feel.mts). Knob `hoops.turnTrueArc` 0 restores the lerp. */
+export const HANDLER_TURN_TRUE_ARC = 1;
+/** TUNED (lane/move-feel, owner 2026-11-17) s — the turbo press's 0.9 m/s kick spread over 0.1 s (was one frame: 68 → 23 m/s² at most).
+ *  Handler only; knob `hoops.kickSec` 0 restores the one-frame kick. */
+export const HANDLER_KICK_SEC = 0.1;
+/** TUNED (lane/move-feel, owner 2026-11-17) s — a cut's cost paid over 0.08 s (was one frame: a turbo cut braked 71 → 17 m/s² at most; the
+ *  speed paid is the same). Handler only; knob `hoops.cutSec` 0 restores the one-frame cost. */
+export const HANDLER_CUT_SEC = 0.08;
 
 /** hoops-p01: the release stick as feel-panel values — paste it to put the ball handler back exactly as it shipped before this phase. */
 export const RELEASE_STICK_PRESET: Readonly<Record<string, number>> = Object.freeze({
@@ -110,6 +120,11 @@ export const RELEASE_STICK_PRESET: Readonly<Record<string, number>> = Object.fre
   'hoops.firstStepMps': 0,
   'hoops.reversePlantHold': 1,
   'hoops.reverseLaunchSec': 0,
+  // lane/move-feel (owner 2026-11-17): the handler's turn, kick and cut as release had them, and the walk / jog step
+  'hoops.turnTrueArc': HOOPS_TURN_TRUE_ARC,
+  'hoops.kickSec': HOOPS_KICK_SEC,
+  'hoops.cutSec': HOOPS_CUT_SEC,
+  'hoops.gearBlendBand': 0,
 });
 
 /** THE H3a PRESET: #311's tuned stick (owner 2026-10-16/17, "acceleration felt off… too twitchy"), as feel-panel values. Paste it into the

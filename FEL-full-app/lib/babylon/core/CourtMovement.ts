@@ -30,7 +30,7 @@ import {   // lane/hoops-reverse: the hoops gears' numbers (feel knobs, defaults
   HOOPS_REVERSE_DECEL, liveGears, jerkLimit, turnToward,
   HANDLER_STOP_DECEL_LOW, HANDLER_STOP_DECEL_HIGH, HANDLER_JOG_TAU, HANDLER_JOG_ACCEL, HANDLER_LOAD_SCALE, HANDLER_FIRST_STEP_MPS,
   HANDLER_REVERSE_PLANT_HOLD, HANDLER_REVERSE_LAUNCH_SEC, HOOPS_HANDLER_TURN_DEG,
-  HOOPS_GEAR_BLEND_BAND, gearBandTop,
+  HOOPS_GEAR_BLEND_BAND, gearBandTop, HANDLER_TURN_TRUE_ARC, HANDLER_KICK_SEC, HANDLER_CUT_SEC,
 } from './HoopsStick';
 
 export interface MovementTuning {
@@ -114,7 +114,8 @@ export const GEARS_HANDLER: GearTuning = {
   stopDecelLow: HANDLER_STOP_DECEL_LOW, stopDecelHigh: HANDLER_STOP_DECEL_HIGH,          // TUNED 22 → 32, 11 → 26 m/s²
   turnRateDeg: HOOPS_HANDLER_TURN_DEG,                                                     // (the handler's turn-rate knob, as before: 540)
   firstStep: HANDLER_FIRST_STEP_MPS, reversePlantHold: HANDLER_REVERSE_PLANT_HOLD, reverseLaunchSec: HANDLER_REVERSE_LAUNCH_SEC,   // TUNED (new)
-  gearBand: HOOPS_GEAR_BLEND_BAND,   // lane/move-feel (new): 0, the walk / jog step as shipped (the handler's only: the dunk run-up never reads it)
+  gearBand: HOOPS_GEAR_BLEND_BAND,   // lane/move-feel: TUNED 0 → 0.2 (owner 2026-11-17) — the handler's only: the dunk run-up never reads it
+  trueArc: HANDLER_TURN_TRUE_ARC, kickSec: HANDLER_KICK_SEC, cutSec: HANDLER_CUT_SEC,   // lane/move-feel: TUNED 0 → 1, 0 → 0.1 s, 0 → 0.08 s (owner 2026-11-17); GEARS_HOOPS keeps 0
 };
 /** A committed hop (the step-back's ignoreStickFor) glides on the RELEASE stop whatever the gears or the knobs say: its travel is the move's
  *  separation (#311 kept it; hoops-p01 keeps it for the handler's firmer stop too). */

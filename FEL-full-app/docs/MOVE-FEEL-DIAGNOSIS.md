@@ -104,6 +104,13 @@ jog, the stop at full turbo, a 90° cut, the stick thrown back, the defence slid
 
 ## 5. Try these values (the feel panel)
 
+**Owner, 2026-11-17: "Turn all six on now."** They are the shipped defaults since then (each knob's off value restores the old game); the
+three H3a ones on the 1v1 / 3v3 handler only (the dunk approach keeps the old stick). Re-measured with the new defaults, [STICK]: a 90° turn
+at a jog 261 → 348 °/s, within 10° 283 → 233 ms; at a sprint 203 → 275 °/s, 367 → 300 ms; the turbo cut's one-frame brake 71 → 17 m/s²; the
+kick 68 → 23 m/s²; a weave settles 297 → 247 ms; the largest one-frame speed jump 1.13 → 0.92 m/s; 0.46 of the stick 3.71 → 2.44 m/s (the
+step gone); starts, stops, top speeds and the reversal unchanged (250 ms, 150 ms / 0.29 m, 217 ms / 0.69 m, 183 ms). The camera and the
+fallback as measured on the rig with these values: whips 289–378 → 57–130 °/s; a full push before TURBO 6.23 → 4.33 m/s.
+
 Paste into the panel's values (the format **Copy values** produces). Every one is reversible with the panel's reset; nothing changes for
 anyone else until the owner says which to keep.
 

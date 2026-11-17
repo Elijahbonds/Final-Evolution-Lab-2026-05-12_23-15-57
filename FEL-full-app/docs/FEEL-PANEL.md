@@ -733,7 +733,16 @@ party run plays today's numbers (and so does an agent / probe run). **Phase B (2
   inch over 6'4" (6'0" 96 %, 6'8" 104 %, the cosmetic clamp). Drawing only: while he is drawn scaled the modes read the ball on his hand on
   the standard frame (playFramePoint), so the size changes no outcome. Casual runs only; 0 = the standard body.
 
-## move-feel, 2026-11-12 (the owner: "Find out why the movement still feels off?"; docs/MOVE-FEEL-DIAGNOSIS.md; the owner has not felt these)
+## move-feel, 2026-11-12 (the owner: "Find out why the movement still feels off?"; docs/MOVE-FEEL-DIAGNOSIS.md)
+
+**Owner, 2026-11-17: "Turn all six on now."** The six values of the list below are the shipped defaults since then, each still a knob whose
+off value restores the game before (TUNED, from → to): `hoops.camLeadEase` 0 → 1, `hoops.turnTrueArc` 0 → 1, `hoops.kickSec` 0 → 0.1 s,
+`hoops.cutSec` 0 → 0.08 s, `hoops.gearBlendBand` 0 → 0.2, `hoops.stickSprintFallback` 1 → 0. The three H3a switches moved on the 1v1 / 3v3
+ball handler only (`HANDLER_TURN_TRUE_ARC`, `HANDLER_KICK_SEC`, `HANDLER_CUT_SEC` in `GEARS_HANDLER`): the dunk approach (`GEARS_HOOPS`) keeps
+0, as it keeps the release stick for every phase-1 number (**assumption:** the owner's six are about 1v1 / 3v3, the modes measured).
+`RELEASE_STICK_PRESET` now carries all four movement ones at their old values, so one paste still puts the release stick back.
+
+The section as written on 2026-11-12, when they were off:
 
 Three NEW knobs, each **off by default (today's game exactly)**, each pinned in `lib/feel-panel/knobs.test.ts` and held by its own test:
 - `hoops.gearBlendBand` 0 (group "Hoops · movement"; `core/HoopsStick.ts` HOOPS_GEAR_BLEND_BAND, the 1v1 / 3v3 handler only): past the
@@ -749,7 +758,7 @@ Three NEW knobs, each **off by default (today's game exactly)**, each pinned in 
   point the camera looks at jumps in one frame. 1 = it eases over `camera.leadEaseSec` (0.2 s) and grows to full by `camera.leadFullMps`
   (1 m/s) (`core/CameraDirector.hoopsLead.test.ts`). Try 1.
 
-**Try these values** (paste into the panel's values; every one is reversible from the panel's reset). The first three are #311's H3a
+**Try these values** (2026-11-12; now the defaults — paste them with 0s / 1 to feel the old game). The first three are #311's H3a
 switches that change no top speed, stop or distance — only how a change arrives:
 
 ```json

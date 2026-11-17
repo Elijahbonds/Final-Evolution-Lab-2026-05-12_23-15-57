@@ -1,6 +1,6 @@
-// lane/move-feel (2026-11-12): THE STICK'S TURBO FALLBACK as a feel knob — `hoops.stickSprintFallback` (core/HoopsStick). As shipped (1), a
-// stick past 0.85 is the turbo until any trigger has reported (a phone before its TURBO pad is touched, a keyboard before Shift); 0 ends
-// the fallback: the turbo is the button or the trigger only, and a full push is a jog from the first frame.
+// lane/move-feel (2026-11-12): THE STICK'S TURBO FALLBACK as a feel knob — `hoops.stickSprintFallback` (core/HoopsStick). OFF (0) since the
+// owner's 2026-11-17 "turn all six on now": the turbo is the button or the trigger only, and a full push is a jog from the first frame. 1 is
+// the game before: a stick past 0.85 is the turbo until any trigger has reported (a phone before TURBO is touched, a keyboard before Shift).
 import { describe, it, expect, afterEach } from 'vitest';
 import { LocalInputSource } from './PlayerSlot';
 import { HOOPS_STICK_SPRINT_FALLBACK } from './HoopsStick';
@@ -9,8 +9,8 @@ import { setFeelUser, setFeelSession, setFeelOverride, resetFeelForTests } from 
 describe('the stick turbo fallback (hoops.stickSprintFallback)', () => {
   afterEach(() => { resetFeelForTests(); });
 
-  it('ships on (1): a full push sprints until a trigger reports, then jogs', () => {
-    expect(HOOPS_STICK_SPRINT_FALLBACK).toBe(1);
+  it('1 (the game before 2026-11-17): a full push sprints until a trigger reports, then jogs', () => {
+    setFeelUser(true); setFeelSession(null); expect(setFeelOverride('hoops.stickSprintFallback', 1)).toBe(1);
     const s = new LocalInputSource();
     s.feed({ t: 'stick', side: 'L', x: 1, y: 0 });
     expect(s.poll().sprint).toBe(true);
@@ -21,8 +21,8 @@ describe('the stick turbo fallback (hoops.stickSprintFallback)', () => {
     expect(s.poll().sprint).toBe(false);
   });
 
-  it('off (0): a full push never sprints; the turbo still does, on the trigger and on Shift', () => {
-    setFeelUser(true); setFeelSession(null); expect(setFeelOverride('hoops.stickSprintFallback', 0)).toBe(0);
+  it('0, the default (owner 2026-11-17): a full push never sprints; the turbo still does, on the trigger and on Shift', () => {
+    expect(HOOPS_STICK_SPRINT_FALLBACK).toBe(0);
     const s = new LocalInputSource();
     s.feed({ t: 'stick', side: 'L', x: 1, y: 0 });
     expect(s.poll().sprint).toBe(false);

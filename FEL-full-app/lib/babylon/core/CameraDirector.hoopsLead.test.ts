@@ -1,6 +1,6 @@
-// lane/move-feel (2026-11-12): THE HOOPS LOOK-AHEAD behind a knob — `hoops.camLeadEase` (CameraDirector HOOPS_CAM_LEAD_EASE, 0 = as
-// shipped). ModeHarness leaves the eased look-ahead off for 1v1 / 3v3 and opens this knob on them (`leadEaseHoopsKnob`); at 0 a hoops cut swings
-// the look-target in one frame exactly as before, at 1 it eases like every other follow mode's.
+// lane/move-feel (2026-11-12): THE HOOPS LOOK-AHEAD behind a knob — `hoops.camLeadEase` (CameraDirector HOOPS_CAM_LEAD_EASE, 1 since the
+// owner's 2026-11-17 "turn all six on now"). ModeHarness leaves the general eased look-ahead off for 1v1 / 3v3 and opens this knob on them
+// (`leadEaseHoopsKnob`); at 0 a hoops cut swings the look-target in one frame exactly as before, at 1 it eases like every other follow mode's.
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import { ArcRotateCamera, NullEngine, Scene, Vector3 } from '@babylonjs/core';
 
@@ -26,16 +26,17 @@ function cut(knob: boolean): number[] {
 
 describe('the hoops look-ahead (hoops.camLeadEase)', () => {
   afterEach(() => knobs.clear());
-  it('ships off: 1v1 / 3v3 keep the raw lead — the cut swings the look-target in one frame', () => {
-    expect(HOOPS_CAM_LEAD_EASE).toBe(0);
+  it('0 (the camera before 2026-11-17): the raw lead — the cut swings the look-target in one frame', () => {
+    knobs.set('hoops.camLeadEase', 0);
     const off = cut(true), none = cut(false);
     expect(off[0]).toBeGreaterThan(0.3);
     off.forEach((m, i) => expect(m).toBeCloseTo(none[i], 9));   // the knob at 0 is exactly the shipped camera
   });
-  it('on: the same cut eases (no frame moves the look-target a fifth of the old jump)', () => {
-    const before = cut(true)[0];
-    knobs.set('hoops.camLeadEase', 1);
+  it('1, the default (owner 2026-11-17): the same cut eases (no frame moves the look-target a fifth of the old jump)', () => {
+    expect(HOOPS_CAM_LEAD_EASE).toBe(1);
     const after = cut(true);
+    knobs.set('hoops.camLeadEase', 0);
+    const before = cut(true)[0];
     expect(Math.max(...after)).toBeLessThan(before * 0.2);
   });
 });
