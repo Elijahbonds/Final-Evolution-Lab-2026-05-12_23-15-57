@@ -23,6 +23,7 @@ assert.ok(enabledModes.length > 20, 'enabled mode scan is unexpectedly empty');
 
 const expectedSlugs: Record<string, string> = {
   aeroaces: 'aero-aces',
+  derby: 'derby',
   velocitykart: 'velocity-kart',
   who_scene_it: 'who-scene-it',
   brainbrawl: 'brain-brawl',

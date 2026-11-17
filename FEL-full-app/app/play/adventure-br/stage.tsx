@@ -8,6 +8,8 @@
 // damage, time — and PLAY AGAIN. No reward is posted (no session-route row for the BR yet: plan open decision 7).
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import { ChevronLeft } from 'lucide-react';
 import { runMode, InputBus, type ModePhase, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
@@ -68,6 +70,7 @@ export function AdventureBRStage({ signedIn = false }: { signedIn?: boolean } = 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-black font-mono text-xs text-white">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none outline-none" />
+      {!playing && <BackToPlay />}
       {playing && <Hud hud={hud} />}
       {(phase === 'ready' || phase === 'loading') && (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-black/70 p-4">
@@ -97,6 +100,15 @@ export function AdventureBRStage({ signedIn = false }: { signedIn?: boolean } = 
         </>
       )}
     </div>
+  );
+}
+
+function BackToPlay() {
+  return (
+    <Link href="/play" data-testid="br-back" aria-label="Back to Play"
+      className="absolute left-3 top-3 z-40 inline-flex min-h-[44px] min-w-[44px] items-center gap-1 rounded-full bg-black/60 px-3 text-base font-bold text-white">
+      <ChevronLeft aria-hidden className="h-5 w-5" /> Play
+    </Link>
   );
 }
 
