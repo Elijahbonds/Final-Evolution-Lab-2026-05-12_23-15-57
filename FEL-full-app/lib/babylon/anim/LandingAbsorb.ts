@@ -99,7 +99,7 @@ export function mountLandingAbsorb(scene: Scene, skeleton: Skeleton, root: Trans
   // held-pose memory on the legs too: a clip that does not key the thigh / shin (idle_stand) leaves last frame's solve in place, and the
   // next solve would start from it (measured: the feet climbed 0.45 m in seven frames). Each frame the legs start from the clip's value.
   const legTracks = legs.map((l) => ({ hip: new AdditiveQuat(), knee: new AdditiveQuat(), l }));
-  const fromClip = (n: TransformNode, t: AdditiveQuat) => { const q = n.rotationQuaternion; if (!q) return; const [x, y, z, w] = t.baseFor(q.x, q.y, q.z, q.w); q.set(x, y, z, w); };
+  const fromClip = (n: TransformNode, t: AdditiveQuat) => { const q = n.rotationQuaternion; if (!q) return; const b = t.baseFor(q.x, q.y, q.z, q.w); q.set(b[0], b[1], b[2], b[3]); };
   const wroteLeg = (n: TransformNode, t: AdditiveQuat) => { const q = n.rotationQuaternion; if (q) t.wrote(q.x, q.y, q.z, q.w); };
   let depth = 0, t = 0, drop = 0, applied = false;
   let held = 0, holdTarget = 0, holdReach = 1, holdEase = 0.18;   // lane/h3-aware: the hold (0 = never asked: the old path exactly)
@@ -116,11 +116,11 @@ export function mountLandingAbsorb(scene: Scene, skeleton: Skeleton, root: Trans
       drop = held < 0 ? (drop > 0 ? drop : held) : Math.max(drop, held);
     }
     const p = hips.position;
-    const base = { x: track.x.baseFor(p.x), y: track.y.baseFor(p.y), z: track.z.baseFor(p.z) };
+    const bx = track.x.baseFor(p.x), by = track.y.baseFor(p.y), bz = track.z.baseFor(p.z);   // hoops-perf: no object a frame
     for (const t of legTracks) { fromClip(t.l.hip, t.hip); fromClip(t.l.knee, t.knee); }
     if (Math.abs(drop) <= 1e-4) {
       // nothing to add: a hips position no clip keys goes back to its own value once (held-pose memory), then is left alone
-      if (applied) { p.set(base.x, base.y, base.z); track.x.wrote(p.x); track.y.wrote(p.y); track.z.wrote(p.z); applied = false; }
+      if (applied) { p.set(bx, by, bz); track.x.wrote(p.x); track.y.wrote(p.y); track.z.wrote(p.z); applied = false; }
       for (const t of legTracks) { wroteLeg(t.l.hip, t.hip); wroteLeg(t.l.knee, t.knee); }
       return;
     }
@@ -141,7 +141,7 @@ export function mountLandingAbsorb(scene: Scene, skeleton: Skeleton, root: Trans
     const parent = hips.parent as TransformNode | null;
     worldDown.set(0, -d, 0);
     if (parent) { parent.computeWorldMatrix(true); parent.getWorldMatrix().invertToRef(inv); Vector3.TransformNormalToRef(worldDown, inv, local); } else local.copyFrom(worldDown);
-    p.set(base.x + local.x, base.y + local.y, base.z + local.z);
+    p.set(bx + local.x, by + local.y, bz + local.z);
     track.x.wrote(p.x); track.y.wrote(p.y); track.z.wrote(p.z); applied = true;
     hips.computeWorldMatrix(true);
     legs.forEach((l, i) => solveChainInFrame(l.hip, l.knee, l.ankle, feet[i], bendPole(hipW[i], knees[i], feet[i], root.forward), 1));

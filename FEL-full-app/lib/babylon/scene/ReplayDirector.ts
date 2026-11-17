@@ -167,7 +167,8 @@ export class ReplayDirector {
     const out = new Float32Array(this.tracked.length * 7);
     this.tracked.forEach((n, k) => {
       const q = n.rotationQuaternion ?? Quaternion.FromEulerVector(n.rotation);
-      out.set([n.position.x, n.position.y, n.position.z, q.x, q.y, q.z, q.w], k * 7);
+      const o = k * 7;   // hoops-perf: written in place (an array of seven a node a sample was ~0.2 MB a game second in 3v3)
+      out[o] = n.position.x; out[o + 1] = n.position.y; out[o + 2] = n.position.z; out[o + 3] = q.x; out[o + 4] = q.y; out[o + 5] = q.z; out[o + 6] = q.w;
     });
     return out;
   }
@@ -195,7 +196,8 @@ export class ReplayDirector {
     const out = new Float32Array(nodes.length * 7);
     nodes.forEach((n, k) => {
       const q = n.rotationQuaternion ?? Quaternion.FromEulerVector(n.rotation);
-      out.set([n.position.x, n.position.y, n.position.z, q.x, q.y, q.z, q.w], k * 7);
+      const o = k * 7;   // hoops-perf: written in place (an array of seven a node a sample was ~0.2 MB a game second in 3v3)
+      out[o] = n.position.x; out[o + 1] = n.position.y; out[o + 2] = n.position.z; out[o + 3] = q.x; out[o + 4] = q.y; out[o + 5] = q.z; out[o + 6] = q.w;
     });
     return out;
   }
