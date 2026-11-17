@@ -23,7 +23,8 @@ import { mountSceneDecals, type GroundDecalsHandle } from '../visual/GroundDecal
 import { mountEnvironmentIBL } from './EnvironmentIBL';
 import { motionPolicy } from '../../a11y/reducedMotion';
 import { FLASH_GAIN, stepFlashLevel } from '../core/ImpactFrame';
-import { phoneSkipsCaster } from './phoneCasters';   // phone-perf (2026-10-14)
+import { phoneSkipsCaster, phoneSkipsCasterMaterial, PHONE_SOCK_CAST } from './phoneCasters';   // phone-perf (2026-10-14)
+import { feel } from '@/lib/feel-panel/feel';   // hoops-p08: perf.phoneSockCast
 import { setGradeExposure } from './gradeUniform';   // perf-lag: the flash beat's exposure without a scene-wide define pass
 
 export interface LightRigHandle {
@@ -200,6 +201,11 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
     if (RECEIVER_HINTS.test(mesh.name)) { mesh.receiveShadows = true; return; }
     if (NEVER_CAST.test(mesh.name)) return;
     if (phoneSkipsCaster(mesh.name, tier)) return;   // phone-perf: a phone's map skips parts hidden in a bigger part's shadow, and HUD pieces (phoneCasters.ts)
+    // hoops-p08: and the sock (phoneCasters.ts), by its material — a cloned part is added before its material is set, so it is asked
+    // again on the next frame and taken back out
+    const sockOut = (): boolean => phoneSkipsCasterMaterial(mesh.material?.name, tier, feel('perf.phoneSockCast', PHONE_SOCK_CAST));
+    if (sockOut()) return;
+    if (tier === 'mobile' && !mesh.material) scene.onBeforeRenderObservable.addOnce(() => { if (!mesh.isDisposed() && sockOut()) shadows.removeShadowCaster(mesh, true); });
     if (FOLIAGE_NO_CAST.test(mesh.name)) { mesh.receiveShadows = true; return; }   // still RECEIVES
     try {
       const r = mesh.getBoundingInfo().boundingSphere.radiusWorld;

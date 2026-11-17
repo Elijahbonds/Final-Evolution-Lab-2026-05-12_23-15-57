@@ -187,7 +187,7 @@ export default function CarnivalBabylon({ onEnd }: GameProps) {
         <MicCaption text={hud.mic} who={hud.micWho}
           className={isBoard(hud.board) && typeof hud.boardTitle === 'string' && hud.boardTitle ? 'bottom-3' : 'top-[62%]'} />
       )}
-      {phase === 'playing' && <MicToggle />}
+      {phase === 'playing' && <MicToggle cc={false} />}   {/* hoops-p08: the carnival keeps every MC line subtitled, as before (no CC chip) */}
 
       <BootSplash
         modeId="carnival"

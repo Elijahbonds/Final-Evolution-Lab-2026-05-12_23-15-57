@@ -1,10 +1,29 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { SCAN_SAVE_CONSENT_TEXT } from '@/lib/privacy/scanSaveConsent';
 import { lineSize } from '@/lib/design/type';
+import type { SavedNumberItem, ScanSaveAccountState } from '@/lib/privacy/scanSaveAccountState';
 
-type Item = { id: string; kind: string; at: string; numbers: Record<string, string | number | null> };
+type Item = SavedNumberItem;
+
+const noSubscribe = () => () => {};
+/** false while the server's HTML is being hydrated, true from then on (and at once on a plain client render) */
+function useHydrated(): boolean {
+  return useSyncExternalStore(noSubscribe, () => true, () => false);
+}
+
+/**
+ * ACCOUNT-SHIFT (2026-11-12): a saved number's time, in the viewer's own time zone and locale, as before. The list can
+ * now come in the server's HTML, and the server knows neither, so until the page is live the time's place is held by the
+ * same instant written in UTC, invisible (no wrong time is shown, and the line keeps about its width); then the local
+ * time replaces it.
+ */
+function LocalTime({ at }: { at: string }) {
+  const hydrated = useHydrated();
+  if (hydrated) return <span>{new Date(at).toLocaleString()}</span>;
+  return <span suppressHydrationWarning style={{ visibility: 'hidden' }}>{new Date(at).toLocaleString('en-US', { timeZone: 'UTC' })}</span>;
+}
 
 /**
  * /account: the opt-in toggle for a verified adult, the saved numbers, and "Delete my saved history"
@@ -55,7 +74,7 @@ export function ScanSaveAccountPanel(props: {
             <li key={item.id} className="rounded-lg border border-white/10 px-3 py-2">
               <span className="font-bold text-white">{item.kind === 'prove_it' ? 'Prove It' : item.kind === 'rescreen' ? 'Re-screen' : 'Jump'}</span>
               {' · '}
-              {new Date(item.at).toLocaleString()}
+              <LocalTime at={item.at} />
               {item.numbers.verticalCm != null ? ` · ${item.numbers.verticalCm} cm` : ''}
               {item.numbers.judgesScore != null ? ` · judges ${item.numbers.judgesScore}` : ''}
               {item.numbers.jumpBestIn != null ? ` · jump ${item.numbers.jumpBestIn} in` : ''}
@@ -68,12 +87,17 @@ export function ScanSaveAccountPanel(props: {
   );
 }
 
-export function ScanSaveAccount() {
-  const [verified, setVerified] = useState(false);
-  const [optedIn, setOptedIn] = useState(false);
-  const [visible, setVisible] = useState(false);
-  const [hasSaved, setHasSaved] = useState(false);
-  const [items, setItems] = useState<Item[]>([]);
+/**
+ * ACCOUNT-SHIFT (2026-11-12): `initial` is what /account read on the server (lib/privacy/scanSaveAccountState.ts), so a
+ * verified adult gets the panel in the first paint instead of after two requests. Everyone else gets nothing, as before.
+ * The panel still asks the two routes once it is live, so what it shows stays as fresh as it was.
+ */
+export function ScanSaveAccount({ initial = null }: { initial?: ScanSaveAccountState | null } = {}) {
+  const [verified, setVerified] = useState(initial?.verifiedAdult === true);
+  const [optedIn, setOptedIn] = useState(initial?.optedIn === true);
+  const [visible, setVisible] = useState(initial?.visible === true);
+  const [hasSaved, setHasSaved] = useState(initial?.hasSaved === true);
+  const [items, setItems] = useState<Item[]>(initial?.items ?? []);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
 

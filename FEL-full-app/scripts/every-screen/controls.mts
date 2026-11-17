@@ -51,6 +51,25 @@ export const CONTROLS: Control[] = [
       <p><a href="/" style="display:inline-block;width:30px;height:30px;background:#333;color:#fff;text-align:center;line-height:30px;font-size:16px" aria-label="Small one">x</a></p>`),
   },
   {
+    // check 1 (2026-11-12): a floating button over a heading and a link on the first screen (the profile's week card did this)
+    name: 'fault-covered',
+    kind: 'do',
+    expectFail: ['clear'],
+    expectFaults: ['float-covers'],
+    html: SHELL(`<h1>Your week</h1><p style="margin-top:520px">This week</p><p><a class="link" href="/">See your jumps</a></p>
+      <div style="position:fixed;left:16px;right:16px;top:600px;display:flex;justify-content:center"><a class="btn" style="width:100%" href="/">Your week card</a></div>`),
+  },
+  {
+    // the /profile shape (2026-11-12): the docked primary lives in the page's hero, a <header data-fel-hero> outside <main>,
+    // and floats over a link in the column below. The first cut of the check took that header for the status rail and missed it.
+    name: 'fault-covered-hero',
+    kind: 'do',
+    expectFail: ['clear'],
+    expectFaults: ['float-covers'],
+    html: SHELL(`<p>Nothing measured yet.</p><p><a class="link" href="/">Jump check, hands on hips</a></p>`).replace('<body>', `<body><header data-fel-hero style="min-height:560px"><h1>Your profile</h1>
+      <div data-fel-dock style="position:fixed;left:16px;right:16px;top:560px;display:flex;justify-content:center"><a class="btn" style="width:100%" href="/">Your week card</a></div></header>`),
+  },
+  {
     // check 1: a dead end (nothing leads on or back)
     name: 'fault-dead-end',
     kind: 'do',

@@ -20,7 +20,8 @@
 import { Vector3 } from '@babylonjs/core';
 import type { ModeContext } from '../../core/ModeHarness';
 import { motionPolicy } from '../../../a11y/reducedMotion';
-import { HoopsReplayPlanner, momentOfReport, type HoopsMomentKind } from '../hoopsMoments';
+import { HoopsReplayPlanner, momentOfReport, capReplay, REPLAY_CAP_SEC, type HoopsMomentKind } from '../hoopsMoments';
+import { feel } from '../../../feel-panel/feel';   // hoops-p06: the replay's cap (knob `hoops.replayCapSec`)
 
 export interface HoopsBroadcastOpts {
   /** What the replay's cameras look toward (the rim). */
@@ -59,12 +60,14 @@ export function mountHoopsBroadcast(ctx: ModeContext, opts: HoopsBroadcastOpts):
     deadBall(next) {
       if (replaying) return false;
       if (bypass) { bypass = false; return false; }
-      const plan = planner.atDeadBall(clock(), { final: opts.final(), reduced: !motionPolicy().travel });
+      const planned = planner.atDeadBall(clock(), { final: opts.final(), reduced: !motionPolicy().travel });
+      // hoops-p06 (phase 6): a big play holds the game at most `hoops.replayCapSec` on screen (the window around the moment); 0 = the plan's
+      const plan = planned ? capReplay(planned, planner.lastAt, feel('hoops.replayCapSec', REPLAY_CAP_SEC)) : null;
       if (!plan || !ctx.highlight) return false;
       replaying = true;
       console.info(`[HOOPS-REPLAY] ${plan.kind}: the last ${plan.lastSeconds.toFixed(1)} s`);
       void ctx.highlight({ lastSeconds: plan.lastSeconds, endAt: plan.endAt, objective: opts.rim })
-        .catch(() => { /* a replay that failed is a replay not shown */ })
+        .catch((e) => { console.warn('[HOOPS-REPLAY] not shown:', String(e).slice(0, 160)); })   // a replay that failed is a replay not shown (hoops-flow: and says so)
         .then(() => { replaying = false; if (gone) return; bypass = true; try { next(); } finally { bypass = false; } });   // a mode torn down during its replay is not reset
       return true;
     },

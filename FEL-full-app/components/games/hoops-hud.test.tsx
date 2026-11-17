@@ -127,7 +127,9 @@ describe('the pieces read no scoring or judging module', () => {
   // Each piece shows what the mode hands it. Its imports may be React, the HUD system, an icon, the audio toggle's own kits and
   // the two pure decoders of the dunk strings (DunkBeats / DunkField): no rules, no judging, no pay, no session.
   const ALLOWED = [/^react$/, /^react-dom/, /^lucide-react$/, /^\.\/tv-hud$/, /^@\/lib\/babylon$/, /^@\/lib\/babylon\/core\/(DunkBeats|DunkField)$/,
-    /^@\/lib\/babylon\/audio\/(SoundKit|mic\/VoiceKit)$/, /^@\/lib\/audio\/ui\/VolumeMixer$/];
+    /^@\/lib\/babylon\/audio\/(SoundKit|mic\/VoiceKit)$/, /^@\/lib\/audio\/ui\/VolumeMixer$/,
+    // test changed (hoops-p08): + the subtitle rule (a voiced MC line shows no subtitle unless CC) — a UI rule, not a scoring module
+    /^@\/lib\/babylon\/ui\/micSubtitles$/];
   for (const f of ['hoops-shot-meter.tsx', 'judge-cards.tsx', 'dunk-beat-strip.tsx', 'dunk-field-board.tsx', 'mic-caption.tsx']) {
     it(`${f} imports only what it draws with`, () => {
       const specs = [...read(f).matchAll(/^import [^;]*? from '([^']+)'/gm)].map((m) => m[1]);

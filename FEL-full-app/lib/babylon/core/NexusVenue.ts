@@ -23,7 +23,10 @@ import { VENUE_PROP_SETS, surroundSize, surroundColor, surroundDetail } from '..
 import { Color3, MeshBuilder, PBRMaterial } from '@babylonjs/core';
 import { dressHoop } from '../visual/meshyProps';
 import { VQ } from '../scene/venueQualityV1';
-import { decorateVeniceBoardwalk, type DressingHooks } from '../nexus/veniceBoardwalk';
+import { decorateVeniceBoardwalk, HALF_COURT_CROWD_CARDS, type DressingHooks } from '../nexus/veniceBoardwalk';
+import { feel } from '@/lib/feel-panel/feel';   // hoops-p08: venue.halfCourtCrowdCards, perf.coveredSkyOff
+/** perf.coveredSkyOff: 1 = a phone's basketball court drops the backdrop dome its venue sky covers (new); 0 = kept, as before. */
+export const COVERED_SKY_OFF = 1;
 import { NavBounds } from './NavBounds';
 import { MAPS } from '../../map-data';
 import type { Vector3 } from '@babylonjs/core';
@@ -195,6 +198,15 @@ export function mountVenue(ctx: VenueCtx, modeId: string, options: MountVenueOpt
   const hadModeLights = !!(ctx.scene.getLightByName('fel_sun') ?? ctx.scene.getLightByName('fel_hemi'));
 
   const built = buildNexusScene(ctx.scene, spec, ctx.canvas);
+  // hoops-p08 (perf.coveredSkyOff): the look stack mounted its backdrop dome (`bk_dome`, radius 280, and `bk_ring`, 235) before this
+  // venue built its own opaque sky sphere (`nexus_sky`, radius 200), which hides them completely from inside — Backdrops.mountBackdrop
+  // stands down when the venue sky comes first, but here it came second, so a phone drew and held two skies to show one. On the phone
+  // tier, on the basketball courts, the covered dome and ring go (their meshes and their sky textures). 0 = kept, as before.
+  if (/^basketball_/.test(modeId) && (ctx.scene.metadata as { felTier?: string } | null)?.felTier === 'mobile' && feel('perf.coveredSkyOff', COVERED_SKY_OFF) >= 0.5
+    && ctx.scene.getMeshByName('nexus_sky')) {
+    // (disabled, and their material and textures freed; the backdrop's own dispose still owns the meshes)
+    for (const name of ['bk_dome', 'bk_ring']) { const m = ctx.scene.getMeshByName(name); if (m && !m.isDisposed()) { m.setEnabled(false); m.material?.dispose(false, true); m.material = null; } }
+  }
   // A mode that lit its own scene keeps its own lighting: drop the venue's pair (and the shadow map hanging off its
   // sun) rather than stacking a second rig on top of the first.
   if (options.keepModeLights ?? hadModeLights) {
@@ -315,7 +327,9 @@ export function mountVenue(ctx: VenueCtx, modeId: string, options: MountVenueOpt
   // FIRST-DUNK-BUDGET: the dressing's jobs — started together by mountDressing(), at once unless the mode deferred them
   const dressingJobs: Array<() => Promise<void> | void> = [], landedJobs: Array<() => void> = [];
   const hooks: DressingHooks | undefined = options.deferDressing ? { start: (job) => { dressingJobs.push(job); }, landed: (job) => { landedJobs.push(job); } } : undefined;
-  if (!location && /^basketball_/.test(modeId)) decorateVeniceBoardwalk(ctx.scene, built.root, scanShiftZ, modeId === 'basketball_dunk' || (VQ.venice() && /^basketball_(h2h|3v3)$/.test(modeId)) ? 'venice-dunk' : 'lawn', hooks);   // VENUE-QUALITY v1: venue.veniceHoopsV1 (off) gives 1v1/3v3 the dunk's Venice
+  if (!location && /^basketball_/.test(modeId)) decorateVeniceBoardwalk(ctx.scene, built.root, scanShiftZ, modeId === 'basketball_dunk' || (VQ.venice() && /^basketball_(h2h|3v3)$/.test(modeId)) ? 'venice-dunk' : 'lawn', hooks,
+    // hoops-p08: the cut-out crowd strip stands behind the dunk's rim only (1v1, 3v3 and 3-Point share basketball_h2h / _3v3)
+    { crowdCards: modeId === 'basketball_dunk' || feel('venue.halfCourtCrowdCards', HALF_COURT_CROWD_CARDS) >= 0.5, phoneRail: modeId !== 'basketball_dunk' });   // VENUE-QUALITY v1: venue.veniceHoopsV1 (off) gives 1v1/3v3 the dunk's Venice
   void dressHoop(ctx.scene, built.root);   // owner 2026-09-05: the scanned Venice hoop stands in for the procedural one, every court, every location
   let props: VenuePropsHandle | null = null; let propsGone = false;
   // HIDE THE STUBS WHEN THE KIT IS ON (SHARED-PLACE-FLOOR). A spec's 'palm' is a cylinder under a six-sided cone and its

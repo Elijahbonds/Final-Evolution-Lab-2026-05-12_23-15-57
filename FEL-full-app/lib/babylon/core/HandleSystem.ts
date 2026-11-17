@@ -28,6 +28,7 @@
 //
 // Pure: no Babylon, no scene. Every rule here is provable without a game running.
 
+import { moveReadOn, readTheMan, type ManRead } from '../hoops/rulebook';   // hoops-p09: a move reads the man
 import { Vector3 } from '@babylonjs/core';   // `offTheHeadLoose` returns a direction; nothing else here touches Babylon
 
 /** The vocabulary. Ordered roughly by what a handle has to be to own it. */
@@ -190,6 +191,11 @@ export const BASELINE_HANDLE = 50;
  * every caller that passes none gates exactly as before).
  */
 export const MOVES_UNLOCKED_GATE = 100;
+// hoops-builder phase B (owner 2026-11-12; H9 wired WITHOUT the gate): the modes now pass the Handle RATING's handle as `handle`
+// (lib/babylon/hoops/ratings.ts: 50 → BASELINE_HANDLE, today; the band 45–70 by default). The gate above stays: every move stays unlocked
+// for everyone. Inside that band the handle moves only the chain window (chainWindowSec) here — isHardBreak needs 72+ and the odds are
+// the dice path's (hoops.moveReadOn 0) — and the lean read lives in hoops/rulebook readTheMan (ManRead.leanScale). Nothing in this
+// file changed for it; a later rework of the escapes can treat `handle` as "the rating's handle" and nothing else.
 
 /**
  * How long after one move the next can still chain off it.
@@ -468,6 +474,9 @@ export interface DefenderRead {
   set: boolean;
   /** Close enough that the move happens TO him. */
   within: boolean;
+  /** hoops-p09 (one rulebook): what he is doing at the press, in my frame — with it, and `hoops.moveReadOn` on, the move beats him
+   *  only on a read (hoops/rulebook readTheMan: off balance, committed, moving the wrong way); no roll. Without it: the odds, as before. */
+  man?: ManRead;
 }
 
 export type BreakResult = 'none' | 'shook' | 'hard';
@@ -522,7 +531,11 @@ export function resolveHandleMove(
   const odds = ankleBreakOdds({
     chainLength: next.length, handle, defenderClosing: def.closing, defenderSet: def.set, move,
   });
-  if (roll() >= odds) return { ...base, broke: 'none', odds };
+  if (def.man && moveReadOn()) {   // hoops-p09: the read decides (odds reported as 1 / 0: what the read charged)
+    if (!readTheMan(def.man).beat) return { ...base, broke: 'none', odds: 0 };
+    return { ...base, broke: isHardBreak(next.length, handle) ? 'hard' : 'shook', odds: 1 };
+  }
+  if (roll() >= odds) return { ...base, broke: 'none', odds };   // dice-off: hoops.moveReadOn 0 (or no read given)
   return { ...base, broke: isHardBreak(next.length, handle) ? 'hard' : 'shook', odds };
 }
 

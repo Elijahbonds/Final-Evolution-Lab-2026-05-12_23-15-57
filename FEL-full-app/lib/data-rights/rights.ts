@@ -13,6 +13,7 @@
 
 import type { RawDb } from '@/lib/coach/pendingSchema';
 import { REGISTRY, PRQ_MOVEMENT, type Erase, type Subject, type TableRights } from './registry';
+import { TOMBSTONE_EMAIL_DOMAIN } from './tombstone';
 
 const IDENT = /^\w+$/;
 const q = (name: string): string => {
@@ -137,7 +138,7 @@ export interface AccountErasure {
  * in as the person goes: an empty password refuses every sign-in (lib/auth.ts `if (!user?.password) return null`).
  */
 export const TOMBSTONE: Scrub = {
-  email: `'erased-' || "id" || '@erased.invalid'`,
+  email: `'erased-' || "id" || '@${TOMBSTONE_EMAIL_DOMAIN}'`,   // ./tombstone.ts tombstoneEmail reads it back
   name: 'NULL',
   password: `''`,
   role: `'player'`,
@@ -193,7 +194,8 @@ async function run(db: RawDb, p: Planned, schema: Map<string, Set<string>>, user
 /**
  * Erase an account, every table the registry names. Pass a TRANSACTION client: all of it goes together or not at all.
  * `dryRun` counts what each statement would touch and changes nothing. Idempotent: a second run deletes nothing.
- * The account erase has no in-app route (Privacy §4: account deletion is by email); scripts/erase-account.ts runs it.
+ * Callers go through ./accountDelete.ts eraseAccountNow (the in-app route and scripts/erase-account.ts), which runs this
+ * in one transaction with the account row locked and records the event once.
  */
 export async function eraseAccount(db: RawDb, userId: string, opts: { dryRun?: boolean } = {}): Promise<AccountErasure> {
   const dryRun = opts.dryRun ?? false;

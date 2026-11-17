@@ -25,20 +25,31 @@ export const KNEE_POLE_MEMORY_M = 0.01;
 /** The pole for a leg's re-solve (pure): `bend` plus KNEE_POLE_MEMORY_M of `prev` (this leg's pole last frame; the body's front `fwd`
  *  the first time). Unit length; `prev` itself when there is nothing else. */
 export function kneePole(bend: Vector3, prev: Vector3 | null | undefined, fwd: Vector3): Vector3 {
+  return kneePoleToRef(bend, prev, fwd, new Vector3());
+}
+const _kpM = new Vector3();
+/** kneePole into `out` (hoops-perf: the same maths; `out` may not be an input). */
+export function kneePoleToRef(bend: Vector3, prev: Vector3 | null | undefined, fwd: Vector3, out: Vector3): Vector3 {
   const m = prev ?? fwd;
-  const b = bend.add(m.scale(KNEE_POLE_MEMORY_M));
-  return b.lengthSquared() > 1e-12 ? b.normalize() : m.clone();
+  const b = bend.addToRef(m.scaleToRef(KNEE_POLE_MEMORY_M, _kpM), out);
+  return b.lengthSquared() > 1e-12 ? b.normalize() : b.copyFrom(m);
 }
 
+// hoops-perf (2026-11-12): legPole runs per leg per frame (the sink and the foot glide): its intermediates are these scratches, the
+// leg's memory is written into its own vector. The returned pole stays a fresh vector (a caller may keep it; legSink.test does): one
+// allocation where there were five. Same arithmetic: each ToRef form is its allocating form's maths.
+const IDENTITY_Q: Readonly<Quaternion> = Quaternion.Identity();
+const _lpPrev = new Vector3(), _lpPole = new Vector3(), _lpInv = new Quaternion();
 /** kneePole for one leg, its memory kept in the ROOT's frame (`leg.pole`), so a body that turned since the layer last solved this leg
  *  does not hand it a stale world direction. */
 export function legPole(leg: { pole?: Vector3 | null }, bend: Vector3, root: TransformNode, fwd: Vector3): Vector3 {
   root.computeWorldMatrix(true);
-  const q = root.absoluteRotationQuaternion ?? Quaternion.Identity();
-  const prev = leg.pole ? leg.pole.applyRotationQuaternion(q) : null;
-  const p = kneePole(bend, prev, fwd);
-  leg.pole = p.applyRotationQuaternion(Quaternion.Inverse(q));
-  return p;
+  const q = root.absoluteRotationQuaternion ?? IDENTITY_Q;
+  const prev = leg.pole ? leg.pole.applyRotationQuaternionToRef(q, _lpPrev) : null;
+  const p = kneePoleToRef(bend, prev, fwd, _lpPole);
+  const inv = Quaternion.InverseToRef(q, _lpInv);
+  if (leg.pole) p.applyRotationQuaternionToRef(inv, leg.pole); else leg.pole = p.applyRotationQuaternion(inv);
+  return p.clone();
 }
 
 /** The bones the sink moves on this body, or null when it has no hips or not two legs. */

@@ -19,6 +19,7 @@ import { mountSweat } from './skinShading';   // vis-foundation-2 A9.14: the her
 import { wave2Look } from '../scene/lookPolicy';
 import type { IntroKind } from '../scene/broadcastShots';
 import { ReplayDirector, characterRoots, mountReplayDof, type ReplayPlayOpts } from '../scene/ReplayDirector';   // A9.12
+import { ReplaySkipGate } from './replaySkip';   // hoops-flow (owner 2026-11-12): any press skips a replay (def.replaySkipAny)
 import { buildResult, type ResultSink, type SessionResult } from './sessionResult';
 import { JuiceKit } from '../premium/JuiceKit';
 import { motionPolicy } from '../../a11y/reducedMotion';   // HOTFIX (2026-09-24): the impact frame asks too
@@ -33,6 +34,7 @@ import {
   type FrameGradeState, type Grade,
 } from './ImpactFrame';
 import { SoundKit } from '../audio/SoundKit';
+import { sampleBankFor } from '../audio/samples';   // HOOPS-SOUND (phase 11a): the court modes' recorded sound
 import { enterBed, exitBed } from '@/lib/soundtrack/client';   // PIPELINES (2026-10-06): the in-game soundtrack bed
 import { VoiceKit } from '../audio/mic/VoiceKit';
 import { QaTrace } from './QaTrace';
@@ -49,6 +51,7 @@ import { PerfMonitor, budgetForTier } from './PerfMonitor';          // M67: dev
 import { mountPerfGuard } from './perfGuard';
 import { mountHitchProbe } from './hitchProbe';
 import { mountPerfStats } from './perfStats';
+import { publishReadoutSource } from './perfReadout';   // DEVICE-PERF: the owner's perf readout reads the live game (no per-frame cost)
 import { pagePlayStamp } from './playFrame';   // NEX-03: the competitive-context stamp
 import { setGradeExposure } from '../scene/gradeUniform';                // PERF-LAG (2026-10-24): the per-frame exposure beat as a uniform                         // PERF-LAG (2026-10-24): anonymous fps + time-to-first-playable to game_diag                     // S1 HITCH (2026-10-22): worst frame, p5 fps, and builds / clones / compiles after the intro                       // PERF-GUARD (2026-10-06): paced frames, adaptive quality, idle
 import { setReady, clearReady } from './readyMarker';  // M67: smoke-test readiness gate
@@ -229,6 +232,10 @@ export interface ModeDefinition {
    *  flattens the frame — on the piste's foreground the mean luma goes 222 → 198 and the groom texture's std 6.3 → 2.6 (its stripes and soft
    *  shadows are gone) — so a mode whose ground is mostly white or whose look is in its surfaces opts out. The replay is otherwise the same (letterbox, angles, half speed). Default: DOF on. */
   replayDof?: boolean;
+  /** hoops-flow (owner 2026-11-12, "any press skips a replay"): read at each input during a replay — true, and a trigger pulled, a stick
+   *  pushed out from rest or a tap on the stage skips it too, not only a button or d-pad press (core/replaySkip: the skipping input is
+   *  the replay's, never a shot or a move). Absent or false: the button / d-pad skip alone, as before. */
+  replaySkipAny?: () => boolean;
   /** vis-race (wave 2): the bodies a replay records, when they are not skinned characters — a race's vehicles (the player's
    *  first: it is the shot's subject), whose rivals are plain nodes `characterRoots` cannot find. Read once, after load().
    *  Absent: the hero and the skinned characters nearest it (every other replay mode). */
@@ -358,6 +365,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   let guard!: ReturnType<typeof mountPerfGuard>;
   let hitch!: ReturnType<typeof mountHitchProbe>;
   let perfStats: ReturnType<typeof mountPerfStats> | null = null;
+  let readout: ReturnType<typeof publishReadoutSource> | null = null;
   let declaredMood!: VenueMood;
   const look = await mountLookStack({
     canvas: opts.canvas,
@@ -377,6 +385,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       // clone() and first-use shader compiles. Published as window.__FEL_HITCH__ under dev / agent runs (hitchProbe.ts).
       hitch = mountHitchProbe({ scene, publish: devOrAgentHooks() });
       perfStats = mountPerfStats({ engine, tier, guard: () => { const g = guard.snapshot(); return g.policy.governor || g.policy.pacing ? g : null; } });   // PERF-LAG
+      readout = publishReadoutSource({ engine, scene, modeId: def.modeId, tier, guard: () => { const g = guard.snapshot(); return g.policy.governor || g.policy.pacing ? g : null; } });   // DEVICE-PERF
       if (opts.heroOverride) scene.metadata.felHeroOverride = opts.heroOverride;   // dev rollout flag (?hero=)
       // DEMO-MODELS-1 v2: this scene is /try's guest dunk demo (the host's known-guest mount of `dunk`), the ONE place setting 4
       // (TRY_GUEST_COACH_BODY_ENABLED) may apply (CharacterLibrary.playerBodyContextOf). Scene-scoped: no other scene is stamped.
@@ -425,6 +434,11 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   const replayTrack: TransformNode[] = [];   // vis-board: nodes a mode asked ctx.trackReplay to record (registered when the director is built, after load())
   let replay: ReplayDirector | null = null;   // A9.12: a mode that asked for replays (def.replay)
   let replayHold = false;                     // a replay is on screen: the mode's update() waits
+  const replaySkip = new ReplaySkipGate('L');   // hoops-flow: a stick, trigger or tap skips too (def.replaySkipAny)
+  const anySkip = (): boolean => phase === 'playing' && replayHold && !!def.replaySkipAny?.();
+  // hoops-flow: a tap on the bare stage (no control under it, so no bus event) skips a replay too — for a mode that asks
+  const onStageTap = (): void => { if (anySkip()) { replaySkip.skips++; replay?.skip(); } };
+  opts.canvas.addEventListener?.('pointerdown', onStageTap);
   const setPhase = (p: ModePhase, detail?: number | string) => {
     phase = p;
     // M37: hero-off-screen watchdog runs only during live play.
@@ -442,6 +456,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     store.setPhase(p);   // MOVEMENT PLAY P4: the body-play store and the shell's Body button read the phase here
     guard.setPhase(p);   // PERF-GUARD: a pause, an end card or an error refreshes at 2 fps instead of the cap
     perfStats?.setPhase(p);   // PERF-LAG: READY, START and live play, for the fps and ttfp reports
+    readout?.setPhase(p);     // DEVICE-PERF: time to READY, and the readout's frame window restarts per phase
     opts.onPhase?.(p, detail);
   };
 
@@ -621,6 +636,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   frameGuard = new FrameGuard(scene, camera, () => heroRef.current, camDirector, () => objectiveRef.current);
   occluderFade = new OccluderFade(scene, () => heroRef.current, def.modeId);
   camDirector.leadEase = !OCCLUDER_FADE_OFF.has(def.modeId);   // GAMEPLAY-CLEAN P2 #10: the eased look-ahead — not under the hoops lanes' modes (routed)
+  if (def.modeId === 'onevone' || def.modeId === 'threevthree') camDirector.leadEaseHoopsKnob = true;   // lane/move-feel: theirs behind a knob (0 = as shipped)
   // `instrument` (2026-09-12): SceneInstrumentation is a bare module specifier, so a probe running
   // IN the page cannot import it — which is why per-mode performance had never been measured and the
   // locomotion Phase 3 gate ("animation pass <= 4 ms") had to be reported unjudgeable. Handing the
@@ -647,6 +663,9 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     audio: () => SoundKit.graph(),
     // gameplay-clean: how many meshes the occluder fade holds see-through right now (the audit rig reads it)
     occluders: () => occluderFade?.count ?? 0,
+    // hoops-p08 (2026-11-12): push a HUD update the way the mode would (the HUD-overlap probe stacks every bottom layer at
+    // once — caption, hint, pass chip, meter, banner — to measure the worst case, not only what a short run happened to show)
+    hud: (u: Record<string, HudValue>) => ctx.setHud(u),
   };
   // CONTROLLER-STICK-LIVE (2026-09-14): a QA eye on the production server (`next start`, /try) waited 120 s for
   // `__FEL_DEV__.input`, which only a dev build published — so it read an empty roster and zero slot events under
@@ -709,6 +728,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       // vis-board: replayDof === false runs the replay without depth of field (a white or surface-led look it would flatten).
       replay = def.replay ? new ReplayDirector(scene, camera, raceBodies?.length ? raceBodies : cast?.bodies?.length ? cast.bodies : characterRoots(scene, heroRef.current), cast?.loose ?? [], (def.replayDof === false ? null : mountReplayDof(scene, lights.pipeline, tier))) : null;
       for (const n of replayTrack) replay?.track(n);
+      if (process.env.NODE_ENV === 'development' && replay) (scene.metadata ??= {}).felReplay = { director: replay, hold: () => replayHold };   // hoops-flow: the rig reads the replay (dev only)
       // SHADER PRE-WARM (lane/owner-1016, 2026-10-16; owner: "pre-warm shaders on phones at load"). Behind the boot splash — the
       // phase is still 'loading' — and AFTER the 20 s watchdog above is cleared, so it cannot trip it; it has its own cap
       // (shaderPrewarm.ts) and READY comes either way. Phone tier only; dev keeps warmAll after READY (below).
@@ -720,6 +740,9 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
         else console.info(`[FEL-PERF] shader pre-warm ${warm.ready ? 'ready' : 'skipped'} in ${Math.round(warm.ms)} ms, ${Math.round(warm.readyMs)} of them to first ready (${warm.polls} polls, ${warm.frames} frames)`);
       }
       setPhase('ready');
+      // HOOPS-SOUND (phase 11a, 2026-11-12): a mode with recorded sound (the court modes) fetches it now, after READY, so it never
+      // slows the load; every cue plays its synth until its files are in (audio/samples.ts sampleBankFor). Sound never fails a load.
+      try { void SoundKit.useSampleBank(sampleBankFor(def.modeId)); } catch { /* the synths play */ }
       // M67: pre-warm every material now, on the loading→ready boundary, so a
       // first-visibility shader compile never hitches mid-play. Dev-only work.
       if (DEV) void perf.warmAll();
@@ -817,6 +840,15 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     // replay (a mid-race overtake) that only a button could skip would have been unskippable for the one player who most needs it to be
     // skippable. The latch keys a d-pad press as `d:<dir>` already, so its release is swallowed unpaired like a button's.
     if (phase === 'playing' && replayHold && (e.t === 'button' || e.t === 'dpad') && e.pressed) { replay?.skip(); wakeLatch.wake(e, performance.now(), true); return; }
+    // hoops-flow (owner 2026-11-12): for a mode that asks, a trigger pulled or a stick pushed out from rest skips it as well — and is the
+    // replay's (a flick is not also a crossover on the fresh possession; a trigger's release is not a launch) until it is let go; the
+    // walking stick (L) is passed on as well, so a held stick moves the body when the ball comes back. Sticks and triggers are read on
+    // every playing frame (a crossing needs the value before it), so this runs outside replays too.
+    if (phase === 'playing' && def.replaySkipAny && (e.t === 'stick' || e.t === 'trigger')) {
+      const v = replaySkip.see(e, anySkip());
+      if (v === 'skip' || v === 'skipPass') replay?.skip();
+      if (v === 'skip' || v === 'drop') return;
+    }
     if (phase === 'playing') {
       const now = performance.now();
       if (!wakeLatch.pass(e, now)) return;
@@ -1049,6 +1081,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     input.stop();
     SoundKit.stopAmbient();   // M43: silence the ambient bed on teardown
     exitBed();                // PIPELINES: the page gets its soundtrack stage back
+    try { void SoundKit.useSampleBank(null); } catch { /* nothing to release */ }   // HOOPS-SOUND: the next mode hears its own synths
     VoiceKit.stopAll(0.1);    // THE MIC: whatever a mode left on the mic goes with it
     juice.dispose();
     qaRestore?.();
@@ -1060,6 +1093,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     guard.dispose();      // PERF-GUARD
     hitch.dispose();      // S1 HITCH
     perfStats?.dispose(); // PERF-LAG (before the engine goes: a mount left before play still reports its wait)
+    readout?.dispose();   // DEVICE-PERF
     clearReady();         // M67
     unink();              // M59
     backdrop.dispose();   // M61
@@ -1067,6 +1101,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     sweat?.dispose();     // A9.14
     iblShadows?.dispose();
     replay?.dispose();   // A9.12
+    opts.canvas.removeEventListener?.('pointerdown', onStageTap);   // hoops-flow
     ssao?.dispose();
     lights.dispose();
     scene.dispose();

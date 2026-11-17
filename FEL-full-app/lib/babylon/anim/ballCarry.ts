@@ -35,7 +35,7 @@ import type { AbstractMesh, Scene, Skeleton, TransformNode } from '@babylonjs/co
 import { attachBallToHand, ballGathering, gatherBallToHand, palmOffsetOf } from './ballRig';
 import { DEFAULT_DRIBBLE, DRIBBLE_ELBOW_HEADROOM, HOOPS_DRIBBLE, PUSHED_FLOOR_PHASE, advancePhase, clearOfBallWeight, dribbleAt, dribbleAtPushed, fitDribbleToReach, pushedBounce01, strideLockHz, type DribbleParams } from './Dribble';
 import { armChain, reachArm, shapeReach, limitElbowSwing, forgetElbowSwing, type ArmChain } from './HandIK';
-import { pathFor, pathAt, cutInWindow, type HandlePath, type PathFrom, type PathLock, type PathMove, type PathSample } from './handlePaths';
+import { pathFor, pathAt, cutInWindow, CONTACT_FADE_SEC, type HandlePath, type PathFrom, type PathLock, type PathMove, type PathSample } from './handlePaths';
 import { MOVE_SHAPE } from '../core/HandleShape';
 import type { HandleMove } from '../core/HandleSystem';
 import { findBone } from './boneLookup';
@@ -45,6 +45,9 @@ import { animDt } from './motionLayers';
 import { ClipHandClock, clipLockTune, guardTune, stepGuardK, GUARD_BAR_POLE } from './RestDribble';   // lane/h3-handler (#312 port): the bounce at rest, the guard
 import { feel } from '../../feel-panel/feel';   // hoops-p04b: knob hoops.carryArmSpeedSec (lib/feel-panel/knobs.ts)
 import { ArmEase } from './MoveEase';   // lane/h3-handler (#314 port): a move's hand-overs ease
+// HOOPS-SOUND (phase 11a, 2026-11-12): the ball this carry draws meeting the floor plays the bounce (audio/dribbleSound.ts)
+import { SoundKit } from '../audio/SoundKit';
+import { DRIBBLE_SOUND_ON, FloorContact, bounceVolume, claimDribbleRole, panFor, type BounceRole, type DribbleSoundRole } from '../audio/dribbleSound';
 
 export interface BallCarryOpts {
   scene: Scene;
@@ -67,6 +70,12 @@ export interface BallCarryOpts {
    * the gap). Default true: every existing caller runs exactly as before.
    */
   idleStride?: boolean;
+  /**
+   * HOOPS-SOUND (phase 11a): whose dribble this is for its sound — the player's (full dribble volume), an AI handler's (a share of it),
+   * or none. Not given: the first hoops carry mounted on the scene is the player's, every later one an AI's (dribbleSound.ts
+   * claimDribbleRole). A carry that is not `hoops` (the dunk runway) makes no sound either way.
+   */
+  soundRole?: DribbleSoundRole;
 }
 /** Where a crossing's ball meets the floor, in the root's frame (x across, z forward; m). Phase 4b: unused — a crossing is a crossover
  *  PATH (handlePaths) with its own floor point; kept in the signatures so a caller that names one still compiles. */
@@ -83,7 +92,16 @@ export interface CarryMoveOpts {
   /** queueMove (hoops-moves, the combo window — anim/comboFlow): start at the running path's cut-in (cutInWindow: the hesi's float top)
    *  instead of its catch, when that window has not passed — at once when the running move is inside it. Default false. */
   cutIn?: boolean;
+  /** hoops-p06: the catching hand starts its reach this long before the catch (handlePaths.pathAt's catchLeadSec). Default: the schedule's. */
+  catchLeadSec?: number;
 }
+/** hoops-p06 (GAMEPLAY-CLEAN-AUDIT §4i, "left open" 1: the dribble HAND CHANGE pops). A hand change on a live dribble is a crossover path the
+ *  carry runs on its own (switchHand / toSide); the hand that will catch the ball is the clip's until CONTACT_FADE_SEC (0.06 s) before the
+ *  catch, and its pose in the other hand's loop is 100–140° from the catch point — so it swung there in four frames at the move's arm limit
+ *  (30° a frame: a hard event on both arm bones at 56 of 64 hand changes, scripts/probes/hoops-p06/handchange.mts). On THAT path the
+ *  catching hand comes to meet the ball over this long instead. Knob `hoops.handChangeCatchLeadSec`; 0.06 (the schedule's own) = as
+ *  before. Stick and AI moves keep the schedule's lead. */
+export const HAND_CHANGE_CATCH_LEAD_SEC = 0.45;
 /** The move under way (plan §3.3's `move`). */
 export interface CarryMoveState {
   name: string; t: number; k: number;
@@ -147,6 +165,18 @@ export interface BallCarry {
   cancelMove(): void;
   /** The move under way, or null. */
   readonly move: CarryMoveState | null;
+  /**
+   * hoops-gather G1: THE PICK-UP. Park the dribble for a shot, a finish or a gather and put the ball in `hand` (default: the dribbling
+   * hand). With `hoops.pickupReadOn` 0 this is exactly `update(0, 0, false)` and then `gatherBallToHand(hand)` (today). With it on, a
+   * ball that is not near the top of its bounce stays on its OWN bounce — sped up at most PICKUP_RATE_MAX× so it never waits longer than
+   * PICKUP_WAIT_MAX_SEC — while the dribbling hand goes down to meet it on its way up, PICKUP_REACH_M under the palm; it is taken where
+   * they meet (then handed palm to palm when `hand` is the other one). Returns 'now' (taken this frame, as today) or 'reading'.
+   */
+  pickUp(hand?: RigHand, releaseSec?: number): 'now' | 'reading';
+  /** A pick-up still waiting for the bounce is taken NOW, from where the ball is (as today): call it before releasing the ball. */
+  settlePickUp(): void;
+  /** A pick-up is waiting for the bounce (the ball is still on the floor-and-back, not yet in a hand). */
+  readonly pickingUp: boolean;
 }
 
 /** The old arm's let-go on a hand switch. */
@@ -216,6 +246,60 @@ export function risingPhaseAt(h01: number): number {
   for (let i = 0; i < 30; i++) { const mid = (lo + hi) / 2; if (pushedBounce01(mid) < want) lo = mid; else hi = mid; }
   return (lo + hi) / 2;
 }
+/** The phase on the pushed bounce's FALLING leg (palm → floor) whose height is `h01` of the stroke. */
+export function fallingPhaseAt(h01: number): number {
+  const want = Math.min(1, Math.max(0, h01));
+  let lo = 0, hi = PUSHED_FLOOR_PHASE;
+  for (let i = 0; i < 30; i++) { const mid = (lo + hi) / 2; if (pushedBounce01(mid) > want) lo = mid; else hi = mid; }
+  return (lo + hi) / 2;
+}
+// ── hoops-gather G1 (owner 2026-11-12, "good gathers and pick ups"; docs/HOOPS-GATHER-ESCAPE-PLAN.md §5 G1): THE PICK-UP READS THE BOUNCE.
+// Measured at eec53f24 (scripts/probes/hoops-gather): a press near the bottom of the bounce took the ball 57–94 cm under the palm and flew
+// it up at the gather's 8.1 m/s to a hand that did not move (it closed 0–4 % of the gap), seated 9 frames later (worst 24); 41 of 45
+// floor presses lifted it from below the knee. At the top it was 4–9 cm and seated at once. So the top stays as it is, and below it the
+// ball keeps its own bounce while the hand goes down to meet it. Every number new, every one a knob whose 0 / off is today exactly.
+/** The pick-up reads the bounce (1) / takes the ball wherever it is, as before (0). Knob `hoops.pickupReadOn`. ON since G2 (coordinator
+ *  2026-11-12: flipped with G2, measured on; FLAGGED): 0 restores the old pick-up exactly. */
+export const PICKUP_READ_ON = 1;
+/** The longest the pick-up waits for the ball to come up (s). Knob `hoops.pickupWaitMaxSec`. */
+export const PICKUP_WAIT_MAX_SEC = 0.2;
+/** How far under the palm the dribbling hand goes to meet the rising ball (m). Knob `hoops.pickupReachM`. */
+export const PICKUP_REACH_M = 0.3;
+/** The bounce may run at most this many times its own pace to meet the hand inside the wait (a harder last dribble). Knob
+ *  `hoops.pickupRateMax`. */
+export const PICKUP_RATE_MAX = 2;
+/** hoops-gather (3v3 at speed): the speed-up is counted from at least this bounce rate (Hz). At a drive or a sprint the stride lock slows
+ *  the bounce to one a stride (measured 0.5-1.5 Hz on the press), so PICKUP_RATE_MAX of THAT could not meet a low ball inside the wait and
+ *  the pick-up fell back to the old take: measured on the 3v3 speed set, 10 of 11 presses at 2.8 m/s or more took the ball at once,
+ *  median 35 cm off the palm, 3 yanks. From this floor a stride-locked bounce may run as hard as a fast free dribble's last one.
+ *  0 = counted from the bounce's own rate (as at G2). Knob `hoops.pickupRateFloorHz`. */
+export const PICKUP_RATE_FLOOR_HZ = 2;
+/** A ball whose centre is within this of the top of its stroke is taken at once, as today (m). Knob `hoops.pickupTopGapM`. */
+export const PICKUP_TOP_GAP_M = 0.1;
+/** The take: the ball within this of touching the dribbling palm as drawn (m, past its radius). Knob `hoops.pickupContactM`. */
+export const PICKUP_CONTACT_M = 0.04;
+/** Past the planned meeting the ball rises on at its own pace to the palm, at most this much longer (s) — then it is taken wherever it is. Knob `hoops.pickupOverrunSec`. */
+export const PICKUP_OVERRUN_SEC = 0.1;
+/** The plan of a pick-up that waits for the bounce (pure, for the carry and its tests): from the ball's height over the floor (its
+ *  centre, m) and whether it is rising, on the stroke `p` at `rateHz` bounces a second — the phase it is on now, the phase where the hand
+ *  meets it, the pace the bounce runs at to get there, and how long that takes. null = take it now (near the top, or it cannot be met
+ *  inside the wait at PICKUP_RATE_MAX). */
+export function planPickUp(ballY: number, rising: boolean, p: DribbleParams, rateHz: number,
+  k: { waitMaxSec: number; reachM: number; rateMax: number; topGapM: number; rateFloorHz?: number }): { phase0: number; phaseMeet: number; rate: number; sec: number } | null {
+  const drop = Math.max(0.1, p.palmY - p.ballR);
+  const h01 = (ballY - p.ballR) / drop;
+  if (!(h01 >= -0.5) || !(rateHz > 0)) return null;
+  if (ballY >= p.palmY - k.topGapM) return null;                                   // at the top: as today
+  const meet01 = Math.min(1, Math.max(0, 1 - k.reachM / drop));
+  if (rising && h01 >= meet01) return null;                                          // already at the hand's reach on its way up
+  const phase0 = rising ? risingPhaseAt(Math.max(0, h01)) : fallingPhaseAt(Math.max(0, h01));
+  const phaseMeet = risingPhaseAt(meet01);
+  const dPhase = phaseMeet - phase0; if (!(dPhase > 0)) return null;
+  const natural = dPhase / rateHz, fastest = dPhase / (Math.max(rateHz, k.rateFloorHz ?? 0) * Math.max(1, k.rateMax));
+  if (fastest > k.waitMaxSec + 1e-9) return null;                                   // cannot be met inside the wait: as today
+  const sec = Math.max(fastest, Math.min(natural, k.waitMaxSec));
+  return { phase0, phaseMeet, rate: dPhase / sec, sec };
+}
 /** A dribbled ball in the air does not turn with the body: its frame follows the root's facing at most this fast (rad/s). A mate
  *  turning onto his run swept a pushed-ahead ball round with him, 0.175 m in a frame (3a smoke). */
 export const BALL_YAW_RATE = 7;
@@ -234,6 +318,11 @@ export const HELD_MPS = 8.4, HELD_OVER_MPS = 1.8;
 export const HELD_STEP_M = HELD_MPS / 60, HELD_STEP_OVER_M = HELD_OVER_MPS / 60;
 /** Seconds the snap lasts, the follow-through holds, and the lag's gain (degrees of flex per degree/s of forearm swing). */
 export const WRIST_SNAP_SEC = 0.18, WRIST_AFTER_SEC = 0.8, WRIST_LAG_GAIN = 0.02;
+/** hoops-gather G2 (docs/HOOPS-GATHER-ESCAPE-PLAN.md §3, "the release wrist"): the smoothing time of the release's snap (s). Measured at
+ *  eec53f24: the ball hand's wrist turns 57.6° in ONE frame at the release of every set jumper and step-back (one hard pop a shot — the
+ *  largest family of hard pops after the press: 70 of 210 in the gather trials). 0.03 is the value it always had (TUNED, unchanged);
+ *  a longer ease spreads the same 58° snap over more frames. Knob `hoops.releaseSnapEaseSec`. */
+export const RELEASE_SNAP_EASE_SEC = 0.03;
 /** The dribbling wrist over a bounce (phase → degrees): cocked back as the ball arrives, the push through the top, a soft hand as it
  *  waits, cocked again to take the next one. Periodic, cosine-eased between the keys. */
 const DRIBBLE_WRIST_KEYS: readonly [number, number][] = [[0, -10], [0.12, 30], [0.3, 16], [0.6, 4], [0.86, -8], [0.96, -16], [1, -10]];
@@ -332,6 +421,43 @@ export function moveHandAt(path: Pick<HandlePath, 'startHand' | 'segs'>, t: numb
   return h;
 }
 
+// HOOPS-SOUND (phase 11a, 2026-11-12): THE BALL ON THE FLOOR IS HEARD. One watcher per ball (the first hoops carry that has it installs
+// it, the last one to go removes it), read after every drawn frame — after the carry, a move's path, the mode's gather or the loose
+// ball's physics have all placed it — so whoever moved it, every floor contact is seen, and seen once (one detector per ball: a contact
+// is never heard twice). Its level comes from how fast the ball came down and whose it is: the carry dribbling it (the player's, or an
+// AI handler's at a share), else 'loose' (a rebound, the last bounce into a gather, a bounce pass) at the player's level. Panned to
+// where the ball is on screen. Knob hoops.dribbleSoundOn (0: silent, as before).
+interface BallSoundCarry { active(): boolean; role: DribbleSoundRole; ballR: number; floor(): number }
+const ballFloorWatches = new WeakMap<AbstractMesh, { carries: Set<BallSoundCarry>; stop(): void }>();
+function watchBallFloor(scene: Scene, ball: AbstractMesh, carry: BallSoundCarry): () => void {
+  let w = ballFloorWatches.get(ball);
+  if (!w) {
+    const carries = new Set<BallSoundCarry>(), contact = new FloorContact();
+    let floor = carry.floor(), ballR = carry.ballR;
+    const obs = scene.onAfterRenderObservable.add(() => {
+      if (ball.isDisposed() || feel('hoops.dribbleSoundOn', DRIBBLE_SOUND_ON) < 0.5) { contact.reset(); return; }
+      let who: BounceRole = 'loose';
+      for (const c of carries) if (c.active()) { who = c.role; floor = c.floor(); ballR = c.ballR; break; }
+      const b = ball.getAbsolutePosition();
+      const speed = contact.step(b.y - floor - ballR, animDt(scene.getEngine().getDeltaTime() / 1000, scene.animationTimeScale));
+      if (!(speed > 0)) return;
+      let pan = 0;
+      const cam = scene.activeCamera;
+      if (cam) {
+        const c = cam.globalPosition, r = cam.getDirection(Vector3.Right());
+        const dx = b.x - c.x, dy = b.y - c.y, dz = b.z - c.z;
+        pan = panFor(dx * r.x + dy * r.y + dz * r.z, Math.hypot(dx, dy, dz));
+      }
+      SoundKit.play('bounce', { volume: bounceVolume(speed, who), pan, tag: who });
+    });
+    w = { carries, stop: () => { scene.onAfterRenderObservable.remove(obs); } };
+    ballFloorWatches.set(ball, w);
+  }
+  const ww = w;
+  ww.carries.add(carry);
+  return () => { ww.carries.delete(carry); if (!ww.carries.size) { ww.stop(); ballFloorWatches.delete(ball); } };
+}
+
 export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   const armW = opts.armIntensity ?? 1;
   const hoops = !!opts.hoops;
@@ -354,6 +480,8 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   let prevArm: ArmChain | null = null; let switchLeft = 0;
   const prevHandT = new Vector3(), prevPole = new Vector3();
   let active = false;
+  // HOOPS-SOUND (phase 11a): whose dribble this is (only a hoops carry sounds: the dunk runway keeps its own; watchBallFloor below)
+  const soundRole: DribbleSoundRole = hoops ? claimDribbleRole(opts.scene, opts.soundRole) : 'off';
   let phase = 0;
   let pending = false;   // a frame was recorded since the last after-animations pass
   let frameDt = 0, stamp = 0;   // the recorded frame's dt, and a counter of drawn frames (the arm memo's continuity)
@@ -584,7 +712,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
         // both palms on the ball at the chest, giving with each step of the jog (the stride clock off the feet)
         if (holdK > 0.05) deg = WRIST_DEG.support + 5 * holdK * Math.sin(2 * Math.PI * Math.min(4, (clock - lockStrikeAt) / Math.max(0.3, lockPeriod)) + (sd === 'Left' ? 0 : Math.PI));
       } else if (releasedBy && sinceRelease < WRIST_AFTER_SEC + 0.4) {
-        if (sd === releasedBy) { deg = sinceRelease < WRIST_SNAP_SEC ? WRIST_DEG.snap : sinceRelease < WRIST_AFTER_SEC ? WRIST_DEG.after : WRIST_DEG.relaxed; smooth[sd] = sinceRelease < WRIST_SNAP_SEC ? 0.03 : 0.12; }
+        if (sd === releasedBy) { deg = sinceRelease < WRIST_SNAP_SEC ? WRIST_DEG.snap : sinceRelease < WRIST_AFTER_SEC ? WRIST_DEG.after : WRIST_DEG.relaxed; smooth[sd] = sinceRelease < WRIST_SNAP_SEC ? feel('hoops.releaseSnapEaseSec', RELEASE_SNAP_EASE_SEC) : 0.12; }   // hoops-gather G2: the snap's ease is a knob (0.03 = as before)
         else deg = WRIST_DEG.relaxed;
       }
       const swing = foreSwing(sd, dt);   // (read every frame so the memo stays continuous)
@@ -665,7 +793,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   /** The held ball's last drawn point, the hand that held it, the root's (a teleport — a check — is not a whip), and the ball arm's
    *  and chest's local rotations as drawn (spine → forearm), sampled after the frame rendered. */
   let heldPrevBall: Vector3 | null = null, heldPrevHand: 'Left' | 'Right' | null = null; const heldPrevRoot = new Vector3();
-  const drawnBall = new Vector3(); let drawnAt = -1, limitedAt = -1;
+  const drawnBall = new Vector3(); let drawnAt = -1, limitedAt = -1, drawnVy = 0;
   // the dribbled ball as the after-animations pass placed it: the root it was placed from (and that root's yaw), and on which frame
   const placedRoot = new Vector3(); let placedYaw = 0, placedAt = -1;
   let passDt = 1 / 60;   // this drawn frame's dt (the held cap is a speed)
@@ -744,7 +872,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   };
   /** After the frame rendered: the ball as drawn, and (while held) the ball arm's locals as drawn. */
   const sampleDrawn = (): void => {
-    opts.ball.computeWorldMatrix(true); drawnBall.copyFrom(opts.ball.getAbsolutePosition()); drawnAt = stamp;
+    opts.ball.computeWorldMatrix(true); { const y = opts.ball.getAbsolutePosition().y; drawnVy = drawnAt === stamp - 1 ? y - drawnBall.y : 0; } drawnBall.copyFrom(opts.ball.getAbsolutePosition()); drawnAt = stamp;   // (hoops-gather G1: drawnVy, the drawn ball's last vertical step)
     if (active && !mv && handRootLocal(side, drawnHand)) { drawnHandAt = stamp; drawnHandSide = side; }   // (the clip clock's held-pose read)
     const held = ballHandNow();
     if (held) {
@@ -765,6 +893,9 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   let queued: { move: PathMove; opts: CarryMoveOpts; at?: number } | null = null;   // `at`: the cut-in (comboFlow), else the catch
   /** The ball as the last pass drew it — in the ball's frame, less the push-ahead — and its velocity there: a move's mid-bounce start. */
   const lastLocal = new Vector3(), lastVel = new Vector3(); let lastLocalAt = -1;
+  // hoops-gather G1: a pick-up waiting for the bounce (pickUp): the target hand, the bounce's phase and pace to the meeting, the hand's
+  // start height (root frame), and the offset from the ball as drawn to the stroke's point at the start (faded out over the wait)
+  let pick: { hand: RigHand | null; t: number; sec: number; phase: number; meet: number; rate: number; natural: number; handY0: number; off: Vector3; push: number; releaseSec?: number } | null = null;
   const athleteOf = (sd: 'Left' | 'Right'): MoveHand => sideOfRigHand(opts.skeleton, opts.root, `${sd}Hand`);
   const rigOf = (h: MoveHand): 'Left' | 'Right' => (rigHandOnSide(opts.skeleton, opts.root, h) === 'LeftHand' ? 'Left' : 'Right');
   const moveArms: Record<'Left' | 'Right', ArmChain | null> = { Left: armChain(opts.skeleton, 'Left'), Right: armChain(opts.skeleton, 'Right') };
@@ -870,7 +1001,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   /** A queued move starts at the running one's catch, from the ball as it is caught (plan §3.3: the double cross's second crossing). */
   const startQueued = (): void => {
     const m = mv!, q = queued!; queued = null;
-    const smp = pathAt(m.path, m.t);
+    const smp = pathAt(m.path, m.t, m.opts.catchLeadSec);
     // HOOPS-HAND-LABEL: the ball is still in flight to the end hand at this catch — the hand that HOLDS it carries into the queued move,
     // whose own catch hands it on when that palm has it (it flipped here, at the catch's t0, a frame or two before the palm reached it)
     setSide(rigOf(m.held));
@@ -897,7 +1028,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   };
   /** The move's frame (the after-animations pass): the ball on its path, each hand by the contact schedule. */
   const applyMove = (dt: number): void => {
-    const m = mv!; const smp = pathAt(m.path, m.t); m.sample = smp; m.sampleT = m.t;
+    const m = mv!; const smp = pathAt(m.path, m.t, m.opts.catchLeadSec); m.sample = smp; m.sampleT = m.t;
     const sg = m.path.segs.find((x) => m.t <= x.t1) ?? m.path.segs[m.path.segs.length - 1]; m.segU = sg.t1 > sg.t0 ? (m.t - sg.t0) / (sg.t1 - sg.t0) : 1;
     // the ball's frame follows the root's turn at a ball's pace (BALL_YAW_RATE, the dribble's) — and never snaps with it: the facing snaps
     // at a cut (the left-stick reversal's −129°, the momentum cross's −55° in one frame; measured, the probe's first 4b run) swung a ball
@@ -944,6 +1075,53 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     }
     moveReached = best > 0;
   };
+  /** hoops-gather G1: one drawn frame of a pick-up waiting for the bounce — the ball on its own stroke (the drawn offset fading out), the
+   *  dribbling hand going down to meet it, and the take where they meet (or at the wait's end, as today). */
+  const takePick = (): void => {
+    const pk = pick; if (!pk) return; pick = null;
+    if (opts.ball.parent !== null || (opts.ball.metadata as { felReleased?: boolean } | null)?.felReleased) return;
+    gatherBallToHand(opts.ball, opts.skeleton, `${side}Hand`);
+    if (pk.hand && pk.hand !== `${side}Hand`) gatherBallToHand(opts.ball, opts.skeleton, pk.hand);   // palm to palm, as a held hand-off
+    releaseLeft = releaseTotal = Math.max(1e-3, pk.releaseSec ?? RELEASE_FADE_SEC); releaseDt = 0;   // the reach lets go from where it met the ball
+  };
+  const _pp = new Vector3();
+  const applyPick = (dt: number): void => {
+    const pk = pick!;
+    if (opts.ball.parent !== null || (opts.ball.metadata as { felReleased?: boolean } | null)?.felReleased) { pick = null; releaseLeft = releaseTotal = Math.max(1e-3, pk.releaseSec ?? RELEASE_FADE_SEC); releaseDt = 0; return; }   // stolen, released, taken by another call: the reach lets go as a let-go does
+    pk.t += dt;
+    const u = Math.min(1, pk.t / pk.sec), e = u * u * (3 - 2 * u);
+    // the bounce runs at the planned pace to the meeting point, then on at its own pace to the top: the take is where the ball reaches the
+    // palm AS IT IS DRAWN (the reach may not get the hand all the way down: a clip under it, a body that cannot fold that far)
+    const natural = Math.max(1e-3, pk.natural);
+    const ph = pk.t <= pk.sec ? pk.phase + pk.rate * pk.t : Math.min(1, pk.meet + natural * (pk.t - pk.sec));
+    const s = dribbleAtPushed(ph, p), sx = sideSign(side);
+    ballToWorld(s.ball.x * sx, s.ball.y, s.ball.z + pk.push, world);
+    world.addInPlace(pk.off.scale(1 - e));
+    opts.ball.position.copyFrom(world);
+    placedRoot.copyFrom(opts.root.getAbsolutePosition()); placedYaw = rootYaw(); placedAt = stamp;
+    if (arm && armW > 0) {
+      // the hand goes down toward the meeting point and never below the ball's top on the way
+      const meetY = dribbleAtPushed(pk.meet, p).ball.y + p.ballR;
+      const hy = Math.max(pk.handY0 + (meetY - pk.handY0) * e, s.ball.y + p.ballR);
+      handLocal.set(s.hand.x * sx, hy, s.hand.z + pk.push);
+      toWorld(handLocal.x, handLocal.y, handLocal.z, handT);
+      toWorld(sx * BALL_ELBOW_POLE[0], BALL_ELBOW_POLE[1], BALL_ELBOW_POLE[2], pole).subtractInPlace(opts.root.getAbsolutePosition());
+      reachShaped(arm, handT, pole, armW, dt, stamp);
+      reachedAt = stamp;
+      // the shot's hand, when it is the OTHER one, comes to the ball's far side for the meeting (both hands onto it: the gather)
+      if (pk.hand && pk.hand !== `${side}Hand` && offArm) {
+        offLocal.set(s.ball.x * sx - sx * (p.ballR + 0.06), s.ball.y + 0.04, s.ball.z + pk.push);
+        toWorld(offLocal.x, offLocal.y, offLocal.z, offT);
+        toWorld(-sx * OFF_ELBOW_POLE[0], OFF_ELBOW_POLE[1], OFF_ELBOW_POLE[2], offPole).subtractInPlace(opts.root.getAbsolutePosition());
+        offW = armW * e; reachShaped(offArm, offT, offPole, offW, dt, stamp);
+      }
+    }
+    // the take: the ball's top at the dribbling palm as drawn (on its way up, past the floor), at the top of the stroke, or the hard cap
+    const hn = handNodes[side];
+    let atPalm = false;
+    if (hn && ph > PUSHED_FLOOR_PHASE) { hn.computeWorldMatrix(true); Vector3.TransformCoordinatesToRef(palmOffsetOf(opts.ball, `${side}Hand`) as Vector3, hn.getWorldMatrix(), _pp); atPalm = Vector3.Distance(_pp, world) <= p.ballR + feel('hoops.pickupContactM', PICKUP_CONTACT_M); }
+    if ((pk.t >= pk.sec - 1e-6 && atPalm) || ph >= 0.999 || pk.t >= pk.sec + feel('hoops.pickupOverrunSec', PICKUP_OVERRUN_SEC)) takePick();
+  };
   const applyHoops = () => {
     stamp++;
     // the dt the mode recorded since the last pass — or, on a frame it did not update() the carry (a defender's, a held move's), the drawn
@@ -954,6 +1132,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     const sx = sideSign(side);
     strideTick(dt, sx);
     holdK += (holdTarget - holdK) * Math.min(1, dt / 0.2);
+    if (!active && pick) { applyPick(dt); applyWrists(dt); return; }   // hoops-gather G1: the pick-up waiting for the bounce
     if (!active) {
       if (releaseLeft > 0) {
         // HOOPS MOTION phase 3c: THE LET-GO FADE RUNS ON THE DRAWN FRAME'S CLOCK. It ran on the dt of the mode's last update() — and a
@@ -1092,8 +1271,10 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
       if (ballHandNow()) gatherBallToHand(opts.ball, opts.skeleton, `${side}Hand`);
       return;
     }
-    if (mv) queued = { move: 'crossover', opts: {} };
-    else runMoveImpl('crossover');
+    const lead = feel('hoops.handChangeCatchLeadSec', HAND_CHANGE_CATCH_LEAD_SEC);   // hoops-p06: the catching hand meets the ball (see the constant)
+    const o: CarryMoveOpts = lead > CONTACT_FADE_SEC ? { catchLeadSec: lead } : {};
+    if (mv) queued = { move: 'crossover', opts: o };
+    else runMoveImpl('crossover', o);
   };
   const obs = opts.scene.onAfterAnimationsObservable.add(hoops ? applyHoops : apply);
   const obsDrawn = hoops ? opts.scene.onAfterRenderObservable.add(sampleDrawn) : null;
@@ -1102,6 +1283,11 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   // before-render drives (the 3v3 driver). Once per drawn frame.
   const obsLimit = hoops ? opts.scene.onBeforeCameraRenderObservable.add(() => { if (limitedAt === stamp) return; limitedAt = stamp; followRoot(); limitHeldBall(); armEase?.apply(stamp, passDt, !!mv); }) : null;   // (+ #314 port: the arm ease, last)
 
+  // HOOPS-SOUND (phase 11a): this carry's ball is heard meeting the floor (its role and floor while it is the one dribbling)
+  const unwatchFloor = soundRole === 'off' ? null : watchBallFloor(opts.scene, opts.ball, {
+    active: () => active, role: soundRole, ballR: p.ballR,
+    floor: () => (Number.isFinite(floorY) ? floorY : opts.root.getAbsolutePosition().y),
+  });
   const api: BallCarry = {
     get active() { return active; },
     get phase() { return phase; },
@@ -1120,7 +1306,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     get crossing() { return (!!mv && mv.crosses > 0) || (!!queued && crossesOf(queued.move) > 0); },
     get move() {
       const m = mv; if (!m) return null;
-      const smp = m.sampleT === m.t && m.sample ? m.sample : pathAt(m.path, m.t);
+      const smp = m.sampleT === m.t && m.sample ? m.sample : pathAt(m.path, m.t, m.opts.catchLeadSec);
       return { name: m.name, t: m.t, duration: m.path.duration, readAtK: m.path.readAtK, k: m.path.duration > 0 ? Math.min(1, m.t / m.path.duration) : 1, exposed01: smp.exposed, contactHands: smp.contactHands.slice(), contactRig: smp.contactHands.map(rigOf), contact: smp.contact, reach: { ...smp.reach }, startHand: m.path.startHand, endHand: m.path.endHand, cutIn: cutInWindow(m.path) };
     },
     runMove(spec: PathMove | HandlePath, o?: CarryMoveOpts) { return runMoveImpl(spec, o); },
@@ -1160,12 +1346,45 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
       guardTarget = 0; guardK = 0;
     },
     setHold(k: number) { holdTarget = Math.min(1, Math.max(0, k)); },
+    get pickingUp() { return !!pick; },
+    settlePickUp() { if (pick) takePick(); },
+    pickUp(hand?: RigHand, releaseSec?: number) {
+      if (pick) { if (hand) pick.hand = hand; return 'reading'; }   // already waiting for the bounce: only the hand it goes to changes
+      const asToday = (): 'now' => {
+        api.update(0, 0, false, undefined, releaseSec);
+        const md = opts.ball.metadata as { felReleased?: boolean } | null;
+        const par = opts.ball.parent;
+        if (hand && !md?.felReleased && (!par || par === handNodes.Left || par === handNodes.Right)) gatherBallToHand(opts.ball, opts.skeleton, hand);
+        return 'now';
+      };
+      if (!hoops || !active || feel('hoops.pickupReadOn', PICKUP_READ_ON) < 0.5 || opts.ball.parent !== null) return asToday();
+      // the ball as drawn now (this frame's placement), and which way it is going (the last two placements, in the ball's own frame)
+      opts.ball.computeWorldMatrix(true);
+      const at = opts.ball.getAbsolutePosition().clone();
+      const fl = Number.isFinite(floorY) ? floorY : opts.root.getAbsolutePosition().y;
+      // a move's path (a crossing, the auto hand's cross) places the ball itself: which way it is going is read off the ball as drawn
+      const rising = mv ? drawnVy > 0 : lastLocalAt >= 0 ? lastVel.y > 0 : phase > PUSHED_FLOOR_PHASE;
+      const rate = lockHz > 0 ? lockHz : p.hzIdle + (p.hzFast - p.hzIdle) * Math.min(1, Math.max(0, lastSpeed01));
+      const plan = planPickUp(at.y - fl, rising, p, rate, { waitMaxSec: feel('hoops.pickupWaitMaxSec', PICKUP_WAIT_MAX_SEC), reachM: feel('hoops.pickupReachM', PICKUP_REACH_M), rateMax: feel('hoops.pickupRateMax', PICKUP_RATE_MAX), topGapM: feel('hoops.pickupTopGapM', PICKUP_TOP_GAP_M), rateFloorHz: feel('hoops.pickupRateFloorHz', PICKUP_RATE_FLOOR_HZ) });
+      if (!plan) return asToday();
+      // park the dribble as update(false) does — the move and the queue dropped — but keep the ball free and the reach on
+      active = false; queued = null; lastLocalAt = -1; releaseLeft = 0;
+      if (mv) { const m = mv; mv = null; m.opts.onEvent?.('cancel', m.name); }   // (as update(false) does: the move is dropped, the ball goes on from where it is)
+      const push = PUSH_AHEAD_M * pushK, sx = sideSign(side);
+      const s0 = dribbleAtPushed(plan.phase0, p);
+      ballToWorld(s0.ball.x * sx, s0.ball.y, s0.ball.z + push, world);
+      const off = at.subtract(world); if (off.length() > 0.5) { active = true; return asToday(); }   // nowhere near its stroke (a move's far point): taken as today
+      const h0 = dribbleAtPushed(plan.phase0, p).hand.y;
+      pick = { hand: hand ?? null, t: 0, sec: plan.sec, phase: plan.phase0, meet: plan.phaseMeet, rate: plan.rate, natural: rate, handY0: h0, off, push, releaseSec };
+      return 'reading';
+    },
     setGuard(k: number) { guardTarget = Math.min(1, Math.max(0, Number.isFinite(k) ? k : 0)); },
     update(dt, speed01, wantActive, hz, releaseSec) {
       if (hoops) pendingDt += dt;
       if (wantActive !== active) {
         active = wantActive;
         if (active) {
+          pick = null;   // hoops-gather G1: the dribble resumes from where the ball is (the activation reads a free ball as ours)
           if (hoops) {
             // the bounce starts at its top on this hand's side: fade out where the palm really had the ball over the first push
             // the bounce starts from the hand that HAS the ball (a finish or a hand-off may have left it in the other one) — and on the next
@@ -1200,7 +1419,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
       frameDt = dt; lastSpeed01 = speed01;
       pending = true;
     },
-    dispose() { opts.scene.onAfterAnimationsObservable.remove(obs); if (obsDrawn) opts.scene.onAfterRenderObservable.remove(obsDrawn); if (obsLimit) opts.scene.onBeforeCameraRenderObservable.remove(obsLimit); },
+    dispose() { unwatchFloor?.(); opts.scene.onAfterAnimationsObservable.remove(obs); if (obsDrawn) opts.scene.onAfterRenderObservable.remove(obsDrawn); if (obsLimit) opts.scene.onBeforeCameraRenderObservable.remove(obsLimit); },
   };
   return api;
 }

@@ -23,7 +23,9 @@ import { touchDeckLayout, type TouchDeckLayout } from '@/lib/ui/consoleView';
 // THE CYPHER'S PAD (lane/dance-extras, 2026-10-14): dance draws its own thumb pairs in place of the generic rig below — the
 // same overlay (bus, safe-area, fit), the same verbs (MODE_VERBS.dance); see lib/babylon/dance/ui/padModel.ts (what each button is) and padStore.ts (what the room tells it).
 import { DancePad } from '@/lib/babylon/dance/ui/DancePad';
-import { TurboPad } from './TurboPad';   // hoops round 2 (owner 2026-10-23): R2 on the touch deck, for the modes whose R2 is the turbo
+import { TurboPad } from './TurboPad';
+import { feel } from '@/lib/feel-panel/feel';
+import { TOUCH_FLOAT_STICK, FLOAT_BASE_PX, FLOAT_RADIUS_PX, FLOAT_ZONE_W, FLOAT_ZONE_H, floatStickVector, floatKnobOffset } from './floatStick';   // lane/move-feel-2: the floating MOVE stick   // hoops round 2 (owner 2026-10-23): R2 on the touch deck, for the modes whose R2 is the turbo
 
 // setPointerCapture throws NotFoundError if the browser has already dropped
 // the pointer session by the time the handler runs (seen on some mobile
@@ -116,7 +118,7 @@ export function TouchOverlay(props: { bus: InputBus; modeId: string; visible: bo
       {/* compact: the stick in the corner and the d-pad inboard of it (row-reverse keeps the DOM order) */}
       <div ref={colL} className={`pointer-events-auto absolute bottom-3 left-3 flex gap-2 ${compact ? 'flex-row-reverse items-end' : 'flex-col items-center'}`} style={lifted(compact ? COMPACT_LEFT : SAFE_LEFT, cs * fit.l, 'bottom left')}>
         <DPad bus={props.bus} />
-        {DEAD_L_STICK.has(props.modeId) ? <HollowStick /> : <AnalogStick bus={props.bus} side="L" label="MOVE" />}
+        {DEAD_L_STICK.has(props.modeId) ? <HollowStick /> : FLOAT_STICK_MODES.has(props.modeId) && feel('touch.floatStick', TOUCH_FLOAT_STICK) > 0 ? <FloatStick bus={props.bus} /> : <AnalogStick bus={props.bus} side="L" label="MOVE" />}
       </div>
       {compact ? (
         // compact: the diamond in the corner with the boost pill over it, the right stick inboard of the diamond
@@ -176,6 +178,55 @@ function AnalogStick({ bus, side, label }: { bus: InputBus; side: 'L' | 'R'; lab
       <span className="absolute inset-0 flex items-center justify-center text-[12px] font-black tracking-widest text-white/50">
         {label}
       </span>
+    </div>
+  );
+}
+
+/** lane/move-feel-2 (owner 2026-11-17): the modes whose MOVE stick floats (lib/babylon/ui/floatStick; knob `touch.floatStick`, 0 = the fixed
+ *  stick): the two hoops modes, where the diagnosis measured it. Every other mode keeps the fixed stick. */
+export const FLOAT_STICK_MODES: ReadonlySet<string> = new Set(['onevone', 'threevthree']);
+
+/** THE FLOATING MOVE STICK (lane/move-feel-2): a zone the thumb lands in; the stick's centre appears under the thumb (so the first contact
+ *  is a standstill), 1.5× today's base, full speed at its rim, a 10 % dead zone (floatStick.ts). At rest a faint base shows where to put
+ *  the thumb. The zone's own transform (the deck's fit / compact scale) is read from its rect, so the travel scales with what is drawn. */
+function FloatStick({ bus }: { bus: InputBus }) {
+  const zone = useRef<HTMLDivElement>(null), base = useRef<HTMLDivElement>(null), knob = useRef<HTMLDivElement>(null);
+  const active = useRef<number | null>(null), origin = useRef({ x: 0, y: 0, k: 1 });
+  const rest = { x: FLOAT_ZONE_W / 2, y: FLOAT_ZONE_H / 2 };
+  const draw = (cx: number, cy: number, kx: number, ky: number, on: boolean) => {
+    if (base.current) { base.current.style.transform = `translate(${cx - FLOAT_BASE_PX / 2}px, ${cy - FLOAT_BASE_PX / 2}px)`; base.current.style.opacity = on ? '1' : '0.45'; }
+    if (knob.current) knob.current.style.transform = `translate(${cx + kx - 24}px, ${cy + ky - 24}px)`;
+  };
+  const local = (e: React.PointerEvent) => {   // the pointer in the zone's own (unscaled) px
+    const r = zone.current!.getBoundingClientRect(); const k = r.width / FLOAT_ZONE_W || 1;
+    return { x: (e.clientX - r.left) / k, y: (e.clientY - r.top) / k, k };
+  };
+  const onDown = (e: React.PointerEvent) => {
+    if (active.current !== null || !zone.current) return;
+    active.current = e.pointerId; safeCapture(e.target as Element, e.pointerId);
+    const p = local(e); origin.current = p;
+    draw(p.x, p.y, 0, 0, true);
+    bus.emit({ t: 'stick', side: 'L', x: 0, y: 0 });   // a landing thumb is a standstill
+  };
+  const onMove = (e: React.PointerEvent) => {
+    if (active.current !== e.pointerId || !zone.current) return;
+    const p = local(e), o = origin.current; const dx = p.x - o.x, dy = p.y - o.y;
+    const v = floatStickVector(dx, dy, FLOAT_RADIUS_PX); const kOff = floatKnobOffset(dx, dy, FLOAT_RADIUS_PX);
+    bus.emit({ t: 'stick', side: 'L', x: v.x, y: v.y });
+    draw(o.x, o.y, kOff.x, kOff.y, true);
+  };
+  const onUp = (e: React.PointerEvent) => {
+    if (active.current !== e.pointerId) return;
+    active.current = null; bus.emit({ t: 'stick', side: 'L', x: 0, y: 0 }); draw(rest.x, rest.y, 0, 0, false);
+  };
+  useEffect(() => { draw(rest.x, rest.y, 0, 0, false); return () => { if (active.current !== null) bus.emit({ t: 'stick', side: 'L', x: 0, y: 0 }); }; }, []);   // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div ref={zone} data-float-stick aria-label="Move: put your thumb anywhere here" onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
+      className="relative touch-none select-none" style={{ width: FLOAT_ZONE_W, height: FLOAT_ZONE_H }}>
+      <div ref={base} className="fel-chrome-glass pointer-events-none absolute left-0 top-0 rounded-full border border-white/20 bg-white/5 backdrop-blur-sm" style={{ width: FLOAT_BASE_PX, height: FLOAT_BASE_PX }}>
+        <span className="absolute inset-0 flex items-center justify-center text-[12px] font-black tracking-widest text-white/50">MOVE</span>
+      </div>
+      <div ref={knob} className="pointer-events-none absolute left-0 top-0 h-12 w-12 rounded-full bg-white/25 shadow-lg" />
     </div>
   );
 }

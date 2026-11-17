@@ -120,7 +120,10 @@ describe('hoops pause — one controls list, the panel', () => {
     // EVERY-SCREEN P10: the panel scrolls as a whole (it was the lines' own box; at 150 % and 200 % text that box cut its words)
     expect(html).toMatch(/data-controls-panel="keys" class="[^"]*\bmin-h-0\b[^"]*\boverflow-y-auto\b/);
     // the 1v1's list is the longest a panel carries: more lines than any curated list's budget, so the scroll is the plan
-    expect(controlsSheet('onevone', 'keys').lines.length).toBeGreaterThan(PANEL_MAX_LINES * 2);
+    // test changed (hoops-p08): the 1v1 offence sheet went from 16 lines to 8 (every control kept, docs/HOOPS-AAA-GAP-SHOW.md
+    // sinker 14), so with defence the list is 14 lines — still over a curated list's budget, and the scroll is still the plan.
+    // Was: > PANEL_MAX_LINES * 2 (16).
+    expect(controlsSheet('onevone', 'keys').lines.length).toBeGreaterThan(PANEL_MAX_LINES);
     // READY's panel is bounded too (26vh, 38vh from sm) — the same lines box scrolls there
     expect(card('ready', 'onevone')).toMatch(/data-controls-panel="keys" class="[^"]*max-h-\[26vh\][^"]*sm:max-h-\[38vh\]/);
   });

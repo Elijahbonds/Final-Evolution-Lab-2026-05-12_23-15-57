@@ -16,11 +16,13 @@ import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } 
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
-import { HUD_TEXT_ALPHA, HudBanner, HudChip, HudFrame, HudLine, HudPlate, HudText, ScoreValue, Scorebug, hudColor, type HudTone } from './tv-hud';
+import { HUD_TEXT_ALPHA, HudBanner, HudChip, HudFrame, HudPlate, HudText, ScoreValue, Scorebug, hudColor, type HudTone } from './tv-hud';
 import { HoopsShotMeter } from './hoops-shot-meter';
 import { HoopsShotClock } from './hoops-shot-clock';   // lane/hoops-shot-core: ELITE's shot clock on the scorebug
 import { MicCaption, MicToggle } from './mic-caption';   // THE MIC (2026-09-24): what the court's MC just said, and the switch for the voice
 import { pipBias } from '@/lib/babylon/modes/onevoneRules';   // IMPROVE (2026-10-06) #10
+import { HoopsBottomStack, StackLine } from './hoops-bottom-stack';   // hoops-p08: one column for the bottom layers
+import { useHintDevice, useHoopsHint } from './use-hoops-hint';   // hoops-p08: the hint for the first plays, in the device's words
 
 /** IMPROVE (2026-10-06) #10: a release pip's colour — the world meter's verdicts (ShotMeter3D) on the HUD palette: perfect and good
  *  green (perfect solid, good a step softer), early and late amber, way late red. */
@@ -110,6 +112,9 @@ export default function BasketballBabylon({ onEnd }: GameProps) {
   }, [emit]);
 
   const meter = typeof hud.shotMeterT === 'number' ? Math.max(0, Math.min(1, hud.shotMeterT)) : null;
+  // hoops-p08: the control hint for the first plays only, and never in pad or key words on a touch screen
+  const { device } = useHintDevice();
+  const hint = useHoopsHint('onevone', typeof hud.hint === 'string' && hud.hint && phase === 'playing' ? hud.hint : '', hud, phase === 'playing', device);
 
   return (
     <div className="relative h-[calc(100dvh-3.25rem)] w-full overflow-hidden rounded-none border-0 bg-transparent">
@@ -140,21 +145,20 @@ export default function BasketballBabylon({ onEnd }: GameProps) {
         </span>
       </div>
 
-      {/* shot meter */}
-      {meter !== null && phase === 'playing' && (
-        <div className="absolute inset-x-0 bottom-24 flex justify-center">
-          <HoopsShotMeter t={meter} green={hud.shotMeterGreen} perfect={hud.shotMeterPerfect} />
-        </div>
-      )}
-
-      {phase === 'playing' && <HudBanner text={typeof hud.banner === 'string' ? hud.banner : ''} tone="you" plate={false} className="top-1/3" />}
-      {/* IMPROVE (2026-10-06) #1: ONE line for the state you are in (the mode's hint — it used to be every control at once, and
-          this host never drew it) */}
-      {typeof hud.hint === 'string' && hud.hint && phase === 'playing' && (
-        <HudLine text={hud.hint} size="caption" alpha={0.75} className="bottom-16" />
+      {/* hoops-p08: the call stays at a third of the stage — on an upright phone (under 640 px) it heads the bottom stack instead, where the
+          MC's line cannot sit on it (measured: the 3v3's taller stack reached it) */}
+      {phase === 'playing' && <HudBanner text={typeof hud.banner === 'string' ? hud.banner : ''} tone="you" plate={false} className="top-1/3 hidden sm:flex" />}
+      {/* hoops-p08: THE BOTTOM STACK, lowest first — IMPROVE (2026-10-06) #1's ONE line for the state you are in (for the first plays),
+          the shot meter, the MC's line (heard: no subtitle unless CC) — one column, so no layer can sit on another */}
+      {phase === 'playing' && (
+        <HoopsBottomStack rows={[
+          ['hint', hint ? <StackLine text={hint} alpha={0.75} /> : null],
+          ['meter', meter !== null ? <HoopsShotMeter t={meter} green={hud.shotMeterGreen} perfect={hud.shotMeterPerfect} /> : null],
+          ['mic', typeof hud.mic === 'string' && hud.mic ? <MicCaption flow text={hud.mic} who={hud.micWho} voiced={hud.micVoiced} /> : null],
+          ['call', typeof hud.banner === 'string' && hud.banner ? <div className="sm:hidden"><HudBanner flow text={hud.banner} tone="you" plate={false} /></div> : null],
+        ]} />
       )}
       </HudFrame>
-      {phase === 'playing' && <MicCaption text={hud.mic} who={hud.micWho} />}
       {phase === 'playing' && <MicToggle />}
 
       <BootSplash

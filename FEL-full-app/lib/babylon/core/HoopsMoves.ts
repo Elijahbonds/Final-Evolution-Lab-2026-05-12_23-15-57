@@ -23,6 +23,7 @@
 //      late one, the flight clock slows at the bump (the velocity kill), the defender is shoved or put down; on the floor
 //      (3v3, no Havok) two bodies exchange momentum along the contact normal with the ContactSystem's own severity
 //      thresholds, so a sprint into a set defender costs speed and reads as a hit.
+import { moveReadOn, passFakeLaneCos } from '../hoops/rulebook';   // hoops-p09: the pass fake reads the lane
 import { Vector3 } from '@babylonjs/core';
 import { classifyContact, type ContactSeverity } from './ContactSystem';
 import { DUNK_PCT, STEPBACK_SEC, STEPBACK_SPEED, LAYUP_STRIDE_SPEED, type ShotStyle, type ShotDrift } from './BasketballCore';
@@ -923,7 +924,10 @@ export function passFakeBite(read: PassFakeRead, roll: () => number = Math.rando
   // he has to be somewhere between me and the man I showed him, or there is no lane to jump
   const cos = (toTarget.x * toDef.x + toTarget.z * toDef.z) / (tLen * dLen);
   if (cos < 0.2) return NO_BITE;
-  if (roll() >= PASS_FAKE_BITE_CHANCE) return NO_BITE;
+  // hoops-p09 (one rulebook): he bites when he stands IN the lane to the man you showed (square to it, hoops.passFakeLaneCos); off it he
+  // reads it for what it is. No roll
+  if (moveReadOn()) { if (cos < passFakeLaneCos()) return NO_BITE; }
+  else if (roll() >= PASS_FAKE_BITE_CHANCE) return NO_BITE;   // dice-off: hoops.moveReadOn 0
 
   const shift = toTarget.scale(1 / tLen);
   return { bit: true, shift, lane: shift.scale(-1) };

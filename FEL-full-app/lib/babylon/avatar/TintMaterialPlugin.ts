@@ -51,6 +51,10 @@ export class ZoneTintPlugin extends MaterialPluginBase {
     samplers.push('felZoneMask');
   }
 
+  // device-perf (2026-11-12, the WebGPU trial): Babylon's default accepts GLSL only and THROWS when this is attached to a WGSL
+  // (WebGPU) material. It emits WGSL itself (getCustomCode / getUniforms below). Under WebGL nothing changes (GLSL was already accepted).
+  isCompatible(): boolean { return true; }
+
   getUniforms(shaderLanguage?: ShaderLanguage): { ubo: { name: string; size: number; type: string }[]; fragment: string } {
     const ubo = [
       { name: 'felTintPrimary', size: 3, type: 'vec3' },
