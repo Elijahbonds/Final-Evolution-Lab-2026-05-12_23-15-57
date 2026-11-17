@@ -5,6 +5,8 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { inviteState, type CoachInvite } from '@/lib/coach/invite';
 import { JoinButton } from './join-button';
+import { notice } from '@/lib/every-screen/notices';
+import { JOIN_CONSENT_LINE } from '@/lib/coach/inviteCopy';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,7 +45,8 @@ export default async function JoinPage({ params }: { params: { token: string } }
         <h1 className="fel-heading mt-3 text-2xl font-bold text-white">
           {state === 'expired' ? 'This invite has expired' : 'This invite has been used'}
         </h1>
-        <p className="mt-3 max-w-sm text-sm text-white/55">Ask your coach for a fresh link — they can make one in a tap.</p>
+        {/* COACH-WORDS (owner 2026-11-12): was "Ask your coach for a fresh link — they can make one in a tap." */}
+        <p className="mt-3 max-w-sm text-sm text-white/55">Ask your coach for a fresh link.</p>
       </Shell>
     );
   }
@@ -64,16 +67,16 @@ export default async function JoinPage({ params }: { params: { token: string } }
       }))
     : false;
 
+  // COACH-WORDS (owner 2026-11-12): the "Coach invite" label above the heading is gone (the heading already says it). The
+  // paragraph under it is what the athlete agrees to (what the coach can see and do, and that they can leave): consent
+  // wording. Option C, approved by the owner: "your coach" in place of the coach's name, every other word unchanged, and
+  // marked as an approved consent notice.
   return (
     <Shell signedIn={!!me}>
-      <p className="font-mono text-[12px] uppercase tracking-widest text-fel-dim">Coach invite</p>
-      <h1 className="fel-heading mt-3 text-3xl font-bold text-white">
+      <h1 className="fel-heading text-3xl font-bold text-white">
         {invite.coachName} <span className="text-white/50">wants to coach you</span>
       </h1>
-      <p className="mt-4 max-w-sm text-base leading-relaxed text-white/60">
-        Accept and {invite.coachName} can build your programming, watch your movement screens and send you work.
-        You can leave at any time.
-      </p>
+      <p {...notice('consent')} className="mt-4 max-w-sm text-base leading-relaxed text-white/60">{JOIN_CONSENT_LINE}</p>
       {me
         ? <JoinButton token={token} coachName={invite.coachName} already={already} />
         : (
