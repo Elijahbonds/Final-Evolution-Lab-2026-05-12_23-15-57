@@ -44,10 +44,11 @@ for (let i = 0; i < 40; i++) { try { if ((await fetch(base)).ok) break; } catch 
 
 const STATS = `(async () => { const d = window.__FEL_DEV__; const s = d.scene; const e = s.getEngine(); window.__SI = window.__SI || d.instrument();
   const draws = await new Promise((r) => requestAnimationFrame(() => r(e._drawCalls.current)));
+  const bodies = s.skeletons.length;
   let tex = 0; for (const t of s.textures) { const z = t.getSize(); tex += z.width * z.height * 4 * (t.noMipmap ? 1 : 1.33); }
   const c = window.__coast && window.__coast();
-  return { draws, active: s.getActiveMeshes().length, textureMb: Math.round(tex / 1e6), textures: s.textures.length, meshes: s.meshes.length, coast: c }; })()`;
-type Worst = { draws: number; active: number; textureMb: number; textures: number; meshes: number };
+  return { draws, active: s.getActiveMeshes().length, textureMb: Math.round(tex / 1e6), textures: s.textures.length, meshes: s.meshes.length, bodies, coast: c }; })()`;
+type Worst = { draws: number; active: number; textureMb: number; textures: number; meshes: number; bodies?: number };
 
 /** Run the player toward (x, z) with the mode's probe driver (CoastZoneMode coastProbeDrive: the move held forward, the yaw on the
  *  target, as the headless test walks the host), sampling every 250 ms. True when it got within 3 m. */
@@ -70,8 +71,14 @@ const result: Record<string, unknown> = {};
 try {
   // interleaved: zone, control, zone, control, … then the streaming control once
   const runs: Array<[string, string]> = [];
-  for (let i = 0; i < N; i++) { runs.push([`coast-${i + 1}`, '']); runs.push([`venice-control-${i + 1}`, 'mode=venice_hub']); }
-  runs.push(['coast-nostream', `feel=${encodeURIComponent(JSON.stringify({ 'coast.streamOn': 0 }))}`]);
+  // CONTROL=phaseA (phase B's measurement): the zone against itself with the partner and the creatures off (= phase A), same session
+  const phaseA = `feel=${encodeURIComponent(JSON.stringify({ 'coast.partnerOn': 0, 'coast.creaturesOn': 0 }))}`;
+  for (let i = 0; i < N; i++) {
+    runs.push([`coast-${i + 1}`, '']);
+    if (process.env.CONTROL === 'phaseA') runs.push([`phaseA-control-${i + 1}`, phaseA]);
+    else runs.push([`venice-control-${i + 1}`, 'mode=venice_hub']);
+  }
+  if (process.env.CONTROL !== 'phaseA') runs.push(['coast-nostream', `feel=${encodeURIComponent(JSON.stringify({ 'coast.streamOn': 0 }))}`]);
   const pick = (process.env.ONLY ?? '').split(',').filter(Boolean);
   for (const [name, query] of runs) {
     if (pick.length && !pick.some((p) => name.startsWith(p))) continue;
@@ -108,16 +115,28 @@ try {
     let worst: Worst = { draws: 0, active: 0, textureMb: 0, textures: 0, meshes: 0 };
     const pieces: string[] = [];
     let streamMax = { fine: 0, props: 0 };
+    const gaps2: number[] = [];
     const sample = async () => {
       const s = await page.evaluate(STATS) as Worst & { coast?: { piece: string; view: { fineMeshes: number; props: number } } };
-      worst = { draws: Math.max(worst.draws, s.draws), active: Math.max(worst.active, s.active), textureMb: Math.max(worst.textureMb, s.textureMb), textures: Math.max(worst.textures, s.textures), meshes: Math.max(worst.meshes, s.meshes) };
-      if (s.coast) { if (pieces[pieces.length - 1] !== s.coast.piece) pieces.push(s.coast.piece); streamMax = { fine: Math.max(streamMax.fine, s.coast.view.fineMeshes), props: Math.max(streamMax.props, s.coast.view.props) }; }
+      worst = { draws: Math.max(worst.draws, s.draws), active: Math.max(worst.active, s.active), textureMb: Math.max(worst.textureMb, s.textureMb), textures: Math.max(worst.textures, s.textures), meshes: Math.max(worst.meshes, s.meshes), bodies: Math.max(worst.bodies ?? 0, s.bodies ?? 0) };
+      if (s.coast) { if (pieces[pieces.length - 1] !== s.coast.piece) pieces.push(s.coast.piece); streamMax = { fine: Math.max(streamMax.fine, s.coast.view.fineMeshes), props: Math.max(streamMax.props, s.coast.view.props) }; if (s.coast.partner) gaps2.push(s.coast.partner.gap); }
     };
     const legs: Record<string, boolean> = {};
     if (isCoast) {
-      // the walk: off the dock to the beach, down the beach to the bridge, over the bridge onto Palm Key (crosses four pieces)
+      // the walk: off the dock to the beach, past the Shellhopper (a sighting), down the beach to the bridge, over the bridge onto
+      // Palm Key (crosses four pieces)
       legs.beach = await walkTo(page, 92, 24, 120, sample);
+      legs.creature = await walkTo(page, 84, 13, 60, sample);
+      await page.waitForTimeout(600);
+      await shot('sighting');
       legs.beachSouth = await walkTo(page, 72, -30, 150, sample);
+      // the partner follows behind you, where the chase camera is: stand a moment (it settles into its slot behind and to the
+      // right), then swing the camera round to the right with the look stick so both are in the picture
+      await page.waitForTimeout(2500);
+      await page.evaluate(`window.__bus.emit({ t: 'stick', side: 'R', x: 0.8, y: 0 })`);
+      await page.waitForTimeout(900);
+      await page.evaluate(`window.__bus.emit({ t: 'stick', side: 'R', x: 0, y: 0 })`);
+      await page.waitForTimeout(500);
       await shot('beach');
       legs.bridgeEast = await walkTo(page, 66, -36, 60, sample);
       legs.bridgeMid = await walkTo(page, 20, -36, 150, sample);
@@ -132,7 +151,10 @@ try {
     gaps.sort((a, b) => a - b);
     const frameMs = { worst: Math.round(gaps[gaps.length - 1] ?? 0), p95: Math.round(gaps[Math.floor(gaps.length * 0.95)] ?? 0), p50: Math.round(gaps[Math.floor(gaps.length * 0.5)] ?? 0), frames: gaps.length };
     const end = await page.evaluate('window.__coast ? window.__coast() : null');
-    result[name] = { ...t, worst, frameMs, legs, pieces, streamMax, end, errors: errors.slice(0, 5), missing: [...missing] };
+    gaps2.sort((a, b) => a - b);
+    const partnerGap = gaps2.length ? { mean: +(gaps2.reduce((a, b) => a + b, 0) / gaps2.length).toFixed(1), p95: +gaps2[Math.floor(gaps2.length * 0.95)].toFixed(1), max: +gaps2[gaps2.length - 1].toFixed(1) } : null;
+    const log = await page.evaluate('window.__log ?? null');
+    result[name] = { ...t, worst, frameMs, legs, pieces, streamMax, partnerGap, log, end, errors: errors.slice(0, 5), missing: [...missing] };
     console.log(name, JSON.stringify(result[name]));
     await ctx.close();
   }

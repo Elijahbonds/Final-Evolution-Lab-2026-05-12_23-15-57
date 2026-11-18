@@ -72,7 +72,7 @@ describe('the zone: the ground', () => {
 });
 
 /** Run the real host's player toward each waypoint in turn (the stick held forward, the camera's yaw on the target). */
-function walkRoute(route: [number, number][], opts: { secPerLeg?: number } = {}) {
+function walkRoute(route: [number, number][], opts: { secPerLeg?: number; stick?: number } = {}) {
   const world = buildCoastWorld();
   const host = new AdventureHost({ world: world.source, save: emptyAdventureSave(0), playerSpawn: world.spawn, band: null });
   const edge = new WaterEdge(world.spawn.pos);
@@ -80,7 +80,7 @@ function walkRoute(route: [number, number][], opts: { secPerLeg?: number } = {})
   host.setInputSource(host.playerId, (out) => {
     const p = host.player.pos;
     out.camYaw = Math.atan2(target[0] - p.x, target[1] - p.z);
-    out.move.x = 0; out.move.y = 1;
+    out.move.x = 0; out.move.y = opts.stick ?? 1;
   });
   const reached: boolean[] = [];
   let lowest = Infinity, deepFrames = 0;
@@ -119,6 +119,25 @@ describe('the zone on the real Adventure host: you can walk to both islands', ()
     expect(r.edge.turnedBack).toBe(0);
     expect(r.lowest).toBeGreaterThanOrEqual(SEA_Y - WADE_DEPTH - 0.05);
     r.host.dispose();
+  });
+
+  it('at a slow walk too: along the beach and onto the bridge from beside it (the decks lie on the sand; phase A had a 0.7 m ledge there)', () => {
+    const r = walkRoute(route.slice(0, 3), { stick: 0.5, secPerLeg: 80 });
+    expect(r.reached).toEqual([true, true, true]);
+    r.host.dispose();
+  });
+
+  it('a deck lies 0.15 m on the sand, rises through the shallows, and is level over the water; from the sand beside it the step on is under 0.45 m', () => {
+    for (const d of DECKS) {
+      for (let x = d.minX; x <= d.maxX; x += 0.5) {
+        const zm = (d.minZ + d.maxZ) / 2, t = terrainY(x, zm), y = surfaceY(x, zm);
+        expect(y).toBeLessThanOrEqual(Math.max(d.y, t + 0.15) + 1e-9);
+        if (t >= 0) expect(y - t).toBeCloseTo(0.15, 9);
+        // from the side, wherever you could stand beside it, the deck is one easy step up
+        const side = surfaceY(x, d.maxZ + 0.6);
+        if (side >= 0 && deckAt(x, d.maxZ + 0.6) === null) expect(y - side, `${d.id} x ${x}`).toBeLessThan(0.45);   // from dry sand beside it
+      }
+    }
   });
 
   it('running off the end of the dock stops at the deep water (the wall), not in it', () => {

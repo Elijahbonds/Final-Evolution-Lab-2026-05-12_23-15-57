@@ -2099,6 +2099,37 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/adventure/coast/zoneWorld.ts COAST_DEEP_WATER_TURN_BACK',
     hint: 'A jump that ends over water deeper than you can wade puts you back where you could stand. Off = the raw movement sim, for probes.',
   },
+  // ── coast-b (2026-11-18, NEW): the Coast zone, phase B — the partner, the creatures, the log. No shipped number moves.
+  {
+    id: 'coast.partnerOn', label: 'Coast zone: one partner walks with you (1) / you walk alone (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Coast · zone',
+    source: 'lib/adventure/coast/zonePartner.ts COAST_PARTNER_ON',
+    hint: 'Your Adventure partner follows you through the zone (a player with none gets the default creature on loan). Off = phase A.',
+  },
+  {
+    id: 'coast.partnerCatchupM', label: 'Coast zone: partner catches up past', def: 24, min: 8, max: 64, step: 1, unit: 'm', group: 'Coast · zone',
+    source: 'lib/adventure/coast/zonePartner.ts COAST_PARTNER_CATCHUP_M',
+    hint: 'Left this far behind (you outrun it on a long sprint), the partner reappears a few steps behind you on your path.',
+  },
+  {
+    id: 'coast.partnerStuckSec', label: 'Coast zone: a blocked partner comes back after', def: 1, min: 0.3, max: 5, step: 0.1, unit: 's', group: 'Coast · zone',
+    source: 'lib/adventure/coast/zonePartner.ts COAST_PARTNER_STUCK_SEC',
+    hint: 'A partner held up by something (a deck side, a rock) for this long, while more than 6 m behind, reappears on your path.',
+  },
+  {
+    id: 'coast.creaturesOn', label: 'Coast zone: creatures live in the zone (1) / none (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Coast · zone',
+    source: 'lib/adventure/coast/zoneCreatures.ts COAST_CREATURES_ON',
+    hint: 'The placeholder creatures wander near home and can be logged. Off = an empty zone, as in phase A.',
+  },
+  {
+    id: 'coast.logSeenM', label: 'Coast zone: a creature is seen within', def: 16, min: 4, max: 40, step: 1, unit: 'm', group: 'Coast · zone',
+    source: 'lib/adventure/coast/zoneCreatures.ts COAST_LOG_SEEN_M',
+    hint: 'Coming this close puts a creature in your log as seen.',
+  },
+  {
+    id: 'coast.logMeetM', label: 'Coast zone: a creature is met within', def: 3, min: 1, max: 8, step: 0.5, unit: 'm', group: 'Coast · zone',
+    source: 'lib/adventure/coast/zoneCreatures.ts COAST_LOG_MEET_M',
+    hint: 'Walking right up to a creature marks it as met in your log.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));

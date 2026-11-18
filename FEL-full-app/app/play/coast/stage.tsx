@@ -1,35 +1,43 @@
 'use client';
 
-// /play/coast — the Coast & Islands on the real ModeHarness (phase A). Mounts MODES.coast_zone and starts it as soon as it is ready
-// (a place to walk, not a match: no START screen). Over the scene: the way back to Venice (the corner link, always), the boat's card
-// when the player stands at the boat on the dock, the touch deck with the floating stick on a phone, and the party bar (the root
-// layout's, on every page). Nothing else on screen.
+// /play/coast — the Coast & Islands on the real ModeHarness (phases A and B). Mounts MODES.coast_zone and starts it as soon as it is
+// ready (a place to walk, not a match: no START screen). Over the scene: the way back to Venice (the corner link, always), the creature
+// log (its button in the other corner, its panel on a tap), a short note when a creature goes in the log, the boat's card when the
+// player stands at the boat on the dock, the touch deck with the floating stick on a phone, and the party bar (the root layout's).
 
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, Ship } from 'lucide-react';
+import { BookOpen, Ship, X } from 'lucide-react';
 import { runMode, InputBus, type ModePhase } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { zoneUi } from '@/lib/adventure/coast/zoneUi';
-import { veniceReturnHref } from '@/lib/adventure/coast/door';
+import { logCount } from '@/lib/adventure/coast/creatureLog';
+
+/** How long the "new in your log" note stays up (ms). */
+const NOTE_MS = 3500;
 
 const MODE_KEY = 'coast_zone';
 
-export function CoastStage({ signedIn }: { signedIn: boolean }) {
+export function CoastStage({ signedIn, back }: { signedIn: boolean; back: string }) {
   const router = useRouter();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
   const [phase, setPhase] = useState<ModePhase>('loading');
   const [err, setErr] = useState<string | null>(null);
   const [touch, setTouch] = useState(false);
-  const [back, setBack] = useState('/play/venice');
   const ui = useSyncExternalStore(zoneUi.subscribe, zoneUi.getSnapshot, zoneUi.getSnapshot);
+  const [logOpen, setLogOpen] = useState(false);
+  const [note, setNote] = useState<typeof ui.sighting>(null);
+  useEffect(() => {
+    if (!ui.sighting) return;
+    setNote(ui.sighting);
+    const t = setTimeout(() => setNote(null), NOTE_MS);
+    return () => clearTimeout(t);
+  }, [ui.sighting]);
 
   useEffect(() => {
     try { setTouch(window.matchMedia('(pointer: coarse)').matches); } catch { setTouch(false); }
-    setBack(veniceReturnHref(window.location.search));
   }, []);
 
   useEffect(() => {
@@ -60,17 +68,49 @@ export function CoastStage({ signedIn }: { signedIn: boolean }) {
   }, [signedIn]);
 
   const spot = ui.spot;
+  const count = logCount(ui.log);
 
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden bg-black text-white">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none outline-none" aria-label="The Coast: walk the beach and the islands" tabIndex={0} />
-      {/* the way back (every-screen: no dead end) — Venice, where the boat came from */}
-      <Link href={back} data-testid="coast-back" aria-label="Back to Venice"
-        className="absolute left-3 top-3 z-10 inline-flex min-h-[44px] min-w-[44px] items-center gap-1 rounded-full bg-black/60 px-3 text-base font-bold text-white">
-        <ChevronLeft aria-hidden className="h-5 w-5" /> Venice
-      </Link>
+      {/* the way back to Venice is the loader's (loader.tsx): on screen before this stage has loaded */}
       {err && <p role="alert" className="absolute inset-x-4 top-[4.25rem] rounded-lg bg-black/80 p-3 text-base">The coast did not load. {err}</p>}
       {phase === 'loading' && !err && <p className="absolute inset-x-0 top-1/2 text-center text-base text-white/80">Sailing to the coast…</p>}
+      {phase === 'playing' && ui.log.length > 0 && (
+        <button type="button" data-testid="coast-log-open" onClick={() => setLogOpen(true)} aria-label={`Creature log, ${count.seen} of ${count.total} found`}
+          className="absolute right-3 top-3 z-10 inline-flex min-h-[44px] min-w-[44px] items-center gap-1.5 rounded-full bg-black/60 px-3 text-base font-bold text-white">
+          <BookOpen aria-hidden className="h-5 w-5" /> Log {count.seen}/{count.total}
+        </button>
+      )}
+      {note && !spot && !logOpen && phase === 'playing' && (
+        <p role="status" data-testid="coast-log-note" className="absolute inset-x-4 top-[4.25rem] mx-auto max-w-sm rounded-2xl bg-black/75 p-3 text-center text-base text-white">
+          {note.level === 2 ? 'You met' : 'New in your log:'} <b>{note.name.replace('[PLACEHOLDER] ', '')}</b>
+        </p>
+      )}
+      {logOpen && (
+        <section role="dialog" aria-label="Creature log" data-testid="coast-log"
+          className="absolute inset-x-4 top-[4.25rem] z-20 mx-auto max-h-[calc(100dvh-9rem)] max-w-sm overflow-y-auto rounded-2xl border border-white/15 bg-black/85 p-4 backdrop-blur">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-lg font-bold">Creature log</h2>
+            <button type="button" data-testid="coast-log-close" onClick={() => setLogOpen(false)} aria-label="Close the log"
+              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-white/10 text-white">
+              <X aria-hidden className="h-5 w-5" />
+            </button>
+          </div>
+          <p className="mt-1 text-base text-white/80">{count.seen} of {count.total} found, {count.met} met. Walk close to a creature to log it.</p>
+          <ul className="mt-3 flex flex-col gap-2">
+            {ui.log.map((e) => (
+              <li key={e.id} data-testid={`coast-log-${e.id}`} className="rounded-xl bg-white/5 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-base font-bold">{e.level > 0 ? e.name.replace('[PLACEHOLDER] ', '') : 'Not found yet'}</span>
+                  {e.level > 0 && <span className="rounded-full bg-[#facc15] px-2 py-0.5 text-sm font-bold text-black">{e.level === 2 ? 'Met' : 'Seen'}</span>}
+                </div>
+                <p className="text-base text-white/75">{e.where}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {spot && phase === 'playing' && (
         <div data-testid="coast-boat" className="absolute inset-x-4 top-[4.25rem] mx-auto max-w-sm rounded-2xl border border-white/15 bg-black/75 p-3 backdrop-blur">
           <p className="text-base font-bold">{spot.label.replace('[PLACEHOLDER] ', '')}</p>

@@ -15,11 +15,16 @@ const q = new URLSearchParams(window.location.search);
 if (q.get('feel')) { setFeelUser(true); setFeelSession(null); for (const [k, v] of Object.entries(JSON.parse(q.get('feel')!))) setFeelOverride(k, Number(v)); }
 const canvas = document.getElementById('c') as HTMLCanvasElement;
 const card = document.getElementById('card') as HTMLDivElement;
+// the page's boat card and its "new in your log" note, drawn as plain boxes from the same store (app/play/coast/stage.tsx's stand-in)
 zoneUi.subscribe(() => {
-  const s = zoneUi.getSnapshot().spot;
+  const { spot: s, sighting, log } = zoneUi.getSnapshot();
   W.__spot = s?.id ?? null;
-  card.style.display = s ? 'block' : 'none';
+  W.__log = log.map((e) => `${e.id}:${e.level}`).join(',');
+  const fresh = sighting && performance.now() - (W.__noteAt as number ?? 0) < 4000;
+  if (sighting && W.__lastNote !== `${sighting.id}:${sighting.level}`) { W.__lastNote = `${sighting.id}:${sighting.level}`; W.__noteAt = performance.now(); }
+  card.style.display = s || sighting ? 'block' : 'none';
   if (s) card.innerHTML = `<b>${s.label.replace('[PLACEHOLDER] ', '')}</b><div class="btn">Back to Venice</div>`;
+  else if (sighting || fresh) card.innerHTML = `<div style="text-align:center">${sighting!.level === 2 ? 'You met' : 'New in your log:'} <b>${sighting!.name.replace('[PLACEHOLDER] ', '')}</b></div>`;
 });
 W.__coast = coastProbe;
 W.__drive = coastProbeDrive;
