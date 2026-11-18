@@ -12,13 +12,12 @@ import { ChevronLeft, Play, Users } from 'lucide-react';
 import { runMode, InputBus, type ModePhase } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
-import { hubUi } from '@/lib/adventure/venice/hubUi';
+import { hubUi, veniceWayfindingOn } from '@/lib/adventure/venice/hubUi';
 import { hubHrefFor, launchHref, PARTY_MODE_FOR_SPOT, veniceActivity, writeReturn } from '@/lib/adventure/venice/hubReturn';
 import { MODE_INFO } from '@/lib/game-data';
 import { partyClient } from '@/lib/party/social/client';
 import { isHost } from '@/lib/party/social/state';
-import { feel } from '@/lib/feel-panel/feel';
-import { FirstVisitHint, MiniMap, useCardKeys, useFirstVisitHint, VENICE_WAYFINDING } from './wayfinding';
+import { FirstVisitHint, MiniMap, useCardKeys, useFirstVisitHint } from './wayfinding';
 
 const MODE_KEY = 'venice_hub';
 const AGENT_MARK = 'fel-venice-agent';
@@ -36,7 +35,7 @@ export function VeniceStage({ signedIn }: { signedIn: boolean }) {
   useEffect(() => { try { setTouch(window.matchMedia('(pointer: coarse)').matches); } catch { setTouch(false); } }, []);
   // phase 9 (venue.veniceWayfinding): the hint, the mini-map and the card's keys; read once on the client (0 = V1)
   const [wayfinding, setWayfinding] = useState(false);
-  useEffect(() => { setWayfinding(feel('venue.veniceWayfinding', VENICE_WAYFINDING) >= 0.5); }, []);
+  useEffect(() => { setWayfinding(veniceWayfindingOn()); }, []);
   // a probe's run (?agent=1): the hub's walk seam (window.__VENICE__). lib/agentRunHooks honours it on a loopback host only.
   // The mark lasts the tab (sessionStorage), so a probe that goes hub → game → hub by the app's own links finds the seam again
   // (a game's session start resets the hook flag, and the way back carries no ?agent=1). Still loopback-only.
