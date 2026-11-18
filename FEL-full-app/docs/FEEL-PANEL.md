@@ -945,6 +945,22 @@ Two NEW knobs, **shipped ON** (assumption, flagged: the owner chose both; each k
   step-through on the squeeze still comes (4 of 4). Off: the crossover played and the ball went back to the floor. Off: the dribble comes
   back when the pump clip ends.
 
+## kit-mac-jobs, 2026-11-18 (owner: "The clothes are the biggest eye sore immediately"; "skin tight and not baggy, or more natural")
+
+Group "Kit · garments". NEW; both ship at 0, which loads nothing new and leaves every body exactly as before. They apply to the
+next body a scene loads (the garments go into the loaded file once, before any spawn is cloned from it). The garments are the
+owner's two Blender jobs, made headless from the free MakeHuman garments (docs/SHORTS-BUILD-STEPS.md, docs/JERSEY-BUILD-STEPS.md;
+`scripts/avatar/mpfb/onepiece-shorts.py`, `jersey.py`, `fit-outfit.py`, `scripts/avatar/kit-fit/graft.ts`); the files are
+`public/models/kits/sets/` and no body file changes.
+- `kit.onePieceShorts` 0 (`core/kitGarmentSet.ts` `ONE_PIECE_SHORTS`): 1 = the kit bodies (Closet, games, phone files) wear the
+  one-piece court short: one piece of cloth with a gusset 2.5 cm under the crotch, fitted to the legs and seat, in place of the
+  three pieces whose legs reached 10 cm into each other. Both short items (`shorts_court`, `shorts_glitch`) take it.
+- `kit.newJerseys` 0 (`core/sportKitDefaults.ts` `NEW_JERSEYS`): 1 = the kit bodies carry `top_basketball` (the sleeveless jersey
+  from the MakeHuman tee, the default top in 1v1, 3v3, the dunk modes, 3-Point and the carnival) and `top_football` (from the
+  MakeHuman polo; the body now carries it, so the Meshy football pack is not fetched). A Closet pick still wins.
+- MEASURED (KIT-FIT-PLAN §11): with either knob on, more skin shows through in the game (the basketball jersey about twice,
+  the short 2-5x in its slot); the football jersey cuts the pack's torn edges 25x but lets 11-13 % more skin through. Keep both at 0.
+
 ## hoops-items, 2026-11-18 (the basketball items the gather, escape, sound and perf lanes left open; the owner has not felt or heard these)
 
 Each knob is NEW and its off value restores the game as it was (tests pin both sides). Probes: `scripts/probes/hoops-items/`.
