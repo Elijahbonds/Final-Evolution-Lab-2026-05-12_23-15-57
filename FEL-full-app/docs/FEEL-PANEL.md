@@ -959,3 +959,17 @@ Adventure host's movement and camera exactly as the Venice hub does: no movement
 - `coast.deepWaterTurnBack` 1 (`lib/adventure/coast/zoneWorld.ts`): a body that ends a frame over water deeper than you can wade
   (0.85 m) goes back to the last place it could stand. On the ground the deep water is already a wall to the movement sim; this
   catches a jump off the dock. 0 = off (a probe that wants the raw sim).
+
+## coast-b, 2026-11-18 (the Coast & Islands zone, phase B: the partner, the creatures, the log; NEW, no shipped number moved)
+
+Group **Coast · zone**. The partner is the Adventure's own (its brain, its speed, its follow slot are untouched); these are the
+zone's rules around it, and the creatures and the log, all new. Each 0 restores phase A.
+
+- `coast.partnerOn` 1 (`lib/adventure/coast/zonePartner.ts`): one partner walks with you — the Adventure save's own, or the
+  Adventure's default creature (strideraptor) on loan, never written to the save. 0 = you walk alone.
+- `coast.partnerCatchupM` 24 m: left this far behind (on a flat-out sprint you reach 14 m/s, the partner about 10.5 m/s), it
+  reappears 3 m behind you on your own path. The story's own catch-up is 32 m; the zone's 3 × 3 full-detail ring is 192 m wide.
+- `coast.partnerStuckSec` 1 s: blocked (under 0.5 m/s) for this long while more than 6 m behind, it reappears on your path. The
+  brain walks straight at its follow slot and has no path-finding.
+- `coast.creaturesOn` 1 (`lib/adventure/coast/zoneCreatures.ts`): four placeholder creatures wander near home. 0 = none.
+- `coast.logSeenM` 16 m, `coast.logMeetM` 3 m: how close you come for a creature to go in your log as seen, and as met.

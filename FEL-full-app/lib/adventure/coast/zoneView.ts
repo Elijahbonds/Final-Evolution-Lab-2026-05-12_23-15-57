@@ -30,7 +30,7 @@ import '@babylonjs/loaders/glTF';
 import { groundTextureFor, TILE_M } from '@/lib/babylon/visual/groundTextures';
 import { spawnMeshyProp, type MeshyPropKey } from '@/lib/babylon/visual/meshyProps';
 import {
-  BOAT_AT, DECKS, ISLANDS, PIECE_M, PROP_MODELS, SEA_Y, SEABED_Y, ZONE_SPOTS, propsDrawnAt, terrainY, zoneProps, zonePieces,
+  BOAT_AT, DECKS, ISLANDS, deckSurfaceY, PIECE_M, PROP_MODELS, SEA_Y, SEABED_Y, ZONE_SPOTS, propsDrawnAt, terrainY, zoneProps, zonePieces,
   type Piece, type PropModel, type Tier,
 } from './zoneLayout';
 
@@ -246,24 +246,33 @@ export function mountZoneView(scene: Scene, opts: { streamOn: boolean }): ZoneVi
   postMat.diffuseColor = Color3.FromHexString('#5E4630'); postMat.specularColor = Color3.Black(); mats.push(postMat);
   const deckParts: Mesh[] = [];
   const postMats: Matrix[] = [];
+  // each deck in 1 m segments along its length, each at the deck's walking surface there (zoneLayout deckSurfaceY: on the sand,
+  // rising through the shallows, level over the water), so the boards are where the feet are; one merged mesh for all of them
+  const zMid = (d: (typeof DECKS)[number]) => (d.minZ + d.maxZ) / 2;
   for (const d of DECKS) {
-    const w = d.maxX - d.minX, l = d.maxZ - d.minZ;
-    const deck = MeshBuilder.CreateBox(`coast_deck_${d.id}`, { width: w, height: 0.24, depth: l }, scene);
-    deck.position.set((d.minX + d.maxX) / 2, d.y - 0.12, (d.minZ + d.maxZ) / 2);
-    deckParts.push(deck);
+    const l = d.maxZ - d.minZ, n = Math.ceil(d.maxX - d.minX), seg = (d.maxX - d.minX) / n;
+    for (let k = 0; k < n; k++) {
+      const x = d.minX + (k + 0.5) * seg, y = deckSurfaceY(d, terrainY(x, zMid(d)));
+      const deck = MeshBuilder.CreateBox(`coast_deck_${d.id}_${k}`, { width: seg + 0.02, height: 0.24, depth: l }, scene);
+      deck.position.set(x, y - 0.12, zMid(d));
+      deckParts.push(deck);
+      for (const side of [d.minZ + 0.08, d.maxZ - 0.08]) {
+        const rail = MeshBuilder.CreateBox(`coast_rail_${d.id}_${k}`, { width: seg + 0.02, height: 0.12, depth: 0.12 }, scene);
+        rail.position.set(x, y + 0.95, side); deckParts.push(rail);
+      }
+    }
     for (const side of [d.minZ + 0.08, d.maxZ - 0.08]) {
-      const rail = MeshBuilder.CreateBox(`coast_rail_${d.id}`, { width: w, height: 0.12, depth: 0.12 }, scene);
-      rail.position.set((d.minX + d.maxX) / 2, d.y + 0.95, side); deckParts.push(rail);
       for (let x = d.minX + 0.3; x <= d.maxX - 0.2; x += 3.2) {
-        const bottom = Math.min(terrainY(x, side), d.y) - 0.3, top = d.y + 1.0, h = top - bottom;
+        const y = deckSurfaceY(d, terrainY(x, zMid(d)));
+        const bottom = Math.min(terrainY(x, side), y) - 0.3, top = y + 1.0, h = top - bottom;
         postMats.push(Matrix.Compose(new Vector3(0.22, h, 0.22), Quaternion.Identity(), new Vector3(x, bottom + h / 2, side)));
       }
     }
   }
   const deckMesh = Mesh.MergeMeshes(deckParts, true, true)!;
   deckMesh.name = 'coast_decks'; deckMesh.material = woodMat; deckMesh.isPickable = false; deckMesh.receiveShadows = true; deckMesh.parent = root;
-  // the plank tile at about a metre a plank-row (the box UVs run 0..1 per face)
-  planks.uScale = 24; planks.vScale = 2;
+  // the plank tile: one tile a segment along, two across (the box UVs run 0..1 per face)
+  planks.uScale = 1; planks.vScale = 2;
   const post = MeshBuilder.CreateBox('coast_posts', { size: 1 }, scene);
   post.material = postMat; post.isPickable = false; post.parent = null;
   const pbuf = new Float32Array(postMats.length * 16); postMats.forEach((m, i) => m.copyToArray(pbuf, i * 16));
