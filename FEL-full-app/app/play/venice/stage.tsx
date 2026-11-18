@@ -13,7 +13,7 @@ import { runMode, InputBus, type ModePhase } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hubUi } from '@/lib/adventure/venice/hubUi';
-import { launchChoices, PARTY_MODE_FOR_SPOT, writeReturn, writeReturnForHref } from '@/lib/adventure/venice/hubReturn';
+import { launchChoices, launchNavigationHref, PARTY_MODE_FOR_SPOT, writeReturn, writeReturnForHref } from '@/lib/adventure/venice/hubReturn';
 import { MODE_INFO } from '@/lib/game-data';
 import { partyClient } from '@/lib/party/social/client';
 import { isHost } from '@/lib/party/social/state';
@@ -68,7 +68,7 @@ export function VeniceStage({ signedIn }: { signedIn: boolean }) {
   const play = (href: string) => {
     if (!spot) return;
     writeReturnForHref(spot, href, Date.now());
-    router.push(href);
+    router.push(launchNavigationHref(href, signedIn));
   };
   const playParty = () => {
     if (!spot || !partyMode) return;
@@ -93,7 +93,7 @@ export function VeniceStage({ signedIn }: { signedIn: boolean }) {
             {choices.map((choice, index) => (
               <button key={choice.mode} type="button" data-testid={index === 0 ? 'venice-play' : `venice-play-${choice.mode}`} onClick={() => play(choice.href)}
                 className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-[#facc15] px-4 text-base font-bold text-black">
-                <Play aria-hidden className="h-4 w-4" /> Play {choice.label}
+                <Play aria-hidden className="h-4 w-4" /> {signedIn ? `Play ${choice.label}` : `Sign in to play ${choice.label}`}
               </button>
             ))}
             {canPartyStart && (
