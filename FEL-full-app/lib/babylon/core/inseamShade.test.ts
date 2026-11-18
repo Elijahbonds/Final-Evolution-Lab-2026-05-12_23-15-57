@@ -45,17 +45,18 @@ describe('the one-piece short\'s inseam panel (kit.inseamShade)', () => {
   });
   it('on: the short wears the panel texture, and its vertex data keeps the same kinds (the body merge sees the same part)', async () => {
     const r = await shortAfterSwap();
-    expect((r.mesh.material as PBRMaterial).albedoTexture?.name).toBe('fel_inseam_shade');
+    expect((r.mesh.material as PBRMaterial).lightmapTexture?.name).toBe('fel_inseam_shade');
+    expect((r.mesh.material as PBRMaterial).useLightmapAsShadowmap).toBe(true);
     expect(r.kindsAfter).toEqual(r.kindsBefore);
   }, 60_000);
   it('off (0): no texture at all — the short as before', async () => {
     setFeelUser(true); setFeelSession(null); setFeelOverride('kit.inseamShade', 0);
     const r = await shortAfterSwap();
-    expect((r.mesh.material as PBRMaterial).albedoTexture ?? null).toBeNull();
+    expect((r.mesh.material as PBRMaterial).lightmapTexture ?? null).toBeNull();
   }, 60_000);
   it('a tinted player\'s clone of the short\'s material keeps the panel (shared, not a blank deep copy)', async () => {
     const r = await shortAfterSwap();
     const src = r.mesh.material as PBRMaterial, clone = cloneForTint(src as never, 'tinted') as unknown as PBRMaterial;
-    expect(clone.albedoTexture).toBe(src.albedoTexture);
+    expect(clone.lightmapTexture).toBe(src.lightmapTexture);
   }, 60_000);
 });

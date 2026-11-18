@@ -7,7 +7,8 @@
 // the inner thigh. A real athletic short has a gusset panel there, often in a darker cloth: the stretch then reads as that panel.
 //
 // WHAT. A small texture made from the short's OWN UVs, positions and skin weights, once per loaded body: dark on the inseam (the
-// inner side of each leg, gusset to hem: joiningShare), white elsewhere; set as the short's
+// inner side of each leg, gusset to hem: joiningShare), white elsewhere; set as the short's material's LIGHTMAP read as a shadow map (it darkens the lit cloth; the albedo slot is the
+// Creator paint's). set as the short's
 // material's albedo texture, which the Closet tint multiplies. No geometry, UV, bone or vertex-data change, so the body merge sees
 // the same parts (bodyMerge groups by vertex-data kinds). A painted short (Creator paint) takes its paint instead.
 // `kit.inseamShade`: the panel's darkness, 0 = no texture at all (today).
@@ -90,17 +91,19 @@ export function inseamTexels(uv: ArrayLike<number>, indices: ArrayLike<number>, 
 /** Give these short meshes (one shared material each) the inseam panel. Returns the materials changed (0 when off). */
 export function applyInseamShade(meshes: readonly Mesh[], uv: ArrayLike<number> | null, indices: ArrayLike<number>, share: ArrayLike<number>, scene: Scene, dark = inseamShade()): number {
   if (!(dark > 0) || !uv) return 0;
-  console.info(`[FEL-KIT] inseam panel: ${meshes.length} short meshes, materials ${meshes.map((m) => `${m.material?.getClassName() ?? 'none'}${(m.material as PBRMaterial | null)?.albedoTexture ? '+tex' : ''}`).join(',')}`);
+  console.info(`[FEL-KIT] inseam panel: ${meshes.length} short meshes`);
   let tex: RawTexture | null = null, n = 0;
   const seen = new Set<unknown>();
   for (const m of meshes) {
     const mat = m.material;
-    if (!(mat instanceof PBRMaterial) || seen.has(mat) || mat.albedoTexture) continue;   // a texture already there (paint) wins
+    if (!(mat instanceof PBRMaterial) || seen.has(mat) || mat.lightmapTexture) continue;
     seen.add(mat);
     tex ??= RawTexture.CreateRGBATexture(inseamTexels(uv, indices, share, dark), SIZE, SIZE, scene, true, false, Constants.TEXTURE_TRILINEAR_SAMPLINGMODE);
     tex.name = 'fel_inseam_shade';
     tex.metadata = { felShareOnClone: true };   // playerIdentity.cloneForTint shares it (a deep copy of a url-less texture is blank)
-    mat.albedoTexture = tex; n++;
+    // the LIGHTMAP slot, read as a shadow map: it multiplies the lit result like a darker cloth, and nothing else on clothing uses
+    // it — the albedo slot is the Creator paint's (it repainted the short and the panel never showed: the first rig pictures)
+    mat.lightmapTexture = tex; mat.useLightmapAsShadowmap = true; n++;
   }
   return n;
 }
