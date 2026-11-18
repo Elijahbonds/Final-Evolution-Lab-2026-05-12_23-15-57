@@ -24,6 +24,15 @@ describe('booking: the doors, the rule first, and fewer taps', () => {
     expect(t).toContain('{groupsOpen ? <MyGroupSessions compact /> : null}');
     expect(src('lib/group-booking/server.ts')).toContain('export async function groupBookingOpen(');
   });
+  it('Train shows combine doors only after the pending combine SQL is ready', () => {
+    const t = src('app/train/page.tsx');
+    // cursor-intake: #631's own gate and 330ea433's (#658) did the same thing; the page keeps 330ea433's pendingReady probe
+    // (it gates groups and signature programs too), so the pins name that. Same rule: both combine doors wait for the tables.
+    expect(t).toContain("import { combineReady } from '@/lib/combine/store';");
+    expect(t).toContain('pendingReady(combineReady),');
+    expect(t).toMatch(/\.\.\.\(combineResultsOpen && coachesAnyone \? \[\{\s*href: '\/coach\/combine'/);
+    expect(t).toMatch(/\.\.\.\(coachLink && combineResultsOpen \? \[\{\s*href: '\/train\/combine'/);
+  });
   it('your sessions on Train: hidden with nothing booked; the cancel rule sits above the Cancel buttons', () => {
     const m = src('components/group-booking/my-group-sessions.tsx');
     expect(m).toContain("if (compact && !seats.some((x) => x.status === 'booked') && !ones.some((x) => x.status === 'booked')) return null;");

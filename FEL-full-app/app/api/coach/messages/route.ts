@@ -5,6 +5,14 @@ import { currentUserId, bad } from '@/lib/camp/server';
 import { accessRole, validateMessage } from '@/lib/coach/loop';
 import { decorateThread, threadReadStates, type RawDb } from '@/lib/coach/messageReads';
 
+const THREAD_MESSAGE_SELECT = {
+  id: true,
+  programId: true,
+  authorId: true,
+  body: true,
+  createdAt: true,
+} as const;
+
 async function programFor(programId: string, userId: string) {
   const p = await prisma.coachingProgram.findUnique({ where: { id: programId }, select: { id: true, coachId: true, clientId: true } });
   if (!p) return { error: bad('not_found', 404) };
@@ -25,7 +33,12 @@ export async function GET(req: NextRequest) {
   const programId = req.nextUrl.searchParams.get('programId') ?? '';
   const r = await programFor(programId, userId);
   if ('error' in r) return r.error;
-  const newest = await prisma.programMessage.findMany({ where: { programId }, orderBy: { createdAt: 'desc' }, take: 100 });
+  const newest = await prisma.programMessage.findMany({
+    where: { programId },
+    orderBy: { createdAt: 'desc' },
+    take: 100,
+    select: THREAD_MESSAGE_SELECT,
+  });
   const messages = newest.reverse();
   const reads = await threadReadStates(prisma as unknown as RawDb, programId);
   return NextResponse.json({ messages: decorateThread(messages, userId, r.program.coachId, reads), reads: reads !== null });
@@ -41,6 +54,9 @@ export async function POST(req: NextRequest) {
   if ('error' in r) return r.error;
   const text = validateMessage(body.body);
   if (!text) return bad('body_required');
-  const m = await prisma.programMessage.create({ data: { programId: r.program.id, authorId: userId, body: text } });
+  const m = await prisma.programMessage.create({
+    data: { programId: r.program.id, authorId: userId, body: text },
+    select: THREAD_MESSAGE_SELECT,
+  });
   return NextResponse.json({ message: { ...m, mine: true, fromCoach: userId === r.program.coachId } });
 }

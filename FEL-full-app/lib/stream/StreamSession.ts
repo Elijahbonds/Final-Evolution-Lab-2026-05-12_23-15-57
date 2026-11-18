@@ -9,8 +9,8 @@
 // their email in it. Capturing the canvas cannot leak a desktop, and it needs no screen-share permission
 // prompt, which makes going live one click instead of three.
 //
-// BROADCAST IS NOT IMPLEMENTED and this file will not pretend. Browsers cannot speak RTMP; Twitch and
-// YouTube need a relay that accepts WebRTC or a WebSocket and pushes RTMP out. `startBroadcast` refuses via
+// BROADCAST IS NOT IMPLEMENTED and this file will not pretend. Browsers cannot speak RTMP; external
+// broadcast targets need a relay that accepts WebRTC or a WebSocket and pushes RTMP out. `startBroadcast` refuses via
 // the policy rather than half-working.
 
 import {
@@ -190,7 +190,7 @@ export class StreamSession {
   // ── BROADCAST ──────────────────────────────────────────────────────────────────────────────────────────
 
   /**
-   * Twitch / YouTube. Refuses, honestly, until a relay exists.
+   * External broadcast relay. Refuses, honestly, until a relay exists.
    *
    * Kept as a real method with a real signature so the UI can call it and get the policy's own explanation,
    * rather than the button simply not existing and the capability being forgotten.

@@ -419,6 +419,14 @@ div:has(> [data-capture-ui]) > div:has(> canvas) > [data-fel-fullbleed] > [data-
     justify-content: flex-start;
     row-gap: 0.875rem;
   }
+  /* COUCH-START-LARGE-TEXT (2026-11-18): the fixed "Couch (2-4)" pill is the same kind of top overlay as the controller
+   * pills. On large text / phone widths it sat over the READY card copy (scorecard repro: /play/karate-vs), so while it is
+   * visible the card starts below that top band instead of centred underneath it. */
+  body.fel-couch-start-visible [data-fel-fullbleed] > [data-splash-column] {
+    padding-top: 5.25rem;
+    justify-content: flex-start;
+    row-gap: 0.875rem;
+  }
 }
 
 /* 5. The MC's line (MicCaption), sideways: one line across the bottom of the
