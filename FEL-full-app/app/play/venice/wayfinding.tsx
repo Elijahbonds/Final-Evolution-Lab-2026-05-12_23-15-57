@@ -13,7 +13,7 @@ import { FENCE, RING } from '@/lib/adventure/venice/courtsDressing';
 import { COURT_HALF } from '@/lib/adventure/venice/courtsView';
 import type { InputBus } from '@/lib/babylon';
 
-export { VENICE_WAYFINDING } from '@/lib/adventure/venice/hubUi';
+export { VENICE_WAYFINDING, veniceWayfindingOn } from '@/lib/adventure/venice/hubUi';
 export const HINT_KEY = 'fel-venice-hint-seen';
 const MAP_PX = 112;
 

@@ -3,6 +3,7 @@
  * adventure/story/uiBridge.ts): the walk-up spot the player stands in, or none. An external store React reads with
  * useSyncExternalStore; the mode writes it only when the spot changes.
  */
+import { feel } from '@/lib/feel-panel/feel';
 import type { Spot } from './layout';
 
 export interface HubUiState { spot: Spot | null }
@@ -28,6 +29,9 @@ export const hubUi = new HubUi();
  */
 /** venue.veniceWayfinding (phase 9): the page's first-visit hint, mini-map and card keys (app/play/venice/wayfinding.tsx). 0 = V1. */
 export const VENICE_WAYFINDING = 1;
+export function veniceWayfindingOn(): boolean {
+  return feel('venue.veniceWayfinding', VENICE_WAYFINDING) >= 0.5;
+}
 
 export interface HubPos { x: number; z: number; yaw: number }
 class HubPosStore {

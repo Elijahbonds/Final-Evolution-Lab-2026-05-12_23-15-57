@@ -32,7 +32,7 @@ import { placeBody } from '../adventure/world/view';
 import { loadRatedTuning, ratedLookScale } from '../hoops/ratedPlay';
 import { buildHubWorld, courtsRect, returnSpawnFor, v1Area, v1Spots } from '@/lib/adventure/venice/hubWorld';
 import { mountCourtsView, type CourtsView } from '@/lib/adventure/venice/courtsView';
-import { hubPos, hubUi } from '@/lib/adventure/venice/hubUi';
+import { hubPos, hubUi, veniceWayfindingOn } from '@/lib/adventure/venice/hubUi';
 import { spotFromSearch } from '@/lib/adventure/venice/hubReturn';
 import type { Spot } from '@/lib/adventure/venice/layout';
 import { COURT_HALF } from '@/lib/adventure/venice/courtsView';
@@ -79,6 +79,8 @@ interface St {
   walkup: Walkup | null;
   /** Phase 8 (venue.veniceSolids): the world's pieces, so the palms join them once the dressing has placed them; null = off. */
   solids: GroundPiece[] | null;
+  /** Phase 9 (venue.veniceWayfinding): keep the page's mini-map position stream live only while the UI is on. */
+  wayfinding: boolean;
   disposed: boolean;
 }
 
@@ -112,7 +114,7 @@ export const VeniceHubMode: ModeDefinition = {
 
   async load(ctx: ModeContext) {
     const scene = ctx.scene;
-    hubUi.reset();
+    hubUi.reset(); hubPos.reset();
     const world = buildHubWorld();
     // phase 8: the hoops, the boardwalk row and (with phase 5's furniture) the fences, benches and poles are solid
     const solidsOn = feel('venue.veniceSolids', VENICE_SOLIDS) >= 0.5;
@@ -143,6 +145,7 @@ export const VeniceHubMode: ModeDefinition = {
       preset: 'runner', rigKey: '', spotSec: SPOT_EVERY, spots: v1Spots(), auto: null, autoPath: [], frames: 0,
       life: null, sound: null, disposed: false,
       walkup: feel('venue.walkupV2', WALKUP_V2) >= 0.5 ? new Walkup(v1Spots()) : null, solids: solidsOn ? world.pieces : null,
+      wayfinding: veniceWayfindingOn(),
     };
     // phase 7: the beach bed now (so the harness's crowd bed for the mood stays off); the rest of the soundscape ticks in update
     if (feel('venue.veniceSound', VENICE_SOUND) >= 0.5) {
@@ -247,7 +250,7 @@ export const VeniceHubMode: ModeDefinition = {
       // (phase 8, venue.walkupV2: on the court or in the ring, after a short dwell, held a metre past the edge; 0 = V1's box)
       const hit: Spot | null = S.walkup ? S.walkup.step(SPOT_EVERY, me.pos.x, me.pos.z) : v1Hit(S.spots, me.pos.x, me.pos.z);
       hubUi.setSpot(hit);
-      hubPos.set(me.pos.x, me.pos.z, me.facingYaw);   // phase 9: the page's mini-map
+      if (S.wayfinding) hubPos.set(me.pos.x, me.pos.z, me.facingYaw);   // phase 9: the page's mini-map
     }
   },
 
