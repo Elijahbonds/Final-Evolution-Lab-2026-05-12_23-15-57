@@ -2,6 +2,7 @@
 # COAST & ISLANDS: one browser-lock hold for the lane's browser jobs (the shared queue is long: one wait, not two; coordinator
 # 2026-11-18: at most ONE hold queued at a time, and no build on disk while waiting).
 #   /home/user/wt/gate-run.sh 3000 bash scripts/probes/coast-islands/gate-hold.sh <out-dir>
+#   (ES_ROUTES=/play/venice,/play/coast: the routes every-screen scores; DOOR=1: the Venice ↔ coast round trip too)
 # 1. when there is a build (.next-coast, built first with `cpu-run.sh env ES_DIST=.next-coast ES_PORT=3811 ES_PG_PORT=55491
 #    ES_PG_DIR=/var/lib/postgresql/coast-islands-pg npx tsx scripts/every-screen/rig.mts build`): the every-screen score of
 #    /play/coast (the scorer's planted-fault controls first), the creature log's picture on the real page (log-shot.mts), and
@@ -31,11 +32,17 @@ if [ "${BUILD_FIRST:-0}" = 1 ] && [ ! -f .next-coast/BUILD_ID ]; then
 fi
 if [ -f .next-coast/BUILD_ID ]; then
   ES_DIST=.next-coast ES_PORT=3811 ES_PG_PORT=55491 ES_PG_DIR=/var/lib/postgresql/coast-islands-pg ES_OUT="$OUT/es" \
-    npx tsx scripts/every-screen/score.mts --routes=/play/coast --budget=900 > "$OUT/score.log" 2>&1
+    npx tsx scripts/every-screen/score.mts --routes="${ES_ROUTES:-/play/coast}" --budget=900 > "$OUT/score.log" 2>&1
   echo "score exit $?"
   ES_DIST=.next-coast ES_PORT=3811 ES_PG_PORT=55491 ES_PG_DIR=/var/lib/postgresql/coast-islands-pg ES_OUT="$OUT/es" \
     npx tsx scripts/probes/coast-islands/log-shot.mts "$OUT" > "$OUT/log-shot.log" 2>&1
   echo "log-shot exit $?"
+  # DOOR=1 (lane/coast-door): the Venice → coast → Venice round trip on the same build (door-roundtrip.mts)
+  if [ "${DOOR:-0}" = 1 ]; then
+    ES_DIST=.next-coast ES_PORT=3811 ES_PG_PORT=55491 ES_PG_DIR=/var/lib/postgresql/coast-islands-pg ES_OUT="$OUT/es" \
+      npx tsx scripts/probes/coast-islands/door-roundtrip.mts "$OUT" > "$OUT/door-roundtrip.log" 2>&1
+    echo "door-roundtrip exit $?"
+  fi
   rm -rf .next-coast && echo "build deleted $(date)"
 else
   echo "no .next-coast build: every-screen skipped"
