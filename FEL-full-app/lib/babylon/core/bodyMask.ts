@@ -788,7 +788,7 @@ export function* maskBodySteps(body: Mesh, meshes: AbstractMesh[], why?: Record<
         const g = m as FitMesh & { __felPreLift?: Float32Array };
         const sw = skinnedWorld(g); const ind = ((g.metadata ?? {}) as { felGarmentIndices0?: number[] }).felGarmentIndices0 ?? g.getIndices(); if (!sw || !ind) continue;
         const pre = g.__felPreLift, ew = pre && pre.length === sw.P.length ? skinnedWorld(g, pre)?.P ?? sw.P : sw.P;   // open edges on the un-lifted shape: the lift splits its seams
-        tightenGarment(g, sw.P, openEdgeWeights(ew, ind, FIT_EDGE_BAND, FIT_WELD, slot === 'shorts' ? (y01) => y01 > 0.5 : undefined).w, skinS, tight, overHidden, [g.__felFlare0, g.__felWaist0]);
+        tightenGarment(g, sw.P, openEdgeWeights(ew, ind, FIT_EDGE_BAND, FIT_WELD, slot === 'shorts' ? (y01) => y01 > 0.5 : undefined).w, skinS, tight, overHidden);   // the saved bases (__felFlare0 …) stay LOOSE: every later mask measures the same cloth, so the skin it hides stays hidden
       }
     } catch (e) { console.warn(`[FEL-KIT] tight fit skipped: ${String((e as Error)?.message ?? e).slice(0, 140)}`); }
   }
