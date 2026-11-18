@@ -341,14 +341,15 @@ class SoundKitImpl {
       }
       // HOOPS-ITEMS (2026-11-18): THE BALL KISSING THE BACKBOARD, synthesised (the fallback while the recording loads, or if it
       // fails). The ball's own knock, higher and shorter than on the floor (a board gives less than a floor), a flat slap of band-passed
-      // noise for the contact, and a short ring of the board at ~1.1 kHz — the part that tells it from a bounce or a body.
+      // noise for the contact, and a short ring of the board at ~1.1 kHz — the part that tells it from a bounce or a body. Levels set ×2.09
+      // from the first draft (-37 dB) to the old kiss's -30.6 dB (loudness.mts), so the fallback plays where the thud played.
       case 'glass': {
         const osc = ctx.createOscillator();
         osc.type = 'sine';
         osc.frequency.setValueAtTime(240 * pitch, ctx.currentTime);
         osc.frequency.exponentialRampToValueAtTime(120 * pitch, ctx.currentTime + 0.06);
         const og = ctx.createGain();
-        this.env(og, ctx, 0.002, 0.09, 0.8 * vol);
+        this.env(og, ctx, 0.002, 0.09, 1.67 * vol);
         osc.connect(og).connect(this.sfxBus);
         osc.start(); osc.stop(ctx.currentTime + 0.12);
         const slap = ctx.createBufferSource();
@@ -356,13 +357,13 @@ class SoundKitImpl {
         const bp = ctx.createBiquadFilter();
         bp.type = 'bandpass'; bp.Q.value = 0.9; bp.frequency.value = 2200 * pitch;
         const sg = ctx.createGain();
-        this.env(sg, ctx, 0.001, 0.03, 0.45 * vol);
+        this.env(sg, ctx, 0.001, 0.03, 0.94 * vol);
         slap.connect(bp).connect(sg).connect(this.sfxBus);
         slap.start(); slap.stop(ctx.currentTime + 0.05);
         const ring = ctx.createOscillator();
         ring.type = 'triangle'; ring.frequency.value = 1120 * pitch;
         const rg = ctx.createGain();
-        this.env(rg, ctx, 0.002, 0.14, 0.12 * vol);
+        this.env(rg, ctx, 0.002, 0.14, 0.25 * vol);
         ring.connect(rg).connect(this.sfxBus);
         ring.start(); ring.stop(ctx.currentTime + 0.17);
         break;

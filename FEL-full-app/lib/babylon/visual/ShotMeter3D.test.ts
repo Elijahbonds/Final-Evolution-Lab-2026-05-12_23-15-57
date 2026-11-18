@@ -95,3 +95,26 @@ describe('ShotMeter3D — the WGSL twin for WebGPU (hoops-items)', () => {
     expect(VERT_WGSL).toContain('uniform worldViewProjection : mat4x4<f32>;');
   });
 });
+
+describe('ShotMeter3D — the WebGPU fallback (hoops-items)', () => {
+  it('a WGSL compile error swaps in a plain bar in the fill colour, and dispose takes it too; WebGL has no such hook', () => {
+    const s = scene();
+    const mats0 = s.materials.length;
+    mountShotMeter3D(s);
+    expect((s.materials.at(-1) as ShaderMaterial).onError).toBeFalsy();   // WebGL: nothing changed
+    const s2 = scene();
+    Object.defineProperty(s2.getEngine(), 'isWebGPU', { value: true, configurable: true });
+    const m = mountShotMeter3D(s2);
+    const mat = s2.materials.at(-1) as ShaderMaterial;
+    expect(mat.options.shaderLanguage).toBe(ShaderLanguage.WGSL);
+    m.begin({ center: 0.6, half: 0.1 });
+    mat.onError!(mat.getEffect()!, 'compile failed');
+    const quad = s2.getMeshByName('shot_meter')!;
+    expect(quad.material!.name).toBe('shot_meter_plain');
+    expect((quad.material as unknown as { emissiveColor: { toHexString(): string } }).emissiveColor.toHexString()).toBe('#22D3EE');
+    const n = s2.materials.length;
+    m.dispose();
+    expect(s2.materials.length).toBe(n - 2);
+    void mats0;
+  });
+});

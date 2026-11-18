@@ -3,7 +3,7 @@
 // that), a marker riding the fill, and the verdict flashed on the release — green for a perfect / good release, amber
 // early or late, red for a brick — then a fade. The HUD's own bar at the bottom of the screen stays; this one is where
 // the player is looking. Pure numbers come from the mode's ShotMeter (greenCenter01 / greenHalfWidth01): this only draws.
-import { Color3, MeshBuilder, ShaderLanguage, ShaderMaterial, TransformNode, Vector3, Vector4, type Camera, type Scene } from '@babylonjs/core';
+import { Color3, MeshBuilder, ShaderLanguage, ShaderMaterial, StandardMaterial, TransformNode, Vector3, Vector4, type Camera, type Scene } from '@babylonjs/core';
 import { feel } from '../../feel-panel/feel';
 import { PERFECT_BAND_SHARE } from '../core/shotBands';
 
@@ -147,8 +147,21 @@ export function mountShotMeter3D(scene: Scene): ShotMeter3DHandle {
   let shown = false, fading = 0, flash = 0, lastT = 0;
   let alphaK = 1;
   const box = new Vector4(W, H, 0.001, -H / 2), greenU = new Vector4(0, 0, 0, 1);
+  // hoops-items: THE CLEAN FALLBACK (WebGPU only). If the WGSL twin does not compile on a device, the bar is drawn in the fill's colour by
+  // a plain unlit material (no green band, no marker) rather than not at all — and nothing is thrown. WebGL never builds this.
+  let plain: StandardMaterial | null = null;
+  if (sh.options.shaderLanguage === ShaderLanguage.WGSL) {
+    mat.onError = () => {
+      if (plain) return;
+      plain = new StandardMaterial('shot_meter_plain', scene);
+      plain.disableLighting = true; plain.backFaceCulling = false; plain.disableDepthWrite = true;
+      quad.material = plain; upload();
+      console.warn('[FEL-METER] the WGSL meter did not compile on this device: the plain bar is drawn');
+    };
+  }
   const upload = (): void => {
     box.z = fillTop; box.w = markY; greenU.set(greenY, greenHalf, perfectHalf, alphaK);
+    if (plain) { plain.emissiveColor.copyFrom(fillColor); plain.alpha = 0.85 * alphaK; return; }
     mat.setVector4('uBox', box); mat.setVector4('uGreen', greenU);
     mat.setColor3('uFillColor', fillColor); mat.setColor3('uMarkColor', markColor);
   };
@@ -199,6 +212,6 @@ export function mountShotMeter3D(scene: Scene): ShotMeter3DHandle {
       if (k <= 0) { show(false); fading = 0; setAlpha(1); }
     },
     visible: () => shown,
-    dispose() { quad.dispose(); mat.dispose(); root.dispose(); },
+    dispose() { quad.dispose(); mat.dispose(); plain?.dispose(); root.dispose(); },
   };
 }

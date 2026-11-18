@@ -31,9 +31,10 @@ export interface SampleCue {
 }
 
 // Each URL is a literal so lib/feel/sensory-assets.test.ts proves the file exists under public/.
-/** The backboard kiss's level (hoops-items): set so the recording plays where the thud it replaces played, measured like the rest
- *  (scripts/probes/hoops-sound/loudness.mts, the loudest 50 ms at the limiter). */
-export const GLASS_GAIN = 0.5;
+/** The backboard kiss's level (hoops-items): set so the recording plays where the thud it replaces played (the thud at pitch 1.5,
+ *  -30.6 dB at volume 1), measured like the rest (scripts/probes/hoops-sound/loudness.mts, the loudest 50 ms at the limiter): at a first
+ *  gain of 0.5 the recording read -45.0 dB, so 0.5 × 10^(14.4 / 20). Its peak then sits near -16 dB, well under the limiter. */
+export const GLASS_GAIN = 2.62;
 
 /** THE HOOPS SET. Keys are SoundKit cue names; a cue with no row keeps its synth (groan, whistle, score, whoosh, impact, thud…).
  *  GAINS ARE MEASURED (scripts/probes/hoops-sound/loudness.mts: each cue rendered at volume 1 through SoundKit's own graph, the loudest
