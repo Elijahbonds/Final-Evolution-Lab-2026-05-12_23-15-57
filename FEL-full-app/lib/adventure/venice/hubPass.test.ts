@@ -1,12 +1,16 @@
 // venice-v1 improvement pass (2026-11-17): the pure parts of phases 5–8 — the park furniture's layout, the life's paths and the
 // soundscape's clock.
 import { describe, expect, it } from 'vitest';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { benchSpots, FENCE, fenceRuns, postsAlong, RING, VENICE_LOOK_V2 } from './courtsDressing';
 import { hoopAt, hubSolids, inCourtPlace, probeRoute, v1Hit, VENICE_SOLIDS, Walkup, WALKUP_DWELL, WALKUP_V2 } from './hubSolids';
 import { gullAt, GULLS, VENICE_LIFE, watchersVenue } from './hubLife';
 import { distanceGain, farGames, HubSoundscape, panFor, STEP, surfaceUnder, VENICE_SOUND, type HubCue } from './hubSound';
 import { buildHubWorld, courtsRect, returnSpawnFor, v1Area, v1Spots } from './hubWorld';
 import { COURT_HALF } from './courtsView';
+import { hubPos, VENICE_WAYFINDING, veniceWayfindingEnabled } from './hubUi';
+import { FirstVisitHint, toMap } from '@/app/play/venice/wayfinding';
 import { CARD_BEYOND_M, layoutSeats, pastLine } from '@/lib/babylon/visual/crowd/crowdLayout';
 
 describe('phase 5: the fences leave the walk-up side open', () => {
@@ -181,4 +185,53 @@ describe('phase 8: solids and the walk-up', () => {
     }
   });
   it('ship on (1)', () => { expect(VENICE_SOLIDS).toBe(1); expect(WALKUP_V2).toBe(1); });
+});
+
+describe('phase 9: finding your way', () => {
+  it('ships the wayfinding layer on by default', () => {
+    expect(VENICE_WAYFINDING).toBe(1);
+    expect(veniceWayfindingEnabled()).toBe(true);
+  });
+
+  it('maps Venice north-up with the sea on the left', () => {
+    const a = v1Area();
+    const nw = toMap(a.minX, a.minZ);
+    const sw = toMap(a.minX, a.maxZ);
+    const ne = toMap(a.maxX, a.minZ);
+    expect(nw[0]).toBeLessThan(ne[0]);
+    expect(nw[1]).toBeLessThan(sw[1]);
+    expect(nw[0]).toBe(0);
+    expect(nw[1]).toBe(0);
+  });
+
+  it('publishes the player marker only when it has really moved, and resets on dispose', () => {
+    hubPos.reset();
+    let heard = 0;
+    const off = hubPos.subscribe(() => { heard += 1; });
+    hubPos.set(10, 20, 0.1);
+    expect(hubPos.getSnapshot()).toEqual({ x: 10, z: 20, yaw: 0.1 });
+    expect(heard).toBe(1);
+    hubPos.set(10.1, 20.1, 0.12);
+    expect(heard).toBe(1);
+    hubPos.set(10.4, 20.1, 0.12);
+    expect(hubPos.getSnapshot()).toEqual({ x: 10.4, z: 20.1, yaw: 0.12 });
+    expect(heard).toBe(2);
+    hubPos.reset();
+    expect(hubPos.getSnapshot()).toBeNull();
+    expect(heard).toBe(3);
+    off();
+    hubPos.set(0, 0, 0);
+    expect(heard).toBe(3);
+    hubPos.reset();
+  });
+
+  it('tells desktop and touch players how to reach a court ring', () => {
+    const desktop = renderToStaticMarkup(createElement(FirstVisitHint, { onDismiss: () => {}, touch: false }));
+    const touch = renderToStaticMarkup(createElement(FirstVisitHint, { onDismiss: () => {}, touch: true }));
+    expect(desktop).toContain('Walk with WASD, the arrows or a stick.');
+    expect(touch).toContain('Drag anywhere to walk.');
+    expect(desktop).toContain('gold ring');
+    expect(touch).toContain('gold ring');
+    expect(desktop).toContain('Got it');
+  });
 });
