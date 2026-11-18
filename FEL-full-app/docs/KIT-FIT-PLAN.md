@@ -501,7 +501,10 @@ byte for byte, so these are fair variants:
 | the same fade without the gusset limit (the inner legs too) | 1,572–2,358 (the cloth left behind the leg, 17 cm) |
 | gusset 4.5 / 6.5 cm under the crotch | 342 / 398 |
 | hem ease 12 → 20 mm | 300 |
+| curved hem, inner side cut 3 / 5 / 8 cm higher (`onepiece-shorts.py --hem-rise`; 0 rebuilds the shipped file byte for byte) | 304 / 360 / 350 (skin through it 130 → 112 / 109 / 75) |
 
 The stretch is the cloth that joins the two legs: when the legs split it has to stretch, wherever its weights put it. Today's short
-avoids it only because its leg tubes overlap instead of joining. Not tried: a curved hem, cut higher on the inner thigh (as
-athletic shorts are), so less cloth joins the legs low down. That is the next shape to try. No cloth bones: GATE 0.
+avoids it only because its leg tubes overlap instead of joining. The curved hem lowers the skin seen through the short but not the
+tears, so the torn edges are the gusset's, not the hem's. With 22 bones and no cloth simulation (GATE 0), the cloth that joins two
+legs that split apart must stretch somewhere. What is left: hide it (a darker inseam panel, so the stretched faces read as a seam),
+or a short with a slit side (less cloth to stretch). Both are owner-look choices.
