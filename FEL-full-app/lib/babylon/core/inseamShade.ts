@@ -19,7 +19,7 @@ import { feel } from '../../feel-panel/feel';
 /** kit.inseamShade: how much darker the inseam panel is (0 = off, today; 1 = black). NEW; the coordinator's reversible default. */
 export const INSEAM_SHADE = 0.55;
 /** Texture size (texels a side). */
-const SIZE = 256;
+const SIZE = 128;   // a soft gradient: 128² is enough, and a quarter of 256²'s main-thread work at body load (15–44 ms measured at 256²)
 
 export const inseamShade = (): number => Math.max(0, Math.min(1, feel('kit.inseamShade', INSEAM_SHADE)));
 
@@ -73,7 +73,7 @@ export function inseamTexels(uv: ArrayLike<number>, indices: ArrayLike<number>, 
       val[y * size + x] = Math.max(val[y * size + x], s);
     }
   }
-  for (let pass = 0; pass < 3; pass++) {   // grow the islands into the empty texels
+  for (let pass = 0; pass < 2; pass++) {   // grow the islands into the empty texels
     const next = Float32Array.from(val);
     for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
       if (val[y * size + x] >= 0) continue;
