@@ -5,7 +5,7 @@
 //   * playable: navigation → the first frame drawn while 'playing' (the hub starts itself at 'ready': no START screen);
 //   * the cost: a 6 s walk with the stick held, the worst frame's draw calls, active meshes, and texture MB (every texture's
 //     size × 4 bytes × 1.33 for mips), for the shipped court (one painted texture) and, as the control, perf.veniceSharedCourt 0;
-//   * shots (JPG): arriving beside Court 1 (the walk-up card up) and the cold start at the court gate, looking over the courts.
+//   * shots (JPG): arriving beside Court 3 (the two-choice walk-up card up) and the cold start at the court gate, looking over the courts.
 // Run under the shared browser gate:  /home/user/wt/gate-run.sh 900 npx tsx scripts/probes/venice-hub/hub-rig.mts   (OUT=<dir>)
 // SwiftShader rasterises on the CPU and overstates a phone's load: the number is the rig's, the owner's phone is the judge.
 import { chromium } from 'playwright-core';
@@ -48,7 +48,7 @@ const browser = await chromium.launch({ executablePath: chromiumExe(), args: ['-
 const result: Record<string, unknown> = {};
 try {
   const runs: Array<[string, string, boolean]> = [
-    ['onevone-yardstick', 'mode=onevone', false], ['shared', '', true], ['control-unshared', `feel=${encodeURIComponent(JSON.stringify({ 'perf.veniceSharedCourt': 0 }))}`, false], ['walkup', 'spot=court.ones', true],
+    ['onevone-yardstick', 'mode=onevone', false], ['shared', '', true], ['control-unshared', `feel=${encodeURIComponent(JSON.stringify({ 'perf.veniceSharedCourt': 0 }))}`, false], ['walkup', 'spot=court.flight', true],
   ];
   const pick = (process.env.RUNS ?? '').split(',').filter(Boolean);
   for (const [name, query, shot] of runs) {
@@ -86,6 +86,7 @@ try {
     }
     await page.evaluate(() => (window as unknown as { __bus: { emit(e: unknown): void } }).__bus.emit({ t: 'stick', side: 'L', x: 0, y: 0 }));
     const spot = await page.evaluate(() => (window as unknown as { __spot?: string | null }).__spot ?? null);
+    const cardButtons = await page.evaluate(() => [...document.querySelectorAll('#card .btn')].map((el) => el.textContent?.trim() ?? ''));
     // one frame's draws by mesh, and the passes outside the meshes (shadow maps, other render targets, post-processes)
     const split = name === 'onevone-yardstick' ? null : await page.evaluate(`(async () => { const s = window.__FEL_DEV__.scene, e = s.getEngine(); const per = new Map();
       const undo = []; for (const m of s.meshes) { const o = m.render; undo.push([m, o]); m.render = function (...a) { const d0 = e._drawCalls.current; const r = o.apply(this, a); per.set(this.name, (per.get(this.name) || 0) + (e._drawCalls.current - d0)); return r; }; }
@@ -94,7 +95,7 @@ try {
       const top = [...per.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12);
       const gens = s.lights.map((l) => l.getShadowGenerator && l.getShadowGenerator()).filter(Boolean).length;
       return { meshDraws: [...per.values()].reduce((a, b) => a + b, 0), top, shadowGens: gens, customRTs: s.customRenderTargets.length, post: s.postProcesses.length, effectLayers: (s.effectLayers || []).length, frameCounter: [f0, f1] }; })()`);
-    result[name] = { ...t, worst, spot, split, errors: errors.slice(0, 5), missing: [...missing] };
+    result[name] = { ...t, worst, spot, cardButtons, split, errors: errors.slice(0, 5), missing: [...missing] };
     if (shot) {
       if (name === 'shared') { await page.reload(); await page.waitForFunction(() => !!(window as unknown as { __ttfp?: number }).__ttfp, null, { timeout: 240000 }); await page.waitForTimeout(5000); }
       const file = path.join(OUT, `venice-v1-${name === 'walkup' ? 'walkup' : 'courts'}-phone.jpg`);
