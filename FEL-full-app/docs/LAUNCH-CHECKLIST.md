@@ -94,7 +94,7 @@ Every item is a step in `docs/OWNER-RUNBOOK.md`. As of 2026-10-20 none has been 
 | C5 | netd redeployed with `party1`. The party works on two phones | **not done** | §8, §13 |
 | C6 | Studio-save SQL applied and deployed; live reads verified with the switch off | **not done** | §9 (PR #373 not merged) |
 | C7 | Feel panel on for the owner (`FEEL_PANEL_ENABLED` + `User.role = 'admin'`) | **not done** | §12 (`lane/feel-panel` not merged) |
-| C8 | The 20 undocumented env vars at their safe defaults. `.env.example` lists them | **not done** | §10.3. The `.env.example` lines are lane work (`docs/SHIP-READINESS.md` §6 call 6) |
+| C8 | The launch-blocking undocumented env vars at their safe defaults. `.env.example` lists them | **done** | `.env.example` lists the operational flags and secrets from `docs/SHIP-READINESS.md` §3.4 with empty/off defaults; `scripts/env-example-tests.ts` guards that those active defaults are present once, that duplicate keys cannot creep back in, and that retired `STRIPE_BOOKS_SECRET_KEY` stays absent |
 
 **Not a launch item:** the Studio-save switch (runbook §9.1). It waits for the policy text and for the Studio itself to
 open.

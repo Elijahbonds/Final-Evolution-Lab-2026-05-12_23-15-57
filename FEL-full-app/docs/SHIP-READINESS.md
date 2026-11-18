@@ -282,6 +282,8 @@ see before it can intentionally turn them on: `ABACUS_ENABLED`, `COACH_STORE_ENA
 `PAYOUTS_ENABLED`, `RETENTION_CRON_SECRET`, `ARENA_RECLAIM_SECRET`, `LIVE_STREAM_SCHEDULE_ENABLED`,
 `NEXT_PUBLIC_JOIN_LAB_ENABLED` and `FEL_TEST_ACCOUNTS`. All default off or closed when unset. The old
 `STRIPE_BOOKS_SECRET_KEY` remains intentionally absent; books use the platform `STRIPE_SECRET_KEY`.
+Follow-up 2026-11-18: `scripts/env-example-tests.ts` now keeps that list active exactly once in `.env.example`
+with empty/off defaults, rejects duplicate active assignments, and keeps the retired books secret absent.
 
 The rest are test- or probe-only (`SESSIONS_IT`, `DAILY_IT`, `DB_CONNECTOR_IT`, `HM_DEBUG`, `CAM_CAL`,
 `MIRROR_BASELINE_OUT`, `COMPLIANCE_PROOF_OUT`, `FEL_RECORD_BUS_GOLDEN`, `FEL_POKE_DEBUG`, `FEL_HERO_GLB`). The full
