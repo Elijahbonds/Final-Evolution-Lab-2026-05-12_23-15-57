@@ -169,22 +169,49 @@ const setCache = new Map<string, Promise<SetGarment[] | null>>();
 function fetchSet(url: string): Promise<SetGarment[] | null> {
   let p = setCache.get(url);
   if (!p) {
-    p = fetch(url).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(`HTTP ${r.status}`)))).then(parseGarmentSet)
+    p = fetch(url).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((b) => { mark('fel-kit:set-parse', url); const set = parseGarmentSet(b); mark('fel-kit:set-parsed', url); return set; })
       .catch((e: unknown) => { console.warn(`[FEL-KIT] garment set ${url} did not load: ${String((e as Error)?.message ?? e).slice(0, 120)}`); setCache.delete(url); return null; });
     setCache.set(url, p);
   }
   return p;
 }
 
-/** CharacterLibrary.loadContainer's hook: the sets this body takes under the knobs, applied to the container. Never throws. */
+/** One user-timing mark (a trace shows where the garment work lands against a tap). Never throws. */
+function mark(name: string, detail: string): void { try { performance.mark(name, { detail }); } catch { /* no User Timing */ } }
+/** Give the browser the main thread back (an input, a frame) before the next piece of garment work: an idle callback where there
+ *  is one (100 ms at most), else the next task. kit-tight, 2026-11-18: the /creator tap measured 240 ms against the release's
+ *  168 (median of 3, budget 200) with the garment sets on; nothing here may sit in one long task in front of a tap. */
+export function yieldToBrowser(): Promise<void> {
+  return new Promise((r) => {
+    const ric = (globalThis as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
+    if (typeof ric === 'function') ric(() => r(), { timeout: 100 }); else setTimeout(r, 0);
+  });
+}
+
+/** Start fetching (and parsing) the sets a body file takes, before the body itself is loaded, so they arrive with it instead of
+ *  after it. CharacterLibrary.loadContainer calls this first. Never throws. */
+export function prefetchGarmentSets(url: string, knobs = garmentSetKnobs()): void {
+  try { for (const u of garmentSetsFor(url, knobs)) void fetchSet(u); } catch { /* the load below fetches again */ }
+}
+
+/** CharacterLibrary.loadContainer's hook: the sets this body takes under the knobs, applied to the container. Never throws.
+ *  Each garment goes in on its own turn of the browser (yieldToBrowser), so no input waits behind the whole swap. */
 export async function loadGarmentSets(container: AssetContainer, url: string, knobs = garmentSetKnobs()): Promise<void> {
   const urls = garmentSetsFor(url, knobs);
   for (const u of urls) {
     const set = await fetchSet(u);
     if (!set) continue;
-    try {
-      const r = applyGarmentSet(container, set);
-      console.info(`[FEL-KIT] garment set ${u.split('/').pop()}: replaced ${r.replaced.join(', ') || '-'}; added ${r.added.join(', ') || '-'}`);
-    } catch (e) { console.warn(`[FEL-KIT] garment set ${u} skipped: ${String((e as Error)?.message ?? e).slice(0, 120)}`); }
+    const r = { replaced: [] as string[], added: [] as string[] };
+    for (const g of set) {
+      await yieldToBrowser();
+      mark('fel-kit:set-apply', `${u.split('/').pop()} ${g.name}`);
+      try {
+        const one = applyGarmentSet(container, [g]);
+        r.replaced.push(...one.replaced); r.added.push(...one.added);
+      } catch (e) { console.warn(`[FEL-KIT] garment set ${u} skipped ${g.name}: ${String((e as Error)?.message ?? e).slice(0, 120)}`); }
+      mark('fel-kit:set-applied', `${u.split('/').pop()} ${g.name}`);
+    }
+    console.info(`[FEL-KIT] garment set ${u.split('/').pop()}: replaced ${r.replaced.join(', ') || '-'}; added ${r.added.join(', ') || '-'}`);
   }
 }

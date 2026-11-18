@@ -24,7 +24,7 @@ import { PROCEDURAL_CHARACTERS } from '../characters/CharacterProvider';
 import { spawnProceduralAthlete } from '../characters/ProceduralAthlete';
 import { rosterUrlFor, normalizeHeroUrl, DEFAULT_HERO_URL, takeRivalRotation } from './athleteRoster';
 import { KIT_BODY_URL, bodyUrlForTier } from './heroBody';
-import { loadGarmentSets } from './kitGarmentSet';
+import { loadGarmentSets, prefetchGarmentSets } from './kitGarmentSet';
 import { demoModelFlags, planPlayerBody, type PlayerBodyContext } from './demoModels';
 import { signedOutVisitor } from './visitor';
 import { installOpponentMotion, HERO_CAPTURE } from '../anim/opponentMotion';
@@ -184,6 +184,7 @@ async function loadContainer(scene: Scene, url: string): Promise<AssetContainer>
   if (!p) {
     const { rootUrl, filename } = splitUrl(url);
     userMark('fel-char:load', url);
+    prefetchGarmentSets(url);   // kit-tight: the garment sets travel with the body, not after it (kitGarmentSet.ts)
     p = SceneLoader.LoadAssetContainerAsync(rootUrl, filename, scene)
       .then((container) => {
         userMark('fel-char:loaded', url);
