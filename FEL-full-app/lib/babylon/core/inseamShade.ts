@@ -79,6 +79,7 @@ export function applyInseamShade(meshes: readonly Mesh[], uv: ArrayLike<number> 
     seen.add(mat);
     tex ??= RawTexture.CreateRGBATexture(inseamTexels(uv, indices, share, dark), SIZE, SIZE, scene, true, false, Constants.TEXTURE_TRILINEAR_SAMPLINGMODE);
     tex.name = 'fel_inseam_shade';
+    tex.metadata = { felShareOnClone: true };   // playerIdentity.cloneForTint shares it (a deep copy of a url-less texture is blank)
     mat.albedoTexture = tex; n++;
   }
   return n;

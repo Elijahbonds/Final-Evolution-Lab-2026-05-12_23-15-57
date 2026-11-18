@@ -8,6 +8,7 @@ import '@babylonjs/loaders/glTF';
 import { INSEAM_SHADE, inseamTexels, joiningShare } from './inseamShade';
 import { KIT_GARMENT_SETS, applyGarmentSet, parseGarmentSet } from './kitGarmentSet';
 import { FEEL_KNOB_BY_ID } from '../../feel-panel/knobs';
+import { cloneForTint } from './playerIdentity';
 import { resetFeelForTests, setFeelOverride, setFeelSession, setFeelUser } from '../../feel-panel/feel';
 
 afterEach(() => resetFeelForTests());
@@ -51,5 +52,10 @@ describe('the one-piece short\'s inseam panel (kit.inseamShade)', () => {
     setFeelUser(true); setFeelSession(null); setFeelOverride('kit.inseamShade', 0);
     const r = await shortAfterSwap();
     expect((r.mesh.material as PBRMaterial).albedoTexture ?? null).toBeNull();
+  }, 60_000);
+  it('a tinted player\'s clone of the short\'s material keeps the panel (shared, not a blank deep copy)', async () => {
+    const r = await shortAfterSwap();
+    const src = r.mesh.material as PBRMaterial, clone = cloneForTint(src as never, 'tinted') as unknown as PBRMaterial;
+    expect(clone.albedoTexture).toBe(src.albedoTexture);
   }, 60_000);
 });

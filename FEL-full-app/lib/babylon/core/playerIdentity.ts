@@ -44,6 +44,14 @@ export function cloneForTint(m: TintMat, name: string): TintMat | null {
     clone.bumpTexture?.dispose();
     clone.bumpTexture = m.bumpTexture;
   }
+  // kit-tight: a texture made in memory (the short's inseam panel, inseamShade.ts) has no url, so a deep copy comes out blank:
+  // the clone shares it, as it shares the weave
+  const albedo = (m as { albedoTexture?: { metadata?: { felShareOnClone?: boolean } } | null }).albedoTexture;
+  if (clone && albedo?.metadata?.felShareOnClone) {
+    const c = clone as { albedoTexture?: { dispose(): void } | null };
+    if (c.albedoTexture !== albedo) c.albedoTexture?.dispose();
+    (clone as unknown as { albedoTexture: unknown }).albedoTexture = albedo;
+  }
   return clone;
 }
 import type { SpawnedCharacter } from './CharacterLibrary';
