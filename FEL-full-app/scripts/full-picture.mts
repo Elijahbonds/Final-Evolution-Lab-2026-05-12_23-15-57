@@ -95,6 +95,7 @@ const bridge = read('lib/controller-link/schemas/registry.ts');
 const gauntlet = read('scripts/gauntlet.sh');
 const gauntletPlay = read('scripts/gauntlet-play.sh');
 const gameData = read('lib/game-data.ts');
+const playPage = read('app/play/page.tsx');
 const locks = new Set(readdirSync('docs/concept-lock').map((f) => f.replace(/\.md$/, '')));
 const routeMap: Record<string, string> = {
   karate_vs: 'karate-vs',
@@ -106,6 +107,7 @@ const routeMap: Record<string, string> = {
   velocitykart: 'velocity-kart',
   who_scene_it: 'who-scene-it',
   brainbrawl: 'brain-brawl',
+  venice_hub: 'venice',
 };
 const lockName: Record<string, string> = { karate: 'karate-endless', karate_vs: 'karate-vs', derby: 'baseball', penalty: 'soccer', snowboard_slalom: 'snowboard' };
 const camName: Record<string, string> = {
@@ -130,6 +132,7 @@ const testName: Record<string, string[]> = {
   threepoint: ['threepoint', 'three-point', 'threePoint'],
   threevthree: ['threevthree', 'three-v-three', 'ThreeVThree'],
   velocitykart: ['velocitykart', 'velocity-kart', 'velocityKart'],
+  venice_hub: ['venice', 'venice-hub', 'VeniceHub'],
   who_scene_it: ['who_scene_it', 'who-scene-it', 'whoSceneIt'],
 };
 const skipTestDirs = new Set(['.git', '.next', 'coverage', 'node_modules', 'public']);
@@ -161,7 +164,7 @@ const rows: Row[] = modeEntries.map(({ key, cls }) => {
   const cores = CORES.filter((c) => coreUsedInSlice(whole, src, c.imports));
   return {
     key, enabled: enabled.has(key), file, route,
-    menu: gameData.includes(`href: '${route}'`),
+    menu: gameData.includes(`href: '${route}'`) || (key === 'venice_hub' && playPage.includes('VENICE_DOOR_HREF')),
     venue, map, kit, baked: !!map && bakedKeys.has(map),
     cores: cores.map((c) => c.name),
     camera: camKeys.has(key) || camKeys.has(camName[key] ?? ''),   // cameraFraming.json is keyed by measured gameplay mode

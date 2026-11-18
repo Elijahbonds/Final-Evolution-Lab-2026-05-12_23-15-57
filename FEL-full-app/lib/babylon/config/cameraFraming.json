@@ -167,6 +167,87 @@
       "samples": 6,
       "viaHero": true,
       "note": "after keepGameplayCamera (the venue orbit camera had been the active one)"
+    },
+    "baseball": {
+      "fraction": 0.618,
+      "min": 0.616,
+      "max": 0.619,
+      "samples": 6,
+      "viaHero": true,
+      "camDist": 4,
+      "note": "measured 2026-11-18 on /dev/mode/baseball with the Linux system Chrome probe after _cam-frame enabled agent hooks and Linux-safe ANGLE flags"
+    },
+    "freerun": {
+      "fraction": 0.263,
+      "min": 0.263,
+      "max": 0.264,
+      "samples": 6,
+      "viaHero": true,
+      "camDist": 8.15,
+      "note": "measured 2026-11-18 on /dev/mode/freerun with the Linux system Chrome probe"
+    },
+    "sprint": {
+      "fraction": 0.262,
+      "min": 0.261,
+      "max": 0.263,
+      "samples": 6,
+      "viaHero": true,
+      "camDist": 8.15,
+      "note": "measured 2026-11-18 on /dev/mode/sprint with the Linux system Chrome probe"
+    },
+    "duel": {
+      "fraction": 0.345,
+      "min": 0.345,
+      "max": 0.346,
+      "samples": 6,
+      "viaHero": true,
+      "camDist": 6.76,
+      "note": "measured 2026-11-18 on /dev/mode/duel with the Linux system Chrome probe"
+    },
+    "aeroaces": {
+      "fraction": 0.087,
+      "min": 0.087,
+      "max": 0.152,
+      "samples": 6,
+      "viaHero": true,
+      "camDist": 14.26,
+      "note": "measured 2026-11-18 on /dev/mode/aeroaces with the Linux system Chrome probe; max is the opening flyover settle, median is the playable chase framing"
+    },
+    "velocitykart": {
+      "fraction": 0.201,
+      "min": 0.2,
+      "max": 0.201,
+      "samples": 6,
+      "viaHero": true,
+      "camDist": 7.99,
+      "note": "measured 2026-11-18 on /dev/mode/velocitykart with the Linux system Chrome probe"
+    },
+    "who_scene_it": {
+      "fraction": 0.18,
+      "min": 0.173,
+      "max": 0.307,
+      "samples": 6,
+      "viaHero": false,
+      "camDist": 8.2,
+      "note": "measured 2026-11-18 on /dev/mode/who_scene_it with a 12 s settle; sweep camera changes the visible contestant size during the orbit"
+    },
+    "brainbrawl": {
+      "fraction": 0.23,
+      "min": 0.229,
+      "max": 0.23,
+      "samples": 6,
+      "viaHero": false,
+      "camDist": 8.48,
+      "note": "measured 2026-11-18 on /dev/mode/brainbrawl with the Linux system Chrome probe; nearest stage contestant is the measured subject"
+    },
+    "tiebreak": {
+      "fraction": 0.337,
+      "min": 0.335,
+      "max": 0.339,
+      "samples": 6,
+      "viaHero": true,
+      "camDist": 6.36,
+      "note": "measured 2026-11-18 on /dev/mode/tiebreak with the Linux system Chrome probe"
     }
   }
 }

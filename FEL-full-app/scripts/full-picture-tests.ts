@@ -10,6 +10,7 @@ const ROOT = process.cwd();
 const registry = readFileSync(join(ROOT, 'lib/babylon/modes/registry.ts'), 'utf8');
 const matrix = readFileSync(join(ROOT, 'scripts/full-picture.mts'), 'utf8');
 const gameData = readFileSync(join(ROOT, 'lib/game-data.ts'), 'utf8');
+const playPage = readFileSync(join(ROOT, 'app/play/page.tsx'), 'utf8');
 const devGauntlet = readFileSync(join(ROOT, 'scripts/gauntlet.sh'), 'utf8');
 const playGauntlet = readFileSync(join(ROOT, 'scripts/gauntlet-play.sh'), 'utf8');
 
@@ -29,6 +30,8 @@ const expectedSlugs: Record<string, string> = {
   velocitykart: 'velocity-kart',
   who_scene_it: 'who-scene-it',
   brainbrawl: 'brain-brawl',
+  derby: 'derby',
+  venice_hub: 'venice',
 };
 const playGauntletExempt = new Set([
   // /play/dunkduel is the owner's real-footage Prove It flow; the Babylon
@@ -66,6 +69,7 @@ const testName: Record<string, string[]> = {
   threepoint: ['threepoint', 'three-point', 'threePoint'],
   threevthree: ['threevthree', 'three-v-three', 'ThreeVThree'],
   velocitykart: ['velocitykart', 'velocity-kart', 'velocityKart'],
+  venice_hub: ['venice', 'venice-hub', 'VeniceHub'],
   who_scene_it: ['who_scene_it', 'who-scene-it', 'whoSceneIt'],
 };
 const skipTestDirs = new Set(['.git', '.next', 'coverage', 'node_modules', 'public']);
@@ -142,7 +146,9 @@ for (const key of enabledModes) {
   const route = `/play/${routeMap.get(key) ?? key}`;
   const slug = route.slice('/play/'.length);
   if (!existsSync(join(ROOT, 'app/play', slug, 'page.tsx'))) missingRoutes.push(`${key} -> ${route}`);
-  if (!gameData.includes(`href: '${route}'`)) missingMenuLinks.push(`${key} -> ${route}`);
+  const hasMenuLink = gameData.includes(`href: '${route}'`)
+    || (key === 'venice_hub' && playPage.includes('VENICE_DOOR_HREF'));
+  if (!hasMenuLink) missingMenuLinks.push(`${key} -> ${route}`);
   if (!(key in MODE_CONTROLLERS)) missingControllerSchemas.push(key);
   if (!devGauntletModes.has(key)) missingDevGauntlet.push(key);
   if (!playGauntletExempt.has(key) && !playGauntletModes.has(key)) missingPlayGauntlet.push(key);

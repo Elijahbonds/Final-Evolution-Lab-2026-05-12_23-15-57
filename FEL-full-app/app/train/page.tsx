@@ -33,12 +33,23 @@ import { JUMP_TESTS_HREF, MIRROR_HREF } from '@/lib/tools-easy/door';
 import { groupBookingOpen, type GroupDb } from '@/lib/group-booking/server';
 import { GROUP_COPY } from '@/lib/group-booking/copy';
 import { MyGroupSessions } from '@/components/group-booking/my-group-sessions';
-import { combineReady, type RawDb as CombineDb } from '@/lib/combine/store';
+import { groupsReady } from '@/lib/groups/store';
+import { signatureReady } from '@/lib/signature/store';
+import { combineReady } from '@/lib/combine/store';
 
 export const dynamic = 'force-dynamic';
 
 type Group = 'measure' | 'program' | 'learn';
 const GROUPS: readonly Group[] = ['measure', 'program', 'learn'];
+
+async function pendingReady<Db>(probe: (db: Db) => Promise<boolean>): Promise<boolean> {
+  try {
+    if (typeof (prisma as { $queryRawUnsafe?: unknown }).$queryRawUnsafe !== 'function') return false;
+    return await probe(prisma as unknown as Db);
+  } catch {
+    return false;
+  }
+}
 
 /**
  * TRAIN — the Mirror, the programming, the coach and the fuel, on one shelf.
@@ -52,7 +63,7 @@ export default async function TrainPage() {
   const me = (session?.user as { id?: string } | undefined)?.id;
   if (!me) redirect(loginPath('/train'));
 
-  const [coachLink, coachesAnyone, programCount, todayCard, dailyDrill, groupsOpen] = await Promise.all([
+  const [coachLink, coachesAnyone, programCount, todayCard, dailyDrill, groupsOpen, squadsOpen, signatureProgramsOpen, combineResultsOpen] = await Promise.all([
     prisma.coachClient.findFirst({ where: { clientId: me, endedAt: null }, select: { coach: { select: { name: true } } } }).catch(() => null),
     prisma.coachClient.findFirst({ where: { coachId: me, endedAt: null }, select: { id: true } }).catch(() => null),
     prisma.coachingProgram.count({ where: { clientId: me } }).catch(() => 0),
@@ -60,9 +71,10 @@ export default async function TrainPage() {
     loadDailyDrill(prisma, me, { warmupContext: (id, now) => loadWarmupContext(prisma, id, now) }).catch(() => null),
     // EVERY-SCREEN P5: the doors to group training and 1:1s, only once booking is open (the owner set, the tables applied)
     groupBookingOpen(prisma as unknown as GroupDb),
+    pendingReady(groupsReady),
+    pendingReady(signatureReady),
+    pendingReady(combineReady),
   ]);
-  // COMBINE-DAY: show the saved combine doors only after the pending SQL has landed. Direct pages still fail closed.
-  const combineOpen = (coachLink || coachesAnyone) ? await combineReady(prisma as unknown as CombineDb).catch(() => false) : false;
 
   const cards = [
     {
@@ -130,11 +142,11 @@ export default async function TrainPage() {
       href: '/train/build', group: 'program' as Group, icon: Wand2, accent: PALETTE.cyan, title: t('train.cards.build.title'),
       line: t('train.cards.build.line'),
     },
-    {
+    ...(signatureProgramsOpen ? [{
       // SIGNATURE-PROGRAMS (2026-10-25): approved programs only (lib/signature/access.ts); the list shows the athlete's week
       href: '/train/programs', group: 'program' as Group, icon: Layers, accent: PALETTE.emerald, title: t('train.cards.signature.title'),
       line: TRAIN_LINE_IDLE,
-    },
+    }] : []),
     {
       // EXERCISE-LIBRARY (2026-10-25): the shared library — search it or ask it; approved entries only for athletes
       href: '/train/library', group: 'program' as Group, icon: Library, accent: PALETTE.cyan, title: t('train.cards.library.title'),
@@ -162,21 +174,22 @@ export default async function TrainPage() {
       href: '/groups/one-on-one', group: 'program' as Group, icon: Users, accent: PALETTE.emerald, title: GROUP_COPY.bookOneOnOne,
       line: GROUP_COPY.inPerson,
     }] : []),
-    {
+    ...(squadsOpen ? [{
       // TEAMS-SQUADS (2026-10-25): squads (friends) and teams (a coach's) — daily drills together, a weekly league
       href: '/squads', group: 'program' as Group, icon: Users, accent: PALETTE.cyan, title: t('train.cards.squads.title'),
       line: t('train.cards.squads.line'),
-    },
+    }] : []),
     ...(coachesAnyone ? [{
       href: '/coach', group: 'program' as Group, icon: Users, accent: PALETTE.violet, title: t('train.cards.roster.title'),
       line: t('train.cards.roster.line'),
     }] : []),
     // COMBINE-DAY (2026-10-25): a coach's tryout / testing day; a coached athlete's own combine numbers
-    ...(combineOpen && coachesAnyone ? [{
+    // (cursor #631: the coach's combine door also waits for the combine tables; the pages themselves fail closed)
+    ...(combineResultsOpen && coachesAnyone ? [{
       href: '/coach/combine', group: 'program' as Group, icon: Timer, accent: PALETTE.cyan, title: t('train.cards.combine.title'),
       line: t('train.cards.combine.line'),
     }] : []),
-    ...(combineOpen && coachLink ? [{
+    ...(coachLink && combineResultsOpen ? [{
       href: '/train/combine', group: 'program' as Group, icon: Timer, accent: PALETTE.cyan, title: t('train.cards.combines.title'),
       line: t('train.cards.combines.line'),
     }] : []),
