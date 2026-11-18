@@ -23,6 +23,7 @@ assert.ok(enabledModes.length > 20, 'enabled mode scan is unexpectedly empty');
 
 const expectedSlugs: Record<string, string> = {
   aeroaces: 'aero-aces',
+  derby: 'derby',
   velocitykart: 'velocity-kart',
   who_scene_it: 'who-scene-it',
   brainbrawl: 'brain-brawl',
@@ -121,6 +122,12 @@ function hasButton(mode: string, action: string, label?: string): boolean {
 for (const [key, slug] of Object.entries(expectedSlugs)) {
   assert.equal(routeMap.get(key), slug, `full-picture routeMap must carry ${key} -> ${slug}`);
 }
+
+assert.match(matrix, /function coreUsedInSlice/, 'full-picture must check imported core symbols against each mode slice');
+assert.match(matrix, /baseball:\s*'derby'/, 'baseball must reuse the measured derby camera row');
+assert.match(matrix, /tiebreak:\s*'tennis'/, 'tiebreak must reuse the measured tennis camera row');
+assert.match(matrix, /camera:\s*camKeys\.has\(key\)\s*\|\|\s*camKeys\.has\(camName\[key\]\s*\?\?\s*''\)/,
+  'full-picture camera check must honor measured-mode aliases');
 
 const missingRoutes: string[] = [];
 const missingMenuLinks: string[] = [];
