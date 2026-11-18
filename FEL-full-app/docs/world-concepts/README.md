@@ -126,3 +126,22 @@ These are rough sizes and layout only, not concept art. The layout is:
 - a blue water or edge volume;
 - purple crystal or rooftop pickups;
 - green and yellow framed pads (likely rest courts, landing pads or spawn points).
+
+## 8. Set paintings, key art, the full keyframe board, and Blender work in progress (owner-shared 2026-11-18, batch 3)
+
+- **`set-paintings-and-rival.jpg`** holds six set paintings and the rival sheet:
+  - SET-01, the prologue park court;
+  - SET-02, the Ch. 2 gymnastics gym, with a partner creature in the gym;
+  - SET-03, the Ch. 11 **Blue Courts**: beach courts with palms, a lifeguard tower and the sea. This is very close to what Venice Beach already is.
+  - SET-04, Ch. 12 **Sandstorm**, with a winged sand beast;
+  - SET-05, Ch. 15 **The Lab**: a training hall with holographic body scans;
+  - SET-06, the **Finale Venue**, a night court with a crowd, floodlights and a car under the rim;
+  - the **rival sheet**: a red and white kit with a headband and arm sleeve, front, side and back.
+- **`keyart-car-dunk-night.jpg` / `keyart-car-dunk-day.jpg`**: two posters. Each shows a player dunking off a car's bonnet, with an armoured winged partner (the Kaelor line) above the rim.
+- **`story-keyframes-full-board.jpg`**: the full board, K00 Prologue through K17, then the Finale and Epilogue. The story is **on hold**, so this is a record only.
+- **`ch2-gym-dressing-kit-rival-blender.jpg`**: **real Blender work in progress** from the 3D Art agent, not paintings.
+  - the Ch. 2 gym environment at LOD0, with a climb-tag view (cyan = CLIMB, gold = WALLRUN, ledges by height);
+  - a **dressing kit**: fence, scaffold, rim tower, pillar, ladder, street light, car and bleacher, each with climb tags;
+  - a WIP **rival LOD0** body, front, side and back.
+  
+  These model files are not in the repo. To be used in the game they must be pushed as `.glb` (or `.blend` plus an export script), with a licence/credits line and the climb-tag naming written down.
