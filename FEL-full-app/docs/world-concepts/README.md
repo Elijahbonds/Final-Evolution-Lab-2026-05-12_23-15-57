@@ -72,3 +72,57 @@ The garden is a 60 × 60 m sanctuary off the Ch. 2 district. Its layout:
 | Kaelor flight / sky-moose loops | Not built; Venice and Coast are linked by a boat |
 
 The owner's answers on how to merge the two go in OWNER-DECISIONS; this file stays a record of the concept.
+
+## 5. Partner system (the 3D Art agent's brainstorm, relayed by the owner 2026-11-18)
+
+The brainstorm merges ideas from the Gameplay, Research and PM agents and the owner.
+
+- **Kaelor always takes slot 1.** He evolves down one of four branches:
+  - **Sand:** hang time
+  - **Ember:** power and fire
+  - **Tide:** water and fins
+  - **Court:** climbing and wall-runs
+- **Companions:** you also pick up to 4 companions from a pool of six:
+  - a panther (working name "Shade") for speed
+  - a ram for climbing
+  - a manta for gliding over water
+  - an owl for support
+  - a bison for power
+  - a fox, the starter
+- **The Sanctuary:** a 60 × 60 m home court off the Ch. 2 district, where your partners live (image 4).
+  - Feeding, play, training and items found in the world push each partner toward a branch, and the change shows: wings, horns, more mass.
+  - Races and sparring there are cosmetic "Garden Exhibitions".
+  - **Nothing is random or paid.**
+- **Creator cards:** reward cards that unlock a signature partner skin, dunk or Finish animation.
+  - No stat boosts and no random packs.
+  - A real person gets a card only after written consent, a licence and a revenue split.
+  - This is legal and money territory, so it is the owner's call before anything is built (CLAUDE.md).
+- **Built into the layout** (it is a proposal; the Gameplay agent owns the mechanics):
+  - **Fight spaces:** room for lock-on fights where dunks are your attacks, with rims and poles to dunk off, and space to dash and knock people back.
+  - **Event courts:** courts around the world where story beats turn into Flight Night rounds.
+  - **Climbing and wall-running:** routes with ledges spaced to match how far you can jump and reach.
+  - **Kaelor:** sky lanes, landing pads, and swoop-dunk spots onto 10 ft rims.
+  - **Camera:** enough clearance that the high gameplay camera never clips into walls or ceilings.
+  - **Souls-like structure:** rest courts, shortcuts that unlock, and rival encounter spots.
+- **Benchmark names are references only.** The brainstorm mentions other games ("Sparking! Zero", "2K High camera", "Chao Garden"). They describe a quality bar and must not be copied: no names, art, modes or UI. "Chao Garden" is already renamed the Sanctuary.
+
+## 6. Story keyframes (`story-keyframes.jpg`)
+
+Twelve frames:
+- K00 Prologue
+- K05 Stop 05
+- K06 Ch 06
+- K08 Stop 08
+- K10 Ch 10
+- K14 Ch 14
+
+They show the player from behind on courts and drills, the glowing rings, and the bus on the road at the end. **The story is on hold** (owner, 2026-11-17, "Leave the story alone for now"), so this is a record only.
+
+## 7. Ch. 2 District greybox (`ch2-district-greybox-3d.jpg`, `ch2-district-greybox-top.jpg`)
+
+These are rough sizes and layout only, not concept art. The layout is:
+- grey building blocks with yellow doors;
+- red event-court volumes;
+- a blue water or edge volume;
+- purple crystal or rooftop pickups;
+- green and yellow framed pads (likely rest courts, landing pads or spawn points).
