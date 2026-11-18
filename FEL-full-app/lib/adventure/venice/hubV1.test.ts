@@ -1,5 +1,6 @@
 // venice-v1 (2026-11-17): the V1 hub's pure parts — the walkable courts district, walking up to a court and coming back.
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { buildHubWorld, courtsRect, returnSpawnFor, v1Area, v1Spots, v1WalkupSpots, V1_RIM_H } from './hubWorld';
 import {
   clearReturn, FROM_VENICE, hubHrefFor, launchHref, PARTY_MODE_FOR_SPOT, readReturn, RETURN_KEY, RETURN_TTL_MS, spotFromSearch,
@@ -144,5 +145,15 @@ describe('the Play screen door', () => {
     expect(veniceDoorOn({ VENICE_HUB_DOOR: '1' })).toBe(true);
     expect(veniceDoorOn({ VENICE_HUB_DOOR: '0' })).toBe(false);
     expect(VENICE_DOOR_HREF).toBe('/play/venice');
+  });
+});
+
+describe('the Venice stage host', () => {
+  it('defers the Babylon boot so a StrictMode phantom mount cannot build a second engine', () => {
+    const src = readFileSync('app/play/venice/stage.tsx', 'utf8');
+    expect(src).toMatch(/const startTimer = setTimeout\(\(\) => \{/);
+    expect(src).toMatch(/if \(disposed\) return;\s*runMode\(def, \{/);
+    expect(src).toContain('clearTimeout(startTimer)');
+    expect(src).toContain('busRef.current = null');
   });
 });

@@ -24,6 +24,7 @@ export function VeniceStage({ signedIn }: { signedIn: boolean }) {
   const router = useRouter();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
+  const mountedRef = useRef(false);
   const [phase, setPhase] = useState<ModePhase>('loading');
   const [err, setErr] = useState<string | null>(null);
   const [touch, setTouch] = useState(false);
@@ -35,28 +36,33 @@ export function VeniceStage({ signedIn }: { signedIn: boolean }) {
   useEffect(() => {
     const canvas = canvasRef.current;
     const def = MODES[MODE_KEY];
-    if (!canvas) return;
+    if (!canvas || mountedRef.current) return;
+    mountedRef.current = true;
     if (!def) { setErr('the Venice hub is not registered'); return; }
     const bus = new InputBus();
     busRef.current = bus;
     let stop: (() => void) | null = null;
     let disposed = false;
-    runMode(def, {
-      canvas,
-      input: bus,
-      onPhase: (p, d) => {
-        if (disposed) return;
-        setPhase(p);
-        if (p === 'error') setErr(String(d));
-        // a place, not a match: walk in at once (next tick: the harness takes a press only once it is in 'ready')
-        if (p === 'ready') setTimeout(() => { if (!disposed) bus.emit({ t: 'button', btn: 'START', pressed: true }); }, 50);
-      },
-      onHud: () => {},
-      guest: !signedIn,
-      resultSink: async () => {},   // the hub posts no session: the games it opens post their own
-    }).then((s) => { if (disposed) s(); else stop = s; })
-      .catch((e) => { if (!disposed) setErr(String(e?.message ?? e)); });
-    return () => { disposed = true; stop?.(); };
+    // Match the other Babylon hosts: StrictMode cleanup can cancel the phantom mount before it builds a WebGL engine.
+    const startTimer = setTimeout(() => {
+      if (disposed) return;
+      runMode(def, {
+        canvas,
+        input: bus,
+        onPhase: (p, d) => {
+          if (disposed) return;
+          setPhase(p);
+          if (p === 'error') setErr(String(d));
+          // a place, not a match: walk in at once (next tick: the harness takes a press only once it is in 'ready')
+          if (p === 'ready') setTimeout(() => { if (!disposed) bus.emit({ t: 'button', btn: 'START', pressed: true }); }, 50);
+        },
+        onHud: () => {},
+        guest: !signedIn,
+        resultSink: async () => {},   // the hub posts no session: the games it opens post their own
+      }).then((s) => { if (disposed) s(); else stop = s; })
+        .catch((e) => { if (!disposed) setErr(String(e?.message ?? e)); });
+    }, 0);
+    return () => { disposed = true; mountedRef.current = false; clearTimeout(startTimer); stop?.(); busRef.current = null; };
   }, [signedIn]);
 
   const spot = ui.spot;
