@@ -33,6 +33,7 @@ import { bindMovementView, type MovementView } from '../adventure/movement/view'
 import { placeBody } from '../adventure/world/view';
 import { loadRatedTuning, ratedLookScale } from '../hoops/ratedPlay';
 import { feel } from '@/lib/feel-panel/feel';
+import { devOrAgentHooks } from '@/lib/agentRunHooks';
 import { buildCoastWorld, COAST_DEEP_WATER_TURN_BACK, WaterEdge } from '@/lib/adventure/coast/zoneWorld';
 import { COAST_STREAM_ON, mountZoneView, type ZoneView, type ZoneViewStats } from '@/lib/adventure/coast/zoneView';
 import {
@@ -86,6 +87,14 @@ export function zoneMoveOnly(inp: MoveInput): MoveInput {
   return inp;
 }
 
+/**
+ * THE PROBE'S DRIVER (scripts/probes/coast-islands/zone-rig.mts): run the player toward a point, the way the headless test walks
+ * the host (the move held forward, the yaw on the target), so a scripted walk does not depend on where the camera looks. Only
+ * under next dev or an agent run (lib/agentRunHooks); null lets go. It moves nothing a player could not move with the stick.
+ */
+let driveTo: { x: number; z: number } | null = null;
+export function coastProbeDrive(t: { x: number; z: number } | null): void { driveTo = t && devOrAgentHooks() ? { x: t.x, z: t.z } : null; }
+
 function camYawOf(ctx: ModeContext, S: St): number {
   ctx.camDirector.forwardFlatToRef(TMP_FWD);
   const yaw = Math.atan2(TMP_FWD.x, TMP_FWD.z);
@@ -138,7 +147,11 @@ export const CoastZoneMode: ModeDefinition = {
       host, mapper, view, me, body, move, edge: new WaterEdge(world.spawn.pos), streamer,
       stickL: { x: 0, y: 0 }, stickR: { x: 0, y: 0 }, latchedYaw: null, preset: 'runner', rigKey: '', spotSec: SPOT_EVERY,
     };
-    host.setInputSource(host.playerId, (out) => { mapper.fill(out, { camYaw: camYawOf(ctx, S), state: host.player.state }); zoneMoveOnly(out); });
+    host.setInputSource(host.playerId, (out) => {
+      mapper.fill(out, { camYaw: camYawOf(ctx, S), state: host.player.state });
+      if (driveTo) { const p = host.player.pos; out.camYaw = Math.atan2(driveTo.x - p.x, driveTo.z - p.z); out.move.x = 0; out.move.y = 1; }
+      zoneMoveOnly(out);
+    });
     ctx.heroRef.current = body;   // the harness frames and checks the player by it (FrameGuard assertSpawned)
     states.set(scene, S); live.add(S); probeState = S;
     placeBody(body, host.player);
@@ -190,5 +203,6 @@ export const CoastZoneMode: ModeDefinition = {
     for (const S of live) { S.move.dispose(); S.view.dispose(); }
     live.clear();
     probeState = null;
+    driveTo = null;
   },
 };

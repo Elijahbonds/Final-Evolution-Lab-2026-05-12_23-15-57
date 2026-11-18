@@ -6,7 +6,7 @@ import { setAgentRunHooksAllowed } from '@/lib/agentRunHooks';
 import { runMode, InputBus } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { zoneUi } from '@/lib/adventure/coast/zoneUi';
-import { coastProbe } from '@/lib/babylon/modes/CoastZoneMode';
+import { coastProbe, coastProbeDrive } from '@/lib/babylon/modes/CoastZoneMode';
 import { setFeelOverride, setFeelSession, setFeelUser } from '@/lib/feel-panel/feel';
 
 const W = window as unknown as Record<string, unknown>;
@@ -22,6 +22,7 @@ zoneUi.subscribe(() => {
   if (s) card.innerHTML = `<b>${s.label.replace('[PLACEHOLDER] ', '')}</b><div class="btn">Back to Venice</div>`;
 });
 W.__coast = coastProbe;
+W.__drive = coastProbeDrive;
 const bus = new InputBus();
 W.__bus = bus;
 void runMode(MODES[q.get('mode') ?? 'coast_zone'], {

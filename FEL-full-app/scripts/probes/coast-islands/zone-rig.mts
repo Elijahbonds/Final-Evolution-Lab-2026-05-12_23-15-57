@@ -49,22 +49,20 @@ const STATS = `(async () => { const d = window.__FEL_DEV__; const s = d.scene; c
   return { draws, active: s.getActiveMeshes().length, textureMb: Math.round(tex / 1e6), textures: s.textures.length, meshes: s.meshes.length, coast: c }; })()`;
 type Worst = { draws: number; active: number; textureMb: number; textures: number; meshes: number };
 
-/** Steer the player toward (x, z): the stick is read in the camera's yaw at the press (the mapper latches it), so re-aim each second.
- *  The bus's stick y is DOWN-positive (host/inputMap: forward is y −1); x is to the right. */
+/** Run the player toward (x, z) with the mode's probe driver (CoastZoneMode coastProbeDrive: the move held forward, the yaw on the
+ *  target, as the headless test walks the host), sampling every 250 ms. True when it got within 3 m. */
 async function walkTo(page: Page, x: number, z: number, maxSec: number, sample: (k: number) => Promise<void>): Promise<boolean> {
   const t0 = Date.now();
   let k = 0;
-  while ((Date.now() - t0) / 1000 < maxSec) {
-    const done = await page.evaluate(`(() => { const c = window.__coast(); const cam = window.__FEL_DEV__.scene.activeCamera; const f = cam.getForwardRay().direction;
-      const dx = ${x} - c.x, dz = ${z} - c.z, L = Math.hypot(dx, dz); if (L < 3) { window.__bus.emit({ t: 'stick', side: 'L', x: 0, y: 0 }); return true; }
-      const fl = Math.hypot(f.x, f.z) || 1, fx = f.x / fl, fz = f.z / fl;   // camera forward on the ground; right = (fz, -fx)
-      const ux = dx / L, uz = dz / L; window.__bus.emit({ t: 'stick', side: 'L', x: 0, y: 0 });
-      setTimeout(() => window.__bus.emit({ t: 'stick', side: 'L', x: ux * fz - uz * fx, y: -(ux * fx + uz * fz) }), 30); return false; })()`) as boolean;
-    if (done) return true;
-    for (let i = 0; i < 4; i++) { await page.waitForTimeout(250); await sample(k++); }
-  }
-  await page.evaluate(() => (window as unknown as { __bus: { emit(e: unknown): void } }).__bus.emit({ t: 'stick', side: 'L', x: 0, y: 0 }));
-  return false;
+  await page.evaluate(`window.__drive({ x: ${x}, z: ${z} })`);
+  try {
+    while ((Date.now() - t0) / 1000 < maxSec) {
+      const d = await page.evaluate(`(() => { const c = window.__coast(); return Math.hypot(${x} - c.x, ${z} - c.z); })()`) as number;
+      if (d < 3) return true;
+      await page.waitForTimeout(250); await sample(k++);
+    }
+    return false;
+  } finally { await page.evaluate('window.__drive(null)'); }
 }
 
 const browser = await chromium.launch({ executablePath: chromiumExe(), args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
