@@ -246,8 +246,9 @@ for its first half, so its frame times are noisier):
   about 1 s longer than the control's in both sessions. One frame, once, in the first seconds; the rig rasterises in
   software, so the owner's phone is the judge. With `coast.townsfolk` 0 the town costs 90 draws and no hitch from bodies
   (diag1).
-- **Every-screen on `/play/coast`** (the production build, the scorer's planted-fault control passed first): **clean**, d1
-  and d2 (first content 256 / 668 ms, layout shift 0; "fast" not measured on a 3D screen, as before).
+- **Every-screen on `/play/coast`** (the production build, the scorer's planted-fault control passed first): **clean** in d1, d2
+  and d5, the last on the final code (first content 256 / 668 / 292 ms, layout shift 0; "fast" not measured on a 3D screen,
+  as before).
 - **The way back from a game, on the real page:** `/play/coast?from=coast&spot=volley.net` puts you just outside the net's
   ring facing it; one push on the move stick and the card offers the game (d2). The round trip's other half (the end screen's
   "Back to the coast" button) is covered by `end-screen.test.tsx` and `phaseD.test.ts`, not by a played match.
