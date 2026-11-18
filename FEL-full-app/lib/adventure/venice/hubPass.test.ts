@@ -224,8 +224,9 @@ describe('V2 phase 2: the shootaround', () => {
     expect(clips.slice(0, 4)).toEqual(['jumpshot', 'bball_follow_through', 'catch_pass', 'bball_dribble_idle']);
     expect(cues).toContain('bounce');
     expect(cues.some((c) => c === 'swish' || c === 'rattle' || c === 'clang')).toBe(true);
-    // a phone: one court, no rebounder, no jogger (its skinned-body budget: the player + one)
-    expect(COURT_LIFE.phone.courts.length).toBe(1);
+    // a phone: none (measured over the row's draw budget; desktop keeps the shootaround)
+    expect(COURT_LIFE.phone.courts.length).toBe(0);
+    expect(COURT_LIFE.desktop.courts.length).toBeGreaterThan(0);
     expect(COURT_LIFE.phone.rebounders).toBe(false);
     expect(COURT_LIFE.phone.joggers).toBe(0);
     const p = joggerPath();

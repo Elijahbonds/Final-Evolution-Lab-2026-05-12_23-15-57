@@ -69,6 +69,8 @@ try {
     ['life-courtoff', `spot=court.arc&${feelQ({ 'venue.veniceCourtLife': 0 })}`, false], ['life-court', 'spot=court.arc', true], ['desktop-court', 'spot=court.arc', true],
     // the cold start with everything on (the row's worst view in the pass: 45 / 58 / 73)
     ['life-gate', '', true],
+    // the gate's controls: court life off (the watchers alone), and court life and phone watchers off (the pass's gulls only)
+    ['life-gate-nocourt', feelQ({ 'venue.veniceCourtLife': 0 }), false], ['life-gate-gulls', feelQ({ 'venue.veniceCourtLife': 0, 'venue.venicePhoneWatchers': 0 }), false],
     // the same-session yardstick (1v1's load on the same rig), last in each round so a stall there cannot hold the hub's runs
     ['onevone-yardstick', 'mode=onevone', false],
     ['shared', '', true], ['control-unshared', `feel=${encodeURIComponent(JSON.stringify({ 'perf.veniceSharedCourt': 0 }))}`, false], ['walkup', 'spot=court.ones', true],

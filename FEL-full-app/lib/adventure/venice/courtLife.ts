@@ -7,9 +7,8 @@
  *                 it out; the shooter catches ('catch_pass') and moves to the next spot;
  *   a jogger      (desktop and up) runs the bike path end to end and back ('run'). No cycling or skating clip fits a figure on a
  *                 path (the board clips are the skate modes' tricks on their own deck), so the path gets a jogger, not a rider.
- * The bodies are the shipped NPC path (CharacterPipeline.spawnNpc: the body merge, the shared animator), tinted apart. A phone
- * has room in its row for ONE more skinned body (venice_hub: skinnedBodies budget 2, the player is 1): one shooter on Court 4, the
- * court nearest the gate. Every clip is one the hoops modes ship; the hub's clip scope borrows the four hoops clips by name
+ * The bodies are the shipped NPC path (CharacterPipeline.spawnNpc: the body merge, the shared animator), tinted apart. A PHONE GETS
+ * NONE: one shooter measured over the phone row's draw budget even without its ink outline and shadow (COURT_LIFE below). Every clip is one the hoops modes ship; the hub's clip scope borrows the four hoops clips by name
  * (clipScope venice_hub). The ball is one sphere with the basketball's colour. `venue.veniceCourtLife` 0 = no court life.
  *
  * The timing below is pure (CourtShootaround) so it is tested without Babylon; mountCourtLife puts it on bodies.
@@ -27,8 +26,10 @@ import { COURT_HALF } from './courtsView';
 export const VENICE_COURT_LIFE = 1;
 /** Who plays where, per tier. A phone: one shooter (its skinned-body budget); a desktop: two courts of two and a jogger. */
 export const COURT_LIFE = {
-  phone: { courts: ['court.arc'], rebounders: false, joggers: 0 },
-  desktop: { courts: ['court.arc', 'court.ones'], rebounders: true, joggers: 1 },
+  // a phone: NONE. Measured on the phone rig (3 runs a side): one full shooter took the frame from 46-51 draws to 65-73 (77 at the
+  // gate), and even drawn without ink outline or shadow 57-64 — over the row's 56 every time. Reverted for phones; desktop keeps it.
+  phone: { courts: [] as string[], rebounders: false, joggers: 0 },
+  desktop: { courts: ['court.arc', 'court.ones'] as string[], rebounders: true, joggers: 1 },
 } as const;
 
 /** The rim of a court's hoop (courtsView puts the pole 0.9 m inside the far baseline; meshyProps' rim is 0.72 m in front of it). */

@@ -1689,7 +1689,7 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
   },  {
     id: 'venue.veniceCourtLife', label: 'Venice hub: people shooting around and a jogger (1) / empty courts (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
     source: 'lib/adventure/venice/courtLife.ts VENICE_COURT_LIFE',
-    hint: 'V2: a shooter on Court 4 (a phone: its one spare skinned body), and on desktop a rebounder there, two more on Court 1 and a jogger on the bike path. Shipped hoops clips; the ball arcs to the rim. 0 = no court life.',
+    hint: 'V2, desktop and up: a shooter and a rebounder on Court 4 and on Court 1, and a jogger on the bike path. Shipped hoops clips; the ball arcs to the rim. A phone gets none (measured over its draw budget). 0 = no court life.',
   },  {
     id: 'venue.veniceCamCollide', label: 'Venice hub: the camera keeps out of poles, fences, boards and palms (1) / passes through (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
     source: 'lib/adventure/venice/courtsDressing.ts VENICE_CAM_COLLIDE',

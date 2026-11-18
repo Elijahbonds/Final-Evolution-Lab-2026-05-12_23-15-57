@@ -87,7 +87,7 @@ if (isMain) {
   console.log(`  the phone watchers add ${(now.total - noWatchers.total).toFixed(1)} MB (crowd texture + baked animation)`);
   ok(PHONE_WATCHERS.run + PHONE_WATCHERS.ones >= 4 && PHONE_WATCHERS.run + PHONE_WATCHERS.ones <= 6, 'a phone stands 4–6 real watchers (owner 2026-11-18)');
   ok(now.total - noWatchers.total < 10, `the phone watchers cost under 10 MB of textures (${(now.total - noWatchers.total).toFixed(1)} MB)`);
-  ok(COURT_LIFE.phone.courts.length <= 1 && !COURT_LIFE.phone.rebounders && COURT_LIFE.phone.joggers === 0, 'a phone gets one court-life body: with the player, the row\'s two skinned bodies');
+  ok(COURT_LIFE.phone.courts.length === 0 && !COURT_LIFE.phone.rebounders && COURT_LIFE.phone.joggers === 0, 'a phone gets no court-life bodies (one shooter measured 57-77 draws against the row\'s 56)');
   if (row) ok(1 + COURT_LIFE.phone.courts.length <= row.budget.skinnedBodies, `the player and the phone's shooter fit the row's skinned bodies (${row.budget.skinnedBodies})`);
   ok(VENICE_SHARED_COURT === 1, 'perf.veniceSharedCourt ships at 1: one court mesh for the four');
   ok(meshes === 1, `one court mesh, drawn as instances (got ${meshes})`);
