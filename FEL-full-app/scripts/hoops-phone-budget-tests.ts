@@ -181,6 +181,11 @@ interface ModeScene {
 // the mesh bases were re-derived against the merged ledger. They hold more than the venue now: the player's kit body merges less than
 // a forge rival (its tops, shorts and sock are re-indexed 32-bit by the kit's UV atlas and its skin carries the face morphs), and a
 // body that changed in the last 12 frames shows its parts until it settles — the worst frame of a run is such a frame.
+// RE-MEASURED 2026-11-18 (lane/hoops-followups: scripts/probes/hoops-followups/perf3v3.sh, the same profile, TRACE_WORST=1, every frame
+// of play counted, the first 30 too): 3v3's worst frame is 194 draws in all eight production-bundle runs — release d985a128 with the
+// merge on (3 runs), off (1; 194 draws, 109 meshes against 79) and pressing START only after the shadow cache's first bake (1), and the
+// code the earlier 209 / 215 readings were taken on (86084097 and the hoops-items tip fbee4861: 194 each). The worst frame is a settled
+// court frame 2.5 s in, not a bake: the first bake lands 57-58 frames into play at 164-169 draws (the intro camera). Inside the row (208).
 export const SCENES: Record<string, ModeScene> = {
   threevthree: { row: 'threevthree', cast: 'threevthree', heroInFrame: 1, rivalsInFrame: 5, rivalsInScene: 5, court: 'half', baseDraws: 42, baseMeshes: 54, baseTexMb: 31, copiedGroundMb: 9.3 },
   threepoint: { row: 'threepoint', cast: 'threepoint', heroInFrame: 1, rivalsInFrame: 3, rivalsInScene: 4, court: 'half', baseDraws: 127, baseMeshes: 75, baseTexMb: 35, copiedGroundMb: 9.3 },
