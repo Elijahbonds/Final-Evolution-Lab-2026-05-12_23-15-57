@@ -52,15 +52,17 @@ try {
       await page.waitForTimeout(4000);
       // walk in to the west fence (inside it), then turn and walk east, recording the camera
       await page.evaluate(([x, z]) => (window as unknown as { __VENICE__: Seam }).__VENICE__.walkToPoint(x, z), [FENCE_X + 1.6, CZ]);
-      await page.waitForFunction((fx) => (window as unknown as { __VENICE__: Seam }).__VENICE__.state().x < fx + 2.2, FENCE_X, { timeout: 30000 });
+      await page.waitForFunction((fx) => (window as unknown as { __VENICE__: Seam }).__VENICE__.state().x < fx + 2.2, FENCE_X, { timeout: 120000 });
       await page.waitForTimeout(1500);
-      const rec = await page.evaluate(async ([sec, fx, cz, hl]) => {
-        const w = window as unknown as { __VENICE__: Seam; __FEL_DEV__: { scene: { activeCamera: { position: { x: number; y: number; z: number } } } } };
+      // (a string, not a function: tsx's name helper (__name) does not exist in the page)
+      const rec = await page.evaluate(`(async () => {
+        const sec = ${TRAIL_SEC}, fx = ${FENCE_X}, cz = ${CZ}, hl = ${HALF_L};
+        const w = window;
         w.__VENICE__.walkToPoint(-40, cz);
-        const d: number[] = [];
+        const d = [];
         let through = 0, frames = 0;
         const t0 = performance.now();
-        await new Promise<void>((done) => {
+        await new Promise((done) => {
           const tick = () => {
             const c = w.__FEL_DEV__.scene.activeCamera.position, p = w.__VENICE__.state();
             frames++;
@@ -70,7 +72,6 @@ try {
           };
           requestAnimationFrame(tick);
         });
-        // reversals of the distance bigger than 0.1 m, and the biggest one-frame step
         let rev = 0, maxStep = 0, ext = d[0], dir = 0;
         for (let i = 1; i < d.length; i++) {
           maxStep = Math.max(maxStep, Math.abs(d[i] - d[i - 1]));
@@ -79,11 +80,11 @@ try {
           else if ((dir > 0 && d[i] > ext) || (dir < 0 && d[i] < ext)) ext = d[i];
         }
         return { frames, through, jitter: rev, maxStep: Math.round(maxStep * 100) / 100, minDist: Math.round(Math.min(...d) * 100) / 100, maxDist: Math.round(Math.max(...d) * 100) / 100 };
-      }, [TRAIL_SEC, FENCE_X, CZ, HALF_L] as const);
+      })()`) as Record<string, number>;
       if (rep === 1) {
         // the picture: the same walk again, shot 0.8 s after the turn (the camera at its pull-in)
         await page.evaluate(([x, z]) => (window as unknown as { __VENICE__: Seam }).__VENICE__.walkToPoint(x, z), [FENCE_X + 1.6, CZ]);
-        await page.waitForFunction((fx) => (window as unknown as { __VENICE__: Seam }).__VENICE__.state().x < fx + 2.2, FENCE_X, { timeout: 30000 });
+        await page.waitForFunction((fx) => (window as unknown as { __VENICE__: Seam }).__VENICE__.state().x < fx + 2.2, FENCE_X, { timeout: 120000 });
         await page.waitForTimeout(1500);
         await page.evaluate((cz) => (window as unknown as { __VENICE__: Seam }).__VENICE__.walkToPoint(-40, cz), CZ);
         await page.waitForTimeout(800);
