@@ -153,7 +153,7 @@ try {
         if (name.startsWith('shared') || name.startsWith('look-') || /^(life|watch)/.test(name) || desk) { await page.reload(); await page.waitForFunction(() => !!(window as unknown as { __ttfp?: number }).__ttfp, null, { timeout: 240000 }); if (/^(life|watch)/.test(name) || desk) await page.waitForFunction(() => (window as unknown as { __life?: boolean }).__life === true, null, { timeout: 150000 }).catch(() => {}); await page.waitForTimeout(4000); }
         const tag = name.startsWith('walkup') ? name0 : /^(look-|life|watch)/.test(name) || desk ? name.split('#')[0] : 'courts';
         const file = path.join(OUT, `venice-v1-${tag}${desk ? '' : '-phone'}.jpg`);
-        await page.screenshot({ path: file, type: 'jpeg', quality: 85 });
+        await page.screenshot({ path: file, type: 'jpeg', quality: 85, timeout: 180000 });
         console.log('wrote', file);
       }
     } catch (e) { clearTimeout(watchdog); result[name] = { error: String((e as Error).message ?? e).slice(0, 300) }; console.log(`run ${name} FAILED: ${(result[name] as { error: string }).error}`); }
