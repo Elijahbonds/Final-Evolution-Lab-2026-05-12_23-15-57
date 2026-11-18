@@ -379,8 +379,10 @@ The owner (2026-11-18): "make the clothes appear to be skin tight and not baggy 
 
 **Where the poof comes from** (`scripts/probes/kit-tight/gap.ts`, headless, default male kit at idle, outward cloth, median / 90th
 percentile, cm). The garment files stand 2.0–2.5 cm off the skin. The runtime then adds 1–1.8 cm: the lift
-(`GARMENT_INFLATE` 13 mm tops / 20 mm shorts) and the edge flare. The flare treats every split seam of the tank as an open edge
-and flares all 408 of its vertices.
+(`GARMENT_INFLATE` 13 mm tops / 20 mm shorts) and the edge flare near the openings. (Correction, 2026-11-18: an earlier note here
+said the flare took every seam of the tank for an opening and flared all of it. That was a fault in the probe — its file stage
+wrote the tank's 408 loaded vertices back into the live mesh. Measured correctly, the flare moves 810 of the tank's 2,160 vertices,
+the ones near its openings, and a "real openings only" flare moves 840 and changes no gap: there is no seam bug.)
 
 | Region | File | Drawn today |
 |---|---|---|

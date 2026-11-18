@@ -13,7 +13,7 @@
 // skin cannot poke through, however close the cloth comes. (The first version pulled over drawn skin too and measured worse on the
 // rig: the arm through the short sleeve, the thighs through the short — +10–35 % skin through cloth at 0.6.) The skin under a garment is hidden by the mask
 // except in a band at its open edges (TOP_EDGE_MARGIN 5 cm at a top's hem, cuffs and armholes; the shorts' leg openings), where
-// the cloth must keep standing off it, so the pull fades to 0 within FIT_EDGE_BAND of an open edge (bodyMask.edgeFlareWeights).
+// the cloth must keep standing off it, so the pull fades to 0 within FIT_EDGE_BAND of an open edge (openEdgeWeights below).
 // Kit packs (a shell with an outer and an inner wall: pulling each wall to the skin would fold one through the other) and the
 // Creator's code-built clothes (already cut from the skin) are left alone.
 import type { AbstractMesh, Mesh } from '@babylonjs/core';
