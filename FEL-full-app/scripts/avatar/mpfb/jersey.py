@@ -42,7 +42,7 @@ ITEM = f'top_{KIND}'; NAME = f'Kit_tops_{ITEM}'
 EASE = float(flag('--ease', '0.010' if KIND == 'basketball' else '0.014'))   # football: room for the pads read
 DRAPE = float(flag('--drape', '0.25'))      # of the gap beyond EASE, how much stays (0 = painted on, 1 = MPFB's own fit)
 MIN_EASE = float(flag('--min-ease', '0.005'))
-OVER_EASE = float(flag('--over-ease', '0.016'))   # over the short's waistband (its band sits 6-10 mm off the skin)
+OVER_EASE = float(flag('--over-ease', '0.020'))   # over the short's band: it sits 6-10 mm off the skin, and the game lifts a short 7 mm more than a top
 def log(*a): print('JERSEY', *a)
 
 # ── §2: MPFB's body with the kit's macros, its rig, the garment ─────────────────────────────────────────────────────

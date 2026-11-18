@@ -31,7 +31,7 @@ for SEX in "${@:-male female}"; do
       run $M/jersey.py -- --sex $S --kind $KIND --out "$WORK/$KIND-$S.blend"
       TRIS=$([ $KIND = basketball ] && echo 3000 || echo 4000)
       run $M/fit-outfit.py -- --sex $S --slot tops --item top_$KIND --mesh "$WORK/$KIND-$S.blend" --object Kit_tops_top_$KIND \
-        --no-align --tris $TRIS --out "$WORK/top_$KIND-$S.glb"
+        --no-align --tris $TRIS --ease 0.0001 --smooth 0 --out "$WORK/top_$KIND-$S.glb"
     done
     npx tsx scripts/avatar/kit-fit/graft.ts --kit $KIT --out "$OUTDIR/fel-kit-$S.jerseys.glb" \
       "$WORK/top_basketball-$S.glb=Kit_tops_top_lab=Kit_tops_top_basketball=add" \
