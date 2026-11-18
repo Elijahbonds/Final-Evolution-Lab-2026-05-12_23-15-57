@@ -37,13 +37,18 @@ import { devOrAgentHooks } from '@/lib/agentRunHooks';
 import { buildCoastWorld, COAST_DEEP_WATER_TURN_BACK, WaterEdge } from '@/lib/adventure/coast/zoneWorld';
 import { COAST_STREAM_ON, mountZoneView, type ZoneView, type ZoneViewStats } from '@/lib/adventure/coast/zoneView';
 import {
-  COAST_STREAM_FULL, COAST_STREAM_KEEP, COAST_STREAM_LOD, ISLANDS, ZoneStreamer, pieceAt, spotAtZone, zonePieces,
+  COAST_STREAM_FULL, COAST_STREAM_KEEP, COAST_STREAM_LOD, ISLANDS, ZoneStreamer, pieceAt, zonePieces,
 } from '@/lib/adventure/coast/zoneLayout';
 import { zoneUi } from '@/lib/adventure/coast/zoneUi';
 import { besidePlayer, COAST_PARTNER_CATCHUP_M, COAST_PARTNER_ON, COAST_PARTNER_STUCK_SEC, PartnerKeeper, zonePartner, type CatchupWhy } from '@/lib/adventure/coast/zonePartner';
 import { COAST_CREATURES_ON, COAST_LOG_MEET_M, COAST_LOG_SEEN_M, CreatureHerd } from '@/lib/adventure/coast/zoneCreatures';
 import { CreatureBodies, LogKeeper, mountPartnerBody, type PartnerBody } from '@/lib/adventure/coast/zoneLife';
 import { adventureSavePolicy } from '../adventure/save/policy';
+import { ALL_SPOTS, COAST_SPORTS_ON, COAST_TOWN_LOAD_AFTER_SEC, COAST_TOWN_ON, COAST_TOWNSFOLK, TOWNSFOLK, returnSpawnFor, sportSpotById, spotAtAll } from '@/lib/adventure/coast/zoneTown';
+import { mountZoneTownView, type ZoneTownView } from '@/lib/adventure/coast/zoneTownView';
+import { spotFromSearch } from '@/lib/adventure/coast/spotReturn';
+import { COAST_QUESTS_ON, questById, readQuests, withPlayed, withQuestTaken, withQuestsChecked } from '@/lib/adventure/coast/zoneQuests';
+import type { ZoneSpot } from '@/lib/adventure/coast/zoneLayout';
 import { signedOutVisitor } from '../core/visitor';   // the harness sets it from runMode's `guest` on every mount
 
 export const COAST_MODE_ID = 'coast_zone';
@@ -75,6 +80,10 @@ interface St {
   creatures: CreatureBodies | null;
   log: LogKeeper;
   creaturesShown: number;
+  /** Phase D: the town, the spots this visit offers, the quests. */
+  town: ZoneTownView | null;
+  spots: readonly ZoneSpot[];
+  questsOn: boolean;
 }
 
 const states = new WeakMap<object, St>();
@@ -116,6 +125,22 @@ export function zoneMoveOnly(inp: MoveInput): MoveInput {
 let driveTo: { x: number; z: number } | null = null;
 export function coastProbeDrive(t: { x: number; z: number } | null): void { driveTo = t && devOrAgentHooks() ? { x: t.x, z: t.z } : null; }
 
+/** The quests to the page, and the "!" over the townsfolk whose quest is on offer. */
+function publishQuests(S: St, note: { id: string; title: string; at: number } | null): void {
+  const qs = S.questsOn ? readQuests(S.log.doc) : [];
+  zoneUi.setQuests(qs, note ?? zoneUi.getSnapshot().questNote);
+  const offers = new Set<string>();
+  if (S.questsOn) for (const p of TOWNSFOLK) if (p.questId && qs.find((q) => q.id === p.questId)?.state === 0) offers.add(p.id);
+  S.town?.setOffers(offers);
+}
+
+/** A taken quest whose thing is now done becomes done (saved), with a note. */
+function checkQuests(S: St): void {
+  let finished: string[] = [];
+  S.log.update((sv) => { const r = withQuestsChecked(sv); if (!r) return null; finished = r.finished.map((q) => q.id); return r.save; });
+  if (finished.length) { const q = questById(finished[finished.length - 1])!; publishQuests(S, { id: q.id, title: q.title, at: Date.now() }); }
+}
+
 function camYawOf(ctx: ModeContext, S: St): number {
   ctx.camDirector.forwardFlatToRef(TMP_FWD);
   const yaw = Math.atan2(TMP_FWD.x, TMP_FWD.z);
@@ -135,7 +160,12 @@ export const CoastZoneMode: ModeDefinition = {
   async load(ctx: ModeContext) {
     const scene = ctx.scene;
     zoneUi.reset();
-    const world = buildCoastWorld();
+    // phase D: the town and the sports spots; a game opened from a spot comes back to it (`?spot=`, spotReturn.ts)
+    const townOn = feel('coast.townOn', COAST_TOWN_ON) >= 0.5;
+    const sportsOn = feel('coast.sportsOn', COAST_SPORTS_ON) >= 0.5;
+    const questsOn = townOn && feel('coast.questsOn', COAST_QUESTS_ON) >= 0.5;
+    const back = sportsOn && typeof window !== 'undefined' ? spotFromSearch(window.location.search) : null;
+    const world = buildCoastWorld({ town: townOn, spawn: back ? returnSpawnFor(back) : null });
     // the Adventure save (the log lives in it; the party's partner comes from it), read once; a guest's stays on the device
     const log = new LogKeeper({ now: () => Date.now(), policy: adventureSavePolicy({ signedIn: !signedOutVisitor() }) });
     // one partner (owner 2026-11-17): the save's own, or the Adventure's default creature on loan (never written back)
@@ -185,9 +215,19 @@ export const CoastZoneMode: ModeDefinition = {
       host, mapper, view, me, body, move, edge: new WaterEdge(world.spawn.pos), streamer,
       stickL: { x: 0, y: 0 }, stickR: { x: 0, y: 0 }, latchedYaw: null, preset: 'runner', rigKey: '', spotSec: SPOT_EVERY,
       partner, partnerEdge: host.partnerActor ? new WaterEdge(host.partnerActor.pos) : null, keeper: new PartnerKeeper(),
-      herd, creatures, log, creaturesShown: 0,
+      herd, creatures, log, creaturesShown: 0, town: null, spots: ALL_SPOTS, questsOn: false,
     };
     zoneUi.setLog(log.entries(), null);
+    // back from a spot's game: it counts as played there (the beach net's quest)
+    if (back) log.update((sv) => withPlayed(sv, back, (id) => !!sportSpotById(id)));
+    S.town = townOn ? mountZoneTownView(scene, { townsfolk: Math.round(feel('coast.townsfolk', COAST_TOWNSFOLK)), sports: sportsOn, heavyAfterSec: feel('coast.townLoadAfterSec', COAST_TOWN_LOAD_AFTER_SEC) }) : null;
+    S.spots = ALL_SPOTS.filter((x) => (x.kind === 'sport' ? sportsOn : x.kind === 'person' ? townOn && TOWNSFOLK.indexOf(x as (typeof TOWNSFOLK)[number]) < Math.round(feel('coast.townsfolk', COAST_TOWNSFOLK)) : true));
+    S.questsOn = questsOn;
+    if (questsOn) {
+      zoneUi.onTakeQuest((id) => { if (S.log.update((sv) => withQuestTaken(sv, id))) publishQuests(S, null); });
+      checkQuests(S);
+    }
+    publishQuests(S, null);
     host.setInputSource(host.playerId, (out) => {
       mapper.fill(out, { camYaw: camYawOf(ctx, S), state: host.player.state });
       if (driveTo) { const p = host.player.pos; out.camYaw = Math.atan2(driveTo.x - p.x, driveTo.z - p.z); out.move.x = 0; out.move.y = 1; }
@@ -196,9 +236,10 @@ export const CoastZoneMode: ModeDefinition = {
     ctx.heroRef.current = body;   // the harness frames and checks the player by it (FrameGuard assertSpawned)
     states.set(scene, S); live.add(S); probeState = S;
     placeBody(body, host.player);
-    // the camera starts behind the player on the dock, looking out at Palm Key and the bridge
-    const isl = ISLANDS[0];
-    ctx.camDirector.snapTo(new Vector3(host.player.pos.x, host.player.pos.y, host.player.pos.z), new Vector3(isl.at[0], 2, isl.at[1]));
+    // the camera starts behind the player: on the dock looking out at Palm Key and the bridge, or, back from a game, at its spot
+    const isl = ISLANDS[0], came = back ? sportSpotById(back) : undefined;
+    const look = came ? new Vector3(came.at[0], host.player.pos.y + 1, came.at[1]) : new Vector3(isl.at[0], 2, isl.at[1]);
+    ctx.camDirector.snapTo(new Vector3(host.player.pos.x, host.player.pos.y, host.player.pos.z), look);
     view.frame(ctx.camera.position.x, ctx.camera.position.z, 0);
   },
 
@@ -232,6 +273,7 @@ export const CoastZoneMode: ModeDefinition = {
       S.partner.view.sync(dt);
     }
     if (S.herd && S.creatures) { S.herd.step(dt); S.creaturesShown = S.creatures.frame(dt, S.streamer.tiers); }
+    S.town?.update(dt);
 
     // streaming: only when the player crosses into another 64 m piece does anything change
     const [pi, pj] = pieceAt(me.pos.x, me.pos.z);
@@ -251,7 +293,7 @@ export const CoastZoneMode: ModeDefinition = {
     S.spotSec += dt;
     if (S.spotSec >= SPOT_EVERY) {
       S.spotSec = 0;
-      zoneUi.setSpot(spotAtZone(me.pos.x, me.pos.z));
+      zoneUi.setSpot(spotAtAll(me.pos.x, me.pos.z, S.spots));
       // the creature log: seen within coast.logSeenM, met within coast.logMeetM (a log only moves up)
       if (S.herd) {
         const seenM = feel('coast.logSeenM', COAST_LOG_SEEN_M), meetM = feel('coast.logMeetM', COAST_LOG_MEET_M);
@@ -261,13 +303,14 @@ export const CoastZoneMode: ModeDefinition = {
           if (note) zoneUi.setLog(S.log.entries(), note);
         }
       }
+      if (S.questsOn) checkQuests(S);
     }
   },
 
   dispose() {
     // the harness disposes the scene; the per-scene state goes with its WeakMap entry. Live states are closed here.
     zoneUi.reset();
-    for (const S of live) { S.move.dispose(); S.view.dispose(); S.partner?.dispose(); S.creatures?.dispose(); }
+    for (const S of live) { S.move.dispose(); S.view.dispose(); S.partner?.dispose(); S.creatures?.dispose(); S.town?.dispose(); }
     live.clear();
     probeState = null;
     driveTo = null;

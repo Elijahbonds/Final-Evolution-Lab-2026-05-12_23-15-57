@@ -178,8 +178,9 @@ export interface ZoneSpot {
   label: string;
   at: readonly [x: number, z: number];
   radius: number;
-  /** What walking into it offers. `venice`: the boat back to Venice. Later phases add sports spots (plan, phase D). */
-  kind: 'venice';
+  /** What walking into it offers: `venice` the boat back to Venice; `sport` a game (zoneTown SPORT_SPOTS); `person` one of
+   *  the townsfolk (zoneTown TOWNSFOLK). */
+  kind: 'venice' | 'sport' | 'person';
 }
 
 const dock = DECKS[0];

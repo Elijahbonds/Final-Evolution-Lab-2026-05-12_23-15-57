@@ -104,6 +104,15 @@ export class LogKeeper {
   get doc(): AdventureSave { return this.save; }
   entries(): LogEntry[] { return readLog(this.save); }
 
+  /** Fold a change into the save and store it (the quests, the played marks): `fn` returns the new save, or null for no change. */
+  update(fn: (save: AdventureSave) => AdventureSave | null): boolean {
+    const next = fn(this.save);
+    if (!next) return false;
+    this.save = next;
+    if (this.canStore) { storeAdventureSave(next, { now: this.o.now(), policy: this.o.policy, storage: this.o.storage }); this.stores++; }
+    return true;
+  }
+
   /** Log `id` at `level`. Returns the new entry's note, or null when it was already logged that far. */
   note(id: string, level: 1 | 2): Sighting | null {
     const next = withLog(this.save, id, level);

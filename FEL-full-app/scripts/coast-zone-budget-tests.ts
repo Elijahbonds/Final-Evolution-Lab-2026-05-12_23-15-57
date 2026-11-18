@@ -31,6 +31,40 @@ import { COAST_STREAM_ON, COARSE_DIV, FINE_DIV } from '../lib/adventure/coast/zo
 import { COAST_CREATURES_ON, ZONE_CREATURES } from '../lib/adventure/coast/zoneCreatures';
 import { COAST_PARTNER_ON } from '../lib/adventure/coast/zonePartner';
 import { pieceKey } from '../lib/adventure/coast/zoneLayout';
+import { COAST_SPORTS_ON, COAST_TOWN_ON, COAST_TOWNSFOLK, MARKET_KIT_URL, SPORT_SPOTS, TOWNSFOLK } from '../lib/adventure/coast/zoneTown';
+import { COAST_QUESTS_ON } from '../lib/adventure/coast/zoneQuests';
+import { CreateBoxVertexData } from '@babylonjs/core/Meshes/Builders/boxBuilder';
+import { CreateSphereVertexData } from '@babylonjs/core/Meshes/Builders/sphereBuilder';
+import { HOUSES, RING_SEGMENTS, STREET } from '../lib/adventure/coast/zoneTown';
+
+/** Phase D: the town's draws (zoneTownView): the houses and markers (one mesh), the street, the market kit (one draw per mesh in
+ *  its GLB), the rings (one, instanced), a sign per sports spot (one shared atlas), the start line's strip, a "!" per quest giver. */
+export function townDraws(): { draws: number; kitMeshes: number } {
+  const j = readGlb(MARKET_KIT_URL).json as unknown as { meshes?: Array<{ primitives: unknown[] }> };
+  const kitMeshes = (j.meshes ?? []).reduce((n, m) => n + m.primitives.length, 0);
+  if (!COAST_TOWN_ON) return { draws: 0, kitMeshes };
+  const sports = COAST_SPORTS_ON ? 1 + SPORT_SPOTS.length + 1 : 0;
+  const bangs = COAST_QUESTS_ON ? TOWNSFOLK.slice(0, COAST_TOWNSFOLK).filter((p) => p.questId).length : 0;
+  return { draws: 1 + 1 + kitMeshes + sports + bangs, kitMeshes };
+}
+
+/** Phase D: the town's triangles, counted from the same builders zoneTownView uses: the houses (body, roof, door: three boxes
+ *  each), the markers, the street strip, the ring (instanced: drawn four times), the signs (two-sided planes), the start strip,
+ *  the "!"s, and the market kit's own triangles from its GLB. Always drawn (the town is not streamed: it is one place). */
+export function townTris(): { tris: number; kit: number } {
+  const kit = modelCost(MARKET_KIT_URL).tris;
+  if (!COAST_TOWN_ON) return { tris: 0, kit };
+  const t = (ix: ArrayLike<number> | null | undefined) => Math.floor((ix?.length ?? 0) / 3);
+  const box = t(CreateBoxVertexData({}).indices);
+  let tris = HOUSES.length * 3 * box + Math.ceil((STREET.x1 - STREET.x0) / 4) * 2 * 2;
+  if (COAST_SPORTS_ON) {
+    for (const s of SPORT_SPOTS) tris += s.marker === 'surfboard' ? t(CreateSphereVertexData({ segments: 10 }).indices)
+      : s.marker === 'net' ? 4 * box : s.marker === 'flag' ? 3 * box : 3 * box + 2;
+    tris += SPORT_SPOTS.length * RING_SEGMENTS * 2 + SPORT_SPOTS.length * 4;
+  }
+  if (COAST_QUESTS_ON) tris += TOWNSFOLK.slice(0, COAST_TOWNSFOLK).filter((p) => p.questId).length * 2;
+  return { tris: tris + kit, kit };
+}
 
 /** Phase B: a creature placeholder's draws (world/view buildCreatureBody: a body and a head, wings from stage 2; one shared
  *  colour material per element, no textures). The partner wears the same body (the default loan: stage 0). */
@@ -48,9 +82,10 @@ export const ZONE_GLBS: readonly string[] = PROP_MODELS.map((m) => (m.kit === 'm
 /** The fixed draws: the sea, the sea floor, the decks and rails, the posts, the boat, the boat spot's ring and sign. */
 export const FIXED_DRAWS = 7;
 /** Computed today (+ 5 %): the worst standable piece's place triangles, its place draws, and the place's phone texture MB. */
-export const PLACE_TRIS = 40400;
-export const PLACE_DRAWS = 66;   // coast-b: 53 → 66, the partner (2) and the four creatures (10) added (computed 63)
-export const PLACE_TEX_MB = 2.2;
+export const PLACE_TRIS = 42900;   // coast-d: 40400 → 42900, the town (2,296 triangles, the market kit's 1,044 among them) added (computed 40864)
+export const PLACE_DRAWS = 87;   // coast-b: 53 → 66, the partner (2) and the four creatures (10) added (computed 63)
+                                 // coast-d: 66 → 87, the town (20: houses 1, street 1, market kit 9, sports 6, quest marks 3) added (computed 83)
+export const PLACE_TEX_MB = 10.6; // coast-d: 2.2 → 10.6, the market kit's maps (5.32 MB at the phone cap) and four new canvases added (computed 10.16)
 
 interface Accessor { count: number }
 interface GlbJson { meshes?: Array<{ primitives: Array<{ material?: number; indices?: number; attributes?: Record<string, number> }> }>; accessors?: Accessor[] }
@@ -90,7 +125,7 @@ export function placeCost(tiers: ReadonlyMap<string, Tier>, streamOn: boolean): 
   // phase B: the partner (always beside you) and every creature whose home piece is drawn (zoneLife CreatureBodies hides the rest)
   const shownC = COAST_CREATURES_ON ? ZONE_CREATURES.filter((c) => tierOf(pieceKey(...pieceAt(c.home[0], c.home[1]))) !== 'far') : [];
   const lifeDraws = (COAST_PARTNER_ON ? PARTNER_DRAWS : 0) + shownC.reduce((n, c) => n + creatureDraws(c.stage), 0);
-  return { tris: terrainTris + propTris, draws: land.length + masters + FIXED_DRAWS + lifeDraws, terrainTris, props, fine, creatures: shownC.length, lifeDraws };
+  return { tris: terrainTris + propTris + townTris().tris, draws: land.length + masters + FIXED_DRAWS + lifeDraws + townDraws().draws, terrainTris, props, fine, creatures: shownC.length, lifeDraws };
 }
 
 /** The worst piece a player can stand in, at these rings: every standable piece, reached by a walk from its neighbour. */
@@ -117,9 +152,10 @@ export function worstPiece(rings: StreamRings, streamOn: boolean): { cost: Place
 
 /** The place's phone texture MB: the GLBs' images at the phone cap, plus the procedural textures. */
 export function placeTexMb(): { total: number; glb: number; procedural: number } {
-  const glb = ZONE_GLBS.reduce((s, u) => s + phoneTexMbOf(u, PHONE_FAR_PROP_MAX), 0);
+  const glb = ZONE_GLBS.reduce((s, u) => s + phoneTexMbOf(u, PHONE_FAR_PROP_MAX), 0) + (COAST_TOWN_ON ? phoneTexMbOf(MARKET_KIT_URL, PHONE_FAR_PROP_MAX) : 0);
   const tex = (w: number, h: number) => (w * h * 4 * 1.33) / MB;
-  const procedural = tex(512, 512) + tex(256, 256) + tex(128, 128) + tex(512, 128);
+  // phase A's sand, waves, planks, boat sign; phase D's street tile, sports-sign atlas, checker, "!"
+  const procedural = tex(512, 512) + tex(256, 256) + tex(128, 128) + tex(512, 128) + (COAST_TOWN_ON ? tex(512, 512) + tex(512, 512) + tex(128, 128) + tex(64, 64) : 0);
   return { total: glb + procedural, glb, procedural };
 }
 
@@ -142,12 +178,16 @@ if (isMain) {
   ok(PLACE_DRAWS <= Math.ceil(now.worstDraws * 1.05) + 1, `PLACE_DRAWS ${PLACE_DRAWS} is the measurement + 5 %, not a raise (computed ${now.worstDraws})`);
   ok(now.maxCreatures <= MAX_CREATURES_SHOWN, `at most ${MAX_CREATURES_SHOWN} creatures are drawn at once (got ${now.maxCreatures})`);
   ok(COAST_PARTNER_ON === 1 && COAST_CREATURES_ON === 1, 'phase B ships on: the partner and the creatures');
+  const td = townDraws();
+  ok(COAST_TOWN_ON === 1 && COAST_SPORTS_ON === 1 && COAST_QUESTS_ON === 1, 'phase D ships on: the town, the sports spots, the quests');
+  ok(td.kitMeshes === 9, `the market is the boardwalk kit as shipped: nine primitives, one draw each (got ${td.kitMeshes})`);
+  ok(COAST_TOWNSFOLK <= 4, `at most four townsfolk (each a skinned body with its own maps; got ${COAST_TOWNSFOLK})`);
+  if (row) ok(row.measured.skinnedBodies <= 1 + COAST_TOWNSFOLK, `skinned bodies: the player and the townsfolk at most (${row.measured.skinnedBodies})`);
   ok(control.cost.tris > PLACE_TRIS, `CONTROL: streaming off (${control.cost.tris} triangles) is over PLACE_TRIS — the guard sees the regression it guards`);
   ok(tex.total <= PLACE_TEX_MB, `the place's phone texture memory ${tex.total.toFixed(2)} MB is within PLACE_TEX_MB ${PLACE_TEX_MB}`);
   ok(ZONE_GLBS.length === 7 && ZONE_GLBS.every((u) => u.startsWith('/models/props/nature/')), 'the zone loads seven models, all from the Kenney nature kit (the Meshy surfboard waits for the surf spot)');
   ok(!!row, 'the zone has a row in lib/babylon/config/mobileBudget.json (coast_zone)');
   if (row) {
-    ok(row.measured.skinnedBodies <= 1, `one body in the zone so far (the player; got ${row.measured.skinnedBodies})`);
     ok(tex.total <= row.budget.textureMb, `the place's textures fit inside the zone's whole-scene texture budget (${row.budget.textureMb} MB)`);
     ok(now.worstDraws <= row.budget.drawCalls, `the place's draws (${now.worstDraws}, unculled) fit inside the row's draw budget (${row.budget.drawCalls})`);
   }
