@@ -50,6 +50,37 @@ const venueOfMode = (key: string, src: string): { venue: string | null; map: str
 };
 
 const CORES = ['CourtMovement', 'BoardMovement', 'CombatMovement', 'FieldRun', 'CarrierControl', 'GroundRide', 'AirControl', 'RallyCore', 'TennisCore', 'GolfCore', 'DanceCore', 'DunkApproach', 'OnslaughtCore', 'KeeperCore', 'Batting', 'Pitching'];
+const ident = '[A-Za-z_$][A-Za-z0-9_$]*';
+const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const importNames = (spec: string): string[] => {
+  const names: string[] = [];
+  const namespace = spec.match(new RegExp(`\\*\\s+as\\s+(${ident})`));
+  if (namespace) names.push(namespace[1]);
+  const named = spec.match(/\{([\s\S]*?)\}/);
+  if (named) {
+    for (const raw of named[1].split(',')) {
+      const part = raw.trim().replace(/^type\s+/, '');
+      if (!part) continue;
+      const alias = part.match(new RegExp(`\\bas\\s+(${ident})$`));
+      const direct = part.match(new RegExp(`^(${ident})`));
+      if (alias) names.push(alias[1]);
+      else if (direct) names.push(direct[1]);
+    }
+  }
+  const withoutNamed = spec.replace(/\{[\s\S]*?\}/g, '').replace(new RegExp(`\\*\\s+as\\s+${ident}`), '');
+  const defaultName = withoutNamed.split(',').map((p) => p.trim()).find((p) => new RegExp(`^${ident}$`).test(p));
+  if (defaultName) names.push(defaultName);
+  return [...new Set(names)];
+};
+const usesName = (src: string, name: string): boolean => new RegExp(`\\b${esc(name)}\\b`).test(src);
+function usesImportedCore(whole: string, src: string, core: string): boolean {
+  const corePath = esc(core);
+  const re = new RegExp(`import\\s+(?:type\\s+)?([\\s\\S]*?)\\s+from\\s+['"](?:\\.\\.\\/core\\/${corePath}|\\.\\/${corePath}|@\\/lib\\/babylon\\/core\\/${corePath})['"]`, 'g');
+  for (const m of whole.matchAll(re)) {
+    if (importNames(m[1]).some((name) => usesName(src, name))) return true;
+  }
+  return false;
+}
 // Camera column = a MEASURED gameplay framing exists for the mode (lib/babylon/config/cameraFraming.json,
 // scripts/probes/_cam-frame.mts). cameraPresets.json describes the retired venue cameras (pre-M104).
 const camFraming = JSON.parse(read('lib/babylon/config/cameraFraming.json'));
@@ -117,12 +148,12 @@ const rows: Row[] = modeEntries.map(({ key, cls }) => {
   const src = file ? implementationSlice(whole, cls) : '';
   const route = `/play/${routeMap[key] ?? key}`;
   const { venue, map, kit } = venueOfMode(key, src);
-  const cores = CORES.filter((c) => new RegExp(`from '\\.\\./core/${c}'|from '\\./${c}'|\\b${c}\\b`).test(src) && src.includes(`${c}`));
+  const cores = CORES.filter((c) => usesImportedCore(whole, src, c));
   return {
     key, enabled: enabled.has(key), file, route,
     menu: gameData.includes(`href: '${route}'`),
     venue, map, kit, baked: !!map && bakedKeys.has(map),
-    cores: cores.filter((c) => src.includes(`/${c}'`)),
+    cores,
     camera: camKeys.has(key),   // cameraFraming.json is keyed by registry key
     navFirst: /\.constrain\(/.test(src),
     clamps: (src.match(/Math\.max\(-?[A-Z_0-9.]+, *Math\.min\(/g) ?? []).length + (src.match(/^const (COURT|FIELD|ARENA|BOUNDS|HALF)[A-Z_]* *=/gm) ?? []).length,

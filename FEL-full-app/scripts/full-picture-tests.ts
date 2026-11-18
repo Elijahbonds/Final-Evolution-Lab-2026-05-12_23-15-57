@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { MODE_CONTROLLERS } from '../lib/controller-link/schemas/registry';
 
@@ -164,5 +166,21 @@ assert.ok(hasButton('threevthree', 'A', 'PASS') && hasButton('threevthree', 'Y',
   'threevthree phone PASS/BLOCK must match the local 2K face-button map');
 assert.ok(!hasButton('threevthree', 'charge'),
   'threevthree phone SHOOT must not use charge/RT, which basketball reads as turbo');
+
+const matrixOut = execFileSync(process.execPath, [
+  join(ROOT, 'node_modules/tsx/dist/cli.mjs'),
+  join(ROOT, 'scripts/full-picture.mts'),
+  '--md',
+  join(tmpdir(), `fel-full-picture-${process.pid}.md`),
+], { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+const matrixRow = (mode: string): string => matrixOut.split('\n').find((line) => line.startsWith(`| ${mode} |`)) ?? '';
+assert.match(matrixRow('snowboard_slalom'), /BoardMovement/,
+  'full-picture must keep core imports above a sliced mode implementation visible');
+assert.match(matrixRow('tennis'), /RallyCore/,
+  'full-picture must detect shared cores used through a sliced config/factory mode');
+assert.doesNotMatch(matrixOut, /snowboard_slalom: no shared movement core/,
+  'full-picture must not report false shared-core gaps for sliced implementations');
+assert.doesNotMatch(matrixOut, /tennis: no shared movement core/,
+  'full-picture must not report false shared-core gaps for config/factory modes');
 
 console.log(`full-picture-tests: ${enabledModes.length} enabled mode routes, menus, phone schemas, and gauntlets resolve`);
