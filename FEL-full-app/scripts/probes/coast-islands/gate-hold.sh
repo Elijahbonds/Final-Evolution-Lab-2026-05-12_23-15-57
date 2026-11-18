@@ -15,13 +15,13 @@ OUT=${1:?out dir}
 cd "$(dirname "$0")/../../.."
 mkdir -p "$OUT"
 # BUILD_FIRST=1: make the production build INSIDE this hold (coordinator 2026-11-18: no build on disk while waiting in the
-# queue), only if the build rules hold right now (>= 12.5 GB memory available, >= 6 GB disk, no other next build running)
+# queue), only if the build rules hold right now (>= 12 GB memory available (coordinator 2026-11-18, was 12.5), >= 6 GB disk, no other next build running)
 if [ "${BUILD_FIRST:-0}" = 1 ] && [ ! -f .next-coast/BUILD_ID ]; then
   a=$(free -m | awk '/Mem:/{print $7}'); d=$(df -BG --output=avail / | tail -1 | tr -dc 0-9)
   # another lane's build: a NODE process running `next build` (a plain `pgrep -f "next build"` also matches any shell
   # whose command line merely mentions it, e.g. another lane's wait loop, and would never let this hold build)
   other=$(ps -eo comm=,args= | awk '$1=="node" && /next build/' | head -1)
-  if [ "$a" -ge 12500 ] && [ "$d" -ge 6 ] && [ -z "$other" ]; then
+  if [ "$a" -ge 12288 ] && [ "$d" -ge 6 ] && [ -z "$other" ]; then
     echo "build start $(date) mem=$a disk=${d}G"
     NODE_OPTIONS=--max-old-space-size=4096 ES_DIST=.next-coast ES_PORT=3811 ES_PG_PORT=55491 ES_PG_DIR=/var/lib/postgresql/coast-islands-pg ES_OUT="$OUT/es" \
       /home/user/wt/cpu-run.sh npx tsx scripts/every-screen/rig.mts build > "$OUT/build.log" 2>&1
