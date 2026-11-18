@@ -91,7 +91,7 @@ export function CoastStage({ signedIn, back }: { signedIn: boolean; back: string
     <div className="relative h-[100dvh] w-full overflow-hidden bg-black text-white">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none outline-none" aria-label="The Coast: walk the beach and the islands" tabIndex={0} />
       {/* the way back to Venice is the loader's (loader.tsx): on screen before this stage has loaded */}
-      {err && <p role="alert" className="absolute inset-x-4 top-[4.25rem] rounded-lg bg-black/80 p-3 text-base">The coast did not load. {err}</p>}
+      {err && <p role="alert" className="absolute inset-x-4 top-[7.25rem] rounded-lg bg-black/80 p-3 text-base">The coast did not load. {err}</p>}
       {phase === 'loading' && !err && <p className="absolute inset-x-0 top-1/2 text-center text-base text-white/80">Sailing to the coast…</p>}
       {phase === 'playing' && ui.log.length > 0 && (
         <button type="button" data-testid="coast-log-open" onClick={() => { setQuestsOpen(false); setLogOpen(true); }} aria-label={`Creature log, ${count.seen} of ${count.total} found`}
@@ -106,7 +106,7 @@ export function CoastStage({ signedIn, back }: { signedIn: boolean; back: string
         </button>
       )}
       {questNote && !spot && !panelOpen && phase === 'playing' && (
-        <p role="status" data-testid="coast-quest-note" className="absolute inset-x-4 top-[8rem] mx-auto max-w-sm rounded-2xl bg-black/75 p-3 text-center text-base text-white">
+        <p role="status" data-testid="coast-quest-note" className="absolute inset-x-4 top-[17rem] mx-auto max-w-sm rounded-2xl bg-black/75 p-3 text-center text-base text-white">
           Quest done: <b>{questNote.title.replace('[PLACEHOLDER] ', '')}</b>
         </p>
       )}
@@ -135,7 +135,7 @@ export function CoastStage({ signedIn, back }: { signedIn: boolean; back: string
         </section>
       )}
       {note && !spot && !panelOpen && phase === 'playing' && (
-        <p role="status" data-testid="coast-log-note" className="absolute inset-x-4 top-[4.25rem] mx-auto max-w-sm rounded-2xl bg-black/75 p-3 text-center text-base text-white">
+        <p role="status" data-testid="coast-log-note" className="absolute inset-x-4 top-[7.25rem] mx-auto max-w-sm rounded-2xl bg-black/75 p-3 text-center text-base text-white">
           {note.level === 2 ? 'You met' : 'New in your log:'} <b>{note.name.replace('[PLACEHOLDER] ', '')}</b>
         </p>
       )}
@@ -164,7 +164,7 @@ export function CoastStage({ signedIn, back }: { signedIn: boolean; back: string
         </section>
       )}
       {sport && phase === 'playing' && !panelOpen && (
-        <div data-testid="coast-sport" className="absolute inset-x-4 top-[4.25rem] mx-auto max-w-sm rounded-2xl border border-white/15 bg-black/75 p-3 backdrop-blur">
+        <div data-testid="coast-sport" className="absolute inset-x-4 top-[7.25rem] mx-auto max-w-sm rounded-2xl border border-white/15 bg-black/75 p-3 backdrop-blur">
           <p className="text-base font-bold">{sport.label.replace('[PLACEHOLDER] ', '')}</p>
           <button type="button" data-testid="coast-play" onClick={playSport}
             className="mt-2 inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-[#facc15] px-4 text-base font-bold text-black">
@@ -173,7 +173,7 @@ export function CoastStage({ signedIn, back }: { signedIn: boolean; back: string
         </div>
       )}
       {person && phase === 'playing' && !panelOpen && (
-        <div data-testid="coast-person" className="absolute inset-x-4 top-[4.25rem] mx-auto max-w-sm rounded-2xl border border-white/15 bg-black/75 p-3 backdrop-blur">
+        <div data-testid="coast-person" className="absolute inset-x-4 top-[7.25rem] mx-auto max-w-sm rounded-2xl border border-white/15 bg-black/75 p-3 backdrop-blur">
           <p className="text-base font-bold">{person.name.replace('[PLACEHOLDER] ', '')}</p>
           <p className="mt-1 text-base text-white/85">{personQuest?.state === 2 ? questById(personQuest.id)?.thanks : personQuest?.state === 1 ? personQuest.ask : person.hello}</p>
           {personQuest && personQuest.state === 0 && (
@@ -185,7 +185,7 @@ export function CoastStage({ signedIn, back }: { signedIn: boolean; back: string
         </div>
       )}
       {spot?.kind === 'venice' && phase === 'playing' && !panelOpen && (
-        <div data-testid="coast-boat" className="absolute inset-x-4 top-[4.25rem] mx-auto max-w-sm rounded-2xl border border-white/15 bg-black/75 p-3 backdrop-blur">
+        <div data-testid="coast-boat" className="absolute inset-x-4 top-[7.25rem] mx-auto max-w-sm rounded-2xl border border-white/15 bg-black/75 p-3 backdrop-blur">
           <p className="text-base font-bold">{spot.label.replace('[PLACEHOLDER] ', '')}</p>
           <button type="button" data-testid="coast-to-venice" onClick={() => router.push(back)}
             className="mt-2 inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-[#facc15] px-4 text-base font-bold text-black">

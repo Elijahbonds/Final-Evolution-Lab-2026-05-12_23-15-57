@@ -93,6 +93,9 @@ try {
     const missing = new Set<string>();
     page.on('response', (r) => { if (r.status() === 404) missing.add(new URL(r.url()).pathname); });
     page.on('console', (m) => { if (logs.length < 400) logs.push(`${m.type()}: ${m.text().slice(0, 200)}`); });
+    // a navigation after load is a finding (coast-d d2: the page navigated in the first zone run): note when and why
+    page.on('framenavigated', (f) => { if (f === page.mainFrame()) logs.push(`NAV ${f.url()} at ${new Date().toISOString()}`); });
+    page.on('crash', () => logs.push('PAGE CRASH'));
     const cdp = await ctx.newCDPSession(page);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: Number(process.env.THROTTLE ?? 4) });
     await page.goto(`${base}${query ? `?${query}` : ''}`);
@@ -105,6 +108,7 @@ try {
       await ctx.close();
       continue;
     }
+    try {
     const t = await page.evaluate(() => { const w = window as unknown as { __ttfp?: number; __readyAt?: number; __err?: string }; return { moveSec: (w.__ttfp ?? 0) / 1000, readySec: (w.__readyAt ?? 0) / 1000, err: w.__err ?? null }; });
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
     await page.evaluate('window.__SI = window.__SI || window.__FEL_DEV__.instrument()');
@@ -174,6 +178,10 @@ try {
     const spotsSeen = await page.evaluate('window.__spotsSeen ?? null');
     result[name] = { ...t, worst, frameMs, legs, pieces, streamMax, partnerGap, log, spotsSeen, end, errors: errors.slice(0, 5), missing: [...missing] };
     console.log(name, JSON.stringify(result[name]));
+    } catch (e) {
+      console.log('RUN FAILED', name, String(e).slice(0, 300), '\n', errors.join('\n'), '\n', logs.filter((l) => !/^debug/.test(l)).slice(-80).join('\n'));
+      result[name] = { failed: String(e).slice(0, 300) };
+    }
     await ctx.close();
   }
 } finally {
