@@ -37,7 +37,7 @@ import { devOrAgentHooks } from '@/lib/agentRunHooks';
 import { buildCoastWorld, COAST_DEEP_WATER_TURN_BACK, WaterEdge } from '@/lib/adventure/coast/zoneWorld';
 import { COAST_STREAM_ON, COAST_STREAM_SLICED, mountZoneView, type ZoneView, type ZoneViewStats } from '@/lib/adventure/coast/zoneView';
 import {
-  COAST_STREAM_FULL, COAST_STREAM_KEEP, COAST_STREAM_LOD, ISLANDS, ZoneStreamer, pieceAt, zonePieces,
+  COAST_STREAM_FULL, COAST_STREAM_KEEP, COAST_STREAM_LOD, COAST_ZONE_GROW, ISLANDS, ZoneStreamer, pieceAt, setZoneGrow, zonePieces,
 } from '@/lib/adventure/coast/zoneLayout';
 import { zoneUi } from '@/lib/adventure/coast/zoneUi';
 import { besidePlayer, COAST_PARTNER_CATCHUP_M, COAST_PARTNER_ON, COAST_PARTNER_STUCK_SEC, PartnerKeeper, zonePartner, type CatchupWhy } from '@/lib/adventure/coast/zonePartner';
@@ -182,6 +182,8 @@ export const CoastZoneMode: ModeDefinition = {
     const townOn = feel('coast.townOn', COAST_TOWN_ON) >= 0.5;
     const sportsOn = feel('coast.sportsOn', COAST_SPORTS_ON) >= 0.5;
     const questsOn = townOn && feel('coast.questsOn', COAST_QUESTS_ON) >= 0.5;
+    // phase F-lite: the four pieces past Reef Rock (open sea, the sandbank, Gull Key), before anything reads the layout
+    setZoneGrow(feel('coast.zoneGrow', COAST_ZONE_GROW) >= 0.5);
     const back = sportsOn && typeof window !== 'undefined' ? spotFromSearch(window.location.search) : null;
     const world = buildCoastWorld({ town: townOn, spawn: back ? returnSpawnFor(back) : null });
     // the Adventure save (the log lives in it; the party's partner comes from it), read once; a guest's stays on the device

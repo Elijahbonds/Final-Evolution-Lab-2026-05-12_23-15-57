@@ -23,12 +23,36 @@
  */
 
 export const PIECE_M = 64;
-export const ZONE_COLS = 6;
+/** Phase F-lite (lane/coast-f): the grid grew two columns west (x −320 … −192), of which only the north-west 2 × 2 block past
+ *  Reef Rock is zone (open sea, the sandbank and Gull Key): the zone is phase A's 6 × 6 plus those four pieces. The old
+ *  pieces keep their places (their column index moved up by two). */
+export const ZONE_COLS = 8;
 export const ZONE_ROWS = 6;
-export const ZONE_MIN_X = -(ZONE_COLS * PIECE_M) / 2;
+export const ZONE_MIN_X = -192 - 2 * PIECE_M;
 export const ZONE_MIN_Z = -(ZONE_ROWS * PIECE_M) / 2;
-export const ZONE_MAX_X = -ZONE_MIN_X;
+export const ZONE_MAX_X = 192;
 export const ZONE_MAX_Z = -ZONE_MIN_Z;
+/** The grown block: columns below GROW.cols are zone only from row GROW.fromRow (the north-west 2 × 2). */
+export const GROW = { cols: 2, fromRow: 4 } as const;
+
+let grown = true;
+/** coast.zoneGrow: 1 = the four pieces past Reef Rock are zone (new); 0 = phase A's 6 × 6 (set once, by the mode, at load). */
+export const COAST_ZONE_GROW = 1;
+export function setZoneGrow(on: boolean): void {
+  if (on === grown) return;
+  grown = on; piecesCache = null; propsCache = null;
+}
+export const zoneGrown = (): boolean => grown;
+/** Is piece (i, j) part of the zone? */
+export function inZonePiece(i: number, j: number): boolean {
+  if (i < 0 || j < 0 || i >= ZONE_COLS || j >= ZONE_ROWS) return false;
+  return i >= GROW.cols || (grown && j >= GROW.fromRow);
+}
+/** Is (x, z) inside the zone's footprint? */
+export function inZoneAt(x: number, z: number): boolean {
+  if (x < ZONE_MIN_X || x > ZONE_MAX_X || z < ZONE_MIN_Z || z > ZONE_MAX_Z) return false;
+  return inZonePiece(Math.min(ZONE_COLS - 1, Math.floor((x - ZONE_MIN_X) / PIECE_M)), Math.min(ZONE_ROWS - 1, Math.floor((z - ZONE_MIN_Z) / PIECE_M)));
+}
 
 /** The sea's surface (m). */
 export const SEA_Y = 0;
@@ -84,6 +108,10 @@ export const ISLANDS: readonly Island[] = [
   { id: 'palmkey', name: '[PLACEHOLDER] Palm Key', at: [-40, -40], radius: 34, wobble: 4, beach: 1.6, hill: 3.5, look: 'palms' },
   { id: 'reefrock', name: '[PLACEHOLDER] Reef Rock', at: [-122, 72], radius: 24, wobble: 3, beach: 1.2, hill: 6, look: 'rocks' },
 ];
+/** Phase F-lite: the islet past Reef Rock, in the grown block (coast.zoneGrow), reached by wading the sandbank. [TUNE] */
+export const GULL_KEY: Island = { id: 'gullkey', name: '[PLACEHOLDER] Gull Key', at: [-262, 148], radius: 15, wobble: 2.5, beach: 1.2, hill: 2.5, look: 'palms' };
+/** Every island the zone has now: Palm Key, Reef Rock, and Gull Key while the zone is grown. */
+export const zoneIslands = (): readonly Island[] => (grown ? [...ISLANDS, GULL_KEY] : ISLANDS);
 
 /** The island's waterline radius in the direction of (dx, dz). */
 export function islandShoreR(isl: Island, dx: number, dz: number): number {
@@ -103,7 +131,15 @@ function islandY(isl: Island, x: number, z: number): number {
 /** The sandbar: a shallow ridge from Palm Key's shore to Reef Rock's that you can wade at this zone's low water. */
 export const SANDBAR = { from: [-52, -12] as const, to: [-114, 60] as const, crestY: -0.45, halfFlat: 5, fall: 0.25 };
 
+/** Phase F-lite: the sandbank from Reef Rock's west shore out to Gull Key, a little deeper than the sandbar (still wadeable). */
+export const SANDBANK = { from: [-144, 80] as const, to: [-249, 141] as const, crestY: -0.55, halfFlat: 4, fall: 0.25 };
+
 function sandbarY(x: number, z: number): number {
+  const y = ridgeY(SANDBAR, x, z);
+  return grown ? Math.max(y, ridgeY(SANDBANK, x, z)) : y;
+}
+function ridgeY(r: { from: readonly [number, number]; to: readonly [number, number]; crestY: number; halfFlat: number; fall: number }, x: number, z: number): number {
+  const SANDBAR = r;
   const [ax, az] = SANDBAR.from, [bx, bz] = SANDBAR.to;
   const vx = bx - ax, vz = bz - az;
   const t = Math.min(1, Math.max(0, ((x - ax) * vx + (z - az) * vz) / (vx * vx + vz * vz)));
@@ -118,6 +154,7 @@ function sandbarY(x: number, z: number): number {
 export function terrainY(x: number, z: number): number {
   let y = Math.max(SEABED_Y, beachProfile(x - mainlandShoreX(z)), sandbarY(x, z));
   for (const isl of ISLANDS) { const h = islandY(isl, x, z); if (h > y) y = h; }
+  if (grown) { const h = islandY(GULL_KEY, x, z); if (h > y) y = h; }
   return y;
 }
 
@@ -167,7 +204,7 @@ export function surfaceY(x: number, z: number): number {
 
 /** May a person stand here: dry land, a deck, or water no deeper than WADE_DEPTH, inside the zone? */
 export function walkable(x: number, z: number): boolean {
-  if (x < ZONE_MIN_X || x > ZONE_MAX_X || z < ZONE_MIN_Z || z > ZONE_MAX_Z) return false;
+  if (!inZoneAt(x, z)) return false;
   return surfaceY(x, z) >= SEA_Y - WADE_DEPTH;
 }
 
@@ -231,6 +268,7 @@ export function zonePieces(): Piece[] {
   if (piecesCache) return piecesCache;
   const out: Piece[] = [];
   for (let j = 0; j < ZONE_ROWS; j++) for (let i = 0; i < ZONE_COLS; i++) {
+    if (!inZonePiece(i, j)) continue;
     const rect = pieceRect(i, j);
     let lo = Infinity, hi = -Infinity;
     for (let z = rect.minZ; z <= rect.maxZ; z += 4) for (let x = rect.minX; x <= rect.maxX; x += 4) {
@@ -349,7 +387,7 @@ export function zoneProps(): PropPlace[] {
   //  against under 200 triangles and no textures for every Kenney model here — scripts/coast-zone-budget-tests.ts)
 
   // the islands
-  ISLANDS.forEach((isl, n) => {
+  zoneIslands().forEach((isl, n) => {
     const ring = (r0: number, r1: number, count: number, pick: (k: number) => string, scale: (k: number) => number) => {
       for (let k = 0; k < count; k++) {
         const a = (k / count) * Math.PI * 2 + hash01(n, k, 1) * 0.4;
