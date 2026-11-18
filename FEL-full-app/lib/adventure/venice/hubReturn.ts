@@ -57,6 +57,12 @@ export function writeReturn(s: Pick<Spot, 'id' | 'route'>, now: number, store: S
   try { store?.setItem(RETURN_KEY, JSON.stringify({ spot: s.id, route: s.route, at: now } satisfies ReturnMark)); } catch { /* convenience only */ }
 }
 
+/** Same return mark, but for a specific launch href from a multi-mode court. */
+export function writeReturnForHref(s: Pick<Spot, 'id' | 'route'>, href: string, now: number, store: StoreLike | null = session()): void {
+  const route = href.split('?')[0] || s.route;
+  try { store?.setItem(RETURN_KEY, JSON.stringify({ spot: s.id, route, at: now } satisfies ReturnMark)); } catch { /* convenience only */ }
+}
+
 export function readReturn(now: number, store: StoreLike | null = session()): ReturnMark | null {
   try {
     const raw = store?.getItem(RETURN_KEY);

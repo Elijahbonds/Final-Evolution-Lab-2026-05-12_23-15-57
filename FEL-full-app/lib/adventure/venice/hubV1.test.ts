@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { buildHubWorld, courtsRect, returnSpawnFor, v1Area, v1Spots, V1_RIM_H } from './hubWorld';
 import {
   clearReturn, FROM_VENICE, hubHrefFor, launchChoices, launchHref, PARTY_MODE_FOR_SPOT, readReturn, RETURN_KEY, RETURN_TTL_MS, spotFromSearch,
-  veniceReturnHref, writeReturn, type StoreLike,
+  veniceReturnHref, writeReturn, writeReturnForHref, type StoreLike,
 } from './hubReturn';
 import { veniceDoorOn, VENICE_DOOR_HREF } from './door';
 import { districtAt } from './layout';
@@ -88,6 +88,22 @@ describe('walking up and coming back', () => {
     expect(veniceReturnHref('/play/threevthree', '', 1000 + RETURN_TTL_MS + 1, st)).toBeNull();   // stale
     clearReturn(st);
     expect(st.m.has(RETURN_KEY)).toBe(false);
+  });
+  it('stores the actual launched route for alternate games on a multi-mode court', () => {
+    const st = mem();
+    const [, , flight, arc] = v1Spots();
+    const duel = launchChoices(flight, MODE_INFO).find((c) => c.mode === 'dunkduel')!;
+    const carnival = launchChoices(arc, MODE_INFO).find((c) => c.mode === 'carnival')!;
+
+    writeReturnForHref(flight, duel.href, 1000, st);
+    expect(readReturn(1001, st)).toMatchObject({ spot: 'court.flight', route: '/play/dunkduel' });
+    expect(veniceReturnHref('/play/dunkduel', '', 1001, st)).toBe(hubHrefFor('court.flight'));
+    expect(veniceReturnHref('/play/dunk', '', 1001, st)).toBeNull();
+
+    writeReturnForHref(arc, carnival.href, 2000, st);
+    expect(readReturn(2001, st)).toMatchObject({ spot: 'court.arc', route: '/play/carnival' });
+    expect(veniceReturnHref('/play/carnival', '', 2001, st)).toBe(hubHrefFor('court.arc'));
+    expect(veniceReturnHref('/play/threepoint', '', 2001, st)).toBeNull();
   });
   it('refuses junk: a made-up spot, broken storage, a mark from the future', () => {
     const st = mem();

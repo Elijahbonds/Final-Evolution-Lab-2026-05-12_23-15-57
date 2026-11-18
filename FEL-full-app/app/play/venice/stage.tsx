@@ -13,7 +13,7 @@ import { runMode, InputBus, type ModePhase } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hubUi } from '@/lib/adventure/venice/hubUi';
-import { launchChoices, PARTY_MODE_FOR_SPOT, writeReturn } from '@/lib/adventure/venice/hubReturn';
+import { launchChoices, PARTY_MODE_FOR_SPOT, writeReturn, writeReturnForHref } from '@/lib/adventure/venice/hubReturn';
 import { MODE_INFO } from '@/lib/game-data';
 import { partyClient } from '@/lib/party/social/client';
 import { isHost } from '@/lib/party/social/state';
@@ -67,7 +67,7 @@ export function VeniceStage({ signedIn }: { signedIn: boolean }) {
 
   const play = (href: string) => {
     if (!spot) return;
-    writeReturn(spot, Date.now());
+    writeReturnForHref(spot, href, Date.now());
     router.push(href);
   };
   const playParty = () => {
