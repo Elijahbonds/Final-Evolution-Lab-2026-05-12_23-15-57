@@ -224,15 +224,17 @@ export const CREDITS: Credit[] = [
     section: 'models',
     title: 'MakeHuman community assets (MPFB2)',
     by: 'MakeHuman Community',
-    used: 'The kit bodies the hero is built from, and the rival and NPC bodies, with their skins, hair and clothes.',
+    used: 'The kit bodies the hero is built from, and the rival and NPC bodies, with their skins, hair and clothes; the basketball and football jerseys (cut from the asset pack shirts01 tees: Elvaerwyn\u2019s crude t-shirt, Toigo\u2019s basic tucked t-shirt, namuhekam\u2019s polo shirt) and the one-piece court short.',
     licence: 'CC0',
     licenceUrl: OPEN_LICENCES.CC0,
     status: 'open',
     link: 'https://github.com/makehumancommunity/mpfb2',
     recordedIn: ['public/models/skins/manifest.json', 'scripts/avatar/skins/export-skins.mts', 'scripts/avatar/mpfb/dress-kit.py', 'docs/history/HUMAN-MODEL-RESEARCH.md',
-      'scripts/avatar/rivals.mts', 'scripts/avatar/mpfb/rival.py', 'public/models/rivals/*.json'],
+      'scripts/avatar/rivals.mts', 'scripts/avatar/mpfb/rival.py', 'public/models/rivals/*.json',
+      // lane/kit-mac-jobs (2026-11-18): the garment sets, built from the CC0 asset packs shirts01 / pants01 (static.makehumancommunity.org)
+      'scripts/avatar/mpfb/jersey.py', 'scripts/avatar/mpfb/onepiece-shorts.py', 'scripts/avatar/kit-fit/build-sets.sh'],
     // HOTFIX (2026-09-24): models/_forge/ left this entry for 'fel': it holds the code-built FORGE hero, not a kit body.
-    covers: ['models/skins/', 'models/fel-hero.glb', 'models/fel-hero.json', 'models/fel-hero.mobile.glb', 'models/candidates/', 'models/rivals/'],
+    covers: ['models/skins/', 'models/fel-hero.glb', 'models/fel-hero.json', 'models/fel-hero.mobile.glb', 'models/candidates/', 'models/rivals/', 'models/kits/sets/'],
     manifestLicences: ['CC0 (MakeHuman community assets)'],
   },
   // DEMO-MODELS-1 (2026-11-09; owner "Yes full swap"): the coach body that replaces the Meshy scan behind DEMO_COACH_BODY_ENABLED
