@@ -51,7 +51,7 @@ import { Confetti } from './confetti';
 import { claimLines } from './claim';
 import { ClaimBar } from './claim-bar';
 import { isFreeDanceResult } from '@/lib/babylon/dance/freeDance';   // lane/dance-extras-2
-import { veniceReturnHref } from '@/lib/adventure/venice/hubReturn';   // venice-v1: back to the court a game was opened from
+import { clearReturn, peekVeniceReturnHref } from '@/lib/adventure/venice/hubReturn';   // venice-v1: back to the court a game was opened from
 
 const fmt = (v: number) => Math.round(v).toLocaleString('en-US');
 
@@ -268,9 +268,13 @@ export function EndScreen(props: EndScreenProps) {
   const stepsLen = useRef(steps.length); stepsLen.current = steps.length;
   // venice-v1: read once on the client (the query, or the hub's return mark for this page); null on every other run
   const [venice, setVenice] = useState<string | null>(null);
-  useEffect(() => { try { setVenice(veniceReturnHref(window.location.pathname, window.location.search, Date.now())); } catch { setVenice(null); } }, []);
+  useEffect(() => { try { setVenice(peekVeniceReturnHref(window.location.pathname, window.location.search, Date.now())); } catch { setVenice(null); } }, []);
+  const navigate = useCallback((href: string) => {
+    if (venice) clearReturn();
+    onNavigate(href);
+  }, [onNavigate, venice]);
   const exitHref = exitHrefFor(storyNodeId, venice);
-  const navRef = useRef(onNavigate); navRef.current = onNavigate;
+  const navRef = useRef(navigate); navRef.current = navigate;
   const armed = () => now() - mountedAt.current >= ARM_MS;
 
   const focusables = useCallback((): HTMLElement[] => {
@@ -354,8 +358,8 @@ export function EndScreen(props: EndScreenProps) {
   const longHead = headline.length > 16;
   const primary: { label: string; Icon: typeof RotateCcw; act: () => void; gold?: boolean } = carnivalRun
     ? carnivalRun.index < carnivalRun.lineup.length
-      ? { label: `Next: ${pick?.title ?? 'next stop'}`, Icon: ArrowRight, act: () => onNavigate(pick?.href ?? '/play/carnival'), gold: true }
-      : { label: 'See carnival results', Icon: PartyPopper, act: () => onNavigate('/play/carnival/recap'), gold: true }
+      ? { label: `Next: ${pick?.title ?? 'next stop'}`, Icon: ArrowRight, act: () => navigate(pick?.href ?? '/play/carnival'), gold: true }
+      : { label: 'See carnival results', Icon: PartyPopper, act: () => navigate('/play/carnival/recap'), gold: true }
     : { label: 'Play again', Icon: RotateCcw, act: onReplay };
   const showTeaser = Boolean(pick) && !carnivalRun;
   // THE CLAIM (owner, 2026-10-13): reveal-only — claim.ts. Nothing is granted or requested; it confirms the numbers above.
@@ -490,8 +494,8 @@ export function EndScreen(props: EndScreenProps) {
               <div className="flex w-full max-w-[34em] flex-col gap-[0.5em]">
                 {carnivalRun && <CarnivalCard run={carnivalRun} />}
                 {mpResult && <Beat show={shown('mp')} instant={fast}><MpCard r={mpResult} /></Beat>}
-                {challengeResult && <Beat show={shown('challenge')} instant={fast}><ChallengeCard r={challengeResult} onNavigate={onNavigate} /></Beat>}
-                {arenaResult && <Beat show={shown('arena')} instant={fast}><ArenaCard r={arenaResult} onNavigate={onNavigate} /></Beat>}
+                {challengeResult && <Beat show={shown('challenge')} instant={fast}><ChallengeCard r={challengeResult} onNavigate={navigate} /></Beat>}
+                {arenaResult && <Beat show={shown('arena')} instant={fast}><ArenaCard r={arenaResult} onNavigate={navigate} /></Beat>}
               </div>
             </div>
             </div>
@@ -646,18 +650,18 @@ export function EndScreen(props: EndScreenProps) {
                 <span aria-hidden className="grid h-[1.4em] w-[1.4em] place-items-center rounded-full bg-black/80 text-[0.7em] font-bold text-[#00FF9D]">A</span>
                 <primary.Icon className="h-[1em] w-[1em]" /> {primary.label}
               </button>
-              {showTeaser && pick && <NextTeaser pick={pick} focused={focusId === 'next'} onPress={guard(() => onNavigate(pick.href))} />}
+              {showTeaser && pick && <NextTeaser pick={pick} focused={focusId === 'next'} onPress={guard(() => navigate(pick.href))} />}
             </div>
             <div className="mt-[0.6em] flex flex-wrap items-center gap-[0.5em]">
               {venice && (
-                <button type="button" data-end-focus="venice" data-focused={focusId === 'venice'} data-testid="end-back-to-venice" onClick={guard(() => onNavigate(venice))} className={`${btnBase} border border-white/20 bg-white/[0.04] px-[0.9em] py-[0.55em] text-[0.9em] text-white/85 data-[focused=true]:ring-[#00E5FF]`}>
+                <button type="button" data-end-focus="venice" data-focused={focusId === 'venice'} data-testid="end-back-to-venice" onClick={guard(() => navigate(venice))} className={`${btnBase} border border-white/20 bg-white/[0.04] px-[0.9em] py-[0.55em] text-[0.9em] text-white/85 data-[focused=true]:ring-[#00E5FF]`}>
                   <MapPin className="h-[1em] w-[1em]" /> Back to Venice
                 </button>
               )}
-              <button type="button" data-end-focus="modes" data-focused={focusId === 'modes'} onClick={guard(() => onNavigate('/play'))} className={`${btnBase} border border-white/20 bg-white/[0.04] px-[0.9em] py-[0.55em] text-[0.9em] text-white/85 data-[focused=true]:ring-[#00E5FF]`}>
+              <button type="button" data-end-focus="modes" data-focused={focusId === 'modes'} onClick={guard(() => navigate('/play'))} className={`${btnBase} border border-white/20 bg-white/[0.04] px-[0.9em] py-[0.55em] text-[0.9em] text-white/85 data-[focused=true]:ring-[#00E5FF]`}>
                 <LayoutGrid className="h-[1em] w-[1em]" /> All modes
               </button>
-              <button type="button" data-end-focus="home" data-focused={focusId === 'home'} onClick={guard(() => onNavigate(storyNodeId ? '/story' : '/'))} className={`${btnBase} border border-white/20 bg-white/[0.04] px-[0.9em] py-[0.55em] text-[0.9em] text-white/85 data-[focused=true]:ring-[#00E5FF]`}>
+              <button type="button" data-end-focus="home" data-focused={focusId === 'home'} onClick={guard(() => navigate(storyNodeId ? '/story' : '/'))} className={`${btnBase} border border-white/20 bg-white/[0.04] px-[0.9em] py-[0.55em] text-[0.9em] text-white/85 data-[focused=true]:ring-[#00E5FF]`}>
                 {storyNodeId ? <><MapIcon className="h-[1em] w-[1em]" /> Story map</> : <><Home className="h-[1em] w-[1em]" /> Home</>}
               </button>
               {/* M13.4 share challenge (K-factor loop) — not for a score the Arena refused, nor a free-dance run (lane/dance-extras-2: no score to beat) */}
@@ -672,7 +676,7 @@ export function EndScreen(props: EndScreenProps) {
                 </button>
               )}
               {(extraActions ?? []).map((a) => (
-                <ActionButton key={a.id} a={a} focused={focusId === `x-${a.id}`} onPress={(x) => { if (!armed()) return; if (x.href) onNavigate(x.href); else x.onSelect?.(); }} />
+                <ActionButton key={a.id} a={a} focused={focusId === `x-${a.id}`} onPress={(x) => { if (!armed()) return; if (x.href) navigate(x.href); else x.onSelect?.(); }} />
               ))}
               <span aria-hidden className="ml-auto hidden items-center gap-[0.9em] text-[0.72em] uppercase tracking-[0.14em] text-white/50 [@media(hover:hover)]:flex">
                 <span><b className="text-[#00FF9D]">A</b> {revealDone(rv, steps.length) ? 'Select' : 'Skip'}</span>

@@ -21,7 +21,7 @@ import { spawnMeshyProp } from '@/lib/babylon/visual/meshyProps';
 import { mountVeniceDunkDressing } from '@/lib/babylon/nexus/veniceBoardwalk';
 import { groundTexture, TILE_M, type GroundKind } from '@/lib/babylon/visual/groundTextures';
 import { feel } from '@/lib/feel-panel/feel';
-import { courtsRect, v1Area, v1Spots } from './hubWorld';
+import { courtsRect, v1Area, v1Spots, v1WalkupSpots } from './hubWorld';
 
 /** perf.veniceSharedCourt: 1 = one court mesh drawn at every court as instances (new); 0 = a mesh, material and detail map per court (the prototype's way). */
 export const VENICE_SHARED_COURT = 1;
@@ -111,6 +111,21 @@ export function mountCourtsView(scene: Scene, parent: TransformNode | null = nul
     const sign = MeshBuilder.CreatePlane(`venice_sign_${s.id}`, { width: 4.2, height: 1.1, sideOrientation: Mesh.DOUBLESIDE }, scene);
     // the court's name above its far baseline, behind the hoop (where the eye looks across the court, never in front of the camera)
     sign.parent = root; sign.position.set(s.at[0], 5.4, s.at[1] - COURT_HALF.l - 1.6); sign.billboardMode = Mesh.BILLBOARDMODE_Y; sign.isPickable = false;
+    const t = new DynamicTexture(`venice_sign_tex_${s.id}`, { width: 512, height: 128 }, scene, false);
+    const g = t.getContext() as CanvasRenderingContext2D;
+    g.fillStyle = 'rgba(8,10,16,0.9)'; g.fillRect(0, 0, 512, 128);
+    g.fillStyle = '#FFD166'; g.font = 'bold 54px sans-serif'; g.textBaseline = 'middle';
+    g.fillText(s.label.replace('[PLACEHOLDER] ', '').slice(0, 18), 20, 66);
+    t.update(); texs.push(t);
+    const sm = new StandardMaterial(`venice_sign_mat_${s.id}`, scene); sm.disableLighting = true; sm.emissiveTexture = t; sign.material = sm; mats.push(sm);
+  }
+  for (const s of v1WalkupSpots().filter((x) => !spots.some((c) => c.id === x.id))) {
+    if (ringMaster) {
+      const r = ringMaster.createInstance(`venice_ring_${s.id}`);
+      r.parent = root; r.position.set(s.at[0], 0.08, s.at[1]); r.isPickable = false;
+    }
+    const sign = MeshBuilder.CreatePlane(`venice_sign_${s.id}`, { width: 4.2, height: 1.1, sideOrientation: Mesh.DOUBLESIDE }, scene);
+    sign.parent = root; sign.position.set(s.at[0], 3.2, s.at[1] - 4.4); sign.billboardMode = Mesh.BILLBOARDMODE_Y; sign.isPickable = false;
     const t = new DynamicTexture(`venice_sign_tex_${s.id}`, { width: 512, height: 128 }, scene, false);
     const g = t.getContext() as CanvasRenderingContext2D;
     g.fillStyle = 'rgba(8,10,16,0.9)'; g.fillRect(0, 0, 512, 128);

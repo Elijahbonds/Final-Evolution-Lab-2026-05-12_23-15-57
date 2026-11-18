@@ -11,7 +11,7 @@
  * Pure apart from the storage it is handed (window.sessionStorage by default).
  */
 
-import { SPOTS, type Spot } from './layout';
+import { VENICE_V1_WALKUP_SPOT_IDS, type Spot } from './layout';
 
 export const HUB_ROUTE = '/play/venice';
 export const FROM_PARAM = 'from';
@@ -28,6 +28,7 @@ export interface StoreLike { getItem(k: string): string | null; setItem(k: strin
 export interface ReturnMark { spot: string; route: string; at: number }
 
 const session = (): StoreLike | null => { try { return typeof window !== 'undefined' ? window.sessionStorage : null; } catch { return null; } };
+const isV1WalkupSpot = (spot: string): boolean => (VENICE_V1_WALKUP_SPOT_IDS as readonly string[]).includes(spot);
 
 /** The page a court opens. Some V1 courts host more than one shelf mode, so callers may pass that mode's own route. */
 export function launchHref(s: Pick<Spot, 'id' | 'route' | 'kind'>, route = s.route): string {
@@ -50,7 +51,7 @@ export function readReturn(now: number, store: StoreLike | null = session()): Re
     if (!raw) return null;
     const m = JSON.parse(raw) as Partial<ReturnMark>;
     if (typeof m.spot !== 'string' || typeof m.route !== 'string' || typeof m.at !== 'number') return null;
-    if (!SPOTS.some((s) => s.id === m.spot) || now - m.at > RETURN_TTL_MS || now < m.at) return null;
+    if (!isV1WalkupSpot(m.spot) || now - m.at > RETURN_TTL_MS || now < m.at) return null;
     return { spot: m.spot, route: m.route, at: m.at };
   } catch { return null; }
 }
@@ -65,16 +66,21 @@ export const hubHrefFor = (spot: string): string => `${HUB_ROUTE}?${SPOT_PARAM}=
  * mark names this page's route — else null (the end screen keeps its own exits).
  */
 export function veniceReturnHref(pathname: string, search: string, now: number, store: StoreLike | null = session()): string | null {
+  const href = peekVeniceReturnHref(pathname, search, now, store);
+  if (href) clearReturn(store);
+  return href;
+}
+
+/** Like veniceReturnHref, but leaves the return mark in place until the player actually chooses an exit. */
+export function peekVeniceReturnHref(pathname: string, search: string, now: number, store: StoreLike | null = session()): string | null {
   let q: URLSearchParams;
   try { q = new URLSearchParams(search); } catch { q = new URLSearchParams(); }
   const spot = q.get(SPOT_PARAM);
-  if (q.get(FROM_PARAM) === FROM_VENICE && spot && SPOTS.some((s) => s.id === spot)) {
-    clearReturn(store);
+  if (q.get(FROM_PARAM) === FROM_VENICE && spot && isV1WalkupSpot(spot)) {
     return hubHrefFor(spot);
   }
   const m = readReturn(now, store);
   if (m && m.route === pathname) {
-    clearReturn(store);
     return hubHrefFor(m.spot);
   }
   return null;
@@ -82,5 +88,5 @@ export function veniceReturnHref(pathname: string, search: string, now: number, 
 
 /** The spot the hub page should put the player at (`?spot=`), when it is one V1 opens. */
 export function spotFromSearch(search: string): string | null {
-  try { const s = new URLSearchParams(search).get(SPOT_PARAM); return s && SPOTS.some((x) => x.id === s) ? s : null; } catch { return null; }
+  try { const s = new URLSearchParams(search).get(SPOT_PARAM); return s && isV1WalkupSpot(s) ? s : null; } catch { return null; }
 }

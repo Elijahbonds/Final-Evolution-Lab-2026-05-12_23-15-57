@@ -1,9 +1,9 @@
 // venice-v1 (2026-11-17): the V1 hub's pure parts — the walkable courts district, walking up to a court and coming back.
 import { describe, expect, it } from 'vitest';
-import { buildHubWorld, courtsRect, returnSpawnFor, v1Area, v1Spots, V1_RIM_H } from './hubWorld';
+import { buildHubWorld, courtsRect, returnSpawnFor, v1Area, v1Spots, v1WalkupSpots, V1_RIM_H } from './hubWorld';
 import {
   clearReturn, FROM_VENICE, hubHrefFor, launchHref, PARTY_MODE_FOR_SPOT, readReturn, RETURN_KEY, RETURN_TTL_MS, spotFromSearch,
-  veniceReturnHref, writeReturn, writeReturnToRoute, type StoreLike,
+  peekVeniceReturnHref, veniceReturnHref, writeReturn, writeReturnToRoute, type StoreLike,
 } from './hubReturn';
 import { veniceDoorOn, VENICE_DOOR_HREF } from './door';
 import { districtAt } from './layout';
@@ -46,7 +46,8 @@ describe('the V1 world: the courts district, walkable', () => {
       expect(Math.hypot(r.pos.x - s.at[0], r.pos.z - s.at[1])).toBeLessThan(s.radius + 4);
       expect(Math.sin(r.yaw)).toBeLessThan(0);   // the court is to the west (−x) of its sideline spawn
     }
-    expect(returnSpawnFor('court.camera')).toBeNull();
+    const camera = returnSpawnFor('court.camera')!;
+    expect(w.source.groundY(camera.pos.x, camera.pos.z)).toBe(0);
     expect(returnSpawnFor('nope')).toBeNull();
   });
 });
@@ -62,9 +63,9 @@ describe('walking up and coming back', () => {
     expect(u.searchParams.get('location')).toBe('venice');
   });
   it('opens every V1 court mode on that mode route, not only the first court entry', () => {
-    const modes = v1Spots().flatMap((s) => s.modes);
-    expect(modes).toEqual(['hoops1v1', 'hoops3v3', 'dunkContest', 'dunkduel', 'threePoint', 'carnival']);
-    for (const s of v1Spots()) {
+    const modes = v1WalkupSpots().flatMap((s) => s.modes);
+    expect(modes).toEqual(['hoops1v1', 'hoops3v3', 'dunkContest', 'dunkduel', 'threePoint', 'carnival', 'irl']);
+    for (const s of v1WalkupSpots()) {
       for (const mode of s.modes) {
         const route = MODE_INFO[mode]?.href ?? '';
         expect(route, mode).not.toBe('');
@@ -96,6 +97,19 @@ describe('walking up and coming back', () => {
     expect(veniceReturnHref('/play/carnival', '', 2000, st)).toBe(hubHrefFor('court.arc'));
     expect(st.m.has(RETURN_KEY)).toBe(false);
   });
+  it('can peek the return href without consuming it before the player chooses an exit', () => {
+    const st = mem();
+    writeReturn(v1Spots()[0], 1000, st);
+    expect(peekVeniceReturnHref('/play/onevone', '', 2000, st)).toBe(hubHrefFor('court.ones'));
+    expect(st.m.has(RETURN_KEY)).toBe(true);
+  });
+  it('returns from the camera hoop / IRL spot too', () => {
+    const st = mem();
+    const camera = v1WalkupSpots().find((s) => s.id === 'court.camera')!;
+    expect(launchHref(camera)).toBe('/play/irl?from=venice&spot=court.camera&location=venice');
+    writeReturn(camera, 1000, st);
+    expect(veniceReturnHref('/play/irl', '', 2000, st)).toBe(hubHrefFor('court.camera'));
+  });
   it('consumes a stored return mark once, so a later shelf launch on the same route does not leak back to Venice', () => {
     const st = mem();
     writeReturn(v1Spots()[0], 1000, st);
@@ -112,7 +126,9 @@ describe('walking up and coming back', () => {
     expect(() => writeReturn(ones, 0, broken)).not.toThrow();
     expect(readReturn(0, broken)).toBeNull();
     expect(spotFromSearch('?spot=court.run')).toBe('court.run');
+    expect(spotFromSearch('?spot=court.camera')).toBe('court.camera');
     expect(spotFromSearch('?spot=x')).toBeNull();
+    expect(spotFromSearch('?spot=skate.bowl')).toBeNull();
   });
   it('offers the party only on courts whose game has a party seat', () => {
     for (const mode of Object.values(PARTY_MODE_FOR_SPOT)) expect(ONLINE_MODES.map((m) => m.id)).toContain(mode);

@@ -30,11 +30,11 @@ import { createInputMapper, loadBindings, type InputMapper } from '../adventure/
 import { bindMovementView, type MovementView } from '../adventure/movement/view';
 import { placeBody } from '../adventure/world/view';
 import { loadRatedTuning, ratedLookScale } from '../hoops/ratedPlay';
-import { buildHubWorld, courtsRect, returnSpawnFor, v1Spots } from '@/lib/adventure/venice/hubWorld';
+import { buildHubWorld, courtsRect, returnSpawnFor, v1WalkupSpots } from '@/lib/adventure/venice/hubWorld';
 import { mountCourtsView, type CourtsView } from '@/lib/adventure/venice/courtsView';
 import { hubUi } from '@/lib/adventure/venice/hubUi';
 import { spotFromSearch } from '@/lib/adventure/venice/hubReturn';
-import type { Spot } from '@/lib/adventure/venice/layout';
+import { spotAt, type Spot } from '@/lib/adventure/venice/layout';
 
 export const VENICE_MODE_ID = 'venice_hub';
 /** The stick's basis latches while held (AdventureMode's rule): below this it lets go. */
@@ -113,7 +113,7 @@ export const VeniceHubMode: ModeDefinition = {
     const mapper = createInputMapper({ bindings: loadBindings() });
     const S: St = {
       host, mapper, view, me, body, move, stickL: { x: 0, y: 0 }, stickR: { x: 0, y: 0 }, latchedYaw: null,
-      preset: 'runner', rigKey: '', spotSec: SPOT_EVERY, spots: v1Spots(),
+      preset: 'runner', rigKey: '', spotSec: SPOT_EVERY, spots: v1WalkupSpots(),
     };
     host.setInputSource(host.playerId, (out) => { mapper.fill(out, { camYaw: camYawOf(ctx, S), state: host.player.state }); walkOnly(out); });
     ctx.heroRef.current = body;   // the harness frames and checks the player by it (FrameGuard assertSpawned)
@@ -154,12 +154,8 @@ export const VeniceHubMode: ModeDefinition = {
     S.spotSec += dt;
     if (S.spotSec >= SPOT_EVERY) {
       S.spotSec = 0;
-      let hit: Spot | null = null;
-      for (const s of S.spots) {
-        // the ring stands on the court's sideline (courtsView): walking into it, or onto the court itself, offers the game
-        const dx = me.pos.x - s.at[0], dz = me.pos.z - s.at[1];
-        if (Math.abs(dx) <= 8 + 6 && Math.abs(dz) <= 14) { hit = s; break; }
-      }
+      const found = spotAt(me.pos.x, me.pos.z);
+      const hit = found && S.spots.some((s) => s.id === found.id) ? found : null;
       hubUi.setSpot(hit);
     }
   },

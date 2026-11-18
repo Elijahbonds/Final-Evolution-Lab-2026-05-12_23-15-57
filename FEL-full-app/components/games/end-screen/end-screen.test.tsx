@@ -208,6 +208,7 @@ describe('the helpers the card reads', () => {
   it('B goes to the shelf, or the story map from a story run', () => {
     expect(exitHrefFor(null)).toBe('/play');
     expect(exitHrefFor('golfGreen.r1')).toBe('/story');
+    expect(exitHrefFor(null, '/play/venice?spot=court.ones')).toBe('/play/venice?spot=court.ones');
   });
 });
 

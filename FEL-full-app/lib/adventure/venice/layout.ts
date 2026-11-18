@@ -89,6 +89,9 @@ export interface Zone {
   color: string;
 }
 
+export const VENICE_V1_COURT_SPOT_IDS = ['court.ones', 'court.run', 'court.flight', 'court.arc'] as const;
+export const VENICE_V1_WALKUP_SPOT_IDS = [...VENICE_V1_COURT_SPOT_IDS, 'court.camera'] as const;
+
 const c = (i: number, j: number): Cell => [i, j];
 const cellsRect = (i0: number, i1: number, j0: number, j1: number): Cell[] => {
   const out: Cell[] = [];

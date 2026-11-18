@@ -10,7 +10,9 @@
 
 import { block, clearBetween, flat, groundYOf, type GroundPiece } from '@/lib/babylon/adventure/world/pieces';
 import type { WorldSource } from '@/lib/babylon/adventure/host/hostWorld';
-import { DISTRICTS, SPOTS, cellRect, hubHome, type Rect, type Spot } from './layout';
+import {
+  DISTRICTS, SPOTS, VENICE_V1_COURT_SPOT_IDS, VENICE_V1_WALKUP_SPOT_IDS, cellRect, hubHome, type Rect, type Spot,
+} from './layout';
 
 /** The extra walkable band round the courts district (m): sand to the west, the path's edge to the east. [TUNE] */
 export const V1_MARGIN = 14;
@@ -31,8 +33,10 @@ export function v1Area(): Rect {
 }
 
 /** The courts V1 opens (each launches its modes in one tap). Court 1 → Ones, Court 2 (the run) → Threes; Courts 3 and 4 too. */
-export const V1_SPOT_IDS = ['court.ones', 'court.run', 'court.flight', 'court.arc'] as const;
+export const V1_SPOT_IDS = VENICE_V1_COURT_SPOT_IDS;
+export const V1_WALKUP_SPOT_IDS = VENICE_V1_WALKUP_SPOT_IDS;
 export const v1Spots = (): Spot[] => SPOTS.filter((s) => (V1_SPOT_IDS as readonly string[]).includes(s.id));
+export const v1WalkupSpots = (): Spot[] => SPOTS.filter((s) => (V1_WALKUP_SPOT_IDS as readonly string[]).includes(s.id));
 
 export interface HubWorld { pieces: GroundPiece[]; area: Rect; source: WorldSource; spawn: { pos: { x: number; y: number; z: number }; yaw: number } }
 
@@ -66,7 +70,7 @@ export function buildHubWorld(): HubWorld {
 /** Where a player coming back from a court's game stands: beside the court, on its sideline facing in. */
 export function returnSpawnFor(spotId: string): { pos: { x: number; y: number; z: number }; yaw: number } | null {
   const s = SPOTS.find((x) => x.id === spotId);
-  if (!s || !(V1_SPOT_IDS as readonly string[]).includes(s.id)) return null;
+  if (!s || !(V1_WALKUP_SPOT_IDS as readonly string[]).includes(s.id)) return null;
   const x = s.at[0] + s.radius + 2.5, z = s.at[1];
   return { pos: { x, y: 0, z }, yaw: Math.atan2(s.at[0] - x, 0) };
 }
