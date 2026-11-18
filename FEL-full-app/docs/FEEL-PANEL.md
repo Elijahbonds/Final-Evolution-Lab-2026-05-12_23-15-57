@@ -674,10 +674,12 @@ holds the result in CI. Phone tier only unless said.
 - `venue.veniceCourtLife` 1 (`lib/adventure/venice/courtLife.ts`, the Venice hub; V2, NEW): a shooter working round Court 4's arc (the
   shipped jump shot, follow-through and catch; the ball arcs to the rim, in or off the iron), and on desktop a rebounder there, a pair on
   Court 1 and a jogger on the bike path (no riding clip fits). A phone gets none: one shooter measured 57-77 draws against the phone row's 56, even without its outline and shadow. 0 = empty courts.
-- `venue.veniceCamCollide` 1 (`lib/adventure/venice/courtsDressing.ts`, the Venice hub; V2, NEW): one invisible proxy mesh of the park's
+- `venue.veniceCamCollide` 0 (`lib/adventure/venice/courtsDressing.ts`, the Venice hub; V2, NEW): one invisible proxy mesh of the park's
   solids (fences, poles, posts, hoops, palms, the boardwalk row) and name boards, flagged for the shared CameraDirector's own occlusion
   probe. No camera number changes. 1 leaves the see-through chain-link fences out (measured with them in: the pull-in at a fence jumped
-  3-5 m in a frame and swung off the player); 2 puts them in; 0 = the camera passes through everything, as before.
+  3-5 m in a frame and swung off the player); 2 puts them in; 0 = the camera passes through everything, as before. SHIPS AT 0
+  (reverted, 2026-11-18): at the boardwalk row level 1 cut the camera 3.9 m in one frame to straight overhead (the director's
+  boxed-in fallback). Easing the shared director's pull-in is the owner's call; the levels stay for that test.
 - `venue.veniceSound` 1 (`lib/adventure/venice/hubSound.ts`, the Venice hub; improvement pass phase 7, NEW): the ocean bed, dribbles and
   shots from unseen pickup games down the beach, the run cheering now and then near Court 2, and footsteps (concrete vs sand), all through
   SoundKit (mute and volume apply; the recorded hoops bank once loaded). 0 = V1 (the harness's mood crowd bed).

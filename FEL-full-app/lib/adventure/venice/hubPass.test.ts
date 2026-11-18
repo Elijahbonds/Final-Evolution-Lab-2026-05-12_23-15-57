@@ -263,7 +263,7 @@ describe('V2 phase 3: the camera blockers', () => {
       const rx = s.at[0] + COURT_HALF.w + RING.out;
       for (const p of pieces) expect(rx > p.minX - 0.5 && rx < p.maxX + 0.5 && s.at[1] > p.minZ - 0.5 && s.at[1] < p.maxZ + 0.5).toBe(false);
     }
-    expect(VENICE_CAM_COLLIDE).toBe(1);
+    expect(VENICE_CAM_COLLIDE).toBe(0);   // reverted: measured jumps (courtsDressing)
   });
 });
 

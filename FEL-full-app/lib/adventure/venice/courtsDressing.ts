@@ -20,8 +20,13 @@ import type { Spot } from './layout';
 
 export const VENICE_LOOK_V2 = 1;
 /** V2 phase 3: the camera keeps out of the park's props (mountCameraBlockers). 1 = poles, posts, boards, palms, hoops and the
- *  boardwalk row; 2 = the fences too; 0 = it passes through them all, as before. */
-export const VENICE_CAM_COLLIDE = 1;
+ *  boardwalk row; 2 = the fences too; 0 = it passes through them all, as before.
+ *  SHIPS AT 0 — REVERTED (2026-11-18, camfence.mts, phone profile, 90 frames a walk): the shared director's own occlusion answer
+ *  is a pull-in and, when boxed in, a cut to straight overhead. At the boardwalk row level 1 jumped the camera 3.9 m in one frame
+ *  to 0.03 m from the player (the overhead fallback) where level 0 never put the camera behind the row at all; at a fence (level 2)
+ *  it jumped 3.3-5.2 m and swung off the player. Making it smooth needs the director's pull-in eased — a shared, tuned camera:
+ *  the owner's call. The levels stay for that test. */
+export const VENICE_CAM_COLLIDE = 0;
 /** Court half-sizes this furniture rings (m): the 16 × 28 painted court plus its run-off. */
 export const FENCE = { halfW: 10.5, halfL: 16.5, h: 3.2, postEvery: 3.5 } as const;
 export const BENCH = { w: 3.2, d: 0.45, h: 0.48 } as const;
