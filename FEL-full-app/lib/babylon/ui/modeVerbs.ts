@@ -300,6 +300,8 @@ const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick' | 'boost' | 'turbo'>> 
   // VENICE V1: the hub is a walkable place, not a fight. It uses Adventure's movement mapper but walkOnly() clears attacks,
   // so the touch deck must expose only the verbs that still do something in Venice.
   venice_hub: verbs({ A: { label: 'JUMP', emit: A('A') }, B: { label: 'DASH', emit: A('B') } }),
+  // COAST & ISLANDS phase A (2026-11-18): the zone walks like the hub (zoneMoveOnly clears the fight's presses): jump and dash only.
+  coast_zone: verbs({ A: { label: 'JUMP', emit: A('A') }, B: { label: 'DASH', emit: A('B') } }),
 
   default: verbs({ A: { label: 'ACTION', emit: A('A') } }),
 };

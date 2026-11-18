@@ -2061,6 +2061,33 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/core/ComboFinish.ts COMBO_DUNK_MIN_MPS',
     hint: 'How fast the drive must be at the press for a euro or hop to become a dunk.',
   },
+  // ── coast-islands (2026-11-18, NEW): the Coast & Islands zone, phase A (docs/COAST-ISLANDS-PLAN.md). New behaviour only: no
+  //    shipped number moves. coast.streamOn 0 is the measuring control (every piece at full detail), not a way to play.
+  {
+    id: 'coast.streamOn', label: 'Coast zone: stream the 64 m pieces (1) / draw every piece in full (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Coast · zone',
+    source: 'lib/adventure/coast/zoneView.ts COAST_STREAM_ON',
+    hint: 'On: fine ground and every prop only round you, coarse ground and the tall props further out. Off: everything in full, the phone budget control.',
+  },
+  {
+    id: 'coast.streamFull', label: 'Coast zone: full-detail ring (pieces)', def: 1, min: 0, max: 3, step: 1, unit: '', group: 'Coast · zone',
+    source: 'lib/adventure/coast/zoneLayout.ts COAST_STREAM_FULL',
+    hint: 'How many 64 m pieces out from yours are drawn in full. 1 = the 3 by 3 round you (the phone plan).',
+  },
+  {
+    id: 'coast.streamLod', label: 'Coast zone: low-detail ring (pieces)', def: 2, min: 0, max: 5, step: 1, unit: '', group: 'Coast · zone',
+    source: 'lib/adventure/coast/zoneLayout.ts COAST_STREAM_LOD',
+    hint: 'Out to this many pieces the ground is coarse and only palms and sea stacks stand. 2 = the 5 by 5 (the phone plan).',
+  },
+  {
+    id: 'coast.streamKeep', label: 'Coast zone: keep a piece this far past its ring', def: 1, min: 0, max: 2, step: 1, unit: '', group: 'Coast · zone',
+    source: 'lib/adventure/coast/zoneLayout.ts COAST_STREAM_KEEP',
+    hint: 'Hysteresis: a piece drops its detail only this many pieces after leaving its ring, so walking along an edge does not flicker.',
+  },
+  {
+    id: 'coast.deepWaterTurnBack', label: 'Coast zone: deep water turns you back (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Coast · zone',
+    source: 'lib/adventure/coast/zoneWorld.ts COAST_DEEP_WATER_TURN_BACK',
+    hint: 'A jump that ends over water deeper than you can wade puts you back where you could stand. Off = the raw movement sim, for probes.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));
