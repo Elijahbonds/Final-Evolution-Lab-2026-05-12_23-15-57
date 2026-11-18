@@ -141,7 +141,7 @@ export function applyGarmentSet(container: AssetContainer, set: readonly SetGarm
       // kit-tight: the one-piece short's darker inseam panel (inseamShade.ts, kit.inseamShade; 0 = none)
       if (g.slot === 'shorts') {
         const shorts = container.meshes.filter((m) => m instanceof Mesh && done.replaced.includes(m.name)) as Mesh[];
-        try { applyInseamShade(shorts, g.uv, g.indices, joiningShare(g.joints, g.weights, g.jointNames), container.scene); } catch (e) { console.warn(`[FEL-KIT] inseam shade skipped: ${String((e as Error)?.message ?? e).slice(0, 120)}`); }
+        try { applyInseamShade(shorts, g.uv, g.indices, joiningShare(g.joints, g.weights, g.jointNames, g.positions), container.scene); } catch (e) { console.warn(`[FEL-KIT] inseam shade skipped: ${String((e as Error)?.message ?? e).slice(0, 120)}`); }
       }
     } else if (!container.meshes.some((m) => m.name === g.name)) {
       const scene = container.scene;

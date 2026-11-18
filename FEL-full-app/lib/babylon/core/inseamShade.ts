@@ -6,8 +6,8 @@
 // cut lowered it — with 22 bones and no cloth simulation, the joining cloth must stretch. Seen on the contact sheet as a fray at
 // the inner thigh. A real athletic short has a gusset panel there, often in a darker cloth: the stretch then reads as that panel.
 //
-// WHAT. A small texture made from the short's OWN UVs and skin weights, once per loaded body: dark where a vertex hangs on both
-// thighs (its share of the smaller thigh, ×2, so the middle of the gusset is fully dark), white elsewhere; set as the short's
+// WHAT. A small texture made from the short's OWN UVs, positions and skin weights, once per loaded body: dark on the inseam (the
+// inner side of each leg, gusset to hem: joiningShare), white elsewhere; set as the short's
 // material's albedo texture, which the Closet tint multiplies. No geometry, UV, bone or vertex-data change, so the body merge sees
 // the same parts (bodyMerge groups by vertex-data kinds). A painted short (Creator paint) takes its paint instead.
 // `kit.inseamShade`: the panel's darkness, 0 = no texture at all (today).
@@ -22,15 +22,34 @@ const SIZE = 256;
 
 export const inseamShade = (): number => Math.max(0, Math.min(1, feel('kit.inseamShade', INSEAM_SHADE)));
 
-/** Pure: per vertex 0..1, how much it belongs to the joining cloth: 2 × the smaller thigh's share of its two thighs' weight. */
-export function joiningShare(joints: ArrayLike<number>, weights: ArrayLike<number>, jointNames: readonly string[]): Float32Array {
+/** Pure: per vertex 0..1, how much it belongs to the inseam panel: the cloth on the inner side of each leg, from the gusset down
+ *  to the hem, found in the garment's own bind space (any axes, any scale). The middle line lies half way between the left-leg
+ *  and the right-leg cloth (each one's mean position, by its heaviest thigh); a vertex's "inner" is its distance from that
+ *  line across, over half the two legs' separation (≈ 0 at the middle, ≈ 1 at a leg's centre line). The panel is full at
+ *  inner ≤ PANEL_IN and gone by PANEL_OUT, and only on cloth that rides the thighs (≥ PANEL_LEGS of its weight), so the seat's
+ *  centre seams, which ride the pelvis, stay plain. */
+export const PANEL_IN = 0.3, PANEL_OUT = 0.5, PANEL_LEGS = 0.6;
+export function joiningShare(joints: ArrayLike<number>, weights: ArrayLike<number>, jointNames: readonly string[], positions?: ArrayLike<number>): Float32Array {
   const L = jointNames.findIndex((n) => /(^|:)LeftUpLeg$/.test(n)), R = jointNames.findIndex((n) => /(^|:)RightUpLeg$/.test(n));
-  const out = new Float32Array(joints.length / 4);
+  const n = joints.length / 4, out = new Float32Array(n);
   if (L < 0 || R < 0) return out;
-  for (let v = 0; v < out.length; v++) {
-    let l = 0, r = 0;
-    for (let k = 0; k < 4; k++) { const j = joints[v * 4 + k], w = weights[v * 4 + k]; if (j === L) l += w; else if (j === R) r += w; }
-    out[v] = l + r > 1e-6 ? Math.min(1, (2 * Math.min(l, r)) / (l + r)) : 0;
+  const leg = (v: number) => { let l = 0, r = 0; for (let k = 0; k < 4; k++) { const j = joints[v * 4 + k], w = weights[v * 4 + k]; if (j === L) l += w; else if (j === R) r += w; } return [l, r]; };
+  if (!positions) {   // no positions: the cloth that hangs on both thighs
+    for (let v = 0; v < n; v++) { const [l, r] = leg(v); out[v] = l + r > 1e-6 ? Math.min(1, (2 * Math.min(l, r)) / (l + r)) : 0; }
+    return out;
+  }
+  const mL = [0, 0, 0, 0], mR = [0, 0, 0, 0];
+  for (let v = 0; v < n; v++) { const [l, r] = leg(v); const m = l > 0.6 ? mL : r > 0.6 ? mR : null; if (!m) continue; for (let a = 0; a < 3; a++) m[a] += positions[v * 3 + a]; m[3]++; }
+  if (!mL[3] || !mR[3]) return out;
+  const cl = [mL[0] / mL[3], mL[1] / mL[3], mL[2] / mL[3]], cr = [mR[0] / mR[3], mR[1] / mR[3], mR[2] / mR[3]];
+  const ax = [cl[0] - cr[0], cl[1] - cr[1], cl[2] - cr[2]], half = Math.hypot(ax[0], ax[1], ax[2]) / 2;
+  if (half < 1e-9) return out;
+  const u = ax.map((x) => x / (2 * half)), mid = [(cl[0] + cr[0]) / 2, (cl[1] + cr[1]) / 2, (cl[2] + cr[2]) / 2];
+  for (let v = 0; v < n; v++) {
+    const [l, r] = leg(v); if (l + r < PANEL_LEGS) continue;
+    const inner = Math.abs((positions[v * 3] - mid[0]) * u[0] + (positions[v * 3 + 1] - mid[1]) * u[1] + (positions[v * 3 + 2] - mid[2]) * u[2]) / half;
+    const t = Math.min(1, Math.max(0, (PANEL_OUT - inner) / (PANEL_OUT - PANEL_IN)));
+    out[v] = t * t * (3 - 2 * t);
   }
   return out;
 }
