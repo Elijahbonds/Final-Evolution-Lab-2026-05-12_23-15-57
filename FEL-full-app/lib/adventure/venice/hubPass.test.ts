@@ -1,0 +1,184 @@
+// venice-v1 improvement pass (2026-11-17): the pure parts of phases 5–8 — the park furniture's layout, the life's paths and the
+// soundscape's clock.
+import { describe, expect, it } from 'vitest';
+import { benchSpots, FENCE, fenceRuns, postsAlong, RING, VENICE_LOOK_V2 } from './courtsDressing';
+import { hoopAt, hubSolids, inCourtPlace, probeRoute, v1Hit, VENICE_SOLIDS, Walkup, WALKUP_DWELL, WALKUP_V2 } from './hubSolids';
+import { gullAt, GULLS, VENICE_LIFE, watchersVenue } from './hubLife';
+import { distanceGain, farGames, HubSoundscape, panFor, STEP, surfaceUnder, VENICE_SOUND, type HubCue } from './hubSound';
+import { buildHubWorld, courtsRect, returnSpawnFor, v1Area, v1Spots } from './hubWorld';
+import { COURT_HALF } from './courtsView';
+import { CARD_BEYOND_M, layoutSeats, pastLine } from '@/lib/babylon/visual/crowd/crowdLayout';
+
+describe('phase 5: the fences leave the walk-up side open', () => {
+  it('each court is fenced west, north and south, round the court with room to spare', () => {
+    for (const s of v1Spots()) {
+      const runs = fenceRuns(s.at[0], s.at[1]);
+      expect(runs).toHaveLength(3);
+      for (const [x0, , x1] of runs) expect(Math.max(x0, x1)).toBeLessThanOrEqual(s.at[0] + FENCE.halfW);
+      expect(FENCE.halfW).toBeGreaterThan(COURT_HALF.w);
+      expect(FENCE.halfL).toBeGreaterThan(COURT_HALF.l);
+      // the walk-up ring (the east sideline, VeniceHubMode's walkTo) is outside every fence run
+      const ringX = s.at[0] + COURT_HALF.w + 3;
+      expect(ringX).toBeGreaterThan(s.at[0] + FENCE.halfW);
+    }
+  });
+  it('posts run the whole length at about the post spacing, ends included', () => {
+    const run = fenceRuns(0, 0)[0];
+    const p = postsAlong(run);
+    expect(p[0]).toEqual([run[0], run[1]]);
+    expect(p.at(-1)).toEqual([run[2], run[3]]);
+    expect((2 * FENCE.halfL) / (p.length - 1)).toBeLessThan(FENCE.postEvery * 1.3);
+  });
+  it('ships on (1) and its off value is V1', () => { expect(VENICE_LOOK_V2).toBe(1); });
+});
+
+describe('phase 6: life', () => {
+  it('the gulls fly over the sand and the water, on the west side of the courts, at gull height', () => {
+    const seaX = v1Area().minX, c = courtsRect();
+    for (let i = 0; i < GULLS.desktop; i++) for (const t of [0, 7, 31, 120]) {
+      const [x, y] = gullAt(i, t, seaX);
+      expect(x).toBeLessThan((c.minX + c.maxX) / 2);
+      expect(y).toBeGreaterThan(12);
+      expect(y).toBeLessThan(25);
+    }
+    expect(GULLS.phone).toBeLessThanOrEqual(GULLS.desktop / 2);
+  });
+  it('the watchers stand off the courts (outside every fence) and the run has the most', () => {
+    const seats = layoutSeats(watchersVenue(), 23);
+    expect(seats.length).toBeGreaterThan(10);
+    for (const seat of seats) {
+      for (const s of v1Spots()) {
+        const inside = Math.abs(seat.pos[0] - s.at[0]) < FENCE.halfW && Math.abs(seat.pos[2] - s.at[1]) < FENCE.halfL;
+        expect(inside).toBe(false);
+      }
+      expect(pastLine(seat.pos, watchersVenue().camera)).toBeGreaterThan(watchersVenue().camera.margin);
+    }
+    // every watcher is near enough the eye to be a body on desktop, never a card
+    for (const seat of seats) expect(seat.dist).toBeLessThan(CARD_BEYOND_M);
+    const run = seats.filter((x) => x.stand === 'venice_run_line').length;
+    expect(run).toBeGreaterThan(seats.length / 2);
+  });
+  it('ships on (1)', () => { expect(VENICE_LIFE).toBe(1); });
+});
+
+describe('phase 7: the soundscape', () => {
+  it('the courts slab and the bike path are hard, the margins are sand', () => {
+    const c = courtsRect(), a = v1Area();
+    expect(surfaceUnder((c.minX + c.maxX) / 2, (c.minZ + c.maxZ) / 2)).toBe('concrete');
+    expect(surfaceUnder(c.maxX + 6, (c.minZ + c.maxZ) / 2)).toBe('concrete');
+    expect(surfaceUnder(a.minX + 2, (a.minZ + a.maxZ) / 2)).toBe('sand');
+  });
+  it('distance and pan behave', () => {
+    expect(distanceGain(2)).toBe(1);
+    expect(distanceGain(80)).toBeLessThan(distanceGain(20));
+    expect(distanceGain(500)).toBe(0);
+    expect(panFor(0, 0, 0, 10, 0)).toBeCloseTo(1);    // facing +z, a source at +x is to the right
+    expect(panFor(0, 0, 0, -10, 0)).toBeCloseTo(-1);
+    expect(Math.abs(panFor(0, 0, 0, 0, 10))).toBeLessThan(1e-9);
+  });
+  it('the far games are outside the walkable park', () => {
+    const a = v1Area();
+    for (const [x, z] of farGames()) expect(x < a.minX || x > a.maxX || z < a.minZ || z > a.maxZ).toBe(true);
+  });
+  it('a step every 0.8 m on the ground, louder on concrete, none standing still or in the air', () => {
+    const cues: Array<{ n: HubCue; v: number; tag: string }> = [];
+    const s = new HubSoundscape((n, o) => cues.push({ n, v: o.volume, tag: o.tag }), () => 0.5);
+    const c = courtsRect(), mid = { x: (c.minX + c.maxX) / 2, z: (c.minZ + c.maxZ) / 2 };
+    for (let i = 0; i < 60; i++) s.update(1 / 60, { ...mid, speed: 4, grounded: true }, 0);   // 1 s at 4 m/s on concrete
+    const hard = cues.filter((x) => x.tag === 'venice.step');
+    expect(hard.length).toBeGreaterThanOrEqual(Math.floor(4 / STEP.every) - 1);
+    expect(hard.every((x) => x.v === STEP.concrete.volume)).toBe(true);
+    cues.length = 0;
+    for (let i = 0; i < 60; i++) s.update(1 / 60, { ...mid, speed: 0, grounded: true }, 0);
+    for (let i = 0; i < 60; i++) s.update(1 / 60, { ...mid, speed: 5, grounded: false }, 0);
+    expect(cues.filter((x) => x.tag === 'venice.step')).toHaveLength(0);
+    const a = v1Area();
+    for (let i = 0; i < 60; i++) s.update(1 / 60, { x: a.minX + 2, z: mid.z, speed: 4, grounded: true }, 0);
+    const soft = cues.filter((x) => x.tag === 'venice.step');
+    expect(soft.length).toBeGreaterThan(0);
+    expect(soft.every((x) => x.v === STEP.sand.volume && x.v < STEP.concrete.volume)).toBe(true);
+  });
+  it('the far games dribble then shoot; the run reacts; all quiet with distance', () => {
+    const cues: Array<{ n: HubCue; v: number; tag: string }> = [];
+    const s = new HubSoundscape((n, o) => cues.push({ n, v: o.volume, tag: o.tag }), () => 0.5);
+    const c = courtsRect();
+    for (let i = 0; i < 60 * 40; i++) s.update(1 / 60, { x: (c.minX + c.maxX) / 2, z: (c.minZ + c.maxZ) / 2, speed: 0, grounded: true }, 0);
+    const games = cues.filter((x) => x.tag === 'venice.game');
+    expect(games.some((x) => x.n === 'bounce')).toBe(true);
+    expect(games.some((x) => x.n === 'swish' || x.n === 'rattle' || x.n === 'clang')).toBe(true);
+    expect(games.every((x) => x.v < 0.5)).toBe(true);   // distant: under the cue's own level
+    expect(cues.some((x) => x.tag === 'venice.run' && x.n === 'crowdCheer')).toBe(true);
+  });
+  it('ships on (1)', () => { expect(VENICE_SOUND).toBe(1); });
+});
+
+describe('phase 8: solids and the walk-up', () => {
+  const spots = v1Spots();
+  const inside = (b: { minX: number; maxX: number; minZ: number; maxZ: number }, x: number, z: number, pad = 0.5) =>
+    x > b.minX - pad && x < b.maxX + pad && z > b.minZ - pad && z < b.maxZ + pad;
+  it('nothing solid stands on a ring, on a return spawn, or on the cold-start spawn', () => {
+    const solids = hubSolids(spots, true);
+    const w = buildHubWorld();
+    for (const s of spots) {
+      const ring: [number, number] = [s.at[0] + COURT_HALF.w + RING.out, s.at[1]];
+      const back = returnSpawnFor(s.id)!.pos;
+      for (const b of solids) {
+        expect(inside(b, ring[0], ring[1], RING.r)).toBe(false);
+        expect(inside(b, back.x, back.z)).toBe(false);
+        expect(inside(b, w.spawn.pos.x, w.spawn.pos.z)).toBe(false);
+      }
+    }
+  });
+  it('the fences are walls (above the step) and leave the walk-up side open; the hoop is solid with or without the furniture', () => {
+    const solids = hubSolids(spots, true);
+    for (const s of spots) {
+      const fence = solids.filter((b) => b.id.startsWith(`venice.fence.${s.id}`));
+      expect(fence).toHaveLength(3);
+      for (const f of fence) expect(f.top).toBeGreaterThan(1);
+      // walking in from the ring to the court centre crosses no solid
+      const from: [number, number] = [s.at[0] + COURT_HALF.w + RING.out, s.at[1]];
+      for (let k = 0; k <= 20; k++) {
+        const x = from[0] + (s.at[0] - from[0]) * (k / 20);
+        for (const b of solids) expect(inside(b, x, s.at[1], 0.3)).toBe(false);
+      }
+      expect(hubSolids(spots, false).some((b) => b.id === `venice.hoop.${s.id}`)).toBe(true);
+      const [hx, hz] = hoopAt(s);
+      expect(Math.abs(hz - s.at[1])).toBeLessThan(COURT_HALF.l);
+      expect(hx).toBe(s.at[0]);
+    }
+    expect(hubSolids(spots, false).some((b) => b.id.startsWith('venice.fence'))).toBe(false);
+  });
+  it('benches stand clear of the ring on the open sideline', () => {
+    for (const s of spots) for (const [x, z] of benchSpots(s)) {
+      expect(x).toBeGreaterThan(s.at[0] + FENCE.halfW);
+      expect(Math.abs(z - s.at[1])).toBeGreaterThan(RING.r + 1);
+    }
+    expect(benchSpots(spots.find((s) => s.id === 'court.run')!)).toHaveLength(4);
+  });
+  it('V2 walk-up: not behind the fence; on the court or in the ring after the dwell; held a metre past', () => {
+    const s = spots[0];
+    // V1 offered the game behind the west fence; V2 does not
+    expect(v1Hit(spots, s.at[0] - FENCE.halfW - 2, s.at[1])?.id).toBe(s.id);
+    expect(inCourtPlace(s, s.at[0] - FENCE.halfW - 2, s.at[1])).toBe(false);
+    const w = new Walkup(spots);
+    const ringX = s.at[0] + COURT_HALF.w + RING.out;
+    expect(w.step(0.1, ringX, s.at[1])).toBeNull();                   // arrived: dwelling
+    let shown = null;
+    for (let t = 0; t < WALKUP_DWELL + 0.1; t += 0.1) shown = w.step(0.1, ringX, s.at[1]);
+    expect(shown?.id).toBe(s.id);
+    expect(w.step(0.1, ringX + RING.r + 1.6, s.at[1])?.id).toBe(s.id); // just past the ring: held
+    expect(w.step(0.1, ringX + RING.r + 3, s.at[1])).toBeNull();        // well past: gone
+  });
+  it('the probes\' route to each ring, from the gate and from every other ring, crosses no solid', () => {
+    const solids = hubSolids(spots, true), w = buildHubWorld();
+    const starts = [{ x: w.spawn.pos.x, z: w.spawn.pos.z }, ...spots.map((s) => ({ x: s.at[0] + COURT_HALF.w + RING.out, z: s.at[1] }))];
+    for (const from of starts) for (const to of spots) {
+      const legs = [from, ...probeRoute(spots, from, to)];
+      for (let i = 1; i < legs.length; i++) for (let k = 0; k <= 60; k++) {
+        const x = legs[i - 1].x + (legs[i].x - legs[i - 1].x) * (k / 60), z = legs[i - 1].z + (legs[i].z - legs[i - 1].z) * (k / 60);
+        for (const b of solids) expect(inside(b, x, z, 0.45), `${to.id} via (${x.toFixed(1)}, ${z.toFixed(1)}) hits ${b.id}`).toBe(false);
+      }
+    }
+  });
+  it('ship on (1)', () => { expect(VENICE_SOLIDS).toBe(1); expect(WALKUP_V2).toBe(1); });
+});

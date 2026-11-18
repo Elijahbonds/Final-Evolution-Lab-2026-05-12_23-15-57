@@ -98,3 +98,19 @@ describe('the Play screen door', () => {
     expect(VENICE_DOOR_HREF).toBe('/play/venice');
   });
 });
+
+describe('the party: every member comes back to Venice (phase 2)', () => {
+  it('names a court in the host activity line and reads it back, and nothing else', async () => {
+    const { veniceActivity, spotFromActivity, partyVeniceReturn } = await import('./hubReturn');
+    expect(veniceActivity('court.ones')).toBe('At Venice Beach · Court 1');
+    expect(veniceActivity('court.run')).toBe('At Venice Beach · Court 2');
+    expect(veniceActivity('court.camera')).toBeNull();
+    for (const s of ['court.ones', 'court.run', 'court.flight', 'court.arc']) expect(spotFromActivity(veniceActivity(s))).toBe(s);
+    for (const junk of [null, '', 'Playing Downtown', 'At Venice Beach · Court 5', 'At Venice Beach · Court 1 extra', 'Court 1']) expect(spotFromActivity(junk)).toBeNull();
+    const host = (a: string | null) => ({ host: true, activity: a }), member = (a: string | null) => ({ host: false, activity: a });
+    expect(partyVeniceReturn([member(null), host('At Venice Beach · Court 2')])).toBe('court.run');
+    // only the HOST's line counts: a member standing at a court does not send the party's game back there
+    expect(partyVeniceReturn([member('At Venice Beach · Court 1'), host('Picking a game')])).toBeNull();
+    expect(partyVeniceReturn([])).toBeNull();
+  });
+});

@@ -73,3 +73,38 @@ export function veniceReturnHref(pathname: string, search: string, now: number, 
 export function spotFromSearch(search: string): string | null {
   try { const s = new URLSearchParams(search).get(SPOT_PARAM); return s && SPOTS.some((x) => x.id === s) ? s : null; } catch { return null; }
 }
+
+// ── the party: every member comes back to Venice (improvement pass phase 2) ─────────────────────────────────────────────
+//
+// "Start together" sends each member's page to the game with the server's own query (?net=&peer=&party=1): netd's offer has no
+// room for "this started in Venice", and changing netd means a redeploy (the owner's). But the party already carries every
+// member's ACTIVITY line to everyone, in order, before a start offer: the hub's host sets "At Venice Beach · Court N" just
+// before it starts, and each member's countdown reads the HOST's line and adds the Venice return (query + mark) on the way in.
+// The line is the page's own words (never typed), so it is the same for a teen.
+
+export const VENICE_ACTIVITY_PREFIX = 'At Venice Beach · ';
+const courtNumber = (spot: string): string | null => {
+  const n = ['court.ones', 'court.run', 'court.flight', 'court.arc'].indexOf(spot);
+  return n < 0 ? null : `Court ${n + 1}`;
+};
+
+/** The hub's activity line at a court: "At Venice Beach · Court 2". */
+export function veniceActivity(spot: string): string | null {
+  const c = courtNumber(spot);
+  return c ? `${VENICE_ACTIVITY_PREFIX}${c}` : null;
+}
+
+/** The court a member's activity line names, or null. */
+export function spotFromActivity(line: string | null | undefined): string | null {
+  if (!line || !line.startsWith(VENICE_ACTIVITY_PREFIX)) return null;
+  const m = /^Court ([1-4])$/.exec(line.slice(VENICE_ACTIVITY_PREFIX.length).trim());
+  return m ? ['court.ones', 'court.run', 'court.flight', 'court.arc'][Number(m[1]) - 1] : null;
+}
+
+/**
+ * For a member's countdown: the Venice return to add when the party's HOST started the game from a court (their activity line
+ * names it), else null. `members` is the party's member list (state.ts PartyMember: `host`, `activity`).
+ */
+export function partyVeniceReturn(members: readonly { host: boolean; activity: string | null }[]): string | null {
+  return spotFromActivity(members.find((m) => m.host)?.activity ?? null);
+}
