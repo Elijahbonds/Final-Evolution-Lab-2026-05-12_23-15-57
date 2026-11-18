@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { MODE_CONTROLLERS } from '../lib/controller-link/schemas/registry';
 
 const ROOT = process.cwd();
+const requireFromHere = createRequire(import.meta.url);
 
 const registry = readFileSync(join(ROOT, 'lib/babylon/modes/registry.ts'), 'utf8');
 const matrix = readFileSync(join(ROOT, 'scripts/full-picture.mts'), 'utf8');
@@ -118,6 +122,21 @@ function hasButton(mode: string, action: string, label?: string): boolean {
   ));
 }
 
+function generatedFullPicture(): string {
+  return execFileSync(process.execPath, [
+    requireFromHere.resolve('tsx/cli'),
+    join(ROOT, 'scripts/full-picture.mts'),
+    '--md',
+    join(tmpdir(), `full-picture-${process.pid}.md`),
+  ], { cwd: ROOT, encoding: 'utf8' });
+}
+
+function rowCells(output: string, mode: string): string[] {
+  const row = output.split('\n').find((line) => line.startsWith(`| ${mode} |`));
+  assert.ok(row, `generated full-picture matrix must include ${mode}`);
+  return row.split('|').slice(1, -1).map((cell) => cell.trim());
+}
+
 for (const [key, slug] of Object.entries(expectedSlugs)) {
   assert.equal(routeMap.get(key), slug, `full-picture routeMap must carry ${key} -> ${slug}`);
 }
@@ -164,5 +183,19 @@ assert.ok(hasButton('threevthree', 'A', 'PASS') && hasButton('threevthree', 'Y',
   'threevthree phone PASS/BLOCK must match the local 2K face-button map');
 assert.ok(!hasButton('threevthree', 'charge'),
   'threevthree phone SHOOT must not use charge/RT, which basketball reads as turbo');
+
+const fullPicture = generatedFullPicture();
+assert.match(rowCells(fullPicture, 'tennis')[7], /RallyCore/,
+  'full-picture must follow config/factory modes to their shared RallyCore');
+assert.match(rowCells(fullPicture, 'snowboard_slalom')[7], /BoardMovement/,
+  'full-picture must not drop core imports when a mode implementation starts below its imports');
+assert.match(rowCells(fullPicture, 'dance')[7], /DanceCore/,
+  'full-picture must count named core imports even when the imported class is not named after the file');
+assert.ok(!fullPicture.includes('tennis: no shared movement core'),
+  'RallyCore-backed tennis must not be reported as mode-local movement');
+assert.ok(!fullPicture.includes('snowboard_slalom: no shared movement core'),
+  'BoardMovement-backed snowboard must not be reported as mode-local movement');
+assert.ok(!fullPicture.includes('dance: no shared movement core'),
+  'DanceCore-backed dance must not be reported as mode-local movement');
 
 console.log(`full-picture-tests: ${enabledModes.length} enabled mode routes, menus, phone schemas, and gauntlets resolve`);

@@ -25,6 +25,34 @@ const exportSlice = (src: string, marker: string): string | null => {
   const at = src.indexOf(marker);
   return at >= 0 ? src.slice(at, nextExport(src, at)) : null;
 };
+const nextTopLevel = (src: string, start: number): number => {
+  const rest = src.slice(start + 1);
+  const next = rest.match(/\n(?:export )?(?:const|let|function|class|interface|type) /);
+  return next?.index === undefined ? src.length : start + 1 + next.index;
+};
+const localDeclarationSlice = (src: string, name: string): string | null => {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const m = src.match(new RegExp(`(?:^|\\n)(?:const|let|function) ${escaped}\\b`));
+  return m?.index === undefined ? null : src.slice(m.index, nextTopLevel(src, m.index));
+};
+const identifiersOf = (src: string): string[] => [...new Set([...src.matchAll(/\b[A-Za-z_][A-Za-z0-9_]*\b/g)].map((m) => m[0]))];
+const withLocalDependencies = (whole: string, seed: string): string => {
+  let expanded = seed;
+  const included = new Set<string>();
+  for (let pass = 0; pass < 4; pass++) {
+    let changed = false;
+    for (const id of identifiersOf(expanded)) {
+      if (included.has(id)) continue;
+      const dep = localDeclarationSlice(whole, id);
+      if (!dep) continue;
+      included.add(id);
+      expanded = `${dep}\n${expanded}`;
+      changed = true;
+    }
+    if (!changed) break;
+  }
+  return expanded;
+};
 function implementationSlice(src: string, cls: string): string {
   const own = exportSlice(src, `export const ${cls}`) ?? exportSlice(src, `export function ${cls}`) ?? src;
   const factory = own.match(/=\s*(make[A-Za-z0-9_]+)\(/)?.[1];
@@ -50,6 +78,33 @@ const venueOfMode = (key: string, src: string): { venue: string | null; map: str
 };
 
 const CORES = ['CourtMovement', 'BoardMovement', 'CombatMovement', 'FieldRun', 'CarrierControl', 'GroundRide', 'AirControl', 'RallyCore', 'TennisCore', 'GolfCore', 'DanceCore', 'DunkApproach', 'OnslaughtCore', 'KeeperCore', 'Batting', 'Pitching'];
+function importedCoreSymbols(src: string, core: string): string[] {
+  const symbols: string[] = [];
+  const fromCore = new RegExp(`import\\s+(?:type\\s+)?([^;]+?)\\s+from ['"](?:\\.\\./core/${core}|\\./${core})['"]`, 'gs');
+  for (const match of src.matchAll(fromCore)) {
+    const clause = match[1];
+    const named = clause.match(/\{([\s\S]*?)\}/)?.[1];
+    if (!named) {
+      const local = clause.trim().split(/\s*,\s*/)[0];
+      if (/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(local)) symbols.push(local);
+      continue;
+    }
+    for (const raw of named.split(',')) {
+      const part = raw.trim();
+      if (!part || part.startsWith('type ')) continue;
+      const withoutType = part.replace(/^type\s+/, '');
+      const local = withoutType.split(/\s+as\s+/).pop()?.trim();
+      if (local && /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(local)) symbols.push(local);
+    }
+  }
+  return symbols;
+}
+function movementCoresFor(whole: string, src: string): string[] {
+  return CORES.filter((core) => {
+    const symbols = importedCoreSymbols(whole, core);
+    return symbols.some((symbol) => new RegExp(`\\b${symbol}\\b`).test(src));
+  });
+}
 // Camera column = a MEASURED gameplay framing exists for the mode (lib/babylon/config/cameraFraming.json,
 // scripts/probes/_cam-frame.mts). cameraPresets.json describes the retired venue cameras (pre-M104).
 const camFraming = JSON.parse(read('lib/babylon/config/cameraFraming.json'));
@@ -115,14 +170,14 @@ const rows: Row[] = modeEntries.map(({ key, cls }) => {
   // A file may export several modes (precisionModes.ts: Tennis, Golf, Derby, Penalty). Judge each mode by ITS
   // slice — from its `export const <Cls>` to the next export — or derby reads golf's venue mount.
   const src = file ? implementationSlice(whole, cls) : '';
+  const coreSrc = file ? withLocalDependencies(whole, src) : '';
   const route = `/play/${routeMap[key] ?? key}`;
   const { venue, map, kit } = venueOfMode(key, src);
-  const cores = CORES.filter((c) => new RegExp(`from '\\.\\./core/${c}'|from '\\./${c}'|\\b${c}\\b`).test(src) && src.includes(`${c}`));
   return {
     key, enabled: enabled.has(key), file, route,
     menu: gameData.includes(`href: '${route}'`),
     venue, map, kit, baked: !!map && bakedKeys.has(map),
-    cores: cores.filter((c) => src.includes(`/${c}'`)),
+    cores: movementCoresFor(whole, coreSrc),
     camera: camKeys.has(key),   // cameraFraming.json is keyed by registry key
     navFirst: /\.constrain\(/.test(src),
     clamps: (src.match(/Math\.max\(-?[A-Z_0-9.]+, *Math\.min\(/g) ?? []).length + (src.match(/^const (COURT|FIELD|ARENA|BOUNDS|HALF)[A-Z_]* *=/gm) ?? []).length,
