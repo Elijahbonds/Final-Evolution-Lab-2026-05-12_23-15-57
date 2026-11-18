@@ -1691,6 +1691,10 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/adventure/venice/courtLife.ts VENICE_COURT_LIFE',
     hint: 'V2: a shooter on Court 4 (a phone: its one spare skinned body), and on desktop a rebounder there, two more on Court 1 and a jogger on the bike path. Shipped hoops clips; the ball arcs to the rim. 0 = no court life.',
   },  {
+    id: 'venue.veniceCamCollide', label: 'Venice hub: the camera keeps out of poles, fences, boards and palms (1) / passes through (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/adventure/venice/courtsDressing.ts VENICE_CAM_COLLIDE',
+    hint: 'V2: one invisible proxy of the park\'s solids and name boards that the shared camera\'s own occlusion probe pulls in on. No camera distance or lag changes. 0 = the camera goes through them, as before.',
+  },  {
     id: 'venue.veniceSound', label: 'Venice hub: beach bed, far games, the run, footsteps (1) / the harness crowd bed only (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
     source: 'lib/adventure/venice/hubSound.ts VENICE_SOUND',
     hint: 'The ocean bed, dribbles and shots from pickup games down the beach, the run cheering now and then near Court 2, and your steps (concrete vs sand). Through SoundKit: mute and volume apply. 0 = V1 (the mood crowd bed on first input).',

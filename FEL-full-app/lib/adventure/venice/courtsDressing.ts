@@ -19,6 +19,8 @@ import { v1Spots } from './hubWorld';
 import type { Spot } from './layout';
 
 export const VENICE_LOOK_V2 = 1;
+/** V2 phase 3: the camera keeps out of the park's props (mountCameraBlockers). 0 = it passes through them, as before. */
+export const VENICE_CAM_COLLIDE = 1;
 /** Court half-sizes this furniture rings (m): the 16 × 28 painted court plus its run-off. */
 export const FENCE = { halfW: 10.5, halfL: 16.5, h: 3.2, postEvery: 3.5 } as const;
 export const BENCH = { w: 3.2, d: 0.45, h: 0.48 } as const;
@@ -187,4 +189,35 @@ export function mountCourtsDressing(scene: Scene, parent: TransformNode): Courts
     draws: 6,
     dispose() { for (const o of owned) o.dispose(); root.dispose(false, true); },
   };
+}
+
+/** V2 phase 3 (venue.veniceCamCollide): the camera keeps out of the poles, fences, boards, palms, hoops and the boardwalk row.
+ *  The hub's camera is the shared CameraDirector, whose occlusion probe already pulls in on anything `isPickable && checkCollisions`
+ *  (and swings ±50° round the player when boxed in); nothing in the park carried those flags. Rather than flag the drawn meshes
+ *  (thin instances, LOD palms, alpha-tested fence panels: picking them costs triangles every frame), this builds ONE invisible
+ *  proxy mesh of boxes from the park's solids (hubSolids: the same footprints the player walks round, low benches left out — the
+ *  camera rides above them) and the four name boards. Invisible: no draw; one mesh, a few hundred triangles to pick. No camera
+ *  number changes. */
+export interface CamBlockPiece { minX: number; maxX: number; minZ: number; maxZ: number; y0: number; top: number }
+export function camBlockPieces(solids: readonly CamBlockPiece[], boards = true): CamBlockPiece[] {
+  const out = solids.filter((p) => p.top - p.y0 >= 1.5).map((p) => ({ ...p }));
+  if (boards) for (const s of v1Spots()) {
+    const z = s.at[1] - FENCE.halfL - 0.62;
+    out.push({ minX: s.at[0] - 3, maxX: s.at[0] + 3, minZ: z - 0.1, maxZ: z + 0.1, y0: 4.25, top: 5.75 });
+  }
+  return out;
+}
+export function mountCameraBlockers(scene: Scene, parent: TransformNode, pieces: readonly CamBlockPiece[]): Mesh | null {
+  if (!pieces.length) return null;
+  const boxes = pieces.map((p, i) => {
+    const b = MeshBuilder.CreateBox(`venice_camblock_${i}`, { width: Math.max(0.05, p.maxX - p.minX), height: Math.max(0.05, p.top - p.y0), depth: Math.max(0.05, p.maxZ - p.minZ) }, scene);
+    b.position.set((p.minX + p.maxX) / 2, (p.y0 + p.top) / 2, (p.minZ + p.maxZ) / 2);
+    return b;
+  });
+  const m = Mesh.MergeMeshes(boxes, true, true);
+  if (!m) return null;
+  m.name = 'venice_camera_blockers'; m.parent = parent;
+  m.isVisible = false; m.isPickable = true; m.checkCollisions = true;
+  m.freezeWorldMatrix();
+  return m;
 }

@@ -43,7 +43,7 @@ import { mountHubLife, VENICE_LIFE, type HubLife } from '@/lib/adventure/venice/
 import { distanceGain, HubSoundscape, panFor, VENICE_SOUND } from '@/lib/adventure/venice/hubSound';
 import { mountCourtLife, VENICE_COURT_LIFE, type CourtLife } from '@/lib/adventure/venice/courtLife';
 import { hubSolids, palmSolid, probeRoute, v1Hit, VENICE_SOLIDS, Walkup, WALKUP_V2 } from '@/lib/adventure/venice/hubSolids';
-import { VENICE_LOOK_V2 } from '@/lib/adventure/venice/courtsDressing';
+import { camBlockPieces, mountCameraBlockers, VENICE_CAM_COLLIDE, VENICE_LOOK_V2 } from '@/lib/adventure/venice/courtsDressing';
 import type { GroundPiece } from '../adventure/world/pieces';
 
 export const VENICE_MODE_ID = 'venice_hub';
@@ -219,6 +219,13 @@ export const VeniceHubMode: ModeDefinition = {
           const life = mountHubLife(ctx.scene, S.view.root, (ctx.scene.metadata as { felTier?: string } | null)?.felTier ?? 'desktop');
           S.life = life;
           void life.watchers.then((n) => console.info(`[VENICE] life: ${life.gulls} gulls, ${n} watchers`));
+        }
+        // V2 phase 3: the camera keeps out of the park's poles, fences, boards, palms and the boardwalk row (an invisible proxy
+        // the shared director's occlusion probe sees; the palms are in the solids by now)
+        if (feel('venue.veniceCamCollide', VENICE_CAM_COLLIDE) >= 0.5) {
+          const look2 = feel('venue.veniceLookV2', VENICE_LOOK_V2) >= 0.5;
+          const solids = (S.solids ?? hubSolids(v1Spots(), look2)).filter((p) => p.kind === 'block') as Array<{ minX: number; maxX: number; minZ: number; maxZ: number; y0: number; top: number }>;
+          mountCameraBlockers(ctx.scene, S.view.root, camBlockPieces(solids, look2));
         }
         if (feel('venue.veniceCourtLife', VENICE_COURT_LIFE) >= 0.5) {
           const tier = (ctx.scene.metadata as { felTier?: string } | null)?.felTier ?? 'desktop';
