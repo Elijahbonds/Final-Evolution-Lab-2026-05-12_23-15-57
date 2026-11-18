@@ -13,10 +13,12 @@ import { runMode, InputBus, type ModePhase } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hubUi } from '@/lib/adventure/venice/hubUi';
-import { launchHref, PARTY_MODE_FOR_SPOT, writeReturn } from '@/lib/adventure/venice/hubReturn';
+import { hubHrefFor, launchHref, PARTY_MODE_FOR_SPOT, veniceActivity, writeReturn } from '@/lib/adventure/venice/hubReturn';
 import { MODE_INFO } from '@/lib/game-data';
 import { partyClient } from '@/lib/party/social/client';
 import { isHost } from '@/lib/party/social/state';
+import { feel } from '@/lib/feel-panel/feel';
+import { FirstVisitHint, MiniMap, useCardKeys, useFirstVisitHint, VENICE_WAYFINDING } from './wayfinding';
 
 const MODE_KEY = 'venice_hub';
 
@@ -31,6 +33,13 @@ export function VeniceStage({ signedIn }: { signedIn: boolean }) {
   const party = useSyncExternalStore(partyClient().subscribe, partyClient().getState, partyClient().getState);
 
   useEffect(() => { try { setTouch(window.matchMedia('(pointer: coarse)').matches); } catch { setTouch(false); } }, []);
+  // phase 9 (venue.veniceWayfinding): the hint, the mini-map and the card's keys; read once on the client (0 = V1)
+  const [wayfinding, setWayfinding] = useState(false);
+  useEffect(() => { setWayfinding(feel('venue.veniceWayfinding', VENICE_WAYFINDING) >= 0.5); }, []);
+  // a probe's run (?agent=1): the hub's walk seam (window.__VENICE__). lib/agentRunHooks honours it on a loopback host only.
+  useEffect(() => {
+    try { if (new URLSearchParams(window.location.search).get('agent') === '1') void import('@/lib/agentRunHooks').then((m) => m.setAgentRunHooksAllowed(true)); } catch { /* not a probe */ }
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -64,17 +73,26 @@ export function VeniceStage({ signedIn }: { signedIn: boolean }) {
   const partyMode = spot ? PARTY_MODE_FOR_SPOT[spot.id] : undefined;
   const crowd = party.members.filter((m) => m.connected).length;
   const canPartyStart = !!partyMode && isHost(party) && crowd >= 2;
+  const cardUp = !!spot && phase === 'playing';
+  const [hint, dismissHint] = useFirstVisitHint(wayfinding && phase === 'playing', cardUp);
 
   const play = () => {
     if (!spot) return;
     writeReturn(spot, Date.now());
+    // the browser's Back from the game lands beside this court too (the hub reads ?spot=)
+    try { window.history.replaceState(window.history.state, '', hubHrefFor(spot.id)); } catch { /* history is a convenience */ }
     router.push(launchHref(spot));
   };
   const playParty = () => {
     if (!spot || !partyMode) return;
     writeReturn(spot, Date.now());
-    partyClient().startTogether(partyMode);
+    try { window.history.replaceState(window.history.state, '', hubHrefFor(spot.id)); } catch { /* history is a convenience */ }
+    // every member comes back here: the host's activity names the court before the start offer goes out (hubReturn, phase 2)
+    const c = partyClient();
+    c.setActivity(veniceActivity(spot.id));
+    c.startTogether(partyMode);
   };
+  useCardKeys(wayfinding ? busRef.current : null, wayfinding && cardUp, play, canPartyStart ? playParty : null);
 
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden bg-black text-white">
@@ -86,18 +104,22 @@ export function VeniceStage({ signedIn }: { signedIn: boolean }) {
       </Link>
       {err && <p role="alert" className="absolute inset-x-4 top-[4.25rem] rounded-lg bg-black/80 p-3 text-base">The courts did not load. {err}</p>}
       {phase === 'loading' && !err && <p className="absolute inset-x-0 top-1/2 text-center text-base text-white/80">Heading to the courts…</p>}
-      {spot && phase === 'playing' && (
-        <div data-testid="venice-walkup" className="absolute inset-x-4 top-[4.25rem] mx-auto max-w-sm rounded-2xl border border-white/15 bg-black/75 p-3 backdrop-blur">
+      {wayfinding && phase === 'playing' && <MiniMap active={spot?.id ?? null} />}
+      {hint && !cardUp && <FirstVisitHint onDismiss={dismissHint} touch={touch} />}
+      {cardUp && (
+        <div data-testid="venice-walkup" className={`absolute inset-x-4 ${wayfinding ? 'top-[9.25rem]' : 'top-[4.25rem]'} mx-auto max-w-sm rounded-2xl border border-white/15 bg-black/75 p-3 backdrop-blur`}>
           <p className="text-base font-bold">{spot.label.replace('[PLACEHOLDER] ', '')}</p>
           <div className="mt-2 flex flex-col gap-2">
             <button type="button" data-testid="venice-play" onClick={play}
               className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-[#facc15] px-4 text-base font-bold text-black">
               <Play aria-hidden className="h-4 w-4" /> Play {game}
+              {wayfinding && !touch && <span className="ml-1 rounded border border-black/30 px-1 text-xs font-bold" aria-hidden>Enter · X</span>}
             </button>
             {canPartyStart && (
               <button type="button" data-testid="venice-party" onClick={playParty}
                 className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-white/25 px-4 text-base font-bold text-white">
                 <Users aria-hidden className="h-4 w-4" /> Play with your party
+                {wayfinding && !touch && <span className="ml-1 rounded border border-white/30 px-1 text-xs font-bold" aria-hidden>Y</span>}
               </button>
             )}
           </div>
