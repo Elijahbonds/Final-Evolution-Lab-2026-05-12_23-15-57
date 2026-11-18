@@ -259,6 +259,24 @@ for its first half, so its frame times are noisier):
 **Knobs** (Coast · zone, `docs/FEEL-PANEL.md`), all new: `coast.townOn` 1, `coast.townsfolk` 4, `coast.townLoadAfterSec` 0.5,
 `coast.sportsOn` 1, `coast.questsOn` 1. Each off restores phase B.
 
+## 4f. Phase F, first part: the Venice door, end to end (lane/coast-door, 2026-11-18)
+
+**What it adds.** The boat from Venice to the coast and back, through the app's own links:
+- **Venice:** a landing on the sand west of the courts — a plank jetty to the water's edge and a boat moored at its end (one
+  merged, vertex-coloured mesh: one draw, no texture), with a gold ring at the jetty's head (an instance of the courts' own
+  ring). Step into it and the courts' walk-up rule (a short dwell, a metre's hold) brings up a card: "The Boat to the Coast"
+  with one button, **Take the boat to the coast**, which opens `/play/coast?from=venice&spot=pier.end`. The mini-map shows the
+  boat. Behind the knob `venue.coastDoor` (1; 0 = no boat, no card, and `?spot=pier.end` lands at the court gate as before).
+- `assumption:` the landing stands in for the pier end. The plan's pier end is in the Pier district (`layout.ts`, a V5
+  district) and the hub walks only V1's courts district today, so the pier cannot be reached yet. The landing uses the same
+  spot id (`pier.end`), so when the pier is walkable the landing moves there and nothing else changes.
+- **The coast:** `/play/coast?from=venice&spot=pier.end` lands you on the dock (its arrival, unchanged); the boat back's card
+  and the corner link open `/play/venice?spot=pier.end`, and the hub lands you beside the boat's ring, facing the boat.
+- Venice's courts are unchanged: their walk-up, returns, solids and tests are as they were (the boat's ring is far from every
+  court's place; the tests hold that).
+
+<!-- F-MEASURED -->
+
 ## 5. Flags and assumptions
 
 - `assumption:` the zone's layout — which side the mainland is on, the islands' places and sizes, the dock, the bridge and

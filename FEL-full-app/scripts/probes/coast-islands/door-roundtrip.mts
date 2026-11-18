@@ -48,6 +48,7 @@ async function until<T>(page: Page, fn: string, ok: (v: T) => boolean, sec: numb
   return null;
 }
 
+const logs: string[] = [];
 const stop = await serve(path.join(OUT, 'door-server.log'));
 const browser = await chromium.launch({ executablePath: chromiumExe(), args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 try {
@@ -55,6 +56,8 @@ try {
   const page = await ctx.newPage();
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e).slice(0, 300)));
+  page.on('console', (m) => { const t = m.text(); if (/FEL-(READY|TIER|PERF|CANVAS)|VENICE|COAST|context|lost/i.test(t) && logs.length < 300) logs.push(`${new Date().toISOString().slice(11, 23)} ${m.type()}: ${t.slice(0, 200)}`); });
+  page.on('framenavigated', (f) => { if (f === page.mainFrame()) logs.push(`${new Date().toISOString().slice(11, 23)} NAV ${f.url()}`); });
   const shot = async (name: string) => { const f = path.join(OUT, name); await page.screenshot({ path: f, type: 'jpeg', quality: 85 }); console.log('wrote', f); };
 
   // 1. Venice: to the boat, its card, the boat
@@ -76,6 +79,21 @@ try {
   verdict.veniceCard = await page.getByTestId('venice-walkup').textContent().catch(() => null);
   await page.waitForTimeout(500);
   await shot('venice-boat-card-phone.jpg');
+  // what the hub does in the seconds after the picture (r2, r3: the card was gone by the time of the click)
+  const after: unknown[] = [];
+  for (let k = 0; k < 8; k++) {
+    after.push({ t: k * 0.5, card: await page.getByTestId('venice-boat').count(), state: await page.evaluate('window.__VENICE__ ? window.__VENICE__.state() : null').catch((e) => String(e).slice(0, 80)) });
+    await page.waitForTimeout(500);
+  }
+  verdict.afterShot = after;
+  if (!(await page.getByTestId('venice-boat').count())) {
+    // the card went: walk back into the ring and press at once, before any picture
+    verdict.rewalk = true;
+    await until<boolean>(page, '!!(window.__VENICE__ && window.__VENICE__.state)', Boolean, 120);
+    await page.evaluate("window.__VENICE__.walkTo('pier.end')");
+    await until<{ walking: boolean; spot: string | null }>(page, 'window.__VENICE__.state()', (st) => !st.walking && st.spot === 'pier.end', 180);
+    await page.getByTestId('venice-boat').waitFor({ timeout: 15000 }).catch(() => fail('the boat card did not come back'));
+  }
   await press(page, 'venice-boat', 'veniceBoat');
 
   // 2. the coast, on its dock
@@ -118,6 +136,7 @@ try {
 } catch (e) {
   fail(String(e).slice(0, 300));
 } finally {
+  verdict.logs = logs;
   await browser.close();
   stop();
   fs.writeFileSync(path.join(OUT, 'door-roundtrip.json'), JSON.stringify(verdict, null, 1));
