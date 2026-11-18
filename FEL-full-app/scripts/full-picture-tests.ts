@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { MODE_CONTROLLERS } from '../lib/controller-link/schemas/registry';
 
 const ROOT = process.cwd();
+const requireFromHere = createRequire(import.meta.url);
 
 const registry = readFileSync(join(ROOT, 'lib/babylon/modes/registry.ts'), 'utf8');
 const matrix = readFileSync(join(ROOT, 'scripts/full-picture.mts'), 'utf8');
@@ -98,6 +102,23 @@ function modesInForLoops(script: string): Set<string> {
   return modes;
 }
 
+function generatedMatrixRows(): Map<string, { cores: string[] }> {
+  const out = execFileSync(
+    process.execPath,
+    [requireFromHere.resolve('tsx/cli'), join(ROOT, 'scripts/full-picture.mts'), '--md', join(tmpdir(), `fel-full-picture-${process.pid}.md`)],
+    { cwd: ROOT, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 },
+  );
+  const rows = new Map<string, { cores: string[] }>();
+  for (const line of out.split('\n')) {
+    if (!line.startsWith('| ') || line.startsWith('| mode ') || line.startsWith('|---')) continue;
+    const cells = line.split('|').slice(1, -1).map((c) => c.trim());
+    const [mode] = cells;
+    const cores = cells[7] === '—' ? [] : cells[7].split(',').map((c) => c.trim());
+    rows.set(mode, { cores });
+  }
+  return rows;
+}
+
 function hasDpadAction(mode: string, action: string): boolean {
   return (MODE_CONTROLLERS[mode]?.schemas ?? []).some((schema) => (
     schema.kind === 'dpad' && schema.dpad.action === action
@@ -148,6 +169,29 @@ assert.deepEqual(missingDevGauntlet, [], 'enabled modes must be in the dev-mode 
 assert.deepEqual(missingPlayGauntlet, [], 'enabled modes must be in the shipping-route gauntlet');
 assert.deepEqual(missingConceptLocks, [], 'enabled modes must have concept locks');
 assert.deepEqual(missingModeTests, [], 'enabled modes must have named regression coverage');
+const matrixRows = generatedMatrixRows();
+const expectedCoreRows: Record<string, string[]> = {
+  bigair: ['AirSessionCore'],
+  dance: ['DanceCore'],
+  football: ['RushRun'],
+  onevone: ['BasketballCore'],
+  showdown: ['CombatMovement'],
+  skateboard: ['BoardMovement', 'AirControl'],
+  snowboard_slalom: ['BoardMovement'],
+  sprint: ['SprintCore'],
+  tennis: ['RallyCore'],
+  threevthree: ['BasketballCore'],
+  volleyball: ['RallyCore'],
+};
+for (const [mode, cores] of Object.entries(expectedCoreRows)) {
+  const actual = matrixRows.get(mode)?.cores ?? [];
+  for (const core of cores) {
+    assert.ok(
+      actual.includes(core),
+      `full-picture matrix must classify ${mode} as using ${core}; got ${actual.join(', ') || 'none'}`,
+    );
+  }
+}
 assert.ok(hasDpadAction('freerun', 'move'), 'freerun phone d-pad must steer with LEFT STICK movement');
 assert.ok(hasHeldButton('freerun', 'charge'), 'freerun phone schema must expose held RT sprint');
 assert.ok(hasHeldButton('freerun', 'brake'), 'freerun phone schema must expose held LT slide');

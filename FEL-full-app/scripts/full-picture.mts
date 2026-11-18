@@ -49,7 +49,32 @@ const venueOfMode = (key: string, src: string): { venue: string | null; map: str
   return { venue, map: venue ? venueMapKeys[venue] ?? null : null, kit: kit.length ? [...new Set(kit)].join('+') : null };
 };
 
-const CORES = ['CourtMovement', 'BoardMovement', 'CombatMovement', 'FieldRun', 'CarrierControl', 'GroundRide', 'AirControl', 'RallyCore', 'TennisCore', 'GolfCore', 'DanceCore', 'DunkApproach', 'OnslaughtCore', 'KeeperCore', 'Batting', 'Pitching'];
+type CoreDef = { name: string; imports: string[]; symbols: string[] };
+const CORE_DEFS: CoreDef[] = [
+  { name: 'CourtMovement', imports: ['../core/CourtMovement'], symbols: ['CourtMovement'] },
+  { name: 'BasketballCore', imports: ['../core/BasketballCore'], symbols: ['DribbleController', 'ShotMeter', 'DefenderBrain'] },
+  { name: 'BoardMovement', imports: ['../core/BoardMovement'], symbols: ['BoardMovement', 'SKATE_TUNING', 'SNOW_TUNING'] },
+  { name: 'GroundRide', imports: ['../core/GroundRide', './boardCore'], symbols: ['Rider', 'buildRig', 'BoardRig'] },
+  { name: 'AirControl', imports: ['../core/AirControl'], symbols: ['AirControl'] },
+  { name: 'AirSessionCore', imports: ['../../feel/cores/air-session-core', '../../feel/cores/big-air-skin'], symbols: ['AirSessionCore', 'makeBigAirSession', 'makeAirSessionMode'] },
+  { name: 'CombatMovement', imports: ['../core/CombatMovement'], symbols: ['CombatMovement'] },
+  { name: 'RushRun', imports: ['../core/RushRun'], symbols: ['stepRun', 'cutSlideSec', 'breakawayMeter'] },
+  { name: 'SprintCore', imports: ['../../feel/cores/sprint-core', '../../feel/cores/sprint-skin'], symbols: ['SprintCore', 'makeSprintRace'] },
+  { name: 'RallyCore', imports: ['../core/RallyCore'], symbols: ['TENNIS', 'VOLLEYBALL', 'createNetSportMode'] },
+  { name: 'DanceCore', imports: ['../core/DanceCore'], symbols: ['DancePerformance', 'generateRoutine'] },
+  { name: 'DunkApproach', imports: ['../core/DunkApproach'], symbols: ['takeoffFor', 'takeoffTell', 'rangeLabel'] },
+  { name: 'OnslaughtCore', imports: ['../core/OnslaughtCore'], symbols: ['waveSpec', 'spawnRing', 'DownRevive'] },
+  { name: 'KeeperCore', imports: ['../core/KeeperCore'], symbols: ['planRivalKick', 'gradeDive', 'resolveSaveRead', 'resolveSave'] },
+  { name: 'Batting', imports: ['../core/DerbyLoop'], symbols: ['pitchShape', 'bankSwing', 'batFlipRead'] },
+  { name: 'GolfCore', imports: ['../core/GolfBall', '../core/GolfAim', '../core/GolfLoop'], symbols: ['GolfBallSim', 'simulateShot', 'loopHole'] },
+];
+const hasImport = (src: string, mod: string) => src.includes(`from '${mod}'`) || src.includes(`from "${mod}"`);
+const hasSymbol = (src: string, sym: string) => new RegExp(`\\b${sym}\\b`).test(src);
+function coresOfMode(whole: string, src: string): string[] {
+  return CORE_DEFS
+    .filter((c) => c.imports.some((mod) => hasImport(whole, mod)) && c.symbols.some((sym) => hasSymbol(src, sym)))
+    .map((c) => c.name);
+}
 // Camera column = a MEASURED gameplay framing exists for the mode (lib/babylon/config/cameraFraming.json,
 // scripts/probes/_cam-frame.mts). cameraPresets.json describes the retired venue cameras (pre-M104).
 const camFraming = JSON.parse(read('lib/babylon/config/cameraFraming.json'));
@@ -117,12 +142,15 @@ const rows: Row[] = modeEntries.map(({ key, cls }) => {
   const src = file ? implementationSlice(whole, cls) : '';
   const route = `/play/${routeMap[key] ?? key}`;
   const { venue, map, kit } = venueOfMode(key, src);
-  const cores = CORES.filter((c) => new RegExp(`from '\\.\\./core/${c}'|from '\\./${c}'|\\b${c}\\b`).test(src) && src.includes(`${c}`));
+  // `src` is the per-mode implementation slice, which intentionally often
+  // starts below the imports. Match imports against the full file and usage
+  // against the slice so shared-core rows stay per-mode without losing imports.
+  const cores = coresOfMode(whole, src);
   return {
     key, enabled: enabled.has(key), file, route,
     menu: gameData.includes(`href: '${route}'`),
     venue, map, kit, baked: !!map && bakedKeys.has(map),
-    cores: cores.filter((c) => src.includes(`/${c}'`)),
+    cores,
     camera: camKeys.has(key),   // cameraFraming.json is keyed by registry key
     navFirst: /\.constrain\(/.test(src),
     clamps: (src.match(/Math\.max\(-?[A-Z_0-9.]+, *Math\.min\(/g) ?? []).length + (src.match(/^const (COURT|FIELD|ARENA|BOUNDS|HALF)[A-Z_]* *=/gm) ?? []).length,
