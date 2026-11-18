@@ -91,7 +91,48 @@ Not started in this run: the partner, creatures, flying, riding, quests (phases 
 
 ## 4. Phase A, measured
 
-The numbers, the shots and the gate counts are in section 6 when measured; "not measured" is said where they are not.
+**The phone rig** (`scripts/probes/coast-islands/zone-rig.mts`, 2026-11-18 08:50–09:20 UTC): the real mode bundled with esbuild, a
+phone (390 × 844, DPR 3, touch), SwiftShader, the page's JS throttled 4× until it is playable; the zone and **the Venice hub as the
+same-session control**, interleaved, three runs each; then the zone with streaming off. The walk: from the dock along the beach
+toward the bridge, crossing four 64 m pieces. SwiftShader overstates a phone; the comparison with the control is the point.
+
+| Run | Playable (s) | Worst frame: draws / active meshes / texture MB / bodies | Fine pieces / props drawn (max) |
+|---|---|---|---|
+| Zone 1 · 2 · 3 | 34.7 · 32.4 · 28.3 (median 32.4) | 60 / 34 / 37 / 1 (all three within 1) | 16 / 147 |
+| Venice hub (control) 1 · 2 · 3 | 38.9 · 33.1 · 33.3 (median 33.3) | 48 / 51 / 73 / 1 | — |
+| Zone, streaming off (`coast.streamOn` 0) | 31.2 | 59 / 35 / 37 / 1 | 30 / 187 |
+
+- **The zone is playable as fast as the Venice hub** on the same rig and session (median 32.4 s against 33.3 s), and costs fewer
+  active meshes and half the texture memory (37 MB against 73 MB). It draws 12 more calls than the hub (60 against 48): one per
+  land piece's terrain mesh. All well inside the phone plan's 450 draws / 300 meshes / 200 MB.
+- **Streaming** halves what is drawn in triangles (the guard: the worst standable piece 38,568 triangles, 75,858 with streaming
+  off) and drops props and fine terrain pieces by a third on the rig (147 against 187 props, 16 against 30 fine pieces). It
+  does not change draw calls: every land piece always draws one terrain mesh, fine or coarse.
+- **Frame time on the rig** (rAF gaps while walking, throttle off): the zone's worst frame was 3.5 / 2.1 / 1.5 s against the
+  hub's 1.4 / 1.7 / 1.2 s (p95 1.8 / 1.2 / 1.0 s against 1.2 / 1.2 / 0.7 s). The rig draws a 1170 × 2532 phone frame in software,
+  so these are the rig's, and three runs do not separate the zone from the box's noise; the zone does more on a walk (it crosses
+  pieces and builds terrain). **Not measured on a phone.** Phase F's gate (no frame over 100 ms from a load) needs the owner's
+  phone or a GPU rig; if a hitch shows, building a crossing's new fine pieces one per frame is the first fix.
+- The `coast_zone` row in `lib/babylon/config/mobileBudget.json`: measured 60 / 34 / 1 / 37 / 0, budget (× 1.2) 72 / 41 / 2 / 45 / 0.
+- **The static guard** `scripts/coast-zone-budget-tests.ts` (in ci-suite): the worst standable piece's triangles (38,568, cap
+  40,400) and place draws (51, cap 53), the place's textures (2.1 MB: only procedural; the Kenney models carry none), the model
+  list, and its **control**: streaming off must come out over the triangle cap (it does: 75,858).
+
+**Headless, on the real Adventure host** (`lib/adventure/coast/coast.test.ts`): dock → beach → bridge → Palm Key → sandbar →
+Reef Rock, every leg reached, never in deep water; running off the dock stops at the deep water; a jump off its side is turned
+back, and with `coast.deepWaterTurnBack` 0 (the control) the same jump does end over deep water.
+
+**Pictures** (phone, JPG, from the rig): arrival on the dock; the beach from the shallows; Palm Key and the bridge from beside it,
+in `scratchpad/coast-islands/` (paths in the lane report).
+
+**Every-screen on `/play/coast`: not scored in this run.** The scorer needs a production build (3.2 GB); two builds were killed
+for memory beside other lanes' builds, the third succeeded but was deleted to free disk before the scorer's turn, and the disk
+then stayed under the 7 GB-free rule (3.4 GB free). The page is built the same way as `/play/venice`, which scored clean
+(VENICE-HUB-PLAN §8): a back link (here "Venice"), 16 px text, 44 px targets, one action. It needs a scorer run before the
+zone is linked from anywhere.
+
+**Found and fixed on the way:** the palms were never drawn on the first rig run — a Babylon clone keeps its source's parent, so
+the baked prop masters were disposed with the import's root (held now by `zoneProps.test.ts`, mutation-checked).
 
 ---
 

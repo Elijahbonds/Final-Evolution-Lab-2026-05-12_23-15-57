@@ -59,7 +59,7 @@ async function walkTo(page: Page, x: number, z: number, maxSec: number, sample: 
     while ((Date.now() - t0) / 1000 < maxSec) {
       const d = await page.evaluate(`(() => { const c = window.__coast(); return Math.hypot(${x} - c.x, ${z} - c.z); })()`) as number;
       if (d < 3) return true;
-      await page.waitForTimeout(250); await sample(k++);
+      await page.waitForTimeout(500); if (k % 2 === 0) await sample(k); k++;   // the rig draws a few frames a second: sample lightly
     }
     return false;
   } finally { await page.evaluate('window.__drive(null)'); }
@@ -116,13 +116,13 @@ try {
     const legs: Record<string, boolean> = {};
     if (isCoast) {
       // the walk: off the dock to the beach, down the beach to the bridge, over the bridge onto Palm Key (crosses four pieces)
-      legs.beach = await walkTo(page, 92, 24, 25, sample);
-      legs.beachSouth = await walkTo(page, 72, -30, 25, sample);
+      legs.beach = await walkTo(page, 92, 24, 120, sample);
+      legs.beachSouth = await walkTo(page, 72, -30, 150, sample);
       await shot('beach');
-      legs.bridgeEast = await walkTo(page, 66, -36, 15, sample);
-      legs.bridgeMid = await walkTo(page, 20, -36, 25, sample);
+      legs.bridgeEast = await walkTo(page, 66, -36, 60, sample);
+      legs.bridgeMid = await walkTo(page, 20, -36, 150, sample);
       await shot('island');
-      legs.palmKey = await walkTo(page, -24, -36, 20, sample);
+      legs.palmKey = await walkTo(page, -24, -36, 150, sample);
     } else {
       await page.evaluate(() => (window as unknown as { __bus: { emit(e: unknown): void } }).__bus.emit({ t: 'stick', side: 'L', x: 0, y: -1 }));   // forward (the bus's y is down-positive)
       for (let k = 0; k < 40; k++) { await page.waitForTimeout(250); await sample(); }
