@@ -45,7 +45,10 @@ async function checkB(page: Page): Promise<{ ok: boolean; why: string }> {
   const b = await page.evaluate(READ) as typeof a;
   const moved = Math.hypot(b.x - a.x, b.z - a.z);
   if (b.phaseB !== 'playing') return { ok: false, why: `the second hub is ${b.phaseB}` };
-  if (moved < 1) return { ok: false, why: `the second hub's player did not walk (${moved.toFixed(2)} m)` };
+  // 0.2 m, not 1 m: with two engines in one tab on the shared box the walk is slow — the first run (2026-11-18) read 0.26-0.77 m in
+  // the CONTROL (nobody torn down) too. What the old teardown broke was the seam and the scene (the courts view disposed): those
+  // are the checks that tell; the walk only proves the player still answers.
+  if (moved < 0.2) return { ok: false, why: `the second hub's player did not walk (${moved.toFixed(2)} m)` };
   if (!b.meshes || b.meshes < 100) return { ok: false, why: `the second hub's scene holds ${b.meshes} meshes` };
   return { ok: true, why: `playing, seam present, walked ${moved.toFixed(1)} m, ${b.meshes} meshes` };
 }
