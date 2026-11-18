@@ -30,7 +30,18 @@ import { PHONE_MODEL_TEXTURE_MAX, PHONE_FAR_PROP_MAX } from '../lib/babylon/scen
 import { VENICE_SHARED_COURT } from '../lib/adventure/venice/courtsView';
 import { v1Spots } from '../lib/adventure/venice/hubWorld';
 import { BOARD_ROW, VENICE_LOOK_V2 } from '../lib/adventure/venice/courtsDressing';
-import { VENICE_LIFE, GULLS } from '../lib/adventure/venice/hubLife';
+import { VENICE_LIFE, GULLS, VENICE_PHONE_WATCHERS, PHONE_WATCHERS } from '../lib/adventure/venice/hubLife';
+import { COURT_LIFE } from '../lib/adventure/venice/courtLife';
+import { CROWD_BODY_URLS } from '../lib/babylon/visual/crowd/crowdBake';
+import { layoutClips } from '../lib/babylon/visual/crowd/crowdVat';
+
+/** V2: the phone watchers' textures — the crowd's ONE base-colour image (crowdBake keeps the first body's, at its own 1024², not
+ *  phone-capped) and each body's baked animation (RGBA float: (22 bones + 1) × 4 px wide, one row per baked frame, 16 bytes a px). */
+export function crowdTexMb(): number {
+  const { rows } = layoutClips();
+  const vat = CROWD_BODY_URLS.length * ((22 + 1) * 4 * rows * 16) / MB;
+  return (1024 * 1024 * 4 * 1.33) / MB + vat;
+}
 
 let failed = 0, passed = 0;
 const ok = (c: boolean, msg: string) => { if (c) passed++; else { failed++; console.error(`  ✗ ${msg}`); } };
@@ -42,17 +53,18 @@ export const PLACE_GLBS: readonly string[] = [
   ...VENICE_PALM_LODS.files.map((f) => `${VENICE_ENV2_DIR}${f}`),
   `${VENICE_ENV2_DIR}venice_boardwalk_kit.glb`,
 ];
-/** The place's texture MB on a phone, computed today with the paint shared (+ 5 %). */
-export const PLACE_TEX_MB = 43;
+/** The place's texture MB on a phone, computed today with the paint shared (+ 5 %). V2 (2026-11-18): 43 -> 53 for the phone
+ *  watchers (owner: "phones get a few REAL 3D people"): the crowd's one base-colour texture and five baked-animation textures. */
+export const PLACE_TEX_MB = 53;
 
 /** Pure: the place's texture MB on a phone when the courts are drawn by `courtMeshes` meshes (1 shared, 4 unshared). */
-export function placeTexMb(courtMeshes: number, o: { look2?: boolean; life?: boolean } = {}): { total: number; glb: number; procedural: number } {
-  const look2 = o.look2 ?? VENICE_LOOK_V2 >= 0.5, life = o.life ?? VENICE_LIFE >= 0.5;
+export function placeTexMb(courtMeshes: number, o: { look2?: boolean; life?: boolean; watchers?: boolean } = {}): { total: number; glb: number; procedural: number } {
+  const look2 = o.look2 ?? VENICE_LOOK_V2 >= 0.5, life = o.life ?? VENICE_LIFE >= 0.5, watchers = life && (o.watchers ?? VENICE_PHONE_WATCHERS >= 0.5);
   const glb = PLACE_GLBS.reduce((s, u) => s + phoneTexMbOf(u, PHONE_FAR_PROP_MAX), 0);
   const tex = (w: number, h: number) => (w * h * 4 * 1.33) / MB;
   const courts = v1Spots().length;
   const names = look2 ? tex(BOARD_ROW.w, BOARD_ROW.h * courts) + tex(128, 128) : courts * tex(512, 128);
-  const procedural = tex(PHONE_MODEL_TEXTURE_MAX, PHONE_MODEL_TEXTURE_MAX) + courtMeshes * tex(512, 512) + 3 * tex(512, 512) + names + (life ? tex(64, 64) : 0);
+  const procedural = tex(PHONE_MODEL_TEXTURE_MAX, PHONE_MODEL_TEXTURE_MAX) + courtMeshes * tex(512, 512) + 3 * tex(512, 512) + names + (life ? tex(64, 64) : 0) + (watchers ? crowdTexMb() : 0);
   return { total: glb + procedural, glb, procedural };
 }
 
@@ -68,8 +80,15 @@ if (isMain) {
   ok(courts === 4, `V1 opens four courts (got ${courts})`);
   const v1 = placeTexMb(meshes, { look2: false, life: false });
   console.log(`  V1's look and an empty park: ${v1.total.toFixed(1)} MB; the improvement pass adds ${(now.total - v1.total).toFixed(2)} MB`);
-  ok(now.total - v1.total < 0.5, `the furniture and the gulls add under 0.5 MB of phone textures (${(now.total - v1.total).toFixed(2)} MB): the name boards cost what V1's signs did`);
+
   ok(GULLS.phone <= 3, `a phone flies at most three gulls (got ${GULLS.phone})`);
+  const noWatchers = placeTexMb(meshes, { watchers: false });
+  ok(noWatchers.total - v1.total < 0.5, `the furniture and the gulls add under 0.5 MB of phone textures (${(noWatchers.total - v1.total).toFixed(2)} MB): the name boards cost what V1's signs did`);
+  console.log(`  the phone watchers add ${(now.total - noWatchers.total).toFixed(1)} MB (crowd texture + baked animation)`);
+  ok(PHONE_WATCHERS.run + PHONE_WATCHERS.ones >= 4 && PHONE_WATCHERS.run + PHONE_WATCHERS.ones <= 6, 'a phone stands 4–6 real watchers (owner 2026-11-18)');
+  ok(now.total - noWatchers.total < 10, `the phone watchers cost under 10 MB of textures (${(now.total - noWatchers.total).toFixed(1)} MB)`);
+  ok(COURT_LIFE.phone.courts.length <= 1 && !COURT_LIFE.phone.rebounders && COURT_LIFE.phone.joggers === 0, 'a phone gets one court-life body: with the player, the row\'s two skinned bodies');
+  if (row) ok(1 + COURT_LIFE.phone.courts.length <= row.budget.skinnedBodies, `the player and the phone's shooter fit the row's skinned bodies (${row.budget.skinnedBodies})`);
   ok(VENICE_SHARED_COURT === 1, 'perf.veniceSharedCourt ships at 1: one court mesh for the four');
   ok(meshes === 1, `one court mesh, drawn as instances (got ${meshes})`);
   ok(now.total <= PLACE_TEX_MB, `the place's phone texture memory ${now.total.toFixed(1)} MB is within PLACE_TEX_MB ${PLACE_TEX_MB}`);
