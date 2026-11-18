@@ -12,7 +12,7 @@
  * sessions, so you must have played a mode before you can challenge with it.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Swords, Copy, Check, Loader2, Users, Radio, Trophy, Share2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { readToast } from '@/components/ui/fel/toast';
@@ -32,6 +32,7 @@ export function MultiplayerLobby() {
   const [tab, setTab] = useState<Tab>('online');
   const [matches, setMatches] = useState<MatchRow[]>([]);
   const [prefillCode, setPrefillCode] = useState('');
+  const actionPanelRef = useRef<HTMLDivElement | null>(null);
 
   const loadMatches = () => {
     fetch('/api/v1/mp/list')
@@ -49,6 +50,13 @@ export function MultiplayerLobby() {
       if (c) { setPrefillCode(c.toUpperCase()); setTab('join'); }
     } catch { /* no-op */ }
   }, []);
+
+  const showChallengePanel = () => {
+    setTab('online');
+    const scroll = () => actionPanelRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(scroll);
+    else scroll();
+  };
 
   return (
     <div className="mx-auto max-w-[820px] px-4 py-8">
@@ -68,7 +76,7 @@ export function MultiplayerLobby() {
         <TabBtn active={tab === 'local'} onClick={() => setTab('local')} icon={<Users className="h-4 w-4" />} label="Pass & play" />
       </div>
 
-      <div className="mt-5">
+      <div className="mt-5" ref={actionPanelRef}>
         {tab === 'online' && <OnlinePanel onDone={loadMatches} />}
         {tab === 'join' && <JoinPanel onDone={loadMatches} initialCode={prefillCode} />}
         {tab === 'local' && <LocalPanel onDone={loadMatches} />}
@@ -77,9 +85,16 @@ export function MultiplayerLobby() {
       <h2 className="mt-10 fel-heading text-xl font-bold text-white">Your matches</h2>
       <div className="mt-3 space-y-2">
         {matches.length === 0 ? (
-          <p className="rounded-xl border border-white/10 bg-white/[0.03] p-4 text-sm text-white/50">
-            No matches yet. Create a challenge above to get started.
-          </p>
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 text-sm text-white/60">
+            <p>No matches yet. Create a challenge to get started.</p>
+            <button
+              type="button"
+              onClick={showChallengePanel}
+              className="mt-3 inline-flex min-h-11 items-center rounded-xl bg-[#00E5FF] px-4 font-bold text-black"
+            >
+              Create a challenge
+            </button>
+          </div>
         ) : (
           matches.map((m) => <MatchCard key={m.id} m={m} />)
         )}

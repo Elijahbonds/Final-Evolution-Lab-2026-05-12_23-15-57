@@ -2,12 +2,13 @@
 import { describe, expect, it } from 'vitest';
 import { buildHubWorld, courtsRect, returnSpawnFor, v1Area, v1Spots, V1_RIM_H } from './hubWorld';
 import {
-  clearReturn, FROM_VENICE, hubHrefFor, launchHref, PARTY_MODE_FOR_SPOT, readReturn, RETURN_KEY, RETURN_TTL_MS, spotFromSearch,
-  veniceReturnHref, writeReturn, type StoreLike,
+  clearReturn, consumeVeniceReturnHref, FROM_VENICE, hubHrefFor, launchChoices, launchHref, PARTY_MODE_FOR_SPOT, readReturn, RETURN_KEY, RETURN_TTL_MS, spotFromSearch,
+  veniceReturnHref, writeReturn, writeReturnForHref, type StoreLike,
 } from './hubReturn';
 import { veniceDoorOn, VENICE_DOOR_HREF } from './door';
 import { districtAt } from './layout';
 import { ONLINE_MODES } from '@/server/netd/src/partyRules';
+import { MODE_INFO } from '@/lib/game-data';
 
 const mem = (): StoreLike & { m: Map<string, string> } => {
   const m = new Map<string, string>();
@@ -60,6 +61,23 @@ describe('walking up and coming back', () => {
     expect(u.searchParams.get('spot')).toBe('court.ones');
     expect(u.searchParams.get('location')).toBe('venice');
   });
+  it('offers every mode on a multi-mode court, each with the Venice return query', () => {
+    const [, , flight, arc] = v1Spots();
+    expect(launchChoices(flight, MODE_INFO).map((c) => [c.mode, c.label, new URL(c.href, 'http://x').pathname])).toEqual([
+      ['dunkContest', 'Flight Night', '/play/dunk'],
+      ['dunkduel', 'Prove It', '/play/dunkduel'],
+    ]);
+    expect(launchChoices(arc, MODE_INFO).map((c) => [c.mode, c.label, new URL(c.href, 'http://x').pathname])).toEqual([
+      ['threePoint', 'Downtown', '/play/threepoint'],
+      ['carnival', 'Game Night', '/play/carnival'],
+    ]);
+    for (const c of [...launchChoices(flight, MODE_INFO), ...launchChoices(arc, MODE_INFO)]) {
+      const u = new URL(c.href, 'http://x');
+      expect(u.searchParams.get('from')).toBe(FROM_VENICE);
+      expect(u.searchParams.get('spot')).toMatch(/^court\./);
+      expect(u.searchParams.get('location')).toBe('venice');
+    }
+  });
   it('the end screen goes back to the court the game came from: by the query, or by the return mark', () => {
     const st = mem();
     expect(veniceReturnHref('/play/onevone', '?from=venice&spot=court.ones', 0, st)).toBe(hubHrefFor('court.ones'));
@@ -70,6 +88,29 @@ describe('walking up and coming back', () => {
     expect(veniceReturnHref('/play/threevthree', '', 1000 + RETURN_TTL_MS + 1, st)).toBeNull();   // stale
     clearReturn(st);
     expect(st.m.has(RETURN_KEY)).toBe(false);
+  });
+  it('consumes the storage fallback once the end screen has claimed it', () => {
+    const st = mem();
+    writeReturn(v1Spots()[0], 1000, st);
+    expect(consumeVeniceReturnHref('/play/onevone', '', 1001, st)).toBe(hubHrefFor('court.ones'));
+    expect(st.m.has(RETURN_KEY)).toBe(false);
+    expect(veniceReturnHref('/play/onevone', '', 1002, st)).toBeNull();
+  });
+  it('stores the actual launched route for alternate games on a multi-mode court', () => {
+    const st = mem();
+    const [, , flight, arc] = v1Spots();
+    const duel = launchChoices(flight, MODE_INFO).find((c) => c.mode === 'dunkduel')!;
+    const carnival = launchChoices(arc, MODE_INFO).find((c) => c.mode === 'carnival')!;
+
+    writeReturnForHref(flight, duel.href, 1000, st);
+    expect(readReturn(1001, st)).toMatchObject({ spot: 'court.flight', route: '/play/dunkduel' });
+    expect(veniceReturnHref('/play/dunkduel', '', 1001, st)).toBe(hubHrefFor('court.flight'));
+    expect(veniceReturnHref('/play/dunk', '', 1001, st)).toBeNull();
+
+    writeReturnForHref(arc, carnival.href, 2000, st);
+    expect(readReturn(2001, st)).toMatchObject({ spot: 'court.arc', route: '/play/carnival' });
+    expect(veniceReturnHref('/play/carnival', '', 2001, st)).toBe(hubHrefFor('court.arc'));
+    expect(veniceReturnHref('/play/threepoint', '', 2001, st)).toBeNull();
   });
   it('refuses junk: a made-up spot, broken storage, a mark from the future', () => {
     const st = mem();
@@ -87,6 +128,7 @@ describe('walking up and coming back', () => {
     expect(PARTY_MODE_FOR_SPOT['court.ones']).toBe('onevone');
     expect(PARTY_MODE_FOR_SPOT['court.run']).toBe('threevthree');
     expect(PARTY_MODE_FOR_SPOT['court.flight']).toBeUndefined();
+    expect(PARTY_MODE_FOR_SPOT['court.camera']).toBeUndefined();
   });
 });
 

@@ -33,6 +33,23 @@ function implementationSlice(src: string, cls: string): string {
   const exportConstCount = (src.match(/(?:^|\n)export const /g) ?? []).length;
   return exportConstCount > 1 ? own : src;
 }
+const importStatementsFor = (src: string, from: string): string[] => (
+  [...src.matchAll(new RegExp(`import\\s+([\\s\\S]*?)\\s+from '${from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}'`, 'g'))].map((m) => m[1])
+);
+function importedNames(stmt: string): string[] {
+  const noType = stmt.replace(/\btype\b/g, '');
+  const braced = noType.match(/\{([\s\S]*?)\}/)?.[1] ?? noType.split(',')[0] ?? '';
+  return braced.split(',')
+    .map((part) => part.trim().split(/\s+as\s+/).pop()?.trim() ?? '')
+    .filter((name) => /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(name));
+}
+function coreUsedInSlice(whole: string, src: string, imports: readonly string[]): boolean {
+  for (const from of imports) {
+    const names = importStatementsFor(whole, from).flatMap(importedNames);
+    if (names.some((name) => new RegExp(`\\b${name}\\b`).test(src))) return true;
+  }
+  return false;
+}
 
 // venue: two mounting paths. (a) a venue SPEC (lib/babylon/nexus/venueSpecs) via
 // mountVenue(ctx, venueId) — the route table in NexusVenue or a literal in the mode —
@@ -49,7 +66,27 @@ const venueOfMode = (key: string, src: string): { venue: string | null; map: str
   return { venue, map: venue ? venueMapKeys[venue] ?? null : null, kit: kit.length ? [...new Set(kit)].join('+') : null };
 };
 
-const CORES = ['CourtMovement', 'BoardMovement', 'CombatMovement', 'FieldRun', 'CarrierControl', 'GroundRide', 'AirControl', 'RallyCore', 'TennisCore', 'GolfCore', 'DanceCore', 'DunkApproach', 'OnslaughtCore', 'KeeperCore', 'Batting', 'Pitching'];
+const CORES = [
+  { name: 'CourtMovement', imports: ['../core/CourtMovement', './CourtMovement'] },
+  { name: 'BoardMovement', imports: ['../core/BoardMovement', './BoardMovement'] },
+  { name: 'CombatMovement', imports: ['../core/CombatMovement', './CombatMovement'] },
+  { name: 'FieldRun', imports: ['../core/FieldRun', './FieldRun'] },
+  { name: 'CarrierControl', imports: ['../core/CarrierControl', './CarrierControl'] },
+  { name: 'GroundRide', imports: ['../core/GroundRide', './GroundRide'] },
+  { name: 'AirControl', imports: ['../core/AirControl', './AirControl'] },
+  { name: 'RallyCore', imports: ['../core/RallyCore', './RallyCore'] },
+  { name: 'TennisCore', imports: ['../core/TennisCore', './TennisCore'] },
+  { name: 'GolfCore', imports: ['../core/GolfCore', './GolfCore'] },
+  { name: 'DanceCore', imports: ['../core/DanceCore', './DanceCore'] },
+  { name: 'DunkApproach', imports: ['../core/DunkApproach', './DunkApproach'] },
+  { name: 'OnslaughtCore', imports: ['../core/OnslaughtCore', './OnslaughtCore'] },
+  { name: 'KeeperCore', imports: ['../core/KeeperCore', './KeeperCore'] },
+  { name: 'FreeRunCore', imports: ['../core/FreeRunCore', './FreeRunCore'] },
+  { name: 'SprintCore', imports: ['../../feel/cores/sprint-core', '../../feel/cores/sprint-skin'] },
+  { name: 'BaseballGame', imports: ['./baseballGame'] },
+  { name: 'Batting', imports: ['../core/Batting', './Batting'] },
+  { name: 'Pitching', imports: ['../core/Pitching', './Pitching'] },
+] as const;
 // Camera column = a MEASURED gameplay framing exists for the mode (lib/babylon/config/cameraFraming.json,
 // scripts/probes/_cam-frame.mts). cameraPresets.json describes the retired venue cameras (pre-M104).
 const camFraming = JSON.parse(read('lib/babylon/config/cameraFraming.json'));
@@ -62,7 +99,7 @@ const locks = new Set(readdirSync('docs/concept-lock').map((f) => f.replace(/\.m
 const routeMap: Record<string, string> = {
   karate_vs: 'karate-vs',
   penalty: 'soccer',
-  derby: 'baseball',
+  derby: 'derby',
   snowboard_slalom: 'snowboard',
   bigair: 'big-air',
   aeroaces: 'aero-aces',
@@ -71,7 +108,11 @@ const routeMap: Record<string, string> = {
   brainbrawl: 'brain-brawl',
 };
 const lockName: Record<string, string> = { karate: 'karate-endless', karate_vs: 'karate-vs', derby: 'baseball', penalty: 'soccer', snowboard_slalom: 'snowboard' };
-const camName: Record<string, string> = { karate_vs: 'karate-vs', derby: 'baseball', penalty: 'soccer', snowboard_slalom: 'snowboard' };
+const camName: Record<string, string> = {
+  // These shipped routes reuse the measured gameplay camera from the mode they wrap.
+  baseball: 'derby',
+  tiebreak: 'tennis',
+};
 const testName: Record<string, string[]> = {
   aeroaces: ['aeroaces', 'aero-aces', 'aeroAces'],
   bigair: ['bigair', 'big-air', 'BigAir'],
@@ -117,13 +158,13 @@ const rows: Row[] = modeEntries.map(({ key, cls }) => {
   const src = file ? implementationSlice(whole, cls) : '';
   const route = `/play/${routeMap[key] ?? key}`;
   const { venue, map, kit } = venueOfMode(key, src);
-  const cores = CORES.filter((c) => new RegExp(`from '\\.\\./core/${c}'|from '\\./${c}'|\\b${c}\\b`).test(src) && src.includes(`${c}`));
+  const cores = CORES.filter((c) => coreUsedInSlice(whole, src, c.imports));
   return {
     key, enabled: enabled.has(key), file, route,
     menu: gameData.includes(`href: '${route}'`),
     venue, map, kit, baked: !!map && bakedKeys.has(map),
-    cores: cores.filter((c) => src.includes(`/${c}'`)),
-    camera: camKeys.has(key),   // cameraFraming.json is keyed by registry key
+    cores: cores.map((c) => c.name),
+    camera: camKeys.has(key) || camKeys.has(camName[key] ?? ''),   // cameraFraming.json is keyed by measured gameplay mode
     navFirst: /\.constrain\(/.test(src),
     clamps: (src.match(/Math\.max\(-?[A-Z_0-9.]+, *Math\.min\(/g) ?? []).length + (src.match(/^const (COURT|FIELD|ARENA|BOUNDS|HALF)[A-Z_]* *=/gm) ?? []).length,
     bridge: bridge.includes(`'${key}'`),

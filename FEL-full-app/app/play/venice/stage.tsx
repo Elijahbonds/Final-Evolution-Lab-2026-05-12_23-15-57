@@ -13,7 +13,7 @@ import { runMode, InputBus, type ModePhase } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hubUi, wayfindingOn } from '@/lib/adventure/venice/hubUi';
-import { hubHrefFor, launchHref, PARTY_MODE_FOR_SPOT, veniceActivity, writeReturn } from '@/lib/adventure/venice/hubReturn';
+import { hubHrefFor, launchChoices, PARTY_MODE_FOR_SPOT, veniceActivity, writeReturn, writeReturnForHref } from '@/lib/adventure/venice/hubReturn';
 import { MODE_INFO } from '@/lib/game-data';
 import { partyClient } from '@/lib/party/social/client';
 import { isHost } from '@/lib/party/social/state';
@@ -74,19 +74,21 @@ export function VeniceStage({ signedIn }: { signedIn: boolean }) {
   }, [signedIn]);
 
   const spot = ui.spot;
-  const game = spot ? MODE_INFO[spot.modes[0]]?.name ?? spot.modes[0] : '';
+  const choices = spot ? launchChoices(spot, MODE_INFO) : [];
   const partyMode = spot ? PARTY_MODE_FOR_SPOT[spot.id] : undefined;
   const crowd = party.members.filter((m) => m.connected).length;
   const canPartyStart = !!partyMode && isHost(party) && crowd >= 2;
   const cardUp = !!spot && phase === 'playing';
   const [hint, dismissHint] = useFirstVisitHint(wayfinding && phase === 'playing', cardUp);
 
-  const play = () => {
-    if (!spot) return;
-    writeReturn(spot, Date.now());
+  const play = (href: string | undefined = choices[0]?.href) => {
+    if (!spot || !href) return;
+    // a court can offer more than one game (Court 3: Flight Night or Prove It; Court 4: Downtown or Game Night): the mark keeps
+    // the page actually opened, so the end screen's way back still finds this court (cursor #616 / #620)
+    writeReturnForHref(spot, href, Date.now());
     // the browser's Back from the game lands beside this court too (the hub reads ?spot=)
     try { window.history.replaceState(window.history.state, '', hubHrefFor(spot.id)); } catch { /* history is a convenience */ }
-    router.push(launchHref(spot));
+    router.push(href);
   };
   const playParty = () => {
     if (!spot || !partyMode) return;
@@ -97,7 +99,7 @@ export function VeniceStage({ signedIn }: { signedIn: boolean }) {
     c.setActivity(veniceActivity(spot.id));
     c.startTogether(partyMode);
   };
-  useCardKeys(wayfinding ? busRef.current : null, wayfinding && cardUp, play, canPartyStart ? playParty : null);
+  useCardKeys(wayfinding ? busRef.current : null, wayfinding && cardUp, () => play(), canPartyStart ? playParty : null);
 
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden bg-black text-white">
@@ -115,11 +117,13 @@ export function VeniceStage({ signedIn }: { signedIn: boolean }) {
         <div data-testid="venice-walkup" className={`absolute inset-x-4 ${wayfinding ? 'top-[9.25rem]' : 'top-[4.25rem]'} mx-auto max-w-sm rounded-2xl border border-white/15 bg-black/75 p-3 backdrop-blur`}>
           <p className="text-base font-bold">{spot.label.replace('[PLACEHOLDER] ', '')}</p>
           <div className="mt-2 flex flex-col gap-2">
-            <button type="button" data-testid="venice-play" onClick={play}
-              className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-[#facc15] px-4 text-base font-bold text-black">
-              <Play aria-hidden className="h-4 w-4" /> Play {game}
-              {wayfinding && !touch && <span className="ml-1 rounded border border-black/30 px-1 text-xs font-bold" aria-hidden>Enter · X</span>}
-            </button>
+            {choices.map((choice, index) => (
+              <button key={choice.mode} type="button" data-testid={index === 0 ? 'venice-play' : `venice-play-${choice.mode}`} onClick={() => play(choice.href)}
+                className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-[#facc15] px-4 text-base font-bold text-black">
+                <Play aria-hidden className="h-4 w-4" /> Play {choice.label}
+                {index === 0 && wayfinding && !touch && <span className="ml-1 rounded border border-black/30 px-1 text-xs font-bold" aria-hidden>Enter · X</span>}
+              </button>
+            ))}
             {canPartyStart && (
               <button type="button" data-testid="venice-party" onClick={playParty}
                 className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-white/25 px-4 text-base font-bold text-white">
