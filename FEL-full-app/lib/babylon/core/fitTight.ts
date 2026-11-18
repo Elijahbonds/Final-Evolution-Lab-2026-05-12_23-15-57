@@ -31,6 +31,15 @@ export const FIT_WELD = 0.003;
 /** How far (m) a garment vertex looks for the skin under it; beyond, it is left where it is. */
 const FIT_REACH = 0.12;
 
+/** kit.setLiftScale (kit-tight phase 2): the runtime lift (garmentFixes.GARMENT_INFLATE) and edge flare (bodyMask.EDGE_FLARE) on
+ *  the Blender-made garment sets ONLY (kitGarmentSet.ts: the one-piece short, the new jerseys — cut close and weighted from the
+ *  body), as a share of today's. 1 = today's numbers (kit-mac-jobs measured those: 28 mm off a 7 mm short); every other garment
+ *  always takes today's. NEW. */
+export const SET_LIFT_SCALE = 1;
+/** The lift / flare share for this garment: SET_LIFT_SCALE (via its knob) on a garment-set mesh, 1 on any other. */
+export function liftScaleOf(m: AbstractMesh): number {
+  return (m.metadata as { felKitGarmentSet?: string } | null)?.felKitGarmentSet ? Math.max(0, Math.min(1, feel('kit.setLiftScale', SET_LIFT_SCALE))) : 1;
+}
 export const fitTightness = (): number => Math.max(0, Math.min(1, feel('kit.fitTightness', FIT_TIGHTNESS)));
 const tightened = new WeakSet<AbstractMesh>();
 

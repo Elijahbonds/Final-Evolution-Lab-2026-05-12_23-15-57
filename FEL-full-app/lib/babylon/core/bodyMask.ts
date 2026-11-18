@@ -29,7 +29,7 @@ import type { AbstractMesh, IndicesArray, Mesh, Scene, TransformNode } from '@ba
 import { boneNode } from '../anim/boneLookup';
 import { tubeCoverage, trimSpan, type TubeSpan } from './accessoryFit';
 import { coachGarmentSlotOf, demoModelFlags } from './demoModels';
-import { FIT_EDGE_BAND, FIT_WELD, SkinSurface, fitTightness, fitsTight, openEdgeWeights, tightenGarment } from './fitTight';
+import { FIT_EDGE_BAND, FIT_WELD, SkinSurface, fitTightness, fitsTight, liftScaleOf, openEdgeWeights, tightenGarment } from './fitTight';
 
 /** How far under a garment (from its open edge, metres) the skin must be before it is hidden. Tops and shorts leave a
  *  band at the hem so a garment that rides up never opens a hole into the body. */
@@ -460,10 +460,11 @@ function flareGarmentEdges(mesh: Mesh, slot: string): void {
     return Math.hypot(lx * Wm[0] + ly * Wm[4] + lz * Wm[8], lx * Wm[1] + ly * Wm[5] + lz * Wm[9], lx * Wm[2] + ly * Wm[6] + lz * Wm[10]) / (Math.hypot(nx, ny, nz) || 1);
   };
   let moved = 0;
+  const out0 = cfg.out * (slot === 'shoes' ? 1 : liftScaleOf(mesh));   // kit-tight: a Blender-made set garment flares less (kit.setLiftScale)
   const out = new Float32Array(pos.length);
   for (let v = 0; v < pos.length / 3; v++) {
     const s = w[v] > 0 ? worldPerBind(v) : 0;
-    const d = s > 1e-4 ? cfg.out * w[v] / s : 0; if (d > 0 && cfg.out * w[v] > 1e-4) moved++;
+    const d = s > 1e-4 ? out0 * w[v] / s : 0; if (d > 0 && out0 * w[v] > 1e-4) moved++;
     for (let k = 0; k < 3; k++) out[v * 3 + k] = pos[v * 3 + k] + nrm[v * 3 + k] * d;
   }
   if (!moved) return;

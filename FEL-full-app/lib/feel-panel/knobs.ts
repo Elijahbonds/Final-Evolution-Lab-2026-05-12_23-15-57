@@ -2074,6 +2074,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
   },
   // ── lane/kit-tight (owner 2026-11-18: "make the clothes appear to be skin tight and not baggy ... right now it looks poofy") ──
   {
+    id: 'kit.setLiftScale', label: 'New garments: lift off the body (share of today)', def: 1, min: 0, max: 1, step: 0.05, unit: '', group: 'Kit · fit',
+    source: 'lib/babylon/core/fitTight.ts SET_LIFT_SCALE',
+    hint: 'Only the Blender-made one-piece short and new jerseys. 1 = today (13 mm tops, 20 mm shorts, plus the edge flare). Lower sits them closer to the body.',
+  },
+  {
     id: 'kit.fitTightness', label: 'Clothes fit: as before (0) to skin-tight (1)', def: 0, min: 0, max: 1, step: 0.05, unit: '', group: 'Kit · fit',
     source: 'lib/babylon/core/fitTight.ts FIT_TIGHTNESS',
     hint: 'How close the worn tee and shorts sit on the body. 0 = as before (about 3 cm off the skin). 1 = 8 mm off it everywhere but the hems, cuffs and leg openings.',

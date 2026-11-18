@@ -133,6 +133,7 @@ export function applyGarmentSet(container: AssetContainer, set: readonly SetGarm
           for (const kind of geo.getVerticesDataKinds()) if (![VertexBuffer.PositionKind, VertexBuffer.NormalKind, VertexBuffer.MatricesIndicesKind, VertexBuffer.MatricesWeightsKind].includes(kind)) geo.removeVerticesData(kind);
         }
         vd.applyToMesh(m, false);
+        m.metadata = { ...(m.metadata ?? {}), felKitGarmentSet: g.name };   // kit-tight: its own lift / flare share (fitTight.liftScaleOf)
         for (const user of geo?.meshes ?? [m]) { (user as Mesh).subMeshes = []; (user as Mesh)._createGlobalSubMesh(true); user.refreshBoundingInfo(); }
         done.replaced.push(m.name);
       }
