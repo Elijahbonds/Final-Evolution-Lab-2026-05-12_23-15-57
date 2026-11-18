@@ -122,7 +122,9 @@ const rows: Row[] = modeEntries.map(({ key, cls }) => {
     key, enabled: enabled.has(key), file, route,
     menu: gameData.includes(`href: '${route}'`),
     venue, map, kit, baked: !!map && bakedKeys.has(map),
-    cores: cores.filter((c) => src.includes(`/${c}'`)),
+    // `implementationSlice` often starts below the import block when a mode file exports helper constants.
+    // The usage scan above is the source of truth; re-checking import paths here falsely hid real shared cores.
+    cores,
     camera: camKeys.has(key),   // cameraFraming.json is keyed by registry key
     navFirst: /\.constrain\(/.test(src),
     clamps: (src.match(/Math\.max\(-?[A-Z_0-9.]+, *Math\.min\(/g) ?? []).length + (src.match(/^const (COURT|FIELD|ARENA|BOUNDS|HALF)[A-Z_]* *=/gm) ?? []).length,

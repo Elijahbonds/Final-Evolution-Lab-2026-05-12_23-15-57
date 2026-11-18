@@ -20,6 +20,7 @@ const routeMap = new Map(
 );
 
 assert.ok(enabledModes.length > 20, 'enabled mode scan is unexpectedly empty');
+assert.ok(!matrix.includes('cores: cores.filter'), 'full-picture matrix must not throw away shared-core uses when a mode slice starts below imports');
 
 const expectedSlugs: Record<string, string> = {
   aeroaces: 'aero-aces',
