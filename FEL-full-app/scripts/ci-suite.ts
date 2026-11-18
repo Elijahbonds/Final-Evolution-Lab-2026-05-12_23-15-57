@@ -4,7 +4,8 @@
  *
  * Where `standing-suite.ts` runs a hand-maintained list, this runner DISCOVERS
  * every `scripts/*-tests.ts` plus the EXTRA_SUITES below (`ledger-invariants.ts`,
- * `smokeTest.ts`, `mode-list-check.ts`). Nothing can be added to the tree and silently skipped.
+ * `smokeTest.ts`, `mode-list-check.ts`, `gate0-animation-verification.ts`).
+ * Nothing can be added to the tree and silently skipped.
  *
  * INTEGRATION NOTE (2026-09-16). This was written on 2026-09-10 and never merged;
  * it sat on claude/outstanding-tasks-deployment-helayq while the dev line moved
@@ -74,8 +75,12 @@ export const DB_SUITES = new Set([
  *
  * mode-list-check.ts: generated MASTER_MODE_LIST.md drift guard. It is not named
  * `*-tests.ts`, but registry/doc drift is a release-quality blocker.
+ *
+ * gate0-animation-verification.ts: the live GLB/spawn-path Gate 0 proof. It is
+ * intentionally not a unit test, but skipping it means a green suite can miss a
+ * bind-pose or rig-normalization regression.
  */
-const EXTRA_SUITES = ['ledger-invariants.ts', 'smokeTest.ts', 'mode-list-check.ts'];
+const EXTRA_SUITES = ['ledger-invariants.ts', 'smokeTest.ts', 'mode-list-check.ts', 'gate0-animation-verification.ts'];
 
 type Status = 'pass' | 'fail' | 'skip';
 interface Result {

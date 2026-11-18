@@ -44,64 +44,104 @@ const STATS = `(async () => { const d = window.__FEL_DEV__; const s = d.scene; c
   const draws = await new Promise((r) => requestAnimationFrame(() => r(e._drawCalls.current)));
   let tex = 0; for (const t of s.textures) { const z = t.getSize(); tex += z.width * z.height * 4 * (t.noMipmap ? 1 : 1.33); }
   return { draws, active: s.getActiveMeshes().length, textureMb: Math.round(tex / 1e6), textures: s.textures.length, meshes: s.meshes.length }; })()`;
+// a stalled page (no animation frame: the 1v1 yardstick once held the rig 11 min on a rAF that never came) must not hang the rig
+const RUN_MS = Number(process.env.RUN_MS ?? 420000);
+const within = <T,>(p: Promise<T>, ms: number, what: string): Promise<T> => Promise.race([p, new Promise<T>((_, no) => setTimeout(() => no(new Error(`${what}: no answer in ${ms} ms`)), ms))]);
 const browser = await chromium.launch({ executablePath: chromiumExe(), args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const result: Record<string, unknown> = {};
 try {
+  const feelQ = (o: Record<string, number>) => `feel=${encodeURIComponent(JSON.stringify(o))}`;
+  const QUIET = { 'venue.veniceLife': 0, 'venue.veniceSound': 0 };
   const runs: Array<[string, string, boolean]> = [
-    ['onevone-yardstick', 'mode=onevone', false], ['shared', '', true], ['control-unshared', `feel=${encodeURIComponent(JSON.stringify({ 'perf.veniceSharedCourt': 0 }))}`, false], ['walkup', 'spot=court.ones', true],
+    // improvement pass phase 3: the load before (V1: everything during the load) and after (the paint and far scenery once you can move)
+    // (both on V1's look, so only the deferral differs: venue.veniceLookV2 0)
+    // (phases 6 and 7 off in phases 3 and 5's runs, so each compares one change)
+    ['v1-load', feelQ({ 'venue.deferScenery': 0, 'venue.veniceLookV2': 0, ...QUIET }), false], ['deferred', feelQ({ 'venue.veniceLookV2': 0, ...QUIET }), false],
+    // improvement pass phase 5: the look before (V1) and after, on the phone; their shots
+    ['look-v1', feelQ({ 'venue.veniceLookV2': 0, ...QUIET }), true], ['look-v2', feelQ(QUIET), true],
+    // improvement pass phase 6: life off / on (everything else as shipped), and on a desktop (the watchers: desktop and up only)
+    // (beside Court 2, looking across it at the run's watchers and west toward the gulls)
+    ['life-off', `spot=court.run&${feelQ({ 'venue.veniceLife': 0 })}`, false], ['life', 'spot=court.run', true], ['desktop-life', 'spot=court.run', true],
+    // the same-session yardstick (1v1's load on the same rig), last in each round so a stall there cannot hold the hub's runs
+    ['onevone-yardstick', 'mode=onevone', false],
+    ['shared', '', true], ['control-unshared', `feel=${encodeURIComponent(JSON.stringify({ 'perf.veniceSharedCourt': 0 }))}`, false], ['walkup', 'spot=court.ones', true],
+    // the final picture set: each court's walk-up (arriving beside it, the card up)
+    ['walkup-run', 'spot=court.run', true], ['walkup-flight', 'spot=court.flight', true], ['walkup-arc', 'spot=court.arc', true],
   ];
   const pick = (process.env.RUNS ?? '').split(',').filter(Boolean);
-  for (const [name, query, shot] of runs) {
-    if (pick.length && !pick.includes(name)) continue;
-    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
-    const page = await ctx.newPage();
-    const errors: string[] = [];
-    page.on('pageerror', (e) => errors.push(String(e)));
-    const logs: string[] = [];
-    const missing = new Set<string>();
-    page.on('response', (r) => { if (r.status() === 404) missing.add(new URL(r.url()).pathname); });
-    page.on('console', (m) => { if (logs.length < 400) logs.push(`${m.type()}: ${m.text().slice(0, 200)}`); });
-    const cdp = await ctx.newCDPSession(page);
-    await cdp.send('Emulation.setCPUThrottlingRate', { rate: Number(process.env.THROTTLE ?? 4) });
-    await page.goto(`${base}${query ? `?${query}` : ''}`);
+  const reps = Math.max(1, Number(process.env.REPS ?? 1));
+  const order: Array<[string, string, boolean, number]> = [];
+  // (a desktop run is a picture, not a timing: once)
+  for (let r = 1; r <= reps; r++) for (const [n, q, sh] of runs) if ((!pick.length || pick.includes(n)) && !(r > 1 && n.startsWith('desktop-'))) order.push([n, q, sh && r === 1, r]);
+  for (const [name0, query, shot, rep] of order) {
+    const name = reps > 1 ? `${name0}#${rep}` : name0;
+    console.log(`run ${name}`);
+    const desk = name0.startsWith('desktop-');
+    const ctx = await browser.newContext(desk ? { viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 } : { viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
+    // a run that stalls (a page that stops answering) is closed after RUN_MS and recorded as failed; the next run goes on
+    const watchdog = setTimeout(() => { console.log(`run ${name}: watchdog after ${RUN_MS / 1000} s`); void ctx.close().catch(() => {}); }, RUN_MS);
     try {
-      await page.waitForFunction(() => { const w = window as unknown as { __ttfp?: number; __err?: string }; return !!w.__ttfp || !!w.__err; }, null, { timeout: Number(process.env.WAIT_MS ?? 240000) });
-    } catch {
-      const st = await page.evaluate(() => { const w = window as unknown as Record<string, unknown>; return { phase: w.__phase, err: w.__err, readyAt: w.__readyAt }; });
-      console.log('TIMEOUT', name, JSON.stringify(st), '\n', errors.join('\n'), '\n', logs.filter((l) => !/^debug/.test(l)).slice(-60).join('\n'));
-      throw new Error(`no playable frame: ${JSON.stringify(st)}`);
-    }
-    const t = await page.evaluate(() => { const w = window as unknown as { __ttfp?: number; __readyAt?: number; __err?: string }; return { ttfpSec: (w.__ttfp ?? 0) / 1000, readySec: (w.__readyAt ?? 0) / 1000, err: w.__err ?? null }; });
-    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
-    // let the dressing land, then 6 s: walk forward with the stick, then stand. The instrumentation goes in first: it is what resets
-    // the engine's draw counter each frame.
-    await page.evaluate('window.__SI = window.__SI || window.__FEL_DEV__.instrument()');
-    await page.waitForTimeout(4000);
-    let worst = { draws: 0, active: 0, textureMb: 0, textures: 0, meshes: 0 };
-    if (name !== 'walkup') await page.evaluate(() => (window as unknown as { __bus: { emit(e: unknown): void } }).__bus.emit({ t: 'stick', side: 'L', x: 0, y: 1 }));
-    for (let k = 0; k < 30; k++) {
-      await page.waitForTimeout(200);
-      const s = await page.evaluate(STATS) as typeof worst;
-      worst = { draws: Math.max(worst.draws, s.draws), active: Math.max(worst.active, s.active), textureMb: Math.max(worst.textureMb, s.textureMb), textures: Math.max(worst.textures, s.textures), meshes: Math.max(worst.meshes, s.meshes) };
-    }
-    await page.evaluate(() => (window as unknown as { __bus: { emit(e: unknown): void } }).__bus.emit({ t: 'stick', side: 'L', x: 0, y: 0 }));
-    const spot = await page.evaluate(() => (window as unknown as { __spot?: string | null }).__spot ?? null);
-    // one frame's draws by mesh, and the passes outside the meshes (shadow maps, other render targets, post-processes)
-    const split = name === 'onevone-yardstick' ? null : await page.evaluate(`(async () => { const s = window.__FEL_DEV__.scene, e = s.getEngine(); const per = new Map();
-      const undo = []; for (const m of s.meshes) { const o = m.render; undo.push([m, o]); m.render = function (...a) { const d0 = e._drawCalls.current; const r = o.apply(this, a); per.set(this.name, (per.get(this.name) || 0) + (e._drawCalls.current - d0)); return r; }; }
-      let f0 = 0, f1 = 0; await new Promise((r) => requestAnimationFrame(() => { f0 = e._drawCalls.current; requestAnimationFrame(() => { f1 = e._drawCalls.current; r(); }); }));
-      for (const [m, o] of undo) m.render = o;
-      const top = [...per.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12);
-      const gens = s.lights.map((l) => l.getShadowGenerator && l.getShadowGenerator()).filter(Boolean).length;
-      return { meshDraws: [...per.values()].reduce((a, b) => a + b, 0), top, shadowGens: gens, customRTs: s.customRenderTargets.length, post: s.postProcesses.length, effectLayers: (s.effectLayers || []).length, frameCounter: [f0, f1] }; })()`);
-    result[name] = { ...t, worst, spot, split, errors: errors.slice(0, 5), missing: [...missing] };
-    if (shot) {
-      if (name === 'shared') { await page.reload(); await page.waitForFunction(() => !!(window as unknown as { __ttfp?: number }).__ttfp, null, { timeout: 240000 }); await page.waitForTimeout(5000); }
-      const file = path.join(OUT, `venice-v1-${name === 'walkup' ? 'walkup' : 'courts'}-phone.jpg`);
-      await page.screenshot({ path: file, type: 'jpeg', quality: 85 });
-      console.log('wrote', file);
-    }
-    await ctx.close();
+      const page = await ctx.newPage();
+      const errors: string[] = [];
+      page.on('pageerror', (e) => errors.push(String(e)));
+      const logs: string[] = [];
+      const missing = new Set<string>();
+      page.on('response', (r) => { if (r.status() === 404) missing.add(new URL(r.url()).pathname); });
+      page.on('console', (m) => { if (logs.length < 400) logs.push(`${m.type()}: ${m.text().slice(0, 200)}`); });
+    // the deferred scenery's landing (and phase 6's life after it) as page flags the rig can wait on
+    await page.addInitScript(() => { const o = console.info.bind(console); console.info = (...a: unknown[]) => { const t = String(a[0] ?? ''); if (/deferred scenery landed/.test(t)) (window as unknown as { __landed?: boolean }).__landed = true; if (/\[VENICE\] life:/.test(t)) (window as unknown as { __life?: boolean }).__life = true; o(...a); }; });
+      const cdp = await ctx.newCDPSession(page);
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate: desk ? 1 : Number(process.env.THROTTLE ?? 4) });
+      await page.goto(`${base}${query ? `?${query}` : ''}`, { waitUntil: 'commit', timeout: 180000 });
+      try {
+        await page.waitForFunction(() => { const w = window as unknown as { __ttfp?: number; __err?: string }; return !!w.__ttfp || !!w.__err; }, null, { timeout: Number(process.env.WAIT_MS ?? 240000) });
+      } catch {
+        const st = await page.evaluate(() => { const w = window as unknown as Record<string, unknown>; return { phase: w.__phase, err: w.__err, readyAt: w.__readyAt }; });
+        console.log('TIMEOUT', name, JSON.stringify(st), '\n', errors.join('\n'), '\n', logs.filter((l) => !/^debug/.test(l)).slice(-60).join('\n'));
+        throw new Error(`no playable frame: ${JSON.stringify(st)}`);
+      }
+      const t = await page.evaluate(() => { const w = window as unknown as { __ttfp?: number; __readyAt?: number; __err?: string }; return { ttfpSec: (w.__ttfp ?? 0) / 1000, readySec: (w.__readyAt ?? 0) / 1000, err: w.__err ?? null }; });
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+      // let the dressing land, then 6 s: walk forward with the stick, then stand. The instrumentation goes in first: it is what resets
+      // the engine's draw counter each frame.
+      await page.evaluate('window.__SI = window.__SI || window.__FEL_DEV__.instrument()');
+      await page.waitForTimeout(4000);
+      let worst = { draws: 0, active: 0, textureMb: 0, textures: 0, meshes: 0 };
+      if (!name.startsWith('walkup')) await page.evaluate(() => (window as unknown as { __bus: { emit(e: unknown): void } }).__bus.emit({ t: 'stick', side: 'L', x: 0, y: 1 }));
+      for (let k = 0; k < 30; k++) {
+        await page.waitForTimeout(200);
+        const s = await within(page.evaluate(STATS), 15000, 'stats') as typeof worst;
+        worst = { draws: Math.max(worst.draws, s.draws), active: Math.max(worst.active, s.active), textureMb: Math.max(worst.textureMb, s.textureMb), textures: Math.max(worst.textures, s.textures), meshes: Math.max(worst.meshes, s.meshes) };
+      }
+      await page.evaluate(() => (window as unknown as { __bus: { emit(e: unknown): void } }).__bus.emit({ t: 'stick', side: 'L', x: 0, y: 0 }));
+      const spot = await page.evaluate(() => (window as unknown as { __spot?: string | null }).__spot ?? null);
+      // one frame's draws by mesh, and the passes outside the meshes (shadow maps, other render targets, post-processes)
+      const split = name.startsWith('onevone') ? null : await page.evaluate(`(async () => { const s = window.__FEL_DEV__.scene, e = s.getEngine(); const per = new Map();
+        const undo = []; for (const m of s.meshes) { const o = m.render; undo.push([m, o]); m.render = function (...a) { const d0 = e._drawCalls.current; const r = o.apply(this, a); per.set(this.name, (per.get(this.name) || 0) + (e._drawCalls.current - d0)); return r; }; }
+        let f0 = 0, f1 = 0; await new Promise((r) => requestAnimationFrame(() => { f0 = e._drawCalls.current; requestAnimationFrame(() => { f1 = e._drawCalls.current; r(); }); }));
+        for (const [m, o] of undo) m.render = o;
+        const top = [...per.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12);
+        const gens = s.lights.map((l) => l.getShadowGenerator && l.getShadowGenerator()).filter(Boolean).length;
+        return { meshDraws: [...per.values()].reduce((a, b) => a + b, 0), top, shadowGens: gens, customRTs: s.customRenderTargets.length, post: s.postProcesses.length, effectLayers: (s.effectLayers || []).length, frameCounter: [f0, f1] }; })()`);
+      result[name] = { ...t, worst, spot, split, errors: errors.slice(0, 5), missing: [...missing], notes: logs.filter((l) => /crowd|venice|life/i.test(l)).slice(-12) };
+      // phase 3's "full": when the deferred paint and far scenery landed (ms after the playable frame's run went on), if it did
+      if (query.includes('deferScenery%22%3A0')) (result[name] as Record<string, unknown>).fullSec = t.ttfpSec;
+      else {
+        try { await page.waitForFunction(() => (window as unknown as { __landed?: boolean }).__landed === true, null, { timeout: 120000 }); } catch { /* not landed in 2 min */ }
+        const m = logs.map((l) => /deferred scenery landed in (\d+) ms/.exec(l)).find(Boolean);
+        (result[name] as Record<string, unknown>).landedMs = m ? Number(m[1]) : null;
+      }
+      if (shot) {
+        if (name.startsWith('shared') || name.startsWith('look-') || name.startsWith('life') || desk) { await page.reload(); await page.waitForFunction(() => !!(window as unknown as { __ttfp?: number }).__ttfp, null, { timeout: 240000 }); if (name.startsWith('life') || desk) await page.waitForFunction(() => (window as unknown as { __life?: boolean }).__life === true, null, { timeout: 150000 }).catch(() => {}); await page.waitForTimeout(4000); }
+        const tag = name.startsWith('walkup') ? name0 : name.startsWith('look-') || name.startsWith('life') || desk ? name.split('#')[0] : 'courts';
+        const file = path.join(OUT, `venice-v1-${tag}${desk ? '' : '-phone'}.jpg`);
+        await page.screenshot({ path: file, type: 'jpeg', quality: 85 });
+        console.log('wrote', file);
+      }
+    } catch (e) { clearTimeout(watchdog); result[name] = { error: String((e as Error).message ?? e).slice(0, 300) }; console.log(`run ${name} FAILED: ${(result[name] as { error: string }).error}`); }
+    clearTimeout(watchdog);
+    await ctx.close().catch(() => {});
+    fs.writeFileSync(path.join(OUT, 'hub-rig.json'), JSON.stringify(result, null, 1));   // after every run: a killed rig keeps what it measured
   }
 } finally {
   await browser.close();

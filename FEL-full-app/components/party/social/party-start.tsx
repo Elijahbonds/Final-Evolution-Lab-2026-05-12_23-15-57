@@ -12,6 +12,7 @@ import { Play } from 'lucide-react';
 import { partyClient } from '@/lib/party/social/client';
 import { isHost, type PartyState } from '@/lib/party/social/state';
 import { ONLINE_MODES } from '@/server/netd/src/partyRules';
+import { FROM_PARAM, FROM_VENICE, partyVeniceReturn, SPOT_PARAM, writeReturn } from '@/lib/adventure/venice/hubReturn';   // venice-v1: every member back to the court
 
 export function StartSection({ s }: { s: PartyState }) {
   const [mode, setMode] = useState(ONLINE_MODES[0].id);
@@ -63,6 +64,9 @@ export function StartCountdown({ s }: { s: PartyState }) {
       c.patch({ start: null });
       if (!offer.seat) return;
       const q = new URLSearchParams({ net: offer.room, peer: offer.seat, party: '1' });
+      // venice-v1: the host started it from a Venice court — every member's game comes back to that court
+      const venice = partyVeniceReturn(c.getState().members);
+      if (venice) { q.set(FROM_PARAM, FROM_VENICE); q.set(SPOT_PARAM, venice); writeReturn({ id: venice, route: offer.path }, Date.now()); }
       router.push(`${offer.path}?${q.toString()}`);
       // the host's page connects first so the host is the match's authority (netd: first in holds it)
     }, wait + (offer.seat && !offer.seat.startsWith('h') ? 400 : 0));

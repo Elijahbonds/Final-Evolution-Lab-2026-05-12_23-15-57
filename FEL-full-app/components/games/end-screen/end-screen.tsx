@@ -51,7 +51,7 @@ import { Confetti } from './confetti';
 import { claimLines } from './claim';
 import { ClaimBar } from './claim-bar';
 import { isFreeDanceResult } from '@/lib/babylon/dance/freeDance';   // lane/dance-extras-2
-import { veniceReturnHref } from '@/lib/adventure/venice/hubReturn';   // venice-v1: back to the court a game was opened from
+import { consumeVeniceReturnHref } from '@/lib/adventure/venice/hubReturn';   // venice-v1: back to the court a game was opened from
 
 const fmt = (v: number) => Math.round(v).toLocaleString('en-US');
 
@@ -268,7 +268,7 @@ export function EndScreen(props: EndScreenProps) {
   const stepsLen = useRef(steps.length); stepsLen.current = steps.length;
   // venice-v1: read once on the client (the query, or the hub's return mark for this page); null on every other run
   const [venice, setVenice] = useState<string | null>(null);
-  useEffect(() => { try { setVenice(veniceReturnHref(window.location.pathname, window.location.search, Date.now())); } catch { setVenice(null); } }, []);
+  useEffect(() => { try { setVenice(consumeVeniceReturnHref(window.location.pathname, window.location.search, Date.now())); } catch { setVenice(null); } }, []);
   const exitHref = exitHrefFor(storyNodeId, venice);
   const navRef = useRef(onNavigate); navRef.current = onNavigate;
   const armed = () => now() - mountedAt.current >= ARM_MS;

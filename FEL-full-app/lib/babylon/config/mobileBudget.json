@@ -303,7 +303,7 @@
     "venice_hub": {
       "measured": {
         "drawCalls": 46,
-        "activeMeshes": 54,
+        "activeMeshes": 58,
         "skinnedBodies": 1,
         "textureMb": 73,
         "particles": 0

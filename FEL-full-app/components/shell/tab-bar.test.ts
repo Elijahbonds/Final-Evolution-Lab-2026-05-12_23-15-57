@@ -16,6 +16,7 @@ describe('which tab owns a path', () => {
     expect(tabForPath('/coach')?.id).toBe('train');
     expect(tabForPath('/kitchens')?.id).toBe('train');
     expect(tabForPath('/live')?.id).toBe('train');
+    expect(tabForPath('/squads')?.id).toBe('train');
     expect(tabForPath('/profile')?.id).toBe('profile');
     expect(tabForPath('/wallet')?.id).toBe('profile');
     expect(tabForPath('/account')?.id).toBe('profile');
@@ -26,6 +27,7 @@ describe('which tab owns a path', () => {
     expect(tabForPath('/coach/join/abc123')?.id).toBe('train');
     expect(tabForPath('/card/elijah')?.id).toBe('profile');
     expect(tabForPath('/kitchens/fuel')?.id).toBe('train');
+    expect(tabForPath('/squads/alpha')?.id).toBe('train');
   });
 
   it('LONGEST PREFIX WINS, so a short route never steals a longer one', () => {
