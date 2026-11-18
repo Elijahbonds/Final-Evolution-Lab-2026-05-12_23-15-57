@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { MODE_CONTROLLERS } from '../lib/controller-link/schemas/registry';
 
@@ -8,6 +10,7 @@ const ROOT = process.cwd();
 const registry = readFileSync(join(ROOT, 'lib/babylon/modes/registry.ts'), 'utf8');
 const matrix = readFileSync(join(ROOT, 'scripts/full-picture.mts'), 'utf8');
 const gameData = readFileSync(join(ROOT, 'lib/game-data.ts'), 'utf8');
+const playPage = readFileSync(join(ROOT, 'app/play/page.tsx'), 'utf8');
 const devGauntlet = readFileSync(join(ROOT, 'scripts/gauntlet.sh'), 'utf8');
 const playGauntlet = readFileSync(join(ROOT, 'scripts/gauntlet-play.sh'), 'utf8');
 
@@ -20,12 +23,15 @@ const routeMap = new Map(
 );
 
 assert.ok(enabledModes.length > 20, 'enabled mode scan is unexpectedly empty');
+assert.ok(!matrix.includes('cores: cores.filter'), 'full-picture matrix must not throw away shared-core uses when a mode slice starts below imports');
 
 const expectedSlugs: Record<string, string> = {
   aeroaces: 'aero-aces',
+  derby: 'derby',
   velocitykart: 'velocity-kart',
   who_scene_it: 'who-scene-it',
   brainbrawl: 'brain-brawl',
+  venice_hub: 'venice',
 };
 const playGauntletExempt = new Set([
   // /play/dunkduel is the owner's real-footage Prove It flow; the Babylon
@@ -63,6 +69,7 @@ const testName: Record<string, string[]> = {
   threepoint: ['threepoint', 'three-point', 'threePoint'],
   threevthree: ['threevthree', 'three-v-three', 'ThreeVThree'],
   velocitykart: ['velocitykart', 'velocity-kart', 'velocityKart'],
+  venice_hub: ['venice', 'venice-hub', 'VeniceHub'],
   who_scene_it: ['who_scene_it', 'who-scene-it', 'whoSceneIt'],
 };
 const skipTestDirs = new Set(['.git', '.next', 'coverage', 'node_modules', 'public']);
@@ -122,6 +129,12 @@ for (const [key, slug] of Object.entries(expectedSlugs)) {
   assert.equal(routeMap.get(key), slug, `full-picture routeMap must carry ${key} -> ${slug}`);
 }
 
+assert.match(matrix, /function coreUsedInSlice/, 'full-picture must check imported core symbols against each mode slice');
+assert.match(matrix, /baseball:\s*'derby'/, 'baseball must reuse the measured derby camera row');
+assert.match(matrix, /tiebreak:\s*'tennis'/, 'tiebreak must reuse the measured tennis camera row');
+assert.match(matrix, /camera:\s*camKeys\.has\(key\)\s*\|\|\s*camKeys\.has\(camName\[key\]\s*\?\?\s*''\)/,
+  'full-picture camera check must honor measured-mode aliases');
+
 const missingRoutes: string[] = [];
 const missingMenuLinks: string[] = [];
 const missingControllerSchemas: string[] = [];
@@ -133,7 +146,9 @@ for (const key of enabledModes) {
   const route = `/play/${routeMap.get(key) ?? key}`;
   const slug = route.slice('/play/'.length);
   if (!existsSync(join(ROOT, 'app/play', slug, 'page.tsx'))) missingRoutes.push(`${key} -> ${route}`);
-  if (!gameData.includes(`href: '${route}'`)) missingMenuLinks.push(`${key} -> ${route}`);
+  const hasMenuLink = gameData.includes(`href: '${route}'`)
+    || (key === 'venice_hub' && playPage.includes('VENICE_DOOR_HREF'));
+  if (!hasMenuLink) missingMenuLinks.push(`${key} -> ${route}`);
   if (!(key in MODE_CONTROLLERS)) missingControllerSchemas.push(key);
   if (!devGauntletModes.has(key)) missingDevGauntlet.push(key);
   if (!playGauntletExempt.has(key) && !playGauntletModes.has(key)) missingPlayGauntlet.push(key);
@@ -148,6 +163,8 @@ assert.deepEqual(missingDevGauntlet, [], 'enabled modes must be in the dev-mode 
 assert.deepEqual(missingPlayGauntlet, [], 'enabled modes must be in the shipping-route gauntlet');
 assert.deepEqual(missingConceptLocks, [], 'enabled modes must have concept locks');
 assert.deepEqual(missingModeTests, [], 'enabled modes must have named regression coverage');
+assert.ok(existsSync(join(ROOT, 'app/play/venice/page.tsx')), 'hidden Venice hub route must resolve to /play/venice');
+assert.ok(testCountFor('venice_hub') > 0, 'hidden Venice hub must be counted against its Venice regression coverage');
 assert.ok(hasDpadAction('freerun', 'move'), 'freerun phone d-pad must steer with LEFT STICK movement');
 assert.ok(hasHeldButton('freerun', 'charge'), 'freerun phone schema must expose held RT sprint');
 assert.ok(hasHeldButton('freerun', 'brake'), 'freerun phone schema must expose held LT slide');
@@ -164,5 +181,21 @@ assert.ok(hasButton('threevthree', 'A', 'PASS') && hasButton('threevthree', 'Y',
   'threevthree phone PASS/BLOCK must match the local 2K face-button map');
 assert.ok(!hasButton('threevthree', 'charge'),
   'threevthree phone SHOOT must not use charge/RT, which basketball reads as turbo');
+
+const matrixOut = execFileSync(process.execPath, [
+  join(ROOT, 'node_modules/tsx/dist/cli.mjs'),
+  join(ROOT, 'scripts/full-picture.mts'),
+  '--md',
+  join(tmpdir(), `fel-full-picture-${process.pid}.md`),
+], { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+const matrixRow = (mode: string): string => matrixOut.split('\n').find((line) => line.startsWith(`| ${mode} |`)) ?? '';
+assert.match(matrixRow('snowboard_slalom'), /BoardMovement/,
+  'full-picture must keep core imports above a sliced mode implementation visible');
+assert.match(matrixRow('tennis'), /RallyCore/,
+  'full-picture must detect shared cores used through a sliced config/factory mode');
+assert.doesNotMatch(matrixOut, /snowboard_slalom: no shared movement core/,
+  'full-picture must not report false shared-core gaps for sliced implementations');
+assert.doesNotMatch(matrixOut, /tennis: no shared movement core/,
+  'full-picture must not report false shared-core gaps for config/factory modes');
 
 console.log(`full-picture-tests: ${enabledModes.length} enabled mode routes, menus, phone schemas, and gauntlets resolve`);

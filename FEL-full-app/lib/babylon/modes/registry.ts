@@ -35,7 +35,7 @@ import { BaseballInningsMode } from './BaseballInningsMode';   // BASEBALL-3INN:
 import { AdventureMode } from './AdventureMode';   // ADVENTURE A4 (2026-10-06): the dev test yard — registered, NOT enabled
 import { AdventureBRMode } from './AdventureBRMode';
 import { CoastZoneMode } from './CoastZoneMode';   // COAST & ISLANDS phase A (2026-11-18): the first open zone — registered, NOT enabled (/play/coast)
-import { VeniceHubMode } from './VeniceHubMode';   // VENICE V1 (2026-11-17): the walkable hoops park — registered, NOT enabled (/play/venice)   // ADVENTURE C (2026-10-07): the bot BR — registered, NOT enabled (/play/adventure-br, unlisted)
+import { VeniceHubMode } from './VeniceHubMode';   // VENICE V1 (2026-11-17): the walkable hoops park — registered, Play-door served, NOT a scoring game.   // ADVENTURE C (2026-10-07): the bot BR — registered, NOT enabled (/play/adventure-br, unlisted)
 
 export const MODES: Record<string, ModeDefinition> = {
   // P3–P4 proof mode — shipped and playtested FIRST
@@ -104,7 +104,7 @@ export const MODES: Record<string, ModeDefinition> = {
   adventure: AdventureMode,
   adventure_br: AdventureBRMode,
   coast_zone: CoastZoneMode,   // COAST & ISLANDS (docs/COAST-ISLANDS-PLAN.md): its own page /play/coast; NOT enabled (no picker serves it)
-  venice_hub: VeniceHubMode,   // VENICE V1 (docs/VENICE-HUB-PLAN.md): its own page /play/venice; NOT enabled (no picker serves it)   // ADVENTURE C (2026-10-07): the bot Battle Royale; NOT enabled (unlisted route)
+  venice_hub: VeniceHubMode,   // VENICE V1 (docs/VENICE-HUB-PLAN.md): its own page /play/venice; Play has a Venice door, but it is not a scoring game.   // ADVENTURE C (2026-10-07): the bot Battle Royale; NOT enabled (unlisted route)
 };
 
 /** Modes proven safe to serve on Babylon right now (dunk = the gate; karate +

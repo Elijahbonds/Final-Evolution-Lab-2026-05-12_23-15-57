@@ -92,7 +92,7 @@ export function VenueShelf({ heading = t('shell.venues.heading') }: { heading?: 
                 <div className="min-w-0">
                   <h3 className="fel-heading text-[16px] font-bold leading-tight text-white">{venue.name}</h3>
                   {/* QA P1-28: the live modes whose venue this is (lib/venueModes), not a hand list that drifts */}
-                  <p className="mt-1 line-clamp-2 text-[12px] text-fel-quiet">{venueCardModes(venue).join(' · ')}</p>
+                  <p className="mt-1 line-clamp-3 text-[12px] text-fel-quiet">{venueCardModes(venue).join(' · ')}</p>
                 </div>
                 {tier ? <MasteryBadge tierIndex={tier} className="ml-auto shrink-0" /> : null}
               </div>

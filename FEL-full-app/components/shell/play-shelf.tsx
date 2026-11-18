@@ -38,6 +38,12 @@ function modesOf(f: Family): ModeRow[] {
     .filter((x): x is ModeRow => x !== null);
 }
 
+export function closedFamilyModeSummary(modes: readonly { name: string }[]): string {
+  if (modes.length <= 5) return modes.map((m) => m.name).join('  ·  ');
+  const shown = modes.slice(0, 3).map((m) => m.name).join('  ·  ');
+  return `${shown}  ·  +${modes.length - 3} more`;
+}
+
 export function PlayShelf({ initialFamily }: { initialFamily?: string }) {
   const [open, setOpen] = useState<string | null>(initialFamily ?? FAMILIES[0].id);
 
@@ -93,7 +99,7 @@ export function PlayShelf({ initialFamily }: { initialFamily?: string }) {
                     they are one height. A shorter list or blurb starts on the first line, beside the family's name, as a three-line
                     list always has. The three-line clamp is unchanged. Layout only. */}
                 <span data-shelf-list className={`${TYPE.small} min-h-[3lh] min-w-0 line-clamp-3 leading-snug text-fel-dim`}>
-                  {isOpen ? f.blurb : modes.map((m) => m.name).join('  ·  ')}
+                  {isOpen ? f.blurb : closedFamilyModeSummary(modes)}
                 </span>
               </span>
 

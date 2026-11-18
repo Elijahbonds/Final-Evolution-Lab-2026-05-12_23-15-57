@@ -41,6 +41,7 @@ describe('venue cards list their live modes', () => {
     const shelf = readFileSync(path.resolve(__dirname, '../components/shell/venue-shelf.tsx'), 'utf8');
     expect(shelf).toMatch(/\{venue\.image \? \([\s\S]*<Image[\s\S]*\) : \([\s\S]*A venue whose art has not shipped yet gets a branded tile/);
     expect(shelf).toContain('venueCardModes(venue)');
+    expect(shelf).toContain('line-clamp-3 text-[12px] text-fel-quiet');
     for (const v of VENUES.filter((x) => !x.image)) expect(['gridiron', 'octagon', 'dunkduel']).toContain(v.key);
   });
 });

@@ -325,6 +325,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
           {mode === 'signup' && (
             <input
               type="text"
+              aria-label="Athlete name"
               placeholder="Athlete name"
               value={name}
               onChange={(e) => setName(e?.target?.value ?? '')}
