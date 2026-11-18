@@ -4,6 +4,7 @@
  * useSyncExternalStore; the mode writes it only when the spot changes.
  */
 import type { Spot } from './layout';
+import { feel } from '@/lib/feel-panel/feel';
 
 export interface HubUiState { spot: Spot | null }
 
@@ -28,6 +29,8 @@ export const hubUi = new HubUi();
  */
 /** venue.veniceWayfinding (phase 9): the page's first-visit hint, mini-map and card keys (app/play/venice/wayfinding.tsx). 0 = V1. */
 export const VENICE_WAYFINDING = 1;
+/** Whether the page shows the hint, the mini-map and the card keys (read once on the client). */
+export const wayfindingOn = (): boolean => feel('venue.veniceWayfinding', VENICE_WAYFINDING) >= 0.5;
 
 export interface HubPos { x: number; z: number; yaw: number }
 class HubPosStore {
