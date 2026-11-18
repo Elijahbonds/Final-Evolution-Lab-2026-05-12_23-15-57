@@ -10,6 +10,8 @@
 //   gap0 / gap48     the nearest defender's planar distance at the press and 48 frames (0.8 s) later; gain = gap48 − gap0
 //   late    the log's read: `he bit (…)` / `he is set` / '-' (no read logged)
 import fs from 'node:fs';
+/** the recorder's clips: one string, 'name:weight' joined by spaces (an array in the selftest) */
+const clipsOf = (x) => (Array.isArray(x) ? x : String(x || '').split(' ').filter(Boolean));
 const RIM = { x: 0, z: -0.6 };
 const med = (a) => { const s = a.filter((x) => x != null && Number.isFinite(x)).sort((x, y) => x - y); return s.length ? s[Math.floor((s.length - 1) / 2)] : null; };
 export function readTrial(tr) {
@@ -22,7 +24,7 @@ export function readTrial(tr) {
     const [ux, uz] = awayDir(a.r); const d = (b.r[0] - a.r[0]) * ux + (b.r[2] - a.r[2]) * uz;   // m this frame, away from the rim
     if (move == null && d >= 0.01) move = b.f - P;
     if (v2 == null && d * 60 >= 2) v2 = b.f - P;
-    const w = Math.max(0, ...(b.clips || []).filter((c) => /stepback_gather|snatch_back/.test(c)).map((c) => +c.split(':').pop()));
+    const w = Math.max(0, ...clipsOf(b.clips).filter((c) => /stepback_gather|snatch_back/.test(c)).map((c) => +c.split(':').pop()));
     if (clip5 == null && w >= 0.05) clip5 = b.f - P;
     if (clip95 == null && w >= 0.95) clip95 = b.f - P;
   }
