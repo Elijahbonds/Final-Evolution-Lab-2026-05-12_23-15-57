@@ -84,6 +84,8 @@ try {
     else if (process.env.CONTROL === 'fliteOff') runs.push([`fliteOff-control-${i + 1}`, fliteOff]);
     else runs.push([`venice-control-${i + 1}`, 'mode=venice_hub']);
   }
+  // GULL=1 (phase F-lite's picture): one more zone run, after the measured ones, on past Palm Key to Gull Key (not in the comparison)
+  if (process.env.GULL === '1') runs.push(['coast-gull', '']);
   if (!process.env.CONTROL) runs.push(['coast-nostream', `feel=${encodeURIComponent(JSON.stringify({ 'coast.streamOn': 0 }))}`]);
   // VARIANTS='name={"knob":v};name2={...}': these zone runs instead (a diagnosis: which part of a change does what)
   if (process.env.VARIANTS) {
@@ -133,7 +135,8 @@ try {
     await page.evaluate(`(() => { window.__gaps = []; window.__gapAt = []; let last = performance.now(); function tick() { const n = performance.now(); window.__gaps.push(n - last); if (n - last > 250) window.__gapAt.push([Math.round(n), Math.round(n - last)]); last = n; requestAnimationFrame(tick); } requestAnimationFrame(tick); })()`);
     await page.waitForTimeout(5000);   // let the dressing land
     const isCoast = !query.includes('venice_hub');
-    const first = name === 'coast-1';
+    const first = name === 'coast-1' && process.env.GULL !== '1';
+    const gull = name === 'coast-gull';
     const shot = async (label: string) => { if (!first) return; const file = path.join(OUT, `coast-${label}-phone.jpg`); await page.screenshot({ path: file, type: 'jpeg', quality: 85 }); console.log('wrote', file); };
     await shot('arrival');
     let worst: Worst = { draws: 0, active: 0, textureMb: 0, textures: 0, meshes: 0 };
@@ -180,6 +183,18 @@ try {
       legs.bridgeMid = await walkTo(page, 20, -36, 150, sample);
       await shot('island');
       legs.palmKey = await walkTo(page, -24, -36, 150, sample);
+      if (gull) {
+        // on along the sandbar to Reef Rock, over its top, down the sandbank to Gull Key (zoneLayout SANDBAR, SANDBANK, GULL_KEY)
+        legs.sandbar = await walkTo(page, -52, -12, 120, sample);
+        legs.reefRock = await walkTo(page, -114, 60, 200, sample);
+        legs.sandbankStart = await walkTo(page, -144, 80, 120, sample);
+        legs.sandbankMid = await walkTo(page, -196, 110, 150, sample);
+        await page.waitForTimeout(1500);
+        const f = path.join(OUT, 'coast-sandbank-phone.jpg'); await page.screenshot({ path: f, type: 'jpeg', quality: 85 }); console.log('wrote', f);
+        legs.gullKey = await walkTo(page, -258, 146, 150, sample);
+        await page.waitForTimeout(1500);
+        const g = path.join(OUT, 'coast-gullkey-phone.jpg'); await page.screenshot({ path: g, type: 'jpeg', quality: 85 }); console.log('wrote', g);
+      }
     } else {
       await page.evaluate(() => (window as unknown as { __bus: { emit(e: unknown): void } }).__bus.emit({ t: 'stick', side: 'L', x: 0, y: -1 }));   // forward (the bus's y is down-positive)
       for (let k = 0; k < 40; k++) { await page.waitForTimeout(250); await sample(); }
