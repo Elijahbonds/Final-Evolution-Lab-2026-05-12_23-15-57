@@ -955,6 +955,10 @@ Group **Kit · fit**. A look slider, not a feel number: it moves no body, no bon
   mask is fitted; the pull fades out near the hems, cuffs, armholes and leg openings, where the skin is still drawn. Kit packs (the
   football jersey) and the Creator's built clothes are not touched. `lib/babylon/core/fitTight.ts` `FIT_TIGHTNESS` (with `FIT_FLOOR`
   8 mm and `FIT_EDGE_BAND` 7 cm).
+- `kit.inseamShade` **0.45 — the coordinator's reversible default, 2026-11-18 (option (a); flagged to the owner)** (new; 0 = as before,
+  no texture): how much darker the one-piece short's cloth between the legs is, a gusset panel, so its stretch in a stride reads
+  as a seam (KIT-FIT-PLAN §12.3: no weight or shape change removed it). A texture made from the short's own UVs and weights; no
+  geometry, UV, bone or vertex-data change. `lib/babylon/core/inseamShade.ts` `INSEAM_SHADE`.
 - `kit.setLiftScale` **0.5 — owner 2026-11-18 pick (3) from the contact sheet** (new; 1 = today's numbers): the runtime lift
   (`GARMENT_INFLATE` 13 mm tops / 20 mm shorts) and edge flare on the Blender-made garment sets ONLY (the one-piece short, the new
   jerseys); every other garment takes today's. `lib/babylon/core/fitTight.ts` `SET_LIFT_SCALE`.

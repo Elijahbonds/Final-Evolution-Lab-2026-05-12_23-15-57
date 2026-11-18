@@ -2074,6 +2074,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
   },
   // ── lane/kit-tight (owner 2026-11-18: "make the clothes appear to be skin tight and not baggy ... right now it looks poofy") ──
   {
+    id: 'kit.inseamShade', label: 'One-piece short: darker inseam panel (0 = none)', def: 0.45, min: 0, max: 1, step: 0.05, unit: '', group: 'Kit · fit',
+    source: 'lib/babylon/core/inseamShade.ts INSEAM_SHADE',
+    hint: 'How much darker the cloth between the legs is, so its stretch in a stride reads as a gusset panel. 0 = as before (no panel).',
+  },
+  {
     id: 'kit.setLiftScale', label: 'New garments: lift off the body (share of today)', def: 0.5, min: 0, max: 1, step: 0.05, unit: '', group: 'Kit · fit',
     source: 'lib/babylon/core/fitTight.ts SET_LIFT_SCALE',
     hint: 'Only the Blender-made one-piece short and new jerseys. 1 = today (13 mm tops, 20 mm shorts, plus the edge flare). Lower sits them closer to the body.',

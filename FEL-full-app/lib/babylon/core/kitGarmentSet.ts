@@ -23,6 +23,7 @@ import type { AssetContainer, Skeleton } from '@babylonjs/core';
 import { feel } from '@/lib/feel-panel/feel';
 import { KIT_BODY_MOBILE_URL, KIT_BODY_URL, type BodyType } from './heroBody';
 import { NEW_JERSEYS } from './sportKitDefaults';
+import { applyInseamShade, joiningShare } from './inseamShade';
 
 /** Knob `kit.onePieceShorts`: 1 = the one-piece short on the kit bodies; 0 = today's three-piece short (default). */
 export const ONE_PIECE_SHORTS = 1;   // owner 2026-11-18 pick (3) from the contact sheet (was 0)
@@ -136,6 +137,11 @@ export function applyGarmentSet(container: AssetContainer, set: readonly SetGarm
         m.metadata = { ...(m.metadata ?? {}), felKitGarmentSet: g.name };   // kit-tight: its own lift / flare share (fitTight.liftScaleOf)
         for (const user of geo?.meshes ?? [m]) { (user as Mesh).subMeshes = []; (user as Mesh)._createGlobalSubMesh(true); user.refreshBoundingInfo(); }
         done.replaced.push(m.name);
+      }
+      // kit-tight: the one-piece short's darker inseam panel (inseamShade.ts, kit.inseamShade; 0 = none)
+      if (g.slot === 'shorts') {
+        const shorts = container.meshes.filter((m) => m instanceof Mesh && done.replaced.includes(m.name)) as Mesh[];
+        try { applyInseamShade(shorts, g.uv, g.indices, joiningShare(g.joints, g.weights, g.jointNames), container.scene); } catch (e) { console.warn(`[FEL-KIT] inseam shade skipped: ${String((e as Error)?.message ?? e).slice(0, 120)}`); }
       }
     } else if (!container.meshes.some((m) => m.name === g.name)) {
       const scene = container.scene;
