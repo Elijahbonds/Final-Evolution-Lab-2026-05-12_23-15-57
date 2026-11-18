@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { MODE_CONTROLLERS } from '../lib/controller-link/schemas/registry';
 
@@ -164,5 +166,44 @@ assert.ok(hasButton('threevthree', 'A', 'PASS') && hasButton('threevthree', 'Y',
   'threevthree phone PASS/BLOCK must match the local 2K face-button map');
 assert.ok(!hasButton('threevthree', 'charge'),
   'threevthree phone SHOOT must not use charge/RT, which basketball reads as turbo');
+
+const fullPictureOutput = execFileSync('npx', [
+  'tsx',
+  'scripts/full-picture.mts',
+  '--md',
+  join(tmpdir(), 'fel-full-picture-test.md'),
+], { cwd: ROOT, encoding: 'utf8' });
+const [headerLine] = fullPictureOutput.split('\n').filter((line) => line.startsWith('| mode |'));
+const headers = headerLine.split('|').slice(1, -1).map((cell) => cell.trim());
+
+function matrixCell(mode: string, header: string): string {
+  const row = fullPictureOutput.split('\n').find((line) => line.startsWith(`| ${mode} |`));
+  assert.ok(row, `full-picture output must include ${mode}`);
+  const cells = row.split('|').slice(1, -1).map((cell) => cell.trim());
+  const index = headers.indexOf(header);
+  assert.notEqual(index, -1, `full-picture output must include ${header} column`);
+  return cells[index];
+}
+
+assert.match(matrixCell('football', 'movement cores'), /\bRushRun\b/,
+  'full-picture core detector must see imported pure cores used below the import block');
+assert.match(matrixCell('snowboard_slalom', 'movement cores'), /\bBoardMovement\b/,
+  'full-picture core detector must not lose import-only shared board cores');
+assert.match(matrixCell('tennis', 'movement cores'), /\bRallyCore\b/,
+  'full-picture core detector must see createNetSportMode wrappers');
+assert.match(matrixCell('bigair', 'movement cores'), /\bAirSessionCore\b/,
+  'full-picture core detector must see makeAirSessionMode wrappers');
+assert.match(matrixCell('sprint', 'movement cores'), /\bSprintCore\b/,
+  'full-picture core detector must see makeSprintMode factory bodies');
+assert.match(matrixCell('baseball', 'movement cores'), /\bBaseballGame\b/,
+  'full-picture core detector must see mode-specific pure gameplay cores');
+assert.match(matrixCell('dance', 'movement cores'), /\bDanceCore\b/,
+  'full-picture core detector must see timing/gameplay cores used in long mode files');
+assert.doesNotMatch(matrixCell('onevone', 'movement cores'), /\bDerbyLoop\b/,
+  'full-picture core detector must not count local variable names as imported cores');
+assert.equal(matrixCell('derby', 'cam'), '✓',
+  'full-picture camera detector must keep measured registry keys even when a legacy alias exists');
+assert.equal(matrixCell('snowboard_slalom', 'cam'), '✓',
+  'full-picture camera detector must keep measured underscore registry keys');
 
 console.log(`full-picture-tests: ${enabledModes.length} enabled mode routes, menus, phone schemas, and gauntlets resolve`);

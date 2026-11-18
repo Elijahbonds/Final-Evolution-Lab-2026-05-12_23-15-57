@@ -49,7 +49,42 @@ const venueOfMode = (key: string, src: string): { venue: string | null; map: str
   return { venue, map: venue ? venueMapKeys[venue] ?? null : null, kit: kit.length ? [...new Set(kit)].join('+') : null };
 };
 
-const CORES = ['CourtMovement', 'BoardMovement', 'CombatMovement', 'FieldRun', 'CarrierControl', 'GroundRide', 'AirControl', 'RallyCore', 'TennisCore', 'GolfCore', 'DanceCore', 'DunkApproach', 'OnslaughtCore', 'KeeperCore', 'Batting', 'Pitching'];
+const CORE_DETECTORS: { name: string; tokens: string[] }[] = [
+  { name: 'CourtMovement', tokens: ['CourtMovement'] },
+  { name: 'BoardMovement', tokens: ['BoardMovement'] },
+  { name: 'CombatMovement', tokens: ['CombatMovement'] },
+  { name: 'FieldRun', tokens: ['FieldRun'] },
+  { name: 'CarrierControl', tokens: ['CarrierControl'] },
+  { name: 'GroundRide', tokens: ['GroundRide'] },
+  { name: 'AirControl', tokens: ['AirControl'] },
+  { name: 'RallyCore', tokens: ['RallyCore', 'createNetSportMode', 'TENNIS', 'VOLLEYBALL'] },
+  { name: 'TennisCore', tokens: ['TennisCore'] },
+  { name: 'GolfCore', tokens: ['GolfCore', 'GolfBallSim', 'GolfAim', 'loopHole'] },
+  { name: 'DanceCore', tokens: ['DanceCore', 'DancePerformance', 'generateRoutine'] },
+  { name: 'DunkApproach', tokens: ['DunkApproach', 'takeoffFor'] },
+  { name: 'OnslaughtCore', tokens: ['OnslaughtCore'] },
+  { name: 'KeeperCore', tokens: ['KeeperCore', 'planRivalKick', 'resolveSaveRead'] },
+  { name: 'Batting', tokens: ['Batting'] },
+  { name: 'Pitching', tokens: ['Pitching'] },
+  { name: 'RushRun', tokens: ['RushRun', 'stepRun', 'kickMoveStep'] },
+  { name: 'AirSessionCore', tokens: ['AirSessionCore', 'makeAirSessionMode', 'makeBigAirSession'] },
+  { name: 'FreeRunCore', tokens: ['FreeRunCore', 'verbsFor', 'trickPoints'] },
+  { name: 'SprintCore', tokens: ['SprintCore', 'makeSprintRace', 'SPRINT_TUNING'] },
+  { name: 'BaseballGame', tokens: ['BaseballGame', 'BaseballSlots'] },
+  { name: 'DerbyLoop', tokens: ['DerbyLoop', 'pitchShape', 'derbySeed', 'rivalVerdict'] },
+  { name: 'PenaltyLoop', tokens: ['PenaltyLoop', 'readPensStyle', 'launchKick', 'shootoutState'] },
+  { name: 'SurfHeat', tokens: ['SurfHeat', 'HeatScore', 'scoreWave'] },
+  { name: 'GateCrasher', tokens: ['gateCrasher', 'judgeGate', 'resolveSolids'] },
+  { name: 'CarnivalNight', tokens: ['CarnivalNight', 'rivalProgress'] },
+  { name: 'BrainBrawlCore', tokens: ['BrainBrawlCore', 'BrainBrawl', 'brainBrawl'] },
+  { name: 'WhoSceneItCore', tokens: ['WhoSceneItCore', 'WhoSceneIt', 'whoSceneIt'] },
+];
+const hasToken = (src: string, token: string) => new RegExp(`\\b${token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(src);
+const importSource = (src: string) => [...src.matchAll(/import[\s\S]*?;\n/g)].map((m) => m[0]).join('\n');
+const detectCores = (whole: string, implementation: string): string[] => CORE_DETECTORS
+  .filter((core) => core.tokens.some((token) => hasToken(implementation, token))
+    && core.tokens.some((token) => hasToken(importSource(whole), token)))
+  .map((core) => core.name);
 // Camera column = a MEASURED gameplay framing exists for the mode (lib/babylon/config/cameraFraming.json,
 // scripts/probes/_cam-frame.mts). cameraPresets.json describes the retired venue cameras (pre-M104).
 const camFraming = JSON.parse(read('lib/babylon/config/cameraFraming.json'));
@@ -117,13 +152,13 @@ const rows: Row[] = modeEntries.map(({ key, cls }) => {
   const src = file ? implementationSlice(whole, cls) : '';
   const route = `/play/${routeMap[key] ?? key}`;
   const { venue, map, kit } = venueOfMode(key, src);
-  const cores = CORES.filter((c) => new RegExp(`from '\\.\\./core/${c}'|from '\\./${c}'|\\b${c}\\b`).test(src) && src.includes(`${c}`));
+  const cores = detectCores(whole, src);
   return {
     key, enabled: enabled.has(key), file, route,
     menu: gameData.includes(`href: '${route}'`),
     venue, map, kit, baked: !!map && bakedKeys.has(map),
-    cores: cores.filter((c) => src.includes(`/${c}'`)),
-    camera: camKeys.has(key),   // cameraFraming.json is keyed by registry key
+    cores,
+    camera: camKeys.has(key) || (!!camName[key] && camKeys.has(camName[key])),   // cameraFraming.json is keyed by registry key, with legacy measured aliases
     navFirst: /\.constrain\(/.test(src),
     clamps: (src.match(/Math\.max\(-?[A-Z_0-9.]+, *Math\.min\(/g) ?? []).length + (src.match(/^const (COURT|FIELD|ARENA|BOUNDS|HALF)[A-Z_]* *=/gm) ?? []).length,
     bridge: bridge.includes(`'${key}'`),
