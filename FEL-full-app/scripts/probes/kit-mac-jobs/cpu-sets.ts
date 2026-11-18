@@ -27,6 +27,13 @@ const load = SceneLoader.LoadAssetContainerAsync.bind(SceneLoader);
       const b = readFileSync(resolve(ROOT, `public${KIT_GARMENT_SETS[kind][sex]}`));
       applyGarmentSet(c, parseGarmentSet(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength)));
     }
+    // cpu.ts names its clones `_c<body>` (no digits), which kitOf does not strip, so a wardrobe pick never matches and the slot
+    // shows its FIRST garment: the jersey under test is put first (the shorts set replaces the first short already)
+    if (what !== 'shorts') {
+      const want = `Kit_tops_top_${what}`, i = c.meshes.findIndex((m) => m.name === want);
+      const kids = (c.meshes[i]?.parent as unknown as { _children?: unknown[] } | null)?._children;   // applyKit reads the children's order
+      if (i >= 0 && kids) { kids.splice(kids.indexOf(c.meshes[i]), 1); kids.unshift(c.meshes[i]); }
+    }
   }
   return c;
 };
