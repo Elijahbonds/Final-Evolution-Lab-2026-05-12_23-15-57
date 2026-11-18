@@ -751,19 +751,6 @@ export function* maskBodySteps(body: Mesh, meshes: AbstractMesh[], why?: Record<
   if (isShrunk(body)) return null;   // mid spawn-in: the margins are world metres and the body is millimetres tall (see isShrunk)
   const bodySkin = skinnedWorld(body); if (!bodySkin) return null;
   meshes = withSiblings(body, meshes);
-  // KIT-TIGHT (fitTight.ts): the worn tee and short drawn closer to the skin, once, before the waistband fit and the flare measure them
-  const tight = fitTightness();
-  if (tight > 0) {
-    try {
-      const skinS = new SkinSurface(bodySkin.P, bodySkin.N, meta.felBodyIndices0!);
-      for (const m of meshes) {
-        const slot = maskSlotOf(m.name); if (!fitsTight(m, slot) || !m.isVisible || m.isDisposed() || !(m as Mesh).skeleton) continue;
-        const sw = skinnedWorld(m as Mesh); const ind = ((m.metadata ?? {}) as { felGarmentIndices0?: number[] }).felGarmentIndices0 ?? (m as Mesh).getIndices(); if (!sw || !ind) continue;
-        const pre = (m as { __felPreLift?: Float32Array }).__felPreLift, ew = pre && pre.length === sw.P.length ? skinnedWorld(m as Mesh, pre)?.P ?? sw.P : sw.P;
-        tightenGarment(m as Mesh, sw.P, openEdgeWeights(ew, ind, FIT_EDGE_BAND, FIT_WELD, slot === 'shorts' ? (y01) => y01 > 0.5 : undefined).w, skinS, tight);
-      }
-    } catch (e) { console.warn(`[FEL-KIT] tight fit skipped: ${String((e as Error)?.message ?? e).slice(0, 140)}`); }
-  }
   try { fitShortsUnderTop(body, bodySkin, meta.felBodyIndices0!, meshes); } catch (e) { console.warn(`[FEL-KIT] waistband fit skipped: ${String((e as Error)?.message ?? e).slice(0, 140)}`); }
   yield;   // RUNUP-STALL-5: step 1 done (the body's skin)
   if (body.isDisposed()) return null;
@@ -790,6 +777,21 @@ export function* maskBodySteps(body: Mesh, meshes: AbstractMesh[], why?: Record<
   // vertices deep inside a built piece, which is made of these very triangles); a triangle goes when all three corners do
   const clothHide = (meta as { felClothHide?: Uint8Array }).felClothHide;
   if (clothHide) res.indices = dropHiddenTriangles(res.indices, clothHide, res);
+  // KIT-TIGHT (fitTight.ts): the worn tee and short drawn closer to the skin, once — only over the skin this mask hides
+  const tight = fitTightness();
+  if (tight > 0) {
+    try {
+      const bInd = meta.felBodyIndices0!, skinS = new SkinSurface(bodySkin.P, bodySkin.N, bInd), hid = res.hidden;
+      const overHidden = (t: number) => !!(hid[bInd[t]] && hid[bInd[t + 1]] && hid[bInd[t + 2]]);
+      for (const m of meshes) {
+        const slot = maskSlotOf(m.name); if (!fitsTight(m, slot) || !m.isVisible || m.isDisposed() || !(m as Mesh).skeleton) continue;
+        const g = m as FitMesh & { __felPreLift?: Float32Array };
+        const sw = skinnedWorld(g); const ind = ((g.metadata ?? {}) as { felGarmentIndices0?: number[] }).felGarmentIndices0 ?? g.getIndices(); if (!sw || !ind) continue;
+        const pre = g.__felPreLift, ew = pre && pre.length === sw.P.length ? skinnedWorld(g, pre)?.P ?? sw.P : sw.P;   // open edges on the un-lifted shape: the lift splits its seams
+        tightenGarment(g, sw.P, openEdgeWeights(ew, ind, FIT_EDGE_BAND, FIT_WELD, slot === 'shorts' ? (y01) => y01 > 0.5 : undefined).w, skinS, tight, overHidden, [g.__felFlare0, g.__felWaist0]);
+      }
+    } catch (e) { console.warn(`[FEL-KIT] tight fit skipped: ${String((e as Error)?.message ?? e).slice(0, 140)}`); }
+  }
   shareBodyBounds(body, meshes);   // after the shoe's late fold, which refreshed its own box
   if (!meta.felBodyMask) body.makeGeometryUnique();   // this body only — the container's geometry keeps the whole skin
   body.setIndices(res.indices, null, false);

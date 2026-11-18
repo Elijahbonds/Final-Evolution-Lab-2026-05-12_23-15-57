@@ -7,9 +7,11 @@
 // 4–4.6 cm at the 90th percentile. On a girth-max Creator build the body already fills them (the gap is ≤ 0), so the poof is
 // the default builds'.
 //
-// THE RULE. Once, when the body mask is fitted (bodyMask.maskBodySteps, before the waistband fit and the edge flare), each worn
-// kit tee / tank / short vertex further than FIT_FLOOR off the skin is pulled toward the skin point under it by `t` of the
-// excess (t = kit.fitTightness: 0 = today exactly, 1 = FIT_FLOOR everywhere). The skin under a garment is hidden by the mask
+// THE RULE. Once, when the body mask has been computed (bodyMask.maskBodySteps, after the waistband fit and the edge flare), each
+// worn kit tee / tank / short vertex further than FIT_FLOOR off the skin is pulled toward the skin point under it by `t` of the
+// excess (t = kit.fitTightness: 0 = today exactly, 1 = FIT_FLOOR everywhere) — ONLY where that skin is hidden by the mask: hidden
+// skin cannot poke through, however close the cloth comes. (The first version pulled over drawn skin too and measured worse on the
+// rig: the arm through the short sleeve, the thighs through the short — +10–35 % skin through cloth at 0.6.) The skin under a garment is hidden by the mask
 // except in a band at its open edges (TOP_EDGE_MARGIN 5 cm at a top's hem, cuffs and armholes; the shorts' leg openings), where
 // the cloth must keep standing off it, so the pull fades to 0 within FIT_EDGE_BAND of an open edge (bodyMask.edgeFlareWeights).
 // Kit packs (a shell with an outer and an inner wall: pulling each wall to the skin would fold one through the other) and the
@@ -71,10 +73,10 @@ export class SkinSurface {
     }
   }
   /** Signed distance along the skin's normal (+ outside) and that normal, or null when no skin is within `reach`. */
-  closest(x: number, y: number, z: number, reach: number): { signed: number; n: [number, number, number] } | null {
+  closest(x: number, y: number, z: number, reach: number): { signed: number; n: [number, number, number]; tri: number } | null {
     const { P, N, ind, cell } = this, r = Math.ceil(reach / cell);
     const ci = Math.floor(x / cell), cj = Math.floor(y / cell), ck = Math.floor(z / cell);
-    let best = reach * reach, hit: { signed: number; n: [number, number, number] } | null = null; const seen = new Set<number>();
+    let best = reach * reach, hit: { signed: number; n: [number, number, number]; tri: number } | null = null; const seen = new Set<number>();
     for (let i = -r; i <= r; i++) for (let j = -r; j <= r; j++) for (let k = -r; k <= r; k++) {
       const tris = this.grid.get(`${ci + i},${cj + j},${ck + k}`); if (!tris) continue;
       for (const t of tris) {
@@ -85,7 +87,7 @@ export class SkinSurface {
         const d2 = (x - qx) ** 2 + (y - qy) ** 2 + (z - qz) ** 2; if (d2 >= best) continue;
         let nx = u * N[a] + v * N[b] + w * N[c], ny = u * N[a + 1] + v * N[b + 1] + w * N[c + 1], nz = u * N[a + 2] + v * N[b + 2] + w * N[c + 2];
         const l = Math.hypot(nx, ny, nz) || 1; nx /= l; ny /= l; nz /= l;
-        best = d2; hit = { signed: (x - qx) * nx + (y - qy) * ny + (z - qz) * nz, n: [nx, ny, nz] };
+        best = d2; hit = { signed: (x - qx) * nx + (y - qy) * ny + (z - qz) * nz, n: [nx, ny, nz], tri: t };
       }
     }
     return hit;
@@ -93,12 +95,14 @@ export class SkinSurface {
 }
 
 /** Pure: the world pull of each vertex (3 per vertex) toward the skin: `t` of its excess over `floor`, faded by `edge` (0..1, 1 at
- *  an open edge). A vertex the skin is not under (out of reach, or already inside) does not move. */
-export function tightPull(P: ArrayLike<number>, edge: ArrayLike<number>, skin: SkinSurface, t: number, floor = FIT_FLOOR, reach = FIT_REACH): { delta: Float32Array; moved: number; before: number; after: number } {
+ *  an open edge). A vertex the skin is not under (out of reach, or already inside) does not move, nor one whose skin triangle
+ *  `overHidden` rejects. */
+export function tightPull(P: ArrayLike<number>, edge: ArrayLike<number>, skin: SkinSurface, t: number, floor = FIT_FLOOR, reach = FIT_REACH, overHidden?: (tri: number) => boolean): { delta: Float32Array; moved: number; before: number; after: number } {
   const delta = new Float32Array(P.length); let moved = 0, sb = 0, sa = 0, n = 0;
   if (!(t > 0)) return { delta, moved, before: 0, after: 0 };
   for (let v = 0; v < P.length / 3; v++) {
     const h = skin.closest(P[v * 3], P[v * 3 + 1], P[v * 3 + 2], reach); if (!h || h.signed <= floor) continue;
+    if (overHidden && !overHidden(h.tri)) continue;   // the skin under it is drawn (an edge band, an arm in a sleeve): it could poke through
     const k = t * (1 - (edge[v] ?? 0)) * (h.signed - floor);
     sb += h.signed; sa += h.signed - k; n++;
     if (k <= 1e-5) continue;
@@ -122,13 +126,13 @@ function inv3(m: number[]): number[] | null {
  * carried into the vertex data through each vertex's own skin (world = W · Σwᵢ·Mᵢ · local), so every pose draws it.
  * Returns the vertices moved (0: off, already done, or nothing to pull).
  */
-export function tightenGarment(mesh: Mesh, world: Float32Array, edge: ArrayLike<number>, skin: SkinSurface, t = fitTightness()): number {
+export function tightenGarment(mesh: Mesh, world: Float32Array, edge: ArrayLike<number>, skin: SkinSurface, t = fitTightness(), overHidden?: (tri: number) => boolean, alsoMove: (Float32Array | undefined)[] = []): number {
   if (!(t > 0) || tightened.has(mesh) || !mesh.skeleton) return 0;
   const pos = mesh.getVerticesData('position'), mi = mesh.getVerticesData('matricesIndices'), mw = mesh.getVerticesData('matricesWeights');
   const M = mesh.skeleton.getTransformMatrices(mesh), Wm = mesh.computeWorldMatrix(true).m;
   if (!pos || !mi || !mw || !M || pos.length !== world.length) return 0;
   tightened.add(mesh);
-  const { delta, moved, before, after } = tightPull(world, edge, skin, t);
+  const { delta, moved, before, after } = tightPull(world, edge, skin, t, FIT_FLOOR, FIT_REACH, overHidden);
   if (!moved) return 0;
   const out = new Float32Array(pos);
   for (let v = 0; v < pos.length / 3; v++) {
@@ -138,7 +142,9 @@ export function tightenGarment(mesh: Mesh, world: Float32Array, edge: ArrayLike<
     const A = [0, 0, 0, 0, 0, 0, 0, 0, 0];   // W · S
     for (let c = 0; c < 3; c++) for (let r = 0; r < 3; r++) A[c * 3 + r] = Wm[r] * S[c * 3] + Wm[4 + r] * S[c * 3 + 1] + Wm[8 + r] * S[c * 3 + 2];
     const I = inv3(A); if (!I) continue;
-    out[v * 3] += I[0] * dx + I[3] * dy + I[6] * dz; out[v * 3 + 1] += I[1] * dx + I[4] * dy + I[7] * dz; out[v * 3 + 2] += I[2] * dx + I[5] * dy + I[8] * dz;
+    const lx = I[0] * dx + I[3] * dy + I[6] * dz, ly = I[1] * dx + I[4] * dy + I[7] * dz, lz = I[2] * dx + I[5] * dy + I[8] * dz;
+    out[v * 3] += lx; out[v * 3 + 1] += ly; out[v * 3 + 2] += lz;
+    for (const a of alsoMove) if (a && a.length === out.length) { a[v * 3] += lx; a[v * 3 + 1] += ly; a[v * 3 + 2] += lz; }   // the fits' saved bases keep the pull
   }
   if ((mesh.geometry?.meshes.length ?? 1) > 1) mesh.makeGeometryUnique();   // never move a container's (or a sibling clone's) vertices
   mesh.setVerticesData('position', out, false);
