@@ -117,7 +117,11 @@ else:
     want = flag('--object')
     if want: meshes = [o for o in meshes if o.name == want]
     if not meshes: raise SystemExit('FELFIT --mesh: no mesh found' + (f' named {want}' if want else ''))
-    for o in meshes: o.parent = None
+    for o in meshes:
+        o.parent = None
+        # lane/kit-mac-jobs (first run, Blender 5.0.1): the kit GLB's two shorts share one mesh, and transform_apply refuses
+        # a multi-user mesh ("Cannot apply to a multi user"). The garment takes its own copy.
+        if o.data.users > 1: o.data = o.data.copy()
     select_only(meshes)
     for o in meshes:   # a rigged download keeps its own armature modifier: the garment is re-skinned to the FEL rig below
         for m in [m for m in o.modifiers if m.type == 'ARMATURE']: o.modifiers.remove(m)
