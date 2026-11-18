@@ -199,11 +199,33 @@ assert.match(matrixCell('baseball', 'movement cores'), /\bBaseballGame\b/,
   'full-picture core detector must see mode-specific pure gameplay cores');
 assert.match(matrixCell('dance', 'movement cores'), /\bDanceCore\b/,
   'full-picture core detector must see timing/gameplay cores used in long mode files');
+assert.match(matrixCell('onevone', 'movement cores'), /\bBasketballCore\b/,
+  'full-picture core detector must see basketball modes that import named BasketballCore rules');
+assert.match(matrixCell('threepoint', 'movement cores'), /\bBasketballCore\b/,
+  'full-picture core detector must see the shootout shot meter as the shared BasketballCore');
+assert.match(matrixCell('karate_vs', 'movement cores'), /\bFightCore\b/,
+  'full-picture core detector must see combat modes that import named FightCore rules');
+assert.match(matrixCell('mixedcombat', 'movement cores'), /\bFightCore\b/,
+  'full-picture core detector must see mixed combat sharing FightCore with karate-vs');
+assert.match(matrixCell('dunkduel', 'movement cores'), /\bDunkSystem\b/,
+  'full-picture core detector must see the dunk contest flight/verdict core');
+assert.match(matrixCell('aeroaces', 'movement cores'), /\bArcadeFlight\b/,
+  'full-picture core detector must see the flyer handling model');
+assert.match(matrixCell('velocitykart', 'movement cores'), /\bKartModel\b/,
+  'full-picture core detector must see the kart handling model');
+assert.match(matrixCell('who_scene_it', 'movement cores'), /\bSceneBuzz\b/,
+  'full-picture core detector must see the live scene-quiz rules core');
+assert.match(matrixCell('tiebreak', 'movement cores'), /\bTiebreakBlitz\b/,
+  'full-picture core detector must see the tiebreak rally/scoring core');
 assert.doesNotMatch(matrixCell('onevone', 'movement cores'), /\bDerbyLoop\b/,
   'full-picture core detector must not count local variable names as imported cores');
 assert.equal(matrixCell('derby', 'cam'), '✓',
   'full-picture camera detector must keep measured registry keys even when a legacy alias exists');
 assert.equal(matrixCell('snowboard_slalom', 'cam'), '✓',
   'full-picture camera detector must keep measured underscore registry keys');
+assert.equal(matrixCell('tiebreak', 'cam'), '✓',
+  'full-picture camera detector must accept mode-specific measured camera proofs');
+assert.equal(matrixCell('freerun', 'cam'), '—',
+  'full-picture camera detector must not treat a missing proof list as measured');
 
 console.log(`full-picture-tests: ${enabledModes.length} enabled mode routes, menus, phone schemas, and gauntlets resolve`);

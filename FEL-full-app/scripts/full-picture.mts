@@ -78,6 +78,14 @@ const CORE_DETECTORS: { name: string; tokens: string[] }[] = [
   { name: 'CarnivalNight', tokens: ['CarnivalNight', 'rivalProgress'] },
   { name: 'BrainBrawlCore', tokens: ['BrainBrawlCore', 'BrainBrawl', 'brainBrawl'] },
   { name: 'WhoSceneItCore', tokens: ['WhoSceneItCore', 'WhoSceneIt', 'whoSceneIt'] },
+  { name: 'BasketballCore', tokens: ['BasketballCore', 'ShotMeter', 'ShotArc', 'distanceContest01', 'SHOT_QUALITY_PCT', 'BODY_STANDOFF'] },
+  { name: 'FightCore', tokens: ['FightCore', 'resolveStrike', 'applyHit', 'rivalPower', 'guardPressMs', 'FighterState'] },
+  { name: 'DunkSystem', tokens: ['DunkSystem', 'DunkFlight', 'cueVerdict', 'cueFireAt', 'DUNK_TRICKS'] },
+  { name: 'ArcadeFlight', tokens: ['ArcadeFlight', 'ArcadeState', 'stepArcade', 'arcadeInput', 'ARCADE_TRAINER'] },
+  { name: 'KartModel', tokens: ['KartModel', 'KartState', 'spawnKart', 'stepKart', 'driftQuality'] },
+  { name: 'RaceField', tokens: ['RaceField', 'racerPlace', 'stepRace', 'startRace', 'RaceProgress'] },
+  { name: 'SceneBuzz', tokens: ['SceneBuzz', 'BuzzMatch', 'drawSceneRounds', 'splitSceneVenue', 'WHO_SCENE_IT'] },
+  { name: 'TiebreakBlitz', tokens: ['TiebreakBlitz', 'freshBlitz', 'tickBlitz', 'commitSwing', 'matchCall'] },
 ];
 const hasToken = (src: string, token: string) => new RegExp(`\\b${token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(src);
 const importSource = (src: string) => [...src.matchAll(/import[\s\S]*?;\n/g)].map((m) => m[0]).join('\n');
@@ -86,9 +94,17 @@ const detectCores = (whole: string, implementation: string): string[] => CORE_DE
     && core.tokens.some((token) => hasToken(importSource(whole), token)))
   .map((core) => core.name);
 // Camera column = a MEASURED gameplay framing exists for the mode (lib/babylon/config/cameraFraming.json,
-// scripts/probes/_cam-frame.mts). cameraPresets.json describes the retired venue cameras (pre-M104).
+// scripts/probes/_cam-frame.mts, or a mode-specific measured camera proof). cameraPresets.json describes the retired
+// venue cameras (pre-M104).
 const camFraming = JSON.parse(read('lib/babylon/config/cameraFraming.json'));
 const camKeys = new Set(Object.keys(camFraming.modes));
+const measuredCameraProofs: Record<string, string[]> = {
+  tiebreak: ['lib/babylon/modes/tiebreakCam.ts', 'lib/babylon/modes/tiebreakCam.test.ts'],
+};
+const hasMeasuredCameraProof = (key: string): boolean => {
+  const proofs = measuredCameraProofs[key];
+  return !!proofs && proofs.length > 0 && proofs.every((p) => existsSync(p));
+};
 const bridge = read('lib/controller-link/schemas/registry.ts');
 const gauntlet = read('scripts/gauntlet.sh');
 const gauntletPlay = read('scripts/gauntlet-play.sh');
@@ -158,7 +174,7 @@ const rows: Row[] = modeEntries.map(({ key, cls }) => {
     menu: gameData.includes(`href: '${route}'`),
     venue, map, kit, baked: !!map && bakedKeys.has(map),
     cores,
-    camera: camKeys.has(key) || (!!camName[key] && camKeys.has(camName[key])),   // cameraFraming.json is keyed by registry key, with legacy measured aliases
+    camera: camKeys.has(key) || (!!camName[key] && camKeys.has(camName[key])) || hasMeasuredCameraProof(key),   // cameraFraming.json is keyed by registry key, with legacy measured aliases
     navFirst: /\.constrain\(/.test(src),
     clamps: (src.match(/Math\.max\(-?[A-Z_0-9.]+, *Math\.min\(/g) ?? []).length + (src.match(/^const (COURT|FIELD|ARENA|BOUNDS|HALF)[A-Z_]* *=/gm) ?? []).length,
     bridge: bridge.includes(`'${key}'`),
