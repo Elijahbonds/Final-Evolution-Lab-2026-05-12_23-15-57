@@ -5,7 +5,9 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { dpadLayout, DPAD_TAP_PX, DPAD_COMPACT_SCALE, TOUCH_DPAD_TAP_ON } from './dpadTap';
-import { TouchOverlay } from './TouchOverlay';
+import { TouchOverlay, DEAD_DPAD } from './TouchOverlay';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { FLOAT_ZONE_H } from './floatStick';
 import type { InputBus } from '../core/InputBus';
 import { setFeelUser, setFeelSession, setFeelOverride, resetFeelForTests } from '@/lib/feel-panel/feel';
@@ -44,9 +46,9 @@ describe('the d-pad on the deck (touch.dpadTapOn)', () => {
     Object.defineProperty(globalThis, 'navigator', { value: { maxTouchPoints: 5 }, configurable: true, writable: true });
     return renderToStaticMarkup(createElement(TouchOverlay, { bus: { emit: () => {}, gamepadActive: false } as unknown as InputBus, modeId, visible: true }));
   };
-  it('ships ON: four labelled 44 px arrows in a row upright, a 52 px cross sideways — every mode', () => {
+  it('ships ON: four labelled 44 px arrows in a row upright, a 52 px cross sideways — every mode that uses the d-pad', () => {
     expect(TOUCH_DPAD_TAP_ON).toBe(1);
-    for (const m of ['onevone', 'threevthree', 'sprint', 'karate']) {
+    for (const m of ['sprint', 'karate', 'dunk', 'carnival']) {
       const up = deck(m);
       expect(up).toContain('data-dpad-shape="row"');
       expect(up.match(/data-dpad="(up|down|left|right)"/g)).toHaveLength(4);
@@ -56,6 +58,23 @@ describe('the d-pad on the deck (touch.dpadTapOn)', () => {
       expect(side).toContain('data-dpad-shape="cross"');
       expect(side.match(/style="width:52px;height:52px/g)).toHaveLength(4);
     }
+  });
+  it('1v1 and 3v3 (no d-pad verb): a hollow, unpressable cross in the old 72 px place, upright and sideways', () => {
+    expect([...DEAD_DPAD].sort()).toEqual(['onevone', 'threevthree']);
+    for (const m of DEAD_DPAD) for (const [w, h] of [[390, 844], [844, 390]]) {
+      const html = deck(m, w, h);
+      expect(html).toContain('data-dpad-shape="hollow"');
+      expect(html).toContain('aria-hidden="true" data-dpad-shape="hollow" class="pointer-events-none relative h-[72px] w-[72px]');
+      expect(html).not.toMatch(/data-dpad="/);
+      expect(html).not.toMatch(/>▲<\/button>/);
+    }
+  });
+  it('the hollow modes really use no d-pad: 1v1 reads none, 3v3 only refuses it', () => {
+    const src = (f: string) => readFileSync(join(__dirname, '..', 'modes', f), 'utf8');
+    expect(src('OneVOneMode.ts')).not.toMatch(/t === 'dpad'/);
+    const lines = src('ThreeVThreeMode.ts').split('\n'); const at = lines.flatMap((l, i) => (/t === 'dpad'/.test(l) ? [i] : []));
+    expect(at).toHaveLength(1);
+    expect(lines.slice(at[0], at[0] + 2).join(' ')).toContain("refuse(ctx, 'MOVE WITH THE STICK')");
   });
   it('OFF (0): the 24 px cross exactly as before', () => {
     setFeelUser(true); setFeelSession(null); expect(setFeelOverride('touch.dpadTapOn', 0)).toBe(0);

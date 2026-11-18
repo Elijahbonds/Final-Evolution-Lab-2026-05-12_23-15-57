@@ -118,7 +118,7 @@ export function TouchOverlay(props: { bus: InputBus; modeId: string; visible: bo
       : 'pointer-events-none absolute inset-x-0 bottom-0 z-30 h-[44vh] bg-gradient-to-t from-black/85 to-transparent'}>
       {/* compact: the stick in the corner and the d-pad inboard of it (row-reverse keeps the DOM order) */}
       <div ref={colL} className={`pointer-events-auto absolute bottom-3 left-3 flex gap-2 ${compact ? 'flex-row-reverse items-end' : 'flex-col items-center'}`} style={lifted(compact ? COMPACT_LEFT : SAFE_LEFT, cs * fit.l, 'bottom left')}>
-        <DPad bus={props.bus} layout={deck} />
+        {DEAD_DPAD.has(props.modeId) && feel('touch.dpadTapOn', TOUCH_DPAD_TAP_ON) >= 0.5 ? <HollowDPad /> : <DPad bus={props.bus} layout={deck} />}
         {DEAD_L_STICK.has(props.modeId) ? <HollowStick /> : FLOAT_STICK_MODES.has(props.modeId) && feel('touch.floatStick', TOUCH_FLOAT_STICK) > 0 ? <FloatStick bus={props.bus} /> : <AnalogStick bus={props.bus} side="L" label="MOVE" />}
       </div>
       {compact ? (
@@ -238,6 +238,23 @@ function FloatStick({ bus }: { bus: InputBus }) {
  *  drew a live MOVE stick there that answered with nothing (the audit's photographs: baseball's bottom-left); it is the
  *  inert dashed ring now, like an unbound right stick. touchOverlayFit.test.ts holds each to its mode file reading no L stick. */
 export const DEAD_L_STICK: ReadonlySet<string> = new Set(['baseball', 'sprint', 'brainbrawl', 'who_scene_it']);
+
+/** hoops-items (2026-11-18, dpadTap.ts): the modes whose D-PAD does nothing on the touch deck — 1v1 reads no d-pad at all and 3v3 only answers
+ *  it with "MOVE WITH THE STICK". The owner's rule for a slot a mode does not use (2026-09-05: it keeps its place and renders HOLLOW, not
+ *  pressable; DEAD_L_STICK did the same for the stick) applies: an inert dashed cross where the 24 px arrows were — no tap target under 44 px,
+ *  the same 72 px in the column, so the floating stick and TURBO keep their places (a 44 px d-pad there would cover TURBO upright: measured,
+ *  dpad.mjs). touchOverlayFit.test.ts holds each to its mode file using no d-pad as a verb. With touch.dpadTapOn 0: the old 24 px cross. */
+export const DEAD_DPAD: ReadonlySet<string> = new Set(['onevone', 'threevthree']);
+
+function HollowDPad() {
+  const arm = 'absolute rounded-sm border border-dashed border-white';
+  return (
+    <div aria-hidden="true" data-dpad-shape="hollow" className="pointer-events-none relative h-[72px] w-[72px] opacity-30">
+      <div className={`${arm} left-1/2 top-0 h-6 w-6 -translate-x-1/2`} /><div className={`${arm} bottom-0 left-1/2 h-6 w-6 -translate-x-1/2`} />
+      <div className={`${arm} left-0 top-1/2 h-6 w-6 -translate-y-1/2`} /><div className={`${arm} right-0 top-1/2 h-6 w-6 -translate-y-1/2`} />
+    </div>
+  );
+}
 
 function HollowStick() {
   return <div aria-hidden="true" className="pointer-events-none h-24 w-24 rounded-full border border-dashed border-white opacity-30" />;
