@@ -71,6 +71,7 @@ export function inseamTexels(uv: ArrayLike<number>, indices: ArrayLike<number>, 
 /** Give these short meshes (one shared material each) the inseam panel. Returns the materials changed (0 when off). */
 export function applyInseamShade(meshes: readonly Mesh[], uv: ArrayLike<number> | null, indices: ArrayLike<number>, share: ArrayLike<number>, scene: Scene, dark = inseamShade()): number {
   if (!(dark > 0) || !uv) return 0;
+  console.info(`[FEL-KIT] inseam panel: ${meshes.length} short meshes, materials ${meshes.map((m) => `${m.material?.getClassName() ?? 'none'}${(m.material as PBRMaterial | null)?.albedoTexture ? '+tex' : ''}`).join(',')}`);
   let tex: RawTexture | null = null, n = 0;
   const seen = new Set<unknown>();
   for (const m of meshes) {
