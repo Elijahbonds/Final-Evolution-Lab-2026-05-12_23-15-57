@@ -33,6 +33,7 @@ import { JUMP_TESTS_HREF, MIRROR_HREF } from '@/lib/tools-easy/door';
 import { groupBookingOpen, type GroupDb } from '@/lib/group-booking/server';
 import { GROUP_COPY } from '@/lib/group-booking/copy';
 import { MyGroupSessions } from '@/components/group-booking/my-group-sessions';
+import { combineReady, type RawDb as CombineDb } from '@/lib/combine/store';
 
 export const dynamic = 'force-dynamic';
 
@@ -60,6 +61,8 @@ export default async function TrainPage() {
     // EVERY-SCREEN P5: the doors to group training and 1:1s, only once booking is open (the owner set, the tables applied)
     groupBookingOpen(prisma as unknown as GroupDb),
   ]);
+  // COMBINE-DAY: show the saved combine doors only after the pending SQL has landed. Direct pages still fail closed.
+  const combineOpen = (coachLink || coachesAnyone) ? await combineReady(prisma as unknown as CombineDb).catch(() => false) : false;
 
   const cards = [
     {
@@ -169,11 +172,11 @@ export default async function TrainPage() {
       line: t('train.cards.roster.line'),
     }] : []),
     // COMBINE-DAY (2026-10-25): a coach's tryout / testing day; a coached athlete's own combine numbers
-    ...(coachesAnyone ? [{
+    ...(combineOpen && coachesAnyone ? [{
       href: '/coach/combine', group: 'program' as Group, icon: Timer, accent: PALETTE.cyan, title: t('train.cards.combine.title'),
       line: t('train.cards.combine.line'),
     }] : []),
-    ...(coachLink ? [{
+    ...(combineOpen && coachLink ? [{
       href: '/train/combine', group: 'program' as Group, icon: Timer, accent: PALETTE.cyan, title: t('train.cards.combines.title'),
       line: t('train.cards.combines.line'),
     }] : []),

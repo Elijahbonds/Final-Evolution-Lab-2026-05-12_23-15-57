@@ -24,6 +24,13 @@ describe('booking: the doors, the rule first, and fewer taps', () => {
     expect(t).toContain('{groupsOpen ? <MyGroupSessions compact /> : null}');
     expect(src('lib/group-booking/server.ts')).toContain('export async function groupBookingOpen(');
   });
+  it('Train shows combine doors only after the pending combine SQL is ready', () => {
+    const t = src('app/train/page.tsx');
+    expect(t).toContain("import { combineReady, type RawDb as CombineDb } from '@/lib/combine/store';");
+    expect(t).toContain('const combineOpen = (coachLink || coachesAnyone) ? await combineReady(prisma as unknown as CombineDb).catch(() => false) : false;');
+    expect(t).toMatch(/\.\.\.\(combineOpen && coachesAnyone \? \[\{\s*href: '\/coach\/combine'/);
+    expect(t).toMatch(/\.\.\.\(combineOpen && coachLink \? \[\{\s*href: '\/train\/combine'/);
+  });
   it('your sessions on Train: hidden with nothing booked; the cancel rule sits above the Cancel buttons', () => {
     const m = src('components/group-booking/my-group-sessions.tsx');
     expect(m).toContain("if (compact && !seats.some((x) => x.status === 'booked') && !ones.some((x) => x.status === 'booked')) return null;");
