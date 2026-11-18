@@ -944,3 +944,18 @@ Two NEW knobs, **shipped ON** (assumption, flagged: the owner chose both; each k
   crossover flick 1.2 s later): on, 3 of 3 in 1v1 and 3 of 3 in 3v3 kept the ball in the hands for all 66 recorded frames, no move; the
   step-through on the squeeze still comes (4 of 4). Off: the crossover played and the ball went back to the floor. Off: the dribble comes
   back when the pump clip ends.
+
+## coast-islands, 2026-11-18 (the Coast & Islands zone, phase A; docs/COAST-ISLANDS-PLAN.md; NEW, no shipped number moved)
+
+Group **Coast · zone**. Every row is new behaviour in the new zone; nothing outside `/play/coast` reads them. The zone walks on the
+Adventure host's movement and camera exactly as the Venice hub does: no movement or camera number was touched.
+
+- `coast.streamOn` 1 (`lib/adventure/coast/zoneView.ts`): the zone streams its 64 m pieces. 0 = every piece at full detail with every
+  prop, the phone-budget control the guard (`scripts/coast-zone-budget-tests.ts`) and the rig (`scripts/probes/coast-islands/zone-rig.mts`)
+  compare against.
+- `coast.streamFull` 1, `coast.streamLod` 2, `coast.streamKeep` 1 (`lib/adventure/coast/zoneLayout.ts`): the rings, in pieces round
+  yours — the full 3 × 3, the low-detail 5 × 5 (the plan's phone rule, docs/VENICE-HUB-PLAN.md §3) — and the hysteresis before a piece
+  drops its detail. Bounds are assumptions until felt.
+- `coast.deepWaterTurnBack` 1 (`lib/adventure/coast/zoneWorld.ts`): a body that ends a frame over water deeper than you can wade
+  (0.85 m) goes back to the last place it could stand. On the ground the deep water is already a wall to the movement sim; this
+  catches a jump off the dock. 0 = off (a probe that wants the raw sim).
