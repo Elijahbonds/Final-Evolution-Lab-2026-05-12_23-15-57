@@ -28,6 +28,16 @@ import {
   pieceAt, propsDrawnAt, walkable, zonePieces, zoneProps, type PropModel, type StreamRings, type Tier,
 } from '../lib/adventure/coast/zoneLayout';
 import { COAST_STREAM_ON, COARSE_DIV, FINE_DIV } from '../lib/adventure/coast/zoneView';
+import { COAST_CREATURES_ON, ZONE_CREATURES } from '../lib/adventure/coast/zoneCreatures';
+import { COAST_PARTNER_ON } from '../lib/adventure/coast/zonePartner';
+import { pieceKey } from '../lib/adventure/coast/zoneLayout';
+
+/** Phase B: a creature placeholder's draws (world/view buildCreatureBody: a body and a head, wings from stage 2; one shared
+ *  colour material per element, no textures). The partner wears the same body (the default loan: stage 0). */
+export const creatureDraws = (stage: number): number => (stage >= 2 ? 3 : 2);
+export const PARTNER_DRAWS = creatureDraws(0);
+/** At most this many creatures drawn at once (the plan's budget: ≤ 6 NPCs or creatures in the 3 × 3). */
+export const MAX_CREATURES_SHOWN = 6;
 
 let failed = 0, passed = 0;
 const ok = (c: boolean, msg: string) => { if (c) passed++; else { failed++; console.error(`  ✗ ${msg}`); } };
@@ -39,7 +49,7 @@ export const ZONE_GLBS: readonly string[] = PROP_MODELS.map((m) => (m.kit === 'm
 export const FIXED_DRAWS = 7;
 /** Computed today (+ 5 %): the worst standable piece's place triangles, its place draws, and the place's phone texture MB. */
 export const PLACE_TRIS = 40400;
-export const PLACE_DRAWS = 53;
+export const PLACE_DRAWS = 66;   // coast-b: 53 → 66, the partner (2) and the four creatures (10) added (computed 63)
 export const PLACE_TEX_MB = 2.2;
 
 interface Accessor { count: number }
@@ -57,7 +67,7 @@ export function modelCost(url: string): { tris: number; materials: number } {
   return { tris, materials: mats.size };
 }
 
-export interface PlaceCost { tris: number; draws: number; terrainTris: number; props: number; fine: number }
+export interface PlaceCost { tris: number; draws: number; terrainTris: number; props: number; fine: number; creatures: number; lifeDraws: number }
 const FINE_TRIS = FINE_DIV * FINE_DIV * 2, COARSE_TRIS = COARSE_DIV * COARSE_DIV * 2;
 
 /** What the zone draws (not culled: the whole place) at a tier map. `streamOn` false = the control (all full). */
@@ -77,12 +87,17 @@ export function placeCost(tiers: ReadonlyMap<string, Tier>, streamOn: boolean): 
     shown.add(pl.model);
   }
   for (const id of shown) masters += cost.get(id)!.materials;
-  return { tris: terrainTris + propTris, draws: land.length + masters + FIXED_DRAWS, terrainTris, props, fine };
+  // phase B: the partner (always beside you) and every creature whose home piece is drawn (zoneLife CreatureBodies hides the rest)
+  const shownC = COAST_CREATURES_ON ? ZONE_CREATURES.filter((c) => tierOf(pieceKey(...pieceAt(c.home[0], c.home[1]))) !== 'far') : [];
+  const lifeDraws = (COAST_PARTNER_ON ? PARTNER_DRAWS : 0) + shownC.reduce((n, c) => n + creatureDraws(c.stage), 0);
+  return { tris: terrainTris + propTris, draws: land.length + masters + FIXED_DRAWS + lifeDraws, terrainTris, props, fine, creatures: shownC.length, lifeDraws };
 }
 
 /** The worst piece a player can stand in, at these rings: every standable piece, reached by a walk from its neighbour. */
-export function worstPiece(rings: StreamRings, streamOn: boolean): { cost: PlaceCost; piece: string } {
-  let worst: { cost: PlaceCost; piece: string } = { cost: { tris: 0, draws: 0, terrainTris: 0, props: 0, fine: 0 }, piece: '' };
+export function worstPiece(rings: StreamRings, streamOn: boolean): { cost: PlaceCost; piece: string; worstDraws: number; maxCreatures: number } {
+  let maxCreatures = 0;
+  let worst: { cost: PlaceCost; piece: string } = { cost: { tris: 0, draws: 0, terrainTris: 0, props: 0, fine: 0, creatures: 0, lifeDraws: 0 }, piece: '' };
+  let worstDraws = 0;
   const standable = new Set<string>();
   for (let z = ZONE_MIN_Z + 2; z < ZONE_MAX_Z; z += 4) for (let x = ZONE_MIN_X + 2; x < ZONE_MAX_X; x += 4) if (walkable(x, z)) { const [i, j] = pieceAt(x, z); standable.add(`${i},${j}`); }
   for (const key of standable) {
@@ -94,9 +109,10 @@ export function worstPiece(rings: StreamRings, streamOn: boolean): { cost: Place
       s.step(i, j);
       const c = placeCost(s.tiers, streamOn);
       if (c.tris > worst.cost.tris || (c.tris === worst.cost.tris && c.draws > worst.cost.draws)) worst = { cost: c, piece: key };
+      worstDraws = Math.max(worstDraws, c.draws); maxCreatures = Math.max(maxCreatures, c.creatures);
     }
   }
-  return worst;
+  return { ...worst, worstDraws, maxCreatures };
 }
 
 /** The place's phone texture MB: the GLBs' images at the phone cap, plus the procedural textures. */
@@ -114,7 +130,7 @@ if (isMain) {
   const control = worstPiece(rings, false);
   const tex = placeTexMb();
   const row = JSON.parse(readFileSync(resolve(__dirname, '../lib/babylon/config/mobileBudget.json'), 'utf8')).modes?.coast_zone;
-  console.log(`coast zone, worst standable piece ${now.piece}: ${now.cost.tris} triangles (terrain ${now.cost.terrainTris}, ${now.cost.props} props), ${now.cost.draws} place draws, ${now.cost.fine} fine pieces`);
+  console.log(`coast zone, worst standable piece ${now.piece}: ${now.cost.tris} triangles (terrain ${now.cost.terrainTris}, ${now.cost.props} props), ${now.cost.draws} place draws (${now.cost.lifeDraws} the partner and ${now.cost.creatures} creatures), ${now.cost.fine} fine pieces; worst place draws anywhere ${now.worstDraws}, most creatures drawn ${now.maxCreatures}`);
   console.log(`  control (streaming off): ${control.cost.tris} triangles, ${control.cost.props} props, ${control.cost.draws} place draws; textures ${tex.total.toFixed(2)} MB (GLBs ${tex.glb.toFixed(2)}, procedural ${tex.procedural.toFixed(2)})`);
 
   ok(COAST_STREAM_ON === 1, 'coast.streamOn ships at 1: the zone streams its pieces');
@@ -122,8 +138,10 @@ if (isMain) {
   ok(now.cost.fine <= 16, `at most 16 fine pieces are drawn anywhere (the 3 × 3 plus the hysteresis band; got ${now.cost.fine})`);
   ok(now.cost.tris <= PLACE_TRIS, `the worst piece's place triangles ${now.cost.tris} are within PLACE_TRIS ${PLACE_TRIS}`);
   ok(PLACE_TRIS <= Math.ceil(now.cost.tris * 1.05) + 1, `PLACE_TRIS ${PLACE_TRIS} is the measurement + 5 %, not a raise (computed ${now.cost.tris})`);
-  ok(now.cost.draws <= PLACE_DRAWS, `the worst piece's place draws ${now.cost.draws} are within PLACE_DRAWS ${PLACE_DRAWS}`);
-  ok(PLACE_DRAWS <= Math.ceil(now.cost.draws * 1.05) + 1, `PLACE_DRAWS ${PLACE_DRAWS} is the measurement + 5 %, not a raise (computed ${now.cost.draws})`);
+  ok(now.worstDraws <= PLACE_DRAWS, `the worst place draws anywhere (${now.worstDraws}, the partner and the creatures in view included) are within PLACE_DRAWS ${PLACE_DRAWS}`);
+  ok(PLACE_DRAWS <= Math.ceil(now.worstDraws * 1.05) + 1, `PLACE_DRAWS ${PLACE_DRAWS} is the measurement + 5 %, not a raise (computed ${now.worstDraws})`);
+  ok(now.maxCreatures <= MAX_CREATURES_SHOWN, `at most ${MAX_CREATURES_SHOWN} creatures are drawn at once (got ${now.maxCreatures})`);
+  ok(COAST_PARTNER_ON === 1 && COAST_CREATURES_ON === 1, 'phase B ships on: the partner and the creatures');
   ok(control.cost.tris > PLACE_TRIS, `CONTROL: streaming off (${control.cost.tris} triangles) is over PLACE_TRIS — the guard sees the regression it guards`);
   ok(tex.total <= PLACE_TEX_MB, `the place's phone texture memory ${tex.total.toFixed(2)} MB is within PLACE_TEX_MB ${PLACE_TEX_MB}`);
   ok(ZONE_GLBS.length === 7 && ZONE_GLBS.every((u) => u.startsWith('/models/props/nature/')), 'the zone loads seven models, all from the Kenney nature kit (the Meshy surfboard waits for the surf spot)');
@@ -131,7 +149,7 @@ if (isMain) {
   if (row) {
     ok(row.measured.skinnedBodies <= 1, `one body in the zone so far (the player; got ${row.measured.skinnedBodies})`);
     ok(tex.total <= row.budget.textureMb, `the place's textures fit inside the zone's whole-scene texture budget (${row.budget.textureMb} MB)`);
-    ok(now.cost.draws <= row.budget.drawCalls, `the place's draws (${now.cost.draws}, unculled) fit inside the row's draw budget (${row.budget.drawCalls})`);
+    ok(now.worstDraws <= row.budget.drawCalls, `the place's draws (${now.worstDraws}, unculled) fit inside the row's draw budget (${row.budget.drawCalls})`);
   }
 
   console.log(`\ncoast-zone-budget: ${passed} passed, ${failed} failed`);
