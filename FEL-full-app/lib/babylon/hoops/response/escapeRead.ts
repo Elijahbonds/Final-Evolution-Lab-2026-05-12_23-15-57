@@ -103,10 +103,20 @@ export function trapEscape(handler: XZ, yaw: number, side: 'left' | 'right', men
   return { kind: 'open', beat };
 }
 
-/** hoops-items: THE LATE THAT LETS HIS BACKPEDAL RUN ON (3v3). A reaction that owns the beaten man's feet for `lateSec` and wishes for
- *  nothing: the defenders' loop then steps his mover toward a standstill from the velocity he really had, at the mover's own brake cap —
- *  he carries the backpedal, stops where it takes him and stands — instead of the stun's freeze (velocity zeroed in the frame). Shaped
- *  like the stand-up (DefenderReact: no distance, no direction), only longer. Pure. */
-export function lateRunOn(lateSec: number): DefReaction {
-  return { kind: 'standup', dir: { x: 0, z: 0 }, left: Math.max(0, lateSec), togo: 0, tune: { sec: Math.max(0, lateSec), dist: 0, maxMps: 0 } };
+/** hoops-items: how much of his own speed a beaten 3v3 man carries through the late window (NEW). Measured on the rig: the 1v1 man the read
+ *  beats keeps going at 3.7 → 1.7 m/s over the 0.8 s after the hop (about 0.7 of his speed on average) — that is the space the 1v1 read buys
+ *  (+1.64 m); a 3v3 man braked to a stand inside 0.2 s bought only +0.73 m. Knob `hoops.escapeLateCarry` (0 = he brakes at once and stands). */
+export const ESCAPE_LATE_CARRY = 0.7;
+export const escapeLateCarry = (): number => feel('hoops.escapeLateCarry', ESCAPE_LATE_CARRY);
+
+/** hoops-items: THE LATE THAT LETS HIS BACKPEDAL RUN ON (3v3). A reaction that owns the beaten man's feet for `lateSec`: he carries the
+ *  backpedal he was in — along his own velocity `vel`, at `carry` × his speed, steady through the window (DefenderReact's wish is the
+ *  distance left over the time left) — then stops at his mover's brake cap and the brain has him. With `carry` 0, or a man barely moving
+ *  (off balance), it wishes for nothing: his mover brakes from the speed he had and he stands (no freeze: the stun zeroed his velocity in
+ *  the frame, the reason the earlier 3v3 try cost space). Pure. */
+export function lateRunOn(lateSec: number, vel: XZ = { x: 0, z: 0 }, carry = 0): DefReaction {
+  const L = Math.max(0, lateSec), v = Math.hypot(vel.x, vel.z);
+  if (!(carry > 0) || v < 0.2) return { kind: 'standup', dir: { x: 0, z: 0 }, left: L, togo: 0, tune: { sec: L, dist: 0, maxMps: 0 } };
+  const togo = carry * v * L;
+  return { kind: 'retreat', dir: { x: vel.x / v, z: vel.z / v }, left: L, togo, tune: { sec: L, dist: togo, maxMps: v } };
 }

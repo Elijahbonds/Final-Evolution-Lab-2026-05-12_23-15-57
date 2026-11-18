@@ -49,7 +49,7 @@
 import { nerve, standingOf } from '../core/Nerve';
 import { PressBuffer } from '../hoops/response/pressBuffer';
 import { dunkGatherOn, dunkGatherDone } from '../hoops/response/dunkGather';   // hoops-gather: the drive dunk gathers, then goes up
-import { escapeLateSec, trapEscape, trapReadOn, trapSqueezeOn, squeezeStandoffM, squeezeSec, escapeRead3v3On, stepBackRead, lateRunOn } from '../hoops/response/escapeRead';   // hoops-gather G3: escapes read the defenders
+import { escapeLateSec, trapEscape, trapReadOn, trapSqueezeOn, squeezeStandoffM, squeezeSec, escapeRead3v3On, stepBackRead, lateRunOn, escapeLateCarry } from '../hoops/response/escapeRead';   // hoops-gather G3: escapes read the defenders
 import { moveImpulse } from '../core/HandleSystem';   // hoops-gather G3: a crossing escape (a lateral body) in a trap
 import { pumpHoldSec, pumpHolding, pumpEndsDribbleOn } from '../hoops/response/pumpHold';   // hoops-gather: the pump keeps the ball while its clip plays   // hoops-p01: the shot press waits out the move (was gameFeel's InputBuffer)
 import { tickScuff, scuffPuffScale, scuffVolume, SCUFF_IDLE, type ScuffState } from '../core/ScuffFx';
@@ -1815,7 +1815,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
             // his backpedal runs on (lateRunOn: his mover brakes from the speed he had) instead of the stun's freeze. A set man mirrors it.
             if (escapeRead3v3On() && nfS && foeDistS < SHAKE_RANGE) {
               const v = stepBackRead(manReadOf(nfS, null));
-              if (v.beat) { nfS.stunSec = Math.max(nfS.stunSec, escapeLateSec()); nfS.react = lateRunOn(escapeLateSec()); }
+              if (v.beat) { nfS.stunSec = Math.max(nfS.stunSec, escapeLateSec()); nfS.react = lateRunOn(escapeLateSec(), nfS.vel, escapeLateCarry()); }
               console.info(`[3V3-HANDLE] escape stepback: ${v.beat ? `he bit (${v.why}), late ${escapeLateSec().toFixed(2)} s, his backpedal runs on` : 'he is set, he stays with it'}`);
             }
             continue;

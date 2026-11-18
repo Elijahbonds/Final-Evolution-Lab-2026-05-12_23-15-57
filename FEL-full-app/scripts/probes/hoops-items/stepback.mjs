@@ -61,7 +61,7 @@ else {
     for (const tr of j.trials || []) {
       if (!tr.frames || !/stepback|snatchback/.test(tr.spec.kind)) continue;
       const r = readTrial(tr); if (!r) continue;
-      const key = `${j.mode} ${r.kind}`; if (!groups.has(key)) groups.set(key, []); groups.get(key).push(r);
+      const key = `${j.mode} ${j.tag} ${r.kind}`; if (!groups.has(key)) groups.set(key, []); groups.get(key).push(r);
       console.log(`${j.mode.padEnd(11)} ${j.tag.padEnd(8)} ${r.kind.padEnd(20)} rec ${r.rec} move ${r.move} v2 ${r.v2} clip ${r.clip5}/${r.clip95} gap ${r.gap0} → ${r.gap48} (${r.gain >= 0 ? '+' : ''}${r.gain}) read ${r.read}`);
     }
   }
