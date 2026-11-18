@@ -6,7 +6,7 @@
 //   * the card's keys: Enter or X (keyboard L, a pad's X) plays, Y (keyboard I, a pad's Y) plays with your party. In Venice X and Y
 //     do nothing else (no fights here: VeniceHubMode.walkOnly).
 
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { hubPos } from '@/lib/adventure/venice/hubUi';
 import { v1Area, v1Spots } from '@/lib/adventure/venice/hubWorld';
 import { FENCE, RING } from '@/lib/adventure/venice/courtsDressing';
@@ -23,8 +23,11 @@ export function useFirstVisitHint(enabled: boolean, cardUp: boolean): [boolean, 
     if (!enabled) return;
     try { setShow(localStorage.getItem(HINT_KEY) !== '1'); } catch { setShow(true); }
   }, [enabled]);
-  const dismiss = () => { setShow(false); try { localStorage.setItem(HINT_KEY, '1'); } catch { /* private mode: once per visit */ } };
-  useEffect(() => { if (cardUp && show) dismiss(); }, [cardUp, show]);
+  const dismiss = useCallback(() => {
+    setShow(false);
+    try { localStorage.setItem(HINT_KEY, '1'); } catch { /* private mode: once per visit */ }
+  }, []);
+  useEffect(() => { if (cardUp && show) dismiss(); }, [cardUp, show, dismiss]);
   return [enabled && show, dismiss];
 }
 
@@ -43,13 +46,21 @@ export function toMap(x: number, z: number): [number, number] {
   return [(x - a.minX) * s, (z - a.minZ) * s];
 }
 
+export function miniMapStatus(active: string | null): string {
+  const spots = v1Spots();
+  const idx = active ? spots.findIndex((sp) => sp.id === active) : -1;
+  if (idx >= 0) return `Venice mini-map: you are at Court ${idx + 1}'s play ring.`;
+  return 'Venice mini-map: four courts are ahead; step into a gold play ring to choose one.';
+}
+
 export function MiniMap({ active }: { active: string | null }) {
   const me = useSyncExternalStore(hubPos.subscribe, hubPos.getSnapshot, () => null);
   const spots = v1Spots();
   const a = v1Area(), s = MAP_PX / Math.max(a.maxX - a.minX, a.maxZ - a.minZ);
   return (
-    <div data-testid="venice-minimap" aria-hidden className="pointer-events-none absolute right-3 top-3 z-10 rounded-xl border border-white/15 bg-black/55 p-1.5 backdrop-blur">
-      <svg width={MAP_PX} height={MAP_PX} viewBox={`0 0 ${MAP_PX} ${MAP_PX}`}>
+    <div data-testid="venice-minimap" className="pointer-events-none absolute right-3 top-3 z-10 rounded-xl border border-white/15 bg-black/55 p-1.5 backdrop-blur">
+      <p data-testid="venice-minimap-status" className="sr-only" aria-live="polite">{miniMapStatus(active)}</p>
+      <svg aria-hidden="true" width={MAP_PX} height={MAP_PX} viewBox={`0 0 ${MAP_PX} ${MAP_PX}`}>
         <rect x={0} y={0} width={MAP_PX} height={MAP_PX} rx={6} fill="#E8D3A8" opacity={0.18} />
         {spots.map((sp, i) => {
           const [x, y] = toMap(sp.at[0] - FENCE.halfW, sp.at[1] - FENCE.halfL);
@@ -82,6 +93,7 @@ export function useCardKeys(bus: InputBus | null, up: boolean, play: () => void,
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (e.repeat) return;
       if (e.key === 'Enter' && !(t && (t.tagName === 'BUTTON' || t.tagName === 'A'))) { e.preventDefault(); play(); }
     };
     window.addEventListener('keydown', onKey);
