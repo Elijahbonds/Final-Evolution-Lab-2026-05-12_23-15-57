@@ -4,7 +4,8 @@
 // After each trip, back in the hub: a forced garbage collection (CDP), then the JS heap, the DOM's event listeners (CDP DOMDebugger on
 // window + document), the live WebGL contexts the page holds, and the hub scene's meshes / textures / sounds (the hub's walk seam).
 // A leak shows as a heap or a count that climbs trip over trip; the verdict compares the last three trips with trips 2–4 (trip 1 warms
-// caches) and fails on growth above GROW_MB.
+// caches) and fails on growth above GROW_MB. With 10 or more trips the baseline is the second lap (trips 5–7): the first lap
+// is each of the four games' first visit.
 //
 //   ES_OUT=<dir> /home/user/wt/gate-run.sh 2400 npx tsx scripts/probes/venice-hub/roundtrip.mts   (TRIPS=10 GROW_MB=8)
 import { chromium, type CDPSession, type Page } from 'playwright-core';
@@ -105,13 +106,16 @@ try {
       console.log(`trip ${trip} (${court}): heap ${s.heapMb} MB, listeners window ${s.windowListeners} / document ${s.documentListeners}, canvases ${s.canvases}, scene ${JSON.stringify(s.scene)}`);
     }
     const heap = rows.map((r) => r.heapMb as number);
-    const early = heap.slice(1, 4), late = heap.slice(-3);
+    // the baseline is the SECOND lap (trips 5–7): trips 1–4 are each game's first visit (its code, models and caches come in once;
+    // measured 2026-11-18: 119 → 147 → 165 → 161 MB, then flat at 186–193 MB for trips 5–10). The first version of this probe
+    // compared trips 2–4 and read that warm-up as +31 MB of growth.
+    const early = heap.length >= 10 ? heap.slice(4, 7) : heap.slice(1, 4), late = heap.slice(-3);
     const avg = (a: number[]) => a.reduce((x, y) => x + y, 0) / Math.max(1, a.length);
     const grow = avg(late) - avg(early);
     const lw = rows.map((r) => r.windowListeners as number), ld = rows.map((r) => r.documentListeners as number);
     const listenersGrow = (lw.at(-1)! - lw[1]) + (ld.at(-1)! - ld[1]);
     verdict = grow <= GROW_MB && listenersGrow <= 0 ? 'pass' : 'fail';
-    console.log(`round trips: heap trips 2–4 ${avg(early).toFixed(1)} MB → last 3 ${avg(late).toFixed(1)} MB (${grow >= 0 ? '+' : ''}${grow.toFixed(1)} MB); listeners ${listenersGrow >= 0 ? '+' : ''}${listenersGrow}; ${verdict}`);
+    console.log(`round trips: heap ${heap.length >= 10 ? 'trips 5–7' : 'trips 2–4'} ${avg(early).toFixed(1)} MB → last 3 ${avg(late).toFixed(1)} MB (${grow >= 0 ? '+' : ''}${grow.toFixed(1)} MB); listeners ${listenersGrow >= 0 ? '+' : ''}${listenersGrow}; ${verdict}`);
     rows.push({ errors: errors.slice(0, 5) });
     await ctx.close();
   } finally { await browser.close(); }
