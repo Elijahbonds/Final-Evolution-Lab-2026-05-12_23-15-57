@@ -536,3 +536,24 @@ adds to the main thread when a body loads, measured headless:
 - the panel texture: 3–4 ms at 128² (14–17 ms at 256², the size the control did not include yet).
 
 assumption: if the body's load overlaps the tap, the garment-set work is the likely difference. Not confirmed with a trace.
+
+**The control again, with the garment work off the tap path (2026-11-18, release 77e5bb3e vs lane/kit-tight 29fe6bd7).**
+The change: the sets are fetched with the body, and each garment goes in on its own browser turn. One gate hold, 5 alternating
+/creator scores a side, then a traced tap each side (`score.mts` `ES_TRACE`, read with `scripts/probes/kit-tight/trace-read.mjs`).
+
+| Side | Tap times (ms) | Median | Spread |
+|---|---|---|---|
+| release 77e5bb3e | 232 / 200 / 176 / 176 / 160 | 176 | 160–232 |
+| lane/kit-tight 29fe6bd7 | 168 / 184 / 200 / 144 / 248 | 184 | 144–248 |
+
+The kit median is inside the release's spread and under the 200 ms budget. The traces (traced taps: release 168 ms, kit 152 ms)
+look the same on both sides:
+- the tap is the page's own `pointerdown` handler in the layout bundle: 64 ms on the release, 58 ms on the kit, at the scorer's
+  4× CPU throttle;
+- no garment-set mark (`fel-kit:*`) falls within ±1.5 s of it.
+
+So /creator's tap path carries none of this lane's work, and the earlier 240-vs-168 was the loaded machine. The release itself
+reaches 232 ms, over budget.
+
+Note for the next control: the hold's wait-for-disk loop gave up after 30 minutes and built anyway, with 4 GB free. It should
+fail instead of building.
