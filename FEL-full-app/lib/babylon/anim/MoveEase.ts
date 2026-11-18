@@ -33,7 +33,7 @@ export const MOVE_ARM_RATE_DEG = 1800;
  *  above holds the clavicle, the upper arm and the forearm, never the hand — and the behind-the-back's ball hand turns 112-146° in one
  *  frame 15-25 frames in (hoops-gather phase A; GATE 0 keeps the clip's keys as they are). With this on, through a move the hand bones are
  *  held to MOVE_HAND_RATE_DEG from where they were drawn, like the arm. Knob `hoops.moveHandEaseOn`. */
-export const MOVE_HAND_EASE_ON = 0;
+export const MOVE_HAND_EASE_ON = 1;   // ON (hoops-items, measured, FLAGGED): the behind-the-back's hand 125-132° in a frame → 30° (1v1 and 3v3), the ball's path untouched
 /** The fastest a hand bone turns through a move with the hand ease on (deg/s). NEW (hoops-items). Knob `hoops.moveHandRateDeg`. */
 export const MOVE_HAND_RATE_DEG = 1800;
 

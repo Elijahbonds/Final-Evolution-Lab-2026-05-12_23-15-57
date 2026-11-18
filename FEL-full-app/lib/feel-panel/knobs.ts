@@ -309,7 +309,7 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/anim/MoveEase.ts MOVE_ARM_RATE_DEG',
     hint: 'The fastest an arm bone may turn through the rest of a move.',
   },  {
-    id: 'hoops.moveHandEaseOn', label: 'Moves: the hands ease too (1) / as before (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · handle (rest)',
+    id: 'hoops.moveHandEaseOn', label: 'Moves: the hands ease too (1) / as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · handle (rest)',
     source: 'lib/babylon/anim/MoveEase.ts MOVE_HAND_EASE_ON',
     hint: 'On: through a handle move no hand turns faster than the rate below from where it was drawn (the behind-the-back hand whip). Off: as before.',
   },

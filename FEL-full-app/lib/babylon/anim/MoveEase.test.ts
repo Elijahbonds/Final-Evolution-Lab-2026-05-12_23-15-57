@@ -55,3 +55,41 @@ describe('on the node rig: the hand-overs ease', () => {
     expect(on.turns.at(-1)!).toBeLessThan(MOVE_EASE_RATE_DEG * DT + 1e-6);
   });
 });
+
+// hoops-items (2026-11-18): the hands ease too. The whip is a HAND bone (the behind-the-back's ball hand, 125-132° in one frame on the rig);
+// the arm ease above never held the hands. On a node rig the hand is driven like a clip would flip it, and the ease is read off the bone.
+import { ArmEase, MOVE_HAND_EASE_ON, MOVE_HAND_RATE_DEG } from './MoveEase';
+import { Skeleton, Bone, Matrix, TransformNode, NullEngine, Scene } from '@babylonjs/core';
+describe('the hand ease (hoops-items)', () => {
+  const rig = () => {
+    const scene = new Scene(new NullEngine()); const sk = new Skeleton('sk', 'sk', scene);
+    const nodes: Record<string, TransformNode> = {};
+    let parent: Bone | null = null;
+    for (const n of ['RightShoulder', 'RightArm', 'RightForeArm', 'RightHand']) {
+      const t = new TransformNode(n, scene); t.rotationQuaternion = Quaternion.Identity(); if (parent) t.parent = nodes[parent.name];
+      const b = new Bone(n, sk, parent, Matrix.Identity()); b.linkTransformNode(t); nodes[n] = t; parent = b;
+    }
+    return { scene, sk, nodes };
+  };
+  const flip = (on: boolean) => {
+    if (!on) openFeel({ 'hoops.moveHandEaseOn': 0 });
+    const { scene, sk, nodes } = rig(); const ease = new ArmEase(sk);
+    const hand = nodes.RightHand; const turns: number[] = []; let last = hand.rotationQuaternion!.clone();
+    for (let f = 0; f < 12; f++) {
+      if (f >= 3) hand.rotationQuaternion = Quaternion.RotationAxis(Vector3.Forward(), (130 * Math.PI) / 180);   // the clip's flip, frame 3
+      ease.apply(f, DT, true);
+      turns.push(quatAngle(last, hand.rotationQuaternion!) * 180 / Math.PI); last = hand.rotationQuaternion!.clone();
+    }
+    scene.dispose(); closeFeel();
+    return { turns, end: quatAngle(Quaternion.RotationAxis(Vector3.Forward(), (130 * Math.PI) / 180), last) * 180 / Math.PI };
+  };
+  it('ships ON at 1800°/s: a 130° flip is drawn over several frames, never past 30° in one, and arrives', () => {
+    expect(MOVE_HAND_EASE_ON).toBe(1); expect(MOVE_HAND_RATE_DEG).toBe(1800);
+    const r = flip(true);
+    expect(Math.max(...r.turns)).toBeLessThanOrEqual(MOVE_HAND_RATE_DEG * DT + 1e-6);
+    expect(r.end).toBeLessThan(1e-3);
+  });
+  it('off: the hand flips 130° in the one frame, as before', () => {
+    expect(Math.max(...flip(false).turns)).toBeCloseTo(130, 3);
+  });
+});
