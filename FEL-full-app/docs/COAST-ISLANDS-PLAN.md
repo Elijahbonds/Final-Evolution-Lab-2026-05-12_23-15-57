@@ -275,7 +275,24 @@ for its first half, so its frame times are noisier):
 - Venice's courts are unchanged: their walk-up, returns, solids and tests are as they were (the boat's ring is far from every
   court's place; the tests hold that).
 
-<!-- F-MEASURED -->
+**Measured on the production build** (the every-screen rig's `next start`, a phone: 390 × 844, DPR 3, touch;
+`scripts/probes/coast-islands/door-roundtrip.mts`, kept in the repo, run inside the gate hold with `DOOR=1`):
+- **The round trip passed on the app's own links** (r4): the hub's walk to the boat brought its card up; *Take the boat to the
+  coast* opened `/play/coast?from=venice&spot=pier.end`; the coast landed the player on its dock (55, 24: its arrival); the walk
+  to the coast's boat back brought its card up; *Back to Venice* opened `/play/venice?spot=pier.end`; the hub landed the player
+  beside the boat's ring, facing the boat (−98.5, −69: the boat's return spawn then). No page errors; a tap at each button's
+  centre lands on the button (nothing covers the cards).
+- Once in r4 the scripted walk ran 5.5 m on past the ring at the rig's 2–3 frames a second and the card went before the press;
+  the ring now reaches the rim (x −104 → −106), so a walk that runs on stops at the rim still in the boat's place.
+  <!-- R5 -->
+- **Every-screen** (the scorer's planted-fault control passed first each time): **clean** on `/play/venice` and `/play/coast`
+  in r2, r3 and r4 (first content 364–456 ms, layout shift 0; "fast" not measured on a 3D screen, as before).
+- **Cost:** the landing is one draw (one merged mesh, one material, no texture, no model; `scripts/venice-hub-budget-tests.ts`
+  now holds that, with a planted-texture control that fails it); its ring is an instance of the courts' ring. Venice's place
+  texture memory is unchanged (the guard's 15 checks as before, plus 3). The `venice_hub` row is unchanged: the landing adds at
+  most one draw and two active meshes where it is in view (the row: 46 / 56 draws, 58 / 65 active meshes, measured / budget). Not re-measured on the phone rig.
+
+**Knob:** `venue.coastDoor` 1 (new). 0 = the hub as before the door.
 
 ## 5. Flags and assumptions
 
