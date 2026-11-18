@@ -41,6 +41,7 @@ import { feel } from '@/lib/feel-panel/feel';
 import { SoundKit } from '../audio/SoundKit';
 import { mountHubLife, VENICE_LIFE, type HubLife } from '@/lib/adventure/venice/hubLife';
 import { distanceGain, HubSoundscape, panFor, VENICE_SOUND } from '@/lib/adventure/venice/hubSound';
+import { SceneScoped } from '@/lib/adventure/venice/hubLifecycle';
 import { mountCourtLife, VENICE_COURT_LIFE, type CourtLife } from '@/lib/adventure/venice/courtLife';
 import { hubSolids, palmSolid, probeRoute, v1Hit, VENICE_SOLIDS, Walkup, WALKUP_V2 } from '@/lib/adventure/venice/hubSolids';
 import { camBlockPieces, mountCameraBlockers, VENICE_CAM_COLLIDE, VENICE_LOOK_V2 } from '@/lib/adventure/venice/courtsDressing';
@@ -83,10 +84,33 @@ interface St {
   /** Phase 8 (venue.veniceSolids): the world's pieces, so the palms join them once the dressing has placed them; null = off. */
   solids: GroundPiece[] | null;
   disposed: boolean;
+  /** The probe seam this hub published (window.__VENICE__), so only its own is ever removed. */
+  seam: unknown;
 }
 
-const states = new WeakMap<object, St>();
-const live = new Set<St>();
+/** V2 (Cursor PR #635's race, fixed here): each state belongs to its scene and closes with it; the page's globals belong to the
+ *  newest load (lib/adventure/venice/hubLifecycle). */
+const hubs = new SceneScoped<St>();
+
+/** Close one scene's hub: its bodies, life, sound and view; the page's card, map and probe seam only if it was the current hub. */
+function closeHub(scene: object): void {
+  const { state: S, wasCurrent, current } = hubs.close(scene);
+  if (S && !S.disposed) {
+    S.disposed = true;
+    S.life?.dispose(); S.life = null;
+    S.court?.dispose(); S.court = null;
+    S.move.dispose(); S.view.dispose();
+  }
+  if (wasCurrent) {
+    hubUi.reset(); hubPos.reset();
+    if (S?.sound) SoundKit.stopAmbient();
+    if (typeof window !== 'undefined' && S?.seam && (window as unknown as { __VENICE__?: unknown }).__VENICE__ === S.seam) delete (window as unknown as { __VENICE__?: unknown }).__VENICE__;
+  } else if (current?.sound && !current.disposed) {
+    // an older hub's teardown (the harness silences the bed on every teardown): the hub still running keeps its beach
+    SoundKit.startAmbient('ocean');
+  }
+  if (S) S.sound = null;
+}
 const TMP_FWD = new Vector3(), TMP_SUBJECT = new Vector3(), TMP_VEL = new Vector3();
 
 /** Venice has no fights: a press that would start one does nothing here (the movement sim sees walk, run, jump, dash). */
@@ -115,6 +139,7 @@ export const VeniceHubMode: ModeDefinition = {
 
   async load(ctx: ModeContext) {
     const scene = ctx.scene;
+    hubs.begin(scene);   // the current hub from now: an older one closing later leaves the page to this one
     hubUi.reset();
     const world = buildHubWorld();
     // phase 8: the hoops, the boardwalk row and (with phase 5's furniture) the fences, benches and poles are solid
@@ -132,6 +157,8 @@ export const VeniceHubMode: ModeDefinition = {
     const pose = new TransformNode('venice_player_pose', scene);
     pose.parent = body;
     const me = await CharacterPipeline.spawnPlayer(scene, DUNK_CONFIG.heroUrl, { position: Vector3.Zero(), yawRad: 0, startClip: 'idle_stand', modeId: VENICE_MODE_ID });
+    // torn down while the player loaded (a slow first load, left at once): stop here and touch nothing of the page's
+    if (scene.isDisposed) { view.dispose(); return; }
     installSafePlay(me.animator, VENICE_MODE_ID);
     me.root.parent = pose; me.root.position.set(0, 0, 0); me.root.rotation.set(0, 0, 0);
     void loadRatedTuning(scene.metadata).then((r) => {
@@ -144,11 +171,12 @@ export const VeniceHubMode: ModeDefinition = {
     const S: St = {
       host, mapper, view, me, body, move, stickL: { x: 0, y: 0 }, stickR: { x: 0, y: 0 }, latchedYaw: null,
       preset: 'runner', rigKey: '', spotSec: SPOT_EVERY, spots: v1Spots(), auto: null, autoPath: [], frames: 0,
-      life: null, sound: null, court: null, disposed: false,
+      life: null, sound: null, court: null, disposed: false, seam: null,
       walkup: feel('venue.walkupV2', WALKUP_V2) >= 0.5 ? new Walkup(v1Spots()) : null, solids: solidsOn ? world.pieces : null,
     };
     // phase 7: the beach bed now (so the harness's crowd bed for the mood stays off); the rest of the soundscape ticks in update
-    if (feel('venue.veniceSound', VENICE_SOUND) >= 0.5) {
+    const mine = hubs.isCurrent(scene);   // a newer hub began while this one loaded: this one leaves the page's globals alone
+    if (mine && feel('venue.veniceSound', VENICE_SOUND) >= 0.5) {
       SoundKit.startAmbient('ocean');
       S.sound = new HubSoundscape((name, o) => SoundKit.play(name, o));
     }
@@ -163,8 +191,8 @@ export const VeniceHubMode: ModeDefinition = {
       }
     });
     // PROBES ONLY (dev, or an agent run on a loopback host: lib/agentRunHooks): walk to a court's ring, read where you are
-    if (typeof window !== 'undefined' && devOrAgentHooks()) {
-      (window as unknown as { __VENICE__?: unknown }).__VENICE__ = {
+    if (mine && typeof window !== 'undefined' && devOrAgentHooks()) {
+      (window as unknown as { __VENICE__?: unknown }).__VENICE__ = S.seam = {
         spots: () => S.spots.map((x) => x.id),
         // to a court's ring the way a player goes once the fences are solid (phase 8): along the open corridors, never through a court
         walkTo: (id: string) => {
@@ -183,7 +211,8 @@ export const VeniceHubMode: ModeDefinition = {
       };
     }
     ctx.heroRef.current = body;   // the harness frames and checks the player by it (FrameGuard assertSpawned)
-    states.set(scene, S); live.add(S);
+    hubs.open(scene, S);
+    scene.onDisposeObservable.addOnce(() => closeHub(scene));
     placeBody(body, host.player);
     // the camera starts behind the player, looking at the courts (a cold start) or at the court they came back to
     const c = courtsRect(), court = back ? S.spots.find((x) => x.id === back) : undefined;
@@ -192,14 +221,14 @@ export const VeniceHubMode: ModeDefinition = {
   },
 
   onInput(ctx: ModeContext, e: FelInput) {
-    const S = states.get(ctx.scene);
+    const S = hubs.get(ctx.scene);
     if (!S) return;
     if (e.t === 'stick') { const s = e.side === 'L' ? S.stickL : S.stickR; s.x = e.x; s.y = e.y; }
     S.mapper.onInput(e);
   },
 
   update(ctx: ModeContext, dt: number) {
-    const S = states.get(ctx.scene);
+    const S = hubs.get(ctx.scene);
     if (!S) return;
     const h = S.host;
     if (++S.frames === 2) {
@@ -276,16 +305,9 @@ export const VeniceHubMode: ModeDefinition = {
   },
 
   dispose() {
-    // the harness disposes the scene; the per-scene state goes with its WeakMap entry. Live states are closed here.
-    hubUi.reset(); hubPos.reset();
-    if (typeof window !== 'undefined') delete (window as unknown as { __VENICE__?: unknown }).__VENICE__;
-    for (const S of live) {
-      S.disposed = true;
-      S.life?.dispose(); S.life = null;
-      S.court?.dispose(); S.court = null;
-      if (S.sound) { S.sound = null; SoundKit.stopAmbient(); }
-      S.move.dispose(); S.view.dispose();
-    }
-    live.clear();
+    // No arguments, and the harness disposes the run's scene right after: each hub closes with ITS scene (load:
+    // onDisposeObservable). Closing every live hub here closed a newer Venice scene when an older one was torn down (PR #635's
+    // race). Here only a hub whose scene is already gone is closed.
+    for (const scene of hubs.scenes()) if ((scene as { isDisposed?: boolean }).isDisposed) closeHub(scene);
   },
 };

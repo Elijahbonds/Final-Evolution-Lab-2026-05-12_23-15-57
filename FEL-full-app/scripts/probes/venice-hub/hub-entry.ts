@@ -20,6 +20,20 @@ hubUi.subscribe(() => {
   card.style.display = s ? 'block' : 'none';
   if (s) card.innerHTML = `<b>${s.label.replace('[PLACEHOLDER] ', '')}</b><div class="btn">▶ Play ${s.modes[0] === 'hoops1v1' ? 'Ones' : s.modes[0] === 'hoops3v3' ? 'Threes' : s.modes[0]}</div>`;
 });
+// ?race=<ms> (V2, PR #635's race): a second hub is mounted on a second canvas <ms> after the first; the probe (race.mts) then
+// tears the FIRST down (W.__stopA) and checks the second is untouched.
+if (q.get('race')) {
+  const c2 = document.createElement('canvas'); c2.id = 'c2'; c2.style.cssText = 'position:fixed;inset:0;width:100%;height:100%';
+  setTimeout(() => {
+    document.body.appendChild(c2);
+    const busB = new InputBus();
+    void runMode(MODES.venice_hub, {
+      canvas: c2, input: busB, guest: true,
+      onPhase: (p) => { W.__phaseB = p; if (p === 'ready') setTimeout(() => busB.emit({ t: 'button', btn: 'START', pressed: true }), 50); },
+      onHud: () => {}, resultSink: async () => {},
+    }).then((stop) => { W.__stopB = stop; }).catch((e) => { W.__errB = String(e?.message ?? e); });
+  }, Number(q.get('race')));
+}
 const bus = new InputBus();
 W.__bus = bus;
 // ?mode=onevone: the same rig on a shipped mode, as the load-time yardstick
@@ -33,4 +47,4 @@ void runMode(MODES[q.get('mode') ?? 'venice_hub'], {
   },
   onHud: () => {},
   resultSink: async () => {},
-}).catch((e) => { W.__err = String(e?.message ?? e); });
+}).then((stop) => { W.__stopA = stop; }).catch((e) => { W.__err = String(e?.message ?? e); });
