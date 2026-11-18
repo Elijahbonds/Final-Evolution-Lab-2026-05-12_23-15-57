@@ -7,8 +7,7 @@
 #   §2 the body and the garment . MPFB's human with the kit's macros (dress-kit.py's: age 0.5, muscle 0.6, weight 0.5,
 #                                 proportions 0.7, gender 0.9 / 0.1) and its mixamo rig, the garment from the clothes library
 #   §3 the cut (basketball) ..... sleeves off with style.cut_sleeves (what the tee's own skin hangs on the arms); each armhole
-#                                 loop scaled 1.15 and moved 3 cm down; the hem 10 cm longer (extruded in 2.5 cm rows, so the
-#                                 last row of faces does not stretch 10 cm); the neck loop scaled 1.1 and 2 cm down
+#                                 loop scaled 1.15 and moved 3 cm down; the neck loop scaled 1.1 and 2 cm down
 #      (football) ............... sleeves kept; the body 8 % wider in X and Y; the shoulders 3 cm higher; the hem as above
 #      both ..................... Merge by Distance 0.1 mm, Smooth Vertices 0.3 x2
 #   §4 the number and name slots  a second UV map `decal`: the chest (20 x 20 cm) projected from the front into the left half,
@@ -150,13 +149,33 @@ else:
     top = max(v.co.z for v in bm.verts)
     for v in bm.verts:   # the shoulders 3 cm higher, fading out over the top 15 cm (the pads)
         t = max(0.0, 1 - (top - v.co.z) / 0.15); v.co.z += 0.03 * t
-# the long hem: 10 cm more, in four 2.5 cm rows
-hem_edges = [e for e in bm.edges if e.is_boundary and all(v in set(hem[1]) for v in e.verts)]
-for _ in range(4):
-    r = bmesh.ops.extrude_edge_only(bm, edges=hem_edges)
-    nv = [x for x in r['geom'] if isinstance(x, bmesh.types.BMVert)]
-    for v in nv: v.co.z -= 0.025
-    hem_edges = [x for x in r['geom'] if isinstance(x, bmesh.types.BMEdge) and x.is_boundary]
+# the long hem: 10 cm more. The garment's lowest 30 cm is stretched to 40 cm (a vertex there moves down in proportion to how
+# far below the stretch's top it is), so the hem keeps its own edge and fold: extruding the open edge instead hung the polo's
+# extension from its folded-up INNER hem layer, inside the shirt, with a crack all round (measured on the female render)
+# The stretch runs on the MAIN piece's bottom: the polo's hem band is its own piece overlapping the body's last 3 cm, and anything
+# below the main piece's bottom (the band) moves the full 10 cm, so the two stay overlapped
+def pieces():
+    seen, out = set(), []
+    for v in bm.verts:
+        if v in seen: continue
+        st, comp = [v], []; seen.add(v)
+        while st:
+            a = st.pop(); comp.append(a)
+            for e in a.link_edges:
+                b = e.other_vert(a)
+                if b not in seen: seen.add(b); st.append(b)
+        out.append(comp)
+    return out
+main = max(pieces(), key=len)
+z_bottom = min(v.co.z for v in main)
+# a separate piece at the very bottom (the polo's hem band, 256 verts overlapping the body's last 3 cm) is dropped: the fit left a
+# gap between the two layers that showed the short through it, and a football jersey has no polo band. The main piece's edge is the hem.
+band = [p for p in pieces() if p is not main and max(v.co.z for v in p) < z_bottom + 0.06]
+for p in band: bmesh.ops.delete(bm, geom=p, context='VERTS')
+if band: log(f'hem band dropped: {sum(len(p) for p in band)} verts')
+z_top = z_bottom + 0.30
+for v in bm.verts:
+    if v.co.z < z_top: v.co.z -= 0.10 * min(1.0, (z_top - v.co.z) / 0.30)
 n0 = len(bm.verts); bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.0001)
 for _ in range(2): bmesh.ops.smooth_vert(bm, verts=bm.verts, factor=0.3, use_axis_x=True, use_axis_y=True, use_axis_z=True)
 log(f'cut: merge 0.1 mm joined {n0 - len(bm.verts)}; now {len(bm.verts)} verts, hem z {min(v.co.z for v in bm.verts):.3f}')
