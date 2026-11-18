@@ -1697,6 +1697,17 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/core/bodyMerge.ts BODY_MERGE_ON',
     hint: 'Every mode: once a body holds still, its parts that the renderer treats alike share one mesh (one sub-mesh per part, the same shaders, draw order and ink). Any change puts the parts back that frame. Same picture, fewer active meshes. 1 = the phone tier (measured identical there), 2 = every tier, 0 = one mesh per part, as before.',
   },
+  // ── lane/kit-mac-jobs (owner 2026-11-18: the clothes look poofy; the two Blender jobs, the one-piece short and the new jerseys) ──
+  {
+    id: 'kit.onePieceShorts', label: 'Kit body short: one piece, fitted (1) / three pieces, as before (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Kit · garments',
+    source: 'lib/babylon/core/kitGarmentSet.ts ONE_PIECE_SHORTS',
+    hint: 'The kit bodies wear the one-piece court short made in Blender (a real crotch, fitted to the legs and seat) in place of the three-piece short whose legs crossed into each other. Applies to the next body loaded. 0 = the three-piece short.',
+  },
+  {
+    id: 'kit.newJerseys', label: 'Kit body tops: the new basketball and football jerseys (1) / as before (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Kit · garments',
+    source: 'lib/babylon/core/sportKitDefaults.ts NEW_JERSEYS',
+    hint: 'The kit bodies carry the basketball jersey (the basketball modes default top) and the football jersey (in place of the Meshy football pack), both cut from the free MakeHuman tees and fitted close. Applies to the next body loaded. 0 = the tops as before.',
+  },
   // ── hoops-p09 (1v1 / 3v3 phase 9 "one rulebook": the play audit's sinkers 2 to 6 and 10) ──
   {
     id: 'hoops.skillShotOn', label: 'Shots: the release decides (1) / a rate and a draw (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · one rulebook',
