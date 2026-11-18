@@ -49,7 +49,37 @@ const venueOfMode = (key: string, src: string): { venue: string | null; map: str
   return { venue, map: venue ? venueMapKeys[venue] ?? null : null, kit: kit.length ? [...new Set(kit)].join('+') : null };
 };
 
-const CORES = ['CourtMovement', 'BoardMovement', 'CombatMovement', 'FieldRun', 'CarrierControl', 'GroundRide', 'AirControl', 'RallyCore', 'TennisCore', 'GolfCore', 'DanceCore', 'DunkApproach', 'OnslaughtCore', 'KeeperCore', 'Batting', 'Pitching'];
+const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const codeOnly = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+const importBlocks = (s: string): string => [...s.matchAll(/import[\s\S]*?from ['"][^'"]+['"];?/g)].map((m) => m[0]).join('\n');
+const CORE_MARKERS: { name: string; markers: string[] }[] = [
+  { name: 'CourtMovement', markers: ['CourtMovement'] },
+  { name: 'BoardMovement', markers: ['BoardMovement', 'buildRig', 'BoardRig'] },
+  { name: 'CombatMovement', markers: ['CombatMovement'] },
+  { name: 'RushRun', markers: ['stepRun'] },
+  { name: 'KartModel', markers: ['spawnKart', 'stepKart', 'KartState'] },
+  { name: 'ArcadeFlight', markers: ['spawnArcade', 'stepArcade', 'ArcadeState'] },
+  { name: 'RaceCourse', markers: ['startRace', 'stepRace', 'RaceProgress'] },
+  { name: 'FreeRunCore', markers: ['verbsFor', 'FreeRunCore', 'FREERUN_TRICKS'] },
+  { name: 'SprintCore', markers: ['SprintCore', 'makeSprintRace'] },
+  { name: 'AirControl', markers: ['AirControl'] },
+  { name: 'AirSessionCore', markers: ['AirSessionCore'] },
+  { name: 'RallyCore', markers: ['RallyCore', 'RallyState', 'gradeSwing', 'planShot', 'judgeShot', 'TennisScore', 'VolleyScore'] },
+  { name: 'TiebreakBlitz', markers: ['TiebreakBlitz', 'freshBlitz', 'tickBlitz'] },
+  { name: 'BasketballCore', markers: ['BasketballCore', 'DribbleController', 'ShotMeter', 'DefenderBrain', 'TeammateBrain'] },
+  { name: 'FightCore', markers: ['FightCore', 'FighterState', 'resolveStrike', 'applyHit'] },
+  { name: 'DunkSystem', markers: ['DunkFlight', 'DUNK_TRICKS', 'judgeDunk', 'JudgePanel'] },
+  { name: 'BaseballGame', markers: ['BaseballGame'] },
+  { name: 'CarnivalNight', markers: ['pickNight', 'rivalProgress', 'nightChampion'] },
+  { name: 'BrainBrawlCore', markers: ['BrainBrawlCore', 'makeChallenge', 'challengeScore', 'spinWheel'] },
+  { name: 'SceneBuzz', markers: ['SceneBuzz', 'BuzzMatch', 'drawSceneRounds'] },
+  { name: 'DanceCore', markers: ['DancePerformance', 'generateRoutine'] },
+  { name: 'DunkApproach', markers: ['takeoffFor', 'takeoffTell'] },
+  { name: 'OnslaughtCore', markers: ['waveSpec', 'DownRevive', 'spawnRing'] },
+  { name: 'KeeperCore', markers: ['planRivalKick', 'gradeDive', 'resolveSaveRead'] },
+  { name: 'AimSwingCore', markers: ['spawnAthlete', 'spawnFoe', 'Flight'] },
+  { name: 'DerbyLoop', markers: ['derbySeed'] },
+];
 // Camera column = a MEASURED gameplay framing exists for the mode (lib/babylon/config/cameraFraming.json,
 // scripts/probes/_cam-frame.mts). cameraPresets.json describes the retired venue cameras (pre-M104).
 const camFraming = JSON.parse(read('lib/babylon/config/cameraFraming.json'));
@@ -115,14 +145,17 @@ const rows: Row[] = modeEntries.map(({ key, cls }) => {
   // A file may export several modes (precisionModes.ts: Tennis, Golf, Derby, Penalty). Judge each mode by ITS
   // slice — from its `export const <Cls>` to the next export — or derby reads golf's venue mount.
   const src = file ? implementationSlice(whole, cls) : '';
+  const coreSrc = codeOnly(`${importBlocks(whole)}\n${src}`);
   const route = `/play/${routeMap[key] ?? key}`;
   const { venue, map, kit } = venueOfMode(key, src);
-  const cores = CORES.filter((c) => new RegExp(`from '\\.\\./core/${c}'|from '\\./${c}'|\\b${c}\\b`).test(src) && src.includes(`${c}`));
+  const cores = CORE_MARKERS
+    .filter((c) => c.markers.some((marker) => new RegExp(`\\b${esc(marker)}\\b`).test(coreSrc)))
+    .map((c) => c.name);
   return {
     key, enabled: enabled.has(key), file, route,
     menu: gameData.includes(`href: '${route}'`),
     venue, map, kit, baked: !!map && bakedKeys.has(map),
-    cores: cores.filter((c) => src.includes(`/${c}'`)),
+    cores,
     camera: camKeys.has(key),   // cameraFraming.json is keyed by registry key
     navFirst: /\.constrain\(/.test(src),
     clamps: (src.match(/Math\.max\(-?[A-Z_0-9.]+, *Math\.min\(/g) ?? []).length + (src.match(/^const (COURT|FIELD|ARENA|BOUNDS|HALF)[A-Z_]* *=/gm) ?? []).length,

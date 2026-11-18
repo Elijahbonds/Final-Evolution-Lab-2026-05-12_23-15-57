@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { MODE_CONTROLLERS } from '../lib/controller-link/schemas/registry';
 
@@ -120,6 +122,47 @@ function hasButton(mode: string, action: string, label?: string): boolean {
 
 for (const [key, slug] of Object.entries(expectedSlugs)) {
   assert.equal(routeMap.get(key), slug, `full-picture routeMap must carry ${key} -> ${slug}`);
+}
+
+const matrixTemp = mkdtempSync(join(tmpdir(), 'fel-full-picture-'));
+const matrixPath = join(matrixTemp, 'matrix.md');
+try {
+  execFileSync('npx', ['tsx', 'scripts/full-picture.mts', '--md', matrixPath], {
+    cwd: ROOT,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const renderedMatrix = readFileSync(matrixPath, 'utf8');
+  const rowFor = (mode: string): string => {
+    const row = renderedMatrix.split('\n').find((line) => line.startsWith(`| ${mode} |`));
+    assert.ok(row, `full-picture matrix must render a row for ${mode}`);
+    return row;
+  };
+  const coreExpectations: Record<string, string[]> = {
+    snowboard_slalom: ['BoardMovement'],
+    football: ['RushRun'],
+    tennis: ['RallyCore'],
+    volleyball: ['RallyCore'],
+    onevone: ['BasketballCore'],
+    threevthree: ['BasketballCore'],
+    bigair: ['AirSessionCore'],
+    sprint: ['SprintCore'],
+    karate_vs: ['FightCore'],
+    mixedcombat: ['FightCore'],
+    dunkduel: ['DunkSystem'],
+    baseball: ['BaseballGame'],
+    carnival: ['CarnivalNight'],
+    duel: ['CombatMovement'],
+    dance: ['DanceCore'],
+    who_scene_it: ['SceneBuzz'],
+    brainbrawl: ['BrainBrawlCore'],
+  };
+  for (const [mode, cores] of Object.entries(coreExpectations)) {
+    const row = rowFor(mode);
+    for (const core of cores) assert.ok(row.includes(core), `full-picture must detect ${mode}'s shared ${core} usage`);
+  }
+} finally {
+  rmSync(matrixTemp, { recursive: true, force: true });
 }
 
 const missingRoutes: string[] = [];
