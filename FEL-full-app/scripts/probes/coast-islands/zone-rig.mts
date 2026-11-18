@@ -130,6 +130,13 @@ try {
       await page.waitForTimeout(600);
       await shot('sighting');
       legs.beachSouth = await walkTo(page, 72, -30, 150, sample);
+      // the partner follows behind you, where the chase camera is: stand a moment (it settles into its slot behind and to the
+      // right), then swing the camera round to the right with the look stick so both are in the picture
+      await page.waitForTimeout(2500);
+      await page.evaluate(`window.__bus.emit({ t: 'stick', side: 'R', x: 0.8, y: 0 })`);
+      await page.waitForTimeout(900);
+      await page.evaluate(`window.__bus.emit({ t: 'stick', side: 'R', x: 0, y: 0 })`);
+      await page.waitForTimeout(500);
       await shot('beach');
       legs.bridgeEast = await walkTo(page, 66, -36, 60, sample);
       legs.bridgeMid = await walkTo(page, 20, -36, 150, sample);
