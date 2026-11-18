@@ -96,6 +96,7 @@ describe("the READY card's corner", () => {
     expect(media).toContain('padding-top: 5.25rem;');
     expect(media).toContain('justify-content: flex-start;');
     expect(media).toContain('row-gap: 0.875rem;');
+    expect(media).toContain('body.fel-couch-start-visible [data-fel-fullbleed] > [data-splash-column] {');
     // the pills rule comes after the shell rule (same specificity: the later one wins for the dunk)
     expect(css.indexOf('@media (max-aspect-ratio: 6/5) {')).toBeGreaterThan(css.indexOf('> [data-splash-column] {\n  padding-top: 3.5rem;'));
     // the pills it clears: the dunk's anchor and the two testids
@@ -103,5 +104,8 @@ describe("the READY card's corner", () => {
     const lobby = read('components/controller-link/host-lobby.tsx');
     expect(lobby).toContain('data-testid="usb-connect-hint"');
     expect(lobby).toContain('data-testid="host-lobby-badge"');
+    const couch = read('components/controller-link/couch-start.tsx');
+    expect(couch).toContain('data-fel-couch-start');
+    expect(couch).toContain("document.body.classList.add('fel-couch-start-visible')");
   });
 });
