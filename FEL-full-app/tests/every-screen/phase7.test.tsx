@@ -23,6 +23,11 @@ describe('a game says what it is loading', () => {
     const files = filesUnder('app').filter((f) => f.endsWith('/loader.tsx') || f === 'app/play/carnival/_components/hub-client.tsx');
     const out = files.filter((f) => src(f).includes('Loader2'));
     expect(out).toEqual([]);
+    // cursor-intake: the original scope too (every file under app/ and components/, the bare-spinner markup), now walked in
+    // node instead of a grep whose failure passed silently
+    const tsx = [...filesUnder('app'), ...filesUnder('components')].filter((f) => f.endsWith('.tsx'));
+    const bare = tsx.filter((f) => /<div className="flex h-\[60vh\] items-center justify-center">\s*<Loader2 className="h-8 w-8 animate-spin/.test(src(f)));
+    expect(bare).toEqual([]);
   });
 });
 
