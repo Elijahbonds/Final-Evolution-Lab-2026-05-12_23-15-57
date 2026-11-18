@@ -127,6 +127,9 @@ export function returnSpawnFor(spotId: string): { pos: { x: number; y: number; z
   return { pos: { x, y: terrainY(x, z), z }, yaw: Math.atan2(s.at[0] - x, 0) };
 }
 
+/** Segments in a sports spot's ground ring (zoneTownView groundRing): 2 triangles each. */
+export const RING_SEGMENTS = 40;
+
 /** coast.townOn: 1 = the harbour town is built (new); 0 = the beach as in phase B. */
 export const COAST_TOWN_ON = 1;
 /** coast.townsfolk: how many townsfolk stand in town (roster bodies, each a skinned body and its maps: a phone cost). */

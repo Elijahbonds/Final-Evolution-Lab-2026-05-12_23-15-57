@@ -11,14 +11,27 @@
  */
 
 import {
-  Color3, Color4, DynamicTexture, Mesh, MeshBuilder, SceneLoader, StandardMaterial, TransformNode, Vector3, Vector4, VertexBuffer,
+  Color3, Color4, DynamicTexture, Mesh, MeshBuilder, SceneLoader, StandardMaterial, TransformNode, Vector3, Vector4, VertexBuffer, VertexData,
   type Scene,
 } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { Onlookers } from '@/lib/babylon/visual/Onlookers';
 import { groundTextureFor, TILE_M } from '@/lib/babylon/visual/groundTextures';
 import { terrainY } from './zoneLayout';
-import { HOUSES, MARKET, MARKET_KIT_URL, SPORT_SPOTS, STREET, TOWNSFOLK, houseBase, type SportSpot } from './zoneTown';
+import { HOUSES, MARKET, MARKET_KIT_URL, RING_SEGMENTS, SPORT_SPOTS, STREET, TOWNSFOLK, houseBase, type SportSpot } from './zoneTown';
+
+/** A flat band on the ground (radius r, width w): RING_SEGMENTS × 2 triangles (a torus at the same look was 2,592). */
+function groundRing(name: string, r: number, w: number, scene: Scene): Mesh {
+  const pos: number[] = [], nrm: number[] = [], idx: number[] = [];
+  for (let i = 0; i <= RING_SEGMENTS; i++) {
+    const a = (i / RING_SEGMENTS) * Math.PI * 2, c = Math.cos(a), s = Math.sin(a);
+    pos.push(c * (r - w / 2), 0, s * (r - w / 2), c * (r + w / 2), 0, s * (r + w / 2)); nrm.push(0, 1, 0, 0, 1, 0);
+    if (i < RING_SEGMENTS) { const k = i * 2; idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); }
+  }
+  const m = new Mesh(name, scene), vd = new VertexData();
+  vd.positions = pos; vd.normals = nrm; vd.indices = idx; vd.applyToMesh(m);
+  return m;
+}
 
 export interface ZoneTownView {
   root: TransformNode;
@@ -97,7 +110,7 @@ export function mountZoneTownView(scene: Scene, o: { townsfolk: number; sports: 
 
   // the rings and the signs at the sports spots (one ring mesh, instances; one atlas for the four signs)
   if (o.sports) {
-    const ringMat = new StandardMaterial('coast_sport_ring_mat', scene);
+    const ringMat = new StandardMaterial('coast_sport_ring_mat', scene); ringMat.backFaceCulling = false;
     ringMat.diffuseColor = Color3.FromHexString('#7DD3FC'); ringMat.emissiveColor = Color3.FromHexString('#7DD3FC').scale(0.5); ringMat.specularColor = Color3.Black(); mats.push(ringMat);
     const atlas = new DynamicTexture('coast_sport_signs', { width: 512, height: 512 }, scene, false); texs.push(atlas);
     const g = atlas.getContext() as CanvasRenderingContext2D;
@@ -107,9 +120,9 @@ export function mountZoneTownView(scene: Scene, o: { townsfolk: number; sports: 
     SPORT_SPOTS.forEach((s, k) => {
       const [x, y, z] = markerAt(s);
       if (!ringMaster) {
-        ringMaster = MeshBuilder.CreateTorus('coast_sport_ring', { diameter: s.radius * 1.4, thickness: 0.18, tessellation: 36 }, scene);
-        ringMaster.material = ringMat; ringMaster.isPickable = false; ringMaster.parent = root; ringMaster.position.set(x, y + 0.08, z);
-      } else { const r = ringMaster.createInstance(`coast_sport_ring_${s.id}`); r.parent = root; r.isPickable = false; r.position.set(x, y + 0.08, z); }
+        ringMaster = groundRing('coast_sport_ring', 1, 0.05, scene); ringMaster.scaling.setAll(s.radius * 0.7);
+        ringMaster.material = ringMat; ringMaster.isPickable = false; ringMaster.parent = root; ringMaster.position.set(x, y + 0.1, z);
+      } else { const r = ringMaster.createInstance(`coast_sport_ring_${s.id}`); r.parent = root; r.isPickable = false; r.scaling.setAll(s.radius * 0.7); r.position.set(x, y + 0.1, z); }
       g.fillStyle = '#7DD3FC'; g.font = 'bold 54px sans-serif'; g.textBaseline = 'middle';
       g.fillText(s.game.slice(0, 18), 20, k * 128 + 66);
       const v0 = 1 - (k + 1) / 4, v1 = 1 - k / 4;
