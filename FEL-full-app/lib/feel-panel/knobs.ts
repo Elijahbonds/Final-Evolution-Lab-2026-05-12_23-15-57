@@ -2074,7 +2074,7 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
   },
   // ── lane/kit-tight (owner 2026-11-18: "make the clothes appear to be skin tight and not baggy ... right now it looks poofy") ──
   {
-    id: 'kit.inseamShade', label: 'One-piece short: darker inseam panel (0 = none)', def: 0.45, min: 0, max: 1, step: 0.05, unit: '', group: 'Kit · fit',
+    id: 'kit.inseamShade', label: 'One-piece short: darker inseam panel (0 = none)', def: 0.55, min: 0, max: 1, step: 0.05, unit: '', group: 'Kit · fit',
     source: 'lib/babylon/core/inseamShade.ts INSEAM_SHADE',
     hint: 'How much darker the cloth between the legs is, so its stretch in a stride reads as a gusset panel. 0 = as before (no panel).',
   },

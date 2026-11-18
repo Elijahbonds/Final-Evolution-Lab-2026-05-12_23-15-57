@@ -25,16 +25,16 @@ async function shortAfterSwap(): Promise<{ mesh: Mesh; kindsBefore: string[]; ki
 }
 
 describe('the one-piece short\'s inseam panel (kit.inseamShade)', () => {
-  it('ships at 0.45 (the coordinator\'s reversible default), and 0 on its row is off', () => {
-    expect(INSEAM_SHADE).toBe(0.45);
+  it('ships at 0.55 (the coordinator\'s reversible default), and 0 on its row is off', () => {
+    expect(INSEAM_SHADE).toBe(0.55);
     const k = FEEL_KNOB_BY_ID.get('kit.inseamShade')!;
-    expect([k.def, k.min, k.max]).toEqual([0.45, 0, 1]);
+    expect([k.def, k.min, k.max]).toEqual([0.55, 0, 1]);
   });
   it('marks the inseam (the inner side of each leg) and leaves most of the short plain', () => {
     const g = set().find((x) => x.slot === 'shorts')!;
     const s = joiningShare(g.joints, g.weights, g.jointNames, g.positions);
     const panel = [...s].filter((x) => x > 0.5).length;
-    expect(panel).toBeGreaterThan(s.length * 0.05);
+    expect(panel).toBeGreaterThan(s.length * 0.03);
     expect(panel).toBeLessThan(s.length * 0.35);
   });
   it('the texels: white where nothing joins, darker by the knob where it does', () => {

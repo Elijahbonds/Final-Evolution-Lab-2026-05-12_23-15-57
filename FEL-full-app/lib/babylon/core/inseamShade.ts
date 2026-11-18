@@ -17,7 +17,7 @@ import type { Mesh, Scene } from '@babylonjs/core';
 import { feel } from '../../feel-panel/feel';
 
 /** kit.inseamShade: how much darker the inseam panel is (0 = off, today; 1 = black). NEW; the coordinator's reversible default. */
-export const INSEAM_SHADE = 0.45;
+export const INSEAM_SHADE = 0.55;
 /** Texture size (texels a side). */
 const SIZE = 256;
 
@@ -29,7 +29,7 @@ export const inseamShade = (): number => Math.max(0, Math.min(1, feel('kit.insea
  *  line across, over half the two legs' separation (≈ 0 at the middle, ≈ 1 at a leg's centre line). The panel is full at
  *  inner ≤ PANEL_IN and gone by PANEL_OUT, and only on cloth that rides the thighs (≥ PANEL_LEGS of its weight), so the seat's
  *  centre seams, which ride the pelvis, stay plain. */
-export const PANEL_IN = 0.3, PANEL_OUT = 0.5, PANEL_LEGS = 0.6;
+export const PANEL_IN = 0.15, PANEL_OUT = 0.35, PANEL_LEGS = 0.6;
 export function joiningShare(joints: ArrayLike<number>, weights: ArrayLike<number>, jointNames: readonly string[], positions?: ArrayLike<number>): Float32Array {
   const L = jointNames.findIndex((n) => /(^|:)LeftUpLeg$/.test(n)), R = jointNames.findIndex((n) => /(^|:)RightUpLeg$/.test(n));
   const n = joints.length / 4, out = new Float32Array(n);
