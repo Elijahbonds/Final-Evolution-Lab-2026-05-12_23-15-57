@@ -212,7 +212,11 @@ export const VeniceHubMode: ModeDefinition = {
             if (p.x > a.minX && p.x < a.maxX && p.z > a.minZ && p.z < a.maxZ) S.solids.push(palmSolid(i++, p.x, p.z));
           }
         }
-        if (feel('venue.veniceLife', VENICE_LIFE) >= 0.5) S.life = mountHubLife(ctx.scene, S.view.root, (ctx.scene.metadata as { felTier?: string } | null)?.felTier ?? 'desktop');
+        if (feel('venue.veniceLife', VENICE_LIFE) >= 0.5) {
+          const life = mountHubLife(ctx.scene, S.view.root, (ctx.scene.metadata as { felTier?: string } | null)?.felTier ?? 'desktop');
+          S.life = life;
+          void life.watchers.then((n) => console.info(`[VENICE] life: ${life.gulls} gulls, ${n} watchers`));
+        }
         if (S.sound) void SoundKit.useSampleBank('hoops');
       });
     }

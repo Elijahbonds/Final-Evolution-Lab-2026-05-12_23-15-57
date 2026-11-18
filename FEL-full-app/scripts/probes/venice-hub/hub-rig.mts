@@ -88,6 +88,8 @@ try {
       const missing = new Set<string>();
       page.on('response', (r) => { if (r.status() === 404) missing.add(new URL(r.url()).pathname); });
       page.on('console', (m) => { if (logs.length < 400) logs.push(`${m.type()}: ${m.text().slice(0, 200)}`); });
+    // the deferred scenery's landing (and phase 6's life after it) as page flags the rig can wait on
+    await page.addInitScript(() => { const o = console.info.bind(console); console.info = (...a: unknown[]) => { const t = String(a[0] ?? ''); if (/deferred scenery landed/.test(t)) (window as unknown as { __landed?: boolean }).__landed = true; if (/\[VENICE\] life:/.test(t)) (window as unknown as { __life?: boolean }).__life = true; o(...a); }; });
       const cdp = await ctx.newCDPSession(page);
       await cdp.send('Emulation.setCPUThrottlingRate', { rate: desk ? 1 : Number(process.env.THROTTLE ?? 4) });
       await page.goto(`${base}${query ? `?${query}` : ''}`, { waitUntil: 'commit', timeout: 180000 });
@@ -121,9 +123,16 @@ try {
         const top = [...per.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12);
         const gens = s.lights.map((l) => l.getShadowGenerator && l.getShadowGenerator()).filter(Boolean).length;
         return { meshDraws: [...per.values()].reduce((a, b) => a + b, 0), top, shadowGens: gens, customRTs: s.customRenderTargets.length, post: s.postProcesses.length, effectLayers: (s.effectLayers || []).length, frameCounter: [f0, f1] }; })()`);
-      result[name] = { ...t, worst, spot, split, errors: errors.slice(0, 5), missing: [...missing] };
+      result[name] = { ...t, worst, spot, split, errors: errors.slice(0, 5), missing: [...missing], notes: logs.filter((l) => /crowd|venice|life/i.test(l)).slice(-12) };
+      // phase 3's "full": when the deferred paint and far scenery landed (ms after the playable frame's run went on), if it did
+      if (query.includes('deferScenery%22%3A0')) (result[name] as Record<string, unknown>).fullSec = t.ttfpSec;
+      else {
+        try { await page.waitForFunction(() => (window as unknown as { __landed?: boolean }).__landed === true, null, { timeout: 120000 }); } catch { /* not landed in 2 min */ }
+        const m = logs.map((l) => /deferred scenery landed in (\d+) ms/.exec(l)).find(Boolean);
+        (result[name] as Record<string, unknown>).landedMs = m ? Number(m[1]) : null;
+      }
       if (shot) {
-        if (name.startsWith('shared') || name.startsWith('look-') || name.startsWith('life') || desk) { await page.reload(); await page.waitForFunction(() => !!(window as unknown as { __ttfp?: number }).__ttfp, null, { timeout: 240000 }); await page.waitForTimeout(5000); }
+        if (name.startsWith('shared') || name.startsWith('look-') || name.startsWith('life') || desk) { await page.reload(); await page.waitForFunction(() => !!(window as unknown as { __ttfp?: number }).__ttfp, null, { timeout: 240000 }); if (name.startsWith('life') || desk) await page.waitForFunction(() => (window as unknown as { __life?: boolean }).__life === true, null, { timeout: 150000 }).catch(() => {}); await page.waitForTimeout(4000); }
         const tag = name.startsWith('walkup') ? name0 : name.startsWith('look-') || name.startsWith('life') || desk ? name.split('#')[0] : 'courts';
         const file = path.join(OUT, `venice-v1-${tag}${desk ? '' : '-phone'}.jpg`);
         await page.screenshot({ path: file, type: 'jpeg', quality: 85 });
