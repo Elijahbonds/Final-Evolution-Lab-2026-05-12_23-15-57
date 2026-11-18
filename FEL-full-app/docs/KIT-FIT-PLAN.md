@@ -508,3 +508,31 @@ avoids it only because its leg tubes overlap instead of joining. The curved hem 
 tears, so the torn edges are the gusset's, not the hem's. With 22 bones and no cloth simulation (GATE 0), the cloth that joins two
 legs that split apart must stretch somewhere. What is left: hide it (a darker inseam panel, so the stretched faces read as a seam),
 or a short with a slit side (less cloth to stretch). Both are owner-look choices.
+
+### 12.4 The inseam panel, and the /creator tap control (2026-11-18)
+
+**The panel** (`lib/babylon/core/inseamShade.ts`, `kit.inseamShade` 0.55; 0 = none). This is the coordinator's option (a), taken
+as the reversible default and flagged to the owner.
+- A 128² texture made from the one-piece short's own UVs, positions and weights. It is dark on the inner side of each leg, from
+  the gusset to the hem.
+- It sits in the short's LIGHTMAP slot, read as a shadow map. The albedo slot is the Creator paint's, and a panel there never
+  showed.
+- The Closet tint's material clone shares it (`playerIdentity.cloneForTint`), because a deep copy of a texture made in memory is
+  blank.
+- No geometry, UV, bone or vertex-data change: the body merge sees the same parts (tested).
+- It reads in a kick, where the inner thigh faces the camera. Standing, the inner thigh is mostly hidden between the legs.
+
+**The /creator tap control** (every-screen `fast`; budget 200 ms; one gate hold; own database). Each side was built alone, scored
+3 times, then deleted:
+
+| Side | Tap times (ms) |
+|---|---|
+| release tip 28a9e732 | 224 / 160 / 168 |
+| lane/kit-tight 193eb9f3 | 240 / 224 / 288 |
+
+The ranges touch only at 224. The kit side's median is ~70 ms slower, and the release itself missed the budget once. What this lane
+adds to the main thread when a body loads, measured headless:
+- fetching, parsing and applying the two garment sets: 8–32 ms;
+- the panel texture: 3–4 ms at 128² (14–17 ms at 256², the size the control did not include yet).
+
+assumption: if the body's load overlaps the tap, the garment-set work is the likely difference. Not confirmed with a trace.
