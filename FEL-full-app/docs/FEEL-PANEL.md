@@ -925,3 +925,14 @@ Two NEW knobs, **shipped ON** (assumption, flagged: the owner chose both; each k
   crossover flick 1.2 s later): on, 3 of 3 in 1v1 and 3 of 3 in 3v3 kept the ball in the hands for all 66 recorded frames, no move; the
   step-through on the squeeze still comes (4 of 4). Off: the crossover played and the ball went back to the floor. Off: the dribble comes
   back when the pump clip ends.
+
+## kit-tight, 2026-11-18 (owner: "make the clothes appear to be skin tight and not baggy ... right now it looks poofy")
+
+Group **Kit · fit**. A look slider, not a feel number: it moves no body, no bone and no timing.
+
+- `kit.fitTightness` **0** (the shipped value is chosen from the browser rig and the pictures; 0 = today exactly): how close the worn
+  kit tee / tank and shorts sit on the body. Today they stand about 3–4 cm off the skin (the garment files 2–2.5 cm, plus the runtime
+  lift and edge flare). Each vertex further than 8 mm off is pulled toward the skin by this share of the excess, once, when the body
+  mask is fitted; the pull fades out near the hems, cuffs, armholes and leg openings, where the skin is still drawn. Kit packs (the
+  football jersey) and the Creator's built clothes are not touched. `lib/babylon/core/fitTight.ts` `FIT_TIGHTNESS` (with `FIT_FLOOR`
+  8 mm and `FIT_EDGE_BAND` 7 cm).

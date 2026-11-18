@@ -29,6 +29,7 @@ import type { AbstractMesh, IndicesArray, Mesh, Scene, TransformNode } from '@ba
 import { boneNode } from '../anim/boneLookup';
 import { tubeCoverage, trimSpan, type TubeSpan } from './accessoryFit';
 import { coachGarmentSlotOf, demoModelFlags } from './demoModels';
+import { FIT_EDGE_BAND, FIT_WELD, SkinSurface, fitTightness, fitsTight, openEdgeWeights, tightenGarment } from './fitTight';
 
 /** How far under a garment (from its open edge, metres) the skin must be before it is hidden. Tops and shorts leave a
  *  band at the hem so a garment that rides up never opens a hole into the body. */
@@ -750,6 +751,19 @@ export function* maskBodySteps(body: Mesh, meshes: AbstractMesh[], why?: Record<
   if (isShrunk(body)) return null;   // mid spawn-in: the margins are world metres and the body is millimetres tall (see isShrunk)
   const bodySkin = skinnedWorld(body); if (!bodySkin) return null;
   meshes = withSiblings(body, meshes);
+  // KIT-TIGHT (fitTight.ts): the worn tee and short drawn closer to the skin, once, before the waistband fit and the flare measure them
+  const tight = fitTightness();
+  if (tight > 0) {
+    try {
+      const skinS = new SkinSurface(bodySkin.P, bodySkin.N, meta.felBodyIndices0!);
+      for (const m of meshes) {
+        const slot = maskSlotOf(m.name); if (!fitsTight(m, slot) || !m.isVisible || m.isDisposed() || !(m as Mesh).skeleton) continue;
+        const sw = skinnedWorld(m as Mesh); const ind = ((m.metadata ?? {}) as { felGarmentIndices0?: number[] }).felGarmentIndices0 ?? (m as Mesh).getIndices(); if (!sw || !ind) continue;
+        const pre = (m as { __felPreLift?: Float32Array }).__felPreLift, ew = pre && pre.length === sw.P.length ? skinnedWorld(m as Mesh, pre)?.P ?? sw.P : sw.P;
+        tightenGarment(m as Mesh, sw.P, openEdgeWeights(ew, ind, FIT_EDGE_BAND, FIT_WELD, slot === 'shorts' ? (y01) => y01 > 0.5 : undefined).w, skinS, tight);
+      }
+    } catch (e) { console.warn(`[FEL-KIT] tight fit skipped: ${String((e as Error)?.message ?? e).slice(0, 140)}`); }
+  }
   try { fitShortsUnderTop(body, bodySkin, meta.felBodyIndices0!, meshes); } catch (e) { console.warn(`[FEL-KIT] waistband fit skipped: ${String((e as Error)?.message ?? e).slice(0, 140)}`); }
   yield;   // RUNUP-STALL-5: step 1 done (the body's skin)
   if (body.isDisposed()) return null;

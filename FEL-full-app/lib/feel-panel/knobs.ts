@@ -1987,6 +1987,12 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/core/ComboFinish.ts COMBO_DUNK_MIN_MPS',
     hint: 'How fast the drive must be at the press for a euro or hop to become a dunk.',
   },
+  // ── lane/kit-tight (owner 2026-11-18: "make the clothes appear to be skin tight and not baggy ... right now it looks poofy") ──
+  {
+    id: 'kit.fitTightness', label: 'Clothes fit: as before (0) to skin-tight (1)', def: 0, min: 0, max: 1, step: 0.05, unit: '', group: 'Kit · fit',
+    source: 'lib/babylon/core/fitTight.ts FIT_TIGHTNESS',
+    hint: 'How close the worn tee and shorts sit on the body. 0 = as before (about 3 cm off the skin). 1 = 8 mm off it everywhere but the hems, cuffs and leg openings.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));

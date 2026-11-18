@@ -416,6 +416,7 @@ export function liftOffBody(mesh: AbstractMesh, slot: 'tops' | 'shorts'): void {
       const k = d / (ibms && mi && mw ? metresPerBind(ibms, mi, mw, v, nx, ny, nz) : 1);   // metres → this vertex's bind units
       out[v * 3] = positions[v * 3] + nx * k; out[v * 3 + 1] = positions[v * 3 + 1] + ny * k; out[v * 3 + 2] = positions[v * 3 + 2] + nz * k;
     }
+    (mesh as { __felPreLift?: Float32Array }).__felPreLift = new Float32Array(positions);   // KIT-TIGHT: the welded shape, for its open edges (the lift splits UV seams apart)
     mesh.setVerticesData(VertexBuffer.PositionKind, out, false);   // updateVerticesData is a silent no-op on the loader's non-updatable buffer
     mesh.refreshBoundingInfo();
   } catch (e) {
