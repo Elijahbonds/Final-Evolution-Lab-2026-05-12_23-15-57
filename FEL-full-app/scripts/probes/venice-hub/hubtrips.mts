@@ -70,7 +70,11 @@ try {
   const heap = rows.map((r) => r.heapMb as number), avg = (a: number[]) => a.reduce((x, y) => x + y, 0) / Math.max(1, a.length);
   const grow = avg(heap.slice(-3)) - avg(heap.slice(1, 4));
   const lis = (rows.at(-1)!.windowListeners as number) - (rows[1].windowListeners as number) + (rows.at(-1)!.documentListeners as number) - (rows[1].documentListeners as number);
-  const flat = ['meshes', 'materials', 'textures', 'observersBefore'].every((k) => rows.slice(1).every((r) => r[k] === rows[1][k]));
+  // each trip is a NEW scene, so its counts are a sanity check, not the leak signal (heap, listeners and canvases are): the life and
+  // the court life land asynchronously, and the first run (2026-11-18) read 233-237 meshes, 151-155 materials, 108-109 textures and
+  // 20-23 observers over trips 2-10 with no trend. Within 4 of trip 2 is steady; a leak that kept old scenes alive would show in
+  // the heap. (FLAG: the first version demanded exact equality.)
+  const flat = ['meshes', 'materials', 'textures', 'observersBefore'].every((k) => rows.slice(1).every((r) => Math.abs((r[k] as number) - (rows[1][k] as number)) <= 4));
   verdict = grow <= GROW_MB && lis <= 0 && flat ? 'pass' : 'fail';
   console.log(`hub trips: heap trips 2-4 ${avg(heap.slice(1, 4)).toFixed(1)} MB -> last 3 ${avg(heap.slice(-3)).toFixed(1)} MB (${grow >= 0 ? '+' : ''}${grow.toFixed(1)}); listeners ${lis >= 0 ? '+' : ''}${lis}; scene counts ${flat ? 'flat' : 'MOVED'}; ${verdict}`);
   await ctx.close();
