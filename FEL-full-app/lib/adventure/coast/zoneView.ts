@@ -141,13 +141,15 @@ function normaliseKit(mat: PBRMaterial): void {
 }
 
 /** One model's drawable masters: its parts baked to model space and merged by material, parked at the origin. */
-async function loadMasters(scene: Scene, m: PropModel): Promise<Mesh[]> {
+export async function loadMasters(scene: Scene, m: PropModel, natureUrl = '/models/props/nature/'): Promise<Mesh[]> {
   let root: TransformNode | null = null;
   const extra: TransformNode[] = [];
   if (m.kit === 'meshy') {
     root = await spawnMeshyProp(scene, m.file.replace(/\.glb$/, '') as MeshyPropKey, null, `coast_${m.id}`);
   } else {
-    const r = await SceneLoader.ImportMeshAsync('', '/models/props/nature/', m.file, scene);
+    const r = natureUrl.startsWith('data:')
+      ? await SceneLoader.ImportMeshAsync('', '', natureUrl, scene, undefined, '.glb')
+      : await SceneLoader.ImportMeshAsync('', natureUrl, m.file, scene);
     root = (r.meshes.find((x) => !x.parent) as TransformNode | undefined) ?? null;
     extra.push(...r.transformNodes);
   }
@@ -159,6 +161,7 @@ async function loadMasters(scene: Scene, m: PropModel): Promise<Mesh[]> {
     if (part.material instanceof PBRMaterial) normaliseKit(part.material);
     part.computeWorldMatrix(true);
     const c = part.clone(`${part.name}_coast`, null, true, false) as Mesh;
+    c.parent = null;   // a clone keeps its source's parent; this one must not die with the import's root (disposed below)
     c.makeGeometryUnique();
     c.position.setAll(0); c.rotation.setAll(0); c.rotationQuaternion = null; c.scaling.setAll(1);
     c.bakeTransformIntoVertices(part.getWorldMatrix());
