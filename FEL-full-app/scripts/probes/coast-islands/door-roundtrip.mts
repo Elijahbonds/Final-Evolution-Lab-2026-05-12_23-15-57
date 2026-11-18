@@ -21,8 +21,22 @@ const { BOAT_STOP, boatReturnSpawn } = ((doorNs as { default?: unknown }).defaul
 const OUT = process.argv[2] ?? '/tmp/coast-door';
 fs.mkdirSync(OUT, { recursive: true });
 const verdict: Record<string, unknown> = {};
-const fail = (why: string) => { verdict.ok = false; (verdict.failures as string[]).push(why); console.log('FAIL', why); };
+const fail = (why: string) => { verdict.ok = false; (verdict.failures as string[]).push(why.slice(0, 2000)); console.log('FAIL', why.slice(0, 2000)); };
+
+/** A phone's tap on a card's button: first, what a finger there would hit (the topmost element at the button's centre); then the
+ *  click; if the click's checks time out (a software-rasterised frame can take seconds at DPR 3), a touch tap; the path is noted. */
+async function press(page: Page, testId: string, label: string): Promise<void> {
+  const loc = page.getByTestId(testId);
+  const hit = await loc.evaluate((el) => { const r = el.getBoundingClientRect(); const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return { onTop: !!top && (top === el || el.contains(top)), top: top ? `${top.tagName.toLowerCase()}${top.getAttribute('data-testid') ? `[${top.getAttribute('data-testid')}]` : ''}` : null }; });
+  (verdict.presses as Record<string, unknown>)[label] = { hit };
+  if (!hit.onTop) fail(`${label}: a tap at the button's centre lands on ${hit.top}, not the button`);
+  try { await loc.click({ timeout: 15000 }); (verdict.presses as Record<string, Record<string, unknown>>)[label].via = 'click'; return; }
+  catch (e) { (verdict.presses as Record<string, Record<string, unknown>>)[label].clickError = String(e).slice(0, 1500); }
+  await loc.tap({ timeout: 15000, force: true });
+  (verdict.presses as Record<string, Record<string, unknown>>)[label].via = 'tap';
+}
 verdict.failures = [];
+verdict.presses = {};
 verdict.ok = true;
 
 async function until<T>(page: Page, fn: string, ok: (v: T) => boolean, sec: number): Promise<T | null> {
@@ -62,7 +76,7 @@ try {
   verdict.veniceCard = await page.getByTestId('venice-walkup').textContent().catch(() => null);
   await page.waitForTimeout(500);
   await shot('venice-boat-card-phone.jpg');
-  await card.click();
+  await press(page, 'venice-boat', 'veniceBoat');
 
   // 2. the coast, on its dock
   await page.waitForURL(/\/play\/coast\?/, { timeout: 30000 }).catch(() => fail('the boat did not open /play/coast'));
@@ -85,7 +99,7 @@ try {
   try { await back.waitFor({ timeout: 10000 }); } catch { fail('no "Back to Venice" button on the coast\'s card'); }
   await page.waitForTimeout(400);
   await shot('coast-boat-back-card-phone.jpg');
-  await back.click();
+  await press(page, 'coast-to-venice', 'coastBack');
 
   // 3. back in Venice, at the boat
   await page.waitForURL(/\/play\/venice\?spot=pier\.end/, { timeout: 30000 }).catch(() => fail('the boat back did not open /play/venice?spot=pier.end'));
