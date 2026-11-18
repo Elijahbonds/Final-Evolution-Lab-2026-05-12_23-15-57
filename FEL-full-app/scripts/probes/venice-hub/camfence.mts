@@ -1,12 +1,12 @@
 // VENICE CAMERA AT A FENCE (lane/venice-v2, phase 3, 2026-11-18): the hub on the phone profile (./hub-entry.ts, esbuild, the real
 // mode), arriving beside Court 1. The player walks in to the court's west fence, turns, and walks back east: for the first seconds
-// the camera trails behind them — where it wants to be is past the fence. Recorded every animation frame for TRAIL_SEC:
+// the camera trails behind them — where it wants to be is past the fence. Recorded for TRAIL_FRAMES frames (a second scene: the boardwalk row, below):
 //   through     frames the camera stands outside the fence while the player is inside it (the camera went through the fence)
 //   jitter      the camera-to-player distance's reversals bigger than 0.1 m (a pull-in that pumps in and out)
 //   maxStep     the biggest one-frame change of that distance (m)
 // Run with venue.veniceCamCollide off and on (FEEL), REPS times each, and a shot at the pull-in.
 //
-//   OUT=<dir> /home/user/wt/gate-run.sh 1200 npx tsx scripts/probes/venice-hub/camfence.mts      (REPS=3 TRAIL_SEC=6)
+//   OUT=<dir> /home/user/wt/gate-run.sh 1200 npx tsx scripts/probes/venice-hub/camfence.mts      (REPS=3 TRAIL_FRAMES=90 LEVELS=0,1,2)
 import { chromium } from 'playwright-core';
 import { createRequire } from 'node:module';
 import { spawn } from 'node:child_process';
@@ -19,7 +19,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const APP = path.resolve(HERE, '../../..');
 const OUT = process.env.OUT ?? '/tmp/venice-camfence';
 const PORT = Number(process.env.PORT ?? 3743);
-const REPS = Number(process.env.REPS ?? 3), TRAIL_SEC = Number(process.env.TRAIL_SEC ?? 6);
+const REPS = Number(process.env.REPS ?? 3);
 const SITE = path.join(OUT, 'site');
 fs.mkdirSync(SITE, { recursive: true });
 const esbuild = createRequire(path.join(APP, 'package.json'))('esbuild');
@@ -36,65 +36,70 @@ process.on('exit', stopServer);
 const url = (feel: Record<string, number>) => `http://127.0.0.1:${PORT}/hub.html?spot=court.ones&feel=${encodeURIComponent(JSON.stringify(feel))}`;
 for (let i = 0; i < 40; i++) { try { if ((await fetch(url({}))).ok) break; } catch { /* not yet */ } await new Promise((r) => setTimeout(r, 250)); }
 
-// Court 1: centre (-64, -100); the fence's west run at x = -64 - 10.5 = -74.5, from z -116.5 to -83.5
-const FENCE_X = -74.5, CZ = -100, HALF_L = 16.5;
+// two places the camera trails into a solid: Court 1's west fence (see-through chain-link; only venue.veniceCamCollide 2 blocks it)
+// and the boardwalk row's shopfronts (x -78..-50, z -78.2..-75.4: an opaque building, blocked at level 1). Each: walk in to the
+// solid, turn, walk away; for TRAIL_FRAMES frames the camera trails back toward it.
+type Scene = { name: string; via: Array<[number, number]>; at: [number, number]; away: [number, number];
+  /** the camera is past the solid while the player is not */ through: string };
+const SCENES: Scene[] = [
+  { name: 'fence', via: [], at: [-72.9, -100], away: [-40, -100], through: 'c.x < -74.55 && p.x > -74.5 && Math.abs(c.z + 100) < 16.5' },
+  { name: 'boardwalk', via: [[-46, -100], [-46, -69], [-64, -71]], at: [-64, -74.6], away: [-64, -58], through: 'c.z < -75.4 && p.z > -75.4 && c.x > -78 && c.x < -50' },
+];
+const TRAIL_FRAMES = Number(process.env.TRAIL_FRAMES ?? 90);
+const LEVELS = (process.env.LEVELS ?? '0,1,2').split(',').map(Number);
 type Seam = { state(): { x: number; z: number; walking: boolean }; walkToPoint(x: number, z: number): void; stop(): void };
+const walk = async (page: import('playwright-core').Page, x: number, z: number) => {
+  await page.evaluate(`window.__VENICE__.walkToPoint(${x}, ${z})`);
+  await page.waitForFunction(`(() => { const s = window.__VENICE__.state(); return !s.walking || Math.hypot(s.x - (${x}), s.z - (${z})) < 1.2; })()`, null, { timeout: 120000 });
+};
 const browser = await chromium.launch({ executablePath: chromiumExe(), args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const rows: Record<string, unknown>[] = [];
 try {
-  for (let rep = 1; rep <= REPS; rep++) for (const side of ['off', 'on'] as const) {
+  for (let rep = 1; rep <= REPS; rep++) for (const level of LEVELS) {
     const page = await (await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true })).newPage();
     try {
-      await page.goto(url({ 'venue.veniceCamCollide': side === 'on' ? 1 : 0, 'venue.veniceLife': 0, 'venue.veniceCourtLife': 0 }));
-      await page.waitForFunction(() => !!(window as unknown as { __VENICE__?: unknown }).__VENICE__ && (window as unknown as { __phase?: string }).__phase === 'playing', null, { timeout: 180000 });
-      // the blockers land with the deferred scenery
-      await page.waitForFunction(() => { const d = (window as unknown as { __FEL_DEV__?: { scene: { getMeshByName(n: string): unknown; meshes: unknown[] } } }).__FEL_DEV__; return !!d && d.scene.meshes.length > 150; }, null, { timeout: 120000 }).catch(() => {});
+      await page.goto(url({ 'venue.veniceCamCollide': level, 'venue.veniceLife': 0, 'venue.veniceCourtLife': 0 }));
+      await page.waitForFunction(`!!window.__VENICE__ && window.__phase === 'playing'`, null, { timeout: 180000 });
+      await page.waitForFunction(`!!window.__FEL_DEV__ && window.__FEL_DEV__.scene.meshes.length > 150`, null, { timeout: 120000 }).catch(() => {});
       await page.waitForTimeout(4000);
-      // walk in to the west fence (inside it), then turn and walk east, recording the camera
-      await page.evaluate(([x, z]) => (window as unknown as { __VENICE__: Seam }).__VENICE__.walkToPoint(x, z), [FENCE_X + 1.6, CZ]);
-      await page.waitForFunction((fx) => (window as unknown as { __VENICE__: Seam }).__VENICE__.state().x < fx + 2.2, FENCE_X, { timeout: 120000 });
-      await page.waitForTimeout(1500);
-      // (a string, not a function: tsx's name helper (__name) does not exist in the page)
-      const rec = await page.evaluate(`(async () => {
-        const sec = ${TRAIL_SEC}, fx = ${FENCE_X}, cz = ${CZ}, hl = ${HALF_L};
-        const w = window;
-        w.__VENICE__.walkToPoint(-40, cz);
-        const d = [];
-        let through = 0, frames = 0;
-        const t0 = performance.now();
-        await new Promise((done) => {
-          const tick = () => {
-            const c = w.__FEL_DEV__.scene.activeCamera.position, p = w.__VENICE__.state();
-            frames++;
-            d.push(Math.hypot(c.x - p.x, c.z - p.z));
-            if (c.x < fx - 0.05 && p.x > fx && Math.abs(c.z - cz) < hl) through++;
-            if (performance.now() - t0 < sec * 1000) requestAnimationFrame(tick); else done();
-          };
-          requestAnimationFrame(tick);
-        });
-        let rev = 0, maxStep = 0, ext = d[0], dir = 0;
-        for (let i = 1; i < d.length; i++) {
-          maxStep = Math.max(maxStep, Math.abs(d[i] - d[i - 1]));
-          const nd = Math.sign(d[i] - ext);
-          if (nd !== 0 && Math.abs(d[i] - ext) >= 0.1) { if (dir !== 0 && nd !== dir) rev++; dir = nd; ext = d[i]; }
-          else if ((dir > 0 && d[i] > ext) || (dir < 0 && d[i] < ext)) ext = d[i];
-        }
-        return { frames, through, jitter: rev, maxStep: Math.round(maxStep * 100) / 100, minDist: Math.round(Math.min(...d) * 100) / 100, maxDist: Math.round(Math.max(...d) * 100) / 100 };
-      })()`) as Record<string, number>;
-      if (rep === 1) {
-        // the picture: the same walk again, shot 0.8 s after the turn (the camera at its pull-in)
-        await page.evaluate(([x, z]) => (window as unknown as { __VENICE__: Seam }).__VENICE__.walkToPoint(x, z), [FENCE_X + 1.6, CZ]);
-        await page.waitForFunction((fx) => (window as unknown as { __VENICE__: Seam }).__VENICE__.state().x < fx + 2.2, FENCE_X, { timeout: 120000 });
+      for (const sc of SCENES) {
+        for (const [x, z] of sc.via) await walk(page, x, z);
+        await walk(page, sc.at[0], sc.at[1]);
         await page.waitForTimeout(1500);
-        await page.evaluate((cz) => (window as unknown as { __VENICE__: Seam }).__VENICE__.walkToPoint(-40, cz), CZ);
-        await page.waitForTimeout(800);
-        await page.screenshot({ path: path.join(OUT, `venice-v2-camera-fence-${side}-phone.jpg`), type: 'jpeg', quality: 85 });
+        // FRAME-based (the shared box runs the rig at a few frames a second; the director and the movement clamp their step, so N
+        // frames are the same game-time walk however slow the box is). A string: tsx's __name helper is not in the page.
+        const rec = await page.evaluate(`(async () => {
+          const w = window, n = ${TRAIL_FRAMES};
+          w.__VENICE__.walkToPoint(${sc.away[0]}, ${sc.away[1]});
+          const d = []; let through = 0;
+          await new Promise((done) => { let k = 0; const tick = () => {
+            const c = w.__FEL_DEV__.scene.activeCamera.position, p = w.__VENICE__.state();
+            d.push(Math.hypot(c.x - p.x, c.z - p.z));
+            if (${sc.through}) through++;
+            if (++k < n) requestAnimationFrame(tick); else done(); }; requestAnimationFrame(tick); });
+          let rev = 0, maxStep = 0, ext = d[0], dir = 0;
+          for (let i = 1; i < d.length; i++) {
+            maxStep = Math.max(maxStep, Math.abs(d[i] - d[i - 1]));
+            const nd = Math.sign(d[i] - ext);
+            if (nd !== 0 && Math.abs(d[i] - ext) >= 0.1) { if (dir !== 0 && nd !== dir) rev++; dir = nd; ext = d[i]; }
+            else if ((dir > 0 && d[i] > ext) || (dir < 0 && d[i] < ext)) ext = d[i];
+          }
+          return { frames: d.length, through, jitter: rev, maxStep: Math.round(maxStep * 100) / 100, minDist: Math.round(Math.min(...d) * 100) / 100, maxDist: Math.round(Math.max(...d) * 100) / 100 };
+        })()`) as Record<string, number>;
+        if (rep === 1) {
+          await walk(page, sc.at[0], sc.at[1]);
+          await page.waitForTimeout(1500);
+          await page.evaluate(`window.__VENICE__.walkToPoint(${sc.away[0]}, ${sc.away[1]})`);
+          await page.waitForTimeout(800);
+          await page.screenshot({ path: path.join(OUT, `venice-v2-camera-${sc.name}-level${level}-phone.jpg`), type: 'jpeg', quality: 85 });
+        }
+        rows.push({ rep, level, scene: sc.name, ...rec });
+        console.log(`rep ${rep} level ${level} ${sc.name}: ${JSON.stringify(rec)}`);
+        await page.evaluate(`window.__VENICE__.stop()`);
       }
-      rows.push({ rep, side, ...rec });
-      console.log(`rep ${rep} camCollide ${side}: ${JSON.stringify(rec)}`);
     } catch (e) {
-      rows.push({ rep, side, error: String((e as Error).message).slice(0, 200) });
-      console.log(`rep ${rep} camCollide ${side} FAILED: ${String((e as Error).message).slice(0, 200)}`);
+      rows.push({ rep, level, error: String((e as Error).message).slice(0, 200) });
+      console.log(`rep ${rep} level ${level} FAILED: ${String((e as Error).message).split('\n')[0].slice(0, 200)}`);
     }
     await page.context().close();
   }

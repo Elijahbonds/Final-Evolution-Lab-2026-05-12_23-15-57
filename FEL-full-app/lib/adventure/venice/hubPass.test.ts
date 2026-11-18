@@ -244,13 +244,16 @@ describe('V2 phase 3: the camera blockers', () => {
   it('cover every fence, pole and board post, the four boards and the boardwalk row; leave the benches to the camera', async () => {
     const { camBlockPieces, VENICE_CAM_COLLIDE } = await import('./courtsDressing');
     const solids = hubSolids(v1Spots(), true);
-    const pieces = camBlockPieces(solids);
-    const covered = (b: { minX: number; maxX: number; minZ: number; maxZ: number }) => pieces.some((p) => p.minX <= b.minX && p.maxX >= b.maxX && p.minZ <= b.minZ && p.maxZ >= b.maxZ);
+    const withFences = camBlockPieces(solids, true, true), pieces = camBlockPieces(solids);
+    const covered = (set: typeof pieces, b: { minX: number; maxX: number; minZ: number; maxZ: number }) => set.some((p) => p.minX <= b.minX && p.maxX >= b.maxX && p.minZ <= b.minZ && p.maxZ >= b.maxZ);
     for (const b of solids) {
-      if (/bench/.test(b.id)) expect(covered(b)).toBe(false);
-      else expect(covered(b), b.id).toBe(true);
+      if (/bench/.test(b.id)) expect(covered(withFences, b)).toBe(false);
+      else expect(covered(withFences, b), b.id).toBe(true);
+      // the shipped level leaves the see-through fences to the camera
+      if (/fence/.test(b.id)) expect(pieces.some((p) => p.id === b.id)).toBe(false);
+      else if (!/bench/.test(b.id)) expect(covered(pieces, b), b.id).toBe(true);
     }
-    expect(pieces.length).toBe(solids.filter((b) => !/bench/.test(b.id)).length + v1Spots().length);
+    expect(withFences.length).toBe(solids.filter((b) => !/bench/.test(b.id)).length + v1Spots().length);
     // nothing in the camera's way where a player stands at a ring
     for (const s of v1Spots()) {
       const rx = s.at[0] + COURT_HALF.w + RING.out;

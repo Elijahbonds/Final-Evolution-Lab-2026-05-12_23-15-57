@@ -19,7 +19,8 @@ import { v1Spots } from './hubWorld';
 import type { Spot } from './layout';
 
 export const VENICE_LOOK_V2 = 1;
-/** V2 phase 3: the camera keeps out of the park's props (mountCameraBlockers). 0 = it passes through them, as before. */
+/** V2 phase 3: the camera keeps out of the park's props (mountCameraBlockers). 1 = poles, posts, boards, palms, hoops and the
+ *  boardwalk row; 2 = the fences too; 0 = it passes through them all, as before. */
 export const VENICE_CAM_COLLIDE = 1;
 /** Court half-sizes this furniture rings (m): the 16 × 28 painted court plus its run-off. */
 export const FENCE = { halfW: 10.5, halfL: 16.5, h: 3.2, postEvery: 3.5 } as const;
@@ -198,9 +199,12 @@ export function mountCourtsDressing(scene: Scene, parent: TransformNode): Courts
  *  proxy mesh of boxes from the park's solids (hubSolids: the same footprints the player walks round, low benches left out — the
  *  camera rides above them) and the four name boards. Invisible: no draw; one mesh, a few hundred triangles to pick. No camera
  *  number changes. */
-export interface CamBlockPiece { minX: number; maxX: number; minZ: number; maxZ: number; y0: number; top: number }
-export function camBlockPieces(solids: readonly CamBlockPiece[], boards = true): CamBlockPiece[] {
-  const out = solids.filter((p) => p.top - p.y0 >= 1.5).map((p) => ({ ...p }));
+export interface CamBlockPiece { id?: string; minX: number; maxX: number; minZ: number; maxZ: number; y0: number; top: number }
+/** `fences`: the chain-link runs too (venue.veniceCamCollide 2). Measured (camfence.mts, the phone profile): with the fences in,
+ *  the director's pull-in at a fence jumped 3-5 m in a frame, reversed 2-3 times in 6 s and swung the frame off the player; the
+ *  chain-link is see-through and reads from outside. So the shipped level (1) leaves the fences out. */
+export function camBlockPieces(solids: readonly CamBlockPiece[], boards = true, fences = false): CamBlockPiece[] {
+  const out = solids.filter((p) => p.top - p.y0 >= 1.5 && (fences || !/fence/.test(p.id ?? ''))).map((p) => ({ ...p }));
   if (boards) for (const s of v1Spots()) {
     const z = s.at[1] - FENCE.halfL - 0.62;
     out.push({ minX: s.at[0] - 3, maxX: s.at[0] + 3, minZ: z - 0.1, maxZ: z + 0.1, y0: 4.25, top: 5.75 });

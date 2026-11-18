@@ -1691,9 +1691,9 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/adventure/venice/courtLife.ts VENICE_COURT_LIFE',
     hint: 'V2, desktop and up: a shooter and a rebounder on Court 4 and on Court 1, and a jogger on the bike path. Shipped hoops clips; the ball arcs to the rim. A phone gets none (measured over its draw budget). 0 = no court life.',
   },  {
-    id: 'venue.veniceCamCollide', label: 'Venice hub: the camera keeps out of poles, fences, boards and palms (1) / passes through (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    id: 'venue.veniceCamCollide', label: 'Venice hub: the camera keeps out of poles, boards, palms, the boardwalk (1), the fences too (2) / passes through (0)', def: 1, min: 0, max: 2, step: 1, unit: '', group: 'Hoops · phone budget',
     source: 'lib/adventure/venice/courtsDressing.ts VENICE_CAM_COLLIDE',
-    hint: 'V2: one invisible proxy of the park\'s solids and name boards that the shared camera\'s own occlusion probe pulls in on. No camera distance or lag changes. 0 = the camera goes through them, as before.',
+    hint: 'V2: one invisible proxy of the park\'s solids and name boards that the shared camera\'s own occlusion probe pulls in on. No camera distance or lag changes. 2 adds the chain-link fences (measured: the pull-in at a fence jumps and swings off the player). 0 = through everything, as before.',
   },  {
     id: 'venue.veniceSound', label: 'Venice hub: beach bed, far games, the run, footsteps (1) / the harness crowd bed only (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
     source: 'lib/adventure/venice/hubSound.ts VENICE_SOUND',
