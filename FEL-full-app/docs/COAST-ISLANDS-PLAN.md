@@ -125,7 +125,7 @@ back, and with `coast.deepWaterTurnBack` 0 (the control) the same jump does end 
 **Pictures** (phone, JPG, from the rig): arrival on the dock; the beach from the shallows; Palm Key and the bridge from beside it,
 in `scratchpad/coast-islands/` (paths in the lane report).
 
-**Every-screen on `/play/coast`: not scored in this run.** The scorer needs a production build (3.2 GB); two builds were killed
+**Every-screen on `/play/coast`: not scored in phase A** (it was in phase B: clean, section 4b). The scorer needs a production build (3.2 GB); two builds were killed
 for memory beside other lanes' builds, the third succeeded but was deleted to free disk before the scorer's turn, and the disk
 then stayed under the 7 GB-free rule (3.4 GB free). The page is built the same way as `/play/venice`, which scored clean
 (VENICE-HUB-PLAN §8): a back link (here "Venice"), 16 px text, 44 px targets, one action. It needs a scorer run before the
@@ -161,6 +161,32 @@ the baked prop masters were disposed with the import's root (held now by `zonePr
   above the movement sim's 0.45 m step, so anyone walking up beside the bridge was stuck against its side (a slow walk
   reached 2 of 6 points). A deck now lies 0.15 m on the sand, rises with the water's depth through the shallows, and is
   level over the water. With it, the partner follows the whole route by itself.
+
+**Measured** (the phone rig, 2026-11-18 14:12–14:32 UTC, one session: phase B three times against the same zone with the partner and
+the creatures switched off — phase A — three times, interleaved; the walk from the dock past the Shellhopper, down the beach,
+over the bridge onto Palm Key, 6 of 6 points reached in every run, no page errors):
+
+| | Phase B (partner + creatures) | Phase A control |
+|---|---|---|
+| Playable (s) | 30.9 · 31.8 · 25.8 (median 30.9) | 30.5 · 28.2 · 27.3 (median 28.2) |
+| Worst frame: draws / active meshes / texture MB | 75–76 / 37–38 / 37 | 60 / 34 / 37 |
+| Skinned bodies | the player only (the partner and the creatures are placeholder shapes, not skinned) | the player |
+| Partner's distance behind you: mean / 95th percentile / max (m) | 7.3 / 16.8 / 17.1 · 5.4 / 6.7 / 6.9 · 8.4 / 22.9 / 23.3 | — |
+| Catch-ups on the walk | 1 · 0 · 1 (all "stuck", none "far") | — |
+
+- **What the partner and the four creatures cost:** about 16 draws and 4 active meshes, no texture memory, no skinned body. The
+  static guard counts 12 draws for them (`scripts/coast-zone-budget-tests.ts`); the rig sees 16 (the partner's movement view
+  and the shadow pass add a few). The `coast_zone` row: measured 76 / 38 / 1 / 37 / 0, budget (× 1.2) 92 / 46 / 2 / 45 / 0.
+- **Load:** playable about 2.7 s later at the median (30.9 against 28.2 s; the runs overlap: 25.8–31.8 against 27.3–30.5). The
+  rig overstates a phone; the owner's phone is the judge.
+- **Frame time on the rig** (software raster): worst 0.9 / 0.9 / 1.6 s against 1.1 / 0.9 / 3.3 s: no difference the rig can
+  separate. Not measured on a phone.
+- **The log:** every phase B run logged the Shellhopper (met in two runs, seen in one) and two logged the Palm Glider (seen).
+- **Every-screen on `/play/coast`** (the production build, 390 × 844, 4× throttle; the scorer's planted-fault control passed
+  first): **clean**. Clear, finished and right pass; first content 288 ms, layout shift 0. "Fast" reads *not measured*: the
+  scorer does not time a tap on a screen running 3D (the rig has no real GPU), as for every 3D screen. The first score
+  (12:40) found a dead end and a 2.7 s tap: it read the page while the 3D stage was still loading, and the Venice link lived
+  inside the stage. The link is now drawn outside it, from the first paint, and the zone's load gives the page turns.
 
 **Knobs** (Coast · zone, `docs/FEEL-PANEL.md`): `coast.partnerOn` 1, `coast.partnerCatchupM` 24, `coast.partnerStuckSec` 1,
 `coast.creaturesOn` 1, `coast.logSeenM` 16, `coast.logMeetM` 3. Each 0 or off restores phase A.
