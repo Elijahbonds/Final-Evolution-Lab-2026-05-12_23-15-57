@@ -372,3 +372,39 @@ the judge.
 - `docs/JERSEY-BUILD-STEPS.md`, `docs/SHORTS-BUILD-STEPS.md` (job 1, the one-piece short), the owner's 2026-11-13 answers.
 
 The contact sheet of the jersey cells, phase 0 vs refit, is in the PR report, not in the repository.
+
+## 12. kit-tight, phase 1 (2026-11-18): pulling today's garments in fails the bar; the slider ships at 0
+
+The owner (2026-11-18): "make the clothes appear to be skin tight and not baggy ... right now it looks poofy."
+
+**Where the poof comes from** (`scripts/probes/kit-tight/gap.ts`, headless, default male kit at idle, outward cloth, median / 90th
+percentile, cm). The garment files stand 2.0–2.5 cm off the skin. The runtime then adds 1–1.8 cm: the lift
+(`GARMENT_INFLATE` 13 mm tops / 20 mm shorts) and the edge flare. The flare treats every split seam of the tank as an open edge
+and flares all 408 of its vertices.
+
+| Region | File | Drawn today |
+|---|---|---|
+| chest / upper back (tank) | 2.5 / 4.2 | 3.9 / 5.7 |
+| belly / lower back (tank) | 2.0 / 2.4 | 3.2 / 4.2 |
+| shoulder (tank) | 2.2 / 3.6 | 3.7 / 5.1 |
+| thigh (short) | 2.3 / 3.2 | 4.1 / 5.4 |
+
+On girth-max Creator builds the body fills the cloth (≤ 0 cm): the poof is the default builds'.
+
+**What was tried** (`lib/babylon/core/fitTight.ts`, `kit.fitTightness`). Each worn kit tee / tank / short vertex further than 8 mm
+off the skin is pulled toward the skin by the slider's share of the excess, once, fading out within 7 cm of an open edge.
+Headless at 1 the belly, shoulders, hem and thigh come to 0.1–1.1 cm. On the steady phone rig (one round each; all 8 kit
+subjects), all three versions failed:
+1. **Pull everywhere, at 0.6:** skin through cloth +10–35 %; the shorts slot doubled to quadrupled.
+2. **Pull only over skin the mask hides, at 1:** the same; skin seen against the cloth's outside rose too (female default shorts
+   1,065 → 4,586 px).
+3. **As 2, with the mask always measuring the loose cloth, at 1:** the same (female default shorts 3,404 → 7,405; game female
+   648 → 4,264). So it is not a re-mask un-hiding skin.
+
+The cause: the kit's coarse short and tank ride their OWN skin weights, not the body's. In a stride the cloth slides over the skin
+by centimetres, so skin from the drawn bands at the openings slides under cloth that now sits close, and comes through. Today's
+3–4 cm gap is what absorbs that slide. Pulling the cloth in only works if it also rides the skin (the body's weights under it).
+For these three-piece files that fails at the crotch (§3.1). **The slider ships at 0 (today), the code stays for phase 2.**
+
+Phase 2 (the coordinator, 2026-11-18): the kit-mac-jobs garments (a one-piece short, the new jerseys, cut close in Blender with
+weights from the body), with the runtime lift and flare reduced for those files only, and the mask tuned to their openings.
