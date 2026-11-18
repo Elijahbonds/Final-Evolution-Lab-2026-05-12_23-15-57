@@ -35,7 +35,7 @@ import { loadRatedTuning, ratedLookScale } from '../hoops/ratedPlay';
 import { feel } from '@/lib/feel-panel/feel';
 import { devOrAgentHooks } from '@/lib/agentRunHooks';
 import { buildCoastWorld, COAST_DEEP_WATER_TURN_BACK, WaterEdge } from '@/lib/adventure/coast/zoneWorld';
-import { COAST_STREAM_ON, mountZoneView, type ZoneView, type ZoneViewStats } from '@/lib/adventure/coast/zoneView';
+import { COAST_STREAM_ON, COAST_STREAM_SLICED, mountZoneView, type ZoneView, type ZoneViewStats } from '@/lib/adventure/coast/zoneView';
 import {
   COAST_STREAM_FULL, COAST_STREAM_KEEP, COAST_STREAM_LOD, ISLANDS, ZoneStreamer, pieceAt, zonePieces,
 } from '@/lib/adventure/coast/zoneLayout';
@@ -198,7 +198,7 @@ export const CoastZoneMode: ModeDefinition = {
     // give the page a turn between the heavy steps (a tap on the way back is answered while the zone loads)
     const breathe = () => new Promise<void>((r) => setTimeout(r, 0));
     await breathe();
-    const view = mountZoneView(scene, { streamOn });
+    const view = mountZoneView(scene, { streamOn, sliced: feel('coast.streamSliced', COAST_STREAM_SLICED) >= 0.5 });
     await breathe();
     const streamer = new ZoneStreamer({
       full: Math.round(feel('coast.streamFull', COAST_STREAM_FULL)),

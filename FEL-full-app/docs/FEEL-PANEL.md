@@ -1053,6 +1053,7 @@ zone's rules around it, and the creatures and the log, all new. Each 0 restores 
 
 Group **Coast · zone**. All new; each off restores phase B.
 
+- `coast.streamSliced` 1 (`lib/adventure/coast/zoneView.ts`; lane/coast-f, NEW): crossing into a 64 m piece used to build the newly full pieces' fine ground and refresh all seven prop models in that one frame; now the coarse ground stands in and the work runs one job a frame (the full ring's fine ground first, then one prop model, then load-ahead). The load (the first stream) still builds at once. 0 = phases A–D.
 - `coast.townOn` 1 (`lib/adventure/coast/zoneTown.ts`): the harbour town beside the dock (four houses you cannot walk through,
   the shipped Venice boardwalk kit as the market strip, the street). 0 = the bare beach, and no quests.
 - `coast.townsfolk` 4: how many townsfolk stand in town (the Venice watchers' roster bodies; each is a skinned body with its own

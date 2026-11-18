@@ -43,7 +43,7 @@ export const COARSE_DIV = 8;
 export const SEA_PLANE_M = 520;
 const WAVE_TILE_M = 8;
 
-export interface ZoneViewStats { fineMeshes: number; coarseMeshes: number; props: number; propMasters: number }
+export interface ZoneViewStats { fineMeshes: number; coarseMeshes: number; props: number; propMasters: number; /** sliced: jobs waiting, jobs run */ pending: number; slicedJobs: number }
 export interface ZoneView {
   root: TransformNode;
   /** Every model has loaded (or failed and been skipped). */
@@ -186,7 +186,11 @@ export async function loadMasters(scene: Scene, m: PropModel, natureUrl = '/mode
 
 // ── the view ─────────────────────────────────────────────────────────────────────────────────────────────────────────
 
-export function mountZoneView(scene: Scene, opts: { streamOn: boolean }): ZoneView {
+/** coast.streamSliced (phase F-lite): 1 = crossing into a piece builds its fine ground and refreshes the props over the next
+ *  frames, one job a frame (the coarse ground stands in meanwhile); 0 = all of it in the frame you cross (phases A–D). */
+export const COAST_STREAM_SLICED = 1;
+
+export function mountZoneView(scene: Scene, opts: { streamOn: boolean; sliced?: boolean }): ZoneView {
   const root = new TransformNode('coast_zone', scene);
   const mats: (StandardMaterial | PBRMaterial)[] = [], texs: Texture[] = [];
 
@@ -328,30 +332,53 @@ export function mountZoneView(scene: Scene, opts: { streamOn: boolean }): ZoneVi
 
   let seaT = 0, bob = 0;
   const ahead: Piece[] = [];
+  // phase F-lite (sliced): the full ring's fine ground still to build (first), the prop models still to refresh
+  const urgent: Piece[] = [];
+  const dirty = new Set<PropModel>();
+  const showFine = (key: string, t: Tier) => { const f = fine.get(key); f?.setEnabled(t === 'full'); coarse.get(key)!.setEnabled(!(t === 'full' && f)); };
+  const jobsDone = { fine: 0, props: 0 };
+  let streamed = false;   // the first stream() (the load, around where you arrive) builds at once, sliced or not
   const sky: AbstractMesh[] = [];
   const view: ZoneView = {
     root,
     ready: Promise.allSettled(jobs).then(() => undefined),
     stream(tiers, changed) {
       tiersNow = tiers;
+      const slice = !!opts.sliced && streamed;
+      streamed = true;
       for (const key of changed) {
         const p = landPieces.find((x) => x.key === key);
         if (!p) continue;
         const t = opts.streamOn ? tiers.get(key) ?? 'far' : 'full';
         // the fine mesh: built from the LOD ring in (load ahead), shown in the full ring, dropped when the piece is far
         let f = fine.get(key);
-        // the full ring's fine ground now; the LOD ring's one piece a frame (frame()), so arriving and crossing never block
-        if (t === 'full' && !f) { f = buildTerrain(p, FINE_DIV); fine.set(key, f); }
+        // the full ring's fine ground now (sliced: first in the next frames' queue, the coarse ground meanwhile); the LOD
+        // ring's one piece a frame (frame()), so arriving and crossing never block
+        if (t === 'full' && !f) {
+          if (slice) { if (!urgent.includes(p)) urgent.push(p); }
+          else { f = buildTerrain(p, FINE_DIV); fine.set(key, f); }
+        }
         if (t === 'lod' && !f && !ahead.includes(p)) ahead.push(p);
         if (t === 'far' && f) { f.dispose(); fine.delete(key); f = undefined; }
         f?.setEnabled(t === 'full');
         coarse.get(key)!.setEnabled(!(t === 'full' && f));
       }
-      if (changed.length) for (const m of PROP_MODELS) fill(m);
+      if (changed.length) for (const m of PROP_MODELS) { if (slice) dirty.add(m); else fill(m); }
     },
     frame(camX, camZ, dt) {
+      // sliced (phase F-lite): ONE job a frame — a full-ring piece's fine ground, else one prop model's refresh, else load-ahead
+      const now = (k: string): Tier => (opts.streamOn ? tiersNow.get(k) ?? 'far' : 'full');
+      let did = false;
+      if (opts.sliced) {
+        while (!did && urgent.length) {
+          const u = urgent.shift()!;
+          if (fine.has(u.key) || now(u.key) !== 'full') { if (fine.has(u.key)) showFine(u.key, now(u.key)); continue; }
+          fine.set(u.key, buildTerrain(u, FINE_DIV)); showFine(u.key, now(u.key)); jobsDone.fine++; did = true;
+        }
+        if (!did && dirty.size) { const m = dirty.values().next().value as PropModel; dirty.delete(m); fill(m); jobsDone.props++; did = true; }
+      }
       // load ahead: one LOD-ring piece's fine ground a frame (built hidden; shown when its piece becomes full)
-      const next = ahead.shift();
+      const next = did ? undefined : ahead.shift();
       if (next && !fine.has(next.key) && (tiersNow.get(next.key) ?? 'far') !== 'far') { const m = buildTerrain(next, FINE_DIV); m.setEnabled(false); fine.set(next.key, m); }
       // the sea and its floor travel with the camera, snapped to the wave tile (the pattern stays put on the water)
       const sx = Math.round(camX / WAVE_TILE_M) * WAVE_TILE_M, sz = Math.round(camZ / WAVE_TILE_M) * WAVE_TILE_M;
@@ -368,7 +395,7 @@ export function mountZoneView(scene: Scene, opts: { streamOn: boolean }): ZoneVi
       let f = 0, c = 0;
       for (const m of fine.values()) if (m.isEnabled()) f++;
       for (const m of coarse.values()) if (m.isEnabled()) c++;
-      return { fineMeshes: f, coarseMeshes: c, props, propMasters };
+      return { fineMeshes: f, coarseMeshes: c, props, propMasters, pending: urgent.length + dirty.size, slicedJobs: jobsDone.fine + jobsDone.props };
     },
     dispose() {
       for (const list of masters.values()) for (const m of list) m.dispose();
