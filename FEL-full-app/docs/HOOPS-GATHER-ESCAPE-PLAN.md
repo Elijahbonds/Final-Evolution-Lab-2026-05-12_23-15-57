@@ -416,6 +416,27 @@ with a real player (`hoops-audit/mash-audit.mjs PLAYER=script` and `mash`): the 
     pump still comes on the squeeze.
   - **The 3v3 step-back's "late" that lets the backpedal run on:** not done in this pass (the 3v3 read stays off; see above).
 
+- **hoops-items (2026-11-18): the two GATE 0 items, tried at runtime first** (`scripts/probes/hoops-items/whip.mjs`, `clip-feet.mts`):
+  - **The behind-the-back whip: cured at runtime, no clip change.** It is the HAND bone (the ball hand 113-143° in one frame, 15-25 frames
+    in), and the clip on its own never turns a hand past 400 °/s (`hoops-gap/clip-flip.mts`): a runtime layer flips it, and the arm ease
+    (#314) held the arm but never the hand. `hoops.moveHandEaseOn` 1 holds the hands to the arm's 1800 °/s: worst 125-132° → 30° a frame
+    (1v1 and 3v3, 3 trials each), the ball's path and contact unchanged. The `BEHIND_V2` keys stay as they are.
+  - **The hop step's feet: a clip job (owner / Mac).** Measured: at the take-off the planted foot slides 6-13 cm a frame for 4 frames while
+    the root moves 3-6 cm (3v3 rig); the landing is clean (0-0.4 cm). The clip alone (`clip-feet.mts`, the built clip on the hero, no
+    game): the ankles rise 0.066 → 0.33 m above the root in 0.12 s while they travel 3.8 cm a frame relative to it in the first four
+    frames — `bball_hop_step` keys only the thighs and knees (−26° → −54° → −38°, 40° → 60° → 52°) and hipsY (−0.08 → +0.06 → −0.13), so the
+    hop is the legs folding up under a body that barely rises, and the feet sweep along the floor before they leave it. Why no runtime fix:
+    a later clip start skips the fold and pops the legs (a 0.13 m jump in a frame); a longer blend-in does not reach it (the slide is
+    inside the clip, after the blend); and the foot lock (`anim/FootPlanting.ts`) lets go by design while the root rises (its airborne
+    rule) — pinning the feet there would hold them against the clip's own tuck and fold the knee the wrong way.
+    **What the clip needs** (GATE 0: the rig's naming and rest checked before and after; `clip-flip.mts` and `clip-feet.mts` before / after):
+    1. key the ankles in the world like the handle clips do (`V2Key.feet`): both feet at the stance spots at t 0 and held there to
+       t 0.04 (the push), off the floor from 0.05, landing square at 0.22 and held to 0.26;
+    2. let the HIPS carry the hop (hipsY up to about +0.12 at t 0.12) instead of the thighs folding to −54°: the knees to about −35° / 45°
+       in the air;
+    3. the take-off: no foot more than 1 cm a frame relative to the root while its ankle is under 0.12 m (today 3.8 cm);
+    4. or capture a hop step at game speed with the ball (the plan's G2 capture note), retarget and run the same two probes.
+
 ## 6. The worst moments, drawn
 
 One JPG, `scratchpad/hoops-gather/gather-escape-worst.jpg` (the lane's scratch folder; its absolute path is in the lane's report): five
