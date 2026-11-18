@@ -3,7 +3,8 @@
 // that), a marker riding the fill, and the verdict flashed on the release — green for a perfect / good release, amber
 // early or late, red for a brick — then a fade. The HUD's own bar at the bottom of the screen stays; this one is where
 // the player is looking. Pure numbers come from the mode's ShotMeter (greenCenter01 / greenHalfWidth01): this only draws.
-import { Color3, MeshBuilder, ShaderMaterial, TransformNode, Vector3, Vector4, type Camera, type Scene } from '@babylonjs/core';
+import { Color3, MeshBuilder, ShaderLanguage, ShaderMaterial, TransformNode, Vector3, Vector4, type Camera, type Scene } from '@babylonjs/core';
+import { feel } from '../../feel-panel/feel';
 import { PERFECT_BAND_SHARE } from '../core/shotBands';
 
 export type MeterVerdict = 'perfect' | 'good' | 'early' | 'late' | 'brick' | 'held' | null;
@@ -37,7 +38,7 @@ const VERDICT_HEX: Record<Exclude<MeterVerdict, null>, string> = {
 // planes' sizes.
 const QW = W + 0.05, QH = H + 0.03;   // the marker's width, the frame's height
 
-const VERT = `precision highp float;
+export const VERT = `precision highp float;
 attribute vec3 position;
 uniform mat4 worldViewProjection;
 varying vec2 vPos;
@@ -47,7 +48,7 @@ void main(void) {
 }`;
 
 // vPos is the quad's own local point in metres (the bar centred on the origin), so nothing here depends on a UV convention.
-const FRAG = `precision highp float;
+export const FRAG = `precision highp float;
 varying vec2 vPos;
 uniform vec4 uBox;      // x bar width, y bar height, z fill top (m above the bar's foot), w marker y (local)
 uniform vec4 uGreen;    // x green centre y (local), y green half-height, z perfect half-height, w the whole bar's alpha factor
@@ -71,15 +72,72 @@ void main(void) {
   gl_FragColor = vec4(acc.rgb / acc.a, acc.a);
 }`;
 
+// hoops-items (2026-11-18): THE SAME SHADER IN WGSL, for `?engine=webgpu` (docs/PHONE-PERF-CHECK.md: under WebGPU the project never
+// loads Babylon's GLSL→WGSL translator from its CDN, so the GLSL meter above was not drawn there). Line for line the GLSL's: the same
+// six layers in the same order, the same colours and alphas, the same discard. Babylon's WGSL dialect: `attribute` / `varying` /
+// `uniform` declarations, read as vertexInputs.* / fragmentInputs.* / uniforms.*. WebGL never sees these strings: the material is
+// built from VERT / FRAG with exactly the options it always had (meterShaderFor below).
+export const VERT_WGSL = `attribute position : vec3<f32>;
+uniform worldViewProjection : mat4x4<f32>;
+varying vPos : vec2<f32>;
+@vertex
+fn main(input : VertexInputs) -> FragmentInputs {
+  vertexOutputs.vPos = vertexInputs.position.xy;
+  vertexOutputs.position = uniforms.worldViewProjection * vec4<f32>(vertexInputs.position, 1.0);
+}`;
+
+export const FRAG_WGSL = `varying vPos : vec2<f32>;
+uniform uBox : vec4<f32>;
+uniform uGreen : vec4<f32>;
+uniform uFillColor : vec3<f32>;
+uniform uMarkColor : vec3<f32>;
+fn layer(acc : vec4<f32>, c : vec3<f32>, a : f32, inside : bool) -> vec4<f32> {
+  if (!inside) { return acc; }
+  return vec4<f32>(c * a + acc.rgb * (1.0 - a), a + acc.a * (1.0 - a));
+}
+@fragment
+fn main(input : FragmentInputs) -> FragmentOutputs {
+  let w = uniforms.uBox.x;
+  let h = uniforms.uBox.y;
+  let k = uniforms.uGreen.w;
+  let ax = abs(fragmentInputs.vPos.x);
+  let y = fragmentInputs.vPos.y;
+  let foot = -0.5 * h;
+  var acc = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+  acc = layer(acc, vec3<f32>(1.0, 1.0, 1.0), 0.35 * k, ax <= 0.5 * (w + 0.03) && abs(y) <= 0.5 * (h + 0.03));
+  acc = layer(acc, vec3<f32>(0.043137, 0.070588, 0.12549), 0.72 * k, ax <= 0.5 * w && abs(y) <= 0.5 * h);
+  acc = layer(acc, uniforms.uFillColor, 0.95 * k, ax <= 0.5 * (w - 0.02) && y >= foot && y <= foot + uniforms.uBox.z);
+  acc = layer(acc, vec3<f32>(0.223529, 1.0, 0.533333), 0.55 * k, ax <= 0.5 * w && abs(y - uniforms.uGreen.x) <= uniforms.uGreen.y);
+  acc = layer(acc, vec3<f32>(0.909804, 1.0, 0.941176), 0.9 * k, ax <= 0.5 * w && abs(y - uniforms.uGreen.x) <= uniforms.uGreen.z);
+  acc = layer(acc, uniforms.uMarkColor, k, ax <= 0.5 * (w + 0.05) && abs(y - uniforms.uBox.w) <= 0.01);
+  if (acc.a <= 0.0001) { discard; }
+  fragmentOutputs.color = vec4<f32>(acc.rgb / acc.a, acc.a);
+}`;
+
+/** feel knob `perf.meterWgslOn` (new, hoops-items): under WebGPU the meter draws with its WGSL twin (1) / with the GLSL, which WebGPU does
+ *  not draw without the translator, as before (0). Under WebGL it changes nothing at all. */
+export const METER_WGSL_ON = 1;
+const METER_UNIFORMS = ['worldViewProjection', 'uBox', 'uGreen', 'uFillColor', 'uMarkColor'];
+/** The meter's shader for an engine: the GLSL and its options exactly as they were on WebGL (and on WebGPU with the knob off); the WGSL
+ *  twin on WebGPU. Pure. */
+export function meterShaderFor(isWebGPU: boolean, wgslOn = feel('perf.meterWgslOn', METER_WGSL_ON) >= 0.5): {
+  source: { vertexSource: string; fragmentSource: string }; options: { attributes: string[]; uniforms: string[]; needAlphaBlending: boolean; shaderLanguage?: ShaderLanguage };
+} {
+  if (isWebGPU && wgslOn) {
+    return { source: { vertexSource: VERT_WGSL, fragmentSource: FRAG_WGSL },
+      options: { attributes: ['position'], uniforms: [...METER_UNIFORMS], needAlphaBlending: true, shaderLanguage: ShaderLanguage.WGSL } };
+  }
+  return { source: { vertexSource: VERT, fragmentSource: FRAG }, options: { attributes: ['position'], uniforms: [...METER_UNIFORMS], needAlphaBlending: true } };
+}
+
 /** A direction scratch and the camera's local +X, so `set()` builds nothing (it was `cam.getDirection(Vector3.Right())`: two vectors a frame). */
 const RIGHT_AXIS = new Vector3(1, 0, 0);
 
 export function mountShotMeter3D(scene: Scene): ShotMeter3DHandle {
   const root = new TransformNode('shot_meter_3d', scene);
   root.billboardMode = TransformNode.BILLBOARDMODE_ALL;
-  const mat = new ShaderMaterial('shot_meter_m', scene, { vertexSource: VERT, fragmentSource: FRAG }, {
-    attributes: ['position'], uniforms: ['worldViewProjection', 'uBox', 'uGreen', 'uFillColor', 'uMarkColor'], needAlphaBlending: true,
-  });
+  const sh = meterShaderFor(!!(scene.getEngine() as unknown as { isWebGPU?: boolean }).isWebGPU);   // hoops-items: WGSL on WebGPU only
+  const mat = new ShaderMaterial('shot_meter_m', scene, sh.source, sh.options);
   mat.backFaceCulling = false; mat.disableDepthWrite = true;
   const quad = MeshBuilder.CreatePlane('shot_meter', { width: QW, height: QH }, scene);
   quad.material = mat; quad.parent = root; quad.isPickable = false; quad.renderingGroupId = 2;   // group 2: over the bodies

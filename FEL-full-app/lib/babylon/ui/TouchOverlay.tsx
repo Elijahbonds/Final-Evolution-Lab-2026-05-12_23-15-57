@@ -20,6 +20,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import type { InputBus } from '../core/InputBus';
 import { MODE_VERBS, type VerbButton } from './modeVerbs';
 import { touchDeckLayout, type TouchDeckLayout } from '@/lib/ui/consoleView';
+import { dpadLayout, TOUCH_DPAD_TAP_ON, DPAD_OLD_ARM_PX } from './dpadTap';   // hoops-items: the d-pad at a 44 px tap target
 // THE CYPHER'S PAD (lane/dance-extras, 2026-10-14): dance draws its own thumb pairs in place of the generic rig below — the
 // same overlay (bus, safe-area, fit), the same verbs (MODE_VERBS.dance); see lib/babylon/dance/ui/padModel.ts (what each button is) and padStore.ts (what the room tells it).
 import { DancePad } from '@/lib/babylon/dance/ui/DancePad';
@@ -117,7 +118,7 @@ export function TouchOverlay(props: { bus: InputBus; modeId: string; visible: bo
       : 'pointer-events-none absolute inset-x-0 bottom-0 z-30 h-[44vh] bg-gradient-to-t from-black/85 to-transparent'}>
       {/* compact: the stick in the corner and the d-pad inboard of it (row-reverse keeps the DOM order) */}
       <div ref={colL} className={`pointer-events-auto absolute bottom-3 left-3 flex gap-2 ${compact ? 'flex-row-reverse items-end' : 'flex-col items-center'}`} style={lifted(compact ? COMPACT_LEFT : SAFE_LEFT, cs * fit.l, 'bottom left')}>
-        <DPad bus={props.bus} />
+        <DPad bus={props.bus} layout={deck} />
         {DEAD_L_STICK.has(props.modeId) ? <HollowStick /> : FLOAT_STICK_MODES.has(props.modeId) && feel('touch.floatStick', TOUCH_FLOAT_STICK) > 0 ? <FloatStick bus={props.bus} /> : <AnalogStick bus={props.bus} side="L" label="MOVE" />}
       </div>
       {compact ? (
@@ -242,9 +243,36 @@ function HollowStick() {
   return <div aria-hidden="true" className="pointer-events-none h-24 w-24 rounded-full border border-dashed border-white opacity-30" />;
 }
 
-function DPad({ bus }: { bus: InputBus }) {
+function DPad({ bus, layout }: { bus: InputBus; layout: TouchDeckLayout }) {
   const press = (dir: 'up' | 'down' | 'left' | 'right') => () => bus.emit({ t: 'dpad', dir, pressed: true });
   const release = (dir: 'up' | 'down' | 'left' | 'right') => () => bus.emit({ t: 'dpad', dir, pressed: false });
+  // hoops-items (dpadTap.ts): the arrows at a 44 px tap target as drawn — a row of four upright, a 44 / 52 px cross otherwise
+  const big = dpadLayout(layout, feel('touch.dpadTapOn', TOUCH_DPAD_TAP_ON) >= 0.5);
+  if (big.arm !== DPAD_OLD_ARM_PX) {
+    const a = big.arm;
+    const cell = 'flex touch-none select-none items-center justify-center border border-white/15 bg-white/8 text-[16px] text-white/60 active:bg-white/25 active:text-white';
+    const arrow = (dir: 'up' | 'down' | 'left' | 'right', glyph: string, label: string, style: React.CSSProperties, round: string) => (
+      <button key={dir} type="button" aria-label={label} data-dpad={dir} className={`${cell} ${round}`} style={{ width: a, height: a, ...style }}
+        onPointerDown={press(dir)} onPointerUp={release(dir)} onPointerCancel={release(dir)} onPointerLeave={release(dir)}>{glyph}</button>
+    );
+    if (big.shape === 'row') {
+      return (
+        <div data-dpad-shape="row" className="flex" style={{ width: big.w, height: big.h }}>
+          {arrow('left', '◀', 'D-pad left', {}, 'rounded-l-md')}{arrow('up', '▲', 'D-pad up', {}, '')}
+          {arrow('down', '▼', 'D-pad down', {}, '')}{arrow('right', '▶', 'D-pad right', {}, 'rounded-r-md')}
+        </div>
+      );
+    }
+    return (
+      <div data-dpad-shape="cross" className="relative" style={{ width: big.w, height: big.h }}>
+        {arrow('up', '▲', 'D-pad up', { position: 'absolute', left: a, top: 0 }, 'rounded-t-md')}
+        {arrow('down', '▼', 'D-pad down', { position: 'absolute', left: a, bottom: 0 }, 'rounded-b-md')}
+        {arrow('left', '◀', 'D-pad left', { position: 'absolute', left: 0, top: a }, 'rounded-l-md')}
+        {arrow('right', '▶', 'D-pad right', { position: 'absolute', right: 0, top: a }, 'rounded-r-md')}
+        <div className="absolute rounded-sm bg-white/5" style={{ left: a, top: a, width: a, height: a }} />
+      </div>
+    );
+  }
   const seg = 'absolute flex touch-none select-none items-center justify-center border border-white/15 bg-white/8 text-[12px] text-white/50 active:bg-white/25 active:text-white';
   return (
     <div className="relative h-[72px] w-[72px]">

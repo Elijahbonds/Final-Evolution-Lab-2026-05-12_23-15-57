@@ -45,6 +45,8 @@ import { OCCLUDER_FADE_ALPHA, OCCLUDER_FADE_SEC, OCCLUDER_HOLD_SEC } from '@/lib
 import { FOOTBALL_CARRY_RATE_MAX, FOOTBALL_HURDLE_EXIT_FADE_SEC, FOOTBALL_HURDLE_FADE_SEC } from '@/lib/babylon/anim/footballTree';   // gameplay-clean P2 #6
 import { HOOPS_STICK_FRAME_HOLD } from '@/lib/babylon/core/StickFrame';   // lane/move-feel-2
 import { TOUCH_FLOAT_STICK } from '@/lib/babylon/ui/floatStick';
+import { TOUCH_DPAD_TAP_ON } from '@/lib/babylon/ui/dpadTap';
+import { METER_WGSL_ON } from '@/lib/babylon/visual/ShotMeter3D';
 import { CAM_LEAD_EASE_SEC, CAM_LEAD_FULL_MPS, HOOPS_CAM_LEAD_EASE } from '@/lib/babylon/core/CameraDirector';   // gameplay-clean P2 #10
 import { PLANT_ENGAGE_SEC, PLANT_RELEASE_SEC, PLANT_REPLANT_EASE_ON, PLANT_SEATED_OFF_ON } from '@/lib/babylon/anim/FootPlanting';   // gameplay-clean P3 / P4 / P5
 import { FADE_HOLD_ENDED_ON } from '@/lib/babylon/anim/CharacterAnimator';   // gameplay-clean P5
@@ -373,6 +375,8 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.gearBlendBand')).toBe(HOOPS_GEAR_BLEND_BAND); expect(HOOPS_GEAR_BLEND_BAND).toBe(0.2);   // lane/move-feel: TUNED 0 → 0.2 (owner 2026-11-17)
     expect(def('hoops.stickSprintFallback')).toBe(HOOPS_STICK_SPRINT_FALLBACK); expect(HOOPS_STICK_SPRINT_FALLBACK).toBe(0);   // lane/move-feel: TUNED 1 → 0 (owner 2026-11-17)
     expect(def('touch.floatStick')).toBe(TOUCH_FLOAT_STICK); expect(TOUCH_FLOAT_STICK).toBe(1);   // lane/move-feel-2 (new, ON: the owner's phone stick; 0 restores the fixed stick)
+    expect(def('perf.meterWgslOn')).toBe(METER_WGSL_ON);   // hoops-items (new: the meter's WGSL twin, WebGPU only)
+    expect(def('touch.dpadTapOn')).toBe(TOUCH_DPAD_TAP_ON); expect(TOUCH_DPAD_TAP_ON).toBe(1);   // hoops-items (new, ON: 44 px arrows as drawn; 0 restores the 24 px cross)
     expect(def('hoops.stickFrameHold')).toBe(HOOPS_STICK_FRAME_HOLD); expect(HOOPS_STICK_FRAME_HOLD).toBe(1);   // lane/move-feel-2 (new, ON: the owner's straight line; 0 restores the old stick)
     expect(def('hoops.camLeadEase')).toBe(HOOPS_CAM_LEAD_EASE); expect(HOOPS_CAM_LEAD_EASE).toBe(1);   // lane/move-feel: TUNED 0 → 1 (owner 2026-11-17)
     expect(def('hoops.retreatSpeedK')).toBe(HOOPS_RETREAT_SPEED_K);   // TUNED (new), owner 2026-10-24

@@ -2,7 +2,9 @@
 // public API is what 1v1 / 3v3 / 3PT / Dunk / Dunk Duel call, and set() hangs it beside the head without building vectors.
 import { describe, it, expect, afterEach } from 'vitest';
 import { NullEngine, Scene, TargetCamera, Vector3, ShaderMaterial } from '@babylonjs/core';
-import { mountShotMeter3D } from './ShotMeter3D';
+import { mountShotMeter3D, meterShaderFor, VERT, FRAG, VERT_WGSL, FRAG_WGSL, METER_WGSL_ON } from './ShotMeter3D';
+import { ShaderLanguage } from '@babylonjs/core';
+import { createHash } from 'node:crypto';
 
 const engines: NullEngine[] = [];
 afterEach(() => { while (engines.length) engines.pop()!.dispose(); });
@@ -57,5 +59,39 @@ describe('ShotMeter3D — one quad (#19)', () => {
     const root = s.getTransformNodeByName('shot_meter_3d')!;
     m.set(0.4, new Vector3(5, 5, 5));
     expect(root.position.equals(Vector3.Zero())).toBe(true);
+  });
+});
+
+// hoops-items (2026-11-18): the meter under ?engine=webgpu. WebGL must stay byte-identical: the GLSL is pinned to the hash it had before
+// this change (sha256 of VERT + '\n----\n' + FRAG, taken from the file at release 86084097), and the WebGL material is built with exactly the
+// options it always had — no shaderLanguage key.
+describe('ShotMeter3D — the WGSL twin for WebGPU (hoops-items)', () => {
+  it('the GLSL is byte-for-byte what it was', () => {
+    expect(createHash('sha256').update(VERT + '\n----\n' + FRAG).digest('hex')).toBe('27683a74fe0aa4164b4b18ad9228f74d5c3f81c8d444088ce43bd502cf8bae4f');
+  });
+  it('WebGL: the GLSL with the old options; WebGPU: the WGSL; WebGPU with the knob off: the GLSL, as before', () => {
+    const old = { attributes: ['position'], uniforms: ['worldViewProjection', 'uBox', 'uGreen', 'uFillColor', 'uMarkColor'], needAlphaBlending: true };
+    expect(meterShaderFor(false)).toEqual({ source: { vertexSource: VERT, fragmentSource: FRAG }, options: old });
+    expect(meterShaderFor(false, false)).toEqual({ source: { vertexSource: VERT, fragmentSource: FRAG }, options: old });
+    expect(meterShaderFor(true, false)).toEqual({ source: { vertexSource: VERT, fragmentSource: FRAG }, options: old });
+    const g = meterShaderFor(true);
+    expect(METER_WGSL_ON).toBe(1);
+    expect(g.source).toEqual({ vertexSource: VERT_WGSL, fragmentSource: FRAG_WGSL });
+    expect(g.options).toEqual({ ...old, shaderLanguage: ShaderLanguage.WGSL });
+  });
+  it('the mounted material on a WebGL-family engine is the GLSL one', () => {
+    const s = scene();
+    mountShotMeter3D(s);
+    const mat = s.materials.at(-1) as ShaderMaterial & { _shaderPath: { vertexSource: string; fragmentSource: string }; options: { shaderLanguage?: number } };
+    expect(mat._shaderPath).toEqual({ vertexSource: VERT, fragmentSource: FRAG });
+    expect(mat.options.shaderLanguage ?? ShaderLanguage.GLSL).toBe(ShaderLanguage.GLSL);
+  });
+  it('the WGSL draws the same six layers as the GLSL: every constant colour, alpha and band test is in both', () => {
+    const consts = (src: string) => (src.match(/\d+\.\d+/g) ?? []).sort();
+    expect(consts(FRAG_WGSL.replace(/vec4<f32>\(0\.0, 0\.0, 0\.0, 0\.0\)|vec3<f32>\(1\.0, 1\.0, 1\.0\)/g, ''))).toEqual(consts(FRAG.replace(/vec4\(0\.0\)|vec3\(1\.0\)/g, '')));
+    expect(FRAG_WGSL.match(/acc = layer\(/g)).toHaveLength(6);
+    expect(FRAG_WGSL).toContain('discard;');
+    for (const u of ['uBox', 'uGreen', 'uFillColor', 'uMarkColor']) expect(FRAG_WGSL).toContain(`uniform ${u} :`);
+    expect(VERT_WGSL).toContain('uniform worldViewProjection : mat4x4<f32>;');
   });
 });

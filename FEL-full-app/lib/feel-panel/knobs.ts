@@ -880,6 +880,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/ui/floatStick.ts TOUCH_FLOAT_STICK',
     hint: '1v1 and 3v3 on a touch screen. 1 = the stick appears under the thumb, 1.5 times the old size, a 10 percent dead zone. 0 = the old fixed 96 px stick.',
   },
+  {
+    id: 'touch.dpadTapOn', label: 'Phone: d-pad arrows a 44 px tap (1) / 24 px (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · movement',
+    source: 'lib/babylon/ui/dpadTap.ts TOUCH_DPAD_TAP_ON',
+    hint: 'Every mode on a touch screen. 1 = each d-pad arrow is at least 44 px as drawn: a row of four on an upright phone, a bigger cross sideways. 0 = the old 24 px cross.',
+  },
   // lane/move-feel (new, 2026-11-12): the walk / jog line eased (0 = the step as shipped) — GEARS_HANDLER only (the dunk run-up never reads it)
   {
     id: 'hoops.gearBlendBand', label: 'Stick: walk to jog blend', def: 0.2, min: 0, max: 0.4, step: 0.05, unit: '', group: 'Hoops · movement',
@@ -1692,6 +1697,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'On a phone the basketball courts drop the look stack backdrop dome and ring: the venue own opaque sky sphere sits inside them and hides them completely. Same picture. 0 = kept, as before.',
   },
   // ── lane/hoops-perf (owner 2026-11-12: join each body into one mesh; cut the heap churn) ──
+  {
+    id: 'perf.meterWgslOn', label: 'WebGPU try: the shot meter drawn by its WebGPU shader (1) / not drawn (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/babylon/visual/ShotMeter3D.ts METER_WGSL_ON',
+    hint: 'Only under the owner WebGPU try (?engine=webgpu). 1 = the 3D shot meter has a WebGPU version of its shader. 0 = as before (missing under WebGPU). WebGL is the same either way.',
+  },
   {
     id: 'perf.bodyMergeOn', label: 'Bodies: parts drawn by a few meshes (1 phone, 2 every tier) / one mesh per part (0)', def: 1, min: 0, max: 2, step: 1, unit: '', group: 'Hoops · phone budget',
     source: 'lib/babylon/core/bodyMerge.ts BODY_MERGE_ON',
