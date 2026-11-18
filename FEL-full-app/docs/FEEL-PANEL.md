@@ -671,6 +671,9 @@ holds the result in CI. Phone tier only unless said.
   other courts (the shipped crowd bodies). A phone gets no people (its crowd tier is cut-out cards). 0 = V1's empty park.
 - `venue.venicePhoneWatchers` 1 (`lib/adventure/venice/hubLife.ts`, the Venice hub; V2, NEW, owner 2026-11-18): a phone stands six real
   people at the courts (four at the run, two by Court 1) — the crowd's baked bodies, never its cut-out cards. 0 = gulls only.
+- `venue.veniceCourtLife` 1 (`lib/adventure/venice/courtLife.ts`, the Venice hub; V2, NEW): a shooter working round Court 4's arc (the
+  shipped jump shot, follow-through and catch; the ball arcs to the rim, in or off the iron), and on desktop a rebounder there, a pair on
+  Court 1 and a jogger on the bike path (no riding clip fits). A phone gets the shooter only (its skinned-body budget). 0 = empty courts.
 - `venue.veniceSound` 1 (`lib/adventure/venice/hubSound.ts`, the Venice hub; improvement pass phase 7, NEW): the ocean bed, dribbles and
   shots from unseen pickup games down the beach, the run cheering now and then near Court 2, and footsteps (concrete vs sand), all through
   SoundKit (mute and volume apply; the recorded hoops bank once loaded). 0 = V1 (the harness's mood crowd bed).

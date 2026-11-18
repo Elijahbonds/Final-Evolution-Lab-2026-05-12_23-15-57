@@ -121,7 +121,7 @@ export const MODE_CLIP_SCOPES: Record<string, { suites: readonly ClipSuite[]; bo
   // ADVENTURE A4 (2026-10-06): the Adventure's bodies run, grind and fight — A1's MOVEMENT_CLIP_SUITES (freerun, board, combat)
   adventure: { suites: ['freerun', 'board', 'combat'], borrow: [] },
   adventure_br: { suites: ['freerun', 'board', 'combat'], borrow: [] },
-  venice_hub: { suites: ['freerun', 'board', 'combat'], borrow: [] },   // venice-v1 (2026-11-17): the hub walks on the Adventure's movement view, as the Adventure does   // ADVENTURE C: the BR's fighters are the Adventure's bodies
+  venice_hub: { suites: ['freerun', 'board', 'combat'], borrow: ['bball_dribble_idle', 'bball_follow_through', 'bball_hand_up', 'bball_idle_stand'] },   // venice-v2 (2026-11-18): the court life's shootaround borrows four hoops clips by name   // venice-v1 (2026-11-17): the hub walks on the Adventure's movement view, as the Adventure does   // ADVENTURE C: the BR's fighters are the Adventure's bodies
   // LIBRARY-ANATOMY (2026-10-25): not a game mode — the exercise library's demo stage (components/library/exercise-stage.tsx
   // stamps felModeId 'library'). It owns the exercise loops, and borrows the hoops clips a basketball library entry plays
   // (LIBRARY_HOOPS_BORROW, lib/library/demo.ts DEMO_RULES): the drill's own movement, from the suite the court plays it with.

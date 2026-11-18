@@ -43,7 +43,8 @@ for (let i = 0; i < 40; i++) { try { if ((await fetch(base)).ok) break; } catch 
 const STATS = `(async () => { const d = window.__FEL_DEV__; const s = d.scene; const e = s.getEngine(); window.__SI = window.__SI || d.instrument();
   const draws = await new Promise((r) => requestAnimationFrame(() => r(e._drawCalls.current)));
   let tex = 0; for (const t of s.textures) { const z = t.getSize(); tex += z.width * z.height * 4 * (t.noMipmap ? 1 : 1.33); }
-  return { draws, active: s.getActiveMeshes().length, textureMb: Math.round(tex / 1e6), textures: s.textures.length, meshes: s.meshes.length }; })()`;
+  const am = s.getActiveMeshes(); const sk = new Set(); for (let i = 0; i < am.length; i++) { const m = am.data[i]; if (m.skeleton && !m.bakedVertexAnimationManager) sk.add(m.skeleton.uniqueId); }
+  return { draws, active: am.length, textureMb: Math.round(tex / 1e6), textures: s.textures.length, meshes: s.meshes.length, skinned: sk.size }; })()`;
 // a stalled page (no animation frame: the 1v1 yardstick once held the rig 11 min on a rAF that never came) must not hang the rig
 const RUN_MS = Number(process.env.RUN_MS ?? 420000);
 const within = <T,>(p: Promise<T>, ms: number, what: string): Promise<T> => Promise.race([p, new Promise<T>((_, no) => setTimeout(() => no(new Error(`${what}: no answer in ${ms} ms`)), ms))]);
@@ -64,6 +65,10 @@ try {
     ['life-off', `spot=court.run&${feelQ({ 'venue.veniceLife': 0 })}`, false], ['life', 'spot=court.run', true], ['desktop-life', 'spot=court.run', true],
     // V2 phase 1: a phone's watchers off (gulls only) / on, at the run (the worst view: all of them in front of the camera)
     ['watch-gulls', `spot=court.run&${feelQ({ 'venue.venicePhoneWatchers': 0 })}`, false], ['watch-phone', 'spot=court.run', true],
+    // V2 phase 2: court life off / on, arriving beside Court 4 (the phone's shooter, in front of the camera) and on a desktop
+    ['life-courtoff', `spot=court.arc&${feelQ({ 'venue.veniceCourtLife': 0 })}`, false], ['life-court', 'spot=court.arc', true], ['desktop-court', 'spot=court.arc', true],
+    // the cold start with everything on (the row's worst view in the pass: 45 / 58 / 73)
+    ['life-gate', '', true],
     // the same-session yardstick (1v1's load on the same rig), last in each round so a stall there cannot hold the hub's runs
     ['onevone-yardstick', 'mode=onevone', false],
     ['shared', '', true], ['control-unshared', `feel=${encodeURIComponent(JSON.stringify({ 'perf.veniceSharedCourt': 0 }))}`, false], ['walkup', 'spot=court.ones', true],
@@ -91,7 +96,7 @@ try {
       page.on('response', (r) => { if (r.status() === 404) missing.add(new URL(r.url()).pathname); });
       page.on('console', (m) => { if (logs.length < 400) logs.push(`${m.type()}: ${m.text().slice(0, 200)}`); });
     // the deferred scenery's landing (and phase 6's life after it) as page flags the rig can wait on
-    await page.addInitScript(() => { const o = console.info.bind(console); console.info = (...a: unknown[]) => { const t = String(a[0] ?? ''); if (/deferred scenery landed/.test(t)) (window as unknown as { __landed?: boolean }).__landed = true; if (/\[VENICE\] life:/.test(t)) (window as unknown as { __life?: boolean }).__life = true; o(...a); }; });
+    await page.addInitScript(() => { const o = console.info.bind(console); console.info = (...a: unknown[]) => { const t = String(a[0] ?? ''); if (/deferred scenery landed/.test(t)) (window as unknown as { __landed?: boolean }).__landed = true; if (/\[VENICE\] life:/.test(t)) (window as unknown as { __life?: boolean }).__life = true; if (/\[VENICE\] court life:/.test(t)) (window as unknown as { __court?: boolean }).__court = true; o(...a); }; });
       const cdp = await ctx.newCDPSession(page);
       await cdp.send('Emulation.setCPUThrottlingRate', { rate: desk ? 1 : Number(process.env.THROTTLE ?? 4) });
       await page.goto(`${base}${query ? `?${query}` : ''}`, { waitUntil: 'commit', timeout: 180000 });
@@ -112,14 +117,15 @@ try {
       if (/^(life|watch|desktop-)/.test(name)) {
         const landed = await page.waitForFunction(() => (window as unknown as { __life?: boolean }).__life === true, null, { timeout: 150000 }).then(() => true).catch(() => false);
         if (!landed) console.log(`run ${name}: life never landed (measured without it)`);
+        if (!/courtoff/.test(name)) await page.waitForFunction(() => (window as unknown as { __court?: boolean }).__court === true, null, { timeout: 120000 }).catch(() => console.log(`run ${name}: court life never landed`));
         await page.waitForTimeout(3000);   // the crowd's bake + its first frames
       }
-      let worst = { draws: 0, active: 0, textureMb: 0, textures: 0, meshes: 0 };
+      let worst = { draws: 0, active: 0, textureMb: 0, textures: 0, meshes: 0, skinned: 0 };
       if (!name.startsWith('walkup')) await page.evaluate(() => (window as unknown as { __bus: { emit(e: unknown): void } }).__bus.emit({ t: 'stick', side: 'L', x: 0, y: 1 }));
       for (let k = 0; k < 30; k++) {
         await page.waitForTimeout(200);
         const s = await within(page.evaluate(STATS), 15000, 'stats') as typeof worst;
-        worst = { draws: Math.max(worst.draws, s.draws), active: Math.max(worst.active, s.active), textureMb: Math.max(worst.textureMb, s.textureMb), textures: Math.max(worst.textures, s.textures), meshes: Math.max(worst.meshes, s.meshes) };
+        worst = { draws: Math.max(worst.draws, s.draws), active: Math.max(worst.active, s.active), textureMb: Math.max(worst.textureMb, s.textureMb), textures: Math.max(worst.textures, s.textures), meshes: Math.max(worst.meshes, s.meshes), skinned: Math.max(worst.skinned, s.skinned) };
       }
       await page.evaluate(() => (window as unknown as { __bus: { emit(e: unknown): void } }).__bus.emit({ t: 'stick', side: 'L', x: 0, y: 0 }));
       const spot = await page.evaluate(() => (window as unknown as { __spot?: string | null }).__spot ?? null);

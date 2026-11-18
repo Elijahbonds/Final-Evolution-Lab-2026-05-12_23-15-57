@@ -40,7 +40,8 @@ import { devOrAgentHooks } from '@/lib/agentRunHooks';
 import { feel } from '@/lib/feel-panel/feel';
 import { SoundKit } from '../audio/SoundKit';
 import { mountHubLife, VENICE_LIFE, type HubLife } from '@/lib/adventure/venice/hubLife';
-import { HubSoundscape, VENICE_SOUND } from '@/lib/adventure/venice/hubSound';
+import { distanceGain, HubSoundscape, panFor, VENICE_SOUND } from '@/lib/adventure/venice/hubSound';
+import { mountCourtLife, VENICE_COURT_LIFE, type CourtLife } from '@/lib/adventure/venice/courtLife';
 import { hubSolids, palmSolid, probeRoute, v1Hit, VENICE_SOLIDS, Walkup, WALKUP_V2 } from '@/lib/adventure/venice/hubSolids';
 import { VENICE_LOOK_V2 } from '@/lib/adventure/venice/courtsDressing';
 import type { GroundPiece } from '../adventure/world/pieces';
@@ -75,6 +76,8 @@ interface St {
   life: HubLife | null;
   /** Phase 7 (venue.veniceSound): the beach bed is started in load; the steps, far games and the run's cheers tick here. */
   sound: HubSoundscape | null;
+  /** V2 phase 2 (venue.veniceCourtLife): the shootaround and the jogger; mounted after the life. */
+  court: CourtLife | null;
   /** Phase 8 (venue.walkupV2): the card's dwell and hold; null = V1's box. */
   walkup: Walkup | null;
   /** Phase 8 (venue.veniceSolids): the world's pieces, so the palms join them once the dressing has placed them; null = off. */
@@ -141,7 +144,7 @@ export const VeniceHubMode: ModeDefinition = {
     const S: St = {
       host, mapper, view, me, body, move, stickL: { x: 0, y: 0 }, stickR: { x: 0, y: 0 }, latchedYaw: null,
       preset: 'runner', rigKey: '', spotSec: SPOT_EVERY, spots: v1Spots(), auto: null, autoPath: [], frames: 0,
-      life: null, sound: null, disposed: false,
+      life: null, sound: null, court: null, disposed: false,
       walkup: feel('venue.walkupV2', WALKUP_V2) >= 0.5 ? new Walkup(v1Spots()) : null, solids: solidsOn ? world.pieces : null,
     };
     // phase 7: the beach bed now (so the harness's crowd bed for the mood stays off); the rest of the soundscape ticks in update
@@ -217,6 +220,19 @@ export const VeniceHubMode: ModeDefinition = {
           S.life = life;
           void life.watchers.then((n) => console.info(`[VENICE] life: ${life.gulls} gulls, ${n} watchers`));
         }
+        if (feel('venue.veniceCourtLife', VENICE_COURT_LIFE) >= 0.5) {
+          const tier = (ctx.scene.metadata as { felTier?: string } | null)?.felTier ?? 'desktop';
+          // the shootaround's ball on the floor, off the iron and through the net, heard from where the player stands
+          const cue = S.sound ? (name: 'bounce' | 'swish' | 'rattle' | 'clang', x: number, z: number) => {
+            const p = S.host.player.pos, k = distanceGain(Math.hypot(x - p.x, z - p.z), 6, 70);
+            if (k <= 0) return;
+            ctx.camDirector.forwardFlatToRef(TMP_FWD);
+            SoundKit.play(name, { volume: 0.6 * k, pan: panFor(p.x, p.z, Math.atan2(TMP_FWD.x, TMP_FWD.z), x, z), tag: 'venice.court' });
+          } : undefined;
+          const court = mountCourtLife(ctx.scene, S.view.root, tier, cue);
+          S.court = court;
+          void court.bodies.then((n) => console.info(`[VENICE] court life: ${n} people`));
+        }
         if (S.sound) void SoundKit.useSampleBank('hoops');
       });
     }
@@ -225,6 +241,7 @@ export const VeniceHubMode: ModeDefinition = {
     placeBody(S.body, me);
     S.move.sync(dt);
     S.life?.update(dt);
+    S.court?.update(dt);
     if (S.sound) {
       ctx.camDirector.forwardFlatToRef(TMP_FWD);
       S.sound.update(dt, { x: me.pos.x, z: me.pos.z, speed: Math.hypot(me.vel.x, me.vel.z), grounded: me.grounded }, Math.atan2(TMP_FWD.x, TMP_FWD.z));
@@ -258,6 +275,7 @@ export const VeniceHubMode: ModeDefinition = {
     for (const S of live) {
       S.disposed = true;
       S.life?.dispose(); S.life = null;
+      S.court?.dispose(); S.court = null;
       if (S.sound) { S.sound = null; SoundKit.stopAmbient(); }
       S.move.dispose(); S.view.dispose();
     }

@@ -200,3 +200,41 @@ describe('V2 phase 1: a phone\'s watchers are a few real people', () => {
     expect(VENICE_PHONE_WATCHERS).toBe(1);
   });
 });
+
+describe('V2 phase 2: the shootaround', () => {
+  it('dribble → jump shot → the ball reaches the rim → follow-through → back out → next spot, on loop', async () => {
+    const { CourtShootaround, rimOf, BEAT, COURT_LIFE, VENICE_COURT_LIFE, joggerPath } = await import('./courtLife');
+    const court = v1Spots().find((s) => s.id === 'court.arc')!;
+    const run = new CourtShootaround(court, true, 3);
+    const clips: string[] = [], cues: string[] = [];
+    let atRim = false;
+    const rim = rimOf(court);
+    const cycle = BEAT.dribble + BEAT.rise + BEAT.flight + BEAT.drop + BEAT.toRebounder + BEAT.pass + BEAT.settle;
+    for (let i = 0; i < Math.ceil((cycle * 3) / (1 / 60)); i++) {
+      const f = run.step(1 / 60);
+      if (f.shooterClip) clips.push(f.shooterClip);
+      if (f.cue) cues.push(f.cue.name);
+      if (f.phase === 'drop' && Math.hypot(f.ball[0] - rim[0], f.ball[2] - rim[2]) < 0.3 && Math.abs(f.ball[1] - rim[1]) < 0.4) atRim = true;
+      expect(f.ball[1]).toBeGreaterThan(0);
+      // the shooter stays on the court
+      expect(Math.abs(f.shooter[0] - court.at[0])).toBeLessThan(COURT_HALF.w);
+      expect(Math.abs(f.shooter[1] - court.at[1])).toBeLessThan(COURT_HALF.l);
+    }
+    expect(atRim).toBe(true);
+    expect(clips.slice(0, 4)).toEqual(['jumpshot', 'bball_follow_through', 'catch_pass', 'bball_dribble_idle']);
+    expect(cues).toContain('bounce');
+    expect(cues.some((c) => c === 'swish' || c === 'rattle' || c === 'clang')).toBe(true);
+    // a phone: one court, no rebounder, no jogger (its skinned-body budget: the player + one)
+    expect(COURT_LIFE.phone.courts.length).toBe(1);
+    expect(COURT_LIFE.phone.rebounders).toBe(false);
+    expect(COURT_LIFE.phone.joggers).toBe(0);
+    const p = joggerPath();
+    expect(p.z1).toBeGreaterThan(p.z0);
+    expect(VENICE_COURT_LIFE).toBe(1);
+  });
+  it('every clip the court life plays is allowed by the hub\'s clip scope', async () => {
+    const { scopeAllows, scopeForMode } = await import('@/lib/babylon/anim/clipScope');
+    const scope = scopeForMode('venice_hub');
+    for (const c of ['jumpshot', 'bball_follow_through', 'catch_pass', 'bball_dribble_idle', 'bball_hand_up', 'bball_idle_stand', 'run']) expect(scopeAllows(scope, c), c).toBe(true);
+  });
+});

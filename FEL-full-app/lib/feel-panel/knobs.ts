@@ -1687,6 +1687,10 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/adventure/venice/hubLife.ts VENICE_PHONE_WATCHERS',
     hint: 'V2 (owner 2026-11-18): six real baked-animation people (the crowd bodies, never its cut-out cards) on a phone: four at the run, two by Court 1. 0 = a phone gets the gulls only.',
   },  {
+    id: 'venue.veniceCourtLife', label: 'Venice hub: people shooting around and a jogger (1) / empty courts (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/adventure/venice/courtLife.ts VENICE_COURT_LIFE',
+    hint: 'V2: a shooter on Court 4 (a phone: its one spare skinned body), and on desktop a rebounder there, two more on Court 1 and a jogger on the bike path. Shipped hoops clips; the ball arcs to the rim. 0 = no court life.',
+  },  {
     id: 'venue.veniceSound', label: 'Venice hub: beach bed, far games, the run, footsteps (1) / the harness crowd bed only (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
     source: 'lib/adventure/venice/hubSound.ts VENICE_SOUND',
     hint: 'The ocean bed, dribbles and shots from pickup games down the beach, the run cheering now and then near Court 2, and your steps (concrete vs sand). Through SoundKit: mute and volume apply. 0 = V1 (the mood crowd bed on first input).',
