@@ -35,7 +35,7 @@ import { loadRatedTuning, ratedLookScale } from '../hoops/ratedPlay';
 import { feel } from '@/lib/feel-panel/feel';
 import { devOrAgentHooks } from '@/lib/agentRunHooks';
 import { buildCoastWorld, COAST_DEEP_WATER_TURN_BACK, WaterEdge } from '@/lib/adventure/coast/zoneWorld';
-import { COAST_STREAM_ON, COAST_STREAM_SLICED, mountZoneView, type ZoneView, type ZoneViewStats } from '@/lib/adventure/coast/zoneView';
+import { COAST_PREWARM_LATE, COAST_STREAM_ON, COAST_STREAM_SLICED, mountZoneView, type ZoneView, type ZoneViewStats } from '@/lib/adventure/coast/zoneView';
 import {
   COAST_STREAM_FULL, COAST_STREAM_KEEP, COAST_STREAM_LOD, COAST_ZONE_GROW, ISLANDS, ZoneStreamer, pieceAt, setZoneGrow, zonePieces,
 } from '@/lib/adventure/coast/zoneLayout';
@@ -200,7 +200,8 @@ export const CoastZoneMode: ModeDefinition = {
     // give the page a turn between the heavy steps (a tap on the way back is answered while the zone loads)
     const breathe = () => new Promise<void>((r) => setTimeout(r, 0));
     await breathe();
-    const view = mountZoneView(scene, { streamOn, sliced: feel('coast.streamSliced', COAST_STREAM_SLICED) >= 0.5 });
+    const prewarm = feel('coast.prewarmLate', COAST_PREWARM_LATE) >= 0.5;
+    const view = mountZoneView(scene, { streamOn, sliced: feel('coast.streamSliced', COAST_STREAM_SLICED) >= 0.5, prewarm });
     await breathe();
     const streamer = new ZoneStreamer({
       full: Math.round(feel('coast.streamFull', COAST_STREAM_FULL)),
@@ -240,7 +241,7 @@ export const CoastZoneMode: ModeDefinition = {
     zoneUi.setLog(log.entries(), null);
     // back from a spot's game: it counts as played there (the beach net's quest)
     if (back) log.update((sv) => withPlayed(sv, back, (id) => !!sportSpotById(id)));
-    S.town = townOn ? mountZoneTownView(scene, { townsfolk: Math.round(feel('coast.townsfolk', COAST_TOWNSFOLK)), sports: sportsOn, heavyAfterSec: feel('coast.townLoadAfterSec', COAST_TOWN_LOAD_AFTER_SEC) }) : null;
+    S.town = townOn ? mountZoneTownView(scene, { townsfolk: Math.round(feel('coast.townsfolk', COAST_TOWNSFOLK)), sports: sportsOn, heavyAfterSec: feel('coast.townLoadAfterSec', COAST_TOWN_LOAD_AFTER_SEC), prewarm }) : null;
     S.spots = ALL_SPOTS.filter((x) => (x.kind === 'sport' ? sportsOn : x.kind === 'person' ? townOn && TOWNSFOLK.indexOf(x as (typeof TOWNSFOLK)[number]) < Math.round(feel('coast.townsfolk', COAST_TOWNSFOLK)) : true));
     S.questsOn = questsOn;
     if (questsOn) {

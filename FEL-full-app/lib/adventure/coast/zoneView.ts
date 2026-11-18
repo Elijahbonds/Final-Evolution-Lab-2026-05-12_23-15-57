@@ -28,6 +28,7 @@ import {
 } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { groundTextureFor, TILE_M } from '@/lib/babylon/visual/groundTextures';
+import { prewarmMeshes } from '@/lib/babylon/core/hitchProbe';
 import { spawnMeshyProp, type MeshyPropKey } from '@/lib/babylon/visual/meshyProps';
 import {
   BOAT_AT, DECKS, ISLANDS, deckSurfaceY, PIECE_M, PROP_MODELS, SEA_Y, SEABED_Y, ZONE_SPOTS, propsDrawnAt, terrainY, zoneProps, zonePieces,
@@ -190,7 +191,11 @@ export async function loadMasters(scene: Scene, m: PropModel, natureUrl = '/mode
  *  frames, one job a frame (the coarse ground stands in meanwhile); 0 = all of it in the frame you cross (phases A–D). */
 export const COAST_STREAM_SLICED = 1;
 
-export function mountZoneView(scene: Scene, opts: { streamOn: boolean; sliced?: boolean }): ZoneView {
+/** coast.prewarmLate (phase F-lite): 1 = a model that lands after the load has its shaders (lit, shadow, instanced) compiled as it
+ *  lands, not on the frame it first comes into view mid-walk (core/hitchProbe prewarmMeshes); 0 = compiled on first sight. */
+export const COAST_PREWARM_LATE = 1;
+
+export function mountZoneView(scene: Scene, opts: { streamOn: boolean; sliced?: boolean; prewarm?: boolean }): ZoneView {
   const root = new TransformNode('coast_zone', scene);
   const mats: (StandardMaterial | PBRMaterial)[] = [], texs: Texture[] = [];
 
@@ -328,7 +333,7 @@ export function mountZoneView(scene: Scene, opts: { streamOn: boolean; sliced?: 
     }
     return at.length;
   };
-  const jobs = PROP_MODELS.map((m) => loadMasters(scene, m).then((list) => { masters.set(m.id, list); fill(m); }).catch((e) => console.warn(`[COAST] ${m.file}`, e)));
+  const jobs = PROP_MODELS.map((m) => loadMasters(scene, m).then((list) => { masters.set(m.id, list); fill(m); if (opts.prewarm) void prewarmMeshes(scene, list); }).catch((e) => console.warn(`[COAST] ${m.file}`, e)));
 
   let seaT = 0, bob = 0;
   const ahead: Piece[] = [];

@@ -75,10 +75,13 @@ try {
   const phaseA = `feel=${encodeURIComponent(JSON.stringify({ 'coast.partnerOn': 0, 'coast.creaturesOn': 0 }))}`;
   // CONTROL=phaseB (phase D's measurement): the zone with the town, the sports spots and the quests off (= phase B), same session
   const phaseB = `feel=${encodeURIComponent(JSON.stringify({ 'coast.townOn': 0, 'coast.sportsOn': 0, 'coast.questsOn': 0 }))}`;
+  // CONTROL=fliteOff (phase F-lite's measurement): the zone with the streaming slices and the late pre-warm off (= phase D's way)
+  const fliteOff = `feel=${encodeURIComponent(JSON.stringify({ 'coast.streamSliced': 0, 'coast.prewarmLate': 0 }))}`;
   for (let i = 0; i < N; i++) {
     runs.push([`coast-${i + 1}`, '']);
     if (process.env.CONTROL === 'phaseA') runs.push([`phaseA-control-${i + 1}`, phaseA]);
     else if (process.env.CONTROL === 'phaseB') runs.push([`phaseB-control-${i + 1}`, phaseB]);
+    else if (process.env.CONTROL === 'fliteOff') runs.push([`fliteOff-control-${i + 1}`, fliteOff]);
     else runs.push([`venice-control-${i + 1}`, 'mode=venice_hub']);
   }
   if (!process.env.CONTROL) runs.push(['coast-nostream', `feel=${encodeURIComponent(JSON.stringify({ 'coast.streamOn': 0 }))}`]);
