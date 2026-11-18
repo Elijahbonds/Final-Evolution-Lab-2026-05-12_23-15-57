@@ -193,7 +193,10 @@ export const COAST_STREAM_SLICED = 1;
 
 /** coast.prewarmLate (phase F-lite): 1 = a model that lands after the load has its shaders (lit, shadow, instanced) compiled as it
  *  lands, not on the frame it first comes into view mid-walk (core/hitchProbe prewarmMeshes); 0 = compiled on first sight. */
-export const COAST_PREWARM_LATE = 1;
+// SHIPS OFF (m1, 3 runs a side against the old way): it doubled the compile time on the rig (5.1-5.2 s against 1.9-2.7 s: it
+// compiles every variant a mesh could draw, not only the ones it does) and the worst frame was no better (2.7-3.4 s against
+// 2.2-3.8 s). Kept as a knob for a phone with parallel shader compiles to try.
+export const COAST_PREWARM_LATE = 0;
 
 export function mountZoneView(scene: Scene, opts: { streamOn: boolean; sliced?: boolean; prewarm?: boolean }): ZoneView {
   const root = new TransformNode('coast_zone', scene);

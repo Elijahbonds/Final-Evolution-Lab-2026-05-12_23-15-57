@@ -2158,9 +2158,9 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'A 2 by 2 block of 64 m pieces north-west of Reef Rock: open sea, a sandbank you can wade from Reef Rock, and a small palm islet. 0 = the 6 by 6 zone of phases A to D.',
   },
   {
-    id: 'coast.prewarmLate', label: 'Coast zone: compile the shaders of models that land after the load as they land (1) / on first sight (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Coast · zone',
+    id: 'coast.prewarmLate', label: 'Coast zone: compile the shaders of models that land after the load as they land (1) / on first sight (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Coast · zone',
     source: 'lib/adventure/coast/zoneView.ts COAST_PREWARM_LATE',
-    hint: 'The palms and rocks, the market and each townsperson: their shaders compile when they arrive, not on the frame you first see them mid-walk. 0 = phases A to D.',
+    hint: 'The palms and rocks, the market and each townsperson: their shaders compile when they arrive, not on the frame you first see them mid-walk. Ships 0: on the rig it doubled the compile time and the worst frame was no better.',
   },
   {
     id: 'coast.townOn', label: 'Coast zone: the harbour town (1) / the bare beach (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Coast · zone',
