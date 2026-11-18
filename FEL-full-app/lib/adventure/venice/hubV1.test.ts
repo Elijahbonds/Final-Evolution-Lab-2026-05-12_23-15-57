@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildHubWorld, courtsRect, returnSpawnFor, v1Area, v1CourtSpots, v1Spots, V1_RIM_H } from './hubWorld';
 import {
-  clearReturn, FROM_VENICE, hubHrefFor, launchChoices, launchHref, PARTY_MODE_FOR_SPOT, readReturn, RETURN_KEY, RETURN_TTL_MS, spotFromSearch,
+  clearReturn, consumeVeniceReturnHref, FROM_VENICE, hubHrefFor, launchChoices, launchHref, PARTY_MODE_FOR_SPOT, readReturn, RETURN_KEY, RETURN_TTL_MS, spotFromSearch,
   veniceReturnHref, writeReturn, writeReturnForHref, type StoreLike,
 } from './hubReturn';
 import { veniceDoorOn, VENICE_DOOR_HREF } from './door';
@@ -104,6 +104,13 @@ describe('walking up and coming back', () => {
     expect(veniceReturnHref('/play/threevthree', '', 1000 + RETURN_TTL_MS + 1, st)).toBeNull();   // stale
     clearReturn(st);
     expect(st.m.has(RETURN_KEY)).toBe(false);
+  });
+  it('consumes the storage fallback once the end screen has claimed it', () => {
+    const st = mem();
+    writeReturn(v1Spots()[0], 1000, st);
+    expect(consumeVeniceReturnHref('/play/onevone', '', 1001, st)).toBe(hubHrefFor('court.ones'));
+    expect(st.m.has(RETURN_KEY)).toBe(false);
+    expect(veniceReturnHref('/play/onevone', '', 1002, st)).toBeNull();
   });
   it('stores the actual launched route for alternate games on a multi-mode court', () => {
     const st = mem();

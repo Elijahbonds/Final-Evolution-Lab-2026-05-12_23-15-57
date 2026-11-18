@@ -92,6 +92,13 @@ export function veniceReturnHref(pathname: string, search: string, now: number, 
   return m && m.route === pathname ? hubHrefFor(m.spot) : null;
 }
 
+/** One-shot version for the result screen: once the Venice exit is shown, the storage fallback cannot leak to later runs. */
+export function consumeVeniceReturnHref(pathname: string, search: string, now: number, store: StoreLike | null = session()): string | null {
+  const href = veniceReturnHref(pathname, search, now, store);
+  if (href) clearReturn(store);
+  return href;
+}
+
 /** The spot the hub page should put the player at (`?spot=`), when it is one V1 opens. */
 export function spotFromSearch(search: string): string | null {
   try { const s = new URLSearchParams(search).get(SPOT_PARAM); return s && SPOTS.some((x) => x.id === s) ? s : null; } catch { return null; }
