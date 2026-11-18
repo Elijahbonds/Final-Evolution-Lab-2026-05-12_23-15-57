@@ -23,7 +23,9 @@ export const VENICE_COAST_DOOR = 1;
 
 /** The landing: the ring's centre on the sand band west of the courts, midway between the two rows (the open corridor), and the
  *  jetty running west from the rim to the water's edge (the hub's sea starts about 40 m out: courtsView's sand plane). [TUNE] */
-export const BOAT_STOP = { x: -104, z: -69 } as const;
+// x −106: the ring's west edge (and its card's place) reaches the rim, so a walk that runs on past the ring stops at the rim
+// still in the boat's place (door r4: at the rig's 2–3 frames a second the scripted walk ran 5.5 m on from −104 and the card went).
+export const BOAT_STOP = { x: -106, z: -69 } as const;
 export const JETTY = { x0: -110, x1: -152, halfW: 1.6, y: 0.5 } as const;
 
 export const PIER_SPOT_ID = 'pier.end';

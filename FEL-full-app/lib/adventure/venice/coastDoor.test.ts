@@ -101,8 +101,8 @@ describe('the walk to the boat on the real host, the solids in', () => {
     let t = path.shift()!;
     host.setInputSource(host.playerId, (out) => {
       const p = host.player.pos, dx = t.x - p.x, dz = t.z - p.z, d = Math.hypot(dx, dz);
-      if (d < 0.8 && path.length) t = path.shift()!;
-      out.camYaw = 0; out.move.x = d < 0.3 ? 0 : dx / d; out.move.y = d < 0.3 ? 0 : dz / d;
+      if (d < 0.8) { if (path.length) t = path.shift()!; else { out.move.x = 0; out.move.y = 0; return; } }
+      out.camYaw = 0; out.move.x = dx / d; out.move.y = dz / d;
     });
     const card = new BoatWalkup();
     let shown = false;
@@ -110,17 +110,25 @@ describe('the walk to the boat on the real host, the solids in', () => {
       host.frame(1 / 60);
       if (f % 6 === 0 && card.step(0.1, host.player.pos.x, host.player.pos.z)) shown = true;
     }
-    return { shown, at: { ...host.player.pos } };
+    // the walk ends (the seam lets go 0.8 m short, as VeniceHubMode's does) and the player coasts to a stop: the card must stay
+    // up (door r4: the player ran on 5.5 m west past the ring's hold and the card went before the tap)
+    for (let f = 0; f < 60 * 60 && path.length; f++) host.frame(1 / 60);
+    let held = true;
+    for (let f = 0; f < 3 * 60; f++) { host.frame(1 / 60); if (f % 6 === 0 && !card.step(0.1, host.player.pos.x, host.player.pos.z)) held = false; }
+    return { shown, held, at: { ...host.player.pos } };
   }
   it('from the court gate (the cold start) the route reaches the ring and the card comes up', () => {
     const s = buildHubWorld().spawn.pos;
     const r = walk({ x: s.x, z: s.z });
     expect(r.shown).toBe(true);
+    expect(r.held).toBe(true);
   });
   it('from beside each court (a return) too', () => {
     for (const c of v1Spots()) {
       const b = returnSpawnFor(c.id)!.pos;
-      expect(walk({ x: b.x, z: b.z }).shown).toBe(true);
+      const r = walk({ x: b.x, z: b.z });
+      expect(r.shown).toBe(true);
+      expect(r.held).toBe(true);
     }
   });
 });
