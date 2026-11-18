@@ -1,6 +1,6 @@
 // VENICE HUB ROUND TRIPS WITHOUT A BUILD (lane/venice-v2, 2026-11-18): the shared box had no disk for a production build, so this
 // is the hub's half of roundtrip.mts on the esbuild rig (./hub-entry.ts): TRIPS times, tear the hub down and mount a fresh one on
-// the same canvas (W.__remount: what the page does when you leave for a game and come back), wait for its life and court life to
+// a fresh canvas (W.__remount: what the page does when you leave for a game and come back), wait for its life and court life to
 // land, force a GC (CDP), and read the JS heap, the window / document listeners, the canvases and the hub scene's counts (its
 // seam). A leak climbs trip over trip: the verdict compares the last three trips with trips 2-4 and fails on more than GROW_MB or
 // on any listener growth. The games' own pages are not in this one (roundtrip.mts covers them on a build).
@@ -39,7 +39,7 @@ const rows: Record<string, number | string | null>[] = [];
 let verdict = 'not run';
 try {
   // a desktop page: the life (gulls + watchers) and the court life (bodies) are both mounted, the most a trip can leave behind
-  const ctx = await browser.newContext({ viewport: { width: 960, height: 540 }, deviceScaleFactor: 1 });
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });   // under 1024 px wide the hub picks the phone tier
   const page = await ctx.newPage();
   const cdp = await ctx.newCDPSession(page);
   const logs: string[] = [];

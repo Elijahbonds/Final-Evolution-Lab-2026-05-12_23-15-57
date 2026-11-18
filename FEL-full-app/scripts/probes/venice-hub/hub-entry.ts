@@ -64,7 +64,7 @@ void runMode(MODES[q.get('mode') ?? 'venice_hub'], {
   onHud: () => {},
   resultSink: async () => {},
 }).then((stop) => { W.__stopA = stop; }).catch((e) => { W.__err = String(e?.message ?? e); });
-// ?remount=1 (V2 hardening, no production build): W.__remount() tears the hub down and mounts a fresh one on the same canvas, the
+// W.__remount() (V2 hardening, no production build) tears the hub down and mounts a fresh one on a fresh canvas, the
 // way the page does on a round trip; resolves when the new hub is playing. hubtrips.mts measures what each round leaves behind.
 W.__remount = async () => {
   const stop = W.__stopA as (() => void) | undefined;
@@ -73,8 +73,13 @@ W.__remount = async () => {
   await new Promise((r) => setTimeout(r, 300));
   const busN = new InputBus();
   W.__bus = busN;
+  // a fresh canvas, as the page's remounted stage has (reusing the torn-down engine's canvas broke the next bloom setup)
+  const old = document.querySelector('canvas');
+  const fresh = document.createElement('canvas');
+  fresh.style.cssText = 'width:100%;height:100%;display:block';
+  old?.replaceWith(fresh);
   const s = await runMode(MODES.venice_hub, {
-    canvas, input: busN, guest: true,
+    canvas: fresh, input: busN, guest: true,
     onPhase: (p) => { W.__phase = p; if (p === 'ready') setTimeout(() => busN.emit({ t: 'button', btn: 'START', pressed: true }), 50); },
     onHud: () => {}, resultSink: async () => {},
   });
