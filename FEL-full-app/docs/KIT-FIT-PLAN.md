@@ -445,3 +445,28 @@ For these three-piece files that fails at the crotch (§3.1). **The slider ships
 
 Phase 2 (the coordinator, 2026-11-18): the kit-mac-jobs garments (a one-piece short, the new jerseys, cut close in Blender with
 weights from the body), with the runtime lift and flare reduced for those files only, and the mask tuned to their openings.
+
+### 12.1 Phase 2 (2026-11-18): the kit-mac-jobs garments in the game, with their own lift (`kit.setLiftScale`)
+
+The seam-flare "bug" from phase 1 does not exist (§12's correction). The garment sets (§11) were measured on the phone rig, one
+round, against today, with `rival-halo` as the control:
+
+| Subject | Skin through cloth: today → sets at today's lift → sets at 0.3 of it | Tops slot | Shorts slot |
+|---|---|---|---|
+| closet-male-default | 16,583 → 21,062 → 31,088 | 10,290 → 10,324 → 10,314 | 2,359 → 6,844 → 16,602 |
+| closet-female-default | 13,750 → 14,414 → 23,101 | 8,489 → 8,498 → 8,485 | 3,655 → 3,929 → 12,443 |
+| game-male-default | 17,667 → 24,831 → 40,878 | 11,687 → 17,522 → 26,115 | 3,419 → 4,711 → 11,998 |
+| game-female-default | 11,494 → 21,821 → 35,343 | 8,167 → 17,259 → 21,904 | 1,535 → 3,070 → 11,408 |
+
+Bringing them closer makes the count worse, as in phase 1. **But the count may not be judging what the eye judges here.**
+- The rig counts a skin pixel as "through the cloth" when the skin lies within 4 cm of a garment and inside the garments-only
+  silhouette (`rig-entry.ts` `POKE_NEAR`). The tops slot rose only on the game subjects, the ones that wear the new SLEEVELESS
+  jersey; the Closet subjects keep the tee and did not move. A bare arm beside a sleeveless jersey sits within 4 cm of it, in
+  front of its silhouette. The same goes for a bare thigh just below a tight hem: the closer the cloth, the more skin falls
+  inside 4 cm.
+- In the game male overhead close-up (`scratchpad/kit-tight/diag-overhead.jpg`) today's tee shows skin patches through its
+  chest. The new jersey shows none.
+
+assumption, not measured: much of the rise is this proximity effect, not skin poking through. A design that shows more arm or
+thigh cannot pass a count that treats nearby bare skin as poke. The owner's eye, or a rig measure that tells skin in front of
+cloth from skin that should be under it, is needed to judge it.
