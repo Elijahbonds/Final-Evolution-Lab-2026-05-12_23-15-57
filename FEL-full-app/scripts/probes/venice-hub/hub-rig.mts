@@ -86,7 +86,7 @@ try {
     const name = reps > 1 ? `${name0}#${rep}` : name0;
     console.log(`run ${name}`);
     const desk = name0.startsWith('desktop-');
-    const ctx = await browser.newContext(desk ? { viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 } : { viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
+    const ctx = await browser.newContext(desk ? { viewport: { width: Number(process.env.DESK_W ?? 1280), height: Number(process.env.DESK_H ?? 720) }, deviceScaleFactor: 1 } : { viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
     // a run that stalls (a page that stops answering) is closed after RUN_MS and recorded as failed; the next run goes on
     const watchdog = setTimeout(() => { console.log(`run ${name}: watchdog after ${RUN_MS / 1000} s`); void ctx.close().catch(() => {}); }, RUN_MS);
     try {
