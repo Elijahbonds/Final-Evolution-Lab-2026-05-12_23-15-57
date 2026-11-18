@@ -23,7 +23,7 @@ for SEX in "${@:-male female}"; do
     echo "== $S: job 1, the one-piece short"
     run $M/onepiece-shorts.py -- --sex $S --out "$WORK/court-$S.blend"
     run $M/fit-outfit.py -- --sex $S --slot shorts --item shorts_court --mesh "$WORK/court-$S.blend" --object Kit_shorts_shorts_court \
-      --no-align --tris 2500 --out "$WORK/shorts_court-$S.glb"
+      --no-align --tris 2500 --sided --ease 0.0001 --smooth 0 --out "$WORK/shorts_court-$S.glb"
     npx tsx scripts/avatar/kit-fit/graft.ts --kit $KIT --out "$OUTDIR/fel-kit-$S.shorts1p.glb" \
       "$WORK/shorts_court-$S.glb=Kit_shorts_shorts_court=Kit_shorts_shorts_court=replace=shorts_court,shorts_glitch"
     echo "== $S: job 2, the jerseys"

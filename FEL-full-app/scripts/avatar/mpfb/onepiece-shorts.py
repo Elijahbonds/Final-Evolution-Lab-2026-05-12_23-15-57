@@ -199,6 +199,7 @@ def leg_rings(rows, sign):
     out.append(top + gusset)
     return out   # hem first
 legs = {1: leg_rings(L_rows, 1), -1: leg_rings(R_rows, -1)}
+VSIDE = {v: sign for sign, rows in legs.items() for row in rows[:-1] for v in row}   # a leg's own vertices (its top row is the seat's)
 def loft(rows):
     for lo, hi in zip(rows, rows[1:]):
         n = len(lo)
@@ -268,6 +269,8 @@ for k, g in enumerate(gusset):   # the gusset: straight across between the fitte
 # §2.4 SMOOTH: factor 0.3, 3 repeats, the opening loops left out
 inner_v = [v for v in bm.verts if v not in opening]
 for _ in range(3): bmesh.ops.smooth_vert(bm, verts=inner_v, factor=0.3, use_axis_x=True, use_axis_y=True, use_axis_z=True)
+for v, sg in VSIDE.items():
+    if sg * v.co.x < MID_GAP: v.co.x = sg * MID_GAP
 def clear_skin(passes=6):
     """Nothing under MIN_EASE: a vertex, and the middle of every face and edge (a flat face across a curve cuts the corner
     a vertex test misses), goes back out along the skin's normal. Returns how many vertices moved."""
@@ -275,7 +278,11 @@ def clear_skin(passes=6):
     for _ in range(passes):
         push = {}
         def probe(p, verts):
-            loc, n, _, d = bvh_all.find_nearest(p)
+            # a leg's vertex clears against ITS leg only: the thighs are 1-7 mm apart, and the other thigh's normal pushed an inner
+            # wall across the middle, where the exporter gave it the other leg's weights (headless: 92 -> 808 torn edges)
+            sides = {VSIDE.get(v, 0) for v in verts}
+            side = sides.pop() if len(sides) == 1 else 0
+            loc, n, _, d = (bvh_side[side] if side else bvh_all).find_nearest(p)
             if loc is None: return
             s = (p - loc).dot(n)
             if s < MIN_EASE:
@@ -286,7 +293,10 @@ def clear_skin(passes=6):
         for e in bm.edges: probe((e.verts[0].co + e.verts[1].co) / 2, e.verts)
         for f in bm.faces: probe(f.calc_center_median(), f.verts)
         if not push: break
-        for v, (n, d) in push.items(): v.co += n * (d + 0.0005); moved.add(v)
+        for v, (n, d) in push.items():
+            v.co += n * (d + 0.0005); moved.add(v)
+            sg = VSIDE.get(v, 0)
+            if sg and sg * v.co.x < MID_GAP: v.co.x = sg * MID_GAP   # never across the middle line
     return len(moved)
 pushed = clear_skin()
 bm.normal_update()

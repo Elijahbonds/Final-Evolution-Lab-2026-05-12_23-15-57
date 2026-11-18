@@ -34,7 +34,7 @@ void (async () => {
   const silence = console.warn; console.warn = () => undefined; console.info = () => undefined;
   const log = console.log; console.log = (...x: unknown[]) => { if (!/^(BJS|\[FEL-)/.test(String(x[0]))) log(...x); };
   const want = what === 'shorts' ? /^Kit_shorts/ : /^Kit_tops/;
-  const reads = await measureBodies(keys, { wardrobe, log: (r) => console.log(JSON.stringify({ b: r.body, c: `${r.clip}@${r.frac}`, poke: r.pokeBySlot, g: r.garments.filter((g) => want.test(g.mesh)).map((g) => `${g.mesh.replace(/^Kit_/, '')} tear${g.tear} x${g.maxRatio} float${g.float}`) })) });
+  const reads = await measureBodies(keys, { wardrobe, log: (r) => console.log(JSON.stringify({ b: r.body, c: `${r.clip}@${r.frac}`, poke: r.pokeBySlot, g: r.garments.filter((g) => want.test(g.mesh)).map((g) => `${g.mesh.replace(/^Kit_/, '')} tear${g.tear} x${g.maxRatio} float${g.float} ${JSON.stringify(g.tearBones)}`) })) });
   console.warn = silence;
   const slot = what === 'shorts' ? 'shorts' : 'tops';
   const T: Record<string, { tear: number; poke: number; floatMax: number; poses: number }> = {};
