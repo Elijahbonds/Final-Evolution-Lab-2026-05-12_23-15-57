@@ -21,7 +21,7 @@ import { spawnMeshyProp } from '@/lib/babylon/visual/meshyProps';
 import { mountVeniceDunkDressing } from '@/lib/babylon/nexus/veniceBoardwalk';
 import { groundTexture, TILE_M, type GroundKind } from '@/lib/babylon/visual/groundTextures';
 import { feel } from '@/lib/feel-panel/feel';
-import { courtsRect, v1Area, v1Spots } from './hubWorld';
+import { courtsRect, v1Area, v1CourtSpots } from './hubWorld';
 
 /** perf.veniceSharedCourt: 1 = one court mesh drawn at every court as instances (new); 0 = a mesh, material and detail map per court (the prototype's way). */
 export const VENICE_SHARED_COURT = 1;
@@ -60,7 +60,7 @@ export function mountCourtsView(scene: Scene, parent: TransformNode | null = nul
 
   // the four courts: ONE painted court, drawn at each spot
   const share = feel('perf.veniceSharedCourt', VENICE_SHARED_COURT) >= 0.5;
-  const spots = v1Spots();
+  const spots = v1CourtSpots();
   const courts: AbstractMesh[] = [];
   let courtTextures = 0;
   let master: Mesh | null = null;

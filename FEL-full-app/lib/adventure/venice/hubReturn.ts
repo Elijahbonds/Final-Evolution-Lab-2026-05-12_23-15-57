@@ -12,6 +12,7 @@
  */
 
 import { SPOTS, type Spot } from './layout';
+import { MODE_INFO } from '@/lib/game-data';
 
 export const HUB_ROUTE = '/play/venice';
 export const FROM_PARAM = 'from';
@@ -30,10 +31,14 @@ export interface ReturnMark { spot: string; route: string; at: number }
 const session = (): StoreLike | null => { try { return typeof window !== 'undefined' ? window.sessionStorage : null; } catch { return null; } };
 
 /** The page a court opens. */
-export function launchHref(s: Pick<Spot, 'id' | 'route' | 'kind'>): string {
+export function launchRoute(s: Pick<Spot, 'route'>, modeKey?: string): string {
+  return (modeKey && MODE_INFO[modeKey]?.href) || s.route;
+}
+
+export function launchHref(s: Pick<Spot, 'id' | 'route' | 'kind'>, modeKey?: string): string {
   const q = new URLSearchParams({ [FROM_PARAM]: FROM_VENICE, [SPOT_PARAM]: s.id });
   if (s.kind === 'court') q.set('location', 'venice');
-  return `${s.route}?${q.toString()}`;
+  return `${launchRoute(s, modeKey)}?${q.toString()}`;
 }
 
 export function writeReturn(s: Pick<Spot, 'id' | 'route'>, now: number, store: StoreLike | null = session()): void {

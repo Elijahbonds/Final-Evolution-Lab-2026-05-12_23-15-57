@@ -13,7 +13,7 @@ import { runMode, InputBus, type ModePhase } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hubUi } from '@/lib/adventure/venice/hubUi';
-import { launchHref, PARTY_MODE_FOR_SPOT, writeReturn } from '@/lib/adventure/venice/hubReturn';
+import { launchHref, launchRoute, PARTY_MODE_FOR_SPOT, writeReturn } from '@/lib/adventure/venice/hubReturn';
 import { MODE_INFO } from '@/lib/game-data';
 import { partyClient } from '@/lib/party/social/client';
 import { isHost } from '@/lib/party/social/state';
@@ -60,15 +60,15 @@ export function VeniceStage({ signedIn }: { signedIn: boolean }) {
   }, [signedIn]);
 
   const spot = ui.spot;
-  const game = spot ? MODE_INFO[spot.modes[0]]?.name ?? spot.modes[0] : '';
+  const modeOptions = spot ? spot.modes.map((mode) => ({ mode, name: MODE_INFO[mode]?.name ?? mode })) : [];
   const partyMode = spot ? PARTY_MODE_FOR_SPOT[spot.id] : undefined;
   const crowd = party.members.filter((m) => m.connected).length;
   const canPartyStart = !!partyMode && isHost(party) && crowd >= 2;
 
-  const play = () => {
+  const play = (mode: string) => {
     if (!spot) return;
-    writeReturn(spot, Date.now());
-    router.push(launchHref(spot));
+    writeReturn({ id: spot.id, route: launchRoute(spot, mode) }, Date.now());
+    router.push(launchHref(spot, mode));
   };
   const playParty = () => {
     if (!spot || !partyMode) return;
@@ -90,10 +90,12 @@ export function VeniceStage({ signedIn }: { signedIn: boolean }) {
         <div data-testid="venice-walkup" className="absolute inset-x-4 top-[4.25rem] mx-auto max-w-sm rounded-2xl border border-white/15 bg-black/75 p-3 backdrop-blur">
           <p className="text-base font-bold">{spot.label.replace('[PLACEHOLDER] ', '')}</p>
           <div className="mt-2 flex flex-col gap-2">
-            <button type="button" data-testid="venice-play" onClick={play}
-              className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-[#facc15] px-4 text-base font-bold text-black">
-              <Play aria-hidden className="h-4 w-4" /> Play {game}
-            </button>
+            {modeOptions.map((o) => (
+              <button key={o.mode} type="button" data-testid={`venice-play-${o.mode}`} onClick={() => play(o.mode)}
+                className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-[#facc15] px-4 text-base font-bold text-black">
+                <Play aria-hidden className="h-4 w-4" /> Play {o.name}
+              </button>
+            ))}
             {canPartyStart && (
               <button type="button" data-testid="venice-party" onClick={playParty}
                 className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-white/25 px-4 text-base font-bold text-white">

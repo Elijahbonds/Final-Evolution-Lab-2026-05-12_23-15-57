@@ -1,13 +1,14 @@
 // venice-v1 (2026-11-17): the V1 hub's pure parts — the walkable courts district, walking up to a court and coming back.
 import { describe, expect, it } from 'vitest';
-import { buildHubWorld, courtsRect, returnSpawnFor, v1Area, v1Spots, V1_RIM_H } from './hubWorld';
+import { buildHubWorld, courtsRect, returnSpawnFor, v1Area, v1CourtSpots, v1Spots, V1_RIM_H } from './hubWorld';
 import {
-  clearReturn, FROM_VENICE, hubHrefFor, launchHref, PARTY_MODE_FOR_SPOT, readReturn, RETURN_KEY, RETURN_TTL_MS, spotFromSearch,
+  clearReturn, FROM_VENICE, hubHrefFor, launchHref, launchRoute, PARTY_MODE_FOR_SPOT, readReturn, RETURN_KEY, RETURN_TTL_MS, spotFromSearch,
   veniceReturnHref, writeReturn, type StoreLike,
 } from './hubReturn';
 import { veniceDoorOn, VENICE_DOOR_HREF } from './door';
 import { districtAt } from './layout';
 import { ONLINE_MODES } from '@/server/netd/src/partyRules';
+import { MODE_INFO } from '@/lib/game-data';
 
 const mem = (): StoreLike & { m: Map<string, string> } => {
   const m = new Map<string, string>();
@@ -32,11 +33,20 @@ describe('the V1 world: the courts district, walkable', () => {
   it('spawns a cold start at the court gate, in the courts district', () => {
     expect(districtAt(w.spawn.pos.x, w.spawn.pos.z)?.id).toBe('courts');
   });
-  it('opens the four courts: Court 1 is Ones, Court 2 is Threes', () => {
-    const s = v1Spots();
+  it('draws the four courts: Court 1 is Ones, Court 2 is Threes', () => {
+    const s = v1CourtSpots();
     expect(s.map((x) => x.id)).toEqual(['court.ones', 'court.run', 'court.flight', 'court.arc']);
     expect(s[0].modes).toContain('hoops1v1'); expect(s[0].route).toBe('/play/onevone');
     expect(s[1].modes).toContain('hoops3v3'); expect(s[1].route).toBe('/play/threevthree');
+  });
+  it('opens every V1 hoops-park game in one tap, including the second option on shared courts', () => {
+    const spots = v1Spots();
+    expect(spots.map((x) => x.id)).toEqual(['court.ones', 'court.run', 'court.flight', 'court.arc', 'court.camera']);
+    for (const mode of ['hoops1v1', 'hoops3v3', 'dunkContest', 'dunkduel', 'threePoint', 'carnival', 'irl']) {
+      const spot = spots.find((s) => s.modes.includes(mode));
+      expect(spot, mode).toBeDefined();
+      expect(launchRoute(spot!, mode), mode).toBe(MODE_INFO[mode].href);
+    }
   });
   it('puts a returning player beside the court they left, on walkable ground, facing it', () => {
     for (const s of v1Spots()) {
@@ -45,7 +55,7 @@ describe('the V1 world: the courts district, walkable', () => {
       expect(Math.hypot(r.pos.x - s.at[0], r.pos.z - s.at[1])).toBeLessThan(s.radius + 4);
       expect(Math.sin(r.yaw)).toBeLessThan(0);   // the court is to the west (−x) of its sideline spawn
     }
-    expect(returnSpawnFor('court.camera')).toBeNull();
+    expect(returnSpawnFor('court.camera')).toMatchObject({ pos: { x: 20.5, y: 0, z: -70 } });
     expect(returnSpawnFor('nope')).toBeNull();
   });
 });
@@ -66,7 +76,9 @@ describe('walking up and coming back', () => {
     expect(veniceReturnHref('/play/onevone', '', 1000, st)).toBeNull();
     writeReturn(v1Spots()[1], 1000, st);
     expect(veniceReturnHref('/play/threevthree', '?net=ABC&peer=h1&party=1', 2000, st)).toBe('/play/venice?spot=court.run');
-    expect(veniceReturnHref('/play/onevone', '', 2000, st)).toBeNull();   // another game: not this trip
+    writeReturn({ id: 'court.flight', route: '/play/dunkduel' }, 2100, st);
+    expect(veniceReturnHref('/play/dunkduel', '', 2200, st)).toBe('/play/venice?spot=court.flight');
+    expect(veniceReturnHref('/play/onevone', '', 2200, st)).toBeNull();   // another game: not this trip
     expect(veniceReturnHref('/play/threevthree', '', 1000 + RETURN_TTL_MS + 1, st)).toBeNull();   // stale
     clearReturn(st);
     expect(st.m.has(RETURN_KEY)).toBe(false);

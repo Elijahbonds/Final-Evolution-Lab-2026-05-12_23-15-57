@@ -30,8 +30,11 @@ export function v1Area(): Rect {
   return { minX: r.minX - V1_MARGIN, maxX: r.maxX + V1_MARGIN, minZ: r.minZ - V1_MARGIN, maxZ: r.maxZ + V1_MARGIN };
 }
 
-/** The courts V1 opens (each launches its modes in one tap). Court 1 → Ones, Court 2 (the run) → Threes; Courts 3 and 4 too. */
-export const V1_SPOT_IDS = ['court.ones', 'court.run', 'court.flight', 'court.arc'] as const;
+/** The four painted courts V1 draws. */
+export const V1_COURT_SPOT_IDS = ['court.ones', 'court.run', 'court.flight', 'court.arc'] as const;
+/** The V1 walk-up spots: the four courts plus the camera hoop (IRL hang-time check). */
+export const V1_SPOT_IDS = [...V1_COURT_SPOT_IDS, 'court.camera'] as const;
+export const v1CourtSpots = (): Spot[] => SPOTS.filter((s) => (V1_COURT_SPOT_IDS as readonly string[]).includes(s.id));
 export const v1Spots = (): Spot[] => SPOTS.filter((s) => (V1_SPOT_IDS as readonly string[]).includes(s.id));
 
 export interface HubWorld { pieces: GroundPiece[]; area: Rect; source: WorldSource; spawn: { pos: { x: number; y: number; z: number }; yaw: number } }

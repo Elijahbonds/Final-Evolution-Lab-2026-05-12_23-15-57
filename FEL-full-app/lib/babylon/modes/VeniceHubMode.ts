@@ -30,7 +30,7 @@ import { createInputMapper, loadBindings, type InputMapper } from '../adventure/
 import { bindMovementView, type MovementView } from '../adventure/movement/view';
 import { placeBody } from '../adventure/world/view';
 import { loadRatedTuning, ratedLookScale } from '../hoops/ratedPlay';
-import { buildHubWorld, courtsRect, returnSpawnFor, v1Spots } from '@/lib/adventure/venice/hubWorld';
+import { buildHubWorld, courtsRect, returnSpawnFor, V1_COURT_SPOT_IDS, v1Spots } from '@/lib/adventure/venice/hubWorld';
 import { mountCourtsView, type CourtsView } from '@/lib/adventure/venice/courtsView';
 import { hubUi } from '@/lib/adventure/venice/hubUi';
 import { spotFromSearch } from '@/lib/adventure/venice/hubReturn';
@@ -158,7 +158,8 @@ export const VeniceHubMode: ModeDefinition = {
       for (const s of S.spots) {
         // the ring stands on the court's sideline (courtsView): walking into it, or onto the court itself, offers the game
         const dx = me.pos.x - s.at[0], dz = me.pos.z - s.at[1];
-        if (Math.abs(dx) <= 8 + 6 && Math.abs(dz) <= 14) { hit = s; break; }
+        const court = (V1_COURT_SPOT_IDS as readonly string[]).includes(s.id);
+        if ((court && Math.abs(dx) <= 8 + 6 && Math.abs(dz) <= 14) || (!court && Math.hypot(dx, dz) <= s.radius)) { hit = s; break; }
       }
       hubUi.setSpot(hit);
     }
