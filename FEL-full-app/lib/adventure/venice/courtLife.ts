@@ -15,7 +15,7 @@
  * The timing below is pure (CourtShootaround) so it is tested without Babylon; mountCourtLife puts it on bodies.
  */
 
-import { Color3, MeshBuilder, PBRMaterial, Vector3, type Mesh, type Scene, type TransformNode } from '@babylonjs/core';
+import { Color3, MeshBuilder, PBRMaterial, Vector3, type AbstractMesh, type Mesh, type Scene, type TransformNode } from '@babylonjs/core';
 import { CharacterPipeline } from '@/lib/babylon/core/characterPipeline';
 import type { SpawnedCharacter } from '@/lib/babylon/core/CharacterLibrary';
 import { DUNK_CONFIG } from '@/lib/babylon/modes/modeConfigs';
@@ -145,6 +145,16 @@ export function joggerPath(): { x: number; z0: number; z1: number } {
   return { x: c.maxX + 6, z0: a.minZ + 6, z1: a.maxZ - 6 };
 }
 
+/** A phone's shooter in one draw a part (measured: the full body, ink outline and shadow, cost 19 draws and took the hub's
+ *  phone frame to 65 of its 56): no outline, no shadow. The player keeps both. */
+export function phoneTrim(scene: Scene, c: SpawnedCharacter): void {
+  const gens = scene.lights.map((l) => l.getShadowGenerator?.()).filter(Boolean) as unknown as Array<{ removeShadowCaster?(m: AbstractMesh, d?: boolean): unknown }>;
+  for (const m of c.root.getChildMeshes(false)) {
+    m.renderOutline = false;
+    for (const g of gens) g.removeShadowCaster?.(m, false);
+  }
+}
+
 export interface CourtLife { update(dt: number): void; dispose(): void; bodies: Promise<number> }
 
 export function mountCourtLife(scene: Scene, parent: TransformNode, tier: string, onCue?: (name: 'bounce' | 'swish' | 'rattle' | 'clang', x: number, z: number) => void): CourtLife {
@@ -158,9 +168,10 @@ export function mountCourtLife(scene: Scene, parent: TransformNode, tier: string
   let disposed = false;
   const tints = ['#3B82F6', '#F59E0B', '#10B981', '#EF4444', '#A855F7'];
   let ti = 0;
+  const phone = tier === 'mobile';
   const spawn = (at: [number, number], yaw: number, clip: string) =>
     CharacterPipeline.spawnNpc(scene, DUNK_CONFIG.heroUrl, { position: new Vector3(at[0], 0, at[1]), yawRad: yaw, tint: tints[ti++ % tints.length], startClip: clip, modeId: 'venice_hub' })
-      .then((c) => { if (disposed) { c.dispose(); return null; } all.push(c); return c; })
+      .then((c) => { if (disposed) { c.dispose(); return null; } if (phone) phoneTrim(scene, c); all.push(c); return c; })
       .catch((e) => { console.warn('[VENICE] court life body', (e as Error)?.message ?? e); return null; });
   const jobs: Promise<unknown>[] = [];
   plan.courts.forEach((id, i) => {
