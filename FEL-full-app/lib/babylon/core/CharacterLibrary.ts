@@ -24,6 +24,7 @@ import { PROCEDURAL_CHARACTERS } from '../characters/CharacterProvider';
 import { spawnProceduralAthlete } from '../characters/ProceduralAthlete';
 import { rosterUrlFor, normalizeHeroUrl, DEFAULT_HERO_URL, takeRivalRotation } from './athleteRoster';
 import { KIT_BODY_URL, bodyUrlForTier } from './heroBody';
+import { loadGarmentSets } from './kitGarmentSet';
 import { demoModelFlags, planPlayerBody, type PlayerBodyContext } from './demoModels';
 import { signedOutVisitor } from './visitor';
 import { installOpponentMotion, HERO_CAPTURE } from '../anim/opponentMotion';
@@ -190,7 +191,9 @@ async function loadContainer(scene: Scene, url: string): Promise<AssetContainer>
         // rigs AT LOAD, before any spawn can freeze at bind pose. Runs once
         // per cached container; unprefixed rigs pass through untouched.
         gateContainerRig(container, url);
-        return container;
+        // lane/kit-mac-jobs: the Blender-made garments (one-piece short, new jerseys) go into a kit body's container before any
+        // spawn is cloned from it, when their knobs are on (kitGarmentSet.ts); off, nothing is fetched. Never throws.
+        return loadGarmentSets(container, url).then(() => container);
       })
       .catch((e) => {
         cache.delete(url);                               // allow retry after a failure

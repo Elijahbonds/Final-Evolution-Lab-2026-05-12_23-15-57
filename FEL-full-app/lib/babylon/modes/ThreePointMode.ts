@@ -80,6 +80,7 @@ import { rimDecides, type RimVerdict } from '../core/RimDecides';   // THE RIM D
 import { planRimPlay, forcedMakeProfile, maybeAirball, rimPlaySuffix, type RimPlay } from '../core/RimPlay';   // RIM PLAY (2026-09-18): the ball's time on the iron
 import { THREE_CORNER_R, THREE_TOP_R, threePointRadius } from '../core/BasketballCore';
 import { SoundKit } from '../audio/SoundKit';
+import { glassKissSound } from '../audio/hoopsSfx';   // hoops-items: the backboard kiss, the drift's squeak, the quiet throw
 import { ModeMic } from '../audio/mic/ModeMic';   // THE MIC (2026-09-24): the court's MC, the sidekick and the crowd call the shootout
 import type { MicEvent } from '../audio/mic/MicDirector';
 import { mountRimFx, type RimFxHandle } from '../hoops/RimFx';   // vis-hoops-dunk: the rim's light on a make, the fire on a streak (visual only)
@@ -1130,7 +1131,7 @@ function stepFlights(ctx: ModeContext, dt: number): void {
     if (f.state !== 'air') continue;
     const r = f.arc.step(dt, f.mesh.position, f.mesh);
     for (const t of f.arc.takeTouches()) {   // RIM PLAY: the iron answers every touch of the dwell
-      if (t.on === 'glass') { SoundKit.play('thud', { pitch: 1.5, volume: 0.35 }); console.info(`[3PT-RIM] glass kiss`); }
+      if (t.on === 'glass') { const gk = glassKissSound(); SoundKit.play(gk.name, gk.opts); console.info(`[3PT-RIM] glass kiss`); }   // hoops-items: its own sound (hoops.glassSoundOn)
       else { SoundKit.play('rattle', { volume: 0.18 + t.strength01 * 0.22 }); hoopJuice?.graze(); }
     }
     if (r === 'made') {

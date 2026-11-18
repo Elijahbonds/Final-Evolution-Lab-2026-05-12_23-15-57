@@ -108,6 +108,18 @@ describe('SoundKit sample player', () => {
     expect(one(() => SoundKit.play('bounce')).all).toHaveLength(0);
   });
 
+  it('hoops-items: the backboard kiss has its own synth and, loaded, its recording — the ball against a wall, fetched once for two cues', async () => {
+    const { SoundKit, g, one } = await kit();
+    expect(one(() => SoundKit.play('glass')).synth.length).toBeGreaterThan(0);   // before the bank: its synth
+    await SoundKit.useSampleBank('hoops');
+    expect(fetched.filter((u) => u === '/audio/hoops/bounce_6.mp3')).toHaveLength(1);
+    expect(new Set(fetched).size).toBe(fetched.length);   // no file fetched twice
+    expect(SoundKit.sampleState()).toMatchObject({ loaded: 24, failed: 0 });
+    const r = one(() => SoundKit.play('glass', { volume: 0.35 }));
+    expect(r.samples).toHaveLength(1);
+    expect(reaches(r.samples[0].src as unknown as FakeNode, [g.sfx, g.crowdDuck])).toBe(g.sfx);
+  });
+
   it('released (the next mode) every cue is its synth again; asked again it plays the recordings it kept, fetching nothing new', async () => {
     const { SoundKit, one } = await kit();
     await SoundKit.useSampleBank('hoops');

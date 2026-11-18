@@ -372,3 +372,38 @@ the judge.
 - `docs/JERSEY-BUILD-STEPS.md`, `docs/SHORTS-BUILD-STEPS.md` (job 1, the one-piece short), the owner's 2026-11-13 answers.
 
 The contact sheet of the jersey cells, phase 0 vs refit, is in the PR report, not in the repository.
+
+## 11. The two "Mac jobs", done headless (lane/kit-mac-jobs, 2026-11-18) — built, measured, NOT switched on
+
+The owner (2026-11-18): "Do the 2 jobs on the Mac"; "The clothes are the biggest eye sore immediately"; "make the clothes
+appear to be skin tight and not baggy, or more natural, right now it looks poofy." No Mac was connected, so both jobs ran on
+Linux with Blender as a Python module (bpy 5.0.1) and MPFB 2.0.18 with the MakeHuman CC0 packs; see the "Done headless"
+sections of `SHORTS-BUILD-STEPS.md` and `JERSEY-BUILD-STEPS.md`. The garments are `public/models/kits/sets/` (one-piece short;
+basketball and football jerseys), put on the kit bodies at load behind `kit.onePieceShorts` and `kit.newJerseys`
+(`lib/babylon/core/kitGarmentSet.ts`). Both knobs ship at **0**: the game is exactly as before.
+
+**At rest they are what was asked:** fitted, one piece, no skin through (renders in the lane report). Off the skin, at rest,
+median: short 20 mm → 7 mm (Blender) and, in the game with its own lift, 38.9 → 28.1 mm (`kitGarmentSet.test.ts`); tops 23 →
+10–17 mm.
+
+**In the game they fail the 10.1a bar.** The rig, steady, run 1 (one hold; the shared machine ran ~6 min a subject, so the hold
+was narrowed to 4 poses × 3 cameras and the second run was cut short). Px are summed over those cells.
+
+| Subject | Skin through cloth, before → after | Tops slot | Shorts slot | Stretched edges (tops / shorts) |
+|---|---|---|---|---|
+| game-male-default, desktop (2 before runs) | 4,400–5,985 → 10,313 | 3,654–3,913 → 7,864 | 133–1,766 → 2,024 | 0–1 / 55–73 → 64 / 226 |
+| game-female-default, desktop | 3,676 → 9,638 | 2,943 → 7,369 | 389 → 1,814 | 0 / 93 → 37 / 436 |
+| closet-male-default, desktop (2 before runs) | 5,895–7,232 → 8,092 | 3,520–4,476 → 3,969 | 811–3,031 → 3,437 | 5–6 / 64–68 → 5 / 274 |
+| game-male-default, phone | 5,552 → 10,425 | 3,833 → 7,400 | 1,303 → 2,550 | 2 / 35 → 54 / 220 |
+| pack-football-female, phone (Meshy pack → new jersey) | 14,433 → 16,069 | 11,831 → 13,313 | 1,267 → 2,154 | 2,567 / 30 → 101 / 316 |
+| rival-halo, phone (control, unchanged) | 5,430 → 5,190 | 2,017 → 2,079 | 2,011 → 1,818 | 1 / 79 → 1 / 78 |
+
+- **The basketball jersey** doubles the skin seen through the top in the game, although headless (`cpu-sets.ts`, 10 poses) it
+  cut the skin through it by 39–74 %. The headless count again is not the screen (as §10.4 found).
+- **The one-piece short** shows more skin in the shorts slot, and its stretched edges rise 3–5×. The cloth that joins the legs
+  stretches in a stride (headless torn edges 228 → 1,052 over 10 poses, after two rounds of fixes from 1,718).
+- **The football jersey** cuts the Meshy pack's torn edges 25× (2,567 → 101) and its flicker (19 → 6), but lets 11–13 % more
+  skin through. It fails the bar on skin.
+- assumption (not measured): the closer cloth leaves less room for the skin the mask keeps. The mask keeps a 5 cm band at a
+  top's hem and armholes (`TOP_EDGE_MARGIN`) and 1 cm at a short's openings, and both new tops have larger openings. A tight
+  garment needs the mask and the fit to be tuned together (the kit-tight lane's `kit.fitTightness`), not a closer file alone.
