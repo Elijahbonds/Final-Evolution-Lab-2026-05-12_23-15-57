@@ -52,14 +52,14 @@ type Worst = { draws: number; active: number; textureMb: number; textures: numbe
 
 /** Run the player toward (x, z) with the mode's probe driver (CoastZoneMode coastProbeDrive: the move held forward, the yaw on the
  *  target, as the headless test walks the host), sampling every 250 ms. True when it got within 3 m. */
-async function walkTo(page: Page, x: number, z: number, maxSec: number, sample: (k: number) => Promise<void>): Promise<boolean> {
+async function walkTo(page: Page, x: number, z: number, maxSec: number, sample: (k: number) => Promise<void>, near = 3): Promise<boolean> {
   const t0 = Date.now();
   let k = 0;
   await page.evaluate(`window.__drive({ x: ${x}, z: ${z} })`);
   try {
     while ((Date.now() - t0) / 1000 < maxSec) {
       const d = await page.evaluate(`(() => { const c = window.__coast(); return Math.hypot(${x} - c.x, ${z} - c.z); })()`) as number;
-      if (d < 3) return true;
+      if (d < near) return true;
       await page.waitForTimeout(500); if (k % 2 === 0) await sample(k); k++;   // the rig draws a few frames a second: sample lightly
     }
     return false;
@@ -73,12 +73,15 @@ try {
   const runs: Array<[string, string]> = [];
   // CONTROL=phaseA (phase B's measurement): the zone against itself with the partner and the creatures off (= phase A), same session
   const phaseA = `feel=${encodeURIComponent(JSON.stringify({ 'coast.partnerOn': 0, 'coast.creaturesOn': 0 }))}`;
+  // CONTROL=phaseB (phase D's measurement): the zone with the town, the sports spots and the quests off (= phase B), same session
+  const phaseB = `feel=${encodeURIComponent(JSON.stringify({ 'coast.townOn': 0, 'coast.sportsOn': 0, 'coast.questsOn': 0 }))}`;
   for (let i = 0; i < N; i++) {
     runs.push([`coast-${i + 1}`, '']);
     if (process.env.CONTROL === 'phaseA') runs.push([`phaseA-control-${i + 1}`, phaseA]);
+    else if (process.env.CONTROL === 'phaseB') runs.push([`phaseB-control-${i + 1}`, phaseB]);
     else runs.push([`venice-control-${i + 1}`, 'mode=venice_hub']);
   }
-  if (process.env.CONTROL !== 'phaseA') runs.push(['coast-nostream', `feel=${encodeURIComponent(JSON.stringify({ 'coast.streamOn': 0 }))}`]);
+  if (!process.env.CONTROL) runs.push(['coast-nostream', `feel=${encodeURIComponent(JSON.stringify({ 'coast.streamOn': 0 }))}`]);
   const pick = (process.env.ONLY ?? '').split(',').filter(Boolean);
   for (const [name, query] of runs) {
     if (pick.length && !pick.some((p) => name.startsWith(p))) continue;
@@ -126,9 +129,21 @@ try {
       // the walk: off the dock to the beach, past the Shellhopper (a sighting), down the beach to the bridge, over the bridge onto
       // Palm Key (crosses four pieces)
       legs.beach = await walkTo(page, 92, 24, 120, sample);
+      // phase D: up the town's street (the houses on the right, the market on the left), to Pip (a townsperson's card), then
+      // back to the beach and down to the volleyball net (a sports spot's card). The control (town off) walks the same legs.
+      legs.street = await walkTo(page, 104, 24, 60, sample);
+      await page.waitForTimeout(800);
+      await shot('town');
+      legs.person = await walkTo(page, 112, 21, 40, sample, 1);
+      await page.waitForTimeout(800);
+      await shot('person');
+      legs.backToBeach = await walkTo(page, 92, 18, 60, sample);
       legs.creature = await walkTo(page, 84, 13, 60, sample);
       await page.waitForTimeout(600);
       await shot('sighting');
+      legs.volley = await walkTo(page, 88.5, -20, 120, sample, 1.2);
+      await page.waitForTimeout(800);
+      await shot('sport');
       legs.beachSouth = await walkTo(page, 72, -30, 150, sample);
       // the partner follows behind you, where the chase camera is: stand a moment (it settles into its slot behind and to the
       // right), then swing the camera round to the right with the look stick so both are in the picture
@@ -154,7 +169,8 @@ try {
     gaps2.sort((a, b) => a - b);
     const partnerGap = gaps2.length ? { mean: +(gaps2.reduce((a, b) => a + b, 0) / gaps2.length).toFixed(1), p95: +gaps2[Math.floor(gaps2.length * 0.95)].toFixed(1), max: +gaps2[gaps2.length - 1].toFixed(1) } : null;
     const log = await page.evaluate('window.__log ?? null');
-    result[name] = { ...t, worst, frameMs, legs, pieces, streamMax, partnerGap, log, end, errors: errors.slice(0, 5), missing: [...missing] };
+    const spotsSeen = await page.evaluate('window.__spotsSeen ?? null');
+    result[name] = { ...t, worst, frameMs, legs, pieces, streamMax, partnerGap, log, spotsSeen, end, errors: errors.slice(0, 5), missing: [...missing] };
     console.log(name, JSON.stringify(result[name]));
     await ctx.close();
   }
