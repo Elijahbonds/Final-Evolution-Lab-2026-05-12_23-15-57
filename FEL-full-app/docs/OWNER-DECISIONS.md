@@ -476,3 +476,14 @@ Taken by the coordinator on the standing rule (reversible, the recommended optio
 4. **3v3 online with six humans** (V2; it needs the owner's netd redeploy and a 6-device test).
 5. **Streaming in 64 m pieces** on phones (the plan's §3; a change from ADVENTURE-PLAN.md's 256 m chunks).
 6. **Art from the shipped kits, procedural pieces and the owner's Meshy** (no commissioned art).
+
+## owner 2026-11-18: deploying without the Mac
+
+1. **A GitHub deploy button** (`.github/workflows/deploy.yml`, `docs/DEPLOY-BUTTON.md`). It is manual only: `dry-run` first, then
+   `deploy`, from `main` only, with the secrets in the `production-deploy` environment. A push to `main` still deploys nothing.
+2. **The database step for PR #373 goes through the existing guarded job** (`db-guard.yml`, `production-db`
+   environment, `PROD_DIRECT_URL`). The owner adds the secret; agents never hold or ask for it.
+3. **The Venice answers:** keep staged loading (`venue.deferScenery` 1); phones get 4–6 real 3D watchers, not cut-outs;
+   ship Venice with the Play door on; the next Venice step is court life plus the camera.
+4. **Clothes are the top visual priority:** fitted and natural, not poofy. There is a `kit.fitTightness` slider, and the two
+   Mac garment jobs are done headless in the cloud.
