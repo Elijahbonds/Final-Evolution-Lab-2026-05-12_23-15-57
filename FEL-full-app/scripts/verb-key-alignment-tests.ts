@@ -10,7 +10,7 @@
 // shipped host components for the modeId they actually pass and asserts each one
 // has its own MODE_VERBS entry, so the next mode cannot repeat it.
 
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { MODE_VERBS } from '../lib/babylon/ui/modeVerbs';
 import { ENABLED_BABYLON_MODES, MODES } from '../lib/babylon/modes/registry';
@@ -19,18 +19,39 @@ let checks = 0;
 const fail: string[] = [];
 const ok = (c: boolean, label: string): void => { checks++; if (!c) fail.push(label); };
 
-const GAMES = join(process.cwd(), 'components', 'games');
+const ROOT = process.cwd();
+const TOUCH_HOST_ROOTS = [
+  join(ROOT, 'components', 'games'),
+  join(ROOT, 'app', 'play'),
+];
+
+function tsxFiles(dir: string): string[] {
+  const out: string[] = [];
+  for (const ent of readdirSync(dir)) {
+    const abs = join(dir, ent);
+    const st = statSync(abs);
+    if (st.isDirectory()) out.push(...tsxFiles(abs));
+    else if (ent.endsWith('.tsx')) out.push(abs);
+  }
+  return out;
+}
 
 /** Every modeId literal handed to a TouchOverlay in a shipped host component. */
 function touchOverlayModeIds(): { file: string; modeId: string }[] {
   const out: { file: string; modeId: string }[] = [];
-  for (const file of readdirSync(GAMES)) {
-    if (!file.endsWith('.tsx')) continue;
-    const src = readFileSync(join(GAMES, file), 'utf8');
+  for (const file of TOUCH_HOST_ROOTS.flatMap(tsxFiles)) {
+    const src = readFileSync(file, 'utf8');
     if (!src.includes('TouchOverlay')) continue;
     // Static literal form: modeId="threepoint"
     for (const m of src.matchAll(/<TouchOverlay[^>]*?modeId="([a-zA-Z_0-9-]+)"/gs)) {
       out.push({ file, modeId: m[1] });
+    }
+    // Local constant form: const MODE_KEY = 'venice_hub'; <TouchOverlay modeId={MODE_KEY} />
+    const constants = new Map<string, string>();
+    for (const m of src.matchAll(/\bconst\s+([A-Z0-9_]+)\s*=\s*'([a-zA-Z_0-9-]+)'/g)) constants.set(m[1], m[2]);
+    for (const m of src.matchAll(/<TouchOverlay[^>]*?modeId=\{([A-Z0-9_]+)\}/gs)) {
+      const modeId = constants.get(m[1]);
+      if (modeId) out.push({ file, modeId });
     }
   }
   return out;

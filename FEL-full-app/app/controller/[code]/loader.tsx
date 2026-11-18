@@ -1,12 +1,10 @@
 'use client';
 
 import dynamicImport from 'next/dynamic';
-import { Loader2 } from 'lucide-react';
+import { GameLoading } from '@/components/games/game-loading';
 
 const spinner = () => (
-  <div className="flex min-h-[100dvh] items-center justify-center bg-[#07090d]">
-    <Loader2 className="h-8 w-8 animate-spin text-[#00E5FF]" />
-  </div>
+  <GameLoading className="min-h-[100dvh] bg-[#07090d]" label="Loading controller…" />
 );
 
 // WebRTC + DeviceOrientation are browser-only; never server-render this.

@@ -20,6 +20,7 @@ import { ReplayInPlaceContext } from './replay-in-place';
 import { BodyControl } from './body-control';
 import { GraphicsToggle } from './graphics-toggle';
 import { PauseButton } from './pause-button';   // gameplay-clean: a pause a thumb can reach (ESC → START, every harness mode)
+import { PageDiagnostics } from './page-diagnostics';
 import { GameCaptureHud } from '@/components/capture/game-capture-hud';
 import { LearnWhileYouWait } from '@/components/learn/learn-while-you-wait';
 import type { SessionTallies } from '@/lib/game-systems';
@@ -37,6 +38,7 @@ import { isFreeDanceResult } from '@/lib/babylon/dance/freeDance';   // lane/dan
 import { PartyInvite } from '@/components/party/party-invite';   // MULTIPLAYER: the results card's door to the party room
 import { formReadStore, formForPost } from '@/lib/move/formRead';   // HOOPS BODY (P10): the run's FORM read, adults only
 import { resultsAction } from '@/lib/creator/hoops/links';   // hoops-builder phase B
+import { veniceReturnHref } from '@/lib/adventure/venice/hubReturn';   // venice-v1: Leave goes back to the court a game came from
 import {
   type CarnivalStop, type CarnivalRunState,
   recordCarnivalResult, clearCarnivalRun,
@@ -151,6 +153,9 @@ function GameShellInner({
   gameProps?: Record<string, unknown>;
 }) {
   const router = useRouter();
+  // venice-v1: a game opened from a Venice court leaves back to that court (lib/adventure/venice/hubReturn); else /play, as before
+  const [leaveHref, setLeaveHref] = useState('/play');
+  useEffect(() => { try { setLeaveHref(veniceReturnHref(window.location.pathname, window.location.search, Date.now()) ?? '/play'); } catch { /* /play */ } }, []);
   const searchParams = useSearchParams();
   const storyNodeId = searchParams.get('story');
   const signatureFlag = searchParams.get('signature');
@@ -709,11 +714,14 @@ function GameShellInner({
             Wrapped, a phone gets two rows: Home · title · BODY, then PRQ · graphics · full screen (measured natural widths
             75 + 108 + 76 and 166 + 118 + 32). BODY comes before the PRQ badge for that split; nothing is shortened. */}
         <div className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5">
+          {/* VENICE (improvement pass phase 1): a game opened from a Venice court goes back to that court from here too
+              (the splash shows this header, not the stage's corner button); every other game keeps Home. */}
           <Link
-            href="/"
+            href={leaveHref === '/play' ? '/' : leaveHref}
+            data-testid="game-header-back"
             className="flex shrink-0 items-center gap-1.5 rounded-md border border-white/10 px-2.5 py-1.5 text-xs font-medium text-white/60 transition-colors hover:border-[#00E5FF]/50 hover:text-[#00E5FF] min-h-11"
           >
-            <ArrowLeft className="h-3.5 w-3.5" /> Home
+            <ArrowLeft className="h-3.5 w-3.5" /> {leaveHref === '/play' ? 'Home' : 'Venice'}
           </Link>
           <div className="min-w-0">
             <h1 className="fel-heading text-xl font-bold leading-none text-white">{title}</h1>
@@ -769,9 +777,9 @@ function GameShellInner({
           <div data-game-chrome data-fel-corner className="pointer-events-none absolute right-2 top-2 z-30 flex items-center gap-1.5">
             <PauseButton />
             <Link
-              href="/play"
+              href={leaveHref}
               aria-label="Leave the game"
-              className="pointer-events-auto grid h-9 w-9 place-items-center rounded-lg border border-white/15
+              className="pointer-events-auto grid h-11 w-11 place-items-center rounded-lg border border-white/15
                          bg-black/50 text-white/70 backdrop-blur-md transition-colors hover:text-white fel-chrome-glass"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -782,7 +790,7 @@ function GameShellInner({
                 type="button"
                 onClick={onFullscreen}
                 aria-label={fsOn ? 'Leave full screen' : 'Full screen'}
-                className="pointer-events-auto grid h-9 w-9 place-items-center rounded-lg border border-white/15
+                className="pointer-events-auto grid h-11 w-11 place-items-center rounded-lg border border-white/15
                            bg-black/50 text-white/70 backdrop-blur-md transition-colors hover:text-white fel-chrome-glass"
               >
                 {fsOn ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
@@ -797,11 +805,14 @@ function GameShellInner({
           </div>
         )}
         {profile ? (
-          <ReplayInPlaceContext.Provider value={registerReplay}>
-            <ThreeDErrorBoundary key={gameKey}>
-              <Game grade={profile.grade} prq={profile.prq} prqDisplay={profile.display} onEnd={handleEnd} {...(gameProps ?? {})} />
-            </ThreeDErrorBoundary>
-          </ReplayInPlaceContext.Provider>
+          <>
+            <PageDiagnostics mode={mode} active={!isBabylon(mode) && !result} />
+            <ReplayInPlaceContext.Provider value={registerReplay}>
+              <ThreeDErrorBoundary key={gameKey}>
+                <Game grade={profile.grade} prq={profile.prq} prqDisplay={profile.display} onEnd={handleEnd} {...(gameProps ?? {})} />
+              </ThreeDErrorBoundary>
+            </ReplayInPlaceContext.Provider>
+          </>
         ) : !unreachable ? (
           <div role="status" className="flex h-[60vh] flex-col items-center justify-center gap-3">
             <Loader2 aria-hidden className="h-8 w-8 animate-spin text-[#00E5FF]" />

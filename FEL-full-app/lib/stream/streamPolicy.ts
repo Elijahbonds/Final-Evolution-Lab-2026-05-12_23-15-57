@@ -1,13 +1,13 @@
 // STREAM POLICY — who may broadcast, what goes out, and who is told (2026-09-13).
 //
 // Owner: "I need people to be able to stream themselves playing this game", and on which kind: all three —
-// in-app spectating, broadcast to Twitch/YouTube, and a local recording they can post themselves.
+// in-app spectating, an external broadcast relay, and a local recording they can post themselves.
 //
 // WHAT IS ACTUALLY BUILDABLE HERE, stated plainly rather than discovered later:
 //   · SPECTATE  — real, and shipped. Same WebRTC mesh as voice: the canvas is captured and sent to viewers.
 //   · RECORD    — real, and shipped. MediaRecorder on the canvas, saved to a file the player keeps.
 //   · BROADCAST — NOT shippable from a browser alone and this file does not pretend otherwise. Browsers
-//                 cannot speak RTMP, so Twitch/YouTube need a relay that takes WebRTC or WebSocket in and
+//                 cannot speak RTMP, so external broadcast targets need a relay that takes WebRTC or WebSocket in and
 //                 pushes RTMP out. That is infrastructure somebody has to run and a stream key somebody has
 //                 to enter. The seam is here and typed; `BROADCAST_READY` is false until a relay exists, and
 //                 the UI must read that rather than offering a button that fails.
@@ -52,7 +52,7 @@ export function eligibility(kind: StreamKind, s: StreamSubject): StreamEligibili
   if (kind === 'broadcast' && !BROADCAST_READY) {
     return {
       allowed: false, reason: 'unavailable',
-      message: 'Broadcasting to Twitch and YouTube isn’t switched on yet. You can still go live in-app or record a clip.',
+      message: 'External broadcasting isn’t switched on yet. You can still go live in-app or record a clip.',
     };
   }
   if (!s.consented) {

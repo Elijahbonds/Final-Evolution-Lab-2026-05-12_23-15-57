@@ -122,10 +122,18 @@ const INSTRUMENT = `(() => {
     for (const ps of scene.particleSystems) parts += ps.getActiveCount ? ps.getActiveCount() : 0;
     const act = scene.getActiveMeshes();
     let verts = 0; for (let i = 0; i < act.length; i++) verts += act.data[i].getTotalVertices();
-    R.frames.push({
+    const fr0 = {
       work: te - tb, update: ta - tb, anim: taa - ta, render: te - taa,
       draws: si.drawCallsCounter.current, shadowDraws: sd, rtDraws: od, meshes: act.length, verts, parts, psys: scene.particleSystems.length,
-    });
+    };
+    // hoops-items (TRACE_WORST=1): the shadow cache's bakes so far and why the last one ran, and the body merge's counters, per frame
+    if (${process.env.TRACE_WORST === '1'}) {
+      const sc = scene.metadata && scene.metadata.felShadowCache; const st = sc ? sc.stats() : null;
+      const bm = scene.__felBodyMerge; const ms = bm ? bm.stats() : null;
+      Object.assign(fr0, { bakes: st ? st.bakes : -1, bakeWhy: st ? String(st.lastReason) : '', cacheState: st ? st.state : '', moving: st ? st.moving : -1, statics: st ? st.statics : -1,
+        swapped: ms ? ms.swapped : -1, dissolves: ms ? ms.dissolves : -1, builds: ms ? ms.builds : -1, lastDissolve: ms ? String(ms.lastDissolve).slice(0, 80) : '', g: Math.round((performance.now() - R.t0) / 16.667) });
+    }
+    R.frames.push(fr0);
     ta = 0;
   });
   return 'ok';
@@ -248,6 +256,9 @@ async function run(b: Browser, mode: string, profile: string): Promise<Row> {
       churnMbPerS: heapRec.churn / 1048576 / Math.max(0.1, (heapRec.now - heapRec.t0) / 1000), calibMs: pct(heapRec.calib, 0.5),
       fillMpx: (Number(snap.backingPx) * (1 + postPasses) + shadowPx) / 1e6,
       ...snap, govLog, errors: errs.length, err0: errs[0],
+      // hoops-items (TRACE_WORST=1): the 6 frames with the most draws, each with what the shadow cache and the body merge did on it
+      ...(process.env.TRACE_WORST === '1' ? { worstFrames: f.map((x, i) => ({ i, ...x, bakedHere: i > 0 && x.bakes > f[i - 1].bakes })).sort((a, b) => b.draws - a.draws).slice(0, 6),
+        bakesInPlay: f.length ? f[f.length - 1].bakes - f[0].bakes : 0, bakeFrames: f.filter((x, i) => i > 0 && x.bakes > f[i - 1].bakes).map((x) => ({ g: x.g, draws: x.draws, shadowDraws: x.shadowDraws, why: x.bakeWhy, swapped: x.swapped, dissolves: x.dissolves })) } : {}),
     };
   } catch (e) {
     return { mode, profile, ok: false, crashed, note: String((e as Error).message).slice(0, 140) };

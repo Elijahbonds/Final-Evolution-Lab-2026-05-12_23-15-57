@@ -1,0 +1,153 @@
+# The Coast & Islands: the first open zone (lane/coast-islands, 2026-11-18)
+
+**Owner, 2026-11-12 and 2026-11-17.** The world is big open zones joined by a Venice Beach hub town, with a load between
+zones. The bar is the open zones of DBZ Kakarot, Pokémon Legends Arceus, Sword and Scarlet — **a bar only**: no names, art,
+creatures, maps or UI of theirs. A zone's life is flying and riding, creatures and partners, side quests and towns, and
+sports spots everywhere. **The first zone is the Coast & Islands.** You travel with **one partner** and keep a **creature
+log**. Play is **party-only** (nobody but your party walks your zone). Art comes from the shipped kits, procedural pieces and
+the owner's Meshy (owner 2026-11-17, default 6). Every name here is `[PLACEHOLDER]` until the owner names it.
+
+This file is the zone's build plan, phases A to F. Phase A is built (below); B to F are next.
+
+---
+
+## 1. What the engine already has (the survey)
+
+| Piece | Where | What the zone takes from it |
+|---|---|---|
+| The Adventure host: a fixed 60 Hz step, the systems, the input, the camera hints | `lib/babylon/adventure/host/*` | The zone runs ONE host with the movement only, exactly as the Venice hub does |
+| Movement: run, jump, dash, slopes, steps, riding, flight | `lib/babylon/adventure/movement/*`, `flight/*` | Walk, run and jump now; riding and flight are phase E. **No movement or camera number is changed** |
+| World pieces: flats, ramps, blocks, the ground and sight questions | `adventure/world/pieces.ts`, `host/hostWorld.ts` | The zone's WorldSource answers the same two questions from a heightfield |
+| 64 m pieces | `world/pieces/brTiles.ts` (the BR's 5 × 5 tiles), `lib/adventure/venice/layout.ts` (`PIECE_M`, `tiersAround`) | The same 64 m piece and the same full / LOD / far rings. **There was no streaming code yet** (the plan's V3); phase A adds a small streamer for the zone (below) |
+| The partner: brain, identity, fusion, evolution | `adventure/partner/*` | Phase B: one partner travels with you |
+| Monsters and their defs, the bestiary | `adventure/combat/monsters`, `world/ch1/bestiary.ts` | Phase C: the zone's creatures and the log |
+| Story beats and quests | `core/StoryHub.ts` `QuestDef`, `adventure/story/*` | Phase D: side quests |
+| The Venice hub on the host, its page, its phone row and guard | `VeniceHubMode`, `app/play/venice/**`, `scripts/venice-hub-budget-tests.ts` | The zone is built the same way (the Venice files are the Venice lane's and are not touched) |
+| The floating phone stick | `lib/babylon/ui/floatStick.ts`, `TouchOverlay` `FLOAT_STICK_MODES` | The zone walks on it |
+| The Creator look at the hoops builder's height, the body merge | `CharacterPipeline.spawnPlayer`, `hoops/ratedPlay` `ratedLookScale`, `core/bodyMerge.ts` | The player is spawned exactly as in Venice |
+| Island and sea content | `coastal-links` golf, the surf breaks, Coconut Cove (aero), Harbor Run (kart), Night Beach; the Venice sea | Their MODES are the zone's sports spots (phase D). Their art is mode-sized; the zone draws its own sea and terrain from the same procedural approach |
+| Shipped art the zone can use | `public/models/props/nature` (Kenney, CC0: palms, rocks, bushes), `public/models/meshy` (the owner's surfboard), `visual/groundTextures` (the sand tile) | Used now |
+
+---
+
+## 2. The zone, as built in phase A
+
+`/play/coast` (unlisted, noindex) mounts **`CoastZoneMode`** (`lib/babylon/modes/CoastZoneMode.ts`, registered, not in
+`ENABLED_BABYLON_MODES`) on the Adventure host: walk, run, jump; no partner, no creatures, no combat yet.
+
+**The map** (`lib/adventure/coast/zoneLayout.ts`, the Venice frame: x west to east, north is −z, the sea to the west):
+
+- **6 × 6 pieces of 64 m (384 m)**, the plan's first cut. About 60 % is water you cannot stand in.
+- **The mainland**: a curving beach strip along the east side, sand to the dune line, grass behind, palms along the dunes.
+- **The Landing** [PLACEHOLDER]: the arrival dock, a jetty out from the beach. **The boat from Venice is moored at its end.**
+  You arrive on the dock, facing Palm Key.
+- **Palm Key** [PLACEHOLDER]: the near island, palms and a low hill, joined to the beach by **the Boardwalk Bridge**.
+- **Reef Rock** [PLACEHOLDER]: the far island, rocks and sea stacks, reached by **wading the sandbar** from Palm Key.
+- **The sea**: shallows you can wade (to 0.85 m deep), then deep water. On the ground deep water stops you like a wall; a
+  jump off the dock that ends over deep water puts you back where you could stand (`coast.deepWaterTurnBack`).
+
+**The ground and the picture are one function.** `terrainY(x, z)` is the sim's ground (`zoneWorld.ts`) and the drawn
+terrain's height (`zoneView.ts`), so what you see is what you stand on.
+
+**Streaming** (`ZoneStreamer`, `zoneView.stream`): each 64 m piece with land or shallows has its own terrain mesh. The 3 × 3
+pieces round you are drawn fine (2 m) with every prop; the next ring (the 5 × 5) coarse (8 m) with only the tall props
+(palms, sea stacks); everything further, coarse only. A fine mesh is built when its piece reaches the 5 × 5 (ready before
+you arrive) and dropped when it falls to far. A piece drops its detail only one piece after leaving its ring
+(hysteresis), and nothing changes until you cross into another piece. Open-sea pieces draw nothing of their own: one sea
+plane and one sea floor travel with the camera. Each prop model is loaded once and drawn as thin instances of the pieces
+that want it.
+
+**The way in and out** (`lib/adventure/coast/door.ts`):
+- **From Venice (to be wired by the Venice lane):** Venice's pier end (`pier.end` in `lib/adventure/venice/layout.ts`,
+  `zone: 'coast'`) calls `router.push(coastEntryHref('pier.end'))` → `/play/coast?from=venice&spot=pier.end`. That is the
+  whole hook. The zone does not need it to work: any visit arrives on the dock.
+- **Back to Venice:** the boat on the dock (walk into its ring: "Back to Venice") and the "Venice" corner link both go to
+  `veniceReturnHref(search)` → `/play/venice?spot=pier.end`. For the player to land at the pier end, Venice reads
+  `?spot=pier.end` the way it already reads a court's spot; until it does, the hub's normal start.
+
+**Phone budget**: the `coast_zone` row in `lib/babylon/config/mobileBudget.json`, measured on the phone rig
+(`scripts/probes/coast-islands/zone-rig.mts`) against the Venice hub in the same session, and the static guard
+`scripts/coast-zone-budget-tests.ts` (section 4).
+
+---
+
+## 3. The phases
+
+Sizes are lane-weeks of one agent lane (S ≤ 1, M 1–2, L 2–3, XL 3–5). Marks: **OWNER** (a name, a decision, a device
+test), **GATE 0** (animation or rig work: verify the rig first), **ART** (beyond the shipped kits, procedural and Meshy).
+
+| Phase | Delivers | Size | Exit gates (all measured) | Marks |
+|---|---|---|---|---|
+| **A — The walkable shell** (BUILT, this lane) | `/play/coast` on the Adventure host: the beach, the sea, Palm Key and Reef Rock, the dock with the boat, the bridge, the sandbar; 64 m streaming; the Creator look at builder height; the boat back to Venice and the Venice hook; the `coast_zone` phone row and guard | M | Both islands reached on the real host headless; deep water holds; streaming rings and hysteresis tested; the phone row inside budget with the guard's control failing; every-screen clean on `/play/coast`; tsc, ci-suite, vitest green | OWNER: the walk on a phone, the names |
+| **B — The partner and the creature log** | One partner walks with you from the dock (the Adventure's `partner/*`: brain, identity; follow, wait, come here); the log screen (every creature seen and befriended), saved in the Adventure save on the device | M | The partner keeps up across the bridge and the sandbar headless; never stands in deep water; the log saves and reloads; the budget holds with two bodies | OWNER: the partner's look and name; "befriend" is our verb (VENICE-HUB-PLAN q. 11). GATE 0 if the partner is not a humanoid |
+| **C — Creatures** | Three to five creature kinds on the islands and the shallows, built from the Creator's parts first, the owner's Meshy for one signature creature; idle, wander, flee, follow; befriend one into the log (no fights in the first cut) | L | Each kind spawns, wanders and despawns with its piece's streaming; a befriend completes headless; at most 6 creatures in the 3 × 3; the budget holds | **GATE 0** (a non-humanoid rig), ART (creature bodies), OWNER: the creature direction (q. 10) |
+| **D — The harbour town, side quests, sports spots** | A small harbour town on the mainland (the kit, procedural first); 2–3 side quests in the story's beat and quest format; sports spots that open their modes with `?from=coast&spot=`: golf (coastal-links), surf (the breaks), Aero Aces (Coconut Cove), Velocity Kart (Harbor Run), Beach Rally; the end screen's way back to the zone | L | Each spot launches its mode in one tap and returns to it; a side quest completes headless; the town's pieces within the per-piece budget | OWNER: the town's and the spots' names. A one-line route in `end-screen.tsx` (the end screen's owner) |
+| **E — Riding and flying** | Riding the partner over the shallows and the sea between the islands (the movement's `riding`), short glides; the fused cruise capped inside the zone (VENICE-HUB-PLAN q. 9); load-ahead two pieces ahead at speed | L | Ride to every island; no frame over 100 ms from a load at riding speed; the budget holds at speed | OWNER: when flight unlocks (Adventure decision 10); the cruise cap is a new feel knob |
+| **F — Growth and finish** | The zone to its full 12 × 12 (768 m): more islands and reefs, the far silhouette, a sky that suits it; the Venice door wired end to end with the boat's short load; online presence for the party | XL | Door → zone playable ≤ 8 s and full ≤ 20 s on the owner's phone; a 10-minute walk with texture memory flat; the Venice → coast → Venice round trip E2E | OWNER: the device test, the names, the netd redeploy for presence |
+
+Not started in this run: the partner, creatures, flying, riding, quests (phases B to E).
+
+---
+
+## 4. Phase A, measured
+
+**The phone rig** (`scripts/probes/coast-islands/zone-rig.mts`, 2026-11-18 08:50–09:20 UTC): the real mode bundled with esbuild, a
+phone (390 × 844, DPR 3, touch), SwiftShader, the page's JS throttled 4× until it is playable; the zone and **the Venice hub as the
+same-session control**, interleaved, three runs each; then the zone with streaming off. The walk: from the dock along the beach
+toward the bridge, crossing four 64 m pieces. SwiftShader overstates a phone; the comparison with the control is the point.
+
+| Run | Playable (s) | Worst frame: draws / active meshes / texture MB / bodies | Fine pieces / props drawn (max) |
+|---|---|---|---|
+| Zone 1 · 2 · 3 | 34.7 · 32.4 · 28.3 (median 32.4) | 60 / 34 / 37 / 1 (all three within 1) | 16 / 147 |
+| Venice hub (control) 1 · 2 · 3 | 38.9 · 33.1 · 33.3 (median 33.3) | 48 / 51 / 73 / 1 | — |
+| Zone, streaming off (`coast.streamOn` 0) | 31.2 | 59 / 35 / 37 / 1 | 30 / 187 |
+
+- **The zone is playable as fast as the Venice hub** on the same rig and session (median 32.4 s against 33.3 s), and costs fewer
+  active meshes and half the texture memory (37 MB against 73 MB). It draws 12 more calls than the hub (60 against 48): one per
+  land piece's terrain mesh. All well inside the phone plan's 450 draws / 300 meshes / 200 MB.
+- **Streaming** halves what is drawn in triangles (the guard: the worst standable piece 38,568 triangles, 75,858 with streaming
+  off) and drops props and fine terrain pieces by a third on the rig (147 against 187 props, 16 against 30 fine pieces). It
+  does not change draw calls: every land piece always draws one terrain mesh, fine or coarse.
+- **Frame time on the rig** (rAF gaps while walking, throttle off): the zone's worst frame was 3.5 / 2.1 / 1.5 s against the
+  hub's 1.4 / 1.7 / 1.2 s (p95 1.8 / 1.2 / 1.0 s against 1.2 / 1.2 / 0.7 s). The rig draws a 1170 × 2532 phone frame in software,
+  so these are the rig's, and three runs do not separate the zone from the box's noise; the zone does more on a walk (it crosses
+  pieces and builds terrain). **Not measured on a phone.** Phase F's gate (no frame over 100 ms from a load) needs the owner's
+  phone or a GPU rig; if a hitch shows, building a crossing's new fine pieces one per frame is the first fix.
+- The `coast_zone` row in `lib/babylon/config/mobileBudget.json`: measured 60 / 34 / 1 / 37 / 0, budget (× 1.2) 72 / 41 / 2 / 45 / 0.
+- **The static guard** `scripts/coast-zone-budget-tests.ts` (in ci-suite): the worst standable piece's triangles (38,568, cap
+  40,400) and place draws (51, cap 53), the place's textures (2.1 MB: only procedural; the Kenney models carry none), the model
+  list, and its **control**: streaming off must come out over the triangle cap (it does: 75,858).
+
+**Headless, on the real Adventure host** (`lib/adventure/coast/coast.test.ts`): dock → beach → bridge → Palm Key → sandbar →
+Reef Rock, every leg reached, never in deep water; running off the dock stops at the deep water; a jump off its side is turned
+back, and with `coast.deepWaterTurnBack` 0 (the control) the same jump does end over deep water.
+
+**Pictures** (phone, JPG, from the rig): arrival on the dock; the beach from the shallows; Palm Key and the bridge from beside it,
+in `scratchpad/coast-islands/` (paths in the lane report).
+
+**Every-screen on `/play/coast`: not scored in this run.** The scorer needs a production build (3.2 GB); two builds were killed
+for memory beside other lanes' builds, the third succeeded but was deleted to free disk before the scorer's turn, and the disk
+then stayed under the 7 GB-free rule (3.4 GB free). The page is built the same way as `/play/venice`, which scored clean
+(VENICE-HUB-PLAN §8): a back link (here "Venice"), 16 px text, 44 px targets, one action. It needs a scorer run before the
+zone is linked from anywhere.
+
+**Found and fixed on the way:** the palms were never drawn on the first rig run — a Babylon clone keeps its source's parent, so
+the baked prop masters were disposed with the import's root (held now by `zoneProps.test.ts`, mutation-checked).
+
+---
+
+## 5. Flags and assumptions
+
+- `assumption:` the zone's layout — which side the mainland is on, the islands' places and sizes, the dock, the bridge and
+  the sandbar — is a [TUNE] placeholder for the owner's walk. The frame is Venice's (the sea to the west), so the boat from
+  Venice's west-facing pier lands on a west-facing beach.
+- `assumption:` wading to 0.85 m deep, and a beach whose shallows run 12 m out before the drop. New numbers, not feel knobs:
+  they are the shape of the land, held by the tests.
+- `assumption:` the boat is a placeholder built from boxes (procedural, like the hub's placeholders); the owner's Meshy can
+  replace it.
+- New knobs (Coast · zone, `docs/FEEL-PANEL.md`): `coast.streamOn`, `coast.streamFull`, `coast.streamLod`, `coast.streamKeep`,
+  `coast.deepWaterTurnBack`. No shipped number moved.
+- Props are scenery: you walk through a palm or a rock (no collision), as in Venice. A rock you cannot walk through is phase
+  D's (a block piece under each big rock).
+- The sky: the harness's painted ocean dome travels with the camera, as the Adventure's story does (`AdventureMode`).
+- No Venice file was touched. The Venice hook is described in section 2 and in `lib/adventure/coast/door.ts`.

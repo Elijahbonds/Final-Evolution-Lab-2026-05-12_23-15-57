@@ -20,6 +20,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import type { InputBus } from '../core/InputBus';
 import { MODE_VERBS, type VerbButton } from './modeVerbs';
 import { touchDeckLayout, type TouchDeckLayout } from '@/lib/ui/consoleView';
+import { dpadLayout, TOUCH_DPAD_TAP_ON, DPAD_OLD_ARM_PX } from './dpadTap';   // hoops-items: the d-pad at a 44 px tap target
 // THE CYPHER'S PAD (lane/dance-extras, 2026-10-14): dance draws its own thumb pairs in place of the generic rig below — the
 // same overlay (bus, safe-area, fit), the same verbs (MODE_VERBS.dance); see lib/babylon/dance/ui/padModel.ts (what each button is) and padStore.ts (what the room tells it).
 import { DancePad } from '@/lib/babylon/dance/ui/DancePad';
@@ -117,7 +118,7 @@ export function TouchOverlay(props: { bus: InputBus; modeId: string; visible: bo
       : 'pointer-events-none absolute inset-x-0 bottom-0 z-30 h-[44vh] bg-gradient-to-t from-black/85 to-transparent'}>
       {/* compact: the stick in the corner and the d-pad inboard of it (row-reverse keeps the DOM order) */}
       <div ref={colL} className={`pointer-events-auto absolute bottom-3 left-3 flex gap-2 ${compact ? 'flex-row-reverse items-end' : 'flex-col items-center'}`} style={lifted(compact ? COMPACT_LEFT : SAFE_LEFT, cs * fit.l, 'bottom left')}>
-        <DPad bus={props.bus} />
+        {DEAD_DPAD.has(props.modeId) && feel('touch.dpadTapOn', TOUCH_DPAD_TAP_ON) >= 0.5 ? <HollowDPad /> : <DPad bus={props.bus} layout={deck} />}
         {DEAD_L_STICK.has(props.modeId) ? <HollowStick /> : FLOAT_STICK_MODES.has(props.modeId) && feel('touch.floatStick', TOUCH_FLOAT_STICK) > 0 ? <FloatStick bus={props.bus} /> : <AnalogStick bus={props.bus} side="L" label="MOVE" />}
       </div>
       {compact ? (
@@ -184,7 +185,7 @@ function AnalogStick({ bus, side, label }: { bus: InputBus; side: 'L' | 'R'; lab
 
 /** lane/move-feel-2 (owner 2026-11-17): the modes whose MOVE stick floats (lib/babylon/ui/floatStick; knob `touch.floatStick`, 0 = the fixed
  *  stick): the two hoops modes, where the diagnosis measured it. Every other mode keeps the fixed stick. */
-export const FLOAT_STICK_MODES: ReadonlySet<string> = new Set(['onevone', 'threevthree', 'venice_hub']);   // venice-v1: the hub walks on the courts' stick
+export const FLOAT_STICK_MODES: ReadonlySet<string> = new Set(['onevone', 'threevthree', 'venice_hub', 'coast_zone']);   // venice-v1: the hub walks on the courts' stick; coast-islands: the zone walks on the hub's
 
 /** THE FLOATING MOVE STICK (lane/move-feel-2): a zone the thumb lands in; the stick's centre appears under the thumb (so the first contact
  *  is a standstill), 1.5× today's base, full speed at its rim, a 10 % dead zone (floatStick.ts). At rest a faint base shows where to put
@@ -238,13 +239,57 @@ function FloatStick({ bus }: { bus: InputBus }) {
  *  inert dashed ring now, like an unbound right stick. touchOverlayFit.test.ts holds each to its mode file reading no L stick. */
 export const DEAD_L_STICK: ReadonlySet<string> = new Set(['baseball', 'sprint', 'brainbrawl', 'who_scene_it']);
 
+/** hoops-items (2026-11-18, dpadTap.ts): the modes whose D-PAD does nothing on the touch deck — 1v1 reads no d-pad at all and 3v3 only answers
+ *  it with "MOVE WITH THE STICK". The owner's rule for a slot a mode does not use (2026-09-05: it keeps its place and renders HOLLOW, not
+ *  pressable; DEAD_L_STICK did the same for the stick) applies: an inert dashed cross where the 24 px arrows were — no tap target under 44 px,
+ *  the same 72 px in the column, so the floating stick and TURBO keep their places (a 44 px d-pad there would cover TURBO upright: measured,
+ *  dpad.mjs). touchOverlayFit.test.ts holds each to its mode file using no d-pad as a verb. With touch.dpadTapOn 0: the old 24 px cross. */
+export const DEAD_DPAD: ReadonlySet<string> = new Set(['onevone', 'threevthree']);
+
+function HollowDPad() {
+  const arm = 'absolute rounded-sm border border-dashed border-white';
+  return (
+    <div aria-hidden="true" data-dpad-shape="hollow" className="pointer-events-none relative h-[72px] w-[72px] opacity-30">
+      <div className={`${arm} left-1/2 top-0 h-6 w-6 -translate-x-1/2`} /><div className={`${arm} bottom-0 left-1/2 h-6 w-6 -translate-x-1/2`} />
+      <div className={`${arm} left-0 top-1/2 h-6 w-6 -translate-y-1/2`} /><div className={`${arm} right-0 top-1/2 h-6 w-6 -translate-y-1/2`} />
+    </div>
+  );
+}
+
 function HollowStick() {
   return <div aria-hidden="true" className="pointer-events-none h-24 w-24 rounded-full border border-dashed border-white opacity-30" />;
 }
 
-function DPad({ bus }: { bus: InputBus }) {
+function DPad({ bus, layout }: { bus: InputBus; layout: TouchDeckLayout }) {
   const press = (dir: 'up' | 'down' | 'left' | 'right') => () => bus.emit({ t: 'dpad', dir, pressed: true });
   const release = (dir: 'up' | 'down' | 'left' | 'right') => () => bus.emit({ t: 'dpad', dir, pressed: false });
+  // hoops-items (dpadTap.ts): the arrows at a 44 px tap target as drawn — a row of four upright, a 44 / 52 px cross otherwise
+  const big = dpadLayout(layout, feel('touch.dpadTapOn', TOUCH_DPAD_TAP_ON) >= 0.5);
+  if (big.arm !== DPAD_OLD_ARM_PX) {
+    const a = big.arm;
+    const cell = 'flex touch-none select-none items-center justify-center border border-white/15 bg-white/8 text-[16px] text-white/60 active:bg-white/25 active:text-white';
+    const arrow = (dir: 'up' | 'down' | 'left' | 'right', glyph: string, label: string, style: React.CSSProperties, round: string) => (
+      <button key={dir} type="button" aria-label={label} data-dpad={dir} className={`${cell} ${round}`} style={{ width: a, height: a, ...style }}
+        onPointerDown={press(dir)} onPointerUp={release(dir)} onPointerCancel={release(dir)} onPointerLeave={release(dir)}>{glyph}</button>
+    );
+    if (big.shape === 'row') {
+      return (
+        <div data-dpad-shape="row" className="flex" style={{ width: big.w, height: big.h }}>
+          {arrow('left', '◀', 'D-pad left', {}, 'rounded-l-md')}{arrow('up', '▲', 'D-pad up', {}, '')}
+          {arrow('down', '▼', 'D-pad down', {}, '')}{arrow('right', '▶', 'D-pad right', {}, 'rounded-r-md')}
+        </div>
+      );
+    }
+    return (
+      <div data-dpad-shape="cross" className="relative" style={{ width: big.w, height: big.h }}>
+        {arrow('up', '▲', 'D-pad up', { position: 'absolute', left: a, top: 0 }, 'rounded-t-md')}
+        {arrow('down', '▼', 'D-pad down', { position: 'absolute', left: a, bottom: 0 }, 'rounded-b-md')}
+        {arrow('left', '◀', 'D-pad left', { position: 'absolute', left: 0, top: a }, 'rounded-l-md')}
+        {arrow('right', '▶', 'D-pad right', { position: 'absolute', right: 0, top: a }, 'rounded-r-md')}
+        <div className="absolute rounded-sm bg-white/5" style={{ left: a, top: a, width: a, height: a }} />
+      </div>
+    );
+  }
   const seg = 'absolute flex touch-none select-none items-center justify-center border border-white/15 bg-white/8 text-[12px] text-white/50 active:bg-white/25 active:text-white';
   return (
     <div className="relative h-[72px] w-[72px]">

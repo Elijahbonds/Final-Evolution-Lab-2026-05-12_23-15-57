@@ -308,7 +308,17 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'hoops.moveArmRateDeg', label: 'Move ease: arm limit mid-move', def: 1800, min: 600, max: 5000, step: 50, unit: '°/s', group: 'Hoops · handle (rest)',
     source: 'lib/babylon/anim/MoveEase.ts MOVE_ARM_RATE_DEG',
     hint: 'The fastest an arm bone may turn through the rest of a move.',
+  },  {
+    id: 'hoops.moveHandEaseOn', label: 'Moves: the hands ease too (1) / as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/MoveEase.ts MOVE_HAND_EASE_ON',
+    hint: 'On: through a handle move no hand turns faster than the rate below from where it was drawn (the behind-the-back hand whip). Off: as before.',
   },
+  {
+    id: 'hoops.moveHandRateDeg', label: 'Moves: fastest a hand turns', def: 1800, min: 600, max: 4000, step: 100, unit: '°/s', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/MoveEase.ts MOVE_HAND_RATE_DEG',
+    hint: 'With the hand ease on: how fast a hand may turn in a move.',
+  },
+
   {
     id: 'hoops.jumperHopOn', label: 'Jumper hop timed to the release on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · jump shot',
     source: 'lib/babylon/core/JumperHop.ts JUMPER_HOP_ON',
@@ -879,6 +889,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'touch.floatStick', label: 'Phone: floating move stick (1) / fixed (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · movement',
     source: 'lib/babylon/ui/floatStick.ts TOUCH_FLOAT_STICK',
     hint: '1v1 and 3v3 on a touch screen. 1 = the stick appears under the thumb, 1.5 times the old size, a 10 percent dead zone. 0 = the old fixed 96 px stick.',
+  },
+  {
+    id: 'touch.dpadTapOn', label: 'Phone: d-pad arrows a 44 px tap (1) / 24 px (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · movement',
+    source: 'lib/babylon/ui/dpadTap.ts TOUCH_DPAD_TAP_ON',
+    hint: 'Every mode on a touch screen. 1 = each d-pad arrow is at least 44 px as drawn: a row of four on an upright phone, a bigger cross sideways. 0 = the old 24 px cross.',
   },
   // lane/move-feel (new, 2026-11-12): the walk / jog line eased (0 = the step as shipped) — GEARS_HANDLER only (the dunk run-up never reads it)
   {
@@ -1675,6 +1690,34 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/visual/VenueProps.ts PROP_MERGE_ON',
     hint: 'A prop model whose parts share a material (the far pier: fifteen parts, two materials) is drawn as one mesh per material. Same picture. 0 = one draw per part, as before.',
   },  {
+    id: 'venue.veniceLookV2', label: 'Venice hub: fences, benches, light poles, name boards, lit grounds (1) / V1 look (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/adventure/venice/courtsDressing.ts VENICE_LOOK_V2',
+    hint: 'The park furniture round the four courts (one draw each: merged fences and posts, thin-instanced benches and poles, one board atlas) and PBR grounds and sea. 0 = V1, with its floating name signs.',
+  },  {
+    id: 'venue.veniceLife', label: 'Venice hub: gulls, and watchers at the run on desktop (1) / an empty park (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/adventure/venice/hubLife.ts VENICE_LIFE',
+    hint: 'A few gulls over the sea (one thin-instanced draw; a phone flies half) and, on desktop and up only, people standing at Court 2 and by the other courts (the shipped crowd bodies). A phone gets no people: its crowd policy is cut-out cards. 0 = V1, an empty park.',
+  },  {
+    id: 'venue.veniceSound', label: 'Venice hub: beach bed, far games, the run, footsteps (1) / the harness crowd bed only (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/adventure/venice/hubSound.ts VENICE_SOUND',
+    hint: 'The ocean bed, dribbles and shots from pickup games down the beach, the run cheering now and then near Court 2, and your steps (concrete vs sand). Through SoundKit: mute and volume apply. 0 = V1 (the mood crowd bed on first input).',
+  },  {
+    id: 'venue.veniceSolids', label: 'Venice hub: hoops, fences, benches, poles, palms and the boardwalk row are solid (1) / walk through (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/adventure/venice/hubSolids.ts VENICE_SOLIDS',
+    hint: 'Block pieces for the props round the courts (the movement sim\'s own wall rule; no movement number changes). The walk-up side of each fence stays open. 0 = V1, where the player walked through them.',
+  },  {
+    id: 'venue.walkupV2', label: 'Venice hub: the card on the court or in its ring, after a short dwell (1) / a 28 m box round the court (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/adventure/venice/hubSolids.ts WALKUP_V2',
+    hint: 'The court card comes up when you stand on the court or in its gold ring for a quarter second, and stays until you are a metre past. 0 = V1 (anywhere in a box round the court, behind its fence too, at once).',
+  },  {
+    id: 'venue.veniceWayfinding', label: 'Venice hub: first-visit hint, mini-map, Enter / X / Y on the card (1) / none (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/adventure/venice/hubUi.ts VENICE_WAYFINDING',
+    hint: 'A one-time line saying what to do, a small north-up map of the four courts with you on it, and keys for the card (Enter or X plays, Y plays with your party). 0 = V1.',
+  },  {
+    id: 'venue.deferScenery', label: 'Venice hub: paint and far scenery after you can move (1) / during the load (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/adventure/venice/courtsView.ts VENICE_DEFER_SCENERY',
+    hint: 'The hub loads the courts in their plain colour and you first; the painted courts, the palms and the boardwalk row arrive once you can walk. 0 = all of it during the load, as V1.',
+  },  {
     id: 'perf.veniceSharedCourt', label: 'Venice hub: one court mesh for the four courts (1) / one per court (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
     source: 'lib/adventure/venice/courtsView.ts VENICE_SHARED_COURT',
     hint: 'The hub draws one court mesh at all four courts. Same picture. 0 = a mesh, material and detail map per court, as the prototype did (about 4 MB more on a phone, measured).',
@@ -1693,9 +1736,25 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
   },
   // ── lane/hoops-perf (owner 2026-11-12: join each body into one mesh; cut the heap churn) ──
   {
+    id: 'perf.meterWgslOn', label: 'WebGPU try: the shot meter drawn by its WebGPU shader (1) / not drawn (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/babylon/visual/ShotMeter3D.ts METER_WGSL_ON',
+    hint: 'Only under the owner WebGPU try (?engine=webgpu). 1 = the 3D shot meter has a WebGPU version of its shader. 0 = as before (missing under WebGPU). WebGL is the same either way.',
+  },
+  {
     id: 'perf.bodyMergeOn', label: 'Bodies: parts drawn by a few meshes (1 phone, 2 every tier) / one mesh per part (0)', def: 1, min: 0, max: 2, step: 1, unit: '', group: 'Hoops · phone budget',
     source: 'lib/babylon/core/bodyMerge.ts BODY_MERGE_ON',
     hint: 'Every mode: once a body holds still, its parts that the renderer treats alike share one mesh (one sub-mesh per part, the same shaders, draw order and ink). Any change puts the parts back that frame. Same picture, fewer active meshes. 1 = the phone tier (measured identical there), 2 = every tier, 0 = one mesh per part, as before.',
+  },
+  // ── lane/kit-mac-jobs (owner 2026-11-18: the clothes look poofy; the two Blender jobs, the one-piece short and the new jerseys) ──
+  {
+    id: 'kit.onePieceShorts', label: 'Kit body short: one piece, fitted (1) / three pieces, as before (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Kit · garments',
+    source: 'lib/babylon/core/kitGarmentSet.ts ONE_PIECE_SHORTS',
+    hint: 'The kit bodies wear the one-piece court short made in Blender (a real crotch, fitted to the legs and seat) in place of the three-piece short whose legs crossed into each other. Applies to the next body loaded. 0 = the three-piece short.',
+  },
+  {
+    id: 'kit.newJerseys', label: 'Kit body tops: the new basketball and football jerseys (1) / as before (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Kit · garments',
+    source: 'lib/babylon/core/sportKitDefaults.ts NEW_JERSEYS',
+    hint: 'The kit bodies carry the basketball jersey (the basketball modes default top) and the football jersey (in place of the Meshy football pack), both cut from the free MakeHuman tees and fitted close. Applies to the next body loaded. 0 = the tops as before.',
   },
   // ── hoops-p09 (1v1 / 3v3 phase 9 "one rulebook": the play audit's sinkers 2 to 6 and 10) ──
   {
@@ -1808,6 +1867,22 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'hoops.passCatchVol', label: 'Catch: volume', def: 0.7, min: 0, max: 1.5, step: 0.05, unit: '', group: 'Hoops · sound',
     source: 'lib/babylon/audio/dribbleSound.ts PASS_CATCH_VOL',
     hint: 'How loud a caught pass is.',
+  },
+  // ── hoops-items (2026-11-18): three sound leftovers of hoops-sound, each NEW, its off value the sound as before (audio/hoopsSfx.ts)
+  {
+    id: 'hoops.passThrowQuietOn', label: 'Pass: no menu click on the throw (1) / the click as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · sound',
+    source: 'lib/babylon/audio/hoopsSfx.ts PASS_THROW_QUIET_ON',
+    hint: 'On: a 3v3 pass is heard only in the hands that catch it (and a sling pass whooshes). Off: the throw plays the menu click, as before.',
+  },
+  {
+    id: 'hoops.driftSqueakOn', label: 'Drift: a shoe squeak (1) / the net swish as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · sound',
+    source: 'lib/babylon/audio/hoopsSfx.ts DRIFT_SQUEAK_ON',
+    hint: 'On: the DRIFT slide squeaks like the hardest cut. Off: it plays the net swish, as before.',
+  },
+  {
+    id: 'hoops.glassSoundOn', label: 'Backboard kiss: its own sound (1) / the floor thud as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · sound',
+    source: 'lib/babylon/audio/hoopsSfx.ts GLASS_SOUND_ON',
+    hint: 'On: a banked ball off the glass sounds like a ball on a board. Off: it plays the body-on-the-floor thud, as before.',
   },
   // ── hoops-builder (owner 2026-11-12): what the five hoops ratings and the playing height change, casual runs only. Every band is
   //    the change at rating 90 (at 40 it moves the other way by a quarter of it); rating 50 is today at any band, and 0 = no effect.
@@ -1928,6 +2003,16 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'On: a step-back beats a man on his heels or off balance (he is late), never a set man or one coming at you. Off: as before.',
   },
   {
+    id: 'hoops.escapeRead3v3On', label: '3v3 step-back reads the man, his backpedal runs on (1) / reads nobody, as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · gathers',
+    source: 'lib/babylon/hoops/response/escapeRead.ts ESCAPE_READ_3V3_ON',
+    hint: 'On: in 3v3 a step-back beats a man on his heels or off balance like 1v1, and he carries the backpedal he was in before he recovers. Off: as before.',
+  },
+  {
+    id: 'hoops.escapeLateCarry', label: '3v3 step-back: a beaten man carries this share of his speed', def: 0.7, min: 0, max: 1, step: 0.05, unit: '', group: 'Hoops · gathers',
+    source: 'lib/babylon/hoops/response/escapeRead.ts ESCAPE_LATE_CARRY',
+    hint: 'Through the late window the man the 3v3 step-back beat keeps backpedalling at this share of his speed. 0 = he brakes at once and stands.',
+  },
+  {
     id: 'hoops.trapReadOn', label: 'Trap: a cross splits an open gap, is stripped on the closed side (1) / as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · gathers',
     source: 'lib/babylon/hoops/response/escapeRead.ts TRAP_READ_ON',
     hint: 'On: a crossover in a double team splits the two men when a body fits between them, and is a steal thrown into a man on the closed side (the owner rule). Off: as before.',
@@ -1992,6 +2077,33 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'kit.fitTightness', label: 'Clothes fit: as before (0) to skin-tight (1)', def: 0, min: 0, max: 1, step: 0.05, unit: '', group: 'Kit · fit',
     source: 'lib/babylon/core/fitTight.ts FIT_TIGHTNESS',
     hint: 'How close the worn tee and shorts sit on the body. 0 = as before (about 3 cm off the skin). 1 = 8 mm off it everywhere but the hems, cuffs and leg openings.',
+  },
+  // ── coast-islands (2026-11-18, NEW): the Coast & Islands zone, phase A (docs/COAST-ISLANDS-PLAN.md). New behaviour only: no
+  //    shipped number moves. coast.streamOn 0 is the measuring control (every piece at full detail), not a way to play.
+  {
+    id: 'coast.streamOn', label: 'Coast zone: stream the 64 m pieces (1) / draw every piece in full (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Coast · zone',
+    source: 'lib/adventure/coast/zoneView.ts COAST_STREAM_ON',
+    hint: 'On: fine ground and every prop only round you, coarse ground and the tall props further out. Off: everything in full, the phone budget control.',
+  },
+  {
+    id: 'coast.streamFull', label: 'Coast zone: full-detail ring (pieces)', def: 1, min: 0, max: 3, step: 1, unit: '', group: 'Coast · zone',
+    source: 'lib/adventure/coast/zoneLayout.ts COAST_STREAM_FULL',
+    hint: 'How many 64 m pieces out from yours are drawn in full. 1 = the 3 by 3 round you (the phone plan).',
+  },
+  {
+    id: 'coast.streamLod', label: 'Coast zone: low-detail ring (pieces)', def: 2, min: 0, max: 5, step: 1, unit: '', group: 'Coast · zone',
+    source: 'lib/adventure/coast/zoneLayout.ts COAST_STREAM_LOD',
+    hint: 'Out to this many pieces the ground is coarse and only palms and sea stacks stand. 2 = the 5 by 5 (the phone plan).',
+  },
+  {
+    id: 'coast.streamKeep', label: 'Coast zone: keep a piece this far past its ring', def: 1, min: 0, max: 2, step: 1, unit: '', group: 'Coast · zone',
+    source: 'lib/adventure/coast/zoneLayout.ts COAST_STREAM_KEEP',
+    hint: 'Hysteresis: a piece drops its detail only this many pieces after leaving its ring, so walking along an edge does not flicker.',
+  },
+  {
+    id: 'coast.deepWaterTurnBack', label: 'Coast zone: deep water turns you back (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Coast · zone',
+    source: 'lib/adventure/coast/zoneWorld.ts COAST_DEEP_WATER_TURN_BACK',
+    hint: 'A jump that ends over water deeper than you can wade puts you back where you could stand. Off = the raw movement sim, for probes.',
   },
 ];
 

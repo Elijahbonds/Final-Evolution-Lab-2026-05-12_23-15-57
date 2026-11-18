@@ -33,7 +33,7 @@
 # Options: --kit <fel-kit-*.glb> (default: public/models/candidates/fel-kit-<sex>.glb), --object <name> (which mesh of a
 # --mesh file; default: every mesh, joined), --ease <m> (default tops 0.008, shorts 0.012, shoes 0.004), --smooth <n>
 # (corrective smoothing passes, default 2), --tris <n> (triangle budget; default tops 4000, shorts 2500, shoes 3000),
-# --no-align, --keep-uv-scale. Output lines start FELFIT.
+# --no-align, --keep-uv-scale, --sided (shorts: each leg keeps its own leg's bones; the middle takes both evenly). Output lines start FELFIT.
 
 import bpy, bmesh, importlib, os, sys
 from mathutils import Vector
@@ -69,8 +69,13 @@ BAND = {
     'female': {'tops': (0.82, 1.38), 'shorts': (0.50, 0.97), 'shoes': (0.0, 0.16)},
 }[SEX][SLOT]
 
-def world_bbox(o):
-    vs = [o.matrix_world @ v.co for v in o.data.vertices]
+def world_bbox(o, evaluated=False):
+    # evaluated: the mesh as SHAPED (lane/kit-mac-jobs, 2026-11-18): an MPFB human's sex and build are shape keys, and its raw
+    # vertices are the androgynous base mesh (1.695 m for both sexes) — reading them mapped every --mhclo garment wrongly
+    if evaluated:
+        ev = o.evaluated_get(bpy.context.evaluated_depsgraph_get()); me = ev.to_mesh()
+        vs = [o.matrix_world @ v.co for v in me.vertices]; ev.to_mesh_clear()
+    else: vs = [o.matrix_world @ v.co for v in o.data.vertices]
     return Vector((min(v.x for v in vs), min(v.y for v in vs), min(v.z for v in vs))), Vector((max(v.x for v in vs), max(v.y for v in vs), max(v.z for v in vs)))
 
 def select_only(objs, active=None):
@@ -99,7 +104,7 @@ if MHCLO:
         except Exception as e: print('FELFIT modifier', m.name, 'not applied', repr(e)[:120]); garment.modifiers.remove(m)
     garment.parent = None
     garment.vertex_groups.clear()
-    human_box = world_bbox(human)   # the MPFB body it was fitted to (checked against the kit body below)
+    human_box = world_bbox(human, evaluated=True)   # the MPFB body it was fitted to (checked against the kit body below)
     for o in [o for o in bpy.data.objects if o is not garment]: bpy.data.objects.remove(o, do_unlink=True)
     print(f'FELFIT mhclo fitted by MPFB: {len(garment.data.vertices)} verts')
 else:
@@ -117,7 +122,11 @@ else:
     want = flag('--object')
     if want: meshes = [o for o in meshes if o.name == want]
     if not meshes: raise SystemExit('FELFIT --mesh: no mesh found' + (f' named {want}' if want else ''))
-    for o in meshes: o.parent = None
+    for o in meshes:
+        o.parent = None
+        # lane/kit-mac-jobs (first run, Blender 5.0.1): the kit GLB's two shorts share one mesh, and transform_apply refuses
+        # a multi-user mesh ("Cannot apply to a multi user"). The garment takes its own copy.
+        if o.data.users > 1: o.data = o.data.copy()
     select_only(meshes)
     for o in meshes:   # a rigged download keeps its own armature modifier: the garment is re-skinned to the FEL rig below
         for m in [m for m in o.modifiers if m.type == 'ARMATURE']: o.modifiers.remove(m)
@@ -211,6 +220,52 @@ select_only([garment]); bpy.ops.object.modifier_apply(modifier='fel_weights')
 # at most 4 influences per vertex, normalised (what the game's skinning reads)
 bpy.ops.object.vertex_group_limit_total(limit=4)
 bpy.ops.object.vertex_group_normalize_all(lock_active=False)
+# --sided (lane/kit-mac-jobs, 2026-11-18; SHORTS-BUILD-STEPS §3 "the gusset takes both thighs' weights evenly"): on a garment
+# whose legs nearly touch (the kit thighs are 1-7 mm apart), the nearest-face transfer gave part of each leg's inner wall to the
+# OTHER thigh, and every stride tore it (one-piece short, headless: 92 -> 808 torn edges over 10 poses). With --sided a vertex
+# off the middle line keeps only its own side's leg bones (+X is the left leg), and a vertex ON the middle (|x| <= 0.5 mm: the
+# gusset, the centre seams) takes the left and right legs' weights evenly (mirrored and averaged), fading to its own side over
+# --gusset-fade-x (3 cm) either side of the centre seams and over --gusset-fade-down (5 mm) below the gusset (a longer fade blended the legs' inner walls with the other leg: more tears).
+if has('--sided'):
+    gname = {vg.index: vg.name for vg in garment.vertex_groups}; gidx = {vg.name: vg for vg in garment.vertex_groups}
+    LEG = ('UpLeg', 'Leg', 'Foot', 'ToeBase')
+    def side_of(n):
+        b = n.split(':')[-1]
+        if not b.endswith(LEG): return 0
+        return 1 if b.startswith('Left') else -1 if b.startswith('Right') else 0
+    def mirror(n): return n.replace('Left', '\0').replace('Right', 'Left').replace('\0', 'Right')
+    mw = garment.matrix_world; sided = centred = 0
+    # the gusset: the lowest vertex ON the middle line. Its even weighting fades out over 3 cm to the sides and 5 cm down / 3 cm
+    # up (a one-step change from even to one thigh tore the crotch's 1 cm edges in every stride, headless)
+    mids = [(mw @ v.co).z for v in garment.data.vertices if abs((mw @ v.co).x) <= 0.0005]
+    zg = min(mids) if mids else None
+    FADE_X = float(flag('--gusset-fade-x', '0.03')); FADE_DOWN = float(flag('--gusset-fade-down', '0.005'))
+    for v in garment.data.vertices:
+        p = mw @ v.co; x = p.x
+        w = {gname[g.group]: g.weight for g in v.groups if g.weight > 0}
+        sgn = 1 if x > 0 else -1
+        own = w if abs(x) <= 0.0005 else {n: val for n, val in w.items() if side_of(n) != -sgn}
+        if len(own) != len(w): sided += 1
+        if not own: own = {('LeftUpLeg' if sgn > 0 else 'RightUpLeg') if 'LeftUpLeg' in gidx else ('mixamorig:LeftUpLeg' if sgn > 0 else 'mixamorig:RightUpLeg'): 1.0}
+        t = 0.0
+        # the whole centre seam, front and back, up to the waist (on the female body the cloth bridging the gluteal cleft tore: its
+        # weights jumped from one buttock to the other within 1 cm), and below the gusset fading out over FADE_DOWN
+        if zg is not None and p.z >= zg - FADE_DOWN: t = max(0.0, 1 - abs(x) / FADE_X) * (1 - max(0.0, (zg - p.z) / FADE_DOWN))
+        if abs(x) <= 0.0005: t = 1.0
+        out = {n: val * (1 - t) for n, val in own.items()}
+        if t > 0:
+            centred += 1
+            for n, val in w.items():   # the even share: each leg bone's weight split between it and its mirror
+                if side_of(n): out[n] = out.get(n, 0) + t * val / 2; out[mirror(n)] = out.get(mirror(n), 0) + t * val / 2
+                else: out[n] = out.get(n, 0) + t * val
+        tot = sum(out.values()) or 1
+        for g in list(v.groups): gidx[gname[g.group]].remove([v.index])
+        for n, val in out.items():
+            if n not in gidx: gidx[n] = garment.vertex_groups.new(name=n); gname[gidx[n].index] = n
+            gidx[n].add([v.index], val / tot, 'REPLACE')
+    bpy.ops.object.vertex_group_limit_total(limit=4)
+    bpy.ops.object.vertex_group_normalize_all(lock_active=False)
+    print(f'FELFIT --sided: {sided} verts lost the other leg\'s weights, {centred} near the centre seams share both legs (even on the middle line, fading over {FADE_X * 100:.0f} cm)')
 empty = [vg.name for vg in garment.vertex_groups if not any(vg.index in [g.group for g in v.groups] for v in garment.data.vertices)]
 for n in empty: garment.vertex_groups.remove(garment.vertex_groups[n])
 arm = garment.modifiers.new('Armature', 'ARMATURE'); arm.object = rig

@@ -11,6 +11,7 @@
  * Pure apart from the storage it is handed (window.sessionStorage by default).
  */
 
+import { loginPath } from '@/lib/auth/safeNext';
 import { SPOTS, type Spot } from './layout';
 
 export const HUB_ROUTE = '/play/venice';
@@ -26,18 +27,46 @@ export const PARTY_MODE_FOR_SPOT: Readonly<Record<string, string>> = { 'court.on
 
 export interface StoreLike { getItem(k: string): string | null; setItem(k: string, v: string): void; removeItem(k: string): void }
 export interface ReturnMark { spot: string; route: string; at: number }
+export interface LaunchChoice { mode: string; label: string; href: string }
+export interface ModeInfoLike { name: string; href: string }
 
 const session = (): StoreLike | null => { try { return typeof window !== 'undefined' ? window.sessionStorage : null; } catch { return null; } };
 
 /** The page a court opens. */
-export function launchHref(s: Pick<Spot, 'id' | 'route' | 'kind'>): string {
-  const q = new URLSearchParams({ [FROM_PARAM]: FROM_VENICE, [SPOT_PARAM]: s.id });
+export function launchHref(s: Pick<Spot, 'id' | 'route' | 'kind'>, href = s.route): string {
+  const [path, query = ''] = href.split('?');
+  const q = new URLSearchParams(query);
+  q.set(FROM_PARAM, FROM_VENICE);
+  q.set(SPOT_PARAM, s.id);
   if (s.kind === 'court') q.set('location', 'venice');
-  return `${s.route}?${q.toString()}`;
+  return `${path}?${q.toString()}`;
+}
+
+/** Every mode a spot offers, each preserving the Venice return query. */
+export function launchChoices(s: Pick<Spot, 'id' | 'route' | 'kind' | 'modes'>, info: Record<string, ModeInfoLike | undefined>): LaunchChoice[] {
+  const seen = new Set<string>();
+  return s.modes.flatMap((mode) => {
+    const meta = info[mode];
+    const route = meta?.href ?? s.route;
+    if (!route || seen.has(route)) return [];
+    seen.add(route);
+    return [{ mode, label: meta?.name ?? mode, href: launchHref(s, route) }];
+  });
+}
+
+/** The URL the hub button navigates to: a signed-out player keeps the exact court/game launch through login. */
+export function launchNavigationHref(href: string, signedIn: boolean): string {
+  return signedIn ? href : loginPath(href);
 }
 
 export function writeReturn(s: Pick<Spot, 'id' | 'route'>, now: number, store: StoreLike | null = session()): void {
   try { store?.setItem(RETURN_KEY, JSON.stringify({ spot: s.id, route: s.route, at: now } satisfies ReturnMark)); } catch { /* convenience only */ }
+}
+
+/** Same return mark, but for a specific launch href from a multi-mode court. */
+export function writeReturnForHref(s: Pick<Spot, 'id' | 'route'>, href: string, now: number, store: StoreLike | null = session()): void {
+  const route = href.split('?')[0] || s.route;
+  try { store?.setItem(RETURN_KEY, JSON.stringify({ spot: s.id, route, at: now } satisfies ReturnMark)); } catch { /* convenience only */ }
 }
 
 export function readReturn(now: number, store: StoreLike | null = session()): ReturnMark | null {
@@ -69,7 +98,49 @@ export function veniceReturnHref(pathname: string, search: string, now: number, 
   return m && m.route === pathname ? hubHrefFor(m.spot) : null;
 }
 
+/** One-shot version for the result screen: once the Venice exit is shown, the storage fallback cannot leak to later runs. */
+export function consumeVeniceReturnHref(pathname: string, search: string, now: number, store: StoreLike | null = session()): string | null {
+  const href = veniceReturnHref(pathname, search, now, store);
+  if (href) clearReturn(store);
+  return href;
+}
+
 /** The spot the hub page should put the player at (`?spot=`), when it is one V1 opens. */
 export function spotFromSearch(search: string): string | null {
   try { const s = new URLSearchParams(search).get(SPOT_PARAM); return s && SPOTS.some((x) => x.id === s) ? s : null; } catch { return null; }
+}
+
+// ── the party: every member comes back to Venice (improvement pass phase 2) ─────────────────────────────────────────────
+//
+// "Start together" sends each member's page to the game with the server's own query (?net=&peer=&party=1): netd's offer has no
+// room for "this started in Venice", and changing netd means a redeploy (the owner's). But the party already carries every
+// member's ACTIVITY line to everyone, in order, before a start offer: the hub's host sets "At Venice Beach · Court N" just
+// before it starts, and each member's countdown reads the HOST's line and adds the Venice return (query + mark) on the way in.
+// The line is the page's own words (never typed), so it is the same for a teen.
+
+export const VENICE_ACTIVITY_PREFIX = 'At Venice Beach · ';
+const courtNumber = (spot: string): string | null => {
+  const n = ['court.ones', 'court.run', 'court.flight', 'court.arc'].indexOf(spot);
+  return n < 0 ? null : `Court ${n + 1}`;
+};
+
+/** The hub's activity line at a court: "At Venice Beach · Court 2". */
+export function veniceActivity(spot: string): string | null {
+  const c = courtNumber(spot);
+  return c ? `${VENICE_ACTIVITY_PREFIX}${c}` : null;
+}
+
+/** The court a member's activity line names, or null. */
+export function spotFromActivity(line: string | null | undefined): string | null {
+  if (!line || !line.startsWith(VENICE_ACTIVITY_PREFIX)) return null;
+  const m = /^Court ([1-4])$/.exec(line.slice(VENICE_ACTIVITY_PREFIX.length).trim());
+  return m ? ['court.ones', 'court.run', 'court.flight', 'court.arc'][Number(m[1]) - 1] : null;
+}
+
+/**
+ * For a member's countdown: the Venice return to add when the party's HOST started the game from a court (their activity line
+ * names it), else null. `members` is the party's member list (state.ts PartyMember: `host`, `activity`).
+ */
+export function partyVeniceReturn(members: readonly { host: boolean; activity: string | null }[]): string | null {
+  return spotFromActivity(members.find((m) => m.host)?.activity ?? null);
 }

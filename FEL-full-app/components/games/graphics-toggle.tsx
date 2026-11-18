@@ -41,7 +41,7 @@ export function GraphicsToggle() {
         <button
           type="button"
           onClick={() => window.location.reload()}
-          className="h-8 rounded-md border border-[#00E5FF]/60 px-2 font-mono text-xs text-[#00E5FF]"
+          className="min-h-11 rounded-md border border-[#00E5FF]/60 px-2 font-mono text-xs text-[#00E5FF]"
         >
           Reload to apply
         </button>

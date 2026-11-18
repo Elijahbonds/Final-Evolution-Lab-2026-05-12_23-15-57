@@ -3,10 +3,24 @@
 //   URL=http://localhost:3000/dev/mode/dunk npx tsx scripts/probes/_cam-frame.mts
 import { chromium } from 'playwright-core';
 import { chromiumExe } from './_chromium.mts';
-const URL_ = process.env.URL ?? 'http://localhost:3000/dev/mode/dunk';
-const b = await chromium.launch({ executablePath: chromiumExe(), args: ['--use-gl=angle', '--use-angle=metal', '--enable-webgl', '--ignore-gpu-blocklist'] });
+function probeUrl(raw: string): string {
+  const url = new URL(raw);
+  url.searchParams.set('agent', '1');
+  return url.toString();
+}
+const URL_ = probeUrl(process.env.URL ?? 'http://localhost:3000/dev/mode/dunk');
+const browserArgs = [
+  '--use-gl=angle',
+  ...(process.platform === 'darwin' ? ['--use-angle=metal'] : []),
+  '--enable-webgl',
+  '--ignore-gpu-blocklist',
+];
+const b = await chromium.launch({ executablePath: chromiumExe(), args: browserArgs });
 const p = await b.newPage({ viewport: { width: 1280, height: 800 } });
-await p.goto(URL_, { waitUntil: 'domcontentloaded' }); await p.waitForSelector('canvas', { timeout: 60000 }); await p.waitForTimeout(Number(process.env.WAIT_MS ?? 8000));
+await p.goto(URL_, { waitUntil: 'domcontentloaded', timeout: 120000 });
+await p.waitForSelector('canvas', { timeout: 60000 });
+await p.waitForFunction('!!window.__FEL_DEV__?.scene', null, { timeout: 120000 });
+await p.waitForTimeout(Number(process.env.WAIT_MS ?? 8000));
 const samples: number[] = [];
 for (let i = 0; i < 6; i++) {
   const r = await p.evaluate(`(() => {

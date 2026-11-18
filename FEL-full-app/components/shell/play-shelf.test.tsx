@@ -1,7 +1,7 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { PlayShelf } from './play-shelf';
+import { closedFamilyModeSummary, PlayShelf } from './play-shelf';
 
 describe('PlayShelf', () => {
   it('renders the maintained mode descriptions inside an opened family', () => {
@@ -21,6 +21,22 @@ describe('the closed families\' mode lists (owner, 2026-11-10: they may wrap to 
       expect(cls).toContain('line-clamp-3');
       expect(cls).not.toContain('line-clamp-2');
     }
+  });
+
+  it('summarises overlong closed rows instead of clipping half a mode name', () => {
+    const summary = closedFamilyModeSummary([
+      { name: 'Breakaway' },
+      { name: 'Twelve Yards' },
+      { name: 'Baseball' },
+      { name: 'Moonshot Derby' },
+      { name: 'Tennis' },
+      { name: 'Volleyball' },
+      { name: 'Golf' },
+      { name: 'Tiebreak' },
+    ]);
+
+    expect(summary).toBe('Breakaway  ·  Twelve Yards  ·  Baseball  ·  +5 more');
+    expect(summary).not.toContain('Moonsh');
   });
 });
 

@@ -1,16 +1,15 @@
 // lib/coach/messageReads.ts — COACH-AI Phase 8 (2026-10-07): read markers on the coach ↔ athlete thread (plan #13).
 //
-// THE COLUMN IS NOT ON PRODUCTION YET. ProgramMessage.readAt arrives with prisma/pending/2026-10-07-coach-ai-1-
-// message-read-markers.sql, which the owner applies (owner decision 9). Until then — and in CI, whose database is
-// pushed from schema.prisma, which does not carry the column either — every function here answers "not available"
-// and the thread works exactly as before. Nothing here may 500 (the Knowledge Feed precedent: its routes answer 503
-// without their tables; here the read markers simply do not show).
+// THE COLUMN MAY NOT BE ON PRODUCTION YET. ProgramMessage.readAt arrives with
+// prisma/pending/2026-10-07-coach-ai-1-message-read-markers.sql, which the owner applies (owner decision 9).
+// Until then every function here answers "not available" and the thread works exactly as before. Nothing here may
+// 500 (the Knowledge Feed precedent: its routes answer 503 without their tables; here the read markers simply do
+// not show).
 //
-// WHY RAW SQL, NOT THE GENERATED CLIENT. The committed client (public/_prisma/client, a deploy artifact this lane does
-// not regenerate) has never heard of readAt, so `prisma.programMessage.update({ data: { readAt } })` would not even
-// type-check, and a schema.prisma change without the regenerated client turns lib/db/prismaSchemaSync.test.ts red.
-// The three statements below name the column themselves (parameterised: $1, $2 — never string-built from input), and
-// they work the same before and after the owner regenerates the client.
+// WHY RAW SQL. The Prisma schema and committed client may be ahead of production SQL, so normal client reads/writes
+// must not implicitly select or return `readAt`. The thread route projects only stable fields, and the three
+// statements below name the column themselves (parameterised: $1, $2 — never string-built from input). They work the
+// same before and after the owner applies the SQL.
 //
 // FEATURE-DETECTED, NOT FLAGGED. One information_schema probe, cached: a "yes" is kept for the process (the column does
 // not go away; if it ever did, the failing statement resets the cache), a "no" is re-asked after PROBE_TTL_MS so the

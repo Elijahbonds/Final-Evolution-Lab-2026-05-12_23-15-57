@@ -29,6 +29,14 @@ export const MOVE_EASE_RATE_DEG = 1000;
 /** …and through the rest of the move (deg/s). TUNED (new, #314). Knob `hoops.moveArmRateDeg`. */
 export const MOVE_ARM_RATE_DEG = 1800;
 
+/** hoops-items (2026-11-18): the HANDS ease too (1) / the hands are left as the layers wrote them, as before (0). Measured: the arm ease
+ *  above holds the clavicle, the upper arm and the forearm, never the hand — and the behind-the-back's ball hand turns 112-146° in one
+ *  frame 15-25 frames in (hoops-gather phase A; GATE 0 keeps the clip's keys as they are). With this on, through a move the hand bones are
+ *  held to MOVE_HAND_RATE_DEG from where they were drawn, like the arm. Knob `hoops.moveHandEaseOn`. */
+export const MOVE_HAND_EASE_ON = 1;   // ON (hoops-items, measured, FLAGGED): the behind-the-back's hand 125-132° in a frame → 30° (1v1 and 3v3), the ball's path untouched
+/** The fastest a hand bone turns through a move with the hand ease on (deg/s). NEW (hoops-items). Knob `hoops.moveHandRateDeg`. */
+export const MOVE_HAND_RATE_DEG = 1800;
+
 /** The angle between two rotations (rad, 0..π). */
 export function quatAngle(a: Quaternion, b: Quaternion): number {
   return 2 * Math.acos(Math.min(1, Math.abs(Quaternion.Dot(a, b))));
@@ -46,6 +54,7 @@ export class ArmEase {
   private readonly nodes: TransformNode[];
   private readonly hands: TransformNode[];
   private readonly last: Quaternion[];
+  private readonly lastHand: Quaternion[];
   private lastAt = -1;
   private left = 0;
   /** Bones limited on the last drawn frame (probes / tests). */
@@ -54,6 +63,7 @@ export class ArmEase {
     this.nodes = (['Left', 'Right'] as const).flatMap((sd) => [`${sd}Shoulder`, `${sd}Arm`, `${sd}ForeArm`].map((b) => findBone(skeleton, b)?.getTransformNode() ?? null)).filter((n): n is TransformNode => !!n);
     this.hands = (['Left', 'Right'] as const).map((sd) => findBone(skeleton, `${sd}Hand`)?.getTransformNode() ?? null).filter((n): n is TransformNode => !!n);
     this.last = this.nodes.map(() => new Quaternion());
+    this.lastHand = this.hands.map(() => new Quaternion());
   }
   /** A hand-over starts now: the window opens (MOVE_EASE_SEC). */
   handOver(): void { this.left = feel('hoops.moveEaseSec', MOVE_EASE_SEC); }
@@ -74,11 +84,20 @@ export class ArmEase {
         const q = this.nodes[i].rotationQuaternion; if (!q) continue;
         if (limitTurn(this.last[i], q, maxRad)) this.limited++;
       }
+      // hoops-items: the hands, whenever the arms are eased (a move, and its hand-over windows)
+      if (feel('hoops.moveHandEaseOn', MOVE_HAND_EASE_ON) >= 0.5) {
+        const handRad = (feel('hoops.moveHandRateDeg', MOVE_HAND_RATE_DEG) * Math.PI / 180) * dt;
+        for (let i = 0; i < this.hands.length; i++) {
+          const q = this.hands[i].rotationQuaternion; if (!q) continue;
+          if (limitTurn(this.lastHand[i], q, handRad)) this.limited++;
+        }
+      }
       // (parent first: the clavicle, the upper arm, the forearm — then the hands that ride them) so the camera draws the eased chain
       if (this.limited) { for (const n of this.nodes) n.computeWorldMatrix(true); for (const h of this.hands) h.computeWorldMatrix(true); }
       this.left = Math.max(0, this.left - dt);
     }
     for (let i = 0; i < this.nodes.length; i++) this.last[i].copyFrom(this.nodes[i].rotationQuaternion ?? Quaternion.Identity());
+    for (let i = 0; i < this.hands.length; i++) this.lastHand[i].copyFrom(this.hands[i].rotationQuaternion ?? Quaternion.Identity());
     this.lastAt = stamp;
   }
 }

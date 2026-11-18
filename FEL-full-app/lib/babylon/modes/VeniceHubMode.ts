@@ -30,11 +30,20 @@ import { createInputMapper, loadBindings, type InputMapper } from '../adventure/
 import { bindMovementView, type MovementView } from '../adventure/movement/view';
 import { placeBody } from '../adventure/world/view';
 import { loadRatedTuning, ratedLookScale } from '../hoops/ratedPlay';
-import { buildHubWorld, courtsRect, returnSpawnFor, v1Spots } from '@/lib/adventure/venice/hubWorld';
+import { buildHubWorld, courtsRect, returnSpawnFor, v1Area, v1Spots } from '@/lib/adventure/venice/hubWorld';
 import { mountCourtsView, type CourtsView } from '@/lib/adventure/venice/courtsView';
-import { hubUi } from '@/lib/adventure/venice/hubUi';
+import { hubPos, hubUi } from '@/lib/adventure/venice/hubUi';
 import { spotFromSearch } from '@/lib/adventure/venice/hubReturn';
 import type { Spot } from '@/lib/adventure/venice/layout';
+import { COURT_HALF } from '@/lib/adventure/venice/courtsView';
+import { devOrAgentHooks } from '@/lib/agentRunHooks';
+import { feel } from '@/lib/feel-panel/feel';
+import { SoundKit } from '../audio/SoundKit';
+import { mountHubLife, VENICE_LIFE, type HubLife } from '@/lib/adventure/venice/hubLife';
+import { HubSoundscape, VENICE_SOUND } from '@/lib/adventure/venice/hubSound';
+import { hubSolids, palmSolid, probeRoute, v1Hit, VENICE_SOLIDS, Walkup, WALKUP_V2 } from '@/lib/adventure/venice/hubSolids';
+import { VENICE_LOOK_V2 } from '@/lib/adventure/venice/courtsDressing';
+import type { GroundPiece } from '../adventure/world/pieces';
 
 export const VENICE_MODE_ID = 'venice_hub';
 /** The stick's basis latches while held (AdventureMode's rule): below this it lets go. */
@@ -56,6 +65,21 @@ interface St {
   rigKey: string;
   spotSec: number;
   spots: Spot[];
+  /** A probe's scripted walk (window.__VENICE__.walkTo, dev / agent runs only): the point the player walks to, or null. */
+  auto: { x: number; z: number } | null;
+  /** The scripted walk's next legs after `auto` (walkTo's route round the fences, phase 8). */
+  autoPath: Array<{ x: number; z: number }>;
+  /** Frames played: the deferred scenery is asked for on the second (you can move first). */
+  frames: number;
+  /** Phase 6 (venue.veniceLife): gulls, and watchers on desktop and up; mounted once the deferred scenery has landed. */
+  life: HubLife | null;
+  /** Phase 7 (venue.veniceSound): the beach bed is started in load; the steps, far games and the run's cheers tick here. */
+  sound: HubSoundscape | null;
+  /** Phase 8 (venue.walkupV2): the card's dwell and hold; null = V1's box. */
+  walkup: Walkup | null;
+  /** Phase 8 (venue.veniceSolids): the world's pieces, so the palms join them once the dressing has placed them; null = off. */
+  solids: GroundPiece[] | null;
+  disposed: boolean;
 }
 
 const states = new WeakMap<object, St>();
@@ -90,6 +114,9 @@ export const VeniceHubMode: ModeDefinition = {
     const scene = ctx.scene;
     hubUi.reset();
     const world = buildHubWorld();
+    // phase 8: the hoops, the boardwalk row and (with phase 5's furniture) the fences, benches and poles are solid
+    const solidsOn = feel('venue.veniceSolids', VENICE_SOLIDS) >= 0.5;
+    if (solidsOn) world.pieces.push(...hubSolids(v1Spots(), feel('venue.veniceLookV2', VENICE_LOOK_V2) >= 0.5));
     const back = typeof window !== 'undefined' ? spotFromSearch(window.location.search) : null;
     const spawn = (back && returnSpawnFor(back)) || world.spawn;
     const host = new AdventureHost({ world: world.source, save: emptyAdventureSave(0), playerSpawn: spawn, band: ctx.prqBand ?? null });
@@ -113,9 +140,45 @@ export const VeniceHubMode: ModeDefinition = {
     const mapper = createInputMapper({ bindings: loadBindings() });
     const S: St = {
       host, mapper, view, me, body, move, stickL: { x: 0, y: 0 }, stickR: { x: 0, y: 0 }, latchedYaw: null,
-      preset: 'runner', rigKey: '', spotSec: SPOT_EVERY, spots: v1Spots(),
+      preset: 'runner', rigKey: '', spotSec: SPOT_EVERY, spots: v1Spots(), auto: null, autoPath: [], frames: 0,
+      life: null, sound: null, disposed: false,
+      walkup: feel('venue.walkupV2', WALKUP_V2) >= 0.5 ? new Walkup(v1Spots()) : null, solids: solidsOn ? world.pieces : null,
     };
-    host.setInputSource(host.playerId, (out) => { mapper.fill(out, { camYaw: camYawOf(ctx, S), state: host.player.state }); walkOnly(out); });
+    // phase 7: the beach bed now (so the harness's crowd bed for the mood stays off); the rest of the soundscape ticks in update
+    if (feel('venue.veniceSound', VENICE_SOUND) >= 0.5) {
+      SoundKit.startAmbient('ocean');
+      S.sound = new HubSoundscape((name, o) => SoundKit.play(name, o));
+    }
+    host.setInputSource(host.playerId, (out) => {
+      mapper.fill(out, { camYaw: camYawOf(ctx, S), state: host.player.state });
+      walkOnly(out);
+      // a probe's scripted walk: the stick held toward the point in world space (camYaw 0: move.x = +x, move.y = +z)
+      if (S.auto) {
+        const dx = S.auto.x - host.player.pos.x, dz = S.auto.z - host.player.pos.z, d = Math.hypot(dx, dz);
+        if (d < 0.8) S.auto = S.autoPath.shift() ?? null;
+        else { out.camYaw = 0; out.move.x = dx / d; out.move.y = dz / d; }
+      }
+    });
+    // PROBES ONLY (dev, or an agent run on a loopback host: lib/agentRunHooks): walk to a court's ring, read where you are
+    if (typeof window !== 'undefined' && devOrAgentHooks()) {
+      (window as unknown as { __VENICE__?: unknown }).__VENICE__ = {
+        spots: () => S.spots.map((x) => x.id),
+        // to a court's ring the way a player goes once the fences are solid (phase 8): along the open corridors, never through a court
+        walkTo: (id: string) => {
+          const t = S.spots.find((x) => x.id === id);
+          if (!t) { S.auto = null; S.autoPath = []; return false; }
+          const path = probeRoute(S.spots, { x: host.player.pos.x, z: host.player.pos.z }, t);
+          S.auto = path.shift() ?? null; S.autoPath = path; return true;
+        },
+        walkToPoint: (x: number, z: number) => { S.auto = { x, z }; S.autoPath = []; },
+        stop: () => { S.auto = null; S.autoPath = []; },
+        state: () => ({ x: host.player.pos.x, z: host.player.pos.z, y: host.player.pos.y, walking: !!S.auto, spot: hubUi.getSnapshot().spot?.id ?? null }),
+        // the stuck check (phase 8): is the player inside a solid (a block taller than a step above their feet)?
+        inSolid: () => !!S.solids?.some((p) => p.kind === 'block' && !p.off && host.player.pos.x > p.minX && host.player.pos.x < p.maxX && host.player.pos.z > p.minZ && host.player.pos.z < p.maxZ && p.top > host.player.pos.y + 0.45),
+        // the round-trip probe's leak counts (phase 10): what this scene holds, and the sound kit's bed
+        counts: () => ({ meshes: scene.meshes.length, materials: scene.materials.length, textures: scene.textures.length, observersBefore: scene.onBeforeRenderObservable.observers.length, bed: SoundKit.ambientKind(), life: S.life ? S.life.gulls : 0 }),
+      };
+    }
     ctx.heroRef.current = body;   // the harness frames and checks the player by it (FrameGuard assertSpawned)
     states.set(scene, S); live.add(S);
     placeBody(body, host.player);
@@ -136,10 +199,36 @@ export const VeniceHubMode: ModeDefinition = {
     const S = states.get(ctx.scene);
     if (!S) return;
     const h = S.host;
+    if (++S.frames === 2) {
+      // phase 3: the court paint and the far scenery, once you can move; then phase 6's life, then the recorded court sounds
+      void S.view.afterPlayable().then(() => {
+        if (S.disposed || ctx.scene.isDisposed) return;
+        if (S.solids) {   // phase 8: the palms the dressing kept (inside the park) are trunks you walk round
+          const a = v1Area();
+          let i = 0;
+          for (const n of ctx.scene.transformNodes) {
+            if (!/^vb_palm_\d+$/.test(n.name) || !n.isEnabled()) continue;
+            const p = n.getAbsolutePosition();
+            if (p.x > a.minX && p.x < a.maxX && p.z > a.minZ && p.z < a.maxZ) S.solids.push(palmSolid(i++, p.x, p.z));
+          }
+        }
+        if (feel('venue.veniceLife', VENICE_LIFE) >= 0.5) {
+          const life = mountHubLife(ctx.scene, S.view.root, (ctx.scene.metadata as { felTier?: string } | null)?.felTier ?? 'desktop');
+          S.life = life;
+          void life.watchers.then((n) => console.info(`[VENICE] life: ${life.gulls} gulls, ${n} watchers`));
+        }
+        if (S.sound) void SoundKit.useSampleBank('hoops');
+      });
+    }
     h.frame(dt);
     const me = h.player;
     placeBody(S.body, me);
     S.move.sync(dt);
+    S.life?.update(dt);
+    if (S.sound) {
+      ctx.camDirector.forwardFlatToRef(TMP_FWD);
+      S.sound.update(dt, { x: me.pos.x, z: me.pos.z, speed: Math.hypot(me.vel.x, me.vel.z), grounded: me.grounded }, Math.atan2(TMP_FWD.x, TMP_FWD.z));
+    }
 
     // the camera: the host's held hint as a director rig (AdventureMode's)
     const rig = h.camera.rig();
@@ -154,20 +243,24 @@ export const VeniceHubMode: ModeDefinition = {
     S.spotSec += dt;
     if (S.spotSec >= SPOT_EVERY) {
       S.spotSec = 0;
-      let hit: Spot | null = null;
-      for (const s of S.spots) {
-        // the ring stands on the court's sideline (courtsView): walking into it, or onto the court itself, offers the game
-        const dx = me.pos.x - s.at[0], dz = me.pos.z - s.at[1];
-        if (Math.abs(dx) <= 8 + 6 && Math.abs(dz) <= 14) { hit = s; break; }
-      }
+      // the ring stands on the court's sideline (courtsView): walking into it, or onto the court itself, offers the game
+      // (phase 8, venue.walkupV2: on the court or in the ring, after a short dwell, held a metre past the edge; 0 = V1's box)
+      const hit: Spot | null = S.walkup ? S.walkup.step(SPOT_EVERY, me.pos.x, me.pos.z) : v1Hit(S.spots, me.pos.x, me.pos.z);
       hubUi.setSpot(hit);
+      hubPos.set(me.pos.x, me.pos.z, me.facingYaw);   // phase 9: the page's mini-map
     }
   },
 
   dispose() {
     // the harness disposes the scene; the per-scene state goes with its WeakMap entry. Live states are closed here.
-    hubUi.reset();
-    for (const S of live) { S.move.dispose(); S.view.dispose(); }
+    hubUi.reset(); hubPos.reset();
+    if (typeof window !== 'undefined') delete (window as unknown as { __VENICE__?: unknown }).__VENICE__;
+    for (const S of live) {
+      S.disposed = true;
+      S.life?.dispose(); S.life = null;
+      if (S.sound) { S.sound = null; SoundKit.stopAmbient(); }
+      S.move.dispose(); S.view.dispose();
+    }
     live.clear();
   },
 };
