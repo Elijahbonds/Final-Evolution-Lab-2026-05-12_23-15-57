@@ -123,7 +123,9 @@ try {
     try {
     const t = await page.evaluate(() => { const w = window as unknown as { __ttfp?: number; __readyAt?: number; __err?: string }; return { moveSec: (w.__ttfp ?? 0) / 1000, readySec: (w.__readyAt ?? 0) / 1000, err: w.__err ?? null }; });
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
-    await page.evaluate('window.__SI = window.__SI || window.__FEL_DEV__.instrument()');
+    // returns nothing: the instrument object itself is a graph of the live scene, and handing it back to the rig to serialise
+    // failed ("execution context was destroyed") once the town's bodies were loading as play began (coast-d d2, d3)
+    await page.evaluate('void (window.__SI = window.__SI || window.__FEL_DEV__.instrument())');
     // frame gaps, from here on
     await page.evaluate(`(() => { window.__gaps = []; let last = performance.now(); function tick() { const n = performance.now(); window.__gaps.push(n - last); last = n; requestAnimationFrame(tick); } requestAnimationFrame(tick); })()`);
     await page.waitForTimeout(5000);   // let the dressing land
@@ -194,7 +196,7 @@ try {
       // what is there now: a fresh page (a reload) or none (a crash)?
       const after = await page.evaluate('({ href: location.href, phase: window.__phase ?? null, ttfp: window.__ttfp ?? null, t: performance.now() })').catch((x) => String(x).slice(0, 160));
       logs.push(`AFTER ${new Date().toISOString()} ${JSON.stringify(after)}`);
-      console.log('RUN FAILED', name, String(e).slice(0, 300), '\n', errors.join('\n'), '\n', logs.filter((l) => !/^debug/.test(l)).slice(-80).join('\n'));
+      console.log('RUN FAILED', name, String(e).slice(0, 300), '\n', String((e as Error)?.stack ?? '').split('\n').filter((l) => l.includes('zone-rig')).slice(0, 4).join(' | '), '\n', errors.join('\n'), '\n', logs.filter((l) => !/^debug/.test(l)).slice(-80).join('\n'));
       result[name] = { failed: String(e).slice(0, 300) };
     }
     await ctx.close();
