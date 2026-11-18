@@ -74,6 +74,7 @@ function CarnivalHubInner() {
           </div>
 
           <button
+            type="button"
             onClick={startNight}
             className="fel-heading mt-6 flex w-full items-center justify-center gap-2 rounded-md bg-[#FFD700] py-3.5 text-base font-bold text-black transition-all hover:bg-[#FFD700]/85"
           >

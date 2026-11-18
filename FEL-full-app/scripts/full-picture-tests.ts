@@ -26,6 +26,7 @@ const expectedSlugs: Record<string, string> = {
   velocitykart: 'velocity-kart',
   who_scene_it: 'who-scene-it',
   brainbrawl: 'brain-brawl',
+  derby: 'derby',
 };
 const playGauntletExempt = new Set([
   // /play/dunkduel is the owner's real-footage Prove It flow; the Babylon

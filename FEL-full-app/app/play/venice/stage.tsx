@@ -78,7 +78,7 @@ export function VeniceStage({ signedIn }: { signedIn: boolean }) {
 
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden bg-black text-white">
-      <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none outline-none" aria-label="Venice Beach: walk to a court to play" tabIndex={0} />
+      <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none outline-none focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-fel-cyan" aria-label="Venice Beach: walk to a court to play" tabIndex={0} />
       {/* the way back (every-screen: no dead end) — the Play shelf, where every game is still one tap */}
       <Link href="/play" data-testid="venice-back" aria-label="Back to Play"
         className="absolute left-3 top-3 z-10 inline-flex min-h-[44px] min-w-[44px] items-center gap-1 rounded-full bg-black/60 px-3 text-base font-bold text-white">

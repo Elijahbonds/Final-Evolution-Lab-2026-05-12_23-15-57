@@ -62,7 +62,7 @@ const locks = new Set(readdirSync('docs/concept-lock').map((f) => f.replace(/\.m
 const routeMap: Record<string, string> = {
   karate_vs: 'karate-vs',
   penalty: 'soccer',
-  derby: 'baseball',
+  derby: 'derby',
   snowboard_slalom: 'snowboard',
   bigair: 'big-air',
   aeroaces: 'aero-aces',
