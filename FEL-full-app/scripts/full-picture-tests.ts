@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { MODE_CONTROLLERS } from '../lib/controller-link/schemas/registry';
@@ -164,5 +166,25 @@ assert.ok(hasButton('threevthree', 'A', 'PASS') && hasButton('threevthree', 'Y',
   'threevthree phone PASS/BLOCK must match the local 2K face-button map');
 assert.ok(!hasButton('threevthree', 'charge'),
   'threevthree phone SHOOT must not use charge/RT, which basketball reads as turbo');
+
+const generatedMatrix = execFileSync(
+  process.argv[0],
+  [...process.execArgv, join(ROOT, 'scripts/full-picture.mts'), '--md', join(tmpdir(), 'fel-full-picture-tests.md')],
+  { cwd: ROOT, encoding: 'utf8' },
+);
+
+function matrixCoreColumn(mode: string): string {
+  const row = generatedMatrix.split('\n').find((line) => line.startsWith(`| ${mode} |`));
+  assert.ok(row, `full-picture output must include ${mode}`);
+  return row.split('|').map((part) => part.trim())[8] ?? '';
+}
+
+assert.match(matrixCoreColumn('tennis'), /RallyCore/, 'factory-built tennis must report its RallyCore');
+assert.match(matrixCoreColumn('onevone'), /BasketballCore/, '1v1 must report shared BasketballCore usage');
+assert.match(matrixCoreColumn('football'), /KickoffReturn|RushRun/, 'football must report shared football run cores');
+assert.match(matrixCoreColumn('freerun'), /FreeRunCore/, 'freerun must report its shared FreeRunCore');
+assert.match(matrixCoreColumn('sprint'), /rideBody|SpeedFov/, 'sprint must report its shared run-body core');
+assert.match(matrixCoreColumn('velocitykart'), /RaceCourse|KartModel/, 'velocitykart must report racing/kart cores');
+assert.match(matrixCoreColumn('brainbrawl'), /BrainBrawlCore/, 'Brain Brawl must report its shared quiz core');
 
 console.log(`full-picture-tests: ${enabledModes.length} enabled mode routes, menus, phone schemas, and gauntlets resolve`);
