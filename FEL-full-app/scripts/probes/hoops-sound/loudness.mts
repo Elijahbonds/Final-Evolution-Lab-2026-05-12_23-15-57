@@ -32,13 +32,15 @@ if (cmd === 'build') {
     const r = await p.evaluate(() => (window as unknown as { __RUN: () => Promise<Record<string, unknown>> }).__RUN()) as Record<string, unknown>;
     await b.close();
     const rows: string[] = [];
-    for (const c of ['swish', 'rattle', 'squeak', 'crowdCheer', 'bounce', 'catch', 'impact', 'thud']) {
+    for (const c of ['swish', 'rattle', 'squeak', 'crowdCheer', 'bounce', 'catch', 'impact', 'thud', 'glass']) {   // hoops-items: + glass
       const s = r[`${c}:synth`] as { st50: number; peak: number; sec: number };
       const v = r[`${c}:sample`] as { st50: number; peak: number; sec: number }[];
       const mean = v.reduce((a, x) => a + x.st50, 0) / v.length;
       rows.push(`${c.padEnd(11)} synth ${s.st50} dB (peak ${s.peak}, ${s.sec} s) | recording ${mean.toFixed(1)} dB [${v.map((x) => x.st50).join(' ')}] peak max ${Math.max(...v.map((x) => x.peak))} | to match: ${(s.st50 - mean).toFixed(1)} dB`);
     }
     console.log(rows.join('\n'));
+    { const k = r['kissOld:synth'] as { st50: number }; const g = r['glass:sample'] as { st50: number }[]; const m = g.reduce((a, x) => a + x.st50, 0) / g.length;   // hoops-items
+      console.log(`backboard   before (thud at pitch 1.5) ${k.st50} dB | glass recording ${m.toFixed(1)} dB | to match: ${(k.st50 - m).toFixed(1)} dB`); }
     console.log(`crowd bed   synth ${r['bed:synth']} dB | recording ${r['bed:sample']} dB (mean RMS over 3 s) | to match: ${((r['bed:synth'] as number) - (r['bed:sample'] as number)).toFixed(1)} dB`);
     console.log('bank', JSON.stringify(r.bank), 'bed decoded', r.bedDecodedSec, 's');
     fs.writeFileSync(path.join(outDir, 'loudness.json'), JSON.stringify(r, null, 1));

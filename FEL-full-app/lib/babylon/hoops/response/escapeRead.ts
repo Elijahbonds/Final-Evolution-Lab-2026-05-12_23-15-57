@@ -20,6 +20,7 @@
 // Every number is a knob; hoops.escapeReadOn 0 and hoops.trapReadOn 0 are today exactly (the modes skip all of it). Pure: no Babylon.
 import { feel } from '../../../feel-panel/feel';
 import { readTheMan, moveLeanMps, type ManRead, type ReadVerdict } from '../rulebook';
+import type { DefReaction } from '../../core/DefenderReact';
 
 /** The step-back reads the defender (1) / today's step-back (0). Knob `hoops.escapeReadOn`. ON (measured, FLAGGED). 1v1 only: in 3v3 a
  *  late man (stunSec) is frozen on the spot — the backpedal he was in stops dead, so the read cost space there (measured +0.58-0.62 m
@@ -53,6 +54,13 @@ export const PASS_APART_M = 2.2;
 /** A man is ON a side when he is this far across the handler's centre line (m; geometry). */
 export const SIDE_MIN_M = 0.15;
 
+/** hoops-items (2026-11-18): THE 3V3 HOP-BACK READS HIM TOO (1) / the 3v3 step-back reads nobody, as before (0). The same read as
+ *  1v1 (stepBackRead: off balance, or on his heels), the same escapeLateSec — but the man is NOT frozen: a 3v3 stun stops a body dead
+ *  (its velocity zeroed, the reason the earlier try cost space), so the beaten man gets a LATE REACTION instead (lateRunOn): no wish for
+ *  escapeLateSec, his own mover braking from the backpedal he was in at its own brake cap, so the backpedal runs on and THEN he stands
+ *  and recovers — what the 1v1 man does. Knob `hoops.escapeRead3v3On`. */
+export const ESCAPE_READ_3V3_ON = 1;
+export const escapeRead3v3On = (): boolean => feel('hoops.escapeRead3v3On', ESCAPE_READ_3V3_ON) >= 0.5;
 export const escapeReadOn = (): boolean => feel('hoops.escapeReadOn', ESCAPE_READ_ON) >= 0.5;
 export const escapeLateSec = (): number => feel('hoops.escapeLateSec', ESCAPE_LATE_SEC);
 export const trapReadOn = (): boolean => feel('hoops.trapReadOn', TRAP_READ_ON) >= 0.5;
@@ -93,4 +101,12 @@ export function trapEscape(handler: XZ, yaw: number, side: 'left' | 'right', men
   const beat: number[] = [];
   men.forEach((m, i) => { if (readTheMan({ ...m.read, moveSide: side }).beat) beat.push(i); });
   return { kind: 'open', beat };
+}
+
+/** hoops-items: THE LATE THAT LETS HIS BACKPEDAL RUN ON (3v3). A reaction that owns the beaten man's feet for `lateSec` and wishes for
+ *  nothing: the defenders' loop then steps his mover toward a standstill from the velocity he really had, at the mover's own brake cap —
+ *  he carries the backpedal, stops where it takes him and stands — instead of the stun's freeze (velocity zeroed in the frame). Shaped
+ *  like the stand-up (DefenderReact: no distance, no direction), only longer. Pure. */
+export function lateRunOn(lateSec: number): DefReaction {
+  return { kind: 'standup', dir: { x: 0, z: 0 }, left: Math.max(0, lateSec), togo: 0, tune: { sec: Math.max(0, lateSec), dist: 0, maxMps: 0 } };
 }

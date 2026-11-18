@@ -49,7 +49,7 @@
 import { nerve, standingOf } from '../core/Nerve';
 import { PressBuffer } from '../hoops/response/pressBuffer';
 import { dunkGatherOn, dunkGatherDone } from '../hoops/response/dunkGather';   // hoops-gather: the drive dunk gathers, then goes up
-import { escapeLateSec, trapEscape, trapReadOn, trapSqueezeOn, squeezeStandoffM, squeezeSec } from '../hoops/response/escapeRead';   // hoops-gather G3: escapes read the defenders
+import { escapeLateSec, trapEscape, trapReadOn, trapSqueezeOn, squeezeStandoffM, squeezeSec, escapeRead3v3On, stepBackRead, lateRunOn } from '../hoops/response/escapeRead';   // hoops-gather G3: escapes read the defenders
 import { moveImpulse } from '../core/HandleSystem';   // hoops-gather G3: a crossing escape (a lateral body) in a trap
 import { pumpHoldSec, pumpHolding, pumpEndsDribbleOn } from '../hoops/response/pumpHold';   // hoops-gather: the pump keeps the ball while its clip plays   // hoops-p01: the shot press waits out the move (was gameFeel's InputBuffer)
 import { tickScuff, scuffPuffScale, scuffVolume, SCUFF_IDLE, type ScuffState } from '../core/ScuffFx';
@@ -1811,6 +1811,13 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
             const toRimS = RIM_FLOOR.subtract(me.char.root.position); toRimS.y = 0;
             me.drib.stepBack(toRimS.x, toRimS.z, sprintOk); stepbackWindow = STEPBACK_WINDOW_SEC;
             SoundKit.play('whoosh', { pitch: 0.9, volume: 0.35 });
+            // hoops-items: THE HOP-BACK READS HIM (1v1's read, escapeRead): a man on his heels or off balance is late by escapeLateSec — and
+            // his backpedal runs on (lateRunOn: his mover brakes from the speed he had) instead of the stun's freeze. A set man mirrors it.
+            if (escapeRead3v3On() && nfS && foeDistS < SHAKE_RANGE) {
+              const v = stepBackRead(manReadOf(nfS, null));
+              if (v.beat) { nfS.stunSec = Math.max(nfS.stunSec, escapeLateSec()); nfS.react = lateRunOn(escapeLateSec()); }
+              console.info(`[3V3-HANDLE] escape stepback: ${v.beat ? `he bit (${v.why}), late ${escapeLateSec().toFixed(2)} s, his backpedal runs on` : 'he is set, he stays with it'}`);
+            }
             continue;
           }
           if (pick.move === 'snatchback') {

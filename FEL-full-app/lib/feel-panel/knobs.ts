@@ -1954,6 +1954,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'On: a step-back beats a man on his heels or off balance (he is late), never a set man or one coming at you. Off: as before.',
   },
   {
+    id: 'hoops.escapeRead3v3On', label: '3v3 step-back reads the man, his backpedal runs on (1) / reads nobody, as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · gathers',
+    source: 'lib/babylon/hoops/response/escapeRead.ts ESCAPE_READ_3V3_ON',
+    hint: 'On: in 3v3 a step-back beats a man on his heels or off balance like 1v1, and he carries the backpedal he was in before he recovers. Off: as before.',
+  },
+  {
     id: 'hoops.trapReadOn', label: 'Trap: a cross splits an open gap, is stripped on the closed side (1) / as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · gathers',
     source: 'lib/babylon/hoops/response/escapeRead.ts TRAP_READ_ON',
     hint: 'On: a crossover in a double team splits the two men when a body fits between them, and is a steal thrown into a man on the closed side (the owner rule). Off: as before.',

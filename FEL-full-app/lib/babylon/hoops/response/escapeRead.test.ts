@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { trapEscape, stepBackRead, ESCAPE_READ_ON, ESCAPE_LATE_SEC, TRAP_READ_ON, TRAP_GAP_MIN_M, ESCAPE_STRIP_REACH_M, PASS_APART_M, passApartM, TRAP_SQUEEZE_ON, SQUEEZE_STANDOFF_M, SQUEEZE_SEC } from './escapeRead';
+import { trapEscape, stepBackRead, lateRunOn, ESCAPE_READ_3V3_ON, ESCAPE_READ_ON, ESCAPE_LATE_SEC, TRAP_READ_ON, TRAP_GAP_MIN_M, ESCAPE_STRIP_REACH_M, PASS_APART_M, passApartM, TRAP_SQUEEZE_ON, SQUEEZE_STANDOFF_M, SQUEEZE_SEC } from './escapeRead';
 import { resetFeelForTests } from '../../../feel-panel/feel';
 import { FEEL_KNOB_BY_ID } from '../../../feel-panel/knobs';
 import type { ManRead } from '../rulebook';
@@ -13,6 +13,7 @@ describe('escapeRead (hoops-gather G3: escapes read the defenders, never a roll)
   afterEach(() => resetFeelForTests());
   it('the knobs default to the constants', () => {
     expect(FEEL_KNOB_BY_ID.get('hoops.escapeReadOn')!.def).toBe(ESCAPE_READ_ON);
+    expect(FEEL_KNOB_BY_ID.get('hoops.escapeRead3v3On')!.def).toBe(ESCAPE_READ_3V3_ON);   // hoops-items
     expect(FEEL_KNOB_BY_ID.get('hoops.escapeLateSec')!.def).toBe(ESCAPE_LATE_SEC);
     expect(FEEL_KNOB_BY_ID.get('hoops.trapGapMinM')!.def).toBe(TRAP_GAP_MIN_M);
     expect(FEEL_KNOB_BY_ID.get('hoops.trapReadOn')!.def).toBe(TRAP_READ_ON);
@@ -57,5 +58,25 @@ describe('escapeRead (hoops-gather G3: escapes read the defenders, never a roll)
     const men = [{ at: { x: -1.0, z: 0.5 }, read: SET }];
     expect(trapEscape(H, -Math.PI / 2, 'right', men)).toEqual({ kind: 'strip', by: 0 });
     expect(trapEscape(H, -Math.PI / 2, 'left', men).kind).toBe('open');
+  });
+});
+
+describe('the 3v3 late that lets the backpedal run on (hoops-items)', () => {
+  it('owns his feet for the late window and wishes for nothing: his mover brakes from the speed he had', async () => {
+    const { reactionWish, stepReaction } = await import('../../core/DefenderReact');
+    const r = lateRunOn(ESCAPE_LATE_SEC);
+    expect(r.left).toBe(ESCAPE_LATE_SEC);
+    expect(reactionWish(r)).toEqual({ x: 0, z: 0 });
+    // it lasts exactly the late window, however he moves, and then the brain has him again
+    let cur: ReturnType<typeof stepReaction> = r; let t = 0;
+    while (cur) { cur = stepReaction(cur, 1 / 60, { x: -2, z: 0 }); t += 1 / 60; }
+    expect(t).toBeGreaterThanOrEqual(ESCAPE_LATE_SEC - 1e-9); expect(t).toBeLessThan(ESCAPE_LATE_SEC + 1 / 60 + 1e-9);
+  });
+  it('the 3v3 mode wires it behind its knob, after the hop, and never as a freeze alone', async () => {
+    const { readFileSync } = await import('node:fs'); const { join } = await import('node:path');
+    const src = readFileSync(join(__dirname, '..', '..', 'modes', 'ThreeVThreeMode.ts'), 'utf8');
+    const at = src.indexOf('if (escapeRead3v3On() && nfS && foeDistS < SHAKE_RANGE)');
+    expect(at).toBeGreaterThan(src.indexOf('me.drib.stepBack(toRimS.x, toRimS.z, sprintOk)'));
+    expect(src.slice(at, at + 400)).toContain('nfS.react = lateRunOn(escapeLateSec())');
   });
 });
