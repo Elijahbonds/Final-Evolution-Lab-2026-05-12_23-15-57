@@ -36,6 +36,20 @@ const renderWalkup = () => {
 };
 hubUi.subscribe(renderWalkup);
 renderWalkup();
+// ?race=<ms> (V2, PR #635's race): a second hub is mounted on a second canvas <ms> after the first; the probe (race.mts) then
+// tears the FIRST down (W.__stopA) and checks the second is untouched.
+if (q.get('race')) {
+  const c2 = document.createElement('canvas'); c2.id = 'c2'; c2.style.cssText = 'position:fixed;inset:0;width:100%;height:100%';
+  setTimeout(() => {
+    document.body.appendChild(c2);
+    const busB = new InputBus();
+    void runMode(MODES.venice_hub, {
+      canvas: c2, input: busB, guest: true,
+      onPhase: (p) => { W.__phaseB = p; if (p === 'ready') setTimeout(() => busB.emit({ t: 'button', btn: 'START', pressed: true }), 50); },
+      onHud: () => {}, resultSink: async () => {},
+    }).then((stop) => { W.__stopB = stop; }).catch((e) => { W.__errB = String(e?.message ?? e); });
+  }, Number(q.get('race')));
+}
 const bus = new InputBus();
 W.__bus = bus;
 // ?mode=onevone: the same rig on a shipped mode, as the load-time yardstick
@@ -49,4 +63,25 @@ void runMode(MODES[q.get('mode') ?? 'venice_hub'], {
   },
   onHud: () => {},
   resultSink: async () => {},
-}).catch((e) => { W.__err = String(e?.message ?? e); });
+}).then((stop) => { W.__stopA = stop; }).catch((e) => { W.__err = String(e?.message ?? e); });
+// W.__remount() (V2 hardening, no production build) tears the hub down and mounts a fresh one on a fresh canvas, the
+// way the page does on a round trip; resolves when the new hub is playing. hubtrips.mts measures what each round leaves behind.
+W.__remount = async () => {
+  const stop = W.__stopA as (() => void) | undefined;
+  stop?.();
+  W.__phase = 'loading';
+  await new Promise((r) => setTimeout(r, 300));
+  const busN = new InputBus();
+  W.__bus = busN;
+  // a fresh canvas, as the page's remounted stage has (reusing the torn-down engine's canvas broke the next bloom setup)
+  const old = document.querySelector('canvas');
+  const fresh = document.createElement('canvas');
+  fresh.style.cssText = 'width:100%;height:100%;display:block';
+  old?.replaceWith(fresh);
+  const s = await runMode(MODES.venice_hub, {
+    canvas: fresh, input: busN, guest: true,
+    onPhase: (p) => { W.__phase = p; if (p === 'ready') setTimeout(() => busN.emit({ t: 'button', btn: 'START', pressed: true }), 50); },
+    onHud: () => {}, resultSink: async () => {},
+  });
+  W.__stopA = s;
+};

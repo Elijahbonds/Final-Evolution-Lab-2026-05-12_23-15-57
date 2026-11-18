@@ -1698,6 +1698,18 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/adventure/venice/hubLife.ts VENICE_LIFE',
     hint: 'A few gulls over the sea (one thin-instanced draw; a phone flies half) and, on desktop and up only, people standing at Court 2 and by the other courts (the shipped crowd bodies). A phone gets no people: its crowd policy is cut-out cards. 0 = V1, an empty park.',
   },  {
+    id: 'venue.venicePhoneWatchers', label: 'Venice hub: a few real people at the courts on a phone (1) / gulls only (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/adventure/venice/hubLife.ts VENICE_PHONE_WATCHERS',
+    hint: 'V2 (owner 2026-11-18): six real baked-animation people (the crowd bodies, never its cut-out cards) on a phone: four at the run, two by Court 1. 0 = a phone gets the gulls only.',
+  },  {
+    id: 'venue.veniceCourtLife', label: 'Venice hub: people shooting around and a jogger (1) / empty courts (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/adventure/venice/courtLife.ts VENICE_COURT_LIFE',
+    hint: 'V2, desktop and up: a shooter and a rebounder on Court 4 and on Court 1, and a jogger on the bike path. Shipped hoops clips; the ball arcs to the rim. A phone gets none (measured over its draw budget). 0 = no court life.',
+  },  {
+    id: 'venue.veniceCamCollide', label: 'Venice hub: the camera keeps out of poles, boards, palms, the boardwalk (1), the fences too (2) / passes through (0)', def: 0, min: 0, max: 2, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/adventure/venice/courtsDressing.ts VENICE_CAM_COLLIDE',
+    hint: 'V2: one invisible proxy of the park\'s solids and name boards that the shared camera\'s own occlusion probe pulls in on. No camera distance or lag changes. 2 adds the chain-link fences. Ships at 0 (reverted): the director\'s pull-in jumped 3.9 m in a frame to straight overhead at the boardwalk row, and swung off the player at a fence; easing it is a shared-camera change for the owner.',
+  },  {
     id: 'venue.veniceSound', label: 'Venice hub: beach bed, far games, the run, footsteps (1) / the harness crowd bed only (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
     source: 'lib/adventure/venice/hubSound.ts VENICE_SOUND',
     hint: 'The ocean bed, dribbles and shots from pickup games down the beach, the run cheering now and then near Court 2, and your steps (concrete vs sand). Through SoundKit: mute and volume apply. 0 = V1 (the mood crowd bed on first input).',
@@ -2114,6 +2126,63 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'coast.deepWaterTurnBack', label: 'Coast zone: deep water turns you back (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Coast · zone',
     source: 'lib/adventure/coast/zoneWorld.ts COAST_DEEP_WATER_TURN_BACK',
     hint: 'A jump that ends over water deeper than you can wade puts you back where you could stand. Off = the raw movement sim, for probes.',
+  },
+  // ── coast-b (2026-11-18, NEW): the Coast zone, phase B — the partner, the creatures, the log. No shipped number moves.
+  {
+    id: 'coast.partnerOn', label: 'Coast zone: one partner walks with you (1) / you walk alone (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Coast · zone',
+    source: 'lib/adventure/coast/zonePartner.ts COAST_PARTNER_ON',
+    hint: 'Your Adventure partner follows you through the zone (a player with none gets the default creature on loan). Off = phase A.',
+  },
+  {
+    id: 'coast.partnerCatchupM', label: 'Coast zone: partner catches up past', def: 24, min: 8, max: 64, step: 1, unit: 'm', group: 'Coast · zone',
+    source: 'lib/adventure/coast/zonePartner.ts COAST_PARTNER_CATCHUP_M',
+    hint: 'Left this far behind (you outrun it on a long sprint), the partner reappears a few steps behind you on your path.',
+  },
+  {
+    id: 'coast.partnerStuckSec', label: 'Coast zone: a blocked partner comes back after', def: 1, min: 0.3, max: 5, step: 0.1, unit: 's', group: 'Coast · zone',
+    source: 'lib/adventure/coast/zonePartner.ts COAST_PARTNER_STUCK_SEC',
+    hint: 'A partner held up by something (a deck side, a rock) for this long, while more than 6 m behind, reappears on your path.',
+  },
+  {
+    id: 'coast.creaturesOn', label: 'Coast zone: creatures live in the zone (1) / none (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Coast · zone',
+    source: 'lib/adventure/coast/zoneCreatures.ts COAST_CREATURES_ON',
+    hint: 'The placeholder creatures wander near home and can be logged. Off = an empty zone, as in phase A.',
+  },
+  {
+    id: 'coast.logSeenM', label: 'Coast zone: a creature is seen within', def: 16, min: 4, max: 40, step: 1, unit: 'm', group: 'Coast · zone',
+    source: 'lib/adventure/coast/zoneCreatures.ts COAST_LOG_SEEN_M',
+    hint: 'Coming this close puts a creature in your log as seen.',
+  },
+  {
+    id: 'coast.logMeetM', label: 'Coast zone: a creature is met within', def: 3, min: 1, max: 8, step: 0.5, unit: 'm', group: 'Coast · zone',
+    source: 'lib/adventure/coast/zoneCreatures.ts COAST_LOG_MEET_M',
+    hint: 'Walking right up to a creature marks it as met in your log.',
+  },
+  // ── coast-d (2026-11-18, NEW): the Coast zone, phase D — the harbour town, the sports spots, the side quests.
+  {
+    id: 'coast.townOn', label: 'Coast zone: the harbour town (1) / the bare beach (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Coast · zone',
+    source: 'lib/adventure/coast/zoneTown.ts COAST_TOWN_ON',
+    hint: 'Houses, a market strip and townsfolk beside the dock. Off = phase B, and no quests.',
+  },
+  {
+    id: 'coast.townsfolk', label: 'Coast zone: townsfolk in town', def: 4, min: 0, max: 4, step: 1, unit: '', group: 'Coast · zone',
+    source: 'lib/adventure/coast/zoneTown.ts COAST_TOWNSFOLK',
+    hint: 'Each is a full body with its own textures (a phone cost, measured). Fewer = fewer quest givers.',
+  },
+  {
+    id: 'coast.townLoadAfterSec', label: 'Coast zone: seconds after you can move before the market and townsfolk load', def: 0.5, min: 0, max: 10, step: 0.5, unit: 's', group: 'Coast · zone',
+    source: 'lib/adventure/coast/zoneTown.ts COAST_TOWN_LOAD_AFTER_SEC',
+    hint: 'Keeps the two big town downloads out of the wait before you can move. 0 = load them with the zone.',
+  },
+  {
+    id: 'coast.sportsOn', label: 'Coast zone: sports spots open their games (1) / none (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Coast · zone',
+    source: 'lib/adventure/coast/zoneTown.ts COAST_SPORTS_ON',
+    hint: 'Surf, beach volleyball, golf and the kart, one tap each, and back to the same spot after.',
+  },
+  {
+    id: 'coast.questsOn', label: 'Coast zone: townsfolk give quests (1) / only say hello (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Coast · zone',
+    source: 'lib/adventure/coast/zoneQuests.ts COAST_QUESTS_ON',
+    hint: 'Three small quests, saved with your Adventure progress.',
   },
 ];
 

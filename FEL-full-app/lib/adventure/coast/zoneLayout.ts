@@ -145,11 +145,24 @@ export function deckAt(x: number, z: number): Deck | null {
   return null;
 }
 
+/** How high a deck's boards sit above dry sand (m): a boardwalk lying on the beach, one easy step up from the side. */
+export const DECK_ON_SAND = 0.15;
+
+/**
+ * A deck's walking surface at a point: on the sand it lies DECK_ON_SAND above it (so the beach steps onto it from any side);
+ * over the shallows it rises with the water's depth (a gentle ramp, the sand's own slope); over deeper water it is level at
+ * the deck's height. (Phase A drew every deck level at its height: from the beach beside the bridge that was a 0.7 m ledge,
+ * above the movement sim's 0.45 m step, and a walker beside the bridge could not get on.)
+ */
+export function deckSurfaceY(d: Deck, terrain: number): number {
+  return Math.max(terrain + DECK_ON_SAND, Math.min(d.y, DECK_ON_SAND + Math.max(0, -terrain)));
+}
+
 /** What you stand on at (x, z): the terrain, or a deck above it. */
 export function surfaceY(x: number, z: number): number {
   const t = terrainY(x, z);
   const d = deckAt(x, z);
-  return d && d.y > t ? d.y : t;
+  return d ? deckSurfaceY(d, t) : t;
 }
 
 /** May a person stand here: dry land, a deck, or water no deeper than WADE_DEPTH, inside the zone? */
@@ -165,8 +178,9 @@ export interface ZoneSpot {
   label: string;
   at: readonly [x: number, z: number];
   radius: number;
-  /** What walking into it offers. `venice`: the boat back to Venice. Later phases add sports spots (plan, phase D). */
-  kind: 'venice';
+  /** What walking into it offers: `venice` the boat back to Venice; `sport` a game (zoneTown SPORT_SPOTS); `person` one of
+   *  the townsfolk (zoneTown TOWNSFOLK). */
+  kind: 'venice' | 'sport' | 'person';
 }
 
 const dock = DECKS[0];

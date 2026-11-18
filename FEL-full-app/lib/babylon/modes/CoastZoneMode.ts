@@ -37,9 +37,19 @@ import { devOrAgentHooks } from '@/lib/agentRunHooks';
 import { buildCoastWorld, COAST_DEEP_WATER_TURN_BACK, WaterEdge } from '@/lib/adventure/coast/zoneWorld';
 import { COAST_STREAM_ON, mountZoneView, type ZoneView, type ZoneViewStats } from '@/lib/adventure/coast/zoneView';
 import {
-  COAST_STREAM_FULL, COAST_STREAM_KEEP, COAST_STREAM_LOD, ISLANDS, ZoneStreamer, pieceAt, spotAtZone, zonePieces,
+  COAST_STREAM_FULL, COAST_STREAM_KEEP, COAST_STREAM_LOD, ISLANDS, ZoneStreamer, pieceAt, zonePieces,
 } from '@/lib/adventure/coast/zoneLayout';
 import { zoneUi } from '@/lib/adventure/coast/zoneUi';
+import { besidePlayer, COAST_PARTNER_CATCHUP_M, COAST_PARTNER_ON, COAST_PARTNER_STUCK_SEC, PartnerKeeper, zonePartner, type CatchupWhy } from '@/lib/adventure/coast/zonePartner';
+import { COAST_CREATURES_ON, COAST_LOG_MEET_M, COAST_LOG_SEEN_M, CreatureHerd } from '@/lib/adventure/coast/zoneCreatures';
+import { CreatureBodies, LogKeeper, mountPartnerBody, type PartnerBody } from '@/lib/adventure/coast/zoneLife';
+import { adventureSavePolicy } from '../adventure/save/policy';
+import { ALL_SPOTS, COAST_SPORTS_ON, COAST_TOWN_LOAD_AFTER_SEC, COAST_TOWN_ON, COAST_TOWNSFOLK, TOWNSFOLK, returnSpawnFor, sportSpotById, spotAtAll } from '@/lib/adventure/coast/zoneTown';
+import { mountZoneTownView, type ZoneTownView } from '@/lib/adventure/coast/zoneTownView';
+import { spotFromSearch } from '@/lib/adventure/coast/spotReturn';
+import { COAST_QUESTS_ON, questById, readQuests, withPlayed, withQuestTaken, withQuestsChecked } from '@/lib/adventure/coast/zoneQuests';
+import type { ZoneSpot } from '@/lib/adventure/coast/zoneLayout';
+import { signedOutVisitor } from '../core/visitor';   // the harness sets it from runMode's `guest` on every mount
 
 export const COAST_MODE_ID = 'coast_zone';
 /** The stick's basis latches while held (AdventureMode's rule): below this it lets go. */
@@ -62,6 +72,18 @@ interface St {
   preset: string;
   rigKey: string;
   spotSec: number;
+  /** Phase B: the partner (its body, its own water's edge, the last catch-up), the creatures, the log. */
+  partner: PartnerBody | null;
+  partnerEdge: WaterEdge | null;
+  keeper: PartnerKeeper;
+  herd: CreatureHerd | null;
+  creatures: CreatureBodies | null;
+  log: LogKeeper;
+  creaturesShown: number;
+  /** Phase D: the town, the spots this visit offers, the quests. */
+  town: ZoneTownView | null;
+  spots: readonly ZoneSpot[];
+  questsOn: boolean;
 }
 
 const states = new WeakMap<object, St>();
@@ -69,13 +91,21 @@ const live = new Set<St>();
 const TMP_FWD = new Vector3(), TMP_SUBJECT = new Vector3(), TMP_VEL = new Vector3();
 
 /** What the phone rig (scripts/probes/coast-islands) reads: where the player is and what the streamer is drawing. */
-export interface CoastProbe { x: number; y: number; z: number; piece: string; full: number; lod: number; far: number; turnedBack: number; view: ZoneViewStats }
+export interface CoastProbe {
+  x: number; y: number; z: number; piece: string; full: number; lod: number; far: number; turnedBack: number; view: ZoneViewStats;
+  partner: { x: number; z: number; gap: number } | null; catchups: Record<CatchupWhy, number>; creaturesShown: number; logged: number; logStores: number;
+}
 let probeState: St | null = null;
 export function coastProbe(): CoastProbe | null {
   const S = probeState;
   if (!S) return null;
   const p = S.host.player.pos, [i, j] = pieceAt(p.x, p.z);
-  return { x: p.x, y: p.y, z: p.z, piece: `${i},${j}`, full: S.streamer.count('full'), lod: S.streamer.count('lod'), far: S.streamer.count('far'), turnedBack: S.edge.turnedBack, view: S.view.stats() };
+  const q = S.host.partnerActor;
+  return {
+    x: p.x, y: p.y, z: p.z, piece: `${i},${j}`, full: S.streamer.count('full'), lod: S.streamer.count('lod'), far: S.streamer.count('far'), turnedBack: S.edge.turnedBack, view: S.view.stats(),
+    partner: q ? { x: q.pos.x, z: q.pos.z, gap: Math.hypot(q.pos.x - p.x, q.pos.z - p.z) } : null, catchups: { ...S.keeper.counts }, creaturesShown: S.creaturesShown,
+    logged: S.log.entries().filter((e) => e.level > 0).length, logStores: S.log.stores,
+  };
 }
 
 /** No fights yet in the zone: a press that would start one does nothing (the movement sim sees walk, run, jump, dash). The Venice
@@ -94,6 +124,22 @@ export function zoneMoveOnly(inp: MoveInput): MoveInput {
  */
 let driveTo: { x: number; z: number } | null = null;
 export function coastProbeDrive(t: { x: number; z: number } | null): void { driveTo = t && devOrAgentHooks() ? { x: t.x, z: t.z } : null; }
+
+/** The quests to the page, and the "!" over the townsfolk whose quest is on offer. */
+function publishQuests(S: St, note: { id: string; title: string; at: number } | null): void {
+  const qs = S.questsOn ? readQuests(S.log.doc) : [];
+  zoneUi.setQuests(qs, note ?? zoneUi.getSnapshot().questNote);
+  const offers = new Set<string>();
+  if (S.questsOn) for (const p of TOWNSFOLK) if (p.questId && qs.find((q) => q.id === p.questId)?.state === 0) offers.add(p.id);
+  S.town?.setOffers(offers);
+}
+
+/** A taken quest whose thing is now done becomes done (saved), with a note. */
+function checkQuests(S: St): void {
+  let finished: string[] = [];
+  S.log.update((sv) => { const r = withQuestsChecked(sv); if (!r) return null; finished = r.finished.map((q) => q.id); return r.save; });
+  if (finished.length) { const q = questById(finished[finished.length - 1])!; publishQuests(S, { id: q.id, title: q.title, at: Date.now() }); }
+}
 
 function camYawOf(ctx: ModeContext, S: St): number {
   ctx.camDirector.forwardFlatToRef(TMP_FWD);
@@ -114,12 +160,28 @@ export const CoastZoneMode: ModeDefinition = {
   async load(ctx: ModeContext) {
     const scene = ctx.scene;
     zoneUi.reset();
-    const world = buildCoastWorld();
-    const host = new AdventureHost({ world: world.source, save: emptyAdventureSave(0), playerSpawn: world.spawn, band: ctx.prqBand ?? null });
+    // phase D: the town and the sports spots; a game opened from a spot comes back to it (`?spot=`, spotReturn.ts)
+    const townOn = feel('coast.townOn', COAST_TOWN_ON) >= 0.5;
+    const sportsOn = feel('coast.sportsOn', COAST_SPORTS_ON) >= 0.5;
+    const questsOn = townOn && feel('coast.questsOn', COAST_QUESTS_ON) >= 0.5;
+    const back = sportsOn && typeof window !== 'undefined' ? spotFromSearch(window.location.search) : null;
+    const world = buildCoastWorld({ town: townOn, spawn: back ? returnSpawnFor(back) : null });
+    // the Adventure save (the log lives in it; the party's partner comes from it), read once; a guest's stays on the device
+    const log = new LogKeeper({ now: () => Date.now(), policy: adventureSavePolicy({ signedIn: !signedOutVisitor() }) });
+    // one partner (owner 2026-11-17): the save's own, or the Adventure's default creature on loan (never written back)
+    const partnerOn = feel('coast.partnerOn', COAST_PARTNER_ON) >= 0.5;
+    const pick = partnerOn ? zonePartner(log.doc) : { partner: null, loaned: false };
+    const party = { ...emptyAdventureSave(0), partner: pick.partner };
+    const partnerSpawn = { pos: besidePlayer(world.spawn.pos, world.spawn.yaw, { x: 0, y: 0, z: 0 }), yaw: world.spawn.yaw };
+    const host = new AdventureHost({ world: world.source, save: party, playerSpawn: world.spawn, partnerSpawn, band: ctx.prqBand ?? null });
 
     // the place first, around where you arrive (the plan's "you and your 3 × 3 first" loading rule)
     const streamOn = feel('coast.streamOn', COAST_STREAM_ON) >= 0.5;
+    // give the page a turn between the heavy steps (a tap on the way back is answered while the zone loads)
+    const breathe = () => new Promise<void>((r) => setTimeout(r, 0));
+    await breathe();
     const view = mountZoneView(scene, { streamOn });
+    await breathe();
     const streamer = new ZoneStreamer({
       full: Math.round(feel('coast.streamFull', COAST_STREAM_FULL)),
       lod: Math.round(feel('coast.streamLod', COAST_STREAM_LOD)),
@@ -128,6 +190,7 @@ export const CoastZoneMode: ModeDefinition = {
     const [pi, pj] = pieceAt(world.spawn.pos.x, world.spawn.pos.z);
     streamer.step(pi, pj);
     view.stream(streamer.tiers, zonePieces().map((p) => p.key));
+    await breathe();
 
     // the player: the Creator's look through the identity layer, at the hoops builder's playing height (drawing only)
     const body = new TransformNode('coast_player', scene);
@@ -142,11 +205,29 @@ export const CoastZoneMode: ModeDefinition = {
     }).catch(() => { /* today's height */ });
     const move = bindMovementView({ animator: me.animator, poseNode: pose, actor: () => host.world.actors.get(host.playerId), telemetry: () => host.movement.inspect(host.playerId), clock: () => host.tSec });
 
+    await breathe();
+    const partner = pick.partner ? await mountPartnerBody(scene, host, pick.partner, COAST_MODE_ID) : null;
+    const herd = feel('coast.creaturesOn', COAST_CREATURES_ON) >= 0.5 ? new CreatureHerd() : null;
+    const creatures = herd ? new CreatureBodies(scene, herd) : null;
+
     const mapper = createInputMapper({ bindings: loadBindings() });
     const S: St = {
       host, mapper, view, me, body, move, edge: new WaterEdge(world.spawn.pos), streamer,
       stickL: { x: 0, y: 0 }, stickR: { x: 0, y: 0 }, latchedYaw: null, preset: 'runner', rigKey: '', spotSec: SPOT_EVERY,
+      partner, partnerEdge: host.partnerActor ? new WaterEdge(host.partnerActor.pos) : null, keeper: new PartnerKeeper(),
+      herd, creatures, log, creaturesShown: 0, town: null, spots: ALL_SPOTS, questsOn: false,
     };
+    zoneUi.setLog(log.entries(), null);
+    // back from a spot's game: it counts as played there (the beach net's quest)
+    if (back) log.update((sv) => withPlayed(sv, back, (id) => !!sportSpotById(id)));
+    S.town = townOn ? mountZoneTownView(scene, { townsfolk: Math.round(feel('coast.townsfolk', COAST_TOWNSFOLK)), sports: sportsOn, heavyAfterSec: feel('coast.townLoadAfterSec', COAST_TOWN_LOAD_AFTER_SEC) }) : null;
+    S.spots = ALL_SPOTS.filter((x) => (x.kind === 'sport' ? sportsOn : x.kind === 'person' ? townOn && TOWNSFOLK.indexOf(x as (typeof TOWNSFOLK)[number]) < Math.round(feel('coast.townsfolk', COAST_TOWNSFOLK)) : true));
+    S.questsOn = questsOn;
+    if (questsOn) {
+      zoneUi.onTakeQuest((id) => { if (S.log.update((sv) => withQuestTaken(sv, id))) publishQuests(S, null); });
+      checkQuests(S);
+    }
+    publishQuests(S, null);
     host.setInputSource(host.playerId, (out) => {
       mapper.fill(out, { camYaw: camYawOf(ctx, S), state: host.player.state });
       if (driveTo) { const p = host.player.pos; out.camYaw = Math.atan2(driveTo.x - p.x, driveTo.z - p.z); out.move.x = 0; out.move.y = 1; }
@@ -155,9 +236,10 @@ export const CoastZoneMode: ModeDefinition = {
     ctx.heroRef.current = body;   // the harness frames and checks the player by it (FrameGuard assertSpawned)
     states.set(scene, S); live.add(S); probeState = S;
     placeBody(body, host.player);
-    // the camera starts behind the player on the dock, looking out at Palm Key and the bridge
-    const isl = ISLANDS[0];
-    ctx.camDirector.snapTo(new Vector3(host.player.pos.x, host.player.pos.y, host.player.pos.z), new Vector3(isl.at[0], 2, isl.at[1]));
+    // the camera starts behind the player: on the dock looking out at Palm Key and the bridge, or, back from a game, at its spot
+    const isl = ISLANDS[0], came = back ? sportSpotById(back) : undefined;
+    const look = came ? new Vector3(came.at[0], host.player.pos.y + 1, came.at[1]) : new Vector3(isl.at[0], 2, isl.at[1]);
+    ctx.camDirector.snapTo(new Vector3(host.player.pos.x, host.player.pos.y, host.player.pos.z), look);
     view.frame(ctx.camera.position.x, ctx.camera.position.z, 0);
   },
 
@@ -174,9 +256,24 @@ export const CoastZoneMode: ModeDefinition = {
     const h = S.host;
     h.frame(dt);
     const me = h.player;
-    S.edge.hold(me, feel('coast.deepWaterTurnBack', COAST_DEEP_WATER_TURN_BACK) >= 0.5);
+    const edgeOn = feel('coast.deepWaterTurnBack', COAST_DEEP_WATER_TURN_BACK) >= 0.5;
+    const turnedBack = S.edge.hold(me, edgeOn);
     placeBody(S.body, me);
     S.move.sync(dt);
+
+    // the partner: its own water's edge, then the catch-up (left behind, in deep water, or after your turn-back)
+    const q = h.partnerActor;
+    if (q && S.partner) {
+      S.partnerEdge?.hold(q, edgeOn);
+      S.keeper.step(me, q, dt, {
+        catchupM: feel('coast.partnerCatchupM', COAST_PARTNER_CATCHUP_M), stuckSec: feel('coast.partnerStuckSec', COAST_PARTNER_STUCK_SEC),
+        playerTurnedBack: turnedBack, reset: (id) => h.movement.reset(id),
+      });
+      placeBody(S.partner.root, q);
+      S.partner.view.sync(dt);
+    }
+    if (S.herd && S.creatures) { S.herd.step(dt); S.creaturesShown = S.creatures.frame(dt, S.streamer.tiers); }
+    S.town?.update(dt);
 
     // streaming: only when the player crosses into another 64 m piece does anything change
     const [pi, pj] = pieceAt(me.pos.x, me.pos.z);
@@ -194,13 +291,26 @@ export const CoastZoneMode: ModeDefinition = {
     S.view.frame(ctx.camera.position.x, ctx.camera.position.z, dt);
 
     S.spotSec += dt;
-    if (S.spotSec >= SPOT_EVERY) { S.spotSec = 0; zoneUi.setSpot(spotAtZone(me.pos.x, me.pos.z)); }
+    if (S.spotSec >= SPOT_EVERY) {
+      S.spotSec = 0;
+      zoneUi.setSpot(spotAtAll(me.pos.x, me.pos.z, S.spots));
+      // the creature log: seen within coast.logSeenM, met within coast.logMeetM (a log only moves up)
+      if (S.herd) {
+        const seenM = feel('coast.logSeenM', COAST_LOG_SEEN_M), meetM = feel('coast.logMeetM', COAST_LOG_MEET_M);
+        for (const c of S.herd.near(me.pos.x, me.pos.z, seenM)) {
+          const met = Math.hypot(c.x - me.pos.x, c.z - me.pos.z) <= meetM;
+          const note = S.log.note(c.id, met ? 2 : 1);
+          if (note) zoneUi.setLog(S.log.entries(), note);
+        }
+      }
+      if (S.questsOn) checkQuests(S);
+    }
   },
 
   dispose() {
     // the harness disposes the scene; the per-scene state goes with its WeakMap entry. Live states are closed here.
     zoneUi.reset();
-    for (const S of live) { S.move.dispose(); S.view.dispose(); }
+    for (const S of live) { S.move.dispose(); S.view.dispose(); S.partner?.dispose(); S.creatures?.dispose(); S.town?.dispose(); }
     live.clear();
     probeState = null;
     driveTo = null;

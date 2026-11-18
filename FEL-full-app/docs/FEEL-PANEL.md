@@ -668,7 +668,18 @@ holds the result in CI. Phone tier only unless said.
   look (its floating name signs).
 - `venue.veniceLife` 1 (`lib/adventure/venice/hubLife.ts`, the Venice hub; improvement pass phase 6, NEW): gulls wheeling over the sea (one
   thin-instanced billboard draw; a phone flies 3, desktop 6) and, on desktop and up only, people standing at Court 2's sideline and by the
-  other courts (the shipped crowd bodies). A phone gets no people (its crowd tier is cut-out cards). 0 = V1's empty park.
+  other courts (the shipped crowd bodies). A phone gets no crowd-tier people (cut-out cards); `venue.venicePhoneWatchers` stands six real ones. 0 = V1's empty park.
+- `venue.venicePhoneWatchers` 1 (`lib/adventure/venice/hubLife.ts`, the Venice hub; V2, NEW, owner 2026-11-18): a phone stands six real
+  people at the courts (four at the run, two by Court 1) — the crowd's baked bodies, never its cut-out cards. 0 = gulls only.
+- `venue.veniceCourtLife` 1 (`lib/adventure/venice/courtLife.ts`, the Venice hub; V2, NEW): a shooter working round Court 4's arc (the
+  shipped jump shot, follow-through and catch; the ball arcs to the rim, in or off the iron), and on desktop a rebounder there, a pair on
+  Court 1 and a jogger on the bike path (no riding clip fits). A phone gets none: one shooter measured 57-77 draws against the phone row's 56, even without its outline and shadow. 0 = empty courts.
+- `venue.veniceCamCollide` 0 (`lib/adventure/venice/courtsDressing.ts`, the Venice hub; V2, NEW): one invisible proxy mesh of the park's
+  solids (fences, poles, posts, hoops, palms, the boardwalk row) and name boards, flagged for the shared CameraDirector's own occlusion
+  probe. No camera number changes. 1 leaves the see-through chain-link fences out (measured with them in: the pull-in at a fence jumped
+  3-5 m in a frame and swung off the player); 2 puts them in; 0 = the camera passes through everything, as before. SHIPS AT 0
+  (reverted, 2026-11-18): at the boardwalk row level 1 cut the camera 3.9 m in one frame to straight overhead (the director's
+  boxed-in fallback). Easing the shared director's pull-in is the owner's call; the levels stay for that test.
 - `venue.veniceSound` 1 (`lib/adventure/venice/hubSound.ts`, the Venice hub; improvement pass phase 7, NEW): the ocean bed, dribbles and
   shots from unseen pickup games down the beach, the run cheering now and then near Court 2, and footsteps (concrete vs sand), all through
   SoundKit (mute and volume apply; the recorded hoops bank once loaded). 0 = V1 (the harness's mood crowd bed).
@@ -1041,3 +1052,31 @@ Adventure host's movement and camera exactly as the Venice hub does: no movement
 - `coast.deepWaterTurnBack` 1 (`lib/adventure/coast/zoneWorld.ts`): a body that ends a frame over water deeper than you can wade
   (0.85 m) goes back to the last place it could stand. On the ground the deep water is already a wall to the movement sim; this
   catches a jump off the dock. 0 = off (a probe that wants the raw sim).
+
+## coast-b, 2026-11-18 (the Coast & Islands zone, phase B: the partner, the creatures, the log; NEW, no shipped number moved)
+
+Group **Coast · zone**. The partner is the Adventure's own (its brain, its speed, its follow slot are untouched); these are the
+zone's rules around it, and the creatures and the log, all new. Each 0 restores phase A.
+
+- `coast.partnerOn` 1 (`lib/adventure/coast/zonePartner.ts`): one partner walks with you — the Adventure save's own, or the
+  Adventure's default creature (strideraptor) on loan, never written to the save. 0 = you walk alone.
+- `coast.partnerCatchupM` 24 m: left this far behind (on a flat-out sprint you reach 14 m/s, the partner about 10.5 m/s), it
+  reappears 3 m behind you on your own path. The story's own catch-up is 32 m; the zone's 3 × 3 full-detail ring is 192 m wide.
+- `coast.partnerStuckSec` 1 s: blocked (under 0.5 m/s) for this long while more than 6 m behind, it reappears on your path. The
+  brain walks straight at its follow slot and has no path-finding.
+- `coast.creaturesOn` 1 (`lib/adventure/coast/zoneCreatures.ts`): four placeholder creatures wander near home. 0 = none.
+- `coast.logSeenM` 16 m, `coast.logMeetM` 3 m: how close you come for a creature to go in your log as seen, and as met.
+
+## coast-d, 2026-11-18 (the Coast & Islands zone, phase D: the harbour town, the sports spots, the side quests; NEW)
+
+Group **Coast · zone**. All new; each off restores phase B.
+
+- `coast.townOn` 1 (`lib/adventure/coast/zoneTown.ts`): the harbour town beside the dock (four houses you cannot walk through,
+  the shipped Venice boardwalk kit as the market strip, the street). 0 = the bare beach, and no quests.
+- `coast.townsfolk` 4: how many townsfolk stand in town (the Venice watchers' roster bodies; each is a skinned body with its own
+  textures, measured on the phone rig). 0–4; the first three give the quests.
+- `coast.townLoadAfterSec` 0.5 s: the market kit and the townsfolk's bodies start loading this long after the zone is playable, not during its load (measured: loading them with the zone made it playable about 5 s later on the rig). 0 = with the zone. New (coast-d), [TUNE].
+- `coast.sportsOn` 1: the sports spots (surf, beach volleyball, golf, the kart) open their games in one tap and the end screen
+  brings you back to the spot. 0 = none.
+- `coast.questsOn` 1 (`lib/adventure/coast/zoneQuests.ts`): the townsfolk give three quests, saved in the Adventure save like the
+  creature log. 0 = they only say hello.

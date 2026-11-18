@@ -16,6 +16,7 @@
 import type { WorldSource } from '@/lib/babylon/adventure/host/hostWorld';
 import type { Vec3 } from '@/lib/babylon/adventure/contracts';
 import { arrivalSpawn, surfaceY, walkable, ZONE_MAX_X, ZONE_MAX_Z, ZONE_MIN_X, ZONE_MIN_Z } from './zoneLayout';
+import { buildingTopAt } from './zoneTown';
 
 /** The wall deep water and the zone's edge answer with (m): above any deck or shallow by more than the sim's step-up. */
 export const DEEP_WALL_Y = 2;
@@ -25,15 +26,19 @@ export const COAST_DEEP_WATER_TURN_BACK = 1;
 
 export interface CoastWorld { source: WorldSource; spawn: { pos: Vec3; yaw: number } }
 
-export function coastGroundY(x: number, z: number): number {
-  return walkable(x, z) ? surfaceY(x, z) : DEEP_WALL_Y;
+/** The ground the sim stands on. With the town (phase D), a building's top stands where it is: a wall to walk into. */
+export function coastGroundY(x: number, z: number, town = true): number {
+  if (!walkable(x, z)) return DEEP_WALL_Y;
+  const b = town ? buildingTopAt(x, z) : null;
+  return b === null ? surfaceY(x, z) : Math.max(b, surfaceY(x, z));
 }
 
-export function buildCoastWorld(): CoastWorld {
+export function buildCoastWorld(o: { town?: boolean; spawn?: { pos: Vec3; yaw: number } | null } = {}): CoastWorld {
+  const town = o.town !== false;
   return {
-    spawn: arrivalSpawn(),
+    spawn: o.spawn ?? arrivalSpawn(),
     source: {
-      groundY: coastGroundY,
+      groundY: (x, z) => coastGroundY(x, z, town),
       clear: () => true,   // no line-of-sight blockers: nothing in this zone locks on or homes yet (no combat)
       rails: { id: 'coast.rails', segments: [] },
       walls: [],

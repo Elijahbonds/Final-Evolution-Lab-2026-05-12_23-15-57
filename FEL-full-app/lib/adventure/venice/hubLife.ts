@@ -16,8 +16,14 @@ import { mountCrowd, type CrowdHandle } from '@/lib/babylon/visual/crowd/crowdSt
 import type { CrowdVenue } from '@/lib/babylon/visual/crowd/crowdLayout';
 import { v1Area, v1Spots } from './hubWorld';
 import { FENCE } from './courtsDressing';
+import { feel } from '@/lib/feel-panel/feel';
 
 export const VENICE_LIFE = 1;
+/** V2 (owner 2026-11-18: "phones get a few REAL 3D people"): a phone's watchers, real baked bodies (the crowd's fans, never its
+ *  cut-out cards). 1 = PHONE_WATCHERS people at the run and by Court 1; 0 = a phone's life is the gulls only (the pass's V1). */
+export const VENICE_PHONE_WATCHERS = 1;
+/** How many real people a phone stands at the courts: four at the run, two by Court 1. */
+export const PHONE_WATCHERS = { run: 4, ones: 2 } as const;
 export const GULLS = { desktop: 6, phone: 3 } as const;
 
 /** Pure: a gull's position at time t (s) on its ellipse over the sand and the water's edge west of the courts (`seaX`: the
@@ -52,6 +58,17 @@ export function watchersVenue(): CrowdVenue {
   };
 }
 
+/** Pure: a phone's watchers' venue — the same places as the desktop's, only a few people, no gaps (each seat is a person). */
+export function phoneWatchersVenue(): CrowdVenue {
+  const v = watchersVenue();
+  const pitch = 1.1;
+  const run = v.stands.find((s) => s.id === 'venice_run_line')!;
+  const ones = v.stands.find((s) => s.id === 'venice_watch_court.ones');
+  const stands: CrowdVenue['stands'] = [{ ...run, id: 'venice_run_phone', width: PHONE_WATCHERS.run * pitch, pitch, gaps: 0 }];
+  if (ones && PHONE_WATCHERS.ones > 0) stands.push({ ...ones, id: 'venice_ones_phone', width: PHONE_WATCHERS.ones * pitch, pitch, gaps: 0 });
+  return { ...v, stands };
+}
+
 export interface HubLife { update(dt: number): void; dispose(): void; gulls: number; watchers: Promise<number> }
 
 export function mountHubLife(scene: Scene, parent: TransformNode, tier: string): HubLife {
@@ -68,9 +85,11 @@ export function mountHubLife(scene: Scene, parent: TransformNode, tier: string):
   const m = new Matrix(), q = Quaternion.Identity(), one = Vector3.One(), p = new Vector3();
   for (let i = 0; i < n; i++) { const [x, y, z] = gullAt(i, 0, seaX); p.set(x, y, z); Matrix.ComposeToRef(one, q, p, m); quad.thinInstanceAdd(m, i === n - 1); }
   let t = 0;
-  // the watchers: desktop and up only (above)
+  // the watchers: desktop and up, the full set; a phone (V2, venue.venicePhoneWatchers) a few, as real baked bodies — asked of
+  // the crowd at its desktop tier so every seat is a fan (its phone tier is cards only), and the seats are so few that is all
   let crowd: CrowdHandle | null = null;
   if (!phone) crowd = mountCrowd(scene, watchersVenue(), { tier, seed: 23 });
+  else if (feel('venue.venicePhoneWatchers', VENICE_PHONE_WATCHERS) >= 0.5) crowd = mountCrowd(scene, phoneWatchersVenue(), { tier: 'desktop', seed: 23 });
   return {
     gulls: n,
     watchers: crowd ? crowd.ready.then((ok) => (ok ? crowd!.fans : 0)) : Promise.resolve(0),

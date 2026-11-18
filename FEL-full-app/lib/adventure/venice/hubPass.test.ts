@@ -187,6 +187,86 @@ describe('phase 8: solids and the walk-up', () => {
   it('ship on (1)', () => { expect(VENICE_SOLIDS).toBe(1); expect(WALKUP_V2).toBe(1); });
 });
 
+describe('V2 phase 1: a phone\'s watchers are a few real people', () => {
+  it('six seats, every one a fan at the crowd\'s desktop tier (none a card), off every fence', async () => {
+    const { phoneWatchersVenue, PHONE_WATCHERS, VENICE_PHONE_WATCHERS } = await import('./hubLife');
+    const { splitSeats } = await import('@/lib/babylon/visual/crowd/crowdLayout');
+    const seats = layoutSeats(phoneWatchersVenue(), 23);
+    expect(seats).toHaveLength(PHONE_WATCHERS.run + PHONE_WATCHERS.ones);
+    expect(seats.length).toBeGreaterThanOrEqual(4);
+    expect(seats.length).toBeLessThanOrEqual(6);
+    const { fans, cards } = splitSeats(seats, 'desktop');
+    expect(fans).toHaveLength(seats.length);
+    expect(cards).toHaveLength(0);
+    for (const seat of seats) for (const s of v1Spots()) {
+      expect(Math.abs(seat.pos[0] - s.at[0]) < FENCE.halfW && Math.abs(seat.pos[2] - s.at[1]) < FENCE.halfL).toBe(false);
+    }
+    expect(VENICE_PHONE_WATCHERS).toBe(1);
+  });
+});
+
+describe('V2 phase 2: the shootaround', () => {
+  it('dribble → jump shot → the ball reaches the rim → follow-through → back out → next spot, on loop', async () => {
+    const { CourtShootaround, rimOf, BEAT, COURT_LIFE, VENICE_COURT_LIFE, joggerPath } = await import('./courtLife');
+    const court = v1Spots().find((s) => s.id === 'court.arc')!;
+    const run = new CourtShootaround(court, true, 3);
+    const clips: string[] = [], cues: string[] = [];
+    let atRim = false;
+    const rim = rimOf(court);
+    const cycle = BEAT.dribble + BEAT.rise + BEAT.flight + BEAT.drop + BEAT.toRebounder + BEAT.pass + BEAT.settle;
+    for (let i = 0; i < Math.ceil((cycle * 3) / (1 / 60)); i++) {
+      const f = run.step(1 / 60);
+      if (f.shooterClip) clips.push(f.shooterClip);
+      if (f.cue) cues.push(f.cue.name);
+      if (f.phase === 'drop' && Math.hypot(f.ball[0] - rim[0], f.ball[2] - rim[2]) < 0.3 && Math.abs(f.ball[1] - rim[1]) < 0.4) atRim = true;
+      expect(f.ball[1]).toBeGreaterThan(0);
+      // the shooter stays on the court
+      expect(Math.abs(f.shooter[0] - court.at[0])).toBeLessThan(COURT_HALF.w);
+      expect(Math.abs(f.shooter[1] - court.at[1])).toBeLessThan(COURT_HALF.l);
+    }
+    expect(atRim).toBe(true);
+    expect(clips.slice(0, 4)).toEqual(['jumpshot', 'bball_follow_through', 'catch_pass', 'bball_dribble_idle']);
+    expect(cues).toContain('bounce');
+    expect(cues.some((c) => c === 'swish' || c === 'rattle' || c === 'clang')).toBe(true);
+    // a phone: none (measured over the row's draw budget; desktop keeps the shootaround)
+    expect(COURT_LIFE.phone.courts.length).toBe(0);
+    expect(COURT_LIFE.desktop.courts.length).toBeGreaterThan(0);
+    expect(COURT_LIFE.phone.rebounders).toBe(false);
+    expect(COURT_LIFE.phone.joggers).toBe(0);
+    const p = joggerPath();
+    expect(p.z1).toBeGreaterThan(p.z0);
+    expect(VENICE_COURT_LIFE).toBe(1);
+  });
+  it('every clip the court life plays is allowed by the hub\'s clip scope', async () => {
+    const { scopeAllows, scopeForMode } = await import('@/lib/babylon/anim/clipScope');
+    const scope = scopeForMode('venice_hub');
+    for (const c of ['jumpshot', 'bball_follow_through', 'catch_pass', 'bball_dribble_idle', 'bball_hand_up', 'bball_idle_stand', 'run']) expect(scopeAllows(scope, c), c).toBe(true);
+  });
+});
+
+describe('V2 phase 3: the camera blockers', () => {
+  it('cover every fence, pole and board post, the four boards and the boardwalk row; leave the benches to the camera', async () => {
+    const { camBlockPieces, VENICE_CAM_COLLIDE } = await import('./courtsDressing');
+    const solids = hubSolids(v1Spots(), true);
+    const withFences = camBlockPieces(solids, true, true), pieces = camBlockPieces(solids);
+    const covered = (set: typeof pieces, b: { minX: number; maxX: number; minZ: number; maxZ: number }) => set.some((p) => p.minX <= b.minX && p.maxX >= b.maxX && p.minZ <= b.minZ && p.maxZ >= b.maxZ);
+    for (const b of solids) {
+      if (/bench/.test(b.id)) expect(covered(withFences, b)).toBe(false);
+      else expect(covered(withFences, b), b.id).toBe(true);
+      // the shipped level leaves the see-through fences to the camera
+      if (/fence/.test(b.id)) expect(pieces.some((p) => p.id === b.id)).toBe(false);
+      else if (!/bench/.test(b.id)) expect(covered(pieces, b), b.id).toBe(true);
+    }
+    expect(withFences.length).toBe(solids.filter((b) => !/bench/.test(b.id)).length + v1Spots().length);
+    // nothing in the camera's way where a player stands at a ring
+    for (const s of v1Spots()) {
+      const rx = s.at[0] + COURT_HALF.w + RING.out;
+      for (const p of pieces) expect(rx > p.minX - 0.5 && rx < p.maxX + 0.5 && s.at[1] > p.minZ - 0.5 && s.at[1] < p.maxZ + 0.5).toBe(false);
+    }
+    expect(VENICE_CAM_COLLIDE).toBe(0);   // reverted: measured jumps (courtsDressing)
+  });
+});
+
 describe('phase 9: finding your way', () => {
   it('ships the wayfinding layer on by default', () => {
     expect(VENICE_WAYFINDING).toBe(1);
