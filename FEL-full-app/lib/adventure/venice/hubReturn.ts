@@ -64,9 +64,16 @@ export function veniceReturnHref(pathname: string, search: string, now: number, 
   let q: URLSearchParams;
   try { q = new URLSearchParams(search); } catch { q = new URLSearchParams(); }
   const spot = q.get(SPOT_PARAM);
-  if (q.get(FROM_PARAM) === FROM_VENICE && spot && SPOTS.some((s) => s.id === spot)) return hubHrefFor(spot);
+  if (q.get(FROM_PARAM) === FROM_VENICE && spot && SPOTS.some((s) => s.id === spot)) {
+    clearReturn(store);
+    return hubHrefFor(spot);
+  }
   const m = readReturn(now, store);
-  return m && m.route === pathname ? hubHrefFor(m.spot) : null;
+  if (m && m.route === pathname) {
+    clearReturn(store);
+    return hubHrefFor(m.spot);
+  }
+  return null;
 }
 
 /** The spot the hub page should put the player at (`?spot=`), when it is one V1 opens. */

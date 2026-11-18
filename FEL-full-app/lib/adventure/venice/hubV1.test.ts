@@ -62,14 +62,24 @@ describe('walking up and coming back', () => {
   });
   it('the end screen goes back to the court the game came from: by the query, or by the return mark', () => {
     const st = mem();
+    writeReturn(v1Spots()[0], 0, st);
     expect(veniceReturnHref('/play/onevone', '?from=venice&spot=court.ones', 0, st)).toBe(hubHrefFor('court.ones'));
+    expect(st.m.has(RETURN_KEY)).toBe(false);
     expect(veniceReturnHref('/play/onevone', '', 1000, st)).toBeNull();
     writeReturn(v1Spots()[1], 1000, st);
     expect(veniceReturnHref('/play/threevthree', '?net=ABC&peer=h1&party=1', 2000, st)).toBe('/play/venice?spot=court.run');
+    expect(st.m.has(RETURN_KEY)).toBe(false);
     expect(veniceReturnHref('/play/onevone', '', 2000, st)).toBeNull();   // another game: not this trip
     expect(veniceReturnHref('/play/threevthree', '', 1000 + RETURN_TTL_MS + 1, st)).toBeNull();   // stale
     clearReturn(st);
     expect(st.m.has(RETURN_KEY)).toBe(false);
+  });
+  it('consumes a stored return mark once, so a later shelf launch on the same route does not leak back to Venice', () => {
+    const st = mem();
+    writeReturn(v1Spots()[0], 1000, st);
+    expect(veniceReturnHref('/play/onevone', '', 2000, st)).toBe(hubHrefFor('court.ones'));
+    expect(st.m.has(RETURN_KEY)).toBe(false);
+    expect(veniceReturnHref('/play/onevone', '', 2500, st)).toBeNull();
   });
   it('refuses junk: a made-up spot, broken storage, a mark from the future', () => {
     const st = mem();
