@@ -28,6 +28,8 @@ try {
   const b = await chromium.launch({ executablePath: exe, headless: true, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
   for (const route of ROUTES) for (const [w, h] of VIEWS) {
     const ctx = await b.newContext({ storageState: storageState(ppl, 'solo') as never, viewport: { width: w, height: h }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+    // tsx wraps named arrow functions in __name(); the page has no such helper (the perf sweep shims it the same way)
+    await ctx.addInitScript({ content: 'window.__name = window.__name || function (f) { return f; };' });
     const p = await ctx.newPage();
     const errs: string[] = [];
     p.on('pageerror', (e) => errs.push(e.message.slice(0, 160)));
