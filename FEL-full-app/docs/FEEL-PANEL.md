@@ -939,3 +939,5 @@ owner's two Blender jobs, made headless from the free MakeHuman garments (docs/S
 - `kit.newJerseys` 0 (`core/sportKitDefaults.ts` `NEW_JERSEYS`): 1 = the kit bodies carry `top_basketball` (the sleeveless jersey
   from the MakeHuman tee, the default top in 1v1, 3v3, the dunk modes, 3-Point and the carnival) and `top_football` (from the
   MakeHuman polo; the body now carries it, so the Meshy football pack is not fetched). A Closet pick still wins.
+- MEASURED (KIT-FIT-PLAN §11): with either knob on, more skin shows through in the game (the basketball jersey about twice,
+  the short 2-5x in its slot); the football jersey cuts the pack's torn edges 25x but lets 11-13 % more skin through. Keep both at 0.
