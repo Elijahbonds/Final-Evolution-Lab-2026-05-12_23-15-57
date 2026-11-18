@@ -955,6 +955,9 @@ Group **Kit · fit**. A look slider, not a feel number: it moves no body, no bon
   mask is fitted; the pull fades out near the hems, cuffs, armholes and leg openings, where the skin is still drawn. Kit packs (the
   football jersey) and the Creator's built clothes are not touched. `lib/babylon/core/fitTight.ts` `FIT_TIGHTNESS` (with `FIT_FLOOR`
   8 mm and `FIT_EDGE_BAND` 7 cm).
+- `kit.setLiftScale` **0.5 — owner 2026-11-18 pick (3) from the contact sheet** (new; 1 = today's numbers): the runtime lift
+  (`GARMENT_INFLATE` 13 mm tops / 20 mm shorts) and edge flare on the Blender-made garment sets ONLY (the one-piece short, the new
+  jerseys); every other garment takes today's. `lib/babylon/core/fitTight.ts` `SET_LIFT_SCALE`.
 
 ## kit-mac-jobs, 2026-11-18 (owner: "The clothes are the biggest eye sore immediately"; "skin tight and not baggy, or more natural")
 
@@ -963,14 +966,15 @@ next body a scene loads (the garments go into the loaded file once, before any s
 owner's two Blender jobs, made headless from the free MakeHuman garments (docs/SHORTS-BUILD-STEPS.md, docs/JERSEY-BUILD-STEPS.md;
 `scripts/avatar/mpfb/onepiece-shorts.py`, `jersey.py`, `fit-outfit.py`, `scripts/avatar/kit-fit/graft.ts`); the files are
 `public/models/kits/sets/` and no body file changes.
-- `kit.onePieceShorts` 0 (`core/kitGarmentSet.ts` `ONE_PIECE_SHORTS`): 1 = the kit bodies (Closet, games, phone files) wear the
+- `kit.onePieceShorts` **1 — owner 2026-11-18 pick (3) from the contact sheet** (was 0) (`core/kitGarmentSet.ts` `ONE_PIECE_SHORTS`): 1 = the kit bodies (Closet, games, phone files) wear the
   one-piece court short: one piece of cloth with a gusset 2.5 cm under the crotch, fitted to the legs and seat, in place of the
   three pieces whose legs reached 10 cm into each other. Both short items (`shorts_court`, `shorts_glitch`) take it.
-- `kit.newJerseys` 0 (`core/sportKitDefaults.ts` `NEW_JERSEYS`): 1 = the kit bodies carry `top_basketball` (the sleeveless jersey
+- `kit.newJerseys` **1 — owner 2026-11-18 pick (3) from the contact sheet** (was 0) (`core/sportKitDefaults.ts` `NEW_JERSEYS`): 1 = the kit bodies carry `top_basketball` (the sleeveless jersey
   from the MakeHuman tee, the default top in 1v1, 3v3, the dunk modes, 3-Point and the carnival) and `top_football` (from the
   MakeHuman polo; the body now carries it, so the Meshy football pack is not fetched). A Closet pick still wins.
 - MEASURED (KIT-FIT-PLAN §11): with either knob on, more skin shows through in the game (the basketball jersey about twice,
-  the short 2-5x in its slot); the football jersey cuts the pack's torn edges 25x but lets 11-13 % more skin through. Keep both at 0.
+  the short 2-5x in its slot); the football jersey cuts the pack's torn edges 25x but lets 11-13 % more skin through. The owner judged
+  by eye instead (KIT-FIT-PLAN §12.2): both ship at 1, with `kit.setLiftScale` 0.5.
 
 ## hoops-items, 2026-11-18 (the basketball items the gather, escape, sound and perf lanes left open; the owner has not felt or heard these)
 

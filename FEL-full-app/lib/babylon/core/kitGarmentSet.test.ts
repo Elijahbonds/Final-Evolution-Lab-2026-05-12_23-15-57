@@ -1,6 +1,6 @@
 // lane/kit-mac-jobs (owner 2026-11-18: "make the clothes appear to be skin tight and not baggy"): the Blender-made garment sets
 // (the one-piece short, the basketball and football jerseys) and the load-time swap that puts them on a kit body, behind
-// `kit.onePieceShorts` and `kit.newJerseys`. Off (the default) nothing changes; on, the garments land on the body, in its
+// `kit.onePieceShorts` and `kit.newJerseys` (both ship ON since the owner's pick (3), 2026-11-18). Off, nothing changes; on, the garments land on the body, in its
 // bind space, where Blender fitted them.
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -33,8 +33,10 @@ describe('which body takes which set (pure)', () => {
     expect(garmentSetsFor('/models/rivals/ace.glb', { shorts: true, jerseys: true })).toEqual([]);
   });
   it('the basketball modes default to the new jersey only with kit.newJerseys on; football and tennis keep their tops', () => {
+    // kit-tight: the owner's pick (3), 2026-11-18, ships kit.newJerseys at 1 (was 0); the off path is the knob at 0
+    setFeelUser(true); setFeelSession(null); setFeelOverride('kit.newJerseys', 0);
     expect(sportKitDefault('onevone').tops).toBe('top_bonds');
-    setFeelUser(true); setFeelSession(null); setFeelOverride('kit.newJerseys', 1);
+    setFeelOverride('kit.newJerseys', 1);
     expect(sportKitDefault('onevone').tops).toBe(BASKETBALL_JERSEY);
     expect(sportKitDefault('dunk').tops).toBe(BASKETBALL_JERSEY);
     expect(sportKitDefault('tennis').tops).toBe('top_bonds');

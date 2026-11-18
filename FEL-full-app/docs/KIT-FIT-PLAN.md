@@ -470,3 +470,16 @@ Bringing them closer makes the count worse, as in phase 1. **But the count may n
 assumption, not measured: much of the rise is this proximity effect, not skin poking through. A design that shows more arm or
 thigh cannot pass a count that treats nearby bare skin as poke. The owner's eye, or a rig measure that tells skin in front of
 cloth from skin that should be under it, is needed to judge it.
+
+### 12.2 The owner's pick, and the waived count (2026-11-18)
+
+The coordinator put a contact sheet to the owner (`scripts/probes/kit-tight/pick.sh`, `tile.sh`: each kit body standing and
+mid-stride, plus the phone frames at game distance), with three versions: (1) today, (2) the new garments, (3) the new garments
+at half the runtime lift. **The owner picked (3).** It ships: `kit.onePieceShorts` 1, `kit.newJerseys` 1, `kit.setLiftScale` 0.5.
+
+**The 10.1a skin count is waived for this change, by the owner's eye.** It is a reasoned call, not a measured one. The count
+calls any bare skin within 4 cm of a garment, inside its silhouette, "through the cloth". So it scores a sleeveless jersey (a bare
+arm beside it) and a closer hem (a bare thigh just below it) as worse, and §12.1's game-only rise in the tops slot fits that. It
+was not checked with a sharper measure. What it does not waive: flicker was not judged, and the one-piece short's hem frays at the
+inner thigh in a stride (visible on the sheet; kit-mac-jobs measured its stretched edges 3–5×). That is the next job:
+fix it in `scripts/avatar/mpfb/onepiece-shorts.py` and re-export, behind the same knobs, with before / after pictures.

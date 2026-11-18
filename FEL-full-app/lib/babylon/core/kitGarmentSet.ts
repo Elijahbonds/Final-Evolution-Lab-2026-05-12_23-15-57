@@ -25,7 +25,7 @@ import { KIT_BODY_MOBILE_URL, KIT_BODY_URL, type BodyType } from './heroBody';
 import { NEW_JERSEYS } from './sportKitDefaults';
 
 /** Knob `kit.onePieceShorts`: 1 = the one-piece short on the kit bodies; 0 = today's three-piece short (default). */
-export const ONE_PIECE_SHORTS = 0;
+export const ONE_PIECE_SHORTS = 1;   // owner 2026-11-18 pick (3) from the contact sheet (was 0)
 
 export type GarmentSetKind = 'shorts' | 'jerseys';
 export const KIT_GARMENT_SETS: Readonly<Record<GarmentSetKind, Readonly<Record<BodyType, string>>>> = {

@@ -1747,12 +1747,12 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
   },
   // ── lane/kit-mac-jobs (owner 2026-11-18: the clothes look poofy; the two Blender jobs, the one-piece short and the new jerseys) ──
   {
-    id: 'kit.onePieceShorts', label: 'Kit body short: one piece, fitted (1) / three pieces, as before (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Kit · garments',
+    id: 'kit.onePieceShorts', label: 'Kit body short: one piece, fitted (1) / three pieces, as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Kit · garments',
     source: 'lib/babylon/core/kitGarmentSet.ts ONE_PIECE_SHORTS',
     hint: 'The kit bodies wear the one-piece court short made in Blender (a real crotch, fitted to the legs and seat) in place of the three-piece short whose legs crossed into each other. Applies to the next body loaded. 0 = the three-piece short.',
   },
   {
-    id: 'kit.newJerseys', label: 'Kit body tops: the new basketball and football jerseys (1) / as before (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Kit · garments',
+    id: 'kit.newJerseys', label: 'Kit body tops: the new basketball and football jerseys (1) / as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Kit · garments',
     source: 'lib/babylon/core/sportKitDefaults.ts NEW_JERSEYS',
     hint: 'The kit bodies carry the basketball jersey (the basketball modes default top) and the football jersey (in place of the Meshy football pack), both cut from the free MakeHuman tees and fitted close. Applies to the next body loaded. 0 = the tops as before.',
   },
@@ -2074,7 +2074,7 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
   },
   // ── lane/kit-tight (owner 2026-11-18: "make the clothes appear to be skin tight and not baggy ... right now it looks poofy") ──
   {
-    id: 'kit.setLiftScale', label: 'New garments: lift off the body (share of today)', def: 1, min: 0, max: 1, step: 0.05, unit: '', group: 'Kit · fit',
+    id: 'kit.setLiftScale', label: 'New garments: lift off the body (share of today)', def: 0.5, min: 0, max: 1, step: 0.05, unit: '', group: 'Kit · fit',
     source: 'lib/babylon/core/fitTight.ts SET_LIFT_SCALE',
     hint: 'Only the Blender-made one-piece short and new jerseys. 1 = today (13 mm tops, 20 mm shorts, plus the edge flare). Lower sits them closer to the body.',
   },
