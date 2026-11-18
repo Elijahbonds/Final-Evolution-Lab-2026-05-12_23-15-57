@@ -26,7 +26,7 @@ import { VENICE_ENV2_DIR, VENICE_PALM_LODS } from '../lib/babylon/visual/venuePr
 import { MESHY_DIR } from '../lib/babylon/visual/meshyProps';
 import { PHONE_MODEL_TEXTURE_MAX, PHONE_FAR_PROP_MAX } from '../lib/babylon/scene/phoneTextureCap';
 import { VENICE_SHARED_COURT } from '../lib/adventure/venice/courtsView';
-import { v1Spots } from '../lib/adventure/venice/hubWorld';
+import { v1CourtSpots } from '../lib/adventure/venice/hubWorld';
 
 let failed = 0, passed = 0;
 const ok = (c: boolean, msg: string) => { if (c) passed++; else { failed++; console.error(`  ✗ ${msg}`); } };
@@ -45,14 +45,14 @@ export const PLACE_TEX_MB = 43;
 export function placeTexMb(courtMeshes: number): { total: number; glb: number; procedural: number } {
   const glb = PLACE_GLBS.reduce((s, u) => s + phoneTexMbOf(u, PHONE_FAR_PROP_MAX), 0);
   const tex = (w: number, h: number) => (w * h * 4 * 1.33) / MB;
-  const courts = v1Spots().length;
+  const courts = v1CourtSpots().length;
   const procedural = tex(PHONE_MODEL_TEXTURE_MAX, PHONE_MODEL_TEXTURE_MAX) + courtMeshes * tex(512, 512) + 3 * tex(512, 512) + courts * tex(512, 128);
   return { total: glb + procedural, glb, procedural };
 }
 
 const isMain = (() => { try { return resolve(process.argv[1] ?? '') === resolve(new URL(import.meta.url).pathname); } catch { return false; } })();
 if (isMain) {
-  const courts = v1Spots().length;
+  const courts = v1CourtSpots().length;
   const meshes = VENICE_SHARED_COURT >= 0.5 ? 1 : courts;
   const now = placeTexMb(meshes);
   const control = placeTexMb(courts);

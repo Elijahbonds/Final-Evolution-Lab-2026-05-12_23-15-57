@@ -1,6 +1,6 @@
 // venice-v1 (2026-11-17): the V1 hub's pure parts — the walkable courts district, walking up to a court and coming back.
 import { describe, expect, it } from 'vitest';
-import { buildHubWorld, courtsRect, returnSpawnFor, v1Area, v1Spots, V1_RIM_H } from './hubWorld';
+import { buildHubWorld, courtsRect, returnSpawnFor, v1Area, v1CourtSpots, v1Spots, V1_RIM_H } from './hubWorld';
 import {
   clearReturn, FROM_VENICE, hubHrefFor, launchChoices, launchHref, PARTY_MODE_FOR_SPOT, readReturn, RETURN_KEY, RETURN_TTL_MS, spotFromSearch,
   veniceReturnHref, writeReturn, writeReturnForHref, type StoreLike,
@@ -33,11 +33,17 @@ describe('the V1 world: the courts district, walkable', () => {
   it('spawns a cold start at the court gate, in the courts district', () => {
     expect(districtAt(w.spawn.pos.x, w.spawn.pos.z)?.id).toBe('courts');
   });
-  it('opens the four courts: Court 1 is Ones, Court 2 is Threes', () => {
-    const s = v1Spots();
+  it('draws the four court meshes: Court 1 is Ones, Court 2 is Threes', () => {
+    const s = v1CourtSpots();
     expect(s.map((x) => x.id)).toEqual(['court.ones', 'court.run', 'court.flight', 'court.arc']);
     expect(s[0].modes).toContain('hoops1v1'); expect(s[0].route).toBe('/play/onevone');
     expect(s[1].modes).toContain('hoops3v3'); expect(s[1].route).toBe('/play/threevthree');
+  });
+  it('opens every V1 launch spot, including the camera hoop for IRL', () => {
+    const s = v1Spots();
+    expect(s.map((x) => x.id)).toEqual(['court.ones', 'court.run', 'court.flight', 'court.arc', 'court.camera']);
+    expect(s[4].modes).toEqual(['irl']);
+    expect(s[4].route).toBe('/play/irl');
   });
   it('puts a returning player beside the court they left, on walkable ground, facing it', () => {
     for (const s of v1Spots()) {
@@ -46,7 +52,7 @@ describe('the V1 world: the courts district, walkable', () => {
       expect(Math.hypot(r.pos.x - s.at[0], r.pos.z - s.at[1])).toBeLessThan(s.radius + 4);
       expect(Math.sin(r.yaw)).toBeLessThan(0);   // the court is to the west (−x) of its sideline spawn
     }
-    expect(returnSpawnFor('court.camera')).toBeNull();
+    expect(returnSpawnFor('court.camera')).not.toBeNull();
     expect(returnSpawnFor('nope')).toBeNull();
   });
 });
@@ -77,6 +83,16 @@ describe('walking up and coming back', () => {
       expect(u.searchParams.get('spot')).toMatch(/^court\./);
       expect(u.searchParams.get('location')).toBe('venice');
     }
+  });
+  it('offers the IRL camera hoop, with the Venice return query', () => {
+    const camera = v1Spots().find((s) => s.id === 'court.camera')!;
+    expect(launchChoices(camera, MODE_INFO).map((c) => [c.mode, c.label, new URL(c.href, 'http://x').pathname])).toEqual([
+      ['irl', 'Hang Time', '/play/irl'],
+    ]);
+    const u = new URL(launchChoices(camera, MODE_INFO)[0].href, 'http://x');
+    expect(u.searchParams.get('from')).toBe(FROM_VENICE);
+    expect(u.searchParams.get('spot')).toBe('court.camera');
+    expect(u.searchParams.get('location')).toBe('venice');
   });
   it('the end screen goes back to the court the game came from: by the query, or by the return mark', () => {
     const st = mem();
@@ -121,6 +137,7 @@ describe('walking up and coming back', () => {
     expect(PARTY_MODE_FOR_SPOT['court.ones']).toBe('onevone');
     expect(PARTY_MODE_FOR_SPOT['court.run']).toBe('threevthree');
     expect(PARTY_MODE_FOR_SPOT['court.flight']).toBeUndefined();
+    expect(PARTY_MODE_FOR_SPOT['court.camera']).toBeUndefined();
   });
 });
 
