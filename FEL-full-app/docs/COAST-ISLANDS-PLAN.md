@@ -284,8 +284,9 @@ for its first half, so its frame times are noisier):
   centre lands on the button (nothing covers the cards).
 - Once in r4 the scripted walk ran 5.5 m on past the ring at the rig's 2–3 frames a second and the card went before the press;
   the ring now reaches the rim (x −104 → −106), so a walk that runs on stops at the rim still in the boat's place.
-  The round trip has not been run again since that change (x −106): the shared disk stayed under the 6 GB a build needs (1 GB
-  free at the end). The change is held by `coastDoor.test.ts` (the walk on the real host, the card held through the stop).
+  On the final code (r6, x −106, 21:54–22:12 UTC) the round trip passed first time, no walk back: the walk ran on to the rim
+  (x −109.9) and the card stayed up; the coast landed on its dock (55, 24); the hub landed beside the boat (−100.5, −69);
+  no page errors. Every-screen clean on both pages again (first content 288 / 392 ms).
 - **Every-screen** (the scorer's planted-fault control passed first each time): **clean** on `/play/venice` and `/play/coast`
   in r2, r3 and r4 (first content 364–456 ms, layout shift 0; "fast" not measured on a 3D screen, as before).
 - **Cost:** the landing is one draw (one merged mesh, one material, no texture, no model; `scripts/venice-hub-budget-tests.ts`

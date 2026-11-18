@@ -84,6 +84,19 @@ interface St {
   town: ZoneTownView | null;
   spots: readonly ZoneSpot[];
   questsOn: boolean;
+  /** Phase F-lite: the zone's own frame cost, in parts (probes read the worst frames: where a hitch comes from). */
+  cost: FrameCosts;
+}
+
+/** The worst frames of the zone's update, by its parts (ms), with the time they ran (performance.now) and what streamed. */
+export interface FrameCost { at: number; total: number; host: number; life: number; town: number; stream: number; view: number; changed: number }
+class FrameCosts {
+  readonly worst: FrameCost[] = [];
+  note(c: FrameCost): void {
+    if (this.worst.length < 10) { this.worst.push(c); this.worst.sort((a, b) => b.total - a.total); return; }
+    if (c.total <= this.worst[this.worst.length - 1].total) return;
+    this.worst[this.worst.length - 1] = c; this.worst.sort((a, b) => b.total - a.total);
+  }
 }
 
 const states = new WeakMap<object, St>();
@@ -94,6 +107,9 @@ const TMP_FWD = new Vector3(), TMP_SUBJECT = new Vector3(), TMP_VEL = new Vector
 export interface CoastProbe {
   x: number; y: number; z: number; piece: string; full: number; lod: number; far: number; turnedBack: number; view: ZoneViewStats;
   partner: { x: number; z: number; gap: number } | null; catchups: Record<CatchupWhy, number>; creaturesShown: number; logged: number; logStores: number;
+  /** Phase F-lite: the zone update's ten worst frames, by part; the town's loads (when they landed). */
+  worstFrames: FrameCost[];
+  townEvents: Array<{ what: string; at: number }>;
 }
 let probeState: St | null = null;
 export function coastProbe(): CoastProbe | null {
@@ -105,6 +121,8 @@ export function coastProbe(): CoastProbe | null {
     x: p.x, y: p.y, z: p.z, piece: `${i},${j}`, full: S.streamer.count('full'), lod: S.streamer.count('lod'), far: S.streamer.count('far'), turnedBack: S.edge.turnedBack, view: S.view.stats(),
     partner: q ? { x: q.pos.x, z: q.pos.z, gap: Math.hypot(q.pos.x - p.x, q.pos.z - p.z) } : null, catchups: { ...S.keeper.counts }, creaturesShown: S.creaturesShown,
     logged: S.log.entries().filter((e) => e.level > 0).length, logStores: S.log.stores,
+    worstFrames: S.cost.worst.map((c) => ({ ...c })),
+    townEvents: S.town ? S.town.events.map((e) => ({ ...e })) : [],
   };
 }
 
@@ -215,7 +233,7 @@ export const CoastZoneMode: ModeDefinition = {
       host, mapper, view, me, body, move, edge: new WaterEdge(world.spawn.pos), streamer,
       stickL: { x: 0, y: 0 }, stickR: { x: 0, y: 0 }, latchedYaw: null, preset: 'runner', rigKey: '', spotSec: SPOT_EVERY,
       partner, partnerEdge: host.partnerActor ? new WaterEdge(host.partnerActor.pos) : null, keeper: new PartnerKeeper(),
-      herd, creatures, log, creaturesShown: 0, town: null, spots: ALL_SPOTS, questsOn: false,
+      herd, creatures, log, creaturesShown: 0, town: null, spots: ALL_SPOTS, questsOn: false, cost: new FrameCosts(),
     };
     zoneUi.setLog(log.entries(), null);
     // back from a spot's game: it counts as played there (the beach net's quest)
@@ -254,6 +272,7 @@ export const CoastZoneMode: ModeDefinition = {
     const S = states.get(ctx.scene);
     if (!S) return;
     const h = S.host;
+    const t0 = performance.now();
     h.frame(dt);
     const me = h.player;
     const edgeOn = feel('coast.deepWaterTurnBack', COAST_DEEP_WATER_TURN_BACK) >= 0.5;
@@ -272,13 +291,17 @@ export const CoastZoneMode: ModeDefinition = {
       placeBody(S.partner.root, q);
       S.partner.view.sync(dt);
     }
+    const t1 = performance.now();
     if (S.herd && S.creatures) { S.herd.step(dt); S.creaturesShown = S.creatures.frame(dt, S.streamer.tiers); }
+    const t2 = performance.now();
     S.town?.update(dt);
+    const t3 = performance.now();
 
     // streaming: only when the player crosses into another 64 m piece does anything change
     const [pi, pj] = pieceAt(me.pos.x, me.pos.z);
     const changed = S.streamer.step(pi, pj);
     if (changed.length) S.view.stream(S.streamer.tiers, changed);
+    const t4 = performance.now();
 
     // the camera: the host's held hint as a director rig (AdventureMode's)
     const rig = h.camera.rig();
@@ -288,7 +311,10 @@ export const CoastZoneMode: ModeDefinition = {
     TMP_SUBJECT.set(me.pos.x, me.pos.y, me.pos.z);
     TMP_VEL.set(me.vel.x, me.vel.y, me.vel.z);
     ctx.camDirector.update(TMP_SUBJECT, TMP_VEL, null);
+    const t5 = performance.now();
     S.view.frame(ctx.camera.position.x, ctx.camera.position.z, dt);
+    const t6 = performance.now();
+    S.cost.note({ at: Math.round(t0), total: +(t6 - t0).toFixed(1), host: +(t1 - t0).toFixed(1), life: +(t2 - t1).toFixed(1), town: +(t3 - t2).toFixed(1), stream: +(t4 - t3).toFixed(1), view: +(t6 - t5).toFixed(1), changed: changed.length });
 
     S.spotSec += dt;
     if (S.spotSec >= SPOT_EVERY) {

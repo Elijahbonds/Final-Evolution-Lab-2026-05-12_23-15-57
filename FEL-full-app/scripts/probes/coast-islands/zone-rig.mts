@@ -127,7 +127,7 @@ try {
     // failed ("execution context was destroyed") once the town's bodies were loading as play began (coast-d d2, d3)
     await page.evaluate('void (window.__SI = window.__SI || window.__FEL_DEV__.instrument())');
     // frame gaps, from here on
-    await page.evaluate(`(() => { window.__gaps = []; let last = performance.now(); function tick() { const n = performance.now(); window.__gaps.push(n - last); last = n; requestAnimationFrame(tick); } requestAnimationFrame(tick); })()`);
+    await page.evaluate(`(() => { window.__gaps = []; window.__gapAt = []; let last = performance.now(); function tick() { const n = performance.now(); window.__gaps.push(n - last); if (n - last > 250) window.__gapAt.push([Math.round(n), Math.round(n - last)]); last = n; requestAnimationFrame(tick); } requestAnimationFrame(tick); })()`);
     await page.waitForTimeout(5000);   // let the dressing land
     const isCoast = !query.includes('venice_hub');
     const first = name === 'coast-1';
@@ -183,6 +183,8 @@ try {
       await page.evaluate(() => (window as unknown as { __bus: { emit(e: unknown): void } }).__bus.emit({ t: 'stick', side: 'L', x: 0, y: 0 }));
     }
     const gaps = await page.evaluate(() => (window as unknown as { __gaps: number[] }).__gaps.slice(5));
+    // phase F-lite: the long frames (> 250 ms) with when they ended (performance.now), the worst eight
+    const longFrames = (await page.evaluate('window.__gapAt') as Array<[number, number]>).sort((a, b) => b[1] - a[1]).slice(0, 8);
     gaps.sort((a, b) => a - b);
     const frameMs = { worst: Math.round(gaps[gaps.length - 1] ?? 0), p95: Math.round(gaps[Math.floor(gaps.length * 0.95)] ?? 0), p50: Math.round(gaps[Math.floor(gaps.length * 0.5)] ?? 0), frames: gaps.length };
     const end = await page.evaluate('window.__coast ? window.__coast() : null');
@@ -190,7 +192,7 @@ try {
     const partnerGap = gaps2.length ? { mean: +(gaps2.reduce((a, b) => a + b, 0) / gaps2.length).toFixed(1), p95: +gaps2[Math.floor(gaps2.length * 0.95)].toFixed(1), max: +gaps2[gaps2.length - 1].toFixed(1) } : null;
     const log = await page.evaluate('window.__log ?? null');
     const spotsSeen = await page.evaluate('window.__spotsSeen ?? null');
-    result[name] = { ...t, worst, frameMs, legs, pieces, streamMax, partnerGap, log, spotsSeen, end, errors: errors.slice(0, 5), missing: [...missing] };
+    result[name] = { ...t, worst, frameMs, longFrames, legs, pieces, streamMax, partnerGap, log, spotsSeen, end, errors: errors.slice(0, 5), missing: [...missing] };
     console.log(name, JSON.stringify(result[name]));
     } catch (e) {
       // what is there now: a fresh page (a reload) or none (a crash)?
