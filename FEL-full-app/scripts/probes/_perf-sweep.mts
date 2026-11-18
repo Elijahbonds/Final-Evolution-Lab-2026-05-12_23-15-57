@@ -56,6 +56,8 @@ const VIEW: Record<string, { width: number; height: number }> = {
 // behaviour run); the default virtual clock makes every mode play the same game seconds (the content measurement).
 const REALTIME = !!process.env.REALTIME;
 const SEED = process.env.SEED;
+const TRACE = process.env.TRACE_WORST === '1';
+const START_WHEN_BAKED = process.env.START_WHEN_BAKED === '1';
 const INIT = `(() => {
   const realNow = performance.now.bind(performance);
   window.__realNow = realNow;
@@ -199,12 +201,21 @@ async function run(b: Browser, mode: string, profile: string): Promise<Row> {
     const url = PAGE ? `${PAGE}?mode=${mode}${QUERY ? '&' + QUERY.replace(/^\?/, '') : ''}` : `http://127.0.0.1:${PORT}/dev/mode/${mode}${QUERY}`;
     await p.goto(url, { waitUntil: 'domcontentloaded', timeout: 240000 });
     let state = '';
-    for (let i = 0; i < 180; i++) {
+    let rasterCut = false, cacheAtStart = '';
+    for (let i = 0; i < (START_WHEN_BAKED ? 600 : 180); i++) {
       state = await ev(() => (window as any).__phase ?? (/DEV · \S+ · (\w+)/.exec(document.body.innerText) ?? [])[1] ?? '');
       if (process.env.VERBOSE && i % 10 === 0) console.log(`  [${mode}/${profile}] t+${((Date.now() - t0) / 1000).toFixed(0)}s phase "${state}"`);
       if (state === 'playing') break;
       if (state === 'error') break;
       if (state === 'ready' || (PAGE && state && state !== 'loading' && i % 4 === 3)) {
+        // hoops-followups (START_WHEN_BAKED=1): a player who reads the READY card first — the probe presses START only once the
+        // shadow cache has made its first bake (or has none / is off), at the cut backing so the READY frames come quickly
+        if (START_WHEN_BAKED && state === 'ready') {
+          if (RASTER !== 1 && !rasterCut) { rasterCut = true; await ev(`(() => { const e = window.__FEL_DEV__.scene.getEngine(); e.setHardwareScalingLevel(e.getHardwareScalingLevel() * ${RASTER}); })()`); }
+          const cs = await ev(() => { const sc = (window as any).__FEL_DEV__?.scene?.metadata?.felShadowCache; const st = sc ? sc.stats() : null; return st ? `${st.state}:${st.bakes}` : 'none'; });
+          if (/^(warming|idle):/.test(cs) || cs === 'cached:0') { await p.waitForTimeout(1000); continue; }
+        }
+        if (TRACE && !cacheAtStart) cacheAtStart = await ev(() => { const sc = (window as any).__FEL_DEV__?.scene?.metadata?.felShadowCache; const st = sc ? sc.stats() : null; return st ? `${st.state}:${st.bakes}` : 'none'; }).catch(() => '?');
         const bus = await ev(() => { const b = (window as any).__bus; if (!b) return false; b.emit({ t: 'button', btn: 'START', pressed: true }); b.emit({ t: 'button', btn: 'START', pressed: false }); return true; });
         const s = p.locator('text=/^START$/').first();
         if (!bus && await s.count()) await s.click({ timeout: 5000 }).catch(() => {});
@@ -216,7 +227,7 @@ async function run(b: Browser, mode: string, profile: string): Promise<Row> {
       return { mode, profile, ok: false, note: `never played (${state || 'no phase'}) ${why} ${errs[0] ?? ''} ${cons.slice(0, 2).join(' | ')}` };
     }
     const loadS = (Date.now() - t0) / 1000;
-    if (RASTER !== 1) await ev(`(() => { const e = window.__FEL_DEV__.scene.getEngine(); e.setHardwareScalingLevel(e.getHardwareScalingLevel() * ${RASTER}); })()`);
+    if (RASTER !== 1 && !rasterCut) await ev(`(() => { const e = window.__FEL_DEV__.scene.getEngine(); e.setHardwareScalingLevel(e.getHardwareScalingLevel() * ${RASTER}); })()`);
     await ev(INSTRUMENT);
     const cdp = await Promise.race([ctx.newCDPSession(p), crash]);
     const send = (rate: number) => Promise.race([cdp.send('Emulation.setCPUThrottlingRate', { rate }), crash,
@@ -258,6 +269,11 @@ async function run(b: Browser, mode: string, profile: string): Promise<Row> {
       ...snap, govLog, errors: errs.length, err0: errs[0],
       // hoops-items (TRACE_WORST=1): the 6 frames with the most draws, each with what the shadow cache and the body merge did on it
       ...(process.env.TRACE_WORST === '1' ? { worstFrames: f.map((x, i) => ({ i, ...x, bakedHere: i > 0 && x.bakes > f[i - 1].bakes })).sort((a, b) => b.draws - a.draws).slice(0, 6),
+        // hoops-followups: the cache when START was pressed, and the whole run INCLUDING the first 30 frames (draw counts do not
+        // depend on the throttle switch those frames carry): its worst draws, and every bake in it
+        cacheAtStart, drawsMaxAll: Math.max(...fr.map((x) => x.draws)), shadowDrawsAll: pct(fr.map((x) => x.shadowDraws), 0.5),
+        bakeFramesAll: fr.filter((x, i) => i > 0 && x.bakes > fr[i - 1].bakes).map((x) => ({ g: x.g, draws: x.draws, shadowDraws: x.shadowDraws, why: x.bakeWhy })),
+        firstFrame: fr.length ? { cacheState: fr[0].cacheState, bakes: fr[0].bakes, draws: fr[0].draws } : null,
         bakesInPlay: f.length ? f[f.length - 1].bakes - f[0].bakes : 0, bakeFrames: f.filter((x, i) => i > 0 && x.bakes > f[i - 1].bakes).map((x) => ({ g: x.g, draws: x.draws, shadowDraws: x.shadowDraws, why: x.bakeWhy, swapped: x.swapped, dissolves: x.dissolves })) } : {}),
     };
   } catch (e) {
