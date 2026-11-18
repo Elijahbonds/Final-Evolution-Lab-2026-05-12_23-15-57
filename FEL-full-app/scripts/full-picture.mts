@@ -71,7 +71,14 @@ const routeMap: Record<string, string> = {
   brainbrawl: 'brain-brawl',
 };
 const lockName: Record<string, string> = { karate: 'karate-endless', karate_vs: 'karate-vs', derby: 'baseball', penalty: 'soccer', snowboard_slalom: 'snowboard' };
-const camName: Record<string, string> = { karate_vs: 'karate-vs', derby: 'baseball', penalty: 'soccer', snowboard_slalom: 'snowboard' };
+const camName: Record<string, string> = {
+  karate_vs: 'karate-vs',
+  derby: 'baseball',
+  baseball: 'derby',
+  penalty: 'soccer',
+  snowboard_slalom: 'snowboard',
+  tiebreak: 'tennis',
+};
 const testName: Record<string, string[]> = {
   aeroaces: ['aeroaces', 'aero-aces', 'aeroAces'],
   bigair: ['bigair', 'big-air', 'BigAir'],
@@ -108,6 +115,12 @@ function testCountFor(key: string): number {
   const tokens = testName[key] ?? [key, routeMap[key] ?? key];
   return testFiles.filter((file) => tokens.some((token) => file.toLowerCase().includes(token.toLowerCase()))).length;
 }
+function coreNamesIn(whole: string, src: string): string[] {
+  return CORES.filter((c) => {
+    const importsCore = new RegExp(`from ['"](?:\\.\\./core/${c}|\\./${c})['"]`).test(whole);
+    return importsCore && new RegExp(`\\b${c}\\b`).test(src);
+  });
+}
 
 interface Row { navFirst: boolean; key: string; enabled: boolean; file: string | null; route: string; menu: boolean; venue: string | null; map: string | null; kit: string | null; baked: boolean; cores: string[]; camera: boolean; clamps: number; bridge: boolean; gauntlet: boolean; play: boolean; lock: boolean; tests: number; lines: number }
 const rows: Row[] = modeEntries.map(({ key, cls }) => {
@@ -117,13 +130,13 @@ const rows: Row[] = modeEntries.map(({ key, cls }) => {
   const src = file ? implementationSlice(whole, cls) : '';
   const route = `/play/${routeMap[key] ?? key}`;
   const { venue, map, kit } = venueOfMode(key, src);
-  const cores = CORES.filter((c) => new RegExp(`from '\\.\\./core/${c}'|from '\\./${c}'|\\b${c}\\b`).test(src) && src.includes(`${c}`));
+  const cores = coreNamesIn(whole, src);
   return {
     key, enabled: enabled.has(key), file, route,
     menu: gameData.includes(`href: '${route}'`),
     venue, map, kit, baked: !!map && bakedKeys.has(map),
-    cores: cores.filter((c) => src.includes(`/${c}'`)),
-    camera: camKeys.has(key),   // cameraFraming.json is keyed by registry key
+    cores,
+    camera: camKeys.has(key) || camKeys.has(camName[key] ?? ''),   // cameraFraming.json is keyed by registry key, with measured aliases for shared routes
     navFirst: /\.constrain\(/.test(src),
     clamps: (src.match(/Math\.max\(-?[A-Z_0-9.]+, *Math\.min\(/g) ?? []).length + (src.match(/^const (COURT|FIELD|ARENA|BOUNDS|HALF)[A-Z_]* *=/gm) ?? []).length,
     bridge: bridge.includes(`'${key}'`),

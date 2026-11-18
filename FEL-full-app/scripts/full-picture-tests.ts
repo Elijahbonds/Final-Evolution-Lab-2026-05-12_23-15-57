@@ -46,6 +46,10 @@ const conceptLockName: Record<string, string> = {
   penalty: 'soccer',
   snowboard_slalom: 'snowboard',
 };
+const cameraName: Record<string, string> = {
+  baseball: 'derby',
+  tiebreak: 'tennis',
+};
 const testName: Record<string, string[]> = {
   aeroaces: ['aeroaces', 'aero-aces', 'aeroAces'],
   bigair: ['bigair', 'big-air', 'BigAir'],
@@ -82,6 +86,9 @@ function walkTestFiles(dir: string): string[] {
 }
 
 const testFiles = walkTestFiles(ROOT);
+const cameraFraming = JSON.parse(readFileSync(join(ROOT, 'lib/babylon/config/cameraFraming.json'), 'utf8')) as {
+  modes: Record<string, unknown>;
+};
 
 function testCountFor(mode: string): number {
   const tokens = testName[mode] ?? [mode, routeMap.get(mode) ?? mode];
@@ -129,6 +136,7 @@ const missingDevGauntlet: string[] = [];
 const missingPlayGauntlet: string[] = [];
 const missingConceptLocks: string[] = [];
 const missingModeTests: string[] = [];
+const missingCameraFraming: string[] = [];
 for (const key of enabledModes) {
   const route = `/play/${routeMap.get(key) ?? key}`;
   const slug = route.slice('/play/'.length);
@@ -139,6 +147,7 @@ for (const key of enabledModes) {
   if (!playGauntletExempt.has(key) && !playGauntletModes.has(key)) missingPlayGauntlet.push(key);
   if (!conceptLockNames.has(conceptLockName[key] ?? key)) missingConceptLocks.push(key);
   if (testCountFor(key) === 0) missingModeTests.push(key);
+  if (!(key in cameraFraming.modes) && !((cameraName[key] ?? '') in cameraFraming.modes)) missingCameraFraming.push(key);
 }
 
 assert.deepEqual(missingRoutes, [], 'full-picture must resolve enabled modes to real /play routes');
@@ -148,6 +157,12 @@ assert.deepEqual(missingDevGauntlet, [], 'enabled modes must be in the dev-mode 
 assert.deepEqual(missingPlayGauntlet, [], 'enabled modes must be in the shipping-route gauntlet');
 assert.deepEqual(missingConceptLocks, [], 'enabled modes must have concept locks');
 assert.deepEqual(missingModeTests, [], 'enabled modes must have named regression coverage');
+assert.ok('derby' in cameraFraming.modes && !('baseball' in cameraFraming.modes),
+  'camera alias regression setup expects baseball to reuse the measured derby framing row');
+assert.ok(!missingCameraFraming.includes('baseball'),
+  'full-picture camera audit must credit baseball with the measured derby framing row');
+assert.ok(!missingCameraFraming.includes('tiebreak'),
+  'full-picture camera audit must credit tiebreak with the measured tennis framing row');
 assert.ok(hasDpadAction('freerun', 'move'), 'freerun phone d-pad must steer with LEFT STICK movement');
 assert.ok(hasHeldButton('freerun', 'charge'), 'freerun phone schema must expose held RT sprint');
 assert.ok(hasHeldButton('freerun', 'brake'), 'freerun phone schema must expose held LT slide');
