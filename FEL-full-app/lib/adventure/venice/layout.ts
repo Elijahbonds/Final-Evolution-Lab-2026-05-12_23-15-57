@@ -5,8 +5,8 @@
  * it in and put it together." Later the same day: big open ZONES joined by a hub town; Venice Beach is the hub town; each
  * zone is large and seamless inside, a short load between zones, zones ship one at a time.
  *
- * NOT SHIPPED. Nothing in the app imports this file except the dev-only prototype (app/dev/venice-hub) and the probes in
- * scripts/probes/venice-hub. It is the plan's layout in a form a test can hold and a renderer can draw: typed values, not
+ * V1 SHIPS THE COURTS. The app imports this for /play/venice, the dev prototype and the probes. It is the plan's layout
+ * in a form a test can hold and a renderer can draw: typed values, not
  * JSON, for the reason venueSpecs.ts gives (a typo is a compile error, there is no serialised copy to drift).
  *
  * GEOGRAPHY: real-world-INSPIRED, public geography only — the beach and the water to the west, the bike path and the

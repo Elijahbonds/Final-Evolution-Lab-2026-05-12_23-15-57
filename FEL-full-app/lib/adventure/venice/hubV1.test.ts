@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildHubWorld, courtsRect, returnSpawnFor, v1Area, v1Spots, V1_RIM_H } from './hubWorld';
 import {
-  clearReturn, FROM_VENICE, hubHrefFor, launchHref, PARTY_MODE_FOR_SPOT, readReturn, RETURN_KEY, RETURN_TTL_MS, spotFromSearch,
+  clearReturn, FROM_VENICE, hubHrefFor, launchHref, launchOptions, launchRoute, PARTY_MODE_FOR_SPOT, readReturn, RETURN_KEY, RETURN_TTL_MS, spotFromSearch,
   veniceReturnHref, writeReturn, type StoreLike,
 } from './hubReturn';
 import { veniceDoorOn, VENICE_DOOR_HREF } from './door';
@@ -60,6 +60,19 @@ describe('walking up and coming back', () => {
     expect(u.searchParams.get('spot')).toBe('court.ones');
     expect(u.searchParams.get('location')).toBe('venice');
   });
+  it('offers every advertised game on multi-mode courts, each with its own return route', () => {
+    const [, , flight, arc] = v1Spots();
+    expect(launchOptions(flight).map((o) => [o.mode, o.name, o.route])).toEqual([
+      ['dunkContest', 'Flight Night', '/play/dunk'],
+      ['dunkduel', 'Prove It', '/play/dunkduel'],
+    ]);
+    expect(launchOptions(arc).map((o) => [o.mode, o.name, o.route])).toEqual([
+      ['threePoint', 'Downtown', '/play/threepoint'],
+      ['carnival', 'Game Night', '/play/carnival'],
+    ]);
+    expect(new URL(launchHref(flight, 'dunkduel'), 'http://x').pathname).toBe('/play/dunkduel');
+    expect(launchRoute(arc, 'carnival')).toBe('/play/carnival');
+  });
   it('the end screen goes back to the court the game came from: by the query, or by the return mark', () => {
     const st = mem();
     expect(veniceReturnHref('/play/onevone', '?from=venice&spot=court.ones', 0, st)).toBe(hubHrefFor('court.ones'));
@@ -68,6 +81,9 @@ describe('walking up and coming back', () => {
     expect(veniceReturnHref('/play/threevthree', '?net=ABC&peer=h1&party=1', 2000, st)).toBe('/play/venice?spot=court.run');
     expect(veniceReturnHref('/play/onevone', '', 2000, st)).toBeNull();   // another game: not this trip
     expect(veniceReturnHref('/play/threevthree', '', 1000 + RETURN_TTL_MS + 1, st)).toBeNull();   // stale
+    writeReturn({ id: 'court.flight', route: '/play/dunkduel' }, 3000, st);
+    expect(veniceReturnHref('/play/dunkduel', '', 3001, st)).toBe('/play/venice?spot=court.flight');
+    expect(veniceReturnHref('/play/dunk', '', 3001, st)).toBeNull();
     clearReturn(st);
     expect(st.m.has(RETURN_KEY)).toBe(false);
   });

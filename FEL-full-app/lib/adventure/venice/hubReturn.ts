@@ -11,6 +11,7 @@
  * Pure apart from the storage it is handed (window.sessionStorage by default).
  */
 
+import { MODE_INFO } from '@/lib/game-data';
 import { SPOTS, type Spot } from './layout';
 
 export const HUB_ROUTE = '/play/venice';
@@ -26,14 +27,28 @@ export const PARTY_MODE_FOR_SPOT: Readonly<Record<string, string>> = { 'court.on
 
 export interface StoreLike { getItem(k: string): string | null; setItem(k: string, v: string): void; removeItem(k: string): void }
 export interface ReturnMark { spot: string; route: string; at: number }
+export interface LaunchOption { mode: string; name: string; route: string; href: string }
 
 const session = (): StoreLike | null => { try { return typeof window !== 'undefined' ? window.sessionStorage : null; } catch { return null; } };
 
+/** The route for one advertised mode on a Venice spot. */
+export function launchRoute(s: Pick<Spot, 'route' | 'modes'>, mode = s.modes[0]): string {
+  return MODE_INFO[mode]?.href ?? s.route;
+}
+
 /** The page a court opens. */
-export function launchHref(s: Pick<Spot, 'id' | 'route' | 'kind'>): string {
+export function launchHref(s: Pick<Spot, 'id' | 'route' | 'kind' | 'modes'>, mode = s.modes[0]): string {
   const q = new URLSearchParams({ [FROM_PARAM]: FROM_VENICE, [SPOT_PARAM]: s.id });
   if (s.kind === 'court') q.set('location', 'venice');
-  return `${s.route}?${q.toString()}`;
+  return `${launchRoute(s, mode)}?${q.toString()}`;
+}
+
+/** The buttons the hub card should offer. Multi-mode courts stay one tap per game. */
+export function launchOptions(s: Pick<Spot, 'id' | 'route' | 'kind' | 'modes'>): LaunchOption[] {
+  return s.modes.map((mode) => {
+    const route = launchRoute(s, mode);
+    return { mode, name: MODE_INFO[mode]?.name ?? mode, route, href: launchHref(s, mode) };
+  });
 }
 
 export function writeReturn(s: Pick<Spot, 'id' | 'route'>, now: number, store: StoreLike | null = session()): void {

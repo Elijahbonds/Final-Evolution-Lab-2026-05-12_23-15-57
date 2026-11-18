@@ -7,7 +7,7 @@
 // unreachable from touch and nothing anywhere reported a problem.
 //
 // That is the worst kind of bug: it degrades instead of failing. This scans the
-// shipped host components for the modeId they actually pass and asserts each one
+// shipped host components and app/play stages for the modeId they actually pass and asserts each one
 // has its own MODE_VERBS entry, so the next mode cannot repeat it.
 
 import { readFileSync, readdirSync } from 'node:fs';
@@ -19,18 +19,33 @@ let checks = 0;
 const fail: string[] = [];
 const ok = (c: boolean, label: string): void => { checks++; if (!c) fail.push(label); };
 
-const GAMES = join(process.cwd(), 'components', 'games');
+const TOUCH_ROOTS = [join(process.cwd(), 'components', 'games'), join(process.cwd(), 'app', 'play')];
 
-/** Every modeId literal handed to a TouchOverlay in a shipped host component. */
+function tsxFilesUnder(dir: string): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...tsxFilesUnder(path));
+    else if (entry.name.endsWith('.tsx')) out.push(path);
+  }
+  return out;
+}
+
+/** Every modeId handed to a TouchOverlay in a shipped host component or play stage. */
 function touchOverlayModeIds(): { file: string; modeId: string }[] {
   const out: { file: string; modeId: string }[] = [];
-  for (const file of readdirSync(GAMES)) {
-    if (!file.endsWith('.tsx')) continue;
-    const src = readFileSync(join(GAMES, file), 'utf8');
+  for (const path of TOUCH_ROOTS.flatMap(tsxFilesUnder)) {
+    const src = readFileSync(path, 'utf8');
     if (!src.includes('TouchOverlay')) continue;
+    const file = path.slice(process.cwd().length + 1);
+    const consts = new Map([...src.matchAll(/const\s+([A-Z0-9_]+)\s*=\s*'([a-zA-Z_0-9-]+)'/g)].map((m) => [m[1], m[2]] as const));
     // Static literal form: modeId="threepoint"
     for (const m of src.matchAll(/<TouchOverlay[^>]*?modeId="([a-zA-Z_0-9-]+)"/gs)) {
       out.push({ file, modeId: m[1] });
+    }
+    // Const-bound form used by app/play stages: const MODE_KEY = 'adventure'; ... modeId={MODE_KEY}
+    for (const m of src.matchAll(/<TouchOverlay[^>]*?modeId=\{([A-Z0-9_]+)\}/gs)) {
+      out.push({ file, modeId: consts.get(m[1]) ?? `{${m[1]}}` });
     }
   }
   return out;

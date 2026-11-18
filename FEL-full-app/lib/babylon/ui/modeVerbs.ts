@@ -297,6 +297,8 @@ const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick' | 'boost' | 'turbo'>> 
   // guard, slow-time, partner and fuse ride the d-pad and the Adventure's own touch radial (adventure/host/touchRadial)
   adventure: verbs({ A: { label: 'JUMP', emit: A('A') }, B: { label: 'DASH', emit: A('B') }, X: { label: 'LIGHT', emit: A('X') }, Y: { label: 'HEAVY', emit: A('Y') } }),
   adventure_br: verbs({ A: { label: 'JUMP', emit: A('A') }, B: { label: 'DASH', emit: A('B') }, X: { label: 'LIGHT', emit: A('X') }, Y: { label: 'HEAVY', emit: A('Y') } }),   // ADVENTURE C: the BR plays on the same buttons
+  // Venice Hub V1: the sticks move and look; court launch buttons live in the page card, not in the in-world control deck.
+  venice_hub: verbs({}),
 
   default: verbs({ A: { label: 'ACTION', emit: A('A') } }),
 };

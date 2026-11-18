@@ -13,8 +13,7 @@ import { runMode, InputBus, type ModePhase } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hubUi, veniceWayfindingOn } from '@/lib/adventure/venice/hubUi';
-import { hubHrefFor, launchHref, PARTY_MODE_FOR_SPOT, veniceActivity, writeReturn } from '@/lib/adventure/venice/hubReturn';
-import { MODE_INFO } from '@/lib/game-data';
+import { hubHrefFor, launchOptions, PARTY_MODE_FOR_SPOT, veniceActivity, writeReturn, type LaunchOption } from '@/lib/adventure/venice/hubReturn';
 import { partyClient } from '@/lib/party/social/client';
 import { isHost } from '@/lib/party/social/state';
 import { FirstVisitHint, MiniMap, useCardKeys, useFirstVisitHint } from './wayfinding';
@@ -74,19 +73,21 @@ export function VeniceStage({ signedIn }: { signedIn: boolean }) {
   }, [signedIn]);
 
   const spot = ui.spot;
-  const game = spot ? MODE_INFO[spot.modes[0]]?.name ?? spot.modes[0] : '';
+  const options = spot ? launchOptions(spot) : [];
   const partyMode = spot ? PARTY_MODE_FOR_SPOT[spot.id] : undefined;
   const crowd = party.members.filter((m) => m.connected).length;
   const canPartyStart = !!partyMode && isHost(party) && crowd >= 2;
   const cardUp = !!spot && phase === 'playing';
   const [hint, dismissHint] = useFirstVisitHint(wayfinding && phase === 'playing', cardUp);
+  const backHref = signedIn ? '/play' : '/';
+  const backLabel = signedIn ? 'Play' : 'Home';
 
-  const play = () => {
-    if (!spot) return;
-    writeReturn(spot, Date.now());
+  const play = (option = options[0]) => {
+    if (!spot || !option) return;
+    writeReturn({ id: spot.id, route: option.route }, Date.now());
     // the browser's Back from the game lands beside this court too (the hub reads ?spot=)
     try { window.history.replaceState(window.history.state, '', hubHrefFor(spot.id)); } catch { /* history is a convenience */ }
-    router.push(launchHref(spot));
+    router.push(option.href);
   };
   const playParty = () => {
     if (!spot || !partyMode) return;
@@ -103,9 +104,9 @@ export function VeniceStage({ signedIn }: { signedIn: boolean }) {
     <div className="relative h-[100dvh] w-full overflow-hidden bg-black text-white">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none outline-none" aria-label="Venice Beach: walk to a court to play" tabIndex={0} />
       {/* the way back (every-screen: no dead end) — the Play shelf, where every game is still one tap */}
-      <Link href="/play" data-testid="venice-back" aria-label="Back to Play"
+      <Link href={backHref} data-testid="venice-back" aria-label={`Back to ${backLabel}`}
         className="absolute left-3 top-3 z-10 inline-flex min-h-[44px] min-w-[44px] items-center gap-1 rounded-full bg-black/60 px-3 text-base font-bold text-white">
-        <ChevronLeft aria-hidden className="h-5 w-5" /> Play
+        <ChevronLeft aria-hidden className="h-5 w-5" /> {backLabel}
       </Link>
       {err && <p role="alert" className="absolute inset-x-4 top-[4.25rem] rounded-lg bg-black/80 p-3 text-base">The courts did not load. {err}</p>}
       {phase === 'loading' && !err && <p className="absolute inset-x-0 top-1/2 text-center text-base text-white/80">Heading to the courts…</p>}
@@ -115,11 +116,13 @@ export function VeniceStage({ signedIn }: { signedIn: boolean }) {
         <div data-testid="venice-walkup" className={`absolute inset-x-4 ${wayfinding ? 'top-[9.25rem]' : 'top-[4.25rem]'} mx-auto max-w-sm rounded-2xl border border-white/15 bg-black/75 p-3 backdrop-blur`}>
           <p className="text-base font-bold">{spot.label.replace('[PLACEHOLDER] ', '')}</p>
           <div className="mt-2 flex flex-col gap-2">
-            <button type="button" data-testid="venice-play" onClick={play}
-              className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-[#facc15] px-4 text-base font-bold text-black">
-              <Play aria-hidden className="h-4 w-4" /> Play {game}
-              {wayfinding && !touch && <span className="ml-1 rounded border border-black/30 px-1 text-xs font-bold" aria-hidden>Enter · X</span>}
-            </button>
+            {options.map((option: LaunchOption, index: number) => (
+              <button key={option.mode} type="button" data-testid={index === 0 ? 'venice-play' : `venice-play-${option.mode}`} data-mode={option.mode} onClick={() => play(option)}
+                className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-[#facc15] px-4 text-base font-bold text-black">
+                <Play aria-hidden className="h-4 w-4" /> Play {option.name}
+                {index === 0 && wayfinding && !touch && <span className="ml-1 rounded border border-black/30 px-1 text-xs font-bold" aria-hidden>Enter · X</span>}
+              </button>
+            ))}
             {canPartyStart && (
               <button type="button" data-testid="venice-party" onClick={playParty}
                 className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-white/25 px-4 text-base font-bold text-white">
