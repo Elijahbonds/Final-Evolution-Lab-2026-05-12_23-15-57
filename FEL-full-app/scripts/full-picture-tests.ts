@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { MODE_CONTROLLERS } from '../lib/controller-link/schemas/registry';
 
@@ -164,5 +166,44 @@ assert.ok(hasButton('threevthree', 'A', 'PASS') && hasButton('threevthree', 'Y',
   'threevthree phone PASS/BLOCK must match the local 2K face-button map');
 assert.ok(!hasButton('threevthree', 'charge'),
   'threevthree phone SHOOT must not use charge/RT, which basketball reads as turbo');
+
+const matrixDir = mkdtempSync(join(tmpdir(), 'fel-full-picture-'));
+const matrixOut = join(matrixDir, 'matrix.md');
+try {
+  execFileSync(process.execPath, [join(ROOT, 'node_modules/tsx/dist/cli.mjs'), 'scripts/full-picture.mts', '--md', matrixOut], {
+    cwd: ROOT,
+    env: process.env,
+    stdio: 'ignore',
+  });
+  const generated = readFileSync(matrixOut, 'utf8');
+  const gaps = generated.split('\n## Gaps')[1] ?? '';
+  for (const mode of [
+    'football',
+    'snowboard_slalom',
+    'tennis',
+    'volleyball',
+    'onevone',
+    'threepoint',
+    'threevthree',
+    'freerun',
+    'carnival',
+    'baseball',
+    'aeroaces',
+    'velocitykart',
+    'dunkduel',
+    'who_scene_it',
+    'brainbrawl',
+    'tiebreak',
+  ]) {
+    assert.ok(!gaps.includes(`${mode}: no shared gameplay core`), `full-picture must detect ${mode}'s shared gameplay core`);
+  }
+  assert.match(generated, /\| football \|.*RushRun/s, 'full-picture should name FootballRushMode shared run core');
+  assert.match(generated, /\| tennis \|.*RallyCore/s, 'full-picture should trace config-only net-sport wrappers');
+  assert.match(generated, /\| freerun \|.*FreeRunCore/s, 'full-picture should name FreeRun shared traversal core');
+  assert.match(generated, /\| dunkduel \|.*DunkSystem/s, 'full-picture should name Dunk Duel shared dunk system');
+  assert.match(generated, /\| velocitykart \|.*KartModel/s, 'full-picture should name VelocityKart shared vehicle model');
+} finally {
+  rmSync(matrixDir, { recursive: true, force: true });
+}
 
 console.log(`full-picture-tests: ${enabledModes.length} enabled mode routes, menus, phone schemas, and gauntlets resolve`);

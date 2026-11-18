@@ -25,13 +25,44 @@ const exportSlice = (src: string, marker: string): string | null => {
   const at = src.indexOf(marker);
   return at >= 0 ? src.slice(at, nextExport(src, at)) : null;
 };
-function implementationSlice(src: string, cls: string): string {
+const nextTopLevel = (src: string, start: number): number => {
+  const rest = src.slice(start + 1);
+  const next = rest.match(/\n(?:export\s+)?(?:const|function|class|interface|type) /);
+  return next?.index === undefined ? src.length : start + 1 + next.index;
+};
+const constSlice = (src: string, name: string): string | null => {
+  const match = new RegExp(`(?:^|\\n)(?:export\\s+)?const\\s+${name}\\b`).exec(src);
+  return match ? src.slice(match.index, nextTopLevel(src, match.index)) : null;
+};
+const localModeFile = (from: string, spec: string): string | null => {
+  if (!spec.startsWith('./')) return null;
+  const base = from.slice(0, from.lastIndexOf('/') + 1);
+  const path = `${base}${spec.slice(2)}.ts`;
+  return existsSync(path) ? path : null;
+};
+interface ImplementationSource { src: string; importSrc: string }
+function importedFactory(src: string, file: string | null, factory: string): ImplementationSource | null {
+  if (!file) return null;
+  const importRe = new RegExp(`import\\s+\\{[^}]*\\b${factory}\\b[^}]*\\}\\s+from\\s+'([^']+)'`);
+  const spec = src.match(importRe)?.[1];
+  const importedFile = spec ? localModeFile(file, spec) : null;
+  const imported = importedFile ? read(importedFile) : '';
+  const body = imported ? exportSlice(imported, `export function ${factory}`) : null;
+  return body ? { src: body, importSrc: imported } : null;
+}
+function implementationSource(src: string, cls: string, file: string | null): ImplementationSource {
   const own = exportSlice(src, `export const ${cls}`) ?? exportSlice(src, `export function ${cls}`) ?? src;
-  const factory = own.match(/=\s*(make[A-Za-z0-9_]+)\(/)?.[1];
-  const factoryBody = factory ? exportSlice(src, `export function ${factory}`) : null;
-  if (factoryBody) return `${factoryBody}\n${own}`;
+  const factory = own.match(/=\s*([A-Za-z0-9_]+)\(/)?.[1];
+  const localFactoryBody = factory ? exportSlice(src, `export function ${factory}`) : null;
+  const imported = factory && !localFactoryBody ? importedFactory(src, file, factory) : null;
+  const args = [...own.matchAll(/\b([A-Z][A-Z0-9_]*|[A-Z][A-Za-z0-9]*_OPTIONS)\b/g)].map((m) => m[1]);
+  const argBodies = args.map((name) => constSlice(src, name)).filter((x): x is string => !!x);
+  const parts = [localFactoryBody ?? imported?.src ?? '', ...argBodies, own].filter(Boolean);
   const exportConstCount = (src.match(/(?:^|\n)export const /g) ?? []).length;
-  return exportConstCount > 1 ? own : src;
+  return {
+    src: parts.length ? parts.join('\n') : exportConstCount > 1 ? own : src,
+    importSrc: imported ? `${src}\n${imported.importSrc}` : src,
+  };
 }
 
 // venue: two mounting paths. (a) a venue SPEC (lib/babylon/nexus/venueSpecs) via
@@ -49,7 +80,51 @@ const venueOfMode = (key: string, src: string): { venue: string | null; map: str
   return { venue, map: venue ? venueMapKeys[venue] ?? null : null, kit: kit.length ? [...new Set(kit)].join('+') : null };
 };
 
-const CORES = ['CourtMovement', 'BoardMovement', 'CombatMovement', 'FieldRun', 'CarrierControl', 'GroundRide', 'AirControl', 'RallyCore', 'TennisCore', 'GolfCore', 'DanceCore', 'DunkApproach', 'OnslaughtCore', 'KeeperCore', 'Batting', 'Pitching'];
+const CORES = [
+  'CourtMovement', 'BasketballCore', 'BallHandling', 'ShotWindow', 'ShotClock', 'SharedShot',
+  'BoardMovement', 'GroundRide', 'AirControl', 'KartAir',
+  'CombatMovement', 'OnslaughtCore', 'TiebreakBlitz', 'TiebreakFlight',
+  'RushRun', 'KickoffReturn', 'RaceCourse', 'RaceField', 'ArcadeFlight', 'KartModel',
+  'RallyCore', 'KeeperCore', 'DerbyLoop', 'GolfAim', 'GolfBall', 'PenaltyLoop', 'ShootoutCore',
+  'BaseballGame', 'BaseballSlots', 'FreeRunCore', 'FreeRunFlow', 'FreeRunRivals', 'FreeRunSplits',
+  'CarnivalNight', 'BrainBrawlCore', 'SceneBuzz', 'QuizCore', 'DanceCore',
+  'DunkSystem', 'DunkAssist', 'DunkCuts', 'DunkObstacles', 'DunkPosture', 'DunkLegs', 'JudgePanel',
+  'DunkApproach', 'Batting', 'Pitching',
+];
+const CORE_HINTS: Array<[RegExp, string[]]> = [
+  [/\bcreateNetSportMode\(/, ['RallyCore']],
+  [/\bmakeAirSessionMode\(/, ['AirControl']],
+];
+const importAliases = (src: string, moduleName: string): string[] => {
+  const aliases: string[] = [];
+  const importRe = /import\s+([\s\S]*?)\s+from\s+'([^']+)'/g;
+  for (const m of src.matchAll(importRe)) {
+    const specBase = m[2].split('/').pop();
+    if (specBase !== moduleName) continue;
+    const clause = m[1].trim();
+    const named = clause.match(/\{([\s\S]*?)\}/)?.[1] ?? '';
+    for (const part of named.split(',')) {
+      const cleaned = part.trim().replace(/^type\s+/, '');
+      if (!cleaned) continue;
+      aliases.push((cleaned.match(/\bas\s+([A-Za-z0-9_]+)/)?.[1] ?? cleaned.split(/\s+/)[0]).trim());
+    }
+    const beforeNamed = clause.replace(/\{[\s\S]*\}/, '').replace(/,\s*$/, '').trim();
+    if (beforeNamed && !beforeNamed.startsWith('type ') && !beforeNamed.startsWith('*')) aliases.push(beforeNamed);
+    const namespace = clause.match(/\*\s+as\s+([A-Za-z0-9_]+)/)?.[1];
+    if (namespace) aliases.push(namespace);
+  }
+  return aliases;
+};
+const word = (src: string, token: string) => new RegExp(`\\b${token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(src);
+const sharedCoresOf = (src: string, importSrc: string): string[] => {
+  const found = new Set<string>();
+  for (const c of CORES) {
+    const aliases = importAliases(importSrc, c);
+    if (word(src, c) || aliases.some((a) => word(src, a))) found.add(c);
+  }
+  for (const [re, cores] of CORE_HINTS) if (re.test(src)) for (const c of cores) found.add(c);
+  return [...found];
+};
 // Camera column = a MEASURED gameplay framing exists for the mode (lib/babylon/config/cameraFraming.json,
 // scripts/probes/_cam-frame.mts). cameraPresets.json describes the retired venue cameras (pre-M104).
 const camFraming = JSON.parse(read('lib/babylon/config/cameraFraming.json'));
@@ -114,15 +189,16 @@ const rows: Row[] = modeEntries.map(({ key, cls }) => {
   const file = modeFile(cls); const whole = file ? read(file) : '';
   // A file may export several modes (precisionModes.ts: Tennis, Golf, Derby, Penalty). Judge each mode by ITS
   // slice — from its `export const <Cls>` to the next export — or derby reads golf's venue mount.
-  const src = file ? implementationSlice(whole, cls) : '';
+  const impl = file ? implementationSource(whole, cls, file) : { src: '', importSrc: '' };
+  const src = impl.src;
   const route = `/play/${routeMap[key] ?? key}`;
   const { venue, map, kit } = venueOfMode(key, src);
-  const cores = CORES.filter((c) => new RegExp(`from '\\.\\./core/${c}'|from '\\./${c}'|\\b${c}\\b`).test(src) && src.includes(`${c}`));
+  const cores = sharedCoresOf(src, impl.importSrc);
   return {
     key, enabled: enabled.has(key), file, route,
     menu: gameData.includes(`href: '${route}'`),
     venue, map, kit, baked: !!map && bakedKeys.has(map),
-    cores: cores.filter((c) => src.includes(`/${c}'`)),
+    cores,
     camera: camKeys.has(key),   // cameraFraming.json is keyed by registry key
     navFirst: /\.constrain\(/.test(src),
     clamps: (src.match(/Math\.max\(-?[A-Z_0-9.]+, *Math\.min\(/g) ?? []).length + (src.match(/^const (COURT|FIELD|ARENA|BOUNDS|HALF)[A-Z_]* *=/gm) ?? []).length,
@@ -137,7 +213,7 @@ const rows: Row[] = modeEntries.map(({ key, cls }) => {
 
 const mark = (b: boolean) => (b ? '✓' : '—');
 const lines = ['# Ship Pass 4 — Phase 1 matrix (generated by scripts/full-picture.mts)', '', `Generated ${new Date().toISOString().slice(0, 10)}. ✓ present · — missing. Clamps = typed bounds constants / clamp calls in the mode file.`, '',
-  '| mode | on | route | menu | venue spec → map | kit builder | baked | movement cores | cam | clamps | phone | gauntlet | play sweep | lock | tests | lines |', '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|'];
+  '| mode | on | route | menu | venue spec → map | kit builder | baked | shared cores | cam | clamps | phone | gauntlet | play sweep | lock | tests | lines |', '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|'];
 for (const r of rows) lines.push(`| ${r.key} | ${mark(r.enabled)} | ${r.route} | ${mark(r.menu)} | ${r.venue ?? '—'} → ${r.map ?? '—'} | ${r.kit ?? '—'} | ${mark(r.baked)} | ${r.cores.join(', ') || '—'} | ${mark(r.camera)} | ${r.clamps}${r.navFirst ? ' (nav-first)' : ''} | ${mark(r.bridge)} | ${mark(r.gauntlet)} | ${mark(r.play)} | ${mark(r.lock)} | ${r.tests} | ${r.lines} |`);
 const gaps: string[] = [];
 for (const r of rows.filter((x) => x.enabled)) {
@@ -148,7 +224,7 @@ for (const r of rows.filter((x) => x.enabled)) {
   if (!r.menu) gaps.push(`${r.key}: no Modes-screen entry for ${r.route}`);
   if (!r.gauntlet) gaps.push(`${r.key}: not in the dev-mode gauntlet`);
   if (!r.lock) gaps.push(`${r.key}: no concept lock`);
-  if (r.cores.length === 0) gaps.push(`${r.key}: no shared movement core (mode-local movement)`);
+  if (r.cores.length === 0) gaps.push(`${r.key}: no shared gameplay core (mode-local mechanics)`);
 }
 lines.push('', `## Gaps (${gaps.length})`, '', ...gaps.map((g) => `- ${g}`), '');
 writeFileSync(MD, lines.join('\n'));
