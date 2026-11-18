@@ -11,6 +11,10 @@ owner announces.
 Status as read from `origin/lane/finish-release` `fdd77784` on 2026-10-20 by `lane/launch-docs`. Nothing was run on a
 device or against production for this file.
 
+Refreshed on 2026-11-18 for in-tree evidence that landed after that read: installable PWA wiring, anonymous
+`fps`/`ttfp` diagnostics, the owner-written load budget, and menu/TV remote focus. Device and production rows still
+need the owner-run checks named below.
+
 **What the statuses mean**
 
 - **done**: the evidence is in the tree (a file, a test, or a measured report).
@@ -26,7 +30,7 @@ A row turns green only on evidence. Update the row and its evidence when it chan
 | Area | Done | Not done | Unknown | Blocks launch? |
 |---|---:|---:|---:|---|
 | A. Every mode playable, no known crashers | 2 | 2 | 3 | **yes**: the device pass is the gate |
-| B. Performance budgets | 5 | 3 | 1 | **yes**: no written load-time budget and no real-device pass |
+| B. Performance budgets | 6 | 2 | 1 | **yes**: missing budget rows, known over-budget modes, and real-device proof |
 | C. Ops items | 0 | 8 | 0 | **yes**: all in one runbook session |
 | D. Legal pages | 3 | 1 | 0 | the retention cron (C) is the open one |
 | E. Accessibility basics | 6 | 0 | 0 | green in code; lesson films need captions before content ships |
@@ -37,11 +41,12 @@ A row turns green only on evidence. Update the row and its evidence when it chan
 **The launch blockers, shortest path:**
 
 1. **Run the ops session** (`docs/OWNER-RUNBOOK.md`). That covers all of section C.
-2. **Run the standalone/PWA device pass and enable the service worker when it passes** (section F). The manifest,
-   icons, theme/viewport tags and conservative worker are in the tree; the production flag still ships off.
-3. **Run the device pass on your phone** (`docs/DEVICE-TEST-CHECKLIST.md`), then fix what it finds. That covers A2 and
-   the remaining A/B/F unknowns.
-4. **Decide a load-time budget** (B4). There is no written number today, so "green" cannot be judged.
+2. **Run the device pass on your phone** (`docs/DEVICE-TEST-CHECKLIST.md`), then fix what it finds. That covers A2,
+   the real-device side of A3/A5, B5/B9, F7 and G6.
+3. **Close the phone-budget holes**: add rows for every enabled Babylon mode and fix or owner-accept the three
+   `knownOver` rows (B1/B2).
+4. **Finish the PWA field check**: verify standalone home-screen play, then turn on `NEXT_PUBLIC_SW_ENABLED` only after
+   the device check says the conservative service worker is safe (F6/F7).
 5. **Run the real-TV smoke** (`docs/DEPLOY-CHECKLIST-PARTY.md` §4), or decide that TV launch is "game screens only".
 
 ---
@@ -69,10 +74,10 @@ The live roster is the Play shelf plus off-shelf experiences (`lib/nav/families.
 
 | # | Item | Status | Evidence |
 |---|---|---|---|
-| B1 | Per-mode phone content budgets (draw calls, active meshes, skinned bodies, texture MB, particles) are enforced | **not done** (15 of 30 enabled Babylon modes have a row) | `lib/babylon/config/mobileBudget.json` (measured 2026-10-14) + `scripts/mobile-budget-tests.ts` (CI). The test now prints enabled coverage and fails stale rows that no longer map to a registered mode. **Rows exist for:** dunk, karate, karate_vs, football, skateboard, surf, tennis, golf, onevone, threevthree, threepoint, carnival, mixedcombat, aeroaces, velocitykart. **No enabled row:** dunkduel, duel, showdown, snowboard_slalom, bigair, freerun, sprint, penalty (soccer), derby (baseball), baseball, volleyball, tiebreak, dance, brainbrawl, who_scene_it. Non-Babylon music, acting, irl and story still need a separate page/load budget rather than a Babylon content row |
+| B1 | Per-mode phone content budgets (draw calls, active meshes, skinned bodies, texture MB, particles) are enforced | **not done** (15 of 30 enabled Babylon modes have a row) | `lib/babylon/config/mobileBudget.json` (measured 2026-10-14) + `scripts/mobile-budget-tests.ts` (CI). The test now prints enabled coverage and lists rows that name no registered mode (adventure-story: the Adventure's story World 1). **Rows exist for:** dunk, karate, karate_vs, football, skateboard, surf, tennis, golf, onevone, threevthree, threepoint, carnival, mixedcombat, aeroaces, velocitykart. **No enabled row:** dunkduel, duel, showdown, snowboard_slalom, bigair, freerun, sprint, penalty (soccer), derby (baseball), baseball, volleyball, tiebreak, dance, brainbrawl, who_scene_it. Non-Babylon music, acting, irl and story still need a separate page/load budget rather than a Babylon content row |
 | B2 | No mode over the phone ceiling | **not done** | `knownOver` in `mobileBudget.json`: **football and karate `skinnedBodies`** (over 16) and **velocitykart `textureMb`** (over 256). Frozen, so they cannot grow, but they are over |
 | B3 | Texture memory: no mobile mode above 2× the tier median | **done** | `scripts/perf-budget-tests.ts` (CI) on `lib/babylon/config/textureBudget.json` |
-| B4 | A written load-time budget (time to first playable frame on a phone) | **not done** | no number exists. Rig TTFPF with the 8 s pre-warm was 26.7–59.0 s (`docs/SHIP-READINESS.md` §1). That is SwiftShader on a loaded 4-core box, which overstates a phone's time. The load watchdog is now "20 s with no progress", not 20 s total (`6abc52c2`, #316). **Owner call:** pick a number (for example "dunk on `/try` playable in under N s on a mid-range Android on 4G"), then measure it on the device pass |
+| B4 | A written load-time budget (time to first playable frame on a phone) | **done** | Owner decision 2026-10-20: playable in 8 s, full load in 20 s on a mid-range phone (`docs/OWNER-DECISIONS.md`, DOCS AUDIT). Rig TTFPF with the 8 s pre-warm was 26.7–59.0 s (`docs/SHIP-READINESS.md` §1), but that is SwiftShader on a loaded 4-core box and overstates phone time. The load watchdog is now "20 s with no progress", not 20 s total (`6abc52c2`, #316). The device pass must measure against the 8 s / 20 s budget |
 | B5 | Frame rate on real phones | **done** | `lib/babylon/core/perfStats.ts`, mounted by `ModeHarness.ts`, sends anonymous `game_diag` kind `fps` windows for real play (0-30 s and 90-120 s) with device class only. `lib/babylon/core/perfStats.test.ts` covers the report windows, hidden/pause filtering and page cap |
 | B6 | Shader pre-warm cap hits and load timeouts are reported from real phones | **done** | `capHit` and the watchdog's `load timed out` both send `game_diag` kind `load` (`docs/SHIP-READINESS.md` §5). Successful loads now have the denominator from `perfStats.ts`'s `ttfp` report (`ready`, `start`, first playable frame and page time), covered by `perfStats.test.ts` |
 | B7 | Per-frame garbage in the hot modes | **done** (dunk, the rig layers) | `lane/rig-perf` (#290: the rig layers write no garbage per frame), `lane/dunk-garbage`, `CharacterAnimator.clipNames` cached (#281) |
@@ -138,7 +143,7 @@ the service worker still ships off by default until the owner/device check flips
 | F1 | Served over HTTPS | **done** | Firebase Hosting |
 | F2 | Web app manifest (`app/manifest.ts` or `public/manifest.webmanifest`): `name`, `short_name`, `start_url`, `display` (`standalone` or `fullscreen`), `background_color`, `theme_color`, `icons` | **done** | Served as `/app.webmanifest` by `app/app.webmanifest/route.ts` and linked once from `app/layout.tsx`; `lib/pwa/manifest.test.ts` checks names, `start_url`, `display`, colours, icons and content type |
 | F3 | Install icons: 192×192 and 512×512 PNG, plus a maskable one | **done** | `public/icons/icon-192.png`, `icon-512.png`, `icon-maskable-512.png` and `apple-touch-icon.png`; `lib/pwa/manifest.test.ts` opens each PNG and checks its dimensions |
-| F4 | iOS: `apple-touch-icon` (180×180) and `apple-mobile-web-app-capable` / status-bar style | **done** | `app/layout.tsx` exports `appleWebApp` metadata and links `APPLE_TOUCH_ICON_HREF`; `lib/pwa/installPrompt.test.ts` covers the iOS Safari Share/Add to Home Screen path |
+| F4 | iOS: `apple-touch-icon` (180×180) and `apple-mobile-web-app-capable` / status-bar style | **done** | `public/icons/apple-touch-icon.png`; `app/layout.tsx` sets `metadata.appleWebApp` and links the apple touch icon from `<head>` |
 | F5 | `theme-color` and an explicit `viewport` export (`viewport-fit=cover` for the notch) | **done** | `app/layout.tsx` exports `viewport` with `themeColor: THEME_COLOR`, and `lib/pwa/manifest.test.ts` pins the theme colour to `--fel-bg`. `viewport-fit=cover` is intentionally not set until the home-screen device pass, so pages are not moved under the notch early |
 | F6 | A service worker. At minimum an offline fallback page. Optionally, cache the shell and the big static assets | **done in code, off by default** | `components/pwa/sw-register.tsx` registers `/sw.js` only when `NEXT_PUBLIC_SW_ENABLED=1`; `lib/pwa/sw.test.ts` pins the kill switch and `.env.example` default, and `tests/pwa/sw-routes.test.ts` proves navigations use the network with `/offline.html` fallback, hashed Next static is cache-first, pose assets are stale-while-revalidate, and pages/API/Stripe are never cached |
 | F7 | Tested from the home-screen icon (standalone): canvas size, orientation, audio unlock, the back gesture | **unknown** | still needs the real home-screen device pass after F2-F6 and the service-worker flag decision. Standalone removes the browser bar, which changes the viewport the harness fits (`game-surface.css`, `consoleView`) |
