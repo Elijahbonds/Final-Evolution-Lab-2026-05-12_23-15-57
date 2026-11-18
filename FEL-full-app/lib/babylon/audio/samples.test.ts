@@ -116,13 +116,15 @@ describe('the hoops set', () => {
   it('every file it names is in public/, with its credits', () => {
     const pub = join(__dirname, '..', '..', '..', 'public');
     const urls = [...Object.values(HOOPS_SAMPLES).flatMap((c) => c.urls), HOOPS_BED_URL];
-    expect(urls.length).toBe(24);
+    // hoops-items: 25 names, 24 files — the backboard kiss ('glass') names bounce_6, the ball against a wall, which the dribble also plays
+    expect(urls.length).toBe(25);
+    expect(new Set(urls).size).toBe(24);
     for (const u of urls) expect(existsSync(join(pub, u)), u).toBe(true);
     expect(existsSync(join(pub, 'audio/hoops/CREDITS.md'))).toBe(true);
     expect(existsSync(join(pub, 'audio/hoops/sources.json'))).toBe(true);
   });
   it('the cues it replaces are the court\'s: no synth it does not have a recording for is touched', () => {
-    expect(Object.keys(HOOPS_SAMPLES).sort()).toEqual(['bounce', 'catch', 'crowdCheer', 'rattle', 'squeak', 'swish']);
+    expect(Object.keys(HOOPS_SAMPLES).sort()).toEqual(['bounce', 'catch', 'crowdCheer', 'glass', 'rattle', 'squeak', 'swish']);   // hoops-items: + glass (the backboard, its own cue)
   });
 });
 

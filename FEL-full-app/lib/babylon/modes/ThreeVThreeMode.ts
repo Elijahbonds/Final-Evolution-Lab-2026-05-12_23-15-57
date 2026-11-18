@@ -184,6 +184,7 @@ import { TeamDefense, type TeamDEvent } from '../hoops/teamDefense';   // lane/h
 import { HandCheckPlay } from '../hoops/handCheck';   // lane/hoops-round2 HOP-04: hand-checks, too many = a foul
 import { mountContactPoses } from '../hoops/contactPoses';   // lane/hoops-round2 HOP-04: forearm on hip, arm bar, chest in (drawn only)
 import { SoundKit } from '../audio/SoundKit';
+import { glassKissSound, driftSound, passThrowClick } from '../audio/hoopsSfx';   // hoops-items: the backboard kiss, the drift's squeak, the quiet throw
 import { EffectsKit, applyTrail, type TrailLevel, type AmbientHandle } from '../visual/EffectsKit';
 import { retreatFor, closeoutFor, defendRunFor, approachFor } from '../anim/basketballTree';
 import { TeamOffense3v3, teamOffenseOn, crossesHand } from '../hoops/teamOffense3v3';   // hoops-p03 (1v1/3v3 phase 3): their team offence on bodies
@@ -1734,7 +1735,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       if (driftCool <= 0 && iAmCarrier && !shooting && !dunking && !finish && !gather && !spin && !posting && !passFlight.active && driftRead(ltHeld, sprintOk, me.drib.vel, { x: wish.x, z: wish.z })) {
         const before = me.drib.vel.clone();
         me.drib.drift(wish.x, wish.z); driftCool = DRIFT.cooldownSec; kin.drifts++;
-        ctx.juice.callout('DRIFT', '#22d3ee', 380); SoundKit.play('swish', { pitch: 0.8, volume: 0.4 }); EffectsKit.burst(ctx.scene, me.char.root.position.clone(), 'dust');
+        ctx.juice.callout('DRIFT', '#22d3ee', 380); { const ds = driftSound(); SoundKit.play(ds.name, ds.opts); }   /* hoops-items: a squeak (hoops.driftSqueakOn) */ EffectsKit.burst(ctx.scene, me.char.root.position.clone(), 'dust');
         console.info(`[3V3-KIN] drift at ${before.length().toFixed(1)} m/s`);
         let broke = false;
         for (const f of foes) if (f.stunSec === 0 && !f.floored && ankleBreak(me.char.root.position, before, f.char.root.position)) { f.stunSec = DRIFT.stunSec; f.tree.beat('bball_contact_react', { fadeSec: 0.08 }); broke = true; }
@@ -2303,7 +2304,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           );
           if (slingPass) { kin.slings++; ctx.juice.callout('SLING-PASS', '#fbbf24', 420); SoundKit.play('whoosh', { pitch: 1.4, volume: 0.45 }); console.info(`[3V3-KIN] sling-pass at ${Math.hypot(me.drib.vel.x, me.drib.vel.z).toFixed(1)} m/s`); }
           lastPasserWasMe = true;
-          SoundKit.play('uiTick', { pitch: type === 'bounce' ? 1.0 : type === 'lob' ? 0.8 : 1.3 });
+          { const tick = passThrowClick(type); if (tick) SoundKit.play(tick.name, tick.opts); }   // hoops-items: no menu click on the throw (hoops.passThrowQuietOn); the catch is heard
           if (type === 'lob') { bannerFlash(ctx, 'LOB!', 500); mic?.expect({ moment: 'game.alleyoop' }); mic?.crowd('crowd.hype', 1); }   // THE MIC: the oop call decoded before the catch; the stands see it coming
           EffectsKit.burst(ctx.scene, me.char.root.position.add(new Vector3(0, 1.2, 0)), 'sparks');
         } else {
@@ -3428,7 +3429,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   /** …and the touches while it is there: the iron's rattle and the ring's spring, the glass's thud. */
   function rimTouches(a: ShotArc): void {
     for (const t of a.takeTouches()) {
-      if (t.on === 'glass') { SoundKit.play('thud', { pitch: 1.5, volume: 0.35 }); console.info(`[3V3-RIM] glass kiss`); }
+      if (t.on === 'glass') { const gk = glassKissSound(); SoundKit.play(gk.name, gk.opts); console.info(`[3V3-RIM] glass kiss`); }   // hoops-items: its own sound (hoops.glassSoundOn)
       else { SoundKit.play('rattle', { volume: 0.18 + t.strength01 * 0.22 }); hoopJuice?.graze(); shotClock.rimTouch(); }   // lane/hoops-shot-core: a rim touch resets the shot clock
     }
   }

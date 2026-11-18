@@ -1809,6 +1809,22 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/audio/dribbleSound.ts PASS_CATCH_VOL',
     hint: 'How loud a caught pass is.',
   },
+  // ── hoops-items (2026-11-18): three sound leftovers of hoops-sound, each NEW, its off value the sound as before (audio/hoopsSfx.ts)
+  {
+    id: 'hoops.passThrowQuietOn', label: 'Pass: no menu click on the throw (1) / the click as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · sound',
+    source: 'lib/babylon/audio/hoopsSfx.ts PASS_THROW_QUIET_ON',
+    hint: 'On: a 3v3 pass is heard only in the hands that catch it (and a sling pass whooshes). Off: the throw plays the menu click, as before.',
+  },
+  {
+    id: 'hoops.driftSqueakOn', label: 'Drift: a shoe squeak (1) / the net swish as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · sound',
+    source: 'lib/babylon/audio/hoopsSfx.ts DRIFT_SQUEAK_ON',
+    hint: 'On: the DRIFT slide squeaks like the hardest cut. Off: it plays the net swish, as before.',
+  },
+  {
+    id: 'hoops.glassSoundOn', label: 'Backboard kiss: its own sound (1) / the floor thud as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · sound',
+    source: 'lib/babylon/audio/hoopsSfx.ts GLASS_SOUND_ON',
+    hint: 'On: a banked ball off the glass sounds like a ball on a board. Off: it plays the body-on-the-floor thud, as before.',
+  },
   // ── hoops-builder (owner 2026-11-12): what the five hoops ratings and the playing height change, casual runs only. Every band is
   //    the change at rating 90 (at 40 it moves the other way by a quarter of it); rating 50 is today at any band, and 0 = no effect.
   {

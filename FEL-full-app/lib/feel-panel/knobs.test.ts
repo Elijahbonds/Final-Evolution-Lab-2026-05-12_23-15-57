@@ -3,6 +3,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { FEEL_KNOBS, FEEL_KNOB_BY_ID, clampKnob, stepDecimals } from './knobs';
+import * as HSFX from '@/lib/babylon/audio/hoopsSfx';   // hoops-items
 import { AI_HAND_RANGE_M, AI_HAND_DWELL_SEC, AI_HAND_GAP_SEC } from '@/lib/babylon/core/AiBallHand';
 import { HAND_CLEAR_M } from '@/lib/babylon/anim/Dribble';
 import { DIST_GREEN_NEAR_M, DIST_GREEN_FAR_M, DIST_GREEN_MAX_NARROW } from '@/lib/babylon/core/ShotWindow';
@@ -412,6 +413,9 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.sampleSfxOn')).toBe(SAMPLE_SFX_ON); expect(def('hoops.dribbleSoundOn')).toBe(DS.DRIBBLE_SOUND_ON);
     expect(def('hoops.dribbleSoundVol')).toBe(DS.DRIBBLE_SOUND_VOL); expect(def('hoops.dribbleSoundAiK')).toBe(DS.DRIBBLE_SOUND_AI_K);
     expect(def('hoops.passCatchSoundOn')).toBe(DS.PASS_CATCH_SOUND_ON); expect(def('hoops.passCatchVol')).toBe(DS.PASS_CATCH_VOL);
+    // hoops-items (the sound leftovers; new, the owner has not heard these)
+    expect(def('hoops.passThrowQuietOn')).toBe(HSFX.PASS_THROW_QUIET_ON); expect(def('hoops.driftSqueakOn')).toBe(HSFX.DRIFT_SQUEAK_ON);
+    expect(def('hoops.glassSoundOn')).toBe(HSFX.GLASS_SOUND_ON);
     // hoops-builder (the ratings' bands; new, the owner has not felt these; rating 50 is today at any value)
     expect(def('hoops.ratingsOn')).toBe(HR.RATINGS_ON); expect(def('hoops.rateSpeedBand')).toBe(HR.RATE_SPEED_BAND);
     expect(def('hoops.rateHandleBand')).toBe(HR.RATE_HANDLE_BAND); expect(def('hoops.rateReadBand')).toBe(HR.RATE_READ_BAND);

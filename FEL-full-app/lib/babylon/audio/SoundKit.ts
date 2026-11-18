@@ -38,8 +38,10 @@ export function momentumScalesBed(kind: AmbientKind | null): boolean { return ki
 // HOOPS-SOUND (phase 11a, 2026-11-12): two more, for the court — `bounce` (the dribble's floor contact: the most-heard sound in
 // basketball, and the game had none) and `catch` (a pass arriving in the hands). Both have a synth here like every cue; while the
 // hoops sample bank is loaded (samples.ts) they, and the swish, rim, squeak and cheer, play CC0 recordings instead (below: play).
+// HOOPS-ITEMS (2026-11-18): `glass` — a ball kissing the backboard (it played the body-on-the-floor `thud` at pitch 1.5); a synth here,
+// and the recording of a ball against a wall while the hoops bank is loaded (audio/hoopsSfx.ts, `hoops.glassSoundOn`).
 type SfxName = 'whoosh' | 'impact' | 'score' | 'miss' | 'whistle' | 'uiTick' | 'crowdCheer' | 'crowdGroan' | 'powerUp'
-  | 'thud' | 'rattle' | 'swish' | 'clang' | 'squeak' | 'exhaust' | 'bounce' | 'catch';
+  | 'thud' | 'rattle' | 'swish' | 'clang' | 'squeak' | 'exhaust' | 'bounce' | 'catch' | 'glass';
 /** What a cue is asked to play with. `pan` (-1 left … 1 right) places a recorded hit in the stereo field; `tag` names who asked
  *  (a probe's log reads it; the sound ignores it). */
 export interface PlayOpts { pitch?: number; volume?: number; pan?: number; tag?: string }
@@ -335,6 +337,34 @@ class SoundKitImpl {
         this.env(og, ctx, 0.002, 0.05, 0.7 * vol);
         osc.connect(og).connect(this.sfxBus);
         osc.start(); osc.stop(ctx.currentTime + 0.07);
+        break;
+      }
+      // HOOPS-ITEMS (2026-11-18): THE BALL KISSING THE BACKBOARD, synthesised (the fallback while the recording loads, or if it
+      // fails). The ball's own knock, higher and shorter than on the floor (a board gives less than a floor), a flat slap of band-passed
+      // noise for the contact, and a short ring of the board at ~1.1 kHz — the part that tells it from a bounce or a body.
+      case 'glass': {
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(240 * pitch, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(120 * pitch, ctx.currentTime + 0.06);
+        const og = ctx.createGain();
+        this.env(og, ctx, 0.002, 0.09, 0.8 * vol);
+        osc.connect(og).connect(this.sfxBus);
+        osc.start(); osc.stop(ctx.currentTime + 0.12);
+        const slap = ctx.createBufferSource();
+        slap.buffer = this.noiseBuffer(ctx, 0.04);
+        const bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass'; bp.Q.value = 0.9; bp.frequency.value = 2200 * pitch;
+        const sg = ctx.createGain();
+        this.env(sg, ctx, 0.001, 0.03, 0.45 * vol);
+        slap.connect(bp).connect(sg).connect(this.sfxBus);
+        slap.start(); slap.stop(ctx.currentTime + 0.05);
+        const ring = ctx.createOscillator();
+        ring.type = 'triangle'; ring.frequency.value = 1120 * pitch;
+        const rg = ctx.createGain();
+        this.env(rg, ctx, 0.002, 0.14, 0.12 * vol);
+        ring.connect(rg).connect(this.sfxBus);
+        ring.start(); ring.stop(ctx.currentTime + 0.17);
         break;
       }
       // A BODY ON THE FLOOR. Low sine that drops fast, plus a short noise slap for the contact — no ring,

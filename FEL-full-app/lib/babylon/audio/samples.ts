@@ -31,6 +31,10 @@ export interface SampleCue {
 }
 
 // Each URL is a literal so lib/feel/sensory-assets.test.ts proves the file exists under public/.
+/** The backboard kiss's level (hoops-items): set so the recording plays where the thud it replaces played, measured like the rest
+ *  (scripts/probes/hoops-sound/loudness.mts, the loudest 50 ms at the limiter). */
+export const GLASS_GAIN = 0.5;
+
 /** THE HOOPS SET. Keys are SoundKit cue names; a cue with no row keeps its synth (groan, whistle, score, whoosh, impact, thud…).
  *  GAINS ARE MEASURED (scripts/probes/hoops-sound/loudness.mts: each cue rendered at volume 1 through SoundKit's own graph, the loudest
  *  50 ms at the limiter's output): a recording that replaces a synth plays at that synth's level (±1 dB), so the mix the modes set with
@@ -49,6 +53,9 @@ export const HOOPS_SAMPLES: Readonly<Record<string, SampleCue>> = {
   swish: { urls: ['/audio/hoops/net_1.mp3', '/audio/hoops/net_2.mp3', '/audio/hoops/net_3.mp3', '/audio/hoops/net_4.mp3'], gain: 0.051, pitchJitter: 0.05, volJitterDb: 1.5, bus: 'sfx', maxVoices: 2 },
   // a pass caught (a new cue; its synth fallback is SoundKit's 'catch')
   catch: { urls: ['/audio/hoops/catch_1.mp3', '/audio/hoops/catch_2.mp3', '/audio/hoops/catch_3.mp3'], gain: 0.264, pitchJitter: 0.05, volJitterDb: 1.5, bus: 'sfx', maxVoices: 3 },
+  // hoops-items (2026-11-18): the backboard kiss — a ball against a wall (bounce_6's recording, BigSoundBank s1825, CC0: a ball on a
+  // flat hard board), its own cue (it played the floor thud). One file named by two cues is fetched once (SampleBank.one).
+  glass: { urls: ['/audio/hoops/bounce_6.mp3'], gain: GLASS_GAIN, pitchJitter: 0.04, volJitterDb: 1, bus: 'sfx', maxVoices: 2 },
   // the crowd cheers
   crowdCheer: { urls: ['/audio/hoops/cheer_1.mp3', '/audio/hoops/cheer_2.mp3'], gain: 0.096, pitchJitter: 0.03, volJitterDb: 1, bus: 'crowd', maxVoices: 2 },
 };
@@ -106,6 +113,8 @@ export interface SamplePick<B> { buffer: B; rate: number; gain: number; bus: 'sf
 export class SampleBank<B> {
   private readonly buffers = new Map<string, (B | null)[]>();
   private readonly robins = new Map<string, RoundRobin>();
+  /** Each file's one fetch and decode (hoops-items: a file two cues name — bounce_6, the dribble and the backboard — is fetched once). */
+  private readonly files = new Map<string, Promise<B | null>>();
   private bedBuf: B | null = null;
   private loading: Promise<void> | null = null;
   private stateNow: LoadState = 'idle';
@@ -139,7 +148,12 @@ export class SampleBank<B> {
     });
     return this.loading;
   }
-  private async one(url: string): Promise<B | null> {
+  private one(url: string): Promise<B | null> {
+    let p = this.files.get(url);
+    if (!p) { p = this.fetchOne(url); this.files.set(url, p); }
+    return p;
+  }
+  private async fetchOne(url: string): Promise<B | null> {
     try {
       const bytes = await this.io.fetch(url);
       const b = await this.io.decode(bytes);
