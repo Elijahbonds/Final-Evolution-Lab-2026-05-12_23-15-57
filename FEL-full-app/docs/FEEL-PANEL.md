@@ -663,6 +663,25 @@ holds the result in CI. Phone tier only unless said.
   (24 cm) upload their maps at 512² (37 MB → 9 MB). The dunk parks the bus on its corner as a wall-run prop and keeps 1024². 1024 = as before.
 - `perf.propMergeOn` 1 (`visual/VenueProps.ts`, every tier): a prop model's parts that share a material are one thin-instanced mesh (the
   far pier: fifteen parts in two materials → two; the Venice dunk set: 35 masters → 22). Same geometry, same placements. 0 = one per part.
+- `venue.veniceLookV2` 1 (`lib/adventure/venice/courtsDressing.ts`, the Venice hub; improvement pass phase 5, NEW): chain-link fences (open
+  on the walk-up side), benches (the run's long bench), light poles, a name board per court on one atlas, and PBR grounds and sea. 0 = V1's
+  look (its floating name signs).
+- `venue.veniceLife` 1 (`lib/adventure/venice/hubLife.ts`, the Venice hub; improvement pass phase 6, NEW): gulls wheeling over the sea (one
+  thin-instanced billboard draw; a phone flies 3, desktop 6) and, on desktop and up only, people standing at Court 2's sideline and by the
+  other courts (the shipped crowd bodies). A phone gets no people (its crowd tier is cut-out cards). 0 = V1's empty park.
+- `venue.veniceSound` 1 (`lib/adventure/venice/hubSound.ts`, the Venice hub; improvement pass phase 7, NEW): the ocean bed, dribbles and
+  shots from unseen pickup games down the beach, the run cheering now and then near Court 2, and footsteps (concrete vs sand), all through
+  SoundKit (mute and volume apply; the recorded hoops bank once loaded). 0 = V1 (the harness's mood crowd bed).
+- `venue.veniceSolids` 1 (`lib/adventure/venice/hubSolids.ts`, the Venice hub; improvement pass phase 8, NEW): the hoop posts, the boardwalk
+  row's front, the palms in the park and (with `venue.veniceLookV2`) the fences, benches, light poles and board posts are block pieces: walls
+  to the movement sim's own step rule. No movement number changes. 0 = V1 (walk through them).
+- `venue.walkupV2` 1 (`lib/adventure/venice/hubSolids.ts`, the Venice hub; improvement pass phase 8, NEW): a court's card comes up on the
+  court or in its gold ring after 0.25 s, and holds until a metre past. 0 = V1 (a 28 m box round the court, behind the fence too, at once).
+- `venue.veniceWayfinding` 1 (`lib/adventure/venice/hubUi.ts`, shown by `app/play/venice/wayfinding.tsx`, the Venice hub; improvement pass phase 9, NEW): the first-visit hint (once per
+  device), the north-up mini-map of the four courts with you on it, and the card's keys (Enter or X plays, Y plays with your party). 0 = V1.
+- `venue.deferScenery` 1 (`lib/adventure/venice/courtsView.ts`, the Venice hub; venice-v1 improvement pass phase 3, NEW): the courts load in
+  their plain base colour and the player first; the painted courts, the palms and the boardwalk row arrive once the player can move.
+  0 = everything during the load, as V1.
 - `perf.veniceSharedCourt` 1 (`lib/adventure/venice/courtsView.ts`, the Venice hub, every tier; lane/venice-v1, 2026-11-17, NEW): the four courts
   are ONE court mesh drawn as instances. 0 = a mesh, material and asphalt detail map per court (the prototype's way: about 4 MB more on a
   phone, measured 73 → 77 MB; the painted court itself was already cached per scene).

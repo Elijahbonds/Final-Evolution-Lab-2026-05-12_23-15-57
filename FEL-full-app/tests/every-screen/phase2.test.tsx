@@ -102,8 +102,10 @@ describe('3. the bars: 44 px targets, and the rail does not arrive late', () => 
     const shell = read('components/games/game-shell.tsx');
     expect(shell).toContain('hover:text-[#00E5FF] min-h-11"');
     expect(shell).toContain('grid h-11 w-11 place-items-center rounded-md');
+    expect(shell).toContain('pointer-events-auto grid h-11 w-11 place-items-center rounded-lg');
     expect(shell).toContain('invisible whitespace-nowrap');
     expect(read('components/games/graphics-toggle.tsx')).toContain('h-11 rounded-md');
+    expect(read('components/games/graphics-toggle.tsx')).toContain('min-h-11 rounded-md border border-[#00E5FF]/60');
     expect(read('components/games/body-control.tsx')).toContain('inline-flex min-h-11 items-center');
     expect(read('components/games/pause-button.tsx')).toContain('grid h-11 w-11');
   });

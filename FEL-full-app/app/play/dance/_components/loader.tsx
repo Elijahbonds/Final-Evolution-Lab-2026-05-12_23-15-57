@@ -1,15 +1,11 @@
 'use client';
 
 import dynamicImport from 'next/dynamic';
-import { Loader2 } from 'lucide-react';
-import { GAME_LOADING } from '@/components/games/game-loading';
+import { GameLoading } from '@/components/games/game-loading';
 import { GameShell } from '@/components/games/game-shell';
 
 const spinner = () => (
-  <div role="status" className="flex h-[60vh] flex-col items-center justify-center gap-3">
-    <Loader2 aria-hidden className="h-8 w-8 animate-spin text-[#FF2D95]" />
-    <p className="text-[16px] text-white/60">{GAME_LOADING}</p>
-  </div>
+  <GameLoading />
 );
 
 const DanceBabylon = dynamicImport(

@@ -1690,6 +1690,34 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/visual/VenueProps.ts PROP_MERGE_ON',
     hint: 'A prop model whose parts share a material (the far pier: fifteen parts, two materials) is drawn as one mesh per material. Same picture. 0 = one draw per part, as before.',
   },  {
+    id: 'venue.veniceLookV2', label: 'Venice hub: fences, benches, light poles, name boards, lit grounds (1) / V1 look (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/adventure/venice/courtsDressing.ts VENICE_LOOK_V2',
+    hint: 'The park furniture round the four courts (one draw each: merged fences and posts, thin-instanced benches and poles, one board atlas) and PBR grounds and sea. 0 = V1, with its floating name signs.',
+  },  {
+    id: 'venue.veniceLife', label: 'Venice hub: gulls, and watchers at the run on desktop (1) / an empty park (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/adventure/venice/hubLife.ts VENICE_LIFE',
+    hint: 'A few gulls over the sea (one thin-instanced draw; a phone flies half) and, on desktop and up only, people standing at Court 2 and by the other courts (the shipped crowd bodies). A phone gets no people: its crowd policy is cut-out cards. 0 = V1, an empty park.',
+  },  {
+    id: 'venue.veniceSound', label: 'Venice hub: beach bed, far games, the run, footsteps (1) / the harness crowd bed only (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/adventure/venice/hubSound.ts VENICE_SOUND',
+    hint: 'The ocean bed, dribbles and shots from pickup games down the beach, the run cheering now and then near Court 2, and your steps (concrete vs sand). Through SoundKit: mute and volume apply. 0 = V1 (the mood crowd bed on first input).',
+  },  {
+    id: 'venue.veniceSolids', label: 'Venice hub: hoops, fences, benches, poles, palms and the boardwalk row are solid (1) / walk through (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/adventure/venice/hubSolids.ts VENICE_SOLIDS',
+    hint: 'Block pieces for the props round the courts (the movement sim\'s own wall rule; no movement number changes). The walk-up side of each fence stays open. 0 = V1, where the player walked through them.',
+  },  {
+    id: 'venue.walkupV2', label: 'Venice hub: the card on the court or in its ring, after a short dwell (1) / a 28 m box round the court (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/adventure/venice/hubSolids.ts WALKUP_V2',
+    hint: 'The court card comes up when you stand on the court or in its gold ring for a quarter second, and stays until you are a metre past. 0 = V1 (anywhere in a box round the court, behind its fence too, at once).',
+  },  {
+    id: 'venue.veniceWayfinding', label: 'Venice hub: first-visit hint, mini-map, Enter / X / Y on the card (1) / none (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/adventure/venice/hubUi.ts VENICE_WAYFINDING',
+    hint: 'A one-time line saying what to do, a small north-up map of the four courts with you on it, and keys for the card (Enter or X plays, Y plays with your party). 0 = V1.',
+  },  {
+    id: 'venue.deferScenery', label: 'Venice hub: paint and far scenery after you can move (1) / during the load (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/adventure/venice/courtsView.ts VENICE_DEFER_SCENERY',
+    hint: 'The hub loads the courts in their plain colour and you first; the painted courts, the palms and the boardwalk row arrive once you can walk. 0 = all of it during the load, as V1.',
+  },  {
     id: 'perf.veniceSharedCourt', label: 'Venice hub: one court mesh for the four courts (1) / one per court (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
     source: 'lib/adventure/venice/courtsView.ts VENICE_SHARED_COURT',
     hint: 'The hub draws one court mesh at all four courts. Same picture. 0 = a mesh, material and detail map per court, as the prototype did (about 4 MB more on a phone, measured).',
