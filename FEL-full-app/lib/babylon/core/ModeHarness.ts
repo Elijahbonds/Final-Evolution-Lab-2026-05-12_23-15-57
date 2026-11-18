@@ -252,7 +252,7 @@ export interface ModeDefinition {
    *  load, before the start screen's picks, so a mode re-reads anything the player can still pick there (the OPPONENT
    *  tier, WIN BY 2) here. Before the first update(). */
   onPlay?(ctx: ModeContext): void;
-  dispose?(): void;
+  dispose?(ctx?: ModeContext): void;
   /** MOVEMENT PLAY P3 (2026-09-24): the mode's own say in its body play (none in P3: every mode runs its table row in
    *  lib/input/bodyProfiles). `claims` takes a move off the floor and hands it to onBody instead (P5+). */
   body?: ModeBodySpec;
@@ -1088,7 +1088,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     shaker.dispose();
     groundLock.dispose();
     ring?.dispose(); ring = null; ringRoot = null;   // PLAYER RING
-    def.dispose?.();
+    def.dispose?.(ctx);
     perf.dispose();       // M67
     guard.dispose();      // PERF-GUARD
     hitch.dispose();      // S1 HITCH

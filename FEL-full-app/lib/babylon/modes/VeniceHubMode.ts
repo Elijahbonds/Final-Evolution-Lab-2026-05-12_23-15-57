@@ -165,10 +165,12 @@ export const VeniceHubMode: ModeDefinition = {
     }
   },
 
-  dispose() {
-    // the harness disposes the scene; the per-scene state goes with its WeakMap entry. Live states are closed here.
+  dispose(ctx?: ModeContext) {
+    // The harness can tear down an older async mount after a newer one is already running; close only this scene's state.
+    const one = ctx ? states.get(ctx.scene) : null;
+    const close = (S: St) => { S.move.dispose(); S.view.dispose(); live.delete(S); };
+    if (one) { close(one); if (live.size === 0) hubUi.reset(); return; }
+    for (const S of [...live]) close(S);
     hubUi.reset();
-    for (const S of live) { S.move.dispose(); S.view.dispose(); }
-    live.clear();
   },
 };
