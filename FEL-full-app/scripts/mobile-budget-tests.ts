@@ -19,6 +19,7 @@
 //   * a mode already over the ceiling is listed in `knownOver` — a finding for its lane, printed every run — and its
 //     budget is frozen at what it measured: it may shrink, never grow. A knownOver entry whose mode is no longer over is
 //     stale and fails, so the list cannot rot into a blanket exemption.
+//   * a row that no longer names a registered mode is printed (not failed): a finding for its lane.
 //   * a registered mode with no row is printed (not failed): not every mode is measurable on every box.
 //
 //   npx tsx scripts/mobile-budget-tests.ts                # the shipped table
@@ -101,8 +102,16 @@ if (isMain) {
     const src = readFileSync(resolve(process.cwd(), 'lib/babylon/modes/registry.ts'), 'utf8');
     const body = src.slice(src.indexOf('export const MODES'), src.indexOf('};', src.indexOf('export const MODES')));
     const reg = [...body.matchAll(/^\s+([a-z_]+):\s+[A-Z]\w+,/gm)].map((m) => m[1]);
-    const missing = reg.filter((k) => !t.modes[k]);
-    if (missing.length) console.log(`\n  not measured (no row): ${missing.join(', ')}`);
+    const enabledBody = src.match(/ENABLED_BABYLON_MODES = new Set<string>\(\[([\s\S]*?)\]\)/)?.[1] ?? '';
+    const enabled = [...enabledBody.matchAll(/'([^']+)'/g)].map((m) => m[1]);
+    const missing = enabled.filter((k) => !t.modes[k]);
+    const stale = Object.keys(t.modes).filter((k) => !reg.includes(k));
+    const measuredEnabled = enabled.length - missing.length;
+    console.log(`\n  enabled budget coverage: ${measuredEnabled}/${enabled.length} measured`);
+    if (missing.length) console.log(`  not measured enabled modes (no row): ${missing.join(', ')}`);
+    // cursor-intake: printed, not failed. A row for a surface that is not a registry key (adventure-story: the Adventure's
+    // story World 1, measured by the phone-perf pass) is a finding for its lane, not a reason to delete a measured row.
+    if (stale.length) console.log(`  rows that name no registered Babylon mode (check them): ${stale.join(', ')}`);
   } catch { /* no registry in a fixture run */ }
   if (r.over.length) {
     console.log(`\n  over the phone ceiling (findings for the modes' lanes; listed in knownOver):`);

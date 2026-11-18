@@ -20,6 +20,7 @@ import { ReplayInPlaceContext } from './replay-in-place';
 import { BodyControl } from './body-control';
 import { GraphicsToggle } from './graphics-toggle';
 import { PauseButton } from './pause-button';   // gameplay-clean: a pause a thumb can reach (ESC → START, every harness mode)
+import { PageDiagnostics } from './page-diagnostics';
 import { GameCaptureHud } from '@/components/capture/game-capture-hud';
 import { LearnWhileYouWait } from '@/components/learn/learn-while-you-wait';
 import type { SessionTallies } from '@/lib/game-systems';
@@ -778,7 +779,7 @@ function GameShellInner({
             <Link
               href={leaveHref}
               aria-label="Leave the game"
-              className="pointer-events-auto grid h-9 w-9 place-items-center rounded-lg border border-white/15
+              className="pointer-events-auto grid h-11 w-11 place-items-center rounded-lg border border-white/15
                          bg-black/50 text-white/70 backdrop-blur-md transition-colors hover:text-white fel-chrome-glass"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -789,7 +790,7 @@ function GameShellInner({
                 type="button"
                 onClick={onFullscreen}
                 aria-label={fsOn ? 'Leave full screen' : 'Full screen'}
-                className="pointer-events-auto grid h-9 w-9 place-items-center rounded-lg border border-white/15
+                className="pointer-events-auto grid h-11 w-11 place-items-center rounded-lg border border-white/15
                            bg-black/50 text-white/70 backdrop-blur-md transition-colors hover:text-white fel-chrome-glass"
               >
                 {fsOn ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
@@ -804,11 +805,14 @@ function GameShellInner({
           </div>
         )}
         {profile ? (
-          <ReplayInPlaceContext.Provider value={registerReplay}>
-            <ThreeDErrorBoundary key={gameKey}>
-              <Game grade={profile.grade} prq={profile.prq} prqDisplay={profile.display} onEnd={handleEnd} {...(gameProps ?? {})} />
-            </ThreeDErrorBoundary>
-          </ReplayInPlaceContext.Provider>
+          <>
+            <PageDiagnostics mode={mode} active={!isBabylon(mode) && !result} />
+            <ReplayInPlaceContext.Provider value={registerReplay}>
+              <ThreeDErrorBoundary key={gameKey}>
+                <Game grade={profile.grade} prq={profile.prq} prqDisplay={profile.display} onEnd={handleEnd} {...(gameProps ?? {})} />
+              </ThreeDErrorBoundary>
+            </ReplayInPlaceContext.Provider>
+          </>
         ) : !unreachable ? (
           <div role="status" className="flex h-[60vh] flex-col items-center justify-center gap-3">
             <Loader2 aria-hidden className="h-8 w-8 animate-spin text-[#00E5FF]" />

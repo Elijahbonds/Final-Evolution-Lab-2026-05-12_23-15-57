@@ -6,7 +6,9 @@ import { setAgentRunHooksAllowed } from '@/lib/agentRunHooks';
 import { runMode, InputBus } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { hubUi } from '@/lib/adventure/venice/hubUi';
+import { launchChoices } from '@/lib/adventure/venice/hubReturn';
 import { setFeelOverride, setFeelSession, setFeelUser } from '@/lib/feel-panel/feel';
+import { MODE_INFO } from '@/lib/game-data';
 
 const W = window as unknown as Record<string, unknown>;
 setAgentRunHooksAllowed(true);
@@ -14,12 +16,26 @@ const q = new URLSearchParams(window.location.search);
 if (q.get('feel')) { setFeelUser(true); setFeelSession(null); for (const [k, v] of Object.entries(JSON.parse(q.get('feel')!))) setFeelOverride(k, Number(v)); }
 const canvas = document.getElementById('c') as HTMLCanvasElement;
 const card = document.getElementById('card') as HTMLDivElement;
-hubUi.subscribe(() => {
+const renderWalkup = () => {
   const s = hubUi.getSnapshot().spot;
   W.__spot = s?.id ?? null;
+  W.__choices = s ? launchChoices(s, MODE_INFO).map((choice) => choice.mode) : [];
   card.style.display = s ? 'block' : 'none';
-  if (s) card.innerHTML = `<b>${s.label.replace('[PLACEHOLDER] ', '')}</b><div class="btn">▶ Play ${s.modes[0] === 'hoops1v1' ? 'Ones' : s.modes[0] === 'hoops3v3' ? 'Threes' : s.modes[0]}</div>`;
-});
+  card.replaceChildren();
+  if (!s) return;
+  const title = document.createElement('b');
+  title.textContent = s.label.replace('[PLACEHOLDER] ', '');
+  card.append(title);
+  for (const choice of launchChoices(s, MODE_INFO)) {
+    const btn = document.createElement('div');
+    btn.className = 'btn';
+    btn.textContent = `\u25b6 Play ${choice.label}`;
+    btn.setAttribute('data-mode', choice.mode);
+    card.append(btn);
+  }
+};
+hubUi.subscribe(renderWalkup);
+renderWalkup();
 // ?race=<ms> (V2, PR #635's race): a second hub is mounted on a second canvas <ms> after the first; the probe (race.mts) then
 // tears the FIRST down (W.__stopA) and checks the second is untouched.
 if (q.get('race')) {

@@ -444,6 +444,8 @@ files, routing); `~/Claude/outbox/qa-fixes-routed.md`; session notes `project_fe
 - Deploys come only from `lane/finish-release`, after the owner has merged, and are run by the owner or by the one
   deploy owner the owner names for that deploy. Lanes never deploy: no `firebase deploy`, no hosting or channel
   pushes.
+- **The deploy button (owner 2026-11-18):** `.github/workflows/deploy.yml` deploys `main` when dispatched (dry-run by
+  default; `docs/DEPLOY-BUTTON.md`). Only the owner or the coordinator dispatches it; lanes never do.
 - **Never push `main`.** `/CLAUDE.md` calls `main` the deploy branch ("a push ships"). The repo has no deploy
   workflow, though: `.github/workflows/ci.yml` only checks. The deploys on record were run by hand from worktrees of
   `lane/finish-release` commits. Both facts stand until the owner says otherwise.

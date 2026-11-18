@@ -1,14 +1,17 @@
 // EVERY-SCREEN P7 (2026-11-11): "Around the games" — what phase 7 changed on the screens around play (never play itself,
 // never a feel number), as tests that fail on the code before it.
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { createElement as h } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { GameLoading, GAME_LOADING } from '@/components/games/game-loading';
 import { FIT_MIN, fitScale } from '@/lib/ui/controlsScreen';
 
 const src = (p: string) => readFileSync(p, 'utf8');
+const filesUnder = (dir: string): string[] => readdirSync(dir).flatMap((ent) => {
+  const p = `${dir}/${ent}`;
+  return statSync(p).isDirectory() ? filesUnder(p) : [p];
+});
 
 describe('a game says what it is loading', () => {
   it('the shared loader is a status with words', () => {
@@ -17,11 +20,14 @@ describe('a game says what it is loading', () => {
     expect(html).toContain(GAME_LOADING);
   });
   it('no bare spinner is left in the games\' loaders (there were 35 copies)', () => {
-    let files: string[] = [];
-    try { files = execFileSync('grep', ['-rl', 'flex h-\\[60vh\\] items-center justify-center', 'app', 'components'], { encoding: 'utf8' }).split('\n').filter(Boolean); }
-    catch { files = []; }                                       // grep finds nothing: exit 1
-    const out = files.filter((f) => /<div className="flex h-\[60vh\] items-center justify-center">\s*<Loader2 className="h-8 w-8 animate-spin/.test(src(f)));
+    const files = filesUnder('app').filter((f) => f.endsWith('/loader.tsx') || f === 'app/play/carnival/_components/hub-client.tsx');
+    const out = files.filter((f) => src(f).includes('Loader2'));
     expect(out).toEqual([]);
+    // cursor-intake: the original scope too (every file under app/ and components/, the bare-spinner markup), now walked in
+    // node instead of a grep whose failure passed silently
+    const tsx = [...filesUnder('app'), ...filesUnder('components')].filter((f) => f.endsWith('.tsx'));
+    const bare = tsx.filter((f) => /<div className="flex h-\[60vh\] items-center justify-center">\s*<Loader2 className="h-8 w-8 animate-spin/.test(src(f)));
+    expect(bare).toEqual([]);
   });
 });
 

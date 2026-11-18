@@ -1,13 +1,13 @@
 'use client';
 
 import dynamicImport from 'next/dynamic';
-import { Loader2 } from 'lucide-react';
+import { GameLoading } from '@/components/games/game-loading';
 
 // WebRTC, the Gamepad API and Babylon are browser-only: never server-render the room.
 const PartyRoomScreen = dynamicImport(() => import('@/components/party/party-room'), {
   ssr: false,
   loading: () => (
-    <div className="fixed inset-0 grid place-items-center bg-[#05070c]"><Loader2 className="h-8 w-8 animate-spin text-[#00E5FF]" /></div>
+    <GameLoading className="fixed inset-0 bg-[#05070c]" label="Loading the party room…" />
   ),
 });
 
