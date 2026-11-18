@@ -32,8 +32,6 @@ const expectedSlugs: Record<string, string> = {
   who_scene_it: 'who-scene-it',
   brainbrawl: 'brain-brawl',
   venice_hub: 'venice',
-  derby: 'derby',
-  venice_hub: 'venice',
 };
 const playGauntletExempt = new Set([
   // /play/dunkduel is the owner's real-footage Prove It flow; the Babylon
@@ -73,7 +71,6 @@ const testName: Record<string, string[]> = {
   velocitykart: ['velocitykart', 'velocity-kart', 'velocityKart'],
   venice_hub: ['venice', 'venice-hub', 'VeniceHub'],
   who_scene_it: ['who_scene_it', 'who-scene-it', 'whoSceneIt'],
-  venice_hub: ['venice', 'venice-hub', 'VeniceHub'],
 };
 const skipTestDirs = new Set(['.git', '.next', 'coverage', 'node_modules', 'public']);
 const testFilePattern = /(?:^|[./-])(?:test|tests)\.(?:ts|tsx)$|-tests\.ts$/;
