@@ -251,15 +251,20 @@ export function mountZoneView(scene: Scene, opts: { streamOn: boolean }): ZoneVi
   const zMid = (d: (typeof DECKS)[number]) => (d.minZ + d.maxZ) / 2;
   for (const d of DECKS) {
     const l = d.maxZ - d.minZ, n = Math.ceil(d.maxX - d.minX), seg = (d.maxX - d.minX) / n;
-    for (let k = 0; k < n; k++) {
-      const x = d.minX + (k + 0.5) * seg, y = deckSurfaceY(d, terrainY(x, zMid(d)));
-      const deck = MeshBuilder.CreateBox(`coast_deck_${d.id}_${k}`, { width: seg + 0.02, height: 0.24, depth: l }, scene);
+    // a run of segments at the same height (the level stretch over the water) is ONE box: ~20 boxes a deck, not ~70
+    const ys = Array.from({ length: n }, (_, k) => deckSurfaceY(d, terrainY(d.minX + (k + 0.5) * seg, zMid(d))));
+    for (let k = 0; k < n;) {
+      let e = k + 1;
+      while (e < n && Math.abs(ys[e] - ys[k]) < 0.01) e++;
+      const x0 = d.minX + k * seg, x1 = d.minX + e * seg, w = x1 - x0 + 0.02, x = (x0 + x1) / 2, y = ys[k];
+      const deck = MeshBuilder.CreateBox(`coast_deck_${d.id}_${k}`, { width: w, height: 0.24, depth: l }, scene);
       deck.position.set(x, y - 0.12, zMid(d));
       deckParts.push(deck);
       for (const side of [d.minZ + 0.08, d.maxZ - 0.08]) {
-        const rail = MeshBuilder.CreateBox(`coast_rail_${d.id}_${k}`, { width: seg + 0.02, height: 0.12, depth: 0.12 }, scene);
+        const rail = MeshBuilder.CreateBox(`coast_rail_${d.id}_${k}`, { width: w, height: 0.12, depth: 0.12 }, scene);
         rail.position.set(x, y + 0.95, side); deckParts.push(rail);
       }
+      k = e;
     }
     for (const side of [d.minZ + 0.08, d.maxZ - 0.08]) {
       for (let x = d.minX + 0.3; x <= d.maxX - 0.2; x += 3.2) {
@@ -322,6 +327,7 @@ export function mountZoneView(scene: Scene, opts: { streamOn: boolean }): ZoneVi
   const jobs = PROP_MODELS.map((m) => loadMasters(scene, m).then((list) => { masters.set(m.id, list); fill(m); }).catch((e) => console.warn(`[COAST] ${m.file}`, e)));
 
   let seaT = 0, bob = 0;
+  const ahead: Piece[] = [];
   const sky: AbstractMesh[] = [];
   const view: ZoneView = {
     root,
@@ -334,14 +340,19 @@ export function mountZoneView(scene: Scene, opts: { streamOn: boolean }): ZoneVi
         const t = opts.streamOn ? tiers.get(key) ?? 'far' : 'full';
         // the fine mesh: built from the LOD ring in (load ahead), shown in the full ring, dropped when the piece is far
         let f = fine.get(key);
-        if (t !== 'far' && !f) { f = buildTerrain(p, FINE_DIV); fine.set(key, f); }
+        // the full ring's fine ground now; the LOD ring's one piece a frame (frame()), so arriving and crossing never block
+        if (t === 'full' && !f) { f = buildTerrain(p, FINE_DIV); fine.set(key, f); }
+        if (t === 'lod' && !f && !ahead.includes(p)) ahead.push(p);
         if (t === 'far' && f) { f.dispose(); fine.delete(key); f = undefined; }
         f?.setEnabled(t === 'full');
-        coarse.get(key)!.setEnabled(t !== 'full');
+        coarse.get(key)!.setEnabled(!(t === 'full' && f));
       }
       if (changed.length) for (const m of PROP_MODELS) fill(m);
     },
     frame(camX, camZ, dt) {
+      // load ahead: one LOD-ring piece's fine ground a frame (built hidden; shown when its piece becomes full)
+      const next = ahead.shift();
+      if (next && !fine.has(next.key) && (tiersNow.get(next.key) ?? 'far') !== 'far') { const m = buildTerrain(next, FINE_DIV); m.setEnabled(false); fine.set(next.key, m); }
       // the sea and its floor travel with the camera, snapped to the wave tile (the pattern stays put on the water)
       const sx = Math.round(camX / WAVE_TILE_M) * WAVE_TILE_M, sz = Math.round(camZ / WAVE_TILE_M) * WAVE_TILE_M;
       sea.position.x = sx; sea.position.z = sz; floor.position.x = sx; floor.position.z = sz;

@@ -147,7 +147,11 @@ export const CoastZoneMode: ModeDefinition = {
 
     // the place first, around where you arrive (the plan's "you and your 3 × 3 first" loading rule)
     const streamOn = feel('coast.streamOn', COAST_STREAM_ON) >= 0.5;
+    // give the page a turn between the heavy steps (a tap on the way back is answered while the zone loads)
+    const breathe = () => new Promise<void>((r) => setTimeout(r, 0));
+    await breathe();
     const view = mountZoneView(scene, { streamOn });
+    await breathe();
     const streamer = new ZoneStreamer({
       full: Math.round(feel('coast.streamFull', COAST_STREAM_FULL)),
       lod: Math.round(feel('coast.streamLod', COAST_STREAM_LOD)),
@@ -156,6 +160,7 @@ export const CoastZoneMode: ModeDefinition = {
     const [pi, pj] = pieceAt(world.spawn.pos.x, world.spawn.pos.z);
     streamer.step(pi, pj);
     view.stream(streamer.tiers, zonePieces().map((p) => p.key));
+    await breathe();
 
     // the player: the Creator's look through the identity layer, at the hoops builder's playing height (drawing only)
     const body = new TransformNode('coast_player', scene);
@@ -170,6 +175,7 @@ export const CoastZoneMode: ModeDefinition = {
     }).catch(() => { /* today's height */ });
     const move = bindMovementView({ animator: me.animator, poseNode: pose, actor: () => host.world.actors.get(host.playerId), telemetry: () => host.movement.inspect(host.playerId), clock: () => host.tSec });
 
+    await breathe();
     const partner = pick.partner ? await mountPartnerBody(scene, host, pick.partner, COAST_MODE_ID) : null;
     const herd = feel('coast.creaturesOn', COAST_CREATURES_ON) >= 0.5 ? new CreatureHerd() : null;
     const creatures = herd ? new CreatureBodies(scene, herd) : null;

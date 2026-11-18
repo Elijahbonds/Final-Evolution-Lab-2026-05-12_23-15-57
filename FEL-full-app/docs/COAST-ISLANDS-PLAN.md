@@ -136,6 +136,38 @@ the baked prop masters were disposed with the import's root (held now by `zonePr
 
 ---
 
+## 4b. Phase B, built (lane/coast-b, 2026-11-18)
+
+**What it adds.**
+- **One partner walks with you.** It is the Adventure's own partner: the brain (`adventure/partner/brain.ts`: a slot behind
+  and to the right, a sprint when it falls behind), its speed and its body, spawned by the host from the Adventure save. A
+  player with no partner yet walks with the Adventure's default creature (strideraptor) on loan, never written to the save.
+  The zone adds a keeper (`lib/adventure/coast/zonePartner.ts`): the partner reappears 3 m behind you, on ground you walked
+  over, when you leave it 24 m behind, when it is in deep water, after a turn-back that left it, or when something blocks it
+  for a second while it is more than 6 m back. It never blocks you (the movement sim has no body-to-body collision; it
+  keeps its slot).
+- **Four creatures** (`zoneCreatures.ts`): the Shellhopper in the shallows below the Landing, the Ember Gull on the dunes,
+  the Palm Glider on Palm Key, the Reef Stone on Reef Rock (all names `[PLACEHOLDER]`). Each wears the Adventure's shipped
+  creature body (a colour per element, wings from stage 2), wanders near home on ground it can stand on, and is drawn only
+  while its piece is drawn. They do not fight.
+- **The creature log** (`creatureLog.ts`, `zoneLife.ts`): within 16 m a creature is *seen*, within 3 m you have *met* it. The
+  page has a "Log n/4" button (top right) and a panel listing each creature: its name once found, where it lives, Seen or
+  Met; a short note says when one goes in. **It is saved in the Adventure save**, the same document and path as all
+  Adventure progress, as story flags `coast.log.<id>`: on the device first, and to the account under the Adventure save
+  policy — which today keeps everyone's Adventure save on the device, because the account-side Adventure save (its table)
+  is not built yet (`save/policy.ts` `ADVENTURE_SERVER_SAVE_ENABLED`, the owner's step). No schema change, no new save
+  version.
+- **A phase A fix the partner found:** the dock and the bridge stood 0.7 m above the sand all the way to their landward ends,
+  above the movement sim's 0.45 m step, so anyone walking up beside the bridge was stuck against its side (a slow walk
+  reached 2 of 6 points). A deck now lies 0.15 m on the sand, rises with the water's depth through the shallows, and is
+  level over the water. With it, the partner follows the whole route by itself.
+
+**Knobs** (Coast · zone, `docs/FEEL-PANEL.md`): `coast.partnerOn` 1, `coast.partnerCatchupM` 24, `coast.partnerStuckSec` 1,
+`coast.creaturesOn` 1, `coast.logSeenM` 16, `coast.logMeetM` 3. Each 0 or off restores phase A.
+
+**Next (phase C):** the creatures as real Adventure bodies (a non-humanoid rig, GATE 0), befriending one into the log, the
+partner's look and name chosen by the owner, and a dedicated `log` field in the save once the log outgrows a handful.
+
 ## 5. Flags and assumptions
 
 - `assumption:` the zone's layout — which side the mainland is on, the islands' places and sizes, the dock, the bridge and

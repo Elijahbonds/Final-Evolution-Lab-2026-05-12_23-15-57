@@ -6,14 +6,12 @@
 // player stands at the boat on the dock, the touch deck with the floating stick on a phone, and the party bar (the root layout's).
 
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { BookOpen, ChevronLeft, Ship, X } from 'lucide-react';
+import { BookOpen, Ship, X } from 'lucide-react';
 import { runMode, InputBus, type ModePhase } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { zoneUi } from '@/lib/adventure/coast/zoneUi';
-import { veniceReturnHref } from '@/lib/adventure/coast/door';
 import { logCount } from '@/lib/adventure/coast/creatureLog';
 
 /** How long the "new in your log" note stays up (ms). */
@@ -21,14 +19,13 @@ const NOTE_MS = 3500;
 
 const MODE_KEY = 'coast_zone';
 
-export function CoastStage({ signedIn }: { signedIn: boolean }) {
+export function CoastStage({ signedIn, back }: { signedIn: boolean; back: string }) {
   const router = useRouter();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
   const [phase, setPhase] = useState<ModePhase>('loading');
   const [err, setErr] = useState<string | null>(null);
   const [touch, setTouch] = useState(false);
-  const [back, setBack] = useState('/play/venice');
   const ui = useSyncExternalStore(zoneUi.subscribe, zoneUi.getSnapshot, zoneUi.getSnapshot);
   const [logOpen, setLogOpen] = useState(false);
   const [note, setNote] = useState<typeof ui.sighting>(null);
@@ -41,7 +38,6 @@ export function CoastStage({ signedIn }: { signedIn: boolean }) {
 
   useEffect(() => {
     try { setTouch(window.matchMedia('(pointer: coarse)').matches); } catch { setTouch(false); }
-    setBack(veniceReturnHref(window.location.search));
   }, []);
 
   useEffect(() => {
@@ -77,11 +73,7 @@ export function CoastStage({ signedIn }: { signedIn: boolean }) {
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden bg-black text-white">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none outline-none" aria-label="The Coast: walk the beach and the islands" tabIndex={0} />
-      {/* the way back (every-screen: no dead end) — Venice, where the boat came from */}
-      <Link href={back} data-testid="coast-back" aria-label="Back to Venice"
-        className="absolute left-3 top-3 z-10 inline-flex min-h-[44px] min-w-[44px] items-center gap-1 rounded-full bg-black/60 px-3 text-base font-bold text-white">
-        <ChevronLeft aria-hidden className="h-5 w-5" /> Venice
-      </Link>
+      {/* the way back to Venice is the loader's (loader.tsx): on screen before this stage has loaded */}
       {err && <p role="alert" className="absolute inset-x-4 top-[4.25rem] rounded-lg bg-black/80 p-3 text-base">The coast did not load. {err}</p>}
       {phase === 'loading' && !err && <p className="absolute inset-x-0 top-1/2 text-center text-base text-white/80">Sailing to the coast…</p>}
       {phase === 'playing' && ui.log.length > 0 && (
