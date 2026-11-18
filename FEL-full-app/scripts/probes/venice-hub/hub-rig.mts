@@ -119,14 +119,16 @@ try {
       if (/^(life|watch|desktop-)/.test(name)) {
         const landed = await page.waitForFunction(() => (window as unknown as { __life?: boolean }).__life === true, null, { timeout: 150000 }).then(() => true).catch(() => false);
         if (!landed) console.log(`run ${name}: life never landed (measured without it)`);
-        if (!/courtoff/.test(name)) await page.waitForFunction(() => (window as unknown as { __court?: boolean }).__court === true, null, { timeout: 120000 }).catch(() => console.log(`run ${name}: court life never landed`));
+        if (!/courtoff|nocourt|gulls|^watch|desktop-life/.test(name)) await page.waitForFunction(() => (window as unknown as { __court?: boolean }).__court === true, null, { timeout: 120000 }).catch(() => console.log(`run ${name}: court life never landed`));
         await page.waitForTimeout(3000);   // the crowd's bake + its first frames
       }
       let worst = { draws: 0, active: 0, textureMb: 0, textures: 0, meshes: 0, skinned: 0 };
       if (!name.startsWith('walkup')) await page.evaluate(() => (window as unknown as { __bus: { emit(e: unknown): void } }).__bus.emit({ t: 'stick', side: 'L', x: 0, y: 1 }));
       for (let k = 0; k < 30; k++) {
         await page.waitForTimeout(200);
-        const s = await within(page.evaluate(STATS), 15000, 'stats') as typeof worst;
+        // a desktop run is a picture: a stalled stats read on the shared box skips the numbers, not the shot
+        let s: typeof worst;
+        try { s = await within(page.evaluate(STATS), 15000, 'stats') as typeof worst; } catch (e) { if (desk) { console.log(`run ${name}: stats skipped (${(e as Error).message})`); break; } throw e; }
         worst = { draws: Math.max(worst.draws, s.draws), active: Math.max(worst.active, s.active), textureMb: Math.max(worst.textureMb, s.textureMb), textures: Math.max(worst.textures, s.textures), meshes: Math.max(worst.meshes, s.meshes), skinned: Math.max(worst.skinned, s.skinned) };
       }
       await page.evaluate(() => (window as unknown as { __bus: { emit(e: unknown): void } }).__bus.emit({ t: 'stick', side: 'L', x: 0, y: 0 }));
