@@ -3,11 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { buildHubWorld, courtsRect, returnSpawnFor, v1Area, v1Spots, V1_RIM_H } from './hubWorld';
 import {
   clearReturn, FROM_VENICE, hubHrefFor, launchHref, PARTY_MODE_FOR_SPOT, readReturn, RETURN_KEY, RETURN_TTL_MS, spotFromSearch,
-  veniceReturnHref, writeReturn, type StoreLike,
+  veniceReturnHref, writeReturn, writeReturnToRoute, type StoreLike,
 } from './hubReturn';
 import { veniceDoorOn, VENICE_DOOR_HREF } from './door';
 import { districtAt } from './layout';
 import { ONLINE_MODES } from '@/server/netd/src/partyRules';
+import { MODE_INFO } from '@/lib/game-data';
 
 const mem = (): StoreLike & { m: Map<string, string> } => {
   const m = new Map<string, string>();
@@ -60,6 +61,20 @@ describe('walking up and coming back', () => {
     expect(u.searchParams.get('spot')).toBe('court.ones');
     expect(u.searchParams.get('location')).toBe('venice');
   });
+  it('opens every V1 court mode on that mode route, not only the first court entry', () => {
+    const modes = v1Spots().flatMap((s) => s.modes);
+    expect(modes).toEqual(['hoops1v1', 'hoops3v3', 'dunkContest', 'dunkduel', 'threePoint', 'carnival']);
+    for (const s of v1Spots()) {
+      for (const mode of s.modes) {
+        const route = MODE_INFO[mode]?.href ?? '';
+        expect(route, mode).not.toBe('');
+        const u = new URL(launchHref(s, route), 'http://x');
+        expect(u.pathname, mode).toBe(route);
+        expect(u.searchParams.get('spot'), mode).toBe(s.id);
+        expect(u.searchParams.get('location'), mode).toBe('venice');
+      }
+    }
+  });
   it('the end screen goes back to the court the game came from: by the query, or by the return mark', () => {
     const st = mem();
     writeReturn(v1Spots()[0], 0, st);
@@ -72,6 +87,13 @@ describe('walking up and coming back', () => {
     expect(veniceReturnHref('/play/onevone', '', 2000, st)).toBeNull();   // another game: not this trip
     expect(veniceReturnHref('/play/threevthree', '', 1000 + RETURN_TTL_MS + 1, st)).toBeNull();   // stale
     clearReturn(st);
+    expect(st.m.has(RETURN_KEY)).toBe(false);
+  });
+  it('returns from a court alternate mode such as Carnival, not only the spot default route', () => {
+    const st = mem();
+    const arc = v1Spots().find((s) => s.id === 'court.arc')!;
+    writeReturnToRoute(arc, MODE_INFO.carnival.href, 1000, st);
+    expect(veniceReturnHref('/play/carnival', '', 2000, st)).toBe(hubHrefFor('court.arc'));
     expect(st.m.has(RETURN_KEY)).toBe(false);
   });
   it('consumes a stored return mark once, so a later shelf launch on the same route does not leak back to Venice', () => {

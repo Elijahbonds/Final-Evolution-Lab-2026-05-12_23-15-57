@@ -29,15 +29,19 @@ export interface ReturnMark { spot: string; route: string; at: number }
 
 const session = (): StoreLike | null => { try { return typeof window !== 'undefined' ? window.sessionStorage : null; } catch { return null; } };
 
-/** The page a court opens. */
-export function launchHref(s: Pick<Spot, 'id' | 'route' | 'kind'>): string {
+/** The page a court opens. Some V1 courts host more than one shelf mode, so callers may pass that mode's own route. */
+export function launchHref(s: Pick<Spot, 'id' | 'route' | 'kind'>, route = s.route): string {
   const q = new URLSearchParams({ [FROM_PARAM]: FROM_VENICE, [SPOT_PARAM]: s.id });
   if (s.kind === 'court') q.set('location', 'venice');
-  return `${s.route}?${q.toString()}`;
+  return `${route}?${q.toString()}`;
 }
 
 export function writeReturn(s: Pick<Spot, 'id' | 'route'>, now: number, store: StoreLike | null = session()): void {
-  try { store?.setItem(RETURN_KEY, JSON.stringify({ spot: s.id, route: s.route, at: now } satisfies ReturnMark)); } catch { /* convenience only */ }
+  writeReturnToRoute(s, s.route, now, store);
+}
+
+export function writeReturnToRoute(s: Pick<Spot, 'id'>, route: string, now: number, store: StoreLike | null = session()): void {
+  try { store?.setItem(RETURN_KEY, JSON.stringify({ spot: s.id, route, at: now } satisfies ReturnMark)); } catch { /* convenience only */ }
 }
 
 export function readReturn(now: number, store: StoreLike | null = session()): ReturnMark | null {
