@@ -62,6 +62,8 @@ try {
     // improvement pass phase 6: life off / on (everything else as shipped), and on a desktop (the watchers: desktop and up only)
     // (beside Court 2, looking across it at the run's watchers and west toward the gulls)
     ['life-off', `spot=court.run&${feelQ({ 'venue.veniceLife': 0 })}`, false], ['life', 'spot=court.run', true], ['desktop-life', 'spot=court.run', true],
+    // V2 phase 1: a phone's watchers off (gulls only) / on, at the run (the worst view: all of them in front of the camera)
+    ['watch-gulls', `spot=court.run&${feelQ({ 'venue.venicePhoneWatchers': 0 })}`, false], ['watch-phone', 'spot=court.run', true],
     // the same-session yardstick (1v1's load on the same rig), last in each round so a stall there cannot hold the hub's runs
     ['onevone-yardstick', 'mode=onevone', false],
     ['shared', '', true], ['control-unshared', `feel=${encodeURIComponent(JSON.stringify({ 'perf.veniceSharedCourt': 0 }))}`, false], ['walkup', 'spot=court.ones', true],
@@ -106,6 +108,12 @@ try {
       // the engine's draw counter each frame.
       await page.evaluate('window.__SI = window.__SI || window.__FEL_DEV__.instrument()');
       await page.waitForTimeout(4000);
+      // V2: a life run is measured once the life is in the scene (it lands after the deferred scenery), else a stand-still at landing
+      if (/^(life|watch|desktop-)/.test(name)) {
+        const landed = await page.waitForFunction(() => (window as unknown as { __life?: boolean }).__life === true, null, { timeout: 150000 }).then(() => true).catch(() => false);
+        if (!landed) console.log(`run ${name}: life never landed (measured without it)`);
+        await page.waitForTimeout(3000);   // the crowd's bake + its first frames
+      }
       let worst = { draws: 0, active: 0, textureMb: 0, textures: 0, meshes: 0 };
       if (!name.startsWith('walkup')) await page.evaluate(() => (window as unknown as { __bus: { emit(e: unknown): void } }).__bus.emit({ t: 'stick', side: 'L', x: 0, y: 1 }));
       for (let k = 0; k < 30; k++) {
@@ -132,8 +140,8 @@ try {
         (result[name] as Record<string, unknown>).landedMs = m ? Number(m[1]) : null;
       }
       if (shot) {
-        if (name.startsWith('shared') || name.startsWith('look-') || name.startsWith('life') || desk) { await page.reload(); await page.waitForFunction(() => !!(window as unknown as { __ttfp?: number }).__ttfp, null, { timeout: 240000 }); if (name.startsWith('life') || desk) await page.waitForFunction(() => (window as unknown as { __life?: boolean }).__life === true, null, { timeout: 150000 }).catch(() => {}); await page.waitForTimeout(4000); }
-        const tag = name.startsWith('walkup') ? name0 : name.startsWith('look-') || name.startsWith('life') || desk ? name.split('#')[0] : 'courts';
+        if (name.startsWith('shared') || name.startsWith('look-') || /^(life|watch)/.test(name) || desk) { await page.reload(); await page.waitForFunction(() => !!(window as unknown as { __ttfp?: number }).__ttfp, null, { timeout: 240000 }); if (/^(life|watch)/.test(name) || desk) await page.waitForFunction(() => (window as unknown as { __life?: boolean }).__life === true, null, { timeout: 150000 }).catch(() => {}); await page.waitForTimeout(4000); }
+        const tag = name.startsWith('walkup') ? name0 : /^(look-|life|watch)/.test(name) || desk ? name.split('#')[0] : 'courts';
         const file = path.join(OUT, `venice-v1-${tag}${desk ? '' : '-phone'}.jpg`);
         await page.screenshot({ path: file, type: 'jpeg', quality: 85 });
         console.log('wrote', file);

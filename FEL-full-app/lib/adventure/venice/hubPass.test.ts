@@ -182,3 +182,21 @@ describe('phase 8: solids and the walk-up', () => {
   });
   it('ship on (1)', () => { expect(VENICE_SOLIDS).toBe(1); expect(WALKUP_V2).toBe(1); });
 });
+
+describe('V2 phase 1: a phone\'s watchers are a few real people', () => {
+  it('six seats, every one a fan at the crowd\'s desktop tier (none a card), off every fence', async () => {
+    const { phoneWatchersVenue, PHONE_WATCHERS, VENICE_PHONE_WATCHERS } = await import('./hubLife');
+    const { splitSeats } = await import('@/lib/babylon/visual/crowd/crowdLayout');
+    const seats = layoutSeats(phoneWatchersVenue(), 23);
+    expect(seats).toHaveLength(PHONE_WATCHERS.run + PHONE_WATCHERS.ones);
+    expect(seats.length).toBeGreaterThanOrEqual(4);
+    expect(seats.length).toBeLessThanOrEqual(6);
+    const { fans, cards } = splitSeats(seats, 'desktop');
+    expect(fans).toHaveLength(seats.length);
+    expect(cards).toHaveLength(0);
+    for (const seat of seats) for (const s of v1Spots()) {
+      expect(Math.abs(seat.pos[0] - s.at[0]) < FENCE.halfW && Math.abs(seat.pos[2] - s.at[1]) < FENCE.halfL).toBe(false);
+    }
+    expect(VENICE_PHONE_WATCHERS).toBe(1);
+  });
+});

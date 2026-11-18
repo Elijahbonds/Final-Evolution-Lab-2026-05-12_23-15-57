@@ -669,6 +669,8 @@ holds the result in CI. Phone tier only unless said.
 - `venue.veniceLife` 1 (`lib/adventure/venice/hubLife.ts`, the Venice hub; improvement pass phase 6, NEW): gulls wheeling over the sea (one
   thin-instanced billboard draw; a phone flies 3, desktop 6) and, on desktop and up only, people standing at Court 2's sideline and by the
   other courts (the shipped crowd bodies). A phone gets no people (its crowd tier is cut-out cards). 0 = V1's empty park.
+- `venue.venicePhoneWatchers` 1 (`lib/adventure/venice/hubLife.ts`, the Venice hub; V2, NEW, owner 2026-11-18): a phone stands six real
+  people at the courts (four at the run, two by Court 1) — the crowd's baked bodies, never its cut-out cards. 0 = gulls only.
 - `venue.veniceSound` 1 (`lib/adventure/venice/hubSound.ts`, the Venice hub; improvement pass phase 7, NEW): the ocean bed, dribbles and
   shots from unseen pickup games down the beach, the run cheering now and then near Court 2, and footsteps (concrete vs sand), all through
   SoundKit (mute and volume apply; the recorded hoops bank once loaded). 0 = V1 (the harness's mood crowd bed).
