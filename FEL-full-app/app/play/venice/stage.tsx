@@ -21,6 +21,7 @@ import { feel } from '@/lib/feel-panel/feel';
 import { FirstVisitHint, MiniMap, useCardKeys, useFirstVisitHint, VENICE_WAYFINDING } from './wayfinding';
 
 const MODE_KEY = 'venice_hub';
+const AGENT_MARK = 'fel-venice-agent';
 
 export function VeniceStage({ signedIn }: { signedIn: boolean }) {
   const router = useRouter();
@@ -37,8 +38,13 @@ export function VeniceStage({ signedIn }: { signedIn: boolean }) {
   const [wayfinding, setWayfinding] = useState(false);
   useEffect(() => { setWayfinding(feel('venue.veniceWayfinding', VENICE_WAYFINDING) >= 0.5); }, []);
   // a probe's run (?agent=1): the hub's walk seam (window.__VENICE__). lib/agentRunHooks honours it on a loopback host only.
+  // The mark lasts the tab (sessionStorage), so a probe that goes hub → game → hub by the app's own links finds the seam again
+  // (a game's session start resets the hook flag, and the way back carries no ?agent=1). Still loopback-only.
   useEffect(() => {
-    try { if (new URLSearchParams(window.location.search).get('agent') === '1') void import('@/lib/agentRunHooks').then((m) => m.setAgentRunHooksAllowed(true)); } catch { /* not a probe */ }
+    try {
+      const probe = new URLSearchParams(window.location.search).get('agent') === '1' || sessionStorage.getItem(AGENT_MARK) === '1';
+      if (probe) { sessionStorage.setItem(AGENT_MARK, '1'); void import('@/lib/agentRunHooks').then((m) => m.setAgentRunHooksAllowed(true)); }
+    } catch { /* not a probe */ }
   }, []);
 
   useEffect(() => {

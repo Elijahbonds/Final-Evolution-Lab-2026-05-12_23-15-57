@@ -36,6 +36,32 @@ async function sample(page: Page, cdp: CDPSession) {
   return { heapMb: Math.round((heap.usedSize / 1048576) * 10) / 10, windowListeners: lw.listeners.length, documentListeners: ld.listeners.length, canvases: await page.evaluate(() => document.querySelectorAll('canvas').length), scene };
 }
 
+type VS = { x: number; z: number; walking: boolean; spot: string | null };
+/** The seam's walk to a court's ring (its route round the fences), and what a player does at a palm trunk in the way: a side step,
+ *  then on again (the route is re-planned from where they are). Resolves when the player stands in that court's place, its card up. */
+async function walkToCourt(page: Page, court: string): Promise<void> {
+  const st = () => page.evaluate(() => (window as unknown as { __VENICE__: { state(): VS } }).__VENICE__.state());
+  await page.evaluate((id) => (window as unknown as { __VENICE__: { walkTo(i: string): boolean } }).__VENICE__.walkTo(id), court);
+  let last = await st(), still = 0, sidesteps = 0;
+  for (let k = 0; k < 480; k++) {
+    await page.waitForTimeout(250);
+    const s = await st();
+    if (!s.walking && s.spot === court) return;
+    still = Math.hypot(s.x - last.x, s.z - last.z) < 0.05 && s.walking ? still + 1 : 0;
+    last = s;
+    if (still >= 8) {   // 2 s against something
+      sidesteps++;
+      const a = sidesteps * 1.9;
+      await page.evaluate(([x, z]) => (window as unknown as { __VENICE__: { walkToPoint(x: number, z: number): void } }).__VENICE__.walkToPoint(x, z), [s.x + Math.cos(a) * 2.5, s.z + Math.sin(a) * 2.5]);
+      await page.waitForTimeout(1200);
+      await page.evaluate((id) => (window as unknown as { __VENICE__: { walkTo(i: string): boolean } }).__VENICE__.walkTo(id), court);
+      still = 0;
+    }
+  }
+  await page.screenshot({ path: path.join(OUT, `walk-fail-${court}.jpg`), type: 'jpeg', quality: 60 });
+  throw new Error(`never reached ${court}: ${JSON.stringify(await st())}`);
+}
+
 dbUp();
 const stop = await serve(path.join(OUT, 'server.log'));
 const rows: Record<string, unknown>[] = [];
@@ -48,25 +74,34 @@ try {
     const page = await ctx.newPage();
     const cdp = await ctx.newCDPSession(page);
     const errors: string[] = [];
+    const consoleTail: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e).slice(0, 160)));
     await page.goto(`${ORIGIN}/play/venice?agent=1`);
+    page.on('console', (m) => { if (m.type() === 'error' || /\[VENICE\]|FEL-PERF|phase/i.test(m.text())) consoleTail.push(`${m.type()}: ${m.text().slice(0, 200)}`); if (consoleTail.length > 40) consoleTail.shift(); });
     for (let trip = 1; trip <= TRIPS; trip++) {
       const court = COURTS[(trip - 1) % COURTS.length];
+      try {
       await page.waitForFunction(() => !!(window as unknown as { __VENICE__?: unknown }).__VENICE__, null, { timeout: 120000 });
-      await page.evaluate((id) => (window as unknown as { __VENICE__: { walkTo(i: string): boolean } }).__VENICE__.walkTo(id), court);
-      await page.getByTestId('venice-play').waitFor({ timeout: 90000 });
+      await walkToCourt(page, court);
+      await page.getByTestId('venice-play').waitFor({ timeout: 10000 });
       await page.getByTestId('venice-play').click();
       await page.waitForURL((u) => u.pathname === ROUTE[court], { timeout: 30000 });
       await page.getByRole('button', { name: /TAP TO START/i }).waitFor({ timeout: 180000 });
       await page.waitForFunction(() => /\/play\/venice/.test(document.querySelector('a[data-testid="game-header-back"]')?.getAttribute('href') ?? ''), null, { timeout: 20000 });
-      // the trip back: the Leave link with ?agent=1 kept, so the hub's seam answers (the probe's only change to the page)
-      await page.evaluate(() => { const a = document.querySelector('a[data-testid="game-header-back"]') as HTMLAnchorElement; a.setAttribute('href', `${a.getAttribute('href')}&agent=1`); });
+      // the trip back: the app's own link (the hub finds its probe seam again from the tab's mark, stage.tsx)
       await page.getByTestId('game-header-back').click();
       await page.waitForURL((u) => u.pathname === '/play/venice', { timeout: 30000 });
       await page.waitForFunction(() => !!(window as unknown as { __VENICE__?: unknown }).__VENICE__, null, { timeout: 120000 });
-      await page.waitForTimeout(3000);   // the deferred scenery lands
-      const s = await sample(page, cdp);
-      rows.push({ trip, court, ...s });
+      // the deferred scenery and the life land (the seam's life count turns non-zero), then a beat
+      await page.waitForFunction(() => ((window as unknown as { __VENICE__?: { counts?: () => { life: number } } }).__VENICE__?.counts?.().life ?? 0) > 0, null, { timeout: 30000 }).catch(() => {});
+      await page.waitForTimeout(2000);
+      rows.push({ trip, court, ...(await sample(page, cdp)) });
+      } catch (e) {
+        await page.screenshot({ path: path.join(OUT, `trip-fail-${trip}.jpg`), type: 'jpeg', quality: 60 }).catch(() => {});
+        console.log(`trip ${trip} (${court}) FAILED at ${page.url()}: ${String((e as Error).message).split('\n')[0]}\n  errors: ${errors.join(' | ')}\n  console: ${consoleTail.join('\n    ')}`);
+        throw e;
+      }
+      const s = rows.at(-1) as Awaited<ReturnType<typeof sample>>;
       console.log(`trip ${trip} (${court}): heap ${s.heapMb} MB, listeners window ${s.windowListeners} / document ${s.documentListeners}, canvases ${s.canvases}, scene ${JSON.stringify(s.scene)}`);
     }
     const heap = rows.map((r) => r.heapMb as number);
