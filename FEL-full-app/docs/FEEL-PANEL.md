@@ -690,6 +690,7 @@ holds the result in CI. Phone tier only unless said.
   court or in its gold ring after 0.25 s, and holds until a metre past. 0 = V1 (a 28 m box round the court, behind the fence too, at once).
 - `venue.veniceWayfinding` 1 (`lib/adventure/venice/hubUi.ts`, shown by `app/play/venice/wayfinding.tsx`, the Venice hub; improvement pass phase 9, NEW): the first-visit hint (once per
   device), the north-up mini-map of the four courts with you on it, and the card's keys (Enter or X plays, Y plays with your party). 0 = V1.
+- `venue.coastDoor` 1 (`lib/adventure/venice/coastDoor.ts`, drawn by `coastDoorView.ts`, the card in `app/play/venice/stage.tsx`; lane/coast-door, NEW): the boat to the Coast and Islands. A jetty and a boat on the sand west of the courts (a stand-in for the pier end until the Pier district is walkable); step into its gold ring and the card's "Take the boat to the coast" opens `/play/coast?from=venice&spot=pier.end`; the coast's way back (`?spot=pier.end`) lands you beside the ring, facing the boat. 0 = no boat, no card, and `?spot=pier.end` lands at the court gate as before. One draw (the landing, merged), the ring an instance of the courts' own.
 - `venue.deferScenery` 1 (`lib/adventure/venice/courtsView.ts`, the Venice hub; venice-v1 improvement pass phase 3, NEW): the courts load in
   their plain base colour and the player first; the painted courts, the palms and the boardwalk row arrive once the player can move.
   0 = everything during the load, as V1.

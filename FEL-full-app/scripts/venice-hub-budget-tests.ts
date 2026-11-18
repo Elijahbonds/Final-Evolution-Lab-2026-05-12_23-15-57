@@ -33,6 +33,7 @@ import { BOARD_ROW, VENICE_LOOK_V2 } from '../lib/adventure/venice/courtsDressin
 import { VENICE_LIFE, GULLS, VENICE_PHONE_WATCHERS, PHONE_WATCHERS } from '../lib/adventure/venice/hubLife';
 import { COURT_LIFE } from '../lib/adventure/venice/courtLife';
 import { CROWD_BODY_URLS } from '../lib/babylon/visual/crowd/crowdBake';
+import { VENICE_COAST_DOOR } from '../lib/adventure/venice/coastDoor';
 import { layoutClips } from '../lib/babylon/visual/crowd/crowdVat';
 
 /** V2: the phone watchers' textures — the crowd's ONE base-colour image (crowdBake keeps the first body's, at its own 1024², not
@@ -95,6 +96,13 @@ if (isMain) {
   ok(PLACE_TEX_MB <= Math.ceil(now.total * 1.05) + 1, `PLACE_TEX_MB ${PLACE_TEX_MB} is the measurement + 5 %, not a raise (computed ${now.total.toFixed(1)})`);
   ok(control.total > PLACE_TEX_MB, `CONTROL: a mesh and detail map per court (${control.total.toFixed(1)} MB) is over PLACE_TEX_MB — the guard sees the regression it guards`);
   ok(PLACE_GLBS.length === 5 && !PLACE_GLBS.some((u) => /crowd_cards/.test(u)), 'the view loads five GLBs: the hoop, three palm LODs, the boardwalk kit (no crowd strip)');
+  // lane/coast-door: the boat to the coast (venue.coastDoor) is one merged, vertex-coloured mesh and an instance of the courts' ring:
+  // no texture and no model of its own, so the place's texture memory above is unchanged by it. Read from its source, so a sign
+  // canvas or a boat model added later fails here first.
+  const doorSrc = readFileSync(resolve(__dirname, '../lib/adventure/venice/coastDoorView.ts'), 'utf8').replace(/\/\/.*$|\/\*[\s\S]*?\*\//gm, '');
+  ok(VENICE_COAST_DOOR === 1, 'venue.coastDoor ships on: the boat to the coast');
+  ok(!/Texture|SceneLoader|ImportMesh|spawnMeshyProp|\.glb/.test(doorSrc), 'the boat landing loads no texture and no model (one merged, vertex-coloured mesh)');
+  ok((doorSrc.match(/MergeMeshes\(/g) ?? []).length === 1 && (doorSrc.match(/new StandardMaterial\(/g) ?? []).length === 1, 'the boat landing is ONE mesh with ONE material (one draw); its ring an instance of the courts\' ring');
   ok(!!row, 'the hub has a row in lib/babylon/config/mobileBudget.json (venice_hub)');
   if (row) ok(now.total <= row.budget.textureMb, `the place's textures fit inside the hub's whole-scene texture budget (${row.budget.textureMb} MB)`);
 
