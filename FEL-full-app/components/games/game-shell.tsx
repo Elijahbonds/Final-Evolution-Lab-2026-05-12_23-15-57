@@ -20,6 +20,7 @@ import { ReplayInPlaceContext } from './replay-in-place';
 import { BodyControl } from './body-control';
 import { GraphicsToggle } from './graphics-toggle';
 import { PauseButton } from './pause-button';   // gameplay-clean: a pause a thumb can reach (ESC → START, every harness mode)
+import { PageDiagnostics } from './page-diagnostics';
 import { GameCaptureHud } from '@/components/capture/game-capture-hud';
 import { LearnWhileYouWait } from '@/components/learn/learn-while-you-wait';
 import type { SessionTallies } from '@/lib/game-systems';
@@ -804,11 +805,14 @@ function GameShellInner({
           </div>
         )}
         {profile ? (
-          <ReplayInPlaceContext.Provider value={registerReplay}>
-            <ThreeDErrorBoundary key={gameKey}>
-              <Game grade={profile.grade} prq={profile.prq} prqDisplay={profile.display} onEnd={handleEnd} {...(gameProps ?? {})} />
-            </ThreeDErrorBoundary>
-          </ReplayInPlaceContext.Provider>
+          <>
+            <PageDiagnostics mode={mode} active={!isBabylon(mode) && !result} />
+            <ReplayInPlaceContext.Provider value={registerReplay}>
+              <ThreeDErrorBoundary key={gameKey}>
+                <Game grade={profile.grade} prq={profile.prq} prqDisplay={profile.display} onEnd={handleEnd} {...(gameProps ?? {})} />
+              </ThreeDErrorBoundary>
+            </ReplayInPlaceContext.Provider>
+          </>
         ) : !unreachable ? (
           <div role="status" className="flex h-[60vh] flex-col items-center justify-center gap-3">
             <Loader2 aria-hidden className="h-8 w-8 animate-spin text-[#00E5FF]" />
