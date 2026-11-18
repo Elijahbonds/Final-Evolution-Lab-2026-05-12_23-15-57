@@ -49,7 +49,71 @@ const venueOfMode = (key: string, src: string): { venue: string | null; map: str
   return { venue, map: venue ? venueMapKeys[venue] ?? null : null, kit: kit.length ? [...new Set(kit)].join('+') : null };
 };
 
-const CORES = ['CourtMovement', 'BoardMovement', 'CombatMovement', 'FieldRun', 'CarrierControl', 'GroundRide', 'AirControl', 'RallyCore', 'TennisCore', 'GolfCore', 'DanceCore', 'DunkApproach', 'OnslaughtCore', 'KeeperCore', 'Batting', 'Pitching'];
+const CORE_MODULES = [
+  { label: 'CourtMovement', paths: ['CourtMovement'] },
+  { label: 'BoardMovement', paths: ['BoardMovement'] },
+  { label: 'CombatMovement', paths: ['CombatMovement'] },
+  { label: 'FieldRun', paths: ['FieldRun'] },
+  { label: 'CarrierControl', paths: ['CarrierControl'] },
+  { label: 'GroundRide', paths: ['GroundRide'] },
+  { label: 'AirControl', paths: ['AirControl'] },
+  { label: 'RallyCore', paths: ['RallyCore'] },
+  { label: 'TennisCore', paths: ['TennisCore'] },
+  { label: 'GolfCore', paths: ['GolfCore'] },
+  { label: 'DanceCore', paths: ['DanceCore'] },
+  { label: 'DunkApproach', paths: ['DunkApproach'] },
+  { label: 'OnslaughtCore', paths: ['OnslaughtCore'] },
+  { label: 'KeeperCore', paths: ['KeeperCore'] },
+  { label: 'Batting', paths: ['Batting'] },
+  { label: 'Pitching', paths: ['Pitching'] },
+  { label: 'RushRun', paths: ['RushRun'] },
+  { label: 'BasketballCore', paths: ['BasketballCore'] },
+  { label: 'BallHandling', paths: ['BallHandling'] },
+  { label: 'HandleSystem', paths: ['HandleSystem'] },
+  { label: 'HoopsMoves', paths: ['HoopsMoves'] },
+  { label: 'HoopsDefense', paths: ['HoopsDefense'] },
+  { label: 'PlayerSlot', paths: ['PlayerSlot'] },
+  { label: 'FreeRunCore', paths: ['FreeRunCore'] },
+  { label: 'FreeRunFlow', paths: ['FreeRunFlow'] },
+  { label: 'AirSessionCore', paths: ['air-session-core', 'big-air-skin'] },
+  { label: 'DerbyLoop', paths: ['DerbyLoop'] },
+  { label: 'GolfBall', paths: ['GolfBall'] },
+  { label: 'GolfAim', paths: ['GolfAim'] },
+  { label: 'PenaltyKick', paths: ['PenaltyKick'] },
+  { label: 'ShootoutCore', paths: ['ShootoutCore'] },
+  { label: 'KartModel', paths: ['KartModel'] },
+  { label: 'RaceCourse', paths: ['RaceCourse'] },
+  { label: 'KartAir', paths: ['KartAir'] },
+  { label: 'TiebreakBlitz', paths: ['TiebreakBlitz'] },
+  { label: 'TiebreakFlight', paths: ['TiebreakFlight'] },
+] as const;
+const importStatements = (src: string) => [...src.matchAll(/import\s+(?:type\s+)?[\s\S]*?\s+from\s+['"][^'"]+['"];?/g)].map((m) => m[0]);
+function importBindings(stmt: string): string[] {
+  const spec = stmt.replace(/^import\s+(?:type\s+)?/, '').replace(/\s+from\s+['"][^'"]+['"];?$/, '').trim();
+  const out: string[] = [];
+  const ns = spec.match(/^\*\s+as\s+([A-Za-z0-9_$]+)/);
+  if (ns) out.push(ns[1]);
+  const brace = spec.match(/\{([\s\S]*?)\}/);
+  if (brace) {
+    for (const raw of brace[1].split(',')) {
+      const binding = raw.trim().replace(/^type\s+/, '').split(/\s+as\s+/).pop()?.trim();
+      if (binding) out.push(binding);
+    }
+  }
+  const beforeBrace = spec.split('{')[0].replace(/,$/, '').trim();
+  if (beforeBrace && beforeBrace !== spec && !beforeBrace.startsWith('*')) out.push(beforeBrace);
+  if (!brace && !ns && beforeBrace) out.push(beforeBrace);
+  return out.filter((name) => /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(name));
+}
+function coreModulesUsed(whole: string, src: string): string[] {
+  const statements = importStatements(whole);
+  return CORE_MODULES
+    .filter((core) => statements
+      .filter((stmt) => core.paths.some((p) => stmt.includes(`/${p}`)))
+      .flatMap(importBindings)
+      .some((name) => new RegExp(`\\b${name}\\b`).test(src)))
+    .map((core) => core.label);
+}
 // Camera column = a MEASURED gameplay framing exists for the mode (lib/babylon/config/cameraFraming.json,
 // scripts/probes/_cam-frame.mts). cameraPresets.json describes the retired venue cameras (pre-M104).
 const camFraming = JSON.parse(read('lib/babylon/config/cameraFraming.json'));
@@ -117,12 +181,12 @@ const rows: Row[] = modeEntries.map(({ key, cls }) => {
   const src = file ? implementationSlice(whole, cls) : '';
   const route = `/play/${routeMap[key] ?? key}`;
   const { venue, map, kit } = venueOfMode(key, src);
-  const cores = CORES.filter((c) => new RegExp(`from '\\.\\./core/${c}'|from '\\./${c}'|\\b${c}\\b`).test(src) && src.includes(`${c}`));
+  const cores = coreModulesUsed(whole, src);
   return {
     key, enabled: enabled.has(key), file, route,
     menu: gameData.includes(`href: '${route}'`),
     venue, map, kit, baked: !!map && bakedKeys.has(map),
-    cores: cores.filter((c) => src.includes(`/${c}'`)),
+    cores,
     camera: camKeys.has(key),   // cameraFraming.json is keyed by registry key
     navFirst: /\.constrain\(/.test(src),
     clamps: (src.match(/Math\.max\(-?[A-Z_0-9.]+, *Math\.min\(/g) ?? []).length + (src.match(/^const (COURT|FIELD|ARENA|BOUNDS|HALF)[A-Z_]* *=/gm) ?? []).length,
@@ -137,7 +201,7 @@ const rows: Row[] = modeEntries.map(({ key, cls }) => {
 
 const mark = (b: boolean) => (b ? '✓' : '—');
 const lines = ['# Ship Pass 4 — Phase 1 matrix (generated by scripts/full-picture.mts)', '', `Generated ${new Date().toISOString().slice(0, 10)}. ✓ present · — missing. Clamps = typed bounds constants / clamp calls in the mode file.`, '',
-  '| mode | on | route | menu | venue spec → map | kit builder | baked | movement cores | cam | clamps | phone | gauntlet | play sweep | lock | tests | lines |', '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|'];
+  '| mode | on | route | menu | venue spec → map | kit builder | baked | shared cores | cam | clamps | phone | gauntlet | play sweep | lock | tests | lines |', '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|'];
 for (const r of rows) lines.push(`| ${r.key} | ${mark(r.enabled)} | ${r.route} | ${mark(r.menu)} | ${r.venue ?? '—'} → ${r.map ?? '—'} | ${r.kit ?? '—'} | ${mark(r.baked)} | ${r.cores.join(', ') || '—'} | ${mark(r.camera)} | ${r.clamps}${r.navFirst ? ' (nav-first)' : ''} | ${mark(r.bridge)} | ${mark(r.gauntlet)} | ${mark(r.play)} | ${mark(r.lock)} | ${r.tests} | ${r.lines} |`);
 const gaps: string[] = [];
 for (const r of rows.filter((x) => x.enabled)) {
@@ -148,7 +212,7 @@ for (const r of rows.filter((x) => x.enabled)) {
   if (!r.menu) gaps.push(`${r.key}: no Modes-screen entry for ${r.route}`);
   if (!r.gauntlet) gaps.push(`${r.key}: not in the dev-mode gauntlet`);
   if (!r.lock) gaps.push(`${r.key}: no concept lock`);
-  if (r.cores.length === 0) gaps.push(`${r.key}: no shared movement core (mode-local movement)`);
+  if (r.cores.length === 0) gaps.push(`${r.key}: no shared core module detected (mode-local mechanics)`);
 }
 lines.push('', `## Gaps (${gaps.length})`, '', ...gaps.map((g) => `- ${g}`), '');
 writeFileSync(MD, lines.join('\n'));

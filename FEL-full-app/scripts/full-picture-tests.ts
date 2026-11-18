@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { MODE_CONTROLLERS } from '../lib/controller-link/schemas/registry';
 
@@ -83,6 +85,11 @@ function walkTestFiles(dir: string): string[] {
 }
 
 const testFiles = walkTestFiles(ROOT);
+const matrixOutput = execFileSync(
+  'npx',
+  ['tsx', 'scripts/full-picture.mts', '--md', join(tmpdir(), 'fel-full-picture-tests.md')],
+  { cwd: ROOT, encoding: 'utf8', maxBuffer: 1024 * 1024 * 4 },
+);
 
 function testCountFor(mode: string): number {
   const tokens = testName[mode] ?? [mode, routeMap.get(mode) ?? mode];
@@ -119,6 +126,10 @@ function hasButton(mode: string, action: string, label?: string): boolean {
   ));
 }
 
+function matrixRow(mode: string): string {
+  return matrixOutput.split('\n').find((line) => line.startsWith(`| ${mode} |`)) ?? '';
+}
+
 for (const [key, slug] of Object.entries(expectedSlugs)) {
   assert.equal(routeMap.get(key), slug, `full-picture routeMap must carry ${key} -> ${slug}`);
 }
@@ -149,6 +160,10 @@ assert.deepEqual(missingDevGauntlet, [], 'enabled modes must be in the dev-mode 
 assert.deepEqual(missingPlayGauntlet, [], 'enabled modes must be in the shipping-route gauntlet');
 assert.deepEqual(missingConceptLocks, [], 'enabled modes must have concept locks');
 assert.deepEqual(missingModeTests, [], 'enabled modes must have named regression coverage');
+assert.match(matrixRow('football'), /\| RushRun \|/, 'football must be credited for its shared RushRun core');
+assert.match(matrixRow('snowboard_slalom'), /\| BoardMovement \|/, 'snowboard must be credited for BoardMovement even when the mode slice starts below imports');
+assert.match(matrixRow('bigair'), /\| AirSessionCore \|/, 'bigair must be credited for the shared AirSessionCore skin');
+assert.match(matrixRow('onevone'), /\| .*BasketballCore.* \|/, 'onevone must be credited for its shared basketball core modules');
 assert.ok(hasDpadAction('freerun', 'move'), 'freerun phone d-pad must steer with LEFT STICK movement');
 assert.ok(hasHeldButton('freerun', 'charge'), 'freerun phone schema must expose held RT sprint');
 assert.ok(hasHeldButton('freerun', 'brake'), 'freerun phone schema must expose held LT slide');
