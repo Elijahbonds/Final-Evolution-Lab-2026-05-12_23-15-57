@@ -13,7 +13,7 @@ import { runMode, InputBus, type ModePhase } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hubUi, wayfindingOn } from '@/lib/adventure/venice/hubUi';
-import { hubHrefFor, launchChoices, PARTY_MODE_FOR_SPOT, veniceActivity, writeReturn, writeReturnForHref } from '@/lib/adventure/venice/hubReturn';
+import { hubHrefFor, launchChoices, launchNavigationHref, PARTY_MODE_FOR_SPOT, veniceActivity, writeReturn, writeReturnForHref } from '@/lib/adventure/venice/hubReturn';
 import { MODE_INFO } from '@/lib/game-data';
 import { partyClient } from '@/lib/party/social/client';
 import { isHost } from '@/lib/party/social/state';
@@ -88,7 +88,7 @@ export function VeniceStage({ signedIn }: { signedIn: boolean }) {
     writeReturnForHref(spot, href, Date.now());
     // the browser's Back from the game lands beside this court too (the hub reads ?spot=)
     try { window.history.replaceState(window.history.state, '', hubHrefFor(spot.id)); } catch { /* history is a convenience */ }
-    router.push(href);
+    router.push(launchNavigationHref(href, signedIn));
   };
   const playParty = () => {
     if (!spot || !partyMode) return;
@@ -120,7 +120,7 @@ export function VeniceStage({ signedIn }: { signedIn: boolean }) {
             {choices.map((choice, index) => (
               <button key={choice.mode} type="button" data-testid={index === 0 ? 'venice-play' : `venice-play-${choice.mode}`} onClick={() => play(choice.href)}
                 className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-[#facc15] px-4 text-base font-bold text-black">
-                <Play aria-hidden className="h-4 w-4" /> Play {choice.label}
+                <Play aria-hidden className="h-4 w-4" /> {signedIn ? `Play ${choice.label}` : `Sign in to play ${choice.label}`}
                 {index === 0 && wayfinding && !touch && <span className="ml-1 rounded border border-black/30 px-1 text-xs font-bold" aria-hidden>Enter · X</span>}
               </button>
             ))}

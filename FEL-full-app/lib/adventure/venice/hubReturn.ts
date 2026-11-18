@@ -11,6 +11,7 @@
  * Pure apart from the storage it is handed (window.sessionStorage by default).
  */
 
+import { loginPath } from '@/lib/auth/safeNext';
 import { SPOTS, type Spot } from './layout';
 
 export const HUB_ROUTE = '/play/venice';
@@ -51,6 +52,11 @@ export function launchChoices(s: Pick<Spot, 'id' | 'route' | 'kind' | 'modes'>, 
     seen.add(route);
     return [{ mode, label: meta?.name ?? mode, href: launchHref(s, route) }];
   });
+}
+
+/** The URL the hub button navigates to: a signed-out player keeps the exact court/game launch through login. */
+export function launchNavigationHref(href: string, signedIn: boolean): string {
+  return signedIn ? href : loginPath(href);
 }
 
 export function writeReturn(s: Pick<Spot, 'id' | 'route'>, now: number, store: StoreLike | null = session()): void {

@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildHubWorld, courtsRect, returnSpawnFor, v1Area, v1Spots, V1_RIM_H } from './hubWorld';
 import {
-  clearReturn, consumeVeniceReturnHref, FROM_VENICE, hubHrefFor, launchChoices, launchHref, PARTY_MODE_FOR_SPOT, readReturn, RETURN_KEY, RETURN_TTL_MS, spotFromSearch,
+  clearReturn, consumeVeniceReturnHref, FROM_VENICE, hubHrefFor, launchChoices, launchHref, launchNavigationHref, PARTY_MODE_FOR_SPOT, readReturn, RETURN_KEY, RETURN_TTL_MS, spotFromSearch,
   veniceReturnHref, writeReturn, writeReturnForHref, type StoreLike,
 } from './hubReturn';
 import { veniceDoorOn, VENICE_DOOR_HREF } from './door';
@@ -77,6 +77,13 @@ describe('walking up and coming back', () => {
       expect(u.searchParams.get('spot')).toMatch(/^court\./);
       expect(u.searchParams.get('location')).toBe('venice');
     }
+  });
+  it('sends signed-out walk-up launches through login without losing the court return query', () => {
+    const href = launchHref(ones);
+    expect(launchNavigationHref(href, true)).toBe('/play/onevone?from=venice&spot=court.ones&location=venice');
+    const login = new URL(launchNavigationHref(href, false), 'http://x');
+    expect(login.pathname).toBe('/login');
+    expect(login.searchParams.get('next')).toBe('/play/onevone?from=venice&spot=court.ones&location=venice');
   });
   it('the end screen goes back to the court the game came from: by the query, or by the return mark', () => {
     const st = mem();
