@@ -483,3 +483,25 @@ arm beside it) and a closer hem (a bare thigh just below it) as worse, and §12.
 was not checked with a sharper measure. What it does not waive: flicker was not judged, and the one-piece short's hem frays at the
 inner thigh in a stride (visible on the sheet; kit-mac-jobs measured its stretched edges 3–5×). That is the next job:
 fix it in `scripts/avatar/mpfb/onepiece-shorts.py` and re-export, behind the same knobs, with before / after pictures.
+
+### 12.3 The one-piece short's inner-thigh fray (2026-11-18): weights cannot fix it; the shape must
+
+Headless (`scripts/probes/kit-mac-jobs/cpu-sets.ts`, male, 10 poses; torn = an edge past ×2 and past ×1.5 of the skin under it):
+today's three-piece short tears 92 edges, the shipped one-piece short 300, up to ×6.8 in a kick. `TEAR_DUMP=1`
+(`scripts/probes/kit-glitch/cpu.ts`) shows where: 298 of the 300 hang on both thighs, near the middle line, at and below the gusset.
+The build rebuilt here (bpy 5.0.1 in a scratch venv; `scripts/avatar/kit-fit/build-sets.sh`'s steps) reproduces the shipped file
+byte for byte, so these are fair variants:
+
+| Variant | Torn edges (10 poses) |
+|---|---|
+| shipped (gusset 2.5 cm under the crotch) | 300 |
+| each vertex on its own thigh only (no shared weights) | 314 (216 of them now the left-to-right seam, ×5–10) |
+| the shared thigh share moved to the pelvis | 354 |
+| own thigh, then fading into the pelvis from the gusset up, over 2 / 4 / 7 cm | 624 / 714 / 632 |
+| the same fade without the gusset limit (the inner legs too) | 1,572–2,358 (the cloth left behind the leg, 17 cm) |
+| gusset 4.5 / 6.5 cm under the crotch | 342 / 398 |
+| hem ease 12 → 20 mm | 300 |
+
+The stretch is the cloth that joins the two legs: when the legs split it has to stretch, wherever its weights put it. Today's short
+avoids it only because its leg tubes overlap instead of joining. Not tried: a curved hem, cut higher on the inner thigh (as
+athletic shorts are), so less cloth joins the legs low down. That is the next shape to try. No cloth bones: GATE 0.
