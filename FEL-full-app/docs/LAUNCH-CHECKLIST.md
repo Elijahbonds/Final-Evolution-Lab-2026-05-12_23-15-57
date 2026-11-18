@@ -11,6 +11,10 @@ owner announces.
 Status as read from `origin/lane/finish-release` `fdd77784` on 2026-10-20 by `lane/launch-docs`. Nothing was run on a
 device or against production for this file.
 
+Refreshed on 2026-11-18 for in-tree evidence that landed after that read: installable PWA wiring, anonymous
+`fps`/`ttfp` diagnostics, the owner-written load budget, and menu/TV remote focus. Device and production rows still
+need the owner-run checks named below.
+
 **What the statuses mean**
 
 - **done**: the evidence is in the tree (a file, a test, or a measured report).
@@ -26,24 +30,23 @@ A row turns green only on evidence. Update the row and its evidence when it chan
 | Area | Done | Not done | Unknown | Blocks launch? |
 |---|---:|---:|---:|---|
 | A. Every mode playable, no known crashers | 2 | 2 | 3 | **yes**: the device pass is the gate |
-| B. Performance budgets | 4 | 3 | 2 | **yes**: no load-time number, no real-phone frame rate |
+| B. Performance budgets | 6 | 2 | 1 | **yes**: missing budget rows, known over-budget modes, and real-device proof |
 | C. Ops items | 0 | 8 | 0 | **yes**: all in one runbook session |
 | D. Legal pages | 3 | 1 | 0 | the retention cron (C) is the open one |
-| E. Accessibility basics | 3 | 1 | 2 | menu controller focus is not done |
-| F. Installable PWA | 1 | 6 | 0 | **yes**: no manifest, no icons |
-| G. TV and big screen | 4 | 1 | 2 | the menu remote/pad navigation is not done |
-| H. Analytics and diagnostics | 6 | 2 | 2 | reading needs the `admin` role (C7) |
+| E. Accessibility basics | 6 | 0 | 0 | no checklist blocker; auth-label polish remains routed in E5 |
+| F. Installable PWA | 4 | 3 | 0 | **yes**: standalone device test and the service-worker flip remain |
+| G. TV and big screen | 5 | 0 | 2 | real TV proof remains open |
+| H. Analytics and diagnostics | 8 | 0 | 2 | reading needs the `admin` role (C7) |
 
 **The launch blockers, shortest path:**
 
 1. **Run the ops session** (`docs/OWNER-RUNBOOK.md`). That covers all of section C.
-2. **Make the app installable** (section F). This is lane work: a web manifest, the icons (your art), `theme-color`,
-   and the iOS tags.
-3. **Run the device pass on your phone** (`docs/DEVICE-TEST-CHECKLIST.md`), then fix what it finds. That covers A2 and
-   B5.
-4. **Decide a load-time budget** (B4). There is no written number today, so "green" cannot be judged.
-5. **Add controller and remote navigation to the menus** (E4 and G5), or decide that the TV launch is "game screens
-   only".
+2. **Run the device pass on your phone** (`docs/DEVICE-TEST-CHECKLIST.md`), then fix what it finds. That covers A2,
+   the real-device side of A3/A5, B5/B9, F7 and G6.
+3. **Close the phone-budget holes**: add rows for every enabled Babylon mode and fix or owner-accept the three
+   `knownOver` rows (B1/B2).
+4. **Finish the PWA field check**: verify standalone home-screen play, then turn on `NEXT_PUBLIC_SW_ENABLED` only after
+   the device check says the conservative service worker is safe (F6/F7).
 
 ---
 
@@ -72,8 +75,8 @@ guest dunk), `/party`, `/play/party`, and the Mirror on the Train tab.
 | B1 | Per-mode phone content budgets (draw calls, active meshes, skinned bodies, texture MB, particles) are enforced | **not done** (15 of 33 have a row) | `lib/babylon/config/mobileBudget.json` (measured 2026-10-14) + `scripts/mobile-budget-tests.ts` (CI). **Rows exist for:** dunk, karate, karate_vs, football, skateboard, surf, tennis, golf, onevone, threevthree, threepoint, carnival, mixedcombat, aeroaces, velocitykart. **No row:** dunkduel, duel, showdown, snowboard_slalom, bigair, freerun, sprint, penalty (soccer), derby (baseball), volleyball, tiebreak, dance, brainbrawl, who_scene_it, plus the non-Babylon music, acting, irl and story |
 | B2 | No mode over the phone ceiling | **not done** | `knownOver` in `mobileBudget.json`: **football and karate `skinnedBodies`** (over 16) and **velocitykart `textureMb`** (over 256). Frozen, so they cannot grow, but they are over |
 | B3 | Texture memory: no mobile mode above 2× the tier median | **done** | `scripts/perf-budget-tests.ts` (CI) on `lib/babylon/config/textureBudget.json` |
-| B4 | A written load-time budget (time to first playable frame on a phone) | **not done** | no number exists. Rig TTFPF with the 8 s pre-warm was 26.7–59.0 s (`docs/SHIP-READINESS.md` §1). That is SwiftShader on a loaded 4-core box, which overstates a phone's time. The load watchdog is now "20 s with no progress", not 20 s total (`6abc52c2`, #316). **Owner call:** pick a number (for example "dunk on `/try` playable in under N s on a mid-range Android on 4G"), then measure it on the device pass |
-| B5 | Frame rate on real phones | **unknown** | `lib/three-budget.ts` targets 60 fps with a 30 fps floor on mid-tier mobile, and `core/PerfGovernor` sheds resolution under load. But **nothing reports a real phone's frame rate.** `DiagKind` has an `fps` kind (`lib/babylon/core/diag.ts`), and no code ever sends it. The device pass is the only read today |
+| B4 | A written load-time budget (time to first playable frame on a phone) | **done** | Owner decision 2026-10-20: playable in 8 s, full load in 20 s on a mid-range phone (`docs/OWNER-DECISIONS.md`, DOCS AUDIT). Rig TTFPF with the 8 s pre-warm was 26.7–59.0 s (`docs/SHIP-READINESS.md` §1), but that is SwiftShader on a loaded 4-core box and overstates phone time. The load watchdog is now "20 s with no progress", not 20 s total (`6abc52c2`, #316). The device pass must measure against the 8 s / 20 s budget |
+| B5 | Real-phone frame-rate telemetry leaves the browser | **done** | `lib/babylon/core/perfStats.ts`, mounted by `ModeHarness.ts`, sends anonymous `game_diag` kind `fps` for the first 30 s of play and the 90-120 s warm window. `lib/analyticsAnon.ts` stores `fps` rows with no user, guest or page key. The **measurement result** is still a device-pass item |
 | B6 | Shader pre-warm cap hits and load timeouts are reported from real phones | **done** | `capHit` and the watchdog's `load timed out` both send `game_diag` kind `load` (`docs/SHIP-READINESS.md` §5). The query is in `docs/DEVICE-TEST-CHECKLIST.md`. There is no success denominator yet (owner call 1b) |
 | B7 | Per-frame garbage in the hot modes | **done** (dunk, the rig layers) | `lane/rig-perf` (#290: the rig layers write no garbage per frame), `lane/dunk-garbage`, `CharacterAnimator.clipNames` cached (#281) |
 | B8 | Mid-play shader compiles cut on phones | **done** | the pre-warm moved mid-play compiles from a median of 14 to 1 per mode (`docs/SHIP-READINESS.md` §1) |
@@ -130,20 +133,21 @@ The policy files are not edited here. They are only pointed to.
 
 ## F. Installable PWA
 
-Checked on 2026-10-20: `app/` and `public/` contain no manifest, no service worker, and no install icons.
+Refreshed on 2026-11-18: the manifest, icons, iOS tags and conservative service worker are in the tree. The worker still
+ships off by default until the device check says it is safe.
 
 | # | Item | Status | Evidence / what is missing |
 |---|---|---|---|
 | F1 | Served over HTTPS | **done** | Firebase Hosting |
-| F2 | Web app manifest (`app/manifest.ts` or `public/manifest.webmanifest`): `name`, `short_name`, `start_url`, `display` (`standalone` or `fullscreen`), `background_color`, `theme_color`, `icons` | **not done** | none exists. `app/layout.tsx` `metadata` has no `manifest`. (`public/agent-manifest.json` is unrelated) |
-| F3 | Install icons: 192×192 and 512×512 PNG, plus a maskable one | **not done** | `public/` has only `favicon.svg`. Android needs PNGs. **The art is the owner's**: `public/brand/` has the crest and wordmark sources |
-| F4 | iOS: `apple-touch-icon` (180×180) and `apple-mobile-web-app-capable` / status-bar style | **not done** | not in `app/layout.tsx` |
-| F5 | `theme-color` and an explicit `viewport` export (`viewport-fit=cover` for the notch) | **not done** | `app/layout.tsx` exports no `viewport`, so Next's default applies. The game CSS already uses `env()` safe-area insets (`lib/ui/consoleView.ts`) |
-| F6 | A service worker. At minimum an offline fallback page. Optionally, cache the shell and the big static assets | **not done** | no file registers one. assumption: Chrome no longer requires a service worker for its install prompt, but without one a launch with no network shows the browser's error page |
-| F7 | Tested from the home-screen icon (standalone): canvas size, orientation, audio unlock, the back gesture | **not done** | it depends on F2–F5. Standalone removes the browser bar, which changes the viewport the harness fits (`game-surface.css`, `consoleView`) |
+| F2 | Web app manifest (`app/manifest.ts` or `public/manifest.webmanifest`): `name`, `short_name`, `start_url`, `display` (`standalone` or `fullscreen`), `background_color`, `theme_color`, `icons` | **done** | `app/app.webmanifest/route.ts` serves `lib/pwa/manifest.ts`'s `FEL_MANIFEST` at `/app.webmanifest`; `app/layout.tsx` links it once from `<head>`. `lib/pwa/manifest.test.ts` checks the route, content type, install fields and the non-Next-metadata path |
+| F3 | Install icons: 192×192 and 512×512 PNG, plus a maskable one | **done** | `public/icons/icon-192.png`, `icon-512.png`, `icon-maskable-512.png`; `APP_ICONS` and `lib/pwa/manifest.test.ts` verify every named PNG exists and has the size it claims. assumption: the current icons are favicon-derived until the owner supplies final logo art |
+| F4 | iOS: `apple-touch-icon` (180×180) and `apple-mobile-web-app-capable` / status-bar style | **done** | `public/icons/apple-touch-icon.png`; `app/layout.tsx` sets `metadata.appleWebApp` and links the apple touch icon from `<head>` |
+| F5 | `theme-color` and an explicit `viewport` export (`viewport-fit=cover` for the notch) | **not done** | `app/layout.tsx` now exports `viewport` with `themeColor: THEME_COLOR`, width and initial scale. `viewport-fit=cover` remains deliberately deferred in the layout comment until the home-screen device check proves every page behaves under the notch |
+| F6 | A service worker. At minimum an offline fallback page. Optionally, cache the shell and the big static assets | **not done** | `public/sw.js`, `public/offline.html`, `components/pwa/sw-register.tsx`, `lib/pwa/sw.ts`, and `tests/pwa/sw-routes.test.ts` are present. It ships **off** by default through `NEXT_PUBLIC_SW_ENABLED` in `.env.example`; the off path unregisters FEL's worker and deletes `fel-*` caches. Turning it on is a device-check / deploy-time switch, not a code gap |
+| F7 | Tested from the home-screen icon (standalone): canvas size, orientation, audio unlock, the back gesture | **not done** | still needs a real standalone install/device pass. Standalone removes the browser bar, which changes the viewport the harness fits (`game-surface.css`, `consoleView`) |
 
-These are code and asset changes in `app/` and `public/`. They are lane work, and they are not deploy config. The icons
-need your art.
+The remaining PWA work is field verification and the service-worker switch. No deploy config changes are needed for the
+current manifest/icon/iOS-tag code.
 
 ---
 
@@ -166,11 +170,11 @@ need your art.
 | # | Item | Status | Evidence |
 |---|---|---|---|
 | H1 | First-party analytics: batched, `sendBeacon` on unload, stored in `AnalyticsEvent`. No third-party trackers | **done** | `lib/analytics.ts`, `app/api/analytics/route.ts`, `lib/analytics-server.ts` |
-| H2 | Game diagnostics leave the browser: `game_diag` kinds `frame`, `ident`, `clip`, `cam`, `context`, `load` (load failures, the stall watchdog, render watchdog, pre-warm cap hits) | **done** | `lib/babylon/core/diag.ts` (rate limit: once per 10 s per kind). Senders: `ModeHarness.ts`, `FrameGuard.ts`, `CameraDirector.ts`, `playerIdentity.ts`, `clipRegistry.ts`. **Only modes run through the Babylon harness send it.** Music (Groove Academy), Acting, Hang Time and Story send none |
+| H2 | Game diagnostics leave the browser: `game_diag` kinds `frame`, `ident`, `clip`, `cam`, `context`, `load`, `fps`, `ttfp` | **done** | `lib/babylon/core/diag.ts` (rate limit: once per 10 s per kind). Senders: `ModeHarness.ts`, `FrameGuard.ts`, `CameraDirector.ts`, `playerIdentity.ts`, `clipRegistry.ts`, and `lib/babylon/core/perfStats.ts`. **Only modes run through the Babylon harness send it.** Music (Groove Academy), Acting, Hang Time and Story send none |
 | H3 | `game_diag` can be read back | **done** (it needs `admin`) | `GET /api/admin/diag?hours=N` (`app/api/admin/diag/route.ts`): grouped by kind and mode, plus the last 50 lines. Admin only (runbook §12). The read-only SQL is in `docs/DEVICE-TEST-CHECKLIST.md` |
 | H4 | Client crashes are reported | **done** (logs only) | `components/reliability/global-error-boundary.tsx` → `POST /api/telemetry/crash` → a `[FEL-CRASH]` server log line. These are **not** in the database, so `/api/admin/diag` does not show them. Read with `gcloud logging read` (runbook §11.3) |
-| H5 | A real phone's frame rate is reported | **not done** | the `fps` `DiagKind` is never sent (B5) |
-| H6 | A successful load's time is reported (a denominator for cap hits and timeouts) | **not done** | `docs/SHIP-READINESS.md` §6 call 1b, recommended, not built |
+| H5 | A real phone's frame rate is reported | **done** | `lib/babylon/core/perfStats.ts` sends anonymous `fps` rows for live play windows; `lib/babylon/core/perfStats.test.ts` covers the summary windows and page cap |
+| H6 | A successful load's time is reported (a denominator for cap hits and timeouts) | **done** | `lib/babylon/core/perfStats.ts` sends anonymous `ttfp` rows at first playable frame, and on abandon before play with a `left=` duration. `lib/analyticsAnon.ts` keeps `fps`/`ttfp` rows free of user, guest and page ids |
 | H7 | Admin dashboards: metrics and the funnel | **done** (they need `admin`) | `app/admin/metrics/page.tsx`, `app/admin/funnel/page.tsx`, `app/coach/admin/page.tsx` |
 | H8 | Liveness endpoint | **done** | `/healthz` and `/api/health` (`app/api/health/route.ts`, no dependencies, reports the revision) |
 | H9 | An uptime monitor watches `/healthz` and alerts you | **unknown** | none is recorded in the repo. The Cloud Monitoring uptime check is yours to set up |
@@ -178,8 +182,8 @@ need your art.
 
 ---
 
-_How this was checked: the files and tests named in each row on `fdd77784`; `grep` for `manifest`, `serviceWorker`,
-`viewport`, `apple-touch-icon`, `getGamepads` and `prefers-reduced-motion` across `app/`, `components/` and `lib/`; the
-`modes` and `knownOver` of `mobileBudget.json`; `docs/SHIP-READINESS.md` (§1, §2, §4, §5, §6);
-`docs/VISUAL-PASS-PLAN.md` ("Phone perf pass" and owner-1016); `git log` of `lane/finish-release` (#242, #281, #290,
-#293, #316). Nothing was run on a device, against production, or in a browser._
+_How this was checked: the files and tests named in each row on `fdd77784`, then refreshed on 2026-11-18 from the current
+tree for PWA/perf telemetry; `grep` for `manifest`, `serviceWorker`, `viewport`, `apple-touch-icon`, `getGamepads` and
+`prefers-reduced-motion` across `app/`, `components/` and `lib/`; the `modes` and `knownOver` of `mobileBudget.json`;
+`docs/SHIP-READINESS.md` (§1, §2, §4, §5, §6); `docs/VISUAL-PASS-PLAN.md` ("Phone perf pass" and owner-1016); `git log`
+of `lane/finish-release` (#242, #281, #290, #293, #316). Nothing was run on a device, against production, or in a browser._
