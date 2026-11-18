@@ -24,7 +24,7 @@ import { resolve } from 'node:path';
 import { phoneTexMbOf, readGlb } from './hoops-phone-budget-tests';
 import { PHONE_FAR_PROP_MAX } from '../lib/babylon/scene/phoneTextureCap';
 import {
-  COAST_STREAM_FULL, COAST_STREAM_KEEP, COAST_STREAM_LOD, PROP_MODELS, ZONE_MAX_X, ZONE_MAX_Z, ZONE_MIN_X, ZONE_MIN_Z, ZoneStreamer,
+  COAST_STREAM_FULL, COAST_STREAM_KEEP, COAST_STREAM_LOD, PROP_MODELS, ZONE_COLS, ZONE_MAX_X, ZONE_MAX_Z, ZONE_MIN_X, ZONE_MIN_Z, ZONE_ROWS, ZoneStreamer,
   pieceAt, propsDrawnAt, walkable, zonePieces, zoneProps, type PropModel, type StreamRings, type Tier,
 } from '../lib/adventure/coast/zoneLayout';
 import { COAST_STREAM_ON, COARSE_DIV, FINE_DIV } from '../lib/adventure/coast/zoneView';
@@ -140,7 +140,7 @@ export function worstPiece(rings: StreamRings, streamOn: boolean): { cost: Place
     // arrive from each side (the hysteresis keeps what the last piece raised): the worst of the four
     for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       const s = new ZoneStreamer(rings);
-      s.step(Math.max(0, Math.min(5, i + di)), Math.max(0, Math.min(5, j + dj)));
+      s.step(Math.max(0, Math.min(ZONE_COLS - 1, i + di)), Math.max(0, Math.min(ZONE_ROWS - 1, j + dj)));
       s.step(i, j);
       const c = placeCost(s.tiers, streamOn);
       if (c.tris > worst.cost.tris || (c.tris === worst.cost.tris && c.draws > worst.cost.draws)) worst = { cost: c, piece: key };

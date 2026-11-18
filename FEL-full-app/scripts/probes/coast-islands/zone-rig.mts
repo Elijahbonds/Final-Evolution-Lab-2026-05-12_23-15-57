@@ -192,7 +192,8 @@ try {
     const partnerGap = gaps2.length ? { mean: +(gaps2.reduce((a, b) => a + b, 0) / gaps2.length).toFixed(1), p95: +gaps2[Math.floor(gaps2.length * 0.95)].toFixed(1), max: +gaps2[gaps2.length - 1].toFixed(1) } : null;
     const log = await page.evaluate('window.__log ?? null');
     const spotsSeen = await page.evaluate('window.__spotsSeen ?? null');
-    result[name] = { ...t, worst, frameMs, longFrames, legs, pieces, streamMax, partnerGap, log, spotsSeen, end, errors: errors.slice(0, 5), missing: [...missing] };
+    const longs = await page.evaluate('window.__longs ?? null') as Array<Record<string, number>> | null;
+    result[name] = { ...t, worst, frameMs, longFrames, longs, legs, pieces, streamMax, partnerGap, log, spotsSeen, end, errors: errors.slice(0, 5), missing: [...missing] };
     console.log(name, JSON.stringify(result[name]));
     } catch (e) {
       // what is there now: a fresh page (a reload) or none (a crash)?

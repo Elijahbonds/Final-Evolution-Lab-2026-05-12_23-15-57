@@ -4,6 +4,7 @@
 // Phase D: the sports spots' and the townsfolk's cards too.
 //   ?mode=venice_hub (the same rig on the Venice hub: the same-session control)   ?feel=<json> (feel-panel values, e.g. {"coast.streamOn":0})
 import { setAgentRunHooksAllowed } from '@/lib/agentRunHooks';
+import { EngineInstrumentation, SceneInstrumentation, type Scene } from '@babylonjs/core';
 import { runMode, InputBus } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { zoneUi } from '@/lib/adventure/coast/zoneUi';
@@ -43,8 +44,34 @@ void runMode(MODES[q.get('mode') ?? 'coast_zone'], {
     W.__phase = p;
     if (p === 'error') W.__err = String(d);
     if (p === 'ready') { W.__readyAt = performance.now(); setTimeout(() => bus.emit({ t: 'button', btn: 'START', pressed: true }), 50); }
-    if (p === 'playing' && !W.__ttfp) requestAnimationFrame(() => { W.__ttfp = performance.now(); });
+    if (p === 'playing' && !W.__ttfp) requestAnimationFrame(() => { W.__ttfp = performance.now(); watchFrames(); });
   },
   onHud: () => {},
   resultSink: async () => {},
 }).catch((e) => { W.__err = String(e?.message ?? e); });
+
+/** Phase F-lite: where a long frame's time goes — Babylon's own counters per frame (render, active-mesh evaluation, render targets
+ *  such as the shadow map, shader compiles, texture count), and the gap since the last frame (time outside the render loop: async
+ *  work such as a body's setup). Frames over 200 ms are kept (window.__longs). */
+function watchFrames(): void {
+  const dev = (window as unknown as { __FEL_DEV__?: { scene: Scene } }).__FEL_DEV__;
+  if (!dev) return;
+  const scene = dev.scene, engine = scene.getEngine();
+  const si = new SceneInstrumentation(scene);
+  si.captureFrameTime = true; si.captureRenderTime = true; si.captureActiveMeshesEvaluationTime = true; si.captureRenderTargetsRenderTime = true; si.captureInterFrameTime = true;
+  const ei = new EngineInstrumentation(engine);
+  ei.captureShaderCompilationTime = true;
+  const longs: unknown[] = [];
+  W.__longs = longs;
+  let lastCompile = 0, lastCount = 0, lastTex = scene.textures.length, lastMeshes = scene.meshes.length;
+  scene.onAfterRenderObservable.add(() => {
+    const c = ei.shaderCompilationTimeCounter, compile = c.total - lastCompile, compiles = c.count - lastCount;
+    lastCompile = c.total; lastCount = c.count;
+    const frame = si.frameTimeCounter.current, inter = si.interFrameTimeCounter.current;
+    const tex = scene.textures.length - lastTex, meshes = scene.meshes.length - lastMeshes;
+    lastTex = scene.textures.length; lastMeshes = scene.meshes.length;
+    if ((frame > 200 || inter > 200) && longs.length < 60) {
+      longs.push({ at: Math.round(performance.now()), frame: Math.round(frame), render: Math.round(si.renderTimeCounter.current), eval: Math.round(si.activeMeshesEvaluationTimeCounter.current), targets: Math.round(si.renderTargetsRenderTimeCounter.current), inter: Math.round(inter), compileMs: Math.round(compile), compiles, newTextures: tex, newMeshes: meshes });
+    }
+  });
+}
