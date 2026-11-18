@@ -8,7 +8,7 @@
 // This file stays light: every /play page imports it, so the stage (and Babylon with it) is loaded only once the couch
 // is actually opened.
 
-import { useSyncExternalStore } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import dynamicImport from 'next/dynamic';
 import { Loader2, Users } from 'lucide-react';
 import { sessionStore } from '@/lib/babylon/core/sessionStore';
@@ -38,10 +38,17 @@ export function CouchRoom({ modeId }: { modeId: string }) {
 export function CouchStart({ modeId }: { modeId: string }) {
   const phase = useSyncExternalStore(sessionStore.subscribe, () => sessionStore.view().phase, () => null);
   const m = couchModeById(modeId);
-  if (!m || (phase !== 'ready' && phase !== 'ended')) return null;
+  const visible = !!m && (phase === 'ready' || phase === 'ended');
+  useEffect(() => {
+    if (!visible || typeof document === 'undefined') return;
+    document.body.classList.add('fel-couch-start-visible');
+    return () => { document.body.classList.remove('fel-couch-start-visible'); };
+  }, [visible]);
+  if (!m || !visible) return null;
   return (
     <a
       href={couchHref(m)}
+      data-fel-couch-start
       data-testid="couch-start"
       className="fixed right-3 top-[max(0.75rem,env(safe-area-inset-top))] z-40 flex items-center gap-1.5 rounded-full border border-[#00E5FF]/50 bg-black/70 px-3 py-1.5 font-mono text-xs font-bold text-[#00E5FF] backdrop-blur hover:bg-[#00E5FF]/15"
     >
