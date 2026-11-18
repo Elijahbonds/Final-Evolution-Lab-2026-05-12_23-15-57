@@ -1036,3 +1036,16 @@ zone's rules around it, and the creatures and the log, all new. Each 0 restores 
   brain walks straight at its follow slot and has no path-finding.
 - `coast.creaturesOn` 1 (`lib/adventure/coast/zoneCreatures.ts`): four placeholder creatures wander near home. 0 = none.
 - `coast.logSeenM` 16 m, `coast.logMeetM` 3 m: how close you come for a creature to go in your log as seen, and as met.
+
+## coast-d, 2026-11-18 (the Coast & Islands zone, phase D: the harbour town, the sports spots, the side quests; NEW)
+
+Group **Coast · zone**. All new; each off restores phase B.
+
+- `coast.townOn` 1 (`lib/adventure/coast/zoneTown.ts`): the harbour town beside the dock (four houses you cannot walk through,
+  the shipped Venice boardwalk kit as the market strip, the street). 0 = the bare beach, and no quests.
+- `coast.townsfolk` 4: how many townsfolk stand in town (the Venice watchers' roster bodies; each is a skinned body with its own
+  textures, measured on the phone rig). 0–4; the first three give the quests.
+- `coast.sportsOn` 1: the sports spots (surf, beach volleyball, golf, the kart) open their games in one tap and the end screen
+  brings you back to the spot. 0 = none.
+- `coast.questsOn` 1 (`lib/adventure/coast/zoneQuests.ts`): the townsfolk give three quests, saved in the Adventure save like the
+  creature log. 0 = they only say hello.

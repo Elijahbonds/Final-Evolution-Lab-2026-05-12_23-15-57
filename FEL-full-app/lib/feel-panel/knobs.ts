@@ -2130,6 +2130,27 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/adventure/coast/zoneCreatures.ts COAST_LOG_MEET_M',
     hint: 'Walking right up to a creature marks it as met in your log.',
   },
+  // ── coast-d (2026-11-18, NEW): the Coast zone, phase D — the harbour town, the sports spots, the side quests.
+  {
+    id: 'coast.townOn', label: 'Coast zone: the harbour town (1) / the bare beach (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Coast · zone',
+    source: 'lib/adventure/coast/zoneTown.ts COAST_TOWN_ON',
+    hint: 'Houses, a market strip and townsfolk beside the dock. Off = phase B, and no quests.',
+  },
+  {
+    id: 'coast.townsfolk', label: 'Coast zone: townsfolk in town', def: 4, min: 0, max: 4, step: 1, unit: '', group: 'Coast · zone',
+    source: 'lib/adventure/coast/zoneTown.ts COAST_TOWNSFOLK',
+    hint: 'Each is a full body with its own textures (a phone cost, measured). Fewer = fewer quest givers.',
+  },
+  {
+    id: 'coast.sportsOn', label: 'Coast zone: sports spots open their games (1) / none (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Coast · zone',
+    source: 'lib/adventure/coast/zoneTown.ts COAST_SPORTS_ON',
+    hint: 'Surf, beach volleyball, golf and the kart, one tap each, and back to the same spot after.',
+  },
+  {
+    id: 'coast.questsOn', label: 'Coast zone: townsfolk give quests (1) / only say hello (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Coast · zone',
+    source: 'lib/adventure/coast/zoneQuests.ts COAST_QUESTS_ON',
+    hint: 'Three small quests, saved with your Adventure progress.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));
