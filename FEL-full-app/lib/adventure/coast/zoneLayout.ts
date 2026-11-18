@@ -326,8 +326,8 @@ export function zoneProps(): PropPlace[] {
   // the mainland: palms along the dune line, bushes on the grass behind, rocks at the water's edge
   for (let z = ZONE_MIN_Z + 10, k = 0; z < ZONE_MAX_Z - 10; z += 13, k++) {
     const sx = mainlandShoreX(z);
-    put(hash01(k, 1) < 0.5 ? 'palmTall' : 'palmBend', sx + 30 + hash01(k, 2) * 10, z + (hash01(k, 3) - 0.5) * 6, hash01(k, 4) * 6.28, 5.5 + hash01(k, 5) * 2);
-    if (k % 2 === 0) put('palmShort', sx + 44 + hash01(k, 6) * 8, z + 5, hash01(k, 7) * 6.28, 4.5);
+    put(hash01(k, 1) < 0.5 ? 'palmTall' : 'palmBend', sx + 30 + hash01(k, 2) * 10, z + (hash01(k, 3) - 0.5) * 6, hash01(k, 4) * 6.28, 4.4 + hash01(k, 5) * 1.2);
+    if (k % 2 === 0) put('palmShort', sx + 44 + hash01(k, 6) * 8, z + 5, hash01(k, 7) * 6.28, 3.8);
     if (k % 3 === 0) put('bush', sx + 58 + hash01(k, 8) * 20, z - 3, hash01(k, 9) * 6.28, 5);
     if (k % 4 === 1) put(hash01(k, 10) < 0.5 ? 'rockA' : 'rockC', sx - 2 + hash01(k, 11) * 3, z, hash01(k, 12) * 6.28, 2.5 + hash01(k, 13) * 1.5);
   }
@@ -346,12 +346,12 @@ export function zoneProps(): PropPlace[] {
       }
     };
     if (isl.look === 'palms') {
-      ring(7, 14, 16, (k) => (k % 3 === 0 ? 'palmBend' : 'palmTall'), (k) => 5.5 + hash01(n, k, 4) * 2);
+      ring(7, 14, 16, (k) => (k % 3 === 0 ? 'palmBend' : 'palmTall'), (k) => 4.4 + hash01(n, k, 4) * 1.2);
       ring(16, 24, 8, () => 'bush', () => 5.5);
       ring(-1, 1, 7, (k) => (k % 2 ? 'rockA' : 'rockC'), (k) => 2.5 + hash01(n, k, 5) * 1.5);
     } else {
       ring(2, 14, 12, (k) => (k % 3 === 0 ? 'rockTall' : k % 2 ? 'rockA' : 'rockC'), (k) => 3 + hash01(n, k, 6) * 3);
-      ring(6, 10, 4, () => 'palmBend', () => 5.5);
+      ring(6, 10, 4, () => 'palmBend', () => 4.6);
     }
   });
   propsCache = out;
