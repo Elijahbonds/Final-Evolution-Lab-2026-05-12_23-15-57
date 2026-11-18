@@ -82,6 +82,11 @@ try {
     else runs.push([`venice-control-${i + 1}`, 'mode=venice_hub']);
   }
   if (!process.env.CONTROL) runs.push(['coast-nostream', `feel=${encodeURIComponent(JSON.stringify({ 'coast.streamOn': 0 }))}`]);
+  // VARIANTS='name={"knob":v};name2={...}': these zone runs instead (a diagnosis: which part of a change does what)
+  if (process.env.VARIANTS) {
+    runs.length = 0;
+    for (const v of process.env.VARIANTS.split(';').filter(Boolean)) { const i = v.indexOf('='); runs.push([`coast-${v.slice(0, i)}`, `feel=${encodeURIComponent(v.slice(i + 1))}`]); }
+  }
   const pick = (process.env.ONLY ?? '').split(',').filter(Boolean);
   for (const [name, query] of runs) {
     if (pick.length && !pick.some((p) => name.startsWith(p))) continue;
@@ -95,8 +100,15 @@ try {
     page.on('console', (m) => { if (logs.length < 400) logs.push(`${m.type()}: ${m.text().slice(0, 200)}`); });
     // a navigation after load is a finding (coast-d d2: the page navigated in the first zone run): note when and why
     page.on('framenavigated', (f) => { if (f === page.mainFrame()) logs.push(`NAV ${f.url()} at ${new Date().toISOString()}`); });
-    page.on('crash', () => logs.push('PAGE CRASH'));
+    page.on('crash', () => logs.push(`PAGE CRASH at ${new Date().toISOString()}`));
+    page.on('close', () => logs.push(`PAGE CLOSE at ${new Date().toISOString()}`));
     const cdp = await ctx.newCDPSession(page);
+    await cdp.send('Inspector.enable').catch(() => {});
+    cdp.on('Inspector.targetCrashed', () => logs.push(`TARGET CRASHED at ${new Date().toISOString()}`));
+    cdp.on('Inspector.detached', (e: { reason: string }) => logs.push(`INSPECTOR DETACHED ${e.reason} at ${new Date().toISOString()}`));
+    await cdp.send('Runtime.enable').catch(() => {});
+    cdp.on('Runtime.executionContextDestroyed', (e: { executionContextId: number }) => logs.push(`CONTEXT DESTROYED ${e.executionContextId} at ${new Date().toISOString()}`));
+    cdp.on('Runtime.executionContextCreated', (e: { context: { id: number; origin: string; auxData?: { isDefault?: boolean } } }) => logs.push(`CONTEXT CREATED ${e.context.id} ${e.context.origin} default=${e.context.auxData?.isDefault} at ${new Date().toISOString()}`));
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: Number(process.env.THROTTLE ?? 4) });
     await page.goto(`${base}${query ? `?${query}` : ''}`);
     try {
@@ -179,6 +191,9 @@ try {
     result[name] = { ...t, worst, frameMs, legs, pieces, streamMax, partnerGap, log, spotsSeen, end, errors: errors.slice(0, 5), missing: [...missing] };
     console.log(name, JSON.stringify(result[name]));
     } catch (e) {
+      // what is there now: a fresh page (a reload) or none (a crash)?
+      const after = await page.evaluate('({ href: location.href, phase: window.__phase ?? null, ttfp: window.__ttfp ?? null, t: performance.now() })').catch((x) => String(x).slice(0, 160));
+      logs.push(`AFTER ${new Date().toISOString()} ${JSON.stringify(after)}`);
       console.log('RUN FAILED', name, String(e).slice(0, 300), '\n', errors.join('\n'), '\n', logs.filter((l) => !/^debug/.test(l)).slice(-80).join('\n'));
       result[name] = { failed: String(e).slice(0, 300) };
     }
