@@ -69,6 +69,7 @@ const routeMap: Record<string, string> = {
   velocitykart: 'velocity-kart',
   who_scene_it: 'who-scene-it',
   brainbrawl: 'brain-brawl',
+  venice_hub: 'venice',
 };
 const lockName: Record<string, string> = { karate: 'karate-endless', karate_vs: 'karate-vs', derby: 'baseball', penalty: 'soccer', snowboard_slalom: 'snowboard' };
 const camName: Record<string, string> = { karate_vs: 'karate-vs', derby: 'baseball', penalty: 'soccer', snowboard_slalom: 'snowboard' };
@@ -90,6 +91,7 @@ const testName: Record<string, string[]> = {
   threevthree: ['threevthree', 'three-v-three', 'ThreeVThree'],
   velocitykart: ['velocitykart', 'velocity-kart', 'velocityKart'],
   who_scene_it: ['who_scene_it', 'who-scene-it', 'whoSceneIt'],
+  venice_hub: ['venice', 'venice-hub', 'VeniceHub'],
 };
 const skipTestDirs = new Set(['.git', '.next', 'coverage', 'node_modules', 'public']);
 function walkTestFiles(dir: string): string[] {

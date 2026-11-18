@@ -27,6 +27,7 @@ const expectedSlugs: Record<string, string> = {
   velocitykart: 'velocity-kart',
   who_scene_it: 'who-scene-it',
   brainbrawl: 'brain-brawl',
+  venice_hub: 'venice',
   derby: 'derby',
 };
 const playGauntletExempt = new Set([
@@ -66,6 +67,7 @@ const testName: Record<string, string[]> = {
   threevthree: ['threevthree', 'three-v-three', 'ThreeVThree'],
   velocitykart: ['velocitykart', 'velocity-kart', 'velocityKart'],
   who_scene_it: ['who_scene_it', 'who-scene-it', 'whoSceneIt'],
+  venice_hub: ['venice', 'venice-hub', 'VeniceHub'],
 };
 const skipTestDirs = new Set(['.git', '.next', 'coverage', 'node_modules', 'public']);
 const testFilePattern = /(?:^|[./-])(?:test|tests)\.(?:ts|tsx)$|-tests\.ts$/;
@@ -150,6 +152,8 @@ assert.deepEqual(missingDevGauntlet, [], 'enabled modes must be in the dev-mode 
 assert.deepEqual(missingPlayGauntlet, [], 'enabled modes must be in the shipping-route gauntlet');
 assert.deepEqual(missingConceptLocks, [], 'enabled modes must have concept locks');
 assert.deepEqual(missingModeTests, [], 'enabled modes must have named regression coverage');
+assert.ok(existsSync(join(ROOT, 'app/play/venice/page.tsx')), 'hidden Venice hub route must resolve to /play/venice');
+assert.ok(testCountFor('venice_hub') > 0, 'hidden Venice hub must be counted against its Venice regression coverage');
 assert.ok(hasDpadAction('freerun', 'move'), 'freerun phone d-pad must steer with LEFT STICK movement');
 assert.ok(hasHeldButton('freerun', 'charge'), 'freerun phone schema must expose held RT sprint');
 assert.ok(hasHeldButton('freerun', 'brake'), 'freerun phone schema must expose held LT slide');
