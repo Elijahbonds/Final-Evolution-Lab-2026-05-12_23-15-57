@@ -69,8 +69,13 @@ BAND = {
     'female': {'tops': (0.82, 1.38), 'shorts': (0.50, 0.97), 'shoes': (0.0, 0.16)},
 }[SEX][SLOT]
 
-def world_bbox(o):
-    vs = [o.matrix_world @ v.co for v in o.data.vertices]
+def world_bbox(o, evaluated=False):
+    # evaluated: the mesh as SHAPED (lane/kit-mac-jobs, 2026-11-18): an MPFB human's sex and build are shape keys, and its raw
+    # vertices are the androgynous base mesh (1.695 m for both sexes) — reading them mapped every --mhclo garment wrongly
+    if evaluated:
+        ev = o.evaluated_get(bpy.context.evaluated_depsgraph_get()); me = ev.to_mesh()
+        vs = [o.matrix_world @ v.co for v in me.vertices]; ev.to_mesh_clear()
+    else: vs = [o.matrix_world @ v.co for v in o.data.vertices]
     return Vector((min(v.x for v in vs), min(v.y for v in vs), min(v.z for v in vs))), Vector((max(v.x for v in vs), max(v.y for v in vs), max(v.z for v in vs)))
 
 def select_only(objs, active=None):
@@ -99,7 +104,7 @@ if MHCLO:
         except Exception as e: print('FELFIT modifier', m.name, 'not applied', repr(e)[:120]); garment.modifiers.remove(m)
     garment.parent = None
     garment.vertex_groups.clear()
-    human_box = world_bbox(human)   # the MPFB body it was fitted to (checked against the kit body below)
+    human_box = world_bbox(human, evaluated=True)   # the MPFB body it was fitted to (checked against the kit body below)
     for o in [o for o in bpy.data.objects if o is not garment]: bpy.data.objects.remove(o, do_unlink=True)
     print(f'FELFIT mhclo fitted by MPFB: {len(garment.data.vertices)} verts')
 else:
