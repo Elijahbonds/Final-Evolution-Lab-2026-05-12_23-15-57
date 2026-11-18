@@ -39,7 +39,7 @@ const rows: Record<string, number | string | null>[] = [];
 let verdict = 'not run';
 try {
   // a desktop page: the life (gulls + watchers) and the court life (bodies) are both mounted, the most a trip can leave behind
-  const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });   // under 1024 px wide the hub picks the phone tier
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });   // a short edge under 700 px is the phone tier (scene/tierRule MOBILE_MAX_SHORT_EDGE_PX)
   const page = await ctx.newPage();
   const cdp = await ctx.newCDPSession(page);
   const logs: string[] = [];

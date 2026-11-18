@@ -67,6 +67,9 @@ try {
     ['watch-gulls', `spot=court.run&${feelQ({ 'venue.venicePhoneWatchers': 0 })}`, false], ['watch-phone', 'spot=court.run', true],
     // V2 phase 2: court life off / on, arriving beside Court 4 (the phone's shooter, in front of the camera) and on a desktop
     ['life-courtoff', `spot=court.arc&${feelQ({ 'venue.veniceCourtLife': 0 })}`, false], ['life-court', 'spot=court.arc', true], ['desktop-court', 'spot=court.arc', true],
+    // the same at a small window with the desktop tier forced (?tier=desktop, scene/graphicsSetting): the tier rule makes any
+    // viewport whose short edge is under 700 px a phone (scene/tierRule MOBILE_MAX_SHORT_EDGE_PX), and a big one is slow here
+    ['desktop-court-forced', 'spot=court.arc&tier=desktop', true],
     // the cold start with everything on (the row's worst view in the pass: 45 / 58 / 73)
     ['life-gate', '', true],
     // the gate's controls: court life off (the watchers alone), and court life and phone watchers off (the pass's gulls only)
