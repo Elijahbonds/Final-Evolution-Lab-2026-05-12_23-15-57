@@ -2,8 +2,9 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Loader2, PartyPopper, ArrowRight } from 'lucide-react';
+import { PartyPopper, ArrowRight } from 'lucide-react';
 import { CarnivalLoader } from './loader';
+import { GameLoading } from '@/components/games/game-loading';
 import {
   drawCarnivalLineup, startCarnivalRun, carnivalStopHref, carnivalStopLabel,
 } from '@/lib/carnival-run';
@@ -15,7 +16,7 @@ import {
  *  the native 3D round and the quick mini-game pages — off from stop one. */
 export function CarnivalHubClient() {
   return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-[#050505]"><Loader2 className="h-8 w-8 animate-spin text-[#FFD700]" /></div>}>
+    <Suspense fallback={<GameLoading className="min-h-screen bg-[#050505]" label="Loading Game Night…" />}>
       <CarnivalHubInner />
     </Suspense>
   );
@@ -48,9 +49,7 @@ function CarnivalHubInner() {
 
   if (!lineup) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#050505]">
-        <Loader2 className="h-8 w-8 animate-spin text-[#FFD700]" />
-      </div>
+      <GameLoading className="min-h-screen bg-[#050505]" label="Loading Game Night…" />
     );
   }
 

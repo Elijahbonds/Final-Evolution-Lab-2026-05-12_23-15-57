@@ -297,6 +297,9 @@ const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick' | 'boost' | 'turbo'>> 
   // guard, slow-time, partner and fuse ride the d-pad and the Adventure's own touch radial (adventure/host/touchRadial)
   adventure: verbs({ A: { label: 'JUMP', emit: A('A') }, B: { label: 'DASH', emit: A('B') }, X: { label: 'LIGHT', emit: A('X') }, Y: { label: 'HEAVY', emit: A('Y') } }),
   adventure_br: verbs({ A: { label: 'JUMP', emit: A('A') }, B: { label: 'DASH', emit: A('B') }, X: { label: 'LIGHT', emit: A('X') }, Y: { label: 'HEAVY', emit: A('Y') } }),   // ADVENTURE C: the BR plays on the same buttons
+  // VENICE V1: the hub is a walkable place, not a fight. It uses Adventure's movement mapper but walkOnly() clears attacks,
+  // so the touch deck must expose only the verbs that still do something in Venice.
+  venice_hub: verbs({ A: { label: 'JUMP', emit: A('A') }, B: { label: 'DASH', emit: A('B') } }),
 
   default: verbs({ A: { label: 'ACTION', emit: A('A') } }),
 };

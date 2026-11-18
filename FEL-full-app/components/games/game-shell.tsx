@@ -771,7 +771,7 @@ function GameShellInner({
             <Link
               href="/play"
               aria-label="Leave the game"
-              className="pointer-events-auto grid h-9 w-9 place-items-center rounded-lg border border-white/15
+              className="pointer-events-auto grid h-11 w-11 place-items-center rounded-lg border border-white/15
                          bg-black/50 text-white/70 backdrop-blur-md transition-colors hover:text-white fel-chrome-glass"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -782,7 +782,7 @@ function GameShellInner({
                 type="button"
                 onClick={onFullscreen}
                 aria-label={fsOn ? 'Leave full screen' : 'Full screen'}
-                className="pointer-events-auto grid h-9 w-9 place-items-center rounded-lg border border-white/15
+                className="pointer-events-auto grid h-11 w-11 place-items-center rounded-lg border border-white/15
                            bg-black/50 text-white/70 backdrop-blur-md transition-colors hover:text-white fel-chrome-glass"
               >
                 {fsOn ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
