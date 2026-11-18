@@ -13,6 +13,19 @@ set -u
 OUT=${1:?out dir}
 cd "$(dirname "$0")/../../.."
 mkdir -p "$OUT"
+# BUILD_FIRST=1: make the production build INSIDE this hold (coordinator 2026-11-18: no build on disk while waiting in the
+# queue), only if the build rules hold right now (>= 12.5 GB memory available, >= 6 GB disk, no other next build running)
+if [ "${BUILD_FIRST:-0}" = 1 ] && [ ! -f .next-coast/BUILD_ID ]; then
+  a=$(free -m | awk '/Mem:/{print $7}'); d=$(df -BG --output=avail / | tail -1 | tr -dc 0-9)
+  if [ "$a" -ge 12500 ] && [ "$d" -ge 6 ] && ! pgrep -f "next build" >/dev/null; then
+    echo "build start $(date) mem=$a disk=${d}G"
+    NODE_OPTIONS=--max-old-space-size=4096 ES_DIST=.next-coast ES_PORT=3811 ES_PG_PORT=55491 ES_PG_DIR=/var/lib/postgresql/coast-islands-pg ES_OUT="$OUT/es" \
+      /home/user/wt/cpu-run.sh npx tsx scripts/every-screen/rig.mts build > "$OUT/build.log" 2>&1
+    echo "build exit $? $(date)"; git checkout -- tsconfig.json
+  else
+    echo "build rules not met (mem=$a disk=${d}G or another build): every-screen skipped this hold"
+  fi
+fi
 if [ -f .next-coast/BUILD_ID ]; then
   ES_DIST=.next-coast ES_PORT=3811 ES_PG_PORT=55491 ES_PG_DIR=/var/lib/postgresql/coast-islands-pg ES_OUT="$OUT/es" \
     npx tsx scripts/every-screen/score.mts --routes=/play/coast --budget=900 > "$OUT/score.log" 2>&1
