@@ -44,7 +44,7 @@ import { besidePlayer, COAST_PARTNER_CATCHUP_M, COAST_PARTNER_ON, COAST_PARTNER_
 import { COAST_CREATURES_ON, COAST_LOG_MEET_M, COAST_LOG_SEEN_M, CreatureHerd } from '@/lib/adventure/coast/zoneCreatures';
 import { CreatureBodies, LogKeeper, mountPartnerBody, type PartnerBody } from '@/lib/adventure/coast/zoneLife';
 import { adventureSavePolicy } from '../adventure/save/policy';
-import { ALL_SPOTS, COAST_SPORTS_ON, COAST_TOWN_ON, COAST_TOWNSFOLK, TOWNSFOLK, returnSpawnFor, sportSpotById, spotAtAll } from '@/lib/adventure/coast/zoneTown';
+import { ALL_SPOTS, COAST_SPORTS_ON, COAST_TOWN_LOAD_AFTER_SEC, COAST_TOWN_ON, COAST_TOWNSFOLK, TOWNSFOLK, returnSpawnFor, sportSpotById, spotAtAll } from '@/lib/adventure/coast/zoneTown';
 import { mountZoneTownView, type ZoneTownView } from '@/lib/adventure/coast/zoneTownView';
 import { spotFromSearch } from '@/lib/adventure/coast/spotReturn';
 import { COAST_QUESTS_ON, questById, readQuests, withPlayed, withQuestTaken, withQuestsChecked } from '@/lib/adventure/coast/zoneQuests';
@@ -220,7 +220,7 @@ export const CoastZoneMode: ModeDefinition = {
     zoneUi.setLog(log.entries(), null);
     // back from a spot's game: it counts as played there (the beach net's quest)
     if (back) log.update((sv) => withPlayed(sv, back, (id) => !!sportSpotById(id)));
-    S.town = townOn ? mountZoneTownView(scene, { townsfolk: Math.round(feel('coast.townsfolk', COAST_TOWNSFOLK)), sports: sportsOn }) : null;
+    S.town = townOn ? mountZoneTownView(scene, { townsfolk: Math.round(feel('coast.townsfolk', COAST_TOWNSFOLK)), sports: sportsOn, heavyAfterSec: feel('coast.townLoadAfterSec', COAST_TOWN_LOAD_AFTER_SEC) }) : null;
     S.spots = ALL_SPOTS.filter((x) => (x.kind === 'sport' ? sportsOn : x.kind === 'person' ? townOn && TOWNSFOLK.indexOf(x as (typeof TOWNSFOLK)[number]) < Math.round(feel('coast.townsfolk', COAST_TOWNSFOLK)) : true));
     S.questsOn = questsOn;
     if (questsOn) {

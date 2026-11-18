@@ -1045,6 +1045,7 @@ Group **Coast · zone**. All new; each off restores phase B.
   the shipped Venice boardwalk kit as the market strip, the street). 0 = the bare beach, and no quests.
 - `coast.townsfolk` 4: how many townsfolk stand in town (the Venice watchers' roster bodies; each is a skinned body with its own
   textures, measured on the phone rig). 0–4; the first three give the quests.
+- `coast.townLoadAfterSec` 0.5 s: the market kit and the townsfolk's bodies start loading this long after the zone is playable, not during its load (measured: loading them with the zone made it playable about 5 s later on the rig). 0 = with the zone. New (coast-d), [TUNE].
 - `coast.sportsOn` 1: the sports spots (surf, beach volleyball, golf, the kart) open their games in one tap and the end screen
   brings you back to the spot. 0 = none.
 - `coast.questsOn` 1 (`lib/adventure/coast/zoneQuests.ts`): the townsfolk give three quests, saved in the Adventure save like the

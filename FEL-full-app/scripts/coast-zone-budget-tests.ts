@@ -59,7 +59,7 @@ export function townTris(): { tris: number; kit: number } {
   let tris = HOUSES.length * 3 * box + Math.ceil((STREET.x1 - STREET.x0) / 4) * 2 * 2;
   if (COAST_SPORTS_ON) {
     for (const s of SPORT_SPOTS) tris += s.marker === 'surfboard' ? t(CreateSphereVertexData({ segments: 10 }).indices)
-      : s.marker === 'net' ? 3 * box : s.marker === 'flag' ? 3 * box : 3 * box + 2;
+      : s.marker === 'net' ? 4 * box : s.marker === 'flag' ? 3 * box : 3 * box + 2;
     tris += SPORT_SPOTS.length * RING_SEGMENTS * 2 + SPORT_SPOTS.length * 4;
   }
   if (COAST_QUESTS_ON) tris += TOWNSFOLK.slice(0, COAST_TOWNSFOLK).filter((p) => p.questId).length * 2;

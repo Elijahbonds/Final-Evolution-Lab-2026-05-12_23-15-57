@@ -50,7 +50,9 @@ const paint = (m: Mesh, hex: string): Mesh => {
   return m;
 };
 
-export function mountZoneTownView(scene: Scene, o: { townsfolk: number; sports: boolean }): ZoneTownView {
+/** `heavyAfterSec`: the market kit and the townsfolk's bodies (the town's two downloads) start this long after the zone's first
+ *  frame, not during its load (coast-d d1: loading them with the zone made it playable about 5 s later on the rig). */
+export function mountZoneTownView(scene: Scene, o: { townsfolk: number; sports: boolean; heavyAfterSec?: number }): ZoneTownView {
   const root = new TransformNode('coast_town', scene);
   const mats: StandardMaterial[] = [], texs: DynamicTexture[] = [];
   const vcMat = new StandardMaterial('coast_town_mat', scene); vcMat.specularColor = new Color3(0.1, 0.1, 0.1); mats.push(vcMat);
@@ -77,14 +79,16 @@ export function mountZoneTownView(scene: Scene, o: { townsfolk: number; sports: 
       b.scaling.set(0.55, 2.2, 0.14); b.position.set(x - 2.5, y + 0.9, z - 1); b.rotation.z = 0.12; parts.push(b);
     } else if (s.marker === 'net') {
       for (const dz of [-4.5, 4.5]) { const p = paint(MeshBuilder.CreateBox(`${s.id}_post${dz}`, { width: 0.12, height: 2.5, depth: 0.12 }, scene), '#E8E8E8'); p.position.set(x - 3, y + 1.25, z + dz); parts.push(p); }
-      const net = paint(MeshBuilder.CreateBox(`${s.id}_netband`, { width: 0.05, height: 0.9, depth: 9 }, scene), '#F7F7F2'); net.position.set(x - 3, y + 1.95, z); parts.push(net);
+      // two tapes, not a solid band: from behind the player (the camera's side) a solid 9 m band read as a white wall
+      for (const [ty, th] of [[2.38, 0.12], [1.62, 0.06]] as const) { const t = paint(MeshBuilder.CreateBox(`${s.id}_tape${ty}`, { width: 0.05, height: th, depth: 9 }, scene), '#F7F7F2'); t.position.set(x - 3, y + ty, z); parts.push(t); }
     } else if (s.marker === 'flag') {
       const pole = paint(MeshBuilder.CreateBox(`${s.id}_pole`, { width: 0.07, height: 2.6, depth: 0.07 }, scene), '#EDEDED'); pole.position.set(x - 2, y + 1.3, z - 2); parts.push(pole);
       const flag = paint(MeshBuilder.CreateBox(`${s.id}_flag`, { width: 0.03, height: 0.5, depth: 0.8 }, scene), '#E63946'); flag.position.set(x - 2, y + 2.35, z - 1.6); parts.push(flag);
       const tee = paint(MeshBuilder.CreateBox(`${s.id}_teebox`, { width: 3, height: 0.06, depth: 3 }, scene), '#4F9A52'); tee.position.set(x, y + 0.03, z); parts.push(tee);
     } else {
-      for (const dz of [-4, 4]) { const p = paint(MeshBuilder.CreateBox(`${s.id}_gate${dz}`, { width: 0.25, height: 3.2, depth: 0.25 }, scene), '#222222'); p.position.set(x + 2, y + 1.6, z + dz); parts.push(p); }
-      const banner = paint(MeshBuilder.CreateBox(`${s.id}_banner`, { width: 0.2, height: 0.7, depth: 8.2 }, scene), '#E63946'); banner.position.set(x + 2, y + 3.0, z); parts.push(banner);
+      // a gantry high enough that, back from a race, the camera looks under it down the street (at 3 m it filled the screen)
+      for (const dz of [-4, 4]) { const p = paint(MeshBuilder.CreateBox(`${s.id}_gate${dz}`, { width: 0.25, height: 5.2, depth: 0.25 }, scene), '#222222'); p.position.set(x + 2, y + 2.6, z + dz); parts.push(p); }
+      const banner = paint(MeshBuilder.CreateBox(`${s.id}_banner`, { width: 0.2, height: 0.5, depth: 8.2 }, scene), '#E63946'); banner.position.set(x + 2, y + 5.0, z); parts.push(banner);
       const t = new DynamicTexture('coast_checker', 128, scene, false); texs.push(t);
       const g = t.getContext() as CanvasRenderingContext2D;
       for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) { g.fillStyle = (i + j) % 2 ? '#111' : '#f4f4f4'; g.fillRect(i * 16, j * 16, 16, 16); }
@@ -120,14 +124,15 @@ export function mountZoneTownView(scene: Scene, o: { townsfolk: number; sports: 
     SPORT_SPOTS.forEach((s, k) => {
       const [x, y, z] = markerAt(s);
       if (!ringMaster) {
-        ringMaster = groundRing('coast_sport_ring', 1, 0.05, scene); ringMaster.scaling.setAll(s.radius * 0.7);
+        ringMaster = groundRing('coast_sport_ring', 1, 0.05, scene); ringMaster.scaling.setAll(s.radius);
         ringMaster.material = ringMat; ringMaster.isPickable = false; ringMaster.parent = root; ringMaster.position.set(x, y + 0.1, z);
-      } else { const r = ringMaster.createInstance(`coast_sport_ring_${s.id}`); r.parent = root; r.isPickable = false; r.scaling.setAll(s.radius * 0.7); r.position.set(x, y + 0.1, z); }
+      } else { const r = ringMaster.createInstance(`coast_sport_ring_${s.id}`); r.parent = root; r.isPickable = false; r.scaling.setAll(s.radius); r.position.set(x, y + 0.1, z); }
       g.fillStyle = '#7DD3FC'; g.font = 'bold 54px sans-serif'; g.textBaseline = 'middle';
       g.fillText(s.game.slice(0, 18), 20, k * 128 + 66);
       const v0 = 1 - (k + 1) / 4, v1 = 1 - k / 4;
-      const sign = MeshBuilder.CreatePlane(`coast_sport_sign_${s.id}`, { width: 4.2, height: 1.05, sideOrientation: Mesh.DOUBLESIDE, frontUVs: new Vector4(0, v0, 1, v1), backUVs: new Vector4(1, v0, 0, v1) }, scene);
-      sign.parent = root; sign.position.set(x, y + 3.6, z); sign.billboardMode = Mesh.BILLBOARDMODE_Y; sign.isPickable = false; sign.material = signMat;
+      // high over the spot: seen from the beach, and above the camera's view once you stand in the ring (at 3.6 m it filled the screen)
+      const sign = MeshBuilder.CreatePlane(`coast_sport_sign_${s.id}`, { width: 3.6, height: 0.9, sideOrientation: Mesh.DOUBLESIDE, frontUVs: new Vector4(0, v0, 1, v1), backUVs: new Vector4(1, v0, 0, v1) }, scene);
+      sign.parent = root; sign.position.set(x, y + 6.5, z); sign.billboardMode = Mesh.BILLBOARDMODE_Y; sign.isPickable = false; sign.material = signMat;
     });
     atlas.update();
   }
@@ -136,13 +141,18 @@ export function mountZoneTownView(scene: Scene, o: { townsfolk: number; sports: 
   const kitAt = new TransformNode('coast_market', scene); kitAt.parent = root;
   kitAt.position.set(MARKET.x, terrainY(MARKET.x, MARKET.z) - 0.05, MARKET.z);
   const slash = MARKET_KIT_URL.lastIndexOf('/');
-  const kit = SceneLoader.ImportMeshAsync('', MARKET_KIT_URL.slice(0, slash + 1), MARKET_KIT_URL.slice(slash + 1), scene).then((r) => {
+  let disposed = false;
+  let kitDone!: () => void;
+  const kit = new Promise<void>((r) => { kitDone = r; });
+  const loadKit = () => SceneLoader.ImportMeshAsync('', MARKET_KIT_URL.slice(0, slash + 1), MARKET_KIT_URL.slice(slash + 1), scene).then((r) => {
+    if (disposed) { for (const m of r.meshes) m.dispose(false, true); return; }
     for (const m of r.meshes) { if (!m.parent) m.parent = kitAt; m.isPickable = false; m.receiveShadows = true; }
-  }).catch((e) => console.warn('[COAST] market kit', e));
+  }).catch((e) => console.warn('[COAST] market kit', e)).finally(() => kitDone());
 
   // the townsfolk: the Venice watchers' bodies, idling, facing the street; paused while off screen
   const folk = TOWNSFOLK.slice(0, Math.max(0, Math.min(TOWNSFOLK.length, Math.round(o.townsfolk))));
-  const crowd = folk.length ? new Onlookers(scene, folk.map((p) => new Vector3(p.at[0], terrainY(p.at[0], p.at[1]), p.at[1])), '#2b3550',
+  let crowd: Onlookers | null = null;
+  const loadCrowd = () => folk.length ? new Onlookers(scene, folk.map((p) => new Vector3(p.at[0], terrainY(p.at[0], p.at[1]), p.at[1])), '#2b3550',
     new Vector3((STREET.x0 + STREET.x1) / 2, terrainY((STREET.x0 + STREET.x1) / 2, STREET.z), STREET.z), { pauseOffscreen: true, restBetweenCheers: true, idleBobStepSec: 0.2, oneBodyPerFrame: true }) : null;
 
   // "!" over a townsperson whose quest is on offer
@@ -160,7 +170,9 @@ export function mountZoneTownView(scene: Scene, o: { townsfolk: number; sports: 
     marks.set(p.id, m);
   }
 
-  let t = 0;
+  let t = 0, heavy = false;
+  const startHeavy = () => { heavy = true; void loadKit(); crowd = loadCrowd(); };
+  if (!(o.heavyAfterSec! > 0)) startHeavy();
   return {
     root,
     ready: Promise.allSettled([kit]).then(() => undefined),
@@ -168,9 +180,10 @@ export function mountZoneTownView(scene: Scene, o: { townsfolk: number; sports: 
     setOffers(ids) { for (const [id, m] of marks) m.setEnabled(ids.has(id)); },
     update(dt) {
       t += dt;
+      if (!heavy && !disposed && t >= o.heavyAfterSec!) startHeavy();
       crowd?.update(dt);
       for (const m of marks.values()) if (m.isEnabled()) m.position.y += Math.sin(t * 3) * 0.002;
     },
-    dispose() { crowd?.dispose(); for (const x of texs) x.dispose(); for (const m of mats) m.dispose(); root.dispose(false, true); },
+    dispose() { disposed = true; crowd?.dispose(); for (const x of texs) x.dispose(); for (const m of mats) m.dispose(); root.dispose(false, true); },
   };
 }

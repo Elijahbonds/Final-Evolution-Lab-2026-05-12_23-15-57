@@ -3,7 +3,7 @@
 // one seen), the way the zone writes them (lib/adventure/coast/creatureLog withLog), so the panel has something to show.
 // Phase D, on the same real page: the quest panel (a save with Marisol's quest taken and Pip's done, the way the zone writes them:
 // zoneQuests withQuestTaken), the volleyball spot's card (the page opened as a game sends you back, `?from=coast&spot=volley.net`,
-// then a step forward into the ring with the keyboard), and the town seen from the kart's start line (`?spot=kart.start`).
+// then a step forward into the ring on the move stick), and the town seen from the kart's start line (`?spot=kart.start`).
 // Run inside the browser hold, after the build:  ES_DIST=.next-coast ES_PORT=3811 … npx tsx scripts/probes/coast-islands/log-shot.mts <out-dir>
 import { chromium } from 'playwright-core';
 import path from 'node:path';
@@ -61,7 +61,11 @@ try {
     await p2.waitForTimeout(6000);   // the dressing and the townsfolk land
     let card: string | null = null;
     if (step) {
-      await p2.keyboard.down('w'); await p2.waitForTimeout(step); await p2.keyboard.up('w');
+      // the move stick (a phone has no keyboard): a thumb down on the stick's zone, pushed up (forward), held, let go
+      const z = await p2.locator('[data-float-stick]').boundingBox();
+      const cx = z ? z.x + z.width / 2 : 100, cy = z ? z.y + z.height / 2 : 760;
+      await p2.mouse.move(cx, cy); await p2.mouse.down(); await p2.mouse.move(cx, cy - 70, { steps: 5 });
+      await p2.waitForTimeout(step); await p2.mouse.up();
       try { await p2.getByTestId('coast-sport').waitFor({ timeout: 8000 }); card = await p2.getByTestId('coast-sport').textContent(); } catch { card = null; }
       await p2.waitForTimeout(400);
     }

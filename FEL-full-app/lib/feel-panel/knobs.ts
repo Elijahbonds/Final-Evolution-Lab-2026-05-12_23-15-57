@@ -2142,6 +2142,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'Each is a full body with its own textures (a phone cost, measured). Fewer = fewer quest givers.',
   },
   {
+    id: 'coast.townLoadAfterSec', label: 'Coast zone: seconds after you can move before the market and townsfolk load', def: 0.5, min: 0, max: 10, step: 0.5, unit: 's', group: 'Coast · zone',
+    source: 'lib/adventure/coast/zoneTown.ts COAST_TOWN_LOAD_AFTER_SEC',
+    hint: 'Keeps the two big town downloads out of the wait before you can move. 0 = load them with the zone.',
+  },
+  {
     id: 'coast.sportsOn', label: 'Coast zone: sports spots open their games (1) / none (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Coast · zone',
     source: 'lib/adventure/coast/zoneTown.ts COAST_SPORTS_ON',
     hint: 'Surf, beach volleyball, golf and the kart, one tap each, and back to the same spot after.',

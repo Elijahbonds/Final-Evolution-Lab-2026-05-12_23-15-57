@@ -153,7 +153,9 @@ try {
       await page.evaluate(`window.__bus.emit({ t: 'stick', side: 'R', x: 0, y: 0 })`);
       await page.waitForTimeout(500);
       await shot('beach');
-      legs.bridgeEast = await walkTo(page, 66, -36, 60, sample);
+      // onto the bridge's middle line first (within 1 m): from the volleyball net the walk reaches the beach's south end at another
+      // angle, and a 3 m tolerance left it on a line along the bridge's edge, off the deck into the shallows (coast-d d1: both sides)
+      legs.bridgeEast = await walkTo(page, 68, -36, 60, sample, 1);
       legs.bridgeMid = await walkTo(page, 20, -36, 150, sample);
       await shot('island');
       legs.palmKey = await walkTo(page, -24, -36, 150, sample);

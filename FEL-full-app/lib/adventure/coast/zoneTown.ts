@@ -134,5 +134,7 @@ export const RING_SEGMENTS = 40;
 export const COAST_TOWN_ON = 1;
 /** coast.townsfolk: how many townsfolk stand in town (roster bodies, each a skinned body and its maps: a phone cost). */
 export const COAST_TOWNSFOLK = 4;
+/** coast.townLoadAfterSec: the market kit and the townsfolk start loading this long after the zone is playable (0 = with the zone). */
+export const COAST_TOWN_LOAD_AFTER_SEC = 0.5;
 /** coast.sportsOn: 1 = the sports spots open their games (new); 0 = none. */
 export const COAST_SPORTS_ON = 1;
