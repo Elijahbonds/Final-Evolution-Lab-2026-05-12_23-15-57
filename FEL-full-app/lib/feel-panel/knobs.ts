@@ -308,7 +308,17 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'hoops.moveArmRateDeg', label: 'Move ease: arm limit mid-move', def: 1800, min: 600, max: 5000, step: 50, unit: '°/s', group: 'Hoops · handle (rest)',
     source: 'lib/babylon/anim/MoveEase.ts MOVE_ARM_RATE_DEG',
     hint: 'The fastest an arm bone may turn through the rest of a move.',
+  },  {
+    id: 'hoops.moveHandEaseOn', label: 'Moves: the hands ease too (1) / as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/MoveEase.ts MOVE_HAND_EASE_ON',
+    hint: 'On: through a handle move no hand turns faster than the rate below from where it was drawn (the behind-the-back hand whip). Off: as before.',
   },
+  {
+    id: 'hoops.moveHandRateDeg', label: 'Moves: fastest a hand turns', def: 1800, min: 600, max: 4000, step: 100, unit: '°/s', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/MoveEase.ts MOVE_HAND_RATE_DEG',
+    hint: 'With the hand ease on: how fast a hand may turn in a move.',
+  },
+
   {
     id: 'hoops.jumperHopOn', label: 'Jumper hop timed to the release on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · jump shot',
     source: 'lib/babylon/core/JumperHop.ts JUMPER_HOP_ON',
@@ -879,6 +889,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'touch.floatStick', label: 'Phone: floating move stick (1) / fixed (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · movement',
     source: 'lib/babylon/ui/floatStick.ts TOUCH_FLOAT_STICK',
     hint: '1v1 and 3v3 on a touch screen. 1 = the stick appears under the thumb, 1.5 times the old size, a 10 percent dead zone. 0 = the old fixed 96 px stick.',
+  },
+  {
+    id: 'touch.dpadTapOn', label: 'Phone: d-pad arrows a 44 px tap (1) / 24 px (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · movement',
+    source: 'lib/babylon/ui/dpadTap.ts TOUCH_DPAD_TAP_ON',
+    hint: 'Every mode on a touch screen. 1 = each d-pad arrow is at least 44 px as drawn: a row of four on an upright phone, a bigger cross sideways. 0 = the old 24 px cross.',
   },
   // lane/move-feel (new, 2026-11-12): the walk / jog line eased (0 = the step as shipped) — GEARS_HANDLER only (the dunk run-up never reads it)
   {
@@ -1721,6 +1736,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
   },
   // ── lane/hoops-perf (owner 2026-11-12: join each body into one mesh; cut the heap churn) ──
   {
+    id: 'perf.meterWgslOn', label: 'WebGPU try: the shot meter drawn by its WebGPU shader (1) / not drawn (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/babylon/visual/ShotMeter3D.ts METER_WGSL_ON',
+    hint: 'Only under the owner WebGPU try (?engine=webgpu). 1 = the 3D shot meter has a WebGPU version of its shader. 0 = as before (missing under WebGPU). WebGL is the same either way.',
+  },
+  {
     id: 'perf.bodyMergeOn', label: 'Bodies: parts drawn by a few meshes (1 phone, 2 every tier) / one mesh per part (0)', def: 1, min: 0, max: 2, step: 1, unit: '', group: 'Hoops · phone budget',
     source: 'lib/babylon/core/bodyMerge.ts BODY_MERGE_ON',
     hint: 'Every mode: once a body holds still, its parts that the renderer treats alike share one mesh (one sub-mesh per part, the same shaders, draw order and ink). Any change puts the parts back that frame. Same picture, fewer active meshes. 1 = the phone tier (measured identical there), 2 = every tier, 0 = one mesh per part, as before.',
@@ -1848,6 +1868,22 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/audio/dribbleSound.ts PASS_CATCH_VOL',
     hint: 'How loud a caught pass is.',
   },
+  // ── hoops-items (2026-11-18): three sound leftovers of hoops-sound, each NEW, its off value the sound as before (audio/hoopsSfx.ts)
+  {
+    id: 'hoops.passThrowQuietOn', label: 'Pass: no menu click on the throw (1) / the click as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · sound',
+    source: 'lib/babylon/audio/hoopsSfx.ts PASS_THROW_QUIET_ON',
+    hint: 'On: a 3v3 pass is heard only in the hands that catch it (and a sling pass whooshes). Off: the throw plays the menu click, as before.',
+  },
+  {
+    id: 'hoops.driftSqueakOn', label: 'Drift: a shoe squeak (1) / the net swish as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · sound',
+    source: 'lib/babylon/audio/hoopsSfx.ts DRIFT_SQUEAK_ON',
+    hint: 'On: the DRIFT slide squeaks like the hardest cut. Off: it plays the net swish, as before.',
+  },
+  {
+    id: 'hoops.glassSoundOn', label: 'Backboard kiss: its own sound (1) / the floor thud as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · sound',
+    source: 'lib/babylon/audio/hoopsSfx.ts GLASS_SOUND_ON',
+    hint: 'On: a banked ball off the glass sounds like a ball on a board. Off: it plays the body-on-the-floor thud, as before.',
+  },
   // ── hoops-builder (owner 2026-11-12): what the five hoops ratings and the playing height change, casual runs only. Every band is
   //    the change at rating 90 (at 40 it moves the other way by a quarter of it); rating 50 is today at any band, and 0 = no effect.
   {
@@ -1965,6 +2001,16 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'hoops.escapeReadOn', label: 'Step-back escape reads the man (1) / as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · gathers',
     source: 'lib/babylon/hoops/response/escapeRead.ts ESCAPE_READ_ON',
     hint: 'On: a step-back beats a man on his heels or off balance (he is late), never a set man or one coming at you. Off: as before.',
+  },
+  {
+    id: 'hoops.escapeRead3v3On', label: '3v3 step-back reads the man, his backpedal runs on (1) / reads nobody, as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · gathers',
+    source: 'lib/babylon/hoops/response/escapeRead.ts ESCAPE_READ_3V3_ON',
+    hint: 'On: in 3v3 a step-back beats a man on his heels or off balance like 1v1, and he carries the backpedal he was in before he recovers. Off: as before.',
+  },
+  {
+    id: 'hoops.escapeLateCarry', label: '3v3 step-back: a beaten man carries this share of his speed', def: 0.7, min: 0, max: 1, step: 0.05, unit: '', group: 'Hoops · gathers',
+    source: 'lib/babylon/hoops/response/escapeRead.ts ESCAPE_LATE_CARRY',
+    hint: 'Through the late window the man the 3v3 step-back beat keeps backpedalling at this share of his speed. 0 = he brakes at once and stands.',
   },
   {
     id: 'hoops.trapReadOn', label: 'Trap: a cross splits an open gap, is stripped on the closed side (1) / as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · gathers',

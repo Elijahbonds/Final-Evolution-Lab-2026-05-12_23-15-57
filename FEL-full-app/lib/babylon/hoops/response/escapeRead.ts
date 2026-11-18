@@ -20,6 +20,7 @@
 // Every number is a knob; hoops.escapeReadOn 0 and hoops.trapReadOn 0 are today exactly (the modes skip all of it). Pure: no Babylon.
 import { feel } from '../../../feel-panel/feel';
 import { readTheMan, moveLeanMps, type ManRead, type ReadVerdict } from '../rulebook';
+import type { DefReaction } from '../../core/DefenderReact';
 
 /** The step-back reads the defender (1) / today's step-back (0). Knob `hoops.escapeReadOn`. ON (measured, FLAGGED). 1v1 only: in 3v3 a
  *  late man (stunSec) is frozen on the spot — the backpedal he was in stops dead, so the read cost space there (measured +0.58-0.62 m
@@ -53,6 +54,13 @@ export const PASS_APART_M = 2.2;
 /** A man is ON a side when he is this far across the handler's centre line (m; geometry). */
 export const SIDE_MIN_M = 0.15;
 
+/** hoops-items (2026-11-18): THE 3V3 HOP-BACK READS HIM TOO (1) / the 3v3 step-back reads nobody, as before (0). The same read as
+ *  1v1 (stepBackRead: off balance, or on his heels), the same escapeLateSec — but the man is NOT frozen: a 3v3 stun stops a body dead
+ *  (its velocity zeroed, the reason the earlier try cost space), so the beaten man gets a LATE REACTION instead (lateRunOn): no wish for
+ *  escapeLateSec, his own mover braking from the backpedal he was in at its own brake cap, so the backpedal runs on and THEN he stands
+ *  and recovers — what the 1v1 man does. Knob `hoops.escapeRead3v3On`. */
+export const ESCAPE_READ_3V3_ON = 1;
+export const escapeRead3v3On = (): boolean => feel('hoops.escapeRead3v3On', ESCAPE_READ_3V3_ON) >= 0.5;
 export const escapeReadOn = (): boolean => feel('hoops.escapeReadOn', ESCAPE_READ_ON) >= 0.5;
 export const escapeLateSec = (): number => feel('hoops.escapeLateSec', ESCAPE_LATE_SEC);
 export const trapReadOn = (): boolean => feel('hoops.trapReadOn', TRAP_READ_ON) >= 0.5;
@@ -93,4 +101,22 @@ export function trapEscape(handler: XZ, yaw: number, side: 'left' | 'right', men
   const beat: number[] = [];
   men.forEach((m, i) => { if (readTheMan({ ...m.read, moveSide: side }).beat) beat.push(i); });
   return { kind: 'open', beat };
+}
+
+/** hoops-items: how much of his own speed a beaten 3v3 man carries through the late window (NEW). Measured on the rig: the 1v1 man the read
+ *  beats keeps going at 3.7 → 1.7 m/s over the 0.8 s after the hop (about 0.7 of his speed on average) — that is the space the 1v1 read buys
+ *  (+1.64 m); a 3v3 man braked to a stand inside 0.2 s bought only +0.73 m. Knob `hoops.escapeLateCarry` (0 = he brakes at once and stands). */
+export const ESCAPE_LATE_CARRY = 0.7;
+export const escapeLateCarry = (): number => feel('hoops.escapeLateCarry', ESCAPE_LATE_CARRY);
+
+/** hoops-items: THE LATE THAT LETS HIS BACKPEDAL RUN ON (3v3). A reaction that owns the beaten man's feet for `lateSec`: he carries the
+ *  backpedal he was in — along his own velocity `vel`, at `carry` × his speed, steady through the window (DefenderReact's wish is the
+ *  distance left over the time left) — then stops at his mover's brake cap and the brain has him. With `carry` 0, or a man barely moving
+ *  (off balance), it wishes for nothing: his mover brakes from the speed he had and he stands (no freeze: the stun zeroed his velocity in
+ *  the frame, the reason the earlier 3v3 try cost space). Pure. */
+export function lateRunOn(lateSec: number, vel: XZ = { x: 0, z: 0 }, carry = 0): DefReaction {
+  const L = Math.max(0, lateSec), v = Math.hypot(vel.x, vel.z);
+  if (!(carry > 0) || v < 0.2) return { kind: 'standup', dir: { x: 0, z: 0 }, left: L, togo: 0, tune: { sec: L, dist: 0, maxMps: 0 } };
+  const togo = carry * v * L;
+  return { kind: 'retreat', dir: { x: vel.x / v, z: vel.z / v }, left: L, togo, tune: { sec: L, dist: togo, maxMps: v } };
 }

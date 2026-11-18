@@ -218,6 +218,7 @@ import { retreatFrom, shadeToward, lungeFor, lungesOn, standUpOn, reactionWish, 
 import { mountBallCarry, type BallCarry } from '../anim/ballCarry';
 import { rightHandDunks, dunkHandPass } from '../anim/dunkHand';   // DUNK MOTION phase 11: right-handed game dunks
 import { SoundKit } from '../audio/SoundKit';
+import { glassKissSound, driftSound } from '../audio/hoopsSfx';   // hoops-items: the backboard kiss, the drift's squeak, the quiet throw
 import { ModeMic } from '../audio/mic/ModeMic';   // THE MIC (2026-09-24): the court's MC, the sidekick, the crowd and the rival, on the mic
 import { dunkStingers } from '../audio/mic/names';
 import { HOOPERS } from '../audio/mic/cast';
@@ -815,7 +816,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   /** …and the touches while it is there: the iron's rattle and the ring's spring, the glass's thud. */
   function rimTouches(): void {
     for (const t of arc.takeTouches()) {
-      if (t.on === 'glass') { SoundKit.play('thud', { pitch: 1.5, volume: 0.35 }); console.info(`[1V1-RIM] glass kiss`); }
+      if (t.on === 'glass') { const gk = glassKissSound(); SoundKit.play(gk.name, gk.opts); console.info(`[1V1-RIM] glass kiss`); }   // hoops-items: its own sound (hoops.glassSoundOn)
       else { SoundKit.play('rattle', { volume: 0.18 + t.strength01 * 0.22 }); hoopJuice?.graze(); shotClock.rimTouch(); }   // lane/hoops-shot-core: a rim touch resets the shot clock
     }
   }
@@ -1567,7 +1568,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         if (driftCool <= 0 && carrying && !shooting && !dunking && !finish && !gather && !spin && !posting && driftRead(ltHeld, sprintOk, meDribble.vel, { x: mx, z: -my })) {
           const before = meDribble.vel.clone();
           meDribble.drift(mx, -my); driftCool = DRIFT.cooldownSec; kin.drifts++;   // the cut takes WORLD z (the stick hands −z)
-          ctx.juice.callout('DRIFT', '#22d3ee', 380); SoundKit.play('swish', { pitch: 0.8, volume: 0.4 }); EffectsKit.burst(ctx.scene, me.root.position.clone(), 'dust');
+          ctx.juice.callout('DRIFT', '#22d3ee', 380); { const ds = driftSound(); SoundKit.play(ds.name, ds.opts); }   /* hoops-items: a squeak (hoops.driftSqueakOn) */ EffectsKit.burst(ctx.scene, me.root.position.clone(), 'dust');
           console.info(`[1V1-KIN] drift ${turnDegLog(before, mx, -my)}° at ${before.length().toFixed(1)} m/s`);
           if (foeStunSec === 0 && !foeFloored && ankleBreak(me.root.position, before, foe.root.position)) {
             foeStunSec = DRIFT.stunSec; foeAnimTree.beat('bball_contact_react', { fadeSec: 0.08 }); kin.ankles++;

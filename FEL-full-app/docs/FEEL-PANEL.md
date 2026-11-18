@@ -961,6 +961,53 @@ owner's two Blender jobs, made headless from the free MakeHuman garments (docs/S
 - MEASURED (KIT-FIT-PLAN §11): with either knob on, more skin shows through in the game (the basketball jersey about twice,
   the short 2-5x in its slot); the football jersey cuts the pack's torn edges 25x but lets 11-13 % more skin through. Keep both at 0.
 
+## hoops-items, 2026-11-18 (the basketball items the gather, escape, sound and perf lanes left open; the owner has not felt or heard these)
+
+Each knob is NEW and its off value restores the game as it was (tests pin both sides). Probes: `scripts/probes/hoops-items/`.
+
+**The 3v3 step-back (group "Hoops · gathers").** Measured on the hoops-gap rig (`stepback.mjs` over `hoops-gather/trials.mjs SET=g3`):
+the press moves the body just as fast in 3v3 as in 1v1 (the root leaves 2-3 frames after the flick in both, 2 m/s by frame 4 in 3v3 and
+5 in 1v1; the step-back clip fades in over the same 0.12 s, `moveFadeSec`, the same call in both modes). What was "late" is the man: in
+1v1 the read beats a backpedalling man and he keeps going (3.7 → 1.7 m/s over 0.8 s), so a step-back off a drive gains +1.64 m; in 3v3
+nobody was read and the man recovered at once: +0.58 m. After (5 trials a side, the same seed): **+1.66 m** (1.35-1.75).
+- `hoops.escapeRead3v3On` 1: the 1v1 read (`stepBackRead`: off balance, or on his heels) in 3v3, with `hoops.escapeLateSec` 0.7 s. The
+  beaten man is not frozen (a 3v3 stun zeroes his speed in the frame — why the first try cost space); he gets a late reaction instead.
+- `hoops.escapeLateCarry` 0.7: through the late window he carries his own backpedal at 0.7 of his speed (the 1v1 man's average), then
+  stops and recovers. 0 = he brakes at once and stands (measured: +0.73 m, he stood inside 0.2 s).
+A set man, or one coming at you, is not beaten (the standing step-back against a man at his 2 m cushion: −0.8 m with or without, he
+closes; the man who bit by stepping up: 0, the same).
+
+**Sound (group "Hoops · sound"; `lib/babylon/audio/hoopsSfx.ts`).**
+- `hoops.passThrowQuietOn` 1: a 3v3 pass no longer plays the menu click on the throw; it is heard in the hands that catch it, and a sling
+  pass still whooshes. 0 = the click.
+- `hoops.driftSqueakOn` 1: the DRIFT plays a shoe squeak (the hardest scuff: volume 0.26, pitch 1.12) instead of the net swish (0.8, 0.4).
+  About 5 dB louder than the swish was (−51 against −55 dB at the limiter): the owner's ear decides.
+- `hoops.glassSoundOn` 1: the backboard kiss has its own cue, `glass` — the CC0 "Ball against wall" already in the set (`bounce_6`,
+  BigSoundBank s1825; one file, fetched once for both cues) with its own synth as the fallback — at the level the old kiss played (the
+  thud at pitch 1.5, −30.6 dB; the recording's gain 2.62 measured by `hoops-sound/loudness.mts`). 1v1, 3v3 and the 3-point contest. 0 = the thud.
+
+**The d-pad (group "Hoops · movement").**
+- `touch.dpadTapOn` 1 (`lib/babylon/ui/dpadTap.ts`): every d-pad arrow is at least 44 px AS DRAWN (`dpad.mjs`, a 390 × 844 phone and
+  sideways): a row of four 44 px arrows upright, a cross of 52 px arms sideways (the compact deck draws at 0.85: 44.2 px). Before: 24 px,
+  drawn 23.3 upright on 1v1 / 3v3 and 20.4 sideways. On 1v1 and 3v3, where the d-pad is not a verb (1v1 reads none, 3v3 only says MOVE
+  WITH THE STICK), a 44 px row upright covered the TURBO pad, so there it is a hollow, unpressable cross in the old 72 px place (the owner's
+  rule for an unused slot, 2026-09-05), and the floating stick and TURBO stay exactly where they were. 0 = the old 24 px cross everywhere.
+
+**The shot meter under `?engine=webgpu` (group "Hoops · phone budget").**
+- `perf.meterWgslOn` 1 (`visual/ShotMeter3D.ts`): under WebGPU the 3D meter is drawn by a WGSL twin of its shader (the same six layers);
+  if it does not compile on a device, a plain bar in the fill colour is drawn instead of nothing. WebGL is byte-identical (the GLSL is
+  pinned to its hash, the WebGL material built with exactly its old options). 0 = as before (missing under WebGPU). Not verified on a
+  GPU: this box's WebGPU loses its device in about a second (PHONE-PERF-CHECK), so the owner's phone is the first real test.
+
+**Moves: the hands (group "Hoops · handle (rest)").**
+- `hoops.moveHandEaseOn` 1 (FLAGGED, on), `hoops.moveHandRateDeg` 1800 °/s (`anim/MoveEase.ts`): the arm ease (#314) extended to the hand
+  bones. The behind-the-back's whip is the HAND, which the arm ease never held: measured on the rig (`whip.mjs`, the retreat and the BTB
+  slide, 3 trials each), the ball hand's worst turn in one frame 125-132° → 30° in 1v1 and 131° → 30° in 3v3; the ball's path and its
+  contact with the hand unchanged (the hand bone's position is not touched, only its turn). The clip's keys are untouched (GATE 0). The
+  arms' own limit (1800 °/s) is the hands'. 0 = the hands as the layers wrote them, as before.
+- **The hop step's feet: not curable at runtime — a clip job** (docs/HOOPS-GATHER-ESCAPE-PLAN.md, hoops-items): at the take-off the
+  planted foot slides 6-13 cm a frame (3v3 rig) while the root moves 3-6, because the clip folds the legs up under the body.
+
 ## coast-islands, 2026-11-18 (the Coast & Islands zone, phase A; docs/COAST-ISLANDS-PLAN.md; NEW, no shipped number moved)
 
 Group **Coast · zone**. Every row is new behaviour in the new zone; nothing outside `/play/coast` reads them. The zone walks on the
