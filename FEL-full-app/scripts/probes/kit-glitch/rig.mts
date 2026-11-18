@@ -95,6 +95,11 @@ async function matrix(): Promise<void> {
   const poseIds = (process.env.POSES ?? '').split(',').filter(Boolean);
   const camIds = (process.env.CAMS ?? '').split(',').filter(Boolean);
   const shots = process.env.SHOTS === '1';
+  // lane/kit-mac-jobs: <OUT>/override.json ({ desktop|mobile: subjects, poses, cams, skip: NAMEs }) narrows the later matrices of a
+  // hold that is already running (a loaded machine ran 6 min a subject); absent, nothing changes
+  const ov = existsSync(join(OUT, 'override.json')) ? JSON.parse(readFileSync(join(OUT, 'override.json'), 'utf8')) as Record<string, string[]> : null;
+  if (ov && (ov.skip ?? []).includes(process.env.NAME ?? '')) { console.log(`  skipped ${process.env.NAME} (override)`); await browser.close(); srv.close(); return; }
+  if (ov) { const t = tiers[0]; if (ov[t]) { want.length = 0; want.push(...ov[t]); } if (ov.poses) { poseIds.length = 0; poseIds.push(...ov.poses); } if (ov.cams) { camIds.length = 0; camIds.push(...ov.cams); } }
   const subjects = SUBJECTS.filter((s) => !want.length || want.some((w) => s.id === w || (w.endsWith('*') && s.id.startsWith(w.slice(0, -1)))));
   const poses = POSES.filter((p) => !poseIds.length || poseIds.includes(p.id));
   const cams = CAMS.filter((c) => !camIds.length || camIds.includes(c.id));

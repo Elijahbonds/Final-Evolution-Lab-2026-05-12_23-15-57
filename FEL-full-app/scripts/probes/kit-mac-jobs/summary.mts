@@ -2,7 +2,7 @@
 // cloth seen from outside (pokeFront), the flicker (flipsGarment), and per garment the stretch (edges past x2 of bind) and the
 // distance off the skin (p50 / p95, m). Before runs vs after runs, with the control's spread (KIT-FIT-PLAN §10.1a).
 //   npx tsx scripts/probes/kit-mac-jobs/summary.mts <out-dir>
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const dir = process.argv[2];
@@ -11,13 +11,17 @@ type Row = { mesh: string; cls: string; stretch?: { over2: number } | null; offS
 type Cell = { subject: string; tier: string; pose: string; cam: string; screen: Scr; cpu?: { rows: Row[] }[] };
 type Agg = { poke: number; tops: number; shorts: number; front: number; flips: number; over2: Record<string, number>; gap: Record<string, number[]>; cells: number };
 const runs: Record<string, Record<string, Agg[]>> = {};   // side → subject|tier → per run
+// a hold narrowed mid-run (<out>/override.json: poses, cams) is compared on the cells every run has
+const ovf = join(dir, 'override.json');
+const ov = existsSync(ovf) ? JSON.parse(readFileSync(ovf, 'utf8')) as { poses?: string[]; cams?: string[] } : {};
+const keep = (c: { pose: string; cam: string }) => (!ov.poses || ov.poses.includes(c.pose)) && (!ov.cams || ov.cams.includes(c.cam));
 for (const f of readdirSync(dir).filter((x) => /^(before|after)-(desktop|mobile)-\d+\.json$/.test(x)).sort()) {
   const side = f.split('-')[0];
   const cells = JSON.parse(readFileSync(join(dir, f), 'utf8')) as Cell[];
   const failed = new Set(cells.filter((c) => c.screen.failed).map((c) => `${c.subject}|${c.tier}`));
   const per = new Map<string, Agg>();
   for (const c of cells) {
-    const k = `${c.subject}|${c.tier}`; if (c.screen.poke == null || failed.has(k)) continue;
+    const k = `${c.subject}|${c.tier}`; if (c.screen.poke == null || failed.has(k) || !keep(c)) continue;
     const a = per.get(k) ?? { poke: 0, tops: 0, shorts: 0, front: 0, flips: 0, over2: {}, gap: {}, cells: 0 }; per.set(k, a);
     a.cells++; a.poke += c.screen.poke; a.tops += c.screen.pokeBySlot?.tops ?? 0; a.shorts += c.screen.pokeBySlot?.shorts ?? 0;
     a.front += c.screen.pokeFront ?? 0; a.flips += c.screen.flipsGarment ?? 0;
