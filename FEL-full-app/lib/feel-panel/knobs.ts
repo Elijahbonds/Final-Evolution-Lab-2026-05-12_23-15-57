@@ -1726,6 +1726,10 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/adventure/venice/hubUi.ts VENICE_WAYFINDING',
     hint: 'A one-time line saying what to do, a small north-up map of the four courts with you on it, and keys for the card (Enter or X plays, Y plays with your party). 0 = V1.',
   },  {
+    id: 'venue.coastDoor', label: 'Venice hub: the boat to the coast at the landing (1) / no boat (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/adventure/venice/coastDoor.ts VENICE_COAST_DOOR',
+    hint: 'A jetty and a boat west of the courts: step into its ring and the card takes the boat to the Coast and Islands; coming back lands you at the boat. 0 = no boat and no card.',
+  },  {
     id: 'venue.deferScenery', label: 'Venice hub: paint and far scenery after you can move (1) / during the load (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
     source: 'lib/adventure/venice/courtsView.ts VENICE_DEFER_SCENERY',
     hint: 'The hub loads the courts in their plain colour and you first; the painted courts, the palms and the boardwalk row arrive once you can walk. 0 = all of it during the load, as V1.',

@@ -21,6 +21,8 @@ import type { SportSpot, Townsperson } from '@/lib/adventure/coast/zoneTown';
 const NOTE_MS = 3500;
 
 const MODE_KEY = 'coast_zone';
+/** The probe mark Venice's page sets (app/play/venice/stage.tsx AGENT_MARK): the same tab's probe seam on the coast too. */
+const AGENT_MARK = 'fel-venice-agent';
 
 export function CoastStage({ signedIn, back }: { signedIn: boolean; back: string }) {
   const router = useRouter();
@@ -49,6 +51,19 @@ export function CoastStage({ signedIn, back }: { signedIn: boolean; back: string
 
   useEffect(() => {
     try { setTouch(window.matchMedia('(pointer: coarse)').matches); } catch { setTouch(false); }
+  }, []);
+  // a probe's run (?agent=1, or a tab a Venice probe marked: the round trip Venice → coast → Venice by the app's own links):
+  // the zone's walk seam (window.__COAST__). lib/agentRunHooks honours it on a loopback host only, as Venice's does.
+  useEffect(() => {
+    try {
+      const probe = new URLSearchParams(window.location.search).get('agent') === '1' || sessionStorage.getItem(AGENT_MARK) === '1';
+      if (!probe) return;
+      sessionStorage.setItem(AGENT_MARK, '1');
+      void Promise.all([import('@/lib/agentRunHooks'), import('@/lib/babylon/modes/CoastZoneMode')]).then(([h, m]) => {
+        h.setAgentRunHooksAllowed(true);
+        (window as unknown as { __COAST__?: unknown }).__COAST__ = { state: m.coastProbe, drive: m.coastProbeDrive, spot: () => zoneUi.getSnapshot().spot?.id ?? null };
+      });
+    } catch { /* not a probe */ }
   }, []);
 
   useEffect(() => {

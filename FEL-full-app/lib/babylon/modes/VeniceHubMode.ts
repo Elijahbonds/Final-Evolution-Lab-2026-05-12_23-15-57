@@ -12,7 +12,8 @@
 //            the player → lib/adventure/venice/hubUi, which the page's card reads. The card opens the court's mode on its own
 //            page (hubReturn.launchHref): no mode file is touched to be launched.
 //
-// Arriving with `?spot=<court>` (the end screen's "back to Venice") puts the player beside that court (hubWorld.returnSpawnFor).
+// Arriving with `?spot=<court>` (the end screen's "back to Venice") puts the player beside that court (hubWorld.returnSpawnFor);
+// with `?spot=pier.end` (back from the coast) at the boat (coastDoor.arrivalFor, venue.coastDoor).
 // HIDDEN from the pickers: registered in MODES (so the probe bundles and /dev/mode can mount it) and NOT in
 // ENABLED_BABYLON_MODES; its page is /play/venice (unlisted, noindex), reached from the Play screen's Venice door.
 
@@ -30,7 +31,7 @@ import { createInputMapper, loadBindings, type InputMapper } from '../adventure/
 import { bindMovementView, type MovementView } from '../adventure/movement/view';
 import { placeBody } from '../adventure/world/view';
 import { loadRatedTuning, ratedLookScale } from '../hoops/ratedPlay';
-import { buildHubWorld, courtsRect, returnSpawnFor, v1Area, v1Spots } from '@/lib/adventure/venice/hubWorld';
+import { buildHubWorld, courtsRect, v1Area, v1Spots } from '@/lib/adventure/venice/hubWorld';
 import { mountCourtsView, type CourtsView } from '@/lib/adventure/venice/courtsView';
 import { hubPos, hubUi } from '@/lib/adventure/venice/hubUi';
 import { spotFromSearch } from '@/lib/adventure/venice/hubReturn';
@@ -46,6 +47,8 @@ import { mountCourtLife, VENICE_COURT_LIFE, type CourtLife } from '@/lib/adventu
 import { hubSolids, palmSolid, probeRoute, v1Hit, VENICE_SOLIDS, Walkup, WALKUP_V2 } from '@/lib/adventure/venice/hubSolids';
 import { camBlockPieces, mountCameraBlockers, VENICE_CAM_COLLIDE, VENICE_LOOK_V2 } from '@/lib/adventure/venice/courtsDressing';
 import type { GroundPiece } from '../adventure/world/pieces';
+import { arrivalFor, BoatWalkup, boatRoute, PIER_SPOT_ID, VENICE_COAST_DOOR } from '@/lib/adventure/venice/coastDoor';
+import { mountCoastDoorView, type CoastDoorView } from '@/lib/adventure/venice/coastDoorView';
 
 export const VENICE_MODE_ID = 'venice_hub';
 /** The stick's basis latches while held (AdventureMode's rule): below this it lets go. */
@@ -83,6 +86,9 @@ interface St {
   walkup: Walkup | null;
   /** Phase 8 (venue.veniceSolids): the world's pieces, so the palms join them once the dressing has placed them; null = off. */
   solids: GroundPiece[] | null;
+  /** The boat to the coast (venue.coastDoor, lib/adventure/venice/coastDoor): its walk-up and its landing; null = off. */
+  boat: BoatWalkup | null;
+  boatView: CoastDoorView | null;
   disposed: boolean;
   /** The probe seam this hub published (window.__VENICE__), so only its own is ever removed. */
   seam: unknown;
@@ -99,6 +105,7 @@ function closeHub(scene: object): void {
     S.disposed = true;
     S.life?.dispose(); S.life = null;
     S.court?.dispose(); S.court = null;
+    S.boatView?.dispose(); S.boatView = null;
     S.move.dispose(); S.view.dispose();
   }
   if (wasCurrent) {
@@ -146,7 +153,9 @@ export const VeniceHubMode: ModeDefinition = {
     const solidsOn = feel('venue.veniceSolids', VENICE_SOLIDS) >= 0.5;
     if (solidsOn) world.pieces.push(...hubSolids(v1Spots(), feel('venue.veniceLookV2', VENICE_LOOK_V2) >= 0.5));
     const back = typeof window !== 'undefined' ? spotFromSearch(window.location.search) : null;
-    const spawn = (back && returnSpawnFor(back)) || world.spawn;
+    // the boat to the coast (venue.coastDoor): back from the coast (`?spot=pier.end`) you land at the boat, facing it
+    const doorOn = feel('venue.coastDoor', VENICE_COAST_DOOR) >= 0.5;
+    const spawn = arrivalFor(back, doorOn) ?? world.spawn;
     const host = new AdventureHost({ world: world.source, save: emptyAdventureSave(0), playerSpawn: spawn, band: ctx.prqBand ?? null });
 
     // the courts first (the court and you first: the plan's loading rule); the dressing lands after
@@ -173,6 +182,7 @@ export const VeniceHubMode: ModeDefinition = {
       preset: 'runner', rigKey: '', spotSec: SPOT_EVERY, spots: v1Spots(), auto: null, autoPath: [], frames: 0,
       life: null, sound: null, court: null, disposed: false, seam: null,
       walkup: feel('venue.walkupV2', WALKUP_V2) >= 0.5 ? new Walkup(v1Spots()) : null, solids: solidsOn ? world.pieces : null,
+      boat: doorOn ? new BoatWalkup() : null, boatView: doorOn ? mountCoastDoorView(scene, view.root) : null,
     };
     // phase 7: the beach bed now (so the harness's crowd bed for the mood stays off); the rest of the soundscape ticks in update
     const mine = hubs.isCurrent(scene);   // a newer hub began while this one loaded: this one leaves the page's globals alone
@@ -193,9 +203,13 @@ export const VeniceHubMode: ModeDefinition = {
     // PROBES ONLY (dev, or an agent run on a loopback host: lib/agentRunHooks): walk to a court's ring, read where you are
     if (mine && typeof window !== 'undefined' && devOrAgentHooks()) {
       (window as unknown as { __VENICE__?: unknown }).__VENICE__ = S.seam = {
-        spots: () => S.spots.map((x) => x.id),
+        spots: () => [...S.spots.map((x) => x.id), ...(S.boat ? [PIER_SPOT_ID] : [])],
         // to a court's ring the way a player goes once the fences are solid (phase 8): along the open corridors, never through a court
         walkTo: (id: string) => {
+          if (id === PIER_SPOT_ID && S.boat) {   // the boat: down to the gap between the rows, then west into its ring
+            const path = boatRoute({ x: host.player.pos.x, z: host.player.pos.z });
+            S.auto = path.shift() ?? null; S.autoPath = path; return true;
+          }
           const t = S.spots.find((x) => x.id === id);
           if (!t) { S.auto = null; S.autoPath = []; return false; }
           const path = probeRoute(S.spots, { x: host.player.pos.x, z: host.player.pos.z }, t);
@@ -215,8 +229,9 @@ export const VeniceHubMode: ModeDefinition = {
     scene.onDisposeObservable.addOnce(() => closeHub(scene));
     placeBody(body, host.player);
     // the camera starts behind the player, looking at the courts (a cold start) or at the court they came back to
-    const c = courtsRect(), court = back ? S.spots.find((x) => x.id === back) : undefined;
-    const look = court ? new Vector3(court.at[0], 0, court.at[1]) : new Vector3((c.minX + c.maxX) / 2, 0, (c.minZ + c.maxZ) / 2);
+    const c = courtsRect(), court = back ? S.spots.find((x) => x.id === back) ?? (back === PIER_SPOT_ID && S.boat ? S.boat.spot : undefined) : undefined;
+    // back from the coast: past the ring, out along the jetty to the boat
+    const look = court?.id === PIER_SPOT_ID ? new Vector3(court.at[0] - 30, 0, court.at[1]) : court ? new Vector3(court.at[0], 0, court.at[1]) : new Vector3((c.minX + c.maxX) / 2, 0, (c.minZ + c.maxZ) / 2);
     ctx.camDirector.snapTo(new Vector3(host.player.pos.x, host.player.pos.y, host.player.pos.z), look);
   },
 
@@ -299,7 +314,10 @@ export const VeniceHubMode: ModeDefinition = {
       S.spotSec = 0;
       // the ring stands on the court's sideline (courtsView): walking into it, or onto the court itself, offers the game
       // (phase 8, venue.walkupV2: on the court or in the ring, after a short dwell, held a metre past the edge; 0 = V1's box)
-      const hit: Spot | null = S.walkup ? S.walkup.step(SPOT_EVERY, me.pos.x, me.pos.z) : v1Hit(S.spots, me.pos.x, me.pos.z);
+      const court: Spot | null = S.walkup ? S.walkup.step(SPOT_EVERY, me.pos.x, me.pos.z) : v1Hit(S.spots, me.pos.x, me.pos.z);
+      // the boat's ring is far from every court's: at most one of them can hold the player
+      const boat = S.boat ? S.boat.step(SPOT_EVERY, me.pos.x, me.pos.z) : null;
+      const hit = court ?? boat;
       hubUi.setSpot(hit);
       hubPos.set(me.pos.x, me.pos.z, me.facingYaw);   // phase 9: the page's mini-map
     }

@@ -259,6 +259,42 @@ for its first half, so its frame times are noisier):
 **Knobs** (Coast · zone, `docs/FEEL-PANEL.md`), all new: `coast.townOn` 1, `coast.townsfolk` 4, `coast.townLoadAfterSec` 0.5,
 `coast.sportsOn` 1, `coast.questsOn` 1. Each off restores phase B.
 
+## 4f. Phase F, first part: the Venice door, end to end (lane/coast-door, 2026-11-18)
+
+**What it adds.** The boat from Venice to the coast and back, through the app's own links:
+- **Venice:** a landing on the sand west of the courts — a plank jetty to the water's edge and a boat moored at its end (one
+  merged, vertex-coloured mesh: one draw, no texture), with a gold ring at the jetty's head (an instance of the courts' own
+  ring). Step into it and the courts' walk-up rule (a short dwell, a metre's hold) brings up a card: "The Boat to the Coast"
+  with one button, **Take the boat to the coast**, which opens `/play/coast?from=venice&spot=pier.end`. The mini-map shows the
+  boat. Behind the knob `venue.coastDoor` (1; 0 = no boat, no card, and `?spot=pier.end` lands at the court gate as before).
+- `assumption:` the landing stands in for the pier end. The plan's pier end is in the Pier district (`layout.ts`, a V5
+  district) and the hub walks only V1's courts district today, so the pier cannot be reached yet. The landing uses the same
+  spot id (`pier.end`), so when the pier is walkable the landing moves there and nothing else changes.
+- **The coast:** `/play/coast?from=venice&spot=pier.end` lands you on the dock (its arrival, unchanged); the boat back's card
+  and the corner link open `/play/venice?spot=pier.end`, and the hub lands you beside the boat's ring, facing the boat.
+- Venice's courts are unchanged: their walk-up, returns, solids and tests are as they were (the boat's ring is far from every
+  court's place; the tests hold that).
+
+**Measured on the production build** (the every-screen rig's `next start`, a phone: 390 × 844, DPR 3, touch;
+`scripts/probes/coast-islands/door-roundtrip.mts`, kept in the repo, run inside the gate hold with `DOOR=1`):
+- **The round trip passed on the app's own links** (r4): the hub's walk to the boat brought its card up; *Take the boat to the
+  coast* opened `/play/coast?from=venice&spot=pier.end`; the coast landed the player on its dock (55, 24: its arrival); the walk
+  to the coast's boat back brought its card up; *Back to Venice* opened `/play/venice?spot=pier.end`; the hub landed the player
+  beside the boat's ring, facing the boat (−98.5, −69: the boat's return spawn then). No page errors; a tap at each button's
+  centre lands on the button (nothing covers the cards).
+- Once in r4 the scripted walk ran 5.5 m on past the ring at the rig's 2–3 frames a second and the card went before the press;
+  the ring now reaches the rim (x −104 → −106), so a walk that runs on stops at the rim still in the boat's place.
+  The round trip has not been run again since that change (x −106): the shared disk stayed under the 6 GB a build needs (1 GB
+  free at the end). The change is held by `coastDoor.test.ts` (the walk on the real host, the card held through the stop).
+- **Every-screen** (the scorer's planted-fault control passed first each time): **clean** on `/play/venice` and `/play/coast`
+  in r2, r3 and r4 (first content 364–456 ms, layout shift 0; "fast" not measured on a 3D screen, as before).
+- **Cost:** the landing is one draw (one merged mesh, one material, no texture, no model; `scripts/venice-hub-budget-tests.ts`
+  now holds that, with a planted-texture control that fails it); its ring is an instance of the courts' ring. Venice's place
+  texture memory is unchanged (the guard's 15 checks as before, plus 3). The `venice_hub` row is unchanged: the landing adds at
+  most one draw and two active meshes where it is in view (the row: 46 / 56 draws, 58 / 65 active meshes, measured / budget). Not re-measured on the phone rig.
+
+**Knob:** `venue.coastDoor` 1 (new). 0 = the hub as before the door.
+
 ## 5. Flags and assumptions
 
 - `assumption:` the zone's layout — which side the mainland is on, the islands' places and sizes, the dock, the bridge and
