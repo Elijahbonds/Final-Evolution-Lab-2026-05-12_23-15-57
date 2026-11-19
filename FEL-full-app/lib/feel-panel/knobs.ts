@@ -2101,6 +2101,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'How much darker the cloth between the legs is, so its stretch in a stride reads as a gusset panel. 0 = as before (no panel).',
   },
   {
+    id: 'kit.layerGap', label: 'Shorts kept under the top (metres; 0 = off)', def: 0, min: 0, max: 0.03, step: 0.001, unit: 'm', group: 'Kit · fit',
+    source: 'lib/babylon/core/fitTight.ts LAYER_GAP',
+    hint: 'Where the top covers the shorts, the shorts are held at least this far under it, so they never show through the top. 0 = as before (ships 0); 0.006 removes the dark marks on the new jersey lower back.',
+  },
+  {
     id: 'kit.setLiftScale', label: 'New garments: lift off the body (share of today)', def: 0.5, min: 0, max: 1, step: 0.05, unit: '', group: 'Kit · fit',
     source: 'lib/babylon/core/fitTight.ts SET_LIFT_SCALE',
     hint: 'Only the Blender-made one-piece short and new jerseys. 1 = today (13 mm tops, 20 mm shorts, plus the edge flare). Lower sits them closer to the body.',

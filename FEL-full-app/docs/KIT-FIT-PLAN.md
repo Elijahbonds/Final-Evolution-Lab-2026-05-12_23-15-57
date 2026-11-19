@@ -598,3 +598,35 @@ fail instead of building.
 - The traced kit tap read 208 ms (tracing on). The tap is the page's own `pointerdown` handler, and no garment or print work is
   near it.
 - `/play/onevone` is clean.
+
+## 14. kit-jersey-fix (2026-11-19): the dark marks on the new basketball jersey's lower back
+
+**Cause.** The one-piece short shows through the jersey.
+- On the rig, hiding the shorts removes the marks, and at today's full lift they get worse.
+- Headless (`scripts/probes/kit-jersey-fix/through.ts`), male: 12 of 210 short vertices the jersey covers stand outside it, up to
+  3 mm, 6–11 cm above its hem. The middle gap is only 8 mm inside.
+- The runtime lift is 20 mm a short against 13 a top, and both new garments take the same share, so the short catches up with
+  the jersey.
+- Not normals, UVs or shadows.
+
+**Tried first: `kit.setShortsUnderTop` (a lower lift for the whole short), 0.3.** It removed the marks but failed the bar: skin
+through the cloth +3–8 % on all four jersey bodies, because the thigh came through the short everywhere. Reverted, and the knob
+removed.
+
+**Fix: `kit.layerGap` (`fitTight.layerUnderTop`, after the mask and the waistband fit).** Each short vertex the top covers is held at
+least the gap under it; the rest of the short keeps its lift.
+- Headless at 6 mm: male outside 12 → 0, all at least 4.8 mm under. Female 8 → 6, at the jersey's hem edge, where the rig shows no
+  marks.
+- Rig pictures (male, standing and mid-stride): the marks are gone.
+
+**The bar** (3 runs a side, phone and desktop, `rival-halo` the control; 0 vs 6 mm), strict reading: FAIL.
+
+| Subject | Tier | Change at 6 mm |
+|---|---|---|
+| game female | desktop | tops 20,866–20,891 → 20,878–21,010, one run 119 px past (control tops spread 34) |
+| Closet male | phone | shorts 15,181–15,454 → 15,068–15,932, one run 478 px past (control 384) |
+| the other cases | both | skin / tops highs up by 3–213 px, inside the control's skin spread (317–350) |
+
+- **Medians** are within noise.
+- **Flicker** is equal or better everywhere (game male desktop 57–74 → 52–55).
+- **So it ships OFF (0)** for the owner to judge by eye: `docs` before/after and the rig pictures.

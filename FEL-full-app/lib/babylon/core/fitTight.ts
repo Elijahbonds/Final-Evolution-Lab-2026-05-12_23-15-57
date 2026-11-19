@@ -198,5 +198,60 @@ export function openEdgeWeights(P: ArrayLike<number>, ind: ArrayLike<number>, ba
   return { w, edgeVerts: pts.length / 3 };
 }
 
+/** kit.layerGap (kit-jersey-fix, 2026-11-19): metres the worn short is kept UNDER the worn top where the top covers it; 0 = off,
+ *  as before. The one-piece short (20 mm of runtime lift a short against 13 a top) came within 3 mm of the new jersey and through
+ *  it on the lower back (12 male vertices outside, the dark marks); lowering the whole short's lift fixed that but let the thigh
+ *  through the short everywhere else (rig: skin +3–8 %). This moves only the covered part. NEW; 6 mm is the measured setting. */
+export const LAYER_GAP = 0;   // ships OFF: 6 mm removes the marks (rig pictures) but fails the 10.1a bar by noise-level margins (KIT-FIT-PLAN §14)
+export const layerGap = (): number => Math.max(0, Math.min(0.03, feel('kit.layerGap', LAYER_GAP)));
+const layered = new WeakSet<AbstractMesh>();
+
+/** Pure: the world move (3 per vertex) that puts each short vertex the top covers at least `gap` under it: a vertex above the
+ *  top's hem whose closest top point is within `reach` and which is less than `gap` inside the top moves in along the top's
+ *  normal. Others stay. */
+export function underTopPull(P: ArrayLike<number>, top: SkinSurface, hemY: number, gap: number, reach = 0.06): { delta: Float32Array; moved: number } {
+  const delta = new Float32Array(P.length); let moved = 0;
+  for (let v = 0; v < P.length / 3; v++) {
+    if (P[v * 3 + 1] < hemY) continue;
+    const h = top.closest(P[v * 3], P[v * 3 + 1], P[v * 3 + 2], reach); if (!h || h.signed <= -gap) continue;
+    const k = h.signed + gap;
+    delta[v * 3] = -h.n[0] * k; delta[v * 3 + 1] = -h.n[1] * k; delta[v * 3 + 2] = -h.n[2] * k; moved++;
+  }
+  return { delta, moved };
+}
+
+/** Move `short` under `top` (both skinned now; once per short). `shortWorld` / `topWorld` are their skinned positions now. Returns the
+ *  vertices moved. The move goes into the vertex data through each vertex's own skin, as tightenGarment's does. */
+export function layerUnderTop(short: Mesh, shortWorld: Float32Array, topWorld: { P: Float32Array; N: Float32Array }, topInd: ArrayLike<number>, gap = layerGap()): number {
+  if (!(gap > 0) || layered.has(short) || !short.skeleton) return 0;
+  layered.add(short);
+  let hemY = Infinity; for (let i = 1; i < topWorld.P.length; i += 3) hemY = Math.min(hemY, topWorld.P[i]);
+  const { delta, moved } = underTopPull(shortWorld, new SkinSurface(topWorld.P, topWorld.N, topInd), hemY + 0.005, gap);
+  if (!moved) return 0;
+  applyWorldDelta(short, delta);
+  short.metadata = { ...(short.metadata ?? {}), felLayerGap: { gap, moved } };
+  return moved;
+}
+
+/** Carry a world move (3 per vertex) into `mesh`'s vertex data through each vertex's own skin (world = W · Σwᵢ·Mᵢ · local). */
+export function applyWorldDelta(mesh: Mesh, delta: Float32Array): void {
+  const pos = mesh.getVerticesData('position'), mi = mesh.getVerticesData('matricesIndices'), mw = mesh.getVerticesData('matricesWeights');
+  const M = mesh.skeleton?.getTransformMatrices(mesh), Wm = mesh.computeWorldMatrix(true).m;
+  if (!pos || !mi || !mw || !M || pos.length !== delta.length) return;
+  const out = new Float32Array(pos);
+  for (let v = 0; v < pos.length / 3; v++) {
+    const dx = delta[v * 3], dy = delta[v * 3 + 1], dz = delta[v * 3 + 2]; if (!dx && !dy && !dz) continue;
+    const S = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+    for (let k = 0; k < 4; k++) { const w = mw[v * 4 + k]; if (!(w > 0)) continue; const b = mi[v * 4 + k] * 16; for (let c = 0; c < 3; c++) for (let r = 0; r < 3; r++) S[c * 3 + r] += w * M[b + c * 4 + r]; }
+    const A = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+    for (let c = 0; c < 3; c++) for (let r = 0; r < 3; r++) A[c * 3 + r] = Wm[r] * S[c * 3] + Wm[4 + r] * S[c * 3 + 1] + Wm[8 + r] * S[c * 3 + 2];
+    const I = inv3(A); if (!I) continue;
+    out[v * 3] += I[0] * dx + I[3] * dy + I[6] * dz; out[v * 3 + 1] += I[1] * dx + I[4] * dy + I[7] * dz; out[v * 3 + 2] += I[2] * dx + I[5] * dy + I[8] * dz;
+  }
+  if ((mesh.geometry?.meshes.length ?? 1) > 1) mesh.makeGeometryUnique();
+  mesh.setVerticesData('position', out, false);
+  mesh.refreshBoundingInfo();
+}
+
 /** Tests: is this mesh already pulled. */
 export const isTightened = (m: AbstractMesh): boolean => tightened.has(m);

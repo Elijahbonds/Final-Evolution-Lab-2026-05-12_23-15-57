@@ -29,7 +29,7 @@ import type { AbstractMesh, IndicesArray, Mesh, Scene, TransformNode } from '@ba
 import { boneNode } from '../anim/boneLookup';
 import { tubeCoverage, trimSpan, type TubeSpan } from './accessoryFit';
 import { coachGarmentSlotOf, demoModelFlags } from './demoModels';
-import { FIT_EDGE_BAND, FIT_WELD, SkinSurface, fitTightness, fitsTight, liftScaleOf, openEdgeWeights, tightenGarment } from './fitTight';
+import { FIT_EDGE_BAND, FIT_WELD, SkinSurface, fitTightness, fitsTight, layerGap, layerUnderTop, liftScaleOf, openEdgeWeights, tightenGarment } from './fitTight';
 
 /** How far under a garment (from its open edge, metres) the skin must be before it is hidden. Tops and shorts leave a
  *  band at the hem so a garment that rides up never opens a hole into the body. */
@@ -792,6 +792,17 @@ export function* maskBodySteps(body: Mesh, meshes: AbstractMesh[], why?: Record<
         tightenGarment(g, sw.P, openEdgeWeights(ew, ind, FIT_EDGE_BAND, FIT_WELD, slot === 'shorts' ? (y01) => y01 > 0.5 : undefined).w, skinS, tight, overHidden);   // the saved bases (__felFlare0 …) stay LOOSE: every later mask measures the same cloth, so the skin it hides stays hidden
       }
     } catch (e) { console.warn(`[FEL-KIT] tight fit skipped: ${String((e as Error)?.message ?? e).slice(0, 140)}`); }
+  }
+  // KIT-JERSEY-FIX (fitTight.layerUnderTop, kit.layerGap): the worn short held under the worn top where the top covers it, once
+  if (layerGap() > 0) {
+    try {
+      const top = meshes.find((m) => maskSlotOf(m.name) === 'tops' && m.isVisible && !m.isDisposed() && (m as Mesh).skeleton) as Mesh | undefined;
+      const tw = top ? skinnedWorld(top) : null, tInd = top?.getIndices();
+      if (tw && tInd) for (const m of meshes) {
+        if (maskSlotOf(m.name) !== 'shorts' || !m.isVisible || m.isDisposed() || !(m as Mesh).skeleton) continue;
+        const sw = skinnedWorld(m as Mesh); if (sw) layerUnderTop(m as Mesh, sw.P, tw, tInd);
+      }
+    } catch (e) { console.warn(`[FEL-KIT] layer gap skipped: ${String((e as Error)?.message ?? e).slice(0, 140)}`); }
   }
   shareBodyBounds(body, meshes);   // after the shoe's late fold, which refreshed its own box
   if (!meta.felBodyMask) body.makeGeometryUnique();   // this body only — the container's geometry keeps the whole skin

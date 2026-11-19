@@ -1109,3 +1109,10 @@ Group **Kit · fit**. A look switch: it moves no body, no bone and no timing.
   with the name across the back, in their own `decal` UV map, mixed over the tinted cloth (light ink on a dark jersey, dark on a
   light one). Any other top keeps the plate. `lib/babylon/core/jerseyDecals.ts` `JERSEY_DECALS`. assumption: a player who never
   set a number prints the default jersey's 0, no name.
+
+## kit-jersey-fix, 2026-11-19 (the dark marks on the new basketball jersey's lower back)
+
+- `kit.layerGap` **0 (ships off; 0 = as before)**: metres the worn short is held UNDER the worn top where the top covers it. The
+  marks are the one-piece short showing through the jersey (hiding the shorts on the rig removes them): the runtime lift is
+  20 mm a short against 13 a top. 0.006 removes them on the rig pictures, but fails the 10.1a bar by noise-level margins
+  (KIT-FIT-PLAN §14), so it ships off for the owner to judge. `lib/babylon/core/fitTight.ts` `LAYER_GAP`.
