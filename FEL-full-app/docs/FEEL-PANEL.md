@@ -1099,3 +1099,13 @@ Group "Hoops · phone budget". NEW; its off value restores the old build exactly
 Not a knob: the MIX / MC / CC chips over the court (`components/games/mic-caption.tsx`) were 22 px tall tap targets; each is now a
 see-through 44 px box with the chip drawn inside it as before (1v1, 3v3, 3-Point, the carnival, the dunk duel; the dunk's stacked
 chips unchanged). Nothing drawn moves.
+
+## kit-numbers, 2026-11-19 (the player's number and name on the new court jerseys)
+
+Group **Kit · fit**. A look switch: it moves no body, no bone and no timing.
+
+- `kit.jerseyDecals` **1** (new; 0 = a blank jersey, as before — and the floating back plate for a player with a number, as before):
+  the new basketball and football jerseys (`kit.newJerseys`) print the player's number small on the chest and large on the back,
+  with the name across the back, in their own `decal` UV map, mixed over the tinted cloth (light ink on a dark jersey, dark on a
+  light one). Any other top keeps the plate. `lib/babylon/core/jerseyDecals.ts` `JERSEY_DECALS`. assumption: a player who never
+  set a number prints the default jersey's 0, no name.
