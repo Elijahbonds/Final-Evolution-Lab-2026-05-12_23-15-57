@@ -37,6 +37,9 @@ const closetLooks: { id: string; body: string; creator?: CreatorDoc; wardrobe?: 
   { id: 'female-tee', body: 'kit-female', creator: doc({ clothes: TEE_OUTFIT }) },
   { id: 'female-tank', body: 'kit-female', creator: doc({ clothes: TANK_OUTFIT, shape: { face: {}, body: {}, girth: GIRTH(1.45) } }) },
   { id: 'male-layered', body: 'kit-male', creator: doc({ clothes: LAYERED }) },
+  // kit-numbers (2026-11-19): the new basketball jersey in the Closet, for its printed number and name (jerseyDecals.ts)
+  { id: 'male-jersey', body: 'kit-male', wardrobe: { tops: 'top_basketball' } },
+  { id: 'female-jersey', body: 'kit-female', wardrobe: { tops: 'top_basketball' } },
 ];
 
 export const RIVALS = ['ace', 'blaze', 'bolt', 'colt', 'dash', 'echo', 'fable', 'grit', 'halo', 'jinx', 'kite', 'lux', 'mako', 'nyx', 'orbit', 'quill', 'rook', 'sol', 'tusk', 'umber', 'volt', 'wisp', 'yara', 'zeal'];
