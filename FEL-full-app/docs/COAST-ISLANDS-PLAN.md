@@ -340,6 +340,8 @@ phase F-lite switches off):
   Not changed beyond what phase D did.
 - **Budget:** draws 118–134, active meshes 58–67, textures 63 MB, the player and four townsfolk; the `coast_zone` row's active
   meshes 66 → 67 measured (budget 80 → 81), the rest unchanged (136 / 67 / 5 / 63 / 0, budget 164 / 81 / 6 / 76 / 0).
+- **Every-screen on `/play/coast`** (the production build of this branch, 00:16–00:25 UTC; the planted-fault control passed first):
+  **clean** (first content 220 ms, layout shift 0).
 - **Gull Key** reached on the rig too: on past Palm Key along the sandbar, over Reef Rock and down the sandbank (15 of 15 points;
   pictures `coast-sandbank-phone.jpg`, `coast-gullkey-phone.jpg`).
 
