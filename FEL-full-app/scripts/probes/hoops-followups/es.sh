@@ -3,6 +3,7 @@
 #   scripts/probes/hoops-followups/es.sh build <outDir>                  the production build (run it through /home/user/wt/cpu-run.sh)
 #   scripts/probes/hoops-followups/es.sh score <outDir> <cap s> [tag]    ONE gate hold: the planted-fault control, then both pages
 #   scripts/probes/hoops-followups/es.sh inplay <outDir> <cap s>         ONE gate hold: build, ./inplay.mts on both pages, delete the build
+#                                                                        (ES_SCORE=1: every-screen on both pages too, the planted faults first)
 #   scripts/probes/hoops-followups/es.sh clean                           delete the build folder (do it right after scoring)
 # Never keep the build on disk between holds (coordinator 2026-11-18: one 3.3 GB build blocked the release smoke).
 # The scorer re-proves itself on the planted-fault controls first in the same hold; read <outDir>/plant.json before the pages.
@@ -24,6 +25,7 @@ case "$cmd" in
       if [ "$free" -lt 6 ] || [ "$mem" -lt 12 ] || pgrep -f "[n]ext build" > /dev/null; then echo "no room to build: ${free} GB disk, ${mem} GB memory, or another Next.js production build is running"; exit 4; fi
       echo build $(date +%T); /home/user/wt/cpu-run.sh npx tsx scripts/every-screen/rig.mts build > "$ES_OUT/build.log" 2>&1 || { echo build failed; tail -5 "$ES_OUT/build.log"; exit 1; }
       git checkout -- tsconfig.json next-env.d.ts 2>/dev/null
+      if [ -n "${ES_SCORE:-}" ]; then echo score $(date +%T); npx tsx scripts/every-screen/score.mts --routes=/play/onevone,/play/threevthree --redo --budget=1200 2>&1 | tail -16; fi
       echo inplay $(date +%T); npx tsx scripts/probes/hoops-followups/inplay.mts "$ES_OUT/inplay"; echo end $(date +%T)' ;;
   clean) rm -rf "$APP/$ES_DIST"; echo "removed $ES_DIST" ;;
   *) echo "build | score | inplay | clean"; exit 2 ;;
