@@ -57,9 +57,21 @@ try {
         const hollowTakesTaps = hollow ? getComputedStyle(hollow).pointerEvents !== 'none' || !!hollow.querySelector('button') : null;
         const interactive = [...document.querySelectorAll('button, a[href], [role="button"], input, select, textarea')].filter(seen)
           .filter((e) => !e.closest('[aria-hidden="true"]'));
-        const small = interactive.map((e) => ({ label: label(e), ...r(e) })).filter((q) => Math.min(q.w, q.h) < 44);
+        // dock-sideways: the tap area AS THE BROWSER HIT-TESTS IT (elementFromPoint over the control and 20 px around it, 1 px steps):
+        // an invisible box (a pseudo-element, a padded wrapper) counts, a control something else covers does not
+        const hit = (el: Element) => {
+          const q = el.getBoundingClientRect(); let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+          for (let y = Math.floor(q.top - 20); y <= q.bottom + 20; y++) for (let x = Math.floor(q.left - 20); x <= q.right + 20; x++) {
+            const e = document.elementFromPoint(x + 0.5, y + 0.5);
+            if (e && (e === el || el.contains(e))) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+          }
+          return x1 < x0 ? { hitW: 0, hitH: 0 } : { hitW: x1 - x0 + 1, hitH: y1 - y0 + 1 };
+        };
+        const small = interactive.map((e) => ({ label: label(e), ...r(e), ...hit(e) })).filter((q) => Math.min(q.w, q.h) < 44);
+        const dock = [...document.querySelectorAll('[data-fel-corner] a, [data-fel-corner] button, [data-capture-ui] button')].filter(seen)
+          .map((e) => ({ label: label(e), ...r(e), ...hit(e) }));
         return { deckMounted: !!deck, dpadShape: shape?.getAttribute('data-dpad-shape') ?? null, hollowRect: hollow ? r(hollow) : null, hollowTakesTaps, deckCtrls,
-          smallControls: small, phase: (window as unknown as { __phase?: string }).__phase ?? null };
+          smallControls: small, smallHit: small.filter((q) => Math.min(q.hitW, q.hitH) < 44), dock, phase: (window as unknown as { __phase?: string }).__phase ?? null };
       }));
       const dc = row.deckCtrls as Array<{ label: string; x: number; y: number; w: number; h: number }>;
       const ov = (a: typeof dc[0], c: typeof dc[0]) => Math.max(0, Math.min(a.x + a.w, c.x + c.w) - Math.max(a.x, c.x)) * Math.max(0, Math.min(a.y + a.h, c.y + c.h) - Math.max(a.y, c.y));
@@ -79,7 +91,7 @@ try {
     rows.push(row);
     fs.writeFileSync(path.join(out, 'inplay.json'), JSON.stringify(rows, null, 1));
     const dc = (row.deckCtrls as Array<{ label: string; w: number; h: number }> | undefined) ?? [];
-    console.log(`${route.padEnd(18)} ${row.view} ${row.failed ? `FAILED ${row.failed}` : `ready ${row.readyS}s · started ${row.startGone} · d-pad ${row.dpadShape} (hollow takes taps: ${row.hollowTakesTaps}) · deck ${dc.map((c) => `${c.label} ${c.w}x${c.h}`).join(', ')} · smallest ${row.smallestDeckPx} · overlaps ${(row.deckOverlaps as string[]).length} · off screen ${(row.deckOffScreen as string[]).join(',') || 'none'} · small controls ${JSON.stringify(row.smallControls)}`} · errors ${errs.length}`);
+    console.log(`${route.padEnd(18)} ${row.view} ${row.failed ? `FAILED ${row.failed}` : `ready ${row.readyS}s · started ${row.startGone} · d-pad ${row.dpadShape} (hollow takes taps: ${row.hollowTakesTaps}) · deck ${dc.map((c) => `${c.label} ${c.w}x${c.h}`).join(', ')} · smallest ${row.smallestDeckPx} · overlaps ${(row.deckOverlaps as string[]).length} · off screen ${(row.deckOffScreen as string[]).join(',') || 'none'} · small controls (by tap area) ${JSON.stringify(row.smallHit)} · dock ${((row.dock ?? []) as Array<{ label: string; w: number; h: number; hitW: number; hitH: number }>).map((d) => `${d.label} drawn ${d.w}x${d.h} taps ${d.hitW}x${d.hitH}`).join(', ') || 'none'}`} · errors ${errs.length}`);
     await ctx.close();
   }
   await b.close();
