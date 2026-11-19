@@ -2101,9 +2101,9 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'How much darker the cloth between the legs is, so its stretch in a stride reads as a gusset panel. 0 = as before (no panel).',
   },
   {
-    id: 'kit.setShortsUnderTop', label: 'New short: lift under the new jersey (share)', def: 0.3, min: 0, max: 1, step: 0.05, unit: '', group: 'Kit · fit',
-    source: 'lib/babylon/core/fitTight.ts SET_SHORTS_UNDER_TOP',
-    hint: 'The one-piece short takes this share of the new garments lift, so it stays under the jersey. 1 = as shipped (the short showed through the jersey lower back).',
+    id: 'kit.layerGap', label: 'Shorts kept under the top (metres; 0 = off)', def: 0.006, min: 0, max: 0.03, step: 0.001, unit: 'm', group: 'Kit · fit',
+    source: 'lib/babylon/core/fitTight.ts LAYER_GAP',
+    hint: 'Where the top covers the shorts, the shorts are held at least this far under it, so they never show through the top. 0 = as before.',
   },
   {
     id: 'kit.setLiftScale', label: 'New garments: lift off the body (share of today)', def: 0.5, min: 0, max: 1, step: 0.05, unit: '', group: 'Kit · fit',
