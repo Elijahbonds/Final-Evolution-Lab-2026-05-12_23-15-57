@@ -57,9 +57,22 @@ try {
         const hollowTakesTaps = hollow ? getComputedStyle(hollow).pointerEvents !== 'none' || !!hollow.querySelector('button') : null;
         const interactive = [...document.querySelectorAll('button, a[href], [role="button"], input, select, textarea')].filter(seen)
           .filter((e) => !e.closest('[aria-hidden="true"]'));
-        const small = interactive.map((e) => ({ label: label(e), ...r(e) })).filter((q) => Math.min(q.w, q.h) < 44);
+        // dock-sideways: the tap area AS THE BROWSER HIT-TESTS IT (elementFromPoint over the control and 20 px around it, 0.5 px steps):
+        // an invisible box (a pseudo-element, a padded wrapper) counts, a control something else covers does not
+        const hit = (el: Element) => {
+          const q = el.getBoundingClientRect(); let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+          // half-pixel steps: a sample stands for the half pixel around it, so an extent is (last - first + 0.5), to within 0.5 px
+          for (let y = Math.floor(q.top - 20) + 0.25; y <= q.bottom + 20; y += 0.5) for (let x = Math.floor(q.left - 20) + 0.25; x <= q.right + 20; x += 0.5) {
+            const e = document.elementFromPoint(x, y);
+            if (e && (e === el || el.contains(e))) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+          }
+          return x1 < x0 ? { hitW: 0, hitH: 0 } : { hitW: x1 - x0 + 0.5, hitH: y1 - y0 + 0.5 };
+        };
+        const small = interactive.map((e) => ({ label: label(e), ...r(e), ...hit(e) })).filter((q) => Math.min(q.w, q.h) < 44);
+        const dock = [...document.querySelectorAll('[data-fel-corner] a, [data-fel-corner] button, [data-capture-ui] button')].filter(seen)
+          .map((e) => ({ label: label(e), ...r(e), ...hit(e) }));
         return { deckMounted: !!deck, dpadShape: shape?.getAttribute('data-dpad-shape') ?? null, hollowRect: hollow ? r(hollow) : null, hollowTakesTaps, deckCtrls,
-          smallControls: small, phase: (window as unknown as { __phase?: string }).__phase ?? null };
+          smallControls: small, smallHit: small.filter((q) => Math.min(q.hitW, q.hitH) < 44), dock, phase: (window as unknown as { __phase?: string }).__phase ?? null };
       }));
       const dc = row.deckCtrls as Array<{ label: string; x: number; y: number; w: number; h: number }>;
       const ov = (a: typeof dc[0], c: typeof dc[0]) => Math.max(0, Math.min(a.x + a.w, c.x + c.w) - Math.max(a.x, c.x)) * Math.max(0, Math.min(a.y + a.h, c.y + c.h) - Math.max(a.y, c.y));
@@ -69,6 +82,22 @@ try {
       const shot = path.join(out, `inplay-${route.split('/').pop()}-${w}x${h}.jpg`);
       await p.screenshot({ path: shot, type: 'jpeg', quality: 80 });
       row.shot = shot;
+      // dock-sideways: real taps at the dock's edges, after the picture. Pause first, with nothing open: tapped 2 px inside its left
+      // edge it must pause (the harness pauses on its next frame; the label turns to Resume), and as the CONTROL the same tap at its
+      // centre (if the edge tap did not pause, does a centre tap?). Then the ⋯ tapped 6 px left of where it is drawn opens its menu.
+      const dk = (row.dock ?? []) as Array<{ label: string; x: number; y: number; w: number; h: number }>;
+      const dots = dk.find((d) => /^Capture and stream/.test(d.label)), pause = dk.find((d) => /^Pause/.test(d.label));
+      const pausedNow = () => p.evaluate(() => document.querySelector('[data-fel-pause]')?.getAttribute('aria-label') === 'Resume');
+      const tapWait = async (x: number, y: number) => { await p.touchscreen.tap(x, y); for (let i = 0; i < 16; i++) { await p.waitForTimeout(500); if (await pausedNow()) return true; } return false; };
+      if (pause && w > h) {
+        row.pauseEdgeTapPauses = await tapWait(pause.x + 2, pause.y + pause.h / 2);
+        if (row.pauseEdgeTapPauses) { await p.touchscreen.tap(pause.x + pause.w / 2, pause.y + pause.h / 2); await p.waitForTimeout(3000); }   // resume
+        else row.pauseCentreTapPauses = await tapWait(pause.x + pause.w / 2, pause.y + pause.h / 2);
+      }
+      if (dots && w > h) {
+        await p.touchscreen.tap(dots.x - 6, dots.y + dots.h / 2); await p.waitForTimeout(600);
+        row.dotsEdgeTapOpensMenu = await p.locator('[data-testid="capture-menu"]').isVisible().catch(() => false);
+      }
     } catch (e) {
       row.failed = String((e as Error).message).slice(0, 200);
       const shot = path.join(out, `inplay-${route.split('/').pop()}-${w}x${h}-failed.jpg`);
@@ -79,7 +108,7 @@ try {
     rows.push(row);
     fs.writeFileSync(path.join(out, 'inplay.json'), JSON.stringify(rows, null, 1));
     const dc = (row.deckCtrls as Array<{ label: string; w: number; h: number }> | undefined) ?? [];
-    console.log(`${route.padEnd(18)} ${row.view} ${row.failed ? `FAILED ${row.failed}` : `ready ${row.readyS}s · started ${row.startGone} · d-pad ${row.dpadShape} (hollow takes taps: ${row.hollowTakesTaps}) · deck ${dc.map((c) => `${c.label} ${c.w}x${c.h}`).join(', ')} · smallest ${row.smallestDeckPx} · overlaps ${(row.deckOverlaps as string[]).length} · off screen ${(row.deckOffScreen as string[]).join(',') || 'none'} · small controls ${JSON.stringify(row.smallControls)}`} · errors ${errs.length}`);
+    console.log(`${route.padEnd(18)} ${row.view} ${row.failed ? `FAILED ${row.failed}` : `ready ${row.readyS}s · started ${row.startGone} · d-pad ${row.dpadShape} (hollow takes taps: ${row.hollowTakesTaps}) · deck ${dc.map((c) => `${c.label} ${c.w}x${c.h}`).join(', ')} · smallest ${row.smallestDeckPx} · overlaps ${(row.deckOverlaps as string[]).length} · off screen ${(row.deckOffScreen as string[]).join(',') || 'none'} · small controls (by tap area) ${JSON.stringify(row.smallHit)} · edge taps: ⋯ opens ${row.dotsEdgeTapOpensMenu ?? '-'}, Pause pauses ${row.pauseEdgeTapPauses ?? '-'}${row.pauseCentreTapPauses !== undefined ? ` (centre control: ${row.pauseCentreTapPauses})` : ''} · dock ${((row.dock ?? []) as Array<{ label: string; w: number; h: number; hitW: number; hitH: number }>).map((d) => `${d.label} drawn ${d.w}x${d.h} taps ${d.hitW}x${d.hitH}`).join(', ') || 'none'}`} · errors ${errs.length}`);
     await ctx.close();
   }
   await b.close();
