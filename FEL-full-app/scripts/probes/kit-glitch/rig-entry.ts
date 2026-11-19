@@ -322,7 +322,9 @@ function measureScreen(): Record<string, unknown> {
     const k = `${CLASS_NAMES[c]}>${CLASS_NAMES[c2]}`; flipPairs[k] = (flipPairs[k] ?? 0) + 1;
     if (GARMENT.has(c) || GARMENT.has(c2)) flipsGarment++;
   }
-  return { w, h, garmentPx: covered, cover, poke, pokeBySlot: bySlot, pokeFront, pokeFrontBySlot: frontBySlot, pokePct: covered ? +(100 * poke / covered).toFixed(3) : 0, farSkinOverGarment: skinShown, flips, flipsGarment, flipPairs };
+  // KIT-TIGHT: what each shown short wears (material, its albedo and lightmap textures) — the inseam panel's diagnosis
+  const shortsMat = scene.meshes.filter((m) => /^Kit_shorts_/.test(m.name) && m.isVisible && m.isEnabled()).map((m) => { const mt = m.material as { name?: string; albedoTexture?: { name?: string } | null; lightmapTexture?: { name?: string } | null } | null; return { mesh: m.name, mat: mt?.name, albedo: mt?.albedoTexture?.name ?? null, lightmap: mt?.lightmapTexture?.name ?? null, ready: (mt?.lightmapTexture as { isReady?: () => boolean } | null | undefined)?.isReady?.() ?? null, asShadow: (mt as { useLightmapAsShadowmap?: boolean } | null)?.useLightmapAsShadowmap ?? null }; });
+  return { shortsMat, w, h, garmentPx: covered, cover, poke, pokeBySlot: bySlot, pokeFront, pokeFrontBySlot: frontBySlot, pokePct: covered ? +(100 * poke / covered).toFixed(3) : 0, farSkinOverGarment: skinShown, flips, flipsGarment, flipPairs };
 }
 /** The last poke pass as an RGBA overlay image (garment silhouette grey, poke pixels red, flicker not shown). */
 function pokeImage(): string | null {

@@ -188,6 +188,10 @@ async function scoreUrl(browser: Browser, state: ReturnType<typeof storageState>
     // on /admin/metrics' Recompute); 503 is what the app's own routes answer when a feature is off
     await page.route('**/*', (route) => { if (route.request().method() === 'GET') return route.continue(); writes++; return route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"every_screen_rig","message":"The scorer does not send writes."}' }); });
     const errorsBeforeTap = L.errors.length;
+    // kit-tight (2026-11-18): ES_TRACE=<file> records a Chrome performance trace of the tap (main thread, user timing), to find what
+    // stands in front of it; off, nothing changes
+    const traceTo = process.env.ES_TRACE, tracer = traceTo ? page.context().browser() : null;
+    if (tracer) await tracer.startTracing(page, { path: traceTo, categories: ['devtools.timeline', 'disabled-by-default-devtools.timeline', 'blink.user_timing', 'v8.execute', 'toplevel'] }).catch(() => undefined);
     await page.evaluate('window.__es.armTap()');
     const before = L.counts();
     let navigated = false;
@@ -196,6 +200,7 @@ async function scoreUrl(browser: Browser, state: ReturnType<typeof storageState>
     await page.waitForTimeout(1000);
     const after = L.counts();
     const tap = await page.evaluate('window.__es.readTap()').catch(() => null) as { dur: number; mutations: number; urlChanged: boolean; requests: number } | null;
+    if (tracer) await tracer.stopTracing().catch(() => undefined);
     // an error the stopped write caused is the rig's, not the screen's
     if (writes) L.errors.splice(errorsBeforeTap, L.errors.length - errorsBeforeTap, ...L.errors.slice(errorsBeforeTap).filter((e) => !/Failed to fetch|every_screen_rig|503/.test(e)));
     if (ok && tap) {
