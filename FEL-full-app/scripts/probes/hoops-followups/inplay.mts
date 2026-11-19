@@ -82,18 +82,21 @@ try {
       const shot = path.join(out, `inplay-${route.split('/').pop()}-${w}x${h}.jpg`);
       await p.screenshot({ path: shot, type: 'jpeg', quality: 80 });
       row.shot = shot;
-      // dock-sideways: real taps at the dock's edges, after the picture. The ⋯ tapped 6 px left of where it is drawn opens its menu
-      // (the invisible box); Pause tapped 2 px inside its left edge pauses the game (nothing on top of it).
+      // dock-sideways: real taps at the dock's edges, after the picture. Pause first, with nothing open: tapped 2 px inside its left
+      // edge it must pause (the harness pauses on its next frame; the label turns to Resume), and as the CONTROL the same tap at its
+      // centre (if the edge tap did not pause, does a centre tap?). Then the ⋯ tapped 6 px left of where it is drawn opens its menu.
       const dk = (row.dock ?? []) as Array<{ label: string; x: number; y: number; w: number; h: number }>;
       const dots = dk.find((d) => /^Capture and stream/.test(d.label)), pause = dk.find((d) => /^Pause/.test(d.label));
-      if (dots && w > h) {
-        await p.touchscreen.tap(dots.x - 6, dots.y + dots.h / 2); await p.waitForTimeout(400);
-        row.dotsEdgeTapOpensMenu = await p.locator('[data-testid="capture-menu"]').isVisible().catch(() => false);
-        if (row.dotsEdgeTapOpensMenu) { await p.touchscreen.tap(dots.x + dots.w / 2, dots.y + dots.h / 2); await p.waitForTimeout(300); }
-      }
+      const pausedNow = () => p.evaluate(() => document.querySelector('[data-fel-pause]')?.getAttribute('aria-label') === 'Resume');
+      const tapWait = async (x: number, y: number) => { await p.touchscreen.tap(x, y); for (let i = 0; i < 16; i++) { await p.waitForTimeout(500); if (await pausedNow()) return true; } return false; };
       if (pause && w > h) {
-        await p.touchscreen.tap(pause.x + 2, pause.y + pause.h / 2); await p.waitForTimeout(4000);   // the harness pauses on its next frame
-        row.pauseEdgeTapPauses = await p.evaluate(() => /Resume|Play/i.test(document.querySelector('[data-fel-corner] button')?.getAttribute('aria-label') ?? ''));
+        row.pauseEdgeTapPauses = await tapWait(pause.x + 2, pause.y + pause.h / 2);
+        if (row.pauseEdgeTapPauses) { await p.touchscreen.tap(pause.x + pause.w / 2, pause.y + pause.h / 2); await p.waitForTimeout(3000); }   // resume
+        else row.pauseCentreTapPauses = await tapWait(pause.x + pause.w / 2, pause.y + pause.h / 2);
+      }
+      if (dots && w > h) {
+        await p.touchscreen.tap(dots.x - 6, dots.y + dots.h / 2); await p.waitForTimeout(600);
+        row.dotsEdgeTapOpensMenu = await p.locator('[data-testid="capture-menu"]').isVisible().catch(() => false);
       }
     } catch (e) {
       row.failed = String((e as Error).message).slice(0, 200);
@@ -105,7 +108,7 @@ try {
     rows.push(row);
     fs.writeFileSync(path.join(out, 'inplay.json'), JSON.stringify(rows, null, 1));
     const dc = (row.deckCtrls as Array<{ label: string; w: number; h: number }> | undefined) ?? [];
-    console.log(`${route.padEnd(18)} ${row.view} ${row.failed ? `FAILED ${row.failed}` : `ready ${row.readyS}s · started ${row.startGone} · d-pad ${row.dpadShape} (hollow takes taps: ${row.hollowTakesTaps}) · deck ${dc.map((c) => `${c.label} ${c.w}x${c.h}`).join(', ')} · smallest ${row.smallestDeckPx} · overlaps ${(row.deckOverlaps as string[]).length} · off screen ${(row.deckOffScreen as string[]).join(',') || 'none'} · small controls (by tap area) ${JSON.stringify(row.smallHit)} · edge taps: ⋯ opens ${row.dotsEdgeTapOpensMenu ?? '-'}, Pause pauses ${row.pauseEdgeTapPauses ?? '-'} · dock ${((row.dock ?? []) as Array<{ label: string; w: number; h: number; hitW: number; hitH: number }>).map((d) => `${d.label} drawn ${d.w}x${d.h} taps ${d.hitW}x${d.hitH}`).join(', ') || 'none'}`} · errors ${errs.length}`);
+    console.log(`${route.padEnd(18)} ${row.view} ${row.failed ? `FAILED ${row.failed}` : `ready ${row.readyS}s · started ${row.startGone} · d-pad ${row.dpadShape} (hollow takes taps: ${row.hollowTakesTaps}) · deck ${dc.map((c) => `${c.label} ${c.w}x${c.h}`).join(', ')} · smallest ${row.smallestDeckPx} · overlaps ${(row.deckOverlaps as string[]).length} · off screen ${(row.deckOffScreen as string[]).join(',') || 'none'} · small controls (by tap area) ${JSON.stringify(row.smallHit)} · edge taps: ⋯ opens ${row.dotsEdgeTapOpensMenu ?? '-'}, Pause pauses ${row.pauseEdgeTapPauses ?? '-'}${row.pauseCentreTapPauses !== undefined ? ` (centre control: ${row.pauseCentreTapPauses})` : ''} · dock ${((row.dock ?? []) as Array<{ label: string; w: number; h: number; hitW: number; hitH: number }>).map((d) => `${d.label} drawn ${d.w}x${d.h} taps ${d.hitW}x${d.hitH}`).join(', ') || 'none'}`} · errors ${errs.length}`);
     await ctx.close();
   }
   await b.close();
