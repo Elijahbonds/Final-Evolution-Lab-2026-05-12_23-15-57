@@ -24,6 +24,7 @@ import { feel } from '@/lib/feel-panel/feel';
 import { KIT_BODY_MOBILE_URL, KIT_BODY_URL, type BodyType } from './heroBody';
 import { NEW_JERSEYS } from './sportKitDefaults';
 import { applyInseamShade, joiningShare } from './inseamShade';
+import { printSafe } from './jerseyDecals';
 
 /** Knob `kit.onePieceShorts`: 1 = the one-piece short on the kit bodies; 0 = today's three-piece short (default). */
 export const ONE_PIECE_SHORTS = 1;   // owner 2026-11-18 pick (3) from the contact sheet (was 0)
@@ -107,6 +108,8 @@ function vertexData(g: SetGarment, sk: Skeleton): VertexData | null {
   const map = g.jointNames.map((n) => slots.get(n) ?? -1);
   if (map.some((i) => i < 0)) return null;
   const vd = new VertexData();
+  // kit-numbers: a top with decal UVs takes them print-safe (jerseyDecals.printSafe: a few blended faces get parked copies)
+  if (g.slot === 'tops' && g.uv2) g = { ...g, ...printSafe({ positions: g.positions, normals: g.normals, uv: g.uv, uv2: g.uv2, joints: g.joints, weights: g.weights, indices: g.indices }) };
   vd.positions = g.positions; vd.normals = g.normals; vd.indices = g.indices;
   if (g.uv) vd.uvs = g.uv;
   if (g.uv2) vd.uvs2 = g.uv2;

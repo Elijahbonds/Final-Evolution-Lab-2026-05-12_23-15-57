@@ -49,22 +49,73 @@ export function drawJersey(ctx: CanvasRenderingContext2D, jersey: JerseyConfig, 
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
   ctx.fillStyle = ink.fill; ctx.strokeStyle = ink.edge;
   const num = String(jersey.number);
-  // the chest (left half, 20 × 20 cm): a small number, high on the left of the chest as worn (the player's left = u up from 0.5)
+  // Each half is drawn MIRRORED about its own centre: Babylon's glTF loader flips the handedness (x), so a half drawn as read
+  // came out reversed on the cloth (the first rig shots: "SDNOB").
+  // the chest (left half, 20 × 20 cm): a small number in the middle of the chest
+  ctx.save(); ctx.translate(W * 0.25, 0); ctx.scale(-1, 1);
   ctx.font = 'bold 92px sans-serif'; ctx.lineWidth = 8;
-  ctx.strokeText(num, W * 0.25, H * 0.42); ctx.fillText(num, W * 0.25, H * 0.42);
+  ctx.strokeText(num, 0, H * 0.42); ctx.fillText(num, 0, H * 0.42);
+  ctx.restore();
   // the back (right half, 25 × 35 cm): the name across the top, the number large under it
-  ctx.save(); ctx.translate(W * 0.75, 0); ctx.scale(1, BACK_ASPECT);
+  ctx.save(); ctx.translate(W * 0.75, 0); ctx.scale(-1, BACK_ASPECT);
   const h = H / BACK_ASPECT;
   if (jersey.name) {
     let size = 46; ctx.font = `bold ${size}px sans-serif`;
-    while (size > 18 && ctx.measureText(jersey.name).width > W * 0.46) { size -= 2; ctx.font = `bold ${size}px sans-serif`; }
-    ctx.lineWidth = 6; ctx.strokeText(jersey.name, 0, h * 0.16); ctx.fillText(jersey.name, 0, h * 0.16);
+    while (size > 18 && ctx.measureText(jersey.name).width > W * 0.38) { size -= 2; ctx.font = `bold ${size}px sans-serif`; }
+    ctx.lineWidth = 6; ctx.strokeText(jersey.name, 0, h * 0.22); ctx.fillText(jersey.name, 0, h * 0.22);
   }
   ctx.font = `bold ${num.length > 1 ? 170 : 190}px sans-serif`; ctx.lineWidth = 12;
-  const ny = jersey.name ? h * 0.56 : h * 0.45;
+  const ny = jersey.name ? h * 0.58 : h * 0.45;   // every edge of each box keeps a clear margin (cleanDecalUVs samples it)
   ctx.strokeText(num, 0, ny); ctx.fillText(num, 0, ny);
   ctx.restore();
   ctx.clearRect(0, H - 3, 3, 3);   // the (0, 1) corner every unprinted face samples stays clear
+}
+
+/** The arrays of one garment the print-safety pass reads and may grow (kitGarmentSet.SetGarment's shape). */
+export interface PrintSafeInput { positions: Float32Array; normals: Float32Array; uv: Float32Array | null; uv2: Float32Array; joints: Float32Array; weights: Float32Array; indices: Uint32Array }
+
+/**
+ * Pure: the decal UVs made safe to print through. jersey.py prints a face only when it lies in the chest or back box, and parks
+ * every other face at one point ((0, 1) as stored). The exporter's decimation then blended some of them: a few dozen faces (male
+ * basketball jersey: 10 that mix printed and parked corners, 18 whose UVs are stretched ×2 off their box's scale) sample the
+ * canvas where they should not, and the first rig shots showed it as dark marks along the lower back. Each such face gets its own
+ * copies of its vertices, parked, so it samples only the canvas's clear corner; every vertex shared with a good face keeps its UV.
+ * The shape does not change (a copy sits where its original does, with its weights). Returns the arrays (grown) and the faces parked.
+ */
+export function printSafe(g: PrintSafeInput): PrintSafeInput & { parked: number } {
+  const U = g.uv2, I = g.indices, P = g.positions, nf = I.length / 3;
+  const isParked = (v: number) => U[v * 2] < 1e-3 && U[v * 2 + 1] > 1 - 1e-3;
+  const ratio = new Float32Array(nf), half = new Int8Array(nf);   // UV area per surface area; 0 chest, 1 back, -1 mixed, 2 parked
+  for (let f = 0; f < nf; f++) {
+    const a = I[f * 3], b = I[f * 3 + 1], c = I[f * 3 + 2];
+    const pk = [a, b, c].map(isParked);
+    if (pk.every(Boolean)) { half[f] = 2; continue; }
+    const us = [a, b, c].map((v) => U[v * 2]);
+    half[f] = pk.some(Boolean) ? -1 : us.every((u) => u < 0.5) ? 0 : us.every((u) => u >= 0.5) ? 1 : -1;
+    if (half[f] < 0) continue;
+    const ua = Math.abs((U[b * 2] - U[a * 2]) * (U[c * 2 + 1] - U[a * 2 + 1]) - (U[c * 2] - U[a * 2]) * (U[b * 2 + 1] - U[a * 2 + 1])) / 2;
+    const e1 = [0, 1, 2].map((k) => P[b * 3 + k] - P[a * 3 + k]), e2 = [0, 1, 2].map((k) => P[c * 3 + k] - P[a * 3 + k]);
+    const pa = Math.hypot(e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]) / 2;
+    ratio[f] = pa > 1e-12 ? ua / pa : 0;
+  }
+  const median = (h: number) => { const r = [...ratio.filter((_: number, f: number) => half[f] === h)].sort((x, y) => x - y); return r[r.length >> 1] ?? 0; };
+  const med = [median(0), median(1)];
+  const bad = (f: number) => half[f] === -1 || ((half[f] === 0 || half[f] === 1) && !(ratio[f] > med[half[f]] / 2 && ratio[f] < med[half[f]] * 2));
+  const badFaces: number[] = []; for (let f = 0; f < nf; f++) if (bad(f)) badFaces.push(f);
+  if (!badFaces.length) return { ...g, parked: 0 };
+  const n0 = P.length / 3, extra = badFaces.length * 3;
+  const grow = (a: Float32Array | null, k: number) => { if (!a) return null; const o = new Float32Array((n0 + extra) * k); o.set(a); return o; };
+  const out = { positions: grow(P, 3)!, normals: grow(g.normals, 3)!, uv: grow(g.uv, 2), uv2: grow(U, 2)!, joints: grow(g.joints, 4)!, weights: grow(g.weights, 4)!, indices: Uint32Array.from(I) };
+  let next = n0;
+  for (const f of badFaces) for (let k = 0; k < 3; k++) {
+    const v = I[f * 3 + k], w = next++;
+    out.positions.set(P.subarray(v * 3, v * 3 + 3), w * 3); out.normals.set(g.normals.subarray(v * 3, v * 3 + 3), w * 3);
+    if (g.uv && out.uv) out.uv.set(g.uv.subarray(v * 2, v * 2 + 2), w * 2);
+    out.joints.set(g.joints.subarray(v * 4, v * 4 + 4), w * 4); out.weights.set(g.weights.subarray(v * 4, v * 4 + 4), w * 4);
+    out.uv2[w * 2] = 0; out.uv2[w * 2 + 1] = 1;
+    out.indices[f * 3 + k] = w;
+  }
+  return { ...out, parked: badFaces.length };
 }
 
 const made = new WeakMap<Mesh, { key: string; tex: DynamicTexture; uv: MeshUVSpaceRenderer }>();

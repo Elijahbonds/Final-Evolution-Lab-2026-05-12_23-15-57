@@ -34,7 +34,7 @@ describe('the printed jersey (kit.jerseyDecals)', () => {
     const { ctx, calls } = fakeCtx();
     drawJersey(ctx, { number: 23, name: 'BONDS' }, inkFor('#2C6E55'));
     const fills = calls.filter((c) => c.op === 'fill');
-    expect(fills.filter((c) => c.text === '23').map((c) => c.x)).toEqual([128, 0]);   // the chest at u 0.25; the back drawn at the back's centre (translated to u 0.75)
+    expect(fills.filter((c) => c.text === '23').map((c) => c.x)).toEqual([0, 0]);   // each drawn at its half's centre (translated to u 0.25 and 0.75, mirrored)
     expect(fills.filter((c) => c.text === 'BONDS')).toHaveLength(1);
   });
   it('the print goes only on a worn court jersey that has the decal UVs', () => {
