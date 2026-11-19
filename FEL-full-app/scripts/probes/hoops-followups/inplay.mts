@@ -57,15 +57,16 @@ try {
         const hollowTakesTaps = hollow ? getComputedStyle(hollow).pointerEvents !== 'none' || !!hollow.querySelector('button') : null;
         const interactive = [...document.querySelectorAll('button, a[href], [role="button"], input, select, textarea')].filter(seen)
           .filter((e) => !e.closest('[aria-hidden="true"]'));
-        // dock-sideways: the tap area AS THE BROWSER HIT-TESTS IT (elementFromPoint over the control and 20 px around it, 1 px steps):
+        // dock-sideways: the tap area AS THE BROWSER HIT-TESTS IT (elementFromPoint over the control and 20 px around it, 0.5 px steps):
         // an invisible box (a pseudo-element, a padded wrapper) counts, a control something else covers does not
         const hit = (el: Element) => {
           const q = el.getBoundingClientRect(); let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-          for (let y = Math.floor(q.top - 20); y <= q.bottom + 20; y++) for (let x = Math.floor(q.left - 20); x <= q.right + 20; x++) {
-            const e = document.elementFromPoint(x + 0.5, y + 0.5);
+          // half-pixel steps: a sample stands for the half pixel around it, so an extent is (last - first + 0.5), to within 0.5 px
+          for (let y = Math.floor(q.top - 20) + 0.25; y <= q.bottom + 20; y += 0.5) for (let x = Math.floor(q.left - 20) + 0.25; x <= q.right + 20; x += 0.5) {
+            const e = document.elementFromPoint(x, y);
             if (e && (e === el || el.contains(e))) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
           }
-          return x1 < x0 ? { hitW: 0, hitH: 0 } : { hitW: x1 - x0 + 1, hitH: y1 - y0 + 1 };
+          return x1 < x0 ? { hitW: 0, hitH: 0 } : { hitW: x1 - x0 + 0.5, hitH: y1 - y0 + 0.5 };
         };
         const small = interactive.map((e) => ({ label: label(e), ...r(e), ...hit(e) })).filter((q) => Math.min(q.w, q.h) < 44);
         const dock = [...document.querySelectorAll('[data-fel-corner] a, [data-fel-corner] button, [data-capture-ui] button')].filter(seen)
@@ -91,7 +92,7 @@ try {
         if (row.dotsEdgeTapOpensMenu) { await p.touchscreen.tap(dots.x + dots.w / 2, dots.y + dots.h / 2); await p.waitForTimeout(300); }
       }
       if (pause && w > h) {
-        await p.touchscreen.tap(pause.x + 2, pause.y + pause.h / 2); await p.waitForTimeout(500);
+        await p.touchscreen.tap(pause.x + 2, pause.y + pause.h / 2); await p.waitForTimeout(4000);   // the harness pauses on its next frame
         row.pauseEdgeTapPauses = await p.evaluate(() => /Resume|Play/i.test(document.querySelector('[data-fel-corner] button')?.getAttribute('aria-label') ?? ''));
       }
     } catch (e) {

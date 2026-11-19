@@ -14,11 +14,13 @@ const unesc = (m: string) => m.replace(/&#x27;/g, "'").replace(/&quot;/g, '"').r
 const css = readFileSync(path.resolve(__dirname, '../../app/game-surface.css'), 'utf8');
 
 describe('the sideways dock: every control takes taps across 44 px', () => {
-  it('the compact BODY (38 px drawn) carries a box 3 px past each side, into the dock 6 px gaps: 44 px', () => {
+  it('the compact BODY (38 px drawn) carries a box 4 px past each side of its padding box, into the dock 6 px gaps: 44 px', () => {
     const compact = unesc(renderToStaticMarkup(h(BodyControl, { compact: true })));
     const cls = /<button[^>]*class="([^"]*)"/.exec(compact)?.[1] ?? '';
     for (const c of COMPACT_TAP.split(' ')) expect(cls).toContain(c);
-    expect(COMPACT_TAP).toContain('before:-inset-x-[3px]');   // 38 + 2 x 3 = 44; the gap is 6 (gap-1.5), so neighbours never share a pixel
+    // a ::before sits in the padding box: 38 - 2 (border) + 2 x 4 = 44; 3 px past the border each side, half the 6 px gap (gap-1.5),
+    // so neighbours never share a pixel
+    expect(COMPACT_TAP).toContain('before:-inset-x-[4px]');
     expect(cls).toMatch(/px-2\.5/);                            // drawn as before
     // the header's full BODY button (it has its label, and is wide) is untouched
     const full = /<button[^>]*class="([^"]*)"/.exec(renderToStaticMarkup(h(BodyControl, {})))?.[1] ?? '';
