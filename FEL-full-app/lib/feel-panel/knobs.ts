@@ -2101,6 +2101,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'How much darker the cloth between the legs is, so its stretch in a stride reads as a gusset panel. 0 = as before (no panel).',
   },
   {
+    id: 'kit.setShortsUnderTop', label: 'New short: lift under the new jersey (share)', def: 0.3, min: 0, max: 1, step: 0.05, unit: '', group: 'Kit · fit',
+    source: 'lib/babylon/core/fitTight.ts SET_SHORTS_UNDER_TOP',
+    hint: 'The one-piece short takes this share of the new garments lift, so it stays under the jersey. 1 = as shipped (the short showed through the jersey lower back).',
+  },
+  {
     id: 'kit.setLiftScale', label: 'New garments: lift off the body (share of today)', def: 0.5, min: 0, max: 1, step: 0.05, unit: '', group: 'Kit · fit',
     source: 'lib/babylon/core/fitTight.ts SET_LIFT_SCALE',
     hint: 'Only the Blender-made one-piece short and new jerseys. 1 = today (13 mm tops, 20 mm shorts, plus the edge flare). Lower sits them closer to the body.',

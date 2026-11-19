@@ -38,8 +38,16 @@ const FIT_REACH = 0.12;
 export const SET_LIFT_SCALE = 0.5;   // owner 2026-11-18 pick (3) from the contact sheet (was 1)
 /** The lift / flare share for this garment: SET_LIFT_SCALE (via its knob) on a garment-set mesh, 1 on any other. */
 export function liftScaleOf(m: AbstractMesh): number {
-  return (m.metadata as { felKitGarmentSet?: string } | null)?.felKitGarmentSet ? Math.max(0, Math.min(1, feel('kit.setLiftScale', SET_LIFT_SCALE))) : 1;
+  const set = (m.metadata as { felKitGarmentSet?: string } | null)?.felKitGarmentSet;
+  if (!set) return 1;
+  const share = Math.max(0, Math.min(1, feel('kit.setLiftScale', SET_LIFT_SCALE)));
+  // kit-jersey-fix: the set's SHORT under a set top takes less (kit.setShortsUnderTop): today's lift is 20 mm a short against 13 a
+  // top, so at the same share the one-piece short caught up with the jersey and showed through its lower back
+  return /^Kit_shorts_/.test(set) ? share * Math.max(0, Math.min(1, feel('kit.setShortsUnderTop', SET_SHORTS_UNDER_TOP))) : share;
 }
+/** kit.setShortsUnderTop: the set short's share of the set lift (1 = the same as the tops', as shipped in #669; lower = the short
+ *  sits further under the jersey). NEW (kit-jersey-fix). */
+export const SET_SHORTS_UNDER_TOP = 0.3;   // kit-jersey-fix: 1 (as shipped) left the short within 3 mm of the jersey and 12 male vertices outside it; 0.3 keeps ≥ 4 mm under (through.ts) and the short still ≥ 10 mm off the body at its p10 (kitGarmentSet.test)
 export const fitTightness = (): number => Math.max(0, Math.min(1, feel('kit.fitTightness', FIT_TIGHTNESS)));
 const tightened = new WeakSet<AbstractMesh>();
 
