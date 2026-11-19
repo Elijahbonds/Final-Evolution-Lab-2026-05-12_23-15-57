@@ -16,6 +16,7 @@ import {
 } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { Onlookers } from '@/lib/babylon/visual/Onlookers';
+import { prewarmMeshes } from '@/lib/babylon/core/hitchProbe';
 import { groundTextureFor, TILE_M } from '@/lib/babylon/visual/groundTextures';
 import { terrainY } from './zoneLayout';
 import { HOUSES, MARKET, MARKET_KIT_URL, RING_SEGMENTS, SPORT_SPOTS, STREET, TOWNSFOLK, houseBase, type SportSpot } from './zoneTown';
@@ -40,6 +41,8 @@ export interface ZoneTownView {
   setOffers(ids: ReadonlySet<string>): void;
   update(dt: number): void;
   readonly townsfolk: number;
+  /** When the town's heavy parts started and landed (performance.now, ms): for the probes' hitch reading. */
+  readonly events: Array<{ what: string; at: number }>;
   dispose(): void;
 }
 
@@ -52,7 +55,7 @@ const paint = (m: Mesh, hex: string): Mesh => {
 
 /** `heavyAfterSec`: the market kit and the townsfolk's bodies (the town's two downloads) start this long after the zone's first
  *  frame, not during its load (coast-d d1: loading them with the zone made it playable about 5 s later on the rig). */
-export function mountZoneTownView(scene: Scene, o: { townsfolk: number; sports: boolean; heavyAfterSec?: number }): ZoneTownView {
+export function mountZoneTownView(scene: Scene, o: { townsfolk: number; sports: boolean; heavyAfterSec?: number; prewarm?: boolean }): ZoneTownView {
   const root = new TransformNode('coast_town', scene);
   const mats: StandardMaterial[] = [], texs: DynamicTexture[] = [];
   const vcMat = new StandardMaterial('coast_town_mat', scene); vcMat.specularColor = new Color3(0.1, 0.1, 0.1); mats.push(vcMat);
@@ -142,18 +145,22 @@ export function mountZoneTownView(scene: Scene, o: { townsfolk: number; sports: 
   kitAt.position.set(MARKET.x, terrainY(MARKET.x, MARKET.z) - 0.05, MARKET.z);
   const slash = MARKET_KIT_URL.lastIndexOf('/');
   let disposed = false;
+  const events: Array<{ what: string; at: number }> = [];
+  const mark = (what: string) => { if (events.length < 20) events.push({ what, at: Math.round(performance.now()) }); };
   let kitDone!: () => void;
   const kit = new Promise<void>((r) => { kitDone = r; });
   const loadKit = () => SceneLoader.ImportMeshAsync('', MARKET_KIT_URL.slice(0, slash + 1), MARKET_KIT_URL.slice(slash + 1), scene).then((r) => {
     if (disposed) { for (const m of r.meshes) m.dispose(false, true); return; }
     for (const m of r.meshes) { if (!m.parent) m.parent = kitAt; m.isPickable = false; m.receiveShadows = true; }
+    mark('kit');
+    if (o.prewarm) void prewarmMeshes(scene, r.meshes).then(() => mark('kit warm'));
   }).catch((e) => console.warn('[COAST] market kit', e)).finally(() => kitDone());
 
   // the townsfolk: the Venice watchers' bodies, idling, facing the street; paused while off screen
   const folk = TOWNSFOLK.slice(0, Math.max(0, Math.min(TOWNSFOLK.length, Math.round(o.townsfolk))));
   let crowd: Onlookers | null = null;
   const loadCrowd = () => folk.length ? new Onlookers(scene, folk.map((p) => new Vector3(p.at[0], terrainY(p.at[0], p.at[1]), p.at[1])), '#2b3550',
-    new Vector3((STREET.x0 + STREET.x1) / 2, terrainY((STREET.x0 + STREET.x1) / 2, STREET.z), STREET.z), { pauseOffscreen: true, restBetweenCheers: true, idleBobStepSec: 0.2, oneBodyPerFrame: true }) : null;
+    new Vector3((STREET.x0 + STREET.x1) / 2, terrainY((STREET.x0 + STREET.x1) / 2, STREET.z), STREET.z), { pauseOffscreen: true, restBetweenCheers: true, idleBobStepSec: 0.2, oneBodyPerFrame: true, onSpawn: (b) => { mark('body'); if (o.prewarm) void prewarmMeshes(scene, b.getChildMeshes()).then(() => mark('body warm')); } }) : null;
 
   // "!" over a townsperson whose quest is on offer
   const bang = new DynamicTexture('coast_bang', 64, scene, false); texs.push(bang);
@@ -171,12 +178,13 @@ export function mountZoneTownView(scene: Scene, o: { townsfolk: number; sports: 
   }
 
   let t = 0, heavy = false;
-  const startHeavy = () => { heavy = true; void loadKit(); crowd = loadCrowd(); };
+  const startHeavy = () => { heavy = true; mark('start'); void loadKit(); crowd = loadCrowd(); };
   if (!(o.heavyAfterSec! > 0)) startHeavy();
   return {
     root,
     ready: Promise.allSettled([kit]).then(() => undefined),
     townsfolk: folk.length,
+    events,
     setOffers(ids) { for (const [id, m] of marks) m.setEnabled(ids.has(id)); },
     update(dt) {
       t += dt;

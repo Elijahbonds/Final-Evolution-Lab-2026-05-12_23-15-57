@@ -8,7 +8,7 @@ import { emptyAdventureSave } from '@/lib/babylon/adventure/contracts';
 import { stripComments, sourceFiles } from '@/lib/testing/sourceScan';
 import { ENABLED_BABYLON_MODES, MODES } from '@/lib/babylon/modes/registry';
 import {
-  BOAT_AT, DECKS, ISLANDS, PIECE_M, PROP_MODELS, SANDBAR, SEA_Y, WADE_DEPTH, ZONE_COLS, ZONE_ROWS, ZONE_SPOTS, ZoneStreamer,
+  BOAT_AT, DECKS, GROW, ISLANDS, PIECE_M, setZoneGrow, PROP_MODELS, SANDBAR, SEA_Y, WADE_DEPTH, ZONE_COLS, ZONE_ROWS, ZONE_SPOTS, ZoneStreamer,
   arrivalSpawn, deckAt, mainlandShoreX, pieceAt, pieceRect, spotAtZone, surfaceY, terrainY, tierFor, walkable, zoneProps, zonePieces,
   COAST_STREAM_FULL, COAST_STREAM_KEEP, COAST_STREAM_LOD,
 } from './zoneLayout';
@@ -19,10 +19,13 @@ import { COARSE_DIV, FINE_DIV, drawnY } from './zoneView';
 const RINGS = { full: COAST_STREAM_FULL, lod: COAST_STREAM_LOD, keep: COAST_STREAM_KEEP };
 
 describe('the zone: the ground', () => {
-  it('is 6 × 6 pieces of 64 m, mostly sea, with land and shore pieces', () => {
+  it('is 6 × 6 pieces of 64 m and, grown (phase F-lite), the 2 × 2 block past Reef Rock: mostly sea, with land and shore pieces', () => {
     const ps = zonePieces();
-    expect(ps.length).toBe(36);
-    expect(ZONE_COLS * PIECE_M).toBe(384);
+    expect(ps.length).toBe(36 + 4);
+    expect((ZONE_COLS - GROW.cols) * PIECE_M).toBe(384);
+    setZoneGrow(false);
+    expect(zonePieces().length).toBe(36);   // coast.zoneGrow 0: phase A's zone
+    setZoneGrow(true);
     const sea = ps.filter((p) => p.kind === 'sea').length, land = ps.filter((p) => p.kind === 'land').length;
     expect(sea).toBeGreaterThanOrEqual(4);    // whole open-sea pieces draw nothing of their own
     expect(land).toBeGreaterThanOrEqual(6);   // the mainland's back strip
@@ -186,22 +189,23 @@ describe('streaming the 64 m pieces', () => {
   });
 
   it('arriving: 9 full, 16 LOD, the rest far (an inner piece)', () => {
-    const s = new ZoneStreamer(RINGS);
-    expect(s.step(2, 2).length).toBeGreaterThan(0);
+    // (phase F-lite: the grid's columns moved up by GROW.cols; (2 + 2, 2) is phase A's inner piece (2, 2))
+    const s = new ZoneStreamer(RINGS), g = GROW.cols;
+    expect(s.step(2 + g, 2).length).toBeGreaterThan(0);
     expect(s.count('full')).toBe(9);
     expect(s.count('lod')).toBe(16);
-    expect(s.count('far')).toBe(11);
-    expect(s.step(2, 2)).toEqual([]);   // same piece: nothing changes
+    expect(s.count('far')).toBe(11 + 4);   // the four grown pieces are far from there
+    expect(s.step(2 + g, 2)).toEqual([]);   // same piece: nothing changes
   });
 
   it('hysteresis: one piece over and back changes nothing on the way back; two pieces over lowers the trailing edge', () => {
-    const s = new ZoneStreamer(RINGS);
-    s.step(2, 2);
-    s.step(3, 2);
-    expect(s.tiers.get('1,2')).toBe('full');   // two out, kept by the band
-    expect(s.step(2, 2)).toEqual([]);          // back: every piece already holds what it wants
-    s.step(3, 2); s.step(4, 2);
-    expect(s.tiers.get('1,2')).toBe('lod');    // three out: lowered
+    const s = new ZoneStreamer(RINGS), g = GROW.cols;
+    s.step(2 + g, 2);
+    s.step(3 + g, 2);
+    expect(s.tiers.get(`${1 + g},2`)).toBe('full');   // two out, kept by the band
+    expect(s.step(2 + g, 2)).toEqual([]);          // back: every piece already holds what it wants
+    s.step(3 + g, 2); s.step(4 + g, 2);
+    expect(s.tiers.get(`${1 + g},2`)).toBe('lod');    // three out: lowered
   });
 
   it('a fine piece and a coarse piece draw their shared edge at the same heights (no cracks)', () => {

@@ -284,8 +284,9 @@ for its first half, so its frame times are noisier):
   centre lands on the button (nothing covers the cards).
 - Once in r4 the scripted walk ran 5.5 m on past the ring at the rig's 2–3 frames a second and the card went before the press;
   the ring now reaches the rim (x −104 → −106), so a walk that runs on stops at the rim still in the boat's place.
-  The round trip has not been run again since that change (x −106): the shared disk stayed under the 6 GB a build needs (1 GB
-  free at the end). The change is held by `coastDoor.test.ts` (the walk on the real host, the card held through the stop).
+  On the final code (r6, x −106, 21:54–22:12 UTC) the round trip passed first time, no walk back: the walk ran on to the rim
+  (x −109.9) and the card stayed up; the coast landed on its dock (55, 24); the hub landed beside the boat (−100.5, −69);
+  no page errors. Every-screen clean on both pages again (first content 288 / 392 ms).
 - **Every-screen** (the scorer's planted-fault control passed first each time): **clean** on `/play/venice` and `/play/coast`
   in r2, r3 and r4 (first content 364–456 ms, layout shift 0; "fast" not measured on a 3D screen, as before).
 - **Cost:** the landing is one draw (one merged mesh, one material, no texture, no model; `scripts/venice-hub-budget-tests.ts`
@@ -294,6 +295,63 @@ for its first half, so its frame times are noisier):
   most one draw and two active meshes where it is in view (the row: 46 / 56 draws, 58 / 65 active meshes, measured / budget). Not re-measured on the phone rig.
 
 **Knob:** `venue.coastDoor` 1 (new). 0 = the hub as before the door.
+
+## 4g. Phase F-lite: the walking hitch, and the zone grows past Reef Rock (lane/coast-f, 2026-11-18)
+
+**Where the hitches came from** (two diagnosis runs on the phone rig, each long frame taken apart with Babylon's own counters —
+render, active-mesh evaluation, render targets, shader compiles, the time between frames — and the zone's update timed by part):
+- **The zone's own code was never the hitch.** Its update never took more than 141 ms in a frame; streaming's work in the frame
+  you cross into a piece was 2.4 ms at worst (the coarse ground is always built; the fine ground and the prop refresh are cheap).
+- **Shader compiles at first sight** were the zone's real hitches: 3,379 ms for two programs the first time something came into
+  view mid-walk, 1,751 ms for the market kit's shadow-depth program when it landed. A phone compiles faster than the rig, but
+  this is the hitch a phone feels too.
+- **Most long frames on the rig are the time between frames** (2–3 s, with the frame itself 5–20 ms): the software GPU drawing
+  a 780 × 1688 frame. That is the rig's, not a phone's, and it scales with what is in view.
+
+**What changed** (each behind a knob; both ship off):
+- `coast.prewarmLate` (**ships 0**, see below): everything that lands after the load — the seven prop models, the market kit, each townsperson's body —
+  has its shaders (lit, shadow depth, instanced, skinned) compiled as it lands (`core/hitchProbe` prewarmMeshes, the harness's
+  own phone pre-warm), not on the frame it first comes into view. The townsfolk already land one a frame apart (Onlookers
+  oneBodyPerFrame); their compile now happens with each landing instead of at first sight.
+- `coast.streamSliced` (**off by default, no measured win on the rig; try on a real phone**): crossing into a piece no longer builds the new full pieces' fine ground and refreshes all seven prop
+  models in that frame; the coarse ground stands in and one job runs a frame. Small on the rig (the work was 2.4 ms), kept for
+  phones with slower CPUs.
+- `coast.zoneGrow`: see below.
+
+**Measured** (the phone rig, 390 × 844, DPR 3, the walk from the dock up the town's street, the beach, the bridge onto Palm Key,
+10 of 10 points in every run, no page errors; 3 runs a side, interleaved, same session; the control is the same zone with the
+phase F-lite switches off):
+
+| | Worst frame (s) | 95th-percentile frame (ms) | Shader compiles on the walk (ms) |
+|---|---|---|---|
+| m1 (23:21 UTC): slices + late pre-warm | 3.40 · 2.94 · 2.74 | 1,225 · 1,140 · 1,105 | 5,061 · 5,186 · 5,182 |
+| m1 control (the old way) | 2.35 · 3.81 · 2.20 | 1,172 · 1,139 · 676 | 2,351 · 1,896 · 2,749 |
+| m2 (23:55 UTC): slices only | 1.54 · 1.52 · 1.79 | 574 · 632 · 604 | 2,682 · 1,069 · 2,041 |
+| m2 control (the old way) | 1.47 · 2.30 · 1.44 | 511 · 513 · 606 | 4,140 · 467 · 1,293 |
+
+- **No measurable gain on the rig.** The slices are within the noise of the old way in both sessions (they move ~2 ms of work), so they **ship off** too (coordinator 2026-11-19: a behaviour ships on only on a measured win; try on a real phone);
+  the late pre-warm was worse — it compiles every variant a mesh could draw, doubling the compile time — so it **ships off**
+  (the knob stays for a phone with parallel shader compiles to try).
+- **The session matters more than the switch:** the same zone's worst frame was 2.2–3.8 s in m1 and 1.4–2.3 s in m2, a quieter
+  box (Venice's was 1.2–1.7 s in phase 1). The rig's long frames are mostly its software GPU, which a phone does not have; the
+  owner's phone is the judge.
+- **The townsfolk:** they already land one a frame apart (Onlookers oneBodyPerFrame) and start 0.5 s after you can move
+  (phase D); a body's setup is one ~1 s frame on the rig and cannot be split further without changing the shared crowd code.
+  Not changed beyond what phase D did.
+- **Budget:** draws 118–134, active meshes 58–67, textures 63 MB, the player and four townsfolk; the `coast_zone` row's active
+  meshes 66 → 67 measured (budget 80 → 81), the rest unchanged (136 / 67 / 5 / 63 / 0, budget 164 / 81 / 6 / 76 / 0).
+- **Every-screen on `/play/coast`** (the production build of this branch, 00:16–00:25 UTC; the planted-fault control passed first):
+  **clean** (first content 220 ms, layout shift 0).
+- **Gull Key** reached on the rig too: on past Palm Key along the sandbar, over Reef Rock and down the sandbank (15 of 15 points;
+  pictures `coast-sandbank-phone.jpg`, `coast-gullkey-phone.jpg`).
+
+**The zone grows** (`coast.zoneGrow`, the budget allowed it): the 2 × 2 block of 64 m pieces north-west of Reef Rock — mostly
+open sea (over 70 % of the block is water you cannot stand in), a sandbank from Reef Rock's west shore (its crest 0.55 m under,
+wadeable), and Gull Key, a 15 m palm islet (`[PLACEHOLDER]`). The grid gained two columns west (x −320 … −192), of which only
+that block is zone; phase A's pieces keep their places. 40 pieces now; the way to 768 m (12 × 12) is the same move again.
+Walked on the real host from Reef Rock along the sandbank onto Gull Key, never in deep water (`phaseF.test.ts`). The static
+guard: the worst standable piece 40,864 → 41,388 triangles (cap 42,900), worst draws 83 → 87 (cap 87: the four new land
+pieces' coarse ground), textures unchanged.
 
 ## 5. Flags and assumptions
 

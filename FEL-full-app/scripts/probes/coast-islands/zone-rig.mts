@@ -75,12 +75,17 @@ try {
   const phaseA = `feel=${encodeURIComponent(JSON.stringify({ 'coast.partnerOn': 0, 'coast.creaturesOn': 0 }))}`;
   // CONTROL=phaseB (phase D's measurement): the zone with the town, the sports spots and the quests off (= phase B), same session
   const phaseB = `feel=${encodeURIComponent(JSON.stringify({ 'coast.townOn': 0, 'coast.sportsOn': 0, 'coast.questsOn': 0 }))}`;
+  // CONTROL=fliteOff (phase F-lite's measurement): the zone with the streaming slices and the late pre-warm off (= phase D's way)
+  const fliteOff = `feel=${encodeURIComponent(JSON.stringify({ 'coast.streamSliced': 0, 'coast.prewarmLate': 0 }))}`;
   for (let i = 0; i < N; i++) {
     runs.push([`coast-${i + 1}`, '']);
     if (process.env.CONTROL === 'phaseA') runs.push([`phaseA-control-${i + 1}`, phaseA]);
     else if (process.env.CONTROL === 'phaseB') runs.push([`phaseB-control-${i + 1}`, phaseB]);
+    else if (process.env.CONTROL === 'fliteOff') runs.push([`fliteOff-control-${i + 1}`, fliteOff]);
     else runs.push([`venice-control-${i + 1}`, 'mode=venice_hub']);
   }
+  // GULL=1 (phase F-lite's picture): one more zone run, after the measured ones, on past Palm Key to Gull Key (not in the comparison)
+  if (process.env.GULL === '1') runs.push(['coast-gull', '']);
   if (!process.env.CONTROL) runs.push(['coast-nostream', `feel=${encodeURIComponent(JSON.stringify({ 'coast.streamOn': 0 }))}`]);
   // VARIANTS='name={"knob":v};name2={...}': these zone runs instead (a diagnosis: which part of a change does what)
   if (process.env.VARIANTS) {
@@ -127,10 +132,11 @@ try {
     // failed ("execution context was destroyed") once the town's bodies were loading as play began (coast-d d2, d3)
     await page.evaluate('void (window.__SI = window.__SI || window.__FEL_DEV__.instrument())');
     // frame gaps, from here on
-    await page.evaluate(`(() => { window.__gaps = []; let last = performance.now(); function tick() { const n = performance.now(); window.__gaps.push(n - last); last = n; requestAnimationFrame(tick); } requestAnimationFrame(tick); })()`);
+    await page.evaluate(`(() => { window.__gaps = []; window.__gapAt = []; let last = performance.now(); function tick() { const n = performance.now(); window.__gaps.push(n - last); if (n - last > 250) window.__gapAt.push([Math.round(n), Math.round(n - last)]); last = n; requestAnimationFrame(tick); } requestAnimationFrame(tick); })()`);
     await page.waitForTimeout(5000);   // let the dressing land
     const isCoast = !query.includes('venice_hub');
-    const first = name === 'coast-1';
+    const first = name === 'coast-1' && process.env.GULL !== '1';
+    const gull = name === 'coast-gull';
     const shot = async (label: string) => { if (!first) return; const file = path.join(OUT, `coast-${label}-phone.jpg`); await page.screenshot({ path: file, type: 'jpeg', quality: 85 }); console.log('wrote', file); };
     await shot('arrival');
     let worst: Worst = { draws: 0, active: 0, textureMb: 0, textures: 0, meshes: 0 };
@@ -177,12 +183,26 @@ try {
       legs.bridgeMid = await walkTo(page, 20, -36, 150, sample);
       await shot('island');
       legs.palmKey = await walkTo(page, -24, -36, 150, sample);
+      if (gull) {
+        // on along the sandbar to Reef Rock, over its top, down the sandbank to Gull Key (zoneLayout SANDBAR, SANDBANK, GULL_KEY)
+        legs.sandbar = await walkTo(page, -52, -12, 120, sample);
+        legs.reefRock = await walkTo(page, -114, 60, 200, sample);
+        legs.sandbankStart = await walkTo(page, -144, 80, 120, sample);
+        legs.sandbankMid = await walkTo(page, -196, 110, 150, sample);
+        await page.waitForTimeout(1500);
+        const f = path.join(OUT, 'coast-sandbank-phone.jpg'); await page.screenshot({ path: f, type: 'jpeg', quality: 85 }); console.log('wrote', f);
+        legs.gullKey = await walkTo(page, -258, 146, 150, sample);
+        await page.waitForTimeout(1500);
+        const g = path.join(OUT, 'coast-gullkey-phone.jpg'); await page.screenshot({ path: g, type: 'jpeg', quality: 85 }); console.log('wrote', g);
+      }
     } else {
       await page.evaluate(() => (window as unknown as { __bus: { emit(e: unknown): void } }).__bus.emit({ t: 'stick', side: 'L', x: 0, y: -1 }));   // forward (the bus's y is down-positive)
       for (let k = 0; k < 40; k++) { await page.waitForTimeout(250); await sample(); }
       await page.evaluate(() => (window as unknown as { __bus: { emit(e: unknown): void } }).__bus.emit({ t: 'stick', side: 'L', x: 0, y: 0 }));
     }
     const gaps = await page.evaluate(() => (window as unknown as { __gaps: number[] }).__gaps.slice(5));
+    // phase F-lite: the long frames (> 250 ms) with when they ended (performance.now), the worst eight
+    const longFrames = (await page.evaluate('window.__gapAt') as Array<[number, number]>).sort((a, b) => b[1] - a[1]).slice(0, 8);
     gaps.sort((a, b) => a - b);
     const frameMs = { worst: Math.round(gaps[gaps.length - 1] ?? 0), p95: Math.round(gaps[Math.floor(gaps.length * 0.95)] ?? 0), p50: Math.round(gaps[Math.floor(gaps.length * 0.5)] ?? 0), frames: gaps.length };
     const end = await page.evaluate('window.__coast ? window.__coast() : null');
@@ -190,7 +210,8 @@ try {
     const partnerGap = gaps2.length ? { mean: +(gaps2.reduce((a, b) => a + b, 0) / gaps2.length).toFixed(1), p95: +gaps2[Math.floor(gaps2.length * 0.95)].toFixed(1), max: +gaps2[gaps2.length - 1].toFixed(1) } : null;
     const log = await page.evaluate('window.__log ?? null');
     const spotsSeen = await page.evaluate('window.__spotsSeen ?? null');
-    result[name] = { ...t, worst, frameMs, legs, pieces, streamMax, partnerGap, log, spotsSeen, end, errors: errors.slice(0, 5), missing: [...missing] };
+    const longs = await page.evaluate('window.__longs ?? null') as Array<Record<string, number>> | null;
+    result[name] = { ...t, worst, frameMs, longFrames, longs, legs, pieces, streamMax, partnerGap, log, spotsSeen, end, errors: errors.slice(0, 5), missing: [...missing] };
     console.log(name, JSON.stringify(result[name]));
     } catch (e) {
       // what is there now: a fresh page (a reload) or none (a crash)?

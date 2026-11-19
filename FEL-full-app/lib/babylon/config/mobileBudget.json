@@ -319,14 +319,14 @@
     "coast_zone": {
       "measured": {
         "drawCalls": 136,
-        "activeMeshes": 66,
+        "activeMeshes": 67,
         "skinnedBodies": 5,
         "textureMb": 63,
         "particles": 0
       },
       "budget": {
         "drawCalls": 164,
-        "activeMeshes": 80,
+        "activeMeshes": 81,
         "skinnedBodies": 6,
         "textureMb": 76,
         "particles": 0
