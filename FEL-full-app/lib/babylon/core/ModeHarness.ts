@@ -910,6 +910,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     startedAt = performance.now();
     setPhase('playing');
     try { def.onPlay?.(ctx); } catch (err) { console.error(`[FEL-MODE] ${def.modeId} onPlay threw:`, err); }   // NB-1: the start screen's picks
+    lights.shadowCache?.settle('start');   // hoops-followups: a shadow warm-up still running ends at the press (perf.shadowBakeAtStart, ShadowCache.ts)
     if (def.intro) camDirector.establish(def.intro);   // A9.12: the broadcast intro over the first seconds of play (skippable)
     // CREATOR CARD (2026-09-13): one canonical record, one writer. Every mode's session is recorded HERE
     // rather than in each mode, which is the mission's rule ("No mode may persist its own parallel
