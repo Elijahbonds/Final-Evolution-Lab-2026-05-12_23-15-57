@@ -125,6 +125,7 @@ export function printJersey(top: Mesh, jersey: JerseyConfig, jerseyHex: string, 
   const ink = inkFor(jerseyHex), key = `${jersey.number}|${jersey.name}|${ink.fill}`;
   const had = made.get(top);
   if (had?.key === key) return true;
+  const t0 = performance.now();
   const tex = had?.tex ?? new DynamicTexture(`fel_jersey_print_${top.uniqueId}`, { width: W, height: H }, scene, true);
   const ctx = tex.getContext() as unknown as CanvasRenderingContext2D | null;
   if (!ctx) return false;
@@ -138,6 +139,7 @@ export function printJersey(top: Mesh, jersey: JerseyConfig, jerseyHex: string, 
   if (mat?.decalMap) mat.decalMap.isEnabled = true;
   if (!had) top.onDisposeObservable.addOnce(() => { tex.dispose(); uv.dispose(); made.delete(top); });
   made.set(top, { key, tex, uv });
+  console.info(`[FEL-KIT] jersey print ${top.name}: ${(performance.now() - t0).toFixed(1)} ms (canvas + upload, on an idle turn)`);
   return true;
 }
 
