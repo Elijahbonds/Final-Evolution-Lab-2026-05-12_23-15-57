@@ -1761,6 +1761,12 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/core/bodyMerge.ts BODY_MERGE_ON',
     hint: 'Every mode: once a body holds still, its parts that the renderer treats alike share one mesh (one sub-mesh per part, the same shaders, draw order and ink). Any change puts the parts back that frame. Same picture, fewer active meshes. 1 = the phone tier (measured identical there), 2 = every tier, 0 = one mesh per part, as before.',
   },
+  // ── lane/hoops-followups (coordinator 2026-11-18: the 3v3 worst frame after the body merge was the first shadow bake at tip-off) ──
+  {
+    id: 'perf.shadowBakeAtStart', label: 'Phone shadows: the first bake at the START press (1) / after its full warm-up (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/babylon/scene/ShadowCache.ts SHADOW_BAKE_AT_START',
+    hint: 'Every mode on the phone tier. The shadow cache watches the scene for a second after loading, then bakes the still scenery once. Pressing START before that second is up used to leave about a second of play drawing every shadow each frame, then the bake mid-play (the 3v3 worst frame). 1 = the press ends the watch and the bake happens on the first frame of play, under the intro camera. 0 = as before.',
+  },
   // ── lane/kit-mac-jobs (owner 2026-11-18: the clothes look poofy; the two Blender jobs, the one-piece short and the new jerseys) ──
   {
     id: 'kit.onePieceShorts', label: 'Kit body short: one piece, fitted (1) / three pieces, as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Kit · garments',
