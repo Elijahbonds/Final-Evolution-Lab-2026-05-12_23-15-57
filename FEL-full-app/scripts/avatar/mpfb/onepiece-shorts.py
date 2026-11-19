@@ -17,6 +17,7 @@
 #                                 hips above the gusset, each thigh below it), at `--ease` off the skin (the hem `--hem-ease`)
 #   §2.4 smooth ................. Smooth Vertices factor 0.3, 3 repeats, the waist and leg opening loops left out; then any
 #                                 vertex the smoothing pulled under `--min-ease` goes back out along the skin's normal
+#   (kit-tight) `--hem-rise` cuts the hem higher on the inner thigh, as athletic shorts are (KIT-FIT-PLAN §12.3); 0 = level
 #   §2.5 UVs .................... Smart UV Project, angle 66, island margin 0.02
 #
 # Resolution: the tubes' 14-vertex rings are too coarse to sit close to a thigh (a 25.7 degree facet sags 2.3 mm into a
@@ -47,6 +48,8 @@ HEM_EASE = float(flag('--hem-ease', '0.012'))  # the hem row: a little flare, so
 MIN_EASE = float(flag('--min-ease', '0.004'))  # after smoothing, nothing nearer the skin than this (along its normal)
 DROP = float(flag('--gusset-drop', '0.025'))   # the gusset hangs this far below the body's crotch (steps: 2-3 cm)
 CUTS = int(flag('--gusset-cuts', '4'))         # interior points across the gusset (steps: 2 at today's 14-point rings)
+RISE = float(flag('--hem-rise', '0'))         # kit-tight: the hem cut this much higher on the inner thigh (athletic cut); 0 = level
+RISE_W = 0.05                                  # ... over the cloth within this of the middle line, fading to level outside it
 HALF = int(flag('--half', '16'))               # points per half ring (front centre to back centre)
 ROW = float(flag('--row', '0.015'))            # row spacing, metres
 MERGE = 0.0005                                 # steps §2.3: 0.5 mm
@@ -194,6 +197,11 @@ def leg_rings(rows, sign):
         ring = a + inner
         for p in ring:   # each leg's cut edge starts inside its own half, so the two legs never weld (the fit places it)
             if sign * p.x < START_IN: p.x = sign * START_IN
+        if RISE > 0:   # kit-tight: the curved hem — the inner side of each leg row rises, most at the hem, none at the gusset
+            u = (z - z_hem) / max(1e-6, z_gusset - z_hem)
+            for p in ring:
+                t = min(1.0, max(0.0, (RISE_W - sign * p.x) / RISE_W)); t = t * t * (3 - 2 * t)
+                p.z = z + RISE * t * (1 - u)
         out.append([mk(p) for p in ring])
     top = ([g0[0]] + g0[1:HALF] + [g0[HALF]]) if sign > 0 else ([g0[0]] + list(reversed(g0[HALF + 1:])) + [g0[HALF]])
     out.append(top + gusset)

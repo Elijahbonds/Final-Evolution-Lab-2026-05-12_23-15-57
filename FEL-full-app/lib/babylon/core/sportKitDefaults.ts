@@ -58,7 +58,7 @@ export const SPORT_KIT_DEFAULTS: Readonly<Record<string, SportKit>> = {
 export const BASKETBALL_JERSEY = 'top_basketball';
 /** Knob `kit.newJerseys`: 1 = the basketball and football jerseys of the garment set on the kit bodies (kitGarmentSet.ts) and the
  *  basketball jersey as the basketball modes' default top; 0 = today's tops (the default). */
-export const NEW_JERSEYS = 0;
+export const NEW_JERSEYS = 1;   // owner 2026-11-18 pick (3) from the contact sheet (was 0)
 export const BASKETBALL_MODES: ReadonlySet<string> = new Set(['onevone', 'threevthree', 'dunk', 'dunkduel', 'threepoint', 'carnival']);
 
 /** The default kit for a mode; an unknown or missing id takes FALLBACK_KIT. Pure apart from the `kit.newJerseys` knob. */

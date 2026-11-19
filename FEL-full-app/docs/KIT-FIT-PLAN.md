@@ -407,3 +407,153 @@ was narrowed to 4 poses × 3 cameras and the second run was cut short). Px are s
 - assumption (not measured): the closer cloth leaves less room for the skin the mask keeps. The mask keeps a 5 cm band at a
   top's hem and armholes (`TOP_EDGE_MARGIN`) and 1 cm at a short's openings, and both new tops have larger openings. A tight
   garment needs the mask and the fit to be tuned together (the kit-tight lane's `kit.fitTightness`), not a closer file alone.
+
+## 12. kit-tight, phase 1 (2026-11-18): pulling today's garments in fails the bar; the slider ships at 0
+
+The owner (2026-11-18): "make the clothes appear to be skin tight and not baggy ... right now it looks poofy."
+
+**Where the poof comes from** (`scripts/probes/kit-tight/gap.ts`, headless, default male kit at idle, outward cloth, median / 90th
+percentile, cm). The garment files stand 2.0–2.5 cm off the skin. The runtime then adds 1–1.8 cm: the lift
+(`GARMENT_INFLATE` 13 mm tops / 20 mm shorts) and the edge flare near the openings. (Correction, 2026-11-18: an earlier note here
+said the flare took every seam of the tank for an opening and flared all of it. That was a fault in the probe — its file stage
+wrote the tank's 408 loaded vertices back into the live mesh. Measured correctly, the flare moves 810 of the tank's 2,160 vertices,
+the ones near its openings, and a "real openings only" flare moves 840 and changes no gap: there is no seam bug.)
+
+| Region | File | Drawn today |
+|---|---|---|
+| chest / upper back (tank) | 2.5 / 4.2 | 3.9 / 5.7 |
+| belly / lower back (tank) | 2.0 / 2.4 | 3.2 / 4.2 |
+| shoulder (tank) | 2.2 / 3.6 | 3.7 / 5.1 |
+| thigh (short) | 2.3 / 3.2 | 4.1 / 5.4 |
+
+On girth-max Creator builds the body fills the cloth (≤ 0 cm): the poof is the default builds'.
+
+**What was tried** (`lib/babylon/core/fitTight.ts`, `kit.fitTightness`). Each worn kit tee / tank / short vertex further than 8 mm
+off the skin is pulled toward the skin by the slider's share of the excess, once, fading out within 7 cm of an open edge.
+Headless at 1 the belly, shoulders, hem and thigh come to 0.1–1.1 cm. On the steady phone rig (one round each; all 8 kit
+subjects), all three versions failed:
+1. **Pull everywhere, at 0.6:** skin through cloth +10–35 %; the shorts slot doubled to quadrupled.
+2. **Pull only over skin the mask hides, at 1:** the same; skin seen against the cloth's outside rose too (female default shorts
+   1,065 → 4,586 px).
+3. **As 2, with the mask always measuring the loose cloth, at 1:** the same (female default shorts 3,404 → 7,405; game female
+   648 → 4,264). So it is not a re-mask un-hiding skin.
+
+The cause: the kit's coarse short and tank ride their OWN skin weights, not the body's. In a stride the cloth slides over the skin
+by centimetres, so skin from the drawn bands at the openings slides under cloth that now sits close, and comes through. Today's
+3–4 cm gap is what absorbs that slide. Pulling the cloth in only works if it also rides the skin (the body's weights under it).
+For these three-piece files that fails at the crotch (§3.1). **The slider ships at 0 (today), the code stays for phase 2.**
+
+Phase 2 (the coordinator, 2026-11-18): the kit-mac-jobs garments (a one-piece short, the new jerseys, cut close in Blender with
+weights from the body), with the runtime lift and flare reduced for those files only, and the mask tuned to their openings.
+
+### 12.1 Phase 2 (2026-11-18): the kit-mac-jobs garments in the game, with their own lift (`kit.setLiftScale`)
+
+The seam-flare "bug" from phase 1 does not exist (§12's correction). The garment sets (§11) were measured on the phone rig, one
+round, against today, with `rival-halo` as the control:
+
+| Subject | Skin through cloth: today → sets at today's lift → sets at 0.3 of it | Tops slot | Shorts slot |
+|---|---|---|---|
+| closet-male-default | 16,583 → 21,062 → 31,088 | 10,290 → 10,324 → 10,314 | 2,359 → 6,844 → 16,602 |
+| closet-female-default | 13,750 → 14,414 → 23,101 | 8,489 → 8,498 → 8,485 | 3,655 → 3,929 → 12,443 |
+| game-male-default | 17,667 → 24,831 → 40,878 | 11,687 → 17,522 → 26,115 | 3,419 → 4,711 → 11,998 |
+| game-female-default | 11,494 → 21,821 → 35,343 | 8,167 → 17,259 → 21,904 | 1,535 → 3,070 → 11,408 |
+
+Bringing them closer makes the count worse, as in phase 1. **But the count may not be judging what the eye judges here.**
+- The rig counts a skin pixel as "through the cloth" when the skin lies within 4 cm of a garment and inside the garments-only
+  silhouette (`rig-entry.ts` `POKE_NEAR`). The tops slot rose only on the game subjects, the ones that wear the new SLEEVELESS
+  jersey; the Closet subjects keep the tee and did not move. A bare arm beside a sleeveless jersey sits within 4 cm of it, in
+  front of its silhouette. The same goes for a bare thigh just below a tight hem: the closer the cloth, the more skin falls
+  inside 4 cm.
+- In the game male overhead close-up (`scratchpad/kit-tight/diag-overhead.jpg`) today's tee shows skin patches through its
+  chest. The new jersey shows none.
+
+assumption, not measured: much of the rise is this proximity effect, not skin poking through. A design that shows more arm or
+thigh cannot pass a count that treats nearby bare skin as poke. The owner's eye, or a rig measure that tells skin in front of
+cloth from skin that should be under it, is needed to judge it.
+
+### 12.2 The owner's pick, and the waived count (2026-11-18)
+
+The coordinator put a contact sheet to the owner (`scripts/probes/kit-tight/pick.sh`, `tile.sh`: each kit body standing and
+mid-stride, plus the phone frames at game distance), with three versions: (1) today, (2) the new garments, (3) the new garments
+at half the runtime lift. **The owner picked (3).** It ships: `kit.onePieceShorts` 1, `kit.newJerseys` 1, `kit.setLiftScale` 0.5.
+
+**The 10.1a skin count is waived for this change, by the owner's eye.** It is a reasoned call, not a measured one. The count
+calls any bare skin within 4 cm of a garment, inside its silhouette, "through the cloth". So it scores a sleeveless jersey (a bare
+arm beside it) and a closer hem (a bare thigh just below it) as worse, and §12.1's game-only rise in the tops slot fits that. It
+was not checked with a sharper measure. What it does not waive: flicker was not judged, and the one-piece short's hem frays at the
+inner thigh in a stride (visible on the sheet; kit-mac-jobs measured its stretched edges 3–5×). That is the next job:
+fix it in `scripts/avatar/mpfb/onepiece-shorts.py` and re-export, behind the same knobs, with before / after pictures.
+
+### 12.3 The one-piece short's inner-thigh fray (2026-11-18): weights cannot fix it; the shape must
+
+Headless (`scripts/probes/kit-mac-jobs/cpu-sets.ts`, male, 10 poses; torn = an edge past ×2 and past ×1.5 of the skin under it):
+today's three-piece short tears 92 edges, the shipped one-piece short 300, up to ×6.8 in a kick. `TEAR_DUMP=1`
+(`scripts/probes/kit-glitch/cpu.ts`) shows where: 298 of the 300 hang on both thighs, near the middle line, at and below the gusset.
+The build rebuilt here (bpy 5.0.1 in a scratch venv; `scripts/avatar/kit-fit/build-sets.sh`'s steps) reproduces the shipped file
+byte for byte, so these are fair variants:
+
+| Variant | Torn edges (10 poses) |
+|---|---|
+| shipped (gusset 2.5 cm under the crotch) | 300 |
+| each vertex on its own thigh only (no shared weights) | 314 (216 of them now the left-to-right seam, ×5–10) |
+| the shared thigh share moved to the pelvis | 354 |
+| own thigh, then fading into the pelvis from the gusset up, over 2 / 4 / 7 cm | 624 / 714 / 632 |
+| the same fade without the gusset limit (the inner legs too) | 1,572–2,358 (the cloth left behind the leg, 17 cm) |
+| gusset 4.5 / 6.5 cm under the crotch | 342 / 398 |
+| hem ease 12 → 20 mm | 300 |
+| curved hem, inner side cut 3 / 5 / 8 cm higher (`onepiece-shorts.py --hem-rise`; 0 rebuilds the shipped file byte for byte) | 304 / 360 / 350 (skin through it 130 → 112 / 109 / 75) |
+
+The stretch is the cloth that joins the two legs: when the legs split it has to stretch, wherever its weights put it. Today's short
+avoids it only because its leg tubes overlap instead of joining. The curved hem lowers the skin seen through the short but not the
+tears, so the torn edges are the gusset's, not the hem's. With 22 bones and no cloth simulation (GATE 0), the cloth that joins two
+legs that split apart must stretch somewhere. What is left: hide it (a darker inseam panel, so the stretched faces read as a seam),
+or a short with a slit side (less cloth to stretch). Both are owner-look choices.
+
+### 12.4 The inseam panel, and the /creator tap control (2026-11-18)
+
+**The panel** (`lib/babylon/core/inseamShade.ts`, `kit.inseamShade` 0.55; 0 = none). This is the coordinator's option (a), taken
+as the reversible default and flagged to the owner.
+- A 128² texture made from the one-piece short's own UVs, positions and weights. It is dark on the inner side of each leg, from
+  the gusset to the hem.
+- It sits in the short's LIGHTMAP slot, read as a shadow map. The albedo slot is the Creator paint's, and a panel there never
+  showed.
+- The Closet tint's material clone shares it (`playerIdentity.cloneForTint`), because a deep copy of a texture made in memory is
+  blank.
+- No geometry, UV, bone or vertex-data change: the body merge sees the same parts (tested).
+- It reads in a kick, where the inner thigh faces the camera. Standing, the inner thigh is mostly hidden between the legs.
+
+**The /creator tap control** (every-screen `fast`; budget 200 ms; one gate hold; own database). Each side was built alone, scored
+3 times, then deleted:
+
+| Side | Tap times (ms) |
+|---|---|
+| release tip 28a9e732 | 224 / 160 / 168 |
+| lane/kit-tight 193eb9f3 | 240 / 224 / 288 |
+
+The ranges touch only at 224. The kit side's median is ~70 ms slower, and the release itself missed the budget once. What this lane
+adds to the main thread when a body loads, measured headless:
+- fetching, parsing and applying the two garment sets: 8–32 ms;
+- the panel texture: 3–4 ms at 128² (14–17 ms at 256², the size the control did not include yet).
+
+assumption: if the body's load overlaps the tap, the garment-set work is the likely difference. Not confirmed with a trace.
+
+**The control again, with the garment work off the tap path (2026-11-18, release 77e5bb3e vs lane/kit-tight 29fe6bd7).**
+The change: the sets are fetched with the body, and each garment goes in on its own browser turn. One gate hold, 5 alternating
+/creator scores a side, then a traced tap each side (`score.mts` `ES_TRACE`, read with `scripts/probes/kit-tight/trace-read.mjs`).
+
+| Side | Tap times (ms) | Median | Spread |
+|---|---|---|---|
+| release 77e5bb3e | 232 / 200 / 176 / 176 / 160 | 176 | 160–232 |
+| lane/kit-tight 29fe6bd7 | 168 / 184 / 200 / 144 / 248 | 184 | 144–248 |
+
+The kit median is inside the release's spread and under the 200 ms budget. The traces (traced taps: release 168 ms, kit 152 ms)
+look the same on both sides:
+- the tap is the page's own `pointerdown` handler in the layout bundle: 64 ms on the release, 58 ms on the kit, at the scorer's
+  4× CPU throttle;
+- no garment-set mark (`fel-kit:*`) falls within ±1.5 s of it.
+
+So /creator's tap path carries none of this lane's work, and the earlier 240-vs-168 was the loaded machine. The release itself
+reaches 232 ms, over budget.
+
+Note for the next control: the hold's wait-for-disk loop gave up after 30 minutes and built anyway, with 4 GB free. It should
+fail instead of building.
