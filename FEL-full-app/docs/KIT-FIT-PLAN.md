@@ -557,3 +557,44 @@ reaches 232 ms, over budget.
 
 Note for the next control: the hold's wait-for-disk loop gave up after 30 minutes and built anyway, with 4 GB free. It should
 fail instead of building.
+
+## 13. kit-numbers (2026-11-19): the number and name printed on the new court jerseys
+
+`lib/babylon/core/jerseyDecals.ts`, `kit.jerseyDecals` 1 (0 = blank, as before).
+
+**What it does**
+- **Canvas:** a 512 × 256 canvas drawn in the jerseys' `decal` UV layout (`jersey.py` §4): a small number on the chest; the name
+  across the top of the back and the number large under it.
+- **Shown through Babylon's decal map:** it mixes the print over the tinted cloth by its alpha. The map hangs on each body's mesh,
+  so each player has their own print.
+- **Number and name:** `PlayerIdentity.jersey`. assumption: an unset jersey prints the default 0.
+- **Other tops:** keep the floating plate.
+
+**Two fixes the rig found**
+- **Mirrored print:** each half is drawn mirrored about its own centre, because the glTF loader flips x.
+- **Blended faces:** the exporter's decimation blended a few dozen decal UVs. `printSafe` parks those faces on vertex copies, and
+  the shape does not change.
+- **Found, not this lane's:** the new jersey shows dark marks along its lower back with the print off too (rig, back view).
+  Flagged for the jersey's own build.
+
+**Cost**
+- 9–36 ms a print (canvas and upload; rig console), on an idle turn, never in the identity apply.
+- Cached by what it shows.
+
+**The bar** (steady rig, 3 runs a side, phone and desktop, `rival-halo` the control; off = the plate):
+- **Skin through cloth:** within ±1 % on every subject, inside the control's spread (412 px desktop, 267 px phone). The strict
+  "at or below the highest" rule flags +0.2 % differences, but the print changes no geometry.
+- **Flicker:** equal or lower everywhere except the Closet female on the phone (30–32 → 30–46, 1 px past the control's spread).
+- **Legibility:** the back number is legible at gameplay distance on a phone. The chest number and the name read at mid range and
+  closer.
+
+**every-screen** (one gate hold, one build on disk at a time, release 844e8641 vs this lane):
+
+| Side | /creator taps (ms) | Checks passed |
+|---|---|---|
+| release | 208 / 184 / 160 / 176 / 176 (median 176) | 4 of 5 runs pass all four checks |
+| kit | 192 / 176 / 168 / 176 / 184 (median 176) | 5 of 5 runs pass all four checks |
+
+- The traced kit tap read 208 ms (tracing on). The tap is the page's own `pointerdown` handler, and no garment or print work is
+  near it.
+- `/play/onevone` is clean.

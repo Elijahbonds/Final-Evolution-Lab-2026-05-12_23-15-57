@@ -59,7 +59,7 @@ export interface Cell { subject: string; tier: string; pose: string; clip: strin
 async function runSubject(page: Page, base: string, s: Subject, tier: string, poses: typeof POSES, cams: typeof CAMS, out: Cell[], shots: boolean): Promise<void> {
   await page.goto(`${base}/`, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => !!(window as unknown as { __KG?: { ready: boolean } }).__KG?.ready, undefined, { timeout: 60_000 });
-  await kg(page, 'init', { tier, modeId: s.modeId, closet: s.closet, w: W, h: H, knobs: process.env.KNOBS ? JSON.parse(process.env.KNOBS) : undefined, steady: process.env.STEADY !== '0' });
+  await kg(page, 'init', { tier, modeId: s.modeId, closet: s.closet, w: W, h: H, knobs: process.env.KNOBS ? JSON.parse(process.env.KNOBS) : undefined, steady: process.env.STEADY !== '0', jersey: process.env.JERSEY ? { number: Number(process.env.JERSEY.split(':')[0]), name: process.env.JERSEY.split(':')[1] ?? '' } : undefined });   // kit-numbers: JERSEY=<number>:<name>
   const t0 = Date.now();
   await kg(page, 'spawn', s.spawn);
   // the mask and the shoe's late fold land after the first rendered frames
@@ -152,7 +152,7 @@ async function diag(): Promise<void> {
     page.on('console', (m) => { if (process.env.VERBOSE) console.log('  [page]', m.text().slice(0, 200)); });
     await page.goto(`${srv.url}/`, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => !!(window as unknown as { __KG?: { ready: boolean } }).__KG?.ready, undefined, { timeout: 60_000 });
-    await kg(page, 'init', { tier, modeId: s.modeId, closet: s.closet, w: W, h: H, knobs: process.env.KNOBS ? JSON.parse(process.env.KNOBS) : undefined });   // kit-mac-jobs: KNOBS in diag too
+    await kg(page, 'init', { tier, modeId: s.modeId, closet: s.closet, w: W, h: H, knobs: process.env.KNOBS ? JSON.parse(process.env.KNOBS) : undefined, jersey: process.env.JERSEY ? { number: Number(process.env.JERSEY.split(':')[0]), name: process.env.JERSEY.split(':')[1] ?? '' } : undefined });   // kit-mac-jobs: KNOBS in diag too; kit-numbers: JERSEY
     await kg(page, 'spawn', s.spawn);
     await page.waitForTimeout(1200);
     const p = POSES.find((x) => x.id === poseId)!;

@@ -35,7 +35,7 @@ const POKE_NEAR = 0.04;
 const JITTER = 0.0004;
 
 type Tier = 'mobile' | 'desktop' | 'high';
-interface InitOpts { tier: Tier; modeId: string; closet: boolean; w: number; h: number; knobs?: Record<string, number>; steady?: boolean }
+interface InitOpts { tier: Tier; modeId: string; closet: boolean; w: number; h: number; knobs?: Record<string, number>; steady?: boolean; jersey?: { number: number; name: string } }
 interface SpawnOptsKG { kind: 'player' | 'rival'; body?: HeroBodyKind; url?: string; name?: string; tint?: string; creator?: CreatorDoc | null; wardrobe?: Record<string, string>; frame?: { heightScale: number; buildScale: number } }
 
 const CLASS = {
@@ -90,7 +90,7 @@ function identityFor(o: SpawnOptsKG): PlayerIdentity {
   const face = defaultFace();
   return {
     proportions: null, face, palette: { jersey: '#2C6E55', shorts: '#1C2622', shoes: '#EDE8DC', accent: '#E0B441' },
-    jersey: defaultJersey(), wardrobe: (o.wardrobe ?? {}) as PlayerIdentity['wardrobe'], custom: true, body: o.body ?? 'kit-male',
+    jersey: opts?.jersey ?? defaultJersey(), wardrobe: (o.wardrobe ?? {}) as PlayerIdentity['wardrobe'], custom: true, body: o.body ?? 'kit-male',
     accessories: [], creator: o.creator ?? null, wornParts: [],
   };
 }

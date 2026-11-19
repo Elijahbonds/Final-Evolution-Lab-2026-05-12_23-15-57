@@ -2209,6 +2209,12 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/adventure/coast/zoneQuests.ts COAST_QUESTS_ON',
     hint: 'Three small quests, saved with your Adventure progress.',
   },
+  // ── lane/kit-numbers (2026-11-19): the player's number and name printed on the new court jerseys ──
+  {
+    id: 'kit.jerseyDecals', label: 'Court jerseys: print the number and name (1) / blank (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Kit · fit',
+    source: 'lib/babylon/core/jerseyDecals.ts JERSEY_DECALS',
+    hint: 'On: the new basketball and football jerseys carry the player number on the chest and back and the name across the back. Off: a blank jersey, as before.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));
