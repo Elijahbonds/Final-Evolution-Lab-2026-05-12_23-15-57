@@ -201,8 +201,8 @@ export function openEdgeWeights(P: ArrayLike<number>, ind: ArrayLike<number>, ba
 /** kit.layerGap (kit-jersey-fix, 2026-11-19): metres the worn short is kept UNDER the worn top where the top covers it; 0 = off,
  *  as before. The one-piece short (20 mm of runtime lift a short against 13 a top) came within 3 mm of the new jersey and through
  *  it on the lower back (12 male vertices outside, the dark marks); lowering the whole short's lift fixed that but let the thigh
- *  through the short everywhere else (rig: skin +3–8 %). This moves only the covered part. NEW. */
-export const LAYER_GAP = 0.006;
+ *  through the short everywhere else (rig: skin +3–8 %). This moves only the covered part. NEW; 6 mm is the measured setting. */
+export const LAYER_GAP = 0;   // ships OFF: 6 mm removes the marks (rig pictures) but fails the 10.1a bar by noise-level margins (KIT-FIT-PLAN §14)
 export const layerGap = (): number => Math.max(0, Math.min(0.03, feel('kit.layerGap', LAYER_GAP)));
 const layered = new WeakSet<AbstractMesh>();
 

@@ -79,11 +79,12 @@ describe('the clothes fit (kit.fitTightness)', () => {
     const r = openEdgeWeights(P, ind, 0.5);
     expect(r.edgeVerts).toBe(6);   // every corner lies on the open rim; the two seam pairs weld into one each
   });
+  it('kit.layerGap ships off (0 = as before)', () => { expect(LAYER_GAP).toBe(0); expect(FEEL_KNOB_BY_ID.get('kit.layerGap')!.def).toBe(0); });
   it('underTopPull: a short point the top covers is held at least the gap under it; one below the hem, or already under, stays', () => {
     // a flat top at z = 0 facing +z; short points 2 mm OUTSIDE it, 10 mm under it, and one below the top's hem (y < -0.5)
     const top = new SkinSurface([-1, -1, 0, 1, -1, 0, 0, 1, 0], [0, 0, 1, 0, 0, 1, 0, 0, 1], [0, 1, 2]);
-    const r = underTopPull([0, 0, 0.002, 0.1, 0, -0.01, 0, -0.9, 0.002], top, -0.5, LAYER_GAP);
-    expect(r.delta[2]).toBeCloseTo(-(0.002 + LAYER_GAP), 6);
+    const r = underTopPull([0, 0, 0.002, 0.1, 0, -0.01, 0, -0.9, 0.002], top, -0.5, 0.006);
+    expect(r.delta[2]).toBeCloseTo(-(0.002 + 0.006), 6);
     expect(r.delta[5]).toBe(0);
     expect(r.delta[8]).toBe(0);
     expect(r.moved).toBe(1);
