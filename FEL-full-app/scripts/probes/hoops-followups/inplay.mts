@@ -81,6 +81,19 @@ try {
       const shot = path.join(out, `inplay-${route.split('/').pop()}-${w}x${h}.jpg`);
       await p.screenshot({ path: shot, type: 'jpeg', quality: 80 });
       row.shot = shot;
+      // dock-sideways: real taps at the dock's edges, after the picture. The ⋯ tapped 6 px left of where it is drawn opens its menu
+      // (the invisible box); Pause tapped 2 px inside its left edge pauses the game (nothing on top of it).
+      const dk = (row.dock ?? []) as Array<{ label: string; x: number; y: number; w: number; h: number }>;
+      const dots = dk.find((d) => /^Capture and stream/.test(d.label)), pause = dk.find((d) => /^Pause/.test(d.label));
+      if (dots && w > h) {
+        await p.touchscreen.tap(dots.x - 6, dots.y + dots.h / 2); await p.waitForTimeout(400);
+        row.dotsEdgeTapOpensMenu = await p.locator('[data-testid="capture-menu"]').isVisible().catch(() => false);
+        if (row.dotsEdgeTapOpensMenu) { await p.touchscreen.tap(dots.x + dots.w / 2, dots.y + dots.h / 2); await p.waitForTimeout(300); }
+      }
+      if (pause && w > h) {
+        await p.touchscreen.tap(pause.x + 2, pause.y + pause.h / 2); await p.waitForTimeout(500);
+        row.pauseEdgeTapPauses = await p.evaluate(() => /Resume|Play/i.test(document.querySelector('[data-fel-corner] button')?.getAttribute('aria-label') ?? ''));
+      }
     } catch (e) {
       row.failed = String((e as Error).message).slice(0, 200);
       const shot = path.join(out, `inplay-${route.split('/').pop()}-${w}x${h}-failed.jpg`);
@@ -91,7 +104,7 @@ try {
     rows.push(row);
     fs.writeFileSync(path.join(out, 'inplay.json'), JSON.stringify(rows, null, 1));
     const dc = (row.deckCtrls as Array<{ label: string; w: number; h: number }> | undefined) ?? [];
-    console.log(`${route.padEnd(18)} ${row.view} ${row.failed ? `FAILED ${row.failed}` : `ready ${row.readyS}s · started ${row.startGone} · d-pad ${row.dpadShape} (hollow takes taps: ${row.hollowTakesTaps}) · deck ${dc.map((c) => `${c.label} ${c.w}x${c.h}`).join(', ')} · smallest ${row.smallestDeckPx} · overlaps ${(row.deckOverlaps as string[]).length} · off screen ${(row.deckOffScreen as string[]).join(',') || 'none'} · small controls (by tap area) ${JSON.stringify(row.smallHit)} · dock ${((row.dock ?? []) as Array<{ label: string; w: number; h: number; hitW: number; hitH: number }>).map((d) => `${d.label} drawn ${d.w}x${d.h} taps ${d.hitW}x${d.hitH}`).join(', ') || 'none'}`} · errors ${errs.length}`);
+    console.log(`${route.padEnd(18)} ${row.view} ${row.failed ? `FAILED ${row.failed}` : `ready ${row.readyS}s · started ${row.startGone} · d-pad ${row.dpadShape} (hollow takes taps: ${row.hollowTakesTaps}) · deck ${dc.map((c) => `${c.label} ${c.w}x${c.h}`).join(', ')} · smallest ${row.smallestDeckPx} · overlaps ${(row.deckOverlaps as string[]).length} · off screen ${(row.deckOffScreen as string[]).join(',') || 'none'} · small controls (by tap area) ${JSON.stringify(row.smallHit)} · edge taps: ⋯ opens ${row.dotsEdgeTapOpensMenu ?? '-'}, Pause pauses ${row.pauseEdgeTapPauses ?? '-'} · dock ${((row.dock ?? []) as Array<{ label: string; w: number; h: number; hitW: number; hitH: number }>).map((d) => `${d.label} drawn ${d.w}x${d.h} taps ${d.hitW}x${d.hitH}`).join(', ') || 'none'}`} · errors ${errs.length}`);
     await ctx.close();
   }
   await b.close();
