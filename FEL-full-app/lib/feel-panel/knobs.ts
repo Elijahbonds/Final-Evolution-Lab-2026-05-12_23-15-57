@@ -1761,6 +1761,12 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/core/bodyMerge.ts BODY_MERGE_ON',
     hint: 'Every mode: once a body holds still, its parts that the renderer treats alike share one mesh (one sub-mesh per part, the same shaders, draw order and ink). Any change puts the parts back that frame. Same picture, fewer active meshes. 1 = the phone tier (measured identical there), 2 = every tier, 0 = one mesh per part, as before.',
   },
+  // ── lane/hoops-followups (coordinator 2026-11-18: the 3v3 worst frame after the body merge was the first shadow bake at tip-off) ──
+  {
+    id: 'perf.shadowBakeAtStart', label: 'Phone shadows: the first bake at the START press (1) / after its full warm-up (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/babylon/scene/ShadowCache.ts SHADOW_BAKE_AT_START',
+    hint: 'Every mode on the phone tier. The shadow cache watches the scene for a second after loading, then bakes the still scenery once. Pressing START before that second is up used to leave about a second of play drawing every shadow each frame, then the bake mid-play (the 3v3 worst frame). 1 = the press ends the watch and the bake happens on the first frame of play, under the intro camera. 0 = as before.',
+  },
   // ── lane/kit-mac-jobs (owner 2026-11-18: the clothes look poofy; the two Blender jobs, the one-piece short and the new jerseys) ──
   {
     id: 'kit.onePieceShorts', label: 'Kit body short: one piece, fitted (1) / three pieces, as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Kit · garments',
@@ -2163,6 +2169,21 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'Walking right up to a creature marks it as met in your log.',
   },
   // ── coast-d (2026-11-18, NEW): the Coast zone, phase D — the harbour town, the sports spots, the side quests.
+  {
+    id: 'coast.streamSliced', label: 'Coast zone: crossing into a piece spreads its building over frames (1) / does it all at once (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Coast · zone',
+    source: 'lib/adventure/coast/zoneView.ts COAST_STREAM_SLICED',
+    hint: 'The fine ground of the pieces you walk into and the palms and rocks there arrive one job a frame (the coarse ground meanwhile), so a crossing is not one long frame. Off by default: no measured win on the rig; try on a real phone.',
+  },
+  {
+    id: 'coast.zoneGrow', label: 'Coast zone: the four pieces past Reef Rock, the sandbank and Gull Key (1) / phase A zone (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Coast · zone',
+    source: 'lib/adventure/coast/zoneLayout.ts COAST_ZONE_GROW',
+    hint: 'A 2 by 2 block of 64 m pieces north-west of Reef Rock: open sea, a sandbank you can wade from Reef Rock, and a small palm islet. 0 = the 6 by 6 zone of phases A to D.',
+  },
+  {
+    id: 'coast.prewarmLate', label: 'Coast zone: compile the shaders of models that land after the load as they land (1) / on first sight (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Coast · zone',
+    source: 'lib/adventure/coast/zoneView.ts COAST_PREWARM_LATE',
+    hint: 'The palms and rocks, the market and each townsperson: their shaders compile when they arrive, not on the frame you first see them mid-walk. Ships 0: on the rig it doubled the compile time and the worst frame was no better.',
+  },
   {
     id: 'coast.townOn', label: 'Coast zone: the harbour town (1) / the bare beach (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Coast · zone',
     source: 'lib/adventure/coast/zoneTown.ts COAST_TOWN_ON',

@@ -1072,6 +1072,9 @@ zone's rules around it, and the creatures and the log, all new. Each 0 restores 
 
 Group **Coast · zone**. All new; each off restores phase B.
 
+- `coast.streamSliced` 0 (`lib/adventure/coast/zoneView.ts`; lane/coast-f, NEW): crossing into a 64 m piece used to build the newly full pieces' fine ground and refresh all seven prop models in that one frame; now the coarse ground stands in and the work runs one job a frame (the full ring's fine ground first, then one prop model, then load-ahead). The load (the first stream) still builds at once. **Off by default, no measured win on the rig; try on a real phone** (3 runs a side: worst frame 1.52–1.79 s against 1.44–2.30 s, p95 574–632 ms against 511–606 ms). 0 = phases A–D.
+- `coast.zoneGrow` 1 (`lib/adventure/coast/zoneLayout.ts`; lane/coast-f, NEW): the zone grows toward the plan's 768 m by the 2 × 2 block of 64 m pieces north-west of Reef Rock — mostly open sea, a sandbank (crest 0.55 m under, wadeable) from Reef Rock's west shore, and Gull Key, a 15 m palm islet. The grid gained two columns west (x −320 … −192); only that block of them is zone. 0 = the 6 × 6 zone of phases A–D.
+- `coast.prewarmLate` 0 (`lib/adventure/coast/zoneView.ts`, `zoneTownView.ts`; lane/coast-f, NEW): the models that land after the load (the seven prop models, the market kit, each townsperson's body) have their shaders — lit, shadow depth, instanced, skinned — compiled as they land (`core/hitchProbe` prewarmMeshes, the harness's own phone pre-warm for late meshes), not on the frame they first come into view mid-walk (measured: one such first sight compiled for 3.4 s on the rig). **Ships 0**: measured 3 runs a side, it doubled the rig's compile time (5.1–5.2 s against 1.9–2.7 s: it compiles every variant a mesh could draw) and the worst frame was no better. 0 = phases A–D.
 - `coast.townOn` 1 (`lib/adventure/coast/zoneTown.ts`): the harbour town beside the dock (four houses you cannot walk through,
   the shipped Venice boardwalk kit as the market strip, the street). 0 = the bare beach, and no quests.
 - `coast.townsfolk` 4: how many townsfolk stand in town (the Venice watchers' roster bodies; each is a skinned body with its own
@@ -1081,3 +1084,18 @@ Group **Coast · zone**. All new; each off restores phase B.
   brings you back to the spot. 0 = none.
 - `coast.questsOn` 1 (`lib/adventure/coast/zoneQuests.ts`): the townsfolk give three quests, saved in the Adventure save like the
   creature log. 0 = they only say hello.
+
+## hoops-followups, 2026-11-19 (the two items the hoops-items lane left: the 3v3 worst frame after the body merge, every-screen on the two hoops pages)
+
+Group "Hoops · phone budget". NEW; its off value restores the old build exactly (tests pin both sides). Probes: `scripts/probes/hoops-followups/`.
+- `perf.shadowBakeAtStart` 1 (`scene/ShadowCache.ts` `settle()`, called once from `core/ModeHarness.ts` at the START press; every
+  mode on the phone tier): the phone shadow cache watches the scene for 1 s after loading, then bakes the still scenery once. A START
+  press inside that second used to leave the rest of the watch in play (every shadow redrawn each frame: 59 shadow draws against 29)
+  and the bake on a play frame, which on 3v3 was the worst frame of the run when it fell on a full-court frame: 207 draws against a
+  row of 208 (2 of 12 runs on the rig, `perf3v3.sh`; the hoops-items lane saw 209). Now the press ends the watch and the bake runs
+  on the first frame of play, under the intro camera (measured 150 draws): worst frame 194 in every run (6 runs). Nothing in a mode
+  moves before START, so the rest of the watch was watching play, not scenery. 0 = the full watch, as before (re-measured: 207).
+
+Not a knob: the MIX / MC / CC chips over the court (`components/games/mic-caption.tsx`) were 22 px tall tap targets; each is now a
+see-through 44 px box with the chip drawn inside it as before (1v1, 3v3, 3-Point, the carnival, the dunk duel; the dunk's stacked
+chips unchanged). Nothing drawn moves.
