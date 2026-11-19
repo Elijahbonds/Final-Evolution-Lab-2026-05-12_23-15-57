@@ -141,6 +141,24 @@ const INSTRUMENT = `(() => {
   return 'ok';
 })()`;
 
+/** hoops-followups (TRACE_WORST=1): from the READY card on, every frame's draws, shadow-map draws, the cache's bakes and the phase —
+ *  the frames between the START press and the main recorder (it starts ~1 s of real time later) are otherwise never seen. */
+const EARLY = `(() => {
+  if (window.__EARLY) return 'again';
+  const scene = window.__FEL_DEV__.scene; const engine = scene.getEngine(); const si = window.__FEL_DEV__.instrument();
+  const E = window.__EARLY = [];
+  let sd = 0; const hooked = new WeakSet();
+  const hook = (rt) => { if (!rt || hooked.has(rt)) return; hooked.add(rt); let d0 = 0;
+    rt.onBeforeRenderObservable.add(() => { d0 = engine._drawCalls.current; }); rt.onAfterRenderObservable.add(() => { sd += engine._drawCalls.current - d0; }); };
+  engine.onBeginFrameObservable.add(() => { sd = 0; for (const l of scene.lights) { const g = l.getShadowGenerator && l.getShadowGenerator(); if (g && g.getShadowMap) hook(g.getShadowMap()); } });
+  engine.onEndFrameObservable.add(() => {
+    if (E.length > 4000) return;
+    const sc = scene.metadata && scene.metadata.felShadowCache; const st = sc ? sc.stats() : null;
+    E.push({ phase: String(window.__phase || ''), draws: si.drawCallsCounter.current, shadowDraws: sd, bakes: st ? st.bakes : -1, why: st ? String(st.lastReason) : '', state: st ? st.state : '' });
+  });
+  return 'ok';
+})()`;
+
 const SNAPSHOT = `(() => {
   const scene = window.__FEL_DEV__.scene; const engine = scene.getEngine();
   const cache = engine._internalTexturesCache || [];
@@ -215,6 +233,7 @@ async function run(b: Browser, mode: string, profile: string): Promise<Row> {
           const cs = await ev(() => { const sc = (window as any).__FEL_DEV__?.scene?.metadata?.felShadowCache; const st = sc ? sc.stats() : null; return st ? `${st.state}:${st.bakes}` : 'none'; });
           if (/^(warming|idle):/.test(cs) || cs === 'cached:0') { await p.waitForTimeout(1000); continue; }
         }
+        if (TRACE && state === 'ready') await ev(EARLY).catch(() => '');
         if (TRACE && !cacheAtStart) cacheAtStart = await ev(() => { const sc = (window as any).__FEL_DEV__?.scene?.metadata?.felShadowCache; const st = sc ? sc.stats() : null; return st ? `${st.state}:${st.bakes}` : 'none'; }).catch(() => '?');
         const bus = await ev(() => { const b = (window as any).__bus; if (!b) return false; b.emit({ t: 'button', btn: 'START', pressed: true }); b.emit({ t: 'button', btn: 'START', pressed: false }); return true; });
         const s = p.locator('text=/^START$/').first();
@@ -242,6 +261,9 @@ async function run(b: Browser, mode: string, profile: string): Promise<Row> {
       await p.waitForTimeout(500);
     }
     const snap = await ev(SNAPSHOT) as Record<string, unknown>;
+    // hoops-followups: the frames of play the main recorder missed (from the START press until it started), from the READY recorder
+    const early = TRACE ? (await ev(() => (window as any).__EARLY ?? []) as Array<{ phase: string; draws: number; shadowDraws: number; bakes: number; why: string; state: string }>) : [];
+    const earlyPlay = early.filter((x) => x.phase === 'playing');
     await send(1);
     const fr = (await ev(() => (window as any).__REC.frames)) as Array<Record<string, number>>;
     const govLog = (await ev(() => (window as any).__REC.gov)) as unknown[];
@@ -271,6 +293,8 @@ async function run(b: Browser, mode: string, profile: string): Promise<Row> {
       ...(process.env.TRACE_WORST === '1' ? { worstFrames: f.map((x, i) => ({ i, ...x, bakedHere: i > 0 && x.bakes > f[i - 1].bakes })).sort((a, b) => b.draws - a.draws).slice(0, 6),
         // hoops-followups: the cache when START was pressed, and the whole run INCLUDING the first 30 frames (draw counts do not
         // depend on the throttle switch those frames carry): its worst draws, and every bake in it
+        earlyPlayFrames: earlyPlay.length, earlyPlayDrawsMax: earlyPlay.length ? Math.max(...earlyPlay.map((x) => x.draws)) : null,
+        earlyBakes: early.filter((x, i) => i > 0 && x.bakes > early[i - 1].bakes).map((x) => ({ phase: x.phase, draws: x.draws, shadowDraws: x.shadowDraws, why: x.why })),
         cacheAtStart, drawsMaxAll: Math.max(...fr.map((x) => x.draws)), shadowDrawsAll: pct(fr.map((x) => x.shadowDraws), 0.5),
         bakeFramesAll: fr.filter((x, i) => i > 0 && x.bakes > fr[i - 1].bakes).map((x) => ({ g: x.g, draws: x.draws, shadowDraws: x.shadowDraws, why: x.bakeWhy })),
         firstFrame: fr.length ? { cacheState: fr[0].cacheState, bakes: fr[0].bakes, draws: fr[0].draws } : null,

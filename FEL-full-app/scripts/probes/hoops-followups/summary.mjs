@@ -10,6 +10,6 @@ for (const f of files) {
     if (!r.ok) { console.log(`${tag.padEnd(12)} FAILED ${r.note}`); continue; }
     const w = (r.worstFrames ?? [])[0] ?? {};
     const bakes = (r.bakeFramesAll ?? []).map((b) => `g${b.g}:${b.draws}/${b.shadowDraws} ${b.why}`).join(', ');
-    console.log(`${tag.padEnd(12)} draws p50 ${r.draws} max ${r.drawsMax} (all frames ${r.drawsMaxAll}) · shadow p50 ${r.shadowDraws} max ${r.shadowDrawsMax} · worst i${w.i} g${w.g} ${w.draws}/${w.shadowDraws} cache ${w.cacheState} bakedHere ${w.bakedHere} swapped ${w.swapped} · START at cache ${r.cacheAtStart} · 1st frame ${JSON.stringify(r.firstFrame)} · bakes: ${bakes || 'none'} · meshes max ${r.meshesMax} · work p50 ${Math.round(r.workP50)} · calib ${r.calibMs?.toFixed?.(1)}`);
+    console.log(`${tag.padEnd(12)} draws p50 ${r.draws} max ${r.drawsMax} (all frames ${r.drawsMaxAll}) · shadow p50 ${r.shadowDraws} max ${r.shadowDrawsMax} · worst i${w.i} g${w.g} ${w.draws}/${w.shadowDraws} cache ${w.cacheState} bakedHere ${w.bakedHere} swapped ${w.swapped} · START at cache ${r.cacheAtStart} · 1st frame ${JSON.stringify(r.firstFrame)} · bakes: ${bakes || 'none'} · before the recorder: ${r.earlyPlayFrames ?? '-'} play frames, max ${r.earlyPlayDrawsMax ?? '-'}, bakes ${(r.earlyBakes ?? []).map((b) => `${b.phase}:${b.draws}/${b.shadowDraws} ${b.why}`).join(', ') || 'none'} · meshes max ${r.meshesMax} · work p50 ${Math.round(r.workP50)} · calib ${r.calibMs?.toFixed?.(1)}`);
   }
 }
