@@ -1,7 +1,8 @@
 // dock-sideways (2026-11-19): on a phone held sideways the shell's bottom dock drew two controls under the 44 px tap rule — the capture
 // menu's ⋯ (scaled to 0.77: 33.9 px square) and the icon-only BODY (38 px wide). Measured in play by
 // scripts/probes/hoops-followups/inplay.mts (it hit-tests the tap area). Each is drawn as before and gets an invisible box that takes taps
-// across at least 44 px. These hold the two boxes; they fail on the old dock.
+// across at least 44 px; and the ⋯ bar's padding, which covered the left 6 px of Pause beside it, passes taps through. These fail on
+// the old dock.
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -37,5 +38,11 @@ describe('the sideways dock: every control takes taps across 44 px', () => {
     expect((44 - px('top') - 1) * scale).toBeGreaterThanOrEqual(44);
     expect((44 - px('left') - 1) * scale).toBeGreaterThanOrEqual(44);
     expect(px('right')).toBe(0); expect(px('bottom')).toBe(0);   // never towards the shell's buttons on its right, or below
+  });
+
+  it('the ⋯ bar padding passes taps to the Pause button beside it (it took the left 6 px of Pause, measured by hit test)', () => {
+    const land = css.slice(css.indexOf('@media (orientation: landscape) and (max-height: 520px)'));
+    expect(land).toMatch(/> \[data-capture-ui\],\s*\n\s*\[data-fel-console\][^{]*> \[data-capture-ui\] > div \{\s*pointer-events: none !important;/);
+    expect(land).toMatch(/> \[data-capture-ui\] > div > \* \{\s*pointer-events: auto;/);   // the ⋯, the light, the menu, Show controls
   });
 });

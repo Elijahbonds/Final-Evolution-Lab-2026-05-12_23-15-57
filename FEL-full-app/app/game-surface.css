@@ -237,6 +237,18 @@
   [data-fel-console]:not(:has([data-fel-fullbleed]:not([data-splash-phase="countdown"]))):not(:has([data-end-screen])) > [data-capture-ui] [data-testid="capture-overflow"] {
     position: relative;
   }
+  /* and the menu's bar (its 8 px padding and frame, 6.2 px as drawn) lets taps through to what is under it: measured by hit test,
+   * it took the left 6 px of the shell's Pause button beside it (Pause drawn 44 px, tappable across 38). Only the bar's own
+   * padding and frame pass taps on; everything in it (the ⋯, the recording light, the menu, and the Show controls button of
+   * the hidden bar) still takes them. !important: the
+   * capture layer sets pointer-events on itself inline. */
+  [data-fel-console]:not(:has([data-fel-fullbleed]:not([data-splash-phase="countdown"]))):not(:has([data-end-screen])) > [data-capture-ui],
+  [data-fel-console]:not(:has([data-fel-fullbleed]:not([data-splash-phase="countdown"]))):not(:has([data-end-screen])) > [data-capture-ui] > div {
+    pointer-events: none !important;
+  }
+  [data-fel-console]:not(:has([data-fel-fullbleed]:not([data-splash-phase="countdown"]))):not(:has([data-end-screen])) > [data-capture-ui] > div > * {
+    pointer-events: auto;
+  }
   [data-fel-console]:not(:has([data-fel-fullbleed]:not([data-splash-phase="countdown"]))):not(:has([data-end-screen])) > [data-capture-ui] [data-testid="capture-overflow"]::before {
     content: '';
     position: absolute;
