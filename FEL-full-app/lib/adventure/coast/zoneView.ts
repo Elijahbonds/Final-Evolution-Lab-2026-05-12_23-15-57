@@ -189,7 +189,9 @@ export async function loadMasters(scene: Scene, m: PropModel, natureUrl = '/mode
 
 /** coast.streamSliced (phase F-lite): 1 = crossing into a piece builds its fine ground and refreshes the props over the next
  *  frames, one job a frame (the coarse ground stands in meanwhile); 0 = all of it in the frame you cross (phases A–D). */
-export const COAST_STREAM_SLICED = 1;
+// SHIPS OFF (coordinator 2026-11-19): no measured win on the rig (m2, 3 runs a side: worst frame 1.52-1.79 s against 1.44-2.30 s,
+// p95 574-632 ms against 511-606 ms). Off by default; try it on a real phone.
+export const COAST_STREAM_SLICED = 0;
 
 /** coast.prewarmLate (phase F-lite): 1 = a model that lands after the load has its shaders (lit, shadow, instanced) compiled as it
  *  lands, not on the frame it first comes into view mid-walk (core/hitchProbe prewarmMeshes); 0 = compiled on first sight. */

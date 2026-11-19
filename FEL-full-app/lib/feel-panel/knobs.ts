@@ -2164,9 +2164,9 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
   },
   // ── coast-d (2026-11-18, NEW): the Coast zone, phase D — the harbour town, the sports spots, the side quests.
   {
-    id: 'coast.streamSliced', label: 'Coast zone: crossing into a piece spreads its building over frames (1) / does it all at once (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Coast · zone',
+    id: 'coast.streamSliced', label: 'Coast zone: crossing into a piece spreads its building over frames (1) / does it all at once (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Coast · zone',
     source: 'lib/adventure/coast/zoneView.ts COAST_STREAM_SLICED',
-    hint: 'The fine ground of the pieces you walk into and the palms and rocks there arrive one job a frame (the coarse ground meanwhile), so a crossing is not one long frame. 0 = phases A to D.',
+    hint: 'The fine ground of the pieces you walk into and the palms and rocks there arrive one job a frame (the coarse ground meanwhile), so a crossing is not one long frame. Off by default: no measured win on the rig; try on a real phone.',
   },
   {
     id: 'coast.zoneGrow', label: 'Coast zone: the four pieces past Reef Rock, the sandbank and Gull Key (1) / phase A zone (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Coast · zone',

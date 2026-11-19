@@ -308,12 +308,12 @@ render, active-mesh evaluation, render targets, shader compiles, the time betwee
 - **Most long frames on the rig are the time between frames** (2–3 s, with the frame itself 5–20 ms): the software GPU drawing
   a 780 × 1688 frame. That is the rig's, not a phone's, and it scales with what is in view.
 
-**What changed** (each behind a knob, all on):
+**What changed** (each behind a knob; both ship off):
 - `coast.prewarmLate` (**ships 0**, see below): everything that lands after the load — the seven prop models, the market kit, each townsperson's body —
   has its shaders (lit, shadow depth, instanced, skinned) compiled as it lands (`core/hitchProbe` prewarmMeshes, the harness's
   own phone pre-warm), not on the frame it first comes into view. The townsfolk already land one a frame apart (Onlookers
   oneBodyPerFrame); their compile now happens with each landing instead of at first sight.
-- `coast.streamSliced` (on): crossing into a piece no longer builds the new full pieces' fine ground and refreshes all seven prop
+- `coast.streamSliced` (**off by default, no measured win on the rig; try on a real phone**): crossing into a piece no longer builds the new full pieces' fine ground and refreshes all seven prop
   models in that frame; the coarse ground stands in and one job runs a frame. Small on the rig (the work was 2.4 ms), kept for
   phones with slower CPUs.
 - `coast.zoneGrow`: see below.
@@ -326,10 +326,10 @@ phase F-lite switches off):
 |---|---|---|---|
 | m1 (23:21 UTC): slices + late pre-warm | 3.40 · 2.94 · 2.74 | 1,225 · 1,140 · 1,105 | 5,061 · 5,186 · 5,182 |
 | m1 control (the old way) | 2.35 · 3.81 · 2.20 | 1,172 · 1,139 · 676 | 2,351 · 1,896 · 2,749 |
-| m2 (23:55 UTC): slices only (as shipped) | 1.54 · 1.52 · 1.79 | 574 · 632 · 604 | 2,682 · 1,069 · 2,041 |
+| m2 (23:55 UTC): slices only | 1.54 · 1.52 · 1.79 | 574 · 632 · 604 | 2,682 · 1,069 · 2,041 |
 | m2 control (the old way) | 1.47 · 2.30 · 1.44 | 511 · 513 · 606 | 4,140 · 467 · 1,293 |
 
-- **No measurable gain on the rig.** The slices are within the noise of the old way in both sessions (they move ~2 ms of work);
+- **No measurable gain on the rig.** The slices are within the noise of the old way in both sessions (they move ~2 ms of work), so they **ship off** too (coordinator 2026-11-19: a behaviour ships on only on a measured win; try on a real phone);
   the late pre-warm was worse — it compiles every variant a mesh could draw, doubling the compile time — so it **ships off**
   (the knob stays for a phone with parallel shader compiles to try).
 - **The session matters more than the switch:** the same zone's worst frame was 2.2–3.8 s in m1 and 1.4–2.3 s in m2, a quieter

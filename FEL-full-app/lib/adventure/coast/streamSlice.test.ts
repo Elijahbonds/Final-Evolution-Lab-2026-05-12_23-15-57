@@ -36,7 +36,7 @@ function mount(sliced: boolean) {
 }
 
 describe('coast.streamSliced: the crossing frame does one job, not all of them', () => {
-  it('ships on (1)', () => { expect(COAST_STREAM_SLICED).toBe(1); });
+  it('ships off (0): no measured win on the rig; the slices are tested switched on below', () => { expect(COAST_STREAM_SLICED).toBe(0); });
 
   it('the load still builds the full ring at once', () => {
     const z = mount(true);
