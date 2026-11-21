@@ -111,29 +111,73 @@ export function shortestAngle(a: number, b: number): number {
  * Loss is normal. When a tick never arrives the host REPEATS the last input rather than treating
  * it as neutral: releasing a held sprint or a charging shot meter because one packet dropped is a
  * far worse artefact than one extra tick of a button the player was already holding.
+ *
+ * TWO CLOCKS (lane/online-play, 2026-11-21). The sender stamps its OWN tick (ticks since its page's session started)
+ * and the host asks for ITS tick: two pages that did not open in the same 33 ms never share a tick number. Measured
+ * against a real netd (scripts/probes/online-play/match-room.mts): a guest whose page opened 1.2 s after the host's
+ * reached the host on 0 of 183 frames, so every `?net=` rival stood still. The queue now learns the offset from the
+ * first input (host tick at arrival − sender tick), re-learns it when the lead
+ * drifts out of a band (a long stall, a backgrounded tab), and plays the sender's ticks in order. Ticks the host steps
+ * over in one take are not lost: their button presses (every boolean of the Intent) are OR-ed into what it returns, so a
+ * tap that lived for one sender tick still reaches the simulation.
  */
+/** Ticks of cushion the host reads behind the newest input. 0: the newest the moment it lands (lowest latency); a late or
+ *  bunched packet loses nothing either way, because a take plays every tick up to its read with their buttons merged. */
+export const INPUT_CUSHION_TICKS = 0;
+/** The lead (sender ticks buffered past the host's read) above which the queue re-learns its offset: ~330 ms of input piled up. */
+export const INPUT_MAX_LEAD_TICKS = 10;
+
 export class InputQueue {
   private byTick = new Map<number, Intent>();
   private last: Intent | null = null;
   private highest = -1;
+  /** host tick − sender tick; null until the first input arrives. */
+  private offset: number | null = null;
+  /** The newest sender tick already handed to the simulation. */
+  private consumed = -Infinity;
 
-  push(tick: number, intent: Intent): void {
+  /** `hostTick`: the host's tick when this input arrived (omit for a test that keys both sides alike). */
+  push(tick: number, intent: Intent, hostTick?: number): void {
     if (tick <= this.highest - 120) return;   // far too old to matter
+    if (tick <= this.consumed) return;        // the simulation is already past it
+    if (this.offset === null) this.offset = hostTick !== undefined ? hostTick - tick + INPUT_CUSHION_TICKS : 0;
     this.byTick.set(tick, intent);
     if (tick > this.highest) this.highest = tick;
+    // a burst after a stall: re-learn so the host is not reading a third of a second in the past for the rest of the game
+    if (hostTick !== undefined && this.highest - (hostTick - this.offset) > INPUT_MAX_LEAD_TICKS) this.offset = hostTick - this.highest + INPUT_CUSHION_TICKS;
   }
+
+  /** The sender tick the host's `tick` reads (for tests and the HUD). */
+  senderTickFor(tick: number): number { return tick - (this.offset ?? 0); }
 
   /** The input to simulate for `tick`, and whether it was really received. */
   take(tick: number): { intent: Intent | null; predicted: boolean } {
-    const got = this.byTick.get(tick);
-    if (got) { this.last = got; this.byTick.delete(tick); return { intent: got, predicted: false }; }
+    const target = this.senderTickFor(tick);
+    let merged: Intent | null = null;
+    for (const k of [...this.byTick.keys()].sort((a, b) => a - b)) {
+      if (k > target) break;
+      const i = this.byTick.get(k)!;
+      this.byTick.delete(k);
+      this.consumed = Math.max(this.consumed, k);
+      merged = merged ? orButtons(i, merged) : i;   // the newest axes, every button any of them pressed
+    }
+    if (merged) { this.last = merged; return { intent: merged, predicted: false }; }
     return { intent: this.last, predicted: true };
   }
 
   /** Ticks buffered ahead of `tick` — the host's cushion against jitter. */
   depth(tick: number): number {
+    const target = this.senderTickFor(tick);
     let n = 0;
-    for (const k of this.byTick.keys()) if (k > tick) n++;
+    for (const k of this.byTick.keys()) if (k > target) n++;
     return n;
   }
+}
+
+/** `latest` with every button that was down in `also` held down too (axes and the meter come from `latest`). */
+export function orButtons(latest: Intent, also: Intent): Intent {
+  const out: Intent = { ...latest };
+  const rec = out as unknown as Record<string, unknown>;
+  for (const [k, v] of Object.entries(also)) if (v === true) rec[k] = true;
+  return out;
 }

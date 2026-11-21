@@ -14,10 +14,10 @@
 // reconciliation fixes next. It is not claimed to be finished.
 
 import {
-  TICK_MS, RENDER_DELAY_MS, packIntent,
-  type BodyState, type Intent, type NetMsg, type SnapshotMsg, type Transport, type PeerId,
+  TICK_MS, RENDER_DELAY_MS, packIntent, isPlayMsg,
+  type BodyState, type Intent, type NetMsg, type PlayMsg, type SnapshotMsg, type Transport, type PeerId,
 } from './protocol';
-import { ClockSync, SnapshotBuffer, InputQueue } from './NetClock';
+import { ClockSync, SnapshotBuffer, InputQueue, orButtons } from './NetClock';
 
 export interface NetSessionOptions {
   transport: Transport;
@@ -41,6 +41,11 @@ export class NetSession {
   private startedAt: number;
   private lastSentTick = -1;
   private _peers = new Set<PeerId>();
+  /** Buttons pressed on frames that were not a send tick (60 fps render, 30 Hz send): OR-ed into the next send, so a one-frame tap
+   *  is never lost on the sender's side either (lane/online-play). */
+  private heldButtons: Intent | null = null;
+  /** lane/online-play: the shared-play frames (world, hud, poss, end) go to whoever runs the shared game (lib/net/play.ts). */
+  onPlay: ((m: PlayMsg, arrivedMs: number) => void) | null = null;
 
   isAuthority: boolean;
 
@@ -60,10 +65,22 @@ export class NetSession {
   /** The tick this peer is simulating right now. */
   tickNow(): number { return Math.floor((this.now() - this.startedAt) / TICK_MS); }
 
+  /** The room's membership, as netd announces it (welcome / peer_join / peer_leave), so a page knows who is present before
+   *  they have sent anything. */
+  notePeers(peers: PeerId[]): void { for (const p of peers) if (p !== this.opts.selfId) this._peers.add(p); }
+  peerJoined(peer: PeerId): void { if (peer !== this.opts.selfId) this._peers.add(peer); }
+  peerLeft(peer: PeerId): void { this._peers.delete(peer); this.inputs.delete(peer); this.remoteIntent.delete(peer); }
+  has(peer: PeerId): boolean { return this._peers.has(peer); }
+  get selfId(): PeerId { return this.opts.selfId; }
+
+  /** Send a shared-play frame (lib/net/play.ts). */
+  sendPlay(m: PlayMsg): void { this.opts.transport.send(m); }
+
   private receive(m: NetMsg): void {
-    if (m.t === 'bye') { this._peers.delete(m.from); this.inputs.delete(m.from); this.remoteIntent.delete(m.from); return; }
+    if (m.t === 'bye') { this.peerLeft(m.from); return; }
     if (m.from && m.from !== this.opts.selfId) this._peers.add(m.from);
     if ('sent' in m && typeof m.sent === 'number') this.clock.sample(m.sent, this.now());
+    if (isPlayMsg(m)) { if (m.from !== this.opts.selfId) this.onPlay?.(m, this.now()); return; }
 
     if (m.t === 'input') {
       // Only the authority simulates from raw input; everyone else ignores it and waits for the
@@ -71,7 +88,7 @@ export class NetSession {
       if (!this.isAuthority) return;
       let q = this.inputs.get(m.from);
       if (!q) { q = new InputQueue(); this.inputs.set(m.from, q); }
-      q.push(m.tick, m.intent);
+      q.push(m.tick, m.intent, this.tickNow());   // the host's tick at arrival: the queue learns the two clocks' offset
       return;
     }
     if (m.t === 'snap') {
@@ -83,9 +100,14 @@ export class NetSession {
   /** Call once per rendered frame with the local player's intent. Sends at most one frame per tick. */
   sendLocalIntent(intent: Intent): void {
     const tick = this.tickNow();
-    if (tick === this.lastSentTick) return;    // the sim runs at TICK_HZ, not at the render rate
+    if (tick === this.lastSentTick) {    // the sim runs at TICK_HZ, not at the render rate
+      this.heldButtons = this.heldButtons ? orButtons(this.heldButtons, intent) : { ...intent };
+      return;
+    }
     this.lastSentTick = tick;
-    this.opts.transport.send({ t: 'input', from: this.opts.selfId, tick, intent: packIntent(intent), sent: this.now() });
+    const out = this.heldButtons ? orButtons(intent, this.heldButtons) : intent;
+    this.heldButtons = null;
+    this.opts.transport.send({ t: 'input', from: this.opts.selfId, tick, intent: packIntent(out), sent: this.now() });
   }
 
   /**

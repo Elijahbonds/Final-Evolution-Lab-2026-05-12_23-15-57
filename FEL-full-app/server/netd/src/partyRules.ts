@@ -126,14 +126,32 @@ export const REPORT_REASON_IDS = REPORT_REASONS.map((r) => r.id);
  * Modes with a real `?net=<room>` seat today (lib/net/attach.ts attachNetplay call sites). `guestPeer` is the peer id the
  * mode reads its remote human from (OneVOneMode sourceFor('foe'), ThreeVThreeMode 'net1', KarateEndlessMode 'partner'),
  * so the second seat must connect under that id. Each seats TWO humans today; the rest of the party stays in the party.
+ *
+ * lane/online-play (2026-11-21, `party2`, ADDITIVE): `seatIds` names every seat after the host's in order (the client's
+ * lib/net/seats.ts lays each page's cast out from them), and 3v3 seats SIX. A `party1` netd (the first party build) reads
+ * `humans` as 2 for 3v3 — `humansParty1` — and the client says so: `humansFor(mode, features)`.
  */
-export interface OnlineMode { id: string; title: string; path: string; humans: number; guestPeer: string }
+export interface OnlineMode {
+  id: string; title: string; path: string; humans: number; guestPeer: string;
+  /** The seat ids after the host's (`h…`), in seat order. Absent: guestPeer, then random ids (the party1 rule). */
+  seatIds?: readonly string[];
+  /** How many a party1 netd seats, when it differs from `humans`. */
+  humansParty1?: number;
+}
 
 export const ONLINE_MODES: readonly OnlineMode[] = [
-  { id: 'onevone', title: '1v1 Streetball', path: '/play/onevone', humans: 2, guestPeer: 'foe' },
-  { id: 'threevthree', title: '3v3', path: '/play/threevthree', humans: 2, guestPeer: 'net1' },
+  { id: 'onevone', title: '1v1 Streetball', path: '/play/onevone', humans: 2, guestPeer: 'foe', seatIds: ['foe'] },
+  { id: 'threevthree', title: '3v3', path: '/play/threevthree', humans: 6, humansParty1: 2, guestPeer: 'net1', seatIds: ['net1', 'net2', 'net3', 'net4', 'net5'] },
   { id: 'karate', title: 'Karate Endless (co-op)', path: '/play/karate', humans: 2, guestPeer: 'partner' },
 ];
+
+/** What this build of the party speaks (healthz and p_welcome). `party2`: six-seat 3v3, a seat order, match results. */
+export const PARTY_FEATURES: readonly string[] = ['party1', 'party2'];
+
+/** How many humans a mode seats on a party server that speaks `features` (an old one sends none: party1). */
+export function humansFor(mode: OnlineMode, features: readonly string[] | null | undefined): number {
+  return features?.includes('party2') ? mode.humans : (mode.humansParty1 ?? mode.humans);
+}
 
 export const onlineMode = (id: unknown): OnlineMode | null => ONLINE_MODES.find((m) => m.id === id) ?? null;
 

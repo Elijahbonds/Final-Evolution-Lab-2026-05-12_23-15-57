@@ -391,9 +391,9 @@ gcloud run deploy fel-netd --source server/netd --project final-evolution-lab --
 curl -s https://<netd url>/healthz
 ```
 
-**You should see:** the deploy prints the service URL, and `/healthz` includes `"features":["party1"]`.
+**You should see:** the deploy prints the service URL, and `/healthz` includes `"features":["party1","party2"]` (party2, lane/online-play: six-seat 3v3, winners stay on; `docs/ONLINE-FINISH-PLAN.md` §5).
 
-**If not:** `/healthz` without `party1` means the old image is still serving. Check the revision in the Cloud Run console.
+**If not:** `/healthz` without `party1` means the old image is still serving (`party1` without `party2`: the first party build). Check the revision in the Cloud Run console.
 
 Keep `--max-instances 1`: a party lives in one instance's memory, and a second instance would split it.
 
@@ -533,7 +533,7 @@ One deploy carries: the merged PRs, the `firebase.json` secret line, and the env
 
 - [ ] §5.4 verify passed. §6 tables exist.
 - [ ] `RETENTION_CRON_SECRET` exists (§7.1), and `firebase.json` names it (§7.2).
-- [ ] netd `/healthz` shows `party1` (§8.2).
+- [ ] netd `/healthz` shows `party1` and `party2` (§8.2).
 - [ ] The env file has the §10.2 lines.
 - [ ] `git status --short` is clean apart from your deliberate edits. `public/_prisma/client` is unmodified.
 - [ ] No dev server is serving `.next` from this tree (`lsof -nP -iTCP -sTCP:LISTEN | grep node`).

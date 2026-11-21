@@ -53,7 +53,8 @@ test('healthz names the party feature', async () => {
   const r = await fetch(`http://127.0.0.1:${PORT}/healthz`);
   const j = await r.json() as { ok: boolean; features: string[] };
   assert.equal(j.ok, true);
-  assert.deepEqual(j.features, ['party1']);
+  // lane/online-play (party2, additive): party1 is still named first; party2 adds six-seat 3v3, a seat order and match results
+  assert.deepEqual(j.features, ['party1', 'party2']);
 });
 
 test('the legacy match room is unchanged', async () => {
@@ -70,6 +71,7 @@ test('create, join by code, chat between adults, a teen refused free text', asyn
   const hw = await host.next('p_welcome');
   assert.match(String(hw.code), /^[2-9A-HJKMNP-Z]{6}$/);
   assert.deepEqual(hw.rights, { text: true, voice: true });
+  assert.deepEqual(hw.features, ['party1', 'party2']);   // lane/online-play: the page learns what this server speaks
 
   const guest = client('/party');
   await guest.opened;

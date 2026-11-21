@@ -60,6 +60,8 @@ export interface StartPlan {
   /** peer → the peer id this member joins the match under (null = sitting this one out: the mode is full). */
   seats: Map<string, string | null>;
   declined: Set<string>;
+  /** lane/online-play (party2): the match's result has been announced (one per start). */
+  resulted?: boolean;
 }
 
 export interface Party {
@@ -401,9 +403,14 @@ function handleMore(p: Party, me: Member, isHost: boolean, msg: Record<string, u
       const mode = onlineMode(msg.mode);
       if (!mode) return err(peer, 'bad_mode');
       if (p.start && now < p.start.at) return err(peer, 'starting');
-      const order = live(p).sort((a, b) => (a.peer === p.host ? -1 : b.peer === p.host ? 1 : a.seq - b.seq));
+      // the host first, then join order — unless the host names an ORDER (party2, "winners stay on": the winners, then who is
+      // next up). Only admitted, connected members count; anyone it leaves out follows in join order.
+      const joined = live(p).sort((a, b) => (a.peer === p.host ? -1 : b.peer === p.host ? 1 : a.seq - b.seq));
+      const named = Array.isArray(msg.order) ? (msg.order as unknown[]).filter((x): x is string => typeof x === 'string').slice(0, PARTY_MAX) : [];
+      const first = named.map((id) => joined.find((m) => m.peer === id)).filter((m, i, a): m is Member => !!m && a.indexOf(m) === i);
+      const order = [...first, ...joined.filter((m) => !first.includes(m))];
       const seats = new Map<string, string | null>();
-      order.forEach((m, i) => seats.set(m.peer, i === 0 ? `h${rand()}` : i < mode.humans ? (i === 1 ? mode.guestPeer : `g${i}${rand()}`) : null));
+      order.forEach((m, i) => seats.set(m.peer, i === 0 ? `h${rand()}` : i < mode.humans ? (mode.seatIds?.[i - 1] ?? (i === 1 ? mode.guestPeer : `g${i}${rand()}`)) : null));
       p.start = { id: rand(), mode: mode.id, room: `pt-${p.code}-${rand()}`, at: now + START_COUNTDOWN_MS, seats, declined: new Set() };
       return { out: startFrames(p, now), close: [] };
     }
@@ -413,6 +420,22 @@ function handleMore(p: Party, me: Member, isHost: boolean, msg: Record<string, u
       const id = p.start.id;
       p.start = null;
       return { out: [{ to: live(p).map((m) => m.peer), msg: { t: 'p_start_cancel', id } }], close: [] };
+    }
+    case 'p_result': {
+      // party2: a seated page reports how the match ended — the WINNING seats, by the ids netd handed out. netd turns them into
+      // members and tells the party (for "winners stay on"). One per start; anything that does not match the start is ignored.
+      const s = p.start;
+      if (!s || s.resulted || msg.room !== s.room || now < s.at) return none();
+      if (limited(me, 'control', now)) return err(peer, 'slow_down');
+      const bySeat = new Map<string, string>();
+      for (const [member, seat] of s.seats) if (seat) bySeat.set(seat, member);
+      if (!bySeat.has(s.seats.get(peer) ?? '')) return none();   // only a page that played may say who won
+      const winSeats = Array.isArray(msg.winners) ? (msg.winners as unknown[]).filter((x): x is string => typeof x === 'string').slice(0, PARTY_MAX) : [];
+      const winners = [...new Set(winSeats.map((w) => bySeat.get(w)).filter((x): x is string => !!x))];
+      const losers = [...bySeat.values()].filter((m) => !winners.includes(m));
+      s.resulted = true;
+      const score = Array.isArray(msg.score) && msg.score.length === 2 && msg.score.every((n) => typeof n === 'number' && Number.isFinite(n)) ? (msg.score as number[]).map((n) => Math.max(0, Math.min(999, Math.round(n)))) : null;
+      return { out: [{ to: live(p).map((m) => m.peer), msg: { t: 'p_result', id: s.id, mode: s.mode, winners, losers, score } }], close: [] };
     }
     case 'p_decline': {
       const s = p.start;

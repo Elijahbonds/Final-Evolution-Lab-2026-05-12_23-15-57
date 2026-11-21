@@ -11,35 +11,63 @@ import { useRouter } from 'next/navigation';
 import { Play } from 'lucide-react';
 import { partyClient } from '@/lib/party/social/client';
 import { isHost, type PartyState } from '@/lib/party/social/state';
-import { ONLINE_MODES } from '@/server/netd/src/partyRules';
+import { ONLINE_MODES, humansFor } from '@/server/netd/src/partyRules';
+import { startableModes } from '@/lib/party/social/startable';
+import { nextGame, sync } from '@/lib/party/social/run';
 import { FROM_PARAM, FROM_VENICE, partyVeniceReturn, SPOT_PARAM, writeReturn } from '@/lib/adventure/venice/hubReturn';   // venice-v1: every member back to the court
 
 export function StartSection({ s }: { s: PartyState }) {
-  const [mode, setMode] = useState(ONLINE_MODES[0].id);
+  const modes = startableModes();
+  const [mode, setMode] = useState(modes[0].id);
+  const [runOn, setRunOn] = useState(() => partyClient().runOn);
   const host = isHost(s);
-  const pick = ONLINE_MODES.find((m) => m.id === mode)!;
+  const pick = modes.find((m) => m.id === mode) ?? modes[0];
   if (!host) {
     return <p className="text-xs text-white/50">The host can start a game for the whole party. Until then, play anything — the party comes with you.</p>;
   }
   const crowd = s.members.filter((m) => m.connected).length;
+  const seats = humansFor(pick, s.features);
+  // lane/online-play: on a party server without six-seat 3v3 (a party1 build), say why it seats two
+  const capped = seats < pick.humans;
+  const c = partyClient();
+  const party2 = s.features.includes('party2');
+  const line = sync(c.run, s.members.filter((m) => m.connected).map((m) => m.peer));
+  const run = runOn && party2 ? nextGame(line, seats) : null;
+  const nameOf = (peer: string) => s.members.find((m) => m.peer === peer)?.name ?? 'PLAYER';
   return (
     <section aria-label="Start together" className="space-y-2 rounded-xl border border-white/10 bg-white/[0.03] p-3">
       <h3 className="font-mono text-[12px] tracking-[0.25em] text-white/50">START TOGETHER</h3>
       <div className="flex gap-2">
         <label className="sr-only" htmlFor="party-start-mode">Game to start together</label>
-        <select id="party-start-mode" data-testid="party-start-mode" value={mode} onChange={(e) => setMode(e.target.value)}
+        <select id="party-start-mode" data-testid="party-start-mode" value={pick.id} onChange={(e) => setMode(e.target.value)}
           className="min-w-0 flex-1 rounded-lg bg-white/10 px-2 py-2 text-sm outline-none">
-          {ONLINE_MODES.map((m) => <option key={m.id} value={m.id} className="bg-[#0b0e13]">{m.title} · {m.humans} players</option>)}
+          {modes.map((m) => <option key={m.id} value={m.id} className="bg-[#0b0e13]">{m.title} · {humansFor(m, s.features)} players</option>)}
         </select>
         <button type="button" data-testid="party-start-go" disabled={!!s.start && !s.start.declined && s.start.at > Date.now()}
-          onClick={() => partyClient().startTogether(mode)}
+          onClick={() => c.startTogether(pick.id)}
           className="inline-flex items-center gap-1.5 rounded-lg bg-[#facc15] px-3 text-sm font-bold text-black disabled:opacity-50">
           <Play className="h-4 w-4" /> Start
         </button>
       </div>
       <p className="text-[12px] text-white/50">
-        Everyone gets 5 seconds to cancel. {pick.title} seats {pick.humans}{crowd > pick.humans ? ` — the first ${pick.humans} in the party play, everyone else stays in the party` : ''}.
+        Everyone gets 5 seconds to cancel. {pick.title} seats {seats}{crowd > seats ? ` — the first ${seats} in the party play, everyone else stays in the party` : ''}.
+        {capped ? <span data-testid="party-start-capped"> Up to {pick.humans} need a party server update.</span> : null}
       </p>
+      {party2 ? (
+        <label className="flex items-center gap-2 text-[12px] text-white/70">
+          <input type="checkbox" data-testid="party-run-on" checked={runOn} onChange={(e) => { c.runOn = e.target.checked; setRunOn(e.target.checked); }} />
+          Winners stay on
+        </label>
+      ) : (
+        <p className="text-[12px] text-white/50" data-testid="party-run-off">Winners stay on needs a party server update.</p>
+      )}
+      {run && run.away.length ? (
+        <p className="text-[12px] text-white/70" data-testid="party-next-up">
+          {line.holders.length ? 'On the court' : 'First game'}: <b>{run.home.map(nameOf).join(' & ')}</b> vs <b>{run.away.map(nameOf).join(' & ')}</b>
+          {line.streak > 1 ? ` · ${line.streak} wins in a row` : ''}
+          {run.sitting.length ? ` · next up: ${run.sitting.map(nameOf).join(', ')}` : ''}
+        </p>
+      ) : null}
     </section>
   );
 }
@@ -87,7 +115,17 @@ export function StartCountdown({ s }: { s: PartyState }) {
         {offer.declined ? (
           <p className="text-sm">You&apos;re sitting this one out — you&apos;re still in the party.</p>
         ) : !offer.seat ? (
-          <p className="text-sm">The party is starting <b>{offer.title}</b>. It seats {ONLINE_MODES.find((m) => m.id === offer.mode)?.humans ?? 2} — you&apos;re staying in the party this time.</p>
+          <div className="space-y-2">
+          <p className="text-sm">The party is starting <b>{offer.title}</b>. It seats {(() => { const m = ONLINE_MODES.find((x) => x.id === offer.mode); return m ? humansFor(m, s.features) : 2; })()} — you&apos;re staying in the party this time.</p>
+          {/* lane/online-play: a seat on the bench — the shared game, drawn here, nothing sent (netd: a w… peer) */}
+          <button type="button" data-testid="party-start-watch" onClick={() => {
+            const q = new URLSearchParams({ net: offer.room, peer: `w${Math.random().toString(36).slice(2, 8)}`, party: '1' });
+            const venice = partyVeniceReturn(partyClient().getState().members);
+            if (venice) { q.set(FROM_PARAM, FROM_VENICE); q.set(SPOT_PARAM, venice); writeReturn({ id: venice, route: offer.path }, Date.now()); }
+            partyClient().patch({ start: null });
+            router.push(`${offer.path}?${q.toString()}`);
+          }} className="rounded-lg border border-white/25 px-3 py-1.5 text-sm font-bold">Watch</button>
+          </div>
         ) : (
           <div className="flex items-center gap-3">
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#facc15] font-mono text-xl font-black text-black" aria-hidden>{left}</span>

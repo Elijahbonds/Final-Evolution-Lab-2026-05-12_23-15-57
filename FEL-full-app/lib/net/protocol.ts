@@ -71,7 +71,55 @@ export interface SnapshotMsg {
 
 export interface ByeMsg { t: 'bye'; from: PeerId }
 
-export type NetMsg = HelloMsg | InputMsg | SnapshotMsg | ByeMsg;
+// ── SHARED PLAY (lane/online-play, 2026-11-21) ──────────────────────────────────────────────────────────────────────
+//
+// Until this lane no mode ever called publish(): every `?net=` page ran its OWN game, and the other human was at best a
+// pair of feet in it. These messages put ONE game on every page. They are CLIENT-ONLY: netd relays any frame it is given
+// (index.ts `broadcast(r, { ...msg, from, serverTime, ack })`, the same in the build deployed today), so none of this
+// needs a netd redeploy. Each is ignored by an older page (isNetMsg), which simply keeps its own game.
+
+/** One body as drawn: root position (mm), root yaw or quaternion, and the skeleton's pose (quantised). */
+export interface WireBody {
+  /** Root position, millimetres. */
+  p: [number, number, number];
+  /** Root yaw (milliradians) when the root turns by Euler y; absent when `q` is sent. */
+  y?: number;
+  /** Root rotation quaternion ×10000, when the root carries one. */
+  q?: [number, number, number, number];
+  /** Every pose node's rotation ×10000 (x, y, z, w per node), in poseNodesOf order; then the first node's position (mm). */
+  pose?: number[];
+}
+
+/** The simulating page → everyone: the world as drawn this tick (the mirror's snapshot). */
+export interface WorldMsg {
+  t: 'world';
+  from: PeerId;
+  tick: number;
+  sent: number;
+  bodies: WireBody[];
+  /** Loose meshes (the ball): world position, mm. */
+  loose: [number, number, number][];
+  /** Who drives which body (an index into `bodies`), so a page can find ITS body. */
+  seats: Record<PeerId, number>;
+  /** Each body's team, 0 = the simulating page's own team. */
+  teams: number[];
+  /** Which hand-over this world belongs to: every hand-over and take-over is the next number. Two pages running at once (a
+   *  hand-over crossed a take-over, a backgrounded runner came back) settle on the higher one. */
+  epoch?: number;
+}
+
+/** The simulating page's HUD writes, as written (a page flips "score"/"foeScore" and YOUR/THEIR by its own side). */
+export interface HudMsg { t: 'hud'; from: PeerId; sent: number; hud: Record<string, unknown> }
+
+/** 1v1: "your ball" — the simulating page hands the game to the page whose player now has the ball, with the score. */
+export interface PossMsg { t: 'poss'; from: PeerId; to: PeerId; sent: number; seq: number; score: Record<PeerId, number>; epoch?: number; banner?: string }
+
+/** The game ended on the simulating page: the result every page shows. `team` 0 = the sender's team. */
+export interface EndMsg { t: 'end'; from: PeerId; sent: number; outcome: string; score: Record<PeerId, number>; teamScore: [number, number]; team: Record<PeerId, number> }
+
+export type PlayMsg = WorldMsg | HudMsg | PossMsg | EndMsg;
+
+export type NetMsg = HelloMsg | InputMsg | SnapshotMsg | ByeMsg | PlayMsg;
 
 /** A transport is anything that can move a NetMsg between peers. Supabase Realtime, a WebSocket,
  *  a BroadcastChannel in a test — the netcode never knows which. */
@@ -91,5 +139,11 @@ export function packIntent(i: Intent): Intent {
 export function isNetMsg(x: unknown): x is NetMsg {
   if (!x || typeof x !== 'object') return false;
   const t = (x as { t?: unknown }).t;
-  return t === 'hello' || t === 'input' || t === 'snap' || t === 'bye';
+  return t === 'hello' || t === 'input' || t === 'snap' || t === 'bye' || isPlayMsg(x);
+}
+
+export function isPlayMsg(x: unknown): x is PlayMsg {
+  if (!x || typeof x !== 'object') return false;
+  const t = (x as { t?: unknown }).t;
+  return t === 'world' || t === 'hud' || t === 'poss' || t === 'end';
 }
