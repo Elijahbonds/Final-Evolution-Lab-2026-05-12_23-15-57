@@ -134,6 +134,7 @@ export function attachNetplay(mode: string, search?: string): NetplayHandle | nu
     get stats() { return { ...handle.play.stats }; },
     get peers() { return handle.session.peers; },
     get rttMs() { return transport.rttMs; },
+    get rejoins() { return transport.rejoins; },
     get status() { return handle.status?.kind ?? null; },
   };
   return handle;

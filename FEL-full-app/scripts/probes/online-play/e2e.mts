@@ -72,8 +72,8 @@ async function spy(room: string, ms: number): Promise<Record<string, Record<stri
 }
 
 const felNet = (p: Page) => p.evaluate(() => {
-  const n = (window as unknown as { __felNet?: { role: string; runner: string | null; stats: unknown; peers: string[]; rttMs: number | null; status: string | null; self: string } }).__felNet;
-  return n ? { self: n.self, role: n.role, runner: n.runner, stats: n.stats, peers: n.peers, rttMs: n.rttMs, status: n.status } : null;
+  const n = (window as unknown as { __felNet?: { role: string; runner: string | null; stats: unknown; peers: string[]; rttMs: number | null; status: string | null; self: string; rejoins?: number } }).__felNet;
+  return n ? { self: n.self, role: n.role, runner: n.runner, stats: n.stats, peers: n.peers, rttMs: n.rttMs, status: n.status, rejoins: n.rejoins ?? null } : null;
 }).catch(() => null);
 
 async function frameTimes(p: Page, ms: number): Promise<{ frames: number; p50: number; p95: number; worst: number } | null> {
@@ -115,6 +115,7 @@ try {
     ctx[w] = await browser.newContext(phone
       ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, storageState: storageState(ppl, w) }
       : { viewport: { width: 1100, height: 760 }, storageState: storageState(ppl, w) });
+    await ctx[w].addInitScript({ content: 'window.__name = window.__name || function (f) { return f; };' });   // tsx's helper, inside page.evaluate bodies
     page[w] = await ctx[w].newPage();
     page[w].on('console', (m) => { if (/\[FEL-NET\]|party|netd/i.test(m.text()) && m.type() !== 'debug') fs.appendFileSync(path.join(OUT, `console-${w}.log`), `${m.type()}: ${m.text().slice(0, 300)}\n`); });
     page[w].on('pageerror', (e) => fs.appendFileSync(path.join(OUT, `errors-${w}.log`), `${e.message.slice(0, 300)}\n`));
@@ -161,9 +162,24 @@ try {
     note('party: joined by link', (await partyCount(host)) === 3, await partyCount(host));
     // the QR: the image on the host's page must be the invite link's QR (the same library, the same options)
     await host.goto(`${ORIGIN}/party`);
-    const qrSrc = await host.locator('img[alt^="QR code for the party invite link"]').first().getAttribute('src', { timeout: 20000 }).catch(() => null);
-    const want = await QRCode.toDataURL(`${ORIGIN}/party/${code}`, { margin: 1, width: 240 });
-    note('party: the QR encodes the invite link', qrSrc === want, { qrLen: qrSrc?.length ?? 0 });
+    // the browser draws the PNG with a canvas, node with pngjs: the bytes differ, the modules must not. Read every module of the
+    // page's image (its centre pixel) and compare with the invite link's QR matrix.
+    await host.locator('img[alt^="QR code for the party invite link"]').first().waitFor({ timeout: 20000 }).catch(() => {});
+    const qr = QRCode.create(`${ORIGIN}/party/${code}`, {});
+    const n = qr.modules.size;
+    const want = Array.from({ length: n * n }, (_, i) => (qr.modules.data[i] ? 1 : 0));
+    const got = await host.evaluate(async (n) => {
+      const img = document.querySelector('img[alt^="QR code for the party invite link"]') as HTMLImageElement | null;
+      if (!img) return null;
+      await img.decode().catch(() => {});
+      const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
+      const g = c.getContext('2d')!; g.drawImage(img, 0, 0);
+      const px = c.width / (n + 2), out: number[] = [];
+      for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const d = g.getImageData(Math.floor((x + 1.5) * px), Math.floor((y + 1.5) * px), 1, 1).data; out.push(d[0] < 128 ? 1 : 0); }
+      return out;
+    }, n).catch(() => null);
+    const miss = got ? got.reduce((a, v, i) => a + (v === want[i] ? 0 : 1), 0) : -1;
+    note('party: the QR encodes the invite link (every module)', miss === 0, { modules: n * n, mismatched: miss });
     await joinBy(page.admin, 'AVERY', 'link', link);   // what the QR opens
     await host.waitForFunction(() => /\b4 in party\b/.test(document.body.innerText), null, { timeout: 30000 }).catch(() => {});
     note('party: joined by the QR\'s link', (await partyCount(host)) === 4, await partyCount(host));
@@ -229,8 +245,13 @@ try {
     const seated = ['solo', ...others].filter((w) => page[w].url().includes(route));
     const room = new URL(host.url()).searchParams.get('net') ?? '';
     note(`${mode}: seated`, null, { label, seated: seated.map((w) => NAMES[w]), urls: seated.map((w) => new URL(page[w].url()).search) });
-    // the game loads (3D on swiftshader is slow): wait for the canvas and a while more
-    await sleep(45000);
+    // the game loads (3D on swiftshader is slow); each player taps TAP TO START on their own page, as a person does
+    await Promise.all(seated.map(async (w) => {
+      const b = page[w].getByRole('button', { name: /TAP TO START/i }).first();
+      await b.waitFor({ timeout: 150000 }).catch(() => {});
+      await b.click({ timeout: 10000 }).catch(() => {});
+    }));
+    await sleep(20000);
     if (drive) { await host.locator('canvas').first().click({ position: { x: 300, y: 300 } }).catch(() => {}); }
     const driveLoop = async (ms: number) => {
       const end = Date.now() + ms;

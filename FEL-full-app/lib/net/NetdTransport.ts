@@ -47,6 +47,8 @@ export class NetdTransport implements Transport {
   private pending: NetMsg[] = [];
   private pinger: ReturnType<typeof setInterval> | null = null;
   private rtts: number[] = [];
+  /** Times netd dropped this page while its socket was open, and it joined again. */
+  rejoins = 0;
   /** The latest smoothed round trip to netd, ms (null before the first pong). */
   rttMs: number | null = null;
   /** Spread of the last round trips, ms. */
@@ -80,7 +82,16 @@ export class NetdTransport implements Transport {
         return;
       }
       if (t === 'peer_join') { const m = msg as { peer: string; authority: string | null }; this.opts.onStatus?.({ kind: 'peer_join', peer: m.peer, authority: m.authority }); return; }
-      if (t === 'peer_leave') { const m = msg as { peer: string; authority: string | null; authorityChanged: boolean }; this.opts.onStatus?.({ kind: 'peer_leave', peer: m.peer, authority: m.authority, authorityChanged: !!m.authorityChanged }); return; }
+      if (t === 'peer_leave') {
+        const m = msg as { peer: string; authority: string | null; authorityChanged: boolean };
+        // lane/online-play: netd dropped THIS page from the room (its reaper: nothing heard for 10 s — a phone whose main thread
+        // was busy loading a 3D mode, measured on the rig) while the socket stayed open. The room no longer counts it, so it
+        // joins again: close, and the retry reopens and is welcomed afresh (every netd build broadcasts this to the dropped
+        // socket too).
+        if (m.peer === this.opts.peerId) { this.rejoins++; ws.close(); return; }
+        this.opts.onStatus?.({ kind: 'peer_leave', peer: m.peer, authority: m.authority, authorityChanged: !!m.authorityChanged });
+        return;
+      }
       if (t === 'error') {
         const reason = String((msg as { reason?: string }).reason ?? 'unknown');
         this.opts.onStatus?.({ kind: 'error', reason });
