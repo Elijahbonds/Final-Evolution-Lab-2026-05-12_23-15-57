@@ -149,12 +149,16 @@ function installScript(cfg) {
   S.agent = !!A(); S.acts = 0;
   const fired = new Set();
   const once = (id, t, fn) => { if (!fired.has(id)) { fired.add(id); fn(t); } };
+  // PRESS_AT (s): one keyboard press (Q, the plant: nothing on offence moves for it) that skips the broadcast intro — the hand-over
+  // under hoops-play's `hoops.introPressPlaysOn` (the press starts play at once while the camera still eases back)
+  const pressAt = cfg.pressAt;
   W.__onVtFrame = () => {
     const ss = W.__sessionStore ? W.__sessionStore.view() : null; const ph = ss ? ss.phase : null;
     if (S.t0 === null) { if (ph === 'playing') S.t0 = W.__gameS(); else return; }
     const t = W.__gameS() - S.t0; S.t = t;
     for (const [k, until] of [...S.taps]) if (t >= until) { ku(k); S.taps.delete(k); }
     if (t >= cfg.endS) { S.done = true; return; }
+    if (pressAt >= 0 && t >= pressAt) once('press', t, (tt) => { tap('q', tt, 0.1); S.pressT = tt; if (A()) { A().act({ ...stickOf(0.6, -0.8), sprint: true }, 800); S.acts++; } });   // …and the stick at once: the player moves while the camera hands over
     for (const o of [3.0, 11.0]) {
       const u = t - o;
       for (const [at, name, ms, f] of SEGS) if (u >= at) once(`${name}${o}`, t, () => { if (A()) { A().act(f(), ms); S.acts++; } });
@@ -181,7 +185,7 @@ try {
   while (Date.now() - tB < 180000) { ph = await ev(() => window.__sessionStore?.view().phase ?? null); if (ph === 'ready' || ph === 'playing' || ph === 'error') break; await sleep(400); }
   if (ph !== 'ready' && ph !== 'playing') throw new Error(`boot: phase ${ph}`);
   await ev(installRecorder, { fast: FAST });
-  await ev(installScript, { endS: END_S });
+  await ev(installScript, { endS: END_S, pressAt: Number(process.env.PRESS_AT ?? -1) });
   if (THROTTLE > 1) await cdp.send('Emulation.setCPUThrottlingRate', { rate: THROTTLE });
   await ev(() => window.__vtStart());
   if (ph === 'ready') { const btn = p.locator('button', { hasText: 'TAP TO START' }).first(); if (await btn.count()) await btn.click({ timeout: 10000 }).catch(() => {}); else await ev(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'j' }))); }

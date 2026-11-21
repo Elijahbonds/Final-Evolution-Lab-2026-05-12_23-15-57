@@ -14,6 +14,7 @@ import {
   type CourtFrame, type HighState, type P3,
 } from './HighSidelineCam';
 import { CameraDirector } from './CameraDirector';
+import { INTRO } from '../scene/broadcastShots';
 
 const COURT: CourtFrame = { rimX: 0, rimZ: -0.6, axisX: 0, axisZ: 1, side: 1 };   // OneVOneMode's ONEVONE_CAM_COURT
 const RIM: P3 = { x: 0, y: 3.05, z: -0.6 };
@@ -237,6 +238,40 @@ describe('high sideline in the director (CameraDirector.setHighView)', () => {
       for (const y of [0, 1.9]) worst = Math.max(worst, Math.abs(project(pose, FOV, 390 / 844, { x: me.x, y, z: me.z }).x));
     }
     expect(worst).toBeLessThan(0.95);
+    scene.dispose(); engine.dispose();
+  });
+  it('after the broadcast intro is skipped by a press that moves the player at once (hoops-play `hoops.introPressPlaysOn` 1): the hand-over lands on the high view and settles there', () => {
+    // With the knob on, the press that skips the intro also starts play: the mode's own update steps the director through the hand-over
+    // (INTRO.skipSec) with the player already running. The director is called the same way either way; this is that call sequence.
+    const { scene, engine, cam, dir } = rig();
+    const me = new Vector3(0, 0, 5); let foe = { x: 0.9, z: 2 };
+    dir.setHighView({ court: COURT, on: () => true, frame: () => ({ play: { x: (me.x + foe.x) / 2, z: (me.z + foe.z) / 2 }, must: mustOf({ x: me.x, y: 1, z: me.z }, { x: foe.x, y: 1, z: foe.z }) }) });
+    dir.snapTo(me, RIM_V);
+    expect(dir.establish('walkIn')).toBe(true);
+    for (let i = 0; i < 60; i++) dir.update(me, Vector3.Zero(), RIM_V);   // a second of the crane
+    expect(dir.inIntro).toBe(true);
+    dir.skipIntro();   // the press
+    const vel = new Vector3(3, 0, -4); let prev = cam.position.clone(), worstStep = 0, frames = 0;
+    while (dir.inIntro && frames < 120) {   // the player drives during the hand-over
+      me.addInPlace(vel.scale(1 / 60)); foe = { x: me.x + 0.6, z: me.z - 1.1 };
+      dir.update(me, vel, RIM_V); frames++;
+      worstStep = Math.max(worstStep, Vector3.Distance(prev, cam.position)); prev = cam.position.clone();
+    }
+    expect(dir.inIntro).toBe(false);
+    expect(frames).toBeLessThanOrEqual(Math.ceil(INTRO.skipSec * 60) + 2);   // the hand-over takes its own time, no longer
+    // …and from the first frame after it the camera IS the high view: its look never turns again while the play goes on
+    const look0 = cam.getTarget().subtract(cam.position).normalize();
+    for (let i = 0; i < 90; i++) {
+      me.addInPlace(vel.scale(1 / 60)); foe = { x: me.x + 0.6, z: me.z - 1.1 };
+      dir.update(me, vel, RIM_V);
+      worstStep = Math.max(worstStep, Vector3.Distance(prev, cam.position)); prev = cam.position.clone();
+      expect(Vector3.Dot(cam.getTarget().subtract(cam.position).normalize(), look0)).toBeCloseTo(1, 6);
+    }
+    // the high view's own look (screen-up toward the rim): the court's fixed direction, whatever the intro left behind
+    const want = highPose(COURT, highCamParams(), { x: 0, z: 0, pull: 1 });
+    const wl = new Vector3(want.target.x - want.eye.x, want.target.y - want.eye.y, want.target.z - want.eye.z).normalize();
+    expect(Vector3.Dot(look0, wl)).toBeCloseTo(1, 6);
+    expect(worstStep).toBeLessThan(2.5);   // an eased hand-over (an orbit, not a cut across the court)
     scene.dispose(); engine.dispose();
   });
 });

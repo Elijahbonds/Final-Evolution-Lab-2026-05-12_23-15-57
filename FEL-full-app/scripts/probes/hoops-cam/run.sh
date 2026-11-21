@@ -15,7 +15,7 @@ for job in "$@"; do
   IFS=: read -r name host vw vh thr touch feel shot qs <<<"$job"
   h=127.0.0.1; [ "$host" = b ] && h=localhost
   [ "$feel" = - ] && feel=''
-  PORT=$PORT HOST=$h VW=$vw VH=$vh THROTTLE=$thr TOUCH=$touch FEEL="$feel" SHOT_AT="$shot" QS="${qs:-}" FAST="${FAST:-1}" DUMP="${DUMP:-0}" \
+  PORT=$PORT HOST=$h VW=$vw VH=$vh THROTTLE=$thr TOUCH=$touch FEEL="$feel" SHOT_AT="$shot" QS="${qs:-}" FAST="${FAST:-1}" DUMP="${DUMP:-0}" PRESS_AT="${PRESS_AT:--1}" \
     timeout 900 node "$HERE/possession.mjs" "$OUT" "$name"
 done
 kill $SRV 2>/dev/null
