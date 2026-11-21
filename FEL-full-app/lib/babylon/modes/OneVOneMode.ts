@@ -262,7 +262,7 @@ import type { AmbientHandle } from '../visual/EffectsKit';
 import { StickFrame } from '../core/StickFrame';   // lane/move-feel-2: a held stick keeps its court frame
 import {   // IMPROVE (2026-10-06) #1 #2 #3 #4 #10: the pure rules (onevoneRules.test)
   ONEVONE_TIER, attackerPatience, winRule, gameWinner, onePointAway, winBy2Requested, readWinBy2Pick, type WinRule,
-  hintFor, hintSwap, pushPip, emptyBox,
+  hintFor, hintSwap, pushPip, emptyBox, hintDeviceFor, type HintDevice,
 } from './onevoneRules';
 
 /** Exported so hoop-alignment-tests can check it against the venue's hoop. */
@@ -884,14 +884,21 @@ export const OneVOneMode: ModeDefinition = (() => {
     }
     if (out) ctx.setHud(out);
   }
+  /** CO-7: the hint's device — a seated pad, else a coarse pointer (the touch deck), else the keyboard (onevoneRules.hintDeviceFor). */
+  function cueDevice(ctx: ModeContext): HintDevice {
+    try { return hintDeviceFor(ctx.input.pads().length, typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches); } catch { return 'pad'; }
+  }
   /** IMPROVE (2026-10-06) #1: ONE LINE FOR THE STATE YOU ARE IN (onevoneRules.hintFor), held HINT_DWELL_SEC so a body hovering on a
    *  threshold does not flick it; a new possession or an urgent line (the ref's warning, a shot's beat, the block cue) swaps at once. */
   function tickHint(ctx: ModeContext): void {
+    const brace = !!meSlot.intent.brace;
     const want = hintFor({
       possession, loose, shooting, dunking, showtime: showtimeCam, posting, carrying,
       set: carrying && meSpeed01 < 0.1, nearRim: distXZ(me.root.position, RIM_FLOOR) < DUNK_RANGE,
       paintWarn: possession === 'mine' && paintSec > THREE_SECOND_LIMIT - 1,
       defPhase, gathering: possession === 'defense' && attacker.phase === 'gather',
+      // CO-7 (K3 K4): with the brace or the post held, the line says what the right stick is now, in this device's words
+      brace, device: carrying && (posting || brace) ? cueDevice(ctx) : undefined,
     });
     const turned = hintPossession !== possession;
     if (!hintSwap(hintShown, want, modeClock - hintAt, turned)) return;
