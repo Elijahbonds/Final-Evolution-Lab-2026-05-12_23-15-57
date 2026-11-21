@@ -18,6 +18,7 @@ import { openSlots, type WeeklyWindow } from './slots';
 import { stripeTestGate } from './stripeMode';
 import { newUnlockCode } from './teen';
 import { STORE_TERMS_VERSION } from '../store-terms';
+import { isStoreHurtOptinServerEnabled } from './hurtOptinFlag';
 
 export interface CheckoutBody {
   listingId?: unknown;
@@ -25,7 +26,7 @@ export interface CheckoutBody {
   startsAt?: unknown;
   referralCode?: unknown;
   goal?: unknown;
-  /** STORE-HURT-OPTIN: ignored. The answer stays in the buyer's browser for the session; it is never stored. */
+  /** STORE-HURT-OPTIN: stored only while the flag is off (today's behaviour). Ignored when the flag is on. */
   painYes?: unknown;
   note?: unknown;
   shareWithCoach?: unknown;
@@ -257,8 +258,8 @@ async function bookTime(
       slotLock,
       shareWithCoach: share,
       goal: typeof body.goal === 'string' ? body.goal.slice(0, 80) : null,
-      // STORE-HURT-OPTIN: the "Does anything hurt?" answer is never stored (no opt-in copy exists); any value sent is dropped.
-      painYes: null,
+      // STORE-HURT-OPTIN: when the flag is on, the answer is never stored; when off, today's behaviour (boolean or null).
+      painYes: isStoreHurtOptinServerEnabled() ? null : (typeof body.painYes === 'boolean' ? body.painYes : null),
       reviewNote: typeof body.note === 'string' ? body.note.slice(0, 300) : null,
     },
   });

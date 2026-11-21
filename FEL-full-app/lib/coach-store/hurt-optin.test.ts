@@ -64,13 +64,16 @@ function clientFor(store: Record<string, Row[]>): any {
 
 const COACH = 'coach-elijah';
 const BUYER = 'buyer-1';
-const ENV_KEYS = ['COACH_STORE_PAYMENTS_ENABLED', 'COACH_STORE_COACH_USER_IDS'] as const;
+const ENV_KEYS = ['COACH_STORE_PAYMENTS_ENABLED', 'COACH_STORE_COACH_USER_IDS', 'STORE_HURT_OPTIN_ENABLED', 'NEXT_PUBLIC_STORE_HURT_OPTIN_ENABLED'] as const;
 const SAVED: Record<string, string | undefined> = {};
 
 beforeEach(() => {
   for (const k of ENV_KEYS) SAVED[k] = process.env[k];
   process.env.COACH_STORE_PAYMENTS_ENABLED = '1';
   process.env.COACH_STORE_COACH_USER_IDS = COACH;
+  // This file is the flag-on path (the eight STORE-HURT-OPTIN assertions). The flag-off / main path is hurt-optin-flag.test.ts.
+  process.env.STORE_HURT_OPTIN_ENABLED = '1';
+  process.env.NEXT_PUBLIC_STORE_HURT_OPTIN_ENABLED = '1';
   h.store = {};
   h.db = clientFor(h.store);
   h.store.marketplaceListing = [{
