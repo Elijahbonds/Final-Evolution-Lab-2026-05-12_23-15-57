@@ -30,6 +30,7 @@ import { Color3, Matrix, Mesh, PBRMaterial, Vector3, VertexBuffer } from '@babyl
 import type { AbstractMesh, FloatArray, IndicesArray, Skeleton } from '@babylonjs/core';
 import type { KitSlot } from './kit';
 import { isShrunk } from './bodyMask';
+import { liftScaleOf } from './fitTight';
 
 export const SNEAKER_ROUGHNESS = 0.85;
 /** A shoe taller than this (m, sole bottom to top, rest pose) is a boot and gets its shaft folded. */
@@ -406,7 +407,7 @@ export function liftOffBody(mesh: AbstractMesh, slot: 'tops' | 'shorts'): void {
   try {
     mesh.makeGeometryUnique();
     const out = new Float32Array(positions.length);
-    const d = GARMENT_INFLATE[slot];
+    const d = GARMENT_INFLATE[slot] * liftScaleOf(mesh);   // kit-tight: a Blender-made set garment may stand closer (kit.setLiftScale)
     const N = normals;
     const mi = mesh.getVerticesData(VertexBuffer.MatricesIndicesKind), mw = mesh.getVerticesData(VertexBuffer.MatricesWeightsKind);
     const ibms: ArrayLike<number>[] | null = mesh.skeleton ? [] : null;   // by matrix slot (Bone._index), which joint indices address
@@ -416,6 +417,7 @@ export function liftOffBody(mesh: AbstractMesh, slot: 'tops' | 'shorts'): void {
       const k = d / (ibms && mi && mw ? metresPerBind(ibms, mi, mw, v, nx, ny, nz) : 1);   // metres → this vertex's bind units
       out[v * 3] = positions[v * 3] + nx * k; out[v * 3 + 1] = positions[v * 3 + 1] + ny * k; out[v * 3 + 2] = positions[v * 3 + 2] + nz * k;
     }
+    (mesh as { __felPreLift?: Float32Array }).__felPreLift = new Float32Array(positions);   // KIT-TIGHT: the welded shape, for its open edges (the lift splits UV seams apart)
     mesh.setVerticesData(VertexBuffer.PositionKind, out, false);   // updateVerticesData is a silent no-op on the loader's non-updatable buffer
     mesh.refreshBoundingInfo();
   } catch (e) {

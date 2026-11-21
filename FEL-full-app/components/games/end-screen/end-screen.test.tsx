@@ -208,6 +208,9 @@ describe('the helpers the card reads', () => {
   it('B goes to the shelf, or the story map from a story run', () => {
     expect(exitHrefFor(null)).toBe('/play');
     expect(exitHrefFor('golfGreen.r1')).toBe('/story');
+    // coast-d (2026-11-18): a game opened from a coast sports spot goes back to it; Venice's return wins if both were set
+    expect(exitHrefFor(null, null, '/play/coast?spot=volley.net')).toBe('/play/coast?spot=volley.net');
+    expect(exitHrefFor(null, '/play/venice?spot=court.ones', '/play/coast?spot=volley.net')).toBe('/play/venice?spot=court.ones');
   });
 });
 

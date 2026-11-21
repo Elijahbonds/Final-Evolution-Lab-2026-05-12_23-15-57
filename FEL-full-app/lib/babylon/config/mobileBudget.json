@@ -299,6 +299,38 @@
         "textureMb": 120,
         "particles": 80
       }
+    },
+    "venice_hub": {
+      "measured": {
+        "drawCalls": 46,
+        "activeMeshes": 58,
+        "skinnedBodies": 1,
+        "textureMb": 73,
+        "particles": 0
+      },
+      "budget": {
+        "drawCalls": 56,
+        "activeMeshes": 65,
+        "skinnedBodies": 2,
+        "textureMb": 88,
+        "particles": 0
+      }
+    },
+    "coast_zone": {
+      "measured": {
+        "drawCalls": 136,
+        "activeMeshes": 67,
+        "skinnedBodies": 5,
+        "textureMb": 63,
+        "particles": 0
+      },
+      "budget": {
+        "drawCalls": 164,
+        "activeMeshes": 81,
+        "skinnedBodies": 6,
+        "textureMb": 76,
+        "particles": 0
+      }
     }
   },
   "knownOver": {

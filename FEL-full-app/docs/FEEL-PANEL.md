@@ -663,6 +663,40 @@ holds the result in CI. Phone tier only unless said.
   (24 cm) upload their maps at 512² (37 MB → 9 MB). The dunk parks the bus on its corner as a wall-run prop and keeps 1024². 1024 = as before.
 - `perf.propMergeOn` 1 (`visual/VenueProps.ts`, every tier): a prop model's parts that share a material are one thin-instanced mesh (the
   far pier: fifteen parts in two materials → two; the Venice dunk set: 35 masters → 22). Same geometry, same placements. 0 = one per part.
+- `venue.veniceLookV2` 1 (`lib/adventure/venice/courtsDressing.ts`, the Venice hub; improvement pass phase 5, NEW): chain-link fences (open
+  on the walk-up side), benches (the run's long bench), light poles, a name board per court on one atlas, and PBR grounds and sea. 0 = V1's
+  look (its floating name signs).
+- `venue.veniceLife` 1 (`lib/adventure/venice/hubLife.ts`, the Venice hub; improvement pass phase 6, NEW): gulls wheeling over the sea (one
+  thin-instanced billboard draw; a phone flies 3, desktop 6) and, on desktop and up only, people standing at Court 2's sideline and by the
+  other courts (the shipped crowd bodies). A phone gets no crowd-tier people (cut-out cards); `venue.venicePhoneWatchers` stands six real ones. 0 = V1's empty park.
+- `venue.venicePhoneWatchers` 1 (`lib/adventure/venice/hubLife.ts`, the Venice hub; V2, NEW, owner 2026-11-18): a phone stands six real
+  people at the courts (four at the run, two by Court 1) — the crowd's baked bodies, never its cut-out cards. 0 = gulls only.
+- `venue.veniceCourtLife` 1 (`lib/adventure/venice/courtLife.ts`, the Venice hub; V2, NEW): a shooter working round Court 4's arc (the
+  shipped jump shot, follow-through and catch; the ball arcs to the rim, in or off the iron), and on desktop a rebounder there, a pair on
+  Court 1 and a jogger on the bike path (no riding clip fits). A phone gets none: one shooter measured 57-77 draws against the phone row's 56, even without its outline and shadow. 0 = empty courts.
+- `venue.veniceCamCollide` 0 (`lib/adventure/venice/courtsDressing.ts`, the Venice hub; V2, NEW): one invisible proxy mesh of the park's
+  solids (fences, poles, posts, hoops, palms, the boardwalk row) and name boards, flagged for the shared CameraDirector's own occlusion
+  probe. No camera number changes. 1 leaves the see-through chain-link fences out (measured with them in: the pull-in at a fence jumped
+  3-5 m in a frame and swung off the player); 2 puts them in; 0 = the camera passes through everything, as before. SHIPS AT 0
+  (reverted, 2026-11-18): at the boardwalk row level 1 cut the camera 3.9 m in one frame to straight overhead (the director's
+  boxed-in fallback). Easing the shared director's pull-in is the owner's call; the levels stay for that test.
+- `venue.veniceSound` 1 (`lib/adventure/venice/hubSound.ts`, the Venice hub; improvement pass phase 7, NEW): the ocean bed, dribbles and
+  shots from unseen pickup games down the beach, the run cheering now and then near Court 2, and footsteps (concrete vs sand), all through
+  SoundKit (mute and volume apply; the recorded hoops bank once loaded). 0 = V1 (the harness's mood crowd bed).
+- `venue.veniceSolids` 1 (`lib/adventure/venice/hubSolids.ts`, the Venice hub; improvement pass phase 8, NEW): the hoop posts, the boardwalk
+  row's front, the palms in the park and (with `venue.veniceLookV2`) the fences, benches, light poles and board posts are block pieces: walls
+  to the movement sim's own step rule. No movement number changes. 0 = V1 (walk through them).
+- `venue.walkupV2` 1 (`lib/adventure/venice/hubSolids.ts`, the Venice hub; improvement pass phase 8, NEW): a court's card comes up on the
+  court or in its gold ring after 0.25 s, and holds until a metre past. 0 = V1 (a 28 m box round the court, behind the fence too, at once).
+- `venue.veniceWayfinding` 1 (`lib/adventure/venice/hubUi.ts`, shown by `app/play/venice/wayfinding.tsx`, the Venice hub; improvement pass phase 9, NEW): the first-visit hint (once per
+  device), the north-up mini-map of the four courts with you on it, and the card's keys (Enter or X plays, Y plays with your party). 0 = V1.
+- `venue.coastDoor` 1 (`lib/adventure/venice/coastDoor.ts`, drawn by `coastDoorView.ts`, the card in `app/play/venice/stage.tsx`; lane/coast-door, NEW): the boat to the Coast and Islands. A jetty and a boat on the sand west of the courts (a stand-in for the pier end until the Pier district is walkable); step into its gold ring and the card's "Take the boat to the coast" opens `/play/coast?from=venice&spot=pier.end`; the coast's way back (`?spot=pier.end`) lands you beside the ring, facing the boat. 0 = no boat, no card, and `?spot=pier.end` lands at the court gate as before. One draw (the landing, merged), the ring an instance of the courts' own.
+- `venue.deferScenery` 1 (`lib/adventure/venice/courtsView.ts`, the Venice hub; venice-v1 improvement pass phase 3, NEW): the courts load in
+  their plain base colour and the player first; the painted courts, the palms and the boardwalk row arrive once the player can move.
+  0 = everything during the load, as V1.
+- `perf.veniceSharedCourt` 1 (`lib/adventure/venice/courtsView.ts`, the Venice hub, every tier; lane/venice-v1, 2026-11-17, NEW): the four courts
+  are ONE court mesh drawn as instances. 0 = a mesh, material and asphalt detail map per court (the prototype's way: about 4 MB more on a
+  phone, measured 73 → 77 MB; the painted court itself was already cached per scene).
 - `perf.sharedGroundOn` 1 (`nexus/veniceBoardwalk.ts`, every tier): the boardwalk's tiled grounds wear the kind's one painted tile (the
   tiling is in the UVs: the same repeat) instead of a copy each, and the two sand planes share one grain and one mottle; so the four
   aprons, the two sands, the two seas, the two surf strips, the posts and the flags are one mesh each. A plane's tint rides in its vertex
@@ -868,6 +902,13 @@ restores the old behaviour exactly.
   and the pick-up fell back to the old take: on the 3v3 speed set 10 of 11 presses at 2.8 m/s or more were taken at once, a median
   35 cm off the palm, 3 of them yanked up from below the knee. 0 = counted from the bounce's own rate (as at G2). Feel-check: sprint at
   the rim and pull up off a low dribble: the hand meets the ball on its way up, no snatch.
+- `hoops.releaseSnapEaseSec` 0.03 s (`anim/ballCarry.ts`, G2): the smoothing of the shooting wrist's snap at the release (58°). 0.03 is
+  the value it always had (TUNED, unchanged): the wrist turns ~58° in one frame on every jumper. A longer ease spreads it over frames.
+- `hoops.comboDunkOn` 1 (`core/ComboFinish.ts`, G4; FLAGGED 0 → 1, the owner asked for a euro step dunk; open: two arm pops in the
+  footwork → dunk crossfade, 164°/frame on one euro and 126°/frame on one hop in the G4 runs): on, a euro or a hop step with the turbo held, at least `hoops.comboDunkMinMps`
+  3.4 m/s at the press and its last plant inside dunk range (2.8 m) takes off into a dunk: the euro's cross gives the angle (the windmill
+  at speed, the cradle without it), the hop's two feet none, a body in the way the double clutch (the drive dunk's own picker). Off:
+  they end in a layup or a floater, as before.
 
 ## move-feel-2, 2026-11-17 (owner: "stick right runs a straight line while held"; "redesign the phone stick")
 
@@ -886,3 +927,192 @@ Two NEW knobs, **shipped ON** (assumption, flagged: the owner chose both; each k
   stick's centre sent 0.42–0.49 (a jog) and now sends 0 (a standstill); a 30 px push sent full speed and now 0.35. No overlap with any other
   control, inside the stage, in both orientations. "The same push always the same speed": with `hoops.stickSprintFallback` 0 and
   `hoops.gearBlendBand` 0.2 (move-feel) the stick's scale has no hidden turbo and no step. 0 = the fixed 96 px stick.
+- `hoops.escapeReadOn` 1 (`hoops/response/escapeRead.ts` `ESCAPE_READ_ON`, G3; FLAGGED, on; 1v1): the step-back (the hop-back escape)
+  reads the man, never a roll: a man on his heels (giving ground toward the rim faster than `hoops.moveLeanMps`, the backpedal that cuts
+  a drive off) or off balance is beaten and late by `hoops.escapeLateSec`; a set man, or one coming at you, is not (he mirrors, as before;
+  the ball is safe). Measured (1v1, the step-back off a drive, the stick let go): 2.74-2.84 m from him 0.8 s later (+1.58-1.74 m) against
+  1.77-1.91 m with no read; against a set man +0.58-0.73 m, the same as no read. Off (0): as before. Feel-check: drive, he backs off,
+  step back: the space is yours; step back on a man standing in front of you: he is still there.
+- `hoops.escapeLateSec` 0.7 s (G3): how long a beaten man brakes and stands before he recovers: the same as a man a move shook
+  (`ANKLE_BREAK_STUN_SEC`). Measured: 0.45 s bought nothing over no read (the man braked onto the hop and closed again inside 0.8 s).
+- `hoops.trapReadOn` 1 (G3; ON since the owner's answer 2026-11-17, FLAGGED): in a 3v3 double team on the ball, a crossing move
+  (crossover, behind-the-back, between-the-legs: a move with a sideways body) reads both men: SPLIT when a body fits between them (with
+  the squeeze, 1.6 m apart, plus `hoops.trapGapMinM` 0 m): both men late; STRIPPED when it is thrown into the closed side, a trapper
+  inside `hoops.escapeStripReachM` 1.5 m on the side the ball goes (the owner's rule: an escape into the closed side of a trap is a
+  steal); otherwise a man who bit is late. Measured (3v3 trap trials, the crossover and the behind-the-back, 5 each): with the squeeze,
+  5 splits and 4 steals of 9 reads; without it (2.2 m), 2 splits, 6 steals, 2 open. A split leaves the second man 1.5-2.6 m off in 0.8 s;
+  the near man is still at 1.1-1.5 m. Off (0): as before.
+- `hoops.trapSqueezeOn` 1, `hoops.trapSqueezeM` 0.8 m, `hoops.trapSqueezeSec` 0.6 s (owner 2026-11-17: "let the handler slip between two
+  defenders ~1.6 m apart"): for the split's 0.6 s the handler meets the two trappers at 0.8 m centre to centre instead of the bodies'
+  1.10 m stand-off (no contact event), so two men 1.6 m apart can be split. Off: the stand-off holds and a split needs 2.2 m.
+- `hoops.dunkGatherOn` 1 (`hoops/response/dunkGather.ts`, owner 2026-11-17: "drive dunk — gather, then go up"; FLAGGED, on): a sprint
+  squeeze in dunk range gathers first — the last dribble meets the hands (the pick-up) — and the plant and take-off come when the ball is
+  in them, at most `hoops.dunkGatherMaxSec` 0.3 s after the press (a ball near the top goes up at once, as before). Measured (1v1 poster
+  dunks and 3v3 sprint dunks): the gathered dunks took the ball 1.7-12.5 cm off the palm, no yank (with it off the low ones were 59-72 cm,
+  yanked); the take-off came 100-267 ms after the press (today: on the press). Off: up on the press, as before.
+- `hoops.pumpEndsDribbleOn` 1 (`hoops/response/pumpHold.ts`, owner 2026-11-17: "a pump fake ends the dribble, like real basketball";
+  FLAGGED, on; this overrides phase 3's assumption that the dribble comes back, #601): after a pump the ball stays in the hands (the
+  chest hold) and the feet are set; no dribble move; the shot, the pass or the step-through only. Measured (a standing pump, then a
+  crossover flick 1.2 s later): on, 3 of 3 in 1v1 and 3 of 3 in 3v3 kept the ball in the hands for all 66 recorded frames, no move; the
+  step-through on the squeeze still comes (4 of 4). Off: the crossover played and the ball went back to the floor. Off: the dribble comes
+  back when the pump clip ends.
+
+## kit-tight, 2026-11-18 (owner: "make the clothes appear to be skin tight and not baggy ... right now it looks poofy")
+
+Group **Kit · fit**. A look slider, not a feel number: it moves no body, no bone and no timing.
+
+- `kit.fitTightness` **0** (the shipped value is chosen from the browser rig and the pictures; 0 = today exactly): how close the worn
+  kit tee / tank and shorts sit on the body. Today they stand about 3–4 cm off the skin (the garment files 2–2.5 cm, plus the runtime
+  lift and edge flare). Each vertex further than 8 mm off is pulled toward the skin by this share of the excess, once, when the body
+  mask is fitted; the pull fades out near the hems, cuffs, armholes and leg openings, where the skin is still drawn. Kit packs (the
+  football jersey) and the Creator's built clothes are not touched. `lib/babylon/core/fitTight.ts` `FIT_TIGHTNESS` (with `FIT_FLOOR`
+  8 mm and `FIT_EDGE_BAND` 7 cm).
+- `kit.inseamShade` **0.55 — the coordinator's reversible default, 2026-11-18 (option (a); flagged to the owner)** (new; 0 = as before,
+  no texture): how much darker the one-piece short's cloth between the legs is, a gusset panel, so its stretch in a stride reads
+  as a seam (KIT-FIT-PLAN §12.3: no weight or shape change removed it). A texture made from the short's own UVs and weights; no
+  geometry, UV, bone or vertex-data change. `lib/babylon/core/inseamShade.ts` `INSEAM_SHADE`.
+- `kit.setLiftScale` **0.5 — owner 2026-11-18 pick (3) from the contact sheet** (new; 1 = today's numbers): the runtime lift
+  (`GARMENT_INFLATE` 13 mm tops / 20 mm shorts) and edge flare on the Blender-made garment sets ONLY (the one-piece short, the new
+  jerseys); every other garment takes today's. `lib/babylon/core/fitTight.ts` `SET_LIFT_SCALE`.
+
+## kit-mac-jobs, 2026-11-18 (owner: "The clothes are the biggest eye sore immediately"; "skin tight and not baggy, or more natural")
+
+Group "Kit · garments". NEW; both ship at 0, which loads nothing new and leaves every body exactly as before. They apply to the
+next body a scene loads (the garments go into the loaded file once, before any spawn is cloned from it). The garments are the
+owner's two Blender jobs, made headless from the free MakeHuman garments (docs/SHORTS-BUILD-STEPS.md, docs/JERSEY-BUILD-STEPS.md;
+`scripts/avatar/mpfb/onepiece-shorts.py`, `jersey.py`, `fit-outfit.py`, `scripts/avatar/kit-fit/graft.ts`); the files are
+`public/models/kits/sets/` and no body file changes.
+- `kit.onePieceShorts` **1 — owner 2026-11-18 pick (3) from the contact sheet** (was 0) (`core/kitGarmentSet.ts` `ONE_PIECE_SHORTS`): 1 = the kit bodies (Closet, games, phone files) wear the
+  one-piece court short: one piece of cloth with a gusset 2.5 cm under the crotch, fitted to the legs and seat, in place of the
+  three pieces whose legs reached 10 cm into each other. Both short items (`shorts_court`, `shorts_glitch`) take it.
+- `kit.newJerseys` **1 — owner 2026-11-18 pick (3) from the contact sheet** (was 0) (`core/sportKitDefaults.ts` `NEW_JERSEYS`): 1 = the kit bodies carry `top_basketball` (the sleeveless jersey
+  from the MakeHuman tee, the default top in 1v1, 3v3, the dunk modes, 3-Point and the carnival) and `top_football` (from the
+  MakeHuman polo; the body now carries it, so the Meshy football pack is not fetched). A Closet pick still wins.
+- MEASURED (KIT-FIT-PLAN §11): with either knob on, more skin shows through in the game (the basketball jersey about twice,
+  the short 2-5x in its slot); the football jersey cuts the pack's torn edges 25x but lets 11-13 % more skin through. The owner judged
+  by eye instead (KIT-FIT-PLAN §12.2): both ship at 1, with `kit.setLiftScale` 0.5.
+
+## hoops-items, 2026-11-18 (the basketball items the gather, escape, sound and perf lanes left open; the owner has not felt or heard these)
+
+Each knob is NEW and its off value restores the game as it was (tests pin both sides). Probes: `scripts/probes/hoops-items/`.
+
+**The 3v3 step-back (group "Hoops · gathers").** Measured on the hoops-gap rig (`stepback.mjs` over `hoops-gather/trials.mjs SET=g3`):
+the press moves the body just as fast in 3v3 as in 1v1 (the root leaves 2-3 frames after the flick in both, 2 m/s by frame 4 in 3v3 and
+5 in 1v1; the step-back clip fades in over the same 0.12 s, `moveFadeSec`, the same call in both modes). What was "late" is the man: in
+1v1 the read beats a backpedalling man and he keeps going (3.7 → 1.7 m/s over 0.8 s), so a step-back off a drive gains +1.64 m; in 3v3
+nobody was read and the man recovered at once: +0.58 m. After (5 trials a side, the same seed): **+1.66 m** (1.35-1.75).
+- `hoops.escapeRead3v3On` 1: the 1v1 read (`stepBackRead`: off balance, or on his heels) in 3v3, with `hoops.escapeLateSec` 0.7 s. The
+  beaten man is not frozen (a 3v3 stun zeroes his speed in the frame — why the first try cost space); he gets a late reaction instead.
+- `hoops.escapeLateCarry` 0.7: through the late window he carries his own backpedal at 0.7 of his speed (the 1v1 man's average), then
+  stops and recovers. 0 = he brakes at once and stands (measured: +0.73 m, he stood inside 0.2 s).
+A set man, or one coming at you, is not beaten (the standing step-back against a man at his 2 m cushion: −0.8 m with or without, he
+closes; the man who bit by stepping up: 0, the same).
+
+**Sound (group "Hoops · sound"; `lib/babylon/audio/hoopsSfx.ts`).**
+- `hoops.passThrowQuietOn` 1: a 3v3 pass no longer plays the menu click on the throw; it is heard in the hands that catch it, and a sling
+  pass still whooshes. 0 = the click.
+- `hoops.driftSqueakOn` 1: the DRIFT plays a shoe squeak (the hardest scuff: volume 0.26, pitch 1.12) instead of the net swish (0.8, 0.4).
+  About 5 dB louder than the swish was (−51 against −55 dB at the limiter): the owner's ear decides.
+- `hoops.glassSoundOn` 1: the backboard kiss has its own cue, `glass` — the CC0 "Ball against wall" already in the set (`bounce_6`,
+  BigSoundBank s1825; one file, fetched once for both cues) with its own synth as the fallback — at the level the old kiss played (the
+  thud at pitch 1.5, −30.6 dB; the recording's gain 2.62 measured by `hoops-sound/loudness.mts`). 1v1, 3v3 and the 3-point contest. 0 = the thud.
+
+**The d-pad (group "Hoops · movement").**
+- `touch.dpadTapOn` 1 (`lib/babylon/ui/dpadTap.ts`): every d-pad arrow is at least 44 px AS DRAWN (`dpad.mjs`, a 390 × 844 phone and
+  sideways): a row of four 44 px arrows upright, a cross of 52 px arms sideways (the compact deck draws at 0.85: 44.2 px). Before: 24 px,
+  drawn 23.3 upright on 1v1 / 3v3 and 20.4 sideways. On 1v1 and 3v3, where the d-pad is not a verb (1v1 reads none, 3v3 only says MOVE
+  WITH THE STICK), a 44 px row upright covered the TURBO pad, so there it is a hollow, unpressable cross in the old 72 px place (the owner's
+  rule for an unused slot, 2026-09-05), and the floating stick and TURBO stay exactly where they were. 0 = the old 24 px cross everywhere.
+
+**The shot meter under `?engine=webgpu` (group "Hoops · phone budget").**
+- `perf.meterWgslOn` 1 (`visual/ShotMeter3D.ts`): under WebGPU the 3D meter is drawn by a WGSL twin of its shader (the same six layers);
+  if it does not compile on a device, a plain bar in the fill colour is drawn instead of nothing. WebGL is byte-identical (the GLSL is
+  pinned to its hash, the WebGL material built with exactly its old options). 0 = as before (missing under WebGPU). Not verified on a
+  GPU: this box's WebGPU loses its device in about a second (PHONE-PERF-CHECK), so the owner's phone is the first real test.
+
+**Moves: the hands (group "Hoops · handle (rest)").**
+- `hoops.moveHandEaseOn` 1 (FLAGGED, on), `hoops.moveHandRateDeg` 1800 °/s (`anim/MoveEase.ts`): the arm ease (#314) extended to the hand
+  bones. The behind-the-back's whip is the HAND, which the arm ease never held: measured on the rig (`whip.mjs`, the retreat and the BTB
+  slide, 3 trials each), the ball hand's worst turn in one frame 125-132° → 30° in 1v1 and 131° → 30° in 3v3; the ball's path and its
+  contact with the hand unchanged (the hand bone's position is not touched, only its turn). The clip's keys are untouched (GATE 0). The
+  arms' own limit (1800 °/s) is the hands'. 0 = the hands as the layers wrote them, as before.
+- **The hop step's feet: not curable at runtime — a clip job** (docs/HOOPS-GATHER-ESCAPE-PLAN.md, hoops-items): at the take-off the
+  planted foot slides 6-13 cm a frame (3v3 rig) while the root moves 3-6, because the clip folds the legs up under the body.
+
+## coast-islands, 2026-11-18 (the Coast & Islands zone, phase A; docs/COAST-ISLANDS-PLAN.md; NEW, no shipped number moved)
+
+Group **Coast · zone**. Every row is new behaviour in the new zone; nothing outside `/play/coast` reads them. The zone walks on the
+Adventure host's movement and camera exactly as the Venice hub does: no movement or camera number was touched.
+
+- `coast.streamOn` 1 (`lib/adventure/coast/zoneView.ts`): the zone streams its 64 m pieces. 0 = every piece at full detail with every
+  prop, the phone-budget control the guard (`scripts/coast-zone-budget-tests.ts`) and the rig (`scripts/probes/coast-islands/zone-rig.mts`)
+  compare against.
+- `coast.streamFull` 1, `coast.streamLod` 2, `coast.streamKeep` 1 (`lib/adventure/coast/zoneLayout.ts`): the rings, in pieces round
+  yours — the full 3 × 3, the low-detail 5 × 5 (the plan's phone rule, docs/VENICE-HUB-PLAN.md §3) — and the hysteresis before a piece
+  drops its detail. Bounds are assumptions until felt.
+- `coast.deepWaterTurnBack` 1 (`lib/adventure/coast/zoneWorld.ts`): a body that ends a frame over water deeper than you can wade
+  (0.85 m) goes back to the last place it could stand. On the ground the deep water is already a wall to the movement sim; this
+  catches a jump off the dock. 0 = off (a probe that wants the raw sim).
+
+## coast-b, 2026-11-18 (the Coast & Islands zone, phase B: the partner, the creatures, the log; NEW, no shipped number moved)
+
+Group **Coast · zone**. The partner is the Adventure's own (its brain, its speed, its follow slot are untouched); these are the
+zone's rules around it, and the creatures and the log, all new. Each 0 restores phase A.
+
+- `coast.partnerOn` 1 (`lib/adventure/coast/zonePartner.ts`): one partner walks with you — the Adventure save's own, or the
+  Adventure's default creature (strideraptor) on loan, never written to the save. 0 = you walk alone.
+- `coast.partnerCatchupM` 24 m: left this far behind (on a flat-out sprint you reach 14 m/s, the partner about 10.5 m/s), it
+  reappears 3 m behind you on your own path. The story's own catch-up is 32 m; the zone's 3 × 3 full-detail ring is 192 m wide.
+- `coast.partnerStuckSec` 1 s: blocked (under 0.5 m/s) for this long while more than 6 m behind, it reappears on your path. The
+  brain walks straight at its follow slot and has no path-finding.
+- `coast.creaturesOn` 1 (`lib/adventure/coast/zoneCreatures.ts`): four placeholder creatures wander near home. 0 = none.
+- `coast.logSeenM` 16 m, `coast.logMeetM` 3 m: how close you come for a creature to go in your log as seen, and as met.
+
+## coast-d, 2026-11-18 (the Coast & Islands zone, phase D: the harbour town, the sports spots, the side quests; NEW)
+
+Group **Coast · zone**. All new; each off restores phase B.
+
+- `coast.streamSliced` 0 (`lib/adventure/coast/zoneView.ts`; lane/coast-f, NEW): crossing into a 64 m piece used to build the newly full pieces' fine ground and refresh all seven prop models in that one frame; now the coarse ground stands in and the work runs one job a frame (the full ring's fine ground first, then one prop model, then load-ahead). The load (the first stream) still builds at once. **Off by default, no measured win on the rig; try on a real phone** (3 runs a side: worst frame 1.52–1.79 s against 1.44–2.30 s, p95 574–632 ms against 511–606 ms). 0 = phases A–D.
+- `coast.zoneGrow` 1 (`lib/adventure/coast/zoneLayout.ts`; lane/coast-f, NEW): the zone grows toward the plan's 768 m by the 2 × 2 block of 64 m pieces north-west of Reef Rock — mostly open sea, a sandbank (crest 0.55 m under, wadeable) from Reef Rock's west shore, and Gull Key, a 15 m palm islet. The grid gained two columns west (x −320 … −192); only that block of them is zone. 0 = the 6 × 6 zone of phases A–D.
+- `coast.prewarmLate` 0 (`lib/adventure/coast/zoneView.ts`, `zoneTownView.ts`; lane/coast-f, NEW): the models that land after the load (the seven prop models, the market kit, each townsperson's body) have their shaders — lit, shadow depth, instanced, skinned — compiled as they land (`core/hitchProbe` prewarmMeshes, the harness's own phone pre-warm for late meshes), not on the frame they first come into view mid-walk (measured: one such first sight compiled for 3.4 s on the rig). **Ships 0**: measured 3 runs a side, it doubled the rig's compile time (5.1–5.2 s against 1.9–2.7 s: it compiles every variant a mesh could draw) and the worst frame was no better. 0 = phases A–D.
+- `coast.townOn` 1 (`lib/adventure/coast/zoneTown.ts`): the harbour town beside the dock (four houses you cannot walk through,
+  the shipped Venice boardwalk kit as the market strip, the street). 0 = the bare beach, and no quests.
+- `coast.townsfolk` 4: how many townsfolk stand in town (the Venice watchers' roster bodies; each is a skinned body with its own
+  textures, measured on the phone rig). 0–4; the first three give the quests.
+- `coast.townLoadAfterSec` 0.5 s: the market kit and the townsfolk's bodies start loading this long after the zone is playable, not during its load (measured: loading them with the zone made it playable about 5 s later on the rig). 0 = with the zone. New (coast-d), [TUNE].
+- `coast.sportsOn` 1: the sports spots (surf, beach volleyball, golf, the kart) open their games in one tap and the end screen
+  brings you back to the spot. 0 = none.
+- `coast.questsOn` 1 (`lib/adventure/coast/zoneQuests.ts`): the townsfolk give three quests, saved in the Adventure save like the
+  creature log. 0 = they only say hello.
+
+## hoops-followups, 2026-11-19 (the two items the hoops-items lane left: the 3v3 worst frame after the body merge, every-screen on the two hoops pages)
+
+Group "Hoops · phone budget". NEW; its off value restores the old build exactly (tests pin both sides). Probes: `scripts/probes/hoops-followups/`.
+- `perf.shadowBakeAtStart` 1 (`scene/ShadowCache.ts` `settle()`, called once from `core/ModeHarness.ts` at the START press; every
+  mode on the phone tier): the phone shadow cache watches the scene for 1 s after loading, then bakes the still scenery once. A START
+  press inside that second used to leave the rest of the watch in play (every shadow redrawn each frame: 59 shadow draws against 29)
+  and the bake on a play frame, which on 3v3 was the worst frame of the run when it fell on a full-court frame: 207 draws against a
+  row of 208 (2 of 12 runs on the rig, `perf3v3.sh`; the hoops-items lane saw 209). Now the press ends the watch and the bake runs
+  on the first frame of play, under the intro camera (measured 150 draws): worst frame 194 in every run (6 runs). Nothing in a mode
+  moves before START, so the rest of the watch was watching play, not scenery. 0 = the full watch, as before (re-measured: 207).
+
+Not a knob: the MIX / MC / CC chips over the court (`components/games/mic-caption.tsx`) were 22 px tall tap targets; each is now a
+see-through 44 px box with the chip drawn inside it as before (1v1, 3v3, 3-Point, the carnival, the dunk duel; the dunk's stacked
+chips unchanged). Nothing drawn moves.
+
+## kit-numbers, 2026-11-19 (the player's number and name on the new court jerseys)
+
+Group **Kit · fit**. A look switch: it moves no body, no bone and no timing.
+
+- `kit.jerseyDecals` **1** (new; 0 = a blank jersey, as before — and the floating back plate for a player with a number, as before):
+  the new basketball and football jerseys (`kit.newJerseys`) print the player's number small on the chest and large on the back,
+  with the name across the back, in their own `decal` UV map, mixed over the tinted cloth (light ink on a dark jersey, dark on a
+  light one). Any other top keeps the plate. `lib/babylon/core/jerseyDecals.ts` `JERSEY_DECALS`. assumption: a player who never
+  set a number prints the default jersey's 0, no name.
+
+## kit-jersey-fix, 2026-11-19 (the dark marks on the new basketball jersey's lower back)
+
+- `kit.layerGap` **0 (ships off; 0 = as before)**: metres the worn short is held UNDER the worn top where the top covers it. The
+  marks are the one-piece short showing through the jersey (hiding the shorts on the rig removes them): the runtime lift is
+  20 mm a short against 13 a top. 0.006 removes them on the rig pictures, but fails the 10.1a bar by noise-level margins
+  (KIT-FIT-PLAN §14), so it ships off for the owner to judge. `lib/babylon/core/fitTight.ts` `LAYER_GAP`.

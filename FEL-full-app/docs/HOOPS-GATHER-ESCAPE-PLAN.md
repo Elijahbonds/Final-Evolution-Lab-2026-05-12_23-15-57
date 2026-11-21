@@ -368,6 +368,74 @@ with a real player (`hoops-audit/mash-audit.mjs PLAYER=script` and `mash`): the 
   3v3 arm turns over 25° a frame 32 → 13, worst 175 → 82°/frame; 1v1 worst 117 → 96. The pump's own up-and-down is a second dip by
   design, so the re-drop bar does not apply to it. **assumption:** after a pump the dribble comes back once the clip ends (as the game
   did); whether a pump should end the dribble is the owner's call.
+- **Phase 3, step 3: G4 measured** (`SET=combo`, on the release with move-feel A+B in it; 1v1 from the poster seam, 3v3 from the check;
+  the probe presses the euro AT 3.3-3.6 m and the hop as a double tap at 3.3 m — waiting for a bounce phase at a sprint carried the
+  squeeze 1-2 m further, inside the plain drive dunk's range). With `hoops.comboDunkOn` 1: **the euro into a dunk fired on every euro
+  pressed at speed (1v1: 4 of 4 over two runs), the double-tapped hop into a dunk 2 of 3 in 1v1 and 2 of 2 in 3v3** (the third read
+  the speed at the SECOND press, after the gather bled it: now read at the first press, `force.hopVel`). The ball: always the
+  footwork's own pick-up, 1-6 cm off the palm, no yank (the plain drive dunk on the same runs: 47-69 cm). The arm: worst 39-83°/frame
+  on most, but 164 (one euro) and 126 (one hop) in the footwork → dunk crossfade (the same footwork into a layup: 36-103). The ball's
+  re-drop 6-35 cm (the dunk's own load after the footwork's). **`hoops.comboDunkOn` → 1** (coordinator 2026-11-17: the owner asked for a
+  euro step dunk; FLAGGED), with the two crossfade pops as the open item. The 3v3 euro did not fire in the probe (its drives from the check never met
+  the euro's read at speed): not measured.
+- **The dunk take-off yank (cause c), tried and NOT shipped.** The drive dunk's take through the pick-up (wait for the bounce, into the
+  dunking hand, settled by the take-off pass's end, 0.18 s) measured WORSE on the same seeds: 1v1 53 → 121 cm and 0.5 → 71 cm, settles
+  at the deadline 53-69 cm, because the body leaves the floor while the ball is still on its bounce, and the late take flies it farther.
+  Removed (no knob). The fix this needs is the take-off timed to the gather (the last dribble met in the hands, then the plant), which
+  changes WHEN a drive dunk leaves the floor: a dunk-timing feel call for the owner / the dunk lane, not a pick-up knob. Until then the
+  combo dunks are the yank-free way up.
+
+- **G3, escapes (2026-11-17, lane/hoops-gather-5).** New probe trials: the step-back off a drive (he backpedals; the stick let go with
+  the flick), the step-back against a man closing out, the cross in a trap each way (`SET=g3`, `SET=g3trap`).
+  - **The step-back reads the man (1v1, `hoops.escapeReadOn` ON, FLAGGED):** beaten when he is on his heels or off balance, never a set
+    man, never one coming at you. Off a drive: 2.74-2.84 m from him 0.8 s later, against 1.77-1.91 m with no read (+1.0 m); a set man:
+    the same as no read (+0.58-0.73 m). `hoops.escapeLateSec` 0.7 s (0.45 bought nothing: he braked onto the hop and closed again).
+    Against a man closing out at 4.3 m/s no read helps: he brakes 1.4 m onto the hop and stands at 1.10 m (that man is beaten going BY
+    him, the moves' own read) — so the step-back does not count a closing man as beaten.
+  - **3v3 step-back: left as it was.** A late 3v3 man is frozen on the spot (stunSec stops his velocity dead), so a backpedalling man
+    stopped nearer: the read measured +0.58-0.62 m against +0.17-1.01 m without it. Open: a "late" that lets his backpedal run on.
+  - **The trap (`hoops.trapReadOn`, OFF for the owner):** the read and the owner's rule are in (split / stripped / open, by both men's
+    geometry). On: 3 of 3 crosses in a trap stripped, 0 split — every trap measured was 1.3-2.2 m apart, which the bodies' 1.10 m
+    stand-off cannot pass. A split that works needs the trap's bodies to let a handler through (the collision rule), not a read.
+  - **Spin-out:** already read by the spin's own pivot / shoulder read (`[3V3-MOVE] spin shoulder clear beaten`); not changed. The
+    rig's sweep still throws between-the-legs instead of a spin (phase A: an owner try on the phone first).
+  - **Retreat dribble:** unchanged; its separation is the handler running away (1v1 +0.9-1.2 m in 0.8 s: the 1v1 defender does not
+    follow a retreat). It still plays the behind-the-back (below).
+  - **The behind-the-back whip is a clip job (GATE 0), not runtime code:** `bball_behind_back_*` is authored in
+    `anim/authored/basketball.ts` (`BEHIND_V2`): the ball hand goes from its key behind the back (t 0.25 s, `R: { near: 0.14 }`) to out
+    in front (t 0.34 s, `R: [0.22, 0.92, 0.02]`) in 0.09 s, and the arm's solve flips the hand through it — 112-146° in one frame, 15-25
+    frames in (phase A). The fix is a key between them (the hand coming round the hip) or a longer 0.25 → 0.34, re-verified on the rig
+    (GATE 0: the reel and the hand probe before and after). The BTB slide (`SLIDE_V2`, its own keys) measured 30°/frame: not affected.
+
+- **The owner's answers (2026-11-17), built on lane/hoops-gather-6:**
+  - **The squeeze through a trap** (`hoops.trapSqueezeOn`, and `hoops.trapReadOn` now ON): 5 splits / 4 steals of 9 crossing reads
+    with it, 2 / 6 (and 2 open) without. A split leaves the second man 1.5-2.6 m off in 0.8 s; the near man stays at 1.1-1.5 m.
+  - **The drive dunk gathers, then goes up** (`hoops.dunkGatherOn` ON): 1.7-12.5 cm off the palm on the gathered dunks (59-72 cm yanks
+    with it off); the take-off 100-267 ms after the press (today 0).
+  - **A pump ends the dribble** (`hoops.pumpEndsDribbleOn` ON; overrides #601's assumption): see FEEL-PANEL; the step-through after a
+    pump still comes on the squeeze.
+  - **The 3v3 step-back's "late" that lets the backpedal run on:** not done in this pass (the 3v3 read stays off; see above).
+
+- **hoops-items (2026-11-18): the two GATE 0 items, tried at runtime first** (`scripts/probes/hoops-items/whip.mjs`, `clip-feet.mts`):
+  - **The behind-the-back whip: cured at runtime, no clip change.** It is the HAND bone (the ball hand 113-143° in one frame, 15-25 frames
+    in), and the clip on its own never turns a hand past 400 °/s (`hoops-gap/clip-flip.mts`): a runtime layer flips it, and the arm ease
+    (#314) held the arm but never the hand. `hoops.moveHandEaseOn` 1 holds the hands to the arm's 1800 °/s: worst 125-132° → 30° a frame
+    (1v1 and 3v3, 3 trials each), the ball's path and contact unchanged. The `BEHIND_V2` keys stay as they are.
+  - **The hop step's feet: a clip job (owner / Mac).** Measured: at the take-off the planted foot slides 6-13 cm a frame for 4 frames while
+    the root moves 3-6 cm (3v3 rig); the landing is clean (0-0.4 cm). The clip alone (`clip-feet.mts`, the built clip on the hero, no
+    game): the ankles rise 0.066 → 0.33 m above the root in 0.12 s while they travel 3.8 cm a frame relative to it in the first four
+    frames — `bball_hop_step` keys only the thighs and knees (−26° → −54° → −38°, 40° → 60° → 52°) and hipsY (−0.08 → +0.06 → −0.13), so the
+    hop is the legs folding up under a body that barely rises, and the feet sweep along the floor before they leave it. Why no runtime fix:
+    a later clip start skips the fold and pops the legs (a 0.13 m jump in a frame); a longer blend-in does not reach it (the slide is
+    inside the clip, after the blend); and the foot lock (`anim/FootPlanting.ts`) lets go by design while the root rises (its airborne
+    rule) — pinning the feet there would hold them against the clip's own tuck and fold the knee the wrong way.
+    **What the clip needs** (GATE 0: the rig's naming and rest checked before and after; `clip-flip.mts` and `clip-feet.mts` before / after):
+    1. key the ankles in the world like the handle clips do (`V2Key.feet`): both feet at the stance spots at t 0 and held there to
+       t 0.04 (the push), off the floor from 0.05, landing square at 0.22 and held to 0.26;
+    2. let the HIPS carry the hop (hipsY up to about +0.12 at t 0.12) instead of the thighs folding to −54°: the knees to about −35° / 45°
+       in the air;
+    3. the take-off: no foot more than 1 cm a frame relative to the root while its ankle is under 0.12 m (today 3.8 cm);
+    4. or capture a hop step at game speed with the ball (the plan's G2 capture note), retarget and run the same two probes.
 
 ## 6. The worst moments, drawn
 

@@ -48,6 +48,7 @@ describe('THE UI IS NEVER OFFERED A BUTTON THAT WILL REFUSE', () => {
     expect(e.reason).toBe('unavailable');
     // it names what the player CAN do instead, rather than being a dead end
     expect(e.message).toMatch(/in-app|record/i);
+    expect(e.message).not.toMatch(/youtube/i);
   });
 
   it('availableKinds offers exactly what will work', () => {

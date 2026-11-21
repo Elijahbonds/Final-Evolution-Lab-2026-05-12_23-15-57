@@ -14,6 +14,7 @@ import {
 } from './ShadowCache';
 import { legacyRig, tierRigSettings } from './QualityTier';
 import { mountLightRig } from './LightRig';
+import { resetFeelForTests, setFeelOverride, setFeelSession, setFeelUser } from '@/lib/feel-panel/feel';
 
 /** A caster whose world matrix, visibility and life the test drives. */
 function caster(name: string, extra: Partial<CasterLike> = {}) {
@@ -414,6 +415,42 @@ describe('the cache on a scene', () => {
     expect(sun.autoUpdateExtends).toBe(true);
     expect(calls.dispose).toBe(1);
     expect(scene.getMeshByName('__fel_shadow_keep')).toBeNull();
+  });
+
+  it('the START press ends a warm-up still running: the first bake runs on the next frame (perf.shadowBakeAtStart, hoops-followups)', () => {
+    const { scene, sun, gen, map } = rigScene();
+    const { c, calls } = fakeCopier();
+    const sc = mountShadowCache(scene, gen, sun, { copier: c, now: clock });
+    expect(sc.settle('start')).toBe(false);          // not armed: nothing to end
+    sc.arm(); frames(scene, 4);
+    expect(sc.stats().state).toBe('warming');
+    expect(names(map.renderList)).toEqual(['lamp_post', 'fence', 'hero']);   // warming draws every caster, live
+    expect(sc.settle('start')).toBe(true);
+    frames(scene, 1);
+    const st = sc.stats();
+    expect(st.state).toBe('cached');
+    expect(st.bakes).toBe(1); expect(st.lastReason).toBe('first bake (start)');
+    expect([st.statics, st.moving]).toEqual([2, 1]);
+    expect(calls.save).toBe(1);
+    expect(sc.settle('start')).toBe(false);          // cached: a second press changes nothing
+    frames(scene, WARM);
+    expect(sc.stats().bakes).toBe(1);
+    sc.dispose();
+  });
+
+  it('perf.shadowBakeAtStart 0 restores the full warm-up: the press changes nothing', () => {
+    resetFeelForTests(); setFeelUser(true); setFeelSession(null); setFeelOverride('perf.shadowBakeAtStart', 0);
+    try {
+      const { scene, sun, gen } = rigScene();
+      const sc = mountShadowCache(scene, gen, sun, { copier: fakeCopier().c, now: clock });
+      sc.arm(); frames(scene, 4);
+      expect(sc.settle('start')).toBe(false);
+      frames(scene, 1);
+      expect(sc.stats().state).toBe('warming');
+      frames(scene, WARM);
+      expect(sc.stats()).toMatchObject({ state: 'cached', bakes: 1, lastReason: 'first bake' });
+      sc.dispose();
+    } finally { resetFeelForTests(); }
   });
 
   it('the list is never empty: with no mover left, the keep slot holds it (receivers keep their SHADOW define)', () => {

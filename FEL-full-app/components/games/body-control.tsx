@@ -80,6 +80,12 @@ function Moves({ view }: { view: SessionView }) {
   );
 }
 
+/** dock-sideways (2026-11-19): the compact button (the sideways dock's icon-only BODY) is drawn 38 px wide (measured in play on 1v1 and
+ *  3v3 at 844 x 390), under the 44 px tap rule, beside three 44 px squares. An invisible box reaches 4 px past each side of its padding
+ *  box (3 px past its 1 px border, half the dock's 6 px gaps), so it takes taps across 44 px and is drawn exactly as before; its
+ *  neighbours' tap areas are untouched. (3 px from the padding box was measured by hit test at 42-43 px.) */
+export const COMPACT_TAP = "relative before:absolute before:inset-y-0 before:-inset-x-[4px] before:content-['']";
+
 export function BodyControl({ compact = false }: { compact?: boolean }) {
   // Client only: the server never builds a camera source.
   const src = typeof window === 'undefined' ? null : sharedPoseSource();
@@ -116,7 +122,7 @@ export function BodyControl({ compact = false }: { compact?: boolean }) {
         aria-pressed={on}
         aria-label={on ? 'Turn body play off' : 'Play with your body'}
         className={`inline-flex min-h-11 items-center gap-2 rounded-lg border px-2.5 py-1.5 font-mono text-[12px]
-                    font-bold uppercase tracking-[0.12em] transition-colors ${compact ? '' : 'sm:px-3'}`}
+                    font-bold uppercase tracking-[0.12em] transition-colors ${compact ? COMPACT_TAP : 'sm:px-3'}`}
         style={{
           borderColor: on ? 'rgba(0,255,157,0.45)' : 'rgba(255,255,255,0.12)',
           color: on ? '#00FF9D' : 'rgba(255,255,255,0.5)',

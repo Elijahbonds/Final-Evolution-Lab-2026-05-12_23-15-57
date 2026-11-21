@@ -106,6 +106,8 @@
     const steerRim = (mag, lat = 0, back = 0) => { const [x, z] = toRim(); const px = -z, pz = x; const ax = x * (1 - back * 2) + px * lat, az = z * (1 - back * 2) + pz * lat; HG.steer(ax, az, mag); };
     if (spec.turbo) HG.turbo(true);
     if (spec.retreat) { const [x, z] = toRim(); HG.steer(-x, -z, spec.mag || 0.7); await waitSec(spec.approachSec || 0.5); }
+    // G3 'he bit': back out, stop, and wait for him to come at me (1v1 kinetic(): closing ≥ 1.4 m/s inside 2.6 m) — the man who bit
+    if (spec.waitClose) { HG.stick(0, 0); const w = await watch(() => { try { const k = S().kinetic(); return k.closing >= 1.4 && k.dist < 2.6 ? k.closing : null; } catch (e) { return null; } }, 2.5); o.closingAtPress = w.v ?? null; if (w.v == null) o.notes.push('he never came'); }
     else if ((spec.mag || 0) > 0) {
       const ap = await watch(() => { steerRim(spec.mag); return distRim() <= (spec.untilDist || 0) ? 'in' : null; }, spec.approachSec || 2.5);
       if (ap.frames === null) o.notes.push('approach cap: dist ' + distRim().toFixed(2));
@@ -113,7 +115,7 @@
     o.approachF = HG.frame - fStart; o.distAtPhaseWait = +distRim().toFixed(2);
     // THE TRAP (3v3): stop in the paint and wait for the double team to arrive (hoops/teamDefense: the ball inside 3 m for 0.45 s)
     if (spec.trap) { HG.stick(0, 0); HG.turbo(false); const tw = await watch(() => { const L = window.__LOG || []; for (let i = L.length - 1; i >= 0 && L[i].f >= fStart; i--) if (/double team/i.test(L[i].m)) return 1; return null; }, 2.0); o.trapped = !!tw.v; await waitSec(0.25); if (spec.turbo) HG.turbo(true); }
-    const keepGoing = () => { if (spec.retreat) { const [x, z] = toRim(); HG.steer(-x, -z, spec.mag || 0.7); } else if ((spec.mag || 0) > 0) steerRim(spec.mag); };
+    const keepGoing = () => { if (spec.retreat && !spec.waitClose) { const [x, z] = toRim(); HG.steer(-x, -z, spec.mag || 0.7); } else if ((spec.mag || 0) > 0) steerRim(spec.mag); };
     if (!iHave()) { o.notes.push('no ball before the press'); }
     // pre-moves: the pump fake, a flick (the step-back dribble opens its own shot window)
     let flickF = null;
@@ -125,6 +127,7 @@
     // the press: the first drawn frame that can answer it is the next one
     if (spec.strip) HG.strip(spec.strip, 16, 2);   // (16 drawn frames, every 2nd, from the press: needs NODRAW unset)
     const pressF = HG.frame + 1; o.pressF = pressF; o.distAtPress = +distRim().toFixed(2);
+    if (spec.prePump) { HG.press('X'); await waitSec(0.1); HG.release('X'); await waitSec(spec.pumpWaitSec ?? 1.2); o.pumpF = pressF; o.pressF = HG.frame + 1; }   // a pump, then (the dribble dead) the flick
     if (spec.escape) {
       // the R-stick map is relative to the ball hand (StickHandle.stickMoveFor reads handAfterMove): resolve 'downaway' / 'upaway' on this
       // frame, after any auto hand change has landed (no guard-hand crossing in the last 45 frames), never from a read taken earlier
@@ -134,6 +137,7 @@
         let hand = 'Right'; try { hand = S().carry().hand || 'Right'; } catch (e) { /* default */ }
         fl = (fl.startsWith('down') ? 'down' : 'up') + (hand === 'Left' ? 'right' : 'left'); o.hand = hand; o.pressF = HG.frame + 1;
       }
+      if (spec.stickOff) HG.stick(0, 0);   // G3: the drive's stick let go with the flick (a player stepping back does not keep pushing at the rim)
       o.flickAs = fl; if (fl === 'sweep') HG.sweep(); else if (fl !== 'none') HG.flick(fl);   // 'none': the trap's control (the handler holds)
     }
     else if (spec.pump) { HG.press('X'); await waitSec(0.1); HG.release('X'); o.pumpF = pressF; await waitSec(0.25); HG.press('X'); }   // the pump (the press IS the pick-up), then the step-through squeeze

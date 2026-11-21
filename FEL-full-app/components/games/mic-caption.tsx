@@ -2,7 +2,7 @@
 // THE MIC on screen (2026-09-24): the lower third for what the court's MC (or the sidekick, or a player) just said, and the
 // switch for the voice. The mode sets `mic` / `micWho` through ModeMic; the words show whether or not the voice plays (muted,
 // no audio, a bank that never arrived), and the harness's caption bus reads `mic` out to screen readers.
-import { useState, useSyncExternalStore } from 'react';
+import { useState, useSyncExternalStore, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { Captions, Mic, MicOff, SlidersHorizontal } from 'lucide-react';
 import { SoundKit } from '@/lib/babylon/audio/SoundKit';
 import { VoiceKit } from '@/lib/babylon/audio/mic/VoiceKit';
@@ -53,34 +53,40 @@ export function MicToggle({ className = 'right-3 top-[18%]', flow = false, cc = 
   };
   const chip = 'pointer-events-auto flex items-center gap-1 rounded-full px-2 py-1 uppercase tracking-widest';
   const chipStyle = (alpha: number) => ({ ...hudType('caption'), background: 'rgba(0, 0, 0, 0.5)', color: hudColor('text', alpha) });
+  // hoops-followups (2026-11-19): the chips are drawn 22 px tall, half the 44 px tap rule (measured in play on /play/onevone and
+  // /play/threevthree: MIX 48.8 x 21.8, MC 45.4 x 21.8, CC 44.4 x 21.8). Each BUTTON is now a see-through box at least 44 px tall with
+  // the chip drawn inside it exactly as before; the MIX / MC row's boxes reach up and the CC row's reach down, so nothing on screen
+  // moves and the two rows' boxes do not overlap. In `flow` (the dunk host's stack) a box would reach into its neighbours: as before.
+  const tall = !flow;
+  const chipButton = (row: 'top' | 'bottom', alpha: number, props: ButtonHTMLAttributes<HTMLButtonElement> & { 'data-qa'?: string }, children: ReactNode) => (
+    <button type="button" {...props}
+      className={tall ? `pointer-events-auto flex min-h-[44px] bg-transparent p-0 ${row === 'top' ? '-mt-[22px] items-end' : '-mb-[22px] items-start'}` : chip}
+      style={tall ? undefined : chipStyle(alpha)}>
+      {tall ? <span className={chip} style={chipStyle(alpha)}>{children}</span> : children}
+    </button>
+  );
   return (
     // `flow`: in the flow of a parent column (the dunk host's right-hand stack) instead of a corner of its own
     <div className={`pointer-events-none ${flow ? 'relative' : `absolute ${className}`} z-20 flex flex-col items-end gap-1 ${HUD_FONT_CLASS}`}>
       <div className="flex items-center gap-1">
         {/* a mouse click must not leave focus on the button: Space is SHOOT/JUMP, and a focused button answers its keyup with a click */}
-        <button type="button" onClick={(e) => { setMix((m) => !m); e.currentTarget.blur(); }} onMouseDown={(e) => e.preventDefault()} onPointerDown={(e) => e.stopPropagation()}
-          aria-label={mix ? 'Close the sound mix' : 'Open the sound mix'} aria-expanded={mix} data-qa="mic-mix"
-          className={chip} style={chipStyle(mix ? 0.9 : 0.6)}>
-          <SlidersHorizontal className="h-3 w-3" />
-          MIX
-        </button>
-        <button type="button" onClick={(e) => { flip(); e.currentTarget.blur(); }} onMouseDown={(e) => e.preventDefault()} onPointerDown={(e) => e.stopPropagation()}
-          aria-label={on ? 'Turn the announcer off' : 'Turn the announcer on'} aria-pressed={on}
-          className={chip} style={chipStyle(on ? 0.8 : 0.4)}>
-          {on ? <Mic className="h-3 w-3" /> : <MicOff className="h-3 w-3" />}
-          MC
-        </button>
+        {chipButton('top', mix ? 0.9 : 0.6, {
+          onClick: (e) => { setMix((m) => !m); e.currentTarget.blur(); }, onMouseDown: (e) => e.preventDefault(), onPointerDown: (e) => e.stopPropagation(),
+          'aria-label': mix ? 'Close the sound mix' : 'Open the sound mix', 'aria-expanded': mix, 'data-qa': 'mic-mix',
+        }, <><SlidersHorizontal className="h-3 w-3" />MIX</>)}
+        {chipButton('top', on ? 0.8 : 0.4, {
+          onClick: (e) => { flip(); e.currentTarget.blur(); }, onMouseDown: (e) => e.preventDefault(), onPointerDown: (e) => e.stopPropagation(),
+          'aria-label': on ? 'Turn the announcer off' : 'Turn the announcer on', 'aria-pressed': on,
+        }, <>{on ? <Mic className="h-3 w-3" /> : <MicOff className="h-3 w-3" />}MC</>)}
       </div>
       {cc && (
         <div className="flex items-center gap-1">
           {/* hoops-p08: subtitles for the MC while his voice is on (off by default: the voice carries the line; with the voice off the
               words always show) */}
-          <button type="button" onClick={(e) => { ccSet(!ccOn); e.currentTarget.blur(); }} onMouseDown={(e) => e.preventDefault()} onPointerDown={(e) => e.stopPropagation()}
-            aria-label={ccOn ? 'Turn the announcer subtitles off' : 'Turn the announcer subtitles on'} aria-pressed={ccOn} data-qa="mic-cc"
-            className={chip} style={chipStyle(ccOn ? 0.8 : 0.4)}>
-            <Captions className="h-3 w-3" />
-            CC
-          </button>
+          {chipButton('bottom', ccOn ? 0.8 : 0.4, {
+            onClick: (e) => { ccSet(!ccOn); e.currentTarget.blur(); }, onMouseDown: (e) => e.preventDefault(), onPointerDown: (e) => e.stopPropagation(),
+            'aria-label': ccOn ? 'Turn the announcer subtitles off' : 'Turn the announcer subtitles on', 'aria-pressed': ccOn, 'data-qa': 'mic-cc',
+          }, <><Captions className="h-3 w-3" />CC</>)}
         </div>
       )}
       {mix && (

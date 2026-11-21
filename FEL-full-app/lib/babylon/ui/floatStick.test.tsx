@@ -46,9 +46,13 @@ describe('the floating stick on the deck (touch.floatStick)', () => {
     Object.defineProperty(globalThis, 'navigator', { value: { maxTouchPoints: 5 }, configurable: true, writable: true });
     return renderToStaticMarkup(createElement(TouchOverlay, { bus: { emit: () => {}, gamepadActive: false } as unknown as InputBus, modeId, visible: true }));
   };
-  it('ships ON for 1v1 and 3v3, portrait and sideways; every other mode keeps the fixed stick', () => {
+  // test changed (venice-v1, 2026-11-17): + venice_hub — the Venice hub walks on the courts' stick (coordinator's V1 brief: "the floating
+  // phone stick (#600)"). Still an exact list, so any other mode added fails here.
+  it('ships ON for 1v1, 3v3, the Venice hub and the Coast zone, portrait and sideways; every other mode keeps the fixed stick', () => {
     expect(TOUCH_FLOAT_STICK).toBe(1);
-    expect([...FLOAT_STICK_MODES].sort()).toEqual(['onevone', 'threevthree']);
+    // test changed (coast-islands, 2026-11-18): + coast_zone — the Coast & Islands walks on the hub's stick (the lane brief: "the
+    // floating phone stick. Reuse them"). Still an exact list.
+    expect([...FLOAT_STICK_MODES].sort()).toEqual(['coast_zone', 'onevone', 'threevthree', 'venice_hub']);
     for (const [w, h] of [[390, 844], [844, 390]]) for (const m of FLOAT_STICK_MODES) expect(deck(m, w, h)).toContain('data-float-stick');
     expect(deck('skateboard')).not.toContain('data-float-stick');
   });

@@ -56,6 +56,8 @@ const VIEW: Record<string, { width: number; height: number }> = {
 // behaviour run); the default virtual clock makes every mode play the same game seconds (the content measurement).
 const REALTIME = !!process.env.REALTIME;
 const SEED = process.env.SEED;
+const TRACE = process.env.TRACE_WORST === '1';
+const START_WHEN_BAKED = process.env.START_WHEN_BAKED === '1';
 const INIT = `(() => {
   const realNow = performance.now.bind(performance);
   window.__realNow = realNow;
@@ -122,11 +124,37 @@ const INSTRUMENT = `(() => {
     for (const ps of scene.particleSystems) parts += ps.getActiveCount ? ps.getActiveCount() : 0;
     const act = scene.getActiveMeshes();
     let verts = 0; for (let i = 0; i < act.length; i++) verts += act.data[i].getTotalVertices();
-    R.frames.push({
+    const fr0 = {
       work: te - tb, update: ta - tb, anim: taa - ta, render: te - taa,
       draws: si.drawCallsCounter.current, shadowDraws: sd, rtDraws: od, meshes: act.length, verts, parts, psys: scene.particleSystems.length,
-    });
+    };
+    // hoops-items (TRACE_WORST=1): the shadow cache's bakes so far and why the last one ran, and the body merge's counters, per frame
+    if (${process.env.TRACE_WORST === '1'}) {
+      const sc = scene.metadata && scene.metadata.felShadowCache; const st = sc ? sc.stats() : null;
+      const bm = scene.__felBodyMerge; const ms = bm ? bm.stats() : null;
+      Object.assign(fr0, { bakes: st ? st.bakes : -1, bakeWhy: st ? String(st.lastReason) : '', cacheState: st ? st.state : '', moving: st ? st.moving : -1, statics: st ? st.statics : -1,
+        swapped: ms ? ms.swapped : -1, dissolves: ms ? ms.dissolves : -1, builds: ms ? ms.builds : -1, lastDissolve: ms ? String(ms.lastDissolve).slice(0, 80) : '', g: Math.round((performance.now() - R.t0) / 16.667) });
+    }
+    R.frames.push(fr0);
     ta = 0;
+  });
+  return 'ok';
+})()`;
+
+/** hoops-followups (TRACE_WORST=1): from the READY card on, every frame's draws, shadow-map draws, the cache's bakes and the phase —
+ *  the frames between the START press and the main recorder (it starts ~1 s of real time later) are otherwise never seen. */
+const EARLY = `(() => {
+  if (window.__EARLY) return 'again';
+  const scene = window.__FEL_DEV__.scene; const engine = scene.getEngine(); const si = window.__FEL_DEV__.instrument();
+  const E = window.__EARLY = [];
+  let sd = 0; const hooked = new WeakSet();
+  const hook = (rt) => { if (!rt || hooked.has(rt)) return; hooked.add(rt); let d0 = 0;
+    rt.onBeforeRenderObservable.add(() => { d0 = engine._drawCalls.current; }); rt.onAfterRenderObservable.add(() => { sd += engine._drawCalls.current - d0; }); };
+  engine.onBeginFrameObservable.add(() => { sd = 0; for (const l of scene.lights) { const g = l.getShadowGenerator && l.getShadowGenerator(); if (g && g.getShadowMap) hook(g.getShadowMap()); } });
+  engine.onEndFrameObservable.add(() => {
+    if (E.length > 4000) return;
+    const sc = scene.metadata && scene.metadata.felShadowCache; const st = sc ? sc.stats() : null;
+    E.push({ phase: String(window.__phase || ''), draws: si.drawCallsCounter.current, shadowDraws: sd, bakes: st ? st.bakes : -1, why: st ? String(st.lastReason) : '', state: st ? st.state : '' });
   });
   return 'ok';
 })()`;
@@ -191,12 +219,22 @@ async function run(b: Browser, mode: string, profile: string): Promise<Row> {
     const url = PAGE ? `${PAGE}?mode=${mode}${QUERY ? '&' + QUERY.replace(/^\?/, '') : ''}` : `http://127.0.0.1:${PORT}/dev/mode/${mode}${QUERY}`;
     await p.goto(url, { waitUntil: 'domcontentloaded', timeout: 240000 });
     let state = '';
-    for (let i = 0; i < 180; i++) {
+    let rasterCut = false, cacheAtStart = '';
+    for (let i = 0; i < (START_WHEN_BAKED ? 600 : 180); i++) {
       state = await ev(() => (window as any).__phase ?? (/DEV · \S+ · (\w+)/.exec(document.body.innerText) ?? [])[1] ?? '');
       if (process.env.VERBOSE && i % 10 === 0) console.log(`  [${mode}/${profile}] t+${((Date.now() - t0) / 1000).toFixed(0)}s phase "${state}"`);
       if (state === 'playing') break;
       if (state === 'error') break;
       if (state === 'ready' || (PAGE && state && state !== 'loading' && i % 4 === 3)) {
+        // hoops-followups (START_WHEN_BAKED=1): a player who reads the READY card first — the probe presses START only once the
+        // shadow cache has made its first bake (or has none / is off), at the cut backing so the READY frames come quickly
+        if (START_WHEN_BAKED && state === 'ready') {
+          if (RASTER !== 1 && !rasterCut) { rasterCut = true; await ev(`(() => { const e = window.__FEL_DEV__.scene.getEngine(); e.setHardwareScalingLevel(e.getHardwareScalingLevel() * ${RASTER}); })()`); }
+          const cs = await ev(() => { const sc = (window as any).__FEL_DEV__?.scene?.metadata?.felShadowCache; const st = sc ? sc.stats() : null; return st ? `${st.state}:${st.bakes}` : 'none'; });
+          if (/^(warming|idle):/.test(cs) || cs === 'cached:0') { await p.waitForTimeout(1000); continue; }
+        }
+        if (TRACE && state === 'ready') await ev(EARLY).catch(() => '');
+        if (TRACE && !cacheAtStart) cacheAtStart = await ev(() => { const sc = (window as any).__FEL_DEV__?.scene?.metadata?.felShadowCache; const st = sc ? sc.stats() : null; return st ? `${st.state}:${st.bakes}` : 'none'; }).catch(() => '?');
         const bus = await ev(() => { const b = (window as any).__bus; if (!b) return false; b.emit({ t: 'button', btn: 'START', pressed: true }); b.emit({ t: 'button', btn: 'START', pressed: false }); return true; });
         const s = p.locator('text=/^START$/').first();
         if (!bus && await s.count()) await s.click({ timeout: 5000 }).catch(() => {});
@@ -208,7 +246,7 @@ async function run(b: Browser, mode: string, profile: string): Promise<Row> {
       return { mode, profile, ok: false, note: `never played (${state || 'no phase'}) ${why} ${errs[0] ?? ''} ${cons.slice(0, 2).join(' | ')}` };
     }
     const loadS = (Date.now() - t0) / 1000;
-    if (RASTER !== 1) await ev(`(() => { const e = window.__FEL_DEV__.scene.getEngine(); e.setHardwareScalingLevel(e.getHardwareScalingLevel() * ${RASTER}); })()`);
+    if (RASTER !== 1 && !rasterCut) await ev(`(() => { const e = window.__FEL_DEV__.scene.getEngine(); e.setHardwareScalingLevel(e.getHardwareScalingLevel() * ${RASTER}); })()`);
     await ev(INSTRUMENT);
     const cdp = await Promise.race([ctx.newCDPSession(p), crash]);
     const send = (rate: number) => Promise.race([cdp.send('Emulation.setCPUThrottlingRate', { rate }), crash,
@@ -223,6 +261,9 @@ async function run(b: Browser, mode: string, profile: string): Promise<Row> {
       await p.waitForTimeout(500);
     }
     const snap = await ev(SNAPSHOT) as Record<string, unknown>;
+    // hoops-followups: the frames of play the main recorder missed (from the START press until it started), from the READY recorder
+    const early = TRACE ? (await ev(() => (window as any).__EARLY ?? []) as Array<{ phase: string; draws: number; shadowDraws: number; bakes: number; why: string; state: string }>) : [];
+    const earlyPlay = early.filter((x) => x.phase === 'playing');
     await send(1);
     const fr = (await ev(() => (window as any).__REC.frames)) as Array<Record<string, number>>;
     const govLog = (await ev(() => (window as any).__REC.gov)) as unknown[];
@@ -248,6 +289,16 @@ async function run(b: Browser, mode: string, profile: string): Promise<Row> {
       churnMbPerS: heapRec.churn / 1048576 / Math.max(0.1, (heapRec.now - heapRec.t0) / 1000), calibMs: pct(heapRec.calib, 0.5),
       fillMpx: (Number(snap.backingPx) * (1 + postPasses) + shadowPx) / 1e6,
       ...snap, govLog, errors: errs.length, err0: errs[0],
+      // hoops-items (TRACE_WORST=1): the 6 frames with the most draws, each with what the shadow cache and the body merge did on it
+      ...(process.env.TRACE_WORST === '1' ? { worstFrames: f.map((x, i) => ({ i, ...x, bakedHere: i > 0 && x.bakes > f[i - 1].bakes })).sort((a, b) => b.draws - a.draws).slice(0, 6),
+        // hoops-followups: the cache when START was pressed, and the whole run INCLUDING the first 30 frames (draw counts do not
+        // depend on the throttle switch those frames carry): its worst draws, and every bake in it
+        earlyPlayFrames: earlyPlay.length, earlyPlayDrawsMax: earlyPlay.length ? Math.max(...earlyPlay.map((x) => x.draws)) : null,
+        earlyBakes: early.filter((x, i) => i > 0 && x.bakes > early[i - 1].bakes).map((x) => ({ phase: x.phase, draws: x.draws, shadowDraws: x.shadowDraws, why: x.why })),
+        cacheAtStart, drawsMaxAll: Math.max(...fr.map((x) => x.draws)), shadowDrawsAll: pct(fr.map((x) => x.shadowDraws), 0.5),
+        bakeFramesAll: fr.filter((x, i) => i > 0 && x.bakes > fr[i - 1].bakes).map((x) => ({ g: x.g, draws: x.draws, shadowDraws: x.shadowDraws, why: x.bakeWhy })),
+        firstFrame: fr.length ? { cacheState: fr[0].cacheState, bakes: fr[0].bakes, draws: fr[0].draws } : null,
+        bakesInPlay: f.length ? f[f.length - 1].bakes - f[0].bakes : 0, bakeFrames: f.filter((x, i) => i > 0 && x.bakes > f[i - 1].bakes).map((x) => ({ g: x.g, draws: x.draws, shadowDraws: x.shadowDraws, why: x.bakeWhy, swapped: x.swapped, dissolves: x.dissolves })) } : {}),
     };
   } catch (e) {
     return { mode, profile, ok: false, crashed, note: String((e as Error).message).slice(0, 140) };

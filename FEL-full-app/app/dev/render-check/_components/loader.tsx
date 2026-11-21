@@ -1,12 +1,10 @@
 'use client';
 
 import dynamicImport from 'next/dynamic';
-import { Loader2 } from 'lucide-react';
+import { GameLoading } from '@/components/games/game-loading';
 
 const spinner = () => (
-  <div className="flex h-screen items-center justify-center bg-black">
-    <Loader2 className="h-8 w-8 animate-spin text-[#00E5FF]" />
-  </div>
+  <GameLoading className="h-screen bg-black" label="Loading render check…" />
 );
 
 // Babylon touches window/document at module scope — must never be server-rendered.
