@@ -14,6 +14,8 @@
 import { applyFrame, EMPTY_PARTY, inParty, type PartyState, type PartyMember } from './state';
 import { partySocketUrl } from './config';
 import { loadBlocks, loadStoredParty, saveBlocks, storeParty, type BlockEntry } from './persist';
+import { EMPTY_RUN, afterGame, nextGame, sync, type RunState } from './run';
+import { onlineMode, humansFor } from '@/server/netd/src/partyRules';
 
 export type IceServer = { urls: string[]; username?: string; credential?: string };
 
@@ -71,13 +73,23 @@ export class PartyClient {
   onSignal: ((from: string, data: Record<string, unknown>) => void) | null = null;
   /** Every state change after a frame, for voice.ts to follow who is in voice. */
   onState: ((s: PartyState) => void) | null = null;
+  /** lane/online-play: "winners stay on" — the court's line, kept on this page (the host's is the one that counts). */
+  run: RunState = EMPTY_RUN;
+  /** Owner default (2026-11-17): the run's rule is winners stay on. The host can switch it off for a plain start. */
+  runOn = true;
+  /** The last "Start together" this page was in: its match room, so a match result can be told to the party. */
+  private lastRoom: string | null = null;
 
   constructor(private io: PartyIo = browserIo(), private url: string | null = partySocketUrl()) {
     this.state = { ...EMPTY_PARTY, status: url ? 'idle' : 'unavailable' };
     if (typeof window !== 'undefined') {
       this.blocks = loadBlocks();
       // a reload or a tab switch: the token is fresh at the moment the page goes away
-      if (typeof window.addEventListener === 'function') window.addEventListener('pagehide', () => this.touchStored());
+      if (typeof window.addEventListener === 'function') {
+        window.addEventListener('pagehide', () => this.touchStored());
+        // lane/online-play: a game started together ended — tell the party who won (party2 netd; an older one ignores it)
+        window.addEventListener('fel:net-result', (ev) => this.reportResult((ev as CustomEvent).detail));
+      }
     }
   }
 
@@ -170,7 +182,13 @@ export class PartyClient {
     const ended = f.t === 'p_refused' || f.t === 'p_kicked' || f.t === 'p_denied';
     if (ended) { this.closedByUs = true; storeParty(null); }
     this.set(applyFrame(this.state, f, this.blockedPubs(), this.io.now()));
+    if (f.t === 'p_start' && typeof f.room === 'string') this.lastRoom = f.room;
+    if (f.t === 'p_result') {
+      const r = this.state.lastResult;
+      if (r) this.run = afterGame(sync(this.run, this.state.members.map((m) => m.peer)), r.winners, r.losers);
+    }
     if (f.t === 'p_state') {
+      this.run = sync(this.run, this.state.members.filter((m) => m.connected).map((m) => m.peer));
       this.syncBlocks();
       // re-state what this page is doing only when the server's copy differs (a resume, a new party): sending it on
       // every p_state would loop — p_status makes the server send everyone a fresh p_state
@@ -248,7 +266,25 @@ export class PartyClient {
   admit(peer: string): boolean { return this.send({ t: 'p_admit', peer }); }
   deny(peer: string): boolean { return this.send({ t: 'p_deny', peer }); }
   report(peer: string, reason: string): boolean { return this.send({ t: 'p_report', peer, reason }); }
-  startTogether(mode: string): boolean { return this.send({ t: 'p_start', mode }); }
+  /** "Start together". With winners stay on (and a party2 server), the order is the run's: the court's holders, then who is next
+   *  up. An older server ignores `order` and seats the host first, then join order, as before. */
+  startTogether(mode: string): boolean {
+    const m = onlineMode(mode);
+    const order = this.runOn && m && this.supports('party2') ? nextGame(this.run, humansFor(m, this.state.features)).order : undefined;
+    return this.send(order ? { t: 'p_start', mode, order } : { t: 'p_start', mode });
+  }
+  /** Does the party server speak this (p_welcome `features`)? */
+  supports(feature: string): boolean { return this.state.features.includes(feature); }
+  /** The next game of the run, for the host's card. */
+  nextUp(mode: string): ReturnType<typeof nextGame> | null {
+    const m = onlineMode(mode);
+    return m ? nextGame(this.run, humansFor(m, this.state.features)) : null;
+  }
+  /** A game started together ended (lib/net/play.ts announces it on this page): the winning seats go to netd. */
+  reportResult(d: { room?: unknown; winners?: unknown; score?: unknown } | null | undefined): void {
+    if (!d || typeof d.room !== 'string' || d.room !== this.lastRoom || !this.supports('party2')) return;
+    this.send({ t: 'p_result', room: d.room, winners: Array.isArray(d.winners) ? d.winners : [], score: d.score });
+  }
   cancelStart(): boolean { return this.send({ t: 'p_start_cancel' }); }
   decline(): void {
     const s = this.state.start;

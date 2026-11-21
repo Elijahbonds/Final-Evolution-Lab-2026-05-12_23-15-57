@@ -1184,3 +1184,17 @@ HOOPS-PLAY-AUDIT §1).
   first stick press of every 1v1 / 3v3 game moved you after 383 ms (later presses 33 ms). The camera is untouched: a test runs the real
   CameraDirector and its path is the same frame for frame with the switch on and off. Feel-check: start a 1v1 and push the stick the
   moment the crane shot appears.
+
+## online-play, 2026-11-21 (owner: "Make sure the story and online play is finished"; the owner has not felt these yet)
+
+Group "Online play". All NEW numbers, chosen on this lane (`docs/ONLINE-FINISH-PLAN.md`); none changes an existing tuned
+number. The panel's session gate keeps overrides OFF in online and party runs (`lib/feel-panel/sessionGate.ts`), so in a
+real online game these are what ships; each is the record of the number and the switch back.
+
+| Knob | Default | Restores the old behaviour at | What it does |
+|---|---|---|---|
+| `net.mirrorOn` | 1 | 0 | One shared game (one page runs it, the others draw it). 0: each page runs its own game, the old one-seat wiring. |
+| `net.renderDelayMs` | 0 (adaptive) | — | How far behind the newest world another page draws. 0 = two ticks + 1.2 × jitter, 66–250 ms. |
+| `net.poseHz` | 15 | — | Body pose updates a second (roots and the ball always 30). |
+| `net.possessionSwap` | 1 | — | 1v1: the page whose player has the ball runs the game. 0: the host runs every possession. |
+| `net.karateTogether` | 0 | 1 | "Start together" offers Karate co-op (not shared yet: two fights). |

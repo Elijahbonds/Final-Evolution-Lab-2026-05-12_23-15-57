@@ -511,3 +511,12 @@ leave alone for now") and 2026-11-17 ("Leave the story alone for now"). Online p
 - `assumption:` (lane/story) "finished" means finished **up to the last chapter that exists** (Chapter 1): every dead end, missing
   screen and broken link fixed, an end card that says "to be continued", save and continue, and the doors from the menu and from
   Venice. The chapters after it are the owner's autobiography (ADVENTURE-PLAN Phase E), so they wait on the owner's text.
+
+## owner 2026-11-21: finish the story and online play
+
+The owner, verbatim: **"Make sure the story and online play is finished."** (relayed by the coordinator, 2026-11-21).
+
+- Online play is `lane/online-play` (`docs/ONLINE-FINISH-PLAN.md`: the measured audit, what "finished" needs, the code built,
+  and the owner's netd redeploy as numbered copy-paste steps). The story is its own lane (`wt/story`).
+- The standing rules hold: netd protocol changes are additive; the owner redeploys netd, agents never do; the client keeps
+  working against the netd that is deployed now and says "Parties need a server update" where it must.

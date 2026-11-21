@@ -74,6 +74,10 @@ export interface PartyState {
   start: StartOffer | null;
   /** A report slip the page should carry to /api/party/report (consumed by the dock). */
   reportSlip: { peer: string; slip: string | null } | null;
+  /** lane/online-play: what the party server speaks (p_welcome `features`; none from a party1 build). */
+  features: string[];
+  /** lane/online-play (party2): how the party's last game together ended, as members. */
+  lastResult: { id: string; mode: string; winners: string[]; losers: string[]; score: [number, number] | null; at: number } | null;
 }
 
 export const FEED_MAX = 60;
@@ -82,7 +86,7 @@ const TEXT_MAX = 240;
 
 export const EMPTY_PARTY: PartyState = {
   status: 'idle', notice: null, code: null, you: null, host: null, rights: { text: false, voice: false }, inviteOnly: false,
-  members: [], knocking: [], feed: [], caption: null, start: null, reportSlip: null,
+  members: [], knocking: [], feed: [], caption: null, start: null, reportSlip: null, features: [], lastResult: null,
 };
 
 const str = (v: unknown, max: number): string => (typeof v === 'string' ? v.slice(0, max) : '');
@@ -152,7 +156,8 @@ export function applyFrame(s: PartyState, f: Record<string, unknown>, blockedPub
   switch (f.t) {
     case 'p_welcome': {
       const r = (f.rights ?? {}) as Record<string, unknown>;
-      return { ...s, status: 'connecting', notice: null, code: str(f.code, 6), you: id(f.you), rights: { text: r.text === true, voice: r.voice === true } };
+      const features = Array.isArray(f.features) ? (f.features as unknown[]).filter((x): x is string => typeof x === 'string' && /^[a-z0-9]{1,16}$/.test(x)).slice(0, 16) : [];
+      return { ...s, status: 'connecting', notice: null, code: str(f.code, 6), you: id(f.you), rights: { text: r.text === true, voice: r.voice === true }, features };
     }
     case 'p_wait':
       return { ...s, status: 'waiting', code: str(f.code, 6) || s.code };
@@ -221,6 +226,14 @@ export function applyFrame(s: PartyState, f: Record<string, unknown>, blockedPub
     case 'p_declined': {
       const name = nameOf(s, id(f.peer), f.name);
       return push(s, { key: `declined-${id(f.peer)}-${id(f.id)}`, kind: 'system', from: null, name, text: `${name} is sitting this one out`, self: id(f.peer) === s.you, at: now });
+    }
+    case 'p_result': {
+      const ids = (v: unknown): string[] => (Array.isArray(v) ? (v as unknown[]).map(id).filter(Boolean).slice(0, PARTY_MAX) : []);
+      const sc = Array.isArray(f.score) && f.score.length === 2 && f.score.every((n) => typeof n === 'number') ? [f.score[0] as number, f.score[1] as number] as [number, number] : null;
+      const winners = ids(f.winners), losers = ids(f.losers);
+      const names = (ps: string[]) => ps.map((p) => nameOf(s, p, '')).join(' & ');
+      const line = winners.length ? `${names(winners)} won${sc ? ` ${sc[0]}–${sc[1]}` : ''}` : 'The game is over';
+      return { ...push(s, { key: `result-${id(f.id)}`, kind: 'system', from: null, name: '', text: line, self: false, at: now }), lastResult: { id: id(f.id), mode: id(f.mode), winners, losers, score: sc, at: now } };
     }
     case 'p_report_slip':
       return { ...s, reportSlip: { peer: id(f.peer), slip: typeof f.slip === 'string' ? f.slip.slice(0, 4096) : null } };

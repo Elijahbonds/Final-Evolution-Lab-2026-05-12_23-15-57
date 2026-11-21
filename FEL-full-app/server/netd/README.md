@@ -55,6 +55,19 @@ app shows "Parties need a server update" instead of the party; nothing else in t
 - Voice is peer-to-peer WebRTC: this server only relays the offer/answer/ICE frames between two adults who both turned
   voice on. Audio never passes through netd and is never recorded.
 
+### party2 (lane/online-play, 2026-11-21) — additive
+
+- `p_welcome` and `/healthz` name what the build speaks: `features: ['party1', 'party2']`. A page that gets no `party2` keeps
+  the party1 behaviour and says "Up to 6 need a party server update" / "Winners stay on needs a party server update".
+- **3v3 seats six** (`ONLINE_MODES` `humans: 6`, seats `h…`, `net1`…`net5`; `humansParty1: 2` is what the first party build
+  seated). 1v1 and Karate are unchanged.
+- **`p_start` may name an `order`** (member ids): those are seated first, in that order; anyone left out follows in join order.
+  Without it, the seats are exactly the party1 rule (the host first, then join order). Used by "winners stay on".
+- **`p_result {room, winners: [seat ids], score}`** from a page that played: netd turns the seats into members and tells the
+  party `p_result {id, mode, winners, losers, score}`. Once per game; nothing is stored.
+- Match rooms (`/?room=&peer=&mode=`) are untouched. The shared game itself (one page runs it, the others draw it) is
+  client-only: this server relays its frames like any other, and so does the build deployed before parties.
+
 ### Test
 
 ```bash
@@ -80,7 +93,7 @@ this README already uses; correct them if yours differ.
    - `--max-instances 1`: parties and rooms live in one instance's memory (above). A second instance would split a party.
    - `--timeout 3600`: Cloud Run ends a WebSocket at the request timeout (default 300 s). The party client reconnects and
      resumes its place within 30 s either way, but an hour means one blip an hour instead of one every five minutes.
-3. **Check it:** `curl -s https://<netd url>/healthz` → `"features":["party1"]`.
+3. **Check it:** `curl -s https://<netd url>/healthz` → `"features":["party1","party2"]`.
 4. **The app:** in the deploy tree's production env file set `PARTY_TICKET_SECRET` (the same value) and
    `NEXT_PUBLIC_NETD_URL=wss://<netd url>` (a build-time variable: it must be there when `next build` runs), plus,
    optionally, `PARTY_TURN_URLS` / `PARTY_TURN_SECRET` for a TURN relay. Then the usual app deploy.
