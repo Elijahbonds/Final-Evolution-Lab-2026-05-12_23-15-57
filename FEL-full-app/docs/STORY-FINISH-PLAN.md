@@ -147,6 +147,13 @@ Not measured: a real phone; the production build (the rig renders the real stage
 player (the save policy is unchanged: everyone's story stays on the device); The Nexus Initiative's own pages (`/story`, which needs
 the database and sign-in).
 
+**No bracket tags on screen** (coordinator 2026-11-21: "Players must never see the literal bracket tags"; the next deploy puts the
+doors live). The data keeps its `[PLACEHOLDER]` and `[DRAFT]` marks for the owner and the tests; every story string on screen goes
+through `lib/babylon/adventure/story/shown.ts`, so the HUD says "Fire Bolt", not "[PLACEHOLDER] Fire Bolt", and the dialogue box's
+PLACEHOLDER chip and the end card's DRAFT chip are hidden. Knob `story.showDraftTags` 0 (default); 1 shows the tags and chips for the
+owner's review (feel panel or a `?playtest=1` run). `shown.test.ts` plays Chapter 1 and renders every line, choice and the end card at 0:
+no tag; at 1 the chips are back.
+
 Every new behaviour is behind a switch whose 0 restores the old one: `story.foeFallBack`, `story.endCard`, `story.startProgress`,
-`story.shutGateLine`, `venue.storyDoor` (feel knobs, `docs/FEEL-PANEL.md`) and `NEXT_PUBLIC_STORY_DOOR` (the Play door). No tuned number
+`story.shutGateLine`, `venue.storyDoor`, `story.showDraftTags` (feel knobs, `docs/FEEL-PANEL.md`) and `NEXT_PUBLIC_STORY_DOOR` (the Play door). No tuned number
 was changed.

@@ -1742,6 +1742,10 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/adventure/story/progress.ts STORY_SHUT_GATE_LINE',
     hint: 'In free roam, standing in a gate with no chapter behind it, the objective line reads This gate is still asleep. 0 = nothing on screen, as before.',
   },  {
+    id: 'story.showDraftTags', label: 'Story: show the PLACEHOLDER and DRAFT tags for review (1) / players see plain words (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Story · flow',
+    source: 'lib/babylon/adventure/story/shown.ts STORY_SHOW_DRAFT_TAGS',
+    hint: 'The data keeps its PLACEHOLDER and DRAFT marks. At 0 players see the words plainly, with no tag or tag chip on the HUD, the dialogue box, the start screen or the end card. 1 = shown, for the owner to review the drafts.',
+  },  {
     id: 'story.startProgress', label: 'Story: the start screen shows where you are and Continue (1) / Start and chapter 1 (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Story · flow',
     source: 'lib/babylon/adventure/story/progress.ts STORY_START_PROGRESS',
     hint: 'The start screen names the chapter and the step you stopped at, and its button says Continue (or Explore the hub once every chapter is played). 0 = Start and the first chapter title, as before.',

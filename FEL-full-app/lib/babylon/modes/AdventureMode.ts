@@ -57,6 +57,7 @@ import { chapterById } from '../adventure/story/data';
 import { flightUnlockedIn } from '../adventure/story/flags';
 import { chapterEnding, SHUT_GATE_LINE, STORY_END_CARD, STORY_SHUT_GATE_LINE, type ChapterEnding } from '../adventure/story/progress';
 import { feel } from '@/lib/feel-panel/feel';
+import { shown, shownDialogue, shownEnding, shownOrNull } from '../adventure/story/shown';
 import { buildStoryView, type StoryView } from '../adventure/world/story/view';
 import { cancelNatural, speakNatural } from '../audio/voice/speakNatural';
 
@@ -703,8 +704,8 @@ function storySync(ctx: ModeContext, T: StoryState, dt: number): void {
       special: Math.round(me.stats.special * 100),
       lock: lock ? `${lock.kind === 'boss' ? 'BOSS' : 'TARGET'}${me.lock?.part ? ` · ${me.lock.part.toUpperCase()}` : ''} ${Math.round(lock.stats.hp.cur)}` : null,
       fusion: Math.round(me.fusion.meter * 100), fused: me.fusion.active ? Math.ceil(me.fusion.remainingSec) : 0, tier: me.fusion.tier,
-      slot: slot + 1, spell: spell ? spell.name : null, partner: h.partner?.command() ?? null, state: me.state,
-      objective: storyObjective(s), flight, fusionOpen: s.save.story.flags.fusionUnlocked === true,
+      slot: slot + 1, spell: spell ? shown(spell.name) : null, partner: shownOrNull(h.partner?.command() ?? null), state: me.state,
+      objective: shownOrNull(storyObjective(s)), flight, fusionOpen: s.save.story.flags.fusionUnlocked === true,
     };
     const key = JSON.stringify(hud);
     if (key !== T.lastHud) { T.lastHud = key; ctx.setHud(hud); }
@@ -715,9 +716,9 @@ function storySync(ctx: ModeContext, T: StoryState, dt: number): void {
     const v = s.runner.view();
     storyUi.publish({
       live: true,
-      dialogue: s.paused && v.active ? { speaker: v.speaker, text: v.text, shown: v.shown, placeholder: v.placeholder, choices: v.choices, choiceIndex: v.choiceIndex, hold01: v.hold01 } : null,
-      objective: storyObjective(s), chapterTitle: T.chapterTitle, placeholderChapter: T.placeholder, mirror: T.mirror, storyMode: s.storyMode,
-      ending: T.ending,
+      dialogue: s.paused && v.active ? shownDialogue({ speaker: v.speaker, text: v.text, shown: v.shown, placeholder: v.placeholder, choices: v.choices, choiceIndex: v.choiceIndex, hold01: v.hold01 }) : null,
+      objective: shownOrNull(storyObjective(s)), chapterTitle: shownOrNull(T.chapterTitle), placeholderChapter: T.placeholder, mirror: T.mirror, storyMode: s.storyMode,
+      ending: T.ending ? shownEnding(T.ending) : null,
     });
   }
 

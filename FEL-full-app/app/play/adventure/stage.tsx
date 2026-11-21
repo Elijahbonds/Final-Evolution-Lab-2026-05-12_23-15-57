@@ -27,6 +27,7 @@ import { STORY_INDEX } from '@/lib/babylon/adventure/story/data';
 import { storyExitFor } from '@/lib/adventure/venice/storyDoor';
 import { progressLine, startProgressOn, storyProgress, type StoryProgress } from '@/lib/babylon/adventure/story/progress';
 import { StoryEndCard } from '@/components/adventure/StoryEndCard';
+import { shown } from '@/lib/babylon/adventure/story/shown';
 import { DialogueBox } from '@/components/adventure/DialogueBox';
 import { PartnerPicker } from '@/components/adventure/PartnerPicker';
 import { RebindPanel } from '@/components/adventure/RebindPanel';
@@ -117,7 +118,7 @@ export function AdventureStoryStage({ signedIn }: { signedIn: boolean }) {
   const start = () => busRef.current?.emit({ t: 'button', btn: 'START', pressed: true });
   const playing = phase === 'playing' || phase === 'countdown';
   const chapter = STORY_INDEX.chapters[0];
-  const startTitle = progress ? progressLine(progress) : chapter?.title ?? '';
+  const startTitle = shown(progress ? progressLine(progress) : chapter?.title ?? '');
   const startWord = progress ? progress.button : 'START';
   const back = (
     <a href={exit.href} data-testid="adventure-exit" className="rounded border border-white/20 px-4 py-2 text-[12px] font-bold tracking-wide text-white/80">
@@ -142,7 +143,7 @@ export function AdventureStoryStage({ signedIn }: { signedIn: boolean }) {
       {gate === 'ready' && (phase === 'ready' || phase === 'loading') && (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-black/70 p-4">
           <p className="text-[12px] tracking-[0.3em] text-white/50" data-testid="adventure-start-title">THE ADVENTURE · {startTitle}</p>
-          {progress?.chapterTitle && <p className="text-[12px] font-bold text-white/80" data-testid="adventure-start-chapter">{progress.chapterTitle}</p>}
+          {progress?.chapterTitle && <p className="text-[12px] font-bold text-white/80" data-testid="adventure-start-chapter">{shown(progress.chapterTitle)}</p>}
           <Controls />
           <div className="flex items-center gap-3">
             {back}
