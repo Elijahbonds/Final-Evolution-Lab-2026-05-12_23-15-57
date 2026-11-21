@@ -604,6 +604,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'A/B: 1 puts today\'s strip rolls back exactly (0.22 a reach, 0.6 on the bump, 0.18 a bump strip).',
   },
   {
+    id: 'hoops.myStripHandOn', label: 'My poke: also needs a hand on the ball (1) / the read alone (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · defense',
+    source: 'lib/babylon/hoops/steals.ts MY_STRIP_HAND_ON',
+    hint: 'On: my steal on a 1v1 or 3v3 handler lands only when my hand can get to his ball by the AI strip rule below (reach, his body shielding a ball in his far hand, the ball off the palm), on top of the read of when the ball is exposed; and a bump opens my strip window only when he ran into me, as the AI bump strip opens only when I run into him. Off: the read alone and any contact opening the window, as before.',
+  },
+  {
     id: 'hoops.stripReachM', label: 'AI strip: hand reaches the ball within', def: 1.2, min: 0.5, max: 1.5, step: 0.01, unit: 'm', group: 'Hoops · defense',
     source: 'lib/babylon/hoops/steals.ts STRIP_REACH_M',
     hint: 'Planar, the reacher to the ball, when his reach resolves.',
@@ -1656,6 +1661,16 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'hoops.guardHandRestGapSec', label: 'Outside hand at rest: at most one cross per', def: 1.5, min: 0, max: 4, step: 0.1, unit: 's', group: 'Hoops · flow and pace',
     source: 'lib/babylon/modes/hoopsFlow.ts GUARD_HAND_REST_GAP_SEC',
     hint: 'Standing guarded, the automatic outside hand crosses the ball no more than once in this long (it crossed about once a second). On the move it is the rule as before. 0 = as before.',
+  },
+  {   // ── hoops-play (owner 2026-11-21: gameplay could still be improved greatly; docs/HOOPS-PLAY-AUDIT.md) ──
+    id: 'hoops.rivalChaseBoardOn', label: '1v1 rival: goes and gets a loose board (1) / holds his seal (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · flow and pace',
+    source: 'lib/babylon/hoops/boardChase.ts RIVAL_CHASE_BOARD_ON',
+    hint: 'On: while a 1v1 rebound is loose the rival runs to the ball, as every 3v3 body already does. Off: he holds his box-out seal on your miss and crashes at a walk on his own, as before (a quarter of boards sat loose until the 4 s stall teleported both of you).',
+  },
+  {
+    id: 'hoops.introPressPlaysOn', label: 'Opening intro: the press that skips it starts play at once (1) / after the camera hand-over (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · flow and pace',
+    source: 'lib/babylon/court/mount/hoopsBroadcast.ts INTRO_PRESS_PLAYS_ON',
+    hint: 'On: in 1v1 and 3v3 the first press that skips the broadcast intro moves you on the next frame while the camera eases back exactly as before. Off: the game waited for the whole 0.35 s camera hand-over, so the first stick press of every game moved you after 383 ms (later presses 33 ms).',
   },  // ── hoops-p08 (clean screen and phone budget, docs/HOOPS-AAA-GAP-SHOW.md) ──
   {
     id: 'hud.mcSubsWithVoice', label: 'MC subtitles while his voice plays: on (1) / off (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · screen',
