@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
-import { Play, Sailboat, Users } from 'lucide-react';
+import { BookOpen, Play, Sailboat, Users } from 'lucide-react';
 import { runMode, InputBus, type ModePhase } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
@@ -20,6 +20,7 @@ import { FirstVisitHint, MiniMap, useCardKeys, useFirstVisitHint } from './wayfi
 import { coastEntryHref } from '@/lib/adventure/coast/door';
 import { PIER_SPOT_ID, VENICE_COAST_DOOR } from '@/lib/adventure/venice/coastDoor';
 import { feel } from '@/lib/feel-panel/feel';
+import { STORY_SPOT_ID, VENICE_STORY_DOOR, storyEntryHref } from '@/lib/adventure/venice/storyDoor';
 
 const MODE_KEY = 'venice_hub';
 const AGENT_MARK = 'fel-venice-agent';
@@ -41,6 +42,9 @@ export function VeniceStage({ signedIn }: { signedIn: boolean }) {
   // the boat to the coast (venue.coastDoor), read once on the client like the wayfinding
   const [boatOn, setBoatOn] = useState(false);
   useEffect(() => { setBoatOn(feel('venue.coastDoor', VENICE_COAST_DOOR) >= 0.5); }, []);
+  // lane/story: the story gate (venue.storyDoor), read once on the client like the boat
+  const [storyOn, setStoryOn] = useState(false);
+  useEffect(() => { setStoryOn(feel('venue.storyDoor', VENICE_STORY_DOOR) >= 0.5); }, []);
   // a probe's run (?agent=1): the hub's walk seam (window.__VENICE__). lib/agentRunHooks honours it on a loopback host only.
   // The mark lasts the tab (sessionStorage), so a probe that goes hub → game → hub by the app's own links finds the seam again
   // (a game's session start resets the hook flag, and the way back carries no ?agent=1). Still loopback-only.
@@ -81,7 +85,9 @@ export function VeniceStage({ signedIn }: { signedIn: boolean }) {
   const spot = ui.spot;
   // the boat to the coast (venue.coastDoor): the pier end's card takes the boat instead of opening a game
   const boat = spot?.id === PIER_SPOT_ID;
-  const choices = spot && !boat ? launchChoices(spot, MODE_INFO) : [];
+  // lane/story: the story gate's card opens the Adventure's story (venue.storyDoor)
+  const gate = spot?.id === STORY_SPOT_ID;
+  const choices = spot && !boat && !gate ? launchChoices(spot, MODE_INFO) : [];
   const partyMode = spot ? PARTY_MODE_FOR_SPOT[spot.id] : undefined;
   const crowd = party.members.filter((m) => m.connected).length;
   const canPartyStart = !!partyMode && isHost(party) && crowd >= 2;
@@ -102,6 +108,11 @@ export function VeniceStage({ signedIn }: { signedIn: boolean }) {
     try { window.history.replaceState(window.history.state, '', hubHrefFor(PIER_SPOT_ID)); } catch { /* history is a convenience */ }
     router.push(coastEntryHref(PIER_SPOT_ID));
   };
+  const enterStory = () => {
+    // the browser's Back from the story lands at the gate too (the hub reads ?spot=), as the boat does
+    try { window.history.replaceState(window.history.state, '', hubHrefFor(STORY_SPOT_ID)); } catch { /* history is a convenience */ }
+    router.push(storyEntryHref());
+  };
   const playParty = () => {
     if (!spot || !partyMode) return;
     writeReturn(spot, Date.now());
@@ -111,7 +122,7 @@ export function VeniceStage({ signedIn }: { signedIn: boolean }) {
     c.setActivity(veniceActivity(spot.id));
     c.startTogether(partyMode);
   };
-  useCardKeys(wayfinding ? busRef.current : null, wayfinding && cardUp, () => (boat ? takeBoat() : play()), canPartyStart ? playParty : null);
+  useCardKeys(wayfinding ? busRef.current : null, wayfinding && cardUp, () => (boat ? takeBoat() : gate ? enterStory() : play()), canPartyStart ? playParty : null);
 
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden bg-black text-white">
@@ -119,7 +130,7 @@ export function VeniceStage({ signedIn }: { signedIn: boolean }) {
       {/* the way back is the loader's (loader.tsx): in the server's HTML from the first paint, not after this chunk loads */}
       {err && <p role="alert" className="absolute inset-x-4 top-[4.25rem] rounded-lg bg-black/80 p-3 text-base">The courts did not load. {err}</p>}
       {phase === 'loading' && !err && <p className="absolute inset-x-0 top-1/2 text-center text-base text-white/80">Heading to the courts…</p>}
-      {wayfinding && phase === 'playing' && <MiniMap active={spot?.id ?? null} boat={boatOn} />}
+      {wayfinding && phase === 'playing' && <MiniMap active={spot?.id ?? null} boat={boatOn} story={storyOn} />}
       {hint && !cardUp && <FirstVisitHint onDismiss={dismissHint} touch={touch} />}
       {cardUp && (
         <div data-testid="venice-walkup" className={`absolute inset-x-4 ${wayfinding ? 'top-[9.25rem]' : 'top-[4.25rem]'} mx-auto max-w-sm rounded-2xl border border-white/15 bg-black/75 p-3 backdrop-blur`}>
@@ -129,6 +140,13 @@ export function VeniceStage({ signedIn }: { signedIn: boolean }) {
               <button type="button" data-testid="venice-boat" onClick={takeBoat}
                 className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-[#facc15] px-4 text-base font-bold text-black">
                 <Sailboat aria-hidden className="h-4 w-4" /> Take the boat to the coast
+                {wayfinding && !touch && <span className="ml-1 rounded border border-black/30 px-1 text-xs font-bold" aria-hidden>Enter · X</span>}
+              </button>
+            )}
+            {gate && (
+              <button type="button" data-testid="venice-story" onClick={enterStory}
+                className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-[#facc15] px-4 text-base font-bold text-black">
+                <BookOpen aria-hidden className="h-4 w-4" /> Play the story
                 {wayfinding && !touch && <span className="ml-1 rounded border border-black/30 px-1 text-xs font-bold" aria-hidden>Enter · X</span>}
               </button>
             )}

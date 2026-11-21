@@ -5,6 +5,7 @@
   "title": "[PLACEHOLDER] Chapter 1 — The First Gate",
   "placeholder": true,
   "worldId": "w1",
+  "ending": { "recap": "[DRAFT] You crossed the first world, beat its keeper, and came home fused with your partner. The high ground of the hub is open to you now." },
   "beats": [
     { "id": "b01-home", "kind": "cutscene", "shot": "push", "focus": "player",
       "checkpoint": { "worldId": "hub", "spawnId": "hub.home" },

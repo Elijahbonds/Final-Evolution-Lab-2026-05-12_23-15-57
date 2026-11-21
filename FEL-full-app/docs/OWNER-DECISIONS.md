@@ -490,3 +490,18 @@ Taken by the coordinator on the standing rule (reversible, the recommended optio
 5. **The clothes: pick (3) from the kit-tight contact sheet** (relayed by the coordinator, 2026-11-18): the new garments — the
    one-piece short and the new jerseys — at half the runtime lift (`kit.onePieceShorts` 1, `kit.newJerseys` 1,
    `kit.setLiftScale` 0.5). Judged by eye; the rig's skin count was waived for this change (docs/KIT-FIT-PLAN.md §12.2).
+
+## 2026-11-21 — "Make sure the story and online play is finished" (owner, relayed by the coordinator)
+
+The owner, verbatim: **"Make sure the story and online play is finished."** This lifts the story hold of 2026-11-12 ("Story games:
+leave alone for now") and 2026-11-17 ("Leave the story alone for now"). Online play is its own lane (`wt/online-play`); the story is
+`lane/story` (`docs/STORY-FINISH-PLAN.md`).
+
+- `assumption:` (lane/story) "the story" is **the Adventure's story** — the one story the game has now (`/play/adventure`: the hub,
+  Chapter 1, the partner, the save), carried through the Venice hub — because the owner decided "Adventure REPLACES Story (retire
+  FEL_STORY_MODE_SPEC)" on 2026-10-20 and made Venice the Adventure's hub on 2026-11-17. The old Story mode (The Nexus Initiative,
+  `/story`) is not deleted and still works by its address; only the Play tab's **Story** door moved to the Adventure
+  (`NEXT_PUBLIC_STORY_DOOR=nexus` puts it back). Reversible; the owner can overturn it.
+- `assumption:` (lane/story) "finished" means finished **up to the last chapter that exists** (Chapter 1): every dead end, missing
+  screen and broken link fixed, an end card that says "to be continued", save and continue, and the doors from the menu and from
+  Venice. The chapters after it are the owner's autobiography (ADVENTURE-PLAN Phase E), so they wait on the owner's text.
