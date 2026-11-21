@@ -51,7 +51,14 @@ describe('1v1 wires it', () => {
     expect((s.match(/foeBrain\?\.chaseBall\(null\)/g) ?? []).length).toBeGreaterThanOrEqual(6);
     expect(s).toMatch(/possession = 'mine'; carrying = true;[\s\S]{0,1600}foeBrain\?\.chaseBall\(null\);   \/\/ hoops-play: a new possession ends any board chase/);
   });
-  it('off his own miss the crash takes the chase through his slot', () => {
-    expect(s).toMatch(/const chasing = !!board && loose && !!foeBrain\?\.chasing;\n\s+const foeCrashSt = chasing \? foeMover\.stepIntent\(dt, foeSlot\.intent\) : foeMover\.track\(dt, wish\);/);
+  it('off his own miss the crash takes the chase through his slot (his mover tracks the intent\'s velocity, as stepIntent would)', () => {
+    expect(s).toMatch(/const chasing = !!board && loose && !!foeBrain\?\.chasing;\n\s+if \(chasing\) \{ const w = foeMover\.intentWish\(foeSlot\.intent\); wish\.set\(w\.x, 0, w\.z\); \}.*\n\s+const foeCrashSt = foeMover\.track\(dt, wish\);/);
+  });
+  it('the mover: tracking intentWish is stepIntent, frame for frame', async () => {
+    const { AiMover } = await import('../core/AiMovement');
+    const a = new AiMover(3.6), b = new AiMover(3.6);
+    for (const it of [{ moveX: 0.6, moveY: -0.8, sprint: true }, { moveX: -1, moveY: 0, sprint: false }, { moveX: 0, moveY: 0 }]) {
+      for (let i = 0; i < 20; i++) { const va = a.stepIntent(1 / 60, it).vel, vb = b.track(1 / 60, b.intentWish(it)).vel; expect(Math.hypot(va.x - vb.x, va.z - vb.z)).toBeLessThan(1e-12); }
+    }
   });
 });

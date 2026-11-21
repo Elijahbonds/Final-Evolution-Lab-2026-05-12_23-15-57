@@ -2459,8 +2459,8 @@ export const OneVOneMode: ModeDefinition = (() => {
           // hoops-play (hoops/boardChase, knob hoops.rivalChaseBoardOn): a live board off his own miss — his brain's chase (3v3's rule, set in
           // liveBoard) runs him to the ball through his slot's intent, as on my possession; else the crash as before
           const chasing = !!board && loose && !!foeBrain?.chasing;
-          const foeCrashSt = chasing ? foeMover.stepIntent(dt, foeSlot.intent) : foeMover.track(dt, wish); const foeCrash = foeCrashSt.vel;   // HOOPS MOTION phase 3b: the crash at the hero's accel / decel
-          if (chasing) wish.copyFrom(foeCrash);   // (he faces where he runs)
+          if (chasing) { const w = foeMover.intentWish(foeSlot.intent); wish.set(w.x, 0, w.z); }   // (track toward it = his stepIntent; he faces where he runs)
+          const foeCrashSt = foeMover.track(dt, wish); const foeCrash = foeCrashSt.vel;   // HOOPS MOTION phase 3b: the crash at the hero's accel / decel
           plantFoe(foeCrashSt.planting, dt);   // (3b review) the pin's window runs down here too — a pin from his defence was held through the crash
           driveBody('foe', foe.root, foeCrash, dt);
           foeSpeed01 = Math.min(1, foeCrash.length() / 3.6);

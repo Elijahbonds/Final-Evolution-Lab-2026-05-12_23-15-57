@@ -220,7 +220,19 @@ frame for frame (`court/hoopsIntroPress.test.ts`). **Verdict: ships ON.**
 
 ### 5.4 Phone-tier frame time
 
-RESULTS_PERF
+The phone profile (`hoops-gap/perf.mjs`: 390×844 portrait, DPR 3, 4× CPU throttle, the production bundle, 12 s of play), all three
+switches off against on, one run a side — each run takes about 5.5 minutes of wall on this shared machine, so only one pair per mode fit
+the gate's holds (fewer than the three a side the brief asks; said here plainly):
+
+| | p50 / p95 / p99 frame (ms) | game update a frame (ms) | long frames a minute |
+|---|---|---|---|
+| 1v1 off | 50.2 / 106.8 / 150.9 | 3.4 | 1 805 |
+| 1v1 on | 45.6 / 89.3 / 132.4 | 3.1 | 1 482 |
+PERF3V3
+
+No regression: the "on" run is not slower anywhere (the differences are this machine's noise). None of the three fixes draws anything;
+their per-frame cost is a few comparisons (the chase only while a board is live, the intro check only while the intro is on screen, the
+hand test only on a poke).
 
 ## 6. Recommended next
 
