@@ -4,7 +4,7 @@
 // frame on a wide screen and on a phone held upright; `hoops.oneVOneCam` 0 is the follow camera exactly as it shipped; SELECT / C
 // switches between them with a cut.
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ArcRotateCamera, MeshBuilder, NullEngine, Scene, Vector3 } from '@babylonjs/core';
+import { ArcRotateCamera, Mesh, MeshBuilder, NullEngine, Scene, Vector3 } from '@babylonjs/core';
 
 const knobs = new Map<string, number>();
 vi.mock('../../feel-panel/feel', () => ({ feel: (id: string, def: number) => (knobs.has(id) ? knobs.get(id)! : def) }));
@@ -303,6 +303,62 @@ describe('high sideline in the director (CameraDirector.setHighView)', () => {
     dir.update(at(me), Vector3.Zero(), RIM_V);
     const pose = { eye: { x: cam.position.x, y: cam.position.y, z: cam.position.z }, target: { x: cam.getTarget().x, y: cam.getTarget().y, z: cam.getTarget().z } };
     for (const y of [0, 1.9]) expect(Math.abs(project(pose, FOV, 390 / 844, { x: me.x, y, z: me.z }).x)).toBeLessThan(0.95);   // on screen on the very next frame
+    scene.dispose(); engine.dispose();
+  });
+  it('online 1v1 (lane/online-play #680): on the page that DRAWS the shared game, and through the possession swap both ways, the view stays on screen, never turns and settles', () => {
+    // The call pattern of lib/net/play.ts: the running page's mode calls update(me, vel, rim) and, on its own reset, snapTo; a drawing
+    // page's mode returns early and net.play.frame() calls update(hero, camVel, objective) with the bodies written from the shared
+    // world — 30 Hz snapshots interpolated on the local clock, and a NEW AUTHOR (the swap) empties the buffer, so the bodies land on
+    // the new spots in one frame and no snapTo runs. One director per page; the high view is armed on both (OneVOneMode.load).
+    for (const [w, h] of [[1280, 720], [390, 844]] as const) {
+      const { scene, engine, cam, dir } = rig(w, h);
+      const me = new Vector3(0, 0, 5), foe = new Vector3(0.9, 0, 2);
+      dir.setHighView({ court: COURT, on: () => true, frame: () => ({ play: { x: (me.x + foe.x) / 2, z: (me.z + foe.z) / 2 }, must: mustOf({ x: me.x, y: 1, z: me.z }, { x: foe.x, y: 1, z: foe.z }) }) });
+      dir.snapTo(me, RIM_V);
+      const look0 = cam.getTarget().subtract(cam.position).normalize();
+      const onScreen = () => { const pose = { eye: { x: cam.position.x, y: cam.position.y, z: cam.position.z }, target: { x: cam.getTarget().x, y: cam.getTarget().y, z: cam.getTarget().z } };
+        return [0, 1.9].every((y) => Math.abs(project(pose, FOV, w / h, { x: me.x, y, z: me.z }).x) < 0.95); };
+      let prev = cam.position.clone(), jumps = 0, offAfterSwap = 0;
+      const step = () => { const d = Vector3.Distance(prev, cam.position); if (d > 0.5) jumps++; prev = cam.position.clone();
+        expect(Vector3.Dot(cam.getTarget().subtract(cam.position).normalize(), look0)).toBeCloseTo(1, 6); };
+      // 1. my ball, this page runs it: a drive to the right wing
+      for (let i = 0; i < 60; i++) { me.x += 4 / 60; me.z -= 1 / 60; foe.set(me.x - 0.5, 0, me.z - 1.1); dir.update(me, new Vector3(4, 0, -1), RIM_V); step(); }
+      // 2. a turnover: handOff — no snapTo here; the new author's first world puts me at the check-up (CHECK_ME) and him out top
+      me.set(0, 0, 7.2); foe.set(0, 0, 9.2);
+      for (let i = 0; i < 150; i++) {
+        // his drive, as 30 Hz snapshots interpolated on this page's 60 Hz clock (net.play.frame: camVel from the hero's moves)
+        if (i > 20) { const k = Math.floor((i - 20) / 2) * 2 / 60; foe.set(-1.5 * Math.min(1, k), 0, 9.2 - 7 * Math.min(1, k)); me.set(foe.x + 0.4, 0, foe.z - 1.0); }
+        dir.update(me, Vector3.Zero(), RIM_V); step();
+        if (i >= 1 && !onScreen()) offAfterSwap++;
+      }
+      // 3. the ball back: takeOver on this page — resetPositions (my check, top of the key) and the mode's snapTo, then its own updates
+      me.set(0, 0, 5); foe.set(0.9, 0, 2);
+      dir.snapTo(me, RIM_V); step();
+      for (let i = 0; i < 120; i++) { dir.update(me, Vector3.Zero(), RIM_V); step(); if (!onScreen()) offAfterSwap++; }
+      // settled: still bodies, a still camera
+      const before = cam.position.clone(); dir.update(me, Vector3.Zero(), RIM_V);
+      expect(Vector3.Distance(before, cam.position)).toBeLessThan(0.002);
+      expect(offAfterSwap).toBe(0);
+      expect(jumps).toBeLessThanOrEqual(2);   // at most a cut at each swap (when the new spots are off screen), never a back-and-forth
+      scene.dispose(); engine.dispose();
+    }
+  });
+  it('the eye is never inside a prop, even a sparse one its line of sight passes through untouched (a palm crown of fronds)', () => {
+    const { scene, engine, cam, dir } = rig();
+    const me = new Vector3(0, 0, 5);
+    dir.setHighView({ court: COURT, on: () => true, frame: () => ({ play: { x: 0.5, z: 4 }, must: mustOf({ x: 0, y: 1, z: 5 }, { x: 0.9, y: 1, z: 3 }) }) });
+    dir.snapTo(me, RIM_V);
+    const open = cam.position.clone();
+    // two fronds at opposite corners of a 4 m crown centred on the eye: the crown's box holds the eye, the ray to it touches neither
+    const f1 = MeshBuilder.CreateBox('palm_frond_a', { size: 0.6 }, scene); f1.position = open.add(new Vector3(1.7, 1.7, 1.7));
+    const f2 = MeshBuilder.CreateBox('palm_frond_b', { size: 0.6 }, scene); f2.position = open.add(new Vector3(-1.7, -1.7, -1.7));
+    const crown = Mesh.MergeMeshes([f1, f2], true)!; crown.name = 'palm_crown'; crown.computeWorldMatrix(true); crown.refreshBoundingInfo();
+    const look = cam.getTarget().subtract(cam.position).normalize();
+    for (let i = 0; i < 240; i++) dir.update(me, Vector3.Zero(), RIM_V);
+    const bb = crown.getBoundingInfo().boundingBox, e = cam.position;
+    const inBox = e.x > bb.minimumWorld.x && e.x < bb.maximumWorld.x && e.y > bb.minimumWorld.y && e.y < bb.maximumWorld.y && e.z > bb.minimumWorld.z && e.z < bb.maximumWorld.z;
+    expect(inBox).toBe(false);
+    expect(Vector3.Dot(cam.getTarget().subtract(cam.position).normalize(), look)).toBeCloseTo(1, 6);   // in along its look, never turned
     scene.dispose(); engine.dispose();
   });
 });

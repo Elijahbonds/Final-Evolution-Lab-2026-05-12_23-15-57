@@ -301,6 +301,8 @@ const OCCLUSION_MARGIN = 0.6;
 const VENUE_SHELL = /^(venue_ground|venue_box|wall_|park_floor|piste|water|shore|mc_ring|mc_pit)/i;
 /** lane/hoops-cam: what never blocks the high view's eye (the sky and the floor it looks across, bodies' gear, the ball, birds, rings). */
 const HIGH_NEVER_BLOCKS = /sky|dome|backdrop|horizon|ground|floor|court(?!side)|water|ocean|sea\b|fog|gull|bird|ball|ring|shadow|decal|line|paint|glow|net\b|rim|cloud/i;
+/** lane/hoops-cam: a prop's box the high view's eye stays out of — props only (a box no wider than this, m), with this much room (m). */
+const HIGH_PROP_BOX_M = 25, HIGH_BOX_ROOM_M = 0.3, HIGH_BOX_GATHER_M = 2;
 /** lane/hoops-cam: a hero who moves further than this in one frame was put there (a reset), not run there: the high view treats it as one. */
 const HIGH_TELEPORT_M = 2;
 /** lane/hoops-cam: the high view's clear-view ray runs every this many frames (its answer is kept in between). */
@@ -611,12 +613,34 @@ export class CameraDirector {
     const d = new Vector3(pose.eye.x - t.x, pose.eye.y - t.y, pose.eye.z - t.z);
     const len = d.length();
     if (len < 0.5) return pull;
+    const solid = (m: AbstractMesh): boolean => m.isEnabled() && m.isVisible && m.visibility > 0.25 && !m.skeleton && m.getTotalVertices() > 0
+      && !HIGH_NEVER_BLOCKS.test(m.name);
     const hit = this.scene.pickWithRay(new Ray(t, d.scale(1 / len), len + HIGH_CAM_CLEAR_M), (m: AbstractMesh) =>
-      m.isEnabled() && m.isVisible && m.visibility > 0.25 && !m.skeleton && m.getTotalVertices() > 0 && !HIGH_NEVER_BLOCKS.test(m.name)
-      && m.getBoundingInfo().boundingSphere.radiusWorld > 0.25);
-    if (!hit?.hit || hit.distance === undefined) return pull;
-    const k = Math.max(0, hit.distance - HIGH_CAM_CLEAR_M) / len;   // the share of today's eye distance that is clear
-    return Math.max(HIGH_CAM_PULL_MIN, Math.min(pull, pull * k));
+      solid(m) && m.getBoundingInfo().boundingSphere.radiusWorld > 0.25);
+    let cap = pull;
+    if (hit?.hit && hit.distance !== undefined) cap = Math.max(HIGH_CAM_PULL_MIN, Math.min(pull, pull * (Math.max(0, hit.distance - HIGH_CAM_CLEAR_M) / len)));
+    // …and the props near the view are kept (highInside): the eye is never INSIDE a prop's box — a palm's crown is sparse fronds, so
+    // the ray can pass between them while the eye sits among them (measured on an upright phone at Venice, defending, backed off
+    // ~1.5×). Props only (a box under HIGH_PROP_BOX_M across): a merged row of posts or a venue shell spans the whole court and says
+    // nothing about where the eye is. Gathered round the whole line out to the eye, with room for the truck until the next refresh.
+    const m = HIGH_BOX_GATHER_M;
+    const lo = { x: Math.min(t.x, pose.eye.x) - m, y: Math.min(t.y, pose.eye.y) - m, z: Math.min(t.z, pose.eye.z) - m };
+    const hi = { x: Math.max(t.x, pose.eye.x) + m, y: Math.max(t.y, pose.eye.y) + m, z: Math.max(t.z, pose.eye.z) + m };
+    this.highBoxes.length = 0;
+    for (const mesh of this.scene.meshes) {
+      if (!solid(mesh)) continue;
+      const bb = mesh.getBoundingInfo().boundingBox, a = bb.minimumWorld, b2 = bb.maximumWorld;
+      if (b2.x - a.x > HIGH_PROP_BOX_M || b2.z - a.z > HIGH_PROP_BOX_M || b2.y - a.y > HIGH_PROP_BOX_M) continue;
+      if (b2.x < lo.x || a.x > hi.x || b2.y < lo.y || a.y > hi.y || b2.z < lo.z || a.z > hi.z) continue;
+      this.highBoxes.push({ a: a.clone(), b: b2.clone() });
+    }
+    return cap;
+  }
+  /** lane/hoops-cam: the props near the high view (highClear keeps them), and whether an eye is inside one, with HIGH_BOX_ROOM_M of room. */
+  private highBoxes: Array<{ a: Vector3; b: Vector3 }> = [];
+  private highInside(e: P3): boolean {
+    const r = HIGH_BOX_ROOM_M;
+    return this.highBoxes.some(({ a, b }) => e.x > a.x - r && e.x < b.x + r && e.y > a.y - r && e.y < b.y + r && e.z > a.z - r && e.z < b.z + r);
   }
   /** The high view's frame: where the eye and the look target are this frame (`snap` = land on the want, no truck). */
   private updateHigh(snap: boolean | 'reset'): void {
@@ -648,11 +672,12 @@ export class CameraDirector {
     // a back-away the scenery will not allow: fit again inside it (it lets the rim go before it lets a player go)
     if (want.pull > this.highClearCap + 1e-6) want = highWant(h.court, { ...p, pullMax: Math.max(1, this.highClearCap) }, fr.play, fr.must, this.baseFov, aspect);
     want.pull = Math.min(want.pull, this.highClearCap);
+    while (want.pull > HIGH_CAM_PULL_MIN && this.highInside(highPose(h.court, p, want).eye)) want.pull = Math.max(HIGH_CAM_PULL_MIN, want.pull - 0.05);   // in along the look, out of a prop
     // a reset (snapTo) glides when the new spots are still on screen from here, and cuts when they are not; in play, the truck
     // catches up faster while a point is off its spot
     const fitsNow = !!this.highS && highFits(h.court, p, this.highS, fr.must, this.baseFov, aspect);
     if (snap === 'reset' && fitsNow) snap = false;
-    const behind = !!this.highS && this.highS.pull > this.highClearCap + 1e-3;   // the view is still backing in from behind scenery
+    const behind = !!this.highS && (this.highS.pull > this.highClearCap + 1e-3 || this.highInside(highPose(h.court, p, this.highS).eye));   // still backing in from scenery
     this.highS = snap || !this.highS ? { ...want, vx: 0, vz: 0, vp: 0 } : highStep(this.highS, want, dt, p.panSec * (fitsNow && !behind ? 1 : HIGH_CAM_CATCHUP));
     // THE EDGE PUSH: the hero (the first two points: feet, head) is never left past the frame's edge by the soft truck's lag; the
     // truck slides with him from there (as fast as he runs, so it is a slide, not a jump), and its rate keeps the push
