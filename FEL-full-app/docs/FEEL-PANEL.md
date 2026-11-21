@@ -1123,6 +1123,43 @@ Group **Kit · fit**. A look switch: it moves no body, no bone and no timing.
   20 mm a short against 13 a top. 0.006 removes them on the rig pictures, but fails the 10.1a bar by noise-level margins
   (KIT-FIT-PLAN §14), so it ships off for the owner to judge. `lib/babylon/core/fitTight.ts` `LAYER_GAP`.
 
+## hoops-cam, 2026-11-21 (the 1v1 high sideline camera)
+
+Owner, 2026-11-21: "There needs to be improvements to the camera in the 1v1 mode. When it follows it's hard to play. When it's
+stationary like 2k high camera angle it's easier." Group **Hoops · camera**. Every number is NEW (the owner has not felt them);
+all in `lib/babylon/core/HighSidelineCam.ts`.
+
+- `hoops.oneVOneCam` **1 (ships ON, owner's ask)**: the 1v1 play camera is the high sideline view. It stands high, behind the play
+  and swung toward the +x sideline, and it never turns: it only slides (trucks), slowly and critically damped, after the midpoint of
+  the two players, and backs away along its own look when both players and the rim cannot fit across the screen (a phone held
+  upright). So screen-up is always toward the rim and a stick direction keeps its meaning for the whole game. **0 = the follow
+  camera exactly as it shipped** (unit-tested frame for frame). In a game, SELECT on a pad or C on a keyboard switches between the
+  two for that run (it was the follow ↔ fixed debug switch, which did nothing useful in 1v1). `ONEVONE_CAM`.
+- `hoops.highCamHeightM` **6.8 m** — the eye's height. `HIGH_CAM_HEIGHT_M`.
+- `hoops.highCamDistM` **11.2 m** — the eye's ground distance back from its aim point. `HIGH_CAM_DIST_M`.
+- `hoops.highCamSideDeg` **32°** — the swing off the court's long axis toward the sideline (0 behind the play, 90 side on; past 45
+  up on the stick stops being toward the rim). `HIGH_CAM_SIDE_DEG`.
+- `hoops.highCamFocusM` **3.8 m** — the resting aim point, out from the rim on the long axis. `HIGH_CAM_FOCUS_M`.
+- `hoops.highCamPanShare` **0.3** — the share of the play's offset it slides after. `HIGH_CAM_PAN_SHARE`.
+- `hoops.highCamPanSec` **0.55 s** — the slide's time constant (critically damped: no overshoot). `HIGH_CAM_PAN_SEC`.
+- `hoops.highCamMargin` **0.14** — the share of half the screen kept clear at the left and right edges. `HIGH_CAM_MARGIN`.
+- `hoops.highCamPullMax` **1.6×** — the most it backs away to fit. `HIGH_CAM_PULL_MAX`.
+- `hoops.highCamPortraitLift` **0.34** — on a phone held upright, the share of the screen's height at the bottom (the touch buttons) the
+  players' feet are kept above (0.1 on a wide screen, `HIGH_CAM_BAND_WIDE`; blended by the screen's shape). `HIGH_CAM_PORTRAIT_LIFT`.
+
+Not knobs (same file): `HIGH_CAM_PUNCH` 0.25 (the share of a camera punch this view takes), `HIGH_CAM_TARGET_Y` 1.0 m (the aim
+height), `HIGH_CAM_DEPTH_IN_M` / `HIGH_CAM_DEPTH_OUT_M` 1.5 / 4.5 m (how far the slide may go toward and away from the rim),
+`HIGH_CAM_BAND_WIDE` 0.1, and the clear-view guard: `HIGH_CAM_PULL_MIN` 0.45 (the closest the eye comes in along its look when scenery
+stands in the way: a palm's crown, a tree) and `HIGH_CAM_CLEAR_M` 0.8 m (room kept in front of it).
+How it stays on the play without chasing it: a possession reset glides when the new spots are already on screen and cuts when they
+are not (the check-up, deep past the arc); while a player or the rim is off its spot the slide runs at `HIGH_CAM_CATCHUP` 0.4 of its
+time constant; and the EDGE PUSH slides the truck with the hero (as fast as he runs) whenever he reaches `HIGH_CAM_EDGE` 0.92 of the
+half-screen (at most `HIGH_CAM_PUSH_MPS` 9 m/s, so it is a slide, never a jump), so a sprint across an upright phone never leaves the
+frame. The venue's box is one of the fit's own limits (the side slide and the back-away stay inside it, and it may come in along its
+look, down to `HIGH_CAM_PULL_MIN`, when only that fits); the eye stays out of any prop's box (`HIGH_PROP_BOX_M` 25 m across at most,
+`HIGH_BOX_ROOM_M` 0.3 m of room). None of these turns the view.
+3v3, the dunk and 3-Point keep their cameras. **assumption:** the bounds are safe, not tuned.
+
 ## hoops-play, 2026-11-21 (owner: "Gameplay could still be improved greatly"; docs/HOOPS-PLAY-AUDIT.md; the owner has not felt these yet)
 
 Three NEW switches, each **1 = on, 0 = today's game exactly** (tests pin both ends). No existing tuned number moved. Measured on the
