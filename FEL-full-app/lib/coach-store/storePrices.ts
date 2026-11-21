@@ -61,7 +61,7 @@ const DUNKING_PLYOMETRICS_VIDEO_IDS = ['00j3HPZsPmY', '3GtJ-134D9s'] as const; /
 const SIGNATURE_DUNK_COURSE_VIDEO_IDS = [
   'cWYFVg6GsVU', 'xVE7Gegu27w', 'V0yX1H1OtQ8', 'tiHUrigssOA', 'isjAY8Oo58g', 's4U7IsjowuE',
 ] as const; // the six dunk tutorials
-const BLUEPRINT_SERIES_VIDEO_IDS = ['hrlGbS0r-hM', 'dAoLYThf1bc'] as const; // Bonds Bounce BluePrint videos
+const BLUEPRINT_SERIES_VIDEO_IDS = ['hrlGbS0r-hM'] as const; // Bonds Bounce BluePrint videos
 
 /** mpRZl8VNWlo (Final Evolution Vol. 2, a trailer) is deliberately in no program and not in the shared list. */
 export const UNASSIGNED_VIDEO_IDS = ['mpRZl8VNWlo'] as const;

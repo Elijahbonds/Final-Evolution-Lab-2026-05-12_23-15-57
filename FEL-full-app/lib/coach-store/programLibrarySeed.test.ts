@@ -14,12 +14,12 @@ afterEach(() => {
 });
 
 const ALL_VIDEO_IDS = [
-  '00j3HPZsPmY', '3GtJ-134D9s', 'J037GG99GT0', 'V0yX1H1OtQ8', 'cWYFVg6GsVU', 'dAoLYThf1bc', 'hrlGbS0r-hM',
+  '00j3HPZsPmY', '3GtJ-134D9s', 'J037GG99GT0', 'V0yX1H1OtQ8', 'cWYFVg6GsVU', 'hrlGbS0r-hM',
   'isjAY8Oo58g', 'mpRZl8VNWlo', 'pqyxTY85x4U', 'q1HLjLbhS2s', 's4U7IsjowuE', 'tiHUrigssOA', 'xVE7Gegu27w',
 ];
 
 const UNTIMESTAMPED_VIDEO_IDS = [
-  'hrlGbS0r-hM', 'dAoLYThf1bc', 'mpRZl8VNWlo', '00j3HPZsPmY', '3GtJ-134D9s', 'cWYFVg6GsVU', 'xVE7Gegu27w',
+  'hrlGbS0r-hM', 'mpRZl8VNWlo', '00j3HPZsPmY', '3GtJ-134D9s', 'cWYFVg6GsVU', 'xVE7Gegu27w',
   'V0yX1H1OtQ8', 'tiHUrigssOA', 'isjAY8Oo58g', 's4U7IsjowuE',
 ];
 
