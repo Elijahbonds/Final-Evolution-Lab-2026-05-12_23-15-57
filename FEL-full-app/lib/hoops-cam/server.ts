@@ -15,7 +15,7 @@
 // Before prisma/pending/2026-11-03-hoops-cam.sql is applied: GETs answer { available: false } (the panel stays dark), POST
 // and DELETE 503. Nothing 500s.
 import 'server-only';
-import type { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@/lib/generated/prisma';
 import { coachMaySee } from '@/lib/coach/readiness/gate';
 import { profileGates } from '@/lib/profile-v2/gate';
 import { verifiedAdult } from '@/lib/privacy/verifiedAdult';
