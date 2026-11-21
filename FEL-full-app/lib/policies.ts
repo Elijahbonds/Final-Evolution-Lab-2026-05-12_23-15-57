@@ -84,6 +84,15 @@ const WRITE_TO = isMailingAddressSet(REAL_MAILING_ADDRESS) ? `, or write to ${BU
 // nothing reads User.policyVersion back, so a bump re-labels /privacy and /terms and changes what new signups store, and this
 // edit adds a disclosure of what the Service already did (the Studio is held behind NEXUS_STUDIO_ENABLED, off) rather than
 // widening what it collects or who sees it. 2026-10-14b is the text without these two bullets.
+// STUDIO-SAVE (2026-10-17; owner answers Q0–Q9, Q6 "add the §1, §2 and §4 bullets plus a version bump", text shown to the owner
+// before landing): §1 gains a Studio projects bullet, §2 a bullet on how saved projects are used, §4 two sentences on deleting and
+// downloading them. What the bullets say was read from the code, not the brief: a saved project holds the project's name, its
+// venues (settings and placements), scripts, stamps and characters' names, and never a character's look code
+// (lib/nexus-studio/cloudSave.ts prepareUpload / LOOK_CODES_IN_ACCOUNT); saving is for signed-in users 13 and over (cloudSavePolicy,
+// the AI builder's bands; under 13 and an unknown age refused); only the account that saved it can read it (every query is scoped
+// by the session's user); it is never sent to an AI model or shared; it is kept until the person deletes it or the account
+// (ON DELETE CASCADE; no inactivity purge, Q5); the account download includes it (Q7). No re-acceptance, the same reasoning as
+// every bump above. 2026-10-16 is the text without these.
 // OWNER-APPROVALS (2026-10-27; owner, in chat: "You do it. I approve." — Owner Inbox cards C11 "privacy and terms for
 // teens on a coach roster", C28 "refund policy and store terms", and C03's recommended 90-day replay line).
 // Drafted by Claude 2026-10-27 on owner approval; not lawyer-reviewed.
@@ -104,7 +113,11 @@ const WRITE_TO = isMailingAddressSet(REAL_MAILING_ADDRESS) ? `, or write to ${BU
 // re-labels /privacy and /terms and changes what new signups store; nobody is asked to accept again. (Card C11 said
 // the bump "asks every signed-in person to accept again": there is no such prompt in the code, and this change adds none.)
 // 2026-10-16 is the text without these lines.
-export const CURRENT_POLICY_VERSION = '2026-10-27';
+// MERGE (lane/studio-save x finish-release, 2026-11-12): both texts above, together. '2026-10-17' (Studio save alone) never
+// shipped, and '2026-10-27' already labels the release's text without the Studio save bullets (it is live on main, so
+// signups have recorded it). The combined text needs its own label: '2026-10-27b', the later date with a suffix, as
+// '2026-10-14b' was. No wording changed; the bullets are each side's approved text, unedited.
+export const CURRENT_POLICY_VERSION = '2026-10-27b';
 
 export const TERMS_CONTENT = `
 # Terms of Service
@@ -197,6 +210,7 @@ export const PRIVACY_CONTENT = `
 - **Game session data:** mode, score, duration, win/loss.
 - **Coach chat inputs:** messages sent to the AI coach.
 - **Studio AI builder requests:** if you use the AI builder in Studio, the request you type and the venue it applies to (the venue's settings and what is placed where). Nothing else is sent with them: never your account, age, birth year, character or health data.
+- **Studio projects:** if you save a Studio project to your account, we store the project so you can open it on any device you sign in on: its name, its venues (their settings and what is placed where), its scripts and stamps, and the names you give its characters. A character's look is not saved with it; the look stays on the device where you made it. Saving to your account is for signed-in users aged 13 and over.
 - **Training logs:** if you train on a coach’s program or one of FEL’s programs, the sets you log (exercises, reps, weights and effort), the sessions you complete, the goals you set and how far through each program you are. For a 13- to 17-year-old on a coach’s roster, we save these only after a parent or guardian has said yes to coached training.
 - **Form reviews:** if you send a filmed set to your coach for a form review, the rep data worked out on your phone and a skeleton replay (the positions of points on your body, never the video). Your video stays on your phone and is never recorded to a file. We keep the skeleton replay for 90 days, then delete it. The rep numbers and flags stay with your training history.
 - **A parent or guardian’s details:** when a parent or guardian gives consent for a 13- to 17-year-old, we keep the name and email they give with that consent.
@@ -209,6 +223,7 @@ export const PRIVACY_CONTENT = `
 - Coach chat inputs are processed by AI models to generate responses.
 - **Coached training.** Your coach sees the training you log on their programs, and any form review you send them. For a 13- to 17-year-old, that needs a parent or guardian’s yes to coached training first. The parent or guardian can get a training report by email: sessions and sets done, nothing measured about the body. We use their email only for that report and for the consent itself.
 - Studio AI builder requests are sent to an AI model to work out changes to your venue. The builder is available to signed-in users aged 13 and over, and requests are rate-limited.
+- Saved Studio projects are used only to give them back to you. Only you can open them. They are not shared, published, used for ads, or sent to an AI model.
 - **Parties.** When you join a party, the other members see the party name you choose (never your account name or email) and what you are playing. Party messages, quick chat, emotes and voice go live between the members and are never recorded or stored — not by us, and not on your device beyond the open page. Voice is peer-to-peer and only between verified adults (18+); accounts under 18, or whose age we don't know, can use preset quick chat and emotes only, and their parties are invite-only. If you block someone, we remember that on your device. If you report someone, we keep the report — who reported whom, in which party, when and why — but no conversation, because none is kept. We keep a report for 12 months, then delete it.
 
 ## 3. AI-Generated Content
@@ -219,6 +234,8 @@ guidance, not professional advice. See our AI Disclosure.
 ## 4. Data Retention & Deletion
 
 You may export or delete your PRQ data at any time from your Profile settings. Until an in-app delete option exists, you can have your account and personal data deleted by emailing ${BUSINESS_CONTACT_EMAIL} from the email address on your account.
+
+We keep a saved Studio project until you delete it or your account. You can delete one at any time from Studio, and deleting your account deletes all of them. They are included when you download your data.
 
 ## 5. Health-Adjacent Data
 

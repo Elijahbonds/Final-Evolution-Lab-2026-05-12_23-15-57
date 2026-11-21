@@ -604,6 +604,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'A/B: 1 puts today\'s strip rolls back exactly (0.22 a reach, 0.6 on the bump, 0.18 a bump strip).',
   },
   {
+    id: 'hoops.myStripHandOn', label: 'My poke: also needs a hand on the ball (1) / the read alone (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · defense',
+    source: 'lib/babylon/hoops/steals.ts MY_STRIP_HAND_ON',
+    hint: 'On: my steal on a 1v1 or 3v3 handler lands only when my hand can get to his ball by the AI strip rule below (reach, his body shielding a ball in his far hand, the ball off the palm), on top of the read of when the ball is exposed; and a bump opens my strip window only when he ran into me, as the AI bump strip opens only when I run into him. Off: the read alone and any contact opening the window, as before.',
+  },
+  {
     id: 'hoops.stripReachM', label: 'AI strip: hand reaches the ball within', def: 1.2, min: 0.5, max: 1.5, step: 0.01, unit: 'm', group: 'Hoops · defense',
     source: 'lib/babylon/hoops/steals.ts STRIP_REACH_M',
     hint: 'Planar, the reacher to the ball, when his reach resolves.',
@@ -1707,6 +1712,16 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'hoops.guardHandRestGapSec', label: 'Outside hand at rest: at most one cross per', def: 1.5, min: 0, max: 4, step: 0.1, unit: 's', group: 'Hoops · flow and pace',
     source: 'lib/babylon/modes/hoopsFlow.ts GUARD_HAND_REST_GAP_SEC',
     hint: 'Standing guarded, the automatic outside hand crosses the ball no more than once in this long (it crossed about once a second). On the move it is the rule as before. 0 = as before.',
+  },
+  {   // ── hoops-play (owner 2026-11-21: gameplay could still be improved greatly; docs/HOOPS-PLAY-AUDIT.md) ──
+    id: 'hoops.rivalChaseBoardOn', label: '1v1 rival: goes and gets a loose board (1) / holds his seal (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · flow and pace',
+    source: 'lib/babylon/hoops/boardChase.ts RIVAL_CHASE_BOARD_ON',
+    hint: 'On: while a 1v1 rebound is loose the rival runs to the ball, as every 3v3 body already does. Off: he holds his box-out seal on your miss and crashes at a walk on his own, as before (a quarter of boards sat loose until the 4 s stall teleported both of you).',
+  },
+  {
+    id: 'hoops.introPressPlaysOn', label: 'Opening intro: the press that skips it starts play at once (1) / after the camera hand-over (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · flow and pace',
+    source: 'lib/babylon/court/mount/hoopsBroadcast.ts INTRO_PRESS_PLAYS_ON',
+    hint: 'On: in 1v1 and 3v3 the first press that skips the broadcast intro moves you on the next frame while the camera eases back exactly as before. Off: the game waited for the whole 0.35 s camera hand-over, so the first stick press of every game moved you after 383 ms (later presses 33 ms).',
   },  // ── hoops-p08 (clean screen and phone budget, docs/HOOPS-AAA-GAP-SHOW.md) ──
   {
     id: 'hud.mcSubsWithVoice', label: 'MC subtitles while his voice plays: on (1) / off (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · screen',
@@ -1776,6 +1791,30 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'venue.veniceWayfinding', label: 'Venice hub: first-visit hint, mini-map, Enter / X / Y on the card (1) / none (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
     source: 'lib/adventure/venice/hubUi.ts VENICE_WAYFINDING',
     hint: 'A one-time line saying what to do, a small north-up map of the four courts with you on it, and keys for the card (Enter or X plays, Y plays with your party). 0 = V1.',
+  },  {
+    id: 'venue.storyDoor', label: 'Venice hub: the story gate east of the courts (1) / no gate (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/adventure/venice/storyDoor.ts VENICE_STORY_DOOR',
+    hint: 'A stone gate on the sand east of the courts: step into its ring and the card opens the story; the story says Back to Venice and lands you at the gate. 0 = no gate and no card.',
+  },  {
+    id: 'story.endCard', label: 'Story: the end card when a chapter finishes (1) / straight into the hub (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Story · flow',
+    source: 'lib/babylon/adventure/story/progress.ts STORY_END_CARD',
+    hint: 'When a chapter ends, a card says what it gave you and what comes next (or to be continued), with Keep exploring and the way out. 0 = the chapter ends straight into the hub, as before.',
+  },  {
+    id: 'story.foeFallBack', label: 'Story: a foe that falls out of the world goes back to its spawn (1) / falls for ever (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Story · flow',
+    source: 'lib/babylon/adventure/world/story/runtime.ts STORY_FOE_FALL_BACK',
+    hint: 'A camp monster or boss knocked off an edge is put back where it spawned, so the camp can still be cleared. 0 = it falls for ever and the camp never clears, as before.',
+  },  {
+    id: 'story.shutGateLine', label: 'Story: a hub gate that leads nowhere yet says so on the objective line (1) / says nothing (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Story · flow',
+    source: 'lib/babylon/adventure/story/progress.ts STORY_SHUT_GATE_LINE',
+    hint: 'In free roam, standing in a gate with no chapter behind it, the objective line reads This gate is still asleep. 0 = nothing on screen, as before.',
+  },  {
+    id: 'story.showDraftTags', label: 'Story: show the PLACEHOLDER and DRAFT tags for review (1) / players see plain words (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Story · flow',
+    source: 'lib/babylon/adventure/story/shown.ts STORY_SHOW_DRAFT_TAGS',
+    hint: 'The data keeps its PLACEHOLDER and DRAFT marks. At 0 players see the words plainly, with no tag or tag chip on the HUD, the dialogue box, the start screen or the end card. 1 = shown, for the owner to review the drafts.',
+  },  {
+    id: 'story.startProgress', label: 'Story: the start screen shows where you are and Continue (1) / Start and chapter 1 (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Story · flow',
+    source: 'lib/babylon/adventure/story/progress.ts STORY_START_PROGRESS',
+    hint: 'The start screen names the chapter and the step you stopped at, and its button says Continue (or Explore the hub once every chapter is played). 0 = Start and the first chapter title, as before.',
   },  {
     id: 'venue.coastDoor', label: 'Venice hub: the boat to the coast at the landing (1) / no boat (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
     source: 'lib/adventure/venice/coastDoor.ts VENICE_COAST_DOOR',

@@ -19,7 +19,7 @@
 //
 // Takes the database as an argument (the Today pattern: lib/coach/todayServer.ts), so the route test runs the real code
 // over a fake client on a lane whose database is offline on purpose.
-import type { PrismaClient } from '@/public/_prisma/client';
+import type { PrismaClient } from '@/lib/generated/prisma';
 import { isMinorForMirror } from '../mirror/youth';
 import { MIRROR_SCREEN_KIND } from '../mirror/screen';
 import { readStoredScreen, isUngradedStoredScreen, type StoredScreen } from '../mirror/screenStore';

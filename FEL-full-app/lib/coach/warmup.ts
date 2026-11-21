@@ -89,7 +89,7 @@
 //     run minutes short of the length its chip showed (a youth "10 min" ran 6).
 //
 // Pure: no DOM, no fetch, no clock. Runs on the client (Today) and in tests.
-import type { MovementPattern } from '@/public/_prisma/client';
+import type { MovementPattern } from '@/lib/generated/prisma';
 import { WAKE_UP } from '@/lib/drills/drills';
 import type { CoachPrompt, Drill, DrillPhase } from '@/lib/drills/chart';
 import {

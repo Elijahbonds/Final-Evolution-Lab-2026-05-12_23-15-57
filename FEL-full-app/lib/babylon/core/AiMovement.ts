@@ -71,8 +71,13 @@ export class AiMover {
   /** A brain's stick-space intent (moveX / moveY, a unit vector or 0 — BasketballCore steer(); +moveY = −z on court), at the run top
    *  (with `sprint`: the sprint's), times speedScale. */
   stepIntent(dt: number, intent: { moveX: number; moveY: number; sprint?: boolean }): AiMoveState {
+    return this.step(dt, this.intentWish(intent), !!intent.sprint);
+  }
+  /** hoops-play: the planar velocity (m/s) stepIntent steps toward — a brain's intent at the run top (or the sprint's), times speedScale —
+   *  for a caller that tracks it itself (`track(dt, intentWish(i))` is stepIntent for a unit or zero intent). */
+  intentWish(intent: { moveX: number; moveY: number; sprint?: boolean }): { x: number; z: number } {
     const top = (intent.sprint ? this.sprintTop : this.run) * this.speedScale;
-    return this.step(dt, { x: intent.moveX * top, z: -intent.moveY * top }, !!intent.sprint);
+    return { x: intent.moveX * top, z: -intent.moveY * top };
   }
   /** Braking against the wish at speed this frame (the plant). */
   get plantingNow(): boolean { return this.planting; }

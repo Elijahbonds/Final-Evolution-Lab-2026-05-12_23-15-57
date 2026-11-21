@@ -7,7 +7,7 @@
 //
 // Never throws: a failed read is no card, not a 500.
 import 'server-only';
-import type { PrismaClient } from '@/public/_prisma/client';
+import type { PrismaClient } from '@/lib/generated/prisma';
 import { buildStatus, type AthleteStatus } from './dashboard';
 import { loadSharedProfile } from './profileServer';
 import { PLATFORM_PROTOCOLS } from './protocol';

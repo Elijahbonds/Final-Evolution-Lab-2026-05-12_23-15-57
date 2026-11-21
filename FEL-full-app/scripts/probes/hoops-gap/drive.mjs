@@ -38,6 +38,10 @@ const exe = process.env.CHROMIUM_EXE ?? ['/opt/pw-browsers/chromium-1243/chrome-
 const NODRAW = process.env.NODRAW === '1';
 const INIT = `(() => {
   window.__name = window.__name || ((f) => f);
+  // hoops-play: WD_OFF=1 (with NODRAW=1) — the RenderWatchdog's 64×64 luma sample reads a lit frame, so an undrawn canvas is never judged
+  // black (it ran its rescue at ~5 s — lights × 1.5 — and set the phase to 'error' at ~10 s, cutting every NODRAW run there). Nothing else
+  // reads a 64×64 2-D image in the hoops modes. Control: a NODRAW + WD_OFF run plays the same frames as the drawn run of the seed.
+  if (${NODRAW} && ${process.env.WD_OFF === '1'}) { const gid = CanvasRenderingContext2D.prototype.getImageData; CanvasRenderingContext2D.prototype.getImageData = function (x, y, w, h, ...rest) { const d = gid.call(this, x, y, w, h, ...rest); if (w === 64 && h === 64) d.data.fill(128); return d; }; }
   if (${NODRAW}) for (const C of [window.WebGL2RenderingContext, window.WebGLRenderingContext]) { if (!C) continue; for (const k of ['drawElements', 'drawArrays', 'drawElementsInstanced', 'drawArraysInstanced', 'drawRangeElements', 'multiDrawElements', 'multiDrawArrays', 'clear', 'blitFramebuffer', 'generateMipmap']) if (typeof C.prototype[k] === 'function') C.prototype[k] = function () {}; }
   // hoops-p05: A DETERMINISTIC CLOCK. Two runs of one build and seed played different 1v1 sequences (p04b: the first difference was the
   // spawn's groundSnap, 0.031 vs 0.025 m — the idle clip had run a different time by then, because frames rendered during the async load

@@ -37,7 +37,7 @@
  * scripts/workout/revise-all-plans.ts at deploy, dry run first.
  */
 
-import type { Prisma, PrismaClient } from '@/public/_prisma/client';
+import type { Prisma, PrismaClient } from '@/lib/generated/prisma';
 import { isDepthDrop } from './plan-generator';
 import { PLAN_REVISION_YOUTH, isPlyometric, planAudience, planRevisionNote, reviseForYouth, revisePlanForStorage } from './plan-revision';
 

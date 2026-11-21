@@ -11,7 +11,7 @@
 //
 // Kept out of the route file so it can be tested against a fake transaction (vitest does not collect app/).
 
-import type { Prisma } from '@/public/_prisma/client';
+import type { Prisma } from '@/lib/generated/prisma';
 import { createPrqEntry } from '@/lib/prq-entries';
 import { PRQ_CAMERA_SOURCE } from '@/lib/prq';
 import { planFormWrite, type FormSummary, type FormWritePlan } from './formSummary';

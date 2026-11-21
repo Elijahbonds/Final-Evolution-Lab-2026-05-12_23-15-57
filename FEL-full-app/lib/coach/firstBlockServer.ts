@@ -11,7 +11,7 @@
 // coach's own answers in the form — never the health intake. The Mirror screen is read exactly as the prescribe route
 // reads it (newest graded screen, the coach's own catalogue).
 import 'server-only';
-import type { PrismaClient } from '@/public/_prisma/client';
+import type { PrismaClient } from '@/lib/generated/prisma';
 import { MIRROR_SCREEN_KIND } from '@/lib/mirror/screen';
 import { youthGateFor } from '@/lib/mirror/screenCorrectives';
 import { coachDraft, type CatalogueExercise } from './mirrorToProgram';

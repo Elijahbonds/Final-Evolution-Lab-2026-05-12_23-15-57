@@ -12,7 +12,7 @@
 // mayAssign); an athlete sees only sessions from a LIVE coach that reach them (the whole roster, them, or a team of theirs),
 // and only past the teen gate (lib/coach/teenGateServer.ts: coached training, fails closed for every teen today).
 import 'server-only';
-import type { PrismaClient } from '@/public/_prisma/client';
+import type { PrismaClient } from '@/lib/generated/prisma';
 import { calendarFeedIcs, type FeedEvent } from '@/lib/coach-store/ics';
 import type { BusyRange } from '@/lib/coach-store/slots';
 import { readTeenGate } from '../teenGateServer';

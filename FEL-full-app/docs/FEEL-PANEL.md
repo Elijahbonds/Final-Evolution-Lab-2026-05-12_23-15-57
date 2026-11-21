@@ -691,6 +691,12 @@ holds the result in CI. Phone tier only unless said.
 - `venue.veniceWayfinding` 1 (`lib/adventure/venice/hubUi.ts`, shown by `app/play/venice/wayfinding.tsx`, the Venice hub; improvement pass phase 9, NEW): the first-visit hint (once per
   device), the north-up mini-map of the four courts with you on it, and the card's keys (Enter or X plays, Y plays with your party). 0 = V1.
 - `venue.coastDoor` 1 (`lib/adventure/venice/coastDoor.ts`, drawn by `coastDoorView.ts`, the card in `app/play/venice/stage.tsx`; lane/coast-door, NEW): the boat to the Coast and Islands. A jetty and a boat on the sand west of the courts (a stand-in for the pier end until the Pier district is walkable); step into its gold ring and the card's "Take the boat to the coast" opens `/play/coast?from=venice&spot=pier.end`; the coast's way back (`?spot=pier.end`) lands you beside the ring, facing the boat. 0 = no boat, no card, and `?spot=pier.end` lands at the court gate as before. One draw (the landing, merged), the ring an instance of the courts' own.
+- `venue.storyDoor` 1 (`lib/adventure/venice/storyDoor.ts`, drawn by `storyDoorView.ts`, the card in `app/play/venice/stage.tsx`; lane/story, NEW): the story gate. A stone gate on the sand east of the courts, mirroring the boat; step into its gold ring and the card's "Play the story" opens `/play/adventure?from=venice`; the story's "Back to Venice" opens `/play/venice?spot=story.gate` and lands you beside the ring, facing the gate. 0 = no gate, no card, and `?spot=story.gate` lands at the court gate. One draw (the gate, merged), the ring an instance of the courts' own.
+- `story.endCard` 1 (`lib/babylon/adventure/story/progress.ts`, shown by `app/play/adventure/stage.tsx`; lane/story, NEW): when a chapter ends, its end card (the chapter's recap, the XP its beats paid, the level, the spell and the gates it opened, then the next chapter or "to be continued"), with Keep exploring and the way out. Its words are data (`[DRAFT]` until the owner writes them). 0 = the chapter ends straight into the hub's free roam, as before.
+- `story.foeFallBack` 1 (`lib/babylon/adventure/world/story/runtime.ts`; lane/story, NEW, a fix): a live encounter's monster or boss that falls below its world's kill height is put back where it spawned. Before, it fell for ever while still alive, so its camp could never be cleared — measured: Chapter 1 resumed at the wall run (seed 11) knocked a skitter off camp 1's edge to y −10,629 and the chapter could not go on. 0 = as before.
+- `story.shutGateLine` 1 (`lib/babylon/adventure/story/progress.ts`, read by `AdventureMode`; lane/story, NEW): in free roam (no chapter beat waiting), standing in a hub gate with no chapter behind it yet, the HUD's objective line reads "This gate is still asleep". Before, walking into such a gate did nothing and said nothing (a dead end). HUD text, not a banner. 0 = as before.
+- `story.showDraftTags` 0 (`lib/babylon/adventure/story/shown.ts`, read by `AdventureMode` and `app/play/adventure/stage.tsx`; lane/story, NEW, coordinator 2026-11-21: "Players must never see the literal bracket tags"): the story's data keeps its `[PLACEHOLDER]` / `[DRAFT]` marks; at 0 every story string on screen (the HUD's spell and partner, the objective line, the dialogue box, the start screen, the end card) shows its words plainly ("Fire Bolt", not "[PLACEHOLDER] Fire Bolt"), and the dialogue box's PLACEHOLDER chip and the end card's DRAFT chip are hidden. 1 = tags and chips shown, for the owner's review. Before: the chips always showed and the HUD showed the raw spell name.
+- `story.startProgress` 1 (`lib/babylon/adventure/story/progress.ts`, shown by `app/play/adventure/stage.tsx`; lane/story, NEW): the start screen says which chapter and which step you are at, and its button says CONTINUE (START on a fresh story, EXPLORE THE HUB once every chapter is played). 0 = START and the first chapter's title, as before. The resume itself is unchanged (it always resumed at the saved beat).
 - `venue.deferScenery` 1 (`lib/adventure/venice/courtsView.ts`, the Venice hub; venice-v1 improvement pass phase 3, NEW): the courts load in
   their plain base colour and the player first; the painted courts, the palms and the boardwalk row arrive once the player can move.
   0 = everything during the load, as V1.
@@ -1150,3 +1156,30 @@ are not (the check-up, deep past the arc); while a player or the rim is off its 
 time constant; and the EDGE PUSH slides the truck with the hero (as fast as he runs) whenever he reaches `HIGH_CAM_EDGE` 0.92 of the
 half-screen, so a sprint across an upright phone never leaves the frame. None of these turns the view.
 3v3, the dunk and 3-Point keep their cameras. **assumption:** the bounds are safe, not tuned.
+
+## hoops-play, 2026-11-21 (owner: "Gameplay could still be improved greatly"; docs/HOOPS-PLAY-AUDIT.md; the owner has not felt these yet)
+
+Three NEW switches, each **1 = on, 0 = today's game exactly** (tests pin both ends). No existing tuned number moved. Measured on the
+hoops-gap rig (natural games, the scripted player on both ends, PRO, five seeds a side, pooled — the rig is not bit-exact between runs,
+HOOPS-PLAY-AUDIT §1).
+
+- `hoops.myStripHandOn` **1** (group "Hoops · defense"; `hoops/steals.ts` `MY_STRIP_HAND_ON`): **one rule for the strip, both ways.** My
+  poke on a 1v1 / 3v3 handler must also pass the AI's own hand-on-the-ball test (`aiStripLands`: within `hoops.stripReachM` of the ball,
+  his body not between my hand and a ball in his far hand, the ball off the palm), and a body bump opens my 0.4 s strip window only when
+  HE ran into ME (the AI's bump strip already opened only when I ran into him). The exposure read (when the ball is in play) is
+  unchanged. 1v1, steal rule alone (the other two on): steals a rival possession 0.92 → 0.58, steals a poke 0.34 → 0.11, the rival's
+  shots a minute 0.86 → 2.14 (made 0 → 4), the score margin a minute 14 → 6.7. 3v3: steals a rival possession 0.82 → 0.61, steals on
+  the read or the bump 10 → 1, the rivals' shots a minute 0.24 → 0.72 (the kinetic drive-by steal and parry-vault are not covered: 10 of
+  the 11 steals left). **Flag:** reach-in fouls a poke 0.28 → 0.37 (1v1), 0.13 → 0.24 (3v3) — a poke that misses while running into him
+  is whistled, as before; more pokes miss now. Feel-check: 1v1 PRO on defence,
+  reach at his dribble from the side he holds it and from his far side.
+- `hoops.rivalChaseBoardOn` **1** (group "Hoops · flow and pace"; `hoops/boardChase.ts` `RIVAL_CHASE_BOARD_ON`): **the 1v1 rival goes and
+  gets a loose ball** — 3v3's rule (`DefenderBrain.chaseBall`, the chase outranks the seal) on his brain, on your miss and on his. Before:
+  he held his box-out seal while the ball rolled away (or crashed at a walk after his own miss), and the mode's 4 s stall guard teleported
+  both players to the check. 1v1, all three off → on: boards that stalled 5 of 11 → 0 of 8, miss → board median 3.3 → 0.8 s.
+  Feel-check: 1v1, miss long off the rim and watch him run it down.
+- `hoops.introPressPlaysOn` **1** (group "Hoops · flow and pace"; `court/mount/hoopsBroadcast.ts` `INTRO_PRESS_PLAYS_ON`): **the press
+  that skips the opening intro starts play on the next frame.** Before, play waited out the camera's whole 0.35 s hand-over, so the
+  first stick press of every 1v1 / 3v3 game moved you after 383 ms (later presses 33 ms). The camera is untouched: a test runs the real
+  CameraDirector and its path is the same frame for frame with the switch on and off. Feel-check: start a 1v1 and push the stick the
+  moment the crane shot appears.

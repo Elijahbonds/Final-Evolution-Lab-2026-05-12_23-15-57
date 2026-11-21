@@ -13,7 +13,7 @@
  * the claim route must decide "a kit they don't own" by exactly the rule the room's read uses, not a copy of it.
  */
 
-import { Prisma, type PrismaClient } from '@/public/_prisma/client';
+import { Prisma, type PrismaClient } from '@/lib/generated/prisma';
 import { MUSIC_PURCHASES, kitForSku } from '@/lib/babylon/music/purchases';
 import { grandfatherNote, grandfatherSku, type GrandfatherRecord } from '@/lib/babylon/music/kitGrandfather';
 import type { KitId } from '@/lib/babylon/music/SynthKit';

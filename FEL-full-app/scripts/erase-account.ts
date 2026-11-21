@@ -21,7 +21,7 @@
  * work: the OWNER runs it (CLAUDE.md). Nothing in CI or the app calls it.
  */
 import 'dotenv/config';
-import { PrismaClient } from '@/public/_prisma/client';
+import { PrismaClient } from '@/lib/generated/prisma';
 import { erasureSummary, type AccountErasure } from '@/lib/data-rights/rights';
 import { eraseAccountNow, previewAccountErase, txRunner } from '@/lib/data-rights/accountDelete';
 

@@ -17,7 +17,7 @@
  * It reads DATABASE_URL from the environment (dotenv), prints the host it is about to use, and refuses without one.
  */
 import 'dotenv/config';
-import { PrismaClient } from '@/public/_prisma/client';
+import { PrismaClient } from '@/lib/generated/prisma';
 import { planPrivatize, privatizedStats, type PrivatizeRow } from '../../lib/soundtrack/privatize';
 
 async function main() {

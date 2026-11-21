@@ -90,6 +90,10 @@ export const REGISTRY: Record<string, TableRights> = {
     ],
   },
   MirrorSession: { exportedAs: 'mirrorSessions', subjects: [{ col: 'userId', export: true, erase: 'delete', why: OWN }] },
+  // STUDIO-SAVE (#373, owner 2026-10-17 Q5/Q7; classified at its 2026-11-12 release merge): the account download already
+  // carries them as `studioProjects` (lib/account/exportData.ts); kept until the person deletes a project or the account,
+  // and the table's foreign key cascades on the account delete.
+  StudioProjectSave: { exportedAs: 'studioProjects', subjects: [{ col: 'userId', export: true, erase: 'delete', why: 'The Nexus Studio projects the person saved to the account (Privacy §1/§4): kept until they delete one or the account; the account delete removes them all.' }] },
   PlayerProfile: { exportedAs: 'playerProfile', subjects: [{ col: 'userId', export: true, erase: 'delete', why: 'Game stats and the legacy credit mirror; the balance that counts is the Wallet, which stays.' }] },
   // COACH-READINESS (#447): "not yet in the prq-data-rights export/erase". A camera jump number, so it rides the PRQ +
   // movement history export and erase (lib/prq-data-rights.ts), and through them the account ones.

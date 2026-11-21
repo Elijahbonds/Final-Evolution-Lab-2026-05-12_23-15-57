@@ -14,7 +14,7 @@
 // The route that writes checks gates with lib/privacy/scanSaveGate.ts canSaveScanNumbers BEFORE calling saveCheck (row 1l).
 
 import 'server-only';
-import type { PrismaClient } from '@/public/_prisma/client';
+import type { PrismaClient } from '@/lib/generated/prisma';
 import { isPlausibleToday } from '@/lib/health/readiness';
 import { verifiedAdult } from '@/lib/privacy/verifiedAdult';
 import { profileGates } from '@/lib/profile-v2/gate';
