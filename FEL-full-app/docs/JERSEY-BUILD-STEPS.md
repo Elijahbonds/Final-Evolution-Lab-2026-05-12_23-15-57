@@ -94,3 +94,21 @@ or commit it to a branch named `art/jerseys`). Say which garment you started fro
 3. wire the number and name onto the `decal` map.
 
 Nothing is merged until those numbers are green.
+
+## Done headless, 2026-11-18 (lane/kit-mac-jobs): no Mac needed
+
+`scripts/avatar/mpfb/jersey.py` does steps 2–4 for both jerseys and both bodies; `scripts/avatar/kit-fit/build-sets.sh` runs the
+chain (jersey.py → fit-outfit.py `--ease 0.0001 --smooth 0` → `kit-fit/graft.ts`). The result,
+`public/models/kits/sets/fel-kit-<sex>.jerseys.glb`, is carried by the kit bodies behind the knob `kit.newJerseys`
+(`top_basketball` becomes the basketball modes' default top; `top_football` replaces the Meshy pack). Found and changed:
+- **The pose.** MPFB builds its human in an A-pose (hands at x ±0.57 m); the kit body stands in a T-pose (±0.90 m). The garment
+  is baked with MPFB's arms turned to the kit's arm directions, read off the skin. MPFB's own `t-pose.json`, applied as angles,
+  lowered the arms instead.
+- **The hem.** "Move the bottom loop 10 cm down" stretches one row of faces 10 cm. On the polo the open edge is the folded inner
+  hem, inside the shirt. Instead the garment's lowest 30 cm is stretched to 40 cm. The polo's separate hem band is dropped (it
+  opened a gap that showed the short).
+- **Fitted, not puffed out** (owner 2026-11-18): the gap to the kit body's skin is compressed. Basketball sits at 10 mm, football
+  at 14 mm (room for the pads read), and 20 mm over the short's band. A quarter of any extra gap stays as drape; nothing is
+  closer than 5 mm.
+- **The decal map** is made as in step 4; the first UV map is MPFB's, untouched.
+- **Not done:** the polo's cuffs still flare a little at the sleeve ends (its cuff is a folded double layer).

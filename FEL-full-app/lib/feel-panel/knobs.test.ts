@@ -3,6 +3,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { FEEL_KNOBS, FEEL_KNOB_BY_ID, clampKnob, stepDecimals } from './knobs';
+import * as HSFX from '@/lib/babylon/audio/hoopsSfx';   // hoops-items
 import { AI_HAND_RANGE_M, AI_HAND_DWELL_SEC, AI_HAND_GAP_SEC } from '@/lib/babylon/core/AiBallHand';
 import { HAND_CLEAR_M } from '@/lib/babylon/anim/Dribble';
 import { DIST_GREEN_NEAR_M, DIST_GREEN_FAR_M, DIST_GREEN_MAX_NARROW } from '@/lib/babylon/core/ShotWindow';
@@ -13,7 +14,7 @@ import { GUARD_RANGE_M } from '@/lib/babylon/core/GuardHand';
 import { PROTECT_DRIBBLE_ON, REST_BOUNCE_ON, REST_TEMPO_IDLE, REST_TEMPO_PROTECT, CLIP_LOCK_GAIN, CLIP_LOCK_HZ_MAX, CLIP_LOCK_MAX_MPS, PROTECT_GUARD_ON, GUARD_BACK_M, GUARD_OUT_M, GUARD_DROP_M, GUARD_SEC, GUARD_BAR_X_M, GUARD_BAR_Y_M, GUARD_BAR_Z_M } from '@/lib/babylon/anim/RestDribble';
 import { EYES_ON_DEFENDER_ON, READ_RANGE_M, READ_SPEED01, READ_GLANCE_EVERY_SEC, READ_GLANCE_SEC, PROTECT_POSTURE_ON, PROTECT_TURN_DEG, PROTECT_EYES, PROTECT_CHEST_AIM } from '@/lib/babylon/core/HoopsLook';
 import { PROTECT_SINK_M, PROTECT_SINK_SEC } from '@/lib/babylon/anim/ProtectSink';
-import { MOVE_EASE_ON, MOVE_EASE_SEC, MOVE_EASE_RATE_DEG, MOVE_ARM_RATE_DEG } from '@/lib/babylon/anim/MoveEase';
+import { MOVE_EASE_ON, MOVE_EASE_SEC, MOVE_EASE_RATE_DEG, MOVE_ARM_RATE_DEG, MOVE_HAND_EASE_ON, MOVE_HAND_RATE_DEG } from '@/lib/babylon/anim/MoveEase';
 import { JUMPER_HOP_ON, JUMPER_APEX_AFTER_RELEASE_SEC, JUMPER_MIN_LOAD_SEC, JUMPER_HANG_ON, JUMPER_HANG_SCALE } from '@/lib/babylon/core/JumperHop';
 import { FT_SETUP_SEC, FT_ROUTINE_SEC, FT_SET_SEC, FT_RESULT_SEC, FT_DIST_NARROW_01 } from '@/lib/babylon/core/FreeThrows';
 import { BANK_SET_DEG, BANK_GLANCE_MS } from '@/lib/babylon/hoops/shotLooks';
@@ -44,6 +45,9 @@ import { OCCLUDER_FADE_ALPHA, OCCLUDER_FADE_SEC, OCCLUDER_HOLD_SEC } from '@/lib
 import { FOOTBALL_CARRY_RATE_MAX, FOOTBALL_HURDLE_EXIT_FADE_SEC, FOOTBALL_HURDLE_FADE_SEC } from '@/lib/babylon/anim/footballTree';   // gameplay-clean P2 #6
 import { HOOPS_STICK_FRAME_HOLD } from '@/lib/babylon/core/StickFrame';   // lane/move-feel-2
 import { TOUCH_FLOAT_STICK } from '@/lib/babylon/ui/floatStick';
+import { TOUCH_DPAD_TAP_ON } from '@/lib/babylon/ui/dpadTap';
+import { METER_WGSL_ON } from '@/lib/babylon/visual/ShotMeter3D';
+import { SHADOW_BAKE_AT_START } from '@/lib/babylon/scene/ShadowCache';
 import { CAM_LEAD_EASE_SEC, CAM_LEAD_FULL_MPS, HOOPS_CAM_LEAD_EASE } from '@/lib/babylon/core/CameraDirector';   // gameplay-clean P2 #10
 import { PLANT_ENGAGE_SEC, PLANT_RELEASE_SEC, PLANT_REPLANT_EASE_ON, PLANT_SEATED_OFF_ON } from '@/lib/babylon/anim/FootPlanting';   // gameplay-clean P3 / P4 / P5
 import { FADE_HOLD_ENDED_ON } from '@/lib/babylon/anim/CharacterAnimator';   // gameplay-clean P5
@@ -194,6 +198,8 @@ describe('the feel knob catalogue', () => {
       ['hoops.jumperHopOn', JUMPER_HOP_ON], ['hoops.jumperApexAfterReleaseSec', JUMPER_APEX_AFTER_RELEASE_SEC], ['hoops.jumperMinLoadSec', JUMPER_MIN_LOAD_SEC], ['hoops.jumperHangOn', JUMPER_HANG_ON], ['hoops.jumperHangScale', JUMPER_HANG_SCALE],
     ];
     for (const [id, v] of pins) expect(def(id), id).toBe(v);
+    // hoops-items (new: the hands ease too; off by default)
+    expect(def('hoops.moveHandEaseOn')).toBe(MOVE_HAND_EASE_ON); expect(def('hoops.moveHandRateDeg')).toBe(MOVE_HAND_RATE_DEG);
     // the ported numbers (#312: REST_TEMPO 1.2 / 1.45, clip lock gain 3 / 2.6 Hz, READ 3.5 m / 0.42, PROTECT_TURN 50°, eyes 0.9, chestAim 0.8,
     // PROTECT_SINK 0.06; #314: MOVE_EASE 0.2 s / 1000°/s / 1800°/s, JUMPER apex +0.03 s, load 0.08 s, hang 0.1) and every feature ON
     expect(pins.map(([, v]) => v)).toEqual([1, 1, 1.2, 1.45, 3, 2.6, 0.4, 1, 3.5, 0.42, 2.4, 0.55, 1, 0.22, 0.06, 0.06, 0.15, 0.15, 1.06, 0.34, 1, 50, 0.9, 0.8, 0.06, 0.18, 1, 0.2, 1000, 1800, 1, 0.03, 0.08, 1, 0.1]);
@@ -372,6 +378,9 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.gearBlendBand')).toBe(HOOPS_GEAR_BLEND_BAND); expect(HOOPS_GEAR_BLEND_BAND).toBe(0.2);   // lane/move-feel: TUNED 0 → 0.2 (owner 2026-11-17)
     expect(def('hoops.stickSprintFallback')).toBe(HOOPS_STICK_SPRINT_FALLBACK); expect(HOOPS_STICK_SPRINT_FALLBACK).toBe(0);   // lane/move-feel: TUNED 1 → 0 (owner 2026-11-17)
     expect(def('touch.floatStick')).toBe(TOUCH_FLOAT_STICK); expect(TOUCH_FLOAT_STICK).toBe(1);   // lane/move-feel-2 (new, ON: the owner's phone stick; 0 restores the fixed stick)
+    expect(def('perf.meterWgslOn')).toBe(METER_WGSL_ON);   // hoops-items (new: the meter's WGSL twin, WebGPU only)
+    expect(def('perf.shadowBakeAtStart')).toBe(SHADOW_BAKE_AT_START); expect(SHADOW_BAKE_AT_START).toBe(1);   // hoops-followups (new, ON: the first shadow bake at the START press; 0 restores the full warm-up)
+    expect(def('touch.dpadTapOn')).toBe(TOUCH_DPAD_TAP_ON); expect(TOUCH_DPAD_TAP_ON).toBe(1);   // hoops-items (new, ON: 44 px arrows as drawn; 0 restores the 24 px cross)
     expect(def('hoops.stickFrameHold')).toBe(HOOPS_STICK_FRAME_HOLD); expect(HOOPS_STICK_FRAME_HOLD).toBe(1);   // lane/move-feel-2 (new, ON: the owner's straight line; 0 restores the old stick)
     expect(def('hoops.camLeadEase')).toBe(HOOPS_CAM_LEAD_EASE); expect(HOOPS_CAM_LEAD_EASE).toBe(1);   // lane/move-feel: TUNED 0 → 1 (owner 2026-11-17)
     expect(def('hoops.retreatSpeedK')).toBe(HOOPS_RETREAT_SPEED_K);   // TUNED (new), owner 2026-10-24
@@ -412,6 +421,9 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.sampleSfxOn')).toBe(SAMPLE_SFX_ON); expect(def('hoops.dribbleSoundOn')).toBe(DS.DRIBBLE_SOUND_ON);
     expect(def('hoops.dribbleSoundVol')).toBe(DS.DRIBBLE_SOUND_VOL); expect(def('hoops.dribbleSoundAiK')).toBe(DS.DRIBBLE_SOUND_AI_K);
     expect(def('hoops.passCatchSoundOn')).toBe(DS.PASS_CATCH_SOUND_ON); expect(def('hoops.passCatchVol')).toBe(DS.PASS_CATCH_VOL);
+    // hoops-items (the sound leftovers; new, the owner has not heard these)
+    expect(def('hoops.passThrowQuietOn')).toBe(HSFX.PASS_THROW_QUIET_ON); expect(def('hoops.driftSqueakOn')).toBe(HSFX.DRIFT_SQUEAK_ON);
+    expect(def('hoops.glassSoundOn')).toBe(HSFX.GLASS_SOUND_ON);
     // hoops-builder (the ratings' bands; new, the owner has not felt these; rating 50 is today at any value)
     expect(def('hoops.ratingsOn')).toBe(HR.RATINGS_ON); expect(def('hoops.rateSpeedBand')).toBe(HR.RATE_SPEED_BAND);
     expect(def('hoops.rateHandleBand')).toBe(HR.RATE_HANDLE_BAND); expect(def('hoops.rateReadBand')).toBe(HR.RATE_READ_BAND);

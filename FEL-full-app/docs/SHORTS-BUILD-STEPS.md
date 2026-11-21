@@ -95,3 +95,25 @@ We then:
 5. Do the rivals' baggy shorts the same way afterwards. They share the three-piece cut.
 
 Nothing is merged until those numbers are green.
+
+## Done headless, 2026-11-18 (lane/kit-mac-jobs): no Mac needed
+
+The owner asked for this job on the Mac; it was run instead on Linux with Blender as a Python module (`pip install bpy`, 5.0.1:
+the newest the package index has for Python 3.11; the steps name 5.1) and MPFB 2.0.18 from extensions.blender.org, with the
+MakeHuman CC0 packs `pants01` and `shirts01`. Every step above is `scripts/avatar/mpfb/onepiece-shorts.py`, and the whole chain
+for both bodies is `scripts/avatar/kit-fit/build-sets.sh` (onepiece-shorts.py → fit-outfit.py → `kit-fit/graft.ts`). The result
+is `public/models/kits/sets/fel-kit-<sex>.shorts1p.glb`, put on the kit bodies at load behind the knob `kit.onePieceShorts`
+(`lib/babylon/core/kitGarmentSet.ts`): no body file changes. What the run found, and what changed in these steps:
+- **Step 1's premise.** `dress-kit.py` gives MakeHuman's `cortu_jeans_shorts`, which is already one piece. The three-piece short
+  the game wears is the kit file's own (`Kit_shorts_shorts_court` in `fel-kit-<sex>.glb`, from the 2026-10-20 rebake), so the
+  script reads THAT short from the kit file.
+- **The cut is a bisect at x = 0**, and the gusset hangs 2.5 cm under the crotch, found with rays (male 0.831 m, female 0.749 m).
+- **The kit thighs are 1–7 mm apart** from the knee to the crotch. Two cloth walls cannot both sit outside the skin there. So a
+  leg's vertex is fitted and cleared against its own leg only and never crosses the middle line. The exporter runs with
+  `--sided` (each leg keeps its own leg's bones; the centre seams and the gusset take both legs evenly, fading over 3 cm) and with
+  `--ease 0.0001 --smooth 0`. Its 12 mm push could not hold two walls in a 6 mm gap: it moved them across, and every stride tore
+  them (that was "something sinks").
+- **Fitted, not baggy** (owner 2026-11-18): each row is fitted to the body by rays at 8 mm (the band 6, the hem 12), and nothing
+  is closer than 4 mm, tested at every vertex, edge middle and face centre.
+- **fit-outfit.py fixes:** a mesh shared by two objects failed `transform_apply` (the kit's two shorts share one mesh), and the
+  `--mhclo` path read the MPFB body's raw base mesh for its box (1.695 m for both sexes, arms in A-pose).

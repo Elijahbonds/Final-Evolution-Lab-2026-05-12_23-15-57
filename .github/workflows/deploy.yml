@@ -1,0 +1,180 @@
+# deploy — the owner's "Deploy" button: ships `main` to Firebase (project final-evolution-lab), then checks the live site.
+# Owner decision 2026-11-18 ("GitHub deploy button"). Full story and the one-time setup: FEL-full-app/docs/DEPLOY-BUTTON.md.
+#
+# Manual only (workflow_dispatch). Never runs on push or pull_request: a push to main does NOT deploy.
+#
+#   mode=dry-run  builds everything and runs `firebase deploy --dry-run`: nothing on the live site changes.
+#   mode=deploy   the real deploy, then a live check of /api/health, / and /play/venice.
+#
+# The production env file. Firebase ships the tree's .env files with the server function, so a deploy from a tree
+# without the production env ships a site with no database (it happened 2026-09-15; docs/LANES.md §4). This job
+# writes FEL-full-app/.env.production from, in order:
+#   1. the FEL_PROD_ENV secret, verbatim (the owner's production env file, pasted whole), if it is set; else
+#   2. the LIVE server function's own environment, read with gcloud — what is running now is what ships again.
+#      Secret Manager bindings are left to firebase.json; values a dotenv file cannot carry byte-exactly stop the job.
+# Values are masked before anything else runs. THE REPO IS PUBLIC: run logs are public; no value is ever printed.
+#
+# The secrets live in the GitHub Environment `production-deploy`, whose deployment-branch rule admits only `main`:
+# a workflow edited on another branch cannot read them. The job also refuses any other ref itself.
+name: deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'dry-run = build and validate, change nothing. deploy = ship to the live site.'
+        type: choice
+        options: [dry-run, deploy]
+        default: dry-run
+      ref:
+        description: 'Commit to ship (default: the tip of main). Must be on main — use an older main commit to roll back.'
+        type: string
+        default: ''
+
+permissions: {}
+
+# One production deploy at a time; a queued run waits rather than cancelling one mid-upload.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: deploy main to Firebase
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    environment: production-deploy
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: FEL-full-app
+        shell: bash
+    env:
+      MODE: ${{ inputs.mode }}
+      PROJECT: final-evolution-lab
+      REGION: us-central1
+      SITE_URL: https://final-evolution-lab.web.app
+      FIREBASE_TOOLS: firebase-tools@15.34.2
+      FIREBASE_CLI_EXPERIMENTS: webframeworks
+      NEXT_TELEMETRY_DISABLED: '1'
+      CHECKPOINT_DISABLE: '1'
+    steps:
+      # Defence in depth behind the environment's branch rule: stop before any secret is looked at on another ref.
+      - name: only main
+        working-directory: .
+        run: |
+          case "${GITHUB_REF}" in
+            refs/heads/main) ;;
+            *) echo "::error title=deploy::refusing ${GITHUB_REF}: the deploy button runs only from main. Nothing was read or shipped."; exit 1;;
+          esac
+
+      - name: check out main
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: pick the commit (must be on main)
+        id: pick
+        env:
+          WANT: ${{ inputs.ref }}
+        run: |
+          if [ -n "$WANT" ]; then
+            case "$WANT" in *[!0-9a-fA-F]*) echo "::error::ref must be a commit SHA"; exit 1;; esac
+            git merge-base --is-ancestor "$WANT" origin/main || { echo "::error::$WANT is not on main"; exit 1; }
+            git checkout --quiet --detach "$WANT"
+          fi
+          sha="$(git rev-parse HEAD)"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "### Deploy ${MODE}: \`${sha}\`" >> "$GITHUB_STEP_SUMMARY"
+          git log -1 --format='%h %s' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: check the service-account secret
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$SA" ]; then
+            msg="The FIREBASE_SERVICE_ACCOUNT secret is not set in the production-deploy environment, so nothing was built or shipped. The owner's one-time step is in FEL-full-app/docs/DEPLOY-BUTTON.md."
+            echo "::error title=deploy: no service account::${msg}"; echo "$msg" >> "$GITHUB_STEP_SUMMARY"; exit 1
+          fi
+          umask 077
+          printf '%s' "$SA" > "$RUNNER_TEMP/sa.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> "$GITHUB_ENV"
+
+      - name: sign in to Google Cloud (service account)
+        run: |
+          gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS" --quiet >/dev/null 2>&1 \
+            || { echo "::error::the service-account key was rejected"; exit 1; }
+          gcloud config set project "$PROJECT" --quiet >/dev/null 2>&1
+
+      - name: set up node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: FEL-full-app/package-lock.json
+
+      - name: install
+        run: npm ci --no-audit --no-fund
+
+      # The packager snapshots public/ before the build runs, and public/_prisma/client carries the Linux query engine
+      # Cloud Run loads (CLAUDE.md, "The trap that has cost the most deploys"). Ship it exactly as committed.
+      - name: ship the committed Prisma client and lockfiles
+        run: |
+          git checkout -- public/_prisma yarn.lock package-lock.json 2>/dev/null || git checkout -- public/_prisma
+          git diff --exit-code -- public/_prisma
+          test -f public/_prisma/client/schema.prisma
+
+      - name: the production env file
+        env:
+          PROD_ENV: ${{ secrets.FEL_PROD_ENV }}
+        run: |
+          rm -f .env .env.local .env.production .env.production.local
+          umask 077
+          if [ -n "$PROD_ENV" ]; then
+            printf '%s\n' "$PROD_ENV" > .env.production
+            echo "env source: the FEL_PROD_ENV secret" >> "$GITHUB_STEP_SUMMARY"
+          else
+            svc="$(gcloud run services list --region "$REGION" --format='value(metadata.name)' 2>/dev/null | grep -E '^ssr' || true)"
+            if [ "$(printf '%s\n' "$svc" | grep -c .)" -ne 1 ]; then
+              echo "::error::expected exactly one live ssr* server function in $REGION, found: ${svc:-none}. Set the FEL_PROD_ENV secret instead."; exit 1
+            fi
+            gcloud run services describe "$svc" --region "$REGION" --format=json > "$RUNNER_TEMP/svc.json" 2>/dev/null
+            node scripts/deploy/live-env.mjs "$RUNNER_TEMP/svc.json" .env.production
+            rm -f "$RUNNER_TEMP/svc.json"
+            echo "env source: the live function \`$svc\`" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          node scripts/deploy/live-env.mjs --check .env.production
+          { echo; echo "env keys shipped (names only):"; echo '```'; cut -d= -f1 .env.production | grep -E '^[A-Za-z_]' | sort; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: firebase deploy (${{ inputs.mode }})
+        run: |
+          args=(deploy --only hosting --project "$PROJECT" --non-interactive --force)
+          if [ "$MODE" = "dry-run" ]; then args+=(--dry-run); fi
+          npx -y "$FIREBASE_TOOLS" "${args[@]}"
+
+      - name: live check
+        if: inputs.mode == 'deploy'
+        run: |
+          sleep 20
+          fail=0
+          for p in /api/health / /play/venice /try; do
+            code="000"
+            for i in 1 2 3 4 5 6; do
+              code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "$SITE_URL$p" || echo 000)"
+              case "$code" in 200|307|308) break;; esac
+              sleep 10
+            done
+            echo "| \`$p\` | $code |" >> "$GITHUB_STEP_SUMMARY"
+            case "$code" in 200|307|308) ;; *) fail=1;; esac
+          done
+          if [ "$fail" -ne 0 ]; then
+            echo "::error title=deploy: live check failed::The live site did not answer as expected. Roll back: run this workflow again with mode=deploy and ref=<the previous good main commit>."
+            exit 1
+          fi
+          echo "**Live check passed** for \`${{ steps.pick.outputs.sha }}\`." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: clean up credentials
+        if: always()
+        run: rm -f "$RUNNER_TEMP/sa.json" .env.production "$RUNNER_TEMP/svc.json"

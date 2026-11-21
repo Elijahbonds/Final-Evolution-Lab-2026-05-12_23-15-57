@@ -7,6 +7,7 @@ const h = vi.hoisted(() => ({
   column: false,
   messages: [] as { id: string; programId: string; authorId: string; body: string; createdAt: Date; readAt?: Date | null }[],
   executed: [] as unknown[][],
+  selects: [] as unknown[],
 }));
 vi.mock('next-auth', () => ({ getServerSession: async () => h.session }));
 vi.mock('@/lib/auth', () => ({ authOptions: {} }));
@@ -14,10 +15,18 @@ vi.mock('@/lib/db', () => ({
   prisma: {
     coachingProgram: { findUnique: async ({ where }: any) => (where.id === 'p1' ? { id: 'p1', coachId: 'coach', clientId: 'teen' } : null) },
     programMessage: {
-      findMany: async ({ orderBy, take }: any) => {
+      findMany: async ({ orderBy, take, select }: any) => {
+        h.selects.push(select);
         const sorted = [...h.messages].sort((a, b) => +a.createdAt - +b.createdAt);
         if (orderBy.createdAt === 'desc') sorted.reverse();
         return sorted.slice(0, take).map(({ readAt: _r, ...m }) => m);
+      },
+      create: async ({ data, select }: any) => {
+        h.selects.push(select);
+        const m = { id: 'new', programId: data.programId, authorId: data.authorId, body: data.body, createdAt: new Date(Date.UTC(2026, 9, 1, 2, 0)), readAt: null };
+        h.messages.push(m);
+        const { readAt: _r, ...stable } = m;
+        return stable;
       },
     },
     async $queryRawUnsafe(q: string, ...v: unknown[]) {
@@ -32,18 +41,21 @@ vi.mock('@/lib/db', () => ({
 }));
 
 import { GET as threadGET } from '@/app/api/coach/messages/route';
+import { POST as threadPOST } from '@/app/api/coach/messages/route';
 import { POST as readPOST } from '@/app/api/coach/messages/read/route';
 import { GET as unreadGET } from '@/app/api/coach/messages/unread/route';
 import { resetReadMarkerProbe } from './messageReads';
 
 const get = (programId: string) => new NextRequest(`http://x/api/coach/messages?programId=${programId}`);
 const post = (body: unknown) => new NextRequest('http://x/api/coach/messages/read', { method: 'POST', body: JSON.stringify(body) });
+const postThread = (body: unknown) => new NextRequest('http://x/api/coach/messages', { method: 'POST', body: JSON.stringify(body) });
 
 beforeEach(() => {
   resetReadMarkerProbe();
   h.session = { user: { id: 'teen' } };
   h.column = false;
   h.executed = [];
+  h.selects = [];
   h.messages = Array.from({ length: 105 }, (_, i) => ({ id: `m${i}`, programId: 'p1', authorId: i % 2 ? 'teen' : 'coach', body: `msg ${i}`, createdAt: new Date(Date.UTC(2026, 9, 1, 0, i)) }));
 });
 
@@ -63,6 +75,12 @@ describe('GET /api/coach/messages', () => {
     expect(j.messages.some((m: object) => 'unread' in m)).toBe(false);
   });
 
+  it('reads only stable columns until read markers are feature-detected', async () => {
+    await threadGET(get('p1'));
+    expect(h.selects[0]).toEqual({ id: true, programId: true, authorId: true, body: true, createdAt: true });
+    expect(h.selects[0]).not.toHaveProperty('readAt');
+  });
+
   it('with the column: unread flags for the other side\'s unread messages', async () => {
     h.column = true;
     h.messages[104].readAt = null; // m104 by coach
@@ -77,6 +95,17 @@ describe('GET /api/coach/messages', () => {
     expect((await threadGET(get('p1'))).status).toBe(403);
     h.session = null;
     expect((await threadGET(get('p1'))).status).toBe(401);
+  });
+});
+
+describe('POST /api/coach/messages', () => {
+  it('creates with the stable projection so missing readAt SQL cannot 500 the thread', async () => {
+    const res = await threadPOST(postThread({ programId: 'p1', body: 'Ready after school.' }));
+    expect(res.status).toBe(200);
+    const j = await res.json();
+    expect(j.message).toMatchObject({ id: 'new', mine: true, fromCoach: false });
+    expect(j.message).not.toHaveProperty('readAt');
+    expect(h.selects[0]).toEqual({ id: true, programId: true, authorId: true, body: true, createdAt: true });
   });
 });
 

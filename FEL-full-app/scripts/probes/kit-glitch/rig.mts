@@ -59,7 +59,7 @@ export interface Cell { subject: string; tier: string; pose: string; clip: strin
 async function runSubject(page: Page, base: string, s: Subject, tier: string, poses: typeof POSES, cams: typeof CAMS, out: Cell[], shots: boolean): Promise<void> {
   await page.goto(`${base}/`, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => !!(window as unknown as { __KG?: { ready: boolean } }).__KG?.ready, undefined, { timeout: 60_000 });
-  await kg(page, 'init', { tier, modeId: s.modeId, closet: s.closet, w: W, h: H, knobs: process.env.KNOBS ? JSON.parse(process.env.KNOBS) : undefined, steady: process.env.STEADY !== '0' });
+  await kg(page, 'init', { tier, modeId: s.modeId, closet: s.closet, w: W, h: H, knobs: process.env.KNOBS ? JSON.parse(process.env.KNOBS) : undefined, steady: process.env.STEADY !== '0', jersey: process.env.JERSEY ? { number: Number(process.env.JERSEY.split(':')[0]), name: process.env.JERSEY.split(':')[1] ?? '' } : undefined, hide: process.env.HIDE || undefined });   // kit-numbers: JERSEY=<number>:<name>
   const t0 = Date.now();
   await kg(page, 'spawn', s.spawn);
   // the mask and the shoe's late fold land after the first rendered frames
@@ -95,6 +95,11 @@ async function matrix(): Promise<void> {
   const poseIds = (process.env.POSES ?? '').split(',').filter(Boolean);
   const camIds = (process.env.CAMS ?? '').split(',').filter(Boolean);
   const shots = process.env.SHOTS === '1';
+  // lane/kit-mac-jobs: <OUT>/override.json ({ desktop|mobile: subjects, poses, cams, skip: NAMEs }) narrows the later matrices of a
+  // hold that is already running (a loaded machine ran 6 min a subject); absent, nothing changes
+  const ov = existsSync(join(OUT, 'override.json')) ? JSON.parse(readFileSync(join(OUT, 'override.json'), 'utf8')) as Record<string, string[]> : null;
+  if (ov && (ov.skip ?? []).includes(process.env.NAME ?? '')) { console.log(`  skipped ${process.env.NAME} (override)`); await browser.close(); srv.close(); return; }
+  if (ov) { const t = tiers[0]; if (ov[t]) { want.length = 0; want.push(...ov[t]); } if (ov.poses) { poseIds.length = 0; poseIds.push(...ov.poses); } if (ov.cams) { camIds.length = 0; camIds.push(...ov.cams); } }
   const subjects = SUBJECTS.filter((s) => !want.length || want.some((w) => s.id === w || (w.endsWith('*') && s.id.startsWith(w.slice(0, -1)))));
   const poses = POSES.filter((p) => !poseIds.length || poseIds.includes(p.id));
   const cams = CAMS.filter((c) => !camIds.length || camIds.includes(c.id));
@@ -147,7 +152,7 @@ async function diag(): Promise<void> {
     page.on('console', (m) => { if (process.env.VERBOSE) console.log('  [page]', m.text().slice(0, 200)); });
     await page.goto(`${srv.url}/`, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => !!(window as unknown as { __KG?: { ready: boolean } }).__KG?.ready, undefined, { timeout: 60_000 });
-    await kg(page, 'init', { tier, modeId: s.modeId, closet: s.closet, w: W, h: H });
+    await kg(page, 'init', { tier, modeId: s.modeId, closet: s.closet, w: W, h: H, knobs: process.env.KNOBS ? JSON.parse(process.env.KNOBS) : undefined, jersey: process.env.JERSEY ? { number: Number(process.env.JERSEY.split(':')[0]), name: process.env.JERSEY.split(':')[1] ?? '' } : undefined, hide: process.env.HIDE || undefined });   // kit-mac-jobs: KNOBS in diag too; kit-numbers: JERSEY
     await kg(page, 'spawn', s.spawn);
     await page.waitForTimeout(1200);
     const p = POSES.find((x) => x.id === poseId)!;

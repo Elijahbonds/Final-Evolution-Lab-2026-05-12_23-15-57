@@ -231,6 +231,32 @@
     transform: scale(0.77);
     transform-origin: right bottom;
   }
+  /* dock-sideways (2026-11-19): scaled to 0.77 the ⋯ is drawn 33.9 px square (measured in play, 844 x 390), under the 44 px tap
+   * rule. It is drawn as before; an invisible box reaches 16 px up and 16 px left of its inner edge (59 x 59 with the button before the
+   * scale = 45.4 px as drawn), away from the shell's buttons on its right and the floor below. */
+  [data-fel-console]:not(:has([data-fel-fullbleed]:not([data-splash-phase="countdown"]))):not(:has([data-end-screen])) > [data-capture-ui] [data-testid="capture-overflow"] {
+    position: relative;
+  }
+  /* and the menu's bar (its 8 px padding and frame, 6.2 px as drawn) lets taps through to what is under it: measured by hit test,
+   * it took the left 6 px of the shell's Pause button beside it (Pause drawn 44 px, tappable across 38). Only the bar's own
+   * padding and frame pass taps on; everything in it (the ⋯, the recording light, the menu, and the Show controls button of
+   * the hidden bar) still takes them. !important: the
+   * capture layer sets pointer-events on itself inline. */
+  [data-fel-console]:not(:has([data-fel-fullbleed]:not([data-splash-phase="countdown"]))):not(:has([data-end-screen])) > [data-capture-ui],
+  [data-fel-console]:not(:has([data-fel-fullbleed]:not([data-splash-phase="countdown"]))):not(:has([data-end-screen])) > [data-capture-ui] > div {
+    pointer-events: none !important;
+  }
+  [data-fel-console]:not(:has([data-fel-fullbleed]:not([data-splash-phase="countdown"]))):not(:has([data-end-screen])) > [data-capture-ui] > div > * {
+    pointer-events: auto;
+  }
+  [data-fel-console]:not(:has([data-fel-fullbleed]:not([data-splash-phase="countdown"]))):not(:has([data-end-screen])) > [data-capture-ui] [data-testid="capture-overflow"]::before {
+    content: '';
+    position: absolute;
+    top: -16px;
+    left: -16px;
+    right: 0;
+    bottom: 0;
+  }
   /* and a hint keeps to the gap between the thumb clusters (the compact deck reaches ~30 % in from each side) */
   [data-fel-console] > div:has(> canvas) > div.inset-x-0.text-center > span.fel-panel.font-mono {
     max-width: 44% !important;   /* !important: the base clamp rule below comes later in the file */
@@ -415,6 +441,14 @@ div:has(> [data-capture-ui]) > div:has(> canvas) > [data-fel-fullbleed] > [data-
  *      pills move top-right (4c). */
 @media (max-aspect-ratio: 6/5) {
   div:has(> canvas):has(> div > [data-testid="host-lobby-badge"], > div > [data-testid="usb-connect-hint"]) > [data-fel-fullbleed] > [data-splash-column] {
+    padding-top: 5.25rem;
+    justify-content: flex-start;
+    row-gap: 0.875rem;
+  }
+  /* COUCH-START-LARGE-TEXT (2026-11-18): the fixed "Couch (2-4)" pill is the same kind of top overlay as the controller
+   * pills. On large text / phone widths it sat over the READY card copy (scorecard repro: /play/karate-vs), so while it is
+   * visible the card starts below that top band instead of centred underneath it. */
+  body.fel-couch-start-visible [data-fel-fullbleed] > [data-splash-column] {
     padding-top: 5.25rem;
     justify-content: flex-start;
     row-gap: 0.875rem;

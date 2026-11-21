@@ -86,6 +86,8 @@ export async function measureBodies(keys: string[], opts: { wardrobe?: Wardrobe;
           const ba = map[a], bb = map[b], s0 = len(bodyRest, ba, bb), s1 = len(bw.P, ba, bb);
           const rb = s0 > 0.003 ? s1 / s0 : 1;
           if (r > 1.5 * rb) { tear++; const n = dom(a); tearBones[n] = (tearBones[n] ?? 0) + 1; }
+          // KIT-TIGHT: TEAR_DUMP=1 prints each torn edge of a short: its rest position (world) and its two ends' left / right thigh and hips weights
+          if (r > 1.5 * rb && process.env.TEAR_DUMP && /shorts/.test(g.name)) { const wOf = (v: number, re: RegExp) => { let w = 0; for (let q = 0; q < 4; q++) if (re.test(bones[mi[v * 4 + q]]?.name ?? '')) w += mw[v * 4 + q]; return +w.toFixed(2); }; console.error('TORN', clip, JSON.stringify({ x: +((rest[a * 3] + rest[b * 3]) / 2).toFixed(3), y: +((rest[a * 3 + 1] + rest[b * 3 + 1]) / 2).toFixed(3), z: +((rest[a * 3 + 2] + rest[b * 3 + 2]) / 2).toFixed(3), r: +r.toFixed(1), a: [wOf(a, /LeftUpLeg/), wOf(a, /RightUpLeg/), wOf(a, /Hips/)], b: [wOf(b, /LeftUpLeg/), wOf(b, /RightUpLeg/), wOf(b, /Hips/)] })); }
         }
         // float: the farthest garment vertex from the skin (nearest body vertex, this pose)
         let far = 0;

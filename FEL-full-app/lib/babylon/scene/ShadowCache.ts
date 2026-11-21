@@ -35,6 +35,7 @@
 
 import type { AbstractMesh, DirectionalLight, Matrix, RenderTargetTexture, Scene, ShadowGenerator } from '@babylonjs/core';
 import { Mesh, Vector3 } from '@babylonjs/core';
+import { feel } from '@/lib/feel-panel/feel';
 
 // ── the ledger: pure ───────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -152,6 +153,20 @@ export const SETTLE_FRAMES = 8, SETTLE_MS = 2000;
 /** The watch before the first bake (WARMUP_MS and WARMUP_FRAMES, both): a body's attached props, a bobbing sign, a
  *  ball rolling to rest show themselves as movers here instead of each costing a re-bake later. */
 export const WARMUP_FRAMES = 8, WARMUP_MS = 1000;
+
+/**
+ * THE FIRST BAKE AT THE START PRESS (hoops-followups, 2026-11-19; knob `perf.shadowBakeAtStart`). The warm-up runs from the end of
+ * load() for WARMUP_MS of wall time. A player who presses START before it is over plays the rest of it with EVERY caster drawn
+ * into the map each frame (the cache's "live" path: the frames before the cache existed), and then takes the bake inside play.
+ * Measured on 3v3's phone tier (scripts/probes/hoops-followups/perf3v3.sh, release 87b5d1dd): START on the first READY frame
+ * left ~55 frames of play at 59 shadow draws and put the bake on a full-court frame — the run's worst frame, 207 draws against
+ * 194 cached and a row of 208 (209 in the hoops-items lane's run). The game cannot move anything before START (the mode's
+ * update() does not run on READY), so the rest of the warm-up watches play, not scenery: with this on, the START press ends the
+ * warm-up and the bake runs on the next frame, while the intro camera is up; what moves later is demoted as it already is
+ * after any bake (one re-bake each, CasterLedger). 1 = on; 0 = the warm-up runs its full time, as before.
+ */
+export const SHADOW_BAKE_AT_START = 1;
+export const shadowBakeAtStartOn = (): boolean => feel('perf.shadowBakeAtStart', SHADOW_BAKE_AT_START) >= 0.5;
 
 export type DirtyReason = 'moved' | 'removed' | 'toggled' | 'settled' | '';
 
@@ -338,6 +353,9 @@ export interface ShadowCacheHandle {
   arm(): void;
   /** Force a re-bake on the next frame. */
   invalidate(reason?: string): void;
+  /** Play is starting (the START press): a warm-up still running ends, and the first bake runs on the next frame. Only while
+   *  warming and with `perf.shadowBakeAtStart` on; true when it took effect. */
+  settle(reason?: string): boolean;
   /** The perf lever: draw the moving casters into the map every `n` frames (1 = every frame). Same knob the governor
    *  turns on the map (refreshRate); the cache is restored on each refresh, so the statics never drop out. */
   setRefreshEvery(n: number): void;
@@ -446,6 +464,7 @@ export function mountShadowCache(scene: Scene, gen: ShadowGenerator, light: Dire
   let bakes = 0, lastReason = '', offReason = '';
   let dirty = '';
   let baking = false, bakeIncomplete = false;
+  let settleWhy = '';   // the START press ended the warm-up (SHADOW_BAKE_AT_START)
   const copier = opts.copier ?? glMapCopier(engine, map);
   const clock = opts.now ?? now;
   let baked: Matrix | null = null;
@@ -560,7 +579,7 @@ export function mountShadowCache(scene: Scene, gen: ShadowGenerator, light: Dire
     frameNo++;
     if (state === 'warming') {
       warm!.frame(all, clock());
-      if (!warm!.done) return;
+      if (!warm!.done && !settleWhy) return;
       ledger.arm(all, warm!.movers);
       warm = null;
       gen.addShadowCaster = (mesh: AbstractMesh, includeDescendants = true) => {
@@ -574,7 +593,9 @@ export function mountShadowCache(scene: Scene, gen: ShadowGenerator, light: Dire
         return gen;
       };
       state = 'cached';
-      if (bake('first bake')) console.info(`[FEL-SHADOW] cache on: ${statics.length} static casters baked once, ${moving.length} drawn per frame`);
+      const first = settleWhy ? `first bake (${settleWhy})` : 'first bake';
+      settleWhy = '';
+      if (bake(first)) console.info(`[FEL-SHADOW] cache on: ${statics.length} static casters baked once, ${moving.length} drawn per frame`);
       else dirty = 'retry';
       return;
     }
@@ -610,6 +631,11 @@ export function mountShadowCache(scene: Scene, gen: ShadowGenerator, light: Dire
       state = 'warming';
     },
     invalidate(reason = 'invalidated') { if (state === 'cached') dirty ||= reason; },
+    settle(reason = 'start') {
+      if (state !== 'warming' || !shadowBakeAtStartOn()) return false;
+      settleWhy = reason;
+      return true;
+    },
     setRefreshEvery(n: number) { map.refreshRate = Math.max(1, Math.round(n)); },
     stats: () => ({ state, statics: statics.length, moving: moving.length, bakes, lastReason, offReason }),
     movingByName() {

@@ -168,6 +168,13 @@ describe('the Adventure routes (D4, J5), by source', () => {
     expect(page).toContain('<AdventureBRLoader signedIn={signedIn} />');
     expect(readFileSync('app/play/adventure-br/loader.tsx', 'utf8')).toContain('<Stage signedIn={signedIn} />');
   });
+
+  it('the unlisted BR route still gives the player a way back to Play', () => {
+    const src = readFileSync('app/play/adventure-br/stage.tsx', 'utf8');
+    expect(src).toContain('data-testid="br-back"');
+    expect(src).toContain('href="/play"');
+    expect(src).toContain('Back to Play');
+  });
 });
 
 describe('/terms layout (J9)', () => {

@@ -50,6 +50,12 @@ const SHELL_EXEMPT_ROUTES: Record<string, string> = {
   // ADVENTURE PHASE B (2026-10-07): the story, unlisted. Its progress is the Adventure's own save (device first); it posts
   // no account session yet because /api/sessions refuses a mode outside the catalogue, and listing it would unhide it.
   adventure: 'unlisted story mode: progress lives in the Adventure save; no account session until the owner lists it',
+  // VENICE V1 (2026-11-17): the Venice hub is a place to walk, not a game. It records no session and pays nothing; each court
+  // opens its own game's page, and that game's loader mounts its own GameShell (docs/VENICE-HUB-PLAN.md §8).
+  venice: 'the Venice hub: a place to walk, not a game; records no session (each court opens its game, whose own GameShell records it)',
+  // COAST & ISLANDS phase A (2026-11-18): the first open zone is a place to walk, like the Venice hub. It records no session and
+  // pays nothing; its sports spots (phase D) will open their games' own pages, whose loaders mount their own GameShell.
+  coast: 'the Coast & Islands zone: a place to walk, not a game; records no session (its sports spots will open their games, whose own GameShell records them)',
   // DRILLS (2026-10-07, Mirror & coaching Phase 6): the Playbook drills on the camera. Not a game: no score is posted, no
   // session recorded, nothing paid; it runs body play's space check and the drill engine (lib/drills) on its own page.
   drills: 'Train-owned camera drills (lib/drills): records no play session and pays nothing, so no GameShell',

@@ -23,7 +23,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'r
 import { motion } from 'framer-motion';
 import {
   Trophy, Sparkles, Gem, Coins, TrendingUp, TrendingDown, Award, Share2, Check, Loader2, RotateCcw, ArrowRight,
-  LayoutGrid, Home, PartyPopper, Map as MapIcon, Flame, Star, Zap, BookOpen, Target, Ban,
+  LayoutGrid, Home, PartyPopper, Map as MapIcon, Flame, Star, Zap, BookOpen, Target, Ban, MapPin,
 } from 'lucide-react';
 import { reducedMotion as deviceReducedMotion } from '@/lib/a11y/reducedMotion';
 import { unpaidLine, unpaidTitle } from '@/lib/sessions/unpaidCopy';
@@ -51,6 +51,8 @@ import { Confetti } from './confetti';
 import { claimLines } from './claim';
 import { ClaimBar } from './claim-bar';
 import { isFreeDanceResult } from '@/lib/babylon/dance/freeDance';   // lane/dance-extras-2
+import { consumeVeniceReturnHref } from '@/lib/adventure/venice/hubReturn';   // venice-v1: back to the court a game was opened from
+import { consumeCoastReturnHref } from '@/lib/adventure/coast/spotReturn';   // coast-d: back to the coast's sports spot a game was opened from
 
 const fmt = (v: number) => Math.round(v).toLocaleString('en-US');
 
@@ -65,7 +67,11 @@ export function scoreFigures(p: Pick<EndScreenProps, 'run' | 'arenaVerdict' | 'a
 }
 
 /** Where B (and the card's exit) goes. */
-export function exitHrefFor(storyNodeId: string | null): string {
+export function exitHrefFor(storyNodeId: string | null, venice: string | null = null, coast: string | null = null): string {
+  // venice-v1 (2026-11-17): a game opened from a Venice court goes back to that court (lib/adventure/venice/hubReturn)
+  if (venice) return venice;
+  // coast-d (2026-11-18): a game opened from a coast sports spot goes back to that spot (lib/adventure/coast/spotReturn)
+  if (coast) return coast;
   return storyNodeId ? '/story' : '/play';
 }
 
@@ -263,7 +269,13 @@ export function EndScreen(props: EndScreenProps) {
     else if (doneAt.current === null) doneAt.current = now();
   }, [rv, steps.length, now]);
   const stepsLen = useRef(steps.length); stepsLen.current = steps.length;
-  const exitHref = exitHrefFor(storyNodeId);
+  // venice-v1: read once on the client (the query, or the hub's return mark for this page); null on every other run
+  const [venice, setVenice] = useState<string | null>(null);
+  useEffect(() => { try { setVenice(consumeVeniceReturnHref(window.location.pathname, window.location.search, Date.now())); } catch { setVenice(null); } }, []);
+  // coast-d: the same for a game opened from a coast sports spot (read once; null on every other run)
+  const [coast, setCoast] = useState<string | null>(null);
+  useEffect(() => { try { setCoast(consumeCoastReturnHref(window.location.pathname, window.location.search, Date.now())); } catch { setCoast(null); } }, []);
+  const exitHref = exitHrefFor(storyNodeId, venice, coast);
   const navRef = useRef(onNavigate); navRef.current = onNavigate;
   const armed = () => now() - mountedAt.current >= ARM_MS;
 
@@ -643,6 +655,16 @@ export function EndScreen(props: EndScreenProps) {
               {showTeaser && pick && <NextTeaser pick={pick} focused={focusId === 'next'} onPress={guard(() => onNavigate(pick.href))} />}
             </div>
             <div className="mt-[0.6em] flex flex-wrap items-center gap-[0.5em]">
+              {venice && (
+                <button type="button" data-end-focus="venice" data-focused={focusId === 'venice'} data-testid="end-back-to-venice" onClick={guard(() => onNavigate(venice))} className={`${btnBase} border border-white/20 bg-white/[0.04] px-[0.9em] py-[0.55em] text-[0.9em] text-white/85 data-[focused=true]:ring-[#00E5FF]`}>
+                  <MapPin className="h-[1em] w-[1em]" /> Back to Venice
+                </button>
+              )}
+              {coast && !venice && (
+                <button type="button" data-end-focus="coast" data-focused={focusId === 'coast'} data-testid="end-back-to-coast" onClick={guard(() => onNavigate(coast))} className={`${btnBase} border border-white/20 bg-white/[0.04] px-[0.9em] py-[0.55em] text-[0.9em] text-white/85 data-[focused=true]:ring-[#00E5FF]`}>
+                  <MapPin className="h-[1em] w-[1em]" /> Back to the coast
+                </button>
+              )}
               <button type="button" data-end-focus="modes" data-focused={focusId === 'modes'} onClick={guard(() => onNavigate('/play'))} className={`${btnBase} border border-white/20 bg-white/[0.04] px-[0.9em] py-[0.55em] text-[0.9em] text-white/85 data-[focused=true]:ring-[#00E5FF]`}>
                 <LayoutGrid className="h-[1em] w-[1em]" /> All modes
               </button>

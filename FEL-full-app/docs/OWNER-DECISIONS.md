@@ -455,3 +455,38 @@ The owner answered the three questions of the move-feel diagnosis (relayed by th
 3. **The phone stick:** it appears under the thumb, about 1.5× today's size, a 10 % dead zone, the same push always the same speed; its own
    switch, off = today's stick (lane/move-feel-2).
 
+
+## 2026-11-17 — the Venice hub: owner answers, and the go for V1
+
+The owner answered four of `docs/VENICE-HUB-PLAN.md` §6's questions and said **"Ready to start"** (V1, the walkable hoops
+park, on `lane/venice-v1`).
+
+1. **Who is in your Venice: your party only** (no strangers).
+2. **Its own "Venice" door on Play**, with every game still one tap on the shelf.
+3. **One partner plus a creature log** (befriend; later phases).
+4. **The first zone is the Coast & Islands** (later phases).
+
+## owner 2026-11-17 (defaults taken, flagged)
+
+Taken by the coordinator on the standing rule (reversible, the recommended option; the owner can overturn any of them):
+
+1. **The name: Venice Beach**, with the district names as placeholders until the owner picks them.
+2. **Venice replaces the plain plaza hub as the Adventure's hub** (from V6; `/play/adventure` is unchanged until then).
+3. **The run's rule: winners stay on** (V2).
+4. **3v3 online with six humans** (V2; it needs the owner's netd redeploy and a 6-device test).
+5. **Streaming in 64 m pieces** on phones (the plan's §3; a change from ADVENTURE-PLAN.md's 256 m chunks).
+6. **Art from the shipped kits, procedural pieces and the owner's Meshy** (no commissioned art).
+
+## owner 2026-11-18: deploying without the Mac
+
+1. **A GitHub deploy button** (`.github/workflows/deploy.yml`, `docs/DEPLOY-BUTTON.md`). It is manual only: `dry-run` first, then
+   `deploy`, from `main` only, with the secrets in the `production-deploy` environment. A push to `main` still deploys nothing.
+2. **The database step for PR #373 goes through the existing guarded job** (`db-guard.yml`, `production-db`
+   environment, `PROD_DIRECT_URL`). The owner adds the secret; agents never hold or ask for it.
+3. **The Venice answers:** keep staged loading (`venue.deferScenery` 1); phones get 4–6 real 3D watchers, not cut-outs;
+   ship Venice with the Play door on; the next Venice step is court life plus the camera.
+4. **Clothes are the top visual priority:** fitted and natural, not poofy. There is a `kit.fitTightness` slider, and the two
+   Mac garment jobs are done headless in the cloud.
+5. **The clothes: pick (3) from the kit-tight contact sheet** (relayed by the coordinator, 2026-11-18): the new garments — the
+   one-piece short and the new jerseys — at half the runtime lift (`kit.onePieceShorts` 1, `kit.newJerseys` 1,
+   `kit.setLiftScale` 0.5). Judged by eye; the rig's skin count was waived for this change (docs/KIT-FIT-PLAN.md §12.2).

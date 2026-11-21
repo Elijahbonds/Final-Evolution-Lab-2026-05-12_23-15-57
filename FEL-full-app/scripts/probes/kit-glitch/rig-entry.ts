@@ -35,7 +35,7 @@ const POKE_NEAR = 0.04;
 const JITTER = 0.0004;
 
 type Tier = 'mobile' | 'desktop' | 'high';
-interface InitOpts { tier: Tier; modeId: string; closet: boolean; w: number; h: number; knobs?: Record<string, number>; steady?: boolean }
+interface InitOpts { tier: Tier; modeId: string; closet: boolean; w: number; h: number; knobs?: Record<string, number>; steady?: boolean; jersey?: { number: number; name: string }; hide?: string }
 interface SpawnOptsKG { kind: 'player' | 'rival'; body?: HeroBodyKind; url?: string; name?: string; tint?: string; creator?: CreatorDoc | null; wardrobe?: Record<string, string>; frame?: { heightScale: number; buildScale: number } }
 
 const CLASS = {
@@ -90,7 +90,7 @@ function identityFor(o: SpawnOptsKG): PlayerIdentity {
   const face = defaultFace();
   return {
     proportions: null, face, palette: { jersey: '#2C6E55', shorts: '#1C2622', shoes: '#EDE8DC', accent: '#E0B441' },
-    jersey: defaultJersey(), wardrobe: (o.wardrobe ?? {}) as PlayerIdentity['wardrobe'], custom: true, body: o.body ?? 'kit-male',
+    jersey: opts?.jersey ?? defaultJersey(), wardrobe: (o.wardrobe ?? {}) as PlayerIdentity['wardrobe'], custom: true, body: o.body ?? 'kit-male',
     accessories: [], creator: o.creator ?? null, wornParts: [],
   };
 }
@@ -109,6 +109,8 @@ async function spawn(o: SpawnOptsKG): Promise<number> {
   // KIT-FIT: a measurement must be repeatable — breathing (secondary motion) is a clock, so it is stopped; foot planting
   // settles on a paused clip within the pose's settle frames (kit-fit found a run cell caught at two different moments)
   if (STEADY) s.secondary?.dispose();
+  // kit-jersey-fix: HIDE=<regex> hides the matching meshes after the spawn (a diagnosis: what shows through what)
+  if (opts.hide) { const re = new RegExp(opts.hide); for (const m of s.meshes) if (re.test(m.name)) m.setEnabled(false); }
   bodies.push(s);
   return bodies.length - 1;
 }
@@ -322,7 +324,9 @@ function measureScreen(): Record<string, unknown> {
     const k = `${CLASS_NAMES[c]}>${CLASS_NAMES[c2]}`; flipPairs[k] = (flipPairs[k] ?? 0) + 1;
     if (GARMENT.has(c) || GARMENT.has(c2)) flipsGarment++;
   }
-  return { w, h, garmentPx: covered, cover, poke, pokeBySlot: bySlot, pokeFront, pokeFrontBySlot: frontBySlot, pokePct: covered ? +(100 * poke / covered).toFixed(3) : 0, farSkinOverGarment: skinShown, flips, flipsGarment, flipPairs };
+  // KIT-TIGHT: what each shown short wears (material, its albedo and lightmap textures) — the inseam panel's diagnosis
+  const shortsMat = scene.meshes.filter((m) => /^Kit_shorts_/.test(m.name) && m.isVisible && m.isEnabled()).map((m) => { const mt = m.material as { name?: string; albedoTexture?: { name?: string } | null; lightmapTexture?: { name?: string } | null } | null; return { mesh: m.name, mat: mt?.name, albedo: mt?.albedoTexture?.name ?? null, lightmap: mt?.lightmapTexture?.name ?? null, ready: (mt?.lightmapTexture as { isReady?: () => boolean } | null | undefined)?.isReady?.() ?? null, asShadow: (mt as { useLightmapAsShadowmap?: boolean } | null)?.useLightmapAsShadowmap ?? null }; });
+  return { shortsMat, w, h, garmentPx: covered, cover, poke, pokeBySlot: bySlot, pokeFront, pokeFrontBySlot: frontBySlot, pokePct: covered ? +(100 * poke / covered).toFixed(3) : 0, farSkinOverGarment: skinShown, flips, flipsGarment, flipPairs };
 }
 /** The last poke pass as an RGBA overlay image (garment silhouette grey, poke pixels red, flicker not shown). */
 function pokeImage(): string | null {

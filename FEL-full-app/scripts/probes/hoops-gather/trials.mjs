@@ -3,7 +3,7 @@
 //   /home/user/wt/gate-run.sh 890 scripts/probes/hoops-gap/run-set.sh <site> <out> \
 //     "onevone ext EXT=scripts/probes/hoops-gather/trials.mjs SET=gathers PHASES=top,floor NODRAW=1 TAG=g1"
 //
-// SET (comma list): control | gathers | finishes | escapes | speed (the drives and sprints, for 3v3) | strips (the frame strips of the worst moments, needs NODRAW unset)
+// SET (comma list): control | gathers | finishes | escapes | speed (the drives and sprints, for 3v3) | combo (G4: the euro / hop into a dunk, and the plain drive dunk) | strips (the frame strips of the worst moments, needs NODRAW unset)
 // PHASES (comma list, default top,down,floor,up): the dribble phase each gather is pressed in. REPS (default 1).
 // KINDS (comma list): only these trial kinds. MAX_TRIALS caps the run (the gate hold is the scarce thing).
 // Writes <out>/gather-<mode>-<TAG>.json after every trial (a hold that runs out keeps what was done). Read it with ./analyze.mjs.
@@ -32,9 +32,22 @@ export const KINDS = {
   esc_retreat:    { kind: 'esc_retreat', escape: true, flick: 'downaway', retreat: true, mag: 0.7, approachSec: 0.5, tailF: 70 },
   esc_momcross:   { kind: 'esc_momcross', escape: true, flick: 'upaway', turbo: true, mag: 0.6, untilDist: 4.8, tailF: 70 },
   esc_spin:       { kind: 'esc_spin', escape: true, flick: 'sweep', mag: 0.6, untilDist: 4.8, tailF: 70 },
+  // G4: the footwork into a dunk, the turbo held (hoops.comboDunkOn 1 in the run's FEEL): pressed so the euro's 1.5 m and the hop's 0.8 m
+  // land the last plant inside dunk range (2.8 m) — a squeeze already inside it is the plain drive dunk
+  // (pressed AT the distance, any phase: waiting for a phase at a sprint carried the squeeze 1-2 m further, inside the drive dunk's range)
+  euro_dunk:   { kind: 'euro_dunk', mag: 1, turbo: true, untilDist: Number(process.env.EURO_AT ?? 4.0), lateral: 1, setup: 'poster', anyPhase: true },
+  hop_dunk:    { kind: 'hop_dunk', mag: 1, turbo: true, untilDist: Number(process.env.HOP_AT ?? 3.3), setup: 'poster', anyPhase: true },
+  hop2_dunk:   { kind: 'hop2_dunk', mag: 1, turbo: true, untilDist: Number(process.env.HOP_AT ?? 3.3), setup: 'poster', anyPhase: true, double: true },   // the player's hop: a double tap (H2e)
   // the pick-up AT SPEED (3v3: no poster seam, the drive runs from the check): a turbo pull-up and a turbo layup beside the drive kinds above
   spr_pullup:  { kind: 'spr_pullup', mag: 1, turbo: true, untilDist: 4.6 },
   spr_layup:   { kind: 'spr_layup', mag: 1, turbo: true, untilDist: 2.6 },
+  // G3: the step-back against a man who BIT — backing out (he follows, coming at me), then the flick; and the crossing moves in a trap (the
+  // crossover: up-away; the behind-the-back: down-away — the right stick's map is the ball hand's, core/StickHandle)
+  esc_stepback_bit: { kind: 'esc_stepback_bit', escape: true, flick: 'down', retreat: true, mag: 1, approachSec: 0.6, waitClose: true, tailF: 70 },
+  esc_stepback_drive: { kind: 'esc_stepback_drive', escape: true, flick: 'down', mag: 0.9, untilDist: 4.8, stickOff: true, tailF: 70 },   // he backpedals on the drive
+  pump_then_cross: { kind: 'pump_then_cross', escape: true, prePump: true, flick: 'upaway', mag: 0, settleSec: 0.6, tailF: 90 },      // the pump ends the dribble: no cross after it
+  trap_cross_l:    { kind: 'trap_cross_l', trap: true, escape: true, flick: 'upaway', mag: 0.8, untilDist: 2.6, tailF: 70 },
+  trap_cross_r:    { kind: 'trap_cross_r', trap: true, escape: true, flick: 'downaway', mag: 0.8, untilDist: 2.6, tailF: 70 },
   // the TRAP (3v3 only: hoops/teamDefense doubles a ball held in the paint): drive to 2.6 m, stop, wait for the double, then the escape
   trap_stepback:   { kind: 'trap_stepback', trap: true, escape: true, flick: 'down', mag: 0.8, untilDist: 2.6, tailF: 70 },
   trap_snatchback: { kind: 'trap_snatchback', trap: true, escape: true, flick: 'down', turbo: true, mag: 0.8, untilDist: 2.6, tailF: 70 },
@@ -46,6 +59,9 @@ const SETS = {
   gathers: ['set', 'pullup', 'stepback', 'hop', 'euro', 'stepthrough'],
   finishes: ['layup', 'dunk'],
   escapes: ['esc_stepback', 'esc_snatchback', 'esc_btb', 'esc_retreat', 'esc_momcross', 'esc_spin'],
+  g3: ['esc_stepback', 'esc_stepback_bit', 'esc_stepback_drive', 'esc_retreat', 'esc_snatchback', 'pump_then_cross'],
+  g3trap: ['trap_stepback', 'trap_cross_l', 'trap_cross_r', 'trap_hold'],
+  combo: ['euro_dunk', 'hop_dunk', 'hop2_dunk', 'dunk'],
   speed: ['pullup', 'spr_pullup', 'hop', 'euro', 'layup', 'spr_layup', 'dunk', 'stepthrough'],
   trap: ['trap_stepback', 'trap_snatchback', 'trap_spin', 'trap_btb', 'trap_hold'],
 };
@@ -85,7 +101,7 @@ export default async function run({ ev, runFrames, waitGame, saveStrip, say, res
     // assumption (flagged in the doc): the AI's strip / block / hand-up ROLLS are forced off with the mode's own dev seam (luck 0.99 =
     // no chance lands), so a drive is not stripped on the bump before its gather. What is measured is the body and the ball, not the
     // outcome; the defender is still on the floor, still moves, still bumps
-    await ev(([m, lk]) => { const s = window.__FEL_DEV__.scene.metadata[m]; if (s.luck && lk !== 'off') s.luck(0.99); if (s.forceTie) s.forceTie(0, 85); s.offense(); }, [MODE, process.env.LUCK ?? '']);   // 3v3: the 90 s game clock and the score put back every trial (its own seam), or the game ends a third of the way in
+    await ev(([m, lk]) => { const s = window.__FEL_DEV__.scene.metadata[m]; if (s.luck && lk !== 'off') s.luck(0.99); if (s.forceTie) s.forceTie(0, 85); if (s.tank) s.tank(); s.offense(); }, [MODE, process.env.LUCK ?? '']);   // 3v3: the 90 s game clock and the score put back every trial (its own seam), or the game ends a third of the way in
     for (let i = 0; i < 40; i++) {
       await waitGame(250);
       const ok = await ev(() => { const L = window.__LOG || []; const f = window.__frameNo || 0; const replay = L.some((l) => /\[HOOPS-REPLAY\]/.test(l.m) && f - l.f < 360); return !replay && window.__gx.iHave() && window.__gx.phaseNow !== undefined; });
@@ -119,7 +135,7 @@ export default async function run({ ev, runFrames, waitGame, saveStrip, say, res
     }
   }
   const list = [];
-  for (const s of sets) for (const k of SETS[s] ?? []) if (!only || only.has(k)) for (const ph of KINDS[k].escape ? ['any'] : phases) for (let r = 0; r < reps; r++) list.push({ ...KINDS[k], phase: ph, rep: r });
+  for (const s of sets) for (const k of SETS[s] ?? []) if (!only || only.has(k)) for (const ph of KINDS[k].escape || KINDS[k].anyPhase ? ['any'] : phases) for (let r = 0; r < reps; r++) list.push({ ...KINDS[k], phase: ph, rep: r });
   if (process.env.SHUFFLE !== '0') { let s = 7; for (let i = list.length - 1; i > 0; i--) { s = (s * 1103515245 + 12345) & 0x7fffffff; const j = s % (i + 1); [list[i], list[j]] = [list[j], list[i]]; } }   // (a fixed shuffle: one kind's trials are not all at the end of a cut run)
   say(`trials: ${list.length} (${sets.join('+')} × ${phases.join('/')})`);
   for (const [i, spec] of list.entries()) {

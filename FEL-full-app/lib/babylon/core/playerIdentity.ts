@@ -10,7 +10,7 @@ import { reportDiag } from './diag';
 import { applyFaceMorphs, resolveFaceWeightMap } from './faceMorphs';
 import { Color3, DynamicTexture, MeshBuilder, PBRMaterial, StandardMaterial, Texture, Vector3 } from '@babylonjs/core';
 import { SKIN_DETAIL_NORMAL, SKIN_LIBRARY, type SkinEntry } from './skinLibrary';
-import type { Material } from '@babylonjs/core';
+import type { Material, Mesh } from '@babylonjs/core';
 import type { QualityTier } from '../scene/QualityTier';
 import type { AccessoryId } from './accessories';
 import { wearPlayerAccessories } from './playerAccessories';
@@ -44,6 +44,15 @@ export function cloneForTint(m: TintMat, name: string): TintMat | null {
     clone.bumpTexture?.dispose();
     clone.bumpTexture = m.bumpTexture;
   }
+  // kit-tight: a texture made in memory (the short's inseam panel, inseamShade.ts) has no url, so a deep copy comes out blank:
+  // the clone shares it, as it shares the weave
+  for (const slot of ['albedoTexture', 'lightmapTexture'] as const) {
+    const t = (m as unknown as Record<string, { metadata?: { felShareOnClone?: boolean } } | null | undefined>)[slot];
+    if (!clone || !t?.metadata?.felShareOnClone) continue;
+    const c = clone as unknown as Record<string, { dispose(): void } | null | undefined>;
+    if (c[slot] !== t) c[slot]?.dispose();
+    (clone as unknown as Record<string, unknown>)[slot] = t;
+  }
   return clone;
 }
 import type { SpawnedCharacter } from './CharacterLibrary';
@@ -52,6 +61,7 @@ import { proportionsFromFrame, type HeroBodyKind } from './heroBody';
 import { playContextOf, playScales } from './playFrame';
 import { recordPlayScale } from './playFramePoint';
 import { boneNode } from '../anim/boneLookup';
+import { clearJerseyPrint, decalTopOf, jerseyDecalsOn, scheduleJerseyPrint } from './jerseyDecals';
 import {
   defaultFace, defaultJersey, sanitizeJersey, getWearable,
   type FaceConfig, type WearableSlot, type JerseyConfig,
@@ -334,7 +344,16 @@ export function applyIdentity(
   tintSlot(spawn, ['shoe', 'sneaker', 'boot'], palette.shoes);
   // 4) Jersey ID plate on the back — applied for 'body' too: a team-tinted
   //    hero still wears the player's own number.
-  if (id.jersey && (id.jersey.name || id.jersey.number > 0)) attachJerseyPlate(spawn, id.jersey, palette.accent);
+  //    lane/kit-numbers: a court jersey with decal UVs prints the number and name ON the cloth instead (jerseyDecals.ts,
+  //    kit.jerseyDecals), on an idle turn — never in this apply, which runs on every Creator edit
+  const printTop = jerseyDecalsOn() ? decalTopOf(spawn.meshes) : null;
+  if (printTop) {
+    removeJerseyPlate(spawn);
+    void scheduleJerseyPrint(printTop, id.jersey ?? defaultJersey(), palette.jersey, spawn.root.getScene());
+  } else {
+    for (const m of spawn.meshes) if (/^Kit_tops_top_(basketball|football)/.test(m.name)) clearJerseyPrint(m as Mesh);
+    if (id.jersey && (id.jersey.name || id.jersey.number > 0)) attachJerseyPlate(spawn, id.jersey, palette.accent);
+  }
   // 5) IMPROVE (2026-10-06), research item 2: what the player equipped, in the palette's accent (never the NPCs' deal).
   wearPlayerAccessories(spawn, id.accessories ?? [], palette.accent);
   // 6) THE CREATOR HOOK — parts (phase 2) and paint (phase 3) render from the doc here, and only here; worn parts too.
@@ -375,16 +394,19 @@ function watchReadiness(spawn: SpawnedCharacter): void {
 /** Number + name plate, parented to the Spine2 bone so it rides every
  *  animation. The procedural athlete faces +z (toes at +z), so the plate
  *  hangs off the back at −z, just proud of the chest-volume blob. */
+function removeJerseyPlate(spawn: Pick<SpawnedCharacter, 'meshes'>): void {
+  for (const m of spawn.meshes.filter((x) => x.name.startsWith('jersey_decal_'))) {
+    m.dispose(false, true);
+    spawn.meshes.splice(spawn.meshes.indexOf(m), 1);
+  }
+}
 function attachJerseyPlate(spawn: SpawnedCharacter, jersey: JerseyConfig, accent: string): void {
   const node = boneNode(spawn.skeleton, 'Spine2');
   if (!node) return;
   // idempotent — a second application replaces the plate, never stacks it. IMPROVE (2026-10-06), research item 16: the
   // old plate's own material and canvas texture go with it (they were left in the scene on every live-editor keypress),
   // and it leaves spawn.meshes instead of piling up there disposed.
-  for (const m of spawn.meshes.filter((x) => x.name.startsWith('jersey_decal_'))) {
-    m.dispose(false, true);
-    spawn.meshes.splice(spawn.meshes.indexOf(m), 1);
-  }
+  removeJerseyPlate(spawn);
   const scene = spawn.root.getScene();
   const W = 256, H = 232;
   const tex = new DynamicTexture(`jersey_decal_tex_${spawn.id}`, { width: W, height: H }, scene, true);

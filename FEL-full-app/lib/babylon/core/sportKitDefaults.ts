@@ -14,6 +14,7 @@
 // are listed too so either name resolves.
 import { WEARABLES } from '../../closet/wearable-catalog';
 import type { KitSlot } from './kit';
+import { feel } from '../../feel-panel/feel';
 
 export type SportKit = Readonly<Record<KitSlot, string>>;
 
@@ -50,9 +51,21 @@ export const SPORT_KIT_DEFAULTS: Readonly<Record<string, SportKit>> = {
   gymnastics: FIELD, dance: FIELD,
 };
 
-/** The default kit for a mode; an unknown or missing id takes FALLBACK_KIT. Pure. */
+/** lane/kit-mac-jobs (JERSEY-BUILD-STEPS §7: "make it the court modes' default top"): with `kit.newJerseys` on, the basketball
+ *  modes' default top is the new basketball jersey, which only the garment set carries (kitGarmentSet.ts). assumption: the
+ *  basketball modes only — tennis and volleyball share the COURT kit but not the jersey. A body without the set (the knob on but
+ *  the file missing, a forge rival) does not carry it, and applyKit falls to the slot's first top, as for any item it lacks. */
+export const BASKETBALL_JERSEY = 'top_basketball';
+/** Knob `kit.newJerseys`: 1 = the basketball and football jerseys of the garment set on the kit bodies (kitGarmentSet.ts) and the
+ *  basketball jersey as the basketball modes' default top; 0 = today's tops (the default). */
+export const NEW_JERSEYS = 1;   // owner 2026-11-18 pick (3) from the contact sheet (was 0)
+export const BASKETBALL_MODES: ReadonlySet<string> = new Set(['onevone', 'threevthree', 'dunk', 'dunkduel', 'threepoint', 'carnival']);
+
+/** The default kit for a mode; an unknown or missing id takes FALLBACK_KIT. Pure apart from the `kit.newJerseys` knob. */
 export function sportKitDefault(modeId: string | null | undefined): SportKit {
-  return (modeId && SPORT_KIT_DEFAULTS[modeId]) || FALLBACK_KIT;
+  const kit = (modeId && SPORT_KIT_DEFAULTS[modeId]) || FALLBACK_KIT;
+  if (modeId && BASKETBALL_MODES.has(modeId) && feel('kit.newJerseys', NEW_JERSEYS) >= 1) return { ...kit, tops: BASKETBALL_JERSEY };
+  return kit;
 }
 
 /** Ids the catalogue sells for the three kit slots — what a table entry must be drawn from. */

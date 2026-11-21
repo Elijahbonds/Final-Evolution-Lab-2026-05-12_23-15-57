@@ -86,7 +86,9 @@
 
 import { nerve, standingOf } from '../core/Nerve';
 import { PressBuffer } from '../hoops/response/pressBuffer';
-import { pumpHoldSec, pumpHolding } from '../hoops/response/pumpHold';   // hoops-gather: the pump keeps the ball while its clip plays   // hoops-p01: the shot press waits out the move (was gameFeel's InputBuffer)
+import { dunkGatherOn, dunkGatherDone } from '../hoops/response/dunkGather';   // hoops-gather: the drive dunk gathers, then goes up
+import { escapeReadOn, escapeLateSec, stepBackRead } from '../hoops/response/escapeRead';   // hoops-gather G3: escapes read the defenders
+import { pumpHoldSec, pumpHolding, pumpEndsDribbleOn } from '../hoops/response/pumpHold';   // hoops-gather: the pump keeps the ball while its clip plays   // hoops-p01: the shot press waits out the move (was gameFeel's InputBuffer)
 import { tickScuff, scuffPuffScale, scuffVolume, SCUFF_IDLE, type ScuffState } from '../core/ScuffFx';
 import { MeshBuilder, Quaternion, TransformNode as BABYLON_TransformNode, Vector3 } from '@babylonjs/core';
 import { dressBall } from '../visual/meshyProps';
@@ -165,6 +167,7 @@ import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cann
 import { ContactSystem, HARD_CONTACT_SPEED, FOUL_CLOSING_SPEED } from '../core/ContactSystem';
 import { HardHitDebounce } from './hardHitDebounce';
 import { pickHoopsDunk, dunkSpeedRatio, PAUSIN_DUNK } from '../core/HoopsDunks';
+import { comboDunkOn, comboDunkThen, comboDunkPick, gatherEnd } from '../core/ComboFinish';   // hoops-gather G4: the euro / the hop into a dunk
 import { trickFromFlick, trickWindow, judgeFlick, STICK_TRICK, CONTACT_TRICK_BONUS } from '../core/DunkTrickStick';
 import {   // HOOPS-MOVE-KIT-A (2026-09-08): the gather, the finish kit, the drive contest
   planGather, gatherWish, gatherLabel, gatherTravel, stickBack01, STEPBACK_STICK_BACK_MIN, type GatherPlan,
@@ -215,6 +218,7 @@ import { retreatFrom, shadeToward, lungeFor, lungesOn, standUpOn, reactionWish, 
 import { mountBallCarry, type BallCarry } from '../anim/ballCarry';
 import { rightHandDunks, dunkHandPass } from '../anim/dunkHand';   // DUNK MOTION phase 11: right-handed game dunks
 import { SoundKit } from '../audio/SoundKit';
+import { glassKissSound, driftSound } from '../audio/hoopsSfx';   // hoops-items: the backboard kiss, the drift's squeak, the quiet throw
 import { ModeMic } from '../audio/mic/ModeMic';   // THE MIC (2026-09-24): the court's MC, the sidekick, the crowd and the rival, on the mic
 import { dunkStingers } from '../audio/mic/names';
 import { HOOPERS } from '../audio/mic/cast';
@@ -618,6 +622,8 @@ export const OneVOneMode: ModeDefinition = (() => {
   let camSnapPending = false;   // POLISH: a reset asks the camera to cut, not chase
   let ring: PlayerRingHandle | null = null;   // PLAYER RING: who you are, and how much turbo is left   // SHOWTIME: SQUARE in the air (raw, so a pad, a key and a probe all reach it), and whether the side camera is on
   let spinClip = 'bball_spin';           // M9: the same machinery turns a PIVOT (a shorter sweep, no travel)
+  let dunkGather: { kind: 'dunk' | 'poster' | 'standing'; t: number; at: number } | null = null;   // hoops-gather: a drive dunk's gather before its take-off
+  let deadDribble = false;              // hoops-gather (owner 2026-11-17): a pump ended the dribble — shoot, step through, or nothing
   let pumpHoldFor = 0;                  // hoops-gather: seconds of the pump window the pump holds the ball (its clip)
   let pumpWindow = 0;                    // M8: seconds left in which a squeeze is a STEP-THROUGH (he bit the fake)
   let banked: Vector3 | null = null;     // M12: the glass point this release is routed through
@@ -810,7 +816,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   /** …and the touches while it is there: the iron's rattle and the ring's spring, the glass's thud. */
   function rimTouches(): void {
     for (const t of arc.takeTouches()) {
-      if (t.on === 'glass') { SoundKit.play('thud', { pitch: 1.5, volume: 0.35 }); console.info(`[1V1-RIM] glass kiss`); }
+      if (t.on === 'glass') { const gk = glassKissSound(); SoundKit.play(gk.name, gk.opts); console.info(`[1V1-RIM] glass kiss`); }   // hoops-items: its own sound (hoops.glassSoundOn)
       else { SoundKit.play('rattle', { volume: 0.18 + t.strength01 * 0.22 }); hoopJuice?.graze(); shotClock.rimTouch(); }   // lane/hoops-shot-core: a rim touch resets the shot clock
     }
   }
@@ -834,7 +840,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     meShotWin = 'none'; foeShotWin = 'none'; dunkFlight = null; dunkFlush = null; meLandSec = 0; meCelebrateSec = 0;   // BIOMECH-HOOPS-WAVE1
     if (gather || finish || spin || posting) meAnimTree.release();   // HOOPS-MOVE-KIT-A/B: a held gather / finish / seal / pivot is lifted with the possession
     shotBuffer.clear();   // a squeeze from the last possession is not a shot on this one
-    gather = null; finish = null; spin = null; posting = false; spinCooldown = 0; spinArmed = 0; stickGestures = []; bufferedGesture = null; rStick.reset(); stickShot = null; shimmyLeft = 0; if (pausedDribble) { pausedDribble = false; meDribble.pause(false); } pumpWindow = 0; banked = null; driveContest = null; finishFoul = false; contact?.setAirborne('me', false);
+    gather = null; finish = null; spin = null; posting = false; spinCooldown = 0; spinArmed = 0; stickGestures = []; bufferedGesture = null; rStick.reset(); stickShot = null; shimmyLeft = 0; if (pausedDribble) { pausedDribble = false; meDribble.pause(false); } pumpWindow = 0; endDeadDribble(); banked = null; driveContest = null; finishFoul = false; contact?.setAirborne('me', false);
     clearDefense();
     place('me', me.root, MY_SPAWN, Math.PI);
     place('foe', foe.root, dummyFoe ? new Vector3(5.5, 0, 6) : FOE_SPAWN, 0);   // DEV ?dummy=1: he stands off in the corner
@@ -1562,7 +1568,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         if (driftCool <= 0 && carrying && !shooting && !dunking && !finish && !gather && !spin && !posting && driftRead(ltHeld, sprintOk, meDribble.vel, { x: mx, z: -my })) {
           const before = meDribble.vel.clone();
           meDribble.drift(mx, -my); driftCool = DRIFT.cooldownSec; kin.drifts++;   // the cut takes WORLD z (the stick hands −z)
-          ctx.juice.callout('DRIFT', '#22d3ee', 380); SoundKit.play('swish', { pitch: 0.8, volume: 0.4 }); EffectsKit.burst(ctx.scene, me.root.position.clone(), 'dust');
+          ctx.juice.callout('DRIFT', '#22d3ee', 380); { const ds = driftSound(); SoundKit.play(ds.name, ds.opts); }   /* hoops-items: a squeak (hoops.driftSqueakOn) */ EffectsKit.burst(ctx.scene, me.root.position.clone(), 'dust');
           console.info(`[1V1-KIN] drift ${turnDegLog(before, mx, -my)}° at ${before.length().toFixed(1)} m/s`);
           if (foeStunSec === 0 && !foeFloored && ankleBreak(me.root.position, before, foe.root.position)) {
             foeStunSec = DRIFT.stunSec; foeAnimTree.beat('bball_contact_react', { fadeSec: 0.08 }); kin.ankles++;
@@ -1591,7 +1597,8 @@ export const OneVOneMode: ModeDefinition = (() => {
           if (gather.t >= gather.plan.sec) {
             const plan = gather.plan; gather = null;
             // HOOPS-MOVE-KIT-B wave 2: the footwork gathers (step-through / hop / euro) end IN a finish, where the feet land
-            if (plan.then && plan.then !== 'rise') { startFinish(ctx, plan.then, shotContest, defPos, plan.side, plan.sec); if (plan.glass) banked = bankPoint(me.root.position, RIM, BOARD_NORMAL); }   // H2e: the skip gather lays it off the high glass
+            if (plan.dunk) { shooting = false; shotMeter.active = false; putHud(ctx, { shotMeterT: 0 }); console.info(`[1V1-MOVE] ${plan.kind} into the dunk: ${plan.dunk.label}`); startDunk(ctx, defPos && distXZ(me.root.position, defPos) < 1.5 ? 'poster' : 'dunk', plan.dunk); }   // hoops-gather G4
+            else if (plan.then && plan.then !== 'rise') { startFinish(ctx, plan.then, shotContest, defPos, plan.side, plan.sec); if (plan.glass) banked = bankPoint(me.root.position, RIM, BOARD_NORMAL); }   // H2e: the skip gather lays it off the high glass
             else beginRise(plan.kind);   // hoops-shot-content: the step-back rises on its own release
           }
         }
@@ -1708,7 +1715,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           meFootPlant.update(dt);
           // the ball leaves the palm while I carry; a crossover swaps hands
           // STICK HANDLE: pausin' holds the ball out. HOOPS MOTION phase 4b (U19): …unless a move's path has it (PAUSIN's `hold` segment)
-          meCarry?.update(dt, drib.speed01, carrying && !shooting && !dunking && !finish && !(pausedDribble && !meCarry?.move) && !pumpHolding(pumpWindow, pumpHoldFor, STEP_THROUGH_SEC));   // hoops-gather: the pump keeps the ball
+          meCarry?.update(dt, drib.speed01, carrying && !shooting && !dunking && !finish && !(pausedDribble && !meCarry?.move) && !pumpHolding(pumpWindow, pumpHoldFor, STEP_THROUGH_SEC) && !deadDribble && !dunkGather);   // hoops-gather: the pump keeps the ball (and ends the dribble)
           if (STRONG_HAND_RETURNS) { // hoops-handle (owner 10-17): off — the ball stays in the hand a move left it in. H2d (plan §3.8, Q8): the ball goes back to the strong hand on a stop / after 1.2 s in the left — a quiet crossing, not a move
             const sh = stepStrongHand(strongHand, dt, { hand: meCarry?.handAfterMove === 'Left' ? 'left' : 'right', speed01: drib.speed01, moveActive: !!meCarry?.move,
               dribbling: !!meCarry?.active && carrying && possession === 'mine' && !shooting && !dunking && !finish && !gather && !spin && !pausedDribble,
@@ -1734,6 +1741,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           const foeDistS = distXZ(me.root.position, foe.root.position); const foeLiveS = foeStunSec === 0 && !foeFloored;
           for (const g of stickGestures) {
             if (g.kind === 'release') { if (pausedDribble) { pausedDribble = false; meDribble.pause(false); meAnimTree.releaseHold(); meCarry?.runMove('pausin_release'); SoundKit.play('whoosh', { pitch: 1.3, volume: 0.4 }); console.info('[1V1-STICK] release — the explode out of the pause'); } continue; }
+            if (deadDribble) continue;   // hoops-gather: no dribble move with a dead dribble
             if (g.kind === 'hold') {   // H1 H-03: PAUSIN' — frozen, the ball out; R2 held means you are going, not pausing
               if (!pausedDribble && !meSlot.intent.sprint) { pausedDribble = true; pausedAt = performance.now() / 1000; meDribble.pause(true); meAnimTree.hold(`bball_pausin_${meCarry?.handAfterMove === 'Left' ? 'left' : 'right'}`, { fadeSec: moveFadeSec(false) }); meCarry?.runMove('pausin');   /* H2b (plan §4.18): its own hold, the ball held out on its path */ console.info("[1V1-STICK] PAUSIN'"); }
               continue;
@@ -1770,6 +1778,13 @@ export const OneVOneMode: ModeDefinition = (() => {
               const toRimS = RIM_FLOOR.subtract(me.root.position); toRimS.y = 0;
               meDribble.stepBack(toRimS.x, toRimS.z, sprintOk); stepbackWindow = STEPBACK_WINDOW_SEC;
               SoundKit.play('whoosh', { pitch: 0.9, volume: 0.35 }); ctx.feel?.impact?.(0.1);
+              // hoops-gather G3: THE HOP-BACK READS HIM — a man on his heels (giving ground) or off balance is late by
+              // escapeLateSec, so the hop's travel is the space; a set man mirrors it, as before (hoops.escapeReadOn 0: no read at all)
+              if (escapeReadOn() && foeStunSec <= 0 && !foeFloored && distXZ(me.root.position, foe.root.position) < SHAKE_RANGE) {
+                const v = stepBackRead(foeManRead(null));
+                if (v.beat) foeStunSec = Math.max(foeStunSec, escapeLateSec());
+                console.info(`[1V1-HANDLE] escape stepback: ${v.beat ? `he bit (${v.why}), late ${escapeLateSec().toFixed(2)} s` : 'he is set, he stays with it'}`);
+              }
               continue;
             }
             if (pick.move === 'snatchback') {
@@ -2003,7 +2018,7 @@ export const OneVOneMode: ModeDefinition = (() => {
             if (startFootwork(ctx, mx, my, foeFloored ? null : foe.root.position, { hopVel: squeezeVel.clone() })) { squeezeAt = -1; hopRelease = 'armed'; console.info('[1V1-MOVE] hop step on the double tap'); }
           }
         }
-        if (!shooting && !dunking && !spin && carrying && (meSlot.intent.actionHeld > 0.02 || shotBuffer.consume() || (posting && stickShot !== null && !stickShot.started && shimmyLeft <= 0))) {   // POST HOOK (2K20): the stick starts it too
+        if (!shooting && !dunking && !spin && carrying && (meSlot.intent.actionHeld > 0.02 || shotBuffer.consume() || (posting && stickShot !== null && !stickShot.started && shimmyLeft <= 0)) && !dunkGather) {   // POST HOOK (2K20): the stick starts it too
           const defenderPos = foeStunSec > 0 ? null : foe.root.position;
           squeezeAt = performance.now() / 1000; squeezeVel.copyFrom(meDribble.vel); tapRelease = null; hopRelease = null;   // H2e: the double tap reads this press
           // A+ P0: the gate measures a 3-D distance and the rim sits 3.05 m up — against RIM itself a floor-bound body can
@@ -2026,7 +2041,10 @@ export const OneVOneMode: ModeDefinition = (() => {
           // `sprintOk` is the turbo gate's own answer for this frame — sprint HELD, moving, and fuel in the tank — so
           // the read becomes the one the player can feel: hold it in and go up strong, ease off it and lay it in.
           const kind = posting ? 'none' : checkDriveDunk(me.root.position, meDribble.vel, RIM_FLOOR, sprintOk ? turbo.t01 : 0, defenderPos);
-          if (kind !== 'none') { startDunk(ctx, kind); }
+          if (kind !== 'none') {   // hoops-gather (owner 2026-11-17): gather, then go up — the press is the gather (the pick-up), the take-off when the ball is in the hands
+            if (dunkGatherOn() && meCarry?.pickUp() === 'reading') { dunkGather = { kind, t: 0, at: performance.now() }; console.info('[1V1-MOVE] dunk gather: the last dribble into the hands'); }
+            else startDunk(ctx, kind);
+          }
           // the FOOTWORK reads the body even when he is frozen: a defender who has just BITTEN a pump is exactly the man you
           // step through, and passing null there killed every step-through the fake had earned (measured: 0 of 1).
           else if (startFootwork(ctx, mx, my, foeFloored ? null : foe.root.position)) { /* M8 / M13 / M14 — and the post's own footwork (2026-09-18) */ }
@@ -2079,6 +2097,12 @@ export const OneVOneMode: ModeDefinition = (() => {
           else if (meSlot.intent.action || t >= 1 || (stickShot?.started && Math.hypot(postStick.x, postStick.y) < 0.35)) { stickShot = null; releaseJumper(ctx, meterRelease()); }   // POST HOOK: the stick let go = the release
         }
         pumpWindow = Math.max(0, pumpWindow - dt);
+        if (deadDribble && (!carrying || possession !== 'mine')) endDeadDribble();
+        if (dunkGather) {   // hoops-gather: the gather is in (or it waited its longest): plant and go up
+          dunkGather.t += dt;
+          if (!carrying || possession !== 'mine') dunkGather = null;
+          else if (dunkGatherDone(!!meCarry?.pickingUp, dunkGather.t)) { const g = dunkGather; dunkGather = null; meCarry?.settlePickUp(); console.info(`[1V1-MOVE] dunk gather in: up ${Math.round(g.t * 1000)} ms after the press`); startDunk(ctx, g.kind); }
+        }
 
         // …but NOT while you are in the air on a dunk: the right stick is the TRICK stick then, and a flick that
         // threw a windmill must not also swing the camera 90° off the rim at the moment you want to watch it.
@@ -2583,7 +2607,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     arc.active = false;
     meShotWin = 'none'; foeShotWin = 'none'; dunkFlight = null; dunkFlush = null; meLandSec = 0; meCelebrateSec = 0;   // BIOMECH-HOOPS-WAVE1
     if (gather || finish || spin || posting) meAnimTree.release();   // HOOPS-MOVE-KIT-A/B: a held gather / finish / seal / pivot is lifted with the possession
-    gather = null; finish = null; spin = null; posting = false; spinCooldown = 0; spinArmed = 0; stickGestures = []; bufferedGesture = null; rStick.reset(); stickShot = null; shimmyLeft = 0; if (pausedDribble) { pausedDribble = false; meDribble.pause(false); } pumpWindow = 0; banked = null; driveContest = null; finishFoul = false; contact?.setAirborne('me', false);
+    gather = null; finish = null; spin = null; posting = false; spinCooldown = 0; spinArmed = 0; stickGestures = []; bufferedGesture = null; rStick.reset(); stickShot = null; shimmyLeft = 0; if (pausedDribble) { pausedDribble = false; meDribble.pause(false); } pumpWindow = 0; endDeadDribble(); banked = null; driveContest = null; finishFoul = false; contact?.setAirborne('me', false);
     clearDefense();
     place('foe', foe.root, CHECK_FOE, Math.PI);
     place('me', me.root, CHECK_ME, 0);
@@ -3184,9 +3208,14 @@ export const OneVOneMode: ModeDefinition = (() => {
       plan = planHopStep(meDribble.vel, me.root.position, RIM_FLOOR, dist < 2.8 ? 'layup' : 'rise');
     }
     if (!plan) return false;
+    if ((plan.kind === 'euro' || plan.kind === 'hop') && comboDunkOn()) {   // hoops-gather G4: the turbo held, fast, the last plant in range — the footwork's dunk
+      const end = gatherEnd(me.root.position, plan.legs), sp = Math.max(meDribble.vel.length(), force?.hopVel?.length() ?? 0), onMe = defenderPos ? distXZ(me.root.position, defenderPos) : Infinity;
+      if (comboDunkThen({ sprint: !!meSlot.intent.sprint, turbo01: turbo.t01, speed: sp, rimDistAfter: Math.hypot(end.x - RIM_FLOOR.x, end.z - RIM_FLOOR.z) }))
+        plan.dunk = comboDunkPick(plan.kind, { speed: sp, lateral01: 0, contest01: onMe < 1.5 ? 0.6 : 0, poster: false, momentum01: mbus.score01, roll });
+    }
     shooting = true;
     shotContest = plan.kind === 'shimmy' ? contest * SHIMMY_CONTEST_CUT : contest;   // the shimmy sells: the contest that reaches the fade is cut
-    pumpWindow = 0;
+    pumpWindow = 0; endDeadDribble();   // hoops-gather: the step-through (or any footwork) is the dead dribble's own way on: the feet go
     if (meCarry) meCarry.pickUp(hoopsHand(me));   // hoops-gather G1: the carry's pick-up (reads the bounce behind hoops.pickupReadOn; off = the update(0, 0, false) + gather it replaced)
     else gatherToShootingHand();   // HOOPS MOTION phase 4b (U14): the footwork's gather is the right hand's too
     currentShot = plan.then === 'rise' ? classifyShot(me.root.position, meDribble.vel, RIM, contest) : { style: plan.then as ShotStyle, label: gatherLabel(plan.kind, 'FINISH'), pctMod: plan.then === 'floater' ? 1.0 : plan.then === 'fadeaway' ? 0.86 : 1.18, drift: 'none' };
@@ -3195,6 +3224,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     if (plan.then === 'rise' && isFinishStyle(currentShot.style)) plan.then = currentShot.style;
     meterStart(contest, currentShot.style, plan.sec);
     gather = { plan, t: 0 };
+    if (plan.dunk) { shooting = false; dunking = true; shotMeter.active = false; putHud(ctx, { shotMeterT: 0 }); }   // hoops-gather G4: no shot to meter — the footwork runs to its take-off
     meShotWin = 'footwork'; meShotSec = 0;
     // THE EURO'S CLIP FOLLOWS THE SIDE IT SELLS. This picked by `plan.kind` alone, so a euro that sold LEFT still
     // played the sell-right shape and the body went one way while the move went the other. `plan.side` is the
@@ -3215,12 +3245,15 @@ export const OneVOneMode: ModeDefinition = (() => {
   }
   /** M8: the PUMP FAKE — the trigger came up before the meter had run PUMP_MAX_SEC. The ball goes back to the chest, the
    *  shot is off, and a contesting body inside range can LEAVE ITS FEET (he bit) — which opens the step-through window. */
+  /** hoops-gather: the dead dribble ends with the possession (the ball left me) or a reset. */
+  function endDeadDribble(): void { if (!deadDribble) return; deadDribble = false; meDribble.pause(false); meCarry?.setHold(0); }
   function pumpFake(ctx: ModeContext, defPos: Vector3 | null): void {
     shooting = false; gather = null; currentShot = null;
     shotMeter.active = false;
     meShotWin = 'pump'; meShotSec = 0;
     pumpWindow = STEP_THROUGH_SEC;
-    pumpHoldFor = pumpHoldSec(me.animator.durationOf('bball_pump_fake')); if (pumpHoldFor > 0) meCarry?.settlePickUp();   // hoops-gather: the pump keeps the ball (a pick-up still reading is taken now)
+    pumpHoldFor = pumpHoldSec(me.animator.durationOf('bball_pump_fake')); if (pumpHoldFor > 0) meCarry?.settlePickUp();
+    if (pumpEndsDribbleOn()) { deadDribble = true; meCarry?.settlePickUp(); meDribble.pause(true); meCarry?.setHold(1); console.info('[1V1-MOVE] the pump ended the dribble'); }   // hoops-gather (owner 2026-11-17)   // hoops-gather: the pump keeps the ball (a pick-up still reading is taken now)
     meAnimTree.beat('bball_pump_fake', { fadeSec: 0.06 });
     SoundKit.play('whoosh', { pitch: 1.3, volume: 0.25 });
     // hoops-p09: he leaves his feet when he is flying at you (closing out, or already in the air); a man sitting back does not bite. No roll
@@ -3643,6 +3676,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   }
   /** `cutSide`: the left-stick reversal's (plan §3.4 — the ball's end side for a crossing pick, the same-hand twin when the ball is there). */
   function doMove(ctx: ModeContext, move: HandleMove, dirHint?: 'left' | 'right', flick = false, cutSide?: 'left' | 'right', variant?: 'slide'): boolean {   // H1: false when the handle refused it   // H2: `variant` 'slide' = the BTB slide   // STICK HANDLE: the stick's side wins over the defender read
+    if (deadDribble) return false;   // hoops-gather (owner 2026-11-17): the pump ended the dribble
     // THE DECISION IS SHARED (HandleSystem.resolveHandleMove); what stays here is the RENDERING — this
     // mode's clips, banners and defender. 3v3 renders the same outcome its own way, so a tuning change to
     // the chain or the odds lands in both games instead of one.
@@ -3912,7 +3946,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     currentShot = null; arc.active = false; myJumpAge = Infinity;
     meShotWin = 'none'; foeShotWin = 'none'; dunkFlight = null; dunkFlush = null;
     if (gather || finish || spin || posting) meAnimTree.release();
-    gather = null; finish = null; spin = null; posting = false; pumpWindow = 0; banked = null; finishFoul = false;
+    gather = null; finish = null; spin = null; posting = false; pumpWindow = 0; endDeadDribble(); banked = null; finishFoul = false;
     clearDefense();
     giveBall('me');
     meAnimTree.releaseHold();
@@ -3933,7 +3967,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0; defContest = 0;
     arc.active = false; meShotWin = 'none'; foeShotWin = 'none';
     if (gather || finish || spin || posting) meAnimTree.release();
-    gather = null; finish = null; spin = null; posting = false; pumpWindow = 0; banked = null; finishFoul = false;
+    gather = null; finish = null; spin = null; posting = false; pumpWindow = 0; endDeadDribble(); banked = null; finishFoul = false;
     clearDefense();
     giveBall('foe');
     meAnimTree.releaseHold();

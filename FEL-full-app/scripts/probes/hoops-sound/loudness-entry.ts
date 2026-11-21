@@ -5,7 +5,7 @@ import { SoundKit } from '@/lib/babylon/audio/SoundKit';
 const RATE = 44100;
 class Offline extends OfflineAudioContext { constructor() { super(2, RATE * 4, RATE); } }
 (window as unknown as { AudioContext: unknown }).AudioContext = Offline;
-type Kit = { ctx: unknown; play: (n: string, o?: { volume?: number }) => void; graph: () => unknown; useSampleBank: (n: 'hoops' | null) => Promise<void>; sampleState: () => unknown };
+type Kit = { ctx: unknown; play: (n: string, o?: { volume?: number; pitch?: number }) => void; graph: () => unknown; useSampleBank: (n: 'hoops' | null) => Promise<void>; sampleState: () => unknown };
 const K = SoundKit as unknown as Kit;
 
 /** Short-term loudness: the loudest 50 ms RMS (dBFS), the peak (dBFS), and how long it sounds above -50 dBFS. */
@@ -17,20 +17,21 @@ function measure(buf: AudioBuffer): { st50: number; peak: number; sec: number } 
   const db = (x: number) => +(20 * Math.log10(Math.max(1e-9, x))).toFixed(1);
   return { st50: db(best), peak: db(peak), sec: +(last / RATE).toFixed(2) };
 }
-async function render(name: string, volume: number): Promise<{ st50: number; peak: number; sec: number }> {
+async function render(name: string, volume: number, pitch?: number): Promise<{ st50: number; peak: number; sec: number }> {
   K.ctx = null;                       // a fresh offline graph for each render
   K.graph();
   const ctx = K.ctx as OfflineAudioContext;
-  K.play(name, { volume });
+  K.play(name, pitch === undefined ? { volume } : { volume, pitch });
   return measure(await ctx.startRendering());
 }
 
 (window as unknown as { __RUN: () => Promise<unknown> }).__RUN = async () => {
-  const cues = ['swish', 'rattle', 'squeak', 'crowdCheer', 'bounce', 'catch', 'impact', 'thud'];
+  const cues = ['swish', 'rattle', 'squeak', 'crowdCheer', 'bounce', 'catch', 'impact', 'thud', 'glass'];   // hoops-items: + glass (the backboard)
   const out: Record<string, unknown> = {};
   K.ctx = null; K.graph();
   await K.useSampleBank(null);
   for (const c of cues) out[`${c}:synth`] = await render(c, 1);
+  out['kissOld:synth'] = await render('thud', 1, 1.5);   // hoops-items: what the backboard kiss played before (the thud at pitch 1.5)
   K.graph();
   await K.useSampleBank('hoops');
   out.bank = K.sampleState();

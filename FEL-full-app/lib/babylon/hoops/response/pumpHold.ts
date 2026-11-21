@@ -12,6 +12,12 @@ import { feel } from '../../../feel-panel/feel';
  *  `hoops.pumpBallHandOn`. */
 export const PUMP_BALL_HAND_ON = 1;
 
+/** hoops-gather (owner 2026-11-17: "a pump fake ends the dribble, like real basketball"): after a pump the dribble is DEAD — the ball
+ *  stays in the hands and the feet are set until the shot, the pass or the step-through (1) / the dribble comes back when the pump clip
+ *  ends (0: phase 3's assumption, #601). Knob `hoops.pumpEndsDribbleOn`. */
+export const PUMP_ENDS_DRIBBLE_ON = 1;
+export const pumpEndsDribbleOn = (): boolean => feel('hoops.pumpEndsDribbleOn', PUMP_ENDS_DRIBBLE_ON) >= 0.5;
+
 /** How long the pump holds the ball (s): the pump clip's own length, 0 with the knob off or no clip. Read once, at the pump. */
 export function pumpHoldSec(clipSec: number | null | undefined): number {
   if (feel('hoops.pumpBallHandOn', PUMP_BALL_HAND_ON) < 0.5) return 0;

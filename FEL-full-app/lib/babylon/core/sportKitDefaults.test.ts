@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BASEBALL_JERSEY, FALLBACK_KIT, SPORT_KIT_DEFAULTS, catalogueKitIds, sportKitDefault } from './sportKitDefaults';
+import { BASEBALL_JERSEY, BASKETBALL_JERSEY, FALLBACK_KIT, SPORT_KIT_DEFAULTS, catalogueKitIds, sportKitDefault } from './sportKitDefaults';
 import { KIT_PACKS } from './kit';
 import { WEARABLES, wearablesForSlot } from '../../closet/wearable-catalog';
 import { KIT_SLOTS } from './kit';
@@ -22,7 +22,9 @@ describe('sportKitDefaults (owner decision 2026-09-05: per-sport defaults)', () 
     for (const [key, def] of Object.entries(MODES)) {
       for (const id of [key, def.modeId]) {
         const kit = sportKitDefault(id);
-        for (const slot of KIT_SLOTS) expect(ids.has(kit[slot]), `${id}.${slot}`).toBe(true);
+        // kit-tight, owner pick (3) 2026-11-18: with kit.newJerseys on (it ships on) the court modes' top is the new basketball jersey,
+        // which the kit BODY carries (kitGarmentSet.ts); it is not a Closet item, so it is the one default allowed outside the catalogue
+        for (const slot of KIT_SLOTS) expect(ids.has(kit[slot]) || (slot === 'tops' && kit[slot] === BASKETBALL_JERSEY), `${id}.${slot}`).toBe(true);
       }
     }
     expect(sportKitDefault('no_such_mode')).toBe(FALLBACK_KIT);
