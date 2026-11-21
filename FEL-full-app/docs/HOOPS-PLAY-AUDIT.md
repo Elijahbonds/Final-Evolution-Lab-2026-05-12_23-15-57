@@ -14,7 +14,7 @@ what is left.
 
 The controls answer at the bar (a stick press moves the body in 2 frames, a stop from a jog takes 150 ms, every flick answers in one
 frame) and bodies never pass through each other. What makes play worse now is **the other side of the ball**. On defence, **reaching is
-too strong**: against a scripted player who pokes about once a second the hero stripped the 1v1 rival on half of his possessions and the
+too strong**: against a scripted player who reaches often the hero stripped the 1v1 rival on half of his possessions and the
 3v3 rivals on 14 of 16, so the PRO rivals hardly ever got a shot off (1v1: 1.2 shots a minute, 3 made of 10; 3v3: one shot in three
 minutes) and games ran 10–0 and 12–0. In 1v1, **a long rebound stops the game**: the rival never goes for a loose ball, so a quarter of
 1v1 boards sat on the floor until the mode's 4 s stall guard teleported both players to the check (3v3, whose AI does chase, never
@@ -33,7 +33,7 @@ intro holds the game through its whole camera hand-over.
 **Controls checked first (how far the rig can be trusted).**
 - *A NODRAW run used to stop at ~10 s of play.* The page's RenderWatchdog read the undrawn canvas as black, ran its rescue (lights ×1.5)
   at ~5 s and set the phase to `error` at ~10 s (`docs/MOVE-FEEL-DIAGNOSIS.md` §0). New `WD_OFF=1` (drive.mjs, NODRAW runs only) makes the
-  watchdog's 64×64 luma sample read a lit frame. With it a 50 s game takes ~65 s of wall instead of ~640 s drawn. No run here logged a
+  watchdog's 64×64 luma sample read a lit frame. With it a 40–50 s game takes about a minute of wall instead of about ten drawn. No run here logged a
   watchdog line.
 - *Two runs of one seed.* Seed 7 twice in one hold (`a7`, `a7b`): identical, frame for frame, over 2 880 frames. **But this is not
   guaranteed:** two later runs of the identical configuration (`ctloff`, `off7`) first differ at frame 40, by 1 mm on the rival's root,
@@ -65,7 +65,7 @@ already felt and signed off.
 - **Input → motion** [INPUT, three seeds, both modes]: stick onset 33 ms after the first press; 90 % of the walk's pace 233 ms; reversal
   83–200 ms; stops 150 ms / 0.29 m (jog) and 233 ms / 0.68 m (sprint); shot press → meter and body 17 ms; every flick answered (47 of 48
   standing, 48 of 48 jogging), 17 ms to the move. The turbo's 90 % in 317–350 ms is the owner's own `hoops.kickSec` 0.1 (move-feel).
-- **Collisions** [FLOW]: in all runs, 0 frames with two roots under 0.6 m; the closest pair 0.89 m (3v3) / 1.06 m (1v1).
+- **Collisions** [FLOW]: in all 44 runs (knobs off and on), 0 frames with two roots under 0.6 m; the closest pair 0.89 m.
 - **Possession flow after a score** [FLOW]: 0.25–0.8 s of banner, then the check is instant (0.03 s to the first live frame); a big-play
   replay holds at most 2.5 s and any press skips it (hoops-flow).
 - **Shooting** [HEAD, rulebook-measure]: inside the green goes in, outside misses; a masher makes 14 % of open threes against a decent
@@ -228,9 +228,11 @@ the gate's holds (fewer than the three a side the brief asks; said here plainly)
 |---|---|---|---|
 | 1v1 off | 50.2 / 106.8 / 150.9 | 3.4 | 1 805 |
 | 1v1 on | 45.6 / 89.3 / 132.4 | 3.1 | 1 482 |
-PERF3V3
+| 3v3 off | 83.9 / 211.9 / 310.2 | 5.0 | 3 433 |
+| 3v3 on | 58.6 / 98.7 / 129.0 | 4.0 | 2 876 |
 
-No regression: the "on" run is not slower anywhere (the differences are this machine's noise). None of the three fixes draws anything;
+No regression: the "on" run is not slower anywhere — the differences are this machine's load, which varied between runs (the 3v3 pair
+ran 50 minutes apart: 602 s against 313 s of wall for the same 12 s of play). None of the three fixes draws anything;
 their per-frame cost is a few comparisons (the chase only while a board is live, the intro check only while the intro is on screen, the
 hand test only on a poke).
 
