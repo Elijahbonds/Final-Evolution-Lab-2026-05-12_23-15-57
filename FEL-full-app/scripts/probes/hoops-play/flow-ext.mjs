@@ -13,6 +13,8 @@ export default async function flow({ ev, runFrames, waitGame, shot, say, checkpo
   // FLOW_SNAP_MISS=N (pictures: run it drawn, not NODRAW): from the first missed shot of the run, a page screenshot every 30 game frames,
   // N of them (the before / after sheet of a board); the run steps 30 frames at a time until they are taken
   const SNAP_N = Number(process.env.FLOW_SNAP_MISS ?? 0); let snapAt = null, snaps = 0; result.snapFrames = [];
+  // FLOW_SNAP_EVERY=K (drawn runs): a page screenshot every K game frames for the whole run (pick the moment from the log afterwards)
+  const EVERY = Number(process.env.FLOW_SNAP_EVERY ?? 0);
   await ev((m) => {
     const dev = window.__FEL_DEV__, scene = dev.scene, HG = window.__hg;
     const top = (n) => { while (n && n.parent) n = n.parent; return n; };
@@ -36,7 +38,8 @@ export default async function flow({ ev, runFrames, waitGame, shot, say, checkpo
   const played = async () => (await ev(() => window.__frameNo || 0)) - f0;
   let said = 0; result.freeThrows = 0;
   while ((await played()) < FRAMES) {
-    await runFrames(Math.min(SNAP_N > 0 && snaps < SNAP_N ? 30 : 120, FRAMES - (await played())));
+    await runFrames(Math.min(EVERY > 0 ? EVERY : SNAP_N > 0 && snaps < SNAP_N ? 30 : 120, FRAMES - (await played())));
+    if (EVERY > 0) { const fr = await ev(() => window.__frameNo || 0); await shot(`every-f${String(fr).padStart(5, '0')}`); result.snapFrames.push(fr); }
     if (SNAP_N > 0 && snaps < SNAP_N) {
       if (snapAt === null) snapAt = await ev((t) => { const l = (window.__LOG || []).find((x) => new RegExp('\\[' + t + '-RIM\\] (left|right|front|back|side_iron|front_iron|back_iron|airball)', 'i').test(x.m)); return l ? l.f : null; }, tag);
       if (snapAt !== null) { const fr = await ev(() => window.__frameNo || 0); await shot(`board-${String(snaps).padStart(2, '0')}-f${fr}`); result.snapFrames.push(fr); snaps++; }

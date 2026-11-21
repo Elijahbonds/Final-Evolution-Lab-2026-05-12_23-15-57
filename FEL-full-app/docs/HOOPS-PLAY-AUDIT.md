@@ -131,9 +131,10 @@ frame 184, "[1V1-SHOT] gather reverse" at 185, released at 209, missed — none 
 
 ### 3.7 Readability (#7)
 
-The rig's drawn pictures (`scratchpad/hoops-play/pic1`, 400×225) — the ball carrier's ring and the bodies read; the defender's place
-reads in 1v1. The moment that does not read is #2's: a ball rolling off while both bodies stand still. Everything else about reading the
-play is the camera (hoops-cam).
+The rig's drawn frames (`scratchpad/hoops-play/pic1/chase1-sheet.jpg`, 400×225, eight frames from a miss): the ball, both bodies and the
+ring under the player you steer read at that size; the defender's place reads in 1v1. The moment that did not read is #2's — a ball
+rolling off while both bodies stand still for 4 s, then a cut to the check. Everything else about reading the play is the camera
+(hoops-cam), not measured here.
 
 ## 4. What changed since the 2026-11-12 audit (its sinkers, re-read here)
 
@@ -153,15 +154,69 @@ Each is behind its own knob; the off value restores today's behaviour exactly (t
 
 ### 5.1 One rule for the strip — `hoops.myStripHandOn`
 
-RESULTS_STRIP
+**What it does.** My poke on a 1v1 or 3v3 handler must also pass the AI's own hand-on-the-ball test (`hoops/steals.ts` `aiStripLands`:
+within 1.2 m of the ball, his body not between my hand and a ball in his far hand, the ball off the palm), and a body bump opens my
+0.4 s strip window only when **he** ran into **me** — the AI's bump strip already opened only when I ran into him ("never on a defender
+bumping ME", `OneVOneMode.ts:2223–2226`). The exposure read is unchanged. Off = the read alone and any contact opening the window.
+
+**Measured** (the steal rule alone: the other two knobs on for both sides; five seeds a side, 50 s games):
+
+| | 1v1 off | 1v1 on | 3v3 off | 3v3 on |
+|---|---|---|---|---|
+| runs (minutes of play) | 5 (3.5) | 5 (3.7) | 5 (4.2) | 5 (4.2) |
+| steals a rival possession | 0.92 (11 of 12) | **0.58** (7 of 12) | 0.82 (14 of 17) | **0.61** (11 of 18) |
+| steals on the read / the bump (not the kinetic drive-by and parry) | 8 | 4 | 10 | **1** |
+| steals a poke (the drive-by counted) | 0.34 | **0.11** | 0.23 | 0.22 |
+| reach-in fouls a poke | 0.28 | 0.37 | 0.13 | 0.24 |
+| the rival's shots a minute (made) | 0.86 (0) | **2.14 (4)** | 0.24 (0) | **0.72** (0) |
+| the score margin a minute (mine − theirs) | 14 | **6.7** | 3.4 | 2.2 |
+
+Every poke is now logged with its hand read (`[1V1-DEF] my poke: …`, `[3V3-DEF] my poke: …`). Reading them: when the read says the ball
+is exposed, the hand test almost always agrees (it refused one 3v3 poke with the ball 1.81 m away); what removed most read steals is the
+bump rule — the scripted defender's own run-ins no longer open the window. **Verdict: ships ON** (a measured win in both modes on the
+thing it is for: the rival keeps the ball, gets shots up and the game is closer). **Flag:** reach-in fouls a poke went up (a poke that
+misses while you run into him is whistled, as before; more of them miss now). The kinetic drive-by steal and the parry-vault are owner
+features and are not touched; in 3v3 they are now nearly all the steals that remain (9 drive-bys and a parry-vault of the 11 with the
+rule on; §6).
 
 ### 5.2 The 1v1 rival goes and gets a loose ball — `hoops.rivalChaseBoardOn`
 
-RESULTS_CHASE
+**What it does.** While a 1v1 board is live and the rival is on his feet, his brain's chase points at the ball (3v3's rule:
+`DefenderBrain.chaseBall`, which outranks the box-out seal); on his own miss the crash takes that chase through his slot's intent instead
+of the 3 m/s walk. Cleared whenever the board ends or a possession starts. Off = his seal / his crash as before.
+
+**Measured** (1v1, all three knobs off against all on, five seeds a side; then the steal set above, chase on for both sides):
+
+| | off (5 runs + the control) | on (4 runs) | on (the steal set, 10 runs) |
+|---|---|---|---|
+| boards | 11 | 8 | 17 |
+| boards that stalled to the 4 s guard | **5** | **0** | 1 |
+| miss → board, median | **3.3 s** | **0.8 s** | 0.8–0.9 s |
+
+The one stall left (seed 47): the rival was chasing, but the scripted defender stood between him and the ball, 1.10 m away (the body
+standoff) for the whole 4 s, pushing toward the rim while he pushed toward the ball — the bot keeps "defending" a man without the ball,
+and the chase runs a straight line, it does not go round a body. A person would rarely hold that. The before/after picture:
+`scratchpad/hoops-play/hoops-play-board-before-after.jpg` (top-down traces of the ball, the rival and you from the miss: before, seed 31,
+the ball in the corner, the rival 14 m away holding his spot until the reset; after, seed 11, he runs it down in 1.2 s). In-game frames of
+the after: `scratchpad/hoops-play/pic1/chase1-sheet.jpg`. **Verdict: ships ON.**
 
 ### 5.3 The press that skips the intro plays — `hoops.introPressPlaysOn`
 
-RESULTS_INTRO
+**What it does.** `holdIntro` keeps the mode still while the broadcast intro is on screen; the press that skips it used to start
+only the camera's 0.35 s hand-over, with the mode held through it. Now the broadcast sees the skip (the intro's letterbox stays fully
+closed until its last 0.45 s, and a skip starts opening it at once — no change to the camera director) and hands play over on the next
+frame; the mode's own camera step runs the rest of the same hand-over. With no press the intro plays out exactly as before.
+
+**Measured** ([INPUT] stick test, three seeds a side, both modes, the switch alone):
+
+| | off | on |
+|---|---|---|
+| first stick press → the body moves | **383 ms** (all 6 runs) | **50 ms** (all 6 runs) |
+| first press → 90 % of the walk's pace | 400–583 ms | 250 ms |
+| every later press → the body moves | 33 ms | 33 ms |
+
+The camera: a test drives the real CameraDirector through a skipped intro with the switch on and off — the camera's position is the same
+frame for frame (`court/hoopsIntroPress.test.ts`). **Verdict: ships ON.**
 
 ### 5.4 Phone-tier frame time
 
@@ -169,7 +224,17 @@ RESULTS_PERF
 
 ## 6. Recommended next
 
-RESULTS_NEXT
+Recommendation first; each is reversible.
+
+1. **The 3v3 drive-by steal** (`core/HoopsKinetic.ts` DRIVE_BY): with the strip rule on, it is now nearly every 3v3 steal that remains
+   (9 of the 11 in the "on" runs, with a parry-vault and one strip) — running past the driver at 3.6 m/s with a poke takes the ball with no look at where it is. *Recommend:*
+   the same hand-on-the-ball test for it. It is an owner feature (HOOPS KINETIC, 2026-09-18), so the owner's call; behind its own knob.
+2. **One rule for a shot pressed during a spin** (#5: 1v1 waits out the spin, 533 ms; 3v3 fires at once, 17 ms). *Recommend:* the shot
+   may cut the spin once it is past its half in both modes (a spin into a jumper), behind a knob; the owner's feel call.
+3. **The rival's offence, re-measured** (#3): with the strip rule on, the 1v1 PRO rival got 2.1 shots a minute up and made 4 of 8. Next:
+   the same five-seed rig read with a human-paced defender (one poke every 2–3 s, no run-ins), then decide whether his timing hands
+   (`hoops.aiTiming*Ms`, hoops-p09's chosen numbers) need the owner. Smaller items found on the way: the 1v1 "ghost shot" in the make beat
+   (#6), and the rival's chase going round a body that stands in his line (§5.2).
 
 ## 7. How to re-run
 

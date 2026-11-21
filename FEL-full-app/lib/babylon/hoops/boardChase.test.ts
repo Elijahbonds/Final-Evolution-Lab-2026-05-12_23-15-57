@@ -9,7 +9,7 @@ import { resetFeelForTests, setFeelOverride, setFeelSession, setFeelUser } from 
 
 const knob = (v: number): void => { setFeelUser(true); setFeelSession(null); setFeelOverride('hoops.rivalChaseBoardOn', v); };
 afterEach(() => resetFeelForTests());
-const BALL = new Vector3(-6, 0.12, 2);
+const BALL = new Vector3(-3, 0.12, 6);   // off to the side and well out from where he seals: z matters
 
 describe('rivalChaseTarget', () => {
   it('ships on', () => { expect(RIVAL_CHASE_BOARD_ON).toBe(1); });
@@ -37,8 +37,8 @@ describe('the brain: a chase outranks the seal (the rule 3v3 already runs)', () 
     expect(c.job).toBe('chase');
     const m = Math.hypot(c.it.moveX, c.it.moveY);
     expect(m).toBeGreaterThan(0.5);
-    // the intent points at the ball (the brain's steer: moveX = world x, moveY = world z)
-    expect((c.it.moveX * c.toBall.x + c.it.moveY * c.toBall.z) / m).toBeGreaterThan(0.9);
+    // the intent points at the ball (the brain's steer: moveX = world x, moveY = minus world z, as AiMover.stepIntent reads it)
+    expect((c.it.moveX * c.toBall.x - c.it.moveY * c.toBall.z) / m).toBeGreaterThan(0.99);
   });
 });
 
