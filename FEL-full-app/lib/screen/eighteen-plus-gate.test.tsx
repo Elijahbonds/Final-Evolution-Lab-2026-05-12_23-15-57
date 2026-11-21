@@ -155,3 +155,14 @@ describe('18 or older still reach the camera', () => {
     expect(run([{ type: 'start', locked: '18+' }, { type: 'pain', hurts: false }, { type: 'takeoff', side: null }, { type: 'cameraOn' }]).step).toBe('camera');
   });
 });
+
+describe('Back from kidResult returns to the grown-up step', () => {
+  it.each(KIDS)('%s: Back from kidResult returns to grownUp, with the same age and no gate', (age) => {
+    const k = run([{ type: 'start' }, { type: 'age', age }, { type: 'grownUp' }]);
+    expect(k.step).toBe('kidResult');
+    const viaBack = backStep(k);
+    const viaEvent = preStep(k, { type: 'back' }, NOW);
+    expect(viaBack).toMatchObject({ step: 'grownUp', age, gate: null, kind: k.kind });
+    expect(viaEvent).toEqual(viaBack);
+  });
+});
