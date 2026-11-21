@@ -260,6 +260,9 @@ import { HandCheckPlay } from '../hoops/handCheck';   // lane/hoops-round2 HOP-0
 import { mountContactPoses } from '../hoops/contactPoses';   // lane/hoops-round2 HOP-04: forearm on hip, arm bar, chest in (drawn only)
 import type { AmbientHandle } from '../visual/EffectsKit';
 import { StickFrame } from '../core/StickFrame';   // lane/move-feel-2: a held stick keeps its court frame
+import { feel } from '../../feel-panel/feel';   // lane/hoops-cam: the camera knob
+import { ONEVONE_CAM, type CourtFrame, type P2 } from '../core/HighSidelineCam';   // lane/hoops-cam: the high sideline view
+import type { CameraDirector } from '../core/CameraDirector';
 import {   // IMPROVE (2026-10-06) #1 #2 #3 #4 #10: the pure rules (onevoneRules.test)
   ONEVONE_TIER, attackerPatience, winRule, gameWinner, onePointAway, winBy2Requested, readWinBy2Pick, type WinRule,
   hintFor, hintSwap, pushPip, emptyBox,
@@ -314,6 +317,9 @@ const CHECK_FOE = new Vector3(0, 0, 9.2), CHECK_ME = new Vector3(0, 0, 7.2);
 /** A poke's reach. Body collision holds two players ~1.1 m apart; 1.2 sat ON the standoff and flickered. */
 /** The lines themselves — the same box clampToHalfCourt holds bodies inside. */
 const COURT_HALF_WIDTH = 7.2, COURT_DEPTH = 14.5;
+/** lane/hoops-cam (owner 2026-11-21): the half court the high sideline view frames — the rim, the long axis out to the half-court
+ *  line (+z), and the sideline the eye stands off (+x). HighSidelineCam.test.ts carries a copy (COURT). */
+export const ONEVONE_CAM_COURT: CourtFrame = { rimX: RIM.x, rimZ: RIM.z, axisX: 0, axisZ: 1, side: 1 };
 /** How close to the line counts as ON it (the clamp parks you exactly there, so this is a touch of slack). */
 const OOB_EPSILON = 0.08;
 /** …and how long you have to keep pushing at it before it is a call, so a bump into the line is not a turnover. */
@@ -695,6 +701,19 @@ export const OneVOneMode: ModeDefinition = (() => {
   // IMPROVE (2026-10-06) #14 #15: the per-frame scratch — every one is filled and read inside one call or one frame's branch
   const _camF = new Vector3(), _camR = new Vector3(), _camRelOut: [number, number] = [0, 0];
   const stickFrame = new StickFrame();   // lane/move-feel-2: "stick right runs a straight line while held"
+  // lane/hoops-cam: what the high sideline view frames — the play (the midpoint of the two bodies) and the points that must stay in
+  // frame, in priority order: the hero's feet and head, the rival's feet and head, then the rim. Kept objects, filled per frame.
+  let highDir: CameraDirector | null = null;
+  const _highPlay: P2 = { x: 0, z: 0 }, _highRim: P3 = { x: RIM.x, y: RIM.y, z: RIM.z };
+  const _highBody: P3[] = [{ x: 0, y: 0, z: 0 }, { x: 0, y: 1.9, z: 0 }, { x: 0, y: 0, z: 0 }, { x: 0, y: 1.9, z: 0 }];
+  const _highMust: readonly P3[] = [..._highBody, _highRim], _highOut = { play: _highPlay, must: _highMust };
+  const highFrame = (): { play: P2; must: readonly P3[] } => {
+    const a = me.root.position, b = foe.root.position;
+    _highBody[0].x = _highBody[1].x = a.x; _highBody[0].z = _highBody[1].z = a.z;
+    _highBody[2].x = _highBody[3].x = b.x; _highBody[2].z = _highBody[3].z = b.z;
+    _highPlay.x = (a.x + b.x) / 2; _highPlay.z = (a.z + b.z) / 2;
+    return _highOut;
+  };
   const _driveV = new Vector3(), _driveBack = new Vector3();
   const _foeVel = new Vector3(), _toMe = new Vector3(), _past = new Vector3(), _look = new Vector3(), _head = new Vector3();
   /** The point the world shot meter hangs beside: 1.72 m over a root (a kept vector — ShotMeter3D copies it). */
@@ -1211,6 +1230,10 @@ export const OneVOneMode: ModeDefinition = (() => {
         else if (tier === 'cold') bannerFlash(ctx, 'GONE COLD', 700);
         micTier(tier, prev);   // THE MIC
       });
+      // lane/hoops-cam (owner 2026-11-21): the HIGH SIDELINE view is the 1v1 play camera (`hoops.oneVOneCam` 1; 0 = the follow, as
+      // shipped; SELECT / C switches for the run). It frames the midpoint of the two bodies, and keeps both and the rim in frame.
+      highDir = ctx.camDirector;
+      ctx.camDirector.setHighView({ court: ONEVONE_CAM_COURT, on: () => feel('hoops.oneVOneCam', ONEVONE_CAM) >= 0.5, frame: highFrame });
       ctx.camDirector.snapTo(me.root.position, RIM);
       assertSpawned(ctx.scene, { hero: me.root, minWorldMeshes: 6, modeId: 'onevone' });
       resetPositions();
@@ -2531,6 +2554,7 @@ export const OneVOneMode: ModeDefinition = (() => {
 
     dispose() {
       if (keyBus) keyBus.keyRStick = false;
+      highDir?.setHighView(null); highDir = null;   // lane/hoops-cam
       // IMPROVE (2026-10-06) #13: the mode is over for everything it deferred — no queued beat, no flight, no banner clear runs into
       // the bodies disposed below (later() checks `ended` and the token; the queue is emptied besides)
       ended = true; possessionToken++; timers.length = 0; bannerUntil = 0; meFlightTick = null; foeFlightTick = null;

@@ -1165,6 +1165,57 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/core/CameraDirector.ts HOOPS_CAM_LEAD_EASE',
     hint: '1v1 and 3v3 only. 1 since 2026-11-17. 0 = the old camera: the point ahead of the player swings in one frame on a start, stop, cut or turnaround. 1 = it eases (the two look-ahead knobs above).',
   },
+  // ── lane/hoops-cam (new, owner 2026-11-21: "When it follows it is hard to play. When it is stationary … it is easier"): the 1v1 high sideline view ──
+  {
+    id: 'hoops.oneVOneCam', label: '1v1 camera: high sideline (1) / follow (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · camera',
+    source: 'lib/babylon/core/HighSidelineCam.ts ONEVONE_CAM',
+    hint: '1 = a high camera off the sideline that never turns, so up on the stick is always toward the rim. 0 = the follow camera exactly as before. SELECT or C switches during a game.',
+  },
+  {
+    id: 'hoops.highCamHeightM', label: 'High camera: height', def: 6.8, min: 4, max: 14, step: 0.1, unit: 'm', group: 'Hoops · camera',
+    source: 'lib/babylon/core/HighSidelineCam.ts HIGH_CAM_HEIGHT_M',
+    hint: 'How high the 1v1 high camera stands over the floor.',
+  },
+  {
+    id: 'hoops.highCamDistM', label: 'High camera: distance back', def: 11.2, min: 7, max: 20, step: 0.1, unit: 'm', group: 'Hoops · camera',
+    source: 'lib/babylon/core/HighSidelineCam.ts HIGH_CAM_DIST_M',
+    hint: 'How far back from the play it stands, along the floor. Further = more court, smaller players.',
+  },
+  {
+    id: 'hoops.highCamSideDeg', label: 'High camera: swing to the sideline', def: 32, min: 0, max: 90, step: 1, unit: '°', group: 'Hoops · camera',
+    source: 'lib/babylon/core/HighSidelineCam.ts HIGH_CAM_SIDE_DEG',
+    hint: '0 = straight behind the play, looking at the rim. 90 = side on from the sideline (the rim then sits at the side of the screen).',
+  },
+  {
+    id: 'hoops.highCamFocusM', label: 'High camera: aim point from the rim', def: 3.8, min: 0, max: 8, step: 0.1, unit: 'm', group: 'Hoops · camera',
+    source: 'lib/babylon/core/HighSidelineCam.ts HIGH_CAM_FOCUS_M',
+    hint: 'Where on the court the camera rests its aim, this far out from the rim.',
+  },
+  {
+    id: 'hoops.highCamPanShare', label: 'High camera: how much it slides after the play', def: 0.3, min: 0, max: 1, step: 0.05, unit: '', group: 'Hoops · camera',
+    source: 'lib/babylon/core/HighSidelineCam.ts HIGH_CAM_PAN_SHARE',
+    hint: '0 = it never slides (it still slides to keep both players and the rim on screen). 1 = it slides all the way after the players.',
+  },
+  {
+    id: 'hoops.highCamPanSec', label: 'High camera: slide softness', def: 0.55, min: 0.1, max: 2, step: 0.05, unit: 's', group: 'Hoops · camera',
+    source: 'lib/babylon/core/HighSidelineCam.ts HIGH_CAM_PAN_SEC',
+    hint: 'How slowly and softly it slides. Bigger = slower and smoother.',
+  },
+  {
+    id: 'hoops.highCamMargin', label: 'High camera: room kept at the screen edge', def: 0.14, min: 0, max: 0.4, step: 0.01, unit: '', group: 'Hoops · camera',
+    source: 'lib/babylon/core/HighSidelineCam.ts HIGH_CAM_MARGIN',
+    hint: 'How far in from the left and right edges the players and the rim are kept (a share of half the screen).',
+  },
+  {
+    id: 'hoops.highCamPullMax', label: 'High camera: most it backs away to fit', def: 1.6, min: 1, max: 2, step: 0.05, unit: '×', group: 'Hoops · camera',
+    source: 'lib/babylon/core/HighSidelineCam.ts HIGH_CAM_PULL_MAX',
+    hint: 'When both players and the rim cannot fit across the screen (a phone held upright), it backs away, never turning, up to this many times its distance. 1 = never.',
+  },
+  {
+    id: 'hoops.highCamPortraitLift', label: 'High camera: phone upright, keep players above the buttons', def: 0.34, min: 0, max: 0.5, step: 0.01, unit: '', group: 'Hoops · camera',
+    source: 'lib/babylon/core/HighSidelineCam.ts HIGH_CAM_PORTRAIT_LIFT',
+    hint: 'On a phone held upright, the share of the screen height at the bottom (where the touch buttons are) the players are kept out of.',
+  },
   // GAMEPLAY-CLEAN P2 #6 (2026-11-03): the football carry's stride paces to the carrier (footballTree)
   {
     id: 'football.carryStrideMax', label: 'Football carry: top stride rate', def: 1.4, min: 1, max: 1.85, step: 0.05, unit: '×', group: 'Anim · stride',

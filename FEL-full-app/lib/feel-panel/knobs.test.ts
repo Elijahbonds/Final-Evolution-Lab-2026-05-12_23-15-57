@@ -80,6 +80,7 @@ import * as HR from '@/lib/babylon/hoops/ratings';   // hoops-builder
 import { BAT_GRIP_LOST_M, BAT_GRIP_BACK_M } from '@/lib/babylon/modes/baseballBat';   // bat-grip-2
 import { SAMPLE_SFX_ON } from '@/lib/babylon/audio/samples';   // hoops-sound
 import * as DS from '@/lib/babylon/audio/dribbleSound';   // hoops-sound
+import * as HSC from '@/lib/babylon/core/HighSidelineCam';   // hoops-cam
 
 function tsFiles(dir: string): string[] {
   const out: string[] = [];
@@ -431,6 +432,13 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.rateSlideBand')).toBe(HR.RATE_SLIDE_BAND); expect(def('hoops.rateStealReachBand')).toBe(HR.RATE_STEAL_REACH_BAND);
     expect(def('hoops.rateBlockReachM')).toBe(HR.RATE_BLOCK_REACH_M); expect(def('hoops.heightReachMPerIn')).toBe(HR.HEIGHT_REACH_M_PER_IN);
     expect(def('hoops.heightLookPerIn')).toBe(HR.HEIGHT_LOOK_PER_IN);   // hoops-builder phase B (new)
+    // hoops-cam (new, owner 2026-11-21): the 1v1 high sideline view ships ON; 0 = the follow camera exactly as shipped
+    expect(def('hoops.oneVOneCam')).toBe(HSC.ONEVONE_CAM); expect(HSC.ONEVONE_CAM).toBe(1);
+    expect(def('hoops.highCamHeightM')).toBe(HSC.HIGH_CAM_HEIGHT_M); expect(def('hoops.highCamDistM')).toBe(HSC.HIGH_CAM_DIST_M);
+    expect(def('hoops.highCamSideDeg')).toBe(HSC.HIGH_CAM_SIDE_DEG); expect(def('hoops.highCamFocusM')).toBe(HSC.HIGH_CAM_FOCUS_M);
+    expect(def('hoops.highCamPanShare')).toBe(HSC.HIGH_CAM_PAN_SHARE); expect(def('hoops.highCamPanSec')).toBe(HSC.HIGH_CAM_PAN_SEC);
+    expect(def('hoops.highCamMargin')).toBe(HSC.HIGH_CAM_MARGIN); expect(def('hoops.highCamPullMax')).toBe(HSC.HIGH_CAM_PULL_MAX);
+    expect(def('hoops.highCamPortraitLift')).toBe(HSC.HIGH_CAM_PORTRAIT_LIFT);
   });
 
   it('every row is well formed: unique `<area>.<camelName>` id, min ≤ default ≤ max, the default on the step grid, a source', () => {

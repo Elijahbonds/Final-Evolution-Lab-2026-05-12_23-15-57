@@ -58,6 +58,7 @@ import { reportDiag } from './diag';
 import { INTRO, introLetterbox, introPose, orbitBlend, smoothstep, type IntroKind } from '../scene/broadcastShots';   // vis-foundation-2 A9.12
 import { motionPolicy } from '../../a11y/reducedMotion';
 import { feel } from '../../feel-panel/feel';
+import { highCamParams, highFits, highPose, highSideSpan, HIGH_CAM_EDGE, highStep, highWant, HIGH_CAM_CATCHUP, HIGH_CAM_PUNCH, HIGH_CAM_PULL_MIN, HIGH_CAM_CLEAR_M, type CourtFrame, type HighState, type P2, type P3 } from './HighSidelineCam';   // lane/hoops-cam: the 1v1 high sideline view
 
 export type CamMode = 'follow' | 'fixed';
 
@@ -298,6 +299,10 @@ const OCCLUSION_MARGIN = 0.6;
  *  carry no collision flag (VenueKit builds them without one — the E26 bug).
  *  Deliberately excludes characters, balls, props and the M61 backdrop. */
 const VENUE_SHELL = /^(venue_ground|venue_box|wall_|park_floor|piste|water|shore|mc_ring|mc_pit)/i;
+/** lane/hoops-cam: what never blocks the high view's eye (the sky and the floor it looks across, bodies' gear, the ball, birds, rings). */
+const HIGH_NEVER_BLOCKS = /sky|dome|backdrop|horizon|ground|floor|court(?!side)|water|ocean|sea\b|fog|gull|bird|ball|ring|shadow|decal|line|paint|glow|net\b|rim|cloud/i;
+/** lane/hoops-cam: the high view's clear-view ray runs every this many frames (its answer is kept in between). */
+const HIGH_CLEAR_EVERY = 6;
 /** How far inside the venue bounds the camera must stay. */
 const BOUNDS_MARGIN = 1.2;
 
@@ -570,8 +575,97 @@ export class CameraDirector {
     if (snap) this.camera.position.copyFrom(position);
   }
 
-  /** SELECT-button debug toggle between follow and fixed framing (ModeHarness). */
-  toggle(): void { this.mode = this.mode === 'follow' ? 'fixed' : 'follow'; }
+  /** SELECT-button debug toggle between follow and fixed framing (ModeHarness). lane/hoops-cam: where a mode has armed the high view
+   *  (1v1, `hoops.oneVOneCam` 1), SELECT / C is the player's camera switch instead — the high view ↔ the follow camera, for this run. */
+  toggle(): void {
+    if (this.mode === 'follow' && this.highArmed()) { this.highUserOff = !this.highUserOff; return; }
+    this.mode = this.mode === 'follow' ? 'fixed' : 'follow';
+  }
+
+  // ── HIGH SIDELINE (lane/hoops-cam, owner 2026-11-21: "When it's stationary like 2k high camera angle it's easier") ──
+  // A mode arms it with the court it frames and a callback for the play; while it is on, the follow below never runs: the camera
+  // trucks (never turns) after the play, critically damped (core/HighSidelineCam.ts). `on()` is the mode's knob (re-read every
+  // frame); SELECT / C turns it off and on again for the run. Disarmed (null), or with the knob at 0, every line below is skipped
+  // and the follow camera is the one that shipped.
+  private high: { court: CourtFrame; on: () => boolean; frame: () => { play: P2; must: readonly P3[] } } | null = null;
+  private highUserOff = false;
+  private highWas = false;
+  private highS: HighState | null = null;
+  private highClearCap: number | null = null;
+  private highClearAge = 0;
+  /** Arm (or with null, disarm) the high view. */
+  setHighView(v: { court: CourtFrame; on: () => boolean; frame: () => { play: P2; must: readonly P3[] } } | null): void {
+    this.high = v; this.highS = null; this.highClearCap = null;
+  }
+  private highArmed(): boolean { return this.high !== null && this.high.on(); }
+  /** The high view is the play camera right now. */
+  get highActive(): boolean { return this.highArmed() && !this.highUserOff; }
+  /** The largest pull (≤ `pull`) at which nothing solid stands between the look target and the eye: one ray from the target out to
+   *  the eye, against every visible, solid, non-body mesh (the follow's probe sees only the venue shell; a palm's crown or a tree is
+   *  not one). Bodies, the ball, the sky, the floor and birds never block. */
+  private highClear(pose: { eye: P3; target: P3 }, pull: number): number {
+    const t = new Vector3(pose.target.x, pose.target.y, pose.target.z);
+    const d = new Vector3(pose.eye.x - t.x, pose.eye.y - t.y, pose.eye.z - t.z);
+    const len = d.length();
+    if (len < 0.5) return pull;
+    const hit = this.scene.pickWithRay(new Ray(t, d.scale(1 / len), len + HIGH_CAM_CLEAR_M), (m: AbstractMesh) =>
+      m.isEnabled() && m.isVisible && m.visibility > 0.25 && !m.skeleton && m.getTotalVertices() > 0 && !HIGH_NEVER_BLOCKS.test(m.name)
+      && m.getBoundingInfo().boundingSphere.radiusWorld > 0.25);
+    if (!hit?.hit || hit.distance === undefined) return pull;
+    const k = Math.max(0, hit.distance - HIGH_CAM_CLEAR_M) / len;   // the share of today's eye distance that is clear
+    return Math.max(HIGH_CAM_PULL_MIN, Math.min(pull, pull * k));
+  }
+  /** The high view's frame: where the eye and the look target are this frame (`snap` = land on the want, no truck). */
+  private updateHigh(snap: boolean | 'reset'): void {
+    const h = this.high!; const p = highCamParams();
+    const eng = this.scene.getEngine();
+    const dt = Math.min(0.1, eng.getDeltaTime() / 1000);
+    const aspect = Math.max(0.2, eng.getRenderWidth() / Math.max(1, eng.getRenderHeight()));
+    if (this.baseFov === null) this.baseFov = this.camera.fov;
+    // the lens is fixed here: a widened follow lens (fovGain) eases back to the authored one, a cut lands on it
+    if (snap) this.camera.fov = this.baseFov; else if (Math.abs(this.camera.fov - this.baseFov) > 1e-4) this.camera.fov += (this.baseFov - this.camera.fov) * 0.1;
+    const fr = h.frame();
+    let want = highWant(h.court, p, fr.play, fr.must, this.baseFov, aspect);
+    // the clear view: the want never puts scenery (a palm's crown, a tree, a pole, a wall) between the eye and its look target; the
+    // eye comes in along the look instead, through the same damped truck. One ray, at the full back-away, every HIGH_CLEAR_EVERY frames
+    // (the truck moves centimetres in between, inside the HIGH_CAM_CLEAR_M room): its answer caps the pull for every frame until the next.
+    if (snap || this.highClearCap === null || ++this.highClearAge >= HIGH_CLEAR_EVERY) {
+      this.highClearAge = 0;
+      const top = Math.max(1, p.pullMax);
+      this.highClearCap = this.highClear(highPose(h.court, p, { ...want, pull: top }), top);
+    }
+    // a back-away the scenery will not allow: fit again inside it (it lets the rim go before it lets a player go)
+    if (want.pull > this.highClearCap + 1e-6) want = highWant(h.court, { ...p, pullMax: Math.max(1, this.highClearCap) }, fr.play, fr.must, this.baseFov, aspect);
+    want.pull = Math.min(want.pull, this.highClearCap);
+    // a reset (snapTo) glides when the new spots are still on screen from here, and cuts when they are not; in play, the truck
+    // catches up faster while a point is off its spot
+    const fitsNow = !!this.highS && highFits(h.court, p, this.highS, fr.must, this.baseFov, aspect);
+    if (snap === 'reset' && fitsNow) snap = false;
+    this.highS = snap || !this.highS ? { ...want, vx: 0, vz: 0, vp: 0 } : highStep(this.highS, want, dt, p.panSec * (fitsNow ? 1 : HIGH_CAM_CATCHUP));
+    // THE EDGE PUSH: the hero (the first two points: feet, head) is never left past the frame's edge by the soft truck's lag; the
+    // truck slides with him from there (as fast as he runs, so it is a slide, not a jump), and its rate keeps the push
+    if (!snap && fr.must.length >= 2) {
+      const [lo, hi] = highSideSpan(h.court, p, this.highS.z, this.highS.pull, fr.must.slice(0, 2), this.baseFov, aspect, HIGH_CAM_EDGE);
+      if (lo <= hi && (this.highS.x < lo || this.highS.x > hi)) {
+        const x = Math.max(lo, Math.min(hi, this.highS.x)), rate = dt > 0 ? (x - this.highS.x) / dt : 0;
+        this.highS.x = x;
+        this.highS.vx = rate > 0 ? Math.max(this.highS.vx, rate) : Math.min(this.highS.vx, rate);
+      }
+    }
+    // …and where the truck is still on its way in from behind an occluder, the eye is held in front of it (the one hard step)
+    if (this.highS.pull > this.highClearCap) { this.highS.pull = this.highClearCap; this.highS.vp = Math.min(0, this.highS.vp); }
+    const pose = highPose(h.court, p, this.highS);
+    // a camera punch (pulse): a short push along the look, a share of the follow's
+    const push = (1 - this.beatScale) * HIGH_CAM_PUNCH;
+    const eye = new Vector3(pose.eye.x, pose.eye.y, pose.eye.z), target = new Vector3(pose.target.x, pose.target.y, pose.target.z);
+    if (push > 0) eye.addInPlace(target.subtract(eye).scaleInPlace(push));
+    // the venue box (as every play camera): a clamp moves the look target with the eye, so the view still never turns
+    const clamped = this.clampToBounds(eye.clone());
+    target.addInPlace(clamped.subtract(eye));
+    this.camera.position.copyFrom(clamped);
+    this.camera.setTarget(target);
+  }
+
 
   setFixedBehind(subject: Vector3, facingYaw: number, preset: keyof typeof FIXED_PRESETS = 'swing', snap = false): void {
     const p = FIXED_PRESETS[preset];
@@ -590,6 +684,13 @@ export class CameraDirector {
   }
 
   snapTo(subject: Vector3, objective: Vector3 | null): void {
+    if (this.highActive && this.mode === 'follow') {   // lane/hoops-cam: the high view's court never changes, so a reset GLIDES (the
+      // truck's spring) once the view is up, unless the new spots are off screen from where it is; its first frame (or the switch from
+      // the follow) lands on the want at once
+      const cut = !this.highWas || !this.highS; this.highWas = true; this.updateHigh(cut ? true : 'reset');
+      if (this.intro) this.intro.play = { pos: this.camera.position.clone(), target: this.camera.getTarget().clone(), fov: this.camera.fov };
+      return;
+    }
     const cfg = this.effCfg();
     const back = objective
       ? subject.subtract(objective).normalize()
@@ -700,6 +801,13 @@ export class CameraDirector {
         : subject.add(new Vector3(0, this.fixedTargetHeight, 0));
       this.camera.setTarget(t);
       return;
+    }
+
+    // lane/hoops-cam: the high view, when it is on. Switching between it and the follow is a CUT both ways (never a chase across)
+    if (this.high) {
+      const on = this.highActive;
+      if (on) { const cut = !this.highWas; this.highWas = true; this.updateHigh(cut); return; }
+      if (this.highWas) { this.highWas = false; this.highS = null; this.snapTo(subject, objective); return; }
     }
 
     const cfg = this.effCfg();
