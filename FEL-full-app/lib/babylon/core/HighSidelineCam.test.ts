@@ -361,4 +361,24 @@ describe('high sideline in the director (CameraDirector.setHighView)', () => {
     expect(Vector3.Dot(cam.getTarget().subtract(cam.position).normalize(), look)).toBeCloseTo(1, 6);   // in along its look, never turned
     scene.dispose(); engine.dispose();
   });
+  it('a tight venue box (Canopy Court on an upright phone): the eye comes in along its look to stay inside, and the hero stays on screen', () => {
+    // Rig (2026-11-21): the box clamp trucked the whole view sideways at its edge and the hero went off the right of the screen.
+    const { scene, engine, cam, dir } = rig(390, 844);
+    dir.setBounds({ minX: -9, maxX: 8, minZ: -6, maxZ: 17.1, minY: 0 });
+    const me = new Vector3(0, 0, 6), foe = new Vector3(0.6, 0, 4.8);
+    dir.setHighView({ court: COURT, on: () => true, frame: () => ({ play: { x: (me.x + foe.x) / 2, z: (me.z + foe.z) / 2 }, must: mustOf({ x: me.x, y: 1, z: me.z }, { x: foe.x, y: 1, z: foe.z }) }) });
+    dir.snapTo(me, RIM_V);
+    const look = cam.getTarget().subtract(cam.position).normalize();
+    let off = 0;
+    for (let i = 0; i < 240; i++) {
+      if (i < 120) { me.x -= 3 / 60; me.z += 2 / 60; } foe.set(me.x + 0.6, 0, me.z - 1.2);   // out to the far wing, deep
+      dir.update(me, Vector3.Zero(), RIM_V);
+      const pose = { eye: { x: cam.position.x, y: cam.position.y, z: cam.position.z }, target: { x: cam.getTarget().x, y: cam.getTarget().y, z: cam.getTarget().z } };
+      if (![0, 1.9].every((y) => Math.abs(project(pose, FOV, 390 / 844, { x: me.x, y, z: me.z }).x) < 0.97)) off++;
+      expect(cam.position.x).toBeLessThanOrEqual(8 - 1.2 + 1e-6); expect(cam.position.z).toBeLessThanOrEqual(17.1 - 1.2 + 1e-6);
+      expect(Vector3.Dot(cam.getTarget().subtract(cam.position).normalize(), look)).toBeCloseTo(1, 6);
+    }
+    expect(off).toBe(0);
+    scene.dispose(); engine.dispose();
+  });
 });

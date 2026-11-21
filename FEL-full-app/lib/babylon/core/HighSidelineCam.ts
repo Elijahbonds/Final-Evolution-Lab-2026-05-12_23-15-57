@@ -159,7 +159,10 @@ export function bottomBand(aspect: number, p: HighCamParams): number {
  * takes the depth truck nearest the wanted one that fits, at the least back-away (pull) that fits; when nothing fits up to pullMax,
  * the last point (the rim) is let go first, then the rival.
  */
-export function highWant(c: CourtFrame, p: HighCamParams, play: P2, must: readonly P3[], vfov: number, aspect: number): HighOff {
+/** The ground box the eye must stay inside (the venue's, already shrunk by its margin). */
+export interface EyeBox { minX: number; maxX: number; minZ: number; maxZ: number }
+
+export function highWant(c: CourtFrame, p: HighCamParams, play: P2, must: readonly P3[], vfov: number, aspect: number, box: EyeBox | null = null): HighOff {
   const b = highBasis(c, p.sideDeg), f0 = restFocus(c, p);
   const dx = play.x - f0.x, dz = play.z - f0.z;
   const share = Math.max(0, Math.min(1, p.panShare));
@@ -185,6 +188,16 @@ export function highWant(c: CourtFrame, p: HighCamParams, play: P2, must: readon
       const xc = d.x * b.right.x + d.z * b.right.z, half = k * zc * th;
       lo = Math.max(lo, xc - half); hi = Math.min(hi, xc + half);
     }
+    // the venue's box: the side truck moves the eye along screen-right, so the box allows an interval of trucks too (a view held
+    // inside its venue by a clamp that trucked it sideways lost the play on an upright phone at Canopy Court: rig, 2026-11-21)
+    if (box) {
+      const lim = (e0: number, r: number, mn: number, mx: number): void => {
+        if (Math.abs(r) < 1e-6) { if (e0 < mn || e0 > mx) { lo = 1; hi = 0; } return; }
+        const a = (mn - e0) / r, b = (mx - e0) / r;
+        lo = Math.max(lo, Math.min(a, b)); hi = Math.min(hi, Math.max(a, b));
+      };
+      lim(pose.eye.x, b.right.x, box.minX, box.maxX); lim(pose.eye.z, b.right.z, box.minZ, box.maxZ);
+    }
     return [lo, hi];
   };
   const ok = (az: number, pull: number, n: number) => { const [l, h] = fit(az, pull, n); return l <= h; };
@@ -192,13 +205,17 @@ export function highWant(c: CourtFrame, p: HighCamParams, play: P2, must: readon
   const azs: number[] = [];
   for (let a = -HIGH_CAM_DEPTH_OUT_M; a <= HIGH_CAM_DEPTH_IN_M + 1e-9; a += AZ_STEP) azs.push(a);
   azs.push(azWant); azs.sort((x, y) => Math.abs(x - azWant) - Math.abs(y - azWant));
+  // the back-aways tried, in order: the resting distance, then further out up to pullMax (the play fits wider), then — only when the
+  // venue's box or nothing else fits — in along the look down to HIGH_CAM_PULL_MIN
+  const pulls: number[] = [];
+  for (let i = 0; i <= PULLS; i++) { if (i > 0 && pullMax <= 1) break; pulls.push(1 + ((pullMax - 1) * i) / PULLS); }
+  if (box) for (let q = 0.95; q >= HIGH_CAM_PULL_MIN - 1e-9; q -= 0.05) pulls.push(q);
   for (let n = must.length; n > 0; n--) {
-    for (let i = 0; i <= PULLS; i++) {
-      if (i > 0 && pullMax <= 1) break;
-      let pull = 1 + ((pullMax - 1) * i) / PULLS;
+    for (let i = 0; i < pulls.length; i++) {
+      let pull = pulls[i];
       const az0 = azs.find((a) => ok(a, pull, n));
       if (az0 === undefined) continue;
-      // refine: the depth truck nearest the wanted one (bisect toward it), then the least pull between this step and the last
+      // refine: the depth truck nearest the wanted one (bisect toward it), then the pull nearest the last one tried (no fit there)
       let az = az0;
       if (Math.abs(az - azWant) > 1e-9 && !ok(azWant, pull, n)) {
         let bad = azWant, good = az;
@@ -206,7 +223,7 @@ export function highWant(c: CourtFrame, p: HighCamParams, play: P2, must: readon
         az = good;
       } else az = ok(azWant, pull, n) ? azWant : az;
       if (i > 0) {
-        let bad = 1 + ((pullMax - 1) * (i - 1)) / PULLS, good = pull;
+        let bad = pulls[i - 1], good = pull;
         for (let j = 0; j < 8; j++) { const m = (bad + good) / 2; if (ok(az, m, n)) good = m; else bad = m; }
         pull = good;
       }
@@ -230,7 +247,7 @@ export function highFits(c: CourtFrame, p: HighCamParams, off: HighOff, must: re
 }
 /** The side trucks [lo, hi] at which every one of `pts` sits inside |screen x| ≤ edge, at this depth truck and pull (lo > hi: none).
  *  The director's EDGE PUSH: the hero is never left past the frame's edge by the soft truck's lag (a sprint across an upright phone). */
-export function highSideSpan(c: CourtFrame, p: HighCamParams, z: number, pull: number, pts: readonly P3[], vfov: number, aspect: number, edge: number): [number, number] {
+export function highSideSpan(c: CourtFrame, p: HighCamParams, z: number, pull: number, pts: readonly P3[], vfov: number, aspect: number, edge: number, box: EyeBox | null = null): [number, number] {
   const b = highBasis(c, p.sideDeg), pose = highPose(c, p, { x: 0, z, pull });
   const v = { x: pose.target.x - pose.eye.x, y: pose.target.y - pose.eye.y, z: pose.target.z - pose.eye.z };
   const vl = Math.hypot(v.x, v.y, v.z) || 1; v.x /= vl; v.y /= vl; v.z /= vl;
@@ -240,6 +257,13 @@ export function highSideSpan(c: CourtFrame, p: HighCamParams, z: number, pull: n
     const d = { x: q.x - pose.eye.x, y: q.y - pose.eye.y, z: q.z - pose.eye.z };
     const zc = Math.max(0.5, d.x * v.x + d.y * v.y + d.z * v.z), xc = d.x * b.right.x + d.z * b.right.z, half = edge * zc * th;
     lo = Math.max(lo, xc - half); hi = Math.min(hi, xc + half);
+  }
+  if (box) {   // the venue's box, as in the fit
+    const lim = (e0: number, r: number, mn: number, mx: number): void => {
+      if (Math.abs(r) < 1e-6) { if (e0 < mn || e0 > mx) { lo = 1; hi = 0; } return; }
+      const u = (mn - e0) / r, w = (mx - e0) / r; lo = Math.max(lo, Math.min(u, w)); hi = Math.min(hi, Math.max(u, w));
+    };
+    lim(pose.eye.x, b.right.x, box.minX, box.maxX); lim(pose.eye.z, b.right.z, box.minZ, box.maxZ);
   }
   return [lo, hi];
 }

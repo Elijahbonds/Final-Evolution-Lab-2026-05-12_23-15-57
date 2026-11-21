@@ -300,7 +300,8 @@ const OCCLUSION_MARGIN = 0.6;
  *  Deliberately excludes characters, balls, props and the M61 backdrop. */
 const VENUE_SHELL = /^(venue_ground|venue_box|wall_|park_floor|piste|water|shore|mc_ring|mc_pit)/i;
 /** lane/hoops-cam: what never blocks the high view's eye (the sky and the floor it looks across, bodies' gear, the ball, birds, rings). */
-const HIGH_NEVER_BLOCKS = /sky|dome|backdrop|horizon|ground|floor|court(?!side)|water|ocean|sea\b|fog|gull|bird|ball|ring|shadow|decal|line|paint|glow|net\b|rim|cloud/i;
+// Whole words only for the short ones: `rim` matched every glTF `…_primitive…` mesh (the palms), so neither guard saw a palm (rig, 2026-11-21).
+const HIGH_NEVER_BLOCKS = /sky|dome|backdrop|horizon|ground|floor|court(?!side)|water|ocean|\bsea\b|fog|gull|bird|shadow|decal|glow|cloud|(?:^|[^a-z])(?:ball|ring|rim|net|lines?|paint)(?:[^a-z]|$)/i;
 /** lane/hoops-cam: a prop's box the high view's eye stays out of — props only (a box no wider than this, m), with this much room (m). */
 const HIGH_PROP_BOX_M = 25, HIGH_BOX_ROOM_M = 0.3, HIGH_BOX_GATHER_M = 2;
 /** lane/hoops-cam: a hero who moves further than this in one frame was put there (a reset), not run there: the high view treats it as one. */
@@ -657,7 +658,10 @@ export class CameraDirector {
     const m0 = fr.must[0];
     if (!snap && m0 && this.highLast && Math.hypot(m0.x - this.highLast.x, m0.z - this.highLast.z) > HIGH_TELEPORT_M) snap = 'reset';
     if (m0) this.highLast = { x: m0.x, z: m0.z };
-    let want = highWant(h.court, p, fr.play, fr.must, this.baseFov, aspect);
+    if (!this.boundsTried) this.deriveBounds();
+    const bx = this.bounds, m = BOUNDS_MARGIN;
+    const box = bx && bx.maxX - bx.minX > m * 3 && bx.maxZ - bx.minZ > m * 3 ? { minX: bx.minX + m, maxX: bx.maxX - m, minZ: bx.minZ + m, maxZ: bx.maxZ - m } : null;
+    let want = highWant(h.court, p, fr.play, fr.must, this.baseFov, aspect, box);
     // the clear view: the want never puts scenery (a palm's crown, a tree, a pole, a wall) between the eye and its look target; the
     // eye comes in along the look instead, through the same damped truck. One ray, at the full back-away, every HIGH_CLEAR_EVERY frames
     // (the truck moves centimetres in between, inside the HIGH_CAM_CLEAR_M room): its answer caps the pull for every frame until the next.
@@ -670,7 +674,7 @@ export class CameraDirector {
       this.highClearCap = this.highClear(highPose(h.court, p, { x: at.x, z: at.z, pull: top }), top);
     }
     // a back-away the scenery will not allow: fit again inside it (it lets the rim go before it lets a player go)
-    if (want.pull > this.highClearCap + 1e-6) want = highWant(h.court, { ...p, pullMax: Math.max(1, this.highClearCap) }, fr.play, fr.must, this.baseFov, aspect);
+    if (want.pull > this.highClearCap + 1e-6) want = highWant(h.court, { ...p, pullMax: Math.max(1, this.highClearCap) }, fr.play, fr.must, this.baseFov, aspect, box);
     want.pull = Math.min(want.pull, this.highClearCap);
     while (want.pull > HIGH_CAM_PULL_MIN && this.highInside(highPose(h.court, p, want).eye)) want.pull = Math.max(HIGH_CAM_PULL_MIN, want.pull - 0.05);   // in along the look, out of a prop
     // a reset (snapTo) glides when the new spots are still on screen from here, and cuts when they are not; in play, the truck
@@ -682,7 +686,21 @@ export class CameraDirector {
     // THE EDGE PUSH: the hero (the first two points: feet, head) is never left past the frame's edge by the soft truck's lag; the
     // truck slides with him from there (as fast as he runs, so it is a slide, not a jump), and its rate keeps the push
     if (!snap && fr.must.length >= 2) {
-      const [lo, hi] = highSideSpan(h.court, p, this.highS.z, this.highS.pull, fr.must.slice(0, 2), this.baseFov, aspect, HIGH_CAM_EDGE);
+      const hero = fr.must.slice(0, 2), fov0 = this.baseFov ?? this.camera.fov, st = this.highS;
+      const span = (q: number): [number, number] => highSideSpan(h.court, p, st.z, q, hero, fov0, aspect, HIGH_CAM_EDGE, box);
+      let [lo, hi] = span(this.highS.pull);
+      // where the venue's box leaves no side truck that holds him at this distance, the push comes in along the look as well (a closer
+      // eye has more room to slide inside the box), at the same capped speed
+      if (lo > hi) {
+        let q = this.highS.pull;
+        while (q > HIGH_CAM_PULL_MIN && lo > hi) { q = Math.max(HIGH_CAM_PULL_MIN, q - 0.05); [lo, hi] = span(q); }
+        if (lo <= hi) {
+          const unit = Math.hypot(p.dist, p.height - p.targetY) || 1, capPull = (HIGH_CAM_PUSH_MPS * dt) / unit;
+          this.highS.pull = Math.max(q, this.highS.pull - capPull); this.highS.vp = Math.min(this.highS.vp, 0);
+          [lo, hi] = span(this.highS.pull);
+          if (lo > hi) [lo, hi] = span(q);
+        }
+      }
       if (lo <= hi && (this.highS.x < lo || this.highS.x > hi)) {
         // at most HIGH_CAM_PUSH_MPS (faster than a sprint, so a running hero is held; a hero left far outside by a reset is slid to,
         // never jumped to — measured: an uncapped push moved the view 1.8 m in one frame on an upright phone and carried that speed)
