@@ -375,6 +375,8 @@ export function AssessApp({ initialRun = null, accountAge = null }: { initialRun
     if (next.step === 'age' && accountAge) { pre({ type: 'age', age: accountAge }); return; }
     // SCREEN-MINOR-LOCK: past the age question, a run that is not 18 or older ends on the camera-free card
     if (next.step !== 'intro' && next.step !== 'age' && !cameraAllowed(next.age, readSessionAge(tabStorage()))) { setPhase('noCamera'); return; }
+    // SCREEN-18PLUS-GATE: the reducer's camera-free kid result uses the same card (KidNoCamera).
+    if (next.step === 'kidResult') { setPhase('noCamera'); return; }
     if (next.step === 'camera') { void startCamera(); return; }
     setPhase(next.step);
   };

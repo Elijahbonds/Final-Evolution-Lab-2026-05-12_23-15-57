@@ -52,7 +52,7 @@ describe('every age band → the right next step', () => {
       expect(a.step, age).toBe('grownUp');
       expect(a.gate, age).toBeNull();
       const b = preStep(a, { type: 'grownUp' });
-      expect(b.step, age).toBe('pain');
+      expect(b.step, age).toBe('kidResult');
       expect(b.gate).toMatchObject({ ageBand: age, grownUp: true });
       expect(mayPersist(b.gate), age).toBe(false);                    // CHANGED (SCREEN-FIX-2): nothing but the age answer is kept for them
     }
