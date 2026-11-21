@@ -114,6 +114,7 @@ import { rightHandDunks, dunkHandPass } from '../anim/dunkHand';   // DUNK MOTIO
 import { PlayerSlot, LocalInputSource, AISource } from '../core/PlayerSlot';
 import { BodyControlSource, MergedControlSource, COURT_BODY } from '@/lib/move/bodyControlSource';   // HOOPS BODY (2026-10-07): 3v3 by body
 import { attachNetplay, type NetplayHandle } from '../../net/attach';   // opt-in: ?net=<room> seats a human in the first AI slot
+import type { PlayHooks } from '../../net/play';   // lane/online-play: one shared game, up to six humans
 import { AgentControlSource } from '../core/AgentControlSource';  // M69: intent play under ?agent=1 (same seam as 1v1)
 import { agentBridge } from '../core/AgentBridge';
 import { RIM_HEIGHT_M } from '../core/courtDims';
@@ -316,6 +317,19 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   /** Null unless ?net=<room>. One AI seat becomes a remote player. */
   let net: NetplayHandle | null = null;
   let netSeatTaken = false;
+  let netMates = 0;   // lane/online-play: the teammates spawned so far (their seat keys, mate0 / mate1)
+  /** lane/online-play: what the shared game (lib/net/play.ts) needs from this mode. */
+  const netHooks: PlayHooks = {
+    cast: () => (bodiesAll.length === 6 && ball ? { bodies: bodiesAll.map((b) => b.char.root), loose: [ball] } : null),
+    localIntent: (dt) => { me.slot.poll(dt); return me.slot.intent; },
+    takeOver: (score, _why, hud, ctx) => {   // the page that ran the game left: carry on from a check-up, the score and the clock as they stood
+      myScore = score.mine; foeScore = score.theirs;
+      if (typeof hud.time === 'number') timeLeft = Math.max(1, hud.time);
+      putHud(ctx, { score: myScore, foeScore, time: Math.ceil(timeLeft) });
+      resetPossession(true);
+    },
+    scores: () => ({ mine: myScore, theirs: foeScore }),
+  };
   let agentCtl: AgentControlSource | null = null;   // M69: the hero slot's source under ?agent=1; null for human play
   let shotMeter: ShotMeter;
   let turbo: TurboMeter;
@@ -1056,7 +1070,10 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         // five AI bodies load together now (Promise.all below), so whatever ran after the load ran in the order the loads finished.
         // NETPLAY (2026-09-12): with ?net=<room> the FIRST AI seat becomes a remote player — one human opponent among the AI, which is
         // the smallest honest step for a 6-body mode. The rest keep their brains. No flag, no change.
-        const takeNetSeat = !!net && ai && !netSeatTaken;
+        // lane/online-play (2026-11-21): EVERY AI seat can be a human (up to six, lib/net/seats.ts): the body's key is decided here,
+        // before the await, in spawn order; its slot reads the human on that seat while one is in the room, its brain otherwise
+        const netKey = !ai ? 'me' : aiKind === 'teammate' ? `mate${netMates++}` : `foe${markIndex ?? 0}`;
+        const takeNetSeat = !!net && ai && !netSeatTaken && !net.play.enabled;   // (the old one-seat rule, kept for net.mirrorOn 0)
         if (takeNetSeat) netSeatTaken = true;
         let brain: TeammateBrain | DefenderBrain | null = null;
         let aiSource: TeammateBrain | ReactiveDefender | null = null;   // lane/hoops-round2 HOP-02: what the slot polls (a defender through its lens)
@@ -1103,6 +1120,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           : { ball: () => ball.getAbsolutePosition(), hoop: () => RIM, allies: foePositions, foes: allyPositions };
         const slot = takeNetSeat
           ? new PlayerSlot('net1', net!.sourceFor('net1'), false)
+          : ai && brain && net?.play.enabled
+            ? new PlayerSlot(netKey, net.seatSource(netKey, new AISource(char.root.position, world, aiSource ?? brain)), false)
           : ai && brain
             ? new PlayerSlot('ai', new AISource(char.root.position, world, aiSource ?? brain), false)
             : new PlayerSlot('me', agentCtl ?? (bodyCtl ? new MergedControlSource(localSource, bodyCtl) : localSource), true);
@@ -1127,7 +1146,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       // with no body in frame the merge IS the pad's Intent, so button play is unchanged
       bodyCtl = new BodyControlSource({ role: () => (carrierId === 'foeTeam' ? 'defense' : 'offense'), view: () => ctx.body?.() ?? null, meter: () => shotMeter ?? null, hand: () => carries.get(me)?.handAfterMove ?? 'Right', emit: (e) => ThreeVThreeMode.onInput(ctx, e) });
 
-      net = attachNetplay('threevthree'); netSeatTaken = false;   // no-op without ?net=
+      net = attachNetplay('threevthree'); netSeatTaken = false; netMates = 0;   // no-op without ?net=
       // M69 (mirrors 1v1): when driven by an agent (?agent=1), the hero slot reads from the AgentControlSource
       // instead of local input. Human play is untouched — the bridge is only installed under the dev flag.
       agentCtl = agentBridge() ? new AgentControlSource() : null;
@@ -1245,6 +1264,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
       localSource.feed(e);
+      if (net?.play.drawing) return;   // lane/online-play: another page runs the game — my presses ride my slot to it
       if (e.t === 'trigger' && e.side === 'L') ltHeld = e.value > 0.5;   // HOOPS KINETIC: LT is the drift modifier
       // HOOPS KINETIC: the poke on defense is a PARRY-VAULT when the driver is arriving, a DRIVE-BY when I am running beside him
       // HOTFIX (2026-09-24): …while he still HAS it (ball.parent: his hand). His shot is up, his miss is a live board now (not a
@@ -1304,6 +1324,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
 
     update(ctx: ModeContext, dt: number) {
       if (!ctx.input.keyRStick) { ctx.input.keyRStick = true; keyBus = ctx.input; }   // H1 H-19: the keyboard R stick is on in hoops
+      if (net && net.play.frame(ctx, dt, netHooks)) return;   // lane/online-play: another page runs the game — this one draws it
       meter3d?.update(dt); if (!shooting && !dunking && meter3d?.visible()) meter3d.end(null);   // a shot that ended without a release (a block, a strip) drops the bar
       if (ended) return;
       // IMPROVE (2026-10-06) #10: the mode's clock — the beats that fell due (a reset, a check, a banner's clear) before anything reads

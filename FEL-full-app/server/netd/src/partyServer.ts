@@ -14,7 +14,7 @@ import { WebSocket } from 'ws';
 import {
   createParty, connect, disconnect, handle, sweep, isPartyCollectable, type Party, type Effects, type PartyEnv,
 } from './party.js';
-import { PARTY_CODE_ALPHABET, PARTY_CODE_LEN, PARTY_FRAME_MAX_BYTES, parsePartyCode } from './partyRules.js';
+import { PARTY_CODE_ALPHABET, PARTY_CODE_LEN, PARTY_FEATURES, PARTY_FRAME_MAX_BYTES, parsePartyCode } from './partyRules.js';
 import { verifyTicket, sealSlip } from './ticket.js';
 
 /** A bound on memory: one instance holds every party in RAM (README: single-instance state). */
@@ -57,7 +57,7 @@ function apply(code: string, fx: Effects): void {
 }
 
 export function partyHealth(): { parties: number; features: string[] } {
-  return { parties: parties.size, features: ['party1'] };
+  return { parties: parties.size, features: [...PARTY_FEATURES] };
 }
 
 export function acceptParty(ws: WebSocket): void {
@@ -136,6 +136,7 @@ function hello(ws: WebSocket, msg: Record<string, unknown>, now: number): void {
   send(ws, {
     t: 'p_welcome', v: 1, code: p.code, you: res.member.peer, resume: res.member.resume, resumed: res.resumed,
     rights: { text: res.member.adult, voice: res.member.adult },
+    features: [...PARTY_FEATURES],   // lane/online-play (party2, additive): what this build speaks, so a page knows what to offer
   });
   apply(p.code, res.effects);
 }

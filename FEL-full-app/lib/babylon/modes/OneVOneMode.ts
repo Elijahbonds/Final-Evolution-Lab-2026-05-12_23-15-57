@@ -154,6 +154,7 @@ import { driveDunkKFor, handForward, handShiftTarget, stepShift, driveDunkPos, h
 import { PlayerSlot, LocalInputSource, AISource } from '../core/PlayerSlot';
 import { BodyControlSource, MergedControlSource, COURT_BODY } from '@/lib/move/bodyControlSource';   // HOOPS BODY (2026-10-07): 1v1 by body
 import { attachNetplay, type NetplayHandle } from '../../net/attach';   // opt-in: ?net=<room>, same shape as ?agent=1
+import type { PlayHooks } from '../../net/play';   // lane/online-play: one shared game
 import { AgentControlSource } from '../core/AgentControlSource';  // M69: intent play under ?agent=1
 import { agentBridge } from '../core/AgentBridge';
 import {
@@ -370,6 +371,17 @@ export const OneVOneMode: ModeDefinition = (() => {
   let bodyCtl: BodyControlSource | null = null;   // HOOPS BODY: the body's half of the hero's source (merged with the pad's)
   /** Null unless ?net=<room> and NEXT_PUBLIC_NETD_URL are both present. */
   let net: NetplayHandle | null = null;
+  /** lane/online-play: what the shared game (lib/net/play.ts) needs from this mode. */
+  const netHooks: PlayHooks = {
+    cast: () => (me && foe && ball ? { bodies: [me.root, foe.root], loose: [ball] } : null),
+    localIntent: (dt) => { meSlot?.poll(dt); return meSlot.intent; },
+    takeOver: (score, _why, _hud, ctx) => {   // my ball now (theirs went over, or their page left): the check-up, with the score as it stands
+      myScore = score.mine; foeScore = score.theirs;
+      ctx.setHud({ score: myScore, foeScore });
+      resetPositions();
+    },
+    scores: () => ({ mine: myScore, theirs: foeScore }),
+  };
   let meDribble: DribbleController;
   let meDribbleSM: DribbleStateMachine;
   let meAnimTree: BasketballAnimTree, foeAnimTree: BasketballAnimTree;
@@ -1127,16 +1139,19 @@ export const OneVOneMode: ModeDefinition = (() => {
       // of the DefenderBrain. Exactly the ?agent=1 precedent above — one source swap, and with no
       // flag present nothing is constructed and nothing connects.
       net = attachNetplay('onevone');
-      foeSlot = net
-        ? new PlayerSlot('foe', net.sourceFor('foe'), false)
-        : new PlayerSlot('foe', new AISource(foe.root.position, {
+      // lane/online-play: the rival's slot is the other human while one is in the room, the AI otherwise (a seat nobody took, a
+      // player who left) — so the AI source is built either way (lib/net/attach.ts seatSource)
+      const foeAi = !net || net.play.enabled ? new AISource(foe.root.position, {
         // getAbsolutePosition, NOT .position: while the ball rides a hand it
         // is PARENTED to the hand bone and .position is a palm-local offset
         // (~origin). Fed that, the defender's deny point collapsed onto the
         // rim — measured live: the "defender" parked at (0, 0.3) and never
         // marked anyone, in every game this mode has ever played.
         ball: () => ball.getAbsolutePosition(), hoop: () => RIM, allies: () => [], foes: () => [me.root.position],
-      }, (foeLens = new ReactiveDefender(foeBrain = new DefenderBrain(knobs.defenderAggression, null, roll)))), false);   // IMPROVE (2026-10-06) #2: the tier's poke (PRO 0.7, as always)
+      }, (foeLens = new ReactiveDefender(foeBrain = new DefenderBrain(knobs.defenderAggression, null, roll)))) : null;   // IMPROVE (2026-10-06) #2: the tier's poke (PRO 0.7, as always)
+      foeSlot = net && !net.play.enabled
+        ? new PlayerSlot('foe', net.sourceFor('foe'), false)   // net.mirrorOn 0: the wire alone, exactly as before
+        : new PlayerSlot('foe', net ? net.seatSource('foe', foeAi) : foeAi!, false);
       foeLens?.setTier(runTier());   // lane/hoops-round2 HOP-02: the brain sees through the reaction lens (the tier's delay)
 
       // Phase 4: Havok contact bodies. If the physics wasm is unavailable
@@ -1226,6 +1241,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
       localSource.feed(e);
+      if (net?.play.drawing) return;   // lane/online-play: the other page runs this possession — my presses ride my slot to it
       if (e.t === 'stick' && e.side === 'R') {   // MODE-STICK-FACE: R stick → the director's look orbit — except on the floor with the ball, where it is the DRIBBLE STICK (2K)
         if (posting && carrying && !shooting && !dunking) {   // POST HOOK (2K20): with the post held the stick is the SHOT stick
           postStick = { x: e.x, y: e.y };
@@ -1292,6 +1308,7 @@ export const OneVOneMode: ModeDefinition = (() => {
 
     update(ctx: ModeContext, dt: number) {
       if (!ctx.input.keyRStick) { ctx.input.keyRStick = true; keyBus = ctx.input; }   // H1 H-19: the keyboard R stick is on in hoops
+      if (net && net.play.frame(ctx, dt, netHooks)) return;   // lane/online-play: the other page runs this possession — this one draws it
       meter3d?.update(dt); if (!shooting && !dunking && meter3d?.visible()) meter3d.end(null);   // a shot that ended without a release (a block, a strip) drops the bar
       if (ended) return;
       // IMPROVE (2026-10-06) #6: the mode's clock — the beats that fell due (a reset, a check, a banner's clear) before anything reads
@@ -2599,6 +2616,8 @@ export const OneVOneMode: ModeDefinition = (() => {
   function startDefense(ctx: ModeContext, banner: string): void {
     if (hoopsFx?.deadBall(() => startDefense(ctx, banner))) return;   // vis-hoops-court: a replay of the possession's best moment first
     possessionToken++;
+    // lane/online-play: online, THEIR ball is the other human's possession — their page runs it (the AI attacks only when nobody is there)
+    if (net?.play.handOff({ mine: myScore, theirs: foeScore }, banner)) { possession = 'defense'; carrying = false; shooting = false; dunking = false; return; }
     possession = 'defense'; carrying = false; shooting = false; dunking = false; currentShot = null;
     defPhase = 'check'; kitTheAttacker(); attacker.reset(); nerveTheAttacker(); gatherShown = false; riseShown = false; stepbackShown = false; goaltendCalled = false; paintSec = 0;
     threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0; posterVictim = null; victimSlide = null; foeReact = null; strongHand = STRONG_HAND_IDLE; tapRelease = null; hopRelease = null; foeStealReach.reset();   // #273: a showing reach ends with the possession

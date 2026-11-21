@@ -1116,3 +1116,17 @@ Group **Kit · fit**. A look switch: it moves no body, no bone and no timing.
   marks are the one-piece short showing through the jersey (hiding the shorts on the rig removes them): the runtime lift is
   20 mm a short against 13 a top. 0.006 removes them on the rig pictures, but fails the 10.1a bar by noise-level margins
   (KIT-FIT-PLAN §14), so it ships off for the owner to judge. `lib/babylon/core/fitTight.ts` `LAYER_GAP`.
+
+## online-play, 2026-11-21 (owner: "Make sure the story and online play is finished"; the owner has not felt these yet)
+
+Group "Online play". All NEW numbers, chosen on this lane (`docs/ONLINE-FINISH-PLAN.md`); none changes an existing tuned
+number. The panel's session gate keeps overrides OFF in online and party runs (`lib/feel-panel/sessionGate.ts`), so in a
+real online game these are what ships; each is the record of the number and the switch back.
+
+| Knob | Default | Restores the old behaviour at | What it does |
+|---|---|---|---|
+| `net.mirrorOn` | 1 | 0 | One shared game (one page runs it, the others draw it). 0: each page runs its own game, the old one-seat wiring. |
+| `net.renderDelayMs` | 0 (adaptive) | — | How far behind the newest world another page draws. 0 = two ticks + 1.2 × jitter, 66–250 ms. |
+| `net.poseHz` | 15 | — | Body pose updates a second (roots and the ball always 30). |
+| `net.possessionSwap` | 1 | — | 1v1: the page whose player has the ball runs the game. 0: the host runs every possession. |
+| `net.karateTogether` | 0 | 1 | "Start together" offers Karate co-op (not shared yet: two fights). |

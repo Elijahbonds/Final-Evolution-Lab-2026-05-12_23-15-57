@@ -38,6 +38,33 @@ export interface FeelKnob {
  * Bounds are assumptions until the owner has felt them (flagged in the lane report).
  */
 export const FEEL_KNOBS: readonly FeelKnob[] = [
+  // ── lane/online-play (2026-11-21): one shared game online. NOTE: the panel's session gate keeps overrides OFF in online and
+  // party runs (sessionGate.ts), so these are the shipped numbers and the switches that restore the old behaviour, set in code ──
+  {
+    id: 'net.mirrorOn', label: 'Online: one shared game (1) / each page its own game (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Online play',
+    source: 'lib/net/knobs.ts NET_MIRROR_ON',
+    hint: 'On: one page runs the game and every other page draws it. Off: the old behaviour, where each page ran its own game.',
+  },
+  {
+    id: 'net.renderDelayMs', label: 'Online: draw this far behind (0 = adaptive)', def: 0, min: 0, max: 300, step: 10, unit: 'ms', group: 'Online play',
+    source: 'lib/net/knobs.ts NET_RENDER_DELAY_MS',
+    hint: 'How far in the past another page draws the shared game, to hide late packets. 0 measures the jitter and picks 66 to 250 ms.',
+  },
+  {
+    id: 'net.poseHz', label: 'Online: body pose updates per second', def: 15, min: 5, max: 30, step: 1, unit: '/s', group: 'Online play',
+    source: 'lib/net/knobs.ts NET_POSE_HZ',
+    hint: 'How often the bodies\' poses are sent (positions and the ball always go 30 times a second). Higher looks smoother and costs more data.',
+  },
+  {
+    id: 'net.possessionSwap', label: 'Online 1v1: the player with the ball runs the game (1) / the host runs it all (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Online play',
+    source: 'lib/net/knobs.ts NET_POSSESSION_SWAP',
+    hint: 'On: both players attack with every move. Off: the host runs every possession and the guest only defends.',
+  },
+  {
+    id: 'net.karateTogether', label: 'Start together offers Karate co-op (1) / hides it (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Online play',
+    source: 'lib/party/social/startable.ts NET_KARATE_TOGETHER',
+    hint: 'Karate co-op is not a shared game yet (each page fights its own horde). 1 offers it anyway, as before.',
+  },
   // ── hoops-handle (#375): the 3v3 AI handlers' ball hand, and the hand clearing the ball ──
   {
     id: 'hoops.aiHandRangeM', label: 'AI hand: defender range', def: 2.4, min: 1.0, max: 4.0, step: 0.05, unit: 'm', group: 'Hoops · ball hand',

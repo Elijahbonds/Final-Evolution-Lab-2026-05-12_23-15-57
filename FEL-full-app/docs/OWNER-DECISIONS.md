@@ -490,3 +490,12 @@ Taken by the coordinator on the standing rule (reversible, the recommended optio
 5. **The clothes: pick (3) from the kit-tight contact sheet** (relayed by the coordinator, 2026-11-18): the new garments — the
    one-piece short and the new jerseys — at half the runtime lift (`kit.onePieceShorts` 1, `kit.newJerseys` 1,
    `kit.setLiftScale` 0.5). Judged by eye; the rig's skin count was waived for this change (docs/KIT-FIT-PLAN.md §12.2).
+
+## owner 2026-11-21: finish the story and online play
+
+The owner, verbatim: **"Make sure the story and online play is finished."** (relayed by the coordinator, 2026-11-21).
+
+- Online play is `lane/online-play` (`docs/ONLINE-FINISH-PLAN.md`: the measured audit, what "finished" needs, the code built,
+  and the owner's netd redeploy as numbered copy-paste steps). The story is its own lane (`wt/story`).
+- The standing rules hold: netd protocol changes are additive; the owner redeploys netd, agents never do; the client keeps
+  working against the netd that is deployed now and says "Parties need a server update" where it must.
