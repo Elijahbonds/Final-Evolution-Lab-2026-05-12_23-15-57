@@ -3,6 +3,7 @@ import { setAgentRunHooksAllowed } from "@/lib/agentRunHooks";
 import { runMode, InputBus } from "@/lib/babylon";
 import { MODES } from "@/lib/babylon/modes/registry";
 import { readCourtLocation } from "@/lib/babylon/nexus/courtLocations";
+import { setFeelUser, setFeelSession, setFeelOverride } from "@/lib/feel-panel/feel";   // hoops-play: ?feel= as entry.mjs has it
 const W = window;
 const now = () => W.__realNow ? W.__realNow() : performance.now();
 W.__marks = W.__marks || [];
@@ -26,6 +27,8 @@ setAgentRunHooksAllowed(true);
 (async () => {
   const q = new URLSearchParams(window.location.search);
   const key = q.get("mode") ?? "dunk";
+  // hoops-play: ?feel=<json {knob id: value}> times the run on those feel-panel values (the knob-off / knob-on frame-time check)
+  if (q.get("feel")) { try { const o = JSON.parse(q.get("feel")); setFeelUser(true); setFeelSession(null); for (const [k, v] of Object.entries(o)) setFeelOverride(k, Number(v)); W.__feel = o; } catch (e) { W.__feelErr = String(e); } }
   const raster = Number(q.get("raster") ?? 4);
   const canvas = document.getElementById("c");
   const bus = new InputBus();

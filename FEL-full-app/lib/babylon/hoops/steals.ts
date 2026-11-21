@@ -101,3 +101,23 @@ export function aiStripLands(reacher: { x: number; z: number }, handler: { x: nu
     && (onBump || ball.y <= feel('hoops.stripBallMaxY', STRIP_BALL_MAX_Y));
   return { lands, reach, clear, ballY: ball.y };
 }
+
+// ── hoops-play (owner 2026-11-21, "Gameplay could still be improved greatly"): ONE RULE FOR THE STRIP, BOTH WAYS ───────────────────
+// The AI's strip on me is a hand on the ball (aiStripLands, above). Mine on the AI was the exposure read alone: in range (1.6 m) and
+// the ball "exposed" — and the 1v1 rival's ball reads exposed through about 61 % of every weave of a plain drive, whichever hand it is
+// in. Measured on the rig (docs/HOOPS-PLAY-AUDIT.md): the hero stripped 0.55 of the 1v1 rival's possessions and 0.88 of the 3v3 rivals',
+// half of all pokes landed, and the 3v3 rivals took one shot in three minutes. With this on, my poke must ALSO be a hand that can get to
+// his ball: the same reach, the same shield (his body between my hand and a ball in his far hand) and the ball off the palm (a bump still
+// jars it loose) — the AI's own rule, so a ball dribbled in the hand away from you is safe for him as it is for you. The exposure read
+// stays (it decides WHEN the ball is in play: a crossing, a sway); this adds WHERE. And the bump, the same both ways: the AI's bump strip
+// on my possession opens only when I barrel into HIM ("never on a defender bumping ME", OneVOneMode); my bump window now opens only when
+// the handler runs into ME — running into him is not a free 0.4 s of strips (in the rig most 1v1 steals that passed the hand test were
+// "on the bump", after the defender's own run-in). Off (0) = the exposure read alone and any hard contact opening the window, as before.
+export const MY_STRIP_HAND_ON = 1;
+export const myStripHandOn = (): boolean => feel('hoops.myStripHandOn', MY_STRIP_HAND_ON) >= 0.5;
+/** My poke's hand check: true when the knob is off (today's read alone) or my hand can get to his ball (aiStripLands from my root). */
+export function myStripHandOk(me: { x: number; z: number }, handler: { x: number; z: number }, ball: { x: number; y: number; z: number }, onBump = false): boolean {
+  return !myStripHandOn() || aiStripLands(me, handler, ball, onBump).lands;
+}
+/** Does a hard contact with the handler open MY strip window? Off: any contact, as before. On: only one he caused (he ran into me). */
+export function myBumpOpens(handlerCausedIt: boolean): boolean { return !myStripHandOn() || handlerCausedIt; }
