@@ -256,7 +256,8 @@ import { blockDiceOn, meetsRelease, releaseFrom, handOnBall, deflect, aiBlockJum
 import { oneContestOn, contestFrom, closingSpeed } from '../hoops/contest';   // hoops-p02: one contest model for every shooter
 import { skillShotOn, aiSharedShotOn, greenScaleFor, moveReadOn, readTheMan, manReadFrom, pressFloored, gatherCloseoutOn, isJumpShot, type ManRead } from '../hoops/rulebook';   // hoops-p09: one rulebook (shots, moves, the closeout, the press floor)
 import { heroSkillVerdict, rimFromRelease, aiRelease, missShapeFor } from '../core/SharedShot';   // hoops-p09: one shot model for every shooter
-import { stealDiceOn, aiStripLands } from '../hoops/steals';   // hoops-p02: the AI's strip is a hand on the ball
+import { rivalChaseTarget } from '../hoops/boardChase';   // hoops-play: the 1v1 rival goes and gets a loose ball (3v3's rule)
+import { stealDiceOn, aiStripLands, myStripHandOk, myBumpOpens } from '../hoops/steals';   // hoops-p02: the AI's strip is a hand on the ball; hoops-play: mine too
 import { HandCheckPlay } from '../hoops/handCheck';   // lane/hoops-round2 HOP-04: hand-checks, too many = a foul
 import { mountContactPoses } from '../hoops/contactPoses';   // lane/hoops-round2 HOP-04: forearm on hip, arm bar, chest in (drawn only)
 import type { AmbientHandle } from '../visual/EffectsKit';
@@ -848,6 +849,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     currentShot = null; myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0; goaltendCalled = false; paintSec = 0;
     threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0; posterVictim = null; victimSlide = null; foeReact = null; strongHand = STRONG_HAND_IDLE; tapRelease = null; hopRelease = null; foeStealReach.reset();   // #273: a showing reach ends with the possession
     meMotion.reset(); foeMotion.reset(); foeMover.stop(); foeFootPlant?.release(); meLayers?.reset(); foeLayers?.reset();   // a check-up moves bodies metres in a frame; that is not acceleration (nor a drag, nor a lean)
+    foeBrain?.chaseBall(null);   // hoops-play: a new possession ends any board chase
     arc.active = false;
     meShotWin = 'none'; foeShotWin = 'none'; dunkFlight = null; dunkFlush = null; meLandSec = 0; meCelebrateSec = 0;   // BIOMECH-HOOPS-WAVE1
     if (gather || finish || spin || posting) meAnimTree.release();   // HOOPS-MOVE-KIT-A/B: a held gather / finish / seal / pivot is lifted with the possession
@@ -1506,7 +1508,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         // HOOPS MOTION phase 3: A BALL IN A HAND IS NOT LOOSE. A putback's hand took the ball off the rim without the loose flag clearing,
         // and the sim went on writing its world points into the hand-local ball — 2.5–4.9 m frames on the poster and spin dunk takes
         // (base2 3.1–4.6 m on the same takes)
-        loose = false; ballSim.stop();
+        loose = false; ballSim.stop(); foeBrain?.chaseBall(null);   // (hoops-play: nobody chases a ball in a hand)
       } else if (loose) {   // DUNK-FANATIC: the loose ball keeps stepping through a rim hang / a swat mid-flight (it froze in the net until feet-down)
         ballSim.step(dt);
         if (board) liveBoard(ctx, dt);
@@ -2234,7 +2236,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           // the AI's on my possession (a set defender I bump strips on his roll)
           if (c.severity !== 'bump') {
             if (possession === 'mine' && carrying) meBumpAge = 0;   // #273 T-A: a contact on my carrier exposes the ball to the AI reach
-            if (possession === 'defense' && (defPhase === 'check' || defPhase === 'drive')) bumpAge = 0;
+            if (possession === 'defense' && (defPhase === 'check' || defPhase === 'drive') && myBumpOpens(c.attacker === 'foe')) bumpAge = 0;   // hoops-play: he ran into me (knob hoops.myStripHandOn; off = any contact)
             else if (c.severity === 'hard' && possession === 'mine' && carrying && !shooting && !dunking && !finish && !gather && foeStunSec === 0 && !foeFloored
               && c.attacker === 'me' && c.attackerSpeed >= 4.0 && performance.now() - lastBumpStripAt > bumpStripCooldown) {
               lastBumpStripAt = performance.now();   // I barrelled into him: one roll per collision, never on a defender bumping ME
@@ -2421,7 +2423,10 @@ export const OneVOneMode: ModeDefinition = (() => {
             meAnimTree.beat('bball_steal_reach', { fadeSec: 0.14 });
             // D2: inside the bump window the ball is loose in his hands — the poke connects whatever the crossover read says
             const exposure = bumpExposure(dec.exposure, bumpAge);
-            if (dist < ratedStealRange(STEAL_RANGE, rated.tuning) && (dec.exposure >= STEAL_EXPOSURE_MIN || exposure >= STEAL_EXPOSURE_MIN) && dec.phase !== 'gather' && dec.phase !== 'check') {
+            // hoops-play: and my hand can get to his ball — the AI's own strip rule (hoops/steals myStripHandOk; knob hoops.myStripHandOn, 0 = the read alone)
+            const handOk = myStripHandOk(me.root.position, foe.root.position, ballWorld(), bumpAge <= BUMP_STRIP_WINDOW_SEC);
+            { const hr = aiStripLands(me.root.position, foe.root.position, ballWorld(), bumpAge <= BUMP_STRIP_WINDOW_SEC); console.info(`[1V1-DEF] my poke: phase ${dec.phase} exposure ${dec.exposure.toFixed(2)} bumpAge ${bumpAge === Infinity ? 'none' : bumpAge.toFixed(2)} dist ${dist.toFixed(2)} hand reach ${hr.reach.toFixed(2)} clear ${hr.clear.toFixed(2)} ball y ${hr.ballY.toFixed(2)} → ${hr.lands ? 'on the ball' : 'no hand'}${handOk ? '' : ' (refused)'}`); }   // hoops-play: the rig reads every poke
+            if (dist < ratedStealRange(STEAL_RANGE, rated.tuning) && (dec.exposure >= STEAL_EXPOSURE_MIN || exposure >= STEAL_EXPOSURE_MIN) && dec.phase !== 'gather' && dec.phase !== 'check' && handOk) {
               const onBump = bumpAge <= 0.4 && dec.exposure < STEAL_EXPOSURE_MIN;
               SoundKit.play('impact', { pitch: 1.3, volume: 0.4 });
               swing('steal'); box.steals++;   // IMPROVE (2026-10-06) #4
@@ -2468,6 +2473,10 @@ export const OneVOneMode: ModeDefinition = (() => {
             if (toBall.length() > 0.7) wish.copyFrom(toBall.normalize().scale(3.0));
           }
           observeFoe(ctx, dt);
+          // hoops-play (hoops/boardChase, knob hoops.rivalChaseBoardOn): a live board off his own miss — his brain's chase (3v3's rule, set in
+          // liveBoard) runs him to the ball through his slot's intent, as on my possession; else the crash as before
+          const chasing = !!board && loose && !!foeBrain?.chasing;
+          if (chasing) { const w = foeMover.intentWish(foeSlot.intent); wish.set(w.x, 0, w.z); }   // (track toward it = his stepIntent; he faces where he runs)
           const foeCrashSt = foeMover.track(dt, wish); const foeCrash = foeCrashSt.vel;   // HOOPS MOTION phase 3b: the crash at the hero's accel / decel
           plantFoe(foeCrashSt.planting, dt);   // (3b review) the pin's window runs down here too — a pin from his defence was held through the crash
           driveBody('foe', foe.root, foeCrash, dt);
@@ -2622,6 +2631,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     defPhase = 'check'; kitTheAttacker(); attacker.reset(); nerveTheAttacker(); gatherShown = false; riseShown = false; stepbackShown = false; goaltendCalled = false; paintSec = 0;
     threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0; posterVictim = null; victimSlide = null; foeReact = null; strongHand = STRONG_HAND_IDLE; tapRelease = null; hopRelease = null; foeStealReach.reset();   // #273: a showing reach ends with the possession
     meMotion.reset(); foeMotion.reset(); foeMover.stop(); foeFootPlant?.release(); meLayers?.reset(); foeLayers?.reset();   // a check-up moves bodies metres in a frame; that is not acceleration (nor a drag, nor a lean)
+    foeBrain?.chaseBall(null);   // hoops-play: a new possession ends any board chase
     myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0; defContest = 0;
     arc.active = false;
     meShotWin = 'none'; foeShotWin = 'none'; dunkFlight = null; dunkFlush = null; meLandSec = 0; meCelebrateSec = 0;   // BIOMECH-HOOPS-WAVE1
@@ -3835,6 +3845,8 @@ export const OneVOneMode: ModeDefinition = (() => {
   function liveBoard(ctx: ModeContext, dt: number): void {
     if (!board) return;
     board.age += dt;
+    // hoops-play: THE RIVAL GOES AND GETS IT (hoops/boardChase; 3v3's rule) — his chase outranks his seal; null when the knob is off
+    foeBrain?.chaseBall(rivalChaseTarget(true, !foeFloored && foeStunSec <= 0, ballSim.pos));
     const bodies = reboundBodies();
 
     // the ball off a chest — a tip is a real event and the crowd should hear it
@@ -3854,7 +3866,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         offense: possession === 'mine' ? 'me' : 'foe',
         shooter: board.shooter === 'mine' ? 'me' : 'foe',
       });
-      board = null; foeBrain?.boxOut(null); foeSealing = false; ballSim.stop(); loose = false;
+      board = null; foeBrain?.boxOut(null); foeBrain?.chaseBall(null); foeSealing = false; ballSim.stop(); loose = false;
       console.info(`[1V1-REF] ${call.id} → ${call.ball}`);
       if (call.whistle) SoundKit.play('whistle');
       micWhistle();   // THE MIC
@@ -3885,7 +3897,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         return `${x.id} d=${d.toFixed(2)}${x.unavailable ? ' UNAVAILABLE' : ''}${x.boxingOut ? ' sealing' : ''}`;
       }).join(' · ');
       console.info(`[1V1-BOARD] nobody came down with it (${why}) ball y=${ballSim.pos.y.toFixed(2)} — falling back to the race`);
-      board = null;
+      board = null; foeBrain?.chaseBall(null);
       boardRace(ctx);
     }
   }
@@ -3906,7 +3918,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     const sealed = who === 'me' ? (meSlot.intent.brace ?? false) : foeSealing;
     const ballAt = ballSim.pos.clone();
     board = null;
-    foeBrain?.boxOut(null); foeSealing = false;
+    foeBrain?.boxOut(null); foeBrain?.chaseBall(null); foeSealing = false;
     ballSim.stop(); loose = false;
     // shooter is the mode's possession wording ('mine' = me, 'defense' = the rival had it)
     const offensive = boardOutcome(who, shooter === 'mine' ? 'me' : 'foe') === 'putback';

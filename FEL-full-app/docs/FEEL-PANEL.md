@@ -1117,6 +1117,33 @@ Group **Kit · fit**. A look switch: it moves no body, no bone and no timing.
   20 mm a short against 13 a top. 0.006 removes them on the rig pictures, but fails the 10.1a bar by noise-level margins
   (KIT-FIT-PLAN §14), so it ships off for the owner to judge. `lib/babylon/core/fitTight.ts` `LAYER_GAP`.
 
+## hoops-play, 2026-11-21 (owner: "Gameplay could still be improved greatly"; docs/HOOPS-PLAY-AUDIT.md; the owner has not felt these yet)
+
+Three NEW switches, each **1 = on, 0 = today's game exactly** (tests pin both ends). No existing tuned number moved. Measured on the
+hoops-gap rig (natural games, the scripted player on both ends, PRO, five seeds a side, pooled — the rig is not bit-exact between runs,
+HOOPS-PLAY-AUDIT §1).
+
+- `hoops.myStripHandOn` **1** (group "Hoops · defense"; `hoops/steals.ts` `MY_STRIP_HAND_ON`): **one rule for the strip, both ways.** My
+  poke on a 1v1 / 3v3 handler must also pass the AI's own hand-on-the-ball test (`aiStripLands`: within `hoops.stripReachM` of the ball,
+  his body not between my hand and a ball in his far hand, the ball off the palm), and a body bump opens my 0.4 s strip window only when
+  HE ran into ME (the AI's bump strip already opened only when I ran into him). The exposure read (when the ball is in play) is
+  unchanged. 1v1, steal rule alone (the other two on): steals a rival possession 0.92 → 0.58, steals a poke 0.34 → 0.11, the rival's
+  shots a minute 0.86 → 2.14 (made 0 → 4), the score margin a minute 14 → 6.7. 3v3: steals a rival possession 0.82 → 0.61, steals on
+  the read or the bump 10 → 1, the rivals' shots a minute 0.24 → 0.72 (the kinetic drive-by steal and parry-vault are not covered: 10 of
+  the 11 steals left). **Flag:** reach-in fouls a poke 0.28 → 0.37 (1v1), 0.13 → 0.24 (3v3) — a poke that misses while running into him
+  is whistled, as before; more pokes miss now. Feel-check: 1v1 PRO on defence,
+  reach at his dribble from the side he holds it and from his far side.
+- `hoops.rivalChaseBoardOn` **1** (group "Hoops · flow and pace"; `hoops/boardChase.ts` `RIVAL_CHASE_BOARD_ON`): **the 1v1 rival goes and
+  gets a loose ball** — 3v3's rule (`DefenderBrain.chaseBall`, the chase outranks the seal) on his brain, on your miss and on his. Before:
+  he held his box-out seal while the ball rolled away (or crashed at a walk after his own miss), and the mode's 4 s stall guard teleported
+  both players to the check. 1v1, all three off → on: boards that stalled 5 of 11 → 0 of 8, miss → board median 3.3 → 0.8 s.
+  Feel-check: 1v1, miss long off the rim and watch him run it down.
+- `hoops.introPressPlaysOn` **1** (group "Hoops · flow and pace"; `court/mount/hoopsBroadcast.ts` `INTRO_PRESS_PLAYS_ON`): **the press
+  that skips the opening intro starts play on the next frame.** Before, play waited out the camera's whole 0.35 s hand-over, so the
+  first stick press of every 1v1 / 3v3 game moved you after 383 ms (later presses 33 ms). The camera is untouched: a test runs the real
+  CameraDirector and its path is the same frame for frame with the switch on and off. Feel-check: start a 1v1 and push the stick the
+  moment the crane shot appears.
+
 ## online-play, 2026-11-21 (owner: "Make sure the story and online play is finished"; the owner has not felt these yet)
 
 Group "Online play". All NEW numbers, chosen on this lane (`docs/ONLINE-FINISH-PLAN.md`); none changes an existing tuned

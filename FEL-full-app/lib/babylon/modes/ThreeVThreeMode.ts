@@ -180,7 +180,7 @@ import { blockDiceOn, meetsRelease, releaseFrom, handOnBall, deflect, aiBlockJum
 import { oneContestOn, contestFrom, contestOn, closingSpeed, type ContestBody } from '../hoops/contest';   // hoops-p02: one contest model for every shooter
 import { skillShotOn, aiSharedShotOn, greenScaleFor, moveReadOn, readTheMan, manReadFrom, pressFloored, gatherCloseoutOn, isJumpShot, type ManRead } from '../hoops/rulebook';   // hoops-p09: one rulebook (shots, moves, the closeout, the press floor)
 import { heroSkillVerdict, rimFromRelease, aiRelease, missShapeFor } from '../core/SharedShot';   // hoops-p09: one shot model for every shooter
-import { stealDiceOn, aiStripLands } from '../hoops/steals';   // hoops-p02: the AI's strip is a hand on the ball
+import { stealDiceOn, aiStripLands, myStripHandOk, myBumpOpens } from '../hoops/steals';   // hoops-p02: the AI's strip is a hand on the ball; hoops-play: mine too
 import { TeamDefense, type TeamDEvent } from '../hoops/teamDefense';   // lane/hoops-round2 HOP-03: the switch on a screen and the double team
 import { HandCheckPlay } from '../hoops/handCheck';   // lane/hoops-round2 HOP-04: hand-checks, too many = a foul
 import { mountContactPoses } from '../hoops/contactPoses';   // lane/hoops-round2 HOP-04: forearm on hip, arm bar, chest in (drawn only)
@@ -1468,6 +1468,9 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           const strip = driveStrip({ brainExposure01: teamO && driver === teamDriver ? teamExposure : undefined, moveExposed01: carries.get(driver)?.move?.exposed01 ?? 0, velX: driverVelEst.x, velZ: driverVelEst.z, toRimX: RIM.x - driver.char.root.position.x, toRimZ: RIM.z - driver.char.root.position.z, phase: driveK > 0 && driveK >= 1 - GATHER_TELL_SEC / driveSec ? 'gather' : driveK > 0 ? 'drive' : 'check', bumpAge, dist: distXZ(me.char.root.position, driver.char.root.position) });
           // THE MIC calls the poke here, where it is decided: the knock-loose branch in opponentPossession also runs after a charge,
           // a reach-in, a parry-vault and a drive-by (each has its own call), so a call there would double up or mislabel them
+          // hoops-play: and my hand can get to his ball — the AI's own strip rule (hoops/steals myStripHandOk; knob hoops.myStripHandOn, 0 = the read alone)
+          { const hr = aiStripLands(me.char.root.position, driver.char.root.position, ballWorld(), bumpAge <= BUMP_STRIP_WINDOW_SEC); console.info(`[3V3-DEF] my poke: exposure ${strip.exposure.toFixed(2)} read ${strip.connects ? 'yes' : 'no'} bumpAge ${bumpAge === Infinity ? 'none' : bumpAge.toFixed(2)} hand reach ${hr.reach.toFixed(2)} clear ${hr.clear.toFixed(2)} ball y ${hr.ballY.toFixed(2)} → ${hr.lands ? 'on the ball' : 'no hand'}`); }   // hoops-play: the rig reads every poke
+          if (strip.connects && !myStripHandOk(me.char.root.position, driver.char.root.position, ballWorld(), bumpAge <= BUMP_STRIP_WINDOW_SEC)) strip.connects = false;
           if (strip.connects) { driveStolen = true; box.steals++; mic?.say({ moment: 'game.steal', priority: 2, crowd: { moment: 'crowd.cheer', n: 2 } }); swing('steal'); putHud(ctx, { momentum }); if (synergy.add('steal')) igniteOverdrive(ctx); console.info(`[3V3-DEF] strip by me ${strip.onBump ? 'on the bump' : 'on the read'} exposure ${strip.exposure.toFixed(2)} bumpAge ${bumpAge.toFixed(2)}`); }
           else {
             meStunSec = 0.35;
@@ -4079,7 +4082,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     }
     // D2: any hard / foul contact with the handler opens the strip window — mine on defense (the poke connects inside it),
     // the AI's on my possession (a set defender I bump strips me on his roll)
-    if (carrierId === 'foeTeam' && driver && (attacker === driver || victim === driver) && (attacker === me || victim === me)) bumpAge = 0;
+    if (carrierId === 'foeTeam' && driver && (attacker === driver || victim === driver) && (attacker === me || victim === me) && myBumpOpens(attacker === driver)) bumpAge = 0;   // hoops-play: he ran into me (knob hoops.myStripHandOn; off = any contact)
     if (severity === 'hard' && onBall && attacker === me && attackerSpeed >= 4.0 && performance.now() - lastBumpStripAt > 2500 && (lastBumpStripAt = performance.now()) > 0 && isFoe(victim) && victim.stunSec === 0 && !victim.floored
       // hoops-p02: on the bump his hand still has to GET to the ball (hoops/steals: reach and my body's shield; the palm loose); the roll behind hoops.stealDiceOn
       && (stealDiceOn() ? aiBumpStrips(victim.vel.length() < 1.0, facingCos(victim.char.root.rotation.y, victim.char.root.position, me.char.root.position), roll)
