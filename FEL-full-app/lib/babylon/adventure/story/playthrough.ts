@@ -85,7 +85,9 @@ export function createPlaythroughDriver(session: StorySession, mapper: InputMapp
 
   const fight = (t: number) => {
     const p = P();
-    const m = nearestHostile();
+    // lane/story: a resumed save can start a fight beat from an earlier checkpoint, out of sight of the camp (Chapter 1 at b10-learn
+    // resumes at camp 1, ~110 m short of camp 2): a person walks on toward the fight, so the script does too
+    const m = nearestHostile() ?? nearestHostile(400);
     if (!m) { stick(0, 0); return; }
     // lock the fight's target (a lock that landed on a wisp, or on a body that is down, is let go and taken again)
     const locked = p.lock?.hard ? host.world.actors.get(p.lock.actorId) : undefined;

@@ -6,6 +6,7 @@
  */
 
 import type { StoryChoice } from './format';
+import type { ChapterEnding } from './progress';
 
 export interface StoryDialogueSnapshot {
   speaker: string;
@@ -27,6 +28,8 @@ export interface StoryUiSnapshot {
   mirror: boolean;
   /** 'free' once the chapters run out (the hub is free roam). */
   storyMode: 'chapter' | 'free';
+  /** lane/story (story.endCard): the chapter just finished, for its end card; null when none is up. */
+  ending: ChapterEnding | null;
 }
 
 export interface StoryUiCommands {
@@ -37,12 +40,14 @@ export interface StoryUiCommands {
   setMirror(on: boolean): void;
   /** The pause screen stored new bindings: the mode reloads them into its mapper. */
   reloadBindings(): void;
+  /** lane/story: the player closed the chapter's end card (Keep exploring). */
+  dismissEnding(): void;
 }
 
 /** Who is playing, for the save policy (the page reads the closet; the mode stores with it). */
 export interface StoryWho { signedIn: boolean; closet?: unknown }
 
-const EMPTY: StoryUiSnapshot = { live: false, dialogue: null, objective: null, chapterTitle: null, placeholderChapter: false, mirror: false, storyMode: 'chapter' };
+const EMPTY: StoryUiSnapshot = { live: false, dialogue: null, objective: null, chapterTitle: null, placeholderChapter: false, mirror: false, storyMode: 'chapter', ending: null };
 
 export class StoryUiBridge {
   private snap: StoryUiSnapshot = EMPTY;
@@ -69,7 +74,7 @@ export class StoryUiBridge {
     const c = this.cmds;
     return {
       press: () => c?.press(), release: () => c?.release(), choose: (i) => c?.choose(i), skip: () => c?.skip(),
-      setMirror: (on) => c?.setMirror(on), reloadBindings: () => c?.reloadBindings(),
+      setMirror: (on) => c?.setMirror(on), reloadBindings: () => c?.reloadBindings(), dismissEnding: () => c?.dismissEnding(),
     };
   }
 }

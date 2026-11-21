@@ -13,6 +13,7 @@ import { FENCE, RING } from '@/lib/adventure/venice/courtsDressing';
 import { COURT_HALF } from '@/lib/adventure/venice/courtsView';
 import type { InputBus } from '@/lib/babylon';
 import { BOAT_STOP, PIER_SPOT_ID } from '@/lib/adventure/venice/coastDoor';
+import { STORY_GATE, STORY_SPOT_ID } from '@/lib/adventure/venice/storyDoor';
 
 export { VENICE_WAYFINDING } from '@/lib/adventure/venice/hubUi';
 export const HINT_KEY = 'fel-venice-hint-seen';
@@ -52,10 +53,11 @@ export function miniMapStatus(active: string | null): string {
   const idx = active ? spots.findIndex((sp) => sp.id === active) : -1;
   if (idx >= 0) return `Venice mini-map: you are at Court ${idx + 1}'s play ring.`;
   if (active === PIER_SPOT_ID) return 'Venice mini-map: you are at the boat to the coast.';
+  if (active === STORY_SPOT_ID) return 'Venice mini-map: you are at the story gate.';
   return 'Venice mini-map: four courts are ahead; step into a gold play ring to choose one.';
 }
 
-export function MiniMap({ active, boat = false }: { active: string | null; boat?: boolean }) {
+export function MiniMap({ active, boat = false, story = false }: { active: string | null; boat?: boolean; story?: boolean }) {
   const me = useSyncExternalStore(hubPos.subscribe, hubPos.getSnapshot, () => null);
   const spots = v1Spots();
   const a = v1Area(), s = MAP_PX / Math.max(a.maxX - a.minX, a.maxZ - a.minZ);
@@ -80,6 +82,10 @@ export function MiniMap({ active, boat = false }: { active: string | null; boat?
         {boat && (() => {   // the boat to the coast (venue.coastDoor): its ring on the sand's west edge
           const [bx, by] = toMap(BOAT_STOP.x, BOAT_STOP.z);
           return <circle data-testid="venice-minimap-boat" cx={bx} cy={by} r={Math.max(3, RING.r * s)} fill={active === PIER_SPOT_ID ? '#facc15' : '#1F6FB2'} stroke="#FFD166" strokeWidth={1.5} />;
+        })()}
+        {story && (() => {   // lane/story: the story gate (venue.storyDoor), its ring on the sand's east edge
+          const [gx, gy] = toMap(STORY_GATE.x, STORY_GATE.z);
+          return <circle data-testid="venice-minimap-story" cx={gx} cy={gy} r={Math.max(3, RING.r * s)} fill={active === STORY_SPOT_ID ? '#facc15' : '#7c3aed'} stroke="#FFD166" strokeWidth={1.5} />;
         })()}
         {me && (() => {
           const [px, py] = toMap(me.x, me.z);

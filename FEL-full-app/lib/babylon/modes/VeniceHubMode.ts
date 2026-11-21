@@ -49,6 +49,8 @@ import { camBlockPieces, mountCameraBlockers, VENICE_CAM_COLLIDE, VENICE_LOOK_V2
 import type { GroundPiece } from '../adventure/world/pieces';
 import { arrivalFor, BoatWalkup, boatRoute, PIER_SPOT_ID, VENICE_COAST_DOOR } from '@/lib/adventure/venice/coastDoor';
 import { mountCoastDoorView, type CoastDoorView } from '@/lib/adventure/venice/coastDoorView';
+import { STORY_SPOT_ID, StoryWalkup, storyReturnSpawn, storyRoute, VENICE_STORY_DOOR } from '@/lib/adventure/venice/storyDoor';
+import { mountStoryDoorView, type StoryDoorView } from '@/lib/adventure/venice/storyDoorView';
 
 export const VENICE_MODE_ID = 'venice_hub';
 /** The stick's basis latches while held (AdventureMode's rule): below this it lets go. */
@@ -89,6 +91,9 @@ interface St {
   /** The boat to the coast (venue.coastDoor, lib/adventure/venice/coastDoor): its walk-up and its landing; null = off. */
   boat: BoatWalkup | null;
   boatView: CoastDoorView | null;
+  /** lane/story: the story gate (venue.storyDoor, lib/adventure/venice/storyDoor): its walk-up and its arch; null = off. */
+  story: StoryWalkup | null;
+  storyView: StoryDoorView | null;
   disposed: boolean;
   /** The probe seam this hub published (window.__VENICE__), so only its own is ever removed. */
   seam: unknown;
@@ -106,6 +111,7 @@ function closeHub(scene: object): void {
     S.life?.dispose(); S.life = null;
     S.court?.dispose(); S.court = null;
     S.boatView?.dispose(); S.boatView = null;
+    S.storyView?.dispose(); S.storyView = null;
     S.move.dispose(); S.view.dispose();
   }
   if (wasCurrent) {
@@ -138,6 +144,11 @@ function camYawOf(ctx: ModeContext, S: St): number {
   return S.latchedYaw;
 }
 
+/** lane/story: the raw `?spot=` (the story gate is not a layout spot, so hubReturn.spotFromSearch does not pass it). */
+function rawSpotParam(search: string): string | null {
+  try { return new URLSearchParams(search).get('spot'); } catch { return null; }
+}
+
 export const VeniceHubMode: ModeDefinition = {
   modeId: VENICE_MODE_ID,
   mood: 'goldenHour',
@@ -155,7 +166,10 @@ export const VeniceHubMode: ModeDefinition = {
     const back = typeof window !== 'undefined' ? spotFromSearch(window.location.search) : null;
     // the boat to the coast (venue.coastDoor): back from the coast (`?spot=pier.end`) you land at the boat, facing it
     const doorOn = feel('venue.coastDoor', VENICE_COAST_DOOR) >= 0.5;
-    const spawn = arrivalFor(back, doorOn) ?? world.spawn;
+    // lane/story (venue.storyDoor): back from the story (`?spot=story.gate`, not a layout spot) you land at the story gate, facing it
+    const storyOn = feel('venue.storyDoor', VENICE_STORY_DOOR) >= 0.5;
+    const fromStory = storyOn && typeof window !== 'undefined' && rawSpotParam(window.location.search) === STORY_SPOT_ID;
+    const spawn = (fromStory ? storyReturnSpawn() : arrivalFor(back, doorOn)) ?? world.spawn;
     const host = new AdventureHost({ world: world.source, save: emptyAdventureSave(0), playerSpawn: spawn, band: ctx.prqBand ?? null });
 
     // the courts first (the court and you first: the plan's loading rule); the dressing lands after
@@ -183,6 +197,7 @@ export const VeniceHubMode: ModeDefinition = {
       life: null, sound: null, court: null, disposed: false, seam: null,
       walkup: feel('venue.walkupV2', WALKUP_V2) >= 0.5 ? new Walkup(v1Spots()) : null, solids: solidsOn ? world.pieces : null,
       boat: doorOn ? new BoatWalkup() : null, boatView: doorOn ? mountCoastDoorView(scene, view.root) : null,
+      story: storyOn ? new StoryWalkup() : null, storyView: storyOn ? mountStoryDoorView(scene, view.root) : null,
     };
     // phase 7: the beach bed now (so the harness's crowd bed for the mood stays off); the rest of the soundscape ticks in update
     const mine = hubs.isCurrent(scene);   // a newer hub began while this one loaded: this one leaves the page's globals alone
@@ -203,9 +218,13 @@ export const VeniceHubMode: ModeDefinition = {
     // PROBES ONLY (dev, or an agent run on a loopback host: lib/agentRunHooks): walk to a court's ring, read where you are
     if (mine && typeof window !== 'undefined' && devOrAgentHooks()) {
       (window as unknown as { __VENICE__?: unknown }).__VENICE__ = S.seam = {
-        spots: () => [...S.spots.map((x) => x.id), ...(S.boat ? [PIER_SPOT_ID] : [])],
+        spots: () => [...S.spots.map((x) => x.id), ...(S.boat ? [PIER_SPOT_ID] : []), ...(S.story ? [STORY_SPOT_ID] : [])],
         // to a court's ring the way a player goes once the fences are solid (phase 8): along the open corridors, never through a court
         walkTo: (id: string) => {
+          if (id === STORY_SPOT_ID && S.story) {   // the story gate: down the corridor to the gap between the rows, then east into its ring
+            const path = storyRoute({ x: host.player.pos.x, z: host.player.pos.z });
+            S.auto = path.shift() ?? null; S.autoPath = path; return true;
+          }
           if (id === PIER_SPOT_ID && S.boat) {   // the boat: down to the gap between the rows, then west into its ring
             const path = boatRoute({ x: host.player.pos.x, z: host.player.pos.z });
             S.auto = path.shift() ?? null; S.autoPath = path; return true;
@@ -231,7 +250,7 @@ export const VeniceHubMode: ModeDefinition = {
     // the camera starts behind the player, looking at the courts (a cold start) or at the court they came back to
     const c = courtsRect(), court = back ? S.spots.find((x) => x.id === back) ?? (back === PIER_SPOT_ID && S.boat ? S.boat.spot : undefined) : undefined;
     // back from the coast: past the ring, out along the jetty to the boat
-    const look = court?.id === PIER_SPOT_ID ? new Vector3(court.at[0] - 30, 0, court.at[1]) : court ? new Vector3(court.at[0], 0, court.at[1]) : new Vector3((c.minX + c.maxX) / 2, 0, (c.minZ + c.maxZ) / 2);
+    const look = fromStory && S.story ? new Vector3(S.story.spot.at[0] + 10, 0, S.story.spot.at[1]) : court?.id === PIER_SPOT_ID ? new Vector3(court.at[0] - 30, 0, court.at[1]) : court ? new Vector3(court.at[0], 0, court.at[1]) : new Vector3((c.minX + c.maxX) / 2, 0, (c.minZ + c.maxZ) / 2);
     ctx.camDirector.snapTo(new Vector3(host.player.pos.x, host.player.pos.y, host.player.pos.z), look);
   },
 
@@ -317,7 +336,9 @@ export const VeniceHubMode: ModeDefinition = {
       const court: Spot | null = S.walkup ? S.walkup.step(SPOT_EVERY, me.pos.x, me.pos.z) : v1Hit(S.spots, me.pos.x, me.pos.z);
       // the boat's ring is far from every court's: at most one of them can hold the player
       const boat = S.boat ? S.boat.step(SPOT_EVERY, me.pos.x, me.pos.z) : null;
-      const hit = court ?? boat;
+      // lane/story: the story gate's ring is on the east sand, far from the courts' and the boat's
+      const gate = S.story ? S.story.step(SPOT_EVERY, me.pos.x, me.pos.z) : null;
+      const hit = court ?? boat ?? gate;
       hubUi.setSpot(hit);
       hubPos.set(me.pos.x, me.pos.z, me.facingYaw);   // phase 9: the page's mini-map
     }
