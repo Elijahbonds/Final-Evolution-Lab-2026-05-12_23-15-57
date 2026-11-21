@@ -6,7 +6,10 @@
  *   encounters   a beat's camp or boss spawns when its beat starts (A2's defs through the story bestiary); a downed
  *                body is cleared away after CORPSE_SEC (it still counts against the body budget while it lies there).
  *                A 'world' encounter (the chain's wisps) lives while the player is near it.
- *   falls        a body below its world's kill height: the party back at the checkpoint (`story.checkpoint`).
+ *   falls        a body below its world's kill height: the party back at the checkpoint (`story.checkpoint`). lane/story
+ *                (story.foeFallBack): a monster or boss of a live encounter that falls below it is put back where it spawned —
+ *                before, it fell for ever, still alive, so its camp could never be cleared (measured: a Chapter 1 resume at the
+ *                wall run knocked a skitter off the camp's edge to y −10,629 and the chapter could not go on).
  *   bleed-out    the party back at the checkpoint, stood up through the `revive` event (hp is A2's field).
  *   the partner  catches up (KH-style) when it falls or is left CATCHUP_M behind: it reappears beside the player.
  *   free roam    with no chapter beat waiting on it, an OPEN gate the player walks into warps the party to its spawn.
@@ -25,6 +28,7 @@ import type { HubGates } from '../../story/gates';
 import type { CutsceneFocus } from '../../story/format';
 import type { StoryPort } from '../../story/chapter';
 import { flightUnlockedIn } from '../../story/flags';
+import { feel } from '@/lib/feel-panel/feel';
 
 /** Seconds a downed monster lies before it is cleared away. [TUNE] */
 export const CORPSE_SEC = 3;
@@ -34,6 +38,9 @@ export const CATCHUP_M = 32;
 export const GATE_COOLDOWN_SEC = 2;
 /** How often 'world' encounters check the player's distance, in ticks. [TUNE] */
 export const WORLD_ENC_EVERY = 15;
+/** story.foeFallBack: 1 = a live encounter's monster or boss that falls out of the world goes back to its spawn (new); 0 = it
+ *  falls for ever, as before (its encounter then never clears). */
+export const STORY_FOE_FALL_BACK = 1;
 
 export interface StoryRuntimeHooks {
   /** The party was put back at the checkpoint (the chapter runner re-fuses a flight home). */
@@ -53,6 +60,9 @@ interface Live { spec: EncounterSpec; ids: ActorId[]; bossId: string | null }
 export class StoryRuntime implements StoryPort {
   respawns = 0;
   warps = 0;
+  /** lane/story: foes put back at their spawn after a fall (story.foeFallBack). */
+  foeFallBacks = 0;
+  private readonly foeSpawn = new Map<ActorId, Vec3>();
   private readonly live = new Map<string, Live>();
   private readonly world = new Map<string, Live>();
   private readonly downAt = new Map<ActorId, number>();
@@ -181,11 +191,24 @@ export class StoryRuntime implements StoryPort {
       const far = Math.hypot(q.pos.x - p.pos.x, q.pos.z - p.pos.z) > CATCHUP_M;
       if (q.pos.y < this.killYAt(q.pos) || (far && (p.grounded || p.state === 'ground'))) this.placeBeside(q, p.pos, p.facingYaw);
     }
+    // lane/story (story.foeFallBack): a live foe that fell out of the world goes back where it spawned, so its camp can be cleared
+    if (this.tickN % WORLD_ENC_EVERY === 0 && feel('story.foeFallBack', STORY_FOE_FALL_BACK) >= 0.5) this.foeFalls();
     // free roam: an open gate warps (the story's own gate objective is the chapter runner's)
     if (!this.hooks.storyActive?.() && t >= this.gateQuietUntil) {
       const g = this.gateAt();
       const spec = g?.open ? this.gates.spec(g.id) : null;
       if (spec?.to) this.warpParty(spec.to.worldId, spec.to.spawnId);
+    }
+  }
+
+  private foeFalls(): void {
+    for (const l of [...this.live.values(), ...this.world.values()]) {
+      for (const id of l.ids) {
+        const a = this.host.world.actors.get(id), home = this.foeSpawn.get(id);
+        if (!a || !home || !(a.stats.hp.cur > 0) || !(a.pos.y < this.killYAt(a.pos))) continue;
+        this.place(a, home, a.facingYaw);
+        this.foeFallBacks++;
+      }
     }
   }
 
@@ -227,6 +250,7 @@ export class StoryRuntime implements StoryPort {
       if (!def || this.host.world.actors.has(m.id)) continue;
       this.host.spawnMonster(def, m.id, m.pos, { fly: !!m.fly });
       this.archetypes.set(m.id, def.archetype);
+      this.foeSpawn.set(m.id, { ...m.pos });
       ids.push(m.id);
     }
     let bossId: string | null = null;
@@ -235,6 +259,7 @@ export class StoryRuntime implements StoryPort {
       if (def && !this.host.world.actors.has(e.boss.id)) {
         this.host.spawnBoss(def, e.boss.id, e.boss.pos);
         this.archetypes.set(e.boss.id, 'boss');
+        this.foeSpawn.set(e.boss.id, { ...e.boss.pos });
         ids.push(e.boss.id);
         bossId = e.boss.id;
       }

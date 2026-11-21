@@ -6,6 +6,10 @@
     "guide": { "name": "[PLACEHOLDER] Guide" },
     "warden": { "name": "[PLACEHOLDER] Warden" }
   },
+  "ending": {
+    "title": "[DRAFT] To be continued",
+    "text": "[DRAFT] The next gate is still asleep. Your story goes on when the next chapter is written."
+  },
   "chapters": [
     { "id": "ch01", "file": "01-first-gate", "worldId": "w1", "title": "[PLACEHOLDER] Chapter 1 — The First Gate" }
   ]

@@ -21,6 +21,9 @@
 
 export const STORY_FORMAT_VERSION = 1 as const;
 export const PLACEHOLDER_PREFIX = '[PLACEHOLDER]';
+/** lane/story (2026-11-21): words an agent wrote for the owner to replace (a chapter's recap, the "to be continued" line). A
+ *  placeholder chapter's ending and a placeholder index's ending keep this mark; the end card shows a DRAFT tag for it. */
+export const DRAFT_PREFIX = '[DRAFT]';
 
 export const BEAT_KINDS = ['cutscene', 'dialogue', 'objective', 'fight', 'boss', 'travel', 'choice'] as const;
 export type BeatKind = (typeof BEAT_KINDS)[number];
@@ -129,6 +132,8 @@ export interface StoryChapter {
   /** The manuscript file this chapter is adapted from (Phase E), e.g. `01-<slug>`. Absent on a placeholder. */
   manuscript?: string;
   beats: StoryBeat[];
+  /** lane/story: the chapter's end card (story/progress chapterEnding). `[DRAFT] …` on a placeholder chapter. */
+  ending?: { recap: string };
 }
 
 export interface StoryCastMember { name: string }
@@ -148,6 +153,8 @@ export interface StoryIndex {
   hub: { worldId: string; title: string };
   cast: Record<string, StoryCastMember>;
   chapters: StoryIndexEntry[];
+  /** lane/story: what the end card says after the last chapter there is ("to be continued"). `[DRAFT] …` while placeholder. */
+  ending?: { title: string; text: string };
 }
 
 /** A manuscript paragraph id set (Phase E's generated file, or none yet). */
@@ -256,6 +263,15 @@ export function validateChapter(c: StoryChapter, ctx: ChapterContext): string[] 
         break;
     }
   }
+  // lane/story: the end card's recap — short, and marked [DRAFT] while the chapter is a placeholder (the owner writes it)
+  if (c.ending !== undefined) {
+    const r = c.ending?.recap;
+    if (typeof r !== 'string' || !r.trim()) errs.push(where('ending: no recap'));
+    else {
+      if (r.length > 280) errs.push(where('ending: recap longer than 280 characters'));
+      if (c.placeholder === true && !r.startsWith(DRAFT_PREFIX)) errs.push(where(`ending: a placeholder chapter's recap must start ${DRAFT_PREFIX}`));
+    }
+  }
   // "true to the owner" is checkable: a chapter from the book with no sourceRef at all fails
   if (c.placeholder === false) {
     if (!c.manuscript) errs.push(where('a chapter from the book must name its manuscript'));
@@ -282,6 +298,16 @@ export function validateStoryIndex(ix: StoryIndex, chapters: ReadonlyMap<string,
     if (c.placeholder) anyPlaceholder = true;
   }
   if (anyPlaceholder && ix.placeholder !== true) errs.push('index: a placeholder chapter is listed but the index is not marked placeholder');
+  if (ix.ending !== undefined) {
+    for (const k of ['title', 'text'] as const) {
+      const t = ix.ending?.[k];
+      if (typeof t !== 'string' || !t.trim()) errs.push(`index: ending has no ${k}`);
+      else {
+        if (t.length > 280) errs.push(`index: ending ${k} longer than 280 characters`);
+        if (ix.placeholder && !t.startsWith(DRAFT_PREFIX)) errs.push(`index: ending ${k} must start ${DRAFT_PREFIX} until the owner writes it`);
+      }
+    }
+  }
   for (const [k, v] of Object.entries(ix.cast ?? {})) {
     if (!v?.name?.startsWith(PLACEHOLDER_PREFIX) && ix.placeholder) errs.push(`index: cast ${k}'s name must stay ${PLACEHOLDER_PREFIX} until the owner names it`);
   }

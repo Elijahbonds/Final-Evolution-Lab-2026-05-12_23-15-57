@@ -55,6 +55,9 @@ import { loadStorySave, partnerFromPick, storeStorySave } from '../adventure/sto
 import { storyUi } from '../adventure/story/uiBridge';
 import { chapterById } from '../adventure/story/data';
 import { flightUnlockedIn } from '../adventure/story/flags';
+import { chapterEnding, SHUT_GATE_LINE, STORY_END_CARD, STORY_SHUT_GATE_LINE, type ChapterEnding } from '../adventure/story/progress';
+import { feel } from '@/lib/feel-panel/feel';
+import { shown, shownDialogue, shownEnding, shownOrNull } from '../adventure/story/shown';
 import { buildStoryView, type StoryView } from '../adventure/world/story/view';
 import { cancelNatural, speakNatural } from '../audio/voice/speakNatural';
 
@@ -448,6 +451,8 @@ interface StoryState {
   budgetIn: St['budgetIn'];
   /** Mounted by a probe at `?beat=`: never stored. */
   probe: boolean;
+  /** lane/story (story.endCard): the end card of the chapter just finished, until the player dismisses it. */
+  ending: ChapterEnding | null;
   /** The harness's backdrop meshes (found once), carried with the camera. */
   sky?: AbstractMesh[];
 }
@@ -491,6 +496,11 @@ async function loadStory(ctx: ModeContext): Promise<void> {
     voice: new StoryVoice(STORY_SPEAKER),
     onSave: (s) => { if (T) storeStory(T, s); },
     onWarp: () => { if (T) T.snap = true; },
+    // lane/story (story.endCard): a chapter's end brings up its end card (what it paid, and what comes next)
+    onEvent: (e) => {
+      if (!T || e.kind !== 'chapter' || feel('story.endCard', STORY_END_CARD) < 0.5) return;
+      T.ending = chapterEnding(e.chapterId, T.session.progressSave());
+    },
   });
   const host = session.host;
   const view = buildStoryView(scene, session.map, session.gates);
@@ -536,7 +546,7 @@ async function loadStory(ctx: ModeContext): Promise<void> {
     stickL: { x: 0, y: 0 }, stickR: { x: 0, y: 0 }, latchedYaw: null, baseFov: ctx.camera.fov, fovBoost: 0,
     hudSec: 0, uiSec: 0, saveSec: 0, frame: 0, lastHud: '', mirror: session.save.settings.mirror === true, preset: 'runner', rigKey: '',
     snap: true, flight: flightUnlockedIn(session.save.story.flags), demo: null, offKeys: null, probe: at >= 0,
-    chapterTitle: chapter?.title ?? null, placeholder: !!chapter?.placeholder,
+    chapterTitle: chapter?.title ?? null, placeholder: !!chapter?.placeholder, ending: null,
     budgetIn: {
       tier: (scene.metadata as { felTier?: 'mobile' | 'desktop' } | undefined)?.felTier ?? 'desktop',
       eye: host.player.pos,
@@ -567,6 +577,7 @@ async function loadStory(ctx: ModeContext): Promise<void> {
     choose: (i) => session.runner.choose(i), skip: () => session.runner.skipScene(),
     setMirror: (on) => { S.mirror = on; session.save.settings.mirror = on; storeStory(S); },
     reloadBindings: () => { const b = loadBindings(); for (const a of ADVENTURE_ACTIONS) mapper.rebind(a, b?.[a] ?? DEFAULT_BINDINGS[a]); },
+    dismissEnding: () => { S.ending = null; },
   });
 
   ctx.heroRef.current = me.root;
@@ -587,9 +598,12 @@ async function loadStory(ctx: ModeContext): Promise<void> {
         t: +host.tSec.toFixed(2), state: p.state, pos: { x: +p.pos.x.toFixed(2), y: +p.pos.y.toFixed(2), z: +p.pos.z.toFixed(2) }, hp: p.stats.hp.cur,
         bodies: host.world.actors.size, errors: host.errors.length, beat: session.runner.beat?.id ?? null, paused: session.paused,
         done: session.runner.done, fused: p.fusion.active, flight: flightUnlockedIn(session.save.story.flags), doing: S.demo?.doing() ?? null,
+        ending: S.ending ? S.ending.chapterId : null, storyMode: session.storyMode, objective: session.runner.objective(),
       };
     },
     host, session,
+    // lane/story: the ?demo=1 script's step, for a probe that fast-forwards the story (the script also taps through scenes)
+    drive: () => S.demo?.step(),
   };
   if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
     (window as unknown as { __FEL_ADVENTURE__?: unknown }).__FEL_ADVENTURE__ = scene.metadata.adventure;   // dev probes only
@@ -690,8 +704,8 @@ function storySync(ctx: ModeContext, T: StoryState, dt: number): void {
       special: Math.round(me.stats.special * 100),
       lock: lock ? `${lock.kind === 'boss' ? 'BOSS' : 'TARGET'}${me.lock?.part ? ` · ${me.lock.part.toUpperCase()}` : ''} ${Math.round(lock.stats.hp.cur)}` : null,
       fusion: Math.round(me.fusion.meter * 100), fused: me.fusion.active ? Math.ceil(me.fusion.remainingSec) : 0, tier: me.fusion.tier,
-      slot: slot + 1, spell: spell ? spell.name : null, partner: h.partner?.command() ?? null, state: me.state,
-      objective: s.runner.objective(), flight, fusionOpen: s.save.story.flags.fusionUnlocked === true,
+      slot: slot + 1, spell: spell ? shown(spell.name) : null, partner: shownOrNull(h.partner?.command() ?? null), state: me.state,
+      objective: shownOrNull(storyObjective(s)), flight, fusionOpen: s.save.story.flags.fusionUnlocked === true,
     };
     const key = JSON.stringify(hud);
     if (key !== T.lastHud) { T.lastHud = key; ctx.setHud(hud); }
@@ -702,8 +716,9 @@ function storySync(ctx: ModeContext, T: StoryState, dt: number): void {
     const v = s.runner.view();
     storyUi.publish({
       live: true,
-      dialogue: s.paused && v.active ? { speaker: v.speaker, text: v.text, shown: v.shown, placeholder: v.placeholder, choices: v.choices, choiceIndex: v.choiceIndex, hold01: v.hold01 } : null,
-      objective: s.runner.objective(), chapterTitle: T.chapterTitle, placeholderChapter: T.placeholder, mirror: T.mirror, storyMode: s.storyMode,
+      dialogue: s.paused && v.active ? shownDialogue({ speaker: v.speaker, text: v.text, shown: v.shown, placeholder: v.placeholder, choices: v.choices, choiceIndex: v.choiceIndex, hold01: v.hold01 }) : null,
+      objective: shownOrNull(storyObjective(s)), chapterTitle: shownOrNull(T.chapterTitle), placeholderChapter: T.placeholder, mirror: T.mirror, storyMode: s.storyMode,
+      ending: T.ending ? shownEnding(T.ending) : null,
     });
   }
 
@@ -716,6 +731,15 @@ function storySync(ctx: ModeContext, T: StoryState, dt: number): void {
   T.budget.update(h.world.actors.values(), dt, T.budgetIn);
   T.saveSec += dt;
   if (T.saveSec >= STORY_SAVE_EVERY_SEC) { T.saveSec = 0; storeStory(T); }
+}
+
+/** The HUD's objective line: the beat's, else (lane/story, story.shutGateLine) in free roam, standing in a gate that leads nowhere yet,
+ *  the line that says so — before, a shut gate did nothing and said nothing. */
+function storyObjective(s: StorySession): string | null {
+  const o = s.runner.objective();
+  if (o || s.storyMode !== 'free' || feel('story.shutGateLine', STORY_SHUT_GATE_LINE) < 0.5) return o;
+  const g = s.runtime.gateAt();
+  return g && !g.open ? SHUT_GATE_LINE : null;
 }
 
 function closeStory(T: StoryState): void {

@@ -1741,6 +1741,30 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/adventure/venice/hubUi.ts VENICE_WAYFINDING',
     hint: 'A one-time line saying what to do, a small north-up map of the four courts with you on it, and keys for the card (Enter or X plays, Y plays with your party). 0 = V1.',
   },  {
+    id: 'venue.storyDoor', label: 'Venice hub: the story gate east of the courts (1) / no gate (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/adventure/venice/storyDoor.ts VENICE_STORY_DOOR',
+    hint: 'A stone gate on the sand east of the courts: step into its ring and the card opens the story; the story says Back to Venice and lands you at the gate. 0 = no gate and no card.',
+  },  {
+    id: 'story.endCard', label: 'Story: the end card when a chapter finishes (1) / straight into the hub (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Story · flow',
+    source: 'lib/babylon/adventure/story/progress.ts STORY_END_CARD',
+    hint: 'When a chapter ends, a card says what it gave you and what comes next (or to be continued), with Keep exploring and the way out. 0 = the chapter ends straight into the hub, as before.',
+  },  {
+    id: 'story.foeFallBack', label: 'Story: a foe that falls out of the world goes back to its spawn (1) / falls for ever (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Story · flow',
+    source: 'lib/babylon/adventure/world/story/runtime.ts STORY_FOE_FALL_BACK',
+    hint: 'A camp monster or boss knocked off an edge is put back where it spawned, so the camp can still be cleared. 0 = it falls for ever and the camp never clears, as before.',
+  },  {
+    id: 'story.shutGateLine', label: 'Story: a hub gate that leads nowhere yet says so on the objective line (1) / says nothing (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Story · flow',
+    source: 'lib/babylon/adventure/story/progress.ts STORY_SHUT_GATE_LINE',
+    hint: 'In free roam, standing in a gate with no chapter behind it, the objective line reads This gate is still asleep. 0 = nothing on screen, as before.',
+  },  {
+    id: 'story.showDraftTags', label: 'Story: show the PLACEHOLDER and DRAFT tags for review (1) / players see plain words (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Story · flow',
+    source: 'lib/babylon/adventure/story/shown.ts STORY_SHOW_DRAFT_TAGS',
+    hint: 'The data keeps its PLACEHOLDER and DRAFT marks. At 0 players see the words plainly, with no tag or tag chip on the HUD, the dialogue box, the start screen or the end card. 1 = shown, for the owner to review the drafts.',
+  },  {
+    id: 'story.startProgress', label: 'Story: the start screen shows where you are and Continue (1) / Start and chapter 1 (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Story · flow',
+    source: 'lib/babylon/adventure/story/progress.ts STORY_START_PROGRESS',
+    hint: 'The start screen names the chapter and the step you stopped at, and its button says Continue (or Explore the hub once every chapter is played). 0 = Start and the first chapter title, as before.',
+  },  {
     id: 'venue.coastDoor', label: 'Venice hub: the boat to the coast at the landing (1) / no boat (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
     source: 'lib/adventure/venice/coastDoor.ts VENICE_COAST_DOOR',
     hint: 'A jetty and a boat west of the courts: step into its ring and the card takes the boat to the Coast and Islands; coming back lands you at the boat. 0 = no boat and no card.',

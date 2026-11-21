@@ -10,12 +10,23 @@
 
 export interface Door { href: string; label: string; tab: 'play' | 'train' | 'profile' }
 
+/**
+ * lane/story (2026-11-21; owner 2026-10-20 "Adventure REPLACES Story", owner 2026-11-21 "Make sure the story ... is finished"):
+ * the Play tab's Story door opens the Adventure's story. NEXT_PUBLIC_STORY_DOOR=nexus puts the door back on The Nexus Initiative
+ * (/story), which stays served and is still reached from its own games' end screens. Read at build time (a public variable).
+ */
+export const STORY_DOOR_ADVENTURE = '/play/adventure';
+export const STORY_DOOR_NEXUS = '/story';
+export function storyDoorHref(env: Record<string, string | undefined> = { NEXT_PUBLIC_STORY_DOOR: process.env.NEXT_PUBLIC_STORY_DOOR }): string {
+  return env.NEXT_PUBLIC_STORY_DOOR === 'nexus' ? STORY_DOOR_NEXUS : STORY_DOOR_ADVENTURE;
+}
+
 export const DOORS: Door[] = [
   // PLAY — the rooms around the games rather than the games themselves.
   { href: '/venues', label: 'Venues', tab: 'play' },
   { href: '/arena', label: 'Arena', tab: 'play' },
   { href: '/ladder', label: 'Ladder', tab: 'play' },
-  { href: '/story', label: 'Story', tab: 'play' },
+  { href: storyDoorHref(), label: 'Story', tab: 'play' },
   { href: '/host', label: 'Big screen', tab: 'play' },
   { href: '/join', label: 'Join a game', tab: 'play' },   // MULTIPLAYER (2026-10-06): type the code on a friend's TV
   { href: '/party', label: 'Party chat', tab: 'play' },   // PARTY-CHAT (2026-10-13): the PSN-style party — chat, voice, play together
