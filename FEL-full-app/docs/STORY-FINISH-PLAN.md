@@ -64,7 +64,20 @@ server yet (that needs the owner's database table).
 
 ### 2b. The browser rig, before → after
 
-(filled from `story-rig.json`, below in §5)
+The same rig on the release tree (`fc6dc94e`, before) and on this lane (after), a 390 × 844 touch screen, a guest on a fresh device.
+
+| Screen | Before | After |
+|---|---|---|
+| Partner picker (first run) | shown; no link out | shown; no link out (the next screen has one) |
+| Start screen | "THE ADVENTURE · [PLACEHOLDER] Chapter 1 — The First Gate", one button START, **0 links** | "THE ADVENTURE · CHAPTER 1", the chapter's title, START, **Back to Play** |
+| Start screen after the chapter | START and Chapter 1's title | "ALL 1 CHAPTER PLAYED · THE HUB IS YOURS TO EXPLORE", **EXPLORE THE HUB**, Back to Play |
+| Start screen after a reload mid-chapter | the same START and Chapter 1 title (the resume itself worked: it landed at the saved step's checkpoint) | "CHAPTER 1 · 8 OF 16 · Clear the camp", **CONTINUE** (landed at the camp's checkpoint, as before) |
+| A scene | the dialogue box with its PLACEHOLDER tag and SKIP | the same |
+| Play | the HUD and the objective line; the touch deck | the same |
+| Pause | MIRROR, REBIND, RESUME, **0 links** | the same, **Back to Play**, and "Your progress is saved on this device at every step." |
+| The chapter in the browser (the page's own `?demo=1` script, fast-forwarded) | stuck at camp 1 for good: 803 s of game time in, the player back at the checkpoint, the camp never cleared (D1) | **finished**: all 16 beats, the end card ("Chapter 1 complete", +370 Adventure XP, level 4, the partner's bolt, fusion and flight, "To be continued", Keep exploring / Back to Play); the save on the device says the chapter is done |
+| Venice | no door to the story | the story gate's card ("Play the story" → `/play/adventure?from=venice`); the story says **Back to Venice** (`/play/venice?spot=story.gate`); back in Venice the player stands at (36.5, −69), beside the gate, facing it |
+| Page errors | 0 | 0 |
 
 ## 3. What "finished" needs
 
@@ -99,6 +112,7 @@ Sizes: S ≤ 1 day, M 2–4 days, L a week or more. Order is the build order.
 - the two speakers: "Guide" and "Warden";
 - the mid-boss ("Champion"), the boss ("Chapter 1 Warden") and the light spirits on the chain ("Wisp");
 - the three partner creatures (cinderpup, strideraptor, gardenite: the Garden's working names);
+- the spells (the HUD shows "[PLACEHOLDER] Fire Bolt" and the like);
 - the Venice story gate ("The Story Gate").
 
 **Words:**
@@ -115,6 +129,24 @@ Sizes: S ≤ 1 day, M 2–4 days, L a week or more. Order is the build order.
 
 **Art:** creature and boss bodies; the Grok models as `.glb` with a licence line.
 
-## 5. Built in this lane (phase 2)
+## 5. Built in this lane (phase 2), and how it was checked
 
-(filled in below)
+| What | Where | Checked by |
+|---|---|---|
+| A foe that falls out of the world goes back to its spawn (D1) | `lib/babylon/adventure/world/story/runtime.ts` (`story.foeFallBack` 1) | Resume sweep: before 3 of 48 resumes never finished (control, knob 0); after 128 of 128 finish (16 saved steps × 8 seeds); the browser chapter finishes |
+| START / CONTINUE / EXPLORE THE HUB, where you are (D3) | `lib/babylon/adventure/story/progress.ts`, `app/play/adventure/stage.tsx` (`story.startProgress` 1) | `progress.test.ts`; the browser rig's reload screens |
+| The chapter's end card, "to be continued" (D2) | `components/adventure/StoryEndCard.tsx`, `progress.ts` `chapterEnding`, the `ending` lines in `lib/adventure/story/*.json` (`[DRAFT]`), `AdventureMode` (`story.endCard` 1) | `progress.test.ts` (the card's numbers against a real headless run; the `[DRAFT]` guard with mutation checks); the browser rig |
+| The way out: Back to Play, or Back to Venice (D4) | `app/play/adventure/stage.tsx`, `lib/adventure/venice/storyDoor.ts` `storyExitFor` | `storyDoor.test.ts`; the browser rig (start, pause, end card) |
+| The Play tab's Story door opens the Adventure (D5) | `lib/nav/doors.ts` (`NEXT_PUBLIC_STORY_DOOR=nexus` restores `/story`) | `lib/nav/storyDoor.test.ts`, `hiddenRoute.test.ts`, `reachability.test.ts` |
+| The story gate in Venice and the way back to it (D6) | `lib/adventure/venice/storyDoor.ts`, `storyDoorView.ts` (one draw), `VeniceHubMode.ts`, `app/play/venice/{stage,wayfinding}.tsx` (`venue.storyDoor` 1) | `storyDoor.test.ts` (the walk on the real host with every solid, from the court gate, each court and the boat); the browser rig (the real Venice mode: the walk, the card, the landing at 36.5, −69) |
+| A shut hub gate says "This gate is still asleep" (D7) | `AdventureMode.ts` `storyObjective` (`story.shutGateLine` 1) | `progress.test.ts` (both shut gates answer shut after the chapter) |
+| Continue from every saved step | `progress.test.ts`, `scripts/probes/story/resume-sweep.ts`, `resume-diag.ts` | 16 saved steps: each written to a device store, read back, CONTINUE names the right step, the chapter plays on to the end |
+| The story walk in a browser | `scripts/probes/story/story-rig.mts` (+ `story-entry.tsx`, `venice-entry.tsx`, `contact-sheet.mts`) | One guest from the picker to the end card, a reload, a mid-chapter CONTINUE, the Venice round trip; 0 page errors |
+
+Not measured: a real phone; the production build (the rig renders the real stage and modes with esbuild, not `next build`); a signed-in
+player (the save policy is unchanged: everyone's story stays on the device); The Nexus Initiative's own pages (`/story`, which needs
+the database and sign-in).
+
+Every new behaviour is behind a switch whose 0 restores the old one: `story.foeFallBack`, `story.endCard`, `story.startProgress`,
+`story.shutGateLine`, `venue.storyDoor` (feel knobs, `docs/FEEL-PANEL.md`) and `NEXT_PUBLIC_STORY_DOOR` (the Play door). No tuned number
+was changed.
