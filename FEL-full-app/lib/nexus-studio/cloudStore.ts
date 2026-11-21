@@ -13,7 +13,7 @@
 //
 // A missing table (the SQL not applied yet) throws here; the route answers 503 save_unavailable (cloudRoute.ts guarded).
 
-import type { Prisma, PrismaClient } from '@/public/_prisma/client';
+import type { Prisma, PrismaClient } from '@/lib/generated/prisma';
 import type { QuotaAdmit, StoredMeta, StudioProjectStore, StudioProjectWrite, StorePut } from './cloudRoute';
 
 export type StudioStoreDb = Pick<PrismaClient, '$transaction' | 'studioProjectSave'>;

@@ -166,7 +166,7 @@ describe('the round trip through the real routes', () => {
 // never a 500 — and writes nothing. The error is the one Prisma really throws for a missing table (P2021).
 describe('switched ON before prisma/pending/2026-10-17-studio-project-save.sql is applied', () => {
   it('list, read, save and delete all answer 503 save_unavailable; no 500, nothing written, no user id in the log', async () => {
-    const { Prisma } = await import('@/public/_prisma/client');
+    const { Prisma } = await import('@/lib/generated/prisma');
     const missing = new Prisma.PrismaClientKnownRequestError('The table `public.StudioProjectSave` does not exist in the current database.', { code: 'P2021', clientVersion: Prisma.prismaVersion.client, meta: { modelName: 'StudioProjectSave', table: 'public.StudioProjectSave' } });
     const real = h.db;
     h.db = new Proxy(real, { get: (t, k) => (k === 'tables' ? new Proxy(t.tables, { get: (tt, kk) => { if (kk === 'studioProjectSave') throw missing; return tt[kk]; } }) : t[k]) });
