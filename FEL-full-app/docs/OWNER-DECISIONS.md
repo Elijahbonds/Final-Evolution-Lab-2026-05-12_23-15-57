@@ -491,6 +491,12 @@ Taken by the coordinator on the standing rule (reversible, the recommended optio
    one-piece short and the new jerseys — at half the runtime lift (`kit.onePieceShorts` 1, `kit.newJerseys` 1,
    `kit.setLiftScale` 0.5). Judged by eye; the rig's skin count was waived for this change (docs/KIT-FIT-PLAN.md §12.2).
 
+## owner 2026-11-21: #373's privacy-policy text
+
+owner 2026-11-21: #373 privacy-policy additions approved as written (§1 Studio projects bullet, §2 use bullet, §4 retention
+paragraph; version 2026-10-27b). Cloud save stays off (STUDIO_CLOUD_SAVE_ENABLED) until the StudioProjectSave table is applied
+via db-guard (PROD_DIRECT_URL, owner adds).
+
 ## owner 2026-11-21: finish the story and online play
 
 The owner, verbatim: **"Make sure the story and online play is finished."** (relayed by the coordinator, 2026-11-21).

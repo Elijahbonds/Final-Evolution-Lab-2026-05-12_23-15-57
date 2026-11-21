@@ -43,6 +43,15 @@ export function isNexusStudioEnabled(): boolean {
 }
 
 /**
+ * STUDIO SAVE (owner, 2026-10-17, Q9) — Nexus Studio projects saved to the account (docs/NEXUS-STUDIO-SAVE.md). Default OFF,
+ * and ON only together with NEXUS_STUDIO_ENABLED. Off: PUT /api/studio/projects/:id is a 404 and the Studio shows no account
+ * panel. Reading, exporting and deleting what was already saved are never behind it.
+ */
+export function isStudioCloudSaveEnabled(): boolean {
+  return isNexusStudioEnabled() && envOn('STUDIO_CLOUD_SAVE_ENABLED');
+}
+
+/**
  * NEX-06 (owner 2026-10-20): Studio SHARE LINKS — a creator's venue played by link (lib/nexus-studio/share.ts). Default OFF: every
  * share route and the /play/shared landing are a 404 while unset. Separate from NEXUS_STUDIO_ENABLED (the editor), so the owner can
  * use the Studio without links reaching anyone.
