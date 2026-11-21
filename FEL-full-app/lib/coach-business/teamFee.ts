@@ -9,7 +9,7 @@
 //   · ADULTS ONLY receive it: a purchase is 18+ (service.ts), and a guardian paying for a teen is not built — so a 13–17
 //     athlete (or a blank birth year) is skipped and counted. OWNER CALL: a guardian-pays path for youth team dues;
 //   · no program thread, no message (the automations' rule); nothing is emailed.
-import type { PrismaClient } from '@/public/_prisma/client';
+import type { PrismaClient } from '@/lib/generated/prisma';
 import { coachPeople, mayAssign, type PeopleDb } from '@/lib/coach/parity/people';
 import { connectGate } from './connect';
 import { packagePriceLabel } from './packages';

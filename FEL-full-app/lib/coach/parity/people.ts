@@ -12,7 +12,7 @@
 //   · what a COACH sees of health answers: the readiness rule (lib/coach/readiness/gate.ts coachMaySee) — on the live
 //     roster, a live coach_view grant from that athlete to THAT coach, and a verified adult.
 import 'server-only';
-import type { PrismaClient } from '@/public/_prisma/client';
+import type { PrismaClient } from '@/lib/generated/prisma';
 import { myGroups, members } from '@/lib/groups/store';
 import { readTeenGate } from '../teenGateServer';
 import { teenGateBody, type TeenGateRefusal } from '../teenGate';

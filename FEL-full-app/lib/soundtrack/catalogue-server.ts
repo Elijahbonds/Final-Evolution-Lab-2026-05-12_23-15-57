@@ -4,7 +4,7 @@
 // database once per request in between. A rotation change (the review page) clears it; the CDN catches up in ≤ 5 min.
 
 import 'server-only';
-import type { PrismaClient } from '@/public/_prisma/client';
+import type { PrismaClient } from '@/lib/generated/prisma';
 import { publicCardWhere } from '@/lib/creator/creative-card-review';
 import { buildCatalogue, type CardTrackRow } from './catalogue';
 import { houseTracks } from './house';

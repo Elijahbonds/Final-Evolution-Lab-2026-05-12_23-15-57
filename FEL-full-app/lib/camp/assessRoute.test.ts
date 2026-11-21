@@ -25,7 +25,7 @@ vi.mock('next-auth', () => ({ getServerSession: vi.fn() }));
 vi.mock('@/lib/auth', () => ({ authOptions: {} }));
 
 vi.mock('@/lib/db', async () => {
-  const { Prisma } = await import('@/public/_prisma/client');
+  const { Prisma } = await import('@/lib/generated/prisma');
   const table = (rows: Row[]) => ({
     findMany: async ({ where }: { where: Partial<Row> }) =>
       rows.filter((r) => Object.entries(where).every(([k, v]) => r[k as keyof Row] === v)),

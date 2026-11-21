@@ -1,7 +1,7 @@
 // The invite rows' server side (coach-loop P1): the coded token every new invite gets, and the one create both the
 // single invite and the bulk import go through. lib/coach/invite.ts and inviteCode.ts stay pure.
 import { randomBytes } from 'node:crypto';
-import type { PrismaClient } from '@/public/_prisma/client';
+import type { PrismaClient } from '@/lib/generated/prisma';
 import { INVITE_TTL_MS, type InviteUse } from './invite';
 import { codeFromBytes, codeTokenPrefix, tokenWithCode } from './inviteCode';
 

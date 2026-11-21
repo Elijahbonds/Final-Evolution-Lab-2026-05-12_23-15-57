@@ -14,7 +14,7 @@
  *   - Client cannot write PRQ directly (server-owned create path).
  */
 
-import { Prisma, type PrismaClient } from '@/public/_prisma/client';
+import { Prisma, type PrismaClient } from '@/lib/generated/prisma';
 import { PRQ_ATTRS, PRQ_CAMERA_SOURCE, type PrqAttr } from '@/lib/prq';
 
 export type DbClient = PrismaClient | Prisma.TransactionClient;

@@ -16,7 +16,7 @@
 // Every field is read defensively. `commonFaults` is a Json column (an old row may hold anything), the links are
 // plain strings with no relation, and a row read before the P2 push has none of the new columns. A value that is not
 // what it should be reads as absent — never as a crash on the client's Today.
-import type { BraceMode, MovementPattern } from '@/public/_prisma/client';
+import type { BraceMode, MovementPattern } from '@/lib/generated/prisma';
 import { BRACE_INFO, PATTERN_INFO, isBraceMode, isPattern } from './catalogue';
 import type { TreeExercise } from './loop';
 import { groupBySection, supersetLabels, doseLine } from './structure';

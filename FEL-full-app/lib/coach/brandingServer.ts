@@ -8,7 +8,7 @@
 // Only a certified coach brands (the builder's own gate). Before the pending SQL: no brand anywhere, writes 503.
 import 'server-only';
 import { randomUUID } from 'node:crypto';
-import type { PrismaClient } from '@/public/_prisma/client';
+import type { PrismaClient } from '@/lib/generated/prisma';
 import { objectUrl } from '@/lib/soundtrack/storage';
 import { deliveryReady, NOT_READY, readRows, res, strOrNull, writeRows, type RawDb, type Res } from './delivery/probe';
 import { bucketFrom, signOwnPut, UploadsComingSoon, type SignDeps } from './delivery/media';

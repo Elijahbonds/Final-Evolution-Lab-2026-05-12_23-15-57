@@ -5,7 +5,7 @@
 // because the failure they guard against is quiet: a field the draft reads but the body forgets (or a number the
 // body sends as "") saves a different prescription from the one on screen, and nothing errors. builder.test.ts
 // runs draft → body → validator → tree → draft and expects to land where it started.
-import type { SessionSection } from '@/public/_prisma/client';
+import type { SessionSection } from '@/lib/generated/prisma';
 import type { TreeExercise } from './loop';
 import { STRUCTURE_ERROR_COPY, loadBandConflict, timedRepsSuffix, type StructureError } from './structure';
 import { MAX_SETUP_CUES, suggestEffortBand } from './taxonomy';

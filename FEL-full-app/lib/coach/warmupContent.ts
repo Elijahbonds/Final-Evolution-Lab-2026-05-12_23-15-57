@@ -28,7 +28,7 @@
 // with the knee). The 90/90 row's POSITION is the owner's (ch4); its rock-and-hold cue is FEL's step, reworded here.
 //
 // Pure data: no DOM, no Prisma client value (types only).
-import type { MovementPattern } from '@/public/_prisma/client';
+import type { MovementPattern } from '@/lib/generated/prisma';
 
 // ── zones: what the Movement Screen can point the stretch at ─────────────────────────────────────────────────────────
 
