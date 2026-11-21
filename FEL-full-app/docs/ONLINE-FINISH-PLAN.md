@@ -132,9 +132,28 @@ Do this from the deploy tree's `FEL-full-app/` after this lane is merged. Projec
 6. Undo, if anything is wrong: `gcloud run services update-traffic fel-netd --to-revisions PASTE-THE-OLD-REVISION=100 --region us-central1 --project final-evolution-lab`.
    The app keeps working: on the old netd the party says it needs an update, and games are single-player or shared as before.
 
-## 6. The browser runs (before → after)
+## 6. The browser runs (`e2e.mts`, the lane's build, a local party2 netd, 2026-11-21)
 
-(Filled from `e2e.mts`: see §6 below the line.)
+The rig is a 4-core machine shared by eight lanes, drawing 3D with a software renderer (swiftshader) in up to six browsers at
+once. It proves what happens; it cannot judge smoothness (a page drew at ~1 frame a second under that load). The "before"
+browser run could not be made (the gate queue and the disk floor: one build at a time); the before numbers are the headless
+ones in §1, which use the same netcode.
+
+| Check | Result |
+|---|---|
+| Create a party; join by code typed `abc-def` in lower case; by link; by the QR's link | PASS (2, 3, 4 in the party) |
+| The QR on the host's page is the invite link's QR | PASS: 841 of 841 modules match (first run: a byte compare said FAIL; the browser's PNG bytes differ from node's, the code was right) |
+| A teen knocks and is let in; a guest knocks and is let in; six in; a seventh is turned away ("full") | PASS |
+| The host removes the guest (5 left); a reload is the same member (no ghost); "Make host" gives the crown | PASS |
+| 1v1 Start together: who is seated | HOST (`h…`) and CASEY (`foe`); the other three stay in the party |
+| 1v1: exactly one page runs the game | PASS. CASEY's page (the phone) ran it; HOST's drew it |
+| 1v1: what crosses the match room (a spy peer, 15 s) | **before (headless, §1): no world ever.** After: worlds from the running page (18 sent, 11 seen by the spy at ~1 fps rendering), the drawing page's input; ~1.0 KB a world for two bodies with poses |
+| 1v1: netd dropped a page that was loading for over 10 s | it re-joined by itself (`rejoins` 2) and went on drawing. First run, before that fix: every page dropped, nothing flowed (`worldsOut` 0) |
+| 1v1: the guest drops off the network for 5 s | the running page carried on; frames flowed again afterwards |
+| 1v1: the host walks out | the guest kept the game (it was running it) against the AI, the score kept |
+| 3v3 Start together, a party of five | **5 seated** (`h…`, `net1`…`net4`; party1 seated 2). Exactly one page runs it. No world crossed in the 15 s window: five 3D pages were still loading on the shared machine (one page answered pings 110 s late). **Not measured**: the six-page 3v3 picture; it is covered by the unit suites only, and by the owner's 6-device test (§7). |
+| Frame times on the phone profile | not measurable on this rig (8.4 s a frame with CPU ×4 under the load); **not measured** |
+| Venice "Play with your party" | not re-run here (`scripts/probes/venice-hub/party-walk.mts` covers it; unchanged code path) |
 
 ## 7. Real-device tests (the owner)
 
