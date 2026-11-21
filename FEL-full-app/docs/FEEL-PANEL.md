@@ -1154,7 +1154,8 @@ stands in the way: a palm's crown, a tree) and `HIGH_CAM_CLEAR_M` 0.8 m (room ke
 How it stays on the play without chasing it: a possession reset glides when the new spots are already on screen and cuts when they
 are not (the check-up, deep past the arc); while a player or the rim is off its spot the slide runs at `HIGH_CAM_CATCHUP` 0.4 of its
 time constant; and the EDGE PUSH slides the truck with the hero (as fast as he runs) whenever he reaches `HIGH_CAM_EDGE` 0.92 of the
-half-screen, so a sprint across an upright phone never leaves the frame. None of these turns the view.
+half-screen (at most `HIGH_CAM_PUSH_MPS` 9 m/s, so it is a slide, never a jump), so a sprint across an upright phone never leaves the
+frame. None of these turns the view.
 3v3, the dunk and 3-Point keep their cameras. **assumption:** the bounds are safe, not tuned.
 
 ## hoops-play, 2026-11-21 (owner: "Gameplay could still be improved greatly"; docs/HOOPS-PLAY-AUDIT.md; the owner has not felt these yet)

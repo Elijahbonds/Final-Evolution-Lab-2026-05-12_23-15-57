@@ -245,6 +245,8 @@ export function highSideSpan(c: CourtFrame, p: HighCamParams, z: number, pull: n
 }
 /** The edge push's edge: |screen x| this far out (between the fit's 1 − margin and the frame's edge). */
 export const HIGH_CAM_EDGE = 0.92;
+/** The edge push's top speed (m/s): above a sprint (~7), so a running hero is held, but a slide, never a jump. */
+export const HIGH_CAM_PUSH_MPS = 9;
 
 /** While a point is off its spot the truck runs at this share of its time constant (a catch-up; the follow's lag runs 1.6× there). */
 export const HIGH_CAM_CATCHUP = 0.4;

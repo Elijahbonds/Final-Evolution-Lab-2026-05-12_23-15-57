@@ -58,7 +58,7 @@ import { reportDiag } from './diag';
 import { INTRO, introLetterbox, introPose, orbitBlend, smoothstep, type IntroKind } from '../scene/broadcastShots';   // vis-foundation-2 A9.12
 import { motionPolicy } from '../../a11y/reducedMotion';
 import { feel } from '../../feel-panel/feel';
-import { highCamParams, highFits, highPose, highSideSpan, HIGH_CAM_EDGE, highStep, highWant, HIGH_CAM_CATCHUP, HIGH_CAM_PUNCH, HIGH_CAM_PULL_MIN, HIGH_CAM_CLEAR_M, type CourtFrame, type HighState, type P2, type P3 } from './HighSidelineCam';   // lane/hoops-cam: the 1v1 high sideline view
+import { highCamParams, highFits, highPose, highSideSpan, HIGH_CAM_EDGE, HIGH_CAM_PUSH_MPS, highStep, highWant, HIGH_CAM_CATCHUP, HIGH_CAM_PUNCH, HIGH_CAM_PULL_MIN, HIGH_CAM_CLEAR_M, type CourtFrame, type HighState, type P2, type P3 } from './HighSidelineCam';   // lane/hoops-cam: the 1v1 high sideline view
 
 export type CamMode = 'follow' | 'fixed';
 
@@ -301,6 +301,8 @@ const OCCLUSION_MARGIN = 0.6;
 const VENUE_SHELL = /^(venue_ground|venue_box|wall_|park_floor|piste|water|shore|mc_ring|mc_pit)/i;
 /** lane/hoops-cam: what never blocks the high view's eye (the sky and the floor it looks across, bodies' gear, the ball, birds, rings). */
 const HIGH_NEVER_BLOCKS = /sky|dome|backdrop|horizon|ground|floor|court(?!side)|water|ocean|sea\b|fog|gull|bird|ball|ring|shadow|decal|line|paint|glow|net\b|rim|cloud/i;
+/** lane/hoops-cam: a hero who moves further than this in one frame was put there (a reset), not run there: the high view treats it as one. */
+const HIGH_TELEPORT_M = 2;
 /** lane/hoops-cam: the high view's clear-view ray runs every this many frames (its answer is kept in between). */
 const HIGH_CLEAR_EVERY = 6;
 /** How far inside the venue bounds the camera must stay. */
@@ -592,10 +594,11 @@ export class CameraDirector {
   private highWas = false;
   private highS: HighState | null = null;
   private highClearCap: number | null = null;
+  private highLast: { x: number; z: number } | null = null;
   private highClearAge = 0;
   /** Arm (or with null, disarm) the high view. */
   setHighView(v: { court: CourtFrame; on: () => boolean; frame: () => { play: P2; must: readonly P3[] } } | null): void {
-    this.high = v; this.highS = null; this.highClearCap = null;
+    this.high = v; this.highS = null; this.highClearCap = null; this.highLast = null;
   }
   private highArmed(): boolean { return this.high !== null && this.high.on(); }
   /** The high view is the play camera right now. */
@@ -625,14 +628,22 @@ export class CameraDirector {
     // the lens is fixed here: a widened follow lens (fovGain) eases back to the authored one, a cut lands on it
     if (snap) this.camera.fov = this.baseFov; else if (Math.abs(this.camera.fov - this.baseFov) > 1e-4) this.camera.fov += (this.baseFov - this.camera.fov) * 0.1;
     const fr = h.frame();
+    // a body that TELEPORTED (a possession reset the mode made without a snapTo: the hero more than HIGH_TELEPORT_M in one frame) is
+    // a reset too — measured on an upright phone: the hero sat off screen for a few frames while the capped push slid over
+    const m0 = fr.must[0];
+    if (!snap && m0 && this.highLast && Math.hypot(m0.x - this.highLast.x, m0.z - this.highLast.z) > HIGH_TELEPORT_M) snap = 'reset';
+    if (m0) this.highLast = { x: m0.x, z: m0.z };
     let want = highWant(h.court, p, fr.play, fr.must, this.baseFov, aspect);
     // the clear view: the want never puts scenery (a palm's crown, a tree, a pole, a wall) between the eye and its look target; the
     // eye comes in along the look instead, through the same damped truck. One ray, at the full back-away, every HIGH_CLEAR_EVERY frames
     // (the truck moves centimetres in between, inside the HIGH_CAM_CLEAR_M room): its answer caps the pull for every frame until the next.
+    // The ray is cast from where the view IS (the truck's state; the want on a cut), never from the want: a cap read at the want
+    // moved the want (the refit below), which moved the cap — measured on an upright phone at the check-up, the truck jumped 3 m and
+    // back in three frames.
     if (snap || this.highClearCap === null || ++this.highClearAge >= HIGH_CLEAR_EVERY) {
       this.highClearAge = 0;
-      const top = Math.max(1, p.pullMax);
-      this.highClearCap = this.highClear(highPose(h.court, p, { ...want, pull: top }), top);
+      const top = Math.max(1, p.pullMax), at = snap || !this.highS ? want : this.highS;
+      this.highClearCap = this.highClear(highPose(h.court, p, { x: at.x, z: at.z, pull: top }), top);
     }
     // a back-away the scenery will not allow: fit again inside it (it lets the rim go before it lets a player go)
     if (want.pull > this.highClearCap + 1e-6) want = highWant(h.court, { ...p, pullMax: Math.max(1, this.highClearCap) }, fr.play, fr.must, this.baseFov, aspect);
@@ -641,19 +652,22 @@ export class CameraDirector {
     // catches up faster while a point is off its spot
     const fitsNow = !!this.highS && highFits(h.court, p, this.highS, fr.must, this.baseFov, aspect);
     if (snap === 'reset' && fitsNow) snap = false;
-    this.highS = snap || !this.highS ? { ...want, vx: 0, vz: 0, vp: 0 } : highStep(this.highS, want, dt, p.panSec * (fitsNow ? 1 : HIGH_CAM_CATCHUP));
+    const behind = !!this.highS && this.highS.pull > this.highClearCap + 1e-3;   // the view is still backing in from behind scenery
+    this.highS = snap || !this.highS ? { ...want, vx: 0, vz: 0, vp: 0 } : highStep(this.highS, want, dt, p.panSec * (fitsNow && !behind ? 1 : HIGH_CAM_CATCHUP));
     // THE EDGE PUSH: the hero (the first two points: feet, head) is never left past the frame's edge by the soft truck's lag; the
     // truck slides with him from there (as fast as he runs, so it is a slide, not a jump), and its rate keeps the push
     if (!snap && fr.must.length >= 2) {
       const [lo, hi] = highSideSpan(h.court, p, this.highS.z, this.highS.pull, fr.must.slice(0, 2), this.baseFov, aspect, HIGH_CAM_EDGE);
       if (lo <= hi && (this.highS.x < lo || this.highS.x > hi)) {
-        const x = Math.max(lo, Math.min(hi, this.highS.x)), rate = dt > 0 ? (x - this.highS.x) / dt : 0;
+        // at most HIGH_CAM_PUSH_MPS (faster than a sprint, so a running hero is held; a hero left far outside by a reset is slid to,
+        // never jumped to — measured: an uncapped push moved the view 1.8 m in one frame on an upright phone and carried that speed)
+        const want = Math.max(lo, Math.min(hi, this.highS.x)), cap = HIGH_CAM_PUSH_MPS * dt;
+        const x = this.highS.x + Math.max(-cap, Math.min(cap, want - this.highS.x)), rate = dt > 0 ? (x - this.highS.x) / dt : 0;
         this.highS.x = x;
         this.highS.vx = rate > 0 ? Math.max(this.highS.vx, rate) : Math.min(this.highS.vx, rate);
       }
     }
-    // …and where the truck is still on its way in from behind an occluder, the eye is held in front of it (the one hard step)
-    if (this.highS.pull > this.highClearCap) { this.highS.pull = this.highClearCap; this.highS.vp = Math.min(0, this.highS.vp); }
+    // (a view still backing in from behind scenery does so at the catch-up rate above, never in a jump)
     const pose = highPose(h.court, p, this.highS);
     // a camera punch (pulse): a short push along the look, a share of the follow's
     const push = (1 - this.beatScale) * HIGH_CAM_PUNCH;

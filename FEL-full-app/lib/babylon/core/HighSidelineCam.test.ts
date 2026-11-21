@@ -274,4 +274,35 @@ describe('high sideline in the director (CameraDirector.setHighView)', () => {
     expect(worstStep).toBeLessThan(2.5);   // an eased hand-over (an orbit, not a cut across the court)
     scene.dispose(); engine.dispose();
   });
+  it('a phone held upright, a row of tall posts off the sideline, the check-up reset: one cut, then no jump (the scenery cap no longer feeds back into the fit)', () => {
+    // A GUARD, not a reproduction: the rig (hoops-cam, after the #678 merge) measured the truck jumping ~3 m and back over three frames at
+    // the check-up — the cap was read at the wanted spot, the refit moved that spot, and a hard step moved the view. This synthetic row
+    // of posts passes on the old director too (checked); the rig re-run is the measurement. It holds the shape: one cut, then no jump.
+    const { scene, engine, cam, dir } = rig(390, 844);
+    for (let z = -10; z <= 28; z += 3.5) { const p = MeshBuilder.CreateBox('post', { width: 0.2, height: 7, depth: 0.2 }, scene); p.position.set(7.5, 3.5, z); p.computeWorldMatrix(true); }
+    let me = { x: 2.3, z: 0.2 }, foe = { x: 1.2, z: 0.4 };
+    dir.setHighView({ court: COURT, on: () => true, frame: () => ({ play: { x: (me.x + foe.x) / 2, z: (me.z + foe.z) / 2 }, must: mustOf({ ...me, y: 1 }, { ...foe, y: 1 }) }) });
+    const at = (m: { x: number; z: number }) => new Vector3(m.x, 0, m.z);
+    dir.snapTo(at(me), RIM_V);
+    for (let i = 0; i < 90; i++) dir.update(at(me), Vector3.Zero(), RIM_V);
+    me = { x: 0, z: 7.2 }; foe = { x: 0, z: 9.2 };
+    dir.snapTo(at(me), RIM_V);   // the reset: a cut is allowed here
+    let prev = cam.position.clone(), worst = 0;
+    for (let i = 0; i < 120; i++) { dir.update(at(me), Vector3.Zero(), RIM_V); worst = Math.max(worst, Vector3.Distance(prev, cam.position)); prev = cam.position.clone(); }
+    expect(worst).toBeLessThan(0.5);
+    scene.dispose(); engine.dispose();
+  });
+  it('a reset the mode makes without a snapTo (the bodies put 7 m away in one frame) is cut to when the new spots are off screen', () => {
+    const { scene, engine, cam, dir } = rig(390, 844);
+    let me = { x: 6, z: 0.4 }, foe = { x: 5.2, z: 0.6 };
+    dir.setHighView({ court: COURT, on: () => true, frame: () => ({ play: { x: (me.x + foe.x) / 2, z: (me.z + foe.z) / 2 }, must: mustOf({ ...me, y: 1 }, { ...foe, y: 1 }) }) });
+    const at = (m: { x: number; z: number }) => new Vector3(m.x, 0, m.z);
+    dir.snapTo(at(me), RIM_V);
+    for (let i = 0; i < 90; i++) dir.update(at(me), Vector3.Zero(), RIM_V);
+    me = { x: 0, z: 7.2 }; foe = { x: 0, z: 9.2 };   // the check-up, no snapTo
+    dir.update(at(me), Vector3.Zero(), RIM_V);
+    const pose = { eye: { x: cam.position.x, y: cam.position.y, z: cam.position.z }, target: { x: cam.getTarget().x, y: cam.getTarget().y, z: cam.getTarget().z } };
+    for (const y of [0, 1.9]) expect(Math.abs(project(pose, FOV, 390 / 844, { x: me.x, y, z: me.z }).x)).toBeLessThan(0.95);   // on screen on the very next frame
+    scene.dispose(); engine.dispose();
+  });
 });
