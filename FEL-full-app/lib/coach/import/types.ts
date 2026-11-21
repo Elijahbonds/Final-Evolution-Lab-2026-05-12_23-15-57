@@ -1,6 +1,6 @@
 // lib/coach/import/types.ts — COACH-PARITY (2026-10-26): the paste-a-program importer's shapes. Text in → ParsedProgram →
 // each line matched to an exercise (MatchedProgram) → the coach's review → an ImportPlan the builder writes.
-import type { SessionSection } from '@/public/_prisma/client';
+import type { SessionSection } from '@/lib/generated/prisma';
 import type { WeekDayName } from '../offDay';
 
 /** Why a line needs the coach's eye. Each is shown in the review grid next to the line. */

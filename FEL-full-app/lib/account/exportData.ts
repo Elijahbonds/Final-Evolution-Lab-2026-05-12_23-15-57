@@ -10,7 +10,7 @@
 // store's orders and bookings — as lib/data-rights/registry.ts classifies them, with secrets (tokens, key material)
 // left out. A pending table not applied yet is skipped quietly and named in `accountTables.notYetCreated`.
 
-import type { Prisma } from '@/public/_prisma/client';
+import type { Prisma } from '@/lib/generated/prisma';
 import { collectPrqExport } from '@/lib/prq-data-rights';
 import { collectTables, hasRaw, type CollectedTables } from '@/lib/data-rights/rights';
 

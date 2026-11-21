@@ -22,7 +22,7 @@
 
 import 'dotenv/config';
 import assert from 'node:assert';
-import { PrismaClient } from '@/public/_prisma/client';
+import { PrismaClient } from '@/lib/generated/prisma';
 
 import { PRQ_ATTRS, PRQ_CAMERA_SOURCE } from '../lib/prq';
 import {

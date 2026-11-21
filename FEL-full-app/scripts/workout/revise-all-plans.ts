@@ -21,7 +21,7 @@
  * a jump SERVED to a youth owner) is left; 2 for a bad flag. It prints the target as host/name only, never the credentials.
  */
 
-import type { PrismaClient } from '@/public/_prisma/client';
+import type { PrismaClient } from '@/lib/generated/prisma';
 import { backfillClean, backfillWorkoutPlans, describeDatabaseUrl, formatBackfillReport, parseBackfillArgs } from '../../lib/workout/plan-backfill';
 
 export interface ReviseAllPlansIo {

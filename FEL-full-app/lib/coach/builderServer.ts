@@ -7,7 +7,7 @@
 // What the save used to get wrong is written at each fix (and in the route's header): another coach's catalogue row
 // could be prescribed by id, an edit reset every field it did not send, removing a logged exercise 500'd, and a
 // session could hold two key sets.
-import type { Prisma, PrismaClient } from '@/public/_prisma/client';
+import type { Prisma, PrismaClient } from '@/lib/generated/prisma';
 import { accessRole, mergeSpecUpdate, validateExerciseSpec, type ProgramTree } from './loop';
 import { nameKey, validateCatalogueCreate } from './catalogue';
 import { catalogueCreateInput, templateExercise } from './templateCatalogue';

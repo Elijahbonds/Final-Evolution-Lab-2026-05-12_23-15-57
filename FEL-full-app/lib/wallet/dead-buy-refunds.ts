@@ -27,7 +27,7 @@
  *   - Never breaks the read: any failure is logged and the balance is read as it stands; the next read tries again.
  */
 
-import type { PrismaClient } from '@/public/_prisma/client';
+import type { PrismaClient } from '@/lib/generated/prisma';
 import { shopCardOnSale } from '@/lib/game-data';
 import { isMissingTable } from '@/lib/db/errors';
 import { isPrivateKey, privateHolders } from '@/lib/sessions/joinLink';

@@ -16,7 +16,7 @@
  */
 
 import 'dotenv/config';
-import { PrismaClient } from '@/public/_prisma/client';
+import { PrismaClient } from '@/lib/generated/prisma';
 
 const prisma = new PrismaClient();
 

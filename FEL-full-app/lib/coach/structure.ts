@@ -13,7 +13,7 @@
 // workSeconds / holdSeconds / setupCues / effortBand). This module is the one place that says what those fields may
 // hold, and the pure session-level reads the builder, Today and the duplicate route share: section grouping, superset
 // labels, the dose line, the one-key-set rule and the builder's warnings. Prisma-free, DOM-free.
-import type { SessionSection } from '@/public/_prisma/client';
+import type { SessionSection } from '@/lib/generated/prisma';
 import {
   DEFAULT_SECTION, MAX_SETUP_CUES, SESSION_SECTIONS, effortBand, isEffortBandId, isSessionSection, isSetupCueId, sectionRank,
   suggestEffortBand,

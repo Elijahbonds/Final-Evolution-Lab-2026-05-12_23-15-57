@@ -29,7 +29,7 @@
 // the step-down runs, at read time — today's pain decision cannot be known when a template is cloned.
 //
 // Pure: no Prisma client value, no DOM.
-import type { MovementPattern, SessionSection } from '@/public/_prisma/client';
+import type { MovementPattern, SessionSection } from '@/lib/generated/prisma';
 import { validateCatalogueCreate } from '../catalogue';
 import { COVERAGE_PATTERNS, patternCoverage, pullPushCheck, isWorking, type PatternedItem } from '../coverage';
 import { validateExerciseSpec } from '../loop';

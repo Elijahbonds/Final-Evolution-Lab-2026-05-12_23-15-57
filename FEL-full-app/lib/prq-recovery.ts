@@ -43,7 +43,7 @@
 // SELF-REPORTS. The only tables read are ClientSession, SetLog (with the ExerciseLog / SessionExercise / ProgramExercise
 // fields the filters name) and PlayerProfile; lib/prq-recovery-self-reports.test.ts walks this file's whole import graph
 // and fails if a readiness, pain, intake or breath module ever enters it.
-import type { PrismaClient } from '@/public/_prisma/client';
+import type { PrismaClient } from '@/lib/generated/prisma';
 import { AUTO_COOLDOWN_CREDIT_WHERE, COACH_COOLDOWN_DONE_WHERE, COMPLETED_OFF_DAY_WHERE, EASY_CARDIO_SET_WHERE } from '@/lib/coach/recoverySources';
 import { RECOVERY_DECIMALS, decayRecovery, recoveryAnchor, recoveryDayStart, settleRecovery, type RecoveryEvent, type RecoverySettle } from '@/lib/prq-engine';
 
