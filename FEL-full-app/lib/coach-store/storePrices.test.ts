@@ -116,9 +116,9 @@ describe('program → videoId mapping', () => {
     expect(storePriceByKey('signature-dunk-course')!.videoIds).toEqual([
       'cWYFVg6GsVU', 'xVE7Gegu27w', 'V0yX1H1OtQ8', 'tiHUrigssOA', 'isjAY8Oo58g', 's4U7IsjowuE',
     ]);
-    expect(storePriceByKey('blueprint-series')!.videoIds).toEqual(['hrlGbS0r-hM', 'dAoLYThf1bc']);
+    expect(storePriceByKey('blueprint-series')!.videoIds).toEqual(['hrlGbS0r-hM']);
     expect(storePriceByKey('bundle-all-three')!.videoIds).toEqual([
-      '00j3HPZsPmY', '3GtJ-134D9s', 'cWYFVg6GsVU', 'xVE7Gegu27w', 'V0yX1H1OtQ8', 'tiHUrigssOA', 'isjAY8Oo58g', 's4U7IsjowuE', 'hrlGbS0r-hM', 'dAoLYThf1bc',
+      '00j3HPZsPmY', '3GtJ-134D9s', 'cWYFVg6GsVU', 'xVE7Gegu27w', 'V0yX1H1OtQ8', 'tiHUrigssOA', 'isjAY8Oo58g', 's4U7IsjowuE', 'hrlGbS0r-hM',
     ]);
   });
 

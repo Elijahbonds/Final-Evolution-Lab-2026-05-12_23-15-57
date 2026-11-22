@@ -18,7 +18,6 @@ import fixture3GtJ134D9s from './fixtures/youtube-catalog/3GtJ-134D9s.json';
 import fixtureJ037GG99GT0 from './fixtures/youtube-catalog/J037GG99GT0.json';
 import fixtureV0yX1H1OtQ8 from './fixtures/youtube-catalog/V0yX1H1OtQ8.json';
 import fixturecWYFVg6GsVU from './fixtures/youtube-catalog/cWYFVg6GsVU.json';
-import fixturedAoLYThf1bc from './fixtures/youtube-catalog/dAoLYThf1bc.json';
 import fixturehrlGbS0r0hM from './fixtures/youtube-catalog/hrlGbS0r-hM.json';
 import fixtureisjAY8Oo58g from './fixtures/youtube-catalog/isjAY8Oo58g.json';
 import fixturempRZl8VNWlo from './fixtures/youtube-catalog/mpRZl8VNWlo.json';
@@ -40,10 +39,9 @@ export interface ProgramLibrarySourceVideo {
   chapters: ProgramLibrarySourceChapter[];
 }
 
-/** All 14 trimmed fixtures, in the catalog's order. */
+/** All 13 trimmed fixtures, in the catalog's order. */
 export const PROGRAM_LIBRARY_SOURCE: ProgramLibrarySourceVideo[] = [
   fixturehrlGbS0r0hM,
-  fixturedAoLYThf1bc,
   fixtureq1HLjLbhS2s,
   fixturepqyxTY85x4U,
   fixtureJ037GG99GT0,

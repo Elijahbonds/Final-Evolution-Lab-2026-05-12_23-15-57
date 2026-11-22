@@ -14,12 +14,12 @@ afterEach(() => {
 });
 
 const ALL_VIDEO_IDS = [
-  '00j3HPZsPmY', '3GtJ-134D9s', 'J037GG99GT0', 'V0yX1H1OtQ8', 'cWYFVg6GsVU', 'dAoLYThf1bc', 'hrlGbS0r-hM',
+  '00j3HPZsPmY', '3GtJ-134D9s', 'J037GG99GT0', 'V0yX1H1OtQ8', 'cWYFVg6GsVU', 'hrlGbS0r-hM',
   'isjAY8Oo58g', 'mpRZl8VNWlo', 'pqyxTY85x4U', 'q1HLjLbhS2s', 's4U7IsjowuE', 'tiHUrigssOA', 'xVE7Gegu27w',
 ];
 
 const UNTIMESTAMPED_VIDEO_IDS = [
-  'hrlGbS0r-hM', 'dAoLYThf1bc', 'mpRZl8VNWlo', '00j3HPZsPmY', '3GtJ-134D9s', 'cWYFVg6GsVU', 'xVE7Gegu27w',
+  'hrlGbS0r-hM', 'mpRZl8VNWlo', '00j3HPZsPmY', '3GtJ-134D9s', 'cWYFVg6GsVU', 'xVE7Gegu27w',
   'V0yX1H1OtQ8', 'tiHUrigssOA', 'isjAY8Oo58g', 's4U7IsjowuE',
 ];
 
@@ -138,7 +138,7 @@ describe('program library seed: flag-gated read path', () => {
   it('flag on: getProgramLibrarySeed returns all 14 entries with 85 drills', () => {
     process.env.COACH_STORE_ENABLED = '1';
     const seed = getProgramLibrarySeed();
-    expect(seed.length).toBe(14);
+    expect(seed.length).toBe(13);
     expect(allDrills(seed).length).toBe(85);
     expect(getProgramLibraryDrills().length).toBe(85);
   });
@@ -147,7 +147,7 @@ describe('program library seed: flag-gated read path', () => {
     delete process.env.COACH_STORE_ENABLED;
     expect(getProgramLibrarySeed()).toEqual([]);
     process.env.COACH_STORE_ENABLED = '1';
-    expect(getProgramLibrarySeed().length).toBe(14);
+    expect(getProgramLibrarySeed().length).toBe(13);
     delete process.env.COACH_STORE_ENABLED;
     expect(getProgramLibrarySeed()).toEqual([]);
   });
