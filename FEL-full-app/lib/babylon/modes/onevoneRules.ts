@@ -120,8 +120,42 @@ export interface HintState {
   defPhase: string;
   /** The rival is gathering (the block cue). */
   gathering: boolean;
+  /** CO-7: L1 / L2 (Q / F) held — the brace. Read only with `device` set. */
+  brace?: boolean;
+  /** CO-7: whose words the brace and post lines use. Unset: the lines are the ones they always were (no brace line). */
+  device?: HintDevice;
 }
 export const HINT_PAINT = 'GET OUT OF THE PAINT';
+
+// ── CO-7 (HOOPS-CONTROLS-OPT 2026-10-20, K3 K4): THE BRACE / POSTING CUE ─────────────────────────────────────────────────
+/** Which hands are on the game: a pad, the keyboard, or the touch deck (its right stick is the one labelled DRIBBLE,
+ *  modeVerbs R_STICK). */
+export type HintDevice = 'pad' | 'keys' | 'touch';
+/** Any seated pad is the pad; else a coarse pointer is the touch deck; else the keyboard (the SnowboardSlalomMode touchOnly read).
+ *  assumption: the device that last pressed something is not on the bus (touch and keyboard events carry no tag), so this
+ *  reads what is connected, not what was last pressed. */
+export function cueDeviceFor(padCount: number, coarsePointer: boolean): HintDevice {
+  return padCount > 0 ? 'pad' : coarsePointer ? 'touch' : 'keys';
+}
+/** Same helper under the name hoopsBraceCue.test and the modes import. A const alias, not a *Hint* function, so the
+ *  controls-screen scanner does not treat the device ids as live prompts. */
+export const hintDeviceFor = cueDeviceFor;
+/** POSTED: the right stick is the SHOT stick (OneVOneMode / ThreeVThreeMode onInput, POST HOOK: up past 0.5 with 0.3 to a side
+ *  starts the hook; let go under 0.35 is the release). The keyboard's right-stick keys for up-left / up-right are U and O
+ *  (InputBus KEY_RSTICK). */
+export const HINT_POSTED: Readonly<Record<HintDevice, string>> = {
+  pad: 'POSTED: RIGHT STICK IS THE SHOT STICK — UP-LEFT OR UP-RIGHT HOOKS, LET GO TO SHOOT',
+  keys: 'POSTED: U OR O IS THE SHOT STICK — HOLD ONE TO HOOK, LET GO TO SHOOT',
+  touch: 'POSTED: THE DRIBBLE STICK IS THE SHOT STICK — PUSH UP-LEFT OR UP-RIGHT TO HOOK',
+};
+/** BRACED, not posted: the right stick is still the PRO STICK — the brace changes no stick move (StickHandle.stickMoveFor
+ *  never reads `brace`; hoopsBraceCue.test holds it to that). The touch deck has no brace control on this build, so its line
+ *  names no button. */
+export const HINT_BRACED: Readonly<Record<HintDevice, string>> = {
+  pad: 'L1 / L2 HELD: RIGHT STICK IS STILL THE PRO STICK — THE SAME DRIBBLE MOVES',
+  keys: 'Q / F HELD: U 8 O H ; M , . ARE STILL THE PRO STICK — THE SAME DRIBBLE MOVES',
+  touch: 'BRACED: THE DRIBBLE STICK IS STILL THE PRO STICK — THE SAME DRIBBLE MOVES',
+};
 export function hintFor(s: HintState): string {
   if (s.possession === 'defense') {
     if (s.loose) return 'LOOSE BALL — GO GET IT · L1 BOXES OUT';
@@ -133,7 +167,8 @@ export function hintFor(s: HintState): string {
   if (s.dunking) return s.showtime ? 'SQUARE AT THE RIM — TIME THE FLUSH' : 'FLICK THE RIGHT STICK FOR A TRICK';
   if (s.shooting) return 'LET GO OF SQUARE (L) IN THE GREEN · EARLY = PUMP FAKE';
   if (s.loose || !s.carrying) return 'GO GET THE BOARD · L1 BOXES OUT';
-  if (s.posting) return 'POST: SQUARE HOOK · STICK OFF THE RIM + SQUARE FADE · SWING THE STICK = SPIN';
+  if (s.posting) return s.device ? HINT_POSTED[s.device] : 'POST: SQUARE HOOK · STICK OFF THE RIM + SQUARE FADE · SWING THE STICK = SPIN';
+  if (s.brace && s.device) return HINT_BRACED[s.device];
   if (s.nearRim) return 'R2 + SQUARE (SHIFT + L) = DUNK · SQUARE (L) ALONE = LAY IT IN';
   if (s.set) return 'TAP THE STICK TO JAB · SQUARE (L) SHOOT · L2 (F) POST UP';
   return 'RIGHT STICK = DRIBBLE MOVES · R2 (SHIFT) SPRINT · SQUARE (L) SHOOT';

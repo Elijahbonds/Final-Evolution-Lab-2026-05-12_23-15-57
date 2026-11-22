@@ -9,7 +9,7 @@ import type { Tier } from '../core/Difficulty';
 import type { PassType } from '../core/BallHandling';
 import { rivalShotPct } from '../core/BasketballCore';
 import { contestedPct } from '../core/HoopsDefense';
-import { HEAD_TO_HEAD_PARAMS, HINT_PAINT } from './onevoneRules';
+import { HEAD_TO_HEAD_PARAMS, HINT_PAINT, HINT_POSTED, HINT_BRACED, type HintDevice } from './onevoneRules';
 
 // ── #3 DIFFICULTY ────────────────────────────────────────────────────────────────────────────────────────────────────
 /**
@@ -168,6 +168,10 @@ export interface HintState {
   nearRim: boolean;
   /** Standing still with the ball (triple threat). */
   set: boolean;
+  /** CO-7: L1 / L2 (Q / F) held — the brace. Read only with `device` set (onevoneRules HINT_BRACED). */
+  brace?: boolean;
+  /** CO-7: whose words the brace and post lines use. Unset: the lines are the ones they always were. */
+  device?: HintDevice;
 }
 /** One line for the state the player is in ('' = nothing to say: the dunk is in the air). The urgent ones start the way the 1v1's
  *  do, so onevoneRules.hintSwap lets them in at once. */
@@ -186,7 +190,8 @@ export function hintFor(s: HintState): string {
   if (s.shotUp) return 'CRASH THE GLASS · HOLD L1 (Q) TO BOX OUT';
   if (s.mateHasBall) return 'GET OPEN · BOTTOM BUTTON (J) CALLS FOR THE BALL';
   if (!s.carrying) return '';
-  if (s.posting) return 'POST: SQUARE HOOK · STICK OFF THE RIM + SQUARE FADE · SWING THE STICK = SPIN';
+  if (s.posting) return s.device ? HINT_POSTED[s.device] : 'POST: SQUARE HOOK · STICK OFF THE RIM + SQUARE FADE · SWING THE STICK = SPIN';
+  if (s.brace && s.device) return HINT_BRACED[s.device];
   if (s.nearRim) return 'R2 + SQUARE (SHIFT + L) = DUNK · SQUARE (L) ALONE = LAY IT IN';
   if (s.set) return 'TAP THE STICK TO JAB · BOTTOM BUTTON (J) PASS · CIRCLE (K) SCREEN';
   return 'LEAN THE STICK AT A MATE + J TO PASS · CIRCLE (K) SCREEN · SQUARE (L) SHOOT';

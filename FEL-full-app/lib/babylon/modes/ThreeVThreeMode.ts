@@ -220,7 +220,7 @@ import { distanceGreenFactor, perfectHud, releaseGradeLabel } from '../core/Shot
 import { PlayerShotClock, playerShotClockSec } from '../core/ShotClock';   // lane/hoops-shot-core
 import { hornCall, overtimeSec, periodLabel, OVERTIME_BALL, OVERTIME_BANNER, OVERTIME_BANNER_MS, THREE_GAME_SEC, threeGameSec, introNamesClock } from './threevthreeOvertime';   // lane/hoops-overtime (NB-3); hoops-flow: the game clock
 import { readTier, type Tier } from '../core/Difficulty';   // IMPROVE (2026-10-06) #3: the shared OPPONENT pick
-import { hintSwap } from './onevoneRules';     // IMPROVE (2026-10-06) #7: the 1v1's hint dwell (the urgent lines share its prefixes)
+import { hintSwap, hintDeviceFor, type HintDevice } from './onevoneRules';     // IMPROVE (2026-10-06) #7: the 1v1's hint dwell (the urgent lines share its prefixes)
 import {   // IMPROVE (2026-10-06): the threevthree items of docs/IMPROVEMENTS-2026-10-05.md, as pure logic
   THREEV_TIER, TEAM_READS, tierForRun, cutOff, kickTarget, openness, catchAndShoot, KICK_READ_FROM_K, KICK_READ_TO_K, SWING_PICK_M,
   rivalPoints, goaltendAward, rivalReleasePct, passPreviewLabel, MARK_COLOR, hintFor, emptyBox, lodFor, type Lod,
@@ -743,6 +743,10 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
    *  (pink) — the driver was a random foe and the hint only said "stay tight" — and under the swing's target while it is in the air.
    *  Then the hint: one line for the state I am in (threevthreeRules.hintFor), held HINT_DWELL_SEC against flicker; a side change or
    *  an urgent line (the ref's warning, a shot's beat, the block cue) swaps at once. */
+  /** CO-7: the hint's device — a seated pad, else a coarse pointer (the touch deck), else the keyboard (onevoneRules.hintDeviceFor). */
+  function cueDevice(ctx: ModeContext): HintDevice {
+    try { return hintDeviceFor(ctx.input.pads().length, typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches); } catch { return 'pad'; }
+  }
   function tickCues(ctx: ModeContext, carrying: boolean, stick: { moveX: number; moveY: number }, speed01: number): void {
     let at: Body | null = null, color = '', preview = '';
     if (carrying && !shooting && !dunking && !finish && !gather && !spin && !passFlight.active) {
@@ -762,12 +766,15 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       if (mark.isEnabled() !== !!at) mark.setEnabled(!!at);
     }
     const defence = carrierId === 'foeTeam';
+    const brace = !!me.slot.intent.brace;
     const want = hintFor({
       defence, board: !!board, shotUp: arc.active || mateArc.active || !!foeDunkFlight || mateShooting, theirPass: foePass.active,
       gathering: defence && !!driver && driveK > 0 && driveK >= 1 - GATHER_TELL_SEC / driveSec,
       paintWarn: carrierId === 'me' && paintSec > THREE_SECOND_LIMIT - 1,
       dunking, showtime: showtimeCam, shooting, carrying, mateHasBall: carrierId === 'mate0' || carrierId === 'mate1',
       posting, nearRim: distXZ(me.char.root.position, RIM_FLOOR) < DUNK_RANGE, set: carrying && speed01 < 0.1,
+      // CO-7 (K3 K4): with the brace or the post held, the line says what the right stick is now, in this device's words
+      brace, device: carrying && (posting || brace) ? cueDevice(ctx) : undefined,
     });
     const turned = hintDefence !== defence;
     if (!hintSwap(hintShown, want, modeClock - hintAt, turned)) return;
