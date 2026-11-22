@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 /**
  * LIKENESS-REMOVE (Elijah, Oct 16 2026): the person in the banned YouTube video (ID below, split) is NOT Elijah.
- * No catalog, seed or store data may reference that video. Elijah approved removing it (Oct 20 2026, 2:09 PM PT),
+ * No catalog, seed or store data may reference that video. Elijah approved removing it (Nov 20 2026, 6:02-6:03 PM PT),
  * including deleting its fixture file.
  */
 const BANNED_ID = ['dAoLYThf', '1bc'].join('');   // split so this guard file never matches its own scan

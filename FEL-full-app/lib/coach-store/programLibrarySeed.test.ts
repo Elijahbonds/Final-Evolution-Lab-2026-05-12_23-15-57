@@ -138,7 +138,7 @@ describe('program library seed: flag-gated read path', () => {
   it('flag on: getProgramLibrarySeed returns all 14 entries with 85 drills', () => {
     process.env.COACH_STORE_ENABLED = '1';
     const seed = getProgramLibrarySeed();
-    expect(seed.length).toBe(14);
+    expect(seed.length).toBe(13);
     expect(allDrills(seed).length).toBe(85);
     expect(getProgramLibraryDrills().length).toBe(85);
   });
@@ -147,7 +147,7 @@ describe('program library seed: flag-gated read path', () => {
     delete process.env.COACH_STORE_ENABLED;
     expect(getProgramLibrarySeed()).toEqual([]);
     process.env.COACH_STORE_ENABLED = '1';
-    expect(getProgramLibrarySeed().length).toBe(14);
+    expect(getProgramLibrarySeed().length).toBe(13);
     delete process.env.COACH_STORE_ENABLED;
     expect(getProgramLibrarySeed()).toEqual([]);
   });
