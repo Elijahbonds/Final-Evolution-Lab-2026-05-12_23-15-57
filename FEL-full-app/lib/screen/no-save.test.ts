@@ -131,7 +131,7 @@ describe('a whole screen, played: 0 requests, 0 database writes, storage only th
   it.each(AGE_BANDS)('%s: nothing sent; before the camera only the age answer is written; an adult\'s result stays in this tab, a kid\'s nowhere', (age) => {
     forgetAgeForTests();
     const run = playScreen(whole(age));
-    expect(run.pre.step).toBe('camera');
+    expect(run.pre.step).toBe(age === '18+' ? 'camera' : 'kidResult');
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(m.writes).toEqual([]);
     // CHANGED (SCREEN-FIX Cyber 2): was `beforeCamera` 0 writes; now exactly one, the locked age answer

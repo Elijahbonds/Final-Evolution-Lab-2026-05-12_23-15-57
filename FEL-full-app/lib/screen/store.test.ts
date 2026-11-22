@@ -256,7 +256,7 @@ describe('a new Start asks the age again: nobody inherits the last person\'s ans
     p.run([{ type: 'age', age: second }]);
     expect(p.pre.step).toBe('grownUp');                            // kid handling: the grown-up step before the camera
     p.run([{ type: 'grownUp' }, { type: 'pain', hurts: false }, { type: 'takeoff', side: 'right' }, { type: 'cameraOn' }]);
-    expect(p.pre.step).toBe('camera');
+    expect(p.pre.step).toBe('kidResult');
     expect(keepResult(s, p.pre.gate, SUMMARY)).toBe('kid');        // and nothing of theirs is kept
     expect(readResult(s)).toBeNull();
     expect(readAge(s)).toBe(second);                               // only their own age answer remains

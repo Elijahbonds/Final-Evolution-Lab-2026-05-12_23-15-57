@@ -123,10 +123,10 @@ describe('an under-18 run keeps the age answer and nothing else, and sends nothi
   it.each(KIDS)('%s, grown-up ticked: two screens ("Run it again" re-asks the age); the age answer is the only value kept, and nothing is sent', (age) => {
     const p = page();
     for (const e of through(age)) p.ev(e);
-    expect(p.pre.step).toBe('camera');
+    expect(p.pre.step).toBe('kidResult');
     expect(p.checks(FIRST)).toBe('kid');
     for (const e of again(age)) p.ev(e);
-    expect(p.pre.step).toBe('camera');
+    expect(p.pre.step).toBe('kidResult');
     expect(p.checks(SECOND)).toBe('kid');
     // the age answer is written per run: run 1's answer, the new Start's reset, run 2's answer — nothing else, ever
     expect(writes()).toEqual([
@@ -162,7 +162,7 @@ describe('an under-18 run keeps the age answer and nothing else, and sends nothi
   it.each(KIDS)('SCREEN A: %s answers the take-off tap and it is never written — page memory only', (age) => {
     const p = page();
     for (const e of through(age)) p.ev(e);
-    expect(p.pre.step).toBe('camera');                                   // the tap was on the way to the camera
+    expect(p.pre.step).toBe('kidResult');                                // the tap was on the way to the camera
     expect(writes()).toEqual([{ where: 'sessionStorage', op: 'setItem', key: KEYS.age }]);
     expect(session.keys()).toEqual([KEYS.age]);                          // no fel.screen.takeoffLeg, ever
     p.checks(FIRST);
