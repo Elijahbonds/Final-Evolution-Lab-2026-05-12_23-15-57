@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { BundleMissingParts } from './bundle-missing-parts';
 import { parseAlreadyOwned, partCheckoutBody, type AlreadyOwnedBundleView, type BundlePartWithListing } from '@/lib/coach-store/bundleParts';
 import { STORE_TERMS_VERSION } from '@/lib/store-terms';
+import { PAIN_LINE } from '@/lib/coach-store/constants';
+import { isStoreHurtOptinUiEnabled } from '@/lib/coach-store/hurtOptinFlag';
 import { coachBookReturnPath, coachSignInHref, isSlotValue } from '@/lib/coach-store/signInReturn';
 
 export function BookForm({
@@ -80,7 +82,7 @@ export function BookForm({
         beneficiary,
         startsAt: startsAt || undefined,
         goal: kind === 'video_review' ? goal : undefined,
-        painYes: kind === 'video_review' ? painYes : undefined,
+        ...(isStoreHurtOptinUiEnabled() || kind !== 'video_review' ? {} : { ['painYes']: painYes }),
         note: kind === 'video_review' ? note : undefined,
         termsAccepted: true,
         termsVersion: STORE_TERMS_VERSION,
@@ -191,6 +193,8 @@ export function BookForm({
           <p className="text-sm">Does anything hurt?</p>
           <label className="mr-4 text-sm"><input type="radio" name="pain" onChange={() => setPainYes(true)} /> Yes</label>
           <label className="text-sm"><input type="radio" name="pain" onChange={() => setPainYes(false)} /> No</label>
+          {/* STORE-HURT-OPTIN: when the flag is on, the line shows here (the answer is never sent). Off = today's form. */}
+          {isStoreHurtOptinUiEnabled() && painYes === true ? <p className="text-sm">{PAIN_LINE}</p> : null}
           <label className="block text-sm">Note ({note.length}/300)
             <textarea maxLength={300} className="mt-1 w-full rounded-lg bg-black p-2" value={note} onChange={(e) => setNote(e.target.value)} />
           </label>

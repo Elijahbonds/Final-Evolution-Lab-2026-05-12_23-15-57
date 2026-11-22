@@ -13,6 +13,7 @@ import { parseManifest, priceOk } from './manifest';
 import { connectionFailureReschedule, decideCancel, decideJoin } from './policy';
 import { receiptText } from './receipt';
 import { canDeliver, clipRejected, dueAt, goalOk, noteOk, originalDeleteAt, originalsDue, reviewOpening } from './reviews';
+import { isStoreHurtOptinServerEnabled } from './hurtOptinFlag';
 import { shareWithCoachAllowed } from './rescreen';
 import { slotStillFree } from './slotCheck';
 import { openSlots, type WeeklyWindow } from './slots';
@@ -219,7 +220,9 @@ export async function submitReview(userId: string, bookingId: string, body: { cl
     for (const clip of clips) if (!clip.startsWith(`coach-reviews/originals/${bookingId}/`)) return NextResponse.json({ error: 'clips' }, { status: 400 });
     const goal = typeof body.goal === 'string' ? body.goal : '';
     if (!goalOk(goal)) return NextResponse.json({ error: 'goal_required' }, { status: 400 });
-    if (typeof body.painYes !== 'boolean') return NextResponse.json({ error: 'pain_required' }, { status: 400 });
+    // STORE-HURT-OPTIN: flag off = today's behaviour (painYes required and stored). Flag on = not required; write null so a leftover is cleared.
+    const painYes = typeof body.painYes === 'boolean' ? body.painYes : null;
+    if (!isStoreHurtOptinServerEnabled() && painYes === null) return NextResponse.json({ error: 'pain_required' }, { status: 400 });
     const note = typeof body.note === 'string' ? body.note : '';
     if (!noteOk(note)) return NextResponse.json({ error: 'note_too_long' }, { status: 400 });
     const instructor = await prisma.instructor.findUnique({ where: { id: booking.instructorId } });
@@ -229,7 +232,7 @@ export async function submitReview(userId: string, bookingId: string, body: { cl
       data: {
         clipPaths: clips,
         goal,
-        painYes: body.painYes,
+        painYes: isStoreHurtOptinServerEnabled() ? null : painYes,
         reviewNote: note,
         submittedAt: now,
         dueAt: dueAt(now, instructor?.reviewSlaHours),
@@ -256,7 +259,8 @@ export async function deliverReview(userId: string, bookingId: string, body: { r
     if (!canDeliver({ hasRecording: replyObject.startsWith(`coach-reviews/replies/${bookingId}/`), drillCount: drills.length })) {
       return NextResponse.json({ error: 'needs_recording_and_drill' }, { status: 400 });
     }
-    const text = reviewOpening(Boolean(booking.painYes), typeof body.replyText === 'string' ? body.replyText : '');
+    // STORE-HURT-OPTIN: flag on = every review opens with PAIN_LINE; flag off = today's behaviour (only a stored yes).
+    const text = reviewOpening(isStoreHurtOptinServerEnabled() || Boolean(booking.painYes), typeof body.replyText === 'string' ? body.replyText : '');
     const now = new Date();
     await prisma.booking.update({
       where: { id: bookingId },

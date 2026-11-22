@@ -232,3 +232,11 @@ export function isSellerAdultGateEnabled(env: NodeJS.ProcessEnv = process.env): 
   const v = (env.SELLER_ADULT_GATE_ENABLED ?? '').trim().toLowerCase();
   return v === '1' || v === 'true' || v === 'on' || v === 'yes';
 }
+
+/**
+ * STORE-HURT-OPTIN. Default OFF: the coach store stores the "Does anything hurt?" answer as it does today.
+ * ON: the answer is never stored. The server reads only STORE_HURT_OPTIN_ENABLED (isStoreHurtOptinServerEnabled);
+ * the public twin is UI-only (lib/coach-store/hurtOptinFlag.ts).
+ */
+export { isStoreHurtOptinServerEnabled, isStoreHurtOptinServerEnabled as isStoreHurtOptinEnabled } from './coach-store/hurtOptinFlag';
+
