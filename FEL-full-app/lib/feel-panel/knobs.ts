@@ -2348,6 +2348,12 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/adventure/coast/zoneSound.ts COAST_OCEAN_BED',
     hint: 'The zone asks for the ocean bed in its load as Venice does, with waves on the nearest shore, a gull now and then and steps on sand, boards or in the shallows. 0 = the harness started its stadium crowd on the first press, as before.',
   },
+  // ── lane/improve-world (phase 7): Chapter 1 looks finished ──
+  {
+    id: 'story.worldDressed', label: 'Story: textured ground and stone, edge trims, rail posts and the nature kit (1) / plain colour blocks (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Story · flow',
+    source: 'lib/babylon/adventure/world/dress.ts STORY_WORLD_DRESSED',
+    hint: 'View only: no piece moves or changes size. The shipped ground textures on the tops, stone on the sides and blocks, a lip on each edge, a cap on each block, posts under the rails, and grass, bushes, rocks and trees from the shipped kit kept clear of where you play. 0 = the plain colours, as before.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));

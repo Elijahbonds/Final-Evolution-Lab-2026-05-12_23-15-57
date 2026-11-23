@@ -64,6 +64,8 @@ import { cancelNatural, speakNatural } from '../audio/voice/speakNatural';
 import { STORY_SFX_ON, StorySfx, type StoryPlayFn } from '../adventure/audio/storySfx';
 import { playNature } from '../audio/natureSfx';
 import type { AdventureHost } from '../adventure/host/AdventureHost';
+// improve pass phase 7 (story.worldDressed): textures, trims and the nature kit on the story's worlds (view only)
+import { mountWorldDress, STORY_WORLD_DRESSED, type WorldDress } from '../adventure/world/dress';
 
 /** The yard keeps its own progress under this prefix, so a try-out never writes the player's real save. */
 export const YARD_SAVE_PREFIX = 'yard:';
@@ -480,7 +482,12 @@ interface StoryState {
   sky?: AbstractMesh[];
   /** improve pass phase 5 (story.sfxOn): the sound effects; null with the knob off. */
   sfx: StorySfx | null;
+  /** improve pass phase 7 (story.worldDressed): the worlds' dressing; null with the knob off. */
+  dress: WorldDress | null;
 }
+
+/** The nature kit starts loading after this many played frames (about a second), never during the load. */
+const DRESS_PROPS_AFTER_FRAMES = 60;
 
 const stories = new WeakMap<Scene, StoryState>();
 const liveStories = new Set<StoryState>();
@@ -530,6 +537,7 @@ async function loadStory(ctx: ModeContext): Promise<void> {
   });
   const host = session.host;
   const view = buildStoryView(scene, session.map, session.gates);
+  const dress = feel('story.worldDressed', STORY_WORLD_DRESSED) >= 0.5 ? mountWorldDress(scene, [...session.map.worlds.values()]) : null;
 
   // the party's bodies (the yard's way: the player through CharacterLibrary.spawn, a creature as a placeholder)
   const bodies = new Map<ActorId, Body>();
@@ -554,7 +562,7 @@ async function loadStory(ctx: ModeContext): Promise<void> {
       bodies.set(q.id, { kind: 'placeholder', root: ph.root, pose: ph.pose, ph, view: bindMovementView({ animator: NO_ANIM, poseNode: ph.pose, actor: () => host.world.actors.get(q.id), telemetry: () => host.movement.inspect(q.id), clock: () => host.tSec }) });
     }
   }
-  if (scene.isDisposed) { session.dispose(); view.dispose(); return; }
+  if (scene.isDisposed) { session.dispose(); dress?.dispose(); view.dispose(); return; }
   const me = bodies.get(host.playerId)!;
   const combatView = bindCombatView({
     scene, bus: host.bus, combat: host.combat, actors: host.world.actors, localPlayerId: host.playerId,
@@ -572,7 +580,7 @@ async function loadStory(ctx: ModeContext): Promise<void> {
     stickL: { x: 0, y: 0 }, stickR: { x: 0, y: 0 }, latchedYaw: null, baseFov: ctx.camera.fov, fovBoost: 0,
     hudSec: 0, uiSec: 0, saveSec: 0, frame: 0, lastHud: '', mirror: session.save.settings.mirror === true, preset: 'runner', rigKey: '',
     snap: true, flight: flightUnlockedIn(session.save.story.flags), demo: null, offKeys: null, probe: at >= 0,
-    chapterTitle: chapter?.title ?? null, placeholder: !!chapter?.placeholder, ending: null, sfx: storySfxFor(host),
+    chapterTitle: chapter?.title ?? null, placeholder: !!chapter?.placeholder, ending: null, sfx: storySfxFor(host), dress,
     budgetIn: {
       tier: (scene.metadata as { felTier?: 'mobile' | 'desktop' } | undefined)?.felTier ?? 'desktop',
       eye: host.player.pos,
@@ -663,6 +671,7 @@ function storyCamYaw(ctx: ModeContext, T: StoryState): number {
 function storySync(ctx: ModeContext, T: StoryState, dt: number): void {
   const s = T.session, h = s.host, scene = ctx.scene;
   T.frame++;
+  if (T.dress && T.frame === DRESS_PROPS_AFTER_FRAMES) void T.dress.loadProps().then((n) => console.info(`[FEL-PERF] story dress: ${n} props`));
   // bodies: the encounters' monsters come and go with the story runtime
   for (const a of h.world.actors.values()) {
     if (T.bodies.has(a.id)) continue;
@@ -776,7 +785,7 @@ function closeStory(T: StoryState): void {
   STORY_SPEAKER.cancel();
   if (typeof window !== 'undefined') delete (window as unknown as { __FEL_ADVENTURE__?: unknown }).__FEL_ADVENTURE__;
   T.offKeys?.(); T.offKeys = null;
-  T.combatView.dispose(); T.magicView.dispose(); T.sparks.dispose(); T.speed.dispose(); T.view.dispose(); T.sfx?.dispose();
+  T.combatView.dispose(); T.magicView.dispose(); T.sparks.dispose(); T.speed.dispose(); T.dress?.dispose(); T.view.dispose(); T.sfx?.dispose();
   for (const b of T.bodies.values()) { b.view.dispose(); if (b.ph) b.ph.dispose(); else { b.char?.dispose(); b.pose.dispose(); b.root.dispose(); } }
   T.bodies.clear();
   T.session.dispose();
