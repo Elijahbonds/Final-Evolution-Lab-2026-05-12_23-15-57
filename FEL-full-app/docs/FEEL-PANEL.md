@@ -1223,6 +1223,8 @@ ON because the arena is a new place the owner asked for; each restores today at 
 | `arena.runCompensate` | 0.85 | — | The drift of a moving shot the hand cancels. |
 | `arena.releaseNoise` | 0.05 m/s | — | The hand's tremor (0.04 / 0.055 / 0.07 → good 83 / 68 / 63 % in the sweep). |
 | `arena.aimAssist` | 0.8 | — | POV only: the share of a look off the ring the shot forgives. |
+| `arena.dunks` | 1 | 0 = jump shots only (slice 1) | Phase 4: a run at the ring with the ball is a dunk (the hand jams it down through; the iron decides), a close shot a soft layup (66°). |
+| `arena.dunkJumpVy` | 4.3 m/s | — | The dunk's take-off: 0.94 m up, so the hand gets the ball over the ring. |
 | `cam.povEyeM` | 1.72 m | — | The eye when no head bone is found. |
 | `cam.povFovDeg` | 82° | — | Across the screen; the vertical follows the screen's shape (50–100°). |
 | `cam.povBobM` | 0 | — | Head-bob, OFF by default. |

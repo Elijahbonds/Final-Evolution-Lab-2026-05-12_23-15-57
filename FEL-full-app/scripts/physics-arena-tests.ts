@@ -15,6 +15,8 @@
  *   F. The live mode's own loop (PhysicsArenaMode on a NullEngine scene, no characters): three minutes of the rival against a
  *      player who shoots at the top of his jump. The check passes go and come, both sides shoot, the score moves, the ball never
  *      leaves the world, nothing throws.
+ *   H. Phase 4, dunks at the rim: a run at the ring that leaves from 1.75 m and jams the ball once it is over the ring goes through
+ *      far more often than the same run let go 0.2 s after the press (the ball still under the ring: the push meets the iron).
  *   G. Phase 3, the three-point contest: from the five racks (7.05–7.15 m) a good release still makes clearly more than a bad one,
  *      and the contest mode's own loop runs a whole contest headless (25 balls, the clock, the final).
  *
@@ -177,6 +179,9 @@ async function main() {
   console.log('\nG. the three-point contest');
   await threePoint(B);
 
+  console.log('\nH. dunks: the iron decides');
+  await dunks(B);
+
   console.log(`\nphysics-arena: ${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
 }
@@ -254,6 +259,48 @@ async function liveLoop(B: typeof import('@babylonjs/core')) {
   const st = arenaStats(scene);
   if (st) console.log(`     shots me ${st.makes.me}/${st.shots.me}, rival ${st.makes.foe}/${st.shots.foe}; lost handles ${st.lostHandles}; steals ${st.steals}; physics ${(st.physMsSum / Math.max(1, st.frames)).toFixed(2)} ms a frame (node, max ${st.physMsMax.toFixed(1)})`);
   ok('the rival shoots and makes some, and misses some (the physics decides, not a script)', !!st && st.shots.foe > 4 && st.makes.foe > 0 && st.makes.foe < st.shots.foe);
+  scene.dispose(); engine.dispose();
+}
+
+async function dunks(B: typeof import('@babylonjs/core')) {
+  const { PhysicsArenaMode, arenaSeam, arenaStats } = await import('../lib/babylon/modes/PhysicsArenaMode');
+  const engine = new B.NullEngine();
+  engine.getDeltaTime = () => 1000 / 60;
+  const scene = new B.Scene(engine);
+  const camera = new B.UniversalCamera('camd', new B.Vector3(0, 3, 12), scene);
+  const dir = { mode: 'follow', suspended: false, stickWorldLatched: (x: number, y: number) => new B.Vector3(x, 0, -y), look: () => {}, update: () => {}, snapTo: () => {} };
+  const ctx = { scene, camera, camDirector: dir, heroRef: { current: null }, objectiveRef: { current: null }, setHud: () => {} } as never;
+  await PhysicsArenaMode.load(ctx);
+  const seam = arenaSeam(scene) as unknown as { place: (x: number, z: number) => void; quiet: (on: boolean) => void };
+  seam.quiet(true);
+  const me = scene.getTransformNodeByName('arena_me_body')!;
+  const run = (deg: number, leaveAt: number, letGoAfter = -1): boolean => {
+    const a = (deg * Math.PI) / 180, start = 5.5;
+    seam.place(Math.sin(a) * start, -0.6 + Math.cos(a) * start);
+    const before = arenaStats(scene)!.makes.me;
+    for (let f = 0; f < 30; f++) PhysicsArenaMode.update(ctx, 1 / 60);   // the catch and the first push
+    PhysicsArenaMode.onInput(ctx, { t: 'button', btn: 'R1', pressed: true });
+    let pressed = false, pressedAt = 0;
+    for (let f = 0; f < 60 * 4; f++) {
+      const dx = -me.position.x, dz = -0.6 - me.position.z, d = Math.hypot(dx, dz);
+      if (d > 0.25) PhysicsArenaMode.onInput(ctx, { t: 'stick', side: 'L', x: dx / d, y: -dz / d });   // the stick stays on the ring (a player runs through the dunk)
+      else PhysicsArenaMode.onInput(ctx, { t: 'stick', side: 'L', x: 0, y: 0 });
+      if (!pressed && d < leaveAt) { PhysicsArenaMode.onInput(ctx, { t: 'button', btn: 'X', pressed: true }); pressed = true; }
+      if (pressed && letGoAfter >= 0 && (pressedAt += 1 / 60) > letGoAfter) { PhysicsArenaMode.onInput(ctx, { t: 'button', btn: 'X', pressed: false }); letGoAfter = -1; }
+      PhysicsArenaMode.update(ctx, 1 / 60);
+    }
+    PhysicsArenaMode.onInput(ctx, { t: 'button', btn: 'X', pressed: false });
+    PhysicsArenaMode.onInput(ctx, { t: 'button', btn: 'R1', pressed: false });
+    for (let f = 0; f < 60; f++) PhysicsArenaMode.update(ctx, 1 / 60);
+    return arenaStats(scene)!.makes.me > before;
+  };
+  let good = 0, bad = 0, n = 0; const row: string[] = [];
+  for (const deg of [-50, -25, -10, 0, 10, 25, 50]) {
+    const gd = run(deg, 1.75), bd = run(deg, 1.75, 0.2);
+    good += +gd; bad += +bd; n++; row.push(`${deg}°:${gd ? 'Y' : 'n'}${bd ? 'Y' : 'n'}`);
+  }
+  console.log(`     jammed at the top: ${good}/${n}; let go 0.2 s after the press (ball still under the ring): ${bad}/${n}  [${row.join(' ')}]`);
+  ok(`a dunk jammed over the ring goes through (${good}/${n} ≥ 5) and one let go under it mostly does not (${bad}/${n} ≤ 2)`, good >= 5 && bad <= 2);
   scene.dispose(); engine.dispose();
 }
 

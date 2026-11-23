@@ -38,10 +38,10 @@ import { ArenaPhysics, type ArenaPlayer } from '../arena/arenaPhysics';
 import { mountArenaCourt, RIM_VEC, type ArenaCourt } from '../arena/arenaCourt';
 import { ARC_M, ARENA_RIM, ARENA_RIM_RADIUS, BALL_BOUNDS, BALL_R, CHECK_SPOT, COURT, RIM_FLOOR, type P3 } from '../arena/hoopGeometry';
 import { HoopSensor } from '../arena/hoopSensor';
-import { releaseShot } from '../arena/arenaShot';
+import { dunkPush, LAYUP_ARC_DEG, releaseShot } from '../arena/arenaShot';
 import { passVelocity, seeded } from '../arena/shotModel';
 import { chestPoint, dribbleCatch, dribbleCommit, dribbleHand, dribblePush, setPoint } from '../arena/dribble';
-import { aimAssist, floorBounce, jumpVy, povBobM, povEyeM, povFovDeg, povLookDegS, povOn } from '../arena/arenaConfig';
+import { aimAssist, dunkJumpVy, dunksOn, floorBounce, jumpVy, povBobM, povEyeM, povFovDeg, povLookDegS, povOn } from '../arena/arenaConfig';
 import { aimYawErr, applyPov, fovForAspect, povLook, povPose, type PovView } from '../arena/povCamera';
 
 export const ARENA_MODE_ID = 'physics_arena';
@@ -72,6 +72,15 @@ export const RIVAL_BY_TIER: Record<Tier, { reactSec: number; releaseSd: number; 
 type Who = 'me' | 'foe';
 type BallState = 'held' | 'dribble' | 'flight' | 'pass' | 'loose';
 type Phase = 'check' | 'live' | 'scored' | 'over';
+/** A jump shot, a layup (close: a high soft arc), or a dunk (a run at the ring: the hand jams it down through). */
+export type ShotKind = 'jumper' | 'layup' | 'dunk';
+
+/** Which shot a press at this distance and speed is (arena.dunks 0: always the jump shot). */
+export function shotKindFor(distM: number, speedMps: number, dunks: boolean): ShotKind {
+  if (dunks && distM < 2.1 && speedMps > 2.5) return 'dunk';
+  if (dunks && distM < 2.3) return 'layup';
+  return 'jumper';
+}
 
 interface Athlete {
   who: Who;
@@ -84,7 +93,7 @@ interface Athlete {
   yaw: number;
   clip: string;
   /** A jump shot in progress: t since the gather, whether he has left the floor, a release asked for. */
-  shot: { t: number; jumped: boolean; wantRelease: boolean; aiReleaseAt: number } | null;
+  shot: { t: number; jumped: boolean; wantRelease: boolean; aiReleaseAt: number; kind: ShotKind } | null;
   /** A plain jump (rebound, contest) in progress. */
   hopT: number;
   pokeCd: number;
@@ -121,7 +130,7 @@ interface St {
   input: { lx: number; ly: number; rx: number; ry: number; sprint: boolean };
   pov: { on: boolean; view: PovView; savedFov: number };
   camModeSeen: CamMode;
-  ai: { spot: P3; since: number; reactAt: number; pokeAt: number };
+  ai: { spot: P3; since: number; reactAt: number; pokeAt: number; /** This possession he drives at the ring (a dunk or a layup, if the physics lets him). */ drive: boolean };
   banner: string;
   bannerT: number;
   timing: string;
@@ -134,6 +143,7 @@ interface St {
   aiQuiet: boolean;
   /** The probe seam is published (dev, or an agent run on a loopback host). */
   seamOn: boolean;
+  seam: Record<string, (...a: never[]) => unknown> | null;
   disposed: boolean;
 }
 
@@ -233,9 +243,11 @@ function push(S: St, a: Athlete): void {
 function startShot(S: St, a: Athlete, aiReleaseAt = Infinity): void {
   if (S.handler !== a.who || a.shot || (S.ball !== 'dribble' && S.ball !== 'held')) return;
   S.ball = 'held'; S.ballT = 0;
-  a.shot = { t: 0, jumped: false, wantRelease: false, aiReleaseAt };
+  const v = a.body.vel(TMP);
+  const kind = shotKindFor(flatDist(a.node.position, RIM_FLOOR), Math.hypot(v.x, v.z), dunksOn());
+  a.shot = { t: 0, jumped: false, wantRelease: false, aiReleaseAt, kind };
   a.yaw = S.pov.on && a.who === 'me' ? S.pov.view.yaw : yawTo(a.node.position, ARENA_RIM);
-  playClip(a, 'bball_shoot_jumper', false);
+  playClip(a, kind === 'dunk' ? 'bball_layup_gather' : 'bball_shoot_jumper', false);
 }
 
 function release(S: St, a: Athlete): void {
@@ -245,14 +257,16 @@ function release(S: St, a: Athlete): void {
   const yawErr = S.pov.on && a.who === 'me' ? aimYawErr(S.pov.view.yaw, p3(a.node.position), ARENA_RIM, aimAssist()) : 0;
   // the release against the top of the jump: a body still rising at vy is vy/g early, a falling one late (ballistic, exact)
   const ms = Math.round(((a.shot.jumped ? -v.y : -jumpVy()) / G) * 1000);
-  releaseShot(ball, a.body.bit, { x: v.x, y: a.shot.jumped ? v.y : jumpVy(), z: v.z }, S.rng.normal, yawErr);
+  const kind = a.shot.kind;
+  if (kind === 'dunk') { ball.ignore(a.body.bit, 0.35); ball.launch(dunkPush(p3(ball.pos))); }
+  else releaseShot(ball, a.body.bit, { x: v.x, y: a.shot.jumped ? v.y : jumpVy(), z: v.z }, S.rng.normal, yawErr, kind === 'layup' ? LAYUP_ARC_DEG : undefined);
   S.handler = null; S.ball = 'flight'; S.ballT = 0; S.shotBy = a.who; S.shotTouched = false; S.lastTouch = a.who;
   S.shotFromM = flatDist(a.node.position, RIM_FLOOR);
   S.stats.shots[a.who]++;
   S.sensor.reset();
   a.shot = null;
   const label = ms < -35 ? 'early' : ms > 35 ? 'late' : 'on time';
-  if (a.who === 'me') S.timing = `${label} ${ms > 0 ? '+' : ''}${ms} ms`;
+  if (a.who === 'me') S.timing = kind === 'dunk' ? 'dunk' : `${kind === 'layup' ? 'layup, ' : ''}${label} ${ms > 0 ? '+' : ''}${ms} ms`;
   SoundKit.play('whoosh', { volume: 0.3 });
 }
 
@@ -293,7 +307,7 @@ function foeWish(S: St): { x: number; z: number } {
   let tx = fp.x, tz = fp.z, speed = prof.speed;
   if (S.phase === 'check' || S.aiQuiet) return { x: 0, z: 0 };
   if (S.handler === 'foe') {
-    tx = S.ai.spot.x; tz = S.ai.spot.z; speed = prof.speed * 0.8;
+    tx = S.ai.spot.x; tz = S.ai.spot.z; speed = prof.speed * (S.ai.drive ? 1.1 : 0.8);
   } else if (S.handler === 'me') {
     // between me and the ring, 1.25 m off me
     const mp = me.node.position;
@@ -329,7 +343,7 @@ function beforeStep(ctx: ModeContext, S: St, h: number): void {
   // bodies
   for (const a of [S.me, S.foe]) {
     let w = a.who === 'me' ? myWish(ctx, S) : foeWish(S);
-    if (S.phase === 'check' || (a.shot && !a.shot.jumped)) w = { x: 0, z: 0 };   // planted for the check and the gather
+    if (S.phase === 'check' || (a.shot && !a.shot.jumped && a.shot.kind !== 'dunk')) w = { x: 0, z: 0 };   // planted for the check and the gather (a dunk keeps its run)
     w = keepIn(a.node.position, w);
     a.wish.x = w.x; a.wish.z = w.z;
     // a dribbler's change of run waits for the hand (at most a bounce; measured ~50 ms on a cut), so the ball is never left behind
@@ -339,7 +353,7 @@ function beforeStep(ctx: ModeContext, S: St, h: number): void {
   // the ball in hand
   if (S.handler && S.ball === 'held') {
     const a = athlete(S, S.handler);
-    const at = a.shot ? setPoint(p3(a.node.position), a.yaw) : chestPoint(p3(a.node.position), a.yaw);
+    const at = a.shot?.kind === 'dunk' ? dunkHold(a) : a.shot ? setPoint(p3(a.node.position), a.yaw, a.shot.kind === 'layup' ? 2.2 : 2.3) : chestPoint(p3(a.node.position), a.yaw);
     ball.hold(at);
   } else if (S.handler && S.ball === 'dribble') {
     const a = athlete(S, S.handler);
@@ -442,7 +456,9 @@ function frameRules(ctx: ModeContext, S: St, dt: number): void {
 function pickSpot(S: St): void {
   const prof = RIVAL_BY_TIER[S.tier];
   const a = (S.rng.next() * 2 - 1) * 1.2;
-  const d = 2.6 + S.rng.next() * (prof.maxShotM - 2.6);
+  // a quarter of his possessions (with arena.dunks on) he drives at the ring: what comes of it is the physics' (a body in the lane)
+  S.ai.drive = dunksOn() && S.rng.next() < 0.25;
+  const d = S.ai.drive ? 0.6 : 2.6 + S.rng.next() * (prof.maxShotM - 2.6);
   S.ai.spot = { x: ARENA_RIM.x + Math.sin(a) * d, y: 0, z: ARENA_RIM.z + Math.cos(a) * d };
 }
 
@@ -454,8 +470,13 @@ function shotsAndJumps(S: St, dt: number): void {
     if (a.hopT > 0.2 && a.body.grounded) a.hopT = 0;
     if (!a.shot) continue;
     a.shot.t += dt;
-    if (!a.shot.jumped && a.shot.t >= GATHER_SEC) { a.body.jump(jumpVy()); a.shot.jumped = true; a.shot.t = 0; }
-    if (a.shot.jumped) {
+    if (!a.shot.jumped && a.shot.t >= GATHER_SEC) { a.body.jump(a.shot.kind === 'dunk' ? dunkJumpVy() : jumpVy()); a.shot.jumped = true; a.shot.t = 0; }
+    if (a.shot.jumped && a.shot.kind === 'dunk') {
+      // the jam: on the button's release, or by itself once the ball is over the ring's plane and over the ring, or at the landing
+      const b = S.world.ball.pos;
+      const over = b.y > ARENA_RIM.y + BALL_R + 0.06 && flatDist(b, ARENA_RIM) < 0.5;
+      if (a.shot.wantRelease || over || (a.shot.t > 0.2 && a.body.grounded)) release(S, a);
+    } else if (a.shot.jumped) {
       const vy = a.body.vel(TMP).y;
       const sinceTop = a.shot.t - jumpVy() / G;
       if (a.who === 'foe' && sinceTop >= a.shot.aiReleaseAt) release(S, a);
@@ -471,7 +492,9 @@ function shotsAndJumps(S: St, dt: number): void {
   if (S.handler === 'foe' && !f.shot && (S.ball === 'dribble' || S.ball === 'held')) {
     const atSpot = flatDist(f.node.position, S.ai.spot) < 0.6;
     const open = flatDist(f.node.position, me.node.position) > 2.2 && flatDist(f.node.position, RIM_FLOOR) < prof.maxShotM;
-    if (S.ai.since > 0.8 && (atSpot || S.ai.since > 3.5 || (open && S.ai.since > 1.5))) startShot(S, f, S.rng.normal() * prof.releaseSd);
+    const rimD = flatDist(f.node.position, RIM_FLOOR);
+    if (S.ai.drive) { if (S.ai.since > 0.6 && (rimD < 1.8 || S.ai.since > 4)) startShot(S, f, S.rng.normal() * prof.releaseSd); }
+    else if (S.ai.since > 0.8 && (atSpot || S.ai.since > 3.5 || (open && S.ai.since > 1.5))) startShot(S, f, S.rng.normal() * prof.releaseSd);
   }
   // his contest jump on my shot, after his reaction time
   if (me.shot && f.hopT === 0 && f.body.grounded && flatDist(me.node.position, f.node.position) < 2.2) {
@@ -495,6 +518,14 @@ function shielded(S: St, reacher: Athlete): boolean {
   if (!S.handler) return false;
   const h = athlete(S, S.handler).node.position, r = reacher.node.position, b = S.world.ball.pos;
   return flatDist(b, r) > flatDist(h, r) + 0.05;
+}
+
+/** The dunk's hold: both hands over the head, reaching toward the ring as the body rises. */
+function dunkHold(a: Athlete): P3 {
+  const p = a.node.position;
+  const dx = ARENA_RIM.x - p.x, dz = ARENA_RIM.z - p.z, d = Math.hypot(dx, dz) || 1;
+  const reach = Math.min(0.55, d);
+  return { x: p.x + (dx / d) * reach, y: p.y + 2.45, z: p.z + (dz / d) * reach };
 }
 
 /** A hand on the ball: knocked away from the handler (an impulse at the ball; where it goes is the physics'). */
@@ -623,10 +654,10 @@ export const PhysicsArenaMode: ModeDefinition = {
       dribble: { side: 1, pushedAt: 0, due: 0, crossAt: -9 }, lastTouch: null, shotBy: null, shotFromM: 0, shotTouched: false, passTo: null,
       input: { lx: 0, ly: 0, rx: 0, ry: 0, sprint: false },
       pov: { on: false, view: { yaw: 0, pitch: 0, bobPhase: 0 }, savedFov: ctx.camera.fov }, camModeSeen: ctx.camDirector.mode,
-      ai: { spot: { x: 0, y: 0, z: 4 }, since: 0, reactAt: 0, pokeAt: 0 },
+      ai: { spot: { x: 0, y: 0, z: 4 }, since: 0, reactAt: 0, pokeAt: 0, drive: false },
       banner: '', bannerT: 0, timing: '', prevBall: { x: 0, y: 1, z: 6 }, hudKey: '',
       stats: { shots: { me: 0, foe: 0 }, makes: { me: 0, foe: 0 }, lostHandles: 0, steals: 0, physMsMax: 0, physMsSum: 0, frames: 0 },
-      scriptOffset: null, aiQuiet: false, seamOn: false, disposed: false,
+      scriptOffset: null, aiQuiet: false, seamOn: false, seam: null, disposed: false,
     };
     states.set(scene, S); current = S;
     setupCheck(S, 'me');
@@ -635,9 +666,8 @@ export const PhysicsArenaMode: ModeDefinition = {
     ctx.objectiveRef.current = RIM_VEC();
     ctx.camDirector.snapTo(meNode.position, RIM_VEC());
     scene.onDisposeObservable.addOnce(() => close(scene));
-    if (typeof window !== 'undefined' && devOrAgentHooks()) {
-      S.seamOn = true;
-      (window as unknown as { __ARENA__?: unknown }).__ARENA__ = {
+    // the probe seam (the browser rig through window.__ARENA__ on dev / agent runs; the headless test through arenaSeam)
+    S.seam = {
         state: () => ({
           phase: S.phase, possession: S.possession, handler: S.handler, ball: S.ball, score: { ...S.score }, t: S.t, pov: S.pov.on,
           ballPos: p3(S.world.ball.pos), me: p3(S.me.node.position), foe: p3(S.foe.node.position), stats: JSON.parse(JSON.stringify(S.stats)),
@@ -650,6 +680,9 @@ export const PhysicsArenaMode: ModeDefinition = {
         pov: () => togglePov(ctx, S),
         quiet: (on: boolean) => { S.aiQuiet = on; },
       };
+    if (typeof window !== 'undefined' && devOrAgentHooks()) {
+      S.seamOn = true;
+      (window as unknown as { __ARENA__?: unknown }).__ARENA__ = S.seam;
     }
   },
 
@@ -707,6 +740,9 @@ export const PhysicsArenaMode: ModeDefinition = {
     if (current && current.scene.isDisposed) close(current.scene);
   },
 };
+
+/** The probe seam for a scene (place, shoot, quiet, pov, state): what the browser rig reaches as window.__ARENA__. */
+export function arenaSeam(scene: Scene): Record<string, (...a: never[]) => unknown> | null { return states.get(scene)?.seam ?? null; }
 
 /** The arena's counters for a scene (the headless test and the probe read them): shots and makes by side, lost handles,
  *  steals, the physics steps' cost. Null when no arena runs on that scene. */

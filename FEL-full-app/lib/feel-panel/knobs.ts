@@ -2428,6 +2428,16 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/arena/arenaConfig.ts POV_LOOK_DEG_S',
     hint: 'How fast the right stick turns your view.',
   },
+  {
+    id: 'arena.dunks', label: 'Arena dunks and layups at the rim (1) / jump shots only (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Physics arena',
+    source: 'lib/babylon/arena/arenaConfig.ts ARENA_DUNKS',
+    hint: 'On: a run at the ring with the ball is a dunk the iron decides, a close shot a soft layup. Off: every shot a jump shot.',
+  },
+  {
+    id: 'arena.dunkJumpVy', label: 'Arena dunk take-off speed', def: 4.3, min: 3, max: 5.5, step: 0.05, unit: 'm/s', group: 'Physics arena',
+    source: 'lib/babylon/arena/arenaConfig.ts DUNK_JUMP_VY',
+    hint: 'How high a dunk goes: too low and the ball never gets over the ring.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));

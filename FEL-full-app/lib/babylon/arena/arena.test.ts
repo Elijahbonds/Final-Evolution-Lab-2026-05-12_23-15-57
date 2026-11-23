@@ -186,3 +186,21 @@ describe('the switches restore today', () => {
     expect(C.SHIPPED_ONEVONE_HREF).toBe('/play/onevone');
   });
 });
+
+describe('phase 4: dunks and layups', async () => {
+  const { shotKindFor } = await import('../modes/PhysicsArenaMode');
+  const { dunkPush, LAYUP_ARC_DEG } = await import('./arenaShot');
+  it('a fast run close to the ring is a dunk, a close shot a layup, the rest jump shots; arena.dunks 0 = jump shots only', () => {
+    expect(shotKindFor(1.8, 4, true)).toBe('dunk');
+    expect(shotKindFor(1.8, 1, true)).toBe('layup');
+    expect(shotKindFor(4, 6, true)).toBe('jumper');
+    expect(shotKindFor(1.8, 4, false)).toBe('jumper');
+    expect(LAYUP_ARC_DEG).toBeGreaterThan(C.SHOT_ARC_DEG);
+  });
+  it('the jam pushes toward under the ring, never faster than a hand', () => {
+    const v = dunkPush({ x: ARENA_RIM.x + 0.3, y: ARENA_RIM.y + 0.3, z: ARENA_RIM.z + 0.2 });
+    expect(v.y).toBeLessThan(0);
+    expect(v.x).toBeLessThan(0);
+    expect(Math.hypot(v.x, v.y, v.z)).toBeLessThanOrEqual(8 + 1e-9);
+  });
+});
