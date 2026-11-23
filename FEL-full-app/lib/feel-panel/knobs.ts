@@ -2343,6 +2343,17 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/core/jerseyDecals.ts JERSEY_DECALS',
     hint: 'On: the new basketball and football jerseys carry the player number on the chest and back and the name across the back. Off: a blank jersey, as before.',
   },
+  // ── lane/improve-world (2026-11-22, the 10-phase pass, phase 5): sound in the story and on the coast ──
+  {
+    id: 'story.sfxOn', label: 'Story: footsteps, hits, spells, the partner, camps, bosses and birds (1) / the wind bed and voices only (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Story · flow',
+    source: 'lib/babylon/adventure/audio/storySfx.ts STORY_SFX_ON',
+    hint: 'Sound effects from the shipped sound kit and three sounds made in code (no new files), driven by the story host\'s own events. Mute and volume apply. 0 = the story was silent in play but for the wind and the spoken lines, as before.',
+  },
+  {
+    id: 'coast.oceanBed', label: 'Coast zone: the sea bed, waves, gulls and footsteps (1) / no bed asked for, so the stadium crowd plays (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Coast · zone',
+    source: 'lib/adventure/coast/zoneSound.ts COAST_OCEAN_BED',
+    hint: 'The zone asks for the ocean bed in its load as Venice does, with waves on the nearest shore, a gull now and then and steps on sand, boards or in the shallows. 0 = the harness started its stadium crowd on the first press, as before.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));
