@@ -26,16 +26,17 @@ try {
     const off = kind === 'good' ? (rnd() * 2 - 1) * 0.02 : (rnd() < 0.5 ? -1 : 1) * (0.11 + rnd() * 0.04);
     const [x, z] = spots[Math.floor(rnd() * spots.length)];
     const before = await p.evaluate(() => window.__ARENA__.state().stats.makes.me);
+    // every wait is on the GAME's clock (state().t, the physics time): a software-GL page runs the game slower than the wall clock
+    const gameT = () => p.evaluate(() => window.__ARENA__.state().t);
+    const waitGame = async (sec, done) => { const t0 = await gameT(); const w0 = Date.now(); while (Date.now() - w0 < 90000) { const s = await p.evaluate(() => window.__ARENA__.state()); if (s.t - t0 >= sec || (done && done(s))) return; await p.waitForTimeout(150); } };
     await p.evaluate(([x, z]) => window.__ARENA__.place(x, z), [x, z]);
-    await p.waitForTimeout(350);
+    await waitGame(0.35);
     await p.evaluate((o) => window.__ARENA__.shoot(o), off);
-    // wait for the ball to be done: up to 4 s of page time, or until it is on the floor and loose
-    const t0 = Date.now();
-    await p.waitForTimeout(1500);
-    while (Date.now() - t0 < 6000) { const s = await p.evaluate(() => window.__ARENA__.state()); if (s.phase === 'scored' || (s.ball === 'loose' && s.ballPos.y < 0.5)) break; await p.waitForTimeout(200); }
+    await waitGame(1.2);
+    await waitGame(3.0, (s) => s.phase === 'scored' || (s.ball === 'loose' && s.ballPos.y < 0.5));
     const after = await p.evaluate(() => window.__ARENA__.state().stats.makes.me);
     res[kind].n++; res[kind].made += after > before ? 1 : 0;
-    await p.waitForTimeout(1600);   // the scored beat and the check
+    await waitGame(1.7);   // the scored beat and the check
   }
   res.state = await p.evaluate(() => window.__ARENA__.state());
 } catch (e) { res.failed = String(e.message).slice(0, 200); }

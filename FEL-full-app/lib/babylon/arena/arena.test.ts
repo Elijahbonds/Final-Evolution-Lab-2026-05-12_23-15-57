@@ -168,7 +168,7 @@ describe('POV', () => {
   it('the field of view keeps the asked width on a wide screen and clamps on an upright phone', () => {
     const wide = fovForAspect(82, 16 / 9);
     expect(2 * Math.atan(Math.tan(wide / 2) * (16 / 9)) * (180 / Math.PI)).toBeCloseTo(82, 6);
-    expect(fovForAspect(82, 390 / 844)).toBeCloseTo((100 * Math.PI) / 180, 9);
+    expect(fovForAspect(82, 390 / 844)).toBeCloseTo((90 * Math.PI) / 180, 9);
   });
   it('the aim help forgives its share of a look off the ring', () => {
     const eye = { x: 0, y: 1.7, z: 6 };

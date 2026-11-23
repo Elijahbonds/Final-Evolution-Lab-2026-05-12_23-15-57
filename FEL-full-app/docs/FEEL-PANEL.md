@@ -1226,7 +1226,7 @@ ON because the arena is a new place the owner asked for; each restores today at 
 | `arena.dunks` | 1 | 0 = jump shots only (slice 1) | Phase 4: a run at the ring with the ball is a dunk (the hand jams it down through; the iron decides), a close shot a soft layup (66°). |
 | `arena.dunkJumpVy` | 4.3 m/s | — | The dunk's take-off: 0.94 m up, so the hand gets the ball over the ring. |
 | `cam.povEyeM` | 1.72 m | — | The eye when no head bone is found. |
-| `cam.povFovDeg` | 82° | — | Across the screen; the vertical follows the screen's shape (50–100°). |
+| `cam.povFovDeg` | 82° | — | Across the screen; the vertical follows the screen's shape (50–90°). |
 | `cam.povBobM` | 0 | — | Head-bob, OFF by default. |
 | `cam.povLookDegS` | 150°/s | — | The right stick's turn speed in POV. |
 

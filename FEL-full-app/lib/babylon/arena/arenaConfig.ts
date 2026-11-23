@@ -60,7 +60,7 @@ export const AIM_ASSIST = 0.8;
 // ── the POV camera ────────────────────────────────────────────────────────────────────────────────────────────────────────
 /** Eye height above the feet (m) when no head bone is found. */
 export const POV_EYE_M = 1.72;
-/** Horizontal field of view in POV (degrees). The vertical one follows the screen's shape, clamped 50 to 100. */
+/** Horizontal field of view in POV (degrees). The vertical one follows the screen's shape, clamped 50 to 90. */
 export const POV_FOV_DEG = 82;
 /** Head-bob height (m). 0 = off (the default: a moving horizon is what makes first person sickening). */
 export const POV_BOB_M = 0;

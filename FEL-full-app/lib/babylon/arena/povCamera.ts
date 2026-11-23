@@ -40,10 +40,11 @@ export function povPose(feet: Readonly<P3>, v: PovView, eyeY: number, speed: num
   return { eye, target: { x: eye.x + fx * cp * 10, y: eye.y + Math.sin(v.pitch) * 10, z: eye.z + fz * cp * 10 } };
 }
 
-/** The vertical field of view (radians) that gives `hDeg` across a screen of this aspect (width / height), clamped 50–100°. */
+/** The vertical field of view (radians) that gives `hDeg` across a screen of this aspect (width / height), clamped 50–90° (past 90 an
+ *  upright phone saw the top edge of the sky backdrop: the arena contact sheet, 2026-11-23). */
 export function fovForAspect(hDeg: number, aspect: number): number {
   const v = 2 * Math.atan(Math.tan((hDeg * D2R) / 2) / Math.max(0.2, aspect));
-  return Math.max(50 * D2R, Math.min(100 * D2R, v));
+  return Math.max(50 * D2R, Math.min(90 * D2R, v));
 }
 
 /** The shot's yaw error in POV: how far the view looks off the ring, less the assist's share. */

@@ -106,7 +106,7 @@ check possible later. Not built in this slice: the arena is not on the mirror ye
   hidden while you look out of it.
 - **Head-bob:** `cam.povBobM` **0 = off** by default (a bouncing horizon is what makes first person sickening); the owner can feel
   it on the panel.
-- **Field of view:** `cam.povFovDeg` 82° across the screen; the vertical one follows the screen's shape (50–100°), so a phone held
+- **Field of view:** `cam.povFovDeg` 82° across the screen; the vertical one follows the screen's shape (50–90°), so a phone held
   upright still sees the ring.
 - **Aiming and shooting:** the right stick turns the view (`cam.povLookDegS` 150°/s); the left stick moves you where you look; the
   shot is the same hold-and-let-go; it flies where you look, less `arena.aimAssist` 0.8 of the look's error (1 = always at the
