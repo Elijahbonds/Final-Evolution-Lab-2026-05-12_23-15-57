@@ -28,7 +28,7 @@ export const playerBit = (i: number): number => LAYER.PLAYER0 << i;
 const ALL_PLAYERS = 0xfffffffc;
 
 export type Surface = 'floor' | 'rim' | 'board' | 'frame' | 'body';
-export interface BallContact { surface: Surface; impulse: number; playerId?: string }
+export interface BallContact { surface: Surface; impulse: number; playerId?: string; /** Which ball (its index in `balls`). */ ball: number }
 
 const mat = (restitution: number, friction: number): PhysicsMaterial => ({
   restitution, friction, staticFriction: friction,
@@ -202,7 +202,9 @@ export class ArenaPlayer {
 export interface ArenaStepStats { steps: number; ms: number }
 
 export class ArenaPhysics {
+  /** The first ball (a game has one; the 3-point contest has several in the air at once: `balls`). */
   ball!: ArenaBall;
+  readonly balls: ArenaBall[] = [];
   readonly players: ArenaPlayer[] = [];
   /** Simulated seconds. */
   time = 0;
@@ -214,6 +216,7 @@ export class ArenaPhysics {
   private teleports: PhysicsBody[] = [];
   private surfaceOf = new Map<PhysicsBody, Surface>();
   private playerOf = new Map<PhysicsBody, ArenaPlayer>();
+  private ballOf = new Map<PhysicsBody, number>();
   private disposers: Array<() => void> = [];
   private engine!: PhysicsEngine;
 
@@ -235,7 +238,7 @@ export class ArenaPhysics {
     if (opts.hoop !== false) w.buildHoop();
     const ballNode = opts.ballNode ?? new TransformNode('arena_ball_body', scene);   // the drawn ball can be the body's node
     ballNode.position.set(0, 1, 6);
-    w.ball = new ArenaBall(ballNode, w);
+    w.ball = w.addBall(ballNode);
     const obs = handle.plugin.onCollisionObservable.add((e: IPhysicsCollisionEvent) => w.onCollision(e));
     w.disposers.push(() => handle.plugin.onCollisionObservable.remove(obs));
     return w;
@@ -276,6 +279,14 @@ export class ArenaPhysics {
     this.staticBox('arena_arm_body', arm.centre, arm.half, mat(0.4, 0.5), 'frame');
   }
 
+  /** Another ball in the same world (the 3-point contest's racks). Its node is the drawn ball. */
+  addBall(node: TransformNode): ArenaBall {
+    const b = new ArenaBall(node, this);
+    this.ballOf.set(b.body, this.balls.length);
+    this.balls.push(b);
+    return b;
+  }
+
   addPlayer(id: string, node: TransformNode, opts: PlayerOpts = {}): ArenaPlayer {
     const pl = new ArenaPlayer(id, node, this.players.length, this, opts);
     this.players.push(pl);
@@ -299,7 +310,7 @@ export class ArenaPhysics {
     const t0 = performance.now();
     while (this.acc >= h - 1e-9 && n < ARENA_MAX_STEPS) {
       beforeStep?.(h);
-      this.ball.preStep(h);
+      for (const b of this.balls) b.preStep(h);
       this.engine._step(h);
       if (this.teleports.length) { for (const b of this.teleports) b.disablePreStep = true; this.teleports.length = 0; }
       this.time += h;
@@ -314,14 +325,15 @@ export class ArenaPhysics {
   }
 
   private onCollision(e: IPhysicsCollisionEvent): void {
-    const ballBody = this.ball?.body;
-    if (!ballBody) return;
-    const other = e.collider === ballBody ? e.collidedAgainst : e.collidedAgainst === ballBody ? e.collider : null;
-    if (!other) return;
+    const bi = this.ballOf.get(e.collider) ?? this.ballOf.get(e.collidedAgainst);
+    if (bi === undefined) return;
+    const ballBody = this.balls[bi].body;
+    const other = e.collider === ballBody ? e.collidedAgainst : e.collider;
+    if (this.ballOf.has(other)) return;   // ball on ball: not a surface the rules read
     const pl = this.playerOf.get(other);
     const surface: Surface | undefined = pl ? 'body' : this.surfaceOf.get(other);
     if (!surface) return;
-    if (this.contacts.length < 64) this.contacts.push({ surface, impulse: e.impulse ?? 0, playerId: pl?.id });
+    if (this.contacts.length < 64) this.contacts.push({ surface, impulse: e.impulse ?? 0, playerId: pl?.id, ball: bi });
   }
 
   drainContacts(): BallContact[] { const out = this.contacts; this.contacts = []; return out; }

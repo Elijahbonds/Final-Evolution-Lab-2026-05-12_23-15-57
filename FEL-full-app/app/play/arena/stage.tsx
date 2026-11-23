@@ -12,7 +12,19 @@ import { runMode, InputBus, type ModePhase, type HudValue } from '@/lib/babylon'
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { ARENA_MODE_ID } from '@/lib/babylon/modes/PhysicsArenaMode';
-import { physicsHoopsOn, povOn, SHIPPED_ONEVONE_HREF } from '@/lib/babylon/arena/arenaConfig';
+import { ARENA_3PT_MODE_ID } from '@/lib/babylon/modes/PhysicsArena3ptMode';
+import { ARENA_HREF, physicsHoopsOn, povOn, SHIPPED_ONEVONE_HREF } from '@/lib/babylon/arena/arenaConfig';
+
+/** The arena's sports so far (docs/PHYSICS-ARENA-PLAN.md §5): `?sport=` picks one. */
+const SPORTS = [
+  { id: 'hoops', mode: ARENA_MODE_ID, label: '1v1', keys: 'Move WASD · Sprint Shift · Shoot hold L, let go at the top · Jump J · Pass K · Reach I · Cross Q · View C' },
+  { id: 'threepoint', mode: ARENA_3PT_MODE_ID, label: '3-Point', keys: 'Shoot hold L (or J), let go at the top of the jump · View C' },
+] as const;
+function sportOf(search: string): (typeof SPORTS)[number] {
+  let id = 'hoops';
+  try { id = new URLSearchParams(search).get('sport') ?? 'hoops'; } catch { /* hoops */ }
+  return SPORTS.find((x) => x.id === id) ?? SPORTS[0];
+}
 
 export function ArenaStage({ signedIn }: { signedIn: boolean }) {
   const router = useRouter();
@@ -23,6 +35,8 @@ export function ArenaStage({ signedIn }: { signedIn: boolean }) {
   const [touch, setTouch] = useState(false);
   const [hud, setHud] = useState<Record<string, HudValue>>({});
   const [pov, setPov] = useState(false);
+  const [sport, setSport] = useState<(typeof SPORTS)[number] | null>(null);
+  useEffect(() => { setSport(sportOf(window.location.search)); }, []);
 
   useEffect(() => { try { setTouch(window.matchMedia('(pointer: coarse)').matches); } catch { setTouch(false); } }, []);
   useEffect(() => { setPov(povOn()); }, []);
@@ -35,7 +49,8 @@ export function ArenaStage({ signedIn }: { signedIn: boolean }) {
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    const def = MODES[ARENA_MODE_ID];
+    if (!sport) return;
+    const def = MODES[sport.mode];
     if (!canvas || !physicsHoopsOn()) return;
     if (!def) { setErr('the arena is not registered'); return; }
     const bus = new InputBus();
@@ -58,7 +73,7 @@ export function ArenaStage({ signedIn }: { signedIn: boolean }) {
     }).then((s) => { if (disposed) s(); else stop = s; })
       .catch((e) => { if (!disposed) setErr(String(e?.message ?? e)); });
     return () => { disposed = true; stop?.(); };
-  }, [signedIn]);
+  }, [signedIn, sport]);
 
   const toggleView = () => {
     const bus = busRef.current;
@@ -78,8 +93,16 @@ export function ArenaStage({ signedIn }: { signedIn: boolean }) {
       {phase === 'playing' && (
         <>
           <div data-testid="arena-score" className="absolute right-3 top-3 z-10 rounded-full bg-black/60 px-4 py-2 text-base font-bold tabular-nums">
-            <span className="sr-only">Score, you then rival: </span>{String(hud.arenaScore ?? '0–0')}
+            {sport?.id === 'threepoint'
+              ? <><span className="sr-only">Points, then seconds left: </span>{String(hud.arenaScore ?? '0')} · {String(hud.arenaClock ?? 60)}s</>
+              : <><span className="sr-only">Score, you then rival: </span>{String(hud.arenaScore ?? '0–0')}</>}
           </div>
+          <nav aria-label="Arena sport" className="absolute left-1/2 top-3 z-10 flex -translate-x-1/2 gap-1 rounded-full bg-black/60 p-1">
+            {SPORTS.map((x) => (
+              <a key={x.id} href={`${ARENA_HREF}?sport=${x.id}`} aria-current={sport?.id === x.id ? 'page' : undefined}
+                className={`inline-flex min-h-[44px] items-center rounded-full px-3 text-base font-bold ${sport?.id === x.id ? 'bg-white text-black' : 'text-white'}`}>{x.label}</a>
+            ))}
+          </nav>
           {pov && (
             <button type="button" data-testid="arena-pov" onClick={toggleView} aria-pressed={inPov}
               className="absolute right-3 top-[3.75rem] z-10 inline-flex min-h-[44px] items-center gap-2 rounded-full bg-black/60 px-4 text-base font-bold">
@@ -90,13 +113,11 @@ export function ArenaStage({ signedIn }: { signedIn: boolean }) {
           {banner && <p role="status" className="absolute inset-x-0 top-[22%] text-center text-2xl font-black drop-shadow">{banner}</p>}
           {timing && <p className="absolute inset-x-0 bottom-[38%] text-center text-base font-bold text-white/85 drop-shadow">Release: {timing}</p>}
           {!touch && (
-            <p className="absolute inset-x-0 bottom-3 text-center text-base text-white/70">
-              Move WASD · Sprint Shift · Shoot hold L, let go at the top · Jump J · Pass K · Reach I · Cross Q · View C
-            </p>
+            <p className="absolute inset-x-0 bottom-3 text-center text-base text-white/70">{sport?.keys}</p>
           )}
         </>
       )}
-      {touch && busRef.current && phase === 'playing' && <TouchOverlay bus={busRef.current} modeId={ARENA_MODE_ID} visible />}
+      {touch && busRef.current && phase === 'playing' && sport && <TouchOverlay bus={busRef.current} modeId={sport.mode} visible />}
     </div>
   );
 }

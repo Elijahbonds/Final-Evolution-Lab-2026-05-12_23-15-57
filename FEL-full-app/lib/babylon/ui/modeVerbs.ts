@@ -164,6 +164,10 @@ const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick' | 'boost' | 'turbo'>> 
     B: { label: 'PASS', emit: A('B') },
     Y: { label: 'REACH', emit: A('Y') },
   }),
+  // lane/physics-arena phase 3: the arena's three-point contest. X (or A) takes the next ball and jumps; let go at the top.
+  physics_arena_3pt: verbs({
+    X: { label: 'SHOOT', emit: A('X'), hold: true },
+  }),
   threevthree: verbs({
     X: { label: 'SHOOT', emit: A('X'), hold: true },
     Y: { label: 'BLOCK', emit: A('Y') },

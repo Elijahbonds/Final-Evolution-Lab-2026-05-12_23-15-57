@@ -15,6 +15,8 @@
  *   F. The live mode's own loop (PhysicsArenaMode on a NullEngine scene, no characters): three minutes of the rival against a
  *      player who shoots at the top of his jump. The check passes go and come, both sides shoot, the score moves, the ball never
  *      leaves the world, nothing throws.
+ *   G. Phase 3, the three-point contest: from the five racks (7.05–7.15 m) a good release still makes clearly more than a bad one,
+ *      and the contest mode's own loop runs a whole contest headless (25 balls, the clock, the final).
  *
  * Run: npx tsx scripts/physics-arena-tests.ts
  */
@@ -172,6 +174,9 @@ async function main() {
   console.log('\nF. the live mode, headless');
   await liveLoop(B);
 
+  console.log('\nG. the three-point contest');
+  await threePoint(B);
+
   console.log(`\nphysics-arena: ${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
 }
@@ -249,6 +254,48 @@ async function liveLoop(B: typeof import('@babylonjs/core')) {
   const st = arenaStats(scene);
   if (st) console.log(`     shots me ${st.makes.me}/${st.shots.me}, rival ${st.makes.foe}/${st.shots.foe}; lost handles ${st.lostHandles}; steals ${st.steals}; physics ${(st.physMsSum / Math.max(1, st.frames)).toFixed(2)} ms a frame (node, max ${st.physMsMax.toFixed(1)})`);
   ok('the rival shoots and makes some, and misses some (the physics decides, not a script)', !!st && st.shots.foe > 4 && st.makes.foe > 0 && st.makes.foe < st.shots.foe);
+  scene.dispose(); engine.dispose();
+}
+
+async function threePoint(B: typeof import('@babylonjs/core')) {
+  const { rackSpot, RACKS, PhysicsArena3ptMode, arena3Stats } = await import('../lib/babylon/modes/PhysicsArena3ptMode');
+  const w = await makeWorld();
+  let g = 0, b = 0, n = 0;
+  for (const seed of [11, 12, 13]) {
+    const rng = seeded(seed);
+    for (let i = 0; i < RACKS.length; i++) for (let k = 0; k < 4; k++) {
+      const feet = rackSpot(i);
+      g += +runShot(w.world, { feet, offsetSec: (rng.next() * 2 - 1) * 0.025 }, rng.normal, 2.2).made;
+      b += +runShot(w.world, { feet, offsetSec: (rng.next() < 0.5 ? -1 : 1) * (0.1 + rng.next() * 0.06) }, rng.normal, 2.2).made;
+      n++;
+    }
+  }
+  w.dispose();
+  const gp = (100 * g) / n, bp = (100 * b) / n;
+  ok(`from the racks a good release makes ${g}/${n} = ${gp.toFixed(0)}% (≥ 50%), a bad one ${b}/${n} = ${bp.toFixed(0)}% (≤ 20%)`, gp >= 50 && bp <= 20);
+  // the mode's own loop: a whole contest, each ball let go at the top of the jump
+  const engine = new B.NullEngine();
+  engine.getDeltaTime = () => 1000 / 60;
+  const scene = new B.Scene(engine);
+  const camera = new B.UniversalCamera('cam3', new B.Vector3(0, 3, 12), scene);
+  const hud: Record<string, unknown> = {};
+  const dir = { mode: 'follow', suspended: false, look: () => {}, update: () => {}, snapTo: () => {} };
+  const ctx = { scene, camera, camDirector: dir, heroRef: { current: null }, objectiveRef: { current: null }, setHud: (u: Record<string, unknown>) => Object.assign(hud, u) } as never;
+  let threw: unknown = null, finished = false, downAt = -1;
+  try {
+    await PhysicsArena3ptMode.load(ctx);
+    for (let f = 0; f < 60 * 75 && !finished; f++) {
+      const t = f / 60;
+      if (downAt < 0 && f % 45 === 0) { PhysicsArena3ptMode.onInput(ctx, { t: 'button', btn: 'X', pressed: true }); downAt = t; }
+      if (downAt >= 0 && t - downAt > 0.46) { PhysicsArena3ptMode.onInput(ctx, { t: 'button', btn: 'X', pressed: false }); downAt = -1; }
+      PhysicsArena3ptMode.update(ctx, 1 / 60);
+      if (arena3Stats(scene)?.done) finished = true;
+    }
+  } catch (e) { threw = e; console.error(e); }
+  const st = arena3Stats(scene);
+  console.log(`     contest: ${st?.score} points, ${st?.makes} of ${st?.shots}`);
+  ok('a whole contest ran without a throw and finished', threw === null && finished);
+  ok('all 25 balls were shot, and some went in (scored by the ball through the hoop)', !!st && st.shots === 25 && st.makes > 0 && st.makes < 25);
   scene.dispose(); engine.dispose();
 }
 
