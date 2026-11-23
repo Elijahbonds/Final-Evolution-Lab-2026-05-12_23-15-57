@@ -9,8 +9,16 @@
 // adds the pointer: press on the box (a tap finishes the line, a hold skips the scene), a choice by click, a SKIP button.
 
 import type { StoryDialogueSnapshot, StoryUiCommands } from '@/lib/babylon/adventure/story/uiBridge';
+import { touchTargets44 } from '@/lib/ui/touchTargets';
+
+// improve-screens phase 6 (ui.touchTargets44 1): SKIP measured 68 x 20 px on a 390 x 844 phone, a choice about 32 px tall. SKIP keeps its
+// look in a 44 x 44 box whose -6 px margins keep the header row at the portrait's 32 px (the box reaches into the panel's own padding);
+// a choice is at least 44 px tall. 0 = as before.
+const SKIP_44 = 'ml-auto -my-1.5 min-h-[44px] min-w-[44px] rounded px-2 text-[12px] font-bold tracking-widest text-white/60 hover:bg-white/10';
+const SKIP_OLD = 'ml-auto rounded px-2 py-0.5 text-[12px] font-bold tracking-widest text-white/60 hover:bg-white/10';
 
 export function DialogueBox({ d, cmd }: { d: StoryDialogueSnapshot; cmd: StoryUiCommands }) {
+  const big = touchTargets44();
   const shown = d.text.slice(0, Math.max(0, d.shown));
   return (
     <div className="pointer-events-auto absolute inset-x-0 bottom-0 z-30 flex justify-center px-4"
@@ -32,14 +40,14 @@ export function DialogueBox({ d, cmd }: { d: StoryDialogueSnapshot; cmd: StoryUi
             </span>
           )}
           <button type="button" onClick={(e) => { e.currentTarget.blur(); cmd.skip(); }}
-            className="ml-auto rounded px-2 py-0.5 text-[12px] font-bold tracking-widest text-white/60 hover:bg-white/10">SKIP ▸▸</button>
+            className={big ? SKIP_44 : SKIP_OLD}>SKIP ▸▸</button>
         </div>
         <p className="min-h-[3rem] text-base leading-snug" aria-live="off">{shown}<span className="opacity-0">{d.text.slice(shown.length)}</span></p>
         {d.choices && d.shown >= d.text.length && (
           <div className="mt-2 flex flex-col gap-1">
             {d.choices.map((c, i) => (
               <button key={c.id} type="button" onClick={(e) => { e.currentTarget.blur(); cmd.choose(i); }}
-                className={`rounded-lg px-3 py-1.5 text-left text-sm font-bold ${i === d.choiceIndex ? 'bg-[#00E5FF] text-black' : 'bg-white/10 text-white hover:bg-white/20'}`}>
+                className={`rounded-lg px-3 py-1.5 text-left text-sm font-bold ${big ? 'min-h-[44px] ' : ''}${i === d.choiceIndex ? 'bg-[#00E5FF] text-black' : 'bg-white/10 text-white hover:bg-white/20'}`}>
                 {c.text}
               </button>
             ))}

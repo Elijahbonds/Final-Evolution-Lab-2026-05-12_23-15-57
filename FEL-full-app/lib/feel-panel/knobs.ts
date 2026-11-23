@@ -2344,6 +2344,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'On: the stage reads the real height of the header above it, so the bottom of the game and the move stick stay on the screen. Off: the old 100dvh less 3.25rem box, which ran off the bottom of an upright phone.',
   },
   {
+    id: 'ui.touchTargets44', label: 'Touch: Venice hint above the buttons, 44 px taps on the dunk chips, story SKIP, workout ticks (1) / as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',
+    source: 'lib/ui/touchTargets.ts TOUCH_TARGETS_44',
+    hint: 'On: the Venice first-visit hint sits under the mini-map, clear of DASH and JUMP; the dunk MIX, MC and CC chips, the story SKIP and choices and the workout tick boxes each get a tap box of at least 44 px (same look, same words). Off: each as before.',
+  },
+  {
     id: 'try.prefetchDunk', label: 'Try page: load the first dunk while the birth date is asked (1) / only after the answer (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',
     source: 'lib/try/prefetchDunk.ts TRY_PREFETCH_DUNK',
     hint: 'On: the dunk code and its first files are fetched into the browser cache while a guest gives the birth date (plain file requests, no cookies, nothing about the visitor). Off: nothing is requested until the answer, as before. The try page has no feel panel: this is the shipped value.',

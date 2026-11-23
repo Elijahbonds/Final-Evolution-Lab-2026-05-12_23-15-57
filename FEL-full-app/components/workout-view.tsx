@@ -6,7 +6,8 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { readToast } from '@/components/ui/fel/toast';
-import { Activity, Sparkles, ShieldCheck, Trash2, ChevronRight, Info, Gift } from 'lucide-react';
+import { Activity, Sparkles, ShieldCheck, Trash2, ChevronRight, Info, Gift, Check } from 'lucide-react';
+import { touchTargets44 } from '@/lib/ui/touchTargets';   // improve-screens phase 6 (ui.touchTargets44)
 import { PILLAR_LABELS, analyzeMovement, defaultMetrics, type Pillar } from '@/lib/workout/movement-screen';
 import { buildAvatarSpec } from '@/lib/workout/avatar-builder';
 import {
@@ -249,14 +250,26 @@ export function WorkoutView({ initialData = null }: { initialData?: PageData | n
 
       {/* The demo scan: sample numbers, worked out on this page */}
       <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 mb-4 space-y-2">
-        <label className="flex items-start gap-2 text-sm text-white/80">
-          <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-1 accent-[#00E5FF]" />
-          <span>{DEMO_CONSENT} <span className="text-white/50">Not medical advice.</span></span>
-        </label>
-        <label className="flex items-center gap-2 text-sm text-white/80">
-          <input type="checkbox" checked={ageOk} onChange={(e) => setAgeOk(e.target.checked)} className="accent-[#00E5FF]" />
-          <span>I am 13 or older.</span>
-        </label>
+        {touchTargets44() ? (
+          // improve-screens phase 6 (ui.touchTargets44 1): the two tick boxes were the browser's 13 x 13 px box. Now each whole line is the
+          // target (a 44 px label, the sign-up terms tick's pattern of 2026-11-11): the real checkbox inside it, named by the same words,
+          // and the box beside it is its picture. Same words, same rule (both must be ticked to run the demo). 0 = as before.
+          <>
+            <TickLine checked={consent} onChange={setConsent} top><span>{DEMO_CONSENT} <span className="text-white/50">Not medical advice.</span></span></TickLine>
+            <TickLine checked={ageOk} onChange={setAgeOk}><span>I am 13 or older.</span></TickLine>
+          </>
+        ) : (
+          <>
+            <label className="flex items-start gap-2 text-sm text-white/80">
+              <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-1 accent-[#00E5FF]" />
+              <span>{DEMO_CONSENT} <span className="text-white/50">Not medical advice.</span></span>
+            </label>
+            <label className="flex items-center gap-2 text-sm text-white/80">
+              <input type="checkbox" checked={ageOk} onChange={(e) => setAgeOk(e.target.checked)} className="accent-[#00E5FF]" />
+              <span>I am 13 or older.</span>
+            </label>
+          </>
+        )}
         <button onClick={runScan} disabled={!consent || !ageOk} title={!consent || !ageOk ? 'Tick both boxes above to enable' : undefined} className="mt-2 w-full flex items-center justify-center gap-2 rounded-lg bg-white/10 text-white font-semibold py-3 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
           <Sparkles className="h-4 w-4" /> Run Demo Scan
         </button>
@@ -453,5 +466,20 @@ function PlanViewer({ plan }: { plan: LegacyPlan }) {
       </div>
       <p className="mt-3 text-[12px] text-white/50">Not medical advice.</p>
     </motion.div>
+  );
+}
+
+/** improve-screens phase 6: a tick line whose whole row (at least 44 px tall) is the target. The real checkbox is visually hidden inside the
+ *  label (still focusable, still named by the label's words); the drawn box is aria-hidden and shows its state and its keyboard focus. */
+function TickLine({ checked, onChange, top = false, children }: { checked: boolean; onChange: (v: boolean) => void; top?: boolean; children: React.ReactNode }) {
+  return (
+    <label className={`flex min-h-11 cursor-pointer select-none gap-2 text-sm text-white/80 ${top ? 'items-start' : 'items-center'}`}>
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="peer sr-only" />
+      <span aria-hidden className={`${top ? 'mt-0.5 ' : ''}flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-[#00E5FF] ${
+        checked ? 'border-[#00E5FF] bg-[#00E5FF]/20' : 'border-white/30 bg-[#16161A]'}`}>
+        {checked && <Check className="h-3.5 w-3.5 text-[#00E5FF]" />}
+      </span>
+      {children}
+    </label>
   );
 }
