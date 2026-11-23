@@ -15,6 +15,7 @@ import type { GameProps, GameResult } from '@/components/games/game-shell';
 import { GameLoading } from '@/components/games/game-loading';
 import { REVIEW_BUTTON_LABEL } from '@/lib/coach-store/storeOffers';   // STORE-OFFER-1 (a constant: no flag read on the client)
 import { StageFitStyle, useStageFit } from '@/components/games/stage-fit';   // improve-screens phase 1 (ui.stageFitsHeader)
+import { prefetchDunk } from '@/lib/try/prefetchDunk';   // improve-screens phase 2 (try.prefetchDunk)
 
 const spinner = () => (
   <GameLoading />
@@ -83,6 +84,14 @@ export function GuestDunkShell({ challengeCode, reviewHref = null, ageBands = fa
   const headerRef = useRef<HTMLElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const stageFit = useStageFit(headerRef, stageRef, true);
+
+  // IMPROVE-SCREENS PHASE 2 (lib/try/prefetchDunk.ts): while the birth date is asked, the Babylon dunk's code chunk and the first
+  // static files it asks for go into the browser cache, so the wait after CONTINUE is shorter. GETs of public files only, with no
+  // cookies, no body and no query: nothing about the visitor (the answer still gates every request that carries data, below).
+  // try.prefetchDunk 0 = nothing before the answer, as before.
+  useEffect(() => {
+    if (gate === 'ask' && hydrated && babylon) prefetchDunk();
+  }, [gate, hydrated, babylon]);
 
   // A browser that already carries the block flag skips the question. Reads only; sends nothing.
   useEffect(() => {

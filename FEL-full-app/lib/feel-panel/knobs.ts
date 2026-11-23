@@ -2343,6 +2343,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/ui/stageFit.ts STAGE_FITS_HEADER',
     hint: 'On: the stage reads the real height of the header above it, so the bottom of the game and the move stick stay on the screen. Off: the old 100dvh less 3.25rem box, which ran off the bottom of an upright phone.',
   },
+  {
+    id: 'try.prefetchDunk', label: 'Try page: load the first dunk while the birth date is asked (1) / only after the answer (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',
+    source: 'lib/try/prefetchDunk.ts TRY_PREFETCH_DUNK',
+    hint: 'On: the dunk code and its first files are fetched into the browser cache while a guest gives the birth date (plain file requests, no cookies, nothing about the visitor). Off: nothing is requested until the answer, as before. The try page has no feel panel: this is the shipped value.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));
