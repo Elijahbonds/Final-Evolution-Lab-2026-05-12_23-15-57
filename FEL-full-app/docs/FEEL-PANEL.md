@@ -1200,3 +1200,35 @@ real online game these are what ships; each is the record of the number and the 
 | `net.poseHz` | 15 | — | Body pose updates a second (roots and the ball always 30). |
 | `net.possessionSwap` | 1 | — | 1v1: the page whose player has the ball runs the game. 0: the host runs every possession. |
 | `net.karateTogether` | 0 | 1 | "Start together" offers Karate co-op (not shared yet: two fights). |
+
+## improve-hoops-2, 2026-11-22 (docs/IMPROVE-10-PHASE-AUDIT.md lane B; NEW switches, no shipped number moved)
+
+### Phase 3: the hoops loads (group "Hoops · phone budget"; all three shipped **0**, the owner's switch)
+
+Where the time went (a CPU profile of the whole load on the phone tier, `scripts/probes/improve-hoops/loadprof.mjs`, and the new
+`[FEL-LOAD]` stage marks, `lib/babylon/core/loadMarks.ts`): building each body's ~217 moves by IK at spawn — 24 s of the 1v1 load's 45 s
+before the shader pre-warm, 40 s of the 3v3's 61 s, 17 s of 3-Point's 35 s — including two people on the boardwalk rail who only ever
+stand and cheer. Asset downloads and the glTF parse were small; the pre-warm (owner, 2026-10-16) was left as it is.
+
+- `perf.poseClipFast` (`anim/poseClip.ts` `POSE_CLIP_FAST`): when an arm or a leg is solved, only that limb's joints are recomputed (and
+  meshes hung on the rig wait for the end of each move). The moves come out **bit for bit the same** (`anim/poseClip.fast.test.ts`, every
+  clip on the kit body and a roster body). Half the build time.
+- `perf.onlookerClipsOnly` (`visual/onlookerClips.ts` `ONLOOKER_CLIPS_ONLY`): an onlooker builds only the clips its idle and cheer can
+  resolve to (7 instead of ~217). It plays the same clip, key for key, in six modes (`visual/onlookerClips.test.ts`).
+- `perf.poseClipShare` (`anim/poseClip.ts` `POSE_CLIP_SHARE`): a body whose rig is identical to one already built copies its solved keys.
+  Measured to do almost nothing in hoops (every roster athlete is a different rig); kept for crowds of one body file. Leave it 0.
+
+Measured (the gameplay-clean rig page, phone tier 390 × 844, DPR 3, CPU ×4, SwiftShader; 3 runs a side, interleaved, one gate hold; median):
+
+| | today (0) | on (1) | |
+|---|---|---|---|
+| 1v1 READY | 53.1 s | 38.2 s | −28 % (the plan's bar is −30 %: missed by 2 points) |
+| 3v3 READY | 77.0 s | 44.3 s | −42 % |
+| 3-Point READY | 39.4 s | 29.1 s | −26 % |
+| tennis (control) | 23.1 s | 22.0 s | within 5 % |
+| pre-warm starts, 1v1 / 3v3 | 41.6 / 64.1 s | 26.2 / 32.4 s | −37 % / −49 % |
+| worst frame in the first 4 s of play, 1v1 / 3v3 / 3-Point | 4.1 / 4.3 / 2.8 s | 4.1 / 4.9 / 7.3 s | ranges overlap (3-Point off: 2.4–9.4) |
+
+Shipped OFF because the plan's bar is "READY down ≥ 30 % in 1v1 and 3v3, the first-4-s worst frame not worse": 3v3 clears it, 1v1 misses
+by 2 points and the worst-frame reads are too noisy on this rig to call. *Recommend:* turn `perf.poseClipFast` and `perf.onlookerClipsOnly`
+on (nothing you see or feel changes; the bodies just build faster), after a phone check of the load with the PERF readout.

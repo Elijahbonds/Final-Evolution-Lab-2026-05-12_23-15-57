@@ -232,6 +232,7 @@ import type { MicEvent } from '../audio/mic/MicDirector';
 import { dunkStingers } from '../audio/mic/names';
 import type { MomentumTier } from '../core/MomentumBus';
 import { StickFrame } from '../core/StickFrame';   // lane/move-feel-2: a held stick keeps its court frame
+import { loadMarks } from '../core/loadMarks';   // lane/improve-hoops phase 3: the load's stages (logging only)
 
 /** Exported so hoop-alignment-tests can check it against the venue's hoop. */
 export const RIM = new Vector3(0, RIM_HEIGHT_M, -0.6);
@@ -1069,6 +1070,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       choke = typeof window !== 'undefined' && (readChoke(window.location.search) || readCourtLayout('threevthree') === 'chokepoint');   // CHOKEPOINT COURT: the url, or the splash's remembered pick
       if (choke) { buildChoke(ctx); putHud(ctx, { court: 'CHOKEPOINT' }); console.info('[3V3-CHOKE] the chokepoint court: 4 rails'); }
       if (!threeVenue) { VenueKit.buildCourt(ctx.scene, 'venice'); applyOceanCourt(ctx.scene, 'venice'); }
+      const lm = loadMarks(); lm.mark('venue');   // lane/improve-hoops phase 3: the load's stages (logging only)
       const spawnBody = async (
         pos: Vector3, tint: string | undefined, ai: boolean,
         aiKind: 'teammate' | 'defender', slotAngle = 0, markIndex: number | null = null,
@@ -1162,7 +1164,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       // hoops-builder phase B: the hero's ratings, and his body drawn at his playing height (casual runs; the standard frame otherwise)
       rated = await loadRatedTuning(ctx.scene.metadata); heroDrawnScaled = ratedLookScale(rated) !== 1;
       if (heroDrawnScaled) applyProportions(me.char, { heightScale: ratedLookScale(rated), buildScale: 1 });
-      console.info(`[3V3-RATED] ${ratedLog(rated)}`);
+      console.info(`[3V3-RATED] ${ratedLog(rated)}`); lm.mark('body.hero');
       MoveDip.for(ctx.scene, me.char.skeleton, me.char.root, (n) => me.char.animator.groupFor(n));   // hoops-dip (owner 10-20; BEFORE MoveLegs: both insert first, so the pass runs moveLegs → the dip → the foot planter): the body sinks into the crossover / momentum cross / behind-the-back (anim/moveDip)
       LocoAccent.for(ctx.scene, me.char.skeleton, me.char.root, () => accentState(me.tree)); meRest.mount(ctx.scene, me.char.skeleton, me.char.root);   // (+ h3-handler: the protect's sink, same slot)   // hoops-dip movement pass: the decel step and the push-off drawn on the body (anim/locoAccent; after the posture, before the carries)
       me.tree.attachSteer(HipSteer.for(ctx.scene, me.char.skeleton, me.char.root));   // hoops-p05 (owner 2026-11-10, the hero's slide): built BEFORE MoveLegs (both insert first: the pass runs moveLegs → the steer → the dip)
@@ -1187,6 +1189,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       mates = [mate0, mate1];
       foes = [foe0, foe1, foe2];
       bodiesAll = [me, ...mates, ...foes];   // #12: the six, once
+      lm.mark('body.five');
 
       ball = MeshBuilder.CreateSphere('ball', { diameter: 0.24 }, ctx.scene);
       void dressBall(ball, 'basketball');   // Meshy ball skin rides the physics sphere (visual only)
@@ -1206,6 +1209,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       shotMeter = new ShotMeter();
       turbo = new TurboMeter();
       arc = new ShotArc();
+      lm.mark('carries');
       ambient?.dispose(); ambient = EffectsKit.ambient(ctx.scene, 'venice');   // IMPROVE (2026-10-06) #17: kept, so dispose frees the gulls
       // IMPROVE (2026-10-06) #8: the second EffectsKit.ballTrail that stood here (untracked, 'soft' forever, never disposed) is gone:
       // it trailed every ball all game and hid the hot hand's trail below (momentum ≥ 70), which is the one that means something
@@ -1249,6 +1253,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       ctx.camDirector.snapTo(me.char.root.position, RIM);
       threeVenue?.hidePlaceholders();  // M74: drop stand-ins now that real chars are in
       assertSpawned(ctx.scene, { hero: me.char.root, minWorldMeshes: 6, modeId: 'threevthree' });
+      lm.mark('court.fx');
       resetPossession(true);
       if (process.env.NODE_ENV === 'development') { const dev = (window as unknown as { __FEL_DEV__?: { hoopsPosture?: unknown } }).__FEL_DEV__; const seam = { me: () => me.posture?.layer.get() ?? null, foe: () => foes[0]?.posture?.layer.get() ?? null, bio: () => ({ me: { ...me.bio }, foe: { ...(foes[0]?.bio ?? {}) } }), carrier: () => carrierId, offense: () => { if (!ended) resetPossession(true); }, defend: () => { if (!ended) { resetPossession(false); void opponentPossession(ctx); } }, /* resetPossession(false) only RESETS: its toMe branch is the only thing that hands the ball out, so on its own it leaves the rock wherever it was and no drive ever starts. opponentPossession() is what a defensive possession actually IS here — the 1v1 seam's defend() calls startDefense() for the same reason. */ attackPhase: () => (driveK > 0 && driveK >= 1 - GATHER_TELL_SEC / driveSec ? 'gather' : driveK > 0 ? 'drive' : 'check'), driveK: () => driveK, driveSpeed: () => (driver ? driver.vel.length() : 0), takingCharge: () => takingCharge, flightK: () => (dunkFlight ? dunkFlight.k : foeDunkFlight ? foeDunkFlight.k : -1)   /* MY flight's clock first (the showtime press is timed off it), then the rival's */, luck: (v: number | null) => { defenseLuck = v; }, bumpAge: () => bumpAge, handUp: () => ({ me: meHandUp, foe: !!foeHandUp }), post: () => { const n = nearestLiveFoe(); return { posting, spinning: !!spin, brace: !!me.slot.intent.brace, can: canPostUp(me.char.root.position, RIM_FLOOR, n ? n.char.root.position : null), carrying: carrierId === 'me', shooting, finish: !!finish, gather: !!gather, foeStun: n ? n.stunSec : -1, armed: spinArmed, pump: pumpWindow, glass: !!banked, held: me.tree.held ?? '' }; }, driverRoot: () => driver?.char.root ?? null, block: () => (ctx0 ? contestJump(ctx0) : false), /* the block with no bridge latency: the lab's jump was landing at driveK 1.00 behind its own steer queue */ ended: () => ended, kinetic: () => { const d = driver; const dv = d ? d.char.root.position.subtract(me.char.root.position) : null; const dist = dv ? Math.hypot(dv.x, dv.z) : -1; return { ...kin, synergy: synergy.value, overdrive: synergy.overdriveLeft, ltHeld, slipping, meSpeed: Math.hypot(me.drib.vel.x, me.drib.vel.z), dist, closing: d && dv && dist > 1e-3 ? -(driverVelEst.x * dv.x + driverVelEst.z * dv.z) / dist : 0, driveK, turbo: turbo.t01, carrier: carrierId, mateBurst: [...mateBurst], intent: { moveX: me.slot.intent.moveX, moveY: me.slot.intent.moveY, sprint: me.slot.intent.sprint }, choke, railRuns, railNow, inLane: inChokeLane(me2()), gates: { paused: me.drib.paused, stun: meStunSec, floored: meFloored, land: me.landSec, celebrate: me.celebrateSec, shooting, dunking, vault: !!vault } }; }, synergyAdd: (n: number) => { if (synergy.add(n) && ctx0) igniteOverdrive(ctx0); }, boxing: () => boxingOut,
           // NB-3 probe (lane/hoops-overtime): a forced tie — both sides on `pts`, `sec` left on the game clock — and the overtime read

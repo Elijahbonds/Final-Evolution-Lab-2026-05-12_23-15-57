@@ -4,6 +4,8 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { FEEL_KNOBS, FEEL_KNOB_BY_ID, clampKnob, stepDecimals } from './knobs';
 import * as HSFX from '@/lib/babylon/audio/hoopsSfx';   // hoops-items
+import { POSE_CLIP_FAST, POSE_CLIP_SHARE } from '@/lib/babylon/anim/poseClip';   // improve-hoops-2
+import { ONLOOKER_CLIPS_ONLY } from '@/lib/babylon/visual/onlookerClips';
 import { AI_HAND_RANGE_M, AI_HAND_DWELL_SEC, AI_HAND_GAP_SEC } from '@/lib/babylon/core/AiBallHand';
 import { HAND_CLEAR_M } from '@/lib/babylon/anim/Dribble';
 import { DIST_GREEN_NEAR_M, DIST_GREEN_FAR_M, DIST_GREEN_MAX_NARROW } from '@/lib/babylon/core/ShotWindow';
@@ -439,6 +441,10 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.highCamPanShare')).toBe(HSC.HIGH_CAM_PAN_SHARE); expect(def('hoops.highCamPanSec')).toBe(HSC.HIGH_CAM_PAN_SEC);
     expect(def('hoops.highCamMargin')).toBe(HSC.HIGH_CAM_MARGIN); expect(def('hoops.highCamPullMax')).toBe(HSC.HIGH_CAM_PULL_MAX);
     expect(def('hoops.highCamPortraitLift')).toBe(HSC.HIGH_CAM_PORTRAIT_LIFT);
+    // improve-hoops-2 (new, 2026-11-22): phase 3's load switches (shipped OFF: 1v1 missed the plan's 30 % READY bar by 2 points; the moves are the same either way) and phase 4's rules
+    expect(def('perf.poseClipFast')).toBe(POSE_CLIP_FAST); expect(POSE_CLIP_FAST).toBe(0);
+    expect(def('perf.poseClipShare')).toBe(POSE_CLIP_SHARE); expect(POSE_CLIP_SHARE).toBe(0);
+    expect(def('perf.onlookerClipsOnly')).toBe(ONLOOKER_CLIPS_ONLY); expect(ONLOOKER_CLIPS_ONLY).toBe(0);
   });
 
   it('every row is well formed: unique `<area>.<camelName>` id, min ≤ default ≤ max, the default on the step grid, a source', () => {

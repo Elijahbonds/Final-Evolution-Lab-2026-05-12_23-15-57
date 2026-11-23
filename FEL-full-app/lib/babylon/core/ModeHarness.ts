@@ -46,6 +46,7 @@ import { OccluderFade, OCCLUDER_FADE_OFF } from './OccluderFade';   // gameplay-
 import { watchCanvasFit } from './canvasFit';       // M95 (Pass 2): cap DPR + backing-pixel budget
 import { prewarmScene, prewarmWanted } from './shaderPrewarm';
 import { installLoadProgress, LoadStallClock } from './loadProgress';   // FIRST-DUNK-BUDGET: the load watchdog watches the download
+import { beginLoadMarks } from './loadMarks';   // lane/improve-hoops phase 3: where a load's time goes (logging only)
 import { setSignedOutVisitor } from './visitor';   // FIRST-DUNK-BUDGET: a known guest is not asked for what a guest is refused
 import { PerfMonitor, budgetForTier } from './PerfMonitor';          // M67: dev frame-budget monitor
 import { mountPerfGuard } from './perfGuard';
@@ -706,9 +707,11 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       reportDiag('load', `${def.modeId} load timed out after ${LOAD_WATCHDOG_MS} ms`);
       setPhase('error', 'Load timed out — check your connection and retry.');
     }, LOAD_STALL_LOOK_MS);
+    const lm = beginLoadMarks(def.modeId); lm.mark('load.begin');   // lane/improve-hoops phase 3: the marks only
     try {
       replayTrack.length = 0;
       await def.load(ctx);
+      lm.mark('load.end');
       clearTimeout(watchdog);
       if (timedOut) return false;                  // late resolve after watchdog: stay on error
       liftBlackMaterials(scene);                   // rescue anything venue-load added
@@ -732,14 +735,17 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       // SHADER PRE-WARM (lane/owner-1016, 2026-10-16; owner: "pre-warm shaders on phones at load"). Behind the boot splash — the
       // phase is still 'loading' — and AFTER the 20 s watchdog above is cleared, so it cannot trip it; it has its own cap
       // (shaderPrewarm.ts) and READY comes either way. Phone tier only; dev keeps warmAll after READY (below).
+      lm.mark('postload');
       if (prewarmWanted(tier)) {
         console.info('[FEL-PERF] shader pre-warm start');
         const warm = await prewarmScene(scene, { renderFrame: () => { engine.beginFrame(); scene.render(); engine.endFrame(); }, effectsReady: () => engine.areAllEffectsReady() });
         // ship-ready (2026-10-17): capHit, not timedOut — a scene that turned ready but lost its warm frames to the cap was not reported
         if (warm.capHit) reportDiag('load', `shader pre-warm hit its cap after ${Math.round(warm.ms)} ms (${warm.polls} polls, ${warm.frames} frames, scene ${warm.ready ? 'ready' : 'not ready'})`);
         else console.info(`[FEL-PERF] shader pre-warm ${warm.ready ? 'ready' : 'skipped'} in ${Math.round(warm.ms)} ms, ${Math.round(warm.readyMs)} of them to first ready (${warm.polls} polls, ${warm.frames} frames)`);
+        lm.mark('prewarm');
       }
       setPhase('ready');
+      lm.mark('ready');
       // HOOPS-SOUND (phase 11a, 2026-11-12): a mode with recorded sound (the court modes) fetches it now, after READY, so it never
       // slows the load; every cue plays its synth until its files are in (audio/samples.ts sampleBankFor). Sound never fails a load.
       try { void SoundKit.useSampleBank(sampleBankFor(def.modeId)); } catch { /* the synths play */ }

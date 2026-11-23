@@ -265,6 +265,7 @@ import { StickFrame } from '../core/StickFrame';   // lane/move-feel-2: a held s
 import { feel } from '../../feel-panel/feel';   // lane/hoops-cam: the camera knob
 import { ONEVONE_CAM, type CourtFrame, type P2 } from '../core/HighSidelineCam';   // lane/hoops-cam: the high sideline view
 import type { CameraDirector } from '../core/CameraDirector';
+import { loadMarks } from '../core/loadMarks';   // lane/improve-hoops phase 3: the load's stages (logging only)
 import {   // IMPROVE (2026-10-06) #1 #2 #3 #4 #10: the pure rules (onevoneRules.test)
   ONEVONE_TIER, attackerPatience, winRule, gameWinner, onePointAway, winBy2Requested, readWinBy2Pick, type WinRule,
   hintFor, hintSwap, pushPip, emptyBox, hintDeviceFor, type HintDevice,
@@ -1090,16 +1091,18 @@ export const OneVOneMode: ModeDefinition = (() => {
       hud = (u) => putHud(ctx, u);   // IMPROVE (2026-10-06) #11: through the on-change memo
       onevoneVenue = mountVenue(ctx, 'basketball_h2h', { keepGameplayCamera: true, location: ctx.location });
       if (!onevoneVenue) { VenueKit.buildCourt(ctx.scene, 'venice'); applyOceanCourt(ctx.scene, 'venice'); }
+      const lm = loadMarks(); lm.mark('venue');   // lane/improve-hoops phase 3: the load's stages (logging only)
       me = await CharacterPipeline.spawnPlayer(ctx.scene, cfg.heroUrl, { position: MY_SPAWN.clone(), yawRad: Math.PI, startClip: SPORT_CLIP.idle });
       // hoops-builder phase B: the hero's ratings, and his body drawn at his playing height (casual runs; the standard frame otherwise)
       rated = await loadRatedTuning(ctx.scene.metadata); heroDrawnScaled = ratedLookScale(rated) !== 1;
       if (heroDrawnScaled) applyProportions(me, { heightScale: ratedLookScale(rated), buildScale: 1 });
-      console.info(`[1V1-RATED] ${ratedLog(rated)}`);
+      console.info(`[1V1-RATED] ${ratedLog(rated)}`); lm.mark('body.hero');
       ring?.dispose(); ring = mountPlayerRing(ctx.scene, me.root, { color: '#22d3ee', icon: readPlayerIcon() });   // PLAYER RING
       me.secondary?.setLookTarget(() => bankLook.target() ?? ball?.position ?? null);    // Phase 2: eyes on the ball (hoops-shot-content: on the glass through a called bank)
       neverBindPose(me.animator, SPORT_CLIP.idle); installSafePlay(me.animator, 'onevone-me');
       ctx.groundLock?.track(me.root, me.skeleton);
       foe = await CharacterPipeline.spawnNpc(ctx.scene, cfg.heroUrl, { position: FOE_SPAWN.clone(), tint: '#ff2d78', startClip: SPORT_CLIP.idle });
+      lm.mark('body.foe');
       tintGarmentSlot(foe, SLOT_KEYS.jersey, '#ff2d78');   // suite pass: the rival wears the rival's colour (the tint alone was only a roster seed)
       foe.secondary?.setLookTarget(() => ball?.position ?? null);
       neverBindPose(foe.animator, SPORT_CLIP.idle); installSafePlay(foe.animator, 'onevone-foe');
@@ -1114,6 +1117,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       console.info(`[HOOPS-HAND] 1v1 left-hand dribble loops: ${leftDribbleTwins(me.animator, me.skeleton).length} / ${leftDribbleTwins(foe.animator, foe.skeleton).length}`);
       leftMoveTwins(me.animator, me.skeleton);   // hoops-moves (owner 10-20): the spin's left-hand body (anim/leftMoveTwins)
       onevoneVenue?.hidePlaceholders();  // M74
+      lm.mark('clips');
 
       ball = MeshBuilder.CreateSphere('ball', { diameter: 0.24 }, ctx.scene);
       void dressBall(ball, 'basketball');   // Meshy ball skin rides the physics sphere (visual only)
@@ -1182,6 +1186,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         : new PlayerSlot('foe', net ? net.seatSource('foe', foeAi) : foeAi!, false);
       foeLens?.setTier(runTier());   // lane/hoops-round2 HOP-02: the brain sees through the reaction lens (the tier's delay)
 
+      lm.mark('court.fx');
       // Phase 4: Havok contact bodies. If the physics wasm is unavailable
       // the mode falls back to the kinematic path unchanged.
       try {
@@ -1194,6 +1199,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         console.warn('[1v1] physics unavailable, kinematic fallback:', e);
         contact = null;
       }
+      lm.mark('physics');
 
       meDribble = new DribbleController();
       meDribble.setFacing(Math.PI);           // spawned facing the rim (yaw π)
@@ -1260,6 +1266,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       ctx.camDirector.setHighView({ court: ONEVONE_CAM_COURT, on: () => feel('hoops.oneVOneCam', ONEVONE_CAM) >= 0.5, frame: highFrame });
       ctx.camDirector.snapTo(me.root.position, RIM);
       assertSpawned(ctx.scene, { hero: me.root, minWorldMeshes: 6, modeId: 'onevone' });
+      lm.mark('rigs');
       resetPositions();
       putHud(ctx, { score: myScore, foeScore, target: TARGET_SCORE, momentum: 0, turbo: 100, winBy2: winCond.winBy2, shotPips: '' });   // IMPROVE (2026-10-06) #3 #10 #11
       // dev probes (ONEVONE-DEFENSE-LOGIC): the possession machine, readable without the HUD

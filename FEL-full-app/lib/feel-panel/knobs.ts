@@ -2337,6 +2337,22 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/core/jerseyDecals.ts JERSEY_DECALS',
     hint: 'On: the new basketball and football jerseys carry the player number on the chest and back and the name across the back. Off: a blank jersey, as before.',
   },
+  // ── lane/improve-hoops-2 (2026-11-22, docs/IMPROVE-10-PHASE-AUDIT.md phase 3): the bodies' clips, built faster at load ──
+  {
+    id: 'perf.poseClipFast', label: 'Load: a solved arm or leg recomputes only that limb (1) / the whole body (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/babylon/anim/poseClip.ts POSE_CLIP_FAST',
+    hint: 'How the bodies build their moves while a game loads. The moves come out the same either way; on is faster. Off: as before.',
+  },
+  {
+    id: 'perf.poseClipShare', label: 'Load: bodies with the same build share their solved moves (1) / each solves its own (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/babylon/anim/poseClip.ts POSE_CLIP_SHARE',
+    hint: 'A second body with the same skeleton copies the first one\'s moves instead of working them out again. Off: every body works out its own, as before.',
+  },
+  {
+    id: 'perf.onlookerClipsOnly', label: 'Load: people watching build only their idle and cheer (1) / every move (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/babylon/visual/onlookerClips.ts ONLOOKER_CLIPS_ONLY',
+    hint: 'The crowd on the rail only ever stands and cheers, so on it skips building the rest. They look the same. Off: as before.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));

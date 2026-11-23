@@ -22,6 +22,61 @@ import { plantLeg } from './FootPlanting';
 import { smoothByDefault, smoothQuatKeys, smoothScalarKeys, HOOPS_MOTION_MODES, hoopsMotionModeOf, type Q4 } from './smoothKeys';
 import { HOOPS_OVERHEAD_CLIPS } from './authored/hoopsOverhead';   // (a data table: the clip-scope test reads anim/authored/ as data)
 import { DESNAP_CLIPS, SPEED_CAP_CLIPS, capTracks, celebrateEaseOn, clipSmoothOn, desnapTracks } from './clipDesnap';
+import { feel } from '../../feel-panel/feel';
+
+// ── lane/improve-hoops phase 3 (2026-11-22): THE BODIES' CLIPS COST THE HOOPS LOADS THEIR TIME ──
+// Measured on the phone tier (scripts/probes/improve-hoops/loadprof.mjs, a CPU profile of the whole load): buildPoseClip was 24 s of the
+// 1v1 load's 45 s before the pre-warm, 40 s of the 3v3's 61 s and 17 s of the 3-Point's 35 s — about 217 clips solved by IK on every
+// body, each key re-computing every node's world matrix up to six times. Two switches, each off = exactly the build before:
+//   perf.poseClipFast   after an arm or a leg is solved, only that limb's nodes are recomputed (nothing else moved: the same matrices,
+//                       bit for bit — poseClip.fast.test.ts), and the per-key reset skips a recompute the next one overwrites.
+//   perf.poseClipShare  a body whose rig is the same as one already built (the same bones, bind pose, proportions and scale; where it
+//                       stands and which way it faces do not enter the solve, which works in the body's own frame) is handed a copy of
+//                       that body's solved keys instead of solving them again. The copy agrees with its own solve to float rounding (a
+//                       body at another spot already differs from the first by that much: 7e-5 at most in a quaternion, measured).
+/** 1 = the limb-only recompute; 0 = every node after every step, as before (shipped 0: the phase missed its 1v1 bar by 2 points — FEEL-PANEL.md). */
+export const POSE_CLIP_FAST = 0;
+/** 1 = a body with the same rig reuses the solved keys; 0 = every body solves every clip, as before (shipped 0). */
+export const POSE_CLIP_SHARE = 0;
+export const poseClipFastOn = (): boolean => feel('perf.poseClipFast', POSE_CLIP_FAST) >= 0.5;
+export const poseClipShareOn = (): boolean => feel('perf.poseClipShare', POSE_CLIP_SHARE) >= 0.5;
+/** The shared keys kept at most (one entry a clip a rig a mode): past it the store starts again (a long session through many modes). */
+export const POSE_CLIP_SHARE_MAX = 3000;
+interface SharedClip { bones: [string, Float64Array][]; hipsY: Float64Array | null }
+const sharedClips = new Map<string, SharedClip>();
+/** Probes and tests: how many solves were reused / done since the page loaded, and a way to start the store again. */
+export const poseClipShareStats = { hits: 0, misses: 0, clear(): void { sharedClips.clear(); this.hits = 0; this.misses = 0; }, size: (): number => sharedClips.size };
+/** A 53-bit string hash (cyrb53): the clip's keys are hashed, not kept, in the store's key. */
+function hash53(str: string): string {
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+  for (let i = 0; i < str.length; i++) { const c = str.charCodeAt(i); h1 = Math.imul(h1 ^ c, 2654435761); h2 = Math.imul(h2 ^ c, 1597334677); }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return `${(h2 >>> 0).toString(36)}${(h1 >>> 0).toString(36)}:${str.length}`;
+}
+const rigSigs = new WeakMap<Skeleton, string>();
+/** What a solve reads off a rig: every bone's name and bind (rest) transform, the nodes between the hips and the top, the top's scale
+ *  and which way is up for it — never where it stands or its yaw. Exact numbers: only rigs that are the same to the last bit share. */
+function rigSignature(sk: Skeleton, hips: TransformNode, top: TransformNode): string {
+  const hit = rigSigs.get(sk); if (hit) return hit;
+  const parts: string[] = [];
+  const bf = bindFrame(sk);
+  for (const b of sk.bones) {
+    const n = b.getTransformNode(); const t = n ? bf.bind.get(n) : undefined; const r = n ? bf.parentRot.get(n) : undefined;
+    parts.push(`${b.name}:${t ? [t.p.x, t.p.y, t.p.z, t.q.x, t.q.y, t.q.z, t.q.w].join(',') : '-'}:${r ? [r.x, r.y, r.z, r.w].join(',') : '-'}:${(b.getParent()?.name) ?? ''}`);
+  }
+  for (let n = hips.parent as TransformNode | null; n && n !== top; n = n.parent as TransformNode | null) {
+    const q = n.rotationQuaternion ?? Quaternion.FromEulerVector(n.rotation);
+    parts.push(`^${n.name.replace(/_c\d+$|_[a-z]\d+$/, '')}:${[n.position.x, n.position.y, n.position.z, q.x, q.y, q.z, q.w, n.scaling.x, n.scaling.y, n.scaling.z].join(',')}`);
+  }
+  top.computeWorldMatrix(true);
+  const up = Vector3.TransformNormal(Vector3.Up(), top.getWorldMatrix());
+  const det = top.getWorldMatrix().determinant();
+  parts.push(`top:${[top.scaling.x, top.scaling.y, top.scaling.z].join(',')}:up${[up.x, up.y, up.z].map((v) => v.toFixed(6)).join(',')}:det${det < 0 ? -1 : 1}`);
+  const sig = hash53(parts.join('|'));
+  rigSigs.set(sk, sig);
+  return sig;
+}
 
 export type Deg3 = [number, number, number];
 export interface PoseKey {
@@ -214,13 +269,51 @@ export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration
   // pose and every reach lands short. No scene.render(): this runs at spawn.
   const hips = nodes.get('Hips'); if (!hips) return null;
   const top = (hips.parent as TransformNode | null) ?? hips;
-  const refresh = () => { const walk = (n: TransformNode) => { n.computeWorldMatrix(true); for (const c of n.getChildTransformNodes(true)) walk(c); }; walk(top); };
-  const restore = () => { for (const [n, t] of bind) { n.position.copyFrom(t.p); n.rotationQuaternion = t.q.clone(); } refresh(); };
+  // lane/improve-hoops phase 3: perf.poseClipFast — the children lists read once (nothing is re-parented during a solve), and a limb's
+  // solve recomputes that limb's nodes only (`refreshFrom`). Off: every refresh walks the whole body, as before.
+  // The solve reads bone nodes only, so between keys only the bones and the nodes above them are recomputed (`need`: a mesh hung under
+  // the rig, a garment or a hair card, is skipped until the end); the clip's last restore() walks everything, so the body is left
+  // exactly as before.
+  const fast = poseClipFastOn();
+  const kidsOf = new Map<TransformNode, TransformNode[]>();
+  const need = new Set<TransformNode>();
+  if (fast) for (const n of nodes.values()) for (let x: TransformNode | null = n; x && !need.has(x); x = x === top ? null : (x.parent as TransformNode | null)) need.add(x);
+  const kids = (n: TransformNode): TransformNode[] => {
+    let k = kidsOf.get(n);
+    if (!k) { k = n.getChildTransformNodes(true).filter((c) => need.has(c)); kidsOf.set(n, k); }
+    return k;
+  };
+  const walkAll = (n: TransformNode): void => { n.computeWorldMatrix(true); for (const c of n.getChildTransformNodes(true)) walkAll(c); };
+  const walkNeed = (n: TransformNode): void => { n.computeWorldMatrix(true); for (const c of kids(n)) walkNeed(c); };
+  const refresh = () => { if (fast) walkNeed(top); else walkAll(top); };
+  /** After a solve that wrote `n` and the nodes under it only: those recomputed (their parent's matrix is current). Off: everything. */
+  const refreshFrom = (n: TransformNode) => { if (fast) walkNeed(n); else walkAll(top); };
+  const setBind = () => { for (const [n, t] of bind) { n.position.copyFrom(t.p); n.rotationQuaternion = t.q.clone(); } };
+  const restore = () => { setBind(); refresh(); };
+  /** The end of a build: every node under the rig recomputed, as every build always left it. */
+  const restoreAll = () => { setBind(); walkAll(top); };
   const root = hips.parent as TransformNode | null;
   // From BIND, not from whatever pose the rig holds: the body's scale below is read off the hip joints' height, so a clip
   // built on a crouched rig came out shrunk (built after the two-foot gather's −0.26 m, the take-off's struck-up hands
   // reached 1.35 m instead of 1.81 m — DUNK MOTION phase 7). Every mode builds at spawn, at bind, so play was unaffected.
-  restore();
+  restoreAll();   // (the whole body, as before: a shared clip returns right after this)
+  // lane/improve-hoops phase 3: perf.poseClipShare — the same rig, the same clip, the same keys, the same mode and switches: the keys
+  // another body solved, copied (and the rig left at bind, refreshed, exactly as a solve leaves it)
+  const modeIdForShare = hoopsMotionModeOf(scene.metadata as { felModeId?: string; felCarnivalEvent?: string } | null | undefined) ?? '';
+  const shareKey = poseClipShareOn()
+    ? `${name}|${duration}|${modeIdForShare}|${clipSmoothOn() ? 1 : 0}${celebrateEaseOn() ? 1 : 0}${CAP_PREFILTER ?? '-'}|${rigSignature(sk, hips, frameAbove(hips))}|${hash53(JSON.stringify(opts))}|${hash53(JSON.stringify(keys))}`
+    : null;
+  if (shareKey) {
+    const got = sharedClips.get(shareKey);
+    if (got) {
+      poseClipShareStats.hits++;
+      const bones: QuatKeys = {};
+      for (const [bone, a] of got.bones) { const ks: [number, Quaternion][] = []; for (let i = 0; i < a.length; i += 5) ks.push([a[i], new Quaternion(a[i + 1], a[i + 2], a[i + 3], a[i + 4])]); bones[bone] = ks; }
+      const hy: [number, number][] = []; if (got.hipsY) for (let i = 0; i < got.hipsY.length; i += 2) hy.push([got.hipsY[i], got.hipsY[i + 1]]);
+      return buildQuatClip(scene, sk, name, duration, bones, hy.length ? hy : undefined);
+    }
+    poseClipShareStats.misses++;
+  }
   const frame = frameAbove(hips);
   const keyed = (n: TransformNode, deg: Deg3): Quaternion => bf.keyed(n, deg);
   // Body height ratio = the hips' height ABOVE THE ROOT. This read the hips' absolute y, so a body spawned above y = 0 built
@@ -294,7 +387,7 @@ export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration
   const lastArm: Partial<Record<'Left' | 'Right', { fore: Quaternion; side: Vector3 }>> = {};
   const solveKeys: TransitionKey[] = anatomicalMode === 'overhead' ? withOverheadTransitions(keys) : keys;
   for (const key of solveKeys) {
-    restore();
+    if (fast) setBind(); else restore();   // (fast: the refresh below recomputes every node from these locals; nothing reads between)
     // 1) torso and any explicit bone keys
     for (const [bone, deg] of Object.entries(key.bones ?? {})) { const n = nodes.get(bone); if (n) n.rotationQuaternion = keyed(n, deg); }
     refresh();
@@ -323,7 +416,7 @@ export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration
       }
       const upper0 = arm.shoulder.rotationQuaternion?.clone(), fore0 = arm.elbow.rotationQuaternion?.clone();
       reachArm(arm, world, poleW, 1);   // the pole is a body-frame direction too
-      refresh();
+      refreshFrom(arm.shoulder);
       // HOTFIX (2026-09-24): THE ELBOW DOES NOT PASS THROUGH THE UPPER ARM BETWEEN TWO KEYS. The rule above picks each key's side on
       // its own, and it can jump: the ball hand whipping from the waist to the face (dunk_mocap 0.08 → 0.16, back → down) and the off
       // arm lifting beside a torso leaning back (dunk_360_eastbay 1.0 → 1.25, back → front). Each key was a legal arm, but the forearm's
@@ -341,13 +434,13 @@ export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration
         for (let k = 0; k < 24; k++) {   // every 15° round the arm's line
           const p = b1.scale(Math.cos((k * Math.PI) / 12)).addInPlace(b2.scale(Math.sin((k * Math.PI) / 12)));
           if (!anatomicalElbowPole(p, sh, world, bodyFrame.up, bodyFrame.front).equalsWithEpsilon(p, 1e-6)) continue;   // the forbidden half
-          arm.shoulder.rotationQuaternion = upper0.clone(); arm.elbow.rotationQuaternion = fore0.clone(); refresh();
+          arm.shoulder.rotationQuaternion = upper0.clone(); arm.elbow.rotationQuaternion = fore0.clone(); refreshFrom(arm.shoulder);
           reachArm(arm, world, p, 1);
-          refresh();
+          refreshFrom(arm.shoulder);
           const near = Vector3.Dot(elbowSide(arm), last.side);
           if (near > best.near && !elbowFoldsBetween(arm, last.fore)) best = { upper: arm.shoulder.rotationQuaternion!.clone(), fore: arm.elbow.rotationQuaternion!.clone(), near };
         }
-        arm.shoulder.rotationQuaternion = best.upper; arm.elbow.rotationQuaternion = best.fore; refresh();
+        arm.shoulder.rotationQuaternion = best.upper; arm.elbow.rotationQuaternion = best.fore; refreshFrom(arm.shoulder);
       }
       if (arm.elbow.rotationQuaternion) lastArm[side] = { fore: arm.elbow.rotationQuaternion.clone(), side: elbowSide(arm) };
     }
@@ -357,12 +450,12 @@ export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration
       const [h, k, a] = legs[side].map((b) => nodes.get(b)); if (!h || !k || !a) continue;
       if (!tgt) {
         // phase 4c kneesFront: the keyed leg, to its own ankle, the knee toward the body's front (the foot planter's pole)
-        if (key.kneesFront) { a.computeWorldMatrix(true); plantLeg(h, k, a, a.getAbsolutePosition().clone(), bodyFrame.front); refresh(); }
+        if (key.kneesFront) { a.computeWorldMatrix(true); plantLeg(h, k, a, a.getAbsolutePosition().clone(), bodyFrame.front); refreshFrom(h); }
         continue;
       }
       const kp = key.kneePoles?.[side];
       plantLeg(h, k, a, forLimb(tgt, h, ratios.leg[side]), kp ? inBody(kp).normalize() : bodyFrame.front);   // the knee toward the body's front
-      refresh();
+      refreshFrom(h);
     }
     // 4) read back local rotations for every bone the key touched
     const touched = new Set<string>(Object.keys(key.bones ?? {}));
@@ -370,7 +463,7 @@ export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration
     for (const bone of touched) { const n = nodes.get(bone); if (n?.rotationQuaternion) push(bone, key.t, n.rotationQuaternion); }
     if (key.hipsY != null) hipsY.push([key.t, key.hipsY * scale]);
   }
-  restore();
+  restoreAll();
   // DUNK MOTION phase 2: the joint-space cubic between the poses (slow-in / slow-out, velocity continuous through a key,
   // a pose reached and never overshot) instead of Babylon's constant-speed slerp from key to key
   const byDefault = smoothByDefault(name, modeId);
@@ -391,5 +484,11 @@ export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration
   // GAMEPLAY-CLEAN-7: a listed clip's fast stretch (the celebration's elbows, 28–32° a frame) under a speed cap; knob anim.celebrateEase
   const capBones = SPEED_CAP_CLIPS.get(name);
   if (capBones && celebrateEaseOn()) capTracks(out, capBones, keys.filter((k) => k.hold).map((k) => k.t));
+  if (shareKey) {   // perf.poseClipShare: the solved keys kept for the next body with this rig (a copy: the group's keys are mirrored in place later)
+    if (sharedClips.size >= POSE_CLIP_SHARE_MAX) sharedClips.clear();
+    const bones: [string, Float64Array][] = Object.entries(out).map(([bone, ks]) => { const a = new Float64Array(ks.length * 5); ks.forEach(([t, q], i) => { a.set([t, q.x, q.y, q.z, q.w], i * 5); }); return [bone, a]; });
+    const hy = hipsY.length ? new Float64Array(hipsY.flat()) : null;
+    sharedClips.set(shareKey, { bones, hipsY: hy });
+  }
   return buildQuatClip(scene, sk, name, duration, out, hipsY.length ? hipsY : undefined);
 }
