@@ -98,6 +98,7 @@ export const MODE_CLIP_SCOPES: Record<string, { suites: readonly ClipSuite[]; bo
   dunk: { suites: ['dunk'], borrow: ['bball_dribble_run'] },
   dunkduel: { suites: ['dunk'], borrow: ['bball_dribble_run'] },
   onevone: HOOPS,
+  physics_arena: HOOPS,   // lane/physics-arena (2026-11-23): the arena's 1v1 plays the hoops clips over its capsules
   threevthree: HOOPS,
   threepoint: { suites: ['hoops'], borrow: ['karate_hit_react', 'football_juke_left', 'dunk_celebrate_big'] },   // the make's celebration
   carnival: { suites: ['hoops', 'dunk', 'board', 'combat', 'soccer'], borrow: [] },   // the hub rotates four sports' bursts

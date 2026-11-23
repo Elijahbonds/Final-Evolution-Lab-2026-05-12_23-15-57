@@ -156,6 +156,14 @@ const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick' | 'boost' | 'turbo'>> 
     B: { label: 'CHARGE', emit: A('B'), hold: true },
     // L1 keeps the box-out it was taught on; it lives on the shoulder, not the diamond.
   }),
+  // lane/physics-arena (2026-11-23): the arena's 1v1 on physics. X holds the shot (let go at the top of the jump), A jumps, B passes
+  // the check, Y reaches for his dribble; L1 switches the dribbling hand.
+  physics_arena: verbs({
+    X: { label: 'SHOOT', emit: A('X'), hold: true },
+    A: { label: 'JUMP', emit: A('A') },
+    B: { label: 'PASS', emit: A('B') },
+    Y: { label: 'REACH', emit: A('Y') },
+  }),
   threevthree: verbs({
     X: { label: 'SHOOT', emit: A('X'), hold: true },
     Y: { label: 'BLOCK', emit: A('Y') },

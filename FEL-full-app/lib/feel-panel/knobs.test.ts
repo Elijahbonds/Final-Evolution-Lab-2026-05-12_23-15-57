@@ -81,6 +81,7 @@ import { BAT_GRIP_LOST_M, BAT_GRIP_BACK_M } from '@/lib/babylon/modes/baseballBa
 import { SAMPLE_SFX_ON } from '@/lib/babylon/audio/samples';   // hoops-sound
 import * as DS from '@/lib/babylon/audio/dribbleSound';   // hoops-sound
 import * as HSC from '@/lib/babylon/core/HighSidelineCam';   // hoops-cam
+import * as ARENA from '@/lib/babylon/arena/arenaConfig';   // lane/physics-arena
 
 function tsFiles(dir: string): string[] {
   const out: string[] = [];
@@ -439,6 +440,26 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.highCamPanShare')).toBe(HSC.HIGH_CAM_PAN_SHARE); expect(def('hoops.highCamPanSec')).toBe(HSC.HIGH_CAM_PAN_SEC);
     expect(def('hoops.highCamMargin')).toBe(HSC.HIGH_CAM_MARGIN); expect(def('hoops.highCamPullMax')).toBe(HSC.HIGH_CAM_PULL_MAX);
     expect(def('hoops.highCamPortraitLift')).toBe(HSC.HIGH_CAM_PORTRAIT_LIFT);
+    // lane/physics-arena (new, owner 2026-11-23): the arena ships ON as a new place; 0 on each switch restores today
+    expect(def('arena.on')).toBe(ARENA.ARENA_ON);
+    expect(def('arena.physicsHoops')).toBe(ARENA.ARENA_PHYSICS_HOOPS);
+    expect(def('cam.pov')).toBe(ARENA.CAM_POV);
+    expect(def('arena.stepHz')).toBe(ARENA.ARENA_STEP_HZ);
+    expect(def('arena.floorBounce')).toBe(ARENA.FLOOR_BOUNCE);
+    expect(def('arena.rimBounce')).toBe(ARENA.RIM_BOUNCE);
+    expect(def('arena.boardBounce')).toBe(ARENA.BOARD_BOUNCE);
+    expect(def('arena.jumpVy')).toBe(ARENA.JUMP_VY);
+    expect(def('arena.shotArcDeg')).toBe(ARENA.SHOT_ARC_DEG);
+    expect(def('arena.backspinRps')).toBe(ARENA.BACKSPIN_RPS);
+    expect(def('arena.bodyCarry')).toBe(ARENA.BODY_CARRY);
+    expect(def('arena.runCompensate')).toBe(ARENA.RUN_COMPENSATE);
+    expect(def('arena.releaseNoise')).toBe(ARENA.RELEASE_NOISE);
+    expect(def('arena.aimAssist')).toBe(ARENA.AIM_ASSIST);
+    expect(def('cam.povEyeM')).toBe(ARENA.POV_EYE_M);
+    expect(def('cam.povFovDeg')).toBe(ARENA.POV_FOV_DEG);
+    expect(def('cam.povBobM')).toBe(ARENA.POV_BOB_M);
+    expect(def('cam.povLookDegS')).toBe(ARENA.POV_LOOK_DEG_S);
+    expect(ARENA.ARENA_ON).toBe(1); expect(ARENA.ARENA_PHYSICS_HOOPS).toBe(1); expect(ARENA.CAM_POV).toBe(1); expect(ARENA.POV_BOB_M).toBe(0);
   });
 
   it('every row is well formed: unique `<area>.<camelName>` id, min ≤ default ≤ max, the default on the step grid, a source', () => {

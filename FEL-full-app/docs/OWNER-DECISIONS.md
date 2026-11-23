@@ -520,3 +520,33 @@ The owner, verbatim: **"Make sure the story and online play is finished."** (rel
   and the owner's netd redeploy as numbered copy-paste steps). The story is its own lane (`wt/story`).
 - The standing rules hold: netd protocol changes are additive; the owner redeploys netd, agents never do; the client keeps
   working against the netd that is deployed now and says "Parties need a server update" where it must.
+
+## owner 2026-11-23: a live physics play arena for the sport modes, and POV
+
+The owner, verbatim (relayed by the coordinator, 2026-11-23): **"Make there be a live physics play arena for the sport modes.- all
+the modes can be played physics based. And POV-"**
+
+Work is on `lane/physics-arena` (`docs/PHYSICS-ARENA-PLAN.md`: the audit of what is physics today, the design, the risks, the
+build order and the measured first slice).
+
+- `assumption:` (lane/physics-arena) "a live physics play arena" is **a play space where the sport modes run on real physics**:
+  a rigid-body ball and hoop, the ball's contacts with the rim and the backboard solved by the physics engine (Havok, already in
+  the app), player bodies that collide, and later goals and nets for the other sports — instead of an outcome decided at the
+  release and an arc drawn to agree with it.
+- `assumption:` (lane/physics-arena) "all the modes can be played physics based" means **every sport mode can be switched to
+  physics play**, one mode at a time in the plan's order, each behind its own switch; the shipped modes stay exactly as they are
+  until their switch is on.
+- `assumption:` (lane/physics-arena) "POV" means **a first-person, point-of-view camera** you can switch to.
+- `assumption:` (lane/physics-arena) **the message was cut off after "POV-"**: what came next is not known. The lane built POV as a
+  camera choice inside the arena (SELECT / C toggles it) and asks the owner what the rest of the sentence was.
+- `assumption:` (lane/physics-arena) the arena is a **new place on Play** (its own "Physics Arena" chip, on by default, the knob
+  `arena.on`), a practice space that records no session and pays nothing until the owner says otherwise; no existing mode's default
+  changes.
+- The owner added, verbatim (relayed by the coordinator, 2026-11-23): **"The inspiration for the physics based sport arena was Dunk- made
+  by katapult."** Treated as every benchmark game here is: **a quality and feel reference only.** Nothing is copied from it — no name,
+  title, characters, art, levels, mode names, UI or sounds; the arena keeps its own name and look.
+- The feel goal taken from it (coordinator, 2026-11-23): **physics-first play with no scripted outcomes** — the ball and the players'
+  bodies are physics-driven; dunks, blocks and collisions emerge from the simulation; it is fun and readable to watch. Bodies more
+  physical than capsules (an active ragdoll, physics-driven limbs) go behind their own knob, ship OFF, and are measured for phone
+  frame time first. `assumption:` (lane/physics-arena) the lane does not guess at that game's mechanics; where the plan needs a
+  design choice the owner should make, it is a question in the lane's report and in `docs/PHYSICS-ARENA-PLAN.md` §6.
