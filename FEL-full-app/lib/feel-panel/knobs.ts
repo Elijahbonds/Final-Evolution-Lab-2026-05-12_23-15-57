@@ -2353,6 +2353,27 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/visual/onlookerClips.ts ONLOOKER_CLIPS_ONLY',
     hint: 'The crowd on the rail only ever stands and cheers, so on it skips building the rest. They look the same. Off: as before.',
   },
+  // ── lane/improve-hoops-2 (2026-11-22, phase 4): hoops rules, one way in both modes ──
+  {
+    id: 'hoops.makeBeatHoldsShot', label: '1v1: no shot in the beat after your make (1) / a shot can start (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · rules',
+    source: 'lib/babylon/hoops/oneRule.ts MAKE_BEAT_HOLDS_SHOT',
+    hint: 'After you score, the ball is yours under the rim for a moment before the check. On: a shot pressed then waits for the check. Off: it went up and could not count.',
+  },
+  {
+    id: 'hoops.rivalChaseAroundBody', label: '1v1 rival: chase a loose ball round a body in the way (1) / straight at it (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · rules',
+    source: 'lib/babylon/hoops/boardChase.ts RIVAL_CHASE_AROUND_BODY',
+    hint: 'When someone stands between him and a rebound and he makes no ground for half a second, he steps round them. Off: he keeps pushing straight.',
+  },
+  {
+    id: 'hoops.driveByHandOn', label: '3v3: the drive-by steal must reach the ball (1) / any pass-by poke (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · rules',
+    source: 'lib/babylon/hoops/steals.ts DRIVE_BY_HAND_ON',
+    hint: 'Your feel call. On: running past the driver with a poke only steals if your hand can get to his ball, like any poke. Off: as shipped.',
+  },
+  {
+    id: 'hoops.spinShotCutsHalf', label: 'Both modes: a shot can cut the spin from its half (1) / waits for the spin (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · rules',
+    source: 'lib/babylon/hoops/oneRule.ts SPIN_SHOT_CUTS_HALF',
+    hint: 'Your feel call. On: shoot in the second half of a spin and the shot goes at once, in 1v1 and 3v3 alike. Off: the shot waits for the spin to finish.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));

@@ -180,7 +180,8 @@ import { blockDiceOn, meetsRelease, releaseFrom, handOnBall, deflect, aiBlockJum
 import { oneContestOn, contestFrom, contestOn, closingSpeed, type ContestBody } from '../hoops/contest';   // hoops-p02: one contest model for every shooter
 import { skillShotOn, aiSharedShotOn, greenScaleFor, moveReadOn, readTheMan, manReadFrom, pressFloored, gatherCloseoutOn, isJumpShot, type ManRead } from '../hoops/rulebook';   // hoops-p09: one rulebook (shots, moves, the closeout, the press floor)
 import { heroSkillVerdict, rimFromRelease, aiRelease, missShapeFor } from '../core/SharedShot';   // hoops-p09: one shot model for every shooter
-import { stealDiceOn, aiStripLands, myStripHandOk, myBumpOpens } from '../hoops/steals';   // hoops-p02: the AI's strip is a hand on the ball; hoops-play: mine too
+import { stealDiceOn, aiStripLands, myStripHandOk, myBumpOpens, driveByHandOk } from '../hoops/steals';   // hoops-p02: the AI's strip is a hand on the ball; hoops-play: mine too
+import { spinCutNow } from '../hoops/oneRule';   // lane/improve-hoops-2 phase 4d: one rule for a shot pressed mid-spin
 import { TeamDefense, type TeamDEvent } from '../hoops/teamDefense';   // lane/hoops-round2 HOP-03: the switch on a screen and the double team
 import { HandCheckPlay } from '../hoops/handCheck';   // lane/hoops-round2 HOP-04: hand-checks, too many = a foul
 import { mountContactPoses } from '../hoops/contactPoses';   // lane/hoops-round2 HOP-04: forearm on hip, arm bar, chest in (drawn only)
@@ -1285,7 +1286,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         const d = driver.char.root.position.subtract(me.char.root.position); d.y = 0; const dist = d.length();
         const closing = dist > 1e-3 ? -(driverVelEst.x * d.x + driverVelEst.z * d.z) / dist : 0;
         if (parryVaultRead(dist, closing, driveK > 0 ? 'drive' : 'check')) { parryVault(ctx); return; }
-        if (driveByRead({ x: me.drib.vel.x, z: me.drib.vel.z }, me.char.root.position, driver.char.root.position)) { driveBySteal(ctx); return; }
+        if (driveByRead({ x: me.drib.vel.x, z: me.drib.vel.z }, me.char.root.position, driver.char.root.position)
+          && driveByHandOk(me.char.root.position, driver.char.root.position, ballWorld())) { driveBySteal(ctx); return; }   // improve-hoops-2 4c (knob hoops.driveByHandOn, off): the poke's hand test too
       }
       if (e.t === 'stick' && e.side === 'R') {   // MODE-STICK-FACE: R stick → the look orbit — except on the floor with the ball: the DRIBBLE STICK (2K)
         if (posting && carrierId === 'me' && !shooting && !dunking) {   // POST HOOK (2K20): with the post held the stick is the SHOT stick
@@ -2426,6 +2428,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         // a squeeze made while the body is committed WAITS instead of vanishing
         shotBuffer.tick(!!(shooting || dunking || finish || spin), performance.now());   // hoops-p01: the lock the buffered squeeze waits out
         shotBuffer.hold(iAmCarrier && meIntent.actionHeld > 0.02, !!(shooting || dunking || finish || spin), performance.now());   // hoops-gather: a press made DURING the lock (the one that started it is not buffered through its own pump)
+        if (spin && spinCutNow(spin.t, spin.plan.sec, shotBuffer.pending, spinClip.startsWith('bball_pivot'))) cutSpin();   // improve-hoops-2 4d (knob hoops.spinShotCutsHalf, off): from its half, the shot cuts the spin
         { // H2e (owner 2026-10-16): THE HOP STEP ON A DOUBLE TAP (see 1v1)
           const held = meIntent.actionHeld > 0.02, edge = held && !squeezeHeldWas; squeezeHeldWas = held;
           if (edge && iAmCarrier && !dunking && !posting && hopOnDoubleTap(tapRead())) {
@@ -3291,6 +3294,17 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     SoundKit.play('whoosh', { pitch: pivotRead ? 0.95 : 1.25, volume: pivotRead ? 0.2 : 0.35 });
     if (pivotRead) bannerFlash(ctx, pivotRead.reverse ? 'REVERSE PIVOT' : 'PIVOT', 400);   // IMPROVE (2026-10-06) #10
     console.info(`[3V3-MOVE] ${pivotRead ? (pivotRead.reverse ? 'reverse pivot' : 'front pivot') : 'spin'} ${plan.side} yaw ${plan.yaw0.toFixed(2)} sweep ${(plan.sweep * 180 / Math.PI).toFixed(0)}°`);
+  }
+  /** lane/improve-hoops-2 phase 4d (hoops/oneRule spinShotCutsHalf): a shot pressed in the spin's second half ends it where the body is —
+   *  facing as it faces now, the exit's speed handed back as at the spin's own end — so the shot starts this frame. 1v1 has the same. */
+  function cutSpin(): void {
+    if (!spin) return;
+    const yaw = spinYaw(spin.plan, Math.min(spin.t, spin.plan.sec));
+    me.char.root.rotation.y = yaw; me.drib.setFacing(yaw);
+    me.drib.vel.copyFrom(spin.plan.exit.scale(SPIN_EXIT_SPEED));
+    console.info(`[3V3-MOVE] spin cut by the shot at ${(spin.t / spin.plan.sec).toFixed(2)}`);
+    spin = null;
+    me.tree.release();
   }
   function stepSpin(ctx: ModeContext, dt: number): void {
     if (!spin) return;

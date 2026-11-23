@@ -256,7 +256,8 @@ import { blockDiceOn, meetsRelease, releaseFrom, handOnBall, deflect, aiBlockJum
 import { oneContestOn, contestFrom, closingSpeed } from '../hoops/contest';   // hoops-p02: one contest model for every shooter
 import { skillShotOn, aiSharedShotOn, greenScaleFor, moveReadOn, readTheMan, manReadFrom, pressFloored, gatherCloseoutOn, isJumpShot, type ManRead } from '../hoops/rulebook';   // hoops-p09: one rulebook (shots, moves, the closeout, the press floor)
 import { heroSkillVerdict, rimFromRelease, aiRelease, missShapeFor } from '../core/SharedShot';   // hoops-p09: one shot model for every shooter
-import { rivalChaseTarget } from '../hoops/boardChase';   // hoops-play: the 1v1 rival goes and gets a loose ball (3v3's rule)
+import { rivalChaseTarget, ChaseAround } from '../hoops/boardChase';   // hoops-play: the 1v1 rival goes and gets a loose ball (3v3's rule)   // (+ improve-hoops-2 4b: round a body in his line)
+import { makeBeatHoldsShot, spinCutNow } from '../hoops/oneRule';   // lane/improve-hoops-2 phase 4: the make beat holds the shot; the spin's shot rule
 import { stealDiceOn, aiStripLands, myStripHandOk, myBumpOpens } from '../hoops/steals';   // hoops-p02: the AI's strip is a hand on the ball; hoops-play: mine too
 import { HandCheckPlay } from '../hoops/handCheck';   // lane/hoops-round2 HOP-04: hand-checks, too many = a foul
 import { mountContactPoses } from '../hoops/contactPoses';   // lane/hoops-round2 HOP-04: forearm on hip, arm bar, chest in (drawn only)
@@ -433,6 +434,11 @@ export const OneVOneMode: ModeDefinition = (() => {
   /** Bumped on every possession change — every timer that changes possession checks it (a stale watchdog used to force
    *  the NEXT possession's release 1.1 s in). */
   let possessionToken = 0;
+  /** lane/improve-hoops-2 phase 4a: the possession my last make belongs to (hoops/oneRule makeBeatHoldsShot) — while it is still the
+   *  live one, the make beat runs and no shot starts. -1: no make beat. Any possession change (the check-up) ends it. */
+  let makeBeatToken = -1;
+  /** lane/improve-hoops-2 phase 4b: the rival's board chase steps round a body that blocks it (hoops/boardChase ChaseAround). */
+  const chaseAround = new ChaseAround();
   const shotClock = new PlayerShotClock(() => playerShotClockSec('1v1', runTier()), (v) => hud({ shotClock: v }));   // lane/hoops-shot-core: ELITE's 12 s shot clock (core/ShotClock)
   let carrying = true, shooting = false, dunking = false;
   const hardHitGate = new HardHitDebounce();   // OV75-2: one contact reaction per bump (per ordered pair)
@@ -1448,6 +1454,7 @@ export const OneVOneMode: ModeDefinition = (() => {
             ctx.setHud({ score: myScore, momentum, banner: andOne ? `${arcLabel} +${arcPoints} — ${andOne.banner}` : `${arcLabel} +${arcPoints}${rimPlaySuffix(arc.play)}` });   // HOOPS-MOVE-KIT-A M2: fouled on the finish; RIM PLAY: "— RATTLES IN"
             if (andOne) { finishFoul = false; SoundKit.play('crowdCheer', { volume: 0.5 }); console.info(`[1V1-REF] ${andOne.id} → ${andOne.ball} (${andOne.shots} shot)`); }
             carrying = true;
+            if (makeBeatHoldsShot()) makeBeatToken = possessionToken;   // lane/improve-hoops-2 phase 4a: the make beat holds the shot until the check-up
             // THE MIC: the bucket as it drops — the and-one, the three, a finish at the rim, or the two (a hook or a fade is a two)
             const atRim = isFinishStyle(arc.shotStyle) && arc.shotStyle !== 'hook' && arc.shotStyle !== 'fadeaway';
             micBucket('us', andOne ? { moment: 'game.andone', priority: 2, crowd: { moment: 'crowd.erupt', n: 2 } }
@@ -2065,16 +2072,17 @@ export const OneVOneMode: ModeDefinition = (() => {
         // a squeeze made while the body is committed WAITS instead of vanishing
         shotBuffer.tick(!!(shooting || dunking || spin), performance.now());   // hoops-p01: the lock the buffered squeeze waits out
         shotBuffer.hold(carrying && meSlot.intent.actionHeld > 0.02, !!(shooting || dunking || spin), performance.now());   // hoops-gather: a press made DURING the lock (the one that started it is not buffered through its own pump)
+        if (spin && spinCutNow(spin.t, spin.plan.sec, shotBuffer.pending, spinClip.startsWith('bball_pivot'))) cutSpin();   // improve-hoops-2 4d (knob hoops.spinShotCutsHalf, off): from its half, the shot cuts the spin
         { // H2e (owner 2026-10-16): THE HOP STEP ON A DOUBLE TAP — a second Square inside HOP_TAP_SEC of the first, on a drive, turns the
           // gather that press started (or the pump its quick release made) into the hop step (core/FinishFootwork)
           const held = meSlot.intent.actionHeld > 0.02, edge = held && !squeezeHeldWas; squeezeHeldWas = held;
-          if (edge && carrying && !dunking && !posting && hopOnDoubleTap(tapRead())) {
+          if (edge && carrying && !dunking && !posting && makeBeatToken !== possessionToken && hopOnDoubleTap(tapRead())) {
             if (finish) { finish = null; contact?.setAirborne('me', false); me.root.position.y = 0; }
             gather = null; shooting = false; tapRelease = null;   // the held release is the hop's now: the second press is its meter
             if (startFootwork(ctx, mx, my, foeFloored ? null : foe.root.position, { hopVel: squeezeVel.clone() })) { squeezeAt = -1; hopRelease = 'armed'; console.info('[1V1-MOVE] hop step on the double tap'); }
           }
         }
-        if (!shooting && !dunking && !spin && carrying && (meSlot.intent.actionHeld > 0.02 || shotBuffer.consume() || (posting && stickShot !== null && !stickShot.started && shimmyLeft <= 0)) && !dunkGather) {   // POST HOOK (2K20): the stick starts it too
+        if (!shooting && !dunking && !spin && carrying && (meSlot.intent.actionHeld > 0.02 || shotBuffer.consume() || (posting && stickShot !== null && !stickShot.started && shimmyLeft <= 0)) && !dunkGather && makeBeatToken !== possessionToken) {   // POST HOOK (2K20): the stick starts it too   // (phase 4a: never in the make beat)
           const defenderPos = foeStunSec > 0 ? null : foe.root.position;
           squeezeAt = performance.now() / 1000; squeezeVel.copyFrom(meDribble.vel); tapRelease = null; hopRelease = null;   // H2e: the double tap reads this press
           // A+ P0: the gate measures a 3-D distance and the rim sits 3.05 m up — against RIM itself a floor-bound body can
@@ -3416,6 +3424,17 @@ export const OneVOneMode: ModeDefinition = (() => {
     if (pivotRead) bannerFlash(ctx, pivotRead.reverse ? 'REVERSE PIVOT' : 'PIVOT', 400);
     console.info(`[1V1-MOVE] ${pivotRead ? (pivotRead.reverse ? 'reverse pivot' : 'front pivot') : 'spin'} ${plan.side} yaw ${plan.yaw0.toFixed(2)} sweep ${(plan.sweep * 180 / Math.PI).toFixed(0)}°`);
   }
+  /** lane/improve-hoops-2 phase 4d (hoops/oneRule spinShotCutsHalf): a shot pressed in the spin's second half ends it where the body is —
+   *  facing as it faces now, the exit's speed handed back as at the spin's own end — so the shot starts this frame. */
+  function cutSpin(): void {
+    if (!spin) return;
+    const yaw = spinYaw(spin.plan, Math.min(spin.t, spin.plan.sec));
+    face(me.root, yaw); meDribble.setFacing(yaw);
+    meDribble.vel.copyFrom(spin.plan.exit.scale(SPIN_EXIT_SPEED));
+    console.info(`[1V1-MOVE] spin cut by the shot at ${(spin.t / spin.plan.sec).toFixed(2)}`);
+    spin = null;
+    meAnimTree.release();
+  }
   function stepSpin(ctx: ModeContext, dt: number): void {
     if (!spin) return;
     spin.t += dt;
@@ -3885,6 +3904,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     board.age += dt;
     // hoops-play: THE RIVAL GOES AND GETS IT (hoops/boardChase; 3v3's rule) — his chase outranks his seal; null when the knob is off
     foeBrain?.chaseBall(rivalChaseTarget(true, !foeFloored && foeStunSec <= 0, ballSim.pos));
+    { const n0 = chaseAround.count; const w = chaseAround.next(dt, board.age, !!foeBrain?.chasing, foe.root.position, ballSim.pos, me.root.position); if (w) foeBrain?.chaseBall(new Vector3(w.x, 0, w.z)); if (chaseAround.count !== n0) console.info(`[1V1-BOARD] chase steps round a body (${chaseAround.count})`); }   // improve-hoops-2 4b (knob hoops.rivalChaseAroundBody): a body across his line, stepped round
     const bodies = reboundBodies();
 
     // the ball off a chest — a tip is a real event and the crowd should hear it

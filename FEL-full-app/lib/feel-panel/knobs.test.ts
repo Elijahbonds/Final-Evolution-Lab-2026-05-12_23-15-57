@@ -6,6 +6,9 @@ import { FEEL_KNOBS, FEEL_KNOB_BY_ID, clampKnob, stepDecimals } from './knobs';
 import * as HSFX from '@/lib/babylon/audio/hoopsSfx';   // hoops-items
 import { POSE_CLIP_FAST, POSE_CLIP_SHARE } from '@/lib/babylon/anim/poseClip';   // improve-hoops-2
 import { ONLOOKER_CLIPS_ONLY } from '@/lib/babylon/visual/onlookerClips';
+import { MAKE_BEAT_HOLDS_SHOT, SPIN_SHOT_CUTS_HALF } from '@/lib/babylon/hoops/oneRule';
+import { RIVAL_CHASE_AROUND_BODY } from '@/lib/babylon/hoops/boardChase';
+import { DRIVE_BY_HAND_ON } from '@/lib/babylon/hoops/steals';
 import { AI_HAND_RANGE_M, AI_HAND_DWELL_SEC, AI_HAND_GAP_SEC } from '@/lib/babylon/core/AiBallHand';
 import { HAND_CLEAR_M } from '@/lib/babylon/anim/Dribble';
 import { DIST_GREEN_NEAR_M, DIST_GREEN_FAR_M, DIST_GREEN_MAX_NARROW } from '@/lib/babylon/core/ShotWindow';
@@ -445,6 +448,10 @@ describe('the feel knob catalogue', () => {
     expect(def('perf.poseClipFast')).toBe(POSE_CLIP_FAST); expect(POSE_CLIP_FAST).toBe(0);
     expect(def('perf.poseClipShare')).toBe(POSE_CLIP_SHARE); expect(POSE_CLIP_SHARE).toBe(0);
     expect(def('perf.onlookerClipsOnly')).toBe(ONLOOKER_CLIPS_ONLY); expect(ONLOOKER_CLIPS_ONLY).toBe(0);
+    expect(def('hoops.makeBeatHoldsShot')).toBe(MAKE_BEAT_HOLDS_SHOT); expect(def('hoops.spinShotCutsHalf')).toBe(SPIN_SHOT_CUTS_HALF);
+    expect(def('hoops.rivalChaseAroundBody')).toBe(RIVAL_CHASE_AROUND_BODY); expect(def('hoops.driveByHandOn')).toBe(DRIVE_BY_HAND_ON);
+    expect(SPIN_SHOT_CUTS_HALF).toBe(0); expect(DRIVE_BY_HAND_ON).toBe(0);   // the owner's feel calls ship OFF
+    expect(MAKE_BEAT_HOLDS_SHOT).toBe(1); expect(RIVAL_CHASE_AROUND_BODY).toBe(0);   // 4a ON on its bar; 4b OFF (its stalls did not reach 0)
   });
 
   it('every row is well formed: unique `<area>.<camelName>` id, min ≤ default ≤ max, the default on the step grid, a source', () => {

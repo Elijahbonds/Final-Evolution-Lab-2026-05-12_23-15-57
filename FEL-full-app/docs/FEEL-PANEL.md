@@ -1232,3 +1232,24 @@ Measured (the gameplay-clean rig page, phone tier 390 × 844, DPR 3, CPU ×4, Sw
 Shipped OFF because the plan's bar is "READY down ≥ 30 % in 1v1 and 3v3, the first-4-s worst frame not worse": 3v3 clears it, 1v1 misses
 by 2 points and the worst-frame reads are too noisy on this rig to call. *Recommend:* turn `perf.poseClipFast` and `perf.onlookerClipsOnly`
 on (nothing you see or feel changes; the bodies just build faster), after a phone check of the load with the PERF readout.
+
+### Phase 4: hoops rules, one way in both modes (group "Hoops · rules")
+
+Measured on the hoops-gap rig (`scripts/probes/improve-hoops/phase4-set.sh`: the real 1v1, the rig's bot at both ends, 50 s of play,
+seeds 7, 11, 23, 31 and 47 a side; `makebeat.mjs`, `hoops-play/flow.mjs`, `hoops-play/events.mjs` read the logs).
+
+- `hoops.makeBeatHoldsShot` **1** (`hoops/oneRule.ts` `MAKE_BEAT_HOLDS_SHOT`): **no shot starts in the 0.7 s after your 1v1 make** (the
+  ball is yours under the rim until the check-up, and a shot there went up and could not count). A press then waits for the check.
+  Shots started inside the make beat: **10 of 15 makes → 0 of 13**. My shots 34 → 23 and makes 19 → 13 over the five runs are those
+  ghosts gone (each was a logged gather and release); the rival's shots 16 → 13, steals and fouls within the seeds' spread.
+  Feel-check: score in 1v1 and mash Square straight after.
+- `hoops.rivalChaseAroundBody` **0** (`hoops/boardChase.ts` `RIVAL_CHASE_AROUND_BODY`): when a body stands in the 1v1 rival's line to a
+  loose ball and he makes no ground for 0.5 s (`CHASE_STALL_SEC`, new), he steps round it (a waypoint 1.6 m off its shoulder, held up to
+  1 s; all new numbers). It stepped round 6 times in the five ON runs; boards that stalled to the 4 s guard 3 of 16 → 2 of 21. Shipped OFF
+  because the bar was 0: the stalls left were not this case (the rival 8–11 m from the ball, the same frame with the switch off).
+- `hoops.driveByHandOn` **0** (`hoops/steals.ts` `DRIVE_BY_HAND_ON`): **your feel call.** 1 = the 3v3 drive-by steal (running past the
+  driver with a poke) also needs the poke's hand on the ball (`aiStripLands`: the reach, his body not between, the ball off the floor);
+  one that fails it is an ordinary poke.
+- `hoops.spinShotCutsHalf` **0** (`hoops/oneRule.ts` `SPIN_SHOT_CUTS_HALF`): **your feel call.** 1 = one rule in 1v1 and 3v3 for a shot
+  pressed during a spin: before its half the press waits for the half; from the half on the shot cuts the spin where the body faces
+  (`SPIN_CUT_AT` 0.5, new). 0 = the press waits out the whole spin, as now.
