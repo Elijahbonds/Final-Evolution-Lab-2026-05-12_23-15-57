@@ -41,7 +41,7 @@ import { HoopSensor } from '../arena/hoopSensor';
 import { dunkPush, LAYUP_ARC_DEG, releaseShot } from '../arena/arenaShot';
 import { passVelocity, seeded } from '../arena/shotModel';
 import { chestPoint, dribbleCatch, dribbleCommit, dribbleHand, dribblePush, setPoint } from '../arena/dribble';
-import { aimAssist, dunkJumpVy, dunksOn, floorBounce, jumpVy, povBobM, povEyeM, povFovDeg, povLookDegS, povOn } from '../arena/arenaConfig';
+import { aimAssist, dunkJumpVy, dunksOn, floorBounce, jumpVy, povBobM, povEyeM, povFovDeg, povLookDegS, povOn, stepHz } from '../arena/arenaConfig';
 import { aimYawErr, applyPov, fovForAspect, povLook, povPose, type PovView } from '../arena/povCamera';
 
 export const ARENA_MODE_ID = 'physics_arena';
@@ -359,7 +359,9 @@ function beforeStep(ctx: ModeContext, S: St, h: number): void {
     const a = athlete(S, S.handler);
     const hand = dribbleHand(p3(a.node.position), a.yaw, S.dribble.side);
     const bp = ball.pos, bv = ball.vel(TMP2);
-    const changing = dribbleCommit(a.committed, a.wish).changing;
+    // a change waiting (the stick), or the body knocked off the run it committed to (a collision): the hand takes the ball where it can
+    const bvNow = a.body.vel(TMP);
+    const changing = dribbleCommit(a.committed, a.wish).changing || dribbleCommit(a.committed, { x: bvNow.x, z: bvNow.z }).changing;
     if (S.t > S.dribble.pushedAt + 0.1 && dribbleCatch(p3(bp), p3(bv), p3(a.node.position), hand, changing)) push(S, a);
     else if (S.t > S.dribble.due + 0.45 || flatDist(bp, a.node.position) > 1.6) {
       S.stats.lostHandles++;
@@ -724,13 +726,17 @@ export const PhysicsArenaMode: ModeDefinition = {
   update(ctx: ModeContext, dt: number) {
     const S = states.get(ctx.scene);
     if (!S || S.disposed) return;
-    S.t += dt;
-    S.world.step(dt, (h) => beforeStep(ctx, S, h), (h) => afterStep(S, h));
+    // THE GAME RUNS ON THE PHYSICS CLOCK: a slow frame that the step cap cuts short (ARENA_MAX_STEPS) slows the whole game the same,
+    // so a release timed on the jump is timed on the jump the body actually made (measured in the browser rig: on frame time the
+    // scripted top-of-the-jump release read 216-283 ms early on a slow frame)
+    S.world.step(dt, (h) => { S.t = S.world.time; beforeStep(ctx, S, h); }, (h) => afterStep(S, h));
+    const simDt = S.world.stats.steps / stepHz();
+    S.t = S.world.time;
     S.stats.frames++; S.stats.physMsSum += S.world.stats.ms; S.stats.physMsMax = Math.max(S.stats.physMsMax, S.world.stats.ms);
     // the phone rig's read (scripts/probes/hoops-gap/perf.mjs `extra.physMs`): the physics steps' own time a frame, probes only
     if (S.seamOn) (window as unknown as { __physMs?: number }).__physMs = S.stats.physMsSum / S.stats.frames;
-    shotsAndJumps(S, dt);
-    frameRules(ctx, S, dt);
+    shotsAndJumps(S, simDt);
+    frameRules(ctx, S, simDt);
     facing(ctx, S, dt);
     camera(ctx, S, dt);
     hud(ctx, S, dt);

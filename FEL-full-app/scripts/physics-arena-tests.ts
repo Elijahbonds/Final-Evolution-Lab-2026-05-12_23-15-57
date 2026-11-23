@@ -223,7 +223,7 @@ async function liveLoop(B: typeof import('@babylonjs/core')) {
       // me: with the ball and live, shoot about 1 s after the catch, letting go about at the top of the jump (0.47 s after the press)
       const meAt = scene.getTransformNodeByName('arena_me_body')!.position;
       const fromRim = Math.hypot(meAt.x, meAt.z + 0.6);
-      if (hud.arenaPoss === 'me' && hud.arenaPhase === 'live' && xDownAt < 0 && f % 90 === 0 && fromRim > 2.5) { PhysicsArenaMode.onInput(ctx, { t: 'button', btn: 'X', pressed: true }); xDownAt = t; }
+      if (hud.arenaPoss === 'me' && hud.arenaPhase === 'live' && xDownAt < 0 && f % 90 === 0 && fromRim > 2.5 && fromRim < 5.5) { PhysicsArenaMode.onInput(ctx, { t: 'button', btn: 'X', pressed: true }); xDownAt = t; }
       if (xDownAt >= 0 && t - xDownAt > 0.46) { PhysicsArenaMode.onInput(ctx, { t: 'button', btn: 'X', pressed: false }); xDownAt = -1; }
       // off the ball: go to it (a loose ball, his dribble), reach for it now and then
       const meNode = scene.getTransformNodeByName('arena_me_body')!;
@@ -235,7 +235,9 @@ async function liveLoop(B: typeof import('@babylonjs/core')) {
         const dx = goal.x - meNode.position.x, dz = goal.z - meNode.position.z, d = Math.hypot(dx, dz);
         const mine = hud.arenaPoss === 'me' && d < 0.9;
         // with it under the ring: dribble out to the elbow first (nobody shoots from under the iron)
-        const out = mine && fromRim < 3.2 ? { x: meAt.x / (fromRim || 1), z: (meAt.z + 0.6) / (fromRim || 1) } : null;
+        // …and from past the arc, in to a jump shot's range (5.5 m)
+        const out = mine && fromRim < 3.2 ? { x: meAt.x / (fromRim || 1), z: (meAt.z + 0.6) / (fromRim || 1) }
+          : mine && fromRim > 5.0 ? { x: -meAt.x / fromRim, z: -(meAt.z + 0.6) / fromRim } : null;
         const sx = out ? out.x : mine || d < 0.3 ? 0 : dx / d, sz = out ? out.z : mine || d < 0.3 ? 0 : dz / d;
         PhysicsArenaMode.onInput(ctx, { t: 'stick', side: 'L', x: sx, y: -sz });
 

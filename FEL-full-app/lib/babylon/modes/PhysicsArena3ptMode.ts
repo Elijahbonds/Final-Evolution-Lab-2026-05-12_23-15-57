@@ -29,7 +29,7 @@ import { HoopSensor } from '../arena/hoopSensor';
 import { releaseShot } from '../arena/arenaShot';
 import { seeded } from '../arena/shotModel';
 import { chestPoint, setPoint } from '../arena/dribble';
-import { aimAssist, jumpVy, povBobM, povEyeM, povFovDeg, povLookDegS, povOn } from '../arena/arenaConfig';
+import { aimAssist, jumpVy, povBobM, povEyeM, povFovDeg, povLookDegS, povOn, stepHz } from '../arena/arenaConfig';
 import { aimYawErr, applyPov, fovForAspect, povLook, povPose, type PovView } from '../arena/povCamera';
 
 export const ARENA_3PT_MODE_ID = 'physics_arena_3pt';
@@ -265,7 +265,6 @@ export const PhysicsArena3ptMode: ModeDefinition = {
   update(ctx: ModeContext, dt: number) {
     const S = states.get(ctx.scene);
     if (!S || S.disposed) return;
-    S.t += dt;
     S.world.step(dt, (h) => {
       if (S.body.grounded) S.body.drive(0, 0, h);
       if (S.inHand >= 0) S.pool[S.inHand].ball.hold(S.shot?.jumped || (S.shot && S.shot.t > 0.05) ? setPoint(p3(S.node.position), S.yaw) : chestPoint(p3(S.node.position), S.yaw));
@@ -281,9 +280,12 @@ export const PhysicsArena3ptMode: ModeDefinition = {
         pb.prev = now;
       }
     });
+    // the game on the physics clock (as the 1v1: a frame the step cap cut short slows the game, not the jump against the timing)
+    const simDt = S.world.stats.steps / stepHz();
+    S.t = S.world.time;
     // the jump shot
     if (S.shot) {
-      S.shot.t += dt;
+      S.shot.t += simDt;
       if (!S.shot.jumped && S.shot.t >= GATHER_SEC) { S.body.jump(jumpVy()); S.shot.jumped = true; S.shot.t = 0; }
       if (S.shot?.jumped) {
         const sinceTop = S.shot.t - jumpVy() / G;
@@ -293,16 +295,16 @@ export const PhysicsArena3ptMode: ModeDefinition = {
       }
     }
     // to the next rack
-    if (S.moveT > 0) { S.moveT -= dt; if (S.moveT <= 0 && S.body.grounded) toRack(S, S.rack + 1); else if (S.moveT <= 0) S.moveT = 0.05; }
+    if (S.moveT > 0) { S.moveT -= simDt; if (S.moveT <= 0 && S.body.grounded) toRack(S, S.rack + 1); else if (S.moveT <= 0) S.moveT = 0.05; }
     // the clock and the end
     if (S.started && !S.done) {
-      S.clock = Math.max(0, S.clock - dt);
+      S.clock = Math.max(0, S.clock - simDt);
       if (S.clock <= 0 || (S.shots >= RACKS.length * BALLS_PER_RACK && S.pool.every((pb) => !pb.live || pb.ball.pos.y < 0.5))) {
         S.done = true; S.doneT = 0;
         say(S, `Final: ${S.score} (${S.makes} of ${S.shots})`, 4);
       }
     }
-    if (S.done) { S.doneT += dt; if (S.doneT > 4.5) reset(S); }
+    if (S.done) { S.doneT += simDt; if (S.doneT > 4.5) reset(S); }
     for (const pb of S.pool) if (pb.live && pb.ball.pos.y < 0.2 && pb.ball.vel(TMP).length() < 0.3) pb.live = false;
     // the body drawn
     S.yaw = S.pov.on ? S.pov.view.yaw : S.yaw;
