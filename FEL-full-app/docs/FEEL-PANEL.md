@@ -1223,3 +1223,13 @@ this pass exactly (a test pins both ends).
   sand step; the dock's and bridge's boards 1.45 / 0.15; the shallows a splash). 0 = no bed asked for: the stadium crowd, as before.
   Measured (same runs): the bed built 900 Hz (the stadium crowd) in 3 of 3 → 500 Hz (the ocean) in 3 of 3; Venice unchanged (500 Hz both
   sides). Ships ON.
+- `story.worldDressed` **0** (group "Story · flow"; `lib/babylon/adventure/world/dress.ts` `STORY_WORLD_DRESSED`, phase 7, NEW, **ships
+  OFF**): Chapter 1's hub and World 1 dressed, view only (no piece's collision, size or place changes): the shipped procedural ground
+  textures on the tops (grass in World 1, paving in the hub) in world metres, stone on the cliffs, blocks and walls, a lip band on every
+  edge, coping caps on the blocks, posts under the rails, and the shipped Kenney nature kit (grass, bushes, small rocks along the lanes;
+  trees only in the wide places' outer margins) kept clear of spawns, gates, camps, rails and the run-wall (a test holds every prop to
+  it), loaded after the first played second. New [TUNE] numbers: `CLEAR` (prop margins), `POST_EVERY` 6 m, `DRESS_ANISO` 1, the tiles
+  (grass 4 m, paving 6 m, stone 5 m). Measured (lane C rig, phone tier, 3 runs a side, twice): load hub +1 % / +10 %, World 1 +8 % /
+  +18 %; World 1's frame p95 in play 250 → 317 ms, and after the cut (filtering 8 → 1, frozen matte materials, props without shadow
+  lookups) 150 → 217 ms in 2 of 3 runs. No measured win, so it ships at 0 (the plain colours, exactly as before). Feel-check: set it to 1
+  and play the rail run on a real phone with the PERF readout; the look is the owner's call.

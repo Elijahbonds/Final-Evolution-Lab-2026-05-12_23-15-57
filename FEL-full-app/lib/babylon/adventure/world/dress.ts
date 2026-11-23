@@ -27,8 +27,12 @@ import { buildRailPath } from '../rails/railMath';
 import { groundYOf, type GroundPiece } from './pieces';
 import type { StoryWorldSpec } from './story/spec';
 
-/** story.worldDressed: 1 = textures, trims and the nature kit; 0 = the plain colours (before this pass). */
-export const STORY_WORLD_DRESSED = 1;
+/** story.worldDressed: 1 = textures, trims and the nature kit; 0 = the plain colours (before this pass).
+ *  SHIPS OFF (lane C, 2026-11-23): no measured win on the phone rig, 3 runs a side, twice. Load: hub 15.3 → 15.5 s and World 1
+ *  14.3 → 15.4 s in the first run, 14.6 → 16.1 s and 14.2 → 16.7 s (+10 %, +18 %) in the second; World 1's frame p95 in play
+ *  250 → 317 ms, then (texture filtering 8 → 1, frozen matte materials, no shadow lookups on the props) 150 → 217 ms in 2 of 3 runs.
+ *  The look is the owner's: switch it on in the feel panel and judge it on a real phone, where texture sampling is cheap. */
+export const STORY_WORLD_DRESSED = 0;
 
 // ── the plan (pure) ─────────────────────────────────────────────────────────────────────────────────────────────────────
 

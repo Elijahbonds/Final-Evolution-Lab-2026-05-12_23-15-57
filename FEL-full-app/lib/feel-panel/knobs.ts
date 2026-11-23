@@ -2350,9 +2350,9 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
   },
   // ── lane/improve-world (phase 7): Chapter 1 looks finished ──
   {
-    id: 'story.worldDressed', label: 'Story: textured ground and stone, edge trims, rail posts and the nature kit (1) / plain colour blocks (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Story · flow',
+    id: 'story.worldDressed', label: 'Story: textured ground and stone, edge trims, rail posts and the nature kit (1) / plain colour blocks (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Story · flow',
     source: 'lib/babylon/adventure/world/dress.ts STORY_WORLD_DRESSED',
-    hint: 'View only: no piece moves or changes size. The shipped ground textures on the tops, stone on the sides and blocks, a lip on each edge, a cap on each block, posts under the rails, and grass, bushes, rocks and trees from the shipped kit kept clear of where you play. 0 = the plain colours, as before.',
+    hint: 'View only: no piece moves or changes size. The shipped ground textures on the tops, stone on the sides and blocks, a lip on each edge, a cap on each block, posts under the rails, and grass, bushes, rocks and trees from the shipped kit kept clear of where you play. 0 = the plain colours, as before. Ships OFF: on the phone rig it loaded 10 to 18 percent slower and drew World 1 slower; judge it on a real phone.',
   },
   // ── lane/improve-world (phase 9): the zone cameras ──
   {
