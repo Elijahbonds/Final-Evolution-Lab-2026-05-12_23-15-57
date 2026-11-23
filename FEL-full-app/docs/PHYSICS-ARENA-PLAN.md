@@ -177,6 +177,47 @@ frame.
 
 ---
 
-## 7. Slice 1: measured
+## 7. Measured (lane/physics-arena, 2026-11-23)
 
-_(filled in by the lane's runs; see the commit and the closing report)_
+**Headless, the real Havok WASM** (`scripts/physics-arena-tests.ts`, a ci-suite; 21 checks, all green):
+
+| What | Bar | Measured |
+|---|---|---|
+| Ball bounce: dropped from 1.80 m (its bottom), its top comes back to | 1.20–1.40 m (rule book) | 1.32 m |
+| Same inputs, same world (ten shots, two fresh worlds) | bit for bit | bit for bit |
+| 1v1 spots (2.5–7 m, corner to corner, 3 seeds × 20): good release (within 25 ms of the top of the jump) | ≥ 55 % | 48/60 = **80 %** |
+| … bad release (100–160 ms early or late) | ≤ 25 % | 4/60 = **7 %** |
+| The basket sensor read at 60 Hz against an independent label from the whole path | ≥ 98 % | **120/120** (and per step 120/120) |
+| Tunnelling: 60 throws at the glass up to 30 m/s | 0 through | **0** |
+| … 80 throws at the iron up to 25 m/s, deepest overlap | ≤ 3 cm | **0.2 cm** |
+| … a 30 m/s slam into the floor; a 25 m/s ball at a body's chest | never in | lowest centre 0.120 m (= the radius); overlap 0.0 cm, and it came back off |
+| The live mode's own loop, 3 minutes (rival vs a scripted player) | runs; check → live → scored; both score | yes; rival 16/31 |
+| 3-point racks (7.05–7.15 m, 3 seeds × 20): good / bad | ≥ 50 % / ≤ 20 % | **40/60 = 67 %** / **4/60 = 7 %** |
+| A whole 3-point contest headless (perfect timing) | finishes, some in, some out | 18 of 25, 22 points |
+| Dunks, 7 approach angles: jammed over the ring / let go 0.2 s after the press | ≥ 5 / ≤ 2 | **7/7** / **0/7** |
+
+Mutation checks: `arena.bodyCarry` 0 → good 100 % / bad 90 % (the timing check fails, as it must); a sensor loosened by 15 cm fails
+its unit test.
+
+**In the live page** (`scripts/probes/physics-arena/inmode.mjs`: the real harness, scripted releases through the probe seam, the
+rival kept still, waits on the game's clock), 3 runs × 4 shots a side: good release **4/4, 2/4, 2/4 = 8/12**; bad release **0/4,
+0/4, 0/4 = 0/12**. (The first browser run found the game timers on frame time while the physics is capped at 4 steps a frame: on a
+slow frame the "top of the jump" release read 216–283 ms early. Fixed: everything runs on the physics clock. The runs above are after
+the fix.)
+
+**The phone rig** (`scripts/probes/hoops-gap/perf.mjs`: 390×844, DPR 3, 4× CPU throttle, SwiftShader, the same scripted stick and
+button for both, 10 s of play; 3 runs each, interleaved):
+
+| | First playable frame (load) | Frame p50 | Frame p95 | Update p50 (game + physics) | Draws |
+|---|---|---|---|---|---|
+| **Physics Arena 1v1** | 28.1 / 33.6 / 26.9 s | 19.5 / 18.0 / 19.5 ms | 43.7 / 41.1 / 44.5 ms | 2.9 / 3.0 / 3.0 ms | 73 |
+| Shipped 1v1 (control) | 53.6 / 55.0 / 48.7 s | 40.9 / 42.3 / 43.4 ms | 115.1 / 85.6 / 101.6 ms | 3.1 / 3.3 / 3.2 ms | 87 |
+
+Read it honestly: the arena's court is far lighter than the shipped 1v1's venue (no crowd, no venue models), so most of the frame and
+load difference is the scene, not the physics. The like-for-like number is the update (the game's logic plus, in the arena, two Havok
+steps a frame): **3.0 ms against 3.2 ms** — the physics costs no more than the shipped 1v1's own logic. The physics step's own time
+cannot be read on this rig (its virtual clock stands still inside a frame); headless in node it is 0.05 ms a frame on average.
+Not measured: a real phone.
+
+**The look:** `arena-contact-sheet.jpg` (the lane's scratch folder): the court camera and POV, desktop and an upright phone, the 1v1
+and the 3-point contest.
