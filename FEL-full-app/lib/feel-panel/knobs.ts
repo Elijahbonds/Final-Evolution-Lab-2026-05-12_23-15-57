@@ -1393,6 +1393,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/hoops/teamOffense3v3.ts AI_SHOT_IQ_ON',
     hint: '1: held in front, the 3v3 handler swings it to a man his defender must close out on, else steps back once for room, then pulls up; at the rim with a body in his face he kicks to the open man. 0: as before.',
   },
+  {
+    id: 'hoops.pnrCoverageOn', label: 'Defence: pick-and-roll coverage, over a shooter, under one far out (0 = off)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · defense',
+    source: 'lib/babylon/hoops/pnrCoverage.ts PNR_COVERAGE_ON',
+    hint: '1: the man on the ball plays the screen (over inside 7.5 m, under past it), the screener\'s man shows or drops, a free roll man is tagged, and the switch comes only when beaten. 0: as before.',
+  },
   // hoops-p04 (1v1/3v3 phase 4 "feet and transitions"): one blend + minimum-hold rule (anim/hoopsTransitions), the shot clips on their
   // release (hoops/releaseTiming). Every default is this lane's; the owner has felt none of them.
   {

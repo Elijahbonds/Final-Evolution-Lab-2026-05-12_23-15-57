@@ -35,6 +35,7 @@ import { BallSideShade } from './BallSideShade';   // hoops-defense-fx (owner 20
 import { aiPokes } from './ReachTell';   // lane/hoops-def-tell (#273 T-A): the poke is a per-second rate aimed at the led ball
 import { gatherCloseoutOn, gatherCloseoutM } from '../hoops/rulebook';   // hoops-p09: the closeout on a jump-shot gather
 import { cushionLever } from '../hoops/pressure';   // hoops-p02 (1v1/3v3 phase 2): the on-ball man's cushion on a moving handler
+import { pnrCoverageOn, coverageFor, onBallScreener, markIsScreening, showSpot, rollerToTag, PNR_SHOW_SEC, PNR_UNDER_LEVER, PNR_DROP_LEVER, PNR_TAG_LEVER, PNR_SPOT_DEAD_M, type PnrCoverage } from '../hoops/pnrCoverage';   // hoops-gap: the pick-and-roll coverage
 
 // ── Movement ─────────────────────────────────────────────────────────────
 export interface DribbleResult { crossover: boolean; hesitation: boolean; speed01: number; facingRad: number; planting: boolean; gear: Gear; intensity01: number; paceChange: boolean }
@@ -823,6 +824,10 @@ export class DefenderBrain implements AIBehavior {
   /** The job this frame, for the mode's stance / facing / probes. */
   job: DefenseJob = 'deny';
   private closingOut = false;   // DEFENSE-LOOK: the closeout is sticky until he is on the man
+  /** hoops-gap (hoops.pnrCoverageOn): the show's clock — the screener's man stays out this much longer after his man leaves the screen. */
+  private showT = 0;
+  /** hoops-gap: the coverage this frame for the mode's probes ('over' / 'under' on a screen, null off it), and whether he is tagging a roll. */
+  pnrCoverage: PnrCoverage | null = null; pnrTag = false;
   /** hoops-p09 (one rulebook): the shooter he guards is GATHERING for a jump shot and his reaction time has passed — step up and
    *  close out to hoops.gatherCloseoutM off him (the mode sets it, after the tier's reaction; hoops.gatherCloseoutOn 0 ignores it). */
   closeOnGather = false;
@@ -855,6 +860,8 @@ export class DefenderBrain implements AIBehavior {
     }
     // O1 NAVIGATE — a set attacker (not the handler) planted between me and where I am going: fight over or go under
     const foeSpeeds = foes.map((f, i) => this.prevFoes[i] && dt > 1e-4 ? distXZ(f, this.prevFoes[i]) / dt : 9);
+    const pnrOn = pnrCoverageOn();   // hoops-gap: the pick-and-roll coverage (hoops/pnrCoverage); off = the release exactly
+    const foeVel = pnrOn ? foes.map((f, i) => this.prevFoes[i] && dt > 1e-4 ? { x: (f.x - this.prevFoes[i].x) / dt, z: (f.z - this.prevFoes[i].z) / dt } : { x: 0, z: 0 }) : null;
     this.prevFoes = foes.map((f) => f.clone());
 
     // Two different speeds, two different jobs:
@@ -951,17 +958,45 @@ export class DefenderBrain implements AIBehavior {
     }
     if (!onBall) denyPoint = Vector3.Lerp(denyPoint, ball, 0.22);
     if (helping) denyPoint = Vector3.Lerp(hoop, ball, 0.2);   // the low man steps INTO the drive
+    // hoops-gap: THE PICK-AND-ROLL COVERAGE (hoops/pnrCoverage, `hoops.pnrCoverageOn`). On the ball: the man screening me is played (the
+    // navigate below takes him, over or under by the handler's range), and under, I sag a step. My man screening: over, I SHOW into the
+    // handler's corner (and PNR_SHOW_SEC after); under, I DROP between him and the rim. Off it: the low man TAGS a free roll man.
+    let pnrScreener = -1; let pnrHelp = false;
+    this.pnrCoverage = null; this.pnrTag = false;
+    if (pnrOn) {
+      if (onBall && handlerPos && this.markIndex !== null) {   // (a 1v1 brain has no mark: no screens there)
+        pnrScreener = onBallScreener(self, ball, this.markIndex, foes, foeSpeeds);
+        if (pnrScreener >= 0) {
+          this.pnrCoverage = coverageFor(distXZ(handlerPos, hoop));
+          if (this.pnrCoverage === 'under' && !beaten) denyPoint = Vector3.Lerp(handlerPos, hoop, Math.max(lever, PNR_UNDER_LEVER));
+        }
+      } else if (mark && !helping) {
+        const screening = markIsScreening(self, mark, foeSpeeds[this.markIndex!] ?? 9, ball, allies);
+        this.showT = screening ? PNR_SHOW_SEC : Math.max(0, this.showT - dt);
+        let hIdx = -1, hd = Infinity; foes.forEach((f, i) => { const d = distXZ(f, ball); if (d < hd) { hd = d; hIdx = i; } });
+        const handler = hIdx >= 0 && hd < hasBallM() ? foes[hIdx] : null;
+        if (this.showT > 0 && handler) {
+          this.pnrCoverage = coverageFor(distXZ(handler, hoop)); pnrHelp = true;
+          if (this.pnrCoverage === 'over') { const sp = showSpot(handler, mark, hoop); denyPoint = new Vector3(sp.x, 0, sp.z); }
+          else denyPoint = Vector3.Lerp(mark, hoop, PNR_DROP_LEVER);
+        } else {
+          const r = rollerToTag(self, this.markIndex, ball, hoop, allies, foes, foeVel!);
+          if (r >= 0) { denyPoint = Vector3.Lerp(foes[r], hoop, PNR_TAG_LEVER); pnrHelp = true; this.pnrTag = true; }
+        }
+      }
+    }
 
     const to = denyPoint.subtract(self);
     to.addInPlace(separation(self, allies, 2.0).scale(1.4));
     let fighting = false;
     for (let i = 0; i < foes.length; i++) {
-      if (foes[i] === mark || distXZ(foes[i], ball) < 1.2 || foeSpeeds[i] > 0.6) continue;   // the handler and moving bodies are not screens
+      if (foes[i] === mark || (distXZ(foes[i], ball) < 1.2 && i !== pnrScreener) || foeSpeeds[i] > 0.6) continue;   // the handler and moving bodies are not screens (hoops-gap: the man screening me on the ball is, with the coverage on)
       const nav = navigateAround(self, denyPoint, foes[i], ball, this.over);
-      if (nav) { if (this.navigating <= 0) this.over = this.rng() < 0.6; this.navigating = 0.5; to.addInPlace(nav.scale(1.6)); fighting = true; break; }
+      if (nav) { if (this.navigating <= 0) this.over = pnrOn ? coverageFor(distXZ(mark ?? ball, hoop)) === 'over' : this.rng() < 0.6;   // hoops-gap: the read, not the coin, with the coverage on
+        this.navigating = 0.5; to.addInPlace(nav.scale(1.6)); fighting = true; break; }
     }
     this.navigating = Math.max(0, this.navigating - dt);
-    this.job = fighting ? 'navigate' : helping ? 'help' : beaten ? 'recover' : closingOut || gatherClose ? 'closeout' : onBall ? 'onball' : 'deny';
+    this.job = fighting ? 'navigate' : helping || pnrHelp ? 'help' : beaten ? 'recover' : closingOut || gatherClose ? 'closeout' : onBall ? 'onball' : 'deny';
     this.objective = onBall ? (mark ?? ball) : ball;
     // PLANAR distance. Vector3.Distance includes Y, and the deny point's Y
     // is lerped toward the rim (y=3.05) while the defender's feet are at 0 —
@@ -974,7 +1009,7 @@ export class DefenderBrain implements AIBehavior {
     // approach 0.6m short of the press point, which parked the defender at
     // ~1.4m — just OUTSIDE poke range (1.1m). Pressure without arrival is a
     // statue with intent. Measured live: never stripped, never stole.
-    const out = steer(to, (dist > 3 || beaten || closingOut || gatherClose) && !fighting, gatherClose ? 0.12 : press ? 0.2 : onBall ? 0.6 : 1.4,
+    const out = steer(to, (dist > 3 || beaten || closingOut || gatherClose || (pnrHelp && dist > 1.5)) && !fighting, gatherClose ? 0.12 : press ? 0.2 : onBall ? 0.6 : pnrHelp ? PNR_SPOT_DEAD_M : 1.4,
       onBall && aiPokes(this.rng, this.aggression, dt, dist, ball, { x: hvx, z: hvz }, self));   // #273: core/ReachTell (the old `dist < 1.1 && rng() < aggression × 0.02` is its A/B off)
     if (fighting && this.over) { out.moveX *= 0.7; out.moveY *= 0.7; }   // fighting OVER the screen costs speed (FIGHT_SLOW)
     return out;

@@ -128,7 +128,7 @@ number the owner has felt and signed off.
    an art job (GATE 0), then the tree. Two cheaper fixes were tried here and failed (§5.2).
 2. **The rival team plays isolation** (§2.5): 3v3 on defence is where a player meets the AI most; smothered pull-ups and no ball
    movement read as a weak, predictable opponent. **Built: shot IQ** (§5.1).
-3. **No pick-and-roll coverage on the ball** (§2.4): M, next.
+3. **No pick-and-roll coverage on the ball** (§2.4): M. Built OFF (§5.3); measured not yet better than today's switch-everything.
 4. **Passing is chosen for you** (§2.5): M, needs a button-map call and a hook in lane B's 3v3 file.
 5. **The crossover step's pops** (§2.7): M, clip work (GATE 0).
 6. **Sound on contact** (§2.8): S.
@@ -189,6 +189,45 @@ What the skate needs: clips that step at the speeds the bodies move (the owner's
 already approved on 2026-11-12) — a slide pair captured or authored at 2.4–3.0 m/s both ways, and a turn-and-run for the beaten
 diagonal (the body turned to the travel, the head on the man), which also needs the mode's facing (lane B's files).
 
+### 5.3 Pick-and-roll defence — `hoops.pnrCoverageOn` (built, ships OFF; the coordinator's brief, 2026-11-23)
+
+**What it does** (`hoops/pnrCoverage.ts`, wired in `core/BasketballCore.ts` DefenderBrain and `hoops/teamDefense.ts`; 3v3 only — a 1v1
+brain has no mark and no screens): the man on the ball plays the screen — over the top on a handler inside `PNR_OVER_MAX_M` 7.5 m of the
+rim, under past it (and a step deeper); the screener's man SHOWS into the corner the handler has to turn (over) or DROPS between his man
+and the rim (under); the low man (the off-ball defender nearest the rim) tags a free roll man diving at the rim; the team defence
+switches only when the screened man is beaten (the handler nearer the rim than him, or 1.9 m off him). Away from the ball the same read
+replaces the 60 / 40 coin. Off is today exactly (`pnrCoverage.brain.test` pins the brain's steer frame for frame with the knob off).
+
+**Measured** (`scripts/probes/hoops-close/pnr-sim.mts`: three AI defenders — DefenderBrain on AiMovers, re-marked by the team defence —
+against the real 3v3 team offence, PRO, 300 possessions × seeds 7 / 11 / 23; a pick-and-roll possession is one where a screen was set):
+
+| | today's coverage (control) | the coverage on |
+|---|---|---|
+| pick-and-roll possessions (of 300) | 204 / 212 / 215 | 173 / 171 / 170 |
+| **points a pick-and-roll possession** | **0.597 / 0.604 / 0.579** | **0.655 / 0.635 / 0.592** |
+| points a possession (all) | 0.587 / 0.597 / 0.602 | 0.641 / 0.684 / 0.638 |
+| the handler's contest at his release (median) | 0.84 / 0.84 / 0.84 | 0.83 / 0.82 / 0.84 |
+| **the roll man gets an open look** (rolling, inside 5 m, nobody within 2.2 m for 0.2 s) | **0 %** | **0 %** |
+| the roll man gets the ball | 0 % | 0 % |
+| switches a pick-and-roll | 0.26 / 0.28 / 0.25 | 0.36 / 0.32 / 0.31 |
+| tags a pick-and-roll | 0 | 0.29 / 0.35 / 0.28 |
+
+**Read.** The coverage makes this AI defence a little WORSE, not better: 0.593 → 0.627 points a pick-and-roll possession on average, and
+0.595 → 0.654 overall. Today's rule — switch whenever the screener's man is nearer the handler — keeps a body in front of the ball; going
+over or under means the screened man fights the screen (at 70 % pace) and is beaten more often, so the "switch when beaten" fires later
+and more (0.26 → 0.33). A variant without the show (the screener's man always drops) measured the same (0.640 / 0.621 / 0.665). The coverage
+reads work as written (the unit tests: over at 6.6 m, under at 9.2 m, the show and the drop steps, the tag, the switch only when beaten),
+but every screen in these runs was set inside 7.5 m, so "under" was never played in the sim.
+**Two findings for the next step:** (1) **the roll almost never happens** — against today's coverage the screener rolled once in 631 screens (67 frames of rolling); with
+the show on, a handful of times (629 frames over 514 screens — the showing man leaves the lane), and the roll man was never open either
+way, because the low man was there. He pops otherwise: his roll lane is "open" only when no defender is within 1.6 m of the line to the
+rim (`core/HoopsOffball.ts` `rollLaneOpen`), and the low man at the rim nearly always is. So there is almost no roller to help: the tag
+mostly fires on cutters. A real
+pick-and-roll needs the screener to roll past his own man when that man steps up to the ball — an offence change, its own knob.
+(2) the switch-everything defence is the strongest coverage in this sim; a coverage that beats it needs the on-ball man to get over the
+screen without losing a step (a shorter fight-over cost, or the screener's man holding the handler with the show until he recovers).
+**Verdict: ships OFF**, as asked, for the owner to feel; the numbers say it is not yet an improvement for the AI's defence.
+
 ## 6. Waiting on the owner (recommendation first; each is reversible)
 
 1. **Feel `hoops.aiShotIqOn` in 3v3 PRO on defence.** *Recommend:* turn it on if the rivals feel smarter and not unfair; the rig check
@@ -197,8 +236,8 @@ diagonal (the body turned to the travel, the head on the man), which also needs 
    one source) and a turn-and-run, as an art job after the current kit work; GATE 0 before and after.
 3. **Passing control:** *recommend* a held pass = lob, a double-tap = bounce, a plain tap = today's auto pick. A button-map call; it needs a
    hook in `ThreeVThreeMode.ts` (lane B's file while it runs).
-4. **The pick-and-roll coverage:** *recommend* building it next (over the top on a shooter inside ~7.5 m, under one past it, a switch when
-   beaten), shipped OFF for a feel test — it makes the AI harder to beat off a screen.
+4. **The pick-and-roll coverage** (built OFF, §5.3): *recommend* leaving it off — measured, today's switch-everything defends the screen
+   better. Next, the screener's roll (it never rolls today), then a fight-over that does not lose a step; then re-measure.
 
 ## 6b. The clip list for the stepping defence (the GATE 0 art job, for the owner)
 
@@ -225,7 +264,10 @@ runs. Code after the clips (this lane or the next): the tree's state table and t
 
 ## 7. Flags and assumptions
 
-- No existing tuned number was changed. New numbers: §5.1's six (all behind `hoops.aiShotIqOn`, off).
+- No existing tuned number was changed. New numbers: §5.1's six (behind `hoops.aiShotIqOn`, off) and §5.3's fourteen (behind
+  `hoops.pnrCoverageOn`, off; listed in docs/FEEL-PANEL.md).
+- `assumption:` (§5.3) three AI defenders against the AI offence stand in for the AI defending your team's pick-and-roll in a game (the
+  handler is the AI's planner, not you).
 - Probe changes (additive): `rival-sim-3v3.mts` reports the contest at each release and takes `--def human` (it ignored the flag before);
   `slide-bench.mts` takes `INTENSE=1` (the sat-down slide).
 - `assumption:` 220 ms is a fair human reaction for the "human" defender (rival-sim's 1v1 default, reused).
@@ -236,7 +278,8 @@ runs. Code after the clips (this lane or the next): the tree's state table and t
 ## 8. How to re-run
 
 ```
-# headless (no lock): the shot rulebook, the rivals, the defensive feet
+# headless (no lock): the shot rulebook, the rivals, the defensive feet, the pick-and-roll
+FEEL='{"hoops.pnrCoverageOn":1}' npx tsx scripts/probes/hoops-close/pnr-sim.mts --n 300 --tier pro --seed 7
 npx tsx scripts/probes/hoops-p09/rulebook-measure.mts
 FEEL='{"hoops.aiShotIqOn":1}' npx tsx scripts/probes/hoops-gap/rival-sim.mts --mode 3v3 --n 300 --tier pro --seed 7 --def human
 npx tsx scripts/probes/hoops-gap/slide-bench.mts --speeds 1.5,2.5,3.5,4.5,5.5 --dirs left,right,back,backleft --over none,hand_up --json out.json

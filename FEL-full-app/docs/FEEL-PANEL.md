@@ -1236,3 +1236,15 @@ NEW switches, each **1 = on, 0 = today's game exactly** (tests pin both ends). N
   Headless (rival-sim 3v3, PRO, a defender who sees the ball 220 ms late, three seeds × 300 possessions): points a shot 0.627 → 0.666,
   points a possession 0.507 → 0.530, passes a possession 0.28 → 0.44, catch-and-shoots 70 → 149. Feel-check: 3v3 PRO on defence — do
   they move the ball and find the open man, and are they harder to stop?
+- `hoops.pnrCoverageOn` **0** (group "Hoops · defense"; `hoops/pnrCoverage.ts` `PNR_COVERAGE_ON`, wired in `core/BasketballCore.ts`
+  DefenderBrain and `hoops/teamDefense.ts`; new numbers `PNR_OVER_MAX_M` 7.5 m, `PNR_SCREEN_M` 1.4 m, `PNR_SCREEN_BALL_M` 2.8 m,
+  `PNR_PLANTED_MPS` 0.6 m/s, `PNR_SHOW_SEC` 0.6 s, `PNR_SHOW_M` 1.1 m, `PNR_TAG_RIM_M` 5 m, `PNR_ROLL_MPS` 1.5 m/s, `PNR_TAG_FREE_M` 1.6 m,
+  `PNR_BEATEN_M` 1.9 m, `PNR_UNDER_LEVER` 0.45, `PNR_DROP_LEVER` 0.45, `PNR_TAG_LEVER` 0.35, `PNR_SPOT_DEAD_M` 0.4 m): **the AI's
+  pick-and-roll coverage** (3v3 only; a 1v1 brain has no screens). The man on the ball plays the screen — over the top on a handler inside
+  7.5 m of the rim, under past it (he used to run into the screener: the navigate read skipped any body near the ball); the screener's
+  man shows into the handler's corner (over) or drops (under); the low man tags a free roll man; the team defence switches only when the
+  screened man is beaten (it switched whenever the geometry allowed). Headless (`scripts/probes/hoops-close/pnr-sim.mts`, three AI
+  defenders against the 3v3 team offence, PRO, seeds 7 / 11 / 23 × 300): points a pick-and-roll possession 0.597 / 0.604 / 0.579 →
+  0.655 / 0.635 / 0.592 — **the defence gets a little worse, not better** (today's switch-on-every-screen keeps a man in front); the
+  roll man got an open look 0 % both ways (the screener pops nearly every time: the low man at the rim keeps his roll lane shut). OFF for the owner to
+  feel. Feel-check: 3v3 PRO, call a screen and come off it at the arc.
