@@ -1246,6 +1246,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       shotContest = 0; foeCloseMem = foes.map(() => 0);
       ctx.heroRef.current = me.char.root;
       ctx.objectiveRef.current = RIM;
+      ctx.camDirector.setTeamHighView(RIM, () => bodiesAll, (b) => b.char.root.position);   // lane/improve-camera phase 8: the 1v1 high view for 3v3, behind `hoops.threeVThreeCam` (ships 0 = the follow, as shipped)
       ctx.camDirector.snapTo(me.char.root.position, RIM);
       threeVenue?.hidePlaceholders();  // M74: drop stand-ins now that real chars are in
       assertSpawned(ctx.scene, { hero: me.char.root, minWorldMeshes: 6, modeId: 'threevthree' });

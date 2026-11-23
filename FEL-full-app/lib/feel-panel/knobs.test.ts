@@ -439,6 +439,11 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.highCamPanShare')).toBe(HSC.HIGH_CAM_PAN_SHARE); expect(def('hoops.highCamPanSec')).toBe(HSC.HIGH_CAM_PAN_SEC);
     expect(def('hoops.highCamMargin')).toBe(HSC.HIGH_CAM_MARGIN); expect(def('hoops.highCamPullMax')).toBe(HSC.HIGH_CAM_PULL_MAX);
     expect(def('hoops.highCamPortraitLift')).toBe(HSC.HIGH_CAM_PORTRAIT_LIFT);
+    // lane/improve-camera (phase 8): the lens widening (1 = never, the view as hoops-cam shipped it) and the 3v3 view (ships 0)
+    expect(def('hoops.highCamZoomMax')).toBe(HSC.HIGH_CAM_ZOOM_MAX); expect(FEEL_KNOB_BY_ID.get('hoops.highCamZoomMax')?.min).toBe(1);
+    expect(def('hoops.highCamRoomOn')).toBe(HSC.HIGH_CAM_ROOM_ON); expect(HSC.HIGH_CAM_ROOM_ON).toBe(1);
+    expect(def('hoops.highCamLeadSec')).toBe(HSC.HIGH_CAM_LEAD_SEC); expect(FEEL_KNOB_BY_ID.get('hoops.highCamLeadSec')?.min).toBe(0);
+    expect(def('hoops.threeVThreeCam')).toBe(HSC.THREEVTHREE_CAM); expect(HSC.THREEVTHREE_CAM).toBe(0);
   });
 
   it('every row is well formed: unique `<area>.<camelName>` id, min ≤ default ≤ max, the default on the step grid, a source', () => {

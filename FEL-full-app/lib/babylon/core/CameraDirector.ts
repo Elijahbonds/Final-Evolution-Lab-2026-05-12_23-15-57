@@ -58,7 +58,7 @@ import { reportDiag } from './diag';
 import { INTRO, introLetterbox, introPose, orbitBlend, smoothstep, type IntroKind } from '../scene/broadcastShots';   // vis-foundation-2 A9.12
 import { motionPolicy } from '../../a11y/reducedMotion';
 import { feel } from '../../feel-panel/feel';
-import { highCamParams, highFits, highPose, highSideSpan, HIGH_CAM_EDGE, HIGH_CAM_PUSH_MPS, highStep, highWant, HIGH_CAM_CATCHUP, HIGH_CAM_PUNCH, HIGH_CAM_PULL_MIN, HIGH_CAM_CLEAR_M, type CourtFrame, type HighState, type P2, type P3 } from './HighSidelineCam';   // lane/hoops-cam: the 1v1 high sideline view
+import { highCamParams, highFits, highPose, highSideSpan, HIGH_CAM_EDGE, HIGH_CAM_PUSH_MPS, highStep, highWant, HIGH_CAM_CATCHUP, HIGH_CAM_PUNCH, HIGH_CAM_PULL_MIN, HIGH_CAM_CLEAR_M, THREEVTHREE_CAM, HIGH_CAM_ROOM_ON, HIGH_CAM_LEAD_SEC, highEyeBox, leadPoints, teamCourt, teamFrame, type CourtFrame, type HighState, type P2, type P3 } from './HighSidelineCam';   // lane/hoops-cam: the 1v1 high sideline view
 
 export type CamMode = 'follow' | 'fixed';
 
@@ -552,6 +552,16 @@ export class CameraDirector {
     this.bounds = { minX, maxX, minZ, maxZ, minY };
   }
 
+  /** lane/improve-camera phase 8: the high view's clamp with the court's room — `box` across the ground (already shrunk by its margin),
+   *  the venue's floor as clampToBounds keeps it. */
+  private clampHigh(pos: Vector3, box: { minX: number; maxX: number; minZ: number; maxZ: number }): Vector3 {
+    pos.x = Math.max(box.minX, Math.min(box.maxX, pos.x));
+    pos.z = Math.max(box.minZ, Math.min(box.maxZ, pos.z));
+    const b = this.bounds;
+    if (b) { pos.y = Math.max(b.minY + 0.8, pos.y); if (b.groundAt) pos.y = Math.max(b.groundAt(pos.x, pos.z) + 1.6, pos.y); }
+    return pos;
+  }
+
   /** Keep the camera inside the venue and above its floor. */
   private clampToBounds(pos: Vector3): Vector3 {
     if (!this.boundsTried) this.deriveBounds();
@@ -599,9 +609,20 @@ export class CameraDirector {
   private highClearCap: number | null = null;
   private highLast: { x: number; z: number } | null = null;
   private highClearAge = 0;
+  /** phase 8: the fit's points last frame (the lead's velocity) and the reused list the lead points go in. */
+  private highPrev: P3[] = [];
+  private highLeadOut: P3[] = [];
+  /** The lens the high view set last frame (phase 8: the fit may widen it); null until its first frame. */
+  private highLens: number | null = null;
   /** Arm (or with null, disarm) the high view. */
   setHighView(v: { court: CourtFrame; on: () => boolean; frame: () => { play: P2; must: readonly P3[] } } | null): void {
-    this.high = v; this.highS = null; this.highClearCap = null; this.highLast = null;
+    this.high = v; this.highS = null; this.highClearCap = null; this.highLast = null; this.highLens = null; this.highPrev = [];
+  }
+  /** lane/improve-camera (phase 8, 2026-11-22): arm the high view for 3v3 — the same view as 1v1's, framing every body (`bodies()` lists
+   *  the hero first; `at` reads one's floor spot) and the rim, behind `hoops.threeVThreeCam` (ships 0: the follow camera exactly as it shipped, the owner's feel
+   *  call). One call from the mode's load, before its first snapTo; SELECT / C switches to the follow and back for the run, as in 1v1. */
+  setTeamHighView<B>(rim: P3, bodies: () => readonly B[], at: (b: B) => { x: number; z: number }): void {
+    this.setHighView({ court: teamCourt(rim), on: () => feel('hoops.threeVThreeCam', THREEVTHREE_CAM) >= 0.5, frame: teamFrame(rim, bodies, at) });
   }
   private highArmed(): boolean { return this.high !== null && this.high.on(); }
   /** The high view is the play camera right now. */
@@ -650,8 +671,6 @@ export class CameraDirector {
     const dt = Math.min(0.1, eng.getDeltaTime() / 1000);
     const aspect = Math.max(0.2, eng.getRenderWidth() / Math.max(1, eng.getRenderHeight()));
     if (this.baseFov === null) this.baseFov = this.camera.fov;
-    // the lens is fixed here: a widened follow lens (fovGain) eases back to the authored one, a cut lands on it
-    if (snap) this.camera.fov = this.baseFov; else if (Math.abs(this.camera.fov - this.baseFov) > 1e-4) this.camera.fov += (this.baseFov - this.camera.fov) * 0.1;
     const fr = h.frame();
     // a body that TELEPORTED (a possession reset the mode made without a snapTo: the hero more than HIGH_TELEPORT_M in one frame) is
     // a reset too — measured on an upright phone: the hero sat off screen for a few frames while the capped push slid over
@@ -660,8 +679,15 @@ export class CameraDirector {
     if (m0) this.highLast = { x: m0.x, z: m0.z };
     if (!this.boundsTried) this.deriveBounds();
     const bx = this.bounds, m = BOUNDS_MARGIN;
-    const box = bx && bx.maxX - bx.minX > m * 3 && bx.maxZ - bx.minZ > m * 3 ? { minX: bx.minX + m, maxX: bx.maxX - m, minZ: bx.minZ + m, maxZ: bx.maxZ - m } : null;
-    let want = highWant(h.court, p, fr.play, fr.must, this.baseFov, aspect, box);
+    const venueBox = bx && bx.maxX - bx.minX > m * 3 && bx.maxZ - bx.minZ > m * 3 ? { minX: bx.minX + m, maxX: bx.maxX - m, minZ: bx.minZ + m, maxZ: bx.maxZ - m } : null;
+    // lane/improve-camera phase 8: the court's room (`hoops.highCamRoomOn`; 0 = the venue's box exactly as before)
+    const roomOn = feel('hoops.highCamRoomOn', HIGH_CAM_ROOM_ON) >= 0.5;
+    const box = highEyeBox(venueBox, h.court, roomOn, m);
+    // phase 8: the fit also keeps where the bodies will be HIGH_CAM_LEAD_SEC ahead (`hoops.highCamLeadSec`; 0 = as before). A cut or a
+    // reset starts the history again (a teleport is not a run).
+    if (snap) this.highPrev.length = 0;
+    const fitPts = leadPoints(fr.must, this.highPrev, snap ? 0 : dt, feel('hoops.highCamLeadSec', HIGH_CAM_LEAD_SEC), this.highLeadOut);
+    let want = highWant(h.court, p, fr.play, fitPts, this.baseFov, aspect, box);
     // the clear view: the want never puts scenery (a palm's crown, a tree, a pole, a wall) between the eye and its look target; the
     // eye comes in along the look instead, through the same damped truck. One ray, at the full back-away, every HIGH_CLEAR_EVERY frames
     // (the truck moves centimetres in between, inside the HIGH_CAM_CLEAR_M room): its answer caps the pull for every frame until the next.
@@ -674,7 +700,7 @@ export class CameraDirector {
       this.highClearCap = this.highClear(highPose(h.court, p, { x: at.x, z: at.z, pull: top }), top);
     }
     // a back-away the scenery will not allow: fit again inside it (it lets the rim go before it lets a player go)
-    if (want.pull > this.highClearCap + 1e-6) want = highWant(h.court, { ...p, pullMax: Math.max(1, this.highClearCap) }, fr.play, fr.must, this.baseFov, aspect, box);
+    if (want.pull > this.highClearCap + 1e-6) want = highWant(h.court, { ...p, pullMax: Math.max(1, this.highClearCap) }, fr.play, fitPts, this.baseFov, aspect, box);
     want.pull = Math.min(want.pull, this.highClearCap);
     while (want.pull > HIGH_CAM_PULL_MIN && this.highInside(highPose(h.court, p, want).eye)) want.pull = Math.max(HIGH_CAM_PULL_MIN, want.pull - 0.05);   // in along the look, out of a prop
     // a reset (snapTo) glides when the new spots are still on screen from here, and cuts when they are not; in play, the truck
@@ -682,11 +708,23 @@ export class CameraDirector {
     const fitsNow = !!this.highS && highFits(h.court, p, this.highS, fr.must, this.baseFov, aspect);
     if (snap === 'reset' && fitsNow) snap = false;
     const behind = !!this.highS && (this.highS.pull > this.highClearCap + 1e-3 || this.highInside(highPose(h.court, p, this.highS).eye));   // still backing in from scenery
-    this.highS = snap || !this.highS ? { ...want, vx: 0, vz: 0, vp: 0 } : highStep(this.highS, want, dt, p.panSec * (fitsNow && !behind ? 1 : HIGH_CAM_CATCHUP));
+    this.highS = snap || !this.highS ? { ...want, vx: 0, vz: 0, vp: 0, vzm: 0 } : highStep(this.highS, want, dt, p.panSec * (fitsNow && !behind ? 1 : HIGH_CAM_CATCHUP));
+    // the lens: the authored one, widened only by the fit (lane/improve-camera phase 8, `hoops.highCamZoomMax`; 1 = never) through the
+    // truck's spring. A widened follow lens (fovGain) eases back to it, a cut lands on it.
+    const lens = this.baseFov * (this.highS.zoom ?? 1);
+    if (this.highLens === null || Math.abs(lens - this.highLens) < 1e-12) {
+      // the lens holds still (always, at zoomMax 1): the line exactly as hoops-cam shipped it
+      if (snap) this.camera.fov = lens; else if (Math.abs(this.camera.fov - lens) > 1e-4) this.camera.fov += (lens - this.camera.fov) * 0.1;
+    } else {
+      // the lens moves: it moves the camera with it, and whatever was left of a follow lens's ease keeps easing out on top
+      const rest = this.camera.fov - this.highLens;
+      this.camera.fov = snap ? lens : lens + (Math.abs(rest) > 1e-4 ? rest * 0.9 : rest);
+    }
+    this.highLens = lens;
     // THE EDGE PUSH: the hero (the first two points: feet, head) is never left past the frame's edge by the soft truck's lag; the
     // truck slides with him from there (as fast as he runs, so it is a slide, not a jump), and its rate keeps the push
     if (!snap && fr.must.length >= 2) {
-      const hero = fr.must.slice(0, 2), fov0 = this.baseFov ?? this.camera.fov, st = this.highS;
+      const hero = fr.must.slice(0, 2), fov0 = (this.baseFov ?? this.camera.fov) * (this.highS.zoom ?? 1), st = this.highS;
       const span = (q: number): [number, number] => highSideSpan(h.court, p, st.z, q, hero, fov0, aspect, HIGH_CAM_EDGE, box);
       let [lo, hi] = span(this.highS.pull);
       // where the venue's box leaves no side truck that holds him at this distance, the push comes in along the look as well (a closer
@@ -716,8 +754,9 @@ export class CameraDirector {
     const push = (1 - this.beatScale) * HIGH_CAM_PUNCH;
     const eye = new Vector3(pose.eye.x, pose.eye.y, pose.eye.z), target = new Vector3(pose.target.x, pose.target.y, pose.target.z);
     if (push > 0) eye.addInPlace(target.subtract(eye).scaleInPlace(push));
-    // the venue box (as every play camera): a clamp moves the look target with the eye, so the view still never turns
-    const clamped = this.clampToBounds(eye.clone());
+    // the venue box (as every play camera): a clamp moves the look target with the eye, so the view still never turns. With the court's
+    // room on (phase 8) the eye keeps to the widened box the fit used, and to the venue's floor as every play camera does.
+    const clamped = roomOn && box && venueBox ? this.clampHigh(eye.clone(), box) : this.clampToBounds(eye.clone());
     target.addInPlace(clamped.subtract(eye));
     this.camera.position.copyFrom(clamped);
     this.camera.setTarget(target);

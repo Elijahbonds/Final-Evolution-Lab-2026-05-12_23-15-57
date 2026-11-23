@@ -10,8 +10,8 @@ const knobs = new Map<string, number>();
 vi.mock('../../feel-panel/feel', () => ({ feel: (id: string, def: number) => (knobs.has(id) ? knobs.get(id)! : def) }));
 import {
   ONEVONE_CAM, HIGH_CAM_HEIGHT_M, HIGH_CAM_DIST_M, HIGH_CAM_SIDE_DEG, HIGH_CAM_FOCUS_M, HIGH_CAM_PAN_SHARE, HIGH_CAM_PAN_SEC,
-  HIGH_CAM_MARGIN, HIGH_CAM_PULL_MAX, HIGH_CAM_PUNCH, HIGH_CAM_PORTRAIT_LIFT, bottomBand, highBasis, highCamParams, highPose, highStep, highWant, project,
-  type CourtFrame, type HighState, type P3,
+  HIGH_CAM_MARGIN, HIGH_CAM_PULL_MAX, HIGH_CAM_PUNCH, HIGH_CAM_PORTRAIT_LIFT, HIGH_CAM_ZOOM_MAX, HIGH_CAM_ROOM_ON, HIGH_CAM_LEAD_SEC, leadPoints, THREEVTHREE_CAM, bottomBand, highEyeBox, highRoom, highBasis, highCamParams, highFits, highPose, highStep, highWant, project,
+  teamCourt, teamFrame, type CourtFrame, type HighState, type P3,
 } from './HighSidelineCam';
 import { CameraDirector } from './CameraDirector';
 import { INTRO } from '../scene/broadcastShots';
@@ -68,10 +68,13 @@ function sweep(aspect: number): { bodies: number; withRim: number; n: number } {
   let n = 0, bodies = 0, withRim = 0;
   // on screen by 3 %, and the feet above the bottom band (the touch deck on a phone held upright), by 2 % of slack
   const band = -1 + 2 * bottomBand(aspect, p) - 0.04;
-  const inFrame = (pose: ReturnType<typeof highPose>, q: P3) => { const s = project(pose, FOV, aspect, q); return s.ahead && Math.abs(s.x) <= 0.97 && s.y <= 0.97 && s.y >= (q.y < 0.5 ? band : -0.97); };
+  // the lens as the fit set it (phase 8: it may widen on an upright phone; 1 elsewhere)
+  let lens = FOV;
+  const inFrame = (pose: ReturnType<typeof highPose>, q: P3) => { const s = project(pose, lens, aspect, q); return s.ahead && Math.abs(s.x) <= 0.97 && s.y <= 0.97 && s.y >= (q.y < 0.5 ? band : -0.97); };
   for (let x = -6.5; x <= 6.5; x += 0.5) for (let z = 0.5; z <= 9.5; z += 0.5) for (const [ox, oz] of [[0.9, -1.2], [-0.9, -1.2], [1.2, 0.6], [0, -2]]) {
     const me = { x, y: 1, z }, foe = { x: Math.max(-7.2, Math.min(7.2, x + ox)), y: 1, z: Math.max(0.5, z + oz) };
-    const pose = highPose(COURT, p, highWant(COURT, p, { x: (me.x + foe.x) / 2, z: (me.z + foe.z) / 2 }, mustOf(me, foe), FOV, aspect));
+    const w = highWant(COURT, p, { x: (me.x + foe.x) / 2, z: (me.z + foe.z) / 2 }, mustOf(me, foe), FOV, aspect);
+    const pose = highPose(COURT, p, w); lens = FOV * (w.zoom ?? 1);
     const body = (q: P3) => inFrame(pose, { ...q, y: 0 }) && inFrame(pose, { ...q, y: 1.9 });
     n++;
     if (body(me) && body(foe)) { bodies++; if (inFrame(pose, RIM)) withRim++; }
@@ -363,6 +366,9 @@ describe('high sideline in the director (CameraDirector.setHighView)', () => {
   });
   it('a tight venue box (Canopy Court on an upright phone): the eye comes in along its look to stay inside, and the hero stays on screen', () => {
     // Rig (2026-11-21): the box clamp trucked the whole view sideways at its edge and the hero went off the right of the screen.
+    // phase 8: this is the venue's box itself, so the court's room is off here (`hoops.highCamRoomOn` 0, the view as hoops-cam shipped it);
+    // the room's own test is below
+    knobs.set('hoops.highCamRoomOn', 0);
     const { scene, engine, cam, dir } = rig(390, 844);
     dir.setBounds({ minX: -9, maxX: 8, minZ: -6, maxZ: 17.1, minY: 0 });
     const me = new Vector3(0, 0, 6), foe = new Vector3(0.6, 0, 4.8);
@@ -374,11 +380,292 @@ describe('high sideline in the director (CameraDirector.setHighView)', () => {
       if (i < 120) { me.x -= 3 / 60; me.z += 2 / 60; } foe.set(me.x + 0.6, 0, me.z - 1.2);   // out to the far wing, deep
       dir.update(me, Vector3.Zero(), RIM_V);
       const pose = { eye: { x: cam.position.x, y: cam.position.y, z: cam.position.z }, target: { x: cam.getTarget().x, y: cam.getTarget().y, z: cam.getTarget().z } };
-      if (![0, 1.9].every((y) => Math.abs(project(pose, FOV, 390 / 844, { x: me.x, y, z: me.z }).x) < 0.97)) off++;
+      if (![0, 1.9].every((y) => Math.abs(project(pose, cam.fov, 390 / 844, { x: me.x, y, z: me.z }).x) < 0.97)) off++;   // the lens as set (phase 8: it may widen)
       expect(cam.position.x).toBeLessThanOrEqual(8 - 1.2 + 1e-6); expect(cam.position.z).toBeLessThanOrEqual(17.1 - 1.2 + 1e-6);
       expect(Vector3.Dot(cam.getTarget().subtract(cam.position).normalize(), look)).toBeCloseTo(1, 6);
     }
     expect(off).toBe(0);
     scene.dispose(); engine.dispose();
+  });
+});
+
+// ── lane/improve-camera, phase 8 (2026-11-22): the lens may widen to fit; the same view offered to 3v3 behind its own knob ──
+/** Canopy Court's eye box (CameraDirector: the venue shell's box, less BOUNDS_MARGIN; the rig's eye never passed z 15.9 there). */
+const CANOPY_BOX = { minX: -7.8, maxX: 6.8, minZ: -4.8, maxZ: 15.9 };
+/** Defending deep past the arc (the rig's Canopy run, upright phone): the rival with the ball out round the check (1v1's CHECK_FOE is
+ *  z 9.2), me between him and the rim, beaten to either side, or caught level with him on the far wing. */
+function deepDefence(): Array<{ me: P3; foe: P3 }> {
+  const out: Array<{ me: P3; foe: P3 }> = [];
+  for (let fx = -1.5; fx <= 1.5; fx += 0.5) for (let fz = 7.5; fz <= 9.5; fz += 0.5) for (const [ox, oz] of [[0, -1.2], [0, -2], [0.5, -2.5], [-2.5, -1.5], [2.5, -1.5], [-2.5, 0]]) {
+    out.push({ foe: { x: fx, y: 1, z: fz }, me: { x: Math.max(-7.2, Math.min(7.2, fx + ox)), y: 1, z: fz + oz } });
+  }
+  return out;
+}
+const UPRIGHT = 390 / 844, LENS = 0.8;   // the rig's lens on the phone tier
+
+describe('phase 8: the lens widens to fit when the venue stops the eye backing away (Canopy Court, a phone held upright)', () => {
+  it('the shipped number, and its knob reads through; 1 = the lens never widens', () => {
+    expect(HIGH_CAM_ZOOM_MAX).toBe(1.6);
+    expect(highCamParams().zoomMax).toBe(1.6);
+    knobs.set('hoops.highCamZoomMax', 1);
+    expect(highCamParams().zoomMax).toBe(1);
+  });
+  it('at 1, every want on the half-court grid keeps the authored lens (the view exactly as hoops-cam shipped it)', () => {
+    knobs.set('hoops.highCamZoomMax', 1);
+    const p = highCamParams();
+    for (const a of [16 / 9, 844 / 390, UPRIGHT]) for (const { me, foe } of deepDefence()) {
+      expect(highWant(COURT, p, { x: (me.x + foe.x) / 2, z: (me.z + foe.z) / 2 }, mustOf(me, foe), LENS, a, CANOPY_BOX).zoom).toBe(1);
+    }
+  });
+  it('a wide screen and a phone on its side never widen it, at Canopy or anywhere on the grid', () => {
+    const p = highCamParams();
+    for (const a of [16 / 9, 844 / 390]) {
+      for (const { me, foe } of deepDefence()) expect(highWant(COURT, p, { x: (me.x + foe.x) / 2, z: (me.z + foe.z) / 2 }, mustOf(me, foe), LENS, a, CANOPY_BOX).zoom).toBe(1);
+      for (let x = -6.5; x <= 6.5; x += 1) for (let z = 0.5; z <= 9.5; z += 1) {
+        const me = { x, y: 1, z }, foe = { x: x + 0.9, y: 1, z: Math.max(0.5, z - 1.2) };
+        expect(highWant(COURT, p, { x: (me.x + foe.x) / 2, z: (me.z + foe.z) / 2 }, mustOf(me, foe), LENS, a).zoom).toBe(1);
+      }
+    }
+  });
+  it('defending deep past the arc at Canopy, upright: both bodies and the rim fit in 98% of spots (was 26%: the rim off the side), widened at most 1.6×, the look unchanged', () => {
+    const fitAll = (zoomMax: number) => {
+      knobs.set('hoops.highCamZoomMax', zoomMax);
+      const p = highCamParams(); let ok = 0, n = 0, zmax = 1;
+      for (const { me, foe } of deepDefence()) {
+        const w = highWant(COURT, p, { x: (me.x + foe.x) / 2, z: (me.z + foe.z) / 2 }, mustOf(me, foe), LENS, UPRIGHT, CANOPY_BOX);
+        n++; if (highFits(COURT, p, w, mustOf(me, foe), LENS, UPRIGHT)) ok++;
+        zmax = Math.max(zmax, w.zoom ?? 1);
+        const pose = highPose(COURT, p, w), f = { x: pose.target.x - pose.eye.x, y: pose.target.y - pose.eye.y, z: pose.target.z - pose.eye.z };
+        const rest = highPose(COURT, p, { x: 0, z: 0, pull: 1 }), g = { x: rest.target.x - rest.eye.x, y: rest.target.y - rest.eye.y, z: rest.target.z - rest.eye.z };
+        expect((f.x * g.x + f.y * g.y + f.z * g.z) / (Math.hypot(f.x, f.y, f.z) * Math.hypot(g.x, g.y, g.z))).toBeCloseTo(1, 9);   // never turned
+        expect(pose.eye.z).toBeLessThanOrEqual(CANOPY_BOX.maxZ + 1e-6);
+      }
+      return { share: ok / n, zmax };
+    };
+    const before = fitAll(1), after = fitAll(HIGH_CAM_ZOOM_MAX);
+    expect(before.share).toBeLessThan(0.3);
+    expect(after.share).toBeGreaterThanOrEqual(0.98);   // the misses: caught level on the far wing, 4+ m past the arc
+    expect(after.zmax).toBeLessThanOrEqual(HIGH_CAM_ZOOM_MAX + 1e-9);
+  });
+  it('the lens widens only as far as the fit needs: a play inside the arc keeps the authored lens on the same upright phone', () => {
+    const p = highCamParams();
+    const me = { x: 0, y: 1, z: 5 }, foe = { x: 0.9, y: 1, z: 2 };
+    expect(highWant(COURT, p, { x: 0.45, z: 3.5 }, mustOf(me, foe), LENS, UPRIGHT, CANOPY_BOX).zoom).toBe(1);
+  });
+  it('the spring carries the lens: no step, and it settles on the want', () => {
+    let s: HighState = { x: 0, z: 0, pull: 1, vx: 0, vz: 0, vp: 0 };
+    const zs: number[] = [];
+    for (let i = 0; i < 240; i++) { s = highStep(s, { x: 0, z: 0, pull: 1, zoom: 1.3 }, 1 / 60, HIGH_CAM_PAN_SEC); zs.push(s.zoom!); }
+    expect(zs[0] - 1).toBeLessThan(0.01);
+    for (let i = 1; i < zs.length; i++) expect(zs[i]).toBeGreaterThanOrEqual(zs[i - 1] - 1e-12);
+    expect(zs[zs.length - 1]).toBeCloseTo(1.3, 2);
+    expect(Math.max(...zs)).toBeLessThanOrEqual(1.3 + 1e-9);
+  });
+  it('in the director at Canopy, upright, held to the venue box: walking out to the check deep past the arc the lens widens, the look never turns, the rim stays on screen; back inside, the lens comes home', () => {
+    const run = (zoomMax: number) => {
+      knobs.set('hoops.highCamZoomMax', zoomMax); knobs.set('hoops.highCamRoomOn', 0);   // the lens alone (the room, below, is the first remedy)
+      const { scene, engine, cam, dir } = rig(390, 844); cam.fov = LENS;
+      dir.setBounds({ minX: -9, maxX: 8, minZ: -6, maxZ: 17.1, minY: 0 });
+      const me = new Vector3(0, 0, 5), foe = new Vector3(0.9, 0, 2);
+      dir.setHighView({ court: COURT, on: () => true, frame: () => ({ play: { x: (me.x + foe.x) / 2, z: (me.z + foe.z) / 2 }, must: mustOf({ x: me.x, y: 1, z: me.z }, { x: foe.x, y: 1, z: foe.z }) }) });
+      dir.snapTo(me, RIM_V);
+      const look = cam.getTarget().subtract(cam.position).normalize();
+      let rimOff = 0, fovMax = cam.fov;
+      for (let i = 0; i < 720; i++) {
+        // out to the check (the rival 9.5 m out with the ball, me on the left wing, deep), hold, and back in
+        const k = i < 120 ? i / 120 : i < 300 ? 1 : Math.max(0, 1 - (i - 300) / 120);
+        foe.set(0.9 - 1.1 * k, 0, 2 + 7.5 * k); me.set(-2.6 * k, 0, 5 + 2.4 * k);
+        dir.update(me, Vector3.Zero(), RIM_V);
+        expect(Vector3.Dot(cam.getTarget().subtract(cam.position).normalize(), look)).toBeCloseTo(1, 6);
+        const pose = { eye: { x: cam.position.x, y: cam.position.y, z: cam.position.z }, target: { x: cam.getTarget().x, y: cam.getTarget().y, z: cam.getTarget().z } };
+        const r = project(pose, cam.fov, 390 / 844, RIM);
+        if (i >= 150 && i < 300 && !(Math.abs(r.x) < 0.97 && Math.abs(r.y) < 0.97)) rimOff++;
+        fovMax = Math.max(fovMax, cam.fov);
+      }
+      const end = cam.fov;
+      scene.dispose(); engine.dispose();
+      return { rimOff, fovMax, end };
+    };
+    const off = run(1), on = run(HIGH_CAM_ZOOM_MAX);
+    expect(off.fovMax).toBe(LENS);                       // 1: the lens never moves
+    expect(off.rimOff).toBeGreaterThan(30);              // …and the rim is off the side at the check
+    expect(on.rimOff).toBe(0);
+    expect(on.fovMax).toBeGreaterThan(LENS * 1.05);
+    expect(on.fovMax).toBeLessThanOrEqual(LENS * HIGH_CAM_ZOOM_MAX + 1e-6);
+    expect(on.end).toBeCloseTo(LENS, 3);                 // back inside the arc: the authored lens (the spring settles in ~4 s)
+  });
+});
+
+describe('phase 8: the court room (`hoops.highCamRoomOn` 1): a small venue box no longer holds the eye on the court', () => {
+  it('the room is 3-Point\'s camera box at the same courts (x ±17, z −8..22), and only ever widens a venue box (none stays none)', () => {
+    expect(HIGH_CAM_ROOM_ON).toBe(1);
+    expect(highRoom(COURT)).toEqual({ minX: -17, maxX: 17, minZ: expect.closeTo(-8, 9), maxZ: expect.closeTo(22, 9) });
+    expect(highEyeBox(null, COURT, true, 1.2)).toBeNull();
+    expect(highEyeBox(CANOPY_BOX, COURT, false, 1.2)).toBe(CANOPY_BOX);
+    const wide = { minX: -30, maxX: 30, minZ: -30, maxZ: 30 };
+    expect(highEyeBox(wide, COURT, true, 1.2)).toEqual(wide);
+    const b = highEyeBox(CANOPY_BOX, COURT, true, 1.2)!;
+    expect([b.minX, b.maxX, b.minZ, b.maxZ].map((v) => Math.round(v * 10) / 10)).toEqual([-15.8, 15.8, -6.8, 20.8]);
+  });
+  it('defending deep past the arc at Canopy, upright, with the room: both bodies and the rim fit in every spot, 9 in 10 at the authored lens', () => {
+    const p = highCamParams(), box = highEyeBox(CANOPY_BOX, COURT, true, 1.2);
+    let ok = 0, n = 0, lens1 = 0;
+    for (const { me, foe } of deepDefence()) {
+      const w = highWant(COURT, p, { x: (me.x + foe.x) / 2, z: (me.z + foe.z) / 2 }, mustOf(me, foe), LENS, UPRIGHT, box);
+      n++; if (highFits(COURT, p, w, mustOf(me, foe), LENS, UPRIGHT)) ok++;
+      if (w.zoom === 1) lens1++;
+    }
+    expect(ok / n).toBe(1);
+    expect(lens1 / n).toBeGreaterThanOrEqual(0.85);   // 188 of 210 (2026-11-22): the rest are past pullMax, caught level on the far wing
+  });
+  it('in the director at Canopy, upright: a drive into the +x corner keeps the hero on screen (the venue box held the eye on the court and lost him), and the eye stays in the room', () => {
+    const run = (room: number) => {
+      knobs.set('hoops.highCamRoomOn', room);
+      const { scene, engine, cam, dir } = rig(390, 844); cam.fov = LENS;
+      dir.setBounds({ minX: -8, maxX: 8, minZ: -1.9, maxZ: 17.1, minY: 0 });   // basketball_h2h's 16 × 19 venue_ground (Canopy, Blossom)
+      const me = new Vector3(0, 0, 5), foe = new Vector3(0.9, 0, 2);
+      dir.setHighView({ court: COURT, on: () => true, frame: () => ({ play: { x: (me.x + foe.x) / 2, z: (me.z + foe.z) / 2 }, must: mustOf({ x: me.x, y: 1, z: me.z }, { x: foe.x, y: 1, z: foe.z }) }) });
+      dir.snapTo(me, RIM_V);
+      const look = cam.getTarget().subtract(cam.position).normalize();
+      let off = 0, maxX = -Infinity;
+      for (let i = 0; i < 300; i++) {
+        if (i < 90) { me.x += 6.9 / 90; me.z -= 4.75 / 90; }   // to (6.9, 0.25): the rig's drive, the hero on the +x baseline corner
+        foe.set(me.x - 2.5, 0, Math.max(0.3, me.z + 0.3));
+        dir.update(me, Vector3.Zero(), RIM_V);
+        expect(Vector3.Dot(cam.getTarget().subtract(cam.position).normalize(), look)).toBeCloseTo(1, 6);
+        const pose = { eye: { x: cam.position.x, y: cam.position.y, z: cam.position.z }, target: { x: cam.getTarget().x, y: cam.getTarget().y, z: cam.getTarget().z } };
+        if (i >= 30 && ![0, 1.9].every((y) => Math.abs(project(pose, cam.fov, UPRIGHT, { x: me.x, y, z: me.z }).x) < 0.97)) off++;
+        maxX = Math.max(maxX, cam.position.x);
+        expect(cam.position.x).toBeLessThanOrEqual(17 - 1.2 + 1e-6); expect(cam.position.z).toBeLessThanOrEqual(22 - 1.2 + 1e-6);
+      }
+      scene.dispose(); engine.dispose();
+      return { off, maxX };
+    };
+    const before = run(0), after = run(1);
+    expect(before.maxX).toBeLessThanOrEqual(8 - 1.2 + 1e-6);
+    expect(before.off).toBeGreaterThan(20);
+    expect(after.off).toBe(0);
+    expect(after.maxX).toBeGreaterThan(8 - 1.2);
+  });
+});
+
+describe('phase 8: the lead and the off switches', () => {
+  it('the lead: each moving point once more, leadSec ahead at its velocity (capped at a sprint), after the rest; still points add nothing', () => {
+    expect(HIGH_CAM_LEAD_SEC).toBe(0.35);
+    const prev: P3[] = [], out: P3[] = [];
+    const a = [{ x: 0, y: 0, z: 5 }, RIM];
+    expect(leadPoints(a, prev, 1 / 60, 0.35, out)).toBe(a);   // no history yet
+    const b = [{ x: 0.1, y: 0, z: 5 }, RIM];                 // 6 m/s across
+    const l = leadPoints(b, prev, 1 / 60, 0.35, out);
+    expect(l.length).toBe(3); expect(l[2].x).toBeCloseTo(0.1 + 6 * 0.35, 9); expect(l[2].z).toBeCloseTo(5, 9);
+    const c = [{ x: 3.1, y: 0, z: 5 }, RIM];                 // a 3 m jump in a frame: led at 9 m/s, not 180
+    expect(leadPoints(c, prev, 1 / 60, 0.35, out)[2].x).toBeCloseTo(3.1 + 9 * 0.35, 9);
+    expect(leadPoints(c, prev, 1 / 60, 0, out)).toBe(c);     // 0: the points as given
+  });
+  it('all three at their off values (room 0, lens 1, lead 0): the eye path of the view exactly as hoops-cam shipped it (recorded from that code)', () => {
+    knobs.set('hoops.highCamRoomOn', 0); knobs.set('hoops.highCamZoomMax', 1); knobs.set('hoops.highCamLeadSec', 0);
+    // Canopy's box, upright: a drive to the +x corner, then out to the check; [frame, eye x y z, target x y z, fov] from the untouched code
+    const GOLDEN: number[][] = [[0,6.071433719,6.8,12.794704749,0.13633796,1,3.296566072,0.8],[59,6.8,5.294898961,8.697587673,2.405062654,1,1.664217685,0.8],[119,6.8,5.831100388,9.714680755,1.856371823,1,1.803221885,0.8],[179,6.765460115,6.29882658,14.044847662,1.343211293,1,5.367435647,0.8],[239,5.595782309,6.228584171,15.890032233,0.245412008,1,7.327649898,0.8],[299,5.507267488,6.152629577,15.898919368,0.234620944,1,7.460921044,0.8],[359,5.503848933,6.150926437,15.899818925,0.2329452,1,7.464609682,0.8]];
+    const { scene, engine, cam, dir } = rig(390, 844); cam.fov = 0.8;
+    dir.setBounds({ minX: -8, maxX: 8, minZ: -1.9, maxZ: 17.1, minY: 0 });
+    const me = new Vector3(0, 0, 5), foe = new Vector3(0.9, 0, 2);
+    dir.setHighView({ court: COURT, on: () => true, frame: () => ({ play: { x: (me.x + foe.x) / 2, z: (me.z + foe.z) / 2 }, must: mustOf({ x: me.x, y: 1, z: me.z }, { x: foe.x, y: 1, z: foe.z }) }) });
+    dir.snapTo(me, RIM_V);
+    const got: number[][] = [];
+    for (let i = 0; i < 360; i++) {
+      if (i < 90) { me.x += 6.9 / 90; me.z -= 4.75 / 90; } else if (i < 200) { me.x -= 7.9 / 110; me.z += 7.4 / 110; }
+      foe.set(i < 90 ? me.x - 2.5 : me.x + 0.4, 0, i < 90 ? Math.max(0.3, me.z + 0.3) : me.z + 1.6);
+      dir.update(me, Vector3.Zero(), RIM_V);
+      if (i % 60 === 59 || i === 0) got.push([i, cam.position.x, cam.position.y, cam.position.z, cam.getTarget().x, cam.getTarget().y, cam.getTarget().z, cam.fov]);
+    }
+    scene.dispose(); engine.dispose();
+    expect(got.length).toBe(GOLDEN.length);
+    got.forEach((r, i) => r.forEach((v, k) => expect(v, `frame ${r[0]} field ${k}`).toBeCloseTo(GOLDEN[i][k], 6)));
+  });
+  it('the defaults on that drive (the rival following without a jump): the old view lost something for 7 frames in 10; the defaults for under 1 in 10', () => {
+    const run = () => {
+      const { scene, engine, cam, dir } = rig(390, 844); cam.fov = 0.8;
+      dir.setBounds({ minX: -8, maxX: 8, minZ: -1.9, maxZ: 17.1, minY: 0 });
+      const me = new Vector3(0, 0, 5), foe = new Vector3(-2.5, 0, 5.3);
+      dir.setHighView({ court: COURT, on: () => true, frame: () => ({ play: { x: (me.x + foe.x) / 2, z: (me.z + foe.z) / 2 }, must: mustOf({ x: me.x, y: 1, z: me.z }, { x: foe.x, y: 1, z: foe.z }) }) });
+      dir.snapTo(me, RIM_V);
+      let off = 0;
+      for (let i = 0; i < 360; i++) {
+        if (i < 90) { me.x += 6.9 / 90; me.z -= 4.75 / 90; } else if (i < 200) { me.x -= 7.9 / 110; me.z += 7.4 / 110; }
+        const k = Math.max(0, Math.min(1, (i - 90) / 40));   // his spot beside me eases from the corner side to behind me
+        foe.set(me.x - 2.5 + 2.9 * k, 0, Math.max(0.3, me.z + 0.3 + 1.3 * k));
+        dir.update(me, Vector3.Zero(), RIM_V);
+        const pose = { eye: { x: cam.position.x, y: cam.position.y, z: cam.position.z }, target: { x: cam.getTarget().x, y: cam.getTarget().y, z: cam.getTarget().z } };
+        const pts = [...mustOf({ x: me.x, y: 1, z: me.z }, { x: foe.x, y: 1, z: foe.z })];
+        if (!pts.every((q) => { const s2 = project(pose, cam.fov, UPRIGHT, q); return s2.ahead && Math.abs(s2.x) < 0.97 && Math.abs(s2.y) < 0.97; })) off++;
+      }
+      scene.dispose(); engine.dispose();
+      return off;
+    };
+    knobs.set('hoops.highCamRoomOn', 0); knobs.set('hoops.highCamZoomMax', 1); knobs.set('hoops.highCamLeadSec', 0);
+    const before = run();
+    knobs.clear();
+    const after = run();
+    // 2026-11-22: 257 of 360 frames with something off screen → 29 (the rest: both sprinting straight at the eye, the rival's head
+    // at the right edge for half a second)
+    expect(before).toBeGreaterThan(200);
+    expect(after).toBeLessThan(before / 8);
+  });
+});
+
+describe('phase 8: the high view for 3v3 (`hoops.threeVThreeCam`, ships 0: the owner\'s feel call)', () => {
+  it('ships OFF', () => { expect(THREEVTHREE_CAM).toBe(0); });
+  it('the team frame: the play is the middle of all six, the points are every body feet then head in order (the hero first), the rim last', () => {
+    const bodies = [{ x: 0, z: 6 }, { x: -4.8, z: 5.8 }, { x: 4.8, z: 5.8 }, { x: -1, z: 4 }, { x: 1, z: 4 }, { x: 0, z: 2 }];
+    const fr = teamFrame(RIM, () => bodies, (b) => b)();
+    expect(fr.must.length).toBe(13);
+    expect(fr.must[0]).toEqual({ x: 0, y: 0, z: 6 }); expect(fr.must[1]).toEqual({ x: 0, y: 1.9, z: 6 });
+    expect(fr.must[12]).toEqual(RIM);
+    expect(fr.play.x).toBeCloseTo(0, 9); expect(fr.play.z).toBeCloseTo((6 + 5.8 + 5.8 + 4 + 4 + 2) / 6, 9);
+    expect(teamCourt(RIM)).toEqual(COURT);
+  });
+  /** 3v3 spreads: the opening set, a drive with the help in, the ball swung to the wing, a post-up, the rebound scrum, the far corner. */
+  const SETS: Array<Array<[number, number]>> = [
+    [[0, 6], [-4.8, 5.8], [4.8, 5.8], [-1.2, 4.2], [1.2, 4.2], [0, 2.4]],
+    [[1.5, 3], [-5, 6.5], [5.5, 5], [1, 2], [-1.5, 3], [3.5, 4.5]],
+    [[-6.2, 5], [0, 7.5], [5.5, 2], [-5.2, 4], [-1, 5.5], [4, 2.5]],
+    [[2, 1.2], [-4, 6.5], [5.8, 4], [1.6, 0.6], [-2.5, 5], [4.6, 3.5]],
+    [[0.5, 1.5], [-1.5, 2.5], [2.5, 2.8], [0, 0.8], [-0.8, 1.8], [1.5, 1.2]],
+    [[6.5, 0.8], [-6.5, 0.8], [0, 7.8], [5.6, 1.2], [-5.6, 1.4], [0.5, 6.6]],
+  ];
+  it('desktop and a phone on its side: all six, head to feet, and the rim on screen in every set; upright, too (it widens)', () => {
+    const p = highCamParams();
+    for (const [a, fov] of [[16 / 9, 0.8], [844 / 390, 0.8], [UPRIGHT, LENS]] as const) for (const set of SETS) {
+      const bodies = set.map(([x, z]) => ({ x, z }));
+      const fr = teamFrame(RIM, () => bodies, (b) => b)();
+      const w = highWant(COURT, p, fr.play, fr.must, fov, a);
+      expect(highFits(COURT, p, w, fr.must, fov, a), `aspect ${a.toFixed(2)} set ${SETS.indexOf(set)}`).toBe(true);
+    }
+  });
+  function drive3(knob: number | null, armed: boolean) {
+    if (knob !== null) knobs.set('hoops.threeVThreeCam', knob);
+    const { engine, scene, cam, dir } = rig();
+    const bodies = SETS[0].map(([x, z]) => new Vector3(x, 0, z));
+    if (armed) dir.setTeamHighView(RIM, () => bodies, (b) => b);
+    dir.snapTo(bodies[0], RIM_V);
+    const poses: Array<{ pos: Vector3; fwd: Vector3 }> = [];
+    path().forEach((f) => {
+      bodies[0].copyFrom(f.me); bodies[3].copyFrom(f.foe);
+      dir.update(f.me, f.vel, RIM_V);
+      poses.push({ pos: cam.position.clone(), fwd: cam.getTarget().subtract(cam.position).normalize() });
+    });
+    scene.dispose(); engine.dispose();
+    return poses;
+  }
+  it('0 (the default): the 3v3 follow camera exactly as it shipped (every frame equal to a director the view was never armed on)', () => {
+    const off = drive3(null, true), none = drive3(null, false);
+    expect(off.length).toBe(none.length);
+    off.forEach((f, i) => { expect(f.pos.x).toBeCloseTo(none[i].pos.x, 9); expect(f.pos.y).toBeCloseTo(none[i].pos.y, 9); expect(f.pos.z).toBeCloseTo(none[i].pos.z, 9); expect(Vector3.Dot(f.fwd, none[i].fwd)).toBeCloseTo(1, 9); });
+  });
+  it('1: the look never turns through the drive, where the follow turns', () => {
+    const hi = drive3(1, true), fol = drive3(null, false);
+    const turn = (ps: typeof hi) => Math.max(...ps.map((q) => deg(Math.acos(Math.min(1, Vector3.Dot(q.fwd, ps[0].fwd))))));
+    expect(turn(hi)).toBeLessThan(0.01);
+    expect(turn(fol)).toBeGreaterThan(5);
   });
 });
