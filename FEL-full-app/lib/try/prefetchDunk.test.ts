@@ -30,14 +30,13 @@ function rig(fail = false) {
 const FILES = ['/models/a.glb', '/models/skins/b.jpg', '/sounds/c.mp3'];
 
 describe('the knob try.prefetchDunk', () => {
-  it('ships at 1; the catalogue row matches', () => {
-    expect(TRY_PREFETCH_DUNK).toBe(1);
+  it('ships at 0 (the measured cut missed the 25 % bar); the catalogue row matches', () => {
+    expect(TRY_PREFETCH_DUNK).toBe(0);
     const k = FEEL_KNOB_BY_ID.get('try.prefetchDunk')!;
-    expect([k.def, k.min, k.max, k.step]).toEqual([1, 0, 1, 1]);
-    expect(tryPrefetchDunk()).toBe(true);
+    expect([k.def, k.min, k.max, k.step]).toEqual([0, 0, 1, 1]);
+    expect(tryPrefetchDunk()).toBe(false);
   });
-  it('0: nothing at all is requested (today\'s /try)', async () => {
-    knob(0);
+  it('0 (shipped): nothing at all is requested (today\'s /try)', async () => {
     const { log, deps } = rig();
     expect(prefetchDunk(deps, FILES)).toBe(false);
     await flush();
@@ -45,7 +44,8 @@ describe('the knob try.prefetchDunk', () => {
   });
 });
 
-describe('what it fetches', () => {
+describe('what it fetches (try.prefetchDunk 1)', () => {
+  beforeEach(() => { knob(1); });
   it('1: the code chunk first, then every file, in the order the dunk asks for them', async () => {
     const { log, deps } = rig();
     expect(prefetchDunk(deps, FILES)).toBe(true);

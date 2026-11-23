@@ -88,7 +88,7 @@ export function GuestDunkShell({ challengeCode, reviewHref = null, ageBands = fa
   // IMPROVE-SCREENS PHASE 2 (lib/try/prefetchDunk.ts): while the birth date is asked, the Babylon dunk's code chunk and the first
   // static files it asks for go into the browser cache, so the wait after CONTINUE is shorter. GETs of public files only, with no
   // cookies, no body and no query: nothing about the visitor (the answer still gates every request that carries data, below).
-  // try.prefetchDunk 0 = nothing before the answer, as before.
+  // try.prefetchDunk 0 (shipped: the measured cut missed the bar; lib/try/prefetchDunk.ts) = nothing before the answer, as before.
   useEffect(() => {
     if (gate === 'ask' && hydrated && babylon) prefetchDunk();
   }, [gate, hydrated, babylon]);

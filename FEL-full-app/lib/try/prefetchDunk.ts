@@ -14,12 +14,20 @@
 // Each step waits for an idle moment, so a person typing the date is not slowed. Once per page.
 //
 // Knob `try.prefetchDunk` (lib/feel-panel/knobs.ts): 1 = this; 0 = today exactly (no request at all before the answer).
+//
+// SHIPS OFF (0), measured 2026-11-23 (trydunk.mts, phone tier: 390 x 844, CPU 4x, a 10 s typing pause, the rig's localhost network):
+//   birth date -> TAP TO START, today (0):  28.0 / 29.0 / 28.2 s (median 28.2; tennis control median 23.4 s in that hold)
+//                                    1:      29.0 / 24.7 / 19.9 s (median 24.7; tennis control median 21.1 s in that hold)
+// The cut is about 12 % raw and about 3 % against the control, short of the plan's 25 % bar. Every prefetched file was served from the
+// cache after the answer (0-byte bodies), so the download half works; on localhost a download costs almost nothing, and the rest of the
+// wait is the CPU building the scene and the shader pre-warm. And the early code import blocked the main thread for 1.2-1.75 s while the
+// visitor was on the step (a keystroke there would wait for it). A phone on a real network should gain more; not measured here.
 // assumption: fetching static files before the answer is not data collection (the plan's §7 assumption): every request is a
 // GET of a file any visitor's dunk loads, carrying nothing about this visitor. If the owner reads it otherwise, set it to 0.
 import { feel } from '@/lib/feel-panel/feel';
 
-/** try.prefetchDunk: 1 starts the guest dunk's code and first files while the birth date is asked; 0 = nothing until the answer. */
-export const TRY_PREFETCH_DUNK = 1;
+/** try.prefetchDunk: 1 starts the guest dunk's code and first files while the birth date is asked; 0 (shipped) = nothing until the answer. */
+export const TRY_PREFETCH_DUNK = 0;
 
 export const tryPrefetchDunk = (): boolean => feel('try.prefetchDunk', TRY_PREFETCH_DUNK) >= 0.5;
 
