@@ -662,6 +662,23 @@ describe('phase 8: the high view for 3v3 (`hoops.threeVThreeCam`, ships 0: the o
     expect(off.length).toBe(none.length);
     off.forEach((f, i) => { expect(f.pos.x).toBeCloseTo(none[i].pos.x, 9); expect(f.pos.y).toBeCloseTo(none[i].pos.y, 9); expect(f.pos.z).toBeCloseTo(none[i].pos.z, 9); expect(Vector3.Dot(f.fwd, none[i].fwd)).toBeCloseTo(1, 9); });
   });
+  it('1, in a dressed 3v3 court: the cage frame and the ring of light masts round the court (one merged mesh each, court and eye inside their boxes) do not hold the eye down', () => {
+    knobs.set('hoops.threeVThreeCam', 1);
+    const { scene, engine, cam, dir } = rig();
+    // the rig's dump (2026-11-23): court_cage_frame −9.7..9.7 × 0..3.9 × −2.8..17.9, pole_stb_masts −10.4..10.4 × 0..6.6 × −3.1..18.1
+    const posts = (name: string, h: number, x0: number, z0: number, z1: number) => {
+      const parts: Mesh[] = [];
+      for (const [x, z] of [[-x0, z0], [x0, z0], [-x0, z1], [x0, z1]]) { const m = MeshBuilder.CreateCylinder(name, { height: h, diameter: 0.2 }, scene); m.position.set(x, h / 2, z); parts.push(m); }
+      const merged = Mesh.MergeMeshes(parts, true)!; merged.name = name; merged.computeWorldMatrix(true); return merged;
+    };
+    posts('court_cage_frame', 3.9, 9.7, -2.8, 17.9); posts('pole_stb_masts', 6.6, 10.4, -3.1, 18.1);
+    const bodies = SETS[0].map(([x, z]) => new Vector3(x, 0, z));
+    dir.setTeamHighView(RIM, () => bodies, (b) => b);
+    dir.snapTo(bodies[0], RIM_V);
+    for (let i = 0; i < 60; i++) dir.update(bodies[0], Vector3.Zero(), RIM_V);
+    expect(cam.position.y).toBeGreaterThan(HIGH_CAM_HEIGHT_M - 0.5);   // at its resting height, not pinned in at the closest pull (3.6 m)
+    scene.dispose(); engine.dispose();
+  });
   it('1: the look never turns through the drive, where the follow turns', () => {
     const hi = drive3(1, true), fol = drive3(null, false);
     const turn = (ps: typeof hi) => Math.max(...ps.map((q) => deg(Math.acos(Math.min(1, Vector3.Dot(q.fwd, ps[0].fwd))))));

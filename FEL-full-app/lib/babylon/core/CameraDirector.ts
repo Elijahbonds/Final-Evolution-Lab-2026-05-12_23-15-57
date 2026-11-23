@@ -609,6 +609,8 @@ export class CameraDirector {
   private highClearCap: number | null = null;
   private highLast: { x: number; z: number } | null = null;
   private highClearAge = 0;
+  /** phase 8: the view was armed for a team game (setTeamHighView): the clear-view guard reads the court's own dressing as the court. */
+  private highTeam = false;
   /** phase 8: the fit's points last frame (the lead's velocity) and the reused list the lead points go in. */
   private highPrev: P3[] = [];
   private highLeadOut: P3[] = [];
@@ -616,6 +618,7 @@ export class CameraDirector {
   private highLens: number | null = null;
   /** Arm (or with null, disarm) the high view. */
   setHighView(v: { court: CourtFrame; on: () => boolean; frame: () => { play: P2; must: readonly P3[] } } | null): void {
+    this.highTeam = false;
     this.high = v; this.highS = null; this.highClearCap = null; this.highLast = null; this.highLens = null; this.highPrev = [];
   }
   /** lane/improve-camera (phase 8, 2026-11-22): arm the high view for 3v3 — the same view as 1v1's, framing every body (`bodies()` lists
@@ -623,6 +626,7 @@ export class CameraDirector {
    *  call). One call from the mode's load, before its first snapTo; SELECT / C switches to the follow and back for the run, as in 1v1. */
   setTeamHighView<B>(rim: P3, bodies: () => readonly B[], at: (b: B) => { x: number; z: number }): void {
     this.setHighView({ court: teamCourt(rim), on: () => feel('hoops.threeVThreeCam', THREEVTHREE_CAM) >= 0.5, frame: teamFrame(rim, bodies, at) });
+    this.highTeam = true;
   }
   private highArmed(): boolean { return this.high !== null && this.high.on(); }
   /** The high view is the play camera right now. */
@@ -637,8 +641,10 @@ export class CameraDirector {
     if (len < 0.5) return pull;
     const solid = (m: AbstractMesh): boolean => m.isEnabled() && m.isVisible && m.visibility > 0.25 && !m.skeleton && m.getTotalVertices() > 0
       && !HIGH_NEVER_BLOCKS.test(m.name);
+    const round = (m: AbstractMesh): boolean => { const bb = m.getBoundingInfo().boundingBox, a = bb.minimumWorld, b = bb.maximumWorld;
+      return t.x > a.x && t.x < b.x && t.y > a.y && t.y < b.y && t.z > a.z && t.z < b.z; };
     const hit = this.scene.pickWithRay(new Ray(t, d.scale(1 / len), len + HIGH_CAM_CLEAR_M), (m: AbstractMesh) =>
-      solid(m) && m.getBoundingInfo().boundingSphere.radiusWorld > 0.25);
+      solid(m) && m.getBoundingInfo().boundingSphere.radiusWorld > 0.25 && !(this.highTeam && round(m)));
     let cap = pull;
     if (hit?.hit && hit.distance !== undefined) cap = Math.max(HIGH_CAM_PULL_MIN, Math.min(pull, pull * (Math.max(0, hit.distance - HIGH_CAM_CLEAR_M) / len)));
     // …and the props near the view are kept (highInside): the eye is never INSIDE a prop's box — a palm's crown is sparse fronds, so
@@ -654,6 +660,10 @@ export class CameraDirector {
       const bb = mesh.getBoundingInfo().boundingBox, a = bb.minimumWorld, b2 = bb.maximumWorld;
       if (b2.x - a.x > HIGH_PROP_BOX_M || b2.z - a.z > HIGH_PROP_BOX_M || b2.y - a.y > HIGH_PROP_BOX_M) continue;
       if (b2.x < lo.x || a.x > hi.x || b2.y < lo.y || a.y > hi.y || b2.z < lo.z || a.z > hi.z) continue;
+      // lane/improve-camera phase 8 (the team view): a box round the look target itself is the court's own dressing — 3v3's cage frame
+      // and its ring of light masts (pole_stb_masts, 21 × 6.6 × 21 m, eye and court both inside it), not a prop the eye could stand in:
+      // read as one, it held the eye down at HIGH_CAM_PULL_MIN all game (rig, 2026-11-23). 1v1's guard is unchanged.
+      if (this.highTeam && t.x > a.x && t.x < b2.x && t.y > a.y && t.y < b2.y && t.z > a.z && t.z < b2.z) continue;
       this.highBoxes.push({ a: a.clone(), b: b2.clone() });
     }
     return cap;
