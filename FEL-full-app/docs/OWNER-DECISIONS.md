@@ -520,3 +520,11 @@ The owner, verbatim: **"Make sure the story and online play is finished."** (rel
   and the owner's netd redeploy as numbered copy-paste steps). The story is its own lane (`wt/story`).
 - The standing rules hold: netd protocol changes are additive; the owner redeploys netd, agents never do; the client keeps
   working against the netd that is deployed now and says "Parties need a server update" where it must.
+
+## owner 2026-11-23: close the gap on the basketball games
+
+The owner, verbatim: **"Can I get an agent working on making the gameplay for the basketball mode better. Still not 2ks equal. We're close tho, let's close the gap and pass them."** (relayed by the coordinator, 2026-11-23).
+
+- Lane `lane/hoops-gap` (from `lane/finish-release` at `48a7b244`), `docs/HOOPS-GAP-PLAN.md`: a measured gap audit of 1v1 and 3v3, then the
+  biggest gaps built in order, each behind its own feel knob (off = today exactly), ON only on a measured win.
+- The named series is the quality bar only: no names, art, modes, UI, animation data or sounds are copied from it.
