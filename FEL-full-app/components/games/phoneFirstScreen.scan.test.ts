@@ -53,7 +53,10 @@ describe('the game header on a phone', () => {
     expect(at('<GraphicsToggle />')).toBeLessThan(at('onClick={onFullscreen}'));
     // test changed (gameplay-clean, 2026-10-28): the pause (❚❚, 36 px, only while a game plays) joins BODY in the pushed-right
     // group, before it. Row one on a 393 px phone: Home 75 + title 108 + pause 36 + BODY 76 + three 12 px gaps = 331 of 361.
-    expect(header).toMatch(/<div className="ml-auto flex items-center gap-3">\s*<PauseButton \/>\s*<BodyControl \/>\s*<\/div>/);
+    // test changed (improve-screens phase 1, 2026-11-22): with the stage fitted to the header (ui.stageFitsHeader 1), a harness game holds
+    // the pause's 44 px place from the first frame (an empty slot until play starts), because the pause arriving mid-countdown wrapped the
+    // header one more row and shrank the stage under the player (layout shift). The order is unchanged: the pause, then BODY.
+    expect(header).toMatch(/<div className="ml-auto flex items-center gap-3">\s*(<PauseButton \/>|\{stageFitOn && isBabylon\(mode\) \? <span data-fel-pause-slot className="grid h-11 w-11 shrink-0 place-items-center"><PauseButton \/><\/span> : <PauseButton \/>\})\s*<BodyControl \/>\s*<\/div>/);
   });
 
   it('keeps the PRQ badge on one line, and only BODY pushes the controls right', () => {

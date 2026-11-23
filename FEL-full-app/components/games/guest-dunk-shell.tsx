@@ -14,6 +14,7 @@ import { lockTryAge, tabStorage, tryAgeBand } from '@/lib/privacy/tryAgeGate';  
 import type { GameProps, GameResult } from '@/components/games/game-shell';
 import { GameLoading } from '@/components/games/game-loading';
 import { REVIEW_BUTTON_LABEL } from '@/lib/coach-store/storeOffers';   // STORE-OFFER-1 (a constant: no flag read on the client)
+import { StageFitStyle, useStageFit } from '@/components/games/stage-fit';   // improve-screens phase 1 (ui.stageFitsHeader)
 
 const spinner = () => (
   <GameLoading />
@@ -75,6 +76,13 @@ export function GuestDunkShell({ challengeCode, reviewHref = null, ageBands = fa
   // dropped and the page sat on the question for minutes (DIAG Q1). They stay disabled, with a "Loading…" line, until mount.
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => { setHydrated(true); }, []);
+
+  // IMPROVE-SCREENS PHASE 1 (lib/ui/stageFit.ts): the dunk host is calc(100dvh-3.25rem), but this header is taller than
+  // 3.25rem and the stage has 12 px of padding above it, so on a phone held upright the bottom of the dunk sat under the
+  // edge of the screen. The stage reads the header's real height instead (sideways, game-surface.css still rules).
+  const headerRef = useRef<HTMLElement | null>(null);
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const stageFit = useStageFit(headerRef, stageRef, true);
 
   // A browser that already carries the block flag skips the question. Reads only; sends nothing.
   useEffect(() => {
@@ -265,7 +273,7 @@ export function GuestDunkShell({ challengeCode, reviewHref = null, ageBands = fa
 
   return (
     <div className="flex min-h-screen flex-col bg-[#050505]">
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-[#050505]/85 backdrop-blur-md">
+      <header ref={headerRef} className="sticky top-0 z-40 border-b border-white/10 bg-[#050505]/85 backdrop-blur-md">
         <div className="mx-auto flex max-w-[1200px] items-center gap-3 px-4 py-2.5">
           {/* DUNK-VISUAL-POLISH: on /try the brand is the only thing in the chrome above a live run, and it was a link
               HOME — one stray click on the header and a guest's contest is gone, with no confirm and nothing to come
@@ -321,7 +329,8 @@ export function GuestDunkShell({ challengeCode, reviewHref = null, ageBands = fa
       {/* CONTROLLER-TRY-FIX item 1 (C1): while the stage is live the game owns the pad (lib/nav/focus.ts OWNS_INPUT), so the site's menu
           focus stands aside: pad A no longer focuses and clicks the header QUIT, and pad B no longer runs history.back(). The age step,
           the claim sheet and the result modal keep pad navigation (the attribute is off there). The age gate itself is untouched. */}
-      <div className="relative mx-auto w-full max-w-[1200px] flex-1 px-2 py-3 sm:px-4" data-own-input={gate !== 'ask' && !claimOpen && !result ? '' : undefined}>
+      <div ref={stageRef} {...stageFit} className="relative mx-auto w-full max-w-[1200px] flex-1 px-2 py-3 sm:px-4" data-own-input={gate !== 'ask' && !claimOpen && !result ? '' : undefined}>
+        <StageFitStyle />
         {gate === 'ask' ? (
           <div className="py-10" data-testid="guest-age-step">
             <AgeStep mode="signup" onLocked={onAgeLocked} onBlocked={onAgeBlocked} ready={hydrated} />

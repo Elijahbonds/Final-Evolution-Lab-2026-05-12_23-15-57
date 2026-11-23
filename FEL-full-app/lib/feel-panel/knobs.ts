@@ -2337,6 +2337,12 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/core/jerseyDecals.ts JERSEY_DECALS',
     hint: 'On: the new basketball and football jerseys carry the player number on the chest and back and the name across the back. Off: a blank jersey, as before.',
   },
+  // ── lane/improve-screens (2026-11-22, docs/IMPROVE-10-PHASE-AUDIT.md phases 1, 2, 6): the game shell and the screens ──
+  {
+    id: 'ui.stageFitsHeader', label: 'Phone upright: the game takes the screen the header leaves (1) / sized for a one-row header (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',
+    source: 'lib/ui/stageFit.ts STAGE_FITS_HEADER',
+    hint: 'On: the stage reads the real height of the header above it, so the bottom of the game and the move stick stay on the screen. Off: the old 100dvh less 3.25rem box, which ran off the bottom of an upright phone.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));

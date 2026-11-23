@@ -1200,3 +1200,11 @@ real online game these are what ships; each is the record of the number and the 
 | `net.poseHz` | 15 | — | Body pose updates a second (roots and the ball always 30). |
 | `net.possessionSwap` | 1 | — | 1v1: the page whose player has the ball runs the game. 0: the host runs every possession. |
 | `net.karateTogether` | 0 | 1 | "Start together" offers Karate co-op (not shared yet: two fights). |
+
+## improve-screens, 2026-11-22 (owner: "Do a 10 phase pass improving the areas that need it most"; docs/IMPROVE-10-PHASE-AUDIT.md phases 1, 2, 6)
+
+Group "Screens · phone". NEW switches, each **1 = on, 0 = today's screen exactly** (tests pin both ends). No existing tuned number moved.
+
+| Knob | Default | Restores the old behaviour at | What it does |
+|---|---|---|---|
+| `ui.stageFitsHeader` | 1 | 0 | Phase 1. On a phone held upright the game's stage takes the screen its header really leaves (the header wraps to two or three rows there), so the bottom of the game and the move stick stay on the screen. 0: the hosts' `calc(100dvh - 3.25rem)` box, sized for a one-row header. Sideways, full screen and the stream view are untouched either way. (`lib/ui/stageFit.ts`) |
