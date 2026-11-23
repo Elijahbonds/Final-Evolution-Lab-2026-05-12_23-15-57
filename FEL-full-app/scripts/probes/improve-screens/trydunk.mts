@@ -23,7 +23,7 @@ mkdirSync(out, { recursive: true });
 dbUp();
 const stop = await serve(join(out, 'server.log'));
 /** a static file: the build's chunks and media, or a public/ asset; nothing that a server answers per visitor */
-export const STATIC = /^\/(_next\/static\/|models\/|textures\/|audio\/|sounds\/|fonts\/|images\/|img\/|hdr\/|env\/|icons?\/|favicon|manifest|[^/?]+\.(png|jpe?g|webp|svg|ico|glb|gltf|bin|ktx2|env|dds|mp3|ogg|wav|m4a|json|woff2?)$)/;
+export const STATIC = /^\/(_next\/static\/|models\/|backdrops\/|loaders\/|textures\/|audio\/|sounds\/|fonts\/|images\/|img\/|hdr\/|env\/|icons?\/|favicon|manifest|[^/?]+\.(png|jpe?g|webp|svg|ico|glb|gltf|bin|ktx2|env|dds|mp3|ogg|wav|m4a|json|woff2?)$)/;
 try {
   const browser = await chromium.launch({ executablePath: chromiumExe(), args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required'] });
   const all: unknown[] = [];
