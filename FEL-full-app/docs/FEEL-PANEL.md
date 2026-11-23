@@ -1200,3 +1200,16 @@ real online game these are what ships; each is the record of the number and the 
 | `net.poseHz` | 15 | — | Body pose updates a second (roots and the ball always 30). |
 | `net.possessionSwap` | 1 | — | 1v1: the page whose player has the ball runs the game. 0: the host runs every possession. |
 | `net.karateTogether` | 0 | 1 | "Start together" offers Karate co-op (not shared yet: two fights). |
+
+## hoops-gap, 2026-11-23 (owner: "close the gap and pass them"; docs/HOOPS-GAP-PLAN.md; the owner has not felt these yet)
+
+NEW switches, each **1 = on, 0 = today's game exactly** (tests pin both ends). No existing tuned number moved.
+
+- `hoops.aiShotIqOn` **0** (group "Hoops · rival offense"; `hoops/teamOffense3v3.ts` `AI_SHOT_IQ_ON`, with its new numbers
+  `SWING_OPEN_M` 1.5 m, `STEPBACK_SEC` 0.38 s, `STEPBACK_MPS` 3.2 m/s, `SMOTHER_M` 1.6 m, `STEPBACK_RANGE_EXTRA_M` 1.0 m, `HELP_FACE_M`
+  1.4 m): **the 3v3 rivals' shot IQ.** Held in front, their handler swings it to a team-mate whose man must close out on him before he
+  pulls up into the defender; with nobody to swing to he steps back once for room, then pulls up; at the rim with a body in his face he
+  kicks it to the open man (drive and kick). Before: 80 % of their shots were pull-ups held in front, every one contested 0.5 or more.
+  Headless (rival-sim 3v3, PRO, a defender who sees the ball 220 ms late, three seeds × 300 possessions): points a shot 0.627 → 0.666,
+  points a possession 0.507 → 0.530, passes a possession 0.28 → 0.44, catch-and-shoots 70 → 149. Feel-check: 3v3 PRO on defence — do
+  they move the ball and find the open man, and are they harder to stop?

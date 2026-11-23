@@ -32,6 +32,7 @@ const { Vector3 } = await import('@babylonjs/core');
 const mkRng = (seed: number) => { let s = seed >>> 0; return () => { s += 0x6D2B79F5; let r = Math.imul(s ^ (s >>> 15), 1 | s); r ^= r + Math.imul(r ^ (r >>> 7), 61 | r); return ((r ^ (r >>> 14)) >>> 0) / 4294967296; }; };
 const DT = 1 / 60;
 const RIM = new Vector3(0, 3.05, -0.6), RIM_FLOOR = new Vector3(0, 0, -0.6);
+const REACT_MS_3V3 = Number(process.env.REACT_MS ?? 220);   // hoops-gap lane: the human defender's lag (`--def human`)
 const TELL = 0.35, DRIVE_MPS = 5.4, DUNK_SHARE = 0.55, HARD_GAP = 0.9, PASS_MPS = 14;
 const med = (a: number[]) => { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.floor((s.length - 1) / 2)] : NaN; };
 const p99 = (a: number[]) => { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.min(s.length - 1, Math.floor(s.length * 0.99))] : NaN; };
@@ -43,7 +44,7 @@ export async function sim3v3(tier: string, o: Opts) {
   const rng = mkRng(o.seed * 104729 + tier.length * 31);
   const knobs = THREEV_TIER[tier as 'pro'];
   const poss: string[][] = []; const lens: number[] = []; const driverAcc: number[] = [];
-  const shots: Record<string, number[]> = {}; const pts: number[] = [];
+  const shots: Record<string, number[]> = {}; const pts: number[] = []; const contests: Record<string, number[]> = {};   // hoops-gap lane (2026-11-23): the contest at each release, by look
   let screenOr2Pass = 0, steals = 0, picks = 0, blocks = 0, capped = 0, passesTot = 0, screensTot = 0;
   for (let p = 0; p < o.n; p++) {
     // bodies: their three around the paint (they were defending), my three a step off them
@@ -61,7 +62,7 @@ export async function sim3v3(tier: string, o: Opts) {
     const plan = new TeamOffense3v3(tier as 'pro', rules.TEAM_READS, rng); plan.beginPossession();
     const acts: string[] = []; let passes = 0, screens = 0;
     let meStun = 0, jumpAge = Infinity, nextPoke = 0.5 + rng() * 0.9, gatherSeen = -1, jumped = false;
-    let t = 0, end = '';
+    let t = 0, end = ''; const seenHist: InstanceType<typeof Vector3>[] = [];
     // the touch
     type Touch = { kind: 'plan' | 'legacy' | 'cs'; t: number; from?: typeof foes[0]; end?: typeof foes[0]; len?: number; sec?: number; v0?: number; bend?: InstanceType<typeof AccelFollower>; dir?: typeof foes[0]; kickRolled?: boolean; tell?: string | null; intent?: string };
     let touch: Touch | null = null;
@@ -98,16 +99,19 @@ export async function sim3v3(tier: string, o: Opts) {
       const pct = RB.aiSharedShotOn() ? expectedMake(style, c.contest, d2(sh, RIM_FLOOR), RB.aiTimingSigmaSec(tier as never), RB.skillShotOn())
         : rivalReleasePct({ style, pullUp, distToRim: d2(sh, RIM_FLOOR), defenseFactor: c.contest, ground: 0, mistake: 1 }, knobs);
       const key = style === 'layup' ? 'layup' : pullUp ? 'jumper_cs' : 'jumper';
-      (shots[key] ??= []).push(pct); pts.push(pct * rivalPoints(style, isThree(sh, RIM)));
+      (shots[key] ??= []).push(pct); pts.push(pct * rivalPoints(style, isThree(sh, RIM))); (contests[key] ??= []).push(c.contest);
       acts.push(style === 'layup' ? 'layup' : 'pull_up');
       end = 'shot'; void dd;
     };
     for (; t < 30 && !end; t += DT) {
       const H = foes[hi];
       // ── me: the rig's bot defender on the driver ──
-      const seenH = H;
+      // hoops-gap lane: `--def human` — the defender sees where the ball is REACT_MS late (rival-sim.mts's 1v1 human, here too)
+      seenHist.push((flight ? flight.to : H).clone()); if (seenHist.length > 120) seenHist.shift();
+      const lag = o.def === 'human' ? Math.round(REACT_MS_3V3 / 1000 / DT) : 0;
+      const seenH = seenHist[Math.max(0, seenHist.length - 1 - lag)];
       const rx = RIM.x - seenH.x, rz = RIM.z - seenH.z, rl = Math.hypot(rx, rz) || 1;
-      const target = flight ? flight.to : seenH;
+      const target = seenH;
       const gx = target.x + rx / rl * 1.0, gz = target.z + rz / rl * 1.0; const ex = gx - mine[0].x, ez = gz - mine[0].z, el = Math.hypot(ex, ez);
       const mag = meStun > 0 || jumpAge < 0.75 ? 0 : el < 0.15 ? 0 : Math.min(1, 0.3 + el);
       meCtl.update(DT, el > 1e-4 ? ex / el * mag : 0, el > 1e-4 ? -ez / el * mag : 0, false);
@@ -214,10 +218,11 @@ export async function sim3v3(tier: string, o: Opts) {
     makePct: Object.fromEntries(Object.entries(shots).map(([k, a]) => [k, { n: a.length, pct: a.some((x) => Number.isFinite(x)) ? +(100 * mean(a.filter((x) => Number.isFinite(x)))).toFixed(1) : null }])),
     ptsPerShot: +mean(pts).toFixed(3),
     steals, picks, blocks, capped, mix, driverAccelP99: +p99(driverAcc).toFixed(1),
+    contest: Object.fromEntries(Object.entries(contests).map(([k, a]) => [k, { med: +med(a).toFixed(2), over05: +(100 * a.filter((x) => x >= 0.5).length / a.length).toFixed(0) }])),   // hoops-gap lane: the contest at the release (median, % at 0.5 or more)
     lensRaw: lens, ptsPerPoss: pts.reduce((a, b) => a + b, 0) / o.n,   // hoops-flow: the game-length model reads the raw lengths and the expected points a possession
   };
 }
 export function print(r: Awaited<ReturnType<typeof sim3v3>>) {
-  console.log(`3v3 ${r.tier.padEnd(6)} team ${r.team ? 1 : 0}: variety/10 ${r.variety10.distinctMean} (min ${r.variety10.distinctMin}) bits ${r.variety10.bitsMean} (min ${r.variety10.bitsMin}) | poss med ${r.possSec.med}s [${r.possSec.p25}–${r.possSec.p75}] | screen-or-2-passes ${r.screenOr2PassPct}% (passes ${r.passesPerPoss}, screens ${r.screensPerPoss}) | make ${JSON.stringify(r.makePct)} pts/shot ${r.ptsPerShot} | steals ${r.steals} picks ${r.picks} blocks ${r.blocks} capped ${r.capped} | driver accel p99 ${r.driverAccelP99}`);
+  console.log(`3v3 ${r.tier.padEnd(6)} team ${r.team ? 1 : 0}: variety/10 ${r.variety10.distinctMean} (min ${r.variety10.distinctMin}) bits ${r.variety10.bitsMean} (min ${r.variety10.bitsMin}) | poss med ${r.possSec.med}s [${r.possSec.p25}–${r.possSec.p75}] | screen-or-2-passes ${r.screenOr2PassPct}% (passes ${r.passesPerPoss}, screens ${r.screensPerPoss}) | make ${JSON.stringify(r.makePct)} pts/shot ${r.ptsPerShot} pts/poss ${r.ptsPerPoss.toFixed(3)} contest ${JSON.stringify(r.contest)} | steals ${r.steals} picks ${r.picks} blocks ${r.blocks} capped ${r.capped} | driver accel p99 ${r.driverAccelP99}`);
   console.log(`           mix ${JSON.stringify(r.mix)}`);
 }

@@ -1387,6 +1387,12 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/hoops/teamOffense3v3.ts RIVAL_PULLUP_MAX_M',
     hint: 'The off-the-dribble pull-up is taken only inside this (the release\'s jumper base has no range term).',
   },
+  // hoops-gap (lane/hoops-gap, owner 2026-11-23 "close the gap and pass them"): new numbers, the owner has felt none of them.
+  {
+    id: 'hoops.aiShotIqOn', label: '3v3 rivals: shot IQ, the open man before a smothered pull-up (0 = off)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · rival offense',
+    source: 'lib/babylon/hoops/teamOffense3v3.ts AI_SHOT_IQ_ON',
+    hint: '1: held in front, the 3v3 handler swings it to a man his defender must close out on, else steps back once for room, then pulls up; at the rim with a body in his face he kicks to the open man. 0: as before.',
+  },
   // hoops-p04 (1v1/3v3 phase 4 "feet and transitions"): one blend + minimum-hold rule (anim/hoopsTransitions), the shot clips on their
   // release (hoops/releaseTiming). Every default is this lane's; the owner has felt none of them.
   {
