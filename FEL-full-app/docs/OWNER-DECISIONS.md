@@ -550,3 +550,11 @@ build order and the measured first slice).
   physical than capsules (an active ragdoll, physics-driven limbs) go behind their own knob, ship OFF, and are measured for phone
   frame time first. `assumption:` (lane/physics-arena) the lane does not guess at that game's mechanics; where the plan needs a
   design choice the owner should make, it is a question in the lane's report and in `docs/PHYSICS-ARENA-PLAN.md` §6.
+
+## owner 2026-11-23: close the gap on the basketball games
+
+The owner, verbatim: **"Can I get an agent working on making the gameplay for the basketball mode better. Still not 2ks equal. We're close tho, let's close the gap and pass them."** (relayed by the coordinator, 2026-11-23).
+
+- Lane `lane/hoops-gap` (from `lane/finish-release` at `48a7b244`), `docs/HOOPS-GAP-PLAN.md`: a measured gap audit of 1v1 and 3v3, then the
+  biggest gaps built in order, each behind its own feel knob (off = today exactly), ON only on a measured win.
+- The named series is the quality bar only: no names, art, modes, UI, animation data or sounds are copied from it.

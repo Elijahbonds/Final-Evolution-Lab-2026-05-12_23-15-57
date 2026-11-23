@@ -1387,6 +1387,17 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/hoops/teamOffense3v3.ts RIVAL_PULLUP_MAX_M',
     hint: 'The off-the-dribble pull-up is taken only inside this (the release\'s jumper base has no range term).',
   },
+  // hoops-gap (lane/hoops-gap, owner 2026-11-23 "close the gap and pass them"): new numbers, the owner has felt none of them.
+  {
+    id: 'hoops.aiShotIqOn', label: '3v3 rivals: shot IQ, the open man before a smothered pull-up (0 = off)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · rival offense',
+    source: 'lib/babylon/hoops/teamOffense3v3.ts AI_SHOT_IQ_ON',
+    hint: '1: held in front, the 3v3 handler swings it to a man his defender must close out on, else steps back once for room, then pulls up; at the rim with a body in his face he kicks to the open man. 0: as before.',
+  },
+  {
+    id: 'hoops.pnrCoverageOn', label: 'Defence: pick-and-roll coverage, over a shooter, under one far out (0 = off)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · defense',
+    source: 'lib/babylon/hoops/pnrCoverage.ts PNR_COVERAGE_ON',
+    hint: '1: the man on the ball plays the screen (over inside 7.5 m, under past it), the screener\'s man shows or drops, a free roll man is tagged, and the switch comes only when beaten. 0: as before.',
+  },
   // hoops-p04 (1v1/3v3 phase 4 "feet and transitions"): one blend + minimum-hold rule (anim/hoopsTransitions), the shot clips on their
   // release (hoops/releaseTiming). Every default is this lane's; the owner has felt none of them.
   {
@@ -2437,6 +2448,17 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'arena.dunkJumpVy', label: 'Arena dunk take-off speed', def: 4.3, min: 3, max: 5.5, step: 0.05, unit: 'm/s', group: 'Physics arena',
     source: 'lib/babylon/arena/arenaConfig.ts DUNK_JUMP_VY',
     hint: 'How high a dunk goes: too low and the ball never gets over the ring.',
+  },
+  // ── lane/improve-world (2026-11-22, the 10-phase pass, phase 5): sound in the story and on the coast ──
+  {
+    id: 'story.sfxOn', label: 'Story: footsteps, hits, spells, the partner, camps, bosses and birds (1) / the wind bed and voices only (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Story · flow',
+    source: 'lib/babylon/adventure/audio/storySfx.ts STORY_SFX_ON',
+    hint: 'Sound effects from the shipped sound kit and three sounds made in code (no new files), driven by the story host\'s own events. Mute and volume apply. 0 = the story was silent in play but for the wind and the spoken lines, as before.',
+  },
+  {
+    id: 'coast.oceanBed', label: 'Coast zone: the sea bed, waves, gulls and footsteps (1) / no bed asked for, so the stadium crowd plays (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Coast · zone',
+    source: 'lib/adventure/coast/zoneSound.ts COAST_OCEAN_BED',
+    hint: 'The zone asks for the ocean bed in its load as Venice does, with waves on the nearest shore, a gull now and then and steps on sand, boards or in the shallows. 0 = the harness started its stadium crowd on the first press, as before.',
   },
 ];
 

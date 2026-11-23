@@ -18,7 +18,8 @@
 //
 // Every number is a feel knob (new; the owner felt none of them yet) with 0/1 A/B switches, so the owner can play the release's
 // defence (both off) on the phone. Ranked / staked / head-to-head runs read the defaults (feel()). Pure: no Babylon.
-import { feel } from '../../feel-panel/feel';   // feel-panel knobs hoops.double* / hoops.switch* (lib/feel-panel/knobs.ts)
+import { feel } from '../../feel-panel/feel';
+import { pnrCoverageOn, beatenOnScreen } from './pnrCoverage';   // hoops-gap: switch only when beaten, with the coverage on   // feel-panel knobs hoops.double* / hoops.switch* (lib/feel-panel/knobs.ts)
 
 export interface XZ { x: number; z: number }
 const dist = (a: XZ, b: XZ): number => Math.hypot(a.x - b.x, a.z - b.z);
@@ -42,7 +43,7 @@ export const SWITCH_COOLDOWN_SEC = 1.5;
 /** An attacker this close to the on-ball defender is a body in his way: a pick (planar m; geometry, not a feel number). */
 export const SCREEN_BODY_M = 1.0;
 
-export interface TeamDTune { doubleOn: boolean; paintM: number; afterSec: number; maxSec: number; coolSec: number; switchOn: boolean; helpM: number; switchCoolSec: number }
+export interface TeamDTune { doubleOn: boolean; paintM: number; afterSec: number; maxSec: number; coolSec: number; switchOn: boolean; helpM: number; switchCoolSec: number; /** hoops-gap: switch only when the screened man is beaten (hoops.pnrCoverageOn). */ switchBeatenOnly?: boolean }
 export function teamDTune(): TeamDTune {
   return {
     doubleOn: feel('hoops.doubleTeamOn', DOUBLE_TEAM_ON) >= 0.5,
@@ -53,6 +54,7 @@ export function teamDTune(): TeamDTune {
     switchOn: feel('hoops.switchOnScreenOn', SWITCH_ON_SCREEN_ON) >= 0.5,
     helpM: feel('hoops.switchHelpM', SWITCH_HELP_M),
     switchCoolSec: feel('hoops.switchCooldownSec', SWITCH_COOLDOWN_SEC),
+    switchBeatenOnly: pnrCoverageOn(),
   };
 }
 
@@ -104,7 +106,7 @@ export class TeamDefense {
         const j = screener >= 0 ? marks.indexOf(screener) : -1;
         if (j >= 0 && j !== i) {
           const gj = dist(v.defenders[j], hp), gi = dist(di, hp);
-          if (gj <= t.helpM && gj < gi) {
+          if (gj <= t.helpM && gj < gi && (!t.switchBeatenOnly || beatenOnScreen(di, hp, v.rim))) {
             const next = [...marks]; next[i] = marks[j]; next[j] = marks[i]; marks = next;
             this.coolSwitch = t.switchCoolSec; event = { kind: 'switch', a: i, b: j };
           }

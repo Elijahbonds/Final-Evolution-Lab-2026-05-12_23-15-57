@@ -1232,3 +1232,51 @@ ON because the arena is a new place the owner asked for; each restores today at 
 
 **assumption:** the bounds are safe, not tuned. Feel-check: `/play/arena?playtest=1`, shoot from the elbow and let go at the top
 of the jump, then early and late; press C (or the POV button) and shoot from your own eyes.
+
+## improve-world, 2026-11-22 (the 10-phase pass, lane C: the story and the zones; docs/IMPROVE-10-PHASE-AUDIT.md phases 5, 7, 9)
+
+All NEW switches and numbers, chosen on this lane; none moves an existing tuned number. Each switch's 0 restores the behaviour before
+this pass exactly (a test pins both ends).
+
+- `story.sfxOn` 1 (group "Story · flow"; `lib/babylon/adventure/audio/storySfx.ts` `STORY_SFX_ON`, phase 5): the story's sound effects,
+  driven by the host's own events: your footsteps, jump, landing, strike swing, homing dash; the rail's clank, grind hiss, switch,
+  trick and hop-off; every hit by its outcome (hit, block, parry, guard break, dodge); a foe going down; a monster's and the boss's
+  wind-up; spells pitched by element; the partner's steps, spells, revive and fusion; a camp's drum, the boss's sting and phase change,
+  a cleared camp or boss, a chapter's end, a gate's warp, a soft tick on each new line of a scene; birds and a gust over the wind bed.
+  SoundKit's synths plus three sounds made in code (`lib/babylon/audio/natureSfx.ts`: a bird, a gull, a wave); no new files. Mute and
+  volume apply. New [TUNE] numbers in the file: `STEP` (0.8 m a step; ground 1.25 pitch / 0.11 volume), `HEAR` (full within 6 m,
+  nothing past 60 m), `GRIND_EVERY` 0.12 s, `AMBIENT` (a bird every 3–9 s, a gust every 10–20 s). 0 = the wind bed and the spoken
+  lines only, as before. Measured (lane C rig, phone tier, 3 runs a side interleaved, the Venice hub as control): sound starts in 8 s of
+  the opening scene 0 / 0 / 0 → 8 / 11 / 7, in 8 s of play in control 0 / 0 / 0 → 5 / 27 / 7; load and frame times inside the control's
+  spread. Ships ON. Feel-check: play the rail run and the first camp with the sound up.
+- `coast.oceanBed` 1 (group "Coast · zone"; `lib/adventure/coast/zoneSound.ts` `COAST_OCEAN_BED`, phase 5): the zone asks for the
+  ocean bed in its load (as Venice does), so the harness no longer starts its stadium crowd on the first press; with it, a wave on the
+  nearest shore every 3.5–6.5 s (louder within 10 m, nothing past 90 m), a gull every 6–14 s, and footsteps by surface (sand: Venice's
+  sand step; the dock's and bridge's boards 1.45 / 0.15; the shallows a splash). 0 = no bed asked for: the stadium crowd, as before.
+  Measured (same runs): the bed built 900 Hz (the stadium crowd) in 3 of 3 → 500 Hz (the ocean) in 3 of 3; Venice unchanged (500 Hz both
+  sides). Ships ON.
+
+## hoops-gap, 2026-11-23 (owner: "close the gap and pass them"; docs/HOOPS-GAP-PLAN.md; the owner has not felt these yet)
+
+NEW switches, each **1 = on, 0 = today's game exactly** (tests pin both ends). No existing tuned number moved.
+
+- `hoops.aiShotIqOn` **0** (group "Hoops · rival offense"; `hoops/teamOffense3v3.ts` `AI_SHOT_IQ_ON`, with its new numbers
+  `SWING_OPEN_M` 1.5 m, `STEPBACK_SEC` 0.38 s, `STEPBACK_MPS` 3.2 m/s, `SMOTHER_M` 1.6 m, `STEPBACK_RANGE_EXTRA_M` 1.0 m, `HELP_FACE_M`
+  1.4 m): **the 3v3 rivals' shot IQ.** Held in front, their handler swings it to a team-mate whose man must close out on him before he
+  pulls up into the defender; with nobody to swing to he steps back once for room, then pulls up; at the rim with a body in his face he
+  kicks it to the open man (drive and kick). Before: 80 % of their shots were pull-ups held in front, every one contested 0.5 or more.
+  Headless (rival-sim 3v3, PRO, a defender who sees the ball 220 ms late, three seeds × 300 possessions): points a shot 0.627 → 0.666,
+  points a possession 0.507 → 0.530, passes a possession 0.28 → 0.44, catch-and-shoots 70 → 149. Feel-check: 3v3 PRO on defence — do
+  they move the ball and find the open man, and are they harder to stop?
+- `hoops.pnrCoverageOn` **0** (group "Hoops · defense"; `hoops/pnrCoverage.ts` `PNR_COVERAGE_ON`, wired in `core/BasketballCore.ts`
+  DefenderBrain and `hoops/teamDefense.ts`; new numbers `PNR_OVER_MAX_M` 7.5 m, `PNR_SCREEN_M` 1.4 m, `PNR_SCREEN_BALL_M` 2.8 m,
+  `PNR_PLANTED_MPS` 0.6 m/s, `PNR_SHOW_SEC` 0.6 s, `PNR_SHOW_M` 1.1 m, `PNR_TAG_RIM_M` 5 m, `PNR_ROLL_MPS` 1.5 m/s, `PNR_TAG_FREE_M` 1.6 m,
+  `PNR_BEATEN_M` 1.9 m, `PNR_UNDER_LEVER` 0.45, `PNR_DROP_LEVER` 0.45, `PNR_TAG_LEVER` 0.35, `PNR_SPOT_DEAD_M` 0.4 m): **the AI's
+  pick-and-roll coverage** (3v3 only; a 1v1 brain has no screens). The man on the ball plays the screen — over the top on a handler inside
+  7.5 m of the rim, under past it (he used to run into the screener: the navigate read skipped any body near the ball); the screener's
+  man shows into the handler's corner (over) or drops (under); the low man tags a free roll man; the team defence switches only when the
+  screened man is beaten (it switched whenever the geometry allowed). Headless (`scripts/probes/hoops-close/pnr-sim.mts`, three AI
+  defenders against the 3v3 team offence, PRO, seeds 7 / 11 / 23 × 300): points a pick-and-roll possession 0.597 / 0.604 / 0.579 →
+  0.655 / 0.635 / 0.592 — **the defence gets a little worse, not better** (today's switch-on-every-screen keeps a man in front); the
+  roll man got an open look 0 % both ways (the screener pops nearly every time: the low man at the rim keeps his roll lane shut). OFF for the owner to
+  feel. Feel-check: 3v3 PRO, call a screen and come off it at the arc.

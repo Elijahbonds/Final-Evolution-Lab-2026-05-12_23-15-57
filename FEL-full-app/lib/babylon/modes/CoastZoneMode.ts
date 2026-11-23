@@ -50,6 +50,10 @@ import { spotFromSearch } from '@/lib/adventure/coast/spotReturn';
 import { COAST_QUESTS_ON, questById, readQuests, withPlayed, withQuestTaken, withQuestsChecked } from '@/lib/adventure/coast/zoneQuests';
 import type { ZoneSpot } from '@/lib/adventure/coast/zoneLayout';
 import { signedOutVisitor } from '../core/visitor';   // the harness sets it from runMode's `guest` on every mount
+// improve pass phase 5 (coast.oceanBed): the sea bed and the shore, Venice's way (lib/adventure/coast/zoneSound.ts)
+import { SoundKit } from '../audio/SoundKit';
+import { playNature } from '../audio/natureSfx';
+import { COAST_OCEAN_BED, CoastSoundscape } from '@/lib/adventure/coast/zoneSound';
 
 export const COAST_MODE_ID = 'coast_zone';
 /** The stick's basis latches while held (AdventureMode's rule): below this it lets go. */
@@ -86,6 +90,8 @@ interface St {
   questsOn: boolean;
   /** Phase F-lite: the zone's own frame cost, in parts (probes read the worst frames: where a hitch comes from). */
   cost: FrameCosts;
+  /** improve pass phase 5 (coast.oceanBed): the waves, the gulls, the steps; null with the knob off. */
+  sound: CoastSoundscape | null;
 }
 
 /** The worst frames of the zone's update, by its parts (ms), with the time they ran (performance.now) and what streamed. */
@@ -236,8 +242,13 @@ export const CoastZoneMode: ModeDefinition = {
       host, mapper, view, me, body, move, edge: new WaterEdge(world.spawn.pos), streamer,
       stickL: { x: 0, y: 0 }, stickR: { x: 0, y: 0 }, latchedYaw: null, preset: 'runner', rigKey: '', spotSec: SPOT_EVERY,
       partner, partnerEdge: host.partnerActor ? new WaterEdge(host.partnerActor.pos) : null, keeper: new PartnerKeeper(),
-      herd, creatures, log, creaturesShown: 0, town: null, spots: ALL_SPOTS, questsOn: false, cost: new FrameCosts(),
+      herd, creatures, log, creaturesShown: 0, town: null, spots: ALL_SPOTS, questsOn: false, cost: new FrameCosts(), sound: null,
     };
+    // the sea, not the stadium: the zone asks for its bed in load (so the harness's mood bed stays off), then the shore ticks in update
+    if (feel('coast.oceanBed', COAST_OCEAN_BED) >= 0.5) {
+      SoundKit.startAmbient('ocean');
+      S.sound = new CoastSoundscape((name, o) => { if (name === 'wave' || name === 'gull') playNature(name, o); else SoundKit.play(name, o); });
+    }
     zoneUi.setLog(log.entries(), null);
     // back from a spot's game: it counts as played there (the beach net's quest)
     if (back) log.update((sv) => withPlayed(sv, back, (id) => !!sportSpotById(id)));
@@ -314,6 +325,7 @@ export const CoastZoneMode: ModeDefinition = {
     TMP_SUBJECT.set(me.pos.x, me.pos.y, me.pos.z);
     TMP_VEL.set(me.vel.x, me.vel.y, me.vel.z);
     ctx.camDirector.update(TMP_SUBJECT, TMP_VEL, null);
+    if (S.sound) { ctx.camDirector.forwardFlatToRef(TMP_FWD); S.sound.update(dt, { x: me.pos.x, z: me.pos.z, speed: Math.hypot(me.vel.x, me.vel.z), grounded: me.grounded }, Math.atan2(TMP_FWD.x, TMP_FWD.z)); }
     const t5 = performance.now();
     S.view.frame(ctx.camera.position.x, ctx.camera.position.z, dt);
     const t6 = performance.now();
