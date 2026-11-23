@@ -66,6 +66,9 @@ import { playNature } from '../audio/natureSfx';
 import type { AdventureHost } from '../adventure/host/AdventureHost';
 // improve pass phase 7 (story.worldDressed): textures, trims and the nature kit on the story's worlds (view only)
 import { mountWorldDress, STORY_WORLD_DRESSED, type WorldDress } from '../adventure/world/dress';
+// improve pass phase 9 (venue.camClearView): the story camera keeps out of the raised blocks, the run-wall and the trees
+import { VENUE_CAM_CLEAR_VIEW, type CamBox } from '../adventure/host/camera';
+import { boxesNear, keepEyeClear, meshCamBoxes } from '../adventure/host/camBoxes';
 
 /** The yard keeps its own progress under this prefix, so a try-out never writes the player's real save. */
 export const YARD_SAVE_PREFIX = 'yard:';
@@ -484,7 +487,12 @@ interface StoryState {
   sfx: StorySfx | null;
   /** improve pass phase 7 (story.worldDressed): the worlds' dressing; null with the knob off. */
   dress: WorldDress | null;
+  /** improve pass phase 9 (venue.camClearView): the solids' boxes (the blocks, and the trees once they land); null = off. */
+  cam: { blocks: CamBox[]; all: CamBox[]; near: CamBox[]; sec: number; pulls: number } | null;
 }
+
+/** The story's trees (the dressing's tall props) are solids for the camera; low grass, bushes and rocks are not. */
+const STORY_TALL_PROP = /^dress_prop_(pine|pineTall|oak|tree)_/;
 
 /** The nature kit starts loading after this many played frames (about a second), never during the load. */
 const DRESS_PROPS_AFTER_FRAMES = 60;
@@ -581,6 +589,13 @@ async function loadStory(ctx: ModeContext): Promise<void> {
     hudSec: 0, uiSec: 0, saveSec: 0, frame: 0, lastHud: '', mirror: session.save.settings.mirror === true, preset: 'runner', rigKey: '',
     snap: true, flight: flightUnlockedIn(session.save.story.flags), demo: null, offKeys: null, probe: at >= 0,
     chapterTitle: chapter?.title ?? null, placeholder: !!chapter?.placeholder, ending: null, sfx: storySfxFor(host), dress,
+    cam: feel('venue.camClearView', VENUE_CAM_CLEAR_VIEW) >= 0.5 ? (() => {
+      const blocks = session.map.pieces.filter((p) => p.kind === 'block').map((p) => {
+        const b = p as Extract<typeof p, { kind: 'block' }>;
+        return { minX: b.minX, maxX: b.maxX, minY: b.y0, maxY: b.top, minZ: b.minZ, maxZ: b.maxZ };
+      });
+      return { blocks, all: blocks, near: [], sec: 0, pulls: 0 };
+    })() : null,
     budgetIn: {
       tier: (scene.metadata as { felTier?: 'mobile' | 'desktop' } | undefined)?.felTier ?? 'desktop',
       eye: host.player.pos,
@@ -633,6 +648,7 @@ async function loadStory(ctx: ModeContext): Promise<void> {
         bodies: host.world.actors.size, errors: host.errors.length, beat: session.runner.beat?.id ?? null, paused: session.paused,
         done: session.runner.done, fused: p.fusion.active, flight: flightUnlockedIn(session.save.story.flags), doing: S.demo?.doing() ?? null,
         ending: S.ending ? S.ending.chapterId : null, storyMode: session.storyMode, objective: session.runner.objective(),
+        camPulls: S.cam ? S.cam.pulls : null,
       };
     },
     host, session,
@@ -721,6 +737,12 @@ function storySync(ctx: ModeContext, T: StoryState, dt: number): void {
     TMP_SUBJECT.set(me.pos.x, me.pos.y, me.pos.z);
     TMP_VEL.set(me.vel.x, me.vel.y, me.vel.z);
     ctx.camDirector.update(TMP_SUBJECT, TMP_VEL, target ? TMP_OBJ.set(target.pos.x, target.pos.y + target.height * 0.5, target.pos.z) : null);
+    if (T.cam) {
+      // the trees land after the first second (the dressing): re-read them every 2 s; the blocks never move
+      T.cam.sec += dt;
+      if (T.cam.sec >= 2) { T.cam.sec = 0; T.cam.all = meshCamBoxes(scene, (n) => STORY_TALL_PROP.test(n), [...T.cam.blocks]); }
+      if (keepEyeClear(ctx.camera, me.pos, boxesNear(T.cam.all, me.pos.x, me.pos.z, 24, T.cam.near))) T.cam.pulls++;
+    }
     T.fovBoost += (rig.fovBoostDeg - T.fovBoost) * (1 - Math.exp(-FOV_EASE * Math.max(0, dt)));
     ctx.camera.fov = T.baseFov + (T.fovBoost * Math.PI) / 180;
   }

@@ -2354,6 +2354,12 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/adventure/world/dress.ts STORY_WORLD_DRESSED',
     hint: 'View only: no piece moves or changes size. The shipped ground textures on the tops, stone on the sides and blocks, a lip on each edge, a cap on each block, posts under the rails, and grass, bushes, rocks and trees from the shipped kit kept clear of where you play. 0 = the plain colours, as before.',
   },
+  // ── lane/improve-world (phase 9): the zone cameras ──
+  {
+    id: 'venue.camClearView', label: 'Coast and story camera: keeps out of the boat, houses, trees, rocks and walls (1) / passes through them (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Coast · zone',
+    source: 'lib/babylon/adventure/host/camera.ts VENUE_CAM_CLEAR_VIEW',
+    hint: 'After the shared camera places itself, if a solid stands between you and it, or holds it, it comes in along its own line to just short of the solid. No camera distance, height, lag or FOV changes. 0 = the camera could end up inside the boat, as before.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));
