@@ -200,6 +200,29 @@ diagonal (the body turned to the travel, the head on the man), which also needs 
 4. **The pick-and-roll coverage:** *recommend* building it next (over the top on a shooter inside ~7.5 m, under one past it, a switch when
    beaten), shipped OFF for a feel test — it makes the AI harder to beat off a screen.
 
+## 6b. The clip list for the stepping defence (the GATE 0 art job, for the owner)
+
+Each on the 22-bone unprefixed FEL rig (GATE 0 before and after), a loop with a seamless seam, at least two full steps a loop, and the
+planted foot still (under 1 cm of travel a frame) through its stance at the stride speed named. Acceptance for each: the slide bench
+(`scripts/probes/hoops-gap/slide-bench.mts`) reads planted-foot p90 ≤ 3 cm a frame at every speed listed, and at most 2 leg pops in its
+2.5 s run. Today's number for each is in brackets.
+
+| # | Clip (new name) | Replaces | Travel, relative to where the chest faces | Stride speed at rate 1 | Must read clean at | Today |
+|---|---|---|---|---|---|---|
+| 1 | `bball_defend_slide_left_v2` | `bball_mc_defend_slide_left` (CMU 78_30) | straight left, chest square | 2.4 m/s | 1.5, 2.0, 2.5, 2.7 m/s | 1.9 / 2.0 / 4.2 / 4.7 cm |
+| 2 | `bball_defend_slide_right_v2` (the exact mirror of #1, from the same take) | `bball_mc_defend_slide_right` (CMU 78_30, 1.70 m/s) | straight right | 2.4 m/s | 1.5, 2.0, 2.5, 2.7 m/s | 4.5 / 7.8 / 10.4 / 9.7 cm |
+| 3 | `bball_defend_slide_hard_left_v2` | `bball_mc_defend_slide_hard_left` (CMU 78_26) | left, the sat-down stance (hips low, hands wide) | 2.5 m/s | 1.5, 2.0, 2.5 m/s | 5.9 / 8.0 / 8.7 cm |
+| 4 | `bball_defend_slide_hard_right_v2` (the mirror of #3) | `bball_mc_defend_slide_hard_right` | right, sat-down | 2.5 m/s | 1.5, 2.0, 2.5 m/s | 4.2 / 5.6 / 7.0 cm |
+| 5 | `bball_def_retreat_run_left` | the backpedal on a diagonal | back-left at 135° off the chest: hips open toward the travel, chest and head turned back to the man | 4.0 m/s | 2.5, 3.5, 4.5, 5.5 m/s | 5.5 / 9.9 / 11.2 / 12.4 cm |
+| 6 | `bball_def_retreat_run_right` (the mirror of #5) | the same | back-right at 135° | 4.0 m/s | as #5 | as #5 |
+| 7 | `bball_def_cross_run_left` / `_right`, re-keyed | the authored crossover step (H2c) | straight sideways, running | 2.8 m/s | 3.0, 3.5, 4.5 m/s | feet 0.1–0.2 cm, but **15–23 leg pops** a run |
+| 8 | `bball_hop_step`, foot contacts re-keyed | itself | — | — | the hop's plant | 4–14 cm a frame [PRIOR gather] |
+
+Priority: #1–#2 first (the slide every defender plays most), then #3–#4 (the AI's on-ball slide), then #5–#6, then #7–#8. #5–#6 also
+need a small hook in the modes' defensive facing (the hips may open while the chest stays on the man), which is lane B's file while it
+runs. Code after the clips (this lane or the next): the tree's state table and the stride references (`anim/basketballTree.ts`,
+`core/StrideMatch.ts`), each new clip behind its own knob, off = today's clip.
+
 ## 7. Flags and assumptions
 
 - No existing tuned number was changed. New numbers: §5.1's six (all behind `hoops.aiShotIqOn`, off).
