@@ -2672,6 +2672,22 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/adventure/host/camera.ts VENUE_CAM_CLEAR_VIEW',
     hint: 'After the shared camera places itself, if a solid stands between you and it, or holds it, it comes in along its own line to just short of the solid. No camera distance, height, lag or FOV changes. 0 = the camera could end up inside the boat, as before.',
   },
+  // ── lane/look-venues (look pass B1–B3, docs/LOOK-PASS-AUDIT.md): the hoops venues, the light and the edges ──
+  {
+    id: 'look.phoneAA', label: 'Phone edge smoothing: off as before (0) / FXAA always (1) / 2x MSAA (2)', def: 0, min: 0, max: 2, step: 1, unit: '', group: 'Look · venues',
+    source: 'lib/babylon/scene/QualityTier.ts PHONE_AA_DEFAULT',
+    hint: 'Phones only (desktop already runs 4x MSAA). 0 = as before: no anti-aliasing on a phone, edges stair-step. 1 = the FXAA pass at every screen density. 2 = 2x multisampling on the main target. Applies on the next game load. ?aa=0, 1 or 2 overrides it for one load.',
+  },
+  {
+    id: 'crowd.varietyV2', label: 'Crowd: each fan and card its own height and shade (1) / all alike as before (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Look · venues',
+    source: 'lib/babylon/visual/crowd/crowdStands.ts CROWD_VARIETY_V2',
+    hint: 'The shipped crowd bodies only. Standing fans and cards up to 7 percent taller or shorter, seated fans 2.5 percent; each 3D fan a little lighter or darker with a slight warm or cool cast. 0 = every fan the same height and shade, as before. Phones show cards only, so there it changes heights only. Applies on the next game load.',
+  },
+  {
+    id: 'venue.courtDetailV2', label: 'Court lines and ground grain sharp into the distance (1) / as before (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Look · venues',
+    source: 'lib/babylon/visual/CourtSurface.ts COURT_DETAIL_V2',
+    hint: 'The painted court and the Venice set ground (concrete, sand) sampled with 16x anisotropic filtering instead of 4x (the court) and 8x (the ground), so the lines and grain hold at the play camera angle. No new texture, no colour change. 0 = as before. Applies on the next game load.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));
