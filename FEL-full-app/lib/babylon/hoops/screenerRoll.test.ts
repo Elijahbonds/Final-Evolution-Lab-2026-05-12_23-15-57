@@ -1,7 +1,7 @@
 // hoops-gap: the roll man (hoops/screenerRoll) — the screener reads his own man, the planner looks for the roll.
 import { afterEach, describe, expect, it } from 'vitest';
 import { Vector3 } from '@babylonjs/core';
-import { SCREENER_ROLL_ON, screenerRollOn, screenersMan, manSteppedUp, nearLaneClear, rollRead, ROLL_NEAR_M, ROLL_SCORE_ON, rollScoreOn, ghostRead, rollLeadPoint, ROLL_PASS_MPS } from './screenerRoll';
+import { SCREENER_ROLL_ON, screenerRollOn, screenersMan, manSteppedUp, nearLaneClear, rollRead, ROLL_NEAR_M, ROLL_SCORE_ON, rollScoreOn, ghostRead, rollLeadPoint, ROLL_PASS_MPS, freeBlock, ROLL_BLOCK_SIDE_M } from './screenerRoll';
 import { TeammateBrain } from '../core/BasketballCore';
 import { TeamOffense3v3 } from './teamOffense3v3';
 import { TEAM_READS } from '../modes/threevthreeRules';
@@ -131,6 +131,15 @@ describe('hoops/screenerRoll', () => {
     const slow = firstRoll(0), fast = firstRoll(1);
     expect(fast).toBeGreaterThanOrEqual(0);
     expect(fast).toBeLessThan(slow);
+  });
+
+  it('round 3: the roll goes to the block with the most room from the defence', () => {
+    const toward = { x: 0, z: 5 };
+    const left = freeBlock(RIM, toward, [{ x: 1.8, z: 0.6 }]);    // a defender on the right block: he goes left
+    expect(left.x).toBeCloseTo(-ROLL_BLOCK_SIDE_M, 5);
+    const right = freeBlock(RIM, toward, [{ x: -1.8, z: 0.6 }]);
+    expect(right.x).toBeCloseTo(ROLL_BLOCK_SIDE_M, 5);
+    expect(left.z).toBeGreaterThan(RIM.z);   // out on the floor, not behind the rim
   });
 });
 

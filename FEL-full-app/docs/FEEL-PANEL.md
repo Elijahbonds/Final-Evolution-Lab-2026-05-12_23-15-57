@@ -1265,4 +1265,6 @@ NEW switches, each **1 = on, 0 = today's game exactly** (tests pin both ends). N
   over a screen at full pace instead of `FIGHT_SLOW` 0.7 (the number itself unchanged). Measured no help: against the roll 0.715 → 0.732
   points a pick-and-roll possession. OFF. **Correction to `hoops.pnrCoverageOn` above:** with the game's reaction delay in the sim the
   coverage is worse than today's switch-every-screen against the roll too (0.693 → 0.715); keep it off.
+  Round 3 (the same switch): the roll goes to the block with the most room (`ROLL_BLOCK_SIDE_M` 2.0 m either side of the rim,
+  `ROLL_BLOCK_OUT_M` 1.2 m out) instead of straight down his line into the man guarding him; numbers in docs/HOOPS-GAP-PLAN.md §5.6.
 

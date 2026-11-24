@@ -36,7 +36,7 @@ import { aiPokes } from './ReachTell';   // lane/hoops-def-tell (#273 T-A): the 
 import { gatherCloseoutOn, gatherCloseoutM } from '../hoops/rulebook';   // hoops-p09: the closeout on a jump-shot gather
 import { cushionLever } from '../hoops/pressure';   // hoops-p02 (1v1/3v3 phase 2): the on-ball man's cushion on a moving handler
 import { pnrCoverageOn, coverageFor, onBallScreener, markIsScreening, showSpot, rollerToTag, PNR_SHOW_SEC, PNR_UNDER_LEVER, PNR_DROP_LEVER, PNR_TAG_LEVER, PNR_SPOT_DEAD_M, pnrFightFullOn, type PnrCoverage } from '../hoops/pnrCoverage';   // hoops-gap: the pick-and-roll coverage
-import { screenerRollOn, rollRead, SLIP_MIN_SEC, rollScoreOn, ghostRead } from '../hoops/screenerRoll';   // hoops-gap: the roll man reads his own man
+import { screenerRollOn, rollRead, SLIP_MIN_SEC, rollScoreOn, ghostRead, freeBlock } from '../hoops/screenerRoll';   // hoops-gap: the roll man reads his own man
 
 // ── Movement ─────────────────────────────────────────────────────────────
 export interface DribbleResult { crossover: boolean; hesitation: boolean; speed01: number; facingRad: number; planting: boolean; gear: Gear; intensity01: number; paceChange: boolean }
@@ -1104,7 +1104,12 @@ export class TeammateBrain implements AIBehavior {
         this.screened = def;
         if (this.screen.phase === 'approach') { this.objective = def; const to = sSpot.subtract(self); return steer(to, distXZ(self, sSpot) > 2.5, 0.2); }
         if (this.screen.phase === 'set') { this.objective = def; this.job = 'screen'; return steer(new Vector3(0, 0, 0), false, 1); }   // PLANTED
-        if (this.screen.phase === 'roll') { this.job = 'roll'; this.objective = hoop; const to = rollTarget(self, hoop).subtract(self); return steer(to, true, 0.5); }
+        if (this.screen.phase === 'roll') {
+          this.job = 'roll'; this.objective = hoop;
+          // hoops-gap round 3: with the roll-score switch, to the block with the most room (hoops/screenerRoll freeBlock)
+          const fb = screenerRollOn() && rollScoreOn() ? freeBlock(hoop, self, foes) : null;
+          const to = (fb ? new Vector3(fb.x, 0, fb.z) : rollTarget(self, hoop)).subtract(self); return steer(to, true, 0.5);
+        }
         if (this.screen.phase === 'pop') { this.job = 'pop'; this.objective = ball; const to = spot.subtract(self); return steer(to, false, 0.6); }
       }
       // the screen is over (or the handler is inside the paint): back to spacing

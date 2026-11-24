@@ -91,3 +91,19 @@ export function rollLeadPoint(passer: XZ, roller: XZ, vel: XZ): XZ {
   for (let k = 0; k < 4; k++) { const t = d2(passer, lead) / ROLL_PASS_MPS; lead = { x: roller.x + vel.x * t, z: roller.z + vel.z * t }; }
   return lead;
 }
+
+/** hoops-gap round 3 (with `hoops.rollScoreOn`): THE ROLL TO THE FREE BLOCK. He rolled at the rim on his own line, straight into the man
+ *  guarding him (who sits a third of the way from him to the rim). Now he dives to whichever block — ROLL_BLOCK_SIDE_M either side of the
+ *  rim, ROLL_BLOCK_OUT_M out on the floor — has the most room from the defence. */
+export const ROLL_BLOCK_SIDE_M = 2.0, ROLL_BLOCK_OUT_M = 1.2;
+export function freeBlock(rim: XZ, toward: XZ, defenders: readonly XZ[]): XZ {
+  const ox = toward.x - rim.x, oz = toward.z - rim.z, ol = Math.hypot(ox, oz) || 1;
+  const ux = ox / ol, uz = oz / ol, px = -uz, pz = ux;
+  let best: XZ = { x: rim.x + ux * ROLL_BLOCK_OUT_M, z: rim.z + uz * ROLL_BLOCK_OUT_M }, room = -Infinity;
+  for (const side of [1, -1]) {
+    const spot = { x: rim.x + ux * ROLL_BLOCK_OUT_M + px * side * ROLL_BLOCK_SIDE_M, z: rim.z + uz * ROLL_BLOCK_OUT_M + pz * side * ROLL_BLOCK_SIDE_M };
+    let r = Infinity; for (const d of defenders) r = Math.min(r, d2(d, spot));
+    if (r > room) { room = r; best = spot; }
+  }
+  return best;
+}
