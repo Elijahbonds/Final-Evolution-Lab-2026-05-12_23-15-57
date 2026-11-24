@@ -14,6 +14,7 @@ import { COURT_HALF } from '@/lib/adventure/venice/courtsView';
 import type { InputBus } from '@/lib/babylon';
 import { BOAT_STOP, PIER_SPOT_ID } from '@/lib/adventure/venice/coastDoor';
 import { STORY_GATE, STORY_SPOT_ID } from '@/lib/adventure/venice/storyDoor';
+import { veniceHintPlace } from '@/lib/ui/touchTargets';   // improve-screens phase 6 (ui.touchTargets44)
 
 export { VENICE_WAYFINDING } from '@/lib/adventure/venice/hubUi';
 export const HINT_KEY = 'fel-venice-hint-seen';
@@ -35,7 +36,9 @@ export function useFirstVisitHint(enabled: boolean, cardUp: boolean): [boolean, 
 
 export function FirstVisitHint({ onDismiss, touch }: { onDismiss: () => void; touch: boolean }) {
   return (
-    <div data-testid="venice-hint" role="status" className="absolute inset-x-4 bottom-[9.5rem] z-10 mx-auto flex max-w-sm items-center gap-3 rounded-2xl border border-white/15 bg-black/75 p-3 backdrop-blur">
+    // improve-screens phase 6: on a touch screen the hint sat under the deck's DASH / JUMP (z-30) and DASH covered "Got it"; it now takes
+    // the walk-up card's slot under the mini-map, clear of the deck (lib/ui/touchTargets.ts veniceHintPlace; ui.touchTargets44 0 = as before)
+    <div data-testid="venice-hint" role="status" className={`absolute inset-x-4 ${veniceHintPlace(touch)} z-10 mx-auto flex max-w-sm items-center gap-3 rounded-2xl border border-white/15 bg-black/75 p-3 backdrop-blur`}>
       <p className="flex-1 text-base">{touch ? 'Drag anywhere to walk.' : 'Walk with WASD, the arrows or a stick.'} Step into a court&apos;s gold ring to play.</p>
       <button type="button" onClick={onDismiss} className="min-h-[44px] min-w-[44px] rounded-xl border border-white/25 px-3 text-base font-bold">Got it</button>
     </div>

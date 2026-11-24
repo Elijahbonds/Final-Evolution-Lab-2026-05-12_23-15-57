@@ -1248,6 +1248,27 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/core/HighSidelineCam.ts HIGH_CAM_PORTRAIT_LIFT',
     hint: 'On a phone held upright, the share of the screen height at the bottom (where the touch buttons are) the players are kept out of.',
   },
+  // ── lane/improve-camera (phase 8, 2026-11-22; new): the lens may widen to fit; the high view offered to 3v3 (OFF: the owner's feel call) ──
+  {
+    id: 'hoops.highCamZoomMax', label: 'High camera: most the lens widens to fit', def: 1.6, min: 1, max: 2, step: 0.05, unit: '×', group: 'Hoops · camera',
+    source: 'lib/babylon/core/HighSidelineCam.ts HIGH_CAM_ZOOM_MAX',
+    hint: 'When the players and the rim still do not fit after it backs away (a tight court on a phone held upright), the lens widens, never turning, up to this many times, and back. 1 = never (as before).',
+  },
+  {
+    id: 'hoops.highCamRoomOn', label: 'High camera: room to stand off the court (1) / the venue box (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · camera',
+    source: 'lib/babylon/core/HighSidelineCam.ts HIGH_CAM_ROOM_ON',
+    hint: '1 = on a small court (Canopy, Blossom) it may stand as far out as the 3-Point camera does there, still never inside or behind a tree. 0 = it keeps to the venue box, as before.',
+  },
+  {
+    id: 'hoops.highCamLeadSec', label: 'High camera: how far ahead it reads a run', def: 0.35, min: 0, max: 0.8, step: 0.05, unit: 's', group: 'Hoops · camera',
+    source: 'lib/babylon/core/HighSidelineCam.ts HIGH_CAM_LEAD_SEC',
+    hint: 'It also keeps where each player will be this far ahead, so it starts sliding before a sprint reaches the edge instead of chasing it. 0 = only where they are now (as before).',
+  },
+  {
+    id: 'hoops.threeVThreeCam', label: '3v3 camera: high sideline (1) / follow (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · camera',
+    source: 'lib/babylon/core/HighSidelineCam.ts THREEVTHREE_CAM',
+    hint: '1 = the 1v1 high camera in 3v3, keeping all six players and the rim on screen; it never turns. 0 = the 3v3 follow camera exactly as before (ships 0 until the owner tries it). SELECT or C switches during a game.',
+  },
   // GAMEPLAY-CLEAN P2 #6 (2026-11-03): the football carry's stride paces to the carrier (footballTree)
   {
     id: 'football.carryStrideMax', label: 'Football carry: top stride rate', def: 1.4, min: 1, max: 1.85, step: 0.05, unit: '×', group: 'Anim · stride',
@@ -1412,6 +1433,16 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'hoops.pnrFightFullOn', label: 'Defence: fighting over a screen costs no pace (0 = off)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · defense',
     source: 'lib/babylon/hoops/pnrCoverage.ts PNR_FIGHT_FULL_ON',
     hint: 'Needs the pick-and-roll coverage switch. 1: the man on the ball goes over the top at full speed. 0: at 0.7 of it, as before.',
+  },
+  {
+    id: 'hoops.contactVoiceOn', label: 'Sound: contacts sound like hands on the ball and bodies (0 = off)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · sound',
+    source: 'lib/babylon/audio/hoopsSfx.ts CONTACT_VOICE_ON',
+    hint: '1: on the court, a strip, poke or block plays a palm slap on the ball and a bump or check a low body thud, instead of the arcade impact boop; two contacts within 60 ms are one. 0: the impact, as before.',
+  },
+  {
+    id: 'hoops.steppingDefenceOn', label: 'Defence: play the new stepping-defence clips when the rig has them (0 = off)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · transitions',
+    source: 'lib/babylon/anim/basketballTree.ts STEPPING_DEFENCE_ON',
+    hint: '1: the slides, the sat-down slides and the beaten-diagonal turn-and-run play the clips named in HOOPS-GAP-PLAN 6b when the rig owns them, at their own stride; a missing clip plays today\'s. 0: today\'s clips.',
   },
   // hoops-p04 (1v1/3v3 phase 4 "feet and transitions"): one blend + minimum-hold rule (anim/hoopsTransitions), the shot clips on their
   // release (hoops/releaseTiming). Every default is this lane's; the owner has felt none of them.
@@ -2362,6 +2393,22 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'kit.jerseyDecals', label: 'Court jerseys: print the number and name (1) / blank (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Kit · fit',
     source: 'lib/babylon/core/jerseyDecals.ts JERSEY_DECALS',
     hint: 'On: the new basketball and football jerseys carry the player number on the chest and back and the name across the back. Off: a blank jersey, as before.',
+  },
+  // ── lane/improve-screens (2026-11-22, docs/IMPROVE-10-PHASE-AUDIT.md phases 1, 2, 6): the game shell and the screens ──
+  {
+    id: 'ui.stageFitsHeader', label: 'Phone upright: the game takes the screen the header leaves (1) / sized for a one-row header (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',
+    source: 'lib/ui/stageFit.ts STAGE_FITS_HEADER',
+    hint: 'On: the stage reads the real height of the header above it, so the bottom of the game and the move stick stay on the screen. Off: the old 100dvh less 3.25rem box, which ran off the bottom of an upright phone.',
+  },
+  {
+    id: 'ui.touchTargets44', label: 'Touch: Venice hint above the buttons, 44 px taps on the dunk chips, story SKIP, workout ticks (1) / as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',
+    source: 'lib/ui/touchTargets.ts TOUCH_TARGETS_44',
+    hint: 'On: the Venice first-visit hint sits under the mini-map, clear of DASH and JUMP; the dunk MIX, MC and CC chips, the story SKIP and choices and the workout tick boxes each get a tap box of at least 44 px (same look, same words). Off: each as before.',
+  },
+  {
+    id: 'try.prefetchDunk', label: 'Try page: load the first dunk while the birth date is asked (1) / only after the answer (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',
+    source: 'lib/try/prefetchDunk.ts TRY_PREFETCH_DUNK',
+    hint: 'On: the dunk code and its first files are fetched into the browser cache while a guest gives the birth date (plain file requests, no cookies, nothing about the visitor). Off (shipped: the measured cut was about 12 percent, short of the 25 percent bar): nothing is requested until the answer, as before. The try page has no feel panel: change it by a commit.',
   },
   // ── lane/physics-arena (2026-11-23, owner: "a live physics play arena for the sport modes ... And POV"; docs/PHYSICS-ARENA-PLAN.md): all NEW ──
   {

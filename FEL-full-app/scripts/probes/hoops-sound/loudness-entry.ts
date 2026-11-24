@@ -36,6 +36,17 @@ async function render(name: string, volume: number, pitch?: number): Promise<{ s
   await K.useSampleBank('hoops');
   out.bank = K.sampleState();
   for (const c of cues) { const r = []; for (let i = 0; i < 6; i++) r.push(await render(c, 1)); out[`${c}:sample`] = r; }
+  // hoops-gap (lane/hoops-gap): the contact voice (`hoops.contactVoiceOn`) against the impact it re-voices, at the modes' contact pitches
+  // and volumes (a body bump 0.95 / 0.55, a body-bag 0.82 / 0.7, a knockdown 0.7 / 0.8, a strip 1.3 / 0.45, a parry 1.5 / 0.5)
+  {
+    const F = await import('@/lib/feel-panel/feel');
+    F.setFeelUser(true); F.setFeelSession(null);
+    for (const [pitch, volume] of [[0.95, 0.55], [0.82, 0.7], [0.7, 0.8], [1.3, 0.45], [1.5, 0.5]]) {
+      F.setFeelOverride('hoops.contactVoiceOn', 0); out[`contact:${pitch}:off`] = await render('impact', volume, pitch);
+      const on = []; F.setFeelOverride('hoops.contactVoiceOn', 1); for (let i = 0; i < 3; i++) on.push(await render('impact', volume, pitch)); out[`contact:${pitch}:on`] = on;
+    }
+    F.setFeelOverride('hoops.contactVoiceOn', 0);
+  }
   // the crowd bed: its mean level over 4 s, the noise bed against the recording (at the momentum swell's resting share, 1)
   const bedRms = async (sample: boolean): Promise<number> => {
     await K.useSampleBank(sample ? 'hoops' : null);

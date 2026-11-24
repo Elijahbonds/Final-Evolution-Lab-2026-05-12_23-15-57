@@ -129,7 +129,10 @@ describe('the pieces read no scoring or judging module', () => {
   const ALLOWED = [/^react$/, /^react-dom/, /^lucide-react$/, /^\.\/tv-hud$/, /^@\/lib\/babylon$/, /^@\/lib\/babylon\/core\/(DunkBeats|DunkField)$/,
     /^@\/lib\/babylon\/audio\/(SoundKit|mic\/VoiceKit)$/, /^@\/lib\/audio\/ui\/VolumeMixer$/,
     // test changed (hoops-p08): + the subtitle rule (a voiced MC line shows no subtitle unless CC) — a UI rule, not a scoring module
-    /^@\/lib\/babylon\/ui\/micSubtitles$/];
+    /^@\/lib\/babylon\/ui\/micSubtitles$/,
+    // test changed (improve-screens phase 6, 2026-11-22): + the touch-target switch (ui.touchTargets44: how big a chip's tap box is) —
+    // a layout rule, not a scoring or judging module
+    /^@\/lib\/ui\/touchTargets$/];
   for (const f of ['hoops-shot-meter.tsx', 'judge-cards.tsx', 'dunk-beat-strip.tsx', 'dunk-field-board.tsx', 'mic-caption.tsx']) {
     it(`${f} imports only what it draws with`, () => {
       const specs = [...read(f).matchAll(/^import [^;]*? from '([^']+)'/gm)].map((m) => m[1]);

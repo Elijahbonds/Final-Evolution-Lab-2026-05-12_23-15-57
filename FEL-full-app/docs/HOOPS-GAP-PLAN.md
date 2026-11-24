@@ -349,6 +349,44 @@ way from his man to the rim), so he was never more than about 1.1 m clear. Now, 
 — the screener rolls, gets open and is found, and the rival offence scores a little more. The coverage (`hoops.pnrCoverageOn`, with
 `hoops.pnrFightFullOn` if it goes on at all) stays off: at best it matches today's defence.
 
+### 5.7 Sound on contact — `hoops.contactVoiceOn` (built, ships OFF)
+
+**What was there** (§2.8): every contact in 1v1 / 3v3 — a bump, a chest-to-chest check, a knockdown, a strip, a poke, a parry, a block —
+plays SoundKit's `impact`, a square-wave boop with a noise crack, at a pitch per kind; the modes already sort them by pitch (hands on the
+ball 1.2–1.5, bodies 0.7–1.0) and already debounce a repeated pair (OneVOneMode's `hardHitGate`). The rim has three recordings and the
+backboard its own (`glass`), so those had variety already.
+
+**What it does** (`audio/hoopsSfx.ts` contactVoice, applied in `audio/SoundKit.ts` play; no mode file, no new sound file): with the switch
+and the court's sample bank active, an `impact` is re-voiced from the kit's own sounds — a hand on the ball (pitch ≥ 1.2) is the recorded
+palm-on-leather slap (`catch`, pitched down) over a short knock (`thud` at 1.4); a body is the low, ringless `thud`. The volume each call
+asks for is kept. Two contacts inside `CONTACT_MIN_GAP_SEC` 60 ms are one (on that audio context's own clock: a rebuilt context starts
+afresh — a bug in the first draft, caught by the loudness probe, fixed and tested). Off the court (no hoops bank) the impact stays the
+impact. **The mute silences it** (tested: `SoundKit.contactVoice.test`, the fake Web Audio graph — nothing starts with the effects off).
+
+**Levels** (`scripts/probes/hoops-sound/loudness.mts`, Chromium, SoundKit's own graph, the loudest 50 ms at the limiter): today's impact
+at the modes' contact pitches and volumes — a bump (0.95, vol 0.55) −37.3 dB, a body-bag (0.82, 0.70) −35.4, a knockdown (0.70, 0.80)
+−34.1, a strip (1.3, 0.45) −39.2, a parry (1.5, 0.5) −38.4. With the contact voice at the first draft's
+gains (hand 1.0, knock 0.35, body 0.9): the bump −35.3, the body-bag −33.2, the knockdown −31.8 (bodies 1.9–2.3 dB over today), the strip
+−42.4, the parry −41.5 (hands 3.1–3.2 dB under). The gains were then set to land on today's level (body × 0.79 → 0.71; hand and knock
+× 1.45 → 1.45 / 0.5): computed from those offsets (a linear gain), re-measured below if the probe's hold came in time.
+**Re-measured at the shipped gains** (three renders each): the bump −37.0 (today −37.3), the body-bag −34.9 (−35.4), the knockdown −33.5
+(−34.1), the strip −39.5 (−39.2), the parry −38.8 (−38.5) dB — every contact within 0.7 dB of the impact it replaces; each sounds
+0.11–0.15 s (today 0.09–0.10).
+
+**Verdict: ships OFF.** It is a feel item — the owner judges a slap and a thud against the boop by ear.
+
+### 5.8 The stepping-defence clips drop in by name — `hoops.steppingDefenceOn` (wired, ships OFF until the clips exist)
+
+`anim/basketballTree.ts`: with the switch on, each state in §6b's list plays its new clip when the rig owns it — as `bball_mc_<name>` (the
+capture pipeline) or `bball_<name>` (authored) — forward, paced against the stride the list asks for (the slides 2.4 m/s, the sat-down
+slides 2.5, the turn-and-run 4.0): `defend_slide_left_v2`, `defend_slide_right_v2`, `defend_slide_hard_left_v2`,
+`defend_slide_hard_right_v2`, and for the beaten diagonal (a retreat 100–160° off the chest, in above 2.6 m/s, out under 2.2) the
+`def_retreat_run_left` / `_right` pair, played inside the backpedal's own state with its own travel (135°) for the pelvis steer. A clip the
+rig does not own plays today's clip exactly: tested (`basketballTree.stepping.test`: the same plays, clip for clip, with the knob on and
+no new clips), and on the slide bench with the knob on and no new clips the numbers are today's to the decimal (right 4.5 / 10.4 cm at
+1.5 / 2.5 m/s, back-left 2.7 / 5.6). #7 and #8 of §6b (the crossover step and the hop step re-keyed) keep their names and need no wiring.
+When the owner's clips land: put them on the rig under those names, turn the switch on, run the slide bench (§8) against §6b's bar.
+
 ## 6. Waiting on the owner (recommendation first; each is reversible)
 
 1. **Feel `hoops.aiShotIqOn` in 3v3 PRO on defence.** *Recommend:* turn it on if the rivals feel smarter and not unfair; the rig check

@@ -9,6 +9,7 @@ import { VoiceKit } from '@/lib/babylon/audio/mic/VoiceKit';
 import { VolumeMixer } from '@/lib/audio/ui/VolumeMixer';
 import { HUD_FONT_CLASS, HUD_PLATE, HudText, hudColor, hudType } from './tv-hud';
 import { readCcPref, showMicCaption, writeCcPref } from '@/lib/babylon/ui/micSubtitles';
+import { touchTargets44 } from '@/lib/ui/touchTargets';   // improve-screens phase 6 (ui.touchTargets44)
 
 // hoops-p08 (2026-11-12): THE PLAYER'S SUBTITLE SWITCH (the CC chip beside MC), one store so the chip and the caption agree.
 const ccListeners = new Set<() => void>();
@@ -57,7 +58,10 @@ export function MicToggle({ className = 'right-3 top-[18%]', flow = false, cc = 
   // /play/threevthree: MIX 48.8 x 21.8, MC 45.4 x 21.8, CC 44.4 x 21.8). Each BUTTON is now a see-through box at least 44 px tall with
   // the chip drawn inside it exactly as before; the MIX / MC row's boxes reach up and the CC row's reach down, so nothing on screen
   // moves and the two rows' boxes do not overlap. In `flow` (the dunk host's stack) a box would reach into its neighbours: as before.
-  const tall = !flow;
+  // improve-screens phase 6 (ui.touchTargets44 1): in `flow` too. Measured on /play/dunk, 390 x 844: MIX 49 x 22, MC 45 x 22, CC 44 x 22.
+  // The stack's neighbour above the MIX / MC row is the HYPE meter (not a tap target) and nothing sits under the CC row, so the boxes
+  // reach over no other button (scripts/probes/improve-screens/touch.mts checks every pair of targets for overlap). 0 = as before.
+  const tall = !flow || touchTargets44();
   const chipButton = (row: 'top' | 'bottom', alpha: number, props: ButtonHTMLAttributes<HTMLButtonElement> & { 'data-qa'?: string }, children: ReactNode) => (
     <button type="button" {...props}
       className={tall ? `pointer-events-auto flex min-h-[44px] bg-transparent p-0 ${row === 'top' ? '-mt-[22px] items-end' : '-mb-[22px] items-start'}` : chip}
