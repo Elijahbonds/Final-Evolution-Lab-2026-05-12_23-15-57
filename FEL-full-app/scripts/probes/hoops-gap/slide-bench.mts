@@ -109,7 +109,7 @@ async function run(over: string, dir: string, speed: number): Promise<Row> {
     const st = tree.update({
       dtSec: DT, speedMps: sp, speed01, crossover: false, nearestDefender: Infinity, hasBall: false, shooting: false, dunking: false, driving: false,
       defending: true, bracing: false, staggered: false, slideDir: v.x * Math.cos(yaw) - v.z * Math.sin(yaw) > 0.3 ? 'right' : 'left',
-      retreat: BT.retreatFor(root.position, v, man()), closeout: BT.closeoutFor(root.position, v, man(), speed01), intense: false,
+      retreat: BT.retreatFor(root.position, v, man()), closeout: BT.closeoutFor(root.position, v, man(), speed01), intense: process.env.INTENSE === "1",   // hoops-gap lane: INTENSE=1 feeds the sat-down (hard) slide, as a "sitting" hero or an on-ball AI inside 2 m
       defendRun: BT.defendRunFor(yaw, v, tree.state), approach: BT.approachFor(root.position, v, man(), tree.state),
       ...(sp > 0.6 ? { travelOffRad: Math.atan2(v.x, v.z) - yaw } : {}),   // OneVOneMode travelOff: undefined under 0.6 m/s
     });
