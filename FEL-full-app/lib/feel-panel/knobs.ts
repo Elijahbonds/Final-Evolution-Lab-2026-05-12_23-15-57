@@ -2384,6 +2384,18 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/adventure/coast/zoneSound.ts COAST_OCEAN_BED',
     hint: 'The zone asks for the ocean bed in its load as Venice does, with waves on the nearest shore, a gull now and then and steps on sand, boards or in the shallows. 0 = the harness started its stadium crowd on the first press, as before.',
   },
+  // ── lane/improve-world (phase 7): Chapter 1 looks finished ──
+  {
+    id: 'story.worldDressed', label: 'Story: textured ground and stone, edge trims, rail posts and the nature kit (1) / plain colour blocks (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Story · flow',
+    source: 'lib/babylon/adventure/world/dress.ts STORY_WORLD_DRESSED',
+    hint: 'View only: no piece moves or changes size. The shipped ground textures on the tops, stone on the sides and blocks, a lip on each edge, a cap on each block, posts under the rails, and grass, bushes, rocks and trees from the shipped kit kept clear of where you play. 0 = the plain colours, as before. Ships OFF: on the phone rig it loaded 10 to 18 percent slower and drew World 1 slower; judge it on a real phone.',
+  },
+  // ── lane/improve-world (phase 9): the zone cameras ──
+  {
+    id: 'venue.camClearView', label: 'Coast and story camera: keeps out of the boat, houses, trees, rocks and walls (1) / passes through them (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Coast · zone',
+    source: 'lib/babylon/adventure/host/camera.ts VENUE_CAM_CLEAR_VIEW',
+    hint: 'After the shared camera places itself, if a solid stands between you and it, or holds it, it comes in along its own line to just short of the solid. No camera distance, height, lag or FOV changes. 0 = the camera could end up inside the boat, as before.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));

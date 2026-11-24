@@ -82,7 +82,7 @@ const STATS = `(() => { const d = window.__FEL_DEV__; if (!d || !d.scene) return
 // and its trees. Read from the scene as drawn, independent of the mode's own clear-view lists.
 const CAM = (place: string) => `(() => { const d = window.__FEL_DEV__; if (!d || !d.scene) return null; const s = d.scene; const c = s.activeCamera; if (!c) return null;
   const eye = c.globalPosition; const boxes = [];
-  const solid = ${place === 'coast' ? '/^coast_(prop_|boat$)/' : '/^dress_prop_(pine|pineTall|oak|tree)_/'};
+  const solid = ${place === 'coast' ? '/^coast_(prop_|boat$|sign$)/' : '/^dress_prop_(pine|pineTall|oak|tree)_/'};
   for (const m of s.meshes) {
     if (!m.isEnabled() || !m.isVisible || !solid.test(m.name)) continue;
     if (m.thinInstanceCount > 0) {
@@ -96,6 +96,9 @@ const CAM = (place: string) => `(() => { const d = window.__FEL_DEV__; if (!d ||
           for (let k = 0; k < 3; k++) { lo[k] = Math.min(lo[k], v[k]); hi[k] = Math.max(hi[k], v[k]); } }
         boxes.push([lo, hi, m.name]);
       }
+    } else if (m.name === 'coast_sign') {
+      // the boat sign turns to face you (a billboard, 4.2 x 1.1 m): its box is its half-width round its centre, both ways
+      const c = m.getAbsolutePosition(); boxes.push([[c.x - 2.1, c.y - 0.55, c.z - 2.1], [c.x + 2.1, c.y + 0.55, c.z + 2.1], m.name]);
     } else { const bb = m.getBoundingInfo().boundingBox; boxes.push([[bb.minimumWorld.x, bb.minimumWorld.y, bb.minimumWorld.z], [bb.maximumWorld.x, bb.maximumWorld.y, bb.maximumWorld.z], m.name]); }
   }
   const a = s.metadata && s.metadata.adventure;
