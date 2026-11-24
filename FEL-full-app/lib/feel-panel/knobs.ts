@@ -2457,7 +2457,7 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
   {
     id: 'ui.hudZonesUpright', label: 'Phone upright, hoops: one HUD layout - lines under the score, the hint in the deck, the rest in the dots menu (1) / as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',
     source: 'lib/ui/hudZones.ts HUD_ZONES_UPRIGHT',
-    hint: 'Phase A2. On a phone held upright the hoops HUD keeps off the players and the rim: the call, the MC line and the shot meter hang under the score row; in 1v1 and 3v3 the hint sits in the deck where the empty d-pad was (gone: those modes read no d-pad); the Dunk field board, its prop, specials and signature chips and the MIX, MC and CC switches move into the dots menu. Sideways and desktop unchanged. Off: the upright HUD as before.',
+    hint: 'Phase A2. On a phone held upright the hoops HUD keeps off the players and the rim: the call, the MC line and the shot meter hang under the score row; in 1v1 the hint sits in the deck where the empty d-pad was (gone in 1v1 and 3v3: those modes read no d-pad); the Dunk field board, its prop, specials and signature chips and the MIX, MC and CC switches move into the dots menu. Sideways and desktop unchanged. Off: the upright HUD as before.',
   },
   {
     id: 'ui.deckFadeOverBody', label: 'Phone upright: the action buttons drawn see-through (opacity; 1 = solid, as before)', def: 1, min: 0.35, max: 1, step: 0.05, unit: '', group: 'Screens · phone',

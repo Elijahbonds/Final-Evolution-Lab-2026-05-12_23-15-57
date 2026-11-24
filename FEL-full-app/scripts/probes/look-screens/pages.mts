@@ -16,6 +16,7 @@ const PAGES: { id: string; path: string; who: Person; place?: boolean }[] = [
   { id: 'try', path: '/try', who: 'anon' },
   { id: 'login', path: '/login', who: 'anon' },
   { id: 'play', path: '/play', who: 'solo' },
+  { id: 'closet', path: '/closet', who: 'solo' },   // look-world's flag: the app header over the Closet stage, sideways
   { id: 'venice', path: '/play/venice', who: 'solo', place: true },
   { id: 'coast', path: '/play/coast', who: 'solo', place: true },
   { id: 'arena', path: '/play/arena?sport=hoops', who: 'solo', place: true },

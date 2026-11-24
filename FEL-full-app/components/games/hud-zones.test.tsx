@@ -10,7 +10,7 @@ import { FEEL_STORAGE_KEY, resetFeelForTests, setFeelSession, setFeelUser } from
 import { feelSessionBlock } from '@/lib/feel-panel/sessionGate';
 import { FEEL_KNOB_BY_ID } from '@/lib/feel-panel/knobs';
 import {
-  DECK_FADE_MIN, DECK_FADE_OVER_BODY, deckFadeOverBody, DUNK_UPRIGHT_PIECES, HUD_ZONES_UPRIGHT, hoopsRowZone, hudZonesUpright, ZONES_QUERY,
+  DECK_FADE_MIN, DECK_FADE_OVER_BODY, DECK_HINT_MODES, deckFadeOverBody, DUNK_UPRIGHT_PIECES, HUD_ZONES_UPRIGHT, hoopsRowZone, hudZonesUpright, ZONES_QUERY,
 } from '@/lib/ui/hudZones';
 import { UPRIGHT_PHONE_QUERY } from '@/lib/ui/compactHeader';
 import { HoopsBottomStack, StackLine } from './hoops-bottom-stack';
@@ -92,7 +92,10 @@ describe('the wiring', () => {
   const stack = readFileSync('components/games/hoops-bottom-stack.tsx', 'utf8');
   const menu = readFileSync('components/games/compact-header.tsx', 'utf8');
   it('the deck: no ghost d-pad upright in the zones — its 172 x 72 place kept as the deck slot; the ghost everywhere else', () => {
-    expect(overlay).toContain('(zones && !landscape ? <div ref={deckSlot.ref} {...deckSlot.attr} className="pointer-events-none relative h-[72px] w-[172px]" /> : <HollowDPad />)');
+    expect(overlay).toMatch(/\? \(zones && !landscape\s*\? \(DECK_HINT_MODES\.has\(props\.modeId\)\s*\? <div ref=\{deckSlot\.ref\} \{\.\.\.deckSlot\.attr\} className="pointer-events-none relative h-\[72px\] w-\[172px\]" \/>\s*: <div aria-hidden="true" className="pointer-events-none h-\[72px\] w-\[72px\]" \/>\)\s*: <HollowDPad \/>\)/);
+  });
+  it('the deck slot holds a hint only where the camera keeps bodies above the deck (1v1); 3v3 keeps the empty place', () => {
+    expect([...DECK_HINT_MODES]).toEqual(['onevone']);
   });
   it('the deck fade applies only upright in the zones, and only below 1', () => {
     expect(overlay).toContain("const fade = !landscape && zones ? deckFadeOverBody() : 1;");

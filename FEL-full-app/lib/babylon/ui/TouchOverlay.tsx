@@ -27,7 +27,7 @@ import { DancePad } from '@/lib/babylon/dance/ui/DancePad';
 import { TurboPad } from './TurboPad';
 import { feel } from '@/lib/feel-panel/feel';
 import { useSlotRef, useUprightZones } from '@/components/games/hud-zones';   // look-screens A2 (ui.hudZonesUpright): the deck slot
-import { deckFadeOverBody } from '@/lib/ui/hudZones';   // look-screens A2 (ui.deckFadeOverBody, ships at 1 = solid)
+import { DECK_HINT_MODES, deckFadeOverBody } from '@/lib/ui/hudZones';   // look-screens A2 (ui.deckFadeOverBody, ships at 1 = solid)
 import { TOUCH_FLOAT_STICK, FLOAT_BASE_PX, FLOAT_RADIUS_PX, FLOAT_ZONE_W, FLOAT_ZONE_H, floatStickVector, floatKnobOffset } from './floatStick';   // lane/move-feel-2: the floating MOVE stick   // hoops round 2 (owner 2026-10-23): R2 on the touch deck, for the modes whose R2 is the turbo
 
 // setPointerCapture throws NotFoundError if the browser has already dropped
@@ -127,7 +127,11 @@ export function TouchOverlay(props: { bus: InputBus; modeId: string; visible: bo
       {/* compact: the stick in the corner and the d-pad inboard of it (row-reverse keeps the DOM order) */}
       <div ref={colL} className={`pointer-events-auto absolute bottom-3 left-3 flex gap-2 ${compact ? 'flex-row-reverse items-end' : 'flex-col items-center'}`} style={lifted(compact ? COMPACT_LEFT : SAFE_LEFT, cs * fit.l, 'bottom left')}>
         {DEAD_DPAD.has(props.modeId) && feel('touch.dpadTapOn', TOUCH_DPAD_TAP_ON) >= 0.5
-          ? (zones && !landscape ? <div ref={deckSlot.ref} {...deckSlot.attr} className="pointer-events-none relative h-[72px] w-[172px]" /> : <HollowDPad />)
+          ? (zones && !landscape
+            ? (DECK_HINT_MODES.has(props.modeId)
+              ? <div ref={deckSlot.ref} {...deckSlot.attr} className="pointer-events-none relative h-[72px] w-[172px]" />
+              : <div aria-hidden="true" className="pointer-events-none h-[72px] w-[72px]" />)
+            : <HollowDPad />)
           : <DPad bus={props.bus} layout={deck} />}
         {DEAD_L_STICK.has(props.modeId) ? <HollowStick /> : FLOAT_STICK_MODES.has(props.modeId) && feel('touch.floatStick', TOUCH_FLOAT_STICK) > 0 ? <FloatStick bus={props.bus} /> : <AnalogStick bus={props.bus} side="L" label="MOVE" />}
       </div>

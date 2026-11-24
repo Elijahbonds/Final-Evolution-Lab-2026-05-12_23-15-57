@@ -13,8 +13,8 @@
 //   top strip   the score bug and the round info, as each host draws them (unchanged), with the HYPE meter beside them;
 //   line slot   right under the strip: the call, the MC's line (one line: the whole line is in CC's caption bus) and the shot
 //               meter — the transient lines, above the rim and the bodies instead of on them;
-//   deck slot   the hint, in the touch deck's own band (where the ghost d-pad was, over the move stick in 1v1 / 3v3), where the
-//               camera never stands a body; the Dunk's hint heads its line slot;
+//   deck slot   the hint, in the touch deck's own band (where the ghost d-pad was, over the move stick), in 1v1 only, where the
+//               camera never stands a body (DECK_HINT_MODES); 3v3's and the Dunk's hints head their line slots;
 //   "⋯" menu    what is read between plays, not during one: the Dunk's field board, its prop / specials / signature chips and the
 //               MIX / MC / CC switches (the shell's menu holds them on the upright phone, lib/ui/compactHeader.ts).
 // Sideways, desktop and a TV are untouched, and with no "⋯" menu slot (ui.compactGameHeader 0) the folded pieces stay where
@@ -44,6 +44,13 @@ export const ZONES_QUERY = '(max-width: 640px) and (orientation: portrait)';
 export const MENU_SLOT_ATTR = 'data-fel-menu-slot';
 /** The deck's slot the hint portals into (rendered by TouchOverlay where a ghost d-pad was). */
 export const DECK_SLOT_ATTR = 'data-fel-deck-slot';
+
+/**
+ * The modes whose camera keeps the players above the touch deck's band (1v1's high sideline view: HighSidelineCam bottomBand), so
+ * the deck slot is under no body and the hint may go there. 3v3's camera does not (its high view is a switch, off): measured, its
+ * players walk into the deck's band (the hint sat on a player's feet in 1 of 6 moments), so its hint stays in the line slot.
+ */
+export const DECK_HINT_MODES: ReadonlySet<string> = new Set(['onevone']);
 
 /** Where each of the hoops bottom stack's rows goes on the upright phone. */
 export type HoopsRowZone = 'deck' | 'line';
