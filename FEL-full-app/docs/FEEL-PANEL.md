@@ -1298,6 +1298,16 @@ seeds 7, 11, 23, 31 and 47 a side; `makebeat.mjs`, `hoops-play/flow.mjs`, `hoops
   pass and the shot, and it is called inconclusive, not passed. Two pages loading at once also dropped the guest from netd for a while (its
   heartbeat stops during a 3v3 load on this rig); it rejoined. Turn it on after the owner's two-phone test (ONLINE-FINISH-PLAN §7).
 
+## improve-screens, 2026-11-22 (owner: "Do a 10 phase pass improving the areas that need it most"; docs/IMPROVE-10-PHASE-AUDIT.md phases 1, 2, 6)
+
+Group "Screens · phone". NEW switches, each **1 = on, 0 = today's screen exactly** (tests pin both ends). No existing tuned number moved.
+
+| Knob | Default | Restores the old behaviour at | What it does |
+|---|---|---|---|
+| `ui.stageFitsHeader` | 1 | 0 | Phase 1. On a phone held upright the game's stage takes the screen its header really leaves (the header wraps to two or three rows there), so the bottom of the game and the move stick stay on the screen. 0: the hosts' `calc(100dvh - 3.25rem)` box, sized for a one-row header. Sideways, full screen and the stream view are untouched either way. (`lib/ui/stageFit.ts`) |
+| `ui.touchTargets44` | 1 | 0 | Phase 6. On a touch screen the Venice first-visit hint takes the walk-up card's slot under the mini-map, clear of the deck's DASH and JUMP (it ran under them, and DASH covered its "Got it"); the dunk's MIX / MC / CC chips, the story dialogue's SKIP and its choices, and `/workout`'s two tick lines each get a tap box of at least 44 px, with the same look and the same words. 0: each screen as before. (`lib/ui/touchTargets.ts`) |
+| `try.prefetchDunk` | **0** (ships off) | 0 | Phase 2. Measured on the rig (phone tier, a 10 s typing pause): birth date to TAP TO START 28.2 s median off, 24.7 s on (about 12 %, against the tennis control about 3 %), short of the plan's 25 % bar, and the early code load held the main thread 1.2-1.75 s while the visitor typed; so it ships off. On a real phone network the download half should matter more (not measured). While a first-time guest gives `/try`'s birth date, the dunk stage's code chunk and the first static files the dunk asks for are fetched into the browser cache (GETs of public files, no cookies, no body, no query: nothing about the visitor; the answer still gates every request that carries data). 0: nothing is requested before the answer, as before. `/try` is for signed-out visitors, so the panel never opens there: this is the shipped value, changed by a commit. (`lib/try/prefetchDunk.ts`) |
+
 ## physics-arena, 2026-11-23 (owner: "Make there be a live physics play arena for the sport modes.- all the modes can be played physics based. And POV-"; docs/PHYSICS-ARENA-PLAN.md; the owner has not felt these yet)
 
 Groups "Physics arena" and "Physics arena · POV". All NEW (`lib/babylon/arena/arenaConfig.ts`), read only by the arena
@@ -1322,6 +1332,7 @@ ON because the arena is a new place the owner asked for; each restores today at 
 | `arena.aimAssist` | 0.8 | — | POV only: the share of a look off the ring the shot forgives. |
 | `arena.dunks` | 1 | 0 = jump shots only (slice 1) | Phase 4: a run at the ring with the ball is a dunk (the hand jams it down through; the iron decides), a close shot a soft layup (66°). |
 | `arena.dunkJumpVy` | 4.3 m/s | — | The dunk's take-off: 0.94 m up, so the hand gets the ball over the ring. |
+| `arena.physicsHands` | **0 (OFF)** | 0 = capsules and the impulse poke (shipped) | Owner 2026-11-24: "hands first, behind their own knob, OFF until measured". On: two kinematic hand bodies a player (7 cm, 12 m/s on a swipe, 5 m/s otherwise) moved to where the hands are (the dribble, the set point, a contest held high, a reach); a block or a poke is a contact. Not measured on the phone rig yet. |
 | `cam.povEyeM` | 1.72 m | — | The eye when no head bone is found. |
 | `cam.povFovDeg` | 82° | — | Across the screen; the vertical follows the screen's shape (50–90°). |
 | `cam.povBobM` | 0 | — | Head-bob, OFF by default. |

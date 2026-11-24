@@ -2437,6 +2437,22 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/net/knobs.ts NET_REMOTE_OFFENCE',
     hint: 'On: the body a friend plays brings the ball up, passes where they point and shoots when they press. Off: they move and defend, the AI picks the passes and shots.',
   },
+  // ── lane/improve-screens (2026-11-22, docs/IMPROVE-10-PHASE-AUDIT.md phases 1, 2, 6): the game shell and the screens ──
+  {
+    id: 'ui.stageFitsHeader', label: 'Phone upright: the game takes the screen the header leaves (1) / sized for a one-row header (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',
+    source: 'lib/ui/stageFit.ts STAGE_FITS_HEADER',
+    hint: 'On: the stage reads the real height of the header above it, so the bottom of the game and the move stick stay on the screen. Off: the old 100dvh less 3.25rem box, which ran off the bottom of an upright phone.',
+  },
+  {
+    id: 'ui.touchTargets44', label: 'Touch: Venice hint above the buttons, 44 px taps on the dunk chips, story SKIP, workout ticks (1) / as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',
+    source: 'lib/ui/touchTargets.ts TOUCH_TARGETS_44',
+    hint: 'On: the Venice first-visit hint sits under the mini-map, clear of DASH and JUMP; the dunk MIX, MC and CC chips, the story SKIP and choices and the workout tick boxes each get a tap box of at least 44 px (same look, same words). Off: each as before.',
+  },
+  {
+    id: 'try.prefetchDunk', label: 'Try page: load the first dunk while the birth date is asked (1) / only after the answer (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',
+    source: 'lib/try/prefetchDunk.ts TRY_PREFETCH_DUNK',
+    hint: 'On: the dunk code and its first files are fetched into the browser cache while a guest gives the birth date (plain file requests, no cookies, nothing about the visitor). Off (shipped: the measured cut was about 12 percent, short of the 25 percent bar): nothing is requested until the answer, as before. The try page has no feel panel: change it by a commit.',
+  },
   // ── lane/physics-arena (2026-11-23, owner: "a live physics play arena for the sport modes ... And POV"; docs/PHYSICS-ARENA-PLAN.md): all NEW ──
   {
     id: 'arena.on', label: 'Physics Arena chip on Play (1) / hidden (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Physics arena',
@@ -2532,6 +2548,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'arena.dunks', label: 'Arena dunks and layups at the rim (1) / jump shots only (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Physics arena',
     source: 'lib/babylon/arena/arenaConfig.ts ARENA_DUNKS',
     hint: 'On: a run at the ring with the ball is a dunk the iron decides, a close shot a soft layup. Off: every shot a jump shot.',
+  },
+  {
+    id: 'arena.physicsHands', label: 'Arena physics hands (1) / capsules only (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Physics arena',
+    source: 'lib/babylon/arena/arenaConfig.ts ARENA_PHYSICS_HANDS',
+    hint: 'On: every body has two solid hands that move where the hands are, so blocks and pokes happen by contact. Off (shipped until measured on a phone): the capsules and the old poke.',
   },
   {
     id: 'arena.dunkJumpVy', label: 'Arena dunk take-off speed', def: 4.3, min: 3, max: 5.5, step: 0.05, unit: 'm/s', group: 'Physics arena',

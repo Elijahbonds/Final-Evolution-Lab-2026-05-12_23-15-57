@@ -36,7 +36,8 @@ import { AdventureMode } from './AdventureMode';   // ADVENTURE A4 (2026-10-06):
 import { AdventureBRMode } from './AdventureBRMode';
 import { CoastZoneMode } from './CoastZoneMode';   // COAST & ISLANDS phase A (2026-11-18): the first open zone — registered, NOT enabled (/play/coast)
 import { PhysicsArenaMode } from './PhysicsArenaMode';
-import { PhysicsArena3ptMode } from './PhysicsArena3ptMode';   // PHYSICS ARENA phase 3: the three-point contest on real physics (/play/arena?sport=threepoint)   // PHYSICS ARENA (owner 2026-11-23): the sports on real physics — registered, NOT enabled (/play/arena)
+import { PhysicsArena3ptMode } from './PhysicsArena3ptMode';
+import { PhysicsArena3v3Mode } from './PhysicsArena3v3Mode';   // PHYSICS ARENA: 3v3 on real physics (/play/arena?sport=threes)   // PHYSICS ARENA phase 3: the three-point contest on real physics (/play/arena?sport=threepoint)   // PHYSICS ARENA (owner 2026-11-23): the sports on real physics — registered, NOT enabled (/play/arena)
 import { VeniceHubMode } from './VeniceHubMode';   // VENICE V1 (2026-11-17): the walkable hoops park — registered, Play-door served, NOT a scoring game.   // ADVENTURE C (2026-10-07): the bot BR — registered, NOT enabled (/play/adventure-br, unlisted)
 
 export const MODES: Record<string, ModeDefinition> = {
@@ -108,6 +109,7 @@ export const MODES: Record<string, ModeDefinition> = {
   coast_zone: CoastZoneMode,   // COAST & ISLANDS (docs/COAST-ISLANDS-PLAN.md): its own page /play/coast; NOT enabled (no picker serves it)
   venice_hub: VeniceHubMode,   // VENICE V1 (docs/VENICE-HUB-PLAN.md): its own page /play/venice; Play has a Venice door, but it is not a scoring game.   // ADVENTURE C (2026-10-07): the bot Battle Royale; NOT enabled (unlisted route)
   physics_arena: PhysicsArenaMode,   // PHYSICS ARENA (docs/PHYSICS-ARENA-PLAN.md): its own page /play/arena, Play's Physics Arena chip; a practice place, NOT enabled (no picker serves it)
+  physics_arena_3v3: PhysicsArena3v3Mode,   // PHYSICS ARENA: its page is /play/arena?sport=threes; NOT enabled
   physics_arena_3pt: PhysicsArena3ptMode,   // PHYSICS ARENA phase 3: its page is /play/arena?sport=threepoint; NOT enabled
 };
 

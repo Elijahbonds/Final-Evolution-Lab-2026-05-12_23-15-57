@@ -13,11 +13,13 @@ import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { ARENA_MODE_ID } from '@/lib/babylon/modes/PhysicsArenaMode';
 import { ARENA_3PT_MODE_ID } from '@/lib/babylon/modes/PhysicsArena3ptMode';
+import { ARENA_3V3_MODE_ID } from '@/lib/babylon/modes/PhysicsArena3v3Mode';
 import { ARENA_HREF, physicsHoopsOn, povOn, SHIPPED_ONEVONE_HREF } from '@/lib/babylon/arena/arenaConfig';
 
 /** The arena's sports so far (docs/PHYSICS-ARENA-PLAN.md §5): `?sport=` picks one. */
 const SPORTS = [
   { id: 'hoops', mode: ARENA_MODE_ID, label: '1v1', keys: 'Move WASD · Sprint Shift · Shoot hold L, let go at the top · Jump J · Pass K · Reach I · Cross Q · View C' },
+  { id: 'threes', mode: ARENA_3V3_MODE_ID, label: '3v3', keys: 'Move WASD · Sprint Shift · Shoot hold L · Jump J · Pass K (toward the stick) · Call for it / reach I · Cross Q · View C' },
   { id: 'threepoint', mode: ARENA_3PT_MODE_ID, label: '3-Point', keys: 'Shoot hold L (or J), let go at the top of the jump · View C' },
 ] as const;
 function sportOf(search: string): (typeof SPORTS)[number] {

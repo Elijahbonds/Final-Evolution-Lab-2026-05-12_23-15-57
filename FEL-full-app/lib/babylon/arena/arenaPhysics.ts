@@ -28,7 +28,7 @@ export const playerBit = (i: number): number => LAYER.PLAYER0 << i;
 const ALL_PLAYERS = 0xfffffffc;
 
 export type Surface = 'floor' | 'rim' | 'board' | 'frame' | 'body';
-export interface BallContact { surface: Surface; impulse: number; playerId?: string; /** Which ball (its index in `balls`). */ ball: number }
+export interface BallContact { surface: Surface; impulse: number; playerId?: string; /** Which ball (its index in `balls`). */ ball: number; /** A physics hand (arena.physicsHands), not the body. */ hand?: boolean }
 
 const mat = (restitution: number, friction: number): PhysicsMaterial => ({
   restitution, friction, staticFriction: friction,
@@ -199,6 +199,59 @@ export class ArenaPlayer {
   }
 }
 
+/** A body's two physics hands (owner 2026-11-24, `arena.physicsHands`, OFF until measured): kinematic spheres moved toward their
+ *  targets each step at a hand's top speed, so the ball they meet is pushed by contact (a block, a poke). They carry their player's
+ *  collision bit, so a ball told to ignore a player (his own dribble, his own release) ignores his hands too, and they touch the
+ *  ball only (never a body). */
+export class ArenaHands {
+  readonly left: PhysicsBody;
+  readonly right: PhysicsBody;
+  private readonly at = [new Vector3(), new Vector3()];
+  private readonly want = [new Vector3(), new Vector3()];
+  private placed = false;
+  constructor(readonly player: ArenaPlayer, world: ArenaPhysics) {
+    const scene = player.node.getScene();
+    const mk = (side: string): PhysicsBody => {
+      const node = new TransformNode(`arena_hand_${player.id}_${side}`, scene);
+      node.position.copyFrom(player.node.position);
+      const body = new PhysicsBody(node, PhysicsMotionType.ANIMATED, false, scene);
+      const shape = new PhysicsShapeSphere(Vector3.Zero(), HAND_R, scene);
+      shape.material = mat(BODY_BOUNCE, 0.6);
+      filter(shape, player.bit, LAYER.BALL);
+      body.shape = shape;
+      body.setCollisionCallbackEnabled(true);
+      return body;
+    };
+    this.left = mk('l'); this.right = mk('r');
+    world.registerHand(this.left, player); world.registerHand(this.right, player);
+  }
+  private fast = false;
+  /** Where the hands should be (world). Applied on the next step. `fast`: a swipe (a reach) at a hand's top speed; otherwise the
+   *  hands move at a carrying pace (a guard's hands turning with his body are not paddles). */
+  target(l: Readonly<P3>, r: Readonly<P3>, fast = false): void {
+    this.fast = fast;
+    this.want[0].set(l.x, l.y, l.z); this.want[1].set(r.x, r.y, r.z);
+    if (!this.placed) { this.at[0].copyFrom(this.want[0]); this.at[1].copyFrom(this.want[1]); this.placed = true; }
+  }
+  /** @internal move toward the targets at a hand's top speed (a teleport across the court would swat the ball). */
+  preStep(h: number): void {
+    const bodies = [this.left, this.right];
+    for (let i = 0; i < 2; i++) {
+      const a = this.at[i], w = this.want[i];
+      const dx = w.x - a.x, dy = w.y - a.y, dz = w.z - a.z, d = Math.hypot(dx, dy, dz), max = (this.fast ? HAND_MAX_MPS : HAND_CARRY_MPS) * h;
+      const k = d > max ? max / d : 1;
+      a.set(a.x + dx * k, a.y + dy * k, a.z + dz * k);
+      bodies[i].setTargetTransform(a, Quaternion.Identity());
+    }
+  }
+}
+
+/** A hand: a 7 cm sphere (a palm and fingers round a ball), moving at most 12 m/s (a fast swipe). */
+export const HAND_R = 0.07;
+export const HAND_MAX_MPS = 12;
+/** …and at most 5 m/s when not swiping. */
+export const HAND_CARRY_MPS = 5;
+
 export interface ArenaStepStats { steps: number; ms: number }
 
 export class ArenaPhysics {
@@ -217,6 +270,8 @@ export class ArenaPhysics {
   private surfaceOf = new Map<PhysicsBody, Surface>();
   private playerOf = new Map<PhysicsBody, ArenaPlayer>();
   private ballOf = new Map<PhysicsBody, number>();
+  private handOf = new Map<PhysicsBody, ArenaPlayer>();
+  private hands: ArenaHands[] = [];
   private disposers: Array<() => void> = [];
   private engine!: PhysicsEngine;
 
@@ -287,6 +342,15 @@ export class ArenaPhysics {
     return b;
   }
 
+  /** Two physics hands for a player (arena.physicsHands). */
+  addHands(player: ArenaPlayer): ArenaHands {
+    const h = new ArenaHands(player, this);
+    this.hands.push(h);
+    return h;
+  }
+  /** @internal */
+  registerHand(body: PhysicsBody, player: ArenaPlayer): void { this.handOf.set(body, player); }
+
   addPlayer(id: string, node: TransformNode, opts: PlayerOpts = {}): ArenaPlayer {
     const pl = new ArenaPlayer(id, node, this.players.length, this, opts);
     this.players.push(pl);
@@ -311,6 +375,7 @@ export class ArenaPhysics {
     while (this.acc >= h - 1e-9 && n < ARENA_MAX_STEPS) {
       beforeStep?.(h);
       for (const b of this.balls) b.preStep(h);
+      for (const hd of this.hands) hd.preStep(h);
       this.engine._step(h);
       if (this.teleports.length) { for (const b of this.teleports) b.disablePreStep = true; this.teleports.length = 0; }
       this.time += h;
@@ -330,10 +395,11 @@ export class ArenaPhysics {
     const ballBody = this.balls[bi].body;
     const other = e.collider === ballBody ? e.collidedAgainst : e.collider;
     if (this.ballOf.has(other)) return;   // ball on ball: not a surface the rules read
-    const pl = this.playerOf.get(other);
+    const hand = this.handOf.get(other);
+    const pl = this.playerOf.get(other) ?? hand;
     const surface: Surface | undefined = pl ? 'body' : this.surfaceOf.get(other);
     if (!surface) return;
-    if (this.contacts.length < 64) this.contacts.push({ surface, impulse: e.impulse ?? 0, playerId: pl?.id, ball: bi });
+    if (this.contacts.length < 64) this.contacts.push({ surface, impulse: e.impulse ?? 0, playerId: pl?.id, ball: bi, hand: !!hand });
   }
 
   drainContacts(): BallContact[] { const out = this.contacts; this.contacts = []; return out; }

@@ -13,6 +13,9 @@ vi.mock('react', async (importOriginal) => {
   return { ...actual, useEffect, default: { ...base, useEffect } };
 });
 vi.mock('next/dynamic', () => ({ default: () => function Stage() { return null; } }));
+// improve-screens phase 2: the prefetch's code chunk is the real dunk stage module; stand it in for node (the import is what is checked)
+const chunk = vi.hoisted(() => ({ loads: 0 }));   // module loads of the stage (reset per test below)
+vi.mock('@/components/games/dunk-babylon', () => { chunk.loads++; return { DunkBabylon: () => null }; });
 vi.mock('@/lib/analytics', () => ({
   track: (...a: unknown[]) => { fx.track.push(a); },
   flush: async () => { fx.flush++; },
@@ -21,6 +24,9 @@ vi.mock('@/lib/analytics', () => ({
 import { GuestDunkShell } from './guest-dunk-shell';
 import { AgeStep } from '@/components/age-step';
 import { AGE_QUESTION } from '@/lib/privacy/ageScreen';
+import { DUNK_FIRST_FILES, isStaticFile, resetPrefetchDunkForTests } from '@/lib/try/prefetchDunk';
+import { FEEL_STORAGE_KEY, resetFeelForTests, setFeelSession, setFeelUser } from '@/lib/feel-panel/feel';
+import { feelSessionBlock } from '@/lib/feel-panel/sessionGate';
 
 const THIS_YEAR = new Date().getFullYear();
 let fetchCalls: Array<[string, RequestInit | undefined]> = [];
@@ -60,7 +66,7 @@ const nothingSent = () => {
   expect(fx.flush).toBe(0);
 };
 
-beforeEach(() => { stubBrowser(); });
+beforeEach(() => { stubBrowser(); resetPrefetchDunkForTests(); });
 afterEach(() => { vi.unstubAllGlobals(); });
 
 describe('/try asks the year before any guest row', () => {
@@ -164,6 +170,46 @@ describe('/try asks the year before any guest row', () => {
     expect(fetchCalls.map(([u]) => u)).toEqual(['/api/guest', '/api/challenge/C1/attempt']);
     expect(fx.track.map(([n]) => n)).toEqual(['play_now_click', 'first_dunk_judged']);
     vi.mocked(console.error).mockRestore();
+  });
+
+  // improve-screens phase 2 (try.prefetchDunk 1, lib/try/prefetchDunk.ts). test added (2026-11-22; no assertion above changed): the mount above is the
+  // first render (0 fetch still holds there). Once the question is up AND hydrated, the dunk's code
+  // chunk and its first public files are fetched. The rule this file exists for still holds and is checked here: nothing CARRYING DATA
+  // leaves before the answer — no /api call, no beacon, no track, no year — and every request is a cookie-less GET of a public file.
+  const hydratedOnTheQuestion = () => drive(() => { fx.effects.length = 0; return GuestDunkShell({ challengeCode: 'C1' }); }, [
+    () => { for (const e of fx.effects.splice(0)) e(); },   // mount: hydrated
+    () => { for (const e of fx.effects.splice(0)) e(); },   // the effects of the hydrated render: where the prefetch would start
+  ]);
+  it('on the question, hydrated, try.prefetchDunk 0 (shipped): 0 fetch / beacon / track, and the dunk code is not loaded', async () => {
+    hydratedOnTheQuestion();
+    await new Promise((r) => setTimeout(r, 800));
+    await settle();
+    expect(chunk.loads).toBe(0);
+    nothingSent();
+  });
+
+  it('on the question, hydrated, try.prefetchDunk 1: only cookie-less GETs of public files (the dunk prefetch), and 0 /api, beacon or track', async () => {
+    // the switch at 1, as a commit would set it (the feel panel's override path, which /try itself never opens)
+    const ls = new Map<string, string>([[FEEL_STORAGE_KEY, JSON.stringify({ 'try.prefetchDunk': 1 })]]);
+    (globalThis as { window?: unknown }).window = { localStorage: { getItem: (k: string) => ls.get(k) ?? null, setItem: () => {}, removeItem: () => {} } };
+    setFeelUser(true); setFeelSession(feelSessionBlock('/play/dunk', '?playtest=1'));
+    try {
+    hydratedOnTheQuestion();
+    await new Promise((r) => setTimeout(r, 2600));   // no requestIdleCallback in node: each step waits 200 ms, two at a time
+    await settle();
+    expect(chunk.loads).toBe(1);
+    expect(fetchCalls.map(([u]) => u)).toEqual([...DUNK_FIRST_FILES]);
+    for (const [u, init] of fetchCalls) {
+      expect(isStaticFile(u), u).toBe(true);
+      expect(init?.method).toBe('GET');
+      expect(init?.credentials).toBe('omit');
+      expect(init?.body).toBeUndefined();
+    }
+    expect(guestPosts()).toEqual([]);
+    expect(beacons).toEqual([]);
+    expect(fx.track).toEqual([]);
+    expect(fx.flush).toBe(0);
+    } finally { resetFeelForTests(); delete (globalThis as { window?: unknown }).window; }
   });
 
   it('the year never reaches the server and is never stored', async () => {
