@@ -2551,6 +2551,17 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/ui/closetSideways.ts CLOSET_SIDEWAYS',
     hint: 'On a short sideways screen (a phone held sideways) the Studio walkthrough card sits at the top of the editor beside the stage, as on an upright phone, instead of over the 3D athlete. Same card and steps. Tablets and desktops unchanged. 0 = as before.',
   },
+  // ── lane/look-world (look pass C4): the Coast sea ──
+  {
+    id: 'coast.oceanSurface', label: 'Coast: living sea and shore foam (1) / flat sheet (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Coast · zone',
+    source: 'lib/adventure/coast/shoreFoam.ts COAST_OCEAN_SURFACE',
+    hint: 'The sea borrows the surf break shading: small chop bending the light and a fade toward the sky with distance (the sun glitter on a desktop only), and a foam line breathes where the water meets the sand. The water height and wading are unchanged. 0 = the flat sheet, as before.',
+  },
+  {
+    id: 'venue.veniceGroundV2', label: 'Venice: weathered park slab and sand (1) / flat tiled planes (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Coast · zone',
+    source: 'lib/adventure/venice/groundV2.ts VENICE_GROUND_V2',
+    hint: 'From the hub high camera the slab and the sand were one texture tiled flat to the horizon. 1 draws them as a grid whose vertex colour carries slow worn patches on the concrete and damp drifts on the sand, so the repeat breaks up. No texture added, the same draws. 0 = the flat planes, as before.',
+  },
   // ── lane/improve-world (phase 9): the zone cameras ──
   {
     id: 'venue.camClearView', label: 'Coast and story camera: keeps out of the boat, houses, trees, rocks and walls (1) / passes through them (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Coast · zone',

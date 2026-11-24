@@ -57,6 +57,10 @@ import { COAST_OCEAN_BED, CoastSoundscape } from '@/lib/adventure/coast/zoneSoun
 // improve pass phase 9 (venue.camClearView): the camera keeps out of the boat, the houses, the palms and the rocks
 import { VENUE_CAM_CLEAR_VIEW, type CamBox } from '../adventure/host/camera';
 import { boxesNear, keepEyeClear, meshCamBoxes } from '../adventure/host/camBoxes';
+// look pass C4 (coast.oceanSurface): the living sea and the shore foam
+import { COAST_OCEAN_SURFACE } from '@/lib/adventure/coast/shoreFoam';
+import { oceanLightFor } from '../visual/OceanSurface';
+import { MOODS } from '../scene/moods';
 
 export const COAST_MODE_ID = 'coast_zone';
 /** The stick's basis latches while held (AdventureMode's rule): below this it lets go. */
@@ -231,7 +235,12 @@ export const CoastZoneMode: ModeDefinition = {
     const breathe = () => new Promise<void>((r) => setTimeout(r, 0));
     await breathe();
     const prewarm = feel('coast.prewarmLate', COAST_PREWARM_LATE) >= 0.5;
-    const view = mountZoneView(scene, { streamOn, sliced: feel('coast.streamSliced', COAST_STREAM_SLICED) >= 0.5, prewarm });
+    const ocean = feel('coast.oceanSurface', COAST_OCEAN_SURFACE) >= 0.5 ? (() => {
+      const mood = ctx.lights?.mood ?? 'daylight', M = MOODS[mood] ?? MOODS.daylight;
+      const light = oceanLightFor(mood, M.sunDir, M.sun, (scene.metadata as { felTier?: string } | undefined)?.felTier ?? 'desktop');
+      return light ? { light } : {};
+    })() : null;
+    const view = mountZoneView(scene, { streamOn, sliced: feel('coast.streamSliced', COAST_STREAM_SLICED) >= 0.5, prewarm, ocean });
     await breathe();
     const streamer = new ZoneStreamer({
       full: Math.round(feel('coast.streamFull', COAST_STREAM_FULL)),
