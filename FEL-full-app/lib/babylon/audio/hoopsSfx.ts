@@ -52,7 +52,9 @@ export const CONTACT_VOICE_ON = 0;
 /** An impact at this pitch or higher is a hand on the ball (the modes' strip / steal / parry / block pitches); below, a body. */
 export const CONTACT_HAND_PITCH = 1.2;
 /** The re-voiced levels against the impact they replace (× the call's volume). */
-export const CONTACT_HAND_GAIN = 1.0, CONTACT_KNOCK_GAIN = 0.35, CONTACT_BODY_GAIN = 0.9;
+// Measured (loudness.mts, the loudest 50 ms at the limiter, at the modes' pitches and volumes): at the first draft's 1.0 / 0.35 / 0.9 the
+// bodies came out 2.0–2.2 dB over today's impact and the hands 3.0–3.3 dB under it; set to land on it (bodies × 0.79, hands × 1.45).
+export const CONTACT_HAND_GAIN = 1.45, CONTACT_KNOCK_GAIN = 0.5, CONTACT_BODY_GAIN = 0.71;
 /** Two contacts closer than this (s) are one: the second is dropped. */
 export const CONTACT_MIN_GAP_SEC = 0.06;
 export function contactVoiceOn(): boolean { return feel('hoops.contactVoiceOn', CONTACT_VOICE_ON) >= 0.5; }

@@ -4,7 +4,7 @@
 // court (no hoops bank) the impact stays the impact.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FakeAudioContext, FakeAudioBuffer, installFakeWebAudio, type FakeWebAudio } from '../music/fakeWebAudio';
-import { contactVoice, CONTACT_HAND_PITCH, CONTACT_VOICE_ON } from './hoopsSfx';
+import { contactVoice, CONTACT_HAND_PITCH, CONTACT_VOICE_ON, CONTACT_HAND_GAIN } from './hoopsSfx';
 
 let fake: FakeWebAudio;
 const decoded = new WeakSet<object>();
@@ -41,7 +41,7 @@ describe('the contact voice', () => {
   it('the pure map: a hand on the ball is the slap over a knock, a body the thud; the call\'s volume rides through', () => {
     const hand = contactVoice(1.5, 0.5);
     expect(hand.map((c) => c.name)).toEqual(['catch', 'thud']);
-    expect(hand[0].opts.volume).toBeCloseTo(0.5, 5);
+    expect(hand[0].opts.volume).toBeCloseTo(0.5 * CONTACT_HAND_GAIN, 5);
     const body = contactVoice(0.82, 0.7);
     expect(body.map((c) => c.name)).toEqual(['thud']);
     expect(contactVoice(CONTACT_HAND_PITCH, 1)[0].name).toBe('catch');

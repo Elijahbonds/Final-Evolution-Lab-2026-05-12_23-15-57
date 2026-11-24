@@ -365,7 +365,11 @@ impact. **The mute silences it** (tested: `SoundKit.contactVoice.test`, the fake
 
 **Levels** (`scripts/probes/hoops-sound/loudness.mts`, Chromium, SoundKit's own graph, the loudest 50 ms at the limiter): today's impact
 at the modes' contact pitches and volumes — a bump (0.95, vol 0.55) −37.3 dB, a body-bag (0.82, 0.70) −35.4, a knockdown (0.70, 0.80)
-−34.1, a strip (1.3, 0.45) −39.2, a parry (1.5, 0.5) −38.4. CONTACT_LEVELS_PENDING
+−34.1, a strip (1.3, 0.45) −39.2, a parry (1.5, 0.5) −38.4. With the contact voice at the first draft's
+gains (hand 1.0, knock 0.35, body 0.9): the bump −35.3, the body-bag −33.2, the knockdown −31.8 (bodies 1.9–2.3 dB over today), the strip
+−42.4, the parry −41.5 (hands 3.1–3.2 dB under). The gains were then set to land on today's level (body × 0.79 → 0.71; hand and knock
+× 1.45 → 1.45 / 0.5): computed from those offsets (a linear gain), re-measured below if the probe's hold came in time.
+CONTACT_REMEASURE
 
 **Verdict: ships OFF.** It is a feel item — the owner judges a slap and a thud against the boop by ear.
 
