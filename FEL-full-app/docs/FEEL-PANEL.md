@@ -1370,3 +1370,59 @@ NEW switches, each **1 = on, 0 = today's game exactly** (tests pin both ends). N
   recorded palm slap over a short knock, a body contact the low thud, instead of the arcade boop; the call's volume is kept; two contacts
   within 60 ms are one; the mute silences it (tested). Levels in docs/HOOPS-GAP-PLAN.md §5.7. A feel item: OFF for the owner's ear.
 
+
+## look-world, 2026-11-24 (the look pass, phases C1–C4; docs/LOOK-PASS-AUDIT.md; owner: "Let's do a pass where we improve how things look.")
+
+Measured on the esbuild rig `scripts/probes/look-world/look-rig.mts` (the real stage and zone through `runMode`), the phone tier for cost
+(390 × 844, DPR 3, touch, CPU 4× slower; tennis the control in the same hold) and `?perf=off` for every picture. No existing tuned
+number moved; every number below is NEW.
+
+- `story.gradeV2` **0** (group "Story · flow"; `lib/babylon/adventure/world/grade.ts` `STORY_GRADE_V2`, **ships OFF: colour is the
+  owner's**): why the story looked washed out. The shared post pipeline reads every material colour as linear light and gamma-encodes the
+  frame (its image-processing pass has `fromLinearSpace` on, read on the rig); the story's surfaces hand in the sRGB hex, so the hub's dark
+  slate floor (#334155) reaches the screen pale and, under the daylight sun (2.6), near white. 1 reads the story's own surfaces
+  (`story_*`, `dress_*`) as sRGB, the dressing kit's palette in linear, and scales a textured tint so its painted map keeps its painted
+  brightness (`tintScaleForMean`, read once from the canvas). The light, sky, fog and exposure are untouched. Pictures (look-world rig,
+  `?perf=off`): on the plain blocks the palette as given is DARK (a navy hub, a near-black World 1) — the placeholder palette was picked
+  through the lift; on the dressed world it reads as painted stone and grass. Exposure 0.95 and contrast 1.22 were tried on top and add
+  nothing. Zero added work (colour values only).
+- `story.worldDressed` (exists): made cheaper (`dress.ts`): nothing the dressing adds throws a shadow on a phone (the light rig classified
+  each piece as a caster when it was created — the lips, caps and posts span a whole world, the props are thin instances); a desktop keeps
+  the trees' shadows; the props are one thin-instance draw per model part PER WORLD so a world out of view is culled whole; the probe seam
+  `?dresscut=notex,noprops,notrims` (read by the mode, never stored) attributes the cost. Phone tier, World 1 resumed at the rail run, 3
+  runs a side: load 16.8 / 17.3 / 16.2 s → 17.3 / 17.1 / 16.9 s; frame p95 in play 667 / 567 / 483 → 600 / 567 / 617 ms; in free control
+  267 / 217 / 350 → 250 / 367 / 283 ms (tennis, the control, 1,517 / 1,383 / 1,467 ms in the same hold) — the frame and the load are
+  within noise. Real WebGL draws a frame (counted on the context, the median and the worst of the last 120 frames, `?perf=off`): the hub
+  40 → 41 (worst 49 → 57), World 1 46 → 54 (worst 55 → 82), active meshes in World 1 24 → 52 — against the story's phone row
+  (`mobileBudget.json` adventure-story: 64 draws, 23 active meshes). The pictures are plainly better (paving and stone in the hub, grass
+  in World 1, `look-world-c1-*`), but World 1's worst frame is over the row's draws and its active meshes are over the row (today's are
+  already 24 of 23). The phone tier with the speed guard on (2 runs a side) says the same: median draws 39 / 40 → 52 / 55, the worst
+  frame 83 / 91 → 141 / 153 (today's worst is over the row too), active meshes 14 / 12 → 20 / 50. **So it stays at 0**, with the recommendation to switch it on: the owner's yes to raise the row (measured above), or a
+  phone check with the PERF readout. (The world rig's `draws` number — `engine._drawCalls.current`, thousands in the story — is a
+  counter nothing resets each frame there; the GL count above is the real one.)
+- `story.titleCard` **1** (group "Story · flow"; `lib/babylon/adventure/story/titleCard.ts` `STORY_TITLE_CARD`, drawn by `components/adventure/StoryTitleCard.tsx`, ships ON): the READY screen
+  as a title card (the route's name, where you are, the chapter's title large, START; the same control table one tap away under
+  CONTROLS), and the partner picker's creatures as the silhouette of their in-game stand-in body (`CreatureSilhouette.tsx`: the capsule and
+  head of `world/view.ts buildCreatureBody`, to scale, in the element's colour), not a dot. Same words; DOM only. 0 = the screens as before.
+- `ui.closetSideways` **1** (group "Screens · phone"; `lib/ui/closetSideways.ts` `CLOSET_SIDEWAYS`, laid out by `components/closet/sideways.ts`, ships ON): on a short sideways
+  screen (landscape, at most 520 px tall) the Studio walkthrough card sits at the top of the editor beside the stage, as on an upright
+  phone, instead of over the 3D athlete. Tablets and desktops unchanged. 0 = as before.
+- `coast.oceanSurface` **0** (group "Coast · zone"; `lib/adventure/coast/shoreFoam.ts` `COAST_OCEAN_SURFACE`, with `FOAM` step 2 m, peak
+  0.08 m under the line, half-band 0.22 m, and `OCEAN_LOOK`'s haze #8FC3CF fading 150 → 255 m): the sea plane borrows the surf break's
+  ocean shading (`OceanSurface.ts oceanShade`: the chop and the distance fade; the sun's glitter on a desktop only), takes its own colour
+  #1C6F88 as a linear albedo (it was being lifted to bright cyan), and a foam line breathes where the water meets the sand (one mesh over
+  the shallows, alpha 0.55–0.9). No vertex displacement: SEA_Y, wading and the turn-back are unchanged. 0 = the flat sheet. Phone tier,
+  3 runs a side: frame p95 950 / 1,433 / 950 → 817 / 650 / 1,017 ms; load 23.8 / 19.9 / 19.3 → 20.7 / 22.7 / 22.2 s (inside today's own
+  spread); real draws a frame 81 / 84 / 84 → 85 / 80 / 80 (row 164); textures unchanged. Within noise, but the water's colour is a look
+  call: **ships OFF** with its sheet for the owner.
+- `venue.veniceGroundV2` **0** (group "Coast · zone"; `lib/adventure/venice/groundV2.ts` `VENICE_GROUND_V2`, with `GROUND_V2` one vertex
+  every 4 m, 8–64 cells a side): the Venice park slab and the sand as a grid whose vertex colour carries slow worn patches and damp drifts
+  over the tiled map, so the repeat breaks up. **No texture added** (texture memory re-measured first, below); the same draws. 0 = the flat
+  planes. Phone tier, 3 runs a side: frame p95 1,000 / 1,283 / 967 → 1,117 / 1,000 / 950 ms; load 22.2 / 20.3 / 21.5 → 19.8 / 21.7 / 20.1 s;
+  real draws 47 / 47 / 46 → 50 / 47 / 47 (row 56). Within noise; the change on screen is slight and a look call: **ships OFF**.
+- **Venice's texture memory, re-measured** (the plan's rule before adding anything there): the owner's PERF readout counts every loaded
+  texture INCLUDING the post pipeline's render targets; `_perf-sweep.mts` / `mobileBudget.json` leave render targets out. Phone tier, one
+  run: readout formula 145 MB = render targets 57 MB + textures 83 MB (sweep formula) — against the row's 88 MB. So the readout's 158 MB is
+  not a budget breach; the row is close to its ceiling and nothing that adds a texture should go into Venice. Seen in the same list: the
+  render targets of three render scales (780 × 1688, 663 × 1434, 585 × 1266) are all still loaded after the speed guard stepped down —
+  about 20 MB of stale targets (lane B's area: the engine's post pipeline).

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 // the NullEngine has no canvas to paint the ground textures on: the materials take none here (the browser paints them)
 vi.mock('../../visual/groundTextures', () => ({ groundTexture: () => null }));
 import { Mesh, MeshBuilder, NullEngine, Scene, VertexBuffer } from '@babylonjs/core';
-import { blockedBy, boxProjectUVs, CLEAR, DRESS_MODELS, dressPlan, lipsOf, mountWorldDress, railPostsOf, splitTopsAndSides, STORY_WORLD_DRESSED } from './dress';
+import { blockedBy, boxProjectUVs, CLEAR, DRESS_ALL, DRESS_MODELS, dressCutOf, dressPlan, lipsOf, mountWorldDress, railPostsOf, splitTopsAndSides, STORY_WORLD_DRESSED } from './dress';
 import { buildWorld1, W1_GAPS } from './ch1/world1';
 import { buildHub } from './hub/hub';
 import { groundYOf } from './pieces';
@@ -90,5 +90,40 @@ describe('Chapter 1 dressing (improve pass phase 7)', () => {
     expect(scene.getMeshByName('dress_w1_lip')).toBeNull();
     view.dispose();
     scene.dispose();
+  });
+
+  // look pass C1 (lane/look-world): the dressing made cheaper
+  it('C1: no trim casts a shadow (the mode\'s uncast hook takes each one out); the probe seam leaves parts out', () => {
+    const scene = new Scene(new NullEngine());
+    const map = buildStoryMap(worlds);
+    const view = buildStoryView(scene, map, new HubGates(map));
+    const uncast: string[] = [];
+    const d = mountWorldDress(scene, [...map.worlds.values()], undefined, { phone: true, uncast: (m) => uncast.push(m.name) });
+    for (const n of ['dress_w1_lip', 'dress_w1_cap', 'dress_w1_post', 'dress_hub_lip', 'dress_hub_cap']) expect(uncast).toContain(n);
+    d.dispose();
+    const ground = scene.getMeshByName('story_w1_ground')!;
+    const d2 = mountWorldDress(scene, [...map.worlds.values()], undefined, { cut: dressCutOf('notrims,noprops') });
+    expect(scene.getMeshByName('dress_w1_lip')).toBeNull();
+    expect(ground.material?.name).toBe('dress_w1_ground');   // the surfaces still dressed
+    d2.dispose();
+    view.dispose();
+    scene.dispose();
+  });
+
+  it('C1: the probe seam parses only its own words; nothing = everything', () => {
+    expect(dressCutOf(null)).toEqual(DRESS_ALL);
+    expect(dressCutOf('')).toEqual(DRESS_ALL);
+    expect(dressCutOf('notex')).toEqual({ tex: false, props: true, trims: true });
+    expect(dressCutOf('noprops,notrims,bogus')).toEqual({ tex: true, props: false, trims: false });
+  });
+
+  it('C1: with the grade off the dressing\'s colours are the hex as before (no tint scale)', () => {
+    const scene = new Scene(new NullEngine());
+    const map = buildStoryMap(worlds);
+    const view = buildStoryView(scene, map, new HubGates(map));
+    const d = mountWorldDress(scene, [...map.worlds.values()]);
+    const lip = scene.getMaterialByName('dress_w1_lip_mat') as unknown as { diffuseColor: { toHexString(): string } };
+    expect(lip.diffuseColor.toHexString()).toBe('#4A3F33');
+    d.dispose(); view.dispose(); scene.dispose();
   });
 });

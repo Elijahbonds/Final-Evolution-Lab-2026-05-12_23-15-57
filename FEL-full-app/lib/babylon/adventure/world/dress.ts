@@ -15,23 +15,39 @@
  *              reach of a spawn, a gate, a camp, the rails, the run-wall or the cover (dressPlan's clear rule), one thin-instanced
  *              draw per model part. Loaded after the story can be played (it never lengthens the load).
  * Creature and boss bodies are left alone (owner / art). `story.worldDressed` 0 = the flat colours, as before.
+ *
+ * LOOK PASS C1 (lane/look-world, 2026-11-24): the dressing made cheaper, so it can be measured against the bar again —
+ *   shadows    nothing the dressing adds throws a shadow on a phone (the lips, caps and posts are merged meshes that span a whole
+ *              world, and the props are thin instances: each one cast into the shadow map every frame it re-renders); on a desktop
+ *              only the trees do. Before, every one of them cast (the light rig classifies a mesh by name when it is created, and
+ *              they were created under their parts' names). `uncast` is the mode's hook into its shadow generator.
+ *   per world  the props are one thin-instance draw per model part PER WORLD (it was one for both worlds), so the hub's props are
+ *              culled as a whole while you play World 1 and the reverse.
+ *   linear     with story.gradeV2 (world/grade.ts) the kit's palette goes in as linear and the textured surfaces' tints are scaled
+ *              to their maps' painted brightness.
+ *   cut        a probe seam, `?dresscut=notex,noprops,notrims` (read by the mode, never stored), so a rig can attribute the cost.
  */
 
 import {
   Color3, Matrix, Mesh, MeshBuilder, MultiMaterial, PBRMaterial, Quaternion, SceneLoader, StandardMaterial, SubMesh, Texture, Vector3, VertexBuffer,
-  type Scene, type TransformNode,
+  type AbstractMesh, type DynamicTexture, type Scene, type TransformNode,
 } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { groundTexture } from '../../visual/groundTextures';
 import { buildRailPath } from '../rails/railMath';
 import { groundYOf, type GroundPiece } from './pieces';
+import { markGraded, textureTintScale } from './grade';
 import type { StoryWorldSpec } from './story/spec';
 
 /** story.worldDressed: 1 = textures, trims and the nature kit; 0 = the plain colours (before this pass).
  *  SHIPS OFF (lane C, 2026-11-23): no measured win on the phone rig, 3 runs a side, twice. Load: hub 15.3 → 15.5 s and World 1
  *  14.3 → 15.4 s in the first run, 14.6 → 16.1 s and 14.2 → 16.7 s (+10 %, +18 %) in the second; World 1's frame p95 in play
  *  250 → 317 ms, then (texture filtering 8 → 1, frozen matte materials, no shadow lookups on the props) 150 → 217 ms in 2 of 3 runs.
- *  The look is the owner's: switch it on in the feel panel and judge it on a real phone, where texture sampling is cheap. */
+ *  The look is the owner's: switch it on in the feel panel and judge it on a real phone, where texture sampling is cheap.
+ *  LOOK PASS C1 (lane/look-world, 2026-11-24), after the cut below, phone tier, 3 runs a side, World 1: load and frame p95 within noise
+ *  (load 16.8 → 17.1 s median; p95 in play 567 → 600 ms, in free control 267 → 283 ms, each inside the off side's own spread), but
+ *  World 1's real draws 46 → 54 a frame (worst 55 → 82) and active meshes 24 → 52, over the story's phone row (64 draws, 23 meshes):
+ *  still 0, the owner's call (raise the row, or a phone check). docs/FEEL-PANEL.md (look-world). */
 export const STORY_WORLD_DRESSED = 0;
 
 // ── the plan (pure) ─────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -192,9 +208,11 @@ const TOP_TILE_M = { grass: 4, concrete: 6 } as const;
 const STONE_TILE_M = 5;
 
 /** A matte material tinted `hex`; `tex` (one shared texture per kind, cached per scene) tiles through the mesh's world-metre UVs. */
-function tinted(scene: Scene, name: string, tex: Texture | null, hex: string): StandardMaterial {
+function tinted(scene: Scene, name: string, tex: Texture | null, hex: string, scale = 1, linear = false): StandardMaterial {
   const m = new StandardMaterial(name, scene);
-  m.diffuseColor = Color3.FromHexString(hex);
+  // story.gradeV2: the tint in linear, THEN its map's brightness scale (grade.ts), and the scene pass told it is done; off = the hex
+  m.diffuseColor = linear ? Color3.FromHexString(hex).toLinearSpace().scale(scale) : Color3.FromHexString(hex);
+  if (linear) markGraded(m);
   m.specularColor = Color3.Black();   // matte: no specular term to shade
   if (tex) m.diffuseTexture = tex;
   m.freeze();   // nothing on it changes after the build
@@ -232,6 +250,26 @@ export function splitTopsAndSides(mesh: Mesh): void {
   new SubMesh(1, 0, n, tops.length, sides.length, mesh);
 }
 
+/** The probe seam's parts (`?dresscut=`): which of the dressing's three parts to leave out, to attribute its cost on a rig. */
+export interface DressCut { tex: boolean; props: boolean; trims: boolean }
+export const DRESS_ALL: DressCut = { tex: true, props: true, trims: true };
+/** `?dresscut=notex,noprops,notrims` → the parts kept (pure; anything else is ignored). */
+export function dressCutOf(q: string | null | undefined): DressCut {
+  const t = new Set(String(q ?? '').split(',').map((x) => x.trim()));
+  return { tex: !t.has('notex'), props: !t.has('noprops'), trims: !t.has('notrims') };
+}
+
+export interface DressOpts {
+  /** The mode's hook: take a mesh out of the shadow map (LightRig's shadow generator). Absent: nothing is taken out. */
+  uncast?: (m: AbstractMesh) => void;
+  /** The phone tier: no dressing mesh casts (a desktop keeps the trees' shadows). */
+  phone?: boolean;
+  /** story.gradeV2 (world/grade.ts): the kit's palette in linear, the textured tints at their maps' painted brightness. */
+  linear?: boolean;
+  /** The probe seam (dressCutOf). */
+  cut?: DressCut;
+}
+
 /** What the dressing found to restyle in a built story view (world/story/view.ts names its merged meshes `story_<world>_<group>`). */
 export interface WorldDress {
   /** Start loading the nature kit (once; the mode calls it after the first played second, so it never lengthens the load). Resolves
@@ -244,13 +282,19 @@ export interface WorldDress {
  * Dress the story's worlds. `restyle` the view's merged meshes (by name); add the trims and the props. Cheap and synchronous but
  * for the props, which load in the background.
  */
-export function mountWorldDress(scene: Scene, worlds: readonly StoryWorldSpec[], natureUrl = '/models/props/nature/'): WorldDress {
+export function mountWorldDress(scene: Scene, worlds: readonly StoryWorldSpec[], natureUrl = '/models/props/nature/', opts: DressOpts = {}): WorldDress {
   const owned: { dispose(): void }[] = [];
-  const stone = groundTexture(scene, 'concrete');
+  const cut = opts.cut ?? DRESS_ALL;
+  const uncast = (m: AbstractMesh): void => { try { opts.uncast?.(m); } catch { /* no generator */ } };
+  const stone = cut.tex ? groundTexture(scene, 'concrete') : null;
   if (stone) stone.anisotropicFilteringLevel = DRESS_ANISO;
+  // story.gradeV2: a textured tint scaled to its map's painted brightness (1 = as before)
+  const tScale = (t: Texture | null): number => (opts.linear && t ? textureTintScale(t as DynamicTexture) : 1);
+  const stoneScale = tScale(stone);
+  const lin = !!opts.linear;
   for (const w of worlds) {
     const L = DRESS_LOOK[w.id] ?? DEFAULT_DRESS;
-    const topTex = groundTexture(scene, L.top);
+    const topTex = cut.tex ? groundTexture(scene, L.top) : null;
     if (topTex) topTex.anisotropicFilteringLevel = DRESS_ANISO;
     // the surfaces: the ground (tops textured, sides stone), the blocks and the walls (stone), all in world metres
     const ground = scene.getMeshByName(`story_${w.id}_ground`) as Mesh | null;
@@ -258,7 +302,7 @@ export function mountWorldDress(scene: Scene, worlds: readonly StoryWorldSpec[],
       boxProjectUVs(ground, TOP_TILE_M[L.top], STONE_TILE_M);
       splitTopsAndSides(ground);
       const mm = new MultiMaterial(`dress_${w.id}_ground`, scene);
-      mm.subMaterials.push(tinted(scene, `dress_${w.id}_top`, topTex, L.topTint), tinted(scene, `dress_${w.id}_side`, stone, L.side));
+      mm.subMaterials.push(tinted(scene, `dress_${w.id}_top`, topTex, L.topTint, tScale(topTex), lin), tinted(scene, `dress_${w.id}_side`, stone, L.side, stoneScale, lin));
       owned.push(...(mm.subMaterials.filter(Boolean) as StandardMaterial[]), mm);
       ground.material = mm;
     }
@@ -266,11 +310,12 @@ export function mountWorldDress(scene: Scene, worlds: readonly StoryWorldSpec[],
       const m = scene.getMeshByName(`story_${w.id}_${g}`) as Mesh | null;
       if (!m) continue;
       boxProjectUVs(m, STONE_TILE_M, STONE_TILE_M);
-      const mat = tinted(scene, `dress_${w.id}_${g}`, stone, hex);
+      const mat = tinted(scene, `dress_${w.id}_${g}`, stone, hex, stoneScale, lin);
       owned.push(mat);
       m.material = mat;
     }
     // the trims: the lip band down each flat's edge, a coping cap on each block, the rail posts — one merged mesh each
+    if (!cut.trims) continue;
     const lips = lipsOf(w).map((l, i) => {
       const b = MeshBuilder.CreateBox(`dress_lip_${i}`, l.alongX ? { width: l.len + 0.12, height: 0.35, depth: 0.06 } : { width: 0.06, height: 0.35, depth: l.len + 0.12 }, scene);
       b.position.set(l.x + l.nx * 0.03, l.y - 0.175, l.z + l.nz * 0.03);
@@ -293,9 +338,10 @@ export function mountWorldDress(scene: Scene, worlds: readonly StoryWorldSpec[],
       const m = parts.length > 1 ? Mesh.MergeMeshes(parts as Mesh[], true, true) : parts[0];
       if (!m) continue;
       m.name = `dress_${w.id}_${name}`;
-      const mat = tinted(scene, `dress_${w.id}_${name}_mat`, name === 'cap' ? stone : null, hex);
+      const mat = tinted(scene, `dress_${w.id}_${name}_mat`, name === 'cap' ? stone : null, hex, name === 'cap' ? stoneScale : 1, lin);
       if (name === 'cap') boxProjectUVs(m, STONE_TILE_M, STONE_TILE_M);
       m.material = mat; m.isPickable = false; m.receiveShadows = true; m.freezeWorldMatrix();
+      uncast(m);   // C1: a trim spans its whole world; it never casts
       owned.push(m, mat);
     }
   }
@@ -303,26 +349,35 @@ export function mountWorldDress(scene: Scene, worlds: readonly StoryWorldSpec[],
   let disposed = false;
   let props: Promise<number> | null = null;
   const load = async (): Promise<number> => {
-    const plan = worlds.flatMap((w) => dressPlan(w));
-    const used = [...new Set(plan.map((p) => p.model))];
+    if (!cut.props) return 0;
+    // C1: one set of masters per model, then one thin-instance mesh per model part PER WORLD (a clone sharing the geometry), so a
+    // world's props are culled as a whole when it is out of view
+    const plans = worlds.map((w) => ({ id: w.id, plan: dressPlan(w) }));
+    const used = [...new Set(plans.flatMap((p) => p.plan.map((x) => x.model)))];
     let drawn = 0;
     for (const id of used) {
       if (disposed || scene.isDisposed) return drawn;
-      const masters = await loadKitMasters(scene, id, natureUrl).catch(() => [] as Mesh[]);
+      const masters = await loadKitMasters(scene, id, natureUrl, !!opts.linear).catch(() => [] as Mesh[]);
       if (disposed || scene.isDisposed) { for (const m of masters) m.dispose(); return drawn; }
-      const mine = plan.filter((p) => p.model === id);
-      const mats = mine.map((p) => Matrix.Compose(new Vector3(p.scale, p.scale, p.scale), Quaternion.RotationYawPitchRoll(p.yaw, 0, 0), new Vector3(p.x, p.y, p.z)));
-      for (const m of masters) {
-        for (const x of mats) m.thinInstanceAdd(x, false);
-        m.thinInstanceBufferUpdated('matrix');
-        m.thinInstanceRefreshBoundingInfo(false);
-        m.setEnabled(true);
-        m.freezeWorldMatrix();
-        m.receiveShadows = false;   // small props on a lit floor: their own shading reads, a shadow lookup per pixel is not worth it
-        m.material?.freeze();
-        owned.push(m);
-      }
-      drawn += mine.length;
+      const casts = !opts.phone && DRESS_MODELS[id].tall;   // C1: only a desktop's trees throw a shadow
+      const here = plans.map((p) => ({ wid: p.id, mine: p.plan.filter((x) => x.model === id) })).filter((p) => p.mine.length);
+      // the masters serve the first world; each other world gets clones made before any instance is added (they share the geometry)
+      const sets = here.map((_, i) => (i === 0 ? masters : masters.map((m) => { const c = m.clone(m.name, null, true, false) as Mesh; c.material = m.material; return c; })));
+      here.forEach(({ mine }, i) => {
+        const mats = mine.map((p) => Matrix.Compose(new Vector3(p.scale, p.scale, p.scale), Quaternion.RotationYawPitchRoll(p.yaw, 0, 0), new Vector3(p.x, p.y, p.z)));
+        for (const m of sets[i]) {
+          for (const x of mats) m.thinInstanceAdd(x, false);
+          m.thinInstanceBufferUpdated('matrix');
+          m.thinInstanceRefreshBoundingInfo(false);
+          m.setEnabled(true);
+          m.freezeWorldMatrix();
+          m.receiveShadows = false;   // small props on a lit floor: their own shading reads, a shadow lookup per pixel is not worth it
+          m.material?.freeze();
+          if (!casts) uncast(m);
+          owned.push(m);
+        }
+        drawn += mine.length;
+      });
     }
     return drawn;
   };
@@ -334,14 +389,15 @@ export function mountWorldDress(scene: Scene, worlds: readonly StoryWorldSpec[],
 
 /** The Kenney kit's metallic-with-no-map materials read as dark gems under image light: matte, leaves green (the Coast's fix). */
 const KIT_PALETTE: Record<string, string> = { leafsGreen: '#3F9A55', leafsDark: '#2F7A45', grass: '#4C9E58', woodBark: '#8B5E3C', woodBarkDark: '#6E4A30', dirt: '#8A7A66', stone: '#9a958c' };
-function normaliseKit(mat: PBRMaterial): void {
+function normaliseKit(mat: PBRMaterial, linear = false): void {
   if (mat.unlit) mat.unlit = false;
   if (!mat.metallicTexture && (mat.metallic ?? 0) > 0.5) { mat.metallic = 0; mat.roughness = 0.9; }
-  const hex = KIT_PALETTE[mat.name]; if (hex && !mat.albedoTexture) mat.albedoColor = Color3.FromHexString(hex);
+  // the palette is sRGB hex; a PBR albedo is linear (story.gradeV2 gives it as such; off = as before)
+  const hex = KIT_PALETTE[mat.name]; if (hex && !mat.albedoTexture) mat.albedoColor = linear ? Color3.FromHexString(hex).toLinearSpace() : Color3.FromHexString(hex);
 }
 
 /** One kit model's parts, baked to model space and merged by material, parked at the origin (thin-instance masters). */
-async function loadKitMasters(scene: Scene, id: DressModel, natureUrl: string): Promise<Mesh[]> {
+async function loadKitMasters(scene: Scene, id: DressModel, natureUrl: string, linear = false): Promise<Mesh[]> {
   const r = await SceneLoader.ImportMeshAsync('', natureUrl, DRESS_MODELS[id].file, scene);
   const root = (r.meshes.find((x) => !x.parent) as TransformNode | undefined) ?? null;
   if (!root || scene.isDisposed) return [];
@@ -349,7 +405,7 @@ async function loadKitMasters(scene: Scene, id: DressModel, natureUrl: string): 
   const groups = new Map<number, Mesh[]>();
   for (const part of root.getChildMeshes(false) as Mesh[]) {
     if (!(part.getTotalVertices?.() > 0) || !part.material) continue;
-    if (part.material instanceof PBRMaterial) normaliseKit(part.material);
+    if (part.material instanceof PBRMaterial) normaliseKit(part.material, linear);
     part.computeWorldMatrix(true);
     const c = part.clone(`${part.name}_dress`, null, true, false) as Mesh;
     c.parent = null;
