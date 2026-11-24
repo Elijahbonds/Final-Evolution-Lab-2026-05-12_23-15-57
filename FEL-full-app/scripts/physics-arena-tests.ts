@@ -21,6 +21,10 @@
  *      the lane), both teams score through the hoop, nothing throws.
  *   J. Physics hands (arena.physicsHands, OFF by default): with the knob on, the same 3v3 minutes run with twelve hand bodies;
  *      hands touch the ball (a block or a poke happens by contact), and the step cost stays small (node; the phone is the rig's).
+ *   K. Knockdowns and fouls (arena.knockdowns, arena.fouls, both OFF by default): Havok reports the bodies meeting at their real
+ *      closing speed; a sprint with the ball into a set defender knocks him down and is a charge with the knobs on, and is only a
+ *      push with them off; a jog into him is only a push either way; and the 1v1 and the 3v3 still play three minutes each
+ *      with both knobs on (the counts are printed: how often the game stops for contact).
  *   G. Phase 3, the three-point contest: from the five racks (7.05–7.15 m) a good release still makes clearly more than a bad one,
  *      and the contest mode's own loop runs a whole contest headless (25 balls, the clock, the final).
  *
@@ -38,6 +42,8 @@ const ok = (n: string, c: boolean, extra = '') => {
 };
 
 async function main() {
+  // a probe's shortcut (not used by ci-suite): PA_ONLY=contact3v3 runs only the 3v3 with the contact knobs on
+  if (process.env.PA_ONLY === 'contact3v3') { const w0 = await makeWorld(); w0.dispose(); nodeShims(); await threes(w0.B, false, true); console.log(`\nphysics-arena (contact3v3 only): ${pass} passed, ${fail} failed`); process.exit(fail ? 1 : 0); }
   const { B, world, dispose } = await makeWorld();
   const h = 1 / 120;
 
@@ -192,19 +198,32 @@ async function main() {
   const on = await threes(B, true);
   console.log(`     node physics a frame: hands off ${off.toFixed(3)} ms, on ${on.toFixed(3)} ms`);
 
+  console.log('\nK. knockdowns and fouls (arena.knockdowns / arena.fouls 1, OFF by default)');
+  await contactDirected(B);
+  await liveLoop(B, true);
+  await threes(B, false, true);
+
   console.log(`\nphysics-arena: ${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
 }
 
-/** The mode's own load / onInput / update on a NullEngine scene, with a camera director stub (the follow camera is not under test). */
-async function liveLoop(B: typeof import('@babylonjs/core')) {
-  process.on('unhandledRejection', () => { /* the character and ball-skin loads fail in node (no fetch): the mode plays without them */ });
-  // the court's painted floor is a DynamicTexture: node has no canvas, so a 2-D context that accepts every call and draws nothing
+/** What the live modes need in node: the character and ball-skin loads fail (no fetch) and the mode plays without them; the court's
+ *  painted floor is a DynamicTexture, so a 2-D context that accepts every call and draws nothing. */
+function nodeShims(): void {
+  process.on('unhandledRejection', () => {});
   const g = globalThis as unknown as { OffscreenCanvas?: unknown };
   if (!g.OffscreenCanvas) {
     const ctx2d = () => new Proxy({} as Record<string | symbol, unknown>, { get: (t, k) => (k in t ? t[k] : () => ({})), set: (t, k, v) => { t[k] = v; return true; } });
     g.OffscreenCanvas = class { width: number; height: number; constructor(w: number, h: number) { this.width = w; this.height = h; } getContext() { return ctx2d(); } };
   }
+}
+
+/** The mode's own load / onInput / update on a NullEngine scene, with a camera director stub (the follow camera is not under test). */
+async function liveLoop(B: typeof import('@babylonjs/core'), contact = false) {
+  const { setFeelUser, setFeelSession, setFeelOverride } = await import('../lib/feel-panel/feel');
+  setFeelUser(true); setFeelSession(null); setFeelOverride('arena.knockdowns', contact ? 1 : 0); setFeelOverride('arena.fouls', contact ? 1 : 0);
+  const tag = contact ? '[contact] ' : '';
+  nodeShims();
   const { PhysicsArenaMode, arenaStats } = await import('../lib/babylon/modes/PhysicsArenaMode');
   const engine = new B.NullEngine();
   engine.getDeltaTime = () => 1000 / 60;
@@ -260,17 +279,20 @@ async function liveLoop(B: typeof import('@babylonjs/core')) {
       worstY = Math.min(worstY, p.y);
     }
   } catch (e) { threw = e; console.error(e); }
-  ok(`three minutes ran without a throw`, threw === null);
-  ok(`the ball stayed a number and above the floor (lowest centre ${worstY.toFixed(3)} m)`, !nan && worstY >= BALL_R - 0.03);
-  ok(`the game went check → live → scored (${[...phases].join(', ')})`, phases.has('check') && phases.has('live') && phases.has('scored'));
+  ok(`${tag}three minutes ran without a throw`, threw === null);
+  ok(`${tag}the ball stayed a number and above the floor (lowest centre ${worstY.toFixed(3)} m)`, !nan && worstY >= BALL_R - 0.03);
+  ok(`${tag}the game went check → live → scored (${[...phases].join(', ')})`, phases.has('check') && phases.has('live') && phases.has('scored'));
   const finals = [...scores];
   console.log(`     scores seen: ${finals.join(' ')}`);
   const both = finals.some((x) => /^[1-9]/.test(x)) && finals.some((x) => /–[1-9]/.test(x));
-  ok(`both sides scored through the hoop`, both);
+  ok(`${tag}both sides scored through the hoop`, both);
   console.log(`     calls: ${[...banners].slice(0, 14).join(' | ')}`);
   const st = arenaStats(scene);
   if (st) console.log(`     shots me ${st.makes.me}/${st.shots.me}, rival ${st.makes.foe}/${st.shots.foe}; lost handles ${st.lostHandles}; steals ${st.steals}; physics ${(st.physMsSum / Math.max(1, st.frames)).toFixed(2)} ms a frame (node, max ${st.physMsMax.toFixed(1)})`);
-  ok('the rival shoots and makes some, and misses some (the physics decides, not a script)', !!st && st.shots.foe > 4 && st.makes.foe > 0 && st.makes.foe < st.shots.foe);
+  if (st) console.log(`     ${tag}body contacts ${st.bodyHits} (hardest ${st.hardestHitMps.toFixed(1)} m/s); knockdowns ${st.knockdowns}; fouls ${JSON.stringify(st.fouls)}; and-ones ${st.andOnes}`);
+  if (!contact) ok('knobs off: no knockdown and no foul is ever called', !!st && st.knockdowns === 0 && Object.keys(st.fouls).length === 0);
+  setFeelOverride('arena.knockdowns', 0); setFeelOverride('arena.fouls', 0);
+  ok(`${tag}the rival shoots and makes some, and misses some (the physics decides, not a script)`, !!st && st.shots.foe > 4 && st.makes.foe > 0 && st.makes.foe < st.shots.foe);
   scene.dispose(); engine.dispose();
 }
 
@@ -317,9 +339,10 @@ async function dunks(B: typeof import('@babylonjs/core')) {
 }
 
 /** Three minutes of the arena's 3v3 headless; returns the physics steps' mean cost a frame (node). */
-async function threes(B: typeof import('@babylonjs/core'), hands: boolean): Promise<number> {
+async function threes(B: typeof import('@babylonjs/core'), hands: boolean, contact = false): Promise<number> {
   const { setFeelUser, setFeelSession, setFeelOverride } = await import('../lib/feel-panel/feel');
   setFeelUser(true); setFeelSession(null); setFeelOverride('arena.physicsHands', hands ? 1 : 0);
+  setFeelOverride('arena.knockdowns', contact ? 1 : 0); setFeelOverride('arena.fouls', contact ? 1 : 0);
   const { PhysicsArena3v3Mode, arena3v3Stats } = await import('../lib/babylon/modes/PhysicsArena3v3Mode');
   const engine = new B.NullEngine(); engine.getDeltaTime = () => 1000 / 60;
   const scene = new B.Scene(engine);
@@ -363,12 +386,59 @@ async function threes(B: typeof import('@babylonjs/core'), hands: boolean): Prom
   } catch (e) { threw = e; console.error(e); }
   const st = arena3v3Stats(scene);
   console.log(`     ${hands ? 'hands ON ' : 'hands OFF'}: score ${st?.score.home}–${st?.score.away}; shots home ${st?.makes.home}/${st?.shots.home}, away ${st?.makes.away}/${st?.shots.away}; passes ${st?.passes} (caught ${st?.completed}, picked off ${st?.intercepted}); steals ${st?.steals}; lost handles ${st?.lostHandles}; hand blocks ${st?.blocksByHand}`);
-  ok(`${hands ? '[hands] ' : ''}three minutes of 3v3 ran without a throw, the ball a number above the floor`, threw === null && !nan && worstY >= BALL_R - 0.03);
-  ok(`${hands ? '[hands] ' : ''}passes were thrown and caught through the physics (${st?.completed} of ${st?.passes})`, !!st && st.passes >= 5 && st.completed >= 3);
-  ok(`${hands ? '[hands] ' : ''}both teams scored through the hoop`, !!st && st.makes.home > 0 && st.makes.away > 0);
+  const tag = `${hands ? '[hands] ' : ''}${contact ? '[contact] ' : ''}`;
+  if (st?.callLog.length) console.log(`     first calls: ${st.callLog.join(' | ')}`);
+  console.log(`     ${tag || '[knobs off] '}body contacts ${st?.bodyHits} (hardest ${st?.hardestHitMps.toFixed(1)} m/s); knockdowns ${st?.knockdowns}; fouls ${JSON.stringify(st?.fouls)}; and-ones ${st?.andOnes}`);
+  ok(`${tag}three minutes of 3v3 ran without a throw, the ball a number above the floor`, threw === null && !nan && worstY >= BALL_R - 0.03);
+  ok(`${tag}passes were thrown and caught through the physics (${st?.completed} of ${st?.passes})`, !!st && st.passes >= 5 && st.completed >= 3);
+  ok(`${tag}both teams scored through the hoop`, !!st && st.makes.home > 0 && st.makes.away > 0);
+  if (!contact) ok(`${tag}knobs off: no knockdown and no foul is ever called`, !!st && st.knockdowns === 0 && Object.keys(st.fouls).length === 0);
   scene.dispose(); engine.dispose();
-  setFeelOverride('arena.physicsHands', 0);
+  setFeelOverride('arena.physicsHands', 0); setFeelOverride('arena.knockdowns', 0); setFeelOverride('arena.fouls', 0);
   return physMs / Math.max(1, frames);
+}
+
+/** A run with the ball into a set (quiet) rival: at a sprint and at a jog, with the contact knobs on and off. */
+async function contactDirected(B: typeof import('@babylonjs/core')) {
+  const { setFeelUser, setFeelSession, setFeelOverride } = await import('../lib/feel-panel/feel');
+  const { PhysicsArenaMode, arenaSeam, arenaStats } = await import('../lib/babylon/modes/PhysicsArenaMode');
+  setFeelUser(true); setFeelSession(null);
+  const run = async (sprint: boolean, on: boolean) => {
+    setFeelOverride('arena.knockdowns', on ? 1 : 0); setFeelOverride('arena.fouls', on ? 1 : 0);
+    const engine = new B.NullEngine(); engine.getDeltaTime = () => 1000 / 60;
+    const scene = new B.Scene(engine);
+    const camera = new B.UniversalCamera('camk', new B.Vector3(0, 3, 12), scene);
+    const dir = { mode: 'follow', suspended: false, stickWorldLatched: (x: number, y: number) => new B.Vector3(x, 0, -y), look: () => {}, update: () => {}, snapTo: () => {} };
+    const ctx = { scene, camera, camDirector: dir, heroRef: { current: null }, objectiveRef: { current: null }, setHud: () => {} } as never;
+    await PhysicsArenaMode.load(ctx);
+    const seam = arenaSeam(scene) as unknown as { place: (x: number, z: number) => void; quiet: (on: boolean) => void; state: () => { phase: string; possession: string } };
+    seam.quiet(true);
+    seam.place(-1.5, 4.5);   // me at (-1.5, 4.5) with the ball; the rival stood at (1.5, 7.5)
+    for (let f = 0; f < 20; f++) PhysicsArenaMode.update(ctx, 1 / 60);
+    if (sprint) PhysicsArenaMode.onInput(ctx, { t: 'button', btn: 'R1', pressed: true });
+    const me = scene.getTransformNodeByName('arena_me_body')!, foe = scene.getTransformNodeByName('arena_foe_body')!;
+    const phases = new Set<string>(); let poss = '';
+    for (let f = 0; f < 180; f++) {
+      // run at him until the bodies meet, then let go of the stick (the call, or the push, is all that is under test)
+      const dx = foe.position.x - me.position.x, dz = foe.position.z - me.position.z, d = Math.hypot(dx, dz) || 1;
+      const met = arenaStats(scene)!.bodyHits > 0;
+      PhysicsArenaMode.onInput(ctx, { t: 'stick', side: 'L', x: met ? 0 : dx / d, y: met ? 0 : -dz / d });
+      PhysicsArenaMode.update(ctx, 1 / 60);
+      const s = seam.state(); phases.add(s.phase); poss = s.possession;
+    }
+    const st = arenaStats(scene)!;
+    scene.dispose(); engine.dispose();
+    return { hits: st.bodyHits, hardest: st.hardestHitMps, downs: st.knockdowns, fouls: st.fouls, phases: [...phases], poss };
+  };
+  const sOn = await run(true, true), sOff = await run(true, false), jOn = await run(false, true);
+  setFeelOverride('arena.knockdowns', 0); setFeelOverride('arena.fouls', 0);
+  console.log(`     sprint, knobs on : contacts ${sOn.hits} (hardest ${sOn.hardest.toFixed(2)} m/s), knockdowns ${sOn.downs}, fouls ${JSON.stringify(sOn.fouls)}, phases ${sOn.phases.join('/')}, then ${sOn.poss}'s ball`);
+  console.log(`     sprint, knobs off: contacts ${sOff.hits} (hardest ${sOff.hardest.toFixed(2)} m/s), knockdowns ${sOff.downs}, fouls ${JSON.stringify(sOff.fouls)}, phases ${sOff.phases.join('/')}`);
+  console.log(`     jog,    knobs on : contacts ${jOn.hits} (hardest ${jOn.hardest.toFixed(2)} m/s), knockdowns ${jOn.downs}, fouls ${JSON.stringify(jOn.fouls)}`);
+  ok(`Havok reports the bodies meeting at about the sprint's speed (${sOn.hardest.toFixed(2)} m/s, 5–7)`, sOn.hardest >= 5 && sOn.hardest <= 7);
+  ok('knobs on: the sprint into a set defender knocks him down and is a charge (his ball at the check)', sOn.downs === 1 && sOn.fouls.charge === 1 && sOn.poss === 'foe' && sOn.phases.includes('check'));
+  ok('knobs off: the same sprint is only a push (no knockdown, no whistle, my ball still)', sOff.hits >= 1 && sOff.downs === 0 && Object.keys(sOff.fouls).length === 0 && sOff.poss === 'me');
+  ok(`a jog into him (${jOn.hardest.toFixed(2)} m/s) is only a push: no knockdown, no whistle (the shipped hoops' foul-grade gate)`, jOn.hits >= 1 && jOn.downs === 0 && Object.keys(jOn.fouls).length === 0);
 }
 
 async function threePoint(B: typeof import('@babylonjs/core')) {

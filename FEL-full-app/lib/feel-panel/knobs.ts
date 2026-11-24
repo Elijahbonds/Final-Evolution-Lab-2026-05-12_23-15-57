@@ -2516,6 +2516,26 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/arena/arenaConfig.ts DUNK_JUMP_VY',
     hint: 'How high a dunk goes: too low and the ball never gets over the ring.',
   },
+  {
+    id: 'arena.knockdowns', label: 'Arena knockdowns (1) / bodies only push (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Physics arena',
+    source: 'lib/babylon/arena/arenaConfig.ts ARENA_KNOCKDOWNS',
+    hint: 'On: a body run into hard enough goes down for a moment and drops the ball. Off (shipped until measured): bodies only push.',
+  },
+  {
+    id: 'arena.fouls', label: 'Arena fouls called (1) / no whistle (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Physics arena',
+    source: 'lib/babylon/arena/arenaConfig.ts ARENA_FOULS',
+    hint: 'On: foul-speed contact is whistled by the shared referee rules (charge, blocking foul, shooting foul, loose-ball foul); the ball goes to the check.',
+  },
+  {
+    id: 'arena.knockMps', label: 'Arena knockdown: the speed of the body running in', def: 5, min: 3, max: 9, step: 0.1, unit: 'm/s', group: 'Physics arena',
+    source: 'lib/babylon/arena/arenaConfig.ts KNOCK_MPS',
+    hint: 'How fast a body must run into another to put it down (a sprint is 6, a jog 4.4). A body in the air goes down at 72% of it.',
+  },
+  {
+    id: 'arena.downSec', label: 'Arena time on the floor after a knockdown', def: 1.3, min: 0.6, max: 3, step: 0.05, unit: 's', group: 'Physics arena',
+    source: 'lib/babylon/arena/arenaConfig.ts DOWN_SEC',
+    hint: 'How long a knocked-down body is out of the play, the get-up included.',
+  },
   // ── lane/improve-world (2026-11-22, the 10-phase pass, phase 5): sound in the story and on the coast ──
   {
     id: 'story.sfxOn', label: 'Story: footsteps, hits, spells, the partner, camps, bosses and birds (1) / the wind bed and voices only (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Story · flow',

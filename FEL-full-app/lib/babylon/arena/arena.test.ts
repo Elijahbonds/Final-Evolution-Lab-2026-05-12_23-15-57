@@ -6,6 +6,7 @@ import { dribbleHand, dribblePeriod, dribblePush, pushSpeed } from './dribble';
 import { aimYawErr, fovForAspect, povLook, povPose, POV_PITCH_MAX_DEG } from './povCamera';
 import { ARENA_RIM, ARENA_RIM_RADIUS, BALL_R, RIM_SEGMENTS, RIM_TUBE_R, boardBox, inNet, rimSegments, type P3 } from './hoopGeometry';
 import * as C from './arenaConfig';
+import { ruleContact, type ContactBody, type ContactRules } from './arenaContact';
 
 /** Fly a point under gravity (no air) for t seconds. */
 const fly = (p: P3, v: P3, t: number): P3 => ({ x: p.x + v.x * t, y: p.y + v.y * t - 0.5 * G * t * t, z: p.z + v.z * t });
@@ -224,5 +225,45 @@ describe('physics hands (arena.physicsHands, OFF by default)', async () => {
     const t = handTargets({ feet, yaw: 0, ball, role: 'dribble', dribbleSide: 1 });
     expect(t.right.x).toBeGreaterThan(feet.x);
     expect(t.right.y).toBeGreaterThan(ball.y);
+  });
+});
+
+describe('arenaContact: knockdowns and fouls are read off the hit (the shared referee\'s calls)', () => {
+  const body = (id: string, side: 'me' | 'foe', o: Partial<ContactBody> = {}): ContactBody => ({ id, side, airborne: false, shooting: false, speed: 0, hasBall: false, ...o });
+  const hit = (closing: number, attackerSpeed = closing) => ({ a: 'me', b: 'foe', closingSpeed: closing, attacker: 'me', victim: 'foe', attackerSpeed });
+  const on: ContactRules = { knockdowns: true, fouls: true, knockMps: C.KNOCK_MPS, offense: 'me', looseBall: false };
+  it('both knobs off: nothing, however hard the hit (today\'s arena)', () => {
+    expect(ruleContact(hit(9), body('me', 'me'), body('foe', 'foe'), { ...on, knockdowns: false, fouls: false })).toEqual({ down: null, foul: null });
+  });
+  it('a sprint (6 m/s) into a standing body knocks it down; a jog (4.4) does not, even head-on; in the air it takes less', () => {
+    const r = { ...on, fouls: false };
+    expect(ruleContact(hit(8.8, 4.4), body('me', 'me'), body('foe', 'foe'), r).down).toBeNull();   // two jogs meeting
+    expect(ruleContact(hit(6), body('me', 'me'), body('foe', 'foe'), r).down).toBe('foe');
+    expect(ruleContact(hit(4.4), body('me', 'me'), body('foe', 'foe'), r).down).toBeNull();
+    expect(ruleContact(hit(4.0), body('me', 'me'), body('foe', 'foe', { airborne: true }), r).down).toBe('foe');
+  });
+  it('the handler sprinting into a SET defender is a charge (the defence\'s ball); into a moving one, or at a jog, no call', () => {
+    const set = ruleContact(hit(6), body('me', 'me', { hasBall: true }), body('foe', 'foe', { speed: 0.3 }), on);
+    expect(set.foul?.id).toBe('charge'); expect(set.foul?.call.ball).toBe('foe');
+    expect(ruleContact(hit(6), body('me', 'me', { hasBall: true }), body('foe', 'foe', { speed: 2 }), on).foul).toBeNull();
+    expect(ruleContact(hit(4.4), body('me', 'me', { hasBall: true }), body('foe', 'foe', { speed: 0.3 }), on).foul).toBeNull();   // a jog: a push
+    expect(ruleContact(hit(6), body('me', 'me'), body('foe', 'foe', { speed: 0.3 }), on).foul).toBeNull();   // off the ball: no call
+  });
+  it('a defender running through the handler is a blocking foul (the offence keeps it)', () => {
+    const c = { a: 'me', b: 'foe', closingSpeed: 5.6, attacker: 'foe', victim: 'me', attackerSpeed: 4.6 };
+    const r = ruleContact(c, body('foe', 'foe'), body('me', 'me', { speed: 3, hasBall: true }), on);
+    expect(r.foul?.id).toBe('blocking_foul'); expect(r.foul?.call.ball).toBe('me');
+    expect(ruleContact(c, body('foe', 'foe'), body('me', 'me', { speed: 3 }), on).foul).toBeNull();   // a cutter without the ball: no call
+  });
+  it('a shooter in the air is fouled at the foul speed; on the floor only at the reckless one', () => {
+    const c = { a: 'me', b: 'foe', closingSpeed: 4.4, attacker: 'foe', victim: 'me', attackerSpeed: 4.4 };
+    expect(ruleContact(c, body('foe', 'foe'), body('me', 'me', { shooting: true, airborne: true }), on).foul?.id).toBe('shooting_foul');
+    expect(ruleContact(c, body('foe', 'foe'), body('me', 'me', { shooting: true }), on).foul).toBeNull();
+    expect(ruleContact({ ...c, closingSpeed: 5.4 }, body('foe', 'foe'), body('me', 'me', { shooting: true }), on).foul?.call.ball).toBe('me');
+  });
+  it('a loose ball goes to whoever was fouled, at the reckless speed only; teammates bump without a call', () => {
+    expect(ruleContact(hit(5.4), body('me', 'me'), body('foe', 'foe'), { ...on, looseBall: true }).foul?.call.ball).toBe('foe');
+    expect(ruleContact(hit(4.6), body('me', 'me'), body('foe', 'foe'), { ...on, looseBall: true }).foul).toBeNull();
+    expect(ruleContact(hit(7), body('me', 'me'), body('m2', 'me'), on)).toEqual({ down: 'm2', foul: null });
   });
 });
