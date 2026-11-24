@@ -76,6 +76,10 @@ export const MODE_WEIGHTS: Record<string, number> = {
   tiebreak: 0.9,
   sprint: 1.0,
   storyMode: 1.2,
+  // lane/physics-arena (owner 2026-11-24): the Physics Arena's games train as the shipped game of each sport
+  arenaHoops: 1.0,
+  arenaThrees: 1.0,
+  arenaThreePoint: 0.9,
 };
 
 // Attributes each mode primarily trains
@@ -107,6 +111,10 @@ export const MODE_ATTRS: Record<string, PrqAttr[]> = {
   // trains agility + mental, the Groove Academy mental.
   dance: ['agility', 'mental'],
   music: ['mental'],
+  // lane/physics-arena (owner 2026-11-24): as hoops1v1 / hoops3v3 / threePoint
+  arenaHoops: ['agility', 'power', 'mental'],
+  arenaThrees: ['mental', 'agility', 'endurance'],
+  arenaThreePoint: ['mental', 'flexibility', 'speed'],
 };
 
 /**

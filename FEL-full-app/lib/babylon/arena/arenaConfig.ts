@@ -10,6 +10,7 @@
 // No existing mode reads this file.
 
 import { feel } from '../../feel-panel/feel';
+import { ARENA_XP_ON } from '@/lib/sessions/arenaScore';
 
 // ── switches ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
 /** The Physics Arena chip on the Play screen. 1 = shown (it ships on: a new place the owner asked for). */
@@ -103,6 +104,9 @@ export const aimAssist = (): number => feel('arena.aimAssist', AIM_ASSIST);
 export const physicsHandsOn = (): boolean => feel('arena.physicsHands', ARENA_PHYSICS_HANDS) >= 0.5;
 export const dunksOn = (): boolean => feel('arena.dunks', ARENA_DUNKS) >= 0.5;
 export const dunkJumpVy = (): number => feel('arena.dunkJumpVy', DUNK_JUMP_VY);
+/** The arena's games post a run when they end (XP and progress; owner 2026-11-24). Its default is the server's switch
+ *  (lib/sessions/arenaScore.ts ARENA_XP_ON: with it off the three session keys have no score rules). 0 = a practice court. */
+export const xpOn = (): boolean => feel('arena.xpOn', ARENA_XP_ON) >= 0.5;
 export const knockdownsOn = (): boolean => feel('arena.knockdowns', ARENA_KNOCKDOWNS) >= 0.5;
 export const foulsOn = (): boolean => feel('arena.fouls', ARENA_FOULS) >= 0.5;
 export const knockMps = (): number => feel('arena.knockMps', KNOCK_MPS);

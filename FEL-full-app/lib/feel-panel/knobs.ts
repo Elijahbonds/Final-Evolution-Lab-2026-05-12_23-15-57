@@ -2536,6 +2536,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/arena/arenaConfig.ts DOWN_SEC',
     hint: 'How long a knocked-down body is out of the play, the get-up included.',
   },
+  {
+    id: 'arena.xpOn', label: 'Arena games count for XP and progress (1) / practice only (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Physics arena',
+    source: 'lib/sessions/arenaScore.ts ARENA_XP_ON',
+    hint: 'On: each finished game is posted and the server rebuilds its score from the plays, paying XP and progress (no Lab Credits). Off: a practice court.',
+  },
   // ── lane/improve-world (2026-11-22, the 10-phase pass, phase 5): sound in the story and on the coast ──
   {
     id: 'story.sfxOn', label: 'Story: footsteps, hits, spells, the partner, camps, bosses and birds (1) / the wind bed and voices only (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Story · flow',

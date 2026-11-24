@@ -82,6 +82,7 @@ import { SAMPLE_SFX_ON } from '@/lib/babylon/audio/samples';   // hoops-sound
 import * as DS from '@/lib/babylon/audio/dribbleSound';   // hoops-sound
 import * as HSC from '@/lib/babylon/core/HighSidelineCam';   // hoops-cam
 import * as ARENA from '@/lib/babylon/arena/arenaConfig';   // lane/physics-arena
+import { ARENA_XP_ON } from '@/lib/sessions/arenaScore';   // lane/physics-arena: the XP switch is the server's
 
 function tsFiles(dir: string): string[] {
   const out: string[] = [];
@@ -469,6 +470,7 @@ describe('the feel knob catalogue', () => {
     expect(def('arena.knockdowns')).toBe(ARENA.ARENA_KNOCKDOWNS); expect(ARENA.ARENA_KNOCKDOWNS).toBe(0);   // owner 2026-11-24: behind knobs, the shipping bar
     expect(def('arena.fouls')).toBe(ARENA.ARENA_FOULS); expect(ARENA.ARENA_FOULS).toBe(0);
     expect(def('arena.knockMps')).toBe(ARENA.KNOCK_MPS); expect(def('arena.downSec')).toBe(ARENA.DOWN_SEC);
+    expect(def('arena.xpOn')).toBe(ARENA_XP_ON);   // owner 2026-11-24: XP and progress, ON once tested end to end against a throwaway database
     expect(ARENA.ARENA_ON).toBe(1); expect(ARENA.ARENA_PHYSICS_HOOPS).toBe(1); expect(ARENA.CAM_POV).toBe(1); expect(ARENA.POV_BOB_M).toBe(0);
   });
 

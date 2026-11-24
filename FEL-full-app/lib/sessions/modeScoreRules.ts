@@ -60,6 +60,7 @@ import { canonicalModeKey } from '@/lib/game-data';
 import { DUNK_ATTEMPT_MAX, MIRRORED, SCORE_CEILINGS, UNTIMED_RUN_SEC, killSwitchOn, scoreCeilingFor, sessionRulesMax } from '@/lib/arena-score-integrity';
 import { ENDLESS_MODES, isCatalogueMode } from '@/lib/session-payout';
 import { MAX_FLIGHT, heightFromFlight } from '@/lib/babylon/core/IRLCore';
+import { arenaDerivedBounds } from './arenaScore';
 
 /** An open run expires this long after its maxDurationMs (a finish after that is RUN_EXPIRED). */
 export const RUN_GRACE_MS = 5 * 60_000;
@@ -277,6 +278,9 @@ export function derivedBounds(o: { killSwitch?: boolean } = {}): Readonly<Record
     acting: { maxScore: STORY_MIRRORED.actingMax, runSec: null, basis: 'acting-game: round(average × 100), average clamp01 (ActingCore)' },
     irl: { maxScore: Math.round(heightFromFlight(MAX_FLIGHT) * 100), runSec: null, basis: 'irl-game: best jump in cm; IRLCore refuses a flight over MAX_FLIGHT, so heightFromFlight(MAX_FLIGHT) is the highest' },
     dunkduel: { maxScore: dunkDuelBound(), runSec: null, basis: `dunkDuelRules: (the longest match ${STORY_MIRRORED.dunkDuelMaxDunksEach} + DUNKOFF_MAX_ROUNDS ${STORY_MIRRORED.dunkDuelDunkOffRounds}) × DUNK_ATTEMPT_MAX; paid the played floor only (owner)`, payFloorOnly: true },
+    // lane/physics-arena (owner 2026-11-24): the Physics Arena's three games, their totals rebuilt by the server from the play log
+    // (lib/sessions/arenaScore.ts); none while the arena's XP switch is off (ARENA_XP_ON)
+    ...arenaDerivedBounds(),
   };
 }
 

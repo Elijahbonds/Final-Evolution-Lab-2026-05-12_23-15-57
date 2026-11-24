@@ -574,3 +574,21 @@ The owner answered the lane's questions (`docs/PHYSICS-ARENA-PLAN.md` §6):
 
 Order (coordinator, 2026-11-24): the merged branch is PR'd first; then the 3v3 hoops arena, the physics hands (OFF), knockdowns and
 fouls, XP, then soccer.
+
+## owner 2026-11-24: the Physics Arena's XP questions answered (relayed by the coordinator)
+
+The owner answered the lane's XP questions (`docs/PHYSICS-ARENA-PLAN.md` §8), as relayed:
+
+- **a.** "Own mode keys (arenaHoops, arenaThrees, arenaThreePoint), kept off the mode lists and the staked Arena rival draw."
+- **b.** "The server rebuilds the score from the basket log now. A full server replay is a later step."
+- **c.** "XP and progress only to start. NO LC on arena wins: the LC payout is explicitly off."
+- **d.** "Fouls and knockdowns stay OFF until the owner feel-tests them; the score rules are unaffected by fouls."
+
+The coordinator: build the XP slice behind a knob (`arena.xpOn`); ship it ON only once the server path is tested end to end against
+a local throwaway database (never prod) — a forged log refused, a legit win paying the right XP with no LC; no schema change.
+
+- `assumption:` (lane/physics-arena) "XP and progress only" pays XP, season XP, the mastery sample and PRQ, and no currency of any
+  kind: no Lab Credits (the win's or the streak's), no wallet coins, no profile shards. An arena run does not claim the day's
+  streak either, so it never uses up the streak LC another game would pay that day.
+- `assumption:` the keys are catalogue keys for the session routes only (`session-payout.isCatalogueMode`); they are not
+  `MODE_INFO` rows, so no list, venue, first-game pick, challenge or staked Arena offers them. History shows them by their key.
