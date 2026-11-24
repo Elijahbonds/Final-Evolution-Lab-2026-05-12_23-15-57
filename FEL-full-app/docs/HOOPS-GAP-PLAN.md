@@ -369,7 +369,9 @@ at the modes' contact pitches and volumes — a bump (0.95, vol 0.55) −37.3 dB
 gains (hand 1.0, knock 0.35, body 0.9): the bump −35.3, the body-bag −33.2, the knockdown −31.8 (bodies 1.9–2.3 dB over today), the strip
 −42.4, the parry −41.5 (hands 3.1–3.2 dB under). The gains were then set to land on today's level (body × 0.79 → 0.71; hand and knock
 × 1.45 → 1.45 / 0.5): computed from those offsets (a linear gain), re-measured below if the probe's hold came in time.
-CONTACT_REMEASURE
+**Re-measured at the shipped gains** (three renders each): the bump −37.0 (today −37.3), the body-bag −34.9 (−35.4), the knockdown −33.5
+(−34.1), the strip −39.5 (−39.2), the parry −38.8 (−38.5) dB — every contact within 0.7 dB of the impact it replaces; each sounds
+0.11–0.15 s (today 0.09–0.10).
 
 **Verdict: ships OFF.** It is a feel item — the owner judges a slap and a thud against the boop by ear.
 
