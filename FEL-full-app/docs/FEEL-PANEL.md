@@ -1230,6 +1230,16 @@ real online game these are what ships; each is the record of the number and the 
 | `net.possessionSwap` | 1 | — | 1v1: the page whose player has the ball runs the game. 0: the host runs every possession. |
 | `net.karateTogether` | 0 | 1 | "Start together" offers Karate co-op (not shared yet: two fights). |
 
+## improve-screens, 2026-11-22 (owner: "Do a 10 phase pass improving the areas that need it most"; docs/IMPROVE-10-PHASE-AUDIT.md phases 1, 2, 6)
+
+Group "Screens · phone". NEW switches, each **1 = on, 0 = today's screen exactly** (tests pin both ends). No existing tuned number moved.
+
+| Knob | Default | Restores the old behaviour at | What it does |
+|---|---|---|---|
+| `ui.stageFitsHeader` | 1 | 0 | Phase 1. On a phone held upright the game's stage takes the screen its header really leaves (the header wraps to two or three rows there), so the bottom of the game and the move stick stay on the screen. 0: the hosts' `calc(100dvh - 3.25rem)` box, sized for a one-row header. Sideways, full screen and the stream view are untouched either way. (`lib/ui/stageFit.ts`) |
+| `ui.touchTargets44` | 1 | 0 | Phase 6. On a touch screen the Venice first-visit hint takes the walk-up card's slot under the mini-map, clear of the deck's DASH and JUMP (it ran under them, and DASH covered its "Got it"); the dunk's MIX / MC / CC chips, the story dialogue's SKIP and its choices, and `/workout`'s two tick lines each get a tap box of at least 44 px, with the same look and the same words. 0: each screen as before. (`lib/ui/touchTargets.ts`) |
+| `try.prefetchDunk` | **0** (ships off) | 0 | Phase 2. Measured on the rig (phone tier, a 10 s typing pause): birth date to TAP TO START 28.2 s median off, 24.7 s on (about 12 %, against the tennis control about 3 %), short of the plan's 25 % bar, and the early code load held the main thread 1.2-1.75 s while the visitor typed; so it ships off. On a real phone network the download half should matter more (not measured). While a first-time guest gives `/try`'s birth date, the dunk stage's code chunk and the first static files the dunk asks for are fetched into the browser cache (GETs of public files, no cookies, no body, no query: nothing about the visitor; the answer still gates every request that carries data). 0: nothing is requested before the answer, as before. `/try` is for signed-out visitors, so the panel never opens there: this is the shipped value, changed by a commit. (`lib/try/prefetchDunk.ts`) |
+
 ## physics-arena, 2026-11-23 (owner: "Make there be a live physics play arena for the sport modes.- all the modes can be played physics based. And POV-"; docs/PHYSICS-ARENA-PLAN.md; the owner has not felt these yet)
 
 Groups "Physics arena" and "Physics arena · POV". All NEW (`lib/babylon/arena/arenaConfig.ts`), read only by the arena
