@@ -1280,3 +1280,12 @@ NEW switches, each **1 = on, 0 = today's game exactly** (tests pin both ends). N
   0.655 / 0.635 / 0.592 — **the defence gets a little worse, not better** (today's switch-on-every-screen keeps a man in front); the
   roll man got an open look 0 % both ways (the screener pops nearly every time: the low man at the rim keeps his roll lane shut). OFF for the owner to
   feel. Feel-check: 3v3 PRO, call a screen and come off it at the arc.
+- `hoops.screenerRollOn` **0** (group "Hoops · rival offense"; `hoops/screenerRoll.ts` `SCREENER_ROLL_ON`, wired in `core/BasketballCore.ts`
+  TeammateBrain and `hoops/teamOffense3v3.ts`; new numbers `ROLL_NEAR_M` 2.5 m, `ROLL_NEAR_LANE_M` 1.1 m, `ROLL_MAN_AHEAD_M` 0.3 m,
+  `SLIP_MIN_SEC` 0.25 s): **a real roll man.** The screener rolls (or slips early) when his own man has stepped up to the ball or nobody
+  stands on the first 2.5 m of his line to the rim — before, only when no defender was within 1.6 m of his whole line, so the low man at
+  the rim kept him popping (one roll in 631 screens) — and the PRO and ELITE handler looks for the open roll man through the use and the
+  attack. Headless (pnr-sim, PRO, seeds 7 / 11 / 23 × 300): the screener rolls on 25–30 % of pick-and-rolls (was 0–1 %); points a
+  pick-and-roll possession against today's defence 0.593 → 0.644; with `hoops.pnrCoverageOn` too, 0.576. The roll man's best
+  separation inside 5 m was about 1.0 m (his man stays with him), so he was never open enough for the pass (0 catches). OFF.
+

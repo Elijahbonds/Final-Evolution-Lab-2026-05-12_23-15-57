@@ -36,6 +36,7 @@ import { aiPokes } from './ReachTell';   // lane/hoops-def-tell (#273 T-A): the 
 import { gatherCloseoutOn, gatherCloseoutM } from '../hoops/rulebook';   // hoops-p09: the closeout on a jump-shot gather
 import { cushionLever } from '../hoops/pressure';   // hoops-p02 (1v1/3v3 phase 2): the on-ball man's cushion on a moving handler
 import { pnrCoverageOn, coverageFor, onBallScreener, markIsScreening, showSpot, rollerToTag, PNR_SHOW_SEC, PNR_UNDER_LEVER, PNR_DROP_LEVER, PNR_TAG_LEVER, PNR_SPOT_DEAD_M, type PnrCoverage } from '../hoops/pnrCoverage';   // hoops-gap: the pick-and-roll coverage
+import { screenerRollOn, rollRead, SLIP_MIN_SEC } from '../hoops/screenerRoll';   // hoops-gap: the roll man reads his own man
 
 // ── Movement ─────────────────────────────────────────────────────────────
 export interface DribbleResult { crossover: boolean; hesitation: boolean; speed01: number; facingRad: number; planting: boolean; gear: Gear; intensity01: number; paceChange: boolean }
@@ -1092,8 +1093,12 @@ export class TeammateBrain implements AIBehavior {
       if (def && (farEnough || this.screen.phase === 'set' || this.screen.phase === 'roll' || this.screen.phase === 'pop') && this.screen.phase !== 'done') {
         const side = this.screen.side === -1 || this.screen.side === 1 ? (this.screen.phase === 'approach' ? pickScreenSide(handler, hoop) : this.screen.side) : 1;
         const sSpot = screenSpot(def, handler, hoop, side);
-        const laneOpen = rollLaneOpen(self, hoop, foes);
+        // hoops-gap (`hoops.screenerRollOn`): the roll reads HIS OWN man (hoops/screenerRoll) — stepped up to the ball, or nobody on the near
+        // part of his line — as well as the whole-line read; and a man already gone to the ball lets him slip early
+        const read = screenerRollOn() ? rollRead(self, handler, hoop, foes, def) : null;
+        const laneOpen = rollLaneOpen(self, hoop, foes) || !!read?.roll;
         this.screen = stepScreen({ ...this.screen, side }, dt, self, sSpot, handler, hoop, laneOpen);
+        if (read?.slip && this.screen.phase === 'set' && this.screen.heldSec >= SLIP_MIN_SEC) this.screen = { ...this.screen, phase: 'roll', afterSec: 0 };
         this.screened = def;
         if (this.screen.phase === 'approach') { this.objective = def; const to = sSpot.subtract(self); return steer(to, distXZ(self, sSpot) > 2.5, 0.2); }
         if (this.screen.phase === 'set') { this.objective = def; this.job = 'screen'; return steer(new Vector3(0, 0, 0), false, 1); }   // PLANTED

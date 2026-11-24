@@ -1398,6 +1398,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/hoops/pnrCoverage.ts PNR_COVERAGE_ON',
     hint: '1: the man on the ball plays the screen (over inside 7.5 m, under past it), the screener\'s man shows or drops, a free roll man is tagged, and the switch comes only when beaten. 0: as before.',
   },
+  {
+    id: 'hoops.screenerRollOn', label: '3v3: the screener rolls when his own man steps up to the ball (0 = off)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · rival offense',
+    source: 'lib/babylon/hoops/screenerRoll.ts SCREENER_ROLL_ON',
+    hint: '1: a screener rolls or slips to the rim when his man has stepped up to the ball or nobody is on the near part of his line, and the handler looks for the open roll man. 0: he rolls only on a clear lane all the way to the rim, as before.',
+  },
   // hoops-p04 (1v1/3v3 phase 4 "feet and transitions"): one blend + minimum-hold rule (anim/hoopsTransitions), the shot clips on their
   // release (hoops/releaseTiming). Every default is this lane's; the owner has felt none of them.
   {
