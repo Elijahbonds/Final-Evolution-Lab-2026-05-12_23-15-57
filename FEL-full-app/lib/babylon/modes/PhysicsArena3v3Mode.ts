@@ -446,7 +446,7 @@ function afterStep(S: St, h: number): void {
     SoundKit.play('swish', { volume: 0.7 });
     if (S.score[team] >= ARENA_3V3_GAME_TO) {
       S.phase = 'over'; S.phaseT = 0; say(S, `${team === 'home' ? 'You win' : 'They win'} ${S.score.home}–${S.score.away}`, 3);
-      S.final = { won: team === 'home', me: S.score.home, foe: S.score.away, log: S.game.log };
+      S.final = { won: team === 'home', me: S.score.home, foe: S.score.away, log: { v: 1, baskets: S.game.log.baskets.map((b) => ({ ...b })) } };   // a snapshot: the card is this game
     }
   }
   S.prevBall = now;

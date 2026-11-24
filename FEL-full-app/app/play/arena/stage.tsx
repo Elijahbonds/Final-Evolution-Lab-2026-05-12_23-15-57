@@ -76,9 +76,8 @@ export function ArenaStage({ signedIn }: { signedIn: boolean }) {
     let disposed = false;
     // each game is one server run: started as play begins, finished (and the next one started) when the game ends. Signed out or
     // with arena.xpOn 0, nothing is posted (a practice court).
-    // soccer counts for nothing yet (plan §9: its XP rule is a later step): the soccer tab posts no run
-    const key = sport.id === 'soccer' ? null : ARENA_SESSION_KEY[sport.id];
-    const posting = signedIn && xpOn() && key !== null;
+    const key = ARENA_SESSION_KEY[sport.id];
+    const posting = signedIn && xpOn();
     const runOpts = { agent: queryFlag('agent'), playtest: queryFlag('playtest') };
     let run: Promise<string | null> | null = null;
     runMode(def, {
@@ -90,14 +89,14 @@ export function ArenaStage({ signedIn }: { signedIn: boolean }) {
         if (p === 'error') setErr(String(d));
         // a practice court: straight in (next tick: the harness takes a press only once it is in 'ready')
         if (p === 'ready') setTimeout(() => { if (!disposed) { bus.emit({ t: 'button', btn: 'START', pressed: true }); bus.emit({ t: 'button', btn: 'START', pressed: false }); } }, 50);
-        if (p === 'ready' && posting && key && !run) run = startArenaRun(key, runOpts);
+        if (p === 'ready' && posting && !run) run = startArenaRun(key, runOpts);
       },
       onHud: (u) => { if (!disposed) setHud((h) => ({ ...h, ...u })); },
       guest: !signedIn,
       resultSink: async () => {},   // the arena never ends a session: each game is a card (below), and play goes on
       // a finished game: its run is finished with the game's play log (the server rebuilds the score), the next game's run starts
       cardSink: async (res) => {
-        if (!posting || !key || disposed) return;
+        if (!posting || disposed) return;
         const started = run;
         run = startArenaRun(key, runOpts);
         const runId = started ? await started : null;

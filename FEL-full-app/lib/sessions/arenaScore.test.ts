@@ -11,6 +11,8 @@ import { ARENA_GAME_TO, SCORED_PAUSE_SEC } from '@/lib/babylon/modes/PhysicsAren
 import { ARENA_3V3_GAME_TO } from '@/lib/babylon/modes/PhysicsArena3v3Mode';
 import { BALLS_PER_RACK, CONTEST_SEC, END_PAUSE_SEC, GATHER_SEC, RACKS, RACK_MOVE_SEC, pointsFor } from '@/lib/babylon/modes/PhysicsArena3ptMode';
 import { ARC_M, COURT, RIM_FLOOR } from '@/lib/babylon/arena/hoopGeometry';
+import { SCORED_SEC, SOCCER_GAME_TO } from '@/lib/babylon/modes/PhysicsArenaSoccerMode';
+import { GOAL as SOCCER_GOAL, SOCCER_BALL } from '@/lib/babylon/arena/soccerGeometry';
 
 /** A game where `seq` says who scored each basket ('m' me, 'f' foe, upper case a 2 from past the arc), 3 s apart. */
 function game(seq: string, gap = 3): ArenaBasket[] {
@@ -40,6 +42,43 @@ describe('DRIFT: the mirrored numbers are still what the games say', () => {
     expect(ARENA_MIRRORED.rackMoveSec).toBe(RACK_MOVE_SEC);
     expect(ARENA_MIRRORED.contestEndPauseSec).toBe(END_PAUSE_SEC);
     for (let i = 0; i < 25; i++) expect(contestPoints(i), String(i)).toBe(pointsFor(i % BALLS_PER_RACK));
+  });
+});
+
+describe('DRIFT: soccer', () => {
+  it('first to 5, the ball-in-the-net pause, the mouth, the ball', () => {
+    expect(ARENA_MIRRORED.soccerTo).toBe(SOCCER_GAME_TO);
+    expect(ARENA_MIRRORED.soccerScoredSec).toBe(SCORED_SEC);
+    expect(ARENA_MIRRORED.goalHalfW).toBe(SOCCER_GOAL.halfW);
+    expect(ARENA_MIRRORED.goalH).toBe(SOCCER_GOAL.h);
+    expect(ARENA_MIRRORED.soccerBallR).toBe(SOCCER_BALL.r);
+  });
+});
+
+describe('rebuildArenaScore: soccer', () => {
+  /** `seq`: who scored each goal ('m' / 'f'), `gap` s apart, crossing at (x, y). */
+  const goals = (seq: string, gap = 6, x = 0.4, y = 0.5) => [...seq].map((c, i) => ({ t: 10 + i * gap, side: c === 'm' ? 'me' : 'foe', x, y }));
+  const soccer = (g: ReturnType<typeof goals>, o: { sec?: number; score?: number; opp?: number } = {}) => {
+    const me = g.filter((x) => x.side === 'me').length, foe = g.length - me;
+    return rebuildArenaScore('arenaSoccer', { v: 1, goals: g }, { durationMs: (o.sec ?? 600) * 1000, sentScore: o.score ?? me, sentOpponent: o.opp ?? foe });
+  };
+  it('an honest 5–2 win and a 3–5 loss rebuild; the win is the board\'s; the row is first to 5', () => {
+    expect(soccer(goals('mmfmfmm'))).toMatchObject({ ok: true, score: 5, opponentScore: 2, won: true });
+    expect(soccer(goals('mffmfmff'))).toMatchObject({ ok: true, score: 3, opponentScore: 5, won: false });
+    expect(sessionWon('arenaSoccer', true, null, 120, { score: 5, opponentScore: 2 })).toBe(true);
+    expect(sessionWon('arenaSoccer', true, null, 120, { score: 3, opponentScore: 5 })).toBe(false);
+    expect(MODE_SCORE_RULES.arenaSoccer).toMatchObject({ maxScore: 5, maxScoreFrom: 'derived' });
+  });
+  it('forged goal logs are refused with the rule they broke', () => {
+    expect(soccer(goals('mmmmm', 6, 1.6))).toMatchObject({ ok: false, detail: 'arena_goal_mouth' });      // wide of the post
+    expect(soccer(goals('mmmmm', 6, 0.2, 2.3))).toMatchObject({ ok: false, detail: 'arena_goal_mouth' }); // over the bar
+    expect(soccer(goals('mmmmm', 0.5))).toMatchObject({ ok: false, detail: 'arena_too_fast' });           // no kick-off between
+    expect(soccer(goals('mmmmm', SCORED_SEC))).toMatchObject({ ok: true });                              // exactly the pause
+    expect(soccer(goals('mmmmmm'))).toMatchObject({ ok: false, detail: 'arena_after_final' });
+    expect(soccer(goals('mmm'))).toMatchObject({ ok: false, detail: 'arena_not_final' });
+    expect(soccer(goals('mmmmm'), { score: 6 })).toMatchObject({ ok: false, detail: 'arena_score_mismatch' });
+    expect(soccer(goals('mmmmm'), { sec: 20 })).toMatchObject({ ok: false, detail: 'arena_clock' });
+    expect(rebuildArenaScore('arenaSoccer', { v: 1, baskets: [] }, { durationMs: 1e6, sentScore: 5 })).toMatchObject({ ok: false });
   });
 });
 

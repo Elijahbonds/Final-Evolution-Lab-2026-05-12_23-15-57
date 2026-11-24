@@ -9,8 +9,8 @@ import { sendFinish, type FinishDeps } from '@/lib/sessions/finishOutbox';
 import type { ArenaSessionKey } from '@/lib/sessions/arenaScore';
 
 /** The arena's sports (the page's `?sport=`) and the session key each one's games are saved under. */
-export const ARENA_SESSION_KEY: Readonly<Record<'hoops' | 'threes' | 'threepoint', ArenaSessionKey>> = {
-  hoops: 'arenaHoops', threes: 'arenaThrees', threepoint: 'arenaThreePoint',
+export const ARENA_SESSION_KEY: Readonly<Record<'hoops' | 'threes' | 'threepoint' | 'soccer', ArenaSessionKey>> = {
+  hoops: 'arenaHoops', threes: 'arenaThrees', threepoint: 'arenaThreePoint', soccer: 'arenaSoccer',
 };
 
 /** Start a server run for the next game. The run id, or null (signed out, offline, refused). `playtest` (the page's ?playtest=1,

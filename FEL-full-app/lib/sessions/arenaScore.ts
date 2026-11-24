@@ -4,7 +4,7 @@
  * PURE: no DB, no network, no Babylon (the route imports it; the games' constants are MIRRORED below and held by arenaScore.test.ts).
  *
  * THE OWNER'S ANSWERS (2026-11-24, docs/OWNER-DECISIONS.md):
- *   a. own session keys — arenaHoops, arenaThrees, arenaThreePoint — off every mode list and the staked Arena's rival draw (they are
+ *   a. own session keys — arenaHoops, arenaThrees, arenaThreePoint, arenaSoccer (2026-11-24, under the same decision) — off every mode list and the staked Arena's rival draw (they are
  *      catalogue keys for the session routes only: session-payout isCatalogueMode, never MODE_INFO);
  *   b. the server rebuilds the score from the game's play log now (a full server replay is a later step);
  *   c. XP and progress only to start: NO Lab Credits on an arena win (the route pays no LC, no wallet coins, no shards — see
@@ -25,6 +25,9 @@
  *   threepoint (arenaThreePoint)     { v: 1, shots: [{ t }], makes: [{ t, shot }] }
  *     shots  every release, in order (the racks are shot in order: shot i is rack ⌊i/5⌋, ball i mod 5); t the contest's clock
  *     makes  a release that went in (`shot` its index) and when
+ *   soccer (arenaSoccer)               { v: 1, goals: [{ t, side, x, y }] }
+ *     x, y   where the ball wholly crossed the goal line (across the mouth, up): it must be inside the mouth; first to 5, a goal is 1,
+ *            two goals at least the ball-in-the-net pause apart (the kick-off reset), the game over exactly at 5
  *   The points are the server's (the last ball of a rack is worth 2): at most 25 shots, each made at most once, released before the
  *   horn and at least a gather apart, a make after its release and inside the flight a ball can have.
  *
@@ -39,7 +42,7 @@
  */
 export const ARENA_XP_ON = 1;
 
-export const ARENA_SESSION_KEYS = ['arenaHoops', 'arenaThrees', 'arenaThreePoint'] as const;
+export const ARENA_SESSION_KEYS = ['arenaHoops', 'arenaThrees', 'arenaThreePoint', 'arenaSoccer'] as const;
 export type ArenaSessionKey = (typeof ARENA_SESSION_KEYS)[number];
 
 /** Is this one of the arena's session keys (exactly as stored: no aliases)? */
@@ -49,6 +52,10 @@ export function isArenaSession(mode: unknown): mode is ArenaSessionKey {
 
 /** One basket of a game's play log (the client's record: the server works out its points). */
 export interface ArenaBasket { t: number; side: 'me' | 'foe'; shot: boolean; fromM: number }
+/** One goal of a soccer game's play log: when, for whom, and where the ball crossed the goal line (x across the mouth, y up). */
+export interface ArenaGoal { t: number; side: 'me' | 'foe'; x: number; y: number }
+/** A soccer game's play log, sent as `stats.arena`. */
+export interface ArenaSoccerLog { v: 1; goals: ArenaGoal[] }
 /** A hoops game's play log, sent as `stats.arena`. */
 export interface ArenaHoopsLog { v: 1; baskets: ArenaBasket[] }
 /** The contest's play log: every release (in order) and the releases that went in. */
@@ -64,6 +71,9 @@ export const ARENA_XP_ONLY: ReadonlySet<string> = new Set<string>(ARENA_SESSION_
 export const ARENA_MIRRORED = {
   /** PhysicsArenaMode ARENA_GAME_TO / PhysicsArena3v3Mode ARENA_3V3_GAME_TO. */
   hoopsTo: 11, threesTo: 21,
+  /** PhysicsArenaSoccerMode SOCCER_GAME_TO and SCORED_SEC (the ball sits in the net this long before the kick-off), soccerGeometry
+   *  GOAL (the mouth's half width and height) and SOCCER_BALL's radius. */
+  soccerTo: 5, soccerScoredSec: 2.0, goalHalfW: 1.5, goalH: 2.0, soccerBallR: 0.11,
   /** hoopGeometry ARC_M: a shot from past it is worth 2. */
   arcM: 6.75,
   /** The farthest a body can stand from the ring's centre on the arena's court (hoopGeometry COURT's far corner: 14.22 m). */
@@ -86,7 +96,7 @@ export const CONTEST_MAX_FLIGHT_SEC = 6;
 
 export type ArenaInvalidDetail =
   | 'arena_log_missing' | 'arena_log_malformed' | 'arena_basket_far' | 'arena_too_fast' | 'arena_clock'
-  | 'arena_not_final' | 'arena_after_final' | 'arena_score_mismatch' | 'arena_contest_shots' | 'arena_contest_make';
+  | 'arena_not_final' | 'arena_after_final' | 'arena_score_mismatch' | 'arena_contest_shots' | 'arena_contest_make' | 'arena_goal_mouth';
 
 export type ArenaRebuild =
   | { ok: true; score: number; opponentScore: number; won: boolean; baskets: number }
@@ -103,7 +113,7 @@ export function basketPoints(shot: boolean, fromM: number, m = ARENA_MIRRORED): 
 /** The win on a (rebuilt) board: a game is won by reaching the target first; the contest has no win. */
 export function arenaWon(mode: ArenaSessionKey, score: number, opponentScore: number, m = ARENA_MIRRORED): boolean {
   if (mode === 'arenaThreePoint') return false;
-  const to = mode === 'arenaHoops' ? m.hoopsTo : m.threesTo;
+  const to = mode === 'arenaHoops' ? m.hoopsTo : mode === 'arenaSoccer' ? m.soccerTo : m.threesTo;
   return score >= to && score > opponentScore;
 }
 
@@ -130,6 +140,7 @@ export function rebuildArenaScore(
   if (L.v !== 1) return bad('arena_log_malformed');
   const serverSec = Math.max(0, o.durationMs) / 1000 + ARENA_CLOCK_SLACK_SEC;
   if (mode === 'arenaThreePoint') return rebuildContest(L, serverSec, o.sentScore, m);
+  if (mode === 'arenaSoccer') return rebuildSoccer(L, serverSec, o.sentScore, o.sentOpponent, m);
 
   const to = mode === 'arenaHoops' ? m.hoopsTo : m.threesTo;
   const baskets = L.baskets;
@@ -152,6 +163,33 @@ export function rebuildArenaScore(
   if (!Number.isInteger(o.sentScore) || o.sentScore !== total.me) return bad('arena_score_mismatch', total.me);
   if (o.sentOpponent !== undefined && o.sentOpponent !== total.foe) return bad('arena_score_mismatch', total.foe);
   return { ok: true, score: total.me, opponentScore: total.foe, won, baskets: baskets.length };
+}
+
+/**
+ * Soccer: every goal is the ball wholly over the line inside the mouth (its crossing point between the posts and under the bar, as
+ * the mode's own sensor reads it); two goals at least the ball-in-the-net pause apart (the kick-off reset); the clock no longer than
+ * the run; the game over exactly at the target, on the last goal; the sent score and opponent score the rebuilt ones.
+ */
+function rebuildSoccer(L: Record<string, unknown>, serverSec: number, sentScore: unknown, sentOpponent: unknown, m: typeof ARENA_MIRRORED): ArenaRebuild {
+  const to = m.soccerTo, goals = L.goals;
+  if (!Array.isArray(goals) || goals.length === 0 || goals.length > 2 * to - 1) return bad('arena_log_malformed', 2 * to - 1);
+  const total = { me: 0, foe: 0 };
+  let lastT = -Infinity;
+  for (let i = 0; i < goals.length; i++) {
+    const g = goals[i] as Record<string, unknown> | null;
+    if (!g || typeof g !== 'object' || !num(g.t) || !num(g.x) || !num(g.y) || (g.side !== 'me' && g.side !== 'foe')) return bad('arena_log_malformed');
+    if (g.t < 0 || g.t > serverSec) return bad('arena_clock', Math.floor(serverSec));
+    if (Math.abs(g.x) >= m.goalHalfW || g.y < 0 || g.y >= m.goalH) return bad('arena_goal_mouth', m.goalHalfW);
+    if (i > 0 && g.t - lastT < m.soccerScoredSec - ARENA_FRAME_SLACK_SEC) return bad('arena_too_fast', m.soccerScoredSec);
+    if (total.me >= to || total.foe >= to) return bad('arena_after_final', to);
+    total[g.side] += 1;
+    lastT = g.t;
+  }
+  const won = total.me >= to;
+  if (!won && total.foe < to) return bad('arena_not_final', to);
+  if (!Number.isInteger(sentScore) || sentScore !== total.me) return bad('arena_score_mismatch', total.me);
+  if (sentOpponent !== undefined && sentOpponent !== total.foe) return bad('arena_score_mismatch', total.foe);
+  return { ok: true, score: total.me, opponentScore: total.foe, won, baskets: goals.length };
 }
 
 function rebuildContest(L: Record<string, unknown>, serverSec: number, sentScore: unknown, m: typeof ARENA_MIRRORED): ArenaRebuild {
@@ -207,5 +245,7 @@ export function arenaDerivedBounds(m = ARENA_MIRRORED): Record<ArenaSessionKey, 
     arenaHoops: game(m.hoopsTo),
     arenaThrees: game(m.threesTo),
     arenaThreePoint: { maxScore: contestMax, runSec: contestSec, basis: `${m.racks} racks of ${m.ballsPerRack}, each with one ${m.moneyWorth}-point ball; rebuilt from the play log (lib/sessions/arenaScore.ts)` },
+    // soccer: first to 5, a goal is 1; the fewest goals (5) each after the ball-in-the-net pause of the one before
+    arenaSoccer: { maxScore: m.soccerTo, runSec: (m.soccerTo - 1) * m.soccerScoredSec, basis: `first to ${m.soccerTo}, a goal is 1; ${m.soccerTo} goals at least ${m.soccerScoredSec} s apart (the kick-off reset); rebuilt from the goal log (lib/sessions/arenaScore.ts)` },
   };
 }
