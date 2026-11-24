@@ -1233,6 +1233,25 @@ this pass exactly (a test pins both ends).
   sand step; the dock's and bridge's boards 1.45 / 0.15; the shallows a splash). 0 = no bed asked for: the stadium crowd, as before.
   Measured (same runs): the bed built 900 Hz (the stadium crowd) in 3 of 3 → 500 Hz (the ocean) in 3 of 3; Venice unchanged (500 Hz both
   sides). Ships ON.
+- `story.worldDressed` **0** (group "Story · flow"; `lib/babylon/adventure/world/dress.ts` `STORY_WORLD_DRESSED`, phase 7, NEW, **ships
+  OFF**): Chapter 1's hub and World 1 dressed, view only (no piece's collision, size or place changes): the shipped procedural ground
+  textures on the tops (grass in World 1, paving in the hub) in world metres, stone on the cliffs, blocks and walls, a lip band on every
+  edge, coping caps on the blocks, posts under the rails, and the shipped Kenney nature kit (grass, bushes, small rocks along the lanes;
+  trees only in the wide places' outer margins) kept clear of spawns, gates, camps, rails and the run-wall (a test holds every prop to
+  it), loaded after the first played second. New [TUNE] numbers: `CLEAR` (prop margins), `POST_EVERY` 6 m, `DRESS_ANISO` 1, the tiles
+  (grass 4 m, paving 6 m, stone 5 m). Measured (lane C rig, phone tier, 3 runs a side, twice): load hub +1 % / +10 %, World 1 +8 % /
+  +18 %; World 1's frame p95 in play 250 → 317 ms, and after the cut (filtering 8 → 1, frozen matte materials, props without shadow
+  lookups) 150 → 217 ms in 2 of 3 runs. No measured win, so it ships at 0 (the plain colours, exactly as before). Feel-check: set it to 1
+  and play the rail run on a real phone with the PERF readout; the look is the owner's call.
+- `venue.camClearView` **1** (group "Coast · zone"; `lib/babylon/adventure/host/camera.ts` `VENUE_CAM_CLEAR_VIEW`, phase 9, NEW, ships
+  ON): after the shared director places the eye (CameraDirector itself is not edited), the Coast and the story keep it out of solids:
+  a big solid (the boat, a house, the market wall, the boat sign, a story block or the run-wall) between the chest and the eye, or
+  holding it, brings the eye in along its own line to just short of it, never nearer than 1.2 m (`CAM_CLEAR`: room 0.3 m, NEW); a thin
+  prop (a palm, a rock, a tree) only when the eye is inside it. No distance, height, lag or FOV changes; the director eases back out as
+  after its own occlusion pull. Measured (lane C rig, phone tier, the Coast walk to the boat and back with a look-stick sweep, 3 runs a
+  side): the eye inside the Boat to Venice sign's box 5 / 11 / 11 samples → 0 / 0 / 0 (the clear view stepped in 8–10 times a walk);
+  frame p95 1.5–1.9 s against 1.8–2.0 s; desktop and World 1's run-wall: 0 inside on both sides. FrameGuard's recentre fired during the
+  rig's forced look-stick spin on both sides (2 of 3 off, 1 of 3 on), never on arrival. 0 = the camera passes through, as before.
 
 ## hoops-gap, 2026-11-23 (owner: "close the gap and pass them"; docs/HOOPS-GAP-PLAN.md; the owner has not felt these yet)
 

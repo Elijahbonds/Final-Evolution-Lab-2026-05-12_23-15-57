@@ -64,6 +64,11 @@ import { cancelNatural, speakNatural } from '../audio/voice/speakNatural';
 import { STORY_SFX_ON, StorySfx, type StoryPlayFn } from '../adventure/audio/storySfx';
 import { playNature } from '../audio/natureSfx';
 import type { AdventureHost } from '../adventure/host/AdventureHost';
+// improve pass phase 7 (story.worldDressed): textures, trims and the nature kit on the story's worlds (view only)
+import { mountWorldDress, STORY_WORLD_DRESSED, type WorldDress } from '../adventure/world/dress';
+// improve pass phase 9 (venue.camClearView): the story camera keeps out of the raised blocks, the run-wall and the trees
+import { VENUE_CAM_CLEAR_VIEW, type CamBox } from '../adventure/host/camera';
+import { boxesNear, keepEyeClear, meshCamBoxes } from '../adventure/host/camBoxes';
 
 /** The yard keeps its own progress under this prefix, so a try-out never writes the player's real save. */
 export const YARD_SAVE_PREFIX = 'yard:';
@@ -480,7 +485,17 @@ interface StoryState {
   sky?: AbstractMesh[];
   /** improve pass phase 5 (story.sfxOn): the sound effects; null with the knob off. */
   sfx: StorySfx | null;
+  /** improve pass phase 7 (story.worldDressed): the worlds' dressing; null with the knob off. */
+  dress: WorldDress | null;
+  /** improve pass phase 9 (venue.camClearView): the solids' boxes (the blocks, and the trees once they land); null = off. */
+  cam: { blocks: CamBox[]; all: CamBox[]; near: CamBox[]; sec: number; pulls: number } | null;
 }
+
+/** The story's trees (the dressing's tall props) are solids for the camera; low grass, bushes and rocks are not. */
+const STORY_TALL_PROP = /^dress_prop_(pine|pineTall|oak|tree)_/;
+
+/** The nature kit starts loading after this many played frames (about a second), never during the load. */
+const DRESS_PROPS_AFTER_FRAMES = 60;
 
 const stories = new WeakMap<Scene, StoryState>();
 const liveStories = new Set<StoryState>();
@@ -530,6 +545,7 @@ async function loadStory(ctx: ModeContext): Promise<void> {
   });
   const host = session.host;
   const view = buildStoryView(scene, session.map, session.gates);
+  const dress = feel('story.worldDressed', STORY_WORLD_DRESSED) >= 0.5 ? mountWorldDress(scene, [...session.map.worlds.values()]) : null;
 
   // the party's bodies (the yard's way: the player through CharacterLibrary.spawn, a creature as a placeholder)
   const bodies = new Map<ActorId, Body>();
@@ -554,7 +570,7 @@ async function loadStory(ctx: ModeContext): Promise<void> {
       bodies.set(q.id, { kind: 'placeholder', root: ph.root, pose: ph.pose, ph, view: bindMovementView({ animator: NO_ANIM, poseNode: ph.pose, actor: () => host.world.actors.get(q.id), telemetry: () => host.movement.inspect(q.id), clock: () => host.tSec }) });
     }
   }
-  if (scene.isDisposed) { session.dispose(); view.dispose(); return; }
+  if (scene.isDisposed) { session.dispose(); dress?.dispose(); view.dispose(); return; }
   const me = bodies.get(host.playerId)!;
   const combatView = bindCombatView({
     scene, bus: host.bus, combat: host.combat, actors: host.world.actors, localPlayerId: host.playerId,
@@ -572,7 +588,14 @@ async function loadStory(ctx: ModeContext): Promise<void> {
     stickL: { x: 0, y: 0 }, stickR: { x: 0, y: 0 }, latchedYaw: null, baseFov: ctx.camera.fov, fovBoost: 0,
     hudSec: 0, uiSec: 0, saveSec: 0, frame: 0, lastHud: '', mirror: session.save.settings.mirror === true, preset: 'runner', rigKey: '',
     snap: true, flight: flightUnlockedIn(session.save.story.flags), demo: null, offKeys: null, probe: at >= 0,
-    chapterTitle: chapter?.title ?? null, placeholder: !!chapter?.placeholder, ending: null, sfx: storySfxFor(host),
+    chapterTitle: chapter?.title ?? null, placeholder: !!chapter?.placeholder, ending: null, sfx: storySfxFor(host), dress,
+    cam: feel('venue.camClearView', VENUE_CAM_CLEAR_VIEW) >= 0.5 ? (() => {
+      const blocks = session.map.pieces.filter((p) => p.kind === 'block').map((p) => {
+        const b = p as Extract<typeof p, { kind: 'block' }>;
+        return { minX: b.minX, maxX: b.maxX, minY: b.y0, maxY: b.top, minZ: b.minZ, maxZ: b.maxZ };
+      });
+      return { blocks, all: blocks, near: [], sec: 0, pulls: 0 };
+    })() : null,
     budgetIn: {
       tier: (scene.metadata as { felTier?: 'mobile' | 'desktop' } | undefined)?.felTier ?? 'desktop',
       eye: host.player.pos,
@@ -625,6 +648,7 @@ async function loadStory(ctx: ModeContext): Promise<void> {
         bodies: host.world.actors.size, errors: host.errors.length, beat: session.runner.beat?.id ?? null, paused: session.paused,
         done: session.runner.done, fused: p.fusion.active, flight: flightUnlockedIn(session.save.story.flags), doing: S.demo?.doing() ?? null,
         ending: S.ending ? S.ending.chapterId : null, storyMode: session.storyMode, objective: session.runner.objective(),
+        camPulls: S.cam ? S.cam.pulls : null,
       };
     },
     host, session,
@@ -663,6 +687,7 @@ function storyCamYaw(ctx: ModeContext, T: StoryState): number {
 function storySync(ctx: ModeContext, T: StoryState, dt: number): void {
   const s = T.session, h = s.host, scene = ctx.scene;
   T.frame++;
+  if (T.dress && T.frame === DRESS_PROPS_AFTER_FRAMES) void T.dress.loadProps().then((n) => console.info(`[FEL-PERF] story dress: ${n} props`));
   // bodies: the encounters' monsters come and go with the story runtime
   for (const a of h.world.actors.values()) {
     if (T.bodies.has(a.id)) continue;
@@ -712,6 +737,12 @@ function storySync(ctx: ModeContext, T: StoryState, dt: number): void {
     TMP_SUBJECT.set(me.pos.x, me.pos.y, me.pos.z);
     TMP_VEL.set(me.vel.x, me.vel.y, me.vel.z);
     ctx.camDirector.update(TMP_SUBJECT, TMP_VEL, target ? TMP_OBJ.set(target.pos.x, target.pos.y + target.height * 0.5, target.pos.z) : null);
+    if (T.cam) {
+      // the trees land after the first second (the dressing): re-read them every 2 s; the blocks never move
+      T.cam.sec += dt;
+      if (T.cam.sec >= 2) { T.cam.sec = 0; T.cam.all = meshCamBoxes(scene, (n) => STORY_TALL_PROP.test(n), [...T.cam.blocks]); }
+      if (keepEyeClear(ctx.camera, me.pos, boxesNear(T.cam.all, me.pos.x, me.pos.z, 24, T.cam.near))) T.cam.pulls++;
+    }
     T.fovBoost += (rig.fovBoostDeg - T.fovBoost) * (1 - Math.exp(-FOV_EASE * Math.max(0, dt)));
     ctx.camera.fov = T.baseFov + (T.fovBoost * Math.PI) / 180;
   }
@@ -776,7 +807,7 @@ function closeStory(T: StoryState): void {
   STORY_SPEAKER.cancel();
   if (typeof window !== 'undefined') delete (window as unknown as { __FEL_ADVENTURE__?: unknown }).__FEL_ADVENTURE__;
   T.offKeys?.(); T.offKeys = null;
-  T.combatView.dispose(); T.magicView.dispose(); T.sparks.dispose(); T.speed.dispose(); T.view.dispose(); T.sfx?.dispose();
+  T.combatView.dispose(); T.magicView.dispose(); T.sparks.dispose(); T.speed.dispose(); T.dress?.dispose(); T.view.dispose(); T.sfx?.dispose();
   for (const b of T.bodies.values()) { b.view.dispose(); if (b.ph) b.ph.dispose(); else { b.char?.dispose(); b.pose.dispose(); b.root.dispose(); } }
   T.bodies.clear();
   T.session.dispose();
