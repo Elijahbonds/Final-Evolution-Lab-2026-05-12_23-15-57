@@ -1471,13 +1471,20 @@ game loads; each also has a one-load URL switch for an A/B on any device without
 - `venue.courtDetailV2` **0** (group "Look · venues"; `visual/CourtSurface.ts` `COURT_DETAIL_V2`; URL `?lookon=courtdetail`): **the court's
   lines and the ground's grain hold into the distance** (phase B3, part 1). The court lines and the ground grain are texture, which no
   anti-aliasing pass reaches; on, the painted court (Babylon's default 4x anisotropic filtering) and the Venice set's concrete and sand
-  (8x) are sampled at 16x (the GPU's cap binds). No new texture, no new pass, no colour change. Ships OFF; its A/B is measured in the commit after this one.
+  (8x) are sampled at 16x (the GPU's cap binds). No new texture, no new pass, no colour change. **Ships OFF: no visible change on the rig.** Sideways phone (844x390, DPR 2,
+  full render scale), 1v1 and the Dunk, 2 runs a side: the far court lines and the sand look the same; the edge numbers are flat (hard
+  steps 1v1 208.8 -> 207.4, Dunk 423.2 -> 426.4; detail 1v1 3.67 -> 4.10, Dunk 9.17 -> 9.23). One perf round (tennis 744 ms): 1v1 996
+  -> 692, Dunk 858 -> 922 ms, noise either way; texture MB unchanged (filtering adds no memory). SwiftShader's filtering may not show
+  what a phone GPU's would: worth the owner's eye on a phone (`?lookon=courtdetail`), cheap to keep.
 - `crowd.varietyV2` **0** (group "Look · venues"; `visual/crowd/crowdStands.ts` `CROWD_VARIETY_V2`, with `CROWD_HEIGHT_SPREAD` standing
   0.07, seated 0.025; URL `?lookon=crowdvariety`): **the crowd reads as different people** (phase B3, part 2), with the shipped bodies
   only: each fan and each card its own height (up to 7 % taller or shorter standing, 2.5 % seated, whose hips stay on the bench), each
   3D fan its own shade (0.84-1.08 of its body's colours, a slight warm or cool cast, through the thin instance's colour). The idle was
   already staggered per fan. Phones draw cards only, so there it changes heights only. Real variety (more bodies, arms that clap) is
-  owner art. Ships OFF (crowd look is the owner's call); its A/B is measured in the commit after this one.
+  owner art. **Ships OFF (a crowd look is the owner's call), and not shown yet.** Desktop
+  (1280x720), the Dunk and 3-Point, 1 run a side: at 3 s and 9 s into play the camera never faced the 3D stands, so the pictures hold
+  only the set's silhouette cut-outs and the 3-Point onlookers, which this knob does not touch. No phone cost to measure on the 3D
+  fans (phones draw cards only). Needs a picture with the stands in frame (a replay or a turned camera) before anyone judges it.
 - `venue.iblEnvV1` (exists, **0**, unchanged): **found dead and wired** (phase B2). `mountVenueIBL` (`scene/venueQualityV1.ts`, 2026-11-03)
   was never called, so the knob and `?vq=ibl` did nothing; the light rig now mounts the environment through it (off runs exactly the
   procedural cube, tested). **The prefiltered files it names (`public/env/*.env`) are not in the repo on any branch**, so on is still
