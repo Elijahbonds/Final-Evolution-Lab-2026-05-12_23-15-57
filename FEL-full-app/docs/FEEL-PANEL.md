@@ -1456,14 +1456,16 @@ game loads; each also has a one-load URL switch for an A/B on any device without
   rig logs `[FEL-TIER] edges: msaa N, fxaa on|off` at every mount, so a console shows which one a load got. **Ships OFF (0) until the owner's phone check.** Measured (the
   every-screen rig, SwiftShader; scripts/probes/look-venues/, session scratch `look-venues/`): the pictures at full render scale
   (upright phone, DPR 2) are clearly cleaner with 1 — the sand's edge, the court lines, the lamp posts, the palm fronds and the
-  players' outlines lose their stair-steps; the hard-step count in the crop falls 27 % (1v1), 58 % (3v3) and 30 % (Dunk) while the
-  picture's detail falls only 2-17 %, so it smooths edges rather than blurring the frame. 2 also smooths geometry edges but not the
+  players' outlines lose their stair-steps; the hard-step count in the crop falls 30 % (1v1), 57 % (3v3) and 25 % (Dunk), 3 runs a side, every
+  FXAA run below every run of today's look, while the picture's detail falls only 2-12 %, so it smooths edges rather than blurring the frame. 2 also smooths geometry edges but not the
   court lines (they are texture) or the palm fronds (alpha-tested cut-outs), so 1 is the candidate. The phone tier (390x844, DPR 3,
-  CPU 4x, guard on; tennis as the control): frame p95 medians today -> FXAA: 1v1 783 -> 811 ms, Dunk 978 -> 970, Venice 974 -> 748, the story 666 -> 776 (tennis
-  817 ms, spread 6 ms; the places' own run-to-run spread up to 62 ms today and 203 ms with FXAA): mixed, two slower and two faster
-  (2 rounds); the guard settled at the same level (L2) on both sides; READY within
-  10 % everywhere; texture memory +17 to +44 MB by the readout's estimate (FXAA adds a full-screen float target, because the image
-  pass no longer draws straight to the screen; about half that on a phone, whose targets are half-float — an estimate). The rig
+  CPU 4x, guard on; tennis as the control): frame p95 medians of 3 runs, today -> FXAA: 1v1 789 -> 761 ms, Dunk 976 -> 957, Venice 956 -> 708, the
+  story 652 -> 739 (tennis, the control, 820 ms, spread 82 ms): three places within the noise or faster, the story 87 ms slower,
+  just outside the control's spread; the guard settled at the same level (L2) on both sides; READY within
+  10 % everywhere (the story +7 % page, +9 % mode); texture memory +17 to +44 MB by the readout's estimate (FXAA adds a full-screen float target, because the image
+  pass no longer draws straight to the screen; about half that on a phone, whose targets are half-float — an estimate; the readout also keeps counting the targets of
+  each render scale the guard left behind, which look-world measured at about 20 MB in Venice, so part of the rise is one more stale
+  target per scale). The rig
   cannot give a phone's frame rate, so the owner's check decides: open a hoops game with `?aa=1` and with `?aa=0` on the phone,
   read PERF's frame p95 after 10 s of play in each, and if they match, set `PHONE_AA_DEFAULT` to 1.
 - `venue.courtDetailV2` **0** (group "Look · venues"; `visual/CourtSurface.ts` `COURT_DETAIL_V2`; URL `?lookon=courtdetail`): **the court's
