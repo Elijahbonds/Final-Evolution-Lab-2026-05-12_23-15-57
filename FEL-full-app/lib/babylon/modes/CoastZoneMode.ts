@@ -18,7 +18,7 @@
 // HIDDEN from the pickers: registered in MODES (so the probe bundles and /dev/mode can mount it) and NOT in
 // ENABLED_BABYLON_MODES; its page is /play/coast (unlisted, noindex), reached from Venice's pier (lib/adventure/coast/door.ts).
 
-import { TransformNode, Vector3 } from '@babylonjs/core';
+import { TransformNode, Vector3, type Scene } from '@babylonjs/core';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { CharacterPipeline } from '../core/characterPipeline';
@@ -37,19 +37,26 @@ import { devOrAgentHooks } from '@/lib/agentRunHooks';
 import { buildCoastWorld, COAST_DEEP_WATER_TURN_BACK, WaterEdge } from '@/lib/adventure/coast/zoneWorld';
 import { COAST_PREWARM_LATE, COAST_STREAM_ON, COAST_STREAM_SLICED, mountZoneView, type ZoneView, type ZoneViewStats } from '@/lib/adventure/coast/zoneView';
 import {
-  COAST_STREAM_FULL, COAST_STREAM_KEEP, COAST_STREAM_LOD, COAST_ZONE_GROW, ISLANDS, ZoneStreamer, pieceAt, setZoneGrow, zonePieces,
+  COAST_STREAM_FULL, COAST_STREAM_KEEP, COAST_STREAM_LOD, COAST_ZONE_GROW, DECKS, ISLANDS, ZONE_SPOTS, ZoneStreamer, pieceAt, setZoneGrow, terrainY, zonePieces,
 } from '@/lib/adventure/coast/zoneLayout';
 import { zoneUi } from '@/lib/adventure/coast/zoneUi';
 import { besidePlayer, COAST_PARTNER_CATCHUP_M, COAST_PARTNER_ON, COAST_PARTNER_STUCK_SEC, PartnerKeeper, zonePartner, type CatchupWhy } from '@/lib/adventure/coast/zonePartner';
 import { COAST_CREATURES_ON, COAST_LOG_MEET_M, COAST_LOG_SEEN_M, CreatureHerd } from '@/lib/adventure/coast/zoneCreatures';
 import { CreatureBodies, LogKeeper, mountPartnerBody, type PartnerBody } from '@/lib/adventure/coast/zoneLife';
 import { adventureSavePolicy } from '../adventure/save/policy';
-import { ALL_SPOTS, COAST_SPORTS_ON, COAST_TOWN_LOAD_AFTER_SEC, COAST_TOWN_ON, COAST_TOWNSFOLK, TOWNSFOLK, returnSpawnFor, sportSpotById, spotAtAll } from '@/lib/adventure/coast/zoneTown';
+import { ALL_SPOTS, COAST_SPORTS_ON, COAST_TOWN_LOAD_AFTER_SEC, COAST_TOWN_ON, COAST_TOWNSFOLK, TOWNSFOLK, returnSpawnFor, sportSpotById, spotAtAll, townSolids } from '@/lib/adventure/coast/zoneTown';
 import { mountZoneTownView, type ZoneTownView } from '@/lib/adventure/coast/zoneTownView';
 import { spotFromSearch } from '@/lib/adventure/coast/spotReturn';
 import { COAST_QUESTS_ON, questById, readQuests, withPlayed, withQuestTaken, withQuestsChecked } from '@/lib/adventure/coast/zoneQuests';
 import type { ZoneSpot } from '@/lib/adventure/coast/zoneLayout';
 import { signedOutVisitor } from '../core/visitor';   // the harness sets it from runMode's `guest` on every mount
+// improve pass phase 5 (coast.oceanBed): the sea bed and the shore, Venice's way (lib/adventure/coast/zoneSound.ts)
+import { SoundKit } from '../audio/SoundKit';
+import { playNature } from '../audio/natureSfx';
+import { COAST_OCEAN_BED, CoastSoundscape } from '@/lib/adventure/coast/zoneSound';
+// improve pass phase 9 (venue.camClearView): the camera keeps out of the boat, the houses, the palms and the rocks
+import { VENUE_CAM_CLEAR_VIEW, type CamBox } from '../adventure/host/camera';
+import { boxesNear, keepEyeClear, meshCamBoxes } from '../adventure/host/camBoxes';
 
 export const COAST_MODE_ID = 'coast_zone';
 /** The stick's basis latches while held (AdventureMode's rule): below this it lets go. */
@@ -86,6 +93,26 @@ interface St {
   questsOn: boolean;
   /** Phase F-lite: the zone's own frame cost, in parts (probes read the worst frames: where a hitch comes from). */
   cost: FrameCosts;
+  /** improve pass phase 5 (coast.oceanBed): the waves, the gulls, the steps; null with the knob off. */
+  sound: CoastSoundscape | null;
+  /** improve pass phase 9 (venue.camClearView): the solids' boxes (refreshed as props stream in), those near the player; null = off. */
+  cam: { all: CamBox[]; near: CamBox[]; sec: number; town: boolean; pulls: number } | null;
+}
+
+/** The clear view's solids are re-read this often (s): the palms and rocks stream in and out with the pieces. */
+const CAM_BOXES_EVERY = 1;
+/** Only solids this near the player (m) are tested each frame: the camera's follow distance is under 12 m. */
+const CAM_BOXES_NEAR = 24;
+const COAST_SOLID = /^coast_(prop_|boat$)/;
+
+/** The zone's solids for the clear view: the props and the boat as drawn, the town's houses and market wall, the boat sign. */
+function coastCamBoxes(scene: Scene, town: boolean): CamBox[] {
+  const all = meshCamBoxes(scene, (n) => COAST_SOLID.test(n));
+  if (town) for (const t of townSolids()) all.push({ minX: t.minX, maxX: t.maxX, minY: terrainY((t.minX + t.maxX) / 2, (t.minZ + t.maxZ) / 2) - 1, maxY: t.top + 2, minZ: t.minZ, maxZ: t.maxZ });
+  // the boat spot's sign: a billboard 4.2 × 1.1 m turning to face you (zoneView), so its box is its width both ways
+  const spot = ZONE_SPOTS[0], y = DECKS[0].y + 3.4;
+  all.push({ minX: spot.at[0] - 1 - 2.1, maxX: spot.at[0] - 1 + 2.1, minY: y - 0.55, maxY: y + 0.55, minZ: spot.at[1] - 2.1, maxZ: spot.at[1] + 2.1 });
+  return all;
 }
 
 /** The worst frames of the zone's update, by its parts (ms), with the time they ran (performance.now) and what streamed. */
@@ -110,6 +137,8 @@ export interface CoastProbe {
   /** Phase F-lite: the zone update's ten worst frames, by part; the town's loads (when they landed). */
   worstFrames: FrameCost[];
   townEvents: Array<{ what: string; at: number }>;
+  /** Phase 9: frames the clear view brought the eye in out of a solid (null: venue.camClearView off). */
+  camPulls: number | null;
 }
 let probeState: St | null = null;
 export function coastProbe(): CoastProbe | null {
@@ -123,6 +152,7 @@ export function coastProbe(): CoastProbe | null {
     logged: S.log.entries().filter((e) => e.level > 0).length, logStores: S.log.stores,
     worstFrames: S.cost.worst.map((c) => ({ ...c })),
     townEvents: S.town ? S.town.events.map((e) => ({ ...e })) : [],
+    camPulls: S.cam ? S.cam.pulls : null,
   };
 }
 
@@ -236,8 +266,14 @@ export const CoastZoneMode: ModeDefinition = {
       host, mapper, view, me, body, move, edge: new WaterEdge(world.spawn.pos), streamer,
       stickL: { x: 0, y: 0 }, stickR: { x: 0, y: 0 }, latchedYaw: null, preset: 'runner', rigKey: '', spotSec: SPOT_EVERY,
       partner, partnerEdge: host.partnerActor ? new WaterEdge(host.partnerActor.pos) : null, keeper: new PartnerKeeper(),
-      herd, creatures, log, creaturesShown: 0, town: null, spots: ALL_SPOTS, questsOn: false, cost: new FrameCosts(),
+      herd, creatures, log, creaturesShown: 0, town: null, spots: ALL_SPOTS, questsOn: false, cost: new FrameCosts(), sound: null,
+      cam: feel('venue.camClearView', VENUE_CAM_CLEAR_VIEW) >= 0.5 ? { all: [], near: [], sec: CAM_BOXES_EVERY, town: townOn, pulls: 0 } : null,
     };
+    // the sea, not the stadium: the zone asks for its bed in load (so the harness's mood bed stays off), then the shore ticks in update
+    if (feel('coast.oceanBed', COAST_OCEAN_BED) >= 0.5) {
+      SoundKit.startAmbient('ocean');
+      S.sound = new CoastSoundscape((name, o) => { if (name === 'wave' || name === 'gull') playNature(name, o); else SoundKit.play(name, o); });
+    }
     zoneUi.setLog(log.entries(), null);
     // back from a spot's game: it counts as played there (the beach net's quest)
     if (back) log.update((sv) => withPlayed(sv, back, (id) => !!sportSpotById(id)));
@@ -314,6 +350,12 @@ export const CoastZoneMode: ModeDefinition = {
     TMP_SUBJECT.set(me.pos.x, me.pos.y, me.pos.z);
     TMP_VEL.set(me.vel.x, me.vel.y, me.vel.z);
     ctx.camDirector.update(TMP_SUBJECT, TMP_VEL, null);
+    if (S.cam) {
+      S.cam.sec += dt;
+      if (S.cam.sec >= CAM_BOXES_EVERY) { S.cam.sec = 0; S.cam.all = coastCamBoxes(ctx.scene, S.cam.town); }
+      if (keepEyeClear(ctx.camera, me.pos, boxesNear(S.cam.all, me.pos.x, me.pos.z, CAM_BOXES_NEAR, S.cam.near))) S.cam.pulls++;
+    }
+    if (S.sound) { ctx.camDirector.forwardFlatToRef(TMP_FWD); S.sound.update(dt, { x: me.pos.x, z: me.pos.z, speed: Math.hypot(me.vel.x, me.vel.z), grounded: me.grounded }, Math.atan2(TMP_FWD.x, TMP_FWD.z)); }
     const t5 = performance.now();
     S.view.frame(ctx.camera.position.x, ctx.camera.position.z, dt);
     const t6 = performance.now();

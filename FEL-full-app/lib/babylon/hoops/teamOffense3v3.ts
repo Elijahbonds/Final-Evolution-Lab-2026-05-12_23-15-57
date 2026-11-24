@@ -26,6 +26,7 @@ import { profileFor, type Tier, type TierProfile } from '../core/Difficulty';
 import { driveLateral, type DriveIntent } from '../core/DriveLine';
 import { Vector3 } from '@babylonjs/core';
 import { KIT_WEIGHTS, KIT_CROSSES, moveFrame, pickWeighted, intoBody, type KitMove, type RivalAction } from './rivalOffense';
+import { screenerRollOn, rollScoreOn, rollLeadPoint, ROLL_LEAD_OPEN_M, ROLL_CATCH_RIM_M } from './screenerRoll';   // hoops-gap: the handler looks for the roll man
 
 /** A planar point. */
 export interface XZ { x: number; z: number }
@@ -66,6 +67,28 @@ const screenWaitSec = (): number => feel('hoops.rivalScreenWaitSec', RIVAL_SCREE
 const budgetSec = (): number => feel('hoops.rivalBudgetSec', RIVAL_BUDGET_SEC);
 const attackPullUpSec = (): number => feel('hoops.rivalAttackPullUpSec', RIVAL_ATTACK_PULLUP_SEC);
 const pullUpMaxM = (): number => feel('hoops.rivalPullUpMaxM', RIVAL_PULLUP_MAX_M);
+/** hoops-gap (lane/hoops-gap, owner 2026-11-23 "close the gap"): SHOT IQ for the rival team. Measured before it (rival-sim 3v3, PRO,
+ *  three seeds × 300 possessions): 80 % of their shots were pull-ups held in front, every one at a contest of 0.5 or more (median 0.83),
+ *  0.56 points a shot, while their catch-and-shoot (median contest 0.45) went in 40 %. Held in front, the planner pulled up FIRST and
+ *  only kicked to the open man when it could not; at the rim it went up into whoever stood there. With this on: (1) held in front, he
+ *  swings it to a team-mate his man must close out on (SWING_OPEN_M, a clear lane, a pass left; no roll — the floor decides), else
+ *  (2) steps back once for room (STEPBACK_SEC at STEPBACK_MPS, away from his man), then pulls up; (3) at the rim with a body in his face
+ *  (HELP_FACE_M), the kick to the open man (the release's kick read). Measured (rival-sim 3v3, PRO, a defender who sees the ball 220 ms
+ *  late, seeds 7 / 11 / 23 × 300): points a shot 0.627 → 0.666, a possession 0.507 → 0.530, passes 0.28 → 0.44, catch-and-shoots
+ *  70 → 149 of 900. 0 = the release's order exactly. Knob `hoops.aiShotIqOn`. */
+export const AI_SHOT_IQ_ON = 0;
+export const aiShotIqOn = (): boolean => feel('hoops.aiShotIqOn', AI_SHOT_IQ_ON) >= 0.5;
+/** The shot-IQ step-back: this long (s), at this pace (m/s) away from his man, then the pull-up. Taken only when his man is within
+ *  SMOTHER_M (a pull-up from there is a contest of about 0.5 or more). */
+export const STEPBACK_SEC = 0.38, STEPBACK_MPS = 3.2, SMOTHER_M = 1.6;
+/** The step-back pull-up may be taken this far past the pull-up range (m): the step itself carries him out. */
+export const STEPBACK_RANGE_EXTRA_M = 1.0;
+/** The shot-IQ swing: a team-mate this far from his nearest defender is worth the pass (his man must close out; the release's open read
+ *  KICK_OPEN_M 2.2 is the catch-and-shoot man). */
+export const SWING_OPEN_M = 1.5;
+/** Drive and kick: a body (his man or the help) this close in front of him at the gather sends the ball out to an open man. */
+export const HELP_FACE_M = 1.4;
+
 /** hoops-p06 (phase 6 "flow and pace": the 3v3 rival possession median 7.3 s at PRO against the plan's 8–16 s band). The possession's
  *  FIRST touch (the check, a make, a board — not a swing's catch) works his man this much longer at the top (× the tier's probeK), with one
  *  more probe move to fill it. FLAG: it is the same lever as `hoops.rivalProbeSec`, on the first touch only. Knob `hoops.teamSizeUpSec`;
@@ -138,7 +161,7 @@ export class TeamOffense3v3 {
   private phase: HandlerPhase = 'set'; private phaseT = 0; private fresh = true;
   private probeFor = 0; private movesLeft = 0; private move: KitMove | null = null; private moveT = 0; private moveSide: 1 | -1 = 1; private nextMoveAt = 0;
   private screenMate = -1; private useSide: 1 | -1 = 1; private containedT = 0; private kickRead = false; private gatherKind: 'rim' | 'pullup' = 'rim';
-  private attackMoves = 0; private intent: DriveIntent = 'around'; private attackFrom: XZ = ZERO; private attackLen = 1; private tellT = 0;
+  private attackMoves = 0; private stepT = -1; private stepDir: XZ = ZERO; private steppedBack = false; private intent: DriveIntent = 'around'; private attackFrom: XZ = ZERO; private attackLen = 1; private tellT = 0;
   constructor(readonly tier: Tier, private readonly R: TeamReads, private rng: () => number = Math.random) { this.tt = TEAM_TIER[tier]; this.profile = profileFor(tier); }
 
   /** A new possession (their ball from the check / a make / a board). */
@@ -162,7 +185,7 @@ export class TeamOffense3v3 {
   private go(p: HandlerPhase): void { this.phase = p; this.phaseT = 0; }
 
   step(dt: number, v: TeamView): HandlerStep {
-    this.elapsed += dt; this.phaseT += dt;
+    this.elapsed += dt; this.phaseT += dt; this.lastDt = dt;
     const out: HandlerStep = { wish: ZERO, phase: this.phase, action: null, move: null, moveSide: 1, callScreen: -1, pass: -1, gather: null, release: false, k: 0.05, exposure: DRIVE_EXPOSURE };
     const tx = v.rim.x - v.handler.x, tz = v.rim.z - v.handler.z, rimDist = len(tx, tz) || 1;
     const dir = { x: tx / rimDist, z: tz / rimDist }, perp = { x: -dir.z, z: dir.x };
@@ -179,6 +202,7 @@ export class TeamOffense3v3 {
       case 'set': {
         out.wish = ZERO;
         // a catch inside the screen's range (the roll man, a cutter) attacks at once; a fresh possession in the paint is taken back first
+        if (!this.fresh && rollScoreOn() && rimDist < ROLL_CATCH_RIM_M) { this.startAttack(v); out.action = this.say('drive'); break; }   // hoops-gap: a roll catch at the rim goes up at once
         if (this.phaseT >= SET_SEC) { if (!this.fresh && rimDist < TEAM_SCREEN_MIN_RIM_M + 0.5) { this.startAttack(v); out.action = this.say('drive'); } else this.go(this.fresh && rimDist < takeBackM() ? 'clear' : 'probe'); }
         break;
       }
@@ -255,6 +279,7 @@ export class TeamOffense3v3 {
           if (this.tt.readsScreen && s.phase === 'roll' && mate && this.passesLeft > 0 && inLane && this.R.openness(mate, v.defenders) >= this.R.KICK_OPEN_M && this.R.laneClear(v.handler, mate, v.defenders)) {
             out.pass = this.screenMate; break;
           }
+          if (this.rollOpen(v)) { out.pass = this.screenMate; break; }   // hoops-gap: the roll man, open — whoever his own man went to
           if (passed || this.phaseT > USE_MAX_SEC) this.startAttack(v);
         } else this.startAttack(v);
         break;
@@ -267,6 +292,14 @@ export class TeamOffense3v3 {
         const ed = { x: ex / el, z: ez / el }, ep = { x: -ed.z, z: ed.x };
         const sp = attackMps(this.tier);
         this.containedT = inLane ? this.containedT + dt : Math.max(0, this.containedT - dt * 0.5);
+        if (this.stepT >= 0) {
+          // hoops-gap shot IQ: the step-back off a man in his chest, then the pull-up from where it lands
+          this.stepT += dt;
+          out.wish = { x: this.stepDir.x * STEPBACK_MPS, z: this.stepDir.z * STEPBACK_MPS }; out.exposure = DRIVE_EXPOSURE;
+          if (this.stepT >= STEPBACK_SEC) { this.stepT = -1; this.gatherKind = 'pullup'; this.go('gather'); out.gather = 'pullup'; }
+          out.k = Math.min(1 - (TEAM_GATHER_TELL_SEC + 0.01), 0.1 + 0.8 * k);
+          break;
+        }
         if (this.move) {
           // a move to beat the man in front (the 1v1 kit's shape, full size): it works if his body leaves the lane
           this.moveT += dt;
@@ -292,6 +325,7 @@ export class TeamOffense3v3 {
             }
           }
         }
+        if (!this.move && this.rollOpen(v)) { out.pass = this.screenMate; break; }   // hoops-gap: still rolling after the use, and open
         // the kick read: once, cut off inside the read window with an open man
         if (!this.move && !this.kickRead && k >= this.R.KICK_READ_FROM_K && k <= this.R.KICK_READ_TO_K && this.R.cutOff(v.handler, ed, v.defenders)) {
           this.kickRead = true;
@@ -300,9 +334,25 @@ export class TeamOffense3v3 {
         }
         // still held in front with no moves left: the pull-up (inside the arc), the kick-out, or — late in the budget — a forced shot
         const stuck = !this.move && this.containedT >= attackPullUpSec() && (this.attackMoves === 0 || this.containedT >= attackPullUpSec() * 2);
+        if (stuck && aiShotIqOn()) {
+          // hoops-gap shot IQ: the open man first (no roll — the floor read decides), then room for the jumper, then the jumper
+          if (this.passesLeft > 0) { const pick = this.swingTarget(v); if (pick >= 0) { out.pass = pick; break; } }
+          if (man && manD < SMOTHER_M && !this.steppedBack && rimDist <= pullUpMaxM() + STEPBACK_RANGE_EXTRA_M - 0.6 && rimDist > 2.4) {
+            const ax2 = v.handler.x - man.x, az2 = v.handler.z - man.z, al = len(ax2, az2) || 1;
+            this.steppedBack = true; this.stepT = 0; this.stepDir = { x: ax2 / al, z: az2 / al };
+            out.wish = { x: this.stepDir.x * STEPBACK_MPS, z: this.stepDir.z * STEPBACK_MPS }; out.action = this.say('stepback');
+            break;
+          }
+          if (rimDist <= pullUpMaxM() + (this.steppedBack ? STEPBACK_RANGE_EXTRA_M : 0) && rimDist > 2.4) { this.gatherKind = 'pullup'; this.go('gather'); out.gather = 'pullup'; break; }
+        }
         if (stuck && rimDist <= pullUpMaxM() && rimDist > 2.4) { this.gatherKind = 'pullup'; this.go('gather'); out.gather = 'pullup'; break; }
         if (stuck && this.passesLeft > 0) { const pick = this.R.kickTarget(v.handler, v.mates, v.defenders); if (pick >= 0) { out.pass = pick; break; } }
         if (stuck && this.elapsed >= this.budget + FORCED_AFTER_SEC) { this.gatherKind = 'pullup'; this.go('gather'); out.gather = 'pullup'; break; }
+        // hoops-gap shot IQ: DRIVE AND KICK — at the rim with a body in his face (his man or the help), the open man gets it (the help
+        // left him); the release went up into the crowd every time
+        if (el <= sp * TEAM_GATHER_TELL_SEC + 0.05 && aiShotIqOn() && this.passesLeft > 0 && manD < HELP_FACE_M && along > 0) {
+          const pick = this.R.kickTarget(v.handler, v.mates, v.defenders); if (pick >= 0) { out.pass = pick; break; }
+        }
         if (el <= sp * TEAM_GATHER_TELL_SEC + 0.05) { this.move = null; this.gatherKind = 'rim'; this.go('gather'); out.gather = 'rim'; }
         out.k = Math.min(1 - (TEAM_GATHER_TELL_SEC + 0.01), 0.1 + 0.8 * k);
         break;
@@ -328,6 +378,35 @@ export class TeamOffense3v3 {
     if (this.phase === 'gather' || this.phase === 'done' || this.phase === 'set') out.exposure = 0;
     return out;
   }
+  /** hoops-gap shot IQ: the man to swing it to when held in front — the most open team-mate past SWING_OPEN_M of his man (a catch his
+   *  man has to close out on), at least the kick's pass length away, with a clear lane; −1 = none. */
+  private swingTarget(v: TeamView): number {
+    let best = -1, bestOpen = -Infinity;
+    v.mates.forEach((m, i) => {
+      const open = this.R.openness(m, v.defenders);
+      if (open < SWING_OPEN_M || len(m.x - v.handler.x, m.z - v.handler.z) < 2.5 || !this.R.laneClear(v.handler, m, v.defenders)) return;
+      if (open > bestOpen) { bestOpen = open; best = i; }
+    });
+    return best;
+  }
+  /** hoops-gap (`hoops.screenerRollOn`): the man who set this touch's screen is ROLLING, open (KICK_OPEN_M) with a clear lane, a pass is
+   *  left, and this tier reads the screen. Without the knob, false (the release's read stays: the roll pass only with my man in my lane). */
+  private rollOpen(v: TeamView): boolean {
+    if (!screenerRollOn() || !this.tt.readsScreen || this.passesLeft <= 0 || this.screenMate < 0) return false;
+    const s = v.screen; const mate = v.mates[this.screenMate];
+    if (!s || s.phase !== 'roll' || s.idx !== this.screenMate || !mate) { this.rollPrev = null; return false; }
+    const prev = this.rollPrev; this.rollPrev = { x: mate.x, z: mate.z };
+    if (rollScoreOn()) {
+      // hoops-gap round 2: the leading pass — read him where the ball will meet him
+      const vel = prev && this.lastDt > 1e-4 ? { x: (mate.x - prev.x) / this.lastDt, z: (mate.z - prev.z) / this.lastDt } : { x: 0, z: 0 };
+      const lead = rollLeadPoint(v.handler, mate, vel); this.rollLead = lead;
+      return this.R.openness(lead, v.defenders) >= ROLL_LEAD_OPEN_M && this.R.laneClear(v.handler, lead, v.defenders);
+    }
+    return this.R.openness(mate, v.defenders) >= this.R.KICK_OPEN_M && this.R.laneClear(v.handler, mate, v.defenders);
+  }
+  /** hoops-gap round 2: the roll man last frame (his speed for the lead), the frame's dt, and the spot the last roll read led him to. */
+  private rollPrev: XZ | null = null; private lastDt = 1 / 60;
+  rollLead: XZ | null = null;
   /** The finish this gather is for. */
   get gatherFor(): 'rim' | 'pullup' { return this.gatherKind; }
 
@@ -349,7 +428,7 @@ export class TeamOffense3v3 {
   private startAttack(v: TeamView): void {
     this.attackFrom = { x: v.handler.x, z: v.handler.z };
     this.attackLen = Math.max(1, len(v.rim.x - v.handler.x, v.rim.z + ATTACK_END_DZ - v.handler.z));
-    this.containedT = 0; this.kickRead = false; this.move = null; this.moveT = 0; this.attackMoves = this.tt.movesPerProbe; this.go('attack');
+    this.containedT = 0; this.kickRead = false; this.move = null; this.moveT = 0; this.attackMoves = this.tt.movesPerProbe; this.stepT = -1; this.steppedBack = false; this.go('attack');
   }
 }
 /** On the attack, held in front this long before a move (s); past the budget by this, a shot is forced from anywhere (s). */
