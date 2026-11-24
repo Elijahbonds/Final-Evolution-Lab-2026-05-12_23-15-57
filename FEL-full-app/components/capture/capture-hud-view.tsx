@@ -7,7 +7,7 @@
 // same transitions. Inline styles so a headless render (no Tailwind) still shows the button,
 // the stream frame, and the note.
 
-import { useEffect, useReducer, useRef, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useEffect, useReducer, useRef, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import type { Aspect } from '@/lib/capture/exportLayout';
 import { OVERFLOW_CLOSED, hudIndicator, overflowStep, type OverflowState } from '@/lib/capture/overflowMenu';
 import type { RecPhase } from '@/lib/capture/recorderMachine';
@@ -55,6 +55,12 @@ export interface CaptureHudViewProps {
   onFilm: () => void;
   /** Tests and story-style renders only: start with the menu open. Play always starts closed. */
   defaultMenuOpen?: boolean;
+  /**
+   * look-screens phase A1 (ui.compactGameHeader, lib/ui/compactHeader.ts): the game header's tools (BODY, the PRQ line, the
+   * graphics choice, full screen) on a phone held upright. Drawn under the capture items while the menu is open; kept MOUNTED
+   * (hidden) while it is closed, so body play's camera hold and its card survive the menu closing. Absent = today's menu.
+   */
+  gameTools?: ReactNode;
 }
 
 /** The red dot that never hides: REC while a take records, LIVE while stream mode is on. */
@@ -125,6 +131,7 @@ export function CaptureHudView(props: CaptureHudViewProps) {
         <button type="button" data-testid="capture-show" onClick={props.onShow} style={btn}>
           Show controls
         </button>
+        {props.gameTools ? <div hidden style={{ display: 'none' }}>{props.gameTools}</div> : null}
       </div>
     );
   }
@@ -153,6 +160,53 @@ export function CaptureHudView(props: CaptureHudViewProps) {
     dispatch({ type: 'item-activated' });
   };
 
+  // The capture items, drawn as today's menu (or, with the game's tools, as the top of the A1 panel).
+  const captureItems = (style: CSSProperties) => (
+    <div role="menu" aria-label="Capture and stream controls" data-testid="capture-menu" style={style} onKeyDown={onMenuKeyDown}>
+        <button type="button" role="menuitem" data-testid="capture-record" aria-label={recording ? 'Stop recording' : 'Start recording'} onClick={activate(props.onRecord)} style={recording ? { ...recOn, textAlign: 'left', width: '100%' } : item}>
+          {recording ? 'Stop' : 'Record'}
+        </button>
+        <button type="button" role="menuitem" data-testid="capture-replay" aria-label={buffering || recording ? 'Save the last 30 seconds' : 'Keep the last 30 seconds'} onClick={activate(props.onReplay)} style={buffering ? { ...on, textAlign: 'left', width: '100%' } : item}>
+          {buffering || recording ? 'Save 30s' : 'Last 30s'}
+        </button>
+        <button type="button" role="menuitem" data-testid="capture-aspect-916" aria-label="Portrait 9:16 export shape" onClick={activate(() => props.onAspect('9:16'))} style={props.aspect === '9:16' ? { ...on, textAlign: 'left', width: '100%' } : item}>
+          9:16
+        </button>
+        <button type="button" role="menuitem" data-testid="capture-aspect-169" aria-label="Landscape 16:9 export shape" onClick={activate(() => props.onAspect('16:9'))} style={props.aspect === '16:9' ? { ...on, textAlign: 'left', width: '100%' } : item}>
+          16:9
+        </button>
+        {props.canShareTake ? (
+          <button type="button" role="menuitem" data-testid="capture-share-take" aria-label="Share the take" onClick={activate(() => props.onShare('take'))} disabled={props.busy} style={shareItem}>
+            Share take
+          </button>
+        ) : null}
+        {props.canShareReplay ? (
+          <button type="button" role="menuitem" data-testid="capture-share-replay" aria-label="Share the last 30 seconds" onClick={activate(() => props.onShare('replay'))} disabled={props.busy} style={shareItem}>
+            Share 30s
+          </button>
+        ) : null}
+        {!hasClip ? (
+          <button type="button" role="menuitem" data-testid="capture-share" aria-label="Share the clip" onClick={activate(() => props.onShare('take'))} disabled style={item}>
+            Share
+          </button>
+        ) : null}
+        {hasClip || props.phase === 'error' ? (
+          <button type="button" role="menuitem" data-testid="capture-discard" aria-label="Discard the clip" onClick={activate(props.onDiscard)} style={item}>
+            Discard
+          </button>
+        ) : null}
+        <button type="button" role="menuitemcheckbox" data-testid="capture-stream" aria-label={props.streamOn ? 'Turn stream mode off' : 'Turn stream mode on'} aria-checked={props.streamOn} onClick={activate(props.onStream)} style={props.streamOn ? { ...on, textAlign: 'left', width: '100%' } : item}>
+          {props.streamOn ? 'Stream on' : 'Stream'}
+        </button>
+        {props.dunkFilm ? (
+          <button type="button" role="menuitem" data-testid="capture-film" aria-label="Film a dunk with the camera" onClick={activate(props.onFilm)} style={item}>Film dunk</button>
+        ) : null}
+        {props.streamOn ? (
+          <button type="button" role="menuitem" data-testid="capture-hide" aria-label="Hide the capture controls" onClick={activate(props.onHide)} style={item}>Hide controls</button>
+        ) : null}
+    </div>
+  );
+
   return (
     <div ref={rootRef} data-testid="capture-hud" style={{ ...bar, position: 'relative' }}>
       {indicator}
@@ -174,51 +228,14 @@ export function CaptureHudView(props: CaptureHudViewProps) {
       >
         ⋯
       </button>
-      {menu.open ? (
-        <div role="menu" aria-label="Capture and stream controls" data-testid="capture-menu" style={menuStyle} onKeyDown={onMenuKeyDown}>
-          <button type="button" role="menuitem" data-testid="capture-record" aria-label={recording ? 'Stop recording' : 'Start recording'} onClick={activate(props.onRecord)} style={recording ? { ...recOn, textAlign: 'left', width: '100%' } : item}>
-            {recording ? 'Stop' : 'Record'}
-          </button>
-          <button type="button" role="menuitem" data-testid="capture-replay" aria-label={buffering || recording ? 'Save the last 30 seconds' : 'Keep the last 30 seconds'} onClick={activate(props.onReplay)} style={buffering ? { ...on, textAlign: 'left', width: '100%' } : item}>
-            {buffering || recording ? 'Save 30s' : 'Last 30s'}
-          </button>
-          <button type="button" role="menuitem" data-testid="capture-aspect-916" aria-label="Portrait 9:16 export shape" onClick={activate(() => props.onAspect('9:16'))} style={props.aspect === '9:16' ? { ...on, textAlign: 'left', width: '100%' } : item}>
-            9:16
-          </button>
-          <button type="button" role="menuitem" data-testid="capture-aspect-169" aria-label="Landscape 16:9 export shape" onClick={activate(() => props.onAspect('16:9'))} style={props.aspect === '16:9' ? { ...on, textAlign: 'left', width: '100%' } : item}>
-            16:9
-          </button>
-          {props.canShareTake ? (
-            <button type="button" role="menuitem" data-testid="capture-share-take" aria-label="Share the take" onClick={activate(() => props.onShare('take'))} disabled={props.busy} style={shareItem}>
-              Share take
-            </button>
-          ) : null}
-          {props.canShareReplay ? (
-            <button type="button" role="menuitem" data-testid="capture-share-replay" aria-label="Share the last 30 seconds" onClick={activate(() => props.onShare('replay'))} disabled={props.busy} style={shareItem}>
-              Share 30s
-            </button>
-          ) : null}
-          {!hasClip ? (
-            <button type="button" role="menuitem" data-testid="capture-share" aria-label="Share the clip" onClick={activate(() => props.onShare('take'))} disabled style={item}>
-              Share
-            </button>
-          ) : null}
-          {hasClip || props.phase === 'error' ? (
-            <button type="button" role="menuitem" data-testid="capture-discard" aria-label="Discard the clip" onClick={activate(props.onDiscard)} style={item}>
-              Discard
-            </button>
-          ) : null}
-          <button type="button" role="menuitemcheckbox" data-testid="capture-stream" aria-label={props.streamOn ? 'Turn stream mode off' : 'Turn stream mode on'} aria-checked={props.streamOn} onClick={activate(props.onStream)} style={props.streamOn ? { ...on, textAlign: 'left', width: '100%' } : item}>
-            {props.streamOn ? 'Stream on' : 'Stream'}
-          </button>
-          {props.dunkFilm ? (
-            <button type="button" role="menuitem" data-testid="capture-film" aria-label="Film a dunk with the camera" onClick={activate(props.onFilm)} style={item}>Film dunk</button>
-          ) : null}
-          {props.streamOn ? (
-            <button type="button" role="menuitem" data-testid="capture-hide" aria-label="Hide the capture controls" onClick={activate(props.onHide)} style={item}>Hide controls</button>
-          ) : null}
+      {props.gameTools ? (
+        // A1: one panel, two parts — the capture items (a role="menu", only while open, exactly as before) and the game's tools
+        // (always mounted; the panel is hidden while closed).
+        <div data-testid="capture-panel" style={{ ...menuStyle, display: menu.open ? 'flex' : 'none', maxHeight: 'calc(100dvh - 140px)', overflowY: 'auto' }}>
+          {menu.open ? captureItems({ display: 'flex', flexDirection: 'column', gap: 4 }) : null}
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.12)', marginTop: 4, paddingTop: 6 }}>{props.gameTools}</div>
         </div>
-      ) : null}
+      ) : menu.open ? captureItems(menuStyle) : null}
       {props.codecNote ? <p data-testid="capture-codec" style={{ margin: 0, flexBasis: '100%', fontSize: 12, color: '#FFD700' }}>{props.codecNote}</p> : null}
       {props.note ? <p data-testid="capture-note" style={{ margin: 0, flexBasis: '100%', fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>{props.note}</p> : null}
       {props.streamOn ? <p data-testid="stream-note" style={{ margin: 0, flexBasis: '100%', fontSize: 12, lineHeight: 1.35, color: 'rgba(255,255,255,0.65)' }}>{RTMP_NOTE}</p> : null}

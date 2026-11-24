@@ -5,6 +5,8 @@ import { authOptions } from '@/lib/auth';
 import { loginPath } from '@/lib/auth/safeNext';
 import { TabPage } from '@/components/shell/tab-page';
 import { DoorsRow } from '@/components/shell/doors-row';
+import { CompactDoors } from '@/components/shell/compact-doors';   // look-screens A3
+import { compactAppHeader } from '@/lib/ui/firstRun';
 import { PlayShelf } from '@/components/shell/play-shelf';
 import { SHELF_MODE_COUNT } from '@/lib/nav/families';
 import { PrimaryCta } from '@/components/ui/fel/primary-cta';
@@ -59,7 +61,9 @@ export default async function PlayPage() {
           </div>
         ),
         chips: (
-          <>
+          // LOOK-SCREENS A3 (ui.compactAppHeader): on a phone the doors are a two-column grid (they wrapped in ragged rows); wider, the
+          // grid steps aside (display: contents) and they flow in the hero's row as before
+          <CompactDoors on={compactAppHeader()}>
             {/* MULTIPLAYER (2026-10-06): the couch — one screen, phones and pads, friends join by QR. */}
             {veniceDoorOn() && <Chip href={VENICE_DOOR_HREF} prefetch={false} testId="play-venice-entry" icon={<MapPin aria-hidden className="h-4 w-4 text-fel-cyan" />}>{t('play.venice')}</Chip>}
             {arenaOn() && <Chip href={ARENA_HREF} prefetch={false} testId="play-arena-entry" icon={<Atom aria-hidden className="h-4 w-4 text-fel-cyan" />}>{t('play.arena')}</Chip>}
@@ -69,7 +73,7 @@ export default async function PlayPage() {
             <Chip href={MEASURE_VERTICAL_HREF} testId="play-vertical-entry" icon={<ArrowUpFromLine aria-hidden className="h-4 w-4 text-fel-cyan" />}>{t('play.vertical')}</Chip>
             {/* SCREEN-EASY (2026-10-28): the full movement screen's front door, one tap from the signed-in home */}
             <Chip href={FULL_SCREEN_HREF} testId="play-screen-entry" icon={<ScanLine aria-hidden className="h-4 w-4 text-fel-cyan" />}>{t('play.screen')}</Chip>
-          </>
+          </CompactDoors>
         ),
       }}
     >

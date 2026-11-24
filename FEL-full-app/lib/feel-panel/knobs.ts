@@ -2448,6 +2448,42 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/ui/touchTargets.ts TOUCH_TARGETS_44',
     hint: 'On: the Venice first-visit hint sits under the mini-map, clear of DASH and JUMP; the dunk MIX, MC and CC chips, the story SKIP and choices and the workout tick boxes each get a tap box of at least 44 px (same look, same words). Off: each as before.',
   },
+  // ── lane/look-screens (2026-11-24, docs/LOOK-PASS-AUDIT.md lane A; owner: "Let's do a pass where we improve how things look.") ──
+  {
+    id: 'ui.compactGameHeader', label: 'Phone upright: one-row game header, its tools in the dots menu (1) / the wrapping header (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',
+    source: 'lib/ui/compactHeader.ts COMPACT_GAME_HEADER',
+    hint: 'Phase A1. On a phone held upright the game header is one row (back, title, pause); BODY, the PRQ line, the graphics choice and full screen move into the dots menu on the stage, and the PRQ line there says Not measured yet instead of a NOT MEASURED badge. Sideways, desktop and the stream view are unchanged. Off: the header wraps to three rows, as before.',
+  },
+  {
+    id: 'ui.hudZonesUpright', label: 'Phone upright, hoops: one HUD layout - lines under the score, the hint in the deck, the rest in the dots menu (1) / as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',
+    source: 'lib/ui/hudZones.ts HUD_ZONES_UPRIGHT',
+    hint: 'Phase A2. On a phone held upright the hoops HUD keeps off the players and the rim: the call, the MC line and the shot meter hang under the score row; in 1v1 the hint sits in the deck where the empty d-pad was (gone in 1v1 and 3v3: those modes read no d-pad); the Dunk field board, its prop, specials and signature chips and the MIX, MC and CC switches move into the dots menu. Sideways and desktop unchanged. Off: the upright HUD as before.',
+  },
+  {
+    id: 'ui.deckFadeOverBody', label: 'Phone upright: the action buttons drawn see-through (opacity; 1 = solid, as before)', def: 1, min: 0.35, max: 1, step: 0.05, unit: '', group: 'Screens · phone',
+    source: 'lib/ui/hudZones.ts DECK_FADE_OVER_BODY',
+    hint: 'Phase A2, ships OFF (1). Below 1 the upright touch deck draws its action buttons (the diamond and TURBO) at this opacity so a player behind them shows through. It does not know where the players are, so it fades always: a look call for the owner. 1 = the solid deck, as before.',
+  },
+  {
+    id: 'ui.placeLoadingCard', label: 'Venice, the Coast and the arena load on the branded card (1) / on a black screen with one line (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',
+    source: 'lib/ui/placeLoading.ts PLACE_LOADING_CARD',
+    hint: 'Phase A3. While Venice, the Coast or the Physics Arena builds, the start screen look every hoops game has: the venue art that ships, the place name, the loading line word for word and a bar. Drawn by the shared play layout until the place is ready, or steps aside for its error line. Off: the black screen and one line, as before.',
+  },
+  {
+    id: 'ui.firstRunCard', label: 'Try page birth date on the sign-up card: crest, panel and glow (1) / the bare form (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',
+    source: 'lib/ui/firstRun.ts FIRST_RUN_CARD',
+    hint: 'Phase A3, ships OFF. Same words, same age rule. A look call for the owner: on the phone rig the page first painted a little later with it (median 24 percent, inside the run to run noise of the other pages but over the 10 percent bar). Not a play page, so the panel cannot change it: the shipped value, changed by a commit.',
+  },
+  {
+    id: 'ui.compactAppHeader', label: 'Phone: the app top bar level ring only with a number; Play doors in two columns (1) / as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',
+    source: 'lib/ui/firstRun.ts COMPACT_APP_HEADER',
+    hint: 'Phase A3. The PRQ ring is drawn once it has a number (never an empty ring and a dash), and the Play screen six doors are an even two-column grid on a phone. Wider screens unchanged. Not a play page: the shipped value, changed by a commit.',
+  },
+  {
+    id: 'ui.cardOverlapFixes', label: 'USB line in the dots menu upright, end title balanced, home fits sideways, sign-in glow not cut (1) / as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',
+    source: 'lib/ui/firstRun.ts CARD_OVERLAP_FIXES',
+    hint: 'Phase A3. Before play on an upright phone the USB controller line sat on the loading card venue line: it is in the dots menu there (same words). The results card title wraps balanced, so no word is left alone. The home page fits a phone held sideways (PLAY NOW on the first screen) and the sign-in card glow is no longer cut. Off: as before.',
+  },
   {
     id: 'try.prefetchDunk', label: 'Try page: load the first dunk while the birth date is asked (1) / only after the answer (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',
     source: 'lib/try/prefetchDunk.ts TRY_PREFETCH_DUNK',

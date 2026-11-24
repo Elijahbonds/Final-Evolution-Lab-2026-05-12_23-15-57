@@ -19,6 +19,7 @@
 // action row and its focus grid; `sideCards` (lane/knowledge-feed's card) render under the rewards — any element inside
 // marked `data-end-focus="<id>"` is reachable by pad and keyboard.
 
+import { cardOverlapFixes } from '@/lib/ui/firstRun';   // look-screens A3: the title's balanced wrap
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
@@ -431,6 +432,8 @@ export function EndScreen(props: EndScreenProps) {
                 style={{
                   willChange: instant ? undefined : 'transform, opacity',
                   fontSize: longHead ? 'clamp(24px, min(calc(2.4vw + 1vh), 8vh), 68px)' : 'clamp(28px, min(calc(4vw + 1vh), 11vh), 112px)',
+                  // look-screens A3 (ui.cardOverlapFixes): a balanced wrap, so a long title never leaves one word alone on its last line
+                  ...(cardOverlapFixes() ? { textWrap: 'balance' } : {}),
                   color: won ? '#FFFFFF' : 'rgba(255,255,255,0.88)',
                   textShadow: won ? '0 0 30px rgba(0,229,255,0.45), 0 0 70px rgba(0,229,255,0.2)' : 'none',
                 }}

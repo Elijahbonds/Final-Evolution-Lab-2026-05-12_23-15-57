@@ -28,6 +28,7 @@ import { useMenuFocus } from '@/components/shell/use-menu-focus';
 import { useMotionAttr } from '@/components/ui/fel/use-motion-attr';
 import { ringGeometry } from '@/components/ui/fel/stat-ring';
 import { t } from '@/lib/i18n';
+import { compactAppHeader } from '@/lib/ui/firstRun';   // look-screens A3: the phone's rail is one row
 
 // QA P0-01: the chip prints the MEASURED PRQ (lib/prq-display) — `prq` on the profile body is the seeded gameplay number.
 interface RailData { prq: PrqDisplay; isAdmin: boolean }
@@ -79,6 +80,7 @@ export function StatusRail() {
   }, [status]);
 
   const ring = data && data.prq.score !== null ? ringGeometry(28, 6, data.prq.score, 100) : null;
+  const compact = compactAppHeader();
   // A running mode gets the whole screen. A signed-out visitor gets PublicTopBar, which the legal pages mount.
   // EVERY-SCREEN P2 (2026-11-10): the rail used to appear only once the client had asked who is signed in, so on every
   // signed-in screen it arrived late and pushed the whole page down (the rig measured 0.055-0.068 of layout shift on 122
@@ -113,13 +115,16 @@ export function StatusRail() {
         {/* EVERY-SCREEN P2: on a phone the cluster is always its own row. It did not fit beside the wordmark once the wallet
             counted up from 0 to its balance, so it wrapped mid-load and pushed the page down (0.06 of layout shift on every
             signed-in screen); the row it ends on is now the row it starts on. Wider than 640 px it sits beside the wordmark. */}
+        {/* LOOK-SCREENS A3 (ui.compactAppHeader, lib/ui/firstRun.ts): the PRQ ring shows only once it has a number — never an empty ring
+            and a dash. It arrives on the cluster's left (justify-end), on the cluster's own row, so nothing moves or wraps. The cluster
+            stays on its own row: on the wordmark's row the wallet's count-up could wrap it mid-load (the P2 pin below). */}
         <div className="ml-auto flex min-w-0 basis-full flex-wrap items-center justify-end gap-2 sm:basis-auto">
           {/* P10 (2026-10-27): the PRQ ring and the wallet are always there — a dash and an empty track until the profile
               answers — so nothing swaps in and the cluster never shifts (the rig measured 0.006 CLS from the old skeleton swap) */}
           <>
               {/* PRQ as a mini ring (premium-ui P3): how full at a glance, the number beside it. The colour is the grade's
                   band (meaning, not decoration); the word stays for a screen reader and wider screens. */}
-              <Link
+              {(!compact || (data && data.prq.score !== null)) && <Link
                 href="/profile"
                 title={data?.prq.badge}
                 className="fel-press inline-flex min-h-11 items-center gap-2 rounded-full border border-[color:var(--fel-hairline)] bg-white/[0.04] py-1 pl-1 pr-3 font-sans text-[14px] font-semibold tabular-nums text-white"
@@ -134,7 +139,7 @@ export function StatusRail() {
                 </svg>
                 {!data || data.prq.score === null ? '—' : Math.round(data.prq.score)}
                 {data && <span className="hidden text-fel-dim sm:inline">{data.prq.status}</span>}
-              </Link>
+              </Link>}
               <Link href="/store" aria-label={t('shell.rail.openStore')} className="inline-flex min-h-11 items-center transition-transform active:scale-95">
                 <DualWalletChip />
               </Link>

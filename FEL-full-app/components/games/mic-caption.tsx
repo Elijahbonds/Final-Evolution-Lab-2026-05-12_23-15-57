@@ -10,6 +10,7 @@ import { VolumeMixer } from '@/lib/audio/ui/VolumeMixer';
 import { HUD_FONT_CLASS, HUD_PLATE, HudText, hudColor, hudType } from './tv-hud';
 import { readCcPref, showMicCaption, writeCcPref } from '@/lib/babylon/ui/micSubtitles';
 import { touchTargets44 } from '@/lib/ui/touchTargets';   // improve-screens phase 6 (ui.touchTargets44)
+import { InSlot } from './hud-zones';   // look-screens A2 (ui.hudZonesUpright): on an upright phone the switches live in the "⋯" menu
 
 // hoops-p08 (2026-11-12): THE PLAYER'S SUBTITLE SWITCH (the CC chip beside MC), one store so the chip and the caption agree.
 const ccListeners = new Set<() => void>();
@@ -43,7 +44,14 @@ export function MicCaption({ text, who, className = 'bottom-[14%]', flow = false
 /** The MC's voice on or off (kept across sessions). Off stops what is playing; the captions stay.
  *  VOICEOVER (2026-10-06): and a MIX button beside it: the voice level and the output (phone speaker / TV / headphones), the
  *  same controls the dance room and the Academy show (lib/audio/ui/VolumeMixer.tsx), so a hoops player can find them mid-game. */
-export function MicToggle({ className = 'right-3 top-[18%]', flow = false, cc = true }: { className?: string; flow?: boolean; /** hoops-p08: the CC chip (on its own row under MIX / MC, so the row keeps its width) */ cc?: boolean }) {
+export function MicToggle(props: { className?: string; flow?: boolean; /** hoops-p08: the CC chip (on its own row under MIX / MC, so the row keeps its width) */ cc?: boolean }) {
+  // look-screens A2 (lib/ui/hudZones.ts): on an upright phone the MIX / MC / CC switches are read between plays, not during one,
+  // so they sit in the shell's "⋯" menu (the same buttons, 44 px tall there) instead of over the court. Anywhere else, and with
+  // no menu to hold them (ui.compactGameHeader 0), they stay exactly where each host put them.
+  return <InSlot name="menu" fallback={<MicSwitches {...props} />}><MicSwitches {...props} menu /></InSlot>;
+}
+
+function MicSwitches({ className = 'right-3 top-[18%]', flow = false, cc = true, menu = false }: { className?: string; flow?: boolean; cc?: boolean; menu?: boolean }) {
   const [on, setOn] = useState(() => SoundKit.voiceOn);
   const [mix, setMix] = useState(false);
   const ccOn = useCaptionsOn();
@@ -61,17 +69,17 @@ export function MicToggle({ className = 'right-3 top-[18%]', flow = false, cc = 
   // improve-screens phase 6 (ui.touchTargets44 1): in `flow` too. Measured on /play/dunk, 390 x 844: MIX 49 x 22, MC 45 x 22, CC 44 x 22.
   // The stack's neighbour above the MIX / MC row is the HYPE meter (not a tap target) and nothing sits under the CC row, so the boxes
   // reach over no other button (scripts/probes/improve-screens/touch.mts checks every pair of targets for overlap). 0 = as before.
-  const tall = !flow || touchTargets44();
+  const tall = !menu && (!flow || touchTargets44());
   const chipButton = (row: 'top' | 'bottom', alpha: number, props: ButtonHTMLAttributes<HTMLButtonElement> & { 'data-qa'?: string }, children: ReactNode) => (
     <button type="button" {...props}
-      className={tall ? `pointer-events-auto flex min-h-[44px] bg-transparent p-0 ${row === 'top' ? '-mt-[22px] items-end' : '-mb-[22px] items-start'}` : chip}
+      className={tall ? `pointer-events-auto flex min-h-[44px] bg-transparent p-0 ${row === 'top' ? '-mt-[22px] items-end' : '-mb-[22px] items-start'}` : menu ? `${chip} min-h-[44px]` : chip}
       style={tall ? undefined : chipStyle(alpha)}>
       {tall ? <span className={chip} style={chipStyle(alpha)}>{children}</span> : children}
     </button>
   );
   return (
     // `flow`: in the flow of a parent column (the dunk host's right-hand stack) instead of a corner of its own
-    <div className={`pointer-events-none ${flow ? 'relative' : `absolute ${className}`} z-20 flex flex-col items-end gap-1 ${HUD_FONT_CLASS}`}>
+    <div data-mic-switches={menu ? 'menu' : undefined} className={menu ? `pointer-events-auto flex flex-col items-start gap-1 ${HUD_FONT_CLASS}` : `pointer-events-none ${flow ? 'relative' : `absolute ${className}`} z-20 flex flex-col items-end gap-1 ${HUD_FONT_CLASS}`}>
       <div className="flex items-center gap-1">
         {/* a mouse click must not leave focus on the button: Space is SHOOT/JUMP, and a focused button answers its keyup with a click */}
         {chipButton('top', mix ? 0.9 : 0.6, {

@@ -4,7 +4,7 @@
 // The canvas is captured. The DOM around it is not, except in stream mode, which is for OBS and a phone's
 // own screen broadcast — that one is the page, and the chrome hides.
 
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { SoundKit } from '@/lib/babylon/audio/SoundKit';
 import type { Aspect } from '@/lib/capture/exportLayout';
 import { exportFramed } from '@/lib/capture/exportVideo';
@@ -38,6 +38,8 @@ export function GameCaptureHud(props: {
   stageRef: RefObject<HTMLDivElement | null>;
   streamOn: boolean;
   onStreamMode: (on: boolean) => void;
+  /** look-screens A1: the game header's tools on an upright phone (CaptureHudView `gameTools`). */
+  gameTools?: ReactNode;
 }) {
   const recorder = useRef<GameRecorder | null>(null);
   const [model, setModel] = useState<RecModel>(REC_IDLE);
@@ -189,6 +191,7 @@ export function GameCaptureHud(props: {
           onHide={() => setHidden(true)}
           onShow={() => setHidden(false)}
           onFilm={() => setFilm(true)}
+          gameTools={props.gameTools}
         />
       </div>
       {props.streamOn && !hidden ? <StreamGuides /> : null}

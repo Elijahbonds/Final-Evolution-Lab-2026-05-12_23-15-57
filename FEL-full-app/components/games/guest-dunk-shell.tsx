@@ -8,7 +8,8 @@ import { Trophy, Flame, ArrowRight, ExternalLink, X } from 'lucide-react';
 import { prqGrade } from '@/lib/prq';
 import { is3D, isBabylon } from '@/components/three/flags';
 import { track, flush } from '@/lib/analytics';
-import { AgeStep, ageBlockPresent, writeAgeBlockFlag } from '@/components/age-step';
+import { AgeCard, AgeStep, ageBlockPresent, writeAgeBlockFlag } from '@/components/age-step';
+import { firstRunCard } from '@/lib/ui/firstRun';   // look-screens A3 (ui.firstRunCard): /try's birth date on the sign-up card
 import { ageScreenOutcome } from '@/lib/privacy/ageScreen';
 import { lockTryAge, tabStorage, tryAgeBand } from '@/lib/privacy/tryAgeGate';   // TRY-AGE-PLACEHOLDER-1 (flag ageBands)
 import type { GameProps, GameResult } from '@/components/games/game-shell';
@@ -342,6 +343,7 @@ export function GuestDunkShell({ challengeCode, reviewHref = null, ageBands = fa
         <StageFitStyle />
         {gate === 'ask' ? (
           <div className="py-10" data-testid="guest-age-step">
+            <AgeCard on={firstRunCard()}>
             <AgeStep mode="signup" onLocked={onAgeLocked} onBlocked={onAgeBlocked} ready={hydrated} />
             <button
               type="button"
@@ -355,6 +357,7 @@ export function GuestDunkShell({ challengeCode, reviewHref = null, ageBands = fa
             {!hydrated && (
               <p role="status" className="mt-2 text-center font-mono text-[12px] text-white/50">Loading…</p>
             )}
+            </AgeCard>
           </div>
         ) : babylon ? (
           // G7: NO `key={gameKey}` on this one. The Babylon dunk resets itself in place;

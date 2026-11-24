@@ -9,6 +9,7 @@ import { HeroHeader } from '@/components/ui/fel/hero-header';
 import { PrimaryCta } from '@/components/ui/fel/primary-cta';
 import { Chip } from '@/components/ui/fel/chip';
 import { t } from '@/lib/i18n';
+import { cardOverlapFixes } from '@/lib/ui/firstRun';
 import { MEASURE_VERTICAL_HREF } from '@/lib/vertical/door';
 
 /**
@@ -39,6 +40,7 @@ export function GuestLandingHero() {
       <HeroHeader
         as="section"
         height="full"
+        fitShortLandscape={cardOverlapFixes()}   /* look-screens A3: PLAY NOW on the first screen of a phone held sideways */
         image="/brand/bonds-dunk-arena.jpg"
         imagePosition="50% 22%"
         eyebrow={t('landing.eyebrow')}

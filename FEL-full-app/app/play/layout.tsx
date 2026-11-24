@@ -20,6 +20,7 @@ import { CaptionRegion } from '@/lib/babylon/ui/CaptionRegion';
 import { Suspense } from 'react';
 import { FeelPanel } from '@/components/feel-panel/feel-panel';   // feel-panel lane (owner 10-20): renders nothing unless FEEL_PANEL_ENABLED + admin
 import { PerfReadoutTab } from '@/components/perf-readout/perf-readout-tab';   // device-perf (owner 11-12): the same gate; renders nothing for players
+import { PlaceLoadingVeil } from '@/components/games/place-loading-card';   // look-screens A3 (ui.placeLoadingCard): Venice, the Coast and the arena load on the branded card
 
 export default function PlayLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -28,6 +29,7 @@ export default function PlayLayout({ children }: { children: React.ReactNode }) 
       <Suspense fallback={null}><FeelPanel /></Suspense>
       <PerfReadoutTab />
       {children}
+      <PlaceLoadingVeil />
     </GlobalErrorBoundary>
   );
 }

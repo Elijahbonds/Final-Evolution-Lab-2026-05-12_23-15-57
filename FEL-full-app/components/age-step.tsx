@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { signOut } from 'next-auth/react';
 import {
   AGE_BLOCK_COOKIE,
@@ -55,6 +55,29 @@ export function AgeTurnAway() {
  * `birthDate` ('YYYY-MM-DD'). The block rule still reads the year alone, first: an under-13 year is turned away whatever
  * the month and day say. Any other year needs a real, past date before it locks.
  */
+/**
+ * look-screens A3 (ui.firstRunCard, lib/ui/firstRun.ts): the sign-up card's frame — its glow, its panel and the owner's crest — around
+ * /try's birth-date step, so the guest's first question looks like /signup's. Layout only: the question, its words and its rule are
+ * AgeStep's, unchanged. `on` false: the children exactly as before (no element added).
+ */
+export function AgeCard({ on, children }: { on: boolean; children: ReactNode }) {
+  if (!on) return <>{children}</>;
+  return (
+    <div data-age-card className="relative mx-auto w-full max-w-md px-1">
+      <div aria-hidden className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute -top-40 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-[#00E5FF]/10 blur-[120px]" />
+        <div className="absolute bottom-0 right-0 h-72 w-72 rounded-full bg-[#A855F7]/10 blur-[120px]" />
+      </div>
+      <div className="fel-panel relative w-full rounded-2xl p-5 sm:p-8">
+        {/* a plain img: the crest is a small static file (public/brand), and next/image needs the app's config the guest shell's tests do not load */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/crest-light.png" alt="" width={132} height={140} className="mx-auto mb-4 h-[72px] w-auto opacity-90 sm:h-[92px]" />
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export function AgeStep({
   mode,
   onLocked,
