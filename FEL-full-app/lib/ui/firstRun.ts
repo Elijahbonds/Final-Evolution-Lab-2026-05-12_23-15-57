@@ -15,15 +15,17 @@
 // Knobs (lib/feel-panel/knobs.ts), each 1 = this lane's look, 0 = the screen exactly as before. The pages here are not /play/<mode>
 // playtest runs, so the feel panel's overrides never reach them (lib/feel-panel/sessionGate.ts): these are the shipped values,
 // changed by a commit, and the tests pin both ends.
-//   `ui.firstRunCard`       /try's birth date on the sign-up card (crest, card, glow); the home hero fits a sideways phone; the
-//                           sign-in carousel's glow is not clipped.
+//   `ui.firstRunCard`       /try's birth date on the sign-up card (crest, card, glow). SHIPS OFF (0): a look change, and on the phone
+//                           tier (CPU 4x) /try's first paint was 296 / 296 / 524 ms before and 304 / 368 / 864 ms with it (median
+//                           +24 %; the bar is 10 %, and the control pages moved as much run to run). The owner's look call.
 //   `ui.compactAppHeader`   the app's top rail shows the level ring only with a number (the wallet keeps its own row on a phone: on
 //                           the wordmark's row its count-up could wrap the row mid-load); /play's six doors are a two-column grid.
 //   `ui.cardOverlapFixes`   the USB line goes into the "⋯" menu on an upright phone while the card is up (it sat on the venue line);
-//                           the end card's title wraps balanced, so no word is left alone on a line.
+//                           the end card's title wraps balanced, so no word is left alone on a line; the home hero fits a sideways
+//                           phone (PLAY NOW on the first screen); the sign-in carousel's glow is not clipped.
 import { feel } from '@/lib/feel-panel/feel';
 
-export const FIRST_RUN_CARD = 1;
+export const FIRST_RUN_CARD = 0;   // ships OFF: a style change, and its first-paint cost on the rig was not inside the bar (see below)
 export const firstRunCard = (): boolean => feel('ui.firstRunCard', FIRST_RUN_CARD) >= 0.5;
 
 export const COMPACT_APP_HEADER = 1;

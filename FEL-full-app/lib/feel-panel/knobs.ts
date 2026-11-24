@@ -2470,9 +2470,9 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'Phase A3. While Venice, the Coast or the Physics Arena builds, the start screen look every hoops game has: the venue art that ships, the place name, the loading line word for word and a bar. Drawn by the shared play layout until the place is ready, or steps aside for its error line. Off: the black screen and one line, as before.',
   },
   {
-    id: 'ui.firstRunCard', label: 'Try page birth date on the sign-up card, home fits a sideways phone, sign-in card glow not cut (1) / as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',
+    id: 'ui.firstRunCard', label: 'Try page birth date on the sign-up card: crest, panel and glow (1) / the bare form (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',
     source: 'lib/ui/firstRun.ts FIRST_RUN_CARD',
-    hint: 'Phase A3. Same words, same age rule. Not a play page, so the panel cannot change it: the shipped value, changed by a commit.',
+    hint: 'Phase A3, ships OFF. Same words, same age rule. A look call for the owner: on the phone rig the page first painted a little later with it (median 24 percent, inside the run to run noise of the other pages but over the 10 percent bar). Not a play page, so the panel cannot change it: the shipped value, changed by a commit.',
   },
   {
     id: 'ui.compactAppHeader', label: 'Phone: the app top bar level ring only with a number; Play doors in two columns (1) / as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',
@@ -2480,9 +2480,9 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'Phase A3. The PRQ ring is drawn once it has a number (never an empty ring and a dash), and the Play screen six doors are an even two-column grid on a phone. Wider screens unchanged. Not a play page: the shipped value, changed by a commit.',
   },
   {
-    id: 'ui.cardOverlapFixes', label: 'USB controller line in the dots menu on an upright phone, end card title wraps balanced (1) / as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',
+    id: 'ui.cardOverlapFixes', label: 'USB line in the dots menu upright, end title balanced, home fits sideways, sign-in glow not cut (1) / as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',
     source: 'lib/ui/firstRun.ts CARD_OVERLAP_FIXES',
-    hint: 'Phase A3. Before play on an upright phone the USB controller line sat on the loading card venue line: it is in the dots menu there (same words). The results card title wraps balanced, so no word is left alone. Off: as before.',
+    hint: 'Phase A3. Before play on an upright phone the USB controller line sat on the loading card venue line: it is in the dots menu there (same words). The results card title wraps balanced, so no word is left alone. The home page fits a phone held sideways (PLAY NOW on the first screen) and the sign-in card glow is no longer cut. Off: as before.',
   },
   {
     id: 'try.prefetchDunk', label: 'Try page: load the first dunk while the birth date is asked (1) / only after the answer (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',

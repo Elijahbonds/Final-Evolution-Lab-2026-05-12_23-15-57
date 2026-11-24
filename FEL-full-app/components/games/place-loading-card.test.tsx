@@ -17,10 +17,10 @@ beforeEach(() => { resetFeelForTests(); });
 afterEach(() => { resetFeelForTests(); });
 const read = (f: string) => readFileSync(f, 'utf8');
 
-describe('the knobs: each ships at 1, its catalogue row says so, 0 is the screen as before', () => {
-  for (const [id, def] of [['ui.placeLoadingCard', PLACE_LOADING_CARD], ['ui.firstRunCard', FIRST_RUN_CARD], ['ui.compactAppHeader', COMPACT_APP_HEADER], ['ui.cardOverlapFixes', CARD_OVERLAP_FIXES]] as const) {
-    it(id, () => {
-      expect(def).toBe(1);
+describe('the knobs: each ships as measured (ui.firstRunCard OFF), its catalogue row says so, 0 is the screen as before', () => {
+  for (const [id, def, ships] of [['ui.placeLoadingCard', PLACE_LOADING_CARD, 1], ['ui.firstRunCard', FIRST_RUN_CARD, 0], ['ui.compactAppHeader', COMPACT_APP_HEADER, 1], ['ui.cardOverlapFixes', CARD_OVERLAP_FIXES, 1]] as const) {
+    it(`${id} ships at ${ships}`, () => {
+      expect(def).toBe(ships);
       const k = FEEL_KNOB_BY_ID.get(id)!;
       expect(k.def).toBe(def);
       expect([k.min, k.max, k.step]).toEqual([0, 1, 1]);
@@ -90,12 +90,12 @@ describe('first run', () => {
     expect(g).toContain('Play without saving');
   });
   it('the home hero fits a sideways phone only through its new prop (false: the hero as before)', () => {
-    expect(read('components/guest-landing-hero.tsx')).toContain('fitShortLandscape={firstRunCard()}');
+    expect(read('components/guest-landing-hero.tsx')).toContain('fitShortLandscape={cardOverlapFixes()}');
     expect(read('components/ui/fel/hero-header.tsx')).toContain("${fitShortLandscape ? ` ${HERO_SHORT_LANDSCAPE_CLASS.title}` : ''}");
   });
   it('the sign-in rail gives the glow room and takes it back (pb-2 before)', () => {
     expect(RAIL_GLOW_CLASS).toBe('pb-10 -mb-8');
-    expect(read('components/onboarding/mode-carousel.tsx')).toContain("${firstRunCard() ? RAIL_GLOW_CLASS : 'pb-2'}");
+    expect(read('components/onboarding/mode-carousel.tsx')).toContain("${cardOverlapFixes() ? RAIL_GLOW_CLASS : 'pb-2'}");
   });
 });
 
