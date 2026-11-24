@@ -8,7 +8,7 @@ const card = { modeId: 'physics_arena', outcome: 'WIN', score: 11, stats: { oppo
 
 describe('arenaRun', () => {
   it('each sport saves under its own key', () => {
-    expect(ARENA_SESSION_KEY).toEqual({ hoops: 'arenaHoops', threes: 'arenaThrees', threepoint: 'arenaThreePoint' });
+    expect(ARENA_SESSION_KEY).toEqual({ hoops: 'arenaHoops', threes: 'arenaThrees', threepoint: 'arenaThreePoint', soccer: 'arenaSoccer' });
   });
   it('the start: the key, unpaid playtest when ?playtest=1, the agent query when ?agent=1', async () => {
     const seen: Array<{ url: string; body: unknown }> = [];

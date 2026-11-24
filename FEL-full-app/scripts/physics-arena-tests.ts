@@ -311,14 +311,16 @@ async function soccerLive(B: typeof import('@babylonjs/core')) {
     const scene = new B.Scene(engine);
     const camera = new B.UniversalCamera('cams', new B.Vector3(0, 6, -14), scene);
     const hud: Record<string, unknown> = {};
+    const cards: Card[] = [];
     const dir = { mode: 'follow', suspended: false, stickWorldLatched: (x: number, y: number) => new B.Vector3(x, 0, -y), look: () => {}, update: () => {}, snapTo: () => {} };
-    const ctx = { scene, camera, camDirector: dir, heroRef: { current: null }, objectiveRef: { current: null }, setHud: (u: Record<string, unknown>) => Object.assign(hud, u) } as never;
+    const ctx = { scene, camera, camDirector: dir, heroRef: { current: null }, objectiveRef: { current: null }, setHud: (u: Record<string, unknown>) => Object.assign(hud, u),
+      card: (outcome: string, score: number, stats: Record<string, number>, detail: Card['detail']) => { cards.push({ outcome, score, stats, detail }); } } as never;
     await PhysicsArenaSoccerMode.load(ctx);
-    return { engine, scene, ctx, hud };
+    return { engine, scene, ctx, hud, cards };
   };
   // strikes from 12 m at the corners: at the foot vs 0.55 m off it (the same power and aim)
   {
-    const { engine, scene, ctx } = await mk();
+    const { engine, scene, ctx, cards } = await mk();
     const seam = arenaSoccerSeam(scene) as unknown as { place: (x: number, z: number, off?: number) => void; kick: (k: string, p: number, yaw: number, c: number) => void; quiet: (on: boolean) => void };
     seam.quiet(true);
     const tz = goalLineZ('north');
@@ -337,6 +339,9 @@ async function soccerLive(B: typeof import('@babylonjs/core')) {
     console.log(`     12 m strikes at the corners: clean ${clean}/${n}, 0.55 m off the sweet spot ${off}/${n}`);
     // (the bar is the gap, as the jump shot's: a scuffed strike from 12 m at a keeper-less 3 m goal still goes in some of the time)
     ok(`a clean strike scores clearly more than one off the foot (${clean}/${n} ≥ 70 %, a gap of ${Math.round((100 * (clean - off)) / n)} points ≥ 40)`, clean / n >= 0.7 && (clean - off) / n >= 0.4);
+    // the first game to 5 among those strikes went to the page with its goal log: the server rebuilds the same 5 from it
+    // (the strikes keep scoring past 5 through the seam's own resets, so only the first card is a real game)
+    cardsRebuild('', 'arenaSoccer', cards.slice(0, 1), 600);
     scene.dispose(); engine.dispose();
   }
   // three minutes: a bot that chases the ball, dribbles north and shoots from range

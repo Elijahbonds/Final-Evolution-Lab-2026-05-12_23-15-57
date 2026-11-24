@@ -80,6 +80,7 @@ export const MODE_WEIGHTS: Record<string, number> = {
   arenaHoops: 1.0,
   arenaThrees: 1.0,
   arenaThreePoint: 0.9,
+  arenaSoccer: 1.1,   // as soccer
 };
 
 // Attributes each mode primarily trains
@@ -115,6 +116,7 @@ export const MODE_ATTRS: Record<string, PrqAttr[]> = {
   arenaHoops: ['agility', 'power', 'mental'],
   arenaThrees: ['mental', 'agility', 'endurance'],
   arenaThreePoint: ['mental', 'flexibility', 'speed'],
+  arenaSoccer: ['power', 'agility', 'mental'],   // as soccer
 };
 
 /**

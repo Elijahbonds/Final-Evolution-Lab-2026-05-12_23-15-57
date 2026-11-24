@@ -30,7 +30,8 @@ import { DUNK_CONFIG } from './modeConfigs';
 import { devOrAgentHooks } from '@/lib/agentRunHooks';
 import { ArenaPhysics, SOCCER_SPEC, type ArenaPlayer } from '../arena/arenaPhysics';
 import { buildSoccerColliders, mountSoccerPitch, type SoccerPitch } from '../arena/soccerPitch';
-import { CENTRE, GOAL, PITCH, SOCCER_BALL, goalCrossing, goalLineZ, type End } from '../arena/soccerGeometry';
+import { CENTRE, GOAL, PITCH, SOCCER_BALL, goalCrossingAt, goalLineZ, type End } from '../arena/soccerGeometry';
+import type { ArenaSoccerLog } from '@/lib/sessions/arenaScore';
 import { FOOT_AHEAD_M, REACH_M, WIND_SEC, strike, type KickKind } from '../arena/soccerKick';
 import { seeded } from '../arena/shotModel';
 import type { P3 } from '../arena/hoopGeometry';
@@ -49,8 +50,10 @@ const TOUCH_R = 0.36, TOUCH_GAP_SEC = 0.26;
 const TOUCH_LEAD = 1.32;
 /** A tackle reaches this far from the foot (m); then the foot is out of play this long (s). */
 const TACKLE_REACH_M = 1.25, TACKLE_GAP_SEC = 0.9;
-/** After a goal the ball sits in the net this long (s); a finished game shows its score this long. */
-const SCORED_SEC = 2.0, OVER_SEC = 3.0;
+/** After a goal the ball sits in the net this long (s); a finished game shows its score this long. The server's score rules lean on
+ *  SCORED_SEC (lib/sessions/arenaScore.ts ARENA_MIRRORED.soccerScoredSec: two goals at least this far apart). */
+export const SCORED_SEC = 2.0;
+const OVER_SEC = 3.0;
 
 /** The rival by OPPONENT tier: run speed, reaction (the owner's 420 / 220 / 120 ms), the strike's scatter, how far out he shoots. */
 export const SOCCER_RIVAL: Record<Tier, { speed: number; reactSec: number; scatter: number; shootFromM: number; tackleGapSec: number }> = {
@@ -109,6 +112,10 @@ interface St {
   timing: string;
   hudKey: string;
   stats: { shots: Record<Who, number>; goals: Record<Who, number>; touches: Record<Who, number>; tackles: Record<Who, number>; posts: number; whiffs: number; drops: number };
+  /** This game's goal log (the session's `stats.arena`: the server rebuilds the score from it) and its clock's zero. */
+  game: { t0: number; log: ArenaSoccerLog };
+  /** A finished game waiting to be handed to the page (ctx.card in update()). */
+  final: { won: boolean; me: number; foe: number; log: ArenaSoccerLog } | null;
   /** Probe seam: the rival does nothing. */
   aiQuiet: boolean;
   seam: Record<string, (...a: never[]) => unknown> | null;
@@ -160,13 +167,17 @@ function setupKickoff(S: St, kicker: Who): void {
   say(S, kicker === 'me' ? 'Your kick-off' : 'Their kick-off', 1.2);
 }
 
-function scored(S: St, by: Who): void {
+function scored(S: St, by: Who, at: { x: number; y: number }): void {
   S.score[by]++; S.stats.goals[by]++; S.conceded = other(by);
+  S.game.log.goals.push({ t: S.t - S.game.t0, side: by, x: at.x, y: at.y });
   S.phase = 'scored'; S.phaseT = 0;
   say(S, by === 'me' ? 'GOAL' : 'They score', SCORED_SEC);
   SoundKit.play('swish', { volume: 0.6 });
   playClip(athlete(S, by), 'soccer_goal_celebrate', false, 1.6);
-  if (S.score[by] >= SOCCER_GAME_TO) { S.phase = 'over'; S.phaseT = 0; say(S, `${by === 'me' ? 'You win' : 'They win'} ${S.score.me}–${S.score.foe}`, OVER_SEC); }
+  if (S.score[by] >= SOCCER_GAME_TO) {
+    S.phase = 'over'; S.phaseT = 0; say(S, `${by === 'me' ? 'You win' : 'They win'} ${S.score.me}–${S.score.foe}`, OVER_SEC);
+    S.final = { won: by === 'me', me: S.score.me, foe: S.score.foe, log: { v: 1, goals: S.game.log.goals.map((g) => ({ ...g })) } };   // a snapshot: the card is this game
+  }
 }
 
 // ── the feet ────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -341,8 +352,8 @@ function beforeStep(ctx: ModeContext, S: St, h: number): void {
 function afterStep(S: St): void {
   const b = S.world.ball.pos, now = p3(b);
   if (S.phase === 'live' || S.phase === 'kickoff') {
-    const end = goalCrossing(S.prevBall, now);
-    if (end) scored(S, end === S.me.attacks ? 'me' : 'foe');
+    const g = goalCrossingAt(S.prevBall, now);
+    if (g) scored(S, g.end === S.me.attacks ? 'me' : 'foe', g);
   }
   S.prevBall = now;
 }
@@ -361,7 +372,7 @@ function frameRules(S: St, dt: number): void {
     S.lastTouch = 'foe'; S.lastTouchAt = S.t; S.phase = 'live'; S.phaseT = 0;
   }
   if (S.phase === 'scored' && S.phaseT > SCORED_SEC) setupKickoff(S, S.conceded);
-  if (S.phase === 'over' && S.phaseT > OVER_SEC) { S.score.me = 0; S.score.foe = 0; setupKickoff(S, 'me'); }
+  if (S.phase === 'over' && S.phaseT > OVER_SEC) { S.score.me = 0; S.score.foe = 0; S.game = { t0: S.t, log: { v: 1, goals: [] } }; setupKickoff(S, 'me'); }
   // a ball out of the cage (a chip over the boards): dropped back in where it left
   const b = S.world.ball.pos;
   const out = Math.abs(b.x) > PITCH.halfW + 0.6 || (Math.abs(b.z) > PITCH.halfL + GOAL.depth + 0.6) || (Math.abs(b.z) > PITCH.halfL + 0.6 && Math.abs(b.x) > GOAL.halfW + 0.3) || b.y < -1;
@@ -484,7 +495,7 @@ export const PhysicsArenaSoccerMode: ModeDefinition = {
       pov: { on: false, view: { yaw: 0, pitch: 0, bobPhase: 0 }, savedFov: ctx.camera.fov }, camModeSeen: ctx.camDirector.mode,
       ai: { reactAt: 0, aimX: 0.6, curl: 0 }, banner: '', bannerT: 0, timing: '', hudKey: '',
       stats: { shots: { me: 0, foe: 0 }, goals: { me: 0, foe: 0 }, touches: { me: 0, foe: 0 }, tackles: { me: 0, foe: 0 }, posts: 0, whiffs: 0, drops: 0 },
-      aiQuiet: false, seam: null, disposed: false,
+      game: { t0: 0, log: { v: 1, goals: [] } }, final: null, aiQuiet: false, seam: null, disposed: false,
     };
     states.set(scene, S); current = S;
     setupKickoff(S, 'me');
@@ -547,6 +558,8 @@ export const PhysicsArenaSoccerMode: ModeDefinition = {
     if (S.me.kick) S.me.kick.t += simDt;
     aiDecide(S, simDt);
     frameRules(S, simDt);
+    // a finished game to the page (it posts the run; the server rebuilds the score from the goal log); play goes on
+    if (S.final) { const f = S.final; S.final = null; ctx.card?.(f.won ? 'WIN' : 'LOSS', f.me, { opponentScore: f.foe, won: f.won ? 1 : 0 }, { arena: f.log, opponentScore: f.foe, won: f.won }); }
     facing(S, simDt);
     camera(ctx, S, dt);
     hud(ctx, S, dt);

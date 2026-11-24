@@ -43,6 +43,11 @@ export function inGoalNet(p: Readonly<P3>, end: End): boolean {
  * that crosses between two steps still counts. Returns the end scored in, or null.
  */
 export function goalCrossing(prev: Readonly<P3>, now: Readonly<P3>, r = SOCCER_BALL.r): End | null {
+  return goalCrossingAt(prev, now, r)?.end ?? null;
+}
+
+/** The same, with where the ball crossed: x across the mouth, y up (the session's goal log; lib/sessions/arenaScore.ts checks it). */
+export function goalCrossingAt(prev: Readonly<P3>, now: Readonly<P3>, r = SOCCER_BALL.r): { end: End; x: number; y: number } | null {
   for (const end of ['north', 'south'] as const) {
     const line = goalLineZ(end) + (end === 'north' ? r : -r);   // wholly over: the centre a radius past the line
     const a = prev.z - line, b = now.z - line;
@@ -50,7 +55,7 @@ export function goalCrossing(prev: Readonly<P3>, now: Readonly<P3>, r = SOCCER_B
     if (!crossed) continue;
     const t = a / (a - b);
     const x = prev.x + (now.x - prev.x) * t, y = prev.y + (now.y - prev.y) * t;
-    if (Math.abs(x) < GOAL.halfW && y < GOAL.h) return end;   // between the posts (a ball wider than that meets a post) and under the bar
+    if (Math.abs(x) < GOAL.halfW && y < GOAL.h) return { end, x, y };   // between the posts (a ball wider than that meets a post) and under the bar
   }
   return null;
 }

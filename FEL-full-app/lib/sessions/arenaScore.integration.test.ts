@@ -65,7 +65,7 @@ describe.skipIf(!RUN)('Physics Arena XP against a real throwaway Postgres (SESSI
     ({ getOrCreateProfile } = await import('@/lib/profile-service'));
     const [{ db }] = await prisma.$queryRawUnsafe('SELECT current_database() AS db');
     expect(db).not.toMatch(/^fel(_dev)?$/);
-    for (const who of ['player', 'forger', 'shooter', 'agent']) {
+    for (const who of ['player', 'forger', 'shooter', 'agent', 'striker']) {
       const u = await prisma.user.create({ data: { email: `${TAG}-${who}@example.test`, password: 'x', role: 'player' } });
       users[who] = u.id;
       await getOrCreateProfile(u.id);
@@ -128,6 +128,38 @@ describe.skipIf(!RUN)('Physics Arena XP against a real throwaway Postgres (SESSI
     }
     expect(await balances(users.forger)).toEqual(before);
     expect(await prisma.gameSession.count({ where: { userId: users.forger } })).toBe(0);
+  });
+
+  it('soccer: a legit 5–2 win pays its XP and no Lab Credits; forged goal logs are refused', async () => {
+    as('striker');
+    const before = await balances(users.striker);
+    const goals = [...'mmfmfmm'].map((c, i) => ({ t: 8 + i * 9, side: c === 'm' ? 'me' : 'foe', x: 0.3 - i * 0.1, y: 0.4 }));
+    const body = (runId: string, over: Json = {}) => ({ runId, mode: 'arenaSoccer', score: 5, opponentScore: 2, won: true, duration: 90, played: true, stats: { arena: { v: 1, goals } }, ...over });
+    const run = await start('arenaSoccer');
+    expect(run).toMatchObject({ payoutEligible: true, modeSlug: 'arenaSoccer' });
+    await playedFor(run.runId, 90);
+    const r = await finish(body(run.runId));
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    expect(r.body).toMatchObject({ ok: true, paid: true, won: true, xp: sessionXp(5, true), credits: 0, coins: 0, shards: 0, streakBonus: 0 });
+    const after = await balances(users.striker);
+    expect(after.xp - before.xp).toBe(sessionXp(5, true));
+    expect(after.lc).toBe(before.lc); expect(after.coins).toBe(before.coins); expect(after.shards).toBe(before.shards); expect(after.streak).toBe(before.streak);
+    expect((await ledgerFor(run.runId)).map((g: Json) => g.grantType)).not.toContain('wallet_lc');
+    const forged: Array<[Json, string]> = [
+      [{ stats: { arena: { v: 1, goals: goals.map((g) => ({ ...g, x: 1.8 })) } } }, 'arena_goal_mouth'],
+      [{ stats: { arena: { v: 1, goals: goals.map((g, i) => ({ ...g, t: 5 + i * 0.4 })) } } }, 'arena_too_fast'],
+      [{ score: 6 }, 'arena_score_mismatch'],
+      [{ stats: { arena: { v: 1, goals: [...goals, { t: 80, side: 'me', x: 0, y: 0.3 }] } } }, 'arena_after_final'],
+    ];
+    for (const [over, detail] of forged) {
+      const fr = await start('arenaSoccer');
+      await playedFor(fr.runId, 90);
+      const res = await finish(body(fr.runId, over));
+      expect(res.status, detail).toBe(422);
+      expect(res.body, detail).toMatchObject({ reason: 'SCORE_INVALID', detail, paid: false });
+      expect(await ledgerFor(fr.runId), detail).toEqual([]);
+    }
+    expect((await balances(users.striker)).xp).toBe(after.xp);
   });
 
   it('the contest pays its rebuilt points (no win), and an agent run is recorded unpaid', async () => {
