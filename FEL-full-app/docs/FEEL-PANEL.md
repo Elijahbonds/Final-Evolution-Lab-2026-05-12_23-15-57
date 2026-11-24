@@ -1240,6 +1240,15 @@ Group "Screens · phone". NEW switches, each **1 = on, 0 = today's screen exactl
 | `ui.touchTargets44` | 1 | 0 | Phase 6. On a touch screen the Venice first-visit hint takes the walk-up card's slot under the mini-map, clear of the deck's DASH and JUMP (it ran under them, and DASH covered its "Got it"); the dunk's MIX / MC / CC chips, the story dialogue's SKIP and its choices, and `/workout`'s two tick lines each get a tap box of at least 44 px, with the same look and the same words. 0: each screen as before. (`lib/ui/touchTargets.ts`) |
 | `try.prefetchDunk` | **0** (ships off) | 0 | Phase 2. Measured on the rig (phone tier, a 10 s typing pause): birth date to TAP TO START 28.2 s median off, 24.7 s on (about 12 %, against the tennis control about 3 %), short of the plan's 25 % bar, and the early code load held the main thread 1.2-1.75 s while the visitor typed; so it ships off. On a real phone network the download half should matter more (not measured). While a first-time guest gives `/try`'s birth date, the dunk stage's code chunk and the first static files the dunk asks for are fetched into the browser cache (GETs of public files, no cookies, no body, no query: nothing about the visitor; the answer still gates every request that carries data). 0: nothing is requested before the answer, as before. `/try` is for signed-out visitors, so the panel never opens there: this is the shipped value, changed by a commit. (`lib/try/prefetchDunk.ts`) |
 
+## look-screens, 2026-11-24 (owner: "Let's do a pass where we improve how things look."; docs/LOOK-PASS-AUDIT.md lane A, phases A1–A3)
+
+Group "Screens · phone". NEW switches, each **1 = on, 0 = today's screen exactly** unless the row says it ships off (tests pin both ends).
+No existing tuned number moved.
+
+| Knob | Default | Restores the old behaviour at | What it does |
+|---|---|---|---|
+| `ui.compactGameHeader` | 1 | 0 | Phase A1. On a phone held upright (≤ 640 px wide, portrait) the game header is one row: back · title · pause (61 px; it wrapped to three rows, 165 px on a 390 × 844 phone). BODY, the PRQ line, the graphics choice and full screen are drawn in the stage's "⋯" menu instead (the same controls), and the PRQ line there reads "PRQ · Not measured yet" instead of the "PRQ — · NOT MEASURED" badge. CSS hides the header's tools from the first paint, so the header never shifts. Sideways, desktop, full screen and the stream view are unchanged. 0: the wrapping header and today's menu exactly. (`lib/ui/compactHeader.ts`) |
+
 ## physics-arena, 2026-11-23 (owner: "Make there be a live physics play arena for the sport modes.- all the modes can be played physics based. And POV-"; docs/PHYSICS-ARENA-PLAN.md; the owner has not felt these yet)
 
 Groups "Physics arena" and "Physics arena · POV". All NEW (`lib/babylon/arena/arenaConfig.ts`), read only by the arena

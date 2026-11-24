@@ -24,6 +24,7 @@ import { STAGE_FIT_ATTR } from '@/lib/ui/stageFit';   // improve-screens phase 1
 import { PauseButton } from './pause-button';   // gameplay-clean: a pause a thumb can reach (ESC → START, every harness mode)
 import { PageDiagnostics } from './page-diagnostics';
 import { GameCaptureHud } from '@/components/capture/game-capture-hud';
+import { CompactHeaderStyle, MenuGameTools, useCompactHeader } from './compact-header';   // look-screens A1 (ui.compactGameHeader)
 import { LearnWhileYouWait } from '@/components/learn/learn-while-you-wait';
 import type { SessionTallies } from '@/lib/game-systems';
 import { sessionStore, markRun, countedSince } from '@/lib/babylon/core/sessionStore';
@@ -712,12 +713,22 @@ function GameShellInner({
   const headerRef = useRef<HTMLElement | null>(null);
   const stageFit = useStageFit(headerRef, stageRef, !fullBleed && !streamOn);
   const stageFitOn = stageFit[STAGE_FIT_ATTR] !== undefined;
+  // LOOK-SCREENS A1 (lib/ui/compactHeader.ts): on a phone held upright the header is one row (back · title · pause) and its
+  // tools are drawn in the "⋯" menu. `compact.menu` is false on the server and the first client render, so the header keeps
+  // its tools until the client knows the phone is upright (the CSS has already hidden them there: no shift).
+  // The header itself is unchanged (CSS hides its tools upright); the menu draws its own BODY and graphics controls.
+  const compact = useCompactHeader();
+  const menuTools = compact.menu && !fullBleed && !streamOn
+    ? <MenuGameTools body={<BodyControl />} graphics={<GraphicsToggle id="fel-graphics-menu" />} prq={profile?.display}
+        fullscreen={{ available: fsAvailable, on: fsOn, toggle: onFullscreen }} />
+    : undefined;
 
   return (
     <div className={fullBleed ? 'flex h-[100dvh] flex-col overflow-hidden bg-[#050505]' : 'flex min-h-screen flex-col bg-[#050505]'}>
       {/* Sideways on a phone, the header is a fifth of the screen spent on a back link. It goes; the way out
           lives on the stage instead, where a thumb already is. */}
-      <header data-game-chrome ref={headerRef} className={`sticky top-0 z-40 border-b border-white/10 bg-[#050505]/85 backdrop-blur-md ${fullBleed || streamOn ? 'hidden' : ''}`}>
+      <CompactHeaderStyle />
+      <header data-game-chrome ref={headerRef} {...compact.header} className={`sticky top-0 z-40 border-b border-white/10 bg-[#050505]/85 backdrop-blur-md ${fullBleed || streamOn ? 'hidden' : ''}`}>
         {/* PHONE-FIRST-SCREEN (2026-10-17): the row WRAPS. It needs ~600 px in one line, and a 393 px phone squeezed its
             items into 3-4 line stacks and still ran 104 px off the right edge (graphics select and full screen cut off).
             Wrapped, a phone gets two rows: Home · title · BODY, then PRQ · graphics · full screen (measured natural widths
@@ -784,7 +795,7 @@ function GameShellInner({
           : 'relative mx-auto w-full max-w-[1200px] flex-1 px-2 py-3 sm:px-4'}
       >
         <StageFitStyle />
-        <GameCaptureHud mode={mode} stageRef={stageRef} streamOn={streamOn} onStreamMode={setStreamOn} />
+        <GameCaptureHud mode={mode} stageRef={stageRef} streamOn={streamOn} onStreamMode={setStreamOn} gameTools={menuTools} />
         {/* The two controls the header was carrying, as thumb-sized glass over the corner of the stage. Only
             while full-bleed — with the header up they would be a second copy of it. */}
         {fullBleed && !streamOn && (

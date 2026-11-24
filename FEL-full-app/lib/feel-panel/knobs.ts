@@ -2405,6 +2405,12 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/ui/touchTargets.ts TOUCH_TARGETS_44',
     hint: 'On: the Venice first-visit hint sits under the mini-map, clear of DASH and JUMP; the dunk MIX, MC and CC chips, the story SKIP and choices and the workout tick boxes each get a tap box of at least 44 px (same look, same words). Off: each as before.',
   },
+  // ── lane/look-screens (2026-11-24, docs/LOOK-PASS-AUDIT.md lane A; owner: "Let's do a pass where we improve how things look.") ──
+  {
+    id: 'ui.compactGameHeader', label: 'Phone upright: one-row game header, its tools in the dots menu (1) / the wrapping header (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',
+    source: 'lib/ui/compactHeader.ts COMPACT_GAME_HEADER',
+    hint: 'Phase A1. On a phone held upright the game header is one row (back, title, pause); BODY, the PRQ line, the graphics choice and full screen move into the dots menu on the stage, and the PRQ line there says Not measured yet instead of a NOT MEASURED badge. Sideways, desktop and the stream view are unchanged. Off: the header wraps to three rows, as before.',
+  },
   {
     id: 'try.prefetchDunk', label: 'Try page: load the first dunk while the birth date is asked (1) / only after the answer (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',
     source: 'lib/try/prefetchDunk.ts TRY_PREFETCH_DUNK',
