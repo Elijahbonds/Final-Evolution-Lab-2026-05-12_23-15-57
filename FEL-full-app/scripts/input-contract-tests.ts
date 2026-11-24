@@ -56,6 +56,9 @@ const SHELL_EXEMPT_ROUTES: Record<string, string> = {
   // COAST & ISLANDS phase A (2026-11-18): the first open zone is a place to walk, like the Venice hub. It records no session and
   // pays nothing; its sports spots (phase D) will open their games' own pages, whose loaders mount their own GameShell.
   coast: 'the Coast & Islands zone: a place to walk, not a game; records no session (its sports spots will open their games, whose own GameShell records them)',
+  // PHYSICS ARENA (lane/physics-arena, owner 2026-11-23): a practice court where the sports play on real physics. It records no
+  // session and pays nothing (its stage's resultSink is empty; docs/PHYSICS-ARENA-PLAN.md §2); its own stage shows the score and POV.
+  arena: 'the Physics Arena: a practice place on real physics; records no session and pays nothing, so no GameShell',
   // DRILLS (2026-10-07, Mirror & coaching Phase 6): the Playbook drills on the camera. Not a game: no score is posted, no
   // session recorded, nothing paid; it runs body play's space check and the drill engine (lib/drills) on its own page.
   drills: 'Train-owned camera drills (lib/drills): records no play session and pays nothing, so no GameShell',

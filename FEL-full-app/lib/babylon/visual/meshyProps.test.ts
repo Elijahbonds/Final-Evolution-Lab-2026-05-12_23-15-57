@@ -37,7 +37,8 @@ describe('no basketball outside hoops (QA P1-02)', () => {
     const callers = readdirSync(root).filter((f) => f.endsWith('.ts') && !f.includes('.test.'))
       .filter((f) => /dress(?:Meshy)?Ball\([^)]*'basketball'\)/.test(readFileSync(path.join(root, f), 'utf8')));
     // DunkDuelMode joined the hoops modes on the release (IMPROVE 2026-10-06 #10: the duel ball is a basketball)
-    expect(callers.sort()).toEqual(['DunkDuelMode.ts', 'DunkMode.ts', 'OneVOneMode.ts', 'ThreePointMode.ts', 'ThreeVThreeMode.ts', 'carnivalEvents.ts']);
+    // lane/physics-arena (2026-11-23): the Physics Arena's basketball 1v1 and three-point contest are hoops modes too
+    expect(callers.sort()).toEqual(['DunkDuelMode.ts', 'DunkMode.ts', 'OneVOneMode.ts', 'PhysicsArena3ptMode.ts', 'PhysicsArenaMode.ts', 'ThreePointMode.ts', 'ThreeVThreeMode.ts', 'carnivalEvents.ts']);
   });
 
   it('the player ring shows the mode\'s own ball in the derby, volleyball and golf, never the basketball', () => {
