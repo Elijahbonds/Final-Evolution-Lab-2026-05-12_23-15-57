@@ -379,6 +379,16 @@ switch `arena.soccer` (0 = no soccer tab; the shipped soccer is untouched).
   one into the goal clearly; posts and bar stop 30 m/s shots (no tunnelling); the goal sensor agrees with the path label; three
   minutes of the live mode run, both sides score. Then the phone rig against the arena's 1v1 row.
 
+**Built and measured (2026-11-24): slice 1 ships ON (`arena.soccer` 1).** Headless on the real Havok WASM (`physics-arena-tests` S):
+side spin +45 / −45 rad/s bends a 25 m/s strike 0.70 m right / left over 13 m and no spin 0.000 m; drag takes a 30 m/s strike to
+21 m/s over 20 m; a ball rolled at 6 m/s stops after 5.4 m; 40 shots at 30 m/s at the posts and the bar: 0.0 cm deepest overlap,
+none through; the goal sensor agrees with the resting-place label on 80/80 (33 goals); in the live mode 12 m strikes at the corners
+score 14/14 clean against 7/14 struck 0.55 m off the foot's sweet spot (the bar is the gap: 50 points, ≥ 40); three minutes of the live
+1v1 run, both sides score. Phone tier (3 rounds, the esbuild page, against the control and the arena's 1v1): soccer p95 30.6–40.8 ms
+against the 1v1's 31.6–47.2 and tennis's 39.3–47.6; load 12.5–13.2 s against the 1v1's 13.9–16.9; its `mobileBudget.json` row 78 draws /
+35 meshes / 6 bodies / 50 MB (budget 94 / 42 / 8 / 60). Not done yet: XP (a later step), keepers and 3v3 (slice 2), the pitch's
+surroundings (the dark floor ends a few metres past the boards).
+
 Questions for the owner (recommendation first): (a) 1v1 first, then 3v3 with keepers — or straight to 3v3? (b) keepers as AI bodies
 with hands (the physics hands) or no keepers in small goals? (c) the boards keep the ball in play (a cage game) — or out-of-play lines
 and throw-ins?

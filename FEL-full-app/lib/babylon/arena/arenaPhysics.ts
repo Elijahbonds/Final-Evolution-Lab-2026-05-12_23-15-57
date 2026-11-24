@@ -21,13 +21,24 @@ import type { IPhysicsCollisionEvent, PhysicsMaterial, PhysicsShape, Scene, Havo
 import { initPhysics } from '../core/Physics';
 import { ARENA_MAX_STEPS, BODY_BOUNCE, boardBounce, floorBounce, rimBounce, stepHz } from './arenaConfig';
 import { ARENA_RIM, BALL_MASS, BALL_R, NET, RIM_TUBE_R, armBox, boardBox, bracketBox, inNet, netRadiusAt, poleBox, rimSegments, type P3 } from './hoopGeometry';
+import { GRASS } from '../core/SoccerBall';
+
+const SPIN_TMP = new Vector3();
 
 /** Collision layers. Player i is bit (PLAYER0 << i). */
 export const LAYER = { STATIC: 1, BALL: 2, PLAYER0: 4 } as const;
 export const playerBit = (i: number): number => LAYER.PLAYER0 << i;
 const ALL_PLAYERS = 0xfffffffc;
 
-export type Surface = 'floor' | 'rim' | 'board' | 'frame' | 'body';
+export type Surface = 'floor' | 'rim' | 'board' | 'frame' | 'body' | 'post' | 'boards' | 'net';
+
+/** What a ball is. The basketball is the default (every hoops mode); soccer (plan §9) is a size-5 ball whose air drag, Magnus curl,
+ *  rolling resistance and spin bleed are the shipped core/SoccerBall.ts GRASS coefficients, applied as forces every step. */
+export interface BallSpec { kind: 'basketball' | 'soccer'; r: number; mass: number; restitution: number; friction: number }
+export const BASKETBALL_SPEC: BallSpec = { kind: 'basketball', r: BALL_R, mass: BALL_MASS, restitution: 1, friction: 0.75 };
+export const SOCCER_SPEC: BallSpec = { kind: 'soccer', r: GRASS.radius, mass: GRASS.mass, restitution: GRASS.restitution, friction: 0.6 };
+/** A drag volume a ball slows in (a soccer goal's net): inside(p) and the share of speed it takes a second. */
+export interface NetVolume { inside: (p: Readonly<P3>) => boolean; dragPerSec: number }
 /** Two bodies meeting (knockdowns and fouls read these): the closing speed along the contact normal from the velocities they were
  *  driven at before the step, and which of the two was moving into the other faster. */
 export interface BodyContact { a: string; b: string; closingSpeed: number; attacker: string; victim: string; attackerSpeed: number }
@@ -53,15 +64,15 @@ export class ArenaBall {
   private ignoreMask = 0;
   private ignoreUntil = 0;
   private readonly tmp = new Vector3();
-  constructor(readonly node: TransformNode, private world: ArenaPhysics) {
+  constructor(readonly node: TransformNode, private world: ArenaPhysics, readonly spec: BallSpec = BASKETBALL_SPEC) {
     this.body = new PhysicsBody(node, PhysicsMotionType.DYNAMIC, false, node.getScene());
-    this.shape = new PhysicsShapeSphere(Vector3.Zero(), BALL_R, node.getScene());
-    this.shape.material = mat(1, 0.75);
+    this.shape = new PhysicsShapeSphere(Vector3.Zero(), spec.r, node.getScene());
+    this.shape.material = mat(spec.restitution, spec.friction);
     filter(this.shape, LAYER.BALL, LAYER.STATIC | ALL_PLAYERS);
     this.body.shape = this.shape;
     // a hollow sphere: I = 2/3 m r^2 (Havok's default would be a solid ball of water's density, 12 times the mass)
-    const I = (2 / 3) * BALL_MASS * BALL_R * BALL_R;
-    this.body.setMassProperties({ mass: BALL_MASS, inertia: new Vector3(I, I, I) });
+    const I = (2 / 3) * spec.mass * spec.r * spec.r;
+    this.body.setMassProperties({ mass: spec.mass, inertia: new Vector3(I, I, I) });
     // no air drag: a real ball loses about a tenth of a metre a second squared at shooting speed, and a shooter's hand allows for it
     // without thinking; the aim solve here does not, so drag would only make every shot short
     this.body.setLinearDamping(0);
@@ -117,6 +128,7 @@ export class ArenaBall {
       this.body.setAngularVelocity(Vector3.Zero());
       return;
     }
+    if (this.spec.kind === 'soccer') { this.soccerForces(h); return; }
     const p = this.node.position;
     const below = ARENA_RIM.y - p.y;
     if (below > 0 && below < NET.h && !inNet(p)) {
@@ -142,6 +154,29 @@ export class ArenaBall {
       }
       this.body.setLinearVelocity(v.set(vx, v.y * kv, vz));
     }
+  }
+  /** A soccer ball's step (core/SoccerBall.ts GRASS: its own coefficients, on Havok's real velocity and spin in rad/s): in the air
+   *  quadratic drag and Magnus (spin x velocity: side spin curls, topspin dips) and the spin bleeding off; on the ground the rolling
+   *  resistance (a rolling ball slows and stops); inside a goal's net its drag. */
+  private soccerForces(h: number): void {
+    const p = this.node.position, v = this.vel(this.tmp), w = this.spin(SPIN_TMP);
+    const onGround = p.y < this.spec.r + 0.012 && Math.abs(v.y) < 0.6;
+    const sp = v.length();
+    if (!onGround && sp > 1e-4) {
+      const k = GRASS.dragK * sp, m = GRASS.magnusK;
+      const mx = (w.y * v.z - w.z * v.y) * m, my = (w.z * v.x - w.x * v.z) * m, mz = (w.x * v.y - w.y * v.x) * m;
+      v.set(v.x + (-k * v.x + mx) * h, v.y + (-k * v.y + my) * h, v.z + (-k * v.z + mz) * h);
+      this.body.setAngularVelocity(w.scaleInPlace(Math.exp(-0.35 * h)));
+    } else if (onGround) {
+      const flat = Math.hypot(v.x, v.z);
+      if (flat > 1e-4) { const dec = Math.min(flat, GRASS.grassFriction * h); v.x -= (v.x / flat) * dec; v.z -= (v.z / flat) * dec; }
+    }
+    for (const n of this.world.nets) {
+      if (!n.inside(p)) continue;
+      const kk = Math.exp(-n.dragPerSec * h);
+      v.set(v.x * kk, v.y * (0.5 + 0.5 * kk), v.z * kk);
+    }
+    this.body.setLinearVelocity(v);
   }
 }
 
@@ -277,13 +312,15 @@ export class ArenaPhysics {
   private ballOf = new Map<PhysicsBody, number>();
   private handOf = new Map<PhysicsBody, ArenaPlayer>();
   private hands: ArenaHands[] = [];
+  /** Drag volumes the soccer ball slows in (the goals' nets). */
+  readonly nets: NetVolume[] = [];
   private disposers: Array<() => void> = [];
   private engine!: PhysicsEngine;
 
   private constructor(readonly scene: Scene, readonly plugin: HavokPlugin) {}
 
   /** Build the world: Havok on this scene (the shared bootstrap), the floor, the hoop and the ball. */
-  static async create(scene: Scene, opts: { hoop?: boolean; ballNode?: TransformNode } = {}): Promise<ArenaPhysics> {
+  static async create(scene: Scene, opts: { hoop?: boolean; ballNode?: TransformNode; ball?: BallSpec } = {}): Promise<ArenaPhysics> {
     const handle = await initPhysics(scene);
     const w = new ArenaPhysics(scene, handle.plugin);
     w.engine = scene.getPhysicsEngine() as unknown as PhysicsEngine;
@@ -298,7 +335,7 @@ export class ArenaPhysics {
     if (opts.hoop !== false) w.buildHoop();
     const ballNode = opts.ballNode ?? new TransformNode('arena_ball_body', scene);   // the drawn ball can be the body's node
     ballNode.position.set(0, 1, 6);
-    w.ball = w.addBall(ballNode);
+    w.ball = w.addBall(ballNode, opts.ball);
     const obs = handle.plugin.onCollisionObservable.add((e: IPhysicsCollisionEvent) => w.onCollision(e));
     w.disposers.push(() => handle.plugin.onCollisionObservable.remove(obs));
     return w;
@@ -312,6 +349,30 @@ export class ArenaPhysics {
     shape.material = m;
     filter(shape, LAYER.STATIC, LAYER.BALL | ALL_PLAYERS);
     body.shape = shape;
+    this.surfaceOf.set(body, surface);
+    return body;
+  }
+
+  /** A static box (a board, a goal's back wall): this bounce and grip, read as `surface` in the contacts. */
+  addStaticBox(name: string, centre: P3, half: P3, restitution: number, friction: number, surface: Surface): PhysicsBody {
+    return this.staticBox(name, centre, half, mat(restitution, friction), surface);
+  }
+
+  /** Static capsules as one body (a goal frame: two posts and the bar). */
+  addStaticCapsules(name: string, segs: ReadonlyArray<{ a: P3; b: P3 }>, r: number, restitution: number, friction: number, surface: Surface): PhysicsBody {
+    const node = new TransformNode(name, this.scene);
+    const body = new PhysicsBody(node, PhysicsMotionType.STATIC, false, this.scene);
+    const c = new PhysicsShapeContainer(this.scene);
+    const m = mat(restitution, friction);
+    for (const sg of segs) {
+      const cap = new PhysicsShapeCapsule(v3(sg.a), v3(sg.b), r, this.scene);
+      cap.material = m;
+      filter(cap, LAYER.STATIC, LAYER.BALL | ALL_PLAYERS);
+      c.addChild(cap);
+    }
+    c.material = m;
+    filter(c, LAYER.STATIC, LAYER.BALL | ALL_PLAYERS);
+    body.shape = c;
     this.surfaceOf.set(body, surface);
     return body;
   }
@@ -340,8 +401,8 @@ export class ArenaPhysics {
   }
 
   /** Another ball in the same world (the 3-point contest's racks). Its node is the drawn ball. */
-  addBall(node: TransformNode): ArenaBall {
-    const b = new ArenaBall(node, this);
+  addBall(node: TransformNode, spec?: BallSpec): ArenaBall {
+    const b = new ArenaBall(node, this, spec);
     this.ballOf.set(b.body, this.balls.length);
     this.balls.push(b);
     return b;

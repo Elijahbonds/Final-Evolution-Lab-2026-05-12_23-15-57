@@ -4,7 +4,8 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { ArenaPhysics } from '../../../lib/babylon/arena/arenaPhysics';
+import { ArenaPhysics, SOCCER_SPEC } from '../../../lib/babylon/arena/arenaPhysics';
+import { buildSoccerColliders } from '../../../lib/babylon/arena/soccerPitch';
 import { ARENA_RIM, ARENA_RIM_RADIUS, type P3 } from '../../../lib/babylon/arena/hoopGeometry';
 import { __setHavokWasmBinary } from '../../../lib/babylon/core/Physics';
 import { jumpVy } from '../../../lib/babylon/arena/arenaConfig';
@@ -26,6 +27,22 @@ export async function makeWorld(): Promise<{ B: B; world: ArenaPhysics; dispose:
   const scene = new B.Scene(engine);
   new B.ArcRotateCamera('cam', 0, 0, 10, B.Vector3.Zero(), scene);
   const world = await ArenaPhysics.create(scene);
+  return { B, world, dispose: () => { world.dispose(); scene.dispose(); engine.dispose(); } };
+}
+
+/** A soccer world (plan §9): no hoop, the soccer ball, the pitch's boards, goal frames and nets. */
+export async function makeSoccerWorld(): Promise<{ B: B; world: ArenaPhysics; dispose: () => void }> {
+  const B = await import('@babylonjs/core');
+  if (!wasmSet) {
+    __setHavokWasmBinary(fs.readFileSync(path.resolve(__dirname, '../../../node_modules/@babylonjs/havok/lib/umd/HavokPhysics.wasm')));
+    wasmSet = true;
+  }
+  const engine = new B.NullEngine();
+  engine.getDeltaTime = () => 1000 / 60;
+  const scene = new B.Scene(engine);
+  new B.ArcRotateCamera('cam', 0, 0, 10, B.Vector3.Zero(), scene);
+  const world = await ArenaPhysics.create(scene, { hoop: false, ball: SOCCER_SPEC });
+  buildSoccerColliders(world);
   return { B, world, dispose: () => { world.dispose(); scene.dispose(); engine.dispose(); } };
 }
 
