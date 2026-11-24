@@ -1403,6 +1403,16 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/hoops/screenerRoll.ts SCREENER_ROLL_ON',
     hint: '1: a screener rolls or slips to the rim when his man has stepped up to the ball or nobody is on the near part of his line, and the handler looks for the open roll man. 0: he rolls only on a clear lane all the way to the rim, as before.',
   },
+  {
+    id: 'hoops.rollScoreOn', label: '3v3: the roll man scores, early slip, ghost screen, leading pass (0 = off)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · rival offense',
+    source: 'lib/babylon/hoops/screenerRoll.ts ROLL_SCORE_ON',
+    hint: 'Needs the screener roll switch too. 1: he slips the moment his man leaves him, cuts before planting when his man reads it early, the handler leads the pass to where he will be, and a catch at the rim goes up at once. 0: as before.',
+  },
+  {
+    id: 'hoops.pnrFightFullOn', label: 'Defence: fighting over a screen costs no pace (0 = off)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · defense',
+    source: 'lib/babylon/hoops/pnrCoverage.ts PNR_FIGHT_FULL_ON',
+    hint: 'Needs the pick-and-roll coverage switch. 1: the man on the ball goes over the top at full speed. 0: at 0.7 of it, as before.',
+  },
   // hoops-p04 (1v1/3v3 phase 4 "feet and transitions"): one blend + minimum-hold rule (anim/hoopsTransitions), the shot clips on their
   // release (hoops/releaseTiming). Every default is this lane's; the owner has felt none of them.
   {

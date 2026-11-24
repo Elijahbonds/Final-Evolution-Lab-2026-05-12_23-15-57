@@ -1275,4 +1275,15 @@ NEW switches, each **1 = on, 0 = today's game exactly** (tests pin both ends). N
   attack. Headless (pnr-sim, PRO, seeds 7 / 11 / 23 × 300): the screener rolls on 25–30 % of pick-and-rolls (was 0–1 %); points a
   pick-and-roll possession against today's defence 0.593 → 0.644; with `hoops.pnrCoverageOn` too, 0.576. The roll man's best
   separation inside 5 m was about 1.0 m (his man stays with him), so he was never open enough for the pass (0 catches). OFF.
+- `hoops.rollScoreOn` **0** (group "Hoops · rival offense"; `hoops/screenerRoll.ts` `ROLL_SCORE_ON`; needs `hoops.screenerRollOn`; new
+  numbers `GHOST_RANGE_M` 1.5 m, `ROLL_LEAD_OPEN_M` 1.6 m, `ROLL_PASS_MPS` 14 m/s (the chest pass's speed, for the lead), `ROLL_CATCH_RIM_M`
+  3 m): **the roll man scores** — the early slip, the ghost screen, the leading pass to where he will be, a catch at the rim goes up at
+  once. pnr-sim with the game's reaction delay (`LENS=1`, PRO, three seeds): roll-man catches 0 → 8–13 % of pick-and-rolls, the offence
+  0.659 → 0.680 points a possession; open looks for the roll man still 0 % (his man stays about 1.1 m off him). OFF.
+- `hoops.pnrFightFullOn` **0** (group "Hoops · defense"; `hoops/pnrCoverage.ts` `PNR_FIGHT_FULL_ON`; needs `hoops.pnrCoverageOn`): fighting
+  over a screen at full pace instead of `FIGHT_SLOW` 0.7 (the number itself unchanged). Measured no help: against the roll 0.715 → 0.732
+  points a pick-and-roll possession. OFF. **Correction to `hoops.pnrCoverageOn` above:** with the game's reaction delay in the sim the
+  coverage is worse than today's switch-every-screen against the roll too (0.693 → 0.715); keep it off.
+  Round 3 (the same switch): the roll goes to the block with the most room (`ROLL_BLOCK_SIDE_M` 2.0 m either side of the rim,
+  `ROLL_BLOCK_OUT_M` 1.2 m out) instead of straight down his line into the man guarding him; numbers in docs/HOOPS-GAP-PLAN.md §5.6.
 

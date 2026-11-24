@@ -26,7 +26,7 @@ import { profileFor, type Tier, type TierProfile } from '../core/Difficulty';
 import { driveLateral, type DriveIntent } from '../core/DriveLine';
 import { Vector3 } from '@babylonjs/core';
 import { KIT_WEIGHTS, KIT_CROSSES, moveFrame, pickWeighted, intoBody, type KitMove, type RivalAction } from './rivalOffense';
-import { screenerRollOn } from './screenerRoll';   // hoops-gap: the handler looks for the roll man
+import { screenerRollOn, rollScoreOn, rollLeadPoint, ROLL_LEAD_OPEN_M, ROLL_CATCH_RIM_M } from './screenerRoll';   // hoops-gap: the handler looks for the roll man
 
 /** A planar point. */
 export interface XZ { x: number; z: number }
@@ -185,7 +185,7 @@ export class TeamOffense3v3 {
   private go(p: HandlerPhase): void { this.phase = p; this.phaseT = 0; }
 
   step(dt: number, v: TeamView): HandlerStep {
-    this.elapsed += dt; this.phaseT += dt;
+    this.elapsed += dt; this.phaseT += dt; this.lastDt = dt;
     const out: HandlerStep = { wish: ZERO, phase: this.phase, action: null, move: null, moveSide: 1, callScreen: -1, pass: -1, gather: null, release: false, k: 0.05, exposure: DRIVE_EXPOSURE };
     const tx = v.rim.x - v.handler.x, tz = v.rim.z - v.handler.z, rimDist = len(tx, tz) || 1;
     const dir = { x: tx / rimDist, z: tz / rimDist }, perp = { x: -dir.z, z: dir.x };
@@ -202,6 +202,7 @@ export class TeamOffense3v3 {
       case 'set': {
         out.wish = ZERO;
         // a catch inside the screen's range (the roll man, a cutter) attacks at once; a fresh possession in the paint is taken back first
+        if (!this.fresh && rollScoreOn() && rimDist < ROLL_CATCH_RIM_M) { this.startAttack(v); out.action = this.say('drive'); break; }   // hoops-gap: a roll catch at the rim goes up at once
         if (this.phaseT >= SET_SEC) { if (!this.fresh && rimDist < TEAM_SCREEN_MIN_RIM_M + 0.5) { this.startAttack(v); out.action = this.say('drive'); } else this.go(this.fresh && rimDist < takeBackM() ? 'clear' : 'probe'); }
         break;
       }
@@ -393,9 +394,19 @@ export class TeamOffense3v3 {
   private rollOpen(v: TeamView): boolean {
     if (!screenerRollOn() || !this.tt.readsScreen || this.passesLeft <= 0 || this.screenMate < 0) return false;
     const s = v.screen; const mate = v.mates[this.screenMate];
-    if (!s || s.phase !== 'roll' || s.idx !== this.screenMate || !mate) return false;
+    if (!s || s.phase !== 'roll' || s.idx !== this.screenMate || !mate) { this.rollPrev = null; return false; }
+    const prev = this.rollPrev; this.rollPrev = { x: mate.x, z: mate.z };
+    if (rollScoreOn()) {
+      // hoops-gap round 2: the leading pass — read him where the ball will meet him
+      const vel = prev && this.lastDt > 1e-4 ? { x: (mate.x - prev.x) / this.lastDt, z: (mate.z - prev.z) / this.lastDt } : { x: 0, z: 0 };
+      const lead = rollLeadPoint(v.handler, mate, vel); this.rollLead = lead;
+      return this.R.openness(lead, v.defenders) >= ROLL_LEAD_OPEN_M && this.R.laneClear(v.handler, lead, v.defenders);
+    }
     return this.R.openness(mate, v.defenders) >= this.R.KICK_OPEN_M && this.R.laneClear(v.handler, mate, v.defenders);
   }
+  /** hoops-gap round 2: the roll man last frame (his speed for the lead), the frame's dt, and the spot the last roll read led him to. */
+  private rollPrev: XZ | null = null; private lastDt = 1 / 60;
+  rollLead: XZ | null = null;
   /** The finish this gather is for. */
   get gatherFor(): 'rim' | 'pullup' { return this.gatherKind; }
 
