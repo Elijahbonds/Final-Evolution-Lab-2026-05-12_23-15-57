@@ -233,3 +233,89 @@ Hands stay OFF until the owner feels them (owner 2026-11-24). Not measured on a 
 
 **The look:** `arena-contact-sheet.jpg` (the lane's scratch folder): the court camera and POV, desktop and an upright phone, the 1v1
 and the 3-point contest.
+
+**Knockdowns and fouls** (2026-11-24, `arena.knockdowns` / `arena.fouls`, both **OFF**; headless, section K):
+
+| What | Knobs off | Knobs on |
+|---|---|---|
+| A sprint with the ball into a set (still) rival: the contact Havok reports | 5.99 m/s, a push | 5.99 m/s: he goes down, **CHARGE**, his ball at the check |
+| The same at a jog | — | 4.39 m/s: a push, no call (the foul-grade gate) |
+| 1v1, three minutes (the scripted player against the rival) | 24 contacts, 0 calls | 28 contacts (hardest 7.5 m/s), 0 knockdowns, 6 calls: 4 loose-ball, 1 charge, 1 blocking; the game ran to 7–11 and restarted |
+| 3v3, three minutes | 198 contacts, 0 calls | 205 contacts (hardest 9.6 m/s), 3 knockdowns, 4 calls (2 loose-ball, 2 blocking); 3–9 |
+
+Two fixes came out of the first run with the knobs on, both bringing the arena's calls into line with the shipped hoops. (1) The
+ruling called any defence body running into any offence body, and the 3v3 stuck at 1–0 on 43 blocking fouls. The charge and the
+blocking foul now need the handler in the hit. (2) The calls skipped the shipped gate (`classifyContact` 'foul': 5.25 m/s closing on
+the floor, 4.2 on a shooter in the air), so a jog into a body was whistled. The knockdown now reads the speed of the body running in,
+not the two bodies' closing speed: two jogs meeting head-on close at 8.8 m/s, and on that reading the 3v3 put a body down every four
+seconds. No new physics bodies, so the phone cost is the contact read only (not measured on the rig: there is no frame-time question
+to ask of it). The capsule stays upright when a body is down; only the clips fall. **Both stay OFF** for the owner's feel check:
+how often the game stops for a whistle is a feel call, not a number the lane should pick.
+
+## 8. XP and progress: the proposed score rules (2026-11-24, a design for the owner; no server code written)
+
+The owner (2026-11-24): the arena counts for XP and progress, through server-side score rules (plausibility caps, no
+client-trusted totals), following the existing session / XP pattern; **no schema change without asking first**. The coordinator:
+report the design before any code that touches a server route.
+
+**How sessions and XP are scored today** (read, not changed):
+
+- `POST /api/sessions/start` starts a run on the server (`SessionRun`: `startedAt`, an expiry, and whether it pays, decided there
+  from signals the client cannot turn on: `?agent=1`, a playtest flag, the test-account list; a mode with no rules row starts
+  unpaid, `NO_RULES`).
+- `POST /api/sessions { runId, mode, score, opponentScore, won, stats, tallies }` finishes it once. The duration is the server's
+  (now − `startedAt`). `lib/sessions/modeScoreRules.ts` `checkRunScore` holds the client's `score` against the mode's row
+  (`maxScore`, `maxScorePerSecond`, `minDurationMs`, `maxDurationMs`); anything outside is refused (`SCORE_INVALID`), never
+  clamped. The hoops rows are `'rules'` rows: the exact maximum from the game's own rules (`lib/arena-score-integrity.ts`
+  `firstToCeiling`: first to 11, a bucket of at most 3 → 13). A head-to-head win is judged on the board
+  (`session-payout.ts` `judgeHeadToHead`), not on the client's word.
+- The payout is `sessionXp` (1.5 × score, +50 on a win, +10 otherwise), profile shards, 15 LC on a win, season XP, a mastery
+  sample, the PRQ attributes of the mode (`lib/prq.ts` `MODE_ATTRS`), the streak, all inside the daily economy caps, each grant a
+  ledger row keyed by the run.
+- So today the score itself is the client's number, bounded. The arena can do better: its games are simple enough that the server
+  can rebuild the total from the plays.
+
+**Proposed** (each a reversible code change except where marked):
+
+1. **Three session keys of their own:** `arenaHoops` (1v1 to 11), `arenaThrees` (3v3 to 21), `arenaThreePoint` (the 25-ball
+   contest). Recommended over posting as `hoops1v1` / `hoops3v3` / `threePoint`: the staked Arena's rival draw and the cold-start
+   median read a mode's past scores, and physics games on another scale should not mix into them. They go in `MODE_INFO` as
+   **unlisted** catalogue keys (the Play chip stays the way in; no venue grid, first-game pick or stake offers them).
+2. **The client sends the plays, the server computes the totals.** The finish carries `stats.arena`: the game's basket log
+   `[{ t, side, pts, fromM }]` (`t` the physics clock, `side` me / foe or home / away, `pts`, the shot's distance) and the shot count;
+   for the contest `[{ t, rack, ball, pts }]`. A new pure `lib/sessions/arenaScore.ts` rebuilds `score` and `opponentScore` from it
+   and refuses the run (`SCORE_INVALID`, with the rule it broke) when any play is impossible by the game's own rules:
+   - a bucket is 1, or 2 only from past the arc (`fromM` > 6.75 m) and inside the court;
+   - the game ends where it ends: the winner's total reaches the target (11 / 21) on the last bucket and not before; the loser
+     is under it;
+   - two buckets are at least the game's own cycle apart on its clock (the scored pause 1.4 s + the check pass + a shot's flight:
+     about 2.5 s, from the mode's constants, mirrored with a drift test like `STORY_MIRRORED`);
+   - the log's clock is no longer than the server's duration of the run (+ a small slack), and the shots outnumber the makes;
+   - the contest: at most 25 balls, a rack's fifth ball is the 2-pointer, the last make inside the 60 s clock;
+   - the `score` the client sends must equal the rebuilt one (a mismatch is refused, not corrected).
+   The rebuilt totals then go through the existing `checkRunScore` with `'rules'` rows: `arenaHoops` max **12** (10 + a 2),
+   `arenaThrees` **22**, `arenaThreePoint` **30**, and the pace / length floors derived from the same constants.
+3. **The win is judged on the rebuilt board** (`SERVER_JUDGED_WIN_MODES` gains the two games).
+4. **The payout is the existing one**, unchanged: at most 1.5 × 12 + 50 = 68 XP for a won 1v1, 83 for a won 3v3, inside the daily
+   caps. PRQ attributes as the shipped mode of each sport; a mastery sample as the shipped hoops metrics.
+5. **The arena posts a game when it ends:** today a game simply starts again at 11. The page would start a run when a game starts
+   (`/api/sessions/start`) and finish it at the final, the way `GameShell` does; signed-out play stays unpaid practice; an agent
+   or playtest run stays unpaid as everywhere.
+6. **No schema change.** The log rides in the request body; the run's stored answer (`SessionRun.result`, an existing JSON column)
+   can keep the rebuilt totals and the log's length for audit. Storing the whole log anywhere else would be a schema change, so
+   it is not proposed.
+
+**What it does not stop, said plainly:** the log is still written by the client. A forger can post a log that obeys every rule (an
+11–0 at a believable pace); the rules make that the most it can ever be paid (68 XP, then the daily caps), never more. The stronger
+answer is to replay the game on the server: the arena is deterministic (a fixed step, seeded; section B is bit for bit), so the
+client could send its inputs and the server re-run the Havok game in node. It costs a few seconds of server CPU per finish and a
+Havok load in the function; proposed as a later step, not now.
+
+**Questions for the owner** (the lane's recommendation first):
+
+- a. Own keys `arenaHoops` / `arenaThrees` / `arenaThreePoint` (recommended), or count as the shipped 1v1 / 3v3 / 3-point?
+- b. Totals rebuilt from the play log (recommended now), or the server replay first?
+- c. The full payout (XP, shards, 15 LC on a win), or XP and progress only (no LC) while the arena is new?
+- d. Knockdowns and fouls change nothing in the score rules (a foul is the ball at the check; an and-one is the basket only). Agreed?
+
+Nothing above is built. The server pieces (the route hook, the rows, the catalogue keys) wait for the owner's answer.

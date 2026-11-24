@@ -466,6 +466,9 @@ describe('the feel knob catalogue', () => {
     expect(def('cam.povLookDegS')).toBe(ARENA.POV_LOOK_DEG_S);
     expect(def('arena.physicsHands')).toBe(ARENA.ARENA_PHYSICS_HANDS); expect(ARENA.ARENA_PHYSICS_HANDS).toBe(0);   // owner 2026-11-24: OFF until measured
     expect(def('arena.dunks')).toBe(ARENA.ARENA_DUNKS); expect(def('arena.dunkJumpVy')).toBe(ARENA.DUNK_JUMP_VY);
+    expect(def('arena.knockdowns')).toBe(ARENA.ARENA_KNOCKDOWNS); expect(ARENA.ARENA_KNOCKDOWNS).toBe(0);   // owner 2026-11-24: behind knobs, the shipping bar
+    expect(def('arena.fouls')).toBe(ARENA.ARENA_FOULS); expect(ARENA.ARENA_FOULS).toBe(0);
+    expect(def('arena.knockMps')).toBe(ARENA.KNOCK_MPS); expect(def('arena.downSec')).toBe(ARENA.DOWN_SEC);
     expect(ARENA.ARENA_ON).toBe(1); expect(ARENA.ARENA_PHYSICS_HOOPS).toBe(1); expect(ARENA.CAM_POV).toBe(1); expect(ARENA.POV_BOB_M).toBe(0);
   });
 

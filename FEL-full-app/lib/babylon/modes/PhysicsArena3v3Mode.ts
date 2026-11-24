@@ -37,7 +37,9 @@ import { HoopSensor } from '../arena/hoopSensor';
 import { dunkPush, LAYUP_ARC_DEG, releaseShot } from '../arena/arenaShot';
 import { passVelocity, seeded } from '../arena/shotModel';
 import { chestPoint, dribbleCatch, dribbleCommit, dribbleHand, dribblePush, setPoint } from '../arena/dribble';
-import { aimAssist, dunkJumpVy, dunksOn, floorBounce, jumpVy, physicsHandsOn, povBobM, povEyeM, povFovDeg, povLookDegS, povOn, stepHz } from '../arena/arenaConfig';
+import { aimAssist, downSec, dunkJumpVy, dunksOn, floorBounce, foulsOn, jumpVy, knockdownsOn, knockMps, physicsHandsOn, povBobM, povEyeM, povFovDeg, povLookDegS, povOn, stepHz } from '../arena/arenaConfig';
+import { ruleContact, type ContactBody, type ContactCall } from '../arena/arenaContact';
+import { rule, type Side } from '../core/Ref';
 import { aimYawErr, applyPov, fovForAspect, povLook, povPose, type PovView } from '../arena/povCamera';
 import { handTargets } from '../arena/handTargets';
 import { RIVAL_BY_TIER, shotKindFor, type ShotKind } from './PhysicsArenaMode';
@@ -91,6 +93,8 @@ interface Pl {
   /** Where he spaces on offence (index into SPACING). */
   spot: number;
   reactAt: number;
+  /** Knocked down (arena.knockdowns): seconds until he is back up. Out of the play until then. */
+  downT: number;
 }
 
 interface St {
@@ -131,7 +135,13 @@ interface St {
   timing: string;
   prevBall: P3;
   hudKey: string;
-  stats: { shots: Record<Team, number>; makes: Record<Team, number>; passes: number; completed: number; intercepted: number; steals: number; lostHandles: number; blocksByHand: number; outOfBounds: number; stalls: number };
+  stats: { shots: Record<Team, number>; makes: Record<Team, number>; passes: number; completed: number; intercepted: number; steals: number; lostHandles: number; blocksByHand: number; outOfBounds: number; stalls: number;
+    /** Body-on-body contacts reported, knockdowns, fouls by call (arena.knockdowns / arena.fouls), and-ones. */
+    bodyHits: number; hardestHitMps: number; knockdowns: number; fouls: Record<string, number>; andOnes: number;
+    /** The first calls, for the tests' read: who on whom, at what speeds, how long into the possession. */
+    callLog: string[] };
+  /** A shooting foul whose attempt is still playing out: the fouled shooter (a make counts, a miss is his team's ball). */
+  andOne: Pl | null;
   disposed: boolean;
 }
 
@@ -209,7 +219,8 @@ function setupCheck(S: St, offence: Team): void {
     const m = off[k].node.position;
     d.body.teleport({ x: m.x * 0.85, y: 0, z: m.z - 1.4 }); d.yaw = 0;
   });
-  for (const a of S.pl) { a.shot = null; a.hopT = 0; a.reachT = 0; }
+  for (const a of S.pl) { a.shot = null; a.hopT = 0; a.reachT = 0; a.downT = 0; }
+  S.andOne = null;
   const point = off[0], holder = def[0];
   S.world.ball.teleport(chestPoint(p3(holder.node.position), holder.yaw));
   S.sensor.reset();
@@ -252,7 +263,7 @@ function push(S: St, a: Pl): void {
 }
 
 function startShot(S: St, a: Pl, aiReleaseAt = Infinity): void {
-  if (S.handler !== a || a.shot || (S.ball !== 'dribble' && S.ball !== 'held')) return;
+  if (S.handler !== a || a.shot || a.downT > 0 || (S.ball !== 'dribble' && S.ball !== 'held')) return;
   S.ball = 'held'; S.ballT = 0;
   const v = a.body.vel(TMP);
   const kind = shotKindFor(flatDist(a.node.position, RIM_FLOOR), Math.hypot(v.x, v.z), dunksOn());
@@ -388,7 +399,7 @@ function beforeStep(ctx: ModeContext, S: St, h: number): void {
   const ball = S.world.ball;
   for (const a of S.pl) {
     let w = a.human ? humanWish(ctx, S) : aiWish(S, a);
-    if (S.phase === 'check' || (a.shot && !a.shot.jumped && a.shot.kind !== 'dunk')) w = { x: 0, z: 0 };
+    if (S.phase === 'check' || a.downT > 0 || (a.shot && !a.shot.jumped && a.shot.kind !== 'dunk')) w = { x: 0, z: 0 };   // a body on the floor does not run
     w = keepIn(a.node.position, w);
     a.wish.x = w.x; a.wish.z = w.z;
     const drive = S.handler === a && S.ball === 'dribble' && dribbleCommit(a.committed, w).changing ? a.committed : w;
@@ -396,7 +407,7 @@ function beforeStep(ctx: ModeContext, S: St, h: number): void {
     if (a.hands) {
       const tg = handTargets({
         feet: p3(a.node.position), yaw: a.yaw, ball: p3(ball.pos),
-        role: a.shot ? 'shoot' : S.handler === a ? (S.ball === 'dribble' ? 'dribble' : 'hold') : a.reachT > 0 ? 'reach' : a.hopT > 0 ? 'contest' : S.handler && S.handler.team !== a.team ? 'guard' : 'rest',
+        role: a.downT > 0 ? 'rest' : a.shot ? 'shoot' : S.handler === a ? (S.ball === 'dribble' ? 'dribble' : 'hold') : a.reachT > 0 ? 'reach' : a.hopT > 0 ? 'contest' : S.handler && S.handler.team !== a.team ? 'guard' : 'rest',
         dribbleSide: S.dribble.side,
       });
       a.hands.target(tg.left, tg.right, a.reachT > 0);
@@ -425,6 +436,8 @@ function afterStep(S: St, h: number): void {
     S.phase = 'scored'; S.phaseT = 0;
     S.possession = otherTeam(team);   // the ball changes hands after a make
     say(S, `${team === 'home' ? (by?.human ? 'Bucket' : 'Your team scores') : 'They score'} +${pts}`);
+    if (S.andOne && S.andOne === S.shotBy) { S.stats.andOnes++; say(S, `${rule('and_one').call} +${pts}`); }   // fouled and it went in: the basket counts (no free throws here)
+    S.andOne = null;
     SoundKit.play('swish', { volume: 0.7 });
     if (S.score[team] >= ARENA_3V3_GAME_TO) { S.phase = 'over'; S.phaseT = 0; say(S, `${team === 'home' ? 'You win' : 'They win'} ${S.score.home}–${S.score.away}`, 3); }
   }
@@ -434,6 +447,9 @@ function afterStep(S: St, h: number): void {
 function rules(S: St, dt: number): void {
   const ball = S.world.ball;
   S.phaseT += dt; S.ballT += dt; S.holdT += dt;
+  bodyContacts(S);
+  // a shooting foul's attempt is over and missed: the shooter's team's ball
+  if (S.andOne && S.phase === 'live' && S.ball !== 'flight' && !S.andOne.shot) deadBall(S, S.andOne.team, rule('shooting_foul').call);
   for (const c of S.world.drainContacts()) {
     if (S.ball === 'flight' && c.surface !== 'body') S.shotTouched = true;
     if (c.playerId) { const who = S.pl.find((x) => String(x.i) === c.playerId); if (who) { S.lastTouch = who; if (c.hand && S.ball === 'flight' && who.team !== S.shotBy?.team) { S.stats.blocksByHand++; say(S, who.team === 'home' ? 'Blocked' : 'Got blocked'); } } }
@@ -458,6 +474,7 @@ function rules(S: St, dt: number): void {
       if (S.ball === 'flight' && !S.shotTouched && !(bv.y < 0 && ball.pos.y < 2.6)) continue;
       if (S.phase === 'scored' || (ball.ignoring & a.body.bit)) continue;
       if (a === S.lostBy && S.t - S.lostAt < POKE_GRACE_SEC) continue;   // the poked handler cannot just take it straight back
+      if (a.downT > 0) continue;   // on the floor: not his ball to catch
       const c = chestPoint(p3(a.node.position), a.yaw);
       const dc = Math.hypot(ball.pos.x - c.x, ball.pos.y - c.y, ball.pos.z - c.z);
       const dh = flatDist(ball.pos, a.node.position);
@@ -485,6 +502,65 @@ function rules(S: St, dt: number): void {
   if (S.phase === 'live' && S.ball === 'loose' && S.ballT > STALL_SEC) { S.stats.stalls++; setupCheck(S, S.possession); }
 }
 
+// ── contact: knockdowns and fouls (arena.knockdowns, arena.fouls; both OFF by default; the 1v1's rules) ─────────────────────────
+
+const GET_UP_SEC = 0.45;
+/** The referee names two sides: the human's team is 'me'. */
+const sideOf = (t: Team): Side => (t === 'home' ? 'me' : 'foe');
+const teamOf = (s: Side): Team => (s === 'me' ? 'home' : 'away');
+
+function contactBody(S: St, a: Pl): ContactBody {
+  const v = a.body.lastVel;
+  return { id: String(a.i), side: sideOf(a.team), airborne: !a.body.grounded, shooting: !!a.shot || (S.shotBy === a && S.ball === 'flight' && !a.body.grounded), speed: Math.hypot(v.x, v.z), hasBall: S.handler === a };
+}
+
+function bodyContacts(S: St): void {
+  const hits = S.world.drainBodyContacts();
+  for (const c of hits) { S.stats.bodyHits++; S.stats.hardestHitMps = Math.max(S.stats.hardestHitMps, c.closingSpeed); }
+  const kd = knockdownsOn(), fl = foulsOn();
+  if (!kd && !fl) return;   // both OFF: the bodies only push (today's arena exactly)
+  for (const c of hits) {
+    if (S.phase !== 'live') return;
+    const att = S.pl[Number(c.attacker)], vic = S.pl[Number(c.victim)];
+    if (!att || !vic || att.downT > 0 || vic.downT > 0) continue;
+    const r = ruleContact(c, contactBody(S, att), contactBody(S, vic), { knockdowns: kd, fouls: fl, knockMps: knockMps(), offense: sideOf(S.possession), looseBall: !S.handler && S.ball !== 'pass' });
+    if (r.down) knockDown(S, S.pl[Number(r.down)], c.closingSpeed);
+    if (r.foul) {
+      if (S.stats.callLog.length < 6) S.stats.callLog.push(`${r.foul.id} ${att.i}->${vic.i} closing ${c.closingSpeed.toFixed(1)} att ${c.attackerSpeed.toFixed(1)} vic ${contactBody(S, vic).speed.toFixed(1)} phaseT ${S.phaseT.toFixed(2)} holdT ${S.holdT.toFixed(2)}`);
+      whistle(S, r.foul); return;
+    }
+  }
+}
+
+function knockDown(S: St, a: Pl, mps: number): void {
+  a.downT = downSec(); a.shot = null; a.hopT = 0; a.reachT = 0;
+  S.stats.knockdowns++;
+  if (S.handler === a) {
+    const v = a.body.lastVel;
+    loseBall(S, null);
+    S.world.ball.launch({ x: v.x * 0.8, y: 0.6, z: v.z * 0.8 });
+  }
+  playClip(a, 'karate_knockdown', false);
+  say(S, a.human ? 'Knocked down' : a.team === 'home' ? 'Your man went down' : 'He went down', 1.2);
+  SoundKit.play('impact', { volume: Math.min(0.6, 0.2 + mps * 0.05) });
+}
+
+function whistle(S: St, f: ContactCall): void {
+  S.stats.fouls[f.id] = (S.stats.fouls[f.id] ?? 0) + 1;
+  SoundKit.play('whistle', { volume: 0.45 });
+  const shooter = S.pl[Number(f.on)];
+  if (f.id === 'shooting_foul' && shooter && (shooter.shot || (S.ball === 'flight' && S.shotBy === shooter))) { S.andOne = shooter; say(S, f.call.banner, 1.2); return; }
+  deadBall(S, f.call.ball ? teamOf(f.call.ball) : S.possession, f.call.banner);
+}
+
+function deadBall(S: St, to: Team, banner: string): void {
+  S.andOne = null;
+  if (S.handler) loseBall(S, null);
+  S.possession = to;
+  S.phase = 'scored'; S.phaseT = 0.2;
+  say(S, `${banner}. ${to === 'home' ? 'Your ball' : 'Their ball'}`, 1.4);
+}
+
 function decisions(S: St, dt: number): void {
   const prof = RIVAL_BY_TIER[S.tier];
   for (const a of S.pl) {
@@ -492,6 +568,12 @@ function decisions(S: St, dt: number): void {
     if (a.reachT > 0) a.reachT -= dt;
     if (a.hopT > 0) a.hopT += dt;
     if (a.hopT > 0.2 && a.body.grounded) a.hopT = 0;
+    if (a.downT > 0) {
+      const was = a.downT;
+      a.downT = Math.max(0, a.downT - dt);
+      if (was > GET_UP_SEC && a.downT <= GET_UP_SEC) playClip(a, 'karate_get_up', false);
+      else if (a.downT > GET_UP_SEC && a.clip === 'karate_knockdown' && downSec() - a.downT > 0.6) playClip(a, 'karate_floor_hold');
+    }
     if (!a.shot) continue;
     a.shot.t += dt;
     if (!a.shot.jumped && a.shot.t >= GATHER_SEC) { a.body.jump(a.shot.kind === 'dunk' ? dunkJumpVy() : jumpVy()); a.shot.jumped = true; a.shot.t = 0; }
@@ -508,7 +590,7 @@ function decisions(S: St, dt: number): void {
   if (S.phase !== 'live') return;
   const h = S.handler;
   // the AI handler: shoot open, pass to the open man (the human first when he called for it), or go up anyway
-  if (h && !h.human && !h.shot && (S.ball === 'dribble' || S.ball === 'held') && S.holdT > 0.7) {
+  if (h && !h.human && !h.shot && h.downT <= 0 && (S.ball === 'dribble' || S.ball === 'held') && S.holdT > 0.7) {
     const dist = flatDist(h.node.position, RIM_FLOOR);
     const open = openness(S, h) > OPEN_M;
     const target = mates(S, h).filter((m) => openness(S, m) > OPEN_M && laneClear(S, h, m)).sort((u, w) => (w.human && S.t - S.calledAt < 2 ? 1 : 0) - (u.human && S.t - S.calledAt < 2 ? 1 : 0) || openness(S, w) - openness(S, u))[0];
@@ -520,7 +602,7 @@ function decisions(S: St, dt: number): void {
     else if (S.holdT > 4.5) startShot(S, h, S.rng.normal() * prof.releaseSd);
   }
   for (const d of S.pl) {
-    if (d.human || (h && d.team === h.team)) continue;
+    if (d.human || d.downT > 0 || (h && d.team === h.team)) continue;
     // a contest jump at a shot near him, after his reaction time
     const shooter = S.pl.find((x) => x.shot && x.team !== d.team && flatDist(x.node.position, d.node.position) < 2.2);
     if (shooter && d.hopT === 0 && d.body.grounded) {
@@ -546,7 +628,8 @@ function facing(S: St, dt: number): void {
   for (const a of S.pl) {
     const v = a.body.vel(TMP), sp = Math.hypot(v.x, v.z);
     let want = a.yaw;
-    if (a.human && S.pov.on) want = S.pov.view.yaw;
+    if (a.downT > 0) want = a.yaw;
+    else if (a.human && S.pov.on) want = S.pov.view.yaw;
     else if (a.shot) want = yawTo(a.node.position, ARENA_RIM);
     else if (S.handler && S.handler.team !== a.team) want = yawTo(a.node.position, S.pl[a.guards]?.node.position ?? S.handler.node.position);
     else if (sp > 0.6) want = Math.atan2(v.x, v.z);
@@ -555,6 +638,7 @@ function facing(S: St, dt: number): void {
     a.yaw = a.human && S.pov.on ? want : slewYaw(a.yaw, want, 9, dt);
     a.view.position.copyFrom(a.node.position);
     a.view.rotation.y = a.yaw;
+    if (a.downT > 0) continue;   // the knockdown, the floor and the get-up play out (decisions)
     if (a.shot || (!a.body.grounded && a.clip === 'bball_shoot_jumper')) continue;
     const hasBall = S.handler === a && S.ball === 'dribble';
     playClip(a, hasBall ? (sp > 4.8 ? 'bball_dribble_run' : sp > 2.2 ? 'bball_dribble_jog' : sp > 0.5 ? 'bball_dribble_walk' : 'bball_dribble_idle')
@@ -621,7 +705,7 @@ export const PhysicsArena3v3Mode: ModeDefinition = {
       if (c) { installSafePlay(c.animator, ARENA_3V3_MODE_ID); c.root.parent = b.view; c.root.position.set(0, 0, 0); c.root.rotation.set(0, 0, 0); c.root.rotationQuaternion = null; }
       return {
         i, team: i < 3 ? 'home' : 'away', human: i === 0, ...b, char: c, head: c ? boneNode(c.skeleton, 'Head') : null, yaw: 0, clip: '', shot: null,
-        hopT: 0, pokeCd: 0, reachT: 0, wish: { x: 0, z: 0 }, committed: { x: 0, z: 0 }, guards: i < 3 ? i + 3 : i - 3, spot: i % 3, reactAt: 0,
+        hopT: 0, pokeCd: 0, reachT: 0, wish: { x: 0, z: 0 }, committed: { x: 0, z: 0 }, guards: i < 3 ? i + 3 : i - 3, spot: i % 3, reactAt: 0, downT: 0,
       };
     });
     const S: St = {
@@ -631,8 +715,8 @@ export const PhysicsArena3v3Mode: ModeDefinition = {
       holdT: 0, calledAt: -9, lostBy: null, lostAt: -9, input: { lx: 0, ly: 0, rx: 0, ry: 0, sprint: false },
       pov: { on: false, view: { yaw: 0, pitch: 0, bobPhase: 0 }, savedFov: ctx.camera.fov }, camModeSeen: ctx.camDirector.mode,
       banner: '', bannerT: 0, timing: '', prevBall: { x: 0, y: 1, z: 6 }, hudKey: '',
-      stats: { shots: { home: 0, away: 0 }, makes: { home: 0, away: 0 }, passes: 0, completed: 0, intercepted: 0, steals: 0, lostHandles: 0, blocksByHand: 0, outOfBounds: 0, stalls: 0 },
-      disposed: false,
+      stats: { shots: { home: 0, away: 0 }, makes: { home: 0, away: 0 }, passes: 0, completed: 0, intercepted: 0, steals: 0, lostHandles: 0, blocksByHand: 0, outOfBounds: 0, stalls: 0, bodyHits: 0, hardestHitMps: 0, knockdowns: 0, fouls: {}, andOnes: 0, callLog: [] },
+      andOne: null, disposed: false,
     };
     states.set(scene, S); current = S;
     setupCheck(S, 'home');
@@ -657,6 +741,7 @@ export const PhysicsArena3v3Mode: ModeDefinition = {
     if (e.t !== 'button') return;
     if (e.btn === 'R1') { S.input.sprint = e.pressed; return; }
     if (!e.pressed) { if (e.btn === 'X' && me.shot) me.shot.wantRelease = true; return; }
+    if (me.downT > 0) return;   // on the floor: nothing until he is up
     if (e.btn === 'X') {
       if (S.handler === me && S.phase === 'live') startShot(S, me);
       else if (me.body.grounded && me.hopT === 0) { me.body.jump(jumpVy()); me.hopT = 0.001; }

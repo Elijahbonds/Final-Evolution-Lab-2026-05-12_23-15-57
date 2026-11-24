@@ -58,6 +58,20 @@ export const DUNK_JUMP_VY = 4.3;
  *  bodies that move to where the hands are (the dribble, the set point, a contest held high, a reach), so a hand that meets the ball
  *  moves it by contact: a block or a poke is the physics'. 0 = OFF (shipped): the capsules and the impulse poke, as before. */
 export const ARENA_PHYSICS_HANDS = 0;
+/** Knockdowns (owner 2026-11-24: "Bodies can be knocked over ... behind knobs, and the shipping bar applies"): a body run into hard
+ *  enough goes down for DOWN_SEC (the borrowed knockdown, floor and get-up clips over its capsule), drops the ball and takes no part
+ *  until it is up. 0 = OFF (shipped): bodies only push (as before). */
+export const ARENA_KNOCKDOWNS = 0;
+/** Fouls (the same answer): a foul-speed contact is whistled by the shared referee's rules (core/Ref.ts: the charge needs a set
+ *  defender, a defender running through the handler is a blocking foul, contact on a shooter is a shooting foul whose attempt plays
+ *  out, contact on a loose ball goes to the fouled side). The arena has no free throws: a foul is the ball at the check. 0 = OFF. */
+export const ARENA_FOULS = 0;
+/** The speed (m/s, along the contact) of the body running in that knocks the other down: a sprint (6.0) does, a jog (4.4) does not,
+ *  even two jogs meeting head-on. A body in the air goes down at KNOCK_AIR_SHARE of it (nothing to brace on). */
+export const KNOCK_MPS = 5.0;
+export const KNOCK_AIR_SHARE = 0.72;
+/** How long a knocked-down body stays out (s): the fall, the floor and the get-up (karate_get_up is the last 0.45 s). */
+export const DOWN_SEC = 1.3;
 /** POV only: how much of a look away from the rim the shot forgives (1 = always at the rim, 0 = exactly where you look). */
 export const AIM_ASSIST = 0.8;
 
@@ -89,6 +103,10 @@ export const aimAssist = (): number => feel('arena.aimAssist', AIM_ASSIST);
 export const physicsHandsOn = (): boolean => feel('arena.physicsHands', ARENA_PHYSICS_HANDS) >= 0.5;
 export const dunksOn = (): boolean => feel('arena.dunks', ARENA_DUNKS) >= 0.5;
 export const dunkJumpVy = (): number => feel('arena.dunkJumpVy', DUNK_JUMP_VY);
+export const knockdownsOn = (): boolean => feel('arena.knockdowns', ARENA_KNOCKDOWNS) >= 0.5;
+export const foulsOn = (): boolean => feel('arena.fouls', ARENA_FOULS) >= 0.5;
+export const knockMps = (): number => feel('arena.knockMps', KNOCK_MPS);
+export const downSec = (): number => feel('arena.downSec', DOWN_SEC);
 export const povEyeM = (): number => feel('cam.povEyeM', POV_EYE_M);
 export const povFovDeg = (): number => feel('cam.povFovDeg', POV_FOV_DEG);
 export const povBobM = (): number => feel('cam.povBobM', POV_BOB_M);

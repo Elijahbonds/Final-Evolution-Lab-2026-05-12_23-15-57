@@ -28,6 +28,9 @@ export const playerBit = (i: number): number => LAYER.PLAYER0 << i;
 const ALL_PLAYERS = 0xfffffffc;
 
 export type Surface = 'floor' | 'rim' | 'board' | 'frame' | 'body';
+/** Two bodies meeting (knockdowns and fouls read these): the closing speed along the contact normal from the velocities they were
+ *  driven at before the step, and which of the two was moving into the other faster. */
+export interface BodyContact { a: string; b: string; closingSpeed: number; attacker: string; victim: string; attackerSpeed: number }
 export interface BallContact { surface: Surface; impulse: number; playerId?: string; /** Which ball (its index in `balls`). */ ball: number; /** A physics hand (arena.physicsHands), not the body. */ hand?: boolean }
 
 const mat = (restitution: number, friction: number): PhysicsMaterial => ({
@@ -170,6 +173,8 @@ export class ArenaPlayer {
   }
   get pos(): Vector3 { return this.node.position; }
   vel(out = new Vector3()): Vector3 { this.body.getLinearVelocityToRef(out); return out; }
+  /** This body's velocity at the start of the step (a contact's closing speed is read from it: ContactSystem's rule). */
+  readonly lastVel = new Vector3();
   /** On the floor (feet within 3 cm and not rising). */
   get grounded(): boolean {
     if (this.jumping && this.world.time - this.jumpAt > 0.1) this.jumping = false;
@@ -373,6 +378,7 @@ export class ArenaPhysics {
     let n = 0;
     const t0 = performance.now();
     while (this.acc >= h - 1e-9 && n < ARENA_MAX_STEPS) {
+      for (const p of this.players) p.vel(p.lastVel);   // the speeds the bodies meet at (a contact's closing speed)
       beforeStep?.(h);
       for (const b of this.balls) b.preStep(h);
       for (const hd of this.hands) hd.preStep(h);
@@ -389,7 +395,27 @@ export class ArenaPhysics {
     return n;
   }
 
+  private bodyContactQ: BodyContact[] = [];
+  private pairCooldown = new Map<string, number>();
+  /** Body-on-body contacts since the last drain (one per pair at most every 0.3 s of simulated time). */
+  drainBodyContacts(): BodyContact[] { const out = this.bodyContactQ; this.bodyContactQ = []; return out; }
+
+  private onBodyCollision(pa: ArenaPlayer, pb: ArenaPlayer, e: IPhysicsCollisionEvent): void {
+    const key = pa.id < pb.id ? `${pa.id}|${pb.id}` : `${pb.id}|${pa.id}`;
+    if ((this.pairCooldown.get(key) ?? -1) > this.time) return;
+    const n = e.normal ?? Vector3.Up();
+    const va = pa.lastVel, vb = pb.lastVel;
+    const closing = Math.abs((va.x - vb.x) * n.x + (va.z - vb.z) * n.z);
+    if (closing < 1.2) return;
+    this.pairCooldown.set(key, this.time + 0.3);
+    const aAlong = Math.abs(va.x * n.x + va.z * n.z), bAlong = Math.abs(vb.x * n.x + vb.z * n.z);
+    const att = aAlong >= bAlong ? pa : pb, vic = att === pa ? pb : pa;
+    if (this.bodyContactQ.length < 32) this.bodyContactQ.push({ a: pa.id, b: pb.id, closingSpeed: closing, attacker: att.id, victim: vic.id, attackerSpeed: Math.max(aAlong, bAlong) });
+  }
+
   private onCollision(e: IPhysicsCollisionEvent): void {
+    const pa = this.playerOf.get(e.collider), pb = this.playerOf.get(e.collidedAgainst);
+    if (pa && pb) { this.onBodyCollision(pa, pb, e); return; }
     const bi = this.ballOf.get(e.collider) ?? this.ballOf.get(e.collidedAgainst);
     if (bi === undefined) return;
     const ballBody = this.balls[bi].body;
