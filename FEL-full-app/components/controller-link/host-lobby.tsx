@@ -10,6 +10,8 @@ import { joinUrl } from '@/lib/controller-link/codes';
 import type { ControlEvent, LinkState, LobbyPeer, ModeControllerConfig, PeerId, RoomState } from '@/lib/controller-link/types';
 import type { FelInput, InputBus, PadInfo } from '@/lib/babylon/core/InputBus';
 import { linkErrorText } from '@/lib/controller-link/transport/signaling';
+import { InSlot } from '@/components/games/hud-zones';   // look-screens A3: the upright phone's "⋯" menu slot
+import { cardOverlapFixes } from '@/lib/ui/firstRun';
 import { USB_TITLE, USB_STEPS, PHONE_TITLE, PHONE_STEPS, usbStatusLine, typeInstead } from '@/lib/controller-link/connectHelp';
 import { readDisplaySetting, writeDisplaySetting, displayBanner, MIRROR_FACTOR, type DisplaySetting } from '@/lib/controller-link/tvMode';
 
@@ -159,11 +161,17 @@ export function HostLobby({ config, onInput, collapsed, onPeers, onPadInput, laz
       </span>
     ) : null;
     // HOOPS-TO-75 HP-2: a connected pad replaces the CONNECT badge; HP-3: no room code chip in prod
+    // LOOK-SCREENS A3 (ui.cardOverlapFixes): before play, on an upright phone the line sat on the loading / READY card's venue line;
+    // there it is in the stage's "⋯" menu instead (the same words). In play (the "connected" line after a join), sideways, desktop
+    // and with no menu it stays where it was.
+    const usbStack = (line: React.ReactNode) => (cardOverlapFixes() && !collapsed
+      ? <InSlot name="menu" fallback={<Stack anchor={anchor}>{line}</Stack>}>{line}</InSlot>
+      : <Stack anchor={anchor}>{line}</Stack>);
     if (pads.length > 0) {
-      return usbLine ? <Stack anchor={anchor}>{usbLine}</Stack> : null;
+      return usbLine ? usbStack(usbLine) : null;
     }
     if (hideRoomChip) {
-      return usbLine ? <Stack anchor={anchor}>{usbLine}</Stack> : null;
+      return usbLine ? usbStack(usbLine) : null;
     }
     if (error) {
       return (

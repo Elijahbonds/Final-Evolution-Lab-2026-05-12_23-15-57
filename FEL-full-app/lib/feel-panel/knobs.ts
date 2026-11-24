@@ -2422,6 +2422,26 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'Phase A2, ships OFF (1). Below 1 the upright touch deck draws its action buttons (the diamond and TURBO) at this opacity so a player behind them shows through. It does not know where the players are, so it fades always: a look call for the owner. 1 = the solid deck, as before.',
   },
   {
+    id: 'ui.placeLoadingCard', label: 'Venice, the Coast and the arena load on the branded card (1) / on a black screen with one line (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',
+    source: 'lib/ui/placeLoading.ts PLACE_LOADING_CARD',
+    hint: 'Phase A3. While Venice, the Coast or the Physics Arena builds, the start screen look every hoops game has: the venue art that ships, the place name, the loading line word for word and a bar. Drawn by the shared play layout until the place is ready, or steps aside for its error line. Off: the black screen and one line, as before.',
+  },
+  {
+    id: 'ui.firstRunCard', label: 'Try page birth date on the sign-up card, home fits a sideways phone, sign-in card glow not cut (1) / as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',
+    source: 'lib/ui/firstRun.ts FIRST_RUN_CARD',
+    hint: 'Phase A3. Same words, same age rule. Not a play page, so the panel cannot change it: the shipped value, changed by a commit.',
+  },
+  {
+    id: 'ui.compactAppHeader', label: 'Phone: the app top bar is one row, level ring only with a number; Play doors in two columns (1) / as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',
+    source: 'lib/ui/firstRun.ts COMPACT_APP_HEADER',
+    hint: 'Phase A3. The wallet and sign-out sit beside the wordmark, the PRQ ring is drawn once it has a number (never an empty ring and a dash), and the Play screen six doors are an even two-column grid on a phone. Wider screens unchanged. Not a play page: the shipped value, changed by a commit.',
+  },
+  {
+    id: 'ui.cardOverlapFixes', label: 'USB controller line in the dots menu on an upright phone, end card title wraps balanced (1) / as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',
+    source: 'lib/ui/firstRun.ts CARD_OVERLAP_FIXES',
+    hint: 'Phase A3. Before play on an upright phone the USB controller line sat on the loading card venue line: it is in the dots menu there (same words). The results card title wraps balanced, so no word is left alone. Off: as before.',
+  },
+  {
     id: 'try.prefetchDunk', label: 'Try page: load the first dunk while the birth date is asked (1) / only after the answer (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',
     source: 'lib/try/prefetchDunk.ts TRY_PREFETCH_DUNK',
     hint: 'On: the dunk code and its first files are fetched into the browser cache while a guest gives the birth date (plain file requests, no cookies, nothing about the visitor). Off (shipped: the measured cut was about 12 percent, short of the 25 percent bar): nothing is requested until the answer, as before. The try page has no feel panel: change it by a commit.',
