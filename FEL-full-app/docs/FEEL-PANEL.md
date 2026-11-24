@@ -1267,4 +1267,15 @@ NEW switches, each **1 = on, 0 = today's game exactly** (tests pin both ends). N
   coverage is worse than today's switch-every-screen against the roll too (0.693 → 0.715); keep it off.
   Round 3 (the same switch): the roll goes to the block with the most room (`ROLL_BLOCK_SIDE_M` 2.0 m either side of the rim,
   `ROLL_BLOCK_OUT_M` 1.2 m out) instead of straight down his line into the man guarding him; numbers in docs/HOOPS-GAP-PLAN.md §5.6.
+- `hoops.steppingDefenceOn` **0** (group "Hoops · transitions"; `anim/basketballTree.ts` `STEPPING_DEFENCE_ON`, with `STEP_CLIPS`, the
+  turn-and-run's `STEP_RETREAT_*` numbers: stride 4.0 m/s, travel 135°, the diagonal 100–160° off the chest, in above 2.6 m/s and out under
+  2.2): **the owner's stepping-defence clips drop in by name** (HOOPS-GAP-PLAN §6b: `defend_slide_left_v2`, `defend_slide_right_v2`,
+  `defend_slide_hard_left_v2`, `defend_slide_hard_right_v2`, `def_retreat_run_left`, `def_retreat_run_right`, each as `bball_mc_<name>` from
+  the capture pipeline or `bball_<name>` authored). Each plays forward at the stride the list asks for; a clip the rig does not own plays
+  today's clip exactly (slide bench with the knob on and no new clips: the same 4.5 / 10.4 / 2.7 / 5.6 cm). OFF until the clips exist.
+- `hoops.contactVoiceOn` **0** (group "Hoops · sound"; `audio/hoopsSfx.ts` `CONTACT_VOICE_ON`, with `CONTACT_HAND_PITCH` 1.2,
+  `CONTACT_HAND_GAIN` 1.0, `CONTACT_KNOCK_GAIN` 0.35, `CONTACT_BODY_GAIN` 0.9, `CONTACT_MIN_GAP_SEC` 0.06 s): **contacts sound like hands on
+  the ball and bodies.** On the court (the hoops sample bank), an `impact` at a hand-on-ball pitch (strips, pokes, parries, blocks) plays the
+  recorded palm slap over a short knock, a body contact the low thud, instead of the arcade boop; the call's volume is kept; two contacts
+  within 60 ms are one; the mute silences it (tested). Levels in docs/HOOPS-GAP-PLAN.md §5.7. A feel item: OFF for the owner's ear.
 

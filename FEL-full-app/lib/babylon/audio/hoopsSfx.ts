@@ -39,3 +39,30 @@ export function driftSound(on = feel('hoops.driftSqueakOn', DRIFT_SQUEAK_ON) >= 
 export function glassKissSound(on = feel('hoops.glassSoundOn', GLASS_SOUND_ON) >= 0.5): CueCall {
   return on ? { name: 'glass', opts: { volume: 0.35 } } : { name: 'thud', opts: { pitch: 1.5, volume: 0.35 } };
 }
+
+// ── hoops-gap (lane/hoops-gap, 2026-11-23): THE CONTACT VOICE (`hoops.contactVoiceOn`, OFF) ─────────────────────────────────────────────
+// Every contact in 1v1 / 3v3 — a body bump, a chest-to-chest check, a knockdown, a strip, a poke, a parry, a block — plays SoundKit's
+// `impact`: a square-wave boop with a noise crack, an arcade sound, at a pitch per kind. The modes already sort them by pitch: the hands on
+// the ball high (strips, steals, the parry and the swats at 1.2–1.5), the bodies low (bumps 0.82–1.0, a body on the floor 0.7). With the
+// switch and the court's sample bank active, `impact` is re-voiced from the kit's own sounds (no new files): a hand on the ball is the
+// recorded palm-on-leather slap (`catch`, pitched down: a harder hit than a catch) over a short knock; a body is the low, ringless `thud`
+// (the body-on-the-floor synth). The volume each call asks for is kept, scaled to the impact's level (CONTACT_*_GAIN, measured with
+// scripts/probes/hoops-sound/loudness.mts); a contact inside CONTACT_MIN_GAP_SEC of the last is dropped (a pile-up of one collision).
+export const CONTACT_VOICE_ON = 0;
+/** An impact at this pitch or higher is a hand on the ball (the modes' strip / steal / parry / block pitches); below, a body. */
+export const CONTACT_HAND_PITCH = 1.2;
+/** The re-voiced levels against the impact they replace (× the call's volume). */
+export const CONTACT_HAND_GAIN = 1.0, CONTACT_KNOCK_GAIN = 0.35, CONTACT_BODY_GAIN = 0.9;
+/** Two contacts closer than this (s) are one: the second is dropped. */
+export const CONTACT_MIN_GAP_SEC = 0.06;
+export function contactVoiceOn(): boolean { return feel('hoops.contactVoiceOn', CONTACT_VOICE_ON) >= 0.5; }
+/** The cues an `impact` at `pitch` / `volume` becomes (pure). */
+export function contactVoice(pitch: number, volume: number): Array<{ name: 'catch' | 'thud'; opts: { pitch: number; volume: number } }> {
+  if (pitch >= CONTACT_HAND_PITCH) {
+    return [
+      { name: 'catch', opts: { pitch: Math.max(0.6, Math.min(1.1, 0.55 + pitch * 0.25)), volume: volume * CONTACT_HAND_GAIN } },
+      { name: 'thud', opts: { pitch: 1.4, volume: volume * CONTACT_KNOCK_GAIN } },
+    ];
+  }
+  return [{ name: 'thud', opts: { pitch: Math.max(0.6, Math.min(1.2, 0.35 + pitch * 0.65)), volume: volume * CONTACT_BODY_GAIN } }];
+}

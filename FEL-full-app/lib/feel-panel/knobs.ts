@@ -1413,6 +1413,16 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/hoops/pnrCoverage.ts PNR_FIGHT_FULL_ON',
     hint: 'Needs the pick-and-roll coverage switch. 1: the man on the ball goes over the top at full speed. 0: at 0.7 of it, as before.',
   },
+  {
+    id: 'hoops.contactVoiceOn', label: 'Sound: contacts sound like hands on the ball and bodies (0 = off)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · sound',
+    source: 'lib/babylon/audio/hoopsSfx.ts CONTACT_VOICE_ON',
+    hint: '1: on the court, a strip, poke or block plays a palm slap on the ball and a bump or check a low body thud, instead of the arcade impact boop; two contacts within 60 ms are one. 0: the impact, as before.',
+  },
+  {
+    id: 'hoops.steppingDefenceOn', label: 'Defence: play the new stepping-defence clips when the rig has them (0 = off)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · transitions',
+    source: 'lib/babylon/anim/basketballTree.ts STEPPING_DEFENCE_ON',
+    hint: '1: the slides, the sat-down slides and the beaten-diagonal turn-and-run play the clips named in HOOPS-GAP-PLAN 6b when the rig owns them, at their own stride; a missing clip plays today\'s. 0: today\'s clips.',
+  },
   // hoops-p04 (1v1/3v3 phase 4 "feet and transitions"): one blend + minimum-hold rule (anim/hoopsTransitions), the shot clips on their
   // release (hoops/releaseTiming). Every default is this lane's; the owner has felt none of them.
   {

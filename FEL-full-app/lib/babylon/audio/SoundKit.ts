@@ -58,6 +58,7 @@ import { duckPlan, type DuckSpec } from './voice/ducking';
 // HOOPS-SOUND (phase 11a): the recorded sounds beside the synths (samples.ts) and their switch (feel knob hoops.sampleSfxOn)
 import { SAMPLE_BANKS, SAMPLE_SFX_ON, SampleBank, bedLoopWindow, type SampleBankName, type LoadState } from './samples';
 import { feel } from '../../feel-panel/feel';
+import { contactVoiceOn, contactVoice, CONTACT_MIN_GAP_SEC } from './hoopsSfx';   // hoops-gap: the contact voice
 
 /** Every bus's own tuned base gain BEFORE a player's volume multiplies it — voiceBus and musicBus already had these
  *  numbers (P2); SFX_BASE_GAIN is new (sfxBus below) and is 1 because every SfxName's envelope was already tuned to
@@ -295,6 +296,15 @@ class SoundKitImpl {
     if (!ctx || !this.master || !this.sfxBus) return;
     const vol = opts.volume ?? 1;
     const pitch = opts.pitch ?? 1;
+    // hoops-gap (`hoops.contactVoiceOn`, audio/hoopsSfx contactVoice): on the court's bank, a contact `impact` is a palm on the ball or a
+    // body, from the kit's own sounds; one contact inside CONTACT_MIN_GAP_SEC of the last is dropped
+    if (name === 'impact' && this.bankName === 'hoops' && contactVoiceOn()) {
+      // (the gap is on THIS context's clock: a new context — or a clock that went back — starts it afresh)
+      if (this.lastContactCtx === ctx && ctx.currentTime >= this.lastContactAt && ctx.currentTime - this.lastContactAt < CONTACT_MIN_GAP_SEC) return;
+      this.lastContactAt = ctx.currentTime; this.lastContactCtx = ctx;
+      for (const c of contactVoice(pitch, vol)) this.play(c.name, { ...c.opts, ...(opts.pan !== undefined ? { pan: opts.pan } : {}) });
+      return;
+    }
     // HOOPS-SOUND (phase 11a): a recording when the active bank has one for this cue; otherwise the synth below, exactly as before
     if (this.playSample(name, ctx, vol, pitch, opts.pan)) return;
 
@@ -650,6 +660,9 @@ class SoundKitImpl {
   private readonly sampleVoices = new Map<string, number>();
   private decoder: BaseAudioContext | null = null;
   private bedIsSample = false;
+  /** hoops-gap: when the last re-voiced contact played (the context's clock), for CONTACT_MIN_GAP_SEC. */
+  private lastContactAt = -Infinity;
+  private lastContactCtx: AudioContext | null = null;
 
   /** The active bank and how far it has loaded (a probe reads it). */
   sampleState(): { bank: SampleBankName | null; state: LoadState | 'none'; loaded: number; failed: number; bed: 'sample' | 'synth' | 'none' } {
