@@ -40,6 +40,8 @@ import { sanitizeSlotPresentation, sanitizeStampText } from '@/lib/creator/look/
 import type { StudioApi, StudioEvents, PreviewLook } from '@/components/closet/avatar-preview';
 import { HistoryStrip } from '@/components/closet/studio/history-strip';
 import { WalkthroughCard } from '@/components/closet/studio/walkthrough-card';
+import { walkthroughPlaces } from '@/components/closet/sideways';   // look pass C3 (ui.closetSideways)
+import { closetSidewaysOn } from '@/lib/ui/closetSideways';
 import { STUDIO_SHOTS, type StudioFocus, type StudioTab } from '@/lib/creator/look/studio/framing';
 import { cycle, isFieldTarget, keyAction, type StudioAction } from '@/lib/creator/look/studio/input';
 import { isBigChange, jumpHistory, keepCopy, stripEntries, visibleEntries } from '@/lib/creator/look/studio/historyStrip';
@@ -200,6 +202,9 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan: faceSca
   const [showPose, setShowPose] = useState(false);
   const [compare, setCompare] = useState(false);
   const [photoOpen, setPhotoOpen] = useState(false);
+  // look pass C3 (ui.closetSideways): read after mount (the feel panel lives in the browser)
+  const [sideways, setSideways] = useState(false);
+  useEffect(() => { setSideways(closetSidewaysOn()); }, []);
   const [openPaste, setOpenPaste] = useState(0);
   const [tapped, setTapped] = useState<{ region: PaintRegion; finest: PaintRegion; xy: { x: number; y: number } | null } | null>(null);
   const [walk, setWalk] = useState<WalkState>(WALK_DONE);
@@ -671,6 +676,7 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan: faceSca
   const selLabel = tab === 'parts' && selectedPart ? `Part · ${selectedPart.shape}` : tab === 'paint' && selectedLayer ? `Layer · ${REGION_LABELS[selectedLayer.region]}`
     : selectedCloth ? `Wearing · ${clothLabel(selectedCloth)}` : null;
   const selMirror = tab === 'parts' ? selectedPart?.mirror : tab === 'paint' ? selectedLayer?.mirror : undefined;
+  const walkAt = walkthroughPlaces(sideways);
 
   // CREATOR-PLAN phase 4d: THE STUDIO — a full-screen stage (the preview, its HUD, the history strip) and the editor
   // beside it (below it on a phone), one editor: every tab below is the Closet's, unchanged.
@@ -752,7 +758,7 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan: faceSca
           </div>
         )}
 
-        <div className="pointer-events-none absolute bottom-14 left-3 z-10 max-md:hidden">
+        <div className={`pointer-events-none absolute bottom-14 left-3 z-10 max-md:hidden ${walkAt.stage}`}>
           <WalkthroughCard state={walk} onNext={() => walkDo('next')} onSkip={() => walkDo('skip')} {...(studioEdit ? { studioEdit: true } : {})} />
         </div>
 
@@ -771,7 +777,7 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan: faceSca
       {/* scroll-padding: whatever the editor scrolls into view (a picked row, a focused field) lands below the sticky tabs */}
       <aside aria-label="Editor" className="min-h-0 flex-1 scroll-pt-16 overflow-y-auto border-t border-white/10 bg-[#0a0a0f] px-4 py-4 md:scroll-pt-28 md:border-l md:border-t-0">
         {/* a phone's stage is small: the walkthrough sits at the top of the editor there */}
-        <div className="mb-3 md:hidden"><WalkthroughCard state={walk} onNext={() => walkDo('next')} onSkip={() => walkDo('skip')} {...(studioEdit ? { studioEdit: true } : {})} /></div>
+        <div className={`mb-3 md:hidden ${walkAt.editor}`}><WalkthroughCard state={walk} onNext={() => walkDo('next')} onSkip={() => walkDo('skip')} {...(studioEdit ? { studioEdit: true } : {})} /></div>
         <div className="mb-4 space-y-3">
           <p className="text-base text-white/50">Design your avatar&apos;s face, gear, and card skin. Everyone belongs here — the options are built to represent you. Tap the body to choose a region, drag the stage to spin, pinch or scroll to zoom.</p>
           {studioEdit ? (

@@ -14,7 +14,7 @@
  */
 
 import {
-  Color3, DynamicTexture, Mesh, MeshBuilder, PBRMaterial, StandardMaterial, TransformNode, type AbstractMesh, type Material, type Scene,
+  Color3, DynamicTexture, Mesh, MeshBuilder, PBRMaterial, StandardMaterial, TransformNode, VertexBuffer, type AbstractMesh, type Material, type Scene,
 } from '@babylonjs/core';
 import { mountStreetCourt, VENICE_DUNK_COURT_PALETTE } from '@/lib/babylon/visual/CourtSurface';
 import { spawnMeshyProp } from '@/lib/babylon/visual/meshyProps';
@@ -23,6 +23,7 @@ import { groundTexture, TILE_M, type GroundKind } from '@/lib/babylon/visual/gro
 import { feel } from '@/lib/feel-panel/feel';
 import { courtsRect, v1Area, v1Spots } from './hubWorld';
 import { mountCourtsDressing, VENICE_LOOK_V2 } from './courtsDressing';
+import { groundDiv, groundTint, VENICE_GROUND_V2 } from './groundV2';   // look pass C4 (venue.veniceGroundV2)
 
 /** perf.veniceSharedCourt: 1 = one court mesh drawn at every court as instances (new); 0 = a mesh, material and detail map per court (the prototype's way). */
 export const VENICE_SHARED_COURT = 1;
@@ -56,8 +57,16 @@ export function mountCourtsView(scene: Scene, parent: TransformNode | null = nul
   // lit by the golden-hour sky, V1's warm-grey concrete read as sand (phase 5's first phone shot): a cooler grey keeps the slab and
   // the sand apart
   const LIT_TINT: Record<string, string> = { concrete: '#A9AEB3' };
+  // look pass C4 (venue.veniceGroundV2): the slab and the sand as a grid weathered by vertex colour (no texture added); 0 = one quad
+  const groundV2 = feel('venue.veniceGroundV2', VENICE_GROUND_V2) >= 0.5;
   const surface = (name: string, kind: GroundKind | null, hex: string, w: number, d: number, x: number, z: number, y: number): Mesh => {
-    const g = MeshBuilder.CreateGround(name, { width: w, height: d }, scene);
+    const weathered = groundV2 && (kind === 'concrete' || kind === 'sand');
+    const g = weathered ? MeshBuilder.CreateGround(name, { width: w, height: d, subdivisions: groundDiv(w, d) }, scene) : MeshBuilder.CreateGround(name, { width: w, height: d }, scene);
+    if (weathered && kind) {
+      const pos = g.getVerticesData(VertexBuffer.PositionKind)!, col = new Float32Array((pos.length / 3) * 4);
+      for (let v = 0, k = 0; v < pos.length; v += 3, k += 4) { const t = groundTint(x + pos[v], z + pos[v + 2], kind); col[k] = t[0]; col[k + 1] = t[1]; col[k + 2] = t[2]; col[k + 3] = 1; }
+      g.setVerticesData(VertexBuffer.ColorKind, col, false);
+    }
     g.position.set(x, y, z); g.parent = root; g.isPickable = false; g.receiveShadows = true;
     if (look2) {
       const m = new PBRMaterial(`${name}_mat`, scene);

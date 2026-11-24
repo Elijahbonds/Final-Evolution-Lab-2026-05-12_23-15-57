@@ -1230,6 +1230,74 @@ real online game these are what ships; each is the record of the number and the 
 | `net.possessionSwap` | 1 | — | 1v1: the page whose player has the ball runs the game. 0: the host runs every possession. |
 | `net.karateTogether` | 0 | 1 | "Start together" offers Karate co-op (not shared yet: two fights). |
 
+## improve-hoops-2, 2026-11-22 (docs/IMPROVE-10-PHASE-AUDIT.md lane B; NEW switches, no shipped number moved)
+
+### Phase 3: the hoops loads (group "Hoops · phone budget"; all three shipped **0**, the owner's switch)
+
+Where the time went (a CPU profile of the whole load on the phone tier, `scripts/probes/improve-hoops/loadprof.mjs`, and the new
+`[FEL-LOAD]` stage marks, `lib/babylon/core/loadMarks.ts`): building each body's ~217 moves by IK at spawn — 24 s of the 1v1 load's 45 s
+before the shader pre-warm, 40 s of the 3v3's 61 s, 17 s of 3-Point's 35 s — including two people on the boardwalk rail who only ever
+stand and cheer. Asset downloads and the glTF parse were small; the pre-warm (owner, 2026-10-16) was left as it is.
+
+- `perf.poseClipFast` (`anim/poseClip.ts` `POSE_CLIP_FAST`): when an arm or a leg is solved, only that limb's joints are recomputed (and
+  meshes hung on the rig wait for the end of each move). The moves come out **bit for bit the same** (`anim/poseClip.fast.test.ts`, every
+  clip on the kit body and a roster body). Half the build time.
+- `perf.onlookerClipsOnly` (`visual/onlookerClips.ts` `ONLOOKER_CLIPS_ONLY`): an onlooker builds only the clips its idle and cheer can
+  resolve to (7 instead of ~217). It plays the same clip, key for key, in six modes (`visual/onlookerClips.test.ts`).
+- `perf.poseClipShare` (`anim/poseClip.ts` `POSE_CLIP_SHARE`): a body whose rig is identical to one already built copies its solved keys.
+  Measured to do almost nothing in hoops (every roster athlete is a different rig); kept for crowds of one body file. Leave it 0.
+
+Measured (the gameplay-clean rig page, phone tier 390 × 844, DPR 3, CPU ×4, SwiftShader; 3 runs a side, interleaved, one gate hold; median):
+
+| | today (0) | on (1) | |
+|---|---|---|---|
+| 1v1 READY | 53.1 s | 38.2 s | −28 % (the plan's bar is −30 %: missed by 2 points) |
+| 3v3 READY | 77.0 s | 44.3 s | −42 % |
+| 3-Point READY | 39.4 s | 29.1 s | −26 % |
+| tennis (control) | 23.1 s | 22.0 s | within 5 % |
+| pre-warm starts, 1v1 / 3v3 | 41.6 / 64.1 s | 26.2 / 32.4 s | −37 % / −49 % |
+| worst frame in the first 4 s of play, 1v1 / 3v3 / 3-Point | 4.1 / 4.3 / 2.8 s | 4.1 / 4.9 / 7.3 s | ranges overlap (3-Point off: 2.4–9.4) |
+
+Shipped OFF because the plan's bar is "READY down ≥ 30 % in 1v1 and 3v3, the first-4-s worst frame not worse": 3v3 clears it, 1v1 misses
+by 2 points and the worst-frame reads are too noisy on this rig to call. *Recommend:* turn `perf.poseClipFast` and `perf.onlookerClipsOnly`
+on (nothing you see or feel changes; the bodies just build faster), after a phone check of the load with the PERF readout.
+
+### Phase 4: hoops rules, one way in both modes (group "Hoops · rules")
+
+Measured on the hoops-gap rig (`scripts/probes/improve-hoops/phase4-set.sh`: the real 1v1, the rig's bot at both ends, 50 s of play,
+seeds 7, 11, 23, 31 and 47 a side; `makebeat.mjs`, `hoops-play/flow.mjs`, `hoops-play/events.mjs` read the logs).
+
+- `hoops.makeBeatHoldsShot` **1** (`hoops/oneRule.ts` `MAKE_BEAT_HOLDS_SHOT`): **no shot starts in the 0.7 s after your 1v1 make** (the
+  ball is yours under the rim until the check-up, and a shot there went up and could not count). A press then waits for the check.
+  Shots started inside the make beat: **10 of 15 makes → 0 of 13**. My shots 34 → 23 and makes 19 → 13 over the five runs are those
+  ghosts gone (each was a logged gather and release); the rival's shots 16 → 13, steals and fouls within the seeds' spread.
+  Feel-check: score in 1v1 and mash Square straight after.
+- `hoops.rivalChaseAroundBody` **0** (`hoops/boardChase.ts` `RIVAL_CHASE_AROUND_BODY`): when a body stands in the 1v1 rival's line to a
+  loose ball and he makes no ground for 0.5 s (`CHASE_STALL_SEC`, new), he steps round it (a waypoint 1.6 m off its shoulder, held up to
+  1 s; all new numbers). It stepped round 6 times in the five ON runs; boards that stalled to the 4 s guard 3 of 16 → 2 of 21. Shipped OFF
+  because the bar was 0: the stalls left were not this case (the rival 8–11 m from the ball, the same frame with the switch off).
+- `hoops.driveByHandOn` **0** (`hoops/steals.ts` `DRIVE_BY_HAND_ON`): **your feel call.** 1 = the 3v3 drive-by steal (running past the
+  driver with a poke) also needs the poke's hand on the ball (`aiStripLands`: the reach, his body not between, the ball off the floor);
+  one that fails it is an ordinary poke.
+- `hoops.spinShotCutsHalf` **0** (`hoops/oneRule.ts` `SPIN_SHOT_CUTS_HALF`): **your feel call.** 1 = one rule in 1v1 and 3v3 for a shot
+  pressed during a spin: before its half the press waits for the half; from the half on the shot cuts the spin where the body faces
+  (`SPIN_CUT_AT` 0.5, new). 0 = the press waits out the whole spin, as now.
+
+### improve-hoops-2 phase 10, 2026-11-22: online 3v3, a friend plays his own offence (group "Online play")
+
+- `net.remoteOffence` **0** (`lib/net/knobs.ts` `NET_REMOTE_OFFENCE`; shipped OFF, see the check below): in a shared 3v3, the body a friend plays (a seat in
+  `lib/net/seats.ts`) takes its passes and shots from that friend's own buttons — his PASS throws to the team-mate his stick points at
+  (or the one nearest the rim), his SQUARE goes up (at the rim a layup, a dunk with the turbo; out there the jumper), and on his team's
+  ball he brings it up; off the ball his PASS calls for it. An empty or dropped seat is the AI, as before. Nothing on the wire changed:
+  the whole intent already crossed netd, so it works on the netd production runs today (two humans) and on the new one. What is
+  still the AI's: how his shot goes (his tier's release model — he chooses when, not how well). The panel's session gate keeps
+  overrides off online, so the default is what plays; 0 = the AI brain decides his passes and shots, exactly as before.
+  **The check** (`scripts/probes/improve-hoops/remote3v3.mjs`: two browser pages, one shared 3v3, a local netd): the remote human's body did
+  get the ball (3 times in one run: "foe0 (a remote human) has the ball"), but no press from the rig's keyboard reached either page's game —
+  not the guest's passes (17 presses counted on its input bus) and not even the host's own shots (87) — so the check could not show the
+  pass and the shot, and it is called inconclusive, not passed. Two pages loading at once also dropped the guest from netd for a while (its
+  heartbeat stops during a 3v3 load on this rig); it rejoined. Turn it on after the owner's two-phone test (ONLINE-FINISH-PLAN §7).
+
 ## improve-screens, 2026-11-22 (owner: "Do a 10 phase pass improving the areas that need it most"; docs/IMPROVE-10-PHASE-AUDIT.md phases 1, 2, 6)
 
 Group "Screens · phone". NEW switches, each **1 = on, 0 = today's screen exactly** (tests pin both ends). No existing tuned number moved.
@@ -1280,6 +1348,11 @@ ON because the arena is a new place the owner asked for; each restores today at 
 | `arena.dunks` | 1 | 0 = jump shots only (slice 1) | Phase 4: a run at the ring with the ball is a dunk (the hand jams it down through; the iron decides), a close shot a soft layup (66°). |
 | `arena.dunkJumpVy` | 4.3 m/s | — | The dunk's take-off: 0.94 m up, so the hand gets the ball over the ring. |
 | `arena.physicsHands` | **0 (OFF)** | 0 = capsules and the impulse poke (shipped) | Owner 2026-11-24: "hands first, behind their own knob, OFF until measured". On: two kinematic hand bodies a player (7 cm, 12 m/s on a swipe, 5 m/s otherwise) moved to where the hands are (the dribble, the set point, a contest held high, a reach); a block or a poke is a contact. Not measured on the phone rig yet. |
+| `arena.knockdowns` | **0 (OFF)** | 0 = bodies only push (shipped) | Owner 2026-11-24: "Bodies can be knocked over … behind knobs, and the shipping bar applies". On: a body met at `arena.knockMps` or more (72% of it in the air) is down for `arena.downSec`: the borrowed knockdown, floor and get-up clips over its capsule (the capsule stays upright: no ragdoll), the ball comes out of its hands, it takes no part until it is up. No new bodies (the phone cost is the contact read only). |
+| `arena.fouls` | **0 (OFF)** | 0 = no whistle (shipped) | The same answer. On: foul-speed contact is called by the shared referee (`core/Ref.ts`, at `ContactSystem` FOUL_CLOSING_SPEED 4.2 m/s): the handler's charge into a set defender, a defender's blocking foul on the handler (no call off the ball), a shooting foul (the attempt plays out: a make counts as an and-one, a miss is the shooter's ball), a loose-ball foul at the reckless 5.25 m/s. No free throws: a foul is the ball at the check. |
+| `arena.knockMps` | 5.0 m/s | — | How fast the body running in must be going (along the contact) to put the other down: a sprint (6.0) does, a jog (4.4) does not, even two jogs head-on. |
+| `arena.downSec` | 1.3 s | — | Out of the play after a knockdown, the 0.45 s get-up included. |
+| `arena.xpOn` | 1 | 0 = a practice court (nothing posted) | Owner 2026-11-24: the arena counts for XP and progress. On: each finished game starts and finishes a server run (`arenaHoops` / `arenaThrees` / `arenaThreePoint`); the server rebuilds the score from the game's play log (`lib/sessions/arenaScore.ts`) and pays XP, season XP, mastery and PRQ, no Lab Credits, coins or shards. Its default is the server's own switch (`ARENA_XP_ON`), ON after the end-to-end test against a throwaway Postgres. A playtest run (`?playtest=1`, where overrides apply) and an agent run post unpaid. |
 | `cam.povEyeM` | 1.72 m | — | The eye when no head bone is found. |
 | `cam.povFovDeg` | 82° | — | Across the screen; the vertical follows the screen's shape (50–90°). |
 | `cam.povBobM` | 0 | — | Head-bob, OFF by default. |
@@ -1385,3 +1458,59 @@ NEW switches, each **1 = on, 0 = today's game exactly** (tests pin both ends). N
   recorded palm slap over a short knock, a body contact the low thud, instead of the arcade boop; the call's volume is kept; two contacts
   within 60 ms are one; the mute silences it (tested). Levels in docs/HOOPS-GAP-PLAN.md §5.7. A feel item: OFF for the owner's ear.
 
+
+## look-world, 2026-11-24 (the look pass, phases C1–C4; docs/LOOK-PASS-AUDIT.md; owner: "Let's do a pass where we improve how things look.")
+
+Measured on the esbuild rig `scripts/probes/look-world/look-rig.mts` (the real stage and zone through `runMode`), the phone tier for cost
+(390 × 844, DPR 3, touch, CPU 4× slower; tennis the control in the same hold) and `?perf=off` for every picture. No existing tuned
+number moved; every number below is NEW.
+
+- `story.gradeV2` **0** (group "Story · flow"; `lib/babylon/adventure/world/grade.ts` `STORY_GRADE_V2`, **ships OFF: colour is the
+  owner's**): why the story looked washed out. The shared post pipeline reads every material colour as linear light and gamma-encodes the
+  frame (its image-processing pass has `fromLinearSpace` on, read on the rig); the story's surfaces hand in the sRGB hex, so the hub's dark
+  slate floor (#334155) reaches the screen pale and, under the daylight sun (2.6), near white. 1 reads the story's own surfaces
+  (`story_*`, `dress_*`) as sRGB, the dressing kit's palette in linear, and scales a textured tint so its painted map keeps its painted
+  brightness (`tintScaleForMean`, read once from the canvas). The light, sky, fog and exposure are untouched. Pictures (look-world rig,
+  `?perf=off`): on the plain blocks the palette as given is DARK (a navy hub, a near-black World 1) — the placeholder palette was picked
+  through the lift; on the dressed world it reads as painted stone and grass. Exposure 0.95 and contrast 1.22 were tried on top and add
+  nothing. Zero added work (colour values only).
+- `story.worldDressed` (exists): made cheaper (`dress.ts`): nothing the dressing adds throws a shadow on a phone (the light rig classified
+  each piece as a caster when it was created — the lips, caps and posts span a whole world, the props are thin instances); a desktop keeps
+  the trees' shadows; the props are one thin-instance draw per model part PER WORLD so a world out of view is culled whole; the probe seam
+  `?dresscut=notex,noprops,notrims` (read by the mode, never stored) attributes the cost. Phone tier, World 1 resumed at the rail run, 3
+  runs a side: load 16.8 / 17.3 / 16.2 s → 17.3 / 17.1 / 16.9 s; frame p95 in play 667 / 567 / 483 → 600 / 567 / 617 ms; in free control
+  267 / 217 / 350 → 250 / 367 / 283 ms (tennis, the control, 1,517 / 1,383 / 1,467 ms in the same hold) — the frame and the load are
+  within noise. Real WebGL draws a frame (counted on the context, the median and the worst of the last 120 frames, `?perf=off`): the hub
+  40 → 41 (worst 49 → 57), World 1 46 → 54 (worst 55 → 82), active meshes in World 1 24 → 52 — against the story's phone row
+  (`mobileBudget.json` adventure-story: 64 draws, 23 active meshes). The pictures are plainly better (paving and stone in the hub, grass
+  in World 1, `look-world-c1-*`), but World 1's worst frame is over the row's draws and its active meshes are over the row (today's are
+  already 24 of 23). The phone tier with the speed guard on (2 runs a side) says the same: median draws 39 / 40 → 52 / 55, the worst
+  frame 83 / 91 → 141 / 153 (today's worst is over the row too), active meshes 14 / 12 → 20 / 50. **So it stays at 0**, with the recommendation to switch it on: the owner's yes to raise the row (measured above), or a
+  phone check with the PERF readout. (The world rig's `draws` number — `engine._drawCalls.current`, thousands in the story — is a
+  counter nothing resets each frame there; the GL count above is the real one.)
+- `story.titleCard` **1** (group "Story · flow"; `lib/babylon/adventure/story/titleCard.ts` `STORY_TITLE_CARD`, drawn by `components/adventure/StoryTitleCard.tsx`, ships ON): the READY screen
+  as a title card (the route's name, where you are, the chapter's title large, START; the same control table one tap away under
+  CONTROLS), and the partner picker's creatures as the silhouette of their in-game stand-in body (`CreatureSilhouette.tsx`: the capsule and
+  head of `world/view.ts buildCreatureBody`, to scale, in the element's colour), not a dot. Same words; DOM only. 0 = the screens as before.
+- `ui.closetSideways` **1** (group "Screens · phone"; `lib/ui/closetSideways.ts` `CLOSET_SIDEWAYS`, laid out by `components/closet/sideways.ts`, ships ON): on a short sideways
+  screen (landscape, at most 520 px tall) the Studio walkthrough card sits at the top of the editor beside the stage, as on an upright
+  phone, instead of over the 3D athlete. Tablets and desktops unchanged. 0 = as before.
+- `coast.oceanSurface` **0** (group "Coast · zone"; `lib/adventure/coast/shoreFoam.ts` `COAST_OCEAN_SURFACE`, with `FOAM` step 2 m, peak
+  0.08 m under the line, half-band 0.22 m, and `OCEAN_LOOK`'s haze #8FC3CF fading 150 → 255 m): the sea plane borrows the surf break's
+  ocean shading (`OceanSurface.ts oceanShade`: the chop and the distance fade; the sun's glitter on a desktop only), takes its own colour
+  #1C6F88 as a linear albedo (it was being lifted to bright cyan), and a foam line breathes where the water meets the sand (one mesh over
+  the shallows, alpha 0.55–0.9). No vertex displacement: SEA_Y, wading and the turn-back are unchanged. 0 = the flat sheet. Phone tier,
+  3 runs a side: frame p95 950 / 1,433 / 950 → 817 / 650 / 1,017 ms; load 23.8 / 19.9 / 19.3 → 20.7 / 22.7 / 22.2 s (inside today's own
+  spread); real draws a frame 81 / 84 / 84 → 85 / 80 / 80 (row 164); textures unchanged. Within noise, but the water's colour is a look
+  call: **ships OFF** with its sheet for the owner.
+- `venue.veniceGroundV2` **0** (group "Coast · zone"; `lib/adventure/venice/groundV2.ts` `VENICE_GROUND_V2`, with `GROUND_V2` one vertex
+  every 4 m, 8–64 cells a side): the Venice park slab and the sand as a grid whose vertex colour carries slow worn patches and damp drifts
+  over the tiled map, so the repeat breaks up. **No texture added** (texture memory re-measured first, below); the same draws. 0 = the flat
+  planes. Phone tier, 3 runs a side: frame p95 1,000 / 1,283 / 967 → 1,117 / 1,000 / 950 ms; load 22.2 / 20.3 / 21.5 → 19.8 / 21.7 / 20.1 s;
+  real draws 47 / 47 / 46 → 50 / 47 / 47 (row 56). Within noise; the change on screen is slight and a look call: **ships OFF**.
+- **Venice's texture memory, re-measured** (the plan's rule before adding anything there): the owner's PERF readout counts every loaded
+  texture INCLUDING the post pipeline's render targets; `_perf-sweep.mts` / `mobileBudget.json` leave render targets out. Phone tier, one
+  run: readout formula 145 MB = render targets 57 MB + textures 83 MB (sweep formula) — against the row's 88 MB. So the readout's 158 MB is
+  not a budget breach; the row is close to its ceiling and nothing that adds a texture should go into Venice. Seen in the same list: the
+  render targets of three render scales (780 × 1688, 663 × 1434, 585 × 1266) are all still loaded after the speed guard stepped down —
+  about 20 MB of stale targets (lane B's area: the engine's post pipeline).

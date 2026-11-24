@@ -14,8 +14,8 @@
 //
 // POV: the camera button (SELECT / C) switches to the player's own eyes and back (cam.pov; povCamera.ts).
 // Rules: half court, 1s and 2s (past the arc is 2), first to 11, make it take it, the check at the top of the key is a real pass
-// each way. A practice place: it posts no session and pays nothing (the page's resultSink is empty), and the game simply starts
-// again at 11.
+// each way. At 11 the game is handed to the page as a card (ctx.card, with its play log) and starts again; the page posts it as a
+// run that pays XP and progress (owner 2026-11-24; arena.xpOn; the server rebuilds the score from the log: lib/sessions/arenaScore.ts).
 //
 // Registered in MODES, NOT in ENABLED_BABYLON_MODES: its page is /play/arena (Play's Physics Arena chip, arena.on). No shipped mode
 // reads anything here.
@@ -42,13 +42,19 @@ import { HoopSensor } from '../arena/hoopSensor';
 import { dunkPush, LAYUP_ARC_DEG, releaseShot } from '../arena/arenaShot';
 import { passVelocity, seeded } from '../arena/shotModel';
 import { chestPoint, dribbleCatch, dribbleCommit, dribbleHand, dribblePush, setPoint } from '../arena/dribble';
-import { aimAssist, dunkJumpVy, dunksOn, floorBounce, jumpVy, physicsHandsOn, povBobM, povEyeM, povFovDeg, povLookDegS, povOn, stepHz } from '../arena/arenaConfig';
+import { aimAssist, downSec, dunkJumpVy, dunksOn, floorBounce, foulsOn, jumpVy, knockdownsOn, knockMps, physicsHandsOn, povBobM, povEyeM, povFovDeg, povLookDegS, povOn, stepHz } from '../arena/arenaConfig';
+import { ruleContact, type ContactBody, type ContactCall } from '../arena/arenaContact';
+import { rule } from '../core/Ref';
+import type { ArenaHoopsLog } from '@/lib/sessions/arenaScore';
 import { aimYawErr, applyPov, fovForAspect, povLook, povPose, type PovView } from '../arena/povCamera';
 
 export const ARENA_MODE_ID = 'physics_arena';
 const G = 9.81;
 /** First to this. */
 export const ARENA_GAME_TO = 11;
+/** After a basket the game stops this long before the check (s). The server's score rules lean on it (lib/sessions/arenaScore.ts
+ *  ARENA_MIRRORED.scoredPauseSec: two baskets are at least this far apart on the game's clock). */
+export const SCORED_PAUSE_SEC = 1.4;
 /** The gather: the plant before the jump (s). */
 const GATHER_SEC = 0.14;
 /** A ball comes into the hands from this close (m, from the chest), not faster than this relative speed (m/s). */
@@ -106,6 +112,8 @@ interface Athlete {
   wish: { x: number; z: number };
   /** Dribbling: the run the last push committed to (a cut waits for the hand: dribble.ts dribbleCommit). */
   committed: { x: number; z: number };
+  /** Knocked down (arena.knockdowns): seconds until he is back up. Out of the play until then. */
+  downT: number;
 }
 
 interface St {
@@ -141,7 +149,15 @@ interface St {
   timing: string;
   prevBall: P3;
   hudKey: string;
-  stats: { shots: Record<Who, number>; makes: Record<Who, number>; lostHandles: number; steals: number; physMsMax: number; physMsSum: number; frames: number; blocksByHand: number };
+  stats: { shots: Record<Who, number>; makes: Record<Who, number>; lostHandles: number; steals: number; physMsMax: number; physMsSum: number; frames: number; blocksByHand: number;
+    /** Body-on-body contacts reported, knockdowns, fouls by call (arena.knockdowns / arena.fouls), and-ones. */
+    bodyHits: number; hardestHitMps: number; knockdowns: number; fouls: Record<string, number>; andOnes: number };
+  /** A shooting foul whose attempt is still playing out: the fouled shooter (a make counts, a miss is his ball). */
+  andOne: Who | null;
+  /** This game's play log (the session's `stats.arena`: the server rebuilds the score from it) and its clock's zero. */
+  game: { t0: number; log: ArenaHoopsLog };
+  /** A finished game waiting to be handed to the page (ctx.card, in update()). */
+  final: { won: boolean; me: number; foe: number; log: ArenaHoopsLog } | null;
   /** Probe seam: the next shot of mine releases at the top of the jump plus this (s), instead of on the button. */
   scriptOffset: number | null;
   /** Probe seam: the rival stands still and does nothing (a scripted shot measured on its own). */
@@ -201,7 +217,7 @@ function setupCheck(S: St, offence: Who): void {
   o.body.teleport({ x: CHECK_SPOT.x, y: 0, z: CHECK_SPOT.z + 0.9 });
   d.body.teleport({ x: CHECK_SPOT.x, y: 0, z: CHECK_SPOT.z - 1.6 });
   o.yaw = Math.PI; d.yaw = 0;
-  o.shot = null; d.shot = null; o.hopT = 0; d.hopT = 0;
+  o.shot = null; d.shot = null; o.hopT = 0; d.hopT = 0; o.downT = 0; d.downT = 0; S.andOne = null;
   S.world.ball.teleport(chestPoint(p3(d.node.position), d.yaw));
   S.sensor.reset();
   S.handler = def; S.ball = 'held'; S.ballT = 0; S.shotBy = null; S.passTo = null;
@@ -246,7 +262,7 @@ function push(S: St, a: Athlete): void {
 // ── shooting ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 function startShot(S: St, a: Athlete, aiReleaseAt = Infinity): void {
-  if (S.handler !== a.who || a.shot || (S.ball !== 'dribble' && S.ball !== 'held')) return;
+  if (S.handler !== a.who || a.shot || a.downT > 0 || (S.ball !== 'dribble' && S.ball !== 'held')) return;
   S.ball = 'held'; S.ballT = 0;
   const v = a.body.vel(TMP);
   const kind = shotKindFor(flatDist(a.node.position, RIM_FLOOR), Math.hypot(v.x, v.z), dunksOn());
@@ -348,7 +364,7 @@ function beforeStep(ctx: ModeContext, S: St, h: number): void {
   // bodies
   for (const a of [S.me, S.foe]) {
     let w = a.who === 'me' ? myWish(ctx, S) : foeWish(S);
-    if (S.phase === 'check' || (a.shot && !a.shot.jumped && a.shot.kind !== 'dunk')) w = { x: 0, z: 0 };   // planted for the check and the gather (a dunk keeps its run)
+    if (S.phase === 'check' || a.downT > 0 || (a.shot && !a.shot.jumped && a.shot.kind !== 'dunk')) w = { x: 0, z: 0 };   // planted for the check and the gather (a dunk keeps its run); a body on the floor does not run
     w = keepIn(a.node.position, w);
     a.wish.x = w.x; a.wish.z = w.z;
     // a dribbler's change of run waits for the hand (at most a bounce; measured ~50 ms on a cut), so the ball is never left behind
@@ -357,7 +373,7 @@ function beforeStep(ctx: ModeContext, S: St, h: number): void {
     if (a.hands) {
       const tg = handTargets({
         feet: p3(a.node.position), yaw: a.yaw, ball: p3(S.world.ball.pos), dribbleSide: S.dribble.side,
-        role: a.shot ? 'shoot' : S.handler === a.who ? (S.ball === 'dribble' ? 'dribble' : 'hold') : a.reachT > 0 ? 'reach' : a.hopT > 0 ? 'contest' : S.handler ? 'guard' : 'rest',
+        role: a.downT > 0 ? 'rest' : a.shot ? 'shoot' : S.handler === a.who ? (S.ball === 'dribble' ? 'dribble' : 'hold') : a.reachT > 0 ? 'reach' : a.hopT > 0 ? 'contest' : S.handler ? 'guard' : 'rest',
       });
       a.hands.target(tg.left, tg.right, a.reachT > 0);
     }
@@ -390,11 +406,17 @@ function afterStep(S: St, h: number): void {
     const pts = S.shotBy && S.shotFromM > ARC_M ? 2 : 1;
     S.score[who] += pts;
     S.stats.makes[who]++;
+    S.game.log.baskets.push({ t: S.t - S.game.t0, side: who, shot: !!S.shotBy, fromM: S.shotBy ? S.shotFromM : 0 });
     S.possession = who;   // make it take it: the scorer checks it again
     S.phase = 'scored'; S.phaseT = 0;
     say(S, `${who === 'me' ? 'Bucket' : 'He scores'} +${pts}`, 1.4);
+    if (S.andOne === who) { S.stats.andOnes++; say(S, `${rule('and_one').call} +${pts}`, 1.4); }   // fouled and it went in: the basket counts (no free throws here)
+    S.andOne = null;
     SoundKit.play('swish', { volume: 0.7 });
-    if (S.score[who] >= ARENA_GAME_TO) { S.phase = 'over'; S.phaseT = 0; say(S, `${who === 'me' ? 'You win' : 'He wins'} ${S.score.me}–${S.score.foe}`, 3); }
+    if (S.score[who] >= ARENA_GAME_TO) {
+      S.phase = 'over'; S.phaseT = 0; say(S, `${who === 'me' ? 'You win' : 'He wins'} ${S.score.me}–${S.score.foe}`, 3);
+      S.final = { won: who === 'me', me: S.score.me, foe: S.score.foe, log: S.game.log };
+    }
   }
   S.prevBall = now;
 }
@@ -402,6 +424,9 @@ function afterStep(S: St, h: number): void {
 function frameRules(ctx: ModeContext, S: St, dt: number): void {
   const ball = S.world.ball;
   S.phaseT += dt; S.ballT += dt;
+  bodyContacts(S);
+  // a shooting foul's attempt is over and missed (loose, or in someone's hands, or the shot never left): the shooter's ball
+  if (S.andOne && S.phase === 'live' && S.ball !== 'flight' && !athlete(S, S.andOne).shot) deadBall(S, S.andOne, rule('shooting_foul').call);
   for (const c of S.world.drainContacts()) {
     if (S.ball === 'flight' && c.surface !== 'body') S.shotTouched = true;
     if (c.surface === 'body' && c.playerId) S.lastTouch = c.playerId as Who;
@@ -423,8 +448,8 @@ function frameRules(ctx: ModeContext, S: St, dt: number): void {
     if (S.ball === 'held' && S.handler === def && def === 'foe' && S.phaseT > 0.8) throwPass(S, 'foe', 'me');
     if (S.ball === 'held' && S.handler === def && def === 'me' && S.phaseT > 2.5) throwPass(S, 'me', 'foe');   // B, or on its own
   }
-  if (S.phase === 'scored' && S.phaseT > 1.4) setupCheck(S, S.possession);
-  if (S.phase === 'over' && S.phaseT > 3) { S.score.me = 0; S.score.foe = 0; setupCheck(S, 'me'); }
+  if (S.phase === 'scored' && S.phaseT > SCORED_PAUSE_SEC) setupCheck(S, S.possession);
+  if (S.phase === 'over' && S.phaseT > 3) { S.score.me = 0; S.score.foe = 0; S.game = { t0: S.t, log: { v: 1, baskets: [] } }; setupCheck(S, 'me'); }
 
   // catches: a pass to its receiver, a loose ball or a shot to whoever gets a hand on it
   if (S.ball === 'pass' || S.ball === 'loose' || S.ball === 'flight') {
@@ -432,6 +457,7 @@ function frameRules(ctx: ModeContext, S: St, dt: number): void {
     for (const a of [S.me, S.foe]) {
       if (S.ball === 'flight' && !S.shotTouched && !(bv.y < 0 && ball.pos.y < 2.6)) continue;   // a shot on its way up is nobody's
       if (S.phase === 'scored') continue;
+      if (a.downT > 0) continue;   // on the floor: not his ball to catch
       if (ball.ignoring & a.body.bit) continue;
       const c = chestPoint(p3(a.node.position), a.yaw);
       const reachTop = a.node.position.y + 2.45;
@@ -470,6 +496,63 @@ function frameRules(ctx: ModeContext, S: St, dt: number): void {
   }
 }
 
+// ── contact: knockdowns and fouls (arena.knockdowns, arena.fouls; both OFF by default) ─────────────────────────────────────────
+
+/** The get-up clip is the last this long of a knockdown (s). */
+const GET_UP_SEC = 0.45;
+
+function contactBody(S: St, a: Athlete): ContactBody {
+  const v = a.body.lastVel;
+  return { id: a.who, side: a.who, airborne: !a.body.grounded, shooting: !!a.shot || (S.shotBy === a.who && S.ball === 'flight' && !a.body.grounded), speed: Math.hypot(v.x, v.z), hasBall: S.handler === a.who };
+}
+
+function bodyContacts(S: St): void {
+  const hits = S.world.drainBodyContacts();
+  for (const c of hits) { S.stats.bodyHits++; S.stats.hardestHitMps = Math.max(S.stats.hardestHitMps, c.closingSpeed); }
+  const kd = knockdownsOn(), fl = foulsOn();
+  if (!kd && !fl) return;   // both OFF: the bodies only push (today's arena exactly)
+  for (const c of hits) {
+    if (S.phase !== 'live') return;
+    const att = athlete(S, c.attacker as Who), vic = athlete(S, c.victim as Who);
+    if (att.downT > 0 || vic.downT > 0) continue;   // a body already on the floor
+    const r = ruleContact(c, contactBody(S, att), contactBody(S, vic), { knockdowns: kd, fouls: fl, knockMps: knockMps(), offense: S.possession, looseBall: !S.handler && S.ball !== 'pass' });
+    if (r.down) knockDown(S, athlete(S, r.down as Who), c.closingSpeed);
+    if (r.foul) { whistle(S, r.foul); return; }
+  }
+}
+
+/** Put a body on the floor: the shot he was in is gone, a ball in his hands comes out with his body's speed. */
+function knockDown(S: St, a: Athlete, mps: number): void {
+  a.downT = downSec(); a.shot = null; a.hopT = 0; a.reachT = 0;
+  S.stats.knockdowns++;
+  if (S.handler === a.who) {
+    const v = a.body.lastVel;
+    loseBall(S, null);
+    S.world.ball.launch({ x: v.x * 0.8, y: 0.6, z: v.z * 0.8 });
+  }
+  playClip(a, 'karate_knockdown', false);
+  say(S, a.who === 'me' ? 'Knocked down' : 'He went down', 1.2);
+  SoundKit.play('impact', { volume: Math.min(0.6, 0.2 + mps * 0.05) });
+}
+
+/** The referee's call (core/Ref.ts). A shooting foul lets the attempt play out; every other call is a dead ball to the check. */
+function whistle(S: St, f: ContactCall): void {
+  S.stats.fouls[f.id] = (S.stats.fouls[f.id] ?? 0) + 1;
+  SoundKit.play('whistle', { volume: 0.45 });
+  const shooter = athlete(S, f.on as Who);
+  if (f.id === 'shooting_foul' && (shooter.shot || (S.ball === 'flight' && S.shotBy === shooter.who))) { S.andOne = shooter.who; say(S, f.call.banner, 1.2); return; }
+  deadBall(S, (f.call.ball ?? S.possession) as Who, f.call.banner);
+}
+
+/** Play stops: the ball goes to `to` at the check (through the scored phase's pause, so the knockdown is seen before the reset). */
+function deadBall(S: St, to: Who, banner: string): void {
+  S.andOne = null;
+  if (S.handler) loseBall(S, null);
+  S.possession = to;
+  S.phase = 'scored'; S.phaseT = 0.2;
+  say(S, `${banner}. ${to === 'me' ? 'Your ball' : 'His ball'}`, 1.4);
+}
+
 function pickSpot(S: St): void {
   const prof = RIVAL_BY_TIER[S.tier];
   const a = (S.rng.next() * 2 - 1) * 1.2;
@@ -486,6 +569,12 @@ function shotsAndJumps(S: St, dt: number): void {
     if (a.reachT > 0) a.reachT -= dt;
     if (a.hopT > 0) a.hopT += dt;
     if (a.hopT > 0.2 && a.body.grounded) a.hopT = 0;
+    if (a.downT > 0) {
+      const was = a.downT;
+      a.downT = Math.max(0, a.downT - dt);
+      if (was > GET_UP_SEC && a.downT <= GET_UP_SEC) playClip(a, 'karate_get_up', false);
+      else if (was > a.downT && a.downT > GET_UP_SEC && a.clip === 'karate_knockdown' && downSec() - a.downT > 0.6) playClip(a, 'karate_floor_hold');
+    }
     if (!a.shot) continue;
     a.shot.t += dt;
     if (!a.shot.jumped && a.shot.t >= GATHER_SEC) { a.body.jump(a.shot.kind === 'dunk' ? dunkJumpVy() : jumpVy()); a.shot.jumped = true; a.shot.t = 0; }
@@ -506,7 +595,7 @@ function shotsAndJumps(S: St, dt: number): void {
   // the rival
   const f = S.foe, me = S.me, ball = S.world.ball;
   S.ai.since += dt;
-  if (S.phase !== 'live' || S.aiQuiet) return;
+  if (S.phase !== 'live' || S.aiQuiet || f.downT > 0) return;
   if (S.handler === 'foe' && !f.shot && (S.ball === 'dribble' || S.ball === 'held')) {
     const atSpot = flatDist(f.node.position, S.ai.spot) < 0.6;
     const open = flatDist(f.node.position, me.node.position) > 2.2 && flatDist(f.node.position, RIM_FLOOR) < prof.maxShotM;
@@ -565,7 +654,8 @@ function facing(ctx: ModeContext, S: St, dt: number): void {
     const v = a.body.vel(TMP);
     const sp = Math.hypot(v.x, v.z);
     let want = a.yaw;
-    if (a.who === 'me' && S.pov.on) want = S.pov.view.yaw;
+    if (a.downT > 0) want = a.yaw;
+    else if (a.who === 'me' && S.pov.on) want = S.pov.view.yaw;
     else if (a.shot) want = yawTo(a.node.position, ARENA_RIM);
     else if (S.phase === 'check') want = yawTo(a.node.position, athlete(S, other(a.who)).node.position);
     else if (S.handler && S.handler !== a.who) want = yawTo(a.node.position, athlete(S, S.handler).node.position);
@@ -575,6 +665,7 @@ function facing(ctx: ModeContext, S: St, dt: number): void {
     a.view.position.copyFrom(a.node.position);
     a.view.rotation.y = a.yaw;
     // the clip over the capsule
+    if (a.downT > 0) continue;   // the knockdown, the floor and the get-up play out (shotsAndJumps)
     if (a.shot || (!a.body.grounded && a.clip === 'bball_shoot_jumper')) continue;   // the follow-through holds until he lands
     const hasBall = S.handler === a.who && S.ball === 'dribble';
     const clip = hasBall
@@ -666,7 +757,7 @@ export const PhysicsArenaMode: ModeDefinition = {
     }
     const handsOn = physicsHandsOn();
     const mk = (who: Who, node: TransformNode, body: ArenaPlayer, view: TransformNode, char: SpawnedCharacter | null): Athlete =>
-      ({ who, node, body, hands: handsOn ? world.addHands(body) : null, reachT: 0, view, char, head: char ? boneNode(char.skeleton, 'Head') : null, yaw: 0, clip: '', shot: null, hopT: 0, pokeCd: 0, wish: { x: 0, z: 0 }, committed: { x: 0, z: 0 } });
+      ({ who, node, body, hands: handsOn ? world.addHands(body) : null, reachT: 0, view, char, head: char ? boneNode(char.skeleton, 'Head') : null, yaw: 0, clip: '', shot: null, hopT: 0, pokeCd: 0, wish: { x: 0, z: 0 }, committed: { x: 0, z: 0 }, downT: 0 });
     const S: St = {
       scene, world, court, ballMesh, me: mk('me', meNode, meBody, meView, meChar), foe: mk('foe', foeNode, foeBody, foeView, foeChar),
       sensor: new HoopSensor(ARENA_RIM, ARENA_RIM_RADIUS), rng: seeded(0x0a7e4a), tier: runTier(), t: 0,
@@ -676,8 +767,8 @@ export const PhysicsArenaMode: ModeDefinition = {
       pov: { on: false, view: { yaw: 0, pitch: 0, bobPhase: 0 }, savedFov: ctx.camera.fov }, camModeSeen: ctx.camDirector.mode,
       ai: { spot: { x: 0, y: 0, z: 4 }, since: 0, reactAt: 0, pokeAt: 0, drive: false },
       banner: '', bannerT: 0, timing: '', prevBall: { x: 0, y: 1, z: 6 }, hudKey: '',
-      stats: { shots: { me: 0, foe: 0 }, makes: { me: 0, foe: 0 }, lostHandles: 0, steals: 0, physMsMax: 0, physMsSum: 0, frames: 0, blocksByHand: 0 },
-      scriptOffset: null, aiQuiet: false, seamOn: false, seam: null, disposed: false,
+      stats: { shots: { me: 0, foe: 0 }, makes: { me: 0, foe: 0 }, lostHandles: 0, steals: 0, physMsMax: 0, physMsSum: 0, frames: 0, blocksByHand: 0, bodyHits: 0, hardestHitMps: 0, knockdowns: 0, fouls: {}, andOnes: 0 },
+      andOne: null, game: { t0: 0, log: { v: 1, baskets: [] } }, final: null, scriptOffset: null, aiQuiet: false, seamOn: false, seam: null, disposed: false,
     };
     states.set(scene, S); current = S;
     setupCheck(S, 'me');
@@ -722,6 +813,7 @@ export const PhysicsArenaMode: ModeDefinition = {
       if (e.btn === 'X' && S.me.shot) S.me.shot.wantRelease = true;
       return;
     }
+    if (S.me.downT > 0) return;   // on the floor: nothing until he is up
     if (e.btn === 'X') {
       if (S.handler === 'me' && S.phase === 'live') startShot(S, S.me);
       else if (S.me.body.grounded && S.me.hopT === 0) { S.me.body.jump(jumpVy()); S.me.hopT = 0.001; }   // no ball: a contest jump
@@ -755,6 +847,8 @@ export const PhysicsArenaMode: ModeDefinition = {
     if (S.seamOn) (window as unknown as { __physMs?: number }).__physMs = S.stats.physMsSum / S.stats.frames;
     shotsAndJumps(S, simDt);
     frameRules(ctx, S, simDt);
+    // a finished game to the page (it posts the run: lib/sessions/arenaScore.ts rebuilds the score from the log); play goes on
+    if (S.final) { const f = S.final; S.final = null; ctx.card?.(f.won ? 'WIN' : 'LOSS', f.me, { opponentScore: f.foe, won: f.won ? 1 : 0 }, { arena: f.log, opponentScore: f.foe, won: f.won }); }
     facing(ctx, S, dt);
     camera(ctx, S, dt);
     hud(ctx, S, dt);

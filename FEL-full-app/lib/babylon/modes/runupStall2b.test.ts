@@ -49,7 +49,9 @@ describe('RUNUP-STALL-2b: the rig check (why the onlooker body is not reused)', 
     expect(body).not.toMatch(/tint:/);
   });
   it('the two roles get different clip sets and looks', () => {
-    expect(lib).toContain('if (role === \'opponent\') installOpponentMotion(animator, scene, skeleton);');
+    // test changed (lane/improve-hoops-2 phase 3): the call gained the spawn's optional clip filter (an onlooker's playable clips only,
+    // perf.onlookerClipsOnly); the role split it pins is the same
+    expect(lib).toContain('if (role === \'opponent\') installOpponentMotion(animator, scene, skeleton, undefined, opts.clipFilter);');
     expect(lib).toMatch(/else installOpponentMotion\(animator, scene, skeleton, undefined, HERO_CAPTURE\);/);
     expect(lib).toContain('const fit = opts.tint || opts.name ? fitForName(String(opts.name ?? opts.tint)) : null;');
   });

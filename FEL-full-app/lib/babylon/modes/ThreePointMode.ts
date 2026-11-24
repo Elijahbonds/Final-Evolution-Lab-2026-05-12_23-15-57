@@ -103,6 +103,7 @@ import type { BodyView } from '../core/ModeHarness';
 import type { BodyEvent } from '@/lib/pose/BodyReader';
 import { BodyShot, THREE_BODY, meterTFor, BODY_SHOT_MAX_MS, HELD_ERR_MS, type ShotVerdict } from '@/lib/move/hoopsBody';   // HOOPS BODY (2026-10-07): the shot on the body's clock
 import { replaySkipOn } from '../core/replaySkip';   // hoops-flow (owner 2026-11-12): any press skips the replay (knob hoops.replaySkipOn)
+import { loadMarks } from '../core/loadMarks';   // lane/improve-hoops phase 3: the load's stages (logging only)
 
 let modeVenue: VenueHandle | null = null;   // ship pass 4: the mounted venue spec, disposed with the mode
 // HOOPS-10PHASE-2 (3PT corner camera): CameraDirector.clampToBounds derives its camera-roaming
@@ -1416,6 +1417,7 @@ export const ThreePointMode: ModeDefinition = {
 
     if (!modeVenue) VenueKit.buildCourt(ctx.scene, 'venice');
     applyOceanCourt(ctx.scene, 'venice');
+    const lm = loadMarks(); lm.mark('venue');   // lane/improve-hoops phase 3: the load's stages (logging only)
 
     player = await CharacterPipeline.spawnPlayer(ctx.scene, DEFAULT_HERO_URL, {
       position: RACK_POS[0].clone(),
@@ -1428,6 +1430,7 @@ export const ThreePointMode: ModeDefinition = {
     // HOOPS MOTION phase 3: the shooter right-handed on screen — the hoops family and the dunk family (dunk_mc_celebrate_big is every make's
     // answer, and it played unmirrored: the next ball came off the rack into a hand crossing the body, 0.23 m left, measured)
     console.info(`[HOOPS-HAND] 3PT right-handed: ${rightHandHoops(player.animator, player.skeleton)} hoops / ${rightHandDunks(player.animator, player.skeleton)} dunk clips mirrored`);
+    lm.mark('body.hero');
     ring?.dispose(); ring = mountPlayerRing(ctx.scene, player.root, { color: '#22d3ee', icon: readPlayerIcon() });   // PLAYER RING
     ctx.groundLock.track(player.root, player.skeleton);
     ctx.heroRef.current = player.root;
@@ -1470,6 +1473,7 @@ export const ThreePointMode: ModeDefinition = {
       }
       if (!player || ctx.scene.isDisposed) { bodies.forEach((b) => b?.dispose()); return; }
       rivalBodies = bodies; rivalBeats = owners.map((o) => o ?? undefined);
+      loadMarks().mark('rivals (background)');
       sidelineParked = false;
       sidelinePark(S.phase !== 'standings');   // IMPROVE (2026-10-06) #13: still until a board is up
     })();
@@ -1585,6 +1589,7 @@ export const ThreePointMode: ModeDefinition = {
     camBoundsMesh.position.copyFrom(CAM_BOUNDS_CENTER);
     camBoundsMesh.isVisible = false;
     camBoundsMesh.isPickable = false;
+    lm.mark('court.fx');
     widenCamBounds(ctx.camDirector);   // CAM-FIXES: the mesh above is ignored under an explicit (mountVenue) box; the rectangle is not
 
     // ModeHarness constructs the CameraDirector but does NOT drive it — each

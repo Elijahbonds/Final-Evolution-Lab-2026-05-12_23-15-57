@@ -94,6 +94,9 @@ export interface SpawnOpts {
    *  `installHeroCapture` instead. For the library stage, whose idle and exercise loops no capture replaces: building the
    *  captures was ~0.4 s of the spawn on the phone profile, before the first frame of a squat that never plays one. */
   deferHeroCapture?: boolean;
+  /** lane/improve-hoops phase 3: build only the clips this filter passes (the authored clips and the captures). For a body that only
+   *  ever plays a few (an onlooker: visual/onlookerClips.ts). Omitted: every clip in the scene's scope, as before. */
+  clipFilter?: (name: string) => boolean;
 }
 
 /** DEMO-MODELS-1 v2: the spawn's body context (demoModels.PlayerBodyContext), said by the scene, never by the URL. Only a scene the
@@ -359,7 +362,7 @@ export const CharacterLibrary = {
     // heroes in one by one (AF-1 / P2 #2) — the duel, the net sports, the boards and every rival switched with the linear crossfade,
     // whose weight dips are most of what the rig still counts as pops (GAMEPLAY-CLEAN-AUDIT §4g/§4h). Off (the knob at 0): nothing.
     applyInertialBlend(animator);
-    registerAuthoredClips(animator, scene, skeleton);
+    registerAuthoredClips(animator, scene, skeleton, undefined, opts.clipFilter);
     // M28 dance: build '<base>.M' mirrored groups so mirrored dance steps have a
     // real reflected clip (never a T-pose) — see mirrored-clips.ts. The keeper set rides along so the global
     // `keeper_dive_left` alias resolves outside Penalty mode too (KEEPER_MIRROR_BASES).
@@ -375,7 +378,7 @@ export const CharacterLibrary = {
     // AN OPPONENT MOVES LIKE A CAPTURED PERSON (EVERYONE-BODY-MOCAP-OPPONENTS): the mode's in-scope captures replace the
     // authored clips it asks for. The outermost play wrapper, so modes that re-call neverBindPose/installSafePlay are no-ops.
     let installHeroCapture: (() => void) | undefined;
-    if (role === 'opponent') installOpponentMotion(animator, scene, skeleton);
+    if (role === 'opponent') installOpponentMotion(animator, scene, skeleton, undefined, opts.clipFilter);
     // HOOPS MOVEMENT (owner 2026-09-15): the player plays the same hoops captures — one motion set for both bodies on a court
     else if (!heroCaptureOff()) {
       if (opts.deferHeroCapture) installHeroCapture = () => { installOpponentMotion(animator, scene, skeleton, undefined, HERO_CAPTURE); };

@@ -115,6 +115,8 @@ import { PlayerSlot, LocalInputSource, AISource } from '../core/PlayerSlot';
 import { BodyControlSource, MergedControlSource, COURT_BODY } from '@/lib/move/bodyControlSource';   // HOOPS BODY (2026-10-07): 3v3 by body
 import { attachNetplay, type NetplayHandle } from '../../net/attach';   // opt-in: ?net=<room> seats a human in the first AI slot
 import type { PlayHooks } from '../../net/play';   // lane/online-play: one shared game, up to six humans
+import { netRemoteOffence } from '../../net/knobs';   // lane/improve-hoops-2 phase 10: a remote human plays his own offence
+import { RemoteButtons, remotePassTarget, type RemotePress } from '../../net/remoteOffence';
 import { AgentControlSource } from '../core/AgentControlSource';  // M69: intent play under ?agent=1 (same seam as 1v1)
 import { agentBridge } from '../core/AgentBridge';
 import { RIM_HEIGHT_M } from '../core/courtDims';
@@ -180,7 +182,8 @@ import { blockDiceOn, meetsRelease, releaseFrom, handOnBall, deflect, aiBlockJum
 import { oneContestOn, contestFrom, contestOn, closingSpeed, type ContestBody } from '../hoops/contest';   // hoops-p02: one contest model for every shooter
 import { skillShotOn, aiSharedShotOn, greenScaleFor, moveReadOn, readTheMan, manReadFrom, pressFloored, gatherCloseoutOn, isJumpShot, type ManRead } from '../hoops/rulebook';   // hoops-p09: one rulebook (shots, moves, the closeout, the press floor)
 import { heroSkillVerdict, rimFromRelease, aiRelease, missShapeFor } from '../core/SharedShot';   // hoops-p09: one shot model for every shooter
-import { stealDiceOn, aiStripLands, myStripHandOk, myBumpOpens } from '../hoops/steals';   // hoops-p02: the AI's strip is a hand on the ball; hoops-play: mine too
+import { stealDiceOn, aiStripLands, myStripHandOk, myBumpOpens, driveByHandOk } from '../hoops/steals';   // hoops-p02: the AI's strip is a hand on the ball; hoops-play: mine too
+import { spinCutNow } from '../hoops/oneRule';   // lane/improve-hoops-2 phase 4d: one rule for a shot pressed mid-spin
 import { TeamDefense, type TeamDEvent } from '../hoops/teamDefense';   // lane/hoops-round2 HOP-03: the switch on a screen and the double team
 import { HandCheckPlay } from '../hoops/handCheck';   // lane/hoops-round2 HOP-04: hand-checks, too many = a foul
 import { mountContactPoses } from '../hoops/contactPoses';   // lane/hoops-round2 HOP-04: forearm on hip, arm bar, chest in (drawn only)
@@ -232,6 +235,7 @@ import type { MicEvent } from '../audio/mic/MicDirector';
 import { dunkStingers } from '../audio/mic/names';
 import type { MomentumTier } from '../core/MomentumBus';
 import { StickFrame } from '../core/StickFrame';   // lane/move-feel-2: a held stick keeps its court frame
+import { loadMarks } from '../core/loadMarks';   // lane/improve-hoops phase 3: the load's stages (logging only)
 
 /** Exported so hoop-alignment-tests can check it against the venue's hoop. */
 export const RIM = new Vector3(0, RIM_HEIGHT_M, -0.6);
@@ -318,6 +322,24 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   let net: NetplayHandle | null = null;
   let netSeatTaken = false;
   let netMates = 0;   // lane/online-play: the teammates spawned so far (their seat keys, mate0 / mate1)
+  // lane/improve-hoops-2 phase 10 (knob net.remoteOffence): A REMOTE HUMAN PLAYS HIS OWN OFFENCE — his body's passes and shots come off
+  // his own buttons (lib/net/remoteOffence), read once a frame as press edges; an empty or dropped seat is the AI, as before
+  const remoteButtons = new Map<Body, RemoteButtons>();
+  let remoteFrame = new Map<Body, RemotePress>();
+  /** A human on this AI body's seat, playing its offence himself (never the hero; never without shared play or with the knob off). */
+  const humanOffence = (b: Body): boolean => b !== me && !!net?.play.enabled && netRemoteOffence() && net.seatIsHuman(b.slot.id);
+  const NO_PRESS: RemotePress = { pass: false, shot: false, shotHeld: false };
+  /** Once a frame: every human body's press edges (the stream repeats a lost packet's input, so levels would double-fire). */
+  function readRemote(): void {
+    if (!net?.play.enabled || !netRemoteOffence()) { if (remoteFrame.size) remoteFrame = new Map(); return; }
+    const next = new Map<Body, RemotePress>();
+    for (const b of [...mates, ...foes]) {
+      let rb = remoteButtons.get(b); if (!rb) remoteButtons.set(b, (rb = new RemoteButtons()));
+      if (humanOffence(b)) next.set(b, rb.read(b.slot.intent)); else rb.reset();
+    }
+    remoteFrame = next;
+  }
+  const pressOf = (b: Body): RemotePress => remoteFrame.get(b) ?? NO_PRESS;
   /** lane/online-play: what the shared game (lib/net/play.ts) needs from this mode. */
   const netHooks: PlayHooks = {
     cast: () => (bodiesAll.length === 6 && ball ? { bodies: bodiesAll.map((b) => b.char.root), loose: [ball] } : null),
@@ -920,6 +942,18 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     const mb = mateBalls[i];
     if (passFlight.active || mateShooting || shooting || body.floored || body.stunSec > 0 || (ball.metadata as { felReleased?: boolean } | undefined)?.felReleased) { mb.drop(); return null; }
     const other = mates[1 - i] ?? null;
+    if (humanOffence(body)) {   // lane/improve-hoops-2 phase 10: a remote human on this seat shoots and passes when HE presses
+      mb.drop();
+      const pr = pressOf(body);
+      if (pr.shot) { console.info(`[3V3-NET] mate${i} (a remote human) shoots`); void teammateShoots(ctx, body, i); }
+      else if (pr.pass) {
+        const to: ('me' | 'mate0' | 'mate1')[] = other ? ['me', i === 0 ? 'mate1' : 'mate0'] : ['me'];
+        const k = remotePassTarget(body.char.root.position, { x: body.slot.intent.moveX, z: -body.slot.intent.moveY }, [me, ...(other ? [other] : [])].map((b) => b.char.root.position), RIM_FLOOR);
+        console.info(`[3V3-NET] mate${i} (a remote human) passes to ${to[Math.max(0, k)]}`);
+        mateSwing(ctx, i, to[Math.max(0, k)], 0);
+      }
+      return null;
+    }
     const t = mb.step(dt, { self: body.char.root.position, rim: RIM_FLOOR, me: me.char.root.position, other: other?.char.root.position ?? null, defenders: foePositions() });
     if (t.call === 'shoot') { console.info(`[3V3-OFF] mate${i} reads: shoot (${t.sinceCatchSec.toFixed(2)} s after the catch, ${t.offDrive ? 'off the drive' : 'off the catch'})`); void teammateShoots(ctx, body, i); }
     else if (t.call === 'pass') mateSwing(ctx, i, t.to === 'me' || !other ? 'me' : (i === 0 ? 'mate1' : 'mate0'), t.sinceCatchSec);
@@ -1069,6 +1103,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       choke = typeof window !== 'undefined' && (readChoke(window.location.search) || readCourtLayout('threevthree') === 'chokepoint');   // CHOKEPOINT COURT: the url, or the splash's remembered pick
       if (choke) { buildChoke(ctx); putHud(ctx, { court: 'CHOKEPOINT' }); console.info('[3V3-CHOKE] the chokepoint court: 4 rails'); }
       if (!threeVenue) { VenueKit.buildCourt(ctx.scene, 'venice'); applyOceanCourt(ctx.scene, 'venice'); }
+      const lm = loadMarks(); lm.mark('venue');   // lane/improve-hoops phase 3: the load's stages (logging only)
       const spawnBody = async (
         pos: Vector3, tint: string | undefined, ai: boolean,
         aiKind: 'teammate' | 'defender', slotAngle = 0, markIndex: number | null = null,
@@ -1162,7 +1197,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       // hoops-builder phase B: the hero's ratings, and his body drawn at his playing height (casual runs; the standard frame otherwise)
       rated = await loadRatedTuning(ctx.scene.metadata); heroDrawnScaled = ratedLookScale(rated) !== 1;
       if (heroDrawnScaled) applyProportions(me.char, { heightScale: ratedLookScale(rated), buildScale: 1 });
-      console.info(`[3V3-RATED] ${ratedLog(rated)}`);
+      console.info(`[3V3-RATED] ${ratedLog(rated)}`); lm.mark('body.hero');
       MoveDip.for(ctx.scene, me.char.skeleton, me.char.root, (n) => me.char.animator.groupFor(n));   // hoops-dip (owner 10-20; BEFORE MoveLegs: both insert first, so the pass runs moveLegs → the dip → the foot planter): the body sinks into the crossover / momentum cross / behind-the-back (anim/moveDip)
       LocoAccent.for(ctx.scene, me.char.skeleton, me.char.root, () => accentState(me.tree)); meRest.mount(ctx.scene, me.char.skeleton, me.char.root);   // (+ h3-handler: the protect's sink, same slot)   // hoops-dip movement pass: the decel step and the push-off drawn on the body (anim/locoAccent; after the posture, before the carries)
       me.tree.attachSteer(HipSteer.for(ctx.scene, me.char.skeleton, me.char.root));   // hoops-p05 (owner 2026-11-10, the hero's slide): built BEFORE MoveLegs (both insert first: the pass runs moveLegs → the steer → the dip)
@@ -1187,6 +1222,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       mates = [mate0, mate1];
       foes = [foe0, foe1, foe2];
       bodiesAll = [me, ...mates, ...foes];   // #12: the six, once
+      lm.mark('body.five');
 
       ball = MeshBuilder.CreateSphere('ball', { diameter: 0.24 }, ctx.scene);
       void dressBall(ball, 'basketball');   // Meshy ball skin rides the physics sphere (visual only)
@@ -1206,6 +1242,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       shotMeter = new ShotMeter();
       turbo = new TurboMeter();
       arc = new ShotArc();
+      lm.mark('carries');
       ambient?.dispose(); ambient = EffectsKit.ambient(ctx.scene, 'venice');   // IMPROVE (2026-10-06) #17: kept, so dispose frees the gulls
       // IMPROVE (2026-10-06) #8: the second EffectsKit.ballTrail that stood here (untracked, 'soft' forever, never disposed) is gone:
       // it trailed every ball all game and hid the hot hand's trail below (momentum ≥ 70), which is the one that means something
@@ -1250,6 +1287,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       ctx.camDirector.snapTo(me.char.root.position, RIM);
       threeVenue?.hidePlaceholders();  // M74: drop stand-ins now that real chars are in
       assertSpawned(ctx.scene, { hero: me.char.root, minWorldMeshes: 6, modeId: 'threevthree' });
+      lm.mark('court.fx');
       resetPossession(true);
       if (process.env.NODE_ENV === 'development') { const dev = (window as unknown as { __FEL_DEV__?: { hoopsPosture?: unknown } }).__FEL_DEV__; const seam = { me: () => me.posture?.layer.get() ?? null, foe: () => foes[0]?.posture?.layer.get() ?? null, bio: () => ({ me: { ...me.bio }, foe: { ...(foes[0]?.bio ?? {}) } }), carrier: () => carrierId, offense: () => { if (!ended) resetPossession(true); }, defend: () => { if (!ended) { resetPossession(false); void opponentPossession(ctx); } }, /* resetPossession(false) only RESETS: its toMe branch is the only thing that hands the ball out, so on its own it leaves the rock wherever it was and no drive ever starts. opponentPossession() is what a defensive possession actually IS here — the 1v1 seam's defend() calls startDefense() for the same reason. */ attackPhase: () => (driveK > 0 && driveK >= 1 - GATHER_TELL_SEC / driveSec ? 'gather' : driveK > 0 ? 'drive' : 'check'), driveK: () => driveK, driveSpeed: () => (driver ? driver.vel.length() : 0), takingCharge: () => takingCharge, flightK: () => (dunkFlight ? dunkFlight.k : foeDunkFlight ? foeDunkFlight.k : -1)   /* MY flight's clock first (the showtime press is timed off it), then the rival's */, luck: (v: number | null) => { defenseLuck = v; }, bumpAge: () => bumpAge, handUp: () => ({ me: meHandUp, foe: !!foeHandUp }), post: () => { const n = nearestLiveFoe(); return { posting, spinning: !!spin, brace: !!me.slot.intent.brace, can: canPostUp(me.char.root.position, RIM_FLOOR, n ? n.char.root.position : null), carrying: carrierId === 'me', shooting, finish: !!finish, gather: !!gather, foeStun: n ? n.stunSec : -1, armed: spinArmed, pump: pumpWindow, glass: !!banked, held: me.tree.held ?? '' }; }, driverRoot: () => driver?.char.root ?? null, block: () => (ctx0 ? contestJump(ctx0) : false), /* the block with no bridge latency: the lab's jump was landing at driveK 1.00 behind its own steer queue */ ended: () => ended, kinetic: () => { const d = driver; const dv = d ? d.char.root.position.subtract(me.char.root.position) : null; const dist = dv ? Math.hypot(dv.x, dv.z) : -1; return { ...kin, synergy: synergy.value, overdrive: synergy.overdriveLeft, ltHeld, slipping, meSpeed: Math.hypot(me.drib.vel.x, me.drib.vel.z), dist, closing: d && dv && dist > 1e-3 ? -(driverVelEst.x * dv.x + driverVelEst.z * dv.z) / dist : 0, driveK, turbo: turbo.t01, carrier: carrierId, mateBurst: [...mateBurst], intent: { moveX: me.slot.intent.moveX, moveY: me.slot.intent.moveY, sprint: me.slot.intent.sprint }, choke, railRuns, railNow, inLane: inChokeLane(me2()), gates: { paused: me.drib.paused, stun: meStunSec, floored: meFloored, land: me.landSec, celebrate: me.celebrateSec, shooting, dunking, vault: !!vault } }; }, synergyAdd: (n: number) => { if (synergy.add(n) && ctx0) igniteOverdrive(ctx0); }, boxing: () => boxingOut,
           // NB-3 probe (lane/hoops-overtime): a forced tie — both sides on `pts`, `sec` left on the game clock — and the overtime read
@@ -1281,7 +1319,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         const d = driver.char.root.position.subtract(me.char.root.position); d.y = 0; const dist = d.length();
         const closing = dist > 1e-3 ? -(driverVelEst.x * d.x + driverVelEst.z * d.z) / dist : 0;
         if (parryVaultRead(dist, closing, driveK > 0 ? 'drive' : 'check')) { parryVault(ctx); return; }
-        if (driveByRead({ x: me.drib.vel.x, z: me.drib.vel.z }, me.char.root.position, driver.char.root.position)) { driveBySteal(ctx); return; }
+        if (driveByRead({ x: me.drib.vel.x, z: me.drib.vel.z }, me.char.root.position, driver.char.root.position)
+          && driveByHandOk(me.char.root.position, driver.char.root.position, ballWorld())) { driveBySteal(ctx); return; }   // improve-hoops-2 4c (knob hoops.driveByHandOn, off): the poke's hand test too
       }
       if (e.t === 'stick' && e.side === 'R') {   // MODE-STICK-FACE: R stick → the look orbit — except on the floor with the ball: the DRIBBLE STICK (2K)
         if (posting && carrierId === 'me' && !shooting && !dunking) {   // POST HOOK (2K20): with the post held the stick is the SHOT stick
@@ -1343,6 +1382,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       { const nowMs = performance.now(), gap = lastUpdateMs < 0 ? 0 : nowMs - lastUpdateMs; lastUpdateMs = nowMs;
         const stepMs = Math.min(50, gap > 0 && gap <= FLIGHT_GAP_MS ? gap : dt * 1000);
         meFlightTick?.(stepMs); foeFlightTick?.(stepMs); }
+      readRemote();   // lane/improve-hoops-2 phase 10: the remote humans' presses, once a frame, before anything acts on them
       foeDriveTick?.(Math.min(0.05, Math.max(0, dt)));
       foeSwingTick(ctx, dt);
       if (ended) return;
@@ -2422,6 +2462,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         // a squeeze made while the body is committed WAITS instead of vanishing
         shotBuffer.tick(!!(shooting || dunking || finish || spin), performance.now());   // hoops-p01: the lock the buffered squeeze waits out
         shotBuffer.hold(iAmCarrier && meIntent.actionHeld > 0.02, !!(shooting || dunking || finish || spin), performance.now());   // hoops-gather: a press made DURING the lock (the one that started it is not buffered through its own pump)
+        if (spin && spinCutNow(spin.t, spin.plan.sec, shotBuffer.pending, spinClip.startsWith('bball_pivot'))) cutSpin();   // improve-hoops-2 4d (knob hoops.spinShotCutsHalf, off): from its half, the shot cuts the spin
         { // H2e (owner 2026-10-16): THE HOP STEP ON A DOUBLE TAP (see 1v1)
           const held = meIntent.actionHeld > 0.02, edge = held && !squeezeHeldWas; squeezeHeldWas = held;
           if (edge && iAmCarrier && !dunking && !posting && hopOnDoubleTap(tapRead())) {
@@ -3287,6 +3328,17 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     SoundKit.play('whoosh', { pitch: pivotRead ? 0.95 : 1.25, volume: pivotRead ? 0.2 : 0.35 });
     if (pivotRead) bannerFlash(ctx, pivotRead.reverse ? 'REVERSE PIVOT' : 'PIVOT', 400);   // IMPROVE (2026-10-06) #10
     console.info(`[3V3-MOVE] ${pivotRead ? (pivotRead.reverse ? 'reverse pivot' : 'front pivot') : 'spin'} ${plan.side} yaw ${plan.yaw0.toFixed(2)} sweep ${(plan.sweep * 180 / Math.PI).toFixed(0)}°`);
+  }
+  /** lane/improve-hoops-2 phase 4d (hoops/oneRule spinShotCutsHalf): a shot pressed in the spin's second half ends it where the body is —
+   *  facing as it faces now, the exit's speed handed back as at the spin's own end — so the shot starts this frame. 1v1 has the same. */
+  function cutSpin(): void {
+    if (!spin) return;
+    const yaw = spinYaw(spin.plan, Math.min(spin.t, spin.plan.sec));
+    me.char.root.rotation.y = yaw; me.drib.setFacing(yaw);
+    me.drib.vel.copyFrom(spin.plan.exit.scale(SPIN_EXIT_SPEED));
+    console.info(`[3V3-MOVE] spin cut by the shot at ${(spin.t / spin.plan.sec).toFixed(2)}`);
+    spin = null;
+    me.tree.release();
   }
   function stepSpin(ctx: ModeContext, dt: number): void {
     if (!spin) return;
@@ -4335,15 +4387,18 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     }
     // the drive beat is watchable AND contestable: your positioning sets
     // the make%, and a timed block jump at the release erases it outright
-    const shooter = cont ? cont.receiver : foes[Math.floor(Math.random() * foes.length)];
+    // lane/improve-hoops-2 phase 10: a human on their team brings it up, as the hero brings up mine (no human: the random pick, as before)
+    const humanUp = !cont ? foes.find((f) => humanOffence(f)) : undefined;
+    const shooter = cont ? cont.receiver : humanUp ?? foes[Math.floor(Math.random() * foes.length)];
+    const humanDrive = humanOffence(shooter);
     // IMPROVE (2026-10-06) #6: THE MAN WITH THE BALL IS NAMED AT THE CHECK — the pink ring under him (tickCues) and the call; he was a
     // random one of three and the hint said only "stay tight"
     if (!cont) ctx.juice.callout('HE HAS IT — STAY IN FRONT', MARK_COLOR.driver, 650);
     // #1: the swing's receiver, OPEN out there, lets it go off the catch (threevthreeRules.catchAndShoot) — a pull-up where he stands
-    const pullUp = !!cont && catchAndShoot(openness(shooter.char.root.position, allyPositions()), distXZ(shooter.char.root.position, RIM_FLOOR), knobs, Math.random());
+    const pullUp = !!cont && !humanDrive && catchAndShoot(openness(shooter.char.root.position, allyPositions()), distXZ(shooter.char.root.position, RIM_FLOOR), knobs, Math.random());
     // hoops-p03: their possession is a team's OFFENCE on bodies (hoops/teamOffense3v3; null = the release's one drive). A catch-and-shoot
     // keeps its standing release; a swing's catch is the same possession's next touch.
-    const team = pullUp ? null : teamOff();
+    const team = pullUp || humanDrive ? null : teamOff();   // (phase 10: a human's possession is his, not the planner's)
     if (team && !cont) team.beginPossession();
     teamDriver = null; teamExposure = 0;
     const t0 = performance.now();
@@ -4448,7 +4503,55 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       later(700, () => (call.ball === 'me' ? resetPossession(true) : void opponentPossession(ctx)));
     };
     if (team) { team.beginTouch({ fresh: !cont, intent }); driveSec = 1; driveMps = 0; }   // hoops-p03: the seams' gather read (driveK ≥ 1 − GATHER_TELL_SEC / driveSec) is the planner's k
+    if (humanDrive) { driveSec = 1; driveMps = 0; }   // phase 10: the seams' gather read is the human's own (k 0.5 until he goes up, then the tell's last GATHER_TELL_SEC)
+    /** lane/improve-hoops-2 phase 10: a human team-mate of the driver presses pass — the ball is kicked to him (he called for it). */
+    const humanCaller = (): Body | null => foes.find((f) => f !== shooter && f.stunSec === 0 && !f.floored && pressOf(f).pass) ?? null;
+    /** phase 10: the finish a human's press asks for, as the hero's would read: at the rim a dunk with the turbo, else a layup; out
+     *  there the jumper. assumption: the 3v3 rival's own dunk-gate numbers (2.4 m, DUNK_SHARE's lane) stand in for the hero's. */
+    const humanFinish = (): 'dunk' | 'layup' | 'jumper' => {
+      const atRim = distXZ(shooter.char.root.position, RIM_FLOOR) < 2.4;
+      if (!atRim) return 'jumper';
+      return shooter.slot.intent.sprint || shooter.slot.intent.turbo ? 'dunk' : 'layup';
+    };
     await new Promise<void>((res) => {
+      if (humanDrive) {
+        // lane/improve-hoops-2 phase 10 (net.remoteOffence): THE REMOTE HUMAN WITH THE BALL. His stick moves him (the mover his off-ball
+        // feet already run on), his pass button throws to the team-mate his stick points at, his shot button goes up — the tell, the
+        // contest, the block and every finish after this are the rival's own, as for the AI's drive. The make is still the rival's
+        // model (aiRelease / rivalReleasePct): he chooses WHEN, his tier's hand decides how it goes (said in the lane report).
+        let upAt = -1, tSec = 0;
+        driverDribbling = true;
+        console.info(`[3V3-NET] foe${foes.indexOf(shooter)} (a remote human) has the ball`);
+        foeDriveTick = (fdt: number): void => {
+          if (driveStolen || possessionToken !== tok) { foeDriveTick = null; res(); return; }
+          tSec += fdt;
+          const root = shooter.char.root.position;
+          if (upAt < 0) {
+            const pr = pressOf(shooter);
+            const it = shooter.slot.intent;
+            if (pr.pass) {
+              const others = foes.filter((f) => f !== shooter && f.stunSec === 0 && !f.floored);
+              const k = remotePassTarget(root, { x: it.moveX, z: -it.moveY }, others.map((o) => o.char.root.position), RIM_FLOOR);
+              if (k >= 0) { kickTo = others[k]; console.info(`[3V3-NET] foe${foes.indexOf(shooter)} (a remote human) passes to foe${foes.indexOf(kickTo)}`); foeDriveTick = null; res(); return; }
+            }
+            if (pr.shot) {
+              upAt = tSec; driveK = 1 - GATHER_TELL_SEC; tellAt(humanFinish(), driveK);
+              console.info(`[3V3-NET] foe${foes.indexOf(shooter)} (a remote human) goes up: ${tellPlan}`);
+              return;
+            }
+            shooter.mover?.observe(root, fdt);
+            const v = shooter.mover ? shooter.mover.stepIntent(fdt, it).vel : new Vector3(0, 0, 0);
+            root.x += v.x * fdt; root.z += v.z * fdt;
+            if (!threeVenue?.constrain(root)) clampToHalfCourt(root, 8, 15);
+            driveK = 0.5; driveMps = Math.hypot(v.x, v.z);
+            if (takingCharge) drivePlanted = true;
+            return;
+          }
+          driveK = Math.min(1, 1 - GATHER_TELL_SEC + (tSec - upAt)); driveMps = 0;   // the tell's beat to the release (driveSec 1: k in seconds)
+          if (driveK >= 1) { foeDriveTick = null; res(); }
+        };
+        return;
+      }
       // hoops-p03 (1v1/3v3 phase 3): THEIR OFFENCE ON BODIES (hoops/teamOffense3v3) — the handler is a body on his mover (the hero's accel and
       // brake), the planner probes, calls a screen (the screener's TeammateBrain job, Aware3v3), swings it, attacks; the tell, the contact
       // rule and every finish below are the release's. `hoops.teamOffenseOn` 0 = the release's one drive (the tick after this one).
@@ -4457,6 +4560,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         let screener: Body | null = null, screenSaid = false;
         foeDriveTick = (fdt: number): void => {
           if (driveStolen || possessionToken !== tok) { foeDriveTick = null; res(); return; }
+          { const caller = !tellPlan ? humanCaller() : null; if (caller) { kickTo = caller; console.info(`[3V3-NET] foe${foes.indexOf(caller)} (a remote human) calls for it`); foeDriveTick = null; res(); return; } }   // phase 10
           const root = shooter.char.root.position;
           shooter.mover?.observe(root, fdt);   // the body is where it is (a bump, the court's clamps)
           const sc = screener ? aware.screenOf(screener) : null;
@@ -4481,6 +4585,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       // keeps rendering through a pause: a drive could finish, and score, behind the pause card
       foeDriveTick = (fdt: number): void => {
         if (driveStolen || possessionToken !== tok) { foeDriveTick = null; res(); return; }   // D2: the poke took it / the possession moved on
+        { const caller = !tellPlan && !pullUp ? humanCaller() : null; if (caller) { kickTo = caller; console.info(`[3V3-NET] foe${foes.indexOf(caller)} (a remote human) calls for it`); foeDriveTick = null; res(); return; } }   // phase 10
         driveT += fdt;
         const k = Math.min(1, driveT / driveSec);
         driveK = k;
@@ -4545,7 +4650,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       later(750, () => resetPossession(true));
       return;
     }
-    const plan = tellPlan ?? decideFinish();   // a drive too short for a tell decides here
+    const plan = tellPlan ?? (humanDrive ? humanFinish() : decideFinish());   // a drive too short for a tell decides here
     if (plan === 'dunk') { await driverDunk(ctx, shooter); return; }
     const finishStyle: 'layup' | 'jumper' = plan;
     // THE BLOCK — a timed jump in range at this exact release moment

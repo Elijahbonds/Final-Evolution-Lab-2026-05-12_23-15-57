@@ -4,6 +4,12 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { FEEL_KNOBS, FEEL_KNOB_BY_ID, clampKnob, stepDecimals } from './knobs';
 import * as HSFX from '@/lib/babylon/audio/hoopsSfx';   // hoops-items
+import { POSE_CLIP_FAST, POSE_CLIP_SHARE } from '@/lib/babylon/anim/poseClip';   // improve-hoops-2
+import { ONLOOKER_CLIPS_ONLY } from '@/lib/babylon/visual/onlookerClips';
+import { MAKE_BEAT_HOLDS_SHOT, SPIN_SHOT_CUTS_HALF } from '@/lib/babylon/hoops/oneRule';
+import { RIVAL_CHASE_AROUND_BODY } from '@/lib/babylon/hoops/boardChase';
+import { DRIVE_BY_HAND_ON } from '@/lib/babylon/hoops/steals';
+import { NET_REMOTE_OFFENCE } from '@/lib/net/knobs';
 import { AI_HAND_RANGE_M, AI_HAND_DWELL_SEC, AI_HAND_GAP_SEC } from '@/lib/babylon/core/AiBallHand';
 import { HAND_CLEAR_M } from '@/lib/babylon/anim/Dribble';
 import { DIST_GREEN_NEAR_M, DIST_GREEN_FAR_M, DIST_GREEN_MAX_NARROW } from '@/lib/babylon/core/ShotWindow';
@@ -82,6 +88,7 @@ import { SAMPLE_SFX_ON } from '@/lib/babylon/audio/samples';   // hoops-sound
 import * as DS from '@/lib/babylon/audio/dribbleSound';   // hoops-sound
 import * as HSC from '@/lib/babylon/core/HighSidelineCam';   // hoops-cam
 import * as ARENA from '@/lib/babylon/arena/arenaConfig';   // lane/physics-arena
+import { ARENA_XP_ON } from '@/lib/sessions/arenaScore';   // lane/physics-arena: the XP switch is the server's
 
 function tsFiles(dir: string): string[] {
   const out: string[] = [];
@@ -440,6 +447,15 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.highCamPanShare')).toBe(HSC.HIGH_CAM_PAN_SHARE); expect(def('hoops.highCamPanSec')).toBe(HSC.HIGH_CAM_PAN_SEC);
     expect(def('hoops.highCamMargin')).toBe(HSC.HIGH_CAM_MARGIN); expect(def('hoops.highCamPullMax')).toBe(HSC.HIGH_CAM_PULL_MAX);
     expect(def('hoops.highCamPortraitLift')).toBe(HSC.HIGH_CAM_PORTRAIT_LIFT);
+    // improve-hoops-2 (new, 2026-11-22): phase 3's load switches (shipped OFF: 1v1 missed the plan's 30 % READY bar by 2 points; the moves are the same either way) and phase 4's rules
+    expect(def('perf.poseClipFast')).toBe(POSE_CLIP_FAST); expect(POSE_CLIP_FAST).toBe(0);
+    expect(def('perf.poseClipShare')).toBe(POSE_CLIP_SHARE); expect(POSE_CLIP_SHARE).toBe(0);
+    expect(def('perf.onlookerClipsOnly')).toBe(ONLOOKER_CLIPS_ONLY); expect(ONLOOKER_CLIPS_ONLY).toBe(0);
+    expect(def('hoops.makeBeatHoldsShot')).toBe(MAKE_BEAT_HOLDS_SHOT); expect(def('hoops.spinShotCutsHalf')).toBe(SPIN_SHOT_CUTS_HALF);
+    expect(def('hoops.rivalChaseAroundBody')).toBe(RIVAL_CHASE_AROUND_BODY); expect(def('hoops.driveByHandOn')).toBe(DRIVE_BY_HAND_ON);
+    expect(SPIN_SHOT_CUTS_HALF).toBe(0); expect(DRIVE_BY_HAND_ON).toBe(0);   // the owner's feel calls ship OFF
+    expect(MAKE_BEAT_HOLDS_SHOT).toBe(1); expect(RIVAL_CHASE_AROUND_BODY).toBe(0);   // 4a ON on its bar; 4b OFF (its stalls did not reach 0)
+    expect(def('net.remoteOffence')).toBe(NET_REMOTE_OFFENCE);   // phase 10
     // lane/improve-camera (phase 8): the lens widening (1 = never, the view as hoops-cam shipped it) and the 3v3 view (ships 0)
     expect(def('hoops.highCamZoomMax')).toBe(HSC.HIGH_CAM_ZOOM_MAX); expect(FEEL_KNOB_BY_ID.get('hoops.highCamZoomMax')?.min).toBe(1);
     expect(def('hoops.highCamRoomOn')).toBe(HSC.HIGH_CAM_ROOM_ON); expect(HSC.HIGH_CAM_ROOM_ON).toBe(1);
@@ -466,6 +482,10 @@ describe('the feel knob catalogue', () => {
     expect(def('cam.povLookDegS')).toBe(ARENA.POV_LOOK_DEG_S);
     expect(def('arena.physicsHands')).toBe(ARENA.ARENA_PHYSICS_HANDS); expect(ARENA.ARENA_PHYSICS_HANDS).toBe(0);   // owner 2026-11-24: OFF until measured
     expect(def('arena.dunks')).toBe(ARENA.ARENA_DUNKS); expect(def('arena.dunkJumpVy')).toBe(ARENA.DUNK_JUMP_VY);
+    expect(def('arena.knockdowns')).toBe(ARENA.ARENA_KNOCKDOWNS); expect(ARENA.ARENA_KNOCKDOWNS).toBe(0);   // owner 2026-11-24: behind knobs, the shipping bar
+    expect(def('arena.fouls')).toBe(ARENA.ARENA_FOULS); expect(ARENA.ARENA_FOULS).toBe(0);
+    expect(def('arena.knockMps')).toBe(ARENA.KNOCK_MPS); expect(def('arena.downSec')).toBe(ARENA.DOWN_SEC);
+    expect(def('arena.xpOn')).toBe(ARENA_XP_ON);   // owner 2026-11-24: XP and progress, ON once tested end to end against a throwaway database
     expect(ARENA.ARENA_ON).toBe(1); expect(ARENA.ARENA_PHYSICS_HOOPS).toBe(1); expect(ARENA.CAM_POV).toBe(1); expect(ARENA.POV_BOB_M).toBe(0);
   });
 

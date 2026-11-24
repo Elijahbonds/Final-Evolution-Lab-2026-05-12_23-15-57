@@ -65,7 +65,9 @@ import { STORY_SFX_ON, StorySfx, type StoryPlayFn } from '../adventure/audio/sto
 import { playNature } from '../audio/natureSfx';
 import type { AdventureHost } from '../adventure/host/AdventureHost';
 // improve pass phase 7 (story.worldDressed): textures, trims and the nature kit on the story's worlds (view only)
-import { mountWorldDress, STORY_WORLD_DRESSED, type WorldDress } from '../adventure/world/dress';
+import { dressCutOf, mountWorldDress, STORY_WORLD_DRESSED, type WorldDress } from '../adventure/world/dress';
+// look pass C1 (story.gradeV2): the story's surface colours read as sRGB (world/grade.ts)
+import { gradeStoryScene, STORY_GRADE_V2 } from '../adventure/world/grade';
 // improve pass phase 9 (venue.camClearView): the story camera keeps out of the raised blocks, the run-wall and the trees
 import { VENUE_CAM_CLEAR_VIEW, type CamBox } from '../adventure/host/camera';
 import { boxesNear, keepEyeClear, meshCamBoxes } from '../adventure/host/camBoxes';
@@ -545,7 +547,15 @@ async function loadStory(ctx: ModeContext): Promise<void> {
   });
   const host = session.host;
   const view = buildStoryView(scene, session.map, session.gates);
-  const dress = feel('story.worldDressed', STORY_WORLD_DRESSED) >= 0.5 ? mountWorldDress(scene, [...session.map.worlds.values()]) : null;
+  // look pass C1: the dressing never casts on a phone (only a desktop's trees do), its props per world; story.gradeV2 its palette linear
+  const gradeOn = feel('story.gradeV2', STORY_GRADE_V2) >= 0.5;
+  const dress = feel('story.worldDressed', STORY_WORLD_DRESSED) >= 0.5 ? mountWorldDress(scene, [...session.map.worlds.values()], undefined, {
+    phone: (scene.metadata as { felTier?: string } | undefined)?.felTier === 'mobile',
+    linear: gradeOn,
+    cut: dressCutOf(param('dresscut')),
+    uncast: (m) => ctx.lights?.shadows?.removeShadowCaster(m, true),
+  }) : null;
+  if (gradeOn) gradeStoryScene(scene);
 
   // the party's bodies (the yard's way: the player through CharacterLibrary.spawn, a creature as a placeholder)
   const bodies = new Map<ActorId, Body>();
