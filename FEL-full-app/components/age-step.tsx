@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
-import Image from 'next/image';
 import { signOut } from 'next-auth/react';
 import {
   AGE_BLOCK_COOKIE,
@@ -70,7 +69,9 @@ export function AgeCard({ on, children }: { on: boolean; children: ReactNode }) 
         <div className="absolute bottom-0 right-0 h-72 w-72 rounded-full bg-[#A855F7]/10 blur-[120px]" />
       </div>
       <div className="fel-panel relative w-full rounded-2xl p-5 sm:p-8">
-        <Image src="/brand/crest-light.png" alt="" width={132} height={140} className="mx-auto mb-4 h-[72px] w-auto opacity-90 sm:h-[92px]" />
+        {/* a plain img: the crest is a small static file (public/brand), and next/image needs the app's config the guest shell's tests do not load */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/crest-light.png" alt="" width={132} height={140} className="mx-auto mb-4 h-[72px] w-auto opacity-90 sm:h-[92px]" />
         {children}
       </div>
     </div>

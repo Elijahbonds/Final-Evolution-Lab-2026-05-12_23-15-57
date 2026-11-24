@@ -106,16 +106,16 @@ describe('the app header and /play', () => {
     expect(on).toContain('grid w-full grid-cols-2');
     expect(on).toContain('sm:contents');
   });
-  it('the rail: the cluster joins the wordmark\'s row and the ring shows only with a number while on', () => {
+  it('the rail: the ring shows only with a number while on; the cluster keeps its own row (its count-up must not wrap it mid-load)', () => {
     const r = read('components/shell/status-rail.tsx');
-    expect(r).toContain("${compact ? '' : 'basis-full '}flex-wrap");
+    expect(r).toContain('ml-auto flex min-w-0 basis-full flex-wrap items-center justify-end gap-2 sm:basis-auto');
     expect(r).toContain('{(!compact || (data && data.prq.score !== null)) && <Link');
   });
 });
 
 describe('the overlap fixes', () => {
   it('the USB line goes to the menu only before play; the end card title wraps balanced', () => {
-    expect(read('components/controller-link/host-lobby.tsx')).toContain('cardOverlapFixes() && !collapsed');
+    expect(read('components/controller-link/host-lobby.tsx')).toContain('<InMenuWhen on={cardOverlapFixes() && !collapsed}><span');
     expect(read('components/games/end-screen/end-screen.tsx')).toContain("...(cardOverlapFixes() ? { textWrap: 'balance' } : {}),");
   });
 });

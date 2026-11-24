@@ -151,27 +151,24 @@ export function HostLobby({ config, onInput, collapsed, onPeers, onPadInput, laz
     // The USB line sits under the badge until play starts: plugging a pad in needs no tap at all, only a button press.
     // CONTROLLER-TRY-FIX item 2 (C2): in play the "P1 … connected" line holds only JOINED_MS after a join, then clears — a trailing
     // `|| pads.length > 0` kept it up for the whole session, over the scoreboard (live walkthrough Part 4)
+    // LOOK-SCREENS A3 (ui.cardOverlapFixes): before play, on an upright phone the line sat on the loading / READY card's venue line;
+    // there it is drawn in the stage's "⋯" menu instead (the same words; the Stack it would sit in stays, empty). In play (the
+    // "connected" line after a join), sideways, desktop and with no menu it is where it was.
     const usbLine = bus && (!collapsed || (justJoined && pads.length > 0)) ? (
-      <span
+      <InMenuWhen on={cardOverlapFixes() && !collapsed}><span
         data-testid="usb-connect-hint"
         className={`rounded-full px-3 py-0.5 text-[12px] ${pads.length ? 'text-[#22d3ee]' : 'text-white/70'}`}
         style={{ background: '#000000aa' }}
       >
         {usbStatusLine(pads)}
-      </span>
+      </span></InMenuWhen>
     ) : null;
     // HOOPS-TO-75 HP-2: a connected pad replaces the CONNECT badge; HP-3: no room code chip in prod
-    // LOOK-SCREENS A3 (ui.cardOverlapFixes): before play, on an upright phone the line sat on the loading / READY card's venue line;
-    // there it is in the stage's "⋯" menu instead (the same words). In play (the "connected" line after a join), sideways, desktop
-    // and with no menu it stays where it was.
-    const usbStack = (line: React.ReactNode) => (cardOverlapFixes() && !collapsed
-      ? <InSlot name="menu" fallback={<Stack anchor={anchor}>{line}</Stack>}>{line}</InSlot>
-      : <Stack anchor={anchor}>{line}</Stack>);
     if (pads.length > 0) {
-      return usbLine ? usbStack(usbLine) : null;
+      return usbLine ? <Stack anchor={anchor}>{usbLine}</Stack> : null;
     }
     if (hideRoomChip) {
-      return usbLine ? usbStack(usbLine) : null;
+      return usbLine ? <Stack anchor={anchor}>{usbLine}</Stack> : null;
     }
     if (error) {
       return (
@@ -288,6 +285,11 @@ export function HostLobby({ config, onInput, collapsed, onPeers, onPadInput, laz
       </div>
     </div>
   );
+}
+
+/** look-screens A3: `on`, the children in the upright phone's "⋯" menu slot when it is there (InSlot); otherwise, as they are. */
+function InMenuWhen({ on, children }: { on: boolean; children: React.ReactNode }) {
+  return on ? <InSlot name="menu" fallback={children}>{children}</InSlot> : <>{children}</>;
 }
 
 function Stack({ children, anchor }: { children: React.ReactNode; anchor: string }) {

@@ -115,10 +115,10 @@ export function StatusRail() {
         {/* EVERY-SCREEN P2: on a phone the cluster is always its own row. It did not fit beside the wordmark once the wallet
             counted up from 0 to its balance, so it wrapped mid-load and pushed the page down (0.06 of layout shift on every
             signed-in screen); the row it ends on is now the row it starts on. Wider than 640 px it sits beside the wordmark. */}
-        {/* LOOK-SCREENS A3 (ui.compactAppHeader, lib/ui/firstRun.ts): on a phone the cluster sits on the wordmark's row (it is one row with
-            the empty ring gone: wordmark 44 + wallet ~190 + sign-out 44 + gaps fit 358 px), and the PRQ ring shows only once it has a
-            number — never an empty ring and a dash. Off: the cluster on its own row and the ring always, as before. */}
-        <div className={`ml-auto flex min-w-0 ${compact ? '' : 'basis-full '}flex-wrap items-center justify-end gap-2 sm:basis-auto`}>
+        {/* LOOK-SCREENS A3 (ui.compactAppHeader, lib/ui/firstRun.ts): the PRQ ring shows only once it has a number — never an empty ring
+            and a dash. It arrives on the cluster's left (justify-end), on the cluster's own row, so nothing moves or wraps. The cluster
+            stays on its own row: on the wordmark's row the wallet's count-up could wrap it mid-load (the P2 pin below). */}
+        <div className="ml-auto flex min-w-0 basis-full flex-wrap items-center justify-end gap-2 sm:basis-auto">
           {/* P10 (2026-10-27): the PRQ ring and the wallet are always there — a dash and an empty track until the profile
               answers — so nothing swaps in and the cluster never shifts (the rig measured 0.006 CLS from the old skeleton swap) */}
           <>

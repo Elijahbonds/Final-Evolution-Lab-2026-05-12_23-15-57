@@ -17,8 +17,8 @@
 // changed by a commit, and the tests pin both ends.
 //   `ui.firstRunCard`       /try's birth date on the sign-up card (crest, card, glow); the home hero fits a sideways phone; the
 //                           sign-in carousel's glow is not clipped.
-//   `ui.compactAppHeader`   the app's top rail on a phone is one row (the wallet beside the wordmark) and the level ring shows only
-//                           with a number; /play's six doors are a two-column grid on a phone.
+//   `ui.compactAppHeader`   the app's top rail shows the level ring only with a number (the wallet keeps its own row on a phone: on
+//                           the wordmark's row its count-up could wrap the row mid-load); /play's six doors are a two-column grid.
 //   `ui.cardOverlapFixes`   the USB line goes into the "⋯" menu on an upright phone while the card is up (it sat on the venue line);
 //                           the end card's title wraps balanced, so no word is left alone on a line.
 import { feel } from '@/lib/feel-panel/feel';

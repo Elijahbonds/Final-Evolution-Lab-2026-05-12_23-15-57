@@ -2432,9 +2432,9 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'Phase A3. Same words, same age rule. Not a play page, so the panel cannot change it: the shipped value, changed by a commit.',
   },
   {
-    id: 'ui.compactAppHeader', label: 'Phone: the app top bar is one row, level ring only with a number; Play doors in two columns (1) / as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',
+    id: 'ui.compactAppHeader', label: 'Phone: the app top bar level ring only with a number; Play doors in two columns (1) / as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',
     source: 'lib/ui/firstRun.ts COMPACT_APP_HEADER',
-    hint: 'Phase A3. The wallet and sign-out sit beside the wordmark, the PRQ ring is drawn once it has a number (never an empty ring and a dash), and the Play screen six doors are an even two-column grid on a phone. Wider screens unchanged. Not a play page: the shipped value, changed by a commit.',
+    hint: 'Phase A3. The PRQ ring is drawn once it has a number (never an empty ring and a dash), and the Play screen six doors are an even two-column grid on a phone. Wider screens unchanged. Not a play page: the shipped value, changed by a commit.',
   },
   {
     id: 'ui.cardOverlapFixes', label: 'USB controller line in the dots menu on an upright phone, end card title wraps balanced (1) / as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',
