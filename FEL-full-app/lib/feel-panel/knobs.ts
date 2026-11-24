@@ -2539,6 +2539,12 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/adventure/world/grade.ts STORY_GRADE_V2',
     hint: 'The story ground, blocks, walls, gates and dressing give their colours as screen colours, but the shared light treats them as light values and lifts them a second time, so the dark slate hub floor draws near white. 1 reads them as painted, so the world palette shows; the sun, sky and exposure are unchanged. 0 = as before. Ships OFF: colour is the owner call.',
   },
+  // ── lane/look-world (look pass C2): the story's first screens ──
+  {
+    id: 'story.titleCard', label: 'Story: title card and creature silhouettes (1) / control table and dots (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Story · flow',
+    source: 'lib/babylon/adventure/story/titleCard.ts STORY_TITLE_CARD',
+    hint: 'The READY screen as a title card: the route name, where you are, the chapter title large and START, with the same control table one tap away under CONTROLS. The partner picker shows each creature as the silhouette of its body in the game, not a dot. Same words. 0 = the screens as before.',
+  },
   // ── lane/improve-world (phase 9): the zone cameras ──
   {
     id: 'venue.camClearView', label: 'Coast and story camera: keeps out of the boat, houses, trees, rocks and walls (1) / passes through them (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Coast · zone',
