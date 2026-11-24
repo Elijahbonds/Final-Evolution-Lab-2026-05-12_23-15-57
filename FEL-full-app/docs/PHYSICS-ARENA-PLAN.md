@@ -318,4 +318,15 @@ Havok load in the function; proposed as a later step, not now.
 - c. The full payout (XP, shards, 15 LC on a win), or XP and progress only (no LC) while the arena is new?
 - d. Knockdowns and fouls change nothing in the score rules (a foul is the ball at the check; an and-one is the basket only). Agreed?
 
-Nothing above is built. The server pieces (the route hook, the rows, the catalogue keys) wait for the owner's answer.
+**Built** (2026-11-24, after the owner's answers, `docs/OWNER-DECISIONS.md`): own keys (a), the totals rebuilt from the play log (b),
+XP and progress only with no LC, coins or shards (c). `lib/sessions/arenaScore.ts` (the rules), its rows as derived bounds in
+`modeScoreRules.ts` (12 / 22 / 30), one hook in `app/api/sessions/route.ts` (the rebuild before the rules check; the rebuilt board
+decides the win; the XP-only payout), the keys known to `session-payout.isCatalogueMode`, PRQ rows as the shipped mode of each
+sport, the games handing each finished game to the page (`ctx.card` with its log), and the page posting it (`lib/babylon/arena/arenaRun.ts`,
+the shell's own finish outbox). Behind `arena.xpOn` (server switch `ARENA_XP_ON`), **ON**: tested end to end against a throwaway
+Postgres (`lib/sessions/arenaScore.integration.test.ts`, the real routes and Prisma): a legit 11–4 win paid 67 XP (1.5 × 11 + 50)
+and 0 LC, 0 coins, 0 shards, the streak untouched; five forged logs refused (`arena_score_mismatch`, `arena_too_fast`,
+`arena_clock`, `arena_log_missing`, `arena_after_final`) with nothing paid; the contest paid its rebuilt points; an agent run was
+unpaid. Control: the repo's own `sessionRuns.integration.test.ts` on the same database pays LC and coins for a normal mode. Headless,
+every finished game the real modes hand the page rebuilds on the server to the score the game showed. Not tested: the page's two calls
+in a real browser against a running server (they are unit-tested against the route's body).

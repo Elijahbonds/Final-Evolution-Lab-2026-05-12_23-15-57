@@ -14,8 +14,8 @@
 //
 // POV: the camera button (SELECT / C) switches to the player's own eyes and back (cam.pov; povCamera.ts).
 // Rules: half court, 1s and 2s (past the arc is 2), first to 11, make it take it, the check at the top of the key is a real pass
-// each way. A practice place: it posts no session and pays nothing (the page's resultSink is empty), and the game simply starts
-// again at 11.
+// each way. At 11 the game is handed to the page as a card (ctx.card, with its play log) and starts again; the page posts it as a
+// run that pays XP and progress (owner 2026-11-24; arena.xpOn; the server rebuilds the score from the log: lib/sessions/arenaScore.ts).
 //
 // Registered in MODES, NOT in ENABLED_BABYLON_MODES: its page is /play/arena (Play's Physics Arena chip, arena.on). No shipped mode
 // reads anything here.
@@ -45,12 +45,16 @@ import { chestPoint, dribbleCatch, dribbleCommit, dribbleHand, dribblePush, setP
 import { aimAssist, downSec, dunkJumpVy, dunksOn, floorBounce, foulsOn, jumpVy, knockdownsOn, knockMps, physicsHandsOn, povBobM, povEyeM, povFovDeg, povLookDegS, povOn, stepHz } from '../arena/arenaConfig';
 import { ruleContact, type ContactBody, type ContactCall } from '../arena/arenaContact';
 import { rule } from '../core/Ref';
+import type { ArenaHoopsLog } from '@/lib/sessions/arenaScore';
 import { aimYawErr, applyPov, fovForAspect, povLook, povPose, type PovView } from '../arena/povCamera';
 
 export const ARENA_MODE_ID = 'physics_arena';
 const G = 9.81;
 /** First to this. */
 export const ARENA_GAME_TO = 11;
+/** After a basket the game stops this long before the check (s). The server's score rules lean on it (lib/sessions/arenaScore.ts
+ *  ARENA_MIRRORED.scoredPauseSec: two baskets are at least this far apart on the game's clock). */
+export const SCORED_PAUSE_SEC = 1.4;
 /** The gather: the plant before the jump (s). */
 const GATHER_SEC = 0.14;
 /** A ball comes into the hands from this close (m, from the chest), not faster than this relative speed (m/s). */
@@ -150,6 +154,10 @@ interface St {
     bodyHits: number; hardestHitMps: number; knockdowns: number; fouls: Record<string, number>; andOnes: number };
   /** A shooting foul whose attempt is still playing out: the fouled shooter (a make counts, a miss is his ball). */
   andOne: Who | null;
+  /** This game's play log (the session's `stats.arena`: the server rebuilds the score from it) and its clock's zero. */
+  game: { t0: number; log: ArenaHoopsLog };
+  /** A finished game waiting to be handed to the page (ctx.card, in update()). */
+  final: { won: boolean; me: number; foe: number; log: ArenaHoopsLog } | null;
   /** Probe seam: the next shot of mine releases at the top of the jump plus this (s), instead of on the button. */
   scriptOffset: number | null;
   /** Probe seam: the rival stands still and does nothing (a scripted shot measured on its own). */
@@ -398,13 +406,17 @@ function afterStep(S: St, h: number): void {
     const pts = S.shotBy && S.shotFromM > ARC_M ? 2 : 1;
     S.score[who] += pts;
     S.stats.makes[who]++;
+    S.game.log.baskets.push({ t: S.t - S.game.t0, side: who, shot: !!S.shotBy, fromM: S.shotBy ? S.shotFromM : 0 });
     S.possession = who;   // make it take it: the scorer checks it again
     S.phase = 'scored'; S.phaseT = 0;
     say(S, `${who === 'me' ? 'Bucket' : 'He scores'} +${pts}`, 1.4);
     if (S.andOne === who) { S.stats.andOnes++; say(S, `${rule('and_one').call} +${pts}`, 1.4); }   // fouled and it went in: the basket counts (no free throws here)
     S.andOne = null;
     SoundKit.play('swish', { volume: 0.7 });
-    if (S.score[who] >= ARENA_GAME_TO) { S.phase = 'over'; S.phaseT = 0; say(S, `${who === 'me' ? 'You win' : 'He wins'} ${S.score.me}–${S.score.foe}`, 3); }
+    if (S.score[who] >= ARENA_GAME_TO) {
+      S.phase = 'over'; S.phaseT = 0; say(S, `${who === 'me' ? 'You win' : 'He wins'} ${S.score.me}–${S.score.foe}`, 3);
+      S.final = { won: who === 'me', me: S.score.me, foe: S.score.foe, log: S.game.log };
+    }
   }
   S.prevBall = now;
 }
@@ -436,8 +448,8 @@ function frameRules(ctx: ModeContext, S: St, dt: number): void {
     if (S.ball === 'held' && S.handler === def && def === 'foe' && S.phaseT > 0.8) throwPass(S, 'foe', 'me');
     if (S.ball === 'held' && S.handler === def && def === 'me' && S.phaseT > 2.5) throwPass(S, 'me', 'foe');   // B, or on its own
   }
-  if (S.phase === 'scored' && S.phaseT > 1.4) setupCheck(S, S.possession);
-  if (S.phase === 'over' && S.phaseT > 3) { S.score.me = 0; S.score.foe = 0; setupCheck(S, 'me'); }
+  if (S.phase === 'scored' && S.phaseT > SCORED_PAUSE_SEC) setupCheck(S, S.possession);
+  if (S.phase === 'over' && S.phaseT > 3) { S.score.me = 0; S.score.foe = 0; S.game = { t0: S.t, log: { v: 1, baskets: [] } }; setupCheck(S, 'me'); }
 
   // catches: a pass to its receiver, a loose ball or a shot to whoever gets a hand on it
   if (S.ball === 'pass' || S.ball === 'loose' || S.ball === 'flight') {
@@ -756,7 +768,7 @@ export const PhysicsArenaMode: ModeDefinition = {
       ai: { spot: { x: 0, y: 0, z: 4 }, since: 0, reactAt: 0, pokeAt: 0, drive: false },
       banner: '', bannerT: 0, timing: '', prevBall: { x: 0, y: 1, z: 6 }, hudKey: '',
       stats: { shots: { me: 0, foe: 0 }, makes: { me: 0, foe: 0 }, lostHandles: 0, steals: 0, physMsMax: 0, physMsSum: 0, frames: 0, blocksByHand: 0, bodyHits: 0, hardestHitMps: 0, knockdowns: 0, fouls: {}, andOnes: 0 },
-      andOne: null, scriptOffset: null, aiQuiet: false, seamOn: false, seam: null, disposed: false,
+      andOne: null, game: { t0: 0, log: { v: 1, baskets: [] } }, final: null, scriptOffset: null, aiQuiet: false, seamOn: false, seam: null, disposed: false,
     };
     states.set(scene, S); current = S;
     setupCheck(S, 'me');
@@ -835,6 +847,8 @@ export const PhysicsArenaMode: ModeDefinition = {
     if (S.seamOn) (window as unknown as { __physMs?: number }).__physMs = S.stats.physMsSum / S.stats.frames;
     shotsAndJumps(S, simDt);
     frameRules(ctx, S, simDt);
+    // a finished game to the page (it posts the run: lib/sessions/arenaScore.ts rebuilds the score from the log); play goes on
+    if (S.final) { const f = S.final; S.final = null; ctx.card?.(f.won ? 'WIN' : 'LOSS', f.me, { opponentScore: f.foe, won: f.won ? 1 : 0 }, { arena: f.log, opponentScore: f.foe, won: f.won }); }
     facing(ctx, S, dt);
     camera(ctx, S, dt);
     hud(ctx, S, dt);

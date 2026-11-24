@@ -40,9 +40,10 @@ import { chestPoint, dribbleCatch, dribbleCommit, dribbleHand, dribblePush, setP
 import { aimAssist, downSec, dunkJumpVy, dunksOn, floorBounce, foulsOn, jumpVy, knockdownsOn, knockMps, physicsHandsOn, povBobM, povEyeM, povFovDeg, povLookDegS, povOn, stepHz } from '../arena/arenaConfig';
 import { ruleContact, type ContactBody, type ContactCall } from '../arena/arenaContact';
 import { rule, type Side } from '../core/Ref';
+import type { ArenaHoopsLog } from '@/lib/sessions/arenaScore';
 import { aimYawErr, applyPov, fovForAspect, povLook, povPose, type PovView } from '../arena/povCamera';
 import { handTargets } from '../arena/handTargets';
-import { RIVAL_BY_TIER, shotKindFor, type ShotKind } from './PhysicsArenaMode';
+import { RIVAL_BY_TIER, SCORED_PAUSE_SEC, shotKindFor, type ShotKind } from './PhysicsArenaMode';
 
 export const ARENA_3V3_MODE_ID = 'physics_arena_3v3';
 const G = 9.81;
@@ -142,6 +143,9 @@ interface St {
     callLog: string[] };
   /** A shooting foul whose attempt is still playing out: the fouled shooter (a make counts, a miss is his team's ball). */
   andOne: Pl | null;
+  /** This game's play log (the session's `stats.arena`; the home team is 'me') and its clock's zero. */
+  game: { t0: number; log: ArenaHoopsLog };
+  final: { won: boolean; me: number; foe: number; log: ArenaHoopsLog } | null;
   disposed: boolean;
 }
 
@@ -433,13 +437,17 @@ function afterStep(S: St, h: number): void {
     const team = by?.team ?? S.possession;
     const pts = S.shotBy && S.shotFromM > ARC_M ? 2 : 1;
     S.score[team] += pts; S.stats.makes[team]++;
+    S.game.log.baskets.push({ t: S.t - S.game.t0, side: team === 'home' ? 'me' : 'foe', shot: !!S.shotBy, fromM: S.shotBy ? S.shotFromM : 0 });
     S.phase = 'scored'; S.phaseT = 0;
     S.possession = otherTeam(team);   // the ball changes hands after a make
     say(S, `${team === 'home' ? (by?.human ? 'Bucket' : 'Your team scores') : 'They score'} +${pts}`);
     if (S.andOne && S.andOne === S.shotBy) { S.stats.andOnes++; say(S, `${rule('and_one').call} +${pts}`); }   // fouled and it went in: the basket counts (no free throws here)
     S.andOne = null;
     SoundKit.play('swish', { volume: 0.7 });
-    if (S.score[team] >= ARENA_3V3_GAME_TO) { S.phase = 'over'; S.phaseT = 0; say(S, `${team === 'home' ? 'You win' : 'They win'} ${S.score.home}–${S.score.away}`, 3); }
+    if (S.score[team] >= ARENA_3V3_GAME_TO) {
+      S.phase = 'over'; S.phaseT = 0; say(S, `${team === 'home' ? 'You win' : 'They win'} ${S.score.home}–${S.score.away}`, 3);
+      S.final = { won: team === 'home', me: S.score.home, foe: S.score.away, log: S.game.log };
+    }
   }
   S.prevBall = now;
 }
@@ -464,8 +472,8 @@ function rules(S: St, dt: number): void {
   if (S.ball === 'pass' && S.ballT > 1.6) S.ball = 'loose';
 
   if (S.phase === 'check' && S.ball === 'held' && S.handler && S.handler.team !== S.possession && S.phaseT > (S.handler.human ? 2.5 : 0.8) && S.passTo) throwPass(S, S.handler, S.passTo);
-  if (S.phase === 'scored' && S.phaseT > 1.4) setupCheck(S, S.possession);
-  if (S.phase === 'over' && S.phaseT > 3) { S.score.home = 0; S.score.away = 0; setupCheck(S, 'home'); }
+  if (S.phase === 'scored' && S.phaseT > SCORED_PAUSE_SEC) setupCheck(S, S.possession);
+  if (S.phase === 'over' && S.phaseT > 3) { S.score.home = 0; S.score.away = 0; S.game = { t0: S.t, log: { v: 1, baskets: [] } }; setupCheck(S, 'home'); }
 
   if (S.ball === 'pass' || S.ball === 'loose' || S.ball === 'flight') {
     const bv = ball.vel(TMP2);
@@ -716,7 +724,7 @@ export const PhysicsArena3v3Mode: ModeDefinition = {
       pov: { on: false, view: { yaw: 0, pitch: 0, bobPhase: 0 }, savedFov: ctx.camera.fov }, camModeSeen: ctx.camDirector.mode,
       banner: '', bannerT: 0, timing: '', prevBall: { x: 0, y: 1, z: 6 }, hudKey: '',
       stats: { shots: { home: 0, away: 0 }, makes: { home: 0, away: 0 }, passes: 0, completed: 0, intercepted: 0, steals: 0, lostHandles: 0, blocksByHand: 0, outOfBounds: 0, stalls: 0, bodyHits: 0, hardestHitMps: 0, knockdowns: 0, fouls: {}, andOnes: 0, callLog: [] },
-      andOne: null, disposed: false,
+      andOne: null, game: { t0: 0, log: { v: 1, baskets: [] } }, final: null, disposed: false,
     };
     states.set(scene, S); current = S;
     setupCheck(S, 'home');
@@ -778,6 +786,7 @@ export const PhysicsArena3v3Mode: ModeDefinition = {
     S.t = S.world.time;
     decisions(S, simDt);
     rules(S, simDt);
+    if (S.final) { const f = S.final; S.final = null; ctx.card?.(f.won ? 'WIN' : 'LOSS', f.me, { opponentScore: f.foe, won: f.won ? 1 : 0 }, { arena: f.log, opponentScore: f.foe, won: f.won }); }
     facing(S, simDt);
     camera(ctx, S, dt);
     if (S.bannerT > 0) { S.bannerT -= dt; if (S.bannerT <= 0) S.banner = ''; }

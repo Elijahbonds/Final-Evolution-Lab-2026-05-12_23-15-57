@@ -79,6 +79,7 @@ import { gameWinner, winRule } from '@/lib/babylon/modes/onevoneRules';
 import { canonicalModeKey, MODE_INFO } from '@/lib/game-data';
 import { scoreCeilingFor, killSwitchOn, SCORE_CEILINGS, sessionRulesMax, MIRRORED } from '@/lib/arena-score-integrity';
 import { performSetMax } from '@/lib/babylon/music/performSet';
+import { arenaWon, isArenaSession } from '@/lib/sessions/arenaScore';
 
 /**
  * Does the shell forward the room's `stats` to POST /api/sessions yet? YES since 2026-09-26: GameShell's handleEnd sends
@@ -90,9 +91,11 @@ import { performSetMax } from '@/lib/babylon/music/performSet';
  */
 export const ROOM_STATS_FORWARDED = true;
 
-/** Is this a mode the catalogue knows (after an old spelling is mapped)? Anything else is paid as endless and wins nothing. */
+/** Is this a mode the catalogue knows (after an old spelling is mapped)? Anything else is paid as endless and wins nothing.
+ *  lane/physics-arena (owner 2026-11-24): the Physics Arena's three session keys are known here too — for the session routes
+ *  only; they are not MODE_INFO rows, so no mode list, venue, first-game pick or staked Arena offers them. */
 export function isCatalogueMode(mode: string): boolean {
-  return Object.prototype.hasOwnProperty.call(MODE_INFO, canonicalModeKey(mode));
+  return Object.prototype.hasOwnProperty.call(MODE_INFO, canonicalModeKey(mode)) || isArenaSession(mode);
 }
 
 // ---------------------------------------------------------------------------
@@ -392,6 +395,9 @@ export const ROUND_MODE_RULES: Readonly<Record<string, { roundsToWin: number; wi
   },
 };
 export function judgeHeadToHead(modeKey: string, score: number | undefined, opponentScore: number | undefined): boolean | null {
+  // lane/physics-arena (owner 2026-11-24): an arena game is judged on the board the server REBUILT from its play log (the route
+  // passes the rebuilt totals); the 3-point contest has no win. Missing totals: no win.
+  if (isArenaSession(modeKey)) return Number.isFinite(score) && Number.isFinite(opponentScore) ? arenaWon(modeKey, Number(score), Number(opponentScore)) : false;
   if (!SERVER_JUDGED_WIN_MODES.includes(modeKey)) return null;
   if (!Number.isFinite(score) || !Number.isFinite(opponentScore)) return null;
   const me = Number(score), foe = Number(opponentScore);

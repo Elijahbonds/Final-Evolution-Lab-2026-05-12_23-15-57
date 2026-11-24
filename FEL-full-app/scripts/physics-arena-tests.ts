@@ -34,6 +34,17 @@
 import { makeWorld, runShot, spots } from './probes/physics-arena/harness';
 import { seeded } from '../lib/babylon/arena/shotModel';
 import { BALL_R, RIM_TUBE_R, ARENA_RIM, ARENA_RIM_RADIUS, boardBox, type P3 } from '../lib/babylon/arena/hoopGeometry';
+import { rebuildArenaScore } from '../lib/sessions/arenaScore';
+
+/** The cards a live mode handed its page (ctx.card: a finished game with its play log). */
+type Card = { outcome: string; score: number; stats: Record<string, number>; detail: { arena?: unknown; opponentScore?: number; won?: boolean } };
+/** Every card the game handed over must be what the SERVER rebuilds from its own log (an honest game is never refused), on the
+ *  game's own clock as the run's duration (the server's is longer: it also counts the load). */
+function cardsRebuild(tag: string, mode: string, cards: Card[], simSec: number): void {
+  const results = cards.map((c) => ({ c, r: rebuildArenaScore(mode, c.detail.arena, { durationMs: simSec * 1000, sentScore: c.score, sentOpponent: c.detail.opponentScore }) }));
+  console.log(`     ${tag}games handed to the page: ${cards.length}${results.map(({ c, r }) => ` [${c.outcome} ${c.score}${c.detail.opponentScore !== undefined ? `–${c.detail.opponentScore}` : ''} → ${r.ok ? `server ${r.score}${r.ok && mode !== 'arenaThreePoint' ? `–${r.opponentScore}${r.won ? ' won' : ''}` : ''}` : `REFUSED ${r.detail}`}]`).join('')}`);
+  ok(`${tag}every finished game's play log rebuilds on the server to the score the game showed (${cards.length})`, results.every(({ c, r }) => r.ok && r.score === c.score && (mode === 'arenaThreePoint' || (r.ok && r.opponentScore === c.detail.opponentScore && r.won === (c.outcome === 'WIN')))));
+}
 
 let pass = 0, fail = 0;
 const ok = (n: string, c: boolean, extra = '') => {
@@ -239,7 +250,9 @@ async function liveLoop(B: typeof import('@babylonjs/core'), contact = false) {
   const ctx = {
     scene, camera, camDirector: dir, heroRef: { current: null }, objectiveRef: { current: null },
     setHud: (u: Record<string, unknown>) => { Object.assign(hud, u); if (u.arenaPhase) phases.add(String(u.arenaPhase)); if (u.arenaScore) scores.add(String(u.arenaScore)); if (u.arenaBanner) banners.add(String(u.arenaBanner)); },
+    card: (outcome: string, score: number, stats: Record<string, number>, detail: Card['detail']) => { cards.push({ outcome, score, stats, detail }); },
   } as never;
+  const cards: Card[] = [];
   let threw: unknown = null;
   let worstY = Infinity, nan = false;
   try {
@@ -291,6 +304,8 @@ async function liveLoop(B: typeof import('@babylonjs/core'), contact = false) {
   if (st) console.log(`     shots me ${st.makes.me}/${st.shots.me}, rival ${st.makes.foe}/${st.shots.foe}; lost handles ${st.lostHandles}; steals ${st.steals}; physics ${(st.physMsSum / Math.max(1, st.frames)).toFixed(2)} ms a frame (node, max ${st.physMsMax.toFixed(1)})`);
   if (st) console.log(`     ${tag}body contacts ${st.bodyHits} (hardest ${st.hardestHitMps.toFixed(1)} m/s); knockdowns ${st.knockdowns}; fouls ${JSON.stringify(st.fouls)}; and-ones ${st.andOnes}`);
   if (!contact) ok('knobs off: no knockdown and no foul is ever called', !!st && st.knockdowns === 0 && Object.keys(st.fouls).length === 0);
+  cardsRebuild(tag, 'arenaHoops', cards, 180);
+  if (!contact) ok('the three minutes finished at least one game (a card to post)', cards.length >= 1);
   setFeelOverride('arena.knockdowns', 0); setFeelOverride('arena.fouls', 0);
   ok(`${tag}the rival shoots and makes some, and misses some (the physics decides, not a script)`, !!st && st.shots.foe > 4 && st.makes.foe > 0 && st.makes.foe < st.shots.foe);
   scene.dispose(); engine.dispose();
@@ -349,7 +364,9 @@ async function threes(B: typeof import('@babylonjs/core'), hands: boolean, conta
   const camera = new B.UniversalCamera('cam33', new B.Vector3(0, 3, 12), scene);
   const hud: Record<string, unknown> = {};
   const dir = { mode: 'follow', suspended: false, stickWorldLatched: (x: number, y: number) => new B.Vector3(x, 0, -y), look: () => {}, update: () => {}, snapTo: () => {} };
-  const ctx = { scene, camera, camDirector: dir, heroRef: { current: null }, objectiveRef: { current: null }, setHud: (u: Record<string, unknown>) => Object.assign(hud, u) } as never;
+  const cards: Card[] = [];
+  const ctx = { scene, camera, camDirector: dir, heroRef: { current: null }, objectiveRef: { current: null }, setHud: (u: Record<string, unknown>) => Object.assign(hud, u),
+    card: (outcome: string, score: number, stats: Record<string, number>, detail: Card['detail']) => { cards.push({ outcome, score, stats, detail }); } } as never;
   let threw: unknown = null, worstY = Infinity, nan = false, physMs = 0, frames = 0;
   try {
     await PhysicsArena3v3Mode.load(ctx);
@@ -393,6 +410,8 @@ async function threes(B: typeof import('@babylonjs/core'), hands: boolean, conta
   ok(`${tag}passes were thrown and caught through the physics (${st?.completed} of ${st?.passes})`, !!st && st.passes >= 5 && st.completed >= 3);
   ok(`${tag}both teams scored through the hoop`, !!st && st.makes.home > 0 && st.makes.away > 0);
   if (!contact) ok(`${tag}knobs off: no knockdown and no foul is ever called`, !!st && st.knockdowns === 0 && Object.keys(st.fouls).length === 0);
+  if (cards.length) cardsRebuild(tag, 'arenaThrees', cards, 180);
+  else console.log(`     ${tag}no game reached 21 in three minutes (no card to post)`);
   scene.dispose(); engine.dispose();
   setFeelOverride('arena.physicsHands', 0); setFeelOverride('arena.knockdowns', 0); setFeelOverride('arena.fouls', 0);
   return physMs / Math.max(1, frames);
@@ -464,7 +483,9 @@ async function threePoint(B: typeof import('@babylonjs/core')) {
   const camera = new B.UniversalCamera('cam3', new B.Vector3(0, 3, 12), scene);
   const hud: Record<string, unknown> = {};
   const dir = { mode: 'follow', suspended: false, look: () => {}, update: () => {}, snapTo: () => {} };
-  const ctx = { scene, camera, camDirector: dir, heroRef: { current: null }, objectiveRef: { current: null }, setHud: (u: Record<string, unknown>) => Object.assign(hud, u) } as never;
+  const cards: Card[] = [];
+  const ctx = { scene, camera, camDirector: dir, heroRef: { current: null }, objectiveRef: { current: null }, setHud: (u: Record<string, unknown>) => Object.assign(hud, u),
+    card: (outcome: string, score: number, stats: Record<string, number>, detail: Card['detail']) => { cards.push({ outcome, score, stats, detail }); } } as never;
   let threw: unknown = null, finished = false, downAt = -1;
   try {
     await PhysicsArena3ptMode.load(ctx);
@@ -480,6 +501,11 @@ async function threePoint(B: typeof import('@babylonjs/core')) {
   console.log(`     contest: ${st?.score} points, ${st?.makes} of ${st?.shots}`);
   ok('a whole contest ran without a throw and finished', threw === null && finished);
   ok('all 25 balls were shot, and some went in (scored by the ball through the hoop)', !!st && st.shots === 25 && st.makes > 0 && st.makes < 25);
+  // the final's pause, then the card (the page posts it) and the racks again
+  const finalScore = st?.score ?? -1;
+  for (let f = 0; f < 60 * 6 && !cards.length; f++) PhysicsArena3ptMode.update(ctx, 1 / 60);
+  ok('the final is handed to the page with the score it showed', cards.length === 1 && cards[0].score === finalScore);
+  cardsRebuild('', 'arenaThreePoint', cards, 90);
   scene.dispose(); engine.dispose();
 }
 
