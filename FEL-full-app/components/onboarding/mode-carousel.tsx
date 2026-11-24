@@ -1,4 +1,5 @@
 'use client';
+import { cardOverlapFixes, RAIL_GLOW_CLASS } from '@/lib/ui/firstRun';
 
 // ModeCarousel — the games, as a thing you swipe, on the screen where you decide to join.
 //
@@ -89,7 +90,8 @@ export function ModeCarousel({ lead, value, onChange, accent }: CarouselProps) {
           sized so the next one peeks in and tells you there is more without needing an arrow. */}
       <ul
         ref={railRef}
-        className="fel-rail -mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-2"
+        // look-screens A3 (ui.cardOverlapFixes): the rail scrolls sideways, so it clips; room for the chosen card's glow, given back below
+        className={`fel-rail -mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 ${cardOverlapFixes() ? RAIL_GLOW_CLASS : 'pb-2'}`}
       >
         {order.map((key) => {
           const info = MODE_INFO[key];

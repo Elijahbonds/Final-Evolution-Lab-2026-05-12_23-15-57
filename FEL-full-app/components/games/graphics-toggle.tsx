@@ -12,7 +12,8 @@ import { GRAPHICS_CHOICES, readGraphicsChoice, writeGraphicsChoice, parseGraphic
 
 const LABEL: Record<GraphicsChoice, string> = { auto: 'Auto', performance: 'Performance', quality: 'Quality' };
 
-export function GraphicsToggle() {
+/** `id`: the select's id (look-screens A1: the "⋯" menu draws a second one on an upright phone while the header's is hidden). */
+export function GraphicsToggle({ id = 'fel-graphics' }: { id?: string }) {
   const [choice, setChoice] = useState<GraphicsChoice>('auto');
   const [loaded, setLoaded] = useState<GraphicsChoice | null>(null);
   const [tier, setTier] = useState<string>('');
@@ -26,9 +27,9 @@ export function GraphicsToggle() {
   const pending = loaded !== null && choice !== loaded;
   return (
     <span className="flex items-center gap-1.5">
-      <label className="sr-only" htmlFor="fel-graphics">Graphics</label>
+      <label className="sr-only" htmlFor={id}>Graphics</label>
       <select
-        id="fel-graphics"
+        id={id}
         value={choice}
         title={tier ? `Graphics — running the ${tier} tier` : 'Graphics'}
         onChange={(e) => { const c = parseGraphicsChoice(e.target.value) ?? 'auto'; setChoice(c); writeGraphicsChoice(c); }}

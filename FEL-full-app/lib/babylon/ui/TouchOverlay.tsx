@@ -26,6 +26,8 @@ import { dpadLayout, TOUCH_DPAD_TAP_ON, DPAD_OLD_ARM_PX } from './dpadTap';   //
 import { DancePad } from '@/lib/babylon/dance/ui/DancePad';
 import { TurboPad } from './TurboPad';
 import { feel } from '@/lib/feel-panel/feel';
+import { useSlotRef, useUprightZones } from '@/components/games/hud-zones';   // look-screens A2 (ui.hudZonesUpright): the deck slot
+import { DECK_HINT_MODES, deckFadeOverBody } from '@/lib/ui/hudZones';   // look-screens A2 (ui.deckFadeOverBody, ships at 1 = solid)
 import { TOUCH_FLOAT_STICK, FLOAT_BASE_PX, FLOAT_RADIUS_PX, FLOAT_ZONE_W, FLOAT_ZONE_H, floatStickVector, floatKnobOffset } from './floatStick';   // lane/move-feel-2: the floating MOVE stick   // hoops round 2 (owner 2026-10-23): R2 on the touch deck, for the modes whose R2 is the turbo
 
 // setPointerCapture throws NotFoundError if the browser has already dropped
@@ -94,6 +96,12 @@ export function TouchOverlay(props: { bus: InputBus; modeId: string; visible: bo
   }, [props.visible, deck]);
   const landscape = deck !== 'portrait';
   const compact = deck === 'compact';
+  // look-screens A2: on an upright phone a mode that reads no d-pad gets no ghost d-pad — its place in the column is kept (so the
+  // stick and TURBO stay where they were) and becomes the deck's slot, where the host's hint line is drawn (in the camera's bottom
+  // band, under no body). `zones` is false on the server and the first render: the ghost is drawn until the client knows.
+  const zones = useUprightZones();
+  const deckSlot = useSlotRef('deck');
+  const fade = !landscape && zones ? deckFadeOverBody() : 1;
 
   if (!props.visible || props.bus.gamepadActive || deck === 'none') return null;
   const lifted = (side: React.CSSProperties, k: number, origin: string): React.CSSProperties =>
@@ -118,7 +126,13 @@ export function TouchOverlay(props: { bus: InputBus; modeId: string; visible: bo
       : 'pointer-events-none absolute inset-x-0 bottom-0 z-30 h-[44vh] bg-gradient-to-t from-black/85 to-transparent'}>
       {/* compact: the stick in the corner and the d-pad inboard of it (row-reverse keeps the DOM order) */}
       <div ref={colL} className={`pointer-events-auto absolute bottom-3 left-3 flex gap-2 ${compact ? 'flex-row-reverse items-end' : 'flex-col items-center'}`} style={lifted(compact ? COMPACT_LEFT : SAFE_LEFT, cs * fit.l, 'bottom left')}>
-        {DEAD_DPAD.has(props.modeId) && feel('touch.dpadTapOn', TOUCH_DPAD_TAP_ON) >= 0.5 ? <HollowDPad /> : <DPad bus={props.bus} layout={deck} />}
+        {DEAD_DPAD.has(props.modeId) && feel('touch.dpadTapOn', TOUCH_DPAD_TAP_ON) >= 0.5
+          ? (zones && !landscape
+            ? (DECK_HINT_MODES.has(props.modeId)
+              ? <div ref={deckSlot.ref} {...deckSlot.attr} className="pointer-events-none relative h-[72px] w-[172px]" />
+              : <div aria-hidden="true" className="pointer-events-none h-[72px] w-[72px]" />)
+            : <HollowDPad />)
+          : <DPad bus={props.bus} layout={deck} />}
         {DEAD_L_STICK.has(props.modeId) ? <HollowStick /> : FLOAT_STICK_MODES.has(props.modeId) && feel('touch.floatStick', TOUCH_FLOAT_STICK) > 0 ? <FloatStick bus={props.bus} /> : <AnalogStick bus={props.bus} side="L" label="MOVE" />}
       </div>
       {compact ? (
@@ -137,14 +151,20 @@ export function TouchOverlay(props: { bus: InputBus; modeId: string; visible: bo
           {cfg.turbo && landscape && <TurboPad bus={props.bus} shape="pill" />}
           {/* portrait: TURBO beside the diamond, inboard and out of the column's flow — the column keeps its size (a phone's stage has no
               height to spare: fitDeck already scales it), so the diamond and the stick stay exactly where they were */}
-          {cfg.turbo && !landscape
+          {fadeCluster(fade, cfg.turbo && !landscape
             ? <div className="relative"><div className="absolute right-full top-1/2 mr-2 -translate-y-1/2"><TurboPad bus={props.bus} shape="round" /></div><ButtonDiamond bus={props.bus} buttons={buttons} /></div>
-            : <ButtonDiamond bus={props.bus} buttons={buttons} />}
+            : <ButtonDiamond bus={props.bus} buttons={buttons} />)}
           {cfg.rStick === null ? <HollowStick /> : <AnalogStick bus={props.bus} side="R" label={cfg.rStick} />}
         </div>
       )}
     </div>
   );
+}
+
+/** look-screens A2 (ui.deckFadeOverBody): the action cluster (the diamond and TURBO, not the stick) at the fade's opacity; at 1 it is
+ *  returned untouched (no wrapper), today's deck exactly. */
+function fadeCluster(fade: number, cluster: React.ReactNode): React.ReactNode {
+  return fade < 1 ? <div data-deck-fade style={{ opacity: fade }}>{cluster}</div> : cluster;
 }
 
 function AnalogStick({ bus, side, label }: { bus: InputBus; side: 'L' | 'R'; label: string }) {
