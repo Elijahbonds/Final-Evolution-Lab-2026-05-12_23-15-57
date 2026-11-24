@@ -250,7 +250,8 @@ through the use and the attack — the release needed his own man to still be in
 | switches / tags a pick-and-roll | 0.26 / 0 | 0.30 / 0 | 0.33 / 0.31 | 0.36 / 0.36 |
 
 **Read.**
-- **Against the roll, the coverage beats today's defence:** 0.644 → 0.576 points a pick-and-roll possession (−0.068, −11 %), no seed
+- **Against the roll, the coverage beats today's defence (defenders with no reaction delay; see §5.5 — with the game's delay it does
+  not):** 0.644 → 0.576 points a pick-and-roll possession (−0.068, −11 %), no seed
   overlapping (the coverage's worst, 0.605, is under today's best against the roll, 0.626). That is the case a top-level defence must
   handle: when the screener really rolls, over-the-top plus the show, the tag and switching only when beaten defend it better than
   switching every screen. It even ends under today's pick-and-roll number with no roll (0.593).
@@ -263,10 +264,90 @@ through the use and the attack — the release needed his own man to still be in
 - `assumption:` three AI defenders against the AI offence stand in for both directions in a game (the AI defending your team's
   pick-and-roll, and your AI mates defending theirs).
 
-**Verdict: both switches ship OFF** for the owner to feel. Recommendation: if the roll man goes on, the coverage goes on with it (they are
-better together than either alone); neither alone.
+**Verdict: both switches ship OFF** for the owner to feel. (Superseded by §5.5: with the game's reaction delay in the sim, the coverage
+does not beat today's defence against the roll; keep the coverage off.)
 
 Not built (time): a fight over the screen that does not lose a step (§5.3's second finding).
+
+### 5.5 The roll man scores — `hoops.rollScoreOn`, and a full-pace fight over — `hoops.pnrFightFullOn` (built, both ship OFF)
+
+**What they do.** `hoops.rollScoreOn` (needs `hoops.screenerRollOn`; `hoops/screenerRoll.ts`): the EARLY SLIP (with his man already up at
+the ball he goes the frame he plants), the GHOST SCREEN (coming to set it, inside `GHOST_RANGE_M` 1.5 m of the spot with his man already
+gone to the ball, he cuts without planting), the LEADING PASS (the handler reads him where a chest pass meets him — his speed × the flight,
+as the mode throws every 3v3 pass — open by `ROLL_LEAD_OPEN_M` 1.6 m there, with a clear lane), and THE CATCH IS A FINISH (inside
+`ROLL_CATCH_RIM_M` 3 m of the rim he goes up at once, no triple-threat beat). `hoops.pnrFightFullOn` (needs `hoops.pnrCoverageOn`;
+`hoops/pnrCoverage.ts`): the man on the ball fights over the top at full pace instead of `FIGHT_SLOW` 0.7 (the number is unchanged for
+everyone else). Off = today exactly.
+
+**A correction to §5.3–§5.4 first.** In the game every 3v3 AI defender sees the floor through its tier's reaction delay
+(`hoops/reaction.ts` ReactiveDefender: 420 / 220 / 120 ms, owner 2026-10-20); the sim's defenders did not. pnr-sim now takes `LENS=1`
+(the PRO 220 ms lens on every defender), and every number below is with it — the closer stand-in for the game. **With the lens, the
+coverage no longer beats today's defence against the roll** (below), so §5.4's "beats today's defence" holds only for defenders with no
+reaction delay.
+
+**Measured** (pnr-sim, `LENS=1`, PRO, 300 possessions × seeds 7 / 11 / 23; "roll" = `screenerRollOn` + `rollScoreOn`):
+
+| | today | roll | coverage | roll + coverage | roll + coverage + full-pace fight | (round 1: roll without the score parts) |
+|---|---|---|---|---|---|---|
+| **points a pick-and-roll possession** | 0.667 / 0.644 / 0.673 (**0.661**) | 0.681 / 0.697 / 0.701 (**0.693**) | 0.794 / 0.742 / 0.764 (**0.767**) | 0.752 / 0.735 / 0.659 (**0.715**) | 0.769 / 0.706 / 0.720 (**0.732**) | 0.712 / 0.710 / 0.658 (0.693) |
+| points a possession, all (the offence overall) | 0.653 / 0.656 / 0.668 (0.659) | 0.667 / 0.673 / 0.701 (**0.680**) | 0.772 | 0.668 | 0.693 | 0.680 |
+| the screener rolls | 0 % | 31–35 % | 1–2 % | 35–44 % | 33–45 % | 36–40 % |
+| **roll-man catches** (of pick-and-rolls) | 0 % | **7.7 / 8.4 / 12.7 %** | 0 % | **4.8 / 5.6 / 8.2 %** | 3.4 / 7.0 / 7.9 % | 0–0.5 % |
+| points a roll-man catch | — | 0.33–0.43 | — | 0.12–0.21 | 0.26–0.48 | — |
+| **roll-man open looks, of rolls** (2.2 m clear, 0.2 s) | — | **0 %** | 0 % | 0–2 % | 0 % | 0 % |
+| the same at the leading pass's 1.6 m | — | 0–1.8 % | 0 % | 0–8.2 % | 0–4.5 % | 2.7–3.2 % |
+| the roll man's best separation inside 5 m (median) | — | 1.1–1.2 m | 1.0–1.1 m | 1.0–1.1 m | 1.0–1.1 m | 1.1–1.2 m |
+
+**Read, against the brief's targets.**
+- **Roll-man catches above 0: met** — 8–13 % of pick-and-rolls with the roll on (was 0), 5–8 % against the coverage.
+- **Open looks 10–20 % of rolls: NOT met** — 0 % at 2.2 m, under 2 % at the pass's 1.6 m window. His man never leaves him by more than
+  about 1.1 m, so the catches are contested: a catch is worth 0.33–0.43 points against today's defence and 0.12–0.21 against the coverage.
+- **The offence overall is not broken:** 0.659 → 0.680 points a possession with the roll on.
+- **The coverage against the roll:** 0.693 (today's defence) → 0.715 (the coverage) — slightly WORSE with the reaction delay, the seeds
+  overlapping; the full-pace fight over does not help (0.732). The coverage alone is clearly worse than today (0.661 → 0.767).
+- Why the roll man is never open: the defender guarding him plays the release's deny job (between his man and the rim, a third of the
+  way), so a screener diving at the rim runs straight into his own man; and the low man helps the drive on top. An open roll needs the
+  screener's man pulled AWAY from the rim — a hard show or a trap of the handler that the coverage does not do (its show is a step), or
+  a slip before the screen is read, which the zero-lag rival planner never needs to make. That is the next design step: a real hedge
+  (the screener's man out on the ball for half a second, and the recovery race to the roller), measured the same way.
+
+**Verdict: all three switches stay OFF** (`hoops.screenerRollOn`, `hoops.rollScoreOn`, `hoops.pnrFightFullOn`, with
+`hoops.pnrCoverageOn`). Recommendation: keep `hoops.pnrCoverageOn` off (worse than today with the game's reaction delay); the roll man
+(`screenerRollOn` + `rollScoreOn`) is the one worth the owner's feel test on offence — the screener rolls, the handler finds him, the
+offence scores a little more — but the roll man still does not get open.
+
+### 5.6 Round 3 — the roll goes to the free block (inside `hoops.rollScoreOn`), and the full-pace fight over, re-measured
+
+**What changed.** §5.5's roll man dived down his own line at the rim, straight into the man guarding him (the deny job sits a third of the
+way from his man to the rim), so he was never more than about 1.1 m clear. Now, with `hoops.rollScoreOn`, he dives to whichever block
+— `ROLL_BLOCK_SIDE_M` 2.0 m either side of the rim, `ROLL_BLOCK_OUT_M` 1.2 m out on the floor — has the most room from the defence
+(`hoops/screenerRoll.ts` freeBlock; tested). New numbers, behind the switch. (A 1.6 / 1.0 m block measured on seed 7 only: 7.4 % open at
+2.2 m against 6.8 % for 2.0 / 1.2, but 10 % at 1.6 m against 19 %; 2.0 / 1.2 kept.)
+
+**Measured** (pnr-sim `LENS=1` — the game's PRO reaction delay on every defender — 300 possessions × seeds 7 / 11 / 23):
+
+| | today | roll | coverage | roll + coverage | roll + coverage + full-pace fight |
+|---|---|---|---|---|---|
+| **points a pick-and-roll possession** | 0.667 / 0.644 / 0.673 (**0.661**) | 0.669 / 0.659 / 0.759 (**0.696**) | 0.794 / 0.742 / 0.764 (**0.767**) | 0.728 / 0.728 / 0.718 (**0.725**) | 0.728 / 0.629 / 0.730 (**0.696**) |
+| points a possession, all | 0.659 | **0.697** | 0.772 | 0.683 | 0.697 |
+| the screener rolls | 0 % | 36–41 % | 1–2 % | 30–41 % | 28–38 % |
+| the roll man's best separation (median) | — | 1.4–1.5 m (was 1.1–1.2) | 1.0–1.1 m | 1.3–1.5 m | 1.3–1.4 m |
+| **roll-man catches** (of pick-and-rolls) | 0 % | **15.9 / 19.4 / 16.0 %** | 0 % | 19.7 / 14.7 / 11.3 % | 18.4 / 17.9 / 9.4 % |
+| points a roll-man catch | — | 0.42 / 0.57 / 0.84 | — | 0.51 / 0.88 / 0.65 | 0.69 / 0.42 / 0.99 |
+| **roll-man open looks, of rolls** — at the pass's 1.6 m | — | **18.6 / 15.9 / 15.2 %** | 0 % | 21.3 / 8.3 / 14.7 % | 21.3 / 12.8 / 25.7 % |
+| — at the stricter 2.2 m | — | 6.8 / 7.9 / 6.1 % | 0 % | 14.9 / 2.1 / 2.9 % | 6.4 / 7.7 / 5.7 % |
+
+**Against the brief's targets.**
+- **Roll-man catches above 0: met** — 16–19 % of pick-and-rolls against today's defence (§5.5: 8–13 %; before the roll man: 0).
+- **Open looks 10–20 % of rolls: met at the leading pass's 1.6 m window (15–19 %)**; at the stricter 2.2 m, 6–8 %.
+- **The offence overall is not broken:** 0.659 → 0.697 points a possession (up 6 %).
+- **The defence against the roll:** today's switch-every-screen 0.696; the coverage 0.725 (worse); **the coverage with the full-pace fight
+  0.696 — level with today, not better** (the seeds overlap: 0.629–0.730 against 0.659–0.759). So the fight over without losing a step
+  is what brings the coverage back to today's level against a real roll; nothing here beats today's switch.
+
+**Verdict: all OFF.** Recommendation, for the owner's feel test: the roll man on offence (`hoops.screenerRollOn` 1 + `hoops.rollScoreOn` 1)
+— the screener rolls, gets open and is found, and the rival offence scores a little more. The coverage (`hoops.pnrCoverageOn`, with
+`hoops.pnrFightFullOn` if it goes on at all) stays off: at best it matches today's defence.
 
 ## 6. Waiting on the owner (recommendation first; each is reversible)
 
@@ -305,7 +386,8 @@ runs. Code after the clips (this lane or the next): the tree's state table and t
 ## 7. Flags and assumptions
 
 - No existing tuned number was changed. New numbers: §5.1's six (behind `hoops.aiShotIqOn`, off), §5.3's fourteen (behind
-  `hoops.pnrCoverageOn`, off) and §5.4's four (behind `hoops.screenerRollOn`, off); all listed in docs/FEEL-PANEL.md.
+  `hoops.pnrCoverageOn`, off) §5.4's four (behind `hoops.screenerRollOn`, off), §5.5's five and §5.6's two (behind `hoops.rollScoreOn` and `hoops.pnrFightFullOn`,
+  off); all listed in docs/FEEL-PANEL.md.
 - `assumption:` (§5.3) three AI defenders against the AI offence stand in for the AI defending your team's pick-and-roll in a game (the
   handler is the AI's planner, not you).
 - Probe changes (additive): `rival-sim-3v3.mts` reports the contest at each release and takes `--def human` (it ignored the flag before);
