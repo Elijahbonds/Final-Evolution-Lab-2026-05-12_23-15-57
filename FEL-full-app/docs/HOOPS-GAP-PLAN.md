@@ -122,6 +122,26 @@ number the owner has felt and signed off.
 | Celebrations | a made-basket celebration, the crowd ooh on an ankle-breaker (owner 2026-10-20) [C] | cheap and skippable | near the bar | — | — | — | — |
 | Sound on contact | 12 distinct sound ids across the two modes; a body bump is the shared `impact` / `thud` [C] | a sound per contact kind | small gap | a soft body thud by force, the sneaker squeak on a plant (CC0, owner 2026-11-12) | no | S | `core/HoopsSound*` / the shared kit |
 
+## 2b. Re-score at today's release (2026-11-24, `c6766d64` + this lane; every new switch at its default, OFF)
+
+The coordinator asked for the next tier: what §3 did not cover that can be closed without art or the owner. Each candidate measured
+headless with the game's reaction delay (the "human" defender sees the floor 220 ms late, the AI defenders through their tier's lens),
+three seeds × 300 possessions, before anything was built.
+
+| Candidate | Measured now | The bar | Verdict |
+|---|---|---|---|
+| **Help-side rotation after a drive** (3v3 AI defence) | pnr-sim `LENS=1`, PRO: **84–94 % of the rivals' layups meet two defenders inside 1.6 m** (median contest 0.82); 77–81 % of pull-ups too (the help or the double) | the help arrives at the rim | **at the bar** — nothing to build |
+| **The late contest on jumpers** (closeouts) | the same runs: catch-and-shoot contest median **0.58–0.59** after a kick (pull-ups 0.80–0.81; layups 0.82); the catch-and-shoot is still their best shot (0.72–0.74 a shot) | a kick-out is a better look than a contested pull-up, and is still contested | **at the bar** — a harder closeout would make the kick worthless, which no top sim does |
+| **Can you just run past the 1v1 AI?** (cutting off a drive) | new `scripts/probes/hoops-close/drive-sim.mts`: a straight drive with no move never gets by (0 % at every tier; the layup meets contest 0.62); a drive that starts 25–45° off his line reaches his hip every time but he stays on it — gap at 2 m from the rim ROOKIE 1.55–1.68 m (contest 0.35–0.40), PRO 1.08–1.12 m (0.57–0.58), ELITE 1.01–1.03 m (0.60–0.61) | a set man stops a straight line; an angle gets a step; the tiers differ | **at the bar** |
+| **The 1v1 rival's move variety** | rival-sim 1v1: distinct actions per 10 possessions PRO 8.0–9.4, ELITE 6.4–9.2, ROOKIE 4.0–6.6 (by design: his kit is the cross, the shuffle and a hesitation now and then) | varied enough that you cannot sit on one move | **at the bar** for PRO / ELITE; ROOKIE is the kit's design |
+| **The 1v1 rival reads a sagging defender** | new `--def sagset` (a patient defender 2.2 m off, never reaching): PRO and ELITE take the jumper (jumpers 70–85 and 130–152 of 300, made 41–42 / 54 %) and score 0.64–0.65 / 0.95–0.97 points a possession; ROOKIE never does (SAG_TAKE 0, design) | sag and he shoots over you | **at the bar** |
+| **The 1v1 rival against a patient, tight defender** | new `--def humanset` (1 m in front, 220 ms late, never reaching): **0.36 / 0.48 / 0.63 points a possession** (ROOKIE / PRO / ELITE); layups 16 / 22 / 30 %, jumpers 17 / 23 / 31 % | a fair game at PRO is near a point a possession | **a gap — but not a decision gap.** Tried a shot IQ for him (one more move, twice a possession, before a smothered shot, PRO and ELITE): **no change** (PRO 0.477 → 0.474, ELITE 0.628 → 0.626; against the sagging defender 0.650 → 0.680); reverted, no code kept. A defender who mirrors him at 1 m contests whatever he does; what decides it is his make rate under a contest — his timing hands (`hoops.aiTiming*Ms`, hoops-p09's chosen numbers) and the contest model, both tuned: **the owner's call** (§6). |
+| **Rebounding position (box-outs)** | hoops-p06 (`docs/HOOPS-GOAL-GAP.md` §3i): the seal wins the race it is nearer for, the defence's box-out takes 97 % (1v1) / 86 % (3v3) of swatted boards; the 1v1 rival chases a loose ball since `hoops.rivalChaseBoardOn` (HOOPS-PLAY-AUDIT §5.2) | position decides the board | **at the bar** (not re-measured: no board model in these sims) |
+
+**So the next tier is mostly at the bar**, and the one measured gap left — the AI scores little against a patient, tight defender — is
+in the tuned numbers, not in a decision. Nothing new is built from this re-score; the probes stay (`drive-sim.mts`, pnr-sim's shot-kind
+table, rival-sim's `--def sag / sagset / humanset`).
+
 ## 3. The gaps, ranked by how much they would improve play
 
 1. **Defenders skate** (§2.4): every defensive possession, every body, both modes, on screen all the time. Needs new stepping clips —
@@ -388,6 +408,10 @@ no new clips), and on the slide bench with the knob on and no new clips the numb
 When the owner's clips land: put them on the rig under those names, turn the switch on, run the slide bench (§8) against §6b's bar.
 
 ## 6. Waiting on the owner (recommendation first; each is reversible)
+
+0. **The AI's make rate against a patient defender** (§2b): the 1v1 rival scores 0.36 / 0.48 / 0.63 points a possession against a defender
+   who stays in front and never reaches. *Recommend:* a phone session on his timing hands (`hoops.aiTimingProMs` and the rest, hoops-p09) —
+   the one lever that moves it; every other read is at the bar.
 
 1. **Feel `hoops.aiShotIqOn` in 3v3 PRO on defence.** *Recommend:* turn it on if the rivals feel smarter and not unfair; the rig check
    runs before the flip either way.
