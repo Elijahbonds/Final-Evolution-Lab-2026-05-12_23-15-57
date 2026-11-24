@@ -1388,11 +1388,21 @@ game loads; each also has a one-load URL switch for an A/B on any device without
   court lines (they are texture) or the palm fronds (alpha-tested cut-outs), so 1 is the candidate. The phone tier (390x844, DPR 3,
   CPU 4x, guard on; tennis as the control): frame p95 medians today -> FXAA: 1v1 783 -> 811 ms, Dunk 978 -> 970, Venice 974 -> 748, the story 666 -> 776 (tennis
   817 ms, spread 6 ms; the places' own run-to-run spread up to 62 ms today and 203 ms with FXAA): mixed, two slower and two faster
-  2 rounds; the 3rd is below if it ran; the guard settled at the same level (L2) on both sides; READY within
+  (2 rounds); the guard settled at the same level (L2) on both sides; READY within
   10 % everywhere; texture memory +17 to +44 MB by the readout's estimate (FXAA adds a full-screen float target, because the image
   pass no longer draws straight to the screen; about half that on a phone, whose targets are half-float — an estimate). The rig
   cannot give a phone's frame rate, so the owner's check decides: open a hoops game with `?aa=1` and with `?aa=0` on the phone,
   read PERF's frame p95 after 10 s of play in each, and if they match, set `PHONE_AA_DEFAULT` to 1.
+- `venue.courtDetailV2` **0** (group "Look · venues"; `visual/CourtSurface.ts` `COURT_DETAIL_V2`; URL `?lookon=courtdetail`): **the court's
+  lines and the ground's grain hold into the distance** (phase B3, part 1). The court lines and the ground grain are texture, which no
+  anti-aliasing pass reaches; on, the painted court (Babylon's default 4x anisotropic filtering) and the Venice set's concrete and sand
+  (8x) are sampled at 16x (the GPU's cap binds). No new texture, no new pass, no colour change. Ships OFF; its A/B is measured in the commit after this one.
+- `crowd.varietyV2` **0** (group "Look · venues"; `visual/crowd/crowdStands.ts` `CROWD_VARIETY_V2`, with `CROWD_HEIGHT_SPREAD` standing
+  0.07, seated 0.025; URL `?lookon=crowdvariety`): **the crowd reads as different people** (phase B3, part 2), with the shipped bodies
+  only: each fan and each card its own height (up to 7 % taller or shorter standing, 2.5 % seated, whose hips stay on the bench), each
+  3D fan its own shade (0.84-1.08 of its body's colours, a slight warm or cool cast, through the thin instance's colour). The idle was
+  already staggered per fan. Phones draw cards only, so there it changes heights only. Real variety (more bodies, arms that clap) is
+  owner art. Ships OFF (crowd look is the owner's call); its A/B is measured in the commit after this one.
 - `venue.iblEnvV1` (exists, **0**, unchanged): **found dead and wired** (phase B2). `mountVenueIBL` (`scene/venueQualityV1.ts`, 2026-11-03)
   was never called, so the knob and `?vq=ibl` did nothing; the light rig now mounts the environment through it (off runs exactly the
   procedural cube, tested). **The prefiltered files it names (`public/env/*.env`) are not in the repo on any branch**, so on is still
