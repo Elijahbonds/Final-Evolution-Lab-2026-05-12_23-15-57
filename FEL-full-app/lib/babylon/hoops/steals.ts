@@ -121,3 +121,15 @@ export function myStripHandOk(me: { x: number; z: number }, handler: { x: number
 }
 /** Does a hard contact with the handler open MY strip window? Off: any contact, as before. On: only one he caused (he ran into me). */
 export function myBumpOpens(handlerCausedIt: boolean): boolean { return !myStripHandOn() || handlerCausedIt; }
+
+// ── lane/improve-hoops-2 phase 4c (2026-11-22): THE 3V3 DRIVE-BY MUST REACH THE BALL ───────────────────────────────────────────────────
+// With the strip rule on, the kinetic drive-by (core/HoopsKinetic DRIVE_BY: running past the driver at speed with a poke) was 9 of the 11
+// 3v3 steals left (HOOPS-PLAY-AUDIT §6.1) — it takes the ball with no look at where the ball is. On: the drive-by also needs the poke's
+// hand on the ball (aiStripLands from my root: the reach, his body not between, the ball off the floor); a drive-by that fails it is an
+// ordinary poke. An owner feature (HOOPS KINETIC, 2026-09-18), so the owner's feel call: ships OFF (0 = the drive-by as before).
+export const DRIVE_BY_HAND_ON = 0;
+export const driveByHandOn = (): boolean => feel('hoops.driveByHandOn', DRIVE_BY_HAND_ON) >= 0.5;
+/** The drive-by's hand check: true with the knob off (as before), else the poke's own hand test. */
+export function driveByHandOk(me: { x: number; z: number }, handler: { x: number; z: number }, ball: { x: number; y: number; z: number }): boolean {
+  return !driveByHandOn() || aiStripLands(me, handler, ball).lands;
+}

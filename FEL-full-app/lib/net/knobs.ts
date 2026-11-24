@@ -16,7 +16,13 @@ export const NET_POSE_HZ = 15;
  *  runs every possession and the guest only defends (the AI rival attacks the host). */
 export const NET_POSSESSION_SWAP = 1;
 
+/** lane/improve-hoops-2 phase 10 (docs/IMPROVE-10-PHASE-AUDIT.md): 3v3 — 1 = a remote human's body takes its passes and shots from
+ *  that human's own buttons (the AI still plays an empty or dropped seat); 0 = the AI brain decides them, as before.
+ *  Shipped 0: the two-page browser check could not show it (scripts/probes/improve-hoops/remote3v3.mjs; docs/FEEL-PANEL.md). */
+export const NET_REMOTE_OFFENCE = 0;
+
 export const netMirrorOn = (): boolean => feel('net.mirrorOn', NET_MIRROR_ON) >= 0.5;
 export const netRenderDelayMs = (): number => feel('net.renderDelayMs', NET_RENDER_DELAY_MS);
 export const netPoseHz = (): number => feel('net.poseHz', NET_POSE_HZ);
 export const netPossessionSwap = (): boolean => feel('net.possessionSwap', NET_POSSESSION_SWAP) >= 0.5;
+export const netRemoteOffence = (): boolean => feel('net.remoteOffence', NET_REMOTE_OFFENCE) >= 0.5;
