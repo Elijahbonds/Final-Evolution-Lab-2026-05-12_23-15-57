@@ -29,6 +29,9 @@ import {
 import '@babylonjs/loaders/glTF';
 import { groundTextureFor, TILE_M } from '@/lib/babylon/visual/groundTextures';
 import { prewarmMeshes } from '@/lib/babylon/core/hitchProbe';
+// look pass C4 (coast.oceanSurface): the surf break's ocean shading on the sea plane, and the shore foam
+import { oceanShade, type OceanLight } from '@/lib/babylon/visual/OceanSurface';
+import { mountShoreFoam, OCEAN_LOOK, type ShoreFoam } from './shoreFoam';
 import { spawnMeshyProp, type MeshyPropKey } from '@/lib/babylon/visual/meshyProps';
 import {
   BOAT_AT, DECKS, ISLANDS, deckSurfaceY, PIECE_M, PROP_MODELS, SEA_Y, SEABED_Y, ZONE_SPOTS, propsDrawnAt, terrainY, zoneProps, zonePieces,
@@ -200,7 +203,7 @@ export const COAST_STREAM_SLICED = 0;
 // 2.2-3.8 s). Kept as a knob for a phone with parallel shader compiles to try.
 export const COAST_PREWARM_LATE = 0;
 
-export function mountZoneView(scene: Scene, opts: { streamOn: boolean; sliced?: boolean; prewarm?: boolean }): ZoneView {
+export function mountZoneView(scene: Scene, opts: { streamOn: boolean; sliced?: boolean; prewarm?: boolean; ocean?: { light?: OceanLight } | null }): ZoneView {
   const root = new TransformNode('coast_zone', scene);
   const mats: (StandardMaterial | PBRMaterial)[] = [], texs: Texture[] = [];
 
@@ -219,6 +222,11 @@ export function mountZoneView(scene: Scene, opts: { streamOn: boolean; sliced?: 
   mats.push(seaMat);
   const sea = MeshBuilder.CreateGround('coast_sea', { width: SEA_PLANE_M, height: SEA_PLANE_M }, scene);
   sea.material = seaMat; sea.position.y = SEA_Y; sea.isPickable = false; sea.parent = root;
+  // look pass C4 (coast.oceanSurface): the chop and the distance fade on the same material; the foam where it meets the sand
+  // (with it, the water's own colour is given as the linear albedo a PBR surface expects: the hex was being lifted to bright cyan)
+  if (opts.ocean) seaMat.albedoColor = Color3.FromHexString('#1C6F88').toLinearSpace();
+  const oceanSh = opts.ocean ? oceanShade(seaMat, { foam: OCEAN_LOOK.foam, horizon: OCEAN_LOOK.horizon, shoreZ: 1e6, fade: [...OCEAN_LOOK.fade], ...(opts.ocean.light ? { light: opts.ocean.light } : {}) }) : null;
+  const foam: ShoreFoam | null = opts.ocean ? mountShoreFoam(scene, root, sea) : null;
 
   // the terrain pieces
   const sand = groundTextureFor(scene, 'sand', PIECE_M / TILE_M.sand, PIECE_M / TILE_M.sand); texs.push(sand);
@@ -394,6 +402,8 @@ export function mountZoneView(scene: Scene, opts: { streamOn: boolean; sliced?: 
       const sx = Math.round(camX / WAVE_TILE_M) * WAVE_TILE_M, sz = Math.round(camZ / WAVE_TILE_M) * WAVE_TILE_M;
       sea.position.x = sx; sea.position.z = sz; floor.position.x = sx; floor.position.z = sz;
       seaT += dt; waves.uOffset = (seaT * 0.012) % 1; waves.vOffset = (seaT * 0.007) % 1;
+      if (oceanSh) oceanSh.setTime(seaT);
+      foam?.update(dt);
       // the harness's painted sky is a 280 m dome round the origin: it travels with the camera (AdventureMode's rule)
       if (!sky.length) for (const n of ['bk_dome', 'bk_ring']) { const m = scene.getMeshByName(n); if (m) sky.push(m); }
       for (const m of sky) { m.position.x = camX; m.position.z = camZ; }
@@ -411,6 +421,7 @@ export function mountZoneView(scene: Scene, opts: { streamOn: boolean; sliced?: 
       for (const list of masters.values()) for (const m of list) m.dispose();
       for (const m of fine.values()) m.dispose();
       post.dispose();
+      foam?.dispose();
       for (const t of texs) t.dispose();
       for (const m of mats) m.dispose();
       root.dispose(false, true);

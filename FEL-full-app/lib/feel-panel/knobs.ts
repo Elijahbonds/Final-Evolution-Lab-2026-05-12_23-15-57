@@ -2599,7 +2599,36 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
   {
     id: 'story.worldDressed', label: 'Story: textured ground and stone, edge trims, rail posts and the nature kit (1) / plain colour blocks (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Story · flow',
     source: 'lib/babylon/adventure/world/dress.ts STORY_WORLD_DRESSED',
-    hint: 'View only: no piece moves or changes size. The shipped ground textures on the tops, stone on the sides and blocks, a lip on each edge, a cap on each block, posts under the rails, and grass, bushes, rocks and trees from the shipped kit kept clear of where you play. 0 = the plain colours, as before. Ships OFF: on the phone rig it loaded 10 to 18 percent slower and drew World 1 slower; judge it on a real phone.',
+    hint: 'View only: no piece moves or changes size. The shipped ground textures on the tops, stone on the sides and blocks, a lip on each edge, a cap on each block, posts under the rails, and grass, bushes, rocks and trees from the shipped kit kept clear of where you play. 0 = the plain colours, as before. Ships OFF: after the look pass made it cheaper its load and frame time are within noise on the phone rig, but World 1 draws and active meshes go over the story phone budget row; judge it on a real phone.',
+  },
+  // ── lane/look-world (look pass C1): the story's light ──
+  {
+    id: 'story.gradeV2', label: 'Story: surface colours read as painted (1) / lifted pale (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Story · flow',
+    source: 'lib/babylon/adventure/world/grade.ts STORY_GRADE_V2',
+    hint: 'The story ground, blocks, walls, gates and dressing give their colours as screen colours, but the shared light treats them as light values and lifts them a second time, so the dark slate hub floor draws near white. 1 reads them as painted, so the world palette shows; the sun, sky and exposure are unchanged. 0 = as before. Ships OFF: colour is the owner call.',
+  },
+  // ── lane/look-world (look pass C2): the story's first screens ──
+  {
+    id: 'story.titleCard', label: 'Story: title card and creature silhouettes (1) / control table and dots (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Story · flow',
+    source: 'lib/babylon/adventure/story/titleCard.ts STORY_TITLE_CARD',
+    hint: 'The READY screen as a title card: the route name, where you are, the chapter title large and START, with the same control table one tap away under CONTROLS. The partner picker shows each creature as the silhouette of its body in the game, not a dot. Same words. 0 = the screens as before.',
+  },
+  // ── lane/look-world (look pass C3): the Closet held sideways ──
+  {
+    id: 'ui.closetSideways', label: 'Closet held sideways on a phone: walkthrough beside the athlete (1) / over the athlete (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',
+    source: 'lib/ui/closetSideways.ts CLOSET_SIDEWAYS',
+    hint: 'On a short sideways screen (a phone held sideways) the Studio walkthrough card sits at the top of the editor beside the stage, as on an upright phone, instead of over the 3D athlete. Same card and steps. Tablets and desktops unchanged. 0 = as before.',
+  },
+  // ── lane/look-world (look pass C4): the Coast sea ──
+  {
+    id: 'coast.oceanSurface', label: 'Coast: living sea and shore foam (1) / flat sheet (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Coast · zone',
+    source: 'lib/adventure/coast/shoreFoam.ts COAST_OCEAN_SURFACE',
+    hint: 'The sea borrows the surf break shading: small chop bending the light and a fade toward the sky with distance (the sun glitter on a desktop only), and a foam line breathes where the water meets the sand. The water height and wading are unchanged. 0 = the flat sheet, as before.',
+  },
+  {
+    id: 'venue.veniceGroundV2', label: 'Venice: weathered park slab and sand (1) / flat tiled planes (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Coast · zone',
+    source: 'lib/adventure/venice/groundV2.ts VENICE_GROUND_V2',
+    hint: 'From the hub high camera the slab and the sand were one texture tiled flat to the horizon. 1 draws them as a grid whose vertex colour carries slow worn patches on the concrete and damp drifts on the sand, so the repeat breaks up. No texture added, the same draws. 0 = the flat planes, as before.',
   },
   // ── lane/improve-world (phase 9): the zone cameras ──
   {
