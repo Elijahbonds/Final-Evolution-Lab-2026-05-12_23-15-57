@@ -7,7 +7,7 @@ import {
 } from '@babylonjs/core';
 import type { AbstractMesh, PBRMaterial, StandardMaterial } from '@babylonjs/core';
 import { MOODS, type VenueMood, type MoodCurves } from './moods';
-import { tierRigSettings, legacyRig, legacyMobilePost, type QualityTier } from './QualityTier';
+import { tierRigSettings, legacyRig, legacyMobilePost, phoneAARig, readPhoneAA, type QualityTier } from './QualityTier';
 import { isLegacyLook, readShadowCacheParam, readMobilePostParam, lookFeatureOff } from './graphicsSetting';
 import { mountShadowCache, shadowCacheWanted, gpuCanCopyShadowMap, type ShadowCacheHandle } from './ShadowCache';
 import { mountKickerLight, type KickerHandle } from './KickerLight';
@@ -21,6 +21,7 @@ import { mountHeatHaze, type HeatHazeHandle } from './HeatHaze';
 import { mountSunShafts, type SunShaftsHandle } from './SunShafts';
 import { mountSceneDecals, type GroundDecalsHandle } from '../visual/GroundDecals';
 import { mountEnvironmentIBL } from './EnvironmentIBL';
+import { mountVenueIBL } from './venueQualityV1';   // look pass B2: venue.iblEnvV1 reaches the rig
 import { motionPolicy } from '../../a11y/reducedMotion';
 import { FLASH_GAIN, stepFlashLevel } from '../core/ImpactFrame';
 import { phoneSkipsCaster, phoneSkipsCasterMaterial, PHONE_SOCK_CAST } from './phoneCasters';   // phone-perf (2026-10-14)
@@ -110,7 +111,9 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
   // shadow map size, cascades on outdoor moods, sharpen and bloom weight.
   const legacy = isLegacyLook();   // ?look=legacy: the shared look as it shipped before 2026-10-06 (before/after shots)
   const T0 = legacy ? legacyRig(tierRigSettings(tier, mood), tier) : tierRigSettings(tier, mood);
-  const T = tier === 'mobile' && readMobilePostParam() === '0' ? legacyMobilePost(T0) : T0;   // the phase-2 A/B
+  const T1 = tier === 'mobile' && readMobilePostParam() === '0' ? legacyMobilePost(T0) : T0;   // the phase-2 A/B
+  // look pass B1: the phones' edge smoothing (look.phoneAA / ?aa=; 0 = as before). Set once here, at mount, like the rest.
+  const T = tier === 'mobile' && !legacy ? phoneAARig(T1, readPhoneAA()) : T1;
 
   // A9.3: the rig owns the scene's grade. A spec venue built after this (NexusWebScene.applyVenueGrade) stands down
   // instead of overwriting the mood — the pipeline reads the SAME scene.imageProcessingConfiguration it would write.
@@ -128,7 +131,10 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
   // PBRMaterial reflects nothing and metals read as flat plastic — see
   // EnvironmentIBL.ts. Mounted before the lights so materials compiled during
   // venue load already see an environment.
-  const disposeEnv = mountEnvironmentIBL(scene, mood);
+  // look pass B2 (2026-11-24): venue.iblEnvV1 / ?vq=ibl was defined (2026-11-03) but never mounted, so the knob did nothing. It
+  // now reaches the rig; off (the default) runs exactly the procedural cube as before. On, a mood with a prefiltered .env lights
+  // from it once it loads — the files (public/env/*.env) are not in the repo yet, so on today it keeps the procedural cube.
+  const disposeEnv = mountVenueIBL(scene, mood, () => mountEnvironmentIBL(scene, mood));
 
   const sun = new DirectionalLight('fel_sun', new Vector3(...M.sunDir).normalize(), scene);
   sun.intensity = M.sunIntensity;
@@ -239,6 +245,8 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
   // the backing density the canvas fit chose (the harness fits the canvas before it mounts the rig)
   const backingDpr = 1 / Math.max(1e-3, scene.getEngine().getHardwareScalingLevel());
   pipeline.fxaaEnabled = T.fxaa && backingDpr < T.fxaaMaxDpr;
+  // look pass B1: what edge smoothing this mount got, so a probe (or the owner's console) can prove the A/B was applied
+  console.info(`[FEL-TIER] edges: msaa ${pipeline.samples}, fxaa ${pipeline.fxaaEnabled ? 'on' : 'off'} (backing dpr ${backingDpr.toFixed(2)}, ${tier})`);
   pipeline.sharpenEnabled = T.sharpen;               // mobile skips the full-screen pass
   pipeline.sharpen.edgeAmount = 0.25;                             //TUNE(elijah)
   // M44: mood-tinted vignette so the grade reads on the whole frame

@@ -19,7 +19,7 @@
 import { phoneHalf } from '../scene/phoneTrim';   // lane/owner-1016: a phone keeps half the gulls
 import { Color3, DynamicTexture, InstancedMesh, Mesh, MeshBuilder, PBRMaterial, SceneLoader, StandardMaterial, Texture, TransformNode, Vector3, Vector4, VertexData } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
-import { mountStreetCourt, STREET_COURT_PALETTE, VENICE_DUNK_COURT_PALETTE } from '../visual/CourtSurface';
+import { mountStreetCourt, STREET_COURT_PALETTE, VENICE_DUNK_COURT_PALETTE, courtAniso } from '../visual/CourtSurface';
 import { courtLogoTexture, groundTexture, groundTextureFor, signTexture, TILE_M, type GroundKind } from '../visual/groundTextures';
 import { HOOP_SCAN, spawnMeshyProp } from '../visual/meshyProps';
 import { MAX_BODIES, Onlookers } from '../visual/Onlookers';
@@ -101,7 +101,7 @@ function flat(scene: Scene, name: string, w: number, d: number, x: number, z: nu
       m = new PBRMaterial(`vb_ground_${kind}_mat`, scene);
       m.roughness = rough; m.metallic = 0; m.environmentIntensity = 0.35;
       // the kind's own painted tile (groundTextures' per-scene source), not a copy of it: one texture per kind for every look
-      const t = groundTexture(scene, kind); t.wrapU = Texture.WRAP_ADDRESSMODE; t.wrapV = Texture.WRAP_ADDRESSMODE; t.anisotropicFilteringLevel = 8;
+      const t = groundTexture(scene, kind); t.wrapU = Texture.WRAP_ADDRESSMODE; t.wrapV = Texture.WRAP_ADDRESSMODE; t.anisotropicFilteringLevel = courtAniso(8);   // look pass B3
       m.albedoTexture = t; m.albedoColor = Color3.White();
       cache.set(key, m);
     }
@@ -543,7 +543,7 @@ function veniceSandPaint(scene: Scene, mesh: Mesh, mul: string, w: number, d: nu
     });
   }
   grain.update(false);
-  grain.wrapU = Texture.WRAP_ADDRESSMODE; grain.wrapV = Texture.WRAP_ADDRESSMODE; grain.anisotropicFilteringLevel = 8;
+  grain.wrapU = Texture.WRAP_ADDRESSMODE; grain.wrapV = Texture.WRAP_ADDRESSMODE; grain.anisotropicFilteringLevel = courtAniso(8);   // look pass B3
   grain.uScale = Math.max(1, w / TILE_M.sand); grain.vScale = Math.max(1, d / TILE_M.sand);
   mat.albedoTexture = grain; mat.albedoColor = Color3.FromHexString(mul);
   // the mottle: soft light and dark pools, 5–17 m across on a 44 m tile, luminance about neutral (a PBR detail map's red

@@ -25,7 +25,9 @@ import { crowdBake, type CrowdBake, type CrowdBody } from './crowdBake';
 import { fanBody, frontRowOf } from './crowdFront';
 import { CARD_H, CARD_POSES, CARD_W, cardMaterial, cardQuad, paintAtlas, snapshotAtlas, type CardAtlas, type CardPose } from './crowdCards';
 import { SEAT_TOP_M } from './crowdClips';
-import { layoutSeats, splitSeats, crowdTierOf, type CrowdVenue, type Seat, type CrowdTierName } from './crowdLayout';
+import { layoutSeats, splitSeats, crowdTierOf, rand01, type CrowdVenue, type Seat, type CrowdTierName } from './crowdLayout';
+import { feel } from '../../../feel-panel/feel';
+import { lookFeatureOn } from '../../scene/graphicsSetting';
 import { CrowdDirector, type ClipChange, type ReactionKind } from './crowdReact';
 import { loopOffset, startOffset, type CrowdClipName } from './crowdVat';
 
@@ -87,6 +89,32 @@ const CARD_POSE_OF: Record<CrowdClipName, CardPose> = {
   stand_idle: 2, stand_clap: 2, stand_groan: 2, stand_cheer: 3,
 };
 
+// ── LOOK PASS B3, part 2 (look-venues, 2026-11-24): crowd.varietyV2 ──────────────────────────────────────────────────────────
+// The crowd behind the rim read as rows of one person (docs/LOOK-PASS-AUDIT.md finding 18): five baked bodies, every fan the
+// same height and the same shade. With the bodies that ship, each fan and each card gets its own height (standing a little
+// more than seated, whose hips must stay on the bench) and each fan its own shade (lighter or darker clothes and a slight warm
+// or cool cast, through the thin instance's colour). The idle is already staggered per fan (Seat.phase). 0 = as before.
+export const CROWD_VARIETY_V2 = 0;
+/** Height spread, as a fraction either way: a standing fan or card, a seated one. */
+export const CROWD_HEIGHT_SPREAD = { standing: 0.07, seated: 0.025 } as const;
+/** A fan's or card's own number in 0..1 from where it stands (the seat layout is seeded, so it is the same every load). */
+function seatRand(s: Pick<Seat, 'pos'>, k: number): number { return rand01(Math.round(s.pos[0] * 97) ^ Math.round(s.pos[2] * 131), Math.round(s.pos[1] * 53) + k); }
+/** Pure: the height scale of one fan or card (1 with the knob off). */
+export function crowdHeightScale(s: Pick<Seat, 'pos' | 'posture'>, on: boolean): number {
+  if (!on) return 1;
+  const spread = s.posture === 'seated' ? CROWD_HEIGHT_SPREAD.seated : CROWD_HEIGHT_SPREAD.standing;
+  return 1 + (seatRand(s, 1) * 2 - 1) * spread;
+}
+/** Pure: one fan's shade, RGBA multiplying its body's colours (null with the knob off: no colour buffer at all). */
+export function crowdShade(s: Pick<Seat, 'pos'>, on: boolean): [number, number, number, number] | null {
+  if (!on) return null;
+  const v = 0.84 + seatRand(s, 2) * 0.24;            // 0.84 .. 1.08: darker and lighter clothes
+  const warm = (seatRand(s, 3) - 0.5) * 0.08;        // a slight warm or cool cast, never a hue of its own
+  return [v * (1 + warm), v, v * (1 - warm), 1];
+}
+/** `?lookon=crowdvariety` turns it on for one load (the A/B). */
+export const crowdVarietyOn = (): boolean => feel('crowd.varietyV2', CROWD_VARIETY_V2) >= 0.5 || lookFeatureOn('crowdvariety');
+
 export function mountCrowd(scene: Scene, venue: CrowdVenue, opts: CrowdOptions = {}): CrowdHandle {
   const tier = crowdTierOf(opts.tier ?? (scene.metadata as { felTier?: string } | null)?.felTier);
   const seats = layoutSeats(venue, opts.seed ?? 11);
@@ -121,7 +149,8 @@ export function mountCrowd(scene: Scene, venue: CrowdVenue, opts: CrowdOptions =
       const k = `${s.stand}|${fb.front ? 'f' : ''}${fb.index}`;
       (byKey.get(k) ?? byKey.set(k, []).get(k)!).push(i);
     });
-    const place = new Matrix(), q = new Quaternion(), p = new Vector3();
+    const place = new Matrix(), q = new Quaternion(), p = new Vector3(), sc = new Vector3();
+    const variety = crowdVarietyOn();   // look pass B3: crowd.varietyV2 (0 = every fan as before)
     for (const [k, list] of byKey) {
       const [stand, bodyS] = k.split('|');
       const parts: CrowdBody[] = bodyS.startsWith('f') ? b.front[Number(bodyS.slice(1))].parts : [b.bodies[Number(bodyS)]];
@@ -139,14 +168,18 @@ export function mountCrowd(scene: Scene, venue: CrowdVenue, opts: CrowdOptions =
       mesh.material = body.material ?? b.material;
       mesh.freezeWorldMatrix(body.w0);
       const mats = new Float32Array(16 * list.length), settings = new Float32Array(4 * list.length);
+      const shades = variety ? new Float32Array(4 * list.length) : null;
       const index = new Map<number, number>();
       const lo = new Vector3(Infinity, Infinity, Infinity), hi = new Vector3(-Infinity, -Infinity, -Infinity);
       list.forEach((fi, j) => {
         const s = fans[fi];
         p.set(s.pos[0], s.pos[1], s.pos[2]);
         Quaternion.RotationYawPitchRollToRef(s.yaw, 0, 0, q);
-        Matrix.ComposeToRef(Vector3.OneReadOnly as Vector3, q, p, place);
+        const h = crowdHeightScale(s, variety);
+        Matrix.ComposeToRef(sc.set(h, h, h), q, p, place);
         body.w0.multiply(place).multiply(body.w0inv).copyToArray(mats, j * 16);
+        const shade = crowdShade(s, variety);
+        if (shades && shade) shades.set(shade, j * 4);
         const idle = s.posture === 'seated' ? b.ranges.sit_idle : b.ranges.stand_idle;
         settings.set([idle.start, idle.end, loopOffset(idle, s.phase), idle.speed], j * 4);
         index.set(fi, j);
@@ -155,6 +188,7 @@ export function mountCrowd(scene: Scene, venue: CrowdVenue, opts: CrowdOptions =
       });
       mesh.thinInstanceSetBuffer('matrix', mats, 16, true);
       mesh.thinInstanceSetBuffer('bakedVertexAnimationSettingsInstanced', settings, 4, false);
+      if (shades) mesh.thinInstanceSetBuffer('color', shades, 4, true);   // look pass B3: each fan's own shade (knob on only)
       // the block's cull volume, in the mesh's own space (its frozen world is the body's load transform)
       const corners = [lo, hi, new Vector3(lo.x, lo.y, hi.z), new Vector3(lo.x, hi.y, lo.z), new Vector3(hi.x, lo.y, lo.z), new Vector3(hi.x, hi.y, lo.z), new Vector3(hi.x, lo.y, hi.z), new Vector3(lo.x, hi.y, hi.z)]
         .map((c) => Vector3.TransformCoordinates(c, body.w0inv));
@@ -208,6 +242,7 @@ export function mountCrowd(scene: Scene, venue: CrowdVenue, opts: CrowdOptions =
     refreshCardMeshes();
   };
   const cardM = new Matrix(), cq = new Quaternion(), cp = new Vector3(), cs = new Vector3(CARD_W, CARD_H, 1);
+  const cardVariety = crowdVarietyOn();   // look pass B3: each card its own height (crowd.varietyV2; off = CARD_W x CARD_H as before)
   const writeCard = (j: number, pose: CardPose, dy: number): void => {
     const c = cardSlot[j];
     if (!c) return;
@@ -221,7 +256,8 @@ export function mountCrowd(scene: Scene, venue: CrowdVenue, opts: CrowdOptions =
     if (moved) cardCounts[c.variant][pose]++;
     Quaternion.RotationYawPitchRollToRef(c.yaw, 0, 0, cq);
     cp.set(s.pos[0], s.pos[1] + dy, s.pos[2]);
-    Matrix.ComposeToRef(cs, cq, cp, cardM);
+    const ch = crowdHeightScale(s, cardVariety);
+    Matrix.ComposeToRef(cs.set(CARD_W * ch, CARD_H * ch, 1), cq, cp, cardM);
     cardM.copyToArray(cardBufs[c.variant][pose], c.slot * 16);
     c.pose = pose; c.placed = true;
     cardMeshes[c.variant][pose].thinInstanceBufferUpdated('matrix');

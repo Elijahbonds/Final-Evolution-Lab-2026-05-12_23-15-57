@@ -1444,6 +1444,45 @@ NEW switches, each **1 = on, 0 = today's game exactly** (tests pin both ends). N
   within 60 ms are one; the mute silences it (tested). Levels in docs/HOOPS-GAP-PLAN.md §5.7. A feel item: OFF for the owner's ear.
 
 
+## look-venues, 2026-11-24 (owner: "Let's do a pass where we improve how things look."; docs/LOOK-PASS-AUDIT.md phases B1-B3; the owner has not seen these yet)
+
+NEW switches, each **0 = today's look exactly** (tests pin the off value). No existing tuned number moved. Each is read once, when a
+game loads; each also has a one-load URL switch for an A/B on any device without the panel.
+
+- `look.phoneAA` **0** (group "Look · venues"; `scene/QualityTier.ts` `PHONE_AA_DEFAULT`, applied in `scene/LightRig.ts`; URL `?aa=0|1|2`):
+  **edge smoothing on phones** (phase B1). Today a phone draws with no anti-aliasing: FXAA runs only below 1.5 backing pixels per CSS
+  pixel and every DPR-2/3 phone is above it, and multisampling is desktop-only. 1 = the FXAA pass at every density (the pass the phones
+  already have, no new shader); 2 = 2x MSAA on the HDR pipeline's first target instead. Desktop and high are untouched (4x MSAA). The
+  rig logs `[FEL-TIER] edges: msaa N, fxaa on|off` at every mount, so a console shows which one a load got. **Ships OFF (0) until the owner's phone check.** Measured (the
+  every-screen rig, SwiftShader; scripts/probes/look-venues/, session scratch `look-venues/`): the pictures at full render scale
+  (upright phone, DPR 2) are clearly cleaner with 1 — the sand's edge, the court lines, the lamp posts, the palm fronds and the
+  players' outlines lose their stair-steps; the hard-step count in the crop falls 30 % (1v1), 57 % (3v3) and 25 % (Dunk), 3 runs a side, every
+  FXAA run below every run of today's look, while the picture's detail falls only 2-12 %, so it smooths edges rather than blurring the frame. 2 also smooths geometry edges but not the
+  court lines (they are texture) or the palm fronds (alpha-tested cut-outs), so 1 is the candidate. The phone tier (390x844, DPR 3,
+  CPU 4x, guard on; tennis as the control): frame p95 medians of 3 runs, today -> FXAA: 1v1 789 -> 761 ms, Dunk 976 -> 957, Venice 956 -> 708, the
+  story 652 -> 739 (tennis, the control, 820 ms, spread 82 ms): three places within the noise or faster, the story 87 ms slower,
+  just outside the control's spread; the guard settled at the same level (L2) on both sides; READY within
+  10 % everywhere (the story +7 % page, +9 % mode); texture memory +17 to +44 MB by the readout's estimate (FXAA adds a full-screen float target, because the image
+  pass no longer draws straight to the screen; about half that on a phone, whose targets are half-float — an estimate; the readout also keeps counting the targets of
+  each render scale the guard left behind, which look-world measured at about 20 MB in Venice, so part of the rise is one more stale
+  target per scale). The rig
+  cannot give a phone's frame rate, so the owner's check decides: open a hoops game with `?aa=1` and with `?aa=0` on the phone,
+  read PERF's frame p95 after 10 s of play in each, and if they match, set `PHONE_AA_DEFAULT` to 1.
+- `venue.courtDetailV2` **0** (group "Look · venues"; `visual/CourtSurface.ts` `COURT_DETAIL_V2`; URL `?lookon=courtdetail`): **the court's
+  lines and the ground's grain hold into the distance** (phase B3, part 1). The court lines and the ground grain are texture, which no
+  anti-aliasing pass reaches; on, the painted court (Babylon's default 4x anisotropic filtering) and the Venice set's concrete and sand
+  (8x) are sampled at 16x (the GPU's cap binds). No new texture, no new pass, no colour change. Ships OFF; its A/B is measured in the commit after this one.
+- `crowd.varietyV2` **0** (group "Look · venues"; `visual/crowd/crowdStands.ts` `CROWD_VARIETY_V2`, with `CROWD_HEIGHT_SPREAD` standing
+  0.07, seated 0.025; URL `?lookon=crowdvariety`): **the crowd reads as different people** (phase B3, part 2), with the shipped bodies
+  only: each fan and each card its own height (up to 7 % taller or shorter standing, 2.5 % seated, whose hips stay on the bench), each
+  3D fan its own shade (0.84-1.08 of its body's colours, a slight warm or cool cast, through the thin instance's colour). The idle was
+  already staggered per fan. Phones draw cards only, so there it changes heights only. Real variety (more bodies, arms that clap) is
+  owner art. Ships OFF (crowd look is the owner's call); its A/B is measured in the commit after this one.
+- `venue.iblEnvV1` (exists, **0**, unchanged): **found dead and wired** (phase B2). `mountVenueIBL` (`scene/venueQualityV1.ts`, 2026-11-03)
+  was never called, so the knob and `?vq=ibl` did nothing; the light rig now mounts the environment through it (off runs exactly the
+  procedural cube, tested). **The prefiltered files it names (`public/env/*.env`) are not in the repo on any branch**, so on is still
+  the procedural cube until the owner adds them (art list). The audit's A/B of it (finding 15) compared two identical renders.
+
 ## look-world, 2026-11-24 (the look pass, phases C1–C4; docs/LOOK-PASS-AUDIT.md; owner: "Let's do a pass where we improve how things look.")
 
 Measured on the esbuild rig `scripts/probes/look-world/look-rig.mts` (the real stage and zone through `runMode`), the phone tier for cost

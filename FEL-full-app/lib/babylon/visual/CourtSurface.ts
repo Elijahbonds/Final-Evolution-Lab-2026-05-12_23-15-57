@@ -18,6 +18,19 @@
 import { Color3, DynamicTexture, Mesh, MeshBuilder, PBRMaterial, Texture, Vector2 } from '@babylonjs/core';
 import type { Scene, TransformNode } from '@babylonjs/core';
 import { applyFloorDetailToMesh } from './groundTextures';
+import { feel } from '../../feel-panel/feel';
+import { lookFeatureOn } from '../scene/graphicsSetting';
+
+// ── LOOK PASS B3, part 1 (look-venues, 2026-11-24): venue.courtDetailV2 ─────────────────────────────────────────────────────────
+// The court's lines and the ground's grain are TEXTURE, so no anti-aliasing pass reaches them: seen at the play camera's grazing
+// angle the court texture (Babylon's default 4x anisotropic filtering) and the ground tiles (8x) blur into the distance and the
+// thin lines shimmer as the camera moves. On, those textures are sampled at 16x (the GPU's own cap still binds). No new texture,
+// no new pass, no colour change. 0 = as before. `?lookon=courtdetail` turns it on for one load (the A/B).
+export const COURT_DETAIL_V2 = 0;
+export const COURT_DETAIL_ANISO = 16;
+export function courtDetailOn(): boolean { return feel('venue.courtDetailV2', COURT_DETAIL_V2) >= 0.5 || lookFeatureOn('courtdetail'); }
+/** The anisotropic level for a court or ground texture whose shipped level is `base`. */
+export function courtAniso(base: number, on = courtDetailOn()): number { return on ? Math.max(base, COURT_DETAIL_ANISO) : base; }
 
 const TEX = 2048;                       // court lines need the resolution
 
@@ -183,6 +196,7 @@ export function applyOceanCourt(scene: Scene, style: CourtWaterStyle = 'venice')
   // the largest single texture on the phone tier after the hero variant landed.
   const size = (scene.metadata as { felTier?: string } | undefined)?.felTier === 'mobile' ? TEX / 2 : TEX;
   const tex = new DynamicTexture('court_ocean_tex', { width: size, height: size }, scene, true);
+  tex.anisotropicFilteringLevel = courtAniso(4);   // look pass B3: 4 is Babylon's default, what it always had
   const g = tex.getContext() as unknown as CanvasRenderingContext2D;
   paintOcean(g, size, size, style);
   tex.update();
@@ -449,7 +463,7 @@ export function mountStreetCourt(
     tex.update(false);
     paintMs = Math.round((typeof performance !== 'undefined' ? performance.now() : 0) - t0);
     tex.wrapU = Texture.CLAMP_ADDRESSMODE; tex.wrapV = Texture.CLAMP_ADDRESSMODE;
-    tex.anisotropicFilteringLevel = 8;
+    tex.anisotropicFilteringLevel = courtAniso(8);   // look pass B3: venue.courtDetailV2
     byKey.set(key, tex);
   }
 
