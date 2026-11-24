@@ -2394,6 +2394,49 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/core/jerseyDecals.ts JERSEY_DECALS',
     hint: 'On: the new basketball and football jerseys carry the player number on the chest and back and the name across the back. Off: a blank jersey, as before.',
   },
+  // ── lane/improve-hoops-2 (2026-11-22, docs/IMPROVE-10-PHASE-AUDIT.md phase 3): the bodies' clips, built faster at load ──
+  {
+    id: 'perf.poseClipFast', label: 'Load: a solved arm or leg recomputes only that limb (1) / the whole body (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/babylon/anim/poseClip.ts POSE_CLIP_FAST',
+    hint: 'How the bodies build their moves while a game loads. The moves come out the same either way; on is faster. Off: as before.',
+  },
+  {
+    id: 'perf.poseClipShare', label: 'Load: bodies with the same build share their solved moves (1) / each solves its own (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/babylon/anim/poseClip.ts POSE_CLIP_SHARE',
+    hint: 'A second body with the same skeleton copies the first one\'s moves instead of working them out again. Off: every body works out its own, as before.',
+  },
+  {
+    id: 'perf.onlookerClipsOnly', label: 'Load: people watching build only their idle and cheer (1) / every move (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/babylon/visual/onlookerClips.ts ONLOOKER_CLIPS_ONLY',
+    hint: 'The crowd on the rail only ever stands and cheers, so on it skips building the rest. They look the same. Off: as before.',
+  },
+  // ── lane/improve-hoops-2 (2026-11-22, phase 4): hoops rules, one way in both modes ──
+  {
+    id: 'hoops.makeBeatHoldsShot', label: '1v1: no shot in the beat after your make (1) / a shot can start (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · rules',
+    source: 'lib/babylon/hoops/oneRule.ts MAKE_BEAT_HOLDS_SHOT',
+    hint: 'After you score, the ball is yours under the rim for a moment before the check. On: a shot pressed then waits for the check. Off: it went up and could not count.',
+  },
+  {
+    id: 'hoops.rivalChaseAroundBody', label: '1v1 rival: chase a loose ball round a body in the way (1) / straight at it (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · rules',
+    source: 'lib/babylon/hoops/boardChase.ts RIVAL_CHASE_AROUND_BODY',
+    hint: 'When someone stands between him and a rebound and he makes no ground for half a second, he steps round them. Off: he keeps pushing straight.',
+  },
+  {
+    id: 'hoops.driveByHandOn', label: '3v3: the drive-by steal must reach the ball (1) / any pass-by poke (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · rules',
+    source: 'lib/babylon/hoops/steals.ts DRIVE_BY_HAND_ON',
+    hint: 'Your feel call. On: running past the driver with a poke only steals if your hand can get to his ball, like any poke. Off: as shipped.',
+  },
+  {
+    id: 'hoops.spinShotCutsHalf', label: 'Both modes: a shot can cut the spin from its half (1) / waits for the spin (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · rules',
+    source: 'lib/babylon/hoops/oneRule.ts SPIN_SHOT_CUTS_HALF',
+    hint: 'Your feel call. On: shoot in the second half of a spin and the shot goes at once, in 1v1 and 3v3 alike. Off: the shot waits for the spin to finish.',
+  },
+  // ── lane/improve-hoops-2 (2026-11-22, phase 10): online 3v3. NOTE: the session gate keeps overrides OFF in online runs, so the default is what plays ──
+  {
+    id: 'net.remoteOffence', label: 'Online 3v3: a friend on a seat passes and shoots with their own buttons (1) / the AI decides (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Online play',
+    source: 'lib/net/knobs.ts NET_REMOTE_OFFENCE',
+    hint: 'On: the body a friend plays brings the ball up, passes where they point and shoots when they press. Off: they move and defend, the AI picks the passes and shots.',
+  },
   // ── lane/improve-screens (2026-11-22, docs/IMPROVE-10-PHASE-AUDIT.md phases 1, 2, 6): the game shell and the screens ──
   {
     id: 'ui.stageFitsHeader', label: 'Phone upright: the game takes the screen the header leaves (1) / sized for a one-row header (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',
