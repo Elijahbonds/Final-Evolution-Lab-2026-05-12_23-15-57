@@ -58,3 +58,52 @@ export function rollRead(self: XZ, handler: XZ, rim: XZ, defenders: readonly XZ[
   const stepped = m >= 0 && manSteppedUp(self, defenders[m], handler, rim);
   return { roll: stepped || nearLaneClear(self, rim, defenders), slip: stepped };
 }
+
+// ── hoops-gap, round 2 (`hoops.rollScoreOn`, OFF): THE ROLL MAN SCORES ────────────────────────────────────────────────────────────────
+// Measured with the roll on (pnr-sim, PRO): the screener rolled on 25–44 % of pick-and-rolls but was never open (his man stayed about
+// 1.0 m off him) and never caught it. Three changes, one switch (it needs `hoops.screenerRollOn` too):
+//   · THE EARLY SLIP — with his man already up at the ball he goes the frame he is planted (no SLIP_MIN_SEC wait).
+//   · THE GHOST SCREEN — coming to set it, inside GHOST_RANGE_M of the spot, with his man already gone to the ball (the switch or the show
+//     read the screen coming), he never plants: he cuts straight to the rim.
+//   · THE LEADING PASS — the handler reads the roll man where he WILL be when the ball gets there (his speed × the flight time, as every
+//     3v3 pass in the mode is thrown: BallHandling.leadPoint), open by ROLL_LEAD_OPEN_M there, with a clear lane to that spot.
+//   · THE CATCH IS A FINISH — a catch inside ROLL_CATCH_RIM_M of the rim goes up at once (no triple-threat beat at the rim).
+export const ROLL_SCORE_ON = 0;
+export const rollScoreOn = (): boolean => screenerRollOn() && feel('hoops.rollScoreOn', ROLL_SCORE_ON) >= 0.5;
+/** The ghost screen: inside this of the screen spot (m) he may cut without planting. */
+export const GHOST_RANGE_M = 1.5;
+/** The leading pass: the roll man this open (m) at the spot the ball meets him. */
+export const ROLL_LEAD_OPEN_M = 1.6;
+/** The chest pass's flight speed (m/s) the lead is solved against (core/BallHandling PASS_SPEED.chest). */
+export const ROLL_PASS_MPS = 14;
+/** A catch this close to the rim (m) is a finish at once. */
+export const ROLL_CATCH_RIM_M = 3.0;
+
+/** The ghost: coming to set the screen, near the spot, his own man already stepped up to the ball. */
+export function ghostRead(self: XZ, spot: XZ, handler: XZ, rim: XZ, defenders: readonly XZ[], screened: XZ | null): boolean {
+  if (d2(self, spot) > GHOST_RANGE_M) return false;
+  const m = screenersMan(self, screened, defenders);
+  return m >= 0 && manSteppedUp(self, defenders[m], handler, rim);
+}
+/** Where the ball meets the roll man: his position led by his velocity over the flight (iterated, as BallHandling.leadPoint). */
+export function rollLeadPoint(passer: XZ, roller: XZ, vel: XZ): XZ {
+  let lead = { x: roller.x, z: roller.z };
+  for (let k = 0; k < 4; k++) { const t = d2(passer, lead) / ROLL_PASS_MPS; lead = { x: roller.x + vel.x * t, z: roller.z + vel.z * t }; }
+  return lead;
+}
+
+/** hoops-gap round 3 (with `hoops.rollScoreOn`): THE ROLL TO THE FREE BLOCK. He rolled at the rim on his own line, straight into the man
+ *  guarding him (who sits a third of the way from him to the rim). Now he dives to whichever block — ROLL_BLOCK_SIDE_M either side of the
+ *  rim, ROLL_BLOCK_OUT_M out on the floor — has the most room from the defence. */
+export const ROLL_BLOCK_SIDE_M = 2.0, ROLL_BLOCK_OUT_M = 1.2;
+export function freeBlock(rim: XZ, toward: XZ, defenders: readonly XZ[]): XZ {
+  const ox = toward.x - rim.x, oz = toward.z - rim.z, ol = Math.hypot(ox, oz) || 1;
+  const ux = ox / ol, uz = oz / ol, px = -uz, pz = ux;
+  let best: XZ = { x: rim.x + ux * ROLL_BLOCK_OUT_M, z: rim.z + uz * ROLL_BLOCK_OUT_M }, room = -Infinity;
+  for (const side of [1, -1]) {
+    const spot = { x: rim.x + ux * ROLL_BLOCK_OUT_M + px * side * ROLL_BLOCK_SIDE_M, z: rim.z + uz * ROLL_BLOCK_OUT_M + pz * side * ROLL_BLOCK_SIDE_M };
+    let r = Infinity; for (const d of defenders) r = Math.min(r, d2(d, spot));
+    if (r > room) { room = r; best = spot; }
+  }
+  return best;
+}

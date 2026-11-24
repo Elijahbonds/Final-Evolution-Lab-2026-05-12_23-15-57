@@ -99,4 +99,14 @@ describe('pick-and-roll coverage in the brains (hoops.pnrCoverageOn)', () => {
     expect(new TeamDefense().step(DT, inFront, teamDTune()).event).toBeNull();             // still in front of him: no switch
     expect(new TeamDefense().step(DT, beaten, teamDTune()).event?.kind).toBe('switch');    // beaten: switch
   });
+
+  it('round 2: fighting over the screen at full pace only with hoops.pnrFightFullOn (and the coverage)', async () => {
+    const { PNR_FIGHT_FULL_ON, pnrFightFullOn } = await import('./pnrCoverage');
+    expect(PNR_FIGHT_FULL_ON).toBe(0);
+    setFeelUser(true); setFeelSession(null); setFeelOverride('hoops.pnrFightFullOn', 1);
+    expect(pnrFightFullOn()).toBe(false);   // the coverage is off
+    setFeelOverride('hoops.pnrCoverageOn', 1);
+    expect(pnrFightFullOn()).toBe(true);
+  });
 });
+
