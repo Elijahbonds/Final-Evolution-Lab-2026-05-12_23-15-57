@@ -40,6 +40,7 @@ const TEAM = arg('--team', '1') !== '0';
 const DEF = arg('--def', 'bot');
 const SEED = Number(arg('--seed', '7'));
 const REACT_MS = Number(process.env.REACT_MS ?? 220);
+const SAG_GAP_M = Number(process.env.SAG_GAP_M ?? 2.2);
 const OUT: Record<string, unknown> = {};
 
 const mkRng = (seed: number) => { let s = seed >>> 0; return () => { s += 0x6D2B79F5; let r = Math.imul(s ^ (s >>> 15), 1 | s); r ^= r + Math.imul(r ^ (r >>> 7), 61 | r); return ((r ^ (r >>> 14)) >>> 0) / 4294967296; }; };
@@ -74,10 +75,11 @@ function sim1v1(tier: string) {
     for (; t < 12; t += DT) {
       // the defender sees the rival (now, or REACT_MS late) and steers to 1.0 m in front of him on his line to the rim
       hist.push({ x: self.x, z: self.z });
-      const lag = DEF === 'human' ? Math.round(REACT_MS / 1000 / DT) : 0;
+      const lag = DEF === 'human' || DEF === 'sag' || DEF === 'sagset' || DEF === 'humanset' ? Math.round(REACT_MS / 1000 / DT) : 0;
       const seen = hist[Math.max(0, hist.length - 1 - lag)];
       const rx = RIM.x - seen.x, rz = RIM.z - seen.z, rl = Math.hypot(rx, rz) || 1;
-      const gx = seen.x + rx / rl * 1.0, gz = seen.z + rz / rl * 1.0; const ex = gx - me.x, ez = gz - me.z, el = Math.hypot(ex, ez);
+      const gap = DEF === 'sag' || DEF === 'sagset' ? SAG_GAP_M : 1.0;   // hoops-gap re-score: `--def sag` — a human who gives the jumper and walls the drive (human lag too)
+      const gx = seen.x + rx / rl * gap, gz = seen.z + rz / rl * gap; const ex = gx - me.x, ez = gz - me.z, el = Math.hypot(ex, ez);
       const mag = meStun > 0 || jumpAge < 0.75 ? 0 : el < 0.15 ? 0 : Math.min(1, 0.3 + el);
       const mvx = el > 1e-4 ? ex / el * mag : 0, mvy = el > 1e-4 ? -ez / el * mag : 0;
       meCtl.update(DT, mvx, mvy, false);
@@ -105,7 +107,7 @@ function sim1v1(tier: string) {
       lastPhase = dec.phase;
       // the poke (the bot: 50 % every 0.6–1.6 s inside 1.6 m) — the mode's read
       const dd = Math.hypot(self.x - me.x, self.z - me.z);
-      if (DEF !== 'set' && dd < 1.6 && t >= nextPoke && meStun === 0 && reachCd === 0 && jumpAge === Infinity) {   // hoops-p06: `--def set` never reaches (a patient defender: stays in front, contests)
+      if (DEF !== 'set' && DEF !== 'sagset' && DEF !== 'humanset' && dd < 1.6 && t >= nextPoke && meStun === 0 && reachCd === 0 && jumpAge === Infinity) {   // hoops-p06: `--def set` never reaches (a patient defender: stays in front, contests)
         nextPoke = t + 0.6 + rng() * 1.0;
         if (rng() < 0.5) {
           reachCd = REACH_COOLDOWN_SEC;
