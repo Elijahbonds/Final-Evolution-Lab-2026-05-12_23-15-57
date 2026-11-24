@@ -102,3 +102,65 @@ export class AdventureCamera {
     this.heldUntil = -Infinity;
   }
 }
+
+// ── THE CLEAR VIEW (improve pass phase 9, lane/improve-world, 2026-11-22; docs/IMPROVE-10-PHASE-AUDIT.md §2.8, finding #15) ──
+// Measured before: on desktop the Coast camera went INSIDE the boat after a short walk (the "Boat to Venice" sign filled a quarter of
+// the screen). The shared director's occlusion probe only sees pickable meshes with collisions or a venue-shell name; the zone's boat,
+// houses, palms and rocks are none of those, so nothing kept the eye out of them. This is the 1v1 high camera's rule
+// (HighSidelineCam: "in along the look, out of a prop") for the Adventure host's follow camera, done by the mode AFTER the director
+// has placed the eye, so the director and every number it was tuned with stay as they are: when a solid's box (with ROOM) stands
+// between the player's chest and the eye, or holds the eye, the eye comes in along its own line to just short of it, never closer
+// than MIN_PULL. Nothing else moves: not the aim, the distance it wants, the height, the lag or the FOV — next frame the director
+// eases back out from where the eye is, as it does after its own occlusion pull. `venue.camClearView` 0 = no check (as before).
+
+/** venue.camClearView: 1 = the zone and story cameras keep out of solid props; 0 = they pass through them (before this pass).
+ *  SHIPS ON (lane C, 2026-11-24): phone rig, the Coast walk to the boat and back, 3 runs a side: the eye inside the boat sign's box
+ *  5 / 11 / 11 samples → 0 / 0 / 0; frame times not worse. */
+export const VENUE_CAM_CLEAR_VIEW = 1;
+/** A solid's box (world metres). `insideOnly`: a thin prop (a palm, a tree, a rock) — the eye only keeps out of it, it is not a wall
+ *  between you and the eye (a palm's crown box between them would pull the camera in and out all along a beach). */
+export interface CamBox { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number; insideOnly?: boolean }
+/** Room kept between the eye and a solid (m), and the closest the eye comes to the chest (m). [TUNE] new numbers, this pass */
+export const CAM_CLEAR = { room: 0.3, minPull: 1.2 } as const;
+/** The chest the director frames from: the player's feet plus this (CameraDirector.resolveOcclusion's eye offset). */
+export const CAM_CHEST_Y = 1.2;
+
+interface P3 { x: number; y: number; z: number }
+
+/** Where the segment chest → eye first enters `b` grown by `room`, as a fraction in [0, 1]; null if it does not (or starts inside). */
+export function enterFraction(c: P3, e: P3, b: CamBox, room: number = CAM_CLEAR.room): number | null {
+  // less room up and down: a low rim the chest stands just above is not in the way of an eye looking down over it
+  const ry = Math.min(room, 0.1);
+  const lo = [b.minX - room, b.minY - ry, b.minZ - room], hi = [b.maxX + room, b.maxY + ry, b.maxZ + room];
+  const o = [c.x, c.y, c.z], d = [e.x - c.x, e.y - c.y, e.z - c.z];
+  if (o[0] > lo[0] && o[0] < hi[0] && o[1] > lo[1] && o[1] < hi[1] && o[2] > lo[2] && o[2] < hi[2]) return null;   // the chest is inside: not a blocker
+  let t0 = 0, t1 = 1;
+  for (let k = 0; k < 3; k++) {
+    if (Math.abs(d[k]) < 1e-9) { if (o[k] <= lo[k] || o[k] >= hi[k]) return null; continue; }
+    let u0 = (lo[k] - o[k]) / d[k], u1 = (hi[k] - o[k]) / d[k];
+    if (u0 > u1) { const t = u0; u0 = u1; u1 = t; }
+    if (u0 > t0) t0 = u0;
+    if (u1 < t1) t1 = u1;
+    if (t0 > t1) return null;
+  }
+  return t0;
+}
+
+/** The eye kept clear of every box: null when it already is, else the eye pulled in along chest → eye. */
+export function clearViewEye(chest: P3, eye: P3, boxes: readonly CamBox[]): P3 | null {
+  const len = Math.hypot(eye.x - chest.x, eye.y - chest.y, eye.z - chest.z);
+  if (!(len > CAM_CLEAR.minPull)) return null;
+  let first = Infinity;
+  for (const b of boxes) {
+    // cheap reject: a box wholly further than the eye from the chest, in x or z
+    if (b.minX - CAM_CLEAR.room > Math.max(chest.x, eye.x) || b.maxX + CAM_CLEAR.room < Math.min(chest.x, eye.x)) continue;
+    if (b.minZ - CAM_CLEAR.room > Math.max(chest.z, eye.z) || b.maxZ + CAM_CLEAR.room < Math.min(chest.z, eye.z)) continue;
+    if (b.insideOnly && !(eye.x > b.minX - CAM_CLEAR.room && eye.x < b.maxX + CAM_CLEAR.room && eye.y > b.minY && eye.y < b.maxY && eye.z > b.minZ - CAM_CLEAR.room && eye.z < b.maxZ + CAM_CLEAR.room)) continue;
+    const t = enterFraction(chest, eye, b);
+    if (t !== null && t < first) first = t;
+  }
+  if (first === Infinity) return null;
+  const t = Math.max(CAM_CLEAR.minPull / len, first - 0.02);
+  if (t >= 1) return null;
+  return { x: chest.x + (eye.x - chest.x) * t, y: chest.y + (eye.y - chest.y) * t, z: chest.z + (eye.z - chest.z) * t };
+}

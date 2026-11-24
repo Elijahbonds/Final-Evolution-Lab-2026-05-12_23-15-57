@@ -60,6 +60,15 @@ import { feel } from '@/lib/feel-panel/feel';
 import { shown, shownDialogue, shownEnding, shownOrNull } from '../adventure/story/shown';
 import { buildStoryView, type StoryView } from '../adventure/world/story/view';
 import { cancelNatural, speakNatural } from '../audio/voice/speakNatural';
+// improve pass phase 5 (story.sfxOn): the story's sound effects, from the host's events (adventure/audio/storySfx)
+import { STORY_SFX_ON, StorySfx, type StoryPlayFn } from '../adventure/audio/storySfx';
+import { playNature } from '../audio/natureSfx';
+import type { AdventureHost } from '../adventure/host/AdventureHost';
+// improve pass phase 7 (story.worldDressed): textures, trims and the nature kit on the story's worlds (view only)
+import { mountWorldDress, STORY_WORLD_DRESSED, type WorldDress } from '../adventure/world/dress';
+// improve pass phase 9 (venue.camClearView): the story camera keeps out of the raised blocks, the run-wall and the trees
+import { VENUE_CAM_CLEAR_VIEW, type CamBox } from '../adventure/host/camera';
+import { boxesNear, keepEyeClear, meshCamBoxes } from '../adventure/host/camBoxes';
 
 /** The yard keeps its own progress under this prefix, so a try-out never writes the player's real save. */
 export const YARD_SAVE_PREFIX = 'yard:';
@@ -103,9 +112,27 @@ interface St {
   /** The follow overlay last handed to the director (re-tuned only when the rig changes). */
   rigKey: string;
   budgetIn: { tier: 'mobile' | 'desktop'; eye: { x: number; y: number; z: number }; pinned: (a: AdventureActor) => boolean };
+  /** improve pass phase 5 (story.sfxOn): the sound effects; null with the knob off. */
+  sfx: StorySfx | null;
 }
 
 const states = new WeakMap<Scene, St>();
+
+/** SoundKit's cues and the nature synths (natureSfx), as the story's sound asks for them. */
+const storyPlay: StoryPlayFn = (name, o) => {
+  if (name === 'chirp' || name === 'gull' || name === 'wave') { playNature(name, o); return; }
+  SoundKit.play(name, o);
+};
+/** The story's sound effects on this host, or null with story.sfxOn 0 (the wind bed and the spoken lines only, as before). */
+function storySfxFor(host: AdventureHost): StorySfx | null {
+  if (feel('story.sfxOn', STORY_SFX_ON) < 0.5) return null;
+  return new StorySfx(host.bus, {
+    playerId: host.playerId,
+    get partnerId() { return host.partnerId ?? null; },
+    actor: (id) => host.world.actors.get(id),
+    swingLock: () => host.combat.moveLockOf(host.playerId),
+  }, storyPlay);
+}
 const TMP_SUBJECT = new Vector3(), TMP_VEL = new Vector3(), TMP_OBJ = new Vector3(), TMP_FWD = new Vector3();
 
 /** The yard's storage: the device store, with every key under YARD_SAVE_PREFIX (try/catch inside A3's store). */
@@ -238,7 +265,7 @@ export const AdventureMode: ModeDefinition = {
       sb, mapper, yard, bodies, budget: new BodyBudget(), combatView, magicView, sparks, speed,
       stickL: { x: 0, y: 0 }, stickR: { x: 0, y: 0 }, latchedYaw: null, baseFov: ctx.camera.fov, fovBoost: 0,
       hudSec: 0, saveSec: 0, frame: 0, offKeys: null, storage, lastHud: '', mirror: save.settings.mirror === true, preset: 'runner',
-      rigKey: '',
+      rigKey: '', sfx: storySfxFor(host),
       budgetIn: {
         tier: (scene.metadata as { felTier?: 'mobile' | 'desktop' } | undefined)?.felTier ?? 'desktop',
         eye: host.player.pos,
@@ -331,7 +358,7 @@ function closeState(S: St): void {
   try { storeYard(S); } catch { /* the device store is best-effort */ }
   if (typeof window !== 'undefined') delete (window as unknown as { __FEL_ADVENTURE__?: unknown }).__FEL_ADVENTURE__;
   S.offKeys?.(); S.offKeys = null;
-  S.combatView.dispose(); S.magicView.dispose(); S.sparks.dispose(); S.speed.dispose(); S.yard.dispose();
+  S.combatView.dispose(); S.magicView.dispose(); S.sparks.dispose(); S.speed.dispose(); S.yard.dispose(); S.sfx?.dispose();
   for (const b of S.bodies.values()) { b.view.dispose(); if (b.ph) b.ph.dispose(); else { b.char?.dispose(); b.pose.dispose(); b.root.dispose(); } }
   S.bodies.clear();
   S.sb.runtime.dispose();
@@ -380,6 +407,7 @@ function syncFrame(ctx: ModeContext, S: St, dt: number): void {
   S.combatView.sync();
   S.magicView.sync();
   S.yard.sync();
+  if (S.sfx) { ctx.camDirector.forwardFlatToRef(TMP_FWD); S.sfx.update(dt, Math.atan2(TMP_FWD.x, TMP_FWD.z)); }
 
   // the camera: the host's held hint as a director rig
   const rig = h.camera.rig();
@@ -455,7 +483,19 @@ interface StoryState {
   ending: ChapterEnding | null;
   /** The harness's backdrop meshes (found once), carried with the camera. */
   sky?: AbstractMesh[];
+  /** improve pass phase 5 (story.sfxOn): the sound effects; null with the knob off. */
+  sfx: StorySfx | null;
+  /** improve pass phase 7 (story.worldDressed): the worlds' dressing; null with the knob off. */
+  dress: WorldDress | null;
+  /** improve pass phase 9 (venue.camClearView): the solids' boxes (the blocks, and the trees once they land); null = off. */
+  cam: { blocks: CamBox[]; all: CamBox[]; near: CamBox[]; sec: number; pulls: number } | null;
 }
+
+/** The story's trees (the dressing's tall props) are solids for the camera; low grass, bushes and rocks are not. */
+const STORY_TALL_PROP = /^dress_prop_(pine|pineTall|oak|tree)_/;
+
+/** The nature kit starts loading after this many played frames (about a second), never during the load. */
+const DRESS_PROPS_AFTER_FRAMES = 60;
 
 const stories = new WeakMap<Scene, StoryState>();
 const liveStories = new Set<StoryState>();
@@ -495,15 +535,17 @@ async function loadStory(ctx: ModeContext): Promise<void> {
     band: ctx.prqBand ?? null,
     voice: new StoryVoice(STORY_SPEAKER),
     onSave: (s) => { if (T) storeStory(T, s); },
-    onWarp: () => { if (T) T.snap = true; },
+    onWarp: () => { if (T) { T.snap = true; T.sfx?.warp(); } },
     // lane/story (story.endCard): a chapter's end brings up its end card (what it paid, and what comes next)
     onEvent: (e) => {
+      T?.sfx?.runner(e);
       if (!T || e.kind !== 'chapter' || feel('story.endCard', STORY_END_CARD) < 0.5) return;
       T.ending = chapterEnding(e.chapterId, T.session.progressSave());
     },
   });
   const host = session.host;
   const view = buildStoryView(scene, session.map, session.gates);
+  const dress = feel('story.worldDressed', STORY_WORLD_DRESSED) >= 0.5 ? mountWorldDress(scene, [...session.map.worlds.values()]) : null;
 
   // the party's bodies (the yard's way: the player through CharacterLibrary.spawn, a creature as a placeholder)
   const bodies = new Map<ActorId, Body>();
@@ -528,7 +570,7 @@ async function loadStory(ctx: ModeContext): Promise<void> {
       bodies.set(q.id, { kind: 'placeholder', root: ph.root, pose: ph.pose, ph, view: bindMovementView({ animator: NO_ANIM, poseNode: ph.pose, actor: () => host.world.actors.get(q.id), telemetry: () => host.movement.inspect(q.id), clock: () => host.tSec }) });
     }
   }
-  if (scene.isDisposed) { session.dispose(); view.dispose(); return; }
+  if (scene.isDisposed) { session.dispose(); dress?.dispose(); view.dispose(); return; }
   const me = bodies.get(host.playerId)!;
   const combatView = bindCombatView({
     scene, bus: host.bus, combat: host.combat, actors: host.world.actors, localPlayerId: host.playerId,
@@ -546,7 +588,14 @@ async function loadStory(ctx: ModeContext): Promise<void> {
     stickL: { x: 0, y: 0 }, stickR: { x: 0, y: 0 }, latchedYaw: null, baseFov: ctx.camera.fov, fovBoost: 0,
     hudSec: 0, uiSec: 0, saveSec: 0, frame: 0, lastHud: '', mirror: session.save.settings.mirror === true, preset: 'runner', rigKey: '',
     snap: true, flight: flightUnlockedIn(session.save.story.flags), demo: null, offKeys: null, probe: at >= 0,
-    chapterTitle: chapter?.title ?? null, placeholder: !!chapter?.placeholder, ending: null,
+    chapterTitle: chapter?.title ?? null, placeholder: !!chapter?.placeholder, ending: null, sfx: storySfxFor(host), dress,
+    cam: feel('venue.camClearView', VENUE_CAM_CLEAR_VIEW) >= 0.5 ? (() => {
+      const blocks = session.map.pieces.filter((p) => p.kind === 'block').map((p) => {
+        const b = p as Extract<typeof p, { kind: 'block' }>;
+        return { minX: b.minX, maxX: b.maxX, minY: b.y0, maxY: b.top, minZ: b.minZ, maxZ: b.maxZ };
+      });
+      return { blocks, all: blocks, near: [], sec: 0, pulls: 0 };
+    })() : null,
     budgetIn: {
       tier: (scene.metadata as { felTier?: 'mobile' | 'desktop' } | undefined)?.felTier ?? 'desktop',
       eye: host.player.pos,
@@ -599,6 +648,7 @@ async function loadStory(ctx: ModeContext): Promise<void> {
         bodies: host.world.actors.size, errors: host.errors.length, beat: session.runner.beat?.id ?? null, paused: session.paused,
         done: session.runner.done, fused: p.fusion.active, flight: flightUnlockedIn(session.save.story.flags), doing: S.demo?.doing() ?? null,
         ending: S.ending ? S.ending.chapterId : null, storyMode: session.storyMode, objective: session.runner.objective(),
+        camPulls: S.cam ? S.cam.pulls : null,
       };
     },
     host, session,
@@ -637,6 +687,7 @@ function storyCamYaw(ctx: ModeContext, T: StoryState): number {
 function storySync(ctx: ModeContext, T: StoryState, dt: number): void {
   const s = T.session, h = s.host, scene = ctx.scene;
   T.frame++;
+  if (T.dress && T.frame === DRESS_PROPS_AFTER_FRAMES) void T.dress.loadProps().then((n) => console.info(`[FEL-PERF] story dress: ${n} props`));
   // bodies: the encounters' monsters come and go with the story runtime
   for (const a of h.world.actors.values()) {
     if (T.bodies.has(a.id)) continue;
@@ -662,6 +713,7 @@ function storySync(ctx: ModeContext, T: StoryState, dt: number): void {
   T.speed.sync(me, h.movement.inspect(h.playerId), h.tSec);
   T.combatView.sync();
   T.magicView.sync();
+  if (T.sfx) { ctx.camDirector.forwardFlatToRef(TMP_FWD); T.sfx.update(dt, Math.atan2(TMP_FWD.x, TMP_FWD.z), s.paused); }
   const flight = flightUnlockedIn(s.save.story.flags);
   if (flight !== T.flight || T.frame === 1) { T.flight = flight; T.view.syncGates({ flight, reached: (id) => s.reached(id) }); }
 
@@ -685,6 +737,12 @@ function storySync(ctx: ModeContext, T: StoryState, dt: number): void {
     TMP_SUBJECT.set(me.pos.x, me.pos.y, me.pos.z);
     TMP_VEL.set(me.vel.x, me.vel.y, me.vel.z);
     ctx.camDirector.update(TMP_SUBJECT, TMP_VEL, target ? TMP_OBJ.set(target.pos.x, target.pos.y + target.height * 0.5, target.pos.z) : null);
+    if (T.cam) {
+      // the trees land after the first second (the dressing): re-read them every 2 s; the blocks never move
+      T.cam.sec += dt;
+      if (T.cam.sec >= 2) { T.cam.sec = 0; T.cam.all = meshCamBoxes(scene, (n) => STORY_TALL_PROP.test(n), [...T.cam.blocks]); }
+      if (keepEyeClear(ctx.camera, me.pos, boxesNear(T.cam.all, me.pos.x, me.pos.z, 24, T.cam.near))) T.cam.pulls++;
+    }
     T.fovBoost += (rig.fovBoostDeg - T.fovBoost) * (1 - Math.exp(-FOV_EASE * Math.max(0, dt)));
     ctx.camera.fov = T.baseFov + (T.fovBoost * Math.PI) / 180;
   }
@@ -714,6 +772,7 @@ function storySync(ctx: ModeContext, T: StoryState, dt: number): void {
   if (T.uiSec >= 1 / STORY_UI_HZ || T.frame === 1 || !s.paused) {
     T.uiSec = 0;
     const v = s.runner.view();
+    T.sfx?.line(s.paused && v.active ? `${v.speaker}|${v.text}` : null);
     storyUi.publish({
       live: true,
       dialogue: s.paused && v.active ? shownDialogue({ speaker: v.speaker, text: v.text, shown: v.shown, placeholder: v.placeholder, choices: v.choices, choiceIndex: v.choiceIndex, hold01: v.hold01 }) : null,
@@ -748,7 +807,7 @@ function closeStory(T: StoryState): void {
   STORY_SPEAKER.cancel();
   if (typeof window !== 'undefined') delete (window as unknown as { __FEL_ADVENTURE__?: unknown }).__FEL_ADVENTURE__;
   T.offKeys?.(); T.offKeys = null;
-  T.combatView.dispose(); T.magicView.dispose(); T.sparks.dispose(); T.speed.dispose(); T.view.dispose();
+  T.combatView.dispose(); T.magicView.dispose(); T.sparks.dispose(); T.speed.dispose(); T.dress?.dispose(); T.view.dispose(); T.sfx?.dispose();
   for (const b of T.bodies.values()) { b.view.dispose(); if (b.ph) b.ph.dispose(); else { b.char?.dispose(); b.pose.dispose(); b.root.dispose(); } }
   T.bodies.clear();
   T.session.dispose();
