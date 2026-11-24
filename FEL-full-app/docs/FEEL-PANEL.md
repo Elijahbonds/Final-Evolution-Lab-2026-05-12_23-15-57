@@ -1242,3 +1242,37 @@ this pass exactly (a test pins both ends).
   side): the eye inside the Boat to Venice sign's box 5 / 11 / 11 samples → 0 / 0 / 0 (the clear view stepped in 8–10 times a walk);
   frame p95 1.5–1.9 s against 1.8–2.0 s; desktop and World 1's run-wall: 0 inside on both sides. FrameGuard's recentre fired during the
   rig's forced look-stick spin on both sides (2 of 3 off, 1 of 3 on), never on arrival. 0 = the camera passes through, as before.
+
+## hoops-gap, 2026-11-23 (owner: "close the gap and pass them"; docs/HOOPS-GAP-PLAN.md; the owner has not felt these yet)
+
+NEW switches, each **1 = on, 0 = today's game exactly** (tests pin both ends). No existing tuned number moved.
+
+- `hoops.aiShotIqOn` **0** (group "Hoops · rival offense"; `hoops/teamOffense3v3.ts` `AI_SHOT_IQ_ON`, with its new numbers
+  `SWING_OPEN_M` 1.5 m, `STEPBACK_SEC` 0.38 s, `STEPBACK_MPS` 3.2 m/s, `SMOTHER_M` 1.6 m, `STEPBACK_RANGE_EXTRA_M` 1.0 m, `HELP_FACE_M`
+  1.4 m): **the 3v3 rivals' shot IQ.** Held in front, their handler swings it to a team-mate whose man must close out on him before he
+  pulls up into the defender; with nobody to swing to he steps back once for room, then pulls up; at the rim with a body in his face he
+  kicks it to the open man (drive and kick). Before: 80 % of their shots were pull-ups held in front, every one contested 0.5 or more.
+  Headless (rival-sim 3v3, PRO, a defender who sees the ball 220 ms late, three seeds × 300 possessions): points a shot 0.627 → 0.666,
+  points a possession 0.507 → 0.530, passes a possession 0.28 → 0.44, catch-and-shoots 70 → 149. Feel-check: 3v3 PRO on defence — do
+  they move the ball and find the open man, and are they harder to stop?
+- `hoops.pnrCoverageOn` **0** (group "Hoops · defense"; `hoops/pnrCoverage.ts` `PNR_COVERAGE_ON`, wired in `core/BasketballCore.ts`
+  DefenderBrain and `hoops/teamDefense.ts`; new numbers `PNR_OVER_MAX_M` 7.5 m, `PNR_SCREEN_M` 1.4 m, `PNR_SCREEN_BALL_M` 2.8 m,
+  `PNR_PLANTED_MPS` 0.6 m/s, `PNR_SHOW_SEC` 0.6 s, `PNR_SHOW_M` 1.1 m, `PNR_TAG_RIM_M` 5 m, `PNR_ROLL_MPS` 1.5 m/s, `PNR_TAG_FREE_M` 1.6 m,
+  `PNR_BEATEN_M` 1.9 m, `PNR_UNDER_LEVER` 0.45, `PNR_DROP_LEVER` 0.45, `PNR_TAG_LEVER` 0.35, `PNR_SPOT_DEAD_M` 0.4 m): **the AI's
+  pick-and-roll coverage** (3v3 only; a 1v1 brain has no screens). The man on the ball plays the screen — over the top on a handler inside
+  7.5 m of the rim, under past it (he used to run into the screener: the navigate read skipped any body near the ball); the screener's
+  man shows into the handler's corner (over) or drops (under); the low man tags a free roll man; the team defence switches only when the
+  screened man is beaten (it switched whenever the geometry allowed). Headless (`scripts/probes/hoops-close/pnr-sim.mts`, three AI
+  defenders against the 3v3 team offence, PRO, seeds 7 / 11 / 23 × 300): points a pick-and-roll possession 0.597 / 0.604 / 0.579 →
+  0.655 / 0.635 / 0.592 — **the defence gets a little worse, not better** (today's switch-on-every-screen keeps a man in front); the
+  roll man got an open look 0 % both ways (the screener pops nearly every time: the low man at the rim keeps his roll lane shut). OFF for the owner to
+  feel. Feel-check: 3v3 PRO, call a screen and come off it at the arc.
+- `hoops.screenerRollOn` **0** (group "Hoops · rival offense"; `hoops/screenerRoll.ts` `SCREENER_ROLL_ON`, wired in `core/BasketballCore.ts`
+  TeammateBrain and `hoops/teamOffense3v3.ts`; new numbers `ROLL_NEAR_M` 2.5 m, `ROLL_NEAR_LANE_M` 1.1 m, `ROLL_MAN_AHEAD_M` 0.3 m,
+  `SLIP_MIN_SEC` 0.25 s): **a real roll man.** The screener rolls (or slips early) when his own man has stepped up to the ball or nobody
+  stands on the first 2.5 m of his line to the rim — before, only when no defender was within 1.6 m of his whole line, so the low man at
+  the rim kept him popping (one roll in 631 screens) — and the PRO and ELITE handler looks for the open roll man through the use and the
+  attack. Headless (pnr-sim, PRO, seeds 7 / 11 / 23 × 300): the screener rolls on 25–30 % of pick-and-rolls (was 0–1 %); points a
+  pick-and-roll possession against today's defence 0.593 → 0.644; with `hoops.pnrCoverageOn` too, 0.576. The roll man's best
+  separation inside 5 m was about 1.0 m (his man stays with him), so he was never open enough for the pass (0 catches). OFF.
+
