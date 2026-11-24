@@ -1,7 +1,7 @@
 'use client';
 
 // /play/arena — the Physics Arena on the real ModeHarness. Mounts MODES.physics_arena (basketball 1v1 on Havok) and starts it as
-// soon as it is ready (a practice court, not a ranked match: no START screen). Over the scene: the score, the last call (a make,
+// soon as it is ready (no START screen). Each finished game is posted as a server run when signed in (XP and progress, no LC; arena.xpOn). Over the scene: the score, the last call (a make,
 // a board, a lost handle), the release timing of your last shot, the POV switch, and the touch deck on a phone.
 // With arena.physicsHoops 0 the arena's basketball is the shipped 1v1, so this page sends you there.
 
@@ -14,7 +14,14 @@ import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { ARENA_MODE_ID } from '@/lib/babylon/modes/PhysicsArenaMode';
 import { ARENA_3PT_MODE_ID } from '@/lib/babylon/modes/PhysicsArena3ptMode';
 import { ARENA_3V3_MODE_ID } from '@/lib/babylon/modes/PhysicsArena3v3Mode';
-import { ARENA_HREF, physicsHoopsOn, povOn, SHIPPED_ONEVONE_HREF } from '@/lib/babylon/arena/arenaConfig';
+import { ARENA_HREF, physicsHoopsOn, povOn, SHIPPED_ONEVONE_HREF, xpOn } from '@/lib/babylon/arena/arenaConfig';
+import { ARENA_SESSION_KEY, finishArenaRun, startArenaRun } from '@/lib/babylon/arena/arenaRun';
+import type { FinishDeps } from '@/lib/sessions/finishOutbox';
+
+/** The shell's own finish transport (game-shell.tsx FINISH_DEPS): the outbox in this browser, retries on a timer. */
+const FINISH_DEPS: FinishDeps = { fetch: (url, init) => fetch(url, init), sleep: (ms) => new Promise((r) => setTimeout(r, ms)) };
+const finishStore = (): Storage | null => { try { return window.localStorage; } catch { return null; } };
+const queryFlag = (k: string): boolean => { try { return new URLSearchParams(window.location.search).get(k) === '1'; } catch { return false; } };
 
 /** The arena's sports so far (docs/PHYSICS-ARENA-PLAN.md §5): `?sport=` picks one. */
 const SPORTS = [
@@ -38,6 +45,8 @@ export function ArenaStage({ signedIn }: { signedIn: boolean }) {
   const [hud, setHud] = useState<Record<string, HudValue>>({});
   const [pov, setPov] = useState(false);
   const [sport, setSport] = useState<(typeof SPORTS)[number] | null>(null);
+  // XP and progress (owner 2026-11-24): what the server paid for the last game, shown for a moment
+  const [xpNote, setXpNote] = useState<string | null>(null);
   useEffect(() => { setSport(sportOf(window.location.search)); }, []);
 
   useEffect(() => { try { setTouch(window.matchMedia('(pointer: coarse)').matches); } catch { setTouch(false); } }, []);
@@ -59,6 +68,12 @@ export function ArenaStage({ signedIn }: { signedIn: boolean }) {
     busRef.current = bus;
     let stop: (() => void) | null = null;
     let disposed = false;
+    // each game is one server run: started as play begins, finished (and the next one started) when the game ends. Signed out or
+    // with arena.xpOn 0, nothing is posted (a practice court).
+    const key = ARENA_SESSION_KEY[sport.id];
+    const posting = signedIn && xpOn();
+    const runOpts = { agent: queryFlag('agent'), playtest: queryFlag('playtest') };
+    let run: Promise<string | null> | null = null;
     runMode(def, {
       canvas,
       input: bus,
@@ -68,10 +83,23 @@ export function ArenaStage({ signedIn }: { signedIn: boolean }) {
         if (p === 'error') setErr(String(d));
         // a practice court: straight in (next tick: the harness takes a press only once it is in 'ready')
         if (p === 'ready') setTimeout(() => { if (!disposed) { bus.emit({ t: 'button', btn: 'START', pressed: true }); bus.emit({ t: 'button', btn: 'START', pressed: false }); } }, 50);
+        if (p === 'ready' && posting && !run) run = startArenaRun(key, runOpts);
       },
       onHud: (u) => { if (!disposed) setHud((h) => ({ ...h, ...u })); },
       guest: !signedIn,
-      resultSink: async () => {},   // a practice place: no session, no pay
+      resultSink: async () => {},   // the arena never ends a session: each game is a card (below), and play goes on
+      // a finished game: its run is finished with the game's play log (the server rebuilds the score), the next game's run starts
+      cardSink: async (res) => {
+        if (!posting || disposed) return;
+        const started = run;
+        run = startArenaRun(key, runOpts);
+        const runId = started ? await started : null;
+        if (!runId) return;
+        const paid = await finishArenaRun(runId, key, res, FINISH_DEPS, finishStore());
+        if (disposed || !paid) return;
+        setXpNote(paid.paid ? `+${paid.xp} XP` : paid.reason === 'PLAYTEST' || paid.reason === 'AGENT' ? 'Practice run: no XP' : 'No XP for this game');
+        setTimeout(() => { if (!disposed) setXpNote(null); }, 3500);
+      },
     }).then((s) => { if (disposed) s(); else stop = s; })
       .catch((e) => { if (!disposed) setErr(String(e?.message ?? e)); });
     return () => { disposed = true; stop?.(); };
@@ -114,6 +142,7 @@ export function ArenaStage({ signedIn }: { signedIn: boolean }) {
           {inPov && <div aria-hidden className="pointer-events-none absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/80" />}
           {banner && <p role="status" className="absolute inset-x-0 top-[22%] text-center text-2xl font-black drop-shadow">{banner}</p>}
           {timing && <p className="absolute inset-x-0 bottom-[38%] text-center text-base font-bold text-white/85 drop-shadow">Release: {timing}</p>}
+          {xpNote && <p role="status" data-testid="arena-xp" className="absolute inset-x-0 top-[30%] text-center text-xl font-black text-[#FFD166] drop-shadow">{xpNote}</p>}
           {!touch && (
             <p className="absolute inset-x-0 bottom-3 text-center text-base text-white/70">{sport?.keys}</p>
           )}

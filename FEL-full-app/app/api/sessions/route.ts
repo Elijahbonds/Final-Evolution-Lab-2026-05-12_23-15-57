@@ -27,6 +27,7 @@ import { canonicalModeKey } from '@/lib/game-data';
 import { isExpired } from '@/lib/arena-reclaim';
 import { readMusicAttempt, musicAttemptScore, claimMusicSessionPay, MUSIC_SESSION_PAID } from '@/lib/arena-music';
 import { checkRunScore, checkUnruledScore } from '@/lib/sessions/modeScoreRules';
+import { ARENA_XP_ONLY, isArenaSession, rebuildArenaScore } from '@/lib/sessions/arenaScore';
 import {
   RUN_STATUS, RunClosedError, claimRun, closeRun, fileGrants, findRun, readRunId, replayOf, runWalletKey, sessionLcKey, settleGrant,
   storePaidResult, storedResult, type StoredResult,
@@ -152,7 +153,7 @@ export async function POST(req: Request) {
 
     const body = await req.json().catch(() => ({}));
     const mode = String(body?.mode ?? '');
-    const opponentScore = Math.max(0, Math.floor(Number(body?.opponentScore ?? 0)));
+    let opponentScore = Math.max(0, Math.floor(Number(body?.opponentScore ?? 0)));   // a Physics Arena game's is rebuilt below
     const claimedWon = Boolean(body?.won);
     // RATE-LIMIT-WIRE (partial): more recorded finishes in the last minute than any honest player makes is refused 429
     // before anything is read or written (lib/sessions/finishRateLimit.ts; GameSession [userId, createdAt])
@@ -244,9 +245,24 @@ export async function POST(req: Request) {
     if (now.getTime() > run.expiresAt.getTime()) return send(await refuse(userId, mode, 'RUN_EXPIRED', 422, {}, { id: run.id, close: 'expired' }));
     const durationMs = Math.max(0, now.getTime() - run.startedAt.getTime());
     const duration = Math.floor(durationMs / 1000);
+    // lane/physics-arena (owner 2026-11-24): a Physics Arena game's totals are the SERVER's, rebuilt from the game's play log
+    // (`stats.arena`, lib/sessions/arenaScore.ts) on the server's duration. An impossible log — or a sent score that is not the
+    // rebuilt one — is SCORE_INVALID with the rule it broke; the rebuilt score is what the mode's rules below then check, and the
+    // rebuilt board decides the win.
+    const arenaGame = isArenaSession(run.mode)
+      ? rebuildArenaScore(run.mode, (body?.stats as { arena?: unknown } | null | undefined)?.arena, { durationMs, sentScore: body?.score, sentOpponent: body?.opponentScore })
+      : null;
+    if (arenaGame && !arenaGame.ok) {
+      const rawScore = typeof body?.score === 'number' && Number.isInteger(body.score) ? body.score : null;
+      return send(await refuse(userId, mode, 'SCORE_INVALID', 422, { detail: arenaGame.detail, limit: arenaGame.limit }, { id: run.id, close: 'rejected', score: rawScore, durationMs }));
+    }
+    if (arenaGame) opponentScore = arenaGame.opponentScore;
+    // owner 2026-11-24 (c): the arena pays XP and progress only — no Lab Credits (not the win's, not the streak's), no wallet
+    // coins, no profile shards. (Its runs do not claim the streak day either, so they never use up the day's streak LC.)
+    const xpOnly = ARENA_XP_ONLY.has(run.mode);
     // FIX 1: the mode's rules (MODE_SCORE_RULES) — a finite integer >= 0, within maxScore and maxScorePerSecond, a
     // duration inside the believable window, a known and enabled mode. Broken = SCORE_INVALID: rejected, never clamped.
-    const check = checkRunScore({ mode: run.mode, score: body?.score, durationMs });
+    const check = checkRunScore({ mode: run.mode, score: arenaGame ? arenaGame.score : body?.score, durationMs });
     // OWNER DECISION (2026-09-28, after land): a catalogue mode with no rules row yet is RECORDED unpaid (NO_RULES), not
     // refused — refused, it also skipped the shell's Arena submit, carnival relay and challenge join (they follow only an
     // ok answer). It still has to be a storable whole number, and it still meets its own per-run cap below.
@@ -272,6 +288,7 @@ export async function POST(req: Request) {
     // MUSIC-SUITE P2 FIX PASS (2026-09-25): until the shell forwards `stats` (ROOM_STATS_FORWARDED, a held file), a
     // session without them is an old-contract client and keeps its own music win (the room applies the rule itself) —
     // this refused every honest win while the card said "set won". A mode the catalogue does not know wins nothing.
+    // (a Physics Arena game: score and opponentScore are the rebuilt ones above, and session-payout judges its win on that board)
     const won = floorOnly ? false : sessionWon(rulesMode, claimedWon, stats, duration, { score, opponentScore });
     if (claimedWon && !won && !floorOnly) {
       const read = readMusicSet(stats, duration);
@@ -390,7 +407,7 @@ export async function POST(req: Request) {
       const payout = sessionPayout({ score: payScore, won, endless, durationSec: duration, payCapScore: finitePayCapScore(rulesMode) });
       // (the PRQ delta goes to the mode's attributes inside the transaction, on the row as it is then — trainedAttrValues)
       // (the win's credits only: the streak's share is added in the transaction, once its claim is won)
-      return { prqDelta, payout, xp: payout.xp, shards: payout.shards, credits: payout.winCredits };
+      return { prqDelta, payout, xp: payout.xp, shards: xpOnly ? 0 : payout.shards, credits: xpOnly ? 0 : payout.winCredits };
     };
     type Plan = ReturnType<typeof planFor>;
     const freePlan: Plan = planFor(false);
@@ -402,7 +419,7 @@ export async function POST(req: Request) {
     // the new GameSession id, so a retried session paid them again; that route now refuses both events. Dunk keeps the
     // shell's old exception (its host reports richer per-attempt earns).
     // A floor-only run (Prove It, owner decision) pays neither: the played floor is XP, a shard and the streak day.
-    const walletCoins = mode !== 'dunk' && !floorOnly;
+    const walletCoins = mode !== 'dunk' && !floorOnly && !xpOnly;
 
     const at = new Date();
     let committed: { payload: Record<string, unknown>; season: Awaited<ReturnType<typeof addSeasonXp>>; mastery: Awaited<ReturnType<typeof recordMastery>> | null; plan: Plan };
@@ -441,7 +458,7 @@ export async function POST(req: Request) {
         // 1c. STREAK-CLAIM-RACE: the day's streak, claimed against the row this request read (claimPlayStreak). Before the
         //    ledger, so wallet_lc files only what this run is paid; inside the run's transaction, so a run that rolls back
         //    releases the claim with it. A run that loses pays the win's credits alone.
-        const streakClaimed = await claimPlayStreak(tx, userId, profile as StreakProfile, streak, stamp);
+        const streakClaimed = xpOnly ? false : await claimPlayStreak(tx, userId, profile as StreakProfile, streak, stamp);
         const streakBonus = streakClaimed ? streak.streakBonus : 0;
         const streakOwed = streakClaimed && streak.owed;
         credits += streakBonus;

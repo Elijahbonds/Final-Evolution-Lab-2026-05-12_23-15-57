@@ -1285,12 +1285,16 @@ export function buildAuthoredClip(animator: CharacterAnimator, scene: Scene, ske
 export function registerAuthoredClips(
   animator: CharacterAnimator, scene: Scene, skeleton: Skeleton,
   scope: ClipScope | null = scopeForScene(scene),
+  /** lane/improve-hoops phase 3: build only the clips this body can play (an onlooker: its idle and cheer, visual/onlookerClips.ts).
+   *  Omitted: every clip in scope, as before. */
+  only?: (name: string) => boolean,
 ): string[] {
   const builders = authoredBuilders(scene, skeleton);
   const registered: string[] = [];
   let skipped = 0;
   for (const [name, build] of builders) {
     if (!scopeAllows(scope, name)) { skipped++; continue; }   // another sport's clip: never built, never playable here
+    if (only && !only(name)) { skipped++; continue; }   // lane/improve-hoops: a clip this body never plays
     if (scope?.lazy && suiteOfClip(name) !== 'core') { skipped++; continue; }   // LIBRARY-ANATOMY: a lazy scope builds the rest on demand (buildAuthoredClip)
     if (!scope && OPT_IN_SUITES.includes(suiteOfClip(name))) { skipped++; continue; }   // LIBRARY-ANATOMY: an opt-in suite is built only where a scope names it
     const g = build();
@@ -1301,7 +1305,7 @@ export function registerAuthoredClips(
   // animations (the MPFB2 candidate) plays them — one source of truth.
   // ANIM-RESIDUAL: a scope may omit core base clips (the derby owns no fighter guard or strikes) — skipped like a foreign suite
   for (const g of buildBaseClips(scene, skeleton)) {
-    if (!scopeAllows(scope, g.name)) { skipped++; g.dispose(); continue; }
+    if (!scopeAllows(scope, g.name) || (only && !only(g.name))) { skipped++; g.dispose(); continue; }
     animator.register(g); registered.push(g.name);
   }
   animator.setScope(scope);

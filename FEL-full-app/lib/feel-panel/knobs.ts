@@ -2394,6 +2394,49 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/core/jerseyDecals.ts JERSEY_DECALS',
     hint: 'On: the new basketball and football jerseys carry the player number on the chest and back and the name across the back. Off: a blank jersey, as before.',
   },
+  // ── lane/improve-hoops-2 (2026-11-22, docs/IMPROVE-10-PHASE-AUDIT.md phase 3): the bodies' clips, built faster at load ──
+  {
+    id: 'perf.poseClipFast', label: 'Load: a solved arm or leg recomputes only that limb (1) / the whole body (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/babylon/anim/poseClip.ts POSE_CLIP_FAST',
+    hint: 'How the bodies build their moves while a game loads. The moves come out the same either way; on is faster. Off: as before.',
+  },
+  {
+    id: 'perf.poseClipShare', label: 'Load: bodies with the same build share their solved moves (1) / each solves its own (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/babylon/anim/poseClip.ts POSE_CLIP_SHARE',
+    hint: 'A second body with the same skeleton copies the first one\'s moves instead of working them out again. Off: every body works out its own, as before.',
+  },
+  {
+    id: 'perf.onlookerClipsOnly', label: 'Load: people watching build only their idle and cheer (1) / every move (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · phone budget',
+    source: 'lib/babylon/visual/onlookerClips.ts ONLOOKER_CLIPS_ONLY',
+    hint: 'The crowd on the rail only ever stands and cheers, so on it skips building the rest. They look the same. Off: as before.',
+  },
+  // ── lane/improve-hoops-2 (2026-11-22, phase 4): hoops rules, one way in both modes ──
+  {
+    id: 'hoops.makeBeatHoldsShot', label: '1v1: no shot in the beat after your make (1) / a shot can start (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · rules',
+    source: 'lib/babylon/hoops/oneRule.ts MAKE_BEAT_HOLDS_SHOT',
+    hint: 'After you score, the ball is yours under the rim for a moment before the check. On: a shot pressed then waits for the check. Off: it went up and could not count.',
+  },
+  {
+    id: 'hoops.rivalChaseAroundBody', label: '1v1 rival: chase a loose ball round a body in the way (1) / straight at it (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · rules',
+    source: 'lib/babylon/hoops/boardChase.ts RIVAL_CHASE_AROUND_BODY',
+    hint: 'When someone stands between him and a rebound and he makes no ground for half a second, he steps round them. Off: he keeps pushing straight.',
+  },
+  {
+    id: 'hoops.driveByHandOn', label: '3v3: the drive-by steal must reach the ball (1) / any pass-by poke (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · rules',
+    source: 'lib/babylon/hoops/steals.ts DRIVE_BY_HAND_ON',
+    hint: 'Your feel call. On: running past the driver with a poke only steals if your hand can get to his ball, like any poke. Off: as shipped.',
+  },
+  {
+    id: 'hoops.spinShotCutsHalf', label: 'Both modes: a shot can cut the spin from its half (1) / waits for the spin (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · rules',
+    source: 'lib/babylon/hoops/oneRule.ts SPIN_SHOT_CUTS_HALF',
+    hint: 'Your feel call. On: shoot in the second half of a spin and the shot goes at once, in 1v1 and 3v3 alike. Off: the shot waits for the spin to finish.',
+  },
+  // ── lane/improve-hoops-2 (2026-11-22, phase 10): online 3v3. NOTE: the session gate keeps overrides OFF in online runs, so the default is what plays ──
+  {
+    id: 'net.remoteOffence', label: 'Online 3v3: a friend on a seat passes and shoots with their own buttons (1) / the AI decides (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Online play',
+    source: 'lib/net/knobs.ts NET_REMOTE_OFFENCE',
+    hint: 'On: the body a friend plays brings the ball up, passes where they point and shoots when they press. Off: they move and defend, the AI picks the passes and shots.',
+  },
   // ── lane/improve-screens (2026-11-22, docs/IMPROVE-10-PHASE-AUDIT.md phases 1, 2, 6): the game shell and the screens ──
   {
     id: 'ui.stageFitsHeader', label: 'Phone upright: the game takes the screen the header leaves (1) / sized for a one-row header (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',
@@ -2516,6 +2559,31 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/arena/arenaConfig.ts DUNK_JUMP_VY',
     hint: 'How high a dunk goes: too low and the ball never gets over the ring.',
   },
+  {
+    id: 'arena.knockdowns', label: 'Arena knockdowns (1) / bodies only push (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Physics arena',
+    source: 'lib/babylon/arena/arenaConfig.ts ARENA_KNOCKDOWNS',
+    hint: 'On: a body run into hard enough goes down for a moment and drops the ball. Off (shipped until measured): bodies only push.',
+  },
+  {
+    id: 'arena.fouls', label: 'Arena fouls called (1) / no whistle (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Physics arena',
+    source: 'lib/babylon/arena/arenaConfig.ts ARENA_FOULS',
+    hint: 'On: foul-speed contact is whistled by the shared referee rules (charge, blocking foul, shooting foul, loose-ball foul); the ball goes to the check.',
+  },
+  {
+    id: 'arena.knockMps', label: 'Arena knockdown: the speed of the body running in', def: 5, min: 3, max: 9, step: 0.1, unit: 'm/s', group: 'Physics arena',
+    source: 'lib/babylon/arena/arenaConfig.ts KNOCK_MPS',
+    hint: 'How fast a body must run into another to put it down (a sprint is 6, a jog 4.4). A body in the air goes down at 72% of it.',
+  },
+  {
+    id: 'arena.downSec', label: 'Arena time on the floor after a knockdown', def: 1.3, min: 0.6, max: 3, step: 0.05, unit: 's', group: 'Physics arena',
+    source: 'lib/babylon/arena/arenaConfig.ts DOWN_SEC',
+    hint: 'How long a knocked-down body is out of the play, the get-up included.',
+  },
+  {
+    id: 'arena.xpOn', label: 'Arena games count for XP and progress (1) / practice only (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Physics arena',
+    source: 'lib/sessions/arenaScore.ts ARENA_XP_ON',
+    hint: 'On: each finished game is posted and the server rebuilds its score from the plays, paying XP and progress (no Lab Credits). Off: a practice court.',
+  },
   // ── lane/improve-world (2026-11-22, the 10-phase pass, phase 5): sound in the story and on the coast ──
   {
     id: 'story.sfxOn', label: 'Story: footsteps, hits, spells, the partner, camps, bosses and birds (1) / the wind bed and voices only (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Story · flow',
@@ -2531,7 +2599,36 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
   {
     id: 'story.worldDressed', label: 'Story: textured ground and stone, edge trims, rail posts and the nature kit (1) / plain colour blocks (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Story · flow',
     source: 'lib/babylon/adventure/world/dress.ts STORY_WORLD_DRESSED',
-    hint: 'View only: no piece moves or changes size. The shipped ground textures on the tops, stone on the sides and blocks, a lip on each edge, a cap on each block, posts under the rails, and grass, bushes, rocks and trees from the shipped kit kept clear of where you play. 0 = the plain colours, as before. Ships OFF: on the phone rig it loaded 10 to 18 percent slower and drew World 1 slower; judge it on a real phone.',
+    hint: 'View only: no piece moves or changes size. The shipped ground textures on the tops, stone on the sides and blocks, a lip on each edge, a cap on each block, posts under the rails, and grass, bushes, rocks and trees from the shipped kit kept clear of where you play. 0 = the plain colours, as before. Ships OFF: after the look pass made it cheaper its load and frame time are within noise on the phone rig, but World 1 draws and active meshes go over the story phone budget row; judge it on a real phone.',
+  },
+  // ── lane/look-world (look pass C1): the story's light ──
+  {
+    id: 'story.gradeV2', label: 'Story: surface colours read as painted (1) / lifted pale (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Story · flow',
+    source: 'lib/babylon/adventure/world/grade.ts STORY_GRADE_V2',
+    hint: 'The story ground, blocks, walls, gates and dressing give their colours as screen colours, but the shared light treats them as light values and lifts them a second time, so the dark slate hub floor draws near white. 1 reads them as painted, so the world palette shows; the sun, sky and exposure are unchanged. 0 = as before. Ships OFF: colour is the owner call.',
+  },
+  // ── lane/look-world (look pass C2): the story's first screens ──
+  {
+    id: 'story.titleCard', label: 'Story: title card and creature silhouettes (1) / control table and dots (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Story · flow',
+    source: 'lib/babylon/adventure/story/titleCard.ts STORY_TITLE_CARD',
+    hint: 'The READY screen as a title card: the route name, where you are, the chapter title large and START, with the same control table one tap away under CONTROLS. The partner picker shows each creature as the silhouette of its body in the game, not a dot. Same words. 0 = the screens as before.',
+  },
+  // ── lane/look-world (look pass C3): the Closet held sideways ──
+  {
+    id: 'ui.closetSideways', label: 'Closet held sideways on a phone: walkthrough beside the athlete (1) / over the athlete (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',
+    source: 'lib/ui/closetSideways.ts CLOSET_SIDEWAYS',
+    hint: 'On a short sideways screen (a phone held sideways) the Studio walkthrough card sits at the top of the editor beside the stage, as on an upright phone, instead of over the 3D athlete. Same card and steps. Tablets and desktops unchanged. 0 = as before.',
+  },
+  // ── lane/look-world (look pass C4): the Coast sea ──
+  {
+    id: 'coast.oceanSurface', label: 'Coast: living sea and shore foam (1) / flat sheet (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Coast · zone',
+    source: 'lib/adventure/coast/shoreFoam.ts COAST_OCEAN_SURFACE',
+    hint: 'The sea borrows the surf break shading: small chop bending the light and a fade toward the sky with distance (the sun glitter on a desktop only), and a foam line breathes where the water meets the sand. The water height and wading are unchanged. 0 = the flat sheet, as before.',
+  },
+  {
+    id: 'venue.veniceGroundV2', label: 'Venice: weathered park slab and sand (1) / flat tiled planes (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Coast · zone',
+    source: 'lib/adventure/venice/groundV2.ts VENICE_GROUND_V2',
+    hint: 'From the hub high camera the slab and the sand were one texture tiled flat to the horizon. 1 draws them as a grid whose vertex colour carries slow worn patches on the concrete and damp drifts on the sand, so the repeat breaks up. No texture added, the same draws. 0 = the flat planes, as before.',
   },
   // ── lane/improve-world (phase 9): the zone cameras ──
   {

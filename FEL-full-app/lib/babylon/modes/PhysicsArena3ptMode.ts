@@ -31,6 +31,7 @@ import { seeded } from '../arena/shotModel';
 import { chestPoint, setPoint } from '../arena/dribble';
 import { aimAssist, jumpVy, povBobM, povEyeM, povFovDeg, povLookDegS, povOn, stepHz } from '../arena/arenaConfig';
 import { aimYawErr, applyPov, fovForAspect, povLook, povPose, type PovView } from '../arena/povCamera';
+import type { ArenaContestLog } from '@/lib/sessions/arenaScore';
 
 export const ARENA_3PT_MODE_ID = 'physics_arena_3pt';
 const G = 9.81;
@@ -43,7 +44,10 @@ export const RACKS: ReadonlyArray<{ deg: number; d: number }> = [
 export const BALLS_PER_RACK = 5;
 /** The pool of physical balls (a shot leaves while the last one is still in the air). */
 const POOL = 4;
-const GATHER_SEC = 0.14;
+/** The gather before the jump (s). Mirrored by the server's score rules (lib/sessions/arenaScore.ts ARENA_MIRRORED.gatherSec). */
+export const GATHER_SEC = 0.14;
+/** The walk to the next rack (s), and the final's pause before the contest starts again (mirrored there too). */
+export const RACK_MOVE_SEC = 0.7, END_PAUSE_SEC = 4.5;
 
 /** Where the shooter stands at rack i (feet), facing the ring. */
 export function rackSpot(i: number): P3 {
@@ -55,7 +59,7 @@ export function rackSpot(i: number): P3 {
 /** Points for ball b of a rack (0-based): the last one is the 2-point ball. */
 export const pointsFor = (b: number): number => (b === BALLS_PER_RACK - 1 ? 2 : 1);
 
-interface PoolBall { ball: ArenaBall; mesh: Mesh; sensor: HoopSensor; prev: P3; pts: number; live: boolean }
+interface PoolBall { ball: ArenaBall; mesh: Mesh; sensor: HoopSensor; prev: P3; pts: number; live: boolean; /** The release it is (index into the log's shots). */ shotIx: number }
 
 interface St {
   scene: Scene;
@@ -94,6 +98,9 @@ interface St {
   timing: string;
   hudKey: string;
   scriptOffset: number | null;
+  /** The contest's play log (the session's `stats.arena`: the server rebuilds the points from it), from the first pick's time. */
+  log: ArenaContestLog;
+  t0: number;
   disposed: boolean;
 }
 
@@ -119,6 +126,7 @@ function toRack(S: St, i: number): void {
 
 function reset(S: St): void {
   S.score = 0; S.makes = 0; S.shots = 0; S.clock = CONTEST_SEC; S.started = false; S.done = false; S.doneT = 0; S.inHand = -1; S.shot = null;
+  S.log = { v: 1, shots: [], makes: [] }; S.t0 = 0;
   for (const rack of S.racks) for (const m of rack) m.isVisible = true;
   for (const pb of S.pool) { pb.live = false; pb.ball.teleport({ x: 9 + S.pool.indexOf(pb) * 0.3, y: BALL_R, z: 12 }); pb.sensor.reset(); }
   toRack(S, 0);
@@ -139,7 +147,7 @@ function pick(S: St): void {
   S.inHand = pi;
   S.shot = { t: 0, jumped: false, wantRelease: false };
   playClip(S, 'bball_shoot_jumper', false);
-  if (!S.started) { S.started = true; }
+  if (!S.started) { S.started = true; S.t0 = S.t; }
 }
 
 function release(S: St): void {
@@ -150,10 +158,11 @@ function release(S: St): void {
   const ms = Math.round(((S.shot.jumped ? -v.y : -jumpVy()) / G) * 1000);
   releaseShot(pb.ball, S.body.bit, { x: v.x, y: S.shot.jumped ? v.y : jumpVy(), z: v.z }, S.rng.normal, yawErr);
   pb.live = true; pb.prev = p3(pb.ball.pos);
+  pb.shotIx = S.log.shots.length; S.log.shots.push({ t: S.t - S.t0 });
   S.inHand = -1; S.shot = null; S.shots++; S.inRack++;
   S.timing = `${ms < -35 ? 'early' : ms > 35 ? 'late' : 'on time'} ${ms > 0 ? '+' : ''}${ms} ms`;
   SoundKit.play('whoosh', { volume: 0.3 });
-  if (S.inRack >= BALLS_PER_RACK) S.moveT = S.rack < RACKS.length - 1 ? 0.7 : 0;
+  if (S.inRack >= BALLS_PER_RACK) S.moveT = S.rack < RACKS.length - 1 ? RACK_MOVE_SEC : 0;
 }
 
 function camera(ctx: ModeContext, S: St, dt: number): void {
@@ -202,7 +211,7 @@ export const PhysicsArena3ptMode: ModeDefinition = {
     }
     const world = await ArenaPhysics.create(scene, { ballNode: meshes[0] });
     if (scene.isDisposed) { world.dispose(); return; }
-    const pool: PoolBall[] = meshes.map((m, i) => ({ ball: i === 0 ? world.ball : world.addBall(m), mesh: m, sensor: new HoopSensor(ARENA_RIM, ARENA_RIM_RADIUS), prev: { x: 0, y: 0, z: 0 }, pts: 1, live: false }));
+    const pool: PoolBall[] = meshes.map((m, i) => ({ ball: i === 0 ? world.ball : world.addBall(m), mesh: m, sensor: new HoopSensor(ARENA_RIM, ARENA_RIM_RADIUS), prev: { x: 0, y: 0, z: 0 }, pts: 1, live: false, shotIx: -1 }));
     // the racks: a low stand beside each spot, its five balls (the last one gold: worth 2); drawing only (a ball goes to the
     // physics when it is picked up)
     const standMat = new PBRMaterial('arena3_stand', scene);
@@ -232,7 +241,7 @@ export const PhysicsArena3ptMode: ModeDefinition = {
       yaw: 0, clip: '', rack: 0, inRack: 0, inHand: -1, shot: null, moveT: 0, clock: CONTEST_SEC, started: false, done: false, doneT: 0,
       score: 0, makes: 0, shots: 0, t: 0, rng: seeded(0x3a7e3), input: { rx: 0, ry: 0 },
       pov: { on: false, view: { yaw: 0, pitch: 0, bobPhase: 0 }, savedFov: ctx.camera.fov }, camModeSeen: ctx.camDirector.mode,
-      banner: '', bannerT: 0, timing: '', hudKey: '', scriptOffset: null, disposed: false,
+      banner: '', bannerT: 0, timing: '', hudKey: '', scriptOffset: null, log: { v: 1, shots: [], makes: [] }, t0: 0, disposed: false,
     };
     states.set(scene, S); current = S;
     reset(S);
@@ -274,6 +283,7 @@ export const PhysicsArena3ptMode: ModeDefinition = {
         const now = p3(pb.ball.pos);
         if (pb.sensor.step(pb.prev, now, h) === 'make') {
           S.score += pb.pts; S.makes++;
+          S.log.makes.push({ t: S.t - S.t0, shot: pb.shotIx });
           SoundKit.play('swish', { volume: 0.7 });
           say(S, pb.pts === 2 ? '+2' : '+1', 0.8);
         }
@@ -304,7 +314,14 @@ export const PhysicsArena3ptMode: ModeDefinition = {
         say(S, `Final: ${S.score} (${S.makes} of ${S.shots})`, 4);
       }
     }
-    if (S.done) { S.doneT += simDt; if (S.doneT > 4.5) reset(S); }
+    if (S.done) {
+      S.doneT += simDt;
+      if (S.doneT > END_PAUSE_SEC) {
+        // the final to the page (it posts the run; the server rebuilds the points from the log), then the racks again
+        ctx.card?.('FINAL', S.score, { makes: S.makes, shots: S.shots }, { arena: S.log });
+        reset(S);
+      }
+    }
     for (const pb of S.pool) if (pb.live && pb.ball.pos.y < 0.2 && pb.ball.vel(TMP).length() < 0.3) pb.live = false;
     // the body drawn
     S.yaw = S.pov.on ? S.pov.view.yaw : S.yaw;

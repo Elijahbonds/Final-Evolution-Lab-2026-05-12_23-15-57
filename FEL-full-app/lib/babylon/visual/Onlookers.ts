@@ -14,6 +14,8 @@ import { DEFAULT_HERO_URL } from '../core/athleteRoster';
 import { registerPerfTarget } from '../core/perfGuard';
 import type { PerfLevel } from '../core/PerfGovernor';
 import { onePerFrame } from '../core/onePerFrame';   // RUNUP-STALL-1 v3
+import { onlookerClipFilter } from './onlookerClips';   // lane/improve-hoops phase 3: an onlooker builds only the clips it plays
+import { scopeForScene } from '../anim/clipScope';
 
 interface Figure { char: SpawnedCharacter; root: TransformNode; baseY: number; phase: number; bounds: BoundingInfo; parked: boolean; hidden?: boolean; resting: boolean; age: number }
 
@@ -92,10 +94,11 @@ export class Onlookers {
     this.requested = chosen.length;
     this.unperf = registerPerfTarget(scene, this);
     let landed: () => void = () => {};
+    const clipFilter = onlookerClipFilter(scopeForScene(scene));   // perf.onlookerClipsOnly (off: every clip in scope, as before)
     const spawnOne = (p: Vector3, i: number): Promise<void> => {
       const seed = SEEDS[(i + tint.length) % SEEDS.length];
       const yaw = Math.atan2(lookAt.x - p.x, lookAt.z - p.z);   // face the action
-      return CharacterLibrary.spawn(scene, DEFAULT_HERO_URL, { position: p.clone(), yawRad: yaw, tint: seed, startClip: 'idle', identity: false })
+      return CharacterLibrary.spawn(scene, DEFAULT_HERO_URL, { position: p.clone(), yawRad: yaw, tint: seed, startClip: 'idle', identity: false, ...(clipFilter ? { clipFilter } : {}) })
         .then((char) => {
           if (this.disposed) { char.dispose(); return; }
           // A9.9: past ~14 m from the camera, no ink hull and no cast shadow. Best-effort: a scene the LOD cannot watch must not

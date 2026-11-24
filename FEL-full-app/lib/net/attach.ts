@@ -30,6 +30,8 @@ export interface NetplayHandle {
   /** lane/online-play: the body this page spawned as `localKey` ('foe', 'mate0', 'foe2'…): the human on that seat while one is
    *  present, otherwise `ai` (or neutral). */
   seatSource(localKey: string, ai: ControlSource | null): ControlSource;
+  /** lane/improve-hoops-2 phase 10: is a human on this body's seat right now (and sending)? Always false without shared play. */
+  seatIsHuman(localKey: string): boolean;
   /** Call once per frame with the local player's intent. */
   tick(localIntent: Intent): void;
   status: NetStatus | null;
@@ -91,6 +93,11 @@ export function attachNetplay(mode: string, search?: string): NetplayHandle | nu
         },
         dispose: () => ai?.dispose?.(),
       };
+    },
+    seatIsHuman(localKey: string): boolean {
+      if (!handle.play?.enabled || !SEAT_LAYOUTS[mode]) return false;
+      const peer = peerForLocal(mode, selfId, localKey, handle.session?.peers ?? []);
+      return !!peer && !!intentOf(peer);
     },
     tick(localIntent: Intent): void {
       // shared play: a drawing page sends its intent from play.frame(), and the running page's own player is simulated right
