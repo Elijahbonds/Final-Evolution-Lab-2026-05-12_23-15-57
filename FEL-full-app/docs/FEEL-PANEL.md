@@ -1253,3 +1253,18 @@ seeds 7, 11, 23, 31 and 47 a side; `makebeat.mjs`, `hoops-play/flow.mjs`, `hoops
 - `hoops.spinShotCutsHalf` **0** (`hoops/oneRule.ts` `SPIN_SHOT_CUTS_HALF`): **your feel call.** 1 = one rule in 1v1 and 3v3 for a shot
   pressed during a spin: before its half the press waits for the half; from the half on the shot cuts the spin where the body faces
   (`SPIN_CUT_AT` 0.5, new). 0 = the press waits out the whole spin, as now.
+
+### improve-hoops-2 phase 10, 2026-11-22: online 3v3, a friend plays his own offence (group "Online play")
+
+- `net.remoteOffence` **0** (`lib/net/knobs.ts` `NET_REMOTE_OFFENCE`; shipped OFF, see the check below): in a shared 3v3, the body a friend plays (a seat in
+  `lib/net/seats.ts`) takes its passes and shots from that friend's own buttons — his PASS throws to the team-mate his stick points at
+  (or the one nearest the rim), his SQUARE goes up (at the rim a layup, a dunk with the turbo; out there the jumper), and on his team's
+  ball he brings it up; off the ball his PASS calls for it. An empty or dropped seat is the AI, as before. Nothing on the wire changed:
+  the whole intent already crossed netd, so it works on the netd production runs today (two humans) and on the new one. What is
+  still the AI's: how his shot goes (his tier's release model — he chooses when, not how well). The panel's session gate keeps
+  overrides off online, so the default is what plays; 0 = the AI brain decides his passes and shots, exactly as before.
+  **The check** (`scripts/probes/improve-hoops/remote3v3.mjs`: two browser pages, one shared 3v3, a local netd): the remote human's body did
+  get the ball (3 times in one run: "foe0 (a remote human) has the ball"), but no press from the rig's keyboard reached either page's game —
+  not the guest's passes (17 presses counted on its input bus) and not even the host's own shots (87) — so the check could not show the
+  pass and the shot, and it is called inconclusive, not passed. Two pages loading at once also dropped the guest from netd for a while (its
+  heartbeat stops during a 3v3 load on this rig); it rejoined. Turn it on after the owner's two-phone test (ONLINE-FINISH-PLAN §7).

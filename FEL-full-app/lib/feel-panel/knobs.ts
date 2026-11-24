@@ -2374,6 +2374,12 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/hoops/oneRule.ts SPIN_SHOT_CUTS_HALF',
     hint: 'Your feel call. On: shoot in the second half of a spin and the shot goes at once, in 1v1 and 3v3 alike. Off: the shot waits for the spin to finish.',
   },
+  // ── lane/improve-hoops-2 (2026-11-22, phase 10): online 3v3. NOTE: the session gate keeps overrides OFF in online runs, so the default is what plays ──
+  {
+    id: 'net.remoteOffence', label: 'Online 3v3: a friend on a seat passes and shoots with their own buttons (1) / the AI decides (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Online play',
+    source: 'lib/net/knobs.ts NET_REMOTE_OFFENCE',
+    hint: 'On: the body a friend plays brings the ball up, passes where they point and shoots when they press. Off: they move and defend, the AI picks the passes and shots.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));
