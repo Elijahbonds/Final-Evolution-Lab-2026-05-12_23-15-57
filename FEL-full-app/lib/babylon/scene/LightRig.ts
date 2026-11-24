@@ -21,6 +21,7 @@ import { mountHeatHaze, type HeatHazeHandle } from './HeatHaze';
 import { mountSunShafts, type SunShaftsHandle } from './SunShafts';
 import { mountSceneDecals, type GroundDecalsHandle } from '../visual/GroundDecals';
 import { mountEnvironmentIBL } from './EnvironmentIBL';
+import { mountVenueIBL } from './venueQualityV1';   // look pass B2: venue.iblEnvV1 reaches the rig
 import { motionPolicy } from '../../a11y/reducedMotion';
 import { FLASH_GAIN, stepFlashLevel } from '../core/ImpactFrame';
 import { phoneSkipsCaster, phoneSkipsCasterMaterial, PHONE_SOCK_CAST } from './phoneCasters';   // phone-perf (2026-10-14)
@@ -128,7 +129,10 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
   // PBRMaterial reflects nothing and metals read as flat plastic — see
   // EnvironmentIBL.ts. Mounted before the lights so materials compiled during
   // venue load already see an environment.
-  const disposeEnv = mountEnvironmentIBL(scene, mood);
+  // look pass B2 (2026-11-24): venue.iblEnvV1 / ?vq=ibl was defined (2026-11-03) but never mounted, so the knob did nothing. It
+  // now reaches the rig; off (the default) runs exactly the procedural cube as before. On, a mood with a prefiltered .env lights
+  // from it once it loads — the files (public/env/*.env) are not in the repo yet, so on today it keeps the procedural cube.
+  const disposeEnv = mountVenueIBL(scene, mood, () => mountEnvironmentIBL(scene, mood));
 
   const sun = new DirectionalLight('fel_sun', new Vector3(...M.sunDir).normalize(), scene);
   sun.intensity = M.sunIntensity;
