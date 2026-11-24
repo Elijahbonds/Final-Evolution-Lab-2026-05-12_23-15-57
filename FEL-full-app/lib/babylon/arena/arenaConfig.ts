@@ -73,6 +73,9 @@ export const KNOCK_MPS = 5.0;
 export const KNOCK_AIR_SHARE = 0.72;
 /** How long a knocked-down body stays out (s): the fall, the floor and the get-up (karate_get_up is the last 0.45 s). */
 export const DOWN_SEC = 1.3;
+/** Soccer in the arena (plan §9, owner 2026-11-24: "The next sport after 3v3: SOCCER"): the Soccer tab on /play/arena. 0 = no
+ *  tab (the arena as before; the shipped soccer, /play/soccer, is never touched). */
+export const ARENA_SOCCER = 1;   // ON: measured (plan §9): the physics bar met, the phone cost under the arena 1v1's row
 /** The arena's set (look pass 2026-11-24, LOOK-PASS-AUDIT finding 12, arenaSet.ts): the shipped streetball cage, lamp poles and
  *  benches round the court, and an apron to the horizon. 0 = the court alone (today's look exactly). */
 export const ARENA_SET_V1 = 0;
@@ -110,6 +113,7 @@ export const dunkJumpVy = (): number => feel('arena.dunkJumpVy', DUNK_JUMP_VY);
 /** The arena's games post a run when they end (XP and progress; owner 2026-11-24). Its default is the server's switch
  *  (lib/sessions/arenaScore.ts ARENA_XP_ON: with it off the three session keys have no score rules). 0 = a practice court. */
 export const xpOn = (): boolean => feel('arena.xpOn', ARENA_XP_ON) >= 0.5;
+export const arenaSoccerOn = (): boolean => feel('arena.soccer', ARENA_SOCCER) >= 0.5;
 export const arenaSetOn = (): boolean => feel('arena.setV1', ARENA_SET_V1) >= 0.5;
 export const knockdownsOn = (): boolean => feel('arena.knockdowns', ARENA_KNOCKDOWNS) >= 0.5;
 export const foulsOn = (): boolean => feel('arena.fouls', ARENA_FOULS) >= 0.5;

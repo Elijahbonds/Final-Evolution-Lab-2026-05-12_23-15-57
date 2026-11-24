@@ -2616,6 +2616,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'How long a knocked-down body is out of the play, the get-up included.',
   },
   {
+    id: 'arena.soccer', label: 'Arena soccer tab (1) / hoops only (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Physics arena',
+    source: 'lib/babylon/arena/arenaConfig.ts ARENA_SOCCER',
+    hint: 'On: the Physics Arena has a Soccer tab — 1v1 in a small cage on real ball physics (curl, drag, posts). Off: hoops only.',
+  },
+  {
     id: 'arena.setV1', label: 'Arena set: the cage, lamps and benches round the court (1) / the court alone (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Physics arena',
     source: 'lib/babylon/arena/arenaConfig.ts ARENA_SET_V1',
     hint: 'On: the shipped streetball cage, lamp poles and benches stand round the arena court, and the ground runs to the horizon. Off: the court alone (today).',

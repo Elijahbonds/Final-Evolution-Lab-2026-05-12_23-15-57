@@ -25,13 +25,18 @@
  *      closing speed; a sprint with the ball into a set defender knocks him down and is a charge with the knobs on, and is only a
  *      push with them off; a jog into him is only a push either way; and the 1v1 and the 3v3 still play three minutes each
  *      with both knobs on (the counts are printed: how often the game stops for contact).
+ *   S. Soccer (plan §9, arena.soccer): a struck ball curls with side spin and flies straight without; drag slows a hard shot; a
+ *      rolling ball stops; 30 m/s shots at the posts and the bar never pass through them; the goal sensor (swept, the whole ball over
+ *      the line) agrees with an independent label from the ball's resting place; in the live mode a clean strike from 12 m scores
+ *      clearly more than one off the foot's sweet spot; three minutes of the live 1v1 run and both sides score.
  *   G. Phase 3, the three-point contest: from the five racks (7.05–7.15 m) a good release still makes clearly more than a bad one,
  *      and the contest mode's own loop runs a whole contest headless (25 balls, the clock, the final).
  *
  * Run: npx tsx scripts/physics-arena-tests.ts
  */
 
-import { makeWorld, runShot, spots } from './probes/physics-arena/harness';
+import { makeSoccerWorld, makeWorld, runShot, spots } from './probes/physics-arena/harness';
+import { GOAL, PITCH, SOCCER_BALL, goalCrossing, goalFrame, goalLineZ, inGoalNet } from '../lib/babylon/arena/soccerGeometry';
 import { seeded } from '../lib/babylon/arena/shotModel';
 import { BALL_R, RIM_TUBE_R, ARENA_RIM, ARENA_RIM_RADIUS, boardBox, type P3 } from '../lib/babylon/arena/hoopGeometry';
 import { rebuildArenaScore } from '../lib/sessions/arenaScore';
@@ -54,6 +59,7 @@ const ok = (n: string, c: boolean, extra = '') => {
 
 async function main() {
   // a probe's shortcut (not used by ci-suite): PA_ONLY=contact3v3 runs only the 3v3 with the contact knobs on
+  if (process.env.PA_ONLY === 'soccer') { const w0 = await makeWorld(); w0.dispose(); nodeShims(); await soccerPhysics(); await soccerLive(w0.B); console.log(`\nphysics-arena (soccer only): ${pass} passed, ${fail} failed`); process.exit(fail ? 1 : 0); }
   if (process.env.PA_ONLY === 'contact3v3') { const w0 = await makeWorld(); w0.dispose(); nodeShims(); await threes(w0.B, false, true); console.log(`\nphysics-arena (contact3v3 only): ${pass} passed, ${fail} failed`); process.exit(fail ? 1 : 0); }
   const { B, world, dispose } = await makeWorld();
   const h = 1 / 120;
@@ -214,8 +220,157 @@ async function main() {
   await liveLoop(B, true);
   await threes(B, false, true);
 
+  console.log('\nS. soccer on the same core');
+  await soccerPhysics();
+  await soccerLive(B);
+
   console.log(`\nphysics-arena: ${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
+}
+
+/** The soccer ball, the frames and the sensor in a bare soccer world. */
+async function soccerPhysics() {
+  const { world, dispose } = await makeSoccerWorld();
+  const h = 1 / 120, r = SOCCER_BALL.r;
+  const fly = (from: P3, vel: P3, spin: P3, sec: number, each?: (a: P3, b: P3) => void): P3 => {
+    world.ball.teleport(from);
+    world.step(h);
+    world.ball.launch(vel, spin);
+    let prev = { ...from };
+    for (let i = 0; i < sec / h; i++) {
+      world.step(h);
+      const p = world.ball.pos, now = { x: p.x, y: p.y, z: p.z };
+      each?.(prev, now);
+      prev = now;
+    }
+    return prev;
+  };
+  // curl: 25 m/s at 8 degrees, side spin +45 / 0 / -45 rad/s; where it crosses 13 m downfield
+  const crossX = (spinY: number): number => {
+    let x = NaN;
+    const e = (8 * Math.PI) / 180;
+    fly({ x: 0, y: r + 0.02, z: -8 }, { x: 0, y: 25 * Math.sin(e), z: 25 * Math.cos(e) }, { x: 0, y: spinY, z: 0 }, 1.2, (_a, b) => { if (Number.isNaN(x) && b.z >= 5) x = b.x; });
+    return x;
+  };
+  const right = crossX(45), straight = crossX(0), left = crossX(-45);
+  ok(`side spin bends it: +45 rad/s ends ${right.toFixed(2)} m right, -45 ${left.toFixed(2)} m, none ${straight.toFixed(3)} m (bend ≥ 0.4 m each way, straight ≤ 0.05)`, right > 0.4 && left < -0.4 && Math.abs(straight) < 0.05);
+  // drag: a 30 m/s drive along the ground's height, its speed after ~20 m
+  let at20 = NaN;
+  fly({ x: 0, y: 1.0, z: -12 }, { x: 0, y: 2.5, z: 30 }, { x: 0, y: 0, z: 0 }, 1.0, (_a, b) => { if (Number.isNaN(at20) && b.z >= 8) { const v = world.ball.vel(); at20 = v.length(); } });
+  ok(`air drag slows a 30 m/s strike: ${at20.toFixed(1)} m/s after 20 m (< 27)`, at20 < 27 && at20 > 15);
+  // rolling: a ball rolled at 6 m/s stops
+  const rest = fly({ x: -3, y: r, z: -6 }, { x: 0, y: 0, z: 6 }, { x: 0, y: 0, z: 0 }, 5);
+  const still = world.ball.vel().length();
+  ok(`a ball rolled at 6 m/s stops (${(rest.z + 6).toFixed(1)} m later, speed ${still.toFixed(2)} m/s)`, still < 0.15 && rest.z + 6 > 3 && rest.z + 6 < 14);
+  // no tunnelling: 40 shots at 30 m/s straight at the posts and the bar
+  const segs = goalFrame('north');
+  const segDist = (p: P3, a: P3, b: P3) => {
+    const abx = b.x - a.x, aby = b.y - a.y, abz = b.z - a.z, L = abx * abx + aby * aby + abz * abz;
+    const t = Math.max(0, Math.min(1, ((p.x - a.x) * abx + (p.y - a.y) * aby + (p.z - a.z) * abz) / L));
+    return Math.hypot(p.x - a.x - abx * t, p.y - a.y - aby * t, p.z - a.z - abz * t);
+  };
+  let worst = 0, through = 0;
+  for (let k = 0; k < 40; k++) {
+    const sg = segs[k % 3], t = ((k * 7) % 10) / 10 + 0.05;
+    const tgt = { x: sg.a.x + (sg.b.x - sg.a.x) * t, y: sg.a.y + (sg.b.y - sg.a.y) * t, z: sg.a.z };
+    const from = { x: tgt.x * 0.6 + ((k % 5) - 2) * 0.3, y: Math.max(r + 0.05, tgt.y - 0.3), z: tgt.z - 9 };
+    const d = Math.hypot(tgt.x - from.x, tgt.y - from.y, tgt.z - from.z);
+    const vel = { x: ((tgt.x - from.x) / d) * 30, y: ((tgt.y - from.y) / d) * 30 + 0.8, z: ((tgt.z - from.z) / d) * 30 };
+    let hitPost = false;
+    const end = fly(from, vel, { x: 0, y: 0, z: 0 }, 0.8, (a, b) => {
+      for (let q = 0; q <= 8; q++) {
+        const p = { x: a.x + (b.x - a.x) * (q / 8), y: a.y + (b.y - a.y) * (q / 8), z: a.z + (b.z - a.z) * (q / 8) };
+        for (const s2 of segs) { const pen = r + GOAL.postR - segDist(p, s2.a, s2.b); worst = Math.max(worst, pen); if (pen > -0.01) hitPost = true; }
+      }
+    });
+    if (hitPost && end.z > goalLineZ('north') + GOAL.depth + 0.5) through++;
+  }
+  ok(`40 shots at 30 m/s at the posts and the bar: deepest overlap ${(worst * 100).toFixed(1)} cm (≤ 3 cm), none through the frame (${through})`, worst <= 0.03 && through === 0);
+  // the sensor against the label: 80 shots at the mouth from round the box
+  let agree = 0, goals = 0, n = 0;
+  for (let k = 0; k < 80; k++) {
+    const from = { x: ((k * 37) % 11) - 5, y: r, z: 13 - 6 - ((k * 13) % 7) };
+    const aimX = (((k * 29) % 21) - 10) / 10 * (GOAL.halfW + 1.2), aimY = ((k * 17) % 9) / 9 * (GOAL.h + 0.8);
+    const tz = goalLineZ('north'), d = Math.hypot(aimX - from.x, tz - from.z), sp = 14 + (k % 6) * 2.5;
+    const tFly = d / sp, vy = (aimY - from.y) / tFly + 0.5 * 9.81 * tFly;
+    let sensed = false;
+    const end = fly(from, { x: ((aimX - from.x) / d) * sp, y: vy, z: ((tz - from.z) / d) * sp }, { x: 0, y: 0, z: 0 }, 3, (a, b) => { if (goalCrossing(a, b) === 'north') sensed = true; });
+    const label = inGoalNet(end, 'north') || (end.z > tz + r && Math.abs(end.x) < GOAL.halfW && end.y < GOAL.h + 0.3);
+    n++; goals += +label; agree += +(sensed === label);
+  }
+  ok(`the goal sensor agrees with the resting-place label on ${agree}/${n} shots (${goals} goals; ≥ 98 %)`, agree / n >= 0.98 && goals > 10 && goals < n - 10);
+  void PITCH;
+  dispose();
+}
+
+/** The live soccer mode: clean against mistimed strikes, then three minutes of play. */
+async function soccerLive(B: typeof import('@babylonjs/core')) {
+  const { PhysicsArenaSoccerMode, arenaSoccerSeam, arenaSoccerStats } = await import('../lib/babylon/modes/PhysicsArenaSoccerMode');
+  const mk = async () => {
+    const engine = new B.NullEngine(); engine.getDeltaTime = () => 1000 / 60;
+    const scene = new B.Scene(engine);
+    const camera = new B.UniversalCamera('cams', new B.Vector3(0, 6, -14), scene);
+    const hud: Record<string, unknown> = {};
+    const dir = { mode: 'follow', suspended: false, stickWorldLatched: (x: number, y: number) => new B.Vector3(x, 0, -y), look: () => {}, update: () => {}, snapTo: () => {} };
+    const ctx = { scene, camera, camDirector: dir, heroRef: { current: null }, objectiveRef: { current: null }, setHud: (u: Record<string, unknown>) => Object.assign(hud, u) } as never;
+    await PhysicsArenaSoccerMode.load(ctx);
+    return { engine, scene, ctx, hud };
+  };
+  // strikes from 12 m at the corners: at the foot vs 0.55 m off it (the same power and aim)
+  {
+    const { engine, scene, ctx } = await mk();
+    const seam = arenaSoccerSeam(scene) as unknown as { place: (x: number, z: number, off?: number) => void; kick: (k: string, p: number, yaw: number, c: number) => void; quiet: (on: boolean) => void };
+    seam.quiet(true);
+    const tz = goalLineZ('north');
+    const shoot = (deg: number, off: number, corner: number): boolean => {
+      const a = (deg * Math.PI) / 180, d = 12;
+      const x = Math.sin(a) * d, z = tz - Math.cos(a) * d;
+      seam.place(x, z, off);
+      for (let f = 0; f < 3; f++) PhysicsArenaSoccerMode.update(ctx, 1 / 60);
+      const before = arenaSoccerStats(scene)!.goals.me;
+      seam.kick('shot', 0.75, Math.atan2(corner * 0.95 - x, tz - z), 0);
+      for (let f = 0; f < 150; f++) PhysicsArenaSoccerMode.update(ctx, 1 / 60);
+      return arenaSoccerStats(scene)!.goals.me > before;
+    };
+    let clean = 0, off = 0, n = 0;
+    for (const deg of [-35, -20, -8, 0, 8, 20, 35]) for (const corner of [-1, 1]) { clean += +shoot(deg, 0, corner); off += +shoot(deg, 0.55, corner); n++; }
+    console.log(`     12 m strikes at the corners: clean ${clean}/${n}, 0.55 m off the sweet spot ${off}/${n}`);
+    // (the bar is the gap, as the jump shot's: a scuffed strike from 12 m at a keeper-less 3 m goal still goes in some of the time)
+    ok(`a clean strike scores clearly more than one off the foot (${clean}/${n} ≥ 70 %, a gap of ${Math.round((100 * (clean - off)) / n)} points ≥ 40)`, clean / n >= 0.7 && (clean - off) / n >= 0.4);
+    scene.dispose(); engine.dispose();
+  }
+  // three minutes: a bot that chases the ball, dribbles north and shoots from range
+  {
+    const { engine, scene, ctx, hud } = await mk();
+    const phases = new Set<string>();
+    let threw: unknown = null, nan = false, xDown = -1;
+    try {
+      const ball = scene.getMeshByName('ball')!, me = scene.getTransformNodeByName('arena_soccer_me')!;
+      for (let f = 0; f < 60 * 180; f++) {
+        const t = f / 60, b = ball.position, p = me.position;
+        const tz = goalLineZ('north');
+        const atFeet = Math.hypot(b.x - p.x, b.z - p.z) < 0.9;
+        if (f % 4 === 0 && xDown < 0) {
+          // to the ball (behind it, toward the goal) — with it, at the goal
+          const gx = atFeet ? 0 : b.x, gz = atFeet ? tz : b.z - 0.5;
+          const dx = gx - p.x, dz = gz - p.z, d = Math.hypot(dx, dz) || 1;
+          PhysicsArenaSoccerMode.onInput(ctx, { t: 'stick', side: 'L', x: d < 0.2 ? 0 : dx / d, y: d < 0.2 ? 0 : -dz / d });
+          PhysicsArenaSoccerMode.onInput(ctx, { t: 'button', btn: 'R1', pressed: !atFeet });
+        }
+        if (atFeet && tz - p.z < 11 && xDown < 0 && f % 30 === 0) { PhysicsArenaSoccerMode.onInput(ctx, { t: 'button', btn: 'X', pressed: true }); xDown = t; }
+        if (xDown >= 0 && t - xDown > 0.5) { PhysicsArenaSoccerMode.onInput(ctx, { t: 'button', btn: 'X', pressed: false }); xDown = -1; }
+        PhysicsArenaSoccerMode.update(ctx, 1 / 60);
+        if (hud.arenaPhase) phases.add(String(hud.arenaPhase));
+        if (!Number.isFinite(b.x + b.y + b.z)) nan = true;
+      }
+    } catch (e) { threw = e; console.error(e); }
+    const st = arenaSoccerStats(scene);
+    console.log(`     three minutes: ${st?.score.me}–${st?.score.foe} (goals ${st?.goals.me}/${st?.goals.foe}); shots ${st?.shots.me}/${st?.shots.foe}; touches ${st?.touches.me}/${st?.touches.foe}; tackles ${st?.tackles.me}/${st?.tackles.foe}; posts ${st?.posts}; air kicks ${st?.whiffs}; drops ${st?.drops}; phases ${[...phases].join('/')}`);
+    ok('three minutes of soccer ran without a throw, the ball a number', threw === null && !nan);
+    ok('the game went kick-off → live → scored', phases.has('kickoff') && phases.has('live') && phases.has('scored'));
+    ok('both sides scored (the ball through the goal, read by the sensor)', !!st && st.goals.me > 0 && st.goals.foe > 0);
+    scene.dispose(); engine.dispose();
+  }
 }
 
 /** What the live modes need in node: the character and ball-skin loads fail (no fetch) and the mode plays without them; the court's

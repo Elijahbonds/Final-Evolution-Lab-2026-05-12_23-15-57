@@ -175,6 +175,12 @@ const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick' | 'boost' | 'turbo'>> 
   physics_arena_3pt: verbs({
     X: { label: 'SHOOT', emit: A('X'), hold: true },
   }),
+  // lane/physics-arena §9: the arena's soccer. X holds the shot, A the pass (let go to strike: the hold is the power), B tackles.
+  physics_arena_soccer: verbs({
+    X: { label: 'SHOOT', emit: A('X'), hold: true },
+    A: { label: 'PASS', emit: A('A'), hold: true },
+    B: { label: 'TACKLE', emit: A('B') },
+  }),
   threevthree: verbs({
     X: { label: 'SHOOT', emit: A('X'), hold: true },
     Y: { label: 'BLOCK', emit: A('Y') },

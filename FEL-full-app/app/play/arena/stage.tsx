@@ -14,7 +14,8 @@ import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { ARENA_MODE_ID } from '@/lib/babylon/modes/PhysicsArenaMode';
 import { ARENA_3PT_MODE_ID } from '@/lib/babylon/modes/PhysicsArena3ptMode';
 import { ARENA_3V3_MODE_ID } from '@/lib/babylon/modes/PhysicsArena3v3Mode';
-import { ARENA_HREF, physicsHoopsOn, povOn, SHIPPED_ONEVONE_HREF, xpOn } from '@/lib/babylon/arena/arenaConfig';
+import { ARENA_SOCCER_MODE_ID } from '@/lib/babylon/modes/PhysicsArenaSoccerMode';
+import { ARENA_HREF, arenaSoccerOn, physicsHoopsOn, povOn, SHIPPED_ONEVONE_HREF, xpOn } from '@/lib/babylon/arena/arenaConfig';
 import { ARENA_SESSION_KEY, finishArenaRun, startArenaRun } from '@/lib/babylon/arena/arenaRun';
 import type { FinishDeps } from '@/lib/sessions/finishOutbox';
 
@@ -29,11 +30,15 @@ const SPORTS = [
   { id: 'threes', mode: ARENA_3V3_MODE_ID, label: '3v3', keys: 'Move WASD · Sprint Shift · Shoot hold L · Jump J · Pass K (toward the stick) · Call for it / reach I · Cross Q · View C' },
   // look pass (LOOK-PASS-AUDIT finding 12 c): "3-Point" wrapped to two lines on an upright phone; there it reads "3PT"
   { id: 'threepoint', mode: ARENA_3PT_MODE_ID, label: '3-Point', short: '3PT', keys: 'Shoot hold L (or J), let go at the top of the jump · View C' },
+  // plan §9 (arena.soccer): soccer 1v1 in the cage
+  { id: 'soccer', mode: ARENA_SOCCER_MODE_ID, label: 'Soccer', keys: 'Move WASD · Sprint Shift · Shoot hold L, let go to strike · Pass hold K · Tackle I · Curl: the stick across the aim · View C' },
 ] as const;
+/** The tabs on show: soccer only with arena.soccer. */
+const shownSports = () => SPORTS.filter((x) => x.id !== 'soccer' || arenaSoccerOn());
 function sportOf(search: string): (typeof SPORTS)[number] {
   let id = 'hoops';
   try { id = new URLSearchParams(search).get('sport') ?? 'hoops'; } catch { /* hoops */ }
-  return SPORTS.find((x) => x.id === id) ?? SPORTS[0];
+  return shownSports().find((x) => x.id === id) ?? SPORTS[0];
 }
 
 export function ArenaStage({ signedIn }: { signedIn: boolean }) {
@@ -71,8 +76,9 @@ export function ArenaStage({ signedIn }: { signedIn: boolean }) {
     let disposed = false;
     // each game is one server run: started as play begins, finished (and the next one started) when the game ends. Signed out or
     // with arena.xpOn 0, nothing is posted (a practice court).
-    const key = ARENA_SESSION_KEY[sport.id];
-    const posting = signedIn && xpOn();
+    // soccer counts for nothing yet (plan §9: its XP rule is a later step): the soccer tab posts no run
+    const key = sport.id === 'soccer' ? null : ARENA_SESSION_KEY[sport.id];
+    const posting = signedIn && xpOn() && key !== null;
     const runOpts = { agent: queryFlag('agent'), playtest: queryFlag('playtest') };
     let run: Promise<string | null> | null = null;
     runMode(def, {
@@ -84,14 +90,14 @@ export function ArenaStage({ signedIn }: { signedIn: boolean }) {
         if (p === 'error') setErr(String(d));
         // a practice court: straight in (next tick: the harness takes a press only once it is in 'ready')
         if (p === 'ready') setTimeout(() => { if (!disposed) { bus.emit({ t: 'button', btn: 'START', pressed: true }); bus.emit({ t: 'button', btn: 'START', pressed: false }); } }, 50);
-        if (p === 'ready' && posting && !run) run = startArenaRun(key, runOpts);
+        if (p === 'ready' && posting && key && !run) run = startArenaRun(key, runOpts);
       },
       onHud: (u) => { if (!disposed) setHud((h) => ({ ...h, ...u })); },
       guest: !signedIn,
       resultSink: async () => {},   // the arena never ends a session: each game is a card (below), and play goes on
       // a finished game: its run is finished with the game's play log (the server rebuilds the score), the next game's run starts
       cardSink: async (res) => {
-        if (!posting || disposed) return;
+        if (!posting || !key || disposed) return;
         const started = run;
         run = startArenaRun(key, runOpts);
         const runId = started ? await started : null;
@@ -129,7 +135,7 @@ export function ArenaStage({ signedIn }: { signedIn: boolean }) {
               : <><span className="sr-only">Score, you then rival: </span>{String(hud.arenaScore ?? '0–0')}</>}
           </div>
           <nav aria-label="Arena sport" className="absolute left-1/2 top-3 z-10 flex -translate-x-1/2 gap-1 rounded-full bg-black/60 p-1">
-            {SPORTS.map((x) => (
+            {shownSports().map((x) => (
               <a key={x.id} href={`${ARENA_HREF}?sport=${x.id}`} aria-current={sport?.id === x.id ? 'page' : undefined} aria-label={x.label}
                 className={`inline-flex min-h-[44px] items-center whitespace-nowrap rounded-full px-2.5 text-base font-bold sm:px-3 ${sport?.id === x.id ? 'bg-white text-black' : 'text-white'}`}>
                 {'short' in x ? <><span aria-hidden className="sm:hidden">{x.short}</span><span aria-hidden className="hidden sm:inline">{x.label}</span></> : x.label}
