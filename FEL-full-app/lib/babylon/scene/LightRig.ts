@@ -7,7 +7,7 @@ import {
 } from '@babylonjs/core';
 import type { AbstractMesh, PBRMaterial, StandardMaterial } from '@babylonjs/core';
 import { MOODS, type VenueMood, type MoodCurves } from './moods';
-import { tierRigSettings, legacyRig, legacyMobilePost, type QualityTier } from './QualityTier';
+import { tierRigSettings, legacyRig, legacyMobilePost, phoneAARig, readPhoneAA, type QualityTier } from './QualityTier';
 import { isLegacyLook, readShadowCacheParam, readMobilePostParam, lookFeatureOff } from './graphicsSetting';
 import { mountShadowCache, shadowCacheWanted, gpuCanCopyShadowMap, type ShadowCacheHandle } from './ShadowCache';
 import { mountKickerLight, type KickerHandle } from './KickerLight';
@@ -111,7 +111,9 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
   // shadow map size, cascades on outdoor moods, sharpen and bloom weight.
   const legacy = isLegacyLook();   // ?look=legacy: the shared look as it shipped before 2026-10-06 (before/after shots)
   const T0 = legacy ? legacyRig(tierRigSettings(tier, mood), tier) : tierRigSettings(tier, mood);
-  const T = tier === 'mobile' && readMobilePostParam() === '0' ? legacyMobilePost(T0) : T0;   // the phase-2 A/B
+  const T1 = tier === 'mobile' && readMobilePostParam() === '0' ? legacyMobilePost(T0) : T0;   // the phase-2 A/B
+  // look pass B1: the phones' edge smoothing (look.phoneAA / ?aa=; 0 = as before). Set once here, at mount, like the rest.
+  const T = tier === 'mobile' && !legacy ? phoneAARig(T1, readPhoneAA()) : T1;
 
   // A9.3: the rig owns the scene's grade. A spec venue built after this (NexusWebScene.applyVenueGrade) stands down
   // instead of overwriting the mood — the pipeline reads the SAME scene.imageProcessingConfiguration it would write.
@@ -243,6 +245,8 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
   // the backing density the canvas fit chose (the harness fits the canvas before it mounts the rig)
   const backingDpr = 1 / Math.max(1e-3, scene.getEngine().getHardwareScalingLevel());
   pipeline.fxaaEnabled = T.fxaa && backingDpr < T.fxaaMaxDpr;
+  // look pass B1: what edge smoothing this mount got, so a probe (or the owner's console) can prove the A/B was applied
+  console.info(`[FEL-TIER] edges: msaa ${pipeline.samples}, fxaa ${pipeline.fxaaEnabled ? 'on' : 'off'} (backing dpr ${backingDpr.toFixed(2)}, ${tier})`);
   pipeline.sharpenEnabled = T.sharpen;               // mobile skips the full-screen pass
   pipeline.sharpen.edgeAmount = 0.25;                             //TUNE(elijah)
   // M44: mood-tinted vignette so the grade reads on the whole frame

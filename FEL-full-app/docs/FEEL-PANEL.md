@@ -1370,3 +1370,30 @@ NEW switches, each **1 = on, 0 = today's game exactly** (tests pin both ends). N
   recorded palm slap over a short knock, a body contact the low thud, instead of the arcade boop; the call's volume is kept; two contacts
   within 60 ms are one; the mute silences it (tested). Levels in docs/HOOPS-GAP-PLAN.md §5.7. A feel item: OFF for the owner's ear.
 
+
+## look-venues, 2026-11-24 (owner: "Let's do a pass where we improve how things look."; docs/LOOK-PASS-AUDIT.md phases B1-B3; the owner has not seen these yet)
+
+NEW switches, each **0 = today's look exactly** (tests pin the off value). No existing tuned number moved. Each is read once, when a
+game loads; each also has a one-load URL switch for an A/B on any device without the panel.
+
+- `look.phoneAA` **0** (group "Look · venues"; `scene/QualityTier.ts` `PHONE_AA_DEFAULT`, applied in `scene/LightRig.ts`; URL `?aa=0|1|2`):
+  **edge smoothing on phones** (phase B1). Today a phone draws with no anti-aliasing: FXAA runs only below 1.5 backing pixels per CSS
+  pixel and every DPR-2/3 phone is above it, and multisampling is desktop-only. 1 = the FXAA pass at every density (the pass the phones
+  already have, no new shader); 2 = 2x MSAA on the HDR pipeline's first target instead. Desktop and high are untouched (4x MSAA). The
+  rig logs `[FEL-TIER] edges: msaa N, fxaa on|off` at every mount, so a console shows which one a load got. **Ships OFF (0) until the owner's phone check.** Measured (the
+  every-screen rig, SwiftShader; scripts/probes/look-venues/, session scratch `look-venues/`): the pictures at full render scale
+  (upright phone, DPR 2) are clearly cleaner with 1 — the sand's edge, the court lines, the lamp posts, the palm fronds and the
+  players' outlines lose their stair-steps; the hard-step count in the crop falls 27 % (1v1), 58 % (3v3) and 30 % (Dunk) while the
+  picture's detail falls only 2-17 %, so it smooths edges rather than blurring the frame. 2 also smooths geometry edges but not the
+  court lines (they are texture) or the palm fronds (alpha-tested cut-outs), so 1 is the candidate. The phone tier (390x844, DPR 3,
+  CPU 4x, guard on; tennis as the control): frame p95 medians today -> FXAA: 1v1 783 -> 811 ms, Dunk 978 -> 970, Venice 974 -> 748, the story 666 -> 776 (tennis
+  817 ms, spread 6 ms; the places' own run-to-run spread up to 62 ms today and 203 ms with FXAA): mixed, two slower and two faster
+  2 rounds; the 3rd is below if it ran; the guard settled at the same level (L2) on both sides; READY within
+  10 % everywhere; texture memory +17 to +44 MB by the readout's estimate (FXAA adds a full-screen float target, because the image
+  pass no longer draws straight to the screen; about half that on a phone, whose targets are half-float — an estimate). The rig
+  cannot give a phone's frame rate, so the owner's check decides: open a hoops game with `?aa=1` and with `?aa=0` on the phone,
+  read PERF's frame p95 after 10 s of play in each, and if they match, set `PHONE_AA_DEFAULT` to 1.
+- `venue.iblEnvV1` (exists, **0**, unchanged): **found dead and wired** (phase B2). `mountVenueIBL` (`scene/venueQualityV1.ts`, 2026-11-03)
+  was never called, so the knob and `?vq=ibl` did nothing; the light rig now mounts the environment through it (off runs exactly the
+  procedural cube, tested). **The prefiltered files it names (`public/env/*.env`) are not in the repo on any branch**, so on is still
+  the procedural cube until the owner adds them (art list). The audit's A/B of it (finding 15) compared two identical renders.

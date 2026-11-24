@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { OUTDOOR_MOODS, resolveQualityTier, explainQualityTier, classifyGpu, tierFromName, tierRigSettings, legacyRig, legacyMobilePost, type TierInput } from './QualityTier';
+import { OUTDOOR_MOODS, resolveQualityTier, explainQualityTier, classifyGpu, tierFromName, tierRigSettings, legacyRig, legacyMobilePost, phoneAARig, readPhoneAA, PHONE_AA_DEFAULT, type TierInput } from './QualityTier';
 import { fitCanvas } from '../core/canvasFit';
 import { MOODS } from './moods';
 
@@ -184,5 +184,23 @@ describe('tierRigSettings', () => {
     for (const m of OUTDOOR_MOODS) expect(Object.keys(MOODS)).toContain(m);
     expect(OUTDOOR_MOODS.has('overcast') && OUTDOOR_MOODS.has('dusk')).toBe(true);
     expect(OUTDOOR_MOODS.has('dojoWarm') || OUTDOOR_MOODS.has('indoorArena')).toBe(false);
+  });
+});
+
+describe('look pass B1: the phones\' edge smoothing (look.phoneAA)', () => {
+  const phone = tierRigSettings('mobile', 'goldenHour');
+  it('0 (and any unknown value) restores today\'s phone rig exactly: FXAA only below DPR 1.5, no MSAA', () => {
+    for (const v of [0, -1, 3, 0.5, NaN]) expect(phoneAARig(phone, v)).toEqual(phone);
+    expect(phoneAARig(phone, 0)).toMatchObject({ fxaa: true, fxaaMaxDpr: 1.5, msaaSamples: 1 });
+  });
+  it('1 runs FXAA at every density and changes nothing else', () => {
+    expect(phoneAARig(phone, 1)).toEqual({ ...phone, fxaa: true, fxaaMaxDpr: Infinity });
+  });
+  it('2 swaps FXAA for 2x MSAA and changes nothing else', () => {
+    expect(phoneAARig(phone, 2)).toEqual({ ...phone, fxaa: false, msaaSamples: 2 });
+  });
+  it('reads the shipped default with no window, no URL switch and the feel panel closed', () => {
+    expect(readPhoneAA()).toBe(PHONE_AA_DEFAULT);
+    expect([0, 1, 2]).toContain(PHONE_AA_DEFAULT);
   });
 });

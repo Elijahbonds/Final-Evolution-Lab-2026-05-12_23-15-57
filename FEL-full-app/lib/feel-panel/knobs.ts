@@ -2539,6 +2539,12 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/adventure/host/camera.ts VENUE_CAM_CLEAR_VIEW',
     hint: 'After the shared camera places itself, if a solid stands between you and it, or holds it, it comes in along its own line to just short of the solid. No camera distance, height, lag or FOV changes. 0 = the camera could end up inside the boat, as before.',
   },
+  // ── lane/look-venues (look pass B1–B3, docs/LOOK-PASS-AUDIT.md): the hoops venues, the light and the edges ──
+  {
+    id: 'look.phoneAA', label: 'Phone edge smoothing: off as before (0) / FXAA always (1) / 2x MSAA (2)', def: 0, min: 0, max: 2, step: 1, unit: '', group: 'Look · venues',
+    source: 'lib/babylon/scene/QualityTier.ts PHONE_AA_DEFAULT',
+    hint: 'Phones only (desktop already runs 4x MSAA). 0 = as before: no anti-aliasing on a phone, edges stair-step. 1 = the FXAA pass at every screen density. 2 = 2x multisampling on the main target. Applies on the next game load. ?aa=0, 1 or 2 overrides it for one load.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));

@@ -21,6 +21,7 @@ import type { Camera, Scene } from '@babylonjs/core';
 import type { FitResult } from '../core/canvasFit';
 import type { VenueMood } from './moods';
 import { readGraphicsChoice, readTierParam, isLegacyLook, recordTierDecision } from './graphicsSetting';
+import { feel } from '../../feel-panel/feel';
 
 // The policy (types, explainQualityTier, autoTier, classifyGpu) lives in tierRule.ts — no Babylon there — and is re-exported.
 export * from './tierRule';
@@ -120,6 +121,28 @@ export function legacyMobilePost(t: TierRigSettings): TierRigSettings { return {
 export function legacyRig(t: TierRigSettings, tier: QualityTier = 'desktop'): TierRigSettings {
   const r = { ...t, msaaSamples: 1, fxaa: true, glow: false, venueProbe: false, shadowCache: false };
   return tier === 'mobile' ? legacyMobilePost(r) : r;
+}
+
+/**
+ * LOOK PASS B1 (look-venues, 2026-11-24): the phones' edge smoothing, one knob (`look.phoneAA`), read at mount.
+ *   0 — today: FXAA only below 1.5 backing px per CSS px, which no DPR-2/3 phone is, so phones draw with no AA at all;
+ *   1 — FXAA at every density (the pass the phones already run below 1.5): one full-screen pass, no new shader;
+ *   2 — 2x MSAA on the HDR pipeline's first target instead of FXAA (resolves geometry edges; costs fill and a resolve).
+ * Only the mobile tier reads it (desktop and high already run 4x MSAA) and `?look=legacy` ignores it. `?aa=0|1|2` beats the
+ * knob for one load (the probes' A/B and the owner's). Unknown values read as 0, so a bad value restores today's look.
+ */
+export const PHONE_AA_DEFAULT = 0;
+export function phoneAARig(t: TierRigSettings, aa: number): TierRigSettings {
+  if (aa === 1) return { ...t, fxaa: true, fxaaMaxDpr: Infinity };
+  if (aa === 2) return { ...t, fxaa: false, msaaSamples: 2 };
+  return t;
+}
+/** The phones' AA mode for this mount: `?aa=` for one load, else the feel knob, else the shipped default. */
+export function readPhoneAA(): number {
+  let q: string | null = null;
+  try { q = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('aa'); } catch { q = null; }
+  const v = q !== null && q !== '' ? Number(q) : feel('look.phoneAA', PHONE_AA_DEFAULT);
+  return v === 1 || v === 2 ? v : 0;
 }
 
 export function tierRigSettings(tier: QualityTier, mood: VenueMood): TierRigSettings {
