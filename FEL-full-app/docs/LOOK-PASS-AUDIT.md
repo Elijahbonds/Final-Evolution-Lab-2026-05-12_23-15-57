@@ -74,6 +74,31 @@ shared gate lock (`/home/user/wt/gate-run.sh`), one hold at a time; the build wa
 
 ---
 
+### 2.1 What each place costs a phone today (the owner's PERF readout, phone tier, one run each)
+
+390×844, DPR 3, touch, CPU 4× slower, SwiftShader; the readout opened after READY and read after 9 s of play
+(`shots/p1-phoneperf-<place>.json`). The frame times are the rig's (a comparison with tennis, never a phone's); draw calls, meshes and
+texture MB are what a phone pays. The budget column is the place's row in `lib/babylon/config/mobileBudget.json` (draws / texture MB).
+
+| Place | Frame p95 (rig) | JS per frame p95 | Draw calls now (max) | Active meshes | Textures ≈ MB | Budget row (draws / MB) | Guard level at read |
+|---|---|---|---|---|---|---|---|
+| tennis (control) | 757 ms | 776 ms | 63 (87) | 36 of 129 | 118 | 138 / 170 | L3 |
+| 1v1 | 826 ms | 2,521 ms | 86 (100) | 53 of 288 | 168 | 202 / 256 | L1 |
+| Dunk | 867 ms | 682 ms | 68 (69) | 51 of 248 | 150 | 173 / 220 | L2 |
+| Physics Arena (1v1) | 776 ms | 303 ms | 74 (95) | 31 of 62 | 124 | **no row** | L3 |
+| Venice | 970 ms | 77 ms | 45 (50) | 55 of 169 | 158 | 56 / 88 | L2 |
+| the story (hub) | 655 ms | 82 ms | 39 (40) | 18 of 117 | 104 | 83 / 122 | L3 |
+
+What it says for the plan: **the hoops have draw-call room** (1v1 100 of 202, the Dunk 69 of 173), so a look change that adds a few draws
+there (B3) is not near a ceiling; **texture memory is the tighter limit** (1v1 168 MB against a 256 MB row), so no phase adds textures
+to the hoops without measuring them. **Venice's readout counts 158 MB of textures against its row's 88 MB**: the readout and the budget
+probe estimate texture memory differently (`perfReadout.ts` `textureBytes` against `_perf-sweep.mts`), so this is not a finding until
+`_perf-sweep.mts` re-measures the row; phase C4 must do that before adding anything to Venice. **The arena has no budget row**, so no look
+change there can be held to one until it has (routed, §5). One run each: these are today's levels, not a bar; each phase measures 3 runs
+a side plus the control in its own hold (§4).
+
+---
+
 ## 3. The findings, ranked by need
 
 **Need = how many players see it (5 = every phone player in every game … 1 = rarely) × how bad it looks (5 = looks broken or
@@ -89,22 +114,22 @@ textures in a budget row near its ceiling).
 | 3 | **The touch deck and the hints sit on the players (1v1 / 3v3 upright).** SHOOT / TURBO / CHARGE / BLOCK and their HOLD labels are drawn over the two players; "TAP THE STICK TO JAB · SHOOT" and "NO TEAMMATE TO SCREEN" sit across them, the toast half under the buttons; HOLD collides with BLOCK's ring; a dashed ghost d-pad is drawn for 1v1, which reads no d-pad; the "⋯" menu overlaps the score (`b1-portrait-onevone-d-play.jpg`, `b1-portrait-threevthree-d-play.jpg`). | You cannot see your own player; overlapping text looks broken. | every 1v1 / 3v3 on an upright phone (5) | 5 | M | 5 × 5 ÷ 2 = **12.5** | no | none (DOM) / low (camera) |
 | 4 | **The hubs, the story and the arena load on black.** "Heading to the courts…", "Sailing to the coast…", "Building the arena…" in one line of small grey text on black for 9–19 s on the rig (`b1-portrait-venice-a-loading.jpg`, `-coast-a-`, `-arena-hoops-a-loading.jpg`, `-adventure-a-`), while every hoops game has the branded card (`b1-portrait-onevone-a-loading.jpg`). | A jarring drop in finish at the moment a player is deciding whether to wait. | every Venice / Coast / story / arena visit (4) | 3 | S | 4 × 3 ÷ 1 = **12** | no | none |
 | 5 | **/try, the first-run's dip.** After the photo home page, the guest's birth-date step is a bare form on black with 60 % of the screen empty and a two-line "GUEST · NO ACCOUNT NEEDED" badge (`b1-portrait-try.jpg`); the same question on /signup gets the card, the logo and the glow (`b1-portrait-signup.jpg`). Sideways, the home page's headline fills the screen and PLAY NOW is below the fold (`b1-landscape-home.jpg`). | Inconsistent style on the most-seen first-run screen. | every first visit from the home page (4) | 3 | S | 4 × 3 ÷ 1 = **12** | no | none |
-| 6 | **Phones draw with no anti-aliasing.** The mobile tier skips FXAA above 1.5 device px per CSS px (`QualityTier.ts` `fxaaMaxDpr: 1.5`) and multisampling is desktop-only (`msaaSamples: 1`), so on every DPR-2/3 phone the bodies' outlines, the palm fronds, the rim and the court lines stair-step and crawl as the camera moves (`b1-portrait-onevone-d-play.jpg`, `ab-portrait-onevone-perfoff-d-play.jpg` at full scale). When the phone's perf guard drops the render scale it gets worse. | Aliasing on every edge, in every 3D mode on a phone. | every 3D mode on a phone (5) | 3 | S–M | 5 × 3 ÷ 1.5 = **10** | no | **medium** (one full-screen pass, or 2× MSAA on the HDR target) |
+| 6 | **Phones draw with no anti-aliasing.** The mobile tier skips FXAA above 1.5 device px per CSS px (`QualityTier.ts` `fxaaMaxDpr: 1.5`) and multisampling is desktop-only (`msaaSamples: 1`), so on every DPR-2/3 phone the bodies' outlines, the palm fronds, the rim and the court lines stair-step and crawl as the camera moves (`b1-portrait-onevone-d-play.jpg`, `ab-portrait-dunk-perfoff-c-play.jpg` at full scale; the crop `look-ab-phone-edges-guard-vs-fullscale.jpg`: left, the guard's 0.67 scale — soft and stepped; right, full scale — sharp but the palm fronds and the rim's edges hard-stepped). When the phone's perf guard drops the render scale it gets worse. | Aliasing on every edge, in every 3D mode on a phone. | every 3D mode on a phone (5) | 3 | S–M | 5 × 3 ÷ 1.5 = **10** | no | **medium** (one full-screen pass, or 2× MSAA on the HDR target) |
 | 7 | **/play on a phone opens on chrome, not games.** "FEL" alone on one row, then the wallet chips and **an empty level ring with a dash** on a second; a "+100 coins" toast over the header; six wrapped chips (PROVE IT DUNK DUEL · VENICE BEACH · PHYSICS ARENA · COUCH MULTIPLAYER · VERSUS · MEASURE · SCREEN) with ragged rows; the first game family starts at 1,330 of 1,688 px; the family icons are plain shaded balls (`b1-portrait-play.jpg`, `-full.jpg`). Sideways only the hero photo shows (`b1-landscape-play.jpg`). The same two-row header and empty ring are on every menu page (`look-before-2-menus-portrait.jpg`). | Empty-looking placeholder ring; the picker is below the fold. | every signed-in session (5) | 2 | S | 5 × 2 ÷ 1 = **10** | no | none |
 | 8 | **The story's first screens.** The partner picker shows each creature as a coloured dot; the READY screen is a dense monospace table of every control (`b1-portrait-adventure-b-first.jpg`, `-b-ready.jpg`). | Placeholder art; a wall of text where a title card should be. | every story start (3) | 3 | S | 3 × 3 ÷ 1 = **9** | creature art (§7) | none |
 | 9 | **The "USB controller? Plug it in…" chip is drawn over the loading card's venue line** (Dunk, 3-Point; `b1-portrait-dunk-a-loading.jpg`, `b1-portrait-threepoint-b-ready.jpg`). Found by IMPROVE-10-PHASE-AUDIT #23; improve-screens phase 6 left it (it lives in `components/controller-link/host-lobby.tsx`, anchored by `dunk-babylon.tsx`). | Overlapping text on the first card a guest sees. | every Dunk / 3-Point load on a phone (4) | 2 | S | 4 × 2 ÷ 1 = **8** | no | none |
 | 10 | **The end card's title wraps with an orphan.** "SHOOTOUT COMPLETE · 6 PTS VS / 19" on an upright phone (`b1-portrait-threepoint-e-end.jpg`). | Misaligned headline on the most rewarding screen. | every results screen on a phone (4) | 2 | S | 4 × 2 ÷ 1 = **8** | no | none |
-| 11 | **The prefiltered sky light is built and off.** `venue.iblEnvV1` (CC0 Poly Haven HDRIs, `lib/babylon/scene/venueQualityV1.ts`) lights the hoops sets from a real sky instead of the procedural cube; `?vq=ibl` shows it (`ab-desktop-onevone-ibl-d-play.jpg` against `b1-desktop-onevone-d-play.jpg`). | Flatter, less grounded light on skin and the ball than it could have, with the files already shipped. | every hoops game (4) | 2 | S | 4 × 2 ÷ 1 = **8** | no | low (one 128 px cube, replaces the procedural one) |
-| 12 | **The story's world is pale flat blocks.** A near-white floor plane, a blurred sand wall, single-colour blocks, a tiny dark HP bar; on desktop a pale plane and an orange capsule creature (`b1-portrait-adventure-d-play.jpg`, `b1-landscape-adventure-d-play.jpg`). The dressed world (`story.worldDressed`, textures, trims, Kenney nature kit) is built but **ships at 0**: lane C measured World 1's frame p95 250 → 317 ms then 150 → 217 ms on the rig (FEEL-PANEL.md). A/B: `ab-dressed-desktop-adventure-d-play.jpg`. | Looks unfinished; the story is on the Play door and in Venice. | every story player (3) | 5 | M | 3 × 5 ÷ 2 = **7.5** | partly (creatures, §7) | **medium** (that is why it is off) |
-| 13 | **The Physics Arena is a court in a void.** A pink-to-orange gradient, a flat grey band for a horizon, no stands, no props, no fence; the hoop's pole runs up through the middle of a pale backboard; the "3-Point" tab wraps to two lines on an upright phone (`b1-portrait-arena-hoops-d-play.jpg`, `b1-landscape-arena-threes-d-play.jpg`). | Looks like a test scene; it is on Play by default (`arena.on`). | arena players (3) | 4 | M | 3 × 4 ÷ 2 = **6** | no for a first set (shipped kits), yes for its own look (§7) | medium (props, shadows); **no phone budget row yet** |
-| 14 | **The Closet held sideways shows almost no athlete**: the tutorial card and the header cover the 3D preview (`b1-landscape-closet.jpg`). | Looks broken in that orientation. | sideways Closet visits (2) | 3 | S | 2 × 3 ÷ 1 = **6** | no | none |
-| 15 | **Clothes look torn at the edges in the Closet.** The tee's shoulders and sleeve hems are ragged with light specks along the seams; the shirt colour reads flat (`b1-portrait-closet.jpg`). In play at distance the shirts' edges shimmer (#6 makes it worse). The owner's top visual priority (2026-11-18). KIT-FIT-PLAN §10–§14: every runtime pull-in so far failed its bar; `kit.layerGap` waits on the owner's eye. | The athlete is the thing a player looks at most in the Closet. | every Closet visit; every game up close (4) | 4 | L | 4 × 4 ÷ 3 = **5.3** | **yes** (the garment's shape at the shoulder: an in-house Blender job, KIT-FIT-PLAN §12.3) | low |
+| 11 | **The story's world is pale flat blocks.** A near-white floor plane, a blurred sand wall, single-colour blocks, a tiny dark HP bar; on desktop a pale plane and an orange capsule creature (`b1-portrait-adventure-d-play.jpg`, `b1-landscape-adventure-d-play.jpg`). The dressed world (`story.worldDressed`, textures, trims, Kenney nature kit) is built but **ships at 0**: lane C measured World 1's frame p95 250 → 317 ms then 150 → 217 ms on the rig (FEEL-PANEL.md). **A/B with it on** (`ab-dressed-desktop-adventure-d-play.jpg`, `look-ab-skylight-and-dressed-story.jpg` bottom row): the hub's first view is **still a near-white floor and pale blue walls** — the dressing alone does not fix it; the exposure and grade of the story's light do. | Looks unfinished; the story is on the Play door and in Venice. | every story player (3) | 5 | M | 3 × 5 ÷ 2 = **7.5** | partly (creatures, §7) | **medium** (that is why it is off) |
+| 12 | **The Physics Arena is a court in a void.** A pink-to-orange gradient, a flat grey band for a horizon, no stands, no props, no fence; the hoop's pole runs up through the middle of a pale backboard; the "3-Point" tab wraps to two lines on an upright phone (`b1-portrait-arena-hoops-d-play.jpg`, `b1-landscape-arena-threes-d-play.jpg`). | Looks like a test scene; it is on Play by default (`arena.on`). | arena players (3) | 4 | M | 3 × 4 ÷ 2 = **6** | no for a first set (shipped kits), yes for its own look (§7) | medium (props, shadows); **no phone budget row yet** |
+| 13 | **The Closet held sideways shows almost no athlete**: the tutorial card and the header cover the 3D preview (`b1-landscape-closet.jpg`). | Looks broken in that orientation. | sideways Closet visits (2) | 3 | S | 2 × 3 ÷ 1 = **6** | no | none |
+| 14 | **Clothes look torn at the edges in the Closet.** The tee's shoulders and sleeve hems are ragged with light specks along the seams; the shirt colour reads flat (`b1-portrait-closet.jpg`). In play at distance the shirts' edges shimmer (#6 makes it worse). The owner's top visual priority (2026-11-18). KIT-FIT-PLAN §10–§14: every runtime pull-in so far failed its bar; `kit.layerGap` waits on the owner's eye. | The athlete is the thing a player looks at most in the Closet. | every Closet visit; every game up close (4) | 4 | L | 4 × 4 ÷ 3 = **5.3** | **yes** (the garment's shape at the shoulder: an in-house Blender job, KIT-FIT-PLAN §12.3) | low |
+| 15 | **The prefiltered sky light is built and off.** `venue.iblEnvV1` (CC0 Poly Haven HDRIs, `lib/babylon/scene/venueQualityV1.ts`) lights the hoops sets from a real sky instead of the procedural cube; `?vq=ibl` shows it. **A/B (`look-ab-skylight-and-dressed-story.jpg`, top row; `ab-desktop-onevone-ibl-d-play.jpg` against `b1-desktop-onevone-d-play.jpg`): at the play camera's distance the difference is slight** — a little more colour in the players' shading, nothing a player would name. | It may give a more grounded light on skin and the ball, with the files already shipped; the A/B says the gain is small. | every hoops game (4) | 1 | S | 4 × 1 ÷ 1 = **4** | no | low (one 128 px cube, replaces the procedural one) |
 | 16 | **The Coast's sea is a flat cyan sheet and Venice's paving is bare from a high camera** (`b1-landscape-coast-d-play.jpg`, `b1-landscape-venice-d-play.jpg`): no glints, no shore foam, no shading change with distance; the hero is small in a big empty square. | Empty, unlit-looking water; a park that reads as unfinished. | every Coast / Venice visit (3) | 2 | M | 3 × 2 ÷ 2 = **3** | no (`OceanSurface.ts` ships; Venice props ship) | low–medium |
 | 17 | **The sign-in venue card's glow is cut flat** at the carousel's bottom edge (`b1-portrait-login.jpg`). | Clipped UI. | every sign-in on a phone (3) | 1 | S | 3 × 1 ÷ 1 = **3** | no | none |
 | 18 | **The crowd behind the rim is flat, blocky cut-outs** in matching colours (Dunk, 3-Point; `b1-landscape-dunk-d-play.jpg`, `b1-landscape-threepoint-d-play.jpg`). | Low-detail crowd next to detailed players. | every Dunk / 3-Point (4) | 2 | L | 4 × 2 ÷ 3 = **2.7** | **yes** for variety and arm motion (VISUAL-PASS-PLAN, w3-crowds) | high (skinned bodies at their row's ceiling) |
 
 **The top ten by need: 1 to 10 above** (the Dunk HUD, the upright header, the deck over the players, the black loading screens, /try,
-phone anti-aliasing, /play's top, the story's first screens, the USB chip, the end card's title). The story's world (12) and the arena (13)
+phone anti-aliasing, /play's top, the story's first screens, the USB chip, the end card's title). The story's world (11) and the arena (12)
 look the most unfinished but fewer players see them and they cost more; they are still phases (C1, routed).
 
 Not findings (checked and fine): the hoops courts sideways and on desktop; the 3-Point results card's layout; the TV-style score bugs;
@@ -198,9 +223,11 @@ shots tag, plus the frame-time check of §4.
 - **Bar:** visibly smoother edges, **and** p95 within the control's spread; otherwise OFF. This is the one phase most likely to fail
   the frame bar; it is first in lane B because it is S and touches every mode.
 
-**Phase B2 — Real sky light on the hoops sets (S). Finding 11.**
-- **Do:** measure `venue.iblEnvV1` (built 2026-10-31, never measured to a bar) on 1v1, 3v3, 3-Point and the Dunk; turn it on per mood
-  where it wins; fix what it shows (the intensity per mood is a NEW number, flagged).
+**Phase B2 — Real sky light on the hoops sets (S). Finding 15.**
+- **Do:** measure `venue.iblEnvV1` (built 2026-10-31, never measured to a bar) on 1v1, 3v3, 3-Point and the Dunk, close up (the replay
+  and intro cameras, where skin and the ball fill the frame) as well as at the play camera, where this audit's A/B shows only a slight
+  change; turn it on per mood where it wins; otherwise it stays OFF with its sheet for the owner. The smallest phase: last in lane B if
+  time is short.
 - **Files:** `lib/babylon/scene/venueQualityV1.ts`, `lib/babylon/scene/EnvironmentIBL.ts` (the fallback, read only).
 - **Knob:** `venue.iblEnvV1` exists (0 today); per-mood intensities as new knobs only if changed.
 - **Measure:** `ab-desktop-*-ibl` against `b1-desktop-*` (and the same on the phone tier), 3 runs; load time (each `.env` is 0.3–0.5 MB):
@@ -229,11 +256,11 @@ shots tag, plus the frame-time check of §4.
 
 ### Lane C — characters, the story and the zones (phone risk: low to medium)
 
-**Phase C1 — The story looks finished, on a phone's budget (M). Finding 12.**
-- **Do:** make `story.worldDressed` pay for itself: the cut lane C started (filtering 8 → 1, frozen matte materials, no shadow lookups
+**Phase C1 — The story looks finished, on a phone's budget (M). Finding 11.**
+- **Do:** first the light: the A/B shows the dressing alone leaves the hub's first view near-white, so the story's mood gets an exposure
+  and grade pass (tone mapping, the sky, fog colour) that is cheap and phone-safe; then make `story.worldDressed` pay for itself: the cut lane C started (filtering 8 → 1, frozen matte materials, no shadow lookups
   on props) carried on — the dressing merged per material (one draw per material per chunk), props culled by distance on the phone
-  tier, the ground's procedural textures baked once at load to a small atlas; and a grade for the story's mood (exposure and fog so the
-  floor is not near-white: the mood's tone mapping, not new art).
+  tier, the ground's procedural textures baked once at load to a small atlas. Each half ships on its own knob.
 - **Files:** `lib/babylon/adventure/world/dress.ts` (+ test), `lib/babylon/adventure/world/view.ts`, `lib/babylon/modes/AdventureMode.ts`
   (the mood and grade lines), the story's row in `lib/babylon/config/mobileBudget.json` (only if measured and flagged).
 - **Knobs:** `story.worldDressed` (exists, 0), new `story.gradeV2` (0 = today).
@@ -250,7 +277,7 @@ shots tag, plus the frame-time check of §4.
 - **Measure:** before/after sheets (`look-before-6-*`); first frame to READY on the phone tier unchanged (3 runs).
 - **Bar:** §4 (pictures; no frame cost).
 
-**Phase C3 — The athlete up close: clothes and skin (L, partly art). Findings 15 and 14.**
+**Phase C3 — The athlete up close: clothes and skin (L, partly art). Findings 14 and 13.**
 - **Do (code):** the Closet's 3D preview fits a sideways phone (the tutorial card moves beside it); the owner's pending kit switch
   (`kit.layerGap`, KIT-FIT-PLAN §14) gets its A/B sheet in the Closet and in play for the owner's eye; the garment edges' light specks
   are checked for what they are (back faces or skin through the seam: the kit-glitch rig's counters) and fixed in the renderer if they
@@ -274,7 +301,7 @@ shots tag, plus the frame-time check of §4.
   63/76 MB; venice_hub 46/56 draws), phone p95 3 runs + control.
 - **Bar:** §4.
 
-### Routed — the Physics Arena's look (finding 13)
+### Routed — the Physics Arena's look (finding 12)
 
 `lib/babylon/arena/**`, `lib/babylon/modes/PhysicsArena*` and `app/play/arena/**` belong to lane physics-arena, which is active. **No
 build lane here touches them.** The plan for that lane, in its own order: (a) a set from the shipped kits (the 3v3 streetball cage and
@@ -352,7 +379,9 @@ title card and silhouettes (C2); the Closet's sideways layout and the kit render
 Scratch folder (the session's): `/tmp/claude-0/-home-user-Final-Evolution-Lab-2026-05-12-23-15-57/e156aa0c-5ac6-5a64-b2e0-57cb533692fe/scratchpad/look-audit/`
 - contact sheets: `look-before-<area>-<portrait|landscape|desktop>.jpg` (areas 1 to 6, §2);
 - every frame: `shots/b1-<size>-<screen>[-a-loading|-b-ready|-c-play|-d-play|-e-end].jpg`, the A/Bs `shots/ab-*`, `shots/ab-dressed-*`;
-- the per-run JSON beside each picture (READY time, the guard's scale steps, errors); the perf readouts `shots/p1-phoneperf-*.json`.
+- the per-run JSON beside each picture (READY time, the guard's scale steps, errors); the perf readouts `shots/p1-phoneperf-*.json`;
+- the two A/B sheets: `look-ab-phone-edges-guard-vs-fullscale.jpg` (finding 6) and `look-ab-skylight-and-dressed-story.jpg` (findings
+  11 and 15).
 
 ```
 # one production build (inside a gate hold), the walks (each job its own hold), the sheets, then delete the build
@@ -360,6 +389,8 @@ export ES_PG_DIR=/var/lib/postgresql/look-audit-pg ES_PG_PORT=55531 ES_PORT=3911
 env -u DATABASE_URL -u DIRECT_URL /home/user/wt/gate-run.sh 1800 npx tsx scripts/every-screen/rig.mts build
 git checkout -- tsconfig.json                                        # next build adds its types folder to it
 CHROMIUM_EXE=/opt/pw-browsers/chromium-1243/chrome-linux64/chrome scripts/probes/look-audit/run-all.sh <out> portrait landscape desktop perf ab
+# (this audit: portrait and landscape in full; desktop pages in full and its 3D places through the short `final` job — the first desktop
+#  run's 3D pictures timed out while another job shared the CPU — plus the phone readouts and the A/Bs)
 node scripts/probes/look-audit/sheets.mjs <out>/shots <out> b1       # a phase: its own --tag, then the same command with that tag
 npx tsx scripts/every-screen/rig.mts db-down; rm -rf .next-look
 ```
