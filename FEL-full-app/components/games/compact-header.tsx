@@ -7,6 +7,7 @@ import { Maximize2, Minimize2 } from 'lucide-react';
 import { getFeelState, getServerFeelState, subscribeFeel } from '@/lib/feel-panel/feel';
 import { COMPACT_HEADER_ATTR, COMPACT_HEADER_CSS, compactGameHeader, menuPrqLine, UPRIGHT_PHONE_QUERY } from '@/lib/ui/compactHeader';
 import type { PrqDisplay } from '@/lib/prq-display';
+import { useSlotRef } from './hud-zones';   // look-screens A2: the mode's folded pieces (MIX / MC / CC, the Dunk's board and chips)
 
 const noSub = () => () => {};
 function subscribeUpright(fn: () => void): () => void {
@@ -47,8 +48,11 @@ export function MenuGameTools({ body, graphics, prq, fullscreen }: {
   prq: PrqDisplay | null | undefined;
   fullscreen: { available: boolean; on: boolean; toggle: () => void } | null;
 }) {
+  const slot = useSlotRef('menu');
   return (
     <div data-testid="menu-game-tools" className="flex flex-col gap-1.5">
+      {/* A2 (ui.hudZonesUpright): the mode's own pieces portal in here on an upright phone; empty, it takes no room */}
+      <div ref={slot.ref} {...slot.attr} className="flex flex-col items-stretch gap-1.5 empty:hidden" />
       <p className={label}>Game</p>
       <div className={row}>{body}</div>
       <div className={row}>{graphics}</div>

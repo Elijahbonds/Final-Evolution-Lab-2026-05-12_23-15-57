@@ -8,7 +8,7 @@
 
 import { readCourtLocation } from '@/lib/babylon/nexus/courtLocations';
 import { courtArtSkin } from '@/lib/modes/art/apply-art-card';
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo, type ReactNode } from 'react';
 import type { GameProps, GameResult } from './game-shell';
 import { BootSplash } from './boot-splash';
 import { surfaceBootError } from './boot-error';
@@ -30,12 +30,13 @@ import { DunkFieldBoard } from './dunk-field-board';
 import { DunkSpecialsChip } from './dunk-specials-chip';
 import { decodeTakeoff, ZONE_HEX } from '@/lib/babylon/core/DunkTakeoffRead';
 import { MicCaption, MicToggle } from './mic-caption';
-import { useBelowFold } from './hoops-bottom-stack';   // hoops-p08
+import { LINE_SLOT_CSS, useBelowFold } from './hoops-bottom-stack';   // hoops-p08; look-screens A2: the MC's line clamp in the zones
 import { useHintDevice } from './use-hoops-hint';   // hoops-p08
 import { touchHint } from '@/lib/babylon/ui/hudHints';   // hoops-p08
 import { DunkPreloadCard } from './dunk-preload-card';   // RUNUP-STALL-3
 import { HUD_PLATE, HUD_TEXT_ALPHA, HudBanner, HudChip, HudFrame, HudMeter, HudPlate, HudText, LINE_CLAMP_STYLE, ScoreValue, Scorebug, hudColor, hudType, type HudTone } from './tv-hud';
 import { JudgeCards } from './judge-cards';
+import { InSlot, useUprightZones } from './hud-zones';   // look-screens A2 (ui.hudZonesUpright): the upright phone's HUD zones
 import type { HudPoster } from '@/lib/babylon/core/ModeHarness';
 
 type Hud = Record<string, HudValue>;
@@ -97,7 +98,10 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
   // when the stage runs under the bottom of the screen (an upright phone), as the touch deck does
   const { device: hintDevice } = useHintDevice();
   const bottomRef = useRef<HTMLDivElement>(null);
-  const bottomBelow = useBelowFold(bottomRef, phase === 'playing');
+  // look-screens A2 (lib/ui/hudZones.ts): on an upright phone the bottom column hangs under the top strip, above the hoop, instead of
+  // growing up from the deck across it; the field board and the prop / specials / signature chips go to the "⋯" menu
+  const zones = useUprightZones();
+  const bottomBelow = useBelowFold(bottomRef, phase === 'playing' && !zones);
   const hudShown = useMemo(() => (hintDevice === 'touch' && typeof hud.hint === 'string' && hud.hint ? { ...hud, hint: touchHint(hud.hint, 'dunk') } : hud), [hud, hintDevice]);
 
   const retryBoot = useCallback(() => {
@@ -263,6 +267,108 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
   // a controller paired to the PHONE arrives already canonical — straight onto the hero stream, like a local pad
   const onPhonePad = useCallback((e: Parameters<InputBus['emit']>[0]) => { bus?.emit(e); }, [bus]);
 
+  // what the column's lines say right now (one read for both of its places)
+  const readLines = () => {
+        const hud = hudShown;   // hoops-p08: on a touch screen the hint names no pad button and no key (hudHints.touchHint)
+        const t = decodeTakeoff(hud.takeoff);
+        const beats = typeof hud.beats === 'string' && hud.beats ? hud.beats : '';
+        const cutting = typeof hud.cut === 'string' && hud.cut;
+        // CONTROLLER-TRY-FIX item 4: the live hint names the pad's own buttons (withButtons; the mode's words are unchanged, null = as written)
+        const hint = typeof hud.hint === 'string' && hud.hint && phase === 'playing' ? withButtons(hud.hint, padFamily) : '';
+        const takeoff = t && phase === 'playing' && !judging && !beats ? t : null;
+        const strip = beats && phase === 'playing' && !judging && !cutting ? beats : '';
+        const mic = phase === 'playing' && !judging && typeof hud.mic === 'string' && hud.mic ? hud.mic : '';
+        const call = !judging && hud.slamPulse !== true && typeof hud.call === 'string' && hud.call && phase === 'playing' ? hud.call : '';   // (the call yields to the SLAM! cue: the QTE window is the one thing on screen then)
+        return { hud, hint, takeoff, strip, mic, call };
+  };
+
+  // WAVE 3's bottom column (the hint, the take-off read, the beat strip, the MC's line, the call), growing up from above the deck.
+  const bottomColumn = () => {
+        const { hud, hint, takeoff, strip, mic, call } = readLines();
+        if (!hint && !takeoff && !strip && !mic && !call) return null;
+        return (
+          // hoops-p08: the wrapper ends where the screen does (an upright phone's stage runs under it), so the column's PAD_LIFT counts
+          // from the visible bottom, as the touch deck does
+          <div ref={bottomRef} className="pointer-events-none absolute inset-x-0 top-0" style={{ bottom: bottomBelow }}>
+          <div data-dunk-bottom className="pointer-events-none absolute inset-x-0 top-0 flex flex-col-reverse items-center gap-[0.35rem] px-3" style={{ bottom: PAD_LIFT }}>
+            {hint && (
+              <HudText as="div" size="body" className="w-full text-center" style={HINT_SLOT_STYLE}>
+                <HudPlate as="span" className="inline-block max-w-[min(92%,980px)] px-3 py-1.5 align-top">
+                  <HudText as="div" size="body" alpha={0.8} style={LINE_CLAMP_STYLE}>{hint}</HudText>
+                </HudPlate>
+              </HudText>
+            )}
+            {takeoff && (
+              <HudPlate as="span" className="inline-flex items-center px-3 py-1">
+                <HudText size="label" className="inline-flex items-baseline gap-2 uppercase" style={{ fontWeight: 800 }}>
+                  <span style={{ opacity: 0.45 }}>TAKE-OFF</span><span style={{ color: ZONE_HEX[takeoff.zone] }} data-fel-takeoff={takeoff.zone}>{takeoff.chip}</span>
+                </HudText>
+              </HudPlate>
+            )}
+            {strip && <DunkBeatStrip value={strip} />}
+            {mic && <MicCaption flow text={hud.mic} who={hud.micWho} voiced={hud.micVoiced} />}
+            {/* the call ("FROM THE STRIPE!") was a layer of its own at 58 % of the stage, and the caption now stands where it was */}
+            {call && (
+              <div className="w-full px-4 text-center">
+                <HudPlate as="span" className="inline-block px-3 py-1"><HudText size="value" tone="score" className="uppercase italic">{call}</HudText></HudPlate>
+              </div>
+            )}
+          </div>
+          </div>
+        );
+  };
+
+  // look-screens A2 (the upright zones): the same lines hung under the top strip, read top-down — the hint's two-line slot first, so a
+  // re-worded hint never moves the lines under it; the judges' column joins it (as a layer of its own at 13 % / 20 % of the stage it
+  // would land on these lines, which now hang in the same place).
+  const topColumn = () => {
+        const { hud, hint, takeoff, strip, mic, call } = readLines();
+        // the judges' column (the high banner in the air, the cards, the timing verdict) joins this one upright: as a layer of its own
+        // at 13 % / 20 % of the stage it would land on these lines, which now hang in the same place
+        const judgesUp = judging || timing || bannerUp;
+        if (!hint && !takeoff && !strip && !mic && !call && !judgesUp) return null;
+        return (
+          <div data-dunk-lines data-dunk-zone="line" className="pointer-events-none relative flex flex-col items-center gap-[0.35rem] px-3">
+            {hint && !judgesUp && (
+              <HudText as="div" size="body" className="w-full text-center" style={HINT_SLOT_STYLE}>
+                <HudPlate as="span" className="inline-block max-w-[min(92%,980px)] px-3 py-1.5 align-top">
+                  <HudText as="div" size="body" alpha={0.8} style={LINE_CLAMP_STYLE}>{hint}</HudText>
+                </HudPlate>
+              </HudText>
+            )}
+            {bannerUp && <HudBanner flow text={bannerText} tone="you" size="score" />}
+            {judging && <JudgeCards cards={hud.judgeReveal as HudScoreCard[]} />}
+            {timing && (
+              <div className="flex flex-col items-center gap-1">
+                <HudChip tone="you" size="body">{String(hud.slamTiming)}</HudChip>
+                {typeof hud.breakdown === 'string' && hud.breakdown ? (
+                  <HudChip size="caption" alpha={0.6}>{hud.breakdown}</HudChip>
+                ) : null}
+              </div>
+            )}
+            {strip && <DunkBeatStrip value={strip} />}
+            {takeoff && (
+              <HudPlate as="span" className="inline-flex items-center px-3 py-1">
+                <HudText size="label" className="inline-flex items-baseline gap-2 uppercase" style={{ fontWeight: 800 }}>
+                  <span style={{ opacity: 0.45 }}>TAKE-OFF</span><span style={{ color: ZONE_HEX[takeoff.zone] }} data-fel-takeoff={takeoff.zone}>{takeoff.chip}</span>
+                </HudText>
+              </HudPlate>
+            )}
+            {call && (
+              <div className="w-full px-4 text-center">
+                <HudPlate as="span" className="inline-block px-3 py-1"><HudText size="value" tone="score" className="uppercase italic">{call}</HudText></HudPlate>
+              </div>
+            )}
+            {mic && <MicCaption flow text={hud.mic} who={hud.micWho} voiced={hud.micVoiced} />}
+            <style dangerouslySetInnerHTML={{ __html: LINE_SLOT_CSS }} />
+          </div>
+        );
+  };
+
+  // A2: upright, the scoreboard row and the column under it share one flow (nothing can land on anything); anywhere else the row is
+  // the HUD frame's direct child exactly as before (app/game-surface.css's sideways rules key on that)
+  const wrapTop = (row: ReactNode) => (zones ? <div className="absolute inset-x-0 top-0 flex flex-col">{row}{topColumn()}</div> : row);
+
   return (
     <div className="relative h-[calc(100dvh-3.25rem)] w-full overflow-hidden rounded-none border-0 bg-transparent" data-fel-slam={typeof hud.slamBeat === 'string' && hud.slamBeat ? hud.slamBeat : 'off'}>
       {/* data-fel-slam (above): where the flight is against the SLAM window ('cue' | 'open' | 'beat' | 'catch' | 'off'), mirrored
@@ -275,7 +381,8 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
           so the walk-out line, the SKIP / RUN IT BACK / CHALLENGE chip and the cut bug landed on top of it (measured). */}
       <HudFrame>
       {/* HUD bezel — judged contest scoreboard (M47) */}
-      <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-2 px-4 py-3">
+      {wrapTop(<>
+      <div className={zones ? 'relative flex items-start justify-between gap-2 px-4 py-3' : 'absolute inset-x-0 top-0 flex items-start justify-between gap-2 px-4 py-3'}>
         <div className="flex min-w-0 flex-col items-start gap-1.5">
           <div className="flex flex-wrap items-center gap-2">
             <Scorebug>
@@ -312,22 +419,26 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
           )}
           {/* dunk-next phase 5: THE FIELD — four dunkers, the cut line, the final (core/DunkField); the night card shows the full board */}
           {typeof hud.field === 'string' && hud.field && phase === 'playing' && !card && !judging && (
-            <div>
-              <DunkFieldBoard value={hud.field} compact />
-            </div>
+            <InSlot name="menu" fallback={<div><DunkFieldBoard value={hud.field} compact /></div>}><DunkFieldBoard value={hud.field} compact /></InSlot>
           )}
         </div>
         <div className="flex max-w-[55%] flex-none flex-col items-end gap-1.5">
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            {hud.prop != null && (
-              <HudChip tone="power" size="body">{hnode(hud.prop)}</HudChip>
-            )}
-            {/* SEASON SPECIALS: the kangaroo, the sky tap, the board-top flip and the backboard run are the PRO lane's — named and locked, never missing (a guest is not shown the pass label) */}
-            <DunkSpecialsChip specials={hud.specials} guest={guest} />
-            {hud.style != null && (
-              <HudChip tone="score" size="body">{hnode(hud.style)}</HudChip>
-            )}
-          </div>
+          {(() => {
+            const chips = (
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                {hud.prop != null && (
+                  <HudChip tone="power" size="body">{hnode(hud.prop)}</HudChip>
+                )}
+                {/* SEASON SPECIALS: the kangaroo, the sky tap, the board-top flip and the backboard run are the PRO lane's — named and locked, never missing (a guest is not shown the pass label) */}
+                <DunkSpecialsChip specials={hud.specials} guest={guest} />
+                {hud.style != null && (
+                  <HudChip tone="score" size="body">{hnode(hud.style)}</HudChip>
+                )}
+              </div>
+            );
+            // A2: in the menu they read as one labelled row (what the next dunk carries), not over the court
+            return <InSlot name="menu" fallback={chips}><div data-dunk-menu-chips className="flex flex-col items-start gap-1.5">{chips}</div></InSlot>;
+          })()}
 
           {/* dunk-next phase 4: SKIP the rival's dunk straight to his card (B on a pad, K on a keyboard, this chip on a phone) */}
           {hud.rivalSkip === true && phase === 'playing' && !card && (
@@ -361,6 +472,7 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
           {phase === 'playing' && <MicToggle flow />}
         </div>
       </div>
+      </>)}
 
       {/* Venice DualShock pad (2026-09-05): the charge METER is gone — the Benchmark feel bar calls a meter a hard
           fail ("meter slideshow"), and HOLD = RUN carries its own cue: the hold ring fills on the pad's RUN button. */}
@@ -384,7 +496,7 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
           the verdict frame with "105 ms EARLY - EXECUTION 75%" showing through the gaps BETWEEN the judge chips,
           stray letters and all. Percent offsets cannot express "under" — a column can, so they share one now and the
           order is the order they are read in. */}
-      {(judging || timing || bannerUp) ? (
+      {(judging || timing || bannerUp) && !zones ? (
         <div className={`absolute inset-x-0 ${bannerUp ? 'top-[13%]' : 'top-[20%]'} flex flex-col items-center gap-2`}>
           {/* banner — DUNK-CAR-CLIP R2: while the dunker is in the air (hud.bannerHigh) it rides at the top of the frame. At 38% it
               sat exactly where both flight cameras put the rim, so "OVER THE CAR!" / "WINDMILL!" covered the ball going through the
@@ -427,49 +539,8 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
           (one line or two, re-worded every few seconds on the runway) pushed the chip and the MC's caption up and down a line each time.
           The box now spans from the top of the stage to the hint's slot (it never changes; the rows still stack up from the bottom), and
           the hint's row is always two lines tall with its plate at the top of it — a one-line hint leaves the second line empty. */}
-      {(() => {
-        const hud = hudShown;   // hoops-p08: on a touch screen the hint names no pad button and no key (hudHints.touchHint)
-        const t = decodeTakeoff(hud.takeoff);
-        const beats = typeof hud.beats === 'string' && hud.beats ? hud.beats : '';
-        const cutting = typeof hud.cut === 'string' && hud.cut;
-        // CONTROLLER-TRY-FIX item 4: the live hint names the pad's own buttons (withButtons; the mode's words are unchanged, null = as written)
-        const hint = typeof hud.hint === 'string' && hud.hint && phase === 'playing' ? withButtons(hud.hint, padFamily) : '';
-        const takeoff = t && phase === 'playing' && !judging && !beats ? t : null;
-        const strip = beats && phase === 'playing' && !judging && !cutting ? beats : '';
-        const mic = phase === 'playing' && !judging && typeof hud.mic === 'string' && hud.mic ? hud.mic : '';
-        const call = !judging && hud.slamPulse !== true && typeof hud.call === 'string' && hud.call && phase === 'playing' ? hud.call : '';   // (the call yields to the SLAM! cue: the QTE window is the one thing on screen then)
-        if (!hint && !takeoff && !strip && !mic && !call) return null;
-        return (
-          // hoops-p08: the wrapper ends where the screen does (an upright phone's stage runs under it), so the column's PAD_LIFT counts
-          // from the visible bottom, as the touch deck does
-          <div ref={bottomRef} className="pointer-events-none absolute inset-x-0 top-0" style={{ bottom: bottomBelow }}>
-          <div data-dunk-bottom className="pointer-events-none absolute inset-x-0 top-0 flex flex-col-reverse items-center gap-[0.35rem] px-3" style={{ bottom: PAD_LIFT }}>
-            {hint && (
-              <HudText as="div" size="body" className="w-full text-center" style={HINT_SLOT_STYLE}>
-                <HudPlate as="span" className="inline-block max-w-[min(92%,980px)] px-3 py-1.5 align-top">
-                  <HudText as="div" size="body" alpha={0.8} style={LINE_CLAMP_STYLE}>{hint}</HudText>
-                </HudPlate>
-              </HudText>
-            )}
-            {takeoff && (
-              <HudPlate as="span" className="inline-flex items-center px-3 py-1">
-                <HudText size="label" className="inline-flex items-baseline gap-2 uppercase" style={{ fontWeight: 800 }}>
-                  <span style={{ opacity: 0.45 }}>TAKE-OFF</span><span style={{ color: ZONE_HEX[takeoff.zone] }} data-fel-takeoff={takeoff.zone}>{takeoff.chip}</span>
-                </HudText>
-              </HudPlate>
-            )}
-            {strip && <DunkBeatStrip value={strip} />}
-            {mic && <MicCaption flow text={hud.mic} who={hud.micWho} voiced={hud.micVoiced} />}
-            {/* the call ("FROM THE STRIPE!") was a layer of its own at 58 % of the stage, and the caption now stands where it was */}
-            {call && (
-              <div className="w-full px-4 text-center">
-                <HudPlate as="span" className="inline-block px-3 py-1"><HudText size="value" tone="score" className="uppercase italic">{call}</HudText></HudPlate>
-              </div>
-            )}
-          </div>
-          </div>
-        );
-      })()}
+      {!zones && bottomColumn()}
+
 
       {/* NIGHT CARD (TRY-ONBOARD G1) — the end of a contest, held on the live court. This is
           deliberately NOT a modal over a dead canvas: the game is still running behind it, the

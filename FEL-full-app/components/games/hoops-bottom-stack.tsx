@@ -6,7 +6,15 @@
 // so no length, size or zoom can lay one on another. The slot sits above the touch deck on an upright phone (narrower than 640 px,
 // where the deck's two columns fill the bottom 17.5 rem) and 2.5 rem up everywhere else.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { HUD_PLATE, HudText, LINE_CLAMP_STYLE, PHONE_THUMB_GAP_CLASS, hudColor, type HudSize } from './tv-hud';
+import { createPortal } from 'react-dom';
+import { HUD_FONT_CLASS, HUD_PLATE, HudText, LINE_CLAMP_STYLE, PHONE_THUMB_GAP_CLASS, hudColor, type HudSize } from './tv-hud';
+import { hoopsRowZone, LINE_SLOT_TOP } from '@/lib/ui/hudZones';
+import { useSlot, useUprightZones } from './hud-zones';
+
+/** look-screens A2: the hint in the deck's slot may take three lines (the slot is 150 px wide, 72 px tall). */
+export const DECK_HINT_CSS = '[data-hoops-deck-hint] [data-hud-line] > span{-webkit-line-clamp:3!important;max-width:150px}';
+/** look-screens A2: in the line slot the MC's line is at most two lines (the full line is on the caption bus and in CC). */
+export const LINE_SLOT_CSS = '[data-hoops-zone="line"] [data-mic-line],[data-dunk-zone="line"] [data-mic-line]{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}';
 
 /** Where the column starts: above the deck on an upright phone, near the bottom otherwise (the dunk host's PAD_LIFT). */
 export const HOOPS_STACK_LIFT = 'clamp(2.5rem, calc((640px - 100vw) * 999), 17.5rem)';
@@ -36,8 +44,33 @@ export function useBelowFold(ref: { current: HTMLElement | null }, on = true): n
 export function HoopsBottomStack({ rows }: { rows: ReadonlyArray<readonly [string, ReactNode]> }) {
   const live = rows.filter(([, r]) => !!r);
   const ref = useRef<HTMLDivElement>(null);
-  const below = useBelowFold(ref, live.length > 0);
+  const zones = useUprightZones();   // look-screens A2 (lib/ui/hudZones.ts): the upright phone's zones
+  const deckEl = useSlot('deck');
+  const below = useBelowFold(ref, live.length > 0 && !zones);
   if (!live.length) return null;
+  if (zones) {
+    // THE UPRIGHT ZONES: the hint goes into the touch deck's slot (where the ghost d-pad was: the camera's bottom band, under no
+    // body); the call, the MC's line and the shot meter go to the line slot under the top strip, read top-down — above the
+    // bodies the camera stands right over the deck, instead of on them. With no deck slot (a deck with a live d-pad) the hint
+    // heads the line slot too.
+    const deck = deckEl ? live.filter(([k]) => hoopsRowZone(k) === 'deck') : [];
+    const lines = live.filter((r) => !deck.includes(r)).reverse();
+    return (
+      <>
+        {deck.length > 0 && deckEl && createPortal(
+          <div data-hoops-deck-hint className={`absolute bottom-0 left-0 flex w-[150px] flex-col items-start gap-1 text-left text-white ${HUD_FONT_CLASS}`}>
+            <style dangerouslySetInnerHTML={{ __html: DECK_HINT_CSS }} />
+            {deck.map(([k, r]) => <div key={k} className="flex w-full justify-start">{r}</div>)}
+          </div>, deckEl)}
+        {lines.length > 0 && (
+          <div ref={ref} data-hoops-bottom data-hoops-zone="line" className="pointer-events-none absolute inset-x-0 flex flex-col items-center gap-[0.35rem] px-3" style={{ top: LINE_SLOT_TOP }}>
+            <style dangerouslySetInnerHTML={{ __html: LINE_SLOT_CSS }} />
+            {lines.map(([k, r]) => <div key={k} className="flex w-full justify-center">{r}</div>)}
+          </div>
+        )}
+      </>
+    );
+  }
   return (
     <div ref={ref} data-hoops-bottom className="pointer-events-none absolute inset-x-0 top-0 flex flex-col-reverse items-center gap-[0.35rem] px-3" style={{ bottom: below ? `calc(${HOOPS_STACK_LIFT} + ${below}px)` : HOOPS_STACK_LIFT }}>
       {live.map(([k, r]) => <div key={k} className="flex w-full justify-center">{r}</div>)}

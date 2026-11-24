@@ -2412,6 +2412,16 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'Phase A1. On a phone held upright the game header is one row (back, title, pause); BODY, the PRQ line, the graphics choice and full screen move into the dots menu on the stage, and the PRQ line there says Not measured yet instead of a NOT MEASURED badge. Sideways, desktop and the stream view are unchanged. Off: the header wraps to three rows, as before.',
   },
   {
+    id: 'ui.hudZonesUpright', label: 'Phone upright, hoops: one HUD layout - lines under the score, the hint in the deck, the rest in the dots menu (1) / as before (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',
+    source: 'lib/ui/hudZones.ts HUD_ZONES_UPRIGHT',
+    hint: 'Phase A2. On a phone held upright the hoops HUD keeps off the players and the rim: the call, the MC line and the shot meter hang under the score row; in 1v1 and 3v3 the hint sits in the deck where the empty d-pad was (gone: those modes read no d-pad); the Dunk field board, its prop, specials and signature chips and the MIX, MC and CC switches move into the dots menu. Sideways and desktop unchanged. Off: the upright HUD as before.',
+  },
+  {
+    id: 'ui.deckFadeOverBody', label: 'Phone upright: the action buttons drawn see-through (opacity; 1 = solid, as before)', def: 1, min: 0.35, max: 1, step: 0.05, unit: '', group: 'Screens · phone',
+    source: 'lib/ui/hudZones.ts DECK_FADE_OVER_BODY',
+    hint: 'Phase A2, ships OFF (1). Below 1 the upright touch deck draws its action buttons (the diamond and TURBO) at this opacity so a player behind them shows through. It does not know where the players are, so it fades always: a look call for the owner. 1 = the solid deck, as before.',
+  },
+  {
     id: 'try.prefetchDunk', label: 'Try page: load the first dunk while the birth date is asked (1) / only after the answer (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',
     source: 'lib/try/prefetchDunk.ts TRY_PREFETCH_DUNK',
     hint: 'On: the dunk code and its first files are fetched into the browser cache while a guest gives the birth date (plain file requests, no cookies, nothing about the visitor). Off (shipped: the measured cut was about 12 percent, short of the 25 percent bar): nothing is requested until the answer, as before. The try page has no feel panel: change it by a commit.',
