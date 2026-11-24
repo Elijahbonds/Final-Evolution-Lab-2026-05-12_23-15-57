@@ -521,6 +521,36 @@ The owner, verbatim: **"Make sure the story and online play is finished."** (rel
 - The standing rules hold: netd protocol changes are additive; the owner redeploys netd, agents never do; the client keeps
   working against the netd that is deployed now and says "Parties need a server update" where it must.
 
+## owner 2026-11-23: a live physics play arena for the sport modes, and POV
+
+The owner, verbatim (relayed by the coordinator, 2026-11-23): **"Make there be a live physics play arena for the sport modes.- all
+the modes can be played physics based. And POV-"**
+
+Work is on `lane/physics-arena` (`docs/PHYSICS-ARENA-PLAN.md`: the audit of what is physics today, the design, the risks, the
+build order and the measured first slice).
+
+- `assumption:` (lane/physics-arena) "a live physics play arena" is **a play space where the sport modes run on real physics**:
+  a rigid-body ball and hoop, the ball's contacts with the rim and the backboard solved by the physics engine (Havok, already in
+  the app), player bodies that collide, and later goals and nets for the other sports — instead of an outcome decided at the
+  release and an arc drawn to agree with it.
+- `assumption:` (lane/physics-arena) "all the modes can be played physics based" means **every sport mode can be switched to
+  physics play**, one mode at a time in the plan's order, each behind its own switch; the shipped modes stay exactly as they are
+  until their switch is on.
+- `assumption:` (lane/physics-arena) "POV" means **a first-person, point-of-view camera** you can switch to.
+- `assumption:` (lane/physics-arena) **the message was cut off after "POV-"**: what came next is not known. The lane built POV as a
+  camera choice inside the arena (SELECT / C toggles it) and asks the owner what the rest of the sentence was.
+- `assumption:` (lane/physics-arena) the arena is a **new place on Play** (its own "Physics Arena" chip, on by default, the knob
+  `arena.on`), a practice space that records no session and pays nothing until the owner says otherwise; no existing mode's default
+  changes.
+- The owner added, verbatim (relayed by the coordinator, 2026-11-23): **"The inspiration for the physics based sport arena was Dunk- made
+  by katapult."** Treated as every benchmark game here is: **a quality and feel reference only.** Nothing is copied from it — no name,
+  title, characters, art, levels, mode names, UI or sounds; the arena keeps its own name and look.
+- The feel goal taken from it (coordinator, 2026-11-23): **physics-first play with no scripted outcomes** — the ball and the players'
+  bodies are physics-driven; dunks, blocks and collisions emerge from the simulation; it is fun and readable to watch. Bodies more
+  physical than capsules (an active ragdoll, physics-driven limbs) go behind their own knob, ship OFF, and are measured for phone
+  frame time first. `assumption:` (lane/physics-arena) the lane does not guess at that game's mechanics; where the plan needs a
+  design choice the owner should make, it is a question in the lane's report and in `docs/PHYSICS-ARENA-PLAN.md` §6.
+
 ## owner 2026-11-23: close the gap on the basketball games
 
 The owner, verbatim: **"Can I get an agent working on making the gameplay for the basketball mode better. Still not 2ks equal. We're close tho, let's close the gap and pass them."** (relayed by the coordinator, 2026-11-23).
@@ -528,3 +558,19 @@ The owner, verbatim: **"Can I get an agent working on making the gameplay for th
 - Lane `lane/hoops-gap` (from `lane/finish-release` at `48a7b244`), `docs/HOOPS-GAP-PLAN.md`: a measured gap audit of 1v1 and 3v3, then the
   biggest gaps built in order, each behind its own feel knob (off = today exactly), ON only on a measured win.
 - The named series is the quality bar only: no names, art, modes, UI, animation data or sounds are copied from it.
+
+## owner 2026-11-24: the Physics Arena's open questions answered (relayed by the coordinator)
+
+The owner answered the lane's questions (`docs/PHYSICS-ARENA-PLAN.md` §6):
+
+1. **"POV-" (the cut-off message):** still unanswered. POV stays the arena's first-person camera.
+2. **Physics-driven limbs: YES.** Hands first, behind their own knob, OFF until measured; then arms.
+3. **Jump and dunk controls: "Yes".** `assumption:` (lane/physics-arena) keep hold-and-release for everything, as built (the dunk
+   included: the hand jams the ball on the release or once it is over the ring).
+4. **Hard collisions: YES.** Bodies can be knocked over and fouls are called; both behind knobs, and the shipping bar applies.
+5. **XP and progress: YES.** The arena counts for XP and progress. That needs server-side score rules (plausibility caps, no
+   client-trusted totals), following the existing session / XP pattern. **No schema change without stopping to ask the owner first.**
+6. **The next sport after 3v3: SOCCER.**
+
+Order (coordinator, 2026-11-24): the merged branch is PR'd first; then the 3v3 hoops arena, the physics hands (OFF), knockdowns and
+fouls, XP, then soccer.

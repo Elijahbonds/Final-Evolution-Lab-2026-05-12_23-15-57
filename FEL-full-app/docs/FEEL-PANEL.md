@@ -1230,6 +1230,38 @@ real online game these are what ships; each is the record of the number and the 
 | `net.possessionSwap` | 1 | — | 1v1: the page whose player has the ball runs the game. 0: the host runs every possession. |
 | `net.karateTogether` | 0 | 1 | "Start together" offers Karate co-op (not shared yet: two fights). |
 
+## physics-arena, 2026-11-23 (owner: "Make there be a live physics play arena for the sport modes.- all the modes can be played physics based. And POV-"; docs/PHYSICS-ARENA-PLAN.md; the owner has not felt these yet)
+
+Groups "Physics arena" and "Physics arena · POV". All NEW (`lib/babylon/arena/arenaConfig.ts`), read only by the arena
+(`/play/arena`, `PhysicsArenaMode`); no shipped mode reads any of them and no existing tuned number moved. The three switches ship
+ON because the arena is a new place the owner asked for; each restores today at 0.
+
+| Knob | Default | 0 restores | What it does |
+|---|---|---|---|
+| `arena.on` | 1 | no Physics Arena chip on Play | The chip on Play. The page still answers its address. |
+| `arena.physicsHoops` | 1 | the arena's hoops opens the shipped 1v1 | The arena's basketball on real physics. |
+| `cam.pov` | 1 | SELECT / C is the director's own toggle | The camera button in the arena switches to your own eyes. |
+| `arena.stepHz` | 120 Hz | — | Fixed physics steps a second (at most 4 a frame). |
+| `arena.floorBounce` | 0.78 | — | A 1.80 m drop comes back to 1.34 m (the rule book's 1.20–1.40; physics-arena-tests A). |
+| `arena.rimBounce` | 0.55 | — | Off the iron. |
+| `arena.boardBounce` | 0.62 | — | Off the glass. |
+| `arena.jumpVy` | 3.1 m/s | — | The jump shot's take-off: 0.49 m up, 0.32 s to the top (the release that flies true). |
+| `arena.shotArcDeg` | 52° | — | The arc the hand throws at. |
+| `arena.backspinRps` | 2.2 | — | Backspin on a jump shot. |
+| `arena.bodyCarry` | 0.3 | 0 = timing never matters | The timing: the share of the body's rise or fall at the release the ball keeps. Chosen by the headless sweep (0.2 / 0.3 / 0.4 → good 63 / 63 / 65 %, bad 23 / 13 / 3 % at a 0.07 scatter): 0.3 keeps a slightly-off release alive. |
+| `arena.runCompensate` | 0.85 | — | The drift of a moving shot the hand cancels. |
+| `arena.releaseNoise` | 0.05 m/s | — | The hand's tremor (0.04 / 0.055 / 0.07 → good 83 / 68 / 63 % in the sweep). |
+| `arena.aimAssist` | 0.8 | — | POV only: the share of a look off the ring the shot forgives. |
+| `arena.dunks` | 1 | 0 = jump shots only (slice 1) | Phase 4: a run at the ring with the ball is a dunk (the hand jams it down through; the iron decides), a close shot a soft layup (66°). |
+| `arena.dunkJumpVy` | 4.3 m/s | — | The dunk's take-off: 0.94 m up, so the hand gets the ball over the ring. |
+| `cam.povEyeM` | 1.72 m | — | The eye when no head bone is found. |
+| `cam.povFovDeg` | 82° | — | Across the screen; the vertical follows the screen's shape (50–90°). |
+| `cam.povBobM` | 0 | — | Head-bob, OFF by default. |
+| `cam.povLookDegS` | 150°/s | — | The right stick's turn speed in POV. |
+
+**assumption:** the bounds are safe, not tuned. Feel-check: `/play/arena?playtest=1`, shoot from the elbow and let go at the top
+of the jump, then early and late; press C (or the POV button) and shoot from your own eyes.
+
 ## improve-world, 2026-11-22 (the 10-phase pass, lane C: the story and the zones; docs/IMPROVE-10-PHASE-AUDIT.md phases 5, 7, 9)
 
 All NEW switches and numbers, chosen on this lane; none moves an existing tuned number. Each switch's 0 restores the behaviour before

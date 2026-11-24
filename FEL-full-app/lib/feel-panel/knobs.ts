@@ -2384,6 +2384,107 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/core/jerseyDecals.ts JERSEY_DECALS',
     hint: 'On: the new basketball and football jerseys carry the player number on the chest and back and the name across the back. Off: a blank jersey, as before.',
   },
+  // ── lane/physics-arena (2026-11-23, owner: "a live physics play arena for the sport modes ... And POV"; docs/PHYSICS-ARENA-PLAN.md): all NEW ──
+  {
+    id: 'arena.on', label: 'Physics Arena chip on Play (1) / hidden (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Physics arena',
+    source: 'lib/babylon/arena/arenaConfig.ts ARENA_ON',
+    hint: 'On: the Play screen shows the Physics Arena chip. Off: no chip; the arena still answers its own address.',
+  },
+  {
+    id: 'arena.physicsHoops', label: 'Arena basketball on physics (1) / the shipped 1v1 (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Physics arena',
+    source: 'lib/babylon/arena/arenaConfig.ts ARENA_PHYSICS_HOOPS',
+    hint: 'On: the arena plays 1v1 with a real ball, rim and glass. Off: the arena hoops door opens the shipped 1v1.',
+  },
+  {
+    id: 'cam.pov', label: 'Arena camera button gives first person POV (1) / the usual toggle (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Physics arena · POV',
+    source: 'lib/babylon/arena/arenaConfig.ts CAM_POV',
+    hint: 'On: SELECT or C in the arena switches to your own eyes and back. Off: the camera button does what it does elsewhere.',
+  },
+  {
+    id: 'arena.stepHz', label: 'Arena physics steps a second', def: 120, min: 60, max: 240, step: 30, unit: 'Hz', group: 'Physics arena',
+    source: 'lib/babylon/arena/arenaConfig.ts ARENA_STEP_HZ',
+    hint: 'More steps cost phone time; fewer let a fast ball skip further between checks.',
+  },
+  {
+    id: 'arena.floorBounce', label: 'Arena ball bounce off the floor', def: 0.78, min: 0.5, max: 0.95, step: 0.01, unit: '', group: 'Physics arena',
+    source: 'lib/babylon/arena/arenaConfig.ts FLOOR_BOUNCE',
+    hint: 'Share of speed kept by a floor bounce. 0.78 passes the rule book drop test.',
+  },
+  {
+    id: 'arena.rimBounce', label: 'Arena ball bounce off the iron', def: 0.55, min: 0.2, max: 0.9, step: 0.01, unit: '', group: 'Physics arena',
+    source: 'lib/babylon/arena/arenaConfig.ts RIM_BOUNCE',
+    hint: 'Lower is a softer rim: more rattles go in.',
+  },
+  {
+    id: 'arena.boardBounce', label: 'Arena ball bounce off the glass', def: 0.62, min: 0.3, max: 0.9, step: 0.01, unit: '', group: 'Physics arena',
+    source: 'lib/babylon/arena/arenaConfig.ts BOARD_BOUNCE',
+    hint: 'Share of speed kept off the backboard.',
+  },
+  {
+    id: 'arena.jumpVy', label: 'Arena jump shot take-off speed', def: 3.1, min: 2, max: 4.5, step: 0.05, unit: 'm/s', group: 'Physics arena',
+    source: 'lib/babylon/arena/arenaConfig.ts JUMP_VY',
+    hint: 'How high and how long the jump is: the top of it is the release that flies true.',
+  },
+  {
+    id: 'arena.shotArcDeg', label: 'Arena shot launch angle', def: 52, min: 40, max: 65, step: 1, unit: '°', group: 'Physics arena',
+    source: 'lib/babylon/arena/arenaConfig.ts SHOT_ARC_DEG',
+    hint: 'The arc the hand throws at. Higher drops in steeper.',
+  },
+  {
+    id: 'arena.backspinRps', label: 'Arena shot backspin', def: 2.2, min: 0, max: 5, step: 0.1, unit: 'turns/s', group: 'Physics arena',
+    source: 'lib/babylon/arena/arenaConfig.ts BACKSPIN_RPS',
+    hint: 'Spin the ball leaves with. More spin, softer off the iron.',
+  },
+  {
+    id: 'arena.bodyCarry', label: 'Arena timing: share of the body rise or fall the ball keeps', def: 0.3, min: 0, max: 1, step: 0.05, unit: '', group: 'Physics arena',
+    source: 'lib/babylon/arena/arenaConfig.ts BODY_CARRY',
+    hint: 'The timing: let go rising and the shot goes long, falling and it goes short. 0 = timing never matters.',
+  },
+  {
+    id: 'arena.runCompensate', label: 'Arena shot on the move: drift the hand cancels', def: 0.85, min: 0, max: 1, step: 0.05, unit: '', group: 'Physics arena',
+    source: 'lib/babylon/arena/arenaConfig.ts RUN_COMPENSATE',
+    hint: '1 = a moving shot flies like a still one. Lower, the drift carries the ball.',
+  },
+  {
+    id: 'arena.releaseNoise', label: 'Arena hand scatter', def: 0.05, min: 0, max: 0.3, step: 0.01, unit: 'm/s', group: 'Physics arena',
+    source: 'lib/babylon/arena/arenaConfig.ts RELEASE_NOISE',
+    hint: 'The tremor of a human hand on every throw.',
+  },
+  {
+    id: 'arena.aimAssist', label: 'Arena POV aim help', def: 0.8, min: 0, max: 1, step: 0.05, unit: '', group: 'Physics arena',
+    source: 'lib/babylon/arena/arenaConfig.ts AIM_ASSIST',
+    hint: 'POV only. 1 = every shot goes at the rim, 0 = exactly where you look.',
+  },
+  {
+    id: 'cam.povEyeM', label: 'POV eye height when no head is found', def: 1.72, min: 1.4, max: 2.1, step: 0.01, unit: 'm', group: 'Physics arena · POV',
+    source: 'lib/babylon/arena/arenaConfig.ts POV_EYE_M',
+    hint: 'Where the eyes sit above the feet.',
+  },
+  {
+    id: 'cam.povFovDeg', label: 'POV field of view across the screen', def: 82, min: 60, max: 110, step: 1, unit: '°', group: 'Physics arena · POV',
+    source: 'lib/babylon/arena/arenaConfig.ts POV_FOV_DEG',
+    hint: 'Wider sees more court, narrower feels closer.',
+  },
+  {
+    id: 'cam.povBobM', label: 'POV head bob', def: 0, min: 0, max: 0.06, step: 0.005, unit: 'm', group: 'Physics arena · POV',
+    source: 'lib/babylon/arena/arenaConfig.ts POV_BOB_M',
+    hint: '0 = off, the default. Up and down with each stride when moving.',
+  },
+  {
+    id: 'cam.povLookDegS', label: 'POV look speed', def: 150, min: 60, max: 360, step: 10, unit: '°/s', group: 'Physics arena · POV',
+    source: 'lib/babylon/arena/arenaConfig.ts POV_LOOK_DEG_S',
+    hint: 'How fast the right stick turns your view.',
+  },
+  {
+    id: 'arena.dunks', label: 'Arena dunks and layups at the rim (1) / jump shots only (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Physics arena',
+    source: 'lib/babylon/arena/arenaConfig.ts ARENA_DUNKS',
+    hint: 'On: a run at the ring with the ball is a dunk the iron decides, a close shot a soft layup. Off: every shot a jump shot.',
+  },
+  {
+    id: 'arena.dunkJumpVy', label: 'Arena dunk take-off speed', def: 4.3, min: 3, max: 5.5, step: 0.05, unit: 'm/s', group: 'Physics arena',
+    source: 'lib/babylon/arena/arenaConfig.ts DUNK_JUMP_VY',
+    hint: 'How high a dunk goes: too low and the ball never gets over the ring.',
+  },
   // ── lane/improve-world (2026-11-22, the 10-phase pass, phase 5): sound in the story and on the coast ──
   {
     id: 'story.sfxOn', label: 'Story: footsteps, hits, spells, the partner, camps, bosses and birds (1) / the wind bed and voices only (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Story · flow',
