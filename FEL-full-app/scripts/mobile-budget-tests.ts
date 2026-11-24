@@ -101,7 +101,7 @@ if (isMain) {
   try {
     const src = readFileSync(resolve(process.cwd(), 'lib/babylon/modes/registry.ts'), 'utf8');
     const body = src.slice(src.indexOf('export const MODES'), src.indexOf('};', src.indexOf('export const MODES')));
-    const reg = [...body.matchAll(/^\s+([a-z_]+):\s+[A-Z]\w+,/gm)].map((m) => m[1]);
+    const reg = [...body.matchAll(/^\s+([a-z0-9_]+):\s+[A-Z]\w+,/gm)].map((m) => m[1]);   // digits too (physics_arena_3v3 read as unregistered)
     const enabledBody = src.match(/ENABLED_BABYLON_MODES = new Set<string>\(\[([\s\S]*?)\]\)/)?.[1] ?? '';
     const enabled = [...enabledBody.matchAll(/'([^']+)'/g)].map((m) => m[1]);
     const missing = enabled.filter((k) => !t.modes[k]);

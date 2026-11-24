@@ -252,6 +252,25 @@ seconds. No new physics bodies, so the phone cost is the contact read only (not 
 to ask of it). The capsule stays upright when a body is down; only the clips fall. **Both stay OFF** for the owner's feel check:
 how often the game stops for a whistle is a feel call, not a number the lane should pick.
 
+**The look pass** (2026-11-24, `docs/LOOK-PASS-AUDIT.md` finding 12, routed to this lane: "a court in a void"; the audit's bar, §4).
+
+- **(d) The phone budget row: done.** `lib/babylon/config/mobileBudget.json` had no arena row; it now has `physics_arena`,
+  `physics_arena_3v3` and `physics_arena_3pt` (the sweep's profile through the esbuild static page, `scripts/probes/physics-arena/perf-round.sh`,
+  3 rounds, portrait and landscape, the worst of each, the set off as shipped): 1v1 95 draws / 31 meshes / 6 bodies / 54 MB (budget
+  114 / 38 / 8 / 65), 3v3 179 / 52 / 10 / 92 MB (215 / 63 / 12 / 111), the contest 161 / 58 / 5 / 44 MB (194 / 70 / 6 / 53).
+- **(c) The sport tabs: fixed, ON.** "3-Point" wrapped to two lines on an upright phone and, with the contest's score, ran into it.
+  Measured on a replica of the top row in the app's own font (`scripts/probes/physics-arena/tabs-fit.mjs`; the control reproduces the
+  audit's wrap): before, every tab 48 px tall (wrapped) and the row over the score at 390 px and over the back chip at 360 px; after
+  (no wrap, "3PT" and 10 px padding under 640 px), every tab 44 px, the row clear of both at 360, 390 and 844 px.
+- **(a) The set: built, OFF (`arena.setV1`).** The shipped streetball cage (posts, rail, lamp poles, benches; the wire and the graffiti
+  walls on desktop) round the arena court and a matte apron to the horizon; the contest gets the apron only (a post stood in the
+  shooter's view from the corner rack). The pictures (3 runs a side, the same seed and moment, `?perf=off`) read as a place where the
+  court used to stand in the sky, but it turns the arena's own lab-court look into the 3v3's streetball yard: an art-direction call,
+  the owner's. It also misses the cost bar: against the control's spread (tennis p95 36.6–45.8 ms, load 16.4–18.7 s) the 1v1's p95
+  stays inside (31.7–45.1 → 37.4–44.1 ms) but its load grows about 16 % (13.9–15.0 → 16.3–17.6 s), and the 3v3's p95 moves out of the
+  noise (46.5–63.3 → 55.5–74.6 ms). Draws +9 / +5 / +1, no new textures.
+- **(b) The loading card:** waits for lane look-screens' shared place card (phase A); the arena's line is ready to take it.
+
 ## 8. XP and progress: the proposed score rules (2026-11-24, a design for the owner; no server code written)
 
 The owner (2026-11-24): the arena counts for XP and progress, through server-side score rules (plausibility caps, no
@@ -330,3 +349,36 @@ and 0 LC, 0 coins, 0 shards, the streak untouched; five forged logs refused (`ar
 unpaid. Control: the repo's own `sessionRuns.integration.test.ts` on the same database pays LC and coins for a normal mode. Headless,
 every finished game the real modes hand the page rebuilds on the server to the score the game showed. Not tested: the page's two calls
 in a real browser against a running server (they are unit-tested against the route's body).
+
+## 9. Soccer (owner 2026-11-24: "The next sport after 3v3: SOCCER") — the design, slice 1
+
+Today: `/play/soccer` serves the penalty; the ball already flies on `core/SoccerBall.ts` (drag, Magnus curl, bounce: analytic) and
+`core/FirstTouch.ts` / `core/PassShoot.ts` (touch and strike rules) are built and in no live mode. The arena's soccer puts the same
+ball on Havok and makes the play physical: the ball is only ever moved by contact and forces.
+
+**Slice 1: arena soccer 1v1** (`PhysicsArenaSoccerMode.ts`, `physics_arena_soccer`, `/play/arena?sport=soccer`), the arena's own
+switch `arena.soccer` (0 = no soccer tab; the shipped soccer is untouched).
+- `assumption:` 1v1 on a small caged pitch (about 26 × 16 m, the arena's own place: no venue copied) with a small goal at each end
+  (3 × 2 m), no keepers (the mouth is small), first to 5, a kick-off from the centre after each goal. 3v3 with keepers is slice 2.
+- **The ball:** a Havok sphere with a size-5 ball's numbers (0.43 kg, 0.11 m), its drag and Magnus applied every step as forces
+  from `SoccerBall`'s own shipped coefficients (read, never changed), rolling resistance on the ground, spin bleeding off. Posts and
+  crossbars are Havok capsules, the net a drag volume and walls (the hoop's pattern), the boards round the pitch static boxes (a
+  cage game: the ball stays in play off the boards).
+- **The dribble is touches:** within reach and in front, a touch pushes the ball ahead of the run (the hoops dribble's rule: the
+  push leads the body by the run's own speed); a hard cut or a body in the way and the ball runs loose. A defender who reaches a
+  loose or exposed ball first touches it away. Bodies are the arena's capsules (shoulder to shoulder; the knockdowns and fouls
+  knobs apply, OFF).
+- **Hold and release (owner: "Yes"):** hold the kick button to wind up (power over about 0.8 s), let go to strike toward the aim
+  (the stick, or the view in POV); a ball too far off the foot at the release loses power and direction in proportion (the strike's
+  timing, the body-carry idea of the jump shot). The stick's sideways push at the release curls it (Magnus). A short tap is a pass.
+- **The goal:** the ball wholly over the line between the posts and under the bar, read on the swept path every physics step (the
+  hoop sensor's pattern), against an independent label in the headless test.
+- **POV** as in the hoops (the camera button). **XP:** a later step, under the same rules as the hoops (a `arenaSoccer` key and its
+  rebuilt-from-the-log rule), not in slice 1.
+- **The bar (headless, real Havok):** a struck ball curls with side spin and not without; a clean strike from 12 m beats a mistimed
+  one into the goal clearly; posts and bar stop 30 m/s shots (no tunnelling); the goal sensor agrees with the path label; three
+  minutes of the live mode run, both sides score. Then the phone rig against the arena's 1v1 row.
+
+Questions for the owner (recommendation first): (a) 1v1 first, then 3v3 with keepers — or straight to 3v3? (b) keepers as AI bodies
+with hands (the physics hands) or no keepers in small goals? (c) the boards keep the ball in play (a cage game) — or out-of-play lines
+and throw-ins?

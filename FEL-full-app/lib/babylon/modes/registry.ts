@@ -108,7 +108,7 @@ export const MODES: Record<string, ModeDefinition> = {
   adventure_br: AdventureBRMode,
   coast_zone: CoastZoneMode,   // COAST & ISLANDS (docs/COAST-ISLANDS-PLAN.md): its own page /play/coast; NOT enabled (no picker serves it)
   venice_hub: VeniceHubMode,   // VENICE V1 (docs/VENICE-HUB-PLAN.md): its own page /play/venice; Play has a Venice door, but it is not a scoring game.   // ADVENTURE C (2026-10-07): the bot Battle Royale; NOT enabled (unlisted route)
-  physics_arena: PhysicsArenaMode,   // PHYSICS ARENA (docs/PHYSICS-ARENA-PLAN.md): its own page /play/arena, Play's Physics Arena chip; a practice place, NOT enabled (no picker serves it)
+  physics_arena: PhysicsArenaMode,   // PHYSICS ARENA (docs/PHYSICS-ARENA-PLAN.md): its own page /play/arena, Play's Physics Arena chip; NOT enabled (no picker serves it); its games post as arenaHoops (lib/sessions/arenaScore.ts)
   physics_arena_3v3: PhysicsArena3v3Mode,   // PHYSICS ARENA: its page is /play/arena?sport=threes; NOT enabled
   physics_arena_3pt: PhysicsArena3ptMode,   // PHYSICS ARENA phase 3: its page is /play/arena?sport=threepoint; NOT enabled
 };

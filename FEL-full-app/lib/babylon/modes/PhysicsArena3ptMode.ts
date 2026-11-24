@@ -197,7 +197,7 @@ export const PhysicsArena3ptMode: ModeDefinition = {
 
   async load(ctx: ModeContext) {
     const scene = ctx.scene;
-    const court = mountArenaCourt(scene);
+    const court = mountArenaCourt(scene, { cage: false });   // the racks stand at the fence line: no cage in the shooter's view
     const ballMat = new PBRMaterial('arena3_ball', scene);
     ballMat.albedoColor = Color3.FromHexString('#e0742c'); ballMat.roughness = 0.7; ballMat.metallic = 0;
     const goldMat = new PBRMaterial('arena3_gold', scene);
