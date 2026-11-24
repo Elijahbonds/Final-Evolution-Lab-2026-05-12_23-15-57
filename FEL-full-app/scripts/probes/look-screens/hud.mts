@@ -8,8 +8,11 @@
 //   header      the game header's height, and the stage's and the canvas's top / height
 //   hudText     every visible text box over the canvas (the HUD, the deck's hint slot, the juice overlay's callout) with its text
 //   deck        every touch-deck control's box
-//   bodies/rim  the players' and the rim's boxes on screen, projected from the running scene (window.__NEXUS_AGENT__, which a
-//               production build arms only on a server-marked agent run on loopback: the page is opened with ?agent=1)
+//   bodies/rim  the players' and the rim's boxes on screen, projected from the running scene. A production build publishes no handle to
+//               it (window.__NEXUS_AGENT__ is armed only when the server marked the run before the mode mounted, which it had not:
+//               measured, scene false), so the probe finds the engine through the DevTools protocol, read-only: the canvas's own event
+//               listeners (Babylon's engine and input manager attach theirs there) close over the engine or the scene; the first
+//               captured value with `scenes` / `meshes` + `activeCamera` is the one. Nothing in the app is changed to allow it.
 //   overlap     px² of HUD text over a body or the rim, and of HUD text over a deck control
 //
 //   /home/user/wt/gate-run.sh 1700 npx tsx scripts/probes/look-screens/hud.mts <outDir> --side=before|after [--only=id,id] [--runs=3] [--size=390x844]
@@ -25,6 +28,12 @@ const ROUTES: Record<string, string> = {
 const KNOBS_OFF = { 'ui.compactGameHeader': 0, 'ui.hudZonesUpright': 0 };
 const KNOBS_ON = { 'ui.compactGameHeader': 1, 'ui.hudZonesUpright': 1 };
 const INIT = `(() => { const st = window.setTimeout.bind(window); window.setTimeout = (fn, ms, ...a) => st(fn, ms === 20000 ? 300000 : ms, ...a); })()`;
+/** The scene handle, read-only, from the probe's side: the engine registers itself (EngineStore.Instances.push(engine)) and every
+ *  scene registers with its engine (engine.scenes.push(scene)) — one pass through Array.prototype.push catches the engine, then the
+ *  original push is put back. Nothing in the app changes; the same wrapper runs on both sides of an A/B. */
+const SCENE_TAP = `(() => { const orig = Array.prototype.push; Array.prototype.push = function (...a) {
+  const v = a[0]; if (v && typeof v === 'object' && typeof v.getRenderingCanvas === 'function' && Array.isArray(v.scenes)) { window.__LS_ENGINE__ = v; Array.prototype.push = orig; }
+  return orig.apply(this, a); }; })()`;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** In the page: the boxes. A string so tsx does not rewrite it. */
@@ -53,7 +62,8 @@ const MEASURE = `(() => {
   }
   // the scene, through the agent bridge (production arms it only on a server-marked agent run)
   try {
-    const b = window.__NEXUS_AGENT__; const scene = b && b.host && b.host.scene;
+    const b = window.__NEXUS_AGENT__; const eng = window.__LS_ENGINE__;
+    const scene = (b && b.host && b.host.scene) || window.__LS_SCENE__ || (eng && eng.scenes && eng.scenes.length ? [...eng.scenes].sort((x, y) => y.meshes.length - x.meshes.length)[0] : null);
     if (scene && cr) {
       out.scene = true;
       const cam = scene.activeCamera, eng = scene.getEngine(), W = eng.getRenderWidth(), H = eng.getRenderHeight();
@@ -62,7 +72,7 @@ const MEASURE = `(() => {
       const rectOf = (pts) => { const ps = pts.map(proj).filter((p) => p.z > 0 && p.z < 1); if (!ps.length) return null;
         const xs = ps.map((p) => p.x), ys = ps.map((p) => p.y); const x0 = Math.max(cr.left, Math.min(...xs)), x1 = Math.min(cr.right, Math.max(...xs)), y0 = Math.max(cr.top, Math.min(...ys)), y1 = Math.min(cr.bottom, Math.max(...ys));
         return x1 > x0 && y1 > y0 ? { x: Math.round(x0), y: Math.round(y0), w: Math.round(x1 - x0), h: Math.round(y1 - y0) } : null; };
-      // the players: the hero and the characters the mode tells the bridge about are skinned bodies near the play; group meshes by skeleton
+      // the players: skinned bodies near the play; group meshes by skeleton
       const bySkel = new Map();
       for (const m of scene.meshes) {
         if (!m.skeleton || !m.isEnabled() || !m.isVisible || m.visibility < 0.05) continue;
@@ -70,34 +80,73 @@ const MEASURE = `(() => {
         const bb = m.getBoundingInfo().boundingBox; const k = m.skeleton.uniqueId;
         const a = bySkel.get(k) || { name: m.skeleton.name || m.name, pts: [] }; a.pts.push(...bb.vectorsWorld); bySkel.set(k, a);
       }
-      const hero = b.snapshot ? (b.snapshot().hero) : null;
       for (const [, a] of bySkel) {
-        // a body: under 2.6 m tall and within 25 m of the hero (the crowd stands farther back, behind the rim)
+        // a body: under 2.8 m tall and within 14 m of the camera's target (the crowd stands farther back, behind the rim)
         const ys = a.pts.map((p) => p.y), xs = a.pts.map((p) => p.x), zs = a.pts.map((p) => p.z);
         const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cz = (Math.min(...zs) + Math.max(...zs)) / 2;
         if (Math.max(...ys) - Math.min(...ys) > 2.8) continue;
-        if (hero && Math.hypot(cx - hero.x, cz - hero.z) > 14) continue;
+        const tg = cam.getTarget ? cam.getTarget() : null;
+        if (tg && Math.hypot(cx - tg.x, cz - tg.z) > 14) continue;
         const r = rectOf(a.pts); if (r) out.bodies.push({ ...r, n: a.name });
       }
-      // the rim: a mesh named like one
-      const rims = scene.meshes.filter((m) => /rim|hoop|ring|backboard/i.test(m.name) && m.isEnabled() && m.isVisible);
-      const rimPts = []; for (const m of rims) { if (/backboard/i.test(m.name)) continue; rimPts.push(...m.getBoundingInfo().boundingBox.vectorsWorld); }
+      // the rim: the hoops' own logical rim and net meshes ("rim", "hoopnet": drawn or not, they sit where the ring is), else a mesh
+      // named like a rim ("rim", not "primitive"), never a whole hoop model (its pole and board), a far decor hoop or the backboard
+      const pick = (f) => scene.meshes.filter((m) => f(m.name) && !/backboard|pole|stanchion|far/i.test(m.name) && m.isEnabled());
+      let rims = pick((n) => n === 'rim' || n === 'hoopnet');
+      if (!rims.length) rims = pick((n) => /rim(?!itive)/i.test(n));
+      const rimPts = []; for (const m of rims) rimPts.push(...m.getBoundingInfo().boundingBox.vectorsWorld);
       out.rim = rimPts.length ? rectOf(rimPts) : null;
-      out.rimNames = rims.slice(0, 6).map((m) => m.name);
+      out.rimNames = rims.slice(0, 8).map((m) => m.name);
+      out.rimCandidates = scene.meshes.filter((m) => /rim(?!itive)|hoop|net|backboard/i.test(m.name)).slice(0, 12).map((m) => m.name);
     }
   } catch (e) { out.sceneErr = String(e).slice(0, 160); }
   return out;
 })()`;
 
+
+/** Find the running Babylon scene through the canvas's event listeners' closures (CDP, read-only) and park it on window.__LS_SCENE__. */
+async function findScene(page: Page): Promise<string> {
+  const cdp = await page.context().newCDPSession(page);
+  try {
+    const canvas = await cdp.send('Runtime.evaluate', { expression: `[...document.querySelectorAll('canvas')].sort((a, b) => b.clientWidth * b.clientHeight - a.clientWidth * a.clientHeight)[0] || null` });
+    const cid = canvas.result.objectId; if (!cid) return 'no canvas';
+    const targets = [cid, (await cdp.send('Runtime.evaluate', { expression: 'window' })).result.objectId!];
+    const CHECK = `function () { const v = this; try {
+        const sc = v && v.meshes && v.activeCamera ? v : v && v.scenes && v.scenes[0] && v.scenes[0].meshes ? v.scenes[v.scenes.length - 1] : v && v._scene && v._scene.meshes ? v._scene : v && v.scene && v.scene.meshes && v.scene.activeCamera ? v.scene : null;
+        if (sc) { window.__LS_SCENE__ = sc; return true; } } catch (e) {} return false; }`;
+    for (const t of targets) {
+      const ls = await cdp.send('DOMDebugger.getEventListeners', { objectId: t, depth: 0 }).catch(() => ({ listeners: [] as { handler?: { objectId?: string }; type: string }[] }));
+      for (const l of ls.listeners) {
+        const h = l.handler?.objectId; if (!h) continue;
+        const props = await cdp.send('Runtime.getProperties', { objectId: h, ownProperties: false }).catch(() => null);
+        const scopes = props?.internalProperties?.find((p) => p.name === '[[Scopes]]')?.value?.objectId;
+        if (!scopes) continue;
+        const list = await cdp.send('Runtime.getProperties', { objectId: scopes, ownProperties: true }).catch(() => null);
+        for (const sc of list?.result ?? []) {
+          const sid = sc.value?.objectId; if (!sid) continue;
+          const vars = await cdp.send('Runtime.getProperties', { objectId: sid, ownProperties: true }).catch(() => null);
+          for (const v of vars?.result ?? []) {
+            const oid = v.value?.objectId; if (!oid || v.value?.type !== 'object') continue;
+            const r = await cdp.send('Runtime.callFunctionOn', { objectId: oid, functionDeclaration: CHECK, returnByValue: true }).catch(() => null);
+            if (r?.result?.value === true) return `found via ${l.type} listener`;
+          }
+        }
+      }
+    }
+    return 'not found';
+  } finally { await cdp.detach().catch(() => {}); }
+}
+
 interface Box { x: number; y: number; w: number; h: number }
 const inter = (a: Box, b: Box) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
 
-function score(m: { hudText: (Box & { deck: boolean; button: boolean; t: string })[]; deck: Box[]; bodies: Box[]; rim: Box | null }) {
-  const text = m.hudText.filter((t) => !t.button);   // the deck's own button labels are not HUD text
+function score(m: { hudText: (Box & { deck: boolean; button: boolean; hint: boolean; t: string })[]; deck: Box[]; bodies: Box[]; rim: Box | null }) {
+  const text = m.hudText.filter((t) => !t.button && (!t.deck || t.hint));   // the deck's own labels (buttons, MOVE / LOOK, HOLD) are the deck's, counted apart; the hint in its slot is HUD text
   const targets = [...m.bodies, ...(m.rim ? [m.rim] : [])];
   const overBody = text.map((t) => ({ t: t.t, px: targets.reduce((s, b) => s + inter(t, b), 0) })).filter((o) => o.px > 0);
+  const deckOverBodyPx = m.deck.reduce((s, d) => s + targets.reduce((a, b) => a + inter(d, b), 0), 0);
   const overDeck = text.filter((t) => !t.deck).map((t) => ({ t: t.t, px: m.deck.reduce((s, b) => s + inter(t, b), 0) })).filter((o) => o.px > 0);
-  return { textOverBodyPx: overBody.reduce((s, o) => s + o.px, 0), overBody, textOverDeckPx: overDeck.reduce((s, o) => s + o.px, 0), overDeck, textBoxes: text.length };
+  return { textOverBodyPx: overBody.reduce((s, o) => s + o.px, 0), overBody, deckOverBodyPx, textOverDeckPx: overDeck.reduce((s, o) => s + o.px, 0), overDeck, textBoxes: text.length };
 }
 
 async function one(browser: Browser, p: People, id: string, side: 'before' | 'after', run: number, vw: number, vh: number, out: string) {
@@ -109,6 +158,7 @@ async function one(browser: Browser, p: People, id: string, side: 'before' | 'af
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e).slice(0, 200)));
   await page.addInitScript(INIT);
+  await page.addInitScript(SCENE_TAP);
   await page.addInitScript(`try { localStorage.setItem('fel.feel.overrides.v1', ${JSON.stringify(JSON.stringify(side === 'after' ? KNOBS_ON : KNOBS_OFF))}); } catch {}`);
   const tag = `${side}-${vw}x${vh}-${id}-r${run}`;
   const res: Record<string, unknown> = { id, side, run, vw, vh };
@@ -125,6 +175,7 @@ async function one(browser: Browser, p: People, id: string, side: 'before' | 'af
   }
   const moments: Record<string, unknown>[] = [];
   if (res.started) {
+    res.sceneFind = await findScene(page).catch((e) => 'error ' + String(e).slice(0, 120));
     await sleep(3000);
     const m1 = await page.evaluate(MEASURE).catch((e) => ({ err: String(e).slice(0, 160) })) as Record<string, unknown>;
     await page.screenshot({ path: join(out, `${tag}-c-play.jpg`), type: 'jpeg', quality: 70 }).catch(() => {});
@@ -172,7 +223,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       writeFileSync(join(out, `${side}-${vw}x${vh}-${id}-r${run}.json`), JSON.stringify(res, null, 1));
       const ms = (res.moments as Record<string, unknown>[] | undefined) ?? [];
       console.log(`${side} ${vw}x${vh} ${id} r${run} ready ${res.readyS ?? '-'} header ${res.headerAtReady ?? '-'} ` +
-        ms.map((m) => `${m.at}: hdr ${(m.header as Box | null)?.h ?? '-'} scene ${m.scene} bodies ${(m.bodies as unknown[] | undefined)?.length ?? '-'} rim ${m.rim ? 'y' : 'n'} overBody ${m.textOverBodyPx ?? '-'} overDeck ${m.textOverDeckPx ?? '-'} text ${m.textBoxes ?? '-'}`).join(' | ') +
+        ms.map((m) => `${m.at}: hdr ${(m.header as Box | null)?.h ?? '-'} scene ${m.scene} bodies ${(m.bodies as unknown[] | undefined)?.length ?? '-'} rim ${m.rim ? 'y' : 'n'} overBody ${m.textOverBodyPx ?? '-'} deckOverBody ${m.deckOverBodyPx ?? '-'} overDeck ${m.textOverDeckPx ?? '-'} text ${m.textBoxes ?? '-'}`).join(' | ') +
         ` err ${(res.errors as string[] | undefined)?.length ?? '?'}`);
     }
     await browser.close();
