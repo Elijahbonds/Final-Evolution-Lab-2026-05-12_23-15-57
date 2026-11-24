@@ -220,5 +220,16 @@ steps a frame): **3.0 ms against 3.2 ms** — the physics costs no more than the
 cannot be read on this rig (its virtual clock stands still inside a frame); headless in node it is 0.05 ms a frame on average.
 Not measured: a real phone.
 
+**3v3 and physics hands** (2026-11-24, the same phone rig, the arena's 3v3, hands off / on alternating, 2 runs each):
+
+| `arena.physicsHands` | First playable frame | Frame p50 | Frame p95 | Update p50 / p95 (game + physics) | Draws |
+|---|---|---|---|---|---|
+| 0 (OFF, shipped) | 52.4 / 53.4 s | 30.5 / 30.1 ms | 59.8 / 57.4 ms | 3.5 / 3.5 ms; p95 9.3 / 9.9 ms | 137 |
+| 1 (twelve hand bodies) | 48.0 / 46.8 s | 31.2 / 30.8 ms | 53.1 / 67.2 ms | 4.1 / 4.0 ms; p95 11.8 / 10.9 ms | 137 |
+
+The hands cost about **0.5–0.6 ms a frame** of update on this rig (node, headless: 0.14 → 0.20 ms a frame of physics); the frame p50
+moves by under 1 ms and the p95 runs overlap. Headless with the hands on, blocks happen by contact (2 in three minutes of 3v3).
+Hands stay OFF until the owner feels them (owner 2026-11-24). Not measured on a real phone.
+
 **The look:** `arena-contact-sheet.jpg` (the lane's scratch folder): the court camera and POV, desktop and an upright phone, the 1v1
 and the 3-point contest.
