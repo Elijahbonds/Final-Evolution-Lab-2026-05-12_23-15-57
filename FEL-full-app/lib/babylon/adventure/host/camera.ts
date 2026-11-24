@@ -113,7 +113,9 @@ export class AdventureCamera {
 // than MIN_PULL. Nothing else moves: not the aim, the distance it wants, the height, the lag or the FOV — next frame the director
 // eases back out from where the eye is, as it does after its own occlusion pull. `venue.camClearView` 0 = no check (as before).
 
-/** venue.camClearView: 1 = the zone and story cameras keep out of solid props; 0 = they pass through them (before this pass). */
+/** venue.camClearView: 1 = the zone and story cameras keep out of solid props; 0 = they pass through them (before this pass).
+ *  SHIPS ON (lane C, 2026-11-24): phone rig, the Coast walk to the boat and back, 3 runs a side: the eye inside the boat sign's box
+ *  5 / 11 / 11 samples → 0 / 0 / 0; frame times not worse. */
 export const VENUE_CAM_CLEAR_VIEW = 1;
 /** A solid's box (world metres). `insideOnly`: a thin prop (a palm, a tree, a rock) — the eye only keeps out of it, it is not a wall
  *  between you and the eye (a palm's crown box between them would pull the camera in and out all along a beach). */

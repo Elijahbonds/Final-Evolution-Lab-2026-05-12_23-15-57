@@ -1233,3 +1233,12 @@ this pass exactly (a test pins both ends).
   +18 %; World 1's frame p95 in play 250 → 317 ms, and after the cut (filtering 8 → 1, frozen matte materials, props without shadow
   lookups) 150 → 217 ms in 2 of 3 runs. No measured win, so it ships at 0 (the plain colours, exactly as before). Feel-check: set it to 1
   and play the rail run on a real phone with the PERF readout; the look is the owner's call.
+- `venue.camClearView` **1** (group "Coast · zone"; `lib/babylon/adventure/host/camera.ts` `VENUE_CAM_CLEAR_VIEW`, phase 9, NEW, ships
+  ON): after the shared director places the eye (CameraDirector itself is not edited), the Coast and the story keep it out of solids:
+  a big solid (the boat, a house, the market wall, the boat sign, a story block or the run-wall) between the chest and the eye, or
+  holding it, brings the eye in along its own line to just short of it, never nearer than 1.2 m (`CAM_CLEAR`: room 0.3 m, NEW); a thin
+  prop (a palm, a rock, a tree) only when the eye is inside it. No distance, height, lag or FOV changes; the director eases back out as
+  after its own occlusion pull. Measured (lane C rig, phone tier, the Coast walk to the boat and back with a look-stick sweep, 3 runs a
+  side): the eye inside the Boat to Venice sign's box 5 / 11 / 11 samples → 0 / 0 / 0 (the clear view stepped in 8–10 times a walk);
+  frame p95 1.5–1.9 s against 1.8–2.0 s; desktop and World 1's run-wall: 0 inside on both sides. FrameGuard's recentre fired during the
+  rig's forced look-stick spin on both sides (2 of 3 off, 1 of 3 on), never on arrival. 0 = the camera passes through, as before.
