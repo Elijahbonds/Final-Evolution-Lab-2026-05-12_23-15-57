@@ -56,6 +56,7 @@ function sim(tier: string) {
   const knobs = THREEV_TIER[tier as 'pro'];
   const all: number[] = []; const pnr: number[] = []; const pnrContest: number[] = [];
   const phases: Record<string, number> = {}; const covF: Record<string, number> = {};
+  const byKind: Record<string, { n: number; contest: number[]; pts: number; twoNear: number }> = {};   // hoops-gap re-score: by shot kind
   const rollSep: number[] = []; let rolls = 0, rollOpenOfRolls = 0, rollOpen16 = 0;
   let pnrN = 0, rollOpen = 0, rollGotBall = 0, rollPts = 0, switches = 0, helps = 0, blocks = 0, picks = 0, capped = 0;
   for (let p = 0; p < N; p++) {
@@ -92,7 +93,11 @@ function sim(tier: string) {
       if (jumper >= 0 && meetsRelease({ x: mine[jumper].x, z: mine[jumper].z, jumpAge, handsUp: false }, ball, RIM, style).hit) { blocks++; end = 'block'; return; }
       const c = contestOn(mine.map((m, i) => ({ dist: d2(m, sh), facingCos: 1, handUp: false, jumpAge: i === jumper ? jumpAge : Infinity, closeMps: 0 })));
       lastContest = c.contest;
+      const kind = touch?.kind === 'cs' ? 'catch_shoot' : style === 'jumper' ? 'pull_up' : 'layup';
+      const near = mine.filter((m) => d2(m, sh) < 1.6).length;
+      (byKind[kind] ??= { n: 0, contest: [], pts: 0, twoNear: 0 }).n++; byKind[kind].contest.push(c.contest); if (near >= 2) byKind[kind].twoNear++;
       pts = expectedMake(style, c.contest, d2(sh, RIM_FLOOR), RB.aiTimingSigmaSec(tier as never), RB.skillShotOn()) * rivalPoints(style, isThree(sh, RIM));
+      byKind[kind].pts += pts;
       end = 'shot';
     };
     for (; t < 30 && !end; t += DT) {
@@ -177,6 +182,7 @@ function sim(tier: string) {
     rollOpenOfRollsPct: +(100 * rollOpenOfRolls / Math.max(1, rolls)).toFixed(1), rollOpen16OfRollsPct: +(100 * rollOpen16 / Math.max(1, rolls)).toFixed(1),
     rollOpenPct: +(100 * rollOpen / Math.max(1, pnrN)).toFixed(1), rollGotBallPct: +(100 * rollGotBall / Math.max(1, pnrN)).toFixed(1),
     rollPtsPerTouch: rollGotBall ? +(rollPts / rollGotBall).toFixed(3) : null, switchesPerPnr: +(switches / Math.max(1, pnrN)).toFixed(2), tagsPerPnr: +(helps / Math.max(1, pnrN)).toFixed(2), blocks, picks, capped, phaseFrames: phases, coverageFrames: covF,
+    byKind: Object.fromEntries(Object.entries(byKind).map(([k, v]) => [k, { n: v.n, contestMed: +med(v.contest).toFixed(2), ptsPerShot: +(v.pts / Math.max(1, v.n)).toFixed(3), twoNearPct: +(100 * v.twoNear / Math.max(1, v.n)).toFixed(0) }])),
   };
 }
 const OUT: Record<string, unknown> = {};
