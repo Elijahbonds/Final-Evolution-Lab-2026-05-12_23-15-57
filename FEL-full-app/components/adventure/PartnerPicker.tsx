@@ -9,12 +9,11 @@
 import { useState } from 'react';
 import type { Element } from '@/lib/babylon/adventure/contracts';
 import { CHARACTER_ELEMENTS, DEFAULT_CHARACTER_SLOT, creatureChoices, type PartnerPick } from '@/lib/babylon/adventure/story/party';
+// look pass C2 (story.titleCard): each creature as the silhouette of its in-game body, not a dot
+import { CreatureSilhouette, ELEMENT_COLOR } from './CreatureSilhouette';
 
-const ELEMENT_COLOR: Record<Element, string> = {
-  fire: '#ea580c', water: '#0284c7', earth: '#a16207', wind: '#34d399', lightning: '#facc15', ice: '#7dd3fc', light: '#fde68a', shadow: '#7c3aed',
-};
-
-export function PartnerPicker({ slots, onPick }: { slots: { id: string; label: string }[]; onPick: (p: PartnerPick) => void }) {
+/** `cards` (story.titleCard, look pass C2): the creatures as silhouette cards. Off = the dots, exactly as before. */
+export function PartnerPicker({ slots, onPick, cards = false }: { slots: { id: string; label: string }[]; onPick: (p: PartnerPick) => void; cards?: boolean }) {
   const [kind, setKind] = useState<'creature' | 'character'>('creature');
   const [species, setSpecies] = useState(creatureChoices()[0]?.speciesId ?? '');
   const [slot, setSlot] = useState(slots[0]?.id ?? DEFAULT_CHARACTER_SLOT);
@@ -37,14 +36,25 @@ export function PartnerPicker({ slots, onPick }: { slots: { id: string; label: s
       </div>
       {kind === 'creature' ? (
         <div className="grid grid-cols-3 gap-2">
-          {creatureChoices().map((c) => (
+          {creatureChoices().map((c) => (cards ? (
+            <button key={c.speciesId} type="button" onClick={() => setSpecies(c.speciesId)} data-testid={`partner-species-${c.speciesId}`}
+              aria-pressed={species === c.speciesId}
+              className={`flex min-h-[44px] flex-col items-center overflow-hidden rounded-xl border text-center transition ${species === c.speciesId ? 'border-[#00E5FF] bg-white/10 shadow-[0_0_18px_rgba(0,229,255,0.25)]' : 'border-white/10 bg-white/[0.03]'}`}>
+              <span className="flex w-full justify-center pb-1 pt-3" data-testid={`partner-silhouette-${c.speciesId}`}
+                style={{ background: `radial-gradient(ellipse at 50% 80%, ${ELEMENT_COLOR[c.element]}40 0%, transparent 70%)` }}>
+                <CreatureSilhouette color={ELEMENT_COLOR[c.element]} size={44} />
+              </span>
+              <span className="block w-full px-1 text-xs font-black tracking-tight [overflow-wrap:anywhere]">{c.speciesId.toUpperCase()}</span>
+              <span className="block px-1 pb-2 text-[12px] leading-tight text-white/60">{c.element.toUpperCase()} · RIDE · FLIES LATER</span>
+            </button>
+          ) : (
             <button key={c.speciesId} type="button" onClick={() => setSpecies(c.speciesId)} data-testid={`partner-species-${c.speciesId}`}
               className={`rounded-lg border p-2 text-left ${species === c.speciesId ? 'border-[#00E5FF] bg-white/10' : 'border-white/10'}`}>
               <span className="block h-6 w-6 rounded-full" style={{ background: ELEMENT_COLOR[c.element] }} />
               <span className="mt-1 block text-xs font-black">{c.speciesId.toUpperCase()}</span>
               <span className="block text-[12px] text-white/60">{c.element.toUpperCase()} · RIDE · FLIES LATER</span>
             </button>
-          ))}
+          )))}
         </div>
       ) : (
         <div className="space-y-2">

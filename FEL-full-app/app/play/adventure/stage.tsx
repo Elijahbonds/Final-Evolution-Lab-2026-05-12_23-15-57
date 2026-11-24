@@ -32,6 +32,9 @@ import { DialogueBox } from '@/components/adventure/DialogueBox';
 import { PartnerPicker } from '@/components/adventure/PartnerPicker';
 import { RebindPanel } from '@/components/adventure/RebindPanel';
 import { AdventureRadial } from '@/components/adventure/AdventureRadial';
+// look pass C2 (story.titleCard): the READY screen as a title card, the controls one tap away; the picker's silhouette cards
+import { StoryTitleCard } from '@/components/adventure/StoryTitleCard';
+import { storyTitleCardOn } from '@/lib/babylon/adventure/story/titleCard';
 
 const MODE_KEY = 'adventure';
 /** The route's name, as app/play/adventure/page.tsx titles it. */
@@ -55,6 +58,9 @@ export function AdventureStoryStage({ signedIn }: { signedIn: boolean }) {
   const [exit, setExit] = useState(() => storyExitFor(null));
   useEffect(() => { try { setExit(storyExitFor(window.location.search)); } catch { /* Play */ } }, []);
   const ui = useSyncExternalStore(storyUi.subscribe, storyUi.getSnapshot, storyUi.getSnapshot);
+  // look pass C2: read after mount (the feel panel lives in the browser), before the picker or the READY screen can show
+  const [titleCard, setTitleCard] = useState(false);
+  useEffect(() => { setTitleCard(storyTitleCardOn()); }, []);
 
   useEffect(() => { try { setTouch(window.matchMedia('(pointer: coarse)').matches); } catch { setTouch(false); } }, []);
 
@@ -134,13 +140,17 @@ export function AdventureStoryStage({ signedIn }: { signedIn: boolean }) {
           {/* PUBLIC-POLISH (2026-11-02, live sweep J5): the route's own name (its page title), not "[PLACEHOLDER]". The chapter,
               move and monster names stay [PLACEHOLDER] until the owner names them (their own guards hold that). */}
           <p className="text-[12px] tracking-[0.3em] text-white/50">{ADVENTURE_TITLE.toUpperCase()}</p>
-          <PartnerPicker slots={slots} onPick={pick} />
+          <PartnerPicker slots={slots} onPick={pick} cards={titleCard} />
           {err && <p className="text-red-400">{err}</p>}
         </div>
       )}
       {gate === 'ready' && playing && <Hud hud={hud} />}
       {gate === 'ready' && playing && ui.dialogue && <DialogueBox d={ui.dialogue} cmd={storyUi.command} />}
-      {gate === 'ready' && (phase === 'ready' || phase === 'loading') && (
+      {gate === 'ready' && (phase === 'ready' || phase === 'loading') && titleCard && (
+        <StoryTitleCard kicker={ADVENTURE_TITLE.toUpperCase()} line={startTitle} title={progress?.chapterTitle ? shown(progress.chapterTitle) : null}
+          ready={phase === 'ready'} word={startWord} back={back} err={err} onStart={start} controls={<Controls />} />
+      )}
+      {gate === 'ready' && (phase === 'ready' || phase === 'loading') && !titleCard && (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-black/70 p-4">
           <p className="text-[12px] tracking-[0.3em] text-white/50" data-testid="adventure-start-title">THE ADVENTURE · {startTitle}</p>
           {progress?.chapterTitle && <p className="text-[12px] font-bold text-white/80" data-testid="adventure-start-chapter">{shown(progress.chapterTitle)}</p>}
