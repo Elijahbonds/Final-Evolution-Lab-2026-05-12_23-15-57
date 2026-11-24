@@ -42,9 +42,8 @@ export const PLACE_CARDS: Record<Place, PlaceCard> = {
 
 /** The place a /play route is, for the veil: only the three that load on black (the story's loading is its READY card). */
 export function veiledPlace(pathname: string | null | undefined): Exclude<Place, 'story'> | null {
-  const p = (pathname ?? '').replace(/\/+$/, '');
-  if (p === '/play/venice') return 'venice';
-  if (p === '/play/coast') return 'coast';
-  if (p === '/play/arena') return 'arena';
-  return null;
+  // by its segments (/play/<place>), so this file names no route of its own (the Coast's stays unlisted: coast.test.ts)
+  const [lead, play, place, ...rest] = (pathname ?? '').replace(/\/+$/, '').split('/');
+  if (lead !== '' || play !== 'play' || rest.length) return null;
+  return place === 'venice' || place === 'coast' || place === 'arena' ? place : null;
 }

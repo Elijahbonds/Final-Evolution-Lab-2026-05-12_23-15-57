@@ -10,9 +10,9 @@ import { sessionStore } from '@/lib/babylon/core/sessionStore';
 import { venueThumb } from '@/lib/babylon/ui/venueThumbs';
 import { PLACE_CARDS, placeLoadingCard, veiledPlace, type Place } from '@/lib/ui/placeLoading';
 
-const BAR_CSS = '.fel-place-bar{width:30%;animation:felplacebar 1.1s ease-in-out infinite alternate}'
+const BAR_CSS = '[data-place-bar]{width:30%;animation:felplacebar 1.1s ease-in-out infinite alternate}'
   + '@keyframes felplacebar{from{transform:translateX(0)}to{transform:translateX(233%)}}'
-  + '@media (prefers-reduced-motion: reduce){.fel-place-bar{animation:none}}';
+  + '@media (prefers-reduced-motion: reduce){[data-place-bar]{animation:none}}';
 
 /** A stage's failed-load line (the layout's caption region is a role="alert" too, always mounted: not that one). */
 export const STAGE_ALERT = '[role="alert"]:not([data-fel-captions])';
@@ -38,7 +38,7 @@ export function PlaceLoadingCard({ place, fixed = false }: { place: Place; fixed
       <h1 className="text-4xl font-black uppercase tracking-wide text-white drop-shadow-lg">{c.title}</h1>
       <div className="w-56">
         <div className="h-1.5 overflow-hidden rounded-full bg-white/15">
-          <div className="fel-place-bar h-full rounded-full" style={{ background: c.tint }} />
+          <div data-place-bar className="h-full rounded-full" style={{ background: c.tint }} />
         </div>
         <p className="mt-2 text-base text-white/80">{c.line}</p>
       </div>

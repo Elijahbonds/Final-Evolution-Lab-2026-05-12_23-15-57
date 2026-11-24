@@ -52,7 +52,7 @@ describe('the place card: no new words', () => {
     expect(html).toContain('Venice Beach');
     expect(html).toContain('FINAL EVOLUTION');
     expect(html).toContain('Heading to the courts…');
-    expect(html).toContain('fel-place-bar');
+    expect(html).toContain('data-place-bar');
   });
 });
 
