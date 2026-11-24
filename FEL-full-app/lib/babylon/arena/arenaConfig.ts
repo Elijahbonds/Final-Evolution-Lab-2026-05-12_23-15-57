@@ -54,6 +54,10 @@ export const RELEASE_NOISE = 0.05;
 export const ARENA_DUNKS = 1;
 /** The dunk's take-off speed (m/s): 4.3 = about 0.94 m up, so the hand (2.45 m standing reach) gets the ball over the ring. */
 export const DUNK_JUMP_VY = 4.3;
+/** Physics hands (owner 2026-11-24: "hands first, behind their own knob, OFF until measured"): each body gets two kinematic hand
+ *  bodies that move to where the hands are (the dribble, the set point, a contest held high, a reach), so a hand that meets the ball
+ *  moves it by contact: a block or a poke is the physics'. 0 = OFF (shipped): the capsules and the impulse poke, as before. */
+export const ARENA_PHYSICS_HANDS = 0;
 /** POV only: how much of a look away from the rim the shot forgives (1 = always at the rim, 0 = exactly where you look). */
 export const AIM_ASSIST = 0.8;
 
@@ -82,6 +86,7 @@ export const bodyCarry = (): number => feel('arena.bodyCarry', BODY_CARRY);
 export const runCompensate = (): number => feel('arena.runCompensate', RUN_COMPENSATE);
 export const releaseNoise = (): number => feel('arena.releaseNoise', RELEASE_NOISE);
 export const aimAssist = (): number => feel('arena.aimAssist', AIM_ASSIST);
+export const physicsHandsOn = (): boolean => feel('arena.physicsHands', ARENA_PHYSICS_HANDS) >= 0.5;
 export const dunksOn = (): boolean => feel('arena.dunks', ARENA_DUNKS) >= 0.5;
 export const dunkJumpVy = (): number => feel('arena.dunkJumpVy', DUNK_JUMP_VY);
 export const povEyeM = (): number => feel('cam.povEyeM', POV_EYE_M);

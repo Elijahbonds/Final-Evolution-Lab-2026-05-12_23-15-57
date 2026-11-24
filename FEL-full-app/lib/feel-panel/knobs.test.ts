@@ -459,6 +459,7 @@ describe('the feel knob catalogue', () => {
     expect(def('cam.povFovDeg')).toBe(ARENA.POV_FOV_DEG);
     expect(def('cam.povBobM')).toBe(ARENA.POV_BOB_M);
     expect(def('cam.povLookDegS')).toBe(ARENA.POV_LOOK_DEG_S);
+    expect(def('arena.physicsHands')).toBe(ARENA.ARENA_PHYSICS_HANDS); expect(ARENA.ARENA_PHYSICS_HANDS).toBe(0);   // owner 2026-11-24: OFF until measured
     expect(def('arena.dunks')).toBe(ARENA.ARENA_DUNKS); expect(def('arena.dunkJumpVy')).toBe(ARENA.DUNK_JUMP_VY);
     expect(ARENA.ARENA_ON).toBe(1); expect(ARENA.ARENA_PHYSICS_HOOPS).toBe(1); expect(ARENA.CAM_POV).toBe(1); expect(ARENA.POV_BOB_M).toBe(0);
   });

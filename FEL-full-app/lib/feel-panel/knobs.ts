@@ -2450,6 +2450,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'On: a run at the ring with the ball is a dunk the iron decides, a close shot a soft layup. Off: every shot a jump shot.',
   },
   {
+    id: 'arena.physicsHands', label: 'Arena physics hands (1) / capsules only (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Physics arena',
+    source: 'lib/babylon/arena/arenaConfig.ts ARENA_PHYSICS_HANDS',
+    hint: 'On: every body has two solid hands that move where the hands are, so blocks and pokes happen by contact. Off (shipped until measured on a phone): the capsules and the old poke.',
+  },
+  {
     id: 'arena.dunkJumpVy', label: 'Arena dunk take-off speed', def: 4.3, min: 3, max: 5.5, step: 0.05, unit: 'm/s', group: 'Physics arena',
     source: 'lib/babylon/arena/arenaConfig.ts DUNK_JUMP_VY',
     hint: 'How high a dunk goes: too low and the ball never gets over the ring.',

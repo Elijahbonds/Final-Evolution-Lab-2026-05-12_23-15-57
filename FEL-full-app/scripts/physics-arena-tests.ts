@@ -17,6 +17,10 @@
  *      leaves the world, nothing throws.
  *   H. Phase 4, dunks at the rim: a run at the ring that leaves from 1.75 m and jams the ball once it is over the ring goes through
  *      far more often than the same run let go 0.2 s after the press (the ball still under the ring: the push meets the iron).
+ *   I. 3v3 on the same core (PhysicsArena3v3Mode): three minutes headless — passes fly and are caught (or picked off by a body in
+ *      the lane), both teams score through the hoop, nothing throws.
+ *   J. Physics hands (arena.physicsHands, OFF by default): with the knob on, the same 3v3 minutes run with twelve hand bodies;
+ *      hands touch the ball (a block or a poke happens by contact), and the step cost stays small (node; the phone is the rig's).
  *   G. Phase 3, the three-point contest: from the five racks (7.05–7.15 m) a good release still makes clearly more than a bad one,
  *      and the contest mode's own loop runs a whole contest headless (25 balls, the clock, the final).
  *
@@ -182,6 +186,12 @@ async function main() {
   console.log('\nH. dunks: the iron decides');
   await dunks(B);
 
+  console.log('\nI. 3v3 on the same core');
+  const off = await threes(B, false);
+  console.log('\nJ. physics hands (arena.physicsHands 1, OFF by default)');
+  const on = await threes(B, true);
+  console.log(`     node physics a frame: hands off ${off.toFixed(3)} ms, on ${on.toFixed(3)} ms`);
+
   console.log(`\nphysics-arena: ${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
 }
@@ -304,6 +314,61 @@ async function dunks(B: typeof import('@babylonjs/core')) {
   console.log(`     jammed at the top: ${good}/${n}; let go 0.2 s after the press (ball still under the ring): ${bad}/${n}  [${row.join(' ')}]`);
   ok(`a dunk jammed over the ring goes through (${good}/${n} ≥ 5) and one let go under it mostly does not (${bad}/${n} ≤ 2)`, good >= 5 && bad <= 2);
   scene.dispose(); engine.dispose();
+}
+
+/** Three minutes of the arena's 3v3 headless; returns the physics steps' mean cost a frame (node). */
+async function threes(B: typeof import('@babylonjs/core'), hands: boolean): Promise<number> {
+  const { setFeelUser, setFeelSession, setFeelOverride } = await import('../lib/feel-panel/feel');
+  setFeelUser(true); setFeelSession(null); setFeelOverride('arena.physicsHands', hands ? 1 : 0);
+  const { PhysicsArena3v3Mode, arena3v3Stats } = await import('../lib/babylon/modes/PhysicsArena3v3Mode');
+  const engine = new B.NullEngine(); engine.getDeltaTime = () => 1000 / 60;
+  const scene = new B.Scene(engine);
+  const camera = new B.UniversalCamera('cam33', new B.Vector3(0, 3, 12), scene);
+  const hud: Record<string, unknown> = {};
+  const dir = { mode: 'follow', suspended: false, stickWorldLatched: (x: number, y: number) => new B.Vector3(x, 0, -y), look: () => {}, update: () => {}, snapTo: () => {} };
+  const ctx = { scene, camera, camDirector: dir, heroRef: { current: null }, objectiveRef: { current: null }, setHud: (u: Record<string, unknown>) => Object.assign(hud, u) } as never;
+  let threw: unknown = null, worstY = Infinity, nan = false, physMs = 0, frames = 0;
+  try {
+    await PhysicsArena3v3Mode.load(ctx);
+    const ball = scene.getMeshByName('ball')!, me = scene.getTransformNodeByName('arena3v3_body_0')!;
+    let xDownAt = -1;
+    for (let f = 0; f < 60 * 180; f++) {
+      const t = f / 60;
+      const d = Math.hypot(me.position.x, me.position.z + 0.6);
+      const mine = Math.hypot(ball.position.x - me.position.x, ball.position.z - me.position.z) < 0.9 && hud.arenaPoss === 'home';
+      if (f % 6 === 0 && xDownAt < 0) {
+        // me: with the ball, into range then shoot; without, toward the ball, and call for it now and then
+        // on their ball, a fair defender: 1.5 m off my man (away player 1) toward the ring, no ball-hawking
+        const man = scene.getTransformNodeByName('arena3v3_body_3')!.position, mr = Math.hypot(man.x, man.z + 0.6) || 1;
+        const theirs = hud.arenaPoss === 'away';
+        const gx = mine ? (d > 5.0 ? 0 : me.position.x * 2) : theirs ? man.x - (man.x / mr) * 1.5 : ball.position.x;
+        const gz = mine ? (d > 5.0 ? -0.6 : me.position.z * 2) : theirs ? man.z - ((man.z + 0.6) / mr) * 1.5 : ball.position.z;
+        const dx = gx - me.position.x, dz = gz - me.position.z, n = Math.hypot(dx, dz) || 1;
+        PhysicsArena3v3Mode.onInput(ctx, { t: 'stick', side: 'L', x: n < 0.3 ? 0 : dx / n, y: n < 0.3 ? 0 : -dz / n });
+        if (!mine && !theirs && f % 240 === 0) PhysicsArena3v3Mode.onInput(ctx, { t: 'button', btn: 'Y', pressed: true });   // call for it
+      }
+      if (mine && hud.arenaPhase === 'live' && d > 2.5 && d < 5.5 && xDownAt < 0 && f % 60 === 0) {
+        if (f % 120 === 0) PhysicsArena3v3Mode.onInput(ctx, { t: 'button', btn: 'B', pressed: true });   // half the time a pass
+        else { PhysicsArena3v3Mode.onInput(ctx, { t: 'button', btn: 'X', pressed: true }); xDownAt = t; }
+      }
+      if (xDownAt >= 0 && t - xDownAt > 0.46) { PhysicsArena3v3Mode.onInput(ctx, { t: 'button', btn: 'X', pressed: false }); xDownAt = -1; }
+      if (hud.arenaPhase === 'check' && f % 60 === 0) PhysicsArena3v3Mode.onInput(ctx, { t: 'button', btn: 'B', pressed: true });
+      const t0 = performance.now();
+      PhysicsArena3v3Mode.update(ctx, 1 / 60);
+      physMs += performance.now() - t0; frames++;
+      const p = ball.position;
+      if (!Number.isFinite(p.x + p.y + p.z)) nan = true;
+      worstY = Math.min(worstY, p.y);
+    }
+  } catch (e) { threw = e; console.error(e); }
+  const st = arena3v3Stats(scene);
+  console.log(`     ${hands ? 'hands ON ' : 'hands OFF'}: score ${st?.score.home}–${st?.score.away}; shots home ${st?.makes.home}/${st?.shots.home}, away ${st?.makes.away}/${st?.shots.away}; passes ${st?.passes} (caught ${st?.completed}, picked off ${st?.intercepted}); steals ${st?.steals}; lost handles ${st?.lostHandles}; hand blocks ${st?.blocksByHand}`);
+  ok(`${hands ? '[hands] ' : ''}three minutes of 3v3 ran without a throw, the ball a number above the floor`, threw === null && !nan && worstY >= BALL_R - 0.03);
+  ok(`${hands ? '[hands] ' : ''}passes were thrown and caught through the physics (${st?.completed} of ${st?.passes})`, !!st && st.passes >= 5 && st.completed >= 3);
+  ok(`${hands ? '[hands] ' : ''}both teams scored through the hoop`, !!st && st.makes.home > 0 && st.makes.away > 0);
+  scene.dispose(); engine.dispose();
+  setFeelOverride('arena.physicsHands', 0);
+  return physMs / Math.max(1, frames);
 }
 
 async function threePoint(B: typeof import('@babylonjs/core')) {
