@@ -1264,6 +1264,7 @@ ON because the arena is a new place the owner asked for; each restores today at 
 | `arena.aimAssist` | 0.8 | — | POV only: the share of a look off the ring the shot forgives. |
 | `arena.dunks` | 1 | 0 = jump shots only (slice 1) | Phase 4: a run at the ring with the ball is a dunk (the hand jams it down through; the iron decides), a close shot a soft layup (66°). |
 | `arena.dunkJumpVy` | 4.3 m/s | — | The dunk's take-off: 0.94 m up, so the hand gets the ball over the ring. |
+| `arena.physicsHands` | **0 (OFF)** | 0 = capsules and the impulse poke (shipped) | Owner 2026-11-24: "hands first, behind their own knob, OFF until measured". On: two kinematic hand bodies a player (7 cm, 12 m/s on a swipe, 5 m/s otherwise) moved to where the hands are (the dribble, the set point, a contest held high, a reach); a block or a poke is a contact. Not measured on the phone rig yet. |
 | `cam.povEyeM` | 1.72 m | — | The eye when no head bone is found. |
 | `cam.povFovDeg` | 82° | — | Across the screen; the vertical follows the screen's shape (50–90°). |
 | `cam.povBobM` | 0 | — | Head-bob, OFF by default. |

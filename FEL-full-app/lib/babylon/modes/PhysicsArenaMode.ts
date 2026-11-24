@@ -34,14 +34,15 @@ import { SoundKit } from '../audio/SoundKit';
 import { runTier, type Tier } from '../core/Difficulty';
 import { DUNK_CONFIG } from './modeConfigs';
 import { devOrAgentHooks } from '@/lib/agentRunHooks';
-import { ArenaPhysics, type ArenaPlayer } from '../arena/arenaPhysics';
+import { ArenaPhysics, type ArenaHands, type ArenaPlayer } from '../arena/arenaPhysics';
+import { handTargets } from '../arena/handTargets';
 import { mountArenaCourt, RIM_VEC, type ArenaCourt } from '../arena/arenaCourt';
 import { ARC_M, ARENA_RIM, ARENA_RIM_RADIUS, BALL_BOUNDS, BALL_R, CHECK_SPOT, COURT, RIM_FLOOR, type P3 } from '../arena/hoopGeometry';
 import { HoopSensor } from '../arena/hoopSensor';
 import { dunkPush, LAYUP_ARC_DEG, releaseShot } from '../arena/arenaShot';
 import { passVelocity, seeded } from '../arena/shotModel';
 import { chestPoint, dribbleCatch, dribbleCommit, dribbleHand, dribblePush, setPoint } from '../arena/dribble';
-import { aimAssist, dunkJumpVy, dunksOn, floorBounce, jumpVy, povBobM, povEyeM, povFovDeg, povLookDegS, povOn, stepHz } from '../arena/arenaConfig';
+import { aimAssist, dunkJumpVy, dunksOn, floorBounce, jumpVy, physicsHandsOn, povBobM, povEyeM, povFovDeg, povLookDegS, povOn, stepHz } from '../arena/arenaConfig';
 import { aimYawErr, applyPov, fovForAspect, povLook, povPose, type PovView } from '../arena/povCamera';
 
 export const ARENA_MODE_ID = 'physics_arena';
@@ -86,6 +87,10 @@ interface Athlete {
   who: Who;
   node: TransformNode;
   body: ArenaPlayer;
+  /** Physics hands (arena.physicsHands, OFF by default): null without the knob. */
+  hands: ArenaHands | null;
+  /** A hand swinging at the ball (with physics hands): seconds left. */
+  reachT: number;
   view: TransformNode;
   char: SpawnedCharacter | null;
   /** The head bone (POV's eye height), found once. */
@@ -136,7 +141,7 @@ interface St {
   timing: string;
   prevBall: P3;
   hudKey: string;
-  stats: { shots: Record<Who, number>; makes: Record<Who, number>; lostHandles: number; steals: number; physMsMax: number; physMsSum: number; frames: number };
+  stats: { shots: Record<Who, number>; makes: Record<Who, number>; lostHandles: number; steals: number; physMsMax: number; physMsSum: number; frames: number; blocksByHand: number };
   /** Probe seam: the next shot of mine releases at the top of the jump plus this (s), instead of on the button. */
   scriptOffset: number | null;
   /** Probe seam: the rival stands still and does nothing (a scripted shot measured on its own). */
@@ -349,6 +354,13 @@ function beforeStep(ctx: ModeContext, S: St, h: number): void {
     // a dribbler's change of run waits for the hand (at most a bounce; measured ~50 ms on a cut), so the ball is never left behind
     const drive = S.handler === a.who && S.ball === 'dribble' && dribbleCommit(a.committed, w).changing ? a.committed : w;
     if (a.body.grounded) a.body.drive(drive.x, drive.z, h, a.shot ? 40 : DRIVE_ACCEL);
+    if (a.hands) {
+      const tg = handTargets({
+        feet: p3(a.node.position), yaw: a.yaw, ball: p3(S.world.ball.pos), dribbleSide: S.dribble.side,
+        role: a.shot ? 'shoot' : S.handler === a.who ? (S.ball === 'dribble' ? 'dribble' : 'hold') : a.reachT > 0 ? 'reach' : a.hopT > 0 ? 'contest' : S.handler ? 'guard' : 'rest',
+      });
+      a.hands.target(tg.left, tg.right, a.reachT > 0);
+    }
   }
   // the ball in hand
   if (S.handler && S.ball === 'held') {
@@ -393,6 +405,9 @@ function frameRules(ctx: ModeContext, S: St, dt: number): void {
   for (const c of S.world.drainContacts()) {
     if (S.ball === 'flight' && c.surface !== 'body') S.shotTouched = true;
     if (c.surface === 'body' && c.playerId) S.lastTouch = c.playerId as Who;
+    // a physics hand on the ball: a dribble knocked loose, a shot touched (a block when it is the other side's hand)
+    if (c.hand && S.ball === 'dribble' && S.handler && c.playerId !== S.handler) loseBall(S, c.playerId === 'me' ? 'Poked it' : 'He poked it');
+    if (c.hand && S.ball === 'flight' && S.shotBy && c.playerId !== S.shotBy) { S.stats.blocksByHand++; say(S, c.playerId === 'me' ? 'Blocked' : 'Got blocked'); }
     if (c.impulse > 0.4) {
       if (c.surface === 'rim') SoundKit.play('rattle', { volume: Math.min(0.6, 0.15 + c.impulse * 0.1) });
       else if (c.surface === 'board') SoundKit.play('thud', { volume: Math.min(0.5, 0.1 + c.impulse * 0.08) });
@@ -468,6 +483,7 @@ function shotsAndJumps(S: St, dt: number): void {
   const prof = RIVAL_BY_TIER[S.tier];
   for (const a of [S.me, S.foe]) {
     if (a.pokeCd > 0) a.pokeCd -= dt;
+    if (a.reachT > 0) a.reachT -= dt;
     if (a.hopT > 0) a.hopT += dt;
     if (a.hopT > 0.2 && a.body.grounded) a.hopT = 0;
     if (!a.shot) continue;
@@ -532,6 +548,7 @@ function dunkHold(a: Athlete): P3 {
 
 /** A hand on the ball: knocked away from the handler (an impulse at the ball; where it goes is the physics'). */
 function poke(S: St, a: Athlete): void {
+  if (a.hands) { a.reachT = 0.18; return; }   // physics hands: the hand swings at the ball; the contact decides
   const ball = S.world.ball;
   const h = S.handler ? athlete(S, S.handler) : null;
   const from = h ? h.node.position : a.node.position;
@@ -647,8 +664,9 @@ export const PhysicsArenaMode: ModeDefinition = {
       installSafePlay(c.animator, ARENA_MODE_ID);
       c.root.parent = v; c.root.position.set(0, 0, 0); c.root.rotation.set(0, 0, 0); c.root.rotationQuaternion = null;
     }
+    const handsOn = physicsHandsOn();
     const mk = (who: Who, node: TransformNode, body: ArenaPlayer, view: TransformNode, char: SpawnedCharacter | null): Athlete =>
-      ({ who, node, body, view, char, head: char ? boneNode(char.skeleton, 'Head') : null, yaw: 0, clip: '', shot: null, hopT: 0, pokeCd: 0, wish: { x: 0, z: 0 }, committed: { x: 0, z: 0 } });
+      ({ who, node, body, hands: handsOn ? world.addHands(body) : null, reachT: 0, view, char, head: char ? boneNode(char.skeleton, 'Head') : null, yaw: 0, clip: '', shot: null, hopT: 0, pokeCd: 0, wish: { x: 0, z: 0 }, committed: { x: 0, z: 0 } });
     const S: St = {
       scene, world, court, ballMesh, me: mk('me', meNode, meBody, meView, meChar), foe: mk('foe', foeNode, foeBody, foeView, foeChar),
       sensor: new HoopSensor(ARENA_RIM, ARENA_RIM_RADIUS), rng: seeded(0x0a7e4a), tier: runTier(), t: 0,
@@ -658,7 +676,7 @@ export const PhysicsArenaMode: ModeDefinition = {
       pov: { on: false, view: { yaw: 0, pitch: 0, bobPhase: 0 }, savedFov: ctx.camera.fov }, camModeSeen: ctx.camDirector.mode,
       ai: { spot: { x: 0, y: 0, z: 4 }, since: 0, reactAt: 0, pokeAt: 0, drive: false },
       banner: '', bannerT: 0, timing: '', prevBall: { x: 0, y: 1, z: 6 }, hudKey: '',
-      stats: { shots: { me: 0, foe: 0 }, makes: { me: 0, foe: 0 }, lostHandles: 0, steals: 0, physMsMax: 0, physMsSum: 0, frames: 0 },
+      stats: { shots: { me: 0, foe: 0 }, makes: { me: 0, foe: 0 }, lostHandles: 0, steals: 0, physMsMax: 0, physMsSum: 0, frames: 0, blocksByHand: 0 },
       scriptOffset: null, aiQuiet: false, seamOn: false, seam: null, disposed: false,
     };
     states.set(scene, S); current = S;

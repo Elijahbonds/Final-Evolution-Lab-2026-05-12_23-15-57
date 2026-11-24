@@ -204,3 +204,25 @@ describe('phase 4: dunks and layups', async () => {
     expect(Math.hypot(v.x, v.y, v.z)).toBeLessThanOrEqual(8 + 1e-9);
   });
 });
+
+describe('physics hands (arena.physicsHands, OFF by default)', async () => {
+  const { handTargets } = await import('./handTargets');
+  const feet = { x: 0, y: 0, z: 5 }, ball = { x: 0.4, y: 0.5, z: 5.2 };
+  it('ships OFF', () => { expect(C.ARENA_PHYSICS_HANDS).toBe(0); });
+  it('a contest puts both hands high (in a shot\'s way), a rest keeps them low', () => {
+    const c = handTargets({ feet, yaw: 0, ball, role: 'contest', dribbleSide: 1 });
+    const r = handTargets({ feet, yaw: 0, ball, role: 'rest', dribbleSide: 1 });
+    expect(Math.min(c.left.y, c.right.y)).toBeGreaterThan(2.3);
+    expect(Math.max(r.left.y, r.right.y)).toBeLessThan(1.0);
+  });
+  it('a reach sends one hand at the ball (never above the shoulders)', () => {
+    const t = handTargets({ feet, yaw: 0, ball, role: 'reach', dribbleSide: 1 });
+    expect(Math.hypot(t.right.x - ball.x, t.right.z - ball.z)).toBeLessThan(1e-9);
+    expect(t.right.y).toBeLessThanOrEqual(1.5);
+  });
+  it('the dribbling hand is on the dribbling side, above the ball', () => {
+    const t = handTargets({ feet, yaw: 0, ball, role: 'dribble', dribbleSide: 1 });
+    expect(t.right.x).toBeGreaterThan(feet.x);
+    expect(t.right.y).toBeGreaterThan(ball.y);
+  });
+});
