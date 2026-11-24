@@ -1,7 +1,7 @@
 // hoops-gap: the roll man (hoops/screenerRoll) — the screener reads his own man, the planner looks for the roll.
 import { afterEach, describe, expect, it } from 'vitest';
 import { Vector3 } from '@babylonjs/core';
-import { SCREENER_ROLL_ON, screenerRollOn, screenersMan, manSteppedUp, nearLaneClear, rollRead, ROLL_NEAR_M } from './screenerRoll';
+import { SCREENER_ROLL_ON, screenerRollOn, screenersMan, manSteppedUp, nearLaneClear, rollRead, ROLL_NEAR_M, ROLL_SCORE_ON, rollScoreOn, ghostRead, rollLeadPoint, ROLL_PASS_MPS } from './screenerRoll';
 import { TeammateBrain } from '../core/BasketballCore';
 import { TeamOffense3v3 } from './teamOffense3v3';
 import { TEAM_READS } from '../modes/threevthreeRules';
@@ -93,4 +93,44 @@ describe('hoops/screenerRoll', () => {
     expect(off).toBe(0);           // the release: his own man was not in his lane, so no roll pass
     expect(on).toBeGreaterThanOrEqual(8);   // measured: 9 of the 9 screens called in 20 seeds
   });
+
+  it('round 2: the roll-score switch ships off and needs the roll switch too', () => {
+    expect(ROLL_SCORE_ON).toBe(0);
+    setFeelUser(true); setFeelSession(null); setFeelOverride('hoops.rollScoreOn', 1);
+    expect(rollScoreOn()).toBe(false);   // the roll itself is off
+    setFeelOverride('hoops.screenerRollOn', 1);
+    expect(rollScoreOn()).toBe(true);
+  });
+  it('round 2: the ghost — near the spot, his man already up at the ball; far from the spot, or his man home, no', () => {
+    const handler = { x: 0, z: 6.6 }, screened = { x: 0.1, z: 5.8 };
+    const up = [screened, { x: 1.2, z: 6.7 }, { x: 0, z: 0.3 }], home = [screened, { x: 1.0, z: 3.6 }, { x: 0, z: 0.3 }];
+    expect(ghostRead({ x: 1.0, z: 5.2 }, { x: 0.9, z: 5.9 }, handler, RIM, up, screened)).toBe(true);
+    expect(ghostRead({ x: 1.0, z: 5.2 }, { x: 0.9, z: 5.9 }, handler, RIM, home, screened)).toBe(false);
+    expect(ghostRead({ x: 3.5, z: 3.0 }, { x: 0.9, z: 5.9 }, handler, RIM, up, screened)).toBe(false);
+  });
+  it('round 2: the lead point is where he will be when a chest pass gets there', () => {
+    const passer = { x: 0, z: 7 }, roller = { x: 1, z: 4 }, vel = { x: -0.5, z: -4 };
+    const lead = rollLeadPoint(passer, roller, vel);
+    const t = Math.hypot(lead.x - passer.x, lead.z - passer.z) / ROLL_PASS_MPS;
+    expect(lead.x).toBeCloseTo(roller.x + vel.x * t, 2); expect(lead.z).toBeCloseTo(roller.z + vel.z * t, 2);
+    expect(rollLeadPoint(passer, roller, { x: 0, z: 0 })).toEqual(roller);
+  });
+  it('round 2 in the brain: with his man up at the ball, the early slip goes the frame he plants', () => {
+    const firstRoll = (score: number) => {
+      setFeelUser(true); setFeelSession(null); setFeelOverride('hoops.screenerRollOn', 1); setFeelOverride('hoops.rollScoreOn', score);
+      const b = new TeammateBrain(0.4); b.setJob('screen');
+      const self = new Vector3(0.7, 0, 5.2); const ball = new Vector3(0, 0, 6.6);
+      const foes = [new Vector3(0.1, 0, 5.8), new Vector3(1.1, 0, 6.6), new Vector3(0.1, 0, 0.3)];
+      for (let k = 0; k < 120; k++) {
+        const it = b.decide(1 / 60, self, ball, new Vector3(0, 0, -0.6), [ball, self], foes);
+        if (b.screen.phase === 'approach') { self.x += it.moveX * 0.02; self.z -= it.moveY * 0.02; }
+        if (b.screen.phase === 'roll') return k;
+      }
+      return -1;
+    };
+    const slow = firstRoll(0), fast = firstRoll(1);
+    expect(fast).toBeGreaterThanOrEqual(0);
+    expect(fast).toBeLessThan(slow);
+  });
 });
+

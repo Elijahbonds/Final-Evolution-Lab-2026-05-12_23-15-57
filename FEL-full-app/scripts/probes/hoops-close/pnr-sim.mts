@@ -13,6 +13,7 @@
 // defender within KICK_OPEN_M 2.2 m of him for at least 0.2 s), how often he got the ball, switches and helps.
 //   npx tsx scripts/probes/hoops-close/pnr-sim.mts [--n 300] [--tier pro|rookie|elite|all] [--seed 7] [--json out.json]
 //   env: FEEL='{"hoops.pnrCoverageOn":1,"hoops.screenerRollOn":1}' (the coverage, the roll man; the four ways: HOOPS-GAP-PLAN §5.4)
+//        LENS=1 — every defender behind the tier's reaction delay (hoops/reaction ReactiveDefender), as in the game: use it (HOOPS-GAP-PLAN §5.5)
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -29,6 +30,10 @@ const { THREEV_TIER, catchAndShoot, openness, rivalPoints, SWING_PICK_M, KICK_OP
 const { foeSpaceAngle } = await import(APP + '/lib/babylon/core/PossessionSwap.ts');
 const { TeamOffense3v3 } = await import(APP + '/lib/babylon/hoops/teamOffense3v3.ts');
 const { TeamDefense } = await import(APP + '/lib/babylon/hoops/teamDefense.ts');
+const { rollScoreOn } = await import(APP + '/lib/babylon/hoops/screenerRoll.ts');
+const { ReactiveDefender } = await import(APP + '/lib/babylon/hoops/reaction.ts');
+// LENS=1: each defender sees the floor through its tier's reaction delay (hoops/reaction ReactiveDefender), as the 3v3 mode's AI defenders do
+const LENS = process.env.LENS === '1';
 const { meetsRelease, releaseFrom } = await import(APP + '/lib/babylon/hoops/blocks.ts');
 const { contestOn } = await import(APP + '/lib/babylon/hoops/contest.ts');
 const { expectedMake } = await import(APP + '/lib/babylon/core/SharedShot.ts');
@@ -51,7 +56,7 @@ function sim(tier: string) {
   const knobs = THREEV_TIER[tier as 'pro'];
   const all: number[] = []; const pnr: number[] = []; const pnrContest: number[] = [];
   const phases: Record<string, number> = {}; const covF: Record<string, number> = {};
-  const rollSep: number[] = []; let rolls = 0;
+  const rollSep: number[] = []; let rolls = 0, rollOpenOfRolls = 0, rollOpen16 = 0;
   let pnrN = 0, rollOpen = 0, rollGotBall = 0, rollPts = 0, switches = 0, helps = 0, blocks = 0, picks = 0, capped = 0;
   for (let p = 0; p < N; p++) {
     const foes = [0, 1, 2].map((i) => { const a = (-0.9 + i * 0.9) + (rng() - 0.5) * 0.5, r = 4.5 + rng() * 2.5; return new Vector3(Math.sin(a) * r, 0, RIM.z + Math.abs(Math.cos(a)) * r + 0.3); });
@@ -59,12 +64,13 @@ function sim(tier: string) {
     let hi = Math.floor(rng() * 3);
     const foeMv = foes.map(() => new AiMover(3.8)); const myMv = mine.map(() => new AiMover(4.2));
     const myBr = mine.map((_, i) => new DefenderBrain(0.6, i, rng));
+    const myLens = myBr.map((b) => { const r = new ReactiveDefender(b); r.setTier(tier as 'pro'); return r; });
     let offBr = foes.map((_, i) => new TeammateBrain(foeSpaceAngle(i)));
     const teamD = new TeamDefense(); let marks: number[] = [0, 1, 2];
     const plan = new TeamOffense3v3(tier as 'pro', rules.TEAM_READS, rng); plan.beginPossession();
     let t = 0, end = ''; let pts = 0; let screenSet = false; let openF = 0, rollOpenHit = false, toRoller = false; let flight: { from: InstanceType<typeof Vector3>; to: InstanceType<typeof Vector3>; ti: number; t: number; T: number } | null = null;
     let touch: { kind: 'plan' | 'cs'; t: number; tell: string | null } | null = null; let screenIdx = -1; let jumper = -1, jumpAge = Infinity, gatherSeen = -1;
-    let lastContest = NaN; let helpSaid = false; let rolled = false, rollBest = 0;
+    let lastContest = NaN; let helpSaid = false; let rolled = false, rollBest = 0; let open16F = 0, rollOpen16Hit = false;
     const others = () => [0, 1, 2].filter((i) => i !== hi);
     const startTouch = (fresh: boolean) => {
       const intent = driveIntent({ defenderSet: true, aggression: 1, roll: rng });
@@ -98,7 +104,7 @@ function sim(tier: string) {
       marks = [...td.marks];
       for (let i = 0; i < 3; i++) {
         myBr[i].setMark(td.play[i]);
-        const it = myBr[i].decide(DT, mine[i], ballAt, RIM_FLOOR, mine, foes);
+        const it = (LENS ? myLens[i] : myBr[i]).decide(DT, mine[i], ballAt, RIM_FLOOR, mine, foes);
         if ((myBr[i] as { pnrTag?: boolean }).pnrTag && !helpSaid) { helpSaid = true; helps++; }   // a tag of the roll man (the coverage's)
         const cov = (myBr[i] as { pnrCoverage?: string | null }).pnrCoverage; if (cov) covF[cov] = (covF[cov] ?? 0) + 1;
         if (i === jumper && jumpAge < 0.75) continue;
@@ -119,6 +125,7 @@ function sim(tier: string) {
         phases[sc.phase] = (phases[sc.phase] ?? 0) + 1;
         if (sc.phase === 'roll') { rolled = true; if (d2(foes[si], RIM_FLOOR) < 5) rollBest = Math.max(rollBest, openness(foes[si], mine)); }
         if (sc.phase === 'roll' && d2(foes[si], RIM_FLOOR) < 5 && openness(foes[si], mine) >= KICK_OPEN_M) { if (++openF >= 12) rollOpenHit = true; } else openF = 0;
+        if (sc.phase === 'roll' && d2(foes[si], RIM_FLOOR) < 5 && openness(foes[si], mine) >= 1.6) { if (++open16F >= 12) rollOpen16Hit = true; } else open16F = 0;   // the leading pass's window
       }
       if (flight) {
         flight.t += DT;
@@ -137,8 +144,11 @@ function sim(tier: string) {
           if (s.callScreen >= 0) { screenIdx = s.callScreen; offBr[os[screenIdx]].setJob('screen'); }
           if (s.pass >= 0) {
             const ti = os[s.pass]; plan.notePass();
-            if (screenIdx >= 0 && s.pass === screenIdx && offBr[ti].screen.phase === 'roll') toRoller = true;
-            flight = { from: H.clone(), to: foes[ti].clone(), ti, t: 0, T: d2(H, foes[ti]) / PASS_MPS }; continue;
+            const roll = screenIdx >= 0 && s.pass === screenIdx && offBr[ti].screen.phase === 'roll';
+            if (roll) toRoller = true;
+            // a pass to the roll man with the roll-score switch is thrown where he will be (the mode leads every 3v3 pass: leadPoint)
+            const lead = roll && rollScoreOn() && plan.rollLead ? new Vector3(plan.rollLead.x, 0, plan.rollLead.z) : foes[ti].clone();
+            flight = { from: H.clone(), to: lead, ti, t: 0, T: d2(H, lead) / PASS_MPS }; continue;
           }
           const st = foeMv[hi].track(DT, s.wish); H.addInPlace(st.vel.scale(DT));
           if (s.gather) { touch.tell = plan.gatherFor === 'pullup' ? 'jumper' : decideFinish(); gatherSeen = t; }
@@ -159,11 +169,12 @@ function sim(tier: string) {
     }
     if (!end) capped++;
     all.push(pts);
-    if (screenSet) { pnrN++; pnr.push(pts); if (Number.isFinite(lastContest)) pnrContest.push(lastContest); if (rollOpenHit) rollOpen++; if (rolled) { rolls++; rollSep.push(rollBest); } if (toRoller) { rollGotBall++; rollPts += pts; } }
+    if (screenSet) { pnrN++; pnr.push(pts); if (Number.isFinite(lastContest)) pnrContest.push(lastContest); if (rollOpenHit) rollOpen++; if (rolled) { rolls++; rollSep.push(rollBest); if (rollOpenHit) rollOpenOfRolls++; if (rollOpen16Hit) rollOpen16++; } if (toRoller) { rollGotBall++; rollPts += pts; } }
   }
   return {
     tier, n: N, ptsPerPoss: +mean(all).toFixed(3), pnrN, ptsPerPnr: +mean(pnr).toFixed(3), pnrContestMed: +med(pnrContest).toFixed(2),
     rollPct: +(100 * rolls / Math.max(1, pnrN)).toFixed(1), rollSepMed: rollSep.length ? +med(rollSep).toFixed(2) : null,
+    rollOpenOfRollsPct: +(100 * rollOpenOfRolls / Math.max(1, rolls)).toFixed(1), rollOpen16OfRollsPct: +(100 * rollOpen16 / Math.max(1, rolls)).toFixed(1),
     rollOpenPct: +(100 * rollOpen / Math.max(1, pnrN)).toFixed(1), rollGotBallPct: +(100 * rollGotBall / Math.max(1, pnrN)).toFixed(1),
     rollPtsPerTouch: rollGotBall ? +(rollPts / rollGotBall).toFixed(3) : null, switchesPerPnr: +(switches / Math.max(1, pnrN)).toFixed(2), tagsPerPnr: +(helps / Math.max(1, pnrN)).toFixed(2), blocks, picks, capped, phaseFrames: phases, coverageFrames: covF,
   };

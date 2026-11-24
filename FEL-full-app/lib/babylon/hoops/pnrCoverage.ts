@@ -116,3 +116,8 @@ export function rollerToTag(self: XZ, markIdx: number | null, ball: XZ, rim: XZ,
 export function beatenOnScreen(defender: XZ, handler: XZ, rim: XZ): boolean {
   return d2(handler, rim) < d2(defender, rim) - 0.3 || d2(defender, handler) > PNR_BEATEN_M;
 }
+
+/** hoops-gap round 2 (`hoops.pnrFightFullOn`, OFF; needs `hoops.pnrCoverageOn`): fighting OVER a screen costs no pace — the man on the ball
+ *  slides round the screener at his full speed instead of core/HoopsOffball's FIGHT_SLOW 0.7 (which stays the number for everyone else). */
+export const PNR_FIGHT_FULL_ON = 0;
+export const pnrFightFullOn = (): boolean => pnrCoverageOn() && feel('hoops.pnrFightFullOn', PNR_FIGHT_FULL_ON) >= 0.5;

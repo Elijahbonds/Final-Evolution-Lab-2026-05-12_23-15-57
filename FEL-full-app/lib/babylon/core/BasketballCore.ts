@@ -35,8 +35,8 @@ import { BallSideShade } from './BallSideShade';   // hoops-defense-fx (owner 20
 import { aiPokes } from './ReachTell';   // lane/hoops-def-tell (#273 T-A): the poke is a per-second rate aimed at the led ball
 import { gatherCloseoutOn, gatherCloseoutM } from '../hoops/rulebook';   // hoops-p09: the closeout on a jump-shot gather
 import { cushionLever } from '../hoops/pressure';   // hoops-p02 (1v1/3v3 phase 2): the on-ball man's cushion on a moving handler
-import { pnrCoverageOn, coverageFor, onBallScreener, markIsScreening, showSpot, rollerToTag, PNR_SHOW_SEC, PNR_UNDER_LEVER, PNR_DROP_LEVER, PNR_TAG_LEVER, PNR_SPOT_DEAD_M, type PnrCoverage } from '../hoops/pnrCoverage';   // hoops-gap: the pick-and-roll coverage
-import { screenerRollOn, rollRead, SLIP_MIN_SEC } from '../hoops/screenerRoll';   // hoops-gap: the roll man reads his own man
+import { pnrCoverageOn, coverageFor, onBallScreener, markIsScreening, showSpot, rollerToTag, PNR_SHOW_SEC, PNR_UNDER_LEVER, PNR_DROP_LEVER, PNR_TAG_LEVER, PNR_SPOT_DEAD_M, pnrFightFullOn, type PnrCoverage } from '../hoops/pnrCoverage';   // hoops-gap: the pick-and-roll coverage
+import { screenerRollOn, rollRead, SLIP_MIN_SEC, rollScoreOn, ghostRead } from '../hoops/screenerRoll';   // hoops-gap: the roll man reads his own man
 
 // ── Movement ─────────────────────────────────────────────────────────────
 export interface DribbleResult { crossover: boolean; hesitation: boolean; speed01: number; facingRad: number; planting: boolean; gear: Gear; intensity01: number; paceChange: boolean }
@@ -1012,7 +1012,7 @@ export class DefenderBrain implements AIBehavior {
     // statue with intent. Measured live: never stripped, never stole.
     const out = steer(to, (dist > 3 || beaten || closingOut || gatherClose || (pnrHelp && dist > 1.5)) && !fighting, gatherClose ? 0.12 : press ? 0.2 : onBall ? 0.6 : pnrHelp ? PNR_SPOT_DEAD_M : 1.4,
       onBall && aiPokes(this.rng, this.aggression, dt, dist, ball, { x: hvx, z: hvz }, self));   // #273: core/ReachTell (the old `dist < 1.1 && rng() < aggression × 0.02` is its A/B off)
-    if (fighting && this.over) { out.moveX *= 0.7; out.moveY *= 0.7; }   // fighting OVER the screen costs speed (FIGHT_SLOW)
+    if (fighting && this.over && !pnrFightFullOn()) { out.moveX *= 0.7; out.moveY *= 0.7; }   // fighting OVER the screen costs speed (FIGHT_SLOW; hoops-gap: not with hoops.pnrFightFullOn)
     return out;
   }
   /** Fighting over / under this frame (for the mode's marks). */
@@ -1098,7 +1098,9 @@ export class TeammateBrain implements AIBehavior {
         const read = screenerRollOn() ? rollRead(self, handler, hoop, foes, def) : null;
         const laneOpen = rollLaneOpen(self, hoop, foes) || !!read?.roll;
         this.screen = stepScreen({ ...this.screen, side }, dt, self, sSpot, handler, hoop, laneOpen);
-        if (read?.slip && this.screen.phase === 'set' && this.screen.heldSec >= SLIP_MIN_SEC) this.screen = { ...this.screen, phase: 'roll', afterSec: 0 };
+        const score = !!read && rollScoreOn();   // hoops-gap round 2: the early slip and the ghost screen
+        if (read?.slip && this.screen.phase === 'set' && this.screen.heldSec >= (score ? 0 : SLIP_MIN_SEC)) this.screen = { ...this.screen, phase: 'roll', afterSec: 0 };
+        else if (score && this.screen.phase === 'approach' && ghostRead(self, sSpot, handler, hoop, foes, def)) this.screen = { ...this.screen, phase: 'roll', afterSec: 0 };
         this.screened = def;
         if (this.screen.phase === 'approach') { this.objective = def; const to = sSpot.subtract(self); return steer(to, distXZ(self, sSpot) > 2.5, 0.2); }
         if (this.screen.phase === 'set') { this.objective = def; this.job = 'screen'; return steer(new Vector3(0, 0, 0), false, 1); }   // PLANTED
