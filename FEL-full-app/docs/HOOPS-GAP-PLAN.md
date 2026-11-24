@@ -228,6 +228,46 @@ pick-and-roll needs the screener to roll past his own man when that man steps up
 screen without losing a step (a shorter fight-over cost, or the screener's man holding the handler with the show until he recovers).
 **Verdict: ships OFF**, as asked, for the owner to feel; the numbers say it is not yet an improvement for the AI's defence.
 
+### 5.4 A real roll man — `hoops.screenerRollOn` (built, ships OFF) — and the pick-and-roll re-measured four ways
+
+**What it does** (`hoops/screenerRoll.ts`, wired in `core/BasketballCore.ts` TeammateBrain and `hoops/teamOffense3v3.ts`; 3v3): the
+screener reads HIS OWN man, not the rim. At the screen's end he rolls when his man has stepped up to the ball (level with him or behind
+him, or nearer the ball than him — a show, a hedge, a switch) or when nobody stands on the first `ROLL_NEAR_M` 2.5 m of his line; and
+planted at least `SLIP_MIN_SEC` 0.25 s with his man already gone to the ball, he slips at once. The old whole-line read still rolls him
+too. The handler (PRO and ELITE: the tier's `readsScreen`) hits the rolling man when he is open (`KICK_OPEN_M` 2.2 m) with a clear lane,
+through the use and the attack — the release needed his own man to still be in his lane. Off is today exactly; mode files untouched.
+
+**Measured** (`pnr-sim.mts`, PRO, 300 possessions × seeds 7 / 11 / 23, the four ways asked):
+
+| | today (control) | roll only | coverage only | roll + coverage |
+|---|---|---|---|---|
+| **points a pick-and-roll possession** | 0.597 / 0.604 / 0.579 (**0.593**) | 0.650 / 0.655 / 0.626 (**0.644**) | 0.655 / 0.635 / 0.592 (**0.627**) | 0.605 / 0.581 / 0.542 (**0.576**) |
+| the screener rolls (of pick-and-rolls) | 0 / 0 / 0.9 % | 24.9 / 27.9 / 30.2 % | 1.7 / 0.6 / 2.4 % | 37.9 / 44.4 / 44.1 % |
+| the roll man's best separation inside 5 m (median of the rolls) | — | 0.95 / 1.08 / 0.99 m | 0.92 / 1.24 / 0.94 m | 0.94 / 0.96 / 0.93 m |
+| **roll-man open looks** (nobody within 2.2 m for 0.2 s) | 0 % | 0 % | 0 % | 0 % |
+| **roll-man catches** | 0 % | 0 % | 0 % | 0 % |
+| points a possession (all) | 0.587 / 0.597 / 0.602 | 0.646 / 0.637 / 0.623 | 0.641 / 0.684 / 0.638 | 0.643 / 0.616 / 0.633 |
+| switches / tags a pick-and-roll | 0.26 / 0 | 0.30 / 0 | 0.33 / 0.31 | 0.36 / 0.36 |
+
+**Read.**
+- **Against the roll, the coverage beats today's defence:** 0.644 → 0.576 points a pick-and-roll possession (−0.068, −11 %), no seed
+  overlapping (the coverage's worst, 0.605, is under today's best against the roll, 0.626). That is the case a top-level defence must
+  handle: when the screener really rolls, over-the-top plus the show, the tag and switching only when beaten defend it better than
+  switching every screen. It even ends under today's pick-and-roll number with no roll (0.593).
+- **Without the roll, the coverage is worse than today** (0.593 → 0.627, §5.3): switching every screen is the better answer to a screener
+  who never rolls.
+- **The roll man is never open and never catches it**, in any of the four: his own man stays attached (best separation about 1 m against
+  the 2.2 m the pass needs), so the roll's points come from what it does to the defence (it drags his man and the help), not from the
+  pass. A roll that gets him open needs either a slip before his man reads it (earlier, or out of a fake screen) or a pass read that
+  takes a tighter window — the next tuning step if the owner wants the roll man to score.
+- `assumption:` three AI defenders against the AI offence stand in for both directions in a game (the AI defending your team's
+  pick-and-roll, and your AI mates defending theirs).
+
+**Verdict: both switches ship OFF** for the owner to feel. Recommendation: if the roll man goes on, the coverage goes on with it (they are
+better together than either alone); neither alone.
+
+Not built (time): a fight over the screen that does not lose a step (§5.3's second finding).
+
 ## 6. Waiting on the owner (recommendation first; each is reversible)
 
 1. **Feel `hoops.aiShotIqOn` in 3v3 PRO on defence.** *Recommend:* turn it on if the rivals feel smarter and not unfair; the rig check
@@ -264,8 +304,8 @@ runs. Code after the clips (this lane or the next): the tree's state table and t
 
 ## 7. Flags and assumptions
 
-- No existing tuned number was changed. New numbers: §5.1's six (behind `hoops.aiShotIqOn`, off) and §5.3's fourteen (behind
-  `hoops.pnrCoverageOn`, off; listed in docs/FEEL-PANEL.md).
+- No existing tuned number was changed. New numbers: §5.1's six (behind `hoops.aiShotIqOn`, off), §5.3's fourteen (behind
+  `hoops.pnrCoverageOn`, off) and §5.4's four (behind `hoops.screenerRollOn`, off); all listed in docs/FEEL-PANEL.md.
 - `assumption:` (§5.3) three AI defenders against the AI offence stand in for the AI defending your team's pick-and-roll in a game (the
   handler is the AI's planner, not you).
 - Probe changes (additive): `rival-sim-3v3.mts` reports the contest at each release and takes `--def human` (it ignored the flag before);

@@ -26,6 +26,7 @@ import { profileFor, type Tier, type TierProfile } from '../core/Difficulty';
 import { driveLateral, type DriveIntent } from '../core/DriveLine';
 import { Vector3 } from '@babylonjs/core';
 import { KIT_WEIGHTS, KIT_CROSSES, moveFrame, pickWeighted, intoBody, type KitMove, type RivalAction } from './rivalOffense';
+import { screenerRollOn } from './screenerRoll';   // hoops-gap: the handler looks for the roll man
 
 /** A planar point. */
 export interface XZ { x: number; z: number }
@@ -277,6 +278,7 @@ export class TeamOffense3v3 {
           if (this.tt.readsScreen && s.phase === 'roll' && mate && this.passesLeft > 0 && inLane && this.R.openness(mate, v.defenders) >= this.R.KICK_OPEN_M && this.R.laneClear(v.handler, mate, v.defenders)) {
             out.pass = this.screenMate; break;
           }
+          if (this.rollOpen(v)) { out.pass = this.screenMate; break; }   // hoops-gap: the roll man, open — whoever his own man went to
           if (passed || this.phaseT > USE_MAX_SEC) this.startAttack(v);
         } else this.startAttack(v);
         break;
@@ -322,6 +324,7 @@ export class TeamOffense3v3 {
             }
           }
         }
+        if (!this.move && this.rollOpen(v)) { out.pass = this.screenMate; break; }   // hoops-gap: still rolling after the use, and open
         // the kick read: once, cut off inside the read window with an open man
         if (!this.move && !this.kickRead && k >= this.R.KICK_READ_FROM_K && k <= this.R.KICK_READ_TO_K && this.R.cutOff(v.handler, ed, v.defenders)) {
           this.kickRead = true;
@@ -384,6 +387,14 @@ export class TeamOffense3v3 {
       if (open > bestOpen) { bestOpen = open; best = i; }
     });
     return best;
+  }
+  /** hoops-gap (`hoops.screenerRollOn`): the man who set this touch's screen is ROLLING, open (KICK_OPEN_M) with a clear lane, a pass is
+   *  left, and this tier reads the screen. Without the knob, false (the release's read stays: the roll pass only with my man in my lane). */
+  private rollOpen(v: TeamView): boolean {
+    if (!screenerRollOn() || !this.tt.readsScreen || this.passesLeft <= 0 || this.screenMate < 0) return false;
+    const s = v.screen; const mate = v.mates[this.screenMate];
+    if (!s || s.phase !== 'roll' || s.idx !== this.screenMate || !mate) return false;
+    return this.R.openness(mate, v.defenders) >= this.R.KICK_OPEN_M && this.R.laneClear(v.handler, mate, v.defenders);
   }
   /** The finish this gather is for. */
   get gatherFor(): 'rim' | 'pullup' { return this.gatherKind; }

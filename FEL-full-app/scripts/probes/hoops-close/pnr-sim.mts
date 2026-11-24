@@ -8,10 +8,11 @@
 // Not modelled: pokes (the brains' reach intents are ignored: no steals), fouls, boards.
 //
 // What it prints per tier: every possession, and THE PICK-AND-ROLL POSSESSIONS (a screen that was set): their count, points a PnR
-// possession, the handler's contest at his release, how often the ROLL MAN GETS AN OPEN LOOK (rolling, inside 5 m of the rim, with no
+// possession, the handler's contest at his release, how often the screener rolls and his best separation inside 5 m (the median over
+// the rolls), how often the ROLL MAN GETS AN OPEN LOOK (rolling, inside 5 m of the rim, with no
 // defender within KICK_OPEN_M 2.2 m of him for at least 0.2 s), how often he got the ball, switches and helps.
 //   npx tsx scripts/probes/hoops-close/pnr-sim.mts [--n 300] [--tier pro|rookie|elite|all] [--seed 7] [--json out.json]
-//   env: FEEL='{"hoops.pnrCoverageOn":1}'
+//   env: FEEL='{"hoops.pnrCoverageOn":1,"hoops.screenerRollOn":1}' (the coverage, the roll man; the four ways: HOOPS-GAP-PLAN §5.4)
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -50,6 +51,7 @@ function sim(tier: string) {
   const knobs = THREEV_TIER[tier as 'pro'];
   const all: number[] = []; const pnr: number[] = []; const pnrContest: number[] = [];
   const phases: Record<string, number> = {}; const covF: Record<string, number> = {};
+  const rollSep: number[] = []; let rolls = 0;
   let pnrN = 0, rollOpen = 0, rollGotBall = 0, rollPts = 0, switches = 0, helps = 0, blocks = 0, picks = 0, capped = 0;
   for (let p = 0; p < N; p++) {
     const foes = [0, 1, 2].map((i) => { const a = (-0.9 + i * 0.9) + (rng() - 0.5) * 0.5, r = 4.5 + rng() * 2.5; return new Vector3(Math.sin(a) * r, 0, RIM.z + Math.abs(Math.cos(a)) * r + 0.3); });
@@ -62,7 +64,7 @@ function sim(tier: string) {
     const plan = new TeamOffense3v3(tier as 'pro', rules.TEAM_READS, rng); plan.beginPossession();
     let t = 0, end = ''; let pts = 0; let screenSet = false; let openF = 0, rollOpenHit = false, toRoller = false; let flight: { from: InstanceType<typeof Vector3>; to: InstanceType<typeof Vector3>; ti: number; t: number; T: number } | null = null;
     let touch: { kind: 'plan' | 'cs'; t: number; tell: string | null } | null = null; let screenIdx = -1; let jumper = -1, jumpAge = Infinity, gatherSeen = -1;
-    let lastContest = NaN; let helpSaid = false;
+    let lastContest = NaN; let helpSaid = false; let rolled = false, rollBest = 0;
     const others = () => [0, 1, 2].filter((i) => i !== hi);
     const startTouch = (fresh: boolean) => {
       const intent = driveIntent({ defenderSet: true, aggression: 1, roll: rng });
@@ -115,6 +117,7 @@ function sim(tier: string) {
         const si = others()[screenIdx]; const sc = offBr[si].screen;
         if (sc.phase === 'set') screenSet = true;
         phases[sc.phase] = (phases[sc.phase] ?? 0) + 1;
+        if (sc.phase === 'roll') { rolled = true; if (d2(foes[si], RIM_FLOOR) < 5) rollBest = Math.max(rollBest, openness(foes[si], mine)); }
         if (sc.phase === 'roll' && d2(foes[si], RIM_FLOOR) < 5 && openness(foes[si], mine) >= KICK_OPEN_M) { if (++openF >= 12) rollOpenHit = true; } else openF = 0;
       }
       if (flight) {
@@ -156,10 +159,11 @@ function sim(tier: string) {
     }
     if (!end) capped++;
     all.push(pts);
-    if (screenSet) { pnrN++; pnr.push(pts); if (Number.isFinite(lastContest)) pnrContest.push(lastContest); if (rollOpenHit) rollOpen++; if (toRoller) { rollGotBall++; rollPts += pts; } }
+    if (screenSet) { pnrN++; pnr.push(pts); if (Number.isFinite(lastContest)) pnrContest.push(lastContest); if (rollOpenHit) rollOpen++; if (rolled) { rolls++; rollSep.push(rollBest); } if (toRoller) { rollGotBall++; rollPts += pts; } }
   }
   return {
     tier, n: N, ptsPerPoss: +mean(all).toFixed(3), pnrN, ptsPerPnr: +mean(pnr).toFixed(3), pnrContestMed: +med(pnrContest).toFixed(2),
+    rollPct: +(100 * rolls / Math.max(1, pnrN)).toFixed(1), rollSepMed: rollSep.length ? +med(rollSep).toFixed(2) : null,
     rollOpenPct: +(100 * rollOpen / Math.max(1, pnrN)).toFixed(1), rollGotBallPct: +(100 * rollGotBall / Math.max(1, pnrN)).toFixed(1),
     rollPtsPerTouch: rollGotBall ? +(rollPts / rollGotBall).toFixed(3) : null, switchesPerPnr: +(switches / Math.max(1, pnrN)).toFixed(2), tagsPerPnr: +(helps / Math.max(1, pnrN)).toFixed(2), blocks, picks, capped, phaseFrames: phases, coverageFrames: covF,
   };
