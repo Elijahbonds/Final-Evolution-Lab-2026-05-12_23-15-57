@@ -1,7 +1,7 @@
 {
   "measuredAt": "2026-10-14",
   "probe": "scripts/probes/_perf-sweep.mts",
-  "profile": "390x844 portrait, DPR 3, isMobile/hasTouch (mobile tier, 780x1688 backing), SwiftShader, 4x CPU throttle, virtual time, a fake pad playing; ?perf=off (the content, not the governor). Worst frame of the run per metric. 2026-10-14 (lane/phone-perf): the drawCalls and textureMb of dunk, karate, threepoint and threevthree re-measured after the phone pass (the same profile through the esbuild static bundle, PAGE=, RASTER=4, SEED=7; only lowered); every other number is the 2026-10-06 sweep's.",
+  "profile": "390x844 portrait, DPR 3, isMobile/hasTouch (mobile tier, 780x1688 backing), SwiftShader, 4x CPU throttle, virtual time, a fake pad playing; ?perf=off (the content, not the governor). Worst frame of the run per metric. 2026-10-14 (lane/phone-perf): the drawCalls and textureMb of dunk, karate, threepoint and threevthree re-measured after the phone pass (the same profile through the esbuild static bundle, PAGE=, RASTER=4, SEED=7; only lowered); every other number is the 2026-10-06 sweep's. 2026-11-24 (lane/physics-arena, the look pass): physics_arena, physics_arena_3v3 and physics_arena_3pt measured on the same profile through the esbuild static page (scripts/probes/physics-arena/perf-round.sh: PAGE=, RASTER=4, SEED=7, ?perf=off, arena.setV1 0 as shipped), 3 rounds, portrait and landscape, the worst of each.",
   "headroom": 1.2,
   "ceilingSource": "drawCalls / activeMeshes / textureMb: PerfMonitor MOBILE_BUDGET. skinnedBodies 16 and particles 1500: perf-guard (TUNED).",
   "ceiling": {
@@ -329,6 +329,54 @@
         "activeMeshes": 81,
         "skinnedBodies": 6,
         "textureMb": 76,
+        "particles": 0
+      }
+    },
+    "physics_arena": {
+      "measured": {
+        "drawCalls": 95,
+        "activeMeshes": 31,
+        "skinnedBodies": 6,
+        "textureMb": 54,
+        "particles": 0
+      },
+      "budget": {
+        "drawCalls": 114,
+        "activeMeshes": 38,
+        "skinnedBodies": 8,
+        "textureMb": 65,
+        "particles": 0
+      }
+    },
+    "physics_arena_3v3": {
+      "measured": {
+        "drawCalls": 179,
+        "activeMeshes": 52,
+        "skinnedBodies": 10,
+        "textureMb": 92,
+        "particles": 0
+      },
+      "budget": {
+        "drawCalls": 215,
+        "activeMeshes": 63,
+        "skinnedBodies": 12,
+        "textureMb": 111,
+        "particles": 0
+      }
+    },
+    "physics_arena_3pt": {
+      "measured": {
+        "drawCalls": 161,
+        "activeMeshes": 58,
+        "skinnedBodies": 5,
+        "textureMb": 44,
+        "particles": 0
+      },
+      "budget": {
+        "drawCalls": 194,
+        "activeMeshes": 70,
+        "skinnedBodies": 6,
+        "textureMb": 53,
         "particles": 0
       }
     }

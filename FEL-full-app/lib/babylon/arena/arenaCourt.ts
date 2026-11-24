@@ -7,6 +7,8 @@
 import { Color3, DynamicTexture, Mesh, MeshBuilder, PBRMaterial, StandardMaterial, TransformNode, Vector3 } from '@babylonjs/core';
 import type { Scene } from '@babylonjs/core';
 import { ARC_M, ARENA_RIM, ARENA_RIM_RADIUS, NET, RIM_TUBE_R, armBox, boardBox, bracketBox, poleBox } from './hoopGeometry';
+import { arenaSetOn } from './arenaConfig';
+import { mountArenaSet } from './arenaSet';
 
 /** The painted court (m): sidelines at ±HALF_W, the baseline under the glass, the half-court line. */
 export const LINES = Object.freeze({ halfW: 7.5, baselineZ: -2.2, midZ: 11.8, keyHalfW: 2.45, ftZ: 3.6, ftR: 1.8, cornerX: 6.6 });
@@ -32,7 +34,7 @@ function painter(W: number, H: number, w: number, l: number, cx: number, cz: num
   };
 }
 
-export function mountArenaCourt(scene: Scene): ArenaCourt {
+export function mountArenaCourt(scene: Scene, o: { cage?: boolean } = {}): ArenaCourt {
   const root = new TransformNode('arena_court', scene);
   const w = 24, l = 24, cx = 0, cz = 4.6;   // square, so a painted circle stays round
   const ground = MeshBuilder.CreateGround('arena_ground', { width: w, height: l }, scene);
@@ -111,7 +113,9 @@ export function mountArenaCourt(scene: Scene): ArenaCourt {
   netMat.diffuseColor = new Color3(1, 1, 1); netMat.emissiveColor = new Color3(0.6, 0.6, 0.6); netMat.wireframe = true; netMat.backFaceCulling = false;
   net.material = netMat; net.parent = root; net.isPickable = false;
 
-  return { root, dispose: () => root.dispose(false, true) };
+  // the set round it (arena.setV1: the shipped streetball cage and an apron to the horizon; 0 = the court alone, as before)
+  const set = arenaSetOn() ? mountArenaSet(scene, o) : null;
+  return { root, dispose: () => { set?.dispose(); root.dispose(false, true); } };
 }
 
 /** A point on the floor (for the camera's objective). */

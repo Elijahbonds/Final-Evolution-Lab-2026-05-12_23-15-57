@@ -27,7 +27,8 @@ const queryFlag = (k: string): boolean => { try { return new URLSearchParams(win
 const SPORTS = [
   { id: 'hoops', mode: ARENA_MODE_ID, label: '1v1', keys: 'Move WASD · Sprint Shift · Shoot hold L, let go at the top · Jump J · Pass K · Reach I · Cross Q · View C' },
   { id: 'threes', mode: ARENA_3V3_MODE_ID, label: '3v3', keys: 'Move WASD · Sprint Shift · Shoot hold L · Jump J · Pass K (toward the stick) · Call for it / reach I · Cross Q · View C' },
-  { id: 'threepoint', mode: ARENA_3PT_MODE_ID, label: '3-Point', keys: 'Shoot hold L (or J), let go at the top of the jump · View C' },
+  // look pass (LOOK-PASS-AUDIT finding 12 c): "3-Point" wrapped to two lines on an upright phone; there it reads "3PT"
+  { id: 'threepoint', mode: ARENA_3PT_MODE_ID, label: '3-Point', short: '3PT', keys: 'Shoot hold L (or J), let go at the top of the jump · View C' },
 ] as const;
 function sportOf(search: string): (typeof SPORTS)[number] {
   let id = 'hoops';
@@ -129,8 +130,10 @@ export function ArenaStage({ signedIn }: { signedIn: boolean }) {
           </div>
           <nav aria-label="Arena sport" className="absolute left-1/2 top-3 z-10 flex -translate-x-1/2 gap-1 rounded-full bg-black/60 p-1">
             {SPORTS.map((x) => (
-              <a key={x.id} href={`${ARENA_HREF}?sport=${x.id}`} aria-current={sport?.id === x.id ? 'page' : undefined}
-                className={`inline-flex min-h-[44px] items-center rounded-full px-3 text-base font-bold ${sport?.id === x.id ? 'bg-white text-black' : 'text-white'}`}>{x.label}</a>
+              <a key={x.id} href={`${ARENA_HREF}?sport=${x.id}`} aria-current={sport?.id === x.id ? 'page' : undefined} aria-label={x.label}
+                className={`inline-flex min-h-[44px] items-center whitespace-nowrap rounded-full px-2.5 text-base font-bold sm:px-3 ${sport?.id === x.id ? 'bg-white text-black' : 'text-white'}`}>
+                {'short' in x ? <><span aria-hidden className="sm:hidden">{x.short}</span><span aria-hidden className="hidden sm:inline">{x.label}</span></> : x.label}
+              </a>
             ))}
           </nav>
           {pov && (

@@ -5,11 +5,14 @@ import { setAgentRunHooksAllowed } from '@/lib/agentRunHooks';
 import { runMode, InputBus } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { readCourtLocation } from '@/lib/babylon/nexus/courtLocations';
+import { setFeelUser, setFeelSession, setFeelOverride } from '@/lib/feel-panel/feel';
 const W = window;
 W.__hudNow = {};
 setAgentRunHooksAllowed(true);
 (async () => {
   const q = new URLSearchParams(window.location.search);
+  // ?feel=<json {knob id: value}>: the run on those feel-panel values (the look pass's A/B: {"arena.setV1":1})
+  if (q.get('feel')) { try { const o = JSON.parse(q.get('feel')); setFeelUser(true); setFeelSession(null); for (const [k, v] of Object.entries(o)) setFeelOverride(k, Number(v)); W.__feel = o; } catch (e) { W.__err = 'bad feel ' + String(e); return; } }
   const def = MODES[q.get('mode') ?? 'physics_arena'];
   if (!def) { W.__err = 'no mode'; return; }
   const bus = new InputBus();

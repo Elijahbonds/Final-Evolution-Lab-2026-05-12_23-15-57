@@ -73,6 +73,9 @@ export const KNOCK_MPS = 5.0;
 export const KNOCK_AIR_SHARE = 0.72;
 /** How long a knocked-down body stays out (s): the fall, the floor and the get-up (karate_get_up is the last 0.45 s). */
 export const DOWN_SEC = 1.3;
+/** The arena's set (look pass 2026-11-24, LOOK-PASS-AUDIT finding 12, arenaSet.ts): the shipped streetball cage, lamp poles and
+ *  benches round the court, and an apron to the horizon. 0 = the court alone (today's look exactly). */
+export const ARENA_SET_V1 = 0;
 /** POV only: how much of a look away from the rim the shot forgives (1 = always at the rim, 0 = exactly where you look). */
 export const AIM_ASSIST = 0.8;
 
@@ -107,6 +110,7 @@ export const dunkJumpVy = (): number => feel('arena.dunkJumpVy', DUNK_JUMP_VY);
 /** The arena's games post a run when they end (XP and progress; owner 2026-11-24). Its default is the server's switch
  *  (lib/sessions/arenaScore.ts ARENA_XP_ON: with it off the three session keys have no score rules). 0 = a practice court. */
 export const xpOn = (): boolean => feel('arena.xpOn', ARENA_XP_ON) >= 0.5;
+export const arenaSetOn = (): boolean => feel('arena.setV1', ARENA_SET_V1) >= 0.5;
 export const knockdownsOn = (): boolean => feel('arena.knockdowns', ARENA_KNOCKDOWNS) >= 0.5;
 export const foulsOn = (): boolean => feel('arena.fouls', ARENA_FOULS) >= 0.5;
 export const knockMps = (): number => feel('arena.knockMps', KNOCK_MPS);
