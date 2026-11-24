@@ -2545,6 +2545,12 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/adventure/story/titleCard.ts STORY_TITLE_CARD',
     hint: 'The READY screen as a title card: the route name, where you are, the chapter title large and START, with the same control table one tap away under CONTROLS. The partner picker shows each creature as the silhouette of its body in the game, not a dot. Same words. 0 = the screens as before.',
   },
+  // ── lane/look-world (look pass C3): the Closet held sideways ──
+  {
+    id: 'ui.closetSideways', label: 'Closet held sideways on a phone: walkthrough beside the athlete (1) / over the athlete (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Screens · phone',
+    source: 'lib/ui/closetSideways.ts CLOSET_SIDEWAYS',
+    hint: 'On a short sideways screen (a phone held sideways) the Studio walkthrough card sits at the top of the editor beside the stage, as on an upright phone, instead of over the 3D athlete. Same card and steps. Tablets and desktops unchanged. 0 = as before.',
+  },
   // ── lane/improve-world (phase 9): the zone cameras ──
   {
     id: 'venue.camClearView', label: 'Coast and story camera: keeps out of the boat, houses, trees, rocks and walls (1) / passes through them (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Coast · zone',
