@@ -283,6 +283,34 @@ export function defenseLegsOn(): boolean { return feel('hoops.defenseLegsOn', DE
  */
 export const BACKPEDAL_REVERSE_ON = 1;
 
+/** hoops-gap (lane/hoops-gap, 2026-11-23; HOOPS-GAP-PLAN §6b): THE STEPPING DEFENCE, READY FOR THE OWNER'S CLIPS. The defensive slides
+ *  skate (slide bench: 4–10 cm a frame at 1.5–2.5 m/s, the bar 3), and the fix is new clips — an art job. This wires them by NAME: with
+ *  `hoops.steppingDefenceOn` on, a state whose new clip the rig owns (as `bball_mc_<name>` from the capture pipeline, or `bball_<name>`
+ *  authored) plays it, paced against the stride the clip list asks for; a clip the rig does not own falls back to today's clip, exactly.
+ *  The beaten diagonal (a retreat whose travel is more than STEP_RETREAT_MIN_DEG off the chest, faster than STEP_RETREAT_ENTER_MPS) plays
+ *  the turn-and-run pair inside the backpedal's state. Knob off (the default) = today exactly, whatever the rig owns. */
+export const STEPPING_DEFENCE_ON = 0;
+export function steppingDefenceOn(): boolean { return feel('hoops.steppingDefenceOn', STEPPING_DEFENCE_ON) >= 0.5; }
+/** The §6b names (without the `bball_` / `bball_mc_` prefix), by the state they replace, and the stride (m/s at rate 1) each is made at. */
+export const STEP_CLIPS: Readonly<Partial<Record<BasketballAnimState, { name: string; strideMps: number }>>> = {
+  defend_slide: { name: 'defend_slide_left_v2', strideMps: 2.4 },
+  defend_slide_right: { name: 'defend_slide_right_v2', strideMps: 2.4 },
+  defend_slide_hard: { name: 'defend_slide_hard_left_v2', strideMps: 2.5 },
+  defend_slide_hard_right: { name: 'defend_slide_hard_right_v2', strideMps: 2.5 },
+};
+/** The turn-and-run pair (§6b #5–#6) for the beaten diagonal, and its stride; it travels STEP_RETREAT_TRAVEL_DEG off the chest. */
+export const STEP_RETREAT_CLIPS = { left: 'def_retreat_run_left', right: 'def_retreat_run_right' } as const;
+export const STEP_RETREAT_STRIDE_MPS = 4.0, STEP_RETREAT_TRAVEL_DEG = 135;
+/** The diagonal: travel this far off the chest (degrees; 180 is straight back) … and faster than ENTER (in) / EXIT (out) m/s. */
+export const STEP_RETREAT_MIN_DEG = 100, STEP_RETREAT_MAX_DEG = 160, STEP_RETREAT_ENTER_MPS = 2.6, STEP_RETREAT_EXIT_MPS = 2.2;
+/** The clip this rig owns under `name`, capture first; null = none. */
+export function ownedStepClip(names: ReadonlySet<string> | undefined, name: string): string | null {
+  if (!names) return null;
+  if (names.has(`bball_mc_${name}`)) return `bball_mc_${name}`;
+  if (names.has(`bball_${name}`)) return `bball_${name}`;
+  return null;
+}
+
 /** States that may cut a beat in flight. */
 const PRIORITY = new Set<BasketballAnimState>(['floor', 'contact_stagger', 'dunk']);
 
@@ -343,6 +371,7 @@ export class BasketballAnimTree {
   attachSteer(steer: HipSteer): void { this.steer = steer; }
   /** hoops-p05: +1, or −1 for a loop this rig plays in reverse (BACKPEDAL_REVERSE_ON). */
   private strideSign(state: BasketballAnimState | null): 1 | -1 {
+    if (state && this.stepClip.has(state)) return 1;   // hoops-gap: a stepping-defence clip plays forward
     return state === 'defend_backpedal' && feel('hoops.backpedalReverseOn', BACKPEDAL_REVERSE_ON) >= 0.5
       && !!(this.animator as { clipNames?: Set<string> }).clipNames?.has('bball_mc_defend_backpedal') ? -1 : 1;
   }
@@ -352,7 +381,8 @@ export class BasketballAnimTree {
     const st = !input.defending || input.airborne ? null : this.override ? (this.legsFree && this.legsLoop && this.legs?.live ? this.legsLoop.state : null) : this.current;
     // a beat with its own legs on defence (not a defensive beat stepping a loop): the turn holds, never unwinds under it (hipSteer.hold)
     const hold = input.defending && !input.airborne && !!this.override && !(this.legsFree && this.legs?.live);
-    s.drive({ state: st, hold, ...(st === 'defend_backpedal' && this.strideSign(st) < 0 ? { loopDeg: BACKPEDAL_REVERSED_TRAVEL_DEG } : {}), travelOffRad: input.travelOffRad, speedMps: input.speedMps ?? 0, dtSec: input.dtSec ?? 1 / 60 });
+    const retreatDeg = st === 'defend_backpedal' ? this.stepRetreatDeg : null;   // hoops-gap: the turn-and-run's own travel
+    s.drive({ state: st, hold, ...(retreatDeg !== null ? { loopDeg: retreatDeg } : st === 'defend_backpedal' && this.strideSign(st) < 0 ? { loopDeg: BACKPEDAL_REVERSED_TRAVEL_DEG } : {}), travelOffRad: input.travelOffRad, speedMps: input.speedMps ?? 0, dtSec: input.dtSec ?? 1 / 60 });
   }
   /** H2: drive the legs layer for this frame — under a move beat, the loop the body would be in and its stride rate; after it, fading. */
   private stepLegs(input: AnimTreeInput): void {
@@ -392,7 +422,35 @@ export class BasketballAnimTree {
     this.legsLoop = this.current && this.strideClip ? { state: this.current, clip: this.strideClip, since: this.stateSince } : null;
   }
   /** The stride references for THIS rig: a body running the CMU loops paces against their stride, not the authored one. */
-  private get ref() { return strideRef(!!(this.animator as { clipNames?: Set<string> }).clipNames?.has('bball_mc_run')); }
+  private get ref() {
+    const r = strideRef(!!(this.animator as { clipNames?: Set<string> }).clipNames?.has('bball_mc_run'));
+    if (!this.stepClip.size) return r;
+    // hoops-gap: a state on a stepping-defence clip paces against that clip's own stride (and the default rate ceiling)
+    const byState = { ...(r.byState ?? {}) }; const rateMax = { ...(r.rateMaxByState ?? {}) };
+    for (const [st, mps] of this.stepClip) { byState[st] = mps; delete rateMax[st]; }
+    return { ...r, byState, rateMaxByState: rateMax };
+  }
+  /** hoops-gap: the states playing a stepping-defence clip now, and the stride each is paced at; the turn-and-run's travel (deg) or null. */
+  private readonly stepClip = new Map<BasketballAnimState, number>();
+  private stepRetreatDeg: number | null = null;
+  /** hoops-gap: swap in the owner's stepping-defence clip for this choice, when the knob is on and the rig owns it (else the choice). */
+  private stepping(c: AnimChoice, input: AnimTreeInput | null): AnimChoice {
+    const names = (this.animator as { clipNames?: Set<string> }).clipNames;
+    if (!steppingDefenceOn()) { this.stepClip.clear(); this.stepRetreatDeg = null; return c; }
+    const row = STEP_CLIPS[c.state];
+    if (row) { const clip = ownedStepClip(names, row.name); if (clip) { this.stepClip.set(c.state, row.strideMps); return { ...c, clip }; } this.stepClip.delete(c.state); return c; }
+    if (c.state === 'defend_backpedal' && input) {
+      const off = input.travelOffRad, sp = input.speedMps ?? 0;
+      const deg = off === undefined ? 180 : Math.abs(((off * 180 / Math.PI) % 360 + 540) % 360 - 180);
+      const inRun = this.stepRetreatDeg !== null;
+      const diag = deg >= STEP_RETREAT_MIN_DEG && deg <= STEP_RETREAT_MAX_DEG && sp > (inRun ? STEP_RETREAT_EXIT_MPS : STEP_RETREAT_ENTER_MPS);
+      const side: 'left' | 'right' = (off ?? 0) < 0 ? 'left' : 'right';
+      const clip = diag ? ownedStepClip(names, STEP_RETREAT_CLIPS[side]) : null;
+      if (clip) { this.stepClip.set('defend_backpedal', STEP_RETREAT_STRIDE_MPS); this.stepRetreatDeg = side === 'left' ? -STEP_RETREAT_TRAVEL_DEG : STEP_RETREAT_TRAVEL_DEG; return { ...c, clip }; }
+    }
+    if (c.state === 'defend_backpedal') { this.stepClip.delete('defend_backpedal'); this.stepRetreatDeg = null; }
+    return c;
+  }
 
   /** POLISH (2026-09-17): a loop state DWELLS. The choice is pure and per frame, so a defender whose reads sat on a
    *  threshold flipped closeout ↔ slide ↔ backpedal every other frame (measured: 20 flip-flops in six 3v3 possessions,
@@ -422,9 +480,9 @@ export class BasketballAnimTree {
     this.last = input;
     this.stepLegs(input);
     this.stepSteer(input);
-    const raw = this.owned(chooseBasketballClip(input));
+    const raw = this.stepping(this.owned(chooseBasketballClip(input)), input);   // hoops-gap: the stepping-defence clips, by name
     if (this.settledState && raw.state !== this.settledState) this.settledState = null;
-    const c = this.settledState ? this.owned(chooseBasketballClip(withoutTrigger(input, this.settledState))) : raw;
+    const c = this.settledState ? this.stepping(this.owned(chooseBasketballClip(withoutTrigger(input, this.settledState))), input) : raw;
     if (this.override) {
       // a mode-owned hold is never interrupted; a beat yields only to a priority state
       const yields = this.override.kind === 'beat' && PRIORITY.has(c.state) && c.state !== this.override.state;

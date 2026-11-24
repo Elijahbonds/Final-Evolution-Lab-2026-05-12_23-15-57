@@ -455,6 +455,11 @@ describe('the feel knob catalogue', () => {
     expect(SPIN_SHOT_CUTS_HALF).toBe(0); expect(DRIVE_BY_HAND_ON).toBe(0);   // the owner's feel calls ship OFF
     expect(MAKE_BEAT_HOLDS_SHOT).toBe(1); expect(RIVAL_CHASE_AROUND_BODY).toBe(0);   // 4a ON on its bar; 4b OFF (its stalls did not reach 0)
     expect(def('net.remoteOffence')).toBe(NET_REMOTE_OFFENCE);   // phase 10
+    // lane/improve-camera (phase 8): the lens widening (1 = never, the view as hoops-cam shipped it) and the 3v3 view (ships 0)
+    expect(def('hoops.highCamZoomMax')).toBe(HSC.HIGH_CAM_ZOOM_MAX); expect(FEEL_KNOB_BY_ID.get('hoops.highCamZoomMax')?.min).toBe(1);
+    expect(def('hoops.highCamRoomOn')).toBe(HSC.HIGH_CAM_ROOM_ON); expect(HSC.HIGH_CAM_ROOM_ON).toBe(1);
+    expect(def('hoops.highCamLeadSec')).toBe(HSC.HIGH_CAM_LEAD_SEC); expect(FEEL_KNOB_BY_ID.get('hoops.highCamLeadSec')?.min).toBe(0);
+    expect(def('hoops.threeVThreeCam')).toBe(HSC.THREEVTHREE_CAM); expect(HSC.THREEVTHREE_CAM).toBe(0);
     // lane/physics-arena (new, owner 2026-11-23): the arena ships ON as a new place; 0 on each switch restores today
     expect(def('arena.on')).toBe(ARENA.ARENA_ON);
     expect(def('arena.physicsHoops')).toBe(ARENA.ARENA_PHYSICS_HOOPS);

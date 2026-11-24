@@ -1160,6 +1160,35 @@ look, down to `HIGH_CAM_PULL_MIN`, when only that fits); the eye stays out of an
 `HIGH_BOX_ROOM_M` 0.3 m of room). None of these turns the view.
 3v3, the dunk and 3-Point keep their cameras. **assumption:** the bounds are safe, not tuned.
 
+## improve-camera, 2026-11-22 (phase 8 of docs/IMPROVE-10-PHASE-AUDIT.md: the hoops high camera)
+
+Group **Hoops · camera**, all in `lib/babylon/core/HighSidelineCam.ts`. Four NEW knobs; no existing number moved. Each has an off
+value that gives back the view exactly as hoops-cam shipped it (unit-tested).
+
+- `hoops.highCamRoomOn` **1** — on a court whose venue box is tighter than the court needs (Canopy Court and Blossom Park stand on a
+  16 × 19 m ground), the 1v1 high view may stand as far out as the 3-Point camera already does at the same courts (x ±17 m, z −8..22 m
+  round the rim: `HIGH_CAM_ROOM_SIDE_M` 17, `HIGH_CAM_ROOM_BACK_M` 7.4, `HIGH_CAM_ROOM_OUT_M` 22.6, ThreePointMode's camera box). Before,
+  the eye was held on the court, so on a phone held upright the rim went off the side while defending deep past the arc, and the hero
+  went off the edge in the +x corner. The clear-view guard still keeps the eye out of and in front of trees. 0 = the venue box, as before.
+  `HIGH_CAM_ROOM_ON`. Measured with the lead below (rig, 3 runs a side, upright phone): rim on screen Canopy 73-89% -> 100%,
+  Blossom 57-83% -> 100%, Venice 95% -> 100%; both players and the rim on screen Canopy 74-85% -> 98-100%, Blossom 55-71% ->
+  99.9-100%, Venice 96% -> 99.8-100%. Desktop and a phone on its side: 100% before and after at all three.
+- `hoops.highCamZoomMax` **1.6×** — when the hero, the rival and the rim still do not fit after it backs away (scenery or the box stops
+  it), the lens widens — a zoom out, never a turn — only as far as needed, through the same soft slide, and back; the rim is let go only
+  after that. A fallback: on the rig (Canopy and Venice, every tier, 18 runs) the room and the lead fitted everything and the lens never
+  widened. 1 = never. `HIGH_CAM_ZOOM_MAX`.
+- `hoops.highCamLeadSec` **0.35 s** — the fit also keeps where each player will be this far ahead (his last frame's velocity, at most
+  `HIGH_CAM_LEAD_MPS` 9 m/s), so the slide sets off before a sprint reaches the edge instead of chasing it (on the rig, the drive to the
+  +x corner on an upright phone lost the rim off the far side for 0.6 s). Lead points are let go first. 0 = as before.
+  `HIGH_CAM_LEAD_SEC`.
+- `hoops.threeVThreeCam` **0 (ships OFF: the owner's feel call)** — 1 = the 1v1 high view in 3v3: the same court, it slides after the
+  middle of all six and keeps every player head to feet, and the rim, on screen (the rim is let go first, the hero never); it never
+  turns. SELECT or C switches to the follow for the run, as in 1v1. 0 = the 3v3 follow camera exactly as shipped. `THREEVTHREE_CAM`.
+  Measured (rig, 3 runs a side, 2026-11-23): all six players and the rim on screen, desktop 29-50% -> 100%, phone on its side
+  76-84% -> 98-99%, phone upright 29-32% -> 34-56% (six bodies do not fit a narrow upright screen; the rim is let go first); the
+  smallest player is drawn smaller (desktop 0.15-0.17 -> 0.13 of the screen height, upright 0.14-0.16 -> 0.11-0.12). For a team
+  game the clear-view guard reads a mesh whose box holds the court (3v3's cage frame and light masts) as the court, not a prop.
+
 ## hoops-play, 2026-11-21 (owner: "Gameplay could still be improved greatly"; docs/HOOPS-PLAY-AUDIT.md; the owner has not felt these yet)
 
 Three NEW switches, each **1 = on, 0 = today's game exactly** (tests pin both ends). No existing tuned number moved. Measured on the
@@ -1386,4 +1415,15 @@ NEW switches, each **1 = on, 0 = today's game exactly** (tests pin both ends). N
   coverage is worse than today's switch-every-screen against the roll too (0.693 → 0.715); keep it off.
   Round 3 (the same switch): the roll goes to the block with the most room (`ROLL_BLOCK_SIDE_M` 2.0 m either side of the rim,
   `ROLL_BLOCK_OUT_M` 1.2 m out) instead of straight down his line into the man guarding him; numbers in docs/HOOPS-GAP-PLAN.md §5.6.
+- `hoops.steppingDefenceOn` **0** (group "Hoops · transitions"; `anim/basketballTree.ts` `STEPPING_DEFENCE_ON`, with `STEP_CLIPS`, the
+  turn-and-run's `STEP_RETREAT_*` numbers: stride 4.0 m/s, travel 135°, the diagonal 100–160° off the chest, in above 2.6 m/s and out under
+  2.2): **the owner's stepping-defence clips drop in by name** (HOOPS-GAP-PLAN §6b: `defend_slide_left_v2`, `defend_slide_right_v2`,
+  `defend_slide_hard_left_v2`, `defend_slide_hard_right_v2`, `def_retreat_run_left`, `def_retreat_run_right`, each as `bball_mc_<name>` from
+  the capture pipeline or `bball_<name>` authored). Each plays forward at the stride the list asks for; a clip the rig does not own plays
+  today's clip exactly (slide bench with the knob on and no new clips: the same 4.5 / 10.4 / 2.7 / 5.6 cm). OFF until the clips exist.
+- `hoops.contactVoiceOn` **0** (group "Hoops · sound"; `audio/hoopsSfx.ts` `CONTACT_VOICE_ON`, with `CONTACT_HAND_PITCH` 1.2,
+  `CONTACT_HAND_GAIN` 1.0, `CONTACT_KNOCK_GAIN` 0.35, `CONTACT_BODY_GAIN` 0.9, `CONTACT_MIN_GAP_SEC` 0.06 s): **contacts sound like hands on
+  the ball and bodies.** On the court (the hoops sample bank), an `impact` at a hand-on-ball pitch (strips, pokes, parries, blocks) plays the
+  recorded palm slap over a short knock, a body contact the low thud, instead of the arcade boop; the call's volume is kept; two contacts
+  within 60 ms are one; the mute silences it (tested). Levels in docs/HOOPS-GAP-PLAN.md §5.7. A feel item: OFF for the owner's ear.
 

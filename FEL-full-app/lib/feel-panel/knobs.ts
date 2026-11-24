@@ -1248,6 +1248,27 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/core/HighSidelineCam.ts HIGH_CAM_PORTRAIT_LIFT',
     hint: 'On a phone held upright, the share of the screen height at the bottom (where the touch buttons are) the players are kept out of.',
   },
+  // ── lane/improve-camera (phase 8, 2026-11-22; new): the lens may widen to fit; the high view offered to 3v3 (OFF: the owner's feel call) ──
+  {
+    id: 'hoops.highCamZoomMax', label: 'High camera: most the lens widens to fit', def: 1.6, min: 1, max: 2, step: 0.05, unit: '×', group: 'Hoops · camera',
+    source: 'lib/babylon/core/HighSidelineCam.ts HIGH_CAM_ZOOM_MAX',
+    hint: 'When the players and the rim still do not fit after it backs away (a tight court on a phone held upright), the lens widens, never turning, up to this many times, and back. 1 = never (as before).',
+  },
+  {
+    id: 'hoops.highCamRoomOn', label: 'High camera: room to stand off the court (1) / the venue box (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · camera',
+    source: 'lib/babylon/core/HighSidelineCam.ts HIGH_CAM_ROOM_ON',
+    hint: '1 = on a small court (Canopy, Blossom) it may stand as far out as the 3-Point camera does there, still never inside or behind a tree. 0 = it keeps to the venue box, as before.',
+  },
+  {
+    id: 'hoops.highCamLeadSec', label: 'High camera: how far ahead it reads a run', def: 0.35, min: 0, max: 0.8, step: 0.05, unit: 's', group: 'Hoops · camera',
+    source: 'lib/babylon/core/HighSidelineCam.ts HIGH_CAM_LEAD_SEC',
+    hint: 'It also keeps where each player will be this far ahead, so it starts sliding before a sprint reaches the edge instead of chasing it. 0 = only where they are now (as before).',
+  },
+  {
+    id: 'hoops.threeVThreeCam', label: '3v3 camera: high sideline (1) / follow (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · camera',
+    source: 'lib/babylon/core/HighSidelineCam.ts THREEVTHREE_CAM',
+    hint: '1 = the 1v1 high camera in 3v3, keeping all six players and the rim on screen; it never turns. 0 = the 3v3 follow camera exactly as before (ships 0 until the owner tries it). SELECT or C switches during a game.',
+  },
   // GAMEPLAY-CLEAN P2 #6 (2026-11-03): the football carry's stride paces to the carrier (footballTree)
   {
     id: 'football.carryStrideMax', label: 'Football carry: top stride rate', def: 1.4, min: 1, max: 1.85, step: 0.05, unit: '×', group: 'Anim · stride',
@@ -1412,6 +1433,16 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'hoops.pnrFightFullOn', label: 'Defence: fighting over a screen costs no pace (0 = off)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · defense',
     source: 'lib/babylon/hoops/pnrCoverage.ts PNR_FIGHT_FULL_ON',
     hint: 'Needs the pick-and-roll coverage switch. 1: the man on the ball goes over the top at full speed. 0: at 0.7 of it, as before.',
+  },
+  {
+    id: 'hoops.contactVoiceOn', label: 'Sound: contacts sound like hands on the ball and bodies (0 = off)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · sound',
+    source: 'lib/babylon/audio/hoopsSfx.ts CONTACT_VOICE_ON',
+    hint: '1: on the court, a strip, poke or block plays a palm slap on the ball and a bump or check a low body thud, instead of the arcade impact boop; two contacts within 60 ms are one. 0: the impact, as before.',
+  },
+  {
+    id: 'hoops.steppingDefenceOn', label: 'Defence: play the new stepping-defence clips when the rig has them (0 = off)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · transitions',
+    source: 'lib/babylon/anim/basketballTree.ts STEPPING_DEFENCE_ON',
+    hint: '1: the slides, the sat-down slides and the beaten-diagonal turn-and-run play the clips named in HOOPS-GAP-PLAN 6b when the rig owns them, at their own stride; a missing clip plays today\'s. 0: today\'s clips.',
   },
   // hoops-p04 (1v1/3v3 phase 4 "feet and transitions"): one blend + minimum-hold rule (anim/hoopsTransitions), the shot clips on their
   // release (hoops/releaseTiming). Every default is this lane's; the owner has felt none of them.
