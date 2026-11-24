@@ -558,3 +558,19 @@ The owner, verbatim: **"Can I get an agent working on making the gameplay for th
 - Lane `lane/hoops-gap` (from `lane/finish-release` at `48a7b244`), `docs/HOOPS-GAP-PLAN.md`: a measured gap audit of 1v1 and 3v3, then the
   biggest gaps built in order, each behind its own feel knob (off = today exactly), ON only on a measured win.
 - The named series is the quality bar only: no names, art, modes, UI, animation data or sounds are copied from it.
+
+## owner 2026-11-24: the Physics Arena's open questions answered (relayed by the coordinator)
+
+The owner answered the lane's questions (`docs/PHYSICS-ARENA-PLAN.md` §6):
+
+1. **"POV-" (the cut-off message):** still unanswered. POV stays the arena's first-person camera.
+2. **Physics-driven limbs: YES.** Hands first, behind their own knob, OFF until measured; then arms.
+3. **Jump and dunk controls: "Yes".** `assumption:` (lane/physics-arena) keep hold-and-release for everything, as built (the dunk
+   included: the hand jams the ball on the release or once it is over the ring).
+4. **Hard collisions: YES.** Bodies can be knocked over and fouls are called; both behind knobs, and the shipping bar applies.
+5. **XP and progress: YES.** The arena counts for XP and progress. That needs server-side score rules (plausibility caps, no
+   client-trusted totals), following the existing session / XP pattern. **No schema change without stopping to ask the owner first.**
+6. **The next sport after 3v3: SOCCER.**
+
+Order (coordinator, 2026-11-24): the merged branch is PR'd first; then the 3v3 hoops arena, the physics hands (OFF), knockdowns and
+fouls, XP, then soccer.
