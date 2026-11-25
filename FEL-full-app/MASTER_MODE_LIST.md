@@ -40,6 +40,7 @@ Generated from `lib/babylon/modes/registry.ts` — the only thing that decides w
 | `physics_arena_3pt` | PhysicsArena3ptMode | registered, not enabled |
 | `physics_arena_3v3` | PhysicsArena3v3Mode | registered, not enabled |
 | `physics_arena_soccer` | PhysicsArenaSoccerMode | registered, not enabled |
+| `physics_arena_soccer_3v3` | PhysicsArenaSoccer3v3Mode | registered, not enabled |
 | `showdown` | ShowdownMode | enabled |
 | `skateboard` | SkateRunMode | enabled |
 | `snowboard_slalom` | SnowboardSlalomMode | enabled |

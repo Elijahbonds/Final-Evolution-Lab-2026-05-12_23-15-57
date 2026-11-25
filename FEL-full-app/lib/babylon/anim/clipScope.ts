@@ -101,7 +101,8 @@ export const MODE_CLIP_SCOPES: Record<string, { suites: readonly ClipSuite[]; bo
   physics_arena: HOOPS,   // lane/physics-arena (2026-11-23): the arena's 1v1 plays the hoops clips over its capsules
   physics_arena_3v3: HOOPS,   // lane/physics-arena: the arena's 3v3
   physics_arena_3pt: HOOPS,   // lane/physics-arena phase 3: the arena's three-point contest
-  physics_arena_soccer: { suites: ['soccer'], borrow: ['dunk_celebrate_big', 'freerun_slide'] },   // lane/physics-arena §9: the arena's soccer (the soccer suite; its goal celebration and slide tackle are aliases of these two)
+  physics_arena_soccer: { suites: ['soccer'], borrow: ['dunk_celebrate_big', 'freerun_slide'] },
+  physics_arena_soccer_3v3: { suites: ['soccer'], borrow: ['dunk_celebrate_big', 'freerun_slide'] },   // lane/physics-arena §9 slice 2: the 3v3 with keepers (the same; the keepers play the soccer suite's keeper_set and dives)   // lane/physics-arena §9: the arena's soccer (the soccer suite; its goal celebration and slide tackle are aliases of these two)
   threevthree: HOOPS,
   threepoint: { suites: ['hoops'], borrow: ['karate_hit_react', 'football_juke_left', 'dunk_celebrate_big'] },   // the make's celebration
   carnival: { suites: ['hoops', 'dunk', 'board', 'combat', 'soccer'], borrow: [] },   // the hub rotates four sports' bursts

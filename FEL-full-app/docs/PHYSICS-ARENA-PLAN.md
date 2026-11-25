@@ -386,9 +386,36 @@ none through; the goal sensor agrees with the resting-place label on 80/80 (33 g
 score 14/14 clean against 7/14 struck 0.55 m off the foot's sweet spot (the bar is the gap: 50 points, ≥ 40); three minutes of the live
 1v1 run, both sides score. Phone tier (3 rounds, the esbuild page, against the control and the arena's 1v1): soccer p95 30.6–40.8 ms
 against the 1v1's 31.6–47.2 and tennis's 39.3–47.6; load 12.5–13.2 s against the 1v1's 13.9–16.9; its `mobileBudget.json` row 78 draws /
-35 meshes / 6 bodies / 50 MB (budget 94 / 42 / 8 / 60). Not done yet: XP (a later step), keepers and 3v3 (slice 2), the pitch's
-surroundings (the dark floor ends a few metres past the boards).
+35 meshes / 6 bodies / 50 MB (budget 94 / 42 / 8 / 60). Not done yet: XP (built since: `arenaSoccer`, plan §8), keepers and 3v3 (slice 2, below), the pitch's
+surroundings (the dark floor ends a few metres past the boards: slice 2's `arena.soccerApron`, below).
 
 Questions for the owner (recommendation first): (a) 1v1 first, then 3v3 with keepers — or straight to 3v3? (b) keepers as AI bodies
 with hands (the physics hands) or no keepers in small goals? (c) the boards keep the ball in play (a cage game) — or out-of-play lines
 and throw-ins?
+
+**Slice 2: 3v3 with keepers** (`PhysicsArenaSoccer3v3Mode.ts`, `physics_arena_soccer_3v3`; the Soccer tab plays it with
+`arena.soccer3v3` 1, **shipped OFF**), on slice 1's ball, pitch, goals, touches, tackle and strike, unchanged.
+- **The keepers:** a body (85 kg) and two gloved physics hands (`ArenaHands`, 13 cm, at most 4 m/s; the basketball hands keep their
+  7 cm and 12 m/s). He stands 0.7 m off his line on the line from the ball to his goal's centre; a shot at his goal is read after the
+  tier's reaction (`SOCCER_RIVAL`: 420 / 220 / 120 ms) with the tier's misread (its scatter × 1.5, across); his gloves go for where it
+  will cross, within 0.9 m of his chest and, τ s after the reaction, within ½·a·τ² (a = 10 m/s²) of where they rested: a dive
+  accelerates. A **save is the contact**: the ball goes where the glove sends it. A ball at his gloves under 7.5 m/s (relative) is
+  held, then thrown out after 1.2 s to the most open team-mate; a slow loose ball in his area (3 m) with nobody nearer, he comes out for.
+- **Passing:** A (J) is a pass (hold for pace) to the team-mate the stick points at, the most open with the stick at rest, led to his
+  run. Y (I) calls for the ball; L1 (Q) switches player; the control moves by itself to the team-mate nearest the ball when your side
+  loses it.
+- **The AI** (both sides off one tier profile): the carrier runs at goal (along the boards when the ball is on them); he passes when
+  pressed (only through a clear lane: no opponent within 0.9 m of its line, an open man further forward preferred), clears it lofted
+  upfield when pressed in his own half with no lane, and shoots in range at a corner he has a line to (no outfielder within 0.5 m of
+  it) with the hardest strike that still crosses under the bar. He sets himself (a soft touch) before he winds up, the wind-up being a
+  plant for everyone; under pressure in range he shoots first time. Defenders press the ball (the nearest, goal-side) and mark the
+  rest goal-side; they jockey and go in on a heavy touch (the ball 0.55 m out from the carrier's foot) or near their goal. A ball dead
+  4 s (pinned in a corner) is dropped back into play 1.5 m inside the boards.
+- **Measured (headless, real Havok, `physics-arena-tests` S):** the same 20 strikes from 12 m (power 0.7, inside the posts) score 20/20
+  with the keeper stood aside and 10/20 with him in goal — the corners 8/10, half a metre off the centre 2/10 — 13 credited saves, every
+  save a glove. Three minutes of AI against AI: 1–2 (shots 5 / 8, on target 3 / 3), 28 of 70 passes reached a team-mate, 1 / 1 saves, 72 tackles, no ball dropped back into play, the ball 80 / 90 s in each attacking half. Over nine minutes and three other seeds the match scores about 0.7 goals a
+  minute (1–3 in three minutes), so a game to 5 between level sides runs about 7 minutes; `finding:` that is futsal's rate, slow for an
+  arcade game; the owner's feel test decides (options: first to 3, a lower keeper tier than the outfield's, a bigger goal).
+- **Phone tier** (3 rounds, the esbuild page, `perf-soccer.sh`): the 3v3 is the arena's heaviest mode: p95 48.9–58.5 ms upright (47.0–58.8 sideways) against the arena hoops 3v3's 33.4–38.4 and the control's (tennis) 25.0–35.2 in the same rounds; load 12.8–15.7 s (the hoops 3v3 16.4–17.1); 201 draws against the hoops 3v3's 124 (eight bodies to six, 40 shadow draws to 30), 108 MB of textures. Its `mobileBudget.json` row: 234 draws / 69 meshes / 12 bodies / 108 MB (budget 281 / 83 / 15 / 130). `finding:` before it ships ON it wants the bodies' draws down (the hoops 3v3 spends about 14 a body, the soccer 3v3 about 22) and one of the eight bodies' shadows off on the phone.
+- **The floor past the boards** (`arena.soccerApron`, 1v1 and 3v3): built and **shipped OFF**. Pictures, the same seed and moment, upright and sideways, OFF / ON (`set-look.mjs` with `FEEL_KEY=arena.soccerApron`): sideways it fills the void (the pitch no longer floats over a purple ground disc and the sky), but upright and sideways alike it lays a dark slab over the low sunset up to a hard horizon line: the pitch reads as standing in a dark room, a palette call for the owner. A fogged apron would not soften the edge (the golden hour's haze is EXP2 0.0034: a quarter of the way to the fog colour 160 m out). Cost: +1 draw, +1 mesh; p95 and load inside the control's noise.
+- Not done: its XP (its own key and a rebuild from its goal log, the 1v1's pattern; a later step), the loading card.

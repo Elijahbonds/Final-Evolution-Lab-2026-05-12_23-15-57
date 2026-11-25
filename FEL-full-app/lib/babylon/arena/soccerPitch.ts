@@ -10,6 +10,7 @@
 import { Color3, DynamicTexture, MeshBuilder, PBRMaterial, StandardMaterial, TransformNode, Vector3 } from '@babylonjs/core';
 import type { Scene } from '@babylonjs/core';
 import type { ArenaPhysics } from './arenaPhysics';
+import { arenaSoccerApronOn } from './arenaConfig';
 import { BOARD, GOAL, PITCH, goalFrame, goalLineZ, inGoalNet, type End } from './soccerGeometry';
 
 export interface SoccerPitch { root: TransformNode; dispose(): void }
@@ -74,6 +75,15 @@ export function mountSoccerPitch(scene: Scene): SoccerPitch {
   const gm = new PBRMaterial('soccer_ground_mat', scene);
   gm.albedoTexture = tex; gm.metallic = 0; gm.roughness = 0.9; gm.emissiveColor = new Color3(0.04, 0.05, 0.05);
   ground.material = gm;
+  // the floor past the boards (arena.soccerApron): the outside colour out to the horizon, matte and unfogged (the arena set's lesson:
+  // a PBR floor at a grazing angle mirrors the sky and reads as a pale wall)
+  if (arenaSoccerApronOn()) {
+    const apron = MeshBuilder.CreateGround('soccer_apron', { width: 320, height: 320 }, scene);
+    apron.position.y = -0.015; apron.parent = root; apron.isPickable = false; apron.applyFog = false;
+    const am = new StandardMaterial('soccer_apron_mat', scene);
+    am.diffuseColor = Color3.FromHexString('#16232b'); am.specularColor = Color3.Black(); am.emissiveColor = new Color3(0.04, 0.05, 0.05);
+    apron.material = am;
+  }
 
   // the boards (drawn 1 m: the colliders stand taller, unseen)
   const boardMat = pbr(scene, 'soccer_board_mat', '#2b3a55', 0.15, 0.4);

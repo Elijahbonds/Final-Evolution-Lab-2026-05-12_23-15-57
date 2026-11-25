@@ -486,6 +486,7 @@ describe('the feel knob catalogue', () => {
     expect(def('arena.fouls')).toBe(ARENA.ARENA_FOULS); expect(ARENA.ARENA_FOULS).toBe(0);
     expect(def('arena.knockMps')).toBe(ARENA.KNOCK_MPS); expect(def('arena.downSec')).toBe(ARENA.DOWN_SEC);
     expect(def('arena.soccer')).toBe(ARENA.ARENA_SOCCER);   // plan §9: the soccer tab
+    expect(def('arena.soccer3v3')).toBe(ARENA.ARENA_SOCCER_3V3); expect(def('arena.soccerApron')).toBe(ARENA.ARENA_SOCCER_APRON);
     expect(def('arena.setV1')).toBe(ARENA.ARENA_SET_V1);   // look pass: its off value is today's look (arenaCourt mounts nothing)
     expect(def('arena.xpOn')).toBe(ARENA_XP_ON);   // owner 2026-11-24: XP and progress, ON once tested end to end against a throwaway database
     expect(ARENA.ARENA_ON).toBe(1); expect(ARENA.ARENA_PHYSICS_HOOPS).toBe(1); expect(ARENA.CAM_POV).toBe(1); expect(ARENA.POV_BOB_M).toBe(0);

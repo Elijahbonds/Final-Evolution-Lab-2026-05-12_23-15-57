@@ -181,6 +181,14 @@ const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick' | 'boost' | 'turbo'>> 
     A: { label: 'PASS', emit: A('A'), hold: true },
     B: { label: 'TACKLE', emit: A('B') },
   }),
+  // §9 slice 2: the 3v3 with keepers. The same, and Y calls for the ball; L1 (Q) switches player (no deck button: the control
+  // follows the ball by itself when your side loses it).
+  physics_arena_soccer_3v3: verbs({
+    X: { label: 'SHOOT', emit: A('X'), hold: true },
+    A: { label: 'PASS', emit: A('A'), hold: true },
+    B: { label: 'TACKLE', emit: A('B') },
+    Y: { label: 'CALL', emit: A('Y') },
+  }),
   threevthree: verbs({
     X: { label: 'SHOOT', emit: A('X'), hold: true },
     Y: { label: 'BLOCK', emit: A('Y') },
