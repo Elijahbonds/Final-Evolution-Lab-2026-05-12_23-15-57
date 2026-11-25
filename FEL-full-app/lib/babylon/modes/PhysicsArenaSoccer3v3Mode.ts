@@ -32,7 +32,9 @@ import { GOAL, PITCH, SOCCER_BALL, goalCrossingAt, goalLineZ, type End } from '.
 import { FOOT_AHEAD_M, WIND_SEC, strike, type KickKind } from '../arena/soccerKick';
 import { seeded } from '../arena/shotModel';
 import type { P3 } from '../arena/hoopGeometry';
-import { povBobM, povEyeM, povFovDeg, povLookDegS, povOn, stepHz } from '../arena/arenaConfig';
+import { arenaBodyLodOn, arenaTeamRingsOn, povBobM, povEyeM, povFovDeg, povLookDegS, povOn, stepHz } from '../arena/arenaConfig';
+import { mountBodyLod, type BodyLodHandle } from '../arena/bodyLod';
+import { AWAY_RING, HOME_RING, mountTeamRings, type TeamRingsHandle } from '../arena/teamRings';
 import { applyPov, fovForAspect, povLook, povPose, type PovView } from '../arena/povCamera';
 import { SCORED_SEC, SOCCER_GAME_TO, SOCCER_RIVAL } from './PhysicsArenaSoccerMode';
 
@@ -151,6 +153,9 @@ interface St {
   /** Probe seam: the keepers stand still with their hands at rest (the keeper-less control for the saves test). */
   keepersOff: boolean;
   seam: Record<string, (...a: never[]) => unknown> | null;
+  /** The phone's body budget (arena.bodyLod) and the team rings (arena.teamRings), when on. */
+  lod: BodyLodHandle | null;
+  rings: TeamRingsHandle | null;
   disposed: boolean;
 }
 
@@ -792,9 +797,11 @@ export const PhysicsArenaSoccer3v3Mode: ModeDefinition = {
       pov: { on: false, view: { yaw: 0, pitch: 0, bobPhase: 0 }, savedFov: ctx.camera.fov }, camModeSeen: ctx.camDirector.mode,
       banner: '', bannerT: 0, timing: '', hudKey: '',
       stats: { shots: { home: 0, away: 0 }, onTarget: { home: 0, away: 0 }, goals: { home: 0, away: 0 }, passes: 0, completed: 0, saves: { home: 0, away: 0 }, catches: 0, tackles: 0, touches: 0, posts: 0, whiffs: 0, drops: 0, half: { home: 0, away: 0 } },
-      aiQuiet: false, keepersOff: false, seam: null, disposed: false, ball2pass: null, stillAt: { x: 0, y: 0, z: 0 }, stillSince: 0, passTo: -1, shotOnTarget: false, autoHome: false,
+      aiQuiet: false, keepersOff: false, seam: null, lod: null, rings: null, disposed: false, ball2pass: null, stillAt: { x: 0, y: 0, z: 0 }, stillSince: 0, passTo: -1, shotOnTarget: false, autoHome: false,
     };
     states.set(scene, S); current = S;
+    if (arenaBodyLodOn()) S.lod = mountBodyLod(scene, () => ctx.camera, pl.map((a) => ({ root: a.view, human: () => human(S, a) })), () => S.world.ball.pos);
+    if (arenaTeamRingsOn()) S.rings = mountTeamRings(scene, (['home', 'away'] as const).map((t) => ({ color: t === 'home' ? HOME_RING : AWAY_RING, nodes: () => S.pl.filter((a) => a.team === t).map((a) => (human(S, a) ? null : a.view)) })));
     setupKickoff(S, 'home');
     for (const a of pl) { a.view.position.copyFrom(a.node.position); a.view.rotation.y = a.yaw; }
     ctx.heroRef.current = pl[0].view;
@@ -869,6 +876,8 @@ export const PhysicsArenaSoccer3v3Mode: ModeDefinition = {
     frameRules(S, simDt);
     facing(S, simDt);
     camera(ctx, S, dt);
+    S.lod?.update(dt);
+    S.rings?.update();
     if (S.bannerT > 0) { S.bannerT -= dt; if (S.bannerT <= 0) S.banner = ''; }
     const power = m.kick ? Math.round(Math.min(1, m.kick.t / WIND_SEC) * 100) : -1;
     const key = `${S.score.home}|${S.score.away}|${S.banner}|${S.timing}|${S.pov.on}|${S.phase}|${power}`;
@@ -892,6 +901,7 @@ function close(scene: Scene): void {
   const S = states.get(scene);
   if (!S || S.disposed) return;
   S.disposed = true;
+  S.lod?.dispose(); S.rings?.dispose();
   S.world.dispose();
   S.pitch.dispose();
   states.delete(scene);
