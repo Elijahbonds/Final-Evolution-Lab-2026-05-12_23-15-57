@@ -15,7 +15,8 @@ import { ARENA_MODE_ID } from '@/lib/babylon/modes/PhysicsArenaMode';
 import { ARENA_3PT_MODE_ID } from '@/lib/babylon/modes/PhysicsArena3ptMode';
 import { ARENA_3V3_MODE_ID } from '@/lib/babylon/modes/PhysicsArena3v3Mode';
 import { ARENA_SOCCER_MODE_ID } from '@/lib/babylon/modes/PhysicsArenaSoccerMode';
-import { ARENA_HREF, arenaSoccerOn, physicsHoopsOn, povOn, SHIPPED_ONEVONE_HREF, xpOn } from '@/lib/babylon/arena/arenaConfig';
+import { ARENA_SOCCER_3V3_MODE_ID } from '@/lib/babylon/modes/PhysicsArenaSoccer3v3Mode';
+import { ARENA_HREF, arenaSoccer3v3On, arenaSoccerOn, physicsHoopsOn, povOn, SHIPPED_ONEVONE_HREF, xpOn } from '@/lib/babylon/arena/arenaConfig';
 import { ARENA_SESSION_KEY, finishArenaRun, startArenaRun } from '@/lib/babylon/arena/arenaRun';
 import type { FinishDeps } from '@/lib/sessions/finishOutbox';
 
@@ -31,8 +32,13 @@ const SPORTS = [
   // look pass (LOOK-PASS-AUDIT finding 12 c): "3-Point" wrapped to two lines on an upright phone; there it reads "3PT"
   { id: 'threepoint', mode: ARENA_3PT_MODE_ID, label: '3-Point', short: '3PT', keys: 'Shoot hold L (or J), let go at the top of the jump · View C' },
   // plan §9 (arena.soccer): soccer 1v1 in the cage
-  { id: 'soccer', mode: ARENA_SOCCER_MODE_ID, label: 'Soccer', keys: 'Move WASD · Sprint Shift · Shoot hold L, let go to strike · Pass hold K · Tackle I · Curl: the stick across the aim · View C' },
+  // (the keys: J is A, the pass; K is B and I is Y, both the tackle: InputBus KEYMAP)
+  { id: 'soccer', mode: ARENA_SOCCER_MODE_ID, label: 'Soccer', keys: 'Move WASD · Sprint Shift · Shoot hold L, let go to strike · Pass hold J · Tackle K · Curl: the stick across the aim · View C' },
 ] as const;
+/** plan §9 slice 2 (arena.soccer3v3): the Soccer tab plays 3v3 with keepers. Its games are not posted yet (its XP is a later step). */
+const SOCCER_3V3 = { mode: ARENA_SOCCER_3V3_MODE_ID, keys: 'Move WASD · Sprint Shift · Shoot hold L · Pass hold J (toward the stick) · Tackle K · Call for it I · Switch player Q · View C' };
+/** The mode a sport mounts, and its key line. */
+const played = (x: (typeof SPORTS)[number]): { mode: string; keys: string } => (x.id === 'soccer' && arenaSoccer3v3On() ? SOCCER_3V3 : x);
 /** The tabs on show: soccer only with arena.soccer. */
 const shownSports = () => SPORTS.filter((x) => x.id !== 'soccer' || arenaSoccerOn());
 function sportOf(search: string): (typeof SPORTS)[number] {
@@ -67,7 +73,7 @@ export function ArenaStage({ signedIn }: { signedIn: boolean }) {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!sport) return;
-    const def = MODES[sport.mode];
+    const def = MODES[played(sport).mode];
     if (!canvas || !physicsHoopsOn()) return;
     if (!def) { setErr('the arena is not registered'); return; }
     const bus = new InputBus();
@@ -77,7 +83,7 @@ export function ArenaStage({ signedIn }: { signedIn: boolean }) {
     // each game is one server run: started as play begins, finished (and the next one started) when the game ends. Signed out or
     // with arena.xpOn 0, nothing is posted (a practice court).
     const key = ARENA_SESSION_KEY[sport.id];
-    const posting = signedIn && xpOn();
+    const posting = signedIn && xpOn() && played(sport).mode !== ARENA_SOCCER_3V3_MODE_ID;
     const runOpts = { agent: queryFlag('agent'), playtest: queryFlag('playtest') };
     let run: Promise<string | null> | null = null;
     runMode(def, {
@@ -152,11 +158,11 @@ export function ArenaStage({ signedIn }: { signedIn: boolean }) {
           {timing && <p className="absolute inset-x-0 bottom-[38%] text-center text-base font-bold text-white/85 drop-shadow">Release: {timing}</p>}
           {xpNote && <p role="status" data-testid="arena-xp" className="absolute inset-x-0 top-[30%] text-center text-xl font-black text-[#FFD166] drop-shadow">{xpNote}</p>}
           {!touch && (
-            <p className="absolute inset-x-0 bottom-3 text-center text-base text-white/70">{sport?.keys}</p>
+            <p className="absolute inset-x-0 bottom-3 text-center text-base text-white/70">{sport ? played(sport).keys : ''}</p>
           )}
         </>
       )}
-      {touch && busRef.current && phase === 'playing' && sport && <TouchOverlay bus={busRef.current} modeId={sport.mode} visible />}
+      {touch && busRef.current && phase === 'playing' && sport && <TouchOverlay bus={busRef.current} modeId={played(sport).mode} visible />}
     </div>
   );
 }

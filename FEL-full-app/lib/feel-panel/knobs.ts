@@ -2621,6 +2621,16 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'On: the Physics Arena has a Soccer tab — 1v1 in a small cage on real ball physics (curl, drag, posts). Off: hoops only.',
   },
   {
+    id: 'arena.soccer3v3', label: 'Arena soccer: 3v3 with keepers (1) / 1v1 (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Physics arena',
+    source: 'lib/babylon/arena/arenaConfig.ts ARENA_SOCCER_3V3',
+    hint: 'On: the Soccer tab opens 3v3 with a keeper each side (saves by the gloves\' contact). Off: the 1v1.',
+  },
+  {
+    id: 'arena.soccerApron', label: 'Arena soccer floor past the boards (1) / the pitch alone (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Physics arena',
+    source: 'lib/babylon/arena/arenaConfig.ts ARENA_SOCCER_APRON',
+    hint: 'On: a dark floor runs from the boards to the horizon (fills the void past the boards; hides the low sunset). Off: the pitch stands on its own 3 m margin. OFF: a palette call for the owner.',
+  },
+  {
     id: 'arena.setV1', label: 'Arena set: the cage, lamps and benches round the court (1) / the court alone (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Physics arena',
     source: 'lib/babylon/arena/arenaConfig.ts ARENA_SET_V1',
     hint: 'On: the shipped streetball cage, lamp poles and benches stand round the arena court, and the ground runs to the horizon. Off: the court alone (today).',

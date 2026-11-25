@@ -11,6 +11,8 @@ const PORT = process.env.PORT ?? '3871', TAG = process.env.TAG ?? 'arena';
 const MODES = (process.env.MODES ?? 'physics_arena,physics_arena_3v3,physics_arena_3pt').split(',');
 const SIZES = (process.env.SIZES ?? '390x844,844x390').split(',');
 const SIDES = (process.env.SIDES ?? 'off,on').split(',');
+// the knob the two sides differ in (slice 2's floor past the boards: FEEL_KEY=arena.soccerApron); EXTRA: more knobs on both sides
+const KEY = process.env.FEEL_KEY ?? 'arena.setV1', EXTRA = JSON.parse(process.env.EXTRA ?? '{}');
 fs.mkdirSync(out, { recursive: true });
 const exe = ['/opt/pw-browsers/chromium-1243/chrome-linux64/chrome', '/opt/pw-browsers/chromium/chrome-linux64/chrome'].find((p) => fs.existsSync(p));
 const b = await chromium.launch({ executablePath: exe, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--no-sandbox'] });
@@ -21,7 +23,7 @@ for (const mode of MODES) for (const size of SIZES) for (const side of SIDES) {
   await ctx.addInitScript({ content: SEED });
   const p = await ctx.newPage();
   const errs = []; p.on('pageerror', (e) => errs.push(e.message.slice(0, 160)));
-  const feel = encodeURIComponent(JSON.stringify({ 'arena.setV1': side === 'on' ? 1 : 0 }));
+  const feel = encodeURIComponent(JSON.stringify({ ...EXTRA, [KEY]: side === 'on' ? 1 : 0 }));
   const t0 = Date.now();
   try {
     await p.goto(`http://127.0.0.1:${PORT}/${TAG}.html?mode=${mode}&tier=${phone ? 'mobile' : 'desktop'}&perf=off&feel=${feel}`, { waitUntil: 'domcontentloaded', timeout: 120000 });

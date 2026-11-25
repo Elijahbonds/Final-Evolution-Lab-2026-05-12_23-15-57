@@ -37,7 +37,8 @@ import { AdventureBRMode } from './AdventureBRMode';
 import { CoastZoneMode } from './CoastZoneMode';   // COAST & ISLANDS phase A (2026-11-18): the first open zone — registered, NOT enabled (/play/coast)
 import { PhysicsArenaMode } from './PhysicsArenaMode';
 import { PhysicsArena3ptMode } from './PhysicsArena3ptMode';
-import { PhysicsArenaSoccerMode } from './PhysicsArenaSoccerMode';   // PHYSICS ARENA §9: soccer on real physics (/play/arena?sport=soccer)
+import { PhysicsArenaSoccerMode } from './PhysicsArenaSoccerMode';
+import { PhysicsArenaSoccer3v3Mode } from './PhysicsArenaSoccer3v3Mode';   // PHYSICS ARENA §9 slice 2: soccer 3v3 with keepers (arena.soccer3v3)   // PHYSICS ARENA §9: soccer on real physics (/play/arena?sport=soccer)
 import { PhysicsArena3v3Mode } from './PhysicsArena3v3Mode';   // PHYSICS ARENA: 3v3 on real physics (/play/arena?sport=threes)   // PHYSICS ARENA phase 3: the three-point contest on real physics (/play/arena?sport=threepoint)   // PHYSICS ARENA (owner 2026-11-23): the sports on real physics — registered, NOT enabled (/play/arena)
 import { VeniceHubMode } from './VeniceHubMode';   // VENICE V1 (2026-11-17): the walkable hoops park — registered, Play-door served, NOT a scoring game.   // ADVENTURE C (2026-10-07): the bot BR — registered, NOT enabled (/play/adventure-br, unlisted)
 
@@ -111,7 +112,8 @@ export const MODES: Record<string, ModeDefinition> = {
   venice_hub: VeniceHubMode,   // VENICE V1 (docs/VENICE-HUB-PLAN.md): its own page /play/venice; Play has a Venice door, but it is not a scoring game.   // ADVENTURE C (2026-10-07): the bot Battle Royale; NOT enabled (unlisted route)
   physics_arena: PhysicsArenaMode,   // PHYSICS ARENA (docs/PHYSICS-ARENA-PLAN.md): its own page /play/arena, Play's Physics Arena chip; NOT enabled (no picker serves it); its games post as arenaHoops (lib/sessions/arenaScore.ts)
   physics_arena_3v3: PhysicsArena3v3Mode,   // PHYSICS ARENA: its page is /play/arena?sport=threes; NOT enabled
-  physics_arena_soccer: PhysicsArenaSoccerMode,   // PHYSICS ARENA §9: soccer 1v1, /play/arena?sport=soccer (arena.soccer); NOT enabled
+  physics_arena_soccer: PhysicsArenaSoccerMode,
+  physics_arena_soccer_3v3: PhysicsArenaSoccer3v3Mode,   // PHYSICS ARENA §9 slice 2: soccer 3v3 with keepers, the Soccer tab with arena.soccer3v3; NOT enabled   // PHYSICS ARENA §9: soccer 1v1, /play/arena?sport=soccer (arena.soccer); NOT enabled
   physics_arena_3pt: PhysicsArena3ptMode,   // PHYSICS ARENA phase 3: its page is /play/arena?sport=threepoint; NOT enabled
 };
 

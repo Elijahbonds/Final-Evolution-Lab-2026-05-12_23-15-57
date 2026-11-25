@@ -249,13 +249,15 @@ export class ArenaHands {
   private readonly at = [new Vector3(), new Vector3()];
   private readonly want = [new Vector3(), new Vector3()];
   private placed = false;
-  constructor(readonly player: ArenaPlayer, world: ArenaPhysics) {
+  /** `radius`: a hand sphere's (HAND_R by default; a keeper's gloved hand is bigger: soccer, plan §9). `maxMps`: a reach's top speed
+   *  (HAND_MAX_MPS by default; a keeper's dive is slower than a guard's swipe). */
+  constructor(readonly player: ArenaPlayer, world: ArenaPhysics, radius = HAND_R, private readonly maxMps = HAND_MAX_MPS) {
     const scene = player.node.getScene();
     const mk = (side: string): PhysicsBody => {
       const node = new TransformNode(`arena_hand_${player.id}_${side}`, scene);
       node.position.copyFrom(player.node.position);
       const body = new PhysicsBody(node, PhysicsMotionType.ANIMATED, false, scene);
-      const shape = new PhysicsShapeSphere(Vector3.Zero(), HAND_R, scene);
+      const shape = new PhysicsShapeSphere(Vector3.Zero(), radius, scene);
       shape.material = mat(BODY_BOUNCE, 0.6);
       filter(shape, player.bit, LAYER.BALL);
       body.shape = shape;
@@ -278,7 +280,7 @@ export class ArenaHands {
     const bodies = [this.left, this.right];
     for (let i = 0; i < 2; i++) {
       const a = this.at[i], w = this.want[i];
-      const dx = w.x - a.x, dy = w.y - a.y, dz = w.z - a.z, d = Math.hypot(dx, dy, dz), max = (this.fast ? HAND_MAX_MPS : HAND_CARRY_MPS) * h;
+      const dx = w.x - a.x, dy = w.y - a.y, dz = w.z - a.z, d = Math.hypot(dx, dy, dz), max = (this.fast ? this.maxMps : HAND_CARRY_MPS) * h;
       const k = d > max ? max / d : 1;
       a.set(a.x + dx * k, a.y + dy * k, a.z + dz * k);
       bodies[i].setTargetTransform(a, Quaternion.Identity());
@@ -409,8 +411,8 @@ export class ArenaPhysics {
   }
 
   /** Two physics hands for a player (arena.physicsHands). */
-  addHands(player: ArenaPlayer): ArenaHands {
-    const h = new ArenaHands(player, this);
+  addHands(player: ArenaPlayer, radius?: number, maxMps?: number): ArenaHands {
+    const h = new ArenaHands(player, this, radius, maxMps);
     this.hands.push(h);
     return h;
   }

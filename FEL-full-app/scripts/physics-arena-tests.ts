@@ -29,6 +29,9 @@
  *      rolling ball stops; 30 m/s shots at the posts and the bar never pass through them; the goal sensor (swept, the whole ball over
  *      the line) agrees with an independent label from the ball's resting place; in the live mode a clean strike from 12 m scores
  *      clearly more than one off the foot's sweet spot; three minutes of the live 1v1 run and both sides score.
+ *      Slice 2 (arena.soccer3v3): the keeper's saves are contact (the same 12 m strikes score clearly less with him in goal than
+ *      with him stood aside, and the corners still beat him), and three minutes of the 3v3 run with both sides attacking (shots on
+ *      target from each end), passes reaching team-mates, keepers saving and the ball seldom dead.
  *   G. Phase 3, the three-point contest: from the five racks (7.05–7.15 m) a good release still makes clearly more than a bad one,
  *      and the contest mode's own loop runs a whole contest headless (25 balls, the clock, the final).
  *
@@ -60,6 +63,7 @@ const ok = (n: string, c: boolean, extra = '') => {
 async function main() {
   // a probe's shortcut (not used by ci-suite): PA_ONLY=contact3v3 runs only the 3v3 with the contact knobs on
   if (process.env.PA_ONLY === 'soccer') { const w0 = await makeWorld(); w0.dispose(); nodeShims(); await soccerPhysics(); await soccerLive(w0.B); console.log(`\nphysics-arena (soccer only): ${pass} passed, ${fail} failed`); process.exit(fail ? 1 : 0); }
+  if (process.env.PA_ONLY === 'soccer3v3') { const w0 = await makeWorld(); w0.dispose(); nodeShims(); await soccer3v3(w0.B); console.log(`\nphysics-arena (soccer3v3 only): ${pass} passed, ${fail} failed`); process.exit(fail ? 1 : 0); }
   if (process.env.PA_ONLY === 'contact3v3') { const w0 = await makeWorld(); w0.dispose(); nodeShims(); await threes(w0.B, false, true); console.log(`\nphysics-arena (contact3v3 only): ${pass} passed, ${fail} failed`); process.exit(fail ? 1 : 0); }
   const { B, world, dispose } = await makeWorld();
   const h = 1 / 120;
@@ -223,6 +227,7 @@ async function main() {
   console.log('\nS. soccer on the same core');
   await soccerPhysics();
   await soccerLive(B);
+  await soccer3v3(B);
 
   console.log(`\nphysics-arena: ${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
@@ -374,6 +379,66 @@ async function soccerLive(B: typeof import('@babylonjs/core')) {
     ok('three minutes of soccer ran without a throw, the ball a number', threw === null && !nan);
     ok('the game went kick-off → live → scored', phases.has('kickoff') && phases.has('live') && phases.has('scored'));
     ok('both sides scored (the ball through the goal, read by the sensor)', !!st && st.goals.me > 0 && st.goals.foe > 0);
+    scene.dispose(); engine.dispose();
+  }
+}
+
+/** Slice 2: the keepers against the keeper-less control, then three minutes of 3v3 played by the AI on both sides. */
+async function soccer3v3(B: typeof import('@babylonjs/core')) {
+  const { PhysicsArenaSoccer3v3Mode: M, arenaSoccer3v3Seam, arenaSoccer3v3Stats } = await import('../lib/babylon/modes/PhysicsArenaSoccer3v3Mode');
+  const mk = async () => {
+    const engine = new B.NullEngine(); engine.getDeltaTime = () => 1000 / 60;
+    const scene = new B.Scene(engine);
+    const camera = new B.UniversalCamera('cams', new B.Vector3(0, 6, -14), scene);
+    const dir = { mode: 'follow', suspended: false, stickWorldLatched: (x: number, y: number) => new B.Vector3(x, 0, -y), look: () => {}, update: () => {}, snapTo: () => {} };
+    const ctx = { scene, camera, camDirector: dir, heroRef: { current: null }, objectiveRef: { current: null }, setHud: () => {}, card: () => {} } as never;
+    await M.load(ctx);
+    type Seam = { place: (x: number, z: number) => void; kick: (p: number, yaw: number, c: number) => void; quiet: (on: boolean) => void; keepersOff: (on: boolean) => void; auto: (on: boolean) => void };
+    return { engine, scene, ctx, seam: arenaSoccer3v3Seam(scene) as unknown as Seam };
+  };
+  const tz = goalLineZ('north');
+  // the same 12 m strikes (inside the posts, the power of a firm shot) with the keeper in goal and with him stood aside
+  const strikes = async (keeper: boolean): Promise<{ goals: number; corners: number; saves: number; n: number }> => {
+    const { engine, scene, ctx, seam } = await mk();
+    seam.quiet(true); seam.keepersOff(!keeper);
+    let goals = 0, corners = 0, n = 0;
+    // aims a ball's width inside a post (a corner) and half a metre off the centre
+    for (const deg of [-30, -15, 0, 15, 30]) for (const aim of [-1.3, -0.5, 0.5, 1.3]) {
+      const a = (deg * Math.PI) / 180, x = Math.sin(a) * 12, z = tz - Math.cos(a) * 12;
+      seam.place(x, z);
+      for (let f = 0; f < 45; f++) M.update(ctx, 1 / 60);
+      const before = arenaSoccer3v3Stats(scene)!.goals.home;
+      seam.kick(0.7, Math.atan2(aim - x, tz - z), 0);
+      for (let f = 0; f < 120; f++) M.update(ctx, 1 / 60);
+      const g = +(arenaSoccer3v3Stats(scene)!.goals.home > before);
+      goals += g; if (Math.abs(aim) > 1) corners += g; n++;
+    }
+    const saves = arenaSoccer3v3Stats(scene)!.saves.away;
+    scene.dispose(); engine.dispose();
+    return { goals, corners, saves, n };
+  };
+  const withK = await strikes(true), without = await strikes(false);
+  console.log(`     12 m strikes inside the posts: with the keeper ${withK.goals}/${withK.n} in (the corners ${withK.corners}/${withK.n / 2}; ${withK.saves} saved), keeper stood aside ${without.goals}/${without.n}`);
+  ok(`a keeper in goal saves by contact: the same strikes score clearly less (${withK.goals} vs ${without.goals} of ${withK.n}, a gap ≥ 25 %) and he is credited saves`, (without.goals - withK.goals) / withK.n >= 0.25 && withK.saves > 0);
+  ok(`…and he can be beaten: the corners go in clearly more than the middle (${withK.corners} vs ${withK.goals - withK.corners} of ${withK.n / 2}, corners ≥ 30 %)`, withK.corners / (withK.n / 2) >= 0.3 && withK.corners > withK.goals - withK.corners);
+  // three minutes, the AI on both sides
+  {
+    const { engine, scene, ctx, seam } = await mk();
+    seam.auto(true);
+    let threw: unknown = null, nan = false;
+    try {
+      const ball = scene.getMeshByName('ball')!;
+      for (let f = 0; f < 60 * 180; f++) { M.update(ctx, 1 / 60); const b = ball.position; if (!Number.isFinite(b.x + b.y + b.z)) nan = true; }
+    } catch (e) { threw = e; console.error(e); }
+    const st = arenaSoccer3v3Stats(scene);
+    console.log(`     three minutes of 3v3: goals ${st?.goals.home}/${st?.goals.away}; shots ${st?.shots.home}/${st?.shots.away} (on target ${st?.onTarget.home}/${st?.onTarget.away}); passes ${st?.completed}/${st?.passes} reached a team-mate; saves ${st?.saves.home}/${st?.saves.away} (catches ${st?.catches}); tackles ${st?.tackles}; posts ${st?.posts}; air kicks ${st?.whiffs}; drops ${st?.drops}; the ball in each attacking half ${Math.round(st?.half.home ?? 0)}/${Math.round(st?.half.away ?? 0)} s`);
+    ok('three minutes of 3v3 soccer ran without a throw, the ball a number', threw === null && !nan);
+    // (not "both sides scored", the 1v1's bar: with keepers in goal the AI's match scores about one goal in two minutes, so three
+    // minutes of it are often goalless; what the AI can be held to is attacking from both ends)
+    ok('both sides attacked: shots on target from each (at least 2), the ball in each attacking half for at least a fifth of the play', !!st && st.onTarget.home >= 2 && st.onTarget.away >= 2 && Math.min(st.half.home, st.half.away) >= 0.2 * (st.half.home + st.half.away));
+    ok('passes reached team-mates (at least a third of them, and at least 10)', !!st && st.completed >= 10 && st.completed / Math.max(1, st.passes) >= 1 / 3);
+    ok('the keepers saved shots', !!st && st.saves.home + st.saves.away > 0);
+    ok(`the ball was dropped back into play (a dead ball for 4 s) at most 4 times (${st?.drops})`, !!st && st.drops <= 4);
     scene.dispose(); engine.dispose();
   }
 }
