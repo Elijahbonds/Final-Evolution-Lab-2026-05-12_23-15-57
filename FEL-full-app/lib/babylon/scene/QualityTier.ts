@@ -22,6 +22,7 @@ import type { FitResult } from '../core/canvasFit';
 import type { VenueMood } from './moods';
 import { readGraphicsChoice, readTierParam, isLegacyLook, recordTierDecision } from './graphicsSetting';
 import { feel } from '../../feel-panel/feel';
+import { PROBE_SIZE, PHONE_PROBE_SIZE } from './VenueReflection';
 
 // The policy (types, explainQualityTier, autoTier, classifyGpu) lives in tierRule.ts — no Babylon there — and is re-exported.
 export * from './tierRule';
@@ -144,6 +145,41 @@ export function readPhoneAA(): number {
   const v = q !== null && q !== '' ? Number(q) : feel('look.phoneAA', PHONE_AA_DEFAULT);
   return v === 1 || v === 2 ? v : 0;
 }
+
+/**
+ * DEPTH PASS (lane depth-light, 2026-11-25): a look knob for ONE load from the URL, `?look.<name>=<value>` (e.g.
+ * `?look.phoneFeetPool=0.6`), as `?aa=` is for look.phoneAA. The feel panel's overrides arrive only once the server has opened the
+ * panel, which can be after the light rig has mounted; a URL value is there from the first line, so a before/after picture and the
+ * owner's own phone check get exactly the value asked for. Null when the page has no such parameter (then the knob is read).
+ */
+export function urlLook(id: string): number | null {
+  try {
+    if (typeof window === 'undefined') return null;
+    const q = new URLSearchParams(window.location.search).get(id);
+    if (q === null || q === '') return null;
+    const v = Number(q);
+    return Number.isFinite(v) ? v : null;
+  } catch { return null; }
+}
+
+/**
+ * DEPTH PASS PHASE 3 (lane depth-light, 2026-11-25; docs/DEPTH-PASS-AUDIT.md finding 7): the venue capture by tier, one knob
+ * (`look.venueProbeTiers`), read at mount. Glossy surfaces (the rim, the backboard frame, the ball, a sealed court) reflect the mood's
+ * procedural gradient everywhere but the high tier.
+ *   0 — today: the high tier only (256 px);
+ *   1 — and the desktop tier (256 px: one capture at load, six scene passes, nothing per frame);
+ *   2 — and the phones, at 128 px (the same one capture; its load cost is measured before it ships).
+ * `?look=legacy` never captures (legacyRig). Unknown values read as 0.
+ */
+export const VENUE_PROBE_TIERS = 0;
+/** Pure: the capture's size in px for this tier (0 = no capture). `base` is the tier's own setting (high). */
+export function venueProbeSize(tier: QualityTier, base: boolean, v: number): number {
+  if (base) return PROBE_SIZE;
+  if (tier === 'desktop' && (v === 1 || v === 2)) return PROBE_SIZE;
+  if (tier === 'mobile' && v === 2) return PHONE_PROBE_SIZE;
+  return 0;
+}
+export const readVenueProbeTiers = (): number => urlLook('look.venueProbeTiers') ?? feel('look.venueProbeTiers', VENUE_PROBE_TIERS);
 
 export function tierRigSettings(tier: QualityTier, mood: VenueMood): TierRigSettings {
   if (tier === 'mobile') {

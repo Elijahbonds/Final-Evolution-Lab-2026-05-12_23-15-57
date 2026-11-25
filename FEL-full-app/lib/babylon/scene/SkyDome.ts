@@ -18,14 +18,15 @@
 // A MaterialPlugin on the dome's own StandardMaterial (the CUSTOM_FRAGMENT_BEFORE_FOG hook): the material object, its
 // emissive texture, a weather's dimmed `level`, AlpineSky's recompose and every caller that reads the dome keep working —
 // the plugin re-reads whatever texture is there. GLSL only. Mounted once after load(), never toggled; phones keep the
-// photograph (their sky is a few hundred pixels across, and the noise is fill they do not have).
+// photograph (look.phoneSkySoft, depth pass phase 4a, gives them the soften and the haze only) (their sky is a few hundred pixels across, and the noise is fill they do not have).
 
 import { Color3, MaterialPluginBase, ShaderLanguage, Vector3 } from '@babylonjs/core';
 import type { AbstractEngine, AbstractMesh, Material, Nullable, Observer, Scene, SubMesh, UniformBuffer } from '@babylonjs/core';
 import { MOODS, type VenueMood } from './moods';
-import type { QualityTier } from './QualityTier';
+import { urlLook, type QualityTier } from './QualityTier';
 import { hazeColor } from './Atmosphere';
 import { sceneModeId, wave2Look } from './lookPolicy';
+import { feel } from '@/lib/feel-panel/feel';
 
 /** How each bake is treated. `softenFrom` / `cloudFrom`: the direction's y (sin of the elevation) where it starts. */
 export interface SkyLook { soften: number; softenFrom: number; clouds: number; cloudFrom: number; disc: boolean }
@@ -71,13 +72,17 @@ class SkyPlugin extends MaterialPluginBase {
   cloudLit = new Color3(1, 1, 1); cloudShade = new Color3(0.6, 0.65, 0.75);
   haze = new Color3(0.8, 0.8, 0.8); hazeAmt = 0.3; horizonY = BAKE_HORIZON_Y;
   private _enabled = false;
-  constructor(material: Material) { super(material, PLUGIN, 300, { FEL_SKY: false }); }
+  /** Depth pass phase 4: the cloud layer compiled in (desktop/high); the phones' path leaves the noise out of the shader. */
+  clouds = true;
+  /** Depth pass phase 4: the soften's blur radius (× the 8 taps' reach): 1 on desktop/high, PHONE_SKY_BLUR on phones. */
+  blur = 1;
+  constructor(material: Material, clouds = true) { super(material, PLUGIN, 300, { FEL_SKY: false, FEL_SKY_CLOUDS: false }); this.clouds = clouds; }
   // device-perf (2026-11-12, the WebGPU trial): Babylon's default accepts GLSL only and THROWS when this is attached to a WGSL
   // (WebGPU) material. Under WGSL it adds no code, so the dome keeps its plain look. Under WebGL nothing changes (GLSL was already accepted).
   isCompatible(): boolean { return true; }
   get isEnabled(): boolean { return this._enabled; }
   set isEnabled(v: boolean) { if (this._enabled === v) return; this._enabled = v; this.markAllDefinesAsDirty(); this._enable(v); }
-  prepareDefines(defines: Record<string, unknown>): void { defines.FEL_SKY = this._enabled; }
+  prepareDefines(defines: Record<string, unknown>): void { defines.FEL_SKY = this._enabled; defines.FEL_SKY_CLOUDS = this._enabled && this.clouds; }
   getClassName(): string { return 'SkyPlugin'; }
   getUniforms(lang?: ShaderLanguage): { ubo: { name: string; size: number; type: string }[]; fragment?: string } {
     const ubo = [
@@ -109,13 +114,13 @@ class SkyPlugin extends MaterialPluginBase {
     ubo.updateColor3('felSkyCloudLit', this.cloudLit);
     ubo.updateColor3('felSkyCloudShade', this.cloudShade);
     ubo.updateFloat4('felSkyHaze', this.haze.r, this.haze.g, this.haze.b, this.hazeAmt);
-    ubo.updateFloat4('felSkySoften', this.soften, this.softenFrom, this.horizonY, 0);
+    ubo.updateFloat4('felSkySoften', this.soften, this.softenFrom, this.horizonY, this.blur);
   }
   getCustomCode(shaderType: string, lang?: ShaderLanguage): Nullable<Record<string, string>> {
     if (lang === ShaderLanguage.WGSL || shaderType !== 'fragment') return null;
     return {
       CUSTOM_FRAGMENT_DEFINITIONS: `
-        #ifdef FEL_SKY
+        #ifdef FEL_SKY_CLOUDS
           float felSkyHash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
           float felSkyNoise(vec2 p) {
             vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
@@ -132,7 +137,7 @@ class SkyPlugin extends MaterialPluginBase {
             float up = smoothstep(felSkySoften.y, felSkySoften.y + 0.2, felD.y) * felSkySoften.x;
             if (up > 0.001) {
               vec2 uv0 = vEmissiveUV + uvOffset; vec3 b = vec3(0.0);
-              for (int i = 0; i < 8; i++) { float a = float(i) * 0.785398; b += texture2D(emissiveSampler, uv0 + vec2(cos(a) * 0.014, sin(a) * 0.02)).rgb; }
+              for (int i = 0; i < 8; i++) { float a = float(i) * 0.785398; b += texture2D(emissiveSampler, uv0 + vec2(cos(a) * 0.014, sin(a) * 0.02) * felSkySoften.w).rgb; }
               b = b * 0.125 * vEmissiveInfos.y + vEmissiveColor;
               color.rgb = mix(color.rgb, b, up);
             }
@@ -143,6 +148,7 @@ class SkyPlugin extends MaterialPluginBase {
             felLevel = vEmissiveInfos.y;   // a weather's night dims the sky texture: the clouds and the sun dim with it
           #endif
           float felMu = max(dot(felD, felSkySun.xyz), 0.0);
+          #ifdef FEL_SKY_CLOUDS
           if (felSkyCloud.x > 0.0 && felD.y > felSkyCloud.y) {
             vec2 cp = felD.xz / (felD.y + 0.12) * 2.8 + vec2(felSkyCloud.z * 0.012, felSkyCloud.z * 0.005);
             float n = felSkyFbm(cp + 0.35 * vec2(felSkyFbm(cp * 0.5 + 3.1), felSkyFbm(cp * 0.5 - 1.7)));   // a little domain warp: billows, not blobs
@@ -151,6 +157,7 @@ class SkyPlugin extends MaterialPluginBase {
             float lit = clamp(0.45 + 0.55 * felMu + (n - 0.5) * 0.6, 0.0, 1.0);
             color.rgb = mix(color.rgb, mix(felSkyCloudShade, felSkyCloudLit, lit) * felLevel, a);
           }
+          #endif
           float felGlow = pow(felMu, 10.0) * felSkySunColor.a + pow(felMu, 90.0) * felSkySunColor.a * 1.5;
           float felDisc = smoothstep(0.99955, 0.99975, felMu) * felSkySun.w;
           color.rgb += felSkySunColor.rgb * (felGlow + felDisc * 3.0) * felLevel;
@@ -164,12 +171,26 @@ class SkyPlugin extends MaterialPluginBase {
 
 export interface SkyDomeHandle { readonly meshes: readonly AbstractMesh[]; readonly keys: readonly string[]; dispose(): void }
 
-/** Pure: desktop/high, a mode the wave-2 look reaches, not switched off. */
-export function skyDomeWanted(tier: QualityTier, modeId: string | null, off = false): boolean { return tier !== 'mobile' && wave2Look(modeId) && !off; }
+// DEPTH PASS PHASE 4a (lane depth-light, 2026-11-25; docs/DEPTH-PASS-AUDIT.md finding 8): the phone's sky was the raw photograph — a
+// smeared blob behind Blossom's trees, a flat gradient behind the hero held sideways. `look.phoneSkySoft` (0 = today) gives phones the
+// plugin's cheap half: the SOFTEN (the 8-tap blur of the open sky) and the HAZE band at the horizon. No clouds (compiled out of the
+// phone's shader: FEL_SKY_CLOUDS), no sun disc, no sun glow. Desktop and high are unchanged.
+/** look.phoneSkySoft's shipped value: 0 = today (phones keep the photograph). */
+export const PHONE_SKY_SOFT = 0;
+/** The phones' soften blur, × the desktop's reach. The desktop blur (~14 × 10 texels) was set to sit UNDER the procedural clouds; with
+ *  no clouds on a phone it erased a bake's own cloud streaks (the Dunk's beach sunset, measured 2026-11-25). At 0.4 (~6 × 4 texels) it
+ *  still smooths the photograph's compression blocks (Blossom's smeared sky) and keeps the streaks. */
+export const PHONE_SKY_BLUR = 0.4;
+
+/** Pure: desktop/high, a mode the wave-2 look reaches, not switched off; phones too with `phoneSoft` (look.phoneSkySoft) on. */
+export function skyDomeWanted(tier: QualityTier, modeId: string | null, off = false, phoneSoft = 0): boolean {
+  return (tier !== 'mobile' || phoneSoft >= 0.5) && wave2Look(modeId) && !off;
+}
 
 /** Give the scene's sky domes (bk_dome, nexus_sky) the live sky. Call after load(); the rig's captureVenue does. */
 export function mountSkyDome(scene: Scene, mood: VenueMood, tier: QualityTier, off = false): SkyDomeHandle | null {
-  if (!skyDomeWanted(tier, sceneModeId(scene), off)) return null;
+  const phone = tier === 'mobile';
+  if (!skyDomeWanted(tier, sceneModeId(scene), off, phone ? (urlLook('look.phoneSkySoft') ?? feel('look.phoneSkySoft', PHONE_SKY_SOFT)) : 0)) return null;
   const domes = ['nexus_sky', 'bk_dome'].map((n) => scene.getMeshByName(n)).filter((m): m is AbstractMesh => !!m && !!m.material && m.material.getClassName() === 'StandardMaterial');
   if (!domes.length) return null;
   const M = MOODS[mood];
@@ -181,14 +202,15 @@ export function mountSkyDome(scene: Scene, mood: VenueMood, tier: QualityTier, o
     const key = bakeKeyOf(tex, (e.mesh.metadata as { felBake?: string } | null)?.felBake ?? null);
     e.key = key;
     const L = SKY_LOOKS[key];
-    e.p.soften = L.soften; e.p.softenFrom = L.softenFrom; e.p.cover = L.clouds; e.p.cloudFrom = L.cloudFrom;
-    e.p.disc = L.disc && sun.y > 0.05 ? 1 : 0;
+    e.p.soften = L.soften; e.p.softenFrom = L.softenFrom; e.p.cover = phone ? 0 : L.clouds; e.p.cloudFrom = L.cloudFrom;
+    e.p.disc = !phone && L.disc && sun.y > 0.05 ? 1 : 0;
   };
   for (const mesh of domes) {
-    const p = new SkyPlugin(mesh.material!);
+    const p = new SkyPlugin(mesh.material!, !phone);
+    p.blur = phone ? PHONE_SKY_BLUR : 1;
     p.sun.set(sun.x, sun.y, sun.z);
     p.sunColor.copyFrom(sunC);
-    p.glow = SUN_GLOW[mood] ?? 0;
+    p.glow = phone ? 0 : SUN_GLOW[mood] ?? 0;
     p.cloudLit.copyFrom(Color3.Lerp(Color3.White(), sunC, 0.35));
     p.cloudShade.copyFrom(Color3.Lerp(skyC, grd, 0.45).scale(0.85));
     p.haze.copyFrom(Color3.FromHexString(hazeColor(mood)));
@@ -206,7 +228,7 @@ export function mountSkyDome(scene: Scene, mood: VenueMood, tier: QualityTier, o
     // a bake streams in after load (NexusWebScene swaps its painted placeholder for the jpg): look again for a few seconds
     if (recheck > 1 && t < 12) { recheck = 0; for (const e of plugins) configure(e); }
   });
-  console.info(`[FEL-SKY] live sky on ${plugins.map((e) => `${e.mesh.name}(${e.key})`).join(', ')}`);
+  console.info(`[FEL-SKY] ${phone ? 'soft phone sky (no clouds)' : 'live sky'} on ${plugins.map((e) => `${e.mesh.name}(${e.key})`).join(', ')}`);
   return {
     get meshes() { return plugins.map((e) => e.mesh); },
     get keys() { return plugins.map((e) => e.key); },

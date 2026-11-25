@@ -2718,6 +2718,52 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/visual/CourtSurface.ts COURT_DETAIL_V2',
     hint: 'The painted court and the Venice set ground (concrete, sand) sampled with 16x anisotropic filtering instead of 4x (the court) and 8x (the ground), so the lines and grain hold at the play camera angle. No new texture, no colour change. 0 = as before. Applies on the next game load.',
   },
+  // ── lane/depth-light (depth pass phases 1–4, docs/DEPTH-PASS-AUDIT.md lane L): light and shadow ──
+  {
+    id: 'look.phoneFeetPool', label: 'Phone: a soft shadow pool under each player, darkness (0 = the faint disc as before)', def: 0, min: 0, max: 1, step: 0.05, unit: '', group: 'Look · light and shadow',
+    source: 'lib/babylon/visual/contactShadow.ts PHONE_FEET_POOL',
+    hint: 'Phones only (desktop and high draw real shadows). The disc under each player becomes a darker pool with a soft rim, stretched and leaned away from the sun like a short shadow. The value is the pool darkness at its centre. Same single draw for every player. 0 = the faint round disc, as before. Applies on the next game load.',
+  },
+  {
+    id: 'look.discOverCourt', label: 'Shadow disc under each player drawn over the court, no dark star (1) / as before (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Look · light and shadow',
+    source: 'lib/babylon/visual/contactShadow.ts DISC_OVER_COURT',
+    hint: 'Every tier. The soft disc under each player sat in the same plane as the painted Venice court, and the two fought for depth: dark wedges radiating from the feet like a star. On, the disc is drawn just over the court. No colour, size or darkness change. 0 = as before. Applies on the next game load.',
+  },
+  {
+    id: 'look.phoneShadowFit', label: 'Phone: shadow map spent on the court, metres around play (0 = whole venue as before)', def: 0, min: 0, max: 60, step: 1, unit: 'm', group: 'Look · light and shadow',
+    source: 'lib/babylon/scene/phoneCasters.ts PHONE_SHADOW_FIT',
+    hint: 'Phones only. Scenery farther than this from the play area stops casting a shadow on a phone (it still receives one), so the phone shadow map covers the court and the players get sharper shadows. 0 = every caster in the venue, as before. Applies on the next game load.',
+  },
+  {
+    id: 'look.phoneShadowDepth', label: 'Phone: shadow depth range from the scene (1) / the camera range as before (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Look · light and shadow',
+    source: 'lib/babylon/scene/phoneCasters.ts PHONE_SHADOW_DEPTH',
+    hint: 'Phones only. The phone shadow map measures depth over the casters own range instead of the camera 10 km range, so its depth test can tell a shoe from the court under it. 0 = as before. Applies on the next game load.',
+  },
+  {
+    id: 'look.bodyFormLight', label: 'Players: share of the soft sky fill on bodies, for a light and a dark side (0 = full fill as before)', def: 0, min: 0, max: 1, step: 0.05, unit: '', group: 'Look · light and shadow',
+    source: 'lib/babylon/scene/bodyFill.ts BODY_FORM_LIGHT',
+    hint: 'Every tier. The players (and only the players) take this share of the even sky fill, so the sun and the rim light shape the torso, arms and face: a lit side and a shaded side. With it on, the rim light also gets stronger when the camera is behind the players. Court, set and sky light unchanged. No colour change. 0 = as before. Applies on the next game load.',
+  },
+  {
+    id: 'look.venueProbeTiers', label: 'Shiny surfaces reflect the real place: high tier only as before (0) / and desktop (1) / and phones (2)', def: 0, min: 0, max: 2, step: 1, unit: '', group: 'Look · light and shadow',
+    source: 'lib/babylon/scene/QualityTier.ts VENUE_PROBE_TIERS',
+    hint: 'The rim, the backboard frame, the ball and a glossy court reflect one picture of the venue taken at load, instead of a made-up sky gradient. 0 = the high tier only, as before. 1 = desktop too. 2 = phones too, with a smaller picture. One capture at load, nothing per frame. Applies on the next game load.',
+  },
+  {
+    id: 'look.glossyCourtOnes', label: 'Desktop: 1v1 and 3v3 court mirrors the players like the Dunk (1) / as before (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Look · light and shadow',
+    source: 'lib/babylon/scene/GlossyFloor.ts GLOSSY_COURT_ONES',
+    hint: 'Desktop and high only, phones never. The painted Venice court in 1v1 and 3v3 gets the soft mirror the Dunk court has: the players, the hoop and the set reflected faintly at their feet. 0 = as before. Applies on the next game load.',
+  },
+  {
+    id: 'look.phoneSkySoft', label: 'Phone: softer sky with a haze band at the horizon (1) / the plain sky picture as before (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Look · light and shadow',
+    source: 'lib/babylon/scene/SkyDome.ts PHONE_SKY_SOFT',
+    hint: 'Phones only. The cheap half of the desktop sky: the open sky softened so its pixels stop showing, and a light haze where the sky meets the set. No moving clouds, no sun glow (desktop keeps those). 0 = the sky picture as before. Applies on the next game load.',
+  },
+  {
+    id: 'look.desktopPcss', label: 'Desktop: shadows sharp at the feet and softer further out, softening rate (0 = even softness as before)', def: 0, min: 0, max: 0.2, step: 0.01, unit: '', group: 'Look · light and shadow',
+    source: 'lib/babylon/scene/LightRig.ts DESKTOP_PCSS',
+    hint: 'Desktop and high only, phones never. Contact-hardening shadows: a shadow is crisp where it touches what casts it (a shoe on the court) and softens with distance, so a landing player shadow tightens under them. The value is how quickly it softens. 0 = evenly soft, as before. Applies on the next game load.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));

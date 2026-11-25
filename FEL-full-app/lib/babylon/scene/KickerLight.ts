@@ -11,7 +11,7 @@
 // the subject, a little to one side and above, travelling back toward the lens. Colour and strength are per mood.
 
 import { Color3, DirectionalLight, Vector3 } from '@babylonjs/core';
-import type { AbstractMesh, Observer, Scene } from '@babylonjs/core';
+import type { AbstractMesh, Observer, Scene, TransformNode } from '@babylonjs/core';
 import type { VenueMood } from './moods';
 
 export interface KickerDef { color: string; intensity: number }
@@ -48,16 +48,40 @@ export function kickerDirection(forward: { x: number; y: number; z: number }): {
   return { x: x / n, y: y / n, z: z / n };
 }
 
+// ── depth pass phase 2 (lane depth-light, 2026-11-25): the rim from behind ───────────────────────────────────────────────────────────
+// The rim did not show from the Dunk's behind-the-player camera (docs/DEPTH-PASS-AUDIT.md finding 3): from behind, the kicker lights the
+// side of the body the camera cannot see and only a sliver of edge catches it. With `look.bodyFormLight` on (bodyFill.ts), the kicker's
+// strength follows how much of the bodies' BACKS the camera sees: × (1 + KICKER_BACK_GAIN × backness), backness 0 (the camera sees
+// their fronts or sides) .. 1 (straight behind them). Off, the kicker is exactly as before (the per-mood KICKER numbers are not edited).
+/** How much stronger the kicker gets when the camera is straight behind the bodies (new; only with look.bodyFormLight on). */
+export const KICKER_BACK_GAIN = 0.8;
+
+/** Pure: how much of the bodies' backs the camera sees — the mean over bodies of max(0, cos) between the camera's ground heading and
+ *  each body's ground facing (the rig faces +z at yaw 0). 0 with no body. */
+export function kickerBackness(camForward: { x: number; z: number }, bodyForwards: readonly { x: number; z: number }[]): number {
+  const cl = Math.hypot(camForward.x, camForward.z);
+  if (cl < 1e-6 || !bodyForwards.length) return 0;
+  let sum = 0, n = 0;
+  for (const f of bodyForwards) {
+    const fl = Math.hypot(f.x, f.z);
+    if (fl < 1e-6) continue;
+    sum += Math.max(0, (camForward.x * f.x + camForward.z * f.z) / (cl * fl)); n++;
+  }
+  return n ? sum / n : 0;
+}
+
 export interface KickerHandle {
   light: DirectionalLight;
   /** The meshes it lights (players only). */
   readonly meshes: readonly AbstractMesh[];
+  /** depth pass phase 2: the last backness read (0 unless `followBacks` is on). */
+  readonly backness: number;
   dispose(): void;
 }
 
 /** Mount the kicker. Players are found the way AnimeInk finds them: a mesh with a skeleton (checked a frame after it is
  *  added, because an instantiated character's skeleton attaches just after the mesh). */
-export function mountKickerLight(scene: Scene, mood: VenueMood): KickerHandle {
+export function mountKickerLight(scene: Scene, mood: VenueMood, opts: { followBacks?: boolean } = {}): KickerHandle {
   const K = KICKER[mood] ?? KICKER.goldenHour;
   const light = new DirectionalLight('fel_kicker', new Vector3(0, -KICKER_LIFT, -1), scene);
   light.diffuse = Color3.FromHexString(K.color);
@@ -85,6 +109,10 @@ export function mountKickerLight(scene: Scene, mood: VenueMood): KickerHandle {
     light.setEnabled(meshes.length > 0);
   };
   apply();
+  let backness = 0;
+  const roots: TransformNode[] = [];
+  let rootsFor = -1;
+  const facings: { x: number; z: number }[] = [];
   const aim: Observer<Scene> = scene.onBeforeRenderObservable.add(() => {
     apply();
     const cam = scene.activeCamera;
@@ -92,10 +120,21 @@ export function mountKickerLight(scene: Scene, mood: VenueMood): KickerHandle {
     const f = cam.getDirection(Vector3.Forward());
     const d = kickerDirection(f);
     light.direction.set(d.x, d.y, d.z);
+    if (!opts.followBacks) return;
+    // the bodies' roots (the top of each skinned mesh's parent chain), refreshed when the body list changes
+    if (rootsFor !== meshes.length) {
+      rootsFor = meshes.length; roots.length = 0;
+      for (const m of meshes) { let r: TransformNode = m; while (r.parent) r = r.parent as TransformNode; if (!roots.includes(r)) roots.push(r); }
+    }
+    facings.length = 0;
+    for (const r of roots) if (r.isEnabled()) { const fw = r.forward; facings.push({ x: fw.x, z: fw.z }); }
+    backness = kickerBackness({ x: f.x, z: f.z }, facings);
+    light.intensity = K.intensity * (1 + KICKER_BACK_GAIN * backness);
   });
   return {
     light,
     get meshes() { return meshes; },
+    get backness() { return backness; },
     dispose() {
       scene.onNewMeshAddedObservable.remove(added);
       scene.onMeshRemovedObservable.remove(removed);
