@@ -419,3 +419,27 @@ and throw-ins?
 - **Phone tier** (3 rounds, the esbuild page, `perf-soccer.sh`): the 3v3 is the arena's heaviest mode: p95 48.9–58.5 ms upright (47.0–58.8 sideways) against the arena hoops 3v3's 33.4–38.4 and the control's (tennis) 25.0–35.2 in the same rounds; load 12.8–15.7 s (the hoops 3v3 16.4–17.1); 201 draws against the hoops 3v3's 124 (eight bodies to six, 40 shadow draws to 30), 108 MB of textures. Its `mobileBudget.json` row: 234 draws / 69 meshes / 12 bodies / 108 MB (budget 281 / 83 / 15 / 130). `finding:` before it ships ON it wants the bodies' draws down (the hoops 3v3 spends about 14 a body, the soccer 3v3 about 22) and one of the eight bodies' shadows off on the phone.
 - **The floor past the boards** (`arena.soccerApron`, 1v1 and 3v3): built and **shipped OFF**. Pictures, the same seed and moment, upright and sideways, OFF / ON (`set-look.mjs` with `FEEL_KEY=arena.soccerApron`): sideways it fills the void (the pitch no longer floats over a purple ground disc and the sky), but upright and sideways alike it lays a dark slab over the low sunset up to a hard horizon line: the pitch reads as standing in a dark room, a palette call for the owner. A fogged apron would not soften the edge (the golden hour's haze is EXP2 0.0034: a quarter of the way to the fog colour 160 m out). Cost: +1 draw, +1 mesh; p95 and load inside the control's noise.
 - Not done: its XP (its own key and a rebuild from its goal log, the 1v1's pattern; a later step), the loading card.
+
+**Slice 2, the phone cost and the team rings (2026-11-25, the coordinator: "cut its phone cost toward the hoops 3v3" and
+"team-colour ground rings for both 3v3s").**
+- **Where a body's cost goes** (`scripts/probes/physics-arena/census.mjs`, `bodycost.mjs`, the phone profile): a body is ~25 draws in
+  BOTH 3v3s (~10 parts, ~10 ink: the hull and the mesh again on the 5 parts the phone inks, 5 into the shadow map); the soccer 3v3 is
+  heavier for its two extra bodies, not a costlier body (its bodies merge like the hoops 3v3's: `bodyMerge`). In one page, unthrottled,
+  the render's own time: as is 5.3–6.5 ms, every body hidden 3.0–3.2, ink off 4.9–5.2, shadows off 4.8–5.4.
+- **`arena.bodyLod` (built, shipped OFF):** on the phone tier a body more than 14 m from the camera drops its ink (about a pixel there;
+  `visual/CrowdLod.ts` makes the same call for crowds) and only the player's man, the 3 bodies nearest the ball and the bodies within
+  14 m of the camera cast the sun's shadow (all keep the contact shadow), without touching a render list (no merge dissolves, no
+  shadow-cache re-bake). It takes the soccer 3v3's draws from 201 to 131 (shadow 40 → 26: the hoops 3v3's 126) — and **does not move the
+  frame**: p50 37.2 against 37.4, p95 66.4 against 66.3 in the same round; even an aggressive setting (8 m, 1 caster: 119 draws) read
+  36.2 / 71.5 against 37.6 / 61.2. On this rig (SwiftShader, 4× throttle) the 3v3's frame is its eight skinned bodies' vertex work
+  (158k vertices against the hoops 3v3's 106k; the phone already loads the decimated kit bodies), not its draws. The pictures (OFF / ON,
+  `set-look.mjs` with `FEEL_KEY=arena.bodyLod`): the far bodies lose a small shadow and a sub-pixel line. OFF: no measured gain here.
+  `finding:` bringing the soccer 3v3 to the control's noise wants fewer vertices a body (a far-distance body mesh: asset work, the
+  owner's list) or fewer bodies; on a real phone GPU, often draw-bound, the draw cut may well pay — a device measure decides.
+- **`arena.teamRings` (built, shipped OFF, recommended ON):** a ring in the side's colour under every body in both 3v3s (teal home, red
+  away; none under the player's man, who has his own): one thin-instanced mesh a side, 2 draws, unlit, no shadow. The pictures read:
+  a team-mate and a rival in the same olive tee are told apart at a glance (the kits cannot: an NPC's tint only seeds its roster body).
+  Cost: in one page, rings shown / hidden 4.0 / 3.8–3.5 ms (hoops) and 6.2 / 5.5–6.9 (soccer), inside the page's own drift; on the phone
+  rig the p95 overlaps, but the p50 read higher with the rings in 4 of 4 alternations (+1 to +4 ms, the order swapped between the two
+  rounds). Not clean by the bar, so OFF; the owner's call.
+
