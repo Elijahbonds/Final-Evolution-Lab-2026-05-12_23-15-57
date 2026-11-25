@@ -6,9 +6,10 @@
 //   THE INK of a far body. The arena modes ink at a fixed 1.5 cm; on the phone's 844 px through the ~0.8 rad field of view that is
 //            ~15 px ÷ metres, so a body more than ~14 m from the camera draws its 10 ink draws for a line about one pixel wide.
 //            Beyond INK_FAR_M a body's parts drop the contour (back on inside INK_FAR_M − 1 m: no flicker at the edge).
-//   THE SHADOW of a body away from the play. Every body still stands on its contact shadow (the soft disc under the feet, one
-//            instanced mesh for all of them); the sun's shadow is kept for the player's man and the CASTERS bodies nearest the
-//            ball (a body keeps it until it falls a rank further back: no flicker either).
+//   THE SHADOW of a far body away from the play. Every body still stands on its contact shadow (the soft disc under the feet, one
+//            instanced mesh for all of them); the sun's shadow is kept by the player's man, the CASTERS bodies nearest the ball (a
+//            body keeps it until it falls a rank further back: no flicker either) and every body within INK_FAR_M of the camera
+//            (the first A/B took it from two near the camera and far from the ball, and they were the ones it showed on).
 // HOW, without touching what the body merge and the shadow cache watch: the ink is each part's own `renderOutline` (the merge
 // copies it per sub-mesh at the draw, and it is not in the merge's change signature); the shadow is a `getCustomRenderList` on
 // each shadow map, a filter over whatever list the map renders (the shadow cache rewrites that list every frame) — no part ever
@@ -95,8 +96,9 @@ export function mountBodyLod(scene: Scene, camera: () => Camera, bodies: LodBody
       const dist = entries.map((e) => { const p = e.b.root.position; return Math.hypot(p.x - bp.x, p.z - bp.z); });
       const cast = castersFor(dist, entries.map((e) => e.cast), human);
       entries.forEach((e, i) => {
-        e.cast = cast[i];
-        const p = e.b.root.position, ink = human[i] || inkAt(Math.hypot(p.x - cam.x, p.y + 1 - cam.y, p.z - cam.z), e.ink);
+        const p = e.b.root.position, dCam = Math.hypot(p.x - cam.x, p.y + 1 - cam.y, p.z - cam.z);
+        const ink = human[i] || inkAt(dCam, e.ink);
+        e.cast = cast[i] || inkAt(dCam, e.cast);
         // (an ink-less body is re-checked every time: the ink pass can reach a part after it was turned off)
         if (ink !== e.ink || !ink) { e.ink = ink; setInk(e, ink); }
       });

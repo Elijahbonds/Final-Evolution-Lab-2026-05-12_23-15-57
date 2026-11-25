@@ -11,7 +11,7 @@ import type { Mesh, Scene, TransformNode } from '@babylonjs/core';
 /** The sides' colours (the arena's: the player's teal, the rival red). */
 export const HOME_RING = '#2EC4B6', AWAY_RING = '#F25F5C';
 /** The ring's size (m: outer diameter, tube) and its height over the floor. */
-const RING_D = 0.95, RING_T = 0.05, RING_Y = 0.025;
+const RING_D = 0.95, RING_T = 0.08, RING_Y = 0.025;
 
 /** A side: its colour and its bodies (null: no ring — the player's man, who has his own). */
 export interface RingSide { color: string; nodes: () => Array<TransformNode | null> }
