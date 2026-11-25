@@ -592,3 +592,21 @@ a local throwaway database (never prod) — a forged log refused, a legit win pa
   streak either, so it never uses up the streak LC another game would pay that day.
 - `assumption:` the keys are catalogue keys for the session routes only (`session-payout.isCatalogueMode`); they are not
   `MODE_INFO` rows, so no list, venue, first-game pick, challenge or staked Arena offers them. History shows them by their key.
+
+## owner 2026-11-25: the go for the Sanctuary (relayed by the coordinator)
+
+The owner, verbatim: **"Let's improve the sanctuary to feel like the chao gardens and improve the whole partner customizable monster
+partner experience."** This is the owner's **go for the Sanctuary**, which was on hold ("don't start Kaelor or the Sanctuary without
+the owner's go"). Work is on `lane/sanctuary` (`docs/SANCTUARY-PLAN.md`).
+
+- **"Chao gardens" is a feel benchmark only**, as every benchmark game here is (`docs/world-concepts/README.md` §5: "Chao Garden is
+  already renamed the Sanctuary"). Taken: a cozy home garden where partners live, wander and react to you; feeding, petting, play and
+  training; care that visibly shapes growth; small cosmetic exhibitions; an attachment loop. **Nothing copied:** no names, creature
+  designs, art, UI, sounds, item names or exact mechanics. Built on our own partner system.
+- `assumption:` (lane/sanctuary) the go covers **the Sanctuary only**. Kaelor, the six named companions and the cast stay proposals;
+  the garden uses the three existing species and placeholder names, each flagged.
+- `assumption:` (lane/sanctuary) the garden is a **new unlisted page** (`/play/sanctuary`, noindex, in no mode list), ON when measured
+  clean; its doors from Play, the story, the Coast and the picker wait for the owner's OK to list it.
+- Owner calls that ship OFF until answered (the plan's §6): names and words, the cast, palette (tints, accessories), and anything
+  touching progression or rewards (care training the partner's stats and stage, care raising the bond). Nothing in the garden is
+  random or paid, and it pays no XP or currency. **No schema change**: the garden's state is story flags in the Adventure save.
