@@ -2631,6 +2631,16 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'On: a dark floor runs from the boards to the horizon (fills the void past the boards; hides the low sunset). Off: the pitch stands on its own 3 m margin. OFF: a palette call for the owner.',
   },
   {
+    id: 'arena.bodyLod', label: 'Arena soccer 3v3 bodies at a phone cost (1) / every body inked and casting (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Physics arena',
+    source: 'lib/babylon/arena/arenaConfig.ts ARENA_BODY_LOD',
+    hint: 'Phone tier only. On: a body over 14 m from the camera draws no ink line, and only your man and the 3 bodies nearest the ball cast the sun shadow (all keep the contact shadow).',
+  },
+  {
+    id: 'arena.teamRings', label: 'Arena 3v3 team-colour rings at the feet (1) / none (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Physics arena',
+    source: 'lib/babylon/arena/arenaConfig.ts ARENA_TEAM_RINGS',
+    hint: 'On: a ring in the side colour under every body in the soccer and hoops 3v3 (teal yours, red theirs): the kits do not say whose side a body is on.',
+  },
+  {
     id: 'arena.setV1', label: 'Arena set: the cage, lamps and benches round the court (1) / the court alone (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Physics arena',
     source: 'lib/babylon/arena/arenaConfig.ts ARENA_SET_V1',
     hint: 'On: the shipped streetball cage, lamp poles and benches stand round the arena court, and the ground runs to the horizon. Off: the court alone (today).',

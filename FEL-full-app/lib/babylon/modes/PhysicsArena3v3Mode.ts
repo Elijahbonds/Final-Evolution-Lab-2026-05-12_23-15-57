@@ -37,7 +37,8 @@ import { HoopSensor } from '../arena/hoopSensor';
 import { dunkPush, LAYUP_ARC_DEG, releaseShot } from '../arena/arenaShot';
 import { passVelocity, seeded } from '../arena/shotModel';
 import { chestPoint, dribbleCatch, dribbleCommit, dribbleHand, dribblePush, setPoint } from '../arena/dribble';
-import { aimAssist, downSec, dunkJumpVy, dunksOn, floorBounce, foulsOn, jumpVy, knockdownsOn, knockMps, physicsHandsOn, povBobM, povEyeM, povFovDeg, povLookDegS, povOn, stepHz } from '../arena/arenaConfig';
+import { aimAssist, arenaTeamRingsOn, downSec, dunkJumpVy, dunksOn, floorBounce, foulsOn, jumpVy, knockdownsOn, knockMps, physicsHandsOn, povBobM, povEyeM, povFovDeg, povLookDegS, povOn, stepHz } from '../arena/arenaConfig';
+import { AWAY_RING, HOME_RING, mountTeamRings, type TeamRingsHandle } from '../arena/teamRings';
 import { ruleContact, type ContactBody, type ContactCall } from '../arena/arenaContact';
 import { rule, type Side } from '../core/Ref';
 import type { ArenaHoopsLog } from '@/lib/sessions/arenaScore';
@@ -146,6 +147,8 @@ interface St {
   /** This game's play log (the session's `stats.arena`; the home team is 'me') and its clock's zero. */
   game: { t0: number; log: ArenaHoopsLog };
   final: { won: boolean; me: number; foe: number; log: ArenaHoopsLog } | null;
+  /** The team rings (arena.teamRings), when on. */
+  rings: TeamRingsHandle | null;
   disposed: boolean;
 }
 
@@ -724,9 +727,10 @@ export const PhysicsArena3v3Mode: ModeDefinition = {
       pov: { on: false, view: { yaw: 0, pitch: 0, bobPhase: 0 }, savedFov: ctx.camera.fov }, camModeSeen: ctx.camDirector.mode,
       banner: '', bannerT: 0, timing: '', prevBall: { x: 0, y: 1, z: 6 }, hudKey: '',
       stats: { shots: { home: 0, away: 0 }, makes: { home: 0, away: 0 }, passes: 0, completed: 0, intercepted: 0, steals: 0, lostHandles: 0, blocksByHand: 0, outOfBounds: 0, stalls: 0, bodyHits: 0, hardestHitMps: 0, knockdowns: 0, fouls: {}, andOnes: 0, callLog: [] },
-      andOne: null, game: { t0: 0, log: { v: 1, baskets: [] } }, final: null, disposed: false,
+      andOne: null, game: { t0: 0, log: { v: 1, baskets: [] } }, final: null, rings: null, disposed: false,
     };
     states.set(scene, S); current = S;
+    if (arenaTeamRingsOn()) S.rings = mountTeamRings(scene, (['home', 'away'] as const).map((t) => ({ color: t === 'home' ? HOME_RING : AWAY_RING, nodes: () => S.pl.filter((a) => a.team === t).map((a) => (a.human ? null : a.view)) })));
     setupCheck(S, 'home');
     for (const a of pl) { a.view.position.copyFrom(a.node.position); a.view.rotation.y = a.yaw; }
     ctx.heroRef.current = pl[0].view;
@@ -789,6 +793,7 @@ export const PhysicsArena3v3Mode: ModeDefinition = {
     if (S.final) { const f = S.final; S.final = null; ctx.card?.(f.won ? 'WIN' : 'LOSS', f.me, { opponentScore: f.foe, won: f.won ? 1 : 0 }, { arena: f.log, opponentScore: f.foe, won: f.won }); }
     facing(S, simDt);
     camera(ctx, S, dt);
+    S.rings?.update();
     if (S.bannerT > 0) { S.bannerT -= dt; if (S.bannerT <= 0) S.banner = ''; }
     const key = `${S.score.home}|${S.score.away}|${S.banner}|${S.timing}|${S.pov.on}|${S.possession}|${S.phase}`;
     if (key !== S.hudKey) {
@@ -810,6 +815,7 @@ function close(scene: Scene): void {
   const S = states.get(scene);
   if (!S || S.disposed) return;
   S.disposed = true;
+  S.rings?.dispose();
   S.world.dispose();
   S.court.dispose();
   states.delete(scene);

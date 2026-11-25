@@ -121,6 +121,15 @@ export const xpOn = (): boolean => feel('arena.xpOn', ARENA_XP_ON) >= 0.5;
 export const arenaSoccerOn = (): boolean => feel('arena.soccer', ARENA_SOCCER) >= 0.5;
 export const arenaSoccer3v3On = (): boolean => feel('arena.soccer3v3', ARENA_SOCCER_3V3) >= 0.5;
 export const arenaSoccerApronOn = (): boolean => feel('arena.soccerApron', ARENA_SOCCER_APRON) >= 0.5;
+/** The soccer 3v3's bodies at a phone's cost (bodyLod.ts; the phone tier only): a body more than 14 m from the camera draws no ink
+ *  contour (about a pixel there), and only the player's man and the 3 bodies nearest the ball cast the sun's shadow (every body keeps
+ *  its contact shadow). 0 = every body inked and casting, as before. */
+export const ARENA_BODY_LOD = 0;
+export const arenaBodyLodOn = (): boolean => feel('arena.bodyLod', ARENA_BODY_LOD) >= 0.5;
+/** A team-colour ring at every body's feet in the arena's 3v3s (teamRings.ts): the kits cannot say whose side a body is on.
+ *  0 = no rings, as before. */
+export const ARENA_TEAM_RINGS = 0;
+export const arenaTeamRingsOn = (): boolean => feel('arena.teamRings', ARENA_TEAM_RINGS) >= 0.5;
 export const arenaSetOn = (): boolean => feel('arena.setV1', ARENA_SET_V1) >= 0.5;
 export const knockdownsOn = (): boolean => feel('arena.knockdowns', ARENA_KNOCKDOWNS) >= 0.5;
 export const foulsOn = (): boolean => feel('arena.fouls', ARENA_FOULS) >= 0.5;
