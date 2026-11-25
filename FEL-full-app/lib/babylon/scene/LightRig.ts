@@ -7,10 +7,11 @@ import {
 } from '@babylonjs/core';
 import type { AbstractMesh, PBRMaterial, StandardMaterial } from '@babylonjs/core';
 import { MOODS, type VenueMood, type MoodCurves } from './moods';
-import { tierRigSettings, legacyRig, legacyMobilePost, phoneAARig, readPhoneAA, type QualityTier } from './QualityTier';
+import { tierRigSettings, legacyRig, legacyMobilePost, phoneAARig, readPhoneAA, venueProbeSize, readVenueProbeTiers, urlLook, type QualityTier } from './QualityTier';
 import { isLegacyLook, readShadowCacheParam, readMobilePostParam, lookFeatureOff } from './graphicsSetting';
 import { mountShadowCache, shadowCacheWanted, gpuCanCopyShadowMap, type ShadowCacheHandle } from './ShadowCache';
 import { mountKickerLight, type KickerHandle } from './KickerLight';
+import { mountBodyFill, BODY_FORM_LIGHT, type BodyFillHandle } from './bodyFill';   // depth pass phase 2
 import { mountEmissiveGlow, type GlowHandle } from './EmissiveGlow';
 import { captureVenueReflection, type VenueReflectionHandle } from './VenueReflection';
 import { mountFixtureLights, type FixtureLightsHandle } from './FixtureLights';
@@ -24,7 +25,7 @@ import { mountEnvironmentIBL } from './EnvironmentIBL';
 import { mountVenueIBL } from './venueQualityV1';   // look pass B2: venue.iblEnvV1 reaches the rig
 import { motionPolicy } from '../../a11y/reducedMotion';
 import { FLASH_GAIN, stepFlashLevel } from '../core/ImpactFrame';
-import { phoneSkipsCaster, phoneSkipsCasterMaterial, PHONE_SOCK_CAST } from './phoneCasters';   // phone-perf (2026-10-14)
+import { phoneSkipsCaster, phoneSkipsCasterMaterial, PHONE_SOCK_CAST, phoneFitDrops, PHONE_SHADOW_FIT, PHONE_SHADOW_DEPTH } from './phoneCasters';   // phone-perf (2026-10-14); depth pass phase 1
 import { feel } from '@/lib/feel-panel/feel';   // hoops-p08: perf.phoneSockCast
 import { setGradeExposure } from './gradeUniform';   // perf-lag: the flash beat's exposure without a scene-wide define pass
 
@@ -38,6 +39,8 @@ export interface LightRigHandle {
   mood: VenueMood;
   /** A9.6: the players-only rim light (KickerLight.ts); null under ?look=legacy. */
   kicker: KickerHandle | null;
+  /** Depth pass phase 2: the bodies' own share of the hemisphere (bodyFill.ts); null unless look.bodyFormLight is on. */
+  bodyFill: BodyFillHandle | null;
   /** A9.5: the include-list glow on light fixtures (EmissiveGlow.ts); null on mobile and under ?look=legacy. */
   glow: GlowHandle | null;
   /** M44: brief exposure pulse for a highlight beat (dunk flush, TD, KO,
@@ -102,6 +105,13 @@ export function moodColorCurves(c: MoodCurves): ColorCurves {
  */
 export const CSM_BIAS = 0.002, CSM_NORMAL_BIAS = 0.022;
 
+/**
+ * DEPTH PASS PHASE 4b (lane depth-light, 2026-11-25; docs/DEPTH-PASS-AUDIT.md finding 10): `look.desktopPcss`, 0 = today (PCF medium:
+ * a shadow as soft at the shoe as a metre away). Above 0: Babylon's contact-hardening (PCSS) on the cascades, the value its light-size
+ * ratio (how fast the shadow softens away from the caster). Desktop and high only — the mobile tier draws no cascades.
+ */
+export const DESKTOP_PCSS = 0;
+
 /** Names that read as ground/floor — auto-receivers, never auto-casters (M44). */
 const RECEIVER_HINTS = /floor|ground|piste|water|court|pitch|green|plate|mound|shore|park_floor|tatami|snow|sky|horizon|swell/i;
 
@@ -141,6 +151,17 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
   sun.diffuse = Color3.FromHexString(M.sun);
   sun.position = new Vector3(-M.sunDir[0], -M.sunDir[1], -M.sunDir[2]).scale(30);
 
+  // depth pass phase 1 (phoneCasters.ts): the phone map fitted to the play area, and its depth range. Read once, at mount; 0 = today.
+  const phone = tier === 'mobile' && !legacy;
+  const fitM = phone ? Math.max(0, urlLook('look.phoneShadowFit') ?? feel('look.phoneShadowFit', PHONE_SHADOW_FIT)) : 0;
+  const phoneDepth = phone && (urlLook('look.phoneShadowDepth') ?? feel('look.phoneShadowDepth', PHONE_SHADOW_DEPTH)) >= 0.5;
+  let playAt: Vector3 | null = null;   // the play area, once captureVenue names it (the fit's centre)
+  const fitDrops = (mesh: AbstractMesh): boolean => {
+    if (!playAt) return false;
+    const b = mesh.getBoundingInfo().boundingSphere;
+    return phoneFitDrops(tier, fitM, b.centerWorld.x - playAt.x, b.centerWorld.z - playAt.z, b.radiusWorld);
+  };
+
   let shadows: ShadowGenerator;
   if (T.cascaded) {
     // Desktop, outdoor: three cascades keep the near shadow crisp on a
@@ -161,12 +182,18 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
     // case for it — the depth slope across one texel is enormous, so a bias that is fine at noon is nothing at dusk.
     // Babylon ships bias 0.00005 and normalBias 0, i.e. essentially none of either.
     csm.bias = CSM_BIAS; csm.normalBias = CSM_NORMAL_BIAS;
+    // depth pass phase 4b (look.desktopPcss, 0 = today's PCF medium): contact-hardening — sharp where the shadow meets what casts it
+    // (a shoe on the court), softer a metre away. Desktop and high only (the cascades); the phones' single map never reads it.
+    const pcss = legacy ? 0 : urlLook('look.desktopPcss') ?? feel('look.desktopPcss', DESKTOP_PCSS);
+    if (pcss > 0) { csm.useContactHardeningShadow = true; csm.contactHardeningLightSizeUVRatio = pcss; }
     shadows = csm;
   } else {
     shadows = new ShadowGenerator(T.shadowMapSize, sun);
     shadows.useBlurExponentialShadowMap = true;   // M44: soft, cheap shadows
     shadows.blurKernel = tier === 'mobile' ? 12 : 24;   //TUNE(elijah)
     shadows.darkness = 0.35;                        //TUNE(elijah) shadows read, never pitch black
+    // depth pass phase 1 (look.phoneShadowDepth, 0 = today): the phone map's depth range from its casters, not the camera's 10 km
+    if (phoneDepth) sun.autoCalcShadowZBounds = true;
   }
 
   // M44: auto-classify casters/receivers by mesh name so shadows appear in
@@ -213,11 +240,17 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
     if (sockOut()) return;
     if (tier === 'mobile' && !mesh.material) scene.onBeforeRenderObservable.addOnce(() => { if (!mesh.isDisposed() && sockOut()) shadows.removeShadowCaster(mesh, true); });
     if (FOLIAGE_NO_CAST.test(mesh.name)) { mesh.receiveShadows = true; return; }   // still RECEIVES
-    try {
-      const r = mesh.getBoundingInfo().boundingSphere.radiusWorld;
-      if (r > 25) return;                       // a scan, a sea, a dome: receives at most, never casts
-      shadows.addShadowCaster(mesh, true);
-    } catch { /* non-renderable */ }
+    const cast = (): void => {
+      try {
+        const r = mesh.getBoundingInfo().boundingSphere.radiusWorld;
+        if (r > 25) return;                       // a scan, a sea, a dome: receives at most, never casts
+        if (fitDrops(mesh)) return;               // depth pass phase 1: far from the play area, on a phone with the fit on
+        shadows.addShadowCaster(mesh, true);
+      } catch { /* non-renderable */ }
+    };
+    // a mesh added after the play area is known is placed after it is added: judge its distance on the next frame
+    if (fitM > 0 && playAt) { scene.onBeforeRenderObservable.addOnce(() => { if (!mesh.isDisposed()) cast(); }); return; }
+    cast();
   };
   for (const m of scene.meshes as AbstractMesh[]) classify(m);
   const autoObserver = scene.onNewMeshAddedObservable.add((m) => classify(m as AbstractMesh));
@@ -260,7 +293,10 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
   }
   const rest = { exposure: M.exposure, vignette: M.vignetteWeight };
   // A9.6: a rim light on the players only — every tier (one shadowless light on a handful of bodies costs no draws)
-  const kicker = legacy ? null : mountKickerLight(scene, mood);
+  // depth pass phase 2 (look.bodyFormLight, 0 = today): the bodies take `share` of the hemisphere's fill, and the kicker follows their backs
+  const bodyForm = legacy ? 0 : urlLook('look.bodyFormLight') ?? feel('look.bodyFormLight', BODY_FORM_LIGHT);
+  const kicker = legacy ? null : mountKickerLight(scene, mood, { followBacks: bodyForm > 0 });
+  const bodyFill = legacy ? null : mountBodyFill(scene, hemi, bodyForm);
   // A9.5: lamp heads, floods, LED strips and neon glow on the tiers that can pay for it; mounted now, before load()
   // builds the venue, so every fixture's glow shader compiles during the load and never mid-play
   const glow = T.glow ? mountEmissiveGlow(scene, tier, mood) : null;
@@ -281,13 +317,21 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
   // perf-lag: the flash's per-frame exposure as a uniform write (gradeUniform.ts), not the setter that re-prepared every material
   const paintFlash = (): void => { setGradeExposure(pipeline.imageProcessing, rest.exposure * (1 + (FLASH_GAIN - 1) * flashLevel)); };
   return {
-    hemi, sun, shadows, pipeline, tier, mood, kicker, glow, rest, shadowCache,
+    hemi, sun, shadows, pipeline, tier, mood, kicker, bodyFill, glow, rest, shadowCache,
     adoptRest() {
       if (legacy) return;   // the pre-pass harness kept the mood's grade as its rest, whatever load() wrote
       rest.exposure = pipeline.imageProcessing.exposure;
       rest.vignette = pipeline.imageProcessing.vignetteWeight;
     },
     captureVenue(at) {
+      // depth pass phase 1: the phone map keeps only the casters near the play area (look.phoneShadowFit; 0 = every caster)
+      if (fitM > 0 && at) {
+        playAt = at.clone();
+        const list = shadows.getShadowMap()?.renderList ?? [];
+        const far = list.filter((m) => { try { return fitDrops(m); } catch { return false; } });
+        for (const m of far) shadows.removeShadowCaster(m, false);
+        console.info(`[FEL-FIT] phone shadow map fitted to ${fitM} m of the play area: ${list.length} casters, ${far.length} far ones left out (they still receive)`);
+      }
       shadowCache?.arm();   // load() is done: the venue's casters are in — watch, then bake the still ones once
       // A9.5 second half: the fixtures light the place (desktop/high; mounted once here, at the load→ready boundary, so the
       // materials' one recompile for the new light happens behind the splash)
@@ -303,12 +347,14 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
         heat?.dispose(); heat = mountHeatHaze(scene, tier);
         sunShafts?.dispose(); sunShafts = mountSunShafts(scene, tier, mood);   // w3-atmos: mounted once, never toggled; null unless this mode earned it
       }
-      if (!T.venueProbe) return false;
+      // depth pass phase 3 (look.venueProbeTiers, 0 = high only as before): the capture's size on this tier, 0 = none
+      const probeSize = legacy ? 0 : venueProbeSize(tier, T.venueProbe, readVenueProbeTiers());
+      if (!probeSize) return false;
       const where = at?.clone() ?? null;
       scene.executeWhenReady(() => {
         if (scene.isDisposed) return;
         venueProbe?.dispose();   // a retried load captures again
-        venueProbe = captureVenueReflection(scene, where);
+        venueProbe = captureVenueReflection(scene, where, probeSize);
       });
       return true;
     },
@@ -344,6 +390,7 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
       if ((scene.metadata as { felGradeOwner?: string } | null)?.felGradeOwner === 'rig') delete scene.metadata.felGradeOwner;
       shadowCache?.dispose();
       kicker?.dispose();
+      bodyFill?.dispose();
       glow?.dispose();
       venueProbe?.dispose();
       fixtureLights?.dispose();

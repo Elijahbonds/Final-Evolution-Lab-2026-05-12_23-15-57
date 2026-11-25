@@ -18,6 +18,8 @@ import { ReflectionProbe, RenderTargetTexture, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, BaseTexture, Material, PBRMaterial, Scene } from '@babylonjs/core';
 
 export const PROBE_SIZE = 256;
+/** Depth pass phase 3: the phones' capture (look.venueProbeTiers 2), a quarter of the pixels of the 256 one. */
+export const PHONE_PROBE_SIZE = 128;
 /** A material is glossy enough to show the venue at or below this roughness. */
 export const GLOSSY_ROUGHNESS = 0.5;
 /** Probe height above the play area: a body's chest, where most glossy surfaces are seen from. */
@@ -48,10 +50,10 @@ export interface VenueReflectionHandle {
  * Capture the venue once, from `at` (the play area; the hero's feet), and point the glossy materials at it.
  * Call after load() — the harness does, through LightRigHandle.captureVenue — and only on the high tier.
  */
-export function captureVenueReflection(scene: Scene, at: Vector3 | null | undefined): VenueReflectionHandle | null {
+export function captureVenueReflection(scene: Scene, at: Vector3 | null | undefined, size = PROBE_SIZE): VenueReflectionHandle | null {
   let probe: ReflectionProbe;
   try {
-    probe = new ReflectionProbe('fel_venue_probe', PROBE_SIZE, scene, true, true, true);   // mips, half-float, linear (HDR)
+    probe = new ReflectionProbe('fel_venue_probe', size, scene, true, true, true);   // mips, half-float, linear (HDR)
   } catch (e) {
     console.warn('[FEL-PROBE] reflection probe unavailable, keeping the gradient environment:', e);
     return null;
@@ -79,7 +81,7 @@ export function captureVenueReflection(scene: Scene, at: Vector3 | null | undefi
       mat.reflectionTexture = cube;
       materials.push(mat);
     }
-    console.info(`[FEL-PROBE] venue captured (${list.length} meshes, ${PROBE_SIZE} px); ${materials.length} glossy materials reflect it`);
+    console.info(`[FEL-PROBE] venue captured (${list.length} meshes, ${size} px); ${materials.length} glossy materials reflect it`);
   });
   // a cube the engine cannot render (WebGL1 float targets) simply never fires the swap: the gradient stays
   return {

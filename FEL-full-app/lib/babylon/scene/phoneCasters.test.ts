@@ -69,3 +69,28 @@ describe('phoneCasters — the ink and the sock (hoops-p08)', () => {
     expect(look.indexOf('scene.metadata ??= {}).felTier = tier')).toBeLessThan(look.indexOf('autoInk(scene, inkStyleFor(o.modeId))'));
   });
 });
+
+// depth pass phase 1 (lane depth-light, 2026-11-25): the phone map fitted to the play area (look.phoneShadowFit, look.phoneShadowDepth)
+describe('the phone shadow fit (look.phoneShadowFit / look.phoneShadowDepth)', () => {
+  it('ships OFF: both shipped values are 0, and at 0 nothing is dropped on any tier', async () => {
+    const { PHONE_SHADOW_FIT, PHONE_SHADOW_DEPTH, phoneFitDrops } = await import('./phoneCasters');
+    expect(PHONE_SHADOW_FIT).toBe(0); expect(PHONE_SHADOW_DEPTH).toBe(0);
+    for (const tier of ['mobile', 'desktop', 'high']) expect(phoneFitDrops(tier, 0, 500, 500, 1)).toBe(false);
+  });
+  it('mobile only: a caster whose nearest point is past the distance stays out; one reaching into it stays in', async () => {
+    const { phoneFitDrops } = await import('./phoneCasters');
+    expect(phoneFitDrops('mobile', 18, 30, 0, 2)).toBe(true);     // 28 m out
+    expect(phoneFitDrops('mobile', 18, 30, 0, 14)).toBe(false);   // a big piece reaching to 16 m
+    expect(phoneFitDrops('mobile', 18, 10, 10, 0.5)).toBe(false); // on the court
+    expect(phoneFitDrops('desktop', 18, 30, 0, 2)).toBe(false);   // desktop and high keep every caster (cascades)
+    expect(phoneFitDrops('high', 18, 30, 0, 2)).toBe(false);
+  });
+  it('the rig reads both knobs on the mobile generator only, at mount, and fits at captureVenue before the cache arms', () => {
+    const rig = readFileSync(join(__dirname, 'LightRig.ts'), 'utf8');
+    expect(rig).toMatch(/const phone = tier === 'mobile' && !legacy;/);
+    expect(rig).toMatch(/feel\('look\.phoneShadowFit', PHONE_SHADOW_FIT\)/);
+    expect(rig).toMatch(/feel\('look\.phoneShadowDepth', PHONE_SHADOW_DEPTH\)/);
+    expect(rig).toMatch(/if \(phoneDepth\) sun\.autoCalcShadowZBounds = true;/);
+    expect(rig.indexOf('playAt = at.clone();')).toBeLessThan(rig.indexOf('shadowCache?.arm();'));
+  });
+});

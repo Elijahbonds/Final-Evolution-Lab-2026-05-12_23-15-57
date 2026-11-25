@@ -56,3 +56,24 @@ export function phoneSkipsInk(name: string | null | undefined, material: string 
 export function phoneSkipsCasterMaterial(material: string | null | undefined, tier: string, cast = PHONE_SOCK_CAST): boolean {
   return tier === 'mobile' && cast < 0.5 && typeof material === 'string' && PHONE_SOCK_MATERIAL.test(material);
 }
+
+// ── depth pass phase 1 (lane depth-light, 2026-11-25; docs/DEPTH-PASS-AUDIT.md finding 1): the phone map fitted to the play area ──────
+// The phone's one 512 px map is fitted to EVERY caster in the venue (the light's auto extents; ShadowCache freezes that frustum at the
+// bake), so on a Venice court the map spans the boardwalk, the palms and the stalls and a player covers a few texels of it — the
+// "four-pointed star" under the shoes. `look.phoneShadowFit` (0 = every caster, today) keeps casters whose nearest point is farther
+// than that many metres (on the ground) from the play area OUT of the phone map: they still RECEIVE shadows, they stop casting, and the
+// same 512 texels cover the court. `look.phoneShadowDepth` (0 = today) gives the phone map the casters' own depth range instead of the
+// camera's (0.1 .. 10 000 m): the blurred map's depth test (ESM) then has the resolution to tell a shoe from the court under it.
+// Mobile tier only: desktop and high draw cascades and keep every caster.
+
+/** look.phoneShadowFit's shipped value: 0 = every caster in the venue casts on a phone (today). */
+export const PHONE_SHADOW_FIT = 0;
+/** look.phoneShadowDepth's shipped value: 0 = the phone map's depth range is the camera's (today). */
+export const PHONE_SHADOW_DEPTH = 0;
+
+/** Pure: does the phone map leave this caster out? `fitM` is the knob; (dx, dz) the caster's bounding-sphere centre from the play
+ *  area on the ground, `radius` its bounding radius. Only the mobile tier, only with the knob on. */
+export function phoneFitDrops(tier: string, fitM: number, dx: number, dz: number, radius: number): boolean {
+  if (tier !== 'mobile' || !(fitM > 0)) return false;
+  return Math.hypot(dx, dz) - Math.max(0, radius) > fitM;
+}

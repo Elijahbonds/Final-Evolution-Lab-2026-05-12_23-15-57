@@ -3,6 +3,13 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { FEEL_KNOBS, FEEL_KNOB_BY_ID, clampKnob, stepDecimals } from './knobs';
+import { PHONE_FEET_POOL, DISC_OVER_COURT } from '@/lib/babylon/visual/contactShadow';   // depth-light (depth pass phase 1)
+import { PHONE_SHADOW_FIT, PHONE_SHADOW_DEPTH } from '@/lib/babylon/scene/phoneCasters';   // depth-light (depth pass phase 1)
+import { BODY_FORM_LIGHT } from '@/lib/babylon/scene/bodyFill';   // depth-light (depth pass phase 2)
+import { VENUE_PROBE_TIERS } from '@/lib/babylon/scene/QualityTier';   // depth-light (depth pass phase 3)
+import { GLOSSY_COURT_ONES } from '@/lib/babylon/scene/GlossyFloor';   // depth-light (depth pass phase 3)
+import { PHONE_SKY_SOFT } from '@/lib/babylon/scene/SkyDome';   // depth-light (depth pass phase 4)
+import { DESKTOP_PCSS } from '@/lib/babylon/scene/LightRig';   // depth-light (depth pass phase 4)
 import * as HSFX from '@/lib/babylon/audio/hoopsSfx';   // hoops-items
 import { POSE_CLIP_FAST, POSE_CLIP_SHARE } from '@/lib/babylon/anim/poseClip';   // improve-hoops-2
 import { ONLOOKER_CLIPS_ONLY } from '@/lib/babylon/visual/onlookerClips';
@@ -491,6 +498,11 @@ describe('the feel knob catalogue', () => {
     expect(def('arena.setV1')).toBe(ARENA.ARENA_SET_V1);   // look pass: its off value is today's look (arenaCourt mounts nothing)
     expect(def('arena.xpOn')).toBe(ARENA_XP_ON);   // owner 2026-11-24: XP and progress, ON once tested end to end against a throwaway database
     expect(ARENA.ARENA_ON).toBe(1); expect(ARENA.ARENA_PHYSICS_HOOPS).toBe(1); expect(ARENA.CAM_POV).toBe(1); expect(ARENA.POV_BOB_M).toBe(0);
+    // depth-light (depth pass, lane L): every switch ships at today's look until the bar of docs/DEPTH-PASS-AUDIT.md section 4 says otherwise
+    expect(def('look.phoneFeetPool')).toBe(PHONE_FEET_POOL); expect(def('look.discOverCourt')).toBe(DISC_OVER_COURT); expect(def('look.phoneShadowFit')).toBe(PHONE_SHADOW_FIT); expect(def('look.phoneShadowDepth')).toBe(PHONE_SHADOW_DEPTH);
+    expect(def('look.bodyFormLight')).toBe(BODY_FORM_LIGHT);
+    expect(def('look.venueProbeTiers')).toBe(VENUE_PROBE_TIERS); expect(def('look.glossyCourtOnes')).toBe(GLOSSY_COURT_ONES);
+    expect(def('look.phoneSkySoft')).toBe(PHONE_SKY_SOFT); expect(def('look.desktopPcss')).toBe(DESKTOP_PCSS);
   });
 
   it('every row is well formed: unique `<area>.<camelName>` id, min ≤ default ≤ max, the default on the step grid, a source', () => {
